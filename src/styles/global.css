@@ -1,0 +1,284 @@
+@font-face {
+  font-family: "Playstation";
+  src: url("/fonts/Playstation.ttf") format("truetype");
+  font-weight: 400 900;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Inter";
+  src: url("/fonts/Inter.ttf") format("truetype");
+  font-weight: 100 900;
+  font-display: swap;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body, #root { height: 100%; margin: 0; }
+
+body {
+  background: #020514;
+  color: #ffffff;
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-size: 14px;
+  line-height: 1.4;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+button { font-family: inherit; }
+
+a { color: inherit; text-decoration: none; }
+
+input, button, select, textarea {
+  font: inherit;
+  color: inherit;
+}
+
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: #1f2a44; border-radius: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+
+.app-shell {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  height: 100vh;
+}
+
+.sidebar {
+  background: #0b1224;
+  border-right: 1px solid #1f2a44;
+  display: flex;
+  flex-direction: column;
+  padding: 20px 12px;
+  gap: 6px;
+}
+
+.sidebar h1 {
+  font-size: 16px;
+  font-weight: 700;
+  margin: 0 8px 16px;
+  color: #07ddf1;
+  letter-spacing: 0.5px;
+}
+
+.sidebar a {
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-weight: 500;
+  color: #94a3b8;
+  transition: background 120ms, color 120ms;
+}
+.sidebar a:hover { background: #101a35; color: #ffffff; }
+.sidebar a.active { background: #101a35; color: #07ddf1; }
+
+.sidebar .spacer { flex: 1; }
+.sidebar .logout {
+  padding: 10px 12px;
+  background: transparent;
+  border: 1px solid #1f2a44;
+  border-radius: 8px;
+  color: #94a3b8;
+  cursor: pointer;
+}
+.sidebar .logout:hover { color: #ffffff; border-color: #07ddf1; }
+
+.main { padding: 24px 32px; overflow-y: auto; }
+
+.page-title { font-size: 22px; font-weight: 700; margin: 0 0 16px; }
+
+.card {
+  background: #0b1224;
+  border: 1px solid #1f2a44;
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.row { display: flex; align-items: center; gap: 12px; }
+.row-between { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.col { display: flex; flex-direction: column; gap: 12px; }
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #07ddf1;
+  color: #020514;
+  font-weight: 600;
+  padding: 10px 16px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: opacity 120ms, transform 120ms;
+}
+.btn:hover { opacity: 0.9; }
+.btn:active { transform: scale(0.97); }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn.secondary {
+  background: transparent;
+  color: #ffffff;
+  border: 1px solid #1f2a44;
+}
+.btn.secondary:hover { border-color: #07ddf1; }
+
+.input {
+  background: #0b1224;
+  border: 1px solid #1f2a44;
+  border-radius: 8px;
+  padding: 10px 12px;
+  color: #ffffff;
+  width: 100%;
+  outline: none;
+}
+.input:focus { border-color: #07ddf1; }
+
+.label { font-size: 12px; color: #94a3b8; margin-bottom: 6px; display: block; }
+
+.muted { color: #94a3b8; }
+.error { color: #ef4444; }
+
+.spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid #1f2a44;
+  border-top-color: #07ddf1;
+  border-radius: 50%;
+  animation: spin 700ms linear infinite;
+  margin: 24px auto;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.list {
+  display: grid;
+  gap: 10px;
+}
+
+.list-item {
+  background: #0b1224;
+  border: 1px solid #1f2a44;
+  border-radius: 10px;
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  cursor: pointer;
+  transition: border-color 120ms, transform 120ms;
+}
+.list-item:hover { border-color: #07ddf1; transform: translateY(-1px); }
+.list-item .name { font-weight: 600; }
+.list-item .meta { color: #94a3b8; font-size: 12px; }
+
+.live-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 12px;
+}
+
+.place-cell {
+  background: #0b1224;
+  border-radius: 10px;
+  padding: 12px;
+  border: 1.5px solid;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-height: 96px;
+}
+.place-cell .dot {
+  width: 10px; height: 10px; border-radius: 50%;
+  position: absolute; top: 10px; right: 10px;
+}
+.place-cell .platform { font-size: 11px; color: #94a3b8; text-transform: uppercase; }
+.place-cell .id { font-size: 16px; font-weight: 700; }
+.place-cell .status { font-size: 13px; font-weight: 600; }
+.place-cell .until { font-size: 11px; color: #94a3b8; }
+
+.legend { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+.legend .item { display: flex; align-items: center; gap: 6px; font-size: 12px; }
+.legend .dot { width: 10px; height: 10px; border-radius: 50%; }
+.legend .total { margin-left: auto; }
+.legend .count { color: #07ddf1; font-weight: 700; }
+
+.chips { display: flex; gap: 8px; flex-wrap: wrap; }
+.chip {
+  border: 1px solid #07ddf1;
+  border-radius: 16px;
+  padding: 6px 12px;
+  font-size: 12px;
+}
+
+.month-picker { display: flex; align-items: center; gap: 12px; }
+.month-picker .month-btn {
+  width: 36px; height: 36px;
+  border: 1px solid #07ddf1;
+  background: #0b1224;
+  color: #07ddf1;
+  border-radius: 8px;
+  font-size: 18px;
+  cursor: pointer;
+}
+.month-picker .month-label { font-weight: 600; }
+
+.kv-row { display: flex; justify-content: space-between; padding: 6px 0; }
+.kv-row .k { color: #94a3b8; }
+.kv-row .v { font-weight: 600; }
+.kv-row .v.hi { color: #07ddf1; font-size: 18px; font-weight: 800; }
+
+.divider { height: 1px; background: #1f2a44; margin: 6px 0; }
+
+.login-shell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  height: 100vh;
+  background: #020514;
+  padding: 0 24px 40px;
+  gap: 24px;
+}
+
+.login-brand {
+  font-family: "Playstation", "Inter", sans-serif;
+  font-size: 56px;
+  font-weight: 600;
+  letter-spacing: 2px;
+  background: linear-gradient(90deg, #07ddf1 0%, #32aff7 50%, #d152fa 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  margin: 0;
+  text-align: center;
+}
+
+.login-logo {
+  width: 90px;
+  height: auto;
+  margin-bottom: -8px;
+}
+
+.login-title {
+  font-size: 20px;
+  font-weight: 600;
+  margin: 0;
+  text-align: center;
+}
+
+.login-card {
+  width: 100%;
+  max-width: 420px;
+  background: transparent;
+  border: none;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.login-forgot {
+  text-align: right;
+  font-size: 13px;
+  color: #07ddf1;
+  text-decoration: none;
+}
+.login-forgot:hover { opacity: 0.85; }

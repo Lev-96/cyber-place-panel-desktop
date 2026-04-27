@@ -1,0 +1,27 @@
+{
+  "appId": "com.cyberplace.panel.desktop",
+  "productName": "Cyberplace Panel",
+  "directories": { "output": "release", "buildResources": "build" },
+  "files": [
+    "electron/dist/**/*",
+    "dist/web/**/*",
+    "package.json"
+  ],
+  "extraMetadata": { "main": "electron/dist/main.js" },
+  "win": {
+    "target": [{ "target": "nsis", "arch": ["x64"] }]
+  },
+  "linux": {
+    "target": [
+      { "target": "AppImage", "arch": ["x64"] },
+      { "target": "deb",      "arch": ["x64"] }
+    ],
+    "category": "Utility"
+  },
+  "nsis": {
+    "oneClick": false,
+    "allowToChangeInstallationDirectory": true
+  },
+  "asar": true,
+  "publish": null
+}
