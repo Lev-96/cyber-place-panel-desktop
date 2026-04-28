@@ -1,4 +1,5 @@
 import Button from "@/components/ui/Button";
+import Modal from "@/components/ui/Modal";
 import Input from "@/components/ui/Input";
 import { timePackageRepository } from "@/repositories/TimePackageRepository";
 import { ITimePackage } from "@/types/sessions";
@@ -36,7 +37,7 @@ const PackageForm = ({ branchId, initial, onClose, onSaved }: Props) => {
   };
 
   return (
-    <div style={overlay}>
+    <Modal open onClose={onClose}>
       <form className="card" style={{ width: 420, maxWidth: "90vw", display: "flex", flexDirection: "column", gap: 14 }} onSubmit={submit}>
         <h2 style={{ margin: 0 }}>{initial ? "Edit tariff" : "New tariff"}</h2>
         <Input label="Name (e.g. 1 hour)" value={name} onChange={(e) => setName(e.target.value)} required autoFocus />
@@ -48,13 +49,8 @@ const PackageForm = ({ branchId, initial, onClose, onSaved }: Props) => {
           <Button disabled={busy}>{busy ? "Saving…" : "Save"}</Button>
         </div>
       </form>
-    </div>
+    </Modal>
   );
-};
-
-const overlay: React.CSSProperties = {
-  position: "fixed", inset: 0, background: "rgba(2,5,20,0.7)",
-  display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50,
 };
 
 export default PackageForm;

@@ -1,4 +1,5 @@
 import Button from "@/components/ui/Button";
+import Modal from "@/components/ui/Modal";
 import { IPcApi } from "@/types/sessions";
 import { useState } from "react";
 
@@ -20,7 +21,7 @@ const PairingTokenModal = ({ pc, onClose }: Props) => {
   };
 
   return (
-    <div style={overlay}>
+    <Modal open onClose={onClose}>
       <div className="card" style={{ width: 480, maxWidth: "90vw", display: "flex", flexDirection: "column", gap: 14 }}>
         <h2 style={{ margin: 0 }}>Pairing token · {pc.label}</h2>
         <div className="muted" style={{ fontSize: 13 }}>
@@ -35,13 +36,8 @@ const PairingTokenModal = ({ pc, onClose }: Props) => {
           <Button onClick={onClose}>I saved it</Button>
         </div>
       </div>
-    </div>
+    </Modal>
   );
-};
-
-const overlay: React.CSSProperties = {
-  position: "fixed", inset: 0, background: "rgba(2,5,20,0.7)",
-  display: "flex", alignItems: "center", justifyContent: "center", zIndex: 60,
 };
 
 export default PairingTokenModal;

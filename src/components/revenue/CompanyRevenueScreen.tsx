@@ -8,6 +8,7 @@ import CommissionInput from "./CommissionInput";
 interface Props {
   companyId: number;
   companyName?: string;
+  initialPercent?: number;
 }
 
 const currentMonth = () => {
@@ -16,24 +17,30 @@ const currentMonth = () => {
 };
 const fmtIso = (d: Date) => d.toISOString().slice(0, 10);
 
-const CompanyRevenueScreen = ({ companyId, companyName }: Props) => {
-  const [percent, setPercent] = useState(0);
+const CompanyRevenueScreen = ({ companyId, companyName, initialPercent }: Props) => {
+  const [percent, setPercent] = useState(initialPercent ?? 0);
   const [report, setReport] = useState<RevenueReport | null>(null);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [sel, setSel] = useState(currentMonth());
 
-  useEffect(() => { void commissionStore.getPercent(companyId).then(setPercent); }, [companyId]);
+  useEffect(() => {
+    if (initialPercent != null && Number.isFinite(initialPercent)) {
+      setPercent(initialPercent);
+      return;
+    }
+    void commissionStore.getPercent(companyId).then(setPercent);
+  }, [companyId, initialPercent]);
 
   const reload = useCallback(async () => {
     setLoading(true); setErr(null);
     try {
-      const r = await revenueCalculator.forCompanyMonth(companyId, sel);
+      const r = await revenueCalculator.forCompanyMonth(companyId, sel, percent);
       setReport(r);
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Failed to load report");
     } finally { setLoading(false); }
-  }, [companyId, sel]);
+  }, [companyId, sel, percent]);
 
   useEffect(() => { void reload(); }, [reload, percent]);
 
@@ -61,7 +68,11 @@ const CompanyRevenueScreen = ({ companyId, companyName }: Props) => {
         <button className="month-btn" onClick={() => shift(1)}>›</button>
       </div>
 
-      <CommissionInput value={percent} onChange={onPercent} />
+      <CommissionInput
+        value={percent}
+        onChange={onPercent}
+        sourceLabel={initialPercent != null ? "From company config" : "Stored locally on this device."}
+      />
 
       {loading && <Spinner />}
       {err && <div className="error">{err}</div>}

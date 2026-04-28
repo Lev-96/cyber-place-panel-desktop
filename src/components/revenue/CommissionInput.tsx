@@ -4,9 +4,10 @@ interface Props {
   value: number;
   onChange: (v: number) => void;
   disabled?: boolean;
+  sourceLabel?: string;
 }
 
-const CommissionInput = ({ value, onChange, disabled }: Props) => (
+const CommissionInput = ({ value, onChange, disabled, sourceLabel }: Props) => (
   <div className="col" style={{ gap: 6 }}>
     <Input
       label="Commission percent"
@@ -22,7 +23,7 @@ const CommissionInput = ({ value, onChange, disabled }: Props) => (
         else if (e.target.value === "") onChange(0);
       }}
     />
-    <span className="muted" style={{ fontSize: 11 }}>0–100%. Stored locally on this device.</span>
+    <span className="muted" style={{ fontSize: 11 }}>0–100%. {sourceLabel ?? "Stored locally on this device."}</span>
   </div>
 );
 

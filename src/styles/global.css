@@ -35,8 +35,161 @@ input, button, select, textarea {
 }
 
 ::-webkit-scrollbar { width: 10px; height: 10px; }
-::-webkit-scrollbar-thumb { background: #1f2a44; border-radius: 6px; }
+::-webkit-scrollbar-thumb { background: #1f2a44; border-radius: 6px; transition: background 160ms; }
+::-webkit-scrollbar-thumb:hover { background: #2a3859; }
 ::-webkit-scrollbar-track { background: transparent; }
+
+html { scroll-behavior: smooth; }
+
+/* === Modal — centered when fits, scrolls outer when too tall ============ */
+.cp-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(2, 5, 20, 0.7);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  z-index: 50;
+  /* Use the dynamic viewport height so DevTools / on-screen IME bars don't
+     clip the bottom of the modal. */
+  height: 100vh;
+  height: 100dvh;
+}
+.cp-modal-wrapper {
+  /* min-height = viewport: lets us center when content fits AND lets the
+     wrapper grow beyond viewport when content overflows so .cp-modal scrolls
+     and the title remains reachable from the top.
+     `safe center` falls back to flex-start when content overflows, so the
+     top of the modal is never clipped above the scroll origin. */
+  min-height: 100%;
+  display: flex;
+  align-items: safe center;
+  justify-content: safe center;
+  padding: 32px 24px;
+}
+.cp-modal-wrapper > * {
+  /* Allow the inner card to shrink on small viewports but keep its declared
+     width when there is room. */
+  max-width: min(100%, calc(100vw - 48px));
+  /* Belt-and-braces vertical centering for browsers that don't support
+     `align-items: safe center`: auto margins keep the card centered when
+     it fits and collapse to top-aligned when it overflows. */
+  margin-block: auto;
+}
+
+/* === Animations & transitions ============================================== */
+/* All animations are skipped if user prefers reduced motion. */
+
+@media (prefers-reduced-motion: no-preference) {
+  /* Page enter — fires when route content mounts */
+  .main > * { animation: cp-page-in 240ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+
+  /* Cards & tiles fade-up on mount */
+  .card, .gradient-card, .stat-tile {
+    animation: cp-card-in 260ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  }
+
+  /* List items: stagger first six, rest snap in fast */
+  .list > * { animation: cp-list-in 280ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+  .list > *:nth-child(1) { animation-delay: 0ms; }
+  .list > *:nth-child(2) { animation-delay: 30ms; }
+  .list > *:nth-child(3) { animation-delay: 60ms; }
+  .list > *:nth-child(4) { animation-delay: 90ms; }
+  .list > *:nth-child(5) { animation-delay: 120ms; }
+  .list > *:nth-child(n+6) { animation-delay: 150ms; }
+
+  /* Live grid cells fade in (no slide — too jittery for a grid) */
+  .live-grid > * { animation: cp-fade-in 260ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+
+  /* Brand title shimmer once on login screen */
+  .login-brand { animation: cp-brand-in 600ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+  .login-logo  { animation: cp-card-in 500ms 80ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+}
+
+/* Hover/active transitions — kept even with reduced-motion (very small) */
+.list-item {
+  transition: border-color 160ms ease, transform 160ms ease, box-shadow 200ms ease, background 160ms;
+}
+.list-item:hover {
+  box-shadow: 0 4px 14px rgba(7, 221, 241, 0.10);
+}
+
+.place-cell {
+  transition: border-color 220ms ease, background 220ms ease, box-shadow 220ms ease, transform 160ms ease;
+}
+.place-cell:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(0,0,0,0.35); }
+
+.btn {
+  transition: opacity 140ms ease, transform 90ms ease, background 200ms ease, box-shadow 200ms ease, border-color 200ms ease;
+}
+.btn:hover { box-shadow: 0 4px 12px rgba(7, 221, 241, 0.30); }
+.btn.secondary:hover { box-shadow: inset 0 0 0 1px rgba(7, 221, 241, 0.6); }
+
+.input { transition: border-color 160ms ease, box-shadow 160ms ease, background 160ms; }
+.input:focus { box-shadow: 0 0 0 3px rgba(7, 221, 241, 0.15); }
+
+.pill { transition: background 220ms ease, color 220ms ease, border-color 220ms ease; }
+
+.chip { transition: background 160ms ease, transform 160ms ease, border-color 160ms; }
+.chip:hover { background: rgba(7, 221, 241, 0.08); transform: translateY(-1px); }
+
+/* Sidebar nav indicator slides in on active */
+.sidebar a { position: relative; transition: background 160ms ease, color 160ms ease, padding-left 200ms ease; }
+.sidebar a::before {
+  content: "";
+  position: absolute;
+  left: 4px;
+  top: 8px;
+  bottom: 8px;
+  width: 3px;
+  background: transparent;
+  border-radius: 2px;
+  transition: background 200ms ease, height 200ms;
+}
+.sidebar a.active::before { background: #07ddf1; }
+.sidebar a:hover { padding-left: 16px; }
+
+/* Cards — soft hover lift on the action ones (Home tiles) */
+a.card { transition: border-color 200ms ease, transform 200ms ease, box-shadow 200ms ease; }
+a.card:hover { transform: translateY(-2px); border-color: #07ddf1; box-shadow: 0 8px 22px rgba(7, 221, 241, 0.10); }
+
+/* Spinner — already rotates; smooth color */
+.spinner { transition: border-top-color 200ms; }
+
+/* Modal entry */
+.cp-modal { animation: cp-fade-in 180ms ease-out; }
+.cp-modal-wrapper > * { animation: cp-modal-in 220ms cubic-bezier(0.2, 0.8, 0.2, 1); }
+
+/* Page-title subtle slide */
+.page-title { animation: cp-title-in 320ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+
+@keyframes cp-page-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes cp-card-in {
+  from { opacity: 0; transform: translateY(6px) scale(0.99); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes cp-list-in {
+  from { opacity: 0; transform: translateX(-8px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+@keyframes cp-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes cp-modal-in {
+  from { opacity: 0; transform: scale(0.95) translateY(10px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+@keyframes cp-title-in {
+  from { opacity: 0; transform: translateX(-6px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+@keyframes cp-brand-in {
+  from { opacity: 0; transform: translateY(-12px); letter-spacing: 6px; }
+  to   { opacity: 1; transform: translateY(0); letter-spacing: 2px; }
+}
 
 .app-shell {
   display: grid;
@@ -132,6 +285,67 @@ input, button, select, textarea {
 .input:focus { border-color: #07ddf1; }
 
 .label { font-size: 12px; color: #94a3b8; margin-bottom: 6px; display: block; }
+
+/* === NumberStepper — pretty numeric input with custom arrows ============= */
+.num-stepper {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  background: #0b1224;
+  border: 1px solid #1f2a44;
+  border-radius: 8px;
+  transition: border-color 160ms ease, box-shadow 160ms ease;
+  overflow: hidden;
+}
+.num-stepper:focus-within {
+  border-color: #07ddf1;
+  box-shadow: 0 0 0 3px rgba(7, 221, 241, 0.15);
+}
+.num-stepper-input {
+  flex: 1;
+  background: transparent;
+  border: 0;
+  outline: 0;
+  padding: 10px 12px;
+  color: #ffffff;
+  font: inherit;
+  min-width: 0;
+}
+.num-stepper-input:disabled { opacity: 0.5; }
+.num-stepper-suffix {
+  display: flex;
+  align-items: center;
+  padding: 0 8px 0 0;
+  color: #94a3b8;
+  font-weight: 600;
+  pointer-events: none;
+  user-select: none;
+}
+.num-stepper-arrows {
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid #1f2a44;
+  width: 36px;
+}
+.num-stepper-arrow {
+  flex: 1;
+  background: linear-gradient(180deg, #131c33 0%, #0e1528 100%);
+  border: 0;
+  color: #94a3b8;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 120ms ease, color 120ms ease, transform 80ms ease;
+  padding: 0;
+}
+.num-stepper-arrow:first-child { border-bottom: 1px solid #1f2a44; }
+.num-stepper-arrow:hover {
+  background: linear-gradient(180deg, #1a2540 0%, #131c33 100%);
+  color: #07ddf1;
+}
+.num-stepper-arrow:active { transform: translateY(1px); }
+.num-stepper-arrow:disabled { opacity: 0.4; cursor: not-allowed; }
 
 .muted { color: #94a3b8; }
 .error { color: #ef4444; }
@@ -282,3 +496,82 @@ input, button, select, textarea {
   text-decoration: none;
 }
 .login-forgot:hover { opacity: 0.85; }
+
+/* Background screen wrapper (matches RN ScreenWithBg) */
+.screen-bg { position: relative; min-height: 100%; padding: 24px 32px; }
+.screen-bg-img {
+  position: absolute; inset: 0;
+  background-size: cover;
+  background-position: center top;
+  opacity: 0.45;
+  pointer-events: none;
+}
+.screen-bg-fade {
+  position: absolute; inset: 0;
+  background: linear-gradient(180deg, rgba(2,5,20,0.2) 0%, rgba(2,5,20,0.85) 60%, #020514 100%);
+  pointer-events: none;
+}
+.screen-bg-content { position: relative; z-index: 1; display: flex; flex-direction: column; gap: 18px; }
+
+.gradient-text {
+  background: linear-gradient(90deg, #07ddf1 0%, #32aff7 50%, #d152fa 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  font-weight: 700;
+}
+
+/* Stat tiles for dashboards (RN-style) */
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px;
+}
+.stat-tile {
+  border: 1px solid #1f2a44;
+  background: rgba(11, 18, 36, 0.7);
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  backdrop-filter: blur(4px);
+}
+.stat-tile .v {
+  font-size: 28px;
+  font-weight: 800;
+  color: #07ddf1;
+  font-variant-numeric: tabular-nums;
+}
+.stat-tile .k { color: #94a3b8; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+
+/* Gradient-bordered card */
+.gradient-card {
+  position: relative;
+  border-radius: 14px;
+  padding: 1px;
+  background: linear-gradient(135deg, #07ddf1 0%, #32aff7 50%, #d152fa 100%);
+}
+.gradient-card-inner {
+  background: #0b1224;
+  border-radius: 13px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* Booking status pills */
+.pill {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.pill.pending   { background: rgba(245,158,11,0.15); color: #f59e0b; border: 1px solid #f59e0b; }
+.pill.confirmed { background: rgba(34,197,94,0.15);  color: #22c55e; border: 1px solid #22c55e; }
+.pill.cancelled { background: rgba(239,68,68,0.15);  color: #ef4444; border: 1px solid #ef4444; }
+.pill.rescheduled { background: rgba(7,221,241,0.15); color: #07ddf1; border: 1px solid #07ddf1; }

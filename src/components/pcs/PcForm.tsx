@@ -1,4 +1,5 @@
 import Button from "@/components/ui/Button";
+import Modal from "@/components/ui/Modal";
 import Input from "@/components/ui/Input";
 import { pcRepository } from "@/repositories/PcRepository";
 import { IPcApi } from "@/types/sessions";
@@ -33,11 +34,19 @@ const PcForm = ({ branchId, initial, onClose, onSaved }: Props) => {
   };
 
   return (
-    <div style={overlay}>
+    <Modal open onClose={onClose}>
       <form className="card" style={{ width: 420, maxWidth: "90vw", display: "flex", flexDirection: "column", gap: 14 }} onSubmit={submit}>
         <h2 style={{ margin: 0 }}>{initial ? "Edit PC" : "Register new PC"}</h2>
         <Input label="Label (e.g. PC #5)" value={label} onChange={(e) => setLabel(e.target.value)} required autoFocus />
-        <Input label="MAC address (optional)" value={mac ?? ""} onChange={(e) => setMac(e.target.value)} />
+        <Input
+          label="MAC address (optional)"
+          placeholder="AA:BB:CC:DD:EE:FF"
+          value={mac ?? ""}
+          onChange={(e) => setMac(e.target.value)}
+        />
+        <span className="muted" style={{ fontSize: 11, marginTop: -8 }}>
+          Used only for Wake-on-LAN. The PC connects via the agent app paired with the token, not the MAC.
+        </span>
         <Input label="Linked place id (optional)" type="number" value={placeId} onChange={(e) => setPlaceId(e.target.value)} />
         {err && <div className="error">{err}</div>}
         <div className="row-between">
@@ -45,13 +54,8 @@ const PcForm = ({ branchId, initial, onClose, onSaved }: Props) => {
           <Button disabled={busy || !label}>{busy ? "Saving…" : "Save"}</Button>
         </div>
       </form>
-    </div>
+    </Modal>
   );
-};
-
-const overlay: React.CSSProperties = {
-  position: "fixed", inset: 0, background: "rgba(2,5,20,0.7)",
-  display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50,
 };
 
 export default PcForm;

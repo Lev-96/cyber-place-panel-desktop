@@ -12,8 +12,8 @@ export interface ExtendSessionBody {
   package_id: number;
 }
 
-/* These call the future Laravel endpoints. Until those exist, the
-   SessionRepository will route to the local MockSessionsApi. */
+/* When the backend's `/sessions`, `/pcs`, `/time-packages` migrations are
+   not yet deployed, repositories return `[]` via api/fallback (orFallback). */
 
 export const apiListActiveSessions = (branchId: number) =>
   request<{ data: ISessionApi[] }>("/sessions", { params: { branch_id: branchId, status: "active" } });

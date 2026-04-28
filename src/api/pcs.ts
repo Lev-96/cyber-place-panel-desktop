@@ -28,3 +28,14 @@ export const apiDeletePc = (id: number) =>
 
 export const apiRotatePcToken = (id: number) =>
   request<{ pc: IPcApi }>(`/pcs/${id}/rotate-token`, { method: "POST" });
+
+export interface WakeResult {
+  message: string;
+  mac?: string;
+  sent_packets?: number;
+  errors?: string[];
+  note?: string;
+}
+
+export const apiWakePc = (id: number) =>
+  request<WakeResult>(`/pcs/${id}/wake`, { method: "POST" });

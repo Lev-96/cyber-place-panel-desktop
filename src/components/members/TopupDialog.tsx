@@ -1,4 +1,5 @@
 import Button from "@/components/ui/Button";
+import Modal from "@/components/ui/Modal";
 import Input from "@/components/ui/Input";
 import { memberRepository } from "@/repositories/MemberRepository";
 import { IMember } from "@/types/members";
@@ -30,7 +31,7 @@ const TopupDialog = ({ member, onClose, onDone }: Props) => {
   };
 
   return (
-    <div style={overlay}>
+    <Modal open onClose={onClose}>
       <form className="card" style={{ width: 380, maxWidth: "90vw", display: "flex", flexDirection: "column", gap: 14 }} onSubmit={submit}>
         <h2 style={{ margin: 0 }}>Top up · {member.name}</h2>
         <div className="muted">Current balance: <b style={{ color: "#fff" }}>{Number(member.balance).toFixed(2)}</b></div>
@@ -42,13 +43,8 @@ const TopupDialog = ({ member, onClose, onDone }: Props) => {
           <Button disabled={busy}>{busy ? "Processing…" : "Top up"}</Button>
         </div>
       </form>
-    </div>
+    </Modal>
   );
-};
-
-const overlay: React.CSSProperties = {
-  position: "fixed", inset: 0, background: "rgba(2,5,20,0.7)",
-  display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50,
 };
 
 export default TopupDialog;

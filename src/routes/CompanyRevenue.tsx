@@ -12,7 +12,9 @@ const CompanyRevenue = () => {
   if (!Number.isFinite(id) || id <= 0) return <div className="error">Invalid company id.</div>;
   if (loading) return <Spinner />;
   if (error) return <div className="error">{error.message}</div>;
-  return <CompanyRevenueScreen companyId={id} companyName={company?.name} />;
+  const initialPercent = company?.raw?.commission_percent;
+  const percent = initialPercent != null && initialPercent !== "" ? Number(initialPercent) : undefined;
+  return <CompanyRevenueScreen companyId={id} companyName={company?.name} initialPercent={Number.isFinite(percent!) ? percent : undefined} />;
 };
 
 export default CompanyRevenue;

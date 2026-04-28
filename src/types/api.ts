@@ -70,6 +70,8 @@ export interface IBranchApi {
   city: string;
   country: string;
   address: string;
+  address_lat?: number | string | null;
+  address_lng?: number | string | null;
   phone: string | string[] | null;
   branch_logo_path: string;
   status: string;
@@ -106,6 +108,9 @@ export interface ICompanyApi {
   status: CompanyStatusType;
   branches_count?: number;
   managers_count?: number;
+  commission_percent?: number | string | null;
+  last_paid_at?: string | null;
+  next_due_at?: string | null;
 }
 
 export interface AuthUser {

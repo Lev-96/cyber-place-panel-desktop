@@ -1,9 +1,10 @@
+import { Booking } from "@/domain/Booking";
 import { Money } from "@/domain/Money";
 import { RevenueReport } from "@/domain/Revenue";
 import { bookingRepository } from "@/repositories/BookingRepository";
 import { branchRepository } from "@/repositories/BranchRepository";
 import { IBranchApi } from "@/types/api";
-import { commissionStore } from "./CommissionStore";
+import { commissionStore, CommissionStore } from "./CommissionStore";
 import { BranchAveragePricing, IPricingPolicy } from "./PricingPolicy";
 
 export interface MonthSelection {
@@ -11,22 +12,50 @@ export interface MonthSelection {
   month: number; // 1..12
 }
 
-export class RevenueCalculator {
-  constructor(private pricing: IPricingPolicy = new BranchAveragePricing()) {}
+/** Ports — the calculator depends on these abstractions, not concrete singletons. */
+export interface IBookingsSource {
+  listAll(params: { company_id?: number; date_from?: string; date_to?: string }): Promise<Booking[]>;
+}
+export interface IBranchesSource {
+  list(params: { company_id?: number }): Promise<IBranchApi[]>;
+}
 
-  async forCompanyMonth(companyId: number, sel: MonthSelection): Promise<RevenueReport> {
+export interface RevenueDeps {
+  bookings: IBookingsSource;
+  branches: IBranchesSource;
+  commissions: Pick<CommissionStore, "getPercent">;
+  pricing: IPricingPolicy;
+  now: () => Date;
+}
+
+export class RevenueCalculator {
+  private deps: RevenueDeps;
+
+  constructor(deps: Partial<RevenueDeps> = {}) {
+    this.deps = {
+      bookings: deps.bookings ?? bookingRepository,
+      branches: deps.branches ?? branchRepository,
+      commissions: deps.commissions ?? commissionStore,
+      pricing: deps.pricing ?? new BranchAveragePricing(),
+      now: deps.now ?? (() => new Date()),
+    };
+  }
+
+  async forCompanyMonth(companyId: number, sel: MonthSelection, percentOverride?: number): Promise<RevenueReport> {
     const { from, to, fromIso, toIso } = monthRange(sel);
-    const [bookings, branches, percent] = await Promise.all([
-      bookingRepository.listAll({ company_id: companyId, date_from: from, date_to: to }),
-      branchRepository.list({ company_id: companyId }),
-      commissionStore.getPercent(companyId),
+    const [bookings, branches, storedPercent] = await Promise.all([
+      this.deps.bookings.listAll({ company_id: companyId, date_from: from, date_to: to }),
+      this.deps.branches.list({ company_id: companyId }),
+      this.deps.commissions.getPercent(companyId),
     ]);
+    const percent = percentOverride != null && Number.isFinite(percentOverride) ? percentOverride : storedPercent;
 
     const branchById = new Map<number, IBranchApi>(branches.map((b) => [b.id, b]));
-    const completed = bookings.filter((b) => b.isCompletedBy(new Date()));
+    const now = this.deps.now();
+    const completed = bookings.filter((b) => b.isCompletedBy(now));
 
     const gross = completed.reduce(
-      (acc, b) => acc.add(this.pricing.priceFor(b, branchById.get(b.branchId))),
+      (acc, b) => acc.add(this.deps.pricing.priceFor(b, branchById.get(b.branchId))),
       Money.zero(),
     );
 

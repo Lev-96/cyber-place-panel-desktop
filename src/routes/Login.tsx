@@ -20,11 +20,14 @@ const Login = () => {
 
   return (
     <div className="login-shell">
+      <h1 className="login-brand">Cyber Place</h1>
+      <img className="login-logo" src="./logo.png" alt="Cyber Place" />
+      <h2 className="login-title">Sign in</h2>
       <form className="login-card" onSubmit={onSubmit}>
-        <h2>Cyberplace Panel</h2>
-        <Input label="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoFocus />
-        <Input label="Password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
-        {err && <div className="error">{err}</div>}
+        <Input label="Email" type="email" placeholder="your@email.com" value={email} onChange={(e) => setEmail(e.target.value)} required autoFocus />
+        <Input label="Password" type="password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} required />
+        {err && <div className="error" style={{ textAlign: "center" }}>{err}</div>}
+        <a className="login-forgot" href="#/forgot-password">Forgot password?</a>
         <Button disabled={busy}>{busy ? "Signing in…" : "Sign in"}</Button>
       </form>
     </div>

@@ -1,4 +1,5 @@
 import Button from "@/components/ui/Button";
+import Modal from "@/components/ui/Modal";
 import Input from "@/components/ui/Input";
 import Spinner from "@/components/ui/Spinner";
 import { sessionRepository } from "@/repositories/SessionRepository";
@@ -33,7 +34,7 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
   };
 
   return (
-    <div style={overlay}>
+    <Modal open onClose={onClose}>
       <div className="card" style={{ width: 420, maxWidth: "90vw", display: "flex", flexDirection: "column", gap: 14 }}>
         <h2 style={{ margin: 0 }}>Start session · {pc.label}</h2>
         {!packages ? <Spinner /> : (
@@ -60,14 +61,10 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
           </>
         )}
       </div>
-    </div>
+    </Modal>
   );
 };
 
-const overlay: React.CSSProperties = {
-  position: "fixed", inset: 0, background: "rgba(2,5,20,0.7)",
-  display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50,
-};
 const pkgRow = (active: boolean): React.CSSProperties => ({
   display: "flex", gap: 10, alignItems: "center",
   border: `1px solid ${active ? "#07ddf1" : "#1f2a44"}`,
