@@ -4,6 +4,7 @@ import ScreenWithBg from "@/components/ui/ScreenWithBg";
 import Spinner from "@/components/ui/Spinner";
 import { ITournamentApi } from "@/api/tournaments";
 import { useAsync } from "@/hooks/useAsync";
+import { useLang } from "@/i18n/LanguageContext";
 import { tournamentRepository } from "@/repositories/TournamentRepository";
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
@@ -11,6 +12,7 @@ import { useAuth } from "@/auth/AuthContext";
 
 const Tournaments = () => {
   const { user } = useAuth();
+  const { t: tr } = useLang();
 
   const { branchId } = useParams();
   const id = Number(branchId);
@@ -51,7 +53,7 @@ const Tournaments = () => {
   const [editing, setEditing] = useState<ITournamentApi | null>(null);
 
   const remove = async (t: ITournamentApi) => {
-    if (!confirm(`Delete tournament "${t.title}"?`)) return;
+    if (!confirm(`${tr("tournaments.confirmDelete")} "${t.title}"?`)) return;
     await tournamentRepository.remove(t.id);
     void reload();
   };
@@ -59,18 +61,17 @@ const Tournaments = () => {
   return (
     <ScreenWithBg
       bg="./bg/owner-home.jpg"
-      title={isBranchScoped ? `Tournaments · branch #${id}` : "Tournaments"}
+      title={isBranchScoped ? `${tr("tournaments.title")} · #${id}` : tr("tournaments.title")}
     >
       {isBranchScoped && (
         <div className="row-between">
           <div />
-          <Button onClick={() => setCreating(true)}>+ New tournament</Button>
+          <Button onClick={() => setCreating(true)}>{tr("tournaments.new")}</Button>
         </div>
       )}
       {!isBranchScoped && (
         <div className="muted">
-          Open a branch and click "Tournaments" to create one. Tournaments
-          belong to a specific branch.
+          {tr("tournaments.scopeHint")}
         </div>
       )}
 
@@ -86,20 +87,20 @@ const Tournaments = () => {
                   {t.start_date}
                   {t.end_date ? ` — ${t.end_date}` : ""}
                   {t.price != null && (
-                    <> · price: {Number(t.price).toFixed(2)}</>
+                    <> · {tr("tournaments.price")}: {Number(t.price).toFixed(2)}</>
                   )}
                   {t.participants_limit ? (
                     <>
                       {" "}
                       · {t.registered_participants}/{t.participants_limit}{" "}
-                      players
+                      {tr("tournaments.players")}
                     </>
                   ) : null}
                 </div>
               </div>
               <div className="row" style={{ gap: 6 }}>
                 <Link to={`/tournaments/${t.id}`} className="muted" style={btn}>
-                  Open
+                  {tr("common.open").replace(" →", "")}
                 </Link>
                 {user?.role &&
                   ["admin", "company_owner"].includes(user?.role) && (
@@ -109,7 +110,7 @@ const Tournaments = () => {
                         onClick={() => setEditing(t)}
                         style={btn}
                       >
-                        Edit
+                        {tr("action.edit")}
                       </Button>
                       <Button
                         variant="secondary"
@@ -120,14 +121,14 @@ const Tournaments = () => {
                           borderColor: "#4a1a1a",
                         }}
                       >
-                        Delete
+                        {tr("action.delete")}
                       </Button>
                     </>
                   )}
               </div>
             </div>
           ))}
-          {!data?.length && <div className="muted">No tournaments.</div>}
+          {!data?.length && <div className="muted">{tr("common.empty.tournaments")}</div>}
         </div>
       )}
       {creating && isBranchScoped && (
@@ -155,7 +156,6 @@ const Tournaments = () => {
   );
 };
 
-// This function is expected to be implemented in TournamentRepository.ts alongside "list", but using the full apiListTournaments param object.
-const btn: React.CSSProperties = { padding: "6px 10px", fontSize: 12 };
+const btn: React.CSSProperties = { padding: "6px 10px", fontSize: 12, minWidth: 80, textAlign: "center" };
 
 export default Tournaments;

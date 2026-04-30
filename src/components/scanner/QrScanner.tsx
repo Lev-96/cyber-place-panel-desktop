@@ -1,4 +1,5 @@
 import jsQR from "jsqr";
+import { useLang } from "@/i18n/LanguageContext";
 import { useEffect, useRef, useState } from "react";
 
 interface Props {
@@ -8,6 +9,7 @@ interface Props {
 }
 
 const QrScanner = ({ onResult, onClose, height = 360 }: Props) => {
+  const { t } = useLang();
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -34,7 +36,7 @@ const QrScanner = ({ onResult, onClose, height = 360 }: Props) => {
         setReady(true);
         tick();
       } catch (e) {
-        setError(e instanceof Error ? e.message : "Camera access denied");
+        setError(e instanceof Error ? e.message : t("qr.deniedPrefix"));
       }
     };
 
@@ -80,11 +82,11 @@ const QrScanner = ({ onResult, onClose, height = 360 }: Props) => {
       <video ref={videoRef} style={{ width: "100%", height, objectFit: "cover", background: "#000", borderRadius: 12 }} muted playsInline />
       <canvas ref={canvasRef} style={{ display: "none" }} />
       <div className="muted" style={{ fontSize: 12, marginTop: 8 }}>
-        {!ready && !error && "Requesting camera access…"}
-        {ready && "Point the camera at the QR code on the customer's screen."}
+        {!ready && !error && t("qr.requesting")}
+        {ready && t("qr.aim")}
       </div>
       {onClose && (
-        <button className="btn secondary" onClick={onClose} style={{ marginTop: 8 }}>Stop scanning</button>
+        <button className="btn secondary" onClick={onClose} style={{ marginTop: 8 }}>{t("qr.stopScan")}</button>
       )}
     </div>
   );

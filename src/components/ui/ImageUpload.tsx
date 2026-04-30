@@ -1,4 +1,5 @@
 import SmartImage from "@/components/ui/SmartImage";
+import { useLang } from "@/i18n/LanguageContext";
 import { useEffect, useRef, useState } from "react";
 
 interface Props {
@@ -18,6 +19,7 @@ interface Props {
  * first-letter placeholder via SmartImage.
  */
 const ImageUpload = ({ label, initialUrl, name, required, onChange }: Props) => {
+  const { t } = useLang();
   const inputRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
@@ -63,7 +65,7 @@ const ImageUpload = ({ label, initialUrl, name, required, onChange }: Props) => 
               pointerEvents: "none",
             }}>
               <span style={{ fontSize: 22, color: "#07ddf1" }}>＋</span>
-              <span>Click to upload</span>
+              <span>{t("image.click")}</span>
             </div>
           )}
         </div>
@@ -77,11 +79,11 @@ const ImageUpload = ({ label, initialUrl, name, required, onChange }: Props) => 
           />
           <div className="row" style={{ gap: 8, flexWrap: "wrap" }}>
             <button type="button" className="btn secondary" onClick={open} style={{ padding: "8px 14px" }}>
-              {previewUrl ? "Change image" : "Choose image"}
+              {previewUrl ? t("image.changeImage") : t("image.chooseImage")}
             </button>
             {file && (
               <button type="button" className="btn secondary" onClick={clear} style={{ padding: "8px 14px", color: "#ef4444", borderColor: "#4a1a1a" }}>
-                Clear
+                {t("image.clear")}
               </button>
             )}
           </div>
@@ -90,7 +92,7 @@ const ImageUpload = ({ label, initialUrl, name, required, onChange }: Props) => 
               {file.name} · {(file.size / 1024).toFixed(1)} KB
             </span>
           )}
-          <span className="muted" style={{ fontSize: 11 }}>PNG / JPG / WebP, ≤ 5 MB</span>
+          <span className="muted" style={{ fontSize: 11 }}>{t("image.formatHint")}</span>
         </div>
       </div>
     </div>

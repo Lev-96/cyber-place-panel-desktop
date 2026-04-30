@@ -1,9 +1,11 @@
-import { PlaceStatusColors, PlaceStatusLabels } from "@/domain/PlaceStatus";
+import { useLang } from "@/i18n/LanguageContext";
+import { PlaceStatusColors } from "@/domain/PlaceStatus";
 import { PlaceSnapshot } from "@/services/realtime/RealtimeService";
 
 const fmt = (d: Date) => d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 
 const PlaceCell = ({ snapshot }: { snapshot: PlaceSnapshot }) => {
+  const { t } = useLang();
   const { place, status, bookings } = snapshot;
   const color = PlaceStatusColors[status];
   const top = bookings[0];
@@ -12,10 +14,10 @@ const PlaceCell = ({ snapshot }: { snapshot: PlaceSnapshot }) => {
       <span className="dot" style={{ background: color }} />
       <span className="platform">{place.platform.toUpperCase()} · {place.type}</span>
       <span className="id">#{place.id}</span>
-      <span className="status" style={{ color }}>{PlaceStatusLabels[status]}</span>
+      <span className="status" style={{ color }}>{t(`place.${status}`)}</span>
       {top && (
         <span className="until">
-          {status === "busy" ? "till " : "from "}
+          {status === "busy" ? t("live.till") : t("live.from")}{" "}
           {fmt(status === "busy" ? top.end : top.start)}
         </span>
       )}

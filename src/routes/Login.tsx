@@ -1,10 +1,12 @@
 import { useAuth } from "@/auth/AuthContext";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
+import { useLang } from "@/i18n/LanguageContext";
 import { FormEvent, useState } from "react";
 
 const Login = () => {
   const { login } = useAuth();
+  const { t } = useLang();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [err, setErr] = useState<string | null>(null);
@@ -14,7 +16,7 @@ const Login = () => {
     e.preventDefault();
     setBusy(true); setErr(null);
     try { await login(email, password); }
-    catch (ex) { setErr(ex instanceof Error ? ex.message : "Login failed"); }
+    catch (ex) { setErr(ex instanceof Error ? ex.message : t("login.failed")); }
     finally { setBusy(false); }
   };
 
@@ -22,13 +24,13 @@ const Login = () => {
     <div className="login-shell">
       <h1 className="login-brand">Cyber Place</h1>
       <img className="login-logo" src="./logo.png" alt="Cyber Place" />
-      <h2 className="login-title">Sign in</h2>
+      <h2 className="login-title">{t("login.title")}</h2>
       <form className="login-card" onSubmit={onSubmit}>
-        <Input label="Email" type="email" placeholder="your@email.com" value={email} onChange={(e) => setEmail(e.target.value)} required autoFocus />
-        <Input label="Password" type="password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} required />
+        <Input label={t("auth.email")} type="email" placeholder="your@email.com" value={email} onChange={(e) => setEmail(e.target.value)} required autoFocus />
+        <Input label={t("auth.password")} type="password" placeholder={t("login.passwordPlaceholder")} value={password} onChange={(e) => setPassword(e.target.value)} required />
         {err && <div className="error" style={{ textAlign: "center" }}>{err}</div>}
-        <a className="login-forgot" href="#/forgot-password">Forgot password?</a>
-        <Button disabled={busy}>{busy ? "Signing in…" : "Sign in"}</Button>
+        <a className="login-forgot" href="#/forgot-password">{t("auth.forgot")}</a>
+        <Button disabled={busy}>{busy ? t("login.signingIn") : t("login.title")}</Button>
       </form>
     </div>
   );

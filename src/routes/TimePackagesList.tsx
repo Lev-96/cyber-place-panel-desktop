@@ -2,6 +2,7 @@ import PackageForm from "@/components/packages/PackageForm";
 import Button from "@/components/ui/Button";
 import Spinner from "@/components/ui/Spinner";
 import { useAsync } from "@/hooks/useAsync";
+import { useLang } from "@/i18n/LanguageContext";
 import { timePackageRepository } from "@/repositories/TimePackageRepository";
 import { ITimePackage } from "@/types/sessions";
 import { useState } from "react";
@@ -10,15 +11,16 @@ import { useParams } from "react-router-dom";
 const TimePackagesList = () => {
   const { branchId } = useParams();
   const id = Number(branchId);
+  const { t, money } = useLang();
   const { data: packages, loading, error, reload } = useAsync(() => timePackageRepository.listByBranch(id), [id]);
 
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState<ITimePackage | null>(null);
 
-  if (!Number.isFinite(id) || id <= 0) return <div className="error">Invalid branch id.</div>;
+  if (!Number.isFinite(id) || id <= 0) return <div className="error">{t("hub.invalidId")}</div>;
 
   const remove = async (pkg: ITimePackage) => {
-    if (!confirm(`Delete tariff "${pkg.name}"?`)) return;
+    if (!confirm(`${t("tariffs.confirmDelete")} "${pkg.name}"?`)) return;
     await timePackageRepository.remove(pkg.id);
     void reload();
   };
@@ -31,8 +33,8 @@ const TimePackagesList = () => {
   return (
     <div className="col" style={{ gap: 18 }}>
       <div className="row-between">
-        <h2 className="page-title" style={{ margin: 0 }}>Tariffs · branch #{id}</h2>
-        <Button onClick={() => setCreating(true)}>+ New tariff</Button>
+        <h2 className="page-title" style={{ margin: 0 }}>{t("tariffs.title")} · #{id}</h2>
+        <Button onClick={() => setCreating(true)}>{t("tariffs.new")}</Button>
       </div>
 
       {loading && <Spinner />}
@@ -45,17 +47,17 @@ const TimePackagesList = () => {
               <div key={p.id} className="list-item" style={{ opacity: active ? 1 : 0.5 }}>
                 <div>
                   <div className="name">{p.name}</div>
-                  <div className="meta">{p.duration_minutes} min · {Number(p.price).toFixed(2)}</div>
+                  <div className="meta">{p.duration_minutes} {t("time.minShort")} · {money(Number(p.price))}</div>
                 </div>
                 <div className="row" style={{ gap: 6 }}>
-                  <Button variant="secondary" onClick={() => toggle(p)} style={btn}>{active ? "Deactivate" : "Activate"}</Button>
-                  <Button variant="secondary" onClick={() => setEditing(p)} style={btn}>Edit</Button>
-                  <Button variant="secondary" onClick={() => remove(p)} style={{ ...btn, color: "#ef4444", borderColor: "#4a1a1a" }}>Delete</Button>
+                  <Button variant="secondary" onClick={() => toggle(p)} style={btn}>{active ? t("action.deactivate") : t("action.activate")}</Button>
+                  <Button variant="secondary" onClick={() => setEditing(p)} style={btn}>{t("action.edit")}</Button>
+                  <Button variant="secondary" onClick={() => remove(p)} style={{ ...btn, color: "#ef4444", borderColor: "#4a1a1a" }}>{t("action.delete")}</Button>
                 </div>
               </div>
             );
           })}
-          {!packages?.length && <div className="muted">No tariffs yet. Add at least one to start sessions.</div>}
+          {!packages?.length && <div className="muted">{t("tariffs.empty")}</div>}
         </div>
       )}
 
@@ -78,6 +80,6 @@ const TimePackagesList = () => {
   );
 };
 
-const btn: React.CSSProperties = { padding: "6px 10px", fontSize: 12 };
+const btn: React.CSSProperties = { padding: "6px 10px", fontSize: 12, minWidth: 80, textAlign: "center" };
 
 export default TimePackagesList;

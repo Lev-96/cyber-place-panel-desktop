@@ -1,6 +1,7 @@
 import Button from "@/components/ui/Button";
 import Modal from "@/components/ui/Modal";
 import Input from "@/components/ui/Input";
+import { useLang } from "@/i18n/LanguageContext";
 import { branchRepository } from "@/repositories/BranchRepository";
 import { managerRepository } from "@/repositories/ManagerRepository";
 import { IManagerApi } from "@/api/managers";
@@ -14,6 +15,7 @@ interface Props {
 }
 
 const ManagerForm = ({ branchId, initial, onClose, onSaved }: Props) => {
+  const { t } = useLang();
   const isEdit = !!initial;
   const [name, setName] = useState(initial?.user?.name ?? "");
   const [email, setEmail] = useState(initial?.user?.email ?? "");
@@ -36,8 +38,8 @@ const ManagerForm = ({ branchId, initial, onClose, onSaved }: Props) => {
       if (isEdit) {
         await managerRepository.update(initial!.id, { name, email });
       } else {
-        if (pw !== pw2) { setErr("Passwords do not match"); setBusy(false); return; }
-        if (!companyId) { setErr("Company not resolved yet — try again"); setBusy(false); return; }
+        if (pw !== pw2) { setErr(t("settings.passwordsMismatch")); setBusy(false); return; }
+        if (!companyId) { setErr(t("manager.errors.companyMissing")); setBusy(false); return; }
         await managerRepository.create({
           branch_id: branchId,
           company_id: companyId,
@@ -47,24 +49,24 @@ const ManagerForm = ({ branchId, initial, onClose, onSaved }: Props) => {
       }
       onSaved();
     } catch (e) {
-      setErr(e instanceof Error ? e.message : "Failed");
+      setErr(e instanceof Error ? e.message : t("form.errors.failed"));
     } finally { setBusy(false); }
   };
 
   return (
     <Modal open onClose={onClose}>
       <form className="card" style={{ width: 420, maxWidth: "90vw", display: "flex", flexDirection: "column", gap: 14 }} onSubmit={submit}>
-        <h2 style={{ margin: 0 }}>{isEdit ? "Edit manager" : "New manager"}</h2>
-        <Input label="Name" value={name} onChange={(e) => setName(e.target.value)} required autoFocus />
-        <Input label="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+        <h2 style={{ margin: 0 }}>{isEdit ? t("manager.titleEdit") : t("manager.titleNew")}</h2>
+        <Input label={t("label.name")} value={name} onChange={(e) => setName(e.target.value)} required autoFocus />
+        <Input label={t("label.email")} type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
         {!isEdit && <>
-          <Input label="Password" type="password" value={pw} onChange={(e) => setPw(e.target.value)} required minLength={8} />
-          <Input label="Confirm password" type="password" value={pw2} onChange={(e) => setPw2(e.target.value)} required minLength={8} />
+          <Input label={t("auth.password")} type="password" value={pw} onChange={(e) => setPw(e.target.value)} required minLength={8} />
+          <Input label={t("label.confirmPassword")} type="password" value={pw2} onChange={(e) => setPw2(e.target.value)} required minLength={8} />
         </>}
         {err && <div className="error">{err}</div>}
         <div className="row-between">
-          <Button type="button" variant="secondary" onClick={onClose} disabled={busy}>Cancel</Button>
-          <Button disabled={busy}>{busy ? "Saving…" : (isEdit ? "Save" : "Create")}</Button>
+          <Button type="button" variant="secondary" onClick={onClose} disabled={busy}>{t("action.cancel")}</Button>
+          <Button disabled={busy}>{busy ? "…" : (isEdit ? t("action.save") : t("action.create"))}</Button>
         </div>
       </form>
     </Modal>

@@ -9,12 +9,42 @@ const fmt = (ms: number) => {
   return h > 0 ? `${pad(h)}:${pad(m)}:${pad(s)}` : `${pad(m)}:${pad(s)}`;
 };
 
-const SessionTimer = ({ endsAt }: { endsAt: string }) => {
+interface Props {
+  // Fixed-package session: counts down from `endsAt`.
+  // Open session: pass `startedAt` + `hourlyRate`, leave `endsAt` null/undefined.
+  endsAt?: string | null;
+  startedAt?: string | null;
+  hourlyRate?: number | string | null;
+  /**
+   * Money formatter from LanguageContext. When provided, the running cost is
+   * rendered in the user's display currency instead of as a raw decimal.
+   */
+  formatMoney?: (amountInBaseAmd: number) => string;
+}
+
+const SessionTimer = ({ endsAt, startedAt, hourlyRate, formatMoney }: Props) => {
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(t);
   }, []);
+
+  const isOpen = !endsAt && !!startedAt;
+
+  if (isOpen) {
+    const elapsedMs = now - new Date(startedAt!).getTime();
+    const rate = Number(hourlyRate ?? 0);
+    const cost = rate > 0 ? (elapsedMs / 3_600_000) * rate : 0;
+    const costLabel = formatMoney ? formatMoney(cost) : cost.toFixed(2);
+    return (
+      <span style={{ fontWeight: 700, fontVariantNumeric: "tabular-nums", color: "#07ddf1" }}>
+        ▲ {fmt(elapsedMs)}
+        {rate > 0 && <span style={{ marginLeft: 8, color: "#d152fa" }}>{costLabel}</span>}
+      </span>
+    );
+  }
+
+  if (!endsAt) return null;
   const remaining = new Date(endsAt).getTime() - now;
   const warn = remaining <= 5 * 60_000;
   const crit = remaining <= 60_000;

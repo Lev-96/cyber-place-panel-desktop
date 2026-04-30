@@ -34,6 +34,7 @@ export interface IBranchService {
   name_en: string;
   name_ru: string;
   name_am: string;
+  price?: number | string | null;
   service_logo_path?: string;
 }
 

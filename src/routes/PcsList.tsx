@@ -4,6 +4,7 @@ import PcForm from "@/components/pcs/PcForm";
 import Button from "@/components/ui/Button";
 import Spinner from "@/components/ui/Spinner";
 import { useAsync } from "@/hooks/useAsync";
+import { useLang } from "@/i18n/LanguageContext";
 import { pcRepository } from "@/repositories/PcRepository";
 import { IPcApi } from "@/types/sessions";
 import { useState } from "react";
@@ -12,6 +13,7 @@ import { useParams } from "react-router-dom";
 const PcsList = () => {
   const { branchId } = useParams();
   const id = Number(branchId);
+  const { t } = useLang();
   const { data: pcs, loading, error, reload } = useAsync(() => pcRepository.listByBranch(id), [id]);
 
   const [creating, setCreating] = useState(false);
@@ -66,8 +68,8 @@ const PcsList = () => {
   return (
     <div className="col" style={{ gap: 18 }}>
       <div className="row-between">
-        <h2 className="page-title" style={{ margin: 0 }}>PCs · branch #{id}</h2>
-        <Button onClick={() => setCreating(true)}>+ Register PC</Button>
+        <h2 className="page-title" style={{ margin: 0 }}>{t("pcs.title")} · #{id}</h2>
+        <Button onClick={() => setCreating(true)}>{t("pcs.register")}</Button>
       </div>
 
       <div className="card" style={{ borderLeft: "3px solid #07ddf1", fontSize: 13 }}>
@@ -85,29 +87,36 @@ const PcsList = () => {
         <div className="list">
           {(pcs ?? []).map((pc) => {
             const neverPaired = !pc.last_seen_at;
+            const isPs = pc.kind === "ps";
             return (
             <div key={pc.id} className="list-item">
               <div>
-                <div className="name">{pc.label} <span className="muted">#{pc.id}</span></div>
+                <div className="name">
+                  {pc.label} <span className="muted">#{pc.id}</span>
+                  {isPs && <span style={{ marginLeft: 8, fontSize: 11, padding: "2px 6px", borderRadius: 4, background: "#101a35", color: "#d152fa" }}>PS</span>}
+                </div>
                 <div className="meta">
                   <StatusDot status={pc.status} /> {pc.status}
-                  {pc.mac_address && <> · MAC: {pc.mac_address}</>}
-                  {pc.last_seen_at
+                  {pc.hourly_rate != null && <> · {Number(pc.hourly_rate)} /ч</>}
+                  {!isPs && pc.mac_address && <> · MAC: {pc.mac_address}</>}
+                  {!isPs && (pc.last_seen_at
                     ? <> · last seen {new Date(pc.last_seen_at).toLocaleString()}</>
                     : <> · <span style={{ color: "#f59e0b" }}>not paired yet — install agent</span></>
-                  }
+                  )}
                 </div>
               </div>
               <div className="row" style={{ gap: 6 }}>
-                {pc.mac_address && (
+                {!isPs && pc.mac_address && (
                   <Button variant="secondary" onClick={() => wake(pc)} disabled={waking === pc.id} style={btn}>
                     {waking === pc.id ? "Sending…" : "Wake"}
                   </Button>
                 )}
                 <Button variant="secondary" onClick={() => setEditing(pc)} style={btn}>Edit</Button>
-                <Button variant="secondary" onClick={() => rotate(pc)} style={btn}>
-                  {neverPaired ? "Get token" : "Rotate token"}
-                </Button>
+                {!isPs && (
+                  <Button variant="secondary" onClick={() => rotate(pc)} style={btn}>
+                    {neverPaired ? "Get token" : "Rotate token"}
+                  </Button>
+                )}
                 <Button variant="secondary" onClick={() => remove(pc)} style={{ ...btn, color: "#ef4444", borderColor: "#4a1a1a" }}>Delete</Button>
               </div>
             </div>
@@ -121,7 +130,12 @@ const PcsList = () => {
         <PcForm
           branchId={id}
           onClose={() => setCreating(false)}
-          onSaved={(pc) => { setCreating(false); setTokenPc(pc); void reload(); }}
+          onSaved={(pc) => {
+            setCreating(false);
+            // PS devices don't run an agent — there's no token to display.
+            if (pc.kind !== "ps") setTokenPc(pc);
+            void reload();
+          }}
         />
       )}
       {editing && (

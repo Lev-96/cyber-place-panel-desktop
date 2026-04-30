@@ -5,6 +5,7 @@ import ImageUpload from "@/components/ui/ImageUpload";
 import Input from "@/components/ui/Input";
 import Modal from "@/components/ui/Modal";
 import NumberStepper from "@/components/ui/NumberStepper";
+import { useLang } from "@/i18n/LanguageContext";
 import { storageUri } from "@/infrastructure/AppConfig";
 import { companyRepository } from "@/repositories/CompanyRepository";
 import { CompanyStatusType, ICompanyApi } from "@/types/api";
@@ -23,6 +24,7 @@ interface Props {
  */
 const CompanyForm = ({ initial, onClose, onSaved }: Props) => {
   const { user } = useAuth();
+  const { t } = useLang();
   const isEdit = !!initial;
   const isAdmin = user?.role === "admin";
   const [step, setStep] = useState<1 | 2>(isEdit ? 2 : 1);
@@ -68,7 +70,7 @@ const CompanyForm = ({ initial, onClose, onSaved }: Props) => {
 
   const submitStep1 = async (e: FormEvent) => {
     e.preventDefault();
-    if (ownerPassword !== ownerPassword2) return setErr("Passwords do not match");
+    if (ownerPassword !== ownerPassword2) return setErr(t("settings.passwordsMismatch"));
     setBusy(true); setErr(null);
     try {
       const r = await apiRegisterUser({
@@ -83,8 +85,8 @@ const CompanyForm = ({ initial, onClose, onSaved }: Props) => {
 
   const submitStep2 = async (e: FormEvent) => {
     e.preventDefault();
-    if (!isEdit && !logo) return setErr("Logo is required for a new company");
-    if (!isEdit && !userId) return setErr("Owner user not created yet");
+    if (!isEdit && !logo) return setErr(t("company.logoRequired"));
+    if (!isEdit && !userId) return setErr(t("company.ownerNotCreated"));
     setBusy(true); setErr(null);
     try {
       const adminFields = isAdmin
@@ -110,15 +112,15 @@ const CompanyForm = ({ initial, onClose, onSaved }: Props) => {
     return (
       <Modal open onClose={onClose}>
         <form className="card" style={cardStyle} onSubmit={submitStep1}>
-          <div className="row-between"><h2 style={{ margin: 0 }}>New company · step 1/2</h2><span className="muted">Owner</span></div>
-          <Input label="Owner full name" value={ownerName} onChange={(e) => setOwnerName(e.target.value)} required autoFocus />
-          <Input label="Owner email" type="email" value={ownerEmail} onChange={(e) => setOwnerEmail(e.target.value)} required />
-          <Input label="Password" type="password" value={ownerPassword} onChange={(e) => setOwnerPassword(e.target.value)} required minLength={8} />
-          <Input label="Confirm password" type="password" value={ownerPassword2} onChange={(e) => setOwnerPassword2(e.target.value)} required minLength={8} />
+          <div className="row-between"><h2 style={{ margin: 0 }}>{t("company.titleNew")} · {t("company.step1")}</h2><span className="muted">{t("company.owner")}</span></div>
+          <Input label={t("company.ownerName")} value={ownerName} onChange={(e) => setOwnerName(e.target.value)} required autoFocus />
+          <Input label={t("company.ownerEmail")} type="email" value={ownerEmail} onChange={(e) => setOwnerEmail(e.target.value)} required />
+          <Input label={t("auth.password")} type="password" value={ownerPassword} onChange={(e) => setOwnerPassword(e.target.value)} required minLength={8} />
+          <Input label={t("label.confirmPassword")} type="password" value={ownerPassword2} onChange={(e) => setOwnerPassword2(e.target.value)} required minLength={8} />
           {err && <div className="error" style={{ whiteSpace: "pre-line" }}>{err}</div>}
           <div className="row-between">
-            <Button type="button" variant="secondary" onClick={onClose} disabled={busy}>Cancel</Button>
-            <Button disabled={busy}>{busy ? "Creating owner…" : "Next"}</Button>
+            <Button type="button" variant="secondary" onClick={onClose} disabled={busy}>{t("action.cancel")}</Button>
+            <Button disabled={busy}>{busy ? t("company.creatingOwner") : t("company.next")}</Button>
           </div>
         </form>
       </Modal>
@@ -129,27 +131,27 @@ const CompanyForm = ({ initial, onClose, onSaved }: Props) => {
     <Modal open onClose={onClose}>
       <form className="card" style={cardStyle} onSubmit={submitStep2}>
         <div className="row-between">
-          <h2 style={{ margin: 0 }}>{isEdit ? "Edit company" : "New company · step 2/2"}</h2>
-          {!isEdit && <span className="muted">Company</span>}
+          <h2 style={{ margin: 0 }}>{isEdit ? t("company.titleEdit") : `${t("company.titleNew")} · ${t("company.step2")}`}</h2>
+          {!isEdit && <span className="muted">{t("company.section")}</span>}
         </div>
 
-        <Input label="Company name" value={name} onChange={(e) => setName(e.target.value)} required maxLength={255} autoFocus />
+        <Input label={t("company.name")} value={name} onChange={(e) => setName(e.target.value)} required maxLength={255} autoFocus />
         <div className="row" style={{ gap: 10 }}>
-          <Input label="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
-          <Input label="Phone" value={phone} onChange={(e) => setPhone(e.target.value)} required />
+          <Input label={t("label.email")} type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+          <Input label={t("label.phone")} value={phone} onChange={(e) => setPhone(e.target.value)} required />
         </div>
         <div className="row" style={{ gap: 10 }}>
-          <Input label="Country" value={country} onChange={(e) => setCountry(e.target.value)} required />
-          <Input label="City" value={city} onChange={(e) => setCity(e.target.value)} required />
+          <Input label={t("branch.country")} value={country} onChange={(e) => setCountry(e.target.value)} required />
+          <Input label={t("branch.city")} value={city} onChange={(e) => setCity(e.target.value)} required />
         </div>
-        <Input label="TIN" value={tin} onChange={(e) => setTin(e.target.value)} required />
-        <Input label="Website" value={website} onChange={(e) => setWebsite(e.target.value)} />
-        <Input label="Description" value={description} onChange={(e) => setDescription(e.target.value)} />
+        <Input label={t("company.tin")} value={tin} onChange={(e) => setTin(e.target.value)} required />
+        <Input label={t("company.website")} value={website} onChange={(e) => setWebsite(e.target.value)} />
+        <Input label={t("label.description")} value={description} onChange={(e) => setDescription(e.target.value)} />
 
         {isAdmin && (
           <>
             <div className="col" style={{ gap: 6 }}>
-              <span className="label">Status (admin only)</span>
+              <span className="label">{t("company.statusAdmin")}</span>
               <div className="row" style={{ gap: 6 }}>
                 {(["pending", "active"] as CompanyStatusType[]).map((s) => (
                   <Button key={s} type="button" variant={status === s ? "primary" : "secondary"} onClick={() => setStatus(s)} style={{ flex: 1 }}>{s}</Button>
@@ -157,7 +159,7 @@ const CompanyForm = ({ initial, onClose, onSaved }: Props) => {
               </div>
             </div>
             <NumberStepper
-              label="Commission % (admin only)"
+              label={t("company.commissionAdmin")}
               value={commission}
               onChange={setCommission}
               onCommit={isEdit ? persistCommission : undefined}
@@ -170,15 +172,15 @@ const CompanyForm = ({ initial, onClose, onSaved }: Props) => {
               disabled={commissionSaving}
             />
             <span className="muted" style={{ fontSize: 11, marginTop: -6 }}>
-              Owner pays this percent of monthly gross revenue to Cyber Place.
-              {isEdit && commissionSaving && " Saving…"}
-              {isEdit && !commissionSaving && commissionSavedAt && " Saved."}
+              {t("company.commissionHint")}
+              {isEdit && commissionSaving && ` ${t("company.saving")}`}
+              {isEdit && !commissionSaving && commissionSavedAt && ` ${t("company.saved")}`}
             </span>
           </>
         )}
 
         <ImageUpload
-          label={isEdit ? "Replace logo (optional)" : "Logo"}
+          label={isEdit ? t("company.replaceLogo") : t("company.logo")}
           required={!isEdit}
           name={name}
           initialUrl={initial ? storageUri(initial.company_logo_path) : null}
@@ -187,10 +189,10 @@ const CompanyForm = ({ initial, onClose, onSaved }: Props) => {
 
         {err && <div className="error" style={{ whiteSpace: "pre-line" }}>{err}</div>}
         <div className="row-between">
-          {!isEdit && <Button type="button" variant="secondary" onClick={() => setStep(1)} disabled={busy}>← Back</Button>}
+          {!isEdit && <Button type="button" variant="secondary" onClick={() => setStep(1)} disabled={busy}>{t("company.back")}</Button>}
           <div className="row" style={{ gap: 8 }}>
-            <Button type="button" variant="secondary" onClick={onClose} disabled={busy}>Cancel</Button>
-            <Button disabled={busy}>{busy ? "Saving…" : (isEdit ? "Save" : "Create company")}</Button>
+            <Button type="button" variant="secondary" onClick={onClose} disabled={busy}>{t("action.cancel")}</Button>
+            <Button disabled={busy}>{busy ? "…" : (isEdit ? t("action.save") : t("company.create"))}</Button>
           </div>
         </div>
       </form>

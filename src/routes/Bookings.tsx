@@ -2,11 +2,13 @@ import { useAuth } from "@/auth/AuthContext";
 import ScreenWithBg from "@/components/ui/ScreenWithBg";
 import Spinner from "@/components/ui/Spinner";
 import { useAsync } from "@/hooks/useAsync";
+import { useLang } from "@/i18n/LanguageContext";
 import { bookingRepository } from "@/repositories/BookingRepository";
 import { Link } from "react-router-dom";
 
 const Bookings = () => {
   const { user } = useAuth();
+  const { t } = useLang();
 
   const { data, loading, error } = useAsync(
     () =>
@@ -17,7 +19,7 @@ const Bookings = () => {
     [],
   );
   return (
-    <ScreenWithBg bg="./bg/booking.jpg" title="Bookings">
+    <ScreenWithBg bg="./bg/booking.jpg" title={t("bookings.title")}>
       {loading && <Spinner />}
       {error && <div className="error">{error.message}</div>}
       {!loading && !error && (
@@ -31,7 +33,7 @@ const Bookings = () => {
                     #{b.raw.code ?? b.id} · {b.raw.company?.name ?? "—"}
                   </div>
                   <div className="meta">
-                    {start} · {b.raw.duration_minutes} min ·{" "}
+                    {start} · {b.raw.duration_minutes} {t("time.minShort")} ·{" "}
                     {b.raw.game?.name ?? ""}{" "}
                     {b.raw.game?.platform ? `(${b.raw.game.platform})` : ""}
                   </div>
@@ -40,7 +42,7 @@ const Bookings = () => {
               </Link>
             );
           })}
-          {!data?.length && <div className="muted">No bookings.</div>}
+          {!data?.length && <div className="muted">{t("common.empty.bookings")}</div>}
         </div>
       )}
     </ScreenWithBg>

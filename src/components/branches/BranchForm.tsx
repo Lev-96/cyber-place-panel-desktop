@@ -4,6 +4,7 @@ import Button from "@/components/ui/Button";
 import ImageUpload from "@/components/ui/ImageUpload";
 import Input from "@/components/ui/Input";
 import Modal from "@/components/ui/Modal";
+import { useLang } from "@/i18n/LanguageContext";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { storageUri } from "@/infrastructure/AppConfig";
 import { branchRepository } from "@/repositories/BranchRepository";
@@ -30,6 +31,7 @@ const toCoord = (v: unknown): number => {
 type GeoStatus = "idle" | "searching" | "found" | "not-found" | "error";
 
 const BranchForm = ({ initial, companyId, onClose, onSaved }: Props) => {
+  const { t } = useLang();
   const [address, setAddress] = useState(initial?.address ?? "");
   const [city, setCity] = useState(initial?.city ?? "");
   const [country, setCountry] = useState(initial?.country ?? "");
@@ -72,12 +74,12 @@ const BranchForm = ({ initial, companyId, onClose, onSaved }: Props) => {
   const onLngChange = (v: string) => { userPinnedRef.current = true; setLng(Number(v) || 0); };
 
   const hasCoords = lat !== 0 && lng !== 0;
-  const markers = hasCoords ? [{ lat, lng, label: address || "Selected location" }] : [];
+  const markers = hasCoords ? [{ lat, lng, label: address || t("branchForm.selectedLocation") }] : [];
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     if (!hasCoords) {
-      setErr("Pick a location on the map (or fill the address so it can be auto-located).");
+      setErr(t("branchForm.pickLocationFirst"));
       return;
     }
     setBusy(true); setErr(null);
@@ -99,17 +101,17 @@ const BranchForm = ({ initial, companyId, onClose, onSaved }: Props) => {
   return (
     <Modal open onClose={onClose}>
       <form className="card" style={{ width: 640, maxWidth: "100%", display: "flex", flexDirection: "column", gap: 12 }} onSubmit={submit}>
-        <h2 style={{ margin: 0 }}>{initial ? "Edit branch" : "New branch"}</h2>
+        <h2 style={{ margin: 0 }}>{initial ? t("branch.titleEdit") : t("branch.titleNew")}</h2>
 
-        <Input label="Address" value={address} onChange={(e) => setAddress(e.target.value)} required autoFocus placeholder="e.g. Samvel Safaryan 14" />
+        <Input label={t("branch.address")} value={address} onChange={(e) => setAddress(e.target.value)} required autoFocus placeholder="e.g. Samvel Safaryan 14" />
         <div className="row" style={{ gap: 10 }}>
-          <Input label="City" value={city} onChange={(e) => setCity(e.target.value)} required />
-          <Input label="Country" value={country} onChange={(e) => setCountry(e.target.value)} required />
+          <Input label={t("branch.city")} value={city} onChange={(e) => setCity(e.target.value)} required />
+          <Input label={t("branch.country")} value={country} onChange={(e) => setCountry(e.target.value)} required />
         </div>
-        <Input label="Phone" value={phone} onChange={(e) => setPhone(e.target.value)} required />
+        <Input label={t("label.phone")} value={phone} onChange={(e) => setPhone(e.target.value)} required />
 
         <ImageUpload
-          label="Branch logo (optional)"
+          label={t("branch.logo")}
           name={address || city}
           initialUrl={initial ? storageUri(initial.branch_logo_path) : null}
           onChange={setLogo}
@@ -117,8 +119,8 @@ const BranchForm = ({ initial, companyId, onClose, onSaved }: Props) => {
 
         <div className="col" style={{ gap: 6 }}>
           <div className="row-between">
-            <span className="label" style={{ margin: 0 }}>Location</span>
-            <span className="muted" style={{ fontSize: 11 }}>{statusLabel(geoStatus)}</span>
+            <span className="label" style={{ margin: 0 }}>{t("branchForm.locationLabel")}</span>
+            <span className="muted" style={{ fontSize: 11 }}>{statusLabel(geoStatus, t)}</span>
           </div>
           <BranchMap
             markers={markers}
@@ -128,31 +130,31 @@ const BranchForm = ({ initial, companyId, onClose, onSaved }: Props) => {
             onPick={onMapPick}
           />
           <div className="row" style={{ gap: 10 }}>
-            <Input label="Latitude"  type="number" step="0.000001" value={lat || ""} onChange={(e) => onLatChange(e.target.value)} />
-            <Input label="Longitude" type="number" step="0.000001" value={lng || ""} onChange={(e) => onLngChange(e.target.value)} />
+            <Input label={t("branchForm.latitude")} type="number" step="0.000001" value={lat || ""} onChange={(e) => onLatChange(e.target.value)} />
+            <Input label={t("branchForm.longitude")} type="number" step="0.000001" value={lng || ""} onChange={(e) => onLngChange(e.target.value)} />
           </div>
           <span className="muted" style={{ fontSize: 11 }}>
-            We auto-locate the address as you type. Click on the map to override the pin.
+            {t("branchForm.autoLocateHint")}
           </span>
         </div>
 
         {err && <div className="error" style={{ whiteSpace: "pre-line" }}>{err}</div>}
         <div className="row-between">
-          <Button type="button" variant="secondary" onClick={onClose} disabled={busy}>Cancel</Button>
-          <Button disabled={busy}>{busy ? "Saving…" : "Save"}</Button>
+          <Button type="button" variant="secondary" onClick={onClose} disabled={busy}>{t("action.cancel")}</Button>
+          <Button disabled={busy}>{busy ? "…" : t("action.save")}</Button>
         </div>
       </form>
     </Modal>
   );
 };
 
-const statusLabel = (s: GeoStatus): string => {
+const statusLabel = (s: GeoStatus, t: (k: string) => string): string => {
   switch (s) {
-    case "searching": return "Searching address…";
-    case "found":     return "Pinned ✓";
-    case "not-found": return "Address not found — click the map to pick";
-    case "error":     return "Geocoding failed — click the map to pick";
-    default:          return "Type address or click the map";
+    case "searching": return t("branchForm.searching");
+    case "found":     return t("branchForm.pinned");
+    case "not-found": return t("branchForm.addrNotFound");
+    case "error":     return t("branchForm.geoFailed");
+    default:          return t("branchForm.typeOrClick");
   }
 };
 

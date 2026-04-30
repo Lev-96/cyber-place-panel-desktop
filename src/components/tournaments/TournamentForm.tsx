@@ -5,6 +5,7 @@ import Input from "@/components/ui/Input";
 import Spinner from "@/components/ui/Spinner";
 import { ITournamentApi } from "@/api/tournaments";
 import { useAsync } from "@/hooks/useAsync";
+import { useLang } from "@/i18n/LanguageContext";
 import { branchRepository } from "@/repositories/BranchRepository";
 import { gameRepository } from "@/repositories/GameRepository";
 import { tournamentRepository } from "@/repositories/TournamentRepository";
@@ -18,6 +19,7 @@ interface Props {
 }
 
 const TournamentForm = ({ branchId, initial, onClose, onSaved }: Props) => {
+  const { t } = useLang();
   const games = useAsync(() => gameRepository.list(), []);
   const branch = useAsync(() => branchRepository.byId(branchId), [branchId]);
 
@@ -33,12 +35,12 @@ const TournamentForm = ({ branchId, initial, onClose, onSaved }: Props) => {
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!gameId) return setErr("Pick a game");
-    if (!description.trim()) return setErr("Description is required");
-    if (!startDate) return setErr("Start date is required");
+    if (!gameId) return setErr(t("tournament.errors.pickGame"));
+    if (!description.trim()) return setErr(t("tournament.errors.descRequired"));
+    if (!startDate) return setErr(t("tournament.errors.startRequired"));
 
     const companyId = branch.data?.company_id;
-    if (!companyId) return setErr("Branch is missing company id — reload and retry");
+    if (!companyId) return setErr(t("tournament.errors.companyMissing"));
 
     setBusy(true); setErr(null);
     try {
@@ -73,35 +75,35 @@ const TournamentForm = ({ branchId, initial, onClose, onSaved }: Props) => {
   return (
     <Modal open onClose={onClose}>
       <form className="card" style={{ width: 540, maxWidth: "90vw", display: "flex", flexDirection: "column", gap: 12 }} onSubmit={submit}>
-        <h2 style={{ margin: 0 }}>{initial ? "Edit tournament" : "New tournament"}</h2>
-        <Input label="Title" value={title} onChange={(e) => setTitle(e.target.value)} required maxLength={255} autoFocus />
-        <Input label="Description" value={description} onChange={(e) => setDescription(e.target.value)} required maxLength={255} />
+        <h2 style={{ margin: 0 }}>{initial ? t("tournament.titleEdit") : t("tournament.titleNew")}</h2>
+        <Input label={t("label.title")} value={title} onChange={(e) => setTitle(e.target.value)} required maxLength={255} autoFocus />
+        <Input label={t("label.description")} value={description} onChange={(e) => setDescription(e.target.value)} required maxLength={255} />
 
         <div className="col" style={{ gap: 6 }}>
-          <span className="label">Game</span>
+          <span className="label">{t("label.game")}</span>
           {games.loading ? <Spinner /> : (
             <select className="input" value={gameId} onChange={(e) => setGameId(e.target.value ? Number(e.target.value) : "")} required>
-              <option value="">— pick —</option>
+              <option value="">{t("label.pick")}</option>
               {(games.data ?? []).map((g) => <option key={g.id} value={g.id}>{g.name} ({g.platform.toUpperCase()})</option>)}
             </select>
           )}
         </div>
 
         <div className="row" style={{ gap: 10 }}>
-          <Input label="Price" type="number" min={0} step="0.01" value={price} onChange={(e) => setPrice(e.target.value)} required />
-          <Input label="Participants limit" type="number" min={0} value={participantsLimit} onChange={(e) => setParticipantsLimit(e.target.value)} />
+          <Input label={t("label.price")} type="number" min={0} step="0.01" value={price} onChange={(e) => setPrice(e.target.value)} required />
+          <Input label={t("label.participantsLimit")} type="number" min={0} value={participantsLimit} onChange={(e) => setParticipantsLimit(e.target.value)} />
         </div>
 
         <div className="row" style={{ gap: 10 }}>
-          <Input label="Start date" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} required />
-          <Input label="End date" type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+          <Input label={t("label.startDate")} type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} required />
+          <Input label={t("label.endDate")} type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
         </div>
 
         {err && <div className="error">{err}</div>}
-        {branch.error && <div className="error">Branch load failed: {branch.error.message}</div>}
+        {branch.error && <div className="error">{t("tournament.branchLoadFailed")}: {branch.error.message}</div>}
         <div className="row-between">
-          <Button type="button" variant="secondary" onClick={onClose} disabled={busy}>Cancel</Button>
-          <Button disabled={busy || branch.loading}>{busy ? "Saving…" : "Save"}</Button>
+          <Button type="button" variant="secondary" onClick={onClose} disabled={busy}>{t("action.cancel")}</Button>
+          <Button disabled={busy || branch.loading}>{busy ? "…" : t("action.save")}</Button>
         </div>
       </form>
     </Modal>

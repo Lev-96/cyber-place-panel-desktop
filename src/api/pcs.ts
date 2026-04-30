@@ -5,12 +5,16 @@ export interface CreatePcBody {
   branch_id: number;
   place_id?: number | null;
   label: string;
+  kind?: "pc" | "ps";
+  hourly_rate?: number | null;
   mac_address?: string | null;
 }
 
 export interface UpdatePcBody {
   place_id?: number | null;
   label?: string;
+  kind?: "pc" | "ps";
+  hourly_rate?: number | null;
   mac_address?: string | null;
 }
 

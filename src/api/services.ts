@@ -11,6 +11,7 @@ export interface CreateServiceBody {
   name_en: string;
   name_ru: string;
   name_am: string;
+  price?: number | null;
   service_logo_path?: File | null;
 }
 
@@ -25,6 +26,9 @@ const buildServiceForm = (body: CreateServiceBody): FormData => {
   fd.append("name_en", body.name_en);
   fd.append("name_ru", body.name_ru);
   fd.append("name_am", body.name_am);
+  if (body.price != null && body.price !== undefined) {
+    fd.append("price", String(body.price));
+  }
   if (body.service_logo_path instanceof File) {
     fd.append("service_logo_path", body.service_logo_path);
   }

@@ -2,6 +2,7 @@ import Button from "@/components/ui/Button";
 import { formatApiError } from "@/api/errors";
 import Modal from "@/components/ui/Modal";
 import Input from "@/components/ui/Input";
+import { useLang } from "@/i18n/LanguageContext";
 import { gameRepository } from "@/repositories/GameRepository";
 import { IGameApi } from "@/api/games";
 import { PlatformType } from "@/types/api";
@@ -16,6 +17,7 @@ interface Props {
 const PLATFORMS: PlatformType[] = ["pc", "ps4", "ps5"];
 
 const GameForm = ({ initial, onClose, onSaved }: Props) => {
+  const { t } = useLang();
   const [name, setName] = useState(initial?.name ?? "");
   const [platform, setPlatform] = useState<PlatformType>(initial?.platform ?? "pc");
   const [busy, setBusy] = useState(false);
@@ -41,21 +43,21 @@ const GameForm = ({ initial, onClose, onSaved }: Props) => {
   return (
     <Modal open onClose={onClose}>
       <form className="card" style={{ width: 380, maxWidth: "90vw", display: "flex", flexDirection: "column", gap: 12 }} onSubmit={submit}>
-        <h2 style={{ margin: 0 }}>{isEdit ? "Edit game" : "New game"}</h2>
-        <Input label="Name" value={name} onChange={(e) => setName(e.target.value)} required autoFocus />
+        <h2 style={{ margin: 0 }}>{isEdit ? t("game.titleEdit") : t("game.titleNew")}</h2>
+        <Input label={t("label.name")} value={name} onChange={(e) => setName(e.target.value)} required autoFocus />
         <div className="col" style={{ gap: 6 }}>
-          <span className="label">Platform</span>
+          <span className="label">{t("label.platform")}</span>
           <div className="row" style={{ gap: 6 }}>
             {PLATFORMS.map((p) => (
               <Button key={p} type="button" variant={platform === p ? "primary" : "secondary"} onClick={() => !isEdit && setPlatform(p)} disabled={isEdit} style={{ flex: 1 }}>{p.toUpperCase()}</Button>
             ))}
           </div>
-          {isEdit && <span className="muted" style={{ fontSize: 11 }}>Platform cannot be changed after creation.</span>}
+          {isEdit && <span className="muted" style={{ fontSize: 11 }}>{t("game.platformLocked")}</span>}
         </div>
         {err && <div className="error">{err}</div>}
         <div className="row-between">
-          <Button type="button" variant="secondary" onClick={onClose} disabled={busy}>Cancel</Button>
-          <Button disabled={busy}>{busy ? "Saving…" : "Save"}</Button>
+          <Button type="button" variant="secondary" onClick={onClose} disabled={busy}>{t("action.cancel")}</Button>
+          <Button disabled={busy}>{busy ? "…" : t("action.save")}</Button>
         </div>
       </form>
     </Modal>
