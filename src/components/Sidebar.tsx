@@ -51,7 +51,9 @@ const Sidebar = () => {
       <div style={{ padding: "0 8px", fontSize: 12, color: "#94a3b8" }}>
         {user?.name}
         <div style={{ fontSize: 11 }}>{user?.email}</div>
-        <div style={{ fontSize: 11, color: "#07ddf1" }}>{role}</div>
+        <div style={{ fontSize: 11, color: "#07ddf1" }}>
+          {role?.replace("_", " ")}
+        </div>
       </div>
       <button className="logout" onClick={() => void logout()}>
         {t("nav.signOut")}
