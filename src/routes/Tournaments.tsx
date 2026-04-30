@@ -7,12 +7,18 @@ import { useAsync } from "@/hooks/useAsync";
 import { tournamentRepository } from "@/repositories/TournamentRepository";
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
+import { useAuth } from "@/auth/AuthContext";
 
 const Tournaments = () => {
+  const { user } = useAuth();
+
   const { branchId } = useParams();
   const id = Number(branchId);
   const isBranchScoped = Number.isFinite(id) && id > 0;
-  const { data, loading, error, reload } = useAsync(() => tournamentRepository.list(isBranchScoped ? id : undefined), [id]);
+  const { data, loading, error, reload } = useAsync(
+    () => tournamentRepository.list(isBranchScoped ? id : undefined),
+    [id],
+  );
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState<ITournamentApi | null>(null);
 
@@ -23,14 +29,22 @@ const Tournaments = () => {
   };
 
   return (
-    <ScreenWithBg bg="./bg/owner-home.jpg" title={isBranchScoped ? `Tournaments · branch #${id}` : "Tournaments"}>
+    <ScreenWithBg
+      bg="./bg/owner-home.jpg"
+      title={isBranchScoped ? `Tournaments · branch #${id}` : "Tournaments"}
+    >
       {isBranchScoped && (
         <div className="row-between">
           <div />
           <Button onClick={() => setCreating(true)}>+ New tournament</Button>
         </div>
       )}
-      {!isBranchScoped && <div className="muted">Open a branch and click "Tournaments" to create one. Tournaments belong to a specific branch.</div>}
+      {!isBranchScoped && (
+        <div className="muted">
+          Open a branch and click "Tournaments" to create one. Tournaments
+          belong to a specific branch.
+        </div>
+      )}
 
       {loading && <Spinner />}
       {error && <div className="error">{error.message}</div>}
@@ -41,15 +55,46 @@ const Tournaments = () => {
               <div>
                 <div className="name">{t.title}</div>
                 <div className="meta">
-                  {t.start_date}{t.end_date ? ` — ${t.end_date}` : ""}
-                  {t.price != null && <> · price: {Number(t.price).toFixed(2)}</>}
-                  {t.participants_limit ? <> · {t.registered_participants}/{t.participants_limit} players</> : null}
+                  {t.start_date}
+                  {t.end_date ? ` — ${t.end_date}` : ""}
+                  {t.price != null && (
+                    <> · price: {Number(t.price).toFixed(2)}</>
+                  )}
+                  {t.participants_limit ? (
+                    <>
+                      {" "}
+                      · {t.registered_participants}/{t.participants_limit}{" "}
+                      players
+                    </>
+                  ) : null}
                 </div>
               </div>
               <div className="row" style={{ gap: 6 }}>
-                <Link to={`/tournaments/${t.id}`} className="muted" style={{ ...btn, border: "1px solid #1f2a44", borderRadius: 6 }}>Open</Link>
-                <Button variant="secondary" onClick={() => setEditing(t)} style={btn}>Edit</Button>
-                <Button variant="secondary" onClick={() => remove(t)} style={{ ...btn, color: "#ef4444", borderColor: "#4a1a1a" }}>Delete</Button>
+                <Link to={`/tournaments/${t.id}`} className="muted" style={btn}>
+                  Open
+                </Link>
+                {user?.role && ["admin", "owner"].includes(user?.role) && (
+                  <>
+                    <Button
+                      variant="secondary"
+                      onClick={() => setEditing(t)}
+                      style={btn}
+                    >
+                      Edit
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      onClick={() => remove(t)}
+                      style={{
+                        ...btn,
+                        color: "#ef4444",
+                        borderColor: "#4a1a1a",
+                      }}
+                    >
+                      Delete
+                    </Button>
+                  </>
+                )}
               </div>
             </div>
           ))}
@@ -57,10 +102,25 @@ const Tournaments = () => {
         </div>
       )}
       {creating && isBranchScoped && (
-        <TournamentForm branchId={id} onClose={() => setCreating(false)} onSaved={() => { setCreating(false); void reload(); }} />
+        <TournamentForm
+          branchId={id}
+          onClose={() => setCreating(false)}
+          onSaved={() => {
+            setCreating(false);
+            void reload();
+          }}
+        />
       )}
       {editing && (
-        <TournamentForm branchId={editing.branch_id} initial={editing} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); void reload(); }} />
+        <TournamentForm
+          branchId={editing.branch_id}
+          initial={editing}
+          onClose={() => setEditing(null)}
+          onSaved={() => {
+            setEditing(null);
+            void reload();
+          }}
+        />
       )}
     </ScreenWithBg>
   );
