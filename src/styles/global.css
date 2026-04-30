@@ -237,6 +237,33 @@ a.card:hover { transform: translateY(-2px); border-color: #07ddf1; box-shadow: 0
 
 .main { padding: 24px 32px; overflow-y: auto; }
 
+.cp-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px 7px 10px;
+  margin: 0 0 14px;
+  background: rgba(7, 221, 241, 0.08);
+  border: 1px solid #1f2a44;
+  border-radius: 999px;
+  color: #cfe9ee;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  cursor: pointer;
+  transition: transform 160ms ease, border-color 160ms ease, background 160ms ease, color 160ms ease, box-shadow 160ms ease;
+}
+.cp-back-btn:hover {
+  color: #ffffff;
+  border-color: transparent;
+  background: linear-gradient(90deg, #07ddf1, #32aff7 55%, #d152fa);
+  box-shadow: 0 6px 18px rgba(7, 221, 241, 0.25);
+  transform: translateX(-2px);
+}
+.cp-back-btn:active { transform: translateX(-1px) scale(0.98); }
+.cp-back-btn svg { transition: transform 160ms ease; }
+.cp-back-btn:hover svg { transform: translateX(-2px); }
+
 .page-title { font-size: 22px; font-weight: 700; margin: 0 0 16px; }
 
 .card {

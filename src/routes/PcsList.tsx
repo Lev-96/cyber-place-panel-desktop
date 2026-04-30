@@ -41,12 +41,23 @@ const PcsList = () => {
     }
     setWaking(pc.id);
     try {
-      const r = await apiWakePc(pc.id);
-      const lines = [r.message];
-      if (r.sent_packets) lines.push(`Packets sent: ${r.sent_packets}`);
-      if (r.note) lines.push("", r.note);
-      if (r.errors?.length) lines.push("", "Errors:", ...r.errors);
-      alert(lines.join("\n"));
+      // Prefer local Electron transport — same LAN as the gaming PCs, broadcast actually reaches them.
+      // Fall back to backend endpoint when running in a browser (no desktopAPI bridge).
+      if (window.desktopAPI?.wakeOnLan) {
+        const r = await window.desktopAPI.wakeOnLan(pc.mac_address);
+        const lines = [r.message];
+        if (r.sent) lines.push(`Packets sent: ${r.sent}`);
+        if (r.errors.length) lines.push("", "Errors:", ...r.errors);
+        lines.push("", "PC must have Wake-on-LAN enabled in BIOS and NIC settings, and be on the same LAN as this cashier.");
+        alert(lines.join("\n"));
+      } else {
+        const r = await apiWakePc(pc.id);
+        const lines = [r.message];
+        if (r.sent_packets) lines.push(`Packets sent: ${r.sent_packets}`);
+        if (r.note) lines.push("", r.note);
+        if (r.errors?.length) lines.push("", "Errors:", ...r.errors);
+        alert(lines.join("\n"));
+      }
     } catch (e) {
       alert(`Wake failed: ${e instanceof Error ? e.message : "unknown error"}`);
     } finally { setWaking(null); }

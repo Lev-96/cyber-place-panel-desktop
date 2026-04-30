@@ -30,9 +30,9 @@ const SessionsBoard = ({ branchId }: Props) => {
     void sessions.reload(); void pcs.reload();
   };
 
-  if (pcs.loading || sessions.loading) return <Spinner />;
-  if (pcs.error) return <div className="error">{pcs.error.message}</div>;
-  if (sessions.error) return <div className="error">{sessions.error.message}</div>;
+  if ((pcs.loading && !pcs.data) || (sessions.loading && !sessions.data)) return <Spinner />;
+  if (pcs.error && !pcs.data) return <div className="error">{pcs.error.message}</div>;
+  if (sessions.error && !sessions.data) return <div className="error">{sessions.error.message}</div>;
 
   const sessionByPc = new Map<number, ISessionApi>();
   for (const s of sessions.data ?? []) sessionByPc.set(s.pc_id, s);

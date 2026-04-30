@@ -1,4 +1,5 @@
-import { BrowserWindow, app, ipcMain, net, protocol, shell } from "electron";
+import { BrowserWindow, app, ipcMain, net, protocol, session, shell } from "electron";
+import { createSocket } from "node:dgram";
 import { existsSync } from "node:fs";
 import { join, normalize, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -6,6 +7,13 @@ import { Store } from "./storage";
 
 const DEV_URL = process.env.ELECTRON_DEV_URL ?? "";
 const isDev = DEV_URL.length > 0 || !app.isPackaged;
+
+// Silence Chromium's own diagnostic chatter (CSP warnings, GL probes,
+// Autofill devtools messages, GPU info, etc.). Same approach Discord and
+// other consumer Electron apps use — production users shouldn't see logs.
+app.commandLine.appendSwitch("log-level", "3");           // FATAL only
+app.commandLine.appendSwitch("disable-logging");
+app.commandLine.appendSwitch("disable-features", "Autofill");
 
 let store: Store | null = null;
 let mainWindow: BrowserWindow | null = null;
@@ -69,17 +77,6 @@ const createWindow = async () => {
     return { action: "deny" as const };
   });
 
-  // Surface renderer errors to terminal during development.
-  mainWindow.webContents.on("render-process-gone", (_e, details) => {
-    console.error("[renderer-gone]", details);
-  });
-  mainWindow.webContents.on("did-fail-load", (_e, code, desc, url) => {
-    console.error("[did-fail-load]", code, desc, url);
-  });
-  mainWindow.webContents.on("console-message", (_e, level, msg, line, src) => {
-    if (level >= 2) console.error("[renderer]", msg, src + ":" + line);
-  });
-
   if (isDev && DEV_URL) {
     await mainWindow.loadURL(DEV_URL);
   } else {
@@ -94,9 +91,22 @@ app.whenReady().then(async () => {
   store = new Store(join(app.getPath("userData"), "cyberplace.kv.json"));
   await store.load();
 
+  // Auto-clear non-essential caches on every startup. Keeps the userData
+  // directory from growing unbounded over time. We DO keep cookies/localStorage
+  // (that's the user's auth token via KV store).
+  try {
+    await session.defaultSession.clearCache();
+    await session.defaultSession.clearStorageData({
+      storages: ["shadercache", "cachestorage"],
+    });
+    await session.defaultSession.clearCodeCaches({});
+  } catch { /* best-effort */ }
+
   ipcMain.handle("kv:get", (_e: unknown, key: string) => store?.get(key) ?? null);
   ipcMain.handle("kv:set", (_e: unknown, key: string, value: string) => store?.set(key, value));
   ipcMain.handle("kv:remove", (_e: unknown, key: string) => store?.remove(key));
+
+  ipcMain.handle("wol:send", (_e: unknown, mac: string) => sendMagicPacket(mac));
 
   if (!(isDev && DEV_URL)) {
     const root = join(__dirname, "..", "..", "dist", "web");
@@ -113,3 +123,53 @@ app.whenReady().then(async () => {
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") app.quit();
 });
+
+interface WolResult {
+  ok: boolean;
+  mac: string;
+  sent: number;
+  errors: string[];
+  message: string;
+}
+
+const sendMagicPacket = async (mac: string): Promise<WolResult> => {
+  const hex = mac.replace(/[^0-9a-fA-F]/g, "");
+  if (hex.length !== 12) {
+    return { ok: false, mac, sent: 0, errors: [], message: "Invalid MAC address. Expected 6 hex bytes (e.g. AA:BB:CC:DD:EE:FF)." };
+  }
+  const macBytes = Buffer.from(hex, "hex");
+  const packet = Buffer.concat([Buffer.alloc(6, 0xff), ...Array(16).fill(macBytes)]);
+  const targets = ["255.255.255.255", "192.168.255.255", "192.168.1.255", "10.255.255.255"];
+  const ports = [9, 7];
+
+  const sock = createSocket("udp4");
+  await new Promise<void>((res, rej) => {
+    sock.once("error", rej);
+    sock.bind(0, () => { sock.setBroadcast(true); res(); });
+  }).catch((e: Error) => {
+    return { ok: false, mac, sent: 0, errors: [e.message], message: "Failed to open UDP socket." };
+  });
+
+  const errors: string[] = [];
+  let sent = 0;
+  for (const ip of targets) {
+    for (const port of ports) {
+      await new Promise<void>((resolve) => {
+        sock.send(packet, port, ip, (err) => {
+          if (err) errors.push(`${ip}:${port} ${err.message}`);
+          else sent++;
+          resolve();
+        });
+      });
+    }
+  }
+  sock.close();
+
+  return {
+    ok: sent > 0,
+    mac,
+    sent,
+    errors,
+    message: sent > 0 ? "Magic packet sent." : "Failed to send magic packet.",
+  };
+};

@@ -4,7 +4,7 @@ import Input from "@/components/ui/Input";
 import Spinner from "@/components/ui/Spinner";
 import { sessionRepository } from "@/repositories/SessionRepository";
 import { IPcApi, ITimePackage } from "@/types/sessions";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 interface Props {
   branchId: number;
@@ -19,14 +19,22 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const nameRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => { void sessionRepository.listPackages(branchId).then((p) => { setPackages(p); setPkgId(p[0]?.id ?? null); }); }, [branchId]);
+
+  // Focus the name input as soon as packages load. Without this, focus stays
+  // wherever the previous native confirm() left it — making the input feel
+  // unresponsive on the second open after a stop.
+  useEffect(() => {
+    if (packages && nameRef.current) nameRef.current.focus();
+  }, [packages]);
 
   const submit = async () => {
     if (!pkgId) return;
     setBusy(true); setErr(null);
     try {
-      await sessionRepository.start({ branch_id: branchId, pc_id: pc.id, package_id: pkgId, user_display_name: name || undefined });
+      await sessionRepository.start({ branch_id: branchId, pc_id: pc.id, time_package_id: pkgId, user_display_name: name || undefined });
       onStarted();
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Failed to start");
@@ -39,7 +47,7 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
         <h2 style={{ margin: 0 }}>Start session · {pc.label}</h2>
         {!packages ? <Spinner /> : (
           <>
-            <Input label="Customer name (optional)" value={name} onChange={(e) => setName(e.target.value)} />
+            <Input ref={nameRef} label="Customer name (optional)" value={name} onChange={(e) => setName(e.target.value)} />
             <div className="col" style={{ gap: 6 }}>
               <span className="label">Time package</span>
               <div className="col" style={{ gap: 6 }}>
@@ -48,7 +56,7 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
                     <input type="radio" name="pkg" value={p.id} checked={p.id === pkgId} onChange={() => setPkgId(p.id)} />
                     <span style={{ flex: 1 }}>{p.name}</span>
                     <span className="muted">{p.duration_minutes} min</span>
-                    <span style={{ fontWeight: 700 }}>{p.price.toFixed(2)}</span>
+                    <span style={{ fontWeight: 700 }}>{Number(p.price).toFixed(2)}</span>
                   </label>
                 ))}
               </div>

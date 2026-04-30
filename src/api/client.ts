@@ -23,7 +23,12 @@ export const request = async <Res>(
   opts: { method?: Method; body?: unknown; params?: Record<string, unknown> | object } = {},
 ): Promise<Res> => {
   const token = await keyValueStore.get<string>(AppConfig.storageKeys.token);
-  const headers: Record<string, string> = { Accept: "application/json" };
+  const headers: Record<string, string> = {
+    Accept: "application/json",
+    // Bypass ngrok-free.app browser-warning interstitial when backend is tunneled via ngrok.
+    // Harmless on any other backend (just an unused header).
+    "ngrok-skip-browser-warning": "1",
+  };
   if (opts.body !== undefined && !(opts.body instanceof FormData)) {
     headers["Content-Type"] = "application/json";
   }

@@ -27,7 +27,7 @@ export class SessionRepository {
     return friendlyMutation(apiStopSession(id).then((r) => r.session));
   }
   async extend(id: number, packageId: number): Promise<ISessionApi> {
-    return friendlyMutation(apiExtendSession(id, { package_id: packageId }).then((r) => r.session));
+    return friendlyMutation(apiExtendSession(id, { time_package_id: packageId }).then((r) => r.session));
   }
 }
 

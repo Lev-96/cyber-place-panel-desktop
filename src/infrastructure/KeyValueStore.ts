@@ -10,6 +10,13 @@ declare global {
       get(key: string): Promise<string | null>;
       set(key: string, value: string): Promise<void>;
       remove(key: string): Promise<void>;
+      wakeOnLan(mac: string): Promise<{
+        ok: boolean;
+        mac: string;
+        sent: number;
+        errors: string[];
+        message: string;
+      }>;
     };
   }
 }

@@ -4,12 +4,12 @@ import { request } from "./client";
 export interface StartSessionBody {
   branch_id: number;
   pc_id: number;
-  package_id: number;
+  time_package_id: number;
   user_display_name?: string;
 }
 
 export interface ExtendSessionBody {
-  package_id: number;
+  time_package_id: number;
 }
 
 /* When the backend's `/sessions`, `/pcs`, `/time-packages` migrations are
