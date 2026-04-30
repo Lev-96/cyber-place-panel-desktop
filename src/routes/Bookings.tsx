@@ -1,3 +1,4 @@
+import { useAuth } from "@/auth/AuthContext";
 import ScreenWithBg from "@/components/ui/ScreenWithBg";
 import Spinner from "@/components/ui/Spinner";
 import { useAsync } from "@/hooks/useAsync";
@@ -5,8 +6,16 @@ import { bookingRepository } from "@/repositories/BookingRepository";
 import { Link } from "react-router-dom";
 
 const Bookings = () => {
-  const { data, loading, error } = useAsync(() => bookingRepository.listAll({}), []);
+  const { user } = useAuth();
 
+  const { data, loading, error } = useAsync(
+    () =>
+      bookingRepository.listAll({
+        branch_id: user?.dashboard?.branch_id || undefined,
+        company_id: user?.dashboard?.company_id,
+      }),
+    [],
+  );
   return (
     <ScreenWithBg bg="./bg/booking.jpg" title="Bookings">
       {loading && <Spinner />}
@@ -18,8 +27,14 @@ const Bookings = () => {
             return (
               <Link key={b.id} to={`/bookings/${b.id}`} className="list-item">
                 <div>
-                  <div className="name">#{b.raw.code ?? b.id} · {b.raw.company?.name ?? "—"}</div>
-                  <div className="meta">{start} · {b.raw.duration_minutes} min · {b.raw.game?.name ?? ""} {b.raw.game?.platform ? `(${b.raw.game.platform})` : ""}</div>
+                  <div className="name">
+                    #{b.raw.code ?? b.id} · {b.raw.company?.name ?? "—"}
+                  </div>
+                  <div className="meta">
+                    {start} · {b.raw.duration_minutes} min ·{" "}
+                    {b.raw.game?.name ?? ""}{" "}
+                    {b.raw.game?.platform ? `(${b.raw.game.platform})` : ""}
+                  </div>
                 </div>
                 <span className={`pill ${b.status}`}>{b.status}</span>
               </Link>
