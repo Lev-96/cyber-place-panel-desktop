@@ -15,10 +15,38 @@ const Tournaments = () => {
   const { branchId } = useParams();
   const id = Number(branchId);
   const isBranchScoped = Number.isFinite(id) && id > 0;
+
+  let filterParams: {
+    branch_id?: number;
+    // company_id?: number
+  } = {};
+
+  if (user?.role === "manager" && user.dashboard?.branch_id) {
+    filterParams.branch_id = user.dashboard.branch_id;
+  }
+  // else if (user?.role === "company_owner" && user.dashboard?.company_id) {
+  //   filterParams.company_id = user.dashboard.company_id;
+  // }
+
+  // If a branchId is in the route (e.g., branch-scoped), it overrides the manager's branch scope for listing
+  // (if this is NOT the desired effect, simply use filterParams as above and ignore branchId)
+  if (isBranchScoped) {
+    filterParams.branch_id = id;
+    // delete filterParams.company_id;
+  }
+
   const { data, loading, error, reload } = useAsync(
-    () => tournamentRepository.list(isBranchScoped ? id : undefined),
-    [id],
+    () => tournamentRepository.list(filterParams.branch_id),
+    // dependencies: update if user, branchId changes
+    [
+      user?.role,
+      user?.dashboard?.branch_id,
+      user?.dashboard?.company_id,
+      id,
+      isBranchScoped,
+    ],
   );
+
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState<ITournamentApi | null>(null);
 
@@ -73,28 +101,29 @@ const Tournaments = () => {
                 <Link to={`/tournaments/${t.id}`} className="muted" style={btn}>
                   Open
                 </Link>
-                {user?.role && ["admin", "owner"].includes(user?.role) && (
-                  <>
-                    <Button
-                      variant="secondary"
-                      onClick={() => setEditing(t)}
-                      style={btn}
-                    >
-                      Edit
-                    </Button>
-                    <Button
-                      variant="secondary"
-                      onClick={() => remove(t)}
-                      style={{
-                        ...btn,
-                        color: "#ef4444",
-                        borderColor: "#4a1a1a",
-                      }}
-                    >
-                      Delete
-                    </Button>
-                  </>
-                )}
+                {user?.role &&
+                  ["admin", "company_owner"].includes(user?.role) && (
+                    <>
+                      <Button
+                        variant="secondary"
+                        onClick={() => setEditing(t)}
+                        style={btn}
+                      >
+                        Edit
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        onClick={() => remove(t)}
+                        style={{
+                          ...btn,
+                          color: "#ef4444",
+                          borderColor: "#4a1a1a",
+                        }}
+                      >
+                        Delete
+                      </Button>
+                    </>
+                  )}
               </div>
             </div>
           ))}
@@ -126,6 +155,7 @@ const Tournaments = () => {
   );
 };
 
+// This function is expected to be implemented in TournamentRepository.ts alongside "list", but using the full apiListTournaments param object.
 const btn: React.CSSProperties = { padding: "6px 10px", fontSize: 12 };
 
 export default Tournaments;
