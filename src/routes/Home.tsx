@@ -65,12 +65,14 @@ const Home = () => {
       </div>
 
       <div className="row" style={{ gap: 12, flexWrap: "wrap" }}>
-        <Link to="/branches" className="card" style={{ minWidth: 220 }}>
-          <div style={{ fontWeight: 700, fontSize: 16 }}>
-            {t("home.menu.branches")}
-          </div>
-          <div className="muted">{t("home.menu.branchesSub")}</div>
-        </Link>
+        {(isAdmin || isOwner) && (
+          <Link to="/branches" className="card" style={{ minWidth: 220 }}>
+            <div style={{ fontWeight: 700, fontSize: 16 }}>
+              {t("home.menu.branches")}
+            </div>
+            <div className="muted">{t("home.menu.branchesSub")}</div>
+          </Link>
+        )}
         <Link to="/bookings" className="card" style={{ minWidth: 220 }}>
           <div style={{ fontWeight: 700, fontSize: 16 }}>
             {t("home.menu.bookings")}
