@@ -5,11 +5,13 @@ import {
   apiListActiveSessions,
   apiListPackages,
   apiListPcs,
+  apiListSessions,
   apiPreviewSession,
   apiRemoveSessionItem,
   apiStartSession,
   apiStopSessionWithBreakdown,
   IBillBreakdown,
+  ListSessionsParams,
   StartSessionBody,
 } from "@/api/sessions";
 import { friendlyMutation, orFallback } from "@/api/fallback";
@@ -23,6 +25,9 @@ export interface StopResult {
 export class SessionRepository {
   async listActive(branchId: number): Promise<ISessionApi[]> {
     return orFallback(apiListActiveSessions(branchId).then((r) => r.data), []);
+  }
+  async list(params: ListSessionsParams): Promise<ISessionApi[]> {
+    return orFallback(apiListSessions(params).then((r) => r.data), []);
   }
   async listPcs(branchId: number): Promise<IPcApi[]> {
     return orFallback(apiListPcs(branchId).then((r) => r.data), []);

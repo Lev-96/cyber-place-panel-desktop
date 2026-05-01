@@ -25,6 +25,30 @@ export interface IBillingReminder {
 export const apiCompanyBilling = (companyId: number) =>
   request<ICompanyBilling>(`/company/${companyId}/billing`);
 
+/**
+ * Operational revenue + commission for a company over a window.
+ * `from`/`to` accept full ISO timestamps with timezone offset (preferred)
+ * or bare "YYYY-MM-DD" (interpreted as midnight in server TZ).
+ */
+export interface ICompanyRevenueSummary {
+  company_id: number;
+  from: string;
+  to: string;
+  sessions_total: number;
+  pos_total: number;
+  gross_total: number;
+  commission_percent: number;
+  commission_amount: number;
+}
+
+export const apiCompanyRevenueSummary = (
+  companyId: number,
+  range?: { from?: string; to?: string },
+) =>
+  request<ICompanyRevenueSummary>(`/company/${companyId}/revenue-summary`, {
+    params: { from: range?.from, to: range?.to },
+  });
+
 export const apiMarkCompanyPaid = (companyId: number) =>
   request<ICompanyBilling & { message: string }>(`/company/${companyId}/mark-paid`, { method: "POST" });
 

@@ -1,5 +1,18 @@
 export type Lang = "en" | "ru" | "am";
 
+/**
+ * Substitute `{0}`, `{1}`, … placeholders in a translated string with the
+ * caller's values. Lets us keep dynamic-text translations in one piece
+ * (e.g. "Delete '{0}'?") instead of splitting them at language boundaries
+ * — which would otherwise force grammars where the verb-noun-modifier
+ * order doesn't match between en/ru/am.
+ */
+export const fmt = (template: string, ...args: (string | number)[]): string =>
+  template.replace(/\{(\d+)\}/g, (m, idx) => {
+    const i = Number(idx);
+    return i >= 0 && i < args.length ? String(args[i]) : m;
+  });
+
 export const LANGUAGES: Array<{ code: Lang; name: string }> = [
   { code: "en", name: "English" },
   { code: "ru", name: "Русский" },
@@ -12,6 +25,7 @@ export const TRANSLATIONS: Dict = {
   // Navigation
   "nav.dashboard": { en: "Dashboard", ru: "Панель", am: "Վահանակ" },
   "nav.branches": { en: "Branches", ru: "Филиалы", am: "Մասնաճյուղեր" },
+  "nav.myBranch": { en: "My branch", ru: "Мой филиал", am: "Իմ մասնաճյուղը" },
   "nav.map": { en: "Map", ru: "Карта", am: "Քարտեզ" },
   "nav.bookings": { en: "Bookings", ru: "Бронирования", am: "Ամրագրումներ" },
   "nav.scan": { en: "Scan / Confirm", ru: "Сканировать", am: "Սկանավորել" },
@@ -154,6 +168,103 @@ export const TRANSLATIONS: Dict = {
   "login.passwordPlaceholder": { en: "••••••••", ru: "••••••••", am: "••••••••" },
   "login.signingIn": { en: "Signing in…", ru: "Вход…", am: "Մուտք…" },
   "login.failed": { en: "Login failed", ru: "Не удалось войти", am: "Մուտքը ձախողվեց" },
+  "login.invalidCredentials": { en: "Wrong email or password", ru: "Неверный логин или пароль", am: "Սխալ էլ. հասցե կամ գաղտնաբառ" },
+
+  // Sessions history
+  "history.title": { en: "Sessions history", ru: "История сессий", am: "Սեանսների պատմություն" },
+  "history.from": { en: "From", ru: "С", am: "Սկսած" },
+  "history.to": { en: "To", ru: "По", am: "Մինչև" },
+  "history.today": { en: "Today", ru: "Сегодня", am: "Այսօր" },
+  "history.yesterday": { en: "Yesterday", ru: "Вчера", am: "Երեկ" },
+  "history.month": { en: "This month", ru: "Текущий месяц", am: "Ընթացիկ ամիս" },
+  "history.backToBoard": { en: "Back to board", ru: "К доске сессий", am: "Վերադառնալ սեանսներին" },
+  "history.sumSessions": { en: "Sessions", ru: "Сессии", am: "Սեանսներ" },
+  "history.sumTotal": { en: "Total revenue", ru: "Выручка", am: "Ընդհանուր եկամուտ" },
+  "history.sumTime": { en: "Time revenue", ru: "За время", am: "Ժամանակի դիմաց" },
+  "history.sumItemsRevenue": { en: "Items revenue", ru: "Товары · сумма", am: "Ապրանքների գումար" },
+  "history.sumItemsQty": { en: "Items sold", ru: "Продано позиций", am: "Վաճառվել է" },
+  "history.topItems": { en: "Top items", ru: "Топ позиций", am: "Լավագույն դիրքեր" },
+  "history.empty": { en: "No sessions in this range.", ru: "В выбранном периоде нет сессий.", am: "Ընտրված ժամանակահատվածում սեանսներ չկան:" },
+  "history.timeCost": { en: "Time", ru: "За время", am: "Ժամանակի դիմաց" },
+  "history.itemsTotal": { en: "Items", ru: "Товары", am: "Ապրանքներ" },
+  "history.total": { en: "Total", ru: "Итог", am: "Ընդհանուր" },
+  "history.modeOpen": { en: "By the hour", ru: "Почасовая", am: "Ժամային" },
+  "history.modeFixed": { en: "Package", ru: "Пакет", am: "Փաթեթ" },
+  "history.status.active": { en: "Active", ru: "Активна", am: "Ակտիվ" },
+  "history.status.stopped": { en: "Closed", ru: "Закрыта", am: "Փակված" },
+  "history.status.expired": { en: "Expired", ru: "Истекла", am: "Ժամկետանց" },
+
+  // Branch places admin (CRUD seats per branch)
+  "branchPlaces.title": { en: "Places", ru: "Места", am: "Տեղեր" },
+  "branchPlaces.intro": { en: "A place is a bookable seat (e.g. PC #1, PS5 VIP #2). Each place gets games linked.", ru: "Место — это место для бронирования (например, ПК №1, PS5 VIP №2). К каждому месту привязываются игры.", am: "Տեղը ամրագրվող նստատեղ է (օր.՝ PC #1, PS5 VIP #2): Յուրաքանչյուր տեղին կապվում են խաղեր:" },
+  "branchPlaces.new": { en: "+ New place", ru: "+ Новое место", am: "+ Նոր տեղ" },
+  "branchPlaces.confirmDelete": { en: "Delete place #{0}?", ru: "Удалить место №{0}?", am: "Ջնջե՞լ #{0} տեղը:" },
+  "branchPlaces.empty": { en: "No places yet. Click 'New place' to add the first one.", ru: "Мест ещё нет. Нажмите «Новое место», чтобы добавить первое.", am: "Տեղեր դեռ չկան: Սեղմեք «Նոր տեղ»՝ առաջինը ավելացնելու համար:" },
+  "branchPlaces.games": { en: "game(s)", ru: "игр", am: "խաղ" },
+  "branchPlaces.status.active": { en: "active", ru: "активно", am: "ակտիվ" },
+  "branchPlaces.status.inactive": { en: "inactive", ru: "неактивно", am: "ոչ ակտիվ" },
+
+  // Booking details page
+  "bookingDetails.title": { en: "Booking", ru: "Бронирование", am: "Ամրագրում" },
+  "bookingDetails.status": { en: "Status", ru: "Статус", am: "Կարգավիճակ" },
+  "bookingDetails.status.pending": { en: "Pending", ru: "Ожидание", am: "Սպասում" },
+  "bookingDetails.status.confirmed": { en: "Confirmed", ru: "Подтверждено", am: "Հաստատված" },
+  "bookingDetails.status.cancelled": { en: "Cancelled", ru: "Отменено", am: "Չեղարկված" },
+  "bookingDetails.status.rescheduled": { en: "Rescheduled", ru: "Перенесено", am: "Տեղափոխված" },
+  "bookingDetails.code": { en: "Code", ru: "Код", am: "Կոդ" },
+  "bookingDetails.company": { en: "Company", ru: "Компания", am: "Ընկերություն" },
+  "bookingDetails.branch": { en: "Branch", ru: "Филиал", am: "Մասնաճյուղ" },
+  "bookingDetails.game": { en: "Game", ru: "Игра", am: "Խաղ" },
+  "bookingDetails.start": { en: "Start", ru: "Начало", am: "Սկիզբ" },
+  "bookingDetails.duration": { en: "Duration", ru: "Длительность", am: "Տևողություն" },
+  "bookingDetails.places": { en: "Places", ru: "Места", am: "Տեղեր" },
+  "bookingDetails.endTime": { en: "End time", ru: "Окончание", am: "Ավարտ" },
+  "bookingDetails.showCode": { en: "Show this code at branch", ru: "Покажите код в филиале", am: "Ցույց տվեք կոդը մասնաճյուղում" },
+  "bookingDetails.reschedule": { en: "Reschedule", ru: "Перенести", am: "Տեղափոխել" },
+  "bookingDetails.cancel": { en: "Cancel", ru: "Отменить", am: "Չեղարկել" },
+  "bookingDetails.rate": { en: "Rate branch", ru: "Оценить филиал", am: "Գնահատել մասնաճյուղը" },
+  "bookingDetails.minShort": { en: "min", ru: "мин", am: "ր" },
+
+  // PCs management page
+  "pcs.confirmDelete": { en: "Delete '{0}'? This cannot be undone.", ru: "Удалить «{0}»? Действие необратимо.", am: "Ջնջե՞լ «{0}»: Անդարձելի գործողություն:" },
+  "pcs.confirmRotate": { en: "Rotate pairing token for '{0}'? The agent on this PC will stop working until updated.", ru: "Сменить токен сопряжения для «{0}»? Агент на этом ПК перестанет работать, пока его не обновят.", am: "Թարմացնե՞լ «{0}»-ի զուգակցման թոքենը: PC-ի գործակալը կդադարի աշխատել մինչև թարմացում:" },
+  "pcs.macRequired": { en: "Set a MAC address on this PC before using Wake-on-LAN.", ru: "Сначала задайте MAC-адрес для этого ПК — без него Wake-on-LAN не сработает.", am: "Նախ նշեք PC-ի MAC հասցեն — առանց դրա Wake-on-LAN չի աշխատի:" },
+  "pcs.packetsSent": { en: "Packets sent: {0}", ru: "Пакетов отправлено: {0}", am: "Փաթեթներ ուղարկվել են՝ {0}" },
+  "pcs.errorsHeader": { en: "Errors:", ru: "Ошибки:", am: "Սխալներ՝" },
+  "pcs.wolReminder": { en: "PC must have Wake-on-LAN enabled in BIOS and NIC settings, and be on the same LAN as this cashier.", ru: "На ПК должен быть включён Wake-on-LAN в BIOS и в настройках сетевой карты, и он должен быть в одной сети с кассой.", am: "PC-ի BIOS-ում և ցանցային քարտի կարգավորումներում պետք է միացված լինի Wake-on-LAN, և PC-ն պետք է լինի դրամարկղի հետ նույն ցանցում:" },
+  "pcs.wakeFailed": { en: "Wake failed: {0}", ru: "Не удалось разбудить: {0}", am: "Արթնացման սխալ՝ {0}" },
+  "pcs.howConnects": { en: "How a PC actually connects:", ru: "Как ПК подключается:", am: "Ինչպես PC-ն իրականում միանում է՝" },
+  "pcs.connect.step1": { en: "Register the PC here — you get a pairing token.", ru: "Зарегистрируйте ПК — получите токен сопряжения.", am: "Գրանցեք PC-ն այստեղ — կստանաք զուգակցման թոքեն:" },
+  "pcs.connect.step2": { en: "Install the agent on the PC and enter the PC ID + token.", ru: "Установите агента на ПК и введите ID и токен.", am: "Տեղադրեք գործակալը PC-ում և մուտքագրեք PC ID-ն և թոքենը:" },
+  "pcs.connect.step3": { en: "The MAC address is optional — used only for Wake-on-LAN, not for authentication.", ru: "MAC-адрес опционален — нужен только для Wake-on-LAN, не для авторизации.", am: "MAC-հասցեն ոչ պարտադիր է — օգտագործվում է միայն Wake-on-LAN-ի համար, ոչ նույնականացման:" },
+  "pcs.lastSeen": { en: "last seen", ru: "последний раз", am: "վերջին անգամ" },
+  "pcs.notPaired": { en: "not paired yet — install agent", ru: "ещё не сопряжён — установите агента", am: "դեռ չզուգակցված — տեղադրեք գործակալը" },
+  "pcs.sending": { en: "Sending…", ru: "Отправка…", am: "Ուղարկում…" },
+  "pcs.wake": { en: "Wake", ru: "Разбудить", am: "Արթնացնել" },
+  "pcs.getToken": { en: "Get token", ru: "Получить токен", am: "Ստանալ թոքեն" },
+  "pcs.rotateToken": { en: "Rotate token", ru: "Сменить токен", am: "Թարմացնել թոքենը" },
+  "pcs.empty": { en: "No PCs registered yet — click Register to add the first one.", ru: "ПК ещё не зарегистрированы — нажмите «Зарегистрировать», чтобы добавить первый.", am: "PC-ներ դեռ չեն գրանցվել — սեղմեք «Գրանցել»՝ առաջինը ավելացնելու համար:" },
+  "pcs.statusInSession": { en: "In session", ru: "В сессии", am: "Սեանսում" },
+  "pcs.statusOnline": { en: "Online", ru: "В сети", am: "Առցանց" },
+  "pcs.statusOffline": { en: "Offline", ru: "Не в сети", am: "Անցանց" },
+
+  // Shift panel — extends existing shift.* block above with strings the
+  // ShiftPanel route needs in addition to the legacy minimal set.
+  "shift.confirmClose": { en: "Close this shift? After close it cannot be modified.", ru: "Закрыть смену? После закрытия её нельзя изменить.", am: "Փակե՞լ հերթափոխը: Փակվելուց հետո չի կարելի փոփոխել:" },
+  "shift.failed": { en: "Failed", ru: "Сбой", am: "Ձախողվեց" },
+  "shift.openingCash": { en: "Opening cash", ru: "Касса на старте", am: "Մեկնարկային կանխիկ" },
+  "shift.opening": { en: "Opening…", ru: "Открытие…", am: "Բացում…" },
+  "shift.opened": { en: "Opened", ru: "Открыта", am: "Բացված" },
+  "shift.sessionsRevenue": { en: "Sessions revenue", ru: "Выручка по сессиям", am: "Սեանսների եկամուտ" },
+  "shift.ordersCash": { en: "Orders — cash", ru: "Заказы — наличные", am: "Պատվերներ — կանխիկ" },
+  "shift.ordersCard": { en: "Orders — card", ru: "Заказы — карта", am: "Պատվերներ — քարտ" },
+  "shift.ordersDeposit": { en: "Orders — deposit", ru: "Заказы — депозит", am: "Պատվերներ — ավանդ" },
+  "shift.expectedCash": { en: "Expected cash drawer", ru: "Ожидаемая наличность", am: "Ակնկալվող կանխիկ" },
+  "shift.grossTotal": { en: "Gross total", ru: "Итого выручка", am: "Ընդհանուր եկամուտ" },
+  "shift.closeTitle": { en: "Close shift (Z-report)", ru: "Закрыть смену (Z-отчёт)", am: "Փակել հերթափոխը (Z-հաշվետվություն)" },
+  "shift.declaredCash": { en: "Declared cash (counted)", ru: "Заявленные наличные (по факту)", am: "Հայտարարված կանխիկ (հաշվարկված)" },
+  "shift.notes": { en: "Notes", ru: "Примечания", am: "Նշումներ" },
+  "shift.closing": { en: "Closing…", ru: "Закрытие…", am: "Փակում…" },
 
   // Settings extras
   "settings.role": { en: "Role", ru: "Роль", am: "Դեր" },
@@ -230,6 +341,19 @@ export const TRANSLATIONS: Dict = {
   "revenue.title": { en: "Revenue & commission", ru: "Выручка и комиссия", am: "Եկամուտ և միջնորդավճար" },
   "revenue.pickCompany": { en: "— pick a company —", ru: "— выберите компанию —", am: "— ընտրեք ընկերություն —" },
   "revenue.pickHint": { en: "Pick a company to see its monthly revenue and commission.", ru: "Выберите компанию, чтобы увидеть её месячную выручку и комиссию.", am: "Ընտրեք ընկերություն՝ ամսական եկամուտ և միջնորդավճար տեսնելու համար:" },
+  "revenue.operationalTitle": { en: "Operational revenue (sessions + POS)", ru: "Операционная выручка (сессии + касса)", am: "Գործառնական եկամուտ (սեանս + դրամարկղ)" },
+  "revenue.sourceSessions": { en: "Sessions", ru: "Сессии", am: "Սեանսներ" },
+  "revenue.sourcePos": { en: "POS orders", ru: "Заказы кассы", am: "Դրամարկղի վաճառք" },
+  "revenue.gross": { en: "Gross", ru: "Итого выручка", am: "Ընդհանուր" },
+  "revenue.commissionPercent": { en: "Commission", ru: "Комиссия", am: "Միջնորդավճար" },
+  "revenue.amountOwed": { en: "You owe us this period", ru: "К оплате за период", am: "Վճարման ենթակա ժամանակահատվածում" },
+  "revenue.bookingsTitle": { en: "Bookings (advisory)", ru: "Брони (справочно)", am: "Ամրագրումներ (տեղեկատու)" },
+  "revenue.bookingsHint": { en: "not billed", ru: "в счёт не идёт", am: "չի հաշվարկվում" },
+  "revenue.period": { en: "Period", ru: "Период", am: "Ժամանակահատված" },
+  "revenue.completedBookings": { en: "Completed bookings", ru: "Завершённые брони", am: "Ավարտված ամրագրումներ" },
+  "revenue.amountDue": { en: "Implied amount", ru: "Расчётная сумма", am: "Հաշվարկային գումար" },
+  "revenue.fromConfig": { en: "From company config", ru: "Из настроек компании", am: "Ընկերության կարգավորումներից" },
+  "revenue.storedLocally": { en: "Stored locally on this device.", ru: "Хранится локально на этом устройстве.", am: "Պահված է տեղական այս սարքում:" },
 
   // Managers
   "managers.title": { en: "Managers", ru: "Менеджеры", am: "Մենեջերներ" },
@@ -431,6 +555,21 @@ export const TRANSLATIONS: Dict = {
   "branchForm.selectedLocation": { en: "Selected location", ru: "Выбранная точка", am: "Ընտրված կետ" },
   "branchForm.pickLocationFirst": { en: "Pick a location on the map (or fill the address so it can be auto-located).", ru: "Укажите точку на карте (или заполните адрес для авто-определения).", am: "Ընտրեք կետ քարտեզի վրա (կամ լրացրեք հասցեն ինքնաբերաբար գտնելու համար):" },
 
+  // Company details page
+  "company.invalidId": { en: "Invalid company id.", ru: "Неверный идентификатор компании.", am: "Ընկերության սխալ ID:" },
+  "company.email": { en: "Email", ru: "Email", am: "Էլ. հասցե" },
+  "company.phone": { en: "Phone", ru: "Телефон", am: "Հեռախոս" },
+  "company.country": { en: "Country", ru: "Страна", am: "Երկիր" },
+  "company.city": { en: "City", ru: "Город", am: "Քաղաք" },
+  "company.description": { en: "Description", ru: "Описание", am: "Նկարագրություն" },
+  "company.status": { en: "Status", ru: "Статус", am: "Կարգավիճակ" },
+  "company.status.active": { en: "Active", ru: "Активна", am: "Ակտիվ" },
+  "company.status.pending": { en: "Pending", ru: "Ожидание", am: "Սպասում" },
+  "company.branches": { en: "Branches", ru: "Филиалы", am: "Մասնաճյուղեր" },
+  "company.edit": { en: "Edit company", ru: "Редактировать компанию", am: "Խմբագրել ընկերությունը" },
+  "company.addBranch": { en: "+ Add branch", ru: "+ Добавить филиал", am: "+ Ավելացնել մասնաճյուղ" },
+  "company.viewBranches": { en: "View branches", ru: "Открыть филиалы", am: "Տեսնել մասնաճյուղերը" },
+
   // Company form extras
   "company.step1": { en: "step 1/2", ru: "шаг 1/2", am: "քայլ 1/2" },
   "company.step2": { en: "step 2/2", ru: "шаг 2/2", am: "քայլ 2/2" },
@@ -613,6 +752,16 @@ export const TRANSLATIONS: Dict = {
     en: "Commission & revenue",
     ru: "Комиссии и доход",
     am: "Կոմիստոն ու եկամուտ",
+  },
+  "home.menu.myBranch": {
+    en: "My branch",
+    ru: "Мой филиал",
+    am: "Իմ մասնաճյուղը",
+  },
+  "home.menu.myBranchSub": {
+    en: "Sessions, POS, shift, members",
+    ru: "Сеансы, касса, смена, клиенты",
+    am: "Սեանսներ, դրամարկղ, հերթափոխ, հաճախորդներ",
   },
   "home.menu.settings": {
     en: "Settings",

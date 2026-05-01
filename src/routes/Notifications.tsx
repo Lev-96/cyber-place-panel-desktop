@@ -4,6 +4,7 @@ import { useAuth } from "@/auth/AuthContext";
 import ScreenWithBg from "@/components/ui/ScreenWithBg";
 import Spinner from "@/components/ui/Spinner";
 import { useAsync } from "@/hooks/useAsync";
+import { formatDate } from "@/i18n/dates";
 import { useLang } from "@/i18n/LanguageContext";
 
 const Notifications = () => {
@@ -61,8 +62,8 @@ const ReminderCard = ({ r, isAdmin }: { r: IBillingReminder; isAdmin: boolean })
       <div className="gradient-card-inner" style={{ borderLeft: `4px solid ${tone}` }}>
         <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 6 }}>{headline}</div>
         <div className="muted" style={{ fontSize: 13 }}>
-          {r.last_paid_at ? `${t("notifications.lastPaid")}: ${new Date(r.last_paid_at).toLocaleDateString()}` : t("notifications.neverPaid")}
-          {r.next_due_at ? ` · ${t("notifications.due")}: ${new Date(r.next_due_at).toLocaleDateString()}` : ""}
+          {r.last_paid_at ? `${t("notifications.lastPaid")}: ${formatDate(r.last_paid_at)}` : t("notifications.neverPaid")}
+          {r.next_due_at ? ` · ${t("notifications.due")}: ${formatDate(r.next_due_at)}` : ""}
         </div>
         {isAdmin && (
           <div className="muted" style={{ fontSize: 13, marginTop: 4 }}>

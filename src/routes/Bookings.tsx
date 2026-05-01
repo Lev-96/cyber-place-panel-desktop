@@ -2,6 +2,7 @@ import { useAuth } from "@/auth/AuthContext";
 import ScreenWithBg from "@/components/ui/ScreenWithBg";
 import Spinner from "@/components/ui/Spinner";
 import { useAsync } from "@/hooks/useAsync";
+import { formatDateTime } from "@/i18n/dates";
 import { useLang } from "@/i18n/LanguageContext";
 import { bookingRepository } from "@/repositories/BookingRepository";
 import { Link } from "react-router-dom";
@@ -25,7 +26,7 @@ const Bookings = () => {
       {!loading && !error && (
         <div className="list">
           {(data ?? []).map((b) => {
-            const start = b.start.toLocaleString();
+            const start = formatDateTime(b.start);
             return (
               <Link key={b.id} to={`/bookings/${b.id}`} className="list-item">
                 <div>

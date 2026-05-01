@@ -38,6 +38,7 @@ const PosTerminal = lazy(() => import("@/routes/PosTerminal"));
 const ProductsList = lazy(() => import("@/routes/ProductsList"));
 const ResetPassword = lazy(() => import("@/routes/ResetPassword"));
 const ServicesAdmin = lazy(() => import("@/routes/ServicesAdmin"));
+const SessionsHistory = lazy(() => import("@/routes/SessionsHistory"));
 const Settings = lazy(() => import("@/routes/Settings"));
 const ShiftPanel = lazy(() => import("@/routes/ShiftPanel"));
 const TimePackagesList = lazy(() => import("@/routes/TimePackagesList"));
@@ -89,6 +90,10 @@ const Authed = () => (
         <Route
           path="/branches/:branchId/sessions"
           element={<BranchSessions />}
+        />
+        <Route
+          path="/branches/:branchId/sessions/history"
+          element={<SessionsHistory />}
         />
         <Route path="/branches/:branchId/pcs" element={<PcsList />} />
         <Route
@@ -187,7 +192,7 @@ const Authed = () => (
         <Route
           path="/companies/:companyId/revenue"
           element={
-            <RoleGuard perm="menu.companies">
+            <RoleGuard perm="revenue.view">
               <CompanyRevenue />
             </RoleGuard>
           }
@@ -195,7 +200,7 @@ const Authed = () => (
         <Route
           path="/revenue"
           element={
-            <RoleGuard perm="menu.companies">
+            <RoleGuard perm="revenue.view">
               <Revenue />
             </RoleGuard>
           }

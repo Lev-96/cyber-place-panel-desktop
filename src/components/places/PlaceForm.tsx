@@ -23,7 +23,7 @@ const TYPES: PlaceType[] = ["standard", "vip"];
 const PlaceForm = ({ branchId, initial, onClose, onSaved }: Props) => {
   const { t } = useLang();
   const games = useAsync(() => gameRepository.list(), []);
-  const [number, setNumber] = useState(initial ? String((initial as any).number ?? "") : "");
+  const [number, setNumber] = useState(initial ? String(initial.number ?? "") : "");
   const [type, setType] = useState<PlaceType>(initial?.type ?? "standard");
   const [platform, setPlatform] = useState<PlatformType>(initial?.platform ?? "pc");
   const [gameIds, setGameIds] = useState<Set<number>>(new Set((initial?.games ?? []).map((g) => g.id)));
@@ -61,7 +61,7 @@ const PlaceForm = ({ branchId, initial, onClose, onSaved }: Props) => {
   return (
     <Modal open onClose={onClose}>
       <form className="card" style={{ width: 540, maxWidth: "90vw", display: "flex", flexDirection: "column", gap: 12, maxHeight: "85vh", overflowY: "auto" }} onSubmit={submit}>
-        <h2 style={{ margin: 0 }}>{initial ? `${t("place.titleEdit")} #${(initial as any).number ?? initial.id}` : t("place.titleNew")}</h2>
+        <h2 style={{ margin: 0 }}>{initial ? `${t("place.titleEdit")} #${initial.number ?? initial.id}` : t("place.titleNew")}</h2>
 
         <div className="row" style={{ gap: 10 }}>
           <Input label={t("label.number")} type="number" min={1} value={number} onChange={(e) => setNumber(e.target.value)} required />

@@ -7,6 +7,8 @@ const Sidebar = () => {
   const { user, logout } = useAuth();
   const { t } = useLang();
   const role = user?.role;
+  const dash = (user?.dashboard ?? {}) as { branch_id?: number | null };
+  const myBranchId = typeof dash.branch_id === "number" ? dash.branch_id : null;
 
   return (
     <aside className="sidebar">
@@ -16,6 +18,9 @@ const Sidebar = () => {
       </NavLink>
       {can(role, "menu.branches") && (
         <NavLink to="/branches">{t("nav.branches")}</NavLink>
+      )}
+      {role === "manager" && myBranchId !== null && (
+        <NavLink to={`/branches/${myBranchId}`}>{t("nav.myBranch")}</NavLink>
       )}
       {can(role, "menu.map") && (
         <NavLink to="/branches-map">{t("nav.map")}</NavLink>
@@ -36,7 +41,7 @@ const Sidebar = () => {
       {can(role, "menu.companies") && (
         <NavLink to="/companies">{t("nav.companies")}</NavLink>
       )}
-      {can(role, "menu.companies") && (
+      {can(role, "revenue.view") && (
         <NavLink to="/revenue">{t("nav.revenue")}</NavLink>
       )}
       {can(role, "menu.myCompany") && (

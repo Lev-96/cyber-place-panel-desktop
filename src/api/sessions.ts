@@ -20,6 +20,20 @@ export interface ExtendSessionBody {
 export const apiListActiveSessions = (branchId: number) =>
   request<{ data: ISessionApi[] }>("/sessions", { params: { branch_id: branchId, status: "active" } });
 
+export interface ListSessionsParams {
+  branch_id?: number;
+  pc_id?: number;
+  status?: "active" | "stopped" | "expired";
+  /** ISO date (YYYY-MM-DD); inclusive — backend expands to startOfDay. */
+  from?: string;
+  /** ISO date (YYYY-MM-DD); inclusive — backend expands to endOfDay. */
+  to?: string;
+  limit?: number;
+}
+
+export const apiListSessions = (params: ListSessionsParams) =>
+  request<{ data: ISessionApi[] }>("/sessions", { params });
+
 export const apiStartSession = (body: StartSessionBody) =>
   request<{ session: ISessionApi }>("/sessions", { method: "POST", body });
 

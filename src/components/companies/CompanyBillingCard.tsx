@@ -3,6 +3,7 @@ import { isMissingEndpoint } from "@/api/fallback";
 import { useAuth } from "@/auth/AuthContext";
 import Button from "@/components/ui/Button";
 import Spinner from "@/components/ui/Spinner";
+import { formatDate } from "@/i18n/dates";
 import { useEffect, useState } from "react";
 
 interface Props {
@@ -10,7 +11,7 @@ interface Props {
   companyName: string;
 }
 
-const fmt = (iso: string | null) => iso ? new Date(iso).toLocaleDateString() : "—";
+const fmt = (iso: string | null) => formatDate(iso);
 
 const CompanyBillingCard = ({ companyId, companyName }: Props) => {
   const { user } = useAuth();

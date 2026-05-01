@@ -1,3 +1,5 @@
+import { useAuth } from "@/auth/AuthContext";
+import { can } from "@/auth/permissions";
 import Button from "@/components/ui/Button";
 import Spinner from "@/components/ui/Spinner";
 import { useAsync } from "@/hooks/useAsync";
@@ -19,6 +21,8 @@ interface Props {
 
 const SessionsBoard = ({ branchId }: Props) => {
   const { money, t } = useLang();
+  const { user } = useAuth();
+  const role = user?.role;
   const pcs = useAsync(() => sessionRepository.listPcs(branchId), [branchId]);
   const sessions = useAsync(() => sessionRepository.listActive(branchId), [branchId]);
   const [startTarget, setStartTarget] = useState<IPcApi | null>(null);
@@ -39,11 +43,14 @@ const SessionsBoard = ({ branchId }: Props) => {
 
   return (
     <div className="col" style={{ gap: 18 }}>
-      <div className="row-between">
+      <div className="row-between" style={{ flexWrap: "wrap", rowGap: 8 }}>
         <h2 className="page-title" style={{ margin: 0 }}>{t("session.boardTitle")} · #{branchId}</h2>
-        <div className="row" style={{ gap: 8 }}>
+        <div className="row" style={{ gap: 8, flexWrap: "wrap", rowGap: 8 }}>
+          <Link to={`/branches/${branchId}/sessions/history`} className="muted" style={navBtn}>{t("history.title")}</Link>
           <Link to={`/branches/${branchId}/pcs`} className="muted" style={navBtn}>{t("pcs.title")}</Link>
-          <Link to={`/branches/${branchId}/tariffs`} className="muted" style={navBtn}>{t("session.tariffField")}</Link>
+          {can(role, "branch.tariffs") && (
+            <Link to={`/branches/${branchId}/tariffs`} className="muted" style={navBtn}>{t("session.tariffField")}</Link>
+          )}
         </div>
       </div>
       <div className="live-grid">

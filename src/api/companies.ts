@@ -34,7 +34,15 @@ export const apiGetCompanies = (params: GetCompaniesParams = {}) =>
 export const apiGetCompanyById = (id: number) =>
   request<{ companies: ICompanyApi }>(`/company/${id}`);
 
-const buildCompanyForm = (body: Record<string, unknown>): FormData => {
+/**
+ * Build a multipart payload from any plain object. Values pass through
+ * `String()` unless they're a File (sent as-is). Empty / null / undefined
+ * are dropped so optional fields don't show up as "null" on the backend.
+ *
+ * Typed as `object` so both CreateCompanyBody and UpdateCompanyBody fit
+ * structurally — no `as any` required at the call site.
+ */
+const buildCompanyForm = (body: object): FormData => {
   const fd = new FormData();
   for (const [k, v] of Object.entries(body)) {
     if (v === undefined || v === null || v === "") continue;
@@ -45,10 +53,10 @@ const buildCompanyForm = (body: Record<string, unknown>): FormData => {
 };
 
 export const apiCreateCompany = (body: CreateCompanyBody) =>
-  request<{ companies: ICompanyApi; message?: string }>("/company", { method: "POST", body: buildCompanyForm(body as any) });
+  request<{ companies: ICompanyApi; message?: string }>("/company", { method: "POST", body: buildCompanyForm(body) });
 
 export const apiUpdateCompany = (id: number, body: UpdateCompanyBody) =>
-  request<{ companies: ICompanyApi; message?: string }>(`/company/${id}?_method=PUT`, { method: "POST", body: buildCompanyForm(body as any) });
+  request<{ companies: ICompanyApi; message?: string }>(`/company/${id}?_method=PUT`, { method: "POST", body: buildCompanyForm(body) });
 
 export const apiDeleteCompany = (id: number) =>
   request<{ message: string }>(`/company/${id}`, { method: "DELETE" });

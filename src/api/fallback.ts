@@ -9,7 +9,7 @@ export const isMissingEndpoint = (e: unknown): boolean => {
   if (!err) return false;
   if (err.status === 404 || err.status === 501) return true;
   if (!err.status) return true; // network / fetch failure
-  const body = (err as any).body;
+  const body = err.body;
   if (body && typeof body === "object") {
     const msg = (body as { message?: unknown }).message;
     if (typeof msg === "string" && /could not be found|route .* not found|404/i.test(msg)) return true;

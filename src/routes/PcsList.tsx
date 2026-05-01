@@ -4,7 +4,9 @@ import PcForm from "@/components/pcs/PcForm";
 import Button from "@/components/ui/Button";
 import Spinner from "@/components/ui/Spinner";
 import { useAsync } from "@/hooks/useAsync";
+import { formatDateTime } from "@/i18n/dates";
 import { useLang } from "@/i18n/LanguageContext";
+import { fmt } from "@/i18n/translations";
 import { pcRepository } from "@/repositories/PcRepository";
 import { IPcApi } from "@/types/sessions";
 import { useState } from "react";
@@ -21,16 +23,16 @@ const PcsList = () => {
   const [tokenPc, setTokenPc] = useState<IPcApi | null>(null);
   const [waking, setWaking] = useState<number | null>(null);
 
-  if (!Number.isFinite(id) || id <= 0) return <div className="error">Invalid branch id.</div>;
+  if (!Number.isFinite(id) || id <= 0) return <div className="error">{t("hub.invalidId")}</div>;
 
   const remove = async (pc: IPcApi) => {
-    if (!confirm(`Delete ${pc.label}? This cannot be undone.`)) return;
+    if (!confirm(fmt(t("pcs.confirmDelete"), pc.label))) return;
     await pcRepository.remove(pc.id);
     void reload();
   };
 
   const rotate = async (pc: IPcApi) => {
-    if (!confirm(`Rotate pairing token for ${pc.label}? The agent on this PC will stop working until updated.`)) return;
+    if (!confirm(fmt(t("pcs.confirmRotate"), pc.label))) return;
     const updated = await pcRepository.rotateToken(pc.id);
     setTokenPc(updated);
     void reload();
@@ -38,7 +40,7 @@ const PcsList = () => {
 
   const wake = async (pc: IPcApi) => {
     if (!pc.mac_address) {
-      alert("Set a MAC address on this PC before using Wake-on-LAN.");
+      alert(t("pcs.macRequired"));
       return;
     }
     setWaking(pc.id);
@@ -48,22 +50,25 @@ const PcsList = () => {
       if (window.desktopAPI?.wakeOnLan) {
         const r = await window.desktopAPI.wakeOnLan(pc.mac_address);
         const lines = [r.message];
-        if (r.sent) lines.push(`Packets sent: ${r.sent}`);
-        if (r.errors.length) lines.push("", "Errors:", ...r.errors);
-        lines.push("", "PC must have Wake-on-LAN enabled in BIOS and NIC settings, and be on the same LAN as this cashier.");
+        if (r.sent) lines.push(fmt(t("pcs.packetsSent"), r.sent));
+        if (r.errors.length) lines.push("", t("pcs.errorsHeader"), ...r.errors);
+        lines.push("", t("pcs.wolReminder"));
         alert(lines.join("\n"));
       } else {
         const r = await apiWakePc(pc.id);
         const lines = [r.message];
-        if (r.sent_packets) lines.push(`Packets sent: ${r.sent_packets}`);
+        if (r.sent_packets) lines.push(fmt(t("pcs.packetsSent"), r.sent_packets));
         if (r.note) lines.push("", r.note);
-        if (r.errors?.length) lines.push("", "Errors:", ...r.errors);
+        if (r.errors?.length) lines.push("", t("pcs.errorsHeader"), ...r.errors);
         alert(lines.join("\n"));
       }
     } catch (e) {
-      alert(`Wake failed: ${e instanceof Error ? e.message : "unknown error"}`);
+      alert(fmt(t("pcs.wakeFailed"), e instanceof Error ? e.message : t("shift.failed")));
     } finally { setWaking(null); }
   };
+
+  const statusLabel = (s: IPcApi["status"]): string =>
+    s === "in_session" ? t("pcs.statusInSession") : s === "online" ? t("pcs.statusOnline") : t("pcs.statusOffline");
 
   return (
     <div className="col" style={{ gap: 18 }}>
@@ -73,11 +78,11 @@ const PcsList = () => {
       </div>
 
       <div className="card" style={{ borderLeft: "3px solid #07ddf1", fontSize: 13 }}>
-        <b>How a PC actually connects:</b>
+        <b>{t("pcs.howConnects")}</b>
         <ol style={{ margin: "6px 0 0 18px", padding: 0 }}>
-          <li>Register the PC here — you get a <b>pairing token</b>.</li>
-          <li>Install <code>cyber-place-panel-client-agent</code> on the PC and enter the PC ID + token.</li>
-          <li>The MAC address is optional — used only for <b>Wake-on-LAN</b>, not for authentication.</li>
+          <li>{t("pcs.connect.step1")}</li>
+          <li>{t("pcs.connect.step2")}</li>
+          <li>{t("pcs.connect.step3")}</li>
         </ol>
       </div>
 
@@ -96,33 +101,33 @@ const PcsList = () => {
                   {isPs && <span style={{ marginLeft: 8, fontSize: 11, padding: "2px 6px", borderRadius: 4, background: "#101a35", color: "#d152fa" }}>PS</span>}
                 </div>
                 <div className="meta">
-                  <StatusDot status={pc.status} /> {pc.status}
-                  {pc.hourly_rate != null && <> · {Number(pc.hourly_rate)} /ч</>}
+                  <StatusDot status={pc.status} /> {statusLabel(pc.status)}
+                  {pc.hourly_rate != null && <> · {Number(pc.hourly_rate)} /{t("time.hourShort")}</>}
                   {!isPs && pc.mac_address && <> · MAC: {pc.mac_address}</>}
                   {!isPs && (pc.last_seen_at
-                    ? <> · last seen {new Date(pc.last_seen_at).toLocaleString()}</>
-                    : <> · <span style={{ color: "#f59e0b" }}>not paired yet — install agent</span></>
+                    ? <> · {t("pcs.lastSeen")} {formatDateTime(pc.last_seen_at)}</>
+                    : <> · <span style={{ color: "#f59e0b" }}>{t("pcs.notPaired")}</span></>
                   )}
                 </div>
               </div>
               <div className="row" style={{ gap: 6 }}>
                 {!isPs && pc.mac_address && (
                   <Button variant="secondary" onClick={() => wake(pc)} disabled={waking === pc.id} style={btn}>
-                    {waking === pc.id ? "Sending…" : "Wake"}
+                    {waking === pc.id ? t("pcs.sending") : t("pcs.wake")}
                   </Button>
                 )}
-                <Button variant="secondary" onClick={() => setEditing(pc)} style={btn}>Edit</Button>
+                <Button variant="secondary" onClick={() => setEditing(pc)} style={btn}>{t("action.edit")}</Button>
                 {!isPs && (
                   <Button variant="secondary" onClick={() => rotate(pc)} style={btn}>
-                    {neverPaired ? "Get token" : "Rotate token"}
+                    {neverPaired ? t("pcs.getToken") : t("pcs.rotateToken")}
                   </Button>
                 )}
-                <Button variant="secondary" onClick={() => remove(pc)} style={{ ...btn, color: "#ef4444", borderColor: "#4a1a1a" }}>Delete</Button>
+                <Button variant="secondary" onClick={() => remove(pc)} style={{ ...btn, color: "#ef4444", borderColor: "#4a1a1a" }}>{t("action.delete")}</Button>
               </div>
             </div>
             );
           })}
-          {!pcs?.length && <div className="muted">No PCs registered yet. Click "Register PC" to add the first one.</div>}
+          {!pcs?.length && <div className="muted">{t("pcs.empty")}</div>}
         </div>
       )}
 

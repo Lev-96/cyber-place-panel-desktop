@@ -2,6 +2,7 @@ import MemberForm from "@/components/members/MemberForm";
 import TopupDialog from "@/components/members/TopupDialog";
 import Button from "@/components/ui/Button";
 import Spinner from "@/components/ui/Spinner";
+import { formatDateTime } from "@/i18n/dates";
 import { useLang } from "@/i18n/LanguageContext";
 import { memberRepository } from "@/repositories/MemberRepository";
 import { IMember, IMemberDeposit } from "@/types/members";
@@ -56,7 +57,7 @@ const MemberCard = () => {
           <div key={d.id} className="row-between" style={{ padding: "6px 0", borderBottom: "1px solid #1f2a44" }}>
             <div>
               <div>{labelOf(d.kind)} <span className="muted">{d.reference ?? ""}</span></div>
-              <div className="muted" style={{ fontSize: 11 }}>{new Date(d.created_at).toLocaleString()}</div>
+              <div className="muted" style={{ fontSize: 11 }}>{formatDateTime(d.created_at)}</div>
             </div>
             <div style={{ color: signColor(d) }}>{signOf(d)}{money(Number(d.amount))}</div>
           </div>

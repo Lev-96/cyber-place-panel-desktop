@@ -3,6 +3,7 @@ import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import Spinner from "@/components/ui/Spinner";
 import { ITournamentRegistration } from "@/api/tournamentRegistrations";
+import { formatDateTime } from "@/i18n/dates";
 import { useEffect, useState } from "react";
 
 interface Props {
@@ -52,7 +53,7 @@ const RegistrationsList = ({ tournamentId }: Props) => {
             <div key={r.id} className="list-item">
               <div>
                 <div className="name">{r.guest?.name ?? `Guest #${r.guest_id}`}</div>
-                <div className="meta">{r.guest?.phone ?? ""} {r.created_at && `· ${new Date(r.created_at).toLocaleString()}`}</div>
+                <div className="meta">{r.guest?.phone ?? ""} {r.created_at && `· ${formatDateTime(r.created_at)}`}</div>
               </div>
               <Button variant="secondary" onClick={() => remove(r.id)} style={{ padding: "6px 10px", fontSize: 12, color: "#ef4444", borderColor: "#4a1a1a" }}>Remove</Button>
             </div>

@@ -26,7 +26,7 @@ const TimePackagesList = () => {
   };
 
   const toggle = async (pkg: ITimePackage) => {
-    await timePackageRepository.update(pkg.id, { is_active: !(pkg as any).is_active });
+    await timePackageRepository.update(pkg.id, { is_active: !pkg.is_active });
     void reload();
   };
 
@@ -42,7 +42,7 @@ const TimePackagesList = () => {
       {!loading && !error && (
         <div className="list">
           {(packages ?? []).map((p) => {
-            const active = (p as any).is_active !== false;
+            const active = p.is_active !== false;
             return (
               <div key={p.id} className="list-item" style={{ opacity: active ? 1 : 0.5 }}>
                 <div>

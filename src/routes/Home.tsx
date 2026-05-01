@@ -9,7 +9,9 @@ const Home = () => {
   const { t } = useLang();
   const isAdmin = user?.role === "admin";
   const isOwner = user?.role === "company_owner";
-  const dash: any = user?.dashboard ?? {};
+  const isManager = user?.role === "manager";
+  const dash = user?.dashboard ?? {};
+  const myBranchId = typeof dash.branch_id === "number" ? dash.branch_id : null;
   const bg = isAdmin
     ? "./bg/admin-home.jpg"
     : isOwner
@@ -71,6 +73,14 @@ const Home = () => {
               {t("home.menu.branches")}
             </div>
             <div className="muted">{t("home.menu.branchesSub")}</div>
+          </Link>
+        )}
+        {isManager && myBranchId !== null && (
+          <Link to={`/branches/${myBranchId}`} className="card" style={{ minWidth: 220 }}>
+            <div style={{ fontWeight: 700, fontSize: 16 }}>
+              {t("home.menu.myBranch")}
+            </div>
+            <div className="muted">{t("home.menu.myBranchSub")}</div>
           </Link>
         )}
         <Link to="/bookings" className="card" style={{ minWidth: 220 }}>

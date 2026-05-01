@@ -1,3 +1,5 @@
+import { useAuth } from "@/auth/AuthContext";
+import { can } from "@/auth/permissions";
 import BranchLiveScreen from "@/components/live/BranchLiveScreen";
 import Avatar from "@/components/ui/Avatar";
 import ScreenWithBg from "@/components/ui/ScreenWithBg";
@@ -11,6 +13,8 @@ const BranchHub = () => {
   const { branchId } = useParams();
   const id = Number(branchId);
   const { t } = useLang();
+  const { user } = useAuth();
+  const role = user?.role;
   const { data, loading, error } = useAsync(() => branchRepository.byId(id), [id]);
 
   if (!Number.isFinite(id) || id <= 0) return <div className="error">{t("hub.invalidId")}</div>;
@@ -49,10 +53,14 @@ const BranchHub = () => {
         <Tile to={`/branches/${id}/members`} title={t("hub.tile.members")} hint={t("hub.tile.membersHint")} />
         <Tile to={`/branches/${id}/places`} title={t("hub.tile.places")} hint={t("hub.tile.placesHint")} />
         <Tile to={`/branches/${id}/pcs`} title={t("hub.tile.pcs")} hint={t("hub.tile.pcsHint")} />
-        <Tile to={`/branches/${id}/tariffs`} title={t("hub.tile.tariffs")} hint={t("hub.tile.tariffsHint")} />
+        {can(role, "branch.tariffs") && (
+          <Tile to={`/branches/${id}/tariffs`} title={t("hub.tile.tariffs")} hint={t("hub.tile.tariffsHint")} />
+        )}
         <Tile to={`/branches/${id}/products`} title={t("hub.tile.products")} hint={t("hub.tile.productsHint")} />
         <Tile to={`/branches/${id}/services`} title={t("hub.tile.services")} hint={t("hub.tile.servicesHint")} />
-        <Tile to={`/branches/${id}/managers`} title={t("hub.tile.managers")} hint={t("hub.tile.managersHint")} />
+        {can(role, "manager.create") && (
+          <Tile to={`/branches/${id}/managers`} title={t("hub.tile.managers")} hint={t("hub.tile.managersHint")} />
+        )}
         <Tile to={`/branches/${id}/tournaments`} title={t("hub.tile.tournaments")} hint={t("hub.tile.tournamentsHint")} />
         <Tile to={`/branches/${id}/edit`} title={t("hub.tile.settings")} hint={t("hub.tile.settingsHint")} />
       </div>

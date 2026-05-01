@@ -5,7 +5,8 @@ import { IBranchApi } from "@/types/api";
 import { FormEvent, useState } from "react";
 
 interface Props {
-  branch: IBranchApi & { days_of_weeks?: Array<{ day_of_week: number; start_time: string; end_time: string }> };
+  /** `days_of_weeks` is now part of IBranchApi itself — no inline intersection needed. */
+  branch: IBranchApi;
   onClose: () => void;
   onSaved: () => void;
 }

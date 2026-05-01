@@ -860,6 +860,50 @@ a.card:hover {
   opacity: 0.85;
 }
 
+button.pill {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(7, 221, 241, 0.25);
+  color: #cfeaff;
+  cursor: pointer;
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 12px;
+}
+button.pill:hover {
+  background: rgba(7, 221, 241, 0.12);
+  border-color: rgba(7, 221, 241, 0.55);
+}
+
+.login-lang {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  display: flex;
+  gap: 6px;
+  z-index: 5;
+}
+.login-lang-pill {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(7, 221, 241, 0.25);
+  color: #cfeaff;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.login-lang-pill:hover {
+  background: rgba(7, 221, 241, 0.12);
+  border-color: rgba(7, 221, 241, 0.55);
+}
+.login-lang-pill.active {
+  background: linear-gradient(90deg, #07ddf1 0%, #32aff7 50%, #d152fa 100%);
+  border-color: transparent;
+  color: #020514;
+}
+
 /* Background screen wrapper (matches RN ScreenWithBg) */
 .screen-bg {
   position: relative;
@@ -916,18 +960,28 @@ a.card:hover {
   flex-direction: column;
   gap: 6px;
   backdrop-filter: blur(4px);
+  /* Allow grid-cell to shrink instead of forcing the tile wider than the column. */
+  min-width: 0;
 }
 .stat-tile .v {
-  font-size: 28px;
+  /* Fluid type: shrinks on narrow tiles / long localized values without overflow. */
+  font-size: clamp(18px, 2.4vw, 26px);
   font-weight: 800;
   color: #07ddf1;
   font-variant-numeric: tabular-nums;
+  line-height: 1.15;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 .stat-tile .k {
   color: #94a3b8;
   font-size: 12px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 /* Gradient-bordered card */

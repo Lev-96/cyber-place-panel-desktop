@@ -49,7 +49,7 @@ const BranchEdit = () => {
 
       {edit && <BranchForm initial={data} onClose={() => setEdit(false)} onSaved={() => { setEdit(false); void reload(); }} />}
       {pricing && <BranchPricingForm branch={data} onClose={() => setPricing(false)} onSaved={() => { setPricing(false); void reload(); }} />}
-      {hours && <BranchOpenDaysForm branch={data as any} onClose={() => setHours(false)} onSaved={() => { setHours(false); void reload(); }} />}
+      {hours && <BranchOpenDaysForm branch={data} onClose={() => setHours(false)} onSaved={() => { setHours(false); void reload(); }} />}
     </ScreenWithBg>
   );
 };

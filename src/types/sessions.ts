@@ -11,6 +11,8 @@ export interface ITimePackage {
   name: string;
   duration_minutes: number;
   price: number;
+  /** Soft-disabled packages stay in DB for historical sessions but don't show in pickers. */
+  is_active?: boolean;
 }
 
 export interface ISessionApi {

@@ -1,8 +1,7 @@
 import { useLang } from "@/i18n/LanguageContext";
 import { PlaceStatusColors } from "@/domain/PlaceStatus";
 import { PlaceSnapshot } from "@/services/realtime/RealtimeService";
-
-const fmt = (d: Date) => d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+import { formatTime } from "@/i18n/dates";
 
 const PlaceCell = ({ snapshot }: { snapshot: PlaceSnapshot }) => {
   const { t } = useLang();
@@ -18,7 +17,7 @@ const PlaceCell = ({ snapshot }: { snapshot: PlaceSnapshot }) => {
       {top && (
         <span className="until">
           {status === "busy" ? t("live.till") : t("live.from")}{" "}
-          {fmt(status === "busy" ? top.end : top.start)}
+          {formatTime(status === "busy" ? top.end : top.start)}
         </span>
       )}
     </div>

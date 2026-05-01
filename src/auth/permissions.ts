@@ -16,10 +16,12 @@ export type Permission =
   | "menu.scan"            // see Scan/Confirm in sidebar
   | "menu.map"             // see Branches map in sidebar
   | "menu.myCompany"       // owner shortcut to their own company
+  | "revenue.view"         // see /revenue and /companies/:id/revenue (admin + owner)
   // branch CRUD
   | "branch.create"
   | "branch.edit"
   | "branch.delete"
+  | "branch.tariffs"        // configure time packages (admin + owner only)
   // company CRUD
   | "company.create"
   | "company.edit"
@@ -40,7 +42,8 @@ const PERMS: Record<Role, ReadonlySet<Permission>> = {
   admin: new Set<Permission>([
     "menu.branches", "menu.companies", "menu.managers", "menu.games",
     "menu.servicesAdmin", "menu.tournaments", "menu.scan", "menu.map",
-    "branch.create", "branch.edit", "branch.delete",
+    "revenue.view",
+    "branch.create", "branch.edit", "branch.delete", "branch.tariffs",
     "company.create", "company.edit", "company.delete",
     "manager.create", "manager.delete",
     "game.crud", "service.crud",
@@ -48,15 +51,17 @@ const PERMS: Record<Role, ReadonlySet<Permission>> = {
   ]),
   company_owner: new Set<Permission>([
     "menu.branches", "menu.managers", "menu.tournaments", "menu.scan", "menu.map",
-    "menu.myCompany",
-    "branch.create", "branch.edit", "branch.delete",
+    "menu.myCompany", "revenue.view",
+    "branch.create", "branch.edit", "branch.delete", "branch.tariffs",
     "company.edit",
     "manager.create", "manager.delete",
     "session.start", "session.stop", "pos.charge", "shift.open",
   ]),
   manager: new Set<Permission>([
     // Manager = single-branch staff. No global lists, no CRUD of branches/companies.
+    // Can edit their own branch info (address/pricing/hours), but not tariffs or other staff.
     "menu.tournaments", "menu.scan",
+    "branch.edit",
     "session.start", "session.stop", "pos.charge", "shift.open",
   ]),
 };

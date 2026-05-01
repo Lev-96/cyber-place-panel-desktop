@@ -41,6 +41,8 @@ export interface IBranchService {
 export interface IBranchPlace {
   id: number;
   branch_id: number;
+  /** Cashier-visible label distinct from the surrogate `id` (e.g. "1" or "2"). */
+  number?: number;
   type: PlaceType;
   status: "active" | "inactive";
   platform: PlatformType;
@@ -91,6 +93,7 @@ export interface IBranchApi {
     "ps5-vip": number | null;
   };
   company?: { id: number; name: string };
+  days_of_weeks?: Array<{ day_of_week: number; start_time: string; end_time: string }>;
 }
 
 export interface ICompanyApi {

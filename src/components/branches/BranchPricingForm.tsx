@@ -27,7 +27,11 @@ const BranchPricingForm = ({ branch, onClose, onSaved }: Props) => {
     e.preventDefault();
     setBusy(true); setErr(null);
     try {
-      const payload: any = { id: branch.price_for_branch?.id ?? 0, branch_id: branch.id };
+      // Backend expects the full pricing row including its surrogate id (0
+      // for "no row yet — create one"). Build it as the same shape the API
+      // helper accepts so we don't have to bypass the type system.
+      type Pricing = NonNullable<IBranchApi["price_for_branch"]>;
+      const payload = { id: branch.price_for_branch?.id ?? 0, branch_id: branch.id } as Pricing;
       for (const k of KEYS) {
         const v = prices[k].trim();
         payload[k] = v ? Number(v) : null;

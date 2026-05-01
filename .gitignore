@@ -6,3 +6,6 @@ release
 .env.local
 .DS_Store
 *.log
+# Playwright artefacts — runtime output, not source
+test-results
+playwright-report
