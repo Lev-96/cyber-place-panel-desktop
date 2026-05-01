@@ -254,6 +254,7 @@ export const TRANSLATIONS: Dict = {
   // Generic form helpers
   "label.title": { en: "Title", ru: "Название", am: "Անվանում" },
   "label.description": { en: "Description", ru: "Описание", am: "Նկարագրություն" },
+  "label.name": { en: "Name", ru: "Имя", am: "Անուն" },
   "label.email": { en: "Email", ru: "Email", am: "Էլ. հասցե" },
   "label.phone": { en: "Phone", ru: "Телефон", am: "Հեռախոս" },
   "label.price": { en: "Price", ru: "Цена", am: "Գին" },

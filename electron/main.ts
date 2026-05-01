@@ -82,7 +82,11 @@ const createWindow = async () => {
   } else {
     await mainWindow.loadURL(`${APP_SCHEME}://localhost/index.html`);
   }
-  if (isDev) mainWindow.webContents.openDevTools({ mode: "detach" });
+  // Auto-open DevTools only when explicitly requested. A detached DevTools
+  // window would steal keyboard focus from the renderer.
+  if (process.env.ELECTRON_DEVTOOLS === "1") {
+    mainWindow.webContents.openDevTools({ mode: "detach" });
+  }
 
   mainWindow.on("closed", () => { mainWindow = null; });
 };

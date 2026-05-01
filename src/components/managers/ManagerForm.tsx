@@ -5,7 +5,7 @@ import { useLang } from "@/i18n/LanguageContext";
 import { branchRepository } from "@/repositories/BranchRepository";
 import { managerRepository } from "@/repositories/ManagerRepository";
 import { IManagerApi } from "@/api/managers";
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 
 interface Props {
   branchId: number;
@@ -24,6 +24,15 @@ const ManagerForm = ({ branchId, initial, onClose, onSaved }: Props) => {
   const [companyId, setCompanyId] = useState<number | null>(initial?.company_id ?? null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const nameRef = useRef<HTMLInputElement | null>(null);
+
+  // Force-focus the first input after mount. The native `autoFocus` prop is
+  // unreliable in Electron after a previous modal/native-confirm closed —
+  // calling .focus() explicitly inside a microtask works around it.
+  useEffect(() => {
+    const id = window.setTimeout(() => nameRef.current?.focus(), 0);
+    return () => window.clearTimeout(id);
+  }, []);
 
   // Auto-derive company_id from branch (manager belongs to a branch which belongs to a company).
   useEffect(() => {
@@ -57,7 +66,7 @@ const ManagerForm = ({ branchId, initial, onClose, onSaved }: Props) => {
     <Modal open onClose={onClose}>
       <form className="card" style={{ width: 420, maxWidth: "90vw", display: "flex", flexDirection: "column", gap: 14 }} onSubmit={submit}>
         <h2 style={{ margin: 0 }}>{isEdit ? t("manager.titleEdit") : t("manager.titleNew")}</h2>
-        <Input label={t("label.name")} value={name} onChange={(e) => setName(e.target.value)} required autoFocus />
+        <Input ref={nameRef} label={t("label.name")} value={name} onChange={(e) => setName(e.target.value)} required />
         <Input label={t("label.email")} type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
         {!isEdit && <>
           <Input label={t("auth.password")} type="password" value={pw} onChange={(e) => setPw(e.target.value)} required minLength={8} />

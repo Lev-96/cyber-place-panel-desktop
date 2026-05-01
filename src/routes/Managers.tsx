@@ -1,5 +1,6 @@
 import ManagerForm from "@/components/managers/ManagerForm";
 import Button from "@/components/ui/Button";
+import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import ScreenWithBg from "@/components/ui/ScreenWithBg";
 import Spinner from "@/components/ui/Spinner";
 import { useAsync } from "@/hooks/useAsync";
@@ -20,9 +21,12 @@ const Managers = () => {
   );
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState<IManagerApi | null>(null);
+  const [pendingRemove, setPendingRemove] = useState<IManagerApi | null>(null);
 
-  const remove = async (m: IManagerApi) => {
-    if (!confirm(`${t("managers.confirmRemove")} — ${m.user?.name ?? ""}?`)) return;
+  const confirmRemove = async () => {
+    if (!pendingRemove) return;
+    const m = pendingRemove;
+    setPendingRemove(null);
     await managerRepository.remove(m.id);
     void reload();
   };
@@ -47,7 +51,7 @@ const Managers = () => {
               </div>
               <div className="row" style={{ gap: 6 }}>
                 <Button variant="secondary" onClick={() => setEditing(m)} style={btn}>{t("action.edit")}</Button>
-                <Button variant="secondary" onClick={() => remove(m)} style={{ ...btn, color: "#ef4444", borderColor: "#4a1a1a" }}>{t("action.remove")}</Button>
+                <Button variant="secondary" onClick={() => setPendingRemove(m)} style={{ ...btn, color: "#ef4444", borderColor: "#4a1a1a" }}>{t("action.remove")}</Button>
               </div>
             </div>
           ))}
@@ -65,6 +69,15 @@ const Managers = () => {
           onSaved={() => { setEditing(null); void reload(); }}
         />
       )}
+      <ConfirmDialog
+        open={!!pendingRemove}
+        message={`${t("managers.confirmRemove")} — ${pendingRemove?.user?.name ?? ""}?`}
+        confirmLabel={t("action.remove")}
+        cancelLabel={t("action.cancel")}
+        destructive
+        onConfirm={() => void confirmRemove()}
+        onCancel={() => setPendingRemove(null)}
+      />
     </ScreenWithBg>
   );
 };
