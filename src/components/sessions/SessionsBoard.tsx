@@ -4,9 +4,10 @@ import Button from "@/components/ui/Button";
 import Spinner from "@/components/ui/Spinner";
 import { useAsync } from "@/hooks/useAsync";
 import { useLang } from "@/i18n/LanguageContext";
+import { usePlaceAvailability } from "@/realtime/usePlaceAvailability";
 import { sessionRepository } from "@/repositories/SessionRepository";
 import { IPcApi, ISessionApi } from "@/types/sessions";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import AddSessionItemDialog from "./AddSessionItemDialog";
 import SessionTimer from "./SessionTimer";
@@ -29,8 +30,22 @@ const SessionsBoard = ({ branchId }: Props) => {
   const [stopTarget, setStopTarget] = useState<ISessionApi | null>(null);
   const [addItemTarget, setAddItemTarget] = useState<ISessionApi | null>(null);
 
+  // Reverb pushes a fresh event whenever a place transitions in/out of
+  // a session. We just kick a reload — the existing reload covers
+  // sessions + pcs in one step. This is the "real-time" path.
+  usePlaceAvailability(
+    branchId,
+    useCallback(() => {
+      void sessions.reload();
+      void pcs.reload();
+    }, [sessions, pcs]),
+  );
+
+  // Polling fallback. Cadence relaxed from 5s → 15s now that Reverb
+  // covers the realtime case — this just catches missed events
+  // (WebSocket dropped, tab was backgrounded, Reverb restart).
   useEffect(() => {
-    const t = setInterval(() => { void sessions.reload(); void pcs.reload(); }, 5_000);
+    const t = setInterval(() => { void sessions.reload(); void pcs.reload(); }, 15_000);
     return () => clearInterval(t);
   }, [sessions, pcs]);
 
