@@ -41,11 +41,13 @@ const SessionsBoard = ({ branchId }: Props) => {
     }, [sessions, pcs]),
   );
 
-  // Polling fallback. Cadence relaxed from 5s → 15s now that Reverb
-  // covers the realtime case — this just catches missed events
-  // (WebSocket dropped, tab was backgrounded, Reverb restart).
+  // Polling fallback. Reverb is the primary realtime path now;
+  // 30s is a sanity-check sweep for cases where the WebSocket
+  // dropped silently (Reverb restart, tab backgrounded long enough
+  // for the OS to throttle, network change). Imperceptible on the
+  // happy path, full recovery on the rare drop.
   useEffect(() => {
-    const t = setInterval(() => { void sessions.reload(); void pcs.reload(); }, 15_000);
+    const t = setInterval(() => { void sessions.reload(); void pcs.reload(); }, 30_000);
     return () => clearInterval(t);
   }, [sessions, pcs]);
 
