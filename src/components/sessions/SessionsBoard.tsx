@@ -4,6 +4,7 @@ import Button from "@/components/ui/Button";
 import Spinner from "@/components/ui/Spinner";
 import { useAsync } from "@/hooks/useAsync";
 import { useLang } from "@/i18n/LanguageContext";
+import { useBookingChanged } from "@/realtime/useBookingChanged";
 import { usePlaceAvailability } from "@/realtime/usePlaceAvailability";
 import { sessionRepository } from "@/repositories/SessionRepository";
 import { IPcApi, ISessionApi } from "@/types/sessions";
@@ -29,6 +30,12 @@ const SessionsBoard = ({ branchId }: Props) => {
   const [startTarget, setStartTarget] = useState<IPcApi | null>(null);
   const [stopTarget, setStopTarget] = useState<ISessionApi | null>(null);
   const [addItemTarget, setAddItemTarget] = useState<ISessionApi | null>(null);
+  // Set of place IDs currently reserved by an upcoming/active booking.
+  // Driven by Reverb `booking.changed` events — entries time out so a
+  // long-finished booking eventually drops off without a refetch.
+  const [reservedPlaceIds, setReservedPlaceIds] = useState<Set<number>>(new Set());
+  // Toast banner for the most recent booking event. Auto-dismisses.
+  const [bookingToast, setBookingToast] = useState<{ kind: "created" | "extended"; code: string | number; extra?: number } | null>(null);
 
   // Reverb pushes a fresh event whenever a place transitions in/out of
   // a session. We just kick a reload — the existing reload covers
@@ -40,6 +47,33 @@ const SessionsBoard = ({ branchId }: Props) => {
       void pcs.reload();
     }, [sessions, pcs]),
   );
+
+  // Booking lifecycle realtime: paint reserved tiles + show a toast.
+  // Created → all freshly-booked place IDs go into the reserved set.
+  // Extended → toast only; the place is already in the set.
+  useBookingChanged(
+    branchId,
+    useCallback((evt) => {
+      setReservedPlaceIds((prev) => {
+        const next = new Set(prev);
+        for (const id of evt.place_ids) next.add(id);
+        return next;
+      });
+      setBookingToast({
+        kind: evt.kind,
+        code: evt.code ?? evt.booking_id,
+        extra: evt.kind === "extended" ? evt.rescheduled_minutes : undefined,
+      });
+    }, []),
+  );
+
+  // Auto-dismiss the toast after 6s. Long enough to read, short enough
+  // not to clutter the screen during busy hours.
+  useEffect(() => {
+    if (!bookingToast) return;
+    const id = setTimeout(() => setBookingToast(null), 6_000);
+    return () => clearTimeout(id);
+  }, [bookingToast]);
 
   // Polling fallback. Reverb is the primary realtime path now;
   // 30s is a sanity-check sweep for cases where the WebSocket
@@ -60,6 +94,22 @@ const SessionsBoard = ({ branchId }: Props) => {
 
   return (
     <div className="col" style={{ gap: 18 }}>
+      {bookingToast && (
+        <div
+          className="card"
+          role="status"
+          style={{
+            background: bookingToast.kind === "extended" ? "rgba(245, 158, 11, 0.15)" : "rgba(7, 221, 241, 0.12)",
+            borderLeft: `4px solid ${bookingToast.kind === "extended" ? "#f59e0b" : "#07ddf1"}`,
+            padding: "10px 14px",
+            fontSize: 14,
+          }}
+        >
+          {bookingToast.kind === "created"
+            ? `${t("session.toastNewBooking") || "New booking"} #${bookingToast.code}`
+            : `${t("session.toastBookingExtended") || "Booking extended"} #${bookingToast.code} · +${bookingToast.extra ?? 0} ${t("time.minShort") || "min"}`}
+        </div>
+      )}
       <div className="row-between" style={{ flexWrap: "wrap", rowGap: 8 }}>
         <h2 className="page-title" style={{ margin: 0 }}>{t("session.boardTitle")} · #{branchId}</h2>
         <div className="row" style={{ gap: 8, flexWrap: "wrap", rowGap: 8 }}>
@@ -73,7 +123,13 @@ const SessionsBoard = ({ branchId }: Props) => {
       <div className="live-grid">
         {(pcs.data ?? []).map((pc) => {
           const sess = sessionByPc.get(pc.id);
-          const color = sess ? "#22c55e" : "#6b7280";
+          // Precedence: active session (green) > reserved booking
+          // (orange) > free (grey). A place can be both — a session
+          // running on a pre-booked slot — but the active session is
+          // what the cashier acts on, so it wins.
+          const isReserved =
+            !sess && pc.place_id != null && reservedPlaceIds.has(pc.place_id);
+          const color = sess ? "#22c55e" : isReserved ? "#f59e0b" : "#6b7280";
           const itemsCount = sess?.items?.length ?? 0;
           return (
             <div key={pc.id} className="place-cell" style={{ borderColor: color, minHeight: 160 }}>
@@ -102,7 +158,11 @@ const SessionsBoard = ({ branchId }: Props) => {
                 </>
               ) : (
                 <>
-                  <span className="status" style={{ color }}>{t("session.free")}{pc.kind === "ps" ? " · PS" : ""}</span>
+                  <span className="status" style={{ color }}>
+                    {isReserved
+                      ? t("session.reserved") || "Reserved"
+                      : `${t("session.free")}${pc.kind === "ps" ? " · PS" : ""}`}
+                  </span>
                   <Button onClick={() => setStartTarget(pc)} style={{ padding: "6px 10px", fontSize: 12, marginTop: 6 }}>{t("action.start")}</Button>
                 </>
               )}
