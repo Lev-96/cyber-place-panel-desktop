@@ -1,5 +1,6 @@
 import { useAuth } from "@/auth/AuthContext";
 import { useLang } from "@/i18n/LanguageContext";
+import { useNotifications } from "@/notifications/NotificationsContext";
 import { useBookingChanged, type BookingChangedEvent } from "@/realtime/useBookingChanged";
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -39,6 +40,7 @@ const GlobalBookingNotifier = () => {
   const { user } = useAuth();
   const { t } = useLang();
   const navigate = useNavigate();
+  const { refresh: refreshNotifications } = useNotifications();
 
   // For now, only managers (cashiers) get the in-app banner. Owners/
   // admins receive the push + email channels from the same backend
@@ -58,7 +60,11 @@ const GlobalBookingNotifier = () => {
       placeIds: evt.place_ids ?? [],
       rescheduledMinutes: evt.rescheduled_minutes ?? 0,
     });
-  }, []);
+    // Pull the freshly-written database notification row so the
+    // sidebar badge and Notifications screen reflect it without
+    // waiting for the 60s polling tick.
+    void refreshNotifications();
+  }, [refreshNotifications]);
 
   useBookingChanged(branchId, handleEvent);
 

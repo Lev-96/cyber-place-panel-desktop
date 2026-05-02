@@ -1,11 +1,37 @@
 import { useAuth } from "@/auth/AuthContext";
 import { can } from "@/auth/permissions";
 import { useLang } from "@/i18n/LanguageContext";
+import { useNotifications } from "@/notifications/NotificationsContext";
 import { NavLink } from "react-router-dom";
+
+const UnreadBadge = ({ count }: { count: number }) => {
+  if (count <= 0) return null;
+  return (
+    <span
+      aria-label={`${count} unread`}
+      style={{
+        marginLeft: 8,
+        display: "inline-block",
+        minWidth: 20,
+        padding: "1px 6px",
+        borderRadius: 999,
+        background: "#ef4444",
+        color: "#fff",
+        fontSize: 11,
+        fontWeight: 700,
+        lineHeight: "16px",
+        textAlign: "center",
+      }}
+    >
+      {count > 99 ? "99+" : count}
+    </span>
+  );
+};
 
 const Sidebar = () => {
   const { user, logout } = useAuth();
   const { t } = useLang();
+  const { unreadCount } = useNotifications();
   const role = user?.role;
   const dash = (user?.dashboard ?? {}) as { branch_id?: number | null };
   const myBranchId = typeof dash.branch_id === "number" ? dash.branch_id : null;
@@ -50,7 +76,10 @@ const Sidebar = () => {
       {can(role, "menu.managers") && (
         <NavLink to="/managers">{t("nav.managers")}</NavLink>
       )}
-      <NavLink to="/notifications">{t("nav.notifications")}</NavLink>
+      <NavLink to="/notifications">
+        {t("nav.notifications")}
+        <UnreadBadge count={unreadCount} />
+      </NavLink>
       <NavLink to="/settings">{t("nav.settings")}</NavLink>
       <div className="spacer" />
       <div style={{ padding: "0 8px", fontSize: 12, color: "#94a3b8" }}>

@@ -383,6 +383,12 @@ export const TRANSLATIONS: Dict = {
   "notifications.bookingPlacesPlural": { en: "Places", ru: "Места", am: "Տեղեր" },
   "notifications.bookingMinShort": { en: "min", ru: "мин", am: "րոպե" },
   "notifications.openBoard": { en: "Open board", ru: "К сессиям", am: "Բացել տախտակը" },
+  "notifications.markAllRead": { en: "Mark all as read", ru: "Отметить все прочитанными", am: "Նշել բոլորը կարդացած" },
+  "notifications.unreadDot": { en: "Unread", ru: "Не прочитано", am: "Չկարդացված" },
+  "notifications.bookingFeedTitle": { en: "Bookings", ru: "Бронирования", am: "Ամրագրումներ" },
+  "notifications.billingFeedTitle": { en: "Billing", ru: "Биллинг", am: "Հաշվարկ" },
+  "notifications.openBooking": { en: "Open", ru: "Открыть", am: "Բացել" },
+  "notifications.bookingForDate": { en: "for", ru: "на", am: "—" },
 
   // Generic form helpers
   "label.title": { en: "Title", ru: "Название", am: "Անվանում" },

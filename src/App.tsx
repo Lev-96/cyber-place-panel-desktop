@@ -2,6 +2,7 @@ import { useAuth } from "@/auth/AuthContext";
 import RoleGuard from "@/auth/RoleGuard";
 import Layout from "@/components/Layout";
 import Spinner from "@/components/ui/Spinner";
+import { NotificationsProvider } from "@/notifications/NotificationsContext";
 import { Suspense, lazy } from "react";
 import { HashRouter, Navigate, Route, Routes } from "react-router-dom";
 
@@ -233,7 +234,20 @@ const Unauthed = () => (
 const App = () => {
   const { user, loading } = useAuth();
   if (loading) return <Spinner />;
-  return <HashRouter>{user ? <Authed /> : <Unauthed />}</HashRouter>;
+  return (
+    <HashRouter>
+      {user ? (
+        // NotificationsProvider only mounts when authed — its initial
+        // fetch needs the sanctum token to be set, and the polling
+        // tick has no purpose for an unauth'd visitor.
+        <NotificationsProvider>
+          <Authed />
+        </NotificationsProvider>
+      ) : (
+        <Unauthed />
+      )}
+    </HashRouter>
+  );
 };
 
 export default App;
