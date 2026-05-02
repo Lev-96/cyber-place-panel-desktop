@@ -34,8 +34,6 @@ const SessionsBoard = ({ branchId }: Props) => {
   // Driven by Reverb `booking.changed` events — entries time out so a
   // long-finished booking eventually drops off without a refetch.
   const [reservedPlaceIds, setReservedPlaceIds] = useState<Set<number>>(new Set());
-  // Toast banner for the most recent booking event. Auto-dismisses.
-  const [bookingToast, setBookingToast] = useState<{ kind: "created" | "extended"; code: string | number; extra?: number } | null>(null);
 
   // Reverb pushes a fresh event whenever a place transitions in/out of
   // a session. We just kick a reload — the existing reload covers
@@ -48,9 +46,10 @@ const SessionsBoard = ({ branchId }: Props) => {
     }, [sessions, pcs]),
   );
 
-  // Booking lifecycle realtime: paint reserved tiles + show a toast.
-  // Created → all freshly-booked place IDs go into the reserved set.
-  // Extended → toast only; the place is already in the set.
+  // Booking lifecycle realtime: paint reserved tiles. The cross-screen
+  // toast lives in `<GlobalBookingNotifier />` (mounted in Layout) so
+  // the cashier sees the banner regardless of which screen they're on.
+  // This subscription is for the local tile-state side-effect only.
   useBookingChanged(
     branchId,
     useCallback((evt) => {
@@ -59,21 +58,8 @@ const SessionsBoard = ({ branchId }: Props) => {
         for (const id of evt.place_ids) next.add(id);
         return next;
       });
-      setBookingToast({
-        kind: evt.kind,
-        code: evt.code ?? evt.booking_id,
-        extra: evt.kind === "extended" ? evt.rescheduled_minutes : undefined,
-      });
     }, []),
   );
-
-  // Auto-dismiss the toast after 6s. Long enough to read, short enough
-  // not to clutter the screen during busy hours.
-  useEffect(() => {
-    if (!bookingToast) return;
-    const id = setTimeout(() => setBookingToast(null), 6_000);
-    return () => clearTimeout(id);
-  }, [bookingToast]);
 
   // Polling fallback. Reverb is the primary realtime path now;
   // 30s is a sanity-check sweep for cases where the WebSocket
@@ -94,22 +80,6 @@ const SessionsBoard = ({ branchId }: Props) => {
 
   return (
     <div className="col" style={{ gap: 18 }}>
-      {bookingToast && (
-        <div
-          className="card"
-          role="status"
-          style={{
-            background: bookingToast.kind === "extended" ? "rgba(245, 158, 11, 0.15)" : "rgba(7, 221, 241, 0.12)",
-            borderLeft: `4px solid ${bookingToast.kind === "extended" ? "#f59e0b" : "#07ddf1"}`,
-            padding: "10px 14px",
-            fontSize: 14,
-          }}
-        >
-          {bookingToast.kind === "created"
-            ? `${t("session.toastNewBooking") || "New booking"} #${bookingToast.code}`
-            : `${t("session.toastBookingExtended") || "Booking extended"} #${bookingToast.code} · +${bookingToast.extra ?? 0} ${t("time.minShort") || "min"}`}
-        </div>
-      )}
       <div className="row-between" style={{ flexWrap: "wrap", rowGap: 8 }}>
         <h2 className="page-title" style={{ margin: 0 }}>{t("session.boardTitle")} · #{branchId}</h2>
         <div className="row" style={{ gap: 8, flexWrap: "wrap", rowGap: 8 }}>

@@ -377,6 +377,12 @@ export const TRANSLATIONS: Dict = {
   "notifications.neverPaid": { en: "Never paid", ru: "Не оплачивалось", am: "Չի վճարվել" },
   "notifications.due": { en: "Due", ru: "Срок", am: "Ժամկետ" },
   "notifications.owner": { en: "Owner", ru: "Владелец", am: "Սեփականատեր" },
+  "notifications.newBookingTitle": { en: "New booking", ru: "Новое бронирование", am: "Նոր ամրագրում" },
+  "notifications.bookingExtendedTitle": { en: "Booking extended", ru: "Бронь продлена", am: "Ամրագրումը երկարացվել է" },
+  "notifications.bookingPlaces": { en: "Place", ru: "Место", am: "Տեղ" },
+  "notifications.bookingPlacesPlural": { en: "Places", ru: "Места", am: "Տեղեր" },
+  "notifications.bookingMinShort": { en: "min", ru: "мин", am: "րոպե" },
+  "notifications.openBoard": { en: "Open board", ru: "К сессиям", am: "Բացել տախտակը" },
 
   // Generic form helpers
   "label.title": { en: "Title", ru: "Название", am: "Անվանում" },
