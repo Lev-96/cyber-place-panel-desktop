@@ -40,12 +40,31 @@ declare global {
   var __cyberplace_echo__: EchoLike | null | undefined;
 }
 
+/**
+ * Surface only the failure-state transitions on the Pusher connection
+ * underneath Echo. Successful connect/disconnect cycles are silent —
+ * they don't help the operator and clutter DevTools. When something
+ * is wrong (unavailable / failed / error), we want to see it because
+ * "no realtime toast" is otherwise indistinguishable from a silent
+ * WebSocket failure.
+ */
+const attachConnectionFailureWarnings = (echo: EchoLike): void => {
+  const pusher = (
+    echo as unknown as { connector?: { pusher?: { connection?: { bind?: (e: string, h: (err?: unknown) => void) => void } } } }
+  ).connector?.pusher;
+  const conn = pusher?.connection;
+  if (!conn || typeof conn.bind !== "function") return;
+  conn.bind("unavailable", () => console.warn("[reverb] unavailable — backing off"));
+  conn.bind("failed", () => console.warn("[reverb] failed — WebSocket unsupported by runtime?"));
+  conn.bind("error", (err: unknown) => console.warn("[reverb] connection error", err));
+};
+
 const buildEcho = (cfg: ReverbConfig): EchoLike => {
   // pusher-js needs to be exposed as a global for Echo to find — this
   // is the documented integration pattern.
   (window as unknown as { Pusher: typeof Pusher }).Pusher = Pusher;
 
-  return new Echo({
+  const echo = new Echo({
     broadcaster: "reverb",
     key: cfg.key,
     wsHost: cfg.host,
@@ -56,6 +75,8 @@ const buildEcho = (cfg: ReverbConfig): EchoLike => {
     // Public channels only for now — no auth endpoint configured.
     // When we add private channels later, set authEndpoint here.
   }) as unknown as EchoLike;
+  attachConnectionFailureWarnings(echo);
+  return echo;
 };
 
 /**
