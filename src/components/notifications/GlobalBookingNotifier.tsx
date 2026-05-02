@@ -24,6 +24,70 @@ import { useNavigate } from "react-router-dom";
 const AUTO_DISMISS_MS = 8_000;
 
 /**
+ * One-time permission ask. Browsers (and Electron's renderer) only
+ * grant `Notification.permission === 'granted'` after `requestPermission()`
+ * returns; calling it repeatedly is fine but pointless, so we lazy-init
+ * on first event arrival.
+ */
+let permissionRequested = false;
+
+const ensureNotificationPermission = async (): Promise<NotificationPermission> => {
+  if (typeof Notification === "undefined") return "denied";
+  if (Notification.permission === "granted") return "granted";
+  if (Notification.permission === "denied") return "denied";
+  if (permissionRequested) return Notification.permission;
+  permissionRequested = true;
+  try {
+    return await Notification.requestPermission();
+  } catch {
+    return "denied";
+  }
+};
+
+/**
+ * Fire an OS-level desktop notification for a booking event. This is
+ * the "push" channel (vs the in-app toast rendered below): it surfaces
+ * even when Electron is unfocused or covered by another window, which
+ * is what the cashier needs during a busy session.
+ *
+ * Click on the OS notification focuses the Electron window — Electron
+ * routes this through the renderer's standard `onclick` handler.
+ */
+const showNativeBookingNotification = (evt: BookingChangedEvent): void => {
+  // Permission ask is async but we want the event handler to return
+  // synchronously, so we kick off the permission and fire the
+  // notification afterwards. The first event ever may be missed at
+  // OS level if permission wasn't yet granted — by design,
+  // re-prompting on every event would be far worse UX.
+  void ensureNotificationPermission().then((perm) => {
+    if (perm !== "granted") return;
+    const code = evt.code ?? evt.booking_id;
+    const isExtended = evt.kind === "extended";
+    const title = isExtended ? `Booking #${code} extended` : `New booking #${code}`;
+    const placeFragment = (evt.place_ids ?? []).length > 0
+      ? `Place ${(evt.place_ids ?? []).join(", ")}`
+      : "";
+    const timeFragment = evt.booking_date && evt.start_time
+      ? `${evt.booking_date} ${evt.start_time}`
+      : "";
+    const body = [placeFragment, timeFragment].filter(Boolean).join(" · ");
+    try {
+      const n = new Notification(title, { body, tag: `booking-${evt.booking_id}` });
+      n.onclick = () => {
+        // Bring the Electron window to front (handled by Electron's
+        // default click behaviour) and let the user click again on the
+        // in-app toast to navigate to /bookings/{id}.
+        try { window.focus(); } catch { /* not always allowed */ }
+      };
+    } catch {
+      // Some sandboxed Linux WMs (KDE without notification daemon, etc.)
+      // throw on Notification construction even if permission says
+      // granted. The in-app toast is our floor, so swallow this.
+    }
+  });
+};
+
+/**
  * Map an authenticated user to the most-specific Reverb channel
  * carrying booking events visible to them. Returns `null` when the
  * user lacks the prerequisite scope (e.g. an owner whose
@@ -76,6 +140,13 @@ const GlobalBookingNotifier = () => {
       placeIds: evt.place_ids ?? [],
       rescheduledMinutes: evt.rescheduled_minutes ?? 0,
     });
+    // OS-level push notification (Electron exposes the standard HTML5
+    // Notification API in the renderer). The cashier sees this even if
+    // the app is in the background or behind another window — which is
+    // exactly the "real push" behaviour requested. Falls back silently
+    // when the user denied permission or the platform doesn't expose
+    // Notification (some Linux WMs without notification daemon).
+    showNativeBookingNotification(evt);
     // Pull the freshly-written database notification row so the
     // sidebar badge and Notifications screen reflect it without
     // waiting for the 60s polling tick.
