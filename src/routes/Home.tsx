@@ -2,11 +2,39 @@ import { useAuth } from "@/auth/AuthContext";
 import GradientText from "@/components/ui/GradientText";
 import ScreenWithBg from "@/components/ui/ScreenWithBg";
 import { useLang } from "@/i18n/LanguageContext";
+import { useBookingChanged } from "@/realtime/useBookingChanged";
+import { useCallback, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 
 const Home = () => {
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const { t } = useLang();
+
+  // Dashboard tiles (Occupied now, Today's bookings, Upcoming, etc.)
+  // come from the `/user/me` payload which is populated at login.
+  // To keep them honest in real time, refetch on every booking event
+  // — debounced so a fan-out of multiple events for the same booking
+  // doesn't trigger N requests.
+  //
+  // The refresh is FYI-only: if the network is slow or the request
+  // fails, AuthContext keeps the previous user payload, so the page
+  // never blanks out.
+  const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const debouncedRefreshUser = useCallback(() => {
+    if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
+    refreshTimerRef.current = setTimeout(() => {
+      void refreshUser();
+    }, 400);
+  }, [refreshUser]);
+
+  useEffect(
+    () => () => {
+      if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
+    },
+    [],
+  );
+
+  useBookingChanged("bookings.global", debouncedRefreshUser);
   const isAdmin = user?.role === "admin";
   const isOwner = user?.role === "company_owner";
   const isManager = user?.role === "manager";

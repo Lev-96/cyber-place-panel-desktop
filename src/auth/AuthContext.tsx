@@ -9,6 +9,13 @@ interface AuthState {
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
+  /**
+   * Re-fetches /user/me and replaces the cached `user` (including
+   * its `dashboard` payload). Callers use this to refresh
+   * dashboard tiles in response to realtime events without a
+   * manual reload.
+   */
+  refreshUser: () => Promise<void>;
 }
 
 const AuthCtx = createContext<AuthState | null>(null);
@@ -48,6 +55,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       await keyValueStore.remove(AppConfig.storageKeys.token);
       await keyValueStore.remove(AppConfig.storageKeys.user);
       setUser(null);
+    },
+    refreshUser: async () => {
+      try {
+        const me = await apiGetMe();
+        await keyValueStore.set(AppConfig.storageKeys.user, me.user);
+        setUser(me.user);
+      } catch {
+        // Network blip — keep the cached user so the UI doesn't blank
+        // out. The next call (or polling tick / event) will retry.
+      }
     },
   }), [user, loading]);
 
