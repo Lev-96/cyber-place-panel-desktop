@@ -1,4 +1,5 @@
 import { useAuth } from "@/auth/AuthContext";
+import type { AuthUser } from "@/types/api";
 import { useLang } from "@/i18n/LanguageContext";
 import { useNotifications } from "@/notifications/NotificationsContext";
 import { useBookingChanged, type BookingChangedEvent } from "@/realtime/useBookingChanged";
@@ -7,25 +8,45 @@ import { useNavigate } from "react-router-dom";
 
 /**
  * App-shell-level booking-event notifier. Lives once in `Layout`
- * so the cashier sees a freshly created / extended booking the
- * moment it lands on the wire — regardless of which screen they
- * happen to be on (POS, history, billing, etc.).
+ * so every authenticated user (admin / owner / manager) sees a
+ * freshly created or extended booking the moment it lands on the
+ * wire — regardless of which screen they're on.
  *
- * Was previously coupled to `SessionsBoard`'s local toast; that
- * worked only when the cashier was already on the board. Splitting
- * it out keeps SessionsBoard responsible for the reserved-tile
- * overlay (its own UI state) and lets this component own the
- * cross-screen banner.
+ * Channel resolution by role:
+ *   admin    → `bookings.global`        — every booking, every company
+ *   owner    → `company.{company_id}`   — every branch under their company
+ *   manager  → `branch.{branch_id}`     — single branch they cash for
  *
- * Branch resolution: managers carry `dashboard.branch_id` in their
- * AuthUser payload — that's the branch they cash for. Owners and
- * admins don't have a single pinned branch; they get notifications
- * via the existing push / email / database channel from
- * `BookingObserver`, so leaving them unsubscribed here is correct
- * (subscribing to "all" branches would require a different channel
- * design).
+ * The same backend event fan-outs to all three channels (see
+ * `App\Events\BookingChanged::broadcastOn()`), so each role gets
+ * exactly one toast — no role gets it twice.
  */
 const AUTO_DISMISS_MS = 8_000;
+
+/**
+ * Map an authenticated user to the most-specific Reverb channel
+ * carrying booking events visible to them. Returns `null` when the
+ * user lacks the prerequisite scope (e.g. an owner whose
+ * `company_id` somehow isn't on the dashboard payload yet) — the
+ * notifier safely no-ops in that case.
+ */
+const resolveBookingChannel = (user: AuthUser | null): string | null => {
+  if (!user) return null;
+  if (user.role === "admin") return "bookings.global";
+  if (user.role === "owner") {
+    const companyId = user.dashboard?.company_id;
+    return typeof companyId === "number" && Number.isFinite(companyId)
+      ? `company.${companyId}`
+      : null;
+  }
+  if (user.role === "manager") {
+    const branchId = user.dashboard?.branch_id;
+    return typeof branchId === "number" && Number.isFinite(branchId)
+      ? `branch.${branchId}`
+      : null;
+  }
+  return null;
+};
 
 interface ToastModel {
   kind: "created" | "extended";
@@ -42,12 +63,7 @@ const GlobalBookingNotifier = () => {
   const navigate = useNavigate();
   const { refresh: refreshNotifications } = useNotifications();
 
-  // For now, only managers (cashiers) get the in-app banner. Owners/
-  // admins receive the push + email channels from the same backend
-  // event; an "all branches" UI subscription is a separate, larger
-  // change.
-  const branchId =
-    user?.role === "manager" ? user.dashboard?.branch_id ?? null : null;
+  const channelName = resolveBookingChannel(user);
 
   const [toast, setToast] = useState<ToastModel | null>(null);
 
@@ -66,7 +82,7 @@ const GlobalBookingNotifier = () => {
     void refreshNotifications();
   }, [refreshNotifications]);
 
-  useBookingChanged(branchId, handleEvent);
+  useBookingChanged(channelName, handleEvent);
 
   useEffect(() => {
     if (!toast) return;

@@ -51,7 +51,7 @@ const SessionsBoard = ({ branchId }: Props) => {
   // the cashier sees the banner regardless of which screen they're on.
   // This subscription is for the local tile-state side-effect only.
   useBookingChanged(
-    branchId,
+    Number.isFinite(branchId) ? `branch.${branchId}` : null,
     useCallback((evt) => {
       setReservedPlaceIds((prev) => {
         const next = new Set(prev);
