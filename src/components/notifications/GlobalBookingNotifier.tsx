@@ -33,7 +33,7 @@ const AUTO_DISMISS_MS = 8_000;
 const resolveBookingChannel = (user: AuthUser | null): string | null => {
   if (!user) return null;
   if (user.role === "admin") return "bookings.global";
-  if (user.role === "owner") {
+  if (user.role === "company_owner") {
     const companyId = user.dashboard?.company_id;
     return typeof companyId === "number" && Number.isFinite(companyId)
       ? `company.${companyId}`
