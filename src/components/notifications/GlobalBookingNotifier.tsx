@@ -62,8 +62,11 @@ const showNativeBookingNotification = (evt: BookingChangedEvent): void => {
   void ensureNotificationPermission().then((perm) => {
     if (perm !== "granted") return;
     const code = evt.code ?? evt.booking_id;
-    const isExtended = evt.kind === "extended";
-    const title = isExtended ? `Booking #${code} extended` : `New booking #${code}`;
+    const title = evt.kind === "extended"
+      ? `Booking #${code} extended`
+      : evt.kind === "cancelled"
+        ? `Booking #${code} cancelled`
+        : `New booking #${code}`;
     const placeFragment = (evt.place_ids ?? []).length > 0
       ? `Place ${(evt.place_ids ?? []).join(", ")}`
       : "";
@@ -122,7 +125,7 @@ const resolveBookingChannel = (user: AuthUser | null): string | null => {
 };
 
 interface ToastModel {
-  kind: "created" | "extended";
+  kind: "created" | "extended" | "cancelled";
   code: string | number | null;
   bookingId: number;
   branchId: number;
@@ -173,9 +176,22 @@ const GlobalBookingNotifier = () => {
   if (!toast) return null;
 
   const isExtended = toast.kind === "extended";
+  const isCancelled = toast.kind === "cancelled";
   const title = isExtended
     ? t("notifications.bookingExtendedTitle") || "Booking extended"
-    : t("notifications.newBookingTitle") || "New booking";
+    : isCancelled
+      ? t("notifications.bookingCancelledTitle") || "Booking cancelled"
+      : t("notifications.newBookingTitle") || "New booking";
+  // Per-kind theming: cyan for new, orange for extended, red for
+  // cancelled — matches the per-kind tile overlay on SessionsBoard
+  // so the cashier doesn't have to think about which colour means
+  // what.
+  const accent = isCancelled ? "#ef4444" : isExtended ? "#f59e0b" : "#07ddf1";
+  const accentBg = isCancelled
+    ? "rgba(239, 68, 68, 0.14)"
+    : isExtended
+      ? "rgba(245, 158, 11, 0.18)"
+      : "rgba(7, 221, 241, 0.14)";
   const placeLabel =
     toast.placeIds.length === 1
       ? t("notifications.bookingPlaces") || "Place"
@@ -199,8 +215,8 @@ const GlobalBookingNotifier = () => {
         zIndex: 9000,
         maxWidth: 360,
         borderRadius: 8,
-        background: isExtended ? "rgba(245, 158, 11, 0.18)" : "rgba(7, 221, 241, 0.14)",
-        borderLeft: `4px solid ${isExtended ? "#f59e0b" : "#07ddf1"}`,
+        background: accentBg,
+        borderLeft: `4px solid ${accent}`,
         padding: "12px 14px",
         boxShadow: "0 6px 22px rgba(0, 0, 0, 0.35)",
         color: "#e5e7eb",

@@ -379,6 +379,7 @@ export const TRANSLATIONS: Dict = {
   "notifications.owner": { en: "Owner", ru: "Владелец", am: "Սեփականատեր" },
   "notifications.newBookingTitle": { en: "New booking", ru: "Новое бронирование", am: "Նոր ամրագրում" },
   "notifications.bookingExtendedTitle": { en: "Booking extended", ru: "Бронь продлена", am: "Ամրագրումը երկարացվել է" },
+  "notifications.bookingCancelledTitle": { en: "Booking cancelled", ru: "Бронь отменена", am: "Ամրագրումը չեղարկվել է" },
   "notifications.bookingPlaces": { en: "Place", ru: "Место", am: "Տեղ" },
   "notifications.bookingPlacesPlural": { en: "Places", ru: "Места", am: "Տեղեր" },
   "notifications.bookingMinShort": { en: "min", ru: "мин", am: "րոպե" },

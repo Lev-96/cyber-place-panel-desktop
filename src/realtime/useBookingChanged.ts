@@ -7,7 +7,7 @@ import { getEcho } from "./echo";
  * contract can't drift silently.
  */
 export interface BookingChangedEvent {
-  kind: "created" | "extended";
+  kind: "created" | "extended" | "cancelled";
   booking_id: number;
   branch_id: number;
   company_id: number;

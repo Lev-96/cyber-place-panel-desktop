@@ -134,6 +134,7 @@ const DbNotificationCard = ({ n, onClick, onDelete }: { n: IDbNotification; onCl
 
   const isBookingCreated = dataType === "booking.created";
   const isBookingExtended = dataType === "booking.extended";
+  const isBookingCancelled = dataType === "booking.cancelled";
   const code = n.data?.code ?? n.data?.booking_id;
   const bookingDate = n.data?.booking_date as string | undefined;
   const startTime = n.data?.start_time as string | undefined;
@@ -142,7 +143,9 @@ const DbNotificationCard = ({ n, onClick, onDelete }: { n: IDbNotification; onCl
     ? `${t("notifications.newBookingTitle") || "New booking"} #${code}`
     : isBookingExtended
       ? `${t("notifications.bookingExtendedTitle") || "Booking extended"} #${code}`
-      : (n.type.split("\\").pop() ?? n.type);
+      : isBookingCancelled
+        ? `${t("notifications.bookingCancelledTitle") || "Booking cancelled"} #${code}`
+        : (n.type.split("\\").pop() ?? n.type);
 
   const handleCardClick = () => {
     onClick();
