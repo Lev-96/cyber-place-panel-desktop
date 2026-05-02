@@ -73,10 +73,6 @@ const Home = () => {
             />
             <Tile k={t("home.upcoming")} v={dash.upcoming_bookings ?? 0} />
             <Tile k={t("home.allPlaces")} v={dash.all_places ?? 0} />
-            <Tile
-              k={t("home.occupiedNow")}
-              v={dash.occupied_places_right_now ?? "0/0"}
-            />
           </>
         )}
         {!isAdmin && !isOwner && (
@@ -86,10 +82,6 @@ const Home = () => {
               v={dash.total_bookings_today ?? 0}
             />
             <Tile k={t("home.upcoming")} v={dash.upcoming_bookings ?? 0} />
-            <Tile
-              k={t("home.occupiedNow")}
-              v={dash.occupied_places_right_now ?? "0/0"}
-            />
           </>
         )}
       </div>
