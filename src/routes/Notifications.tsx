@@ -138,11 +138,16 @@ const DbNotificationCard = ({ n, onClick, onDelete }: { n: IDbNotification; onCl
   const code = n.data?.code ?? n.data?.booking_id;
   const bookingDate = n.data?.booking_date as string | undefined;
   const startTime = n.data?.start_time as string | undefined;
+  const extraMinutes = n.data?.extra_minutes as number | undefined;
 
   const headline = isBookingCreated
     ? `${t("notifications.newBookingTitle") || "New booking"} #${code}`
     : isBookingExtended
-      ? `${t("notifications.bookingExtendedTitle") || "Booking extended"} #${code}`
+      ? `${t("notifications.bookingExtendedTitle") || "Booking extended"} #${code}${
+          typeof extraMinutes === "number" && extraMinutes > 0
+            ? ` · +${extraMinutes} ${t("notifications.bookingMinShort") || "min"}`
+            : ""
+        }`
       : isBookingCancelled
         ? `${t("notifications.bookingCancelledTitle") || "Booking cancelled"} #${code}`
         : (n.type.split("\\").pop() ?? n.type);
