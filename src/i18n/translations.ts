@@ -389,6 +389,9 @@ export const TRANSLATIONS: Dict = {
   "notifications.billingFeedTitle": { en: "Billing", ru: "Биллинг", am: "Հաշվարկ" },
   "notifications.openBooking": { en: "Open", ru: "Открыть", am: "Բացել" },
   "notifications.bookingForDate": { en: "for", ru: "на", am: "—" },
+  "notifications.deleteOne": { en: "Delete", ru: "Удалить", am: "Ջնջել" },
+  "notifications.clearAll": { en: "Clear all", ru: "Очистить все", am: "Մաքրել բոլորը" },
+  "notifications.confirmClearAll": { en: "Delete all notifications? This cannot be undone.", ru: "Удалить все уведомления? Это действие нельзя отменить.", am: "Ջնջե՞լ բոլոր ծանուցումները։ Այս գործողությունը չի կարող չեղարկվել։" },
 
   // Generic form helpers
   "label.title": { en: "Title", ru: "Название", am: "Անվանում" },

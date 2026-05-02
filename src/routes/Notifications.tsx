@@ -34,6 +34,8 @@ const Notifications = () => {
     error: errorDb,
     markRead,
     markAllRead,
+    deleteOne,
+    deleteAll,
   } = useNotifications();
 
   const billing = useAsync(
@@ -51,27 +53,34 @@ const Notifications = () => {
 
   return (
     <ScreenWithBg bg="./bg/notifications.jpg" title={t("notifications.title")}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, flexWrap: "wrap", gap: 8 }}>
         <h3 className="muted" style={{ margin: 0, fontSize: 14 }}>
           {t("notifications.bookingFeedTitle") || "Bookings"}
         </h3>
-        {unreadCount > 0 && (
-          <button
-            type="button"
-            onClick={() => void markAllRead()}
-            style={{
-              padding: "4px 10px",
-              border: "1px solid #1f2a44",
-              borderRadius: 6,
-              background: "transparent",
-              color: "#e5e7eb",
-              cursor: "pointer",
-              fontSize: 12,
-            }}
-          >
-            {t("notifications.markAllRead") || "Mark all as read"}
-          </button>
-        )}
+        <div style={{ display: "flex", gap: 8 }}>
+          {unreadCount > 0 && (
+            <button
+              type="button"
+              onClick={() => void markAllRead()}
+              style={feedActionBtn}
+            >
+              {t("notifications.markAllRead") || "Mark all as read"}
+            </button>
+          )}
+          {list.length > 0 && (
+            <button
+              type="button"
+              onClick={() => {
+                if (window.confirm(t("notifications.confirmClearAll") || "Delete all?")) {
+                  void deleteAll();
+                }
+              }}
+              style={{ ...feedActionBtn, color: "#ef4444", borderColor: "#7f1d1d" }}
+            >
+              {t("notifications.clearAll") || "Clear all"}
+            </button>
+          )}
+        </div>
       </div>
 
       {list.length === 0 ? (
@@ -85,6 +94,7 @@ const Notifications = () => {
               key={n.id}
               n={n}
               onClick={() => void markRead(n.id)}
+              onDelete={() => void deleteOne(n.id)}
             />
           ))}
         </div>
@@ -115,7 +125,7 @@ const Notifications = () => {
  * "type — created_at" presentation so unknown notifications still
  * show up rather than disappearing silently.
  */
-const DbNotificationCard = ({ n, onClick }: { n: IDbNotification; onClick: () => void }) => {
+const DbNotificationCard = ({ n, onClick, onDelete }: { n: IDbNotification; onClick: () => void; onDelete: () => void }) => {
   const { t } = useLang();
   const navigate = useNavigate();
   const isUnread = n.read_at === null;
@@ -134,7 +144,7 @@ const DbNotificationCard = ({ n, onClick }: { n: IDbNotification; onClick: () =>
       ? `${t("notifications.bookingExtendedTitle") || "Booking extended"} #${code}`
       : (n.type.split("\\").pop() ?? n.type);
 
-  const handleClick = () => {
+  const handleCardClick = () => {
     onClick();
     if (n.data?.booking_id) {
       navigate(`/bookings/${n.data.booking_id}`);
@@ -142,47 +152,87 @@ const DbNotificationCard = ({ n, onClick }: { n: IDbNotification; onClick: () =>
   };
 
   return (
-    <button
-      type="button"
-      onClick={handleClick}
+    <div
       style={{
-        all: "unset",
-        cursor: "pointer",
-        display: "block",
         background: "rgba(7, 221, 241, 0.05)",
         border: `1px solid ${tone}`,
         borderRadius: 8,
         padding: "12px 14px",
-        textAlign: "left",
         position: "relative",
+        display: "flex",
+        gap: 12,
+        alignItems: "flex-start",
       }}
     >
-      {isUnread && (
-        <span
-          aria-label={t("notifications.unreadDot") || "Unread"}
-          style={{
-            position: "absolute",
-            top: 14,
-            right: 14,
-            width: 8,
-            height: 8,
-            borderRadius: "50%",
-            background: "#ef4444",
-          }}
-        />
-      )}
-      <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 4 }}>{headline}</div>
-      <div className="muted" style={{ fontSize: 13 }}>
-        {bookingDate && startTime && (
-          <>
-            {t("notifications.bookingForDate") || "for"} {bookingDate} {startTime}
-            {" · "}
-          </>
+      {/* The body is the click target — markRead + navigate. The
+          delete button below is a separate target so a click on it
+          doesn't accidentally trigger navigation. */}
+      <button
+        type="button"
+        onClick={handleCardClick}
+        style={{
+          all: "unset",
+          cursor: "pointer",
+          flex: 1,
+          textAlign: "left",
+        }}
+      >
+        {isUnread && (
+          <span
+            aria-label={t("notifications.unreadDot") || "Unread"}
+            style={{
+              display: "inline-block",
+              width: 8,
+              height: 8,
+              borderRadius: "50%",
+              background: "#ef4444",
+              marginRight: 8,
+              verticalAlign: "middle",
+            }}
+          />
         )}
-        {formatDate(n.created_at)}
-      </div>
-    </button>
+        <span style={{ fontWeight: 700, fontSize: 15 }}>{headline}</span>
+        <div className="muted" style={{ fontSize: 13, marginTop: 4 }}>
+          {bookingDate && startTime && (
+            <>
+              {t("notifications.bookingForDate") || "for"} {bookingDate} {startTime}
+              {" · "}
+            </>
+          )}
+          {formatDate(n.created_at)}
+        </div>
+      </button>
+      <button
+        type="button"
+        onClick={(e) => { e.stopPropagation(); onDelete(); }}
+        aria-label={t("notifications.deleteOne") || "Delete"}
+        title={t("notifications.deleteOne") || "Delete"}
+        style={{
+          padding: "4px 10px",
+          border: "1px solid #7f1d1d",
+          borderRadius: 6,
+          background: "transparent",
+          color: "#ef4444",
+          cursor: "pointer",
+          fontSize: 16,
+          lineHeight: 1,
+          alignSelf: "flex-start",
+        }}
+      >
+        ×
+      </button>
+    </div>
   );
+};
+
+const feedActionBtn: React.CSSProperties = {
+  padding: "4px 10px",
+  border: "1px solid #1f2a44",
+  borderRadius: 6,
+  background: "transparent",
+  color: "#e5e7eb",
+  cursor: "pointer",
+  fontSize: 12,
 };
 
 const ReminderCard = ({ r, isAdmin }: { r: IBillingReminder; isAdmin: boolean }) => {

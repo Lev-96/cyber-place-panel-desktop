@@ -58,3 +58,14 @@ export const apiMarkAllNotificationsRead = () =>
   request<{ unread_count: number }>("/notifications/read-all", {
     method: "POST",
   });
+
+export const apiDeleteNotification = (id: string) =>
+  request<{ id: string; unread_count: number }>(
+    `/notifications/${encodeURIComponent(id)}`,
+    { method: "DELETE" },
+  );
+
+export const apiDeleteAllNotifications = () =>
+  request<{ deleted: number; unread_count: number }>("/notifications", {
+    method: "DELETE",
+  });
