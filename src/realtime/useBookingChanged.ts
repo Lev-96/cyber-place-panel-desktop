@@ -47,12 +47,20 @@ export const useBookingChanged = (
   useEffect(() => { handlerRef.current = onChange; }, [onChange]);
 
   useEffect(() => {
-    if (!channelName) return;
+    if (!channelName) {
+      console.warn("[reverb] useBookingChanged got no channel — booking notifications won't fire");
+      return;
+    }
     const echo = getEcho();
-    if (!echo) return;
+    if (!echo) {
+      console.warn("[reverb] echo not initialised — booking notifications won't fire (check VITE_REVERB_* env)");
+      return;
+    }
 
+    console.log(`[reverb] subscribing to ${channelName} for .booking.changed`);
     const channel = echo.channel(channelName);
     const listener = (payload: unknown) => {
+      console.log(`[reverb] .booking.changed received on ${channelName}`, payload);
       handlerRef.current(payload as BookingChangedEvent);
     };
     channel.listen(".booking.changed", listener);

@@ -88,26 +88,35 @@ const showNativeBookingNotification = (evt: BookingChangedEvent): void => {
 };
 
 /**
- * Map an authenticated user to the most-specific Reverb channel
- * carrying booking events visible to them. Returns `null` when the
- * user lacks the prerequisite scope (e.g. an owner whose
- * `company_id` somehow isn't on the dashboard payload yet) — the
- * notifier safely no-ops in that case.
+ * Map an authenticated staff user to the Reverb channel carrying
+ * booking events.
+ *
+ * All three roles (admin / company_owner / manager) subscribe to
+ * `bookings.global`. The backend's `BookingChanged::broadcastOn()`
+ * fans out the same event to `branch.{id}`, `company.{id}` AND
+ * `bookings.global` simultaneously, so the global channel is
+ * guaranteed to carry every booking — admin, owner and manager
+ * all get the toast regardless of how their `dashboard.branch_id`
+ * / `dashboard.company_id` happens to be populated.
+ *
+ * The earlier per-role channel resolution (manager → branch.{id},
+ * owner → company.{id}) silently dropped to `null` when the
+ * dashboard payload didn't carry the expected field, leaving those
+ * roles without any subscription. Picking the one constant channel
+ * removes that whole class of failure.
+ *
+ * Privacy: the desktop is staff-only — admin/owner/manager all
+ * have legitimate access to booking data via the existing routes,
+ * so a global channel doesn't broaden their reach.
  */
 const resolveBookingChannel = (user: AuthUser | null): string | null => {
   if (!user) return null;
-  if (user.role === "admin") return "bookings.global";
-  if (user.role === "company_owner") {
-    const companyId = user.dashboard?.company_id;
-    return typeof companyId === "number" && Number.isFinite(companyId)
-      ? `company.${companyId}`
-      : null;
-  }
-  if (user.role === "manager") {
-    const branchId = user.dashboard?.branch_id;
-    return typeof branchId === "number" && Number.isFinite(branchId)
-      ? `branch.${branchId}`
-      : null;
+  if (
+    user.role === "admin" ||
+    user.role === "company_owner" ||
+    user.role === "manager"
+  ) {
+    return "bookings.global";
   }
   return null;
 };
