@@ -3,6 +3,7 @@ import type { AuthUser } from "@/types/api";
 import { useLang } from "@/i18n/LanguageContext";
 import { useNotifications } from "@/notifications/NotificationsContext";
 import { useBookingChanged, type BookingChangedEvent } from "@/realtime/useBookingChanged";
+import { useBranchSubscribed, type BranchSubscribedEvent } from "@/realtime/useBranchSubscribed";
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -144,6 +145,11 @@ const GlobalBookingNotifier = () => {
   const [toast, setToast] = useState<ToastModel | null>(null);
 
   const handleEvent = useCallback((evt: BookingChangedEvent) => {
+    // `confirmed` is a silent refresh hint (used to drop the booking
+    // out of the dashboard "Upcoming/pending" tile). No toast, no OS
+    // notification, no notifications-list refresh — Home.tsx's own
+    // `useBookingChanged` hook handles the dashboard refetch.
+    if (evt.kind === "confirmed") return;
     setToast({
       kind: evt.kind,
       code: evt.code,
@@ -166,6 +172,30 @@ const GlobalBookingNotifier = () => {
   }, [refreshNotifications]);
 
   useBookingChanged(channelName, handleEvent);
+
+  // Branch-subscribed events ride the same channel fan-out as booking
+  // events. Surface as an OS push only — the in-app toast stays
+  // booking-shaped to keep the cashier's primary attention on bookings.
+  // The Notifications panel still gets the database row (refreshed
+  // below), so the subscribe row is discoverable in the same place.
+  const handleSubscribe = useCallback((evt: BranchSubscribedEvent) => {
+    void ensureNotificationPermission().then((perm) => {
+      if (perm !== "granted") return;
+      const name = evt.guest_name?.trim() || `Guest #${evt.guest_id}`;
+      const branch = evt.branch_address?.trim() || `Branch #${evt.branch_id}`;
+      const title = t("notifications.branchSubscribedTitle") || "New subscriber";
+      try {
+        new Notification(title, {
+          body: `${name} → ${branch}`,
+          tag: `subscribe-${evt.branch_id}-${evt.guest_id}`,
+        });
+      } catch {
+        /* WMs without a notification daemon — swallow */
+      }
+    });
+    void refreshNotifications();
+  }, [refreshNotifications, t]);
+  useBranchSubscribed(channelName, handleSubscribe);
 
   useEffect(() => {
     if (!toast) return;
