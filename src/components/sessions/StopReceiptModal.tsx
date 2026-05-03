@@ -14,10 +14,14 @@ interface Props {
   onItemRemoved: () => void;
 }
 
-const fmtDuration = (mins: number) => {
+const fmtDuration = (mins: number, t: (k: string) => string) => {
   const h = Math.floor(mins / 60);
   const m = mins % 60;
-  return h > 0 ? `${h} ч ${m} мин` : `${m} мин`;
+  // Suffixes flow through the same i18n keys SessionsBoard / SessionsHistory
+  // use, so swapping the language never leaves a stray Russian "ч" behind.
+  const hShort = t("time.hourShort") || "h";
+  const mShort = t("time.minShort") || "min";
+  return h > 0 ? `${h} ${hShort} ${m} ${mShort}` : `${m} ${mShort}`;
 };
 
 /**
@@ -90,12 +94,12 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved }: Prop
             <div style={row}>
               <span style={{ flex: 1 }}>
                 {view.mode === "open"
-                  ? `${t("session.timePlayed")} — ${fmtDuration(view.elapsed_minutes)}`
+                  ? `${t("session.timePlayed")} — ${fmtDuration(view.elapsed_minutes, t)}`
                   : `${t("session.tariff")} · ${view.package_name ?? ""}`}
               </span>
               {view.mode === "open" && view.hourly_rate != null && (
                 <span className="muted" style={{ marginRight: 12, fontSize: 12 }}>
-                  {money(Number(view.hourly_rate))}/ч
+                  {money(Number(view.hourly_rate))}/{t("time.hourShort") || "h"}
                 </span>
               )}
               <span style={{ fontWeight: 700 }}>{money(Number(view.time_cost))}</span>
@@ -110,7 +114,7 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved }: Prop
                 </span>
                 <span style={{ fontWeight: 700, marginRight: 8 }}>{money(Number(it.line_total))}</span>
                 {!stopped && (
-                  <button type="button" onClick={() => remove(it.id)} disabled={busy} style={removeBtn} title="Удалить позицию">
+                  <button type="button" onClick={() => remove(it.id)} disabled={busy} style={removeBtn} title={t("session.removeItemTitle")}>
                     ×
                   </button>
                 )}

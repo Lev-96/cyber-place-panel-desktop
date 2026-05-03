@@ -224,6 +224,12 @@ const pkgRow = (active: boolean): React.CSSProperties => ({
 
 const tabStyle = (active: boolean): React.CSSProperties => ({
   flex: 1,
+  // `min-width: 0` lets the flex child actually shrink — without it
+  // a long RU/AM label ("Фиксированный тариф", "По часам (открытая)")
+  // forces the parent .row past the modal width and the second tab
+  // gets clipped. Pairing with `whiteSpace: normal` lets the label
+  // wrap to a second line on narrow widths instead of overflowing.
+  minWidth: 0,
   padding: "8px 10px",
   border: `1px solid ${active ? "#07ddf1" : "#1f2a44"}`,
   background: active ? "#101a35" : "transparent",
@@ -231,6 +237,8 @@ const tabStyle = (active: boolean): React.CSSProperties => ({
   borderRadius: 8,
   cursor: "pointer",
   fontWeight: 600,
+  whiteSpace: "normal",
+  lineHeight: 1.2,
 });
 
 export default StartSessionDialog;

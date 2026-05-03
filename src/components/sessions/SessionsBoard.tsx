@@ -121,9 +121,15 @@ const SessionsBoard = ({ branchId }: Props) => {
                       : sess.package_name}
                     {itemsCount > 0 && <span className="muted"> · {itemsCount} {t("session.posNote")}</span>}
                   </span>
-                  <div className="row" style={{ gap: 6, marginTop: 4 }}>
-                    <Button variant="secondary" onClick={() => setAddItemTarget(sess)} style={miniBtn}>{t("session.addService")}</Button>
-                    <Button variant="secondary" onClick={() => setStopTarget(sess)} style={miniBtn}>{t("action.stop")}</Button>
+                  {/* `flexWrap: wrap` + `flex: 1 0 auto` lets the two
+                      buttons stay side-by-side on wide cells and stack
+                      cleanly into two rows on narrow ones — important
+                      because the grid item can be as tight as 160px and
+                      RU/AM labels ("+ услуга", "+ ծառայություն") are
+                      noticeably wider than the EN baseline. */}
+                  <div className="row" style={{ gap: 6, marginTop: 4, flexWrap: "wrap" }}>
+                    <Button variant="secondary" onClick={() => setAddItemTarget(sess)} style={miniBtnFlex}>{t("session.addService")}</Button>
+                    <Button variant="secondary" onClick={() => setStopTarget(sess)} style={miniBtnFlex}>{t("action.stop")}</Button>
                   </div>
                 </>
               ) : (
@@ -170,6 +176,15 @@ const SessionsBoard = ({ branchId }: Props) => {
   );
 };
 
-const miniBtn: React.CSSProperties = { padding: "4px 8px", fontSize: 12 };
+// `flex: 1 0 auto` — button starts at its content's natural width so
+// short EN labels don't stretch awkwardly, but it can grow to share
+// the available row width, and won't shrink below content (which would
+// otherwise clip a Cyrillic / Armenian label).
+const miniBtnFlex: React.CSSProperties = {
+  padding: "4px 8px",
+  fontSize: 12,
+  flex: "1 0 auto",
+  minWidth: 0,
+};
 
 export default SessionsBoard;

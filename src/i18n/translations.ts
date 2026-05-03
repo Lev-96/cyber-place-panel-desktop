@@ -175,6 +175,7 @@ export const TRANSLATIONS: Dict = {
   "session.posNote": { en: "items", ru: "поз.", am: "միավոր" },
   "session.products": { en: "Products", ru: "Товары", am: "Ապրանքներ" },
   "session.services": { en: "Services", ru: "Услуги", am: "Ծառայություններ" },
+  "session.removeItemTitle": { en: "Remove item", ru: "Удалить позицию", am: "Հեռացնել տողը" },
   "pcs.title": { en: "PCs", ru: "ПК", am: "Համակարգիչներ" },
   "pcs.register": { en: "+ Register device", ru: "+ Зарегистрировать устройство", am: "+ Գրանցել սարք" },
   "pcs.editDevice": { en: "Edit device", ru: "Редактировать устройство", am: "Խմբագրել սարքը" },
