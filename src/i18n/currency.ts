@@ -35,7 +35,7 @@ export const CURRENCY_LOCALE: Record<Currency, string> = {
  * which is the case in this Electron Chromium build.
  */
 export const AMD_UNIT: Record<Lang, string> = {
-  en: "dram",
+  en: "AMD",
   ru: "драм",
   am: "դրամ",
 };
