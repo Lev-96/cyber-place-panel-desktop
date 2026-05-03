@@ -4,6 +4,7 @@ import { useLang } from "@/i18n/LanguageContext";
 import { useNotifications } from "@/notifications/NotificationsContext";
 import { useBookingChanged, type BookingChangedEvent } from "@/realtime/useBookingChanged";
 import { useBranchSubscribed, type BranchSubscribedEvent } from "@/realtime/useBranchSubscribed";
+import { useTournamentJoined, type TournamentJoinedEvent } from "@/realtime/useTournamentJoined";
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -196,6 +197,30 @@ const GlobalBookingNotifier = () => {
     void refreshNotifications();
   }, [refreshNotifications, t]);
   useBranchSubscribed(channelName, handleSubscribe);
+
+  // Tournament-joined fires only for `as=player` (server-side gate
+  // in TournamentRegistrationController). Same OS-push + feed-
+  // refresh treatment as branch subscribes — both are low-frequency
+  // staff-relevant events that don't need to compete with bookings
+  // for the in-app toast slot.
+  const handleTournamentJoined = useCallback((evt: TournamentJoinedEvent) => {
+    void ensureNotificationPermission().then((perm) => {
+      if (perm !== "granted") return;
+      const name = evt.guest_name?.trim() || `Guest #${evt.guest_id}`;
+      const tournament = evt.tournament_title?.trim() || `Tournament #${evt.tournament_id}`;
+      const title = t("notifications.tournamentJoinedTitle") || "New tournament player";
+      try {
+        new Notification(title, {
+          body: `${name} → ${tournament}`,
+          tag: `tournament-${evt.tournament_id}-${evt.guest_id}`,
+        });
+      } catch {
+        /* WMs without a notification daemon — swallow */
+      }
+    });
+    void refreshNotifications();
+  }, [refreshNotifications, t]);
+  useTournamentJoined(channelName, handleTournamentJoined);
 
   useEffect(() => {
     if (!toast) return;

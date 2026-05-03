@@ -101,6 +101,11 @@ export const TRANSLATIONS: Dict = {
     ru: "Новый подписчик",
     am: "Նոր բաժանորդ",
   },
+  "notifications.tournamentJoinedTitle": {
+    en: "New tournament player",
+    ru: "Новый участник турнира",
+    am: "Մրցաշարի նոր խաղացող",
+  },
   "session.noAssignedRate": {
     en: "No price configured for this PC's place. Set one on the «Branch prices» page first.",
     ru: "Для места этого PC не задана цена. Сначала установите её на странице «Цены филиала».",
