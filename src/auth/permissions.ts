@@ -22,8 +22,8 @@ export type Permission =
   | "branch.edit"
   | "branch.delete"
   // Hourly-rate matrix + time packages — the player-facing tariff
-  // sheet. Admin/owner/manager all need it: manager runs the floor
-  // and is the one editing prices when they shift.
+  // sheet. Admin/owner only — managers run the floor but pricing is
+  // a business decision owned by the company, not the cashier desk.
   | "branch.prices"
   // company CRUD
   | "company.create"
@@ -62,11 +62,11 @@ const PERMS: Record<Role, ReadonlySet<Permission>> = {
   ]),
   manager: new Set<Permission>([
     // Manager = single-branch staff. No global lists, no CRUD of
-    // branches/companies. Edits their own branch info AND its prices
-    // — managers run the floor and need to adjust rates when they
-    // shift (e.g. peak-hour vs off-peak).
+    // branches/companies. Edits their own branch info but NOT prices
+    // — pricing is an owner/admin business decision; the cashier desk
+    // sees rates only through StartSessionDialog (already populated).
     "menu.tournaments", "menu.scan",
-    "branch.edit", "branch.prices",
+    "branch.edit",
     "session.start", "session.stop", "pos.charge", "shift.open",
   ]),
 };

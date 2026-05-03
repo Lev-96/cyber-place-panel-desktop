@@ -69,9 +69,9 @@ describe("can(role, perm)", () => {
       expect(can("manager", "shift.open")).toBe(true);
     });
 
-    it("can edit own-branch info AND its prices (manages the floor)", () => {
+    it("can edit own-branch info but NOT prices (owner-only business decision)", () => {
       expect(can("manager", "branch.edit")).toBe(true);
-      expect(can("manager", "branch.prices")).toBe(true);
+      expect(can("manager", "branch.prices")).toBe(false);
     });
 
     it("cannot manage other managers or see global lists", () => {

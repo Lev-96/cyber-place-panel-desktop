@@ -99,7 +99,11 @@ const Authed = () => (
         <Route path="/branches/:branchId/pcs" element={<PcsList />} />
         <Route
           path="/branches/:branchId/tariffs"
-          element={<BranchPricesPage />}
+          element={
+            <RoleGuard perm="branch.prices">
+              <BranchPricesPage />
+            </RoleGuard>
+          }
         />
         <Route path="/branches/:branchId/products" element={<ProductsList />} />
         <Route path="/branches/:branchId/pos" element={<PosTerminal />} />
