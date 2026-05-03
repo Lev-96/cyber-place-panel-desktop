@@ -1,23 +1,28 @@
 import Button from "@/components/ui/Button";
 import { useLang } from "@/i18n/LanguageContext";
+import { CURRENCY_LOCALE, LANG_TO_CURRENCY, moneyDisplay } from "@/i18n/currency";
 import { branchRepository } from "@/repositories/BranchRepository";
 import { IBranchApi } from "@/types/api";
-import { FormEvent, useState } from "react";
+import { FormEvent, useCallback, useState } from "react";
 
 /**
  * Branch hourly-rate matrix editor — the player-facing tariff sheet
- * keyed by `<platform>-<type>` (pc/ps4/ps5 × standard/vip). This is
- * the SINGLE source of truth for session billing now: auto-sessions
- * after a QR confirm and the manual `SessionController::store` open
- * mode both resolve their hourly rate from this same row.
+ * keyed by `<platform>-<type>` (pc/ps4/ps5 × standard/vip). Single
+ * source of truth for session billing: auto-sessions after a QR
+ * confirm and the manual `SessionController::store` open mode both
+ * resolve their hourly rate from this same row.
  *
- * Embedded inline (not modal) so it slots into the dedicated
- * /branches/:id/tariffs page and the manager — who couldn't reach
- * the modal version buried in branch settings — can edit it.
+ * Inputs are `type="text" inputMode="decimal"` rather than HTML5
+ * `type="number"`: spinners + locale separators behave inconsistently
+ * across Electron Chromium builds and can swallow keystrokes when the
+ * value isn't parseable as a number, producing a "frozen field" feel.
+ * Plain text + manual digit/decimal validation gives us total control
+ * and works the same on every host.
  *
- * Returned numbers are already validated/coerced on submit; on the
- * wire we always send the full row (KEYS) including nulls so a
- * cleared cell properly drops the price.
+ * Storage is always AMD — the small suffix on each row shows the
+ * equivalent in the UI language's currency at the static rate the
+ * money helper uses, so the manager has live FX feedback while
+ * filling the matrix.
  */
 
 type PriceKey =
@@ -45,7 +50,7 @@ interface Props {
 }
 
 const HourlyRatesForm = ({ branch, onSaved }: Props) => {
-  const { t } = useLang();
+  const { t, lang } = useLang();
   const [prices, setPrices] = useState<Record<PriceKey, string>>(() => {
     const init = {} as Record<PriceKey, string>;
     for (const k of KEYS) init[k] = String(branch.price_for_branch?.[k] ?? "");
@@ -55,21 +60,24 @@ const HourlyRatesForm = ({ branch, onSaved }: Props) => {
   const [err, setErr] = useState<string | null>(null);
   const [savedAt, setSavedAt] = useState<number | null>(null);
 
-  const set = (k: PriceKey, v: string) => setPrices((prev) => ({ ...prev, [k]: v }));
+  const set = useCallback((k: PriceKey, v: string) => {
+    // Whitelist the input to digits + a single decimal separator. Any
+    // other key (letters, double dots, etc.) silently drops — same UX
+    // type="number" tries to give us but consistent across hosts.
+    const cleaned = v.replace(",", ".");
+    if (cleaned !== "" && !/^\d*\.?\d*$/.test(cleaned)) return;
+    setPrices((prev) => ({ ...prev, [k]: cleaned }));
+  }, []);
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     setBusy(true);
     setErr(null);
     try {
-      // Build the full payload; backend expects each key, with nulls
-      // for "not set". `id: 0` tells the API to create the row when
-      // the branch doesn't have one yet — same convention the modal
-      // form used.
       type Pricing = NonNullable<IBranchApi["price_for_branch"]>;
       const payload = { id: branch.price_for_branch?.id ?? 0, branch_id: branch.id } as Pricing;
       for (const k of KEYS) {
-        const raw = prices[k].trim().replace(",", ".");
+        const raw = prices[k].trim();
         if (raw === "") {
           payload[k] = null;
           continue;
@@ -89,6 +97,12 @@ const HourlyRatesForm = ({ branch, onSaved }: Props) => {
       setBusy(false);
     }
   };
+
+  // Currency code shown next to each input. AMD is the storage unit,
+  // but we surface the UI-language equivalent so the manager doesn't
+  // have to do mental FX while editing.
+  const targetCurrency = LANG_TO_CURRENCY[lang];
+  const targetLocale = CURRENCY_LOCALE[targetCurrency];
 
   return (
     <form onSubmit={submit} className="card" style={{ display: "flex", flexDirection: "column", gap: 14 }}>
@@ -118,6 +132,8 @@ const HourlyRatesForm = ({ branch, onSaved }: Props) => {
               vipKey={vipKey}
               prices={prices}
               set={set}
+              targetCurrency={targetCurrency}
+              targetLocale={targetLocale}
             />
           );
         })}
@@ -144,28 +160,87 @@ interface PriceRowProps {
   vipKey: PriceKey;
   prices: Record<PriceKey, string>;
   set: (k: PriceKey, v: string) => void;
+  targetCurrency: "AMD" | "USD" | "RUB";
+  targetLocale: string;
 }
 
-const PriceRow = ({ device, stdKey, vipKey, prices, set }: PriceRowProps) => (
+const PriceRow = ({ device, stdKey, vipKey, prices, set, targetCurrency, targetLocale }: PriceRowProps) => (
   <>
     <span style={{ fontWeight: 700, textTransform: "uppercase" }}>{device}</span>
-    <input
-      className="input"
-      type="number"
-      min={0}
-      step="0.01"
+    <PriceInput
       value={prices[stdKey]}
-      onChange={(e) => set(stdKey, e.target.value)}
+      onChange={(v) => set(stdKey, v)}
+      targetCurrency={targetCurrency}
+      targetLocale={targetLocale}
     />
-    <input
-      className="input"
-      type="number"
-      min={0}
-      step="0.01"
+    <PriceInput
       value={prices[vipKey]}
-      onChange={(e) => set(vipKey, e.target.value)}
+      onChange={(v) => set(vipKey, v)}
+      targetCurrency={targetCurrency}
+      targetLocale={targetLocale}
     />
   </>
 );
+
+interface PriceInputProps {
+  value: string;
+  onChange: (v: string) => void;
+  targetCurrency: "AMD" | "USD" | "RUB";
+  targetLocale: string;
+}
+
+/**
+ * Number input + currency suffix. The AMD value the manager types
+ * lives in the underlying state, the suffix renders the conversion
+ * to the UI-language currency live so they have FX feedback while
+ * editing. Suffix sits inside a relative wrapper with `padding-right`
+ * on the input so it never overlaps the value the user typed.
+ */
+const PriceInput = ({ value, onChange, targetCurrency, targetLocale }: PriceInputProps) => {
+  const numeric = Number(value.replace(",", "."));
+  const showConverted =
+    targetCurrency !== "AMD" && Number.isFinite(numeric) && numeric > 0;
+  const converted = showConverted
+    ? new Intl.NumberFormat(targetLocale, {
+        style: "currency",
+        currency: targetCurrency,
+        maximumFractionDigits: 2,
+      }).format(moneyDisplay.convert(numeric, targetCurrency))
+    : null;
+  return (
+    <div style={{ position: "relative", display: "flex", flexDirection: "column", gap: 2 }}>
+      <div style={{ position: "relative" }}>
+        <input
+          className="input"
+          type="text"
+          inputMode="decimal"
+          autoComplete="off"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          style={{ paddingRight: 56 }}
+          placeholder="0"
+        />
+        <span
+          style={{
+            position: "absolute",
+            right: 12,
+            top: "50%",
+            transform: "translateY(-50%)",
+            color: "#9aa8c7",
+            fontSize: 12,
+            pointerEvents: "none",
+          }}
+        >
+          AMD
+        </span>
+      </div>
+      {converted && (
+        <span className="muted" style={{ fontSize: 11, paddingLeft: 4 }}>
+          ≈ {converted}
+        </span>
+      )}
+    </div>
+  );
+};
 
 export default HourlyRatesForm;
