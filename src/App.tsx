@@ -43,6 +43,7 @@ const SessionsHistory = lazy(() => import("@/routes/SessionsHistory"));
 const Settings = lazy(() => import("@/routes/Settings"));
 const ShiftPanel = lazy(() => import("@/routes/ShiftPanel"));
 const BranchPricesPage = lazy(() => import("@/routes/BranchPricesPage"));
+const BranchSubscribersPage = lazy(() => import("@/routes/BranchSubscribersPage"));
 const TournamentDetails = lazy(() => import("@/routes/TournamentDetails"));
 const Tournaments = lazy(() => import("@/routes/Tournaments"));
 
@@ -104,6 +105,10 @@ const Authed = () => (
               <BranchPricesPage />
             </RoleGuard>
           }
+        />
+        <Route
+          path="/branches/:branchId/subscribers"
+          element={<BranchSubscribersPage />}
         />
         <Route path="/branches/:branchId/products" element={<ProductsList />} />
         <Route path="/branches/:branchId/pos" element={<PosTerminal />} />

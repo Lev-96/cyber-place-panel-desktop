@@ -62,6 +62,7 @@ const BranchHub = () => {
           <Tile to={`/branches/${id}/managers`} title={t("hub.tile.managers")} hint={t("hub.tile.managersHint")} />
         )}
         <Tile to={`/branches/${id}/tournaments`} title={t("hub.tile.tournaments")} hint={t("hub.tile.tournamentsHint")} />
+        <Tile to={`/branches/${id}/subscribers`} title={t("hub.tile.subscribers")} hint={t("hub.tile.subscribersHint")} />
         <Tile to={`/branches/${id}/edit`} title={t("hub.tile.settings")} hint={t("hub.tile.settingsHint")} />
       </div>
 

@@ -224,6 +224,28 @@ export const TRANSLATIONS: Dict = {
   "hub.tile.pcsHint": { en: "Agent registration", ru: "Регистрация агента", am: "Գործակալի գրանցում" },
   "hub.tile.prices": { en: "Branch prices", ru: "Цены филиала", am: "Մասնաճյուղի գները" },
   "hub.tile.pricesHint": { en: "Hourly rates per place type", ru: "Ставки за час по типам мест", am: "Ժամային սակագներ ըստ տեղի տեսակի" },
+  "hub.tile.subscribers": { en: "Subscribers", ru: "Подписчики", am: "Բաժանորդներ" },
+  "hub.tile.subscribersHint": {
+    en: "Players following branch announcements",
+    ru: "Игроки, подписанные на филиал",
+    am: "Մասնաճյուղին հետևող խաղացողներ",
+  },
+  "subscribers.title": { en: "Branch subscribers", ru: "Подписчики филиала", am: "Մասնաճյուղի բաժանորդներ" },
+  "subscribers.searchPlaceholder": {
+    en: "Filter by first or last name",
+    ru: "Поиск по имени или фамилии",
+    am: "Որոնել ըստ անվան կամ ազգանվան",
+  },
+  "subscribers.empty": {
+    en: "No subscribers yet.",
+    ru: "Подписчиков пока нет.",
+    am: "Բաժանորդներ դեռ չկան:",
+  },
+  "subscribers.noMatches": {
+    en: "No matches.",
+    ru: "Совпадений не найдено.",
+    am: "Համընկնումներ չեն գտնվել:",
+  },
   "hub.tile.products": { en: "Products", ru: "Товары", am: "Ապրանքներ" },
   "hub.tile.productsHint": { en: "POS catalog", ru: "Каталог кассы", am: "Դրամարկղի կատալոգ" },
   "hub.tile.services": { en: "Services", ru: "Услуги", am: "Ծառայություններ" },
