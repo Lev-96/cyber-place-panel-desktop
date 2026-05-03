@@ -53,8 +53,8 @@ const BranchHub = () => {
         <Tile to={`/branches/${id}/members`} title={t("hub.tile.members")} hint={t("hub.tile.membersHint")} />
         <Tile to={`/branches/${id}/places`} title={t("hub.tile.places")} hint={t("hub.tile.placesHint")} />
         <Tile to={`/branches/${id}/pcs`} title={t("hub.tile.pcs")} hint={t("hub.tile.pcsHint")} />
-        {can(role, "branch.tariffs") && (
-          <Tile to={`/branches/${id}/tariffs`} title={t("hub.tile.tariffs")} hint={t("hub.tile.tariffsHint")} />
+        {can(role, "branch.prices") && (
+          <Tile to={`/branches/${id}/tariffs`} title={t("hub.tile.prices")} hint={t("hub.tile.pricesHint")} />
         )}
         <Tile to={`/branches/${id}/products`} title={t("hub.tile.products")} hint={t("hub.tile.productsHint")} />
         <Tile to={`/branches/${id}/services`} title={t("hub.tile.services")} hint={t("hub.tile.servicesHint")} />

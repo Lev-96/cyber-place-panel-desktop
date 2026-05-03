@@ -1,23 +1,22 @@
 import BranchForm from "@/components/branches/BranchForm";
 import BranchOpenDaysForm from "@/components/branches/BranchOpenDaysForm";
-import BranchPricingForm from "@/components/branches/BranchPricingForm";
 import Button from "@/components/ui/Button";
 import ScreenWithBg from "@/components/ui/ScreenWithBg";
 import Spinner from "@/components/ui/Spinner";
 import { useAsync } from "@/hooks/useAsync";
-import { useLang } from "@/i18n/LanguageContext";
 import { branchRepository } from "@/repositories/BranchRepository";
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
+// Pricing has its own dedicated page — see /branches/:id/tariffs
+// (BranchPricesPage). Keeping it here would duplicate the source of
+// truth and confuse who owns the matrix.
 const BranchEdit = () => {
   const { branchId } = useParams();
   const id = Number(branchId);
   const nav = useNavigate();
-  const { t } = useLang();
   const { data, loading, error, reload } = useAsync(() => branchRepository.byId(id), [id]);
   const [edit, setEdit] = useState(false);
-  const [pricing, setPricing] = useState(false);
   const [hours, setHours] = useState(false);
 
   if (!Number.isFinite(id) || id <= 0) return <div className="error">Invalid branch id.</div>;
@@ -43,14 +42,12 @@ const BranchEdit = () => {
         <Row k="Rating" v={data.ratings_avg_rating != null ? Number(data.ratings_avg_rating).toFixed(1) : "—"} />
         <div className="row" style={{ gap: 8, flexWrap: "wrap", marginTop: 6 }}>
           <Button variant="secondary" onClick={() => setEdit(true)}>Edit info</Button>
-          <Button variant="secondary" onClick={() => setPricing(true)}>{t("branch.editTabs.pricing")}</Button>
           <Button variant="secondary" onClick={() => setHours(true)}>Working hours</Button>
           <Button variant="secondary" onClick={remove} style={{ color: "#ef4444", borderColor: "#4a1a1a" }}>Delete</Button>
         </div>
       </div></div>
 
       {edit && <BranchForm initial={data} onClose={() => setEdit(false)} onSaved={() => { setEdit(false); void reload(); }} />}
-      {pricing && <BranchPricingForm branch={data} onClose={() => setPricing(false)} onSaved={() => { setPricing(false); void reload(); }} />}
       {hours && <BranchOpenDaysForm branch={data} onClose={() => setHours(false)} onSaved={() => { setHours(false); void reload(); }} />}
     </ScreenWithBg>
   );

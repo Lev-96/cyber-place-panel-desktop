@@ -21,7 +21,10 @@ export type Permission =
   | "branch.create"
   | "branch.edit"
   | "branch.delete"
-  | "branch.tariffs"        // configure time packages (admin + owner only)
+  // Hourly-rate matrix + time packages — the player-facing tariff
+  // sheet. Admin/owner/manager all need it: manager runs the floor
+  // and is the one editing prices when they shift.
+  | "branch.prices"
   // company CRUD
   | "company.create"
   | "company.edit"
@@ -43,7 +46,7 @@ const PERMS: Record<Role, ReadonlySet<Permission>> = {
     "menu.branches", "menu.companies", "menu.managers", "menu.games",
     "menu.servicesAdmin", "menu.tournaments", "menu.scan", "menu.map",
     "revenue.view",
-    "branch.create", "branch.edit", "branch.delete", "branch.tariffs",
+    "branch.create", "branch.edit", "branch.delete", "branch.prices",
     "company.create", "company.edit", "company.delete",
     "manager.create", "manager.delete",
     "game.crud", "service.crud",
@@ -52,16 +55,18 @@ const PERMS: Record<Role, ReadonlySet<Permission>> = {
   company_owner: new Set<Permission>([
     "menu.branches", "menu.managers", "menu.tournaments", "menu.scan", "menu.map",
     "menu.myCompany", "revenue.view",
-    "branch.create", "branch.edit", "branch.delete", "branch.tariffs",
+    "branch.create", "branch.edit", "branch.delete", "branch.prices",
     "company.edit",
     "manager.create", "manager.delete",
     "session.start", "session.stop", "pos.charge", "shift.open",
   ]),
   manager: new Set<Permission>([
-    // Manager = single-branch staff. No global lists, no CRUD of branches/companies.
-    // Can edit their own branch info (address/pricing/hours), but not tariffs or other staff.
+    // Manager = single-branch staff. No global lists, no CRUD of
+    // branches/companies. Edits their own branch info AND its prices
+    // — managers run the floor and need to adjust rates when they
+    // shift (e.g. peak-hour vs off-peak).
     "menu.tournaments", "menu.scan",
-    "branch.edit",
+    "branch.edit", "branch.prices",
     "session.start", "session.stop", "pos.charge", "shift.open",
   ]),
 };

@@ -42,7 +42,7 @@ const ServicesAdmin = lazy(() => import("@/routes/ServicesAdmin"));
 const SessionsHistory = lazy(() => import("@/routes/SessionsHistory"));
 const Settings = lazy(() => import("@/routes/Settings"));
 const ShiftPanel = lazy(() => import("@/routes/ShiftPanel"));
-const TimePackagesList = lazy(() => import("@/routes/TimePackagesList"));
+const BranchPricesPage = lazy(() => import("@/routes/BranchPricesPage"));
 const TournamentDetails = lazy(() => import("@/routes/TournamentDetails"));
 const Tournaments = lazy(() => import("@/routes/Tournaments"));
 
@@ -99,7 +99,7 @@ const Authed = () => (
         <Route path="/branches/:branchId/pcs" element={<PcsList />} />
         <Route
           path="/branches/:branchId/tariffs"
-          element={<TimePackagesList />}
+          element={<BranchPricesPage />}
         />
         <Route path="/branches/:branchId/products" element={<ProductsList />} />
         <Route path="/branches/:branchId/pos" element={<PosTerminal />} />

@@ -93,7 +93,7 @@ export const TRANSLATIONS: Dict = {
   "session.tariffField": { en: "Tariff", ru: "Тариф", am: "Սակագին" },
   "session.hourlyRate": { en: "Hourly rate", ru: "Ставка за час", am: "Ժամային սակագին" },
   "session.openHint": { en: "Time counts up. Cost is pro-rated by minute.", ru: "Время идёт вверх. Сумма считается пропорционально.", am: "Ժամանակը հաշվվում է աճողաբար: Գումարը հաշվվում է համամասնորեն:" },
-  "session.noPackages": { en: "No tariffs in this branch yet. Add one on the «Tariffs» page.", ru: "В этом филиале нет тарифов. Добавь на странице «Tariffs».", am: "Այս մասնաճյուղում սակագներ չկան: Ավելացնել «Tariffs» էջում:" },
+  "session.noPackages": { en: "No time packages yet. Add one on the «Branch prices» page.", ru: "Пакетов пока нет. Добавь на странице «Цены филиала».", am: "Փաթեթներ դեռ չկան: Ավելացնել «Մասնաճյուղի գները» էջում:" },
   "session.choosePackage": { en: "Choose a tariff", ru: "Выберите тариф", am: "Ընտրեք սակագինը" },
   "session.enterRate": { en: "Enter hourly rate", ru: "Укажите ставку за час", am: "Նշեք ժամային սակագինը" },
   "session.free": { en: "Free", ru: "Свободно", am: "Ազատ" },
@@ -152,8 +152,8 @@ export const TRANSLATIONS: Dict = {
   "hub.tile.placesHint": { en: "Bookable seats · games", ru: "Места для бронирования · игры", am: "Ամրագրման տեղեր · խաղեր" },
   "hub.tile.pcs": { en: "PCs", ru: "ПК", am: "Համակարգիչներ" },
   "hub.tile.pcsHint": { en: "Agent registration", ru: "Регистрация агента", am: "Գործակալի գրանցում" },
-  "hub.tile.tariffs": { en: "Tariffs", ru: "Тарифы", am: "Սակագներ" },
-  "hub.tile.tariffsHint": { en: "Time packages", ru: "Тарифные пакеты", am: "Ժամանակային փաթեթներ" },
+  "hub.tile.prices": { en: "Branch prices", ru: "Цены филиала", am: "Մասնաճյուղի գները" },
+  "hub.tile.pricesHint": { en: "Hourly rates per place type", ru: "Ставки за час по типам мест", am: "Ժամային սակագներ ըստ տեղի տեսակի" },
   "hub.tile.products": { en: "Products", ru: "Товары", am: "Ապրանքներ" },
   "hub.tile.productsHint": { en: "POS catalog", ru: "Каталог кассы", am: "Դրամարկղի կատալոգ" },
   "hub.tile.services": { en: "Services", ru: "Услуги", am: "Ծառայություններ" },
@@ -547,9 +547,21 @@ export const TRANSLATIONS: Dict = {
   "pos.subtotal": { en: "Subtotal", ru: "Подытог", am: "Միջանկյալ" },
   "pos.total": { en: "Total", ru: "Итого", am: "Ընդամենը" },
 
-  // Branch edit / pricing / open hours
+  // Branch edit / open hours / prices page
   "branch.editTabs.info": { en: "Info", ru: "Инфо", am: "Տվյալներ" },
-  "branch.editTabs.pricing": { en: "Tariffs", ru: "Тарифы", am: "Սակագներ" },
+  // (legacy key still referenced by older translations of mail-out
+  // texts; keep around with a neutral label.)
+  "branch.editTabs.pricing": { en: "Prices", ru: "Цены", am: "Գներ" },
+  "branch.prices.title": { en: "Branch prices", ru: "Цены филиала", am: "Մասնաճյուղի գները" },
+  "branch.prices.standard": { en: "Standard", ru: "Стандарт", am: "Ստանդարտ" },
+  "branch.prices.vip": { en: "VIP", ru: "VIP", am: "VIP" },
+  "branch.prices.hint": {
+    en: "Per-hour rate (AMD). Sessions and the mobile app bill from this matrix.",
+    ru: "Ставка за час (драм). Сессии и мобильное приложение считают по этой таблице.",
+    am: "Ժամային սակագինը (դրամ). Սեսիաներն ու հավելվածը հաշվարկում են այս աղյուսակից:",
+  },
+  "branch.prices.saved": { en: "Saved", ru: "Сохранено", am: "Պահպանված է" },
+  "branch.prices.packagesSubtitle": { en: "Time packages", ru: "Тарифные пакеты", am: "Ժամանակային փաթեթներ" },
   "branch.editTabs.hours": { en: "Working hours", ru: "Часы работы", am: "Աշխատանքային ժամեր" },
   "branch.editTabs.services": { en: "Services", ru: "Услуги", am: "Ծառայություններ" },
   "branch.weekday.mon": { en: "Mon", ru: "Пн", am: "Երկ" },
