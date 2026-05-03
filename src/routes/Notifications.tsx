@@ -137,39 +137,72 @@ const DbNotificationCard = ({ n, onClick, onDelete }: { n: IDbNotification; onCl
   const isBookingCancelled = dataType === "booking.cancelled";
   const isBranchSubscribed = dataType === "branch.subscribed";
   const isTournamentJoined = dataType === "tournament.joined";
-  const code = n.data?.code ?? n.data?.booking_id;
   const bookingDate = n.data?.booking_date as string | undefined;
   const startTime = n.data?.start_time as string | undefined;
   const extraMinutes = n.data?.extra_minutes as number | undefined;
 
-  // Subscribe / tournament-joined fields are pre-resolved in the
-  // backend payload (BranchSubscribed::toArray /
-  // TournamentJoined::toArray) so we can compose a friendly card
-  // without a follow-up fetch.
+  // Pre-resolved on the backend by every notification's `toArray()`
+  // so we can compose a friendly card without a follow-up fetch:
+  // BookingCreated/Extended/Cancelled now mirror BranchSubscribed /
+  // TournamentJoined for guest / venue / places.
   const guestFirstName = (n.data?.guest_first_name as string | undefined)?.trim() || null;
   const guestLastName = (n.data?.guest_last_name as string | undefined)?.trim() || null;
   const guestId = n.data?.guest_id as number | undefined;
   const companyName = (n.data?.company_name as string | undefined)?.trim() || null;
   const branchAddress = (n.data?.branch_address as string | undefined)?.trim() || null;
   const tournamentTitle = (n.data?.tournament_title as string | undefined)?.trim() || null;
+  const placeNumbers = (n.data?.place_numbers as number[] | undefined) ?? [];
   // Player label = first + last; falls back to a guest-id
   // placeholder so the card is never empty.
+  const guestFallback = t("notifications.guestFallback") || "Guest";
   const playerLabel =
     [guestFirstName, guestLastName].filter(Boolean).join(" ") ||
-    `Guest #${guestId ?? "?"}`;
+    (guestId != null ? `${guestFallback} #${guestId}` : guestFallback);
+
+  // Named-token interpolation lives once here so the in-app card and
+  // the OS push share the exact same template strings (defined in
+  // translations.ts under `notifications.booking{Created,Extended,
+  // Cancelled}Push{Title,Body}`). Reordering placeholders in any
+  // language is a one-file change.
+  const interpolate = (template: string, vars: Record<string, string>): string =>
+    template.replace(/\{(\w+)\}/g, (m, k: string) => vars[k] ?? m);
+  const venue = [companyName, branchAddress].filter(Boolean).join(" · ");
+  const placesLabel = placeNumbers.length > 0 ? placeNumbers.join(", ") : "—";
 
   let headline: string;
   let body: string | null = null;
   if (isBookingCreated) {
-    headline = `${t("notifications.newBookingTitle") || "New booking"} #${code}`;
+    const vars = {
+      name: playerLabel,
+      places: placesLabel,
+      company: companyName ?? "",
+      address: branchAddress ?? "",
+      venue,
+    };
+    headline = interpolate(t("notifications.bookingCreatedPushTitle"), vars);
+    body = interpolate(t("notifications.bookingCreatedPushBody"), vars);
   } else if (isBookingExtended) {
-    headline = `${t("notifications.bookingExtendedTitle") || "Booking extended"} #${code}${
-      typeof extraMinutes === "number" && extraMinutes > 0
-        ? ` · +${extraMinutes} ${t("notifications.bookingMinShort") || "min"}`
-        : ""
-    }`;
+    const minShort = t("notifications.bookingMinShort") || "min";
+    const vars = {
+      name: playerLabel,
+      minutes: String(extraMinutes ?? 0),
+      minShort,
+      company: companyName ?? "",
+      address: branchAddress ?? "",
+      venue,
+    };
+    headline = interpolate(t("notifications.bookingExtendedPushTitle"), vars);
+    body = interpolate(t("notifications.bookingExtendedPushBody"), vars);
   } else if (isBookingCancelled) {
-    headline = `${t("notifications.bookingCancelledTitle") || "Booking cancelled"} #${code}`;
+    const vars = {
+      name: playerLabel,
+      places: placesLabel,
+      company: companyName ?? "",
+      address: branchAddress ?? "",
+      venue,
+    };
+    headline = interpolate(t("notifications.bookingCancelledPushTitle"), vars);
+    body = interpolate(t("notifications.bookingCancelledPushBody"), vars);
   } else if (isBranchSubscribed) {
     headline = `🎉 ${t("notifications.branchSubscribedHeadline") || "Congratulations — new subscriber"}`;
     const tail = [companyName, branchAddress].filter(Boolean).join(" · ");
