@@ -69,8 +69,7 @@ const RegistrationsList = ({ tournamentId }: Props) => {
     return items.filter((r) => {
       const first = r.guest?.first_name?.toLowerCase() ?? "";
       const last = r.guest?.last_name?.toLowerCase() ?? "";
-      const name = r.guest?.name?.toLowerCase() ?? "";
-      return first.includes(q) || last.includes(q) || name.includes(q);
+      return first.includes(q) || last.includes(q);
     });
   }, [items, search]);
 
@@ -114,13 +113,11 @@ const RegistrationRow = ({ reg, onRemove }: RowProps) => {
   const { t } = useLang();
   const first = reg.guest?.first_name?.trim() || null;
   const last = reg.guest?.last_name?.trim() || null;
-  // Compose a display name from whatever the row has — split first
-  // (full + most informative), then the legacy single-field name,
-  // then a Guest-id placeholder so the row never reads as empty.
+  // Compose a display label from first + last; fall back to a
+  // Guest-id placeholder so a row with neither field still reads
+  // as something.
   const display =
-    [first, last].filter(Boolean).join(" ") ||
-    reg.guest?.name ||
-    `Guest #${reg.guest_id}`;
+    [first, last].filter(Boolean).join(" ") || `Guest #${reg.guest_id}`;
   const roleLabel =
     reg.as === "player"
       ? t("registrations.rolePlayer") || "Player"

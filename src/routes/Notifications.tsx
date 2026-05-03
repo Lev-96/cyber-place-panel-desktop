@@ -146,19 +146,16 @@ const DbNotificationCard = ({ n, onClick, onDelete }: { n: IDbNotification; onCl
   // backend payload (BranchSubscribed::toArray /
   // TournamentJoined::toArray) so we can compose a friendly card
   // without a follow-up fetch.
-  const guestName = (n.data?.guest_name as string | undefined)?.trim() || null;
   const guestFirstName = (n.data?.guest_first_name as string | undefined)?.trim() || null;
   const guestLastName = (n.data?.guest_last_name as string | undefined)?.trim() || null;
   const guestId = n.data?.guest_id as number | undefined;
   const companyName = (n.data?.company_name as string | undefined)?.trim() || null;
   const branchAddress = (n.data?.branch_address as string | undefined)?.trim() || null;
   const tournamentTitle = (n.data?.tournament_title as string | undefined)?.trim() || null;
-  // Display label priority: split first+last (most informative) →
-  // legacy single-field name → guest id placeholder so the row is
-  // never empty.
+  // Player label = first + last; falls back to a guest-id
+  // placeholder so the card is never empty.
   const playerLabel =
     [guestFirstName, guestLastName].filter(Boolean).join(" ") ||
-    guestName ||
     `Guest #${guestId ?? "?"}`;
 
   let headline: string;

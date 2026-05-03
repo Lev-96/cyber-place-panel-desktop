@@ -39,8 +39,7 @@ const BranchSubscribersPage = () => {
     return items.filter((r) => {
       const first = r.guest?.first_name?.toLowerCase() ?? "";
       const last = r.guest?.last_name?.toLowerCase() ?? "";
-      const name = r.guest?.name?.toLowerCase() ?? "";
-      return first.includes(q) || last.includes(q) || name.includes(q);
+      return first.includes(q) || last.includes(q);
     });
   }, [items, search]);
 
@@ -92,13 +91,10 @@ const BranchSubscribersPage = () => {
 const SubscriberRow = ({ sub }: { sub: IBranchSubscriber }) => {
   const first = sub.guest?.first_name?.trim() || null;
   const last = sub.guest?.last_name?.trim() || null;
-  // Same display-priority rules as the participants list: split
-  // first+last first (most informative), then legacy `name`, then
-  // a guest-id placeholder so a row never reads as empty.
+  // Display = first + last; fall back to a Guest-id placeholder
+  // so a row with neither field still reads as something.
   const display =
-    [first, last].filter(Boolean).join(" ") ||
-    sub.guest?.name ||
-    `Guest #${sub.guest_id}`;
+    [first, last].filter(Boolean).join(" ") || `Guest #${sub.guest_id}`;
 
   return (
     <div className="list-item">

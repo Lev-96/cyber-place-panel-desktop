@@ -182,7 +182,11 @@ const GlobalBookingNotifier = () => {
   const handleSubscribe = useCallback((evt: BranchSubscribedEvent) => {
     void ensureNotificationPermission().then((perm) => {
       if (perm !== "granted") return;
-      const name = evt.guest_name?.trim() || `Guest #${evt.guest_id}`;
+      const split = [evt.guest_first_name, evt.guest_last_name]
+        .map((v) => v?.trim())
+        .filter((v): v is string => !!v)
+        .join(" ");
+      const name = split || `Guest #${evt.guest_id}`;
       const branch = evt.branch_address?.trim() || `Branch #${evt.branch_id}`;
       const title = t("notifications.branchSubscribedTitle") || "New subscriber";
       try {
@@ -206,13 +210,11 @@ const GlobalBookingNotifier = () => {
   const handleTournamentJoined = useCallback((evt: TournamentJoinedEvent) => {
     void ensureNotificationPermission().then((perm) => {
       if (perm !== "granted") return;
-      // Prefer first+last (most informative), fall back to the
-      // legacy single-field name, then a guest-id placeholder.
       const split = [evt.guest_first_name, evt.guest_last_name]
         .map((v) => v?.trim())
         .filter((v): v is string => !!v)
         .join(" ");
-      const name = split || evt.guest_name?.trim() || `Guest #${evt.guest_id}`;
+      const name = split || `Guest #${evt.guest_id}`;
       const tournament =
         evt.tournament_title?.trim() || `Tournament #${evt.tournament_id}`;
       const title = t("notifications.tournamentJoinedTitle") || "New tournament player";

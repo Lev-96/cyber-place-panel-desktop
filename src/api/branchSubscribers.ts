@@ -6,7 +6,6 @@ export interface IBranchSubscriber {
   guest_id: number;
   guest?: {
     id: number;
-    name: string | null;
     first_name?: string | null;
     last_name?: string | null;
   };

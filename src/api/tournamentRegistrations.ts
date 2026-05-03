@@ -7,13 +7,12 @@ export interface ITournamentRegistration {
   /** "player" takes a counted spot; "guest" is a spectator slot. */
   as?: "player" | "guest";
   /**
-   * Backend ships first_name + last_name when the player went
-   * through the split-name modal, plus the legacy `name` for
-   * single-name registrations / older data.
+   * Player identity captured by the mobile WelcomeNameGate. The
+   * backend's guests row only stores split first / last now, so
+   * the response shape mirrors that.
    */
   guest?: {
     id: number;
-    name: string | null;
     first_name?: string | null;
     last_name?: string | null;
     phone?: string;
