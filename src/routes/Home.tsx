@@ -34,6 +34,23 @@ const Home = () => {
     [],
   );
 
+  // Fetch fresh dashboard counts on every mount — the user payload
+  // hangs around in AuthContext between route changes, so without
+  // this the tiles render with whatever was current at last login or
+  // last realtime event. Bookings made on another desktop / mobile
+  // wouldn't show until the next event arrived. Fire-and-forget; if
+  // it fails AuthContext keeps the cached payload.
+  //
+  // Ref-route around the dep cycle: AuthContext re-creates refreshUser
+  // whenever `user` updates (it's part of the memoised context value),
+  // and the refresh itself updates `user`. Listing it as a dep would
+  // loop on every refresh. We only want one fetch per mount.
+  const refreshUserRef = useRef(refreshUser);
+  useEffect(() => { refreshUserRef.current = refreshUser; }, [refreshUser]);
+  useEffect(() => {
+    void refreshUserRef.current();
+  }, []);
+
   useBookingChanged("bookings.global", debouncedRefreshUser);
   const isAdmin = user?.role === "admin";
   const isOwner = user?.role === "company_owner";
