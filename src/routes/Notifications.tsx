@@ -147,11 +147,19 @@ const DbNotificationCard = ({ n, onClick, onDelete }: { n: IDbNotification; onCl
   // TournamentJoined::toArray) so we can compose a friendly card
   // without a follow-up fetch.
   const guestName = (n.data?.guest_name as string | undefined)?.trim() || null;
+  const guestFirstName = (n.data?.guest_first_name as string | undefined)?.trim() || null;
+  const guestLastName = (n.data?.guest_last_name as string | undefined)?.trim() || null;
   const guestId = n.data?.guest_id as number | undefined;
   const companyName = (n.data?.company_name as string | undefined)?.trim() || null;
   const branchAddress = (n.data?.branch_address as string | undefined)?.trim() || null;
   const tournamentTitle = (n.data?.tournament_title as string | undefined)?.trim() || null;
-  const playerLabel = guestName || `Guest #${guestId ?? "?"}`;
+  // Display label priority: split first+last (most informative) →
+  // legacy single-field name → guest id placeholder so the row is
+  // never empty.
+  const playerLabel =
+    [guestFirstName, guestLastName].filter(Boolean).join(" ") ||
+    guestName ||
+    `Guest #${guestId ?? "?"}`;
 
   let headline: string;
   let body: string | null = null;
@@ -173,8 +181,17 @@ const DbNotificationCard = ({ n, onClick, onDelete }: { n: IDbNotification; onCl
   } else if (isTournamentJoined) {
     headline = `🎉 ${t("notifications.tournamentJoinedHeadline") || "Congratulations — new tournament player"}`;
     const verb = t("notifications.tournamentJoinedBody") || "joined the tournament";
-    const tail = tournamentTitle ?? "";
-    body = tail ? `${playerLabel} ${verb} ${tail}` : `${playerLabel} ${verb}`;
+    const venue = [companyName, branchAddress].filter(Boolean).join(" · ");
+    // Body composition:
+    //   "<Player> <verb> <title> · <company> · <address>"
+    // Each segment optional — if the backend hasn't loaded the
+    // tournament/branch (older row, deploy lag), we still ship the
+    // pieces we have rather than forcing an empty body.
+    const segments = [
+      `${playerLabel} ${verb}${tournamentTitle ? ` ${tournamentTitle}` : ""}`,
+      venue,
+    ].filter(Boolean);
+    body = segments.join(" · ");
   } else {
     headline = n.type.split("\\").pop() ?? n.type;
   }

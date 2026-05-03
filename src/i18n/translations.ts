@@ -126,6 +126,41 @@ export const TRANSLATIONS: Dict = {
     ru: "участвует в турнире",
     am: "միացավ մրցաշարին",
   },
+  "registrations.title": {
+    en: "Participants",
+    ru: "Участники",
+    am: "Մասնակիցներ",
+  },
+  "registrations.searchPlaceholder": {
+    en: "Filter by first or last name",
+    ru: "Поиск по имени или фамилии",
+    am: "Որոնել ըստ անվան կամ ազգանվան",
+  },
+  "registrations.confirmRemove": {
+    en: "Remove this registration?",
+    ru: "Удалить эту регистрацию?",
+    am: "Ջնջե՞լ այս գրանցումը:",
+  },
+  "registrations.empty": {
+    en: "No registrations yet.",
+    ru: "Регистраций пока нет.",
+    am: "Գրանցումներ դեռ չկան:",
+  },
+  "registrations.noMatches": {
+    en: "No matches.",
+    ru: "Совпадений не найдено.",
+    am: "Համընկնումներ չեն գտնվել:",
+  },
+  "registrations.rolePlayer": {
+    en: "Player",
+    ru: "Игрок",
+    am: "Խաղացող",
+  },
+  "registrations.roleGuest": {
+    en: "Guest",
+    ru: "Гость",
+    am: "Հյուր",
+  },
   "session.noAssignedRate": {
     en: "No price configured for this PC's place. Set one on the «Branch prices» page first.",
     ru: "Для места этого PC не задана цена. Сначала установите её на странице «Цены филиала».",
