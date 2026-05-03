@@ -277,7 +277,7 @@ export const TRANSLATIONS: Dict = {
   // Settings extras
   "settings.role": { en: "Role", ru: "Роль", am: "Դեր" },
   "settings.autoByLang": { en: "Auto (by language)", ru: "Авто (по языку)", am: "Ավտոմատ (լեզվով)" },
-  "settings.ratesNote": { en: "Stored prices are in AMD. We convert at fixed rates: 1 USD ≈ 400 AMD, 1 RUB ≈ 4.2 AMD. Sample: 1000 AMD =", ru: "Цены хранятся в драмах. Конвертация по фиксированному курсу: 1 USD ≈ 400 ֏, 1 ₽ ≈ 4.2 ֏. Пример: 1000 ֏ =", am: "Գները պահվում են դրամով: Փոխարկում ֆիքսված կուրսով: 1 USD ≈ 400 ֏, 1 ₽ ≈ 4.2 ֏: Օրինակ՝ 1000 ֏ =" },
+  "settings.ratesNote": { en: "Stored prices are in dram. We convert at fixed rates: 1 USD ≈ 400 dram, 1 RUB ≈ 4.2 dram. Sample: 1000 dram =", ru: "Цены хранятся в драмах. Конвертация по фиксированному курсу: 1 USD ≈ 400 драм, 1 ₽ ≈ 4.2 драм. Пример: 1000 драм =", am: "Գները պահվում են դրամով: Փոխարկում ֆիքսված կուրսով: 1 USD ≈ 400 դրամ, 1 ₽ ≈ 4.2 դրամ: Օրինակ՝ 1000 դրամ =" },
   "settings.currentPassword": { en: "Current password", ru: "Текущий пароль", am: "Ընթացիկ գաղտնաբառ" },
   "settings.newPassword": { en: "New password", ru: "Новый пароль", am: "Նոր գաղտնաբառ" },
   "settings.confirmPassword": { en: "Confirm new password", ru: "Подтвердите новый пароль", am: "Հաստատեք նոր գաղտնաբառը" },
@@ -561,7 +561,7 @@ export const TRANSLATIONS: Dict = {
   "branch.prices.standard": { en: "Standard", ru: "Стандарт", am: "Ստանդարտ" },
   "branch.prices.vip": { en: "VIP", ru: "VIP", am: "VIP" },
   "branch.prices.hint": {
-    en: "Per-hour rate (AMD). Sessions and the mobile app bill from this matrix.",
+    en: "Per-hour rate (dram). Sessions and the mobile app bill from this matrix.",
     ru: "Ставка за час (драм). Сессии и мобильное приложение считают по этой таблице.",
     am: "Ժամային սակագինը (դրամ). Սեսիաներն ու հավելվածը հաշվարկում են այս աղյուսակից:",
   },

@@ -5,7 +5,7 @@ import ScreenWithBg from "@/components/ui/ScreenWithBg";
 import { request } from "@/api/client";
 import { apiSubscribe } from "@/api/subscribe";
 import { useLang } from "@/i18n/LanguageContext";
-import { Currency } from "@/i18n/currency";
+import { AMD_UNIT, Currency } from "@/i18n/currency";
 import { LANGUAGES, Lang } from "@/i18n/translations";
 import { FormEvent, useState } from "react";
 
@@ -61,7 +61,17 @@ const Settings = () => {
           <span className="label">{t("settings.currency")}</span>
           <div className="row" style={{ gap: 6, flexWrap: "wrap" }}>
             {(["AMD", "USD", "RUB"] as Currency[]).map((c) => (
-              <Button key={c} type="button" variant={currency === c ? "primary" : "secondary"} onClick={() => setCurrencyOverride(c)}>{c}</Button>
+              // AMD button label is the localized unit word so the
+              // ISO code never appears in the UI; USD/RUB stay as
+              // their codes since those ARE the everyday names.
+              <Button
+                key={c}
+                type="button"
+                variant={currency === c ? "primary" : "secondary"}
+                onClick={() => setCurrencyOverride(c)}
+              >
+                {c === "AMD" ? AMD_UNIT[lang] : c}
+              </Button>
             ))}
             <Button type="button" variant="secondary" onClick={() => setCurrencyOverride(null)}>{t("settings.autoByLang")}</Button>
           </div>

@@ -50,7 +50,9 @@ export const LanguageProvider = ({ children }: { children: ReactNode }) => {
       setLang,
       setCurrencyOverride,
       t: (key: string) => translate(key, lang),
-      money: (amount: number) => moneyDisplay.format(amount, currency),
+      // Pass `lang` so AMD renders as the localized unit word
+      // ("dram" / "драм" / "դрамm"), never the "AMD" ISO code.
+      money: (amount: number) => moneyDisplay.format(amount, currency, lang),
     };
     // AppConfig touched to silence unused import; remove if never referenced
     void AppConfig;

@@ -1,8 +1,9 @@
 import Button from "@/components/ui/Button";
 import { useLang } from "@/i18n/LanguageContext";
-import { CURRENCY_LOCALE, LANG_TO_CURRENCY, moneyDisplay } from "@/i18n/currency";
+import { AMD_UNIT, CURRENCY_LOCALE, LANG_TO_CURRENCY, moneyDisplay } from "@/i18n/currency";
 import { branchRepository } from "@/repositories/BranchRepository";
 import { IBranchApi } from "@/types/api";
+import { Lang } from "@/i18n/translations";
 import { FormEvent, useCallback, useState } from "react";
 
 /**
@@ -134,6 +135,7 @@ const HourlyRatesForm = ({ branch, onSaved }: Props) => {
               set={set}
               targetCurrency={targetCurrency}
               targetLocale={targetLocale}
+              lang={lang}
             />
           );
         })}
@@ -162,9 +164,10 @@ interface PriceRowProps {
   set: (k: PriceKey, v: string) => void;
   targetCurrency: "AMD" | "USD" | "RUB";
   targetLocale: string;
+  lang: Lang;
 }
 
-const PriceRow = ({ device, stdKey, vipKey, prices, set, targetCurrency, targetLocale }: PriceRowProps) => (
+const PriceRow = ({ device, stdKey, vipKey, prices, set, targetCurrency, targetLocale, lang }: PriceRowProps) => (
   <>
     <span style={{ fontWeight: 700, textTransform: "uppercase" }}>{device}</span>
     <PriceInput
@@ -172,12 +175,14 @@ const PriceRow = ({ device, stdKey, vipKey, prices, set, targetCurrency, targetL
       onChange={(v) => set(stdKey, v)}
       targetCurrency={targetCurrency}
       targetLocale={targetLocale}
+      lang={lang}
     />
     <PriceInput
       value={prices[vipKey]}
       onChange={(v) => set(vipKey, v)}
       targetCurrency={targetCurrency}
       targetLocale={targetLocale}
+      lang={lang}
     />
   </>
 );
@@ -187,6 +192,7 @@ interface PriceInputProps {
   onChange: (v: string) => void;
   targetCurrency: "AMD" | "USD" | "RUB";
   targetLocale: string;
+  lang: Lang;
 }
 
 /**
@@ -196,7 +202,7 @@ interface PriceInputProps {
  * editing. Suffix sits inside a relative wrapper with `padding-right`
  * on the input so it never overlaps the value the user typed.
  */
-const PriceInput = ({ value, onChange, targetCurrency, targetLocale }: PriceInputProps) => {
+const PriceInput = ({ value, onChange, targetCurrency, targetLocale, lang }: PriceInputProps) => {
   const numeric = Number(value.replace(",", "."));
   const showConverted =
     targetCurrency !== "AMD" && Number.isFinite(numeric) && numeric > 0;
@@ -231,7 +237,7 @@ const PriceInput = ({ value, onChange, targetCurrency, targetLocale }: PriceInpu
             pointerEvents: "none",
           }}
         >
-          AMD
+          {AMD_UNIT[lang]}
         </span>
       </div>
       {converted && (
