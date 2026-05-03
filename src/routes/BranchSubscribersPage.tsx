@@ -44,11 +44,26 @@ const BranchSubscribersPage = () => {
     });
   }, [items, search]);
 
+  // Format a "12 subscribers" / "5 of 12" counter once and reuse it
+  // in the header. When the filter is active we surface BOTH the
+  // visible and the total counts so the staff sees how much is
+  // hidden by the search.
+  const totalLabel = t("subscribers.total") || "Subscribers";
+  const isFiltering = search.trim().length > 0 && filtered.length !== items.length;
+  const countText = isFiltering
+    ? `${filtered.length} / ${items.length}`
+    : `${items.length}`;
+
   return (
     <ScreenWithBg
       bg="./bg/branch.jpg"
       title={t("subscribers.title") || "Subscribers"}
     >
+      {!loading && !error && (
+        <div className="muted" style={{ fontSize: 13 }}>
+          {totalLabel}: <strong style={{ color: "#fff" }}>{countText}</strong>
+        </div>
+      )}
       <Input
         placeholder={t("subscribers.searchPlaceholder") || "Filter by first or last name"}
         value={search}

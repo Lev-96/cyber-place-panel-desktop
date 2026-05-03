@@ -231,6 +231,7 @@ export const TRANSLATIONS: Dict = {
     am: "Մասնաճյուղին հետևող խաղացողներ",
   },
   "subscribers.title": { en: "Branch subscribers", ru: "Подписчики филиала", am: "Մասնաճյուղի բաժանորդներ" },
+  "subscribers.total": { en: "Total", ru: "Всего", am: "Ընդամենը" },
   "subscribers.searchPlaceholder": {
     en: "Filter by first or last name",
     ru: "Поиск по имени или фамилии",
