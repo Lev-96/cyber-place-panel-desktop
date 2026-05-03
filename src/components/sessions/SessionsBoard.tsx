@@ -85,8 +85,8 @@ const SessionsBoard = ({ branchId }: Props) => {
         <div className="row" style={{ gap: 8, flexWrap: "wrap", rowGap: 8 }}>
           <Link to={`/branches/${branchId}/sessions/history`} className="muted" style={navBtn}>{t("history.title")}</Link>
           <Link to={`/branches/${branchId}/pcs`} className="muted" style={navBtn}>{t("pcs.title")}</Link>
-          {can(role, "branch.tariffs") && (
-            <Link to={`/branches/${branchId}/tariffs`} className="muted" style={navBtn}>{t("session.tariffField")}</Link>
+          {can(role, "branch.prices") && (
+            <Link to={`/branches/${branchId}/tariffs`} className="muted" style={navBtn}>{t("hub.tile.prices")}</Link>
           )}
         </div>
       </div>

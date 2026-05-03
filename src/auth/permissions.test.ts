@@ -24,7 +24,7 @@ describe("can(role, perm)", () => {
       expect(can("admin", "branch.create")).toBe(true);
       expect(can("admin", "branch.edit")).toBe(true);
       expect(can("admin", "branch.delete")).toBe(true);
-      expect(can("admin", "branch.tariffs")).toBe(true);
+      expect(can("admin", "branch.prices")).toBe(true);
       expect(can("admin", "company.create")).toBe(true);
       expect(can("admin", "company.delete")).toBe(true);
     });
@@ -46,8 +46,8 @@ describe("can(role, perm)", () => {
       expect(can("company_owner", "menu.servicesAdmin")).toBe(false);
     });
 
-    it("can configure tariffs and edit branches", () => {
-      expect(can("company_owner", "branch.tariffs")).toBe(true);
+    it("can configure prices and edit branches", () => {
+      expect(can("company_owner", "branch.prices")).toBe(true);
       expect(can("company_owner", "branch.edit")).toBe(true);
     });
 
@@ -69,9 +69,9 @@ describe("can(role, perm)", () => {
       expect(can("manager", "shift.open")).toBe(true);
     });
 
-    it("can edit own-branch info (address/pricing/hours) but NOT tariffs", () => {
+    it("can edit own-branch info AND its prices (manages the floor)", () => {
       expect(can("manager", "branch.edit")).toBe(true);
-      expect(can("manager", "branch.tariffs")).toBe(false);
+      expect(can("manager", "branch.prices")).toBe(true);
     });
 
     it("cannot manage other managers or see global lists", () => {
