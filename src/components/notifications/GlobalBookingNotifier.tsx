@@ -5,6 +5,7 @@ import { useNotifications } from "@/notifications/NotificationsContext";
 import { useBookingChanged, type BookingChangedEvent } from "@/realtime/useBookingChanged";
 import { useBranchSubscribed, type BranchSubscribedEvent } from "@/realtime/useBranchSubscribed";
 import { useTournamentJoined, type TournamentJoinedEvent } from "@/realtime/useTournamentJoined";
+import { playNotificationChime } from "@/utils/notificationSound";
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -47,41 +48,95 @@ const ensureNotificationPermission = async (): Promise<NotificationPermission> =
 };
 
 /**
+ * Substitutes `{name}`-style placeholders. Named tokens read better
+ * across grammar-divergent translations than positional `{0}/{1}`,
+ * because the verb / noun / address word-order may differ between
+ * en / ru / am — translators reorder the tokens, the caller still
+ * passes the same variables map.
+ */
+const interpolate = (template: string, vars: Record<string, string>): string =>
+  template.replace(/\{(\w+)\}/g, (m, k: string) => vars[k] ?? m);
+
+const guestLabel = (
+  first: string | null | undefined,
+  last: string | null | undefined,
+  fallback: string,
+): string => {
+  const parts = [first, last]
+    .map((v) => v?.trim() ?? "")
+    .filter((v) => v.length > 0);
+  return parts.length > 0 ? parts.join(" ") : fallback;
+};
+
+const venueLabel = (company: string | null | undefined, address: string | null | undefined): string => {
+  const c = company?.trim() ?? "";
+  const a = address?.trim() ?? "";
+  if (c && a) return `${c} · ${a}`;
+  return c || a;
+};
+
+const placesLabel = (numbers: number[] | undefined, ids: number[]): string => {
+  // Prefer human-readable place numbers from the backend; fall back to
+  // place ids when an older backend hasn't shipped the enrichment yet.
+  const list = numbers && numbers.length > 0 ? numbers : ids;
+  return list.length > 0 ? list.join(", ") : "—";
+};
+
+/**
  * Fire an OS-level desktop notification for a booking event. This is
  * the "push" channel (vs the in-app toast rendered below): it surfaces
  * even when Electron is unfocused or covered by another window, which
  * is what the cashier needs during a busy session.
  *
- * Click on the OS notification focuses the Electron window — Electron
- * routes this through the renderer's standard `onclick` handler.
+ * Copy is i18n-driven — title and body templates live in translations.ts
+ * keyed by kind, with `{name} {places} {company} {address} {minutes}`
+ * tokens substituted at the call site.
  */
-const showNativeBookingNotification = (evt: BookingChangedEvent): void => {
-  // Permission ask is async but we want the event handler to return
-  // synchronously, so we kick off the permission and fire the
-  // notification afterwards. The first event ever may be missed at
-  // OS level if permission wasn't yet granted — by design,
-  // re-prompting on every event would be far worse UX.
+const showNativeBookingNotification = (
+  evt: BookingChangedEvent,
+  t: (k: string) => string,
+): void => {
   void ensureNotificationPermission().then((perm) => {
     if (perm !== "granted") return;
-    const code = evt.code ?? evt.booking_id;
-    const title = evt.kind === "extended"
-      ? `Booking #${code} extended`
-      : evt.kind === "cancelled"
-        ? `Booking #${code} cancelled`
-        : `New booking #${code}`;
-    const placeFragment = (evt.place_ids ?? []).length > 0
-      ? `Place ${(evt.place_ids ?? []).join(", ")}`
-      : "";
-    const timeFragment = evt.booking_date && evt.start_time
-      ? `${evt.booking_date} ${evt.start_time}`
-      : "";
-    const body = [placeFragment, timeFragment].filter(Boolean).join(" · ");
+
+    const fallbackName = t("notifications.guestFallback") || "Guest";
+    const minShort = t("notifications.bookingMinShort") || "min";
+    const name = guestLabel(evt.guest_first_name, evt.guest_last_name, fallbackName);
+    const places = placesLabel(evt.place_numbers, evt.place_ids ?? []);
+    const company = evt.company_name?.trim() ?? "";
+    const address = evt.branch_address?.trim() ?? "";
+    const venue = venueLabel(evt.company_name, evt.branch_address);
+
+    let titleKey: string;
+    let bodyKey: string;
+    let vars: Record<string, string>;
+
+    if (evt.kind === "extended") {
+      titleKey = "notifications.bookingExtendedPushTitle";
+      bodyKey = "notifications.bookingExtendedPushBody";
+      vars = {
+        name,
+        minutes: String(evt.rescheduled_minutes ?? 0),
+        minShort,
+        company,
+        address,
+        venue,
+      };
+    } else if (evt.kind === "cancelled") {
+      titleKey = "notifications.bookingCancelledPushTitle";
+      bodyKey = "notifications.bookingCancelledPushBody";
+      vars = { name, places, company, address, venue };
+    } else {
+      titleKey = "notifications.bookingCreatedPushTitle";
+      bodyKey = "notifications.bookingCreatedPushBody";
+      vars = { name, places, company, address, venue };
+    }
+
+    const title = interpolate(t(titleKey), vars);
+    const body = interpolate(t(bodyKey), vars);
     try {
       const n = new Notification(title, { body, tag: `booking-${evt.booking_id}` });
       n.onclick = () => {
-        // Bring the Electron window to front (handled by Electron's
-        // default click behaviour) and let the user click again on the
-        // in-app toast to navigate to /bookings/{id}.
         try { window.focus(); } catch { /* not always allowed */ }
       };
     } catch {
@@ -165,12 +220,13 @@ const GlobalBookingNotifier = () => {
     // exactly the "real push" behaviour requested. Falls back silently
     // when the user denied permission or the platform doesn't expose
     // Notification (some Linux WMs without notification daemon).
-    showNativeBookingNotification(evt);
+    showNativeBookingNotification(evt, t);
+    playNotificationChime();
     // Pull the freshly-written database notification row so the
     // sidebar badge and Notifications screen reflect it without
     // waiting for the 60s polling tick.
     void refreshNotifications();
-  }, [refreshNotifications]);
+  }, [refreshNotifications, t]);
 
   useBookingChanged(channelName, handleEvent);
 
@@ -198,6 +254,7 @@ const GlobalBookingNotifier = () => {
         /* WMs without a notification daemon — swallow */
       }
     });
+    playNotificationChime();
     void refreshNotifications();
   }, [refreshNotifications, t]);
   useBranchSubscribed(channelName, handleSubscribe);
@@ -227,6 +284,7 @@ const GlobalBookingNotifier = () => {
         /* WMs without a notification daemon — swallow */
       }
     });
+    playNotificationChime();
     void refreshNotifications();
   }, [refreshNotifications, t]);
   useTournamentJoined(channelName, handleTournamentJoined);

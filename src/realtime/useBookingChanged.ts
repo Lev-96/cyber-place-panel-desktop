@@ -7,7 +7,7 @@ import { getEcho } from "./echo";
  * contract can't drift silently.
  */
 export interface BookingChangedEvent {
-  kind: "created" | "extended" | "cancelled";
+  kind: "created" | "extended" | "cancelled" | "confirmed";
   booking_id: number;
   branch_id: number;
   company_id: number;
@@ -18,6 +18,16 @@ export interface BookingChangedEvent {
   rescheduled_minutes: number;
   /** IDs of places the booking covers — drives the "reserved" tile overlay. */
   place_ids: number[];
+  /**
+   * Human-readable place numbers (e.g. [3, 7]) for display. Undefined
+   * when the desktop is talking to an older backend that hasn't
+   * shipped the enrichment yet — UI falls back to place_ids.
+   */
+  place_numbers?: number[];
+  guest_first_name?: string | null;
+  guest_last_name?: string | null;
+  company_name?: string | null;
+  branch_address?: string | null;
   at: string;
 }
 

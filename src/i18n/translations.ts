@@ -474,6 +474,40 @@ export const TRANSLATIONS: Dict = {
   "notifications.newBookingTitle": { en: "New booking", ru: "Новое бронирование", am: "Նոր ամրագրում" },
   "notifications.bookingExtendedTitle": { en: "Booking extended", ru: "Бронь продлена", am: "Ամրագրումը երկարացվել է" },
   "notifications.bookingCancelledTitle": { en: "Booking cancelled", ru: "Бронь отменена", am: "Ամրագրումը չեղարկվել է" },
+  // Cashier-floor copy for OS push notifications. Keeps the emoji
+  // up front so a glance at the notification tray reads the kind
+  // even before the body is parsed.
+  "notifications.bookingCreatedPushTitle": {
+    en: "🎉 You have a booking!",
+    ru: "🎉 У вас есть бронирование!",
+    am: "🎉 Դուք ունեք ամրագրում!",
+  },
+  "notifications.bookingCreatedPushBody": {
+    en: "Player {name} booked place {places} at {company} {address}",
+    ru: "Игрок {name} забронировал место {places} в {company} {address}",
+    am: "Խաղացող {name}-ը ամրագրեց տեղ {places} {company} {address}-ում",
+  },
+  "notifications.bookingExtendedPushTitle": {
+    en: "⏰ Booking extended",
+    ru: "⏰ Время бронирования продлено",
+    am: "⏰ Ամրագրումը երկարացվել է",
+  },
+  "notifications.bookingExtendedPushBody": {
+    en: "Player {name} extended time by {minutes} {minShort} at {company} {address}",
+    ru: "Игрок {name} продлил время на {minutes} {minShort} в {company} {address}",
+    am: "Խաղացող {name}-ը երկարացրեց ժամանակը {minutes} {minShort}-ով {company} {address}-ում",
+  },
+  "notifications.bookingCancelledPushTitle": {
+    en: "😢 Booking cancelled",
+    ru: "😢 Бронирование отменено",
+    am: "😢 Ամրագրումը չեղարկվել է",
+  },
+  "notifications.bookingCancelledPushBody": {
+    en: "Sadly, player {name} cancelled place {places} at {company} {address}",
+    ru: "К сожалению, игрок {name} отменил место {places} в {company} {address}",
+    am: "Ցավոք, խաղացող {name}-ը չեղարկեց տեղ {places} {company} {address}-ում",
+  },
+  "notifications.guestFallback": { en: "Guest", ru: "Гость", am: "Հյուր" },
   "notifications.bookingPlaces": { en: "Place", ru: "Место", am: "Տեղ" },
   "notifications.bookingPlacesPlural": { en: "Places", ru: "Места", am: "Տեղեր" },
   "notifications.bookingMinShort": { en: "min", ru: "мин", am: "րոպե" },
