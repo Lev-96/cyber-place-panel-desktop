@@ -44,4 +44,13 @@ export interface IPcApi {
   last_seen_at?: string | null;
   pairing_token?: string; // present only on create / rotate-token responses
   current_session_id?: number;
+  // Eager-loaded by PcController (`place:id,number,type,platform`).
+  // Lets the cashier UI resolve the assigned tariff via the branch
+  // price matrix without an extra round-trip.
+  place?: {
+    id: number;
+    number?: number | null;
+    type: "standard" | "vip";
+    platform: "pc" | "ps4" | "ps5";
+  } | null;
 }

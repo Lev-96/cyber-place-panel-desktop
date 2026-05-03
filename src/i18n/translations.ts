@@ -96,6 +96,11 @@ export const TRANSLATIONS: Dict = {
   "session.noPackages": { en: "No time packages yet. Add one on the «Branch prices» page.", ru: "Пакетов пока нет. Добавь на странице «Цены филиала».", am: "Փաթեթներ դեռ չկան: Ավելացնել «Մասնաճյուղի գները» էջում:" },
   "session.choosePackage": { en: "Choose a tariff", ru: "Выберите тариф", am: "Ընտրեք սակագինը" },
   "session.enterRate": { en: "Enter hourly rate", ru: "Укажите ставку за час", am: "Նշեք ժամային սակագինը" },
+  "session.noAssignedRate": {
+    en: "No price configured for this PC's place. Set one on the «Branch prices» page first.",
+    ru: "Для места этого PC не задана цена. Сначала установите её на странице «Цены филиала».",
+    am: "Այս PC-ի տեղի համար գին սահմանված չէ: Սահմանեք այն «Մասնաճյուղի գները» էջում:",
+  },
   "session.free": { en: "Free", ru: "Свободно", am: "Ազատ" },
   "session.reserved": { en: "Reserved", ru: "Зарезервировано", am: "Ամրագրված" },
   "session.toastNewBooking": { en: "New booking", ru: "Новое бронирование", am: "Նոր ամրագրում" },
