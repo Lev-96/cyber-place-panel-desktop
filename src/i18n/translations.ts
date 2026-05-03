@@ -106,6 +106,26 @@ export const TRANSLATIONS: Dict = {
     ru: "Новый участник турнира",
     am: "Մրցաշարի նոր խաղացող",
   },
+  "notifications.branchSubscribedHeadline": {
+    en: "Congratulations — new subscriber",
+    ru: "Поздравляем — новый подписчик",
+    am: "Շնորհավորում ենք — նոր բաժանորդ",
+  },
+  "notifications.branchSubscribedBody": {
+    en: "subscribed to your branch",
+    ru: "подписался на ваш филиал",
+    am: "բաժանորդագրվեց ձեր մասնաճյուղին",
+  },
+  "notifications.tournamentJoinedHeadline": {
+    en: "Congratulations — new tournament player",
+    ru: "Поздравляем — новый участник турнира",
+    am: "Շնորհավորում ենք — մրցաշարի նոր խաղացող",
+  },
+  "notifications.tournamentJoinedBody": {
+    en: "joined the tournament",
+    ru: "участвует в турнире",
+    am: "միացավ մրցաշարին",
+  },
   "session.noAssignedRate": {
     en: "No price configured for this PC's place. Set one on the «Branch prices» page first.",
     ru: "Для места этого PC не задана цена. Сначала установите её на странице «Цены филиала».",

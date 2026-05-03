@@ -135,22 +135,49 @@ const DbNotificationCard = ({ n, onClick, onDelete }: { n: IDbNotification; onCl
   const isBookingCreated = dataType === "booking.created";
   const isBookingExtended = dataType === "booking.extended";
   const isBookingCancelled = dataType === "booking.cancelled";
+  const isBranchSubscribed = dataType === "branch.subscribed";
+  const isTournamentJoined = dataType === "tournament.joined";
   const code = n.data?.code ?? n.data?.booking_id;
   const bookingDate = n.data?.booking_date as string | undefined;
   const startTime = n.data?.start_time as string | undefined;
   const extraMinutes = n.data?.extra_minutes as number | undefined;
 
-  const headline = isBookingCreated
-    ? `${t("notifications.newBookingTitle") || "New booking"} #${code}`
-    : isBookingExtended
-      ? `${t("notifications.bookingExtendedTitle") || "Booking extended"} #${code}${
-          typeof extraMinutes === "number" && extraMinutes > 0
-            ? ` · +${extraMinutes} ${t("notifications.bookingMinShort") || "min"}`
-            : ""
-        }`
-      : isBookingCancelled
-        ? `${t("notifications.bookingCancelledTitle") || "Booking cancelled"} #${code}`
-        : (n.type.split("\\").pop() ?? n.type);
+  // Subscribe / tournament-joined fields are pre-resolved in the
+  // backend payload (BranchSubscribed::toArray /
+  // TournamentJoined::toArray) so we can compose a friendly card
+  // without a follow-up fetch.
+  const guestName = (n.data?.guest_name as string | undefined)?.trim() || null;
+  const guestId = n.data?.guest_id as number | undefined;
+  const companyName = (n.data?.company_name as string | undefined)?.trim() || null;
+  const branchAddress = (n.data?.branch_address as string | undefined)?.trim() || null;
+  const tournamentTitle = (n.data?.tournament_title as string | undefined)?.trim() || null;
+  const playerLabel = guestName || `Guest #${guestId ?? "?"}`;
+
+  let headline: string;
+  let body: string | null = null;
+  if (isBookingCreated) {
+    headline = `${t("notifications.newBookingTitle") || "New booking"} #${code}`;
+  } else if (isBookingExtended) {
+    headline = `${t("notifications.bookingExtendedTitle") || "Booking extended"} #${code}${
+      typeof extraMinutes === "number" && extraMinutes > 0
+        ? ` · +${extraMinutes} ${t("notifications.bookingMinShort") || "min"}`
+        : ""
+    }`;
+  } else if (isBookingCancelled) {
+    headline = `${t("notifications.bookingCancelledTitle") || "Booking cancelled"} #${code}`;
+  } else if (isBranchSubscribed) {
+    headline = `🎉 ${t("notifications.branchSubscribedHeadline") || "Congratulations — new subscriber"}`;
+    const tail = [companyName, branchAddress].filter(Boolean).join(" · ");
+    const verb = t("notifications.branchSubscribedBody") || "subscribed to your branch";
+    body = tail ? `${playerLabel} ${verb} ${tail}` : `${playerLabel} ${verb}`;
+  } else if (isTournamentJoined) {
+    headline = `🎉 ${t("notifications.tournamentJoinedHeadline") || "Congratulations — new tournament player"}`;
+    const verb = t("notifications.tournamentJoinedBody") || "joined the tournament";
+    const tail = tournamentTitle ?? "";
+    body = tail ? `${playerLabel} ${verb} ${tail}` : `${playerLabel} ${verb}`;
+  } else {
+    headline = n.type.split("\\").pop() ?? n.type;
+  }
 
   const handleCardClick = () => {
     onClick();
@@ -200,6 +227,11 @@ const DbNotificationCard = ({ n, onClick, onDelete }: { n: IDbNotification; onCl
           />
         )}
         <span style={{ fontWeight: 700, fontSize: 15 }}>{headline}</span>
+        {body && (
+          <div style={{ fontSize: 14, marginTop: 4, color: "#e5e7eb" }}>
+            {body}
+          </div>
+        )}
         <div className="muted" style={{ fontSize: 13, marginTop: 4 }}>
           {bookingDate && startTime && (
             <>

@@ -11,7 +11,9 @@ export interface TournamentJoinedEvent {
   tournament_id: number;
   tournament_title: string | null;
   branch_id: number;
+  branch_address: string | null;
   company_id: number;
+  company_name: string | null;
   guest_id: number;
   guest_name: string | null;
   as: "player" | "guest";

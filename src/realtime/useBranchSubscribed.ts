@@ -10,6 +10,7 @@ export interface BranchSubscribedEvent {
   branch_id: number;
   branch_address: string | null;
   company_id: number;
+  company_name: string | null;
   guest_id: number;
   guest_name: string | null;
   at: string;
