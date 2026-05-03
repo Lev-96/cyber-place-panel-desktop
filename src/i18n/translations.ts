@@ -753,6 +753,12 @@ export const TRANSLATIONS: Dict = {
   "company.replaceLogo": { en: "Replace logo (optional)", ru: "Заменить логотип (необязательно)", am: "Փոխել լոգոն (ընտրովի)" },
   "company.logo": { en: "Logo", ru: "Логотип", am: "Լոգո" },
 
+  // Role labels — used by the sidebar user card chip and any other
+  // surface that needs to render a humane name for `users.role`.
+  "role.admin": { en: "Admin", ru: "Админ", am: "Ադմին" },
+  "role.company_owner": { en: "Owner", ru: "Владелец", am: "Սեփականատեր" },
+  "role.manager": { en: "Manager", ru: "Менеджер", am: "Մենեջեր" },
+
   // Pairing token modal
   "pairing.titleFor": { en: "Pairing token", ru: "Токен сопряжения", am: "Զուգակցման տոկեն" },
   "pairing.saveNow": { en: "Save this token now — it will not be shown again. You'll need it on the agent during PC setup, along with PC ID", ru: "Сохрани этот токен сейчас — он больше не будет показан. Он понадобится для настройки агента вместе с ID ПК", am: "Պահպանեք այս տոկենն այժմ — այն այլևս չի ցուցադրվի: Այն կպահանջվի գործակալի կարգավորման ժամանակ՝ ՀՀ ID-ի հետ" },
