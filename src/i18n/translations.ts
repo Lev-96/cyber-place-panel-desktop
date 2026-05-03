@@ -549,7 +549,7 @@ export const TRANSLATIONS: Dict = {
 
   // Branch edit / pricing / open hours
   "branch.editTabs.info": { en: "Info", ru: "Инфо", am: "Տվյալներ" },
-  "branch.editTabs.pricing": { en: "Pricing", ru: "Цены", am: "Գներ" },
+  "branch.editTabs.pricing": { en: "Tariffs", ru: "Тарифы", am: "Սակագներ" },
   "branch.editTabs.hours": { en: "Working hours", ru: "Часы работы", am: "Աշխատանքային ժամեր" },
   "branch.editTabs.services": { en: "Services", ru: "Услуги", am: "Ծառայություններ" },
   "branch.weekday.mon": { en: "Mon", ru: "Пн", am: "Երկ" },

@@ -1,5 +1,6 @@
 import Button from "@/components/ui/Button";
 import Modal from "@/components/ui/Modal";
+import { useLang } from "@/i18n/LanguageContext";
 import { branchRepository } from "@/repositories/BranchRepository";
 import { IBranchApi } from "@/types/api";
 import { FormEvent, useState } from "react";
@@ -15,6 +16,7 @@ interface Props {
 const KEYS: PriceKey[] = ["pc-standard", "pc-vip", "ps4-standard", "ps4-vip", "ps5-standard", "ps5-vip"];
 
 const BranchPricingForm = ({ branch, onClose, onSaved }: Props) => {
+  const { t } = useLang();
   const [prices, setPrices] = useState<Record<PriceKey, string>>(() => {
     const init = {} as Record<PriceKey, string>;
     for (const k of KEYS) init[k] = String(branch.price_for_branch?.[k] ?? "");
@@ -45,7 +47,7 @@ const BranchPricingForm = ({ branch, onClose, onSaved }: Props) => {
   return (
     <Modal open onClose={onClose}>
       <form className="card" style={{ width: 480, maxWidth: "90vw", display: "flex", flexDirection: "column", gap: 14 }} onSubmit={submit}>
-        <h2 style={{ margin: 0 }}>Pricing · {branch.address}</h2>
+        <h2 style={{ margin: 0 }}>{t("branch.editTabs.pricing")} · {branch.address}</h2>
         <div style={{ display: "grid", gridTemplateColumns: "100px 1fr 1fr", gap: 10, alignItems: "center" }}>
           <span />
           <span className="muted" style={{ fontSize: 12, textTransform: "uppercase" }}>Standard</span>

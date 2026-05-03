@@ -3,9 +3,11 @@ import Modal from "@/components/ui/Modal";
 import Input from "@/components/ui/Input";
 import Spinner from "@/components/ui/Spinner";
 import { useLang } from "@/i18n/LanguageContext";
+import { branchRepository } from "@/repositories/BranchRepository";
 import { sessionRepository } from "@/repositories/SessionRepository";
 import { IPcApi, ITimePackage } from "@/types/sessions";
-import { useEffect, useState } from "react";
+import { IBranchApi } from "@/types/api";
+import { useEffect, useMemo, useState } from "react";
 
 interface Props {
   branchId: number;
@@ -29,8 +31,51 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
   });
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  // Branch's price matrix — drives the open-mode tariff picker so the
+  // cashier doesn't have to remember/type the per-hour rate. Fetched
+  // alongside time packages on mount.
+  const [branch, setBranch] = useState<IBranchApi | null>(null);
 
   useEffect(() => { void sessionRepository.listPackages(branchId).then((p) => { setPackages(p); setPkgId(p[0]?.id ?? null); }); }, [branchId]);
+  useEffect(() => {
+    let cancelled = false;
+    void branchRepository.byId(branchId).then((b) => {
+      if (!cancelled) setBranch(b);
+    }).catch(() => {
+      // Branch fetch is best-effort — if it fails, the open-mode body
+      // falls back to the manual rate input alone.
+      if (!cancelled) setBranch(null);
+    });
+    return () => { cancelled = true; };
+  }, [branchId]);
+
+  // Visible tariff options for the open-mode picker. PC-kind PCs get
+  // the 2 PC variants; PS-kind PCs get all 4 PS variants since the
+  // PC row doesn't distinguish ps4 from ps5. Empty when the branch
+  // has no priceForBranch row or no rates for the relevant variants.
+  const tariffOptions = useMemo(() => {
+    const matrix = branch?.price_for_branch;
+    if (!matrix) return [];
+    type Row = { key: string; label: string; rate: number };
+    const keys: { key: keyof NonNullable<IBranchApi["price_for_branch"]>; label: string }[] =
+      pc.kind === "ps"
+        ? [
+            { key: "ps4-standard", label: "PS4 · Standard" },
+            { key: "ps4-vip", label: "PS4 · VIP" },
+            { key: "ps5-standard", label: "PS5 · Standard" },
+            { key: "ps5-vip", label: "PS5 · VIP" },
+          ]
+        : [
+            { key: "pc-standard", label: "PC · Standard" },
+            { key: "pc-vip", label: "PC · VIP" },
+          ];
+    const rows: Row[] = [];
+    for (const { key, label } of keys) {
+      const v = matrix[key];
+      if (v != null && Number(v) > 0) rows.push({ key: String(key), label, rate: Number(v) });
+    }
+    return rows;
+  }, [branch, pc.kind]);
 
   const submit = async () => {
     setBusy(true); setErr(null);
@@ -83,7 +128,31 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
                 )}
               </div>
             ) : (
-              <div className="col" style={{ gap: 6 }}>
+              <div className="col" style={{ gap: 10 }}>
+                {tariffOptions.length > 0 && (
+                  <div className="col" style={{ gap: 6 }}>
+                    <span className="label">{t("session.tariffField")}</span>
+                    <div className="col" style={{ gap: 6 }}>
+                      {tariffOptions.map((opt) => {
+                        const active = String(opt.rate) === rate;
+                        return (
+                          <label key={opt.key} style={pkgRow(active)}>
+                            <input
+                              type="radio"
+                              name="open-tariff"
+                              checked={active}
+                              onChange={() => setRate(String(opt.rate))}
+                            />
+                            <span style={{ flex: 1 }}>{opt.label}</span>
+                            <span style={{ fontWeight: 700 }}>
+                              {money(opt.rate)} / {t("time.hourShort") || "h"}
+                            </span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
                 <Input
                   label={t("session.hourlyRate")}
                   inputMode="decimal"
