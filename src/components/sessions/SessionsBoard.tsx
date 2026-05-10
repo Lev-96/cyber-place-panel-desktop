@@ -29,15 +29,20 @@ const toDMY = (d: Date): string => {
 };
 
 /**
- * Pull the IDs of every place currently held by an upcoming or
- * active booking on `branchId`. Used to seed and re-sync the
- * Sessions board's reserved-tile overlay — Reverb gives us the
- * delta stream, this is the snapshot side.
+ * Pull the IDs of every place currently held by a non-cancelled
+ * booking on `branchId` whose window has not yet closed. Used to
+ * seed and re-sync the Sessions board's reserved-tile overlay —
+ * Reverb delivers the deltas, this is the snapshot side.
  *
- * Filtered client-side via `Booking.isUpcoming` / `isActiveAt`,
- * which already encode the "blocking statuses" rule (pending /
- * confirmed only; cancelled rows are ignored), so a cancelled
- * booking never lingers as orange.
+ * Uses `Booking.isReservingAt` (single source of truth on what
+ * counts as "still reserving"), which mirrors the backend's
+ * `BLOCKING_STATUSES`. The earlier helper combo
+ * `isUpcoming || isActiveAt` silently dropped:
+ *   - `rescheduled` rows (extended bookings) entirely;
+ *   - `pending` rows whose start had already passed but whose
+ *     window was still open.
+ * Both cases produced grey tiles for genuinely-reserved seats
+ * the second the user navigated back into the screen.
  */
 const fetchReservedPlaceIds = async (branchId: number): Promise<Set<number>> => {
   const now = new Date();
@@ -50,7 +55,7 @@ const fetchReservedPlaceIds = async (branchId: number): Promise<Set<number>> => 
   });
   const ids = new Set<number>();
   for (const b of bookings) {
-    if (!(b.isUpcoming(now) || b.isActiveAt(now))) continue;
+    if (!b.isReservingAt(now)) continue;
     for (const id of b.placeIds) ids.add(id);
   }
   return ids;

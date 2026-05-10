@@ -1,5 +1,19 @@
 import { BookingStatusType, IBookingApi } from "@/types/api";
 
+/**
+ * Statuses where a booking is still holding the places listed in
+ * its `place_bookings` pivot — must mirror the backend's
+ * `App\Services\Booking\ConflictDetector::BLOCKING_STATUSES`. If
+ * the two drift, a freshly placed booking can be invisible to
+ * the Sessions board (which filters by this set) while the
+ * backend still rejects overlapping submits.
+ */
+const BLOCKING_STATUSES: readonly BookingStatusType[] = [
+  "pending",
+  "confirmed",
+  "rescheduled",
+];
+
 export class Booking {
   readonly id: number;
   readonly branchId: number;
@@ -64,5 +78,28 @@ export class Booking {
 
   isCompletedBy(t: Date): boolean {
     return this.status === "confirmed" && this.end < t;
+  }
+
+  /**
+   * Authoritative "is this booking holding its places at moment t".
+   * Mirrors the backend's blocking-statuses contract exactly:
+   * a row is blocking when its status is one of
+   * pending/confirmed/rescheduled AND its window has not yet
+   * closed (`end > t`).
+   *
+   * Use this — not the union of `isUpcoming || isActiveAt` — to
+   * decide whether to mark the booking's places as reserved on
+   * the Sessions board. The legacy union missed two real cases:
+   *   1. status `rescheduled` (an extension via PUT
+   *      /guest-bookings/{id}) — neither helper checks for it.
+   *   2. status `pending` while `start <= t <= end` — `isActive
+   *      At` requires `confirmed`, `isUpcoming` requires
+   *      `start > t`. A pending booking that has already
+   *      crossed its start (e.g. guest hasn't checked in yet
+   *      but is en route) fell through both filters and the
+   *      tile silently went grey on every screen remount.
+   */
+  isReservingAt(t: Date): boolean {
+    return BLOCKING_STATUSES.includes(this.status) && this.end > t;
   }
 }
