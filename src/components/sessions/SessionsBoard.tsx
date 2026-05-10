@@ -114,13 +114,25 @@ const SessionsBoard = ({ branchId }: Props) => {
   // the cashier sees the banner regardless of which screen they're on.
   // This subscription is for the local tile-state side-effect only.
   //
+  // Subscribes to `bookings.global` — the same constant channel
+  // `GlobalBookingNotifier` and `Home.tsx` use. The backend's
+  // `BookingChanged::broadcastOn()` fans out the same event to
+  // `branch.{id}`, `company.{id}` AND `bookings.global` in one
+  // dispatch, so global is guaranteed to carry every booking. The
+  // earlier per-branch subscription left the tile-paint path silent
+  // when the global toast still landed correctly (a real user-
+  // reported regression on 2026-05-10 — notification fired but the
+  // tile stayed grey). Filter by `branch_id` inside the handler so
+  // we ignore other branches' events.
+  //
   // `kind`-aware: a `cancelled` event must REMOVE the place_ids
   // it carries, otherwise a cancelled booking would linger as
   // orange until the next sanity sweep. Created / extended /
   // confirmed all keep the tile reserved.
   useBookingChanged(
-    Number.isFinite(branchId) ? `branch.${branchId}` : null,
+    "bookings.global",
     useCallback((evt) => {
+      if (evt.branch_id !== branchId) return;
       setReservedPlaceIds((prev) => {
         const next = new Set(prev);
         if (evt.kind === "cancelled") {
@@ -130,7 +142,7 @@ const SessionsBoard = ({ branchId }: Props) => {
         }
         return next;
       });
-    }, []),
+    }, [branchId]),
   );
 
   // Polling fallback. Reverb is the primary realtime path now;
