@@ -6,6 +6,7 @@ import { useAsync } from "@/hooks/useAsync";
 import { useLang } from "@/i18n/LanguageContext";
 import { useBookingChanged } from "@/realtime/useBookingChanged";
 import { usePlaceAvailability } from "@/realtime/usePlaceAvailability";
+import { bookingRepository } from "@/repositories/BookingRepository";
 import { sessionRepository } from "@/repositories/SessionRepository";
 import { IPcApi, ISessionApi } from "@/types/sessions";
 import { useCallback, useEffect, useState } from "react";
@@ -14,6 +15,46 @@ import AddSessionItemDialog from "./AddSessionItemDialog";
 import SessionTimer from "./SessionTimer";
 import StartSessionDialog from "./StartSessionDialog";
 import StopReceiptModal from "./StopReceiptModal";
+
+/**
+ * `d-m-Y` clock-time-of-day stamp — matches what the booking
+ * IndexRequest validator accepts (see backend
+ * `app/Http/Requests/Bookings/IndexRequest.php` rules
+ * `date_format:d-m-Y`). Local time on purpose: the cashier and
+ * the backend's app timezone (Asia/Yerevan) are the same.
+ */
+const toDMY = (d: Date): string => {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${pad(d.getDate())}-${pad(d.getMonth() + 1)}-${d.getFullYear()}`;
+};
+
+/**
+ * Pull the IDs of every place currently held by an upcoming or
+ * active booking on `branchId`. Used to seed and re-sync the
+ * Sessions board's reserved-tile overlay — Reverb gives us the
+ * delta stream, this is the snapshot side.
+ *
+ * Filtered client-side via `Booking.isUpcoming` / `isActiveAt`,
+ * which already encode the "blocking statuses" rule (pending /
+ * confirmed only; cancelled rows are ignored), so a cancelled
+ * booking never lingers as orange.
+ */
+const fetchReservedPlaceIds = async (branchId: number): Promise<Set<number>> => {
+  const now = new Date();
+  const bookings = await bookingRepository.listAll({
+    branch_id: branchId,
+    // Today + future. Past bookings on `booking_date < today` can't
+    // still be active (their end is in the past), so omitting them
+    // shrinks the page count without losing accuracy.
+    date_from: toDMY(now),
+  });
+  const ids = new Set<number>();
+  for (const b of bookings) {
+    if (!(b.isUpcoming(now) || b.isActiveAt(now))) continue;
+    for (const id of b.placeIds) ids.add(id);
+  }
+  return ids;
+};
 
 const navBtn: React.CSSProperties = { padding: "6px 10px", border: "1px solid #1f2a44", borderRadius: 6 };
 
@@ -30,10 +71,32 @@ const SessionsBoard = ({ branchId }: Props) => {
   const [startTarget, setStartTarget] = useState<IPcApi | null>(null);
   const [stopTarget, setStopTarget] = useState<ISessionApi | null>(null);
   const [addItemTarget, setAddItemTarget] = useState<ISessionApi | null>(null);
-  // Set of place IDs currently reserved by an upcoming/active booking.
-  // Driven by Reverb `booking.changed` events — entries time out so a
-  // long-finished booking eventually drops off without a refetch.
+  // Set of place IDs currently reserved by an upcoming/active
+  // booking. Hydrated from REST on mount (so re-entering the
+  // screen restores the orange paint), then kept fresh by both
+  // `booking.changed` Reverb deltas and a 30s sanity refetch
+  // below.
   const [reservedPlaceIds, setReservedPlaceIds] = useState<Set<number>>(new Set());
+
+  // Snapshot-on-mount: without this, navigating away from the
+  // board and back wiped `reservedPlaceIds` because Reverb is a
+  // delta channel — any booking created while the screen was
+  // unmounted was invisible until the next event landed.
+  const reloadReservedIds = useCallback(async () => {
+    if (!Number.isFinite(branchId)) return;
+    try {
+      const ids = await fetchReservedPlaceIds(branchId);
+      setReservedPlaceIds(ids);
+    } catch {
+      // Tile stays as-is; Reverb will repopulate on the next event
+      // and the 30s sweep will retry. Swallowed on purpose so a
+      // transient hiccup doesn't crash the board.
+    }
+  }, [branchId]);
+
+  useEffect(() => {
+    void reloadReservedIds();
+  }, [reloadReservedIds]);
 
   // Reverb pushes a fresh event whenever a place transitions in/out of
   // a session. We just kick a reload — the existing reload covers
@@ -50,12 +113,21 @@ const SessionsBoard = ({ branchId }: Props) => {
   // toast lives in `<GlobalBookingNotifier />` (mounted in Layout) so
   // the cashier sees the banner regardless of which screen they're on.
   // This subscription is for the local tile-state side-effect only.
+  //
+  // `kind`-aware: a `cancelled` event must REMOVE the place_ids
+  // it carries, otherwise a cancelled booking would linger as
+  // orange until the next sanity sweep. Created / extended /
+  // confirmed all keep the tile reserved.
   useBookingChanged(
     Number.isFinite(branchId) ? `branch.${branchId}` : null,
     useCallback((evt) => {
       setReservedPlaceIds((prev) => {
         const next = new Set(prev);
-        for (const id of evt.place_ids) next.add(id);
+        if (evt.kind === "cancelled") {
+          for (const id of evt.place_ids) next.delete(id);
+        } else {
+          for (const id of evt.place_ids) next.add(id);
+        }
         return next;
       });
     }, []),
@@ -65,11 +137,16 @@ const SessionsBoard = ({ branchId }: Props) => {
   // 30s is a sanity-check sweep for cases where the WebSocket
   // dropped silently (Reverb restart, tab backgrounded long enough
   // for the OS to throttle, network change). Imperceptible on the
-  // happy path, full recovery on the rare drop.
+  // happy path, full recovery on the rare drop. Also re-syncs
+  // reserved tiles so expired bookings drop off naturally.
   useEffect(() => {
-    const t = setInterval(() => { void sessions.reload(); void pcs.reload(); }, 30_000);
+    const t = setInterval(() => {
+      void sessions.reload();
+      void pcs.reload();
+      void reloadReservedIds();
+    }, 30_000);
     return () => clearInterval(t);
-  }, [sessions, pcs]);
+  }, [sessions, pcs, reloadReservedIds]);
 
   if ((pcs.loading && !pcs.data) || (sessions.loading && !sessions.data)) return <Spinner />;
   if (pcs.error && !pcs.data) return <div className="error">{pcs.error.message}</div>;

@@ -9,6 +9,15 @@ export class Booking {
   readonly start: Date;
   readonly end: Date;
   readonly placeCount: number;
+  /**
+   * Actual `places.id` values this booking holds — from the
+   * `place_bookings` pivot. Empty array when the backend payload
+   * pre-dates the enrichment (older deploys); consumers must
+   * handle the empty case gracefully.
+   */
+  readonly placeIds: readonly number[];
+  /** Human-readable seat numbers, parallel to `placeIds`. */
+  readonly placeNumbers: readonly number[];
   readonly platform: string;
   readonly raw: IBookingApi;
 
@@ -20,6 +29,8 @@ export class Booking {
     this.companyId = raw.company_id;
     this.status = raw.status;
     this.placeCount = raw.place_booking_count ?? 1;
+    this.placeIds = Object.freeze([...(raw.place_ids ?? [])]);
+    this.placeNumbers = Object.freeze([...(raw.place_numbers ?? [])]);
     this.platform = raw.game?.platform ?? "";
     this.start = Booking.parseStart(raw);
     this.end = new Date(this.start.getTime() + (raw.duration_minutes + (raw.rescheduled_minutes ?? 0)) * 60_000);

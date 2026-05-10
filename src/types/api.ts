@@ -63,6 +63,16 @@ export interface IBookingApi {
   status: BookingStatusType;
   code: number;
   place_booking_count: number;
+  /**
+   * IDs of the places this booking occupies. Same array the
+   * `BookingChanged` Reverb broadcast carries — lets the Sessions
+   * board paint reserved tiles on (re)mount without waiting for a
+   * realtime event. Optional for backwards compatibility with
+   * older backend builds; consumers must fall back to `[]`.
+   */
+  place_ids?: number[];
+  /** Human-readable seat numbers, parallel to `place_ids`. */
+  place_numbers?: number[];
   company?: { id: number; name: string };
   game?: { id: number; platform: PlatformType; name: string };
 }
