@@ -41,11 +41,17 @@ describe("Place.computeStatus", () => {
     expect(p.computeStatus([], new Date())).toBe("free");
   });
 
-  it("busy when active booking covers time", () => {
+  it("reserved when a booking covers the moment (mid-window)", () => {
+    // Place.computeStatus deliberately doesn't distinguish busy
+    // vs reserved any more — both "in-window" and "upcoming"
+    // bookings paint the tile orange. Promotion to "busy" (red)
+    // is RealtimeService's job and only happens when an actual
+    // session is running on the place; without that the cashier
+    // signal is "this seat is held — convert the booking".
     const p = new Place(placeRaw());
     const b = new Booking(bookingRaw());
     const t = new Date(b.start.getTime() + 10 * 60_000);
-    expect(p.computeStatus([b], t)).toBe("busy");
+    expect(p.computeStatus([b], t)).toBe("reserved");
   });
 
   it("reserved when only upcoming booking", () => {
@@ -53,6 +59,35 @@ describe("Place.computeStatus", () => {
     const b = new Booking(bookingRaw());
     const t = new Date(b.start.getTime() - 60 * 60_000);
     expect(p.computeStatus([b], t)).toBe("reserved");
+  });
+
+  it("reserved for a rescheduled booking mid-window", () => {
+    // Status `rescheduled` (an extension via PUT
+    // /guest-bookings/{id}) MUST keep the tile orange — the
+    // backend's BLOCKING_STATUSES treats it as still holding the
+    // seat, and the previous (isActiveAt || isUpcoming) combo
+    // silently dropped this case.
+    const p = new Place(placeRaw());
+    const b = new Booking(bookingRaw({ status: "rescheduled" }));
+    const t = new Date(b.start.getTime() + 10 * 60_000);
+    expect(p.computeStatus([b], t)).toBe("reserved");
+  });
+
+  it("reserved for a pending booking past its start", () => {
+    // Status `pending` with `start <= now <= end` — guest hasn't
+    // confirmed by code yet but the window has begun. Must paint
+    // orange so the cashier sees the seat is held.
+    const p = new Place(placeRaw());
+    const b = new Booking(bookingRaw({ status: "pending" }));
+    const t = new Date(b.start.getTime() + 10 * 60_000);
+    expect(p.computeStatus([b], t)).toBe("reserved");
+  });
+
+  it("free for a cancelled booking", () => {
+    const p = new Place(placeRaw());
+    const b = new Booking(bookingRaw({ status: "cancelled" }));
+    const t = new Date(b.start.getTime() + 10 * 60_000);
+    expect(p.computeStatus([b], t)).toBe("free");
   });
 
   it("free when bookings are in the past", () => {

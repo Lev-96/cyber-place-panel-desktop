@@ -9,7 +9,7 @@ import { placeRepository } from "@/repositories/PlaceRepository";
 import { serviceRepository } from "@/repositories/ServiceRepository";
 import { sessionRepository } from "@/repositories/SessionRepository";
 import { IRealtimeStrategy } from "./IRealtimeStrategy";
-import { IPlaceAssignmentPolicy, PlatformAwareSequentialAssignment } from "./PlaceAssignmentPolicy";
+import { IPlaceAssignmentPolicy, PivotPlaceAssignment } from "./PlaceAssignmentPolicy";
 import { PollingStrategy } from "./PollingStrategy";
 
 export interface PlaceSnapshot {
@@ -38,7 +38,7 @@ export class RealtimeService {
 
   constructor(
     private branchId: number,
-    private assignment: IPlaceAssignmentPolicy = new PlatformAwareSequentialAssignment(),
+    private assignment: IPlaceAssignmentPolicy = new PivotPlaceAssignment(),
     strategy?: IRealtimeStrategy,
   ) {
     this.strategy = strategy ?? new PollingStrategy({
@@ -57,14 +57,19 @@ export class RealtimeService {
 
   private async tick(): Promise<void> {
     try {
-      const today = todayBounds();
-      // Pull PCs + active sessions in addition to bookings, so a running
-      // session at place X marks that place busy on the live board even when
-      // there's no booking for it (walk-in customers).
+      // Today + future. Past bookings are filtered out client-side
+      // by `Booking.isReservingAt` (end_time has passed), so omitting
+      // a `date_to` doesn't add noise. The previous "today only"
+      // window silently hid every booking starting tomorrow or later
+      // — the cashier would see a green tile and could open a walk-
+      // in session minutes before the guest's slot. Pull PCs +
+      // active sessions in addition so a running session at place X
+      // promotes that place to `busy` (red) on the live board even
+      // when no booking covers the slot (walk-in customers).
       const [places, services, bookings, pcs, sessions] = await Promise.all([
         placeRepository.listByBranch(this.branchId),
         serviceRepository.listByBranch(this.branchId),
-        bookingRepository.listAll({ branch_id: this.branchId, date_from: today.from, date_to: today.to }),
+        bookingRepository.listAll({ branch_id: this.branchId, date_from: todayDMY() }),
         sessionRepository.listPcs(this.branchId),
         sessionRepository.listActive(this.branchId),
       ]);
@@ -102,9 +107,15 @@ export class RealtimeService {
   }
 }
 
-const todayBounds = () => {
-  const now = new Date();
-  const stamp = `${pad(now.getDate())}-${pad(now.getMonth() + 1)}-${now.getFullYear()}`;
-  return { from: stamp, to: stamp };
-};
 const pad = (n: number) => String(n).padStart(2, "0");
+
+/**
+ * `d-m-Y` clock-time-of-day stamp — matches the booking
+ * `IndexRequest` validator's `date_format:d-m-Y` rule. Local
+ * time on purpose: the cashier's machine and the backend's
+ * app timezone (Asia/Yerevan) are aligned.
+ */
+const todayDMY = (): string => {
+  const now = new Date();
+  return `${pad(now.getDate())}-${pad(now.getMonth() + 1)}-${now.getFullYear()}`;
+};
