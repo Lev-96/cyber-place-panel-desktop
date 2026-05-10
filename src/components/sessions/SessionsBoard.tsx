@@ -3,10 +3,9 @@ import { can } from "@/auth/permissions";
 import Button from "@/components/ui/Button";
 import Spinner from "@/components/ui/Spinner";
 import { useAsync } from "@/hooks/useAsync";
+import { useReservedPlaceIds } from "@/hooks/useReservedPlaceIds";
 import { useLang } from "@/i18n/LanguageContext";
-import { useBookingChanged } from "@/realtime/useBookingChanged";
 import { usePlaceAvailability } from "@/realtime/usePlaceAvailability";
-import { bookingRepository } from "@/repositories/BookingRepository";
 import { sessionRepository } from "@/repositories/SessionRepository";
 import { IPcApi, ISessionApi } from "@/types/sessions";
 import { useCallback, useEffect, useState } from "react";
@@ -15,51 +14,6 @@ import AddSessionItemDialog from "./AddSessionItemDialog";
 import SessionTimer from "./SessionTimer";
 import StartSessionDialog from "./StartSessionDialog";
 import StopReceiptModal from "./StopReceiptModal";
-
-/**
- * `d-m-Y` clock-time-of-day stamp — matches what the booking
- * IndexRequest validator accepts (see backend
- * `app/Http/Requests/Bookings/IndexRequest.php` rules
- * `date_format:d-m-Y`). Local time on purpose: the cashier and
- * the backend's app timezone (Asia/Yerevan) are the same.
- */
-const toDMY = (d: Date): string => {
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${pad(d.getDate())}-${pad(d.getMonth() + 1)}-${d.getFullYear()}`;
-};
-
-/**
- * Pull the IDs of every place currently held by a non-cancelled
- * booking on `branchId` whose window has not yet closed. Used to
- * seed and re-sync the Sessions board's reserved-tile overlay —
- * Reverb delivers the deltas, this is the snapshot side.
- *
- * Uses `Booking.isReservingAt` (single source of truth on what
- * counts as "still reserving"), which mirrors the backend's
- * `BLOCKING_STATUSES`. The earlier helper combo
- * `isUpcoming || isActiveAt` silently dropped:
- *   - `rescheduled` rows (extended bookings) entirely;
- *   - `pending` rows whose start had already passed but whose
- *     window was still open.
- * Both cases produced grey tiles for genuinely-reserved seats
- * the second the user navigated back into the screen.
- */
-const fetchReservedPlaceIds = async (branchId: number): Promise<Set<number>> => {
-  const now = new Date();
-  const bookings = await bookingRepository.listAll({
-    branch_id: branchId,
-    // Today + future. Past bookings on `booking_date < today` can't
-    // still be active (their end is in the past), so omitting them
-    // shrinks the page count without losing accuracy.
-    date_from: toDMY(now),
-  });
-  const ids = new Set<number>();
-  for (const b of bookings) {
-    if (!b.isReservingAt(now)) continue;
-    for (const id of b.placeIds) ids.add(id);
-  }
-  return ids;
-};
 
 const navBtn: React.CSSProperties = { padding: "6px 10px", border: "1px solid #1f2a44", borderRadius: 6 };
 
@@ -76,32 +30,12 @@ const SessionsBoard = ({ branchId }: Props) => {
   const [startTarget, setStartTarget] = useState<IPcApi | null>(null);
   const [stopTarget, setStopTarget] = useState<ISessionApi | null>(null);
   const [addItemTarget, setAddItemTarget] = useState<ISessionApi | null>(null);
-  // Set of place IDs currently reserved by an upcoming/active
-  // booking. Hydrated from REST on mount (so re-entering the
-  // screen restores the orange paint), then kept fresh by both
-  // `booking.changed` Reverb deltas and a 30s sanity refetch
-  // below.
-  const [reservedPlaceIds, setReservedPlaceIds] = useState<Set<number>>(new Set());
-
-  // Snapshot-on-mount: without this, navigating away from the
-  // board and back wiped `reservedPlaceIds` because Reverb is a
-  // delta channel — any booking created while the screen was
-  // unmounted was invisible until the next event landed.
-  const reloadReservedIds = useCallback(async () => {
-    if (!Number.isFinite(branchId)) return;
-    try {
-      const ids = await fetchReservedPlaceIds(branchId);
-      setReservedPlaceIds(ids);
-    } catch {
-      // Tile stays as-is; Reverb will repopulate on the next event
-      // and the 30s sweep will retry. Swallowed on purpose so a
-      // transient hiccup doesn't crash the board.
-    }
-  }, [branchId]);
-
-  useEffect(() => {
-    void reloadReservedIds();
-  }, [reloadReservedIds]);
+  // Reserved-tile overlay state owned by the shared hook — pairs
+  // a REST snapshot (re)mount + sanity-sweep with the
+  // `booking.changed` Reverb delta. The Branch places grid uses
+  // the same hook, so the two screens can never disagree about
+  // which seats are currently held.
+  const reservedPlaceIds = useReservedPlaceIds(branchId);
 
   // Reverb pushes a fresh event whenever a place transitions in/out of
   // a session. We just kick a reload — the existing reload covers
@@ -114,56 +48,17 @@ const SessionsBoard = ({ branchId }: Props) => {
     }, [sessions, pcs]),
   );
 
-  // Booking lifecycle realtime: paint reserved tiles. The cross-screen
-  // toast lives in `<GlobalBookingNotifier />` (mounted in Layout) so
-  // the cashier sees the banner regardless of which screen they're on.
-  // This subscription is for the local tile-state side-effect only.
-  //
-  // Subscribes to `bookings.global` — the same constant channel
-  // `GlobalBookingNotifier` and `Home.tsx` use. The backend's
-  // `BookingChanged::broadcastOn()` fans out the same event to
-  // `branch.{id}`, `company.{id}` AND `bookings.global` in one
-  // dispatch, so global is guaranteed to carry every booking. The
-  // earlier per-branch subscription left the tile-paint path silent
-  // when the global toast still landed correctly (a real user-
-  // reported regression on 2026-05-10 — notification fired but the
-  // tile stayed grey). Filter by `branch_id` inside the handler so
-  // we ignore other branches' events.
-  //
-  // `kind`-aware: a `cancelled` event must REMOVE the place_ids
-  // it carries, otherwise a cancelled booking would linger as
-  // orange until the next sanity sweep. Created / extended /
-  // confirmed all keep the tile reserved.
-  useBookingChanged(
-    "bookings.global",
-    useCallback((evt) => {
-      if (evt.branch_id !== branchId) return;
-      setReservedPlaceIds((prev) => {
-        const next = new Set(prev);
-        if (evt.kind === "cancelled") {
-          for (const id of evt.place_ids) next.delete(id);
-        } else {
-          for (const id of evt.place_ids) next.add(id);
-        }
-        return next;
-      });
-    }, [branchId]),
-  );
-
-  // Polling fallback. Reverb is the primary realtime path now;
-  // 30s is a sanity-check sweep for cases where the WebSocket
-  // dropped silently (Reverb restart, tab backgrounded long enough
-  // for the OS to throttle, network change). Imperceptible on the
-  // happy path, full recovery on the rare drop. Also re-syncs
-  // reserved tiles so expired bookings drop off naturally.
+  // Polling fallback for the session-side data. Reverb is the
+  // primary realtime path; 30s is a sanity-check sweep for cases
+  // where the WebSocket dropped silently. Reserved-tile state
+  // has its own internal sweep inside `useReservedPlaceIds`.
   useEffect(() => {
     const t = setInterval(() => {
       void sessions.reload();
       void pcs.reload();
-      void reloadReservedIds();
     }, 30_000);
     return () => clearInterval(t);
-  }, [sessions, pcs, reloadReservedIds]);
+  }, [sessions, pcs]);
 
   if ((pcs.loading && !pcs.data) || (sessions.loading && !sessions.data)) return <Spinner />;
   if (pcs.error && !pcs.data) return <div className="error">{pcs.error.message}</div>;
@@ -233,7 +128,23 @@ const SessionsBoard = ({ branchId }: Props) => {
                       ? t("session.reserved") || "Reserved"
                       : `${t("session.free")}${pc.kind === "ps" ? " · PS" : ""}`}
                   </span>
-                  <Button onClick={() => setStartTarget(pc)} style={{ padding: "6px 10px", fontSize: 12, marginTop: 6 }}>{t("action.start")}</Button>
+                  {/*
+                    Start is disabled while the seat is held by an
+                    upcoming/active booking — the cashier must wait
+                    for the guest to confirm-by-code (which converts
+                    the booking into the session) instead of opening
+                    a parallel walk-in session that would conflict.
+                    The orange tile + "Reserved" label make the
+                    state legible; the disabled button makes the
+                    state non-bypassable from this screen.
+                  */}
+                  <Button
+                    onClick={() => setStartTarget(pc)}
+                    disabled={isReserved}
+                    style={{ padding: "6px 10px", fontSize: 12, marginTop: 6 }}
+                  >
+                    {t("action.start")}
+                  </Button>
                 </>
               )}
             </div>
