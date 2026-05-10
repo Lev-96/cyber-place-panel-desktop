@@ -1,6 +1,15 @@
 export type PlatformType = "pc" | "ps4" | "ps5";
 export type PlaceType = "standard" | "vip";
-export type BookingStatusType = "pending" | "confirmed" | "cancelled" | "rescheduled";
+/**
+ * Backend `bookings.status` enum. `finished` is the terminal
+ * state assigned by `SessionController::stop` once every gaming
+ * session the booking spawned has been stopped by the cashier —
+ * distinct from `cancelled` (which is a no-show / manual abort)
+ * so historical reports can tell the two apart. From the seat-
+ * hold perspective both are terminal: `Booking.BLOCKING_STATUSES`
+ * deliberately excludes them.
+ */
+export type BookingStatusType = "pending" | "confirmed" | "cancelled" | "rescheduled" | "finished";
 export type CompanyStatusType = "active" | "pending";
 export type Role = "admin" | "company_owner" | "manager";
 

@@ -7,7 +7,15 @@ import { getEcho } from "./echo";
  * contract can't drift silently.
  */
 export interface BookingChangedEvent {
-  kind: "created" | "extended" | "cancelled" | "confirmed";
+  /**
+   * `finished` is emitted by `SessionController::stop` on the
+   * backend once every gaming session a booking spawned has been
+   * stopped — terminal from the seat-hold perspective, same UX
+   * outcome as `cancelled` (drop the place_ids from the reserved
+   * overlay). Distinct kind so historical reports and toasts can
+   * tell "no-show / aborted" from "fully played out" apart.
+   */
+  kind: "created" | "extended" | "cancelled" | "confirmed" | "finished";
   booking_id: number;
   branch_id: number;
   company_id: number;

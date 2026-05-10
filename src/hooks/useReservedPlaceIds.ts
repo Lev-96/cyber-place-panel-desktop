@@ -1,7 +1,25 @@
 import { Booking } from "@/domain/Booking";
 import { useBookingChanged } from "@/realtime/useBookingChanged";
+import { BookingChangedEvent } from "@/realtime/useBookingChanged";
 import { bookingRepository } from "@/repositories/BookingRepository";
 import { useCallback, useEffect, useState } from "react";
+
+/**
+ * Kinds where the booking has stopped holding its seats — the
+ * `place_ids` payload should be REMOVED from `reservedPlaceIds`
+ * rather than added. Mirrors the backend's terminal statuses:
+ *   - `cancelled` — no-show or manual abort.
+ *   - `finished`  — every spawned session was stopped by the
+ *                   cashier (added 2026-05-11).
+ *
+ * Lifecycle kinds (`created`, `extended`, `confirmed`) are the
+ * additive complement — the conditional in the handler treats
+ * any non-terminal kind as add.
+ */
+const TERMINAL_BOOKING_KINDS: readonly BookingChangedEvent["kind"][] = [
+  "cancelled",
+  "finished",
+];
 
 /**
  * `d-m-Y` clock-time-of-day stamp — matches what the booking
@@ -78,19 +96,21 @@ export const useReservedPlaceIds = (branchId: number): Set<number> => {
     void reload();
   }, [reload]);
 
-  // Realtime delta. `kind`-aware so a `cancelled` event removes
-  // the place_ids it carries; `created` / `extended` / `confirmed`
-  // add them. Filter by `branch_id` because the channel is global.
+  // Realtime delta. Terminal kinds (`cancelled`, `finished`) drop
+  // the place_ids the event carries; lifecycle kinds (`created`,
+  // `extended`, `confirmed`) add them. Filter by `branch_id`
+  // because the channel is global. Keeping the terminal set as
+  // data-driven rather than a chain of `if`s means a future kind
+  // (e.g. `expired`) only needs to be added to the array.
   useBookingChanged(
     "bookings.global",
     useCallback((evt) => {
       if (evt.branch_id !== branchId) return;
+      const isTerminal = TERMINAL_BOOKING_KINDS.includes(evt.kind);
       setIds((prev) => {
         const next = new Set(prev);
-        if (evt.kind === "cancelled") {
-          for (const id of evt.place_ids) next.delete(id);
-        } else {
-          for (const id of evt.place_ids) next.add(id);
+        for (const id of evt.place_ids) {
+          if (isTerminal) next.delete(id); else next.add(id);
         }
         return next;
       });

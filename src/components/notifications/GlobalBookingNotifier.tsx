@@ -205,7 +205,12 @@ const GlobalBookingNotifier = () => {
     // out of the dashboard "Upcoming/pending" tile). No toast, no OS
     // notification, no notifications-list refresh — Home.tsx's own
     // `useBookingChanged` hook handles the dashboard refetch.
-    if (evt.kind === "confirmed") return;
+    //
+    // `finished` is also silent: the cashier who hit Stop already
+    // knows the session ended; the tile flip via `useReservedPlace
+    // Ids` is the only signal needed. A toast here would just nag
+    // them about their own action.
+    if (evt.kind === "confirmed" || evt.kind === "finished") return;
     setToast({
       kind: evt.kind,
       code: evt.code,
