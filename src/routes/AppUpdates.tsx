@@ -91,12 +91,6 @@ const AppUpdates = () => {
     return () => { mounted = false; unsub?.(); };
   }, [hasBridge]);
 
-  // Initial server-side check on mount so the admin sees the snapshot
-  // without having to click "Проверить" first.
-  useEffect(() => {
-    void runCheck();
-  }, []);
-
   const runCheck = async () => {
     setApiState("loading");
     setApiError(null);
@@ -136,14 +130,20 @@ const AppUpdates = () => {
             <Button type="button" onClick={runCheck} disabled={apiState === "loading"}>
               {apiState === "loading" ? t("updates.checking") : t("updates.checkBtn")}
             </Button>
-            <Button
-              type="button"
-              variant={anyUpdates ? "primary" : "secondary"}
-              onClick={runPromote}
-              disabled={!anyUpdates || promoting || apiState !== "ready"}
-            >
-              {promoting ? t("updates.promoting") : t("updates.promoteBtn")}
-            </Button>
+            {/* The "Apply" button only materializes after the admin has
+                clicked Check AND at least one app has a newer release on
+                GitHub. Showing it earlier (greyed-out) felt like a dead
+                button — easier to hide outright so the screen has one
+                clear call-to-action at a time. */}
+            {apiState === "ready" && anyUpdates && (
+              <Button
+                type="button"
+                onClick={runPromote}
+                disabled={promoting}
+              >
+                {promoting ? t("updates.promoting") : t("updates.promoteBtn")}
+              </Button>
+            )}
           </div>
 
           {apiError && (
@@ -160,6 +160,10 @@ const AppUpdates = () => {
         </div>
       </div>
 
+      {/* Snapshot table only after the admin has actively asked. Keeps
+          the initial screen down to a single, clear call-to-action
+          ("Check"); the table fills in after the round-trip. */}
+      {data && (
       <div className="gradient-card" style={{ marginTop: 12 }}>
         <div className="gradient-card-inner">
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
@@ -174,13 +178,27 @@ const AppUpdates = () => {
             <tbody>
               {APPS.map((app) => {
                 const entry = data?.[app];
-                const current = entry?.current?.version ?? "—";
+                // "Current version" means "what's running on the floor
+                // right now". Until the backend pointer is set (no
+                // promote yet), the truthful answer is "whatever was
+                // last installed". For THIS app we know it directly
+                // from the local bridge; for the other app we have to
+                // fall back to the dash.
+                const localFallback = app === "panel" ? local?.currentVersion : null;
+                const current =
+                  entry?.current?.version ??
+                  localFallback ??
+                  "—";
                 const available = entry?.available?.version ?? (entry?.error ? "?" : "—");
-                let tone: "ok" | "warn" | "bad" | "info" = "info";
-                let statusLabel = t("updates.statusNoPromoted");
+                // Default tone: green/"up to date". The previous "not
+                // promoted yet" branch read as an error state to
+                // admins even though it's a perfectly normal initial
+                // condition — nothing has been rolled out because
+                // there's nothing newer than what's already installed.
+                let tone: "ok" | "warn" | "bad" = "ok";
+                let statusLabel = t("updates.statusUpToDate");
                 if (entry?.error) { tone = "bad"; statusLabel = t("updates.statusError"); }
                 else if (entry?.has_update) { tone = "warn"; statusLabel = t("updates.statusUpdateAvailable"); }
-                else if (entry?.current) { tone = "ok"; statusLabel = t("updates.statusUpToDate"); }
 
                 return (
                   <tr key={app} style={{ borderTop: "1px solid #1f2a44" }}>
@@ -199,6 +217,7 @@ const AppUpdates = () => {
           </table>
         </div>
       </div>
+      )}
 
       <div className="gradient-card" style={{ marginTop: 12 }}>
         <div className="gradient-card-inner">
@@ -223,7 +242,11 @@ const LocalUpdateBlock = ({
     return <p className="muted">Running outside the desktop bundle — no local update bridge.</p>;
   }
 
-  if (!state) return <p className="muted">{t("updates.localIdle")}</p>;
+  if (!state) {
+    // Bridge present but state hasn't arrived yet. Render nothing —
+    // a "loading" placeholder here would only flash for a few ms.
+    return null;
+  }
 
   const currentRow = (
     <p className="muted" style={{ marginTop: 0 }}>
@@ -231,7 +254,10 @@ const LocalUpdateBlock = ({
     </p>
   );
 
-  let message: string;
+  // Only render an extra status line when the updater is actually
+  // doing something. Idle ("nothing happening, you're on the latest
+  // installed build") deserves silence — the version above is enough.
+  let message: string | null = null;
   switch (state.status) {
     case "checking":
       message = t("updates.localChecking");
@@ -248,20 +274,20 @@ const LocalUpdateBlock = ({
     case "error":
       message = fmt(t("updates.localError"), state.error ?? "unknown");
       break;
-    case "not-available":
-      message = t("updates.noUpdates");
-      break;
     case "idle":
+    case "not-available":
     default:
-      message = t("updates.localIdle");
+      message = null;
   }
 
   return (
     <>
       {currentRow}
-      <p style={{ margin: "6px 0 10px", color: state.status === "error" ? "#ef4444" : undefined }}>
-        {message}
-      </p>
+      {message !== null && (
+        <p style={{ margin: "6px 0 10px", color: state.status === "error" ? "#ef4444" : undefined }}>
+          {message}
+        </p>
+      )}
       {state.status === "downloaded" && (
         <Button type="button" onClick={() => { void window.cyberplaceUpdates?.install(); }}>
           {t("updates.installNow")}
