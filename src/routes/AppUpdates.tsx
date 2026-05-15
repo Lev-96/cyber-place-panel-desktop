@@ -178,27 +178,54 @@ const AppUpdates = () => {
             <tbody>
               {APPS.map((app) => {
                 const entry = data?.[app];
-                // "Current version" means "what's running on the floor
-                // right now". Until the backend pointer is set (no
-                // promote yet), the truthful answer is "whatever was
-                // last installed". For THIS app we know it directly
-                // from the local bridge; for the other app we have to
-                // fall back to the dash.
-                const localFallback = app === "panel" ? local?.currentVersion : null;
+                // "Current version" semantics:
+                //   - Panel row → the version of THIS install (the
+                //     same number "Эта установка" used to show on its
+                //     own card). That's the truth the admin cares about.
+                //   - Agent row → fall back to the promoted pointer
+                //     since we don't run an agent here.
                 const current =
-                  entry?.current?.version ??
-                  localFallback ??
-                  "—";
+                  app === "panel"
+                    ? local?.currentVersion ?? entry?.current?.version ?? "—"
+                    : entry?.current?.version ?? "—";
                 const available = entry?.available?.version ?? (entry?.error ? "?" : "—");
-                // Default tone: green/"up to date". The previous "not
-                // promoted yet" branch read as an error state to
-                // admins even though it's a perfectly normal initial
-                // condition — nothing has been rolled out because
-                // there's nothing newer than what's already installed.
+
+                // Status: default green. For the Panel row the local
+                // updater state takes precedence (so the admin sees
+                // "Downloading 42%" / "Ready to install" inline,
+                // no separate card); for the Agent row we use the
+                // pointer-vs-GitHub comparison the backend computed.
                 let tone: "ok" | "warn" | "bad" = "ok";
                 let statusLabel = t("updates.statusUpToDate");
-                if (entry?.error) { tone = "bad"; statusLabel = t("updates.statusError"); }
-                else if (entry?.has_update) { tone = "warn"; statusLabel = t("updates.statusUpdateAvailable"); }
+
+                if (entry?.error) {
+                  tone = "bad"; statusLabel = t("updates.statusError");
+                } else if (app === "panel" && local) {
+                  // Local updater is authoritative for the Panel row.
+                  switch (local.status) {
+                    case "downloading":
+                      tone = "warn";
+                      statusLabel = fmt(t("updates.localDownloading"), local.progressPercent ?? 0);
+                      break;
+                    case "downloaded":
+                      tone = "warn";
+                      statusLabel = fmt(t("updates.localDownloaded"), local.availableVersion ?? "?");
+                      break;
+                    case "error":
+                      tone = "bad";
+                      statusLabel = fmt(t("updates.localError"), local.error ?? "unknown");
+                      break;
+                    default:
+                      // checking / available / not-available / idle
+                      if (entry?.has_update && local.currentVersion !== entry.available?.version) {
+                        tone = "warn"; statusLabel = t("updates.statusUpdateAvailable");
+                      }
+                  }
+                } else if (entry?.has_update) {
+                  tone = "warn"; statusLabel = t("updates.statusUpdateAvailable");
+                }
+
+                const showInstallBtn = app === "panel" && local?.status === "downloaded";
 
                 return (
                   <tr key={app} style={{ borderTop: "1px solid #1f2a44" }}>
@@ -208,7 +235,18 @@ const AppUpdates = () => {
                     <td style={{ padding: "10px 6px" }}>{current}</td>
                     <td style={{ padding: "10px 6px" }}>{available}</td>
                     <td style={{ padding: "10px 6px" }}>
-                      <StatusPill label={statusLabel} tone={tone} />
+                      <div className="row" style={{ gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                        <StatusPill label={statusLabel} tone={tone} />
+                        {showInstallBtn && (
+                          <Button
+                            type="button"
+                            onClick={() => { void window.cyberplaceUpdates?.install(); }}
+                            style={{ padding: "4px 10px", fontSize: 12 }}
+                          >
+                            {t("updates.installNow")}
+                          </Button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 );
@@ -219,81 +257,7 @@ const AppUpdates = () => {
       </div>
       )}
 
-      <div className="gradient-card" style={{ marginTop: 12 }}>
-        <div className="gradient-card-inner">
-          <h3 style={{ margin: "0 0 8px" }}>{t("updates.localTitle")}</h3>
-          <LocalUpdateBlock state={local} bridgePresent={hasBridge} />
-        </div>
-      </div>
     </ScreenWithBg>
-  );
-};
-
-const LocalUpdateBlock = ({
-  state,
-  bridgePresent,
-}: {
-  state: DesktopUpdateState | null;
-  bridgePresent: boolean;
-}) => {
-  const { t } = useLang();
-
-  if (!bridgePresent) {
-    return <p className="muted">Running outside the desktop bundle — no local update bridge.</p>;
-  }
-
-  if (!state) {
-    // Bridge present but state hasn't arrived yet. Render nothing —
-    // a "loading" placeholder here would only flash for a few ms.
-    return null;
-  }
-
-  const currentRow = (
-    <p className="muted" style={{ marginTop: 0 }}>
-      v{state.currentVersion}
-    </p>
-  );
-
-  // Only render an extra status line when the updater is actually
-  // doing something. Idle ("nothing happening, you're on the latest
-  // installed build") deserves silence — the version above is enough.
-  let message: string | null = null;
-  switch (state.status) {
-    case "checking":
-      message = t("updates.localChecking");
-      break;
-    case "available":
-      message = fmt(t("updates.localAvailable"), state.availableVersion ?? "?");
-      break;
-    case "downloading":
-      message = fmt(t("updates.localDownloading"), state.progressPercent ?? 0);
-      break;
-    case "downloaded":
-      message = fmt(t("updates.localDownloaded"), state.availableVersion ?? "?");
-      break;
-    case "error":
-      message = fmt(t("updates.localError"), state.error ?? "unknown");
-      break;
-    case "idle":
-    case "not-available":
-    default:
-      message = null;
-  }
-
-  return (
-    <>
-      {currentRow}
-      {message !== null && (
-        <p style={{ margin: "6px 0 10px", color: state.status === "error" ? "#ef4444" : undefined }}>
-          {message}
-        </p>
-      )}
-      {state.status === "downloaded" && (
-        <Button type="button" onClick={() => { void window.cyberplaceUpdates?.install(); }}>
-          {t("updates.installNow")}
-        </Button>
-      )}
-    </>
   );
 };
 

@@ -4,6 +4,9 @@ electron/dist
 release
 .env
 .env.local
+# .env.production is intentionally tracked — CI builds rely on it to
+# bake the Railway backend URL and Reverb config into the bundle.
+!.env.production
 .DS_Store
 *.log
 # Playwright artefacts — runtime output, not source
