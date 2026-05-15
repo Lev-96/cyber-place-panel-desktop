@@ -187,6 +187,27 @@ export const TRANSLATIONS: Dict = {
   "pcs.label": { en: "Label (e.g. PC #5)", ru: "Метка (напр. PC #5)", am: "Պիտակ (օր. PC #5)" },
   "pcs.macHint": { en: "Used only for Wake-on-LAN. The PC connects via the agent app paired with the token.", ru: "Используется только для Wake-on-LAN. ПК подключается через агент с токеном, не через MAC.", am: "Օգտագործվում է միայն Wake-on-LAN-ի համար:" },
   "pcs.placeId": { en: "Linked place id (optional)", ru: "ID места (необязательно)", am: "Տեղի ID (ընտրովի)" },
+  // Price-tier selector — replaces the old free-text hourly_rate input
+  // so PCs draw their price from the branch matrix and can't drift.
+  "pcs.tierLabel": { en: "Price tier", ru: "Тариф", am: "Սակագին" },
+  "pcs.tierPlaceholder": { en: "Choose a tier…", ru: "Выберите тариф…", am: "Ընտրեք սակագինը…" },
+  "pcs.tierNoPrices": {
+    en: "Branch prices are not configured yet. Set them in Tariffs first, then come back.",
+    ru: "Цены филиала ещё не настроены. Сначала задайте их в «Тарифах», потом вернитесь сюда.",
+    am: "Մասնաճյուղի գները դեռ կարգավորված չեն: Սկզբում սահմանեք դրանք «Սակագներ»-ում:",
+  },
+  "pcs.tierEmpty": { en: "no price set", ru: "цена не задана", am: "գին նշված չէ" },
+  "pcs.tierOverwrite": {
+    en: "Current rate differs from the selected tier — saving will overwrite it.",
+    ru: "Текущая цена не совпадает с выбранным тарифом — сохранение перезапишет её.",
+    am: "Ընթացիկ սակագինը տարբերվում է ընտրված սակագնից — պահպանումը կփոխարինի այն:",
+  },
+  "pcs.tier.pcStandard":  { en: "Standard",     ru: "Стандарт",     am: "Ստանդարտ" },
+  "pcs.tier.pcVip":       { en: "VIP",          ru: "VIP",          am: "VIP" },
+  "pcs.tier.ps4Standard": { en: "PS4 Standard", ru: "PS4 Стандарт", am: "PS4 Ստանդարտ" },
+  "pcs.tier.ps4Vip":      { en: "PS4 VIP",      ru: "PS4 VIP",      am: "PS4 VIP" },
+  "pcs.tier.ps5Standard": { en: "PS5 Standard", ru: "PS5 Стандарт", am: "PS5 Ստանդարտ" },
+  "pcs.tier.ps5Vip":      { en: "PS5 VIP",      ru: "PS5 VIP",      am: "PS5 VIP" },
   "service.edit": { en: "Edit service", ru: "Редактировать услугу", am: "Խմբագրել ծառայությունը" },
   "service.new": { en: "New service", ru: "Новая услуга", am: "Նոր ծառայություն" },
   "service.nameEn": { en: "Name (EN)", ru: "Название (EN)", am: "Անվանում (EN)" },
