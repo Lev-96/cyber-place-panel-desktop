@@ -133,19 +133,28 @@ const PcForm = ({ branchId, initial, onClose, onSaved }: Props) => {
               {t("pcs.tierNoPrices")}
             </p>
           ) : (
-            <select
-              value={selectedTier}
-              onChange={(e) => setSelectedTier(e.target.value as TierKey)}
-              style={selectStyle}
-              required
-            >
-              <option value="" disabled>{t("pcs.tierPlaceholder")}</option>
-              {tierOptions.map((o) => (
-                <option key={o.key} value={o.key} disabled={o.amount == null}>
-                  {o.label}{o.amount != null ? ` — ${money(o.amount)}/${t("time.hourShort")}` : ` — ${t("pcs.tierEmpty")}`}
-                </option>
-              ))}
-            </select>
+            <div style={selectWrap}>
+              <select
+                className="input"
+                value={selectedTier}
+                onChange={(e) => setSelectedTier(e.target.value as TierKey)}
+                style={selectInner}
+                required
+              >
+                <option value="" disabled>{t("pcs.tierPlaceholder")}</option>
+                {tierOptions.map((o) => (
+                  <option key={o.key} value={o.key} disabled={o.amount == null}>
+                    {o.label}{o.amount != null ? ` — ${money(o.amount)}/${t("time.hourShort")}` : ` — ${t("pcs.tierEmpty")}`}
+                  </option>
+                ))}
+              </select>
+              {/* Custom caret — the native arrow is browser-dependent
+                  and looks washed out against the dark theme. Using a
+                  ▾ glyph keeps it crisp without pulling in an icon
+                  pack. `pointer-events: none` so clicks fall through
+                  to the select. */}
+              <span aria-hidden style={selectCaret}>▾</span>
+            </div>
           )}
           {mismatchWarning && (
             <span className="muted" style={{ fontSize: 11, color: "#f59e0b" }}>
@@ -225,14 +234,32 @@ const tabStyle = (active: boolean): React.CSSProperties => ({
   fontWeight: 600,
 });
 
-const selectStyle: React.CSSProperties = {
+// Wrapper hosts the custom caret on top of the native select.
+const selectWrap: React.CSSProperties = {
+  position: "relative",
   width: "100%",
-  padding: "10px 12px",
-  background: "transparent",
-  color: "#e5e7eb",
-  border: "1px solid #1f2a44",
-  borderRadius: 8,
-  fontSize: 14,
+};
+
+// Reuse the project's `.input` class for the base styling and only
+// override the bits a select needs: hide the native chrome arrow and
+// leave room on the right for our custom caret.
+const selectInner: React.CSSProperties = {
+  width: "100%",
+  appearance: "none",
+  WebkitAppearance: "none",
+  MozAppearance: "none",
+  paddingRight: 32,
+  cursor: "pointer",
+};
+
+const selectCaret: React.CSSProperties = {
+  position: "absolute",
+  right: 12,
+  top: "50%",
+  transform: "translateY(-50%)",
+  pointerEvents: "none",
+  color: "#07ddf1",
+  fontSize: 12,
 };
 
 export default PcForm;
