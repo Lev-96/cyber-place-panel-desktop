@@ -4,6 +4,7 @@ import { existsSync } from "node:fs";
 import { join, normalize, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { Store } from "./storage";
+import { UpdateService, broadcastUpdateState } from "./updates/UpdateService";
 
 const DEV_URL = process.env.ELECTRON_DEV_URL ?? "";
 const isDev = DEV_URL.length > 0 || !app.isPackaged;
@@ -17,6 +18,7 @@ app.commandLine.appendSwitch("disable-features", "Autofill");
 
 let store: Store | null = null;
 let mainWindow: BrowserWindow | null = null;
+let updateService: UpdateService | null = null;
 
 const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) {
@@ -111,6 +113,38 @@ app.whenReady().then(async () => {
   ipcMain.handle("kv:remove", (_e: unknown, key: string) => store?.remove(key));
 
   ipcMain.handle("wol:send", (_e: unknown, mac: string) => sendMagicPacket(mac));
+
+  // Auto-update bridge — the singleton service owns electron-updater's
+  // event stream; we just expose three IPC channels for the renderer:
+  //   updates:check          — start a check (returns initial state)
+  //   updates:install        — quit + install the downloaded version
+  //   updates:getState       — pull current state on mount
+  // Renderer also subscribes to the `updates:state` push so it can
+  // re-render on download progress without polling.
+  //
+  // We skip auto-update entirely in dev (no published artifacts to
+  // fetch, electron-updater errors out trying), but still register the
+  // IPC channels so the renderer's update screen renders the same
+  // empty state in dev as it would on an unconfigured machine.
+  updateService = new UpdateService("panel");
+  updateService.onState(broadcastUpdateState);
+  ipcMain.handle("updates:check", async () => {
+    if (!updateService) return null;
+    if (isDev) return updateService.getState();
+    return updateService.check();
+  });
+  ipcMain.handle("updates:install", () => {
+    updateService?.installAndRestart();
+  });
+  ipcMain.handle("updates:getState", () => updateService?.getState() ?? null);
+
+  // Sanity check on boot — packaged builds reach out once a few seconds
+  // after launch so a desktop that was offline when the admin clicked
+  // "Внести обновления" still discovers the new release on next start.
+  // Delay keeps the boot path light and the renderer responsive.
+  if (!isDev) {
+    setTimeout(() => { void updateService?.check(); }, 5_000);
+  }
 
   if (!(isDev && DEV_URL)) {
     const root = join(__dirname, "..", "..", "dist", "web");

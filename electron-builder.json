@@ -13,15 +13,25 @@
   },
   "linux": {
     "target": [
-      { "target": "AppImage", "arch": ["x64"] },
-      { "target": "deb",      "arch": ["x64"] }
+      { "target": "AppImage", "arch": ["x64"] }
     ],
     "category": "Utility"
+  },
+  "mac": {
+    "target": [{ "target": "dmg", "arch": ["x64", "arm64"] }],
+    "category": "public.app-category.utilities"
   },
   "nsis": {
     "oneClick": false,
     "allowToChangeInstallationDirectory": true
   },
   "asar": true,
-  "publish": null
+  "publish": [
+    {
+      "provider": "github",
+      "owner": "Lev-96",
+      "repo": "cyber-place-panel-desktop",
+      "releaseType": "release"
+    }
+  ]
 }

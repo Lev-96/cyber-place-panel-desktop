@@ -16,6 +16,7 @@ export type Permission =
   | "menu.scan"            // see Scan/Confirm in sidebar
   | "menu.map"             // see Branches map in sidebar
   | "menu.myCompany"       // owner shortcut to their own company
+  | "menu.updates"         // admin-only desktop auto-update screen
   | "revenue.view"         // see /revenue and /companies/:id/revenue (admin + owner)
   // branch CRUD
   | "branch.create"
@@ -45,6 +46,7 @@ const PERMS: Record<Role, ReadonlySet<Permission>> = {
   admin: new Set<Permission>([
     "menu.branches", "menu.companies", "menu.managers", "menu.games",
     "menu.servicesAdmin", "menu.tournaments", "menu.scan", "menu.map",
+    "menu.updates",
     "revenue.view",
     "branch.create", "branch.edit", "branch.delete", "branch.prices",
     "company.create", "company.edit", "company.delete",

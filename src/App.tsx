@@ -41,6 +41,7 @@ const ResetPassword = lazy(() => import("@/routes/ResetPassword"));
 const ServicesAdmin = lazy(() => import("@/routes/ServicesAdmin"));
 const SessionsHistory = lazy(() => import("@/routes/SessionsHistory"));
 const Settings = lazy(() => import("@/routes/Settings"));
+const AppUpdates = lazy(() => import("@/routes/AppUpdates"));
 const ShiftPanel = lazy(() => import("@/routes/ShiftPanel"));
 const BranchPricesPage = lazy(() => import("@/routes/BranchPricesPage"));
 const BranchSubscribersPage = lazy(() => import("@/routes/BranchSubscribersPage"));
@@ -160,6 +161,14 @@ const Authed = () => (
         {/* Universal */}
         <Route path="/notifications" element={<Notifications />} />
         <Route path="/settings" element={<Settings />} />
+        <Route
+          path="/settings/updates"
+          element={
+            <RoleGuard perm="menu.updates">
+              <AppUpdates />
+            </RoleGuard>
+          }
+        />
 
         {/* Admin/owner only — hidden from manager */}
         <Route

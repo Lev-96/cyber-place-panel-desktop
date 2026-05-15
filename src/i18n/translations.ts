@@ -938,6 +938,57 @@ export const TRANSLATIONS: Dict = {
     ru: "Аккаунт и пароль",
     am: "Հաշիվ և գաղտնաբառ",
   },
+  // Auto-update admin screen (admin-only sidebar entry + route).
+  "nav.updates": {
+    en: "App updates",
+    ru: "Обновления приложений",
+    am: "Հավելվածների թարմացումներ",
+  },
+  "updates.title": {
+    en: "Desktop app updates",
+    ru: "Обновления десктоп-приложений",
+    am: "Աշխատասեղանի հավելվածների թարմացումներ",
+  },
+  "updates.checkBtn": {
+    en: "Check for updates",
+    ru: "Проверить наличие обновлений",
+    am: "Ստուգել թարմացումները",
+  },
+  "updates.promoteBtn": {
+    en: "Apply updates to all installations",
+    ru: "Внести обновления во всех приложениях",
+    am: "Կիրառել թարմացումները բոլոր ինստալյացիաներում",
+  },
+  "updates.checking": { en: "Checking…", ru: "Проверяем…", am: "Ստուգում…" },
+  "updates.promoting": { en: "Applying…", ru: "Применяем…", am: "Կիրառվում է…" },
+  "updates.noUpdates": { en: "All apps are up to date.", ru: "Обновлений нет.", am: "Բոլոր հավելվածները թարմ են:" },
+  "updates.hasUpdates": {
+    en: "Updates available — apply to roll out to all partner installations.",
+    ru: "Доступны обновления — нажмите, чтобы применить их во всех инсталляциях у партнёров.",
+    am: "Կան թարմացումներ — սեղմեք, որպեսզի կիրառեք բոլոր ինստալյացիաներում:",
+  },
+  "updates.appPanel": { en: "Staff panel", ru: "Десктоп для персонала", am: "Աշխատակազմի վահանակ" },
+  "updates.appAgent": { en: "Kiosk agent", ru: "Агент-киоск", am: "Կիոսկ-գործակալ" },
+  "updates.colCurrent": { en: "Current version", ru: "Текущая версия", am: "Ընթացիկ տարբերակը" },
+  "updates.colAvailable": { en: "Latest on GitHub", ru: "Последняя на GitHub", am: "Վերջինը GitHub-ում" },
+  "updates.colStatus": { en: "Status", ru: "Статус", am: "Կարգավիճակ" },
+  "updates.statusUpToDate": { en: "Up to date", ru: "Актуально", am: "Թարմ է" },
+  "updates.statusUpdateAvailable": { en: "Update available", ru: "Доступно обновление", am: "Հասանելի թարմացում" },
+  "updates.statusNoPromoted": { en: "Not promoted yet", ru: "Не опубликовано", am: "Դեռ չի հրապարակվել" },
+  "updates.statusError": { en: "Error", ru: "Ошибка", am: "Սխալ" },
+  "updates.localTitle": { en: "This installation", ru: "Эта установка", am: "Այս ինստալյացիան" },
+  "updates.localIdle": { en: "No active update operation.", ru: "Активного обновления нет.", am: "Ակտիվ թարմացում չկա:" },
+  "updates.localChecking": { en: "Checking GitHub for a newer version…", ru: "Проверяем GitHub на новую версию…", am: "Ստուգում ենք GitHub-ը նոր տարբերակի համար…" },
+  "updates.localAvailable": { en: "Found v{0}. Downloading…", ru: "Найдена v{0}. Загружаем…", am: "Գտնվեց v{0}. ներբեռնում…" },
+  "updates.localDownloading": { en: "Downloading {0}%…", ru: "Загрузка {0}%…", am: "Ներբեռնում {0}%…" },
+  "updates.localDownloaded": { en: "v{0} is ready — click Install & restart.", ru: "v{0} готова — нажмите «Установить и перезапустить».", am: "v{0}-ը պատրաստ է — սեղմեք «Տեղադրել և վերագործարկել»:" },
+  "updates.localError": { en: "Error: {0}", ru: "Ошибка: {0}", am: "Սխալ՝ {0}" },
+  "updates.installNow": { en: "Install & restart", ru: "Установить и перезапустить", am: "Տեղադրել և վերագործարկել" },
+  "updates.cannotPromote": {
+    en: "Cannot apply — backend could not fetch the latest release from GitHub. Check the GH_RELEASES_REPO_* env vars on the server.",
+    ru: "Не удалось применить — backend не смог получить релиз с GitHub. Проверьте переменные GH_RELEASES_REPO_* на сервере.",
+    am: "Չհաջողվեց կիրառել — backend-ը չի կարողացել ստանալ թողարկումը GitHub-ից:",
+  },
 };
 
 export const t = (key: string, lang: Lang): string => {

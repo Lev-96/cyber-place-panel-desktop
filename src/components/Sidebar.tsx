@@ -247,6 +247,9 @@ const Sidebar = () => {
         <UnreadBadge count={unreadCount} />
       </NavLink>
       <NavLink to="/settings">{t("nav.settings")}</NavLink>
+      {can(role, "menu.updates") && (
+        <NavLink to="/settings/updates">{t("nav.updates")}</NavLink>
+      )}
       <div className="spacer" />
       <UserCard
         name={user?.name}
