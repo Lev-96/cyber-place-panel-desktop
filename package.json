@@ -1,9 +1,16 @@
 {
   "name": "cyber-place-panel-desktop",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "private": true,
   "main": "electron/dist/main.js",
-  "author": "Developer <dev@develop.com>",
+  "description": "Cyber Place staff panel — gaming-venue management for admin, owners and managers (bookings, sessions, tournaments, billing).",
+  "homepage": "https://cyberplace.pro",
+  "license": "UNLICENSED",
+  "author": {
+    "name": "Cyber Place",
+    "email": "support@cyberplace.pro",
+    "url": "https://cyberplace.pro"
+  },
   "scripts": {
     "dev": "vite",
     "build:web": "tsc -p tsconfig.app.json && vite build",
