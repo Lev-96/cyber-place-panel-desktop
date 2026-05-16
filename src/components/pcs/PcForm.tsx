@@ -6,7 +6,9 @@ import { useAsync } from "@/hooks/useAsync";
 import { useLang } from "@/i18n/LanguageContext";
 import { branchRepository } from "@/repositories/BranchRepository";
 import { pcRepository } from "@/repositories/PcRepository";
-import { IBranchApi } from "@/types/api";
+import { placeRepository } from "@/repositories/PlaceRepository";
+import { fmt } from "@/i18n/translations";
+import { IBranchApi, IBranchPlace, PlatformType } from "@/types/api";
 import { IPcApi } from "@/types/sessions";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 
@@ -47,6 +49,26 @@ const PcForm = ({ branchId, initial, onClose, onSaved }: Props) => {
   // of this modal so switching kind doesn't refetch.
   const branch = useAsync(() => branchRepository.byId(branchId), [branchId]);
   const matrix = branch.data?.price_for_branch ?? null;
+
+  // Branch places — drives the "Linked place" select. Cached the same
+  // way: one fetch per modal open, regardless of how many times the
+  // user toggles between pc/ps tabs.
+  const places = useAsync(() => placeRepository.listRawByBranch(branchId), [branchId]);
+  const placeOptions = useMemo<IBranchPlace[]>(
+    () => filterPlacesForKind(places.data ?? [], kind),
+    [places.data, kind],
+  );
+
+  // If the operator switches kind (pc ↔ ps) and the previously linked
+  // place no longer belongs to the new kind, drop the link so we never
+  // save a mismatched (pc → ps4 place) pair. Edits preserve the link
+  // on first render because the kind matches what was saved.
+  useEffect(() => {
+    if (!placeId) return;
+    if (places.loading) return;
+    const stillValid = placeOptions.some((p) => String(p.id) === placeId);
+    if (!stillValid) setPlaceId("");
+  }, [placeOptions, placeId, places.loading]);
 
   // Tier options visible for the current kind. PCs see two rows, PS
   // consoles see four because PS4 and PS5 are billed separately.
@@ -181,7 +203,38 @@ const PcForm = ({ branchId, initial, onClose, onSaved }: Props) => {
             {t("pcs.psHint")}
           </span>
         )}
-        <Input label={t("pcs.placeId")} type="number" value={placeId} onChange={(e) => setPlaceId(e.target.value)} />
+        <div className="col" style={{ gap: 6 }}>
+          <span className="label">{t("pcs.placeId")}</span>
+          {places.loading ? (
+            <Spinner />
+          ) : placeOptions.length === 0 ? (
+            <p className="muted" style={{ margin: 0, color: "#f59e0b" }}>
+              {t("pcs.placeEmpty")}
+            </p>
+          ) : (
+            <div style={selectWrap}>
+              <select
+                className="input"
+                value={placeId}
+                onChange={(e) => setPlaceId(e.target.value)}
+                style={selectInner}
+              >
+                <option value="">{t("pcs.placeNone")}</option>
+                {placeOptions.map((p) => (
+                  <option key={p.id} value={String(p.id)}>
+                    {fmt(
+                      t("pcs.placeOption"),
+                      p.number ?? p.id,
+                      p.platform.toUpperCase(),
+                      p.type === "vip" ? "VIP" : "Standard",
+                    )}
+                  </option>
+                ))}
+              </select>
+              <span aria-hidden style={selectCaret}>▾</span>
+            </div>
+          )}
+        </div>
         {err && <div className="error">{err}</div>}
         <div className="row-between">
           <Button type="button" variant="secondary" onClick={onClose} disabled={busy}>{t("action.cancel")}</Button>
@@ -215,6 +268,24 @@ const buildTierOptions = (
     { key: "ps5-standard", label: t("pcs.tier.ps5Standard"), amount: numOrNull(matrix?.["ps5-standard"]) },
     { key: "ps5-vip",      label: t("pcs.tier.ps5Vip"),      amount: numOrNull(matrix?.["ps5-vip"]) },
   ];
+};
+
+/**
+ * Restrict the place dropdown to the platforms that match the current
+ * device kind: PC devices link to "pc" places, PS devices link to ps4
+ * or ps5. Without this filter the operator could pair a PS5 console to
+ * a PC-only seat — the backend would accept it but the live-tile view
+ * would render a contradictory icon. Sorted by `number` so the list
+ * matches the physical layout the cashier sees on the floor.
+ */
+const filterPlacesForKind = (
+  places: IBranchPlace[],
+  kind: "pc" | "ps",
+): IBranchPlace[] => {
+  const allowed: PlatformType[] = kind === "pc" ? ["pc"] : ["ps4", "ps5"];
+  return places
+    .filter((p) => allowed.includes(p.platform))
+    .sort((a, b) => (a.number ?? a.id) - (b.number ?? b.id));
 };
 
 const numOrNull = (v: number | null | undefined): number | null => {

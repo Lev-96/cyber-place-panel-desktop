@@ -186,7 +186,18 @@ export const TRANSLATIONS: Dict = {
   "pcs.psHint": { en: "No agent runs on a console — billing-only device: timer + cost.", ru: "На консоль агент не ставится — это билинг-устройство: только таймер и расчёт стоимости.", am: "Կոնսոլի վրա գործակալ չի տեղադրվում — միայն ժամանաչափ և գումար:" },
   "pcs.label": { en: "Label (e.g. PC #5)", ru: "Метка (напр. PC #5)", am: "Պիտակ (օր. PC #5)" },
   "pcs.macHint": { en: "Used only for Wake-on-LAN. The PC connects via the agent app paired with the token.", ru: "Используется только для Wake-on-LAN. ПК подключается через агент с токеном, не через MAC.", am: "Օգտագործվում է միայն Wake-on-LAN-ի համար:" },
-  "pcs.placeId": { en: "Linked place id (optional)", ru: "ID места (необязательно)", am: "Տեղի ID (ընտրովի)" },
+  "pcs.placeId": { en: "Linked place (optional)", ru: "Связанное место (необязательно)", am: "Կապված տեղ (ընտրովի)" },
+  "pcs.placeNone": { en: "— none —", ru: "— нет —", am: "— չկա —" },
+  "pcs.placeEmpty": {
+    en: "No places in this branch yet. Add places first to link this device to one.",
+    ru: "В этом филиале ещё нет мест. Сначала создайте места, чтобы связать с ними устройство.",
+    am: "Այս մասնաճյուղում տեղեր դեռ չկան: Նախ ավելացրեք տեղեր, որպեսզի կապեք սարքը դրանց հետ:",
+  },
+  "pcs.placeOption": {
+    en: "№{0} · {1} · {2}",
+    ru: "№{0} · {1} · {2}",
+    am: "№{0} · {1} · {2}",
+  },
   // Price-tier selector — replaces the old free-text hourly_rate input
   // so PCs draw their price from the branch matrix and can't drift.
   "pcs.tierLabel": { en: "Price tier", ru: "Тариф", am: "Սակագին" },
