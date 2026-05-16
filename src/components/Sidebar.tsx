@@ -2,6 +2,7 @@ import { useAuth } from "@/auth/AuthContext";
 import { can } from "@/auth/permissions";
 import { useLang } from "@/i18n/LanguageContext";
 import { useNotifications } from "@/notifications/NotificationsContext";
+import { useUpdatesNotification } from "@/realtime/UpdatesNotificationContext";
 import { NavLink } from "react-router-dom";
 
 const UnreadBadge = ({ count }: { count: number }) => {
@@ -174,7 +175,15 @@ const Sidebar = () => {
   const { user, logout } = useAuth();
   const { t } = useLang();
   const { unreadCount } = useNotifications();
+  const { panel: panelUpd, agent: agentUpd } = useUpdatesNotification();
   const role = user?.role;
+
+  // Badge counts: admin sees the union of panel + agent pending
+  // promotes; owner/manager only ever see the agent count. Both stay
+  // 0 when nothing is pending so the badge silently disappears.
+  const adminUpdateCount =
+    (panelUpd?.has_update ? 1 : 0) + (agentUpd?.has_update ? 1 : 0);
+  const agentUpdateCount = agentUpd?.has_update ? 1 : 0;
   const dash = (user?.dashboard ?? {}) as { branch_id?: number | null };
   const myBranchId = typeof dash.branch_id === "number" ? dash.branch_id : null;
 
@@ -248,12 +257,18 @@ const Sidebar = () => {
       </NavLink>
       <NavLink to="/settings">{t("nav.settings")}</NavLink>
       {can(role, "menu.updates") && (
-        <NavLink to="/settings/updates">{t("nav.updates")}</NavLink>
+        <NavLink to="/settings/updates">
+          {t("nav.updates")}
+          <UnreadBadge count={adminUpdateCount} />
+        </NavLink>
       )}
       {can(role, "menu.agentUpdates") && !can(role, "menu.updates") && (
         // Admin already sees both apps under /settings/updates;
         // owner+manager get this dedicated agent-only entry.
-        <NavLink to="/settings/agent-updates">{t("nav.agentUpdates")}</NavLink>
+        <NavLink to="/settings/agent-updates">
+          {t("nav.agentUpdates")}
+          <UnreadBadge count={agentUpdateCount} />
+        </NavLink>
       )}
       <div className="spacer" />
       <UserCard

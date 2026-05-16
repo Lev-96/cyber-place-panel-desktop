@@ -1071,6 +1071,26 @@ export const TRANSLATIONS: Dict = {
   "updates.localDownloaded": { en: "v{0} is ready — click Install & restart.", ru: "v{0} готова — нажмите «Установить и перезапустить».", am: "v{0}-ը պատրաստ է — սեղմեք «Տեղադրել և վերագործարկել»:" },
   "updates.localError": { en: "Error: {0}", ru: "Ошибка: {0}", am: "Սխալ՝ {0}" },
   "updates.installNow": { en: "Install & restart", ru: "Установить и перезапустить", am: "Տեղադրել և վերագործարկել" },
+  "updates.toastTitle": {
+    en: "New update available",
+    ru: "Доступно новое обновление",
+    am: "Հասանելի է նոր թարմացում",
+  },
+  "updates.toastPanel": {
+    en: "You have a new update for your desktop app.",
+    ru: "У вас есть новое обновление для вашего десктоп-приложения.",
+    am: "Ձեր դեսքթոփ-հավելվածի համար նոր թարմացում կա:",
+  },
+  "updates.toastAgent": {
+    en: "You have a new update for your kiosk locker.",
+    ru: "У вас есть новое обновление для вашего блокировщика.",
+    am: "Ձեր կիոսկ-արգելափակիչի համար նոր թարմացում կա:",
+  },
+  "updates.toastCta": {
+    en: "Click to open the updates section",
+    ru: "Нажмите, чтобы открыть раздел обновлений",
+    am: "Սեղմեք՝ բացելու թարմացումների բաժինը",
+  },
   "updates.readyModalTitle": {
     en: "New update installed",
     ru: "Установлено новое обновление",

@@ -2,9 +2,11 @@ import { useAuth } from "@/auth/AuthContext";
 import RoleGuard from "@/auth/RoleGuard";
 import Layout from "@/components/Layout";
 import UpdateReadyModal from "@/components/UpdateReadyModal";
+import UpdatesToast from "@/components/UpdatesToast";
 import Spinner from "@/components/ui/Spinner";
 import { NotificationsProvider } from "@/notifications/NotificationsContext";
 import { useAppUpdates } from "@/realtime/useAppUpdates";
+import { UpdatesNotificationProvider } from "@/realtime/UpdatesNotificationContext";
 import { Suspense, lazy } from "react";
 import { HashRouter, Navigate, Route, Routes } from "react-router-dom";
 
@@ -63,6 +65,7 @@ const Authed = () => {
   return (
   <Suspense fallback={<Spinner />}>
     <UpdateReadyModal />
+    <UpdatesToast />
     <Routes>
       <Route element={<Layout />}>
         <Route path="/" element={<Home />} />
@@ -281,7 +284,9 @@ const App = () => {
         // fetch needs the sanctum token to be set, and the polling
         // tick has no purpose for an unauth'd visitor.
         <NotificationsProvider>
-          <Authed />
+          <UpdatesNotificationProvider>
+            <Authed />
+          </UpdatesNotificationProvider>
         </NotificationsProvider>
       ) : (
         <Unauthed />
