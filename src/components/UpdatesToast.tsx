@@ -1,3 +1,4 @@
+import { useAuth } from "@/auth/AuthContext";
 import { useLang } from "@/i18n/LanguageContext";
 import { useUpdatesNotification } from "@/realtime/UpdatesNotificationContext";
 import { useEffect, useRef, useState } from "react";
@@ -66,6 +67,7 @@ const playDing = (): void => {
 
 const UpdatesToast = () => {
   const { panel, agent } = useUpdatesNotification();
+  const { user } = useAuth();
   const { t } = useLang();
   const navigate = useNavigate();
   const seenRef = useRef<Set<string>>(new Set());
@@ -118,7 +120,14 @@ const UpdatesToast = () => {
 
   const goToSection = () => {
     dismiss();
-    navigate(active.app === "panel" ? "/settings/updates" : "/settings/agent-updates");
+    // Admin's unified updates screen lists both panel + agent rows;
+    // owner/manager have a dedicated agent-only screen and no
+    // visibility into the panel app. Routing per role prevents the
+    // RoleGuard from bouncing admin away from a forbidden agent-only
+    // path when they click a toast about an agent release.
+    const target =
+      user?.role === "admin" ? "/settings/updates" : "/settings/agent-updates";
+    navigate(target);
   };
 
   const messageKey =

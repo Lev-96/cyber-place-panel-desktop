@@ -12,9 +12,10 @@
       - https + wss connect — Railway backend (HTTP) and the Reverb
         WebSocket service. Both hosts are pinned, no wildcards, so a
         compromised dependency can't exfiltrate to arbitrary domains.
-        `frame-ancestors` is intentionally kept here as documentation
-        even though browsers ignore it via <meta> — Electron's
-        BrowserWindow blocks framing at the chrome layer anyway.
+      `frame-ancestors` deliberately omitted — browsers ignore that
+      directive when it's delivered via <meta> and emit a console
+      warning. Electron's BrowserWindow already blocks framing at the
+      chrome layer, so the protection isn't lost.
     -->
     <meta http-equiv="Content-Security-Policy" content="
       default-src 'self';
@@ -25,7 +26,6 @@
       connect-src 'self' https://cyber-place-server-staging-production.up.railway.app wss://cyber-place-reverb.up.railway.app https://cyber-place-reverb.up.railway.app;
       base-uri 'self';
       form-action 'none';
-      frame-ancestors 'none';
     " />
     <title>Cyberplace Panel</title>
   </head>

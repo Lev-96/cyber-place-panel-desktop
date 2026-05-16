@@ -5,6 +5,7 @@ import { join, normalize, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { Store } from "./storage";
 import { UpdateService, broadcastUpdateState } from "./updates/UpdateService";
+import { bundledIconPath, ensureLinuxDesktopIntegration } from "./linuxIntegration";
 
 const DEV_URL = process.env.ELECTRON_DEV_URL ?? "";
 const isDev = DEV_URL.length > 0 || !app.isPackaged;
@@ -96,6 +97,17 @@ const createWindow = async () => {
 app.whenReady().then(async () => {
   store = new Store(join(app.getPath("userData"), "cyberplace.kv.json"));
   await store.load();
+
+  // Linux only: register a .desktop file in ~/.local/share/applications/
+  // on every launch so AppImage installs show up in the system menu
+  // with the brand icon (no AppImageLauncher dependency). No-op on
+  // Windows/macOS — those have their own installer-driven shortcuts.
+  ensureLinuxDesktopIntegration({
+    appId: "cyberplace-panel",
+    displayName: "Cyberplace Panel",
+    comment: "Cyber Place staff panel — bookings, sessions, billing",
+    iconSourcePath: bundledIconPath(),
+  });
 
   // Auto-clear non-essential caches on every startup. Keeps the userData
   // directory from growing unbounded over time. We DO keep cookies/localStorage

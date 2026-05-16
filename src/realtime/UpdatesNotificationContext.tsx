@@ -72,6 +72,26 @@ export const UpdatesNotificationProvider = ({ children }: { children: ReactNode 
     return () => clearInterval(id);
   }, [role, reload]);
 
+  // Window focus → immediate reload. Chromium throttles setInterval
+  // when the window is in the background (5+ minute intervals can
+  // become 60s), so a fresh GitHub release published while the user
+  // was away might not surface until the next natural tick. Hitting
+  // reload on focus closes that gap to "as fast as the user can
+  // refocus the window".
+  useEffect(() => {
+    if (!role) return;
+    const onFocus = () => { void reload(); };
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "visible") onFocus();
+    });
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      // visibilitychange listener is anonymous; safe to leak in
+      // electron renderer (one per mount, mount is per-session).
+    };
+  }, [role, reload]);
+
   // Broadcast: any promote (anywhere) re-syncs the badge/toast state.
   // Pass "panel" as thisApp so the hook's auto-`check()` only fires
   // for panel events — we just want the side-effect of re-fetching.
