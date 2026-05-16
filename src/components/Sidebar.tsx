@@ -250,6 +250,11 @@ const Sidebar = () => {
       {can(role, "menu.updates") && (
         <NavLink to="/settings/updates">{t("nav.updates")}</NavLink>
       )}
+      {can(role, "menu.agentUpdates") && !can(role, "menu.updates") && (
+        // Admin already sees both apps under /settings/updates;
+        // owner+manager get this dedicated agent-only entry.
+        <NavLink to="/settings/agent-updates">{t("nav.agentUpdates")}</NavLink>
+      )}
       <div className="spacer" />
       <UserCard
         name={user?.name}

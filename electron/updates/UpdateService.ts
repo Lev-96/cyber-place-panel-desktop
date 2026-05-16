@@ -94,9 +94,12 @@ export class UpdateService {
    * No-op when the state is anything other than `downloaded` — protects
    * against an admin double-clicking the button during the download.
    *
-   * `isSilent=false, forceRunAfter=true` mirrors the documented "best
-   * UX" config: NSIS installer runs visibly on Windows so the user
-   * sees the progress dialog, the new version starts on completion.
+   * `isSilent=true, forceRunAfter=true` — pass `/S` to NSIS so the
+   * installer wizard never appears on update; the new version starts
+   * automatically after the swap. Pairs with `nsis.oneClick: true` in
+   * electron-builder.json. Without isSilent the user sees a full
+   * NSIS wizard ("Welcome", path, components…) which defeats the
+   * point of an in-app "Restart" button.
    */
   installAndRestart(): void {
     if (this.state.status !== "downloaded") {
@@ -104,7 +107,7 @@ export class UpdateService {
       return;
     }
     log.info(`[${this.logTag}] quitAndInstall → restarting into v${this.state.availableVersion}`);
-    autoUpdater.quitAndInstall(false, true);
+    autoUpdater.quitAndInstall(true, true);
   }
 
   getState(): UpdateState {

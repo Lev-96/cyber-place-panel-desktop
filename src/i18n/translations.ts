@@ -976,6 +976,61 @@ export const TRANSLATIONS: Dict = {
     ru: "Обновления приложений",
     am: "Հավելվածների թարմացումներ",
   },
+  "nav.agentUpdates": {
+    en: "Agent updates",
+    ru: "Обновления агента",
+    am: "Գործակալի թարմացումներ",
+  },
+  "agentUpdates.title": {
+    en: "Kiosk agent updates",
+    ru: "Обновления агента-киоска",
+    am: "Կիոսկ-գործակալի թարմացումներ",
+  },
+  "agentUpdates.subtitle": {
+    en: "Roll out a new version of the kiosk agent to every gaming PC in your branches. Updates download in the background and prompt the cashier on the lock screen.",
+    ru: "Обновите версию агента на всех игровых ПК ваших филиалов. Обновление скачается фоном и предложит кассиру перезапустить на экране блокировки.",
+    am: "Թարմացրեք գործակալի տարբերակը ձեր մասնաճյուղերի բոլոր խաղային համակարգիչներում: Թարմացումը կներբեռնվի և կհուշի կասսային:",
+  },
+  "agentUpdates.loading": {
+    en: "Loading agent status…",
+    ru: "Загрузка состояния агента…",
+    am: "Բեռնվում է գործակալի վիճակը…",
+  },
+  "agentUpdates.currentVersion": {
+    en: "Current version",
+    ru: "Текущая версия",
+    am: "Ընթացիկ տարբերակը",
+  },
+  "agentUpdates.latestVersion": {
+    en: "Latest version",
+    ru: "Новая версия",
+    am: "Նոր տարբերակը",
+  },
+  "agentUpdates.upToDate": {
+    en: "Every agent is up to date.",
+    ru: "Все агенты обновлены.",
+    am: "Բոլոր գործակալները թարմ են:",
+  },
+  "agentUpdates.hasUpdate": {
+    en: "A newer version is available. Install it for every agent in your branches.",
+    ru: "Доступна новая версия. Установите её на всех агентах ваших филиалов.",
+    am: "Հասանելի է նոր տարբերակ: Տեղադրեք այն ձեր մասնաճյուղերի բոլոր գործակալներում:",
+  },
+  "agentUpdates.promoteBtn": {
+    en: "Install new version on all agents and restart",
+    ru: "Установить новую версию на всех агентах и перезапустить",
+    am: "Տեղադրել նոր տարբերակը բոլոր գործակալներում և վերագործարկել",
+  },
+  "agentUpdates.promoting": {
+    en: "Applying…",
+    ru: "Применяем…",
+    am: "Կիրառվում է…",
+  },
+  "agentUpdates.cannotPromote": {
+    en: "Cannot apply — backend could not fetch the latest release from GitHub.",
+    ru: "Не удалось применить — backend не смог получить релиз с GitHub.",
+    am: "Չհաջողվեց կիրառել — backend-ը չի կարողացել ստանալ թողարկումը GitHub-ից:",
+  },
   "updates.title": {
     en: "Desktop app updates",
     ru: "Обновления десктоп-приложений",

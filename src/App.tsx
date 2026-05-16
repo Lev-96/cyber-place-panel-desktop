@@ -44,6 +44,7 @@ const ServicesAdmin = lazy(() => import("@/routes/ServicesAdmin"));
 const SessionsHistory = lazy(() => import("@/routes/SessionsHistory"));
 const Settings = lazy(() => import("@/routes/Settings"));
 const AppUpdates = lazy(() => import("@/routes/AppUpdates"));
+const AgentUpdates = lazy(() => import("@/routes/AgentUpdates"));
 const ShiftPanel = lazy(() => import("@/routes/ShiftPanel"));
 const BranchPricesPage = lazy(() => import("@/routes/BranchPricesPage"));
 const BranchSubscribersPage = lazy(() => import("@/routes/BranchSubscribersPage"));
@@ -178,6 +179,14 @@ const Authed = () => {
           element={
             <RoleGuard perm="menu.updates">
               <AppUpdates />
+            </RoleGuard>
+          }
+        />
+        <Route
+          path="/settings/agent-updates"
+          element={
+            <RoleGuard perm="menu.agentUpdates">
+              <AgentUpdates />
             </RoleGuard>
           }
         />

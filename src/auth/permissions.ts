@@ -17,6 +17,7 @@ export type Permission =
   | "menu.map"             // see Branches map in sidebar
   | "menu.myCompany"       // owner shortcut to their own company
   | "menu.updates"         // admin-only desktop auto-update screen
+  | "menu.agentUpdates"    // owner/manager screen to roll out agent updates to their fleet
   | "revenue.view"         // see /revenue and /companies/:id/revenue (admin + owner)
   // branch CRUD
   | "branch.create"
@@ -56,7 +57,7 @@ const PERMS: Record<Role, ReadonlySet<Permission>> = {
   ]),
   company_owner: new Set<Permission>([
     "menu.branches", "menu.managers", "menu.tournaments", "menu.scan", "menu.map",
-    "menu.myCompany", "revenue.view",
+    "menu.myCompany", "menu.agentUpdates", "revenue.view",
     "branch.create", "branch.edit", "branch.delete", "branch.prices",
     "company.edit",
     "manager.create", "manager.delete",
@@ -67,7 +68,7 @@ const PERMS: Record<Role, ReadonlySet<Permission>> = {
     // branches/companies. Edits their own branch info but NOT prices
     // — pricing is an owner/admin business decision; the cashier desk
     // sees rates only through StartSessionDialog (already populated).
-    "menu.tournaments", "menu.scan",
+    "menu.tournaments", "menu.scan", "menu.agentUpdates",
     "branch.edit",
     "session.start", "session.stop", "pos.charge", "shift.open",
   ]),

@@ -72,8 +72,15 @@ const AppUpdates = () => {
 
   // Reverb push: when ANY admin (this one or another) promotes a
   // release, the broadcast lands here and we re-fetch the snapshot so
-  // both buttons reflect the new state without a manual click.
+  // both buttons reflect the new state without a manual click. Also
+  // fires the initial fetch on mount — admin shouldn't have to click
+  // "Check" just to see the current state of the rollout.
   useAppUpdates("panel", () => { void runCheck(); });
+
+  useEffect(() => {
+    void runCheck();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (!hasBridge) return;
@@ -126,15 +133,14 @@ const AppUpdates = () => {
     <ScreenWithBg bg="./bg/admin-home.jpg" title={t("updates.title")}>
       <div className="gradient-card">
         <div className="gradient-card-inner">
-          <div className="row" style={{ gap: 10, flexWrap: "wrap" }}>
-            <Button type="button" onClick={runCheck} disabled={apiState === "loading"}>
-              {apiState === "loading" ? t("updates.checking") : t("updates.checkBtn")}
-            </Button>
-            {/* The "Apply" button only materializes after the admin has
-                clicked Check AND at least one app has a newer release on
-                GitHub. Showing it earlier (greyed-out) felt like a dead
-                button — easier to hide outright so the screen has one
-                clear call-to-action at a time. */}
+          <div className="row" style={{ gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+            {/* No manual "Check" button anymore — the page auto-checks
+                on mount and re-checks on every promote broadcast. The
+                Apply button only materializes when at least one app
+                has a newer release on GitHub. */}
+            {apiState === "loading" && (
+              <span className="muted">{t("updates.checking")}</span>
+            )}
             {apiState === "ready" && anyUpdates && (
               <Button
                 type="button"

@@ -22,8 +22,9 @@
     "category": "public.app-category.utilities"
   },
   "nsis": {
-    "oneClick": false,
-    "allowToChangeInstallationDirectory": true
+    "oneClick": true,
+    "perMachine": true,
+    "runAfterFinish": true
   },
   "asar": true,
   "publish": [
