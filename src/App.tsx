@@ -1,8 +1,10 @@
 import { useAuth } from "@/auth/AuthContext";
 import RoleGuard from "@/auth/RoleGuard";
 import Layout from "@/components/Layout";
+import UpdateReadyModal from "@/components/UpdateReadyModal";
 import Spinner from "@/components/ui/Spinner";
 import { NotificationsProvider } from "@/notifications/NotificationsContext";
+import { useAppUpdates } from "@/realtime/useAppUpdates";
 import { Suspense, lazy } from "react";
 import { HashRouter, Navigate, Route, Routes } from "react-router-dom";
 
@@ -48,8 +50,18 @@ const BranchSubscribersPage = lazy(() => import("@/routes/BranchSubscribersPage"
 const TournamentDetails = lazy(() => import("@/routes/TournamentDetails"));
 const Tournaments = lazy(() => import("@/routes/Tournaments"));
 
-const Authed = () => (
+const Authed = () => {
+  // App-wide subscription to the Reverb `app-update.promoted` broadcast.
+  // The AppUpdates admin screen ALSO subscribes (for its own re-fetch),
+  // but Echo de-duplicates the channel so a second subscription is free.
+  // Lifting the subscription to the root means owner/manager — who never
+  // visit /settings/updates — still trigger their local electron-updater
+  // immediately when admin promotes, not only on the next app boot.
+  useAppUpdates("panel");
+
+  return (
   <Suspense fallback={<Spinner />}>
+    <UpdateReadyModal />
     <Routes>
       <Route element={<Layout />}>
         <Route path="/" element={<Home />} />
@@ -237,7 +249,8 @@ const Authed = () => (
       </Route>
     </Routes>
   </Suspense>
-);
+  );
+};
 
 const Unauthed = () => (
   <Suspense fallback={<Spinner />}>

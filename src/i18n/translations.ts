@@ -1005,6 +1005,21 @@ export const TRANSLATIONS: Dict = {
   "updates.localDownloaded": { en: "v{0} is ready — click Install & restart.", ru: "v{0} готова — нажмите «Установить и перезапустить».", am: "v{0}-ը պատրաստ է — սեղմեք «Տեղադրել և վերագործարկել»:" },
   "updates.localError": { en: "Error: {0}", ru: "Ошибка: {0}", am: "Սխալ՝ {0}" },
   "updates.installNow": { en: "Install & restart", ru: "Установить и перезапустить", am: "Տեղադրել և վերագործարկել" },
+  "updates.readyModalTitle": {
+    en: "New update installed",
+    ru: "Установлено новое обновление",
+    am: "Տեղադրվել է նոր թարմացում",
+  },
+  "updates.readyModalBody": {
+    en: "Version {0} has been downloaded. Restart the app to finish the update.",
+    ru: "Версия {0} загружена. Перезапустите приложение, чтобы завершить обновление.",
+    am: "Տարբերակ {0}-ը ներբեռնված է: Վերագործարկեք հավելվածը՝ թարմացումն ավարտելու համար:",
+  },
+  "updates.readyModalRestart": {
+    en: "Restart application",
+    ru: "Перезапустить приложение",
+    am: "Վերագործարկել հավելվածը",
+  },
   "updates.cannotPromote": {
     en: "Cannot apply — backend could not fetch the latest release from GitHub. Check the GH_RELEASES_REPO_* env vars on the server.",
     ru: "Не удалось применить — backend не смог получить релиз с GitHub. Проверьте переменные GH_RELEASES_REPO_* на сервере.",
