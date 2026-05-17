@@ -17,6 +17,12 @@ app.commandLine.appendSwitch("log-level", "3");           // FATAL only
 app.commandLine.appendSwitch("disable-logging");
 app.commandLine.appendSwitch("disable-features", "Autofill");
 
+// Cap Chromium's HTTP disk cache at 50 MB. Default cap is per-origin and
+// can balloon over months on long-running staff PCs. Hard cap from the
+// switch + boot-time clear + hourly periodic purge (below) keep the
+// userData dir from quietly accumulating gigabytes of throwaway data.
+app.commandLine.appendSwitch("disk-cache-size", String(50 * 1024 * 1024));
+
 let store: Store | null = null;
 let mainWindow: BrowserWindow | null = null;
 let updateService: UpdateService | null = null;
@@ -112,13 +118,24 @@ app.whenReady().then(async () => {
   // Auto-clear non-essential caches on every startup. Keeps the userData
   // directory from growing unbounded over time. We DO keep cookies/localStorage
   // (that's the user's auth token via KV store).
-  try {
-    await session.defaultSession.clearCache();
-    await session.defaultSession.clearStorageData({
-      storages: ["shadercache", "cachestorage"],
-    });
-    await session.defaultSession.clearCodeCaches({});
-  } catch { /* best-effort */ }
+  const purgeThrowawayCaches = async () => {
+    try {
+      await session.defaultSession.clearCache();
+      await session.defaultSession.clearStorageData({
+        storages: ["shadercache", "cachestorage"],
+      });
+      await session.defaultSession.clearCodeCaches({});
+    } catch { /* best-effort */ }
+  };
+  await purgeThrowawayCaches();
+
+  // Long-running staff windows (panel that nobody quits for weeks) need
+  // mid-runtime housekeeping too — startup-only would let HTTP + shader
+  // + code caches creep back up between restarts. Hourly is conservative
+  // (no perceptible UI impact, no auth state touched) and still keeps
+  // total cache well below the 50 MB switch cap above.
+  const ONE_HOUR_MS = 60 * 60 * 1000;
+  setInterval(() => { void purgeThrowawayCaches(); }, ONE_HOUR_MS);
 
   ipcMain.handle("kv:get", (_e: unknown, key: string) => store?.get(key) ?? null);
   ipcMain.handle("kv:set", (_e: unknown, key: string, value: string) => store?.set(key, value));
