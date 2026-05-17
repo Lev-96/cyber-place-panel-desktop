@@ -113,6 +113,10 @@ export interface IBranchApi {
   };
   company?: { id: number; name: string };
   days_of_weeks?: Array<{ day_of_week: number; start_time: string; end_time: string }>;
+  /** ISO-8601 of the last time the emergency unlock PIN was set, or
+   *  null if the branch has never set one. The PIN hash itself is
+   *  shipped only to agents, never to the panel. */
+  unlock_pin_updated_at?: string | null;
 }
 
 export interface ICompanyApi {

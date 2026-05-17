@@ -1,5 +1,6 @@
 import BranchForm from "@/components/branches/BranchForm";
 import BranchOpenDaysForm from "@/components/branches/BranchOpenDaysForm";
+import BranchUnlockPinCard from "@/components/branches/BranchUnlockPinCard";
 import Button from "@/components/ui/Button";
 import ScreenWithBg from "@/components/ui/ScreenWithBg";
 import Spinner from "@/components/ui/Spinner";
@@ -46,6 +47,12 @@ const BranchEdit = () => {
           <Button variant="secondary" onClick={remove} style={{ color: "#ef4444", borderColor: "#4a1a1a" }}>Delete</Button>
         </div>
       </div></div>
+
+      <BranchUnlockPinCard
+        branchId={id}
+        updatedAt={data.unlock_pin_updated_at ?? null}
+        onSaved={() => void reload()}
+      />
 
       {edit && <BranchForm initial={data} onClose={() => setEdit(false)} onSaved={() => { setEdit(false); void reload(); }} />}
       {hours && <BranchOpenDaysForm branch={data} onClose={() => setHours(false)} onSaved={() => { setHours(false); void reload(); }} />}

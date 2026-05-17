@@ -68,3 +68,17 @@ export const apiUpdateBranchOpenDays = (id: number, days_of_weeks: Array<{ day_o
 
 export const apiUpdateBranchServices = (id: number, service_ids: number[]) =>
   request<{ message: string }>(`/branches/${id}?_method=PUT`, { method: "POST", body: { service_ids } });
+
+/**
+ * Set or rotate the emergency unlock PIN for this branch. PIN is shipped
+ * to every agent in the branch on its next /agent/hello so a cashier
+ * can rescue a stuck kiosk by typing the PIN directly on the lock
+ * screen — works even when the panel/server is unreachable.
+ *
+ * Backend hashes with bcrypt; the panel never reads back the plaintext.
+ */
+export const apiSetBranchUnlockPin = (id: number, pin: string) =>
+  request<{ message: string; data: { unlock_pin_updated_at: string } }>(
+    `/branches/${id}/unlock-pin`,
+    { method: "POST", body: { pin } },
+  );
