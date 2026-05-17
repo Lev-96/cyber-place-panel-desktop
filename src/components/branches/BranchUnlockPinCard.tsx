@@ -1,6 +1,6 @@
-import { apiSetBranchUnlockPin } from "@/api/branches";
+import { apiGetBranchUnlockPin, apiSetBranchUnlockPin } from "@/api/branches";
 import Button from "@/components/ui/Button";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 interface Props {
   branchId: number;
@@ -12,26 +12,43 @@ interface Props {
 /**
  * Emergency-unlock PIN section on the branch settings screen.
  *
- * The PIN is what a cashier types directly on a stuck kiosk's lock
- * screen when the panel/server is unreachable. Backend hashes with
- * bcrypt; the plaintext is never read back from the server. Every
- * agent in the branch picks up the new hash on its next /agent/hello
- * (next heartbeat tick, ~2-5s after the panel save).
+ * Two surfaces in one card:
+ *   1. CURRENT PIN — fetched on mount via apiGetBranchUnlockPin
+ *      (server decrypts the APP_KEY-encrypted column). Masked by
+ *      default as ••••, the eye icon toggles to plaintext so the
+ *      owner can recover from "I forgot what I set last week"
+ *      without forcing a rotation.
+ *   2. NEW PIN INPUT — when the owner wants to change it. Same
+ *      masked/visible toggle. On submit, calls apiSetBranchUnlockPin
+ *      which writes both the bcrypt hash (agents verify against this)
+ *      and the encrypted copy (shows back here next mount).
  *
  * Constraints (mirrored from backend regex):
- *   - 4-6 digits only
- *   - digits 0-9 (no letters / symbols / spaces)
- *
- * The display masks the PIN as a password — there's no "show" toggle
- * because revealing a 4-digit number above the keyboard on a shared
- * staff PC is exactly the kind of leak this whole feature exists to
- * prevent.
+ *   - 4–6 digits, digits only.
  */
-const BranchUnlockPinCard = ({ branchId, updatedAt, onSaved }: Props) => {
+const BranchUnlockPinCard = ({ branchId, updatedAt: initialUpdatedAt, onSaved }: Props) => {
+  const [currentPin, setCurrentPin] = useState<string | null>(null);
+  const [currentVisible, setCurrentVisible] = useState(false);
+  const [loadingCurrent, setLoadingCurrent] = useState(true);
+
   const [pin, setPin] = useState("");
+  const [newVisible, setNewVisible] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [updatedAt, setUpdatedAt] = useState<string | null>(initialUpdatedAt);
+
+  // Fetch the current PIN on mount. Server decrypts under APP_KEY;
+  // null means "never set" OR "legacy hash-only row that predates
+  // the encrypted column."
+  useEffect(() => {
+    let alive = true;
+    void apiGetBranchUnlockPin(branchId)
+      .then((res) => { if (alive) setCurrentPin(res.data.pin); })
+      .catch(() => { if (alive) setCurrentPin(null); })
+      .finally(() => { if (alive) setLoadingCurrent(false); });
+    return () => { alive = false; };
+  }, [branchId]);
 
   const handleSubmit = async () => {
     const clean = pin.trim();
@@ -44,6 +61,8 @@ const BranchUnlockPinCard = ({ branchId, updatedAt, onSaved }: Props) => {
     setBusy(true);
     try {
       const res = await apiSetBranchUnlockPin(branchId, clean);
+      setUpdatedAt(res.data.unlock_pin_updated_at);
+      setCurrentPin(clean);
       setPin("");
       setSuccess(true);
       onSaved(res.data.unlock_pin_updated_at);
@@ -64,11 +83,50 @@ const BranchUnlockPinCard = ({ branchId, updatedAt, onSaved }: Props) => {
           Кассир сможет ввести этот PIN прямо на заблокированном ПК, если связь
           с панелью или сервером пропала. Работает даже офлайн. PIN из 4–6 цифр.
         </div>
+
+        {/* Current PIN — read-only, masked by default with eye toggle. */}
+        <div style={{ marginBottom: 12 }}>
+          <div className="muted" style={{ fontSize: 12, marginBottom: 4 }}>
+            Текущий PIN
+          </div>
+          <div className="row" style={{ gap: 8, alignItems: "center" }}>
+            <input
+              className="input"
+              readOnly
+              value={
+                loadingCurrent
+                  ? "..."
+                  : currentPin === null
+                    ? ""
+                    : currentVisible
+                      ? currentPin
+                      : "•".repeat(currentPin.length)
+              }
+              placeholder={loadingCurrent ? "" : "PIN ещё не установлен"}
+              style={{ maxWidth: 200, letterSpacing: currentVisible ? "normal" : "0.3em" }}
+            />
+            <button
+              type="button"
+              onClick={() => setCurrentVisible((v) => !v)}
+              disabled={loadingCurrent || currentPin === null}
+              title={currentVisible ? "Скрыть PIN" : "Показать PIN"}
+              aria-label={currentVisible ? "Скрыть PIN" : "Показать PIN"}
+              style={eyeButtonStyle}
+            >
+              {currentVisible ? "🙈" : "👁"}
+            </button>
+          </div>
+        </div>
+
+        {/* New PIN — write-only entry. Default masked + eye toggle. */}
+        <div className="muted" style={{ fontSize: 12, marginBottom: 4 }}>
+          {currentPin ? "Изменить PIN" : "Установить PIN"}
+        </div>
         <div className="row" style={{ gap: 8, flexWrap: "wrap", alignItems: "center" }}>
           <input
             className="input"
             inputMode="numeric"
-            type="password"
+            type={newVisible ? "text" : "password"}
             placeholder="Новый PIN"
             value={pin}
             onChange={(e) => {
@@ -80,10 +138,21 @@ const BranchUnlockPinCard = ({ branchId, updatedAt, onSaved }: Props) => {
             disabled={busy}
             autoComplete="new-password"
           />
+          <button
+            type="button"
+            onClick={() => setNewVisible((v) => !v)}
+            disabled={busy || pin.length === 0}
+            title={newVisible ? "Скрыть PIN" : "Показать PIN"}
+            aria-label={newVisible ? "Скрыть PIN" : "Показать PIN"}
+            style={eyeButtonStyle}
+          >
+            {newVisible ? "🙈" : "👁"}
+          </button>
           <Button onClick={() => void handleSubmit()} disabled={busy || pin.length < 4}>
-            {busy ? "Сохранение…" : updatedAt ? "Обновить PIN" : "Установить PIN"}
+            {busy ? "Сохранение…" : currentPin ? "Обновить PIN" : "Установить PIN"}
           </Button>
         </div>
+
         <div className="muted" style={{ marginTop: 8, fontSize: 12 }}>
           {updatedAt
             ? `Установлен · ${new Date(updatedAt).toLocaleString("ru-RU", { hour12: false })}`
@@ -94,6 +163,20 @@ const BranchUnlockPinCard = ({ branchId, updatedAt, onSaved }: Props) => {
       </div>
     </div>
   );
+};
+
+const eyeButtonStyle: React.CSSProperties = {
+  background: "transparent",
+  border: "1px solid rgba(255,255,255,0.15)",
+  borderRadius: 6,
+  cursor: "pointer",
+  fontSize: 18,
+  width: 36,
+  height: 36,
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  color: "inherit",
 };
 
 export default BranchUnlockPinCard;
