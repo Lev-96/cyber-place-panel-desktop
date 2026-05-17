@@ -35,12 +35,14 @@ import { ReactNode, createContext, useCallback, useContext, useEffect, useState 
  *      to clear the badge across the fleet after an admin acts.
  *   4. Window focus / visibility — cheap one-shot reload when the
  *      user returns to the app.
- *   5. 5-minute backstop poll — survives transient WebSocket drops
- *      without spamming the backend (was 60s; broadcast is now the
- *      fast path).
+ *   5. 60-second backstop poll — kept tight because the cascade
+ *      broadcast is best-effort (Reverb has no message persistence;
+ *      a transient connection drop loses that event entirely). 60s
+ *      means worst-case the toast is one minute late instead of
+ *      "until the user navigates away and back."
  */
 
-const POLL_INTERVAL_MS = 5 * 60_000;
+const POLL_INTERVAL_MS = 60_000;
 
 interface UpdatesNotificationState {
   /** null when this role has no panel-update visibility (owner/manager). */
