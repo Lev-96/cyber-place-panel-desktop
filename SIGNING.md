@@ -97,15 +97,31 @@ This is *not* an AV — it's reputation-based. Microsoft tracks the
 hash + signer combination across all installs; until enough installs
 happen without incident, every new release shows this banner.
 
-**What works:**
-- User clicks *More info* → *Run anyway*. Reputation accrues per
-  signer over time; after dozens-to-hundreds of clean installs the
-  banner stops appearing for that signer.
-- The **only** instant fix is an EV (Extended Validation) cert
-  (~$300/yr from Sectigo / DigiCert / SSL.com). EV certs get
-  pre-trusted reputation from day one.
+**Important truth about reputation:** SmartScreen reputation is
+keyed on the signing certificate's *chain to a Microsoft Trusted Root
+CA*. Self-signed certs do NOT chain to any trusted root, so they
+accumulate **essentially zero reputation no matter how many installs
+happen**. Earlier drafts of this doc suggested "dozens-to-hundreds of
+installs" — that's only true for OV/EV CA-issued certs, not self-signed.
 
-There is no submission portal for SmartScreen — it's pure usage signal.
+**What actually works:**
+- User clicks *More info* → *Run anyway* every time. This does NOT
+  build reputation for self-signed; it just dismisses the current
+  install. Same warning will appear next install.
+- The **only** real fixes:
+  - **EV cert** (~$300/yr from Sectigo / DigiCert / SSL.com) →
+    pre-trusted reputation, SmartScreen passes immediately from day 1.
+  - **OV cert** (~$80/yr) → no immediate effect, but reputation accrues
+    over thousands of installs (typically 3-6 months) and warning
+    eventually stops appearing.
+  - **Microsoft Store distribution** ($19 one-time, MSIX rebuild
+    required) → no SmartScreen at all because Store apps are trusted.
+- **Renaming the file, removing the version, hosting on different
+  domains, etc. do not help.** SmartScreen keys on file hash + cert
+  chain, not filename or URL.
+
+There is no submission portal for SmartScreen — it's pure cert-chain +
+usage signal.
 
 ### 2. Windows Defender real-time detection
 
