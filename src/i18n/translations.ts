@@ -725,6 +725,8 @@ export const TRANSLATIONS: Dict = {
   },
   "branch.prices.saved": { en: "Saved", ru: "Сохранено", am: "Պահպանված է" },
   "branch.prices.packagesSubtitle": { en: "Time packages", ru: "Тарифные пакеты", am: "Ժամանակային փաթեթներ" },
+  "tariff.platform": { en: "Platform", ru: "Платформа", am: "Պլատֆորմա" },
+  "tariff.platformAll": { en: "All platforms", ru: "Все платформы", am: "Բոլոր պլատֆորմները" },
   "tariff.discount.toggle": {
     en: "Add a time-windowed discount",
     ru: "Добавить скидку по времени",

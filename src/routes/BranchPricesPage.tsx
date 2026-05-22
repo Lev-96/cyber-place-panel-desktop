@@ -97,6 +97,23 @@ const BranchPricesPage = () => {
                   <div>
                     <div className="name">
                       {timePackageNameOf(p, lang)}
+                      {p.platform && (
+                        <span
+                          style={{
+                            marginLeft: 8,
+                            fontSize: 11,
+                            padding: "2px 6px",
+                            borderRadius: 4,
+                            background: "rgba(7, 221, 241, 0.18)",
+                            color: "#07ddf1",
+                            fontWeight: 700,
+                            textTransform: "uppercase",
+                            letterSpacing: 0.5,
+                          }}
+                        >
+                          {p.platform}
+                        </span>
+                      )}
                       {hasDiscount && p.is_discount_currently_active && (
                         <span
                           style={{

@@ -24,6 +24,13 @@ export interface ITimePackage {
   /** Soft-disabled packages stay in DB for historical sessions but don't show in pickers. */
   is_active?: boolean;
   /**
+   * Target platform for this tariff. `null` means "applies to all
+   * platforms". Mobile durationSelect filters tariffs server-side via
+   * the `?platform=` query parameter — NULL-platform rows always
+   * match, specific-platform rows match exactly.
+   */
+  platform?: "pc" | "ps4" | "ps5" | null;
+  /**
    * Optional time-windowed discount. All four columns are nullable as
    * an atomic group: when any is null, no discount applies. Backend
    * normalizes the group on every write, so clients can rely on

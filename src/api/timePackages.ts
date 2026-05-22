@@ -9,6 +9,8 @@ export interface CreateTimePackageBody {
   duration_minutes: number;
   price: number;
   is_active?: boolean;
+  /** Target platform; null = applies to all. */
+  platform?: "pc" | "ps4" | "ps5" | null;
   // Optional discount group — backend enforces "all four or none" via
   // `required_with` rules, so the form layer should keep the four
   // fields in lock-step (or omit them entirely).
@@ -25,6 +27,7 @@ export interface UpdateTimePackageBody {
   duration_minutes?: number;
   price?: number;
   is_active?: boolean;
+  platform?: "pc" | "ps4" | "ps5" | null;
   // Discount stays an atomic group on update too. Clearing means
   // sending `discount_price: null` (the backend cascades the other
   // three columns to NULL automatically).
