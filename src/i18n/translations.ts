@@ -1013,7 +1013,7 @@ export const TRANSLATIONS: Dict = {
   // Auto-update admin screen (admin-only sidebar entry + route).
   "nav.updates": {
     en: "App updates",
-    ru: "Обновления приложений",
+    ru: "Обн. приложения",
     am: "Հավելվածների թարմացումներ",
   },
   "nav.agentUpdates": {
