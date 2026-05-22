@@ -23,6 +23,20 @@ export interface ITimePackage {
   price: number;
   /** Soft-disabled packages stay in DB for historical sessions but don't show in pickers. */
   is_active?: boolean;
+  /**
+   * Optional time-windowed discount. All four columns are nullable as
+   * an atomic group: when any is null, no discount applies. Backend
+   * normalizes the group on every write, so clients can rely on
+   * "either all four are set, or all four are null".
+   */
+  discount_price?: number | string | null;
+  discount_start_time?: string | null;   // "HH:MM" or "HH:MM:SS"
+  discount_end_time?: string | null;
+  discount_days_of_week?: number[] | null; // ISO 1..7
+  /** Server-computed via TimePackage::isDiscountCurrentlyActive accessor. */
+  is_discount_currently_active?: boolean;
+  /** Server-computed: the discount price IF the window is live, otherwise null. */
+  discounted_price_now?: number | string | null;
 }
 
 export interface ISessionApi {
