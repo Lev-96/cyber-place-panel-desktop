@@ -2,6 +2,7 @@ import Button from "@/components/ui/Button";
 import Modal from "@/components/ui/Modal";
 import Spinner from "@/components/ui/Spinner";
 import { useLang } from "@/i18n/LanguageContext";
+import { timePackageNameOf } from "@/i18n/timePackageName";
 import { branchRepository } from "@/repositories/BranchRepository";
 import { sessionRepository } from "@/repositories/SessionRepository";
 import { IPcApi, ITimePackage } from "@/types/sessions";
@@ -36,7 +37,7 @@ type Mode = "fixed" | "open";
  * not something the cashier should be making up at the till.
  */
 const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
-  const { t, money } = useLang();
+  const { t, money, lang } = useLang();
   const [packages, setPackages] = useState<ITimePackage[] | null>(null);
   const [pkgId, setPkgId] = useState<number | null>(null);
   // PlayStation rows are billing-only (no kiosk agent), so the open/count-up
@@ -144,7 +145,7 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
                     {packages.map((p) => (
                       <label key={p.id} style={pkgRow(p.id === pkgId)}>
                         <input type="radio" name="pkg" value={p.id} checked={p.id === pkgId} onChange={() => setPkgId(p.id)} />
-                        <span style={{ flex: 1 }}>{p.name}</span>
+                        <span style={{ flex: 1 }}>{timePackageNameOf(p, lang)}</span>
                         <span className="muted">{p.duration_minutes} {t("time.minShort") || "min"}</span>
                         <span style={{ fontWeight: 700 }}>{money(Number(p.price))}</span>
                       </label>

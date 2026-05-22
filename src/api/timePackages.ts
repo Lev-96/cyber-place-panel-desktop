@@ -3,14 +3,18 @@ import { request } from "./client";
 
 export interface CreateTimePackageBody {
   branch_id: number;
-  name: string;
+  name_en: string;
+  name_ru: string;
+  name_am: string;
   duration_minutes: number;
   price: number;
   is_active?: boolean;
 }
 
 export interface UpdateTimePackageBody {
-  name?: string;
+  name_en?: string;
+  name_ru?: string;
+  name_am?: string;
   duration_minutes?: number;
   price?: number;
   is_active?: boolean;

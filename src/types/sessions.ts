@@ -8,7 +8,17 @@
 
 export interface ITimePackage {
   id: number;
-  name: string;
+  branch_id?: number;
+  /**
+   * Per-locale labels — backend stores three separate columns matching
+   * the `services.name_en/name_ru/name_am` convention. Render sites
+   * resolve the right one via {@link timePackageNameOf}; never read a
+   * single locale directly so a future fallback (e.g. en → ru) stays
+   * centralised.
+   */
+  name_en: string;
+  name_ru: string;
+  name_am: string;
   duration_minutes: number;
   price: number;
   /** Soft-disabled packages stay in DB for historical sessions but don't show in pickers. */

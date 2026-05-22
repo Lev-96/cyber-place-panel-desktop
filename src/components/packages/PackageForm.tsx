@@ -15,7 +15,11 @@ interface Props {
 
 const PackageForm = ({ branchId, initial, onClose, onSaved }: Props) => {
   const { t } = useLang();
-  const [name, setName] = useState(initial?.name ?? "");
+  // Per-locale name fields — mirrors ServiceForm so staff has the
+  // same 3-input layout across both Tariffs and Services CRUD.
+  const [nameEn, setNameEn] = useState(initial?.name_en ?? "");
+  const [nameRu, setNameRu] = useState(initial?.name_ru ?? "");
+  const [nameAm, setNameAm] = useState(initial?.name_am ?? "");
   const [duration, setDuration] = useState(String(initial?.duration_minutes ?? "60"));
   const [price, setPrice] = useState(String(initial?.price ?? ""));
   const [busy, setBusy] = useState(false);
@@ -29,9 +33,10 @@ const PackageForm = ({ branchId, initial, onClose, onSaved }: Props) => {
     if (!Number.isFinite(pr) || pr < 0) return setErr(t("tariff.errors.price"));
     setBusy(true); setErr(null);
     try {
+      const nameBody = { name_en: nameEn, name_ru: nameRu, name_am: nameAm };
       const pkg = initial
-        ? await timePackageRepository.update(initial.id, { name, duration_minutes: dur, price: pr })
-        : await timePackageRepository.create({ branch_id: branchId, name, duration_minutes: dur, price: pr, is_active: true });
+        ? await timePackageRepository.update(initial.id, { ...nameBody, duration_minutes: dur, price: pr })
+        : await timePackageRepository.create({ branch_id: branchId, ...nameBody, duration_minutes: dur, price: pr, is_active: true });
       onSaved(pkg);
     } catch (e) {
       setErr(e instanceof Error ? e.message : t("form.errors.failedSave"));
@@ -42,7 +47,9 @@ const PackageForm = ({ branchId, initial, onClose, onSaved }: Props) => {
     <Modal open onClose={onClose}>
       <form className="card" style={{ width: 420, maxWidth: "90vw", display: "flex", flexDirection: "column", gap: 14 }} onSubmit={submit}>
         <h2 style={{ margin: 0 }}>{initial ? t("tariff.titleEdit") : t("tariff.titleNew")}</h2>
-        <Input label={t("tariff.namePlaceholder")} value={name} onChange={(e) => setName(e.target.value)} required autoFocus />
+        <Input label={t("tariff.nameEn")} value={nameEn} onChange={(e) => setNameEn(e.target.value)} required autoFocus />
+        <Input label={t("tariff.nameRu")} value={nameRu} onChange={(e) => setNameRu(e.target.value)} required />
+        <Input label={t("tariff.nameAm")} value={nameAm} onChange={(e) => setNameAm(e.target.value)} required />
         <Input label={t("tariff.durationMin")} type="number" min={1} value={duration} onChange={(e) => setDuration(e.target.value)} required />
         <Input label={t("label.price")} type="number" min={0} step="0.01" value={price} onChange={(e) => setPrice(e.target.value)} required />
         {err && <div className="error">{err}</div>}
