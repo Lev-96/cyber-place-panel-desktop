@@ -40,11 +40,16 @@ export const AMD_UNIT: Record<Lang, string> = {
   am: "դրամ",
 };
 
-/** Default rates: 1 AMD costs X target-currency. Adjustable via Settings. */
+/** Default rates: 1 AMD costs X target-currency. Adjustable via Settings.
+ *
+ *  RUB last updated 2026-05-23 against the published mid-market rate
+ *  (1000 RUB = 5142.93 AMD). The previous 1/4.2 figure was a stale
+ *  placeholder from an earlier 2025-era rate that made a 1000-руб
+ *  tariff render as ~4200 AMD instead of the correct ~5143 AMD. */
 export const DEFAULT_RATES: Record<Currency, number> = {
   AMD: 1,
-  USD: 1 / 400, // 1 AMD = 0.0025 USD ⇒ 1 USD ≈ 400 AMD
-  RUB: 1 / 4.2, // 1 AMD ≈ 0.238 RUB ⇒ 1 RUB ≈ 4.2 AMD
+  USD: 1 / 400,       // 1 AMD = 0.0025 USD ⇒ 1 USD ≈ 400 AMD
+  RUB: 1 / 5.14293,   // 1 AMD ≈ 0.1944 RUB ⇒ 1 RUB ≈ 5.143 AMD
 };
 
 export interface MoneyDisplay {
