@@ -1,6 +1,7 @@
 import Button from "@/components/ui/Button";
 import { useLang } from "@/i18n/LanguageContext";
 import { AMD_UNIT, CURRENCY_LOCALE, LANG_TO_CURRENCY, moneyDisplay } from "@/i18n/currency";
+import { useFxRates } from "@/i18n/FxRatesContext";
 import { branchRepository } from "@/repositories/BranchRepository";
 import { IBranchApi } from "@/types/api";
 import { Lang } from "@/i18n/translations";
@@ -52,6 +53,13 @@ interface Props {
 
 const HourlyRatesForm = ({ branch, onSaved }: Props) => {
   const { t, lang } = useLang();
+  // Subscribe to FX-rate updates so the "≈ X RUB" preview under each
+  // input refreshes as soon as today's rates land from the public
+  // endpoint. We don't read the returned value — just calling the
+  // hook is enough to make this component re-render on context change,
+  // and `moneyDisplay.convert(...)` below reads from the now-mutated
+  // DEFAULT_RATES singleton.
+  useFxRates();
   const [prices, setPrices] = useState<Record<PriceKey, string>>(() => {
     const init = {} as Record<PriceKey, string>;
     for (const k of KEYS) init[k] = String(branch.price_for_branch?.[k] ?? "");

@@ -1,4 +1,5 @@
 import { AMD_UNIT, Currency, DEFAULT_RATES, LANG_TO_CURRENCY } from "@/i18n/currency";
+import { useFxRates } from "@/i18n/FxRatesContext";
 import { useLang } from "@/i18n/LanguageContext";
 import { Lang } from "@/i18n/translations";
 import { useEffect, useRef, useState } from "react";
@@ -88,6 +89,13 @@ const PriceInput = ({
 }: Props) => {
   const { lang } = useLang();
   const target = LANG_TO_CURRENCY[lang];
+  // Subscribe to live FX rate updates: when the provider fetches
+  // today's snapshot from the public endpoint, `version` bumps and
+  // the display re-derives through the freshly-mutated DEFAULT_RATES.
+  // The subscription is just "call the hook" — even though we don't
+  // read fields off the object we still get re-rendered on context
+  // change, which is what triggers the useEffect below.
+  const { version: fxVersion } = useFxRates();
 
   const [display, setDisplay] = useState<string>(() => amdToDisplay(value, target));
 
@@ -98,13 +106,21 @@ const PriceInput = ({
   // type and strip the trailing dot the user is mid-keystroke on.
   const lastAmdRef = useRef(value);
   const lastTargetRef = useRef(target);
+  const lastFxVersionRef = useRef(fxVersion);
 
   useEffect(() => {
-    if (value === lastAmdRef.current && target === lastTargetRef.current) return;
+    if (
+      value === lastAmdRef.current &&
+      target === lastTargetRef.current &&
+      fxVersion === lastFxVersionRef.current
+    ) {
+      return;
+    }
     lastAmdRef.current = value;
     lastTargetRef.current = target;
+    lastFxVersionRef.current = fxVersion;
     setDisplay(amdToDisplay(value, target));
-  }, [value, target]);
+  }, [value, target, fxVersion]);
 
   const handleChange = (raw: string) => {
     const cleaned = raw.replace(",", ".");
