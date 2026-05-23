@@ -2,15 +2,38 @@ import { PaginatedList } from "@/types/api";
 import { request } from "./client";
 
 /**
+ * Mirrors the backend `App\Enums\TournamentSkillLevel` cases. Kept
+ * as a literal union (not an `enum`) so the JSON payload uses the
+ * same strings the backend stores and validates against, with no
+ * runtime mapping layer.
+ */
+export type SkillLevel = "any" | "beginner" | "intermediate" | "professional";
+
+/** Single source of truth for the picker order (UI use). */
+export const SKILL_LEVELS: readonly SkillLevel[] = [
+  "any",
+  "beginner",
+  "intermediate",
+  "professional",
+] as const;
+
+/**
  * Wire schema (matches backend `tournaments` table + StoreRequest):
  *   title, description (REQUIRED), price (REQUIRED), participants_limit,
  *   start_date / end_date in Y-m-d, branch_id + company_id + game_id REQUIRED.
+ *   skill_level defaults to "any" on the backend if omitted.
  */
 export interface ITournamentApi {
   id: number;
   branch_id: number;
   company_id: number;
   game_id: number;
+  /**
+   * Backwards-compatible: rows created before the 2026-05-24
+   * migration may serialise this as null until the model is touched.
+   * UI code must treat null/undefined the same as "any".
+   */
+  skill_level?: SkillLevel | null;
   title: string;
   description: string;
   tournament_logo_path?: string | null;
@@ -28,6 +51,7 @@ export interface CreateTournamentBody {
   branch_id: number;
   company_id: number;
   game_id: number;
+  skill_level?: SkillLevel;
   title: string;
   description: string;
   price: number;

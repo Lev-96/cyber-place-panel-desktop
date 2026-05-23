@@ -2,11 +2,13 @@ import RegistrationsList from "@/components/tournaments/RegistrationsList";
 import ScreenWithBg from "@/components/ui/ScreenWithBg";
 import Spinner from "@/components/ui/Spinner";
 import { useAsync } from "@/hooks/useAsync";
+import { useLang } from "@/i18n/LanguageContext";
 import { tournamentRepository } from "@/repositories/TournamentRepository";
 import { useParams } from "react-router-dom";
 
 const TournamentDetails = () => {
   const { tournamentId } = useParams();
+  const { t } = useLang();
   const id = Number(tournamentId);
   const { data, loading, error } = useAsync(() => tournamentRepository.byId(id), [id]);
 
@@ -20,6 +22,7 @@ const TournamentDetails = () => {
       <div className="card col" style={{ gap: 6 }}>
         <Row k="Description" v={data.description} />
         <Row k="Game" v={`${data.game?.name ?? "—"} ${data.game?.platform ? `(${data.game.platform})` : ""}`} />
+        <Row k={t("tournament.skillLevel")} v={t(`tournament.skillLevel.${data.skill_level ?? "any"}`)} />
         <Row k="Start" v={data.start_date} />
         {data.end_date && <Row k="End" v={data.end_date} />}
         <Row k="Price" v={Number(data.price).toFixed(2)} />

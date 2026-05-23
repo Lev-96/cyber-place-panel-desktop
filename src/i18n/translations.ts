@@ -632,6 +632,26 @@ export const TRANSLATIONS: Dict = {
   "tournament.errors.companyMissing": { en: "Branch is missing company id — reload and retry", ru: "У филиала нет компании — перезагрузите страницу", am: "Մասնաճյուղին ընկերություն չի կցված" },
   "tournament.branchLoadFailed": { en: "Branch load failed", ru: "Не удалось загрузить филиал", am: "Չհաջողվեց բեռնել մասնաճյուղը" },
 
+  // Skill level (tournament create/edit select + list/detail chip)
+  "tournament.skillLevel": { en: "Skill level", ru: "Уровень игры", am: "Խաղի մակարդակ" },
+  "tournament.skillLevel.any":          { en: "Any",          ru: "Любой",          am: "Ցանկացած" },
+  "tournament.skillLevel.beginner":     { en: "Beginner",     ru: "Новичок",        am: "Սկսնակ" },
+  "tournament.skillLevel.intermediate": { en: "Intermediate", ru: "Средний",        am: "Միջին" },
+  "tournament.skillLevel.professional": { en: "Professional", ru: "Профи",          am: "Պրոֆեսիոնալ" },
+
+  // Verify-code section on the tournament detail page
+  "registrations.verifyCodeTitle":      { en: "Verify player code", ru: "Подтвердить код игрока", am: "Հաստատել խաղացողի կոդը" },
+  "registrations.verifyCodeHint":       { en: "Enter the 6-character code the player shows on their phone, or scan their QR.", ru: "Введите 6-значный код, который игрок показывает на телефоне, или отсканируйте QR.", am: "Մուտքագրեք 6 նիշանոց կոդը, որը խաղացողը ցույց է տալիս հեռախոսին, կամ սկանավորեք QR-ը:" },
+  "registrations.verifyCodePlaceholder":{ en: "e.g. A3K9P2",       ru: "напр. A3K9P2",         am: "օր. A3K9P2" },
+  "registrations.verifyButton":         { en: "Verify",            ru: "Подтвердить",          am: "Հաստատել" },
+  "registrations.scanQrButton":         { en: "Scan QR",           ru: "Сканировать QR",       am: "Սկանավորել QR" },
+  "registrations.verifySuccess":        { en: "Verified",          ru: "Подтверждено",         am: "Հաստատված է" },
+  "registrations.verifyFailed":         { en: "Verification failed", ru: "Не удалось подтвердить", am: "Չհաջողվեց հաստատել" },
+  "registrations.verifyAlready":        { en: "Already verified",  ru: "Уже подтверждено",     am: "Արդեն հաստատված է" },
+  "registrations.verifiedBadge":        { en: "✓ Verified",        ru: "✓ Подтверждён",        am: "✓ Հաստատված" },
+  "registrations.verifiedBy":           { en: "by",                ru: "—",                    am: "կողմից" },
+  "registrations.pendingBadge":         { en: "Pending",           ru: "Ожидает",              am: "Սպասում է" },
+
   // Branch form
   "branch.titleNew": { en: "New branch", ru: "Новый филиал", am: "Նոր մասնաճյուղ" },
   "branch.titleEdit": { en: "Edit branch", ru: "Редактировать филиал", am: "Խմբագրել մասնաճյուղը" },

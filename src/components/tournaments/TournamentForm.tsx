@@ -3,7 +3,7 @@ import { formatApiError } from "@/api/errors";
 import Modal from "@/components/ui/Modal";
 import Input from "@/components/ui/Input";
 import Spinner from "@/components/ui/Spinner";
-import { ITournamentApi } from "@/api/tournaments";
+import { ITournamentApi, SKILL_LEVELS, SkillLevel } from "@/api/tournaments";
 import { useAsync } from "@/hooks/useAsync";
 import { useLang } from "@/i18n/LanguageContext";
 import { branchRepository } from "@/repositories/BranchRepository";
@@ -26,6 +26,10 @@ const TournamentForm = ({ branchId, initial, onClose, onSaved }: Props) => {
   const [title, setTitle] = useState(initial?.title ?? "");
   const [description, setDescription] = useState(initial?.description ?? "");
   const [gameId, setGameId] = useState<number | "">(initial?.game_id ?? "");
+  // Initial value falls back to "any" so legacy rows (created before
+  // the skill_level migration) render a sensible default in the
+  // edit form. Null/undefined on the wire is treated as "any".
+  const [skillLevel, setSkillLevel] = useState<SkillLevel>(initial?.skill_level ?? "any");
   const [price, setPrice] = useState(String(initial?.price ?? "0"));
   const [participantsLimit, setParticipantsLimit] = useState(String(initial?.participants_limit ?? ""));
   const [startDate, setStartDate] = useState(initial?.start_date?.slice(0, 10) ?? "");
@@ -47,6 +51,7 @@ const TournamentForm = ({ branchId, initial, onClose, onSaved }: Props) => {
       if (initial) {
         await tournamentRepository.update(initial.id, {
           game_id: Number(gameId),
+          skill_level: skillLevel,
           title,
           description,
           price: Number(price) || 0,
@@ -59,6 +64,7 @@ const TournamentForm = ({ branchId, initial, onClose, onSaved }: Props) => {
           branch_id: branchId,
           company_id: companyId,
           game_id: Number(gameId),
+          skill_level: skillLevel,
           title,
           description,
           price: Number(price) || 0,
@@ -87,6 +93,23 @@ const TournamentForm = ({ branchId, initial, onClose, onSaved }: Props) => {
               {(games.data ?? []).map((g) => <option key={g.id} value={g.id}>{g.name} ({g.platform.toUpperCase()})</option>)}
             </select>
           )}
+        </div>
+
+        {/* Skill level — uses the SKILL_LEVELS constant from the API
+            module so adding a new bracket on the backend (enum +
+            migration) automatically extends the picker without a
+            second edit here. */}
+        <div className="col" style={{ gap: 6 }}>
+          <span className="label">{t("tournament.skillLevel")}</span>
+          <select
+            className="input"
+            value={skillLevel}
+            onChange={(e) => setSkillLevel(e.target.value as SkillLevel)}
+          >
+            {SKILL_LEVELS.map((lvl) => (
+              <option key={lvl} value={lvl}>{t(`tournament.skillLevel.${lvl}`)}</option>
+            ))}
+          </select>
         </div>
 
         <div className="row" style={{ gap: 10 }}>

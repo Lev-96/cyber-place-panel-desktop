@@ -86,6 +86,10 @@ const Tournaments = () => {
                 <div className="meta">
                   {t.start_date}
                   {t.end_date ? ` — ${t.end_date}` : ""}
+                  {/* Skill level chip — null/undefined means legacy
+                      row (pre-migration); treat as "any" so the line
+                      always renders a level. */}
+                  {" "}· {tr(`tournament.skillLevel.${t.skill_level ?? "any"}`)}
                   {t.price != null && (
                     <> · {tr("tournaments.price")}: {Number(t.price).toFixed(2)}</>
                   )}

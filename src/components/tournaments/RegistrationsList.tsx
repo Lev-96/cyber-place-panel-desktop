@@ -6,6 +6,7 @@ import {
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import Spinner from "@/components/ui/Spinner";
+import VerifyCodeForm from "@/components/tournaments/VerifyCodeForm";
 import { useLang } from "@/i18n/LanguageContext";
 import { formatDateTime } from "@/i18n/dates";
 import { useEffect, useMemo, useState } from "react";
@@ -75,6 +76,14 @@ const RegistrationsList = ({ tournamentId }: Props) => {
 
   return (
     <div className="col" style={{ gap: 10 }}>
+      {/* Verify-code section pinned above the participants list so
+          staff land on it the moment a player walks up. Reloading
+          the list after a successful verify is the source-of-truth
+          refresh — the verify response itself already carries the
+          new state, but a re-fetch keeps the list aligned with any
+          other concurrent changes too. */}
+      <VerifyCodeForm tournamentId={tournamentId} onVerified={() => void load()} />
+
       <h3 style={{ margin: 0 }}>
         {t("registrations.title") || "Participants"}
       </h3>
@@ -125,13 +134,55 @@ const RegistrationRow = ({ reg, onRemove }: RowProps) => {
         ? t("registrations.roleGuest") || "Guest"
         : "";
 
+  // Verification badge logic — only meaningful for as=player rows
+  // (spectators don't get a join code and therefore don't enter
+  // the verification state machine). Pending = orange-ish; verified
+  // = green; spectators show no badge at all.
+  const showStatusBadge = reg.as === "player";
+  const verified = !!reg.verified_at;
+
   return (
     <div className="list-item">
       <div>
-        <div className="name">{display}</div>
+        <div className="row" style={{ gap: 8, alignItems: "center" }}>
+          <div className="name">{display}</div>
+          {showStatusBadge && (
+            <span
+              style={
+                verified
+                  ? {
+                      fontSize: 11,
+                      padding: "2px 6px",
+                      borderRadius: 6,
+                      background: "rgba(34,197,94,0.15)",
+                      color: "#22c55e",
+                      fontWeight: 600,
+                    }
+                  : {
+                      fontSize: 11,
+                      padding: "2px 6px",
+                      borderRadius: 6,
+                      background: "rgba(250,204,21,0.12)",
+                      color: "#facc15",
+                      fontWeight: 600,
+                    }
+              }
+            >
+              {verified
+                ? t("registrations.verifiedBadge")
+                : t("registrations.pendingBadge")}
+            </span>
+          )}
+        </div>
         <div className="meta">
           {roleLabel}
           {reg.created_at ? ` · ${formatDateTime(reg.created_at)}` : ""}
+          {verified && reg.verified_at && (
+            <>
+              {" "}· {formatDateTime(reg.verified_at)}
+              {reg.verifier ? ` ${t("registrations.verifiedBy")} ${reg.verifier.name}` : ""}
+            </>
+          )}
         </div>
       </div>
       <Button
