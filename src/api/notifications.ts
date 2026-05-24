@@ -20,6 +20,12 @@ export interface IDbNotification {
     company_id?: number;
     branch_id?: number;
     game_id?: number;
+    /**
+     * Set by `TournamentJoined::toArray()` — drives the
+     * notification-card → tournament-detail deep link in
+     * `Notifications.tsx`.
+     */
+    tournament_id?: number;
     booking_date?: string;
     start_time?: string;
     [key: string]: unknown;

@@ -269,6 +269,12 @@ const GlobalBookingNotifier = () => {
   // refresh treatment as branch subscribes — both are low-frequency
   // staff-relevant events that don't need to compete with bookings
   // for the in-app toast slot.
+  //
+  // Clicking the OS notification routes to the in-app Notifications
+  // screen: the user explicitly asked for the corner-popup-tap to land
+  // there (vs the tournament detail), because the feed gives them the
+  // full history of who joined what — staff usually want to triage
+  // multiple registrations together rather than jump straight to one.
   const handleTournamentJoined = useCallback((evt: TournamentJoinedEvent) => {
     void ensureNotificationPermission().then((perm) => {
       if (perm !== "granted") return;
@@ -281,17 +287,21 @@ const GlobalBookingNotifier = () => {
         evt.tournament_title?.trim() || `Tournament #${evt.tournament_id}`;
       const title = t("notifications.tournamentJoinedTitle") || "New tournament player";
       try {
-        new Notification(title, {
+        const n = new Notification(title, {
           body: `${name} → ${tournament}`,
           tag: `tournament-${evt.tournament_id}-${evt.guest_id}`,
         });
+        n.onclick = () => {
+          try { window.focus(); } catch { /* not always allowed */ }
+          navigate("/notifications");
+        };
       } catch {
         /* WMs without a notification daemon — swallow */
       }
     });
     playNotificationChime();
     void refreshNotifications();
-  }, [refreshNotifications, t]);
+  }, [navigate, refreshNotifications, t]);
   useTournamentJoined(channelName, handleTournamentJoined);
 
   useEffect(() => {

@@ -51,10 +51,27 @@ const Tournaments = () => {
 
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState<ITournamentApi | null>(null);
+  const [removeErr, setRemoveErr] = useState<string | null>(null);
 
   const remove = async (t: ITournamentApi) => {
     if (!confirm(`${tr("tournaments.confirmDelete")} "${t.title}"?`)) return;
-    await tournamentRepository.remove(t.id);
+    // Without try/catch the previous version awaited the API call and
+    // silently dropped any 4xx (e.g. role-check 403 from
+    // CheckRoleForTournamentService) — the page neither showed an
+    // error nor reloaded, which read to the user as "Delete does
+    // nothing". Surface the backend message + skip the reload on
+    // failure so the row stays visible.
+    setRemoveErr(null);
+    try {
+      await tournamentRepository.remove(t.id);
+    } catch (e) {
+      setRemoveErr(
+        e instanceof Error
+          ? e.message
+          : tr("common.actionFailed") || "Action failed",
+      );
+      return;
+    }
     void reload();
   };
 
@@ -77,6 +94,7 @@ const Tournaments = () => {
 
       {loading && <Spinner />}
       {error && <div className="error">{error.message}</div>}
+      {removeErr && <div className="error">{removeErr}</div>}
       {!loading && !error && (
         <div className="list">
           {(data ?? []).map((t) => (

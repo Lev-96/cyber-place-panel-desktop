@@ -228,8 +228,15 @@ const DbNotificationCard = ({ n, onClick, onDelete }: { n: IDbNotification; onCl
 
   const handleCardClick = () => {
     onClick();
+    // Deep-link priority: a notification can carry several reference
+    // ids (e.g. a tournament + a guest); we route to the most specific
+    // surface the staff can act on. Tournament has its own detail page
+    // with the registrations list + verify form, so it wins over a
+    // generic guest profile when both are present.
     if (n.data?.booking_id) {
       navigate(`/bookings/${n.data.booking_id}`);
+    } else if (n.data?.tournament_id) {
+      navigate(`/tournaments/${n.data.tournament_id}`);
     }
   };
 
