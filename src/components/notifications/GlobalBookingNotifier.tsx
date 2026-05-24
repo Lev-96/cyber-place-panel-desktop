@@ -149,35 +149,59 @@ const showNativeBookingNotification = (
 
 /**
  * Map an authenticated staff user to the Reverb channel carrying
- * booking events.
+ * booking events for THEIR scope.
  *
- * All three roles (admin / company_owner / manager) subscribe to
- * `bookings.global`. The backend's `BookingChanged::broadcastOn()`
- * fans out the same event to `branch.{id}`, `company.{id}` AND
- * `bookings.global` simultaneously, so the global channel is
- * guaranteed to carry every booking — admin, owner and manager
- * all get the toast regardless of how their `dashboard.branch_id`
- * / `dashboard.company_id` happens to be populated.
+ *   admin            → bookings.global         (every booking everywhere)
+ *   company_owner    → company.{company_id}    (every branch of their company)
+ *   manager          → branch.{branch_id}      (one branch they cash for)
  *
- * The earlier per-role channel resolution (manager → branch.{id},
- * owner → company.{id}) silently dropped to `null` when the
- * dashboard payload didn't carry the expected field, leaving those
- * roles without any subscription. Picking the one constant channel
- * removes that whole class of failure.
+ * The backend's `BookingChanged::broadcastOn()` fans the event out
+ * to all three channels in parallel — owner of Company A subscribes
+ * to `company.A`, never receives Company B events; manager of
+ * Branch 1 subscribes to `branch.1`, never receives Branch 2.
  *
- * Privacy: the desktop is staff-only — admin/owner/manager all
- * have legitimate access to booking data via the existing routes,
- * so a global channel doesn't broaden their reach.
+ * Orphan staff (owner without a `companies.user_id` link, manager
+ * without a `managers` row) end up here without `dashboard.company_id`
+ * or `dashboard.branch_id`. We refuse to subscribe — falling back to
+ * `bookings.global` is what produced the cross-tenant leak the user
+ * reported (manager of one branch seeing toasts for unrelated
+ * branches). The DB notification feed still works for them via the
+ * admin-backstop in `NotificationRecipients::forBranch` on the
+ * backend; ops should run `php artisan notifications:audit-scope`
+ * to surface and fix the orphan data so the realtime path lights
+ * up again.
  */
 const resolveBookingChannel = (user: AuthUser | null): string | null => {
   if (!user) return null;
-  if (
-    user.role === "admin" ||
-    user.role === "company_owner" ||
-    user.role === "manager"
-  ) {
-    return "bookings.global";
+
+  if (user.role === "admin") return "bookings.global";
+
+  if (user.role === "company_owner") {
+    const companyId = user.dashboard?.company_id;
+    if (!companyId) {
+      console.warn(
+        "[GlobalBookingNotifier] company_owner without dashboard.company_id — no realtime subscription. " +
+        "DB feed still works via backend admin-backstop. " +
+        "Run `php artisan notifications:audit-scope` to fix the orphan link."
+      );
+      return null;
+    }
+    return `company.${companyId}`;
   }
+
+  if (user.role === "manager") {
+    const branchId = user.dashboard?.branch_id;
+    if (!branchId) {
+      console.warn(
+        "[GlobalBookingNotifier] manager without dashboard.branch_id — no realtime subscription. " +
+        "DB feed still works via backend admin-backstop. " +
+        "Run `php artisan notifications:audit-scope` to fix the orphan link."
+      );
+      return null;
+    }
+    return `branch.${branchId}`;
+  }
+
   return null;
 };
 
