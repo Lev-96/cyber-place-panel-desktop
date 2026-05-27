@@ -93,7 +93,13 @@ const SessionsBoard = ({ branchId }: Props) => {
           return (
             <div key={pc.id} className="place-cell" style={{ borderColor: color, minHeight: 160 }}>
               <span className="dot" style={{ background: color }} />
-              <span className="platform">{pc.label}{pc.kind === "ps" && <span className="muted" style={{ marginLeft: 6, fontSize: 11 }}>PS</span>}</span>
+              {/*
+                Display the place number the operator entered at place
+                creation (`place.number`) — same value the mobile guest
+                sees on `placesSelect`. Fall back to the PC's own label
+                only when the PC isn't linked to a place (legacy data).
+              */}
+              <span className="platform">№{pc.place?.number ?? pc.label}{pc.kind === "ps" && <span className="muted" style={{ marginLeft: 6, fontSize: 11 }}>PS</span>}</span>
               {sess ? (
                 <>
                   <span className="status" style={{ color }}>

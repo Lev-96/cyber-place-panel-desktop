@@ -123,7 +123,7 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
   return (
     <Modal open onClose={onClose}>
       <div className="card" style={{ width: 460, maxWidth: "90vw", display: "flex", flexDirection: "column", gap: 14 }}>
-        <h2 style={{ margin: 0 }}>{t("session.start")} · {pc.label}{pc.kind === "ps" ? " (PS)" : ""}</h2>
+        <h2 style={{ margin: 0 }}>{t("session.start")} · №{pc.place?.number ?? pc.label}{pc.kind === "ps" ? " (PS)" : ""}</h2>
         {!packages ? <Spinner /> : (
           <>
             <div className="row" style={{ gap: 8 }}>
