@@ -103,19 +103,27 @@ export const NotificationsProvider = ({ children }: { children: ReactNode }) => 
     return () => clearInterval(id);
   }, [user]);
 
-  // Realtime push: subscribe to `user.{id}.notifications` and prepend
-  // every freshly-written row to the feed. The backend's
+  // Realtime push: subscribe to the PRIVATE `user.{id}.notifications`
+  // channel (wire name: `private-user.{id}.notifications`) and
+  // prepend every freshly-written row to the feed. The backend's
   // `NotificationSent` listener (registered in AppServiceProvider)
   // fires `UserNotificationCreated` for every database-channel
   // notification, so this hook stays generic — booking events,
   // tournament announcements, billing reminders all surface here
   // without a per-event branch.
+  //
+  // `echo.private` triggers the authorizer in `realtime/echo.ts`,
+  // which POSTs the Sanctum bearer token to `/broadcasting/auth`.
+  // The channel rule in `routes/channels.php` rejects any
+  // subscription whose authenticated user id doesn't match the
+  // channel's `{userId}` segment, so an attacker can't tail another
+  // user's notification feed.
   useEffect(() => {
     if (!user) return;
     const echo = getEcho();
     if (!echo) return;
     const channelName = `user.${user.id}.notifications`;
-    const channel = echo.channel(channelName);
+    const channel = echo.private(channelName);
     const listener = (payload: unknown) => {
       if (!aliveRef.current) return;
       const row = payload as IDbNotification;

@@ -1,5 +1,7 @@
 import Echo from "laravel-echo";
 import Pusher from "pusher-js";
+import { AppConfig } from "@/infrastructure/AppConfig";
+import { keyValueStore } from "@/infrastructure/KeyValueStore";
 
 /**
  * Lazy-initialised Echo client wired to the Reverb backend.
@@ -13,6 +15,12 @@ import Pusher from "pusher-js";
  *
  * Single connection per process — the singleton is cached on
  * `globalThis` so HMR (Vite dev) doesn't churn through sockets.
+ *
+ * Private channels (today: `user.{id}.notifications`) authenticate
+ * via the `authorizer` below — it POSTs the Sanctum bearer token to
+ * the backend's `/broadcasting/auth` endpoint at subscribe time.
+ * Public channels (`branch.*`, `company.*`, `bookings.global`,
+ * `app-updates*`) bypass the authorizer entirely.
  */
 
 interface ReverbConfig {
@@ -59,6 +67,70 @@ const attachConnectionFailureWarnings = (echo: EchoLike): void => {
   conn.bind("error", (err: unknown) => console.warn("[reverb] connection error", err));
 };
 
+/**
+ * Per-subscription authorizer. Resolves the bearer token from the
+ * shared KV store at subscribe time (not at construction time) so
+ * the Echo singleton can be built before the user has logged in —
+ * the first private-channel subscription happens AFTER login and
+ * the token is in place by then.
+ *
+ * Failure path: callback(true, ...) returns an Echo error which
+ * silently aborts the subscription. The NotificationsContext keeps
+ * its 60s polling fallback, so the unread badge eventually catches
+ * up even if the auth handshake never succeeds (e.g., token expired,
+ * Reverb reachable but backend down).
+ */
+type AuthCallback = (
+  error: Error | null,
+  data: { auth: string; channel_data?: string } | null,
+) => void;
+
+const buildAuthorizer = () => (channel: { name: string }) => ({
+  authorize: (socketId: string, callback: AuthCallback): void => {
+    void (async () => {
+      try {
+        const token = await keyValueStore.get<string>(
+          AppConfig.storageKeys.token,
+        );
+        if (!token) {
+          callback(new Error("no token in store"), null);
+          return;
+        }
+        const res = await fetch(
+          `${AppConfig.backendUrl}/broadcasting/auth`,
+          {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+              Accept: "application/json",
+            },
+            body: JSON.stringify({
+              socket_id: socketId,
+              channel_name: channel.name,
+            }),
+          },
+        );
+        if (!res.ok) {
+          console.warn(
+            `[reverb] auth denied for ${channel.name} (HTTP ${res.status})`,
+          );
+          callback(new Error(`HTTP ${res.status}`), null);
+          return;
+        }
+        const data = (await res.json()) as {
+          auth: string;
+          channel_data?: string;
+        };
+        callback(null, data);
+      } catch (err) {
+        console.warn(`[reverb] auth fetch failed for ${channel.name}`, err);
+        callback(err instanceof Error ? err : new Error(String(err)), null);
+      }
+    })();
+  },
+});
+
 const buildEcho = (cfg: ReverbConfig): EchoLike => {
   // pusher-js needs to be exposed as a global for Echo to find — this
   // is the documented integration pattern.
@@ -72,8 +144,11 @@ const buildEcho = (cfg: ReverbConfig): EchoLike => {
     wssPort: cfg.port,
     forceTLS: cfg.scheme === "https",
     enabledTransports: ["ws", "wss"],
-    // Public channels only for now — no auth endpoint configured.
-    // When we add private channels later, set authEndpoint here.
+    // Private channels (e.g. `user.{id}.notifications`) authenticate
+    // through this dynamic authorizer — see comment above. Public
+    // channels never invoke it, so all existing branch/company/global
+    // subscriptions are unaffected.
+    authorizer: buildAuthorizer(),
   }) as unknown as EchoLike;
   attachConnectionFailureWarnings(echo);
   return echo;

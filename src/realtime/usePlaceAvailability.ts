@@ -50,7 +50,16 @@ export const usePlaceAvailability = (
       // `listen` with leading "." subscribes to the raw event name. The
       // matching `stopListening` call mirrors that.
       channel.stopListening(".place.availability.changed", listener);
-      echo.leaveChannel(channelName);
+      // We deliberately do NOT call `echo.leaveChannel(channelName)`.
+      // The same `branch.{id}` Reverb channel is shared with
+      // `useBookingChanged`, `useBranchSubscribed`, and
+      // `useTournamentJoined` (all subscribed by `GlobalBookingNotifier`
+      // for the manager's branch). `leaveChannel` would unsubscribe
+      // every sibling listener with it, silently killing booking /
+      // tournament / branch-subscribe toasts the moment the operator
+      // navigates away from Sessions. Echo caches the channel object
+      // by name; relinquishing it requires every sibling to be torn
+      // down — there is no refcount.
     };
   }, [branchId]);
 };
