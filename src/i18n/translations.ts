@@ -349,9 +349,7 @@ export const TRANSLATIONS: Dict = {
   "bookingDetails.places": { en: "Places", ru: "Места", am: "Տեղեր" },
   "bookingDetails.endTime": { en: "End time", ru: "Окончание", am: "Ավարտ" },
   "bookingDetails.showCode": { en: "Show this code at branch", ru: "Покажите код в филиале", am: "Ցույց տվեք կոդը մասնաճյուղում" },
-  "bookingDetails.reschedule": { en: "Reschedule", ru: "Перенести", am: "Տեղափոխել" },
   "bookingDetails.cancel": { en: "Cancel", ru: "Отменить", am: "Չեղարկել" },
-  "bookingDetails.rate": { en: "Rate branch", ru: "Оценить филиал", am: "Գնահատել մասնաճյուղը" },
   "bookingDetails.minShort": { en: "min", ru: "мин", am: "ր" },
 
   // PCs management page
@@ -860,16 +858,6 @@ export const TRANSLATIONS: Dict = {
   "booking.keep": { en: "Keep booking", ru: "Оставить бронь", am: "Թողնել ամրագրումը" },
   "booking.cancelling": { en: "Cancelling…", ru: "Отмена…", am: "Չեղարկվում է…" },
   "booking.cancelDo": { en: "Cancel booking", ru: "Отменить бронь", am: "Չեղարկել ամրագրումը" },
-  "booking.rescheduleId": { en: "Reschedule booking", ru: "Перенести бронь", am: "Տեղափոխել ամրագրումը" },
-  "booking.rescheduleMinutes": { en: "Rescheduled minutes (delay)", ru: "Сдвиг в минутах", am: "Փոխանցում րոպեներով" },
-  "booking.rescheduleHint": { en: "Positive = later, negative = earlier (if backend allows).", ru: "Положительное = позже, отрицательное = раньше.", am: "Դրականը = ավելի ուշ, բացասականը = ավելի շուտ:" },
-  "booking.reschedule": { en: "Reschedule", ru: "Перенести", am: "Տեղափոխել" },
-  "booking.reschedEnterNumber": { en: "Enter a number", ru: "Введите число", am: "Մուտքագրեք թիվ" },
-  "booking.rateBranchTitle": { en: "Rate branch", ru: "Оценить филиал", am: "Գնահատել մասնաճյուղը" },
-  "booking.stars": { en: "Stars", ru: "Звёзды", am: "Աստղեր" },
-  "booking.commentOpt": { en: "Comment (optional)", ru: "Комментарий (необязательно)", am: "Մեկնաբանություն (ընտրովի)" },
-  "booking.sending": { en: "Sending…", ru: "Отправка…", am: "Ուղարկվում է…" },
-  "booking.submitRating": { en: "Submit rating", ru: "Отправить оценку", am: "Ուղարկել գնահատականը" },
 
   // QR scanner
   "qr.requesting": { en: "Requesting camera access…", ru: "Запрос доступа к камере…", am: "Տեսախցիկի թույլտվության հարցում…" },

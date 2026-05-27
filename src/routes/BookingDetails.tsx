@@ -1,7 +1,5 @@
 import { apiGetBooking } from "@/api/bookings";
-import BranchRatingModal from "@/components/bookings/BranchRatingModal";
 import CancelReasonModal from "@/components/bookings/CancelReasonModal";
-import RescheduleModal from "@/components/bookings/RescheduleModal";
 import Button from "@/components/ui/Button";
 import QrCode from "@/components/ui/QrCode";
 import ScreenWithBg from "@/components/ui/ScreenWithBg";
@@ -20,9 +18,7 @@ const BookingDetails = () => {
     () => apiGetBooking(id).then((r) => r.booking),
     [id],
   );
-  const [reschedule, setReschedule] = useState(false);
   const [cancel, setCancel] = useState(false);
-  const [rate, setRate] = useState(false);
 
   if (loading) return <Spinner />;
   if (error) return <div className="error">{error.message}</div>;
@@ -76,11 +72,6 @@ const BookingDetails = () => {
 
       <div className="row" style={{ gap: 8, flexWrap: "wrap" }}>
         {canModify && (
-          <Button variant="secondary" onClick={() => setReschedule(true)}>
-            {t("bookingDetails.reschedule")}
-          </Button>
-        )}
-        {canModify && (
           <Button
             variant="secondary"
             onClick={() => setCancel(true)}
@@ -89,24 +80,8 @@ const BookingDetails = () => {
             {t("bookingDetails.cancel")}
           </Button>
         )}
-        {data.branch && (
-          <Button variant="secondary" onClick={() => setRate(true)}>
-            {t("bookingDetails.rate")}
-          </Button>
-        )}
       </div>
 
-      {reschedule && (
-        <RescheduleModal
-          bookingId={data.id}
-          currentMinutes={data.rescheduled_minutes ?? 0}
-          onClose={() => setReschedule(false)}
-          onDone={() => {
-            setReschedule(false);
-            void reload();
-          }}
-        />
-      )}
       {cancel && (
         <CancelReasonModal
           bookingId={data.id}
@@ -115,13 +90,6 @@ const BookingDetails = () => {
             setCancel(false);
             void reload();
           }}
-        />
-      )}
-      {rate && data.branch && (
-        <BranchRatingModal
-          branchId={data.branch.id}
-          onClose={() => setRate(false)}
-          onDone={() => setRate(false)}
         />
       )}
     </ScreenWithBg>
