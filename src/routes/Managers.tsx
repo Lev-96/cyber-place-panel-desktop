@@ -32,7 +32,7 @@ const Managers = () => {
   };
 
   return (
-    <ScreenWithBg bg="./bg/owner-home.jpg" title={branchScoped ? `${t("managers.title")} · #${id}` : t("managers.title")}>
+    <ScreenWithBg bg="./bg/owner-home.jpg" title={branchScoped ? `${t("managers.title")} · №${id}` : t("managers.title")}>
       {branchScoped && (
         <div className="row-between">
           <div />

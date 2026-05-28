@@ -29,7 +29,7 @@ const MembersList = () => {
   return (
     <div className="col" style={{ gap: 18 }}>
       <div className="row-between">
-        <h2 className="page-title" style={{ margin: 0 }}>{t("members.title")} · #{id}</h2>
+        <h2 className="page-title" style={{ margin: 0 }}>{t("members.title")} · №{id}</h2>
         <Button onClick={() => setCreating(true)}>{t("members.new")}</Button>
       </div>
       <div className="row" style={{ gap: 6 }}>

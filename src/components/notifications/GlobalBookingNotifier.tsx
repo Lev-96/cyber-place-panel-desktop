@@ -271,8 +271,8 @@ const GlobalBookingNotifier = () => {
         .map((v) => v?.trim())
         .filter((v): v is string => !!v)
         .join(" ");
-      const name = split || `Guest #${evt.guest_id}`;
-      const branch = evt.branch_address?.trim() || `Branch #${evt.branch_id}`;
+      const name = split || `Guest №${evt.guest_id}`;
+      const branch = evt.branch_address?.trim() || `Branch №${evt.branch_id}`;
       const title = t("notifications.branchSubscribedTitle") || "New subscriber";
       try {
         new Notification(title, {
@@ -306,9 +306,9 @@ const GlobalBookingNotifier = () => {
         .map((v) => v?.trim())
         .filter((v): v is string => !!v)
         .join(" ");
-      const name = split || `Guest #${evt.guest_id}`;
+      const name = split || `Guest №${evt.guest_id}`;
       const tournament =
-        evt.tournament_title?.trim() || `Tournament #${evt.tournament_id}`;
+        evt.tournament_title?.trim() || `Tournament №${evt.tournament_id}`;
       const title = t("notifications.tournamentJoinedTitle") || "New tournament player";
       try {
         const n = new Notification(title, {
@@ -386,7 +386,7 @@ const GlobalBookingNotifier = () => {
       }}
     >
       <div style={{ fontWeight: 700, marginBottom: 4 }}>
-        {title} #{toast.code ?? toast.bookingId}
+        {title} №{toast.code ?? toast.bookingId}
       </div>
       <div className="muted" style={{ fontSize: 13 }}>
         {placeLabel}: {toast.placeIds.join(", ") || "—"}

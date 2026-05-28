@@ -126,7 +126,7 @@ const RegistrationRow = ({ reg, onRemove }: RowProps) => {
   // Guest-id placeholder so a row with neither field still reads
   // as something.
   const display =
-    [first, last].filter(Boolean).join(" ") || `Guest #${reg.guest_id}`;
+    [first, last].filter(Boolean).join(" ") || `Guest №${reg.guest_id}`;
   const roleLabel =
     reg.as === "player"
       ? t("registrations.rolePlayer") || "Player"

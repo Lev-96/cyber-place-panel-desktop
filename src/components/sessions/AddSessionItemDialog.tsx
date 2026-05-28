@@ -118,7 +118,7 @@ const AddSessionItemDialog = ({ branchId, session, onClose, onAdded }: Props) =>
     } finally { setBusy(false); }
   };
 
-  const deviceLabel = session.pc_label ?? `#${session.pc_id}`;
+  const deviceLabel = session.pc_label ?? `№${session.pc_id}`;
   const loading = products === null || services === null;
 
   return (

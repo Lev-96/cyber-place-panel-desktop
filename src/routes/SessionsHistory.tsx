@@ -78,7 +78,7 @@ const SessionsHistory = () => {
   };
 
   return (
-    <ScreenWithBg bg="./bg/branch.jpg" title={`${t("history.title")} · #${id}`}>
+    <ScreenWithBg bg="./bg/branch.jpg" title={`${t("history.title")} · №${id}`}>
       <div className="gradient-card">
         <div className="gradient-card-inner">
           <div className="row" style={{ gap: 12, alignItems: "flex-end", flexWrap: "wrap" }}>
@@ -170,7 +170,7 @@ const SessionRow = ({ session }: { session: ISessionApi }) => {
     <div className="card" style={{ display: "flex", flexDirection: "column", gap: 6 }}>
       <div className="row-between" style={{ gap: 12, flexWrap: "wrap" }}>
         <div className="row" style={{ gap: 8, alignItems: "baseline" }}>
-          <strong style={{ fontSize: 15, color: "#07ddf1" }}>{session.pc_label || `#${session.pc_id}`}</strong>
+          <strong style={{ fontSize: 15, color: "#07ddf1" }}>{session.pc_label || `№${session.pc_id}`}</strong>
           <span className="pill" style={{ fontSize: 11, textTransform: "none", letterSpacing: 0 }}>{modeLabel}</span>
           <span className="pill" style={{ fontSize: 11, textTransform: "none", letterSpacing: 0, opacity: isClosed ? 1 : 0.7 }}>{statusLabel}</span>
         </div>

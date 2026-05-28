@@ -157,7 +157,7 @@ const DbNotificationCard = ({ n, onClick, onDelete }: { n: IDbNotification; onCl
   const guestFallback = t("notifications.guestFallback") || "Guest";
   const playerLabel =
     [guestFirstName, guestLastName].filter(Boolean).join(" ") ||
-    (guestId != null ? `${guestFallback} #${guestId}` : guestFallback);
+    (guestId != null ? `${guestFallback} №${guestId}` : guestFallback);
 
   // Named-token interpolation lives once here so the in-app card and
   // the OS push share the exact same template strings (defined in

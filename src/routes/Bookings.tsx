@@ -31,7 +31,7 @@ const Bookings = () => {
               <Link key={b.id} to={`/bookings/${b.id}`} className="list-item">
                 <div>
                   <div className="name">
-                    #{b.raw.code ?? b.id} · {b.raw.company?.name ?? "—"}
+                    №{b.raw.code ?? b.id} · {b.raw.company?.name ?? "—"}
                   </div>
                   <div className="meta">
                     {start} · {b.raw.duration_minutes} {t("time.minShort")} ·{" "}

@@ -94,7 +94,7 @@ const SubscriberRow = ({ sub }: { sub: IBranchSubscriber }) => {
   // Display = first + last; fall back to a Guest-id placeholder
   // so a row with neither field still reads as something.
   const display =
-    [first, last].filter(Boolean).join(" ") || `Guest #${sub.guest_id}`;
+    [first, last].filter(Boolean).join(" ") || `Guest №${sub.guest_id}`;
 
   return (
     <div className="list-item">

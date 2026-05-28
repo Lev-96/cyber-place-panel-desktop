@@ -45,7 +45,7 @@ const ShiftPanel = () => {
   if (!data?.shift) {
     return (
       <div className="col" style={{ gap: 18, maxWidth: 480 }}>
-        <h2 className="page-title" style={{ margin: 0 }}>{t("shift.title")} #{id}</h2>
+        <h2 className="page-title" style={{ margin: 0 }}>{t("shift.title")} №{id}</h2>
         <div className="card col" style={{ gap: 12 }}>
           <div className="muted">{t("shift.noActive")}</div>
           <Input label={t("shift.openingCash")} type="number" min={0} step="0.01" value={openingCash} onChange={(e) => setOpeningCash(e.target.value)} />
@@ -60,7 +60,7 @@ const ShiftPanel = () => {
   const sum = data.summary;
   return (
     <div className="col" style={{ gap: 18, maxWidth: 600 }}>
-      <h2 className="page-title" style={{ margin: 0 }}>{t("shift.title")} #{id}</h2>
+      <h2 className="page-title" style={{ margin: 0 }}>{t("shift.title")} №{id}</h2>
       <div className="card col" style={{ gap: 8 }}>
         <Row k={t("shift.opened")} v={formatDateTime(s.opened_at)} />
         <Row k={t("shift.openingCash")} v={Number(s.opening_cash).toFixed(2)} />

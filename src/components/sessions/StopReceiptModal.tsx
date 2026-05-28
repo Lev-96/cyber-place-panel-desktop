@@ -79,7 +79,7 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved }: Prop
 
   const view = stopped ?? bill;
 
-  const deviceLabel = session.pc_label ?? `#${session.pc_id}`;
+  const deviceLabel = session.pc_label ?? `№${session.pc_id}`;
 
   return (
     <Modal open onClose={onClose}>

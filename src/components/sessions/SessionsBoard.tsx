@@ -70,7 +70,7 @@ const SessionsBoard = ({ branchId }: Props) => {
   return (
     <div className="col" style={{ gap: 18 }}>
       <div className="row-between" style={{ flexWrap: "wrap", rowGap: 8 }}>
-        <h2 className="page-title" style={{ margin: 0 }}>{t("session.boardTitle")} · #{branchId}</h2>
+        <h2 className="page-title" style={{ margin: 0 }}>{t("session.boardTitle")} · №{branchId}</h2>
         <div className="row" style={{ gap: 8, flexWrap: "wrap", rowGap: 8 }}>
           <Link to={`/branches/${branchId}/sessions/history`} className="muted" style={navBtn}>{t("history.title")}</Link>
           <Link to={`/branches/${branchId}/pcs`} className="muted" style={navBtn}>{t("pcs.title")}</Link>

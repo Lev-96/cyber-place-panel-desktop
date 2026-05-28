@@ -41,7 +41,7 @@ const BranchPlaces = () => {
   };
 
   return (
-    <ScreenWithBg bg="./bg/branch.jpg" title={`${t("branchPlaces.title")} · #${id}`}>
+    <ScreenWithBg bg="./bg/branch.jpg" title={`${t("branchPlaces.title")} · №${id}`}>
       <div className="row-between">
         <span className="muted">{t("branchPlaces.intro")}</span>
         <Button onClick={() => setCreating(true)}>{t("branchPlaces.new")}</Button>
@@ -61,7 +61,7 @@ const BranchPlaces = () => {
               <div key={p.id} className="place-cell" style={{ borderColor: tone, minHeight: 130 }}>
                 <span className="dot" style={{ background: tone }} />
                 <span className="platform">{p.platform.toUpperCase()} · {p.type}</span>
-                <span className="id">#{p.number ?? p.id}</span>
+                <span className="id">№{p.number ?? p.id}</span>
                 <span className="status" style={{ color: tone }}>{statusLabel}</span>
                 <span className="until">{p.games?.length ?? 0} {t("branchPlaces.games")}</span>
                 <div className="row" style={{ gap: 4, marginTop: 6 }}>

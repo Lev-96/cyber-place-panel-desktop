@@ -48,7 +48,7 @@ const BranchServices = () => {
   };
 
   return (
-    <ScreenWithBg bg="./bg/branch.jpg" title={`Services · branch #${id}`}>
+    <ScreenWithBg bg="./bg/branch.jpg" title={`Services · branch №${id}`}>
       <span className="muted">Toggle which services this branch provides.</span>
       {loading && <Spinner />}
       {error && <div className="error">{error}</div>}

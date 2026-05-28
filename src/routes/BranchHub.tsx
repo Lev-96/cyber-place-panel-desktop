@@ -20,7 +20,7 @@ const BranchHub = () => {
   if (!Number.isFinite(id) || id <= 0) return <div className="error">{t("hub.invalidId")}</div>;
 
   return (
-    <ScreenWithBg bg="./bg/branch.jpg" title={data ? `${data.company?.name ?? t("hub.branchFallback")} · ${data.address}` : `${t("hub.branchFallback")} #${id}`}>
+    <ScreenWithBg bg="./bg/branch.jpg" title={data ? `${data.company?.name ?? t("hub.branchFallback")} · ${data.address}` : `${t("hub.branchFallback")} №${id}`}>
       {loading && <Spinner />}
       {error && <div className="error">{error.message}</div>}
 

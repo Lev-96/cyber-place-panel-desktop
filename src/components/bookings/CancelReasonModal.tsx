@@ -28,7 +28,7 @@ const CancelReasonModal = ({ bookingId, onClose, onDone }: Props) => {
   return (
     <Modal open onClose={onClose}>
       <form className="card" style={{ width: 420, maxWidth: "90vw", display: "flex", flexDirection: "column", gap: 14 }} onSubmit={submit}>
-        <h2 style={{ margin: 0 }}>{t("booking.cancelTitleId")} #{bookingId}</h2>
+        <h2 style={{ margin: 0 }}>{t("booking.cancelTitleId")} №{bookingId}</h2>
         <Input label={t("booking.cancelReasonField")} value={reason} onChange={(e) => setReason(e.target.value)} autoFocus />
         <span className="muted" style={{ fontSize: 11 }}>{t("booking.cancelReasonHint")}</span>
         {err && <div className="error">{err}</div>}

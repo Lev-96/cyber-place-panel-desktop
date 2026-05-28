@@ -89,7 +89,7 @@ const Tournaments = () => {
   return (
     <ScreenWithBg
       bg="./bg/owner-home.jpg"
-      title={isBranchScoped ? `${tr("tournaments.title")} · #${id}` : tr("tournaments.title")}
+      title={isBranchScoped ? `${tr("tournaments.title")} · №${id}` : tr("tournaments.title")}
     >
       {isBranchScoped && (
         <div className="row-between">

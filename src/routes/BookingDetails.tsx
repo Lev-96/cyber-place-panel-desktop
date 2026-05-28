@@ -32,7 +32,7 @@ const BookingDetails = () => {
   return (
     <ScreenWithBg
       bg="./bg/booking.jpg"
-      title={`${t("bookingDetails.title")} #${data.code ?? data.id}`}
+      title={`${t("bookingDetails.title")} №${data.code ?? data.id}`}
     >
       <div
         className="row"

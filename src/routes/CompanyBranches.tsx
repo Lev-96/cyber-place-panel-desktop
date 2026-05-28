@@ -23,7 +23,7 @@ const CompanyBranches = () => {
   if (!Number.isFinite(id) || id <= 0) return <div className="error">Invalid company id.</div>;
 
   return (
-    <ScreenWithBg bg="./bg/branch.jpg" title={`Branches of company #${id}`}>
+    <ScreenWithBg bg="./bg/branch.jpg" title={`Branches of company №${id}`}>
       <div className="row-between">
         <Link to={`/companies/${id}`} className="muted">← Back to company</Link>
         {canCreate && <Button onClick={() => setCreating(true)}>+ New branch</Button>}

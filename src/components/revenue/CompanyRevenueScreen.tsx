@@ -73,7 +73,7 @@ const CompanyRevenueScreen = ({ companyId, companyName, initialPercent }: Props)
   return (
     <div className="col" style={{ gap: 18 }}>
       <h2 className="page-title" style={{ margin: 0 }}>
-        {(companyName ?? `#${companyId}`) + " · " + t("revenue.title")}
+        {(companyName ?? `№${companyId}`) + " · " + t("revenue.title")}
       </h2>
 
       <div className="month-picker">

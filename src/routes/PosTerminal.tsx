@@ -67,7 +67,7 @@ const PosTerminal = () => {
   return (
     <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 18, height: "100%" }}>
       <div className="col" style={{ gap: 16 }}>
-        <h2 className="page-title" style={{ margin: 0 }}>POS · branch #{id}</h2>
+        <h2 className="page-title" style={{ margin: 0 }}>POS · branch №{id}</h2>
         {Object.entries(grouped).map(([cat, prods]) => (
           <div key={cat}>
             <div className="muted" style={{ marginBottom: 6 }}>{cat}</div>

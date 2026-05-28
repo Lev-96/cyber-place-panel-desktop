@@ -18,7 +18,7 @@ const BranchLiveScreen = ({ branchId }: { branchId: number }) => {
   return (
     <div className="col" style={{ gap: 18 }}>
       <div className="row-between">
-        <h2 className="page-title" style={{ margin: 0 }}>{t("live.title")} · #{branchId}</h2>
+        <h2 className="page-title" style={{ margin: 0 }}>{t("live.title")} · №{branchId}</h2>
         <div className="row" style={{ gap: 12 }}>
           <span className="muted">{t("live.updated")} {formatTime(snapshot.takenAt)}</span>
           <Button variant="secondary" onClick={refresh}>{t("action.refresh")}</Button>
