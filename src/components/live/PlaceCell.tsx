@@ -12,7 +12,7 @@ const PlaceCell = ({ snapshot }: { snapshot: PlaceSnapshot }) => {
     <div className="place-cell" style={{ borderColor: color }}>
       <span className="dot" style={{ background: color }} />
       <span className="platform">{place.platform.toUpperCase()} · {place.type}</span>
-      <span className="id">#{place.id}</span>
+      <span className="id">№{place.number ?? place.id}</span>
       <span className="status" style={{ color }}>{t(`place.${status}`)}</span>
       {top && (
         <span className="until">

@@ -8,6 +8,14 @@ export class Place {
   readonly type: PlaceType;
   readonly platform: PlatformType;
   readonly active: boolean;
+  /**
+   * Cashier-visible label distinct from the surrogate `id`. Same value the
+   * mobile guest sees on `placesSelect` and that `SessionsBoard` /
+   * `StartSessionDialog` print as «№N». Optional — legacy rows imported
+   * before the field existed may not have one, so callers fall back to
+   * `id` as last resort.
+   */
+  readonly number?: number;
   readonly raw: IBranchPlace;
 
   constructor(raw: IBranchPlace) {
@@ -17,6 +25,7 @@ export class Place {
     this.type = raw.type;
     this.platform = raw.platform;
     this.active = raw.status === "active";
+    this.number = raw.number;
   }
 
   /**
