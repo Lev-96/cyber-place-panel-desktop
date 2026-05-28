@@ -97,7 +97,10 @@ const PcsList = () => {
             <div key={pc.id} className="list-item">
               <div>
                 <div className="name">
-                  {pc.label} <span className="muted">#{pc.id}</span>
+                  {pc.label}
+                  {pc.place && (
+                    <span className="muted" style={{ marginLeft: 6 }}>№{pc.place.number ?? pc.place.id}</span>
+                  )}
                   {isPs && <span style={{ marginLeft: 8, fontSize: 11, padding: "2px 6px", borderRadius: 4, background: "#101a35", color: "#d152fa" }}>PS</span>}
                 </div>
                 <div className="meta">
