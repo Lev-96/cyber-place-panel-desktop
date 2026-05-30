@@ -10,6 +10,38 @@
   font-weight: 100 900;
   font-display: swap;
 }
+/* Gaming display font for the brand wordmark next to the logo. */
+@font-face {
+  font-family: "Audiowide";
+  src: url("/fonts/Audiowide.ttf") format("truetype");
+  font-weight: 400;
+  font-display: swap;
+}
+
+/* ===== Brand wordmark neon animation (shared: login + sidebar) ===== */
+/* Periodic neon "flicker" once per cycle + a gentle, eye-comfortable glow
+   "breathing" pulse. Honours prefers-reduced-motion. */
+@keyframes brandFlicker {
+  0%   { opacity: .4; }
+  2%   { opacity: 1; }
+  3.5% { opacity: .35; }
+  5%   { opacity: 1; }
+  6.5% { opacity: .2; }
+  8%   { opacity: .95; }
+  9.5% { opacity: .55; }
+  11%  { opacity: 1; }
+  100% { opacity: 1; }
+}
+@keyframes brandGlow {
+  0%, 100% { filter: drop-shadow(0 0 1px rgba(7, 221, 241, 0.40))
+                     drop-shadow(0 0 4px rgba(49, 175, 247, 0.22)); }
+  50%      { filter: drop-shadow(0 0 5px rgba(7, 221, 241, 0.85))
+                     drop-shadow(0 0 16px rgba(49, 175, 247, 0.55))
+                     drop-shadow(0 0 28px rgba(209, 82, 250, 0.40)); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .login-brand, .sidebar h1 span { animation: none !important; }
+}
 
 *,
 *::before,
@@ -389,6 +421,18 @@ a.card:hover {
   margin: 0 8px 16px;
   color: #07ddf1;
   letter-spacing: 0.5px;
+}
+.sidebar h1 span {
+  --flicker-every: 8s;
+  font-family: "Audiowide", "Inter", sans-serif;
+  font-weight: 400;
+  letter-spacing: 0.5px;
+  background: linear-gradient(120deg, #07ddf1, #32aff7 45%, #d152fa);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: brandFlicker var(--flicker-every) ease-in-out infinite,
+             brandGlow 5s ease-in-out infinite;
 }
 
 .sidebar a {
@@ -814,16 +858,20 @@ a.card:hover {
 }
 
 .login-brand {
-  font-family: "Playstation", "Inter", sans-serif;
-  font-size: 56px;
-  font-weight: 600;
-  letter-spacing: 2px;
-  background: linear-gradient(90deg, #07ddf1 0%, #32aff7 50%, #d152fa 100%);
+  --flicker-every: 8s;
+  font-family: "Audiowide", "Inter", sans-serif;
+  font-size: 48px;
+  font-weight: 400;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  background: linear-gradient(120deg, #07ddf1, #32aff7 45%, #d152fa);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
   margin: 0;
   text-align: center;
+  animation: brandFlicker var(--flicker-every) ease-in-out infinite,
+             brandGlow 5s ease-in-out infinite;
 }
 
 .login-logo {
