@@ -22,10 +22,35 @@ import { useNavigate } from "react-router-dom";
  *      Different cadence and storage (no per-row read state), kept in
  *      its own card group below.
  */
+/**
+ * Single source of truth for "does this role see the booking-shaped
+ * feed on the Уведомления screen". Manager only — admin and
+ * company_owner are scoped to billing-only by product (2026-05-29),
+ * mirroring the backend `StaffNotificationDispatcher` allowlist and
+ * the corner-popup gate in `GlobalBookingNotifier`.
+ */
+export const shouldShowBookingsFeed = (role: string | undefined): boolean =>
+  role === "manager";
+
+/**
+ * Billing feed mirrors the inverse rule: admins and company owners
+ * see the compensation reminders (since that's all they get), while
+ * a cashier-shaped role (manager) has no relationship with the
+ * platform-payment cadence — surfacing "Billing — No notifications
+ * right now" on their screen is noise. Keeping the gate explicit
+ * here (rather than `!shouldShowBookingsFeed`) leaves room for a
+ * future role (e.g. read-only auditor) that may flip rules
+ * independently.
+ */
+export const shouldShowBillingFeed = (role: string | undefined): boolean =>
+  role === "admin" || role === "company_owner";
+
 const Notifications = () => {
   const { user } = useAuth();
   const { t } = useLang();
   const isAdmin = user?.role === "admin";
+  const showBookings = shouldShowBookingsFeed(user?.role);
+  const showBilling = shouldShowBillingFeed(user?.role);
 
   const {
     list,
@@ -39,8 +64,10 @@ const Notifications = () => {
   } = useNotifications();
 
   const billing = useAsync(
-    () => orFallback(apiBillingReminders(7), { data: [] as IBillingReminder[] }),
-    [],
+    () => showBilling
+      ? orFallback(apiBillingReminders(7), { data: [] as IBillingReminder[] })
+      : Promise.resolve({ data: [] as IBillingReminder[] }),
+    [showBilling],
   );
 
   if (loadingDb && list.length === 0 && billing.loading) return <Spinner />;
@@ -53,66 +80,74 @@ const Notifications = () => {
 
   return (
     <ScreenWithBg bg="./bg/notifications.jpg" title={t("notifications.title")}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, flexWrap: "wrap", gap: 8 }}>
-        <h3 className="muted" style={{ margin: 0, fontSize: 14 }}>
-          {t("notifications.bookingFeedTitle") || "Bookings"}
-        </h3>
-        <div style={{ display: "flex", gap: 8 }}>
-          {unreadCount > 0 && (
-            <button
-              type="button"
-              onClick={() => void markAllRead()}
-              style={feedActionBtn}
-            >
-              {t("notifications.markAllRead") || "Mark all as read"}
-            </button>
-          )}
-          {list.length > 0 && (
-            <button
-              type="button"
-              onClick={() => {
-                if (window.confirm(t("notifications.confirmClearAll") || "Delete all?")) {
-                  void deleteAll();
-                }
-              }}
-              style={{ ...feedActionBtn, color: "#ef4444", borderColor: "#7f1d1d" }}
-            >
-              {t("notifications.clearAll") || "Clear all"}
-            </button>
-          )}
-        </div>
-      </div>
+      {showBookings && (
+        <>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, flexWrap: "wrap", gap: 8 }}>
+            <h3 className="muted" style={{ margin: 0, fontSize: 14 }}>
+              {t("notifications.bookingFeedTitle") || "Bookings"}
+            </h3>
+            <div style={{ display: "flex", gap: 8 }}>
+              {unreadCount > 0 && (
+                <button
+                  type="button"
+                  onClick={() => void markAllRead()}
+                  style={feedActionBtn}
+                >
+                  {t("notifications.markAllRead") || "Mark all as read"}
+                </button>
+              )}
+              {list.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (window.confirm(t("notifications.confirmClearAll") || "Delete all?")) {
+                      void deleteAll();
+                    }
+                  }}
+                  style={{ ...feedActionBtn, color: "#ef4444", borderColor: "#7f1d1d" }}
+                >
+                  {t("notifications.clearAll") || "Clear all"}
+                </button>
+              )}
+            </div>
+          </div>
 
-      {list.length === 0 ? (
-        <div className="card">
-          <div className="muted">{t("common.empty.notifications")}</div>
-        </div>
-      ) : (
-        <div style={{ display: "grid", gap: 12, marginBottom: 24 }}>
-          {list.map((n) => (
-            <DbNotificationCard
-              key={n.id}
-              n={n}
-              onClick={() => void markRead(n.id)}
-              onDelete={() => void deleteOne(n.id)}
-            />
-          ))}
-        </div>
+          {list.length === 0 ? (
+            <div className="card">
+              <div className="muted">{t("common.empty.notifications")}</div>
+            </div>
+          ) : (
+            <div style={{ display: "grid", gap: 12, marginBottom: 24 }}>
+              {list.map((n) => (
+                <DbNotificationCard
+                  key={n.id}
+                  n={n}
+                  onClick={() => void markRead(n.id)}
+                  onDelete={() => void deleteOne(n.id)}
+                />
+              ))}
+            </div>
+          )}
+        </>
       )}
 
-      <h3 className="muted" style={{ margin: "24px 0 12px", fontSize: 14 }}>
-        {t("notifications.billingFeedTitle") || "Billing"}
-      </h3>
-      {billingList.length === 0 ? (
-        <div className="card">
-          <div className="muted">{t("common.empty.notifications")}</div>
-        </div>
-      ) : (
-        <div style={{ display: "grid", gap: 12 }}>
-          {billingList.map((r) => (
-            <ReminderCard key={r.id} r={r} isAdmin={isAdmin} />
-          ))}
-        </div>
+      {showBilling && (
+        <>
+          <h3 className="muted" style={{ margin: showBookings ? "24px 0 12px" : "0 0 12px", fontSize: 14 }}>
+            {t("notifications.billingFeedTitle") || "Billing"}
+          </h3>
+          {billingList.length === 0 ? (
+            <div className="card">
+              <div className="muted">{t("common.empty.notifications")}</div>
+            </div>
+          ) : (
+            <div style={{ display: "grid", gap: 12 }}>
+              {billingList.map((r) => (
+                <ReminderCard key={r.id} r={r} isAdmin={isAdmin} />
+              ))}
+            </div>
+          )}
+        </>
       )}
     </ScreenWithBg>
   );

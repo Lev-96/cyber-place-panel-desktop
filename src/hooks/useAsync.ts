@@ -21,7 +21,10 @@ export const useAsync = <T,>(fn: () => Promise<T>, deps: unknown[]) => {
   const genRef = useRef(0);
   const aliveRef = useRef(true);
 
-  useEffect(() => () => { aliveRef.current = false; }, []);
+  useEffect(() => {
+    aliveRef.current = true;
+    return () => { aliveRef.current = false; };
+  }, []);
 
   const run = useCallback(async () => {
     const myGen = ++genRef.current;

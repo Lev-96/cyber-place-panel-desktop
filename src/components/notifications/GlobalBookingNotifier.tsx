@@ -171,6 +171,16 @@ const showNativeBookingNotification = (
  * to surface and fix the orphan data so the realtime path lights
  * up again.
  */
+/**
+ * Single source of truth for the corner-popup gate. Only managers
+ * receive booking / subscribe / tournament toasts + OS push + chime.
+ * Admin and company_owner see compensation reminders only (the
+ * backend `StaffNotificationDispatcher` enforces the same scope on
+ * the database feed); this gate keeps the realtime surface aligned.
+ */
+export const shouldShowBookingToasts = (user: AuthUser | null): boolean =>
+  user?.role === "manager";
+
 const resolveBookingChannel = (user: AuthUser | null): string | null => {
   if (!user) return null;
 
@@ -220,11 +230,22 @@ const GlobalBookingNotifier = () => {
   const navigate = useNavigate();
   const { refresh: refreshNotifications } = useNotifications();
 
+  // Product decision (2026-05-29): only managers see booking /
+  // subscribe / tournament toasts + OS push + chime. Admin and
+  // company_owner have been scoped to compensation reminders only
+  // (see `StaffNotificationDispatcher::dispatch()` backend), so the
+  // corner-popup channel must follow the same gate or the cashier-
+  // shaped noise leaks into platform-owner and company-owner sessions.
+  // `Home.tsx`'s silent dashboard refresh on `bookings.global` is
+  // unaffected — it does NOT live here.
+  const showToasts = shouldShowBookingToasts(user);
+
   const channelName = resolveBookingChannel(user);
 
   const [toast, setToast] = useState<ToastModel | null>(null);
 
   const handleEvent = useCallback((evt: BookingChangedEvent) => {
+    if (!showToasts) return;
     // `confirmed` is a silent refresh hint (used to drop the booking
     // out of the dashboard "Upcoming/pending" tile). No toast, no OS
     // notification, no notifications-list refresh — Home.tsx's own
@@ -255,7 +276,7 @@ const GlobalBookingNotifier = () => {
     // sidebar badge and Notifications screen reflect it without
     // waiting for the 60s polling tick.
     void refreshNotifications();
-  }, [refreshNotifications, t]);
+  }, [refreshNotifications, showToasts, t]);
 
   useBookingChanged(channelName, handleEvent);
 
@@ -265,6 +286,7 @@ const GlobalBookingNotifier = () => {
   // The Notifications panel still gets the database row (refreshed
   // below), so the subscribe row is discoverable in the same place.
   const handleSubscribe = useCallback((evt: BranchSubscribedEvent) => {
+    if (!showToasts) return;
     void ensureNotificationPermission().then((perm) => {
       if (perm !== "granted") return;
       const split = [evt.guest_first_name, evt.guest_last_name]
@@ -285,7 +307,7 @@ const GlobalBookingNotifier = () => {
     });
     playNotificationChime();
     void refreshNotifications();
-  }, [refreshNotifications, t]);
+  }, [refreshNotifications, showToasts, t]);
   useBranchSubscribed(channelName, handleSubscribe);
 
   // Tournament-joined fires only for `as=player` (server-side gate
@@ -300,6 +322,7 @@ const GlobalBookingNotifier = () => {
   // full history of who joined what — staff usually want to triage
   // multiple registrations together rather than jump straight to one.
   const handleTournamentJoined = useCallback((evt: TournamentJoinedEvent) => {
+    if (!showToasts) return;
     void ensureNotificationPermission().then((perm) => {
       if (perm !== "granted") return;
       const split = [evt.guest_first_name, evt.guest_last_name]
@@ -325,7 +348,7 @@ const GlobalBookingNotifier = () => {
     });
     playNotificationChime();
     void refreshNotifications();
-  }, [navigate, refreshNotifications, t]);
+  }, [navigate, refreshNotifications, showToasts, t]);
   useTournamentJoined(channelName, handleTournamentJoined);
 
   useEffect(() => {
