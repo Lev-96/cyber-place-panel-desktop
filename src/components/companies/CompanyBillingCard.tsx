@@ -4,6 +4,8 @@ import { useAuth } from "@/auth/AuthContext";
 import Button from "@/components/ui/Button";
 import Spinner from "@/components/ui/Spinner";
 import { formatDate } from "@/i18n/dates";
+import { useLang } from "@/i18n/LanguageContext";
+import { fmt as msg } from "@/i18n/translations";
 import { useEffect, useState } from "react";
 
 interface Props {
@@ -14,6 +16,7 @@ interface Props {
 const fmt = (iso: string | null) => formatDate(iso);
 
 const CompanyBillingCard = ({ companyId, companyName }: Props) => {
+  const { t } = useLang();
   const { user } = useAuth();
   const isAdmin = user?.role === "admin";
   const isOwner = user?.role === "company_owner";
@@ -28,7 +31,7 @@ const CompanyBillingCard = ({ companyId, companyName }: Props) => {
     try { setBilling(await apiCompanyBilling(companyId)); }
     catch (e) {
       if (isMissingEndpoint(e)) setMissing(true);
-      else setErr(e instanceof Error ? e.message : "Failed");
+      else setErr(e instanceof Error ? e.message : t("form.errors.failedSave"));
     }
     finally { setLoading(false); }
   };
@@ -36,12 +39,12 @@ const CompanyBillingCard = ({ companyId, companyName }: Props) => {
   useEffect(() => { void load(); /* eslint-disable-next-line */ }, [companyId]);
 
   const markPaid = async () => {
-    if (!confirm(`Mark ${companyName} as paid? This shifts the next-due date by one month.`)) return;
+    if (!confirm(msg(t("billing.markPaidConfirm"), companyName))) return;
     setBusy(true); setErr(null);
     try {
       const r = await apiMarkCompanyPaid(companyId);
       setBilling(r);
-    } catch (e) { setErr(e instanceof Error ? e.message : "Failed"); }
+    } catch (e) { setErr(e instanceof Error ? e.message : t("form.errors.failedSave")); }
     finally { setBusy(false); }
   };
 
@@ -49,13 +52,13 @@ const CompanyBillingCard = ({ companyId, companyName }: Props) => {
   if (missing) return (
     <div className="card">
       <div className="muted" style={{ fontSize: 13 }}>
-        Billing endpoints not deployed yet. Run <code>php artisan migrate</code> on the backend.
+        {t("billing.notDeployed")}
       </div>
     </div>
   );
   if (!billing) return (
     <div className="card">
-      {err ? <div className="error">{err}</div> : <div className="muted">No billing info.</div>}
+      {err ? <div className="error">{err}</div> : <div className="muted">{t("billing.noInfo")}</div>}
     </div>
   );
 
@@ -71,21 +74,21 @@ const CompanyBillingCard = ({ companyId, companyName }: Props) => {
   return (
     <div className="gradient-card"><div className="gradient-card-inner" style={{ borderLeft: `4px solid ${bandColor}` }}>
       <div className="row-between">
-        <h3 style={{ margin: 0 }}>Billing</h3>
+        <h3 style={{ margin: 0 }}>{t("billing.title")}</h3>
         <span className={`pill ${billing.status}`}>{billing.status}</span>
       </div>
 
-      <div className="kv-row"><span className="k">Commission rate</span><span className="v">{pctText}</span></div>
-      <div className="kv-row"><span className="k">Last paid</span><span className="v">{fmt(billing.last_paid_at)}</span></div>
-      <div className="kv-row"><span className="k">Next due</span><span className="v">{fmt(billing.next_due_at)}</span></div>
+      <div className="kv-row"><span className="k">{t("billing.commissionRate")}</span><span className="v">{pctText}</span></div>
+      <div className="kv-row"><span className="k">{t("billing.lastPaid")}</span><span className="v">{fmt(billing.last_paid_at)}</span></div>
+      <div className="kv-row"><span className="k">{t("billing.nextDue")}</span><span className="v">{fmt(billing.next_due_at)}</span></div>
 
       {days !== null && (
         <div className="kv-row">
-          <span className="k">Time left</span>
+          <span className="k">{t("billing.timeLeft")}</span>
           <span className="v hi" style={{ color: bandColor }}>
             {overdue
-              ? `Overdue by ${Math.abs(days)} day${Math.abs(days) === 1 ? "" : "s"}`
-              : `${days} day${days === 1 ? "" : "s"} left`}
+              ? msg(t("billing.overdueBy"), Math.abs(days))
+              : msg(t("billing.daysLeft"), days)}
           </span>
         </div>
       )}
@@ -93,22 +96,22 @@ const CompanyBillingCard = ({ companyId, companyName }: Props) => {
       {/* Audience-specific reminder text */}
       {dueSoon && isAdmin && !overdue && (
         <div className="muted" style={{ fontSize: 13, color: "#f59e0b" }}>
-          ⚠ Company <b>{companyName}</b> must pay for the program in {days} {days === 1 ? "day" : "days"}.
+          {msg(t("billing.adminReminder"), companyName, days ?? 0)}
         </div>
       )}
       {dueSoon && isOwner && !overdue && (
         <div className="muted" style={{ fontSize: 13, color: "#f59e0b" }}>
-          ⚠ In {days} {days === 1 ? "day" : "days"} you must pay <b>Cyber Place</b>.
+          {msg(t("billing.ownerReminder"), days ?? 0)}
         </div>
       )}
       {overdue && isAdmin && (
         <div className="error">
-          Company <b>{companyName}</b> is overdue. Status will switch to pending automatically.
+          {msg(t("billing.adminOverdue"), companyName)}
         </div>
       )}
       {overdue && isOwner && (
         <div className="error">
-          Payment to Cyber Place is overdue. Your company status has been set to pending.
+          {t("billing.ownerOverdue")}
         </div>
       )}
 
@@ -117,9 +120,9 @@ const CompanyBillingCard = ({ companyId, companyName }: Props) => {
       {isAdmin && (
         <div className="row-between" style={{ marginTop: 6 }}>
           <span className="muted" style={{ fontSize: 11 }}>
-            Marking as paid sets last_paid_at = now and next_due_at = +1 month.
+            {t("billing.markPaidHint")}
           </span>
-          <Button onClick={markPaid} disabled={busy}>{busy ? "Saving…" : "Mark as paid"}</Button>
+          <Button onClick={markPaid} disabled={busy}>{busy ? t("company.saving") : t("billing.markPaid")}</Button>
         </div>
       )}
     </div></div>

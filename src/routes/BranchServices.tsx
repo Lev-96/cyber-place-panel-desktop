@@ -1,6 +1,8 @@
 import Button from "@/components/ui/Button";
 import ScreenWithBg from "@/components/ui/ScreenWithBg";
 import Spinner from "@/components/ui/Spinner";
+import { useLang } from "@/i18n/LanguageContext";
+import { fmt } from "@/i18n/translations";
 import { branchRepository } from "@/repositories/BranchRepository";
 import { serviceRepository } from "@/repositories/ServiceRepository";
 import { IBranchService } from "@/types/api";
@@ -9,6 +11,7 @@ import { useParams } from "react-router-dom";
 
 const BranchServices = () => {
   const { branchId } = useParams();
+  const { t } = useLang();
   const id = Number(branchId);
 
   const [allServices, setAllServices] = useState<IBranchService[] | null>(null);
@@ -26,11 +29,11 @@ const BranchServices = () => {
         setAllServices(all);
         setActiveIds(new Set(current.map((s) => s.id)));
       })
-      .catch((e) => setError(e instanceof Error ? e.message : "Failed"))
+      .catch((e) => setError(e instanceof Error ? e.message : t("form.errors.failedSave")))
       .finally(() => setLoading(false));
   }, [id]);
 
-  if (!Number.isFinite(id) || id <= 0) return <div className="error">Invalid branch id.</div>;
+  if (!Number.isFinite(id) || id <= 0) return <div className="error">{t("error.invalidBranchId")}</div>;
 
   const toggle = (sid: number) => {
     const next = new Set(activeIds);
@@ -42,14 +45,14 @@ const BranchServices = () => {
     setSaving(true); setMsg(null);
     try {
       await branchRepository.updateServices(id, Array.from(activeIds));
-      setMsg("Saved");
-    } catch (e) { setMsg(e instanceof Error ? e.message : "Failed"); }
+      setMsg(t("branch.prices.saved"));
+    } catch (e) { setMsg(e instanceof Error ? e.message : t("form.errors.failedSave")); }
     finally { setSaving(false); }
   };
 
   return (
-    <ScreenWithBg bg="./bg/branch.jpg" title={`Services · branch №${id}`}>
-      <span className="muted">Toggle which services this branch provides.</span>
+    <ScreenWithBg bg="./bg/branch.jpg" title={fmt(t("branchServices.title"), id)}>
+      <span className="muted">{t("branchServices.instruction")}</span>
       {loading && <Spinner />}
       {error && <div className="error">{error}</div>}
       {!loading && !error && (
@@ -69,11 +72,11 @@ const BranchServices = () => {
                 </label>
               );
             })}
-            {!allServices?.length && <div className="muted">No services exist globally yet.</div>}
+            {!allServices?.length && <div className="muted">{t("branchServices.empty")}</div>}
           </div>
           <div className="row-between">
-            {msg && <span className={msg === "Saved" ? "muted" : "error"}>{msg}</span>}
-            <Button onClick={save} disabled={saving}>{saving ? "Saving…" : "Save"}</Button>
+            {msg && <span className={msg === t("branch.prices.saved") ? "muted" : "error"}>{msg}</span>}
+            <Button onClick={save} disabled={saving}>{saving ? t("company.saving") : t("action.save")}</Button>
           </div>
         </>
       )}

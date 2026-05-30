@@ -12,7 +12,7 @@ const TournamentDetails = () => {
   const id = Number(tournamentId);
   const { data, loading, error } = useAsync(() => tournamentRepository.byId(id), [id]);
 
-  if (!Number.isFinite(id) || id <= 0) return <div className="error">Invalid tournament id.</div>;
+  if (!Number.isFinite(id) || id <= 0) return <div className="error">{t("error.invalidTournamentId")}</div>;
   if (loading) return <Spinner />;
   if (error) return <div className="error">{error.message}</div>;
   if (!data) return null;
@@ -20,13 +20,13 @@ const TournamentDetails = () => {
   return (
     <ScreenWithBg bg="./bg/owner-home.jpg" title={data.title}>
       <div className="card col" style={{ gap: 6 }}>
-        <Row k="Description" v={data.description} />
-        <Row k="Game" v={`${data.game?.name ?? "—"} ${data.game?.platform ? `(${data.game.platform})` : ""}`} />
+        <Row k={t("label.description")} v={data.description} />
+        <Row k={t("label.game")} v={`${data.game?.name ?? "—"} ${data.game?.platform ? `(${data.game.platform})` : ""}`} />
         <Row k={t("tournament.skillLevel")} v={t(`tournament.skillLevel.${data.skill_level ?? "any"}`)} />
-        <Row k="Start" v={data.start_date} />
-        {data.end_date && <Row k="End" v={data.end_date} />}
-        <Row k="Price" v={Number(data.price).toFixed(2)} />
-        {data.participants_limit ? <Row k="Players" v={`${data.registered_participants} / ${data.participants_limit}`} /> : null}
+        <Row k={t("bookingDetails.start")} v={data.start_date} />
+        {data.end_date && <Row k={t("tournamentDetails.end")} v={data.end_date} />}
+        <Row k={t("label.price")} v={Number(data.price).toFixed(2)} />
+        {data.participants_limit ? <Row k={t("tournamentDetails.players")} v={`${data.registered_participants} / ${data.participants_limit}`} /> : null}
       </div>
       <RegistrationsList tournamentId={id} />
     </ScreenWithBg>

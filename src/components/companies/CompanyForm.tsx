@@ -5,7 +5,10 @@ import ImageUpload from "@/components/ui/ImageUpload";
 import Input from "@/components/ui/Input";
 import Modal from "@/components/ui/Modal";
 import NumberStepper from "@/components/ui/NumberStepper";
+import { COUNTRIES, countryByCode, flagOf, resolveCountryCode } from "@/data/countries";
+import { tinExample, validateTin } from "@/data/tin";
 import { useLang } from "@/i18n/LanguageContext";
+import { fmt } from "@/i18n/translations";
 import { storageUri } from "@/infrastructure/AppConfig";
 import { companyRepository } from "@/repositories/CompanyRepository";
 import { CompanyStatusType, ICompanyApi } from "@/types/api";
@@ -40,7 +43,10 @@ const CompanyForm = ({ initial, onClose, onSaved }: Props) => {
   const [name, setName] = useState(initial?.name ?? "");
   const [email, setEmail] = useState(initial?.email ?? "");
   const [phone, setPhone] = useState(initial?.phone ?? "");
-  const [country, setCountry] = useState(initial?.company_country ?? "");
+  // `country` holds the ISO alpha-2 code (drives the picker, the phone
+  // dial-code prefill and TIN validation). Legacy free-text values are
+  // resolved back to a code so editing still pre-selects the dropdown.
+  const [country, setCountry] = useState(resolveCountryCode(initial?.company_country));
   const [city, setCity] = useState(initial?.company_city ?? "");
   const [tin, setTin] = useState(initial?.tin ?? "");
   const [website, setWebsite] = useState(initial?.website ?? "");
@@ -68,38 +74,70 @@ const CompanyForm = ({ initial, onClose, onSaved }: Props) => {
     finally { setCommissionSaving(false); }
   };
 
-  const submitStep1 = async (e: FormEvent) => {
+  // Selecting a country prefills the phone field with its dialling code.
+  // We only overwrite when the phone is empty or still holds the previous
+  // country's bare code — a number the admin already typed is never clobbered.
+  const onCountryChange = (code: string) => {
+    const prevDial = countryByCode(country)?.dial ?? "";
+    const nextDial = countryByCode(code)?.dial ?? "";
+    setCountry(code);
+    setErr(null);
+    setPhone((p) => {
+      const tr = p.trim();
+      if (!tr || tr === `+${prevDial}` || tr === `+${prevDial} `) {
+        return nextDial ? `+${nextDial} ` : "";
+      }
+      return p;
+    });
+  };
+
+  // Step 1 no longer hits the API — it just validates locally and advances.
+  // Owner registration moved to the final step (submitStep2) so the backend
+  // welcome email fires only once the whole company is actually created,
+  // not the moment "Next" is pressed.
+  const submitStep1 = (e: FormEvent) => {
     e.preventDefault();
     if (ownerPassword !== ownerPassword2) return setErr(t("settings.passwordsMismatch"));
-    setBusy(true); setErr(null);
-    try {
-      const r = await apiRegisterUser({
-        name: ownerName, email: ownerEmail,
-        password: ownerPassword, password_confirmation: ownerPassword2,
-      });
-      setUserId(r.register.id);
-      setStep(2);
-    } catch (e) { setErr(formatError(e)); }
-    finally { setBusy(false); }
+    setErr(null);
+    setStep(2);
   };
 
   const submitStep2 = async (e: FormEvent) => {
     e.preventDefault();
     if (!isEdit && !logo) return setErr(t("company.logoRequired"));
-    if (!isEdit && !userId) return setErr(t("company.ownerNotCreated"));
+    if (!isEdit && !country) return setErr(t("company.selectCountryFirst"));
+    // Per-country TIN validation — block submit on a malformed tax id.
+    const tinCheck = validateTin(country, tin);
+    if (!tinCheck.valid) {
+      return setErr(tinCheck.example ? fmt(t("tin.invalid"), tinCheck.example) : t("tin.invalidGeneric"));
+    }
+    // Persist the country as its English name (backend stores free text) so
+    // existing displays keep working; the code lives only in form state.
+    const countryName = countryByCode(country)?.name ?? country;
     setBusy(true); setErr(null);
     try {
+      // Register the owner here (not in step 1). Guard with userId so a retry
+      // after a failed company-create doesn't register — and email — twice.
+      let uid = userId;
+      if (!isEdit && uid == null) {
+        const r = await apiRegisterUser({
+          name: ownerName, email: ownerEmail,
+          password: ownerPassword, password_confirmation: ownerPassword2,
+        });
+        uid = r.register.id;
+        setUserId(uid);
+      }
       const adminFields = isAdmin
         ? { status, commission_percent: Number.isFinite(commission) ? commission : 0 }
         : {};
       const c = isEdit
         ? await companyRepository.update(initial!.id, {
-          name, email, phone, company_country: country, company_city: city, tin,
+          name, email, phone, company_country: countryName, company_city: city, tin,
           website, description, company_logo_path: logo,
           ...adminFields,
         })
         : await companyRepository.create({
-          user_id: userId!, name, email, phone, company_country: country, company_city: city, tin,
+          user_id: uid!, name, email, phone, company_country: countryName, company_city: city, tin,
           website, description, company_logo_path: logo!,
           ...adminFields,
         });
@@ -141,10 +179,31 @@ const CompanyForm = ({ initial, onClose, onSaved }: Props) => {
           <Input label={t("label.phone")} value={phone} onChange={(e) => setPhone(e.target.value)} required />
         </div>
         <div className="row" style={{ gap: 10 }}>
-          <Input label={t("branch.country")} value={country} onChange={(e) => setCountry(e.target.value)} required />
-          <Input label={t("branch.city")} value={city} onChange={(e) => setCity(e.target.value)} required />
+          <div style={{ flex: 1 }}>
+            <span className="label">{t("branch.country")}</span>
+            <select
+              className="input"
+              value={country}
+              onChange={(e) => onCountryChange(e.target.value)}
+              required
+            >
+              <option value="">{t("company.selectCountry")}</option>
+              {COUNTRIES.map((c) => (
+                <option key={c.code} value={c.code}>{flagOf(c.code)} {c.name}</option>
+              ))}
+            </select>
+          </div>
+          <div style={{ flex: 1 }}>
+            <Input label={t("branch.city")} value={city} onChange={(e) => setCity(e.target.value)} required />
+          </div>
         </div>
-        <Input label={t("company.tin")} value={tin} onChange={(e) => setTin(e.target.value)} required />
+        <Input
+          label={t("company.tin")}
+          value={tin}
+          onChange={(e) => setTin(e.target.value)}
+          placeholder={tinExample(country)}
+          required
+        />
         <Input label={t("company.website")} value={website} onChange={(e) => setWebsite(e.target.value)} />
         <Input label={t("label.description")} value={description} onChange={(e) => setDescription(e.target.value)} />
 

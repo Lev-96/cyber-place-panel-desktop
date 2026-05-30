@@ -188,7 +188,7 @@ const PcForm = ({ branchId, initial, onClose, onSaved }: Props) => {
         {kind === "pc" && (
           <>
             <Input
-              label="MAC address"
+              label={t("pcForm.macAddress")}
               placeholder="AA:BB:CC:DD:EE:FF"
               value={mac ?? ""}
               onChange={(e) => setMac(e.target.value)}

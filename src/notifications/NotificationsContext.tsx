@@ -59,8 +59,19 @@ export const NotificationsProvider = ({ children }: { children: ReactNode }) => 
     };
   }, []);
 
+  // The database notifications feed (booking.created / extended /
+  // cancelled, branch.subscribed, tournament.joined) is MANAGER-ONLY by
+  // product (2026-05-29) — admins and company_owners are scoped to the
+  // separate billing-reminders feed, which never lands in this table and
+  // is NOT part of `unreadCount`. Gating the fetch / poll / realtime
+  // subscription here keeps the sidebar badge from lighting up with
+  // booking/tournament counts for owner & admin, mirroring the display
+  // gate in `Notifications.shouldShowBookingsFeed` and the corner-popup
+  // gate in `GlobalBookingNotifier.shouldShowBookingToasts`.
+  const dbFeedEnabled = user?.role === "manager";
+
   const refresh = useCallback(async () => {
-    if (!user) {
+    if (!user || !dbFeedEnabled) {
       setList([]);
       setUnreadCount(0);
       return;
@@ -79,7 +90,7 @@ export const NotificationsProvider = ({ children }: { children: ReactNode }) => 
     } finally {
       if (aliveRef.current) setLoading(false);
     }
-  }, [user]);
+  }, [user, dbFeedEnabled]);
 
   // Initial load + on user change.
   useEffect(() => {
@@ -90,7 +101,7 @@ export const NotificationsProvider = ({ children }: { children: ReactNode }) => 
   // missed and we'd otherwise show a stale badge until the user
   // opens the page.
   useEffect(() => {
-    if (!user) return;
+    if (!user || !dbFeedEnabled) return;
     const id = setInterval(() => {
       void apiNotificationsUnreadCount()
         .then(({ unread_count }) => {
@@ -101,7 +112,7 @@ export const NotificationsProvider = ({ children }: { children: ReactNode }) => 
         });
     }, POLL_MS);
     return () => clearInterval(id);
-  }, [user]);
+  }, [user, dbFeedEnabled]);
 
   // Realtime push: subscribe to the PRIVATE `user.{id}.notifications`
   // channel (wire name: `private-user.{id}.notifications`) and
@@ -119,7 +130,7 @@ export const NotificationsProvider = ({ children }: { children: ReactNode }) => 
   // channel's `{userId}` segment, so an attacker can't tail another
   // user's notification feed.
   useEffect(() => {
-    if (!user) return;
+    if (!user || !dbFeedEnabled) return;
     const echo = getEcho();
     if (!echo) return;
     const channelName = `user.${user.id}.notifications`;
@@ -140,7 +151,7 @@ export const NotificationsProvider = ({ children }: { children: ReactNode }) => 
     return () => {
       channel.stopListening(".notification.created", listener);
     };
-  }, [user]);
+  }, [user, dbFeedEnabled]);
 
   const markRead = useCallback(async (id: string) => {
     // Optimistic patch so the badge moves immediately; rollback on

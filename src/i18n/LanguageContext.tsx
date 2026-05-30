@@ -3,7 +3,7 @@ import { keyValueStore } from "@/infrastructure/KeyValueStore";
 import { ReactNode, createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { Currency, LANG_TO_CURRENCY, moneyDisplay } from "./currency";
 import { useFxRates } from "./FxRatesContext";
-import { Lang, t as translate } from "./translations";
+import { Lang, setActiveLang, t as translate } from "./translations";
 
 interface LangState {
   lang: Lang;
@@ -34,7 +34,10 @@ export const LanguageProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     void (async () => {
       const stored = await keyValueStore.get<Lang>(KEY_LANG);
-      if (stored === "en" || stored === "ru" || stored === "am") setLangState(stored);
+      if (stored === "en" || stored === "ru" || stored === "am") {
+        setLangState(stored);
+        setActiveLang(stored);
+      }
       const ovr = await keyValueStore.get<Currency>(KEY_CURRENCY);
       if (ovr === "AMD" || ovr === "USD" || ovr === "RUB") setOverride(ovr);
     })();
@@ -42,6 +45,7 @@ export const LanguageProvider = ({ children }: { children: ReactNode }) => {
 
   const setLang = useCallback((l: Lang) => {
     setLangState(l);
+    setActiveLang(l);
     void keyValueStore.set(KEY_LANG, l);
   }, []);
 

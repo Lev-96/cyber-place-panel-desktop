@@ -1,6 +1,8 @@
 import Button from "@/components/ui/Button";
 import Spinner from "@/components/ui/Spinner";
 import { useAsync } from "@/hooks/useAsync";
+import { useLang } from "@/i18n/LanguageContext";
+import { fmt as msgFmt } from "@/i18n/translations";
 import { memberRepository } from "@/repositories/MemberRepository";
 import { orderRepository } from "@/repositories/OrderRepository";
 import { productRepository } from "@/repositories/ProductRepository";
@@ -11,6 +13,7 @@ import { useParams } from "react-router-dom";
 
 const PosTerminal = () => {
   const { branchId } = useParams();
+  const { t } = useLang();
   const id = Number(branchId);
   const products = useAsync(() => productRepository.listByBranch(id), [id]);
 
@@ -21,6 +24,7 @@ const PosTerminal = () => {
   const [members, setMembers] = useState<IMember[]>([]);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+  const [msgOk, setMsgOk] = useState(false);
 
   const total = useMemo(() => cart.reduce((s, l) => s + Number(l.product.price) * l.quantity, 0), [cart]);
   const active = useMemo(() => (products.data ?? []).filter((p) => p.is_active), [products.data]);
@@ -44,8 +48,8 @@ const PosTerminal = () => {
 
   const checkout = async () => {
     if (!cart.length) return;
-    if (payment === "deposit" && !member) { setMsg("Pick a member for deposit payment"); return; }
-    setBusy(true); setMsg(null);
+    if (payment === "deposit" && !member) { setMsgOk(false); setMsg(t("pos.pickMember")); return; }
+    setBusy(true); setMsg(null); setMsgOk(false);
     try {
       await orderRepository.create({
         branch_id: id,
@@ -54,23 +58,25 @@ const PosTerminal = () => {
         items: cart.map((l) => ({ product_id: l.product.id, quantity: l.quantity })),
       });
       setCart([]); setMember(null); setMembers([]); setMemberSearch("");
-      setMsg(`Paid ${total.toFixed(2)} (${payment})`);
+      setMsgOk(true);
+      setMsg(msgFmt(t("pos.paid"), total.toFixed(2), t(`pos.${payment}`)));
     } catch (e) {
-      setMsg(e instanceof Error ? e.message : "Checkout failed");
+      setMsgOk(false);
+      setMsg(e instanceof Error ? e.message : t("pos.checkoutFailed"));
     } finally { setBusy(false); }
   };
 
-  if (!Number.isFinite(id) || id <= 0) return <div className="error">Invalid branch id.</div>;
+  if (!Number.isFinite(id) || id <= 0) return <div className="error">{t("error.invalidBranchId")}</div>;
   if (products.loading) return <Spinner />;
   if (products.error) return <div className="error">{products.error.message}</div>;
 
   return (
     <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 18, height: "100%" }}>
       <div className="col" style={{ gap: 16 }}>
-        <h2 className="page-title" style={{ margin: 0 }}>POS · branch №{id}</h2>
+        <h2 className="page-title" style={{ margin: 0 }}>{t("pos.title")} · №{id}</h2>
         {Object.entries(grouped).map(([cat, prods]) => (
           <div key={cat}>
-            <div className="muted" style={{ marginBottom: 6 }}>{cat}</div>
+            <div className="muted" style={{ marginBottom: 6 }}>{cat === "Other" ? t("pos.otherCategory") : cat}</div>
             <div className="live-grid">
               {prods.map((p) => (
                 <button key={p.id} className="place-cell" onClick={() => addToCart(p)} style={{ border: "1px solid #1f2a44", cursor: "pointer", textAlign: "left", background: "#0b1224" }}>
@@ -81,12 +87,12 @@ const PosTerminal = () => {
             </div>
           </div>
         ))}
-        {!active.length && <div className="muted">No active products. Add some in Products page.</div>}
+        {!active.length && <div className="muted">{t("pos.noProducts")}</div>}
       </div>
 
       <div className="card col" style={{ gap: 12, position: "sticky", top: 0, alignSelf: "start" }}>
-        <h3 style={{ margin: 0 }}>Cart</h3>
-        {cart.length === 0 && <div className="muted">Empty</div>}
+        <h3 style={{ margin: 0 }}>{t("pos.cart")}</h3>
+        {cart.length === 0 && <div className="muted">{t("pos.cartEmpty")}</div>}
         <div className="col" style={{ gap: 6, maxHeight: 260, overflowY: "auto" }}>
           {cart.map((l) => (
             <div key={l.product.id} className="row-between" style={{ padding: "6px 0", borderBottom: "1px solid #1f2a44" }}>
@@ -103,28 +109,28 @@ const PosTerminal = () => {
           ))}
         </div>
         <div className="row-between" style={{ fontSize: 22, fontWeight: 800 }}>
-          <span>Total</span>
+          <span>{t("pos.total")}</span>
           <span style={{ color: "#07ddf1" }}>{total.toFixed(2)}</span>
         </div>
         <div className="col" style={{ gap: 6 }}>
-          <span className="label">Payment</span>
+          <span className="label">{t("pos.payment")}</span>
           <div className="row" style={{ gap: 6 }}>
             {(["cash", "card", "deposit"] as const).map((m) => (
-              <Button key={m} variant={payment === m ? "primary" : "secondary"} onClick={() => setPayment(m)} style={{ flex: 1, padding: "8px 0" }}>{m}</Button>
+              <Button key={m} variant={payment === m ? "primary" : "secondary"} onClick={() => setPayment(m)} style={{ flex: 1, padding: "8px 0" }}>{t(`pos.${m}`)}</Button>
             ))}
           </div>
         </div>
         {payment === "deposit" && (
           <div className="col" style={{ gap: 6 }}>
-            <span className="label">Member</span>
+            <span className="label">{t("pos.member")}</span>
             {member ? (
               <div className="row-between">
-                <div>{member.name} <span className="muted">· balance {Number(member.balance).toFixed(2)}</span></div>
-                <Button variant="secondary" onClick={() => setMember(null)} style={btn}>Change</Button>
+                <div>{member.name} <span className="muted">· {t("pos.balance")} {Number(member.balance).toFixed(2)}</span></div>
+                <Button variant="secondary" onClick={() => setMember(null)} style={btn}>{t("pos.change")}</Button>
               </div>
             ) : (
               <>
-                <input className="input" placeholder="Name / phone / card" value={memberSearch} onChange={(e) => setMemberSearch(e.target.value)} onKeyDown={(e) => e.key === "Enter" && searchMembers()} />
+                <input className="input" placeholder={t("pos.searchPlaceholder")} value={memberSearch} onChange={(e) => setMemberSearch(e.target.value)} onKeyDown={(e) => e.key === "Enter" && searchMembers()} />
                 {members.map((m) => (
                   <button key={m.id} className="list-item" onClick={() => { setMember(m); setMembers([]); }}>
                     <div>{m.name} <span className="muted">{m.phone}</span></div>
@@ -135,8 +141,8 @@ const PosTerminal = () => {
             )}
           </div>
         )}
-        {msg && <div className={msg.startsWith("Paid") ? "muted" : "error"}>{msg}</div>}
-        <Button onClick={checkout} disabled={busy || !cart.length}>{busy ? "Processing…" : `Charge ${total.toFixed(2)}`}</Button>
+        {msg && <div className={msgOk ? "muted" : "error"}>{msg}</div>}
+        <Button onClick={checkout} disabled={busy || !cart.length}>{busy ? t("pos.processing") : msgFmt(t("pos.charge"), total.toFixed(2))}</Button>
       </div>
     </div>
   );

@@ -5,6 +5,8 @@ import Button from "@/components/ui/Button";
 import ScreenWithBg from "@/components/ui/ScreenWithBg";
 import Spinner from "@/components/ui/Spinner";
 import { useAsync } from "@/hooks/useAsync";
+import { useLang } from "@/i18n/LanguageContext";
+import { fmt } from "@/i18n/translations";
 import { branchRepository } from "@/repositories/BranchRepository";
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -16,35 +18,36 @@ const BranchEdit = () => {
   const { branchId } = useParams();
   const id = Number(branchId);
   const nav = useNavigate();
+  const { t } = useLang();
   const { data, loading, error, reload } = useAsync(() => branchRepository.byId(id), [id]);
   const [edit, setEdit] = useState(false);
   const [hours, setHours] = useState(false);
 
-  if (!Number.isFinite(id) || id <= 0) return <div className="error">Invalid branch id.</div>;
+  if (!Number.isFinite(id) || id <= 0) return <div className="error">{t("error.invalidBranchId")}</div>;
   if (loading) return <Spinner />;
   if (error) return <div className="error">{error.message}</div>;
   if (!data) return null;
 
   const remove = async () => {
-    if (!confirm("Delete this branch and all related data?")) return;
+    if (!confirm(t("branchEdit.confirmDelete"))) return;
     await branchRepository.remove(id);
     nav("/branches");
   };
 
   return (
-    <ScreenWithBg bg="./bg/branch.jpg" title={`Branch · ${data.address}`}>
+    <ScreenWithBg bg="./bg/branch.jpg" title={fmt(t("branchEdit.title"), data.address)}>
       <div className="gradient-card"><div className="gradient-card-inner">
-        <Row k="Address" v={data.address} />
-        <Row k="City" v={data.city} />
-        <Row k="Country" v={data.country} />
-        <Row k="Phone" v={Array.isArray(data.phone) ? data.phone.join(", ") : (data.phone ?? "—")} />
-        <Row k="Places" v={String(data.places_count ?? 0)} />
-        <Row k="Services" v={String(data.service_count ?? 0)} />
-        <Row k="Rating" v={data.ratings_avg_rating != null ? Number(data.ratings_avg_rating).toFixed(1) : "—"} />
+        <Row k={t("branch.address")} v={data.address} />
+        <Row k={t("branch.city")} v={data.city} />
+        <Row k={t("branch.country")} v={data.country} />
+        <Row k={t("label.phone")} v={Array.isArray(data.phone) ? data.phone.join(", ") : (data.phone ?? "—")} />
+        <Row k={t("label.places")} v={String(data.places_count ?? 0)} />
+        <Row k={t("branch.editTabs.services")} v={String(data.service_count ?? 0)} />
+        <Row k={t("branch.rating")} v={data.ratings_avg_rating != null ? Number(data.ratings_avg_rating).toFixed(1) : "—"} />
         <div className="row" style={{ gap: 8, flexWrap: "wrap", marginTop: 6 }}>
-          <Button variant="secondary" onClick={() => setEdit(true)}>Edit info</Button>
-          <Button variant="secondary" onClick={() => setHours(true)}>Working hours</Button>
-          <Button variant="secondary" onClick={remove} style={{ color: "#ef4444", borderColor: "#4a1a1a" }}>Delete</Button>
+          <Button variant="secondary" onClick={() => setEdit(true)}>{t("branchEdit.editInfo")}</Button>
+          <Button variant="secondary" onClick={() => setHours(true)}>{t("branch.editTabs.hours")}</Button>
+          <Button variant="secondary" onClick={remove} style={{ color: "#ef4444", borderColor: "#4a1a1a" }}>{t("action.delete")}</Button>
         </div>
       </div></div>
 

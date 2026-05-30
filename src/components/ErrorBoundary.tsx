@@ -1,3 +1,4 @@
+import { tActive } from "@/i18n/translations";
 import { logger } from "@/infrastructure/Logger";
 import { Component, ErrorInfo, ReactNode } from "react";
 
@@ -29,7 +30,7 @@ class ErrorBoundary extends Component<Props, State> {
         alignItems: "center", justifyContent: "center", padding: 32, gap: 16,
         background: "#020514", color: "#fff", textAlign: "center",
       }}>
-        <h2 style={{ margin: 0, color: "#ef4444" }}>Something went wrong</h2>
+        <h2 style={{ margin: 0, color: "#ef4444" }}>{tActive("errorBoundary.title")}</h2>
         <pre style={{
           maxWidth: 720, maxHeight: 240, overflow: "auto",
           background: "#0b1224", border: "1px solid #1f2a44", borderRadius: 8,
@@ -39,8 +40,8 @@ class ErrorBoundary extends Component<Props, State> {
           {this.state.error.stack ? `\n\n${this.state.error.stack}` : ""}
         </pre>
         <div style={{ display: "flex", gap: 8 }}>
-          <button onClick={this.reset} className="btn secondary">Try again</button>
-          <button onClick={this.reload} className="btn">Reload app</button>
+          <button onClick={this.reset} className="btn secondary">{tActive("errorBoundary.tryAgain")}</button>
+          <button onClick={this.reload} className="btn">{tActive("errorBoundary.reload")}</button>
         </div>
       </div>
     );

@@ -1155,6 +1155,101 @@ export const TRANSLATIONS: Dict = {
     ru: "Не удалось применить — backend не смог получить релиз с GitHub. Проверьте переменные GH_RELEASES_REPO_* на сервере.",
     am: "Չհաջողվեց կիրառել — backend-ը չի կարողացել ստանալ թողարկումը GitHub-ից:",
   },
+
+  // ─── i18n audit fixes (2026-05-30): previously hardcoded strings ───
+  "error.invalidBranchId": { en: "Invalid branch id.", ru: "Неверный ID филиала.", am: "Մասնաճյուղի սխալ ID:" },
+  "error.invalidCompanyId": { en: "Invalid company id.", ru: "Неверный ID компании.", am: "Ընկերության սխալ ID:" },
+  "error.invalidTournamentId": { en: "Invalid tournament id.", ru: "Неверный ID турнира.", am: "Մրցաշարի սխալ ID:" },
+  "error.noCompanyLinked": { en: "No company linked to this account.", ru: "К этому аккаунту не привязана компания.", am: "Այս հաշվին ընկերություն կապված չէ:" },
+  "branch.rating": { en: "Rating", ru: "Рейтинг", am: "Վարկանիշ" },
+
+  // BranchEdit overview
+  "branchEdit.title": { en: "Branch · {0}", ru: "Филиал · {0}", am: "Մասնաճյուղ · {0}" },
+  "branchEdit.editInfo": { en: "Edit info", ru: "Изменить данные", am: "Խմբագրել տվյալները" },
+  "branchEdit.confirmDelete": { en: "Delete this branch and all related data?", ru: "Удалить этот филиал и все связанные данные?", am: "Ջնջե՞լ այս մասնաճյուղը և բոլոր կապված տվյալները:" },
+
+  // BranchServices screen
+  "branchServices.title": { en: "Services · branch №{0}", ru: "Услуги · филиал №{0}", am: "Ծառայություններ · մասնաճյուղ №{0}" },
+  "branchServices.instruction": { en: "Toggle which services this branch provides.", ru: "Отметьте, какие услуги предоставляет филиал.", am: "Նշեք, թե որ ծառայություններն է մատուցում մասնաճյուղը:" },
+  "branchServices.empty": { en: "No services exist globally yet.", ru: "Глобальных услуг ещё нет.", am: "Գլոբալ ծառայություններ դեռ չկան:" },
+
+  // CompanyBranches list
+  "companyBranches.title": { en: "Branches of company №{0}", ru: "Филиалы компании №{0}", am: "№{0} ընկերության մասնաճյուղերը" },
+  "companyBranches.back": { en: "← Back to company", ru: "← Назад к компании", am: "← Վերադառնալ ընկերություն" },
+  "companyBranches.newBranch": { en: "+ New branch", ru: "+ Новый филиал", am: "+ Նոր մասնաճյուղ" },
+  "companyBranches.empty": { en: "No branches yet for this company.", ru: "У этой компании ещё нет филиалов.", am: "Այս ընկերությունը դեռ մասնաճյուղեր չունի:" },
+
+  // Working-hours form title
+  "openDays.title": { en: "Working hours · {0}", ru: "Часы работы · {0}", am: "Աշխատանքային ժամեր · {0}" },
+
+  // TournamentDetails rows
+  "tournamentDetails.end": { en: "End", ru: "Конец", am: "Ավարտ" },
+  "tournamentDetails.players": { en: "Players", ru: "Игроки", am: "Խաղացողներ" },
+
+  // ErrorBoundary
+  "errorBoundary.title": { en: "Something went wrong", ru: "Что-то пошло не так", am: "Ինչ-որ բան սխալ գնաց" },
+  "errorBoundary.tryAgain": { en: "Try again", ru: "Повторить", am: "Կրկնել" },
+  "errorBoundary.reload": { en: "Reload app", ru: "Перезапустить приложение", am: "Վերագործարկել հավելվածը" },
+
+  // CommissionInput
+  "commission.label": { en: "Commission percent", ru: "Процент комиссии", am: "Միջնորդավճարի տոկոս" },
+  "commission.hint": { en: "0–100%. Stored locally on this device.", ru: "0–100%. Хранится локально на этом устройстве.", am: "0–100%: Պահվում է տեղում՝ այս սարքում:" },
+
+  // PcForm
+  "pcForm.macAddress": { en: "MAC address", ru: "MAC-адрес", am: "MAC հասցե" },
+
+  // Emergency unlock PIN (BranchUnlockPinCard)
+  "unlockPin.title": { en: "Emergency unlock PIN", ru: "PIN экстренного разблокирования", am: "Արտակարգ ապակողպման PIN" },
+  "unlockPin.desc": { en: "The cashier can enter this PIN right on a locked PC if the link to the panel or server is lost. Works even offline. A 4–6 digit PIN.", ru: "Кассир сможет ввести этот PIN прямо на заблокированном ПК, если связь с панелью или сервером пропала. Работает даже офлайн. PIN из 4–6 цифр.", am: "Գանձապահը կարող է մուտքագրել այս PIN-ը անմիջապես կողպված ՀՀ-ի վրա, եթե կապը վահանակի կամ սերվերի հետ կորել է: Աշխատում է նույնիսկ օֆլայն: 4–6 թվանշանից PIN:" },
+  "unlockPin.current": { en: "Current PIN", ru: "Текущий PIN", am: "Ընթացիկ PIN" },
+  "unlockPin.notSet": { en: "PIN not set yet", ru: "PIN ещё не установлен", am: "PIN-ը դեռ սահմանված չէ" },
+  "unlockPin.hide": { en: "Hide PIN", ru: "Скрыть PIN", am: "Թաքցնել PIN-ը" },
+  "unlockPin.show": { en: "Show PIN", ru: "Показать PIN", am: "Ցույց տալ PIN-ը" },
+  "unlockPin.change": { en: "Change PIN", ru: "Изменить PIN", am: "Փոխել PIN-ը" },
+  "unlockPin.set": { en: "Set PIN", ru: "Установить PIN", am: "Սահմանել PIN" },
+  "unlockPin.update": { en: "Update PIN", ru: "Обновить PIN", am: "Թարմացնել PIN-ը" },
+  "unlockPin.newPlaceholder": { en: "New PIN", ru: "Новый PIN", am: "Նոր PIN" },
+  "unlockPin.invalid": { en: "PIN must be 4–6 digits", ru: "PIN должен содержать 4–6 цифр", am: "PIN-ը պետք է լինի 4–6 թվանշան" },
+  "unlockPin.saveFailed": { en: "Failed to save PIN", ru: "Не удалось сохранить PIN", am: "Չհաջողվեց պահպանել PIN-ը" },
+  "unlockPin.setAt": { en: "Set · {0}", ru: "Установлен · {0}", am: "Սահմանված է · {0}" },
+  "unlockPin.saved": { en: "Saved.", ru: "Сохранено.", am: "Պահպանված է:" },
+
+  // CompanyBillingCard
+  "billing.title": { en: "Billing", ru: "Оплата", am: "Վճարում" },
+  "billing.markPaidConfirm": { en: "Mark {0} as paid? This shifts the next-due date by one month.", ru: "Отметить {0} как оплачено? Дата следующего платежа сдвинется на месяц.", am: "Նշե՞լ {0}-ը որպես վճարված: Հաջորդ վճարման ամսաթիվը կտեղափոխվի մեկ ամսով:" },
+  "billing.notDeployed": { en: "Billing endpoints not deployed yet.", ru: "Эндпоинты оплаты ещё не развёрнуты.", am: "Վճարման endpoint-ները դեռ տեղադրված չեն:" },
+  "billing.noInfo": { en: "No billing info.", ru: "Нет данных об оплате.", am: "Վճարման տվյալներ չկան:" },
+  "billing.commissionRate": { en: "Commission rate", ru: "Ставка комиссии", am: "Միջնորդավճարի դրույք" },
+  "billing.lastPaid": { en: "Last paid", ru: "Последняя оплата", am: "Վերջին վճարում" },
+  "billing.nextDue": { en: "Next due", ru: "Следующий платёж", am: "Հաջորդ վճարում" },
+  "billing.timeLeft": { en: "Time left", ru: "Осталось", am: "Մնացել է" },
+  "billing.overdueBy": { en: "Overdue by {0} day(s)", ru: "Просрочено на {0} дн.", am: "Ուշացած {0} օրով" },
+  "billing.daysLeft": { en: "{0} day(s) left", ru: "Осталось {0} дн.", am: "Մնացել է {0} օր" },
+  "billing.adminReminder": { en: "⚠ Company {0} must pay for the program in {1} day(s).", ru: "⚠ Компания {0} должна оплатить программу через {1} дн.", am: "⚠ {0} ընկերությունը պետք է վճարի ծրագրի համար {1} օրից:" },
+  "billing.ownerReminder": { en: "⚠ In {0} day(s) you must pay Cyber Place.", ru: "⚠ Через {0} дн. вам нужно оплатить Cyber Place.", am: "⚠ {0} օրից դուք պետք է վճարեք Cyber Place:" },
+  "billing.adminOverdue": { en: "Company {0} is overdue. Status will switch to pending automatically.", ru: "Компания {0} просрочила оплату. Статус переключится на «ожидание» автоматически.", am: "{0} ընկերությունը ուշացրել է վճարումը: Կարգավիճակն ավտոմատ կփոխվի «սպասման»:" },
+  "billing.ownerOverdue": { en: "Payment to Cyber Place is overdue. Your company status has been set to pending.", ru: "Оплата Cyber Place просрочена. Статус вашей компании переведён в «ожидание».", am: "Cyber Place-ի վճարումը ուշացած է: Ձեր ընկերության կարգավիճակը դրվել է «սպասման»:" },
+  "billing.markPaidHint": { en: "Marking as paid sets last paid = now and next due = +1 month.", ru: "Отметка «оплачено» ставит последнюю оплату = сейчас и следующий платёж = +1 месяц.", am: "«Վճարված» նշումը սահմանում է վերջին վճարումը = հիմա, հաջորդը = +1 ամիս:" },
+  "billing.markPaid": { en: "Mark as paid", ru: "Отметить оплаченным", am: "Նշել վճարված" },
+
+  // PosTerminal
+  "pos.pickMember": { en: "Pick a member for deposit payment", ru: "Выберите клиента для оплаты с депозита", am: "Ընտրեք անդամ՝ ավանդից վճարելու համար" },
+  "pos.paid": { en: "Paid {0} ({1})", ru: "Оплачено {0} ({1})", am: "Վճարված {0} ({1})" },
+  "pos.checkoutFailed": { en: "Checkout failed", ru: "Не удалось провести оплату", am: "Վճարումը ձախողվեց" },
+  "pos.noProducts": { en: "No active products. Add some in the Products page.", ru: "Нет активных товаров. Добавьте их на странице «Товары».", am: "Ակտիվ ապրանքներ չկան: Ավելացրեք դրանք «Ապրանքներ» էջում:" },
+  "pos.deposit": { en: "Deposit", ru: "Депозит", am: "Ավանդ" },
+  "pos.member": { en: "Member", ru: "Клиент", am: "Անդամ" },
+  "pos.change": { en: "Change", ru: "Изменить", am: "Փոխել" },
+  "pos.searchPlaceholder": { en: "Name / phone / card", ru: "Имя / телефон / карта", am: "Անուն / հեռախոս / քարտ" },
+  "pos.processing": { en: "Processing…", ru: "Обработка…", am: "Մշակում…" },
+  "pos.charge": { en: "Charge {0}", ru: "Списать {0}", am: "Գանձել {0}" },
+  "pos.otherCategory": { en: "Other", ru: "Прочее", am: "Այլ" },
+
+  // Company country picker + TIN validation
+  "company.selectCountry": { en: "— select country —", ru: "— выберите страну —", am: "— ընտրեք երկիր —" },
+  "tin.invalid": { en: "Invalid TIN for the selected country (e.g. {0})", ru: "Неверный ИНН для выбранной страны (например: {0})", am: "Սխալ ՀՎՀՀ ընտրված երկրի համար (օրինակ՝ {0})" },
+  "tin.invalidGeneric": { en: "Invalid TIN format", ru: "Неверный формат ИНН", am: "ՀՎՀՀ-ի սխալ ձևաչափ" },
+  "company.selectCountryFirst": { en: "Select a country first", ru: "Сначала выберите страну", am: "Սկզբում ընտրեք երկիր" },
 };
 
 export const t = (key: string, lang: Lang): string => {
@@ -1162,3 +1257,15 @@ export const t = (key: string, lang: Lang): string => {
   if (!entry) return key;
   return entry[lang] || entry.en || key;
 };
+
+/**
+ * Module-level mirror of the active language, kept in sync by
+ * LanguageProvider. Lets non-hook call sites (e.g. the class-based
+ * ErrorBoundary that lives outside the React tree the provider serves)
+ * translate via `tActive(...)` without a context.
+ */
+let activeLang: Lang = "en";
+export const setActiveLang = (l: Lang): void => {
+  activeLang = l;
+};
+export const tActive = (key: string): string => t(key, activeLang);

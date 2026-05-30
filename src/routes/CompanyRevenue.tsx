@@ -1,15 +1,17 @@
 import CompanyRevenueScreen from "@/components/revenue/CompanyRevenueScreen";
 import Spinner from "@/components/ui/Spinner";
 import { useAsync } from "@/hooks/useAsync";
+import { useLang } from "@/i18n/LanguageContext";
 import { companyRepository } from "@/repositories/CompanyRepository";
 import { useParams } from "react-router-dom";
 
 const CompanyRevenue = () => {
   const { companyId } = useParams();
+  const { t } = useLang();
   const id = Number(companyId);
   const { data: company, loading, error } = useAsync(() => companyRepository.byId(id), [id]);
 
-  if (!Number.isFinite(id) || id <= 0) return <div className="error">Invalid company id.</div>;
+  if (!Number.isFinite(id) || id <= 0) return <div className="error">{t("error.invalidCompanyId")}</div>;
   if (loading) return <Spinner />;
   if (error) return <div className="error">{error.message}</div>;
   const initialPercent = company?.raw?.commission_percent;
