@@ -20,6 +20,12 @@ export interface CreateCompanyBody {
   company_logo_path: File;
   status?: CompanyStatusType;
   commission_percent?: number;
+  /**
+   * Owner's plaintext password, passed through transiently so the backend
+   * can send the welcome email AFTER the company is created (deferred from
+   * registration). Never persisted on the company.
+   */
+  owner_password?: string;
 }
 
 export type UpdateCompanyBody = Omit<Partial<CreateCompanyBody>, "user_id" | "company_logo_path"> & {

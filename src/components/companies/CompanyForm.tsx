@@ -6,13 +6,34 @@ import Input from "@/components/ui/Input";
 import Modal from "@/components/ui/Modal";
 import NumberStepper from "@/components/ui/NumberStepper";
 import { COUNTRIES, countryByCode, flagOf, resolveCountryCode } from "@/data/countries";
-import { tinExample, validateTin } from "@/data/tin";
+import { apiGetTinRules } from "@/api/tinRules";
+import { buildTinMap, tinExample, validateTin, type TinRuleMap } from "@/data/tin";
 import { useLang } from "@/i18n/LanguageContext";
 import { fmt } from "@/i18n/translations";
 import { storageUri } from "@/infrastructure/AppConfig";
 import { companyRepository } from "@/repositories/CompanyRepository";
 import { CompanyStatusType, ICompanyApi } from "@/types/api";
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
+
+const dialOf = (code: string): string => countryByCode(code)?.dial ?? "";
+
+/** Strip a leading "+<dial>" so the number input shows the national part only. */
+const stripDial = (full: string, code: string): string => {
+  const dial = dialOf(code);
+  const trimmed = full.trim();
+  if (dial) {
+    const compact = trimmed.replace(/\s+/g, "");
+    if (compact.startsWith(`+${dial}`)) return compact.slice(dial.length + 1);
+  }
+  return trimmed;
+};
+
+/** Recombine the selected country's dial code with the typed national number. */
+const composePhone = (code: string, local: string): string => {
+  const dial = dialOf(code);
+  const l = local.trim();
+  return dial ? `+${dial} ${l}`.trim() : l;
+};
 
 interface Props {
   initial?: ICompanyApi;
@@ -42,7 +63,8 @@ const CompanyForm = ({ initial, onClose, onSaved }: Props) => {
   // Step 2 — company
   const [name, setName] = useState(initial?.name ?? "");
   const [email, setEmail] = useState(initial?.email ?? "");
-  const [phone, setPhone] = useState(initial?.phone ?? "");
+  // `phone` holds the national number only; the dial code comes from `country`.
+  const [phone, setPhone] = useState(() => stripDial(initial?.phone ?? "", resolveCountryCode(initial?.company_country)));
   // `country` holds the ISO alpha-2 code (drives the picker, the phone
   // dial-code prefill and TIN validation). Legacy free-text values are
   // resolved back to a code so editing still pre-selects the dropdown.
@@ -62,6 +84,17 @@ const CompanyForm = ({ initial, onClose, onSaved }: Props) => {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
+  // Per-country TIN rules from the backend (DB source of truth). Falls back
+  // to the bundled static rules in src/data/tin.ts if the fetch fails.
+  const [tinRules, setTinRules] = useState<TinRuleMap | undefined>(undefined);
+  useEffect(() => {
+    let alive = true;
+    apiGetTinRules()
+      .then((r) => { if (alive) setTinRules(buildTinMap(r.tin_rules)); })
+      .catch(() => { /* keep the static fallback */ });
+    return () => { alive = false; };
+  }, []);
+
   /** Persist just the commission_percent to the company without closing the form. */
   const persistCommission = async (v: number) => {
     if (!isEdit || !initial) return;
@@ -74,21 +107,12 @@ const CompanyForm = ({ initial, onClose, onSaved }: Props) => {
     finally { setCommissionSaving(false); }
   };
 
-  // Selecting a country prefills the phone field with its dialling code.
-  // We only overwrite when the phone is empty or still holds the previous
-  // country's bare code — a number the admin already typed is never clobbered.
+  // The country picker and the phone dial-code select are two views of the
+  // same `country` state — picking either updates the other, the shown dial
+  // code, and TIN validation. The national number (`phone`) is left untouched.
   const onCountryChange = (code: string) => {
-    const prevDial = countryByCode(country)?.dial ?? "";
-    const nextDial = countryByCode(code)?.dial ?? "";
     setCountry(code);
     setErr(null);
-    setPhone((p) => {
-      const tr = p.trim();
-      if (!tr || tr === `+${prevDial}` || tr === `+${prevDial} `) {
-        return nextDial ? `+${nextDial} ` : "";
-      }
-      return p;
-    });
   };
 
   // Step 1 no longer hits the API — it just validates locally and advances.
@@ -107,22 +131,26 @@ const CompanyForm = ({ initial, onClose, onSaved }: Props) => {
     if (!isEdit && !logo) return setErr(t("company.logoRequired"));
     if (!isEdit && !country) return setErr(t("company.selectCountryFirst"));
     // Per-country TIN validation — block submit on a malformed tax id.
-    const tinCheck = validateTin(country, tin);
+    const tinCheck = validateTin(country, tin, tinRules);
     if (!tinCheck.valid) {
       return setErr(tinCheck.example ? fmt(t("tin.invalid"), tinCheck.example) : t("tin.invalidGeneric"));
     }
     // Persist the country as its English name (backend stores free text) so
     // existing displays keep working; the code lives only in form state.
     const countryName = countryByCode(country)?.name ?? country;
+    const fullPhone = composePhone(country, phone);
     setBusy(true); setErr(null);
     try {
-      // Register the owner here (not in step 1). Guard with userId so a retry
-      // after a failed company-create doesn't register — and email — twice.
+      // Register the owner here (not in step 1), with defer_welcome so the
+      // welcome email is held back until the company is actually created.
+      // Guard with userId so a retry after a failed company-create doesn't
+      // register — or email — twice.
       let uid = userId;
       if (!isEdit && uid == null) {
         const r = await apiRegisterUser({
           name: ownerName, email: ownerEmail,
           password: ownerPassword, password_confirmation: ownerPassword2,
+          defer_welcome: true,
         });
         uid = r.register.id;
         setUserId(uid);
@@ -132,13 +160,16 @@ const CompanyForm = ({ initial, onClose, onSaved }: Props) => {
         : {};
       const c = isEdit
         ? await companyRepository.update(initial!.id, {
-          name, email, phone, company_country: countryName, company_city: city, tin,
+          name, email, phone: fullPhone, company_country: countryName, company_city: city, tin,
           website, description, company_logo_path: logo,
           ...adminFields,
         })
         : await companyRepository.create({
-          user_id: uid!, name, email, phone, company_country: countryName, company_city: city, tin,
+          user_id: uid!, name, email, phone: fullPhone, company_country: countryName, company_city: city, tin,
           website, description, company_logo_path: logo!,
+          // Transient — backend sends the welcome email with it AFTER the
+          // company is created, then discards it (never stored).
+          owner_password: ownerPassword,
           ...adminFields,
         });
       onSaved(c.raw);
@@ -175,8 +206,34 @@ const CompanyForm = ({ initial, onClose, onSaved }: Props) => {
 
         <Input label={t("company.name")} value={name} onChange={(e) => setName(e.target.value)} required maxLength={255} autoFocus />
         <div className="row" style={{ gap: 10 }}>
-          <Input label={t("label.email")} type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
-          <Input label={t("label.phone")} value={phone} onChange={(e) => setPhone(e.target.value)} required />
+          <div style={{ flex: 1 }}>
+            <Input label={t("label.email")} type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+          </div>
+          <div style={{ flex: 1 }}>
+            <span className="label">{t("label.phone")}</span>
+            <div className="row" style={{ gap: 6 }}>
+              <select
+                className="input"
+                style={{ maxWidth: 120 }}
+                value={country}
+                onChange={(e) => onCountryChange(e.target.value)}
+                aria-label={t("branch.country")}
+              >
+                <option value="">+—</option>
+                {COUNTRIES.map((c) => (
+                  <option key={c.code} value={c.code}>{flagOf(c.code)} +{c.dial}</option>
+                ))}
+              </select>
+              <input
+                className="input"
+                type="tel"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                required
+                style={{ flex: 1 }}
+              />
+            </div>
+          </div>
         </div>
         <div className="row" style={{ gap: 10 }}>
           <div style={{ flex: 1 }}>
@@ -201,7 +258,7 @@ const CompanyForm = ({ initial, onClose, onSaved }: Props) => {
           label={t("company.tin")}
           value={tin}
           onChange={(e) => setTin(e.target.value)}
-          placeholder={tinExample(country)}
+          placeholder={tinExample(country, tinRules)}
           required
         />
         <Input label={t("company.website")} value={website} onChange={(e) => setWebsite(e.target.value)} />

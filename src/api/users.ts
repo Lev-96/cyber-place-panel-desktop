@@ -6,6 +6,8 @@ export interface RegisterUserBody {
   email: string;
   password: string;
   password_confirmation: string;
+  /** Hold the welcome email until the company is created (company flow). */
+  defer_welcome?: boolean;
 }
 
 export interface IRegisteredUser {
