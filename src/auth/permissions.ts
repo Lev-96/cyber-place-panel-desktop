@@ -12,6 +12,7 @@ export type Permission =
   | "menu.managers"        // see global Managers in sidebar
   | "menu.games"           // see Games in sidebar
   | "menu.servicesAdmin"   // see global Services CRUD
+  | "menu.expenses"        // admin-only recurring-services expense tracker
   | "menu.tournaments"     // see Tournaments in sidebar
   | "menu.scan"            // see Scan/Confirm in sidebar
   | "menu.map"             // see Branches map in sidebar
@@ -37,6 +38,8 @@ export type Permission =
   // global lookups
   | "game.crud"
   | "service.crud"
+  // admin recurring-services expense tracker CRUD
+  | "expenses.crud"
   // cashier ops (everyone with a branch can do these)
   | "session.start"
   | "session.stop"
@@ -47,12 +50,12 @@ const PERMS: Record<Role, ReadonlySet<Permission>> = {
   admin: new Set<Permission>([
     "menu.branches", "menu.companies", "menu.managers", "menu.games",
     "menu.servicesAdmin", "menu.tournaments", "menu.scan", "menu.map",
-    "menu.updates",
+    "menu.updates", "menu.expenses",
     "revenue.view",
     "branch.create", "branch.edit", "branch.delete", "branch.prices",
     "company.create", "company.edit", "company.delete",
     "manager.create", "manager.delete",
-    "game.crud", "service.crud",
+    "game.crud", "service.crud", "expenses.crud",
     "session.start", "session.stop", "pos.charge", "shift.open",
   ]),
   company_owner: new Set<Permission>([

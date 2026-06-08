@@ -34,6 +34,7 @@ export const TRANSLATIONS: Dict = {
   "nav.services": { en: "Services", ru: "Сервисы", am: "Ծառայություններ" },
   "nav.companies": { en: "Companies", ru: "Компании", am: "Ընկերություններ" },
   "nav.revenue": { en: "Revenue", ru: "Выручка", am: "Եկամուտ" },
+  "nav.expenses": { en: "Expenses", ru: "Расходы", am: "Ծախսեր" },
   "nav.myCompany": {
     en: "My company",
     ru: "Моя компания",
@@ -459,6 +460,30 @@ export const TRANSLATIONS: Dict = {
   "servicesAdmin.subtitle": { en: "Global services available for branches to enable.", ru: "Глобальные услуги, которые филиалы могут включать у себя.", am: "Համընդհանուր ծառայություններ, որոնք մասնաճյուղերը կարող են ակտիվացնել:" },
   "servicesAdmin.new": { en: "+ New service", ru: "+ Новая услуга", am: "+ Նոր ծառայություն" },
   "servicesAdmin.confirmDelete": { en: "Delete service", ru: "Удалить услугу", am: "Ջնջել ծառայությունը" },
+
+  // Recurring-services expense tracker (admin only)
+  "expenses.title": { en: "Expenses", ru: "Расходы", am: "Ծախսեր" },
+  "expenses.subtitle": { en: "Recurring services you pay for monthly (domain, Gmail Workspace, hosting…).", ru: "Регулярные сервисы, за которые ты платишь каждый месяц (домен, Gmail Workspace, хостинг…).", am: "Կրկնվող ծառայություններ, որոնց համար ամսական վճարում ես (դոմեն, Gmail Workspace, հոստինգ…):" },
+  "expenses.new": { en: "+ New expense", ru: "+ Новый расход", am: "+ Նոր ծախս" },
+  "expenses.edit": { en: "Edit expense", ru: "Редактировать расход", am: "Խմբագրել ծախսը" },
+  "expenses.name": { en: "Service name", ru: "Название сервиса", am: "Ծառայության անունը" },
+  "expenses.namePlaceholder": { en: "e.g. Domain (porkbun)", ru: "напр. Домен (porkbun)", am: "օր. Դոմեն (porkbun)" },
+  "expenses.amount": { en: "Amount", ru: "Сумма", am: "Գումար" },
+  "expenses.currency": { en: "Currency", ru: "Валюта", am: "Արժույթ" },
+  "expenses.purchasedAt": { en: "Purchase date", ru: "Дата покупки", am: "Գնման ամսաթիվ" },
+  "expenses.isActive": { en: "Active (count in monthly total)", ru: "Активен (учитывать в месячном итоге)", am: "Ակտիվ (հաշվել ամսական գումարում)" },
+  "expenses.invalidForm": { en: "Fill in a name, a non-negative amount and a purchase date.", ru: "Укажи название, неотрицательную сумму и дату покупки.", am: "Լրացրու անունը, ոչ բացասական գումարը և գնման ամսաթիվը:" },
+  "expenses.monthlyTotal": { en: "Monthly total", ru: "Итого в месяц", am: "Ամսական ընդամենը" },
+  "expenses.perMonth": { en: "per month", ru: "в месяц", am: "ամսական" },
+  "expenses.empty": { en: "No services tracked yet.", ru: "Пока нет добавленных сервисов.", am: "Դեռ ավելացված ծառայություններ չկան:" },
+  "expenses.upcomingTitle": { en: "Upcoming charges (within 3 days)", ru: "Ближайшие платежи (в течение 3 дней)", am: "Մոտալուտ վճարումներ (3 օրվա ընթացքում)" },
+  "expenses.dueToday": { en: "due today", ru: "платёж сегодня", am: "վճարումն այսօր է" },
+  "expenses.dueIn": { en: "in", ru: "через", am: "ևս" },
+  "expenses.dayShort": { en: "day", ru: "день", am: "օր" },
+  "expenses.daysShort": { en: "days", ru: "дн.", am: "օր" },
+  "expenses.nextDue": { en: "next charge", ru: "след. платёж", am: "հաջորդ վճարում" },
+  "expenses.paused": { en: "paused", ru: "на паузе", am: "դադարեցված" },
+  "expenses.confirmDelete": { en: "Delete expense", ru: "Удалить расход", am: "Ջնջել ծախսը" },
 
   // Companies / revenue
   "companiesList.title": { en: "Companies", ru: "Компании", am: "Ընկերություններ" },

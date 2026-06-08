@@ -1,4 +1,6 @@
 import { apiBillingReminders, IBillingReminder } from "@/api/billing";
+import type { IServiceExpense } from "@/api/expenses";
+import { dueLabel, dueTone } from "@/components/expenses/expenseFormat";
 import type { IDbNotification } from "@/api/notifications";
 import { orFallback } from "@/api/fallback";
 import { useAuth } from "@/auth/AuthContext";
@@ -6,7 +8,9 @@ import ScreenWithBg from "@/components/ui/ScreenWithBg";
 import Spinner from "@/components/ui/Spinner";
 import { useAsync } from "@/hooks/useAsync";
 import { formatDate } from "@/i18n/dates";
+import { formatAmount } from "@/i18n/currency";
 import { useLang } from "@/i18n/LanguageContext";
+import { expenseRepository } from "@/repositories/ExpenseRepository";
 import { useNotifications } from "@/notifications/NotificationsContext";
 import { useNavigate } from "react-router-dom";
 
@@ -70,6 +74,16 @@ const Notifications = () => {
     [showBilling],
   );
 
+  // Admin-only recurring-services expense reminders (on-demand "remind me
+  // 3 days before" feed). Degrades to empty if the endpoint isn't
+  // deployed yet, so it never blocks the rest of the screen.
+  const expenses = useAsync(
+    () => isAdmin
+      ? orFallback(expenseRepository.reminders(3), [] as IServiceExpense[])
+      : Promise.resolve([] as IServiceExpense[]),
+    [isAdmin],
+  );
+
   if (loadingDb && list.length === 0 && billing.loading) return <Spinner />;
   if (errorDb && list.length === 0) return <div className="error">{errorDb}</div>;
   if (billing.error && (billing.data?.data ?? []).length === 0) {
@@ -77,6 +91,7 @@ const Notifications = () => {
   }
 
   const billingList = billing.data?.data ?? [];
+  const expensesList = expenses.data ?? [];
 
   return (
     <ScreenWithBg bg="./bg/notifications.jpg" title={t("notifications.title")}>
@@ -149,7 +164,40 @@ const Notifications = () => {
           )}
         </>
       )}
+
+      {isAdmin && expensesList.length > 0 && (
+        <>
+          <h3 className="muted" style={{ margin: "24px 0 12px", fontSize: 14 }}>
+            {t("expenses.upcomingTitle")}
+          </h3>
+          <div style={{ display: "grid", gap: 12 }}>
+            {expensesList.map((e) => (
+              <ExpenseReminderCard key={e.id} e={e} />
+            ))}
+          </div>
+        </>
+      )}
     </ScreenWithBg>
+  );
+};
+
+/** One recurring-service charge that is due within the reminder window. */
+const ExpenseReminderCard = ({ e }: { e: IServiceExpense }) => {
+  const { t, lang } = useLang();
+  const headline = `${e.name} — ${dueLabel(e.days_until_due, t)}`;
+
+  return (
+    <div className="gradient-card">
+      <div className="gradient-card-inner" style={{ borderLeft: `4px solid ${dueTone(e.days_until_due)}` }}>
+        <div className="row-between" style={{ alignItems: "baseline" }}>
+          <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 6 }}>{headline}</div>
+          <div style={{ fontWeight: 700, fontSize: 16 }}>{formatAmount(e.amount, e.currency, lang)}</div>
+        </div>
+        <div className="muted" style={{ fontSize: 13 }}>
+          {t("expenses.nextDue")}: {formatDate(e.next_due_at)}
+        </div>
+      </div>
+    </div>
   );
 };
 

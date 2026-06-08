@@ -29,6 +29,7 @@ const CompaniesList = lazy(() => import("@/routes/CompaniesList"));
 const CompanyBranches = lazy(() => import("@/routes/CompanyBranches"));
 const CompanyDetails = lazy(() => import("@/routes/CompanyDetails"));
 const CompanyRevenue = lazy(() => import("@/routes/CompanyRevenue"));
+const Expenses = lazy(() => import("@/routes/Expenses"));
 const MyCompany = lazy(() => import("@/routes/MyCompany"));
 const Revenue = lazy(() => import("@/routes/Revenue"));
 const ConfirmByCode = lazy(() => import("@/routes/ConfirmByCode"));
@@ -216,6 +217,14 @@ const Authed = () => {
           element={
             <RoleGuard perm="menu.servicesAdmin">
               <ServicesAdmin />
+            </RoleGuard>
+          }
+        />
+        <Route
+          path="/expenses"
+          element={
+            <RoleGuard perm="menu.expenses">
+              <Expenses />
             </RoleGuard>
           }
         />

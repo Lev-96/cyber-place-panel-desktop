@@ -56,6 +56,13 @@ export interface MoneyDisplay {
   /** Convert amount from BASE (AMD) to target currency. */
   convert(amountInBase: number, target: Currency): number;
   /**
+   * Convert an amount that is ALREADY in `from` currency into `to`
+   * currency, routing through the AMD base. Used by the expense tracker
+   * to roll mixed-currency monthly costs into one grand total. Reads the
+   * same live rates as `convert`, so it tracks the daily FX refresh.
+   */
+  convertBetween(amount: number, from: Currency, to: Currency): number;
+  /**
    * Format amount-in-base as a localized string in target currency.
    * `lang` chooses the AMD unit word ("dram" / "драм" / "դրамm") when
    * target=AMD; ignored otherwise. Optional for back-compat with
@@ -69,6 +76,12 @@ export class StaticRateMoneyDisplay implements MoneyDisplay {
   convert(amountInBase: number, target: Currency): number {
     const r = this.rates[target] ?? 1;
     return amountInBase * r;
+  }
+  convertBetween(amount: number, from: Currency, to: Currency): number {
+    // rates are "1 AMD costs X target", so AMD = amount / rates[from].
+    const rFrom = this.rates[from] ?? 1;
+    const rTo = this.rates[to] ?? 1;
+    return (amount / rFrom) * rTo;
   }
   format(amountInBase: number, target: Currency, lang: Lang = "am"): string {
     const value = this.convert(amountInBase, target);
@@ -91,3 +104,24 @@ export class StaticRateMoneyDisplay implements MoneyDisplay {
 }
 
 export const moneyDisplay = new StaticRateMoneyDisplay();
+
+/**
+ * Format an amount that is ALREADY denominated in `currency` — no base
+ * conversion. `moneyDisplay.format` assumes an AMD-base input, so it is
+ * the wrong tool when a value is literally "$12 USD" (the expense
+ * tracker's per-service prices). Mirrors `format`'s AMD hand-formatting
+ * so a literal AMD amount still reads "1,000 dram", never "AMD 1,000".
+ */
+export const formatAmount = (value: number, currency: Currency, lang: Lang = "am"): string => {
+  if (currency === "AMD") {
+    const number = value.toLocaleString(CURRENCY_LOCALE[currency], {
+      maximumFractionDigits: 0,
+    });
+    return `${number} ${AMD_UNIT[lang]}`;
+  }
+  return new Intl.NumberFormat(CURRENCY_LOCALE[currency], {
+    style: "currency",
+    currency,
+    maximumFractionDigits: 2,
+  }).format(value);
+};
