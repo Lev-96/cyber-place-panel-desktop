@@ -9,12 +9,14 @@ interface Props {
   expense: IServiceExpense;
   onEdit: () => void;
   onDelete: () => void;
+  onMarkPaid: () => void;
+  busy?: boolean;
 }
 
 const btn: React.CSSProperties = { padding: "6px 10px", fontSize: 12, minWidth: 80, textAlign: "center" };
 
 /** One tracked service row — amount in its own currency, next charge, status dot. */
-const ExpenseListItem = ({ expense: e, onEdit, onDelete }: Props) => {
+const ExpenseListItem = ({ expense: e, onEdit, onDelete, onMarkPaid, busy }: Props) => {
   const { t, lang } = useLang();
 
   return (
@@ -38,10 +40,14 @@ const ExpenseListItem = ({ expense: e, onEdit, onDelete }: Props) => {
           <div className="meta">
             {formatAmount(e.amount, e.currency, lang)} · {t("expenses.nextDue")}: {formatDate(e.next_due_at)}
             {e.is_active && <>{" · "}{dueLabel(e.days_until_due, t)}</>}
+            {e.last_paid_at && <>{" · "}{t("expenses.lastPaid")}: {formatDate(e.last_paid_at)}</>}
           </div>
         </div>
       </div>
       <div className="row" style={{ gap: 6 }}>
+        {e.is_active && (
+          <Button onClick={onMarkPaid} disabled={busy} style={btn}>{t("expenses.markPaid")}</Button>
+        )}
         <Button variant="secondary" onClick={onEdit} style={btn}>{t("action.edit")}</Button>
         <Button
           variant="secondary"

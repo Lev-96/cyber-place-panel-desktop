@@ -1,6 +1,7 @@
 import {
   apiCreateServiceExpense,
   apiDeleteServiceExpense,
+  apiMarkServiceExpensePaid,
   apiServiceExpenseReminders,
   apiServiceExpenses,
   apiUpdateServiceExpense,
@@ -23,6 +24,10 @@ export class ExpenseRepository {
   }
   async update(id: number, body: Partial<ServiceExpenseBody>): Promise<IServiceExpense> {
     const res = await apiUpdateServiceExpense(id, body);
+    return res.data;
+  }
+  async markPaid(id: number): Promise<IServiceExpense> {
+    const res = await apiMarkServiceExpensePaid(id);
     return res.data;
   }
   async remove(id: number): Promise<void> {

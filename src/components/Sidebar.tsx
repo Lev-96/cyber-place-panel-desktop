@@ -214,6 +214,7 @@ const Sidebar = () => {
         />
         <span>CYBER PLACE</span>
       </h1>
+      <nav className="sidebar-nav">
       <NavLink to="/" end>
         {t("nav.dashboard")}
       </NavLink>
@@ -273,16 +274,18 @@ const Sidebar = () => {
           <UnreadBadge count={agentUpdateCount} />
         </NavLink>
       )}
-      <div className="spacer" />
-      <UserCard
-        name={user?.name}
-        email={user?.email}
-        role={role}
-        roleLabel={role ? t(`role.${role}`) || role.replace("_", " ") : ""}
-      />
-      <button className="logout" onClick={() => void logout()}>
-        {t("nav.signOut")}
-      </button>
+      </nav>
+      <div className="sidebar-footer">
+        <UserCard
+          name={user?.name}
+          email={user?.email}
+          role={role}
+          roleLabel={role ? t(`role.${role}`) || role.replace("_", " ") : ""}
+        />
+        <button className="logout" onClick={() => void logout()}>
+          {t("nav.signOut")}
+        </button>
+      </div>
     </aside>
   );
 };

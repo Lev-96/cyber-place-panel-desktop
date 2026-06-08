@@ -18,7 +18,9 @@ export interface IServiceExpense {
   purchased_at: string; // YYYY-MM-DD
   is_active: boolean;
   next_due_at: string; // ISO 8601
-  days_until_due: number;
+  days_until_due: number; // negative = overdue
+  is_overdue: boolean;
+  last_paid_at: string | null; // YYYY-MM-DD
   created_at: string | null;
 }
 
@@ -44,6 +46,10 @@ export const apiCreateServiceExpense = (body: ServiceExpenseBody) =>
 
 export const apiUpdateServiceExpense = (id: number, body: Partial<ServiceExpenseBody>) =>
   request<{ data: IServiceExpense }>(`/admin/service-expenses/${id}`, { method: "PUT", body });
+
+/** Settle the current month — advances next_due_at one cycle forward. */
+export const apiMarkServiceExpensePaid = (id: number) =>
+  request<{ data: IServiceExpense }>(`/admin/service-expenses/${id}/mark-paid`, { method: "POST" });
 
 export const apiDeleteServiceExpense = (id: number) =>
   request<null>(`/admin/service-expenses/${id}`, { method: "DELETE" });

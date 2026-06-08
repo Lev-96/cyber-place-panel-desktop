@@ -181,23 +181,36 @@ const Notifications = () => {
   );
 };
 
-/** One recurring-service charge that is due within the reminder window. */
+/**
+ * One recurring-service charge due soon (or overdue). Clicking it opens
+ * the Expenses page, where the "Paid" action lives.
+ */
 const ExpenseReminderCard = ({ e }: { e: IServiceExpense }) => {
   const { t, lang } = useLang();
+  const navigate = useNavigate();
   const headline = `${e.name} — ${dueLabel(e.days_until_due, t)}`;
 
   return (
-    <div className="gradient-card">
-      <div className="gradient-card-inner" style={{ borderLeft: `4px solid ${dueTone(e.days_until_due)}` }}>
-        <div className="row-between" style={{ alignItems: "baseline" }}>
-          <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 6 }}>{headline}</div>
-          <div style={{ fontWeight: 700, fontSize: 16 }}>{formatAmount(e.amount, e.currency, lang)}</div>
-        </div>
-        <div className="muted" style={{ fontSize: 13 }}>
-          {t("expenses.nextDue")}: {formatDate(e.next_due_at)}
+    <button
+      type="button"
+      onClick={() => navigate("/expenses")}
+      style={{
+        background: "none", border: "none", padding: 0, margin: 0,
+        width: "100%", textAlign: "left", cursor: "pointer", font: "inherit", color: "inherit",
+      }}
+    >
+      <div className="gradient-card">
+        <div className="gradient-card-inner" style={{ borderLeft: `4px solid ${dueTone(e.days_until_due)}` }}>
+          <div className="row-between" style={{ alignItems: "baseline" }}>
+            <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 6 }}>{headline}</div>
+            <div style={{ fontWeight: 700, fontSize: 16 }}>{formatAmount(e.amount, e.currency, lang)}</div>
+          </div>
+          <div className="muted" style={{ fontSize: 13 }}>
+            {t("expenses.nextDue")}: {formatDate(e.next_due_at)} · {t("expenses.openToPay")}
+          </div>
         </div>
       </div>
-    </div>
+    </button>
   );
 };
 

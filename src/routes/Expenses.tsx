@@ -24,12 +24,24 @@ const Expenses = () => {
   const [editing, setEditing] = useState<IServiceExpense | null>(null);
   const [toDelete, setToDelete] = useState<IServiceExpense | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [payingId, setPayingId] = useState<number | null>(null);
 
   const all = data ?? [];
   const active = all.filter((e) => e.is_active);
+  // Due within the reminder window OR already overdue (negative days).
   const upcoming = active
-    .filter((e) => e.days_until_due >= 0 && e.days_until_due <= REMIND_WITHIN_DAYS)
+    .filter((e) => e.days_until_due <= REMIND_WITHIN_DAYS)
     .sort((a, b) => a.days_until_due - b.days_until_due);
+
+  const markPaid = async (e: IServiceExpense) => {
+    setPayingId(e.id);
+    try {
+      await expenseRepository.markPaid(e.id);
+      void reload();
+    } finally {
+      setPayingId(null);
+    }
+  };
 
   const confirmDelete = async () => {
     if (!toDelete) return;
@@ -55,7 +67,7 @@ const Expenses = () => {
 
       {!loading && !error && (
         <>
-          <UpcomingChargesBanner items={upcoming} />
+          <UpcomingChargesBanner items={upcoming} onMarkPaid={markPaid} busyId={payingId} />
           <ExpenseSummaryCard active={active} />
 
           <div className="list">
@@ -65,6 +77,8 @@ const Expenses = () => {
                 expense={e}
                 onEdit={() => setEditing(e)}
                 onDelete={() => setToDelete(e)}
+                onMarkPaid={() => void markPaid(e)}
+                busy={payingId === e.id}
               />
             ))}
             {all.length === 0 && <div className="muted">{t("expenses.empty")}</div>}
