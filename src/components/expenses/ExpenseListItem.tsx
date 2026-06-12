@@ -1,5 +1,5 @@
 import { IServiceExpense } from "@/api/expenses";
-import { dueLabel, dueTone } from "@/components/expenses/expenseFormat";
+import { REMIND_WITHIN_DAYS, dueLabel, dueTone } from "@/components/expenses/expenseFormat";
 import Button from "@/components/ui/Button";
 import { formatDate } from "@/i18n/dates";
 import { formatAmount } from "@/i18n/currency";
@@ -18,6 +18,11 @@ const btn: React.CSSProperties = { padding: "6px 10px", fontSize: 12, minWidth: 
 /** One tracked service row — amount in its own currency, next charge, status dot. */
 const ExpenseListItem = ({ expense: e, onEdit, onDelete, onMarkPaid, busy }: Props) => {
   const { t, lang } = useLang();
+
+  // "Paid" is locked by default and only unlocks once the charge is
+  // within the 3-day reminder window (or already overdue) — the admin
+  // settles a month as it comes due, not arbitrarily far in advance.
+  const payable = e.days_until_due <= REMIND_WITHIN_DAYS;
 
   return (
     <div className="list-item" style={{ opacity: e.is_active ? 1 : 0.55 }}>
@@ -46,7 +51,14 @@ const ExpenseListItem = ({ expense: e, onEdit, onDelete, onMarkPaid, busy }: Pro
       </div>
       <div className="row" style={{ gap: 6 }}>
         {e.is_active && (
-          <Button onClick={onMarkPaid} disabled={busy} style={btn}>{t("expenses.markPaid")}</Button>
+          <Button
+            onClick={onMarkPaid}
+            disabled={busy || !payable}
+            style={btn}
+            title={!payable ? t("expenses.payLockedHint") : undefined}
+          >
+            {t("expenses.markPaid")}
+          </Button>
         )}
         <Button variant="secondary" onClick={onEdit} style={btn}>{t("action.edit")}</Button>
         <Button

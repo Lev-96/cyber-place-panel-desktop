@@ -488,6 +488,10 @@ export const TRANSLATIONS: Dict = {
   "expenses.nextDue": { en: "next charge", ru: "след. платёж", am: "հաջորդ վճարում" },
   "expenses.paused": { en: "paused", ru: "на паузе", am: "դադարեցված" },
   "expenses.confirmDelete": { en: "Delete expense", ru: "Удалить расход", am: "Ջնջել ծախսը" },
+  "expenses.payLockedHint": { en: "Activates 3 days before the charge", ru: "Активна за 3 дня до платежа", am: "Ակտիվանում է վճարումից 3 օր առաջ" },
+  "expenses.reminderPushTitle": { en: "Time to pay for a service", ru: "Пора оплатить сервис", am: "Ժամանակն է վճարել ծառայության համար" },
+  "expenses.reminderToastMany": { en: "{n} services awaiting payment", ru: "{n} сервисов ждут оплаты", am: "{n} ծառայություն սպասում է վճարման" },
+  "expenses.openExpenses": { en: "Open expenses", ru: "Открыть расходы", am: "Բացել ծախսերը" },
 
   // Companies / revenue
   "companiesList.title": { en: "Companies", ru: "Компании", am: "Ընկերություններ" },
@@ -1032,6 +1036,16 @@ export const TRANSLATIONS: Dict = {
     en: "Sessions, POS, shift, members",
     ru: "Сеансы, касса, смена, клиенты",
     am: "Սեանսներ, դրամարկղ, հերթափոխ, հաճախորդներ",
+  },
+  "home.menu.expenses": {
+    en: "Expenses",
+    ru: "Расходы",
+    am: "Ծախսեր",
+  },
+  "home.menu.expensesSub": {
+    en: "Recurring services you pay monthly",
+    ru: "Регулярные сервисы, оплата ежемесячно",
+    am: "Կրկնվող ծառայություններ, ամսական վճարում",
   },
   "home.menu.settings": {
     en: "Settings",

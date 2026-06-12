@@ -3,6 +3,7 @@ import { friendlyMutation } from "@/api/fallback";
 import { formatApiError } from "@/api/errors";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
+import MaskedDateInput from "@/components/ui/MaskedDateInput";
 import Modal from "@/components/ui/Modal";
 import { Currency } from "@/i18n/currency";
 import { useLang } from "@/i18n/LanguageContext";
@@ -106,11 +107,10 @@ const ExpenseForm = ({ initial, onClose, onSaved }: Props) => {
           </div>
         </div>
 
-        <Input
+        <MaskedDateInput
           label={t("expenses.purchasedAt")}
-          type="date"
-          value={purchasedAt}
-          onChange={(e) => setPurchasedAt(e.target.value)}
+          valueIso={purchasedAt}
+          onChangeIso={setPurchasedAt}
           required
         />
 

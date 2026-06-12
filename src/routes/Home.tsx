@@ -134,6 +134,14 @@ const Home = () => {
             <div className="muted">{t("home.menu.companiesSub")}</div>
           </Link>
         )}
+        {isAdmin && (
+          <Link to="/expenses" className="card" style={{ minWidth: 220 }}>
+            <div style={{ fontWeight: 700, fontSize: 16 }}>
+              {t("home.menu.expenses")}
+            </div>
+            <div className="muted">{t("home.menu.expensesSub")}</div>
+          </Link>
+        )}
         <Link to="/settings" className="card" style={{ minWidth: 220 }}>
           <div style={{ fontWeight: 700, fontSize: 16 }}>
             {t("home.menu.settings")}
