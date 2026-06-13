@@ -7,7 +7,7 @@ import { Page, Route } from "@playwright/test";
  * changes, the mock changes here and the tests re-run.
  */
 
-const BACKEND = "https://cyber-place-server-staging-production.up.railway.app";
+const BACKEND = "https://cyber-place-server-production.up.railway.app";
 
 export interface AuthFixture {
   role: "admin" | "company_owner" | "manager";

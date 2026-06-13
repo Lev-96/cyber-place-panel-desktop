@@ -1,6 +1,6 @@
 {
   "name": "cyber-place-panel-desktop",
-  "version": "1.0.38",
+  "version": "1.0.39",
   "private": true,
   "main": "electron/dist/main.js",
   "description": "Cyber Place staff panel — gaming-venue management for admin, owners and managers (bookings, sessions, tournaments, billing).",
@@ -14,12 +14,16 @@
   "scripts": {
     "dev": "vite",
     "build:web": "tsc -p tsconfig.app.json && vite build",
+    "build:web:staging": "tsc -p tsconfig.app.json && vite build --mode staging",
     "build:electron": "tsc -p electron/tsconfig.json",
     "build": "npm run build:web && npm run build:electron",
+    "build:staging": "npm run build:web:staging && npm run build:electron",
     "preview": "vite preview",
     "electron:dev": "npm run build:electron && ELECTRON_DEV_URL=http://localhost:5173 electron electron/dist/main.js",
     "dist:linux": "npm run build && electron-builder --linux",
+    "dist:linux:staging": "npm run build:staging && electron-builder --linux --config electron-builder.staging.json",
     "dist:win": "npm run build && electron-builder --win",
+    "dist:win:staging": "npm run build:staging && electron-builder --win --config electron-builder.staging.json",
     "typecheck": "tsc -p tsconfig.app.json --noEmit && tsc -p electron/tsconfig.json --noEmit",
     "test": "vitest run",
     "test:watch": "vitest"

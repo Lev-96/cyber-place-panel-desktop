@@ -11,7 +11,7 @@ import { installBackendMocks } from "./helpers/mockBackend";
  * redirected owner to "/" because the route was gated by `menu.companies`).
  */
 
-const BACKEND = "https://cyber-place-server-staging-production.up.railway.app";
+const BACKEND = "https://cyber-place-server-production.up.railway.app";
 
 test("manager hub hides Managers and Tariffs tiles", async ({ page }) => {
   await installBackendMocks(page, {
