@@ -37,6 +37,36 @@ change. Never silently drift the staff side away from mobile or backend.
 
 ---
 
+## 2.5 Branches, environments & deploy (READ BEFORE COMMITTING)
+
+**Branch workflow — applies to every Cyber Place repo:**
+- **All changes go to the `staging` branch first.** Never commit or push
+  straight to the production branch.
+- Production branch is **`master`** for the backend (`cyber-place`), both
+  desktops (`-panel-desktop`, `-panel-desktop-agent`) and the website
+  (`-panel-website`); it is **`main`** only for the mobile app
+  (`CyberPlace-mob`). The staging branch is named `staging` in every repo.
+- The user reviews on `staging`, then **promotes to production himself**
+  (merges `staging` → the prod branch). Do not open or merge that PR
+  unless explicitly asked.
+
+**Releases / CI (this desktop):** production and staging coexist in the SAME
+GitHub repo, separated by **electron-updater channel + git tag**, not by
+branch — so the two yml files never conflict:
+- `.github/workflows/release.yml` — production; fires on tags `v*`
+  (excludes `v*-staging*`); channel `latest` (`latest*.yml`).
+- `.github/workflows/release-staging.yml` — staging; fires on tags
+  `v*-staging*`; uses `electron-builder.staging.json` (full standalone copy),
+  prerelease, channel `staging` (`staging*.yml`).
+- Both workflow files live on both branches and are **tag-driven**.
+  `package.json` version MUST equal the tag (incl. `-staging.N`) or the
+  backend update gate loops "update available".
+- `.env.production` / `.env.staging` are TRACKED on purpose (public Vite
+  values, required by CI); build via `npm run build` / `dist:*` (prod) or
+  `build:staging` / `dist:*:staging` (staging).
+
+---
+
 ## 3. Stack (verified)
 
 - **Electron 33 + Vite 5.4 + React 19** · TypeScript strict mode
