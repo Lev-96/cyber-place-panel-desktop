@@ -1,6 +1,6 @@
 {
   "name": "cyber-place-panel-desktop",
-  "version": "1.0.39",
+  "version": "1.0.40-staging.3",
   "private": true,
   "main": "electron/dist/main.js",
   "description": "Cyber Place staff panel — gaming-venue management for admin, owners and managers (bookings, sessions, tournaments, billing).",
