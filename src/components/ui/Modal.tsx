@@ -1,4 +1,5 @@
 import { ReactNode, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 
 interface Props {
   open: boolean;
@@ -7,6 +8,10 @@ interface Props {
   closeOnBackdrop?: boolean;
   children: ReactNode;
 }
+
+/** How many modals are currently open — drives the body scroll-lock so stacked
+ *  modals release the lock only when the last one closes. */
+let openModalCount = 0;
 
 /**
  * Centered modal overlay. The outer `.cp-modal` is the scroll container.
@@ -66,6 +71,22 @@ const Modal = ({ open, onClose, closeOnBackdrop = true, children }: Props) => {
     return () => window.removeEventListener("keydown", onKey);
   }, [open, onClose]);
 
+  // Lock the page (`.main`) scroll while a modal is open, so the only scrollbar
+  // belongs to the modal itself. A module-level counter keeps the lock active
+  // until the LAST open modal closes, so stacked modals don't release it early.
+  useEffect(() => {
+    if (!open) return;
+    openModalCount += 1;
+    document.body.classList.add("cp-modal-open");
+    return () => {
+      openModalCount -= 1;
+      if (openModalCount <= 0) {
+        openModalCount = 0;
+        document.body.classList.remove("cp-modal-open");
+      }
+    };
+  }, [open]);
+
   if (!open) return null;
 
   // A click "on the backdrop" means it landed on .cp-modal or its
@@ -87,12 +108,20 @@ const Modal = ({ open, onClose, closeOnBackdrop = true, children }: Props) => {
     if (closeOnBackdrop && onClose && wasOnBackdrop) onClose();
   };
 
-  return (
+  // Render into <body> via a portal so the overlay is NOT nested inside the
+  // route content. That content carries a lasting `transform` (its mount
+  // animation uses animation-fill-mode: both, whose final frame is
+  // `translateY(0)` — an identity transform that still establishes a
+  // containing block). A transformed ancestor makes `position: fixed` resolve
+  // against that ancestor instead of the viewport, which clipped the bottom of
+  // tall modals. Portaling to body keeps `fixed` truly viewport-relative.
+  return createPortal(
     <div className="cp-modal" onMouseDown={onMouseDown} onMouseUp={onMouseUp}>
       <div ref={wrapperRef} className="cp-modal-wrapper">
         {children}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 };
 
