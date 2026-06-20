@@ -127,25 +127,27 @@ html {
   height: 100dvh;
 }
 .cp-modal-wrapper {
-  /* min-height = viewport: lets us center when content fits AND lets the
-     wrapper grow beyond viewport when content overflows so .cp-modal scrolls
-     and the title remains reachable from the top.
-     `safe center` falls back to flex-start when content overflows, so the
-     top of the modal is never clipped above the scroll origin. */
+  /* min-height = viewport so the card centers when it fits. `safe center`
+     keeps the top reachable (falls back to flex-start) if the card ever
+     exceeds the viewport. 16px padding = a guaranteed gutter on every side. */
   min-height: 100%;
   display: flex;
   align-items: safe center;
   justify-content: safe center;
-  padding: 32px 24px;
+  padding: 16px;
 }
 .cp-modal-wrapper > * {
-  /* Allow the inner card to shrink on small viewports but keep its declared
-     width when there is room. */
-  max-width: min(100%, calc(100vw - 48px));
-  /* Belt-and-braces vertical centering for browsers that don't support
-     `align-items: safe center`: auto margins keep the card centered when
-     it fits and collapse to top-aligned when it overflows. */
-  margin-block: auto;
+  /* The card never exceeds the viewport in EITHER axis and scrolls its OWN
+     content when larger — so the whole modal (title, body, actions) is always
+     fully visible at any window size, dynamically. The card keeps its declared
+     width/height below these caps.
+     No `margin-block: auto` here: combined with the flex + scroll container it
+     re-clips the top of tall modals (the part above the centre becomes
+     unreachable). `align-items: safe center` already handles centering. */
+  max-width: calc(100vw - 32px);
+  max-height: calc(100dvh - 32px);
+  overflow: auto;
+  overscroll-behavior: contain;
 }
 
 /* === Animations & transitions ============================================== */
