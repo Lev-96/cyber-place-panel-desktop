@@ -115,39 +115,35 @@ html {
 
 /* === Modal — centered when fits, scrolls outer when too tall ============ */
 .cp-modal {
+  /* Backdrop = a non-scrolling flex centering layer. It NEVER scrolls itself
+     (overflow: hidden) so there is only ONE scrollbar — the wrapper's. 16px
+     padding guarantees a gutter on every side. Dynamic viewport height so
+     DevTools / on-screen IME bars don't clip the bottom. */
   position: fixed;
   inset: 0;
   background: rgba(2, 5, 20, 0.7);
-  overflow-y: auto;
-  overscroll-behavior: contain;
+  overflow: hidden;
   z-index: 50;
-  /* Use the dynamic viewport height so DevTools / on-screen IME bars don't
-     clip the bottom of the modal. */
   height: 100vh;
   height: 100dvh;
-}
-.cp-modal-wrapper {
-  /* min-height = viewport so the card centers when it fits. `safe center`
-     keeps the top reachable (falls back to flex-start) if the card ever
-     exceeds the viewport. 16px padding = a guaranteed gutter on every side. */
-  min-height: 100%;
   display: flex;
-  align-items: safe center;
-  justify-content: safe center;
+  align-items: center;
+  justify-content: center;
   padding: 16px;
 }
-.cp-modal-wrapper > * {
-  /* The card never exceeds the viewport in EITHER axis and scrolls its OWN
-     content when larger — so the whole modal (title, body, actions) is always
-     fully visible at any window size, dynamically. The card keeps its declared
-     width/height below these caps.
-     No `margin-block: auto` here: combined with the flex + scroll container it
-     re-clips the top of tall modals (the part above the centre becomes
-     unreachable). `align-items: safe center` already handles centering. */
-  max-width: calc(100vw - 32px);
-  max-height: calc(100dvh - 32px);
+.cp-modal-wrapper {
+  /* The wrapper is bounded to the backdrop's content box (viewport − padding)
+     and is the SINGLE scroll container — a scrollbar appears only when the
+     modal is bigger than the window. It hugs the card when the card fits, so
+     small modals show no scrollbar and stay centered. */
+  max-width: 100%;
+  max-height: 100%;
   overflow: auto;
   overscroll-behavior: contain;
+}
+.cp-modal-wrapper > * {
+  /* Card shrinks to fit a narrow window; keeps its declared width below this. */
+  max-width: 100%;
 }
 
 /* === Animations & transitions ============================================== */
