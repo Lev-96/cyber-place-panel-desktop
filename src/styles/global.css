@@ -22,25 +22,51 @@
 /* Periodic neon "flicker" once per cycle + a gentle, eye-comfortable glow
    "breathing" pulse. Honours prefers-reduced-motion. */
 @keyframes brandFlicker {
-  0%   { opacity: .4; }
-  2%   { opacity: 1; }
-  3.5% { opacity: .35; }
-  5%   { opacity: 1; }
-  6.5% { opacity: .2; }
-  8%   { opacity: .95; }
-  9.5% { opacity: .55; }
-  11%  { opacity: 1; }
-  100% { opacity: 1; }
+  0% {
+    opacity: 0.4;
+  }
+  2% {
+    opacity: 1;
+  }
+  3.5% {
+    opacity: 0.35;
+  }
+  5% {
+    opacity: 1;
+  }
+  6.5% {
+    opacity: 0.2;
+  }
+  8% {
+    opacity: 0.95;
+  }
+  9.5% {
+    opacity: 0.55;
+  }
+  11% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 1;
+  }
 }
 @keyframes brandGlow {
-  0%, 100% { filter: drop-shadow(0 0 1px rgba(7, 221, 241, 0.40))
-                     drop-shadow(0 0 4px rgba(49, 175, 247, 0.22)); }
-  50%      { filter: drop-shadow(0 0 5px rgba(7, 221, 241, 0.85))
-                     drop-shadow(0 0 16px rgba(49, 175, 247, 0.55))
-                     drop-shadow(0 0 28px rgba(209, 82, 250, 0.40)); }
+  0%,
+  100% {
+    filter: drop-shadow(0 0 1px rgba(7, 221, 241, 0.4))
+      drop-shadow(0 0 4px rgba(49, 175, 247, 0.22));
+  }
+  50% {
+    filter: drop-shadow(0 0 5px rgba(7, 221, 241, 0.85))
+      drop-shadow(0 0 16px rgba(49, 175, 247, 0.55))
+      drop-shadow(0 0 28px rgba(209, 82, 250, 0.4));
+  }
 }
 @media (prefers-reduced-motion: reduce) {
-  .login-brand, .sidebar h1 span { animation: none !important; }
+  .login-brand,
+  .sidebar h1 span {
+    animation: none !important;
+  }
 }
 
 *,
@@ -115,29 +141,37 @@ html {
 
 /* === Modal — centered when fits, scrolls outer when too tall ============ */
 .cp-modal {
-  /* Backdrop = a non-scrolling flex centering layer. It NEVER scrolls itself
-     (overflow: hidden) so there is only ONE scrollbar — the wrapper's. 16px
-     padding guarantees a gutter on every side. Dynamic viewport height so
-     DevTools / on-screen IME bars don't clip the bottom. */
-  position: fixed;
+  position: sticky;
   inset: 0;
   background: rgba(2, 5, 20, 0.7);
   overflow: hidden;
   z-index: 50;
-  height: 100vh;
   height: 100dvh;
+  top: -24px;
+}
+.cp-modal-wrapper {
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 16px;
+  height: 85vh;
+  overflow: hidden;
 }
-.cp-modal-wrapper {
-  /* The wrapper is bounded to the backdrop's content box (viewport − padding)
-     and is the SINGLE scroll container — a scrollbar appears only when the
-     modal is bigger than the window. It hugs the card when the card fits, so
-     small modals show no scrollbar and stay centered. */
-  max-width: 100%;
+
+.cp-modal-wrapper form {
   max-height: 100%;
+  overflow: auto;
+}
+.cp-modal-wrapper > * {
+  /* The card never exceeds the viewport in EITHER axis and scrolls its OWN
+     content when larger — so the whole modal (title, body, actions) is always
+     fully visible at any window size, dynamically. The card keeps its declared
+     width/height below these caps.
+     No `margin-block: auto` here: combined with the flex + scroll container it
+     re-clips the top of tall modals (the part above the centre becomes
+     unreachable). `align-items: safe center` already handles centering. */
+  max-width: calc(100vw - 32px);
+  max-height: calc(100dvh - 32px);
   overflow: auto;
   overscroll-behavior: contain;
 }
@@ -452,8 +486,9 @@ a.card:hover {
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
-  animation: brandFlicker var(--flicker-every) ease-in-out infinite,
-             brandGlow 5s ease-in-out infinite;
+  animation:
+    brandFlicker var(--flicker-every) ease-in-out infinite,
+    brandGlow 5s ease-in-out infinite;
 }
 
 .sidebar a {
@@ -891,8 +926,9 @@ a.card:hover {
   color: transparent;
   margin: 0;
   text-align: center;
-  animation: brandFlicker var(--flicker-every) ease-in-out infinite,
-             brandGlow 5s ease-in-out infinite;
+  animation:
+    brandFlicker var(--flicker-every) ease-in-out infinite,
+    brandGlow 5s ease-in-out infinite;
 }
 
 .login-logo {
@@ -961,7 +997,10 @@ button.pill:hover {
   font-weight: 600;
   letter-spacing: 0.5px;
   cursor: pointer;
-  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  transition:
+    background 0.15s,
+    border-color 0.15s,
+    color 0.15s;
 }
 .login-lang-pill:hover {
   background: rgba(7, 221, 241, 0.12);
@@ -1116,7 +1155,11 @@ button.pill:hover {
   width: min(380px, calc(100vw - 40px));
   padding: 16px 18px;
   border-radius: 14px;
-  background: linear-gradient(135deg, rgba(11, 18, 36, 0.96), rgba(7, 30, 60, 0.96));
+  background: linear-gradient(
+    135deg,
+    rgba(11, 18, 36, 0.96),
+    rgba(7, 30, 60, 0.96)
+  );
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   border: 1px solid rgba(7, 221, 241, 0.4);
@@ -1170,7 +1213,9 @@ button.pill:hover {
   color: #94a3b8;
   font-size: 14px;
   cursor: pointer;
-  transition: background 120ms, color 120ms;
+  transition:
+    background 120ms,
+    color 120ms;
 }
 .cp-update-toast-close:hover {
   background: rgba(255, 255, 255, 0.08);
@@ -1178,6 +1223,12 @@ button.pill:hover {
 }
 
 @keyframes cp-update-toast-in {
-  from { opacity: 0; transform: translateX(60px); }
-  to   { opacity: 1; transform: translateX(0); }
+  from {
+    opacity: 0;
+    transform: translateX(60px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }
