@@ -144,16 +144,15 @@ html {
   position: sticky;
   inset: 0;
   background: rgba(2, 5, 20, 0.7);
-  overflow-y: auto;
-  overscroll-behavior: contain;
+  overflow: hidden;
   z-index: 50;
   height: 100dvh;
   top: -24px;
 }
 .cp-modal-wrapper {
   display: flex;
-  align-items: safe center;
-  justify-content: safe center;
+  align-items: center;
+  justify-content: center;
   padding: 16px;
   height: 85vh;
   overflow: hidden;
@@ -175,6 +174,10 @@ html {
   max-height: calc(100dvh - 32px);
   overflow: auto;
   overscroll-behavior: contain;
+}
+.cp-modal-wrapper > * {
+  /* Card shrinks to fit a narrow window; keeps its declared width below this. */
+  max-width: 100%;
 }
 
 /* === Animations & transitions ============================================== */
