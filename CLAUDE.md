@@ -297,6 +297,247 @@ manager → `branch.{id}`, orphan → null (no subscription).
 
 ---
 
+## 7.5 CSS / Styling Standards (NON-NEGOTIABLE)
+
+### CSS Quality Rules
+
+When writing or editing styles:
+
+* CSS must be production-ready.
+* Never write quick fixes.
+* Never use random values without explanation.
+* Every style must have a clear purpose.
+* Prioritize maintainability over speed.
+
+### Layout Rules
+
+* Prefer Flexbox first.
+* Use CSS Grid only when it genuinely simplifies layout.
+* Never mix Grid and Flex unnecessarily.
+* Avoid absolute positioning unless absolutely required.
+* Avoid magic numbers.
+
+Bad:
+
+```css
+left: 137px;
+top: 43px;
+```
+
+Good:
+
+```css
+justify-content: center;
+align-items: center;
+```
+
+### Spacing System
+
+Use consistent spacing only.
+
+Preferred scale:
+
+```text
+4px
+8px
+12px
+16px
+20px
+24px
+32px
+40px
+48px
+64px
+```
+
+Do not invent values like:
+
+```css
+margin: 13px;
+padding: 27px;
+```
+
+unless there is a strong reason.
+
+### Responsive Rules
+
+Desktop panel must remain usable from:
+
+```text
+1280x720
+1366x768
+1440x900
+1920x1080
+2560x1440
+```
+
+Requirements:
+
+* No horizontal scrolling.
+* No overflowing cards.
+* No text clipping.
+* No broken flex layouts.
+* No overlapping elements.
+
+Always verify:
+
+```css
+min-width
+max-width
+overflow
+flex-shrink
+flex-wrap
+```
+
+before considering the task complete.
+
+### Typography Rules
+
+Use:
+
+* Playstation Font → branding/headings
+* Inter → interface text
+
+Never mix fonts randomly.
+
+Always use:
+
+```css
+line-height
+font-weight
+letter-spacing
+```
+
+intentionally.
+
+### Animation Rules
+
+Animations must feel premium.
+
+Preferred:
+
+```css
+transition:
+  background-color 0.2s ease,
+  border-color 0.2s ease,
+  transform 0.2s ease;
+```
+
+Avoid:
+
+```css
+transition: all;
+```
+
+Never animate:
+
+```css
+width
+height
+left
+top
+```
+
+when transform can be used.
+
+Prefer:
+
+```css
+transform
+opacity
+```
+
+### Color Rules
+
+Use theme tokens whenever possible.
+
+Never hardcode colors if a theme value already exists.
+
+Bad:
+
+```css
+color: #07DDF1;
+```
+
+Good:
+
+```css
+color: var(--color-accent);
+```
+
+### Component Styling Rules
+
+Before creating new styles:
+
+1. Search for existing component styles.
+2. Reuse existing patterns.
+3. Extend existing classes.
+4. Create new styles only if reuse is impossible.
+
+### CSS Architecture
+
+Prefer:
+
+```text
+Component
+ ├─ Layout
+ ├─ State
+ └─ Variants
+```
+
+Avoid deeply nested selectors.
+
+Bad:
+
+```css
+.page .container .card .header .title
+```
+
+Good:
+
+```css
+.cardTitle
+```
+
+### Before Finishing Any Task
+
+Claude MUST verify:
+
+* No layout shifts.
+* No overflow issues.
+* No z-index conflicts.
+* No broken responsiveness.
+* No duplicated styles.
+* No dead CSS.
+* No unused selectors.
+* No unnecessary !important.
+
+### Forbidden
+
+Never:
+
+* Use !important unless absolutely unavoidable.
+* Use inline styles for permanent UI.
+* Use fixed heights for dynamic content.
+* Use magic numbers.
+* Duplicate CSS already existing in the project.
+* Break responsive layouts to solve desktop issues.
+
+### Final CSS Checklist
+
+Before marking work complete:
+
+* Responsive verified.
+* Overflow verified.
+* Alignment verified.
+* Hover states verified.
+* Focus states verified.
+* Dark theme verified.
+* Existing screens not affected.
+* CSS remains clean and readable.
+
+---
+
 ## 8. AI Assistant Behaviour (for me, Claude)
 
 When working on this project:
