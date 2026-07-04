@@ -676,6 +676,64 @@ body.cp-modal-open .main {
   display: block;
 }
 
+/* === Native date/time pickers — dark neon calendar everywhere ===========
+   Applies to every native temporal input across the app (POS history,
+   sessions history, tournament dates, branch working-hours times). The
+   editable field already uses `.input`; these rules theme the parts the
+   browser draws itself: the pop-up calendar, the trigger glyph and the
+   focused date/time segment. */
+
+/* `color-scheme: dark` makes Chromium render the pop-up calendar, the
+   spinners and the clock in dark mode so they match the panel instead of
+   flashing a white system calendar. */
+input[type="date"],
+input[type="datetime-local"],
+input[type="time"],
+input[type="month"] {
+  color-scheme: dark;
+}
+
+/* The calendar/clock glyph on the right edge: tint it to the neon accent,
+   give it a rounded hit-area and a soft hover so it reads as part of the
+   field, not a system artefact. */
+input[type="date"]::-webkit-calendar-picker-indicator,
+input[type="datetime-local"]::-webkit-calendar-picker-indicator,
+input[type="time"]::-webkit-calendar-picker-indicator,
+input[type="month"]::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  padding: 3px;
+  margin-left: 4px;
+  border-radius: 6px;
+  /* Recolour the default white glyph to the cyan accent (#07ddf1). */
+  filter: invert(74%) sepia(58%) saturate(2503%) hue-rotate(151deg) brightness(99%) contrast(94%);
+  transition:
+    background-color 160ms ease,
+    transform 160ms ease;
+}
+input[type="date"]::-webkit-calendar-picker-indicator:hover,
+input[type="datetime-local"]::-webkit-calendar-picker-indicator:hover,
+input[type="time"]::-webkit-calendar-picker-indicator:hover,
+input[type="month"]::-webkit-calendar-picker-indicator:hover {
+  background-color: rgba(7, 221, 241, 0.18);
+  transform: scale(1.06);
+}
+
+/* The editable date/time text segments stay on-theme; the segment the
+   user is editing glows with the same cyan the rest of the UI uses. */
+input[type="date"]::-webkit-datetime-edit-field,
+input[type="datetime-local"]::-webkit-datetime-edit-field,
+input[type="time"]::-webkit-datetime-edit-field {
+  color: var(--color-text);
+}
+input[type="date"]::-webkit-datetime-edit-field:focus,
+input[type="datetime-local"]::-webkit-datetime-edit-field:focus,
+input[type="time"]::-webkit-datetime-edit-field:focus {
+  background: rgba(7, 221, 241, 0.2);
+  color: #ffffff;
+  border-radius: 3px;
+  outline: none;
+}
+
 /* === NumberStepper — pretty numeric input with custom arrows ============= */
 .num-stepper {
   position: relative;
@@ -1255,4 +1313,118 @@ button.pill:hover {
     opacity: 1;
     transform: translateX(0);
   }
+}
+
+/* ── Branch map: animated "Boom" location pin ───────────────────────────── */
+.cp-map-pin {
+  position: relative;
+  width: 22px;
+  height: 22px;
+  /* Drop in with a slight overshoot the moment a real address is pinned. */
+  animation: cp-pin-drop 0.5s cubic-bezier(0.2, 0.85, 0.25, 1.4) both;
+}
+.cp-map-pin__core {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 16px;
+  height: 16px;
+  margin: -8px 0 0 -8px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #9bf7ff 0%, #07ddf1 55%, #04a3bb 100%);
+  border: 2px solid #fff;
+  box-shadow: 0 0 12px rgba(7, 221, 241, 0.9), 0 2px 6px rgba(0, 0, 0, 0.55);
+  z-index: 2;
+}
+.cp-map-pin__pulse {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 16px;
+  height: 16px;
+  margin: -8px 0 0 -8px;
+  border-radius: 50%;
+  background: rgba(7, 221, 241, 0.45);
+  z-index: 1;
+  animation: cp-pin-pulse 1.8s ease-out infinite;
+}
+.cp-map-pin__pulse--2 {
+  animation-delay: 0.6s;
+}
+.cp-map-pin__pulse--3 {
+  animation-delay: 1.2s;
+}
+@keyframes cp-pin-pulse {
+  0% {
+    transform: scale(1);
+    opacity: 0.7;
+  }
+  100% {
+    transform: scale(3.8);
+    opacity: 0;
+  }
+}
+@keyframes cp-pin-drop {
+  0% {
+    transform: translateY(-26px) scale(0.4);
+    opacity: 0;
+  }
+  60% {
+    transform: translateY(3px) scale(1.1);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cp-map-pin,
+  .cp-map-pin__pulse {
+    animation: none;
+  }
+  .cp-map-pin__pulse {
+    opacity: 0;
+  }
+}
+
+/* ── Branch address autocomplete dropdown ───────────────────────────────── */
+.cp-addr-suggest {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 50;
+  margin: 4px 0 0;
+  padding: 4px;
+  list-style: none;
+  max-height: 240px;
+  overflow-y: auto;
+  background: #0b1224;
+  border: 1px solid #1f2a44;
+  border-radius: 10px;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.55);
+  animation: cp-fade-in 0.14s ease-out both;
+}
+.cp-addr-suggest__item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 7px;
+  font-size: 13px;
+  line-height: 1.35;
+  color: #d7e0f4;
+  cursor: pointer;
+  transition: background-color 120ms;
+}
+.cp-addr-suggest__item:hover,
+.cp-addr-suggest__item--active {
+  background: #15203c;
+}
+.cp-addr-suggest__pin {
+  flex-shrink: 0;
+  margin-top: 1px;
+  color: #07ddf1;
+  font-size: 13px;
 }

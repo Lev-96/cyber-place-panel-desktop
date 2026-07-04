@@ -10,6 +10,7 @@ import { apiGetTinRules } from "@/api/tinRules";
 import { buildTinMap, tinExample, validateTin, type TinRuleMap } from "@/data/tin";
 import { useLang } from "@/i18n/LanguageContext";
 import { fmt } from "@/i18n/translations";
+import { parsePhoneNumberFromString, type CountryCode } from "libphonenumber-js";
 import { storageUri } from "@/infrastructure/AppConfig";
 import { companyRepository } from "@/repositories/CompanyRepository";
 import { CompanyStatusType, ICompanyApi } from "@/types/api";
@@ -26,13 +27,6 @@ const stripDial = (full: string, code: string): string => {
     if (compact.startsWith(`+${dial}`)) return compact.slice(dial.length + 1);
   }
   return trimmed;
-};
-
-/** Recombine the selected country's dial code with the typed national number. */
-const composePhone = (code: string, local: string): string => {
-  const dial = dialOf(code);
-  const l = local.trim();
-  return dial ? `+${dial} ${l}`.trim() : l;
 };
 
 interface Props {
@@ -135,10 +129,15 @@ const CompanyForm = ({ initial, onClose, onSaved }: Props) => {
     if (!tinCheck.valid) {
       return setErr(tinCheck.example ? fmt(t("tin.invalid"), tinCheck.example) : t("tin.invalidGeneric"));
     }
+    // Strict, offline phone validation for the selected country.
+    const parsedPhone = parsePhoneNumberFromString(phone, country as CountryCode);
+    if (!parsedPhone || !parsedPhone.isValid()) {
+      return setErr(t("branchForm.invalidPhone"));
+    }
     // Persist the country as its English name (backend stores free text) so
     // existing displays keep working; the code lives only in form state.
     const countryName = countryByCode(country)?.name ?? country;
-    const fullPhone = composePhone(country, phone);
+    const fullPhone = parsedPhone.formatInternational();
     setBusy(true); setErr(null);
     try {
       // Register the owner here (not in step 1), with defer_welcome so the

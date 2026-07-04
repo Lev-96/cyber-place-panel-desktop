@@ -1,9 +1,14 @@
 import { AppConfig } from "@/infrastructure/AppConfig";
 import { keyValueStore } from "@/infrastructure/KeyValueStore";
 import { ReactNode, createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
-import { Currency, LANG_TO_CURRENCY, moneyDisplay } from "./currency";
-import { useFxRates } from "./FxRatesContext";
+import { Currency, moneyDisplay } from "./currency";
 import { Lang, setActiveLang, t as translate } from "./translations";
+
+/** Display currency when the user hasn't picked one in Settings. The
+ *  Cyber Place network base currency is AMD (dram), so the panel shows
+ *  drams by default and stays on drams when the UI language changes —
+ *  currency only moves when the user changes it in Settings. */
+const DEFAULT_CURRENCY: Currency = "AMD";
 
 interface LangState {
   lang: Lang;
@@ -22,14 +27,6 @@ const KEY_CURRENCY = "cp.currencyOverride";
 export const LanguageProvider = ({ children }: { children: ReactNode }) => {
   const [lang, setLangState] = useState<Lang>("en");
   const [override, setOverride] = useState<Currency | null>(null);
-  // Subscribe to FX-rate refreshes so `money()` returns a NEW
-  // function identity every time today's rates land — `useMemo` sees
-  // a new dep value, the context value changes, every useLang()
-  // consumer re-renders, and all the price displays across the panel
-  // (RevenueScreen totals, member balances, session receipts, …)
-  // pick up the live rate without each component having to subscribe
-  // to FxRatesContext on its own.
-  const { version: fxVersion } = useFxRates();
 
   useEffect(() => {
     void (async () => {
@@ -56,7 +53,9 @@ export const LanguageProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const value = useMemo<LangState>(() => {
-    const currency = override ?? LANG_TO_CURRENCY[lang];
+    // Currency is decoupled from language: default to AMD, only the
+    // Settings override moves it. Rates are static (no live FX fetch).
+    const currency = override ?? DEFAULT_CURRENCY;
     return {
       lang,
       currency,
@@ -64,12 +63,12 @@ export const LanguageProvider = ({ children }: { children: ReactNode }) => {
       setCurrencyOverride,
       t: (key: string) => translate(key, lang),
       // Pass `lang` so AMD renders as the localized unit word
-      // ("dram" / "драм" / "դрамm"), never the "AMD" ISO code.
+      // ("dram" / "драм" / "դрам"), never the "AMD" ISO code.
       money: (amount: number) => moneyDisplay.format(amount, currency, lang),
     };
     // AppConfig touched to silence unused import; remove if never referenced
     void AppConfig;
-  }, [lang, override, setLang, setCurrencyOverride, fxVersion]);
+  }, [lang, override, setLang, setCurrencyOverride]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 };

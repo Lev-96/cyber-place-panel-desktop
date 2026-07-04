@@ -1,7 +1,6 @@
 import Button from "@/components/ui/Button";
 import { useLang } from "@/i18n/LanguageContext";
-import { AMD_UNIT, CURRENCY_LOCALE, LANG_TO_CURRENCY, moneyDisplay } from "@/i18n/currency";
-import { useFxRates } from "@/i18n/FxRatesContext";
+import { AMD_UNIT, CURRENCY_LOCALE, moneyDisplay } from "@/i18n/currency";
 import { branchRepository } from "@/repositories/BranchRepository";
 import { IBranchApi } from "@/types/api";
 import { Lang } from "@/i18n/translations";
@@ -52,14 +51,7 @@ interface Props {
 }
 
 const HourlyRatesForm = ({ branch, onSaved }: Props) => {
-  const { t, lang } = useLang();
-  // Subscribe to FX-rate updates so the "≈ X RUB" preview under each
-  // input refreshes as soon as today's rates land from the public
-  // endpoint. We don't read the returned value — just calling the
-  // hook is enough to make this component re-render on context change,
-  // and `moneyDisplay.convert(...)` below reads from the now-mutated
-  // DEFAULT_RATES singleton.
-  useFxRates();
+  const { t, lang, currency } = useLang();
   const [prices, setPrices] = useState<Record<PriceKey, string>>(() => {
     const init = {} as Record<PriceKey, string>;
     for (const k of KEYS) init[k] = String(branch.price_for_branch?.[k] ?? "");
@@ -107,10 +99,10 @@ const HourlyRatesForm = ({ branch, onSaved }: Props) => {
     }
   };
 
-  // Currency code shown next to each input. AMD is the storage unit,
-  // but we surface the UI-language equivalent so the manager doesn't
-  // have to do mental FX while editing.
-  const targetCurrency = LANG_TO_CURRENCY[lang];
+  // The input is always typed in AMD (the storage unit). When the
+  // display currency from Settings is not AMD, each row shows a live
+  // "≈ X" conversion so the manager has FX feedback while editing.
+  const targetCurrency = currency;
   const targetLocale = CURRENCY_LOCALE[targetCurrency];
 
   return (

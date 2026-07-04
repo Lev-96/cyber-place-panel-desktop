@@ -1,5 +1,4 @@
-import { AMD_UNIT, Currency, DEFAULT_RATES, LANG_TO_CURRENCY } from "@/i18n/currency";
-import { useFxRates } from "@/i18n/FxRatesContext";
+import { AMD_UNIT, Currency, DEFAULT_RATES } from "@/i18n/currency";
 import { useLang } from "@/i18n/LanguageContext";
 import { Lang } from "@/i18n/translations";
 import { useEffect, useRef, useState } from "react";
@@ -18,16 +17,12 @@ interface Props {
 }
 
 /**
- * Short localized suffix for the input gutter. The mapping is locked
- * to the same `LANG_TO_CURRENCY` table the money formatter uses so
- * that the suffix the manager sees is the same currency the player
- * sees on the mobile durationSelect — never out of sync.
+ * Short suffix for the input gutter, keyed to the display currency the
+ * user picked in Settings (default AMD). AMD shows the localized unit
+ * word so the ISO code never appears in the UI.
  */
-const SUFFIX_FOR_LANG: Record<Lang, string> = {
-  en: "USD",
-  ru: "руб",
-  am: AMD_UNIT.am,
-};
+const suffixFor = (currency: Currency, lang: Lang): string =>
+  currency === "AMD" ? AMD_UNIT[lang] : currency === "RUB" ? "руб" : "USD";
 
 /**
  * Convert an AMD value (the form's canonical state) to the display
@@ -59,16 +54,15 @@ const displayToAmd = (target: number, currency: Currency): string => {
 
 /**
  * Currency-aware price field. The form state is AMD (the company's
- * base storage currency) but the input renders in whatever currency
- * matches the UI language at today's static rate:
+ * base storage currency) but the input renders in the display currency
+ * chosen in Settings (default AMD) at the static rate:
  *
- *   en → USD  ($1,000 stored as 400,000 AMD)
- *   ru → руб  (1,000 руб stored as 4,200 AMD)
- *   am → драм (whole AMD value)
+ *   AMD → драм (whole AMD value, no conversion)
+ *   USD → $    ($1,000 stored as 400,000 AMD)
+ *   RUB → руб  (1,000 руб stored as ~5,143 AMD)
  *
- * Switching language mid-edit converts the displayed value
- * automatically — the manager never sees "1000 AMD" while a Russian
- * player sees "238 руб" for the same row.
+ * Changing the currency in Settings converts the displayed value
+ * automatically; the underlying AMD payload is unchanged.
  *
  * Input strategy:
  *   - `type="text"` + `inputMode="decimal"` per the existing rule
@@ -87,15 +81,8 @@ const PriceInput = ({
   disabled,
   autoFocus,
 }: Props) => {
-  const { lang } = useLang();
-  const target = LANG_TO_CURRENCY[lang];
-  // Subscribe to live FX rate updates: when the provider fetches
-  // today's snapshot from the public endpoint, `version` bumps and
-  // the display re-derives through the freshly-mutated DEFAULT_RATES.
-  // The subscription is just "call the hook" — even though we don't
-  // read fields off the object we still get re-rendered on context
-  // change, which is what triggers the useEffect below.
-  const { version: fxVersion } = useFxRates();
+  const { lang, currency } = useLang();
+  const target = currency;
 
   const [display, setDisplay] = useState<string>(() => amdToDisplay(value, target));
 
@@ -106,21 +93,15 @@ const PriceInput = ({
   // type and strip the trailing dot the user is mid-keystroke on.
   const lastAmdRef = useRef(value);
   const lastTargetRef = useRef(target);
-  const lastFxVersionRef = useRef(fxVersion);
 
   useEffect(() => {
-    if (
-      value === lastAmdRef.current &&
-      target === lastTargetRef.current &&
-      fxVersion === lastFxVersionRef.current
-    ) {
+    if (value === lastAmdRef.current && target === lastTargetRef.current) {
       return;
     }
     lastAmdRef.current = value;
     lastTargetRef.current = target;
-    lastFxVersionRef.current = fxVersion;
     setDisplay(amdToDisplay(value, target));
-  }, [value, target, fxVersion]);
+  }, [value, target]);
 
   const handleChange = (raw: string) => {
     const cleaned = raw.replace(",", ".");
@@ -166,7 +147,7 @@ const PriceInput = ({
             pointerEvents: "none",
           }}
         >
-          {SUFFIX_FOR_LANG[lang]}
+          {suffixFor(currency, lang)}
         </span>
       </div>
     </div>

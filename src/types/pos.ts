@@ -17,6 +17,12 @@ export interface IOrderItem {
   line_total: number;
 }
 
+export interface IOrderCashier {
+  id: number;
+  name: string;
+  role: string;
+}
+
 export interface IOrder {
   id: number;
   branch_id: number;
@@ -29,6 +35,7 @@ export interface IOrder {
   status: "paid" | "voided";
   created_at: string;
   items?: IOrderItem[];
+  cashier?: IOrderCashier | null;
 }
 
 export interface CartLine {
