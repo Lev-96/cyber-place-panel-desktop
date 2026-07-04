@@ -1,27 +1,56 @@
+import { useAuth } from "@/auth/AuthContext";
+import PosHistory from "@/components/pos/PosHistory";
 import Button from "@/components/ui/Button";
 import Spinner from "@/components/ui/Spinner";
 import { useAsync } from "@/hooks/useAsync";
 import { useLang } from "@/i18n/LanguageContext";
 import { fmt as msgFmt } from "@/i18n/translations";
-import { memberRepository } from "@/repositories/MemberRepository";
 import { orderRepository } from "@/repositories/OrderRepository";
 import { productRepository } from "@/repositories/ProductRepository";
-import { IMember } from "@/types/members";
 import { CartLine, IProduct } from "@/types/pos";
 import { useMemo, useState } from "react";
-import { useParams } from "react-router-dom";
+import { Navigate, useParams } from "react-router-dom";
+
+type PosView = "terminal" | "history";
 
 const PosTerminal = () => {
   const { branchId } = useParams();
   const { t } = useLang();
+  const { user } = useAuth();
   const id = Number(branchId);
-  const products = useAsync(() => productRepository.listByBranch(id), [id]);
+  const [view, setView] = useState<PosView>("terminal");
+
+  if (!Number.isFinite(id) || id <= 0) return <div className="error">{t("error.invalidBranchId")}</div>;
+
+  // A manager may only operate the POS for their OWN branch. If they land on
+  // another branch's terminal (stale link / manual URL), bounce them to
+  // theirs so the sale is never started — let alone booked — against the
+  // wrong venue. The backend enforces the same rule on every order write.
+  const myBranchId = user?.role === "manager" ? user.dashboard?.branch_id ?? null : null;
+  if (myBranchId != null && myBranchId !== id) {
+    return <Navigate to={`/branches/${myBranchId}/pos`} replace />;
+  }
+
+  return (
+    <div className="col" style={{ gap: 14, height: "100%" }}>
+      <div className="row" style={{ gap: 8, alignItems: "center" }}>
+        <h2 className="page-title" style={{ margin: 0 }}>{t("pos.title")} · №{id}</h2>
+        <div className="row" style={{ gap: 6, marginLeft: "auto" }}>
+          <Button variant={view === "terminal" ? "primary" : "secondary"} onClick={() => setView("terminal")}>{t("pos.terminalTab")}</Button>
+          <Button variant={view === "history" ? "primary" : "secondary"} onClick={() => setView("history")}>{t("pos.historyTab")}</Button>
+        </div>
+      </div>
+
+      {view === "terminal" ? <Terminal branchId={id} /> : <PosHistory branchId={id} />}
+    </div>
+  );
+};
+
+const Terminal = ({ branchId }: { branchId: number }) => {
+  const { t } = useLang();
+  const products = useAsync(() => productRepository.listByBranch(branchId), [branchId]);
 
   const [cart, setCart] = useState<CartLine[]>([]);
-  const [payment, setPayment] = useState<"cash" | "card" | "deposit">("cash");
-  const [member, setMember] = useState<IMember | null>(null);
-  const [memberSearch, setMemberSearch] = useState("");
-  const [members, setMembers] = useState<IMember[]>([]);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [msgOk, setMsgOk] = useState(false);
@@ -41,39 +70,32 @@ const PosTerminal = () => {
     : [l]));
   const removeLine = (productId: number) => setCart((c) => c.filter((l) => l.product.id !== productId));
 
-  const searchMembers = async () => {
-    if (!memberSearch) return setMembers([]);
-    setMembers(await memberRepository.list(id, memberSearch));
-  };
-
   const checkout = async () => {
     if (!cart.length) return;
-    if (payment === "deposit" && !member) { setMsgOk(false); setMsg(t("pos.pickMember")); return; }
     setBusy(true); setMsg(null); setMsgOk(false);
     try {
       await orderRepository.create({
-        branch_id: id,
-        member_id: member?.id ?? null,
-        payment_method: payment,
+        branch_id: branchId,
+        member_id: null,
+        payment_method: "cash",
         items: cart.map((l) => ({ product_id: l.product.id, quantity: l.quantity })),
       });
-      setCart([]); setMember(null); setMembers([]); setMemberSearch("");
+      const paidTotal = total;
+      setCart([]);
       setMsgOk(true);
-      setMsg(msgFmt(t("pos.paid"), total.toFixed(2), t(`pos.${payment}`)));
+      setMsg(msgFmt(t("pos.paid"), paidTotal.toFixed(2), t("pos.cash")));
     } catch (e) {
       setMsgOk(false);
       setMsg(e instanceof Error ? e.message : t("pos.checkoutFailed"));
     } finally { setBusy(false); }
   };
 
-  if (!Number.isFinite(id) || id <= 0) return <div className="error">{t("error.invalidBranchId")}</div>;
   if (products.loading) return <Spinner />;
   if (products.error) return <div className="error">{products.error.message}</div>;
 
   return (
     <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 18, height: "100%" }}>
       <div className="col" style={{ gap: 16 }}>
-        <h2 className="page-title" style={{ margin: 0 }}>{t("pos.title")} · №{id}</h2>
         {Object.entries(grouped).map(([cat, prods]) => (
           <div key={cat}>
             <div className="muted" style={{ marginBottom: 6 }}>{cat === "Other" ? t("pos.otherCategory") : cat}</div>
@@ -112,35 +134,10 @@ const PosTerminal = () => {
           <span>{t("pos.total")}</span>
           <span style={{ color: "#07ddf1" }}>{total.toFixed(2)}</span>
         </div>
-        <div className="col" style={{ gap: 6 }}>
+        <div className="row-between">
           <span className="label">{t("pos.payment")}</span>
-          <div className="row" style={{ gap: 6 }}>
-            {(["cash", "card", "deposit"] as const).map((m) => (
-              <Button key={m} variant={payment === m ? "primary" : "secondary"} onClick={() => setPayment(m)} style={{ flex: 1, padding: "8px 0" }}>{t(`pos.${m}`)}</Button>
-            ))}
-          </div>
+          <span className="pill" style={{ textTransform: "none", letterSpacing: 0 }}>{t("pos.cash")}</span>
         </div>
-        {payment === "deposit" && (
-          <div className="col" style={{ gap: 6 }}>
-            <span className="label">{t("pos.member")}</span>
-            {member ? (
-              <div className="row-between">
-                <div>{member.name} <span className="muted">· {t("pos.balance")} {Number(member.balance).toFixed(2)}</span></div>
-                <Button variant="secondary" onClick={() => setMember(null)} style={btn}>{t("pos.change")}</Button>
-              </div>
-            ) : (
-              <>
-                <input className="input" placeholder={t("pos.searchPlaceholder")} value={memberSearch} onChange={(e) => setMemberSearch(e.target.value)} onKeyDown={(e) => e.key === "Enter" && searchMembers()} />
-                {members.map((m) => (
-                  <button key={m.id} className="list-item" onClick={() => { setMember(m); setMembers([]); }}>
-                    <div>{m.name} <span className="muted">{m.phone}</span></div>
-                    <div className="muted">{Number(m.balance).toFixed(2)}</div>
-                  </button>
-                ))}
-              </>
-            )}
-          </div>
-        )}
         {msg && <div className={msgOk ? "muted" : "error"}>{msg}</div>}
         <Button onClick={checkout} disabled={busy || !cart.length}>{busy ? t("pos.processing") : msgFmt(t("pos.charge"), total.toFixed(2))}</Button>
       </div>

@@ -73,7 +73,6 @@ const Settings = () => {
                 {c === "AMD" ? AMD_UNIT[lang] : c}
               </Button>
             ))}
-            <Button type="button" variant="secondary" onClick={() => setCurrencyOverride(null)}>{t("settings.autoByLang")}</Button>
           </div>
           <span className="muted" style={{ fontSize: 11 }}>
             {t("settings.ratesNote")} {money(1000)}.

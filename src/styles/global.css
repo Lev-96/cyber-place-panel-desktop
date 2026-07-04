@@ -1,3 +1,25 @@
+/* === Design tokens =========================================================
+   Single source of truth for the palette, mirroring src/styles/theme.ts (the
+   TS object used by JS-driven styles). Use these var(--color-*) tokens instead
+   of hardcoding hex values (CLAUDE.md §7.5). Values are identical to the
+   previous literals, so nothing renders differently. */
+:root {
+  --color-bg: #020514;
+  --color-surface: #0b1224;
+  --color-surface-alt: #101a35;
+  --color-border: #1f2a44;
+  --color-text: #ffffff;
+  --color-muted: #94a3b8;
+  --color-primary: #07ddf1;
+  --color-danger: #ef4444;
+  --color-success: #22c55e;
+  --color-warning: #f59e0b;
+  --color-inactive: #6b7280;
+  /* Brand neon accents (used in the wordmark gradient + focus glows). */
+  --color-accent-blue: #32aff7;
+  --color-accent-purple: #d152fa;
+}
+
 @font-face {
   font-family: "Playstation";
   src: url("/fonts/Playstation.ttf") format("truetype");
@@ -22,25 +44,51 @@
 /* Periodic neon "flicker" once per cycle + a gentle, eye-comfortable glow
    "breathing" pulse. Honours prefers-reduced-motion. */
 @keyframes brandFlicker {
-  0%   { opacity: .4; }
-  2%   { opacity: 1; }
-  3.5% { opacity: .35; }
-  5%   { opacity: 1; }
-  6.5% { opacity: .2; }
-  8%   { opacity: .95; }
-  9.5% { opacity: .55; }
-  11%  { opacity: 1; }
-  100% { opacity: 1; }
+  0% {
+    opacity: 0.4;
+  }
+  2% {
+    opacity: 1;
+  }
+  3.5% {
+    opacity: 0.35;
+  }
+  5% {
+    opacity: 1;
+  }
+  6.5% {
+    opacity: 0.2;
+  }
+  8% {
+    opacity: 0.95;
+  }
+  9.5% {
+    opacity: 0.55;
+  }
+  11% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 1;
+  }
 }
 @keyframes brandGlow {
-  0%, 100% { filter: drop-shadow(0 0 1px rgba(7, 221, 241, 0.40))
-                     drop-shadow(0 0 4px rgba(49, 175, 247, 0.22)); }
-  50%      { filter: drop-shadow(0 0 5px rgba(7, 221, 241, 0.85))
-                     drop-shadow(0 0 16px rgba(49, 175, 247, 0.55))
-                     drop-shadow(0 0 28px rgba(209, 82, 250, 0.40)); }
+  0%,
+  100% {
+    filter: drop-shadow(0 0 1px rgba(7, 221, 241, 0.4))
+      drop-shadow(0 0 4px rgba(49, 175, 247, 0.22));
+  }
+  50% {
+    filter: drop-shadow(0 0 5px rgba(7, 221, 241, 0.85))
+      drop-shadow(0 0 16px rgba(49, 175, 247, 0.55))
+      drop-shadow(0 0 28px rgba(209, 82, 250, 0.4));
+  }
 }
 @media (prefers-reduced-motion: reduce) {
-  .login-brand, .sidebar h1 span { animation: none !important; }
+  .login-brand,
+  .sidebar h1 span {
+    animation: none !important;
+  }
 }
 
 *,
@@ -57,8 +105,8 @@ body,
 }
 
 body {
-  background: #020514;
-  color: #ffffff;
+  background: var(--color-bg);
+  color: var(--color-text);
   font-family:
     "Inter",
     -apple-system,
@@ -98,7 +146,7 @@ textarea {
   height: 10px;
 }
 ::-webkit-scrollbar-thumb {
-  background: #1f2a44;
+  background: var(--color-border);
   border-radius: 6px;
   transition: background 160ms;
 }
@@ -113,39 +161,39 @@ html {
   scroll-behavior: smooth;
 }
 
-/* === Modal — centered when fits, scrolls outer when too tall ============ */
+/* === Modal — one scroll, always fully visible at any window size =========== */
 .cp-modal {
+  /* Fixed overlay that is the SINGLE scroll container. Being fixed it never
+     joins page flow (no second, page-level scrollbar); overflow-x hidden →
+     no horizontal scroll; overflow-y auto → one vertical scrollbar, and only
+     when the modal is taller than the window. overscroll-behavior stops the
+     scroll chaining to the page behind. Scroll lives HERE, centering lives on
+     the wrapper — keeping them on separate elements avoids the flexbox bug
+     where a centered child taller than a fixed-height flex container gets its
+     top clipped and unreachable. */
   position: fixed;
   inset: 0;
-  background: rgba(2, 5, 20, 0.7);
-  overflow-y: auto;
-  overscroll-behavior: contain;
   z-index: 50;
-  /* Use the dynamic viewport height so DevTools / on-screen IME bars don't
-     clip the bottom of the modal. */
-  height: 100vh;
-  height: 100dvh;
+  background: rgba(2, 5, 20, 0.7);
+  overflow: hidden auto;
+  overscroll-behavior: contain;
 }
 .cp-modal-wrapper {
-  /* min-height = viewport: lets us center when content fits AND lets the
-     wrapper grow beyond viewport when content overflows so .cp-modal scrolls
-     and the title remains reachable from the top.
-     `safe center` falls back to flex-start when content overflows, so the
-     top of the modal is never clipped above the scroll origin. */
+  /* min-height (not height) = viewport: the wrapper centers the card when it
+     fits AND grows past the viewport when the card is taller, so .cp-modal
+     scrolls and the WHOLE card — top and bottom — is reachable. The 16px
+     padding is part of the scrollable area, so the gutter is preserved at both
+     ends while scrolling. */
+  box-sizing: border-box;
   min-height: 100%;
   display: flex;
-  align-items: safe center;
-  justify-content: safe center;
-  padding: 32px 24px;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
 }
 .cp-modal-wrapper > * {
-  /* Allow the inner card to shrink on small viewports but keep its declared
-     width when there is room. */
-  max-width: min(100%, calc(100vw - 48px));
-  /* Belt-and-braces vertical centering for browsers that don't support
-     `align-items: safe center`: auto margins keep the card centered when
-     it fits and collapse to top-aligned when it overflows. */
-  margin-block: auto;
+  /* Card shrinks to fit a narrow window; keeps its declared width below this. */
+  max-width: 100%;
 }
 
 /* === Animations & transitions ============================================== */
@@ -290,7 +338,7 @@ html {
     height 200ms;
 }
 .sidebar a.active::before {
-  background: #07ddf1;
+  background: var(--color-primary);
 }
 .sidebar a:hover {
   padding-left: 16px;
@@ -305,7 +353,7 @@ a.card {
 }
 a.card:hover {
   transform: translateY(-2px);
-  border-color: #07ddf1;
+  border-color: var(--color-primary);
   box-shadow: 0 8px 22px rgba(7, 221, 241, 0.1);
 }
 
@@ -405,8 +453,8 @@ a.card:hover {
 }
 
 .sidebar {
-  background: #0b1224;
-  border-right: 1px solid #1f2a44;
+  background: var(--color-surface);
+  border-right: 1px solid var(--color-border);
   display: flex;
   flex-direction: column;
   padding: 20px 12px;
@@ -442,7 +490,7 @@ a.card:hover {
   font-size: 16px;
   font-weight: 700;
   margin: 0 8px 16px;
-  color: #07ddf1;
+  color: var(--color-primary);
   letter-spacing: 0.5px;
 }
 .sidebar h1 span {
@@ -450,30 +498,31 @@ a.card:hover {
   font-family: "Audiowide", "Inter", sans-serif;
   font-weight: 400;
   letter-spacing: 0.5px;
-  background: linear-gradient(120deg, #07ddf1, #32aff7 45%, #d152fa);
+  background: linear-gradient(120deg, var(--color-primary), var(--color-accent-blue) 45%, var(--color-accent-purple));
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
-  animation: brandFlicker var(--flicker-every) ease-in-out infinite,
-             brandGlow 5s ease-in-out infinite;
+  animation:
+    brandFlicker var(--flicker-every) ease-in-out infinite,
+    brandGlow 5s ease-in-out infinite;
 }
 
 .sidebar a {
   padding: 10px 12px;
   border-radius: 8px;
   font-weight: 500;
-  color: #94a3b8;
+  color: var(--color-muted);
   transition:
     background 120ms,
     color 120ms;
 }
 .sidebar a:hover {
-  background: #101a35;
-  color: #ffffff;
+  background: var(--color-surface-alt);
+  color: var(--color-text);
 }
 .sidebar a.active {
-  background: #101a35;
-  color: #07ddf1;
+  background: var(--color-surface-alt);
+  color: var(--color-primary);
 }
 
 .sidebar .spacer {
@@ -482,19 +531,27 @@ a.card:hover {
 .sidebar .logout {
   padding: 10px 12px;
   background: transparent;
-  border: 1px solid #1f2a44;
+  border: 1px solid var(--color-border);
   border-radius: 8px;
-  color: #94a3b8;
+  color: var(--color-muted);
   cursor: pointer;
 }
 .sidebar .logout:hover {
-  color: #ffffff;
-  border-color: #07ddf1;
+  color: var(--color-text);
+  border-color: var(--color-primary);
 }
 
 .main {
   padding: 24px 32px;
   overflow-y: auto;
+  /* Reserve the scrollbar gutter so locking it (when a modal opens) doesn't
+     shift the page content sideways. */
+  scrollbar-gutter: stable;
+}
+/* While a modal is open, freeze the page scroll so the ONLY scrollbar is the
+   modal's own. Set on <body> by the Modal component (ref-counted). */
+body.cp-modal-open .main {
+  overflow: hidden;
 }
 
 .cp-back-btn {
@@ -504,7 +561,7 @@ a.card:hover {
   padding: 7px 14px 7px 10px;
   margin: 0 0 14px;
   background: rgba(7, 221, 241, 0.08);
-  border: 1px solid #1f2a44;
+  border: 1px solid var(--color-border);
   border-radius: 999px;
   color: #cfe9ee;
   font-size: 13px;
@@ -519,9 +576,9 @@ a.card:hover {
     box-shadow 160ms ease;
 }
 .cp-back-btn:hover {
-  color: #ffffff;
+  color: var(--color-text);
   border-color: transparent;
-  background: linear-gradient(90deg, #07ddf1, #32aff7 55%, #d152fa);
+  background: linear-gradient(90deg, var(--color-primary), var(--color-accent-blue) 55%, var(--color-accent-purple));
   box-shadow: 0 6px 18px rgba(7, 221, 241, 0.25);
   transform: translateX(-2px);
 }
@@ -542,8 +599,8 @@ a.card:hover {
 }
 
 .card {
-  background: #0b1224;
-  border: 1px solid #1f2a44;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
   border-radius: 12px;
   padding: 16px;
 }
@@ -569,8 +626,8 @@ a.card:hover {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: #07ddf1;
-  color: #020514;
+  background: var(--color-primary);
+  color: var(--color-bg);
   font-weight: 600;
   padding: 10px 16px;
   border: none;
@@ -592,31 +649,89 @@ a.card:hover {
 }
 .btn.secondary {
   background: transparent;
-  color: #ffffff;
-  border: 1px solid #1f2a44;
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
 }
 .btn.secondary:hover {
-  border-color: #07ddf1;
+  border-color: var(--color-primary);
 }
 
 .input {
-  background: #0b1224;
-  border: 1px solid #1f2a44;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
   border-radius: 8px;
   padding: 10px 12px;
-  color: #ffffff;
+  color: var(--color-text);
   width: 100%;
   outline: none;
 }
 .input:focus {
-  border-color: #07ddf1;
+  border-color: var(--color-primary);
 }
 
 .label {
   font-size: 12px;
-  color: #94a3b8;
+  color: var(--color-muted);
   margin-bottom: 6px;
   display: block;
+}
+
+/* === Native date/time pickers — dark neon calendar everywhere ===========
+   Applies to every native temporal input across the app (POS history,
+   sessions history, tournament dates, branch working-hours times). The
+   editable field already uses `.input`; these rules theme the parts the
+   browser draws itself: the pop-up calendar, the trigger glyph and the
+   focused date/time segment. */
+
+/* `color-scheme: dark` makes Chromium render the pop-up calendar, the
+   spinners and the clock in dark mode so they match the panel instead of
+   flashing a white system calendar. */
+input[type="date"],
+input[type="datetime-local"],
+input[type="time"],
+input[type="month"] {
+  color-scheme: dark;
+}
+
+/* The calendar/clock glyph on the right edge: tint it to the neon accent,
+   give it a rounded hit-area and a soft hover so it reads as part of the
+   field, not a system artefact. */
+input[type="date"]::-webkit-calendar-picker-indicator,
+input[type="datetime-local"]::-webkit-calendar-picker-indicator,
+input[type="time"]::-webkit-calendar-picker-indicator,
+input[type="month"]::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  padding: 3px;
+  margin-left: 4px;
+  border-radius: 6px;
+  /* Recolour the default white glyph to the cyan accent (#07ddf1). */
+  filter: invert(74%) sepia(58%) saturate(2503%) hue-rotate(151deg) brightness(99%) contrast(94%);
+  transition:
+    background-color 160ms ease,
+    transform 160ms ease;
+}
+input[type="date"]::-webkit-calendar-picker-indicator:hover,
+input[type="datetime-local"]::-webkit-calendar-picker-indicator:hover,
+input[type="time"]::-webkit-calendar-picker-indicator:hover,
+input[type="month"]::-webkit-calendar-picker-indicator:hover {
+  background-color: rgba(7, 221, 241, 0.18);
+  transform: scale(1.06);
+}
+
+/* The editable date/time text segments stay on-theme; the segment the
+   user is editing glows with the same cyan the rest of the UI uses. */
+input[type="date"]::-webkit-datetime-edit-field,
+input[type="datetime-local"]::-webkit-datetime-edit-field,
+input[type="time"]::-webkit-datetime-edit-field {
+  color: var(--color-text);
+}
+input[type="date"]::-webkit-datetime-edit-field:focus,
+input[type="datetime-local"]::-webkit-datetime-edit-field:focus,
+input[type="time"]::-webkit-datetime-edit-field:focus {
+  background: rgba(7, 221, 241, 0.2);
+  color: #ffffff;
+  border-radius: 3px;
+  outline: none;
 }
 
 /* === NumberStepper — pretty numeric input with custom arrows ============= */
@@ -624,8 +739,8 @@ a.card:hover {
   position: relative;
   display: flex;
   align-items: stretch;
-  background: #0b1224;
-  border: 1px solid #1f2a44;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
   border-radius: 8px;
   transition:
     border-color 160ms ease,
@@ -633,7 +748,7 @@ a.card:hover {
   overflow: hidden;
 }
 .num-stepper:focus-within {
-  border-color: #07ddf1;
+  border-color: var(--color-primary);
   box-shadow: 0 0 0 3px rgba(7, 221, 241, 0.15);
 }
 .num-stepper-input {
@@ -642,7 +757,7 @@ a.card:hover {
   border: 0;
   outline: 0;
   padding: 10px 12px;
-  color: #ffffff;
+  color: var(--color-text);
   font: inherit;
   min-width: 0;
 }
@@ -653,7 +768,7 @@ a.card:hover {
   display: flex;
   align-items: center;
   padding: 0 8px 0 0;
-  color: #94a3b8;
+  color: var(--color-muted);
   font-weight: 600;
   pointer-events: none;
   user-select: none;
@@ -661,14 +776,14 @@ a.card:hover {
 .num-stepper-arrows {
   display: flex;
   flex-direction: column;
-  border-left: 1px solid #1f2a44;
+  border-left: 1px solid var(--color-border);
   width: 36px;
 }
 .num-stepper-arrow {
   flex: 1;
   background: linear-gradient(180deg, #131c33 0%, #0e1528 100%);
   border: 0;
-  color: #94a3b8;
+  color: var(--color-muted);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -680,11 +795,11 @@ a.card:hover {
   padding: 0;
 }
 .num-stepper-arrow:first-child {
-  border-bottom: 1px solid #1f2a44;
+  border-bottom: 1px solid var(--color-border);
 }
 .num-stepper-arrow:hover {
   background: linear-gradient(180deg, #1a2540 0%, #131c33 100%);
-  color: #07ddf1;
+  color: var(--color-primary);
 }
 .num-stepper-arrow:active {
   transform: translateY(1px);
@@ -695,17 +810,17 @@ a.card:hover {
 }
 
 .muted {
-  color: #94a3b8;
+  color: var(--color-muted);
 }
 .error {
-  color: #ef4444;
+  color: var(--color-danger);
 }
 
 .spinner {
   width: 32px;
   height: 32px;
-  border: 3px solid #1f2a44;
-  border-top-color: #07ddf1;
+  border: 3px solid var(--color-border);
+  border-top-color: var(--color-primary);
   border-radius: 50%;
   animation: spin 700ms linear infinite;
   margin: 24px auto;
@@ -722,8 +837,8 @@ a.card:hover {
 }
 
 .list-item {
-  background: #0b1224;
-  border: 1px solid #1f2a44;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
   border-radius: 10px;
   padding: 12px 16px;
   display: flex;
@@ -736,14 +851,14 @@ a.card:hover {
     transform 120ms;
 }
 .list-item:hover {
-  border-color: #07ddf1;
+  border-color: var(--color-primary);
   transform: translateY(-1px);
 }
 .list-item .name {
   font-weight: 600;
 }
 .list-item .meta {
-  color: #94a3b8;
+  color: var(--color-muted);
   font-size: 12px;
 }
 
@@ -754,7 +869,7 @@ a.card:hover {
 }
 
 .place-cell {
-  background: #0b1224;
+  background: var(--color-surface);
   border-radius: 10px;
   padding: 12px;
   border: 1.5px solid;
@@ -774,7 +889,7 @@ a.card:hover {
 }
 .place-cell .platform {
   font-size: 11px;
-  color: #94a3b8;
+  color: var(--color-muted);
   text-transform: uppercase;
 }
 .place-cell .id {
@@ -787,7 +902,7 @@ a.card:hover {
 }
 .place-cell .until {
   font-size: 11px;
-  color: #94a3b8;
+  color: var(--color-muted);
 }
 
 .legend {
@@ -811,7 +926,7 @@ a.card:hover {
   margin-left: auto;
 }
 .legend .count {
-  color: #07ddf1;
+  color: var(--color-primary);
   font-weight: 700;
 }
 
@@ -821,7 +936,7 @@ a.card:hover {
   flex-wrap: wrap;
 }
 .chip {
-  border: 1px solid #07ddf1;
+  border: 1px solid var(--color-primary);
   border-radius: 16px;
   padding: 6px 12px;
   font-size: 12px;
@@ -835,9 +950,9 @@ a.card:hover {
 .month-picker .month-btn {
   width: 36px;
   height: 36px;
-  border: 1px solid #07ddf1;
-  background: #0b1224;
-  color: #07ddf1;
+  border: 1px solid var(--color-primary);
+  background: var(--color-surface);
+  color: var(--color-primary);
   border-radius: 8px;
   font-size: 18px;
   cursor: pointer;
@@ -852,20 +967,20 @@ a.card:hover {
   padding: 6px 0;
 }
 .kv-row .k {
-  color: #94a3b8;
+  color: var(--color-muted);
 }
 .kv-row .v {
   font-weight: 600;
 }
 .kv-row .v.hi {
-  color: #07ddf1;
+  color: var(--color-primary);
   font-size: 18px;
   font-weight: 800;
 }
 
 .divider {
   height: 1px;
-  background: #1f2a44;
+  background: var(--color-border);
   margin: 6px 0;
 }
 
@@ -875,7 +990,7 @@ a.card:hover {
   align-items: center;
   justify-content: flex-end;
   height: 100vh;
-  background: #020514;
+  background: var(--color-bg);
   padding: 0 24px 40px;
   gap: 24px;
 }
@@ -887,14 +1002,15 @@ a.card:hover {
   font-weight: 400;
   letter-spacing: 1px;
   text-transform: uppercase;
-  background: linear-gradient(120deg, #07ddf1, #32aff7 45%, #d152fa);
+  background: linear-gradient(120deg, var(--color-primary), var(--color-accent-blue) 45%, var(--color-accent-purple));
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
   margin: 0;
   text-align: center;
-  animation: brandFlicker var(--flicker-every) ease-in-out infinite,
-             brandGlow 5s ease-in-out infinite;
+  animation:
+    brandFlicker var(--flicker-every) ease-in-out infinite,
+    brandGlow 5s ease-in-out infinite;
 }
 
 .login-logo {
@@ -924,7 +1040,7 @@ a.card:hover {
 .login-forgot {
   text-align: right;
   font-size: 13px;
-  color: #07ddf1;
+  color: var(--color-primary);
   text-decoration: none;
 }
 .login-forgot:hover {
@@ -963,16 +1079,19 @@ button.pill:hover {
   font-weight: 600;
   letter-spacing: 0.5px;
   cursor: pointer;
-  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  transition:
+    background 0.15s,
+    border-color 0.15s,
+    color 0.15s;
 }
 .login-lang-pill:hover {
   background: rgba(7, 221, 241, 0.12);
   border-color: rgba(7, 221, 241, 0.55);
 }
 .login-lang-pill.active {
-  background: linear-gradient(90deg, #07ddf1 0%, #32aff7 50%, #d152fa 100%);
+  background: linear-gradient(90deg, var(--color-primary) 0%, var(--color-accent-blue) 50%, var(--color-accent-purple) 100%);
   border-color: transparent;
-  color: #020514;
+  color: var(--color-bg);
 }
 
 /* Background screen wrapper (matches RN ScreenWithBg) */
@@ -996,7 +1115,7 @@ button.pill:hover {
     180deg,
     rgba(2, 5, 20, 0.2) 0%,
     rgba(2, 5, 20, 0.85) 60%,
-    #020514 100%
+    var(--color-bg) 100%
   );
   pointer-events: none;
 }
@@ -1009,7 +1128,7 @@ button.pill:hover {
 }
 
 .gradient-text {
-  background: linear-gradient(90deg, #07ddf1 0%, #32aff7 50%, #d152fa 100%);
+  background: linear-gradient(90deg, var(--color-primary) 0%, var(--color-accent-blue) 50%, var(--color-accent-purple) 100%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
@@ -1023,7 +1142,7 @@ button.pill:hover {
   gap: 12px;
 }
 .stat-tile {
-  border: 1px solid #1f2a44;
+  border: 1px solid var(--color-border);
   background: rgba(11, 18, 36, 0.7);
   border-radius: 12px;
   padding: 16px;
@@ -1038,7 +1157,7 @@ button.pill:hover {
   /* Fluid type: shrinks on narrow tiles / long localized values without overflow. */
   font-size: clamp(18px, 2.4vw, 26px);
   font-weight: 800;
-  color: #07ddf1;
+  color: var(--color-primary);
   font-variant-numeric: tabular-nums;
   line-height: 1.15;
   min-width: 0;
@@ -1046,7 +1165,7 @@ button.pill:hover {
   word-break: break-word;
 }
 .stat-tile .k {
-  color: #94a3b8;
+  color: var(--color-muted);
   font-size: 12px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -1060,10 +1179,10 @@ button.pill:hover {
   position: relative;
   border-radius: 14px;
   padding: 1px;
-  background: linear-gradient(135deg, #07ddf1 0%, #32aff7 50%, #d152fa 100%);
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-accent-blue) 50%, var(--color-accent-purple) 100%);
 }
 .gradient-card-inner {
-  background: #0b1224;
+  background: var(--color-surface);
   border-radius: 13px;
   padding: 16px;
   display: flex;
@@ -1083,23 +1202,23 @@ button.pill:hover {
 }
 .pill.pending {
   background: rgba(245, 158, 11, 0.15);
-  color: #f59e0b;
-  border: 1px solid #f59e0b;
+  color: var(--color-warning);
+  border: 1px solid var(--color-warning);
 }
 .pill.confirmed {
   background: rgba(34, 197, 94, 0.15);
-  color: #22c55e;
-  border: 1px solid #22c55e;
+  color: var(--color-success);
+  border: 1px solid var(--color-success);
 }
 .pill.cancelled {
   background: rgba(239, 68, 68, 0.15);
-  color: #ef4444;
-  border: 1px solid #ef4444;
+  color: var(--color-danger);
+  border: 1px solid var(--color-danger);
 }
 .pill.rescheduled {
   background: rgba(7, 221, 241, 0.15);
-  color: #07ddf1;
-  border: 1px solid #07ddf1;
+  color: var(--color-primary);
+  border: 1px solid var(--color-primary);
 }
 
 /* === Updates toast =========================================================
@@ -1118,14 +1237,18 @@ button.pill:hover {
   width: min(380px, calc(100vw - 40px));
   padding: 16px 18px;
   border-radius: 14px;
-  background: linear-gradient(135deg, rgba(11, 18, 36, 0.96), rgba(7, 30, 60, 0.96));
+  background: linear-gradient(
+    135deg,
+    rgba(11, 18, 36, 0.96),
+    rgba(7, 30, 60, 0.96)
+  );
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   border: 1px solid rgba(7, 221, 241, 0.4);
   box-shadow:
     0 20px 50px rgba(0, 0, 0, 0.5),
     0 0 30px rgba(7, 221, 241, 0.15);
-  color: #ffffff;
+  color: var(--color-text);
   cursor: pointer;
   animation: cp-update-toast-in 360ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
@@ -1147,7 +1270,7 @@ button.pill:hover {
 .cp-update-toast-title {
   font-size: 14px;
   font-weight: 700;
-  color: #07ddf1;
+  color: var(--color-primary);
 }
 .cp-update-toast-message {
   font-size: 13px;
@@ -1157,7 +1280,7 @@ button.pill:hover {
 .cp-update-toast-cta {
   margin-top: 4px;
   font-size: 11px;
-  color: #94a3b8;
+  color: var(--color-muted);
   text-transform: uppercase;
   letter-spacing: 0.4px;
 }
@@ -1169,17 +1292,139 @@ button.pill:hover {
   border: none;
   border-radius: 6px;
   background: transparent;
-  color: #94a3b8;
+  color: var(--color-muted);
   font-size: 14px;
   cursor: pointer;
-  transition: background 120ms, color 120ms;
+  transition:
+    background 120ms,
+    color 120ms;
 }
 .cp-update-toast-close:hover {
   background: rgba(255, 255, 255, 0.08);
-  color: #ffffff;
+  color: var(--color-text);
 }
 
 @keyframes cp-update-toast-in {
-  from { opacity: 0; transform: translateX(60px); }
-  to   { opacity: 1; transform: translateX(0); }
+  from {
+    opacity: 0;
+    transform: translateX(60px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* ── Branch map: animated "Boom" location pin ───────────────────────────── */
+.cp-map-pin {
+  position: relative;
+  width: 22px;
+  height: 22px;
+  /* Drop in with a slight overshoot the moment a real address is pinned. */
+  animation: cp-pin-drop 0.5s cubic-bezier(0.2, 0.85, 0.25, 1.4) both;
+}
+.cp-map-pin__core {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 16px;
+  height: 16px;
+  margin: -8px 0 0 -8px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #9bf7ff 0%, #07ddf1 55%, #04a3bb 100%);
+  border: 2px solid #fff;
+  box-shadow: 0 0 12px rgba(7, 221, 241, 0.9), 0 2px 6px rgba(0, 0, 0, 0.55);
+  z-index: 2;
+}
+.cp-map-pin__pulse {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 16px;
+  height: 16px;
+  margin: -8px 0 0 -8px;
+  border-radius: 50%;
+  background: rgba(7, 221, 241, 0.45);
+  z-index: 1;
+  animation: cp-pin-pulse 1.8s ease-out infinite;
+}
+.cp-map-pin__pulse--2 {
+  animation-delay: 0.6s;
+}
+.cp-map-pin__pulse--3 {
+  animation-delay: 1.2s;
+}
+@keyframes cp-pin-pulse {
+  0% {
+    transform: scale(1);
+    opacity: 0.7;
+  }
+  100% {
+    transform: scale(3.8);
+    opacity: 0;
+  }
+}
+@keyframes cp-pin-drop {
+  0% {
+    transform: translateY(-26px) scale(0.4);
+    opacity: 0;
+  }
+  60% {
+    transform: translateY(3px) scale(1.1);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cp-map-pin,
+  .cp-map-pin__pulse {
+    animation: none;
+  }
+  .cp-map-pin__pulse {
+    opacity: 0;
+  }
+}
+
+/* ── Branch address autocomplete dropdown ───────────────────────────────── */
+.cp-addr-suggest {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 50;
+  margin: 4px 0 0;
+  padding: 4px;
+  list-style: none;
+  max-height: 240px;
+  overflow-y: auto;
+  background: #0b1224;
+  border: 1px solid #1f2a44;
+  border-radius: 10px;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.55);
+  animation: cp-fade-in 0.14s ease-out both;
+}
+.cp-addr-suggest__item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 7px;
+  font-size: 13px;
+  line-height: 1.35;
+  color: #d7e0f4;
+  cursor: pointer;
+  transition: background-color 120ms;
+}
+.cp-addr-suggest__item:hover,
+.cp-addr-suggest__item--active {
+  background: #15203c;
+}
+.cp-addr-suggest__pin {
+  flex-shrink: 0;
+  margin-top: 1px;
+  color: #07ddf1;
+  font-size: 13px;
 }

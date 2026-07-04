@@ -396,7 +396,6 @@ export const TRANSLATIONS: Dict = {
 
   // Settings extras
   "settings.role": { en: "Role", ru: "Роль", am: "Դեր" },
-  "settings.autoByLang": { en: "Auto (by language)", ru: "Авто (по языку)", am: "Ավտոմատ (լեզվով)" },
   "settings.ratesNote": { en: "Stored prices are in AMD. We convert at fixed rates: 1 USD ≈ 400 AMD, 1 RUB ≈ 4.2 AMD. Sample: 1000 AMD =", ru: "Цены хранятся в драмах. Конвертация по фиксированному курсу: 1 USD ≈ 400 драм, 1 ₽ ≈ 4.2 драм. Пример: 1000 драм =", am: "Գները պահվում են դրամով: Փոխարկում ֆիքսված կուրսով: 1 USD ≈ 400 դրամ, 1 ₽ ≈ 4.2 դրամ: Օրինակ՝ 1000 դրամ =" },
   "settings.currentPassword": { en: "Current password", ru: "Текущий пароль", am: "Ընթացիկ գաղտնաբառ" },
   "settings.newPassword": { en: "New password", ru: "Новый пароль", am: "Նոր գաղտնաբառ" },
@@ -687,6 +686,8 @@ export const TRANSLATIONS: Dict = {
   "branch.titleNew": { en: "New branch", ru: "Новый филиал", am: "Նոր մասնաճյուղ" },
   "branch.titleEdit": { en: "Edit branch", ru: "Редактировать филиал", am: "Խմբագրել մասնաճյուղը" },
   "branch.address": { en: "Address", ru: "Адрес", am: "Հասցե" },
+  "branch.addressPlaceholder": { en: "Your branch address", ru: "Ваш адрес филиала", am: "Ձեր մասնաճյուղի հասցեն" },
+  "branchForm.suggestionsHint": { en: "Start typing — pick a real address from the list", ru: "Начните вводить — выберите реальный адрес из списка", am: "Սկսեք մուտքագրել — ընտրեք իրական հասցե ցանկից" },
   "branch.country": { en: "Country", ru: "Страна", am: "Երկիր" },
   "branch.city": { en: "City", ru: "Город", am: "Քաղաք" },
   "branch.coordinates": { en: "Coordinates (lat / lng)", ru: "Координаты (широта / долгота)", am: "Կոորդինատներ (լայն. / երկ.)" },
@@ -756,8 +757,6 @@ export const TRANSLATIONS: Dict = {
   "pos.checkout": { en: "Checkout", ru: "Оплатить", am: "Վճարել" },
   "pos.payment": { en: "Payment method", ru: "Способ оплаты", am: "Վճարման եղանակ" },
   "pos.cash": { en: "Cash", ru: "Наличные", am: "Կանխիկ" },
-  "pos.card": { en: "Card", ru: "Карта", am: "Քարտ" },
-  "pos.balance": { en: "Member balance", ru: "Баланс клиента", am: "Անդամի մնացորդ" },
   "pos.subtotal": { en: "Subtotal", ru: "Подытог", am: "Միջանկյալ" },
   "pos.total": { en: "Total", ru: "Итого", am: "Ընդամենը" },
 
@@ -832,6 +831,10 @@ export const TRANSLATIONS: Dict = {
   "branchForm.typeOrClick": { en: "Type address or click the map", ru: "Введите адрес или кликните на карте", am: "Մուտքագրեք հասցեն կամ սեղմեք քարտեզին" },
   "branchForm.selectedLocation": { en: "Selected location", ru: "Выбранная точка", am: "Ընտրված կետ" },
   "branchForm.pickLocationFirst": { en: "Pick a location on the map (or fill the address so it can be auto-located).", ru: "Укажите точку на карте (или заполните адрес для авто-определения).", am: "Ընտրեք կետ քարտեզի վրա (կամ լրացրեք հասցեն ինքնաբերաբար գտնելու համար):" },
+  "branchForm.pickFromList": { en: "Pick a real address from the suggestions so the location is verified.", ru: "Выберите реальный адрес из подсказок, чтобы точка была подтверждена.", am: "Ընտրեք իրական հասցե ցանկից, որպեսզի կետը հաստատվի:" },
+  "branchForm.cityRequired": { en: "City is required.", ru: "Укажите город.", am: "Քաղաքը պարտադիր է:" },
+  "branchForm.cityFromAddress": { en: "Filled from the address", ru: "Заполняется из адреса", am: "Լրացվում է հասցեից" },
+  "branchForm.invalidPhone": { en: "Enter a valid phone number for the selected country.", ru: "Введите корректный номер телефона для выбранной страны.", am: "Մուտքագրեք վավեր հեռախոսահամար ընտրված երկրի համար:" },
 
   // Company details page
   "company.invalidId": { en: "Invalid company id.", ru: "Неверный идентификатор компании.", am: "Ընկերության սխալ ID:" },
@@ -1276,17 +1279,21 @@ export const TRANSLATIONS: Dict = {
   "billing.markPaid": { en: "Mark as paid", ru: "Отметить оплаченным", am: "Նշել վճարված" },
 
   // PosTerminal
-  "pos.pickMember": { en: "Pick a member for deposit payment", ru: "Выберите клиента для оплаты с депозита", am: "Ընտրեք անդամ՝ ավանդից վճարելու համար" },
   "pos.paid": { en: "Paid {0} ({1})", ru: "Оплачено {0} ({1})", am: "Վճարված {0} ({1})" },
   "pos.checkoutFailed": { en: "Checkout failed", ru: "Не удалось провести оплату", am: "Վճարումը ձախողվեց" },
   "pos.noProducts": { en: "No active products. Add some in the Products page.", ru: "Нет активных товаров. Добавьте их на странице «Товары».", am: "Ակտիվ ապրանքներ չկան: Ավելացրեք դրանք «Ապրանքներ» էջում:" },
-  "pos.deposit": { en: "Deposit", ru: "Депозит", am: "Ավանդ" },
-  "pos.member": { en: "Member", ru: "Клиент", am: "Անդամ" },
-  "pos.change": { en: "Change", ru: "Изменить", am: "Փոխել" },
-  "pos.searchPlaceholder": { en: "Name / phone / card", ru: "Имя / телефон / карта", am: "Անուն / հեռախոս / քարտ" },
   "pos.processing": { en: "Processing…", ru: "Обработка…", am: "Մշակում…" },
   "pos.charge": { en: "Charge {0}", ru: "Списать {0}", am: "Գանձել {0}" },
   "pos.otherCategory": { en: "Other", ru: "Прочее", am: "Այլ" },
+  "pos.terminalTab": { en: "Terminal", ru: "Терминал", am: "Տերմինալ" },
+  "pos.historyTab": { en: "History", ru: "История", am: "Պատմություն" },
+  "pos.histCount": { en: "Orders", ru: "Продажи", am: "Վաճառքներ" },
+  "pos.histSum": { en: "Revenue", ru: "Выручка", am: "Հասույթ" },
+  "pos.histEmpty": { en: "No orders in this period.", ru: "Нет продаж за выбранный период.", am: "Ընտրված ժամանակահատվածում վաճառքներ չկան:" },
+  "pos.statusPaid": { en: "Paid", ru: "Оплачено", am: "Վճարված" },
+  "pos.statusVoided": { en: "Voided", ru: "Отменён", am: "Չեղарկված" },
+  "pos.cashier": { en: "Cashier", ru: "Кассир", am: "Գանձապահ" },
+  "pos.shift": { en: "Shift", ru: "Смена", am: "Հերթափոխ" },
 
   // Company country picker + TIN validation
   "company.selectCountry": { en: "— select country —", ru: "— выберите страну —", am: "— ընտրեք երկիր —" },

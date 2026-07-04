@@ -3,24 +3,18 @@ import { Lang } from "./translations";
 /**
  * Money model: prices are stored in the company's BASE CURRENCY.
  * Default base = AMD (the Cyber Place network currency).
- * For display we convert to language-preferred currency using rates that the user
- * can override in Settings. Rates are FROM base TO target.
+ * For display we convert to the currency selected in Settings (default
+ * AMD) using static rates. Rates are FROM base TO target.
  *
  *   stored: 1000 AMD
- *   en (USD): 1000 / 400 ≈ 2.50 USD
- *   ru (RUB): 1000 / 4.2 ≈ 238.10 RUB
- *   am (AMD): 1000 dram (rendered with the localized word, never the
- *             "AMD" ISO code — Intl.NumberFormat would otherwise spell
- *             it out depending on which CLDR data Chromium ships)
+ *   AMD: 1000 dram (rendered with the localized word, never the
+ *        "AMD" ISO code — Intl.NumberFormat would otherwise spell
+ *        it out depending on which CLDR data Chromium ships)
+ *   USD: 1000 / 400 ≈ 2.50 USD
+ *   RUB: 1000 / 5.14 ≈ 194.44 RUB
  */
 
 export type Currency = "AMD" | "USD" | "RUB";
-
-export const LANG_TO_CURRENCY: Record<Lang, Currency> = {
-  en: "USD",
-  ru: "RUB",
-  am: "AMD",
-};
 
 export const CURRENCY_LOCALE: Record<Currency, string> = {
   AMD: "hy-AM",

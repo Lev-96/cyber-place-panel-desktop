@@ -43,21 +43,38 @@ const BranchMap = ({ markers, center, zoom = 12, height = 360, onPick }: Props) 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Sync markers
+  // Sync markers. Keyed on the actual coordinates/labels so the drop-in
+  // animation only fires when the pin truly moves — not on every unrelated
+  // re-render (markers is rebuilt inline by the parent on each render).
+  const markersKey = markers
+    .map((m) => `${m.lat.toFixed(6)},${m.lng.toFixed(6)},${m.label ?? ""}`)
+    .join("|");
   useEffect(() => {
     const layer = layerRef.current;
     if (!layer) return;
     layer.clearLayers();
     for (const m of markers) {
+      // Animated location pin: cyan core that drops in with a bounce and
+      // emits three expanding radar pulses — styles live in global.css
+      // (.cp-map-pin*). divIcon keeps className empty so Leaflet's default
+      // white box doesn't render behind it.
       const icon = L.divIcon({
-        html: `<div style="width:14px;height:14px;border-radius:50%;background:#07ddf1;border:2px solid #fff;box-shadow:0 0 8px rgba(7,221,241,0.7)"></div>`,
+        html: `<div class="cp-map-pin" aria-hidden="true">
+            <span class="cp-map-pin__pulse"></span>
+            <span class="cp-map-pin__pulse cp-map-pin__pulse--2"></span>
+            <span class="cp-map-pin__pulse cp-map-pin__pulse--3"></span>
+            <span class="cp-map-pin__core"></span>
+          </div>`,
         className: "",
-        iconSize: [14, 14],
+        iconSize: [22, 22],
+        iconAnchor: [11, 11],
+        popupAnchor: [0, -12],
       });
       const marker = L.marker([m.lat, m.lng], { icon }).addTo(layer);
       if (m.label) marker.bindPopup(m.label);
     }
-  }, [markers]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [markersKey]);
 
   return <div ref={ref} style={{ width: "100%", height, borderRadius: 12, overflow: "hidden" }} />;
 };
