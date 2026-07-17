@@ -5,7 +5,7 @@ import UpdateReadyModal from "@/components/UpdateReadyModal";
 import UpdatesToast from "@/components/UpdatesToast";
 import Spinner from "@/components/ui/Spinner";
 import { NotificationsProvider } from "@/notifications/NotificationsContext";
-import { useAppUpdates } from "@/realtime/useAppUpdates";
+import { useAppUpdates, useUpdateCatchUp } from "@/realtime/useAppUpdates";
 import { UpdatesNotificationProvider } from "@/realtime/UpdatesNotificationContext";
 import { Suspense, lazy } from "react";
 import { HashRouter, Navigate, Route, Routes } from "react-router-dom";
@@ -62,6 +62,10 @@ const Authed = () => {
   // visit /settings/updates — still trigger their local electron-updater
   // immediately when admin promotes, not only on the next app boot.
   useAppUpdates("panel");
+  // Catch up on a promote this panel missed while offline — reads the
+  // backend manifest and runs the gated check so only the admin-promoted
+  // version installs. Mounted once here at the authed root.
+  useUpdateCatchUp("panel");
 
   return (
   <Suspense fallback={<Spinner />}>

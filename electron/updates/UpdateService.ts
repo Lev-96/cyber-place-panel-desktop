@@ -33,12 +33,14 @@ export interface UpdateState {
  * surface (`check`, `installAndRestart`, `getState`, `onState`).
  *
  * Design notes:
- *   - `autoDownload = false` — we drive download explicitly after the
- *     "available" event so an admin can see the version first if we
- *     ever decide to gate downloads behind a confirmation dialog.
- *   - `autoInstallOnAppQuit = true` — if the user simply closes the
- *     app between download and confirm, the new version installs on
- *     next start. Idempotent with the explicit `installAndRestart`.
+ *   - `autoDownload = false` — nothing is ever fetched automatically. A
+ *     download starts only from {@link UpdateService.checkGated} once it
+ *     confirms the version on the GitHub channel equals the version an
+ *     admin has PROMOTED on the backend. This is what keeps owner/manager
+ *     panels from self-updating ahead of admin approval.
+ *   - `autoInstallOnAppQuit = false` — an un-promoted version must never
+ *     slip in on a quit either; installs happen only via the explicit
+ *     `installAndRestart` after a gated download completed.
  *   - Events are broadcast to ALL renderer windows (`updates:state`
  *     IPC channel) rather than pinned to one, so a future settings
  *     window doesn't go stale relative to the main window.
@@ -55,6 +57,13 @@ export interface UpdateState {
 export class UpdateService {
   private state: UpdateState;
   private listeners = new Set<(state: UpdateState) => void>();
+  /**
+   * The admin-promoted version the current check is allowed to download,
+   * or null for a plain (non-downloading) check. Set by {@link checkGated};
+   * consulted in the `update-available` handler. Null means "download
+   * nothing", which is the safe default.
+   */
+  private gateVersion: string | null = null;
 
   constructor(private readonly logTag: string = "panel") {
     this.state = {
@@ -76,9 +85,40 @@ export class UpdateService {
    * `onState` so callers don't need the return value.
    */
   async check(): Promise<UpdateState> {
+    // A plain check never downloads — clear any gate so a stale promoted
+    // version from a previous gated check can't leak a download here.
+    this.gateVersion = null;
     if (this.state.status === "checking" || this.state.status === "downloading") {
       // Re-emit current state so caller sees "already busy" without a
       // duplicate network call. Cheap and avoids racing checkForUpdates.
+      return this.getState();
+    }
+    try {
+      await autoUpdater.checkForUpdates();
+    } catch (e: unknown) {
+      this.handleError(e);
+    }
+    return this.getState();
+  }
+
+  /**
+   * Gated check for the admin-driven rollout. `promotedVersion` is the
+   * version the backend pointer currently approves — delivered by the
+   * `app-update.promoted` Reverb broadcast or read from
+   * `/updates/panel/manifest` on boot for catch-up. We only download when
+   * the version electron-updater finds on the GitHub channel is EXACTLY
+   * this promoted version, so a newer-but-unpromoted release never
+   * installs itself on an owner/manager panel ahead of admin approval.
+   *
+   * A null/empty `promotedVersion` means "nothing approved yet" → no-op.
+   */
+  async checkGated(promotedVersion: string | null): Promise<UpdateState> {
+    this.gateVersion = promotedVersion && promotedVersion.length > 0 ? promotedVersion : null;
+    if (!this.gateVersion) {
+      this.update({ status: "idle", availableVersion: null, progressPercent: null, error: null });
+      return this.getState();
+    }
+    if (this.state.status === "checking" || this.state.status === "downloading") {
       return this.getState();
     }
     try {
@@ -127,11 +167,12 @@ export class UpdateService {
   }
 
   private configure(): void {
-    // We schedule downloads ourselves AFTER the "available" event so
-    // the renderer can show "обновление найдено" before bytes start
-    // moving — purely UX, no behavioural difference.
-    autoUpdater.autoDownload = true;
-    autoUpdater.autoInstallOnAppQuit = true;
+    // Hard-gated rollout: NEVER auto-download and NEVER auto-install on
+    // quit. Bytes move only when checkGated() confirms the channel version
+    // equals the admin-promoted version (see the update-available handler),
+    // and installs happen only via the explicit installAndRestart().
+    autoUpdater.autoDownload = false;
+    autoUpdater.autoInstallOnAppQuit = false;
     autoUpdater.logger = log;
     // electron-log defaults to silent in production; lift it so update
     // events show up in the user-data log file ("update.log" is the
@@ -151,6 +192,16 @@ export class UpdateService {
         notes: typeof info.releaseNotes === "string" ? info.releaseNotes : null,
         progressPercent: 0,
       });
+      // Hard gate: fetch the bytes ONLY when the channel version is exactly
+      // the admin-promoted one. Otherwise hold — an owner/manager panel
+      // never self-updates ahead of approval, and a newer-but-unpromoted
+      // GitHub release waits until the admin promotes it too.
+      if (this.gateVersion && info.version === this.gateVersion) {
+        log.info(`[${this.logTag}] promoted v${info.version} matches channel; downloading`);
+        autoUpdater.downloadUpdate().catch((e: unknown) => this.handleError(e));
+      } else {
+        log.info(`[${this.logTag}] v${info.version} available but not promoted (gate=${this.gateVersion ?? "none"}); holding`);
+      }
     });
 
     autoUpdater.on("update-not-available", (info: UpdateInfo) => {

@@ -1,5 +1,4 @@
-import { apiAgentUpdatePromote, apiAgentUpdateStatus } from "@/api/agent-updates";
-import type { UpdateCheckEntry } from "@/api/updates";
+import { apiAgentUpdateApply, apiAgentUpdateStatus, type AgentUpdateStatus } from "@/api/agent-updates";
 import Button from "@/components/ui/Button";
 import ScreenWithBg from "@/components/ui/ScreenWithBg";
 import { useLang } from "@/i18n/LanguageContext";
@@ -7,17 +6,16 @@ import { useAppUpdates } from "@/realtime/useAppUpdates";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 /**
- * Owner / manager-only screen that drives the kiosk-agent rollout
- * for the partner's own fleet. Twin of the admin AppUpdates screen
- * but scoped to a single app and stripped of admin-only knobs
- * (mandatory flag, panel app).
+ * Owner / manager-only screen — STAGE TWO of the two-stage agent rollout.
+ * An admin first APPROVES a version; here the partner APPLIES that
+ * approved version to the kiosk agents of their OWN branches, on their
+ * own timing. There is no "promote to GitHub latest" here — a partner
+ * can only roll out what an admin has already approved.
  *
  * Three sources of freshness, in order of immediacy:
- *   1. Reverb `.app-update.promoted` broadcast filtered to `app:agent`
- *      — fires the instant any party (admin or another owner) promotes.
- *   2. 60-second polling of `/agent-updates/status` — covers the
- *      "new GitHub release exists but no one has promoted yet" gap
- *      since the backend's GithubReleasesClient itself caches 60s.
+ *   1. Reverb `.app-update.promoted` (app:agent) — fires the instant an
+ *      admin approves a new agent version.
+ *   2. 60-second polling of `/agent-updates/status`.
  *   3. Initial fetch on mount — no manual "Check" button.
  */
 
@@ -27,14 +25,15 @@ const POLL_INTERVAL_MS = 60_000;
 
 const AgentUpdates = () => {
   const { t } = useLang();
-  const [data, setData] = useState<UpdateCheckEntry | null>(null);
+  const [data, setData] = useState<AgentUpdateStatus | null>(null);
   const [apiState, setApiState] = useState<ApiState>("loading");
   const [apiError, setApiError] = useState<string | null>(null);
-  const [promoting, setPromoting] = useState(false);
+  const [appliedMsg, setAppliedMsg] = useState<string | null>(null);
+  const [applying, setApplying] = useState(false);
 
-  // Stable reload fn so the polling effect doesn't reset on every
-  // render. We deliberately do NOT flip apiState to "loading" inside
-  // the periodic refresh — only the initial mount shows the spinner.
+  // Stable reload fn so the polling effect doesn't reset on every render.
+  // The periodic refresh never flips apiState to "loading" — only the
+  // initial mount shows the spinner.
   const reload = useCallback(async (initial: boolean) => {
     if (initial) setApiState("loading");
     setApiError(null);
@@ -57,30 +56,32 @@ const AgentUpdates = () => {
     return () => clearInterval(id);
   }, []);
 
-  // Reverb push for instant refresh when admin (or any owner) promotes.
-  // We pass "panel" as thisApp because this binary IS the panel — the
-  // hook's auto-`check()` should only fire for panel events. Our
-  // callback receives both and re-fetches only on agent broadcasts.
+  // Reverb push for instant refresh when an admin approves. We pass
+  // "panel" as thisApp because this binary IS the panel — the hook's
+  // gated updater should only fire for panel events. Our callback
+  // receives both and re-fetches only on agent broadcasts.
   useAppUpdates("panel", (event) => {
     if (event.app === "agent") void reloadRef.current(false);
   });
 
-  const runPromote = async () => {
-    setPromoting(true);
+  const runApply = async () => {
+    setApplying(true);
     setApiError(null);
+    setAppliedMsg(null);
     try {
-      const next = await apiAgentUpdatePromote();
-      setData(next);
+      await apiAgentUpdateApply();
+      setAppliedMsg(t("agentUpdates.applied"));
+      void reloadRef.current(false);
     } catch (e) {
       setApiError(e instanceof Error ? e.message : t("agentUpdates.cannotPromote"));
     } finally {
-      setPromoting(false);
+      setApplying(false);
     }
   };
 
   const current = data?.current?.version ?? "—";
-  const available = data?.available?.version ?? (data?.error ? "?" : "—");
-  const hasUpdate = !!data?.has_update;
+  const approved = data?.approved ?? null;
+  const venuePcCount = data?.venue_pc_count ?? 0;
 
   return (
     <ScreenWithBg bg="./bg/admin-home.jpg" title={t("agentUpdates.title")}>
@@ -109,15 +110,21 @@ const AgentUpdates = () => {
                 </div>
                 <div>
                   <div className="muted" style={{ fontSize: 12 }}>
-                    {t("agentUpdates.latestVersion")}
+                    {t("agentUpdates.approvedVersion")}
                   </div>
                   <div style={{
                     fontSize: 22,
                     fontWeight: 600,
-                    color: hasUpdate ? "#07ddf1" : undefined,
+                    color: approved ? "#07ddf1" : undefined,
                   }}>
-                    {available}
+                    {approved?.version ?? "—"}
                   </div>
+                </div>
+                <div>
+                  <div className="muted" style={{ fontSize: 12 }}>
+                    {t("agentUpdates.venuePcs")}
+                  </div>
+                  <div style={{ fontSize: 22, fontWeight: 600 }}>{venuePcCount}</div>
                 </div>
               </div>
 
@@ -126,27 +133,30 @@ const AgentUpdates = () => {
                   {data.error}
                 </p>
               )}
+              {apiError && (
+                <p style={{ color: "#ef4444", margin: 0 }}>{apiError}</p>
+              )}
+              {appliedMsg && (
+                <p style={{ color: "#22c55e", margin: 0 }}>{appliedMsg}</p>
+              )}
 
-              {hasUpdate ? (
-                <>
-                  <p className="muted" style={{ margin: 0 }}>
-                    {t("agentUpdates.hasUpdate")}
-                  </p>
+              {approved ? (
+                venuePcCount > 0 ? (
                   <div>
-                    <Button
-                      type="button"
-                      onClick={runPromote}
-                      disabled={promoting}
-                    >
-                      {promoting
+                    <Button type="button" onClick={runApply} disabled={applying}>
+                      {applying
                         ? t("agentUpdates.promoting")
-                        : t("agentUpdates.promoteBtn")}
+                        : t("agentUpdates.applyBtn")}
                     </Button>
                   </div>
-                </>
+                ) : (
+                  <p className="muted" style={{ margin: 0 }}>
+                    {t("agentUpdates.noVenuePcs")}
+                  </p>
+                )
               ) : (
                 <p className="muted" style={{ margin: 0 }}>
-                  {t("agentUpdates.upToDate")}
+                  {t("agentUpdates.notApprovedYet")}
                 </p>
               )}
             </div>

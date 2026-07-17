@@ -15,6 +15,8 @@ contextBridge.exposeInMainWorld("desktopAPI", {
 // function for the push stream.
 contextBridge.exposeInMainWorld("cyberplaceUpdates", {
   check: () => ipcRenderer.invoke("updates:check"),
+  checkGated: (promotedVersion: string | null) =>
+    ipcRenderer.invoke("updates:checkGated", promotedVersion),
   install: () => ipcRenderer.invoke("updates:install"),
   getState: () => ipcRenderer.invoke("updates:getState"),
   onState: (cb: (state: unknown) => void) => {

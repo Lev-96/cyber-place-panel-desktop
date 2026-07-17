@@ -1,4 +1,4 @@
-import { request } from "./client";
+import { request, type ApiError } from "./client";
 
 /**
  * Thin REST layer for the desktop auto-update admin flow. The
@@ -60,4 +60,30 @@ export const apiPromoteUpdates = async (
     body: { apps, mandatory },
   });
   return res.data;
+};
+
+export interface AppManifest {
+  app: AppKind;
+  version: string;
+  channel: string;
+  mandatory: boolean;
+  notes: string | null;
+  github_tag: string | null;
+  published_at: string | null;
+}
+
+/**
+ * Read the public rollout manifest for an app — the version an admin has
+ * PROMOTED, or null when nothing is promoted yet (the backend replies 404).
+ * The desktop uses this to catch up on a promote it missed while offline:
+ * the promoted version is the only one the hard-gated updater will install.
+ */
+export const apiGetManifest = async (app: AppKind): Promise<AppManifest | null> => {
+  try {
+    const res = await request<{ data: AppManifest }>(`/updates/${app}/manifest`);
+    return res.data;
+  } catch (e) {
+    if ((e as ApiError)?.status === 404) return null; // nothing promoted yet
+    throw e;
+  }
 };
