@@ -1121,6 +1121,36 @@ export const TRANSLATIONS: Dict = {
     ru: "Не удалось применить — backend не смог получить релиз с GitHub.",
     am: "Չհաջողվեց կիրառել — backend-ը չի կարողացել ստանալ թողարկումը GitHub-ից:",
   },
+  "agentUpdates.approvedVersion": {
+    en: "Approved by administrator",
+    ru: "Одобрено администратором",
+    am: "Հաստատված է ադմինիստրատորի կողմից",
+  },
+  "agentUpdates.notApprovedYet": {
+    en: "No update has been approved by an administrator yet. You will be able to roll it out to your branches once it is approved.",
+    ru: "Администратор ещё не одобрил обновление. Как только он его одобрит, вы сможете применить его в своих филиалах.",
+    am: "Ադմինիստրատորը դեռ չի հաստատել թարմացումը: Հաստատվելուց հետո դուք կկարողանաք կիրառել այն ձեր մասնաճյուղերում:",
+  },
+  "agentUpdates.venuePcs": {
+    en: "PCs in your branches",
+    ru: "ПК в ваших филиалах",
+    am: "Համակարգիչներ ձեր մասնաճյուղերում",
+  },
+  "agentUpdates.applyBtn": {
+    en: "Apply approved version to my branches",
+    ru: "Применить одобренную версию в моих филиалах",
+    am: "Կիրառել հաստատված տարբերակը իմ մասնաճյուղերում",
+  },
+  "agentUpdates.applied": {
+    en: "Sent to your PCs. Each agent downloads in the background and prompts the cashier to restart.",
+    ru: "Отправлено на ваши ПК. Каждый агент скачает обновление фоном и предложит кассиру перезапуск.",
+    am: "Ուղարկվեց ձեր համակարգիչներին: Յուրաքանչյուր գործակալ ֆոնում կներբեռնի և կհուշի կասսային վերագործարկել:",
+  },
+  "agentUpdates.noVenuePcs": {
+    en: "No PCs are registered in your branches yet.",
+    ru: "В ваших филиалах пока нет зарегистрированных ПК.",
+    am: "Ձեր մասնաճյուղերում դեռ գրանցված համակարգիչներ չկան:",
+  },
   "updates.title": {
     en: "Desktop app updates",
     ru: "Обновления десктоп-приложений",

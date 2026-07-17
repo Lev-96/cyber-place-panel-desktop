@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import "@/types/desktopUpdates";
+import { apiGetManifest, type AppKind } from "@/api/updates";
 import { getEcho } from "./echo";
 
 /**
@@ -35,8 +36,9 @@ export interface AppUpdatePromotedEvent {
  * leak a handler.
  *
  * Falls back silently when Reverb isn't configured (`getEcho()` returns
- * null) — the on-boot `check()` in the main process still discovers
- * the update on next start.
+ * null) — a panel that misses the broadcast catches up on next mount via
+ * {@link useUpdateCatchUp}, which reads the backend manifest and runs the
+ * same gated check.
  */
 export const useAppUpdates = (
   thisApp: "panel" | "agent",
@@ -54,13 +56,14 @@ export const useAppUpdates = (
     const channel = echo.channel("app-updates");
     const handler = (event: AppUpdatePromotedEvent) => {
       cbRef.current?.(event);
-      // Only ask electron-updater to check when the event names the
-      // app we are. Otherwise (e.g. agent broadcast received in
-      // panel) it's a benign cross-event; pass it through to the
-      // callback but don't touch the local updater.
+      // Only drive the local updater when the event names the app we
+      // are. We pass the promoted version through the GATED check, so a
+      // panel installs exactly the version the admin just promoted and
+      // nothing else. Cross-events (e.g. an agent broadcast received in
+      // the panel) are handed to the callback but never touch the updater.
       if (event.app === thisApp) {
         window.cyberplaceUpdates
-          ?.check()
+          ?.checkGated(event.version)
           .catch(() => { /* swallowed; main-process logs the error */ });
       }
     };
@@ -73,4 +76,41 @@ export const useAppUpdates = (
       } catch { /* echo may be torn down already during HMR */ }
     };
   }, [thisApp]);
+};
+
+/**
+ * Catch-up for a panel that was offline (or closed) when the admin
+ * promoted — the Reverb broadcast in {@link useAppUpdates} only reaches
+ * live panels. On mount this reads the backend rollout manifest and, if a
+ * version is promoted, runs the SAME gated check, so the promoted (and
+ * only the promoted) version installs. The backend pointer stays the
+ * single source of truth for what a panel is allowed to install.
+ *
+ * Mount once near the authed app root — it runs a single manifest read
+ * per mount and no-ops when nothing is promoted or the updater bridge is
+ * absent (browser/dev).
+ */
+const CATCH_UP_POLL_MS = 10 * 60 * 1000; // 10 min
+
+export const useUpdateCatchUp = (app: AppKind): void => {
+  useEffect(() => {
+    let cancelled = false;
+
+    const runOnce = async () => {
+      try {
+        const manifest = await apiGetManifest(app);
+        if (cancelled || !manifest) return;
+        await window.cyberplaceUpdates?.checkGated(manifest.version);
+      } catch { /* offline / not authed yet — retried on the next tick */ }
+    };
+
+    void runOnce();
+    // Polling fallback (realtime hard rule #11): the `app-update.promoted`
+    // Reverb broadcast is the primary path, but a panel left running for
+    // days could miss it on a Reverb blip — a periodic manifest re-check
+    // guarantees a promoted version is still picked up. Cheap: one manifest
+    // GET, and the gated check only downloads on an exact promoted match.
+    const id = setInterval(() => { void runOnce(); }, CATCH_UP_POLL_MS);
+    return () => { cancelled = true; clearInterval(id); };
+  }, [app]);
 };

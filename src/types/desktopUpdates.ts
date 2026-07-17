@@ -25,7 +25,14 @@ export interface DesktopUpdateState {
 }
 
 export interface DesktopUpdatesBridge {
+  /** Plain check — reports availability but never downloads. */
   check(): Promise<DesktopUpdateState | null>;
+  /**
+   * Gated check for the admin-driven rollout. Downloads ONLY when the
+   * version on the GitHub channel equals `promotedVersion` (the version an
+   * admin has promoted on the backend). Pass null for "nothing approved".
+   */
+  checkGated(promotedVersion: string | null): Promise<DesktopUpdateState | null>;
   install(): Promise<void>;
   getState(): Promise<DesktopUpdateState | null>;
   onState(cb: (state: DesktopUpdateState) => void): () => void;

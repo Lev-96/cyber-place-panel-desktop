@@ -162,18 +162,26 @@ app.whenReady().then(async () => {
     if (isDev) return updateService.getState();
     return updateService.check();
   });
+  // Gated check — the renderer passes the admin-promoted version (from the
+  // `app-update.promoted` broadcast or `/updates/panel/manifest`), and the
+  // service downloads ONLY when the GitHub channel version equals it. This
+  // is the boundary that keeps owner/manager panels from self-updating
+  // before an admin has approved a version.
+  ipcMain.handle("updates:checkGated", async (_e: unknown, promotedVersion: string | null) => {
+    if (!updateService) return null;
+    if (isDev) return updateService.getState();
+    return updateService.checkGated(promotedVersion ?? null);
+  });
   ipcMain.handle("updates:install", () => {
     updateService?.installAndRestart();
   });
   ipcMain.handle("updates:getState", () => updateService?.getState() ?? null);
 
-  // Sanity check on boot — packaged builds reach out once a few seconds
-  // after launch so a desktop that was offline when the admin clicked
-  // "Внести обновления" still discovers the new release on next start.
-  // Delay keeps the boot path light and the renderer responsive.
-  if (!isDev) {
-    setTimeout(() => { void updateService?.check(); }, 5_000);
-  }
+  // No autonomous boot check: a download must be authorised by an admin
+  // promote. Catch-up for a panel that was offline during the promote is
+  // renderer-driven — on mount it reads `/updates/panel/manifest` and, if
+  // a version is promoted, calls `updates:checkGated`. That keeps the
+  // backend promote pointer the single source of truth for what installs.
 
   if (!(isDev && DEV_URL)) {
     const root = join(__dirname, "..", "..", "dist", "web");
