@@ -21,10 +21,11 @@ interface Props {
 }
 
 /**
- * Tier key for the branch's hourly-rate matrix. The form picks a
- * tier; the resolved AMD value lives in `pc.hourly_rate` on save.
- * Single source of truth for prices remains the branch matrix —
- * the form just enforces "no hand-typed rates".
+ * Tier key for the branch's hourly-rate matrix (`{platform}-{type}`). A
+ * computer is always linked to exactly one place, and that place's
+ * platform + type fully determine the tariff — so the operator no longer
+ * picks a tier by hand: it's derived from the chosen place and shown for
+ * confirmation. Single source of truth for prices stays the branch matrix.
  */
 type TierKey =
   | "pc-standard" | "pc-vip"
@@ -33,7 +34,7 @@ type TierKey =
 
 interface TierOption {
   key: TierKey;
-  /** Localised label, e.g. "Standard" / "PS4 VIP". */
+  /** Localised label, e.g. "PC Standard". */
   label: string;
   /** AMD value from the branch matrix; null when the cell is empty. */
   amount: number | null;
@@ -41,169 +42,85 @@ interface TierOption {
 
 const PcForm = ({ branchId, initial, onClose, onSaved }: Props) => {
   const { t, money } = useLang();
-  const [label, setLabel] = useState(initial?.label ?? "");
+  // This form registers COMPUTERS. On create the kind is always PC; on edit
+  // we keep whatever the existing device is (never silently convert it), and
+  // only use the kind to scope which places may be linked.
+  const deviceKind: PcKind = initial?.kind ?? PC_KIND.Pc;
+
   const [mac, setMac] = useState(initial?.mac_address ?? "");
   const [placeId, setPlaceId] = useState<string>(initial?.place_id ? String(initial.place_id) : "");
-  const [kind, setKind] = useState<PcKind>(initial?.kind ?? PC_KIND.Pc);
 
-  // Branch matrix — drives the tier select. Cached for the lifetime
-  // of this modal so switching kind doesn't refetch.
+  // Branch matrix — drives the derived tariff. Cached for the modal's lifetime.
   const branch = useAsync(() => branchRepository.byId(branchId), [branchId]);
   const matrix = branch.data?.price_for_branch ?? null;
 
-  // Branch places — drives the "Linked place" select. Cached the same
-  // way: one fetch per modal open, regardless of how many times the
-  // user toggles between pc/ps tabs.
+  // Branch places — the linked-place select. A computer may only link to a
+  // PC place, so the list is already scoped by kind.
   const places = useAsync(() => placeRepository.listRawByBranch(branchId), [branchId]);
   const placeOptions = useMemo<IBranchPlace[]>(
-    () => filterPlacesForKind(places.data ?? [], kind),
-    [places.data, kind],
+    () => filterPlacesForKind(places.data ?? [], deviceKind),
+    [places.data, deviceKind],
   );
 
-  // If the operator switches kind (pc ↔ ps) and the previously linked
-  // place no longer belongs to the new kind, drop the link so we never
-  // save a mismatched (pc → ps4 place) pair. Edits preserve the link
-  // on first render because the kind matches what was saved.
+  // If the currently linked place vanished from the scoped list (e.g. it was
+  // deleted while the modal was open), drop the stale link so we never submit
+  // a place the operator can't see.
   useEffect(() => {
-    if (!placeId) return;
-    if (places.loading) return;
-    const stillValid = placeOptions.some((p) => String(p.id) === placeId);
-    if (!stillValid) setPlaceId("");
+    if (!placeId || places.loading) return;
+    if (!placeOptions.some((p) => String(p.id) === placeId)) setPlaceId("");
   }, [placeOptions, placeId, places.loading]);
 
-  // Tier options visible for the current kind. PCs see two rows, PS
-  // consoles see four because PS4 and PS5 are billed separately.
-  const tierOptions = useMemo<TierOption[]>(
-    () => buildTierOptions(kind, matrix, t),
-    [kind, matrix, t],
+  const selectedPlace = useMemo<IBranchPlace | null>(
+    () => placeOptions.find((p) => String(p.id) === placeId) ?? null,
+    [placeOptions, placeId],
   );
 
-  // Selected tier. On edit we try to match the existing rate to a
-  // tier; on create we pick the first non-empty tier so the form
-  // always has a sensible default.
-  const [selectedTier, setSelectedTier] = useState<TierKey | "">("");
-  useEffect(() => {
-    if (selectedTier !== "") return; // user has already picked
-    if (tierOptions.length === 0) return;
-    if (initial?.hourly_rate != null) {
-      const match = tierOptions.find((o) => o.amount === Number(initial.hourly_rate));
-      if (match) { setSelectedTier(match.key); return; }
-    }
-    const firstPriced = tierOptions.find((o) => o.amount != null);
-    if (firstPriced) setSelectedTier(firstPriced.key);
-  }, [tierOptions, initial, selectedTier]);
-
-  // When kind flips (pc ↔ ps) the previously selected tier no longer
-  // exists — reset so the next render's effect picks a valid default.
-  useEffect(() => { setSelectedTier(""); }, [kind]);
-
-  const selectedAmount = useMemo(
-    () => tierOptions.find((o) => o.key === selectedTier)?.amount ?? null,
-    [selectedTier, tierOptions],
+  // Tariff is fully determined by the selected place (platform + type). We
+  // surface it as a single, read-only tier so the operator sees exactly which
+  // rate the computer will bill at — "PC standard place → PC-standard tariff".
+  const tier = useMemo<TierOption | null>(
+    () => tierForPlace(selectedPlace, matrix),
+    [selectedPlace, matrix],
   );
+  const selectedAmount = tier?.amount ?? null;
 
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
+  const noPriceForPlace = !!selectedPlace && (tier == null || tier.amount == null);
+
   const submit = async (e: FormEvent) => {
     e.preventDefault();
+    if (!selectedPlace) return setErr(t("pcs.placeRequired"));
     setBusy(true); setErr(null);
     try {
-      const place_id = placeId ? Number(placeId) : null;
-      const body = {
+      // Label is no longer typed by hand — derive a stable one from the place
+      // so lists that fall back to it (when a place isn't loaded) still read
+      // sensibly. The place number is what the cashier actually sees.
+      const label = `№${selectedPlace.number ?? selectedPlace.id}`;
+      const base = {
         label,
-        kind,
         hourly_rate: selectedAmount,
         mac_address: mac || null,
-        place_id,
+        place_id: selectedPlace.id,
       };
       const pc = initial
-        ? await pcRepository.update(initial.id, body)
-        : await pcRepository.create({ branch_id: branchId, ...body });
+        ? await pcRepository.update(initial.id, base)
+        // A fresh registration is always a PC (agent-backed).
+        : await pcRepository.create({ branch_id: branchId, kind: PC_KIND.Pc, ...base });
       onSaved(pc);
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Failed to save");
     } finally { setBusy(false); }
   };
 
-  const noPricesYet = !branch.loading && tierOptions.every((o) => o.amount == null);
-  const mismatchWarning =
-    !!initial?.hourly_rate &&
-    selectedTier !== "" &&
-    selectedAmount !== Number(initial.hourly_rate);
+  const canSave = !busy && !!selectedPlace && !noPriceForPlace;
 
   return (
     <Modal open onClose={onClose}>
       <form className="card" style={{ width: 460, maxWidth: "90vw", display: "flex", flexDirection: "column", gap: 14 }} onSubmit={submit}>
         <h2 style={{ margin: 0 }}>{initial ? t("pcs.editDevice") : t("pcs.newDevice")}</h2>
 
-        <div className="col" style={{ gap: 6 }}>
-          <span className="label">{t("pcs.kind")}</span>
-          <div className="row" style={{ gap: 8 }}>
-            <button type="button" onClick={() => setKind(PC_KIND.Pc)} style={tabStyle(kind === PC_KIND.Pc)}>{t("pcs.kindPc")}</button>
-            <button type="button" onClick={() => setKind(PC_KIND.Ps)} style={tabStyle(kind === PC_KIND.Ps)}>{t("pcs.kindPs")}</button>
-          </div>
-        </div>
-
-        <Input label={t("pcs.label")} value={label} onChange={(e) => setLabel(e.target.value)} required autoFocus />
-
-        <div className="col" style={{ gap: 6 }}>
-          <span className="label">{t("pcs.tierLabel")}</span>
-          {branch.loading ? (
-            <Spinner />
-          ) : noPricesYet ? (
-            <p className="muted" style={{ margin: 0, color: "#f59e0b" }}>
-              {t("pcs.tierNoPrices")}
-            </p>
-          ) : (
-            <div style={selectWrap}>
-              <select
-                className="input"
-                value={selectedTier}
-                onChange={(e) => setSelectedTier(e.target.value as TierKey)}
-                style={selectInner}
-                required
-              >
-                <option value="" disabled>{t("pcs.tierPlaceholder")}</option>
-                {tierOptions.map((o) => (
-                  <option key={o.key} value={o.key} disabled={o.amount == null}>
-                    {o.label}{o.amount != null ? ` — ${money(o.amount)}/${t("time.hourShort")}` : ` — ${t("pcs.tierEmpty")}`}
-                  </option>
-                ))}
-              </select>
-              {/* Custom caret — the native arrow is browser-dependent
-                  and looks washed out against the dark theme. Using a
-                  ▾ glyph keeps it crisp without pulling in an icon
-                  pack. `pointer-events: none` so clicks fall through
-                  to the select. */}
-              <span aria-hidden style={selectCaret}>▾</span>
-            </div>
-          )}
-          {mismatchWarning && (
-            <span className="muted" style={{ fontSize: 11, color: "#f59e0b" }}>
-              {t("pcs.tierOverwrite")}
-            </span>
-          )}
-        </div>
-
-        {kind === PC_KIND.Pc && (
-          <>
-            <Input
-              label={t("pcForm.macAddress")}
-              placeholder="AA:BB:CC:DD:EE:FF"
-              value={mac ?? ""}
-              onChange={(e) => setMac(e.target.value)}
-            />
-            <span className="muted" style={{ fontSize: 11, marginTop: -8 }}>
-              {t("pcs.macHint")}
-            </span>
-          </>
-        )}
-        {kind === PC_KIND.Ps && (
-          <span className="muted" style={{ fontSize: 12 }}>
-            {t("pcs.psHint")}
-          </span>
-        )}
         <div className="col" style={{ gap: 6 }}>
           <span className="label">{t("pcs.placeId")}</span>
           {places.loading ? (
@@ -219,8 +136,9 @@ const PcForm = ({ branchId, initial, onClose, onSaved }: Props) => {
                 value={placeId}
                 onChange={(e) => setPlaceId(e.target.value)}
                 style={selectInner}
+                required
               >
-                <option value="">{t("pcs.placeNone")}</option>
+                <option value="" disabled>{t("pcs.placeNone")}</option>
                 {placeOptions.map((p) => (
                   <option key={p.id} value={String(p.id)}>
                     {fmt(
@@ -236,48 +154,72 @@ const PcForm = ({ branchId, initial, onClose, onSaved }: Props) => {
             </div>
           )}
         </div>
+
+        <div className="col" style={{ gap: 6 }}>
+          <span className="label">{t("pcs.tierLabel")}</span>
+          {!selectedPlace ? (
+            <p className="muted" style={{ margin: 0 }}>{t("pcs.tierPickPlace")}</p>
+          ) : noPriceForPlace ? (
+            <p className="muted" style={{ margin: 0, color: "#f59e0b" }}>{t("pcs.tierNoPrices")}</p>
+          ) : (
+            <div style={selectWrap}>
+              {/* Derived, single-option select — the tariff can't drift from the
+                  place's platform/type, but the operator still sees it plainly. */}
+              <select className="input" value={tier!.key} style={selectInner} disabled>
+                <option value={tier!.key}>
+                  {tier!.label} — {money(tier!.amount!)}/{t("time.hourShort")}
+                </option>
+              </select>
+              <span aria-hidden style={selectCaret}>▾</span>
+            </div>
+          )}
+        </div>
+
+        {deviceKind === PC_KIND.Pc && (
+          <>
+            <Input
+              label={t("pcForm.macAddress")}
+              placeholder="AA:BB:CC:DD:EE:FF"
+              value={mac ?? ""}
+              onChange={(e) => setMac(e.target.value)}
+            />
+            <span className="muted" style={{ fontSize: 11, marginTop: -8 }}>
+              {t("pcs.macHint")}
+            </span>
+          </>
+        )}
+
         {err && <div className="error">{err}</div>}
         <div className="row-between">
           <Button type="button" variant="secondary" onClick={onClose} disabled={busy}>{t("action.cancel")}</Button>
-          <Button disabled={busy || !label || noPricesYet || selectedTier === ""}>
-            {busy ? "…" : t("action.save")}
-          </Button>
+          <Button disabled={!canSave}>{busy ? "…" : t("action.save")}</Button>
         </div>
       </form>
     </Modal>
   );
 };
 
-const buildTierOptions = (
-  kind: PcKind,
+/**
+ * The single tariff a place bills at: its `{platform}-{type}` cell in the
+ * branch matrix. Returns null when no place is chosen yet.
+ */
+const tierForPlace = (
+  place: IBranchPlace | null,
   matrix: IBranchApi["price_for_branch"] | null,
-  t: (key: string) => string,
-): TierOption[] => {
-  // PC kind sees only the two PC tiers — exposing PS4/PS5 rows here
-  // would just be noise on a PC device card.
-  if (kind === PC_KIND.Pc) {
-    return [
-      { key: "pc-standard", label: t("pcs.tier.pcStandard"), amount: numOrNull(matrix?.["pc-standard"]) },
-      { key: "pc-vip",      label: t("pcs.tier.pcVip"),      amount: numOrNull(matrix?.["pc-vip"]) },
-    ];
-  }
-  // PS kind covers both generations. Operators frequently price PS4
-  // and PS5 differently, so we surface all four cells.
-  return [
-    { key: "ps4-standard", label: t("pcs.tier.ps4Standard"), amount: numOrNull(matrix?.["ps4-standard"]) },
-    { key: "ps4-vip",      label: t("pcs.tier.ps4Vip"),      amount: numOrNull(matrix?.["ps4-vip"]) },
-    { key: "ps5-standard", label: t("pcs.tier.ps5Standard"), amount: numOrNull(matrix?.["ps5-standard"]) },
-    { key: "ps5-vip",      label: t("pcs.tier.ps5Vip"),      amount: numOrNull(matrix?.["ps5-vip"]) },
-  ];
+): TierOption | null => {
+  if (!place) return null;
+  const key = `${place.platform}-${place.type}` as TierKey;
+  return {
+    key,
+    label: `${place.platform.toUpperCase()} ${place.type === "vip" ? "VIP" : "Standard"}`,
+    amount: numOrNull(matrix?.[key]),
+  };
 };
 
 /**
- * Restrict the place dropdown to the platforms that match the current
- * device kind: PC devices link to "pc" places, PS devices link to ps4
- * or ps5. Without this filter the operator could pair a PS5 console to
- * a PC-only seat — the backend would accept it but the live-tile view
- * would render a contradictory icon. Sorted by `number` so the list
- * matches the physical layout the cashier sees on the floor.
+ * Restrict the place dropdown to the platforms that match the device kind:
+ * a computer (PC) links only to "pc" places; a console links to ps4/ps5.
+ * Sorted by `number` so the list matches the physical floor layout.
  */
 const filterPlacesForKind = (
   places: IBranchPlace[],
@@ -295,26 +237,15 @@ const numOrNull = (v: number | null | undefined): number | null => {
   return Number.isFinite(n) && n > 0 ? n : null;
 };
 
-const tabStyle = (active: boolean): React.CSSProperties => ({
-  flex: 1,
-  padding: "8px 10px",
-  border: `1px solid ${active ? "#07ddf1" : "#1f2a44"}`,
-  background: active ? "#101a35" : "transparent",
-  color: active ? "#07ddf1" : "#9aa8c7",
-  borderRadius: 8,
-  cursor: "pointer",
-  fontWeight: 600,
-});
-
 // Wrapper hosts the custom caret on top of the native select.
 const selectWrap: React.CSSProperties = {
   position: "relative",
   width: "100%",
 };
 
-// Reuse the project's `.input` class for the base styling and only
-// override the bits a select needs: hide the native chrome arrow and
-// leave room on the right for our custom caret.
+// Reuse the project's `.input` class for the base styling and only override
+// the bits a select needs: hide the native chrome arrow and leave room on
+// the right for our custom caret.
 const selectInner: React.CSSProperties = {
   width: "100%",
   appearance: "none",

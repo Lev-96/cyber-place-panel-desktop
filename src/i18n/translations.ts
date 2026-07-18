@@ -177,17 +177,18 @@ export const TRANSLATIONS: Dict = {
   "session.products": { en: "Products", ru: "Товары", am: "Ապրանքներ" },
   "session.services": { en: "Services", ru: "Услуги", am: "Ծառայություններ" },
   "session.removeItemTitle": { en: "Remove item", ru: "Удалить позицию", am: "Հեռացնել տողը" },
-  "pcs.title": { en: "PCs", ru: "ПК", am: "Համակարգիչներ" },
-  "pcs.register": { en: "+ Register device", ru: "+ Зарегистрировать устройство", am: "+ Գրանցել սարք" },
-  "pcs.editDevice": { en: "Edit device", ru: "Редактировать устройство", am: "Խմբագրել սարքը" },
-  "pcs.newDevice": { en: "Register new device", ru: "Зарегистрировать устройство", am: "Գրանցել նոր սարք" },
+  "pcs.title": { en: "Computers", ru: "Компьютеры", am: "Համակարգիչներ" },
+  "pcs.register": { en: "+ Register computer", ru: "+ Зарегистрировать компьютер", am: "+ Գրանցել համակարգիչ" },
+  "pcs.editDevice": { en: "Edit computer", ru: "Редактировать компьютер", am: "Խմբագրել համակարգիչը" },
+  "pcs.newDevice": { en: "Register computer", ru: "Зарегистрировать компьютер", am: "Գրանցել համակարգիչ" },
   "pcs.kind": { en: "Device type", ru: "Тип устройства", am: "Սարքի տեսակը" },
   "pcs.kindPc": { en: "PC (with agent)", ru: "ПК (с агентом)", am: "ՀՀ (գործակալով)" },
   "pcs.kindPs": { en: "PlayStation / console", ru: "PlayStation / консоль", am: "PlayStation / կոնսոլ" },
   "pcs.psHint": { en: "No agent runs on a console — billing-only device: timer + cost.", ru: "На консоль агент не ставится — это билинг-устройство: только таймер и расчёт стоимости.", am: "Կոնսոլի վրա գործակալ չի տեղադրվում — միայն ժամանաչափ և գումար:" },
   "pcs.label": { en: "Label (e.g. PC #5)", ru: "Метка (напр. PC #5)", am: "Պիտակ (օր. PC #5)" },
   "pcs.macHint": { en: "Used only for Wake-on-LAN. The PC connects via the agent app paired with the token.", ru: "Используется только для Wake-on-LAN. ПК подключается через агент с токеном, не через MAC.", am: "Օգտագործվում է միայն Wake-on-LAN-ի համար:" },
-  "pcs.placeId": { en: "Linked place (optional)", ru: "Связанное место (необязательно)", am: "Կապված տեղ (ընտրովի)" },
+  "pcs.placeId": { en: "Linked place", ru: "Связанное место", am: "Կապված տեղ" },
+  "pcs.placeRequired": { en: "Linked place is required.", ru: "Связанное место обязательно.", am: "Կապված տեղը պարտադիր է:" },
   "pcs.placeNone": { en: "— none —", ru: "— нет —", am: "— չկա —" },
   "pcs.placeEmpty": {
     en: "No places in this branch yet. Add places first to link this device to one.",
@@ -202,6 +203,7 @@ export const TRANSLATIONS: Dict = {
   // Price-tier selector — replaces the old free-text hourly_rate input
   // so PCs draw their price from the branch matrix and can't drift.
   "pcs.tierLabel": { en: "Price tier", ru: "Тариф", am: "Սակագին" },
+  "pcs.tierPickPlace": { en: "Select a place first — its tariff appears here.", ru: "Сначала выберите место — его тариф появится здесь.", am: "Սկզբում ընտրեք տեղը — դրա սակագինը կհայտնվի այստեղ:" },
   "pcs.tierPlaceholder": { en: "Choose a tier…", ru: "Выберите тариф…", am: "Ընտրեք սակագինը…" },
   "pcs.tierNoPrices": {
     en: "Branch prices are not configured yet. Set them in Tariffs first, then come back.",
