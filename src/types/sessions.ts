@@ -83,7 +83,8 @@ export interface IPcApi {
   place?: {
     id: number;
     number?: number | null;
+    name?: string | null;
     type: "standard" | "vip";
-    platform: "pc" | "ps4" | "ps5";
+    platform: string;
   } | null;
 }

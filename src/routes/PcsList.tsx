@@ -11,7 +11,7 @@ import { useLang } from "@/i18n/LanguageContext";
 import { fmt } from "@/i18n/translations";
 import { pcRepository } from "@/repositories/PcRepository";
 import { IPcApi } from "@/types/sessions";
-import { isPs, pcHasAgent, PC_STATUS } from "@/types/pc";
+import { isPs, pcHasAgent, PC_STATUS, PC_STATUS_COLOR } from "@/types/pc";
 import { useState } from "react";
 import { useParams } from "react-router-dom";
 
@@ -170,7 +170,7 @@ const PcsList = () => {
 };
 
 const StatusDot = ({ status }: { status: IPcApi["status"] }) => {
-  const color = status === PC_STATUS.InSession ? "#ef4444" : status === PC_STATUS.Online ? "#22c55e" : "#6b7280";
+  const color = PC_STATUS_COLOR[status];
   return <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: 4, background: color, marginRight: 4 }} />;
 };
 

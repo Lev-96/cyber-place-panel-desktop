@@ -8,7 +8,8 @@ import { useLang } from "@/i18n/LanguageContext";
 import { usePlaceAvailability } from "@/realtime/usePlaceAvailability";
 import { sessionRepository } from "@/repositories/SessionRepository";
 import { IPcApi, ISessionApi } from "@/types/sessions";
-import { isPs } from "@/types/pc";
+import { PC_STATUS_COLOR } from "@/types/pc";
+import { platformLabel } from "@/utils/platform";
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import AddSessionItemDialog from "./AddSessionItemDialog";
@@ -95,12 +96,23 @@ const SessionsBoard = ({ branchId }: Props) => {
             <div key={pc.id} className="place-cell" style={{ borderColor: color, minHeight: 160 }}>
               <span className="dot" style={{ background: color }} />
               {/*
-                Display the place number the operator entered at place
-                creation (`place.number`) — same value the mobile guest
-                sees on `placesSelect`. Fall back to the PC's own label
-                only when the PC isn't linked to a place (legacy data).
+                Title = the place's name if it has one, else its number
+                (same value the mobile guest sees on `placesSelect`),
+                falling back to the device label for legacy unlinked rows.
+                The inline dot is the DEVICE status (online/offline/busy),
+                distinct from the corner session-state dot above. The badge
+                names the platform (PS4 / Table Tennis …) for non-pc places.
               */}
-              <span className="platform">№{pc.place?.number ?? pc.label}{isPs(pc.kind) && <span className="muted" style={{ marginLeft: 6, fontSize: 11 }}>PS</span>}</span>
+              <span className="platform" style={{ display: "inline-flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                <span
+                  title={pc.status}
+                  style={{ width: 8, height: 8, borderRadius: 4, background: PC_STATUS_COLOR[pc.status], flexShrink: 0 }}
+                />
+                <span>{pc.place?.name?.trim() || `№${pc.place?.number ?? pc.label}`}</span>
+                {pc.place && pc.place.platform !== "pc" && (
+                  <span className="muted" style={{ fontSize: 11 }}>{platformLabel(pc.place.platform)}</span>
+                )}
+              </span>
               {sess ? (
                 <>
                   <span className="status" style={{ color }}>
@@ -133,7 +145,7 @@ const SessionsBoard = ({ branchId }: Props) => {
                   <span className="status" style={{ color }}>
                     {isReserved
                       ? t("session.reserved") || "Reserved"
-                      : `${t("session.free")}${isPs(pc.kind) ? " · PS" : ""}`}
+                      : `${t("session.free")}${pc.place && pc.place.platform !== "pc" ? ` · ${platformLabel(pc.place.platform)}` : ""}`}
                   </span>
                   {/*
                     Start is disabled while the seat is held by an

@@ -24,6 +24,17 @@ export const PC_STATUS = {
   InSession: "in_session",
 } as const satisfies Record<string, PcStatus>;
 
+/**
+ * Status-dot palette (single source of truth for the sessions board + device
+ * list): online = green (available), offline = red (agent not connected),
+ * in_session = amber (busy). Billing-only devices are always online → green.
+ */
+export const PC_STATUS_COLOR: Record<PcStatus, string> = {
+  online: "#22c55e",
+  offline: "#ef4444",
+  in_session: "#f59e0b",
+};
+
 /** A PC runs the kiosk agent; a PS/console does not (billing-only). */
 export const pcHasAgent = (kind?: PcKind): boolean => kind === PC_KIND.Pc;
 
