@@ -4,7 +4,7 @@ import BranchForm from "@/components/branches/BranchForm";
 import Avatar from "@/components/ui/Avatar";
 import Button from "@/components/ui/Button";
 import ScreenWithBg from "@/components/ui/ScreenWithBg";
-import Spinner from "@/components/ui/Spinner";
+import { ListSkeleton } from "@/components/ui/Skeleton";
 import { useAsync } from "@/hooks/useAsync";
 import { useLang } from "@/i18n/LanguageContext";
 import { fmt } from "@/i18n/translations";
@@ -31,7 +31,7 @@ const CompanyBranches = () => {
         <Link to={`/companies/${id}`} className="muted">{t("companyBranches.back")}</Link>
         {canCreate && <Button onClick={() => setCreating(true)}>{t("companyBranches.newBranch")}</Button>}
       </div>
-      {loading && <Spinner />}
+      {loading && <ListSkeleton />}
       {error && <div className="error">{error.message}</div>}
       {!loading && !error && (
         <div className="list">

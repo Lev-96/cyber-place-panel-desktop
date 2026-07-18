@@ -69,8 +69,8 @@ describe("can(role, perm)", () => {
       expect(can("manager", "shift.open")).toBe(true);
     });
 
-    it("can edit own-branch info but NOT prices (owner-only business decision)", () => {
-      expect(can("manager", "branch.edit")).toBe(true);
+    it("cannot edit the branch profile (logo/info) or prices — owner/admin only", () => {
+      expect(can("manager", "branch.edit")).toBe(false);
       expect(can("manager", "branch.prices")).toBe(false);
     });
 

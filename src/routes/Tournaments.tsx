@@ -1,7 +1,9 @@
 import TournamentForm from "@/components/tournaments/TournamentForm";
 import Button from "@/components/ui/Button";
 import ScreenWithBg from "@/components/ui/ScreenWithBg";
-import Spinner from "@/components/ui/Spinner";
+import { useConfirm } from "@/components/ui/ConfirmProvider";
+import Pagination from "@/components/ui/Pagination";
+import { ListSkeleton } from "@/components/ui/Skeleton";
 import { ITournamentApi, SkillLevel } from "@/api/tournaments";
 import { useAsync } from "@/hooks/useAsync";
 import { useLang } from "@/i18n/LanguageContext";
@@ -24,6 +26,7 @@ const SKILL_TONES: Record<SkillLevel, { bg: string; fg: string; border: string }
 const Tournaments = () => {
   const { user } = useAuth();
   const { t: tr } = useLang();
+  const confirm = useConfirm();
 
   const { branchId } = useParams();
   const id = Number(branchId);
@@ -48,10 +51,12 @@ const Tournaments = () => {
     // delete filterParams.company_id;
   }
 
+  const [page, setPage] = useState(1);
   const { data, loading, error, reload } = useAsync(
-    () => tournamentRepository.list(filterParams.branch_id),
-    // dependencies: update if user, branchId changes
+    () => tournamentRepository.listPaged(page, filterParams.branch_id),
+    // dependencies: update if user, branchId or page changes
     [
+      page,
       user?.role,
       user?.dashboard?.branch_id,
       user?.dashboard?.company_id,
@@ -59,13 +64,15 @@ const Tournaments = () => {
       isBranchScoped,
     ],
   );
+  const tournaments = data?.data ?? [];
+  const lastPage = data?.meta?.last_page ?? 1;
 
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState<ITournamentApi | null>(null);
   const [removeErr, setRemoveErr] = useState<string | null>(null);
 
   const remove = async (t: ITournamentApi) => {
-    if (!confirm(`${tr("tournaments.confirmDelete")} "${t.title}"?`)) return;
+    if (!(await confirm(`${tr("tournaments.confirmDelete")} "${t.title}"?`, { destructive: true }))) return;
     // Without try/catch the previous version awaited the API call and
     // silently dropped any 4xx (e.g. role-check 403 from
     // CheckRoleForTournamentService) — the page neither showed an
@@ -103,12 +110,12 @@ const Tournaments = () => {
         </div>
       )}
 
-      {loading && <Spinner />}
+      {loading && <ListSkeleton />}
       {error && <div className="error">{error.message}</div>}
       {removeErr && <div className="error">{removeErr}</div>}
       {!loading && !error && (
         <div style={{ display: "grid", gap: 12 }}>
-          {(data ?? []).map((t) => {
+          {tournaments.map((t) => {
             const skill = (t.skill_level ?? "any") as SkillLevel;
             const tone = SKILL_TONES[skill] ?? SKILL_TONES.any;
             // Clamp + guard against participants_limit=0 (would otherwise
@@ -225,9 +232,10 @@ const Tournaments = () => {
               </div>
             );
           })}
-          {!data?.length && <div className="muted">{tr("common.empty.tournaments")}</div>}
+          {!tournaments.length && <div className="muted">{tr("common.empty.tournaments")}</div>}
         </div>
       )}
+      {!error && <Pagination page={page} lastPage={lastPage} onChange={setPage} disabled={loading} />}
       {creating && isBranchScoped && (
         <TournamentForm
           branchId={id}

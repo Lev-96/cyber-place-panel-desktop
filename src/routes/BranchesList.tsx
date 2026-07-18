@@ -1,28 +1,34 @@
 import Avatar from "@/components/ui/Avatar";
+import Pagination from "@/components/ui/Pagination";
 import ScreenWithBg from "@/components/ui/ScreenWithBg";
-import Spinner from "@/components/ui/Spinner";
+import { ListSkeleton } from "@/components/ui/Skeleton";
 import { useAsync } from "@/hooks/useAsync";
 import { useLang } from "@/i18n/LanguageContext";
 import { branchRepository } from "@/repositories/BranchRepository";
+import { useState } from "react";
 import { Link } from "react-router-dom";
 
 /**
- * Global branches list.
+ * Global branches list — paginated (page navigation at the bottom).
  * Per RN cyberplace-panel design: branches are NOT created here — a branch
  * always belongs to a company, so creation lives under
  * `/companies/:id/branches`. This screen is read-only navigation.
  */
 const BranchesList = () => {
   const { t } = useLang();
-  const { data: branches, loading, error } = useAsync(() => branchRepository.list(), []);
+  const [page, setPage] = useState(1);
+  const { data, loading, error } = useAsync(() => branchRepository.listPaged(page), [page]);
+  const branches = data?.data ?? [];
+  const lastPage = data?.meta?.last_page ?? 1;
 
   return (
     <ScreenWithBg bg="./bg/branch.jpg" title={t("branchesList.title")}>
-      {loading && <Spinner />}
       {error && <div className="error">{error.message}</div>}
-      {!loading && !error && (
+      {loading ? (
+        <ListSkeleton />
+      ) : !error ? (
         <div className="list">
-          {(branches ?? []).map((b) => (
+          {branches.map((b) => (
             <Link key={b.id} to={`/branches/${b.id}`} className="list-item">
               <div className="row" style={{ gap: 12, flex: 1 }}>
                 <Avatar src={b.branch_logo_path} name={b.address} size={44} />
@@ -36,9 +42,10 @@ const BranchesList = () => {
               <span className="muted">{t("common.open")}</span>
             </Link>
           ))}
-          {!branches?.length && <div className="muted">{t("common.empty.branches")}</div>}
+          {!branches.length && <div className="muted">{t("common.empty.branches")}</div>}
         </div>
-      )}
+      ) : null}
+      {!error && <Pagination page={page} lastPage={lastPage} onChange={setPage} disabled={loading} />}
     </ScreenWithBg>
   );
 };

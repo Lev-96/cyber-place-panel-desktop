@@ -4,6 +4,8 @@ import Layout from "@/components/Layout";
 import UpdateReadyModal from "@/components/UpdateReadyModal";
 import UpdatesToast from "@/components/UpdatesToast";
 import Spinner from "@/components/ui/Spinner";
+import Toaster from "@/components/ui/Toaster";
+import { ConfirmProvider } from "@/components/ui/ConfirmProvider";
 import { NotificationsProvider } from "@/notifications/NotificationsContext";
 import { useAppUpdates, useUpdateCatchUp } from "@/realtime/useAppUpdates";
 import { UpdatesNotificationProvider } from "@/realtime/UpdatesNotificationContext";
@@ -291,20 +293,26 @@ const App = () => {
   const { user, loading } = useAuth();
   if (loading) return <Spinner />;
   return (
-    <HashRouter>
-      {user ? (
-        // NotificationsProvider only mounts when authed — its initial
-        // fetch needs the sanctum token to be set, and the polling
-        // tick has no purpose for an unauth'd visitor.
-        <NotificationsProvider>
-          <UpdatesNotificationProvider>
-            <Authed />
-          </UpdatesNotificationProvider>
-        </NotificationsProvider>
-      ) : (
-        <Unauthed />
-      )}
-    </HashRouter>
+    <ConfirmProvider>
+      {/* CRUD toaster + confirm dialogs live at the app root so they work on
+          BOTH the authed screens and the unauth'd flow (login / forgot
+          password), and so no native confirm()/alert() poisons focus. */}
+      <Toaster />
+      <HashRouter>
+        {user ? (
+          // NotificationsProvider only mounts when authed — its initial
+          // fetch needs the sanctum token to be set, and the polling
+          // tick has no purpose for an unauth'd visitor.
+          <NotificationsProvider>
+            <UpdatesNotificationProvider>
+              <Authed />
+            </UpdatesNotificationProvider>
+          </NotificationsProvider>
+        ) : (
+          <Unauthed />
+        )}
+      </HashRouter>
+    </ConfirmProvider>
   );
 };
 

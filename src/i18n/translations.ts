@@ -923,6 +923,7 @@ export const TRANSLATIONS: Dict = {
 
   // Forgot/reset
   "forgot.successPrefix": { en: "If the email exists, a reset link has been sent.", ru: "Если email существует, ссылка на сброс отправлена.", am: "Եթե էլ. հասցեն գոյություն ունի, վերակայման հղումն ուղարկվել է:" },
+  "forgot.toastSent": { en: "Password reset link sent to your email", ru: "Ссылка для сброса пароля отправлена на почту", am: "Գաղտնաբառի վերակայման հղումն ուղարկվել է ձեր էլ. փոստին" },
   "auth.sending": { en: "Sending…", ru: "Отправка…", am: "Ուղարկվում է…" },
   "reset.token": { en: "Reset token", ru: "Токен сброса", am: "Վերակայման տոկեն" },
   "reset.successDone": { en: "Password updated. You can now sign in.", ru: "Пароль обновлён. Можно войти.", am: "Գաղտնաբառը թարմացվել է: Կարող եք մուտք գործել:" },
@@ -1151,6 +1152,52 @@ export const TRANSLATIONS: Dict = {
     ru: "В ваших филиалах пока нет зарегистрированных ПК.",
     am: "Ձեր մասնաճյուղերում դեռ գրանցված համակարգիչներ չկան:",
   },
+  // ── CRUD toast messages (top-right notifications) ──────────────────────
+  "toast.generic.created": { en: "Created successfully", ru: "Успешно создано", am: "Հաջողությամբ ստեղծվեց" },
+  "toast.generic.updated": { en: "Updated successfully", ru: "Успешно изменено", am: "Հաջողությամբ թարմացվեց" },
+  "toast.generic.deleted": { en: "Deleted successfully", ru: "Успешно удалено", am: "Հաջողությամբ ջնջվեց" },
+  "toast.generic.error":   { en: "Something went wrong", ru: "Что-то пошло не так", am: "Ինչ-որ բան սխալ գնաց" },
+
+  "toast.place.created": { en: "New place created", ru: "Новое место создано", am: "Նոր տեղ ստեղծվեց" },
+  "toast.place.updated": { en: "Place updated", ru: "Место обновлено", am: "Տեղը թարմացվեց" },
+  "toast.place.deleted": { en: "Place deleted", ru: "Место удалено", am: "Տեղը ջնջվեց" },
+
+  "toast.pc.created": { en: "Device added", ru: "Устройство добавлено", am: "Սարքն ավելացվեց" },
+  "toast.pc.updated": { en: "Device updated", ru: "Устройство обновлено", am: "Սարքը թարմացվեց" },
+  "toast.pc.deleted": { en: "Device removed", ru: "Устройство удалено", am: "Սարքը հեռացվեց" },
+
+  "toast.member.created": { en: "Member added", ru: "Клиент добавлен", am: "Հաճախորդն ավելացվեց" },
+  "toast.member.updated": { en: "Member updated", ru: "Клиент обновлён", am: "Հաճախորդը թարմացվեց" },
+  "toast.member.deleted": { en: "Member removed", ru: "Клиент удалён", am: "Հաճախորդը հեռացվեց" },
+
+  "toast.product.created": { en: "Product created", ru: "Товар создан", am: "Ապրանքը ստեղծվեց" },
+  "toast.product.updated": { en: "Product updated", ru: "Товар обновлён", am: "Ապրանքը թարմացվեց" },
+  "toast.product.deleted": { en: "Product deleted", ru: "Товар удалён", am: "Ապրանքը ջնջվեց" },
+
+  "toast.service.created": { en: "Service created", ru: "Услуга создана", am: "Ծառայությունը ստեղծվեց" },
+  "toast.service.updated": { en: "Service updated", ru: "Услуга обновлена", am: "Ծառայությունը թարմացվեց" },
+  "toast.service.deleted": { en: "Service deleted", ru: "Услуга удалена", am: "Ծառայությունը ջնջվեց" },
+
+  "toast.manager.created": { en: "Manager created", ru: "Менеджер создан", am: "Մենեջերը ստեղծվեց" },
+  "toast.manager.updated": { en: "Manager updated", ru: "Менеджер обновлён", am: "Մենեջերը թարմացվեց" },
+  "toast.manager.deleted": { en: "Manager removed", ru: "Менеджер удалён", am: "Մենեջերը հեռացվեց" },
+
+  "toast.company.created": { en: "Company created", ru: "Компания создана", am: "Ընկերությունը ստեղծվեց" },
+  "toast.company.updated": { en: "Company updated", ru: "Компания обновлена", am: "Ընկերությունը թարմացվեց" },
+  "toast.company.deleted": { en: "Company deleted", ru: "Компания удалена", am: "Ընկերությունը ջնջվեց" },
+
+  "toast.branch.created": { en: "Branch created", ru: "Филиал создан", am: "Մասնաճյուղը ստեղծվեց" },
+  "toast.branch.updated": { en: "Branch updated", ru: "Филиал обновлён", am: "Մասնաճյուղը թարմացվեց" },
+  "toast.branch.deleted": { en: "Branch deleted", ru: "Филиал удалён", am: "Մասնաճյուղը ջնջվեց" },
+
+  "toast.game.created": { en: "Game added", ru: "Игра добавлена", am: "Խաղն ավելացվեց" },
+  "toast.game.updated": { en: "Game updated", ru: "Игра обновлена", am: "Խաղը թարմացվեց" },
+  "toast.game.deleted": { en: "Game removed", ru: "Игра удалена", am: "Խաղը հեռացվեց" },
+
+  "toast.tournament.created": { en: "Tournament created", ru: "Турнир создан", am: "Մրցաշարը ստեղծվեց" },
+  "toast.tournament.updated": { en: "Tournament updated", ru: "Турнир обновлён", am: "Մրցաշարը թարմացվեց" },
+  "toast.tournament.deleted": { en: "Tournament deleted", ru: "Турнир удалён", am: "Մրցաշարը ջնջվեց" },
+
   "updates.title": {
     en: "Desktop app updates",
     ru: "Обновления десктоп-приложений",

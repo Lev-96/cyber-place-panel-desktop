@@ -44,6 +44,23 @@ const PlaceForm = ({ branchId, initial, onClose, onSaved }: Props) => {
 
   const filteredGames = (games.data ?? []).filter((g) => g.platform === platform);
 
+  // A place targets ONE platform, so its games must all belong to that
+  // platform. When the operator switches platform (e.g. pc → ps4), drop any
+  // games that were picked for the previous platform — otherwise a place
+  // could be saved carrying games from a platform it no longer is. We wait
+  // for the catalogue to load before pruning so an edit's initial games
+  // (which already match the saved platform) are never cleared prematurely.
+  useEffect(() => {
+    if (!games.data) return;
+    const validForPlatform = new Set(
+      games.data.filter((g) => g.platform === platform).map((g) => g.id),
+    );
+    setGameIds((prev) => {
+      const next = new Set([...prev].filter((gid) => validForPlatform.has(gid)));
+      return next.size === prev.size ? prev : next;
+    });
+  }, [platform, games.data]);
+
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     const num = Number(number);

@@ -1,21 +1,23 @@
 import GameForm from "@/components/games/GameForm";
 import Button from "@/components/ui/Button";
 import ScreenWithBg from "@/components/ui/ScreenWithBg";
-import Spinner from "@/components/ui/Spinner";
+import { ListSkeleton } from "@/components/ui/Skeleton";
 import { IGameApi } from "@/api/games";
 import { useAsync } from "@/hooks/useAsync";
+import { useConfirm } from "@/components/ui/ConfirmProvider";
 import { useLang } from "@/i18n/LanguageContext";
 import { gameRepository } from "@/repositories/GameRepository";
 import { useState } from "react";
 
 const GamesList = () => {
   const { t } = useLang();
+  const confirm = useConfirm();
   const { data, loading, error, reload } = useAsync(() => gameRepository.list(), []);
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState<IGameApi | null>(null);
 
   const remove = async (g: IGameApi) => {
-    if (!confirm(`${t("action.delete")} ${g.name}?`)) return;
+    if (!(await confirm(`${t("action.delete")} ${g.name}?`, { destructive: true }))) return;
     await gameRepository.remove(g.id);
     void reload();
   };
@@ -26,7 +28,7 @@ const GamesList = () => {
         <div />
         <Button onClick={() => setCreating(true)}>{t("games.new")}</Button>
       </div>
-      {loading && <Spinner />}
+      {loading && <ListSkeleton />}
       {error && <div className="error">{error.message}</div>}
       {!loading && !error && (
         <div className="list">

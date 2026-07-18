@@ -1,9 +1,10 @@
 import PlaceForm from "@/components/places/PlaceForm";
 import Button from "@/components/ui/Button";
 import ScreenWithBg from "@/components/ui/ScreenWithBg";
-import Spinner from "@/components/ui/Spinner";
+import { GridSkeleton } from "@/components/ui/Skeleton";
 import { useAsync } from "@/hooks/useAsync";
 import { useReservedPlaceIds } from "@/hooks/useReservedPlaceIds";
+import { useConfirm } from "@/components/ui/ConfirmProvider";
 import { useLang } from "@/i18n/LanguageContext";
 import { fmt } from "@/i18n/translations";
 import { placeRepository } from "@/repositories/PlaceRepository";
@@ -23,6 +24,7 @@ const COLOR_IDLE = "#6b7280";
 const BranchPlaces = () => {
   const { branchId } = useParams();
   const { t } = useLang();
+  const confirm = useConfirm();
   const id = Number(branchId);
   const { data, loading, error, reload } = useAsync(() => placeRepository.listRawByBranch(id), [id]);
   const [creating, setCreating] = useState(false);
@@ -35,7 +37,7 @@ const BranchPlaces = () => {
   if (!Number.isFinite(id) || id <= 0) return <div className="error">{t("hub.invalidId")}</div>;
 
   const remove = async (p: IBranchPlace) => {
-    if (!confirm(fmt(t("branchPlaces.confirmDelete"), p.number ?? p.id))) return;
+    if (!(await confirm(fmt(t("branchPlaces.confirmDelete"), p.number ?? p.id), { destructive: true }))) return;
     await placeRepository.remove(p.id);
     void reload();
   };
@@ -46,7 +48,7 @@ const BranchPlaces = () => {
         <span className="muted">{t("branchPlaces.intro")}</span>
         <Button onClick={() => setCreating(true)}>{t("branchPlaces.new")}</Button>
       </div>
-      {loading && <Spinner />}
+      {loading && <GridSkeleton />}
       {error && <div className="error">{error.message}</div>}
       {!loading && !error && (
         <div className="live-grid">

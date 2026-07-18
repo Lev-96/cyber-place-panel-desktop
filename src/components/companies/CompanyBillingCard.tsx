@@ -4,6 +4,7 @@ import { useAuth } from "@/auth/AuthContext";
 import Button from "@/components/ui/Button";
 import Spinner from "@/components/ui/Spinner";
 import { formatDate } from "@/i18n/dates";
+import { useConfirm } from "@/components/ui/ConfirmProvider";
 import { useLang } from "@/i18n/LanguageContext";
 import { fmt as msg } from "@/i18n/translations";
 import { useEffect, useState } from "react";
@@ -17,6 +18,7 @@ const fmt = (iso: string | null) => formatDate(iso);
 
 const CompanyBillingCard = ({ companyId, companyName }: Props) => {
   const { t } = useLang();
+  const confirm = useConfirm();
   const { user } = useAuth();
   const isAdmin = user?.role === "admin";
   const isOwner = user?.role === "company_owner";
@@ -39,7 +41,7 @@ const CompanyBillingCard = ({ companyId, companyName }: Props) => {
   useEffect(() => { void load(); /* eslint-disable-next-line */ }, [companyId]);
 
   const markPaid = async () => {
-    if (!confirm(msg(t("billing.markPaidConfirm"), companyName))) return;
+    if (!(await confirm(msg(t("billing.markPaidConfirm"), companyName)))) return;
     setBusy(true); setErr(null);
     try {
       const r = await apiMarkCompanyPaid(companyId);

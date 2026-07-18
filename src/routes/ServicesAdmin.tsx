@@ -2,7 +2,7 @@ import ServiceForm from "@/components/services/ServiceForm";
 import Avatar from "@/components/ui/Avatar";
 import Button from "@/components/ui/Button";
 import ScreenWithBg from "@/components/ui/ScreenWithBg";
-import Spinner from "@/components/ui/Spinner";
+import { ListSkeleton } from "@/components/ui/Skeleton";
 import { useAsync } from "@/hooks/useAsync";
 import { useLang } from "@/i18n/LanguageContext";
 import { serviceRepository } from "@/repositories/ServiceRepository";
@@ -27,7 +27,7 @@ const ServicesAdmin = () => {
         <span className="muted">{t("servicesAdmin.subtitle")}</span>
         <Button onClick={() => setCreating(true)}>{t("servicesAdmin.new")}</Button>
       </div>
-      {loading && <Spinner />}
+      {loading && <ListSkeleton />}
       {error && <div className="error">{error.message}</div>}
       {!loading && !error && (
         <div className="list">

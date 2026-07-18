@@ -134,3 +134,40 @@ describe("Modal — keyboard", () => {
     expect(onClose).not.toHaveBeenCalled();
   });
 });
+
+describe("Modal — initial focus (Electron can't-type fix)", () => {
+  test("focuses the first text field on open (buttons skipped)", async () => {
+    render(
+      <Modal open onClose={vi.fn()}>
+        <button data-testid="tab">tab</button>
+        <input data-testid="label" />
+        <input data-testid="second" />
+      </Modal>,
+    );
+    await act(async () => { await flush(); });
+    expect(document.activeElement).toBe(screen.getByTestId("label"));
+  });
+
+  test("does NOT steal focus already placed inside the dialog", async () => {
+    render(
+      <Modal open onClose={vi.fn()}>
+        <input data-testid="a" />
+        <input data-testid="b" />
+      </Modal>,
+    );
+    screen.getByTestId("b").focus();
+    await act(async () => { await flush(); });
+    expect(document.activeElement).toBe(screen.getByTestId("b"));
+  });
+
+  test("no fields (ConfirmDialog-style) → does not throw / focus stays out", async () => {
+    render(
+      <Modal open onClose={vi.fn()}>
+        <button data-testid="ok">OK</button>
+      </Modal>,
+    );
+    await act(async () => { await flush(); });
+    // No text field to focus; the button is not force-focused by our effect.
+    expect(document.activeElement).not.toBe(screen.getByTestId("ok"));
+  });
+});

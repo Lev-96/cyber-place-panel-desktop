@@ -54,9 +54,9 @@ const normalizeIndexRow = (row: RawIndexRow): IManagerApi | null => {
 };
 
 export const apiListManagers = async (params: { branch_id?: number; company_id?: number; per_page?: number; page?: number } = {}) => {
-  const r = await request<{ data: RawIndexRow[] }>("/managers", { params });
+  const r = await request<{ data: RawIndexRow[]; meta?: { current_page: number; last_page: number; per_page: number; total: number } }>("/managers", { params });
   const data = (r.data ?? []).map(normalizeIndexRow).filter((m): m is IManagerApi => !!m);
-  return { data };
+  return { data, meta: r.meta };
 };
 
 export const apiGetManager = (id: number) =>

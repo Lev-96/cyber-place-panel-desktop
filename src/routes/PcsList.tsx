@@ -2,13 +2,16 @@ import { apiWakePc } from "@/api/pcs";
 import PairingTokenModal from "@/components/pcs/PairingTokenModal";
 import PcForm from "@/components/pcs/PcForm";
 import Button from "@/components/ui/Button";
-import Spinner from "@/components/ui/Spinner";
+import { useConfirm } from "@/components/ui/ConfirmProvider";
+import { ListSkeleton } from "@/components/ui/Skeleton";
+import { notify } from "@/ui/notify";
 import { useAsync } from "@/hooks/useAsync";
 import { formatDateTime } from "@/i18n/dates";
 import { useLang } from "@/i18n/LanguageContext";
 import { fmt } from "@/i18n/translations";
 import { pcRepository } from "@/repositories/PcRepository";
 import { IPcApi } from "@/types/sessions";
+import { isPs, pcHasAgent, PC_STATUS } from "@/types/pc";
 import { useState } from "react";
 import { useParams } from "react-router-dom";
 
@@ -16,6 +19,7 @@ const PcsList = () => {
   const { branchId } = useParams();
   const id = Number(branchId);
   const { t } = useLang();
+  const confirm = useConfirm();
   const { data: pcs, loading, error, reload } = useAsync(() => pcRepository.listByBranch(id), [id]);
 
   const [creating, setCreating] = useState(false);
@@ -26,13 +30,13 @@ const PcsList = () => {
   if (!Number.isFinite(id) || id <= 0) return <div className="error">{t("hub.invalidId")}</div>;
 
   const remove = async (pc: IPcApi) => {
-    if (!confirm(fmt(t("pcs.confirmDelete"), pc.label))) return;
+    if (!(await confirm(fmt(t("pcs.confirmDelete"), pc.label), { destructive: true }))) return;
     await pcRepository.remove(pc.id);
     void reload();
   };
 
   const rotate = async (pc: IPcApi) => {
-    if (!confirm(fmt(t("pcs.confirmRotate"), pc.label))) return;
+    if (!(await confirm(fmt(t("pcs.confirmRotate"), pc.label)))) return;
     const updated = await pcRepository.rotateToken(pc.id);
     setTokenPc(updated);
     void reload();
@@ -40,7 +44,7 @@ const PcsList = () => {
 
   const wake = async (pc: IPcApi) => {
     if (!pc.mac_address) {
-      alert(t("pcs.macRequired"));
+      notify.message("error", t("pcs.macRequired"));
       return;
     }
     setWaking(pc.id);
@@ -49,26 +53,30 @@ const PcsList = () => {
       // Fall back to backend endpoint when running in a browser (no desktopAPI bridge).
       if (window.desktopAPI?.wakeOnLan) {
         const r = await window.desktopAPI.wakeOnLan(pc.mac_address);
-        const lines = [r.message];
-        if (r.sent) lines.push(fmt(t("pcs.packetsSent"), r.sent));
-        if (r.errors.length) lines.push("", t("pcs.errorsHeader"), ...r.errors);
-        lines.push("", t("pcs.wolReminder"));
-        alert(lines.join("\n"));
+        const parts = [r.message];
+        if (r.sent) parts.push(fmt(t("pcs.packetsSent"), r.sent));
+        notify.message(r.ok ? "success" : "error", parts.join(" · "));
       } else {
         const r = await apiWakePc(pc.id);
-        const lines = [r.message];
-        if (r.sent_packets) lines.push(fmt(t("pcs.packetsSent"), r.sent_packets));
-        if (r.note) lines.push("", r.note);
-        if (r.errors?.length) lines.push("", t("pcs.errorsHeader"), ...r.errors);
-        alert(lines.join("\n"));
+        const parts = [r.message];
+        if (r.sent_packets) parts.push(fmt(t("pcs.packetsSent"), r.sent_packets));
+        notify.message("success", parts.join(" · "));
       }
     } catch (e) {
-      alert(fmt(t("pcs.wakeFailed"), e instanceof Error ? e.message : t("shift.failed")));
+      notify.message("error", fmt(t("pcs.wakeFailed"), e instanceof Error ? e.message : t("shift.failed")));
     } finally { setWaking(null); }
   };
 
+  // A PS/console has no kiosk agent to report a heartbeat, so the "offline"
+  // (agent-not-connected) state never applies to it — it is always available
+  // for billing. Coerce any stale/legacy PS 'offline' to 'online' for display
+  // so the operator never sees a misleading Offline badge. PCs keep the full
+  // three-state semantics, where 'offline' legitimately means "agent absent".
+  const effectiveStatus = (pc: IPcApi): IPcApi["status"] =>
+    isPs(pc.kind) && pc.status === PC_STATUS.Offline ? PC_STATUS.Online : pc.status;
+
   const statusLabel = (s: IPcApi["status"]): string =>
-    s === "in_session" ? t("pcs.statusInSession") : s === "online" ? t("pcs.statusOnline") : t("pcs.statusOffline");
+    s === PC_STATUS.InSession ? t("pcs.statusInSession") : s === PC_STATUS.Online ? t("pcs.statusOnline") : t("pcs.statusOffline");
 
   return (
     <div className="col" style={{ gap: 18 }}>
@@ -86,13 +94,13 @@ const PcsList = () => {
         </ol>
       </div>
 
-      {loading && <Spinner />}
+      {loading && <ListSkeleton />}
       {error && <div className="error">{error.message}</div>}
       {!loading && !error && (
         <div className="list">
           {(pcs ?? []).map((pc) => {
             const neverPaired = !pc.last_seen_at;
-            const isPs = pc.kind === "ps";
+            const isPsDevice = isPs(pc.kind);
             return (
             <div key={pc.id} className="list-item">
               <div>
@@ -101,26 +109,26 @@ const PcsList = () => {
                   {pc.place && (
                     <span className="muted" style={{ marginLeft: 6 }}>№{pc.place.number ?? pc.place.id}</span>
                   )}
-                  {isPs && <span style={{ marginLeft: 8, fontSize: 11, padding: "2px 6px", borderRadius: 4, background: "#101a35", color: "#d152fa" }}>PS</span>}
+                  {isPsDevice && <span style={{ marginLeft: 8, fontSize: 11, padding: "2px 6px", borderRadius: 4, background: "#101a35", color: "#d152fa" }}>PS</span>}
                 </div>
                 <div className="meta">
-                  <StatusDot status={pc.status} /> {statusLabel(pc.status)}
+                  <StatusDot status={effectiveStatus(pc)} /> {statusLabel(effectiveStatus(pc))}
                   {pc.hourly_rate != null && <> · {Number(pc.hourly_rate)} /{t("time.hourShort")}</>}
-                  {!isPs && pc.mac_address && <> · MAC: {pc.mac_address}</>}
-                  {!isPs && (pc.last_seen_at
+                  {!isPsDevice && pc.mac_address && <> · MAC: {pc.mac_address}</>}
+                  {!isPsDevice && (pc.last_seen_at
                     ? <> · {t("pcs.lastSeen")} {formatDateTime(pc.last_seen_at)}</>
                     : <> · <span style={{ color: "#f59e0b" }}>{t("pcs.notPaired")}</span></>
                   )}
                 </div>
               </div>
               <div className="row" style={{ gap: 6 }}>
-                {!isPs && pc.mac_address && (
+                {!isPsDevice && pc.mac_address && (
                   <Button variant="secondary" onClick={() => wake(pc)} disabled={waking === pc.id} style={btn}>
                     {waking === pc.id ? t("pcs.sending") : t("pcs.wake")}
                   </Button>
                 )}
                 <Button variant="secondary" onClick={() => setEditing(pc)} style={btn}>{t("action.edit")}</Button>
-                {!isPs && (
+                {!isPsDevice && (
                   <Button variant="secondary" onClick={() => rotate(pc)} style={btn}>
                     {neverPaired ? t("pcs.getToken") : t("pcs.rotateToken")}
                   </Button>
@@ -141,7 +149,7 @@ const PcsList = () => {
           onSaved={(pc) => {
             setCreating(false);
             // PS devices don't run an agent — there's no token to display.
-            if (pc.kind !== "ps") setTokenPc(pc);
+            if (pcHasAgent(pc.kind)) setTokenPc(pc);
             void reload();
           }}
         />
@@ -162,7 +170,7 @@ const PcsList = () => {
 };
 
 const StatusDot = ({ status }: { status: IPcApi["status"] }) => {
-  const color = status === "in_session" ? "#ef4444" : status === "online" ? "#22c55e" : "#6b7280";
+  const color = status === PC_STATUS.InSession ? "#ef4444" : status === PC_STATUS.Online ? "#22c55e" : "#6b7280";
   return <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: 4, background: color, marginRight: 4 }} />;
 };
 

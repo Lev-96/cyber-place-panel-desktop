@@ -67,12 +67,12 @@ const PERMS: Record<Role, ReadonlySet<Permission>> = {
     "session.start", "session.stop", "pos.charge", "shift.open",
   ]),
   manager: new Set<Permission>([
-    // Manager = single-branch staff. No global lists, no CRUD of
-    // branches/companies. Edits their own branch info but NOT prices
-    // — pricing is an owner/admin business decision; the cashier desk
+    // Manager = single-branch floor staff. No global lists, no CRUD of
+    // branches/companies. Managers do NOT edit the branch profile
+    // (address, LOGO, prices) — that is an owner/admin concern and the
+    // backend rejects a manager branch-update anyway. The cashier desk
     // sees rates only through StartSessionDialog (already populated).
     "menu.tournaments", "menu.scan", "menu.agentUpdates",
-    "branch.edit",
     "session.start", "session.stop", "pos.charge", "shift.open",
   ]),
 };
