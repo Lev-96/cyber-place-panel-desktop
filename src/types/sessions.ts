@@ -6,6 +6,8 @@
  * when they ship.
  */
 
+import { PcKind, PcStatus } from "@/types/pc";
+
 export interface ITimePackage {
   id: number;
   branch_id?: number;
@@ -68,10 +70,10 @@ export interface IPcApi {
   branch_id: number;
   place_id?: number | null;
   label: string;
-  kind?: "pc" | "ps";
+  kind?: PcKind;
   hourly_rate?: number | string | null;
   mac_address?: string | null;
-  status: "online" | "offline" | "in_session";
+  status: PcStatus;
   last_seen_at?: string | null;
   pairing_token?: string; // present only on create / rotate-token responses
   current_session_id?: number;

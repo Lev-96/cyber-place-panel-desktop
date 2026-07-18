@@ -8,6 +8,7 @@ import { useLang } from "@/i18n/LanguageContext";
 import { usePlaceAvailability } from "@/realtime/usePlaceAvailability";
 import { sessionRepository } from "@/repositories/SessionRepository";
 import { IPcApi, ISessionApi } from "@/types/sessions";
+import { isPs } from "@/types/pc";
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import AddSessionItemDialog from "./AddSessionItemDialog";
@@ -99,7 +100,7 @@ const SessionsBoard = ({ branchId }: Props) => {
                 sees on `placesSelect`. Fall back to the PC's own label
                 only when the PC isn't linked to a place (legacy data).
               */}
-              <span className="platform">№{pc.place?.number ?? pc.label}{pc.kind === "ps" && <span className="muted" style={{ marginLeft: 6, fontSize: 11 }}>PS</span>}</span>
+              <span className="platform">№{pc.place?.number ?? pc.label}{isPs(pc.kind) && <span className="muted" style={{ marginLeft: 6, fontSize: 11 }}>PS</span>}</span>
               {sess ? (
                 <>
                   <span className="status" style={{ color }}>
@@ -132,7 +133,7 @@ const SessionsBoard = ({ branchId }: Props) => {
                   <span className="status" style={{ color }}>
                     {isReserved
                       ? t("session.reserved") || "Reserved"
-                      : `${t("session.free")}${pc.kind === "ps" ? " · PS" : ""}`}
+                      : `${t("session.free")}${isPs(pc.kind) ? " · PS" : ""}`}
                   </span>
                   {/*
                     Start is disabled while the seat is held by an

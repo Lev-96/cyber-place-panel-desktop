@@ -6,6 +6,7 @@ import { timePackageNameOf } from "@/i18n/timePackageName";
 import { branchRepository } from "@/repositories/BranchRepository";
 import { sessionRepository } from "@/repositories/SessionRepository";
 import { IPcApi, ITimePackage } from "@/types/sessions";
+import { isPs } from "@/types/pc";
 import { IBranchApi } from "@/types/api";
 import { useEffect, useMemo, useState } from "react";
 
@@ -42,7 +43,7 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
   const [pkgId, setPkgId] = useState<number | null>(null);
   // PlayStation rows are billing-only (no kiosk agent), so the open/count-up
   // mode is the only sensible default. PCs default to fixed packages.
-  const [mode, setMode] = useState<Mode>(pc.kind === "ps" ? "open" : "fixed");
+  const [mode, setMode] = useState<Mode>(isPs(pc.kind) ? "open" : "fixed");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [branch, setBranch] = useState<IBranchApi | null>(null);
@@ -123,11 +124,11 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
   return (
     <Modal open onClose={onClose}>
       <div className="card" style={{ width: 460, maxWidth: "90vw", display: "flex", flexDirection: "column", gap: 14 }}>
-        <h2 style={{ margin: 0 }}>{t("session.start")} · №{pc.place?.number ?? pc.label}{pc.kind === "ps" ? " (PS)" : ""}</h2>
+        <h2 style={{ margin: 0 }}>{t("session.start")} · №{pc.place?.number ?? pc.label}{isPs(pc.kind) ? " (PS)" : ""}</h2>
         {!packages ? <Spinner /> : (
           <>
             <div className="row" style={{ gap: 8 }}>
-              <button type="button" onClick={() => setMode("fixed")} style={tabStyle(mode === "fixed")} disabled={pc.kind === "ps"}>
+              <button type="button" onClick={() => setMode("fixed")} style={tabStyle(mode === "fixed")} disabled={isPs(pc.kind)}>
                 {t("session.fixedTariff")}
               </button>
               <button type="button" onClick={() => setMode("open")} style={tabStyle(mode === "open")}>

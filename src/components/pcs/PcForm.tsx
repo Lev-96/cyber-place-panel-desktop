@@ -10,6 +10,7 @@ import { placeRepository } from "@/repositories/PlaceRepository";
 import { fmt } from "@/i18n/translations";
 import { IBranchApi, IBranchPlace, PlatformType } from "@/types/api";
 import { IPcApi } from "@/types/sessions";
+import { PcKind, PC_KIND } from "@/types/pc";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 
 interface Props {
@@ -43,7 +44,7 @@ const PcForm = ({ branchId, initial, onClose, onSaved }: Props) => {
   const [label, setLabel] = useState(initial?.label ?? "");
   const [mac, setMac] = useState(initial?.mac_address ?? "");
   const [placeId, setPlaceId] = useState<string>(initial?.place_id ? String(initial.place_id) : "");
-  const [kind, setKind] = useState<"pc" | "ps">(initial?.kind ?? "pc");
+  const [kind, setKind] = useState<PcKind>(initial?.kind ?? PC_KIND.Pc);
 
   // Branch matrix — drives the tier select. Cached for the lifetime
   // of this modal so switching kind doesn't refetch.
@@ -139,8 +140,8 @@ const PcForm = ({ branchId, initial, onClose, onSaved }: Props) => {
         <div className="col" style={{ gap: 6 }}>
           <span className="label">{t("pcs.kind")}</span>
           <div className="row" style={{ gap: 8 }}>
-            <button type="button" onClick={() => setKind("pc")} style={tabStyle(kind === "pc")}>{t("pcs.kindPc")}</button>
-            <button type="button" onClick={() => setKind("ps")} style={tabStyle(kind === "ps")}>{t("pcs.kindPs")}</button>
+            <button type="button" onClick={() => setKind(PC_KIND.Pc)} style={tabStyle(kind === PC_KIND.Pc)}>{t("pcs.kindPc")}</button>
+            <button type="button" onClick={() => setKind(PC_KIND.Ps)} style={tabStyle(kind === PC_KIND.Ps)}>{t("pcs.kindPs")}</button>
           </div>
         </div>
 
@@ -185,7 +186,7 @@ const PcForm = ({ branchId, initial, onClose, onSaved }: Props) => {
           )}
         </div>
 
-        {kind === "pc" && (
+        {kind === PC_KIND.Pc && (
           <>
             <Input
               label={t("pcForm.macAddress")}
@@ -198,7 +199,7 @@ const PcForm = ({ branchId, initial, onClose, onSaved }: Props) => {
             </span>
           </>
         )}
-        {kind === "ps" && (
+        {kind === PC_KIND.Ps && (
           <span className="muted" style={{ fontSize: 12 }}>
             {t("pcs.psHint")}
           </span>
@@ -248,13 +249,13 @@ const PcForm = ({ branchId, initial, onClose, onSaved }: Props) => {
 };
 
 const buildTierOptions = (
-  kind: "pc" | "ps",
+  kind: PcKind,
   matrix: IBranchApi["price_for_branch"] | null,
   t: (key: string) => string,
 ): TierOption[] => {
   // PC kind sees only the two PC tiers — exposing PS4/PS5 rows here
   // would just be noise on a PC device card.
-  if (kind === "pc") {
+  if (kind === PC_KIND.Pc) {
     return [
       { key: "pc-standard", label: t("pcs.tier.pcStandard"), amount: numOrNull(matrix?.["pc-standard"]) },
       { key: "pc-vip",      label: t("pcs.tier.pcVip"),      amount: numOrNull(matrix?.["pc-vip"]) },
@@ -280,9 +281,9 @@ const buildTierOptions = (
  */
 const filterPlacesForKind = (
   places: IBranchPlace[],
-  kind: "pc" | "ps",
+  kind: PcKind,
 ): IBranchPlace[] => {
-  const allowed: PlatformType[] = kind === "pc" ? ["pc"] : ["ps4", "ps5"];
+  const allowed: PlatformType[] = kind === PC_KIND.Pc ? ["pc"] : ["ps4", "ps5"];
   return places
     .filter((p) => allowed.includes(p.platform))
     .sort((a, b) => (a.number ?? a.id) - (b.number ?? b.id));
