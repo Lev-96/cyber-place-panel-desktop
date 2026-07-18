@@ -52,6 +52,8 @@ export interface IBranchPlace {
   branch_id: number;
   /** Cashier-visible label distinct from the surrogate `id` (e.g. "1" or "2"). */
   number?: number;
+  /** Optional descriptive name (e.g. "Corner PS5", "Poker table"). */
+  name?: string | null;
   type: PlaceType;
   status: "active" | "inactive";
   platform: PlatformType;

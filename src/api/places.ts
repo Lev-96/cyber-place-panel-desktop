@@ -12,6 +12,7 @@ export interface GetPlacesParams {
 export interface CreatePlaceBody {
   branch_id: number;
   number: number;
+  name?: string | null;
   type: PlaceType;
   platform: PlatformType;
   game_ids: number[];

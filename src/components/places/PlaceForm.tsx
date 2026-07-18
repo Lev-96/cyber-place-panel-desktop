@@ -2,6 +2,7 @@ import Button from "@/components/ui/Button";
 import { formatApiError } from "@/api/errors";
 import Modal from "@/components/ui/Modal";
 import Input from "@/components/ui/Input";
+import Checkbox from "@/components/ui/Checkbox";
 import Spinner from "@/components/ui/Spinner";
 import { useAsync } from "@/hooks/useAsync";
 import { useLang } from "@/i18n/LanguageContext";
@@ -24,6 +25,7 @@ const PlaceForm = ({ branchId, initial, onClose, onSaved }: Props) => {
   const { t } = useLang();
   const games = useAsync(() => gameRepository.list(), []);
   const [number, setNumber] = useState(initial ? String(initial.number ?? "") : "");
+  const [name, setName] = useState(initial?.name ?? "");
   const [type, setType] = useState<PlaceType>(initial?.type ?? "standard");
   const [platform, setPlatform] = useState<PlatformType>(initial?.platform ?? "pc");
   const [gameIds, setGameIds] = useState<Set<number>>(new Set((initial?.games ?? []).map((g) => g.id)));
@@ -67,7 +69,7 @@ const PlaceForm = ({ branchId, initial, onClose, onSaved }: Props) => {
     if (!Number.isFinite(num) || num <= 0) return setErr(t("place.errors.number"));
     setBusy(true); setErr(null);
     try {
-      const body = { branch_id: branchId, number: num, type, platform, game_ids: Array.from(gameIds) };
+      const body = { branch_id: branchId, number: num, name: name.trim() || null, type, platform, game_ids: Array.from(gameIds) };
       if (initial) await placeRepository.update(initial.id, body);
       else await placeRepository.create(body);
       onSaved();
@@ -92,6 +94,13 @@ const PlaceForm = ({ branchId, initial, onClose, onSaved }: Props) => {
           </div>
         </div>
 
+        <Input
+          label={t("place.name")}
+          placeholder={t("place.namePlaceholder")}
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+        />
+
         <div className="col" style={{ gap: 6 }}>
           <span className="label">{t("label.platform")}</span>
           <div className="row" style={{ gap: 6 }}>
@@ -106,10 +115,13 @@ const PlaceForm = ({ branchId, initial, onClose, onSaved }: Props) => {
           {games.loading ? <Spinner /> : (
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, maxHeight: 220, overflowY: "auto", padding: 6, border: "1px solid #1f2a44", borderRadius: 8 }}>
               {filteredGames.map((g) => (
-                <label key={g.id} className="row" style={{ gap: 6, padding: "4px 6px", cursor: "pointer", borderRadius: 4, background: gameIds.has(g.id) ? "#101a35" : "transparent" }}>
-                  <input type="checkbox" checked={gameIds.has(g.id)} onChange={() => toggleGame(g.id)} />
-                  <span>{g.name}</span>
-                </label>
+                <Checkbox
+                  key={g.id}
+                  checked={gameIds.has(g.id)}
+                  onChange={() => toggleGame(g.id)}
+                  label={g.name}
+                  style={{ padding: "4px 6px", borderRadius: 4, background: gameIds.has(g.id) ? "#101a35" : "transparent" }}
+                />
               ))}
               {!filteredGames.length && <span className="muted">{t("place.noGamesPlatform")} {platform.toUpperCase()}.</span>}
             </div>
