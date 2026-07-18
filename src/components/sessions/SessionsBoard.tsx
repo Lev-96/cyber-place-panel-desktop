@@ -1,7 +1,7 @@
 import { useAuth } from "@/auth/AuthContext";
 import { can } from "@/auth/permissions";
 import Button from "@/components/ui/Button";
-import Spinner from "@/components/ui/Spinner";
+import { GridSkeleton } from "@/components/ui/Skeleton";
 import { useAsync } from "@/hooks/useAsync";
 import { useReservedPlaceIds } from "@/hooks/useReservedPlaceIds";
 import { useLang } from "@/i18n/LanguageContext";
@@ -62,7 +62,7 @@ const SessionsBoard = ({ branchId }: Props) => {
     return () => clearInterval(t);
   }, [sessions, pcs]);
 
-  if ((pcs.loading && !pcs.data) || (sessions.loading && !sessions.data)) return <Spinner />;
+  if ((pcs.loading && !pcs.data) || (sessions.loading && !sessions.data)) return <GridSkeleton />;
   if (pcs.error && !pcs.data) return <div className="error">{pcs.error.message}</div>;
   if (sessions.error && !sessions.data) return <div className="error">{sessions.error.message}</div>;
 
