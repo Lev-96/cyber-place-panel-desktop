@@ -35,7 +35,8 @@ export interface PaginatedList<T> {
 export interface IGame {
   id: number;
   name: string;
-  platform: PlatformType;
+  // Dynamic: known pc/ps4/ps5 OR a custom branch platform slug.
+  platform: string;
 }
 
 export interface IBranchService {
@@ -56,7 +57,10 @@ export interface IBranchPlace {
   name?: string | null;
   type: PlaceType;
   status: "active" | "inactive";
-  platform: PlatformType;
+  // Dynamic: known pc/ps4/ps5 OR a custom branch platform slug.
+  platform: string;
+  /** Manual per-hour rate for custom platforms (null for known ones). */
+  hourly_rate?: number | string | null;
   games: IGame[];
 }
 

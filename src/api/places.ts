@@ -1,10 +1,10 @@
-import { IBranchPlace, PaginatedList, PlaceType, PlatformType } from "@/types/api";
+import { IBranchPlace, PaginatedList, PlaceType } from "@/types/api";
 import { request } from "./client";
 
 export interface GetPlacesParams {
   branch_id?: number;
   type?: PlaceType;
-  platform?: PlatformType;
+  platform?: string;
   per_page?: number;
   page?: number;
 }
@@ -13,9 +13,11 @@ export interface CreatePlaceBody {
   branch_id: number;
   number: number;
   name?: string | null;
+  // Dynamic: known pc/ps4/ps5 OR a custom branch platform slug.
+  platform: string;
+  hourly_rate?: number | null;
   type: PlaceType;
-  platform: PlatformType;
-  game_ids: number[];
+  game_ids?: number[];
 }
 
 export type UpdatePlaceBody = Partial<Omit<CreatePlaceBody, "branch_id">>;

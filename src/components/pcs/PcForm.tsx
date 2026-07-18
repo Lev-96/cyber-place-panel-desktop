@@ -8,7 +8,7 @@ import { branchRepository } from "@/repositories/BranchRepository";
 import { pcRepository } from "@/repositories/PcRepository";
 import { placeRepository } from "@/repositories/PlaceRepository";
 import { fmt } from "@/i18n/translations";
-import { IBranchApi, IBranchPlace, PlatformType } from "@/types/api";
+import { IBranchApi, IBranchPlace } from "@/types/api";
 import { IPcApi } from "@/types/sessions";
 import { PcKind, PC_KIND } from "@/types/pc";
 import { FormEvent, useEffect, useMemo, useState } from "react";
@@ -225,7 +225,7 @@ const filterPlacesForKind = (
   places: IBranchPlace[],
   kind: PcKind,
 ): IBranchPlace[] => {
-  const allowed: PlatformType[] = kind === PC_KIND.Pc ? ["pc"] : ["ps4", "ps5"];
+  const allowed: readonly string[] = kind === PC_KIND.Pc ? ["pc"] : ["ps4", "ps5"];
   return places
     .filter((p) => allowed.includes(p.platform))
     .sort((a, b) => (a.number ?? a.id) - (b.number ?? b.id));

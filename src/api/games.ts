@@ -1,20 +1,22 @@
-import { PaginatedList, PlatformType } from "@/types/api";
+import { PaginatedList } from "@/types/api";
 import { request } from "./client";
 
+// NOTE: `platform` is a dynamic string now (known pc/ps4/ps5 OR a custom
+// branch slug like "table-tennis"), not the closed PlatformType union.
 export interface IGameApi {
   id: number;
   name: string;
-  platform: PlatformType;
+  platform: string;
   game_logo_path?: string;
   created_at?: string;
 }
 
 export interface CreateGameBody {
   name: string;
-  platform: PlatformType;
+  platform: string;
 }
 
-export const apiListGames = (params: { platform?: PlatformType; per_page?: number; page?: number } = {}) =>
+export const apiListGames = (params: { platform?: string; per_page?: number; page?: number } = {}) =>
   request<PaginatedList<IGameApi>>("/games", { params });
 
 export const apiCreateGame = (body: CreateGameBody) =>

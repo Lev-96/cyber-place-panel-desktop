@@ -3,12 +3,14 @@ import { formatApiError } from "@/api/errors";
 import Modal from "@/components/ui/Modal";
 import Input from "@/components/ui/Input";
 import Checkbox from "@/components/ui/Checkbox";
+import PlatformPicker from "@/components/ui/PlatformPicker";
 import Spinner from "@/components/ui/Spinner";
 import { useAsync } from "@/hooks/useAsync";
 import { useLang } from "@/i18n/LanguageContext";
 import { gameRepository } from "@/repositories/GameRepository";
 import { placeRepository } from "@/repositories/PlaceRepository";
-import { IBranchPlace, PlaceType, PlatformType } from "@/types/api";
+import { IBranchPlace, PlaceType } from "@/types/api";
+import { isKnownPlatform, platformLabel } from "@/utils/platform";
 import { FormEvent, useEffect, useState } from "react";
 
 interface Props {
@@ -18,7 +20,6 @@ interface Props {
   onSaved: () => void;
 }
 
-const PLATFORMS: PlatformType[] = ["pc", "ps4", "ps5"];
 const TYPES: PlaceType[] = ["standard", "vip"];
 
 const PlaceForm = ({ branchId, initial, onClose, onSaved }: Props) => {
@@ -27,8 +28,13 @@ const PlaceForm = ({ branchId, initial, onClose, onSaved }: Props) => {
   const [number, setNumber] = useState(initial ? String(initial.number ?? "") : "");
   const [name, setName] = useState(initial?.name ?? "");
   const [type, setType] = useState<PlaceType>(initial?.type ?? "standard");
-  const [platform, setPlatform] = useState<PlatformType>(initial?.platform ?? "pc");
+  const [platform, setPlatform] = useState<string>(initial?.platform ?? "pc");
+  const [hourlyRate, setHourlyRate] = useState(initial?.hourly_rate != null ? String(initial.hourly_rate) : "");
   const [gameIds, setGameIds] = useState<Set<number>>(new Set((initial?.games ?? []).map((g) => g.id)));
+
+  // A custom (non-pc/ps4/ps5) platform has no cell in the branch tariff
+  // matrix, so it carries its own per-hour price entered right here.
+  const isCustomPlatform = !isKnownPlatform(platform);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -69,7 +75,16 @@ const PlaceForm = ({ branchId, initial, onClose, onSaved }: Props) => {
     if (!Number.isFinite(num) || num <= 0) return setErr(t("place.errors.number"));
     setBusy(true); setErr(null);
     try {
-      const body = { branch_id: branchId, number: num, name: name.trim() || null, type, platform, game_ids: Array.from(gameIds) };
+      const body = {
+        branch_id: branchId,
+        number: num,
+        name: name.trim() || null,
+        type,
+        platform,
+        // Only custom platforms carry a manual rate; known ones bill from the matrix.
+        hourly_rate: isCustomPlatform ? (hourlyRate ? Number(hourlyRate) : null) : null,
+        game_ids: Array.from(gameIds),
+      };
       if (initial) await placeRepository.update(initial.id, body);
       else await placeRepository.create(body);
       onSaved();
@@ -103,15 +118,24 @@ const PlaceForm = ({ branchId, initial, onClose, onSaved }: Props) => {
 
         <div className="col" style={{ gap: 6 }}>
           <span className="label">{t("label.platform")}</span>
-          <div className="row" style={{ gap: 6 }}>
-            {PLATFORMS.map((p) => (
-              <Button key={p} type="button" variant={platform === p ? "primary" : "secondary"} onClick={() => setPlatform(p)} style={{ flex: 1 }}>{p.toUpperCase()}</Button>
-            ))}
-          </div>
+          <PlatformPicker value={platform} onChange={setPlatform} />
         </div>
 
+        {isCustomPlatform && (
+          <div className="col" style={{ gap: 6 }}>
+            <Input
+              label={t("place.hourlyRate")}
+              type="number"
+              min={0}
+              value={hourlyRate}
+              onChange={(e) => setHourlyRate(e.target.value)}
+            />
+            <span className="muted" style={{ fontSize: 11 }}>{t("place.customPlatformNote")}</span>
+          </div>
+        )}
+
         <div className="col" style={{ gap: 6 }}>
-          <span className="label">{t("place.gamesAvailable")} ({platform.toUpperCase()})</span>
+          <span className="label">{t("place.gamesAvailable")} ({platformLabel(platform)})</span>
           {games.loading ? <Spinner /> : (
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, maxHeight: 220, overflowY: "auto", padding: 6, border: "1px solid #1f2a44", borderRadius: 8 }}>
               {filteredGames.map((g) => (
@@ -123,7 +147,7 @@ const PlaceForm = ({ branchId, initial, onClose, onSaved }: Props) => {
                   style={{ padding: "4px 6px", borderRadius: 4, background: gameIds.has(g.id) ? "#101a35" : "transparent" }}
                 />
               ))}
-              {!filteredGames.length && <span className="muted">{t("place.noGamesPlatform")} {platform.toUpperCase()}.</span>}
+              {!filteredGames.length && <span className="muted">{t("place.noGamesPlatform")} {platformLabel(platform)}.</span>}
             </div>
           )}
           <span className="muted" style={{ fontSize: 11 }}>{gameIds.size} {t("place.selected")}</span>
