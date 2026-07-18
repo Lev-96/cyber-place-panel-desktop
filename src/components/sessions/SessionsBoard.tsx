@@ -32,6 +32,11 @@ const SessionsBoard = ({ branchId }: Props) => {
   const [startTarget, setStartTarget] = useState<IPcApi | null>(null);
   const [stopTarget, setStopTarget] = useState<ISessionApi | null>(null);
   const [addItemTarget, setAddItemTarget] = useState<ISessionApi | null>(null);
+  // Local display order for drag-and-drop. Seeded from the server order (which
+  // already reflects sort_order) and preserved across Reverb/poll reloads, so a
+  // just-dragged arrangement doesn't jump back before the persist round-trips.
+  const [order, setOrder] = useState<number[]>([]);
+  const [dragId, setDragId] = useState<number | null>(null);
   // Reserved-tile overlay state owned by the shared hook — pairs
   // a REST snapshot (re)mount + sanity-sweep with the
   // `booking.changed` Reverb delta. The Branch places grid uses
@@ -62,12 +67,47 @@ const SessionsBoard = ({ branchId }: Props) => {
     return () => clearInterval(t);
   }, [sessions, pcs]);
 
+  // Reconcile the local order with the server list: keep the existing order for
+  // devices still present, append newly-added ones, drop removed ones. This
+  // preserves an in-progress local drag order across reloads while staying in
+  // sync as devices are added/removed elsewhere.
+  useEffect(() => {
+    const ids = (pcs.data ?? []).map((p) => p.id);
+    setOrder((prev) => {
+      const present = new Set(ids);
+      const kept = prev.filter((id) => present.has(id));
+      const added = ids.filter((id) => !kept.includes(id));
+      return [...kept, ...added];
+    });
+  }, [pcs.data]);
+
   if ((pcs.loading && !pcs.data) || (sessions.loading && !sessions.data)) return <GridSkeleton />;
   if (pcs.error && !pcs.data) return <div className="error">{pcs.error.message}</div>;
   if (sessions.error && !sessions.data) return <div className="error">{sessions.error.message}</div>;
 
   const sessionByPc = new Map<number, ISessionApi>();
   for (const s of sessions.data ?? []) sessionByPc.set(s.pc_id, s);
+
+  // Render in the operator's order; `order` is kept in lock-step with the data
+  // by the effect above, so this is just a lookup (unknown ids filtered out).
+  const byId = new Map((pcs.data ?? []).map((p) => [p.id, p] as const));
+  const orderedPcs = order.map((id) => byId.get(id)).filter((p): p is IPcApi => !!p);
+
+  // Move the dragged device to just before the drop target and persist. Local
+  // state updates instantly; the backend write is fire-and-forget (the next
+  // reload confirms it, and a failure just leaves the previous saved order).
+  const dropOn = (targetId: number) => {
+    const from = dragId;
+    setDragId(null);
+    if (from == null || from === targetId) return;
+    setOrder((prev) => {
+      const next = prev.filter((id) => id !== from);
+      const idx = next.indexOf(targetId);
+      next.splice(idx < 0 ? next.length : idx, 0, from);
+      void sessionRepository.reorderPcs(branchId, next).catch(() => {});
+      return next;
+    });
+  };
 
   return (
     <div className="col" style={{ gap: 18 }}>
@@ -82,7 +122,7 @@ const SessionsBoard = ({ branchId }: Props) => {
         </div>
       </div>
       <div className="live-grid">
-        {(pcs.data ?? []).map((pc) => {
+        {orderedPcs.map((pc) => {
           const sess = sessionByPc.get(pc.id);
           // Precedence: active session (green) > reserved booking
           // (orange) > free (grey). A place can be both — a session
@@ -93,8 +133,26 @@ const SessionsBoard = ({ branchId }: Props) => {
           const color = sess ? "#22c55e" : isReserved ? "#f59e0b" : "#6b7280";
           const itemsCount = sess?.items?.length ?? 0;
           return (
-            <div key={pc.id} className="place-cell" style={{ borderColor: color, minHeight: 160 }}>
+            <div
+              key={pc.id}
+              className="place-cell"
+              style={{ borderColor: color, minHeight: 160, opacity: dragId === pc.id ? 0.45 : 1 }}
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={() => dropOn(pc.id)}
+            >
               <span className="dot" style={{ background: color }} />
+              {/* Drag handle — only this grabs the tile, so the Start/Stop
+                  buttons keep their normal click behaviour untouched. */}
+              <span
+                className="cell-grip"
+                draggable
+                onDragStart={() => setDragId(pc.id)}
+                onDragEnd={() => setDragId(null)}
+                title={t("session.dragToReorder")}
+                aria-label={t("session.dragToReorder")}
+              >
+                ⠿
+              </span>
               {/*
                 Title = the place's name if it has one, else its number
                 (same value the mobile guest sees on `placesSelect`),

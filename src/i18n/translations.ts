@@ -173,6 +173,7 @@ export const TRANSLATIONS: Dict = {
   "session.toastBookingExtended": { en: "Booking extended", ru: "Бронь продлена", am: "Ամրագրումը երկարացվել է" },
   "session.addService": { en: "+ service", ru: "+ услуга", am: "+ ծառայություն" },
   "session.boardTitle": { en: "Sessions", ru: "Сессии", am: "Նիստեր" },
+  "session.dragToReorder": { en: "Drag to reorder", ru: "Перетащите, чтобы изменить порядок", am: "Քաշեք՝ դասավորությունը փոխելու համար" },
   "session.posNote": { en: "items", ru: "поз.", am: "միավոր" },
   "session.products": { en: "Products", ru: "Товары", am: "Ապրանքներ" },
   "session.services": { en: "Services", ru: "Услуги", am: "Ծառայություններ" },

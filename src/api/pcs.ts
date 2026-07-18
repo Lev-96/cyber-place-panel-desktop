@@ -44,3 +44,7 @@ export interface WakeResult {
 
 export const apiWakePc = (id: number) =>
   request<WakeResult>(`/pcs/${id}/wake`, { method: "POST" });
+
+/** Persist the sessions-board drag order — `order` is device ids, front to back. */
+export const apiReorderPcs = (branch_id: number, order: number[]) =>
+  request<{ ok: boolean }>("/pcs/reorder", { method: "POST", body: { branch_id, order } });

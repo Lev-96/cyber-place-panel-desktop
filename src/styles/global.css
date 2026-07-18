@@ -887,6 +887,27 @@ input[type="time"]::-webkit-datetime-edit-field:focus {
   top: 10px;
   right: 10px;
 }
+/* Drag handle for reordering the sessions board. Sits opposite the status
+   dot; only this element is draggable so Start/Stop buttons are unaffected. */
+.place-cell .cell-grip {
+  position: absolute;
+  top: 6px;
+  left: 8px;
+  font-size: 13px;
+  line-height: 1;
+  color: var(--color-muted);
+  cursor: grab;
+  user-select: none;
+  opacity: 0.55;
+  transition: opacity 140ms ease, color 140ms ease;
+}
+.place-cell .cell-grip:hover {
+  opacity: 1;
+  color: var(--color-primary);
+}
+.place-cell .cell-grip:active {
+  cursor: grabbing;
+}
 .place-cell .platform {
   font-size: 11px;
   color: var(--color-muted);
