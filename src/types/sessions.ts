@@ -6,12 +6,14 @@
  * when they ship.
  */
 
+import { PcKind, PcStatus } from "@/types/pc";
+
 export interface ITimePackage {
   id: number;
   branch_id?: number;
   /**
    * Per-locale labels — backend stores three separate columns matching
-   * the `services.name_en/name_ru/name_am` convention. Render sites
+   * the `name_en/name_ru/name_am` convention. Render sites
    * resolve the right one via {@link timePackageNameOf}; never read a
    * single locale directly so a future fallback (e.g. en → ru) stays
    * centralised.
@@ -68,10 +70,21 @@ export interface IPcApi {
   branch_id: number;
   place_id?: number | null;
   label: string;
-  kind?: "pc" | "ps";
+  kind?: PcKind;
   hourly_rate?: number | string | null;
   mac_address?: string | null;
-  status: "online" | "offline" | "in_session";
+  /**
+   * EFFECTIVE availability, not the raw column — the backend already folds in
+   * "a console has no agent to report in" and "this computer's heartbeat went
+   * stale" (`App\Models\Pcs\Pc::effectiveStatus()`).
+   */
+  status: PcStatus;
+  /**
+   * Server verdict on whether a session may be started on this device.
+   * Optional so an older backend that doesn't send it yet degrades to the
+   * client-side rule in `isDeviceStartable`.
+   */
+  is_startable?: boolean;
   last_seen_at?: string | null;
   pairing_token?: string; // present only on create / rotate-token responses
   current_session_id?: number;
@@ -81,7 +94,8 @@ export interface IPcApi {
   place?: {
     id: number;
     number?: number | null;
+    name?: string | null;
     type: "standard" | "vip";
-    platform: "pc" | "ps4" | "ps5";
+    platform: string;
   } | null;
 }

@@ -1,11 +1,12 @@
 import { IPcApi } from "@/types/sessions";
+import { PcKind } from "@/types/pc";
 import { request } from "./client";
 
 export interface CreatePcBody {
   branch_id: number;
   place_id?: number | null;
   label: string;
-  kind?: "pc" | "ps";
+  kind?: PcKind;
   hourly_rate?: number | null;
   mac_address?: string | null;
 }
@@ -13,7 +14,7 @@ export interface CreatePcBody {
 export interface UpdatePcBody {
   place_id?: number | null;
   label?: string;
-  kind?: "pc" | "ps";
+  kind?: PcKind;
   hourly_rate?: number | null;
   mac_address?: string | null;
 }
@@ -43,3 +44,7 @@ export interface WakeResult {
 
 export const apiWakePc = (id: number) =>
   request<WakeResult>(`/pcs/${id}/wake`, { method: "POST" });
+
+/** Persist the sessions-board drag order — `order` is device ids, front to back. */
+export const apiReorderPcs = (branch_id: number, order: number[]) =>
+  request<{ ok: boolean }>("/pcs/reorder", { method: "POST", body: { branch_id, order } });

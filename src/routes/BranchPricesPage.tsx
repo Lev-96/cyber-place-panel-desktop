@@ -1,11 +1,13 @@
 import HourlyRatesForm from "@/components/branches/HourlyRatesForm";
 import PackageForm from "@/components/packages/PackageForm";
+import PlatformPricesForm from "@/components/prices/PlatformPricesForm";
 import Button from "@/components/ui/Button";
 import Spinner from "@/components/ui/Spinner";
 import { useAsync } from "@/hooks/useAsync";
 import { useLang } from "@/i18n/LanguageContext";
 import { timePackageNameOf } from "@/i18n/timePackageName";
 import { branchRepository } from "@/repositories/BranchRepository";
+import { platformPriceRepository } from "@/repositories/PlatformPriceRepository";
 import { timePackageRepository } from "@/repositories/TimePackageRepository";
 import { ITimePackage } from "@/types/sessions";
 import { useState } from "react";
@@ -30,6 +32,7 @@ const BranchPricesPage = () => {
   const { t, money, lang } = useLang();
   const branch = useAsync(() => branchRepository.byId(id), [id]);
   const packages = useAsync(() => timePackageRepository.listByBranch(id), [id]);
+  const platformPrices = useAsync(() => platformPriceRepository.listByBranch(id), [id]);
 
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState<ITimePackage | null>(null);
@@ -69,7 +72,24 @@ const BranchPricesPage = () => {
         {branch.data && (
           <HourlyRatesForm branch={branch.data} onSaved={() => void branch.reload()} />
         )}
+
       </section>
+
+      {/* Custom-platform hourly rates — same shape as the matrix above so a
+          custom platform reads exactly like pc/ps4/ps5 (a Standard column and
+          a VIP column). Created automatically when a place of that type is
+          added (in Places) — never by hand here — and editable (name in 3
+          languages + each tier). Editing a tier re-points its places + devices. */}
+      {(platformPrices.data?.length ?? 0) > 0 && (
+        <section className="col" style={{ gap: 12 }}>
+          <h2 className="page-title" style={{ margin: 0 }}>{t("platformPrice.sectionTitle")}</h2>
+          <PlatformPricesForm
+            key={(platformPrices.data ?? []).map((p) => p.id).join(",")}
+            prices={platformPrices.data ?? []}
+            onSaved={() => void platformPrices.reload()}
+          />
+        </section>
+      )}
 
       {/* Time packages — used by StartSessionDialog fixed mode AND now
           carry the optional time-windowed discount inline. */}

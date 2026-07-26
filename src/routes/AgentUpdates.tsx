@@ -82,6 +82,10 @@ const AgentUpdates = () => {
   const current = data?.current?.version ?? "—";
   const approved = data?.approved ?? null;
   const venuePcCount = data?.venue_pc_count ?? 0;
+  // The button is only for work that's left: an approved version this operator
+  // hasn't applied yet. Once applied (or after a fresh approval resets it), the
+  // button disappears and a "you're up to date" line takes its place.
+  const alreadyApplied = approved != null && data?.applied_version === approved.version;
 
   return (
     <ScreenWithBg bg="./bg/admin-home.jpg" title={t("agentUpdates.title")}>
@@ -141,7 +145,11 @@ const AgentUpdates = () => {
               )}
 
               {approved ? (
-                venuePcCount > 0 ? (
+                alreadyApplied ? (
+                  <p className="muted" style={{ margin: 0, color: "#22c55e" }}>
+                    {t("agentUpdates.upToDate")}
+                  </p>
+                ) : venuePcCount > 0 ? (
                   <div>
                     <Button type="button" onClick={runApply} disabled={applying}>
                       {applying

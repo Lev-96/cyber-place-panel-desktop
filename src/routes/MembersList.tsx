@@ -1,6 +1,6 @@
 import MemberForm from "@/components/members/MemberForm";
 import Button from "@/components/ui/Button";
-import Spinner from "@/components/ui/Spinner";
+import { ListSkeleton } from "@/components/ui/Skeleton";
 import { useLang } from "@/i18n/LanguageContext";
 import { memberRepository } from "@/repositories/MemberRepository";
 import { IMember } from "@/types/members";
@@ -37,7 +37,7 @@ const MembersList = () => {
         <Button variant="secondary" onClick={load}>{t("action.search")}</Button>
       </div>
       {err && <div className="error">{err}</div>}
-      {!members ? <Spinner /> : (
+      {!members ? <ListSkeleton /> : (
         <div className="list">
           {members.map((m) => (
             <Link key={m.id} to={`/branches/${id}/members/${m.id}`} className="list-item">

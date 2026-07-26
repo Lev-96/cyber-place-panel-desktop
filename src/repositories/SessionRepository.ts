@@ -14,6 +14,7 @@ import {
   ListSessionsParams,
   StartSessionBody,
 } from "@/api/sessions";
+import { apiReorderPcs } from "@/api/pcs";
 import { friendlyMutation, orFallback } from "@/api/fallback";
 import { IPcApi, ISessionApi, ITimePackage } from "@/types/sessions";
 
@@ -31,6 +32,9 @@ export class SessionRepository {
   }
   async listPcs(branchId: number): Promise<IPcApi[]> {
     return orFallback(apiListPcs(branchId).then((r) => r.data), []);
+  }
+  async reorderPcs(branchId: number, order: number[]): Promise<void> {
+    await apiReorderPcs(branchId, order);
   }
   async listPackages(branchId: number): Promise<ITimePackage[]> {
     return orFallback(apiListPackages(branchId).then((r) => r.data), []);

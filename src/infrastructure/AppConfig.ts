@@ -21,6 +21,10 @@ export const AppConfig = {
     role: "cp.role",
     user: "cp.user",
     commissionByCompany: "cp.commissionByCompany",
+    // Emails that have successfully signed in on THIS machine — offered as
+    // login suggestions. Device-scoped by design (a typing aid, not account
+    // data) and it never holds a password.
+    recentEmails: "cp.recentEmails",
   },
 } as const;
 

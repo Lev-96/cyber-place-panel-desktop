@@ -1,6 +1,7 @@
 import Button from "@/components/ui/Button";
 import { useLang } from "@/i18n/LanguageContext";
 import { AMD_UNIT, CURRENCY_LOCALE, moneyDisplay } from "@/i18n/currency";
+import { notify } from "@/ui/notify";
 import { branchRepository } from "@/repositories/BranchRepository";
 import { IBranchApi } from "@/types/api";
 import { Lang } from "@/i18n/translations";
@@ -90,6 +91,7 @@ const HourlyRatesForm = ({ branch, onSaved }: Props) => {
         payload[k] = n;
       }
       await branchRepository.updatePricing(branch.id, payload);
+      notify.success("prices", "saved");
       setSavedAt(Date.now());
       onSaved?.();
     } catch (e2) {
@@ -104,6 +106,17 @@ const HourlyRatesForm = ({ branch, onSaved }: Props) => {
   // "≈ X" conversion so the manager has FX feedback while editing.
   const targetCurrency = currency;
   const targetLocale = CURRENCY_LOCALE[targetCurrency];
+
+  // Save stays disabled until a cell actually differs from what's stored.
+  // Numeric compare so "500" vs a stored "500.00" doesn't read as a change,
+  // and an empty cell equals a stored null.
+  const dirty = KEYS.some((k) => {
+    const cur = prices[k].trim();
+    const orig = branch.price_for_branch?.[k];
+    const nc = cur === "" ? null : Number(cur);
+    const no = orig == null ? null : Number(orig);
+    return nc !== no;
+  });
 
   return (
     <form onSubmit={submit} className="card" style={{ display: "flex", flexDirection: "column", gap: 14 }}>
@@ -145,7 +158,7 @@ const HourlyRatesForm = ({ branch, onSaved }: Props) => {
       </div>
       {err && <div className="error">{err}</div>}
       <div className="row" style={{ gap: 10, alignItems: "center" }}>
-        <Button disabled={busy}>{busy ? "…" : t("action.save")}</Button>
+        <Button disabled={busy || !dirty}>{busy ? "…" : t("action.save")}</Button>
         {savedAt && !busy && !err && (
           <span className="muted" style={{ fontSize: 12 }}>
             {t("branch.prices.saved")}

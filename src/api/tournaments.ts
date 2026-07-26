@@ -62,7 +62,7 @@ export interface CreateTournamentBody {
 
 export type UpdateTournamentBody = Partial<Omit<CreateTournamentBody, "branch_id" | "company_id">>;
 
-export const apiListTournaments = (params: { branch_id?: number; company_id?: number; game_id?: number } = {}) =>
+export const apiListTournaments = (params: { branch_id?: number; company_id?: number; game_id?: number; per_page?: number; page?: number } = {}) =>
   request<PaginatedList<ITournamentApi>>("/tournaments", { params });
 
 export const apiGetTournament = (id: number) =>

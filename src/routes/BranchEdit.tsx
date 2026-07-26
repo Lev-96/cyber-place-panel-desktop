@@ -42,7 +42,6 @@ const BranchEdit = () => {
         <Row k={t("branch.country")} v={data.country} />
         <Row k={t("label.phone")} v={Array.isArray(data.phone) ? data.phone.join(", ") : (data.phone ?? "—")} />
         <Row k={t("label.places")} v={String(data.places_count ?? 0)} />
-        <Row k={t("branch.editTabs.services")} v={String(data.service_count ?? 0)} />
         <Row k={t("branch.rating")} v={data.ratings_avg_rating != null ? Number(data.ratings_avg_rating).toFixed(1) : "—"} />
         <div className="row" style={{ gap: 8, flexWrap: "wrap", marginTop: 6 }}>
           <Button variant="secondary" onClick={() => setEdit(true)}>{t("branchEdit.editInfo")}</Button>

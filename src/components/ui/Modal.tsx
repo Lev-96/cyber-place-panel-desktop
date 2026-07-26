@@ -71,6 +71,29 @@ const Modal = ({ open, onClose, closeOnBackdrop = true, children }: Props) => {
     return () => window.removeEventListener("keydown", onKey);
   }, [open, onClose]);
 
+  // Reliable initial focus. React's `autoFocus` is racy inside a portal
+  // under Electron: the element can be focused before it is painted, so the
+  // OS/renderer drops the focus and the user "can't type" until they click
+  // the field. We imperatively focus the first text field ourselves — once
+  // synchronously (after the DOM commit) and once on the next frame as a
+  // safety net — but only when focus isn't ALREADY inside the dialog, so we
+  // never steal focus a form deliberately placed elsewhere and never fight a
+  // working autoFocus. Modals with no fields (e.g. ConfirmDialog) are a no-op.
+  useEffect(() => {
+    if (!open) return;
+    const focusFirstField = () => {
+      const root = wrapperRef.current;
+      if (!root || root.contains(document.activeElement)) return;
+      const field = root.querySelector<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>(
+        'input:not([disabled]):not([type="hidden"]):not([type="checkbox"]):not([type="radio"]):not([type="button"]):not([type="submit"]), textarea:not([disabled]), select:not([disabled])',
+      );
+      field?.focus();
+    };
+    focusFirstField();
+    const raf = requestAnimationFrame(focusFirstField);
+    return () => cancelAnimationFrame(raf);
+  }, [open]);
+
   // Lock the page (`.main`) scroll while a modal is open, so the only scrollbar
   // belongs to the modal itself. A module-level counter keeps the lock active
   // until the LAST open modal closes, so stacked modals don't release it early.

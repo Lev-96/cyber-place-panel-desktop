@@ -18,7 +18,7 @@ const mkBooking = (overrides: Partial<IBookingApi>): Booking =>
 const mkBranch = (id: number): IBranchApi => ({
   id, company_id: 1, city: "", country: "", address: "",
   phone: null, branch_logo_path: "", status: "active",
-  ratings_avg_rating: null, service_count: 0,
+  ratings_avg_rating: null,
 });
 
 const fixedPrice = (perBooking: number): IPricingPolicy => ({

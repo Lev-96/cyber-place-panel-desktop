@@ -1,4 +1,4 @@
-import { IBranchPlace, PlatformType, PlaceType } from "@/types/api";
+import { IBranchPlace, PlaceType } from "@/types/api";
 import { Booking } from "./Booking";
 import { PlaceLiveStatus } from "./PlaceStatus";
 
@@ -6,7 +6,8 @@ export class Place {
   readonly id: number;
   readonly branchId: number;
   readonly type: PlaceType;
-  readonly platform: PlatformType;
+  // Dynamic: known pc/ps4/ps5 OR a custom branch platform slug.
+  readonly platform: string;
   readonly active: boolean;
   /**
    * Cashier-visible label distinct from the surrogate `id`. Same value the

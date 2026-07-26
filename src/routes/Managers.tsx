@@ -2,7 +2,7 @@ import ManagerForm from "@/components/managers/ManagerForm";
 import Button from "@/components/ui/Button";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import ScreenWithBg from "@/components/ui/ScreenWithBg";
-import Spinner from "@/components/ui/Spinner";
+import { ListSkeleton } from "@/components/ui/Skeleton";
 import { useAsync } from "@/hooks/useAsync";
 import { useLang } from "@/i18n/LanguageContext";
 import { managerRepository } from "@/repositories/ManagerRepository";
@@ -39,7 +39,7 @@ const Managers = () => {
           <Button onClick={() => setCreating(true)}>{t("managers.new")}</Button>
         </div>
       )}
-      {loading && <Spinner />}
+      {loading && <ListSkeleton />}
       {error && <div className="error">{error.message}</div>}
       {!loading && !error && (
         <div className="list">

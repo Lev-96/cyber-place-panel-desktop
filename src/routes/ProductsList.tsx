@@ -1,7 +1,8 @@
 import ProductForm from "@/components/pos/ProductForm";
 import Button from "@/components/ui/Button";
-import Spinner from "@/components/ui/Spinner";
+import { ListSkeleton } from "@/components/ui/Skeleton";
 import { useAsync } from "@/hooks/useAsync";
+import { useConfirm } from "@/components/ui/ConfirmProvider";
 import { useLang } from "@/i18n/LanguageContext";
 import { productRepository } from "@/repositories/ProductRepository";
 import { IProduct } from "@/types/pos";
@@ -12,6 +13,7 @@ const ProductsList = () => {
   const { branchId } = useParams();
   const id = Number(branchId);
   const { t, money } = useLang();
+  const confirm = useConfirm();
   const { data, loading, error, reload } = useAsync(() => productRepository.listByBranch(id), [id]);
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState<IProduct | null>(null);
@@ -19,7 +21,7 @@ const ProductsList = () => {
   if (!Number.isFinite(id) || id <= 0) return <div className="error">{t("hub.invalidId")}</div>;
 
   const remove = async (p: IProduct) => {
-    if (!confirm(`${t("action.delete")} ${p.name}?`)) return;
+    if (!(await confirm(`${t("action.delete")} ${p.name}?`, { destructive: true }))) return;
     await productRepository.remove(p.id);
     void reload();
   };
@@ -34,7 +36,7 @@ const ProductsList = () => {
         <h2 className="page-title" style={{ margin: 0 }}>{t("products.title")} · №{id}</h2>
         <Button onClick={() => setCreating(true)}>{t("products.new")}</Button>
       </div>
-      {loading && <Spinner />}
+      {loading && <ListSkeleton />}
       {error && <div className="error">{error.message}</div>}
       {!loading && !error && (
         <div className="list">

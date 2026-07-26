@@ -1,5 +1,5 @@
 import ScreenWithBg from "@/components/ui/ScreenWithBg";
-import Spinner from "@/components/ui/Spinner";
+import { ListSkeleton } from "@/components/ui/Skeleton";
 import { useAsync } from "@/hooks/useAsync";
 import { useSessionsSummary } from "@/hooks/useSessionsSummary";
 import { formatDateTime, formatTime } from "@/i18n/dates";
@@ -125,7 +125,7 @@ const SessionsHistory = () => {
         </div>
       </div>
 
-      {loading && <Spinner />}
+      {loading && <ListSkeleton />}
       {error && <div className="error">{error.message}</div>}
 
       {!loading && !error && (

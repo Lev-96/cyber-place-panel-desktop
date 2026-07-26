@@ -4,7 +4,7 @@ import BranchForm from "@/components/branches/BranchForm";
 import Avatar from "@/components/ui/Avatar";
 import Button from "@/components/ui/Button";
 import ScreenWithBg from "@/components/ui/ScreenWithBg";
-import Spinner from "@/components/ui/Spinner";
+import { ListSkeleton } from "@/components/ui/Skeleton";
 import { useAsync } from "@/hooks/useAsync";
 import { useLang } from "@/i18n/LanguageContext";
 import { fmt } from "@/i18n/translations";
@@ -31,7 +31,7 @@ const CompanyBranches = () => {
         <Link to={`/companies/${id}`} className="muted">{t("companyBranches.back")}</Link>
         {canCreate && <Button onClick={() => setCreating(true)}>{t("companyBranches.newBranch")}</Button>}
       </div>
-      {loading && <Spinner />}
+      {loading && <ListSkeleton />}
       {error && <div className="error">{error.message}</div>}
       {!loading && !error && (
         <div className="list">
@@ -41,7 +41,7 @@ const CompanyBranches = () => {
                 <Avatar src={b.branch_logo_path} name={b.address} size={44} />
                 <div style={{ flex: 1 }}>
                   <div className="name">{b.address}</div>
-                  <div className="meta">{b.country}, {b.city} · {t("label.places")} {b.places_count ?? 0} · {t("branch.editTabs.services")} {b.service_count}</div>
+                  <div className="meta">{b.country}, {b.city} · {t("label.places")} {b.places_count ?? 0}</div>
                 </div>
               </div>
               <span className="muted">{t("common.open")}</span>

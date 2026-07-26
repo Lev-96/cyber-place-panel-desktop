@@ -135,6 +135,23 @@ pos · places · sessions · tournaments · revenue · services · scanner`
 - For server cache, prefer adding React Query rather than ad-hoc
   `useEffect` fetches (when scope grows).
 - Reuse UI primitives; don't reinvent Button/Input/Modal per feature.
+- **No hard-coded domain string literals — mirror the backend enums.**
+  Any closed set the backend models as an `App\Enums\*` (device kind,
+  status, session mode, role, skill) gets a matching TS `type` + a
+  `const` map + helper predicates in one module; components compare
+  against those, never bare `"ps"` / `"offline"`. **Canonical example:**
+  `src/types/pc.ts` — `PcKind` / `PcStatus` + `PC_KIND` / `PC_STATUS`
+  (`as const satisfies Record<…>`) + `pcHasAgent()` / `isPs()`. Adding a
+  case is a one-file edit; a stray literal in a new diff is a bug.
+  ⚠️ Do NOT conflate overlapping-but-distinct sets: `PcKind`
+  (`"pc"|"ps"`, a *device*) is not `PlatformType` (`"pc"|"ps4"|"ps5"`, a
+  *place's platform*).
+- **Use in-app primitives for dialogs/toasts, never native.** Confirms
+  via `useConfirm()`/`ConfirmDialog`, notifications via `notify.*` — a
+  native `window.confirm()`/`alert()` poisons renderer focus (see traps).
+- **When a backend API contract changes, update the consuming type +
+  repository in the SAME change** — a Resource that drops/renames a field
+  must be reflected in `IPcApi` et al. so `tsc` catches drift.
 
 ### Project-specific traps (memorise)
 - **Typecheck command:** ALWAYS run both
@@ -561,8 +578,16 @@ When working on this project:
 8. **Be honest about un-verified state.** If something wasn't checked
    end-to-end (e.g., couldn't test WoL, no Windows machine on hand), say
    so explicitly rather than claiming success.
+9. **"100% guaranteed" means proven, not asserted.** The user demands
+   maximum rigor. Verify everything machine-verifiable (`typecheck`,
+   `vitest run`, no stray literals via grep, HMR healthy) and give an
+   **honest verified-vs-stage split** — never a bare "yes, 100%". The one
+   thing a machine can't sign off is a **human click-through of the
+   changed screens** — name exactly which screens to smoke-test rather
+   than implying they were visually verified. Hold the line: don't
+   fake-100% on anything you didn't actually run.
 
 ---
 
-_Last verified: 2026-05-28. When the panel's stack or conventions change,
+_Last verified: 2026-07-18. When the panel's stack or conventions change,
 update the relevant section here in the same change._

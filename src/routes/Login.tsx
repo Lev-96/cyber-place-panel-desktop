@@ -1,10 +1,12 @@
 import { ApiError } from "@/api/client";
 import { useAuth } from "@/auth/AuthContext";
+import { recentEmails } from "@/auth/recentEmails";
 import Button from "@/components/ui/Button";
-import Input from "@/components/ui/Input";
+import PasswordInput from "@/components/ui/PasswordInput";
+import SuggestInput from "@/components/ui/SuggestInput";
 import { useLang } from "@/i18n/LanguageContext";
 import { LANGUAGES } from "@/i18n/translations";
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 
 const LANG_LABEL: Record<string, string> = { en: "ENG", ru: "РУС", am: "ՀԱՅ" };
 
@@ -20,6 +22,17 @@ const Login = () => {
   const [password, setPassword] = useState("");
   const [err, setErr] = useState<LoginErr | null>(null);
   const [busy, setBusy] = useState(false);
+  // Addresses that already signed in on this machine — offered while typing
+  // so a returning operator types one letter instead of the whole address.
+  const [known, setKnown] = useState<string[]>([]);
+
+  useEffect(() => {
+    void recentEmails.list().then(setKnown);
+  }, []);
+
+  const forgetEmail = (value: string) => {
+    void recentEmails.forget(value).then(() => recentEmails.list().then(setKnown));
+  };
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -59,8 +72,19 @@ const Login = () => {
       <img className="login-logo" src="./logo.png" alt="Cyber Place" />
       <h2 className="login-title">{t("login.title")}</h2>
       <form className="login-card" onSubmit={onSubmit}>
-        <Input label={t("auth.email")} type="email" placeholder="your@email.com" value={email} onChange={(e) => setEmail(e.target.value)} required autoFocus />
-        <Input label={t("auth.password")} type="password" placeholder={t("login.passwordPlaceholder")} value={password} onChange={(e) => setPassword(e.target.value)} required />
+        <SuggestInput
+          label={t("auth.email")}
+          type="email"
+          placeholder="your@email.com"
+          value={email}
+          onValueChange={setEmail}
+          options={known}
+          onRemoveOption={forgetEmail}
+          removeHint={t("login.forgetEmail")}
+          required
+          autoFocus
+        />
+        <PasswordInput label={t("auth.password")} placeholder={t("login.passwordPlaceholder")} value={password} onChange={(e) => setPassword(e.target.value)} required />
         {errText && <div className="error" style={{ textAlign: "center" }}>{errText}</div>}
         <a className="login-forgot" href="#/forgot-password">{t("auth.forgot")}</a>
         <Button disabled={busy}>{busy ? t("login.signingIn") : t("login.title")}</Button>

@@ -10,7 +10,7 @@ export type Lang = "en" | "ru" | "am";
  * one column is empty.
  *
  * Mirrors the same approach the cashier dialog uses for branch
- * services (`AddSessionItemDialog.tsx`), kept here so future locale
+ * catalogs (`AddSessionItemDialog.tsx`), kept here so future locale
  * additions stay a one-line edit on both surfaces.
  */
 export const timePackageNameOf = (

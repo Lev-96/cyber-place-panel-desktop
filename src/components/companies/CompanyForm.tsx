@@ -3,6 +3,7 @@ import { useAuth } from "@/auth/AuthContext";
 import Button from "@/components/ui/Button";
 import ImageUpload from "@/components/ui/ImageUpload";
 import Input from "@/components/ui/Input";
+import PasswordInput from "@/components/ui/PasswordInput";
 import Modal from "@/components/ui/Modal";
 import NumberStepper from "@/components/ui/NumberStepper";
 import { COUNTRIES, countryByCode, flagOf, resolveCountryCode } from "@/data/countries";
@@ -183,8 +184,8 @@ const CompanyForm = ({ initial, onClose, onSaved }: Props) => {
           <div className="row-between"><h2 style={{ margin: 0 }}>{t("company.titleNew")} · {t("company.step1")}</h2><span className="muted">{t("company.owner")}</span></div>
           <Input label={t("company.ownerName")} value={ownerName} onChange={(e) => setOwnerName(e.target.value)} required autoFocus />
           <Input label={t("company.ownerEmail")} type="email" value={ownerEmail} onChange={(e) => setOwnerEmail(e.target.value)} required />
-          <Input label={t("auth.password")} type="password" value={ownerPassword} onChange={(e) => setOwnerPassword(e.target.value)} required minLength={8} />
-          <Input label={t("label.confirmPassword")} type="password" value={ownerPassword2} onChange={(e) => setOwnerPassword2(e.target.value)} required minLength={8} />
+          <PasswordInput label={t("auth.password")} value={ownerPassword} onChange={(e) => setOwnerPassword(e.target.value)} required minLength={8} />
+          <PasswordInput label={t("label.confirmPassword")} value={ownerPassword2} onChange={(e) => setOwnerPassword2(e.target.value)} required minLength={8} />
           {err && <div className="error" style={{ whiteSpace: "pre-line" }}>{err}</div>}
           <div className="row-between">
             <Button type="button" variant="secondary" onClick={onClose} disabled={busy}>{t("action.cancel")}</Button>

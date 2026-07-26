@@ -35,16 +35,8 @@ export interface PaginatedList<T> {
 export interface IGame {
   id: number;
   name: string;
-  platform: PlatformType;
-}
-
-export interface IBranchService {
-  id: number;
-  name_en: string;
-  name_ru: string;
-  name_am: string;
-  price?: number | string | null;
-  service_logo_path?: string;
+  // Dynamic: known pc/ps4/ps5 OR a custom branch platform slug.
+  platform: string;
 }
 
 export interface IBranchPlace {
@@ -52,10 +44,41 @@ export interface IBranchPlace {
   branch_id: number;
   /** Cashier-visible label distinct from the surrogate `id` (e.g. "1" or "2"). */
   number?: number;
+  /** Optional descriptive name (e.g. "Corner PS5", "Poker table"). */
+  name?: string | null;
   type: PlaceType;
   status: "active" | "inactive";
-  platform: PlatformType;
+  // Dynamic: known pc/ps4/ps5 OR a custom branch platform slug.
+  platform: string;
+  /** Manual per-hour rate for custom platforms (null for known ones). */
+  hourly_rate?: number | string | null;
   games: IGame[];
+}
+
+/**
+ * A named per-hour price for a branch's CUSTOM platform (table-tennis, poker,
+ * VR…). One per (branch, platform slug). Known pc/ps4/ps5 are NOT here — they
+ * bill from the fixed matrix (`IBranchApi.price_for_branch`). The `platform`
+ * slug is the case-insensitive identity shared with `IBranchPlace.platform`.
+ */
+export interface IBranchPlatformPrice {
+  id: number;
+  branch_id: number;
+  /** Lowercase slug — the platform's identity, shared with places.platform. */
+  platform: string;
+  /** Per-locale наименование (mirrors ITimePackage.name_*). */
+  name_en: string;
+  name_ru: string;
+  name_am: string;
+  /** Server-resolved single label (EN→RU→AM). */
+  name: string;
+  /** Server-side de-slugged fallback label (e.g. "Table Tennis"). */
+  label?: string;
+  /** Per-tier per-hour rates (null until a place of that type exists). */
+  price_standard: number | string | null;
+  price_vip: number | string | null;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface IBookingApi {
@@ -99,7 +122,6 @@ export interface IBranchApi {
   status: string;
   places_count?: number;
   managers_count?: number;
-  service_count: number;
   ratings_avg_rating: number | null;
   price_for_branch?: {
     id: number;

@@ -3,7 +3,7 @@ import { can } from "@/auth/permissions";
 import CompanyForm from "@/components/companies/CompanyForm";
 import Button from "@/components/ui/Button";
 import ScreenWithBg from "@/components/ui/ScreenWithBg";
-import Spinner from "@/components/ui/Spinner";
+import { ListSkeleton } from "@/components/ui/Skeleton";
 import { useAsync } from "@/hooks/useAsync";
 import { useLang } from "@/i18n/LanguageContext";
 import { companyRepository } from "@/repositories/CompanyRepository";
@@ -23,7 +23,7 @@ const CompaniesList = () => {
         <Link to="/revenue" className="muted">{t("companiesList.revenueLink")}</Link>
         {canCreate && <Button onClick={() => setCreating(true)}>{t("companiesList.new")}</Button>}
       </div>
-      {loading && <Spinner />}
+      {loading && <ListSkeleton />}
       {error && <div className="error">{error.message}</div>}
       {!loading && !error && (
         <div className="list">

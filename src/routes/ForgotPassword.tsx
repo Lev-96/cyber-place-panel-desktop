@@ -2,6 +2,7 @@ import { apiForgotPassword } from "@/api/auth";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import { useLang } from "@/i18n/LanguageContext";
+import { notify } from "@/ui/notify";
 import { FormEvent, useState } from "react";
 import { Link } from "react-router-dom";
 
@@ -15,9 +16,15 @@ const ForgotPassword = () => {
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     setBusy(true); setMsg(null);
-    try { await apiForgotPassword(email); setMsg(t("forgot.successPrefix")); setSuccess(true); }
-    catch (ex) { setMsg(ex instanceof Error ? ex.message : t("form.errors.failed")); setSuccess(false); }
-    finally { setBusy(false); }
+    try {
+      await apiForgotPassword(email);
+      setMsg(t("forgot.successPrefix")); setSuccess(true);
+      notify.message("success", t("forgot.toastSent"));
+    } catch (ex) {
+      const m = ex instanceof Error ? ex.message : t("form.errors.failed");
+      setMsg(m); setSuccess(false);
+      notify.message("error", m);
+    } finally { setBusy(false); }
   };
 
   return (

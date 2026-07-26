@@ -1,14 +1,13 @@
 import Button from "@/components/ui/Button";
 import Modal from "@/components/ui/Modal";
 import Input from "@/components/ui/Input";
+import PriceInput from "@/components/ui/PriceInput";
 import Spinner from "@/components/ui/Spinner";
 import { useLang } from "@/i18n/LanguageContext";
 import { productRepository } from "@/repositories/ProductRepository";
-import { serviceRepository } from "@/repositories/ServiceRepository";
 import { sessionRepository } from "@/repositories/SessionRepository";
 import { ISessionApi } from "@/types/sessions";
 import { IProduct } from "@/types/pos";
-import { IBranchService } from "@/types/api";
 import { useEffect, useMemo, useState } from "react";
 
 interface Props {
@@ -25,15 +24,9 @@ interface CatalogRow {
   price: number | null;
 }
 
-const localizedServiceName = (s: IBranchService, lang: "en" | "ru" | "am"): string => {
-  const map = { en: s.name_en, ru: s.name_ru, am: s.name_am } as const;
-  return map[lang] || s.name_en || s.name_ru || s.name_am;
-};
-
 const AddSessionItemDialog = ({ branchId, session, onClose, onAdded }: Props) => {
-  const { lang, money, t } = useLang();
+  const { money, t } = useLang();
   const [products, setProducts] = useState<IProduct[] | null>(null);
-  const [services, setServices] = useState<IBranchService[] | null>(null);
   const [search, setSearch] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -44,10 +37,6 @@ const AddSessionItemDialog = ({ branchId, session, onClose, onAdded }: Props) =>
 
   useEffect(() => {
     void productRepository.listByBranch(branchId).then(setProducts);
-    void serviceRepository.listByBranch(branchId).then((list) =>
-      // ServiceRepository wraps the API shape in a domain object — unwrap to .raw.
-      setServices(list.map((s) => s.raw))
-    ).catch(() => setServices([]));
   }, [branchId]);
 
   useEffect(() => {
@@ -71,16 +60,8 @@ const AddSessionItemDialog = ({ branchId, session, onClose, onAdded }: Props) =>
         price: Number(p.price),
       });
     }
-    for (const s of services ?? []) {
-      rows.push({
-        key: `s-${s.id}`,
-        name: localizedServiceName(s, lang),
-        category: t("session.services"),
-        price: s.price != null ? Number(s.price) : null,
-      });
-    }
     return rows;
-  }, [products, services, lang, t]);
+  }, [products, t]);
 
   const filtered = catalog.filter((r) =>
     !search.trim() || r.name.toLowerCase().includes(search.toLowerCase())
@@ -119,7 +100,7 @@ const AddSessionItemDialog = ({ branchId, session, onClose, onAdded }: Props) =>
   };
 
   const deviceLabel = session.pc_label ?? `№${session.pc_id}`;
-  const loading = products === null || services === null;
+  const loading = products === null;
 
   return (
     <Modal open onClose={onClose}>
@@ -168,14 +149,13 @@ const AddSessionItemDialog = ({ branchId, session, onClose, onAdded }: Props) =>
               onChange={(e) => setCustomName(e.target.value)}
               style={{ flex: 2 }}
             />
-            <Input
-              label=""
-              placeholder={t("session.itemPrice")}
-              inputMode="decimal"
-              value={customPrice}
-              onChange={(e) => setCustomPrice(e.target.value)}
-              style={{ flex: 1 }}
-            />
+            <div style={{ flex: 1 }}>
+              <PriceInput
+                placeholder={t("session.itemPrice")}
+                value={customPrice}
+                onChange={setCustomPrice}
+              />
+            </div>
             <Button onClick={addCustom} disabled={busy} style={{ minWidth: 110 }}>{t("action.add")}</Button>
           </div>
         </div>

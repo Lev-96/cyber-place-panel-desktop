@@ -1,11 +1,14 @@
 import Button from "@/components/ui/Button";
 import Modal from "@/components/ui/Modal";
+import Checkbox from "@/components/ui/Checkbox";
+import PriceInput from "@/components/ui/PriceInput";
 import Spinner from "@/components/ui/Spinner";
 import { useLang } from "@/i18n/LanguageContext";
 import { timePackageNameOf } from "@/i18n/timePackageName";
 import { branchRepository } from "@/repositories/BranchRepository";
 import { sessionRepository } from "@/repositories/SessionRepository";
 import { IPcApi, ITimePackage } from "@/types/sessions";
+import { isDeviceStartable, isPs } from "@/types/pc";
 import { IBranchApi } from "@/types/api";
 import { useEffect, useMemo, useState } from "react";
 
@@ -42,10 +45,17 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
   const [pkgId, setPkgId] = useState<number | null>(null);
   // PlayStation rows are billing-only (no kiosk agent), so the open/count-up
   // mode is the only sensible default. PCs default to fixed packages.
-  const [mode, setMode] = useState<Mode>(pc.kind === "ps" ? "open" : "fixed");
+  const [mode, setMode] = useState<Mode>(isPs(pc.kind) ? "open" : "fixed");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [branch, setBranch] = useState<IBranchApi | null>(null);
+  // Optional per-session price override. Off by default → the session bills
+  // at the assigned matrix/PC rate (backend resolution chain). When on, the
+  // cashier types a one-off rate, presses Save to confirm it, and only THEN
+  // can start — so editing the price never starts the session by itself.
+  const [editPrice, setEditPrice] = useState(false);
+  const [customRate, setCustomRate] = useState("");
+  const [rateSaved, setRateSaved] = useState(false);
 
   useEffect(() => { void sessionRepository.listPackages(branchId).then((p) => { setPackages(p); setPkgId(p[0]?.id ?? null); }); }, [branchId]);
   useEffect(() => {
@@ -79,6 +89,34 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
     return null;
   }, [pc, branch]);
 
+  // The override only takes effect once it's a valid number AND explicitly
+  // saved. Until then the session still bills at the assigned rate, and the
+  // start button stays gated on saving — so changing the price never starts
+  // the session on its own.
+  const customRateNum = Number(customRate);
+  const customRateValid = editPrice && Number.isFinite(customRateNum) && customRateNum > 0;
+  const overrideApplied = customRateValid && rateSaved;
+  const effectiveRate = overrideApplied ? customRateNum : assignedRate;
+
+  // Prefill the override input with the current rate the moment it's enabled,
+  // so the operator edits "the current price" rather than a blank field.
+  const toggleEditPrice = (next: boolean) => {
+    setEditPrice(next);
+    setRateSaved(false);
+    setCustomRate(next && assignedRate != null ? String(assignedRate) : "");
+  };
+
+  // Editing the value invalidates a previous save — the cashier must press
+  // Save again before the new number can be used to start.
+  const onRateChange = (v: string) => {
+    setCustomRate(v);
+    setRateSaved(false);
+  };
+
+  const saveRate = () => {
+    if (customRateValid) setRateSaved(true);
+  };
+
   const submit = async () => {
     setBusy(true); setErr(null);
     try {
@@ -92,21 +130,21 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
           user_display_name: pc.label,
         });
       } else {
-        if (assignedRate === null) {
+        if (effectiveRate === null) {
           setErr(t("session.noAssignedRate"));
           setBusy(false);
           return;
         }
-        // Don't send hourly_rate — backend resolves the same chain
-        // (request → matrix → pc.hourly_rate → 422). Keeping the
-        // single-source-of-truth on the server side means a price
-        // edit doesn't require us to re-render every cashier
-        // dialog to stay correct.
+        // Only send hourly_rate when the cashier explicitly overrode it via
+        // "change current price". Otherwise omit it so the backend resolves
+        // the assigned rate from its own chain (request → matrix →
+        // pc.hourly_rate) — the single source of truth stays server-side.
         await sessionRepository.start({
           branch_id: branchId,
           pc_id: pc.id,
           mode: "open",
           user_display_name: pc.label,
+          ...(overrideApplied ? { hourly_rate: customRateNum } : {}),
         });
       }
       onStarted();
@@ -115,19 +153,26 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
     } finally { setBusy(false); }
   };
 
+  // Defence in depth: the board already hides Start for an unreachable
+  // device and the backend rejects it with 422 — but if this dialog is ever
+  // opened another way (deep link, stale tile), it must not offer to bill a
+  // machine whose agent is not connected.
+  const deviceOffline = !isDeviceStartable(pc);
+
   // Open-mode is unavailable when no rate is configured AND fixed-
   // mode would be the only option; for PS-kind PCs the disabled
   // Start button surfaces the noAssignedRate hint instead.
-  const startDisabled = busy || (mode === "open" && assignedRate === null);
+  const startDisabled =
+    busy || deviceOffline || (mode === "open" && (editPrice ? !overrideApplied : assignedRate === null));
 
   return (
     <Modal open onClose={onClose}>
       <div className="card" style={{ width: 460, maxWidth: "90vw", display: "flex", flexDirection: "column", gap: 14 }}>
-        <h2 style={{ margin: 0 }}>{t("session.start")} · №{pc.place?.number ?? pc.label}{pc.kind === "ps" ? " (PS)" : ""}</h2>
+        <h2 style={{ margin: 0 }}>{t("session.start")} · №{pc.place?.number ?? pc.label}{isPs(pc.kind) ? " (PS)" : ""}</h2>
         {!packages ? <Spinner /> : (
           <>
             <div className="row" style={{ gap: 8 }}>
-              <button type="button" onClick={() => setMode("fixed")} style={tabStyle(mode === "fixed")} disabled={pc.kind === "ps"}>
+              <button type="button" onClick={() => setMode("fixed")} style={tabStyle(mode === "fixed")} disabled={isPs(pc.kind)}>
                 {t("session.fixedTariff")}
               </button>
               <button type="button" onClick={() => setMode("open")} style={tabStyle(mode === "open")}>
@@ -154,15 +199,45 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
                 )}
               </div>
             ) : (
-              <AssignedRateDisplay
-                rate={assignedRate}
-                hourSuffix={t("time.hourShort") || "h"}
-                noRateText={t("session.noAssignedRate")}
-                rateLabel={t("session.hourlyRate")}
-                money={money}
-              />
+              <div className="col" style={{ gap: 10 }}>
+                <AssignedRateDisplay
+                  rate={effectiveRate}
+                  hourSuffix={t("time.hourShort") || "h"}
+                  noRateText={t("session.noAssignedRate")}
+                  rateLabel={t("session.hourlyRate")}
+                  money={money}
+                />
+                <Checkbox checked={editPrice} onChange={toggleEditPrice} label={t("session.editPrice")} />
+                {editPrice && (
+                  <div className="col" style={{ gap: 6 }}>
+                    <div className="row" style={{ gap: 8, alignItems: "flex-end" }}>
+                      <div style={{ flex: 1 }}>
+                        <PriceInput
+                          label={t("session.newHourlyRate")}
+                          value={customRate}
+                          onChange={onRateChange}
+                          autoFocus
+                        />
+                      </div>
+                      <Button
+                        type="button"
+                        variant={rateSaved ? "primary" : "secondary"}
+                        onClick={saveRate}
+                        disabled={!customRateValid || rateSaved}
+                        style={{ whiteSpace: "nowrap" }}
+                      >
+                        {rateSaved ? `✓ ${t("session.priceSaved")}` : t("action.save")}
+                      </Button>
+                    </div>
+                    {!rateSaved && (
+                      <span className="muted" style={{ fontSize: 11 }}>{t("session.savePriceHint")}</span>
+                    )}
+                  </div>
+                )}
+              </div>
             )}
 
+            {deviceOffline && <div className="error">{t("session.deviceOfflineHint")}</div>}
             {err && <div className="error">{err}</div>}
             <div className="row-between">
               <Button variant="secondary" onClick={onClose} disabled={busy}>{t("action.cancel")}</Button>

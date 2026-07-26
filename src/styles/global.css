@@ -273,6 +273,177 @@ html {
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
 }
 
+/* ── Sessions board drag-and-drop ─────────────────────────────────────
+   Visual language while reordering: the grabbed tile lifts into a dashed,
+   faded "ghost"; every other tile dims a touch so the eye isn't split; and
+   the tile the drop will land IN FRONT OF lights up with a neon ring plus a
+   glowing insertion bar on its leading edge — so it's unmistakable WHAT is
+   moving and WHERE it will land. */
+.live-grid.is-reordering .place-cell:not(.is-dragging):not(.is-drop-before) {
+  opacity: 0.78;
+}
+.place-cell.is-dragging {
+  opacity: 0.5;
+  border-style: dashed !important;
+  transform: scale(0.97);
+  cursor: grabbing;
+}
+.place-cell.is-drop-before {
+  border-color: var(--color-primary) !important;
+  box-shadow:
+    0 0 0 2px rgba(7, 221, 241, 0.55),
+    0 0 22px rgba(7, 221, 241, 0.35);
+  transform: translateX(6px);
+}
+/* Neon insertion bar on the leading edge — "the tile drops here". */
+.place-cell.is-drop-before::before {
+  content: "";
+  position: absolute;
+  left: -7px;
+  top: 8px;
+  bottom: 8px;
+  width: 3px;
+  border-radius: 3px;
+  background: var(--color-primary);
+  box-shadow: 0 0 10px rgba(7, 221, 241, 0.85);
+}
+/* Bigger, clearly-grabbable handle: a rounded hit area that glows on hover. */
+.place-cell .cell-grip {
+  padding: 2px 5px;
+  border-radius: 6px;
+}
+.place-cell .cell-grip:hover {
+  background: rgba(7, 221, 241, 0.14);
+}
+
+/* ── Collapsible grouped sections (sessions / places / live boards) ────
+   Reusable <CollapsibleSection>: a header that toggles its body open/closed,
+   with an optional drag-to-reorder grip. The body animates via
+   grid-template-rows 1fr↔0fr — a smooth height collapse with no hard-coded
+   pixel height. */
+.cp-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border-radius: 12px;
+  transition: opacity 160ms ease;
+}
+.cp-section-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.cp-section-grip {
+  font-size: 14px;
+  line-height: 1;
+  color: var(--color-muted);
+  cursor: grab;
+  user-select: none;
+  padding: 6px 4px;
+  border-radius: 6px;
+  opacity: 0.6;
+  flex-shrink: 0;
+  transition: opacity 140ms ease, color 140ms ease, background 140ms ease;
+}
+.cp-section-grip:hover {
+  opacity: 1;
+  color: var(--color-primary);
+  background: rgba(7, 221, 241, 0.12);
+}
+.cp-section-grip:active { cursor: grabbing; }
+.cp-section-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+  padding: 10px 14px;
+  border: 1px solid #1f2a44;
+  border-radius: 10px;
+  background: var(--color-surface);
+  color: #e6edf7;
+  font-weight: 700;
+  font-size: 15px;
+  cursor: pointer;
+  text-align: left;
+  transition:
+    border-color 160ms ease,
+    box-shadow 200ms ease,
+    background 160ms ease;
+}
+.cp-section-toggle:hover {
+  border-color: var(--color-primary);
+  box-shadow: 0 4px 16px rgba(7, 221, 241, 0.12);
+}
+.cp-section-chev {
+  color: var(--color-primary);
+  font-size: 12px;
+  line-height: 1;
+  flex-shrink: 0;
+  transition: transform 240ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.cp-section-chev[data-open="true"] { transform: rotate(90deg); }
+.cp-section-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cp-section-count {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-muted);
+  background: #0b1224;
+  border: 1px solid #1f2a44;
+  border-radius: 999px;
+  padding: 2px 10px;
+  flex-shrink: 0;
+}
+.cp-section-body {
+  display: grid;
+  grid-template-rows: 1fr;
+  opacity: 1;
+  transition:
+    grid-template-rows 320ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    opacity 260ms ease;
+}
+.cp-section-body[data-open="false"] {
+  grid-template-rows: 0fr;
+  opacity: 0;
+  pointer-events: none;
+}
+/* The overflow:hidden + min-height:0 pair is what lets the 0fr row actually
+   clip the body to zero height instead of overflowing. The padding gives the
+   tiles room to breathe inside the section — a little gap below the header and
+   a small inset from the section edges. */
+.cp-section-inner {
+  overflow: hidden;
+  min-height: 0;
+  /* Indent the tiles to the right so they read as nested INSIDE their section
+     — the header sits at the left, its tiles tucked in under it. */
+  padding: 10px 8px 6px 24px;
+}
+/* Section reorder feedback: the dragged section fades to a ghost; the section
+   the drop will land before gets a neon ring + an insertion bar on its top. */
+.cp-section.is-dragging { opacity: 0.5; }
+.cp-section.is-drop-before { position: relative; }
+.cp-section.is-drop-before .cp-section-toggle {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px rgba(7, 221, 241, 0.5), 0 0 18px rgba(7, 221, 241, 0.3);
+}
+.cp-section.is-drop-before::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -6px;
+  height: 3px;
+  border-radius: 3px;
+  background: var(--color-primary);
+  box-shadow: 0 0 10px rgba(7, 221, 241, 0.8);
+}
+
 .btn {
   transition:
     opacity 140ms ease,
@@ -312,8 +483,10 @@ html {
     border-color 160ms;
 }
 .chip:hover {
-  background: rgba(7, 221, 241, 0.08);
-  transform: translateY(-1px);
+  background: rgba(7, 221, 241, 0.14);
+  transform: translateY(-2px);
+  border-color: var(--color-primary);
+  box-shadow: 0 6px 16px rgba(7, 221, 241, 0.22);
 }
 
 /* Sidebar nav indicator slides in on active */
@@ -560,7 +733,14 @@ body.cp-modal-open .main {
   gap: 6px;
   padding: 7px 14px 7px 10px;
   margin: 0 0 14px;
-  background: rgba(7, 221, 241, 0.08);
+  /* Stays pinned to the top of the scrolling content area, so it's always
+     reachable however far the page is scrolled. Frosted dark fill keeps the
+     content scrolling behind it legible instead of bleeding through. */
+  position: sticky;
+  top: 0;
+  z-index: 6;
+  background: rgba(9, 14, 30, 0.82);
+  backdrop-filter: blur(8px);
   border: 1px solid var(--color-border);
   border-radius: 999px;
   color: #cfe9ee;
@@ -590,6 +770,102 @@ body.cp-modal-open .main {
 }
 .cp-back-btn:hover svg {
   transform: translateX(-2px);
+}
+
+/* Sticky "go to my branch tournaments" CTA — pins to the top-right of the
+   scroll area (opposite the back button, so the two never overlap). The bar
+   is click-through except for the button itself, so it never blocks content
+   scrolling beneath it. */
+.tournaments-cta {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  justify-content: flex-end;
+  pointer-events: none;
+  margin-top: -6px;
+}
+.tournaments-cta > * {
+  pointer-events: auto;
+}
+
+/* Clickable sidebar user card → opens the profile screen. */
+.user-card {
+  transition:
+    border-color 160ms ease,
+    box-shadow 200ms ease,
+    transform 160ms ease;
+}
+.user-card:hover {
+  border-color: var(--color-primary) !important;
+  box-shadow: 0 6px 18px rgba(7, 221, 241, 0.14);
+  transform: translateY(-1px);
+}
+.user-card.active {
+  border-color: var(--color-primary) !important;
+}
+
+/* Popover above the user card — pick Profile (modal) or Settings. */
+.user-menu-pop {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(100% + 6px);
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px;
+  background: #0b1224;
+  border: 1px solid #1f2a44;
+  border-radius: 12px;
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.5);
+  animation: cp-pop-in 160ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.user-menu-pop button {
+  text-align: left;
+  padding: 9px 12px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: #e5e7eb;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 140ms ease, border-color 140ms ease, color 140ms ease;
+}
+.user-menu-pop button:hover {
+  background: rgba(7, 221, 241, 0.1);
+  border-color: rgba(7, 221, 241, 0.35);
+  color: #07ddf1;
+}
+@keyframes cp-pop-in {
+  from { opacity: 0; transform: translateY(6px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* Show/hide toggle inside a PasswordInput. */
+.pw-eye {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: #9aa8c7;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: color 140ms ease, background 140ms ease;
+}
+.pw-eye:hover {
+  color: var(--color-primary);
+  background: rgba(7, 221, 241, 0.1);
 }
 
 .page-title {
@@ -846,13 +1122,40 @@ input[type="time"]::-webkit-datetime-edit-field:focus {
   justify-content: space-between;
   gap: 12px;
   cursor: pointer;
+  /* These rows are click targets (edit / toggle / open), so the whole row is
+     the affordance — never the text-selection I-beam ("ruler") cursor. */
+  user-select: none;
+  position: relative;
   transition:
-    border-color 120ms,
-    transform 120ms;
+    border-color 160ms ease,
+    transform 160ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    box-shadow 200ms ease,
+    background 160ms ease;
 }
 .list-item:hover {
   border-color: var(--color-primary);
-  transform: translateY(-1px);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 22px rgba(7, 221, 241, 0.16);
+  background: rgba(7, 221, 241, 0.05);
+}
+/* A neon accent bar slides in on the leading edge on hover — the eye lands on
+   exactly the row under the cursor. */
+.list-item::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 10px;
+  bottom: 10px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--color-primary);
+  opacity: 0;
+  transform: scaleY(0.3);
+  transition: opacity 180ms ease, transform 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.list-item:hover::before {
+  opacity: 1;
+  transform: scaleY(1);
 }
 .list-item .name {
   font-weight: 600;
@@ -886,6 +1189,27 @@ input[type="time"]::-webkit-datetime-edit-field:focus {
   position: absolute;
   top: 10px;
   right: 10px;
+}
+/* Drag handle for reordering the sessions board. Sits opposite the status
+   dot; only this element is draggable so Start/Stop buttons are unaffected. */
+.place-cell .cell-grip {
+  position: absolute;
+  top: 6px;
+  left: 8px;
+  font-size: 13px;
+  line-height: 1;
+  color: var(--color-muted);
+  cursor: grab;
+  user-select: none;
+  opacity: 0.55;
+  transition: opacity 140ms ease, color 140ms ease;
+}
+.place-cell .cell-grip:hover {
+  opacity: 1;
+  color: var(--color-primary);
+}
+.place-cell .cell-grip:active {
+  cursor: grabbing;
 }
 .place-cell .platform {
   font-size: 11px;
@@ -940,6 +1264,70 @@ input[type="time"]::-webkit-datetime-edit-field:focus {
   border-radius: 16px;
   padding: 6px 12px;
   font-size: 12px;
+  /* Chips are informational tags, not text to select — never the I-beam
+     ("pencil") cursor; a plain arrow with a lively hover reads as a chip. */
+  cursor: default;
+  user-select: none;
+}
+
+/* ── Reusable animated reveal + live validation checklist ─────────────────
+   .cp-reveal smoothly opens/closes a block via grid-rows 0fr↔1fr (no fixed
+   height), for progressively disclosed form steps (e.g. the new-password
+   fields appearing after the old password is confirmed). */
+.cp-reveal {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition:
+    grid-template-rows 300ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    opacity 260ms ease;
+}
+.cp-reveal[data-open="true"] {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+.cp-reveal-inner {
+  overflow: hidden;
+  min-height: 0;
+}
+/* Live validation rows: the dot fills and the text lifts to the success
+   colour the moment a rule passes. */
+.cp-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--color-muted);
+  transition: color 200ms ease;
+}
+.cp-check[data-ok="true"] {
+  color: #22c55e;
+}
+.cp-check-dot {
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  border: 1.5px solid currentColor;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background 200ms ease, border-color 200ms ease, transform 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.cp-check[data-ok="true"] .cp-check-dot {
+  background: #22c55e;
+  border-color: #22c55e;
+  transform: scale(1.08);
+}
+.cp-check-dot svg {
+  opacity: 0;
+  transform: scale(0.5);
+  color: #04210f;
+  transition: opacity 180ms ease, transform 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.cp-check[data-ok="true"] .cp-check-dot svg {
+  opacity: 1;
+  transform: scale(1);
 }
 
 .month-picker {
@@ -1315,6 +1703,136 @@ button.pill:hover {
   }
 }
 
+/* ── CRUD toasts (create / update / delete outcomes) ────────────────────── */
+.cp-toaster {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 70; /* above the update-available toast (z 60) */
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+  pointer-events: none; /* container is click-through; each toast opts back in */
+}
+.cp-toast {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: min(360px, calc(100vw - 40px));
+  padding: 13px 16px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: #ffffff;
+  cursor: pointer;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  animation: cp-toast-in 320ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.cp-toast-success {
+  background: linear-gradient(135deg, rgba(16, 122, 74, 0.96), rgba(20, 160, 90, 0.96));
+  border: 1px solid rgba(34, 197, 94, 0.6);
+  box-shadow:
+    0 16px 40px rgba(0, 0, 0, 0.45),
+    0 0 24px rgba(34, 197, 94, 0.22);
+}
+.cp-toast-error {
+  background: linear-gradient(135deg, rgba(140, 26, 26, 0.96), rgba(185, 40, 40, 0.96));
+  border: 1px solid rgba(239, 68, 68, 0.6);
+  box-shadow:
+    0 16px 40px rgba(0, 0, 0, 0.45),
+    0 0 24px rgba(239, 68, 68, 0.22);
+}
+.cp-toast-icon {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.18);
+  font-size: 13px;
+}
+@keyframes cp-toast-in {
+  from {
+    opacity: 0;
+    transform: translateX(60px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* ── Skeleton loading placeholders ──────────────────────────────────────── */
+.cp-skeleton {
+  display: inline-block;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.04) 25%,
+    rgba(255, 255, 255, 0.11) 37%,
+    rgba(255, 255, 255, 0.04) 63%
+  );
+  background-size: 400% 100%;
+  animation: cp-skeleton-shimmer 1.4s ease infinite;
+}
+@keyframes cp-skeleton-shimmer {
+  0% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0 50%;
+  }
+}
+
+/* ── Pagination (branches / bookings / tournaments) ─────────────────────── */
+.cp-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 20px 0 4px;
+}
+.cp-page-btn {
+  min-width: 36px;
+  height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--color-text);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    color 0.2s ease;
+}
+.cp-page-btn:hover:not(:disabled) {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+.cp-page-btn.active {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: #041016;
+}
+.cp-page-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.cp-page-gap {
+  min-width: 20px;
+  text-align: center;
+  color: var(--color-muted);
+}
+
 /* ── Branch map: animated "Boom" location pin ───────────────────────────── */
 .cp-map-pin {
   position: relative;
@@ -1427,4 +1945,334 @@ button.pill:hover {
   margin-top: 1px;
   color: #07ddf1;
   font-size: 13px;
+}
+
+/* ---- Themed checkbox (Checkbox.tsx) ------------------------------------
+   Neon box driven by the hidden native input's state (mirrored onto the
+   wrapping label's data-* attrs). Uses theme tokens only. */
+.cp-checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+  line-height: 1.2;
+}
+.cp-checkbox[data-disabled] {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+/* Real input stays for a11y/keyboard/focus but is visually hidden. */
+.cp-checkbox-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+.cp-checkbox-box {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  border: 1.5px solid var(--color-border);
+  border-radius: 5px;
+  background: var(--color-surface);
+  transition: border-color 140ms ease, background 140ms ease, box-shadow 140ms ease;
+}
+.cp-checkbox-tick {
+  color: #04121f;
+  opacity: 0;
+  transform: scale(0.6);
+  transition: opacity 120ms ease, transform 120ms ease;
+}
+.cp-checkbox[data-checked] .cp-checkbox-box {
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(7, 221, 241, 0.16);
+}
+.cp-checkbox[data-checked] .cp-checkbox-tick {
+  opacity: 1;
+  transform: scale(1);
+}
+/* Keyboard focus ring on the visible box. */
+.cp-checkbox-input:focus-visible + .cp-checkbox-box {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(7, 221, 241, 0.30);
+}
+.cp-checkbox:hover:not([data-disabled]) .cp-checkbox-box {
+  border-color: var(--color-primary);
+}
+.cp-checkbox-label {
+  font-size: 14px;
+  color: var(--color-text);
+}
+
+/* ---------------------------------------------------------------------------
+   Account popover — two faces (menu ⇄ manager accounts) inside one surface.
+   Both slide in on transform/opacity only, so switching faces never reflows
+   the sidebar underneath.
+   --------------------------------------------------------------------------- */
+/* The account list carries name + email + branch, which the 240px sidebar
+   cannot hold — so this face widens past it into the content area. */
+.user-menu-pop.is-wide {
+  right: auto;
+  width: 320px;
+  max-width: calc(100vw - 32px);
+  padding: 8px;
+}
+.user-menu-view {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  animation: cp-view-in 200ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+@keyframes cp-view-in {
+  from { opacity: 0; transform: translateX(8px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+.user-menu-sep {
+  display: block;
+  height: 1px;
+  margin: 4px 2px;
+  background: linear-gradient(90deg, transparent, var(--color-border), transparent);
+}
+/* The switch-account CTA reads as an action, not another menu row. */
+.user-menu-pop button.user-menu-switch {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid rgba(209, 82, 250, 0.45);
+  background: linear-gradient(135deg, rgba(209, 82, 250, 0.16), rgba(7, 221, 241, 0.10));
+  color: #e9d5ff;
+}
+.user-menu-pop button.user-menu-switch:hover {
+  border-color: var(--color-accent-purple);
+  background: linear-gradient(135deg, rgba(209, 82, 250, 0.28), rgba(7, 221, 241, 0.16));
+  color: #ffffff;
+}
+.user-menu-switch-icon {
+  font-size: 14px;
+  line-height: 1;
+}
+.user-menu-switch-chevron {
+  margin-left: auto;
+  font-size: 16px;
+  line-height: 1;
+  opacity: 0.7;
+  transition: transform 160ms ease;
+}
+.user-menu-pop button.user-menu-switch:hover .user-menu-switch-chevron {
+  transform: translateX(3px);
+}
+
+/* Manager-account picker (inside the popover). */
+.cp-switch {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.cp-switch-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 2px 6px;
+  border-bottom: 1px solid var(--color-border);
+}
+.user-menu-pop button.cp-switch-back {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+  color: var(--color-muted);
+  font-size: 14px;
+}
+.cp-switch-title {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+.cp-switch-filter {
+  height: 32px;
+  font-size: 12px;
+}
+.cp-switch-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 260px;
+  overflow-y: auto;
+}
+.user-menu-pop button.cp-switch-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px;
+}
+.cp-switch-avatar {
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #22c55e, #16a34a);
+  color: #020514;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+}
+.cp-switch-avatar-lg {
+  width: 46px;
+  height: 46px;
+  font-size: 15px;
+}
+.cp-switch-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.cp-switch-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cp-switch-meta {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--color-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* A button that reads as a link — used for secondary in-form actions
+   (e.g. "forgot the password?") without pulling in Button's weight. */
+.cp-link-btn {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--color-primary);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  transition: color 140ms ease, opacity 140ms ease;
+}
+.cp-link-btn:hover {
+  color: #ffffff;
+  opacity: 0.9;
+}
+
+/* ---------------------------------------------------------------------------
+   SuggestInput — themed suggestion dropdown (a native <datalist> popup is
+   drawn by the OS and ignores the app theme).
+   --------------------------------------------------------------------------- */
+.cp-suggest {
+  position: relative;
+}
+.cp-suggest-list {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: 30;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  max-height: 220px;
+  overflow-y: auto;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.5);
+  animation: cp-pop-in 140ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.cp-suggest-list li {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.cp-suggest-option {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  padding: 8px 10px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--color-text);
+  font-size: 13px;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: background 140ms ease, border-color 140ms ease, color 140ms ease;
+}
+.cp-suggest-option:hover,
+.cp-suggest-option.is-active {
+  background: rgba(7, 221, 241, 0.1);
+  border-color: rgba(7, 221, 241, 0.35);
+  color: var(--color-primary);
+}
+.cp-suggest-remove {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-muted);
+  font-size: 11px;
+  cursor: pointer;
+  transition: color 140ms ease, background 140ms ease;
+}
+.cp-suggest-remove:hover {
+  color: var(--color-danger);
+  background: rgba(239, 68, 68, 0.12);
+}
+
+/* Role badge inside the account picker — an owner reads purple (the role
+   palette in Sidebar), a manager green, so the direction of a switch is
+   obvious at a glance. */
+.cp-switch-role {
+  flex-shrink: 0;
+  margin-left: auto;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  background: rgba(34, 197, 94, 0.14);
+  color: var(--color-success);
+  border: 1px solid rgba(34, 197, 94, 0.45);
+}
+.cp-switch-role.is-owner {
+  background: rgba(209, 82, 250, 0.14);
+  color: var(--color-accent-purple);
+  border-color: rgba(209, 82, 250, 0.45);
+}
+.cp-switch-avatar.is-owner {
+  background: linear-gradient(135deg, #d152fa, #a855f7);
 }

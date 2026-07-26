@@ -2,6 +2,7 @@ import Button from "@/components/ui/Button";
 import { formatApiError } from "@/api/errors";
 import Modal from "@/components/ui/Modal";
 import Input from "@/components/ui/Input";
+import PriceInput from "@/components/ui/PriceInput";
 import Spinner from "@/components/ui/Spinner";
 import { ITournamentApi, SKILL_LEVELS, SkillLevel } from "@/api/tournaments";
 import { useAsync } from "@/hooks/useAsync";
@@ -113,7 +114,7 @@ const TournamentForm = ({ branchId, initial, onClose, onSaved }: Props) => {
         </div>
 
         <div className="row" style={{ gap: 10 }}>
-          <Input label={t("label.price")} type="number" min={0} step="0.01" value={price} onChange={(e) => setPrice(e.target.value)} required />
+          <PriceInput label={t("label.price")} value={price} onChange={setPrice} required />
           <Input label={t("label.participantsLimit")} type="number" min={0} value={participantsLimit} onChange={(e) => setParticipantsLimit(e.target.value)} />
         </div>
 
