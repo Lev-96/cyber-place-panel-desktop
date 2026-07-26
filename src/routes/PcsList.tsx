@@ -11,7 +11,7 @@ import { useLang } from "@/i18n/LanguageContext";
 import { fmt } from "@/i18n/translations";
 import { pcRepository } from "@/repositories/PcRepository";
 import { IPcApi } from "@/types/sessions";
-import { isPs, pcHasAgent, PC_STATUS, PC_STATUS_COLOR } from "@/types/pc";
+import { effectivePcStatus, isPs, pcHasAgent, PC_STATUS, PC_STATUS_COLOR } from "@/types/pc";
 import { useState } from "react";
 import { useParams } from "react-router-dom";
 
@@ -67,14 +67,10 @@ const PcsList = () => {
     } finally { setWaking(null); }
   };
 
-  // A PS/console has no kiosk agent to report a heartbeat, so the "offline"
-  // (agent-not-connected) state never applies to it — it is always available
-  // for billing. Coerce any stale/legacy PS 'offline' to 'online' for display
-  // so the operator never sees a misleading Offline badge. PCs keep the full
-  // three-state semantics, where 'offline' legitimately means "agent absent".
-  const effectiveStatus = (pc: IPcApi): IPcApi["status"] =>
-    isPs(pc.kind) && pc.status === PC_STATUS.Offline ? PC_STATUS.Online : pc.status;
-
+  // Display status comes from the shared domain rule (`effectivePcStatus`):
+  // a console has no agent to report a heartbeat, so an 'offline' row on it
+  // is meaningless, while a PC keeps the full three-state semantics where
+  // 'offline' legitimately means "agent absent / heartbeat stale".
   const statusLabel = (s: IPcApi["status"]): string =>
     s === PC_STATUS.InSession ? t("pcs.statusInSession") : s === PC_STATUS.Online ? t("pcs.statusOnline") : t("pcs.statusOffline");
 
@@ -112,7 +108,7 @@ const PcsList = () => {
                   {isPsDevice && <span style={{ marginLeft: 8, fontSize: 11, padding: "2px 6px", borderRadius: 4, background: "#101a35", color: "#d152fa" }}>PS</span>}
                 </div>
                 <div className="meta">
-                  <StatusDot status={effectiveStatus(pc)} /> {statusLabel(effectiveStatus(pc))}
+                  <StatusDot status={effectivePcStatus(pc)} /> {statusLabel(effectivePcStatus(pc))}
                   {pc.hourly_rate != null && <> · {Number(pc.hourly_rate)} /{t("time.hourShort")}</>}
                   {!isPsDevice && pc.mac_address && <> · MAC: {pc.mac_address}</>}
                   {!isPsDevice && (pc.last_seen_at

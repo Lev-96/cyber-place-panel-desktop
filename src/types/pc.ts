@@ -40,3 +40,45 @@ export const pcHasAgent = (kind?: PcKind): boolean => kind === PC_KIND.Pc;
 
 /** Convenience predicate for the common "is this a console?" branch. */
 export const isPs = (kind?: PcKind): boolean => kind === PC_KIND.Ps;
+
+/**
+ * The minimum a device has to expose for the availability rules below — so
+ * they work on an `IPcApi` row, on a realtime patch, or on a test fixture
+ * without any of them having to import the full API shape.
+ */
+export interface DeviceAvailabilityLike {
+  kind?: PcKind;
+  status: PcStatus;
+  /**
+   * Server verdict (`PcResource.is_startable`). Present since the backend
+   * started owning the rule; kept optional so an older backend (or a
+   * partially-built fixture) degrades to the local fallback below instead
+   * of blocking every device.
+   */
+  is_startable?: boolean;
+}
+
+/**
+ * Availability as it should be SHOWN, mirroring `App\Models\Pcs\Pc::effectiveStatus()`.
+ *
+ * The backend already sends the effective value; this is the client-side
+ * safety net for rows that predate it (or arrive from a cached response):
+ * a console has no kiosk agent to ever report in, so an `offline` row on it
+ * is meaningless and must never render as "not connected".
+ */
+export const effectivePcStatus = (pc: DeviceAvailabilityLike): PcStatus =>
+  isPs(pc.kind) && pc.status === PC_STATUS.Offline ? PC_STATUS.Online : pc.status;
+
+/**
+ * May a session be started on this device right now?
+ *
+ * An offline computer (agent never paired, or its heartbeat went stale) is not
+ * reachable: the kiosk would never unlock for the player, so billing it is
+ * always wrong. The server is authoritative — `is_startable` wins whenever it
+ * is present; otherwise we re-derive the same rule from the effective status.
+ *
+ * NOTE: this answers "is the DEVICE available", not "is the seat free" —
+ * a running session or a booking reservation is a separate, caller-side check.
+ */
+export const isDeviceStartable = (pc: DeviceAvailabilityLike): boolean =>
+  pc.is_startable ?? effectivePcStatus(pc) !== PC_STATUS.Offline;

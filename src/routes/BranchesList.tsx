@@ -35,7 +35,7 @@ const BranchesList = () => {
                 <div style={{ flex: 1 }}>
                   <div className="name">{b.company?.name ?? t("hub.branchFallback")} · {b.address}</div>
                   <div className="meta">
-                    {b.country}, {b.city} · {t("branchesList.placesShort")} {b.places_count ?? 0} · {t("branchesList.servicesShort")} {b.service_count}
+                    {b.country}, {b.city} · {t("branchesList.placesShort")} {b.places_count ?? 0}
                   </div>
                 </div>
               </div>

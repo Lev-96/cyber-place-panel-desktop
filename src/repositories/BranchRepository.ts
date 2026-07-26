@@ -1,6 +1,6 @@
 import {
   apiCreateBranch, apiDeleteBranch, apiGetBranchById, apiGetBranches, apiUpdateBranch,
-  apiUpdateBranchOpenDays, apiUpdateBranchPricing, apiUpdateBranchServices,
+  apiUpdateBranchOpenDays, apiUpdateBranchPricing,
   CreateBranchBody, GetBranchesParams, UpdateBranchBody,
 } from "@/api/branches";
 import { IBranchApi, PaginatedList } from "@/types/api";
@@ -39,7 +39,6 @@ export class BranchRepository {
   async remove(id: number): Promise<void> { await withToast("branch", "deleted", () => apiDeleteBranch(id)); }
   updatePricing = apiUpdateBranchPricing;
   updateOpenDays = apiUpdateBranchOpenDays;
-  updateServices = apiUpdateBranchServices;
 }
 
 export const branchRepository = new BranchRepository();

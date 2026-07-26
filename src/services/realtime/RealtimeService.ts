@@ -1,12 +1,10 @@
 import { Booking } from "@/domain/Booking";
 import { Place } from "@/domain/Place";
 import { PlaceLiveStatus } from "@/domain/PlaceStatus";
-import { Service } from "@/domain/Service";
 import { AppConfig } from "@/infrastructure/AppConfig";
 import { TypedEventEmitter } from "@/infrastructure/TypedEventEmitter";
 import { bookingRepository } from "@/repositories/BookingRepository";
 import { placeRepository } from "@/repositories/PlaceRepository";
-import { serviceRepository } from "@/repositories/ServiceRepository";
 import { sessionRepository } from "@/repositories/SessionRepository";
 import { IRealtimeStrategy } from "./IRealtimeStrategy";
 import { IPlaceAssignmentPolicy, PivotPlaceAssignment } from "./PlaceAssignmentPolicy";
@@ -22,7 +20,6 @@ export interface BranchSnapshot {
   branchId: number;
   takenAt: Date;
   places: PlaceSnapshot[];
-  services: Service[];
   totals: { total: number; free: number; busy: number; reserved: number; maintenance: number };
 }
 
@@ -66,9 +63,8 @@ export class RealtimeService {
       // active sessions in addition so a running session at place X
       // promotes that place to `busy` (red) on the live board even
       // when no booking covers the slot (walk-in customers).
-      const [places, services, bookings, pcs, sessions] = await Promise.all([
+      const [places, bookings, pcs, sessions] = await Promise.all([
         placeRepository.listByBranch(this.branchId),
-        serviceRepository.listByBranch(this.branchId),
         bookingRepository.listAll({ branch_id: this.branchId, date_from: todayDMY() }),
         sessionRepository.listPcs(this.branchId),
         sessionRepository.listActive(this.branchId),
@@ -79,7 +75,7 @@ export class RealtimeService {
         const pc = pcByPcId.get(s.pc_id);
         if (pc && pc.place_id != null) sessionPlaceIds.add(pc.place_id);
       }
-      const snapshot = this.buildSnapshot(places, services, bookings, sessionPlaceIds);
+      const snapshot = this.buildSnapshot(places, bookings, sessionPlaceIds);
       this.last = snapshot;
       this.emitter.emit("snapshot", snapshot);
     } catch (e) {
@@ -88,7 +84,7 @@ export class RealtimeService {
     }
   }
 
-  private buildSnapshot(places: Place[], services: Service[], bookings: Booking[], sessionPlaceIds: Set<number>): BranchSnapshot {
+  private buildSnapshot(places: Place[], bookings: Booking[], sessionPlaceIds: Set<number>): BranchSnapshot {
     const at = new Date();
     const assigned = this.assignment.assign(places, bookings, at);
     const placeSnapshots: PlaceSnapshot[] = places.map((p) => {
@@ -103,7 +99,7 @@ export class RealtimeService {
       (acc, s) => ({ ...acc, total: acc.total + 1, [s.status]: acc[s.status] + 1 }),
       { total: 0, free: 0, busy: 0, reserved: 0, maintenance: 0 },
     );
-    return { branchId: this.branchId, takenAt: at, places: placeSnapshots, services, totals };
+    return { branchId: this.branchId, takenAt: at, places: placeSnapshots, totals };
   }
 }
 

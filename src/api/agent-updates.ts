@@ -24,6 +24,12 @@ export interface AgentUpdateStatus extends UpdateCheckEntry {
   approved: AgentApprovedRelease | null;
   /** How many of the caller's own Pcs an apply would target. */
   venue_pc_count: number;
+  /**
+   * The version THIS caller last applied to their venue, or null. When it
+   * equals `approved.version` the "apply" button + "update available"
+   * notification are suppressed (nothing left to do until a newer approval).
+   */
+  applied_version: string | null;
 }
 
 export interface AgentApplyResult {

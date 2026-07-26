@@ -1,9 +1,14 @@
+import { IAccountSwitchTarget } from "@/api/accountSwitch";
 import { useAuth } from "@/auth/AuthContext";
 import { can } from "@/auth/permissions";
+import AccountSwitchModal from "@/components/profile/AccountSwitchModal";
+import AccountSwitchPanel from "@/components/profile/AccountSwitchPanel";
+import ProfileModal from "@/components/profile/ProfileModal";
 import { useLang } from "@/i18n/LanguageContext";
 import { useNotifications } from "@/notifications/NotificationsContext";
 import { useUpdatesNotification } from "@/realtime/UpdatesNotificationContext";
-import { NavLink } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import { NavLink, useNavigate } from "react-router-dom";
 
 const UnreadBadge = ({ count }: { count: number }) => {
   if (count <= 0) return null;
@@ -85,88 +90,172 @@ interface UserCardProps {
   roleLabel: string;
 }
 
-const UserCard = ({ name, email, role, roleLabel }: UserCardProps) => {
+/** Which face of the account popover is showing. */
+type MenuView = "menu" | "managers";
+
+const UserMenu = ({ name, email, role, roleLabel }: UserCardProps) => {
+  const { t } = useLang();
+  const navigate = useNavigate();
   const palette = paletteFor(role);
+  const [open, setOpen] = useState(false);
+  const [view, setView] = useState<MenuView>("menu");
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [switchTarget, setSwitchTarget] = useState<IAccountSwitchTarget | null>(null);
+  const ref = useRef<HTMLDivElement>(null);
+  // Both company roles hand the machine over to a colleague: an owner to one of
+  // his managers, a manager back to the owner or to another manager of the same
+  // company. WHO is actually offered is decided by the backend — an admin has
+  // no company, so no picker.
+  const canSwitchAccount = role === "company_owner" || role === "manager";
+
+  const closeMenu = () => { setOpen(false); setView("menu"); };
+
+  // Close the popover on an outside click or Escape. While a modal opened
+  // FROM the popover is up, an outside click belongs to that modal.
+  useEffect(() => {
+    if (!open || switchTarget) return;
+    const onDoc = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) closeMenu();
+    };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") closeMenu(); };
+    document.addEventListener("mousedown", onDoc);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDoc);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open, switchTarget]);
+
   return (
-    <div
-      style={{
-        margin: "0 8px 10px",
-        padding: "10px 12px",
-        borderRadius: 12,
-        background:
-          "linear-gradient(135deg, rgba(7, 221, 241, 0.06), rgba(209, 82, 250, 0.05))",
-        border: "1px solid #1f2a44",
-        display: "flex",
-        alignItems: "center",
-        gap: 10,
-      }}
-    >
-      <div
-        aria-hidden
+    <div ref={ref} style={{ position: "relative", margin: "0 8px 10px" }}>
+      {open && (
+        <div className={`user-menu-pop${view === "managers" ? " is-wide" : ""}`}>
+          {view === "menu" ? (
+            <div className="user-menu-view">
+              <button type="button" onClick={() => { closeMenu(); setProfileOpen(true); }}>{t("profile.title")}</button>
+              <button type="button" onClick={() => { closeMenu(); navigate("/settings"); }}>{t("nav.settings")}</button>
+              {canSwitchAccount && (
+                <>
+                  <span className="user-menu-sep" aria-hidden />
+                  <button
+                    type="button"
+                    className="user-menu-switch"
+                    onClick={() => setView("managers")}
+                  >
+                    <span className="user-menu-switch-icon" aria-hidden>⇄</span>
+                    <span>{t("switchAccount.cta")}</span>
+                    <span className="user-menu-switch-chevron" aria-hidden>›</span>
+                  </button>
+                </>
+              )}
+            </div>
+          ) : (
+            <div className="user-menu-view">
+              <AccountSwitchPanel
+                onBack={() => setView("menu")}
+                onPick={(account) => { setSwitchTarget(account); setOpen(false); }}
+              />
+            </div>
+          )}
+        </div>
+      )}
+
+      <button
+        type="button"
+        className={`user-card${open ? " active" : ""}`}
+        title={name}
+        onClick={() => setOpen((o) => !o)}
         style={{
-          width: 38,
-          height: 38,
-          borderRadius: "50%",
-          background: palette.gradient,
+          width: "100%",
+          padding: "10px 12px",
+          borderRadius: 12,
+          background:
+            "linear-gradient(135deg, rgba(7, 221, 241, 0.06), rgba(209, 82, 250, 0.05))",
+          border: "1px solid #1f2a44",
           display: "flex",
           alignItems: "center",
-          justifyContent: "center",
-          color: "#020514",
-          fontWeight: 800,
-          fontSize: 13,
-          letterSpacing: 0.5,
-          flexShrink: 0,
-          boxShadow: "0 2px 8px rgba(0, 0, 0, 0.25)",
+          gap: 10,
+          cursor: "pointer",
+          textAlign: "left",
         }}
       >
-        {initialsFor(name)}
-      </div>
-      <div style={{ flex: 1, minWidth: 0 }}>
         <div
+          aria-hidden
           style={{
+            width: 38,
+            height: 38,
+            borderRadius: "50%",
+            background: palette.gradient,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            color: "#020514",
+            fontWeight: 800,
             fontSize: 13,
-            fontWeight: 700,
-            color: "#e5e7eb",
-            whiteSpace: "nowrap",
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-            lineHeight: 1.2,
+            letterSpacing: 0.5,
+            flexShrink: 0,
+            boxShadow: "0 2px 8px rgba(0, 0, 0, 0.25)",
           }}
-          title={name}
         >
-          {name || "—"}
+          {initialsFor(name)}
         </div>
-        <div
-          style={{
-            fontSize: 11,
-            color: "#94a3b8",
-            whiteSpace: "nowrap",
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-            marginTop: 2,
-          }}
-          title={email}
-        >
-          {email}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div
+            style={{
+              fontSize: 13,
+              fontWeight: 700,
+              color: "#e5e7eb",
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              lineHeight: 1.2,
+            }}
+            title={name}
+          >
+            {name || "—"}
+          </div>
+          <div
+            style={{
+              fontSize: 11,
+              color: "#94a3b8",
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              marginTop: 2,
+            }}
+            title={email}
+          >
+            {email}
+          </div>
+          <span
+            style={{
+              display: "inline-block",
+              marginTop: 6,
+              padding: "1px 8px",
+              borderRadius: 999,
+              fontSize: 10,
+              fontWeight: 700,
+              letterSpacing: 0.6,
+              textTransform: "uppercase",
+              background: palette.chipBg,
+              color: palette.chipFg,
+              border: `1px solid ${palette.chipBorder}`,
+            }}
+          >
+            {roleLabel}
+          </span>
         </div>
-        <span
-          style={{
-            display: "inline-block",
-            marginTop: 6,
-            padding: "1px 8px",
-            borderRadius: 999,
-            fontSize: 10,
-            fontWeight: 700,
-            letterSpacing: 0.6,
-            textTransform: "uppercase",
-            background: palette.chipBg,
-            color: palette.chipFg,
-            border: `1px solid ${palette.chipBorder}`,
-          }}
-        >
-          {roleLabel}
-        </span>
-      </div>
+      </button>
+
+      {profileOpen && <ProfileModal onClose={() => setProfileOpen(false)} />}
+
+      {switchTarget && (
+        <AccountSwitchModal
+          target={switchTarget}
+          onClose={() => { setSwitchTarget(null); setView("menu"); }}
+          onSwitched={() => { setSwitchTarget(null); closeMenu(); }}
+        />
+      )}
     </div>
   );
 };
@@ -237,9 +326,6 @@ const Sidebar = () => {
       {can(role, "menu.games") && (
         <NavLink to="/games">{t("nav.games")}</NavLink>
       )}
-      {can(role, "menu.servicesAdmin") && (
-        <NavLink to="/services-admin">{t("nav.services")}</NavLink>
-      )}
       {can(role, "menu.companies") && (
         <NavLink to="/companies">{t("nav.companies")}</NavLink>
       )}
@@ -276,7 +362,7 @@ const Sidebar = () => {
       )}
       </nav>
       <div className="sidebar-footer">
-        <UserCard
+        <UserMenu
           name={user?.name}
           email={user?.email}
           role={role}

@@ -2,7 +2,6 @@ import { useAuth } from "@/auth/AuthContext";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import ScreenWithBg from "@/components/ui/ScreenWithBg";
-import { request } from "@/api/client";
 import { apiSubscribe } from "@/api/subscribe";
 import { useLang } from "@/i18n/LanguageContext";
 import { AMD_UNIT, Currency } from "@/i18n/currency";
@@ -12,11 +11,6 @@ import { FormEvent, useState } from "react";
 const Settings = () => {
   const { user, logout } = useAuth();
   const { t, lang, setLang, currency, setCurrencyOverride, money } = useLang();
-  const [cur, setCur] = useState("");
-  const [next, setNext] = useState("");
-  const [confirm, setConfirm] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState<string | null>(null);
   const [subEmail, setSubEmail] = useState("");
   const [subBusy, setSubBusy] = useState(false);
   const [subMsg, setSubMsg] = useState<string | null>(null);
@@ -27,22 +21,6 @@ const Settings = () => {
     try { await apiSubscribe(subEmail); setSubMsg(t("settings.subscribed")); setSubEmail(""); }
     catch (e) { setSubMsg(e instanceof Error ? e.message : "Failed"); }
     finally { setSubBusy(false); }
-  };
-
-  const change = async (e: FormEvent) => {
-    e.preventDefault();
-    if (next !== confirm) { setMsg(t("settings.passwordsMismatch")); return; }
-    setBusy(true); setMsg(null);
-    try {
-      await request<void>("/change-password", {
-        method: "PUT",
-        body: { current_password: cur, new_password: next, new_password_confirmation: confirm },
-      });
-      setMsg(t("settings.passwordChanged"));
-      setCur(""); setNext(""); setConfirm("");
-    } catch (e) {
-      setMsg(e instanceof Error ? e.message : "Failed");
-    } finally { setBusy(false); }
   };
 
   return (
@@ -84,20 +62,9 @@ const Settings = () => {
         <h3 style={{ margin: 0 }}>{t("settings.account")}</h3>
         <div className="kv-row"><span className="k">{t("label.name")}</span><span className="v">{user?.name}</span></div>
         <div className="kv-row"><span className="k">{t("auth.email")}</span><span className="v">{user?.email}</span></div>
-        <div className="kv-row"><span className="k">{t("settings.role")}</span><span className="v">{user?.role}</span></div>
+        <div className="kv-row"><span className="k">{t("settings.role")}</span><span className="v">{user?.role ? t(`role.${user.role}`) : ""}</span></div>
         <Button variant="secondary" onClick={() => void logout()}>{t("nav.signOut")}</Button>
       </div></div>
-
-      <form className="gradient-card" onSubmit={change}>
-        <div className="gradient-card-inner">
-          <h3 style={{ margin: 0 }}>{t("settings.changePassword")}</h3>
-          <Input label={t("settings.currentPassword")} type="password" value={cur} onChange={(e) => setCur(e.target.value)} required />
-          <Input label={t("settings.newPassword")} type="password" value={next} onChange={(e) => setNext(e.target.value)} required minLength={8} />
-          <Input label={t("settings.confirmPassword")} type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} required minLength={8} />
-          {msg && <div className={msg === t("settings.passwordChanged") ? "muted" : "error"}>{msg}</div>}
-          <Button disabled={busy}>{busy ? "…" : t("settings.updatePassword")}</Button>
-        </div>
-      </form>
 
       <form className="gradient-card" onSubmit={subscribe}>
         <div className="gradient-card-inner">

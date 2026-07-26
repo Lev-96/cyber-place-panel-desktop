@@ -1,5 +1,6 @@
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
+import PriceInput from "@/components/ui/PriceInput";
 import Spinner from "@/components/ui/Spinner";
 import { useAsync } from "@/hooks/useAsync";
 import { formatDateTime } from "@/i18n/dates";
@@ -48,7 +49,7 @@ const ShiftPanel = () => {
         <h2 className="page-title" style={{ margin: 0 }}>{t("shift.title")} №{id}</h2>
         <div className="card col" style={{ gap: 12 }}>
           <div className="muted">{t("shift.noActive")}</div>
-          <Input label={t("shift.openingCash")} type="number" min={0} step="0.01" value={openingCash} onChange={(e) => setOpeningCash(e.target.value)} />
+          <PriceInput label={t("shift.openingCash")} value={openingCash} onChange={setOpeningCash} />
           {msg && <div className="error">{msg}</div>}
           <Button onClick={open} disabled={busy}>{busy ? t("shift.opening") : t("shift.open")}</Button>
         </div>
@@ -79,7 +80,7 @@ const ShiftPanel = () => {
       </div>
       <div className="card col" style={{ gap: 10 }}>
         <h3 style={{ margin: 0 }}>{t("shift.closeTitle")}</h3>
-        <Input label={t("shift.declaredCash")} type="number" min={0} step="0.01" value={declared} onChange={(e) => setDeclared(e.target.value)} />
+        <PriceInput label={t("shift.declaredCash")} value={declared} onChange={setDeclared} />
         <Input label={t("shift.notes")} value={notes} onChange={(e) => setNotes(e.target.value)} />
         {msg && <div className="error">{msg}</div>}
         <Button onClick={close} disabled={busy}>{busy ? t("shift.closing") : t("shift.close")}</Button>

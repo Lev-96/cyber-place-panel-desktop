@@ -38,8 +38,8 @@ const HHMM_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 const PackageForm = ({ branchId, initial, onClose, onSaved }: Props) => {
   const { t } = useLang();
-  // Per-locale name fields — mirrors ServiceForm so staff has the
-  // same 3-input layout across both Tariffs and Services CRUD.
+  // Per-locale name fields — one input per language so staff can name a
+  // tariff in every locale the clients render.
   const [nameEn, setNameEn] = useState(initial?.name_en ?? "");
   const [nameRu, setNameRu] = useState(initial?.name_ru ?? "");
   const [nameAm, setNameAm] = useState(initial?.name_am ?? "");

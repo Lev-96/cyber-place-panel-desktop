@@ -1,6 +1,7 @@
 import { apiResetPassword } from "@/api/auth";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
+import PasswordInput from "@/components/ui/PasswordInput";
 import { useLang } from "@/i18n/LanguageContext";
 import { FormEvent, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
@@ -35,8 +36,8 @@ const ResetPassword = () => {
       <h2 className="login-title">{t("auth.resetTitle")}</h2>
       <form className="login-card" onSubmit={submit}>
         <Input label={t("reset.token")} value={token} onChange={(e) => setToken(e.target.value)} required />
-        <Input label={t("settings.newPassword")} type="password" value={pw} onChange={(e) => setPw(e.target.value)} required minLength={8} />
-        <Input label={t("settings.confirmPassword")} type="password" value={pw2} onChange={(e) => setPw2(e.target.value)} required minLength={8} />
+        <PasswordInput label={t("settings.newPassword")} value={pw} onChange={(e) => setPw(e.target.value)} required minLength={8} />
+        <PasswordInput label={t("settings.confirmPassword")} value={pw2} onChange={(e) => setPw2(e.target.value)} required minLength={8} />
         {msg && <div className={success ? "muted" : "error"}>{msg}</div>}
         <Button disabled={busy}>{busy ? "…" : t("settings.updatePassword")}</Button>
         <Link to="/login" className="login-forgot">{t("auth.backToLogin")}</Link>

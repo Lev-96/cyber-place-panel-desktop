@@ -1,4 +1,5 @@
 import { apiGetMe, apiLogin } from "@/api/auth";
+import { recentEmails } from "@/auth/recentEmails";
 import { AppConfig } from "@/infrastructure/AppConfig";
 import { keyValueStore } from "@/infrastructure/KeyValueStore";
 import { AuthUser } from "@/types/api";
@@ -49,6 +50,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       await keyValueStore.set(AppConfig.storageKeys.token, res.token);
       const me = await apiGetMe();
       await keyValueStore.set(AppConfig.storageKeys.user, me.user);
+      // Remember the address for the login screen's suggestions — done HERE,
+      // the single point every sign-in goes through (including switching to a
+      // manager account), and only once the credentials actually worked.
+      // Best effort: a storage hiccup must never fail a successful login.
+      try { await recentEmails.remember(me.user.email ?? email); } catch { /* typing aid only */ }
       setUser(me.user);
     },
     logout: async () => {

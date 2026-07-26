@@ -1,6 +1,7 @@
 import Button from "@/components/ui/Button";
 import Modal from "@/components/ui/Modal";
 import Input from "@/components/ui/Input";
+import PriceInput from "@/components/ui/PriceInput";
 import { useLang } from "@/i18n/LanguageContext";
 import { productRepository } from "@/repositories/ProductRepository";
 import { IProduct } from "@/types/pos";
@@ -42,7 +43,7 @@ const ProductForm = ({ branchId, initial, onClose, onSaved }: Props) => {
         <h2 style={{ margin: 0 }}>{initial ? t("product.titleEdit") : t("product.titleNew")}</h2>
         <Input label={t("label.name")} value={name} onChange={(e) => setName(e.target.value)} required autoFocus />
         <Input label={t("label.category")} value={category ?? ""} onChange={(e) => setCategory(e.target.value)} />
-        <Input label={t("label.price")} type="number" min={0} step="0.01" value={price} onChange={(e) => setPrice(e.target.value)} required />
+        <PriceInput label={t("label.price")} value={price} onChange={setPrice} required />
         {err && <div className="error">{err}</div>}
         <div className="row-between">
           <Button type="button" variant="secondary" onClick={onClose} disabled={busy}>{t("action.cancel")}</Button>

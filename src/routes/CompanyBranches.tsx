@@ -41,7 +41,7 @@ const CompanyBranches = () => {
                 <Avatar src={b.branch_logo_path} name={b.address} size={44} />
                 <div style={{ flex: 1 }}>
                   <div className="name">{b.address}</div>
-                  <div className="meta">{b.country}, {b.city} · {t("label.places")} {b.places_count ?? 0} · {t("branch.editTabs.services")} {b.service_count}</div>
+                  <div className="meta">{b.country}, {b.city} · {t("label.places")} {b.places_count ?? 0}</div>
                 </div>
               </div>
               <span className="muted">{t("common.open")}</span>

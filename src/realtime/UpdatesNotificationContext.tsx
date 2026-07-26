@@ -86,7 +86,26 @@ export const UpdatesNotificationProvider = ({ children }: { children: ReactNode 
       } else if (role === "company_owner" || role === "manager") {
         const data = await apiAgentUpdateStatus();
         setPanel(null);
-        setAgent(data);
+        // Owner/manager must be notified ONLY about an admin-APPROVED version
+        // they haven't applied yet — never GitHub's raw latest (`has_update`),
+        // which surfaces before any admin approval. Reshape has_update/available
+        // to reflect approval so the toast + sidebar badge gate on it.
+        const approved = data.approved;
+        const notApplied = approved != null && approved.version !== data.applied_version;
+        setAgent({
+          ...data,
+          has_update: notApplied,
+          available: notApplied
+            ? {
+                version: approved!.version,
+                tag: approved!.github_tag ?? "",
+                name: null,
+                body: null,
+                published_at: null,
+                html_url: "",
+              }
+            : null,
+        });
       }
     } catch {
       // Silent fail at the badge/toast layer — the dedicated updates

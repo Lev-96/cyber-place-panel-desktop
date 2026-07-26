@@ -1,4 +1,5 @@
 import TournamentForm from "@/components/tournaments/TournamentForm";
+import MyBranchTournamentsButton from "@/components/tournaments/MyBranchTournamentsButton";
 import Button from "@/components/ui/Button";
 import ScreenWithBg from "@/components/ui/ScreenWithBg";
 import { useConfirm } from "@/components/ui/ConfirmProvider";
@@ -105,9 +106,12 @@ const Tournaments = () => {
         </div>
       )}
       {!isBranchScoped && (
-        <div className="muted">
-          {tr("tournaments.scopeHint")}
-        </div>
+        <>
+          <MyBranchTournamentsButton />
+          <div className="muted">
+            {tr("tournaments.scopeHint")}
+          </div>
+        </>
       )}
 
       {loading && <ListSkeleton />}

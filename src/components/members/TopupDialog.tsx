@@ -1,6 +1,7 @@
 import Button from "@/components/ui/Button";
 import Modal from "@/components/ui/Modal";
 import Input from "@/components/ui/Input";
+import PriceInput from "@/components/ui/PriceInput";
 import { useLang } from "@/i18n/LanguageContext";
 import { memberRepository } from "@/repositories/MemberRepository";
 import { IMember } from "@/types/members";
@@ -37,7 +38,7 @@ const TopupDialog = ({ member, onClose, onDone }: Props) => {
       <form className="card" style={{ width: 380, maxWidth: "90vw", display: "flex", flexDirection: "column", gap: 14 }} onSubmit={submit}>
         <h2 style={{ margin: 0 }}>{t("topup.title")} · {member.name}</h2>
         <div className="muted">{t("topup.balance")}: <b style={{ color: "#fff" }}>{money(Number(member.balance))}</b></div>
-        <Input label={t("label.amount")} type="number" min={0} step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} required autoFocus />
+        <PriceInput label={t("label.amount")} value={amount} onChange={setAmount} required autoFocus />
         <Input label={t("label.reference")} value={reference} onChange={(e) => setReference(e.target.value)} />
         {err && <div className="error">{err}</div>}
         <div className="row-between">

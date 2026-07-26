@@ -30,3 +30,18 @@ export const platformLabel = (p: string): string =>
   isKnownPlatform(p)
     ? p.toUpperCase()
     : p.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+
+/**
+ * Broad bucket a platform belongs to, used to group the sessions board into
+ * collapsible sections. "ps" is GLOBAL across every PlayStation generation
+ * (ps4, ps5, ps6, …) — matched by the `ps<digits>` shape — so a new console
+ * generation slots in with no code change here. Everything that isn't pc or a
+ * PlayStation (table-tennis, poker, vr, …) falls into "other".
+ */
+export type PlatformGroup = "pc" | "ps" | "other";
+
+export const platformGroup = (platform: string): PlatformGroup => {
+  if (platform === "pc") return "pc";
+  if (/^ps\d*$/i.test(platform)) return "ps";
+  return "other";
+};

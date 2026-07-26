@@ -1,16 +1,23 @@
 import { useAuth } from "@/auth/AuthContext";
 import { can } from "@/auth/permissions";
 import Button from "@/components/ui/Button";
+import CollapsibleSection from "@/components/ui/CollapsibleSection";
 import { GridSkeleton } from "@/components/ui/Skeleton";
 import { useAsync } from "@/hooks/useAsync";
+import { useLocalReorder } from "@/hooks/useLocalReorder";
 import { useReservedPlaceIds } from "@/hooks/useReservedPlaceIds";
 import { useLang } from "@/i18n/LanguageContext";
 import { usePlaceAvailability } from "@/realtime/usePlaceAvailability";
 import { sessionRepository } from "@/repositories/SessionRepository";
 import { IPcApi, ISessionApi } from "@/types/sessions";
-import { PC_STATUS_COLOR } from "@/types/pc";
-import { platformLabel } from "@/utils/platform";
-import { useCallback, useEffect, useState } from "react";
+import { PC_STATUS_COLOR, effectivePcStatus, isPs } from "@/types/pc";
+import {
+  canStartSession,
+  resolveSessionCellState,
+  SESSION_CELL_COLOR,
+} from "@/domain/SessionCellState";
+import { platformGroup, platformLabel } from "@/utils/platform";
+import { DragEvent, useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import AddSessionItemDialog from "./AddSessionItemDialog";
 import SessionTimer from "./SessionTimer";
@@ -18,6 +25,22 @@ import StartSessionDialog from "./StartSessionDialog";
 import StopReceiptModal from "./StopReceiptModal";
 
 const navBtn: React.CSSProperties = { padding: "6px 10px", border: "1px solid #1f2a44", borderRadius: 6 };
+
+// The two lead sections shown before any custom-platform sections.
+const LEAD_SECTIONS = ["pc", "ps"];
+
+// The board section a device belongs to. Computers → "pc", any PlayStation
+// generation → "ps" (global), and each CUSTOM platform gets its OWN section
+// keyed by its slug (table-tennis, poker, …). Falls back to the device kind
+// when a device isn't linked to a place yet.
+const sectionKeyOf = (pc: IPcApi): string => {
+  const platform = pc.place?.platform;
+  if (platform) {
+    const group = platformGroup(platform);
+    return group === "other" ? platform : group;
+  }
+  return isPs(pc.kind) ? "ps" : "pc";
+};
 
 interface Props {
   branchId: number;
@@ -32,21 +55,20 @@ const SessionsBoard = ({ branchId }: Props) => {
   const [startTarget, setStartTarget] = useState<IPcApi | null>(null);
   const [stopTarget, setStopTarget] = useState<ISessionApi | null>(null);
   const [addItemTarget, setAddItemTarget] = useState<ISessionApi | null>(null);
-  // Local display order for drag-and-drop. Seeded from the server order (which
-  // already reflects sort_order) and preserved across Reverb/poll reloads, so a
-  // just-dragged arrangement doesn't jump back before the persist round-trips.
+  // Local display order for tile drag-and-drop. Seeded from the server order
+  // (which already reflects sort_order) and preserved across Reverb/poll
+  // reloads, so a just-dragged arrangement doesn't jump back before the persist
+  // round-trips.
   const [order, setOrder] = useState<number[]>([]);
   const [dragId, setDragId] = useState<number | null>(null);
-  // Reserved-tile overlay state owned by the shared hook — pairs
-  // a REST snapshot (re)mount + sanity-sweep with the
-  // `booking.changed` Reverb delta. The Branch places grid uses
-  // the same hook, so the two screens can never disagree about
-  // which seats are currently held.
+  const [dragOverId, setDragOverId] = useState<number | null>(null);
+  // Section drag-and-drop (order persisted per-device via useLocalReorder).
+  const [dragSection, setDragSection] = useState<string | null>(null);
+  const [dropSection, setDropSection] = useState<string | null>(null);
+  // Which sections are collapsed. Empty = all open (the default).
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const reservedPlaceIds = useReservedPlaceIds(branchId);
 
-  // Reverb pushes a fresh event whenever a place transitions in/out of
-  // a session. We just kick a reload — the existing reload covers
-  // sessions + pcs in one step. This is the "real-time" path.
   usePlaceAvailability(
     branchId,
     useCallback(() => {
@@ -55,10 +77,6 @@ const SessionsBoard = ({ branchId }: Props) => {
     }, [sessions, pcs]),
   );
 
-  // Polling fallback for the session-side data. Reverb is the
-  // primary realtime path; 30s is a sanity-check sweep for cases
-  // where the WebSocket dropped silently. Reserved-tile state
-  // has its own internal sweep inside `useReservedPlaceIds`.
   useEffect(() => {
     const t = setInterval(() => {
       void sessions.reload();
@@ -67,10 +85,8 @@ const SessionsBoard = ({ branchId }: Props) => {
     return () => clearInterval(t);
   }, [sessions, pcs]);
 
-  // Reconcile the local order with the server list: keep the existing order for
-  // devices still present, append newly-added ones, drop removed ones. This
-  // preserves an in-progress local drag order across reloads while staying in
-  // sync as devices are added/removed elsewhere.
+  // Reconcile the local tile order with the server list: keep existing order
+  // for devices still present, append new ones, drop removed ones.
   useEffect(() => {
     const ids = (pcs.data ?? []).map((p) => p.id);
     setOrder((prev) => {
@@ -81,25 +97,45 @@ const SessionsBoard = ({ branchId }: Props) => {
     });
   }, [pcs.data]);
 
-  if ((pcs.loading && !pcs.data) || (sessions.loading && !sessions.data)) return <GridSkeleton />;
-  if (pcs.error && !pcs.data) return <div className="error">{pcs.error.message}</div>;
-  if (sessions.error && !sessions.data) return <div className="error">{sessions.error.message}</div>;
-
   const sessionByPc = new Map<number, ISessionApi>();
   for (const s of sessions.data ?? []) sessionByPc.set(s.pc_id, s);
 
-  // Render in the operator's order; `order` is kept in lock-step with the data
-  // by the effect above, so this is just a lookup (unknown ids filtered out).
   const byId = new Map((pcs.data ?? []).map((p) => [p.id, p] as const));
   const orderedPcs = order.map((id) => byId.get(id)).filter((p): p is IPcApi => !!p);
 
-  // Move the dragged device to just before the drop target and persist. Local
-  // state updates instantly; the backend write is fire-and-forget (the next
-  // reload confirms it, and a failure just leaves the previous saved order).
+  // Bucket devices into sections, preserving tile order within each.
+  const grouped: Record<string, IPcApi[]> = {};
+  for (const pc of orderedPcs) (grouped[sectionKeyOf(pc)] ||= []).push(pc);
+
+  // Canonical section order: computers, then PS, then custom platforms in the
+  // order they first appear. useLocalReorder lets the operator re-arrange them.
+  const canonicalSections = [
+    ...LEAD_SECTIONS.filter((k) => grouped[k]?.length),
+    ...Object.keys(grouped).filter((k) => !LEAD_SECTIONS.includes(k)),
+  ];
+  const sectionReorder = useLocalReorder(`board:sessions:sections:${branchId}`, canonicalSections);
+  const sectionKeys = sectionReorder.ordered;
+
+  const sectionLabel = (key: string): string =>
+    key === "pc" ? t("session.groupComputers") : key === "ps" ? t("session.groupPs") : platformLabel(key);
+
+  const toggleGroup = (key: string) =>
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+
+  // Persist the tile order; drag is scoped to a single section (a computer
+  // can't be dropped into the PS section — its section comes from the platform).
   const dropOn = (targetId: number) => {
     const from = dragId;
     setDragId(null);
+    setDragOverId(null);
     if (from == null || from === targetId) return;
+    const fromPc = byId.get(from);
+    const targetPc = byId.get(targetId);
+    if (!fromPc || !targetPc || sectionKeyOf(fromPc) !== sectionKeyOf(targetPc)) return;
     setOrder((prev) => {
       const next = prev.filter((id) => id !== from);
       const idx = next.indexOf(targetId);
@@ -108,6 +144,125 @@ const SessionsBoard = ({ branchId }: Props) => {
       return next;
     });
   };
+
+  const onSectionDragStart = (key: string) => (e: DragEvent) => {
+    // Use the section header as the drag image for a clean preview.
+    const head = (e.currentTarget as HTMLElement).closest(".cp-section")?.querySelector(".cp-section-toggle");
+    if (head) e.dataTransfer.setDragImage(head as Element, 20, 20);
+    setDragSection(key);
+  };
+  const onSectionDrop = (key: string) => {
+    const from = dragSection;
+    setDragSection(null);
+    setDropSection(null);
+    if (!from || from === key) return;
+    sectionReorder.move(from, key);
+  };
+
+  const renderCell = (pc: IPcApi) => {
+    const sess = sessionByPc.get(pc.id);
+    const isReserved = !sess && pc.place_id != null && reservedPlaceIds.has(pc.place_id);
+    // Seat availability (session / booking) and DEVICE availability (is the
+    // kiosk agent connected?) are different questions — resolveSessionCellState
+    // is the single place that combines them, so tile colour, status text and
+    // the Start button can never tell three different stories.
+    const cellState = resolveSessionCellState({ hasSession: !!sess, isReserved, device: pc });
+    const isOffline = cellState === "offline";
+    const canStart = canStartSession(cellState);
+    const deviceStatus = effectivePcStatus(pc);
+    const color = SESSION_CELL_COLOR[cellState];
+    const itemsCount = sess?.items?.length ?? 0;
+    return (
+      <div
+        key={pc.id}
+        className={`place-cell${dragId === pc.id ? " is-dragging" : ""}${
+          dragOverId === pc.id && dragId != null && dragId !== pc.id ? " is-drop-before" : ""
+        }`}
+        style={{ borderColor: color, minHeight: 160 }}
+        onDragOver={(e) => {
+          e.preventDefault();
+          if (dragId != null && dragId !== pc.id) {
+            const fromPc = byId.get(dragId);
+            if (fromPc && sectionKeyOf(fromPc) === sectionKeyOf(pc)) setDragOverId(pc.id);
+          }
+        }}
+        onDrop={() => dropOn(pc.id)}
+      >
+        <span className="dot" style={{ background: color }} />
+        <span
+          className="cell-grip"
+          draggable
+          onDragStart={(e) => {
+            const cell = (e.currentTarget as HTMLElement).closest(".place-cell");
+            if (cell) e.dataTransfer.setDragImage(cell, 24, 24);
+            setDragId(pc.id);
+          }}
+          onDragEnd={() => { setDragId(null); setDragOverId(null); }}
+          title={t("session.dragToReorder")}
+          aria-label={t("session.dragToReorder")}
+        >
+          ⠿
+        </span>
+        <span className="platform" style={{ display: "inline-flex", alignItems: "center", gap: 6, flexWrap: "wrap", marginLeft: 18 }}>
+          <span
+            title={deviceStatus}
+            style={{ width: 8, height: 8, borderRadius: 4, background: PC_STATUS_COLOR[deviceStatus], flexShrink: 0 }}
+          />
+          <span>{pc.place?.name?.trim() || `№${pc.place?.number ?? pc.label}`}</span>
+          {pc.place && pc.place.platform !== "pc" && (
+            <span className="muted" style={{ fontSize: 11 }}>{platformLabel(pc.place.platform)}</span>
+          )}
+        </span>
+        {sess ? (
+          <>
+            <span className="status" style={{ color }}>
+              <SessionTimer
+                endsAt={sess.ends_at}
+                startedAt={sess.started_at}
+                hourlyRate={sess.hourly_rate}
+                formatMoney={money}
+              />
+            </span>
+            <span className="until">
+              {sess.mode === "open"
+                ? `${money(Number(sess.hourly_rate ?? 0))} / ${t("time.hourShort") || "h"}`
+                : sess.package_name}
+              {itemsCount > 0 && <span className="muted"> · {itemsCount} {t("session.posNote")}</span>}
+            </span>
+            <div className="row" style={{ gap: 6, marginTop: 4, flexWrap: "wrap" }}>
+              <Button variant="secondary" onClick={() => setAddItemTarget(sess)} style={miniBtnFlex}>{t("session.addItem")}</Button>
+              <Button variant="secondary" onClick={() => setStopTarget(sess)} style={miniBtnFlex}>{t("action.stop")}</Button>
+            </div>
+          </>
+        ) : (
+          <>
+            <span className="status" style={{ color }}>
+              {isOffline
+                ? t("session.deviceOffline")
+                : isReserved
+                  ? t("session.reserved") || "Reserved"
+                  : `${t("session.free")}${pc.place && pc.place.platform !== "pc" ? ` · ${platformLabel(pc.place.platform)}` : ""}`}
+            </span>
+            {isOffline && (
+              <span className="until muted" style={{ fontSize: 11 }}>{t("session.deviceOfflineHint")}</span>
+            )}
+            <Button
+              onClick={() => setStartTarget(pc)}
+              disabled={!canStart}
+              title={isOffline ? t("session.deviceOfflineHint") : undefined}
+              style={{ padding: "6px 10px", fontSize: 12, marginTop: 6 }}
+            >
+              {t("action.start")}
+            </Button>
+          </>
+        )}
+      </div>
+    );
+  };
+
+  if ((pcs.loading && !pcs.data) || (sessions.loading && !sessions.data)) return <GridSkeleton />;
+  if (pcs.error && !pcs.data) return <div className="error">{pcs.error.message}</div>;
+  if (sessions.error && !sessions.data) return <div className="error">{sessions.error.message}</div>;
 
   return (
     <div className="col" style={{ gap: 18 }}>
@@ -121,114 +276,41 @@ const SessionsBoard = ({ branchId }: Props) => {
           )}
         </div>
       </div>
-      <div className="live-grid">
-        {orderedPcs.map((pc) => {
-          const sess = sessionByPc.get(pc.id);
-          // Precedence: active session (green) > reserved booking
-          // (orange) > free (grey). A place can be both — a session
-          // running on a pre-booked slot — but the active session is
-          // what the cashier acts on, so it wins.
-          const isReserved =
-            !sess && pc.place_id != null && reservedPlaceIds.has(pc.place_id);
-          const color = sess ? "#22c55e" : isReserved ? "#f59e0b" : "#6b7280";
-          const itemsCount = sess?.items?.length ?? 0;
-          return (
-            <div
-              key={pc.id}
-              className="place-cell"
-              style={{ borderColor: color, minHeight: 160, opacity: dragId === pc.id ? 0.45 : 1 }}
-              onDragOver={(e) => e.preventDefault()}
-              onDrop={() => dropOn(pc.id)}
-            >
-              <span className="dot" style={{ background: color }} />
-              {/* Drag handle — only this grabs the tile, so the Start/Stop
-                  buttons keep their normal click behaviour untouched. */}
-              <span
-                className="cell-grip"
-                draggable
-                onDragStart={() => setDragId(pc.id)}
-                onDragEnd={() => setDragId(null)}
-                title={t("session.dragToReorder")}
-                aria-label={t("session.dragToReorder")}
+
+      {orderedPcs.length === 0 ? (
+        <div className="muted">{t("session.noPcs")}</div>
+      ) : (
+        <div className="col" style={{ gap: 14 }}>
+          {sectionKeys.map((key) => {
+            const items = grouped[key];
+            if (!items?.length) return null;
+            return (
+              <CollapsibleSection
+                key={key}
+                title={sectionLabel(key)}
+                count={items.length}
+                open={!collapsed.has(key)}
+                onToggle={() => toggleGroup(key)}
+                reorderable={sectionKeys.length > 1}
+                dragHint={t("session.dragSectionHint")}
+                dragging={dragSection === key}
+                dropTarget={dropSection === key && dragSection != null && dragSection !== key}
+                onDragStart={onSectionDragStart(key)}
+                onDragEnd={() => { setDragSection(null); setDropSection(null); }}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  if (dragSection && dragSection !== key) setDropSection(key);
+                }}
+                onDrop={() => onSectionDrop(key)}
               >
-                ⠿
-              </span>
-              {/*
-                Title = the place's name if it has one, else its number
-                (same value the mobile guest sees on `placesSelect`),
-                falling back to the device label for legacy unlinked rows.
-                The inline dot is the DEVICE status (online/offline/busy),
-                distinct from the corner session-state dot above. The badge
-                names the platform (PS4 / Table Tennis …) for non-pc places.
-              */}
-              <span className="platform" style={{ display: "inline-flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-                <span
-                  title={pc.status}
-                  style={{ width: 8, height: 8, borderRadius: 4, background: PC_STATUS_COLOR[pc.status], flexShrink: 0 }}
-                />
-                <span>{pc.place?.name?.trim() || `№${pc.place?.number ?? pc.label}`}</span>
-                {pc.place && pc.place.platform !== "pc" && (
-                  <span className="muted" style={{ fontSize: 11 }}>{platformLabel(pc.place.platform)}</span>
-                )}
-              </span>
-              {sess ? (
-                <>
-                  <span className="status" style={{ color }}>
-                    <SessionTimer
-                      endsAt={sess.ends_at}
-                      startedAt={sess.started_at}
-                      hourlyRate={sess.hourly_rate}
-                      formatMoney={money}
-                    />
-                  </span>
-                  <span className="until">
-                    {sess.mode === "open"
-                      ? `${money(Number(sess.hourly_rate ?? 0))} / ${t("time.hourShort") || "h"}`
-                      : sess.package_name}
-                    {itemsCount > 0 && <span className="muted"> · {itemsCount} {t("session.posNote")}</span>}
-                  </span>
-                  {/* `flexWrap: wrap` + `flex: 1 0 auto` lets the two
-                      buttons stay side-by-side on wide cells and stack
-                      cleanly into two rows on narrow ones — important
-                      because the grid item can be as tight as 160px and
-                      RU/AM labels ("+ услуга", "+ ծառայություն") are
-                      noticeably wider than the EN baseline. */}
-                  <div className="row" style={{ gap: 6, marginTop: 4, flexWrap: "wrap" }}>
-                    <Button variant="secondary" onClick={() => setAddItemTarget(sess)} style={miniBtnFlex}>{t("session.addService")}</Button>
-                    <Button variant="secondary" onClick={() => setStopTarget(sess)} style={miniBtnFlex}>{t("action.stop")}</Button>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <span className="status" style={{ color }}>
-                    {isReserved
-                      ? t("session.reserved") || "Reserved"
-                      : `${t("session.free")}${pc.place && pc.place.platform !== "pc" ? ` · ${platformLabel(pc.place.platform)}` : ""}`}
-                  </span>
-                  {/*
-                    Start is disabled while the seat is held by an
-                    upcoming/active booking — the cashier must wait
-                    for the guest to confirm-by-code (which converts
-                    the booking into the session) instead of opening
-                    a parallel walk-in session that would conflict.
-                    The orange tile + "Reserved" label make the
-                    state legible; the disabled button makes the
-                    state non-bypassable from this screen.
-                  */}
-                  <Button
-                    onClick={() => setStartTarget(pc)}
-                    disabled={isReserved}
-                    style={{ padding: "6px 10px", fontSize: 12, marginTop: 6 }}
-                  >
-                    {t("action.start")}
-                  </Button>
-                </>
-              )}
-            </div>
-          );
-        })}
-        {!pcs.data?.length && <div className="muted">No PCs registered.</div>}
-      </div>
+                <div className={`live-grid${dragId != null ? " is-reordering" : ""}`}>
+                  {items.map(renderCell)}
+                </div>
+              </CollapsibleSection>
+            );
+          })}
+        </div>
+      )}
 
       {startTarget && (
         <StartSessionDialog
@@ -258,10 +340,6 @@ const SessionsBoard = ({ branchId }: Props) => {
   );
 };
 
-// `flex: 1 0 auto` — button starts at its content's natural width so
-// short EN labels don't stretch awkwardly, but it can grow to share
-// the available row width, and won't shrink below content (which would
-// otherwise clip a Cyrillic / Armenian label).
 const miniBtnFlex: React.CSSProperties = {
   padding: "4px 8px",
   fontSize: 12,

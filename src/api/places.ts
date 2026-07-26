@@ -16,6 +16,12 @@ export interface CreatePlaceBody {
   // Dynamic: known pc/ps4/ps5 OR a custom branch platform slug.
   platform: string;
   hourly_rate?: number | null;
+  /**
+   * Display наименование for a brand-new custom platform's branch price. Only
+   * meaningful when the platform is custom AND not yet priced; ignored
+   * otherwise. Not a Place column — the backend forwards it to the price row.
+   */
+  platform_name?: string | null;
   type: PlaceType;
   game_ids?: number[];
 }

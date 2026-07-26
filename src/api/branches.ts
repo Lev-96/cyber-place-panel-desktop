@@ -66,8 +66,6 @@ export const apiUpdateBranchPricing = (id: number, prices: NonNullable<IBranchAp
 export const apiUpdateBranchOpenDays = (id: number, days_of_weeks: Array<{ day_of_week: number; start_time: string; end_time: string }>) =>
   request<{ message: string }>(`/branches/${id}?_method=PUT`, { method: "POST", body: { days_of_weeks } });
 
-export const apiUpdateBranchServices = (id: number, service_ids: number[]) =>
-  request<{ message: string }>(`/branches/${id}?_method=PUT`, { method: "POST", body: { service_ids } });
 
 /**
  * Set or rotate the emergency unlock PIN for this branch. PIN is shipped

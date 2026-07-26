@@ -31,7 +31,6 @@ export const TRANSLATIONS: Dict = {
   "nav.scan": { en: "Scan / Confirm", ru: "Сканировать", am: "Սկանավորել" },
   "nav.tournaments": { en: "Tournaments", ru: "Турниры", am: "Մրցաշարեր" },
   "nav.games": { en: "Games", ru: "Игры", am: "Խաղեր" },
-  "nav.services": { en: "Services", ru: "Сервисы", am: "Ծառայություններ" },
   "nav.companies": { en: "Companies", ru: "Компании", am: "Ընկերություններ" },
   "nav.revenue": { en: "Revenue", ru: "Выручка", am: "Եկամուտ" },
   "nav.expenses": { en: "Expenses", ru: "Расходы", am: "Ծախսեր" },
@@ -61,6 +60,7 @@ export const TRANSLATIONS: Dict = {
 
   // Common actions
   "action.save": { en: "Save", ru: "Сохранить", am: "Պահպանել" },
+  "action.continue": { en: "Continue", ru: "Продолжить", am: "Շարունակել" },
   "action.cancel": { en: "Cancel", ru: "Отмена", am: "Չեղարկել" },
   "action.edit": { en: "Edit", ru: "Изменить", am: "Խմբագրել" },
   "action.delete": { en: "Delete", ru: "Удалить", am: "Ջնջել" },
@@ -71,10 +71,11 @@ export const TRANSLATIONS: Dict = {
   "action.confirm": { en: "Confirm", ru: "Подтвердить", am: "Հաստատել" },
   "action.refresh": { en: "Refresh", ru: "Обновить", am: "Թարմացնել" },
   "action.close": { en: "Close", ru: "Закрыть", am: "Փակել" },
+  "action.back": { en: "Back", ru: "Назад", am: "Հետ" },
 
   // Sessions
   "session.start": { en: "Start session", ru: "Старт сессии", am: "Սկսել նիստը" },
-  "session.addItem": { en: "Add service / item", ru: "Добавить услугу/товар", am: "Ավելացնել ծառայություն" },
+  "session.addItem": { en: "Add an item", ru: "Добавить позицию", am: "Ավելացնել գրառում" },
   "session.search": { en: "Search by name…", ru: "Поиск по названию…", am: "Որոնում անունով…" },
   "session.noProducts": { en: "No products in this branch yet. Add a custom item below.", ru: "В этом филиале ещё нет товаров. Добавь произвольную позицию ниже.", am: "Այս մասնաճյուղում ապրանքներ չկան: Ավելացրու ձեռքով գրառում:" },
   "session.customItem": { en: "Or a custom item", ru: "Или произвольная позиция", am: "Կամ ձեռքով գրառում" },
@@ -93,6 +94,14 @@ export const TRANSLATIONS: Dict = {
   "session.openByHour": { en: "By hour (open)", ru: "По часам (открытая)", am: "Ժամով (բաց)" },
   "session.tariffField": { en: "Tariff", ru: "Тариф", am: "Սակագին" },
   "session.hourlyRate": { en: "Hourly rate", ru: "Ставка за час", am: "Ժամային սակագին" },
+  "session.editPrice": { en: "Change current price", ru: "Изменить текущую цену", am: "Փոխել ընթացիկ գինը" },
+  "session.newHourlyRate": { en: "New price per hour", ru: "Новая цена за час", am: "Նոր գին մեկ ժամի համար" },
+  "session.priceSaved": { en: "Saved", ru: "Сохранено", am: "Պահպանված է" },
+  "session.savePriceHint": { en: "Save the new price, then press Start.", ru: "Сохраните новую цену, затем нажмите «Старт».", am: "Պահպանեք նոր գինը, ապա սեղմեք «Սկսել»:" },
+  "session.groupComputers": { en: "Computer places", ru: "Места для компьютеров", am: "Համակարգիչների տեղեր" },
+  "session.groupPs": { en: "PS places", ru: "Места для PS", am: "PS-ի տեղեր" },
+  "session.groupOther": { en: "Other places", ru: "Другие места", am: "Այլ տեղեր" },
+  "session.noPcs": { en: "No devices registered.", ru: "Устройства не зарегистрированы.", am: "Սարքեր գրանցված չեն:" },
   "session.openHint": { en: "Time counts up. Cost is pro-rated by minute.", ru: "Время идёт вверх. Сумма считается пропорционально.", am: "Ժամանակը հաշվվում է աճողաբար: Գումարը հաշվվում է համամասնորեն:" },
   "session.noPackages": { en: "No time packages yet. Add one on the «Branch prices» page.", ru: "Пакетов пока нет. Добавь на странице «Цены филиала».", am: "Փաթեթներ դեռ չկան: Ավելացնել «Մասնաճյուղի գները» էջում:" },
   "session.choosePackage": { en: "Choose a tariff", ru: "Выберите тариф", am: "Ընտրեք սակագինը" },
@@ -169,14 +178,21 @@ export const TRANSLATIONS: Dict = {
   },
   "session.free": { en: "Free", ru: "Свободно", am: "Ազատ" },
   "session.reserved": { en: "Reserved", ru: "Зарезервировано", am: "Ամրագրված" },
+  // Device (not seat) availability: the kiosk agent isn't connected, so the
+  // machine can't be unlocked for a player and must not be billable either.
+  "session.deviceOffline": { en: "Offline", ru: "Не в сети", am: "Անցանց" },
+  "session.deviceOfflineHint": {
+    en: "The device agent is not connected — a session cannot be started.",
+    ru: "Агент устройства не подключён — сессию начать нельзя.",
+    am: "Սարքի գործակալը միացված չէ — նիստը հնարավոր չէ սկսել:",
+  },
   "session.toastNewBooking": { en: "New booking", ru: "Новое бронирование", am: "Նոր ամրագրում" },
   "session.toastBookingExtended": { en: "Booking extended", ru: "Бронь продлена", am: "Ամրագրումը երկարացվել է" },
-  "session.addService": { en: "+ service", ru: "+ услуга", am: "+ ծառայություն" },
   "session.boardTitle": { en: "Sessions", ru: "Сессии", am: "Նիստեր" },
   "session.dragToReorder": { en: "Drag to reorder", ru: "Перетащите, чтобы изменить порядок", am: "Քաշեք՝ դասավորությունը փոխելու համար" },
+  "session.dragSectionHint": { en: "Drag to reorder sections", ru: "Перетащите, чтобы изменить порядок разделов", am: "Քաշեք՝ բաժինների դասավորությունը փոխելու համար" },
   "session.posNote": { en: "items", ru: "поз.", am: "միավոր" },
   "session.products": { en: "Products", ru: "Товары", am: "Ապրանքներ" },
-  "session.services": { en: "Services", ru: "Услуги", am: "Ծառայություններ" },
   "session.removeItemTitle": { en: "Remove item", ru: "Удалить позицию", am: "Հեռացնել տողը" },
   "pcs.title": { en: "Computers", ru: "Компьютеры", am: "Համակարգիչներ" },
   "pcs.register": { en: "+ Register computer", ru: "+ Зарегистрировать компьютер", am: "+ Գրանցել համակարգիչ" },
@@ -223,13 +239,6 @@ export const TRANSLATIONS: Dict = {
   "pcs.tier.ps4Vip":      { en: "PS4 VIP",      ru: "PS4 VIP",      am: "PS4 VIP" },
   "pcs.tier.ps5Standard": { en: "PS5 Standard", ru: "PS5 Стандарт", am: "PS5 Ստանդարտ" },
   "pcs.tier.ps5Vip":      { en: "PS5 VIP",      ru: "PS5 VIP",      am: "PS5 VIP" },
-  "service.edit": { en: "Edit service", ru: "Редактировать услугу", am: "Խմբագրել ծառայությունը" },
-  "service.new": { en: "New service", ru: "Новая услуга", am: "Նոր ծառայություն" },
-  "service.nameEn": { en: "Name (EN)", ru: "Название (EN)", am: "Անվանում (EN)" },
-  "service.nameRu": { en: "Name (RU)", ru: "Название (RU)", am: "Անվանում (RU)" },
-  "service.nameAm": { en: "Name (AM)", ru: "Название (AM)", am: "Անվանում (AM)" },
-  "service.price": { en: "Price (in base currency)", ru: "Цена (в базовой валюте)", am: "Գին (հիմնական արժույթով)" },
-  "service.logo": { en: "Logo (optional)", ru: "Логотип (необязательно)", am: "Լոգո (ընտրովի)" },
   "time.hourShort": { en: "h", ru: "ч", am: "ժ" },
   "time.minShort": { en: "min", ru: "мин", am: "ր" },
 
@@ -257,6 +266,8 @@ export const TRANSLATIONS: Dict = {
   "hub.tile.membersHint": { en: "Cards & deposits", ru: "Карты и депозиты", am: "Քարտեր և ավանդներ" },
   "hub.tile.places": { en: "Places", ru: "Места", am: "Տեղեր" },
   "hub.tile.placesHint": { en: "Bookable seats · games", ru: "Места для бронирования · игры", am: "Ամրագրման տեղեր · խաղեր" },
+  "hub.tile.games": { en: "Games", ru: "Игры", am: "Խաղեր" },
+  "hub.tile.gamesHint": { en: "This branch's game library", ru: "Библиотека игр филиала", am: "Մասնաճյուղի խաղերի գրադարան" },
   "hub.tile.pcs": { en: "PCs", ru: "ПК", am: "Համակարգիչներ" },
   "hub.tile.pcsHint": { en: "Agent registration", ru: "Регистрация агента", am: "Գործակալի գրանցում" },
   "hub.tile.prices": { en: "Branch prices", ru: "Цены филиала", am: "Մասնաճյուղի գները" },
@@ -286,8 +297,6 @@ export const TRANSLATIONS: Dict = {
   },
   "hub.tile.products": { en: "Products", ru: "Товары", am: "Ապրանքներ" },
   "hub.tile.productsHint": { en: "POS catalog", ru: "Каталог кассы", am: "Դրամարկղի կատալոգ" },
-  "hub.tile.services": { en: "Services", ru: "Услуги", am: "Ծառայություններ" },
-  "hub.tile.servicesHint": { en: "What this branch offers", ru: "Что предлагает филиал", am: "Մասնաճյուղի առաջարկները" },
   "hub.tile.managers": { en: "Managers", ru: "Менеджеры", am: "Մենեջերներ" },
   "hub.tile.managersHint": { en: "Branch staff", ru: "Сотрудники филиала", am: "Մասնաճյուղի անձնակազմ" },
   "hub.tile.tournaments": { en: "Tournaments", ru: "Турниры", am: "Մրցաշարեր" },
@@ -302,6 +311,19 @@ export const TRANSLATIONS: Dict = {
   "login.signingIn": { en: "Signing in…", ru: "Вход…", am: "Մուտք…" },
   "login.failed": { en: "Login failed", ru: "Не удалось войти", am: "Մուտքը ձախողվեց" },
   "login.invalidCredentials": { en: "Wrong email or password", ru: "Неверный логин или пароль", am: "Սխալ էլ. հասցե կամ գաղտնաբառ" },
+  "login.forgetEmail": { en: "Forget this address", ru: "Забыть этот адрес", am: "Մոռանալ այս հասցեն" },
+
+  // Switching to a manager account (owner only)
+  "switchAccount.cta": { en: "Switch to another account", ru: "Переключиться на другой аккаунт", am: "Անցնել այլ հաշվի" },
+  "switchAccount.title": { en: "Company accounts", ru: "Аккаунты компании", am: "Ընկերության հաշիվներ" },
+  "switchAccount.filter": { en: "Search by name, email or branch", ru: "Поиск по имени, почте или филиалу", am: "Որոնում ըստ անվան, էլ. հասցեի կամ մասնաճյուղի" },
+  "switchAccount.empty": { en: "No other accounts available yet", ru: "Других аккаунтов пока нет", am: "Այլ հաշիվներ դեռ չկան" },
+  "switchAccount.noMatch": { en: "No account matches", ru: "Ничего не найдено", am: "Համընկնում չկա" },
+  "switchAccount.unnamed": { en: "Unnamed account", ru: "Без имени", am: "Անանուն հաշիվ" },
+  "switchAccount.passwordHint": { en: "Enter this account's password to continue as them.", ru: "Введите пароль этого аккаунта, чтобы войти под ним.", am: "Մուտքագրեք այս հաշվի գաղտնաբառը՝ նրա անունից շարունակելու համար:" },
+  "switchAccount.signIn": { en: "Sign in to this account", ru: "Войти в этот аккаунт", am: "Մուտք գործել այս հաշիվ" },
+  "switchAccount.forgot": { en: "Reset the password", ru: "Сбросить пароль", am: "Վերականգնել գաղտնաբառը" },
+  "switchAccount.done": { en: "Signed in as {0}", ru: "Вы вошли как {0}", am: "Մուտք գործեցիք որպես {0}" },
 
   // Sessions history
   "history.title": { en: "Sessions history", ru: "История сессий", am: "Սեանսների պատմություն" },
@@ -429,7 +451,6 @@ export const TRANSLATIONS: Dict = {
   // Branches list / map
   "branchesList.title": { en: "Branches", ru: "Филиалы", am: "Մասնաճյուղեր" },
   "branchesList.placesShort": { en: "places", ru: "места", am: "տեղեր" },
-  "branchesList.servicesShort": { en: "services", ru: "услуги", am: "ծառայություններ" },
   "branchesMap.title": { en: "Branches map", ru: "Карта филиалов", am: "Մասնաճյուղերի քարտեզ" },
   "branchesMap.geoCount": { en: "of {total} branches geo-located", ru: "из {total} филиалов с координатами", am: "{total}-ից աշխարհագրականորեն տեղորոշված" },
   "branchesMap.noGeoTitle": { en: "No branches geo-located yet.", ru: "Координаты филиалов ещё не заданы.", am: "Մասնաճյուղերի կոորդինատներ դեռ չեն սահմանված:" },
@@ -448,6 +469,9 @@ export const TRANSLATIONS: Dict = {
   "tournaments.title": { en: "Tournaments", ru: "Турниры", am: "Մրցաշարեր" },
   "tournaments.scopeHint": { en: "Open a branch and click \"Tournaments\" to create one. Tournaments belong to a specific branch.", ru: "Откройте филиал и нажмите «Турниры», чтобы создать. Турниры привязаны к конкретному филиалу.", am: "Բացեք մասնաճյուղ և սեղմեք «Մրցաշարեր»՝ ստեղծելու համար: Մրցաշարը պատկանում է որոշակի մասնաճյուղի:" },
   "tournaments.new": { en: "+ New tournament", ru: "+ Новый турнир", am: "+ Նոր մրցաշար" },
+  "tournaments.goToMyBranch": { en: "Go to my branch tournaments", ru: "Перейти к турнирам моего филиала", am: "Անցնել իմ մասնաճյուղի մրցաշարերին" },
+  "tournaments.pickBranch": { en: "Choose a branch", ru: "Выберите филиал", am: "Ընտրեք մասնաճյուղ" },
+  "tournaments.noBranch": { en: "No branch is assigned to your account.", ru: "К вашему аккаунту не привязан филиал.", am: "Ձեր հաշվին մասնաճյուղ կցված չէ:" },
   "tournaments.price": { en: "price", ru: "цена", am: "գին" },
   "tournaments.players": { en: "players", ru: "игроков", am: "խաղացողներ" },
   "tournaments.confirmDelete": { en: "Delete tournament", ru: "Удалить турнир", am: "Ջնջել մրցաշարը" },
@@ -456,12 +480,9 @@ export const TRANSLATIONS: Dict = {
   "games.title": { en: "Games", ru: "Игры", am: "Խաղեր" },
   "games.new": { en: "+ New game", ru: "+ Новая игра", am: "+ Նոր խաղ" },
   "games.confirmDelete": { en: "Delete", ru: "Удалить", am: "Ջնջել" },
-
-  // Services admin
-  "servicesAdmin.title": { en: "Services", ru: "Услуги", am: "Ծառայություններ" },
-  "servicesAdmin.subtitle": { en: "Global services available for branches to enable.", ru: "Глобальные услуги, которые филиалы могут включать у себя.", am: "Համընդհանուր ծառայություններ, որոնք մասնաճյուղերը կարող են ակտիվացնել:" },
-  "servicesAdmin.new": { en: "+ New service", ru: "+ Новая услуга", am: "+ Նոր ծառայություն" },
-  "servicesAdmin.confirmDelete": { en: "Delete service", ru: "Удалить услугу", am: "Ջնջել ծառայությունը" },
+  "branchGames.title": { en: "Branch games", ru: "Игры филиала", am: "Մասնաճյուղի խաղեր" },
+  "branchGames.intro": { en: "Games attached to this branch", ru: "Игры, привязанные к этому филиалу", am: "Այս մասնաճյուղին կցված խաղեր" },
+  "branchGames.empty": { en: "No games for this branch yet.", ru: "Пока нет игр для этого филиала.", am: "Այս մասնաճյուղի համար դեռ խաղեր չկան:" },
 
   // Recurring-services expense tracker (admin only)
   "expenses.title": { en: "Expenses", ru: "Расходы", am: "Ծախսեր" },
@@ -660,7 +681,26 @@ export const TRANSLATIONS: Dict = {
   "place.gamesAvailable": { en: "Games available on this place", ru: "Доступные игры на этом месте", am: "Հասանելի խաղեր այս տեղում" },
   "place.noGamesPlatform": { en: "No games for", ru: "Нет игр для", am: "Խաղեր չկան" },
   "place.selected": { en: "selected", ru: "выбрано", am: "ընտրված" },
+  "place.hasGames": { en: "Does this platform have games?", ru: "У этой платформы есть игры?", am: "Այս հարթակը ունի՞ խաղեր" },
+  "place.hasGamesHint": { en: "Turn on to attach games; leave off for a games-free platform (e.g. table tennis).", ru: "Включите, чтобы прикрепить игры; оставьте выключенным для платформы без игр (напр. настольный теннис).", am: "Միացրեք՝ խաղեր կցելու համար; թողեք անջատած՝ առանց խաղերի հարթակի համար (օր. սեղանի թենիս):" },
+  "place.createGame": { en: "+ Create game", ru: "+ Создать игру", am: "+ Ստեղծել խաղ" },
   "place.errors.number": { en: "Number must be a positive integer", ru: "Номер должен быть положительным целым числом", am: "Համարը պետք է լինի դրական ամբողջ թիվ" },
+  "place.errors.priceRequired": { en: "Set a price for this new platform", ru: "Задайте цену для новой платформы", am: "Սահմանեք գին այս նոր հարթակի համար" },
+  "place.errors.nameRequired": { en: "Enter the platform name (English is required)", ru: "Введите наименование платформы (английское обязательно)", am: "Մուտքագրեք հարթակի անվանումը (անգլերենը պարտադիր է)" },
+  "place.priceName": { en: "Platform name (наименование)", ru: "Наименование платформы", am: "Հարթակի անվանումը" },
+  "place.priceLockedNote": { en: "This platform already has a branch price — it will be applied to this place.", ru: "Для этой платформы уже задана цена филиала — она будет применена к этому месту.", am: "Այս հարթակի համար արդեն սահմանված է մասնաճյուղի գին — այն կկիրառվի այս տեղի համար:" },
+  "place.tierUnpricedNote": { en: "This tier of the platform isn't priced yet — set its rate once here.", ru: "Для этого тарифа платформы цена ещё не задана — задайте её здесь один раз.", am: "Հարթակի այս սակագինը դեռ գնավորված չէ — սահմանեք այն այստեղ մեկ անգամ:" },
+  // Multilingual platform-name widget (place form, custom platform).
+  "platformName.placeholder": { en: "Name", ru: "Наименование", am: "Անվանում" },
+  "platformName.enIdHint": { en: "used as the id", ru: "используется как идентификатор", am: "օգտագործվում է որպես ID" },
+  "platformName.suggestions": { en: "Existing platforms", ru: "Существующие платформы", am: "Առկա հարթակներ" },
+  // Custom-platform prices — read + edit block on the Branch prices page.
+  "platformPrice.sectionTitle": { en: "Custom platform prices", ru: "Цены кастомных платформ", am: "Հատուկ հարթակների գներ" },
+  "platformPrice.perHour": { en: "per hour", ru: "за час", am: "մեկ ժամում" },
+  "platformPrice.managedInPlaces": { en: "Added automatically when you create a place on the platform (in Places). Click a name to rename it; edit the rates here.", ru: "Добавляются автоматически при создании места на платформе (в разделе Места). Нажмите на название, чтобы переименовать; цены изменяются здесь.", am: "Ավելացվում են ինքնաշխատ՝ հարթակի վրա տեղ ստեղծելիս (Տեղեր բաժնում): Սեղմեք անվան վրա՝ վերանվանելու համար; գները փոխվում են այստեղ:" },
+  "platformPrice.titleEdit": { en: "Edit platform price", ru: "Редактировать цену платформы", am: "Խմբագրել հարթակի գինը" },
+  "platformPrice.renameTitle": { en: "Rename platform", ru: "Изменить наименование платформы", am: "Վերանվանել հարթակը" },
+  "platformPrice.renameHint": { en: "Click to rename", ru: "Нажмите, чтобы изменить наименование", am: "Սեղմեք վերանվանելու համար" },
 
   // Tournament form
   "tournament.titleNew": { en: "New tournament", ru: "Новый турнир", am: "Նոր մրցաշար" },
@@ -818,7 +858,6 @@ export const TRANSLATIONS: Dict = {
     am: "Ընտրեք առնվազն մեկ օր",
   },
   "branch.editTabs.hours": { en: "Working hours", ru: "Часы работы", am: "Աշխատանքային ժամեր" },
-  "branch.editTabs.services": { en: "Services", ru: "Услуги", am: "Ծառայություններ" },
   "branch.weekday.mon": { en: "Mon", ru: "Пн", am: "Երկ" },
   "branch.weekday.tue": { en: "Tue", ru: "Вт", am: "Երք" },
   "branch.weekday.wed": { en: "Wed", ru: "Ср", am: "Չրք" },
@@ -888,7 +927,38 @@ export const TRANSLATIONS: Dict = {
   // surface that needs to render a humane name for `users.role`.
   "role.admin": { en: "Admin", ru: "Админ", am: "Ադմին" },
   "role.company_owner": { en: "Owner", ru: "Владелец", am: "Սեփականատեր" },
-  "role.manager": { en: "Manager", ru: "Менеджер", am: "Մենեջեր" },
+  "role.manager": { en: "Manager", ru: "Менеджер", am: "Մենеջեր" },
+
+  // Profile
+  "profile.title": { en: "Profile", ru: "Профиль", am: "Պրոֆիլ" },
+  "profile.firstName": { en: "First name", ru: "Имя", am: "Անուն" },
+  "profile.lastName": { en: "Last name", ru: "Фамилия", am: "Ազգանուն" },
+  "profile.emailChangeSoon": { en: "Email change with verification is coming soon.", ru: "Изменение email с подтверждением — скоро.", am: "Էլ. հասցեի փոփոխությունը հաստատմամբ՝ շուտով:" },
+  "profile.saved": { en: "Profile saved", ru: "Профиль сохранён", am: "Պրոֆիլը պահպանվեց" },
+  "profile.nameRequired": { en: "Enter a name", ru: "Введите имя", am: "Մուտքագրեք անուն" },
+  "profile.pwKnow": { en: "I know my password", ru: "Помню пароль", am: "Հիշում եմ գաղտնաբառը" },
+  "profile.pwForgot": { en: "I forgot it", ru: "Забыл пароль", am: "Մոռացել եմ" },
+  "profile.forgotHint": { en: "We'll email a reset code to your address.", ru: "Отправим код сброса на вашу почту.", am: "Վերակայման կոդը կուղարկենք ձեր էլ. հասցեին:" },
+  "profile.sendCode": { en: "Send code", ru: "Отправить код", am: "Ուղարկել կոդը" },
+  "profile.resendCode": { en: "Resend", ru: "Отправить снова", am: "Ուղարկել կրկին" },
+  "profile.codeSent": { en: "Code sent to your email.", ru: "Код отправлен на почту.", am: "Կոդն ուղարկվեց ձեր էլ. հասցեին:" },
+  "profile.codePlaceholder": { en: "Code from email", ru: "Код из письма", am: "Կոդ նամակից" },
+  "profile.passwordUpdated": { en: "Password updated", ru: "Пароль обновлён", am: "Գաղտնաբառը թարմացվեց" },
+  "profile.pwRuleLength": { en: "At least 8 characters", ru: "Минимум 8 символов", am: "Առնվազն 8 նիշ" },
+  "profile.pwRuleMatch": { en: "Passwords match", ru: "Пароли совпадают", am: "Գաղտնաբառերը համընկնում են" },
+  "profile.wrongCurrentPassword": { en: "Current password is incorrect", ru: "Текущий пароль неверный", am: "Ընթացիկ գաղտնաբառը սխալ է" },
+  "profile.changeEmail": { en: "Change email", ru: "Изменить email", am: "Փոխել էլ. հասցեն" },
+  "profile.newEmail": { en: "New email", ru: "Новый email", am: "Նոր էл. հասցե" },
+  "profile.codeSentCurrent": { en: "Code sent to the new email.", ru: "Код отправлен на новую почту.", am: "Կոդն ուղարկվեց նոր էл. հասցեին:" },
+  "profile.emailUpdated": { en: "Email updated", ru: "Email обновлён", am: "Էլ. հասցեն թարմացվեց" },
+  "profile.emailCodeHint": { en: "Enter the code we sent to the new email.", ru: "Введите код, отправленный на новую почту.", am: "Մուտքագրեք նոր էл. հասցեին ուղարկված կոդը:" },
+  "profile.confirmEmail": { en: "Confirm & change", ru: "Подтвердить и изменить", am: "Հաստատել և փոխել" },
+  "profile.errEmailTaken": { en: "This email is already in use.", ru: "Этот email уже используется.", am: "Այս էլ. հասցեն արդեն օգտագործվում է:" },
+  "profile.errInvalidCode": { en: "The code is invalid or has expired.", ru: "Код неверный или истёк.", am: "Կոդը սխալ է կամ ժամկետը լրացել է:" },
+  "profile.emailChangedToast": { en: "You have successfully changed your email", ru: "Вы успешно изменили почтовый ящик", am: "Դուք հաջողությամբ փոխեցիք էл. հասցեն" },
+  "profile.passwordChangedToast": { en: "You have successfully changed your password", ru: "Вы успешно изменили ваш пароль", am: "Դուք հաջողությամբ փոխեցիք ձեր գաղտնաբառը" },
+  "profile.confirmCode": { en: "Confirm code", ru: "Подтвердить код", am: "Հաստատել կոդը" },
+  "profile.enterCodeHint": { en: "Enter the one-time code we sent to your email.", ru: "Введите одноразовый код, отправленный на вашу почту.", am: "Մուտքագրեք ձեր էլ. հասցեին ուղարկված միանգամյա կոдn:" },
 
   // Pairing token modal
   "pairing.titleFor": { en: "Pairing token", ru: "Токен сопряжения", am: "Զուգակցման տոկեն" },
@@ -936,6 +1006,8 @@ export const TRANSLATIONS: Dict = {
   "auth.sending": { en: "Sending…", ru: "Отправка…", am: "Ուղարկվում է…" },
   "reset.token": { en: "Reset token", ru: "Токен сброса", am: "Վերակայման տոկեն" },
   "reset.successDone": { en: "Password updated. You can now sign in.", ru: "Пароль обновлён. Можно войти.", am: "Գաղտնաբառը թարմացվել է: Կարող եք մուտք գործել:" },
+  "reset.cardHint": { en: "A one-time code will be sent to {0}. Enter it together with the new password.", ru: "Одноразовый код придёт на {0}. Введите его вместе с новым паролем.", am: "Միանգամյա կոդը կուղարկվի {0} հասցեին: Մուտքագրեք այն նոր գաղտնաբառի հետ:" },
+  "reset.codeSentTo": { en: "Code sent to {0}", ru: "Код отправлен на {0}", am: "Կոդն ուղարկվել է {0} հասցեին" },
 
   // Member card
   "memberCard.transactions": { en: "Transactions", ru: "Транзакции", am: "Գործարքներ" },
@@ -1164,6 +1236,7 @@ export const TRANSLATIONS: Dict = {
   // ── CRUD toast messages (top-right notifications) ──────────────────────
   "toast.generic.created": { en: "Created successfully", ru: "Успешно создано", am: "Հաջողությամբ ստեղծվեց" },
   "toast.generic.updated": { en: "Updated successfully", ru: "Успешно изменено", am: "Հաջողությամբ թարմացվեց" },
+  "toast.generic.saved":   { en: "Saved successfully", ru: "Успешно сохранено", am: "Հաջողությամբ պահպանվեց" },
   "toast.generic.deleted": { en: "Deleted successfully", ru: "Успешно удалено", am: "Հաջողությամբ ջնջվեց" },
   "toast.generic.error":   { en: "Something went wrong", ru: "Что-то пошло не так", am: "Ինչ-որ բան սխալ գնաց" },
 
@@ -1183,9 +1256,6 @@ export const TRANSLATIONS: Dict = {
   "toast.product.updated": { en: "Product updated", ru: "Товар обновлён", am: "Ապրանքը թարմացվեց" },
   "toast.product.deleted": { en: "Product deleted", ru: "Товар удалён", am: "Ապրանքը ջնջվեց" },
 
-  "toast.service.created": { en: "Service created", ru: "Услуга создана", am: "Ծառայությունը ստեղծվեց" },
-  "toast.service.updated": { en: "Service updated", ru: "Услуга обновлена", am: "Ծառայությունը թարմացվեց" },
-  "toast.service.deleted": { en: "Service deleted", ru: "Услуга удалена", am: "Ծառայությունը ջնջվեց" },
 
   "toast.manager.created": { en: "Manager created", ru: "Менеджер создан", am: "Մենեջերը ստեղծվեց" },
   "toast.manager.updated": { en: "Manager updated", ru: "Менеджер обновлён", am: "Մենեջերը թարմացվեց" },
@@ -1299,11 +1369,6 @@ export const TRANSLATIONS: Dict = {
   "branchEdit.title": { en: "Branch · {0}", ru: "Филиал · {0}", am: "Մասնաճյուղ · {0}" },
   "branchEdit.editInfo": { en: "Edit info", ru: "Изменить данные", am: "Խմբագրել տվյալները" },
   "branchEdit.confirmDelete": { en: "Delete this branch and all related data?", ru: "Удалить этот филиал и все связанные данные?", am: "Ջնջե՞լ այս մասնաճյուղը և բոլոր կապված տվյալները:" },
-
-  // BranchServices screen
-  "branchServices.title": { en: "Services · branch №{0}", ru: "Услуги · филиал №{0}", am: "Ծառայություններ · մասնաճյուղ №{0}" },
-  "branchServices.instruction": { en: "Toggle which services this branch provides.", ru: "Отметьте, какие услуги предоставляет филиал.", am: "Նշեք, թե որ ծառայություններն է մատուցում մասնաճյուղը:" },
-  "branchServices.empty": { en: "No services exist globally yet.", ru: "Глобальных услуг ещё нет.", am: "Գլոբալ ծառայություններ դեռ չկան:" },
 
   // CompanyBranches list
   "companyBranches.title": { en: "Branches of company №{0}", ru: "Филиалы компании №{0}", am: "№{0} ընկերության մասնաճյուղերը" },

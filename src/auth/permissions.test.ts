@@ -17,7 +17,6 @@ describe("can(role, perm)", () => {
       expect(can("admin", "menu.companies")).toBe(true);
       expect(can("admin", "menu.managers")).toBe(true);
       expect(can("admin", "menu.games")).toBe(true);
-      expect(can("admin", "menu.servicesAdmin")).toBe(true);
     });
 
     it("can manage branches and companies", () => {
@@ -43,12 +42,16 @@ describe("can(role, perm)", () => {
     it("cannot see the global companies list (admin-only)", () => {
       expect(can("company_owner", "menu.companies")).toBe(false);
       expect(can("company_owner", "menu.games")).toBe(false);
-      expect(can("company_owner", "menu.servicesAdmin")).toBe(false);
     });
 
     it("can configure prices and edit branches", () => {
       expect(can("company_owner", "branch.prices")).toBe(true);
       expect(can("company_owner", "branch.edit")).toBe(true);
+    });
+
+    it("builds its branches' game libraries but not the shared catalogue", () => {
+      expect(can("company_owner", "game.crud.branch")).toBe(true);
+      expect(can("company_owner", "game.crud")).toBe(false);
     });
 
     it("can view revenue", () => {
@@ -84,6 +87,15 @@ describe("can(role, perm)", () => {
 
     it("cannot view revenue", () => {
       expect(can("manager", "revenue.view")).toBe(false);
+    });
+
+    // A manager registers the places they run — including custom-platform
+    // ones — so they must be able to add that platform's games to THEIR
+    // branch. The shared catalogue stays out of reach (backend agrees).
+    it("can add games to their own branch but not touch the shared catalogue", () => {
+      expect(can("manager", "game.crud.branch")).toBe(true);
+      expect(can("manager", "game.crud")).toBe(false);
+      expect(can("manager", "menu.games")).toBe(false);
     });
 
     it("can scan codes and see tournaments", () => {

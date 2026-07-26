@@ -1,6 +1,7 @@
 import Button from "@/components/ui/Button";
 import Modal from "@/components/ui/Modal";
 import Input from "@/components/ui/Input";
+import PasswordInput from "@/components/ui/PasswordInput";
 import { useLang } from "@/i18n/LanguageContext";
 import { branchRepository } from "@/repositories/BranchRepository";
 import { managerRepository } from "@/repositories/ManagerRepository";
@@ -69,8 +70,8 @@ const ManagerForm = ({ branchId, initial, onClose, onSaved }: Props) => {
         <Input ref={nameRef} label={t("label.name")} value={name} onChange={(e) => setName(e.target.value)} required />
         <Input label={t("label.email")} type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
         {!isEdit && <>
-          <Input label={t("auth.password")} type="password" value={pw} onChange={(e) => setPw(e.target.value)} required minLength={8} />
-          <Input label={t("label.confirmPassword")} type="password" value={pw2} onChange={(e) => setPw2(e.target.value)} required minLength={8} />
+          <PasswordInput label={t("auth.password")} value={pw} onChange={(e) => setPw(e.target.value)} required minLength={8} />
+          <PasswordInput label={t("label.confirmPassword")} value={pw2} onChange={(e) => setPw2(e.target.value)} required minLength={8} />
         </>}
         {err && <div className="error">{err}</div>}
         <div className="row-between">

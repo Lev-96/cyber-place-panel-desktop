@@ -1,4 +1,5 @@
 import { useAuth } from "@/auth/AuthContext";
+import AuthRouteReset from "@/auth/AuthRouteReset";
 import RoleGuard from "@/auth/RoleGuard";
 import Layout from "@/components/Layout";
 import UpdateReadyModal from "@/components/UpdateReadyModal";
@@ -23,7 +24,7 @@ const BranchEdit = lazy(() => import("@/routes/BranchEdit"));
 const BranchHub = lazy(() => import("@/routes/BranchHub"));
 const BranchLive = lazy(() => import("@/routes/BranchLive"));
 const BranchPlaces = lazy(() => import("@/routes/BranchPlaces"));
-const BranchServices = lazy(() => import("@/routes/BranchServices"));
+const BranchGames = lazy(() => import("@/routes/BranchGames"));
 const BranchSessions = lazy(() => import("@/routes/BranchSessions"));
 const BranchesList = lazy(() => import("@/routes/BranchesList"));
 const BranchesMap = lazy(() => import("@/routes/BranchesMap"));
@@ -45,7 +46,6 @@ const PcsList = lazy(() => import("@/routes/PcsList"));
 const PosTerminal = lazy(() => import("@/routes/PosTerminal"));
 const ProductsList = lazy(() => import("@/routes/ProductsList"));
 const ResetPassword = lazy(() => import("@/routes/ResetPassword"));
-const ServicesAdmin = lazy(() => import("@/routes/ServicesAdmin"));
 const SessionsHistory = lazy(() => import("@/routes/SessionsHistory"));
 const Settings = lazy(() => import("@/routes/Settings"));
 const AppUpdates = lazy(() => import("@/routes/AppUpdates"));
@@ -106,8 +106,12 @@ const Authed = () => {
         <Route path="/branches/:branchId/live" element={<BranchLive />} />
         <Route path="/branches/:branchId/places" element={<BranchPlaces />} />
         <Route
-          path="/branches/:branchId/services"
-          element={<BranchServices />}
+          path="/branches/:branchId/games"
+          element={
+            <RoleGuard perm="game.crud.branch">
+              <BranchGames />
+            </RoleGuard>
+          }
         />
         <Route
           path="/branches/:branchId/tournaments"
@@ -219,14 +223,6 @@ const Authed = () => {
           }
         />
         <Route
-          path="/services-admin"
-          element={
-            <RoleGuard perm="menu.servicesAdmin">
-              <ServicesAdmin />
-            </RoleGuard>
-          }
-        />
-        <Route
           path="/expenses"
           element={
             <RoleGuard perm="menu.expenses">
@@ -299,6 +295,10 @@ const App = () => {
           password), and so no native confirm()/alert() poisons focus. */}
       <Toaster />
       <HashRouter>
+        {/* Signing in / out / switching account always lands on the
+            dashboard — a route must never outlive the account that
+            opened it. Must live INSIDE the router to navigate. */}
+        <AuthRouteReset />
         {user ? (
           // NotificationsProvider only mounts when authed — its initial
           // fetch needs the sanctum token to be set, and the polling

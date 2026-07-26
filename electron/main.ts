@@ -1,4 +1,4 @@
-import { BrowserWindow, app, ipcMain, net, protocol, session, shell } from "electron";
+import { BrowserWindow, Menu, MenuItemConstructorOptions, app, ipcMain, net, protocol, session, shell } from "electron";
 import { createSocket } from "node:dgram";
 import { existsSync } from "node:fs";
 import { join, normalize, resolve } from "node:path";
@@ -84,6 +84,32 @@ const createWindow = async () => {
   mainWindow.webContents.setWindowOpenHandler(({ url }: { url: string }) => {
     shell.openExternal(url);
     return { action: "deny" as const };
+  });
+
+  // Native right-click menu. Electron ships none by default, so without this
+  // the renderer's context menu does nothing. Copy shows whenever text is
+  // selected; cut/copy/paste/select-all show in editable fields (inputs).
+  mainWindow.webContents.on("context-menu", (_event, params) => {
+    const items: MenuItemConstructorOptions[] = [];
+    const hasSelection = params.selectionText.trim().length > 0;
+    if (params.isEditable) {
+      items.push(
+        { role: "cut", enabled: params.editFlags.canCut },
+        { role: "copy", enabled: params.editFlags.canCopy },
+        { role: "paste", enabled: params.editFlags.canPaste },
+        { type: "separator" },
+        { role: "selectAll", enabled: params.editFlags.canSelectAll },
+      );
+    } else if (hasSelection) {
+      items.push(
+        { role: "copy" },
+        { type: "separator" },
+        { role: "selectAll", enabled: params.editFlags.canSelectAll },
+      );
+    }
+    if (items.length && mainWindow) {
+      Menu.buildFromTemplate(items).popup({ window: mainWindow });
+    }
   });
 
   if (isDev && DEV_URL) {
