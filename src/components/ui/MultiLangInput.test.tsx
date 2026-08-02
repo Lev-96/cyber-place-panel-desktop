@@ -44,6 +44,7 @@ vi.mock("@/i18n/LanguageContext", () => ({
 vi.mock("@/api/translations", () => ({ apiPreviewTranslation: api.apiPreviewTranslation }));
 
 import MultiLangInput, { emptyLangValues, LangValues } from "@/components/ui/MultiLangInput";
+import { __clearAutoTranslateCache } from "@/i18n/useAutoTranslate";
 
 /** Renders the field as a controlled input and exposes the latest value. */
 const Harness = ({ initial }: { initial?: LangValues }) => {
@@ -70,15 +71,26 @@ const typePrimary = async (text: string) => {
   await act(async () => { fireEvent.change(boxes()[0], { target: { value: text } }); });
 };
 
+/** Leave the primary box — the shortcut past the idle debounce. */
+const blurPrimary = async () => {
+  await act(async () => { fireEvent.blur(boxes()[0]); });
+  await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+};
+
 /** Let the debounce fire and the (already-resolved) request settle. */
 const settle = async () => {
-  await act(async () => { vi.advanceTimersByTime(600); });
+  // Comfortably past IDLE_MS. Kept generous on purpose: pinning the test to
+  // the exact constant would make every future tuning of it a test edit.
+  await act(async () => { vi.advanceTimersByTime(2000); });
   await act(async () => { await Promise.resolve(); await Promise.resolve(); });
 };
 
 beforeEach(() => {
   vi.useFakeTimers();
   lang.current = "ru";
+  // Module state: without this, one test's cached answer silently serves the
+  // next test's request and the request it was asserting never happens.
+  __clearAutoTranslateCache();
   api.apiPreviewTranslation.mockResolvedValue({ translations: {}, failed: [] });
 });
 
@@ -241,6 +253,107 @@ describe("automatic translation", () => {
     expect(dump().ru).toBe("Кола");
     // …and the user can still type the others by hand.
     await act(async () => { fireEvent.change(boxes()[1], { target: { value: "Coke" } }); });
+    expect(dump().en).toBe("Coke");
+  });
+});
+
+/**
+ * The request budget.
+ *
+ * These are not micro-optimisations — they are the feature working at all. The
+ * free tier is counted in requests, and the first version spent one per pause
+ * in typing: three products exhausted the day's allowance and every field in
+ * the panel started reporting "could not translate". Each test below pins one
+ * of the three things that fixed it.
+ */
+describe("request budget", () => {
+  test("a multi-word name costs one request, not one per word", async () => {
+    render(<Harness />);
+
+    // Pauses of ~0.7s are ordinary typing rhythm — thinking about the next
+    // word, not finishing. The old 550ms debounce billed each of these.
+    await typePrimary("Кока");
+    await act(async () => { vi.advanceTimersByTime(700); });
+    await typePrimary("Кока-кола");
+    await act(async () => { vi.advanceTimersByTime(700); });
+    await typePrimary("Кока-кола 0.5");
+    await settle();
+
+    expect(api.apiPreviewTranslation).toHaveBeenCalledTimes(1);
+  });
+
+  test("leaving the field translates at once, without waiting out the debounce", async () => {
+    api.apiPreviewTranslation.mockResolvedValue({
+      translations: { en: "Coke", am: "Կոլա" },
+      failed: [],
+    });
+
+    render(<Harness />);
+    await typePrimary("Кола");
+    // Not a single timer advanced: this is what pays for the long debounce.
+    await blurPrimary();
+
+    expect(api.apiPreviewTranslation).toHaveBeenCalledTimes(1);
+    expect(dump().en).toBe("Coke");
+  });
+
+  test("the same text is never sent twice", async () => {
+    api.apiPreviewTranslation.mockResolvedValue({
+      translations: { en: "Coke", am: "Կոլա" },
+      failed: [],
+    });
+
+    render(<Harness />);
+    await typePrimary("Кола");
+    await settle();
+    expect(api.apiPreviewTranslation).toHaveBeenCalledTimes(1);
+
+    // Blurring after the debounce already answered would otherwise double the
+    // cost of every field the user tabs out of.
+    await blurPrimary();
+    expect(api.apiPreviewTranslation).toHaveBeenCalledTimes(1);
+  });
+
+  test("an incomplete answer is not cached, so the field can still be fixed", async () => {
+    api.apiPreviewTranslation.mockResolvedValueOnce({ translations: {}, failed: [] });
+
+    render(<Harness />);
+    await typePrimary("Кола");
+    await settle();
+
+    api.apiPreviewTranslation.mockResolvedValue({
+      translations: { en: "Coke", am: "Կոլա" },
+      failed: [],
+    });
+
+    // Caching the blank answer would pin this text to empty forever, with no
+    // request left that could ever fill it.
+    await blurPrimary();
+    expect(dump().en).toBe("Coke");
+  });
+
+  test("a rate limit is presented as a wait, and retried automatically", async () => {
+    api.apiPreviewTranslation
+      .mockResolvedValueOnce({
+        translations: {},
+        failed: ["en", "am"],
+        reason: "quota",
+        retry_after: 5,
+      })
+      .mockResolvedValue({ translations: { en: "Coke", am: "Կոլա" }, failed: [] });
+
+    render(<Harness />);
+    await typePrimary("Кола");
+    await settle();
+
+    // "Wait 5 seconds" and "fill three boxes by hand" are very different
+    // instructions, and the second one is wrong here.
+    expect(screen.getByText(/multilang\.reason\.quota_retry/)).toBeTruthy();
+    expect(screen.queryByText("multilang.reason.quota")).toBeNull();
+
+    await act(async () => { vi.advanceTimersByTime(6000); });
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+
     expect(dump().en).toBe("Coke");
   });
 });

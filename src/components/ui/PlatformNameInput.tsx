@@ -100,7 +100,12 @@ const PlatformNameInput = ({ value, onChange, suggestions, onPickExisting }: Pro
           value={value[l]}
           onChange={(e) => set(l, e.target.value)}
           onFocus={() => setFocused(l)}
-          onBlur={() => setFocused((f) => (f === l ? null : f))}
+          onBlur={() => {
+            setFocused((f) => (f === l ? null : f));
+            // Leaving the leading box translates at once, so the idle debounce
+            // can be long enough not to fire between words.
+            if (l === lang) auto.flush();
+          }}
           autoFocus={autoFocus}
           autoComplete="off"
         />

@@ -55,6 +55,12 @@ export interface TranslationPreviewResult {
    * the API key over one awkward word would send them down the wrong path.
    */
   reason?: TranslationFailureReason | null;
+  /**
+   * Seconds until the request is worth repeating. Only ever set together with
+   * `quota` — a rate limit is a wait, not a failure, and the field retries
+   * itself instead of asking the user to fill three boxes by hand.
+   */
+  retry_after?: number | null;
 }
 
 export const apiPreviewTranslation = (body: TranslationPreviewBody) =>

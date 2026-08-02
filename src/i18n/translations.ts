@@ -1501,6 +1501,15 @@ export const TRANSLATIONS: Dict = {
     ru: "Лимит переводов исчерпан — пока заполните языки вручную.",
     am: "Թարգմանության սահմանաչափը սպառված է — առայժմ լրացրեք ձեռքով։",
   },
+  // Shown INSTEAD of the one above when the service told us how long to wait.
+  // The distinction matters: one asks the user to do the work themselves, the
+  // other asks them to do nothing at all.
+  "multilang.reason.quota_retry": {
+    en: "Too many translations at once — retrying automatically in",
+    ru: "Слишком много переводов подряд — повторим автоматически через",
+    am: "Չափազանց շատ թարգմանություններ անընդմեջ — ավտոմատ կկրկնվի",
+  },
+  "multilang.seconds": { en: "s", ru: "с", am: "վրկ" },
   "multilang.reason.provider_error": {
     en: "The translation service is unavailable right now — fill the languages in by hand.",
     ru: "Сервис перевода сейчас недоступен — заполните языки вручную.",

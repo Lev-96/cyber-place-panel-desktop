@@ -107,7 +107,7 @@ const MultiLangInput = ({
   const ordered = useMemo(() => orderedLocales(lang), [lang]);
   const [primary, ...secondary] = ordered;
 
-  const { busy, failed, reason, locked, setPrimary, setSecondary, releaseLock } = useAutoTranslate({
+  const { busy, failed, reason, retryAfter, locked, setPrimary, setSecondary, releaseLock, flush } = useAutoTranslate({
     values,
     onChange,
     primary,
@@ -127,6 +127,10 @@ const MultiLangInput = ({
       placeholder: isPrimary ? undefined : t("multilang.autoPlaceholder"),
       onChange: (e: { target: { value: string } }) =>
         isPrimary ? setPrimary(e.target.value) : setSecondary(code, e.target.value),
+      // Leaving the source box translates at once. That is what lets the idle
+      // debounce be long enough not to fire mid-sentence: the wait only ever
+      // applies to someone who is still typing.
+      onBlur: isPrimary ? flush : undefined,
     };
 
     return (
@@ -166,7 +170,12 @@ const MultiLangInput = ({
           reads as three problems. */}
       {reason && (
         <span className="cp-mli-failed" style={{ fontSize: 11 }}>
-          {t(`multilang.reason.${reason}`)}
+          {/* A rate limit that clears itself in seconds must not read like an
+              outage — otherwise people start filling three boxes by hand over
+              a wait shorter than doing so. */}
+          {retryAfter !== null
+            ? `${t("multilang.reason.quota_retry")} ${retryAfter} ${t("multilang.seconds")}`
+            : t(`multilang.reason.${reason}`)}
         </span>
       )}
     </div>
