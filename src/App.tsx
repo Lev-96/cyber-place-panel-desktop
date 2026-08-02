@@ -1,7 +1,7 @@
 import { useAuth } from "@/auth/AuthContext";
 import AuthRouteReset from "@/auth/AuthRouteReset";
 import RoleGuard from "@/auth/RoleGuard";
-import { PanelLanguageGate } from "@/i18n/LanguageGates";
+import { AccountLanguageGate } from "@/i18n/LanguageGates";
 import Layout from "@/components/Layout";
 import UpdateReadyModal from "@/components/UpdateReadyModal";
 import UpdatesToast from "@/components/UpdatesToast";
@@ -306,13 +306,14 @@ const App = () => {
           // tick has no purpose for an unauth'd visitor.
           <NotificationsProvider>
             <UpdatesNotificationProvider>
-              {/* Workspace language step for owner/manager. Wraps the authed
-                  tree rather than sitting on a route so it cannot be skipped by
-                  a restored deep link — HashRouter reopens the last hash on
-                  launch. */}
-              <PanelLanguageGate>
+              {/* Per-account language step. Wraps the authed tree rather than
+                  sitting on a route so it cannot be skipped by a restored deep
+                  link — HashRouter reopens the last hash on launch. It also
+                  applies the account's stored language before the cabinet
+                  renders, so nothing flashes in the previous one. */}
+              <AccountLanguageGate>
                 <Authed />
-              </PanelLanguageGate>
+              </AccountLanguageGate>
             </UpdatesNotificationProvider>
           </NotificationsProvider>
         ) : (

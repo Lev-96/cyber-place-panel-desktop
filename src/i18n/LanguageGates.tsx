@@ -3,36 +3,50 @@ import Spinner from "@/components/ui/Spinner";
 import { useAuth } from "@/auth/AuthContext";
 import { useLang } from "@/i18n/LanguageContext";
 import { Lang } from "@/i18n/translations";
-import { rememberPanelLang, shouldPromptPanelLanguage } from "@/i18n/languagePreference";
+import {
+  notePreLoginChoice,
+  readAccountLang,
+  setActiveAccount,
+  takePreLoginChoice,
+} from "@/i18n/languagePreference";
 import { ReactNode, useEffect, useState } from "react";
 
 /**
- * The two language steps of the startup flow.
+ * The language steps of the startup flow.
  *
- * Flow, end to end:
+ *   launch ─ never chosen on this machine? ─→ [FirstRunLanguageGate] ─┐
+ *          └─ already chosen ────────────────────────────────────────┤
+ *                                                                    ▼
+ *                                                                  login
+ *                                                                    │
+ *                              ┌─────────────────────────────────────┘
+ *                              ▼
+ *              [AccountLanguageGate] ─ account has a language? ─→ apply it, no dialog
+ *                                    └ first login for it?      ─→ ask once, store it
  *
- *   launch → [FirstRunLanguageGate] → login → (owner/manager)
- *          → [PanelLanguageGate] → cabinet
+ * The account is the source of truth. The device-level preference exists only
+ * so the LOGIN screen — where there is no account to read from — has a language
+ * to render in.
  *
- * Both gates are *render* gates, not routes. Making them routes would mean the
- * app can be deep-linked past them (the panel uses HashRouter, and a restored
- * window reopens its last hash), and it would put a navigation in the middle of
- * a decision that is not a place in the app.
+ * Both gates are *render* gates, not routes. Making them routes would let a
+ * restored deep link skip them (the panel uses HashRouter and reopens its last
+ * hash on launch), and would put a navigation in the middle of a decision that
+ * is not a place in the app.
  *
- * A note on "load all data in the chosen language without a reload": no reload
- * is needed and none is performed. Every auto-translated entity ships all
- * locales in its `i18n` bag and the client resolves them at render time, so
- * changing the language re-renders instantly — offline, from data already in
- * memory. Refetching on language change would be pure waste; the gate exists to
- * confirm a preference, not to trigger a load.
+ * A note on "open the cabinet already in the chosen language": no refetch
+ * happens and none is needed. Every auto-translated entity ships all locales in
+ * its `i18n` bag and the client resolves them at render time, so applying a
+ * language is an instant re-render from data already in memory.
  */
 
 /**
- * Blocks the app until a language is chosen on a fresh install.
+ * Pre-login picker, shown over the login screen on a machine where nobody has
+ * ever chosen a language.
  *
- * Rendered ABOVE the auth flow, so the very first thing a new install shows is
- * this screen and not a login form in a language the user may not read. Once
- * chosen it never appears again — Settings owns changes from then on.
+ * Rendered ABOVE the auth flow so a fresh install does not present a sign-in
+ * form in a language the user may not read. The choice is remembered on the
+ * device AND handed to the first account that signs in, so that account is not
+ * asked the same question again seconds later.
  */
 export const FirstRunLanguageGate = ({ children }: { children: ReactNode }) => {
   const { lang, setLang, ready, chosen } = useLang();
@@ -42,6 +56,13 @@ export const FirstRunLanguageGate = ({ children }: { children: ReactNode }) => {
   if (!ready) return <Spinner />;
 
   if (!chosen) {
+    const confirm = (l: Lang) => {
+      // Recorded before setLang so the account gate, which may mount in the
+      // very next commit, already sees the hand-off.
+      notePreLoginChoice(l);
+      setLang(l);
+    };
+
     return (
       <>
         {/* The login screen renders behind the picker, blurred and inert. It
@@ -62,13 +83,120 @@ export const FirstRunLanguageGate = ({ children }: { children: ReactNode }) => {
           // making a choice. A dismissable first-run picker just becomes a
           // dialog everyone closes, and then the app is in a language nobody
           // picked.
-          onConfirm={(l: Lang) => setLang(l)}
+          onConfirm={confirm}
         />
       </>
     );
   }
 
   return <>{children}</>;
+};
+
+/**
+ * Per-account language step, shown once for each account that has never chosen.
+ *
+ * Three outcomes, decided from storage on every sign-in and account switch:
+ *
+ *   • the account has a language  → apply it silently, no dialog. This is what
+ *     makes "sign out and back in" and "same account on another machine" quiet.
+ *   • it inherits the pre-login choice from this app run → adopt it silently.
+ *     The user picked a language moments ago on the login screen; asking again
+ *     immediately would read as a bug.
+ *   • neither → ask, once, and store it against the account.
+ *
+ * Applies to every role. Language is a property of the person, and an admin is
+ * as entitled to their own as anyone else.
+ */
+export const AccountLanguageGate = ({ children }: { children: ReactNode }) => {
+  const { user } = useAuth();
+  const { lang, setLang, ready } = useLang();
+  const [decided, setDecided] = useState(false);
+  const [prompt, setPrompt] = useState(false);
+
+  const userId = user?.id;
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!ready || userId == null) return;
+
+    // Every language write from here on — this gate, Settings, anywhere —
+    // is attributed to this account. Cleared on sign-out below so a write
+    // can never land on the account that just left.
+    setActiveAccount(userId);
+
+    void (async () => {
+      const stored = await readAccountLang(userId);
+      // The account can change under us (sign-out, account switch) while the
+      // storage read is in flight; committing a stale answer would prompt the
+      // wrong person or skip the right one.
+      if (cancelled) return;
+
+      if (stored) {
+        // The account's language wins over whatever the device booted in.
+        setLang(stored);
+        setPrompt(false);
+        setDecided(true);
+        return;
+      }
+
+      const inherited = takePreLoginChoice();
+      if (inherited) {
+        // Persists against the account, because setActiveAccount ran above.
+        setLang(inherited);
+        setPrompt(false);
+        setDecided(true);
+        return;
+      }
+
+      setPrompt(true);
+      setDecided(true);
+    })();
+
+    return () => {
+      cancelled = true;
+      setActiveAccount(null);
+    };
+    // Re-runs on account switch, which is what re-arms the gate for the next
+    // person on a shared front-desk machine.
+  }, [ready, userId, setLang]);
+
+  // A signed-out render must never hold the app: the gate lives inside the
+  // authed tree, so this is the unmount path.
+  if (userId == null) return <>{children}</>;
+
+  // Until the account's preference has been read we cannot render the app in a
+  // language we might be about to change — that would flash the device language
+  // and then snap to the account's. The read is a local key-value lookup.
+  if (!decided) return <Spinner />;
+
+  if (!prompt) return <>{children}</>;
+
+  const confirm = (l: Lang) => {
+    // setLang persists to both scopes; the account write is what stops this
+    // dialog ever appearing for them again.
+    setLang(l);
+    setPrompt(false);
+  };
+
+  return (
+    <>
+      {/* Same treatment as the pre-login step: the cabinet sits behind the
+          dialog, blurred and inert. Consistency matters — two language dialogs
+          that look like different products would read as a bug. The tree stays
+          MOUNTED, so nothing refetches once the choice is made. */}
+      <InertBackdrop>{children}</InertBackdrop>
+      <LanguagePickerModal
+        open
+        variant="account"
+        initial={lang}
+        onConfirm={confirm}
+        // No onDismiss: this is the account's one and only prompt, so it has to
+        // produce an answer. Dismissing would either re-ask forever or silently
+        // pick for them.
+      />
+    </>
+  );
 };
 
 /**
@@ -88,77 +216,3 @@ const InertBackdrop = ({ children }: { children: ReactNode }) => (
     {children}
   </div>
 );
-
-/**
- * Workspace language step for owner / manager, shown before their cabinet.
- *
- * Scoped to the session rather than to navigation: it appears once when the
- * authenticated session starts and never again while that session lives, so
- * moving between screens inside the cabinet is never interrupted. Whether it
- * appears at all on subsequent launches is the `PANEL_LANGUAGE_PROMPT` policy.
- *
- * Admin is excluded by policy — admins run the network-wide console and were
- * not part of this requirement.
- */
-export const PanelLanguageGate = ({ children }: { children: ReactNode }) => {
-  const { user } = useAuth();
-  const { lang, setLang, ready } = useLang();
-  const [decided, setDecided] = useState(false);
-  const [prompt, setPrompt] = useState(false);
-
-  const userId = user?.id;
-  const role = user?.role;
-
-  useEffect(() => {
-    let cancelled = false;
-
-    if (!ready || userId == null) return;
-
-    void (async () => {
-      const needed = await shouldPromptPanelLanguage(role, userId);
-      // The account can change under us (sign out, account switch) while the
-      // storage read is in flight; committing a stale answer would prompt the
-      // wrong user or skip the right one.
-      if (cancelled) return;
-      setPrompt(needed);
-      setDecided(true);
-    })();
-
-    return () => { cancelled = true; };
-    // Re-runs on account switch, which is what re-arms the gate for the next
-    // user on a shared front-desk machine.
-  }, [ready, role, userId]);
-
-  // Render children while the (fast, local) check runs rather than a spinner:
-  // the overwhelming case is "no prompt needed", and flashing a spinner on
-  // every launch to answer a key-value lookup is a worse trade than the modal
-  // appearing a frame later.
-  if (!decided || !prompt || userId == null) return <>{children}</>;
-
-  const commit = (l: Lang) => {
-    setLang(l);
-    void rememberPanelLang(userId, l);
-    setPrompt(false);
-  };
-
-  return (
-    <>
-      {/* Same treatment as the first-run step: the cabinet sits behind the
-          dialog, blurred and inert. Consistency matters here — two language
-          dialogs a minute apart that look like different products would read
-          as a bug. The tree stays MOUNTED, so nothing refetches once the
-          choice is made. */}
-      <InertBackdrop>{children}</InertBackdrop>
-      <LanguagePickerModal
-        open
-        variant="workspace"
-        initial={lang}
-        onConfirm={commit}
-        // Dismissing keeps the current language — it is a confirmation step,
-        // not a required field, and trapping someone in it after they have
-        // already authenticated would be hostile.
-        onDismiss={() => commit(lang)}
-      />
-    </>
-  );
-};

@@ -4,16 +4,17 @@ import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 /**
- * Behavioural cover for the startup language flow.
+ * Behavioural cover for the language-selection flow.
  *
- * The three assertions that actually protect the requirement:
+ * The whole specification, as tests:
  *
- *  1. a fresh install shows the picker and NOT the login screen behind it;
- *  2. a returning install never sees the picker again (a language chosen once
- *     must stay chosen — re-prompting on every launch is the classic bug here);
- *  3. the picker never renders on stale state — while the async store read is
- *     in flight the app waits, because guessing "not chosen" would re-prompt
- *     every returning user on every launch.
+ *   1. first ever launch → picker over the login screen;
+ *   2. after signing in, that account is never asked again;
+ *   3. sign out and back in to the SAME account → no picker, their language
+ *      is applied;
+ *   4. sign in as a DIFFERENT account that has never chosen → picker;
+ *   5. sign in as a different account that HAS chosen → no picker;
+ *   6. the preference belongs to the account, not the machine.
  */
 
 const lang = vi.hoisted(() => ({
@@ -28,8 +29,10 @@ const auth = vi.hoisted(() => ({
 }));
 
 const prefs = vi.hoisted(() => ({
-  shouldPromptPanelLanguage: vi.fn(async () => false),
-  rememberPanelLang: vi.fn(async () => {}),
+  readAccountLang: vi.fn(async (_id: number): Promise<string | null> => null),
+  setActiveAccount: vi.fn(),
+  notePreLoginChoice: vi.fn(),
+  takePreLoginChoice: vi.fn((): string | null => null),
 }));
 
 vi.mock("@/i18n/LanguageContext", () => ({
@@ -48,11 +51,13 @@ vi.mock("@/i18n/LanguageContext", () => ({
 vi.mock("@/auth/AuthContext", () => ({ useAuth: () => ({ user: auth.user }) }));
 
 vi.mock("@/i18n/languagePreference", () => ({
-  shouldPromptPanelLanguage: prefs.shouldPromptPanelLanguage,
-  rememberPanelLang: prefs.rememberPanelLang,
+  readAccountLang: prefs.readAccountLang,
+  setActiveAccount: prefs.setActiveAccount,
+  notePreLoginChoice: prefs.notePreLoginChoice,
+  takePreLoginChoice: prefs.takePreLoginChoice,
 }));
 
-import { FirstRunLanguageGate, PanelLanguageGate } from "@/i18n/LanguageGates";
+import { AccountLanguageGate, FirstRunLanguageGate } from "@/i18n/LanguageGates";
 
 const CHILD = <div data-testid="app">app</div>;
 
@@ -61,17 +66,18 @@ const CHILD = <div data-testid="app">app</div>;
  * HIGHLIGHTED language (live preview), so its copy changes as the user arrows
  * through the list and asserting on it would make these tests about wording.
  */
-const pickerShown = (variant: "firstRun" | "workspace") =>
+const pickerShown = (variant: "firstRun" | "account") =>
   screen.queryByTestId(`lang-picker-${variant}`) !== null;
 
-const confirm = () => screen.getByTestId("lang-confirm");
+const confirmButton = () => screen.getByTestId("lang-confirm");
 
 beforeEach(() => {
   lang.lang = "en";
   lang.ready = true;
   lang.chosen = true;
   auth.user = null;
-  prefs.shouldPromptPanelLanguage.mockResolvedValue(false);
+  prefs.readAccountLang.mockResolvedValue(null);
+  prefs.takePreLoginChoice.mockReturnValue(null);
 });
 
 afterEach(() => {
@@ -79,7 +85,7 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-describe("FirstRunLanguageGate", () => {
+describe("FirstRunLanguageGate — before anyone signs in", () => {
   test("a fresh install sees the picker over the login screen", () => {
     lang.chosen = false;
     render(<FirstRunLanguageGate>{CHILD}</FirstRunLanguageGate>);
@@ -98,14 +104,13 @@ describe("FirstRunLanguageGate", () => {
 
     // Rendering the form behind the dialog is only acceptable if it is truly
     // unreachable: mouse (CSS pointer-events), keyboard and programmatic focus
-    // (inert), and screen readers (aria-hidden). Losing any one of these turns
-    // decoration into a way past a blocking dialog.
+    // (inert), and screen readers (aria-hidden).
     expect(backdrop.getAttribute("aria-hidden")).toBe("true");
     expect(backdrop.hasAttribute("inert")).toBe(true);
     expect(backdrop.contains(screen.getByTestId("app"))).toBe(true);
   });
 
-  test("a returning install goes straight through", () => {
+  test("a machine where a language was already chosen goes straight through", () => {
     lang.chosen = true;
     render(<FirstRunLanguageGate>{CHILD}</FirstRunLanguageGate>);
 
@@ -124,14 +129,17 @@ describe("FirstRunLanguageGate", () => {
     expect(screen.queryByTestId("app")).toBeNull();
   });
 
-  test("choosing a language commits it", () => {
+  test("choosing a language commits it and hands it to the first account", () => {
     lang.chosen = false;
     render(<FirstRunLanguageGate>{CHILD}</FirstRunLanguageGate>);
 
     fireEvent.click(screen.getByText("Հայերեն"));
-    fireEvent.click(confirm());
+    fireEvent.click(confirmButton());
 
     expect(lang.setLang).toHaveBeenCalledWith("am");
+    // The hand-off is what stops the account gate asking the same question
+    // again two seconds later.
+    expect(prefs.notePreLoginChoice).toHaveBeenCalledWith("am");
   });
 
   test("the picker offers every configured language, by its own name", () => {
@@ -145,69 +153,115 @@ describe("FirstRunLanguageGate", () => {
   });
 });
 
-describe("PanelLanguageGate", () => {
-  const renderFor = async (role: Role, prompt: boolean) => {
-    auth.user = { id: 5, name: "U", email: "u@t.test", role };
-    prefs.shouldPromptPanelLanguage.mockResolvedValue(prompt);
+describe("AccountLanguageGate — once per account", () => {
+  const signIn = async (id: number, role: Role = "manager") => {
+    auth.user = { id, name: "U", email: `u${id}@t.test`, role };
     await act(async () => {
-      render(<PanelLanguageGate>{CHILD}</PanelLanguageGate>);
+      render(<AccountLanguageGate>{CHILD}</AccountLanguageGate>);
     });
   };
 
-  test("an owner is asked before the cabinet is usable", async () => {
-    await renderFor("company_owner", true);
+  test("an account that has never chosen is asked", async () => {
+    prefs.readAccountLang.mockResolvedValue(null);
+    await signIn(5);
 
-    expect(pickerShown("workspace")).toBe(true);
+    expect(pickerShown("account")).toBe(true);
   });
 
-  test("a manager is asked too", async () => {
-    await renderFor("manager", true);
+  test("an account that already chose is never asked, and gets its language", async () => {
+    // Sign out and back in to the SAME account: silent, and in their language.
+    prefs.readAccountLang.mockResolvedValue("am");
+    await signIn(5);
 
-    expect(pickerShown("workspace")).toBe(true);
-  });
-
-  test("an admin is never asked", async () => {
-    await renderFor("admin", false);
-
-    expect(pickerShown("workspace")).toBe(false);
+    expect(pickerShown("account")).toBe(false);
+    expect(lang.setLang).toHaveBeenCalledWith("am");
     expect(screen.getByTestId("app")).toBeTruthy();
   });
 
-  test("confirming stores the choice per user and closes the step", async () => {
-    await renderFor("company_owner", true);
+  test("a different account that has never chosen IS asked", async () => {
+    // Account 9 signs in on the same machine where account 5 already chose.
+    // Reading per account is what makes this correct.
+    prefs.readAccountLang.mockImplementation(async (id: number) =>
+      (id === 5 ? "ru" : null),
+    );
+    await signIn(9);
 
-    // Two separate acts: batching both clicks into one flush would make the
-    // confirm read the pre-click selection, which is a test artefact, not the
-    // behaviour a user gets.
-    await act(async () => { fireEvent.click(screen.getByText("Русский")); });
-    await act(async () => { fireEvent.click(confirm()); });
-
-    expect(lang.setLang).toHaveBeenCalledWith("ru");
-    expect(prefs.rememberPanelLang).toHaveBeenCalledWith(5, "ru");
-    expect(pickerShown("workspace")).toBe(false);
+    expect(prefs.readAccountLang).toHaveBeenCalledWith(9);
+    expect(pickerShown("account")).toBe(true);
   });
 
-  test("the cabinet is never blocked by an unauthenticated render", async () => {
-    // Sign-out unmounts the authed tree; the gate must not hold a dead session.
+  test("every role is treated the same — including admin", async () => {
+    prefs.readAccountLang.mockResolvedValue(null);
+    await signIn(11, "admin");
+
+    expect(pickerShown("account")).toBe(true);
+  });
+
+  test("confirming stores the choice against the signed-in account", async () => {
+    prefs.readAccountLang.mockResolvedValue(null);
+    await signIn(5);
+
+    await act(async () => { fireEvent.click(screen.getByText("Русский")); });
+    await act(async () => { fireEvent.click(confirmButton()); });
+
+    // setActiveAccount(5) ran first, so setLang persists to the account scope.
+    expect(prefs.setActiveAccount).toHaveBeenCalledWith(5);
+    expect(lang.setLang).toHaveBeenCalledWith("ru");
+    expect(pickerShown("account")).toBe(false);
+  });
+
+  test("the first account inherits the pre-login choice instead of being asked twice", async () => {
+    // Fresh install: the picker was answered on the login screen seconds ago.
+    prefs.readAccountLang.mockResolvedValue(null);
+    prefs.takePreLoginChoice.mockReturnValue("am");
+    await signIn(5);
+
+    expect(pickerShown("account")).toBe(false);
+    expect(lang.setLang).toHaveBeenCalledWith("am");
+  });
+
+  test("language writes are attributed to the account, and released on sign-out", async () => {
+    prefs.readAccountLang.mockResolvedValue("ru");
+    await signIn(5);
+
+    expect(prefs.setActiveAccount).toHaveBeenCalledWith(5);
+
+    cleanup();
+    // Unmount = sign-out. A later write must not land on the account that left.
+    expect(prefs.setActiveAccount).toHaveBeenLastCalledWith(null);
+  });
+
+  test("a signed-out render never blocks the app", async () => {
     auth.user = null;
     await act(async () => {
-      render(<PanelLanguageGate>{CHILD}</PanelLanguageGate>);
+      render(<AccountLanguageGate>{CHILD}</AccountLanguageGate>);
     });
 
     expect(screen.getByTestId("app")).toBeTruthy();
-    expect(prefs.shouldPromptPanelLanguage).not.toHaveBeenCalled();
+    expect(prefs.readAccountLang).not.toHaveBeenCalled();
   });
 
-  test("the app stays mounted underneath, so nothing refetches after the choice", async () => {
-    // The workspace step renders OVER the cabinet rather than replacing it:
-    // remounting the tree would throw away every loaded list and re-request it,
-    // which is exactly the "reload after choosing a language" this design
-    // avoids — all locales are already in the payload.
-    await renderFor("manager", true);
+  test("the cabinet is not rendered in the wrong language while the account loads", async () => {
+    // Rendering children before the account preference is read would show the
+    // device language and then snap to the account's — a visible flash.
+    let resolve: (v: string | null) => void = () => {};
+    prefs.readAccountLang.mockReturnValue(new Promise((r) => { resolve = r; }));
+
+    auth.user = { id: 5, name: "U", email: "u@t.test", role: "manager" };
+    render(<AccountLanguageGate>{CHILD}</AccountLanguageGate>);
+
+    expect(screen.queryByTestId("app")).toBeNull();
+
+    await act(async () => { resolve("am"); });
+    expect(screen.getByTestId("app")).toBeTruthy();
+  });
+
+  test("the app stays mounted under the dialog, so nothing refetches", async () => {
+    prefs.readAccountLang.mockResolvedValue(null);
+    await signIn(5);
 
     expect(screen.getByTestId("app")).toBeTruthy();
-    expect(pickerShown("workspace")).toBe(true);
-    // Behind the dialog, and inert for the same reasons as the first-run step.
+    expect(pickerShown("account")).toBe(true);
     expect(screen.getByTestId("lang-backdrop").hasAttribute("inert")).toBe(true);
   });
 });

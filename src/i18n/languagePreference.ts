@@ -2,107 +2,131 @@ import { keyValueStore } from "@/infrastructure/KeyValueStore";
 import { Lang, LANGUAGES } from "@/i18n/translations";
 
 /**
- * Persistence + policy for the language-selection flow.
+ * Persistence for the language-selection flow.
  *
  * Split out of LanguageContext deliberately: these are pure async functions
- * over the key-value store, so the whole policy ("has this person chosen yet?",
- * "should the workspace ask again?") is unit-testable without mounting React or
- * an Electron bridge.
+ * over the key-value store, so the whole policy ("has this account chosen
+ * yet?") is unit-testable without mounting React or an Electron bridge.
  *
- * Two storage scopes, matching the convention the panel already uses for
- * per-user UI state (`u{id}:key`):
+ * ── Two scopes, and which one is authoritative ────────────────────────────
  *
- *   cp.lang / cp.lang.chosen   — MACHINE scope. The language the app boots in,
- *                                picked on first run before anyone has logged
- *                                in. There is no user yet at that point, so it
- *                                cannot be per-user.
- *   u{id}:cp.panelLang         — USER scope. The language confirmed for that
- *                                account's workspace. A shared front-desk
- *                                machine may be used by a Russian-speaking
- *                                manager on one shift and an Armenian-speaking
- *                                owner on the next; keying by user is what
- *                                stops one overwriting the other.
+ *   u{id}:cp.lang   ACCOUNT scope, and the source of truth. Once someone is
+ *                   signed in, their language follows the account — not the
+ *                   machine. Two people sharing one front-desk PC each get
+ *                   their own; the same person on a second PC gets theirs.
+ *
+ *   cp.lang         DEVICE scope. Used for exactly one thing: rendering the
+ *                   LOGIN screen, where there is no account yet to read a
+ *                   preference from. It is also the boot value, so the app
+ *                   does not flash English before the account preference
+ *                   loads. It never overrides an account's choice.
+ *
+ *   cp.lang.chosen  Whether a human has ever picked a language on this
+ *                   machine — gates the pre-login picker.
+ *
+ * Every write goes through {@link rememberLang}, which mirrors into the active
+ * account automatically. That is why changing the language in Settings persists
+ * per account without Settings knowing anything about accounts.
  */
 
-const KEY_LANG = "cp.lang";
-const KEY_LANG_CHOSEN = "cp.lang.chosen";
-const KEY_PANEL_LANG = (userId: number): string => `u${userId}:cp.panelLang`;
-
-/**
- * How often the workspace step asks.
- *
- * `always` — every time an owner/manager session starts (app launch or login).
- *            This is what the product spec asks for, and it is the default so
- *            that what ships matches what was specified.
- * `once`   — ask the first time only, then remember per user.
- *
- * Recommendation is `once`: the choice is already persisted and changeable from
- * Settings at any moment, so re-asking on every launch is an interruption that
- * buys nothing — and a prompt a user answers identically every day is a prompt
- * they stop reading. Flip this constant to change the behaviour; nothing else
- * needs to move.
- */
-export const PANEL_LANGUAGE_PROMPT: "always" | "once" = "always";
-
-/** Roles that get the workspace language step. Admin is deliberately excluded. */
-export const PANEL_LANGUAGE_ROLES = ["company_owner", "manager"] as const;
+const KEY_DEVICE_LANG = "cp.lang";
+const KEY_DEVICE_CHOSEN = "cp.lang.chosen";
+const KEY_ACCOUNT_LANG = (userId: number): string => `u${userId}:cp.lang`;
 
 const isLang = (v: unknown): v is Lang =>
   typeof v === "string" && LANGUAGES.some((l) => l.code === v);
 
+/* ── Active account ─────────────────────────────────────────────────────── */
+
+/**
+ * Which account language writes should be attributed to.
+ *
+ * Module state rather than a prop because the write path is
+ * `LanguageContext.setLang`, which is called from Settings, from both gates and
+ * from anywhere else in the app. Threading a user id through every one of those
+ * call sites would mean each could forget it — and a forgotten one silently
+ * writes a device-only preference, which is the exact bug this design removes.
+ */
+let activeAccountId: number | null = null;
+
+export const setActiveAccount = (userId: number | null): void => {
+  activeAccountId = userId;
+};
+
+export const getActiveAccount = (): number | null => activeAccountId;
+
+/* ── Pre-login choice hand-off ──────────────────────────────────────────── */
+
+/**
+ * The language picked on the login screen during THIS app run, if any.
+ *
+ * When the first account then signs in, it adopts this instead of being asked
+ * again — the person chose a language seconds ago and asking twice in a row
+ * reads as a broken app. Deliberately in-memory: on the next launch the device
+ * preference must NOT be adopted by an unrelated account, because that account
+ * genuinely has not chosen yet and is entitled to the picker.
+ */
+let preLoginChoice: Lang | null = null;
+
+export const notePreLoginChoice = (lang: Lang): void => {
+  preLoginChoice = lang;
+};
+
+/** Read and clear — a hand-off is consumed by exactly one account. */
+export const takePreLoginChoice = (): Lang | null => {
+  const value = preLoginChoice;
+  preLoginChoice = null;
+  return value;
+};
+
+/* ── Device scope (login screen only) ───────────────────────────────────── */
+
 /** The language the app should boot in, or null when nobody has ever chosen. */
 export const readStoredLang = async (): Promise<Lang | null> => {
-  const stored = await keyValueStore.get<Lang>(KEY_LANG);
+  const stored = await keyValueStore.get<Lang>(KEY_DEVICE_LANG);
   return isLang(stored) ? stored : null;
 };
 
 /**
- * Has a human explicitly chosen the app language?
+ * Has a human explicitly chosen a language on this machine?
  *
  * Tracked with its own flag rather than inferred from `cp.lang` being present,
  * because any future code path that writes a *default* language would otherwise
- * silently suppress the first-run screen. An explicit flag can only be set by
+ * silently suppress the pre-login picker. An explicit flag can only be set by
  * someone clicking a language.
  */
 export const hasChosenLang = async (): Promise<boolean> =>
-  (await keyValueStore.get<boolean>(KEY_LANG_CHOSEN)) === true;
+  (await keyValueStore.get<boolean>(KEY_DEVICE_CHOSEN)) === true;
 
-/** Persist a first-run / Settings choice. */
-export const rememberLang = async (lang: Lang): Promise<void> => {
-  await keyValueStore.set(KEY_LANG, lang);
-  await keyValueStore.set(KEY_LANG_CHOSEN, true);
-};
+/* ── Account scope (authoritative) ──────────────────────────────────────── */
 
-/** The language this user last confirmed for their workspace, if any. */
-export const readPanelLang = async (userId: number): Promise<Lang | null> => {
-  const stored = await keyValueStore.get<Lang>(KEY_PANEL_LANG(userId));
+export const readAccountLang = async (userId: number): Promise<Lang | null> => {
+  const stored = await keyValueStore.get<Lang>(KEY_ACCOUNT_LANG(userId));
   return isLang(stored) ? stored : null;
 };
 
-export const rememberPanelLang = async (userId: number, lang: Lang): Promise<void> => {
-  await keyValueStore.set(KEY_PANEL_LANG(userId), lang);
-  // The workspace choice is also the app language from here on — one active
-  // language, not two competing ones (see the note in LanguageGates).
-  await rememberLang(lang);
+/** Has this account ever chosen? Drives whether the picker is shown at all. */
+export const hasAccountLang = async (userId: number): Promise<boolean> =>
+  (await readAccountLang(userId)) !== null;
+
+export const rememberAccountLang = async (userId: number, lang: Lang): Promise<void> => {
+  await keyValueStore.set(KEY_ACCOUNT_LANG(userId), lang);
 };
 
-/** Does this role get the workspace language step at all? */
-export const roleNeedsPanelLanguage = (role: string | undefined): boolean =>
-  PANEL_LANGUAGE_ROLES.includes(role as (typeof PANEL_LANGUAGE_ROLES)[number]);
+/* ── The single write path ──────────────────────────────────────────────── */
 
 /**
- * Should the workspace step be shown for this user right now?
+ * Persist a language choice, wherever it came from.
  *
- * Under the `always` policy the answer is yes for every eligible role — the
- * caller shows it once per session, not once per navigation, so "always" means
- * "every time they start working", never "every time they click a link".
+ * Always writes the device scope (so the next login screen renders in it) and,
+ * when someone is signed in, the account scope too — which is what makes the
+ * account the source of truth from then on.
  */
-export const shouldPromptPanelLanguage = async (
-  role: string | undefined,
-  userId: number,
-): Promise<boolean> => {
-  if (!roleNeedsPanelLanguage(role)) return false;
-  if (PANEL_LANGUAGE_PROMPT === "always") return true;
+export const rememberLang = async (lang: Lang): Promise<void> => {
+  await keyValueStore.set(KEY_DEVICE_LANG, lang);
+  await keyValueStore.set(KEY_DEVICE_CHOSEN, true);
 
-  return (await readPanelLang(userId)) === null;
+  if (activeAccountId !== null) {
+    await rememberAccountLang(activeAccountId, lang);
+  }
 };

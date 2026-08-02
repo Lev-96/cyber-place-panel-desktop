@@ -11,8 +11,9 @@ interface Props {
   onConfirm: (lang: Lang) => void;
   /** Omitted for the blocking first-run step: there is nothing to go back to. */
   onDismiss?: () => void;
-  /** Copy variant. `firstRun` welcomes; `workspace` confirms before the cabinet. */
-  variant: "firstRun" | "workspace";
+  /** Copy variant. `firstRun` greets on the login screen; `account` is the
+   *  once-per-account step right after signing in. */
+  variant: "firstRun" | "account";
 }
 
 /**
@@ -30,9 +31,11 @@ interface Props {
  *  - **Real radio semantics.** A `radiogroup` with roving tabindex, arrow-key
  *    navigation and Enter to confirm — so the first screen of the app is usable
  *    from the keyboard alone, which on a front-desk machine is common.
- *  - **No dead end.** The first-run variant cannot be dismissed (there is no
- *    app behind it yet); the workspace variant can, and dismissing simply keeps
- *    the current language.
+ *  - **Answer required.** Neither variant is dismissable in the current flow:
+ *    each is asked exactly once (per machine, then per account), so a dismissal
+ *    would either re-ask forever or silently pick on the user's behalf. The
+ *    `onDismiss` prop stays because a future caller — a language switcher
+ *    opened from Settings — is genuinely cancellable.
  */
 const LanguagePickerModal = ({ open, initial, onConfirm, onDismiss, variant }: Props) => {
   const [selected, setSelected] = useState<Lang>(initial);
@@ -74,10 +77,10 @@ const LanguagePickerModal = ({ open, initial, onConfirm, onDismiss, variant }: P
         <div className="cp-langpick-head" data-testid={`lang-picker-${variant}`}>
           <span className="cp-langpick-eyebrow">Cyber Place</span>
           <h2 id="cp-langpick-title" className="cp-langpick-title">
-            {t(variant === "firstRun" ? "lang.firstRun.title" : "lang.workspace.title")}
+            {t(variant === "firstRun" ? "lang.firstRun.title" : "lang.account.title")}
           </h2>
           <p className="cp-langpick-sub">
-            {t(variant === "firstRun" ? "lang.firstRun.subtitle" : "lang.workspace.subtitle")}
+            {t(variant === "firstRun" ? "lang.firstRun.subtitle" : "lang.account.subtitle")}
           </p>
         </div>
 

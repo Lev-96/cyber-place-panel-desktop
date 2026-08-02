@@ -21,20 +21,27 @@ const store = vi.hoisted(() => {
 vi.mock("@/infrastructure/KeyValueStore", () => ({ keyValueStore: store.keyValueStore }));
 
 import {
-  PANEL_LANGUAGE_PROMPT,
+  getActiveAccount,
+  hasAccountLang,
   hasChosenLang,
-  readPanelLang,
+  notePreLoginChoice,
+  readAccountLang,
   readStoredLang,
+  rememberAccountLang,
   rememberLang,
-  rememberPanelLang,
-  roleNeedsPanelLanguage,
-  shouldPromptPanelLanguage,
+  setActiveAccount,
+  takePreLoginChoice,
 } from "@/i18n/languagePreference";
 
-beforeEach(() => store.data.clear());
+beforeEach(() => {
+  store.data.clear();
+  setActiveAccount(null);
+  takePreLoginChoice(); // drain any hand-off left by a previous test
+});
+
 afterEach(() => vi.clearAllMocks());
 
-describe("first-run detection", () => {
+describe("device scope — the login screen only", () => {
   test("a fresh install has neither a language nor a choice", async () => {
     expect(await readStoredLang()).toBeNull();
     expect(await hasChosenLang()).toBe(false);
@@ -48,7 +55,7 @@ describe("first-run detection", () => {
   });
 
   test("a stored language alone does NOT count as a choice", async () => {
-    // The distinction that keeps the first-run screen honest: if any future
+    // The distinction that keeps the pre-login screen honest: if any future
     // code path writes a *default* language, the user must still be asked.
     store.data.set("cp.lang", "ru");
 
@@ -57,61 +64,86 @@ describe("first-run detection", () => {
   });
 
   test("a corrupted stored value degrades to 'never chosen' instead of throwing", async () => {
-    // A bad value must not break startup — the gate simply asks again.
     store.data.set("cp.lang", "klingon");
 
     expect(await readStoredLang()).toBeNull();
   });
 });
 
-describe("workspace language is per user", () => {
-  test("two accounts on one machine keep separate choices", async () => {
-    // The shared front-desk case: a Russian-speaking manager on one shift, an
-    // Armenian-speaking owner on the next.
-    await rememberPanelLang(7, "ru");
-    await rememberPanelLang(9, "am");
-
-    expect(await readPanelLang(7)).toBe("ru");
-    expect(await readPanelLang(9)).toBe("am");
+describe("account scope — the source of truth", () => {
+  test("an account that has never chosen has nothing stored", async () => {
+    expect(await readAccountLang(7)).toBeNull();
+    expect(await hasAccountLang(7)).toBe(false);
   });
 
-  test("confirming a workspace language also becomes the app language", async () => {
-    // One active language, not two competing ones — otherwise signing out would
-    // snap the UI back to a different language than the one just confirmed.
-    await rememberPanelLang(7, "am");
+  test("two accounts on one machine keep separate languages", async () => {
+    // The requirement in one test: the preference belongs to the account, not
+    // to the device. A shared front-desk PC must not make one person's choice
+    // overwrite the other's.
+    await rememberAccountLang(7, "ru");
+    await rememberAccountLang(9, "am");
 
-    expect(await readStoredLang()).toBe("am");
-    expect(await hasChosenLang()).toBe(true);
+    expect(await readAccountLang(7)).toBe("ru");
+    expect(await readAccountLang(9)).toBe("am");
   });
 
-  test("an unknown user id simply has no stored choice", async () => {
-    expect(await readPanelLang(1234)).toBeNull();
+  test("while signed in, every language write lands on the account too", async () => {
+    // This is what makes a change in Settings persist per account without
+    // Settings knowing anything about accounts.
+    setActiveAccount(42);
+    await rememberLang("am");
+
+    expect(await readAccountLang(42)).toBe("am");
+    expect(await readStoredLang()).toBe("am"); // device follows, for the next login screen
+  });
+
+  test("while signed out, a write touches the device only", async () => {
+    setActiveAccount(null);
+    await rememberLang("ru");
+
+    expect(await readStoredLang()).toBe("ru");
+    expect(await readAccountLang(42)).toBeNull();
+  });
+
+  test("signing out stops writes landing on the account that left", async () => {
+    setActiveAccount(42);
+    await rememberLang("ru");
+    setActiveAccount(null);
+
+    await rememberLang("en");
+
+    expect(await readAccountLang(42)).toBe("ru"); // untouched by the later write
+    expect(getActiveAccount()).toBeNull();
   });
 });
 
-describe("who gets asked", () => {
-  test("owner and manager do; admin does not", () => {
-    expect(roleNeedsPanelLanguage("company_owner")).toBe(true);
-    expect(roleNeedsPanelLanguage("manager")).toBe(true);
-    expect(roleNeedsPanelLanguage("admin")).toBe(false);
-    expect(roleNeedsPanelLanguage(undefined)).toBe(false);
+describe("pre-login hand-off", () => {
+  test("the first account to sign in inherits the choice just made", async () => {
+    notePreLoginChoice("am");
+
+    expect(takePreLoginChoice()).toBe("am");
   });
 
-  test("an admin is never prompted, whatever the policy", async () => {
-    expect(await shouldPromptPanelLanguage("admin", 1)).toBe(false);
+  test("it is consumed exactly once", () => {
+    // Otherwise a SECOND account signing in later in the same session would
+    // silently inherit a language it never chose, and never see the picker.
+    notePreLoginChoice("ru");
+
+    expect(takePreLoginChoice()).toBe("ru");
+    expect(takePreLoginChoice()).toBeNull();
   });
 
-  test("policy decides whether a returning owner is asked again", async () => {
-    await rememberPanelLang(1, "ru");
-
-    // Asserted against the constant rather than hard-coded, so flipping the
-    // policy flips this expectation instead of breaking the suite — the
-    // behaviour is a product decision, not an invariant.
-    expect(await shouldPromptPanelLanguage("company_owner", 1))
-      .toBe(PANEL_LANGUAGE_PROMPT === "always");
+  test("nothing is inherited when no pre-login choice was made", () => {
+    // The returning-launch case: the device already had a language, so the
+    // picker never appeared, so an unknown account must still be asked.
+    expect(takePreLoginChoice()).toBeNull();
   });
 
-  test("an owner who has never chosen is always prompted", async () => {
-    expect(await shouldPromptPanelLanguage("company_owner", 42)).toBe(true);
+  test("it does not survive an app restart", async () => {
+    // In-memory by design. Persisting it would let the device preference stand
+    // in for an account's own choice on a later launch.
+    notePreLoginChoice("am");
+    expect(store.data.has("cp.preLoginChoice")).toBe(false);
+    expect([...store.data.keys()].some((k) => k.includes("preLogin"))).toBe(false);
   });
 });

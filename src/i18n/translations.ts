@@ -1474,15 +1474,15 @@ export const TRANSLATIONS: Dict = {
     ru: "Выберите язык, на котором хотите работать. Его можно сменить в любой момент в настройках.",
     am: "Ընտրեք լեզուն, որով ցանկանում եք աշխատել։ Այն կարող եք փոխել ցանկացած պահի կարգավորումներում։",
   },
-  "lang.workspace.title": {
-    en: "Language for your workspace",
-    ru: "Язык вашего кабинета",
-    am: "Ձեր աշխատասենյակի լեզուն",
+  "lang.account.title": {
+    en: "Language for your account",
+    ru: "Язык вашего аккаунта",
+    am: "Ձեր հաշվի լեզուն",
   },
-  "lang.workspace.subtitle": {
-    en: "Your workspace and all its data will open in this language.",
-    ru: "Кабинет и все его данные откроются на этом языке.",
-    am: "Աշխատասենյակը և դրա բոլոր տվյալները կբացվեն այս լեզվով։",
+  "lang.account.subtitle": {
+    en: "This is a one-time setup. Your account will always open in this language, on any computer.",
+    ru: "Это разовая настройка. Ваш аккаунт всегда будет открываться на этом языке, на любом компьютере.",
+    am: "Սա միանվագ կարգավորում է։ Ձեր հաշիվը միշտ կբացվի այս լեզվով՝ ցանկացած համակարգչի վրա։",
   },
   "lang.continue": { en: "Continue", ru: "Продолжить", am: "Շարունակել" },
   "lang.changeLaterHint": {
