@@ -80,13 +80,29 @@ afterEach(() => {
 });
 
 describe("FirstRunLanguageGate", () => {
-  test("a fresh install sees the picker and NOT the app behind it", () => {
+  test("a fresh install sees the picker over the login screen", () => {
     lang.chosen = false;
     render(<FirstRunLanguageGate>{CHILD}</FirstRunLanguageGate>);
 
     expect(pickerShown("firstRun")).toBe(true);
-    // The whole point of the requirement: no login form underneath.
-    expect(screen.queryByTestId("app")).toBeNull();
+    // The login screen is present as context — blurred behind the dialog —
+    // rather than absent. A modal over an empty void reads as an error state.
+    expect(screen.getByTestId("app")).toBeTruthy();
+  });
+
+  test("the login screen behind the picker cannot be reached", () => {
+    lang.chosen = false;
+    render(<FirstRunLanguageGate>{CHILD}</FirstRunLanguageGate>);
+
+    const backdrop = screen.getByTestId("lang-backdrop");
+
+    // Rendering the form behind the dialog is only acceptable if it is truly
+    // unreachable: mouse (CSS pointer-events), keyboard and programmatic focus
+    // (inert), and screen readers (aria-hidden). Losing any one of these turns
+    // decoration into a way past a blocking dialog.
+    expect(backdrop.getAttribute("aria-hidden")).toBe("true");
+    expect(backdrop.hasAttribute("inert")).toBe(true);
+    expect(backdrop.contains(screen.getByTestId("app"))).toBe(true);
   });
 
   test("a returning install goes straight through", () => {
@@ -191,5 +207,7 @@ describe("PanelLanguageGate", () => {
 
     expect(screen.getByTestId("app")).toBeTruthy();
     expect(pickerShown("workspace")).toBe(true);
+    // Behind the dialog, and inert for the same reasons as the first-run step.
+    expect(screen.getByTestId("lang-backdrop").hasAttribute("inert")).toBe(true);
   });
 });

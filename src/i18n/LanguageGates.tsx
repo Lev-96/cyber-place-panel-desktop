@@ -43,21 +43,51 @@ export const FirstRunLanguageGate = ({ children }: { children: ReactNode }) => {
 
   if (!chosen) {
     return (
-      <LanguagePickerModal
-        open
-        variant="firstRun"
-        initial={lang}
-        // No onDismiss: there is deliberately no way past this screen without
-        // making a choice. A dismissable first-run picker just becomes a
-        // dialog everyone closes, and then the app is in a language nobody
-        // picked.
-        onConfirm={(l: Lang) => setLang(l)}
-      />
+      <>
+        {/* The login screen renders behind the picker, blurred and inert. It
+            gives the dialog somewhere to sit — a modal floating over an empty
+            void reads as an error state — and it shows what comes next without
+            letting anyone get there first.
+
+            Safe only because Modal portals to <body>: `filter` on this wrapper
+            establishes a containing block, so a dialog nested inside it would
+            have its `position: fixed` resolve against the blurred layer rather
+            than the viewport. Portaled out, the dialog is unaffected. */}
+        <InertBackdrop>{children}</InertBackdrop>
+        <LanguagePickerModal
+          open
+          variant="firstRun"
+          initial={lang}
+          // No onDismiss: there is deliberately no way past this screen without
+          // making a choice. A dismissable first-run picker just becomes a
+          // dialog everyone closes, and then the app is in a language nobody
+          // picked.
+          onConfirm={(l: Lang) => setLang(l)}
+        />
+      </>
     );
   }
 
   return <>{children}</>;
 };
+
+/**
+ * Decorative, non-interactive backdrop for a blocking dialog.
+ *
+ * Three mechanisms, because each closes a different way in:
+ *   - `pointer-events: none` (CSS) — the mouse;
+ *   - `inert` — keyboard focus and every programmatic focus call;
+ *   - `aria-hidden` — screen readers, which would otherwise announce a login
+ *     form the user has no way to reach.
+ *
+ * The first two are not belt-and-braces for its own sake: they keep the
+ * behaviour correct on a runtime that ignores `inert`.
+ */
+const InertBackdrop = ({ children }: { children: ReactNode }) => (
+  <div className="cp-inert-backdrop" aria-hidden="true" inert data-testid="lang-backdrop">
+    {children}
+  </div>
+);
 
 /**
  * Workspace language step for owner / manager, shown before their cabinet.
@@ -113,7 +143,12 @@ export const PanelLanguageGate = ({ children }: { children: ReactNode }) => {
 
   return (
     <>
-      {children}
+      {/* Same treatment as the first-run step: the cabinet sits behind the
+          dialog, blurred and inert. Consistency matters here — two language
+          dialogs a minute apart that look like different products would read
+          as a bug. The tree stays MOUNTED, so nothing refetches once the
+          choice is made. */}
+      <InertBackdrop>{children}</InertBackdrop>
       <LanguagePickerModal
         open
         variant="workspace"

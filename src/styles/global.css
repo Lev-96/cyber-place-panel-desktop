@@ -2412,3 +2412,25 @@ button.pill:hover {
     transform: none;
   }
 }
+
+/* Blurred, inert backdrop behind a blocking dialog (the language steps).
+   The real screen stays on view so the dialog has context instead of floating
+   over a void, but it is unreachable by mouse, keyboard and screen reader.
+
+   `scale(1.03)` hides the transparent fringe a blur leaves at the element's
+   edges — without it the viewport shows a soft light border all round.
+
+   Note both `filter` and `transform` establish a containing block: any
+   `position: fixed` child of this wrapper would resolve against it rather than
+   the viewport. That is fine only because Modal portals to <body>. */
+.cp-inert-backdrop {
+  filter: blur(10px) saturate(0.8) brightness(0.7);
+  transform: scale(1.03);
+  transform-origin: center;
+  pointer-events: none;
+  user-select: none;
+  /* The wrapper must not become a scroll source of its own — the dialog owns
+     scrolling while it is open. */
+  overflow: hidden;
+  height: 100%;
+}
