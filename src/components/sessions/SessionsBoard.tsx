@@ -1,4 +1,5 @@
 import { useAuth } from "@/auth/AuthContext";
+import { tr } from "@/i18n/translated";
 import { can } from "@/auth/permissions";
 import Button from "@/components/ui/Button";
 import CollapsibleSection from "@/components/ui/CollapsibleSection";
@@ -47,7 +48,7 @@ interface Props {
 }
 
 const SessionsBoard = ({ branchId }: Props) => {
-  const { money, t } = useLang();
+  const { money, t, lang } = useLang();
   const { user } = useAuth();
   const role = user?.role;
   const pcs = useAsync(() => sessionRepository.listPcs(branchId), [branchId]);
@@ -208,7 +209,7 @@ const SessionsBoard = ({ branchId }: Props) => {
             title={deviceStatus}
             style={{ width: 8, height: 8, borderRadius: 4, background: PC_STATUS_COLOR[deviceStatus], flexShrink: 0 }}
           />
-          <span>{pc.place?.name?.trim() || `№${pc.place?.number ?? pc.label}`}</span>
+          <span>{tr(pc.place, "name", lang).trim() || `№${pc.place?.number ?? tr(pc, "label", lang)}`}</span>
           {pc.place && pc.place.platform !== "pc" && (
             <span className="muted" style={{ fontSize: 11 }}>{platformLabel(pc.place.platform)}</span>
           )}

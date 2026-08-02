@@ -1,4 +1,6 @@
 import { PaginatedList } from "@/types/api";
+import { Lang } from "@/i18n/translations";
+import { Translated } from "@/i18n/translated";
 import { request } from "./client";
 
 /**
@@ -23,7 +25,7 @@ export const SKILL_LEVELS: readonly SkillLevel[] = [
  *   start_date / end_date in Y-m-d, branch_id + company_id + game_id REQUIRED.
  *   skill_level defaults to "any" on the backend if omitted.
  */
-export interface ITournamentApi {
+export interface ITournamentApi extends Translated {
   id: number;
   branch_id: number;
   company_id: number;
@@ -58,6 +60,13 @@ export interface CreateTournamentBody {
   participants_limit?: number;
   start_date: string; // Y-m-d
   end_date?: string;  // Y-m-d
+  /**
+   * Language the staff member typed `title` / `description` in. The backend
+   * treats this locale as the source of truth and machine-translates the
+   * others — it never writes back into it. Omitted by older panel builds, which
+   * the backend falls back to its configured default for.
+   */
+  source_locale?: Lang;
 }
 
 export type UpdateTournamentBody = Partial<Omit<CreateTournamentBody, "branch_id" | "company_id">>;

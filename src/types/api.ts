@@ -1,3 +1,5 @@
+import { Translated } from "@/i18n/translated";
+
 export type PlatformType = "pc" | "ps4" | "ps5";
 export type PlaceType = "standard" | "vip";
 /**
@@ -39,7 +41,7 @@ export interface IGame {
   platform: string;
 }
 
-export interface IBranchPlace {
+export interface IBranchPlace extends Translated {
   id: number;
   branch_id: number;
   /** Cashier-visible label distinct from the surrogate `id` (e.g. "1" or "2"). */
@@ -109,7 +111,7 @@ export interface IBookingApi {
   game?: { id: number; platform: PlatformType; name: string };
 }
 
-export interface IBranchApi {
+export interface IBranchApi extends Translated {
   id: number;
   company_id: number;
   city: string;
@@ -141,7 +143,7 @@ export interface IBranchApi {
   unlock_pin_updated_at?: string | null;
 }
 
-export interface ICompanyApi {
+export interface ICompanyApi extends Translated {
   id: number;
   user_id: number;
   user?: { id: number; name: string; email: string };

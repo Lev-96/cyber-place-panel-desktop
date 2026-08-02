@@ -1,4 +1,6 @@
 import Button from "@/components/ui/Button";
+import { Lang } from "@/i18n/translations";
+import { SourceLocaleSelect } from "@/components/ui/TranslatedField";
 import { formatApiError } from "@/api/errors";
 import Modal from "@/components/ui/Modal";
 import Input from "@/components/ui/Input";
@@ -20,7 +22,7 @@ interface Props {
 }
 
 const TournamentForm = ({ branchId, initial, onClose, onSaved }: Props) => {
-  const { t } = useLang();
+  const { t, lang } = useLang();
   const games = useAsync(() => gameRepository.list(), []);
   const branch = useAsync(() => branchRepository.byId(branchId), [branchId]);
 
@@ -35,6 +37,7 @@ const TournamentForm = ({ branchId, initial, onClose, onSaved }: Props) => {
   const [participantsLimit, setParticipantsLimit] = useState(String(initial?.participants_limit ?? ""));
   const [startDate, setStartDate] = useState(initial?.start_date?.slice(0, 10) ?? "");
   const [endDate, setEndDate] = useState(initial?.end_date?.slice(0, 10) ?? "");
+  const [sourceLocale, setSourceLocale] = useState<Lang>(initial?.source_locale ?? lang);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -59,6 +62,7 @@ const TournamentForm = ({ branchId, initial, onClose, onSaved }: Props) => {
           participants_limit: participantsLimit ? Number(participantsLimit) : undefined,
           start_date: startDate,
           end_date: endDate || undefined,
+          source_locale: sourceLocale,
         });
       } else {
         await tournamentRepository.create({
@@ -72,6 +76,7 @@ const TournamentForm = ({ branchId, initial, onClose, onSaved }: Props) => {
           participants_limit: participantsLimit ? Number(participantsLimit) : undefined,
           start_date: startDate,
           end_date: endDate || undefined,
+          source_locale: sourceLocale,
         });
       }
       onSaved();
@@ -85,6 +90,7 @@ const TournamentForm = ({ branchId, initial, onClose, onSaved }: Props) => {
         <h2 style={{ margin: 0 }}>{initial ? t("tournament.titleEdit") : t("tournament.titleNew")}</h2>
         <Input label={t("label.title")} value={title} onChange={(e) => setTitle(e.target.value)} required maxLength={255} autoFocus />
         <Input label={t("label.description")} value={description} onChange={(e) => setDescription(e.target.value)} required maxLength={255} />
+        <SourceLocaleSelect value={sourceLocale} onChange={setSourceLocale} disabled={busy} />
 
         <div className="col" style={{ gap: 6 }}>
           <span className="label">{t("label.game")}</span>

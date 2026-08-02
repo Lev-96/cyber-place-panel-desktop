@@ -1,4 +1,14 @@
-export interface IProduct {
+import { Translated } from "@/i18n/translated";
+
+/**
+ * A bar / POS item.
+ *
+ * `name` and `category` are auto-translated: staff type them once in their own
+ * language and the backend fills every other locale into `i18n`. Render sites
+ * must go through `tr(product, "name", lang)` — reading `.name` directly shows
+ * every user the author's language.
+ */
+export interface IProduct extends Translated {
   id: number;
   branch_id: number;
   name: string;

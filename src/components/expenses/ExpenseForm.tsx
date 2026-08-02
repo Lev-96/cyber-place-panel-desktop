@@ -1,4 +1,6 @@
 import { IServiceExpense } from "@/api/expenses";
+import { Lang } from "@/i18n/translations";
+import { SourceLocaleSelect } from "@/components/ui/TranslatedField";
 import { friendlyMutation } from "@/api/fallback";
 import { formatApiError } from "@/api/errors";
 import Button from "@/components/ui/Button";
@@ -27,12 +29,13 @@ const todayIso = (): string => {
 };
 
 const ExpenseForm = ({ initial, onClose, onSaved }: Props) => {
-  const { t } = useLang();
+  const { t, lang } = useLang();
   const [name, setName] = useState(initial?.name ?? "");
   const [amount, setAmount] = useState<string>(initial != null ? String(initial.amount) : "");
   const [currency, setCurrency] = useState<Currency>(initial?.currency ?? "USD");
   const [purchasedAt, setPurchasedAt] = useState<string>(initial?.purchased_at ?? todayIso());
   const [isActive, setIsActive] = useState<boolean>(initial?.is_active ?? true);
+  const [sourceLocale, setSourceLocale] = useState<Lang>(initial?.source_locale ?? lang);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -52,6 +55,7 @@ const ExpenseForm = ({ initial, onClose, onSaved }: Props) => {
         currency,
         purchased_at: purchasedAt,
         is_active: isActive,
+        source_locale: sourceLocale,
       };
       if (initial) await friendlyMutation(expenseRepository.update(initial.id, body));
       else await friendlyMutation(expenseRepository.create(body));
@@ -81,6 +85,8 @@ const ExpenseForm = ({ initial, onClose, onSaved }: Props) => {
           maxLength={120}
           autoFocus
         />
+
+        <SourceLocaleSelect value={sourceLocale} onChange={setSourceLocale} disabled={busy} />
 
         <div className="row" style={{ gap: 12, alignItems: "flex-end" }}>
           <div style={{ flex: 1 }}>

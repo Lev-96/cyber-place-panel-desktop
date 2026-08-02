@@ -2276,3 +2276,139 @@ button.pill:hover {
 .cp-switch-avatar.is-owner {
   background: linear-gradient(135deg, #d152fa, #a855f7);
 }
+
+/* ============================================================================
+   Language picker — first-run and workspace steps
+   ---------------------------------------------------------------------------
+   The first screen a new install shows, so it carries the brand rather than
+   looking like a system dialog. Flexbox throughout (project standard); the
+   option row wraps instead of using a grid so it degrades to a single column
+   on a narrow window without a media query. All motion is transform/opacity
+   only, and is disabled under prefers-reduced-motion.
+   ========================================================================== */
+.cp-langpick {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  width: min(600px, 92vw);
+  padding: 32px;
+  /* Slight lift off the standard card so the first-run screen reads as a
+     moment, not as another dialog. */
+  background:
+    radial-gradient(120% 90% at 50% -20%, rgba(50, 175, 247, 0.16), transparent 60%),
+    var(--color-surface);
+  border: 1px solid var(--color-border);
+  box-shadow: 0 24px 64px rgba(2, 5, 20, 0.6);
+}
+
+.cp-langpick-head {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  text-align: center;
+}
+.cp-langpick-eyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  background: linear-gradient(90deg, var(--color-primary), var(--color-accent-purple));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.cp-langpick-title {
+  margin: 0;
+  font-size: 26px;
+  line-height: 1.2;
+}
+.cp-langpick-sub {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.cp-langpick-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.cp-langpick-option {
+  position: relative;
+  flex: 1 1 150px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 20px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  background: var(--color-surface-alt);
+  color: var(--color-text);
+  cursor: pointer;
+  /* transform/opacity/colour only — no layout-affecting transitions. */
+  transition: transform 140ms ease, border-color 140ms ease, box-shadow 140ms ease;
+}
+.cp-langpick-option:hover {
+  transform: translateY(-2px);
+  border-color: rgba(7, 221, 241, 0.55);
+}
+.cp-langpick-option:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+.cp-langpick-option.is-active {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 1px var(--color-primary) inset, 0 8px 28px rgba(7, 221, 241, 0.18);
+}
+
+.cp-langpick-name {
+  font-size: 16px;
+  font-weight: 600;
+  /* Endonyms differ wildly in width (English vs Հայերեն); a fixed line height
+     keeps every card the same height whatever script is inside. */
+  line-height: 22px;
+}
+.cp-langpick-latin {
+  font-size: 12px;
+  color: var(--color-muted);
+  line-height: 16px;
+}
+.cp-langpick-check {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-primary);
+  opacity: 0;
+  transform: scale(0.8);
+  transition: opacity 140ms ease, transform 140ms ease;
+}
+.cp-langpick-option.is-active .cp-langpick-check {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.cp-langpick-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+.cp-langpick-foot {
+  margin: 0;
+  text-align: center;
+  font-size: 12px;
+  color: var(--color-muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cp-langpick-option,
+  .cp-langpick-check {
+    transition: none;
+  }
+  .cp-langpick-option:hover {
+    transform: none;
+  }
+}

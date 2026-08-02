@@ -1,4 +1,5 @@
 import { IBranchPlace, PaginatedList, PlaceType } from "@/types/api";
+import { Lang } from "@/i18n/translations";
 import { request } from "./client";
 
 export interface GetPlacesParams {
@@ -24,6 +25,13 @@ export interface CreatePlaceBody {
   platform_name?: string | null;
   type: PlaceType;
   game_ids?: number[];
+  /**
+   * Language the staff member typed `name` in. The backend treats this locale
+   * as the source of truth and machine-translates the others — it never writes
+   * back into it. Omitted by older panel builds, which the backend falls back
+   * to its configured default for.
+   */
+  source_locale?: Lang;
 }
 
 export type UpdatePlaceBody = Partial<Omit<CreatePlaceBody, "branch_id">>;

@@ -13,10 +13,20 @@ export const fmt = (template: string, ...args: (string | number)[]): string =>
     return i >= 0 && i < args.length ? String(args[i]) : m;
   });
 
-export const LANGUAGES: Array<{ code: Lang; name: string }> = [
-  { code: "en", name: "English" },
-  { code: "ru", name: "Русский" },
-  { code: "am", name: "Հայերեն" },
+/**
+ * `name` is the ENDONYM — the language's name in itself. That is what a person
+ * scanning the picker recognises: someone who only reads Armenian cannot find
+ * "Armenian" in a list, but finds "Հայերեն" instantly. `latin` is the English
+ * name, shown underneath as a secondary line so the list is also navigable by
+ * someone who doesn't read the script.
+ *
+ * Adding a language is one entry here plus one flag in `FlagIcon` — no other
+ * file knows how many languages exist.
+ */
+export const LANGUAGES: Array<{ code: Lang; name: string; latin: string }> = [
+  { code: "en", name: "English", latin: "English" },
+  { code: "ru", name: "Русский", latin: "Russian" },
+  { code: "am", name: "Հայերեն", latin: "Armenian" },
 ];
 
 type Dict = Record<string, { en: string; ru: string; am: string }>;
@@ -1451,6 +1461,88 @@ export const TRANSLATIONS: Dict = {
   "tin.invalid": { en: "Invalid TIN for the selected country (e.g. {0})", ru: "Неверный ИНН для выбранной страны (например: {0})", am: "Սխալ ՀՎՀՀ ընտրված երկրի համար (օրինակ՝ {0})" },
   "tin.invalidGeneric": { en: "Invalid TIN format", ru: "Неверный формат ИНН", am: "ՀՎՀՀ-ի սխալ ձևաչափ" },
   "company.selectCountryFirst": { en: "Select a country first", ru: "Сначала выберите страну", am: "Սկզբում ընտրեք երկիր" },
+
+  // Language selection flow — first run (before login) and the workspace step
+  // an owner/manager sees before their cabinet opens.
+  "lang.firstRun.title": {
+    en: "Choose your language",
+    ru: "Выберите язык",
+    am: "Ընտրեք լեզուն",
+  },
+  "lang.firstRun.subtitle": {
+    en: "Pick the language you want to work in. You can change it any time in Settings.",
+    ru: "Выберите язык, на котором хотите работать. Его можно сменить в любой момент в настройках.",
+    am: "Ընտրեք լեզուն, որով ցանկանում եք աշխատել։ Այն կարող եք փոխել ցանկացած պահի կարգավորումներում։",
+  },
+  "lang.workspace.title": {
+    en: "Language for your workspace",
+    ru: "Язык вашего кабинета",
+    am: "Ձեր աշխատասենյակի լեզուն",
+  },
+  "lang.workspace.subtitle": {
+    en: "Your workspace and all its data will open in this language.",
+    ru: "Кабинет и все его данные откроются на этом языке.",
+    am: "Աշխատասենյակը և դրա բոլոր տվյալները կբացվեն այս լեզվով։",
+  },
+  "lang.continue": { en: "Continue", ru: "Продолжить", am: "Շարունակել" },
+  "lang.changeLaterHint": {
+    en: "You can change the language later in Settings.",
+    ru: "Язык можно изменить позже в настройках.",
+    am: "Լեզուն կարող եք փոխել ավելի ուշ՝ կարգավորումներում։",
+  },
+
+  // Automatic translation of staff-authored content. Staff type a value once;
+  // the backend fills in the other UI languages in the background. These
+  // strings are what makes that process visible instead of magic.
+  "i18n.sourceLocale": { en: "Input language", ru: "Язык ввода", am: "Մուտքագրման լեզու" },
+  "i18n.sourceLocale.hint": {
+    en: "Type once — the other languages are filled in automatically.",
+    ru: "Введите один раз — остальные языки заполнятся автоматически.",
+    am: "Մուտքագրեք մեկ անգամ — մնացած լեզուները կլրացվեն ավտոմատ։",
+  },
+  "i18n.translations": { en: "Translations", ru: "Переводы", am: "Թարգմանություններ" },
+  "i18n.pending": { en: "translating…", ru: "переводится…", am: "թարգմանվում է…" },
+  "i18n.overrideHint": {
+    en: "Editing a language here locks it — automatic translation will not overwrite your wording.",
+    ru: "Правка языка здесь блокирует его — автоперевод не перезапишет вашу формулировку.",
+    am: "Այստեղ լեզուն խմբագրելը կողպում է այն — ավտոթարգմանությունը չի վերագրի ձեր ձևակերպումը։",
+  },
+  "i18n.status.pending": { en: "translating…", ru: "переводится…", am: "թարգմանվում է…" },
+  "i18n.status.pending.hint": {
+    en: "Queued for translation. The value will appear shortly.",
+    ru: "В очереди на перевод. Значение появится в ближайшее время.",
+    am: "Հերթում է թարգմանության համար։ Արժեքը շուտով կհայտնվի։",
+  },
+  "i18n.status.ready": { en: "translated", ru: "переведено", am: "թարգմանված է" },
+  "i18n.status.ready.hint": {
+    en: "Up to date with the source text.",
+    ru: "Соответствует исходному тексту.",
+    am: "Համապատասխանում է սկզբնական տեքստին։",
+  },
+  "i18n.status.stale": { en: "updating…", ru: "обновляется…", am: "թարմացվում է…" },
+  "i18n.status.stale.hint": {
+    en: "The source changed — the previous translation is shown until the new one is ready.",
+    ru: "Исходник изменился — показывается прежний перевод, пока не готов новый.",
+    am: "Սկզբնաղբյուրը փոխվել է — ցուցադրվում է նախորդ թարգմանությունը, մինչև նորը պատրաստ լինի։",
+  },
+  "i18n.status.failed": { en: "translation failed", ru: "ошибка перевода", am: "թարգմանության սխալ" },
+  "i18n.status.failed.hint": {
+    en: "Automatic translation did not succeed. The previous value is still shown; you can fill it in by hand.",
+    ru: "Автоперевод не удался. Прежнее значение показывается; можно заполнить вручную.",
+    am: "Ավտոթարգմանությունը չհաջողվեց։ Նախորդ արժեքը ցուցադրվում է․ կարող եք լրացնել ձեռքով։",
+  },
+  "i18n.status.needs_review": { en: "needs review", ru: "нужна проверка", am: "պահանջում է ստուգում" },
+  "i18n.status.needs_review.hint": {
+    en: "You edited this language by hand and the source has changed since. Automatic translation will not touch it.",
+    ru: "Вы правили этот язык вручную, а исходник с тех пор изменился. Автоперевод его не тронет.",
+    am: "Դուք ձեռքով խմբագրել եք այս լեզուն, իսկ սկզբնաղբյուրն այդ ժամանակից փոխվել է։ Ավտոթարգմանությունը այն չի փոխի։",
+  },
+  "i18n.status.skipped": { en: "not translated", ru: "без перевода", am: "առանց թարգմանության" },
+  "i18n.status.skipped.hint": {
+    en: "Brand names, codes and numbers are copied as-is instead of being translated.",
+    ru: "Бренды, коды и числа копируются как есть, без перевода.",
+    am: "Ապրանքանիշերը, կոդերը և թվերը պատճենվում են այնպես, ինչպես կան՝ առանց թարգմանության։",
+  },
 };
 
 export const t = (key: string, lang: Lang): string => {

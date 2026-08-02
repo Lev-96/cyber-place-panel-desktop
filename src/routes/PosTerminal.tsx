@@ -1,4 +1,6 @@
 import { useAuth } from "@/auth/AuthContext";
+import { tr } from "@/i18n/translated";
+import { Lang } from "@/i18n/translations";
 import PosHistory from "@/components/pos/PosHistory";
 import Button from "@/components/ui/Button";
 import Spinner from "@/components/ui/Spinner";
@@ -47,7 +49,7 @@ const PosTerminal = () => {
 };
 
 const Terminal = ({ branchId }: { branchId: number }) => {
-  const { t } = useLang();
+  const { t, lang } = useLang();
   const products = useAsync(() => productRepository.listByBranch(branchId), [branchId]);
 
   const [cart, setCart] = useState<CartLine[]>([]);
@@ -57,7 +59,7 @@ const Terminal = ({ branchId }: { branchId: number }) => {
 
   const total = useMemo(() => cart.reduce((s, l) => s + Number(l.product.price) * l.quantity, 0), [cart]);
   const active = useMemo(() => (products.data ?? []).filter((p) => p.is_active), [products.data]);
-  const grouped = useMemo(() => groupByCategory(active), [active]);
+  const grouped = useMemo(() => groupByCategory(active, lang), [active, lang]);
 
   const addToCart = (p: IProduct) => {
     setCart((c) => {
@@ -102,7 +104,7 @@ const Terminal = ({ branchId }: { branchId: number }) => {
             <div className="live-grid">
               {prods.map((p) => (
                 <button key={p.id} className="place-cell" onClick={() => addToCart(p)} style={{ border: "1px solid #1f2a44", cursor: "pointer", textAlign: "left", background: "#0b1224" }}>
-                  <span className="id" style={{ fontSize: 14 }}>{p.name}</span>
+                  <span className="id" style={{ fontSize: 14 }}>{tr(p, "name", lang)}</span>
                   <span className="status" style={{ color: "#07ddf1" }}>{Number(p.price).toFixed(2)}</span>
                 </button>
               ))}
@@ -119,7 +121,7 @@ const Terminal = ({ branchId }: { branchId: number }) => {
           {cart.map((l) => (
             <div key={l.product.id} className="row-between" style={{ padding: "6px 0", borderBottom: "1px solid #1f2a44" }}>
               <div style={{ flex: 1 }}>
-                <div>{l.product.name}</div>
+                <div>{tr(l.product, "name", lang)}</div>
                 <div className="muted" style={{ fontSize: 11 }}>{Number(l.product.price).toFixed(2)} × {l.quantity}</div>
               </div>
               <div className="row" style={{ gap: 4 }}>
@@ -145,10 +147,18 @@ const Terminal = ({ branchId }: { branchId: number }) => {
   );
 };
 
-const groupByCategory = (products: IProduct[]) => {
+/**
+ * Group the catalogue by category in the ACTIVE language.
+ *
+ * Grouping on the raw `category` column would bucket products by the language
+ * whoever created them was typing in — a Russian-authored "Напитки" and an
+ * English-authored "Drinks" would show up as two separate sections of the same
+ * shelf. Resolving the translation first collapses them into one.
+ */
+const groupByCategory = (products: IProduct[], lang: Lang) => {
   const out: Record<string, IProduct[]> = {};
   for (const p of products) {
-    const k = p.category || "Other";
+    const k = tr(p, "category", lang) || "Other";
     (out[k] ||= []).push(p);
   }
   return out;

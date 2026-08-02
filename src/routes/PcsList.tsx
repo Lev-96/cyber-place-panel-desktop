@@ -1,4 +1,5 @@
 import { apiWakePc } from "@/api/pcs";
+import { tr } from "@/i18n/translated";
 import PairingTokenModal from "@/components/pcs/PairingTokenModal";
 import PcForm from "@/components/pcs/PcForm";
 import Button from "@/components/ui/Button";
@@ -18,7 +19,7 @@ import { useParams } from "react-router-dom";
 const PcsList = () => {
   const { branchId } = useParams();
   const id = Number(branchId);
-  const { t } = useLang();
+  const { t, lang } = useLang();
   const confirm = useConfirm();
   const { data: pcs, loading, error, reload } = useAsync(() => pcRepository.listByBranch(id), [id]);
 
@@ -30,13 +31,13 @@ const PcsList = () => {
   if (!Number.isFinite(id) || id <= 0) return <div className="error">{t("hub.invalidId")}</div>;
 
   const remove = async (pc: IPcApi) => {
-    if (!(await confirm(fmt(t("pcs.confirmDelete"), pc.label), { destructive: true }))) return;
+    if (!(await confirm(fmt(t("pcs.confirmDelete"), tr(pc, "label", lang)), { destructive: true }))) return;
     await pcRepository.remove(pc.id);
     void reload();
   };
 
   const rotate = async (pc: IPcApi) => {
-    if (!(await confirm(fmt(t("pcs.confirmRotate"), pc.label)))) return;
+    if (!(await confirm(fmt(t("pcs.confirmRotate"), tr(pc, "label", lang))))) return;
     const updated = await pcRepository.rotateToken(pc.id);
     setTokenPc(updated);
     void reload();
@@ -101,7 +102,7 @@ const PcsList = () => {
             <div key={pc.id} className="list-item">
               <div>
                 <div className="name">
-                  {pc.label}
+                  {tr(pc, "label", lang)}
                   {pc.place && (
                     <span className="muted" style={{ marginLeft: 6 }}>№{pc.place.number ?? pc.place.id}</span>
                   )}

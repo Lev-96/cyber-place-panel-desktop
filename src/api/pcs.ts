@@ -1,7 +1,15 @@
 import { IPcApi } from "@/types/sessions";
+import { Lang } from "@/i18n/translations";
 import { PcKind } from "@/types/pc";
 import { request } from "./client";
 
+/**
+ * `source_locale` on both bodies is the language the staff member typed `label`
+ * in. The backend treats that locale as the source of truth and
+ * machine-translates the others — it never writes back into it. Omitted by
+ * older panel builds, which the backend falls back to its configured default
+ * for.
+ */
 export interface CreatePcBody {
   branch_id: number;
   place_id?: number | null;
@@ -9,6 +17,7 @@ export interface CreatePcBody {
   kind?: PcKind;
   hourly_rate?: number | null;
   mac_address?: string | null;
+  source_locale?: Lang;
 }
 
 export interface UpdatePcBody {
@@ -17,6 +26,7 @@ export interface UpdatePcBody {
   kind?: PcKind;
   hourly_rate?: number | null;
   mac_address?: string | null;
+  source_locale?: Lang;
 }
 
 export const apiListPcsForBranch = (branchId: number) =>

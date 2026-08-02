@@ -1,4 +1,5 @@
 import { IServiceExpense } from "@/api/expenses";
+import { tr } from "@/i18n/translated";
 import { orFallback } from "@/api/fallback";
 import ExpenseForm from "@/components/expenses/ExpenseForm";
 import ExpenseListItem from "@/components/expenses/ExpenseListItem";
@@ -15,7 +16,7 @@ import { expenseRepository } from "@/repositories/ExpenseRepository";
 import { useState } from "react";
 
 const Expenses = () => {
-  const { t } = useLang();
+  const { t, lang } = useLang();
   const { data, loading, error, reload } = useAsync(
     () => orFallback(expenseRepository.list(), [] as IServiceExpense[]),
     [],
@@ -98,7 +99,7 @@ const Expenses = () => {
       )}
       <ConfirmDialog
         open={toDelete !== null}
-        message={`${t("expenses.confirmDelete")} "${toDelete?.name ?? ""}"?`}
+        message={`${t("expenses.confirmDelete")} "${toDelete ? tr(toDelete, "name", lang) : ""}"?`}
         destructive
         confirmLabel={deleting ? "…" : t("action.delete")}
         onConfirm={() => void confirmDelete()}

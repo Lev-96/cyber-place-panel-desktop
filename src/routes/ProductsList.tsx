@@ -1,4 +1,5 @@
 import ProductForm from "@/components/pos/ProductForm";
+import { tr } from "@/i18n/translated";
 import Button from "@/components/ui/Button";
 import { ListSkeleton } from "@/components/ui/Skeleton";
 import { useAsync } from "@/hooks/useAsync";
@@ -12,7 +13,7 @@ import { useParams } from "react-router-dom";
 const ProductsList = () => {
   const { branchId } = useParams();
   const id = Number(branchId);
-  const { t, money } = useLang();
+  const { t, money, lang } = useLang();
   const confirm = useConfirm();
   const { data, loading, error, reload } = useAsync(() => productRepository.listByBranch(id), [id]);
   const [creating, setCreating] = useState(false);
@@ -21,7 +22,7 @@ const ProductsList = () => {
   if (!Number.isFinite(id) || id <= 0) return <div className="error">{t("hub.invalidId")}</div>;
 
   const remove = async (p: IProduct) => {
-    if (!(await confirm(`${t("action.delete")} ${p.name}?`, { destructive: true }))) return;
+    if (!(await confirm(`${t("action.delete")} ${tr(p, "name", lang)}?`, { destructive: true }))) return;
     await productRepository.remove(p.id);
     void reload();
   };
@@ -43,8 +44,8 @@ const ProductsList = () => {
           {(data ?? []).map((p) => (
             <div key={p.id} className="list-item" style={{ opacity: p.is_active ? 1 : 0.5 }}>
               <div>
-                <div className="name">{p.name}</div>
-                <div className="meta">{p.category ?? "—"} · {money(Number(p.price))}</div>
+                <div className="name">{tr(p, "name", lang)}</div>
+                <div className="meta">{tr(p, "category", lang) || "—"} · {money(Number(p.price))}</div>
               </div>
               <div className="row" style={{ gap: 6 }}>
                 <Button variant="secondary" onClick={() => toggle(p)} style={btn}>{p.is_active ? t("action.hide") : t("action.show")}</Button>

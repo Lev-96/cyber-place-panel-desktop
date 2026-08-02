@@ -1,4 +1,6 @@
 import { Currency } from "@/i18n/currency";
+import { Lang } from "@/i18n/translations";
+import { Translated } from "@/i18n/translated";
 import { request } from "./client";
 
 /**
@@ -10,7 +12,7 @@ import { request } from "./client";
  * `currency` the admin pays in; cross-currency totals are rolled up on
  * the client via `moneyDisplay.convertBetween`.
  */
-export interface IServiceExpense {
+export interface IServiceExpense extends Translated {
   id: number;
   name: string;
   amount: number;
@@ -30,6 +32,13 @@ export interface ServiceExpenseBody {
   currency: Currency;
   purchased_at: string; // YYYY-MM-DD
   is_active?: boolean;
+  /**
+   * Language the admin typed `name` in. The backend treats this locale as the
+   * source of truth and machine-translates the others — it never writes back
+   * into it. Omitted by older panel builds, which the backend falls back to its
+   * configured default for.
+   */
+  source_locale?: Lang;
 }
 
 export const apiServiceExpenses = () =>

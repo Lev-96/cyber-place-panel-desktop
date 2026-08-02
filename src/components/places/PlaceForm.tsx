@@ -1,4 +1,6 @@
 import Button from "@/components/ui/Button";
+import { Lang } from "@/i18n/translations";
+import { SourceLocaleSelect } from "@/components/ui/TranslatedField";
 import { formatApiError } from "@/api/errors";
 import Modal from "@/components/ui/Modal";
 import Input from "@/components/ui/Input";
@@ -51,6 +53,7 @@ const PlaceForm = ({ branchId, initial, platformSuggestions, platformPrices, onC
   const games = useAsync(() => gameRepository.list(), []);
   const [number, setNumber] = useState(initial ? String(initial.number ?? "") : "");
   const [name, setName] = useState(initial?.name ?? "");
+  const [sourceLocale, setSourceLocale] = useState<Lang>(initial?.source_locale ?? lang);
   const [type, setType] = useState<PlaceType>(initial?.type ?? "standard");
   const [platform, setPlatform] = useState<string>(initial?.platform ?? "pc");
   const [hourlyRate, setHourlyRate] = useState(initial?.hourly_rate != null ? String(initial.hourly_rate) : "");
@@ -191,6 +194,7 @@ const PlaceForm = ({ branchId, initial, platformSuggestions, platformPrices, onC
         platform_name_ru: customNew ? (names.ru.trim() || undefined) : undefined,
         platform_name_am: customNew ? (names.am.trim() || undefined) : undefined,
         game_ids: Array.from(gameIds),
+        source_locale: sourceLocale,
       };
       if (initial) await placeRepository.update(initial.id, body);
       else await placeRepository.create(body);
@@ -251,6 +255,11 @@ const PlaceForm = ({ branchId, initial, platformSuggestions, platformPrices, onC
           value={name}
           onChange={(e) => setName(e.target.value)}
         />
+
+        {/* The place name is auto-translated; the platform наименование below
+            still has its own three-language block because branch platform
+            prices have not moved onto the pipeline yet. */}
+        <SourceLocaleSelect value={sourceLocale} onChange={setSourceLocale} disabled={busy} />
 
         <div className="col" style={{ gap: 6 }}>
           <span className="label">{t("label.platform")}</span>
