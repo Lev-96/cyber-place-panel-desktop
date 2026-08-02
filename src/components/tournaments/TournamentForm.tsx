@@ -1,6 +1,6 @@
 import Button from "@/components/ui/Button";
-import { Lang } from "@/i18n/translations";
-import { SourceLocaleSelect } from "@/components/ui/TranslatedField";
+import { apiSaveEntityTranslations } from "@/api/translations";
+import MultiLangInput, { LangValues, hasAnyValue, langValuesFromField, primaryValue } from "@/components/ui/MultiLangInput";
 import { formatApiError } from "@/api/errors";
 import Modal from "@/components/ui/Modal";
 import Input from "@/components/ui/Input";
@@ -26,8 +26,12 @@ const TournamentForm = ({ branchId, initial, onClose, onSaved }: Props) => {
   const games = useAsync(() => gameRepository.list(), []);
   const branch = useAsync(() => branchRepository.byId(branchId), [branchId]);
 
-  const [title, setTitle] = useState(initial?.title ?? "");
-  const [description, setDescription] = useState(initial?.description ?? "");
+  const [title, setTitle] = useState<LangValues>(
+    () => langValuesFromField(initial?.i18n, "title", initial?.title, lang),
+  );
+  const [description, setDescription] = useState<LangValues>(
+    () => langValuesFromField(initial?.i18n, "description", initial?.description, lang),
+  );
   const [gameId, setGameId] = useState<number | "">(initial?.game_id ?? "");
   // Initial value falls back to "any" so legacy rows (created before
   // the skill_level migration) render a sensible default in the
@@ -37,14 +41,14 @@ const TournamentForm = ({ branchId, initial, onClose, onSaved }: Props) => {
   const [participantsLimit, setParticipantsLimit] = useState(String(initial?.participants_limit ?? ""));
   const [startDate, setStartDate] = useState(initial?.start_date?.slice(0, 10) ?? "");
   const [endDate, setEndDate] = useState(initial?.end_date?.slice(0, 10) ?? "");
-  const [sourceLocale, setSourceLocale] = useState<Lang>(initial?.source_locale ?? lang);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     if (!gameId) return setErr(t("tournament.errors.pickGame"));
-    if (!description.trim()) return setErr(t("tournament.errors.descRequired"));
+    if (!hasAnyValue(title)) return setErr(t("product.errors.name"));
+    if (!hasAnyValue(description)) return setErr(t("tournament.errors.descRequired"));
     if (!startDate) return setErr(t("tournament.errors.startRequired"));
 
     const companyId = branch.data?.company_id;
@@ -52,33 +56,34 @@ const TournamentForm = ({ branchId, initial, onClose, onSaved }: Props) => {
 
     setBusy(true); setErr(null);
     try {
-      if (initial) {
-        await tournamentRepository.update(initial.id, {
-          game_id: Number(gameId),
-          skill_level: skillLevel,
-          title,
-          description,
-          price: Number(price) || 0,
-          participants_limit: participantsLimit ? Number(participantsLimit) : undefined,
-          start_date: startDate,
-          end_date: endDate || undefined,
-          source_locale: sourceLocale,
-        });
-      } else {
-        await tournamentRepository.create({
-          branch_id: branchId,
-          company_id: companyId,
-          game_id: Number(gameId),
-          skill_level: skillLevel,
-          title,
-          description,
-          price: Number(price) || 0,
-          participants_limit: participantsLimit ? Number(participantsLimit) : undefined,
-          start_date: startDate,
-          end_date: endDate || undefined,
-          source_locale: sourceLocale,
-        });
-      }
+      // The entity keeps a single title/description — the interface-language
+      // value — so every existing consumer of `tournament.title` still works.
+      // The per-language values follow in the translations call below.
+      const shared = {
+        game_id: Number(gameId),
+        skill_level: skillLevel,
+        title: primaryValue(title, lang),
+        description: primaryValue(description, lang),
+        price: Number(price) || 0,
+        participants_limit: participantsLimit ? Number(participantsLimit) : undefined,
+        start_date: startDate,
+        end_date: endDate || undefined,
+        source_locale: lang,
+      };
+
+      const saved = initial
+        ? await tournamentRepository.update(initial.id, shared)
+        : await tournamentRepository.create({
+            branch_id: branchId,
+            company_id: companyId,
+            ...shared,
+          });
+
+      await apiSaveEntityTranslations("tournament", saved.id, {
+        primary_locale: lang,
+        fields: { title, description },
+      });
+
       onSaved();
     } catch (e) { setErr(formatApiError(e)); }
     finally { setBusy(false); }
@@ -88,9 +93,26 @@ const TournamentForm = ({ branchId, initial, onClose, onSaved }: Props) => {
     <Modal open onClose={onClose}>
       <form className="card" style={{ width: 540, maxWidth: "90vw", display: "flex", flexDirection: "column", gap: 12 }} onSubmit={submit}>
         <h2 style={{ margin: 0 }}>{initial ? t("tournament.titleEdit") : t("tournament.titleNew")}</h2>
-        <Input label={t("label.title")} value={title} onChange={(e) => setTitle(e.target.value)} required maxLength={255} autoFocus />
-        <Input label={t("label.description")} value={description} onChange={(e) => setDescription(e.target.value)} required maxLength={255} />
-        <SourceLocaleSelect value={sourceLocale} onChange={setSourceLocale} disabled={busy} />
+        <MultiLangInput
+          label={t("label.title")}
+          values={title}
+          onChange={setTitle}
+          fieldClass="tournament_title"
+          maxChars={255}
+          required
+          autoFocus
+          disabled={busy}
+        />
+        <MultiLangInput
+          label={t("label.description")}
+          values={description}
+          onChange={setDescription}
+          fieldClass="long_description"
+          maxChars={255}
+          multiline
+          required
+          disabled={busy}
+        />
 
         <div className="col" style={{ gap: 6 }}>
           <span className="label">{t("label.game")}</span>

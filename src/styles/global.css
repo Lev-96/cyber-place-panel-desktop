@@ -2434,3 +2434,46 @@ button.pill:hover {
   overflow: hidden;
   height: 100%;
 }
+
+/* Multilingual field — one label, one row per language.
+   Flexbox rows so a narrow window stacks the language chip above the input
+   without a media query. No layout-affecting transitions. */
+.cp-mli-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.cp-mli-row > .input,
+.cp-mli-row > textarea.input {
+  flex: 1 1 220px;
+  min-width: 0;
+}
+.cp-mli-lang {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  /* Fixed width so every input in the group starts on the same vertical line —
+     the language names differ wildly in length across scripts. */
+  flex: 0 0 116px;
+  font-size: 12px;
+  color: var(--color-muted);
+}
+.cp-mli-note {
+  flex: 0 0 100%;
+  min-height: 14px;
+  padding-left: 126px;
+  font-size: 11px;
+}
+.cp-mli-busy { color: var(--color-primary); }
+.cp-mli-failed { color: var(--color-warning); }
+.cp-mli-reset {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-muted);
+  font-size: 11px;
+  cursor: pointer;
+  text-decoration: underline dotted;
+}
+.cp-mli-reset:hover { color: var(--color-primary); }

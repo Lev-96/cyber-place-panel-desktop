@@ -1462,6 +1462,57 @@ export const TRANSLATIONS: Dict = {
   "tin.invalidGeneric": { en: "Invalid TIN format", ru: "Неверный формат ИНН", am: "ՀՎՀՀ-ի սխալ ձևաչափ" },
   "company.selectCountryFirst": { en: "Select a country first", ru: "Сначала выберите страну", am: "Սկզբում ընտրեք երկիր" },
 
+  "product.errors.name": {
+    en: "Enter a name",
+    ru: "Введите название",
+    am: "Մուտքագրեք անվանումը",
+  },
+
+  "tariff.errors.allNames": {
+    en: "Fill in the name in every language",
+    ru: "Заполните название на всех языках",
+    am: "Լրացրեք անվանումը բոլոր լեզուներով",
+  },
+
+  // Multilingual name fields — one row per language, auto-translated from the
+  // language of the interface.
+  "multilang.translating": { en: "translating…", ru: "переводим…", am: "թարգմանվում է…" },
+  "multilang.autoPlaceholder": {
+    en: "filled automatically",
+    ru: "заполнится автоматически",
+    am: "կլրացվի ավտոմատ",
+  },
+  "multilang.edited": { en: "edited by hand", ru: "изменено вручную", am: "ձեռքով խմբագրված" },
+  "multilang.reset": { en: "restore auto", ru: "вернуть автоперевод", am: "վերականգնել ավտոթարգմանությունը" },
+  // Why the whole field could not be translated. Deliberately actionable for
+  // an operator, and free of anything that would confuse a cashier.
+  "multilang.reason.not_configured": {
+    en: "Automatic translation is not set up on this server — fill the languages in by hand.",
+    ru: "Автоперевод не настроен на сервере — заполните языки вручную.",
+    am: "Ավտոթարգմանությունը սերվերում կարգավորված չէ — լրացրեք լեզուները ձեռքով։",
+  },
+  "multilang.reason.auth": {
+    en: "The translation service rejected the server's credentials — contact the administrator.",
+    ru: "Сервис перевода отклонил доступ сервера — обратитесь к администратору.",
+    am: "Թարգմանության ծառայությունը մերժեց սերվերի հասանելիությունը — դիմեք ադմինիստրատորին։",
+  },
+  "multilang.reason.quota": {
+    en: "The translation quota is used up — fill the languages in by hand for now.",
+    ru: "Лимит переводов исчерпан — пока заполните языки вручную.",
+    am: "Թարգմանության սահմանաչափը սպառված է — առայժմ լրացրեք ձեռքով։",
+  },
+  "multilang.reason.provider_error": {
+    en: "The translation service is unavailable right now — fill the languages in by hand.",
+    ru: "Сервис перевода сейчас недоступен — заполните языки вручную.",
+    am: "Թարգմանության ծառայությունն այժմ հասանելի չէ — լրացրեք ձեռքով։",
+  },
+
+  "multilang.failed": {
+    en: "could not translate — please fill in",
+    ru: "не удалось перевести — заполните вручную",
+    am: "չհաջողվեց թարգմանել — լրացրեք ձեռքով",
+  },
+
   // Language selection flow — first run (before login) and the workspace step
   // an owner/manager sees before their cabinet opens.
   "lang.firstRun.title": {

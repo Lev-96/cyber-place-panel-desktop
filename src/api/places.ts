@@ -42,8 +42,13 @@ export const apiGetPlaces = (params: GetPlacesParams = {}) =>
 export const apiGetPlaceById = (id: number) =>
   request<{ data: IBranchPlace }>(`/places/${id}`);
 
+/**
+ * The backend already returns the created row under `places` (the resource's
+ * `$wrap`); it was simply not typed here. The panel needs its id to store the
+ * per-language names right after the save.
+ */
 export const apiCreatePlace = (body: CreatePlaceBody) =>
-  request<{ message: string }>("/places", { method: "POST", body });
+  request<{ message: string; places?: IBranchPlace }>("/places", { method: "POST", body });
 
 export const apiUpdatePlace = (id: number, body: UpdatePlaceBody) =>
   request<{ message: string }>(`/places/${id}`, { method: "PUT", body });

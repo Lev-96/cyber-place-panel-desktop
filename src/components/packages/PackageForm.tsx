@@ -1,4 +1,5 @@
 import Button from "@/components/ui/Button";
+import MultiLangInput, { LangValues, hasAnyValue, langValuesFrom } from "@/components/ui/MultiLangInput";
 import Modal from "@/components/ui/Modal";
 import Input from "@/components/ui/Input";
 import PriceInput from "@/components/ui/PriceInput";
@@ -37,12 +38,13 @@ const toHHMM = (s: string | null | undefined): string => (s ? s.slice(0, 5) : ""
 const HHMM_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 const PackageForm = ({ branchId, initial, onClose, onSaved }: Props) => {
-  const { t } = useLang();
-  // Per-locale name fields — one input per language so staff can name a
-  // tariff in every locale the clients render.
-  const [nameEn, setNameEn] = useState(initial?.name_en ?? "");
-  const [nameRu, setNameRu] = useState(initial?.name_ru ?? "");
-  const [nameAm, setNameAm] = useState(initial?.name_am ?? "");
+  const { t, lang } = useLang();
+  // Per-locale name, interface language first and auto-translated into the
+  // rest. Tariffs still persist to the legacy `name_en/ru/am` columns rather
+  // than the translations table, so the values are mapped back on submit.
+  const [name, setName] = useState<LangValues>(() =>
+    langValuesFrom({ en: initial?.name_en, ru: initial?.name_ru, am: initial?.name_am }),
+  );
   const [duration, setDuration] = useState(String(initial?.duration_minutes ?? "60"));
   const [price, setPrice] = useState(String(initial?.price ?? ""));
   // Platform = "" means "applies to all platforms" — backend column
@@ -125,9 +127,17 @@ const PackageForm = ({ branchId, initial, onClose, onSaved }: Props) => {
       };
     }
 
+    // The tariff endpoint requires all three columns, so a language the
+    // auto-translation could not produce has to be filled before saving —
+    // otherwise the save fails with a server-side validation error the form
+    // cannot explain.
+    if (!hasAnyValue(name) || !name.en.trim() || !name.ru.trim() || !name.am.trim()) {
+      return setErr(t("tariff.errors.allNames"));
+    }
+
     setBusy(true); setErr(null);
     try {
-      const nameBody = { name_en: nameEn, name_ru: nameRu, name_am: nameAm };
+      const nameBody = { name_en: name.en, name_ru: name.ru, name_am: name.am };
       const platformValue: "pc" | "ps4" | "ps5" | null =
         platform === "" ? null : platform;
       const pkg = initial
@@ -157,9 +167,16 @@ const PackageForm = ({ branchId, initial, onClose, onSaved }: Props) => {
     <Modal open onClose={onClose}>
       <form className="card" style={{ width: 460, maxWidth: "90vw", display: "flex", flexDirection: "column", gap: 14 }} onSubmit={submit}>
         <h2 style={{ margin: 0 }}>{initial ? t("tariff.titleEdit") : t("tariff.titleNew")}</h2>
-        <Input label={t("tariff.nameEn")} value={nameEn} onChange={(e) => setNameEn(e.target.value)} required autoFocus />
-        <Input label={t("tariff.nameRu")} value={nameRu} onChange={(e) => setNameRu(e.target.value)} required />
-        <Input label={t("tariff.nameAm")} value={nameAm} onChange={(e) => setNameAm(e.target.value)} required />
+        <MultiLangInput
+          label={t("label.name")}
+          values={name}
+          onChange={setName}
+          fieldClass="tariff_name"
+          maxChars={60}
+          required
+          autoFocus
+          disabled={busy}
+        />
         <div>
           <span className="label">{t("tariff.platform")}</span>
           <select

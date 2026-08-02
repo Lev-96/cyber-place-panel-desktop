@@ -1,4 +1,5 @@
 import { formatApiError } from "@/api/errors";
+import MultiLangInput, { LangValues, langValuesFrom } from "@/components/ui/MultiLangInput";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import Modal from "@/components/ui/Modal";
@@ -26,14 +27,16 @@ const LANGS: ReadonlyArray<{ key: "en" | "ru" | "am"; label: string }> = [
  * Rename a custom platform (наименование in 3 languages). Opened by clicking a
  * platform name in the prices table. Editing a name never touches the slug or
  * any rate, so no billing path is affected. Blank ru/am fall back to English.
+ *
+ * The interface language leads and auto-translates into the other two; each can
+ * then be corrected by hand. English stays mandatory because the platform slug
+ * — its identity across the branch — is derived from it.
  */
 const PlatformNameModal = ({ price, onClose, onSaved }: Props) => {
-  const { t } = useLang();
-  const [names, setNames] = useState({
-    en: price.name_en ?? "",
-    ru: price.name_ru ?? "",
-    am: price.name_am ?? "",
-  });
+  const { t, lang } = useLang();
+  const [names, setNames] = useState<LangValues>(() =>
+    langValuesFrom({ en: price.name_en, ru: price.name_ru, am: price.name_am }),
+  );
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -62,17 +65,16 @@ const PlatformNameModal = ({ price, onClose, onSaved }: Props) => {
     <Modal open onClose={onClose}>
       <form className="card" style={{ width: 420, maxWidth: "90vw", display: "flex", flexDirection: "column", gap: 12 }} onSubmit={submit}>
         <h2 style={{ margin: 0 }}>{t("platformPrice.renameTitle")}</h2>
-        {LANGS.map(({ key, label }) => (
-          <div key={key} className="col" style={{ gap: 4 }}>
-            <span className="label">{label}</span>
-            <Input
-              value={names[key]}
-              onChange={(e) => setNames((n) => ({ ...n, [key]: e.target.value }))}
-              autoComplete="off"
-              autoFocus={key === "en"}
-            />
-          </div>
-        ))}
+        <MultiLangInput
+          label={t("place.priceName")}
+          values={names}
+          onChange={setNames}
+          fieldClass="platform_name"
+          maxChars={60}
+          required
+          autoFocus
+          disabled={busy}
+        />
         {err && <div className="error" style={{ whiteSpace: "pre-line" }}>{err}</div>}
         <div className="row-between">
           <Button type="button" variant="secondary" onClick={onClose} disabled={busy}>{t("action.cancel")}</Button>

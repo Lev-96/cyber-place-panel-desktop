@@ -1,6 +1,6 @@
 import Button from "@/components/ui/Button";
-import { Lang } from "@/i18n/translations";
-import { SourceLocaleSelect } from "@/components/ui/TranslatedField";
+import { apiSaveEntityTranslations } from "@/api/translations";
+import MultiLangInput, { LangValues, langValuesFromField, primaryValue } from "@/components/ui/MultiLangInput";
 import { formatApiError } from "@/api/errors";
 import Modal from "@/components/ui/Modal";
 import Input from "@/components/ui/Input";
@@ -52,8 +52,9 @@ const PlaceForm = ({ branchId, initial, platformSuggestions, platformPrices, onC
   // admin-created pc/ps4/ps5 games that aren't pinned to any branch.
   const games = useAsync(() => gameRepository.list(), []);
   const [number, setNumber] = useState(initial ? String(initial.number ?? "") : "");
-  const [name, setName] = useState(initial?.name ?? "");
-  const [sourceLocale, setSourceLocale] = useState<Lang>(initial?.source_locale ?? lang);
+  const [name, setName] = useState<LangValues>(
+    () => langValuesFromField(initial?.i18n, "name", initial?.name, lang),
+  );
   const [type, setType] = useState<PlaceType>(initial?.type ?? "standard");
   const [platform, setPlatform] = useState<string>(initial?.platform ?? "pc");
   const [hourlyRate, setHourlyRate] = useState(initial?.hourly_rate != null ? String(initial.hourly_rate) : "");
@@ -180,7 +181,7 @@ const PlaceForm = ({ branchId, initial, platformSuggestions, platformPrices, onC
       const body = {
         branch_id: branchId,
         number: num,
-        name: name.trim() || null,
+        name: primaryValue(name, lang) || null,
         type,
         platform: finalPlatform,
         // Known platforms bill from the matrix (null). An already-priced tier
@@ -194,10 +195,21 @@ const PlaceForm = ({ branchId, initial, platformSuggestions, platformPrices, onC
         platform_name_ru: customNew ? (names.ru.trim() || undefined) : undefined,
         platform_name_am: customNew ? (names.am.trim() || undefined) : undefined,
         game_ids: Array.from(gameIds),
-        source_locale: sourceLocale,
+        source_locale: lang,
       };
-      if (initial) await placeRepository.update(initial.id, body);
-      else await placeRepository.create(body);
+      // The place keeps a single `name` — the interface-language value — so
+      // every existing consumer keeps working; the per-language values follow.
+      const placeId = initial
+        ? (await placeRepository.update(initial.id, body), initial.id)
+        : (await placeRepository.create(body))?.id ?? null;
+
+      if (placeId != null) {
+        await apiSaveEntityTranslations("place", placeId, {
+          primary_locale: lang,
+          fields: { name },
+        });
+      }
+
       onSaved();
     } catch (e) { setErr(formatApiError(e)); }
     finally { setBusy(false); }
@@ -249,17 +261,14 @@ const PlaceForm = ({ branchId, initial, platformSuggestions, platformPrices, onC
           </div>
         </div>
 
-        <Input
+        <MultiLangInput
           label={t("place.name")}
-          placeholder={t("place.namePlaceholder")}
-          value={name}
-          onChange={(e) => setName(e.target.value)}
+          values={name}
+          onChange={setName}
+          fieldClass="place_name"
+          maxChars={40}
+          disabled={busy}
         />
-
-        {/* The place name is auto-translated; the platform наименование below
-            still has its own three-language block because branch platform
-            prices have not moved onto the pipeline yet. */}
-        <SourceLocaleSelect value={sourceLocale} onChange={setSourceLocale} disabled={busy} />
 
         <div className="col" style={{ gap: 6 }}>
           <span className="label">{t("label.platform")}</span>
