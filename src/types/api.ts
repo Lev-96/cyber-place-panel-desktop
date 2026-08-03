@@ -57,6 +57,18 @@ export interface IBranchPlace extends Translated {
    * the platform directly. Needed on edit so the form re-opens the right tab.
    */
   subplatform_id?: number | null;
+  /**
+   * The sub-category itself, when the server eager-loaded it — what the place
+   * card labels itself with. Absent is not the same as "no subcategory": it
+   * means this endpoint did not load the relation.
+   */
+  subplatform?: {
+    id: number;
+    name_en: string;
+    name_ru: string;
+    name_am: string;
+    is_default: boolean;
+  } | null;
   /** Manual per-hour rate for custom platforms (null for known ones). */
   hourly_rate?: number | string | null;
   games: IGame[];

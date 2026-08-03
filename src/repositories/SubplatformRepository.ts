@@ -2,7 +2,6 @@ import {
   CreateSubplatformBody,
   UpdateSubplatformBody,
   apiCreateSubplatform,
-  apiDeleteSubplatform,
   apiListSubplatforms,
   apiUpdateSubplatform,
 } from "@/api/subplatforms";
@@ -14,6 +13,10 @@ import { IBranchSubplatform } from "@/types/api";
  * deployed yet, exactly like platform prices — a panel running against an older
  * backend then shows no subplatform tabs at all and every place is created the
  * way it always was, instead of the place form failing to open.
+ *
+ * There is deliberately no `remove`: a subcategory is a price real places bill
+ * from, so it is never deleted by hand. It retires server-side once its last
+ * place is gone. Exposing the call here would only invite a delete button back.
  */
 export class SubplatformRepository {
   /** One platform's subplatforms (default first, then most-used). */
@@ -32,10 +35,6 @@ export class SubplatformRepository {
 
   async update(id: number, body: UpdateSubplatformBody): Promise<IBranchSubplatform> {
     return friendlyMutation(apiUpdateSubplatform(id, body).then((r) => r.data));
-  }
-
-  async remove(id: number): Promise<void> {
-    return friendlyMutation(apiDeleteSubplatform(id));
   }
 }
 

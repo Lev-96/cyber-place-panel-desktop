@@ -717,25 +717,23 @@ export const TRANSLATIONS: Dict = {
   // their own editable section in Branch Prices.
   "subplatform.label": { en: "Subcategory", ru: "Подкатегория", am: "Ենթակատեգորիա" },
   "subplatform.other": { en: "Other", ru: "Другое", am: "Այլ" },
-  "subplatform.search": { en: "Find a subcategory", ru: "Найти подкатегорию", am: "Գտնել ենթակատեգորիա" },
-  "subplatform.searchPlaceholder": {
-    en: "Type a name in any language",
-    ru: "Введите название на любом языке",
-    am: "Մուտքագրեք անվանումը ցանկացած լեզվով",
-  },
-  "subplatform.noneFound": {
-    en: "Nothing found — create it below.",
-    ru: "Ничего не найдено — создайте ниже.",
-    am: "Ոչինչ չի գտնվել — ստեղծեք ստորև:",
-  },
-  "subplatform.create": { en: "New subcategory", ru: "Новая подкатегория", am: "Նոր ենթակատեգորիա" },
   "subplatform.name": { en: "Name", ru: "Название", am: "Անվանում" },
   "subplatform.add": { en: "Add", ru: "Добавить", am: "Ավելացնել" },
   "subplatform.price": { en: "Price per hour", ru: "Цена за час", am: "Գինը մեկ ժամում" },
-  "subplatform.priceHint": {
-    en: "Leave empty to charge the same as the platform.",
-    ru: "Оставьте пустым — цена будет как у платформы.",
-    am: "Թողեք դատարկ՝ գինը կլինի հարթակի նույնը:",
+  "subplatform.priceRequiredHint": {
+    en: "Required — this is what every place in this subcategory will be charged.",
+    ru: "Обязательно — по этой цене будут считаться все места этой подкатегории.",
+    am: "Պարտադիր է — այս գնով կհաշվարկվեն այս ենթակատեգորիայի բոլոր տեղերը:",
+  },
+  "subplatform.tierUnpricedNote": {
+    en: "This subcategory has no rate for this type yet — set it here.",
+    ru: "У этой подкатегории ещё нет цены для этого типа — задайте её здесь.",
+    am: "Այս ենթակատեգորիան դեռ չունի գին այս տեսակի համար — սահմանեք այն այստեղ:",
+  },
+  "subplatform.errors.priceRequired": {
+    en: "Enter a price for this subcategory.",
+    ru: "Введите цену подкатегории.",
+    am: "Մուտքագրեք ենթակատեգորիայի գինը:",
   },
   "subplatform.priceAppliedNote": {
     en: "This subcategory's rate applies. Change it in Branch prices.",
@@ -751,19 +749,14 @@ export const TRANSLATIONS: Dict = {
   "subplatform.sectionTitle": { en: "Subcategory prices", ru: "Цены подкатегорий", am: "Ենթակատեգորիաների գներ" },
   "subplatform.renameTitle": { en: "Rename subcategory", ru: "Изменить название подкатегории", am: "Վերանվանել ենթակատեգորիան" },
   "subplatform.managedHint": {
-    en: "Created in Places, on the second row of tabs. Rename them and set each rate here — an empty rate bills the same as the platform.",
-    ru: "Создаются в разделе «Места», во втором ряду вкладок. Здесь их можно переименовать и задать цену — пустая цена означает «как у платформы».",
-    am: "Ստեղծվում են «Տեղեր» բաժնում՝ ներդիրների երկրորդ շարքում: Այստեղ կարող եք վերանվանել և սահմանել գինը — դատարկ գինը նշանակում է «ինչպես հարթակը»:",
+    en: "Created in Places, on the second row of tabs. Rename them and edit each rate here. A subcategory disappears on its own once its last place is deleted — it cannot be removed while a place still uses it.",
+    ru: "Создаются в разделе «Места», во втором ряду вкладок. Здесь их можно переименовать и изменить цену. Подкатегория исчезает сама, когда удалено её последнее место — пока хотя бы одно место её использует, удалить её нельзя.",
+    am: "Ստեղծվում են «Տեղեր» բաժնում՝ ներդիրների երկրորդ շարքում: Այստեղ կարող եք վերանվանել և փոխել գինը: Ենթակատեգորիան անհետանում է ինքնաշխատ, երբ ջնջվում է նրա վերջին տեղը:",
   },
   "subplatform.defaultUndeletable": {
     en: "The Default subcategory cannot be deleted.",
     ru: "Подкатегорию «По умолчанию» удалить нельзя.",
     am: "«Կանխադրված» ենթակատեգորիան հնարավոր չէ ջնջել:",
-  },
-  "subplatform.confirmDelete": {
-    en: "Delete this subcategory? Its places will bill from the platform again.",
-    ru: "Удалить подкатегорию? Её места снова будут считаться по цене платформы.",
-    am: "Ջնջե՞լ ենթակատեգորիան: Նրա տեղերը կրկին կհաշվարկվեն հարթակի գնով:",
   },
 
   // Tournament form

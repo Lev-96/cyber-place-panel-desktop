@@ -160,11 +160,22 @@ const PlaceForm = ({ branchId, initial, platformSuggestions, platformPrices, onC
 
   // The sub-category this place will bill from, if the list has loaded.
   const subplatform = (subplatforms.data ?? []).find((s) => s.id === subplatformId);
-  // Its override for THIS tier, if it has one. A subplatform that prices the
-  // tier is the price — the platform's own rate never comes into it.
-  const subplatformRate = subplatform
-    ? (type === "vip" ? subplatform.price_vip : subplatform.price_standard)
+  // A NON-default subcategory owns the rate for the place entirely. Default is
+  // the platform itself and inherits, so pc/ps4/ps5 keep billing from the
+  // tariff matrix and a custom platform from its own price.
+  const ownsRate = !!subplatform && !subplatform.is_default;
+  const subplatformRate = ownsRate
+    ? (type === "vip" ? subplatform!.price_vip : subplatform!.price_standard)
     : null;
+  /**
+   * This subcategory has no rate for the tier the place is on, so one must be
+   * entered here — creating the place is what sets it.
+   *
+   * This is what makes switching Standard → VIP ask for a price: the same
+   * subcategory can be priced for one tier and not the other, and reusing the
+   * Standard rate for VIP would silently erase the VIP premium.
+   */
+  const needsSubplatformRate = ownsRate && subplatformRate == null;
 
   // Auto-suggest next available number on create
   useEffect(() => {
@@ -225,9 +236,13 @@ const PlaceForm = ({ branchId, initial, platformSuggestions, platformPrices, onC
     // tier isn't priced yet. A locked tier needs neither.
     const finalPlatform = customNew ? slugifyPlatform(names.en.trim()) : platform;
     if (customNew && !finalPlatform) return setErr(t("place.errors.nameRequired"));
-    // A subplatform that prices this tier IS the price, so the platform's own
-    // rate is not required — demanding one would block a configured place.
-    if (subplatformRate == null && isCustomPlatform && !tierLocked && !hourlyRate) {
+    // The subcategory owns the rate: priced → nothing to ask, unpriced → the
+    // rate is mandatory. Only when no subcategory owns it does the platform's
+    // own "price this tier" rule apply.
+    if (needsSubplatformRate && !hourlyRate) {
+      return setErr(t("subplatform.errors.priceRequired"));
+    }
+    if (!ownsRate && isCustomPlatform && !tierLocked && !hourlyRate) {
       return setErr(t("place.errors.priceRequired"));
     }
     setBusy(true); setErr(null);
@@ -367,6 +382,18 @@ const PlaceForm = ({ branchId, initial, platformSuggestions, platformPrices, onC
               <strong style={{ color: "#07ddf1" }}>{money(Number(subplatformRate))}</strong>
             </div>
             <span className="muted" style={{ fontSize: 11 }}>{t("subplatform.priceAppliedNote")}</span>
+          </div>
+        ) : needsSubplatformRate ? (
+          // Unpriced tier on this subcategory — the operator sets it here, and
+          // the rate becomes the subcategory's for every place that follows.
+          <div className="col" style={{ gap: 6 }}>
+            <span className="label">{subplatform ? platformPriceNameOf(subplatform, lang) : ""}</span>
+            <PriceInput
+              label={`${t("place.hourlyRate")} · ${typeLabel}`}
+              value={hourlyRate}
+              onChange={setHourlyRate}
+            />
+            <span className="muted" style={{ fontSize: 11 }}>{t("subplatform.tierUnpricedNote")}</span>
           </div>
         ) : isCustomPlatform && (tierLocked ? (
           // This platform + tier is already priced — applied, not re-entered.

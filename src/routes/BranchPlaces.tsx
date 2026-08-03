@@ -9,6 +9,7 @@ import { useReservedPlaceIds } from "@/hooks/useReservedPlaceIds";
 import { useConfirm } from "@/components/ui/ConfirmProvider";
 import { useLang } from "@/i18n/LanguageContext";
 import { fmt } from "@/i18n/translations";
+import { platformPriceNameOf } from "@/i18n/platformPriceName";
 import { placeRepository } from "@/repositories/PlaceRepository";
 import { platformPriceRepository } from "@/repositories/PlatformPriceRepository";
 import { IBranchPlace } from "@/types/api";
@@ -34,7 +35,7 @@ const sectionKeyOf = (p: IBranchPlace): string => {
 
 const BranchPlaces = () => {
   const { branchId } = useParams();
-  const { t } = useLang();
+  const { t, lang } = useLang();
   const confirm = useConfirm();
   const id = Number(branchId);
   const { data, loading, error, reload } = useAsync(() => placeRepository.listRawByBranch(id), [id]);
@@ -120,6 +121,18 @@ const BranchPlaces = () => {
     sectionReorder.move(from, key);
   };
 
+  /**
+   * The place's subcategory, in the panel language — or "" when it has none or
+   * sits on the platform's Default, which is not worth a line of its own: every
+   * platform has one, so labelling it would add noise to every card.
+   */
+  const subplatformLabel = (p: IBranchPlace): string => {
+    const sp = p.subplatform;
+    if (!sp || sp.is_default) return "";
+
+    return platformPriceNameOf(sp, lang);
+  };
+
   const renderCell = (p: IBranchPlace) => {
     const pid = String(p.id);
     const isReserved = reservedPlaceIds.has(p.id);
@@ -163,7 +176,14 @@ const BranchPlaces = () => {
         <span className="id">№{p.number ?? p.id}</span>
         <span className="status" style={{ color: tone }}>{statusLabel}</span>
         <span className="until">{p.games?.length ?? 0} {t("branchPlaces.games")}</span>
-        <div className="row" style={{ gap: 4, marginTop: 6 }}>
+        {/* The subcategory line is rendered even when there is none — as a
+            non-breaking space — so every card in the grid has the same number
+            of lines and therefore the same height. Combined with the nowrap +
+            ellipsis rules in `.place-cell .subplatform`, no name can change it. */}
+        <span className="subplatform" title={subplatformLabel(p) || undefined}>
+          {subplatformLabel(p) || "\u00A0"}
+        </span>
+        <div className="row cell-actions" style={{ gap: 4, marginTop: 6 }}>
           <Button variant="secondary" onClick={() => setEditing(p)} style={{ padding: "4px 8px", fontSize: 11, flex: 1 }}>{t("action.edit")}</Button>
           <Button variant="secondary" onClick={() => remove(p)} style={{ padding: "4px 8px", fontSize: 11, color: "#ef4444", borderColor: "#4a1a1a" }}>×</Button>
         </div>

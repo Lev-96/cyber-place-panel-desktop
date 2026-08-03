@@ -2477,3 +2477,59 @@ button.pill:hover {
   text-decoration: underline dotted;
 }
 .cp-mli-reset:hover { color: var(--color-primary); }
+
+/* ── Subcategory tabs ────────────────────────────────────────────────────
+   The second row of the platform selector. Every tab is the same height
+   whatever its label: a subcategory can be called "PS5 + большой экран", and
+   letting that wrap would make one tab two lines tall and shove the whole row
+   out of line with its neighbours. So the row is a fixed-height flex line, each
+   tab takes an equal share of it (`flex: 1 1 0` with `min-width: 0`, which is
+   what actually lets a flex item shrink below its content), and anything too
+   long is cut with an ellipsis. The full name stays reachable as the title
+   attribute. */
+.cp-subtabs {
+  flex-wrap: nowrap;
+  align-items: stretch;
+}
+.cp-subtab {
+  flex: 1 1 0;
+  min-width: 0;
+  height: 34px;
+  /* Block, not flex: the ellipsis needs a block-level text box — a flex
+     container clips the label without ever drawing the "…". Centring is done
+     with line-height for the same reason. */
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 34px;
+  padding-top: 0;
+  padding-bottom: 0;
+  text-align: center;
+}
+
+/* ── Place cards ─────────────────────────────────────────────────────────
+   Every card is one height, always. The card renders a fixed set of lines —
+   platform, number, status, games, subcategory — and the subcategory line is
+   emitted even when there is none (as a non-breaking space), so a grid of
+   cards can never end up with two different line counts. Each line is a single
+   line: long names are cut with an ellipsis instead of wrapping, which is the
+   only thing that could still change a card's height. */
+.place-cell .platform,
+.place-cell .until,
+.place-cell .subplatform {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+.place-cell .subplatform {
+  font-size: 11px;
+  color: var(--color-primary);
+  font-weight: 600;
+}
+/* Push the actions to the bottom so cards with shorter text still line their
+   buttons up with the rest of the row. */
+.place-cell .cell-actions {
+  margin-top: auto;
+}

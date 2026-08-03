@@ -30,12 +30,19 @@ interface Row {
  * Grouped by platform, because a subplatform only means something under its
  * parent — a flat list of "Default", "Default", "+ VR" would be unreadable.
  *
- * One rule differs from platform prices, and it is the important one: **an
- * empty cell here is a value, not a gap.** Blank means "bill the same as the
- * platform", which is a thing an operator genuinely wants to go back to, so
+ * Two rules differ from platform prices.
+ *
+ * **An empty cell here is a value, not a gap.** Blank means "bill the same as
+ * the platform", which is a thing an operator genuinely wants to go back to, so
  * clearing a rate is sent as an explicit null instead of being skipped. Platform
  * prices skip blanks because there a blank tier would leave real places with no
  * rate at all; here the platform's own rate is always underneath.
+ *
+ * **There is no delete button, deliberately.** A subcategory is a price that
+ * real places bill from, and someone removing a row from a price list is not
+ * thinking about which places they are re-pricing. It retires by itself once its
+ * last place is deleted or moved off it (server-side, on the place observer), so
+ * anything still on screen is still in use.
  */
 const SubplatformPricesForm = ({ subplatforms, onSaved }: Props) => {
   const { t, lang } = useLang();
@@ -78,17 +85,6 @@ const SubplatformPricesForm = ({ subplatforms, onSaved }: Props) => {
   // Platforms in the order the server sent them, each with its own rows.
   const platforms = Array.from(new Set(subplatforms.map((s) => s.platform)));
 
-  const remove = async (s: IBranchSubplatform) => {
-    if (!confirm(`${t("subplatform.confirmDelete")}`)) return;
-    setErr(null);
-    try {
-      await subplatformRepository.remove(s.id);
-      onSaved();
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e));
-    }
-  };
-
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     setBusy(true);
@@ -128,7 +124,7 @@ const SubplatformPricesForm = ({ subplatforms, onSaved }: Props) => {
             <span className="muted" style={{ fontSize: 12, textTransform: "uppercase", letterSpacing: 0.5 }}>
               {platformLabel(platform)}
             </span>
-            <div style={{ display: "grid", gridTemplateColumns: "150px 1fr 1fr 36px", gap: 10, alignItems: "center" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "150px 1fr 1fr", gap: 10, alignItems: "center" }}>
               <span />
               <span className="muted" style={{ fontSize: 12, textTransform: "uppercase" }}>
                 {t("branch.prices.standard")}
@@ -136,7 +132,6 @@ const SubplatformPricesForm = ({ subplatforms, onSaved }: Props) => {
               <span className="muted" style={{ fontSize: 12, textTransform: "uppercase" }}>
                 {t("branch.prices.vip")}
               </span>
-              <span />
 
               {subplatforms
                 .filter((s) => s.platform === platform)
@@ -170,23 +165,6 @@ const SubplatformPricesForm = ({ subplatforms, onSaved }: Props) => {
                         onChange={(v) => setRow(s.id, { vip: v })}
                         placeholder={t("subplatform.inherits")}
                       />
-                      {/* Default has no delete: places point at it, and it is
-                          the one every platform is guaranteed to have. */}
-                      {s.is_default ? (
-                        <span />
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => void remove(s)}
-                          title={t("action.delete")}
-                          style={{
-                            background: "transparent", border: "none", padding: 0,
-                            color: "#ef4444", cursor: "pointer", fontSize: 16, lineHeight: 1,
-                          }}
-                        >
-                          ✕
-                        </button>
-                      )}
                     </Fragment>
                   );
                 })}

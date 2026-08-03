@@ -44,6 +44,3 @@ export const apiCreateSubplatform = (body: CreateSubplatformBody) =>
 
 export const apiUpdateSubplatform = (id: number, body: UpdateSubplatformBody) =>
   request<{ data: IBranchSubplatform }>(`/branch-subplatforms/${id}`, { method: "PUT", body });
-
-export const apiDeleteSubplatform = (id: number) =>
-  request<void>(`/branch-subplatforms/${id}`, { method: "DELETE" });
