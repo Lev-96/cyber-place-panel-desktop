@@ -1,6 +1,7 @@
 import HourlyRatesForm from "@/components/branches/HourlyRatesForm";
 import PackageForm from "@/components/packages/PackageForm";
 import PlatformPricesForm from "@/components/prices/PlatformPricesForm";
+import SubplatformPricesForm from "@/components/prices/SubplatformPricesForm";
 import Button from "@/components/ui/Button";
 import Spinner from "@/components/ui/Spinner";
 import { useAsync } from "@/hooks/useAsync";
@@ -8,6 +9,7 @@ import { useLang } from "@/i18n/LanguageContext";
 import { timePackageNameOf } from "@/i18n/timePackageName";
 import { branchRepository } from "@/repositories/BranchRepository";
 import { platformPriceRepository } from "@/repositories/PlatformPriceRepository";
+import { subplatformRepository } from "@/repositories/SubplatformRepository";
 import { timePackageRepository } from "@/repositories/TimePackageRepository";
 import { ITimePackage } from "@/types/sessions";
 import { useState } from "react";
@@ -33,6 +35,7 @@ const BranchPricesPage = () => {
   const branch = useAsync(() => branchRepository.byId(id), [id]);
   const packages = useAsync(() => timePackageRepository.listByBranch(id), [id]);
   const platformPrices = useAsync(() => platformPriceRepository.listByBranch(id), [id]);
+  const subplatforms = useAsync(() => subplatformRepository.listByBranch(id), [id]);
 
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState<ITimePackage | null>(null);
@@ -87,6 +90,21 @@ const BranchPricesPage = () => {
             key={(platformPrices.data ?? []).map((p) => p.id).join(",")}
             prices={platformPrices.data ?? []}
             onSaved={() => void platformPrices.reload()}
+          />
+        </section>
+      )}
+
+      {/* Subplatform rates — the sub-categories of a platform ("PS5 + VR").
+          Created in Places on the second row of tabs; here they are renamed (in
+          3 languages) and priced. An empty cell is a value, not a gap: it means
+          "bill the same as the platform". */}
+      {(subplatforms.data?.length ?? 0) > 0 && (
+        <section className="col" style={{ gap: 12 }}>
+          <h2 className="page-title" style={{ margin: 0 }}>{t("subplatform.sectionTitle")}</h2>
+          <SubplatformPricesForm
+            key={(subplatforms.data ?? []).map((s) => s.id).join(",")}
+            subplatforms={subplatforms.data ?? []}
+            onSaved={() => void subplatforms.reload()}
           />
         </section>
       )}

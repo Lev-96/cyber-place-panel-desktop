@@ -52,6 +52,11 @@ export interface IBranchPlace extends Translated {
   status: "active" | "inactive";
   // Dynamic: known pc/ps4/ps5 OR a custom branch platform slug.
   platform: string;
+  /**
+   * Priced sub-category of that platform, or null when the place bills from
+   * the platform directly. Needed on edit so the form re-opens the right tab.
+   */
+  subplatform_id?: number | null;
   /** Manual per-hour rate for custom platforms (null for known ones). */
   hourly_rate?: number | string | null;
   games: IGame[];
@@ -79,6 +84,39 @@ export interface IBranchPlatformPrice {
   /** Per-tier per-hour rates (null until a place of that type exists). */
   price_standard: number | string | null;
   price_vip: number | string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+/**
+ * A named, separately-priced sub-category of a platform — "PS5 + VR" under
+ * `ps5`. Unlike {@link IBranchPlatformPrice} these exist for the known
+ * platforms too: refining pc/ps4/ps5 is the point of the feature.
+ *
+ * A null tier price means "bill exactly as this platform bills" — the tariff
+ * matrix for pc/ps4/ps5, the platform price for a custom one. So a subplatform
+ * can be used purely as a label ("PS5 + big screen", same money), and the
+ * Default one ships with no prices at all.
+ */
+export interface IBranchSubplatform {
+  id: number;
+  branch_id: number;
+  /** Parent platform slug, shared with `IBranchPlace.platform`. */
+  platform: string;
+  /** Identity within (branch, platform). `default` for the undeletable one. */
+  slug: string;
+  name_en: string;
+  name_ru: string;
+  name_am: string;
+  /** Server-resolved single label (EN→RU→AM). */
+  name: string;
+  label?: string;
+  /** Per-tier override. Null = inherit the platform's rate. */
+  price_standard: number | string | null;
+  price_vip: number | string | null;
+  is_default: boolean;
+  /** Places using it — the "most used" ranking behind the tab strip. */
+  places_count: number;
   created_at?: string;
   updated_at?: string;
 }

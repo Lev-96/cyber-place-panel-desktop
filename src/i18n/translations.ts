@@ -712,6 +712,60 @@ export const TRANSLATIONS: Dict = {
   "platformPrice.renameTitle": { en: "Rename platform", ru: "Изменить наименование платформы", am: "Վերանվանել հարթակը" },
   "platformPrice.renameHint": { en: "Click to rename", ru: "Нажмите, чтобы изменить наименование", am: "Սեղմեք վերանվանելու համար" },
 
+  // Subplatforms — named, separately-priced sub-categories of a platform
+  // ("PS5 + VR" under PS5). The second row of tabs in the place form, and
+  // their own editable section in Branch Prices.
+  "subplatform.label": { en: "Subcategory", ru: "Подкатегория", am: "Ենթակատեգորիա" },
+  "subplatform.other": { en: "Other", ru: "Другое", am: "Այլ" },
+  "subplatform.search": { en: "Find a subcategory", ru: "Найти подкатегорию", am: "Գտնել ենթակատեգորիա" },
+  "subplatform.searchPlaceholder": {
+    en: "Type a name in any language",
+    ru: "Введите название на любом языке",
+    am: "Մուտքագրեք անվանումը ցանկացած լեզվով",
+  },
+  "subplatform.noneFound": {
+    en: "Nothing found — create it below.",
+    ru: "Ничего не найдено — создайте ниже.",
+    am: "Ոչինչ չի գտնվել — ստեղծեք ստորև:",
+  },
+  "subplatform.create": { en: "New subcategory", ru: "Новая подкатегория", am: "Նոր ենթակատեգորիա" },
+  "subplatform.name": { en: "Name", ru: "Название", am: "Անվանում" },
+  "subplatform.add": { en: "Add", ru: "Добавить", am: "Ավելացնել" },
+  "subplatform.price": { en: "Price per hour", ru: "Цена за час", am: "Գինը մեկ ժամում" },
+  "subplatform.priceHint": {
+    en: "Leave empty to charge the same as the platform.",
+    ru: "Оставьте пустым — цена будет как у платформы.",
+    am: "Թողեք դատարկ՝ գինը կլինի հարթակի նույնը:",
+  },
+  "subplatform.priceAppliedNote": {
+    en: "This subcategory's rate applies. Change it in Branch prices.",
+    ru: "Применяется цена этой подкатегории. Изменить её можно в «Ценах филиала».",
+    am: "Կիրառվում է այս ենթակատեգորիայի գինը: Փոխեք այն «Մասնաճյուղի գներ» բաժնում:",
+  },
+  "subplatform.inherits": { en: "as the platform", ru: "как у платформы", am: "ինչպես հարթակը" },
+  "subplatform.errors.nameRequired": {
+    en: "Enter a name for the subcategory.",
+    ru: "Введите название подкатегории.",
+    am: "Մուտքագրեք ենթակատեգորիայի անվանումը:",
+  },
+  "subplatform.sectionTitle": { en: "Subcategory prices", ru: "Цены подкатегорий", am: "Ենթակատեգորիաների գներ" },
+  "subplatform.renameTitle": { en: "Rename subcategory", ru: "Изменить название подкатегории", am: "Վերանվանել ենթակատեգորիան" },
+  "subplatform.managedHint": {
+    en: "Created in Places, on the second row of tabs. Rename them and set each rate here — an empty rate bills the same as the platform.",
+    ru: "Создаются в разделе «Места», во втором ряду вкладок. Здесь их можно переименовать и задать цену — пустая цена означает «как у платформы».",
+    am: "Ստեղծվում են «Տեղեր» բաժնում՝ ներդիրների երկրորդ շարքում: Այստեղ կարող եք վերանվանել և սահմանել գինը — դատարկ գինը նշանակում է «ինչպես հարթակը»:",
+  },
+  "subplatform.defaultUndeletable": {
+    en: "The Default subcategory cannot be deleted.",
+    ru: "Подкатегорию «По умолчанию» удалить нельзя.",
+    am: "«Կանխադրված» ենթակատեգորիան հնարավոր չէ ջնջել:",
+  },
+  "subplatform.confirmDelete": {
+    en: "Delete this subcategory? Its places will bill from the platform again.",
+    ru: "Удалить подкатегорию? Её места снова будут считаться по цене платформы.",
+    am: "Ջնջե՞լ ենթակատեգորիան: Նրա տեղերը կրկին կհաշվարկվեն հարթակի գնով:",
+  },
+
   // Tournament form
   "tournament.titleNew": { en: "New tournament", ru: "Новый турнир", am: "Նոր մրցաշար" },
   "tournament.titleEdit": { en: "Edit tournament", ru: "Редактировать турнир", am: "Խմբագրել մրցաշարը" },

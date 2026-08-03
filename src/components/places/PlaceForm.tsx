@@ -8,6 +8,7 @@ import PriceInput from "@/components/ui/PriceInput";
 import Checkbox from "@/components/ui/Checkbox";
 import PlatformPicker from "@/components/ui/PlatformPicker";
 import PlatformNameInput, { LangNames } from "@/components/ui/PlatformNameInput";
+import SubplatformTabs from "@/components/ui/SubplatformTabs";
 import Spinner from "@/components/ui/Spinner";
 import GameForm from "@/components/games/GameForm";
 import { useAuth } from "@/auth/AuthContext";
@@ -17,6 +18,7 @@ import { useLang } from "@/i18n/LanguageContext";
 import { platformPriceNameOf } from "@/i18n/platformPriceName";
 import { gameRepository } from "@/repositories/GameRepository";
 import { placeRepository } from "@/repositories/PlaceRepository";
+import { subplatformRepository } from "@/repositories/SubplatformRepository";
 import { IBranchPlace, IBranchPlatformPrice, PlaceType } from "@/types/api";
 import { isKnownPlatform, platformLabel, slugifyPlatform } from "@/utils/platform";
 import { FormEvent, useEffect, useState } from "react";
@@ -57,6 +59,9 @@ const PlaceForm = ({ branchId, initial, platformSuggestions, platformPrices, onC
   );
   const [type, setType] = useState<PlaceType>(initial?.type ?? "standard");
   const [platform, setPlatform] = useState<string>(initial?.platform ?? "pc");
+  // Which sub-category of that platform. Null = none chosen yet; the effect
+  // below settles it to Default once this platform's list has loaded.
+  const [subplatformId, setSubplatformId] = useState<number | null>(initial?.subplatform_id ?? null);
   const [hourlyRate, setHourlyRate] = useState(initial?.hourly_rate != null ? String(initial.hourly_rate) : "");
   const [gameIds, setGameIds] = useState<Set<number>>(new Set((initial?.games ?? []).map((g) => g.id)));
   // A custom platform may legitimately have NO games (table tennis, a poker
@@ -78,6 +83,23 @@ const PlaceForm = ({ branchId, initial, platformSuggestions, platformPrices, onC
   // A brand-new custom platform = custom AND no price row at all. Only then does
   // the operator NAME it (a named platform is only named once).
   const customNew = isCustomPlatform && !existingPrice;
+  /**
+   * A platform that actually exists, so it is safe to ask for its subplatforms.
+   *
+   * Deliberately NOT just `platform !== ""`. While the operator types the name
+   * of a brand-new custom platform the slug changes on every keystroke, and
+   * listing a platform CREATES its Default subplatform server-side — so the
+   * naive version would leave a trail of default rows for "t", "te", "ten"…
+   * before the real "tennis" ever existed. Known platforms are always real;
+   * a custom one is real once it has a price row.
+   */
+  const platformSettled = platform !== "" && (!isCustomPlatform || !!existingPrice);
+  // Reloads whenever the platform changes — subplatforms belong to a platform,
+  // so switching pc → ps5 must not leave the previous platform's tabs on screen.
+  const subplatforms = useAsync(
+    () => (platformSettled ? subplatformRepository.listByPlatform(branchId, platform) : Promise.resolve([])),
+    [branchId, platform, platformSettled],
+  );
   // Pricing is per tier (standard/vip). The rate for THIS place's type may
   // already be set even when the platform exists — then it locks. A platform
   // can exist with only one tier priced, so the other tier still needs a rate.
@@ -115,6 +137,34 @@ const PlaceForm = ({ branchId, initial, platformSuggestions, platformPrices, onC
     setNames({ en: p.name_en ?? "", ru: p.name_ru ?? "", am: p.name_am ?? "" });
     setPlatform(p.platform);
   };
+
+  /**
+   * Keep the chosen subplatform valid for the platform actually selected.
+   *
+   * Two cases, and getting either wrong bills the place wrong:
+   *  - the selection belongs to the previous platform (pc → ps5) — it must go,
+   *    otherwise the place would carry a PC subplatform's price;
+   *  - nothing is selected — settle on Default, so a place always lands in a
+   *    real sub-category instead of silently having none.
+   */
+  useEffect(() => {
+    const list = subplatforms.data;
+    if (!list) return;
+
+    setSubplatformId((prev) => {
+      if (prev != null && list.some((s) => s.id === prev)) return prev;
+
+      return list.find((s) => s.is_default)?.id ?? null;
+    });
+  }, [subplatforms.data]);
+
+  // The sub-category this place will bill from, if the list has loaded.
+  const subplatform = (subplatforms.data ?? []).find((s) => s.id === subplatformId);
+  // Its override for THIS tier, if it has one. A subplatform that prices the
+  // tier is the price — the platform's own rate never comes into it.
+  const subplatformRate = subplatform
+    ? (type === "vip" ? subplatform.price_vip : subplatform.price_standard)
+    : null;
 
   // Auto-suggest next available number on create
   useEffect(() => {
@@ -175,7 +225,11 @@ const PlaceForm = ({ branchId, initial, platformSuggestions, platformPrices, onC
     // tier isn't priced yet. A locked tier needs neither.
     const finalPlatform = customNew ? slugifyPlatform(names.en.trim()) : platform;
     if (customNew && !finalPlatform) return setErr(t("place.errors.nameRequired"));
-    if (isCustomPlatform && !tierLocked && !hourlyRate) return setErr(t("place.errors.priceRequired"));
+    // A subplatform that prices this tier IS the price, so the platform's own
+    // rate is not required — demanding one would block a configured place.
+    if (subplatformRate == null && isCustomPlatform && !tierLocked && !hourlyRate) {
+      return setErr(t("place.errors.priceRequired"));
+    }
     setBusy(true); setErr(null);
     try {
       const body = {
@@ -184,6 +238,9 @@ const PlaceForm = ({ branchId, initial, platformSuggestions, platformPrices, onC
         name: primaryValue(name, lang) || null,
         type,
         platform: finalPlatform,
+        // The sub-category this place bills from. Null is normal — it simply
+        // means the place bills from its platform, as every place did before.
+        subplatform_id: subplatformId,
         // Known platforms bill from the matrix (null). An already-priced tier
         // reuses that rate (server ignores any override). An unpriced tier
         // sends its rate — the server seeds that tier's price; a brand-new
@@ -277,7 +334,41 @@ const PlaceForm = ({ branchId, initial, platformSuggestions, platformPrices, onC
           <PlatformPicker value={platform} onChange={handlePlatformPick} suggestions={platformOptions} hideOtherInput />
         </div>
 
-        {isCustomPlatform && (tierLocked ? (
+        {/* Second level: which sub-category of that platform. Only once the
+            platform is settled — a subplatform belongs to a platform, and
+            offering the tabs while the operator is still typing a custom name
+            would show them tabs for a platform that does not exist yet. */}
+        {platform !== "" && (subplatforms.data?.length ?? 0) > 0 && (
+          <SubplatformTabs
+            branchId={branchId}
+            platform={platform}
+            subplatforms={subplatforms.data ?? []}
+            value={subplatformId}
+            onChange={setSubplatformId}
+            type={type}
+            onCreated={() => void subplatforms.reload()}
+            disabled={busy}
+          />
+        )}
+
+        {/* A subplatform that prices this tier IS the price — for pc/ps4/ps5 as
+            much as for a custom platform, which is the whole point of the
+            feature. Shown as applied rather than editable: the rate belongs to
+            the sub-category (and every place on it), so it is changed in Branch
+            Prices, not per place. */}
+        {subplatformRate != null ? (
+          <div className="col" style={{ gap: 6 }}>
+            <span className="label">{t("place.hourlyRate")} · {typeLabel}</span>
+            <div
+              className="card"
+              style={{ padding: "10px 12px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}
+            >
+              <span>{subplatform ? platformPriceNameOf(subplatform, lang) : ""}</span>
+              <strong style={{ color: "#07ddf1" }}>{money(Number(subplatformRate))}</strong>
+            </div>
+            <span className="muted" style={{ fontSize: 11 }}>{t("subplatform.priceAppliedNote")}</span>
+          </div>
+        ) : isCustomPlatform && (tierLocked ? (
           // This platform + tier is already priced — applied, not re-entered.
           <div className="col" style={{ gap: 6 }}>
             <span className="label">{t("place.hourlyRate")} · {typeLabel}</span>
