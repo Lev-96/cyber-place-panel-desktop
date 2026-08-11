@@ -44,6 +44,7 @@ export const TRANSLATIONS: Dict = {
   "nav.companies": { en: "Companies", ru: "Компании", am: "Ընկերություններ" },
   "nav.revenue": { en: "Revenue", ru: "Выручка", am: "Եկամուտ" },
   "nav.expenses": { en: "Expenses", ru: "Расходы", am: "Ծախսեր" },
+  "nav.metrics": { en: "Metrics", ru: "Метрики", am: "Մետրիկա" },
   "nav.myCompany": {
     en: "My company",
     ru: "Моя компания",
@@ -1188,6 +1189,95 @@ export const TRANSLATIONS: Dict = {
     en: "Recurring services you pay monthly",
     ru: "Регулярные сервисы, оплата ежемесячно",
     am: "Կրկնվող ծառայություններ, ամսական վճարում",
+  },
+  // Admin "Metrics" section — Yandex.Metrica website analytics.
+  "home.menu.metrics": {
+    en: "Metrics",
+    ru: "Метрики",
+    am: "Մետրիկա",
+  },
+  "home.menu.metricsSub": {
+    en: "Site traffic & server health",
+    ru: "Трафик сайта и здоровье сервера",
+    am: "Կայքի թրաֆիկ և սերվերի վիճակ",
+  },
+  "metrics.title": { en: "Metrics", ru: "Метрики", am: "Մետրիկա" },
+  "metrics.period.today": { en: "Today", ru: "Сегодня", am: "Այսօր" },
+  "metrics.period.week": { en: "7 days", ru: "7 дней", am: "7 օր" },
+  "metrics.period.month": { en: "30 days", ru: "30 дней", am: "30 օր" },
+  "metrics.openYandex": {
+    en: "Open Yandex.Metrica →",
+    ru: "Открыть Яндекс.Метрику →",
+    am: "Բացել Yandex.Metrica →",
+  },
+  "metrics.visits": { en: "Visits", ru: "Визиты", am: "Այցեր" },
+  "metrics.users": { en: "Visitors", ru: "Посетители", am: "Այցելուներ" },
+  "metrics.bounceRate": { en: "Bounce rate", ru: "Отказы", am: "Մերժումներ" },
+  "metrics.pageDepth": { en: "Pages / visit", ru: "Глубина просмотра", am: "Դիտման խորություն" },
+  "metrics.avgVisit": { en: "Avg. visit", ru: "Время на сайте", am: "Կայքում անցկացրած ժամանակ" },
+  "metrics.trend": { en: "Trend", ru: "Динамика", am: "Դինամիկա" },
+  "metrics.sources": { en: "Traffic sources", ru: "Источники трафика", am: "Թրաֆիկի աղբյուրներ" },
+  "metrics.noData": {
+    en: "No data for this period yet.",
+    ru: "За этот период данных пока нет.",
+    am: "Այս ժամանակահատվածի տվյալներ դեռ չկան:",
+  },
+  "metrics.sampled": {
+    en: "Figures are estimated (Yandex sampling).",
+    ru: "Данные приблизительные (сэмплирование Яндекса).",
+    am: "Տվյալները մոտավոր են (Yandex-ի ընտրանք):",
+  },
+  "metrics.notConfigured": {
+    en: "Analytics is not set up for this environment",
+    ru: "Аналитика не настроена для этого окружения",
+    am: "Անալիտիկան կարգավորված չէ այս միջավայրի համար",
+  },
+  "metrics.notConfiguredSub": {
+    en: "Add the counter and token to this environment's settings, then reload.",
+    ru: "Добавьте счётчик и токен в настройки этого окружения и обновите страницу.",
+    am: "Ավելացրեք հաշվիչը և թոքենը այս միջավայրի կարգավորումներում և թարմացրեք:",
+  },
+  "metrics.unavailable": {
+    en: "Yandex.Metrica is unavailable",
+    ru: "Яндекс.Метрика недоступна",
+    am: "Yandex.Metrica-ն հասանելի չէ",
+  },
+  "metrics.unavailableSub": {
+    en: "The service did not respond. The figures will return on their own once it does.",
+    ru: "Сервис не ответил. Данные появятся сами, как только он снова заработает.",
+    am: "Ծառայությունը չպատասխանեց: Տվյալները կվերադառնան ինքնաբերաբար:",
+  },
+  "metrics.loadFailed": {
+    en: "Could not load metrics",
+    ru: "Не удалось загрузить метрики",
+    am: "Չհաջողվեց բեռնել մետրիկան",
+  },
+  "metrics.loadFailedSub": {
+    en: "Check the connection to the server and try again.",
+    ru: "Проверьте связь с сервером и попробуйте ещё раз.",
+    am: "Ստուգեք կապը սերվերի հետ և փորձեք կրկին:",
+  },
+  "metrics.retry": { en: "Retry", ru: "Повторить", am: "Կրկնել" },
+  // Backend monitoring dashboard (Laravel Pulse) — admin only.
+  "home.menu.pulse": {
+    en: "Monitoring",
+    ru: "Мониторинг",
+    am: "Մոնիտորինգ",
+  },
+  "home.menu.pulseSub": {
+    en: "Server load, disk, queries",
+    ru: "Нагрузка, диск, запросы",
+    am: "Ծանրաբեռնվածություն, սկավառակ, հարցումներ",
+  },
+  "home.menu.pulseOpening": {
+    en: "Opening in browser…",
+    ru: "Открываю в браузере…",
+    am: "Բացվում է դիտարկիչում…",
+  },
+  "home.menu.pulseError": {
+    en: "Could not open monitoring. Try again.",
+    ru: "Не удалось открыть мониторинг. Попробуйте ещё раз.",
+    am: "Չհաջողվեց բացել մոնիտորինգը: Փորձեք կրկին:",
   },
   "home.menu.settings": {
     en: "Settings",

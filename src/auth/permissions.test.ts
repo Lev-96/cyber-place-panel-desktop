@@ -31,6 +31,21 @@ describe("can(role, perm)", () => {
     it("can view revenue (admin + owner only perm)", () => {
       expect(can("admin", "revenue.view")).toBe(true);
     });
+
+    it("can open the Metrics section", () => {
+      expect(can("admin", "menu.metrics")).toBe(true);
+    });
+  });
+
+  // Website analytics and server health are network-wide data — a single
+  // company's owner (let alone a branch manager) must never see them. The
+  // backend enforces the same on the `admin` guard; this pins the UI half so
+  // the section cannot be widened by accident.
+  describe("menu.metrics is admin-only", () => {
+    it("is denied to owner and manager", () => {
+      expect(can("company_owner", "menu.metrics")).toBe(false);
+      expect(can("manager", "menu.metrics")).toBe(false);
+    });
   });
 
   describe("company_owner", () => {

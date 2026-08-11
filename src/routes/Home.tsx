@@ -142,6 +142,19 @@ const Home = () => {
             <div className="muted">{t("home.menu.expensesSub")}</div>
           </Link>
         )}
+        {/* Website analytics + backend monitoring both live in the "Метрики"
+            section, so this is a plain link — the Pulse entry point sits
+            inside that screen rather than being duplicated here. Admin-only
+            in the UI AND on the server (the endpoints are behind the admin
+            guard), so this tile is convenience, not the access control. */}
+        {isAdmin && (
+          <Link to="/metrics" className="card" style={{ minWidth: 220 }}>
+            <div style={{ fontWeight: 700, fontSize: 16 }}>
+              {t("home.menu.metrics")}
+            </div>
+            <div className="muted">{t("home.menu.metricsSub")}</div>
+          </Link>
+        )}
         <Link to="/settings" className="card" style={{ minWidth: 220 }}>
           <div style={{ fontWeight: 700, fontSize: 16 }}>
             {t("home.menu.settings")}

@@ -34,10 +34,10 @@ const CompanyBranches = lazy(() => import("@/routes/CompanyBranches"));
 const CompanyDetails = lazy(() => import("@/routes/CompanyDetails"));
 const CompanyRevenue = lazy(() => import("@/routes/CompanyRevenue"));
 const Expenses = lazy(() => import("@/routes/Expenses"));
+const Metrics = lazy(() => import("@/routes/Metrics"));
 const MyCompany = lazy(() => import("@/routes/MyCompany"));
 const Revenue = lazy(() => import("@/routes/Revenue"));
 const ConfirmByCode = lazy(() => import("@/routes/ConfirmByCode"));
-const ForgotPassword = lazy(() => import("@/routes/ForgotPassword"));
 const GamesList = lazy(() => import("@/routes/GamesList"));
 const Managers = lazy(() => import("@/routes/Managers"));
 const MemberCard = lazy(() => import("@/routes/MemberCard"));
@@ -231,6 +231,16 @@ const Authed = () => {
             </RoleGuard>
           }
         />
+        {/* Website analytics (Yandex.Metrica) + entry to backend monitoring.
+            Admin-only here and on the backend's `admin` guard. */}
+        <Route
+          path="/metrics"
+          element={
+            <RoleGuard perm="menu.metrics">
+              <Metrics />
+            </RoleGuard>
+          }
+        />
         <Route
           path="/companies"
           element={
@@ -279,7 +289,11 @@ const Authed = () => {
 const Unauthed = () => (
   <Suspense fallback={<Spinner />}>
     <Routes>
-      <Route path="/forgot-password" element={<ForgotPassword />} />
+      {/* The reset request is the reverse face of the sign-in card, not a
+          separate page — Login reads the path and opens already turned. Keeping
+          the URL means a deep link, a bookmark and the browser's Back button
+          all still work. */}
+      <Route path="/forgot-password" element={<Login />} />
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="*" element={<Login />} />
     </Routes>

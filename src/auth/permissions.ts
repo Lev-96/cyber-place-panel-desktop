@@ -12,6 +12,14 @@ export type Permission =
   | "menu.managers"        // see global Managers in sidebar
   | "menu.games"           // see Games in sidebar
   | "menu.expenses"        // admin-only recurring-services expense tracker
+  /**
+   * Admin-only "Метрики" section: Yandex.Metrica web analytics for the public
+   * landing page, plus the entry point to the backend's Pulse dashboard.
+   * Network-wide data (whole-product traffic and server health), so it is not
+   * a single company owner's to read — the backend enforces the same on the
+   * `admin` guard.
+   */
+  | "menu.metrics"
   | "menu.tournaments"     // see Tournaments in sidebar
   | "menu.scan"            // see Scan/Confirm in sidebar
   | "menu.map"             // see Branches map in sidebar
@@ -63,7 +71,7 @@ const PERMS: Record<Role, ReadonlySet<Permission>> = {
   admin: new Set<Permission>([
     "menu.branches", "menu.companies", "menu.managers", "menu.games",
     "menu.tournaments", "menu.scan", "menu.map",
-    "menu.updates", "menu.expenses",
+    "menu.updates", "menu.expenses", "menu.metrics",
     "revenue.view",
     "branch.create", "branch.edit", "branch.delete", "branch.prices",
     "company.create", "company.edit", "company.delete",

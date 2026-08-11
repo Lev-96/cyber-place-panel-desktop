@@ -335,6 +335,9 @@ const Sidebar = () => {
       {can(role, "menu.expenses") && (
         <NavLink to="/expenses">{t("nav.expenses")}</NavLink>
       )}
+      {can(role, "menu.metrics") && (
+        <NavLink to="/metrics">{t("nav.metrics")}</NavLink>
+      )}
       {can(role, "menu.myCompany") && (
         <NavLink to="/my-company">{t("nav.myCompany")}</NavLink>
       )}

@@ -1376,11 +1376,17 @@ input[type="time"]::-webkit-datetime-edit-field:focus {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: center;
   height: 100vh;
   background: var(--color-bg);
-  padding: 0 24px 40px;
+  padding: 24px;
   gap: 24px;
+  /* THE size of the login composition. Every dimension below is a fraction of
+     it, so the ring, the wordmark and the form always shrink together — before
+     this the ring tracked the viewport while the form stayed pinned in pixels,
+     and on a short window the form ended up nearly as wide as the circle
+     around it. Ratios are the original design sizes over 620. */
+  --ring-size: clamp(400px, 62vh, 620px);
 }
 
 .login-brand {
@@ -2532,4 +2538,428 @@ button.pill:hover {
    buttons up with the rest of the row. */
 .place-cell .cell-actions {
   margin-top: auto;
+}
+
+/* Wrapper around brand + logo + title + form, so the panel is one block with
+   its own spacing above the decorative layers. */
+.login-stage {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: calc(var(--ring-size) * 0.039);
+  width: 100%;
+  max-width: calc(var(--ring-size) * 0.84);
+  /* Reserve the half of the ring that sticks out ABOVE the wordmark.
+     The ring is absolutely positioned, so it contributes nothing to layout —
+     which meant the flex centring balanced only the text and the form, and the
+     whole composition rode high with dead space underneath. Padding the stage
+     by the ring's overhang (its radius, less half the wordmark's own height)
+     puts that space back into the flow, so centring the stage now centres what
+     you actually see. Derived from --ring-size, so it stays correct at every
+     window size instead of only at one. */
+  padding-top: calc(var(--ring-size) * 0.454);
+  /* Flattening is what makes the panel arrive as one solid object. Without it
+     each child would be depth-sorted on its own and the group would visibly
+     come apart mid-flight. */
+  transform-style: preserve-3d;
+  animation: cpPanelApproach 2300ms cubic-bezier(0.14, 0.86, 0.2, 1) both;
+}
+
+.login-shell {
+  position: relative;
+  overflow: hidden;
+  /* A real perspective, so the entrance is genuine depth rather than a scale.
+     Scaling grows every edge uniformly; translating along Z foreshortens —
+     the panel reads as travelling towards you instead of merely inflating. */
+  perspective: 1400px;
+  perspective-origin: 50% 42%;
+}
+
+/* ---- Panel entrance ----
+   Arrives out of the same depth the grid recedes into: far away, dim and out
+   of focus, then settles onto its mark. The blur clearing as it lands is what
+   sells the distance — a sharp object that only changes size reads as a
+   sticker being zoomed, not as something approaching. */
+@keyframes cpPanelApproach {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 34px, -1900px);
+    filter: blur(12px);
+  }
+  45% {
+    opacity: 1;
+  }
+  /* A whisper past the mark, then back — the settle that stops a long
+     approach ending abruptly. Two pixels, not a bounce. */
+  88% {
+    transform: translate3d(0, 0, 26px);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+    filter: blur(0);
+  }
+}
+
+/* Composition type and imagery, all derived from --ring-size. */
+.login-shell .login-brand {
+  font-size: calc(var(--ring-size) * 0.077);
+}
+.login-shell .login-logo {
+  width: calc(var(--ring-size) * 0.145);
+}
+.login-shell .login-title {
+  font-size: calc(var(--ring-size) * 0.032);
+}
+.login-shell .login-card {
+  padding: calc(var(--ring-size) * 0.036) calc(var(--ring-size) * 0.039);
+  gap: calc(var(--ring-size) * 0.023);
+}
+
+/* The wordmark lights up once the panel has almost landed, rather than riding
+   in already glowing — the beat between arrival and ignition is what makes it
+   feel deliberate. */
+.login-shell .login-brand {
+  animation:
+    cpBrandIgnite 900ms 1500ms ease-out both,
+    brandFlicker var(--flicker-every) 2400ms ease-in-out infinite,
+    brandGlow 5s 2400ms ease-in-out infinite;
+}
+
+@keyframes cpBrandIgnite {
+  from { opacity: 0.25; }
+  to { opacity: 1; }
+}
+
+/* The backdrops come up under it, so nothing snaps in when the lazy WebGL
+   chunk finally resolves. */
+.login-scene {
+  animation: cpBackdropIn 2200ms ease-out both;
+}
+
+@keyframes cpBackdropIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* === Login HUD backdrop =====================================================
+   A hexagon mesh floor and a slow targeting ring behind the sign-in panel —
+   the "heads-up display" look, rendered in the product's own palette rather
+   than a borrowed cyan.
+
+   Everything here is decoration: it sits behind the character and the form,
+   never takes pointer events, and animates transform/opacity only so the whole
+   layer stays on the compositor (CLAUDE.md §7.5). */
+
+/* Anchor for the ring: a zero-height box centred on the wordmark. */
+.login-brand-wrap {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.login-shell .login-brand {
+  position: relative;
+  /* Above the ring that is centred behind it. */
+  z-index: 1;
+}
+
+/* The ring, centred on the wordmark's own centre. */
+.login-hud {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: var(--ring-size);
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* The WebGL backdrop, behind every other layer. */
+.login-scene {
+  position: absolute !important;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+/* ---- Targeting ring ----
+   Three concentric pieces turning at different rates: a fast thin ring, a slow
+   counter-turning one, and a tick band. Counter-rotation is what stops it
+   reading as one flat spinning disc. */
+.login-hud-ring {
+  position: absolute;
+  inset: 0;
+  opacity: 0.5;
+}
+
+.login-hud-ring span {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+}
+
+.login-hud-ring-outer {
+  border: 2px solid rgba(7, 221, 241, 0.35);
+  box-shadow:
+    0 0 18px rgba(7, 221, 241, 0.25),
+    inset 0 0 22px rgba(7, 221, 241, 0.12);
+  /* Two gaps in the ring: a broken circle reads as an instrument, a closed
+     one reads as a plain border. */
+  mask-image: conic-gradient(#000 0 38%, transparent 38% 44%, #000 44% 88%, transparent 88% 94%, #000 94%);
+  animation: cpHudSpin 32s linear infinite;
+}
+
+.login-hud-ring-inner {
+  inset: 9%;
+  border: 1px solid rgba(209, 82, 250, 0.32);
+  mask-image: conic-gradient(transparent 0 8%, #000 8% 46%, transparent 46% 54%, #000 54% 92%, transparent 92%);
+  animation: cpHudSpin 44s linear infinite reverse;
+}
+
+.login-hud-ring-ticks {
+  inset: 17%;
+  /* Tick marks drawn as a repeating conic gradient — no extra elements. */
+  background: repeating-conic-gradient(
+    from 0deg,
+    rgba(50, 175, 247, 0.5) 0deg 0.7deg,
+    transparent 0.7deg 9deg
+  );
+  mask-image: radial-gradient(circle, transparent 0 82%, #000 82% 100%);
+  animation: cpHudSpin 70s linear infinite;
+}
+
+@keyframes cpHudSpin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* ---- Panel: instrument housing, not a plain card ---- */
+.login-shell .login-card {
+  position: relative;
+  padding: 22px 24px 24px;
+  border: 1px solid rgba(7, 221, 241, 0.3);
+  border-radius: 10px;
+  background:
+    linear-gradient(180deg, rgba(7, 221, 241, 0.05), rgba(2, 5, 20, 0.72));
+  box-shadow:
+    0 0 22px rgba(7, 221, 241, 0.12),
+    inset 0 0 24px rgba(7, 221, 241, 0.05);
+  backdrop-filter: blur(2px);
+  transition:
+    border-color 400ms ease,
+    box-shadow 400ms ease;
+}
+
+.login-shell .login-card:hover,
+.login-shell .login-card:focus-within {
+  border-color: rgba(7, 221, 241, 0.62);
+  box-shadow:
+    0 0 34px rgba(7, 221, 241, 0.22),
+    inset 0 0 28px rgba(7, 221, 241, 0.08);
+}
+
+/* Corner brackets: four short rules pinned to the panel's corners. Drawn on
+   pseudo-elements so they cost no markup. */
+.login-shell .login-card::before,
+.login-shell .login-card::after {
+  content: "";
+  position: absolute;
+  width: 22px;
+  height: 22px;
+  border: 2px solid var(--color-primary);
+  opacity: 0.75;
+  pointer-events: none;
+}
+.login-shell .login-card::before {
+  top: -1px;
+  left: -1px;
+  border-right: none;
+  border-bottom: none;
+  border-top-left-radius: 10px;
+}
+.login-shell .login-card::after {
+  right: -1px;
+  bottom: -1px;
+  border-left: none;
+  border-top: none;
+  border-bottom-right-radius: 10px;
+}
+
+/* Focused fields pulse, the way an instrument acknowledges input. Kept gentle:
+   this screen is looked at every shift, and a hard strobe gets tiring fast. */
+@keyframes cpFieldGlow {
+  from {
+    box-shadow: 0 0 0 2px rgba(7, 221, 241, 0.16), 0 0 8px rgba(7, 221, 241, 0.16);
+  }
+  to {
+    box-shadow: 0 0 0 3px rgba(7, 221, 241, 0.3), 0 0 18px rgba(7, 221, 241, 0.35);
+  }
+}
+.login-shell .input:focus {
+  border-color: var(--color-primary);
+  animation: cpFieldGlow 1.6s ease-in-out infinite alternate;
+}
+
+/* Reduced motion: keep the look, drop the movement. */
+@media (prefers-reduced-motion: reduce) {
+  .login-hud-ring span,
+  .login-shell .input:focus,
+  .login-scene {
+    animation: none !important;
+  }
+  /* No flight, no blur — straight to the resting state. */
+  .login-stage {
+    animation: none !important;
+    opacity: 1;
+    transform: none;
+    filter: none;
+  }
+  .login-shell .login-brand {
+    animation: none !important;
+    opacity: 1;
+  }
+}
+
+/* ---- Ring: extra layers ----
+   A dashed band, a scanning beam and four pulsing nodes on top of the base
+   rings. Everything is masked gradients on pseudo-free elements, so the whole
+   instrument costs no images and animates on transform/opacity only. */
+
+/* Uneven dashes read as an instrument scale; even ones read as a dotted
+   border. The gaps repeat on a different period from the ticks below, so the
+   two never lock into a moiré. */
+.login-hud-ring-dashes {
+  inset: 4%;
+  border: 1px solid rgba(127, 233, 255, 0.5);
+  mask-image: repeating-conic-gradient(
+    from 0deg,
+    #000 0deg 6deg,
+    transparent 6deg 11deg,
+    #000 11deg 13deg,
+    transparent 13deg 22deg
+  );
+  animation: cpHudSpin 26s linear infinite;
+}
+
+/* The beam: a wedge of light fading out behind itself, clipped to a band. */
+.login-hud-ring-sweep {
+  inset: 6%;
+  background: conic-gradient(
+    from 0deg,
+    rgba(7, 221, 241, 0.42) 0deg,
+    rgba(7, 221, 241, 0.14) 26deg,
+    transparent 60deg,
+    transparent 360deg
+  );
+  mask-image: radial-gradient(circle, transparent 0 62%, #000 66% 100%);
+  animation: cpHudSpin 7.5s linear infinite;
+  filter: blur(0.4px);
+}
+
+.login-hud-node {
+  position: absolute;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  box-shadow: 0 0 10px rgba(7, 221, 241, 0.9);
+  animation: cpNodePulse 3.2s ease-in-out infinite;
+}
+/* Offsets are half the node size, so each sits centred on the ring's edge. */
+.login-hud-node--n { top: -3.5px; left: calc(50% - 3.5px); animation-delay: 0s; }
+.login-hud-node--e { right: -3.5px; top: calc(50% - 3.5px); animation-delay: 0.8s; }
+.login-hud-node--s { bottom: -3.5px; left: calc(50% - 3.5px); animation-delay: 1.6s; }
+.login-hud-node--w { left: -3.5px; top: calc(50% - 3.5px); animation-delay: 2.4s; }
+
+@keyframes cpNodePulse {
+  0%, 100% { opacity: 0.35; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.5); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .login-hud-node {
+    animation: none !important;
+    opacity: 0.7;
+  }
+}
+
+/* === Sign-in card flip =====================================================
+   "Forgot password" turns the card over instead of navigating away, so the
+   space backdrop, the ring and the wordmark all stay exactly where they are.
+   Leaving the screen would tear the WebGL scene down and rebuild it — the
+   backdrop would blink, and the whole composition would re-enter from depth
+   for what is a change of one field. */
+
+.login-flip-wrap {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  /* Its own perspective, closer than the shell's, so the turn has real depth:
+     the far edge of the card recedes rather than the whole thing shearing. */
+  perspective: 1200px;
+}
+
+.login-flip {
+  /* Both faces occupy the SAME grid cell, so the wrapper takes the height of
+     the taller one and the card never changes size mid-turn. Absolutely
+     positioning the back face instead would collapse the wrapper's height and
+     make the card jump as it flips. */
+  display: grid;
+  width: 100%;
+  /* Centre both faces in the cell. A grid item narrower than its cell (which
+     `max-width` makes it) aligns to the START by default — that is what pulled
+     the card left of the ring's centre once it became a grid child, and put its
+     top-left corner outside the circle. */
+  justify-items: center;
+  transform-style: preserve-3d;
+  transition: transform 760ms cubic-bezier(0.22, 0.75, 0.2, 1);
+}
+
+.login-flip > * {
+  grid-area: 1 / 1;
+  /* Both faces are the same box, so the card cannot change width mid-turn.
+     The cap lives here rather than on .login-card because these are the
+     elements the grid lays out. */
+  width: 100%;
+  max-width: calc(var(--ring-size) * 0.68);
+  /* The half turned away from the viewer must not show through. */
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+/* The reverse face starts pre-turned, so that after the container's 180° it
+   ends up facing the viewer the right way round. */
+.login-flip-face-back {
+  transform: rotateY(180deg);
+}
+
+.login-flip.is-back {
+  transform: rotateY(180deg);
+}
+
+/* The "forgot password" / "back to sign in" links are buttons — they change
+   state on this screen rather than navigating. Strip the button chrome so they
+   still read as the links they replaced. */
+button.login-flip-back {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  cursor: pointer;
+  text-align: right;
+  color: var(--color-primary);
+}
+button.login-flip-back:hover {
+  opacity: 0.85;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .login-flip {
+    transition: none;
+  }
 }
