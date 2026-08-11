@@ -1,5 +1,6 @@
 import { useAuth } from "@/auth/AuthContext";
 import AuthRouteReset from "@/auth/AuthRouteReset";
+import TelemetryTracker from "@/telemetry/TelemetryTracker";
 import RoleGuard from "@/auth/RoleGuard";
 import { AccountLanguageGate } from "@/i18n/LanguageGates";
 import Layout from "@/components/Layout";
@@ -314,6 +315,10 @@ const App = () => {
             dashboard — a route must never outlive the account that
             opened it. Must live INSIDE the router to navigate. */}
         <AuthRouteReset />
+        {/* Usage + error reporting for the "Мониторинг · Десктоп-панель"
+            section. Inside the router so it can see navigation; renders
+            nothing. */}
+        <TelemetryTracker />
         {user ? (
           // NotificationsProvider only mounts when authed — its initial
           // fetch needs the sanctum token to be set, and the polling

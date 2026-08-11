@@ -1,5 +1,7 @@
 import { IMetrikaSummary, METRIKA_PERIODS, MetrikaPeriod } from "@/api/metrika";
+import { TELEMETRY_APPS, TelemetryApp } from "@/api/telemetry";
 import PulseDashboardCard from "@/components/admin/PulseDashboardCard";
+import TelemetrySection from "@/components/admin/TelemetrySection";
 import Button from "@/components/ui/Button";
 import ScreenWithBg from "@/components/ui/ScreenWithBg";
 import Spinner from "@/components/ui/Spinner";
@@ -27,16 +29,29 @@ const COLOR_USERS = "#9b7bff";
  * `dashboard_url` it is handed, so no counter or credential lives in the client.
  */
 const Metrics = () => {
-  const { t, lang } = useLang();
+  const { t } = useLang();
   const [period, setPeriod] = useState<MetrikaPeriod>("week");
-
-  const { data, loading, error, reload } = useAsync(
-    () => metrikaRepository.summary(period),
-    [period],
-  );
+  const [app, setApp] = useState<TelemetryApp>("mobile");
 
   return (
-    <ScreenWithBg bg="./bg/admin-home.jpg" title={t("metrics.title")}>
+    <ScreenWithBg bg="./bg/admin-home.jpg" title={t("monitoring.title")}>
+      {/* Which app is being monitored. First choice on the screen, because
+          every number below it is meaningless without knowing whose it is. */}
+      <div className="row" style={{ gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+        {TELEMETRY_APPS.map((a) => (
+          <Button
+            key={a}
+            variant={a === app ? "primary" : "secondary"}
+            onClick={() => setApp(a)}
+            aria-pressed={a === app}
+          >
+            {t(`monitoring.app.${a}`)}
+          </Button>
+        ))}
+      </div>
+
+      {/* Reporting window. Shared by every section so switching app keeps the
+          period you were already looking at. */}
       <div className="row" style={{ gap: 8, flexWrap: "wrap", alignItems: "center" }}>
         {METRIKA_PERIODS.map((p) => (
           <Button
@@ -48,16 +63,45 @@ const Metrics = () => {
             {t(`metrics.period.${p}`)}
           </Button>
         ))}
-        <span style={{ flex: 1 }} />
-        {data?.dashboard_url && (
+      </div>
+
+      {app === "website"
+        ? <WebsiteSection period={period} />
+        : <TelemetrySection app={app} period={period} />}
+
+      {/* Backend performance monitoring sits under every tab — it is the one
+          layer all four clients share, so it belongs to none of them alone. */}
+      <div className="row" style={{ gap: 12, flexWrap: "wrap", marginTop: 8 }}>
+        <PulseDashboardCard />
+      </div>
+    </ScreenWithBg>
+  );
+};
+
+/**
+ * The website tab — Yandex.Metrica for the public landing page, proxied by our
+ * own backend so no counter id or credential ever lives in this client.
+ */
+const WebsiteSection = ({ period }: { period: MetrikaPeriod }) => {
+  const { t, lang } = useLang();
+  const { data, loading, error, reload } = useAsync(
+    () => metrikaRepository.summary(period),
+    [period],
+  );
+
+  return (
+    <>
+      {data?.dashboard_url && (
+        <div className="row" style={{ gap: 8, flexWrap: "wrap" }}>
+          <span style={{ flex: 1 }} />
           <Button
             variant="secondary"
             onClick={() => window.open(data.dashboard_url!, "_blank", "noopener,noreferrer")}
           >
             {t("metrics.openYandex")}
           </Button>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Keep the previous window on screen while the next one loads —
           blanking the page on every period switch reads as a crash. */}
@@ -72,13 +116,7 @@ const Metrics = () => {
       )}
 
       {data && <SummaryBody summary={data} lang={lang} t={t} />}
-
-      {/* Backend performance monitoring lives next to website analytics —
-          both answer "how is the product doing", just at different layers. */}
-      <div className="row" style={{ gap: 12, flexWrap: "wrap", marginTop: 8 }}>
-        <PulseDashboardCard />
-      </div>
-    </ScreenWithBg>
+    </>
   );
 };
 
