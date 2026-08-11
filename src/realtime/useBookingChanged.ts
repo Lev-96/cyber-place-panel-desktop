@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { getEcho } from "./echo";
+import { apiCache } from "@/api/client";
 
 /**
  * Frozen mirror of `App\Events\BookingChanged` payload from the backend.
@@ -79,6 +80,11 @@ export const useBookingChanged = (
     const channel = echo.channel(channelName);
     const listener = (payload: unknown) => {
       console.log(`[reverb] .booking.changed received on ${channelName}`, payload);
+      // A booking moved on another machine, which changes the free-place
+      // counts embedded in the branch and place payloads. Drop the local
+      // copies so the socket — not a TTL — decides when they refresh.
+      apiCache.invalidatePrefix("/places");
+      apiCache.invalidatePrefix("/branches");
       handlerRef.current(payload as BookingChangedEvent);
     };
     channel.listen(".booking.changed", listener);

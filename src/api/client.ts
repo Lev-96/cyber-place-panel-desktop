@@ -1,11 +1,35 @@
 import { AppConfig } from "@/infrastructure/AppConfig";
 import { keyValueStore } from "@/infrastructure/KeyValueStore";
+import { HttpCache, invalidationTargets, policyFor } from "@/api/httpCache";
 
 export type Method = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 
 export interface ApiError extends Error {
   status: number;
   body: unknown;
+}
+
+/**
+ * Process-wide response cache. Bounded on both axes so a panel left open
+ * for a whole shift cannot grow its memory footprint over time:
+ * 300 entries / 8 MB is far more than the reference data the UI actually
+ * re-reads, and anything past it evicts the least recently used entry.
+ */
+export const apiCache = new HttpCache({
+  maxEntries: 300,
+  maxBytes: 8 * 1024 * 1024,
+  idleEvictMs: 10 * 60 * 1000,
+});
+
+// Janitor: drop entries nobody has touched in ten minutes. Without it a
+// long-lived window keeps paying for screens the user visited once this
+// morning. Cheap (a map walk), and rare.
+const SWEEP_INTERVAL_MS = 60_000;
+if (typeof setInterval === "function") {
+  const timer = setInterval(() => apiCache.sweep(), SWEEP_INTERVAL_MS);
+  // Node/Electron main-thread safety: never hold the process open just
+  // for a cache sweep.
+  (timer as unknown as { unref?: () => void }).unref?.();
 }
 
 const buildQuery = (params: object | undefined) => {
@@ -20,8 +44,9 @@ const buildQuery = (params: object | undefined) => {
 
 export const request = async <Res>(
   path: string,
-  opts: { method?: Method; body?: unknown; params?: Record<string, unknown> | object } = {},
+  opts: { method?: Method; body?: unknown; params?: Record<string, unknown> | object; noCache?: boolean } = {},
 ): Promise<Res> => {
+  const method = opts.method ?? "GET";
   const token = await keyValueStore.get<string>(AppConfig.storageKeys.token);
   const headers: Record<string, string> = {
     Accept: "application/json",
@@ -34,9 +59,26 @@ export const request = async <Res>(
   }
   if (token) headers.Authorization = `Bearer ${token}`;
 
-  const url = `${AppConfig.backendUrl}${path}${buildQuery(opts.params)}`;
+  const query = buildQuery(opts.params);
+  const cacheKey = `${path}${query}`;
+  const policy = method === "GET" && !opts.noCache ? policyFor(path) : null;
+  const cached = policy ? apiCache.lookup(cacheKey) : undefined;
+
+  // Still inside its freshness window: answer without touching the
+  // network at all. This is the case that makes tab switching instant.
+  if (policy && cached && apiCache.age(cached) < policy.ttlMs) {
+    return JSON.parse(cached.text) as Res;
+  }
+
+  // Stale but still held: ask the server whether it changed. A 304 is a
+  // few dozen bytes and costs the backend nothing but a key lookup.
+  if (cached?.etag) {
+    headers["If-None-Match"] = cached.etag;
+  }
+
+  const url = `${AppConfig.backendUrl}${path}${query}`;
   const res = await fetch(url, {
-    method: opts.method ?? "GET",
+    method,
     headers,
     body:
       opts.body === undefined
@@ -45,6 +87,13 @@ export const request = async <Res>(
           ? opts.body
           : JSON.stringify(opts.body),
   });
+
+  // Checked before the `res.ok` guard below: 304 is a success for us but
+  // not for fetch, which would otherwise turn it into a thrown ApiError.
+  if (res.status === 304 && cached) {
+    apiCache.touch(cacheKey);
+    return JSON.parse(cached.text) as Res;
+  }
 
   const text = await res.text();
   const body = text ? safeJson(text) : null;
@@ -55,6 +104,20 @@ export const request = async <Res>(
     err.body = body;
     throw err;
   }
+
+  if (policy && typeof body === "object" && body !== null) {
+    apiCache.store(cacheKey, text, res.headers.get("ETag"));
+  }
+
+  // A write this client just made must be visible on its next read, TTL
+  // or no TTL. Done after the response so a failed write leaves the
+  // cache alone.
+  if (method !== "GET") {
+    for (const prefix of invalidationTargets(path)) {
+      apiCache.invalidatePrefix(prefix);
+    }
+  }
+
   return body as Res;
 };
 

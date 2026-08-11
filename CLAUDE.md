@@ -555,6 +555,42 @@ Before marking work complete:
 
 ---
 
+## 7.6 Client response cache (`src/api/httpCache.ts`)
+
+`request()` in `src/api/client.ts` caches GET responses in memory. The
+backend cooperates by putting a strong ETag on the same endpoints, so a
+stale entry costs a 304 rather than a full payload.
+
+Hard rules:
+
+- **Opt-in only.** A path is cached only if `POLICIES` lists it. Live
+  data — `/sessions`, `/pcs`, `/orders`, `/shifts`, `/notifications`,
+  `/bookings`, `/members`, `/users` — must NEVER be added. The floor
+  board and the cash drawer are allowed to be slow; they are not allowed
+  to be wrong.
+- **Memory only, bounded on both axes** (300 entries / 8 MB, LRU) plus a
+  60s janitor that drops anything untouched for 10 minutes. Nothing is
+  written to disk, so a panel left open for weeks cannot accumulate a
+  cache directory. Do not "improve" this by persisting it.
+- **Every identity change clears it** — `AuthContext` login AND logout.
+  A manager signing in after an owner must not be able to read a
+  response the owner's session cached.
+- **Writes invalidate what they touch**, including the other resources
+  that embed them (`MUTATION_FANOUT`). The Reverb handlers
+  (`useBookingChanged`, `usePlaceAvailability`) invalidate too, so a
+  change made on another machine lands immediately instead of waiting
+  out a TTL.
+- Pass `noCache: true` to `request()` for a forced refresh; it also
+  sends `Cache-Control: no-cache`, which makes the backend recompute.
+
+Chromium's own disk cache is capped at 50 MB by a command-line switch
+and purged at boot plus hourly (`electron/main.ts`) — that is a separate
+mechanism from this one, and both are needed.
+
+Covered by `src/api/httpCache.test.ts` and `src/api/client.cache.test.ts`.
+
+---
+
 ## 8. AI Assistant Behaviour (for me, Claude)
 
 When working on this project:

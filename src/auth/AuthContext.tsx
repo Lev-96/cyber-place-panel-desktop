@@ -1,4 +1,5 @@
 import { apiGetMe, apiLogin } from "@/api/auth";
+import { apiCache } from "@/api/client";
 import { recentEmails } from "@/auth/recentEmails";
 import { AppConfig } from "@/infrastructure/AppConfig";
 import { keyValueStore } from "@/infrastructure/KeyValueStore";
@@ -46,6 +47,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     user,
     loading,
     login: async (email, password) => {
+      // Identity change = different data scope. A manager signing in
+      // after an owner must never be able to read a response the owner's
+      // session put in the cache, so the cache dies with the session on
+      // BOTH ends of it.
+      apiCache.clear();
       const res = await apiLogin(email, password);
       await keyValueStore.set(AppConfig.storageKeys.token, res.token);
       const me = await apiGetMe();
@@ -58,6 +64,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setUser(me.user);
     },
     logout: async () => {
+      apiCache.clear();
       await keyValueStore.remove(AppConfig.storageKeys.token);
       await keyValueStore.remove(AppConfig.storageKeys.user);
       setUser(null);

@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { getEcho } from "./echo";
+import { apiCache } from "@/api/client";
 
 /**
  * Payload broadcast by `App\Events\PlaceAvailabilityChanged`.
@@ -42,6 +43,12 @@ export const usePlaceAvailability = (
     const channelName = `branch.${branchId}`;
     const channel = echo.channel(channelName);
     const listener = (payload: PlaceAvailabilityEvent) => {
+      // A place just changed on ANOTHER machine. The client-side
+      // response cache is the only place that could still be holding the
+      // previous answer, so drop it before the handler runs — this is
+      // what keeps the socket, not the TTL, in charge of freshness.
+      apiCache.invalidatePrefix("/places");
+      apiCache.invalidatePrefix("/branches");
       handlerRef.current(payload);
     };
     channel.listen(".place.availability.changed", listener);
