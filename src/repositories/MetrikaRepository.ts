@@ -14,8 +14,8 @@ export class MetrikaRepository {
    * through `summary.status`, so callers render a state rather than an error.
    * A rejection here means a real transport/auth failure of OUR api.
    */
-  async summary(period: MetrikaPeriod): Promise<IMetrikaSummary> {
-    const res = await apiMetrikaSummary(period);
+  async summary(period: MetrikaPeriod, fresh = false): Promise<IMetrikaSummary> {
+    const res = await apiMetrikaSummary(period, fresh);
     return res.data;
   }
 }

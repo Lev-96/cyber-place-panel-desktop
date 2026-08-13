@@ -1270,6 +1270,18 @@ export const TRANSLATIONS: Dict = {
     ru: "Открыть Яндекс.Метрику →",
     am: "Բացել Yandex.Metrica →",
   },
+  "metrics.refresh": { en: "Refresh", ru: "Обновить", am: "Թարմացնել" },
+  "metrics.refreshing": { en: "Refreshing…", ru: "Обновляем…", am: "Թարմացվում է…" },
+  "metrics.updatedAt": {
+    en: "Data as of {0}",
+    ru: "Данные на {0}",
+    am: "Տվյալները՝ {0} դրությամբ",
+  },
+  "metrics.yandexLag": {
+    en: "Yandex aggregates visits with a few minutes' delay — a brand-new visit may not be counted yet.",
+    ru: "Яндекс агрегирует визиты с задержкой в несколько минут — самый свежий визит может быть ещё не учтён.",
+    am: "Yandex-ը այցերը հավաքագրում է մի քանի րոպե ուշացումով — ամենավերջին այցը կարող է դեռ հաշվառված չլինել։",
+  },
   "metrics.visits": { en: "Visits", ru: "Визиты", am: "Այցեր" },
   "metrics.users": { en: "Visitors", ru: "Посетители", am: "Այցելուներ" },
   "metrics.bounceRate": { en: "Bounce rate", ru: "Отказы", am: "Մերժումներ" },

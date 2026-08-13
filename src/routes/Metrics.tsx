@@ -7,13 +7,29 @@ import ScreenWithBg from "@/components/ui/ScreenWithBg";
 import Spinner from "@/components/ui/Spinner";
 import TrendChart from "@/components/ui/TrendChart";
 import { useAsync } from "@/hooks/useAsync";
+import { fmt } from "@/i18n/translations";
 import { useLang } from "@/i18n/LanguageContext";
 import { metrikaRepository } from "@/repositories/MetrikaRepository";
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 /** Series colours — the panel's accent for visits, a muted violet for users. */
 const COLOR_VISITS = "#07ddf1";
 const COLOR_USERS = "#9b7bff";
+
+/**
+ * How often an open website tab re-reads by itself. Matched to the backend's
+ * cache TTL: polling faster would only re-serve the same cached window, and
+ * polling slower would leave the section visibly frozen while somebody is
+ * watching it.
+ */
+const AUTO_REFRESH_MS = 60_000;
+
+/**
+ * Floor between the automatic refreshes triggered by the window regaining
+ * focus. Coming back from the browser is the moment the figures matter most —
+ * but clicking between windows must not turn into a burst of upstream reads.
+ */
+const FOCUS_REFRESH_FLOOR_MS = 15_000;
 
 /**
  * Admin "Метрики" section — website analytics for the public landing page,
@@ -81,26 +97,110 @@ const Metrics = () => {
 /**
  * The website tab — Yandex.Metrica for the public landing page, proxied by our
  * own backend so no counter id or credential ever lives in this client.
+ *
+ * ## Why this section refreshes itself
+ * The figures used to be loaded once, on mount, and served from a server-side
+ * cache on top of that — so an admin who opened the site in a browser and came
+ * straight back saw yesterday's picture and no way to tell it was stale. Three
+ * things fix that, in ascending order of force:
+ *
+ *  1. a periodic reload, which is happy to be served from the server cache;
+ *  2. a reload when the window regains focus — exactly the moment somebody
+ *     returns from the browser they just visited the site in;
+ *  3. an explicit refresh button, which tells the backend to skip its cache
+ *     and re-read Yandex now.
+ *
+ * `fetched_at` is displayed alongside, because a screen that refreshes but
+ * cannot say WHEN its numbers are from is no more trustworthy than one that
+ * never refreshes at all.
  */
 const WebsiteSection = ({ period }: { period: MetrikaPeriod }) => {
   const { t, lang } = useLang();
+  // Read at call time by the loader below, which lets one useAsync serve both
+  // the ordinary cached load and a forced, cache-skipping refresh.
+  const freshRef = useRef(false);
+  const lastFreshAtRef = useRef(0);
   const { data, loading, error, reload } = useAsync(
-    () => metrikaRepository.summary(period),
+    () => metrikaRepository.summary(period, freshRef.current),
     [period],
+  );
+
+  const refresh = useCallback(
+    async (floorMs = 0) => {
+      const now = Date.now();
+      if (floorMs > 0 && now - lastFreshAtRef.current < floorMs) return;
+
+      lastFreshAtRef.current = now;
+      freshRef.current = true;
+      try {
+        await reload();
+      } finally {
+        // Cleared in `finally` so a failed refresh cannot leave every later
+        // periodic reload silently forcing an upstream call.
+        freshRef.current = false;
+      }
+    },
+    [reload],
+  );
+
+  // Periodic reload. Skipped while the window is hidden: a panel minimised for
+  // a whole shift should cost nothing, and it reloads on focus anyway.
+  useEffect(() => {
+    const timer = setInterval(() => {
+      if (!document.hidden) void reload();
+    }, AUTO_REFRESH_MS);
+
+    return () => clearInterval(timer);
+  }, [reload]);
+
+  // Back from the browser → re-read Yandex, not the cache.
+  useEffect(() => {
+    const onFocus = () => {
+      if (!document.hidden) void refresh(FOCUS_REFRESH_FLOOR_MS);
+    };
+
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onFocus);
+
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onFocus);
+    };
+  }, [refresh]);
+
+  const updatedAt = useMemo(
+    () => (data ? formatClock(data.fetched_at, lang) : null),
+    [data, lang],
   );
 
   return (
     <>
-      {data?.dashboard_url && (
-        <div className="row" style={{ gap: 8, flexWrap: "wrap" }}>
-          <span style={{ flex: 1 }} />
+      <div className="row" style={{ gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+        <span className="muted" style={{ fontSize: 12, flex: 1 }}>
+          {/* Absent while the first load is in flight, and on a backend that
+              predates the stamp — in both cases showing nothing beats showing
+              a time that is not one. */}
+          {updatedAt && fmt(t("metrics.updatedAt"), updatedAt)}
+        </span>
+        <Button variant="secondary" onClick={() => void refresh()} disabled={loading}>
+          {loading ? t("metrics.refreshing") : t("metrics.refresh")}
+        </Button>
+        {data?.dashboard_url && (
           <Button
             variant="secondary"
             onClick={() => window.open(data.dashboard_url!, "_blank", "noopener,noreferrer")}
           >
             {t("metrics.openYandex")}
           </Button>
-        </div>
+        )}
+      </div>
+
+      {/* Sets the expectation the refresh button cannot: the last few minutes
+          are Yandex's own aggregation lag, not our staleness. Only alongside
+          real figures — on an unconfigured or unreachable counter it would be
+          answering a question nobody is asking yet. */}
+      {data?.status === "ok" && (
+        <div className="muted" style={{ fontSize: 12 }}>{t("metrics.yandexLag")}</div>
       )}
 
       {/* Keep the previous window on screen while the next one loads —
@@ -230,6 +330,27 @@ const formatLabel = (raw: string, lang: string): string => {
   return raw.includes(":")
     ? parsed.toLocaleTimeString(lang, { hour: "2-digit", minute: "2-digit", hour12: false })
     : parsed.toLocaleDateString(lang, { day: "2-digit", month: "2-digit" });
+};
+
+/**
+ * The `fetched_at` instant → a 24-hour wall clock in the operator's timezone.
+ * Seconds are kept: the whole point of the stamp is telling "a moment ago"
+ * apart from "a minute ago".
+ *
+ * Returns null — not "Invalid Date", not a dash — when there is no usable
+ * instant, so the caller can leave the line out entirely. That is also what a
+ * backend older than the `fetched_at` field degrades to.
+ */
+const formatClock = (iso: string, lang: string): string | null => {
+  const parsed = new Date(iso);
+  if (Number.isNaN(parsed.getTime())) return null;
+
+  return parsed.toLocaleTimeString(lang, {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  });
 };
 
 /** Seconds → "m:ss", the form an average visit length is read in. */

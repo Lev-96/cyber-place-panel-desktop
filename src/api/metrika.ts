@@ -58,10 +58,23 @@ export interface IMetrikaSummary {
   dashboard_url: string | null;
   /** True when Yandex estimated rather than counted every visit. */
   sampled: boolean;
+  /**
+   * ISO-8601 UTC instant the backend actually read these figures from Yandex —
+   * not when this response was sent. A cache hit repeats the original stamp, so
+   * the screen can show the true age of what it is displaying.
+   */
+  fetched_at: string;
   totals: IMetrikaTotals;
   trend: IMetrikaTrendPoint[];
   sources: IMetrikaSource[];
 }
 
-export const apiMetrikaSummary = (period: MetrikaPeriod) =>
-  request<{ data: IMetrikaSummary }>("/admin/metrika/summary", { params: { period } });
+/**
+ * @param fresh Ask the backend to skip its cache and re-read Yandex now. Sent
+ *   only when the operator presses refresh: the ordinary load is happy with a
+ *   cached window, and every forced read costs three upstream calls.
+ */
+export const apiMetrikaSummary = (period: MetrikaPeriod, fresh = false) =>
+  request<{ data: IMetrikaSummary }>("/admin/metrika/summary", {
+    params: fresh ? { period, fresh: 1 } : { period },
+  });
