@@ -53,7 +53,17 @@ const AccountSwitchModal = ({ target, onClose, onSwitched }: Props) => {
       onSwitched();
     } catch (ex) {
       const status = (ex as ApiError | undefined)?.status;
-      setErr(status === 401 || status === 422 ? t("login.invalidCredentials") : t("form.errors.failed"));
+      // Switching accounts IS a login, so it can be refused for a reason the
+      // person needs to read: an administratively blocked company or branch
+      // answers 403 with the sentence to act on ("contact the administrator").
+      // Only the credential statuses collapse into the generic wording — for
+      // anything else the server's own message beats "something went wrong".
+      const message = ex instanceof Error ? ex.message : null;
+      setErr(
+        status === 401 || status === 422
+          ? t("login.invalidCredentials")
+          : message ?? t("form.errors.failed"),
+      );
     } finally {
       setBusy(false);
     }

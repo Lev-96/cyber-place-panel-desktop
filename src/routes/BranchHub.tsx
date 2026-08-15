@@ -1,5 +1,6 @@
 import { useAuth } from "@/auth/AuthContext";
 import { can } from "@/auth/permissions";
+import BlockToggle from "@/components/blocking/BlockToggle";
 import BranchLiveScreen from "@/components/live/BranchLiveScreen";
 import Avatar from "@/components/ui/Avatar";
 import ScreenWithBg from "@/components/ui/ScreenWithBg";
@@ -25,7 +26,7 @@ const BranchHub = () => {
   const { t } = useLang();
   const { user } = useAuth();
   const role = user?.role;
-  const { data, loading, error } = useAsync(() => branchRepository.byId(id), [id]);
+  const { data, loading, error, reload } = useAsync(() => branchRepository.byId(id), [id]);
   const [dragKey, setDragKey] = useState<string | null>(null);
   const [dropKey, setDropKey] = useState<string | null>(null);
 
@@ -70,10 +71,30 @@ const BranchHub = () => {
       {data && (
         <div className="row" style={{ gap: 16, alignItems: "center" }}>
           <Avatar src={data.branch_logo_path} name={data.address} size={72} />
-          <div>
-            <div style={{ fontSize: 18, fontWeight: 700 }}>{data.address}</div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 18, fontWeight: 700 }}>
+              {data.address}
+              {/* State before action: an admin arriving at a closed branch
+                  should read WHY it is closed, not infer it from which button
+                  they are being offered. */}
+              {data.is_blocked && (
+                <span className="pill blocked" style={{ marginLeft: 8, fontSize: 12 }}>
+                  {data.blocked_at ? t("blocking.state.branch") : t("blocking.state.byCompany")}
+                </span>
+              )}
+            </div>
             <div className="muted">{data.company?.name ?? ""} · {data.country}, {data.city}</div>
           </div>
+          {/* Admin-only — renders nothing for owners and managers. Re-reads the
+              branch afterwards so the badge and the button always agree. */}
+          <BlockToggle
+            kind="branch"
+            id={id}
+            name={data.address}
+            blockedAt={data.blocked_at}
+            isBlocked={data.is_blocked}
+            onChanged={() => void reload()}
+          />
         </div>
       )}
 

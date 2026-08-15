@@ -232,6 +232,7 @@ booking instantly" and "the cashier finds out 30 s later via polling".
 | `app-updates` | public | promoted-version broadcasts |
 | `app-updates.{role}` | public | release-available per role |
 | `user.{id}.notifications` | **private** (wire: `private-user.{id}.notifications`) | per-user notification feed |
+| `user.{id}.access` | **private** (wire: `private-user.{id}.access`) | admin blocked this account's company / branch — sign out, or leave the branch |
 
 Role-aware routing for staff is preserved in backend
 `GlobalBookingNotifier::resolveBookingChannel`:
@@ -247,6 +248,7 @@ manager → `branch.{id}`, orphan → null (no subscription).
 | `BranchSubscribed` | `branch.subscribed` | branch + company + global |
 | `TournamentJoined` | `tournament.joined` | branch + company + global |
 | `UserNotificationCreated` | `notification.created` | user.{id}.notifications |
+| `StaffAccessChanged` | `access.changed` | user.{id}.access |
 | `AppReleaseAvailable` | `app-release.available` | app-updates.{role} |
 | `AppUpdatePromoted` | `app-update.promoted` | app-updates |
 
@@ -276,9 +278,21 @@ manager → `branch.{id}`, orphan → null (no subscription).
 10. **No HTTP refresh inside a Reverb event handler.** Optimistic-patch
     local state from the payload; periodic polling (30–60 s) handles
     canonical reconciliation.
+    *One documented exception:* `AccessGuard` calls `refreshUser()` on
+    `.access.changed`. The rule exists to stop a request storm on hot,
+    high-frequency events; this one is an administrator pressing a button,
+    fans out to the staff of a single company, and the payload deliberately
+    does NOT carry the account's new scope (which branches it may still
+    reach) — there is nothing to patch optimistically from. Do not read this
+    as licence to fetch from booking/place handlers.
 11. **Polling fallback is mandatory** on every realtime-critical screen
     (`useReservedPlaceIds`, `NotificationsContext` etc.) — 30–60 s. Reverb
     dropouts are silent; polling is the safety net.
+    `.access.changed` gets a different safety net, not a poll: the backend has
+    already revoked the account's tokens, so `src/api/client.ts` raises
+    `sessionExpiry` on a 401 that carried a token and `AccessGuard` signs out.
+    Polling for "am I still allowed in" would ask the same question the next
+    request answers for free.
 12. **Notifications must be branch-scoped.** Every push / email / Reverb
     delivery to staff is filtered by recipient `branch_id`. Owner/manager
     must not see other branches; no global broadcasts to staff. Audit

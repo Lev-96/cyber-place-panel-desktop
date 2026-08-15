@@ -65,7 +65,20 @@ export type Permission =
   | "session.start"
   | "session.stop"
   | "pos.charge"
-  | "shift.open";
+  | "shift.open"
+  /**
+   * Administratively block a company / a single branch: it disappears from the
+   * player-facing app, takes no bookings, and its staff cannot sign in.
+   *
+   * Admin only, and deliberately NOT implied by `company.edit` / `branch.edit`.
+   * An owner may edit their own company all day, but the block exists to be
+   * used AGAINST that company (unpaid invoice, abuse, a venue that must stop
+   * trading today) — so its owner must not be able to lift it. The backend
+   * enforces exactly this on the `admin` guard; the permission only decides
+   * whether the button is drawn.
+   */
+  | "company.block"
+  | "branch.block";
 
 const PERMS: Record<Role, ReadonlySet<Permission>> = {
   admin: new Set<Permission>([
@@ -75,6 +88,7 @@ const PERMS: Record<Role, ReadonlySet<Permission>> = {
     "revenue.view",
     "branch.create", "branch.edit", "branch.delete", "branch.prices",
     "company.create", "company.edit", "company.delete",
+    "company.block", "branch.block",
     "manager.create", "manager.delete",
     "game.crud", "game.crud.branch", "expenses.crud",
     "session.start", "session.stop", "pos.charge", "shift.open",

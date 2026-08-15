@@ -172,6 +172,21 @@ export interface IBranchApi extends Translated {
   phone: string | string[] | null;
   branch_logo_path: string;
   status: string;
+  /**
+   * Administrative block — deliberately two fields, not one:
+   *
+   * - `blocked_at` — this branch's OWN block. The admin toggle owns it, so it
+   *   decides whether the button offers to block or to unblock.
+   * - `is_blocked` — whether the branch is closed at all, which includes its
+   *   company being blocked. A company block is never copied onto the branch
+   *   row, so `is_blocked: true` with `blocked_at: null` means "closed because
+   *   its company is" — and unblocking the branch alone would not reopen it.
+   *
+   * Optional: a backend that predates the feature sends neither, which reads
+   * as "open" everywhere.
+   */
+  blocked_at?: string | null;
+  is_blocked?: boolean;
   places_count?: number;
   managers_count?: number;
   ratings_avg_rating: number | null;
@@ -207,6 +222,14 @@ export interface ICompanyApi extends Translated {
   website: string;
   description: string;
   status: CompanyStatusType;
+  /**
+   * Administrative block. Separate from `status` (approved / awaiting
+   * approval) because they answer different questions: a company can be
+   * approved and blocked, or unapproved and not blocked. Absent on an older
+   * backend, which reads as "not blocked".
+   */
+  blocked_at?: string | null;
+  is_blocked?: boolean;
   branches_count?: number;
   managers_count?: number;
   commission_percent?: number | string | null;

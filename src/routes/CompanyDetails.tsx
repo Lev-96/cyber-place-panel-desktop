@@ -1,5 +1,6 @@
 import { useAuth } from "@/auth/AuthContext";
 import { can } from "@/auth/permissions";
+import BlockToggle from "@/components/blocking/BlockToggle";
 import BranchForm from "@/components/branches/BranchForm";
 import CompanyBillingCard from "@/components/companies/CompanyBillingCard";
 import CompanyForm from "@/components/companies/CompanyForm";
@@ -50,10 +51,30 @@ const CompanyDetails = () => {
         <Row k={t("company.description")} v={c.description || "—"} />
         <Row k={t("company.owner")}       v={c.user?.name ?? "—"} />
         <Row k={t("company.status")}      v={<span className={`pill ${c.status}`}>{t(`company.status.${c.status}`) || c.status}</span>} />
+        {/* Shown only when it applies: an active company has nothing to say
+            here, and a permanent "not blocked" row would be noise on every
+            other company in the network. */}
+        {c.is_blocked && (
+          <Row
+            k={t("blocking.state")}
+            v={<span className="pill blocked">{t("blocking.state.company")}</span>}
+          />
+        )}
         <Row k={t("company.branches")}    v={String(c.branches_count ?? 0)} />
         <div className="row" style={{ gap: 8, marginTop: 6, flexWrap: "wrap" }}>
           {canEditCompany && <Button variant="secondary" onClick={() => setEditing(true)}>{t("company.edit")}</Button>}
           {canAddBranch && <Button onClick={() => setAddingBranch(true)}>{t("company.addBranch")}</Button>}
+          {/* Sits with the other company-level actions, and refreshes the
+              screen from the server afterwards rather than trusting the local
+              copy — the block also changes the branches underneath it. */}
+          <BlockToggle
+            kind="company"
+            id={c.id}
+            name={c.name}
+            blockedAt={c.blocked_at}
+            isBlocked={c.is_blocked}
+            onChanged={() => void reload()}
+          />
           <Link to={`/companies/${id}/branches`} className="btn secondary">{t("company.viewBranches")} ({c.branches_count ?? 0})</Link>
           {can(user?.role, "revenue.view") && (
             <Link to={`/companies/${id}/revenue`} className="btn secondary">{t("revenue.title")}</Link>

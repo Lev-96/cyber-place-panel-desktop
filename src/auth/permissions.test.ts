@@ -35,6 +35,32 @@ describe("can(role, perm)", () => {
     it("can open the Metrics section", () => {
       expect(can("admin", "menu.metrics")).toBe(true);
     });
+
+    it("can block a company or a branch", () => {
+      expect(can("admin", "company.block")).toBe(true);
+      expect(can("admin", "branch.block")).toBe(true);
+    });
+  });
+
+  /**
+   * The block is used AGAINST a company — an unpaid invoice, abuse, a venue
+   * that must stop trading today. Its own owner lifting it would defeat the
+   * point, and a manager doing so would be worse. Editing rights must never
+   * imply blocking rights; the backend refuses these calls on the `admin`
+   * guard, and this pins the button that leads to them.
+   */
+  describe("blocking is admin-only", () => {
+    it("is denied to an owner, who may still edit the very same company", () => {
+      expect(can("company_owner", "company.edit")).toBe(true);
+      expect(can("company_owner", "company.block")).toBe(false);
+      expect(can("company_owner", "branch.edit")).toBe(true);
+      expect(can("company_owner", "branch.block")).toBe(false);
+    });
+
+    it("is denied to a manager", () => {
+      expect(can("manager", "company.block")).toBe(false);
+      expect(can("manager", "branch.block")).toBe(false);
+    });
   });
 
   // Website analytics and server health are network-wide data — a single

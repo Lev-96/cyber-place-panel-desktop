@@ -1614,6 +1614,15 @@ button.pill:hover {
   color: var(--color-primary);
   border: 1px solid var(--color-primary);
 }
+/* Administratively blocked company / branch. Deliberately the danger colour
+   rather than the muted "inactive" look: a blocked venue is not merely idle —
+   its staff cannot sign in and players cannot see it — and an admin scanning a
+   list has to catch it without reading. */
+.pill.blocked {
+  background: rgba(239, 68, 68, 0.15);
+  color: var(--color-danger);
+  border: 1px solid var(--color-danger);
+}
 
 /* === Updates toast =========================================================
    Global "new update available" popup. Top-right corner, slides in from

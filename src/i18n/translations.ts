@@ -1270,6 +1270,84 @@ export const TRANSLATIONS: Dict = {
     ru: "Открыть Яндекс.Метрику →",
     am: "Բացել Yandex.Metrica →",
   },
+  // ---- Administrative blocking (company / branch) ----
+  // The confirmation questions carry the name because the admin is about to
+  // sign people out of their workplace — "block this company?" is not a
+  // question anybody should answer without seeing which one.
+  "blocking.action.block.company": {
+    en: "Block company",
+    ru: "Заблокировать компанию",
+    am: "Արգելափակել ընկերությունը",
+  },
+  "blocking.action.unblock.company": {
+    en: "Unblock company",
+    ru: "Разблокировать компанию",
+    am: "Ապաարգելափակել ընկերությունը",
+  },
+  "blocking.action.block.branch": {
+    en: "Block branch",
+    ru: "Заблокировать филиал",
+    am: "Արգելափակել մասնաճյուղը",
+  },
+  "blocking.action.unblock.branch": {
+    en: "Unblock branch",
+    ru: "Разблокировать филиал",
+    am: "Ապաարգելափակել մասնաճյուղը",
+  },
+  "blocking.confirm.block.company": {
+    en: "Block the company “{0}”? All its branches will be hidden from players, and its owner and managers will not be able to sign in.",
+    ru: "Заблокировать компанию «{0}»? Все её филиалы скроются от игроков, а владелец и менеджеры не смогут войти.",
+    am: "Արգելափակե՞լ «{0}» ընկերությունը։ Նրա բոլոր մասնաճյուղերը կթաքցվեն խաղացողներից, իսկ սեփականատերը և մենեջերները չեն կարողանա մուտք գործել։",
+  },
+  "blocking.confirm.unblock.company": {
+    en: "Unblock the company “{0}”? Its branches become visible again and its staff can sign in.",
+    ru: "Разблокировать компанию «{0}»? Её филиалы снова станут видимыми, а сотрудники смогут войти.",
+    am: "Ապաարգելափակե՞լ «{0}» ընկերությունը։ Նրա մասնաճյուղերը կրկին տեսանելի կդառնան, իսկ աշխատակիցները կկարողանան մուտք գործել։",
+  },
+  "blocking.confirm.block.branch": {
+    en: "Block the branch “{0}”? It will be hidden from players and its managers will not be able to sign in.",
+    ru: "Заблокировать филиал «{0}»? Он скроется от игроков, а его менеджеры не смогут войти.",
+    am: "Արգելափակե՞լ «{0}» մասնաճյուղը։ Այն կթաքցվի խաղացողներից, իսկ նրա մենեջերները չեն կարողանա մուտք գործել։",
+  },
+  "blocking.confirm.unblock.branch": {
+    en: "Unblock the branch “{0}”? It becomes visible again and its managers can sign in.",
+    ru: "Разблокировать филиал «{0}»? Он снова станет видимым, а его менеджеры смогут войти.",
+    am: "Ապաարգելափակե՞լ «{0}» մասնաճյուղը։ Այն կրկին տեսանելի կդառնա, իսկ նրա մենեջերները կկարողանան մուտք գործել։",
+  },
+  "blocking.state": { en: "Access", ru: "Доступ", am: "Հասանելիություն" },
+  "blocking.state.company": { en: "Blocked", ru: "Заблокирована", am: "Արգելափակված է" },
+  "blocking.state.branch": { en: "Blocked", ru: "Заблокирован", am: "Արգելափակված է" },
+  "blocking.state.byCompany": {
+    en: "Blocked with the company",
+    ru: "Заблокирован вместе с компанией",
+    am: "Արգելափակված է ընկերության հետ",
+  },
+  // Read when the block lands while the person is mid-shift. Both say what
+  // happened and who did it: being thrown out of a screen with no explanation
+  // is how a support call starts. The locked-out line is only a fallback — the
+  // server sends its own sentence, which names the company or the branch.
+  "blocking.evicted.lockedOut": {
+    en: "Your access has been blocked by an administrator.",
+    ru: "Ваш доступ заблокирован администратором.",
+    am: "Ձեր հասանելիությունն արգելափակվել է ադմինիստրատորի կողմից։",
+  },
+  "blocking.evicted.branch": {
+    en: "This branch has been blocked by an administrator.",
+    ru: "Этот филиал заблокирован администратором.",
+    am: "Այս մասնաճյուղն արգելափակվել է ադմինիստրատորի կողմից։",
+  },
+  "blocking.closedByCompany": {
+    en: "Closed because its company is blocked — unblocking the branch alone will not reopen it.",
+    ru: "Закрыт из-за блокировки компании — разблокировка филиала сама по себе его не откроет.",
+    am: "Փակ է ընկերության արգելափակման պատճառով — միայն մասնաճյուղի ապաարգելափակումը այն չի բացի։",
+  },
+  "toast.company.blocked": { en: "Company blocked", ru: "Компания заблокирована", am: "Ընկերությունն արգելափակվեց" },
+  "toast.company.unblocked": { en: "Company unblocked", ru: "Компания разблокирована", am: "Ընկերությունն ապաարգելափակվեց" },
+  "toast.branch.blocked": { en: "Branch blocked", ru: "Филиал заблокирован", am: "Մասնաճյուղն արգելափակվեց" },
+  "toast.branch.unblocked": { en: "Branch unblocked", ru: "Филиал разблокирован", am: "Մասնաճյուղն ապաարգելափակվեց" },
+  "toast.generic.blocked": { en: "Blocked", ru: "Заблокировано", am: "Արգելափակվեց" },
+  "toast.generic.unblocked": { en: "Unblocked", ru: "Разблокировано", am: "Ապաարգելափակվեց" },
+
   "metrics.refresh": { en: "Refresh", ru: "Обновить", am: "Թարմացնել" },
   "metrics.refreshing": { en: "Refreshing…", ru: "Обновляем…", am: "Թարմացվում է…" },
   "metrics.updatedAt": {

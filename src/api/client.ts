@@ -1,4 +1,5 @@
 import { AppConfig } from "@/infrastructure/AppConfig";
+import { sessionExpiry } from "@/auth/sessionExpiry";
 import { keyValueStore } from "@/infrastructure/KeyValueStore";
 import { HttpCache, invalidationTargets, policyFor } from "@/api/httpCache";
 
@@ -99,6 +100,16 @@ export const request = async <Res>(
   const body = text ? safeJson(text) : null;
 
   if (!res.ok) {
+    // A token we sent and the server refused: this session is over — most
+    // often because an administrator blocked the company or branch, which
+    // revokes the account's tokens. Announced so the auth layer signs out
+    // instead of leaving the operator on a screen where every action fails.
+    // Only when a token was actually sent: a 401 on an unauthenticated call
+    // says nothing about the session.
+    if (res.status === 401 && token) {
+      sessionExpiry.raise();
+    }
+
     const err = new Error(extractMessage(body) ?? `HTTP ${res.status}`) as ApiError;
     err.status = res.status;
     err.body = body;

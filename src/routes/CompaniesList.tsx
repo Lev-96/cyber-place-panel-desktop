@@ -34,6 +34,12 @@ const CompaniesList = () => {
                 <div className="meta">
                   {c.raw.email} · {t("companiesList.branchesShort")} {c.raw.branches_count ?? 0} ·{" "}
                   <span className={`pill ${c.raw.status}`}>{c.raw.status}</span>
+                  {/* A blocked company stays in the list — an admin has to be
+                      able to find it in order to reopen it — but it must be
+                      recognisable without opening every row. */}
+                  {c.raw.is_blocked && (
+                    <> · <span className="pill blocked">{t("blocking.state.company")}</span></>
+                  )}
                 </div>
               </div>
               <span className="muted">{t("common.open")}</span>

@@ -41,7 +41,17 @@ const CompanyBranches = () => {
                 <Avatar src={b.branch_logo_path} name={b.address} size={44} />
                 <div style={{ flex: 1 }}>
                   <div className="name">{b.address}</div>
-                  <div className="meta">{b.country}, {b.city} · {t("label.places")} {b.places_count ?? 0}</div>
+                  <div className="meta">
+                    {b.country}, {b.city} · {t("label.places")} {b.places_count ?? 0}
+                    {/* Tells a branch closed on its own apart from one closed
+                        with its company — only the first can be reopened from
+                        the branch screen. */}
+                    {b.is_blocked && (
+                      <> · <span className="pill blocked">
+                        {b.blocked_at ? t("blocking.state.branch") : t("blocking.state.byCompany")}
+                      </span></>
+                    )}
+                  </div>
                 </div>
               </div>
               <span className="muted">{t("common.open")}</span>

@@ -10,6 +10,7 @@ import Spinner from "@/components/ui/Spinner";
 import Toaster from "@/components/ui/Toaster";
 import { ConfirmProvider } from "@/components/ui/ConfirmProvider";
 import { NotificationsProvider } from "@/notifications/NotificationsContext";
+import AccessGuard from "@/realtime/AccessGuard";
 import { useAppUpdates, useUpdateCatchUp } from "@/realtime/useAppUpdates";
 import { UpdatesNotificationProvider } from "@/realtime/UpdatesNotificationContext";
 import { Suspense, lazy } from "react";
@@ -324,6 +325,11 @@ const App = () => {
           // fetch needs the sanctum token to be set, and the polling
           // tick has no purpose for an unauth'd visitor.
           <NotificationsProvider>
+            {/* An administrator blocking this account's company or branch has
+                to reach the screen that is already open, not just the next
+                request. Mounted for authed users only — there is nothing to
+                evict anyone from before sign-in. Renders nothing. */}
+            <AccessGuard />
             <UpdatesNotificationProvider>
               {/* Per-account language step. Wraps the authed tree rather than
                   sitting on a route so it cannot be skipped by a restored deep
