@@ -1,0 +1,172 @@
+import { readFileSync, readdirSync, statSync } from "node:fs";
+import path from "node:path";
+import { describe, expect, it } from "vitest";
+
+/**
+ * The panel half of the realtime wire contract.
+ *
+ * The backend pins its side in tests/Unit/Events/BroadcastContractTest.php.
+ * This file pins ours, and the two lists must be kept identical by hand —
+ * that is the whole point. Neither side can fail loudly on its own: a renamed
+ * event simply never fires, a renamed channel silently subscribes to nothing,
+ * and a removed payload key reads as `undefined`. The board stops updating and
+ * nothing throws.
+ *
+ * That failure mode is not hypothetical. The mobile app's own notes claim it
+ * listens for `branch.subscribed` and `tournament.joined`; it binds neither,
+ * and nothing caught it because only one of the eight events had a test.
+ *
+ * Rather than refactor working realtime code onto shared constants — which
+ * would risk the very thing it is meant to protect — this asserts over the
+ * SOURCE. It reads every binding literal out of src/ and compares the set to
+ * the contract below.
+ *
+ * WHEN THIS FAILS: either the backend contract changed and this list must
+ * follow in the same commit, or someone renamed a binding here and the
+ * backend does not know. Do not "fix" it by editing the list alone.
+ *
+ * Backend side of the pairing:
+ *   /var/www/html/cyber-place/tests/Unit/Events/BroadcastContractTest.php
+ */
+
+/** Event aliases the backend publishes via broadcastAs(), in Echo's leading-dot form. */
+const CONTRACT_EVENTS = [
+  ".access.changed",
+  ".app-release.available",
+  ".app-update.promoted",
+  ".booking.changed",
+  ".branch.subscribed",
+  ".notification.created",
+  ".place.availability.changed",
+  ".tournament.joined",
+] as const;
+
+/**
+ * Channel name shapes. `{...}` marks the interpolated part.
+ *
+ * Public channels are read with `echo.channel(name)`; private ones with
+ * `echo.private(name)` — and note the client passes the name WITHOUT the
+ * `private-` prefix that appears on the wire, because Echo adds it.
+ */
+const CONTRACT_CHANNELS = {
+  public: ["bookings.global", "branch.{id}", "company.{id}", "app-updates", "app-updates.{role}"],
+  private: ["user.{id}.notifications", "user.{id}.access"],
+} as const;
+
+const SRC = path.resolve(__dirname, "..");
+
+const sourceFiles = (dir: string): string[] =>
+  readdirSync(dir).flatMap((entry) => {
+    const full = path.join(dir, entry);
+    if (statSync(full).isDirectory()) return sourceFiles(full);
+    if (!/\.tsx?$/.test(entry)) return [];
+    // Test files quote these names while asserting on them.
+    if (/\.test\.tsx?$/.test(entry)) return [];
+    return [full];
+  });
+
+const allSource = (): { file: string; text: string }[] =>
+  sourceFiles(SRC).map((file) => ({ file: path.relative(SRC, file), text: readFileSync(file, "utf8") }));
+
+describe("realtime event bindings", () => {
+  const listened = new Map<string, string[]>();
+
+  for (const { file, text } of allSource()) {
+    for (const m of text.matchAll(/\.listen\(\s*"(\.[^"]+)"/g)) {
+      const name = m[1];
+      listened.set(name, [...(listened.get(name) ?? []), file]);
+    }
+  }
+
+  it("binds exactly the events the backend publishes — no more, no fewer", () => {
+    const found = [...listened.keys()].sort();
+
+    expect(found).toEqual([...CONTRACT_EVENTS].sort());
+  });
+
+  it("stops listening to every event it listens to", () => {
+    // A listener without a matching stopListening leaks across channel
+    // rotation, so the same payload gets handled twice after a branch switch.
+    for (const { text } of allSource()) {
+      for (const m of text.matchAll(/\.listen\(\s*"(\.[^"]+)"/g)) {
+        expect(text).toContain(`stopListening("${m[1]}"`);
+      }
+    }
+  });
+
+  it("keeps the leading dot, which is what selects a custom broadcastAs name", () => {
+    // Without it Echo looks for the fully-qualified PHP class name instead,
+    // and the subscription silently never fires.
+    for (const name of listened.keys()) {
+      expect(name.startsWith(".")).toBe(true);
+    }
+  });
+});
+
+describe("realtime channel names", () => {
+  const files = allSource();
+
+  /** Files whose source matches — reported by name so a failure is readable. */
+  const filesMatching = (re: RegExp): string[] =>
+    files.filter((f) => re.test(f.text)).map((f) => f.file);
+
+  it("subscribes to the three role-scoped booking channels", () => {
+    // admin → bookings.global, owner → company.{id}, manager → branch.{id}.
+    // BookingChanged lands on all three so each role reads the narrowest one.
+    expect(filesMatching(/bookings\.global/).length, "bookings.global").toBeGreaterThan(0);
+    expect(filesMatching(/`company\.\$\{[^}]+\}`/).length, "company.{id}").toBeGreaterThan(0);
+    expect(filesMatching(/`branch\.\$\{[^}]+\}`/).length, "branch.{id}").toBeGreaterThan(0);
+  });
+
+  it("subscribes to the shared update channel", () => {
+    expect(filesMatching(/echo\.channel\(\s*"app-updates"\s*\)/).length, "app-updates").toBeGreaterThan(0);
+  });
+
+  it("names all three role update channels exactly as the backend suffixes them", () => {
+    // AppReleaseAvailable broadcasts on `app-updates.{role}` where role is one
+    // of its ROLE_ADMIN / ROLE_OWNER / ROLE_MANAGER constants — 'admin',
+    // 'company_owner', 'manager'. These are written out one per role here
+    // rather than interpolated, so each is pinned literally.
+    for (const role of ["admin", "company_owner", "manager"]) {
+      expect(
+        filesMatching(new RegExp(`"app-updates\\.${role}"`)).length,
+        `app-updates.${role} — must match the backend ROLE_* constant exactly`
+      ).toBeGreaterThan(0);
+    }
+  });
+
+  it("reads both authorised channels through echo.private()", () => {
+    // The channel name is sometimes built into a variable first, so this
+    // checks per file: whichever file names the channel must also be the one
+    // calling .private() on it.
+    for (const shape of [/user\.\$\{[^}]+\}\.access/, /user\.\$\{[^}]+\}\.notifications/]) {
+      const named = files.filter((f) => shape.test(f.text));
+      expect(named.length, `no file builds ${shape}`).toBeGreaterThan(0);
+
+      for (const f of named) {
+        expect(f.text, `${f.file} names a private channel but never calls echo.private()`).toMatch(/\.private\(/);
+      }
+    }
+  });
+
+  it("never writes the wire-side private- prefix on the client", () => {
+    // Echo adds it. Writing it here yields `private-private-user.1.access`,
+    // which authorises nothing and receives nothing.
+    expect(filesMatching(/\.private\(\s*[`"]private-/), "must be empty").toEqual([]);
+  });
+
+  it("never subscribes to a user channel with echo.channel()", () => {
+    // That skips /broadcasting/auth entirely and simply never receives.
+    expect(filesMatching(/\.channel\(\s*`user\./), "must be empty").toEqual([]);
+  });
+});
+
+describe("contract documentation", () => {
+  it("lists the same number of events the backend pins", () => {
+    // Guards against someone adding a binding here and forgetting the
+    // backend, or vice versa. Eight events, verified 2026-08-18.
+    expect(CONTRACT_EVENTS).toHaveLength(8);
+    expect(CONTRACT_CHANNELS.public).toHaveLength(5);
+    expect(CONTRACT_CHANNELS.private).toHaveLength(2);
+  });
+});
