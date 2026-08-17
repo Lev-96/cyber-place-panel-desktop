@@ -6,9 +6,15 @@ import { pathToFileURL } from "node:url";
 import { Store } from "./storage";
 import { UpdateService, broadcastUpdateState } from "./updates/UpdateService";
 import { bundledIconPath, ensureLinuxDesktopIntegration } from "./linuxIntegration";
+import { mayNavigateTo, mayOpenExternally, navigationKeyFor } from "./urlPolicy";
 
-const DEV_URL = process.env.ELECTRON_DEV_URL ?? "";
-const isDev = DEV_URL.length > 0 || !app.isPackaged;
+// `isDev` follows how the app was BUILT, never the environment it starts in.
+// Previously a packaged panel launched with ELECTRON_DEV_URL set would load
+// that URL with the preload attached — and this preload exposes `kv:get`,
+// which returns the operator's Sanctum token. Reading DEV_URL only in an
+// unpackaged build keeps the developer workflow identical.
+const isDev = !app.isPackaged;
+const DEV_URL = isDev ? (process.env.ELECTRON_DEV_URL ?? "") : "";
 
 // Silence Chromium's own diagnostic chatter (CSP warnings, GL probes,
 // Autofill devtools messages, GPU info, etc.). Same approach Discord and
@@ -123,9 +129,31 @@ const createWindow = async () => {
     },
   });
 
+  // Only hand the OS a URL we are willing to act on. The URLs arriving here
+  // are server-supplied (Pulse entry link, Metrika dashboard), so an
+  // unrestricted openExternal would let a hostile or compromised backend
+  // response launch `file://`, `smb://` or a Windows handler URI.
   mainWindow.webContents.setWindowOpenHandler(({ url }: { url: string }) => {
-    shell.openExternal(url);
+    if (mayOpenExternally(url)) {
+      void shell.openExternal(url);
+    } else {
+      console.warn("[panel] refused to open external URL:", url);
+    }
     return { action: "deny" as const };
+  });
+
+  // The top-level frame may never leave the bundled app. If it did, the
+  // preload — and `kv:get`, which returns the Sanctum token — would follow.
+  const allowedNavigation = [
+    `${APP_SCHEME}://localhost`,
+    ...(isDev && DEV_URL ? [navigationKeyFor(DEV_URL) ?? ""] : []),
+  ].filter(Boolean);
+
+  mainWindow.webContents.on("will-navigate", (event, url) => {
+    if (!mayNavigateTo(url, allowedNavigation)) {
+      event.preventDefault();
+      console.warn("[panel] blocked navigation to", url);
+    }
   });
 
   // Native right-click menu. Electron ships none by default, so without this

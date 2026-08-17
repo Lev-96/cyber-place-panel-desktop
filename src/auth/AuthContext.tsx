@@ -1,4 +1,4 @@
-import { apiGetMe, apiLogin } from "@/api/auth";
+import { apiGetMe, apiLogin, apiLogout } from "@/api/auth";
 import { apiCache } from "@/api/client";
 import { recentEmails } from "@/auth/recentEmails";
 import { AppConfig } from "@/infrastructure/AppConfig";
@@ -64,6 +64,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setUser(me.user);
     },
     logout: async () => {
+      // Revoke the session on the server FIRST, while the token is still in
+      // storage for the request to carry. Sanctum tokens have no expiry, so
+      // without this a copy lifted off disk stays valid forever.
+      //
+      // Best effort by design: the operator must be able to sign out with the
+      // backend unreachable, and a token that is already invalid returns 401.
+      // Neither may trap them in a signed-in UI, so local state is cleared
+      // either way.
+      try {
+        await apiLogout();
+      } catch {
+        /* offline, or the token was already revoked — sign out locally anyway */
+      }
       apiCache.clear();
       await keyValueStore.remove(AppConfig.storageKeys.token);
       await keyValueStore.remove(AppConfig.storageKeys.user);
