@@ -639,5 +639,49 @@ When working on this project:
 
 ---
 
+## 9. Specialist roles, agents & plugins (use them — don't improvise)
+
+Cyber Place is built to a professional standard across four disciplines:
+**architecture, security, design, go-to-market.** Each has a dedicated
+subagent in `~/.claude/agents/` with this product's real constraints baked
+in. Delegate instead of doing everything in one pass; run independent ones
+in parallel.
+
+| Agent | Use it for (panel-relevant) |
+|---|---|
+| `cp-frontend-architect` | State/data flow, hooks, API layer, Reverb wiring, per-user UI isolation, performance, strict-TS contracts |
+| `cp-ui-designer` | Screens, board layout, status language, empty/error/offline states, `en/ru/am` sizing, §7.5 CSS compliance |
+| `cp-security-engineer` | Electron hardening (`contextIsolation`, preload surface, CSP, navigation handlers, update signing), role-scoped data in the UI |
+| `cp-backend-architect` | When the panel needs a field or scope the API doesn't provide — fix it server-side, don't fake it here |
+| `cp-release-engineer` | electron-builder packaging, `artifactName`, signing, staging-as-separate-app, two-stage update gating |
+| `cp-business-strategist` | Which tier gates which panel feature, and what metering that requires |
+
+**Slash commands** (`~/.claude/commands/`): `/cp-design`, `/cp-feature`,
+`/cp-secure`, `/cp-ship`, `/cp-market`, `/cp-business`.
+
+**Plugins enabled in every session:**
+
+- **`superpowers`** — brainstorming before building, TDD, systematic
+  debugging, verification-before-completion. Process skills set the
+  approach; implementation skills follow.
+- **`frontend-design`** — invoke **before writing any UI**; `cp-ui-designer`
+  applies it to this product's dark-first, dense operations aesthetic. Add
+  `dataviz` for charts, KPI tiles, and dashboards.
+- **`code-review`** — `/code-review` on the branch diff before pushing.
+- **`aikido`** — `aikido:scan` on changed files after non-trivial work.
+- **`context7`** — current Electron / React 19 / Vite docs instead of memory.
+
+**Panel defaults these roles enforce** (restated because they regress most
+often): the backend is the source of truth; realtime is Reverb delta **plus**
+a REST snapshot on mount, and a slim broadcast means refetch; persisted UI
+state is keyed per user (`u{id}:key`) and resets on auth change; role
+scoping is enforced in the UI *and* the API, never only in the UI; no
+native `confirm()` and no detached DevTools (focus traps) — use
+`ConfirmDialog`; no `<input type="number">` — use `NumberStepper`;
+typecheck **both** `tsconfig.app.json` and `tsconfig.node.json`; rebuild
+and restart after changes — HMR misses CSP, `index.html`, and preload.
+
+---
+
 _Last verified: 2026-07-18. When the panel's stack or conventions change,
 update the relevant section here in the same change._
