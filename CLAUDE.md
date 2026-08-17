@@ -681,6 +681,52 @@ native `confirm()` and no detached DevTools (focus traps) — use
 typecheck **both** `tsconfig.app.json` and `tsconfig.node.json`; rebuild
 and restart after changes — HMR misses CSP, `index.html`, and preload.
 
+## 10. How work must be done here (MANDATORY — run it in this order)
+
+"100% guaranteed correct" is not achievable as a claim. It is achievable as a
+method. Do not shortcut it, and do not report completion without it.
+
+1. **Baseline BEFORE touching anything.**
+   ```
+   npm test            # vitest run
+   npm run typecheck   # BOTH tsconfig.app.json and electron/tsconfig.json
+   ```
+   Record the numbers. Without a "before" there is no proof of "no regression".
+
+2. **Check the blast radius before editing.** Anything touching an API path, a
+   Reverb channel or an event name must be grepped in `cyber-place` (backend)
+   first — and in the mobile app when the route is shared. `DELETE /subscribe/{id}`
+   is called from here *and* from mobile, with different token types.
+
+3. **Reuse this repo's own idiom.** `useConfirm()` not `window.confirm`;
+   `NumberStepper`/`PriceInput` not `<input type="number">`; `useAsync` for
+   fetch state; the `u{id}:key` prefix for anything persisted per user. A
+   parallel implementation is how drift starts.
+
+4. **Write the test, then MUTATION-VERIFY it.** Break the fix two ways, confirm
+   the test fails, restore, confirm it passes. A test that does not fail on a
+   broken fix proves nothing. When main-process logic needs covering, extract
+   the decision into a pure module (`electron/urlPolicy.ts` is the pattern) and
+   test that — Electron itself does not need to run.
+
+5. **Re-run the full suite and both typechecks**, compare against step 1.
+
+6. **`aikido_full_scan` every changed file.**
+
+7. **Commit to `staging`**, security and docs separately, stating what was
+   verified by running versus only reasoned about.
+
+**Proof ceiling here: high.** 355 vitest tests + 3 Playwright specs + two
+typechecks as of 2026-08-18, so "proven" can be earned. What cannot be:
+a human click-through of the changed screens, and anything about a packaged
+build's runtime behaviour. Name those as smoke-tests instead of implying a pass.
+
+**Realtime has a pinned contract.** `src/realtime/broadcastContract.test.ts`
+locks the eight event names and the channel shapes against the backend's
+`tests/Unit/Events/BroadcastContractTest.php`. If either side changes, both
+change in the same task — a drifted binding fails silently, with nothing in the
+console.
+
 ---
 
 _Last verified: 2026-07-18. When the panel's stack or conventions change,
