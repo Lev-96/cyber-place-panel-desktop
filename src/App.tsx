@@ -11,6 +11,7 @@ import Toaster from "@/components/ui/Toaster";
 import { ConfirmProvider } from "@/components/ui/ConfirmProvider";
 import { NotificationsProvider } from "@/notifications/NotificationsContext";
 import AccessGuard from "@/realtime/AccessGuard";
+import BlockedBranchGuard from "@/routes/BlockedBranchGuard";
 import { useAppUpdates, useUpdateCatchUp } from "@/realtime/useAppUpdates";
 import { UpdatesNotificationProvider } from "@/realtime/UpdatesNotificationContext";
 import { Suspense, lazy } from "react";
@@ -98,65 +99,73 @@ const Authed = () => {
           }
         />
         <Route path="/branches/:branchId" element={<BranchHub />} />
-        <Route
-          path="/branches/:branchId/edit"
-          element={
-            <RoleGuard perm="branch.edit">
-              <BranchEdit />
-            </RoleGuard>
-          }
-        />
-        <Route path="/branches/:branchId/live" element={<BranchLive />} />
-        <Route path="/branches/:branchId/places" element={<BranchPlaces />} />
-        <Route
-          path="/branches/:branchId/games"
-          element={
-            <RoleGuard perm="game.crud.branch">
-              <BranchGames />
-            </RoleGuard>
-          }
-        />
-        <Route
-          path="/branches/:branchId/tournaments"
-          element={<Tournaments />}
-        />
-        <Route
-          path="/branches/:branchId/sessions"
-          element={<BranchSessions />}
-        />
-        <Route
-          path="/branches/:branchId/sessions/history"
-          element={<SessionsHistory />}
-        />
-        <Route path="/branches/:branchId/pcs" element={<PcsList />} />
-        <Route
-          path="/branches/:branchId/tariffs"
-          element={
-            <RoleGuard perm="branch.prices">
-              <BranchPricesPage />
-            </RoleGuard>
-          }
-        />
-        <Route
-          path="/branches/:branchId/subscribers"
-          element={<BranchSubscribersPage />}
-        />
-        <Route path="/branches/:branchId/products" element={<ProductsList />} />
-        <Route path="/branches/:branchId/pos" element={<PosTerminal />} />
-        <Route path="/branches/:branchId/shift" element={<ShiftPanel />} />
-        <Route path="/branches/:branchId/members" element={<MembersList />} />
-        <Route
-          path="/branches/:branchId/members/:memberId"
-          element={<MemberCard />}
-        />
-        <Route
-          path="/branches/:branchId/managers"
-          element={
-            <RoleGuard perm="manager.create">
-              <Managers />
-            </RoleGuard>
-          }
-        />
+        {/* Everything INSIDE a branch. A branch an administrator has taken
+            out of service still has a page — that is where its state is shown
+            and where an admin lifts the block — but none of its working
+            screens. Without this an owner whose other venues are open stays
+            signed in and can walk into the closed one from the branch list and
+            ring up a sale in it. Admins pass through; see the guard. */}
+        <Route element={<BlockedBranchGuard />}>
+          <Route
+            path="/branches/:branchId/edit"
+            element={
+              <RoleGuard perm="branch.edit">
+                <BranchEdit />
+              </RoleGuard>
+            }
+          />
+          <Route path="/branches/:branchId/live" element={<BranchLive />} />
+          <Route path="/branches/:branchId/places" element={<BranchPlaces />} />
+          <Route
+            path="/branches/:branchId/games"
+            element={
+              <RoleGuard perm="game.crud.branch">
+                <BranchGames />
+              </RoleGuard>
+            }
+          />
+          <Route
+            path="/branches/:branchId/tournaments"
+            element={<Tournaments />}
+          />
+          <Route
+            path="/branches/:branchId/sessions"
+            element={<BranchSessions />}
+          />
+          <Route
+            path="/branches/:branchId/sessions/history"
+            element={<SessionsHistory />}
+          />
+          <Route path="/branches/:branchId/pcs" element={<PcsList />} />
+          <Route
+            path="/branches/:branchId/tariffs"
+            element={
+              <RoleGuard perm="branch.prices">
+                <BranchPricesPage />
+              </RoleGuard>
+            }
+          />
+          <Route
+            path="/branches/:branchId/subscribers"
+            element={<BranchSubscribersPage />}
+          />
+          <Route path="/branches/:branchId/products" element={<ProductsList />} />
+          <Route path="/branches/:branchId/pos" element={<PosTerminal />} />
+          <Route path="/branches/:branchId/shift" element={<ShiftPanel />} />
+          <Route path="/branches/:branchId/members" element={<MembersList />} />
+          <Route
+            path="/branches/:branchId/members/:memberId"
+            element={<MemberCard />}
+          />
+          <Route
+            path="/branches/:branchId/managers"
+            element={
+              <RoleGuard perm="manager.create">
+                <Managers />
+              </RoleGuard>
+            }
+          />
+        </Route>
 
         {/* Bookings — everyone */}
         <Route path="/bookings" element={<Bookings />} />

@@ -1345,6 +1345,13 @@ export const TRANSLATIONS: Dict = {
   "toast.company.unblocked": { en: "Company unblocked", ru: "Компания разблокирована", am: "Ընկերությունն ապաարգելափակվեց" },
   "toast.branch.blocked": { en: "Branch blocked", ru: "Филиал заблокирован", am: "Մասնաճյուղն արգելափակվեց" },
   "toast.branch.unblocked": { en: "Branch unblocked", ru: "Филиал разблокирован", am: "Մասնաճյուղն ապաարգելափակվեց" },
+  // Shown when someone opens a working screen of a branch that is out of
+  // service and is sent back to the branch page.
+  "blocking.branchClosed": {
+    en: "This branch is out of service — its sections are unavailable",
+    ru: "Филиал отключён — его разделы недоступны",
+    am: "Մասնաճյուղն անջատված է — նրա բաժինները հասանելի չեն",
+  },
   "toast.generic.blocked": { en: "Blocked", ru: "Заблокировано", am: "Արգելափակվեց" },
   "toast.generic.unblocked": { en: "Unblocked", ru: "Разблокировано", am: "Ապաարգելափակվեց" },
 
@@ -1536,6 +1543,17 @@ export const TRANSLATIONS: Dict = {
   "toast.generic.saved":   { en: "Saved successfully", ru: "Успешно сохранено", am: "Հաջողությամբ պահպանվեց" },
   "toast.generic.deleted": { en: "Deleted successfully", ru: "Успешно удалено", am: "Հաջողությամբ ջնջվեց" },
   "toast.generic.error":   { en: "Something went wrong", ru: "Что-то пошло не так", am: "Ինչ-որ բան սխալ գնաց" },
+
+  // Failure sentences, resolved by the Toaster whenever a toast is red. Kept
+  // per-action rather than per-entity: one line that reads correctly for a
+  // place, a device or a company beats forty lines nobody keeps translated.
+  "toast.fail.created":   { en: "Could not create", ru: "Не удалось создать", am: "Չհաջողվեց ստեղծել" },
+  "toast.fail.updated":   { en: "Could not update", ru: "Не удалось изменить", am: "Չհաջողվեց թարմացնել" },
+  "toast.fail.saved":     { en: "Could not save", ru: "Не удалось сохранить", am: "Չհաջողվեց պահպանել" },
+  "toast.fail.deleted":   { en: "Could not delete", ru: "Не удалось удалить", am: "Չհաջողվեց ջնջել" },
+  "toast.fail.blocked":   { en: "Could not block", ru: "Не удалось заблокировать", am: "Չհաջողվեց արգելափակել" },
+  "toast.fail.unblocked": { en: "Could not unblock", ru: "Не удалось разблокировать", am: "Չհաջողվեց ապաարգելափակել" },
+  "toast.fail.prices":    { en: "Could not save prices", ru: "Не удалось сохранить цены", am: "Չհաջողվեց պահպանել գները" },
 
   "toast.place.created": { en: "New place created", ru: "Новое место создано", am: "Նոր տեղ ստեղծվեց" },
   "toast.place.updated": { en: "Place updated", ru: "Место обновлено", am: "Տեղը թարմացվեց" },
