@@ -31,6 +31,8 @@ export interface TournamentJoinedEvent {
 export const useTournamentJoined = (
   channelName: string | null | undefined,
   onChange: (event: TournamentJoinedEvent) => void,
+  /** Staff feeds are authorised now — see realtime/bookingScope.ts. */
+  isPrivate = false,
 ): void => {
   const handlerRef = useRef(onChange);
   useEffect(() => {
@@ -42,7 +44,7 @@ export const useTournamentJoined = (
     const echo = getEcho();
     if (!echo) return;
 
-    const channel = echo.channel(channelName);
+    const channel = isPrivate ? echo.private(channelName) : echo.channel(channelName);
     const listener = (payload: unknown) => {
       handlerRef.current(payload as TournamentJoinedEvent);
     };
@@ -51,5 +53,5 @@ export const useTournamentJoined = (
     return () => {
       channel.stopListening(".tournament.joined", listener);
     };
-  }, [channelName]);
+  }, [channelName, isPrivate]);
 };

@@ -2,6 +2,7 @@ import { useAuth } from "@/auth/AuthContext";
 import GradientText from "@/components/ui/GradientText";
 import ScreenWithBg from "@/components/ui/ScreenWithBg";
 import { useLang } from "@/i18n/LanguageContext";
+import { resolveBookingScopeChannel } from "@/realtime/bookingScope";
 import { useBookingChanged } from "@/realtime/useBookingChanged";
 import { useCallback, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
@@ -51,7 +52,10 @@ const Home = () => {
     void refreshUserRef.current();
   }, []);
 
-  useBookingChanged("bookings.global", debouncedRefreshUser);
+  // Was `bookings.global` for every role — an owner's machine received every
+  // booking on the platform just to know when to refresh its own dashboard.
+  const bookingScope = resolveBookingScopeChannel(user);
+  useBookingChanged(bookingScope?.name, debouncedRefreshUser, bookingScope?.isPrivate ?? false);
   const isAdmin = user?.role === "admin";
   const isOwner = user?.role === "company_owner";
   const isManager = user?.role === "manager";

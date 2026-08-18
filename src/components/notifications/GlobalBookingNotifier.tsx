@@ -2,6 +2,7 @@ import { useAuth } from "@/auth/AuthContext";
 import type { AuthUser } from "@/types/api";
 import { useLang } from "@/i18n/LanguageContext";
 import { useNotifications } from "@/notifications/NotificationsContext";
+import { resolveBookingScopeChannel, type BookingScopeChannel } from "@/realtime/bookingScope";
 import { useBookingChanged, type BookingChangedEvent } from "@/realtime/useBookingChanged";
 import { useBranchSubscribed, type BranchSubscribedEvent } from "@/realtime/useBranchSubscribed";
 import { useTournamentJoined, type TournamentJoinedEvent } from "@/realtime/useTournamentJoined";
@@ -181,38 +182,32 @@ const showNativeBookingNotification = (
 export const shouldShowBookingToasts = (user: AuthUser | null): boolean =>
   user?.role === "manager";
 
-const resolveBookingChannel = (user: AuthUser | null): string | null => {
-  if (!user) return null;
+const resolveBookingChannel = (user: AuthUser | null): BookingScopeChannel | null => {
+  // Delegates to the shared resolver so the notifier, the dashboard refresh and
+  // the reserved-places overlay cannot drift apart — they used to disagree,
+  // with two of the three subscribing to the global channel for every role.
+  // The orphan-staff warnings stay here: this is the surface where a missing
+  // link is actually noticed.
+  const scope = resolveBookingScopeChannel(user);
 
-  if (user.role === "admin") return "bookings.global";
-
-  if (user.role === "company_owner") {
-    const companyId = user.dashboard?.company_id;
-    if (!companyId) {
+  if (scope === null && user) {
+    if (user.role === "company_owner" && !user.dashboard?.company_id) {
       console.warn(
         "[GlobalBookingNotifier] company_owner without dashboard.company_id — no realtime subscription. " +
         "DB feed still works via backend admin-backstop. " +
         "Run `php artisan notifications:audit-scope` to fix the orphan link."
       );
-      return null;
     }
-    return `company.${companyId}`;
-  }
-
-  if (user.role === "manager") {
-    const branchId = user.dashboard?.branch_id;
-    if (!branchId) {
+    if (user.role === "manager" && !user.dashboard?.branch_id) {
       console.warn(
         "[GlobalBookingNotifier] manager without dashboard.branch_id — no realtime subscription. " +
         "DB feed still works via backend admin-backstop. " +
         "Run `php artisan notifications:audit-scope` to fix the orphan link."
       );
-      return null;
     }
-    return `branch.${branchId}`;
   }
 
-  return null;
+  return scope;
 };
 
 interface ToastModel {
@@ -240,7 +235,9 @@ const GlobalBookingNotifier = () => {
   // unaffected — it does NOT live here.
   const showToasts = shouldShowBookingToasts(user);
 
-  const channelName = resolveBookingChannel(user);
+  const scope = resolveBookingChannel(user);
+  const channelName = scope?.name;
+  const channelIsPrivate = scope?.isPrivate ?? false;
 
   const [toast, setToast] = useState<ToastModel | null>(null);
 
@@ -278,7 +275,7 @@ const GlobalBookingNotifier = () => {
     void refreshNotifications();
   }, [refreshNotifications, showToasts, t]);
 
-  useBookingChanged(channelName, handleEvent);
+  useBookingChanged(channelName, handleEvent, channelIsPrivate);
 
   // Branch-subscribed events ride the same channel fan-out as booking
   // events. Surface as an OS push only — the in-app toast stays
@@ -308,7 +305,7 @@ const GlobalBookingNotifier = () => {
     playNotificationChime();
     void refreshNotifications();
   }, [refreshNotifications, showToasts, t]);
-  useBranchSubscribed(channelName, handleSubscribe);
+  useBranchSubscribed(channelName, handleSubscribe, channelIsPrivate);
 
   // Tournament-joined fires only for `as=player` (server-side gate
   // in TournamentRegistrationController). Same OS-push + feed-
@@ -349,7 +346,7 @@ const GlobalBookingNotifier = () => {
     playNotificationChime();
     void refreshNotifications();
   }, [navigate, refreshNotifications, showToasts, t]);
-  useTournamentJoined(channelName, handleTournamentJoined);
+  useTournamentJoined(channelName, handleTournamentJoined, channelIsPrivate);
 
   useEffect(() => {
     if (!toast) return;

@@ -49,8 +49,14 @@ const CONTRACT_EVENTS = [
  * `private-` prefix that appears on the wire, because Echo adds it.
  */
 const CONTRACT_CHANNELS = {
-  public: ["bookings.global", "branch.{id}", "company.{id}", "app-updates", "app-updates.{role}"],
-  private: ["user.{id}.notifications", "user.{id}.access"],
+  // `branch.{id}` is the only booking channel still read publicly: mobile
+  // listens to it on a guest token, so the backend cannot make it private
+  // without a guest-aware auth route and a slimmer payload.
+  public: ["branch.{id}", "app-updates", "app-updates.{role}"],
+  // The staff feeds moved here on 2026-08-18. They carry the guest's name and
+  // the booking code, and a public Pusher channel is never authorised — the
+  // app key alone was enough to read every booking on the platform.
+  private: ["user.{id}.notifications", "user.{id}.access", "bookings.global", "company.{id}"],
 } as const;
 
 const SRC = path.resolve(__dirname, "..");
@@ -118,6 +124,35 @@ describe("realtime channel names", () => {
     expect(filesMatching(/`branch\.\$\{[^}]+\}`/).length, "branch.{id}").toBeGreaterThan(0);
   });
 
+  it("resolves the booking channel in exactly one place", () => {
+    // Home.tsx and useReservedPlaceIds each used to hardcode `bookings.global`
+    // for every role and filter by branch_id on the client, which is not
+    // scoping: the payload had already been delivered. The name is built in
+    // bookingScope.ts now, and nowhere else may build one.
+    const builders = files.filter(
+      (f) => /bookings\.global/.test(f.text) && !/bookingScope\.ts$/.test(f.file),
+    );
+
+    for (const f of builders) {
+      expect(
+        /^\s*(\/\/|\*)/m.test(f.text.split("\n").find((l) => l.includes("bookings.global")) ?? ""),
+        `${f.file} names bookings.global outside bookingScope.ts — route it through resolveBookingScopeChannel instead`,
+      ).toBe(true);
+    }
+  });
+
+  it("subscribes to the staff feeds privately", () => {
+    // The hooks take an isPrivate flag; the resolver is what sets it. If this
+    // ever reads false for admin/owner the subscription silently falls back to
+    // the public channel, which still exists during the migration — so it would
+    // keep working while leaking exactly as before.
+    const scope = files.find((f) => /bookingScope\.ts$/.test(f.file));
+    expect(scope, "src/realtime/bookingScope.ts is missing").toBeDefined();
+    expect(scope!.text).toMatch(/bookings\.global["'`],?\s*isPrivate:\s*true/);
+    expect(scope!.text).toMatch(/company\.\$\{companyId\}`,\s*isPrivate:\s*true/);
+    expect(scope!.text).toMatch(/branch\.\$\{branchId\}`,\s*isPrivate:\s*false/);
+  });
+
   it("subscribes to the shared update channel", () => {
     expect(filesMatching(/echo\.channel\(\s*"app-updates"\s*\)/).length, "app-updates").toBeGreaterThan(0);
   });
@@ -166,7 +201,11 @@ describe("contract documentation", () => {
     // Guards against someone adding a binding here and forgetting the
     // backend, or vice versa. Eight events, verified 2026-08-18.
     expect(CONTRACT_EVENTS).toHaveLength(8);
-    expect(CONTRACT_CHANNELS.public).toHaveLength(5);
-    expect(CONTRACT_CHANNELS.private).toHaveLength(2);
+    // 3 public / 4 private since the staff feeds moved on 2026-08-18. During
+    // the migration the backend still ALSO broadcasts the two staff feeds
+    // publicly, so an un-updated panel keeps working; when that public pair is
+    // dropped, nothing here changes — this side already reads the private one.
+    expect(CONTRACT_CHANNELS.public).toHaveLength(3);
+    expect(CONTRACT_CHANNELS.private).toHaveLength(4);
   });
 });

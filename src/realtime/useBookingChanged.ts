@@ -61,6 +61,12 @@ export interface BookingChangedEvent {
 export const useBookingChanged = (
   channelName: string | null | undefined,
   onChange: (event: BookingChangedEvent) => void,
+  /**
+   * Subscribe through `echo.private()` instead of `echo.channel()`. The staff
+   * feeds (`bookings.global`, `company.{id}`) are authorised now; the wire name
+   * gains a `private-` prefix, which Echo adds — never write it here.
+   */
+  isPrivate = false,
 ): void => {
   const handlerRef = useRef(onChange);
   useEffect(() => { handlerRef.current = onChange; }, [onChange]);
@@ -76,8 +82,8 @@ export const useBookingChanged = (
       return;
     }
 
-    console.log(`[reverb] subscribing to ${channelName} for .booking.changed`);
-    const channel = echo.channel(channelName);
+    console.log(`[reverb] subscribing to ${isPrivate ? "private-" : ""}${channelName} for .booking.changed`);
+    const channel = isPrivate ? echo.private(channelName) : echo.channel(channelName);
     const listener = (payload: unknown) => {
       console.log(`[reverb] .booking.changed received on ${channelName}`, payload);
       // A booking moved on another machine, which changes the free-place
@@ -96,5 +102,5 @@ export const useBookingChanged = (
       // internally; leaveChannel happens only when the last listener
       // detaches.
     };
-  }, [channelName]);
+  }, [channelName, isPrivate]);
 };
