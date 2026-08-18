@@ -13,12 +13,13 @@ import { AuthUser } from "@/types/api";
  *
  *   admin          → bookings.global   private, every booking everywhere
  *   company_owner  → company.{id}      private, every branch of their company
- *   manager        → branch.{id}       public  (see below)
+ *   manager        → branch.{id}       private, the branch they cash for
  *
- * `branch.{id}` stays public for now because the mobile app listens to it on a
- * guest token, and a guest cannot authorise a private channel on the sanctum
- * guard. Making it private is a separate change that also has to slim the
- * payload, since anyone can register a guest.
+ * All three are private now. The public `branch.{id}` still exists and still
+ * carries a `booking.changed` — but a different, person-free event
+ * (`BookingChangedPublic`), which is what the mobile app reads on its guest
+ * token. Staff need the guest's name and the booking code for the toast, and
+ * those only ever travel privately.
  *
  * Orphan staff (owner with no `dashboard.company_id`, manager with no
  * `branch_id`) get `null` and no subscription at all. That is deliberate and
@@ -49,7 +50,7 @@ export const resolveBookingScopeChannel = (
   if (user.role === "manager") {
     const branchId = user.dashboard?.branch_id;
     if (!branchId) return null;
-    return { name: `branch.${branchId}`, isPrivate: false };
+    return { name: `branch.${branchId}`, isPrivate: true };
   }
 
   return null;

@@ -20,13 +20,17 @@ describe("resolveBookingScopeChannel", () => {
     });
   });
 
-  it("gives a manager their branch, still publicly", () => {
-    // branch.{id} cannot be private while the mobile app reads it on a guest
-    // token. If this ever flips to true the manager silently receives nothing:
-    // /broadcasting/auth would reject a channel the backend never authorises.
+  it("gives a manager their branch, privately", () => {
+    // The staff payload names the guest, so it travels privately for every
+    // role. The mobile app keeps reading the PUBLIC branch.{id}, where a
+    // separate person-free event carries the same `booking.changed` alias.
+    //
+    // If this ever flips back to false the manager keeps receiving something —
+    // the public signal — and simply shows toasts with no guest name and no
+    // booking code. Working, wrong, and silent: hence the assertion.
     expect(resolveBookingScopeChannel(user("manager", { branch_id: 7 }))).toEqual({
       name: "branch.7",
-      isPrivate: false,
+      isPrivate: true,
     });
   });
 

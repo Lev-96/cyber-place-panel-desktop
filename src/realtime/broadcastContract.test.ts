@@ -49,14 +49,21 @@ const CONTRACT_EVENTS = [
  * `private-` prefix that appears on the wire, because Echo adds it.
  */
 const CONTRACT_CHANNELS = {
-  // `branch.{id}` is the only booking channel still read publicly: mobile
-  // listens to it on a guest token, so the backend cannot make it private
-  // without a guest-aware auth route and a slimmer payload.
-  public: ["branch.{id}", "app-updates", "app-updates.{role}"],
-  // The staff feeds moved here on 2026-08-18. They carry the guest's name and
-  // the booking code, and a public Pusher channel is never authorised — the
-  // app key alone was enough to read every booking on the platform.
-  private: ["user.{id}.notifications", "user.{id}.access", "bookings.global", "company.{id}"],
+  // What THIS client subscribes to. The public `branch.{id}` still exists on
+  // the backend and still carries a `booking.changed` — but a person-free one,
+  // for the mobile app's guest token. The panel has no use for it: staff need
+  // the guest's name and the booking code, and those are private-only.
+  public: ["app-updates", "app-updates.{role}"],
+  // Every staff feed is authorised as of 2026-08-18. A public Pusher channel is
+  // never authorised at all, so the app key shipped in each bundle was the
+  // whole of the access control on the platform's bookings.
+  private: [
+    "user.{id}.notifications",
+    "user.{id}.access",
+    "bookings.global",
+    "company.{id}",
+    "branch.{id}",
+  ],
 } as const;
 
 const SRC = path.resolve(__dirname, "..");
@@ -150,7 +157,7 @@ describe("realtime channel names", () => {
     expect(scope, "src/realtime/bookingScope.ts is missing").toBeDefined();
     expect(scope!.text).toMatch(/bookings\.global["'`],?\s*isPrivate:\s*true/);
     expect(scope!.text).toMatch(/company\.\$\{companyId\}`,\s*isPrivate:\s*true/);
-    expect(scope!.text).toMatch(/branch\.\$\{branchId\}`,\s*isPrivate:\s*false/);
+    expect(scope!.text).toMatch(/branch\.\$\{branchId\}`,\s*isPrivate:\s*true/);
   });
 
   it("subscribes to the shared update channel", () => {
@@ -205,7 +212,7 @@ describe("contract documentation", () => {
     // the migration the backend still ALSO broadcasts the two staff feeds
     // publicly, so an un-updated panel keeps working; when that public pair is
     // dropped, nothing here changes — this side already reads the private one.
-    expect(CONTRACT_CHANNELS.public).toHaveLength(3);
-    expect(CONTRACT_CHANNELS.private).toHaveLength(4);
+    expect(CONTRACT_CHANNELS.public).toHaveLength(2);
+    expect(CONTRACT_CHANNELS.private).toHaveLength(5);
   });
 });
