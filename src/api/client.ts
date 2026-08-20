@@ -2,6 +2,7 @@ import { AppConfig } from "@/infrastructure/AppConfig";
 import { sessionExpiry } from "@/auth/sessionExpiry";
 import { keyValueStore } from "@/infrastructure/KeyValueStore";
 import { HttpCache, invalidationTargets, policyFor } from "@/api/httpCache";
+import { getActiveLang } from "@/i18n/translations";
 
 export type Method = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 
@@ -54,6 +55,12 @@ export const request = async <Res>(
     // Bypass ngrok-free.app browser-warning interstitial when backend is tunneled via ngrok.
     // Harmless on any other backend (just an unused header).
     "ngrok-skip-browser-warning": "1",
+    // The language the panel is rendering in — NOT the operating system's.
+    // The backend writes its own sentences (validation errors, "your branch is
+    // blocked") and answers in this language; Chromium's own Accept-Language
+    // would otherwise decide it, which is how a Russian panel ends up showing
+    // an English refusal.
+    "X-App-Language": getActiveLang(),
   };
   if (opts.body !== undefined && !(opts.body instanceof FormData)) {
     headers["Content-Type"] = "application/json";

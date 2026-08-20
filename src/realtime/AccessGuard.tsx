@@ -1,3 +1,4 @@
+import { blockingKeyFor } from "@/api/blockingErrors";
 import { useAuth } from "@/auth/AuthContext";
 import { sessionExpiry } from "@/auth/sessionExpiry";
 import { useLang } from "@/i18n/LanguageContext";
@@ -24,9 +25,12 @@ import { useLocation, useNavigate } from "react-router-dom";
  *    tomorrow), so the person reads one explanation rather than discovering it
  *    at the next login.
  *  - **not locked out** — an owner whose other branches are still open. The
- *    session stands; only the branch they are STANDING IN has closed, so leave
- *    that branch for the dashboard. Anywhere else, nothing visible happens
- *    beyond a refreshed `user`.
+ *    session stands. Only the branch they are STANDING IN has closed, so if
+ *    they are inside one of its working screens (POS, sessions, tariffs) they
+ *    are moved to that branch's own page — NOT signed out and NOT thrown back
+ *    to the dashboard. The branch stays open to them read-only: that page is
+ *    where its state, its history and the reason it closed are shown, and the
+ *    server refuses every write there regardless of what the screen offers.
  *
  * Unblocking travels on the same channel and evicts nobody — it only refreshes
  * the cached account, so a branch that just reopened stops being reported as
@@ -43,6 +47,9 @@ interface AccessChangedPayload {
   branch_ids: number[];
   locked_out: boolean;
   message: string | null;
+  /** Machine-readable reason (`company_blocked` / `branch_blocked`), for translation. */
+  code?: string | null;
+  reason?: "company" | "branch" | null;
   at: string;
 }
 
@@ -91,7 +98,14 @@ const AccessGuard = () => {
       const now = latest.current;
 
       if (payload.action === "block" && payload.locked_out) {
-        notify.message("error", payload.message || now.t("blocking.evicted.lockedOut"));
+        // The panel's own wording, keyed off the code, so the person reads the
+        // reason in the language they are working in. `message` is the server's
+        // sentence and is only reached for a code this build does not know.
+        const key = blockingKeyFor(payload.code);
+        notify.message(
+          "error",
+          key ? now.t(key) : (payload.message || now.t("blocking.evicted.lockedOut")),
+        );
         void now.logout();
         return;
       }
@@ -100,7 +114,11 @@ const AccessGuard = () => {
         const current = branchIdFromPath(now.pathname);
         if (current !== null && payload.branch_ids.includes(current)) {
           notify.message("error", now.t("blocking.evicted.branch"));
-          now.navigate("/", { replace: true });
+          // To the branch's OWN page, not to the dashboard. They keep working
+          // elsewhere and are still entitled to look at this branch — what
+          // they may not do is stay on a working screen of it.
+          const hub = `/branches/${current}`;
+          if (now.pathname !== hub) now.navigate(hub, { replace: true });
         }
       }
 

@@ -1352,6 +1352,45 @@ export const TRANSLATIONS: Dict = {
     ru: "Филиал отключён — его разделы недоступны",
     am: "Մասնաճյուղն անջատված է — նրա բաժինները հասանելի չեն",
   },
+  // The server's refusals, said in the operator's own language.
+  //
+  // The API answers a block with a machine-readable `code` next to its
+  // sentence; the panel renders THESE from the code and only falls back to the
+  // server's text for a code it does not know. Without that, a Russian panel
+  // showed "Your branch has been blocked" at the login screen, because the
+  // sentence was written wherever the refusal happened to be thrown.
+  "blocking.reason.company_blocked": {
+    en: "Your company has been blocked. Please contact the administrator.",
+    ru: "Ваша компания заблокирована. Обратитесь к администратору.",
+    am: "Ձեր ընկերությունն արգելափակված է։ Դիմեք ադմինիստրատորին։",
+  },
+  "blocking.reason.branch_blocked": {
+    en: "Your branch has been blocked. Please contact the administrator.",
+    ru: "Ваш филиал заблокирован. Обратитесь к администратору.",
+    am: "Ձեր մասնաճյուղն արգելափակված է։ Դիմեք ադմինիստրատորին։",
+  },
+  "blocking.reason.branch_operation_blocked": {
+    en: "This branch is blocked — you can view it, but nothing here can be changed.",
+    ru: "Филиал заблокирован — его можно просматривать, но изменения недоступны.",
+    am: "Մասնաճյուղն արգելափակված է — կարող եք դիտել, բայց փոփոխություններն անհասանելի են։",
+  },
+  // Shown on the branch page itself while it is out of service. States the
+  // rule the whole screen then obeys, so a disabled tile never reads as a bug.
+  "blocking.readOnly.banner": {
+    en: "This branch is blocked by an administrator. It is read-only: its sections and actions stay unavailable until the block is lifted.",
+    ru: "Филиал заблокирован администратором. Он доступен только для просмотра: разделы и действия недоступны, пока блокировку не снимут.",
+    am: "Մասնաճյուղն արգելափակված է ադմինիստրատորի կողմից։ Հասանելի է միայն դիտման համար․ բաժիններն ու գործողություններն անհասանելի են, մինչև արգելափակումը հանվի։",
+  },
+  "blocking.readOnly.bannerByCompany": {
+    en: "The company that owns this branch is blocked. The branch is read-only until the company is unblocked.",
+    ru: "Компания, которой принадлежит филиал, заблокирована. Филиал доступен только для просмотра, пока компанию не разблокируют.",
+    am: "Այս մասնաճյուղին տիրապետող ընկերությունն արգելափակված է։ Մասնաճյուղը հասանելի է միայն դիտման համար, մինչև ընկերության արգելափակումը հանվի։",
+  },
+  "blocking.readOnly.tileHint": {
+    en: "Unavailable while the branch is blocked",
+    ru: "Недоступно, пока филиал заблокирован",
+    am: "Անհասանելի է, քանի դեռ մասնաճյուղն արգելափակված է",
+  },
   "toast.generic.blocked": { en: "Blocked", ru: "Заблокировано", am: "Արգելափակվեց" },
   "toast.generic.unblocked": { en: "Unblocked", ru: "Разблокировано", am: "Ապաարգելափակվեց" },
 
@@ -1927,3 +1966,11 @@ export const setActiveLang = (l: Lang): void => {
   activeLang = l;
 };
 export const tActive = (key: string): string => t(key, activeLang);
+
+/**
+ * The language the panel is rendering in, for callers that must TELL the
+ * server about it — the API client sends it as `X-App-Language` so server-side
+ * sentences (validation errors, block refusals) come back in the same language
+ * as the rest of the screen.
+ */
+export const getActiveLang = (): Lang => activeLang;

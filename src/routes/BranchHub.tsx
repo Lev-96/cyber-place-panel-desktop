@@ -12,6 +12,28 @@ import { branchRepository } from "@/repositories/BranchRepository";
 import { DragEvent, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 
+/**
+ * Is this branch read-only for the person looking at it?
+ *
+ * Exported so the rule is testable on its own and cannot drift from what the
+ * server enforces: staff of a closed branch may read it and change nothing,
+ * while an admin — who closed it and may reopen it from this very page — keeps
+ * working inside it.
+ */
+export const isBranchReadOnly = (role: string | undefined, isBlocked: boolean | undefined): boolean =>
+  !!isBlocked && role !== "admin";
+
+/**
+ * Which explanation the read-only banner carries.
+ *
+ * A branch closed by its COMPANY cannot be reopened by unblocking the branch,
+ * so telling its owner "this branch is blocked" would send them to ask the
+ * wrong question. `blocked_at` is what separates the two: set = its own block,
+ * absent while still blocked = inherited from the company.
+ */
+export const readOnlyNoticeKey = (blockedAt: string | null | undefined): string =>
+  blockedAt ? "blocking.readOnly.banner" : "blocking.readOnly.bannerByCompany";
+
 interface TileDef {
   key: string;
   to: string;
@@ -27,6 +49,21 @@ const BranchHub = () => {
   const { user } = useAuth();
   const role = user?.role;
   const { data, loading, error, reload } = useAsync(() => branchRepository.byId(id), [id]);
+
+  /*
+   * A branch an administrator has closed is READ-ONLY for its owner and its
+   * managers: they may open it and look at it — the state, the live board, the
+   * reason it is closed all live here — and every section behind these tiles is
+   * shut, exactly as the server refuses every write into it.
+   *
+   * An admin is exempt: they closed it, they may still work inside it, and
+   * this is the page the block is lifted from.
+   */
+  const readOnly = isBranchReadOnly(role, data?.is_blocked);
+  // `blocked_at` set = this branch's own block; null while `is_blocked` = it is
+  // closed because its company is. Two different sentences, because only one of
+  // them can be undone by unblocking the branch.
+  const readOnlyNotice = t(readOnlyNoticeKey(data?.blocked_at));
   const [dragKey, setDragKey] = useState<string | null>(null);
   const [dropKey, setDropKey] = useState<string | null>(null);
 
@@ -98,6 +135,25 @@ const BranchHub = () => {
         </div>
       )}
 
+      {/* State before consequence: read WHY the tiles below are grey, in one
+          sentence, before meeting them. */}
+      {readOnly && (
+        <div
+          className="card"
+          role="status"
+          style={{
+            width: "100%",
+            borderColor: "#f0a202",
+            background: "rgba(240,162,2,0.08)",
+            color: "#ffd88a",
+            fontSize: 13,
+            lineHeight: 1.4,
+          }}
+        >
+          {readOnlyNotice}
+        </div>
+      )}
+
       <div
         className="row"
         style={{
@@ -113,6 +169,8 @@ const BranchHub = () => {
             to={tile.to}
             title={tile.title}
             hint={tile.hint}
+            disabled={readOnly}
+            disabledHint={t("blocking.readOnly.tileHint")}
             dragHint={t("session.dragSectionHint")}
             dragging={dragKey === tile.key}
             dropTarget={dropKey === tile.key && dragKey != null && dragKey !== tile.key}
@@ -139,6 +197,10 @@ interface TileProps {
   to: string;
   title: string;
   hint: string;
+  /** Branch is out of service — the section behind this tile is closed too. */
+  disabled: boolean;
+  /** Why it is unavailable, shown on hover and to a screen reader. */
+  disabledHint: string;
   dragHint: string;
   dragging: boolean;
   dropTarget: boolean;
@@ -148,11 +210,25 @@ interface TileProps {
   onDrop: (e: DragEvent) => void;
 }
 
-const Tile = ({ to, title, hint, dragHint, dragging, dropTarget, onDragStart, onDragEnd, onDragOver, onDrop }: TileProps) => (
+/**
+ * A section of the branch.
+ *
+ * While the branch is blocked every tile is rendered as an inert card instead
+ * of a link: the section is closed, and offering a link that bounces the
+ * operator straight back reads as a broken panel rather than as a decision an
+ * administrator made. The reason travels with the tile (title + aria-label) so
+ * a greyed-out card is never a mystery.
+ */
+const Tile = ({ to, title, hint, disabled, disabledHint, dragHint, dragging, dropTarget, onDragStart, onDragEnd, onDragOver, onDrop }: TileProps) => (
   <Link
     to={to}
-    className="card hub-tile"
+    className={`card hub-tile${disabled ? " is-disabled" : ""}`}
     draggable={false}
+    aria-disabled={disabled || undefined}
+    title={disabled ? disabledHint : undefined}
+    aria-label={disabled ? `${title} — ${disabledHint}` : undefined}
+    tabIndex={disabled ? -1 : undefined}
+    onClick={disabled ? (e) => e.preventDefault() : undefined}
     onDragOver={onDragOver}
     onDrop={onDrop}
     style={{
@@ -163,7 +239,9 @@ const Tile = ({ to, title, hint, dragHint, dragging, dropTarget, onDragStart, on
       flexDirection: "column",
       justifyContent: "center",
       gap: 4,
-      opacity: dragging ? 0.5 : 1,
+      opacity: disabled ? 0.45 : dragging ? 0.5 : 1,
+      cursor: disabled ? "not-allowed" : undefined,
+      filter: disabled ? "grayscale(1)" : undefined,
       borderColor: dropTarget ? "#07ddf1" : undefined,
       boxShadow: dropTarget ? "0 0 0 2px rgba(7,221,241,0.5), 0 0 18px rgba(7,221,241,0.3)" : undefined,
       transition: "opacity 140ms ease, box-shadow 200ms ease, border-color 160ms ease",
@@ -179,7 +257,7 @@ const Tile = ({ to, title, hint, dragHint, dragging, dropTarget, onDragStart, on
     >
       ⠿
     </span>
-    <div style={{ fontWeight: 700, fontSize: 16, color: "#07ddf1", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", paddingRight: 18 }}>{title}</div>
+    <div style={{ fontWeight: 700, fontSize: 16, color: disabled ? "#9aa8c7" : "#07ddf1", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", paddingRight: 18 }}>{title}</div>
     <div className="muted" style={{ fontSize: 12, lineHeight: 1.3, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>{hint}</div>
   </Link>
 );

@@ -1,3 +1,4 @@
+import { blockingKeyOf } from "@/api/blockingErrors";
 import { ApiError } from "@/api/client";
 import { useAuth } from "@/auth/AuthContext";
 import { recentEmails } from "@/auth/recentEmails";
@@ -21,6 +22,11 @@ const LANG_LABEL: Record<string, string> = { en: "ENG", ru: "РУС", am: "ՀԱ�
 type LoginErr =
   | { kind: "invalid" }
   | { kind: "generic" }
+  // An administrative block. Held as a TRANSLATION KEY, not as a sentence:
+  // the server's own wording follows the request's locale, and this way the
+  // message also re-renders when the operator switches language on this very
+  // screen (the language picker sits on the login card).
+  | { kind: "blocked"; key: string }
   | { kind: "raw"; message: string };
 
 /** Which face of the card is showing. */
@@ -60,7 +66,12 @@ const Login = () => {
     try { await login(email, password); }
     catch (ex) {
       const status = (ex as ApiError | undefined)?.status;
-      if (status === 401 || status === 422) setErr({ kind: "invalid" });
+      // Asked before the status branches: a block is a 403 carrying a code,
+      // and it is the one refusal the operator can act on ("call the
+      // administrator") rather than retype their way out of.
+      const blockedKey = blockingKeyOf(ex);
+      if (blockedKey) setErr({ kind: "blocked", key: blockedKey });
+      else if (status === 401 || status === 422) setErr({ kind: "invalid" });
       else if (ex instanceof Error) setErr({ kind: "raw", message: ex.message });
       else setErr({ kind: "generic" });
     }
@@ -71,6 +82,7 @@ const Login = () => {
     err === null ? null
     : err.kind === "invalid" ? t("login.invalidCredentials")
     : err.kind === "generic" ? t("login.failed")
+    : err.kind === "blocked" ? t(err.key)
     : err.message;
 
   return (

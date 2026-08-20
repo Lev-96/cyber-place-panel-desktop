@@ -126,6 +126,37 @@ describe("AccessGuard", () => {
     ]);
   });
 
+  test("a coded eviction is said in the panel's own language, not the server's", async () => {
+    mountAt("/branches/5/pos");
+
+    await emit({
+      scope: "company",
+      locked_out: true,
+      // The server's sentence is in whatever locale the ADMIN's block request
+      // negotiated — it must not decide what this operator reads.
+      message: "Your company has been blocked. Please contact the administrator.",
+      code: "company_blocked",
+      reason: "company",
+      branch_ids: [5, 6],
+    });
+
+    expect(toasts.messages).toEqual([
+      { kind: "error", text: "blocking.reason.company_blocked" },
+    ]);
+  });
+
+  test("an unknown code falls back to the sentence the server sent", async () => {
+    mountAt("/");
+
+    await emit({
+      locked_out: true,
+      code: "something_this_build_has_never_heard_of",
+      message: "Server wording.",
+    });
+
+    expect(toasts.messages).toEqual([{ kind: "error", text: "Server wording." }]);
+  });
+
   test("falls back to its own wording when the server sent no sentence", async () => {
     mountAt("/");
     await emit({ locked_out: true, message: null });
@@ -133,16 +164,27 @@ describe("AccessGuard", () => {
     expect(toasts.messages[0].text).toBe("blocking.evicted.lockedOut");
   });
 
-  test("an owner standing in the blocked branch leaves it but keeps the session", async () => {
+  test("an owner standing in the blocked branch leaves its sections but keeps the session — and the branch", async () => {
     mountAt("/branches/5/sessions");
 
     await emit({ branch_ids: [5] });
 
-    expect(path).toBe("/");
+    // To the branch's OWN page, not the dashboard: the branch stays readable
+    // (state, history, why it closed) and only its working screens shut.
+    expect(path).toBe("/branches/5");
     expect(auth.logout).not.toHaveBeenCalled();
     expect(toasts.messages).toEqual([
       { kind: "error", text: "blocking.evicted.branch" },
     ]);
+  });
+
+  test("already on the branch page, nothing moves", async () => {
+    mountAt("/branches/5");
+
+    await emit({ branch_ids: [5] });
+
+    expect(path).toBe("/branches/5");
+    expect(auth.logout).not.toHaveBeenCalled();
   });
 
   test("a company block relocates from any of the branches it names", async () => {
@@ -150,7 +192,7 @@ describe("AccessGuard", () => {
 
     await emit({ scope: "company", branch_ids: [8, 9, 10] });
 
-    expect(path).toBe("/");
+    expect(path).toBe("/branches/9");
   });
 
   test("a block elsewhere does not move the operator off the screen they are on", async () => {

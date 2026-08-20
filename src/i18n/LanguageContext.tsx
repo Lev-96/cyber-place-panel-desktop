@@ -1,3 +1,4 @@
+import { apiCache } from "@/api/client";
 import { AppConfig } from "@/infrastructure/AppConfig";
 import { keyValueStore } from "@/infrastructure/KeyValueStore";
 import { ReactNode, createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
@@ -67,6 +68,11 @@ export const LanguageProvider = ({ children }: { children: ReactNode }) => {
     setActiveLang(l);
     setChosen(true);
     void rememberLang(l);
+    // Server-written sentences (messages, validation errors, block refusals)
+    // are cached with the response that carried them, in the language it was
+    // fetched in. Keeping them across a language change would leave the old
+    // language on screen until each entry happened to expire.
+    apiCache.clear();
   }, []);
 
   const setCurrencyOverride = useCallback((c: Currency | null) => {
