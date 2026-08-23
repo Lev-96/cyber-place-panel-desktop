@@ -2,6 +2,7 @@ import { useAuth } from "@/auth/AuthContext";
 import Spinner from "@/components/ui/Spinner";
 import { useAsync } from "@/hooks/useAsync";
 import { useLang } from "@/i18n/LanguageContext";
+import { useAccessVersion } from "@/realtime/accessVersion";
 import { branchRepository } from "@/repositories/BranchRepository";
 import { notify } from "@/ui/notify";
 import { useEffect, useRef } from "react";
@@ -39,18 +40,24 @@ const BlockedBranchGuard = () => {
   const id = Number(branchId);
   const valid = Number.isFinite(id) && id > 0;
 
+  const access = useAccessVersion();
   const { data, loading } = useAsync(
     () => (valid ? branchRepository.byId(id) : Promise.resolve(null)),
-    [id, valid],
+    [id, valid, access],
   );
 
   const isAdmin = user?.role === "admin";
   const blocked = !isAdmin && !!data?.is_blocked;
 
-  // One toast per redirect, not one per render.
+  // One toast per redirect, not one per render — and re-armed when the branch
+  // reopens, so a second block is announced like the first.
   const told = useRef(false);
   useEffect(() => {
-    if (blocked && !told.current) {
+    if (!blocked) {
+      told.current = false;
+      return;
+    }
+    if (!told.current) {
       told.current = true;
       notify.message("error", t("blocking.branchClosed"));
     }

@@ -26,6 +26,9 @@ vi.mock("@/auth/AuthContext", () => ({ useAuth: () => auth }));
 
 vi.mock("@/i18n/LanguageContext", () => ({ useLang: () => ({ t: (k: string) => k }) }));
 
+const cache = vi.hoisted(() => ({ cleared: 0 }));
+vi.mock("@/api/client", () => ({ apiCache: { clear: () => { cache.cleared += 1; } } }));
+
 const toasts = vi.hoisted(() => ({ messages: [] as Array<{ kind: string; text: string }> }));
 vi.mock("@/ui/notify", () => ({
   notify: {
@@ -100,9 +103,36 @@ describe("AccessGuard", () => {
     auth.logout.mockClear();
     auth.refreshUser.mockClear();
     toasts.messages = [];
+    cache.cleared = 0;
     echo.listeners.clear();
     echo.channels = [];
     path = "";
+  });
+
+  test("an unblock makes the open screens re-read themselves", async () => {
+    const { accessVersion } = await import("./accessVersion");
+    mountAt("/branches/5");
+    const before = accessVersion.current();
+
+    await emit({ action: "unblock", branch_ids: [5] });
+
+    // Nobody is evicted by an unblock — but the branch page in front of the
+    // owner is still drawn as "blocked, read only" until it asks again, and
+    // the cached 200 that said so must not be what answers.
+    expect(auth.logout).not.toHaveBeenCalled();
+    expect(accessVersion.current()).toBe(before + 1);
+    expect(cache.cleared).toBe(1);
+  });
+
+  test("a block invalidates the cache too", async () => {
+    const { accessVersion } = await import("./accessVersion");
+    mountAt("/");
+    const before = accessVersion.current();
+
+    await emit({ branch_ids: [5] });
+
+    expect(accessVersion.current()).toBe(before + 1);
+    expect(cache.cleared).toBe(1);
   });
 
   test("listens on the signed-in account's own private channel", () => {

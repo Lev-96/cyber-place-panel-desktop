@@ -8,6 +8,7 @@ import Spinner from "@/components/ui/Spinner";
 import { useAsync } from "@/hooks/useAsync";
 import { useLocalReorder } from "@/hooks/useLocalReorder";
 import { useLang } from "@/i18n/LanguageContext";
+import { useAccessVersion } from "@/realtime/accessVersion";
 import { branchRepository } from "@/repositories/BranchRepository";
 import { DragEvent, useState } from "react";
 import { Link, useParams } from "react-router-dom";
@@ -48,7 +49,12 @@ const BranchHub = () => {
   const { t } = useLang();
   const { user } = useAuth();
   const role = user?.role;
-  const { data, loading, error, reload } = useAsync(() => branchRepository.byId(id), [id]);
+  // Re-read when an administrator blocks or unblocks: this screen's whole
+  // shape (banner, dead tiles) is derived from `is_blocked`, and a reopened
+  // branch that stays grey until a manual reload is the same bug as an open
+  // one that never closed.
+  const access = useAccessVersion();
+  const { data, loading, error, reload } = useAsync(() => branchRepository.byId(id), [id, access]);
 
   /*
    * A branch an administrator has closed is READ-ONLY for its owner and its

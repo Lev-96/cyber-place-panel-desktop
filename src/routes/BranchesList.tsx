@@ -4,6 +4,7 @@ import ScreenWithBg from "@/components/ui/ScreenWithBg";
 import { ListSkeleton } from "@/components/ui/Skeleton";
 import { useAsync } from "@/hooks/useAsync";
 import { useLang } from "@/i18n/LanguageContext";
+import { useAccessVersion } from "@/realtime/accessVersion";
 import { branchRepository } from "@/repositories/BranchRepository";
 import { useState } from "react";
 import { Link } from "react-router-dom";
@@ -17,7 +18,10 @@ import { Link } from "react-router-dom";
 const BranchesList = () => {
   const { t } = useLang();
   const [page, setPage] = useState(1);
-  const { data, loading, error } = useAsync(() => branchRepository.listPaged(page), [page]);
+  // Includes the access version so the "blocked" badge appears — and clears —
+  // without the operator navigating away and back.
+  const access = useAccessVersion();
+  const { data, loading, error } = useAsync(() => branchRepository.listPaged(page), [page, access]);
   const branches = data?.data ?? [];
   const lastPage = data?.meta?.last_page ?? 1;
 

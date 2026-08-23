@@ -1,4 +1,6 @@
 import { blockingKeyFor } from "@/api/blockingErrors";
+import { apiCache } from "@/api/client";
+import { accessVersion } from "@/realtime/accessVersion";
 import { useAuth } from "@/auth/AuthContext";
 import { sessionExpiry } from "@/auth/sessionExpiry";
 import { useLang } from "@/i18n/LanguageContext";
@@ -32,9 +34,13 @@ import { useLocation, useNavigate } from "react-router-dom";
  *    where its state, its history and the reason it closed are shown, and the
  *    server refuses every write there regardless of what the screen offers.
  *
- * Unblocking travels on the same channel and evicts nobody — it only refreshes
- * the cached account, so a branch that just reopened stops being reported as
- * closed without a manual reload.
+ * Unblocking travels on the same channel and evicts nobody, but it is NOT a
+ * no-op for the screen: a branch page that has been sitting there saying
+ * "blocked — read only" describes a state that no longer exists. So every
+ * event, in both directions, drops the response cache (its entries were
+ * recorded under the old access state) and bumps {@link accessVersion}, which
+ * is what makes the open screens re-read themselves. Without it an owner
+ * watches a reopened branch stay grey until they reload the app by hand.
  *
  * Mounted inside the router and inside the authed tree; renders nothing.
  */
@@ -122,10 +128,15 @@ const AccessGuard = () => {
         }
       }
 
-      // Both directions: the account's cached payload (dashboard tiles, the
-      // branch list it renders from) now describes a state that no longer
-      // exists. A failed refresh is survivable — the context keeps the old user
-      // and the next fetch retries.
+      // Both directions: everything cached under the previous access state is
+      // now suspect — the branch payload with its `is_blocked`, the listing
+      // that badges it, the dashboard counts. Dropping the cache before the
+      // re-read is what stops a 200 recorded a second ago from answering it.
+      apiCache.clear();
+      accessVersion.bump();
+
+      // A failed refresh is survivable — the context keeps the old user and the
+      // next fetch retries.
       void now.refreshUser();
     };
 
