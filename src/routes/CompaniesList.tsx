@@ -5,6 +5,7 @@ import Button from "@/components/ui/Button";
 import ScreenWithBg from "@/components/ui/ScreenWithBg";
 import { ListSkeleton } from "@/components/ui/Skeleton";
 import { useAsync } from "@/hooks/useAsync";
+import { useAccessVersion } from "@/realtime/accessVersion";
 import { useLang } from "@/i18n/LanguageContext";
 import { companyRepository } from "@/repositories/CompanyRepository";
 import { useState } from "react";
@@ -13,7 +14,11 @@ import { Link } from "react-router-dom";
 const CompaniesList = () => {
   const { user } = useAuth();
   const { t } = useLang();
-  const { data: companies, loading, error, reload } = useAsync(() => companyRepository.list(), []);
+  // Re-read when a block lands, wherever it came from: this list badges every
+  // company with its block state, and a badge that lags behind the server is
+  // the one thing this screen must not do.
+  const access = useAccessVersion();
+  const { data: companies, loading, error, reload } = useAsync(() => companyRepository.list(), [access]);
   const [creating, setCreating] = useState(false);
   const canCreate = can(user?.role, "company.create");
 

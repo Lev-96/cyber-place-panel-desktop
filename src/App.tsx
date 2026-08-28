@@ -11,6 +11,7 @@ import Toaster from "@/components/ui/Toaster";
 import { ConfirmProvider } from "@/components/ui/ConfirmProvider";
 import { NotificationsProvider } from "@/notifications/NotificationsContext";
 import AccessGuard from "@/realtime/AccessGuard";
+import BranchVisibilityGuard from "@/realtime/BranchVisibilityGuard";
 import BlockedBranchGuard from "@/routes/BlockedBranchGuard";
 import { useAppUpdates, useUpdateCatchUp } from "@/realtime/useAppUpdates";
 import { UpdatesNotificationProvider } from "@/realtime/UpdatesNotificationContext";
@@ -339,6 +340,11 @@ const App = () => {
                 request. Mounted for authed users only — there is nothing to
                 evict anyone from before sign-in. Renders nothing. */}
             <AccessGuard />
+            {/* The same block seen from the other side: an administrator on
+                another machine closing or reopening a venue. Keeps this
+                panel's lists and branch pages from describing a state that
+                ended a minute ago. Renders nothing. */}
+            <BranchVisibilityGuard />
             <UpdatesNotificationProvider>
               {/* Per-account language step. Wraps the authed tree rather than
                   sitting on a route so it cannot be skipped by a restored deep

@@ -36,6 +36,7 @@ const CONTRACT_EVENTS = [
   ".app-update.promoted",
   ".booking.changed",
   ".branch.subscribed",
+  ".branch.visibility.changed",
   ".notification.created",
   ".place.availability.changed",
   ".tournament.joined",
@@ -53,7 +54,11 @@ const CONTRACT_CHANNELS = {
   // the backend and still carries a `booking.changed` — but a person-free one,
   // for the mobile app's guest token. The panel has no use for it: staff need
   // the guest's name and the booking code, and those are private-only.
-  public: ["app-updates", "app-updates.{role}"],
+  // `branches` is the catalogue feed: which venues an administrator just closed
+  // or reopened, as two lists of ids. Public because its other audience is the
+  // mobile app on a guest token, which cannot authorise a private channel —
+  // acceptable only because the payload names no person and no place.
+  public: ["app-updates", "app-updates.{role}", "branches"],
   // Every staff feed is authorised as of 2026-08-18. A public Pusher channel is
   // never authorised at all, so the app key shipped in each bundle was the
   // whole of the access control on the platform's bookings.
@@ -160,6 +165,12 @@ describe("realtime channel names", () => {
     expect(scope!.text).toMatch(/branch\.\$\{branchId\}`,\s*isPrivate:\s*true/);
   });
 
+  it("subscribes to the catalogue feed", () => {
+    // Where a block applied on another machine reaches this panel. Without it
+    // the branch list keeps a closed venue on screen until a manual reload.
+    expect(filesMatching(/echo\.channel\(\s*"branches"\s*\)/).length, "branches").toBeGreaterThan(0);
+  });
+
   it("subscribes to the shared update channel", () => {
     expect(filesMatching(/echo\.channel\(\s*"app-updates"\s*\)/).length, "app-updates").toBeGreaterThan(0);
   });
@@ -206,13 +217,17 @@ describe("realtime channel names", () => {
 describe("contract documentation", () => {
   it("lists the same number of events the backend pins", () => {
     // Guards against someone adding a binding here and forgetting the
-    // backend, or vice versa. Eight events, verified 2026-08-18.
-    expect(CONTRACT_EVENTS).toHaveLength(8);
-    // 3 public / 4 private since the staff feeds moved on 2026-08-18. During
-    // the migration the backend still ALSO broadcasts the two staff feeds
-    // publicly, so an un-updated panel keeps working; when that public pair is
-    // dropped, nothing here changes — this side already reads the private one.
-    expect(CONTRACT_CHANNELS.public).toHaveLength(2);
+    // backend, or vice versa. Nine events, verified 2026-08-28 —
+    // `.branch.visibility.changed` joined with the player-facing half of a
+    // block.
+    expect(CONTRACT_EVENTS).toHaveLength(9);
+    // 3 public / 5 private since 2026-08-28: the two update feeds plus the
+    // catalogue feed this panel joined for block state. The staff feeds moved
+    // to private on 2026-08-18 — during that migration the backend still ALSO
+    // broadcasts them publicly, so an un-updated panel keeps working; when the
+    // public pair is dropped nothing here changes, this side already reads the
+    // private one.
+    expect(CONTRACT_CHANNELS.public).toHaveLength(3);
     expect(CONTRACT_CHANNELS.private).toHaveLength(5);
   });
 });
