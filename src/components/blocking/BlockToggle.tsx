@@ -91,9 +91,11 @@ const BlockToggle = ({ kind, id, name, blockedAt, isBlocked, onChanged }: Props)
         {blockedItself ? t(`blocking.action.unblock.${kind}`) : t(`blocking.action.block.${kind}`)}
       </Button>
       {closedByParent && (
-        <span className="muted" style={{ fontSize: 12, alignSelf: "center" }}>
-          {t("blocking.closedByCompany")}
-        </span>
+        // Styled by class, not inline: it is a full sentence and needs a
+        // measure and a line height, and the two places this control is used
+        // lay it out differently (stacked under the button on the branch
+        // header, inline with the other actions on a company page).
+        <span className="muted block-toggle__note">{t("blocking.closedByCompany")}</span>
       )}
     </>
   );

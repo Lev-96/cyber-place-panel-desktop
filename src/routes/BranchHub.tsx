@@ -112,16 +112,21 @@ const BranchHub = () => {
       {error && <div className="error">{error.message}</div>}
 
       {data && (
-        <div className="row" style={{ gap: 16, alignItems: "center" }}>
+        /* Wrapping header (see `.entity-header` in global.css): the address,
+           the state badge and the block control are all variable-width, so the
+           row reflows instead of squeezing the name into a column of single
+           words when the window is narrow. */
+        <div className="entity-header">
           <Avatar src={data.branch_logo_path} name={data.address} size={72} />
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 18, fontWeight: 700 }}>
-              {data.address}
+          <div className="entity-header__identity">
+            <div className="entity-header__title">
+              <span>{data.address}</span>
               {/* State before action: an admin arriving at a closed branch
                   should read WHY it is closed, not infer it from which button
-                  they are being offered. */}
+                  they are being offered. A sibling of the name rather than
+                  text inside it, so a long badge wraps as a whole. */}
               {data.is_blocked && (
-                <span className="pill blocked" style={{ marginLeft: 8, fontSize: 12 }}>
+                <span className="pill blocked">
                   {data.blocked_at ? t("blocking.state.branch") : t("blocking.state.byCompany")}
                 </span>
               )}
@@ -129,15 +134,19 @@ const BranchHub = () => {
             <div className="muted">{data.company?.name ?? ""} · {data.country}, {data.city}</div>
           </div>
           {/* Admin-only — renders nothing for owners and managers. Re-reads the
-              branch afterwards so the badge and the button always agree. */}
-          <BlockToggle
-            kind="branch"
-            id={id}
-            name={data.address}
-            blockedAt={data.blocked_at}
-            isBlocked={data.is_blocked}
-            onChanged={() => void reload()}
-          />
+              branch afterwards so the badge and the button always agree. The
+              wrapper stacks the button with the note underneath it; side by
+              side they were competing with the address for the same width. */}
+          <div className="entity-header__actions">
+            <BlockToggle
+              kind="branch"
+              id={id}
+              name={data.address}
+              blockedAt={data.blocked_at}
+              isBlocked={data.is_blocked}
+              onChanged={() => void reload()}
+            />
+          </div>
         </div>
       )}
 
