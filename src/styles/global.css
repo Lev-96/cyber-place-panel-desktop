@@ -3030,15 +3030,21 @@ button.login-flip-back:hover {
   white-space: nowrap;
 }
 
-/* Action and its explanation stack, right-aligned against the edge the button
-   sits on. Side by side (the previous shape) the sentence competed with the
-   name for the same horizontal space. */
+/* Action and its explanation stack instead of sitting side by side, where the
+   sentence competed with the name for the same horizontal space.
+
+   No `margin-left: auto` on purpose. The identity block is the flex item that
+   grows, so on a wide line this still ends up hard against the right edge —
+   and when the row wraps, the group starts at the beginning of its own line
+   instead of being pushed to the far side, away from the name it belongs to.
+   That is the same behaviour a width media query was doing by hand, except it
+   follows the CONTAINER: this header sits inside a card, so the row can wrap
+   long before the window is narrow enough for any breakpoint to fire. */
 .entity-header__actions {
   display: flex;
   flex-direction: column;
-  align-items: flex-end;
+  align-items: flex-start;
   gap: 6px;
-  margin-left: auto;
 }
 
 /* "Closed because its company is blocked" and its kind: a full sentence, so it
@@ -3048,19 +3054,4 @@ button.login-flip-back:hover {
   font-size: 12px;
   line-height: 1.35;
   max-width: 34ch;
-}
-
-/* Below the panel's design width the header is a stack: name, then badge, then
-   the action under both, each on the full width. Right-aligning an action that
-   now sits alone on a line would leave it stranded at the far edge from the
-   name it belongs to. */
-@media (max-width: 900px) {
-  .entity-header__actions {
-    align-items: flex-start;
-    margin-left: 0;
-  }
-
-  .block-toggle__note {
-    text-align: left;
-  }
 }
