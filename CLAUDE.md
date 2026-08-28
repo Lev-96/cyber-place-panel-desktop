@@ -226,9 +226,10 @@ booking instantly" and "the cashier finds out 30 s later via polling".
 
 | Channel | Visibility | Purpose for this panel |
 |---|---|---|
-| `branch.{id}` | public | manager: booking + place + tournament + branch-subscribe events for one venue |
-| `company.{id}` | public | owner: same scoped to a whole company |
-| `bookings.global` | public | admin: same for admin-wide visibility |
+| `branch.{id}` | **private** (since 2026-08-18) | manager: booking + place + tournament + branch-subscribe events for one venue. The public `branch.{id}` still exists for the mobile app's guest token, carries no person, and this panel does not use it |
+| `company.{id}` | **private** (since 2026-08-18) | owner: same scoped to a whole company |
+| `bookings.global` | **private** (since 2026-08-18) | admin: same for admin-wide visibility |
+| `branches` | public | catalogue feed: which venues an administrator just closed or reopened, as two lists of ids. Public because the mobile app listens on a guest token; carries no name, address or reason |
 | `app-updates` | public | promoted-version broadcasts |
 | `app-updates.{role}` | public | release-available per role |
 | `user.{id}.notifications` | **private** (wire: `private-user.{id}.notifications`) | per-user notification feed |
@@ -249,6 +250,7 @@ manager → `branch.{id}`, orphan → null (no subscription).
 | `TournamentJoined` | `tournament.joined` | branch + company + global |
 | `UserNotificationCreated` | `notification.created` | user.{id}.notifications |
 | `StaffAccessChanged` | `access.changed` | user.{id}.access |
+| `BranchVisibilityChanged` | `branch.visibility.changed` | `branches` + branch.{id} |
 | `AppReleaseAvailable` | `app-release.available` | app-updates.{role} |
 | `AppUpdatePromoted` | `app-update.promoted` | app-updates |
 
