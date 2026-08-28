@@ -254,6 +254,15 @@ manager → `branch.{id}`, orphan → null (no subscription).
 | `AppReleaseAvailable` | `app-release.available` | app-updates.{role} |
 | `AppUpdatePromoted` | `app-update.promoted` | app-updates |
 
+### Config: the app key must match the server
+
+`VITE_REVERB_KEY` has to equal `REVERB_APP_KEY` on the Reverb service AND on the
+backend broadcasting to it. Otherwise Reverb refuses the socket with Pusher code
+**4001 "Application does not exist"**, every screen silently falls back to
+polling, and the panel looks merely quiet. `src/realtime/echo.ts` prints ONE
+loud `[reverb] REJECTED …` line naming the key and host; the backend has
+`php artisan realtime:check`.
+
 ### Invariants — break these and clients misfire
 
 1. **Every Event class implements `ShouldBroadcastNow`** (queue is `sync`).
