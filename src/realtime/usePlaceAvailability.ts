@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { useRealtimeVersion } from "@/realtime/useRealtimeVersion";
 import { getEcho } from "./echo";
 import { apiCache } from "@/api/client";
 
@@ -35,6 +36,10 @@ export const usePlaceAvailability = (
   const handlerRef = useRef(onChange);
   useEffect(() => { handlerRef.current = onChange; }, [onChange]);
 
+  // Re-attaches when the Echo client is rebuilt on connection details the
+  // backend handed us: a subscription on the discarded client is silent.
+  const realtime = useRealtimeVersion();
+
   useEffect(() => {
     if (!branchId || !Number.isFinite(branchId)) return;
     const echo = getEcho();
@@ -68,5 +73,5 @@ export const usePlaceAvailability = (
       // by name; relinquishing it requires every sibling to be torn
       // down — there is no refcount.
     };
-  }, [branchId]);
+  }, [branchId, realtime]);
 };

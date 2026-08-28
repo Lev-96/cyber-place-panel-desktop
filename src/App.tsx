@@ -11,11 +11,12 @@ import Toaster from "@/components/ui/Toaster";
 import { ConfirmProvider } from "@/components/ui/ConfirmProvider";
 import { NotificationsProvider } from "@/notifications/NotificationsContext";
 import AccessGuard from "@/realtime/AccessGuard";
+import { primeRealtimeConfig } from "@/realtime/echo";
 import BranchVisibilityGuard from "@/realtime/BranchVisibilityGuard";
 import BlockedBranchGuard from "@/routes/BlockedBranchGuard";
 import { useAppUpdates, useUpdateCatchUp } from "@/realtime/useAppUpdates";
 import { UpdatesNotificationProvider } from "@/realtime/UpdatesNotificationContext";
-import { Suspense, lazy } from "react";
+import { Suspense, lazy, useEffect } from "react";
 import { HashRouter, Navigate, Route, Routes } from "react-router-dom";
 
 /* Eagerly loaded — small + always needed (auth flow). */
@@ -314,6 +315,16 @@ const Unauthed = () => (
 
 const App = () => {
   const { user, loading } = useAuth();
+
+  // Ask the backend which socket to connect to, before anything subscribes.
+  // `VITE_REVERB_*` is only a fallback now: a build carrying a key the servers
+  // no longer run was refused with Pusher 4001 for its whole life while every
+  // screen quietly polled. Asking the broadcaster removes that class of failure
+  // and repairs an already-shipped build at launch.
+  useEffect(() => {
+    void primeRealtimeConfig();
+  }, []);
+
   if (loading) return <Spinner />;
   return (
     <ConfirmProvider>

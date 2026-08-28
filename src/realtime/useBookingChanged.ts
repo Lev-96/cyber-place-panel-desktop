@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { useRealtimeVersion } from "@/realtime/useRealtimeVersion";
 import { getEcho } from "./echo";
 import { apiCache } from "@/api/client";
 
@@ -71,6 +72,10 @@ export const useBookingChanged = (
   const handlerRef = useRef(onChange);
   useEffect(() => { handlerRef.current = onChange; }, [onChange]);
 
+  // Re-attaches when the Echo client is rebuilt on connection details the
+  // backend handed us: a subscription on the discarded client is silent.
+  const realtime = useRealtimeVersion();
+
   useEffect(() => {
     if (!channelName) {
       console.warn("[reverb] useBookingChanged got no channel — booking notifications won't fire");
@@ -102,5 +107,5 @@ export const useBookingChanged = (
       // internally; leaveChannel happens only when the last listener
       // detaches.
     };
-  }, [channelName, isPrivate]);
+  }, [channelName, isPrivate, realtime]);
 };

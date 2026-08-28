@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { useRealtimeVersion } from "@/realtime/useRealtimeVersion";
 import { getEcho } from "./echo";
 
 /**
@@ -39,6 +40,10 @@ export const useTournamentJoined = (
     handlerRef.current = onChange;
   }, [onChange]);
 
+  // Re-attaches when the Echo client is rebuilt on connection details the
+  // backend handed us: a subscription on the discarded client is silent.
+  const realtime = useRealtimeVersion();
+
   useEffect(() => {
     if (!channelName) return;
     const echo = getEcho();
@@ -53,5 +58,5 @@ export const useTournamentJoined = (
     return () => {
       channel.stopListening(".tournament.joined", listener);
     };
-  }, [channelName, isPrivate]);
+  }, [channelName, isPrivate, realtime]);
 };

@@ -1,4 +1,5 @@
 import { blockingKeyFor } from "@/api/blockingErrors";
+import { useRealtimeVersion } from "@/realtime/useRealtimeVersion";
 import { apiCache } from "@/api/client";
 import { accessVersion } from "@/realtime/accessVersion";
 import { useAuth } from "@/auth/AuthContext";
@@ -91,6 +92,10 @@ const AccessGuard = () => {
 
   const userId = user?.id ?? null;
 
+  // Re-attaches when the Echo client is rebuilt on connection details the
+  // backend handed us: a subscription on the discarded client is silent.
+  const realtime = useRealtimeVersion();
+
   useEffect(() => {
     if (userId === null) return;
     const echo = getEcho();
@@ -144,7 +149,7 @@ const AccessGuard = () => {
     return () => {
       channel.stopListening(".access.changed", listener);
     };
-  }, [userId]);
+  }, [userId, realtime]);
 
   /**
    * The floor under the realtime path. Reverb can be unconfigured (no

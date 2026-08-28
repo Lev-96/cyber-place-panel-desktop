@@ -61,7 +61,11 @@ const echo = vi.hoisted(() => {
     },
   };
 });
-vi.mock("@/realtime/echo", () => ({ getEcho: () => echo.client }));
+vi.mock("@/realtime/echo", () => ({
+  // `useRealtimeVersion` reads this to re-attach when the client is rebuilt.
+  realtimeVersion: { current: () => 0, subscribe: () => () => {} },
+  getEcho: () => echo.client,
+}));
 
 let path = "";
 const LocationProbe = () => {

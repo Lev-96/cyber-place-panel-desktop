@@ -254,6 +254,21 @@ manager → `branch.{id}`, orphan → null (no subscription).
 | `AppReleaseAvailable` | `app-release.available` | app-updates.{role} |
 | `AppUpdatePromoted` | `app-update.promoted` | app-updates |
 
+### The socket's identity comes from the BACKEND, not from this build
+
+`primeRealtimeConfig()` (called once from `App`) fetches `GET /realtime/config`
+and adopts the host/port/scheme/key the backend actually broadcasts with,
+caching it in `localStorage` for the next launch. `VITE_REVERB_*` is only the
+fallback until that lands or when the backend is unreachable.
+
+Every effect that subscribes takes `useRealtimeVersion()` as a dependency —
+without it a subscription stays on the discarded client, looks alive and
+receives nothing.
+
+Proven with a build carrying `VITE_REVERB_KEY=PANEL_WRONG_KEY`: it adopted the
+server's key, reached `connected`, and a block applied from another process
+badged the branch list with no reload.
+
 ### Where the Reverb app key comes from (and what was wrong with it)
 
 | Build | Source of `VITE_REVERB_KEY` |

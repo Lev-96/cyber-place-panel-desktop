@@ -1,4 +1,5 @@
 import { useAuth } from "@/auth/AuthContext";
+import { useRealtimeVersion } from "@/realtime/useRealtimeVersion";
 import {
   apiDeleteAllNotifications,
   apiDeleteNotification,
@@ -136,6 +137,10 @@ export const NotificationsProvider = ({ children }: { children: ReactNode }) => 
   const refreshRef = useRef(refresh);
   refreshRef.current = refresh;
 
+  // Re-attaches when the Echo client is rebuilt on connection details the
+  // backend handed us: a subscription on the discarded client is silent.
+  const realtime = useRealtimeVersion();
+
   useEffect(() => {
     if (!user || !dbFeedEnabled) return;
     const echo = getEcho();
@@ -195,7 +200,7 @@ export const NotificationsProvider = ({ children }: { children: ReactNode }) => 
       connection?.unbind?.("unavailable", onDropped);
       channel.stopListening(".notification.created", listener);
     };
-  }, [user, dbFeedEnabled]);
+  }, [user, dbFeedEnabled, realtime]);
 
   const markRead = useCallback(async (id: string) => {
     // Optimistic patch so the badge moves immediately; rollback on

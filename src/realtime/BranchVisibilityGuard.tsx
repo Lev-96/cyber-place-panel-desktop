@@ -1,4 +1,5 @@
 import { apiCache } from "@/api/client";
+import { useRealtimeVersion } from "@/realtime/useRealtimeVersion";
 import { accessVersion } from "@/realtime/accessVersion";
 import { getEcho } from "@/realtime/echo";
 import { useEffect } from "react";
@@ -30,6 +31,10 @@ import { useEffect } from "react";
  * Mounted alongside AccessGuard inside the authed tree; renders nothing.
  */
 const BranchVisibilityGuard = () => {
+  // Re-attaches when the Echo client is rebuilt on connection details the
+  // backend handed us: a subscription on the discarded client is silent.
+  const realtime = useRealtimeVersion();
+
   useEffect(() => {
     const echo = getEcho();
     // Reverb unconfigured or unreachable: screens keep their existing refresh
@@ -52,7 +57,7 @@ const BranchVisibilityGuard = () => {
     return () => {
       channel.stopListening(".branch.visibility.changed", listener);
     };
-  }, []);
+  }, [realtime]);
 
   return null;
 };

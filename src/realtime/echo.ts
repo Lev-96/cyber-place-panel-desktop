@@ -31,6 +31,11 @@ interface ReverbConfig {
 }
 
 const readConfig = (): ReverbConfig | null => {
+  // Server-provided first (see primeRealtimeConfig); env only until that lands
+  // and for a backend that cannot be reached.
+  const provided = globalThis.__cyberplace_reverb_config__;
+  if (provided?.key && provided?.host) return provided;
+
   const key = import.meta.env.VITE_REVERB_KEY ?? "";
   const host = import.meta.env.VITE_REVERB_HOST ?? "";
   if (!key || !host) return null;
@@ -46,7 +51,124 @@ declare global {
   // new WebSocket on every save during development.
   // eslint-disable-next-line no-var
   var __cyberplace_echo__: EchoLike | null | undefined;
+  // The connection details the BACKEND told us to use — see primeRealtimeConfig.
+  // eslint-disable-next-line no-var
+  var __cyberplace_reverb_config__: ReverbConfig | null | undefined;
 }
+
+/* ── Where the connection details come from ─────────────────────────────────
+ *
+ * `VITE_REVERB_*` is a FALLBACK now, not the source of truth. The source is the
+ * backend: `GET /realtime/config` returns the host and app key the server
+ * actually broadcasts with, and `primeRealtimeConfig()` adopts it at startup.
+ *
+ * The old arrangement had this identity compiled into every client, in several
+ * places each (a local .env, a CI-written .env.staging from a repo variable, an
+ * EAS profile on mobile). It drifted from the servers, every socket was refused
+ * with Pusher 4001, and both apps quietly fell back to polling — so the only
+ * symptom was that nothing was ever live. A value that lives on the server
+ * cannot drift from the server.
+ */
+
+const CONFIG_STORAGE_KEY = "cp.realtimeConfig";
+
+/** Bumped whenever the client is rebuilt, so live subscriptions re-attach. */
+let configVersion = 0;
+const versionListeners = new Set<(v: number) => void>();
+
+export const realtimeVersion = {
+  current: (): number => configVersion,
+  subscribe: (listener: (v: number) => void): (() => void) => {
+    versionListeners.add(listener);
+    return () => {
+      versionListeners.delete(listener);
+    };
+  },
+};
+
+const bumpVersion = (): void => {
+  configVersion += 1;
+  for (const listener of versionListeners) {
+    try {
+      listener(configVersion);
+    } catch {
+      /* a listener mid-unmount must not stop the others */
+    }
+  }
+};
+
+const sameConfig = (a: ReverbConfig | null, b: ReverbConfig | null): boolean =>
+  a?.key === b?.key && a?.host === b?.host && a?.port === b?.port && a?.scheme === b?.scheme;
+
+/**
+ * Adopt the connection the BACKEND says to use. Called once at startup; safe to
+ * call again. Never throws: on any failure the panel keeps what it had (the
+ * last answer, then the compiled-in env), which is exactly today's behaviour.
+ */
+export const primeRealtimeConfig = async (): Promise<void> => {
+  if (!globalThis.__cyberplace_reverb_config__) {
+    try {
+      const cached = localStorage.getItem(CONFIG_STORAGE_KEY);
+      const parsed = cached ? (JSON.parse(cached) as ReverbConfig) : null;
+      if (parsed?.key && parsed?.host) {
+        globalThis.__cyberplace_reverb_config__ = parsed;
+        bumpVersion();
+      }
+    } catch {
+      /* unreadable cache is not a failure — the fetch below decides */
+    }
+  }
+
+  try {
+    const response = await fetch(`${AppConfig.backendUrl.replace(/\/$/, "")}/realtime/config`, {
+      headers: { Accept: "application/json" },
+    });
+    if (!response.ok) return;
+
+    const body = (await response.json()) as {
+      enabled?: boolean;
+      key?: string;
+      host?: string;
+      port?: number;
+      scheme?: string;
+    };
+
+    if (!body?.enabled || !body.key || !body.host) {
+      console.warn("[reverb] backend reports realtime disabled — polling only");
+      return;
+    }
+
+    const next: ReverbConfig = {
+      key: body.key,
+      host: body.host,
+      port: Number(body.port) || (body.scheme === "http" ? 80 : 443),
+      scheme: body.scheme === "http" ? "http" : "https",
+    };
+
+    if (sameConfig(next, globalThis.__cyberplace_reverb_config__ ?? null)) return;
+
+    globalThis.__cyberplace_reverb_config__ = next;
+    try {
+      localStorage.setItem(CONFIG_STORAGE_KEY, JSON.stringify(next));
+    } catch {
+      /* private mode or a full quota — the fetch runs again next launch */
+    }
+
+    // Throw the old client away and tell live subscriptions to re-attach.
+    const existing = globalThis.__cyberplace_echo__;
+    if (existing) {
+      try {
+        (existing as unknown as { disconnect?: () => void }).disconnect?.();
+      } catch {
+        /* ignore — it is being discarded */
+      }
+    }
+    globalThis.__cyberplace_echo__ = undefined;
+    bumpVersion();
+  } catch {
+    /* offline or unreachable — keep what we have */
+  }
+};
 
 /**
  * Surface only the failure-state transitions on the Pusher connection

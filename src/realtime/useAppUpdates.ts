@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { useRealtimeVersion } from "@/realtime/useRealtimeVersion";
 import "@/types/desktopUpdates";
 import { apiGetManifest, type AppKind } from "@/api/updates";
 import { getEcho } from "./echo";
@@ -49,6 +50,10 @@ export const useAppUpdates = (
   const cbRef = useRef(onEvent);
   cbRef.current = onEvent;
 
+  // Re-attaches when the Echo client is rebuilt on connection details the
+  // backend handed us: a subscription on the discarded client is silent.
+  const realtime = useRealtimeVersion();
+
   useEffect(() => {
     const echo = getEcho();
     if (!echo) return;
@@ -75,7 +80,7 @@ export const useAppUpdates = (
         echo.leaveChannel("app-updates");
       } catch { /* echo may be torn down already during HMR */ }
     };
-  }, [thisApp]);
+  }, [thisApp, realtime]);
 };
 
 /**
