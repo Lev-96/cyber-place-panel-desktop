@@ -273,6 +273,16 @@ opened was refused with 4001 and it fell back to polling. The local files now
 carry the key the servers actually run; if the packaged staging build shows the
 same rejection, the `ENV_STAGING` repo variable still holds the old key.
 
+### Realtime must re-read after a reconnect
+
+A WebSocket has no backlog: anything broadcast while the connection was down is
+gone. Two places re-read on reconnect (and only on RE-connect — the first
+`connected` lands while the mount fetch is already in flight):
+`BranchVisibilityGuard`'s screens through `accessVersion`, and
+`NotificationsContext`, which re-reads its feed. Without it the 60 s poll
+eventually corrects the unread COUNT while the feed itself keeps describing the
+world as it was before the gap.
+
 ### Config: the app key must match the server
 
 `VITE_REVERB_KEY` has to equal `REVERB_APP_KEY` on the Reverb service AND on the

@@ -129,6 +129,13 @@ export const NotificationsProvider = ({ children }: { children: ReactNode }) => 
   // subscription whose authenticated user id doesn't match the
   // channel's `{userId}` segment, so an attacker can't tail another
   // user's notification feed.
+  // Read through a ref inside the subscription effect below: `refresh` is a new
+  // function whenever its inputs change, and depending on it directly would
+  // tear the channel down and rebuild it — losing anything that arrived in the
+  // gap, which is the exact failure this is here to prevent.
+  const refreshRef = useRef(refresh);
+  refreshRef.current = refresh;
+
   useEffect(() => {
     if (!user || !dbFeedEnabled) return;
     const echo = getEcho();
@@ -148,7 +155,44 @@ export const NotificationsProvider = ({ children }: { children: ReactNode }) => 
       setUnreadCount((c) => (row.read_at === null ? c + 1 : c));
     };
     channel.listen(".notification.created", listener);
+
+    // A WebSocket has no backlog: everything sent while the connection was down
+    // is simply gone. The 60s poll corrects the unread COUNT eventually, but
+    // the feed itself would keep describing the world as it was before the gap.
+    // So a reconnect re-reads the list once.
+    //
+    // Reconnects only — the first `connected` lands while the mount fetch above
+    // is already in flight.
+    const connection = (
+      echo as unknown as {
+        connector?: {
+          pusher?: {
+            connection?: {
+              bind?: (e: string, h: () => void) => void;
+              unbind?: (e: string, h: () => void) => void;
+              state?: string;
+            };
+          };
+        };
+      }
+    ).connector?.pusher?.connection;
+
+    let hasConnectedBefore = connection?.state === "connected";
+    const onConnected = () => {
+      if (hasConnectedBefore) void refreshRef.current();
+      hasConnectedBefore = true;
+    };
+    const onDropped = () => {
+      hasConnectedBefore = true;
+    };
+    connection?.bind?.("connected", onConnected);
+    connection?.bind?.("disconnected", onDropped);
+    connection?.bind?.("unavailable", onDropped);
+
     return () => {
+      connection?.unbind?.("connected", onConnected);
+      connection?.unbind?.("disconnected", onDropped);
+      connection?.unbind?.("unavailable", onDropped);
       channel.stopListening(".notification.created", listener);
     };
   }, [user, dbFeedEnabled]);
