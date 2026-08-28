@@ -254,6 +254,25 @@ manager → `branch.{id}`, orphan → null (no subscription).
 | `AppReleaseAvailable` | `app-release.available` | app-updates.{role} |
 | `AppUpdatePromoted` | `app-update.promoted` | app-updates |
 
+### Where the Reverb app key comes from (and what was wrong with it)
+
+| Build | Source of `VITE_REVERB_KEY` |
+|---|---|
+| local dev (`npm run dev`) | `.env` — **untracked**, local to each machine |
+| packaged staging build | `.env.staging`, which CI writes from the GitHub repo **variable `ENV_STAGING`** (`release-staging.yml`) |
+| packaged production build | same shape, from the production variable |
+
+(An earlier version of this file claimed `.env.staging` / `.env.production` are
+tracked in git. They are not — `git ls-files` shows only `.env.example`. CI
+materialises them from repo variables, which is where a key change has to be
+made for packaged builds.)
+
+**2026-08-28:** the local `.env` / `.env.staging` carried `uzhm…` while both
+deployed Reverb services were running `iilyg…`, so every socket this panel
+opened was refused with 4001 and it fell back to polling. The local files now
+carry the key the servers actually run; if the packaged staging build shows the
+same rejection, the `ENV_STAGING` repo variable still holds the old key.
+
 ### Config: the app key must match the server
 
 `VITE_REVERB_KEY` has to equal `REVERB_APP_KEY` on the Reverb service AND on the
