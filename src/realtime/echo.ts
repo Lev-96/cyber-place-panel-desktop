@@ -56,15 +56,71 @@ declare global {
  * "no realtime toast" is otherwise indistinguishable from a silent
  * WebSocket failure.
  */
-const attachConnectionFailureWarnings = (echo: EchoLike): void => {
+/**
+ * Pusher protocol codes 4000-4099 mean "do not retry": the server refused this
+ * client and reconnecting will not change that. 4001 — "Application does not
+ * exist" — is the one that bites in practice: the app key in this build is not
+ * the key the Reverb deployment was started with, so every subscription is
+ * refused while every screen goes on working off its polling fallback. Said
+ * quietly, that is indistinguishable from a quiet evening.
+ */
+const isFatalProtocolError = (code: number | undefined): boolean =>
+  typeof code === "number" && code >= 4000 && code <= 4099;
+
+const errorCodeOf = (err: unknown): number | undefined => {
+  const shape = err as { error?: { data?: { code?: unknown } }; data?: { code?: unknown } } | null;
+  const code = shape?.error?.data?.code ?? shape?.data?.code;
+  return typeof code === "number" ? code : undefined;
+};
+
+const attachConnectionFailureWarnings = (echo: EchoLike, cfg: ReverbConfig): void => {
   const pusher = (
     echo as unknown as { connector?: { pusher?: { connection?: { bind?: (e: string, h: (err?: unknown) => void) => void } } } }
   ).connector?.pusher;
   const conn = pusher?.connection;
   if (!conn || typeof conn.bind !== "function") return;
-  conn.bind("unavailable", () => console.warn("[reverb] unavailable — backing off"));
-  conn.bind("failed", () => console.warn("[reverb] failed — WebSocket unsupported by runtime?"));
-  conn.bind("error", (err: unknown) => console.warn("[reverb] connection error", err));
+
+  // One line per distinct failure. pusher-js retries on a backoff, so an
+  // unfixable rejection otherwise repeats until it has pushed everything else
+  // out of the console.
+  const said = new Set<string>();
+  const sayOnce = (key: string, message: string) => {
+    if (said.has(key)) return;
+    said.add(key);
+    console.warn(message);
+  };
+
+  conn.bind("unavailable", () =>
+    sayOnce("unavailable", "[reverb] unavailable — backing off, falling back to polling"),
+  );
+  conn.bind("failed", () =>
+    sayOnce("failed", "[reverb] failed — WebSocket unsupported by runtime?"),
+  );
+  conn.bind("error", (err: unknown) => {
+    const code = errorCodeOf(err);
+
+    if (code === 4001) {
+      sayOnce(
+        "4001",
+        `[reverb] REJECTED: this build's app key "${cfg.key}" does not exist on ${cfg.host}. ` +
+          "Realtime is OFF for the whole session — every screen falls back to polling. " +
+          "VITE_REVERB_KEY must equal REVERB_APP_KEY on the Reverb service AND on the backend " +
+          "that broadcasts to it; all three have to be the same string.",
+      );
+      return;
+    }
+
+    if (isFatalProtocolError(code)) {
+      sayOnce(
+        `fatal-${code}`,
+        `[reverb] REJECTED with protocol code ${code} by ${cfg.host} — retrying will not help. ` +
+          "Realtime is OFF; screens fall back to polling.",
+      );
+      return;
+    }
+
+    sayOnce(`error-${code ?? "unknown"}`, `[reverb] connection error ${JSON.stringify(err)}`);
+  });
 };
 
 /**
@@ -150,7 +206,7 @@ const buildEcho = (cfg: ReverbConfig): EchoLike => {
     // subscriptions are unaffected.
     authorizer: buildAuthorizer(),
   }) as unknown as EchoLike;
-  attachConnectionFailureWarnings(echo);
+  attachConnectionFailureWarnings(echo, cfg);
   return echo;
 };
 
