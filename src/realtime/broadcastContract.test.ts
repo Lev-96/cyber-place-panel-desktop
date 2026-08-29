@@ -29,7 +29,18 @@ import { describe, expect, it } from "vitest";
  *   /var/www/html/cyber-place/tests/Unit/Events/BroadcastContractTest.php
  */
 
-/** Event aliases the backend publishes via broadcastAs(), in Echo's leading-dot form. */
+/**
+ * Backend events this panel deliberately does NOT bind.
+ *
+ * Kept here so the list below stays readable as "what the panel listens to"
+ * rather than drifting into "what exists". A phone-only event is not a gap:
+ *
+ *  - `.branch.platforms.changed` — the mobile booking screen's platform tabs.
+ *    The panel edits places through its own screens, which reload themselves.
+ */
+const PUBLISHED_BUT_NOT_BOUND_HERE = [".branch.platforms.changed"] as const;
+
+/** Event aliases this panel binds, in Echo's leading-dot form. */
 const CONTRACT_EVENTS = [
   ".access.changed",
   ".app-release.available",
@@ -96,7 +107,7 @@ describe("realtime event bindings", () => {
     }
   }
 
-  it("binds exactly the events the backend publishes — no more, no fewer", () => {
+  it("binds exactly the events it should — no more, no fewer", () => {
     const found = [...listened.keys()].sort();
 
     expect(found).toEqual([...CONTRACT_EVENTS].sort());
@@ -217,10 +228,16 @@ describe("realtime channel names", () => {
 describe("contract documentation", () => {
   it("lists the same number of events the backend pins", () => {
     // Guards against someone adding a binding here and forgetting the
-    // backend, or vice versa. Nine events, verified 2026-08-28 —
-    // `.branch.visibility.changed` joined with the player-facing half of a
-    // block.
+    // backend, or vice versa. Nine bound here plus one published for the phones
+    // only, verified 2026-08-29: `.branch.visibility.changed` joined with the
+    // player-facing half of a block, `.branch.platforms.changed` with the
+    // booking screen's live platform tabs.
     expect(CONTRACT_EVENTS).toHaveLength(9);
+    expect(PUBLISHED_BUT_NOT_BOUND_HERE).toHaveLength(1);
+    // The backend pins 11 in tests/Unit/Events/BroadcastContractTest.php:
+    // the nine below, the mobile-only one above, and BookingChangedPublic,
+    // which shares the `.booking.changed` alias with its private twin.
+    expect(CONTRACT_EVENTS.length + PUBLISHED_BUT_NOT_BOUND_HERE.length + 1).toBe(11);
     // 3 public / 5 private since 2026-08-28: the two update feeds plus the
     // catalogue feed this panel joined for block state. The staff feeds moved
     // to private on 2026-08-18 — during that migration the backend still ALSO
