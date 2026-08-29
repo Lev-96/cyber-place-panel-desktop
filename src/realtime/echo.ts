@@ -30,18 +30,23 @@ interface ReverbConfig {
   scheme: "http" | "https";
 }
 
-const readConfig = (): ReverbConfig | null => {
-  // Server-provided first (see primeRealtimeConfig); env only until that lands
-  // and for a backend that cannot be reached.
-  const provided = globalThis.__cyberplace_reverb_config__;
-  if (provided?.key && provided?.host) return provided;
-
+/** What this build was compiled with — the fallback, never the first choice. */
+const readBundledConfig = (): ReverbConfig | null => {
   const key = import.meta.env.VITE_REVERB_KEY ?? "";
   const host = import.meta.env.VITE_REVERB_HOST ?? "";
   if (!key || !host) return null;
   const scheme = (import.meta.env.VITE_REVERB_SCHEME ?? "https") as "http" | "https";
   const port = Number(import.meta.env.VITE_REVERB_PORT ?? (scheme === "https" ? 443 : 80));
   return { key, host, port, scheme };
+};
+
+const readConfig = (): ReverbConfig | null => {
+  // Server-provided first (see primeRealtimeConfig); env only until that lands
+  // and for a backend that cannot be reached.
+  const provided = globalThis.__cyberplace_reverb_config__;
+  if (provided?.key && provided?.host) return provided;
+
+  return readBundledConfig();
 };
 
 type EchoLike = InstanceType<typeof Echo>;
@@ -100,6 +105,65 @@ const bumpVersion = (): void => {
 const sameConfig = (a: ReverbConfig | null, b: ReverbConfig | null): boolean =>
   a?.key === b?.key && a?.host === b?.host && a?.port === b?.port && a?.scheme === b?.scheme;
 
+/** Throw the current client away; the next `getEcho()` builds a fresh one. */
+const teardownEcho = (): void => {
+  const existing = globalThis.__cyberplace_echo__;
+  if (existing) {
+    try {
+      (existing as unknown as { disconnect?: () => void }).disconnect?.();
+    } catch {
+      /* ignore — it is being discarded */
+    }
+  }
+  globalThis.__cyberplace_echo__ = undefined;
+};
+
+/**
+ * App keys this session has watched Reverb refuse (Pusher 4001).
+ *
+ * Letting the backend name the socket removed one drift — a build carrying a
+ * stale key — and opened the mirror of it. `/realtime/config` reports
+ * `REVERB_APP_KEY` as set on the BACKEND service, and nothing on that path
+ * proves the Reverb service was started with the same string. When it is not,
+ * every client obediently connects with a key Reverb has never heard of, is
+ * refused, and spends the session on polling — the exact failure the mechanism
+ * existed to end, except that now no new build can fix it.
+ *
+ * So a refusal is remembered: the key lands here, the answer that carried it is
+ * dropped (cached copy included), and the client is rebuilt on what this build
+ * ships with. `primeRealtimeConfig` then declines to re-adopt it, which is what
+ * keeps the two from flapping against each other.
+ *
+ * A floor, not a cure: the deployment is still misconfigured until the three
+ * copies of the key agree — `php artisan realtime:check` on the backend names
+ * them.
+ */
+const refusedKeys = new Set<string>();
+
+/**
+ * Reverb refused `cfg.key`. Fall back to the key this build carries, if that is
+ * a different string worth trying. Returns whether anything changed.
+ */
+const demoteRefusedConfig = (cfg: ReverbConfig): boolean => {
+  if (refusedKeys.has(cfg.key)) return false;
+  refusedKeys.add(cfg.key);
+
+  const bundled = readBundledConfig();
+  if (!bundled || bundled.key === cfg.key) return false;
+
+  globalThis.__cyberplace_reverb_config__ = undefined;
+  try {
+    // The cached answer would be adopted and refused again on the next launch.
+    localStorage.removeItem(CONFIG_STORAGE_KEY);
+  } catch {
+    /* unwritable storage — the in-memory demotion still holds for this session */
+  }
+
+  teardownEcho();
+  bumpVersion();
+  return true;
+};
+
 /**
  * Adopt the connection the BACKEND says to use. Called once at startup; safe to
  * call again. Never throws: on any failure the panel keeps what it had (the
@@ -147,6 +211,16 @@ export const primeRealtimeConfig = async (): Promise<void> => {
 
     if (sameConfig(next, globalThis.__cyberplace_reverb_config__ ?? null)) return;
 
+    // Already tried this session and refused by Reverb itself. Re-adopting it
+    // would tear down a working fallback in favour of a connection that cannot
+    // be established — see `refusedKeys`.
+    if (refusedKeys.has(next.key)) {
+      console.warn(
+        `[reverb] backend still advertises the refused app key "${next.key}" — staying on the built-in one`,
+      );
+      return;
+    }
+
     globalThis.__cyberplace_reverb_config__ = next;
     try {
       localStorage.setItem(CONFIG_STORAGE_KEY, JSON.stringify(next));
@@ -155,15 +229,7 @@ export const primeRealtimeConfig = async (): Promise<void> => {
     }
 
     // Throw the old client away and tell live subscriptions to re-attach.
-    const existing = globalThis.__cyberplace_echo__;
-    if (existing) {
-      try {
-        (existing as unknown as { disconnect?: () => void }).disconnect?.();
-      } catch {
-        /* ignore — it is being discarded */
-      }
-    }
-    globalThis.__cyberplace_echo__ = undefined;
+    teardownEcho();
     bumpVersion();
   } catch {
     /* offline or unreachable — keep what we have */
@@ -222,6 +288,21 @@ const attachConnectionFailureWarnings = (echo: EchoLike, cfg: ReverbConfig): voi
     const code = errorCodeOf(err);
 
     if (code === 4001) {
+      // Reverb has never heard of this key. If it came from the backend and the
+      // build carries a different one, that second string is worth trying —
+      // realtime stays on instead of the whole session dropping to polling over
+      // a server-side misconfiguration no new build can repair.
+      if (demoteRefusedConfig(cfg)) {
+        sayOnce(
+          "4001-demote",
+          `[reverb] REJECTED: app key "${cfg.key}" does not exist on ${cfg.host}. ` +
+            "Reconnecting with the key this build ships instead. " +
+            "Fix the deployment: VITE_REVERB_KEY, REVERB_APP_KEY on the Reverb service and " +
+            "REVERB_APP_KEY on the backend must all be the same string (`php artisan realtime:check`).",
+        );
+        return;
+      }
+
       sayOnce(
         "4001",
         `[reverb] REJECTED: this build's app key "${cfg.key}" does not exist on ${cfg.host}. ` +
