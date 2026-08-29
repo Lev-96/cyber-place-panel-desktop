@@ -269,6 +269,22 @@ Proven with a build carrying `VITE_REVERB_KEY=PANEL_WRONG_KEY`: it adopted the
 server's key, reached `connected`, and a block applied from another process
 badged the branch list with no reload.
 
+**2026-08-29 — then the server's key was the wrong one.** The staging backend
+service still carried a key its Reverb service refuses, so every client that
+asked was handed it, rejected with 4001, and polled for the session; realtime
+was off across the panel and the phones without a single error anywhere but the
+console. Adoption is therefore no longer unconditional: a 4001 on a
+server-provided key drops that answer (the `localStorage` copy included),
+rebuilds the client on the key this build ships, and remembers the refused key
+so `primeRealtimeConfig` cannot pull the working connection back down. Pinned by
+`src/realtime/echo.keyFallback.test.ts`.
+
+A floor, not a cure — the deployment is still wrong until backend, Reverb and
+the builds agree on one string. `php artisan realtime:check` on the backend is
+what says whether they do; note that publishing succeeds even with a dead key
+(Reverb authenticates that path by app id and signature), so only the client
+handshake half of that command answers this question.
+
 ### Where the Reverb app key comes from (and what was wrong with it)
 
 | Build | Source of `VITE_REVERB_KEY` |
