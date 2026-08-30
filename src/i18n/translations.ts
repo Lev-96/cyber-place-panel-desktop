@@ -89,6 +89,11 @@ export const TRANSLATIONS: Dict = {
   // "Товар", not "позиция": what the cashier adds is a product off the shelf,
   // and the branch's own catalogue screen already calls them товары.
   // ── Support desk ───────────────────────────────────────────────────────
+  "nav.supportHint": {
+    en: "Message Cyber Place support",
+    ru: "Связаться с поддержкой",
+    am: "Կապվել աջակցության հետ",
+  },
   "nav.support": { en: "Support", ru: "Поддержка", am: "Աջակցություն" },
   "support.title": { en: "Support", ru: "Поддержка", am: "Աջակցություն" },
   "support.intro": {
@@ -115,6 +120,35 @@ export const TRANSLATIONS: Dict = {
     am: "Այստեղ դեռ դատարկ է — նկարագրեք խնդիրը:",
   },
   "support.placeholder": { en: "Write a message…", ru: "Напишите сообщение…", am: "Գրեք հաղորդագրություն…" },
+  // Attachment rules, in the operator's words. Each names the actual limit
+  // rather than saying "invalid file", because the only useful version of this
+  // message is the one that says what to do differently.
+  "support.file.tooLarge": {
+    en: "Too large. Maximum per file: {0} MB",
+    ru: "Файл слишком большой. Максимум на файл: {0} МБ",
+    am: "Ֆայլը չափազանց մեծ է։ Առավելագույնը՝ {0} ՄԲ",
+  },
+  "support.file.empty": {
+    en: "The file is empty — it may not have been read correctly",
+    ru: "Файл пустой — возможно, он не прочитался",
+    am: "Ֆայլը դատարկ է — հնարավոր է՝ այն չի կարդացվել",
+  },
+  "support.file.tooMany": {
+    en: "Too many files. Maximum: {0}",
+    ru: "Слишком много файлов. Максимум: {0}",
+    am: "Չափազանց շատ ֆայլ։ Առավելագույնը՝ {0}",
+  },
+  "support.file.totalTooLarge": {
+    en: "The message is too heavy altogether. Maximum: {0} MB",
+    ru: "Сообщение слишком тяжёлое целиком. Максимум: {0} МБ",
+    am: "Հաղորդագրությունը չափազանց ծանր է։ Առավելագույնը՝ {0} ՄԲ",
+  },
+  "support.file.fixBeforeSending": {
+    en: "Remove the files marked in red to send this message.",
+    ru: "Уберите отмеченные красным файлы, чтобы отправить сообщение.",
+    am: "Հեռացրեք կարմիրով նշված ֆայլերը՝ հաղորդագրությունն ուղարկելու համար։",
+  },
+  "support.file.remove": { en: "Remove file", ru: "Убрать файл", am: "Հեռացնել ֆայլը" },
   "support.attach": { en: "Attach a file", ru: "Прикрепить файл", am: "Կցել ֆայլ" },
   "support.send": { en: "Send", ru: "Отправить", am: "Ուղարկել" },
   "support.retry": { en: "Retry", ru: "Повторить", am: "Կրկնել" },
@@ -149,6 +183,15 @@ export const TRANSLATIONS: Dict = {
   "support.role.company_owner": { en: "Owner", ru: "Владелец", am: "Սեփականատեր" },
   "support.role.manager": { en: "Manager", ru: "Менеджер", am: "Մենեջեր" },
   "support.role.admin": { en: "Admin", ru: "Админ", am: "Ադմին" },
+  "session.createProduct": { en: "New product", ru: "Создать товар", am: "Ստեղծել ապրանք" },
+  "session.createProductHint": {
+    en: "Not stocked yet? Create it — it joins the catalogue and this bill.",
+    ru: "Товара ещё нет? Создайте — он появится в каталоге и в этом счёте.",
+    am: "Ապրանքը դեռ չկա՞։ Ստեղծեք — այն կհայտնվի կատալոգում և այս հաշվին։",
+  },
+  "session.removeFromBill": { en: "Remove from the bill", ru: "Убрать из счёта", am: "Հեռացնել հաշվից" },
+  "session.removedOne": { en: "{0} removed", ru: "Товар «{0}» успешно удалён", am: "«{0}» ապրանքը հեռացվեց" },
+  "session.removeFailed": { en: "Could not remove the product.", ru: "Не удалось удалить товар.", am: "Չհաջողվեց հեռացնել ապրանքը։" },
   "session.addItem": { en: "Add a product", ru: "Добавить товар", am: "Ավելացնել ապրանք" },
   "session.availableProducts": { en: "Available products", ru: "Доступные товары", am: "Հասանելի ապրանքներ" },
   "session.addedProducts": { en: "Added products", ru: "Добавленные товары", am: "Ավելացված ապրանքներ" },
@@ -208,10 +251,7 @@ export const TRANSLATIONS: Dict = {
     am: "սերվերը պատճառ չնշեց:",
   },
   "session.search": { en: "Search by name…", ru: "Поиск по названию…", am: "Որոնում անունով…" },
-  "session.noProducts": { en: "No products in this branch yet. Add a custom item below.", ru: "В этом филиале ещё нет товаров. Добавьте произвольный товар ниже.", am: "Այս մասնաճյուղում ապրանքներ չկան: Ավելացրեք ձեռքով ապրանք ներքևում:" },
-  "session.customItem": { en: "Or a custom item", ru: "Или произвольный товар", am: "Կամ ձեռքով ապրանք" },
-  "session.itemName": { en: "Name (e.g. Lays)", ru: "Название (например, Лейс)", am: "Անվանում (օր. Լեյս)" },
-  "session.itemPrice": { en: "Price", ru: "Цена", am: "Գին" },
+  "session.noProducts": { en: "No products in this branch yet — create the first one below.", ru: "В этом филиале ещё нет товаров — создайте первый ниже.", am: "Այս մասնաճյուղում ապրանքներ դեռ չկան — ստեղծեք առաջինը ներքևում։" },
   "session.added": { en: "Added", ru: "Добавлено", am: "Ավելացված է" },
   "session.checkoutTitle": { en: "Close session", ru: "Закрыть сессию", am: "Փակել նիստը" },
   "session.checkoutDone": { en: "Receipt closed", ru: "Чек закрыт", am: "Հաշիվը փակված է" },
@@ -220,7 +260,6 @@ export const TRANSLATIONS: Dict = {
   "session.totalDue": { en: "Total to pay", ru: "Итого к оплате", am: "Ընդամենը վճարման" },
   "session.confirmStop": { en: "Confirm and close", ru: "Подтвердить и закрыть", am: "Հաստատել և փակել" },
   "session.closing": { en: "Closing…", ru: "Закрываем…", am: "Փակվում է…" },
-  "session.fillNamePrice": { en: "Provide a name and price", ru: "Укажите название и цену", am: "Նշեք անվանումը և գինը" },
   "session.fixedTariff": { en: "Fixed tariff", ru: "Фиксированный тариф", am: "Ֆիքսված սակագին" },
   "session.openByHour": { en: "By hour (open)", ru: "По часам (открытая)", am: "Ժամով (բաց)" },
   "session.tariffField": { en: "Tariff", ru: "Тариф", am: "Սակագին" },
@@ -389,10 +428,6 @@ export const TRANSLATIONS: Dict = {
   "hub.invalidId": { en: "Invalid branch id.", ru: "Неверный идентификатор филиала.", am: "Մասնաճյուղի սխալ ID:" },
   "hub.tile.sessions": { en: "Sessions", ru: "Сессии", am: "Նիստեր" },
   "hub.tile.sessionsHint": { en: "Start / stop · billing", ru: "Старт / стоп · биллинг", am: "Մեկնարկ / ավարտ · վճարում" },
-  "hub.tile.pos": { en: "POS", ru: "Касса", am: "Դրամարկղ" },
-  "hub.tile.posHint": { en: "Sell drinks & snacks", ru: "Продажа напитков и снеков", am: "Ըմպելիք և խորտիկներ" },
-  "hub.tile.shift": { en: "Shift", ru: "Смена", am: "Հերթափոխ" },
-  "hub.tile.shiftHint": { en: "Open / close · Z-report", ru: "Открыть / закрыть · Z-отчёт", am: "Բացել / փակել · Z-հաշվետվություն" },
   "hub.tile.members": { en: "Members", ru: "Клиенты", am: "Անդամներ" },
   "hub.tile.membersHint": { en: "Cards & deposits", ru: "Карты и депозиты", am: "Քարտեր և ավանդներ" },
   "hub.tile.places": { en: "Places", ru: "Места", am: "Տեղեր" },
@@ -427,7 +462,7 @@ export const TRANSLATIONS: Dict = {
     am: "Համընկնումներ չեն գտնվել:",
   },
   "hub.tile.products": { en: "Products", ru: "Товары", am: "Ապրանքներ" },
-  "hub.tile.productsHint": { en: "POS catalog", ru: "Каталог кассы", am: "Դրամարկղի կատալոգ" },
+  "hub.tile.productsHint": { en: "Sold on the session bill", ru: "Продаются в счёт сессии", am: "Վաճառվում են սեանսի հաշվին" },
   "hub.tile.managers": { en: "Managers", ru: "Менеджеры", am: "Մենեջերներ" },
   "hub.tile.managersHint": { en: "Branch staff", ru: "Сотрудники филиала", am: "Մասնաճյուղի անձնակազմ" },
   "hub.tile.tournaments": { en: "Tournaments", ru: "Турниры", am: "Մրցաշարեր" },
@@ -457,7 +492,11 @@ export const TRANSLATIONS: Dict = {
   "switchAccount.done": { en: "Signed in as {0}", ru: "Вы вошли как {0}", am: "Մուտք գործեցիք որպես {0}" },
 
   // Sessions history
-  "history.title": { en: "Sessions history", ru: "История сессий", am: "Սեանսների պատմություն" },
+  // "Sales history", not "Sessions history": the screen summarises what a
+  // branch TOOK over a period — sessions closed, items sold, money — rather
+  // than listing sessions as events. The old name sent people looking for a
+  // log and made the revenue tiles beneath it read as a surprise.
+  "history.title": { en: "Sales history", ru: "История торговли", am: "Վաճառքների պատմություն" },
   "history.from": { en: "From", ru: "С", am: "Սկսած" },
   "history.to": { en: "To", ru: "По", am: "Մինչև" },
   "history.today": { en: "Today", ru: "Сегодня", am: "Այսօր" },
@@ -561,23 +600,7 @@ export const TRANSLATIONS: Dict = {
   "pcs.statusOnline": { en: "Online", ru: "В сети", am: "Առցանց" },
   "pcs.statusOffline": { en: "Offline", ru: "Не в сети", am: "Անցանց" },
 
-  // Shift panel — extends existing shift.* block above with strings the
-  // ShiftPanel route needs in addition to the legacy minimal set.
-  "shift.confirmClose": { en: "Close this shift? After close it cannot be modified.", ru: "Закрыть смену? После закрытия её нельзя изменить.", am: "Փակե՞լ հերթափոխը: Փակվելուց հետո չի կարելի փոփոխել:" },
-  "shift.failed": { en: "Failed", ru: "Сбой", am: "Ձախողվեց" },
-  "shift.openingCash": { en: "Opening cash", ru: "Касса на старте", am: "Մեկնարկային կանխիկ" },
-  "shift.opening": { en: "Opening…", ru: "Открытие…", am: "Բացում…" },
-  "shift.opened": { en: "Opened", ru: "Открыта", am: "Բացված" },
-  "shift.sessionsRevenue": { en: "Sessions revenue", ru: "Выручка по сессиям", am: "Սեանսների եկամուտ" },
-  "shift.ordersCash": { en: "Orders — cash", ru: "Заказы — наличные", am: "Պատվերներ — կանխիկ" },
-  "shift.ordersCard": { en: "Orders — card", ru: "Заказы — карта", am: "Պատվերներ — քարտ" },
-  "shift.ordersDeposit": { en: "Orders — deposit", ru: "Заказы — депозит", am: "Պատվերներ — ավանդ" },
-  "shift.expectedCash": { en: "Expected cash drawer", ru: "Ожидаемая наличность", am: "Ակնկալվող կանխիկ" },
-  "shift.grossTotal": { en: "Gross total", ru: "Итого выручка", am: "Ընդհանուր եկամուտ" },
-  "shift.closeTitle": { en: "Close shift (Z-report)", ru: "Закрыть смену (Z-отчёт)", am: "Փակել հերթափոխը (Z-հաշվետվություն)" },
-  "shift.declaredCash": { en: "Declared cash (counted)", ru: "Заявленные наличные (по факту)", am: "Հայտարարված կանխիկ (հաշվարկված)" },
-  "shift.notes": { en: "Notes", ru: "Примечания", am: "Նշումներ" },
-  "shift.closing": { en: "Closing…", ru: "Закрытие…", am: "Փակում…" },
+  "action.failed": { en: "Failed", ru: "Сбой", am: "Ձախողվեց" },
 
   // Settings extras
   "settings.role": { en: "Role", ru: "Роль", am: "Դեր" },
@@ -683,20 +706,23 @@ export const TRANSLATIONS: Dict = {
   "companiesList.branchesShort": { en: "branches", ru: "филиалы", am: "մասնաճյուղեր" },
   "revenue.title": { en: "Revenue & commission", ru: "Выручка и комиссия", am: "Եկամուտ և միջնորդավճար" },
   "revenue.pickCompany": { en: "— pick a company —", ru: "— выберите компанию —", am: "— ընտրեք ընկերություն —" },
+  "revenue.noCompany": {
+    en: "This account is not attached to a company.",
+    ru: "К этому аккаунту не привязана компания.",
+    am: "Այս հաշիվը կապված չէ ընկերության հետ։",
+  },
   "revenue.pickHint": { en: "Pick a company to see its monthly revenue and commission.", ru: "Выберите компанию, чтобы увидеть её месячную выручку и комиссию.", am: "Ընտրեք ընկերություն՝ ամսական եկամուտ և միջնորդավճար տեսնելու համար:" },
-  "revenue.operationalTitle": { en: "Operational revenue (sessions + POS)", ru: "Операционная выручка (сессии + касса)", am: "Գործառնական եկամուտ (սեանս + դրամարկղ)" },
+  // The heading of the only revenue figure there is now. It used to say
+  // "sessions + POS" beside a second block that computed a different
+  // commission from bookings; that block is gone, and so is the ambiguity
+  // about which number the owner actually owes on.
+  "revenue.operationalTitle": { en: "Revenue from closed sessions", ru: "Выручка по закрытым сессиям", am: "Եկամուտ փակված սեանսներից" },
+  "revenue.closedSessions": { en: "Closed sessions", ru: "Закрытых сессий", am: "Փակված սեանսներ" },
   "revenue.sourceSessions": { en: "Sessions", ru: "Сессии", am: "Սեանսներ" },
   "revenue.sourcePos": { en: "POS orders", ru: "Заказы кассы", am: "Դրամարկղի վաճառք" },
   "revenue.gross": { en: "Gross", ru: "Итого выручка", am: "Ընդհանուր" },
   "revenue.commissionPercent": { en: "Commission", ru: "Комиссия", am: "Միջնորդավճար" },
   "revenue.amountOwed": { en: "You owe us this period", ru: "К оплате за период", am: "Վճարման ենթակա ժամանակահատվածում" },
-  "revenue.bookingsTitle": { en: "Bookings (advisory)", ru: "Брони (справочно)", am: "Ամրագրումներ (տեղեկատու)" },
-  "revenue.bookingsHint": { en: "not billed", ru: "в счёт не идёт", am: "չի հաշվարկվում" },
-  "revenue.period": { en: "Period", ru: "Период", am: "Ժամանակահատված" },
-  "revenue.completedBookings": { en: "Completed bookings", ru: "Завершённые брони", am: "Ավարտված ամրագրումներ" },
-  "revenue.amountDue": { en: "Implied amount", ru: "Расчётная сумма", am: "Հաշվարկային գումար" },
-  "revenue.fromConfig": { en: "From company config", ru: "Из настроек компании", am: "Ընկերության կարգավորումներից" },
-  "revenue.storedLocally": { en: "Stored locally on this device.", ru: "Хранится локально на этом устройстве.", am: "Պահված է տեղական այս սարքում:" },
 
   // Managers
   "managers.title": { en: "Managers", ru: "Менеджеры", am: "Մենեջերներ" },
@@ -1021,22 +1047,6 @@ export const TRANSLATIONS: Dict = {
     ru: "Ничего не найдено.",
     am: "Ոչինչ չի գտնվել:",
   },
-
-  "shift.title": { en: "Shift", ru: "Смена", am: "Հերթափոխ" },
-  "shift.open": { en: "Open shift", ru: "Открыть смену", am: "Բացել հերթափոխը" },
-  "shift.close": { en: "Close shift", ru: "Закрыть смену", am: "Փակել հերթափոխը" },
-  "shift.openingFloat": { en: "Opening cash float", ru: "Сумма в кассе при открытии", am: "Բացման կանխիկ գումար" },
-  "shift.closingCash": { en: "Closing cash counted", ru: "Подсчитанная сумма при закрытии", am: "Փակման հաշվարկած գումար" },
-  "shift.summary": { en: "Z-report", ru: "Z-отчёт", am: "Z-հաշվետվություն" },
-  "shift.noActive": { en: "No open shift right now.", ru: "Открытой смены нет.", am: "Բաց հերթափոխ չկա:" },
-
-  "pos.title": { en: "POS terminal", ru: "Касса", am: "Դրամարկղ" },
-  "pos.cart": { en: "Cart", ru: "Корзина", am: "Զամբյուղ" },
-  "pos.cartEmpty": { en: "Cart is empty", ru: "Корзина пуста", am: "Զամբյուղը դատարկ է" },
-  "pos.checkout": { en: "Checkout", ru: "Оплатить", am: "Վճարել" },
-  "pos.payment": { en: "Payment method", ru: "Способ оплаты", am: "Վճարման եղանակ" },
-  "pos.cash": { en: "Cash", ru: "Наличные", am: "Կանխիկ" },
-  "pos.subtotal": { en: "Subtotal", ru: "Подытог", am: "Միջանկյալ" },
   "pos.total": { en: "Total", ru: "Итого", am: "Ընդամենը" },
 
   // Branch edit / open hours / prices page
@@ -1248,8 +1258,6 @@ export const TRANSLATIONS: Dict = {
 
   // Branch hub tiles
   "tile.sessions": { en: "Sessions", ru: "Сессии", am: "Նիստեր" },
-  "tile.pos": { en: "POS", ru: "Касса", am: "Դրամարկղ" },
-  "tile.shift": { en: "Shift", ru: "Смена", am: "Հերթափոխ" },
   "tile.members": { en: "Members", ru: "Клиенты", am: "Հաճախորդներ" },
   "tile.places": { en: "Places", ru: "Места", am: "Տեղեր" },
   "tile.pcs": { en: "PCs", ru: "ПК", am: "Համակարգիչներ" },
@@ -1318,9 +1326,9 @@ export const TRANSLATIONS: Dict = {
 
   "home.menu.branches": { en: "Branches", ru: "Филиалы", am: "Մասնաճյուղեր" },
   "home.menu.branchesSub": {
-    en: "Live, sessions, POS, members",
-    ru: "Мониторинг, сеансы, касса, игроки",
-    am: "Մոնիթորինգ, սեանսներ, դրամարկղ, խաղացողներ",
+    en: "Live, sessions, products, members",
+    ru: "Мониторинг, сеансы, товары, игроки",
+    am: "Մոնիթորինգ, սեանսներ, ապրանքներ, խաղացողներ",
   },
   "home.menu.bookings": {
     en: "Bookings",
@@ -1348,9 +1356,9 @@ export const TRANSLATIONS: Dict = {
     am: "Իմ մասնաճյուղը",
   },
   "home.menu.myBranchSub": {
-    en: "Sessions, POS, shift, members",
-    ru: "Сеансы, касса, смена, клиенты",
-    am: "Սեանսներ, դրամարկղ, հերթափոխ, հաճախորդներ",
+    en: "Sessions, products, members",
+    ru: "Сеансы, товары, клиенты",
+    am: "Սեանսներ, ապրանքներ, հաճախորդներ",
   },
   "home.menu.expenses": {
     en: "Expenses",
@@ -1956,21 +1964,6 @@ export const TRANSLATIONS: Dict = {
   "billing.markPaid": { en: "Mark as paid", ru: "Отметить оплаченным", am: "Նշել վճարված" },
 
   // PosTerminal
-  "pos.paid": { en: "Paid {0} ({1})", ru: "Оплачено {0} ({1})", am: "Վճարված {0} ({1})" },
-  "pos.checkoutFailed": { en: "Checkout failed", ru: "Не удалось провести оплату", am: "Վճարումը ձախողվեց" },
-  "pos.noProducts": { en: "No active products. Add some in the Products page.", ru: "Нет активных товаров. Добавьте их на странице «Товары».", am: "Ակտիվ ապրանքներ չկան: Ավելացրեք դրանք «Ապրանքներ» էջում:" },
-  "pos.processing": { en: "Processing…", ru: "Обработка…", am: "Մշակում…" },
-  "pos.charge": { en: "Charge {0}", ru: "Списать {0}", am: "Գանձել {0}" },
-  "pos.otherCategory": { en: "Other", ru: "Прочее", am: "Այլ" },
-  "pos.terminalTab": { en: "Terminal", ru: "Терминал", am: "Տերմինալ" },
-  "pos.historyTab": { en: "History", ru: "История", am: "Պատմություն" },
-  "pos.histCount": { en: "Orders", ru: "Продажи", am: "Վաճառքներ" },
-  "pos.histSum": { en: "Revenue", ru: "Выручка", am: "Հասույթ" },
-  "pos.histEmpty": { en: "No orders in this period.", ru: "Нет продаж за выбранный период.", am: "Ընտրված ժամանակահատվածում վաճառքներ չկան:" },
-  "pos.statusPaid": { en: "Paid", ru: "Оплачено", am: "Վճարված" },
-  "pos.statusVoided": { en: "Voided", ru: "Отменён", am: "Չեղарկված" },
-  "pos.cashier": { en: "Cashier", ru: "Кассир", am: "Գանձապահ" },
-  "pos.shift": { en: "Shift", ru: "Смена", am: "Հերթափոխ" },
 
   // Company country picker + TIN validation
   "company.selectCountry": { en: "— select country —", ru: "— выберите страну —", am: "— ընտրեք երկիր —" },

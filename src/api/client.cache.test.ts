@@ -19,6 +19,11 @@ const jsonResponse = (body: unknown, etag = 'W/"v1"') =>
 
 const notModified = () => new Response(null, { status: 304 });
 
+/** Wait until the background revalidation has actually finished. */
+const settle = async (): Promise<void> => {
+  for (let i = 0; i < 20; i++) await new Promise((r) => setTimeout(r, 0));
+};
+
 describe("request() caching", () => {
   let fetchMock: ReturnType<typeof vi.fn>;
 
@@ -33,14 +38,66 @@ describe("request() caching", () => {
     apiCache.clear();
   });
 
-  it("serves a repeat read without touching the network", async () => {
-    fetchMock.mockResolvedValueOnce(jsonResponse({ data: [{ id: 1 }] }));
+  /**
+   * The rule changed on 2026-08-31, deliberately.
+   *
+   * A repeat read is still answered from memory — that is what makes moving
+   * between screens instant — but it no longer means silence. Serving the
+   * cached copy alone left an operator working from data up to a minute old
+   * whenever somebody ELSE changed it, because inside the freshness window no
+   * request left the machine at all.
+   */
+  it("answers a repeat read from memory, without waiting for the network", async () => {
+    fetchMock.mockImplementation(async () => jsonResponse({ data: [{ id: 1 }] }));
 
     const first = await request("/products");
+    const callsAfterFirst = fetchMock.mock.calls.length;
     const second = await request("/products");
 
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    // The answer came from the cache: identical, and not from a fresh parse of
+    // a second body the caller waited for.
     expect(second).toEqual(first);
+    expect(callsAfterFirst).toBe(1);
+  });
+
+  it("asks the server anyway, in the background, so somebody else's change lands", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({ data: [{ id: 1 }] }));
+    await request("/products");
+
+    // Somebody edits the catalogue elsewhere; our copy is still inside its
+    // freshness window and would once have been served for another minute.
+    fetchMock.mockResolvedValueOnce(jsonResponse({ data: [{ id: 1 }, { id: 2 }] }));
+    const changed: string[] = [];
+    const stop = apiCache.subscribe((key) => changed.push(key));
+
+    await request("/products");
+    await settle();
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    // The screen is told, once, and only because the body actually differed.
+    expect(changed).toEqual(["/products"]);
+    // And the next read is the new one.
+    expect(await request("/products")).toEqual({ data: [{ id: 1 }, { id: 2 }] });
+    stop();
+  });
+
+  it("an unchanged answer notifies nobody", async () => {
+    // A fresh Response per call, deliberately: a body can only be read once,
+    // and reusing one instance would make the background revalidation fail
+    // silently — the test would then pass by never exercising the path.
+    fetchMock.mockImplementation(async () => jsonResponse({ data: [{ id: 1 }] }));
+    await request("/products");
+
+    const changed: string[] = [];
+    const stop = apiCache.subscribe((key) => changed.push(key));
+    await request("/products");
+    await settle();
+
+    // The revalidation DID happen — this is not passing by never asking.
+    expect(fetchMock.mock.calls.length).toBeGreaterThan(1);
+    // And it came back the same, so it must not re-render the screen.
+    expect(changed).toEqual([]);
+    stop();
   });
 
   it("hands each caller its own object so one screen cannot corrupt another", async () => {
@@ -93,12 +150,22 @@ describe("request() caching", () => {
     fetchMock.mockResolvedValueOnce(jsonResponse({ data: [] }));
     await request("/products");
 
+    // Aged past its TTL: the next read must revalidate and WAIT for the answer.
     apiCache.lookup("/products")!.storedAt -= 10 * 60 * 1000;
     fetchMock.mockResolvedValueOnce(notModified());
     await request("/products");
-
-    await request("/products");
     expect(fetchMock).toHaveBeenCalledTimes(2);
+
+    // Fresh again, so the third read is answered from memory — and, as of the
+    // stale-data fix, revalidated in the background rather than in silence.
+    fetchMock.mockResolvedValueOnce(notModified());
+    await request("/products");
+    await settle();
+
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    // The last call was conditional — that is what makes it nearly free.
+    const headers = fetchMock.mock.calls[2][1]?.headers as Record<string, string>;
+    expect(headers["If-None-Match"]).toBeTruthy();
   });
 
   it("a write by this client invalidates its own next read", async () => {

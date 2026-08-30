@@ -78,7 +78,7 @@ const PcsList = () => {
         notify.message("success", parts.join(" · "));
       }
     } catch (e) {
-      notify.message("error", fmt(t("pcs.wakeFailed"), e instanceof Error ? e.message : t("shift.failed")));
+      notify.message("error", fmt(t("pcs.wakeFailed"), e instanceof Error ? e.message : t("action.failed")));
     } finally { setWaking(null); }
   };
 

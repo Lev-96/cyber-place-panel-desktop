@@ -19,7 +19,10 @@ import AddSessionItemDialog from "./AddSessionItemDialog";
 const repo = vi.hoisted(() => ({
   addItems: vi.fn(),
   listProducts: vi.fn(),
+  removeItem: vi.fn(),
 }));
+/** Stands in for the Products screen's own form. */
+const form = vi.hoisted(() => ({ saved: null as ((p: unknown) => void) | null }));
 
 vi.mock("@/repositories/SessionRepository", () => ({
   sessionRepository: {
@@ -27,7 +30,13 @@ vi.mock("@/repositories/SessionRepository", () => ({
     // Present so a stray call would be visible as a failure, not a crash.
     addItem: vi.fn(),
     setItemQty: vi.fn(),
-    removeItem: vi.fn(),
+    removeItem: (...a: unknown[]) => repo.removeItem(...a),
+  },
+}));
+vi.mock("@/components/products/ProductForm", () => ({
+  default: ({ onSaved }: { onSaved: (p: unknown) => void }) => {
+    form.saved = onSaved;
+    return <div data-testid="product-form" />;
   },
 }));
 vi.mock("@/repositories/ProductRepository", () => ({
@@ -182,5 +191,82 @@ describe("AddSessionItemDialog — the basket", () => {
 
     fireEvent.click(confirmButton());
     expect(repo.addItems).toHaveBeenCalledTimes(1);
+  });
+});
+
+/**
+ * The two things this dialog gained: a branch with an empty catalogue can start
+ * one from here, and a line already on the bill can come off it.
+ */
+describe("creating a product from the basket", () => {
+  test("the new product joins the catalogue AND the basket, in one action", async () => {
+    repo.listProducts.mockResolvedValue([]);
+    await mount();
+
+    // Nothing to sell yet — this is the case the button exists for.
+    expect(screen.getByText("session.noProducts")).toBeTruthy();
+
+    fireEvent.click(screen.getByText("session.createProduct"));
+    expect(screen.getByTestId("product-form")).toBeTruthy();
+
+    await act(async () => {
+      form.saved?.({ id: 77, branch_id: 1, name: "Espresso", category: "Drinks", price: 500, is_active: true });
+    });
+
+    // Two places, which is the whole point: the catalogue row (with its own
+    // plus) and the basket line beneath it.
+    expect(plusFor("Espresso")).toBeTruthy();
+    expect(screen.getAllByText("Espresso")).toHaveLength(2);
+    expect(confirmButton().disabled).toBe(false);
+    // Still nothing written to the session: the basket is a decision.
+    expect(repo.addItems).not.toHaveBeenCalled();
+  });
+
+  test("confirming afterwards sends the created product by id, not as a loose line", async () => {
+    repo.listProducts.mockResolvedValue([]);
+    repo.addItems.mockResolvedValue({});
+    await mount();
+
+    fireEvent.click(screen.getByText("session.createProduct"));
+    await act(async () => {
+      form.saved?.({ id: 77, branch_id: 1, name: "Espresso", category: "Drinks", price: 500, is_active: true });
+    });
+    await act(async () => { fireEvent.click(confirmButton()!); });
+
+    expect(repo.addItems).toHaveBeenCalledWith(42, [{ product_id: 77, qty: 1 }]);
+  });
+});
+
+describe("taking a line off the bill", () => {
+  const withBill = { ...session, items: [{ id: 5, name: "Cola", qty: 2, price: 300 }] } as unknown as ISessionApi;
+
+  test("it goes to the server at once and says so in red", async () => {
+    repo.listProducts.mockResolvedValue(products);
+    repo.removeItem.mockResolvedValue({});
+    const { onAdded } = await mount({ session: withBill });
+
+    await act(async () => { fireEvent.click(screen.getByLabelText("action.delete: Cola")); });
+
+    expect(repo.removeItem).toHaveBeenCalledWith(42, 5);
+    expect(toasts.message).toHaveBeenCalledWith("error", expect.stringContaining("session.removedOne"));
+    // The screen behind is told, so the bill it shows is the bill there is.
+    expect(onAdded).toHaveBeenCalled();
+    // And the line is off THIS dialog too: the parent's refresh does not reach
+    // an open modal, and a line that stays looks like a removal that failed.
+    expect(screen.queryByLabelText("action.delete: Cola")).toBeNull();
+  });
+
+  test("a refusal does not claim the line was removed", async () => {
+    repo.listProducts.mockResolvedValue(products);
+    repo.removeItem.mockRejectedValue(new Error("session is no longer active"));
+    const { onAdded } = await mount({ session: withBill });
+
+    await act(async () => { fireEvent.click(screen.getByLabelText("action.delete: Cola")); });
+
+    const said = toasts.message.mock.calls.map((c) => String(c[1])).join(" | ");
+    expect(said).toContain("session.removeFailed");
+    expect(said).toContain("session is no longer active");
+    expect(said).not.toContain("session.removedOne");
+    expect(onAdded).not.toHaveBeenCalled();
   });
 });

@@ -1,3 +1,4 @@
+import { apiCache } from "@/api/client";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 interface State<T> { data: T | null; loading: boolean; error: Error | null; }
@@ -13,6 +14,12 @@ interface State<T> { data: T | null; loading: boolean; error: Error | null; }
  *
  * 2. Resolution after unmount is dropped silently — no setState on a dead
  *    component (no React warning, no leaked re-renders).
+ *
+ * 3. A background refresh reaches the screen. The HTTP cache revalidates what
+ *    it serves and says so when a body genuinely changed — usually because
+ *    somebody else edited it. This re-runs then, which costs no network (the
+ *    cache is already fresh) and one render, and is what stops a screen
+ *    showing data that was correct a minute ago.
  *
  * The public shape (`{data, loading, error, reload}`) is unchanged.
  */
@@ -45,6 +52,10 @@ export const useAsync = <T,>(fn: () => Promise<T>, deps: unknown[]) => {
   }, deps);
 
   useEffect(() => { void run(); }, [run]);
+
+  // Only ever fires when a cached response actually differs from what was
+  // held, so an unchanged endpoint re-renders nothing.
+  useEffect(() => apiCache.subscribe(() => { void run(); }), [run]);
 
   return { ...state, reload: run };
 };

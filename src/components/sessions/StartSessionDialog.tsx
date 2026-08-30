@@ -1,3 +1,4 @@
+import { ListSkeleton } from "@/components/ui/Skeleton";
 import Button from "@/components/ui/Button";
 import Modal from "@/components/ui/Modal";
 import Checkbox from "@/components/ui/Checkbox";
@@ -169,7 +170,7 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
     <Modal open onClose={onClose}>
       <div className="card" style={{ width: 460, maxWidth: "90vw", display: "flex", flexDirection: "column", gap: 14 }}>
         <h2 style={{ margin: 0 }}>{t("session.start")} · №{pc.place?.number ?? pc.label}{isPs(pc.kind) ? " (PS)" : ""}</h2>
-        {!packages ? <Spinner /> : (
+        {!packages ? <ListSkeleton rows={3} /> : (
           <>
             <div className="row" style={{ gap: 8 }}>
               <button type="button" onClick={() => setMode("fixed")} style={tabStyle(mode === "fixed")} disabled={isPs(pc.kind)}>

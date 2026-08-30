@@ -1,3 +1,4 @@
+import { SkeletonStats } from "@/components/ui/Skeleton";
 import CompanyRevenueScreen from "@/components/revenue/CompanyRevenueScreen";
 import Spinner from "@/components/ui/Spinner";
 import { useAsync } from "@/hooks/useAsync";
@@ -12,7 +13,7 @@ const CompanyRevenue = () => {
   const { data: company, loading, error } = useAsync(() => companyRepository.byId(id), [id]);
 
   if (!Number.isFinite(id) || id <= 0) return <div className="error">{t("error.invalidCompanyId")}</div>;
-  if (loading) return <Spinner />;
+  if (loading) return <SkeletonStats tiles={3} />;
   if (error) return <div className="error">{error.message}</div>;
   const initialPercent = company?.raw?.commission_percent;
   const percent = initialPercent != null && initialPercent !== "" ? Number(initialPercent) : undefined;

@@ -89,7 +89,6 @@ export type Permission =
   // cashier ops (everyone with a branch can do these)
   | "session.start"
   | "session.stop"
-  | "pos.charge"
   /**
    * Cashier shifts — open, close, Z-report. Declared since the first version of
    * this map and read by nothing until now; the section was open to everyone.
@@ -98,7 +97,6 @@ export type Permission =
    * (`orders.cashier_shift_id` is nullable), so a manager who cannot open one
    * can still ring up a customer.
    */
-  | "shift.open"
   /**
    * Administratively block a company / a single branch: it disappears from the
    * player-facing app, takes no bookings, and its staff cannot sign in.
@@ -125,7 +123,7 @@ const PERMS: Record<Role, ReadonlySet<Permission>> = {
     "company.block", "branch.block",
     "manager.create", "manager.delete",
     "game.crud", "game.crud.branch", "expenses.crud",
-    "session.start", "session.stop", "pos.charge", "shift.open",
+    "session.start", "session.stop",
   ]),
   company_owner: new Set<Permission>([
     "menu.branches", "menu.managers", "menu.tournaments", "menu.scan", "menu.map",
@@ -141,7 +139,7 @@ const PERMS: Record<Role, ReadonlySet<Permission>> = {
     "game.crud.branch",
     "company.edit",
     "manager.create", "manager.delete",
-    "session.start", "session.stop", "pos.charge", "shift.open",
+    "session.start", "session.stop",
   ]),
   manager: new Set<Permission>([
     // Manager = single-branch floor staff, and the floor is what they get: run
@@ -158,7 +156,7 @@ const PERMS: Record<Role, ReadonlySet<Permission>> = {
     // the place form's inline "create game" dead-ends without it. Branch-scoped
     // only — never the shared catalogue.
     "game.crud.branch",
-    "session.start", "session.stop", "pos.charge",
+    "session.start", "session.stop",
   ]),
 };
 

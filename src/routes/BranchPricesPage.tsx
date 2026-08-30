@@ -1,3 +1,4 @@
+import { ListSkeleton, SkeletonForm } from "@/components/ui/Skeleton";
 import HourlyRatesForm from "@/components/branches/HourlyRatesForm";
 import PackageForm from "@/components/packages/PackageForm";
 import PlatformPricesForm from "@/components/prices/PlatformPricesForm";
@@ -70,7 +71,7 @@ const BranchPricesPage = () => {
         <h2 className="page-title" style={{ margin: 0 }}>
           {t("branch.prices.title")}
         </h2>
-        {branch.loading && <Spinner />}
+        {branch.loading && <SkeletonForm fields={3} />}
         {branch.error && <div className="error">{branch.error.message}</div>}
         {branch.data && (
           <HourlyRatesForm branch={branch.data} onSaved={() => void branch.reload()} />
@@ -118,7 +119,7 @@ const BranchPricesPage = () => {
           </h2>
           <Button onClick={() => setCreating(true)}>{t("tariffs.new")}</Button>
         </div>
-        {packages.loading && <Spinner />}
+        {packages.loading && <ListSkeleton rows={4} />}
         {packages.error && <div className="error">{packages.error.message}</div>}
         {!packages.loading && !packages.error && (
           <div className="list">

@@ -1,3 +1,4 @@
+import { SkeletonCard } from "@/components/ui/Skeleton";
 import { useAuth } from "@/auth/AuthContext";
 import { can } from "@/auth/permissions";
 import BlockToggle from "@/components/blocking/BlockToggle";
@@ -24,7 +25,7 @@ const CompanyDetails = () => {
   const [addingBranch, setAddingBranch] = useState(false);
 
   if (!Number.isFinite(id) || id <= 0) return <div className="error">{t("company.invalidId")}</div>;
-  if (loading) return <Spinner />;
+  if (loading) return <SkeletonCard lines={5} />;
   if (error) return <div className="error">{error.message}</div>;
   if (!company) return null;
 

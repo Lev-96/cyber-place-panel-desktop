@@ -1,3 +1,4 @@
+import { SkeletonStats } from "@/components/ui/Skeleton";
 import { ITelemetryCount, ITelemetrySummary, TelemetryApp } from "@/api/telemetry";
 import { MetrikaPeriod } from "@/api/metrika";
 import Button from "@/components/ui/Button";
@@ -30,7 +31,7 @@ const TelemetrySection = ({ app, period }: { app: TelemetryApp; period: MetrikaP
     [app, period],
   );
 
-  if (loading && !data) return <Spinner />;
+  if (loading && !data) return <SkeletonStats tiles={4} />;
 
   if (error) {
     return (

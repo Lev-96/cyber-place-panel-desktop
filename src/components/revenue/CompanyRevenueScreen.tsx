@@ -1,12 +1,9 @@
+import { SkeletonStats } from "@/components/ui/Skeleton";
 import { apiCompanyRevenueSummary, ICompanyRevenueSummary } from "@/api/billing";
 import Spinner from "@/components/ui/Spinner";
-import { RevenueReport } from "@/domain/Revenue";
-import { formatDate, formatMonth } from "@/i18n/dates";
+import { formatMonth } from "@/i18n/dates";
 import { useLang } from "@/i18n/LanguageContext";
-import { commissionStore } from "@/services/revenue/CommissionStore";
-import { revenueCalculator } from "@/services/revenue/RevenueCalculator";
 import { useCallback, useEffect, useState } from "react";
-import CommissionInput from "./CommissionInput";
 
 interface Props {
   companyId: number;
@@ -28,41 +25,30 @@ const monthBoundsIso = (sel: { year: number; month: number }) => {
 const CompanyRevenueScreen = ({ companyId, companyName, initialPercent }: Props) => {
   const { t, money } = useLang();
   const [percent, setPercent] = useState(initialPercent ?? 0);
-  const [report, setReport] = useState<RevenueReport | null>(null);
   const [opRevenue, setOpRevenue] = useState<ICompanyRevenueSummary | null>(null);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [sel, setSel] = useState(currentMonth());
 
+  // The company record is the only source. It used to fall back to a percent
+  // kept in browser storage, which meant two machines could disagree about
+  // what a company owes — and the server, which does the arithmetic that
+  // matters, was never asked.
   useEffect(() => {
-    if (initialPercent != null && Number.isFinite(initialPercent)) {
-      setPercent(initialPercent);
-      return;
-    }
-    void commissionStore.getPercent(companyId).then(setPercent);
+    if (initialPercent != null && Number.isFinite(initialPercent)) setPercent(initialPercent);
   }, [companyId, initialPercent]);
 
   const reload = useCallback(async () => {
     setLoading(true); setErr(null);
     try {
       const bounds = monthBoundsIso(sel);
-      const [bookingsReport, op] = await Promise.all([
-        revenueCalculator.forCompanyMonth(companyId, sel, percent),
-        apiCompanyRevenueSummary(companyId, bounds).catch(() => null),
-      ]);
-      setReport(bookingsReport);
-      setOpRevenue(op);
+      setOpRevenue(await apiCompanyRevenueSummary(companyId, bounds));
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Failed to load report");
     } finally { setLoading(false); }
   }, [companyId, sel, percent]);
 
   useEffect(() => { void reload(); }, [reload, percent]);
-
-  const onPercent = async (v: number) => {
-    setPercent(v);
-    await commissionStore.setPercent(companyId, v);
-  };
 
   const monthLabel = formatMonth(new Date(sel.year, sel.month - 1, 1));
   const shift = (delta: number) => {
@@ -82,13 +68,7 @@ const CompanyRevenueScreen = ({ companyId, companyName, initialPercent }: Props)
         <button className="month-btn" onClick={() => shift(1)}>›</button>
       </div>
 
-      <CommissionInput
-        value={percent}
-        onChange={onPercent}
-        sourceLabel={initialPercent != null ? t("revenue.fromConfig") : t("revenue.storedLocally")}
-      />
-
-      {loading && <Spinner />}
+      {loading && <SkeletonStats tiles={3} />}
       {err && <div className="error">{err}</div>}
 
       {opRevenue && !loading && (
@@ -97,8 +77,12 @@ const CompanyRevenueScreen = ({ companyId, companyName, initialPercent }: Props)
             <span className="k">{t("revenue.operationalTitle")}</span>
             <span className="v" />
           </div>
+          <Row k={t("revenue.closedSessions")} v={String(opRevenue.sessions_count ?? 0)} />
           <Row k={t("revenue.sourceSessions")} v={money(opRevenue.sessions_total)} />
-          <Row k={t("revenue.sourcePos")} v={money(opRevenue.pos_total)} />
+          {/* Till takings only ever appear for a month that had any: the
+              section is gone, so for every month from here it is zero and a
+              row of zeroes is a question nobody needs to ask. */}
+          {opRevenue.pos_total > 0 && <Row k={t("revenue.sourcePos")} v={money(opRevenue.pos_total)} />}
           <div className="divider" />
           <Row k={t("revenue.gross")} v={money(opRevenue.gross_total)} />
           <Row k={t("revenue.commissionPercent")} v={`${opRevenue.commission_percent}%`} />
@@ -106,20 +90,6 @@ const CompanyRevenueScreen = ({ companyId, companyName, initialPercent }: Props)
         </div>
       )}
 
-      {report && !loading && (
-        <div className="card col" style={{ gap: 6 }}>
-          <div className="kv-row" style={{ fontWeight: 700 }}>
-            <span className="k">{t("revenue.bookingsTitle")}</span>
-            <span className="v muted" style={{ fontSize: 11 }}>{t("revenue.bookingsHint")}</span>
-          </div>
-          <Row k={t("revenue.period")} v={`${formatDate(report.periodFrom)} — ${formatDate(report.periodTo)}`} />
-          <Row k={t("revenue.completedBookings")} v={String(report.bookingsCount)} />
-          <Row k={t("revenue.gross")} v={report.grossRevenue.format()} />
-          <div className="divider" />
-          <Row k={t("revenue.commissionPercent")} v={`${report.commissionPercent}%`} />
-          <Row k={t("revenue.amountDue")} v={report.amountDue().format()} />
-        </div>
-      )}
     </div>
   );
 };

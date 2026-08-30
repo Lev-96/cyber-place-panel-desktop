@@ -1,3 +1,4 @@
+import { ListSkeleton } from "@/components/ui/Skeleton";
 import {
   apiListBranchSubscribers,
   IBranchSubscriber,
@@ -68,7 +69,7 @@ const BranchSubscribersPage = () => {
         value={search}
         onChange={(e) => setSearch(e.target.value)}
       />
-      {loading && <Spinner />}
+      {loading && <ListSkeleton rows={6} />}
       {error && <div className="error">{error.message}</div>}
       {!loading && !error && (
         <div className="list">

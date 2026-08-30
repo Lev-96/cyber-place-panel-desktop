@@ -34,6 +34,8 @@ export interface ICompanyRevenueSummary {
   company_id: number;
   from: string;
   to: string;
+  /** How many closed sessions the figure below is made of. */
+  sessions_count: number;
   sessions_total: number;
   pos_total: number;
   gross_total: number;

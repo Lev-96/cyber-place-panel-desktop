@@ -1,3 +1,4 @@
+import { ListSkeleton } from "@/components/ui/Skeleton";
 import { apiBillingReminders, IBillingReminder } from "@/api/billing";
 import type { IServiceExpense } from "@/api/expenses";
 import { dueLabel, dueTone } from "@/components/expenses/expenseFormat";
@@ -84,7 +85,7 @@ const Notifications = () => {
     [isAdmin],
   );
 
-  if (loadingDb && list.length === 0 && billing.loading) return <Spinner />;
+  if (loadingDb && list.length === 0 && billing.loading) return <ListSkeleton rows={5} />;
   if (errorDb && list.length === 0) return <div className="error">{errorDb}</div>;
   if (billing.error && (billing.data?.data ?? []).length === 0) {
     return <div className="error">{billing.error.message}</div>;

@@ -1,3 +1,4 @@
+import { Skeleton } from "@/components/ui/Skeleton";
 import BranchMap from "@/components/map/BranchMap";
 import ScreenWithBg from "@/components/ui/ScreenWithBg";
 import Spinner from "@/components/ui/Spinner";
@@ -31,7 +32,7 @@ const BranchesMap = () => {
 
   return (
     <ScreenWithBg bg="./bg/branch.jpg" title={t("branchesMap.title")}>
-      {loading && <Spinner />}
+      {loading && <Skeleton width="100%" height={420} radius={12} />}
       {error && <div className="error">{error.message}</div>}
       {!loading && !error && (
         <>

@@ -1,4 +1,4 @@
-import ProductForm from "@/components/pos/ProductForm";
+import ProductForm from "@/components/products/ProductForm";
 import { useAuth } from "@/auth/AuthContext";
 import { can } from "@/auth/permissions";
 import { tr } from "@/i18n/translated";

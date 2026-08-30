@@ -69,12 +69,25 @@ export const request = async <Res>(
 
   const query = buildQuery(opts.params);
   const cacheKey = `${path}${query}`;
+  // Built here rather than below, because the background revalidation on the
+  // cache-hit path needs it too.
+  const url = `${AppConfig.backendUrl}${path}${query}`;
   const policy = method === "GET" && !opts.noCache ? policyFor(path) : null;
   const cached = policy ? apiCache.lookup(cacheKey) : undefined;
 
-  // Still inside its freshness window: answer without touching the
-  // network at all. This is the case that makes tab switching instant.
+  // Still inside its freshness window: answer from memory, which is what
+  // makes tab switching instant — and ask the server anyway, in the
+  // background, in case somebody else changed it.
+  //
+  // Serving the cached copy alone was how an operator ended up working from
+  // data that was up to a minute old: a change made by an admin, by another
+  // machine or from a phone reached this client only after the TTL expired,
+  // because within it no request left at all. Now the screen paints at once
+  // and corrects itself a round trip later, and the round trip is a
+  // conditional one — an unchanged answer is a 304 of a few dozen bytes that
+  // re-renders nothing.
   if (policy && cached && apiCache.age(cached) < policy.ttlMs) {
+    void revalidate(cacheKey, url, headers, cached.etag);
     return JSON.parse(cached.text) as Res;
   }
 
@@ -84,7 +97,6 @@ export const request = async <Res>(
     headers["If-None-Match"] = cached.etag;
   }
 
-  const url = `${AppConfig.backendUrl}${path}${query}`;
   const res = await fetch(url, {
     method,
     headers,
@@ -181,6 +193,47 @@ const filenameFrom = (header: string | null): string | null => {
   if (utf8) return decodeURIComponent(utf8[1]);
   const plain = /filename="?([^";]+)"?/i.exec(header);
   return plain ? plain[1] : null;
+};
+
+/**
+ * Ask whether a cached body is still current, without anybody waiting.
+ *
+ * One flight per key: a screen that mounts three components reading the same
+ * endpoint asks once. Failures are swallowed — this is an optimisation of
+ * freshness, and a network blip must not turn into an error on a screen that
+ * already has its data.
+ */
+const inFlight = new Set<string>();
+
+const revalidate = async (
+  cacheKey: string,
+  url: string,
+  headers: Record<string, string>,
+  etag: string | null,
+): Promise<void> => {
+  if (inFlight.has(cacheKey)) return;
+  inFlight.add(cacheKey);
+  try {
+    const res = await fetch(url, {
+      method: "GET",
+      headers: etag ? { ...headers, "If-None-Match": etag } : headers,
+    });
+
+    if (res.status === 304) {
+      apiCache.touch(cacheKey);
+      return;
+    }
+    if (!res.ok) return;
+
+    const text = await res.text();
+    // `replace` notifies only when the body actually differs, so an endpoint
+    // without ETags does not re-render the screen on every navigation.
+    apiCache.replace(cacheKey, text, res.headers.get("ETag"));
+  } catch {
+    /* offline, or the server hiccuped: the screen keeps what it has */
+  } finally {
+    inFlight.delete(cacheKey);
+  }
 };
 
 const safeJson = (s: string): unknown => {

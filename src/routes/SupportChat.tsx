@@ -2,7 +2,7 @@ import BranchPicker from "@/components/support/BranchPicker";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import Spinner from "@/components/ui/Spinner";
-import { ListSkeleton } from "@/components/ui/Skeleton";
+import { ListSkeleton, SkeletonMessages } from "@/components/ui/Skeleton";
 import { useAuth } from "@/auth/AuthContext";
 import { useLang } from "@/i18n/LanguageContext";
 import { formatDateTime } from "@/i18n/dates";
@@ -11,7 +11,15 @@ import { notify } from "@/ui/notify";
 import { branchRepository } from "@/repositories/BranchRepository";
 import { supportRepository } from "@/repositories/SupportRepository";
 import { useSupportMessages } from "@/realtime/useSupportMessages";
+import { fmt } from "@/i18n/translations";
 import { useSupportUnread } from "@/support/SupportUnreadContext";
+import {
+  checkAttachments,
+  formatSize,
+  hasProblem,
+  type AttachmentProblem,
+  type CheckedFile,
+} from "@/support/attachmentRules";
 import type { ISupportConversation, ISupportMessage } from "@/api/support";
 import type { IBranchApi } from "@/types/api";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -39,6 +47,24 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
  * that stops applying the moment someone calls the API directly.
  */
 
+/**
+ * Fold an arriving message into the thread, keyed on its id.
+ *
+ * A line already on screen is REPLACED rather than appended or ignored, which
+ * is what both halves of this need: a reconnect replaying an event must not
+ * double the line, and a SECOND announcement of the same message is how its
+ * delivery status arrives — the worker announces it again once Telegram has
+ * taken it, and the bubble would otherwise sit on "delivering…" until the
+ * thread was reopened.
+ */
+export const mergeMessage = (prev: ISupportMessage[], incoming: ISupportMessage): ISupportMessage[] => {
+  const at = prev.findIndex((m) => m.id === incoming.id);
+  if (at === -1) return [...prev, incoming];
+  const next = [...prev];
+  next[at] = incoming;
+  return next;
+};
+
 /** A line the user typed that has not been accepted by the server yet. */
 interface PendingMessage {
   localId: string;
@@ -65,6 +91,15 @@ const SupportChat = () => {
 
   const [draft, setDraft] = useState("");
   const [files, setFiles] = useState<File[]>([]);
+  /**
+   * The selection, judged before anything leaves the machine.
+   *
+   * Recomputed from the files themselves rather than stored: dropping one file
+   * can make another legal again (the collective limits are cumulative), and a
+   * remembered verdict would go stale the moment the list changes.
+   */
+  const checked: CheckedFile[] = useMemo(() => checkAttachments(files), [files]);
+  const attachmentsInvalid = hasProblem(checked);
   const [pending, setPending] = useState<PendingMessage[]>([]);
   const fileInput = useRef<HTMLInputElement>(null);
   const bottom = useRef<HTMLDivElement>(null);
@@ -141,9 +176,7 @@ const SupportChat = () => {
     user?.id ?? null,
     useCallback((event) => {
       if (event.conversation_id === activeId) {
-        // Dedupe by message id: a reconnect can replay an event, and the same
-        // line twice in a thread reads as support repeating itself.
-        setMessages((prev) => (prev.some((m) => m.id === event.message.id) ? prev : [...prev, event.message]));
+        setMessages((prev) => mergeMessage(prev, event.message));
         void supportRepository.markRead(event.conversation_id).then(() => refreshUnread());
       }
       void loadConversations();
@@ -211,10 +244,23 @@ const SupportChat = () => {
   const submit = async () => {
     const body = draft.trim();
     if (!body && files.length === 0) return;
+    // Belt as well as braces: the button is disabled, and an Enter press or a
+    // stale render cannot get past this either.
+    if (attachmentsInvalid) return;
     setDraft("");
     setFiles([]);
     if (fileInput.current) fileInput.current.value = "";
     await send(body, files);
+  };
+
+  /** One problem, one sentence, with the actual limit in it. */
+  const problemText = (problem: AttachmentProblem): string => {
+    switch (problem.kind) {
+      case "too_large": return fmt(t("support.file.tooLarge"), problem.limitMb);
+      case "empty": return t("support.file.empty");
+      case "too_many": return fmt(t("support.file.tooMany"), problem.limit);
+      case "total_too_large": return fmt(t("support.file.totalTooLarge"), problem.limitMb);
+    }
   };
 
   const loading = conversations === null;
@@ -359,7 +405,7 @@ const SupportChat = () => {
                 </header>
 
                 <div className="support-messages">
-                  {threadLoading && <Spinner />}
+                  {threadLoading && <SkeletonMessages bubbles={4} />}
                   {!threadLoading && messages.length === 0 && pending.length === 0 && (
                     <div className="muted" style={{ fontSize: 13 }}>{t("support.emptyThread")}</div>
                   )}
@@ -424,14 +470,33 @@ const SupportChat = () => {
 
                 {/* ── Composer ────────────────────────────────────────── */}
                 <div className="col" style={{ gap: 8, borderTop: "1px solid #1f2a44", paddingTop: 10 }}>
-                  {files.length > 0 && (
-                    <div className="row" style={{ gap: 6, flexWrap: "wrap" }}>
-                      {files.map((f) => (
-                        <span key={f.name} className="support-chip">
-                          📎 {f.name}
-                          <button type="button" onClick={() => setFiles((prev) => prev.filter((x) => x !== f))}>✕</button>
-                        </span>
+                  {checked.length > 0 && (
+                    <div className="col" style={{ gap: 6 }}>
+                      {checked.map(({ file, problem }) => (
+                        <div
+                          key={`${file.name}:${file.size}:${file.lastModified}`}
+                          className={`support-chip${problem ? " is-bad" : ""}`}
+                        >
+                          <span className="support-chip__icon" aria-hidden>{problem ? "✕" : "📎"}</span>
+                          <span className="support-chip__name" title={file.name}>{file.name}</span>
+                          <span className="support-chip__size">{formatSize(file.size)}</span>
+                          {problem && (
+                            <span className="support-chip__why">{problemText(problem)}</span>
+                          )}
+                          <button
+                            type="button"
+                            aria-label={`${t("support.file.remove")}: ${file.name}`}
+                            onClick={() => setFiles((prev) => prev.filter((x) => x !== file))}
+                          >
+                            ✕
+                          </button>
+                        </div>
                       ))}
+                      {attachmentsInvalid && (
+                        <span className="cp-mli-failed" style={{ fontSize: 12 }}>
+                          {t("support.file.fixBeforeSending")}
+                        </span>
+                      )}
                     </div>
                   )}
                   <div className="row" style={{ gap: 8, alignItems: "flex-end" }}>
@@ -462,7 +527,12 @@ const SupportChat = () => {
                         }}
                       />
                     </div>
-                    <Button onClick={() => void submit()} disabled={!draft.trim() && files.length === 0}>
+                    <Button
+                      onClick={() => void submit()}
+                      // Nothing to send, or something that must not be sent.
+                      disabled={(!draft.trim() && files.length === 0) || attachmentsInvalid}
+                      title={attachmentsInvalid ? t("support.file.fixBeforeSending") : undefined}
+                    >
                       {t("support.send")}
                     </Button>
                   </div>

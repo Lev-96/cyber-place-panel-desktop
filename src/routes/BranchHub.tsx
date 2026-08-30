@@ -1,3 +1,4 @@
+import { GridSkeleton } from "@/components/ui/Skeleton";
 import { useAuth } from "@/auth/AuthContext";
 import { can } from "@/auth/permissions";
 import BlockToggle from "@/components/blocking/BlockToggle";
@@ -78,8 +79,6 @@ const BranchHub = () => {
   // without any backend change.
   const tiles: TileDef[] = [
     { key: "sessions", to: `/branches/${id}/sessions`, title: t("hub.tile.sessions"), hint: t("hub.tile.sessionsHint"), show: true },
-    { key: "pos", to: `/branches/${id}/pos`, title: t("hub.tile.pos"), hint: t("hub.tile.posHint"), show: true },
-    { key: "shift", to: `/branches/${id}/shift`, title: t("hub.tile.shift"), hint: t("hub.tile.shiftHint"), show: can(role, "shift.open") },
     { key: "members", to: `/branches/${id}/members`, title: t("hub.tile.members"), hint: t("hub.tile.membersHint"), show: can(role, "branch.members") },
     { key: "places", to: `/branches/${id}/places`, title: t("hub.tile.places"), hint: t("hub.tile.placesHint"), show: can(role, "branch.places") },
     { key: "games", to: `/branches/${id}/games`, title: t("hub.tile.games"), hint: t("hub.tile.gamesHint"), show: can(role, "game.crud.branch") },
@@ -110,7 +109,7 @@ const BranchHub = () => {
 
   return (
     <ScreenWithBg bg="./bg/branch.jpg" title={data ? `${data.company?.name ?? t("hub.branchFallback")} · ${data.address}` : `${t("hub.branchFallback")} №${id}`}>
-      {loading && <Spinner />}
+      {loading && <GridSkeleton cells={6} />}
       {error && <div className="error">{error.message}</div>}
 
       {data && (

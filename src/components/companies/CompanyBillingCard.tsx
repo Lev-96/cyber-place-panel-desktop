@@ -1,3 +1,4 @@
+import { SkeletonCard } from "@/components/ui/Skeleton";
 import { apiCompanyBilling, apiMarkCompanyPaid, ICompanyBilling } from "@/api/billing";
 import { isMissingEndpoint } from "@/api/fallback";
 import { useAuth } from "@/auth/AuthContext";
@@ -50,7 +51,7 @@ const CompanyBillingCard = ({ companyId, companyName }: Props) => {
     finally { setBusy(false); }
   };
 
-  if (loading) return <div className="card"><Spinner /></div>;
+  if (loading) return <SkeletonCard lines={3} />;
   if (missing) return (
     <div className="card">
       <div className="muted" style={{ fontSize: 13 }}>

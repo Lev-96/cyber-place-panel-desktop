@@ -10,6 +10,8 @@ import { useLang } from "@/i18n/LanguageContext";
 import { useNotifications } from "@/notifications/NotificationsContext";
 import { useUpdatesNotification } from "@/realtime/UpdatesNotificationContext";
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { useAnchoredPopover } from "@/hooks/useAnchoredPopover";
 import { NavLink, useNavigate } from "react-router-dom";
 
 const UnreadBadge = ({ count }: { count: number }) => {
@@ -104,6 +106,7 @@ const UserMenu = ({ name, email, role, roleLabel }: UserCardProps) => {
   const [profileOpen, setProfileOpen] = useState(false);
   const [switchTarget, setSwitchTarget] = useState<IAccountSwitchTarget | null>(null);
   const ref = useRef<HTMLDivElement>(null);
+  const popRef = useRef<HTMLDivElement>(null);
   // Both company roles hand the machine over to a colleague: an owner to one of
   // his managers, a manager back to the owner or to another manager of the same
   // company. WHO is actually offered is decided by the backend — an admin has
@@ -112,12 +115,28 @@ const UserMenu = ({ name, email, role, roleLabel }: UserCardProps) => {
 
   const closeMenu = () => { setOpen(false); setView("menu"); };
 
+  /**
+   * The popover is rendered into `document.body`, not next to the card.
+   *
+   * The sidebar clips its children so its nav can scroll, and the account
+   * switcher is wider than the card it hangs off — so anchored inside the
+   * sidebar, everything past its edge was cut off. In a portal it belongs to
+   * the window, and `useAnchoredPopover` keeps it beside the card and inside
+   * that window at any size or display scaling.
+   */
+  const cardRef = useRef<HTMLButtonElement>(null);
+  const anchored = useAnchoredPopover(cardRef, open, view === "managers" ? 320 : 240);
+
   // Close the popover on an outside click or Escape. While a modal opened
   // FROM the popover is up, an outside click belongs to that modal.
   useEffect(() => {
     if (!open || switchTarget) return;
     const onDoc = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) closeMenu();
+      const target = e.target as Node;
+      // The popover lives in a portal, so it is NOT inside `ref` any more —
+      // without checking it too, clicking the menu would close the menu.
+      if (popRef.current?.contains(target)) return;
+      if (ref.current && !ref.current.contains(target)) closeMenu();
     };
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") closeMenu(); };
     document.addEventListener("mousedown", onDoc);
@@ -130,8 +149,12 @@ const UserMenu = ({ name, email, role, roleLabel }: UserCardProps) => {
 
   return (
     <div ref={ref} style={{ position: "relative", margin: "0 8px 10px" }}>
-      {open && (
-        <div className={`user-menu-pop${view === "managers" ? " is-wide" : ""}`}>
+      {open && anchored && createPortal(
+        <div
+          ref={popRef}
+          className={`user-menu-pop${view === "managers" ? " is-wide" : ""}`}
+          style={anchored.style}
+        >
           {view === "menu" ? (
             <div className="user-menu-view">
               <button type="button" onClick={() => { closeMenu(); setProfileOpen(true); }}>{t("profile.title")}</button>
@@ -159,10 +182,12 @@ const UserMenu = ({ name, email, role, roleLabel }: UserCardProps) => {
               />
             </div>
           )}
-        </div>
+        </div>,
+        document.body,
       )}
 
       <button
+        ref={cardRef}
         type="button"
         className={`user-card${open ? " active" : ""}`}
         title={name}
@@ -366,15 +391,25 @@ const Sidebar = () => {
           <UnreadBadge count={agentUpdateCount} />
         </NavLink>
       )}
-      {can(role, "menu.support") && (
-        <NavLink to="/support" className="nav-support">
-          <SupportIcon />
-          <span className="nav-support__label">{t("nav.support")}</span>
-          <UnreadBadge count={supportUnread} />
-        </NavLink>
-      )}
       </nav>
       <div className="sidebar-footer">
+        {/* Support is not another section of the product — it is the way out of
+            a problem with it. So it reads as a card rather than a row: pinned to
+            the bottom, its own surface, a line of explanation under the name.
+            Somebody looking for help finds it without reading the menu. */}
+        {can(role, "menu.support") && (
+          <NavLink to="/support" className="nav-support-card">
+            <span className="nav-support-card__icon" aria-hidden>
+              <SupportIcon size={18} />
+            </span>
+            <span className="nav-support-card__text">
+              <span className="nav-support-card__title">{t("nav.support")}</span>
+              <span className="nav-support-card__hint">{t("nav.supportHint")}</span>
+            </span>
+            <UnreadBadge count={supportUnread} />
+          </NavLink>
+        )}
+
         <UserMenu
           name={user?.name}
           email={user?.email}

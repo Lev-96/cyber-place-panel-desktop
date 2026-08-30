@@ -1,3 +1,4 @@
+import { ListSkeleton } from "@/components/ui/Skeleton";
 import Button from "@/components/ui/Button";
 import Modal from "@/components/ui/Modal";
 import Input from "@/components/ui/Input";
@@ -140,7 +141,7 @@ const PcForm = ({ branchId, initial, takenPlaceIds = [], onClose, onSaved }: Pro
         <div className="col" style={{ gap: 6 }}>
           <span className="label">{t("pcs.placeId")}</span>
           {places.loading ? (
-            <Spinner />
+            <ListSkeleton rows={3} />
           ) : placeOptions.length === 0 ? (
             <p className="muted" style={{ margin: 0, color: "#f59e0b" }}>
               {t("pcs.placeEmpty")}

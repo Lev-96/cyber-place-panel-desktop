@@ -1,3 +1,4 @@
+import { GridSkeleton } from "@/components/ui/Skeleton";
 import Spinner from "@/components/ui/Spinner";
 import CollapsibleSection from "@/components/ui/CollapsibleSection";
 import { formatTime } from "@/i18n/dates";
@@ -34,7 +35,7 @@ const BranchLiveScreen = ({ branchId }: { branchId: number }) => {
   ];
   const sectionReorder = useLocalReorder(`board:live:sections:${branchId}`, canonicalSections);
 
-  if (loading && !snapshot) return <Spinner />;
+  if (loading && !snapshot) return <GridSkeleton cells={8} />;
   if (error && !snapshot) return <div className="error">{t("live.failedLoad")}</div>;
   if (!snapshot) return null;
 

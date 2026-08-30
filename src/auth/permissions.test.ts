@@ -106,13 +106,12 @@ describe("can(role, perm)", () => {
   });
 
   describe("manager", () => {
-    // `shift.open` left this list on 2026-08-30 — the cashier shift is the
-    // company's cash record, and the section went with it. A sale does not
-    // need one: `orders.cashier_shift_id` is nullable, so the POS still works.
-    it("can do operational work (sessions, POS)", () => {
+    // `shift.open` and `pos.charge` left the model entirely on 2026-08-30 with
+    // the Shift and Till sections. Selling now happens on the session bill, so
+    // running the floor is sessions and nothing else.
+    it("can do operational work (sessions)", () => {
       expect(can("manager", "session.start")).toBe(true);
       expect(can("manager", "session.stop")).toBe(true);
-      expect(can("manager", "pos.charge")).toBe(true);
     });
 
     it("cannot edit the branch profile (logo/info) or prices — owner/admin only", () => {
@@ -151,9 +150,8 @@ describe("can(role, perm)", () => {
     // running the floor did not. The backend refuses the same four sections
     // (`App\Services\Access\StaffCapability`), so this is the button half of
     // one rule — see tests/Feature/StaffSectionAccessTest.php.
-    it("does not arrange the branch: no seats, shifts, member cards or product writes", () => {
+    it("does not arrange the branch: no seats, member cards or product writes", () => {
       expect(can("manager", "branch.places")).toBe(false);
-      expect(can("manager", "shift.open")).toBe(false);
       expect(can("manager", "branch.members")).toBe(false);
       expect(can("manager", "product.crud")).toBe(false);
     });
@@ -161,7 +159,6 @@ describe("can(role, perm)", () => {
     it("still runs the floor", () => {
       expect(can("manager", "session.start")).toBe(true);
       expect(can("manager", "session.stop")).toBe(true);
-      expect(can("manager", "pos.charge")).toBe(true);
     });
   });
 
@@ -176,9 +173,8 @@ describe("can(role, perm)", () => {
   });
 
   describe("owner keeps what a company runs", () => {
-    it("arranges seats, shifts and products", () => {
+    it("arranges seats and products", () => {
       expect(can("company_owner", "branch.places")).toBe(true);
-      expect(can("company_owner", "shift.open")).toBe(true);
       expect(can("company_owner", "product.crud")).toBe(true);
     });
 

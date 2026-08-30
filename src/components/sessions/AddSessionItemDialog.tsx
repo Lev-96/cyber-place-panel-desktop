@@ -1,7 +1,8 @@
+import { ListSkeleton } from "@/components/ui/Skeleton";
 import Button from "@/components/ui/Button";
+import ProductForm from "@/components/products/ProductForm";
 import Modal from "@/components/ui/Modal";
 import Input from "@/components/ui/Input";
-import PriceInput from "@/components/ui/PriceInput";
 import Spinner from "@/components/ui/Spinner";
 import { fmt } from "@/i18n/translations";
 import { useLang } from "@/i18n/LanguageContext";
@@ -51,6 +52,21 @@ interface CartLine {
  * line — locally here, and again server-side when the basket lands, so a basket
  * containing something the session already has raises that line rather than
  * duplicating it.
+ *
+ * ## A branch with no catalogue can start one from here
+ * The first session of a new venue runs into an empty product list, and sending
+ * the cashier off to another screen to fix that loses the basket and the
+ * thread. "New product" opens the SAME form the Products screen uses and
+ * creates a real `Product` — it appears under Products like any other, because
+ * it is one. It is not a line invented for this bill: a per-session pseudo
+ * product would be invisible to stock, to the catalogue and to the next
+ * session. The new product then drops straight into the basket, since creating
+ * it here means wanting it here.
+ *
+ * ## What is already on the bill can be taken off it
+ * The lines the session already holds are listed with a remove of their own.
+ * That one IS immediate — it is a correction to a bill that exists, not a
+ * decision in progress — and it says so with its own toast.
  */
 const AddSessionItemDialog = ({ branchId, session, onClose, onAdded }: Props) => {
   const { money, t } = useLang();
@@ -60,12 +76,27 @@ const AddSessionItemDialog = ({ branchId, session, onClose, onAdded }: Props) =>
   const [err, setErr] = useState<string | null>(null);
   const [cart, setCart] = useState<CartLine[]>([]);
 
-  const [customName, setCustomName] = useState("");
-  const [customPrice, setCustomPrice] = useState("");
+  const [creating, setCreating] = useState(false);
+  /**
+   * The bill, as this dialog knows it.
+   *
+   * Seeded from the session it was opened with and updated from the server's
+   * own answer when a line is removed. The parent is told as well, but its
+   * refresh does not reach a dialog that is already open — so without a copy
+   * here a removed line stayed on screen until the dialog was closed and
+   * reopened, which reads as "it did not work".
+   */
+  const [bill, setBill] = useState(session.items ?? []);
+  /** Items being taken off the bill, so their row can say so. */
+  const [removing, setRemoving] = useState<number[]>([]);
 
   useEffect(() => {
     void productRepository.listByBranch(branchId).then(setProducts);
   }, [branchId]);
+
+  // A fresh session from the parent (after a confirm, or a realtime update)
+  // replaces what we hold, so the two never drift.
+  useEffect(() => { setBill(session.items ?? []); }, [session]);
 
   /** Add one, or raise the count of the line that is already in the basket. */
   const put = (line: Omit<CartLine, "qty">) =>
@@ -89,17 +120,45 @@ const AddSessionItemDialog = ({ branchId, session, onClose, onAdded }: Props) =>
 
   const drop = (key: string) => setCart((prev) => prev.filter((l) => l.key !== key));
 
-  const addCustom = () => {
-    const price = parseFloat(customPrice.replace(",", "."));
-    const name = customName.trim();
-    if (!name || !Number.isFinite(price) || price < 0) {
-      setErr(t("session.fillNamePrice"));
-      return;
-    }
+  /**
+   * A product that now exists everywhere, and is in the basket besides.
+   *
+   * Two steps that cannot be one: the product is a row of its own, the basket
+   * is a decision not yet committed. Doing it this way means neither can leave
+   * the other half-done — the catalogue keeps the product whatever happens to
+   * the basket next, and nothing reaches the bill until the cashier confirms
+   * it, so there is no window in which a product exists "only for this
+   * session" or a bill line points at a product that was never created.
+   */
+  const onProductCreated = (p: IProduct) => {
+    setCreating(false);
+    setProducts((prev) => (prev ? [p, ...prev.filter((x) => x.id !== p.id)] : [p]));
+    put({ key: `p:${p.id}`, product_id: p.id, name: p.name, price: Number(p.price) });
     setErr(null);
-    put({ key: `custom:${name}:${price}`, name, price });
-    setCustomName("");
-    setCustomPrice("");
+  };
+
+  /**
+   * Take a line off the bill.
+   *
+   * Unlike everything else here this goes to the server at once — the line is
+   * already on a bill somebody may be about to pay, so "removed" has to mean
+   * removed. The row is disabled while it is in flight, and a refusal says why
+   * instead of claiming success.
+   */
+  const removeFromBill = async (itemId: number, name: string) => {
+    if (removing.includes(itemId)) return;
+    setRemoving((prev) => [...prev, itemId]);
+    try {
+      const updated = await sessionRepository.removeItem(session.id, itemId);
+      setBill(updated?.items ?? bill.filter((i) => i.id !== itemId));
+      notify.message("error", fmt(t("session.removedOne"), name));
+      onAdded();
+    } catch (e) {
+      const reason = e instanceof Error && e.message ? e.message : t("session.failUnknown");
+      notify.message("error", `${t("session.removeFailed")} ${fmt(t("session.failReason"), reason)}`);
+    } finally {
+      setRemoving((prev) => prev.filter((id) => id !== itemId));
+    }
   };
 
   /**
@@ -152,7 +211,7 @@ const AddSessionItemDialog = ({ branchId, session, onClose, onAdded }: Props) =>
   }, [products, search]);
 
   const cartTotal = cart.reduce((sum, l) => sum + l.price * l.qty, 0);
-  const onBill = session.items ?? [];
+  const onBill = bill;
   const deviceLabel = session.pc_label ?? `№${session.pc_id}`;
   const loading = products === null;
 
@@ -162,12 +221,35 @@ const AddSessionItemDialog = ({ branchId, session, onClose, onAdded }: Props) =>
         <h2 style={{ margin: 0 }}>{t("session.addItem")}</h2>
         <span className="muted" style={{ fontSize: 12 }}>{deviceLabel}</span>
 
-        {/* What the session already holds — read-only, so the cashier can see
-            they are about to add a second coffee before they do it. */}
+        {/* What the session already holds. Listed rather than summarised in a
+            sentence, because each line needs its own way off the bill — and
+            because a cashier about to add a second coffee should see the first
+            one before they do. */}
         {onBill.length > 0 && (
-          <span className="muted" style={{ fontSize: 12 }}>
-            {t("session.alreadyInSession")}: {onBill.map((i) => `${i.name} × ${i.qty}`).join(", ")}
-          </span>
+          <div className="col" style={{ gap: 6 }}>
+            <span className="label" style={{ fontSize: 12 }}>{t("session.alreadyInSession")}</span>
+            <div className="col" style={{ gap: 6, maxHeight: 150, overflowY: "auto" }}>
+              {onBill.map((item) => (
+                <div key={item.id} style={rowStyle}>
+                  <span style={ellipsis} title={item.name}>{item.name}</span>
+                  <span style={{ minWidth: 40, textAlign: "center", fontWeight: 700 }}>× {item.qty}</span>
+                  <span className="muted" style={{ fontSize: 11, minWidth: 74, textAlign: "right" }}>
+                    {money(Number(item.price) * item.qty)}
+                  </span>
+                  <Button
+                    variant="secondary"
+                    onClick={() => void removeFromBill(item.id, item.name)}
+                    disabled={saving || removing.includes(item.id)}
+                    style={{ ...stepBtn, color: "#ef4444", borderColor: "#4a1a1a" }}
+                    aria-label={`${t("action.delete")}: ${item.name}`}
+                    title={t("session.removeFromBill")}
+                  >
+                    {removing.includes(item.id) ? "…" : "🗑"}
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </div>
         )}
 
         {/* ── The branch catalogue ─────────────────────────────────────── */}
@@ -176,7 +258,7 @@ const AddSessionItemDialog = ({ branchId, session, onClose, onAdded }: Props) =>
           <Input placeholder={t("session.search")} value={search} onChange={(e) => setSearch(e.target.value)} />
         )}
 
-        {loading ? <Spinner /> : (
+        {loading ? <ListSkeleton rows={3} /> : (
           <div className="col" style={{ gap: 6, maxHeight: 190, overflowY: "auto" }}>
             {products?.length === 0 && (
               <div className="muted" style={{ fontSize: 13 }}>{t("session.noProducts")}</div>
@@ -263,25 +345,13 @@ const AddSessionItemDialog = ({ branchId, session, onClose, onAdded }: Props) =>
           )}
         </div>
 
-        {/* ── Something the branch does not stock ──────────────────────── */}
+        {/* ── Something the branch does not stock yet ──────────────────── */}
         <div className="col" style={{ gap: 8, borderTop: "1px solid #1f2a44", paddingTop: 12 }}>
-          <span className="label" style={{ fontSize: 12 }}>{t("session.customItem")}</span>
-          <div className="row" style={{ gap: 8, alignItems: "flex-end" }}>
-            <Input
-              label=""
-              placeholder={t("session.itemName")}
-              value={customName}
-              onChange={(e) => setCustomName(e.target.value)}
-              style={{ flex: 2 }}
-            />
-            <div style={{ flex: 1 }}>
-              <PriceInput
-                placeholder={t("session.itemPrice")}
-                value={customPrice}
-                onChange={setCustomPrice}
-              />
-            </div>
-            <Button onClick={addCustom} disabled={saving} style={{ minWidth: 110 }}>{t("action.add")}</Button>
+          <div className="row-between" style={{ gap: 8 }}>
+            <span className="muted" style={{ fontSize: 12 }}>{t("session.createProductHint")}</span>
+            <Button variant="secondary" onClick={() => setCreating(true)} disabled={saving}>
+              {t("session.createProduct")}
+            </Button>
           </div>
         </div>
 
@@ -299,6 +369,16 @@ const AddSessionItemDialog = ({ branchId, session, onClose, onAdded }: Props) =>
           </Button>
         </div>
       </div>
+
+      {/* The Products screen's own form, unchanged: whatever it creates is a
+          product like any other, with its three languages and its category. */}
+      {creating && (
+        <ProductForm
+          branchId={branchId}
+          onClose={() => setCreating(false)}
+          onSaved={onProductCreated}
+        />
+      )}
     </Modal>
   );
 };
