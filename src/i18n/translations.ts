@@ -364,7 +364,20 @@ export const TRANSLATIONS: Dict = {
   "branchPlaces.title": { en: "Places", ru: "Места", am: "Տեղեր" },
   "branchPlaces.intro": { en: "A place is a bookable seat (e.g. PC #1, PS5 VIP #2). Each place gets games linked.", ru: "Место — это место для бронирования (например, ПК №1, PS5 VIP №2). К каждому месту привязываются игры.", am: "Տեղը ամրագրվող նստատեղ է (օր.՝ PC #1, PS5 VIP #2): Յուրաքանչյուր տեղին կապվում են խաղեր:" },
   "branchPlaces.new": { en: "+ New place", ru: "+ Новое место", am: "+ Նոր տեղ" },
-  "branchPlaces.confirmDelete": { en: "Delete place #{0}?", ru: "Удалить место №{0}?", am: "Ջնջե՞լ #{0} տեղը:" },
+  // Deleting a place takes the device that makes it billable and every session
+  // recorded on that device. Two wordings, because a PC place owns a computer
+  // the operator can see under "Computers" and a console place does not —
+  // naming a section that will not change is how a warning stops being read.
+  "branchPlaces.confirmDelete": {
+    en: "Delete place #{0}?\n\nIts device and every session recorded on it will be deleted as well. This cannot be undone.",
+    ru: "Удалить место №{0}?\n\nВместе с ним будут удалены его устройство и все записанные на нём сессии. Действие необратимо.",
+    am: "Ջնջե՞լ #{0} տեղը:\n\nՆրա հետ կջնջվեն դրա սարքը և դրանում գրանցված բոլոր սեսիաները: Գործողությունն անդարձելի է:",
+  },
+  "branchPlaces.confirmDeletePc": {
+    en: "Delete place #{0}?\n\nIts computer will disappear from Computers, and every session recorded on it will be deleted as well. This cannot be undone.",
+    ru: "Удалить место №{0}?\n\nСвязанный компьютер исчезнет из раздела «Компьютеры», а все записанные на нём сессии будут удалены. Действие необратимо.",
+    am: "Ջնջե՞լ #{0} տեղը:\n\nԿապված համակարգիչը կվերանա «Համակարգիչներ» բաժնից, իսկ դրանում գրանցված բոլոր սեսիաները կջնջվեն: Գործողությունն անդարձելի է:",
+  },
   "branchPlaces.empty": { en: "No places yet. Click 'New place' to add the first one.", ru: "Мест ещё нет. Нажмите «Новое место», чтобы добавить первое.", am: "Տեղեր դեռ չկան: Սեղմեք «Նոր տեղ»՝ առաջինը ավելացնելու համար:" },
   "branchPlaces.games": { en: "game(s)", ru: "игр", am: "խաղ" },
   "branchPlaces.status.active": { en: "active", ru: "активно", am: "ակտիվ" },
@@ -390,7 +403,23 @@ export const TRANSLATIONS: Dict = {
   "bookingDetails.minShort": { en: "min", ru: "мин", am: "ր" },
 
   // PCs management page
-  "pcs.confirmDelete": { en: "Delete '{0}'? This cannot be undone.", ru: "Удалить «{0}»? Действие необратимо.", am: "Ջնջե՞լ «{0}»: Անդարձելի գործողություն:" },
+  // A computer is not deleted on its own: it exists to serve one place, so the
+  // place goes with it, and the place's sessions go with the place. The number
+  // is in the text because "delete PC #4" and "delete place #4 too" are the
+  // same action and the operator has to see the second half before confirming.
+  "pcs.confirmDelete": {
+    en: "Delete computer \u201c{0}\u201d?\n\nThe place it serves (#{1}) will be deleted with it, along with every session recorded on it. This cannot be undone.",
+    ru: "Удалить компьютер «{0}»?\n\nВместе с ним будет удалено обслуживаемое место (№{1}) и все записанные на нём сессии. Действие необратимо.",
+    am: "Ջնջե՞լ «{0}» համակարգիչը:\n\nՆրա հետ կջնջվի սպասարկվող տեղը (#{1}) և դրանում գրանցված բոլոր սեսիաները: Գործողությունն անդարձելի է:",
+  },
+  // Same action for a device that serves no place — a legacy row from before
+  // one-device-per-place. Nothing else goes with it, and saying so avoids
+  // promising a cascade that will not happen.
+  "pcs.confirmDeleteUnlinked": {
+    en: "Delete computer \u201c{0}\u201d?\n\nEvery session recorded on it will be deleted as well. This cannot be undone.",
+    ru: "Удалить компьютер «{0}»?\n\nВсе записанные на нём сессии будут удалены. Действие необратимо.",
+    am: "Ջնջե՞լ «{0}» համակարգիչը:\n\nԴրանում գրանցված բոլոր սեսիաները կջնջվեն: Գործողությունն անդարձելի է:",
+  },
   "pcs.confirmRotate": { en: "Rotate pairing token for '{0}'? The agent on this PC will stop working until updated.", ru: "Сменить токен сопряжения для «{0}»? Агент на этом ПК перестанет работать, пока его не обновят.", am: "Թարմացնե՞լ «{0}»-ի զուգակցման թոքենը: PC-ի գործակալը կդադարի աշխատել մինչև թարմացում:" },
   "pcs.macRequired": { en: "Set a MAC address on this PC before using Wake-on-LAN.", ru: "Сначала задайте MAC-адрес для этого ПК — без него Wake-on-LAN не сработает.", am: "Նախ նշեք PC-ի MAC հասցեն — առանց դրա Wake-on-LAN չի աշխատի:" },
   "pcs.packetsSent": { en: "Packets sent: {0}", ru: "Пакетов отправлено: {0}", am: "Փաթեթներ ուղարկվել են՝ {0}" },

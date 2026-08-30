@@ -28,7 +28,11 @@ const ConfirmDialog = ({
         className="card"
         style={{ width: 380, maxWidth: "90vw", display: "flex", flexDirection: "column", gap: 16 }}
       >
-        <div style={{ fontSize: 14, lineHeight: 1.5 }}>{message}</div>
+        {/* `pre-line` so a warning can separate "what you are deleting" from
+            "what goes with it" — a cascade written as one run-on sentence is a
+            sentence nobody finishes reading. Single-line messages are
+            unaffected. */}
+        <div style={{ fontSize: 14, lineHeight: 1.5, whiteSpace: "pre-line" }}>{message}</div>
         <div className="row-between">
           <Button type="button" variant="secondary" onClick={onCancel}>
             {cancelLabel ?? t("action.cancel")}

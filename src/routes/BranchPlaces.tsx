@@ -88,8 +88,13 @@ const BranchPlaces = () => {
       return next;
     });
 
+  // A place does not go alone: the device that makes it billable, and every
+  // session recorded on that device, go with it. A PC place names the Computers
+  // section explicitly — that is the screen the operator will see change; a
+  // console's device was never listed there to begin with.
   const remove = async (p: IBranchPlace) => {
-    if (!(await confirm(fmt(t("branchPlaces.confirmDelete"), p.number ?? p.id), { destructive: true }))) return;
+    const key = p.platform === "pc" ? "branchPlaces.confirmDeletePc" : "branchPlaces.confirmDelete";
+    if (!(await confirm(fmt(t(key), p.number ?? p.id), { destructive: true }))) return;
     await placeRepository.remove(p.id);
     void reload();
     // Deleting the last place on a custom platform auto-removes its price.

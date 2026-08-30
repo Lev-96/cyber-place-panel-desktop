@@ -28,10 +28,24 @@ const PcsList = () => {
   const [tokenPc, setTokenPc] = useState<IPcApi | null>(null);
   const [waking, setWaking] = useState<number | null>(null);
 
+  // Places already served by a computer on this screen. One place owns one
+  // device, so offering a taken place in the register form would only produce
+  // the backend's 422.
+  const takenPlaceIds = (pcs ?? [])
+    .map((pc) => pc.place_id)
+    .filter((placeId): placeId is number => typeof placeId === "number");
+
   if (!Number.isFinite(id) || id <= 0) return <div className="error">{t("hub.invalidId")}</div>;
 
+  // Deleting a computer is never only that: it serves one place, and that place
+  // is what its sessions were billed against, so both go with it. The dialog
+  // names the place before the operator confirms — the row shows only a label,
+  // and "delete PC #4" reads harmless until you know place #4 goes too.
   const remove = async (pc: IPcApi) => {
-    if (!(await confirm(fmt(t("pcs.confirmDelete"), tr(pc, "label", lang)), { destructive: true }))) return;
+    const message = pc.place
+      ? fmt(t("pcs.confirmDelete"), tr(pc, "label", lang), pc.place.number ?? pc.place.id)
+      : fmt(t("pcs.confirmDeleteUnlinked"), tr(pc, "label", lang));
+    if (!(await confirm(message, { destructive: true }))) return;
     await pcRepository.remove(pc.id);
     void reload();
   };
@@ -142,6 +156,7 @@ const PcsList = () => {
       {creating && (
         <PcForm
           branchId={id}
+          takenPlaceIds={takenPlaceIds}
           onClose={() => setCreating(false)}
           onSaved={(pc) => {
             setCreating(false);
@@ -155,6 +170,7 @@ const PcsList = () => {
         <PcForm
           branchId={id}
           initial={editing}
+          takenPlaceIds={takenPlaceIds}
           onClose={() => setEditing(null)}
           onSaved={() => { setEditing(null); void reload(); }}
         />
