@@ -758,13 +758,22 @@ A chat with Cyber Place support. The panel talks to OUR backend and never to
 Telegram: support reads the other side on a phone, and that leg is a delivery
 status on a message rather than a place data lives.
 
-- `SupportRepository` → `/support/conversations…`; the list is already scoped
-  server-side (manager: their branch, owner: their company, admin: all), so
-  nothing is filtered in the component — a filter in a component is a
-  permission that stops applying the moment somebody calls the API directly.
-- `useSupportMessages` subscribes to the PRIVATE `support.branch.{id}`, which is
-  per branch on purpose: owner and manager read the same thread, and a client
-  cannot subscribe to a conversation id it does not have yet.
+- **A thread is personal.** It belongs to the user who opened it — an owner
+  does not see their managers' threads and vice versa. Enforced on the backend
+  (ownership before branch scope, on every route); nothing is filtered here,
+  because a filter in a component is a permission that stops applying the
+  moment somebody calls the API directly.
+- `useSupportMessages` subscribes to the PRIVATE `support.user.{id}` — the
+  person, not the branch. One subscription covers every thread the account has,
+  including one opened a second ago.
+- Attachments have no URL. `supportRepository.downloadAttachment` fetches the
+  bytes with the session token from `/support/attachments/{id}` and saves them
+  through a blob; the payload carries no path, and there is nothing to link to
+  that would skip the check.
+- **Signing out drops the socket** (`disconnectEchoForSignOut` in `logout`).
+  Channels live on the connection, not on the components that subscribed, so
+  without it an account switch on one machine leaves the new operator attached
+  to the previous one's private channels.
 - `SupportUnreadContext` owns the sidebar badge, the chime and the floating
   toast. It listens on the SAME private channel the bell uses
   (`user.{id}.notifications`) rather than reading `NotificationsContext`,
