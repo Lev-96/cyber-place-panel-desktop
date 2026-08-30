@@ -39,6 +39,24 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
  * that stops applying the moment someone calls the API directly.
  */
 
+/**
+ * Fold an arriving message into the thread, keyed on its id.
+ *
+ * A line already on screen is REPLACED rather than appended or ignored, which
+ * is what both halves of this need: a reconnect replaying an event must not
+ * double the line, and a SECOND announcement of the same message is how its
+ * delivery status arrives — the worker announces it again once Telegram has
+ * taken it, and the bubble would otherwise sit on "delivering…" until the
+ * thread was reopened.
+ */
+export const mergeMessage = (prev: ISupportMessage[], incoming: ISupportMessage): ISupportMessage[] => {
+  const at = prev.findIndex((m) => m.id === incoming.id);
+  if (at === -1) return [...prev, incoming];
+  const next = [...prev];
+  next[at] = incoming;
+  return next;
+};
+
 /** A line the user typed that has not been accepted by the server yet. */
 interface PendingMessage {
   localId: string;
@@ -141,9 +159,7 @@ const SupportChat = () => {
     user?.id ?? null,
     useCallback((event) => {
       if (event.conversation_id === activeId) {
-        // Dedupe by message id: a reconnect can replay an event, and the same
-        // line twice in a thread reads as support repeating itself.
-        setMessages((prev) => (prev.some((m) => m.id === event.message.id) ? prev : [...prev, event.message]));
+        setMessages((prev) => mergeMessage(prev, event.message));
         void supportRepository.markRead(event.conversation_id).then(() => refreshUnread());
       }
       void loadConversations();
