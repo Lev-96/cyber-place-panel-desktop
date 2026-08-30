@@ -10,6 +10,7 @@ import Spinner from "@/components/ui/Spinner";
 import Toaster from "@/components/ui/Toaster";
 import { ConfirmProvider } from "@/components/ui/ConfirmProvider";
 import { NotificationsProvider } from "@/notifications/NotificationsContext";
+import { SupportUnreadProvider } from "@/support/SupportUnreadContext";
 import AccessGuard from "@/realtime/AccessGuard";
 import { primeRealtimeConfig } from "@/realtime/echo";
 import BranchVisibilityGuard from "@/realtime/BranchVisibilityGuard";
@@ -383,6 +384,9 @@ const App = () => {
           // fetch needs the sanctum token to be set, and the polling
           // tick has no purpose for an unauth'd visitor.
           <NotificationsProvider>
+            {/* Inside the notifications provider on purpose: the support badge is
+                derived from that feed rather than from a second subscription. */}
+            <SupportUnreadProvider>
             {/* An administrator blocking this account's company or branch has
                 to reach the screen that is already open, not just the next
                 request. Mounted for authed users only — there is nothing to
@@ -403,6 +407,7 @@ const App = () => {
                 <Authed />
               </AccountLanguageGate>
             </UpdatesNotificationProvider>
+            </SupportUnreadProvider>
           </NotificationsProvider>
         ) : (
           <Unauthed />

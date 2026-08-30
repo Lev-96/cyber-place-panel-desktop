@@ -1,3 +1,4 @@
+import BranchPicker from "@/components/support/BranchPicker";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import Spinner from "@/components/ui/Spinner";
@@ -9,6 +10,7 @@ import { storageUri } from "@/infrastructure/AppConfig";
 import { branchRepository } from "@/repositories/BranchRepository";
 import { supportRepository } from "@/repositories/SupportRepository";
 import { useSupportMessages } from "@/realtime/useSupportMessages";
+import { useSupportUnread } from "@/support/SupportUnreadContext";
 import type { ISupportConversation, ISupportMessage } from "@/api/support";
 import type { IBranchApi } from "@/types/api";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -46,8 +48,9 @@ interface PendingMessage {
 }
 
 const SupportChat = () => {
-  const { t, lang } = useLang();
+  const { t } = useLang();
   const { user } = useAuth();
+  const { refresh: refreshUnread, setActiveConversation } = useSupportUnread();
 
   const [conversations, setConversations] = useState<ISupportConversation[] | null>(null);
   const [activeId, setActiveId] = useState<number | null>(null);
@@ -55,6 +58,8 @@ const SupportChat = () => {
   const [threadLoading, setThreadLoading] = useState(false);
   const [branches, setBranches] = useState<IBranchApi[] | null>(null);
   const [starting, setStarting] = useState(false);
+  /** True while the branch cards are up instead of a thread. */
+  const [picking, setPicking] = useState(false);
   const [listError, setListError] = useState<string | null>(null);
 
   const [draft, setDraft] = useState("");
@@ -88,6 +93,18 @@ const SupportChat = () => {
   // rest of the panel reads, so nothing here decides who owns what.
   useEffect(() => { void branchRepository.list().then(setBranches).catch(() => setBranches([])); }, []);
 
+  /**
+   * Tell the badge where the reader is.
+   *
+   * A reply to the thread on screen is marked read the moment it renders, so
+   * counting it would light the sidebar for a message being read. Cleared on
+   * unmount because leaving Support means nothing is on screen any more.
+   */
+  useEffect(() => {
+    setActiveConversation(activeId);
+    return () => setActiveConversation(null);
+  }, [activeId, setActiveConversation]);
+
   // Thread history, whenever the selection changes.
   useEffect(() => {
     if (activeId == null) { setMessages([]); return; }
@@ -98,7 +115,7 @@ const SupportChat = () => {
         if (!alive) return;
         setMessages(thread.messages);
         // Opening the thread IS reading it.
-        void supportRepository.markRead(activeId);
+        void supportRepository.markRead(activeId).then(() => refreshUnread());
         setConversations((prev) => prev?.map((c) => (c.id === activeId ? { ...c, unread: 0 } : c)) ?? prev);
       })
       .catch(() => { if (alive) setMessages([]); })
@@ -121,11 +138,13 @@ const SupportChat = () => {
     active?.branch_id ?? null,
     useCallback((event) => {
       if (event.conversation_id === activeId) {
+        // Dedupe by message id: a reconnect can replay an event, and the same
+        // line twice in a thread reads as support repeating itself.
         setMessages((prev) => (prev.some((m) => m.id === event.message.id) ? prev : [...prev, event.message]));
-        void supportRepository.markRead(event.conversation_id);
+        void supportRepository.markRead(event.conversation_id).then(() => refreshUnread());
       }
       void loadConversations();
-    }, [activeId, loadConversations]),
+    }, [activeId, loadConversations, refreshUnread]),
   );
 
   const startConversation = async (branchId: number) => {
@@ -135,6 +154,7 @@ const SupportChat = () => {
       await loadConversations();
       setActiveId(thread.conversation.id);
       setMessages(thread.messages);
+      setPicking(false);
     } catch (e) {
       setListError(e instanceof Error ? e.message : "Failed");
     } finally {
@@ -182,6 +202,25 @@ const SupportChat = () => {
 
   const loading = conversations === null;
   const onlyBranch = branches?.length === 1 ? branches[0] : null;
+  const autoStarted = useRef(false);
+
+  /**
+   * One branch is not a choice.
+   *
+   * Somebody who runs a single venue should land in a composer, not in front of
+   * a list with one item asking which of their one venue this is about. Guarded
+   * by a ref rather than by state so a slow open cannot fire it twice, and only
+   * when there is no thread already — an existing conversation is the answer.
+   */
+  useEffect(() => {
+    if (autoStarted.current || starting) return;
+    if (!onlyBranch || conversations === null || conversations.length > 0) return;
+    autoStarted.current = true;
+    void startConversation(onlyBranch.id);
+    // `startConversation` is recreated every render; keying on it would defeat
+    // the guard's purpose rather than help.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onlyBranch, conversations, starting]);
 
   return (
     <div className="col" style={{ gap: 18 }}>
@@ -191,11 +230,10 @@ const SupportChat = () => {
           <Button
             disabled={starting}
             onClick={() => {
-              // One branch answers the question itself; several need the pick,
-              // and the select below is where that happens.
+              // One branch answers the question itself; several open the cards.
               if (onlyBranch) void startConversation(onlyBranch.id);
+              else setPicking(true);
             }}
-            style={{ visibility: onlyBranch ? "visible" : "hidden" }}
           >
             {starting ? t("support.starting") : t("support.newRequest")}
           </Button>
@@ -236,30 +274,44 @@ const SupportChat = () => {
               </button>
             ))}
 
-            {/* Opening a thread for a specific branch — shown only when there
-                is a choice to make. */}
-            {branches && branches.length > 1 && (
-              <div className="col" style={{ gap: 6, marginTop: 12 }}>
-                <span className="label" style={{ fontSize: 12 }}>{t("support.startForBranch")}</span>
-                <select
-                  className="input"
-                  defaultValue=""
-                  disabled={starting}
-                  onChange={(e) => { if (e.target.value) void startConversation(Number(e.target.value)); }}
-                >
-                  <option value="" disabled>{t("support.pickBranch")}</option>
-                  {branches.map((b) => (
-                    <option key={b.id} value={b.id}>{b.address}</option>
-                  ))}
-                </select>
-              </div>
+            {/* The branch question is asked in the pane on the right, on cards
+                big enough to read — this is only the way back to it. */}
+            {branches && branches.length > 1 && !picking && (
+              <button
+                type="button"
+                className="support-branch-change"
+                disabled={starting}
+                onClick={() => setPicking(true)}
+              >
+                🏢 {t("support.chooseBranch")}
+              </button>
             )}
           </aside>
 
           {/* ── The thread ────────────────────────────────────────────── */}
           <section className="card support-thread">
-            {!active ? (
-              <div className="muted" style={{ fontSize: 13 }}>{t("support.pickConversation")}</div>
+            {picking || !active ? (
+              branches && branches.length > 1 ? (
+                <div className="col" style={{ gap: 12 }}>
+                  <BranchPicker
+                    branches={branches}
+                    selectedId={active?.branch_id ?? null}
+                    busy={starting}
+                    onPick={(id) => void startConversation(id)}
+                  />
+                  {/* A way out that is not "pick something". Opening the cards
+                      from an open thread must not trap the reader in them. */}
+                  {active && (
+                    <Button variant="secondary" onClick={() => setPicking(false)}>
+                      {t("action.cancel")}
+                    </Button>
+                  )}
+                </div>
+              ) : (
+                <div className="muted" style={{ fontSize: 13 }}>
+                  {starting ? t("support.starting") : t("support.pickConversation")}
+                </div>
+              )
             ) : (
               <>
                 <header className="row" style={{ gap: 10, alignItems: "center", borderBottom: "1px solid #1f2a44", paddingBottom: 10 }}>
@@ -278,6 +330,15 @@ const SupportChat = () => {
                       {active.reference} · {user?.name} · {t(`support.role.${user?.role ?? "manager"}`)}
                     </div>
                   </div>
+                  {branches && branches.length > 1 && (
+                    <button
+                      type="button"
+                      className="support-branch-change is-inline"
+                      onClick={() => setPicking(true)}
+                    >
+                      {t("support.branchChange")}
+                    </button>
+                  )}
                 </header>
 
                 <div className="support-messages">
