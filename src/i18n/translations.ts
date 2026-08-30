@@ -583,6 +583,19 @@ export const TRANSLATIONS: Dict = {
   "managers.new": { en: "+ New manager", ru: "+ Новый менеджер", am: "+ Նոր մենեջեր" },
   "managers.branchLabel": { en: "branch", ru: "филиал", am: "մասնաճյուղ" },
   "managers.confirmRemove": { en: "Remove manager", ru: "Удалить менеджера", am: "Հեռացնել մենեջերին" },
+  // Creating a manager from the sidebar screen, where no branch is implied by
+  // the URL. One branch → no question is asked; several → the owner picks.
+  "managers.pickBranch": { en: "Which branch?", ru: "Для какого филиала?", am: "Ո՞ր մասնաճյուղի համար" },
+  "managers.pickBranchHint": {
+    en: "The manager will be bound to the branch you choose and will only see that one.",
+    ru: "Менеджер будет привязан к выбранному филиалу и увидит только его.",
+    am: "Մենեջերը կկապվի ընտրված մասնաճյուղին և կտեսնի միայն այն:",
+  },
+  "managers.noBranches": {
+    en: "You have no branches yet — create one first, then add a manager to it.",
+    ru: "У вас пока нет филиалов — сначала создайте филиал, затем добавьте в него менеджера.",
+    am: "Դուք դեռ մասնաճյուղ չունեք — նախ ստեղծեք մասնաճյուղ, ապա ավելացրեք մենեջեր:",
+  },
   "action.remove": { en: "Remove", ru: "Удалить", am: "Հեռացնել" },
 
   // Notifications
@@ -878,6 +891,16 @@ export const TRANSLATIONS: Dict = {
   "products.title": { en: "Products", ru: "Товары", am: "Ապրանքներ" },
   "products.new": { en: "+ New product", ru: "+ Новый товар", am: "+ Նոր ապրանք" },
   "products.empty": { en: "No products yet.", ru: "Товаров пока нет.", am: "Ապրանքներ դեռ չկան:" },
+  "products.search": {
+    en: "Search by name or category…",
+    ru: "Поиск по названию или категории…",
+    am: "Որոնում անունով կամ կատեգորիայով…",
+  },
+  "products.noMatches": {
+    en: "Nothing matches that search.",
+    ru: "Ничего не найдено.",
+    am: "Ոչինչ չի գտնվել:",
+  },
 
   "shift.title": { en: "Shift", ru: "Смена", am: "Հերթափոխ" },
   "shift.open": { en: "Open shift", ru: "Открыть смену", am: "Բացել հերթափոխը" },

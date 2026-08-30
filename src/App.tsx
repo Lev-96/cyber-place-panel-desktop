@@ -117,7 +117,14 @@ const Authed = () => {
             }
           />
           <Route path="/branches/:branchId/live" element={<BranchLive />} />
-          <Route path="/branches/:branchId/places" element={<BranchPlaces />} />
+          <Route
+            path="/branches/:branchId/places"
+            element={
+              <RoleGuard perm="branch.places">
+                <BranchPlaces />
+              </RoleGuard>
+            }
+          />
           <Route
             path="/branches/:branchId/games"
             element={
@@ -153,11 +160,32 @@ const Authed = () => {
           />
           <Route path="/branches/:branchId/products" element={<ProductsList />} />
           <Route path="/branches/:branchId/pos" element={<PosTerminal />} />
-          <Route path="/branches/:branchId/shift" element={<ShiftPanel />} />
-          <Route path="/branches/:branchId/members" element={<MembersList />} />
+          <Route
+            path="/branches/:branchId/shift"
+            element={
+              <RoleGuard perm="shift.open">
+                <ShiftPanel />
+              </RoleGuard>
+            }
+          />
+          {/* Member cards and deposits are administrative. Guarding the route
+              as well as the tile is the point: a bookmarked URL is the other
+              way into a section, and the backend refuses these reads too. */}
+          <Route
+            path="/branches/:branchId/members"
+            element={
+              <RoleGuard perm="branch.members">
+                <MembersList />
+              </RoleGuard>
+            }
+          />
           <Route
             path="/branches/:branchId/members/:memberId"
-            element={<MemberCard />}
+            element={
+              <RoleGuard perm="branch.members">
+                <MemberCard />
+              </RoleGuard>
+            }
           />
           <Route
             path="/branches/:branchId/managers"

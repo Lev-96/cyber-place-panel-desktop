@@ -79,9 +79,9 @@ const BranchHub = () => {
   const tiles: TileDef[] = [
     { key: "sessions", to: `/branches/${id}/sessions`, title: t("hub.tile.sessions"), hint: t("hub.tile.sessionsHint"), show: true },
     { key: "pos", to: `/branches/${id}/pos`, title: t("hub.tile.pos"), hint: t("hub.tile.posHint"), show: true },
-    { key: "shift", to: `/branches/${id}/shift`, title: t("hub.tile.shift"), hint: t("hub.tile.shiftHint"), show: true },
-    { key: "members", to: `/branches/${id}/members`, title: t("hub.tile.members"), hint: t("hub.tile.membersHint"), show: true },
-    { key: "places", to: `/branches/${id}/places`, title: t("hub.tile.places"), hint: t("hub.tile.placesHint"), show: true },
+    { key: "shift", to: `/branches/${id}/shift`, title: t("hub.tile.shift"), hint: t("hub.tile.shiftHint"), show: can(role, "shift.open") },
+    { key: "members", to: `/branches/${id}/members`, title: t("hub.tile.members"), hint: t("hub.tile.membersHint"), show: can(role, "branch.members") },
+    { key: "places", to: `/branches/${id}/places`, title: t("hub.tile.places"), hint: t("hub.tile.placesHint"), show: can(role, "branch.places") },
     { key: "games", to: `/branches/${id}/games`, title: t("hub.tile.games"), hint: t("hub.tile.gamesHint"), show: can(role, "game.crud.branch") },
     { key: "pcs", to: `/branches/${id}/pcs`, title: t("hub.tile.pcs"), hint: t("hub.tile.pcsHint"), show: true },
     { key: "tariffs", to: `/branches/${id}/tariffs`, title: t("hub.tile.prices"), hint: t("hub.tile.pricesHint"), show: can(role, "branch.prices") },
@@ -89,7 +89,9 @@ const BranchHub = () => {
     { key: "managers", to: `/branches/${id}/managers`, title: t("hub.tile.managers"), hint: t("hub.tile.managersHint"), show: can(role, "manager.create") },
     { key: "tournaments", to: `/branches/${id}/tournaments`, title: t("hub.tile.tournaments"), hint: t("hub.tile.tournamentsHint"), show: true },
     { key: "subscribers", to: `/branches/${id}/subscribers`, title: t("hub.tile.subscribers"), hint: t("hub.tile.subscribersHint"), show: true },
-    { key: "edit", to: `/branches/${id}/edit`, title: t("hub.tile.settings"), hint: t("hub.tile.settingsHint"), show: true },
+    // The route behind this has always been guarded by `branch.edit`; the tile
+    // was not, so a manager saw a Settings card that bounced them back.
+    { key: "edit", to: `/branches/${id}/edit`, title: t("hub.tile.settings"), hint: t("hub.tile.settingsHint"), show: can(role, "branch.edit") },
   ];
   const visible = tiles.filter((x) => x.show);
   const byKey = new Map(visible.map((x) => [x.key, x] as const));

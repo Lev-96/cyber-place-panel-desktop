@@ -106,11 +106,13 @@ describe("can(role, perm)", () => {
   });
 
   describe("manager", () => {
-    it("can do operational work (sessions, POS, shift)", () => {
+    // `shift.open` left this list on 2026-08-30 — the cashier shift is the
+    // company's cash record, and the section went with it. A sale does not
+    // need one: `orders.cashier_shift_id` is nullable, so the POS still works.
+    it("can do operational work (sessions, POS)", () => {
       expect(can("manager", "session.start")).toBe(true);
       expect(can("manager", "session.stop")).toBe(true);
       expect(can("manager", "pos.charge")).toBe(true);
-      expect(can("manager", "shift.open")).toBe(true);
     });
 
     it("cannot edit the branch profile (logo/info) or prices — owner/admin only", () => {
@@ -142,6 +144,46 @@ describe("can(role, perm)", () => {
     it("can scan codes and see tournaments", () => {
       expect(can("manager", "menu.scan")).toBe(true);
       expect(can("manager", "menu.tournaments")).toBe(true);
+    });
+
+    // 2026-08-30: a manager works inside the arrangement, they do not make it.
+    // Seats, shifts, member cards and the product catalogue left the role;
+    // running the floor did not. The backend refuses the same four sections
+    // (`App\Services\Access\StaffCapability`), so this is the button half of
+    // one rule — see tests/Feature/StaffSectionAccessTest.php.
+    it("does not arrange the branch: no seats, shifts, member cards or product writes", () => {
+      expect(can("manager", "branch.places")).toBe(false);
+      expect(can("manager", "shift.open")).toBe(false);
+      expect(can("manager", "branch.members")).toBe(false);
+      expect(can("manager", "product.crud")).toBe(false);
+    });
+
+    it("still runs the floor", () => {
+      expect(can("manager", "session.start")).toBe(true);
+      expect(can("manager", "session.stop")).toBe(true);
+      expect(can("manager", "pos.charge")).toBe(true);
+    });
+  });
+
+  // The one rule that narrows an OWNER too: member cards and deposit balances
+  // are administrative, so the section is gone from an owner's branch as well.
+  describe("member cards", () => {
+    it("are admin-only", () => {
+      expect(can("admin", "branch.members")).toBe(true);
+      expect(can("company_owner", "branch.members")).toBe(false);
+      expect(can("manager", "branch.members")).toBe(false);
+    });
+  });
+
+  describe("owner keeps what a company runs", () => {
+    it("arranges seats, shifts and products", () => {
+      expect(can("company_owner", "branch.places")).toBe(true);
+      expect(can("company_owner", "shift.open")).toBe(true);
+      expect(can("company_owner", "product.crud")).toBe(true);
+    });
+
+    it("creates managers", () => {
+      expect(can("company_owner", "manager.create")).toBe(true);
     });
   });
 });
