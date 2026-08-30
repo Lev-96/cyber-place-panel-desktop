@@ -86,10 +86,24 @@ export const TRANSLATIONS: Dict = {
 
   // Sessions
   "session.start": { en: "Start session", ru: "Старт сессии", am: "Սկսել նիստը" },
-  "session.addItem": { en: "Add an item", ru: "Добавить позицию", am: "Ավելացնել գրառում" },
+  // "Товар", not "позиция": what the cashier adds is a product off the shelf,
+  // and the branch's own catalogue screen already calls them товары.
+  "session.addItem": { en: "Add a product", ru: "Добавить товар", am: "Ավելացնել ապրանք" },
+  "session.availableProducts": { en: "Available products", ru: "Доступные товары", am: "Հասանելի ապրանքներ" },
+  "session.addedProducts": { en: "Added products", ru: "Добавленные товары", am: "Ավելացված ապրանքներ" },
+  "session.nothingAdded": {
+    en: "Nothing added yet — pick a product above.",
+    ru: "Пока ничего не добавлено — выберите товар выше.",
+    am: "Դեռ ոչինչ ավելացված չէ — ընտրեք ապրանք վերևում:",
+  },
+  "session.noSearchMatches": { en: "Nothing matches that search.", ru: "Ничего не найдено.", am: "Ոչինչ չի գտնվել:" },
+  "session.itemsTotal": { en: "Products total", ru: "Итого за товары", am: "Ընդամենը ապրանքների համար" },
+  "session.decrease": { en: "One fewer", ru: "Убрать одну", am: "Մեկով պակաս" },
+  "session.increase": { en: "One more", ru: "Добавить одну", am: "Մեկով ավելի" },
+  "session.removeItem": { en: "Remove from the session", ru: "Удалить из сессии", am: "Հեռացնել նիստից" },
   "session.search": { en: "Search by name…", ru: "Поиск по названию…", am: "Որոնում անունով…" },
-  "session.noProducts": { en: "No products in this branch yet. Add a custom item below.", ru: "В этом филиале ещё нет товаров. Добавь произвольную позицию ниже.", am: "Այս մասնաճյուղում ապրանքներ չկան: Ավելացրու ձեռքով գրառում:" },
-  "session.customItem": { en: "Or a custom item", ru: "Или произвольная позиция", am: "Կամ ձեռքով գրառում" },
+  "session.noProducts": { en: "No products in this branch yet. Add a custom item below.", ru: "В этом филиале ещё нет товаров. Добавьте произвольный товар ниже.", am: "Այս մասնաճյուղում ապրանքներ չկան: Ավելացրեք ձեռքով ապրանք ներքևում:" },
+  "session.customItem": { en: "Or a custom item", ru: "Или произвольный товар", am: "Կամ ձեռքով ապրանք" },
   "session.itemName": { en: "Name (e.g. Lays)", ru: "Название (например, Лейс)", am: "Անվանում (օր. Լեյս)" },
   "session.itemPrice": { en: "Price", ru: "Цена", am: "Գին" },
   "session.added": { en: "Added", ru: "Добавлено", am: "Ավելացված է" },

@@ -79,6 +79,17 @@ export const apiStopSessionWithBreakdown = (id: number) =>
 export const apiAddSessionItem = (id: number, body: AddItemBody) =>
   request<{ item: ISessionItem; session: ISessionApi }>(`/sessions/${id}/items`, { method: "POST", body });
 
+/**
+ * Set the quantity of a line the session already has. `qty: 0` removes it —
+ * the minus button walks a count to zero and a zero-quantity line on a bill is
+ * not a thing that should exist, so the server deletes the row.
+ */
+export const apiSetSessionItemQty = (sessionId: number, itemId: number, qty: number) =>
+  request<{ session: ISessionApi }>(`/sessions/${sessionId}/items/${itemId}`, {
+    method: "PATCH",
+    body: { qty },
+  });
+
 export const apiRemoveSessionItem = (sessionId: number, itemId: number) =>
   request<{ session: ISessionApi }>(`/sessions/${sessionId}/items/${itemId}`, { method: "DELETE" });
 

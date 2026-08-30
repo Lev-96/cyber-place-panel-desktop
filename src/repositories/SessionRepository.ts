@@ -8,6 +8,7 @@ import {
   apiListSessions,
   apiPreviewSession,
   apiRemoveSessionItem,
+  apiSetSessionItemQty,
   apiStartSession,
   apiStopSessionWithBreakdown,
   IBillBreakdown,
@@ -53,6 +54,9 @@ export class SessionRepository {
   }
   async addItem(sessionId: number, body: AddItemBody): Promise<ISessionApi> {
     return friendlyMutation(apiAddSessionItem(sessionId, body).then((r) => r.session));
+  }
+  async setItemQty(sessionId: number, itemId: number, qty: number): Promise<ISessionApi> {
+    return friendlyMutation(apiSetSessionItemQty(sessionId, itemId, qty).then((r) => r.session));
   }
   async removeItem(sessionId: number, itemId: number): Promise<ISessionApi> {
     return friendlyMutation(apiRemoveSessionItem(sessionId, itemId).then((r) => r.session));
