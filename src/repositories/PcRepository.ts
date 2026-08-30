@@ -10,10 +10,19 @@ import {
 import { friendlyMutation, orFallback } from "@/api/fallback";
 import { withToast } from "@/ui/notify";
 import { IPcApi } from "@/types/sessions";
+import { PC_KIND } from "@/types/pc";
 
 export class PcRepository {
+  /**
+   * The Computers section's list: agent-backed machines only.
+   *
+   * A console place owns a device too — it has to, sessions cannot exist
+   * without one — but it is not a computer and never belongs on this screen.
+   * The sessions board fetches its own, unfiltered list (SessionRepository),
+   * so narrowing here cannot hide a console from billing.
+   */
   async listByBranch(branchId: number): Promise<IPcApi[]> {
-    return orFallback(apiListPcsForBranch(branchId).then((r) => r.data), []);
+    return orFallback(apiListPcsForBranch(branchId, PC_KIND.Pc).then((r) => r.data), []);
   }
   async create(body: CreatePcBody): Promise<IPcApi> {
     return withToast("pc", "created", () => friendlyMutation(apiCreatePc(body).then((r) => r.pc)));
