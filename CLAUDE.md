@@ -752,6 +752,26 @@ native `confirm()` and no detached DevTools (focus traps) — use
 typecheck **both** `tsconfig.app.json` and `tsconfig.node.json`; rebuild
 and restart after changes — HMR misses CSP, `index.html`, and preload.
 
+## 9.3 Support desk (`/support`)
+
+A chat with Cyber Place support. The panel talks to OUR backend and never to
+Telegram: support reads the other side on a phone, and that leg is a delivery
+status on a message rather than a place data lives.
+
+- `SupportRepository` → `/support/conversations…`; the list is already scoped
+  server-side (manager: their branch, owner: their company, admin: all), so
+  nothing is filtered in the component — a filter in a component is a
+  permission that stops applying the moment somebody calls the API directly.
+- `useSupportMessages` subscribes to the PRIVATE `support.branch.{id}`, which is
+  per branch on purpose: owner and manager read the same thread, and a client
+  cannot subscribe to a conversation id it does not have yet.
+- A reply also arrives as a normal database notification, so the badge, the
+  bell and the chime are the ones the app already has.
+- A send that fails stays in the thread, marked, with Retry — the text somebody
+  typed about a problem they are having is the last thing to discard for them.
+
+Nothing here knows the bot token, and nothing should: it is server-only.
+
 ## 9.4 The map's basemap (READ IF THE MAP GOES GREY)
 
 Tiles come from `src/utils/mapTiles.ts`, never from a URL written into a
