@@ -2532,11 +2532,23 @@ button.pill:hover {
    only thing that could still change a card's height. */
 .place-cell .platform,
 .place-cell .until,
+.place-cell .id,
 .place-cell .subplatform {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 100%;
+}
+/* A line that shares its row with something fixed — the sessions board puts the
+   agent dot beside the platform label. A flex child refuses to shrink below its
+   content by default, so without `min-width: 0` a long label pushes the row
+   wider than the card instead of ellipsing, and the ellipsis rules above never
+   get to apply (they belong to the flex CONTAINER, not to the text inside it). */
+.place-cell .cell-line {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .place-cell .subplatform {
   font-size: 11px;

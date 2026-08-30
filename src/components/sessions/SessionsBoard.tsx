@@ -173,6 +173,18 @@ const SessionsBoard = ({ branchId }: Props) => {
     const deviceStatus = effectivePcStatus(pc);
     const color = SESSION_CELL_COLOR[cellState];
     const itemsCount = sess?.items?.length ?? 0;
+    // The two identity lines, resolved once so the JSX below stays readable.
+    // A device with no place (a legacy row) has no platform or tier to show —
+    // it still renders the line, as a non-breaking space, because a tile with
+    // one line fewer than its neighbours is the other way this grid goes ragged.
+    // Split rather than one string: the tier is the half an operator scans for
+    // ("is this the VIP one?"), and a long custom platform — "Table Tennis" —
+    // would otherwise eat the ellipsis and take the tier down with it. The
+    // platform shrinks; the tier never does.
+    const platformName = pc.place ? platformLabel(pc.place.platform) : "";
+    const tierName = pc.place ? pc.place.type : "";
+    const nameLine =
+      tr(pc.place, "name", lang).trim() || `№${pc.place?.number ?? tr(pc, "label", lang)}`;
     return (
       <div
         key={pc.id}
@@ -204,16 +216,33 @@ const SessionsBoard = ({ branchId }: Props) => {
         >
           ⠿
         </span>
-        <span className="platform" style={{ display: "inline-flex", alignItems: "center", gap: 6, flexWrap: "wrap", marginLeft: 18 }}>
+        {/* Line 1 — WHAT this seat is: platform and tier, the same
+            "PS5 · STANDARD" wording the places board uses, so an operator
+            reading both screens sees one vocabulary. The tier lives in
+            `places.type` and was simply never rendered here; the board showed
+            "PS5" and left standard and VIP indistinguishable.
+
+            The agent dot keeps its place at the head of the line and is
+            `flexShrink: 0`, so it cannot be squeezed out by a long label. */}
+        <span className="platform" style={{ display: "flex", alignItems: "center", gap: 6, marginLeft: 18 }}>
           <span
             title={deviceStatus}
             style={{ width: 8, height: 8, borderRadius: 4, background: PC_STATUS_COLOR[deviceStatus], flexShrink: 0 }}
           />
-          <span>{tr(pc.place, "name", lang).trim() || `№${pc.place?.number ?? tr(pc, "label", lang)}`}</span>
-          {pc.place && pc.place.platform !== "pc" && (
-            <span className="muted" style={{ fontSize: 11 }}>{platformLabel(pc.place.platform)}</span>
-          )}
+          {/* Nested so the platform is the only thing that can shrink, and the
+              4px gap reads as the single space in "PS5 · VIP". */}
+          <span style={{ display: "flex", alignItems: "baseline", gap: 4, minWidth: 0 }}>
+            <span className="cell-line" title={platformName || undefined}>{platformName || "\u00A0"}</span>
+            {tierName && <span style={{ flexShrink: 0 }}>· {tierName}</span>}
+          </span>
         </span>
+        {/* Line 2 — WHICH seat it is. Its own line at the card's identity size,
+            because a name an operator typed ("Плейстейшен 5 ВИП большое место")
+            is what they actually look for, and sharing a wrapping flex row with
+            the platform label is what pushed the status and the button down the
+            card by a different amount on every tile. One line, ellipsis, and
+            the full text on hover — the rule every other line here follows. */}
+        <span className="id cell-line" title={nameLine}>{nameLine}</span>
         {sess ? (
           <>
             <span className="status" style={{ color }}>
@@ -237,15 +266,21 @@ const SessionsBoard = ({ branchId }: Props) => {
           </>
         ) : (
           <>
+            {/* The platform used to be repeated here ("Свободно · PS5") because
+                the header could not be trusted to show it. It has its own line
+                now, with the tier, so the status says only what it is for: the
+                state of the seat. */}
             <span className="status" style={{ color }}>
               {isOffline
                 ? t("session.deviceOffline")
                 : isReserved
                   ? t("session.reserved") || "Reserved"
-                  : `${t("session.free")}${pc.place && pc.place.platform !== "pc" ? ` · ${platformLabel(pc.place.platform)}` : ""}`}
+                  : t("session.free")}
             </span>
             {isOffline && (
-              <span className="until muted" style={{ fontSize: 11 }}>{t("session.deviceOfflineHint")}</span>
+              <span className="until muted" style={{ fontSize: 11 }} title={t("session.deviceOfflineHint")}>
+                {t("session.deviceOfflineHint")}
+              </span>
             )}
             <Button
               onClick={() => setStartTarget(pc)}
