@@ -1,4 +1,5 @@
 import { useAuth } from "@/auth/AuthContext";
+import { useRealtimeVersion } from "@/realtime/useRealtimeVersion";
 import { apiAgentUpdateStatus } from "@/api/agent-updates";
 import { apiCheckUpdates, type UpdateCheckEntry } from "@/api/updates";
 import { useAppUpdates } from "@/realtime/useAppUpdates";
@@ -144,6 +145,10 @@ export const UpdatesNotificationProvider = ({ children }: { children: ReactNode 
   // (agent only); manager +10s (agent only). We don't need to inspect
   // the event payload — any signal on our channel means "new version
   // exists, refresh state so badge + toast surface it".
+  // Re-attaches when the Echo client is rebuilt on connection details the
+  // backend handed us: a subscription on the discarded client is silent.
+  const realtime = useRealtimeVersion();
+
   useEffect(() => {
     const channelName = channelForRole(role);
     if (!channelName) return;
@@ -160,7 +165,7 @@ export const UpdatesNotificationProvider = ({ children }: { children: ReactNode 
         echo.leaveChannel(channelName);
       } catch { /* echo may be torn down already during HMR */ }
     };
-  }, [role, reload]);
+  }, [role, reload, realtime]);
 
   // Promote broadcast (admin clicked Apply somewhere in the fleet):
   // re-sync so the "available" badge clears once the pointer moves.

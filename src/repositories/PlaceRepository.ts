@@ -22,7 +22,11 @@ export class PlaceRepository {
   async byId(id: number): Promise<IBranchPlace> {
     return (await apiGetPlaceById(id)).data;
   }
-  async create(b: CreatePlaceBody): Promise<void> { await withToast("place", "created", () => apiCreatePlace(b)); }
+  /** Returns the created row so the caller can attach its per-language names. */
+  async create(b: CreatePlaceBody): Promise<IBranchPlace | null> {
+    const res = await withToast("place", "created", () => apiCreatePlace(b));
+    return res?.places ?? null;
+  }
   async update(id: number, b: UpdatePlaceBody): Promise<void> { await withToast("place", "updated", () => apiUpdatePlace(id, b)); }
   async remove(id: number): Promise<void> { await withToast("place", "deleted", () => apiDeletePlace(id)); }
   nextNumber(branchId: number) { return apiNextPlaceNumber(branchId).then((r) => r.next); }

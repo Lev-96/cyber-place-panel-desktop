@@ -1,6 +1,8 @@
 import { IAccountSwitchTarget } from "@/api/accountSwitch";
 import { useAuth } from "@/auth/AuthContext";
 import { can } from "@/auth/permissions";
+import SupportIcon from "@/components/ui/SupportIcon";
+import { useSupportUnread } from "@/support/SupportUnreadContext";
 import AccountSwitchModal from "@/components/profile/AccountSwitchModal";
 import AccountSwitchPanel from "@/components/profile/AccountSwitchPanel";
 import ProfileModal from "@/components/profile/ProfileModal";
@@ -264,6 +266,7 @@ const Sidebar = () => {
   const { user, logout } = useAuth();
   const { t } = useLang();
   const { unreadCount } = useNotifications();
+  const { unread: supportUnread } = useSupportUnread();
   const { panel: panelUpd, agent: agentUpd } = useUpdatesNotification();
   const role = user?.role;
 
@@ -335,6 +338,9 @@ const Sidebar = () => {
       {can(role, "menu.expenses") && (
         <NavLink to="/expenses">{t("nav.expenses")}</NavLink>
       )}
+      {can(role, "menu.metrics") && (
+        <NavLink to="/metrics">{t("nav.metrics")}</NavLink>
+      )}
       {can(role, "menu.myCompany") && (
         <NavLink to="/my-company">{t("nav.myCompany")}</NavLink>
       )}
@@ -358,6 +364,13 @@ const Sidebar = () => {
         <NavLink to="/settings/agent-updates">
           {t("nav.agentUpdates")}
           <UnreadBadge count={agentUpdateCount} />
+        </NavLink>
+      )}
+      {can(role, "menu.support") && (
+        <NavLink to="/support" className="nav-support">
+          <SupportIcon />
+          <span className="nav-support__label">{t("nav.support")}</span>
+          <UnreadBadge count={supportUnread} />
         </NavLink>
       )}
       </nav>

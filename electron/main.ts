@@ -1,4 +1,4 @@
-import { BrowserWindow, Menu, MenuItemConstructorOptions, app, ipcMain, net, protocol, session, shell } from "electron";
+import { BrowserWindow, Menu, MenuItemConstructorOptions, app, ipcMain, net, protocol, screen, session, shell } from "electron";
 import { createSocket } from "node:dgram";
 import { existsSync } from "node:fs";
 import { join, normalize, resolve } from "node:path";
@@ -6,9 +6,15 @@ import { pathToFileURL } from "node:url";
 import { Store } from "./storage";
 import { UpdateService, broadcastUpdateState } from "./updates/UpdateService";
 import { bundledIconPath, ensureLinuxDesktopIntegration } from "./linuxIntegration";
+import { mayNavigateTo, mayOpenExternally, navigationKeyFor } from "./urlPolicy";
 
-const DEV_URL = process.env.ELECTRON_DEV_URL ?? "";
-const isDev = DEV_URL.length > 0 || !app.isPackaged;
+// `isDev` follows how the app was BUILT, never the environment it starts in.
+// Previously a packaged panel launched with ELECTRON_DEV_URL set would load
+// that URL with the preload attached — and this preload exposes `kv:get`,
+// which returns the operator's Sanctum token. Reading DEV_URL only in an
+// unpackaged build keeps the developer workflow identical.
+const isDev = !app.isPackaged;
+const DEV_URL = isDev ? (process.env.ELECTRON_DEV_URL ?? "") : "";
 
 // Silence Chromium's own diagnostic chatter (CSP warnings, GL probes,
 // Autofill devtools messages, GPU info, etc.). Same approach Discord and
@@ -65,10 +71,52 @@ const registerAppProtocol = (root: string) => {
   });
 };
 
+/**
+ * Default content size of the main window, in CSS pixels.
+ *
+ * Measured from the layout the login screen was signed off at, and expressed
+ * as CONTENT rather than frame size — see the note at the BrowserWindow call.
+ */
+const DEFAULT_CONTENT = { width: 1150, height: 890 } as const;
+
+/**
+ * Margin left around the window when a display cannot fit the default.
+ * Enough to keep the frame, a taskbar shadow and a drop shadow clear of the
+ * screen edges.
+ */
+const SCREEN_MARGIN = 60;
+
+/**
+ * The size to open at on THIS machine.
+ *
+ * The default is a preference, not a promise: a 1366×768 laptop cannot show a
+ * 1150×890 window, and opening one there would push the sign-in button off the
+ * bottom of the screen with no way to reach it. Clamping to the display's work
+ * area — which already excludes taskbars and docks — is what makes one default
+ * safe on every system rather than only on the machine it was measured on.
+ */
+const preferredWindowSize = () => {
+  const { workAreaSize } = screen.getPrimaryDisplay();
+
+  return {
+    width: Math.min(DEFAULT_CONTENT.width, Math.max(960, workAreaSize.width - SCREEN_MARGIN)),
+    height: Math.min(DEFAULT_CONTENT.height, Math.max(600, workAreaSize.height - SCREEN_MARGIN)),
+  };
+};
+
 const createWindow = async () => {
+  const { width, height } = preferredWindowSize();
+
   mainWindow = new BrowserWindow({
-    width: 1280,
-    height: 800,
+    width,
+    height,
+    // These numbers describe the WEB CONTENT, not the outer frame. Title bars
+    // differ in height across Windows, macOS and every Linux window manager,
+    // so sizing the frame would hand each platform a slightly different canvas
+    // — and the login composition is laid out against the viewport. Content
+    // sizing is what makes it identical everywhere.
+    useContentSize: true,
+    center: true,
     minWidth: 960,
     minHeight: 600,
     backgroundColor: "#020514",
@@ -81,9 +129,31 @@ const createWindow = async () => {
     },
   });
 
+  // Only hand the OS a URL we are willing to act on. The URLs arriving here
+  // are server-supplied (Pulse entry link, Metrika dashboard), so an
+  // unrestricted openExternal would let a hostile or compromised backend
+  // response launch `file://`, `smb://` or a Windows handler URI.
   mainWindow.webContents.setWindowOpenHandler(({ url }: { url: string }) => {
-    shell.openExternal(url);
+    if (mayOpenExternally(url)) {
+      void shell.openExternal(url);
+    } else {
+      console.warn("[panel] refused to open external URL:", url);
+    }
     return { action: "deny" as const };
+  });
+
+  // The top-level frame may never leave the bundled app. If it did, the
+  // preload — and `kv:get`, which returns the Sanctum token — would follow.
+  const allowedNavigation = [
+    `${APP_SCHEME}://localhost`,
+    ...(isDev && DEV_URL ? [navigationKeyFor(DEV_URL) ?? ""] : []),
+  ].filter(Boolean);
+
+  mainWindow.webContents.on("will-navigate", (event, url) => {
+    if (!mayNavigateTo(url, allowedNavigation)) {
+      event.preventDefault();
+      console.warn("[panel] blocked navigation to", url);
+    }
   });
 
   // Native right-click menu. Electron ships none by default, so without this

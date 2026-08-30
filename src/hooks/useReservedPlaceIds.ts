@@ -1,6 +1,8 @@
+import { useAuth } from "@/auth/AuthContext";
 import { Booking } from "@/domain/Booking";
 import { useBookingChanged } from "@/realtime/useBookingChanged";
 import { BookingChangedEvent } from "@/realtime/useBookingChanged";
+import { resolveBookingScopeChannel } from "@/realtime/bookingScope";
 import { bookingRepository } from "@/repositories/BookingRepository";
 import { useCallback, useEffect, useState } from "react";
 
@@ -77,6 +79,7 @@ const fetchReservedPlaceIds = async (branchId: number): Promise<Set<number>> => 
  * dereference `.has(...)` safely without a null guard.
  */
 export const useReservedPlaceIds = (branchId: number): Set<number> => {
+  const { user } = useAuth();
   const [ids, setIds] = useState<Set<number>>(new Set());
 
   const reload = useCallback(async () => {
@@ -102,8 +105,14 @@ export const useReservedPlaceIds = (branchId: number): Set<number> => {
   // because the channel is global. Keeping the terminal set as
   // data-driven rather than a chain of `if`s means a future kind
   // (e.g. `expired`) only needs to be added to the array.
+  // Was `"bookings.global"` for every role, with a client-side `branch_id`
+  // filter standing in for scoping. The filter stays — an admin legitimately
+  // receives other branches here — but the channel is now the caller's own
+  // scope, so an owner's or manager's machine is no longer handed the whole
+  // platform's bookings just to colour one grid.
+  const bookingScope = resolveBookingScopeChannel(user);
   useBookingChanged(
-    "bookings.global",
+    bookingScope?.name,
     useCallback((evt) => {
       if (evt.branch_id !== branchId) return;
       const isTerminal = TERMINAL_BOOKING_KINDS.includes(evt.kind);
@@ -115,6 +124,7 @@ export const useReservedPlaceIds = (branchId: number): Set<number> => {
         return next;
       });
     }, [branchId]),
+    bookingScope?.isPrivate ?? false,
   );
 
   // Sanity sweep: drops bookings that quietly expired between

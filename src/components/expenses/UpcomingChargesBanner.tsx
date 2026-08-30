@@ -1,4 +1,5 @@
 import { IServiceExpense } from "@/api/expenses";
+import { tr } from "@/i18n/translated";
 import { dueLabel } from "@/components/expenses/expenseFormat";
 import Button from "@/components/ui/Button";
 import { formatDate } from "@/i18n/dates";
@@ -30,7 +31,7 @@ const UpcomingChargesBanner = ({ items, onMarkPaid, busyId }: Props) => {
         {items.map((e) => (
           <div key={e.id} className="row-between" style={{ fontSize: 14, gap: 10 }}>
             <span>
-              <span style={{ fontWeight: 600 }}>{e.name}</span>
+              <span style={{ fontWeight: 600 }}>{tr(e, "name", lang)}</span>
               <span className="muted">
                 {" · "}{dueLabel(e.days_until_due, t)}{" · "}{formatDate(e.next_due_at)}
               </span>

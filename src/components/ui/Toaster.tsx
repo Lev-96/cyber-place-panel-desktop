@@ -28,16 +28,43 @@ const Toaster = () => {
 
   const dismiss = (id: number) => setItems((cur) => cur.filter((x) => x.id !== id));
 
-  // Entity-specific message ("toast.place.created") with a graceful
-  // fallback to the generic action message ("toast.generic.created").
-  // `t()` returns the key itself when a translation is missing, which is
-  // how we detect the entity key is absent and fall back.
+  // `t()` returns the key itself when a translation is missing, which is how
+  // the fallbacks below detect an absent key.
+  const resolve = (key: string): string | null => {
+    const value = t(key);
+    return value === key ? null : value;
+  };
+
+  /**
+   * The sentence has to agree with the colour.
+   *
+   * A failed create used to render the SUCCESS message in a red box — "New
+   * place created", with a cross in front of it — because both outcomes were
+   * resolved from the same `toast.{entity}.{action}` key and only the styling
+   * differed. Somebody reading that is told the opposite of what happened, and
+   * red is the easier half to miss.
+   *
+   * So the two kinds resolve from different key spaces:
+   *
+   *   success  toast.{entity}.{action}  →  toast.generic.{action}
+   *   error    toast.fail.{action}      →  toast.generic.error
+   *
+   * The failure side is per-ACTION rather than per-entity on purpose: "could
+   * not create" reads correctly for every entity, and one key per entity per
+   * action per language is a dictionary nobody would keep complete.
+   */
   const message = (e: ToastEvent): string => {
     if (e.text) return e.text; // raw-text toast (former alert())
-    const specificKey = `toast.${e.entity}.${e.action}`;
-    const specific = t(specificKey);
-    if (specific !== specificKey) return specific;
-    return t(`toast.generic.${e.action}`);
+
+    if (e.kind === "error") {
+      return resolve(`toast.fail.${e.action}`) ?? t("toast.generic.error");
+    }
+
+    return (
+      resolve(`toast.${e.entity}.${e.action}`)
+      ?? resolve(`toast.generic.${e.action}`)
+      ?? t("toast.generic.saved")
+    );
   };
 
   if (items.length === 0) return null;

@@ -25,6 +25,15 @@ export const apiLogin = async (email: string, password: string): Promise<LoginRe
 
 export const apiGetMe = () => request<{ user: AuthUser }>("/user/me");
 
+/**
+ * Revokes the session server-side. The backend deletes EVERY personal access
+ * token the user holds, so a token copied off disk before sign-out stops
+ * working too. The panel previously cleared only its local copy, which left
+ * the Sanctum token valid indefinitely — and tokens have no expiry.
+ */
+export const apiLogout = () =>
+  request<{ messages?: string }>("/session/logout", { method: "POST" });
+
 export const apiForgotPassword = (email: string) =>
   request<void>("/forgot-password", { method: "POST", body: { email } });
 

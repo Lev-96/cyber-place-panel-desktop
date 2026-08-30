@@ -2,6 +2,7 @@ import { useAuth } from "@/auth/AuthContext";
 import GradientText from "@/components/ui/GradientText";
 import ScreenWithBg from "@/components/ui/ScreenWithBg";
 import { useLang } from "@/i18n/LanguageContext";
+import { resolveBookingScopeChannel } from "@/realtime/bookingScope";
 import { useBookingChanged } from "@/realtime/useBookingChanged";
 import { useCallback, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
@@ -51,7 +52,10 @@ const Home = () => {
     void refreshUserRef.current();
   }, []);
 
-  useBookingChanged("bookings.global", debouncedRefreshUser);
+  // Was `bookings.global` for every role — an owner's machine received every
+  // booking on the platform just to know when to refresh its own dashboard.
+  const bookingScope = resolveBookingScopeChannel(user);
+  useBookingChanged(bookingScope?.name, debouncedRefreshUser, bookingScope?.isPrivate ?? false);
   const isAdmin = user?.role === "admin";
   const isOwner = user?.role === "company_owner";
   const isManager = user?.role === "manager";
@@ -140,6 +144,19 @@ const Home = () => {
               {t("home.menu.expenses")}
             </div>
             <div className="muted">{t("home.menu.expensesSub")}</div>
+          </Link>
+        )}
+        {/* Website analytics + backend monitoring both live in the "Метрики"
+            section, so this is a plain link — the Pulse entry point sits
+            inside that screen rather than being duplicated here. Admin-only
+            in the UI AND on the server (the endpoints are behind the admin
+            guard), so this tile is convenience, not the access control. */}
+        {isAdmin && (
+          <Link to="/metrics" className="card" style={{ minWidth: 220 }}>
+            <div style={{ fontWeight: 700, fontSize: 16 }}>
+              {t("home.menu.metrics")}
+            </div>
+            <div className="muted">{t("home.menu.metricsSub")}</div>
           </Link>
         )}
         <Link to="/settings" className="card" style={{ minWidth: 220 }}>

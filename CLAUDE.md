@@ -226,12 +226,14 @@ booking instantly" and "the cashier finds out 30 s later via polling".
 
 | Channel | Visibility | Purpose for this panel |
 |---|---|---|
-| `branch.{id}` | public | manager: booking + place + tournament + branch-subscribe events for one venue |
-| `company.{id}` | public | owner: same scoped to a whole company |
-| `bookings.global` | public | admin: same for admin-wide visibility |
+| `branch.{id}` | **private** (since 2026-08-18) | manager: booking + place + tournament + branch-subscribe events for one venue. The public `branch.{id}` still exists for the mobile app's guest token, carries no person, and this panel does not use it |
+| `company.{id}` | **private** (since 2026-08-18) | owner: same scoped to a whole company |
+| `bookings.global` | **private** (since 2026-08-18) | admin: same for admin-wide visibility |
+| `branches` | public | catalogue feed: which venues an administrator just closed or reopened, as two lists of ids. Public because the mobile app listens on a guest token; carries no name, address or reason |
 | `app-updates` | public | promoted-version broadcasts |
 | `app-updates.{role}` | public | release-available per role |
 | `user.{id}.notifications` | **private** (wire: `private-user.{id}.notifications`) | per-user notification feed |
+| `user.{id}.access` | **private** (wire: `private-user.{id}.access`) | admin blocked this account's company / branch — sign out, or leave the branch |
 
 Role-aware routing for staff is preserved in backend
 `GlobalBookingNotifier::resolveBookingChannel`:
@@ -247,8 +249,79 @@ manager → `branch.{id}`, orphan → null (no subscription).
 | `BranchSubscribed` | `branch.subscribed` | branch + company + global |
 | `TournamentJoined` | `tournament.joined` | branch + company + global |
 | `UserNotificationCreated` | `notification.created` | user.{id}.notifications |
+| `StaffAccessChanged` | `access.changed` | user.{id}.access |
+| `BranchVisibilityChanged` | `branch.visibility.changed` | `branches` + branch.{id} |
 | `AppReleaseAvailable` | `app-release.available` | app-updates.{role} |
 | `AppUpdatePromoted` | `app-update.promoted` | app-updates |
+
+### The socket's identity comes from the BACKEND, not from this build
+
+`primeRealtimeConfig()` (called once from `App`) fetches `GET /realtime/config`
+and adopts the host/port/scheme/key the backend actually broadcasts with,
+caching it in `localStorage` for the next launch. `VITE_REVERB_*` is only the
+fallback until that lands or when the backend is unreachable.
+
+Every effect that subscribes takes `useRealtimeVersion()` as a dependency —
+without it a subscription stays on the discarded client, looks alive and
+receives nothing.
+
+Proven with a build carrying `VITE_REVERB_KEY=PANEL_WRONG_KEY`: it adopted the
+server's key, reached `connected`, and a block applied from another process
+badged the branch list with no reload.
+
+**2026-08-29 — then the server's key was the wrong one.** The staging backend
+service still carried a key its Reverb service refuses, so every client that
+asked was handed it, rejected with 4001, and polled for the session; realtime
+was off across the panel and the phones without a single error anywhere but the
+console. Adoption is therefore no longer unconditional: a 4001 on a
+server-provided key drops that answer (the `localStorage` copy included),
+rebuilds the client on the key this build ships, and remembers the refused key
+so `primeRealtimeConfig` cannot pull the working connection back down. Pinned by
+`src/realtime/echo.keyFallback.test.ts`.
+
+A floor, not a cure — the deployment is still wrong until backend, Reverb and
+the builds agree on one string. `php artisan realtime:check` on the backend is
+what says whether they do; note that publishing succeeds even with a dead key
+(Reverb authenticates that path by app id and signature), so only the client
+handshake half of that command answers this question.
+
+### Where the Reverb app key comes from (and what was wrong with it)
+
+| Build | Source of `VITE_REVERB_KEY` |
+|---|---|
+| local dev (`npm run dev`) | `.env` — **untracked**, local to each machine |
+| packaged staging build | `.env.staging`, which CI writes from the GitHub repo **variable `ENV_STAGING`** (`release-staging.yml`) |
+| packaged production build | same shape, from the production variable |
+
+(An earlier version of this file claimed `.env.staging` / `.env.production` are
+tracked in git. They are not — `git ls-files` shows only `.env.example`. CI
+materialises them from repo variables, which is where a key change has to be
+made for packaged builds.)
+
+**2026-08-28:** the local `.env` / `.env.staging` carried `uzhm…` while both
+deployed Reverb services were running `iilyg…`, so every socket this panel
+opened was refused with 4001 and it fell back to polling. The local files now
+carry the key the servers actually run; if the packaged staging build shows the
+same rejection, the `ENV_STAGING` repo variable still holds the old key.
+
+### Realtime must re-read after a reconnect
+
+A WebSocket has no backlog: anything broadcast while the connection was down is
+gone. Two places re-read on reconnect (and only on RE-connect — the first
+`connected` lands while the mount fetch is already in flight):
+`BranchVisibilityGuard`'s screens through `accessVersion`, and
+`NotificationsContext`, which re-reads its feed. Without it the 60 s poll
+eventually corrects the unread COUNT while the feed itself keeps describing the
+world as it was before the gap.
+
+### Config: the app key must match the server
+
+`VITE_REVERB_KEY` has to equal `REVERB_APP_KEY` on the Reverb service AND on the
+backend broadcasting to it. Otherwise Reverb refuses the socket with Pusher code
+**4001 "Application does not exist"**, every screen silently falls back to
+polling, and the panel looks merely quiet. `src/realtime/echo.ts` prints ONE
+loud `[reverb] REJECTED …` line naming the key and host; the backend has
+`php artisan realtime:check`.
 
 ### Invariants — break these and clients misfire
 
@@ -276,9 +349,21 @@ manager → `branch.{id}`, orphan → null (no subscription).
 10. **No HTTP refresh inside a Reverb event handler.** Optimistic-patch
     local state from the payload; periodic polling (30–60 s) handles
     canonical reconciliation.
+    *One documented exception:* `AccessGuard` calls `refreshUser()` on
+    `.access.changed`. The rule exists to stop a request storm on hot,
+    high-frequency events; this one is an administrator pressing a button,
+    fans out to the staff of a single company, and the payload deliberately
+    does NOT carry the account's new scope (which branches it may still
+    reach) — there is nothing to patch optimistically from. Do not read this
+    as licence to fetch from booking/place handlers.
 11. **Polling fallback is mandatory** on every realtime-critical screen
     (`useReservedPlaceIds`, `NotificationsContext` etc.) — 30–60 s. Reverb
     dropouts are silent; polling is the safety net.
+    `.access.changed` gets a different safety net, not a poll: the backend has
+    already revoked the account's tokens, so `src/api/client.ts` raises
+    `sessionExpiry` on a 401 that carried a token and `AccessGuard` signs out.
+    Polling for "am I still allowed in" would ask the same question the next
+    request answers for free.
 12. **Notifications must be branch-scoped.** Every push / email / Reverb
     delivery to staff is filtered by recipient `branch_id`. Owner/manager
     must not see other branches; no global broadcasts to staff. Audit
@@ -555,6 +640,42 @@ Before marking work complete:
 
 ---
 
+## 7.6 Client response cache (`src/api/httpCache.ts`)
+
+`request()` in `src/api/client.ts` caches GET responses in memory. The
+backend cooperates by putting a strong ETag on the same endpoints, so a
+stale entry costs a 304 rather than a full payload.
+
+Hard rules:
+
+- **Opt-in only.** A path is cached only if `POLICIES` lists it. Live
+  data — `/sessions`, `/pcs`, `/orders`, `/shifts`, `/notifications`,
+  `/bookings`, `/members`, `/users` — must NEVER be added. The floor
+  board and the cash drawer are allowed to be slow; they are not allowed
+  to be wrong.
+- **Memory only, bounded on both axes** (300 entries / 8 MB, LRU) plus a
+  60s janitor that drops anything untouched for 10 minutes. Nothing is
+  written to disk, so a panel left open for weeks cannot accumulate a
+  cache directory. Do not "improve" this by persisting it.
+- **Every identity change clears it** — `AuthContext` login AND logout.
+  A manager signing in after an owner must not be able to read a
+  response the owner's session cached.
+- **Writes invalidate what they touch**, including the other resources
+  that embed them (`MUTATION_FANOUT`). The Reverb handlers
+  (`useBookingChanged`, `usePlaceAvailability`) invalidate too, so a
+  change made on another machine lands immediately instead of waiting
+  out a TTL.
+- Pass `noCache: true` to `request()` for a forced refresh; it also
+  sends `Cache-Control: no-cache`, which makes the backend recompute.
+
+Chromium's own disk cache is capped at 50 MB by a command-line switch
+and purged at boot plus hourly (`electron/main.ts`) — that is a separate
+mechanism from this one, and both are needed.
+
+Covered by `src/api/httpCache.test.ts` and `src/api/client.cache.test.ts`.
+
+---
+
 ## 8. AI Assistant Behaviour (for me, Claude)
 
 When working on this project:
@@ -586,6 +707,199 @@ When working on this project:
    changed screens** — name exactly which screens to smoke-test rather
    than implying they were visually verified. Hold the line: don't
    fake-100% on anything you didn't actually run.
+
+---
+
+## 9. Specialist roles, agents & plugins (use them — don't improvise)
+
+Cyber Place is built to a professional standard across four disciplines:
+**architecture, security, design, go-to-market.** Each has a dedicated
+subagent in `~/.claude/agents/` with this product's real constraints baked
+in. Delegate instead of doing everything in one pass; run independent ones
+in parallel.
+
+| Agent | Use it for (panel-relevant) |
+|---|---|
+| `cp-frontend-architect` | State/data flow, hooks, API layer, Reverb wiring, per-user UI isolation, performance, strict-TS contracts |
+| `cp-ui-designer` | Screens, board layout, status language, empty/error/offline states, `en/ru/am` sizing, §7.5 CSS compliance |
+| `cp-security-engineer` | Electron hardening (`contextIsolation`, preload surface, CSP, navigation handlers, update signing), role-scoped data in the UI |
+| `cp-backend-architect` | When the panel needs a field or scope the API doesn't provide — fix it server-side, don't fake it here |
+| `cp-release-engineer` | electron-builder packaging, `artifactName`, signing, staging-as-separate-app, two-stage update gating |
+| `cp-business-strategist` | Which tier gates which panel feature, and what metering that requires |
+
+**Slash commands** (`~/.claude/commands/`): `/cp-design`, `/cp-feature`,
+`/cp-secure`, `/cp-ship`, `/cp-market`, `/cp-business`.
+
+**Plugins enabled in every session:**
+
+- **`superpowers`** — brainstorming before building, TDD, systematic
+  debugging, verification-before-completion. Process skills set the
+  approach; implementation skills follow.
+- **`frontend-design`** — invoke **before writing any UI**; `cp-ui-designer`
+  applies it to this product's dark-first, dense operations aesthetic. Add
+  `dataviz` for charts, KPI tiles, and dashboards.
+- **`code-review`** — `/code-review` on the branch diff before pushing.
+- **`aikido`** — `aikido:scan` on changed files after non-trivial work.
+- **`context7`** — current Electron / React 19 / Vite docs instead of memory.
+
+**Panel defaults these roles enforce** (restated because they regress most
+often): the backend is the source of truth; realtime is Reverb delta **plus**
+a REST snapshot on mount, and a slim broadcast means refetch; persisted UI
+state is keyed per user (`u{id}:key`) and resets on auth change; role
+scoping is enforced in the UI *and* the API, never only in the UI; no
+native `confirm()` and no detached DevTools (focus traps) — use
+`ConfirmDialog`; no `<input type="number">` — use `NumberStepper`;
+typecheck **both** `tsconfig.app.json` and `tsconfig.node.json`; rebuild
+and restart after changes — HMR misses CSP, `index.html`, and preload.
+
+## 9.3 Support desk (`/support`)
+
+A chat with Cyber Place support. The panel talks to OUR backend and never to
+Telegram: support reads the other side on a phone, and that leg is a delivery
+status on a message rather than a place data lives.
+
+- **A thread is personal.** It belongs to the user who opened it — an owner
+  does not see their managers' threads and vice versa. Enforced on the backend
+  (ownership before branch scope, on every route); nothing is filtered here,
+  because a filter in a component is a permission that stops applying the
+  moment somebody calls the API directly.
+- `useSupportMessages` subscribes to the PRIVATE `support.user.{id}` — the
+  person, not the branch. One subscription covers every thread the account has,
+  including one opened a second ago.
+- Attachments have no URL. `supportRepository.downloadAttachment` fetches the
+  bytes with the session token from `/support/attachments/{id}` and saves them
+  through a blob; the payload carries no path, and there is nothing to link to
+  that would skip the check.
+- **Signing out drops the socket** (`disconnectEchoForSignOut` in `logout`).
+  Channels live on the connection, not on the components that subscribed, so
+  without it an account switch on one machine leaves the new operator attached
+  to the previous one's private channels.
+- `SupportUnreadContext` owns the sidebar badge, the chime and the floating
+  card, and it is **entirely separate from the bell**. Support does not appear
+  in `NotificationsContext`, in the Notifications screen or in its counter —
+  not because anything filters it out, but because the backend stopped writing
+  those rows. Its only input is `support.user.{id}`, through the same
+  `useSupportMessages` hook the chat screen uses.
+  - Not an arrival: a message this account SENT (the channel carries both
+    directions), a message id already seen (a reconnect replays), and a reply
+    to the thread on screen — for the badge only, which `SupportChat` reports
+    via `setActiveConversation`; it still gets the card and the chime.
+  - The count comes from the server (`unread` per conversation, summed) on
+    mount and after every read. A channel has no history, so a restart shows
+    the right number and plays nothing.
+- `SupportNotifier` renders one card at a time, top-right beside the booking
+  one: a burst of replies replaces it and restarts its timer instead of
+  stacking. It plays `playSupportChime` — two soft sine notes stepping DOWN,
+  against the app's rising triangle arpeggio. Never share the two: the sound is
+  the only thing that says "a person is waiting for you" without looking.
+- The branch question is asked with `BranchPicker` — selectable cards with the
+  company, address and logo, searchable past six branches. One branch is not a
+  choice: `SupportChat` opens that thread itself and never shows the picker.
+- A send that fails stays in the thread, marked, with Retry — the text somebody
+  typed about a problem they are having is the last thing to discard for them.
+
+Nothing here knows the bot token, and nothing should: it is server-only.
+
+## 9.4 The map's basemap (READ IF THE MAP GOES GREY)
+
+Tiles come from `src/utils/mapTiles.ts`, never from a URL written into a
+component. The reason is on the record: the panel drew CartoDB's public tiles —
+free and keyless when that code was written — and CARTO later put them behind
+registration. The URL still answered 200; every tile just became a grey square
+reading "API KEY REQUIRED". Nothing threw, no request failed, and the map simply
+stopped being a map.
+
+Default: Esri Dark Gray Canvas, no key, two layers (the picture and the names
+on it), `maxNativeZoom: 16` so the address picker can still zoom past 16 onto an
+upscaled tile instead of blank ones.
+
+To move to a paid provider, set `VITE_MAP_TILE_URL` (plus
+`VITE_MAP_TILE_ATTRIBUTION`, and `…_MAX_ZOOM` / `…_MAX_NATIVE_ZOOM` /
+`…_SUBDOMAINS` if they differ). The key lives in that URL template in the
+environment — never in the source. It is public either way, since it ships in
+the bundle and travels in every tile request; restrict it by referer at the
+provider rather than pretending otherwise.
+
+**The tile host must also be in `img-src` in `index.html`.** The CSP is not a
+formality here: an allowed-by-default host does not exist, so a new provider
+whose host is missing from that line renders nothing at all in Electron.
+
+## 9.5 What each role may reach (2026-08-30)
+
+`src/auth/permissions.ts` is the map every sidebar entry, hub tile, route guard
+and CRUD button reads. It changed on 2026-08-30, and the backend gained its
+mirror the same day —
+`App\Services\Access\StaffCapability` — because a permission that only hides a
+button is not a permission: a manager who kept the URL could still POST.
+
+| Section | admin | owner | manager |
+|---|---|---|---|
+| Клиенты (members, deposits) | ✅ | ❌ | ❌ |
+| Настройки филиала | ✅ | ✅ | ❌ |
+| Смена (open/close/Z-report) | ✅ | ✅ | ❌ |
+| Места | ✅ | ✅ | ❌ |
+| Товары — создать / изменить / удалить / скрыть | ✅ | ✅ | ❌ |
+| Товары — список + поиск | ✅ | ✅ | ✅ |
+| Сессии, касса, игры, ПК, турниры, подписчики | ✅ | ✅ | ✅ |
+
+Two things that look like oversights and are not:
+
+- **Member cards are gone for the OWNER too.** They hold player identities and
+  stored balances, and nothing on the cashier path reads them — the POS charges
+  cash and sends `member_id: null`.
+- **A manager without shifts can still take money.** `orders.cashier_shift_id`
+  is nullable, so a sale files itself under the open shift if there is one and
+  simply does not if there is not — exactly what already happened outside shift
+  hours.
+
+Product READS stay open to everyone: the POS sells from that list, and the
+manager's screen is the list plus a search box with no write control on it.
+
+## 10. How work must be done here (MANDATORY — run it in this order)
+
+"100% guaranteed correct" is not achievable as a claim. It is achievable as a
+method. Do not shortcut it, and do not report completion without it.
+
+1. **Baseline BEFORE touching anything.**
+   ```
+   npm test            # vitest run
+   npm run typecheck   # BOTH tsconfig.app.json and electron/tsconfig.json
+   ```
+   Record the numbers. Without a "before" there is no proof of "no regression".
+
+2. **Check the blast radius before editing.** Anything touching an API path, a
+   Reverb channel or an event name must be grepped in `cyber-place` (backend)
+   first — and in the mobile app when the route is shared. `DELETE /subscribe/{id}`
+   is called from here *and* from mobile, with different token types.
+
+3. **Reuse this repo's own idiom.** `useConfirm()` not `window.confirm`;
+   `NumberStepper`/`PriceInput` not `<input type="number">`; `useAsync` for
+   fetch state; the `u{id}:key` prefix for anything persisted per user. A
+   parallel implementation is how drift starts.
+
+4. **Write the test, then MUTATION-VERIFY it.** Break the fix two ways, confirm
+   the test fails, restore, confirm it passes. A test that does not fail on a
+   broken fix proves nothing. When main-process logic needs covering, extract
+   the decision into a pure module (`electron/urlPolicy.ts` is the pattern) and
+   test that — Electron itself does not need to run.
+
+5. **Re-run the full suite and both typechecks**, compare against step 1.
+
+6. **`aikido_full_scan` every changed file.**
+
+7. **Commit to `staging`**, security and docs separately, stating what was
+   verified by running versus only reasoned about.
+
+**Proof ceiling here: high.** 355 vitest tests + 3 Playwright specs + two
+typechecks as of 2026-08-18, so "proven" can be earned. What cannot be:
+a human click-through of the changed screens, and anything about a packaged
+build's runtime behaviour. Name those as smoke-tests instead of implying a pass.
+
+**Realtime has a pinned contract.** `src/realtime/broadcastContract.test.ts`
+locks the eight event names and the channel shapes against the backend's
+`tests/Unit/Events/BroadcastContractTest.php`. If either side changes, both
+change in the same task — a drifted binding fails silently, with nothing in the
+console.
 
 ---
 

@@ -4,7 +4,8 @@ import { Lang } from "@/i18n/translations";
 import { platformPriceNameOf } from "@/i18n/platformPriceName";
 import { IBranchPlatformPrice } from "@/types/api";
 import { matchPlatforms, sanitizeForLang } from "@/utils/platformName";
-import { useState } from "react";
+import { useAutoTranslate } from "@/i18n/useAutoTranslate";
+import { useCallback, useState } from "react";
 
 export interface LangNames {
   en: string;
@@ -35,6 +36,11 @@ const LANG_LABEL: Record<Lang, string> = { en: "English", ru: "Русский", 
  * soon as they type, the remaining two languages reveal below so the label is
  * complete in every locale. Each field accepts ONLY its own alphabet.
  *
+ * Typing in the leading field auto-translates into the other two (shared logic
+ * in {@link useAutoTranslate}); either can then be corrected by hand, which
+ * pins it. Adopting a suggestion replaces all three at once and clears any pin,
+ * because the platform's own names then win over anything typed so far.
+ *
  * EVERY field autocompletes against existing platforms, and a match is found
  * across ALL locales of a platform — so typing "Т" / "т" (or the name in any
  * language, any case) surfaces the same платформа no matter which box you are
@@ -55,7 +61,25 @@ const PlatformNameInput = ({ value, onChange, suggestions, onPickExisting }: Pro
   // Which field currently owns the suggestion dropdown (the focused one).
   const [focused, setFocused] = useState<Lang | null>(null);
 
-  const set = (l: Lang, v: string) => onChange({ ...value, [l]: sanitizeForLang(l, v) });
+  // Auto-fills the non-leading languages. `sanitize` is passed through so a
+  // machine translation lands under the same alphabet rule as typed text —
+  // otherwise the English box could receive Cyrillic and the slug (this
+  // platform's identity) would be built from it.
+  const sanitize = useCallback((l: Lang, v: string) => sanitizeForLang(l, v), []);
+  const auto = useAutoTranslate({
+    values: value,
+    onChange,
+    primary: lang,
+    secondary: others,
+    fieldClass: "platform_name",
+    maxChars: 60,
+    sanitize,
+  });
+
+  const set = (l: Lang, v: string) =>
+    l === lang
+      ? auto.setPrimary(sanitizeForLang(l, v))
+      : auto.setSecondary(l, sanitizeForLang(l, v));
 
   const field = (l: Lang, autoFocus = false) => {
     // Match this field's text across ALL locales — typing in any input finds
@@ -76,10 +100,26 @@ const PlatformNameInput = ({ value, onChange, suggestions, onPickExisting }: Pro
           value={value[l]}
           onChange={(e) => set(l, e.target.value)}
           onFocus={() => setFocused(l)}
-          onBlur={() => setFocused((f) => (f === l ? null : f))}
+          onBlur={() => {
+            setFocused((f) => (f === l ? null : f));
+            // Leaving the leading box translates at once, so the idle debounce
+            // can be long enough not to fire between words.
+            if (l === lang) auto.flush();
+          }}
           autoFocus={autoFocus}
           autoComplete="off"
         />
+        <div className="cp-mli-note" style={{ paddingLeft: 0 }}>
+          {l === lang && auto.busy && <span className="cp-mli-busy">{t("multilang.translating")}</span>}
+          {l !== lang && auto.locked[l] && (
+            <button type="button" className="cp-mli-reset" onClick={() => auto.releaseLock(l)}>
+              {t("multilang.edited")} · {t("multilang.reset")}
+            </button>
+          )}
+          {l !== lang && !auto.locked[l] && auto.failed.includes(l) && (
+            <span className="cp-mli-failed">{t("multilang.failed")}</span>
+          )}
+        </div>
         {showSuggestions && (
           <div
             className="col"
@@ -93,7 +133,13 @@ const PlatformNameInput = ({ value, onChange, suggestions, onPickExisting }: Pro
                 className="row-between"
                 // mousedown before blur — keep focus so the click always fires.
                 onMouseDown={(e) => e.preventDefault()}
-                onClick={() => onPickExisting?.(p)}
+                onClick={() => {
+                  // Replace every language at once and drop any pin: the
+                  // platform's stored names now own the field, and a request
+                  // still in flight must not overwrite them.
+                  auto.adopt({ en: p.name_en ?? "", ru: p.name_ru ?? "", am: p.name_am ?? "" });
+                  onPickExisting?.(p);
+                }}
                 style={{
                   textAlign: "left",
                   background: "transparent",

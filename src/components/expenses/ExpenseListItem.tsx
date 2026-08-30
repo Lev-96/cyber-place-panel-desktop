@@ -1,4 +1,5 @@
 import { IServiceExpense } from "@/api/expenses";
+import { tr } from "@/i18n/translated";
 import { REMIND_WITHIN_DAYS, dueLabel, dueTone } from "@/components/expenses/expenseFormat";
 import Button from "@/components/ui/Button";
 import { formatDate } from "@/i18n/dates";
@@ -39,7 +40,7 @@ const ExpenseListItem = ({ expense: e, onEdit, onDelete, onMarkPaid, busy }: Pro
         />
         <div style={{ flex: 1 }}>
           <div className="name">
-            {e.name}
+            {tr(e, "name", lang)}
             {!e.is_active && <span className="muted"> · {t("expenses.paused")}</span>}
           </div>
           <div className="meta">

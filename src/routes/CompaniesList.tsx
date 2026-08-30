@@ -5,6 +5,7 @@ import Button from "@/components/ui/Button";
 import ScreenWithBg from "@/components/ui/ScreenWithBg";
 import { ListSkeleton } from "@/components/ui/Skeleton";
 import { useAsync } from "@/hooks/useAsync";
+import { useAccessVersion } from "@/realtime/accessVersion";
 import { useLang } from "@/i18n/LanguageContext";
 import { companyRepository } from "@/repositories/CompanyRepository";
 import { useState } from "react";
@@ -13,7 +14,11 @@ import { Link } from "react-router-dom";
 const CompaniesList = () => {
   const { user } = useAuth();
   const { t } = useLang();
-  const { data: companies, loading, error, reload } = useAsync(() => companyRepository.list(), []);
+  // Re-read when a block lands, wherever it came from: this list badges every
+  // company with its block state, and a badge that lags behind the server is
+  // the one thing this screen must not do.
+  const access = useAccessVersion();
+  const { data: companies, loading, error, reload } = useAsync(() => companyRepository.list(), [access]);
   const [creating, setCreating] = useState(false);
   const canCreate = can(user?.role, "company.create");
 
@@ -34,6 +39,12 @@ const CompaniesList = () => {
                 <div className="meta">
                   {c.raw.email} · {t("companiesList.branchesShort")} {c.raw.branches_count ?? 0} ·{" "}
                   <span className={`pill ${c.raw.status}`}>{c.raw.status}</span>
+                  {/* A blocked company stays in the list — an admin has to be
+                      able to find it in order to reopen it — but it must be
+                      recognisable without opening every row. */}
+                  {c.raw.is_blocked && (
+                    <> · <span className="pill blocked">{t("blocking.state.company")}</span></>
+                  )}
                 </div>
               </div>
               <span className="muted">{t("common.open")}</span>

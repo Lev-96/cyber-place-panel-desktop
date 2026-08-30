@@ -1,5 +1,7 @@
 import { useEffect, useRef } from "react";
+import { useRealtimeVersion } from "@/realtime/useRealtimeVersion";
 import { getEcho } from "./echo";
+import { apiCache } from "@/api/client";
 
 /**
  * Frozen mirror of `App\Events\BookingChanged` payload from the backend.
@@ -60,9 +62,19 @@ export interface BookingChangedEvent {
 export const useBookingChanged = (
   channelName: string | null | undefined,
   onChange: (event: BookingChangedEvent) => void,
+  /**
+   * Subscribe through `echo.private()` instead of `echo.channel()`. The staff
+   * feeds (`bookings.global`, `company.{id}`) are authorised now; the wire name
+   * gains a `private-` prefix, which Echo adds — never write it here.
+   */
+  isPrivate = false,
 ): void => {
   const handlerRef = useRef(onChange);
   useEffect(() => { handlerRef.current = onChange; }, [onChange]);
+
+  // Re-attaches when the Echo client is rebuilt on connection details the
+  // backend handed us: a subscription on the discarded client is silent.
+  const realtime = useRealtimeVersion();
 
   useEffect(() => {
     if (!channelName) {
@@ -75,10 +87,15 @@ export const useBookingChanged = (
       return;
     }
 
-    console.log(`[reverb] subscribing to ${channelName} for .booking.changed`);
-    const channel = echo.channel(channelName);
+    console.log(`[reverb] subscribing to ${isPrivate ? "private-" : ""}${channelName} for .booking.changed`);
+    const channel = isPrivate ? echo.private(channelName) : echo.channel(channelName);
     const listener = (payload: unknown) => {
       console.log(`[reverb] .booking.changed received on ${channelName}`, payload);
+      // A booking moved on another machine, which changes the free-place
+      // counts embedded in the branch and place payloads. Drop the local
+      // copies so the socket — not a TTL — decides when they refresh.
+      apiCache.invalidatePrefix("/places");
+      apiCache.invalidatePrefix("/branches");
       handlerRef.current(payload as BookingChangedEvent);
     };
     channel.listen(".booking.changed", listener);
@@ -90,5 +107,5 @@ export const useBookingChanged = (
       // internally; leaveChannel happens only when the last listener
       // detaches.
     };
-  }, [channelName]);
+  }, [channelName, isPrivate, realtime]);
 };

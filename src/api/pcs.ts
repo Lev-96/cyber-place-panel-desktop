@@ -1,7 +1,15 @@
 import { IPcApi } from "@/types/sessions";
+import { Lang } from "@/i18n/translations";
 import { PcKind } from "@/types/pc";
 import { request } from "./client";
 
+/**
+ * `source_locale` on both bodies is the language the staff member typed `label`
+ * in. The backend treats that locale as the source of truth and
+ * machine-translates the others — it never writes back into it. Omitted by
+ * older panel builds, which the backend falls back to its configured default
+ * for.
+ */
 export interface CreatePcBody {
   branch_id: number;
   place_id?: number | null;
@@ -9,6 +17,7 @@ export interface CreatePcBody {
   kind?: PcKind;
   hourly_rate?: number | null;
   mac_address?: string | null;
+  source_locale?: Lang;
 }
 
 export interface UpdatePcBody {
@@ -17,10 +26,26 @@ export interface UpdatePcBody {
   kind?: PcKind;
   hourly_rate?: number | null;
   mac_address?: string | null;
+  source_locale?: Lang;
 }
 
-export const apiListPcsForBranch = (branchId: number) =>
-  request<{ data: IPcApi[] }>("/pcs", { params: { branch_id: branchId } });
+/**
+ * Devices of a branch, optionally narrowed to one kind.
+ *
+ * The Computers section passes `kind: "pc"`. Every place owns a device —
+ * `gaming_sessions.pc_id` is NOT NULL, so a place without one could not be
+ * billed at all — but a console's device is not a computer: no agent, no
+ * pairing token, no MAC, nothing an operator ever does with it. Listing it
+ * under Computers only invited someone to "fix" a row working exactly as
+ * intended.
+ *
+ * The sessions board deliberately asks WITHOUT a kind (see `api/sessions.ts`):
+ * it needs every device, consoles included, or they could not be billed.
+ */
+export const apiListPcsForBranch = (branchId: number, kind?: PcKind) =>
+  request<{ data: IPcApi[] }>("/pcs", {
+    params: { branch_id: branchId, ...(kind ? { kind } : {}) },
+  });
 
 export const apiCreatePc = (body: CreatePcBody) =>
   request<{ pc: IPcApi }>("/pcs", { method: "POST", body });

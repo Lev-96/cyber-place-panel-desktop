@@ -16,6 +16,16 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 interface Props {
   branchId: number;
   initial?: IPcApi;
+  /**
+   * Places that already have a device, so the dropdown cannot offer one.
+   *
+   * Every place is provisioned with its device when it is created, so in
+   * practice this form is for the rare place that has none — a device deleted
+   * by hand, or a row from before that rule. The backend refuses a second
+   * device for the same place either way (422); hiding them here means the
+   * operator never reaches that refusal by picking the obvious option.
+   */
+  takenPlaceIds?: readonly number[];
   onClose: () => void;
   onSaved: (pc: IPcApi) => void;
 }
@@ -40,7 +50,7 @@ interface TierOption {
   amount: number | null;
 }
 
-const PcForm = ({ branchId, initial, onClose, onSaved }: Props) => {
+const PcForm = ({ branchId, initial, takenPlaceIds = [], onClose, onSaved }: Props) => {
   const { t, money } = useLang();
   // This form registers COMPUTERS. On create the kind is always PC; on edit
   // we keep whatever the existing device is (never silently convert it), and
@@ -58,8 +68,14 @@ const PcForm = ({ branchId, initial, onClose, onSaved }: Props) => {
   // PC place, so the list is already scoped by kind.
   const places = useAsync(() => placeRepository.listRawByBranch(branchId), [branchId]);
   const placeOptions = useMemo<IBranchPlace[]>(
-    () => filterPlacesForKind(places.data ?? [], deviceKind),
-    [places.data, deviceKind],
+    () => {
+      const scoped = filterPlacesForKind(places.data ?? [], deviceKind);
+      // On edit, the device's OWN place must stay selectable — it is "taken"
+      // by this very device.
+      const taken = new Set(takenPlaceIds.filter((id) => id !== initial?.place_id));
+      return scoped.filter((p) => !taken.has(p.id));
+    },
+    [places.data, deviceKind, takenPlaceIds, initial?.place_id],
   );
 
   // If the currently linked place vanished from the scoped list (e.g. it was

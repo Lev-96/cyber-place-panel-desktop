@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { useRealtimeVersion } from "@/realtime/useRealtimeVersion";
 import { getEcho } from "./echo";
 
 /**
@@ -26,18 +27,24 @@ export interface BranchSubscribedEvent {
 export const useBranchSubscribed = (
   channelName: string | null | undefined,
   onChange: (event: BranchSubscribedEvent) => void,
+  /** Staff feeds are authorised now — see realtime/bookingScope.ts. */
+  isPrivate = false,
 ): void => {
   const handlerRef = useRef(onChange);
   useEffect(() => {
     handlerRef.current = onChange;
   }, [onChange]);
 
+  // Re-attaches when the Echo client is rebuilt on connection details the
+  // backend handed us: a subscription on the discarded client is silent.
+  const realtime = useRealtimeVersion();
+
   useEffect(() => {
     if (!channelName) return;
     const echo = getEcho();
     if (!echo) return;
 
-    const channel = echo.channel(channelName);
+    const channel = isPrivate ? echo.private(channelName) : echo.channel(channelName);
     const listener = (payload: unknown) => {
       handlerRef.current(payload as BranchSubscribedEvent);
     };
@@ -46,5 +53,5 @@ export const useBranchSubscribed = (
     return () => {
       channel.stopListening(".branch.subscribed", listener);
     };
-  }, [channelName]);
+  }, [channelName, isPrivate, realtime]);
 };

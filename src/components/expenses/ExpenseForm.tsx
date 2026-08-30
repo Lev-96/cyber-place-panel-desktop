@@ -1,4 +1,6 @@
 import { IServiceExpense } from "@/api/expenses";
+import { apiSaveEntityTranslations } from "@/api/translations";
+import MultiLangInput, { LangValues, hasAnyValue, langValuesFromField, primaryValue } from "@/components/ui/MultiLangInput";
 import { friendlyMutation } from "@/api/fallback";
 import { formatApiError } from "@/api/errors";
 import Button from "@/components/ui/Button";
@@ -27,8 +29,10 @@ const todayIso = (): string => {
 };
 
 const ExpenseForm = ({ initial, onClose, onSaved }: Props) => {
-  const { t } = useLang();
-  const [name, setName] = useState(initial?.name ?? "");
+  const { t, lang } = useLang();
+  const [name, setName] = useState<LangValues>(
+    () => langValuesFromField(initial?.i18n, "name", initial?.name, lang),
+  );
   const [amount, setAmount] = useState<string>(initial != null ? String(initial.amount) : "");
   const [currency, setCurrency] = useState<Currency>(initial?.currency ?? "USD");
   const [purchasedAt, setPurchasedAt] = useState<string>(initial?.purchased_at ?? todayIso());
@@ -39,7 +43,7 @@ const ExpenseForm = ({ initial, onClose, onSaved }: Props) => {
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     const amountNum = Number(amount.replace(",", "."));
-    if (!name.trim() || !Number.isFinite(amountNum) || amountNum < 0 || !purchasedAt) {
+    if (!hasAnyValue(name) || !Number.isFinite(amountNum) || amountNum < 0 || !purchasedAt) {
       setErr(t("expenses.invalidForm"));
       return;
     }
@@ -47,14 +51,21 @@ const ExpenseForm = ({ initial, onClose, onSaved }: Props) => {
     setErr(null);
     try {
       const body = {
-        name: name.trim(),
+        name: primaryValue(name, lang),
         amount: amountNum,
         currency,
         purchased_at: purchasedAt,
         is_active: isActive,
+        source_locale: lang,
       };
-      if (initial) await friendlyMutation(expenseRepository.update(initial.id, body));
-      else await friendlyMutation(expenseRepository.create(body));
+      const saved = initial
+        ? await friendlyMutation(expenseRepository.update(initial.id, body))
+        : await friendlyMutation(expenseRepository.create(body));
+
+      await apiSaveEntityTranslations("service-expense", saved.id, {
+        primary_locale: lang,
+        fields: { name },
+      });
       onSaved();
     } catch (e) {
       setErr(formatApiError(e));
@@ -72,14 +83,15 @@ const ExpenseForm = ({ initial, onClose, onSaved }: Props) => {
       >
         <h2 style={{ margin: 0 }}>{initial ? t("expenses.edit") : t("expenses.new")}</h2>
 
-        <Input
+        <MultiLangInput
           label={t("expenses.name")}
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder={t("expenses.namePlaceholder")}
+          values={name}
+          onChange={setName}
+          fieldClass="expense_name"
+          maxChars={120}
           required
-          maxLength={120}
           autoFocus
+          disabled={busy}
         />
 
         <div className="row" style={{ gap: 12, alignItems: "flex-end" }}>

@@ -1,4 +1,5 @@
 import { apiWakePc } from "@/api/pcs";
+import { tr } from "@/i18n/translated";
 import PairingTokenModal from "@/components/pcs/PairingTokenModal";
 import PcForm from "@/components/pcs/PcForm";
 import Button from "@/components/ui/Button";
@@ -18,7 +19,7 @@ import { useParams } from "react-router-dom";
 const PcsList = () => {
   const { branchId } = useParams();
   const id = Number(branchId);
-  const { t } = useLang();
+  const { t, lang } = useLang();
   const confirm = useConfirm();
   const { data: pcs, loading, error, reload } = useAsync(() => pcRepository.listByBranch(id), [id]);
 
@@ -27,16 +28,30 @@ const PcsList = () => {
   const [tokenPc, setTokenPc] = useState<IPcApi | null>(null);
   const [waking, setWaking] = useState<number | null>(null);
 
+  // Places already served by a computer on this screen. One place owns one
+  // device, so offering a taken place in the register form would only produce
+  // the backend's 422.
+  const takenPlaceIds = (pcs ?? [])
+    .map((pc) => pc.place_id)
+    .filter((placeId): placeId is number => typeof placeId === "number");
+
   if (!Number.isFinite(id) || id <= 0) return <div className="error">{t("hub.invalidId")}</div>;
 
+  // Deleting a computer is never only that: it serves one place, and that place
+  // is what its sessions were billed against, so both go with it. The dialog
+  // names the place before the operator confirms — the row shows only a label,
+  // and "delete PC #4" reads harmless until you know place #4 goes too.
   const remove = async (pc: IPcApi) => {
-    if (!(await confirm(fmt(t("pcs.confirmDelete"), pc.label), { destructive: true }))) return;
+    const message = pc.place
+      ? fmt(t("pcs.confirmDelete"), tr(pc, "label", lang), pc.place.number ?? pc.place.id)
+      : fmt(t("pcs.confirmDeleteUnlinked"), tr(pc, "label", lang));
+    if (!(await confirm(message, { destructive: true }))) return;
     await pcRepository.remove(pc.id);
     void reload();
   };
 
   const rotate = async (pc: IPcApi) => {
-    if (!(await confirm(fmt(t("pcs.confirmRotate"), pc.label)))) return;
+    if (!(await confirm(fmt(t("pcs.confirmRotate"), tr(pc, "label", lang))))) return;
     const updated = await pcRepository.rotateToken(pc.id);
     setTokenPc(updated);
     void reload();
@@ -101,7 +116,7 @@ const PcsList = () => {
             <div key={pc.id} className="list-item">
               <div>
                 <div className="name">
-                  {pc.label}
+                  {tr(pc, "label", lang)}
                   {pc.place && (
                     <span className="muted" style={{ marginLeft: 6 }}>№{pc.place.number ?? pc.place.id}</span>
                   )}
@@ -141,6 +156,7 @@ const PcsList = () => {
       {creating && (
         <PcForm
           branchId={id}
+          takenPlaceIds={takenPlaceIds}
           onClose={() => setCreating(false)}
           onSaved={(pc) => {
             setCreating(false);
@@ -154,6 +170,7 @@ const PcsList = () => {
         <PcForm
           branchId={id}
           initial={editing}
+          takenPlaceIds={takenPlaceIds}
           onClose={() => setEditing(null)}
           onSaved={() => { setEditing(null); void reload(); }}
         />

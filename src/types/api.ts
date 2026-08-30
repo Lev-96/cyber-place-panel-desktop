@@ -1,3 +1,5 @@
+import { Translated } from "@/i18n/translated";
+
 export type PlatformType = "pc" | "ps4" | "ps5";
 export type PlaceType = "standard" | "vip";
 /**
@@ -39,7 +41,7 @@ export interface IGame {
   platform: string;
 }
 
-export interface IBranchPlace {
+export interface IBranchPlace extends Translated {
   id: number;
   branch_id: number;
   /** Cashier-visible label distinct from the surrogate `id` (e.g. "1" or "2"). */
@@ -50,6 +52,23 @@ export interface IBranchPlace {
   status: "active" | "inactive";
   // Dynamic: known pc/ps4/ps5 OR a custom branch platform slug.
   platform: string;
+  /**
+   * Priced sub-category of that platform, or null when the place bills from
+   * the platform directly. Needed on edit so the form re-opens the right tab.
+   */
+  subplatform_id?: number | null;
+  /**
+   * The sub-category itself, when the server eager-loaded it — what the place
+   * card labels itself with. Absent is not the same as "no subcategory": it
+   * means this endpoint did not load the relation.
+   */
+  subplatform?: {
+    id: number;
+    name_en: string;
+    name_ru: string;
+    name_am: string;
+    is_default: boolean;
+  } | null;
   /** Manual per-hour rate for custom platforms (null for known ones). */
   hourly_rate?: number | string | null;
   games: IGame[];
@@ -77,6 +96,39 @@ export interface IBranchPlatformPrice {
   /** Per-tier per-hour rates (null until a place of that type exists). */
   price_standard: number | string | null;
   price_vip: number | string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+/**
+ * A named, separately-priced sub-category of a platform — "PS5 + VR" under
+ * `ps5`. Unlike {@link IBranchPlatformPrice} these exist for the known
+ * platforms too: refining pc/ps4/ps5 is the point of the feature.
+ *
+ * A null tier price means "bill exactly as this platform bills" — the tariff
+ * matrix for pc/ps4/ps5, the platform price for a custom one. So a subplatform
+ * can be used purely as a label ("PS5 + big screen", same money), and the
+ * Default one ships with no prices at all.
+ */
+export interface IBranchSubplatform {
+  id: number;
+  branch_id: number;
+  /** Parent platform slug, shared with `IBranchPlace.platform`. */
+  platform: string;
+  /** Identity within (branch, platform). `default` for the undeletable one. */
+  slug: string;
+  name_en: string;
+  name_ru: string;
+  name_am: string;
+  /** Server-resolved single label (EN→RU→AM). */
+  name: string;
+  label?: string;
+  /** Per-tier override. Null = inherit the platform's rate. */
+  price_standard: number | string | null;
+  price_vip: number | string | null;
+  is_default: boolean;
+  /** Places using it — the "most used" ranking behind the tab strip. */
+  places_count: number;
   created_at?: string;
   updated_at?: string;
 }
@@ -109,7 +161,7 @@ export interface IBookingApi {
   game?: { id: number; platform: PlatformType; name: string };
 }
 
-export interface IBranchApi {
+export interface IBranchApi extends Translated {
   id: number;
   company_id: number;
   city: string;
@@ -120,6 +172,21 @@ export interface IBranchApi {
   phone: string | string[] | null;
   branch_logo_path: string;
   status: string;
+  /**
+   * Administrative block — deliberately two fields, not one:
+   *
+   * - `blocked_at` — this branch's OWN block. The admin toggle owns it, so it
+   *   decides whether the button offers to block or to unblock.
+   * - `is_blocked` — whether the branch is closed at all, which includes its
+   *   company being blocked. A company block is never copied onto the branch
+   *   row, so `is_blocked: true` with `blocked_at: null` means "closed because
+   *   its company is" — and unblocking the branch alone would not reopen it.
+   *
+   * Optional: a backend that predates the feature sends neither, which reads
+   * as "open" everywhere.
+   */
+  blocked_at?: string | null;
+  is_blocked?: boolean;
   places_count?: number;
   managers_count?: number;
   ratings_avg_rating: number | null;
@@ -141,7 +208,7 @@ export interface IBranchApi {
   unlock_pin_updated_at?: string | null;
 }
 
-export interface ICompanyApi {
+export interface ICompanyApi extends Translated {
   id: number;
   user_id: number;
   user?: { id: number; name: string; email: string };
@@ -155,6 +222,14 @@ export interface ICompanyApi {
   website: string;
   description: string;
   status: CompanyStatusType;
+  /**
+   * Administrative block. Separate from `status` (approved / awaiting
+   * approval) because they answer different questions: a company can be
+   * approved and blocked, or unapproved and not blocked. Absent on an older
+   * backend, which reads as "not blocked".
+   */
+  blocked_at?: string | null;
+  is_blocked?: boolean;
   branches_count?: number;
   managers_count?: number;
   commission_percent?: number | string | null;

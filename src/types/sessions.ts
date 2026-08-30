@@ -7,6 +7,7 @@
  */
 
 import { PcKind, PcStatus } from "@/types/pc";
+import { Translated } from "@/i18n/translated";
 
 export interface ITimePackage {
   id: number;
@@ -65,7 +66,7 @@ export interface ISessionApi {
   items?: Array<{ id: number; name: string; price: number | string; qty: number; product_id: number | null }>;
 }
 
-export interface IPcApi {
+export interface IPcApi extends Translated {
   id: number;
   branch_id: number;
   place_id?: number | null;
@@ -91,11 +92,16 @@ export interface IPcApi {
   // Eager-loaded by PcController (`place:id,number,type,platform`).
   // Lets the cashier UI resolve the assigned tariff via the branch
   // price matrix without an extra round-trip.
-  place?: {
+  //
+  // Carries `Translated` because a place's `name` is auto-translated like any
+  // other staff-authored text: the sessions board must render it in the
+  // viewer's language, not in whichever language the manager who created it
+  // happened to type.
+  place?: (Translated & {
     id: number;
     number?: number | null;
     name?: string | null;
     type: "standard" | "vip";
     platform: string;
-  } | null;
+  }) | null;
 }

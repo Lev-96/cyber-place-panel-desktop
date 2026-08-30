@@ -1,4 +1,5 @@
 import TournamentForm from "@/components/tournaments/TournamentForm";
+import { tr as trField } from "@/i18n/translated";
 import MyBranchTournamentsButton from "@/components/tournaments/MyBranchTournamentsButton";
 import Button from "@/components/ui/Button";
 import ScreenWithBg from "@/components/ui/ScreenWithBg";
@@ -26,7 +27,7 @@ const SKILL_TONES: Record<SkillLevel, { bg: string; fg: string; border: string }
 
 const Tournaments = () => {
   const { user } = useAuth();
-  const { t: tr } = useLang();
+  const { t: tr, lang } = useLang();
   const confirm = useConfirm();
 
   const { branchId } = useParams();
@@ -73,7 +74,7 @@ const Tournaments = () => {
   const [removeErr, setRemoveErr] = useState<string | null>(null);
 
   const remove = async (t: ITournamentApi) => {
-    if (!(await confirm(`${tr("tournaments.confirmDelete")} "${t.title}"?`, { destructive: true }))) return;
+    if (!(await confirm(`${tr("tournaments.confirmDelete")} "${trField(t, "title", lang)}"?`, { destructive: true }))) return;
     // Without try/catch the previous version awaited the API call and
     // silently dropped any 4xx (e.g. role-check 403 from
     // CheckRoleForTournamentService) — the page neither showed an
@@ -143,7 +144,7 @@ const Tournaments = () => {
                   }}
                 >
                   <div style={{ fontWeight: 700, fontSize: 16, flex: 1, minWidth: 0 }}>
-                    {t.title}
+                    {trField(t, "title", lang)}
                   </div>
                   <span
                     style={{

@@ -1,3 +1,4 @@
+import { mapTileLayers } from "@/utils/mapTiles";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { useEffect, useRef } from "react";
@@ -25,13 +26,18 @@ const BranchMap = ({ markers, center, zoom = 12, height = 360, onPick }: Props) 
     if (!ref.current || mapRef.current) return;
     const first = center ?? markers[0] ?? { lat: 40.18, lng: 44.5 }; // default Yerevan
     const map = L.map(ref.current).setView([first.lat, first.lng], zoom);
-    // CartoDB Dark Matter — free, no API key, allows embedded apps unlike
-    // OSM volunteer tiles which 403 unidentified clients.
-    L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
-      maxZoom: 19,
-      subdomains: "abcd",
-      attribution: "© OpenStreetMap, © CartoDB",
-    }).addTo(map);
+    // The basemap comes from `utils/mapTiles` rather than a URL written here:
+    // CARTO put the tiles this used to draw behind an API key, and every tile
+    // silently became a grey square saying so. A provider is something that
+    // changes its terms, so it is configurable in one place.
+    for (const layer of mapTileLayers()) {
+      L.tileLayer(layer.url, {
+        maxZoom: layer.maxZoom,
+        maxNativeZoom: layer.maxNativeZoom,
+        subdomains: layer.subdomains ?? "abc",
+        attribution: layer.attribution,
+      }).addTo(map);
+    }
     layerRef.current = L.layerGroup().addTo(map);
     mapRef.current = map;
 

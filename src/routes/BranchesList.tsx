@@ -4,6 +4,7 @@ import ScreenWithBg from "@/components/ui/ScreenWithBg";
 import { ListSkeleton } from "@/components/ui/Skeleton";
 import { useAsync } from "@/hooks/useAsync";
 import { useLang } from "@/i18n/LanguageContext";
+import { useAccessVersion } from "@/realtime/accessVersion";
 import { branchRepository } from "@/repositories/BranchRepository";
 import { useState } from "react";
 import { Link } from "react-router-dom";
@@ -17,7 +18,10 @@ import { Link } from "react-router-dom";
 const BranchesList = () => {
   const { t } = useLang();
   const [page, setPage] = useState(1);
-  const { data, loading, error } = useAsync(() => branchRepository.listPaged(page), [page]);
+  // Includes the access version so the "blocked" badge appears — and clears —
+  // without the operator navigating away and back.
+  const access = useAccessVersion();
+  const { data, loading, error } = useAsync(() => branchRepository.listPaged(page), [page, access]);
   const branches = data?.data ?? [];
   const lastPage = data?.meta?.last_page ?? 1;
 
@@ -33,7 +37,17 @@ const BranchesList = () => {
               <div className="row" style={{ gap: 12, flex: 1 }}>
                 <Avatar src={b.branch_logo_path} name={b.address} size={44} />
                 <div style={{ flex: 1 }}>
-                  <div className="name">{b.company?.name ?? t("hub.branchFallback")} · {b.address}</div>
+                  <div className="name">
+                    {b.company?.name ?? t("hub.branchFallback")} · {b.address}
+                    {/* An owner walking this list must see which venue is out
+                        of service BEFORE opening it — otherwise the read-only
+                        branch page reads as something that just broke. */}
+                    {b.is_blocked && (
+                      <> · <span className="pill blocked">
+                        {b.blocked_at ? t("blocking.state.branch") : t("blocking.state.byCompany")}
+                      </span></>
+                    )}
+                  </div>
                   <div className="meta">
                     {b.country}, {b.city} · {t("branchesList.placesShort")} {b.places_count ?? 0}
                   </div>

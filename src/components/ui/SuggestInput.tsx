@@ -1,4 +1,4 @@
-import { InputHTMLAttributes, KeyboardEvent, useEffect, useId, useRef, useState } from "react";
+import { InputHTMLAttributes, KeyboardEvent, Ref, useEffect, useId, useRef, useState } from "react";
 
 type NativeProps = Omit<InputHTMLAttributes<HTMLInputElement>, "value" | "onChange" | "list">;
 
@@ -14,6 +14,14 @@ interface Props extends NativeProps {
   /** When given, each suggestion gets a ✕ that removes it from the source. */
   onRemoveOption?: (value: string) => void;
   removeHint?: string;
+  /**
+   * Forwarded to the underlying `<input>` so a caller can focus or select the
+   * field imperatively. Declared explicitly because this component renders a
+   * wrapping `<div>` — without it a `ref` would resolve to the wrapper, not
+   * the field. (React 19 passes `ref` as an ordinary prop, so no
+   * `forwardRef` is needed.)
+   */
+  ref?: Ref<HTMLInputElement>;
 }
 
 const matches = (option: string, query: string): boolean => {
@@ -46,6 +54,7 @@ const SuggestInput = ({
   onKeyDown,
   onFocus,
   onBlur,
+  ref,
   ...rest
 }: Props) => {
   const [open, setOpen] = useState(false);
@@ -111,6 +120,7 @@ const SuggestInput = ({
       {label && <span className="label">{label}</span>}
       <input
         {...rest}
+        ref={ref}
         className="input"
         value={value}
         role="combobox"

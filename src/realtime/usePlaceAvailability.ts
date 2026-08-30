@@ -1,5 +1,7 @@
 import { useEffect, useRef } from "react";
+import { useRealtimeVersion } from "@/realtime/useRealtimeVersion";
 import { getEcho } from "./echo";
+import { apiCache } from "@/api/client";
 
 /**
  * Payload broadcast by `App\Events\PlaceAvailabilityChanged`.
@@ -34,6 +36,10 @@ export const usePlaceAvailability = (
   const handlerRef = useRef(onChange);
   useEffect(() => { handlerRef.current = onChange; }, [onChange]);
 
+  // Re-attaches when the Echo client is rebuilt on connection details the
+  // backend handed us: a subscription on the discarded client is silent.
+  const realtime = useRealtimeVersion();
+
   useEffect(() => {
     if (!branchId || !Number.isFinite(branchId)) return;
     const echo = getEcho();
@@ -42,6 +48,12 @@ export const usePlaceAvailability = (
     const channelName = `branch.${branchId}`;
     const channel = echo.channel(channelName);
     const listener = (payload: PlaceAvailabilityEvent) => {
+      // A place just changed on ANOTHER machine. The client-side
+      // response cache is the only place that could still be holding the
+      // previous answer, so drop it before the handler runs — this is
+      // what keeps the socket, not the TTL, in charge of freshness.
+      apiCache.invalidatePrefix("/places");
+      apiCache.invalidatePrefix("/branches");
       handlerRef.current(payload);
     };
     channel.listen(".place.availability.changed", listener);
@@ -61,5 +73,5 @@ export const usePlaceAvailability = (
       // by name; relinquishing it requires every sibling to be torn
       // down — there is no refcount.
     };
-  }, [branchId]);
+  }, [branchId, realtime]);
 };

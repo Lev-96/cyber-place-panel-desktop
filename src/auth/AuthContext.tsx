@@ -1,4 +1,6 @@
-import { apiGetMe, apiLogin } from "@/api/auth";
+import { apiGetMe, apiLogin, apiLogout } from "@/api/auth";
+import { disconnectEchoForSignOut } from "@/realtime/echo";
+import { apiCache } from "@/api/client";
 import { recentEmails } from "@/auth/recentEmails";
 import { AppConfig } from "@/infrastructure/AppConfig";
 import { keyValueStore } from "@/infrastructure/KeyValueStore";
@@ -46,6 +48,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     user,
     loading,
     login: async (email, password) => {
+      // Identity change = different data scope. A manager signing in
+      // after an owner must never be able to read a response the owner's
+      // session put in the cache, so the cache dies with the session on
+      // BOTH ends of it.
+      apiCache.clear();
       const res = await apiLogin(email, password);
       await keyValueStore.set(AppConfig.storageKeys.token, res.token);
       const me = await apiGetMe();
@@ -58,6 +65,27 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setUser(me.user);
     },
     logout: async () => {
+      // Revoke the session on the server FIRST, while the token is still in
+      // storage for the request to carry. Sanctum tokens have no expiry, so
+      // without this a copy lifted off disk stays valid forever.
+      //
+      // Best effort by design: the operator must be able to sign out with the
+      // backend unreachable, and a token that is already invalid returns 401.
+      // Neither may trap them in a signed-in UI, so local state is cleared
+      // either way.
+      try {
+        await apiLogout();
+      } catch {
+        /* offline, or the token was already revoked — sign out locally anyway */
+      }
+      apiCache.clear();
+      // And the socket, before the next person signs in on this machine. A
+      // channel stays subscribed after the components that asked for it are
+      // gone, so without this an account switch leaves the new operator's
+      // browser attached to the previous one's private channels — their
+      // notifications, their support thread — on an authorisation that has
+      // just been revoked.
+      disconnectEchoForSignOut();
       await keyValueStore.remove(AppConfig.storageKeys.token);
       await keyValueStore.remove(AppConfig.storageKeys.user);
       setUser(null);

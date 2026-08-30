@@ -13,10 +13,20 @@ export const fmt = (template: string, ...args: (string | number)[]): string =>
     return i >= 0 && i < args.length ? String(args[i]) : m;
   });
 
-export const LANGUAGES: Array<{ code: Lang; name: string }> = [
-  { code: "en", name: "English" },
-  { code: "ru", name: "Русский" },
-  { code: "am", name: "Հայերեն" },
+/**
+ * `name` is the ENDONYM — the language's name in itself. That is what a person
+ * scanning the picker recognises: someone who only reads Armenian cannot find
+ * "Armenian" in a list, but finds "Հայերեն" instantly. `latin` is the English
+ * name, shown underneath as a secondary line so the list is also navigable by
+ * someone who doesn't read the script.
+ *
+ * Adding a language is one entry here plus one flag in `FlagIcon` — no other
+ * file knows how many languages exist.
+ */
+export const LANGUAGES: Array<{ code: Lang; name: string; latin: string }> = [
+  { code: "en", name: "English", latin: "English" },
+  { code: "ru", name: "Русский", latin: "Russian" },
+  { code: "am", name: "Հայերեն", latin: "Armenian" },
 ];
 
 type Dict = Record<string, { en: string; ru: string; am: string }>;
@@ -34,6 +44,7 @@ export const TRANSLATIONS: Dict = {
   "nav.companies": { en: "Companies", ru: "Компании", am: "Ընկերություններ" },
   "nav.revenue": { en: "Revenue", ru: "Выручка", am: "Եկամուտ" },
   "nav.expenses": { en: "Expenses", ru: "Расходы", am: "Ծախսեր" },
+  "nav.metrics": { en: "Metrics", ru: "Метрики", am: "Մետրիկա" },
   "nav.myCompany": {
     en: "My company",
     ru: "Моя компания",
@@ -75,10 +86,130 @@ export const TRANSLATIONS: Dict = {
 
   // Sessions
   "session.start": { en: "Start session", ru: "Старт сессии", am: "Սկսել նիստը" },
-  "session.addItem": { en: "Add an item", ru: "Добавить позицию", am: "Ավելացնել գրառում" },
+  // "Товар", not "позиция": what the cashier adds is a product off the shelf,
+  // and the branch's own catalogue screen already calls them товары.
+  // ── Support desk ───────────────────────────────────────────────────────
+  "nav.support": { en: "Support", ru: "Поддержка", am: "Աջակցություն" },
+  "support.title": { en: "Support", ru: "Поддержка", am: "Աջակցություն" },
+  "support.intro": {
+    en: "Write to the Cyber Place support team. Your company, branch and role travel with the message — there is nothing to fill in.",
+    ru: "Напишите в поддержку Cyber Place. Компания, филиал и роль передаются вместе с сообщением — заполнять ничего не нужно.",
+    am: "Գրեք Cyber Place-ի աջակցության թիմին։ Ընկերությունը, մասնաճյուղը և դերը փոխանցվում են հաղորդագրության հետ:",
+  },
+  "support.conversations": { en: "Conversations", ru: "Обращения", am: "Դիմումներ" },
+  "support.noConversations": {
+    en: "No requests yet. Start one below.",
+    ru: "Обращений пока нет. Создайте первое ниже.",
+    am: "Դիմումներ դեռ չկան: Ստեղծեք առաջինը ներքևում:",
+  },
+  "support.newRequest": { en: "+ New request", ru: "+ Новое обращение", am: "+ Նոր դիմում" },
+  "support.starting": { en: "Opening…", ru: "Открываем…", am: "Բացվում է…" },
+  "support.pickConversation": {
+    en: "Pick a conversation on the left.",
+    ru: "Выберите обращение слева.",
+    am: "Ընտրեք դիմումը ձախից:",
+  },
+  "support.emptyThread": {
+    en: "Nothing here yet — describe the problem and we will pick it up.",
+    ru: "Здесь пока пусто — опишите проблему, мы её получим.",
+    am: "Այստեղ դեռ դատարկ է — նկարագրեք խնդիրը:",
+  },
+  "support.placeholder": { en: "Write a message…", ru: "Напишите сообщение…", am: "Գրեք հաղորդագրություն…" },
+  "support.attach": { en: "Attach a file", ru: "Прикрепить файл", am: "Կցել ֆայլ" },
+  "support.send": { en: "Send", ru: "Отправить", am: "Ուղարկել" },
+  "support.retry": { en: "Retry", ru: "Повторить", am: "Կրկնել" },
+  "support.sendFailed": {
+    en: "The message was not sent.",
+    ru: "Сообщение не отправлено.",
+    am: "Հաղորդագրությունը չուղարկվեց:",
+  },
+  "support.state.sending": { en: "Sending…", ru: "Отправляется…", am: "Ուղարկվում է…" },
+  "support.state.queued": {
+    en: "Saved — reaching support…",
+    ru: "Сохранено — доставляем в поддержку…",
+    am: "Պահպանված է — հասնում է աջակցությանը…",
+  },
+  "support.state.undelivered": {
+    en: "Saved, but support has not received it yet",
+    ru: "Сохранено, но поддержка ещё не получила",
+    am: "Պահպանված է, բայց աջակցությունը դեռ չի ստացել",
+  },
+  "support.toast.title": { en: "New message from support", ru: "Новое сообщение от поддержки", am: "Նոր հաղորդագրություն աջակցությունից" },
+  "support.toast.open": { en: "Open", ru: "Открыть", am: "Բացել" },
+  "support.chooseBranch": { en: "Choose a branch", ru: "Выберите филиал", am: "Ընտրեք մասնաճյուղը" },
+  "support.chooseBranchHint": {
+    en: "Support requests are kept per branch, so the team sees which venue you are writing about.",
+    ru: "Обращения ведутся по филиалам — так поддержка сразу видит, о какой площадке речь.",
+    am: "Դիմումները վարվում են ըստ մասնաճյուղերի, որպեսզի թիմը տեսնի, թե որ վայրի մասին է խոսքը:",
+  },
+  "support.searchBranch": { en: "Search a branch…", ru: "Поиск филиала…", am: "Որոնել մասնաճյուղ…" },
+  "support.noBranchMatches": { en: "No branches found", ru: "Филиалы не найдены", am: "Մասնաճյուղեր չեն գտնվել" },
+  "support.branchChange": { en: "Change branch", ru: "Сменить филиал", am: "Փոխել մասնաճյուղը" },
+  "support.openThread": { en: "Open the chat", ru: "Открыть чат", am: "Բացել զրույցը" },
+  "support.role.company_owner": { en: "Owner", ru: "Владелец", am: "Սեփականատեր" },
+  "support.role.manager": { en: "Manager", ru: "Менеджер", am: "Մենեջեր" },
+  "support.role.admin": { en: "Admin", ru: "Админ", am: "Ադմին" },
+  "session.addItem": { en: "Add a product", ru: "Добавить товар", am: "Ավելացնել ապրանք" },
+  "session.availableProducts": { en: "Available products", ru: "Доступные товары", am: "Հասանելի ապրանքներ" },
+  "session.addedProducts": { en: "Added products", ru: "Добавленные товары", am: "Ավելացված ապրանքներ" },
+  "session.nothingAdded": {
+    en: "Nothing added yet — pick a product above.",
+    ru: "Пока ничего не добавлено — выберите товар выше.",
+    am: "Դեռ ոչինչ ավելացված չէ — ընտրեք ապրանք վերևում:",
+  },
+  "session.noSearchMatches": { en: "Nothing matches that search.", ru: "Ничего не найдено.", am: "Ոչինչ չի գտնվել:" },
+  "session.itemsTotal": { en: "Products total", ru: "Итого за товары", am: "Ընդամենը ապրանքների համար" },
+  "session.decrease": { en: "One fewer", ru: "Убрать одну", am: "Մեկով պակաս" },
+  "session.increase": { en: "One more", ru: "Добавить одну", am: "Մեկով ավելի" },
+  "session.removeItem": { en: "Remove from the session", ru: "Удалить из сессии", am: "Հեռացնել նիստից" },
+  // The dialog is a basket: nothing reaches the session until it is confirmed,
+  // so the button says what confirming will do, and the count decides the word.
+  "session.cartConfirmOne": {
+    en: "Add the product to this session",
+    ru: "Добавить товар к этой сессии",
+    am: "Ավելացնել ապրանքը այս նիստին",
+  },
+  "session.cartConfirmMany": {
+    en: "Add the products to this session",
+    ru: "Добавить товары к этой сессии",
+    am: "Ավելացնել ապրանքները այս նիստին",
+  },
+  "session.adding": { en: "Adding…", ru: "Добавление…", am: "Ավելացվում է…" },
+  "session.cartEmpty": {
+    en: "Nothing selected yet — pick a product above.",
+    ru: "Пока ничего не выбрано — выберите товар выше.",
+    am: "Դեռ ոչինչ ընտրված չէ — ընտրեք ապրանք վերևում:",
+  },
+  "session.alreadyInSession": { en: "Already on the bill", ru: "Уже в сессии", am: "Արդեն հաշվին" },
+  "session.addedOne": {
+    en: "{0} × {1} added to the current session.",
+    ru: "{0} × {1} успешно добавлен к текущей сессии.",
+    am: "{0} × {1} ավելացվեց ընթացիկ նիստին:",
+  },
+  "session.addedMany": {
+    en: "Added to the current session: {0}.",
+    ru: "Товары успешно добавлены к текущей сессии: {0}.",
+    am: "Ավելացվեց ընթացիկ նիստին՝ {0}:",
+  },
+  "session.addFailedOne": {
+    en: "The product was not added to the current session.",
+    ru: "Товар не добавлен к текущей сессии.",
+    am: "Ապրանքը չավելացվեց ընթացիկ նիստին:",
+  },
+  "session.addFailedMany": {
+    en: "The products were not added to the current session.",
+    ru: "Товары не добавлены к текущей сессии.",
+    am: "Ապրանքները չավելացվեցին ընթացիկ նիստին:",
+  },
+  "session.failReason": { en: "Reason: {0}", ru: "Причина: {0}", am: "Պատճառը՝ {0}" },
+  "session.failUnknown": {
+    en: "the server did not say why.",
+    ru: "сервер не сообщил причину.",
+    am: "սերվերը պատճառ չնշեց:",
+  },
   "session.search": { en: "Search by name…", ru: "Поиск по названию…", am: "Որոնում անունով…" },
-  "session.noProducts": { en: "No products in this branch yet. Add a custom item below.", ru: "В этом филиале ещё нет товаров. Добавь произвольную позицию ниже.", am: "Այս մասնաճյուղում ապրանքներ չկան: Ավելացրու ձեռքով գրառում:" },
-  "session.customItem": { en: "Or a custom item", ru: "Или произвольная позиция", am: "Կամ ձեռքով գրառում" },
+  "session.noProducts": { en: "No products in this branch yet. Add a custom item below.", ru: "В этом филиале ещё нет товаров. Добавьте произвольный товар ниже.", am: "Այս մասնաճյուղում ապրանքներ չկան: Ավելացրեք ձեռքով ապրանք ներքևում:" },
+  "session.customItem": { en: "Or a custom item", ru: "Или произвольный товар", am: "Կամ ձեռքով ապրանք" },
   "session.itemName": { en: "Name (e.g. Lays)", ru: "Название (например, Лейс)", am: "Անվանում (օր. Լեյս)" },
   "session.itemPrice": { en: "Price", ru: "Цена", am: "Գին" },
   "session.added": { en: "Added", ru: "Добавлено", am: "Ավելացված է" },
@@ -353,7 +484,20 @@ export const TRANSLATIONS: Dict = {
   "branchPlaces.title": { en: "Places", ru: "Места", am: "Տեղեր" },
   "branchPlaces.intro": { en: "A place is a bookable seat (e.g. PC #1, PS5 VIP #2). Each place gets games linked.", ru: "Место — это место для бронирования (например, ПК №1, PS5 VIP №2). К каждому месту привязываются игры.", am: "Տեղը ամրագրվող նստատեղ է (օր.՝ PC #1, PS5 VIP #2): Յուրաքանչյուր տեղին կապվում են խաղեր:" },
   "branchPlaces.new": { en: "+ New place", ru: "+ Новое место", am: "+ Նոր տեղ" },
-  "branchPlaces.confirmDelete": { en: "Delete place #{0}?", ru: "Удалить место №{0}?", am: "Ջնջե՞լ #{0} տեղը:" },
+  // Deleting a place takes the device that makes it billable and every session
+  // recorded on that device. Two wordings, because a PC place owns a computer
+  // the operator can see under "Computers" and a console place does not —
+  // naming a section that will not change is how a warning stops being read.
+  "branchPlaces.confirmDelete": {
+    en: "Delete place #{0}?\n\nIts device and every session recorded on it will be deleted as well. This cannot be undone.",
+    ru: "Удалить место №{0}?\n\nВместе с ним будут удалены его устройство и все записанные на нём сессии. Действие необратимо.",
+    am: "Ջնջե՞լ #{0} տեղը:\n\nՆրա հետ կջնջվեն դրա սարքը և դրանում գրանցված բոլոր սեսիաները: Գործողությունն անդարձելի է:",
+  },
+  "branchPlaces.confirmDeletePc": {
+    en: "Delete place #{0}?\n\nIts computer will disappear from Computers, and every session recorded on it will be deleted as well. This cannot be undone.",
+    ru: "Удалить место №{0}?\n\nСвязанный компьютер исчезнет из раздела «Компьютеры», а все записанные на нём сессии будут удалены. Действие необратимо.",
+    am: "Ջնջե՞լ #{0} տեղը:\n\nԿապված համակարգիչը կվերանա «Համակարգիչներ» բաժնից, իսկ դրանում գրանցված բոլոր սեսիաները կջնջվեն: Գործողությունն անդարձելի է:",
+  },
   "branchPlaces.empty": { en: "No places yet. Click 'New place' to add the first one.", ru: "Мест ещё нет. Нажмите «Новое место», чтобы добавить первое.", am: "Տեղեր դեռ չկան: Սեղմեք «Նոր տեղ»՝ առաջինը ավելացնելու համար:" },
   "branchPlaces.games": { en: "game(s)", ru: "игр", am: "խաղ" },
   "branchPlaces.status.active": { en: "active", ru: "активно", am: "ակտիվ" },
@@ -379,7 +523,23 @@ export const TRANSLATIONS: Dict = {
   "bookingDetails.minShort": { en: "min", ru: "мин", am: "ր" },
 
   // PCs management page
-  "pcs.confirmDelete": { en: "Delete '{0}'? This cannot be undone.", ru: "Удалить «{0}»? Действие необратимо.", am: "Ջնջե՞լ «{0}»: Անդարձելի գործողություն:" },
+  // A computer is not deleted on its own: it exists to serve one place, so the
+  // place goes with it, and the place's sessions go with the place. The number
+  // is in the text because "delete PC #4" and "delete place #4 too" are the
+  // same action and the operator has to see the second half before confirming.
+  "pcs.confirmDelete": {
+    en: "Delete computer \u201c{0}\u201d?\n\nThe place it serves (#{1}) will be deleted with it, along with every session recorded on it. This cannot be undone.",
+    ru: "Удалить компьютер «{0}»?\n\nВместе с ним будет удалено обслуживаемое место (№{1}) и все записанные на нём сессии. Действие необратимо.",
+    am: "Ջնջե՞լ «{0}» համակարգիչը:\n\nՆրա հետ կջնջվի սպասարկվող տեղը (#{1}) և դրանում գրանցված բոլոր սեսիաները: Գործողությունն անդարձելի է:",
+  },
+  // Same action for a device that serves no place — a legacy row from before
+  // one-device-per-place. Nothing else goes with it, and saying so avoids
+  // promising a cascade that will not happen.
+  "pcs.confirmDeleteUnlinked": {
+    en: "Delete computer \u201c{0}\u201d?\n\nEvery session recorded on it will be deleted as well. This cannot be undone.",
+    ru: "Удалить компьютер «{0}»?\n\nВсе записанные на нём сессии будут удалены. Действие необратимо.",
+    am: "Ջնջե՞լ «{0}» համակարգիչը:\n\nԴրանում գրանցված բոլոր սեսիաները կջնջվեն: Գործողությունն անդարձելի է:",
+  },
   "pcs.confirmRotate": { en: "Rotate pairing token for '{0}'? The agent on this PC will stop working until updated.", ru: "Сменить токен сопряжения для «{0}»? Агент на этом ПК перестанет работать, пока его не обновят.", am: "Թարմացնե՞լ «{0}»-ի զուգակցման թոքենը: PC-ի գործակալը կդադարի աշխատել մինչև թարմացում:" },
   "pcs.macRequired": { en: "Set a MAC address on this PC before using Wake-on-LAN.", ru: "Сначала задайте MAC-адрес для этого ПК — без него Wake-on-LAN не сработает.", am: "Նախ նշեք PC-ի MAC հասցեն — առանց դրա Wake-on-LAN չի աշխատի:" },
   "pcs.packetsSent": { en: "Packets sent: {0}", ru: "Пакетов отправлено: {0}", am: "Փաթեթներ ուղարկվել են՝ {0}" },
@@ -543,6 +703,19 @@ export const TRANSLATIONS: Dict = {
   "managers.new": { en: "+ New manager", ru: "+ Новый менеджер", am: "+ Նոր մենեջեր" },
   "managers.branchLabel": { en: "branch", ru: "филиал", am: "մասնաճյուղ" },
   "managers.confirmRemove": { en: "Remove manager", ru: "Удалить менеджера", am: "Հեռացնել մենեջերին" },
+  // Creating a manager from the sidebar screen, where no branch is implied by
+  // the URL. One branch → no question is asked; several → the owner picks.
+  "managers.pickBranch": { en: "Which branch?", ru: "Для какого филиала?", am: "Ո՞ր մասնաճյուղի համար" },
+  "managers.pickBranchHint": {
+    en: "The manager will be bound to the branch you choose and will only see that one.",
+    ru: "Менеджер будет привязан к выбранному филиалу и увидит только его.",
+    am: "Մենեջերը կկապվի ընտրված մասնաճյուղին և կտեսնի միայն այն:",
+  },
+  "managers.noBranches": {
+    en: "You have no branches yet — create one first, then add a manager to it.",
+    ru: "У вас пока нет филиалов — сначала создайте филиал, затем добавьте в него менеджера.",
+    am: "Դուք դեռ մասնաճյուղ չունեք — նախ ստեղծեք մասնաճյուղ, ապա ավելացրեք մենեջեր:",
+  },
   "action.remove": { en: "Remove", ru: "Удалить", am: "Հեռացնել" },
 
   // Notifications
@@ -702,6 +875,53 @@ export const TRANSLATIONS: Dict = {
   "platformPrice.renameTitle": { en: "Rename platform", ru: "Изменить наименование платформы", am: "Վերանվանել հարթակը" },
   "platformPrice.renameHint": { en: "Click to rename", ru: "Нажмите, чтобы изменить наименование", am: "Սեղմեք վերանվանելու համար" },
 
+  // Subplatforms — named, separately-priced sub-categories of a platform
+  // ("PS5 + VR" under PS5). The second row of tabs in the place form, and
+  // their own editable section in Branch Prices.
+  "subplatform.label": { en: "Subcategory", ru: "Подкатегория", am: "Ենթակատեգորիա" },
+  "subplatform.other": { en: "Other", ru: "Другое", am: "Այլ" },
+  "subplatform.name": { en: "Name", ru: "Название", am: "Անվանում" },
+  "subplatform.add": { en: "Add", ru: "Добавить", am: "Ավելացնել" },
+  "subplatform.price": { en: "Price per hour", ru: "Цена за час", am: "Գինը մեկ ժամում" },
+  "subplatform.priceRequiredHint": {
+    en: "Required — this is what every place in this subcategory will be charged.",
+    ru: "Обязательно — по этой цене будут считаться все места этой подкатегории.",
+    am: "Պարտադիր է — այս գնով կհաշվարկվեն այս ենթակատեգորիայի բոլոր տեղերը:",
+  },
+  "subplatform.tierUnpricedNote": {
+    en: "This subcategory has no rate for this type yet — set it here.",
+    ru: "У этой подкатегории ещё нет цены для этого типа — задайте её здесь.",
+    am: "Այս ենթակատեգորիան դեռ չունի գին այս տեսակի համար — սահմանեք այն այստեղ:",
+  },
+  "subplatform.errors.priceRequired": {
+    en: "Enter a price for this subcategory.",
+    ru: "Введите цену подкатегории.",
+    am: "Մուտքագրեք ենթակատեգորիայի գինը:",
+  },
+  "subplatform.priceAppliedNote": {
+    en: "This subcategory's rate applies. Change it in Branch prices.",
+    ru: "Применяется цена этой подкатегории. Изменить её можно в «Ценах филиала».",
+    am: "Կիրառվում է այս ենթակատեգորիայի գինը: Փոխեք այն «Մասնաճյուղի գներ» բաժնում:",
+  },
+  "subplatform.inherits": { en: "as the platform", ru: "как у платформы", am: "ինչպես հարթակը" },
+  "subplatform.errors.nameRequired": {
+    en: "Enter a name for the subcategory.",
+    ru: "Введите название подкатегории.",
+    am: "Մուտքագրեք ենթակատեգորիայի անվանումը:",
+  },
+  "subplatform.sectionTitle": { en: "Subcategory prices", ru: "Цены подкатегорий", am: "Ենթակատեգորիաների գներ" },
+  "subplatform.renameTitle": { en: "Rename subcategory", ru: "Изменить название подкатегории", am: "Վերանվանել ենթակատեգորիան" },
+  "subplatform.managedHint": {
+    en: "Created in Places, on the second row of tabs. Rename them and edit each rate here. A subcategory disappears on its own once its last place is deleted — it cannot be removed while a place still uses it.",
+    ru: "Создаются в разделе «Места», во втором ряду вкладок. Здесь их можно переименовать и изменить цену. Подкатегория исчезает сама, когда удалено её последнее место — пока хотя бы одно место её использует, удалить её нельзя.",
+    am: "Ստեղծվում են «Տեղեր» բաժնում՝ ներդիրների երկրորդ շարքում: Այստեղ կարող եք վերանվանել և փոխել գինը: Ենթակատեգորիան անհետանում է ինքնաշխատ, երբ ջնջվում է նրա վերջին տեղը:",
+  },
+  "subplatform.defaultUndeletable": {
+    en: "The Default subcategory cannot be deleted.",
+    ru: "Подкатегорию «По умолчанию» удалить нельзя.",
+    am: "«Կանխադրված» ենթակատեգորիան հնարավոր չէ ջնջել:",
+  },
+
   // Tournament form
   "tournament.titleNew": { en: "New tournament", ru: "Новый турнир", am: "Նոր մրցաշար" },
   "tournament.titleEdit": { en: "Edit tournament", ru: "Редактировать турнир", am: "Խմբագրել մրցաշարը" },
@@ -791,6 +1011,16 @@ export const TRANSLATIONS: Dict = {
   "products.title": { en: "Products", ru: "Товары", am: "Ապրանքներ" },
   "products.new": { en: "+ New product", ru: "+ Новый товар", am: "+ Նոր ապրանք" },
   "products.empty": { en: "No products yet.", ru: "Товаров пока нет.", am: "Ապրանքներ դեռ չկան:" },
+  "products.search": {
+    en: "Search by name or category…",
+    ru: "Поиск по названию или категории…",
+    am: "Որոնում անունով կամ կատեգորիայով…",
+  },
+  "products.noMatches": {
+    en: "Nothing matches that search.",
+    ru: "Ничего не найдено.",
+    am: "Ոչինչ չի գտնվել:",
+  },
 
   "shift.title": { en: "Shift", ru: "Смена", am: "Հերթափոխ" },
   "shift.open": { en: "Open shift", ru: "Открыть смену", am: "Բացել հերթափոխը" },
@@ -1132,6 +1362,291 @@ export const TRANSLATIONS: Dict = {
     ru: "Регулярные сервисы, оплата ежемесячно",
     am: "Կրկնվող ծառայություններ, ամսական վճարում",
   },
+  // Admin "Metrics" section — Yandex.Metrica website analytics.
+  "home.menu.metrics": {
+    en: "Metrics",
+    ru: "Метрики",
+    am: "Մետրիկա",
+  },
+  "home.menu.metricsSub": {
+    en: "Site traffic & server health",
+    ru: "Трафик сайта и здоровье сервера",
+    am: "Կայքի թրաֆիկ և սերվերի վիճակ",
+  },
+  "metrics.title": { en: "Metrics", ru: "Метрики", am: "Մետրիկա" },
+
+  // ---- Monitoring sections (per app) ----
+  "monitoring.title": { en: "Monitoring", ru: "Мониторинг", am: "Մոնիտորինգ" },
+  "monitoring.app.mobile": { en: "Mobile app", ru: "Мобильное приложение", am: "Բջջային հավելված" },
+  "monitoring.app.panel": { en: "Desktop panel", ru: "Десктоп-панель", am: "Դեսքթոփ վահանակ" },
+  "monitoring.app.agent": { en: "Desktop agent", ru: "Десктоп-агент", am: "Դեսքթոփ գործակալ" },
+  "monitoring.app.website": { en: "Website", ru: "Веб-сайт", am: "Կայք" },
+  "monitoring.installs": { en: "Installs", ru: "Установки", am: "Տեղադրումներ" },
+  "monitoring.installsShort": { en: "inst.", ru: "уст.", am: "տեղ." },
+  "monitoring.viewsShort": { en: "views", ru: "просм.", am: "դիտում" },
+  "monitoring.launches": { en: "Launches", ru: "Запуски", am: "Գործարկումներ" },
+  "monitoring.events": { en: "Events", ru: "События", am: "Իրադարձություններ" },
+  "monitoring.errors": { en: "Errors", ru: "Ошибки", am: "Սխալներ" },
+  "monitoring.errorRate": { en: "Error rate", ru: "Доля ошибок", am: "Սխալների բաժինը" },
+  "monitoring.activity": { en: "Activity", ru: "Активность", am: "Ակտիվություն" },
+  "monitoring.versions": { en: "Versions", ru: "Версии", am: "Տարբերակներ" },
+  "monitoring.platforms": { en: "Platforms", ru: "Платформы", am: "Հարթակներ" },
+  "monitoring.screens": { en: "Top screens", ru: "Популярные экраны", am: "Հանրաճանաչ էկրաններ" },
+  "monitoring.recentErrors": { en: "Recent errors", ru: "Последние ошибки", am: "Վերջին սխալները" },
+  "monitoring.noErrors": {
+    en: "No errors in this period.",
+    ru: "За этот период ошибок нет.",
+    am: "Այս ժամանակահատվածում սխալներ չկան։",
+  },
+  "monitoring.lastSeen": { en: "Last report", ru: "Последний отчёт", am: "Վերջին հաշվետվությունը" },
+  "monitoring.neverSeen": {
+    en: "No reports yet",
+    ru: "Отчётов пока нет",
+    am: "Դեռ հաշվետվություններ չկան",
+  },
+  "monitoring.quietWindow": {
+    en: "This app sent nothing in the selected period.",
+    ru: "За выбранный период приложение ничего не присылало.",
+    am: "Ընտրված ժամանակահատվածում հավելվածը ոչինչ չի ուղարկել։",
+  },
+  "monitoring.neverReported": {
+    en: "This app has never reported. It starts once a version with monitoring is installed.",
+    ru: "Приложение ещё ни разу не отчитывалось. Данные появятся после установки версии с мониторингом.",
+    am: "Հավելվածը դեռ երբեք չի հաշվետվել։ Տվյալները կհայտնվեն մոնիտորինգով տարբերակը տեղադրելուց հետո։",
+  },
+  "monitoring.disabled": {
+    en: "Monitoring is switched off",
+    ru: "Мониторинг выключен",
+    am: "Մոնիտորինգն անջատված է",
+  },
+  "monitoring.disabledSub": {
+    en: "Set TELEMETRY_ENABLED=true for this environment to start collecting.",
+    ru: "Включите TELEMETRY_ENABLED=true для этого окружения, чтобы начать сбор.",
+    am: "Հավաքագրումը սկսելու համար այս միջավայրում միացրեք TELEMETRY_ENABLED=true։",
+  },
+  "monitoring.loadFailed": {
+    en: "Could not load monitoring data",
+    ru: "Не удалось загрузить данные мониторинга",
+    am: "Չհաջողվեց բեռնել մոնիտորինգի տվյալները",
+  },
+  "monitoring.loadFailedSub": {
+    en: "Check the connection to the backend and try again.",
+    ru: "Проверьте соединение с сервером и попробуйте снова.",
+    am: "Ստուգեք կապը սերվերի հետ և կրկին փորձեք։",
+  },
+  "metrics.period.today": { en: "Today", ru: "Сегодня", am: "Այսօր" },
+  "metrics.period.week": { en: "7 days", ru: "7 дней", am: "7 օր" },
+  "metrics.period.month": { en: "30 days", ru: "30 дней", am: "30 օր" },
+  "metrics.openYandex": {
+    en: "Open Yandex.Metrica →",
+    ru: "Открыть Яндекс.Метрику →",
+    am: "Բացել Yandex.Metrica →",
+  },
+  // ---- Administrative blocking (company / branch) ----
+  // The confirmation questions carry the name because the admin is about to
+  // sign people out of their workplace — "block this company?" is not a
+  // question anybody should answer without seeing which one.
+  "blocking.action.block.company": {
+    en: "Block company",
+    ru: "Заблокировать компанию",
+    am: "Արգելափակել ընկերությունը",
+  },
+  "blocking.action.unblock.company": {
+    en: "Unblock company",
+    ru: "Разблокировать компанию",
+    am: "Ապաարգելափակել ընկերությունը",
+  },
+  "blocking.action.block.branch": {
+    en: "Block branch",
+    ru: "Заблокировать филиал",
+    am: "Արգելափակել մասնաճյուղը",
+  },
+  "blocking.action.unblock.branch": {
+    en: "Unblock branch",
+    ru: "Разблокировать филиал",
+    am: "Ապաարգելափակել մասնաճյուղը",
+  },
+  "blocking.confirm.block.company": {
+    en: "Block the company “{0}”? All its branches will be hidden from players, and its owner and managers will not be able to sign in.",
+    ru: "Заблокировать компанию «{0}»? Все её филиалы скроются от игроков, а владелец и менеджеры не смогут войти.",
+    am: "Արգելափակե՞լ «{0}» ընկերությունը։ Նրա բոլոր մասնաճյուղերը կթաքցվեն խաղացողներից, իսկ սեփականատերը և մենեջերները չեն կարողանա մուտք գործել։",
+  },
+  "blocking.confirm.unblock.company": {
+    en: "Unblock the company “{0}”? Its branches become visible again and its staff can sign in.",
+    ru: "Разблокировать компанию «{0}»? Её филиалы снова станут видимыми, а сотрудники смогут войти.",
+    am: "Ապաարգելափակե՞լ «{0}» ընկերությունը։ Նրա մասնաճյուղերը կրկին տեսանելի կդառնան, իսկ աշխատակիցները կկարողանան մուտք գործել։",
+  },
+  "blocking.confirm.block.branch": {
+    en: "Block the branch “{0}”? It will be hidden from players and its managers will not be able to sign in.",
+    ru: "Заблокировать филиал «{0}»? Он скроется от игроков, а его менеджеры не смогут войти.",
+    am: "Արգելափակե՞լ «{0}» մասնաճյուղը։ Այն կթաքցվի խաղացողներից, իսկ նրա մենեջերները չեն կարողանա մուտք գործել։",
+  },
+  "blocking.confirm.unblock.branch": {
+    en: "Unblock the branch “{0}”? It becomes visible again and its managers can sign in.",
+    ru: "Разблокировать филиал «{0}»? Он снова станет видимым, а его менеджеры смогут войти.",
+    am: "Ապաարգելափակե՞լ «{0}» մասնաճյուղը։ Այն կրկին տեսանելի կդառնա, իսկ նրա մենեջերները կկարողանան մուտք գործել։",
+  },
+  "blocking.state": { en: "Access", ru: "Доступ", am: "Հասանելիություն" },
+  "blocking.state.company": { en: "Blocked", ru: "Заблокирована", am: "Արգելափակված է" },
+  "blocking.state.branch": { en: "Blocked", ru: "Заблокирован", am: "Արգելափակված է" },
+  "blocking.state.byCompany": {
+    en: "Blocked with the company",
+    ru: "Заблокирован вместе с компанией",
+    am: "Արգելափակված է ընկերության հետ",
+  },
+  // Read when the block lands while the person is mid-shift. Both say what
+  // happened and who did it: being thrown out of a screen with no explanation
+  // is how a support call starts. The locked-out line is only a fallback — the
+  // server sends its own sentence, which names the company or the branch.
+  "blocking.evicted.lockedOut": {
+    en: "Your access has been blocked by an administrator.",
+    ru: "Ваш доступ заблокирован администратором.",
+    am: "Ձեր հասանելիությունն արգելափակվել է ադմինիստրատորի կողմից։",
+  },
+  "blocking.evicted.branch": {
+    en: "This branch has been blocked by an administrator.",
+    ru: "Этот филиал заблокирован администратором.",
+    am: "Այս մասնաճյուղն արգելափակվել է ադմինիստրատորի կողմից։",
+  },
+  "blocking.closedByCompany": {
+    en: "Closed because its company is blocked — unblocking the branch alone will not reopen it.",
+    ru: "Закрыт из-за блокировки компании — разблокировка филиала сама по себе его не откроет.",
+    am: "Փակ է ընկերության արգելափակման պատճառով — միայն մասնաճյուղի ապաարգելափակումը այն չի բացի։",
+  },
+  "toast.company.blocked": { en: "Company blocked", ru: "Компания заблокирована", am: "Ընկերությունն արգելափակվեց" },
+  "toast.company.unblocked": { en: "Company unblocked", ru: "Компания разблокирована", am: "Ընկերությունն ապաարգելափակվեց" },
+  "toast.branch.blocked": { en: "Branch blocked", ru: "Филиал заблокирован", am: "Մասնաճյուղն արգելափակվեց" },
+  "toast.branch.unblocked": { en: "Branch unblocked", ru: "Филиал разблокирован", am: "Մասնաճյուղն ապաարգելափակվեց" },
+  // Shown when someone opens a working screen of a branch that is out of
+  // service and is sent back to the branch page.
+  "blocking.branchClosed": {
+    en: "This branch is out of service — its sections are unavailable",
+    ru: "Филиал отключён — его разделы недоступны",
+    am: "Մասնաճյուղն անջատված է — նրա բաժինները հասանելի չեն",
+  },
+  // The server's refusals, said in the operator's own language.
+  //
+  // The API answers a block with a machine-readable `code` next to its
+  // sentence; the panel renders THESE from the code and only falls back to the
+  // server's text for a code it does not know. Without that, a Russian panel
+  // showed "Your branch has been blocked" at the login screen, because the
+  // sentence was written wherever the refusal happened to be thrown.
+  "blocking.reason.company_blocked": {
+    en: "Your company has been blocked. Please contact the administrator.",
+    ru: "Ваша компания заблокирована. Обратитесь к администратору.",
+    am: "Ձեր ընկերությունն արգելափակված է։ Դիմեք ադմինիստրատորին։",
+  },
+  "blocking.reason.branch_blocked": {
+    en: "Your branch has been blocked. Please contact the administrator.",
+    ru: "Ваш филиал заблокирован. Обратитесь к администратору.",
+    am: "Ձեր մասնաճյուղն արգելափակված է։ Դիմեք ադմինիստրատորին։",
+  },
+  "blocking.reason.branch_operation_blocked": {
+    en: "This branch is blocked — you can view it, but nothing here can be changed.",
+    ru: "Филиал заблокирован — его можно просматривать, но изменения недоступны.",
+    am: "Մասնաճյուղն արգելափակված է — կարող եք դիտել, բայց փոփոխություններն անհասանելի են։",
+  },
+  // Shown on the branch page itself while it is out of service. States the
+  // rule the whole screen then obeys, so a disabled tile never reads as a bug.
+  "blocking.readOnly.banner": {
+    en: "This branch is blocked by an administrator. It is read-only: its sections and actions stay unavailable until the block is lifted.",
+    ru: "Филиал заблокирован администратором. Он доступен только для просмотра: разделы и действия недоступны, пока блокировку не снимут.",
+    am: "Մասնաճյուղն արգելափակված է ադմինիստրատորի կողմից։ Հասանելի է միայն դիտման համար․ բաժիններն ու գործողություններն անհասանելի են, մինչև արգելափակումը հանվի։",
+  },
+  "blocking.readOnly.bannerByCompany": {
+    en: "The company that owns this branch is blocked. The branch is read-only until the company is unblocked.",
+    ru: "Компания, которой принадлежит филиал, заблокирована. Филиал доступен только для просмотра, пока компанию не разблокируют.",
+    am: "Այս մասնաճյուղին տիրապետող ընկերությունն արգելափակված է։ Մասնաճյուղը հասանելի է միայն դիտման համար, մինչև ընկերության արգելափակումը հանվի։",
+  },
+  "blocking.readOnly.tileHint": {
+    en: "Unavailable while the branch is blocked",
+    ru: "Недоступно, пока филиал заблокирован",
+    am: "Անհասանելի է, քանի դեռ մասնաճյուղն արգելափակված է",
+  },
+  "toast.generic.blocked": { en: "Blocked", ru: "Заблокировано", am: "Արգելափակվեց" },
+  "toast.generic.unblocked": { en: "Unblocked", ru: "Разблокировано", am: "Ապաարգելափակվեց" },
+
+  "metrics.refresh": { en: "Refresh", ru: "Обновить", am: "Թարմացնել" },
+  "metrics.refreshing": { en: "Refreshing…", ru: "Обновляем…", am: "Թարմացվում է…" },
+  "metrics.updatedAt": {
+    en: "Data as of {0}",
+    ru: "Данные на {0}",
+    am: "Տվյալները՝ {0} դրությամբ",
+  },
+  "metrics.yandexLag": {
+    en: "Yandex aggregates visits with a few minutes' delay — a brand-new visit may not be counted yet.",
+    ru: "Яндекс агрегирует визиты с задержкой в несколько минут — самый свежий визит может быть ещё не учтён.",
+    am: "Yandex-ը այցերը հավաքագրում է մի քանի րոպե ուշացումով — ամենավերջին այցը կարող է դեռ հաշվառված չլինել։",
+  },
+  "metrics.visits": { en: "Visits", ru: "Визиты", am: "Այցեր" },
+  "metrics.users": { en: "Visitors", ru: "Посетители", am: "Այցելուներ" },
+  "metrics.bounceRate": { en: "Bounce rate", ru: "Отказы", am: "Մերժումներ" },
+  "metrics.pageDepth": { en: "Pages / visit", ru: "Глубина просмотра", am: "Դիտման խորություն" },
+  "metrics.avgVisit": { en: "Avg. visit", ru: "Время на сайте", am: "Կայքում անցկացրած ժամանակ" },
+  "metrics.trend": { en: "Trend", ru: "Динамика", am: "Դինամիկա" },
+  "metrics.sources": { en: "Traffic sources", ru: "Источники трафика", am: "Թրաֆիկի աղբյուրներ" },
+  "metrics.noData": {
+    en: "No data for this period yet.",
+    ru: "За этот период данных пока нет.",
+    am: "Այս ժամանակահատվածի տվյալներ դեռ չկան:",
+  },
+  "metrics.sampled": {
+    en: "Figures are estimated (Yandex sampling).",
+    ru: "Данные приблизительные (сэмплирование Яндекса).",
+    am: "Տվյալները մոտավոր են (Yandex-ի ընտրանք):",
+  },
+  "metrics.notConfigured": {
+    en: "Analytics is not set up for this environment",
+    ru: "Аналитика не настроена для этого окружения",
+    am: "Անալիտիկան կարգավորված չէ այս միջավայրի համար",
+  },
+  "metrics.notConfiguredSub": {
+    en: "Add the counter and token to this environment's settings, then reload.",
+    ru: "Добавьте счётчик и токен в настройки этого окружения и обновите страницу.",
+    am: "Ավելացրեք հաշվիչը և թոքենը այս միջավայրի կարգավորումներում և թարմացրեք:",
+  },
+  "metrics.unavailable": {
+    en: "Yandex.Metrica is unavailable",
+    ru: "Яндекс.Метрика недоступна",
+    am: "Yandex.Metrica-ն հասանելի չէ",
+  },
+  "metrics.unavailableSub": {
+    en: "The service did not respond. The figures will return on their own once it does.",
+    ru: "Сервис не ответил. Данные появятся сами, как только он снова заработает.",
+    am: "Ծառայությունը չպատասխանեց: Տվյալները կվերադառնան ինքնաբերաբար:",
+  },
+  "metrics.loadFailed": {
+    en: "Could not load metrics",
+    ru: "Не удалось загрузить метрики",
+    am: "Չհաջողվեց բեռնել մետրիկան",
+  },
+  "metrics.loadFailedSub": {
+    en: "Check the connection to the server and try again.",
+    ru: "Проверьте связь с сервером и попробуйте ещё раз.",
+    am: "Ստուգեք կապը սերվերի հետ և փորձեք կրկին:",
+  },
+  "metrics.retry": { en: "Retry", ru: "Повторить", am: "Կրկնել" },
+  // Backend monitoring dashboard (Laravel Pulse) — admin only.
+  "home.menu.pulse": {
+    en: "Monitoring",
+    ru: "Мониторинг",
+    am: "Մոնիտորինգ",
+  },
+  "home.menu.pulseSub": {
+    en: "Server load, disk, queries",
+    ru: "Нагрузка, диск, запросы",
+    am: "Ծանրաբեռնվածություն, սկավառակ, հարցումներ",
+  },
+  "home.menu.pulseOpening": {
+    en: "Opening in browser…",
+    ru: "Открываю в браузере…",
+    am: "Բացվում է դիտարկիչում…",
+  },
+  "home.menu.pulseError": {
+    en: "Could not open monitoring. Try again.",
+    ru: "Не удалось открыть мониторинг. Попробуйте ещё раз.",
+    am: "Չհաջողվեց բացել մոնիտորինգը: Փորձեք կրկին:",
+  },
   "home.menu.settings": {
     en: "Settings",
     ru: "Настройки",
@@ -1239,6 +1754,17 @@ export const TRANSLATIONS: Dict = {
   "toast.generic.saved":   { en: "Saved successfully", ru: "Успешно сохранено", am: "Հաջողությամբ պահպանվեց" },
   "toast.generic.deleted": { en: "Deleted successfully", ru: "Успешно удалено", am: "Հաջողությամբ ջնջվեց" },
   "toast.generic.error":   { en: "Something went wrong", ru: "Что-то пошло не так", am: "Ինչ-որ բան սխալ գնաց" },
+
+  // Failure sentences, resolved by the Toaster whenever a toast is red. Kept
+  // per-action rather than per-entity: one line that reads correctly for a
+  // place, a device or a company beats forty lines nobody keeps translated.
+  "toast.fail.created":   { en: "Could not create", ru: "Не удалось создать", am: "Չհաջողվեց ստեղծել" },
+  "toast.fail.updated":   { en: "Could not update", ru: "Не удалось изменить", am: "Չհաջողվեց թարմացնել" },
+  "toast.fail.saved":     { en: "Could not save", ru: "Не удалось сохранить", am: "Չհաջողվեց պահպանել" },
+  "toast.fail.deleted":   { en: "Could not delete", ru: "Не удалось удалить", am: "Չհաջողվեց ջնջել" },
+  "toast.fail.blocked":   { en: "Could not block", ru: "Не удалось заблокировать", am: "Չհաջողվեց արգելափակել" },
+  "toast.fail.unblocked": { en: "Could not unblock", ru: "Не удалось разблокировать", am: "Չհաջողվեց ապաարգելափակել" },
+  "toast.fail.prices":    { en: "Could not save prices", ru: "Не удалось сохранить цены", am: "Չհաջողվեց պահպանել գները" },
 
   "toast.place.created": { en: "New place created", ru: "Новое место создано", am: "Նոր տեղ ստեղծվեց" },
   "toast.place.updated": { en: "Place updated", ru: "Место обновлено", am: "Տեղը թարմացվեց" },
@@ -1451,6 +1977,148 @@ export const TRANSLATIONS: Dict = {
   "tin.invalid": { en: "Invalid TIN for the selected country (e.g. {0})", ru: "Неверный ИНН для выбранной страны (например: {0})", am: "Սխալ ՀՎՀՀ ընտրված երկրի համար (օրինակ՝ {0})" },
   "tin.invalidGeneric": { en: "Invalid TIN format", ru: "Неверный формат ИНН", am: "ՀՎՀՀ-ի սխալ ձևաչափ" },
   "company.selectCountryFirst": { en: "Select a country first", ru: "Сначала выберите страну", am: "Սկզբում ընտրեք երկիր" },
+
+  "product.errors.name": {
+    en: "Enter a name",
+    ru: "Введите название",
+    am: "Մուտքագրեք անվանումը",
+  },
+
+  "tariff.errors.allNames": {
+    en: "Fill in the name in every language",
+    ru: "Заполните название на всех языках",
+    am: "Լրացրեք անվանումը բոլոր լեզուներով",
+  },
+
+  // Multilingual name fields — one row per language, auto-translated from the
+  // language of the interface.
+  "multilang.translating": { en: "translating…", ru: "переводим…", am: "թարգմանվում է…" },
+  "multilang.autoPlaceholder": {
+    en: "filled automatically",
+    ru: "заполнится автоматически",
+    am: "կլրացվի ավտոմատ",
+  },
+  "multilang.edited": { en: "edited by hand", ru: "изменено вручную", am: "ձեռքով խմբագրված" },
+  "multilang.reset": { en: "restore auto", ru: "вернуть автоперевод", am: "վերականգնել ավտոթարգմանությունը" },
+  // Why the whole field could not be translated. Deliberately actionable for
+  // an operator, and free of anything that would confuse a cashier.
+  "multilang.reason.not_configured": {
+    en: "Automatic translation is not set up on this server — fill the languages in by hand.",
+    ru: "Автоперевод не настроен на сервере — заполните языки вручную.",
+    am: "Ավտոթարգմանությունը սերվերում կարգավորված չէ — լրացրեք լեզուները ձեռքով։",
+  },
+  "multilang.reason.auth": {
+    en: "The translation service rejected the server's credentials — contact the administrator.",
+    ru: "Сервис перевода отклонил доступ сервера — обратитесь к администратору.",
+    am: "Թարգմանության ծառայությունը մերժեց սերվերի հասանելիությունը — դիմեք ադմինիստրատորին։",
+  },
+  "multilang.reason.quota": {
+    en: "The translation quota is used up — fill the languages in by hand for now.",
+    ru: "Лимит переводов исчерпан — пока заполните языки вручную.",
+    am: "Թարգմանության սահմանաչափը սպառված է — առայժմ լրացրեք ձեռքով։",
+  },
+  // Shown INSTEAD of the one above when the service told us how long to wait.
+  // The distinction matters: one asks the user to do the work themselves, the
+  // other asks them to do nothing at all.
+  "multilang.reason.quota_retry": {
+    en: "Too many translations at once — retrying automatically in",
+    ru: "Слишком много переводов подряд — повторим автоматически через",
+    am: "Չափազանց շատ թարգմանություններ անընդմեջ — ավտոմատ կկրկնվի",
+  },
+  "multilang.seconds": { en: "s", ru: "с", am: "վրկ" },
+  "multilang.reason.provider_error": {
+    en: "The translation service is unavailable right now — fill the languages in by hand.",
+    ru: "Сервис перевода сейчас недоступен — заполните языки вручную.",
+    am: "Թարգմանության ծառայությունն այժմ հասանելի չէ — լրացրեք ձեռքով։",
+  },
+
+  "multilang.failed": {
+    en: "could not translate — please fill in",
+    ru: "не удалось перевести — заполните вручную",
+    am: "չհաջողվեց թարգմանել — լրացրեք ձեռքով",
+  },
+
+  // Language selection flow — first run (before login) and the workspace step
+  // an owner/manager sees before their cabinet opens.
+  "lang.firstRun.title": {
+    en: "Choose your language",
+    ru: "Выберите язык",
+    am: "Ընտրեք լեզուն",
+  },
+  "lang.firstRun.subtitle": {
+    en: "Pick the language you want to work in. You can change it any time in Settings.",
+    ru: "Выберите язык, на котором хотите работать. Его можно сменить в любой момент в настройках.",
+    am: "Ընտրեք լեզուն, որով ցանկանում եք աշխատել։ Այն կարող եք փոխել ցանկացած պահի կարգավորումներում։",
+  },
+  "lang.account.title": {
+    en: "Language for your account",
+    ru: "Язык вашего аккаунта",
+    am: "Ձեր հաշվի լեզուն",
+  },
+  "lang.account.subtitle": {
+    en: "This is a one-time setup. Your account will always open in this language, on any computer.",
+    ru: "Это разовая настройка. Ваш аккаунт всегда будет открываться на этом языке, на любом компьютере.",
+    am: "Սա միանվագ կարգավորում է։ Ձեր հաշիվը միշտ կբացվի այս լեզվով՝ ցանկացած համակարգչի վրա։",
+  },
+  "lang.continue": { en: "Continue", ru: "Продолжить", am: "Շարունակել" },
+  "lang.changeLaterHint": {
+    en: "You can change the language later in Settings.",
+    ru: "Язык можно изменить позже в настройках.",
+    am: "Լեզուն կարող եք փոխել ավելի ուշ՝ կարգավորումներում։",
+  },
+
+  // Automatic translation of staff-authored content. Staff type a value once;
+  // the backend fills in the other UI languages in the background. These
+  // strings are what makes that process visible instead of magic.
+  "i18n.sourceLocale": { en: "Input language", ru: "Язык ввода", am: "Մուտքագրման լեզու" },
+  "i18n.sourceLocale.hint": {
+    en: "Type once — the other languages are filled in automatically.",
+    ru: "Введите один раз — остальные языки заполнятся автоматически.",
+    am: "Մուտքագրեք մեկ անգամ — մնացած լեզուները կլրացվեն ավտոմատ։",
+  },
+  "i18n.translations": { en: "Translations", ru: "Переводы", am: "Թարգմանություններ" },
+  "i18n.pending": { en: "translating…", ru: "переводится…", am: "թարգմանվում է…" },
+  "i18n.overrideHint": {
+    en: "Editing a language here locks it — automatic translation will not overwrite your wording.",
+    ru: "Правка языка здесь блокирует его — автоперевод не перезапишет вашу формулировку.",
+    am: "Այստեղ լեզուն խմբագրելը կողպում է այն — ավտոթարգմանությունը չի վերագրի ձեր ձևակերպումը։",
+  },
+  "i18n.status.pending": { en: "translating…", ru: "переводится…", am: "թարգմանվում է…" },
+  "i18n.status.pending.hint": {
+    en: "Queued for translation. The value will appear shortly.",
+    ru: "В очереди на перевод. Значение появится в ближайшее время.",
+    am: "Հերթում է թարգմանության համար։ Արժեքը շուտով կհայտնվի։",
+  },
+  "i18n.status.ready": { en: "translated", ru: "переведено", am: "թարգմանված է" },
+  "i18n.status.ready.hint": {
+    en: "Up to date with the source text.",
+    ru: "Соответствует исходному тексту.",
+    am: "Համապատասխանում է սկզբնական տեքստին։",
+  },
+  "i18n.status.stale": { en: "updating…", ru: "обновляется…", am: "թարմացվում է…" },
+  "i18n.status.stale.hint": {
+    en: "The source changed — the previous translation is shown until the new one is ready.",
+    ru: "Исходник изменился — показывается прежний перевод, пока не готов новый.",
+    am: "Սկզբնաղբյուրը փոխվել է — ցուցադրվում է նախորդ թարգմանությունը, մինչև նորը պատրաստ լինի։",
+  },
+  "i18n.status.failed": { en: "translation failed", ru: "ошибка перевода", am: "թարգմանության սխալ" },
+  "i18n.status.failed.hint": {
+    en: "Automatic translation did not succeed. The previous value is still shown; you can fill it in by hand.",
+    ru: "Автоперевод не удался. Прежнее значение показывается; можно заполнить вручную.",
+    am: "Ավտոթարգմանությունը չհաջողվեց։ Նախորդ արժեքը ցուցադրվում է․ կարող եք լրացնել ձեռքով։",
+  },
+  "i18n.status.needs_review": { en: "needs review", ru: "нужна проверка", am: "պահանջում է ստուգում" },
+  "i18n.status.needs_review.hint": {
+    en: "You edited this language by hand and the source has changed since. Automatic translation will not touch it.",
+    ru: "Вы правили этот язык вручную, а исходник с тех пор изменился. Автоперевод его не тронет.",
+    am: "Դուք ձեռքով խմբագրել եք այս լեզուն, իսկ սկզբնաղբյուրն այդ ժամանակից փոխվել է։ Ավտոթարգմանությունը այն չի փոխի։",
+  },
+  "i18n.status.skipped": { en: "not translated", ru: "без перевода", am: "առանց թարգմանության" },
+  "i18n.status.skipped.hint": {
+    en: "Brand names, codes and numbers are copied as-is instead of being translated.",
+    ru: "Бренды, коды и числа копируются как есть, без перевода.",
+    am: "Ապրանքանիշերը, կոդերը և թվերը պատճենվում են այնպես, ինչպես կան՝ առանց թարգմանության։",
+  },
 };
 
 export const t = (key: string, lang: Lang): string => {
@@ -1470,3 +2138,11 @@ export const setActiveLang = (l: Lang): void => {
   activeLang = l;
 };
 export const tActive = (key: string): string => t(key, activeLang);
+
+/**
+ * The language the panel is rendering in, for callers that must TELL the
+ * server about it — the API client sends it as `X-App-Language` so server-side
+ * sentences (validation errors, block refusals) come back in the same language
+ * as the rest of the screen.
+ */
+export const getActiveLang = (): Lang => activeLang;

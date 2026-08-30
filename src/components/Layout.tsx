@@ -1,6 +1,7 @@
 import { Outlet } from "react-router-dom";
 import ExpenseReminderNotifier from "./notifications/ExpenseReminderNotifier";
 import GlobalBookingNotifier from "./notifications/GlobalBookingNotifier";
+import SupportNotifier from "./notifications/SupportNotifier";
 import Sidebar from "./Sidebar";
 import BackButton from "./ui/BackButton";
 
@@ -18,6 +19,7 @@ const Layout = () => (
       regardless of which page they're currently looking at.
     */}
     <GlobalBookingNotifier />
+    <SupportNotifier />
     {/*
       Admin-only recurring-service payment reminder. Polls the "due
       within 3 days" feed and rings (chime + OS push + corner toast) the
