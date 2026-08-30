@@ -139,6 +139,50 @@ export const request = async <Res>(
   return body as Res;
 };
 
+/**
+ * A file, fetched the same way as everything else — with the token.
+ *
+ * Separate from `request` rather than a flag on it: this one never touches the
+ * response cache (a cache of file bytes is a memory leak with a nice name),
+ * never parses a body, and returns the bytes plus the name the server gave
+ * them. Used for support attachments, which have no public URL by design —
+ * asking for one without a token is a 401, and asking for someone else's is a
+ * 403.
+ */
+export const requestBlob = async (
+  path: string,
+): Promise<{ blob: Blob; filename: string | null }> => {
+  const token = await keyValueStore.get<string>(AppConfig.storageKeys.token);
+  const headers: Record<string, string> = {
+    "ngrok-skip-browser-warning": "1",
+    "X-App-Language": getActiveLang(),
+  };
+  if (token) headers.Authorization = `Bearer ${token}`;
+
+  const res = await fetch(`${AppConfig.backendUrl}${path}`, { headers });
+
+  if (!res.ok) {
+    // Same session rule as `request`: a token the server refused ends the
+    // session, and a 401 without one says nothing about it.
+    if (res.status === 401 && token) sessionExpiry.raise();
+    const text = await res.text();
+    const err = new Error(extractMessage(safeJson(text)) ?? `HTTP ${res.status}`) as ApiError;
+    err.status = res.status;
+    throw err;
+  }
+
+  return { blob: await res.blob(), filename: filenameFrom(res.headers.get("Content-Disposition")) };
+};
+
+/** The name out of `attachment; filename="..."`, when the server sent one. */
+const filenameFrom = (header: string | null): string | null => {
+  if (!header) return null;
+  const utf8 = /filename\*=UTF-8''([^;]+)/i.exec(header);
+  if (utf8) return decodeURIComponent(utf8[1]);
+  const plain = /filename="?([^";]+)"?/i.exec(header);
+  return plain ? plain[1] : null;
+};
+
 const safeJson = (s: string): unknown => {
   try { return JSON.parse(s); } catch { return s; }
 };

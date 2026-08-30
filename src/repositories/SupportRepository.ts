@@ -1,5 +1,6 @@
 import {
   apiMarkSupportRead,
+  apiSupportAttachment,
   apiOpenSupportConversation,
   apiSendSupportMessage,
   apiSupportConversations,
@@ -31,6 +32,28 @@ export class SupportRepository {
   async send(conversationId: number, body: string, files: File[]): Promise<ISupportMessage> {
     return friendlyMutation(apiSendSupportMessage(conversationId, body, files).then((r) => r.message));
   }
+  /**
+   * Save an attachment to the operator's machine.
+   *
+   * Fetched with the session token and handed to the browser as a blob rather
+   * than linked: there is no URL for these files that works without the token,
+   * which is the point — the check happens on every single fetch, not once when
+   * a link was made.
+   */
+  async downloadAttachment(attachmentId: number, fallbackName: string): Promise<void> {
+    const { blob, filename } = await apiSupportAttachment(attachmentId);
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename || fallbackName;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    // Freed on the next tick: revoking before the click is processed cancels
+    // the save in Chromium.
+    setTimeout(() => URL.revokeObjectURL(url), 0);
+  }
+
   async markRead(conversationId: number): Promise<void> {
     await apiMarkSupportRead(conversationId).catch(() => {
       /* Best effort: an unread badge that clears a moment late is not worth

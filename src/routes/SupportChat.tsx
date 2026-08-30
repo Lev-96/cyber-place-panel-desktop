@@ -7,6 +7,7 @@ import { useAuth } from "@/auth/AuthContext";
 import { useLang } from "@/i18n/LanguageContext";
 import { formatDateTime } from "@/i18n/dates";
 import { storageUri } from "@/infrastructure/AppConfig";
+import { notify } from "@/ui/notify";
 import { branchRepository } from "@/repositories/BranchRepository";
 import { supportRepository } from "@/repositories/SupportRepository";
 import { useSupportMessages } from "@/realtime/useSupportMessages";
@@ -128,14 +129,16 @@ const SupportChat = () => {
   }, [messages.length, pending.length]);
 
   /**
-   * Live lines, for the branch of the thread on screen.
+   * Live lines, for every thread this account owns.
    *
-   * A message for the OPEN thread is appended; one for another thread of the
-   * same branch only refreshes the list, so its unread badge moves without
-   * yanking the reader somewhere they did not ask to be.
+   * Subscribed by USER rather than by the branch of the open thread: support
+   * is personal, and the channel is the person. A message for the OPEN thread
+   * is appended; one for another of their threads only refreshes the list, so
+   * its unread badge moves without yanking the reader somewhere they did not
+   * ask to be.
    */
   useSupportMessages(
-    active?.branch_id ?? null,
+    user?.id ?? null,
     useCallback((event) => {
       if (event.conversation_id === activeId) {
         // Dedupe by message id: a reconnect can replay an event, and the same
@@ -188,6 +191,20 @@ const SupportChat = () => {
       setPending((prev) => prev.map((p) => (p.localId === localId
         ? { ...p, state: "failed", error: e instanceof Error ? e.message : t("support.sendFailed") }
         : p)));
+    }
+  };
+
+  /**
+   * Fetch and save one attachment.
+   *
+   * A failure says so where the operator is looking — the thread — rather than
+   * silently doing nothing, which is what a dead link does.
+   */
+  const downloadAttachment = async (attachmentId: number, name: string) => {
+    try {
+      await supportRepository.downloadAttachment(attachmentId, name);
+    } catch (e) {
+      notify.message("error", e instanceof Error ? e.message : t("support.sendFailed"));
     }
   };
 
@@ -353,16 +370,18 @@ const SupportChat = () => {
                         {m.sender_name} · {m.created_at ? formatDateTime(m.created_at) : ""}
                       </div>
                       {m.body && <div style={{ whiteSpace: "pre-wrap" }}>{m.body}</div>}
+                      {/* A button, not a link: these files have no URL that
+                          works without the session token, which is what stops
+                          somebody else's screenshot being one guessed id away. */}
                       {m.attachments.map((a) => (
-                        <a
+                        <button
                           key={a.id}
-                          href={storageUri(a.path) ?? "#"}
-                          target="_blank"
-                          rel="noreferrer"
+                          type="button"
                           className="support-attachment"
+                          onClick={() => void downloadAttachment(a.id, a.original_name)}
                         >
                           📎 {a.original_name}
-                        </a>
+                        </button>
                       ))}
                       {/* Delivery is shown only when it is not the boring case:
                           a message that reached support needs no commentary. */}

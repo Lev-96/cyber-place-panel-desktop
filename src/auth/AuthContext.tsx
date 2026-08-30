@@ -1,4 +1,5 @@
 import { apiGetMe, apiLogin, apiLogout } from "@/api/auth";
+import { disconnectEchoForSignOut } from "@/realtime/echo";
 import { apiCache } from "@/api/client";
 import { recentEmails } from "@/auth/recentEmails";
 import { AppConfig } from "@/infrastructure/AppConfig";
@@ -78,6 +79,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         /* offline, or the token was already revoked — sign out locally anyway */
       }
       apiCache.clear();
+      // And the socket, before the next person signs in on this machine. A
+      // channel stays subscribed after the components that asked for it are
+      // gone, so without this an account switch leaves the new operator's
+      // browser attached to the previous one's private channels — their
+      // notifications, their support thread — on an authorisation that has
+      // just been revoked.
+      disconnectEchoForSignOut();
       await keyValueStore.remove(AppConfig.storageKeys.token);
       await keyValueStore.remove(AppConfig.storageKeys.user);
       setUser(null);

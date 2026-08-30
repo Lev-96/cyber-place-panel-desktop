@@ -80,11 +80,11 @@ const CONTRACT_CHANNELS = {
     "bookings.global",
     "company.{id}",
     "branch.{id}",
-    // The venue's support thread. Per BRANCH, not per conversation: the owner
-    // and the manager of a venue read the same thread, and a client cannot
-    // subscribe to a conversation id it does not have yet — which is the state
-    // it is in when the first message of a new thread arrives.
-    "support.branch.{id}",
+    // Support, per USER — one person's correspondence and nobody else's. It
+    // was per branch, which let a manager listen to their owner's replies and
+    // the other way round. Per user also covers every thread the account has
+    // with one subscription, including one opened a second ago.
+    "support.user.{id}",
   ],
 } as const;
 

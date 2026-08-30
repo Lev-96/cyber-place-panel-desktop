@@ -10,13 +10,14 @@ export interface SupportMessageEvent {
 }
 
 /**
- * Lines arriving in a branch's support thread, from either side.
+ * Lines arriving in THIS PERSON'S support threads, from either side.
  *
- * Subscribed per BRANCH rather than per conversation, matching the backend
- * channel: the owner and the manager of a venue are looking at the same thread
- * and both must see support's reply, and a client cannot subscribe to a
- * conversation id it does not have yet — which is exactly the state a screen is
- * in when the very first message of a new thread arrives.
+ * Subscribed per USER, matching the backend channel. It was per branch, and
+ * that was a leak: a support thread is one person's correspondence, and a
+ * branch-wide channel put a manager's reply in front of their owner and the
+ * other way round. Per user also means one subscription for every thread the
+ * account has, so switching threads churns no channels and the first message
+ * of a brand-new thread arrives on a channel already held.
  *
  * The handler lives in a ref so the subscription survives every re-render of
  * the chat that owns it; re-subscribing per render churns channels and loses
@@ -25,7 +26,7 @@ export interface SupportMessageEvent {
  * alive and receives nothing.
  */
 export const useSupportMessages = (
-  branchId: number | null,
+  userId: number | null,
   onMessage: (event: SupportMessageEvent) => void,
 ): void => {
   const handlerRef = useRef(onMessage);
@@ -36,13 +37,13 @@ export const useSupportMessages = (
   const version = useRealtimeVersion();
 
   useEffect(() => {
-    if (!branchId) return;
+    if (!userId) return;
     const echo = getEcho();
     // No socket configured, or it could not be built: the screen still works
     // off its own fetches, exactly as it does when Reverb is unreachable.
     if (!echo) return;
 
-    const name = `support.branch.${branchId}`;
+    const name = `support.user.${userId}`;
     const channel = echo.private(name);
     const listener = (payload: SupportMessageEvent) => handlerRef.current(payload);
     channel.listen(".support.message.created", listener);
@@ -51,5 +52,5 @@ export const useSupportMessages = (
       channel.stopListening(".support.message.created", listener);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [branchId, version, realtimeVersion]);
+  }, [userId, version, realtimeVersion]);
 };

@@ -1,4 +1,4 @@
-import { request } from "./client";
+import { request, requestBlob } from "./client";
 
 /**
  * In-app support: the venue's side of a conversation whose other side is a
@@ -20,8 +20,9 @@ export interface ISupportAttachment {
   original_name: string;
   mime: string | null;
   size: number;
-  /** Path on the public disk — render it through `storageUri()`. */
-  path: string;
+  // No path: support attachments have no public URL. The bytes come back from
+  // `/support/attachments/{id}`, which checks that the caller owns the thread —
+  // a path here would be an invitation to build a link that skips that check.
 }
 
 export interface ISupportMessage {
@@ -73,6 +74,10 @@ export const apiOpenSupportConversation = (branchId: number) =>
     method: "POST",
     body: { branch_id: branchId },
   });
+
+/** The bytes of one attachment, if this account is entitled to them. */
+export const apiSupportAttachment = (attachmentId: number) =>
+  requestBlob(`/support/attachments/${attachmentId}`);
 
 export const apiSupportThread = (conversationId: number) =>
   request<ISupportThread>(`/support/conversations/${conversationId}`);

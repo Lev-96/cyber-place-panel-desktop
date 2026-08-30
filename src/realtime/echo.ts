@@ -102,6 +102,25 @@ const bumpVersion = (): void => {
   }
 };
 
+/**
+ * Drop the socket because the PERSON changed.
+ *
+ * Subscriptions live on the connection, not on the components that asked for
+ * them: unmounting a screen removes its handlers and leaves the channel
+ * subscribed. So an account switch on one machine — which this panel supports
+ * — would otherwise leave the new operator's browser still subscribed to the
+ * previous one's private channels, including their support thread. The
+ * authorisation that let those channels in belonged to a session that is over.
+ *
+ * Called from `logout`, which is the one place every sign-out goes through.
+ * The next `getEcho()` builds a fresh client, and `bumpVersion` makes every
+ * live hook re-subscribe on it under the new identity.
+ */
+export const disconnectEchoForSignOut = (): void => {
+  teardownEcho();
+  bumpVersion();
+};
+
 const sameConfig = (a: ReverbConfig | null, b: ReverbConfig | null): boolean =>
   a?.key === b?.key && a?.host === b?.host && a?.port === b?.port && a?.scheme === b?.scheme;
 

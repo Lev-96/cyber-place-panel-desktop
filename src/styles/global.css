@@ -3178,13 +3178,23 @@ button.login-flip-back:hover {
   padding: 1px 8px;
   cursor: pointer;
 }
+/* A button that reads as a link: these files are fetched with the session
+   token and saved, so the element has to be a button — but it sits inside a
+   chat bubble where a link is what anyone expects to see. */
 .support-attachment {
   display: inline-block;
   margin-top: 6px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font: inherit;
   font-size: 12px;
+  text-align: left;
   color: var(--color-primary);
   text-decoration: none;
+  cursor: pointer;
 }
+.support-attachment:hover { text-decoration: underline; }
 .support-chip {
   display: inline-flex;
   align-items: center;

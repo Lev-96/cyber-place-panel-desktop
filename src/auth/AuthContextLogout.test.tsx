@@ -36,6 +36,8 @@ const store = vi.hoisted(() => ({
 vi.mock("@/infrastructure/KeyValueStore", () => ({ keyValueStore: store }));
 vi.mock("@/api/client", () => ({ apiCache: { clear: vi.fn() } }));
 vi.mock("@/auth/recentEmails", () => ({ recentEmails: { remember: vi.fn(async () => {}) } }));
+const echo = vi.hoisted(() => ({ disconnect: vi.fn() }));
+vi.mock("@/realtime/echo", () => ({ disconnectEchoForSignOut: echo.disconnect }));
 
 import { AuthProvider, useAuth } from "./AuthContext";
 import { AppConfig } from "@/infrastructure/AppConfig";
@@ -92,6 +94,28 @@ describe("AuthContext.logout", () => {
     await act(async () => { await auth.logout(); });
 
     expect(tokenPresentDuringCall).toBe(true);
+  });
+
+  /**
+   * The socket has to go with the session.
+   *
+   * Channels live on the connection, not on the components that subscribed, so
+   * signing out without dropping it leaves the browser attached to the private
+   * channels of the person who just left — and this panel is built for account
+   * switching on one machine, so the next person is often sitting right there.
+   */
+  test("drops the realtime connection so the next account cannot inherit it", async () => {
+    await act(async () => { await auth.logout(); });
+
+    expect(echo.disconnect).toHaveBeenCalledTimes(1);
+  });
+
+  test("drops the connection even when the revoke call fails", async () => {
+    api.logout.mockRejectedValueOnce(new Error("offline"));
+
+    await act(async () => { await auth.logout(); });
+
+    expect(echo.disconnect).toHaveBeenCalledTimes(1);
   });
 
   test("still signs out locally when the backend is unreachable", async () => {
