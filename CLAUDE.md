@@ -765,8 +765,20 @@ status on a message rather than a place data lives.
 - `useSupportMessages` subscribes to the PRIVATE `support.branch.{id}`, which is
   per branch on purpose: owner and manager read the same thread, and a client
   cannot subscribe to a conversation id it does not have yet.
-- A reply also arrives as a normal database notification, so the badge, the
-  bell and the chime are the ones the app already has.
+- `SupportUnreadContext` owns the sidebar badge, the chime and the floating
+  toast. It listens on the SAME private channel the bell uses
+  (`user.{id}.notifications`) rather than reading `NotificationsContext`,
+  because that context is manager-only by design — hanging support off it left
+  owners and admins with a badge that never moved. It dedupes by notification
+  id (a redelivery is not an arrival), ignores everything already in the feed at
+  startup (history must not chime), and does not count a reply to the thread
+  currently on screen, which `SupportChat` reports via `setActiveConversation`.
+- `SupportNotifier` renders one toast at a time, top-right beside the booking
+  one: a burst of replies replaces the card and restarts its timer instead of
+  stacking.
+- The branch question is asked with `BranchPicker` — selectable cards with the
+  company, address and logo, searchable past six branches. One branch is not a
+  choice: `SupportChat` opens that thread itself and never shows the picker.
 - A send that fails stays in the thread, marked, with Retry — the text somebody
   typed about a problem they are having is the last thing to discard for them.
 
