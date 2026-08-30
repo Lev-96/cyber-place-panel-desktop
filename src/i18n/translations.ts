@@ -94,6 +94,141 @@ export const TRANSLATIONS: Dict = {
     ru: "Связаться с поддержкой",
     am: "Կապվել աջակցության հետ",
   },
+  // PlayStation discovery — phase one of the console integration. The wording
+  // promises exactly what it does: it looks, it does not control.
+  "ps5.discover.open": { en: "Find PlayStations", ru: "Найти PlayStation", am: "Գտնել PlayStation" },
+  "ps5.discover.title": { en: "PlayStations on this network", ru: "PlayStation в этой сети", am: "PlayStation այս ցանցում" },
+  "ps5.discover.hint": {
+    en: "Scanned from this computer, not from the server.",
+    ru: "Поиск идёт с этого компьютера, а не с сервера.",
+    am: "Որոնումն այս համակարգչից է, ոչ թե սերվերից։",
+  },
+  "ps5.discover.none": {
+    en: "Nothing answered. The consoles must be on the same network as this computer and switched on or resting.",
+    ru: "Никто не ответил. Консоли должны быть в той же сети, что и этот компьютер, и быть включены или в режиме покоя.",
+    am: "Ոչ ոք չպատասխանեց։ Կոնսոլները պետք է լինեն նույն ցանցում և միացված կամ քնած վիճակում։",
+  },
+  "ps5.discover.probed": { en: "Looked at", ru: "Опрошено", am: "Հարցվել է" },
+  "ps5.discover.scanning": { en: "Searching…", ru: "Ищем…", am: "Որոնում…" },
+  "ps5.discover.rescan": { en: "Search again", ru: "Искать снова", am: "Որոնել կրկին" },
+  "ps5.discover.desktopOnly": {
+    en: "Console search works only in the desktop app.",
+    ru: "Поиск консолей работает только в десктопном приложении.",
+    am: "Կոնսոլների որոնումն աշխատում է միայն desktop հավելվածում։",
+  },
+  "ps5.state.awake": { en: "On", ru: "Включена", am: "Միացված" },
+  "ps5.state.rest": { en: "Resting", ru: "Режим покоя", am: "Քնած ռեժիմ" },
+  "ps5.state.unreachable": { en: "Unreachable", ru: "Недоступна", am: "Անհասանելի" },
+  "ps5.state.unknown": { en: "Unrecognised answer", ru: "Ответ не распознан", am: "Պատասխանը չի ճանաչվել" },
+  // Binding a found console to the place it stands in. Owner-level wording:
+  // this is arranging the venue, not running the shift.
+  "ps5.bind.attach": { en: "Attach", ru: "Привязать", am: "Կապել" },
+  "ps5.bind.detach": { en: "Detach", ru: "Отвязать", am: "Անջատել" },
+  "ps5.bind.choosePlace": { en: "Choose a place…", ru: "Выберите место…", am: "Ընտրեք տեղը…" },
+  "ps5.bind.noFreePlaces": {
+    en: "Every console place already has one",
+    ru: "У всех консольных мест уже есть приставка",
+    am: "Բոլոր կոնսոլային տեղերն արդեն ունեն",
+  },
+  // Not the same thing as the line above, and telling an owner "every console
+  // place already has one" when the branch has no console place at all sends
+  // them looking for a place that does not exist.
+  "ps5.bind.loadingPlaces": { en: "Loading places…", ru: "Загружаем места…", am: "Բեռնում ենք տեղերը…" },
+  "ps5.bind.placesFailed": {
+    en: "Could not load this branch's places",
+    ru: "Не удалось загрузить места филиала",
+    am: "Չհաջողվեց բեռնել մասնաճյուղի տեղերը",
+  },
+  "ps5.bind.retry": { en: "Retry", ru: "Повторить", am: "Կրկնել" },
+  "ps5.bind.noConsolePlaces": {
+    en: "This branch has no console place yet — create one first",
+    ru: "В филиале ещё нет консольного места — сначала создайте его",
+    am: "Մասնաճյուղում դեռ չկա կոնսոլային տեղ — նախ ստեղծեք այն",
+  },
+  // Shown on the sessions board beside a place whose console is bound. Kept to
+  // one or two words: it shares a line with the platform and the tier.
+  "ps5.tile.bound": { en: "Console", ru: "Приставка", am: "Կոնսոլ" },
+  // The wake key itself, in the console finder.
+  "ps5.key.title": { en: "Wake key", ru: "Ключ пробуждения", am: "Արթնացման բանալի" },
+  "ps5.key.saved": { en: "Key saved on this computer", ru: "Ключ сохранён на этом компьютере", am: "Բանալին պահված է այս համակարգչում" },
+  "ps5.key.placeholder": { en: "8 hex characters", ru: "8 hex-символов", am: "8 hex նիշ" },
+  "ps5.key.save": { en: "Save key", ru: "Сохранить ключ", am: "Պահել բանալին" },
+  "ps5.key.forget": { en: "Remove key", ru: "Удалить ключ", am: "Ջնջել բանալին" },
+  "ps5.key.noKeystore": {
+    en: "This computer has no OS keystore, so a key cannot be stored safely",
+    ru: "На этом компьютере нет хранилища ключей ОС — ключ негде хранить безопасно",
+    am: "Այս համակարգիչը չունի ՕՀ բանալիների պահոց — բանալին ապահով պահել հնարավոր չէ",
+  },
+  "ps5.key.hint": {
+    en: "From pairing the console with a PlayStation account. Stored encrypted by this computer, never sent to the server.",
+    ru: "Выдаётся при привязке приставки к аккаунту PlayStation. Хранится в зашифрованном виде на этом компьютере и никогда не уходит на сервер.",
+    am: "Տրվում է կոնսոլը PlayStation հաշվին կապելիս։ Պահվում է գաղտնագրված այս համակարգչում և երբեք չի ուղարկվում սերվեր։",
+  },
+  // The question the owner is asked when a console is on with no session.
+  "ps5.wake.dialogTitle": {
+    en: "A PlayStation is switched on",
+    ru: "PlayStation включена",
+    am: "PlayStation-ը միացված է",
+  },
+  "ps5.wake.dialogBody": {
+    en: "There is no session on it. Did you switch it on yourself?",
+    ru: "Активной сессии на ней нет. Вы включили её сами?",
+    am: "Դրա վրա ակտիվ սեսիա չկա։ Դուք ինքներդ եք միացրել:",
+  },
+  "ps5.wake.dialogCountdown": {
+    en: "Goes back to rest in {s} s",
+    ru: "Уйдёт в режим сна через {s} с",
+    am: "Կանցնի քնի ռեժիմ {s} վրկ հետո",
+  },
+  "ps5.wake.yes": { en: "Yes, that was me", ru: "Да, это я", am: "Այո, ես էի" },
+  "ps5.wake.no": { en: "No", ru: "Нет", am: "Ոչ" },
+  // Suspending the protection while somebody works on a console.
+  "ps5.maintenance.title": { en: "Maintenance", ru: "Обслуживание", am: "Սպասարկում" },
+  "ps5.maintenance.hint": {
+    en: "While it lasts, this console may stay on without a session.",
+    ru: "Пока оно длится, приставка может быть включена без сессии.",
+    am: "Քանի դեռ այն տևում է, կոնսոլը կարող է միացված մնալ առանց սեսիայի։",
+  },
+  "ps5.maintenance.start": { en: "Suspend for an hour", ru: "Приостановить на час", am: "Կասեցնել մեկ ժամով" },
+  "ps5.maintenance.stop": { en: "Resume protection", ru: "Вернуть защиту", am: "Վերականգնել պաշտպանությունը" },
+  "ps5.maintenance.until": { en: "Suspended until {t}", ru: "Приостановлено до {t}", am: "Կասեցված է մինչև {t}" },
+  // Lifecycle, as the board shows it.
+  "ps5.lifecycle.WAKING": { en: "Waking…", ru: "Просыпается…", am: "Արթնանում է…" },
+  "ps5.lifecycle.GOING_TO_REST": { en: "Going to rest…", ru: "Уходит в сон…", am: "Անցնում է քնի…" },
+  "ps5.lifecycle.UNEXPECTED_WAKE": { en: "On without a session", ru: "Включена без сессии", am: "Միացված է առանց սեսիայի" },
+  "ps5.lifecycle.ERROR": { en: "Command failed", ru: "Команда не прошла", am: "Հրամանը ձախողվեց" },
+  // What went wrong, in words an operator can act on.
+  "ps5.error.NO_CREDENTIAL": {
+    en: "No wake key for this console on this computer",
+    ru: "На этом компьютере нет ключа пробуждения для этой приставки",
+    am: "Այս համակարգչում չկա արթնացման բանալի այս կոնսոլի համար",
+  },
+  "ps5.error.BAD_CREDENTIAL": {
+    en: "The wake key for this console is not valid",
+    ru: "Ключ пробуждения этой приставки недействителен",
+    am: "Այս կոնսոլի արթնացման բանալին վավեր չէ",
+  },
+  "ps5.error.DEVICE_NOT_FOUND": {
+    en: "This console has not been seen on the network",
+    ru: "Эту приставку не видно в сети",
+    am: "Այս կոնսոլը ցանցում չի երևում",
+  },
+  "ps5.error.UNSUPPORTED_BY_TRANSPORT": {
+    en: "This build cannot put a console to rest over the network",
+    ru: "Эта сборка не умеет усыплять приставку по сети",
+    am: "Այս տարբերակը չի կարող կոնսոլը քնեցնել ցանցով",
+  },
+  "ps5.error.TRANSPORT_ERROR": {
+    en: "Could not reach the console",
+    ru: "Не удалось достучаться до приставки",
+    am: "Չհաջողվեց հասնել կոնսոլին",
+  },
+  // What the protocol does NOT offer, said once, where the owner sets things up.
+  "ps5.sleep.impossible": {
+    en: "A console cannot be put to rest over the network — only woken. Use the console's own Power Saving timer for that.",
+    ru: "Усыпить приставку по сети нельзя — только разбудить. Для сна используйте таймер энергосбережения самой приставки.",
+    am: "Կոնսոլը ցանցով քնեցնել հնարավոր չէ — միայն արթնացնել։ Քնի համար օգտագործեք կոնսոլի էներգախնայման ժամաչափը։",
+  },
   "nav.support": { en: "Support", ru: "Поддержка", am: "Աջակցություն" },
   "support.title": { en: "Support", ru: "Поддержка", am: "Աջակցություն" },
   "support.intro": {

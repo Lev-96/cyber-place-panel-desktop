@@ -1,3 +1,6 @@
+import { can } from "@/auth/permissions";
+import { useAuth } from "@/auth/AuthContext";
+import ConsolePicker from "@/components/ps5/ConsolePicker";
 import PlaceForm from "@/components/places/PlaceForm";
 import Button from "@/components/ui/Button";
 import CollapsibleSection from "@/components/ui/CollapsibleSection";
@@ -42,7 +45,14 @@ const BranchPlaces = () => {
   // Existing custom-platform prices — feed the place form so an already-priced
   // platform locks its rate (operator picks it) instead of re-entering one.
   const platformPrices = useAsync(() => platformPriceRepository.listByBranch(id), [id]);
+  const { user } = useAuth();
+  const role = user?.role;
   const [creating, setCreating] = useState(false);
+  /**
+   * The console finder. Read-only in this build — it looks at the network and
+   * reports; binding a console to a place comes with the next phase.
+   */
+  const [findingConsoles, setFindingConsoles] = useState(false);
   const [editing, setEditing] = useState<IBranchPlace | null>(null);
   const [dragId, setDragId] = useState<string | null>(null);
   const [dragOverId, setDragOverId] = useState<string | null>(null);
@@ -202,7 +212,16 @@ const BranchPlaces = () => {
     <ScreenWithBg bg="./bg/branch.jpg" title={`${t("branchPlaces.title")} · №${id}`}>
       <div className="row-between">
         <span className="muted">{t("branchPlaces.intro")}</span>
-        <Button onClick={() => setCreating(true)}>{t("branchPlaces.new")}</Button>
+        <div className="row" style={{ gap: 8 }}>
+          {/* Owner only: pairing a console to a place is an act of arranging
+              the venue, alongside creating the place itself. */}
+          {can(role, "branch.places") && (
+            <Button variant="secondary" onClick={() => setFindingConsoles(true)}>
+              {t("ps5.discover.open")}
+            </Button>
+          )}
+          <Button onClick={() => setCreating(true)}>{t("branchPlaces.new")}</Button>
+        </div>
       </div>
       {loading && <GridSkeleton />}
       {error && <div className="error">{error.message}</div>}
@@ -243,6 +262,7 @@ const BranchPlaces = () => {
         )
       )}
 
+      {findingConsoles && <ConsolePicker branchId={id} onClose={() => setFindingConsoles(false)} />}
       {creating && <PlaceForm branchId={id} platformSuggestions={customPlatforms} platformPrices={platformPrices.data ?? []} onClose={() => setCreating(false)} onSaved={() => { setCreating(false); void reload(); void platformPrices.reload(); }} />}
       {editing && <PlaceForm branchId={id} initial={editing} platformSuggestions={customPlatforms} platformPrices={platformPrices.data ?? []} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); void reload(); void platformPrices.reload(); }} />}
     </ScreenWithBg>

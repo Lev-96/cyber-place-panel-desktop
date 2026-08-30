@@ -75,6 +75,22 @@ export interface IPcApi extends Translated {
   hourly_rate?: number | string | null;
   mac_address?: string | null;
   /**
+   * The physical console this device stands for, once an owner has bound one
+   * from the console finder. Null on every computer, and on every console
+   * nobody has pointed at yet — which is the normal state, not an error.
+   *
+   * Optional so a panel talking to a backend from before the binding existed
+   * degrades to "nothing bound" instead of breaking.
+   */
+  console_host_id?: string | null;
+  /** Last address it answered from. A hint the panel probes first, and allowed to be stale. */
+  console_address?: string | null;
+  /**
+   * Until when the "a console with no session must be asleep" rule is suspended
+   * for this device, or null. An owner opens the window; it closes on its own.
+   */
+  maintenance_until?: string | null;
+  /**
    * EFFECTIVE availability, not the raw column — the backend already folds in
    * "a console has no agent to report in" and "this computer's heartbeat went
    * stale" (`App\Models\Pcs\Pc::effectiveStatus()`).

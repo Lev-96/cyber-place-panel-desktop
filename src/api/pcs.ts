@@ -59,6 +59,24 @@ export const apiDeletePc = (id: number) =>
 export const apiRotatePcToken = (id: number) =>
   request<{ pc: IPcApi }>(`/pcs/${id}/rotate-token`, { method: "POST" });
 
+/**
+ * Point a place's console device at a physical PlayStation found on the LAN.
+ *
+ * The identity is the console's own `host-id`; the address is a hint for the
+ * next probe and may be omitted. Owner-level on the backend (`places.manage`)
+ * and branch-scoped — a manager gets 403, and so does an owner reaching into
+ * another company's branch.
+ */
+export const apiBindConsole = (id: number, console_host_id: string, console_address?: string | null) =>
+  request<{ pc: IPcApi }>(`/pcs/${id}/console`, {
+    method: "POST",
+    body: { console_host_id, ...(console_address ? { console_address } : {}) },
+  });
+
+/** Forget the console. Leaves the device, its place and its history alone. */
+export const apiUnbindConsole = (id: number) =>
+  request<{ pc: IPcApi }>(`/pcs/${id}/console`, { method: "DELETE" });
+
 export interface WakeResult {
   message: string;
   mac?: string;
