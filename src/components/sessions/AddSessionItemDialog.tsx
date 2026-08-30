@@ -76,12 +76,26 @@ const AddSessionItemDialog = ({ branchId, session, onClose, onAdded }: Props) =>
   const [cart, setCart] = useState<CartLine[]>([]);
 
   const [creating, setCreating] = useState(false);
+  /**
+   * The bill, as this dialog knows it.
+   *
+   * Seeded from the session it was opened with and updated from the server's
+   * own answer when a line is removed. The parent is told as well, but its
+   * refresh does not reach a dialog that is already open — so without a copy
+   * here a removed line stayed on screen until the dialog was closed and
+   * reopened, which reads as "it did not work".
+   */
+  const [bill, setBill] = useState(session.items ?? []);
   /** Items being taken off the bill, so their row can say so. */
   const [removing, setRemoving] = useState<number[]>([]);
 
   useEffect(() => {
     void productRepository.listByBranch(branchId).then(setProducts);
   }, [branchId]);
+
+  // A fresh session from the parent (after a confirm, or a realtime update)
+  // replaces what we hold, so the two never drift.
+  useEffect(() => { setBill(session.items ?? []); }, [session]);
 
   /** Add one, or raise the count of the line that is already in the basket. */
   const put = (line: Omit<CartLine, "qty">) =>
@@ -134,7 +148,8 @@ const AddSessionItemDialog = ({ branchId, session, onClose, onAdded }: Props) =>
     if (removing.includes(itemId)) return;
     setRemoving((prev) => [...prev, itemId]);
     try {
-      await sessionRepository.removeItem(session.id, itemId);
+      const updated = await sessionRepository.removeItem(session.id, itemId);
+      setBill(updated?.items ?? bill.filter((i) => i.id !== itemId));
       notify.message("error", fmt(t("session.removedOne"), name));
       onAdded();
     } catch (e) {
@@ -195,7 +210,7 @@ const AddSessionItemDialog = ({ branchId, session, onClose, onAdded }: Props) =>
   }, [products, search]);
 
   const cartTotal = cart.reduce((sum, l) => sum + l.price * l.qty, 0);
-  const onBill = session.items ?? [];
+  const onBill = bill;
   const deviceLabel = session.pc_label ?? `№${session.pc_id}`;
   const loading = products === null;
 

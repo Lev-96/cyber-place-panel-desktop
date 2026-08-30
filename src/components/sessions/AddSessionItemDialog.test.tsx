@@ -251,6 +251,9 @@ describe("taking a line off the bill", () => {
     expect(toasts.message).toHaveBeenCalledWith("error", expect.stringContaining("session.removedOne"));
     // The screen behind is told, so the bill it shows is the bill there is.
     expect(onAdded).toHaveBeenCalled();
+    // And the line is off THIS dialog too: the parent's refresh does not reach
+    // an open modal, and a line that stays looks like a removal that failed.
+    expect(screen.queryByLabelText("action.delete: Cola")).toBeNull();
   });
 
   test("a refusal does not claim the line was removed", async () => {

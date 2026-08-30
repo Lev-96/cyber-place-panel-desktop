@@ -217,7 +217,7 @@ export const TRANSLATIONS: Dict = {
     am: "սերվերը պատճառ չնշեց:",
   },
   "session.search": { en: "Search by name…", ru: "Поиск по названию…", am: "Որոնում անունով…" },
-  "session.noProducts": { en: "No products in this branch yet. Add a custom item below.", ru: "В этом филиале ещё нет товаров. Добавьте произвольный товар ниже.", am: "Այս մասնաճյուղում ապրանքներ չկան: Ավելացրեք ձեռքով ապրանք ներքևում:" },
+  "session.noProducts": { en: "No products in this branch yet — create the first one below.", ru: "В этом филиале ещё нет товаров — создайте первый ниже.", am: "Այս մասնաճյուղում ապրանքներ դեռ չկան — ստեղծեք առաջինը ներքևում։" },
   "session.added": { en: "Added", ru: "Добавлено", am: "Ավելացված է" },
   "session.checkoutTitle": { en: "Close session", ru: "Закрыть сессию", am: "Փակել նիստը" },
   "session.checkoutDone": { en: "Receipt closed", ru: "Чек закрыт", am: "Հաշիվը փակված է" },
