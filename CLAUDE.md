@@ -775,16 +775,23 @@ status on a message rather than a place data lives.
   without it an account switch on one machine leaves the new operator attached
   to the previous one's private channels.
 - `SupportUnreadContext` owns the sidebar badge, the chime and the floating
-  toast. It listens on the SAME private channel the bell uses
-  (`user.{id}.notifications`) rather than reading `NotificationsContext`,
-  because that context is manager-only by design — hanging support off it left
-  owners and admins with a badge that never moved. It dedupes by notification
-  id (a redelivery is not an arrival), ignores everything already in the feed at
-  startup (history must not chime), and does not count a reply to the thread
-  currently on screen, which `SupportChat` reports via `setActiveConversation`.
-- `SupportNotifier` renders one toast at a time, top-right beside the booking
-  one: a burst of replies replaces the card and restarts its timer instead of
-  stacking.
+  card, and it is **entirely separate from the bell**. Support does not appear
+  in `NotificationsContext`, in the Notifications screen or in its counter —
+  not because anything filters it out, but because the backend stopped writing
+  those rows. Its only input is `support.user.{id}`, through the same
+  `useSupportMessages` hook the chat screen uses.
+  - Not an arrival: a message this account SENT (the channel carries both
+    directions), a message id already seen (a reconnect replays), and a reply
+    to the thread on screen — for the badge only, which `SupportChat` reports
+    via `setActiveConversation`; it still gets the card and the chime.
+  - The count comes from the server (`unread` per conversation, summed) on
+    mount and after every read. A channel has no history, so a restart shows
+    the right number and plays nothing.
+- `SupportNotifier` renders one card at a time, top-right beside the booking
+  one: a burst of replies replaces it and restarts its timer instead of
+  stacking. It plays `playSupportChime` — two soft sine notes stepping DOWN,
+  against the app's rising triangle arpeggio. Never share the two: the sound is
+  the only thing that says "a person is waiting for you" without looking.
 - The branch question is asked with `BranchPicker` — selectable cards with the
   company, address and logo, searchable past six branches. One branch is not a
   choice: `SupportChat` opens that thread itself and never shows the picker.
