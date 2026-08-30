@@ -98,15 +98,55 @@ branch — so the two yml files never conflict:
 - `nodeIntegration: false`
 - `sandbox: true`
 - Preload (`electron/preload.ts`) exposes exactly the contracted APIs via
-  `contextBridge`: `desktopAPI` (kv-store + Wake-on-LAN) and
-  `cyberplaceUpdates`.
-- 7 `ipcMain.handle` channels total: `kv:get|set|remove`, `wol:send`,
-  `updates:check|install|getState`.
+  `contextBridge`: `desktopAPI` (kv-store + Wake-on-LAN), `cyberplaceUpdates`
+  and `cyberplacePS5` (PlayStation discovery + status). Each is its own global
+  so a screen can feature-detect it: the renderer can be newer than the preload
+  it loads into, and a missing bridge must produce a sentence, not a throw.
+- 13 `ipcMain.handle` channels total: `kv:get|set|remove`, `wol:send`,
+  `updates:check|install|getState`, `ps5:discover|probe|wake|rest|capabilities`,
+  `ps5:credential:set|has|forget`.
+- **The console wake key never crosses to the renderer.** It is encrypted by the
+  OS keystore (`electron/ps5/credentials.ts`, `safeStorage`), and the bridge can
+  be asked *whether* a console has one, never what it is. If the OS offers no
+  keystore, storing is refused rather than falling back to readable text.
+- **The consoles are talked to from HERE, not from the server.** The backend is
+  in a datacentre and shares no broadcast domain with any club; this process
+  runs on a machine in the room. `electron/ps5/` is read-only by construction —
+  it can find a console and report what it said, and it cannot wake or rest one.
+  `ps5:discover` sweeps the network and belongs behind a button; `ps5:probe`
+  asks named addresses and is what the ten-second status check on the sessions
+  board uses (`src/ps5/useConsoleWatch.ts`). A broadcast every ten seconds would
+  put a packet in front of every device in the venue all shift.
+- **`electron/ps5/transport.ts` is the seam.** It declares what a transport can
+  do, and today's answers `rest: false` — the local protocol has no rest
+  command; that needs a Remote Play session (TCP 9295, a key exchange). The
+  refusal is a value (`UNSUPPORTED_BY_TRANSPORT`) that reaches the screen. It is
+  never a success nothing earned, and swapping in a rest-capable transport
+  changes no logic above it.
+
+### The console lifecycle (`src/ps5/`)
+`machine.ts` is a pure function of (previous state, observation) → (next state,
+commands): UNKNOWN / OFFLINE / REST / WAKING / ACTIVE / GOING_TO_REST /
+UNEXPECTED_WAKE / ERROR, with `desired` kept apart from `actual`. Everything
+racy about this feature is a question about that function, and is asked of it
+directly in `machine.test.ts` with no console anywhere.
+
+**STARTING and STOPPING are NOT session statuses.** `gaming_sessions.status` is
+`active | stopped | expired` and feeds billing, revenue and every client; a
+session that is "starting" is this panel's own intent for the seconds between
+Start being pressed and the console answering. It lives in
+`useConsoleControl.ts` — which is what stops the monitor seeing "awake, no
+session yet" and switching the console off under the player, without touching a
+schema three clients read.
+
+State is recomputed from the current observation every tick, never from a timer.
+That is why a stale ten-second countdown cannot fire into a session that started
+meanwhile: there is no timer left to fire.
 - Custom `app://` protocol — no `file://` disclosure.
 
 ### Feature areas (folders under `src/`)
 `bookings · branches · companies · games · live · managers · members · pcs ·
-pos · places · sessions · tournaments · revenue · services · scanner`
+pos · places · ps5 · sessions · tournaments · revenue · services · scanner`
 
 ---
 
