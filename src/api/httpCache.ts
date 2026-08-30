@@ -102,6 +102,38 @@ export class HttpCache {
     }
   }
 
+  /**
+   * Told when a cached body actually CHANGES underneath a screen.
+   *
+   * The cache exists so navigation paints instantly; the subscription exists
+   * so painting instantly never means working from a stale copy. A background
+   * revalidation that comes back identical (the common case, answered by a
+   * 304) notifies nobody and re-renders nothing.
+   */
+  private listeners = new Set<(key: string) => void>();
+
+  subscribe(listener: (key: string) => void): () => void {
+    this.listeners.add(listener);
+    return () => { this.listeners.delete(listener); };
+  }
+
+  private announce(key: string): void {
+    for (const listener of this.listeners) {
+      try {
+        listener(key);
+      } catch {
+        /* one bad subscriber must not stop the others */
+      }
+    }
+  }
+
+  /** Replace a body and say so, when the new one is genuinely different. */
+  replace(key: string, text: string, etag: string | null): void {
+    const before = this.entries.get(key)?.text;
+    this.store(key, text, etag);
+    if (before !== text) this.announce(key);
+  }
+
   clear(): void {
     this.entries.clear();
     this.bytes = 0;

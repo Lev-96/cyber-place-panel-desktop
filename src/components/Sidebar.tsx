@@ -391,15 +391,25 @@ const Sidebar = () => {
           <UnreadBadge count={agentUpdateCount} />
         </NavLink>
       )}
-      {can(role, "menu.support") && (
-        <NavLink to="/support" className="nav-support">
-          <SupportIcon />
-          <span className="nav-support__label">{t("nav.support")}</span>
-          <UnreadBadge count={supportUnread} />
-        </NavLink>
-      )}
       </nav>
       <div className="sidebar-footer">
+        {/* Support is not another section of the product — it is the way out of
+            a problem with it. So it reads as a card rather than a row: pinned to
+            the bottom, its own surface, a line of explanation under the name.
+            Somebody looking for help finds it without reading the menu. */}
+        {can(role, "menu.support") && (
+          <NavLink to="/support" className="nav-support-card">
+            <span className="nav-support-card__icon" aria-hidden>
+              <SupportIcon size={18} />
+            </span>
+            <span className="nav-support-card__text">
+              <span className="nav-support-card__title">{t("nav.support")}</span>
+              <span className="nav-support-card__hint">{t("nav.supportHint")}</span>
+            </span>
+            <UnreadBadge count={supportUnread} />
+          </NavLink>
+        )}
+
         <UserMenu
           name={user?.name}
           email={user?.email}

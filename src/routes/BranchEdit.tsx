@@ -1,3 +1,4 @@
+import { SkeletonForm } from "@/components/ui/Skeleton";
 import BranchForm from "@/components/branches/BranchForm";
 import BranchOpenDaysForm from "@/components/branches/BranchOpenDaysForm";
 import BranchUnlockPinCard from "@/components/branches/BranchUnlockPinCard";
@@ -24,7 +25,7 @@ const BranchEdit = () => {
   const [hours, setHours] = useState(false);
 
   if (!Number.isFinite(id) || id <= 0) return <div className="error">{t("error.invalidBranchId")}</div>;
-  if (loading) return <Spinner />;
+  if (loading) return <SkeletonForm fields={6} />;
   if (error) return <div className="error">{error.message}</div>;
   if (!data) return null;
 

@@ -1,3 +1,4 @@
+import { ListSkeleton } from "@/components/ui/Skeleton";
 import {
   apiDeleteTournamentRegistration,
   apiListTournamentRegistrations,
@@ -94,7 +95,7 @@ const RegistrationsList = ({ tournamentId }: Props) => {
       />
       {err && <div className="error">{err}</div>}
       {!filtered ? (
-        <Spinner />
+        <ListSkeleton rows={4} />
       ) : (
         <div className="list">
           {filtered.map((r) => (

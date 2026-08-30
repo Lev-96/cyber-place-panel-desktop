@@ -1,3 +1,4 @@
+import { SkeletonCard } from "@/components/ui/Skeleton";
 import RegistrationsList from "@/components/tournaments/RegistrationsList";
 import ScreenWithBg from "@/components/ui/ScreenWithBg";
 import Spinner from "@/components/ui/Spinner";
@@ -13,7 +14,7 @@ const TournamentDetails = () => {
   const { data, loading, error } = useAsync(() => tournamentRepository.byId(id), [id]);
 
   if (!Number.isFinite(id) || id <= 0) return <div className="error">{t("error.invalidTournamentId")}</div>;
-  if (loading) return <Spinner />;
+  if (loading) return <SkeletonCard lines={5} />;
   if (error) return <div className="error">{error.message}</div>;
   if (!data) return null;
 

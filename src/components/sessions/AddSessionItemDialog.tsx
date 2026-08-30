@@ -1,3 +1,4 @@
+import { ListSkeleton } from "@/components/ui/Skeleton";
 import Button from "@/components/ui/Button";
 import ProductForm from "@/components/products/ProductForm";
 import Modal from "@/components/ui/Modal";
@@ -257,7 +258,7 @@ const AddSessionItemDialog = ({ branchId, session, onClose, onAdded }: Props) =>
           <Input placeholder={t("session.search")} value={search} onChange={(e) => setSearch(e.target.value)} />
         )}
 
-        {loading ? <Spinner /> : (
+        {loading ? <ListSkeleton rows={3} /> : (
           <div className="col" style={{ gap: 6, maxHeight: 190, overflowY: "auto" }}>
             {products?.length === 0 && (
               <div className="muted" style={{ fontSize: 13 }}>{t("session.noProducts")}</div>

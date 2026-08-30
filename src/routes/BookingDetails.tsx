@@ -1,3 +1,4 @@
+import { SkeletonCard } from "@/components/ui/Skeleton";
 import { apiGetBooking } from "@/api/bookings";
 import CancelReasonModal from "@/components/bookings/CancelReasonModal";
 import Button from "@/components/ui/Button";
@@ -20,7 +21,7 @@ const BookingDetails = () => {
   );
   const [cancel, setCancel] = useState(false);
 
-  if (loading) return <Spinner />;
+  if (loading) return <SkeletonCard lines={5} />;
   if (error) return <div className="error">{error.message}</div>;
   if (!data) return null;
 

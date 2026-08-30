@@ -1,3 +1,4 @@
+import { SkeletonCard } from "@/components/ui/Skeleton";
 import MemberForm from "@/components/members/MemberForm";
 import TopupDialog from "@/components/members/TopupDialog";
 import Button from "@/components/ui/Button";
@@ -31,7 +32,7 @@ const MemberCard = () => {
   useEffect(() => { void load(); /* eslint-disable-next-line */ }, [id]);
 
   if (err) return <div className="error">{err}</div>;
-  if (!member) return <Spinner />;
+  if (!member) return <SkeletonCard lines={4} />;
 
   const labelOf = (k: IMemberDeposit["kind"]) => k === "topup" ? t("memberCard.topup") : k === "spend" ? t("memberCard.spend") : t("memberCard.adjust");
 

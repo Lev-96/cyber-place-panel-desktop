@@ -1,3 +1,4 @@
+import { RouteSkeleton } from "@/components/ui/Skeleton";
 import { useAuth } from "@/auth/AuthContext";
 import AuthRouteReset from "@/auth/AuthRouteReset";
 import TelemetryTracker from "@/telemetry/TelemetryTracker";
@@ -76,7 +77,7 @@ const Authed = () => {
   useUpdateCatchUp("panel");
 
   return (
-  <Suspense fallback={<Spinner />}>
+  <Suspense fallback={<RouteSkeleton />}>
     <UpdateReadyModal />
     <UpdatesToast />
     <Routes>
@@ -327,7 +328,7 @@ const Authed = () => {
 };
 
 const Unauthed = () => (
-  <Suspense fallback={<Spinner />}>
+  <Suspense fallback={<RouteSkeleton />}>
     <Routes>
       {/* The reset request is the reverse face of the sign-in card, not a
           separate page — Login reads the path and opens already turned. Keeping

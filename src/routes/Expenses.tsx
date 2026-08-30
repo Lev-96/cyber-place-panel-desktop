@@ -1,3 +1,4 @@
+import { SkeletonTable } from "@/components/ui/Skeleton";
 import { IServiceExpense } from "@/api/expenses";
 import { tr } from "@/i18n/translated";
 import { orFallback } from "@/api/fallback";
@@ -63,7 +64,7 @@ const Expenses = () => {
         <Button onClick={() => setCreating(true)}>{t("expenses.new")}</Button>
       </div>
 
-      {loading && <Spinner />}
+      {loading && <SkeletonTable rows={6} columns={4} />}
       {error && <div className="error">{error.message}</div>}
 
       {!loading && !error && (

@@ -1,3 +1,4 @@
+import { ListSkeleton } from "@/components/ui/Skeleton";
 import Button from "@/components/ui/Button";
 import { apiSaveEntityTranslations } from "@/api/translations";
 import MultiLangInput, { LangValues, hasAnyValue, langValuesFromField, primaryValue } from "@/components/ui/MultiLangInput";
@@ -116,7 +117,7 @@ const TournamentForm = ({ branchId, initial, onClose, onSaved }: Props) => {
 
         <div className="col" style={{ gap: 6 }}>
           <span className="label">{t("label.game")}</span>
-          {games.loading ? <Spinner /> : (
+          {games.loading ? <ListSkeleton rows={3} /> : (
             <select className="input" value={gameId} onChange={(e) => setGameId(e.target.value ? Number(e.target.value) : "")} required>
               <option value="">{t("label.pick")}</option>
               {(games.data ?? []).map((g) => <option key={g.id} value={g.id}>{g.name} ({g.platform.toUpperCase()})</option>)}

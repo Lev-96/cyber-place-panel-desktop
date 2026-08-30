@@ -1,3 +1,4 @@
+import { SkeletonStats } from "@/components/ui/Skeleton";
 import CompanyRevenueScreen from "@/components/revenue/CompanyRevenueScreen";
 import ScreenWithBg from "@/components/ui/ScreenWithBg";
 import Spinner from "@/components/ui/Spinner";
@@ -42,7 +43,7 @@ const Revenue = () => {
 
   return (
     <ScreenWithBg bg="./bg/company.jpg" title={t("revenue.title")}>
-      {loading && <Spinner />}
+      {loading && <SkeletonStats tiles={3} />}
       {error && <div className="error">{error.message}</div>}
       {!loading && !error && (
         <div className="col" style={{ gap: 12 }}>

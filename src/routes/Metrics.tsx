@@ -1,3 +1,4 @@
+import { SkeletonStats } from "@/components/ui/Skeleton";
 import { IMetrikaSummary, METRIKA_PERIODS, MetrikaPeriod } from "@/api/metrika";
 import { TELEMETRY_APPS, TelemetryApp } from "@/api/telemetry";
 import PulseDashboardCard from "@/components/admin/PulseDashboardCard";
@@ -205,7 +206,7 @@ const WebsiteSection = ({ period }: { period: MetrikaPeriod }) => {
 
       {/* Keep the previous window on screen while the next one loads —
           blanking the page on every period switch reads as a crash. */}
-      {loading && !data && <Spinner />}
+      {loading && !data && <SkeletonStats tiles={4} />}
 
       {error && (
         <div className="card">

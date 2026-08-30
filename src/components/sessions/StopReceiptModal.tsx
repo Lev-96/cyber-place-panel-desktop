@@ -1,3 +1,4 @@
+import { SkeletonText } from "@/components/ui/Skeleton";
 import Button from "@/components/ui/Button";
 import Modal from "@/components/ui/Modal";
 import Spinner from "@/components/ui/Spinner";
@@ -88,7 +89,7 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved }: Prop
           {stopped ? t("session.checkoutDone") : `${t("session.checkoutTitle")} · ${deviceLabel}`}
         </h2>
 
-        {!view ? <Spinner /> : (
+        {!view ? <SkeletonText lines={5} /> : (
           <div className="col" style={{ gap: 0 }}>
             {/* Time line */}
             <div style={row}>

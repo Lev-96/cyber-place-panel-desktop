@@ -89,6 +89,11 @@ export const TRANSLATIONS: Dict = {
   // "Товар", not "позиция": what the cashier adds is a product off the shelf,
   // and the branch's own catalogue screen already calls them товары.
   // ── Support desk ───────────────────────────────────────────────────────
+  "nav.supportHint": {
+    en: "Message Cyber Place support",
+    ru: "Связаться с поддержкой",
+    am: "Կապվել աջակցության հետ",
+  },
   "nav.support": { en: "Support", ru: "Поддержка", am: "Աջակցություն" },
   "support.title": { en: "Support", ru: "Поддержка", am: "Աջակցություն" },
   "support.intro": {
@@ -115,6 +120,35 @@ export const TRANSLATIONS: Dict = {
     am: "Այստեղ դեռ դատարկ է — նկարագրեք խնդիրը:",
   },
   "support.placeholder": { en: "Write a message…", ru: "Напишите сообщение…", am: "Գրեք հաղորդագրություն…" },
+  // Attachment rules, in the operator's words. Each names the actual limit
+  // rather than saying "invalid file", because the only useful version of this
+  // message is the one that says what to do differently.
+  "support.file.tooLarge": {
+    en: "Too large. Maximum per file: {0} MB",
+    ru: "Файл слишком большой. Максимум на файл: {0} МБ",
+    am: "Ֆայլը չափազանց մեծ է։ Առավելագույնը՝ {0} ՄԲ",
+  },
+  "support.file.empty": {
+    en: "The file is empty — it may not have been read correctly",
+    ru: "Файл пустой — возможно, он не прочитался",
+    am: "Ֆայլը դատարկ է — հնարավոր է՝ այն չի կարդացվել",
+  },
+  "support.file.tooMany": {
+    en: "Too many files. Maximum: {0}",
+    ru: "Слишком много файлов. Максимум: {0}",
+    am: "Չափազանց շատ ֆայլ։ Առավելագույնը՝ {0}",
+  },
+  "support.file.totalTooLarge": {
+    en: "The message is too heavy altogether. Maximum: {0} MB",
+    ru: "Сообщение слишком тяжёлое целиком. Максимум: {0} МБ",
+    am: "Հաղորդագրությունը չափազանց ծանր է։ Առավելագույնը՝ {0} ՄԲ",
+  },
+  "support.file.fixBeforeSending": {
+    en: "Remove the files marked in red to send this message.",
+    ru: "Уберите отмеченные красным файлы, чтобы отправить сообщение.",
+    am: "Հեռացրեք կարմիրով նշված ֆայլերը՝ հաղորդագրությունն ուղարկելու համար։",
+  },
+  "support.file.remove": { en: "Remove file", ru: "Убрать файл", am: "Հեռացնել ֆայլը" },
   "support.attach": { en: "Attach a file", ru: "Прикрепить файл", am: "Կցել ֆայլ" },
   "support.send": { en: "Send", ru: "Отправить", am: "Ուղարկել" },
   "support.retry": { en: "Retry", ru: "Повторить", am: "Կրկնել" },

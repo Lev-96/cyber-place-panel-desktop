@@ -1,3 +1,4 @@
+import { ListSkeleton } from "@/components/ui/Skeleton";
 import Button from "@/components/ui/Button";
 import { apiSaveEntityTranslations } from "@/api/translations";
 import MultiLangInput, { LangValues, langValuesFromField, primaryValue } from "@/components/ui/MultiLangInput";
@@ -289,7 +290,7 @@ const PlaceForm = ({ branchId, initial, platformSuggestions, platformPrices, onC
 
   // Shared game-selection grid — identical for known platforms and for a
   // custom platform once its "has games" toggle is on.
-  const gamesGrid = games.loading ? <Spinner /> : (
+  const gamesGrid = games.loading ? <ListSkeleton rows={3} /> : (
     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, maxHeight: 220, overflowY: "auto", padding: 6, border: "1px solid #1f2a44", borderRadius: 8 }}>
       {filteredGames.map((g) => (
         <Checkbox

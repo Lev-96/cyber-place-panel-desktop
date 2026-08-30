@@ -3197,15 +3197,35 @@ button.login-flip-back:hover {
   cursor: pointer;
 }
 .support-attachment:hover { text-decoration: underline; }
+/* One attached file, with its verdict.
+   A row rather than a pill: a refused file has a reason to show, and a reason
+   is a sentence — it does not fit in a chip and must not be truncated, because
+   it is the only thing that tells the operator what to do differently. */
 .support-chip {
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 3px 8px;
+  gap: 8px;
+  padding: 6px 10px;
   border: 1px solid #1f2a44;
-  border-radius: 999px;
+  border-radius: 10px;
   font-size: 12px;
 }
+.support-chip.is-bad {
+  border-color: #4a1a1a;
+  background: rgba(239, 68, 68, 0.06);
+}
+.support-chip__icon { flex: 0 0 auto; }
+.support-chip.is-bad .support-chip__icon { color: #ef4444; font-weight: 700; }
+.support-chip__name {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.support-chip__size { flex: 0 0 auto; color: var(--color-muted); font-size: 11px; }
+/* Takes the slack so the row's width never depends on the file's name. */
+.support-chip__why { flex: 1; min-width: 0; color: #ef4444; font-size: 11px; line-height: 1.35; }
 .support-chip button {
   background: transparent;
   border: 0;
@@ -3375,19 +3395,59 @@ button.login-flip-back:hover {
 .support-toast__actions button.is-quiet { margin-left: auto; color: var(--color-muted); }
 
 /* ── Support in the sidebar ──────────────────────────────────────────────
-   Last in the nav and pushed to the bottom of it, because it is the thing you
-   reach for when something is wrong rather than part of the daily round. The
-   badge is inside the link so it travels with it at any sidebar width. */
-.nav-support {
-  margin-top: auto;
+   A CARD, not another row in the menu: support is the way out of a problem
+   with the product rather than a part of it, and somebody looking for help
+   should find it without reading the list. Last in the nav and pushed to the
+   bottom for the same reason.
+
+   Everything below is width-proof, because the sidebar is fixed at 240px and
+   the three languages disagree about how long "Support" is: the icon never
+   shrinks, the text column takes the slack with `min-width: 0`, and both lines
+   clip to one with an ellipsis rather than wrapping the card taller. */
+.nav-support-card {
   display: flex;
   align-items: center;
   gap: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid #1f2a44;
+  background: linear-gradient(135deg, rgba(7, 221, 241, 0.07), rgba(209, 82, 250, 0.05));
+  transition: border-color 140ms ease, background 140ms ease, transform 140ms ease;
 }
-/* auto, not a basis: the icon carries its own size and a flex-basis
-   here would stretch its width away from its height. */
-.nav-support svg { flex: 0 0 auto; }
-/* The LABEL takes the slack, not every span in the link: the badge is also a
-   span, and letting it flex stretched the pill and clipped the word next to
-   it. */
-.nav-support__label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nav-support-card:hover {
+  border-color: rgba(7, 221, 241, 0.45);
+  transform: translateY(-1px);
+}
+/* Active means "you are inside Support" and has to be unmistakable next to the
+   hover state — a brighter edge AND a filled surface, not one or the other. */
+.nav-support-card.active {
+  border-color: var(--color-primary);
+  background: linear-gradient(135deg, rgba(7, 221, 241, 0.16), rgba(209, 82, 250, 0.1));
+}
+.nav-support-card.active .nav-support-card__title { color: var(--color-primary); }
+.nav-support-card__icon {
+  flex: 0 0 34px;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  background: rgba(7, 221, 241, 0.12);
+  color: var(--color-primary);
+}
+.nav-support-card__text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  flex: 1;
+  min-width: 0;
+}
+.nav-support-card__title,
+.nav-support-card__hint {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.nav-support-card__title { font-size: 13px; font-weight: 700; }
+.nav-support-card__hint { font-size: 11px; color: var(--color-muted); }

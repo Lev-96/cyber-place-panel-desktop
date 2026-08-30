@@ -1,3 +1,4 @@
+import { SkeletonStats } from "@/components/ui/Skeleton";
 import { apiCompanyRevenueSummary, ICompanyRevenueSummary } from "@/api/billing";
 import Spinner from "@/components/ui/Spinner";
 import { formatMonth } from "@/i18n/dates";
@@ -67,7 +68,7 @@ const CompanyRevenueScreen = ({ companyId, companyName, initialPercent }: Props)
         <button className="month-btn" onClick={() => shift(1)}>›</button>
       </div>
 
-      {loading && <Spinner />}
+      {loading && <SkeletonStats tiles={3} />}
       {err && <div className="error">{err}</div>}
 
       {opRevenue && !loading && (

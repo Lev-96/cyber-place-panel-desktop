@@ -1,3 +1,4 @@
+import { GridSkeleton } from "@/components/ui/Skeleton";
 import { useAuth } from "@/auth/AuthContext";
 import { can } from "@/auth/permissions";
 import BlockToggle from "@/components/blocking/BlockToggle";
@@ -108,7 +109,7 @@ const BranchHub = () => {
 
   return (
     <ScreenWithBg bg="./bg/branch.jpg" title={data ? `${data.company?.name ?? t("hub.branchFallback")} · ${data.address}` : `${t("hub.branchFallback")} №${id}`}>
-      {loading && <Spinner />}
+      {loading && <GridSkeleton cells={6} />}
       {error && <div className="error">{error.message}</div>}
 
       {data && (

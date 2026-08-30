@@ -1,3 +1,4 @@
+import { ListSkeleton } from "@/components/ui/Skeleton";
 import Button from "@/components/ui/Button";
 import Modal from "@/components/ui/Modal";
 import Spinner from "@/components/ui/Spinner";
@@ -52,7 +53,7 @@ const BranchPickerModal = ({ onClose, onPicked }: Props) => {
         <h2 style={{ margin: 0 }}>{t("managers.pickBranch")}</h2>
         <p className="muted" style={{ margin: 0, fontSize: 13 }}>{t("managers.pickBranchHint")}</p>
 
-        {loading && <Spinner />}
+        {loading && <ListSkeleton rows={4} />}
         {error && <div className="error">{error.message}</div>}
 
         {!loading && !error && (
