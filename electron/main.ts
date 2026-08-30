@@ -7,6 +7,10 @@ import { Store } from "./storage";
 import { UpdateService, broadcastUpdateState } from "./updates/UpdateService";
 import { bundledIconPath, ensureLinuxDesktopIntegration } from "./linuxIntegration";
 import { mayNavigateTo, mayOpenExternally, navigationKeyFor } from "./urlPolicy";
+import { discover as discoverPlayStations, probe as probePlayStations } from "./ps5/discovery";
+import { activeTransport } from "./ps5/transport";
+import { WakeKeys } from "./ps5/credentials";
+import { wake as wakePlayStation } from "./ps5/wake";
 
 // `isDev` follows how the app was BUILT, never the environment it starts in.
 // Previously a packaged panel launched with ELECTRON_DEV_URL set would load
@@ -30,6 +34,9 @@ app.commandLine.appendSwitch("disable-features", "Autofill");
 app.commandLine.appendSwitch("disk-cache-size", String(50 * 1024 * 1024));
 
 let store: Store | null = null;
+// Console wake keys, encrypted by the OS. Loaded once at boot like the kv
+// store; a null here means the app has not finished starting, never "no keys".
+let wakeKeys: WakeKeys | null = null;
 let mainWindow: BrowserWindow | null = null;
 let updateService: UpdateService | null = null;
 
@@ -198,6 +205,8 @@ const createWindow = async () => {
 
 app.whenReady().then(async () => {
   store = new Store(join(app.getPath("userData"), "cyberplace.kv.json"));
+  wakeKeys = new WakeKeys(join(app.getPath("userData"), "cyberplace.ps5-keys.json"));
+  await wakeKeys.load();
   await store.load();
 
   // Linux only: register a .desktop file in ~/.local/share/applications/
@@ -238,6 +247,96 @@ app.whenReady().then(async () => {
   ipcMain.handle("kv:remove", (_e: unknown, key: string) => store?.remove(key));
 
   ipcMain.handle("wol:send", (_e: unknown, mac: string) => sendMagicPacket(mac));
+
+  /**
+   * Find PlayStations on the club's own network.
+   *
+   * Here rather than on the server for the same reason `wol:send` is: the
+   * backend runs in a datacentre and shares no broadcast domain with any club,
+   * while this process runs on a machine in the room with the consoles.
+   *
+   * Read-only. It asks; it cannot wake, rest, or alter a console — that needs a
+   * credential this build does not carry.
+   */
+  ipcMain.handle("ps5:discover", (_e: unknown, timeoutMs?: number) =>
+    discoverPlayStations(typeof timeoutMs === "number" ? { timeoutMs } : {}));
+
+  /**
+   * Ask the consoles we already know about how they are doing.
+   *
+   * Separate from `ps5:discover` because the two have opposite costs: a sweep
+   * shouts at the whole network and belongs behind a button, while this is a
+   * handful of unicast datagrams and runs on a timer all shift.
+   */
+  /**
+   * Wake one console.
+   *
+   * The key never leaves this process: the renderer names a console, and the
+   * main process looks up what it is allowed to send. A renderer that asked for
+   * the key itself would be a renderer that could leak it.
+   */
+  ipcMain.handle("ps5:wake", async (_e: unknown, hostId: unknown, address: unknown) => {
+    if (typeof hostId !== "string" || typeof address !== "string") {
+      return { sent: false, reason: "bad-request" };
+    }
+
+    return wakePlayStation(address, wakeKeys?.read(hostId) ?? null);
+  });
+
+  /**
+   * Ask a console to go to rest.
+   *
+   * Routed through the transport, which today answers
+   * `UNSUPPORTED_BY_TRANSPORT`: the local discovery protocol has no such
+   * command. The refusal is returned rather than swallowed, so the panel can
+   * say the console is still awake instead of showing a sleep that never
+   * happened. When a rest-capable transport exists this channel does not change.
+   */
+  ipcMain.handle("ps5:rest", async (_e: unknown, hostId: unknown, address: unknown) => {
+    if (typeof hostId !== "string" || typeof address !== "string") {
+      return { sent: false, code: "INVALID_STATE" };
+    }
+
+    return activeTransport.requestRest(address);
+  });
+
+  /** What the current transport can actually do, for a screen that must not promise more. */
+  ipcMain.handle("ps5:capabilities", () => activeTransport.capabilities);
+
+  /**
+   * Remember a console's wake key. The renderer can write one and ask whether
+   * one exists; it can never read one back.
+   */
+  ipcMain.handle("ps5:credential:set", async (_e: unknown, hostId: unknown, registKey: unknown) => {
+    if (typeof hostId !== "string" || typeof registKey !== "string" || !wakeKeys) {
+      return { saved: false, reason: "bad-request" };
+    }
+
+    return await wakeKeys.set(hostId, registKey)
+      ? { saved: true }
+      // No OS keystore. Storing the key as readable text on a machine the whole
+      // shift walks past is not a lesser evil, so it is simply refused.
+      : { saved: false, reason: "no-os-keystore" };
+  });
+
+  ipcMain.handle("ps5:credential:has", (_e: unknown, hostId: unknown) => ({
+    has: typeof hostId === "string" && (wakeKeys?.has(hostId) ?? false),
+    available: wakeKeys?.available() ?? false,
+  }));
+
+  ipcMain.handle("ps5:credential:forget", async (_e: unknown, hostId: unknown) => {
+    if (typeof hostId === "string") await wakeKeys?.forget(hostId);
+    return { ok: true };
+  });
+
+  ipcMain.handle("ps5:probe", (_e: unknown, addresses: unknown, timeoutMs?: number) =>
+    probePlayStations(
+      // Whatever the renderer sends is treated as untrusted shape, not just
+      // untrusted values: this is the one boundary where a bad type would
+      // otherwise reach a socket call.
+      Array.isArray(addresses) ? addresses.filter((a): a is string => typeof a === "string") : [],
+      typeof timeoutMs === "number" ? timeoutMs : undefined,
+    ));
 
   // Auto-update bridge — the singleton service owns electron-updater's
   // event stream; we just expose three IPC channels for the renderer:
