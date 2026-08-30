@@ -752,6 +752,37 @@ native `confirm()` and no detached DevTools (focus traps) — use
 typecheck **both** `tsconfig.app.json` and `tsconfig.node.json`; rebuild
 and restart after changes — HMR misses CSP, `index.html`, and preload.
 
+## 9.5 What each role may reach (2026-08-30)
+
+`src/auth/permissions.ts` is the map every sidebar entry, hub tile, route guard
+and CRUD button reads. It changed on 2026-08-30, and the backend gained its
+mirror the same day —
+`App\Services\Access\StaffCapability` — because a permission that only hides a
+button is not a permission: a manager who kept the URL could still POST.
+
+| Section | admin | owner | manager |
+|---|---|---|---|
+| Клиенты (members, deposits) | ✅ | ❌ | ❌ |
+| Настройки филиала | ✅ | ✅ | ❌ |
+| Смена (open/close/Z-report) | ✅ | ✅ | ❌ |
+| Места | ✅ | ✅ | ❌ |
+| Товары — создать / изменить / удалить / скрыть | ✅ | ✅ | ❌ |
+| Товары — список + поиск | ✅ | ✅ | ✅ |
+| Сессии, касса, игры, ПК, турниры, подписчики | ✅ | ✅ | ✅ |
+
+Two things that look like oversights and are not:
+
+- **Member cards are gone for the OWNER too.** They hold player identities and
+  stored balances, and nothing on the cashier path reads them — the POS charges
+  cash and sends `member_id: null`.
+- **A manager without shifts can still take money.** `orders.cashier_shift_id`
+  is nullable, so a sale files itself under the open shift if there is one and
+  simply does not if there is not — exactly what already happened outside shift
+  hours.
+
+Product READS stay open to everyone: the POS sells from that list, and the
+manager's screen is the list plus a search box with no write control on it.
+
 ## 10. How work must be done here (MANDATORY — run it in this order)
 
 "100% guaranteed correct" is not achievable as a claim. It is achievable as a
