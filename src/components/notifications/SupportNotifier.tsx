@@ -1,6 +1,6 @@
 import { useLang } from "@/i18n/LanguageContext";
 import { useSupportUnread } from "@/support/SupportUnreadContext";
-import { playNotificationChime } from "@/utils/notificationSound";
+import { playSupportChime } from "@/utils/notificationSound";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -20,16 +20,20 @@ import { useNavigate } from "react-router-dom";
  * notification.
  *
  * ## The sound
- * The chime the app already uses. It fires on ARRIVAL only: the context that
- * feeds this ignores everything already in the notification feed when it starts
- * (see `SupportUnreadContext` — history must not chime), and dedupes by id, so
- * a redelivered event cannot ring twice. Loading a thread, opening the screen
- * and sending your own message all produce no arrival and therefore no sound.
+ * `playSupportChime`, NOT the app's arpeggio: two soft notes stepping down,
+ * the cadence a chat app uses, against the rising "something happened on the
+ * floor" of a booking. If the two sounded alike the second one would be
+ * ignored along with the first.
+ *
+ * It fires on ARRIVAL only. The context that feeds this listens to a live
+ * channel, which has no history to replay, and dedupes by message id — so
+ * opening a thread, restarting the app, reconnecting the socket and sending
+ * your own message all produce no arrival and therefore no sound.
  *
  * Autoplay is not a problem here for the reason it is not one for the booking
  * chime: by the time any of this can happen the user has signed in, which is
  * interaction enough for the renderer to hand back a running AudioContext. If
- * it does not, `playNotificationChime` swallows it and the card still shows.
+ * it does not, `playSupportChime` swallows it and the card still shows.
  */
 const AUTO_DISMISS_MS = 9_000;
 
@@ -42,7 +46,7 @@ const SupportNotifier = () => {
   useEffect(() => {
     if (!arrival) return;
 
-    playNotificationChime();
+    playSupportChime();
     // Mounted invisible, then flipped on the next frame so the transition has
     // two states to move between — set both at once and it simply appears.
     setVisible(false);

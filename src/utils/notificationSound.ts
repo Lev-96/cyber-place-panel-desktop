@@ -96,3 +96,55 @@ export const playNotificationChime = (): void => {
     // chime is best-effort.
   }
 };
+
+/**
+ * The support chime — deliberately NOT the one above.
+ *
+ * The arpeggio means "something happened on the floor": a booking, a
+ * tournament, the day's operational traffic. A message from support is a
+ * person waiting for an answer, and if the two sound alike the second one gets
+ * ignored along with the first.
+ *
+ * So this is the other familiar shape: two notes, a small step apart, the
+ * second slightly LOWER — the "incoming message" cadence every chat app uses,
+ * where the ascending one is reserved for alerts. Lower and softer than the
+ * arpeggio (a sine, peaking at 0.16 rather than 0.18), because it can arrive
+ * while somebody is mid-sentence with a customer. Under 300ms end to end.
+ *
+ * A sine rather than a triangle is most of the difference by ear: no upper
+ * harmonics, so it reads as a soft "bloop" against the arpeggio's brighter
+ * pluck even at the same pitch.
+ */
+export const playSupportChime = (): void => {
+  if (muted) return;
+  const c = getCtx();
+  if (!c) return;
+  if (c.state === "suspended") {
+    void c.resume().catch(() => undefined);
+  }
+
+  const now = c.currentTime;
+  // G5 → E5: a descending minor third, the interval a chat notification uses.
+  const notes: { freq: number; t: number }[] = [
+    { freq: 783.99, t: 0 },
+    { freq: 659.25, t: 0.11 },
+  ];
+
+  try {
+    for (const note of notes) {
+      const osc = c.createOscillator();
+      const gain = c.createGain();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(note.freq, now + note.t);
+      gain.gain.setValueAtTime(0, now + note.t);
+      gain.gain.linearRampToValueAtTime(0.16, now + note.t + 0.012);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + note.t + 0.18);
+      osc.connect(gain);
+      gain.connect(c.destination);
+      osc.start(now + note.t);
+      osc.stop(now + note.t + 0.2);
+    }
+  } catch {
+    // Same as above: the toast is the notification, the chime is sugar.
+  }
+};
