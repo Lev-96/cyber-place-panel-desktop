@@ -806,12 +806,13 @@ body.cp-modal-open .main {
 }
 
 /* Popover above the user card — pick Profile (modal) or Settings. */
+/* Position comes from `useAnchoredPopover` (measured, inline) — this rule owns
+   only the look. It used to be `absolute; left: 0; right: 0` inside the
+   sidebar, which clips its children, so the wide account-switcher variant was
+   cut off at the sidebar's edge instead of overlaying the window. */
 .user-menu-pop {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: calc(100% + 6px);
-  z-index: 20;
+  z-index: 9200;
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -2037,11 +2038,12 @@ button.pill:hover {
 /* The account list carries name + email + branch, which the 240px sidebar
    cannot hold — so this face widens past it into the content area. */
 .user-menu-pop.is-wide {
-  right: auto;
   width: 320px;
-  max-width: calc(100vw - 32px);
   padding: 8px;
 }
+/* The narrow menu matches the card it hangs off rather than the widest text in
+   it, so the two read as one control. */
+.user-menu-pop:not(.is-wide) { width: 240px; }
 .user-menu-view {
   display: flex;
   flex-direction: column;

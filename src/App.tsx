@@ -51,14 +51,12 @@ const MembersList = lazy(() => import("@/routes/MembersList"));
 const Notifications = lazy(() => import("@/routes/Notifications"));
 const SupportChat = lazy(() => import("@/routes/SupportChat"));
 const PcsList = lazy(() => import("@/routes/PcsList"));
-const PosTerminal = lazy(() => import("@/routes/PosTerminal"));
 const ProductsList = lazy(() => import("@/routes/ProductsList"));
 const ResetPassword = lazy(() => import("@/routes/ResetPassword"));
 const SessionsHistory = lazy(() => import("@/routes/SessionsHistory"));
 const Settings = lazy(() => import("@/routes/Settings"));
 const AppUpdates = lazy(() => import("@/routes/AppUpdates"));
 const AgentUpdates = lazy(() => import("@/routes/AgentUpdates"));
-const ShiftPanel = lazy(() => import("@/routes/ShiftPanel"));
 const BranchPricesPage = lazy(() => import("@/routes/BranchPricesPage"));
 const BranchSubscribersPage = lazy(() => import("@/routes/BranchSubscribersPage"));
 const TournamentDetails = lazy(() => import("@/routes/TournamentDetails"));
@@ -161,15 +159,6 @@ const Authed = () => {
             element={<BranchSubscribersPage />}
           />
           <Route path="/branches/:branchId/products" element={<ProductsList />} />
-          <Route path="/branches/:branchId/pos" element={<PosTerminal />} />
-          <Route
-            path="/branches/:branchId/shift"
-            element={
-              <RoleGuard perm="shift.open">
-                <ShiftPanel />
-              </RoleGuard>
-            }
-          />
           {/* Member cards and deposits are administrative. Guarding the route
               as well as the tile is the point: a bookmarked URL is the other
               way into a section, and the backend refuses these reads too. */}
