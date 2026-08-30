@@ -752,6 +752,30 @@ native `confirm()` and no detached DevTools (focus traps) — use
 typecheck **both** `tsconfig.app.json` and `tsconfig.node.json`; rebuild
 and restart after changes — HMR misses CSP, `index.html`, and preload.
 
+## 9.4 The map's basemap (READ IF THE MAP GOES GREY)
+
+Tiles come from `src/utils/mapTiles.ts`, never from a URL written into a
+component. The reason is on the record: the panel drew CartoDB's public tiles —
+free and keyless when that code was written — and CARTO later put them behind
+registration. The URL still answered 200; every tile just became a grey square
+reading "API KEY REQUIRED". Nothing threw, no request failed, and the map simply
+stopped being a map.
+
+Default: Esri Dark Gray Canvas, no key, two layers (the picture and the names
+on it), `maxNativeZoom: 16` so the address picker can still zoom past 16 onto an
+upscaled tile instead of blank ones.
+
+To move to a paid provider, set `VITE_MAP_TILE_URL` (plus
+`VITE_MAP_TILE_ATTRIBUTION`, and `…_MAX_ZOOM` / `…_MAX_NATIVE_ZOOM` /
+`…_SUBDOMAINS` if they differ). The key lives in that URL template in the
+environment — never in the source. It is public either way, since it ships in
+the bundle and travels in every tile request; restrict it by referer at the
+provider rather than pretending otherwise.
+
+**The tile host must also be in `img-src` in `index.html`.** The CSP is not a
+formality here: an allowed-by-default host does not exist, so a new provider
+whose host is missing from that line renders nothing at all in Electron.
+
 ## 9.5 What each role may reach (2026-08-30)
 
 `src/auth/permissions.ts` is the map every sidebar entry, hub tile, route guard
