@@ -101,6 +101,51 @@ export const TRANSLATIONS: Dict = {
   "session.decrease": { en: "One fewer", ru: "Убрать одну", am: "Մեկով պակաս" },
   "session.increase": { en: "One more", ru: "Добавить одну", am: "Մեկով ավելի" },
   "session.removeItem": { en: "Remove from the session", ru: "Удалить из сессии", am: "Հեռացնել նիստից" },
+  // The dialog is a basket: nothing reaches the session until it is confirmed,
+  // so the button says what confirming will do, and the count decides the word.
+  "session.cartConfirmOne": {
+    en: "Add the product to this session",
+    ru: "Добавить товар к этой сессии",
+    am: "Ավելացնել ապրանքը այս նիստին",
+  },
+  "session.cartConfirmMany": {
+    en: "Add the products to this session",
+    ru: "Добавить товары к этой сессии",
+    am: "Ավելացնել ապրանքները այս նիստին",
+  },
+  "session.adding": { en: "Adding…", ru: "Добавление…", am: "Ավելացվում է…" },
+  "session.cartEmpty": {
+    en: "Nothing selected yet — pick a product above.",
+    ru: "Пока ничего не выбрано — выберите товар выше.",
+    am: "Դեռ ոչինչ ընտրված չէ — ընտրեք ապրանք վերևում:",
+  },
+  "session.alreadyInSession": { en: "Already on the bill", ru: "Уже в сессии", am: "Արդեն հաշվին" },
+  "session.addedOne": {
+    en: "{0} × {1} added to the current session.",
+    ru: "{0} × {1} успешно добавлен к текущей сессии.",
+    am: "{0} × {1} ավելացվեց ընթացիկ նիստին:",
+  },
+  "session.addedMany": {
+    en: "Added to the current session: {0}.",
+    ru: "Товары успешно добавлены к текущей сессии: {0}.",
+    am: "Ավելացվեց ընթացիկ նիստին՝ {0}:",
+  },
+  "session.addFailedOne": {
+    en: "The product was not added to the current session.",
+    ru: "Товар не добавлен к текущей сессии.",
+    am: "Ապրանքը չավելացվեց ընթացիկ նիստին:",
+  },
+  "session.addFailedMany": {
+    en: "The products were not added to the current session.",
+    ru: "Товары не добавлены к текущей сессии.",
+    am: "Ապրանքները չավելացվեցին ընթացիկ նիստին:",
+  },
+  "session.failReason": { en: "Reason: {0}", ru: "Причина: {0}", am: "Պատճառը՝ {0}" },
+  "session.failUnknown": {
+    en: "the server did not say why.",
+    ru: "сервер не сообщил причину.",
+    am: "սերվերը պատճառ չնշեց:",
+  },
   "session.search": { en: "Search by name…", ru: "Поиск по названию…", am: "Որոնում անունով…" },
   "session.noProducts": { en: "No products in this branch yet. Add a custom item below.", ru: "В этом филиале ещё нет товаров. Добавьте произвольный товар ниже.", am: "Այս մասնաճյուղում ապրանքներ չկան: Ավելացրեք ձեռքով ապրանք ներքևում:" },
   "session.customItem": { en: "Or a custom item", ru: "Или произвольный товар", am: "Կամ ձեռքով ապրանք" },
