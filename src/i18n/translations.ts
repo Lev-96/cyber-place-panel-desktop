@@ -149,6 +149,15 @@ export const TRANSLATIONS: Dict = {
   "support.role.company_owner": { en: "Owner", ru: "Владелец", am: "Սեփականատեր" },
   "support.role.manager": { en: "Manager", ru: "Менеджер", am: "Մենեջեր" },
   "support.role.admin": { en: "Admin", ru: "Админ", am: "Ադմին" },
+  "session.createProduct": { en: "New product", ru: "Создать товар", am: "Ստեղծել ապրանք" },
+  "session.createProductHint": {
+    en: "Not stocked yet? Create it — it joins the catalogue and this bill.",
+    ru: "Товара ещё нет? Создайте — он появится в каталоге и в этом счёте.",
+    am: "Ապրանքը դեռ չկա՞։ Ստեղծեք — այն կհայտնվի կատալոգում և այս հաշվին։",
+  },
+  "session.removeFromBill": { en: "Remove from the bill", ru: "Убрать из счёта", am: "Հեռացնել հաշվից" },
+  "session.removedOne": { en: "{0} removed", ru: "Товар «{0}» успешно удалён", am: "«{0}» ապրանքը հեռացվեց" },
+  "session.removeFailed": { en: "Could not remove the product.", ru: "Не удалось удалить товар.", am: "Չհաջողվեց հեռացնել ապրանքը։" },
   "session.addItem": { en: "Add a product", ru: "Добавить товар", am: "Ավելացնել ապրանք" },
   "session.availableProducts": { en: "Available products", ru: "Доступные товары", am: "Հասանելի ապրանքներ" },
   "session.addedProducts": { en: "Added products", ru: "Добавленные товары", am: "Ավելացված ապրանքներ" },
@@ -209,9 +218,6 @@ export const TRANSLATIONS: Dict = {
   },
   "session.search": { en: "Search by name…", ru: "Поиск по названию…", am: "Որոնում անունով…" },
   "session.noProducts": { en: "No products in this branch yet. Add a custom item below.", ru: "В этом филиале ещё нет товаров. Добавьте произвольный товар ниже.", am: "Այս մասնաճյուղում ապրանքներ չկան: Ավելացրեք ձեռքով ապրանք ներքևում:" },
-  "session.customItem": { en: "Or a custom item", ru: "Или произвольный товар", am: "Կամ ձեռքով ապրանք" },
-  "session.itemName": { en: "Name (e.g. Lays)", ru: "Название (например, Лейс)", am: "Անվանում (օր. Լեյս)" },
-  "session.itemPrice": { en: "Price", ru: "Цена", am: "Գին" },
   "session.added": { en: "Added", ru: "Добавлено", am: "Ավելացված է" },
   "session.checkoutTitle": { en: "Close session", ru: "Закрыть сессию", am: "Փակել նիստը" },
   "session.checkoutDone": { en: "Receipt closed", ru: "Чек закрыт", am: "Հաշիվը փակված է" },
@@ -220,7 +226,6 @@ export const TRANSLATIONS: Dict = {
   "session.totalDue": { en: "Total to pay", ru: "Итого к оплате", am: "Ընդամենը վճարման" },
   "session.confirmStop": { en: "Confirm and close", ru: "Подтвердить и закрыть", am: "Հաստատել և փակել" },
   "session.closing": { en: "Closing…", ru: "Закрываем…", am: "Փակվում է…" },
-  "session.fillNamePrice": { en: "Provide a name and price", ru: "Укажите название и цену", am: "Նշեք անվանումը և գինը" },
   "session.fixedTariff": { en: "Fixed tariff", ru: "Фиксированный тариф", am: "Ֆիքսված սակագին" },
   "session.openByHour": { en: "By hour (open)", ru: "По часам (открытая)", am: "Ժամով (բաց)" },
   "session.tariffField": { en: "Tariff", ru: "Тариф", am: "Սակագին" },
@@ -453,7 +458,11 @@ export const TRANSLATIONS: Dict = {
   "switchAccount.done": { en: "Signed in as {0}", ru: "Вы вошли как {0}", am: "Մուտք գործեցիք որպես {0}" },
 
   // Sessions history
-  "history.title": { en: "Sessions history", ru: "История сессий", am: "Սեանսների պատմություն" },
+  // "Sales history", not "Sessions history": the screen summarises what a
+  // branch TOOK over a period — sessions closed, items sold, money — rather
+  // than listing sessions as events. The old name sent people looking for a
+  // log and made the revenue tiles beneath it read as a surprise.
+  "history.title": { en: "Sales history", ru: "История торговли", am: "Վաճառքների պատմություն" },
   "history.from": { en: "From", ru: "С", am: "Սկսած" },
   "history.to": { en: "To", ru: "По", am: "Մինչև" },
   "history.today": { en: "Today", ru: "Сегодня", am: "Այսօր" },
@@ -663,20 +672,23 @@ export const TRANSLATIONS: Dict = {
   "companiesList.branchesShort": { en: "branches", ru: "филиалы", am: "մասնաճյուղեր" },
   "revenue.title": { en: "Revenue & commission", ru: "Выручка и комиссия", am: "Եկամուտ և միջնորդավճար" },
   "revenue.pickCompany": { en: "— pick a company —", ru: "— выберите компанию —", am: "— ընտրեք ընկերություն —" },
+  "revenue.noCompany": {
+    en: "This account is not attached to a company.",
+    ru: "К этому аккаунту не привязана компания.",
+    am: "Այս հաշիվը կապված չէ ընկերության հետ։",
+  },
   "revenue.pickHint": { en: "Pick a company to see its monthly revenue and commission.", ru: "Выберите компанию, чтобы увидеть её месячную выручку и комиссию.", am: "Ընտրեք ընկերություն՝ ամսական եկամուտ և միջնորդավճար տեսնելու համար:" },
-  "revenue.operationalTitle": { en: "Operational revenue (sessions + POS)", ru: "Операционная выручка (сессии + касса)", am: "Գործառնական եկամուտ (սեանս + դրամարկղ)" },
+  // The heading of the only revenue figure there is now. It used to say
+  // "sessions + POS" beside a second block that computed a different
+  // commission from bookings; that block is gone, and so is the ambiguity
+  // about which number the owner actually owes on.
+  "revenue.operationalTitle": { en: "Revenue from closed sessions", ru: "Выручка по закрытым сессиям", am: "Եկամուտ փակված սեանսներից" },
+  "revenue.closedSessions": { en: "Closed sessions", ru: "Закрытых сессий", am: "Փակված սեանսներ" },
   "revenue.sourceSessions": { en: "Sessions", ru: "Сессии", am: "Սեանսներ" },
   "revenue.sourcePos": { en: "POS orders", ru: "Заказы кассы", am: "Դրամարկղի վաճառք" },
   "revenue.gross": { en: "Gross", ru: "Итого выручка", am: "Ընդհանուր" },
   "revenue.commissionPercent": { en: "Commission", ru: "Комиссия", am: "Միջնորդավճար" },
   "revenue.amountOwed": { en: "You owe us this period", ru: "К оплате за период", am: "Վճարման ենթակա ժամանակահատվածում" },
-  "revenue.bookingsTitle": { en: "Bookings (advisory)", ru: "Брони (справочно)", am: "Ամրագրումներ (տեղեկատու)" },
-  "revenue.bookingsHint": { en: "not billed", ru: "в счёт не идёт", am: "չի հաշվարկվում" },
-  "revenue.period": { en: "Period", ru: "Период", am: "Ժամանակահատված" },
-  "revenue.completedBookings": { en: "Completed bookings", ru: "Завершённые брони", am: "Ավարտված ամրագրումներ" },
-  "revenue.amountDue": { en: "Implied amount", ru: "Расчётная сумма", am: "Հաշվարկային գումար" },
-  "revenue.fromConfig": { en: "From company config", ru: "Из настроек компании", am: "Ընկերության կարգավորումներից" },
-  "revenue.storedLocally": { en: "Stored locally on this device.", ru: "Хранится локально на этом устройстве.", am: "Պահված է տեղական այս սարքում:" },
 
   // Managers
   "managers.title": { en: "Managers", ru: "Менеджеры", am: "Մենեջերներ" },
