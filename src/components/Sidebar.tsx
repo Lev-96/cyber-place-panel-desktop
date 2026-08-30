@@ -317,6 +317,9 @@ const Sidebar = () => {
         <NavLink to="/branches-map">{t("nav.map")}</NavLink>
       )}
       <NavLink to="/bookings">{t("nav.bookings")}</NavLink>
+      {can(role, "menu.support") && (
+        <NavLink to="/support">{t("nav.support")}</NavLink>
+      )}
       {can(role, "menu.scan") && (
         <NavLink to="/bookings/confirm">{t("nav.scan")}</NavLink>
       )}

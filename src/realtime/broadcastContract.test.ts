@@ -50,6 +50,7 @@ const CONTRACT_EVENTS = [
   ".branch.visibility.changed",
   ".notification.created",
   ".place.availability.changed",
+  ".support.message.created",
   ".tournament.joined",
 ] as const;
 
@@ -79,6 +80,11 @@ const CONTRACT_CHANNELS = {
     "bookings.global",
     "company.{id}",
     "branch.{id}",
+    // The venue's support thread. Per BRANCH, not per conversation: the owner
+    // and the manager of a venue read the same thread, and a client cannot
+    // subscribe to a conversation id it does not have yet — which is the state
+    // it is in when the first message of a new thread arrives.
+    "support.branch.{id}",
   ],
 } as const;
 
@@ -228,16 +234,17 @@ describe("realtime channel names", () => {
 describe("contract documentation", () => {
   it("lists the same number of events the backend pins", () => {
     // Guards against someone adding a binding here and forgetting the
-    // backend, or vice versa. Nine bound here plus one published for the phones
-    // only, verified 2026-08-29: `.branch.visibility.changed` joined with the
+    // backend, or vice versa. Ten bound here plus one published for the phones
+    // only, verified 2026-08-30: `.branch.visibility.changed` joined with the
     // player-facing half of a block, `.branch.platforms.changed` with the
-    // booking screen's live platform tabs.
-    expect(CONTRACT_EVENTS).toHaveLength(9);
+    // booking screen's live platform tabs, and `.support.message.created` with
+    // the in-app support desk.
+    expect(CONTRACT_EVENTS).toHaveLength(10);
     expect(PUBLISHED_BUT_NOT_BOUND_HERE).toHaveLength(1);
-    // The backend pins 11 in tests/Unit/Events/BroadcastContractTest.php:
-    // the nine below, the mobile-only one above, and BookingChangedPublic,
+    // The backend pins 12 in tests/Unit/Events/BroadcastContractTest.php:
+    // the ten below, the mobile-only one above, and BookingChangedPublic,
     // which shares the `.booking.changed` alias with its private twin.
-    expect(CONTRACT_EVENTS.length + PUBLISHED_BUT_NOT_BOUND_HERE.length + 1).toBe(11);
+    expect(CONTRACT_EVENTS.length + PUBLISHED_BUT_NOT_BOUND_HERE.length + 1).toBe(12);
     // 3 public / 5 private since 2026-08-28: the two update feeds plus the
     // catalogue feed this panel joined for block state. The staff feeds moved
     // to private on 2026-08-18 — during that migration the backend still ALSO
@@ -245,6 +252,6 @@ describe("contract documentation", () => {
     // public pair is dropped nothing here changes, this side already reads the
     // private one.
     expect(CONTRACT_CHANNELS.public).toHaveLength(3);
-    expect(CONTRACT_CHANNELS.private).toHaveLength(5);
+    expect(CONTRACT_CHANNELS.private).toHaveLength(6);
   });
 });

@@ -48,6 +48,7 @@ const Managers = lazy(() => import("@/routes/Managers"));
 const MemberCard = lazy(() => import("@/routes/MemberCard"));
 const MembersList = lazy(() => import("@/routes/MembersList"));
 const Notifications = lazy(() => import("@/routes/Notifications"));
+const SupportChat = lazy(() => import("@/routes/SupportChat"));
 const PcsList = lazy(() => import("@/routes/PcsList"));
 const PosTerminal = lazy(() => import("@/routes/PosTerminal"));
 const ProductsList = lazy(() => import("@/routes/ProductsList"));
@@ -229,6 +230,14 @@ const Authed = () => {
 
         {/* Universal */}
         <Route path="/notifications" element={<Notifications />} />
+        <Route
+          path="/support"
+          element={
+            <RoleGuard perm="menu.support">
+              <SupportChat />
+            </RoleGuard>
+          }
+        />
         <Route path="/settings" element={<Settings />} />
         <Route
           path="/settings/updates"

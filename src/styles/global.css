@@ -3067,3 +3067,137 @@ button.login-flip-back:hover {
   line-height: 1.35;
   max-width: 34ch;
 }
+
+/* ── Support desk ────────────────────────────────────────────────────────
+   Two columns on a desk-sized window, one on a narrow one: the conversation
+   list is a way to switch threads, not something worth keeping a 260px column
+   for when there is no room. The thread itself owns the height so the composer
+   stays put while the messages scroll under it — a chat where the input drifts
+   down the page as the conversation grows is one nobody can type in. */
+.support-layout {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  gap: 14px;
+  align-items: start;
+}
+@media (max-width: 900px) {
+  .support-layout { grid-template-columns: 1fr; }
+}
+.support-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 70vh;
+  overflow-y: auto;
+}
+.support-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-align: left;
+  padding: 10px;
+  border: 1px solid #1f2a44;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  transition: border-color 160ms ease, background 160ms ease;
+}
+.support-item:hover { border-color: var(--color-primary); }
+.support-item.is-active {
+  border-color: var(--color-primary);
+  background: rgba(7, 221, 241, 0.08);
+}
+.support-badge {
+  min-width: 20px;
+  padding: 1px 6px;
+  border-radius: 10px;
+  background: var(--color-primary);
+  color: #04121a;
+  font-size: 11px;
+  font-weight: 700;
+  text-align: center;
+}
+.support-thread {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 60vh;
+}
+.support-messages {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex: 1;
+  max-height: 52vh;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+/* Support on the left, the venue on the right — the arrangement every chat
+   uses, so nobody has to learn this one. */
+.support-bubble {
+  align-self: flex-start;
+  max-width: 78%;
+  padding: 8px 12px;
+  border: 1px solid #1f2a44;
+  border-radius: 12px 12px 12px 4px;
+  background: rgba(255, 255, 255, 0.03);
+  font-size: 13px;
+  line-height: 1.5;
+  word-break: break-word;
+}
+.support-bubble.is-mine {
+  align-self: flex-end;
+  border-radius: 12px 12px 4px 12px;
+  background: rgba(7, 221, 241, 0.08);
+  border-color: rgba(7, 221, 241, 0.35);
+}
+/* A line still in flight is dimmed rather than hidden: it is on screen because
+   the person wrote it, and it stops being provisional when the server says so. */
+.support-bubble.is-pending { opacity: 0.75; }
+.support-bubble__meta {
+  font-size: 11px;
+  color: var(--color-muted);
+  margin-bottom: 4px;
+}
+.support-bubble__state {
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--color-muted);
+}
+.support-bubble__state.is-failed { color: #ef4444; }
+.support-retry {
+  margin-left: 8px;
+  background: transparent;
+  border: 1px solid #4a1a1a;
+  border-radius: 6px;
+  color: #ef4444;
+  font: inherit;
+  font-size: 11px;
+  padding: 1px 8px;
+  cursor: pointer;
+}
+.support-attachment {
+  display: inline-block;
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--color-primary);
+  text-decoration: none;
+}
+.support-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  border: 1px solid #1f2a44;
+  border-radius: 999px;
+  font-size: 12px;
+}
+.support-chip button {
+  background: transparent;
+  border: 0;
+  color: var(--color-muted);
+  cursor: pointer;
+  font: inherit;
+}

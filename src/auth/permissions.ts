@@ -26,6 +26,12 @@ export type Permission =
   | "menu.myCompany"       // owner shortcut to their own company
   | "menu.updates"         // admin-only desktop auto-update screen
   | "menu.agentUpdates"    // owner/manager screen to roll out agent updates to their fleet
+  /**
+   * The in-app support desk. Everyone who works a branch: a manager hits a
+   * problem on the floor as often as an owner does, and making them relay it
+   * through somebody else is how a bug report arrives third-hand.
+   */
+  | "menu.support"
   | "revenue.view"         // see /revenue and /companies/:id/revenue (admin + owner)
   // branch CRUD
   | "branch.create"
@@ -111,7 +117,7 @@ const PERMS: Record<Role, ReadonlySet<Permission>> = {
   admin: new Set<Permission>([
     "menu.branches", "menu.companies", "menu.managers", "menu.games",
     "menu.tournaments", "menu.scan", "menu.map",
-    "menu.updates", "menu.expenses", "menu.metrics",
+    "menu.updates", "menu.expenses", "menu.metrics", "menu.support",
     "revenue.view",
     "branch.create", "branch.edit", "branch.delete", "branch.prices",
     "branch.places", "branch.members", "product.crud",
@@ -123,7 +129,7 @@ const PERMS: Record<Role, ReadonlySet<Permission>> = {
   ]),
   company_owner: new Set<Permission>([
     "menu.branches", "menu.managers", "menu.tournaments", "menu.scan", "menu.map",
-    "menu.myCompany", "menu.agentUpdates", "revenue.view",
+    "menu.myCompany", "menu.agentUpdates", "menu.support", "revenue.view",
     "branch.create", "branch.edit", "branch.delete", "branch.prices",
     // Seats, shifts and the product catalogue are the company's to arrange;
     // "branch.members" is deliberately NOT here — member cards and deposits are
@@ -147,7 +153,7 @@ const PERMS: Record<Role, ReadonlySet<Permission>> = {
     // The branch profile was already refused server-side (a manager
     // branch-update is rejected); the rest is enforced the same way now, so
     // removing a screen is not merely hiding a button.
-    "menu.tournaments", "menu.scan", "menu.agentUpdates",
+    "menu.tournaments", "menu.scan", "menu.agentUpdates", "menu.support",
     // Games stay: a manager runs the library of the branch they work at, and
     // the place form's inline "create game" dead-ends without it. Branch-scoped
     // only — never the shared catalogue.
