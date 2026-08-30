@@ -2,6 +2,7 @@ import { Outlet } from "react-router-dom";
 import ExpenseReminderNotifier from "./notifications/ExpenseReminderNotifier";
 import GlobalBookingNotifier from "./notifications/GlobalBookingNotifier";
 import SupportNotifier from "./notifications/SupportNotifier";
+import UnexpectedWakeDialog from "./ps5/UnexpectedWakeDialog";
 import Sidebar from "./Sidebar";
 import BackButton from "./ui/BackButton";
 
@@ -20,6 +21,11 @@ const Layout = () => (
     */}
     <GlobalBookingNotifier />
     <SupportNotifier />
+    {/* Owner-only, and silent for everyone else: it renders nothing unless the
+        signed-in role holds `branch.places` AND a console in their own venue
+        has woken with no session on it. Mounted here so the question reaches
+        them whatever screen they are on. */}
+    <UnexpectedWakeDialog />
     {/*
       Admin-only recurring-service payment reminder. Polls the "due
       within 3 days" feed and rings (chime + OS push + corner toast) the

@@ -18,7 +18,9 @@ import {
   SESSION_CELL_COLOR,
 } from "@/domain/SessionCellState";
 import { platformGroup, platformLabel } from "@/utils/platform";
-import { DragEvent, useCallback, useEffect, useState } from "react";
+import { useConsoleControl } from "@/ps5/useConsoleControl";
+import { PS5_STATE_LOOK } from "@/ps5/stateLook";
+import { DragEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import AddSessionItemDialog from "./AddSessionItemDialog";
 import SessionTimer from "./SessionTimer";
@@ -69,6 +71,27 @@ const SessionsBoard = ({ branchId }: Props) => {
   // Which sections are collapsed. Empty = all open (the default).
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const reservedPlaceIds = useReservedPlaceIds(branchId);
+
+  // The consoles this branch has bound, and the rules that govern them. The
+  // board is where this belongs: it is the screen that knows which places have
+  // a session on them, and this machine is the only component that can reach a
+  // console at all — the backend shares no network with any venue.
+  //
+  // PC places are untouched by every line of it: a device with no console bound
+  // is not in `devices` at all, and nothing below runs for one.
+  const consoleDevices = useMemo(
+    () => (pcs.data ?? []).filter((pc) => pc.console_host_id),
+    [pcs.data],
+  );
+  const sessionDeviceIds = useMemo(
+    () => new Set((sessions.data ?? []).map((s) => s.pc_id)),
+    [sessions.data],
+  );
+  const { views: consoleViews, statuses: consoleStatuses, sessionStarting, sessionStopped } = useConsoleControl({
+    branchId,
+    devices: consoleDevices,
+    sessionDeviceIds,
+  });
 
   usePlaceAvailability(
     branchId,
@@ -185,6 +208,18 @@ const SessionsBoard = ({ branchId }: Props) => {
     const tierName = pc.place ? pc.place.type : "";
     const nameLine =
       tr(pc.place, "name", lang).trim() || `№${pc.place?.number ?? tr(pc, "label", lang)}`;
+    // Live state of the physical console behind this place, when one is bound.
+    // Undefined covers both "this is a computer" and "the first probe has not
+    // come back yet" — neither is something to show a colour for.
+    const consoleState = pc.console_host_id ? consoleStatuses[pc.console_host_id]?.state : undefined;
+    // What the panel is DOING about it, which is a different thing from what
+    // the console said. "Waking…" is not a state a console reports; it is this
+    // machine having sent a datagram and not been answered yet — and saying so
+    // beats a stale "Rest" for the ten seconds in between.
+    const consoleView = pc.console_host_id ? consoleViews[pc.console_host_id] : undefined;
+    const lifecycle = consoleView?.snapshot.state;
+    const consoleBusy = lifecycle === "WAKING" || lifecycle === "GOING_TO_REST"
+      || lifecycle === "UNEXPECTED_WAKE" || lifecycle === "ERROR";
     return (
       <div
         key={pc.id}
@@ -236,6 +271,31 @@ const SessionsBoard = ({ branchId }: Props) => {
             {tierName && <span style={{ flexShrink: 0 }}>· {tierName}</span>}
           </span>
         </span>
+        {/* The console itself, refreshed every ten seconds from this machine.
+            On its OWN line, not beside the platform: a tile is 160px at its
+            narrowest and "Режим покоя" next to "PS5 · STANDARD" does not fit in
+            it — it pushed the line wider than the card.
+
+            Deliberately a SECOND indicator rather than folded into the device
+            dot above: that one is about the billing device and its kiosk agent,
+            this one is about a box in the room, and a single dot meaning both
+            would be unreadable the moment they disagreed. */}
+        {consoleState && (
+          <span
+            className="ps5-chip"
+            title={consoleBusy && lifecycle
+              ? `${t("ps5.tile.bound")}: ${t(`ps5.lifecycle.${lifecycle}`)}${consoleView?.snapshot.error ? ` — ${t(`ps5.error.${consoleView.snapshot.error}`)}` : ""}`
+              : `${t("ps5.tile.bound")}: ${t(PS5_STATE_LOOK[consoleState].key)}`}
+          >
+            <span
+              className="ps5-chip__dot"
+              style={{ background: lifecycle === "ERROR" ? "#ef4444" : PS5_STATE_LOOK[consoleState].dot }}
+            />
+            <span className="ps5-chip__text">
+              {consoleBusy && lifecycle ? t(`ps5.lifecycle.${lifecycle}`) : t(PS5_STATE_LOOK[consoleState].key)}
+            </span>
+          </span>
+        )}
         {/* Line 2 — WHICH seat it is. Its own line at the card's identity size,
             because a name an operator typed ("Плейстейшен 5 ВИП большое место")
             is what they actually look for, and sharing a wrapping flex row with
@@ -353,14 +413,31 @@ const SessionsBoard = ({ branchId }: Props) => {
           branchId={branchId}
           pc={startTarget}
           onClose={() => setStartTarget(null)}
-          onStarted={() => { setStartTarget(null); void sessions.reload(); void pcs.reload(); }}
+          onStarted={() => {
+            // The console may legitimately wake from now on. Said BEFORE the
+            // reload, because the monitor can tick before the session row is
+            // visible — and a monitor that sees "awake, no session" is a
+            // monitor that switches the console off under the player.
+            if (startTarget.console_host_id) sessionStarting(startTarget.id);
+            setStartTarget(null);
+            void sessions.reload();
+            void pcs.reload();
+          }}
         />
       )}
       {stopTarget && (
         <StopReceiptModal
           session={stopTarget}
           onClose={() => { setStopTarget(null); void sessions.reload(); void pcs.reload(); }}
-          onConfirmed={() => { void sessions.reload(); void pcs.reload(); }}
+          onConfirmed={() => {
+            // The session is over on the backend, so the console should be
+            // asleep. Whether this build can actually ask it to is the
+            // transport's business — and its refusal is shown, not swallowed.
+            const device = (pcs.data ?? []).find((pc) => pc.id === stopTarget.pc_id);
+            if (device?.console_host_id) sessionStopped(device.id);
+            void sessions.reload();
+            void pcs.reload();
+          }}
           onItemRemoved={() => { void sessions.reload(); }}
         />
       )}
