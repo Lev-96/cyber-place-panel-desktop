@@ -14,7 +14,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 const pcs = vi.hoisted(() => ({ data: [] as unknown[], calls: 0 }));
 const sessions = vi.hoisted(() => ({ data: [] as unknown[] }));
 const reported = vi.hoisted(() => ({ calls: [] as unknown[] }));
-const bridge = vi.hoisted(() => ({ answer: "awake" as string, probes: 0, rests: 0 }));
+const bridge = vi.hoisted(() => ({ answer: "awake" as string, probes: 0, rests: 0, restResult: { sent: true } as { sent: boolean; code?: string } }));
 
 vi.mock("@/api/pcs", () => ({ apiListPcsEverywhere: async () => { pcs.calls += 1; return pcs; } }));
 vi.mock("@/api/sessions", () => ({ apiListAllActiveSessions: async () => sessions }));
@@ -27,8 +27,12 @@ vi.mock("@/realtime/usePs5Realtime", () => ({
     if (branchId) { decided.branches.push(branchId); decided.deliver = onEvent; }
   },
 }));
+// The key is what identifies WHICH sentence was chosen; the wording itself is
+// the translations file's business and is tested there.
+vi.mock("@/i18n/translations", () => ({ tActive: (key: string) => key }));
 vi.mock("@/auth/AuthContext", () => ({ useAuth: () => ({ user: { id: 3, role: "company_owner" } }) }));
-vi.mock("@/ui/notify", () => ({ notify: { message: () => {} } }));
+const told = vi.hoisted(() => ({ messages: [] as string[] }));
+vi.mock("@/ui/notify", () => ({ notify: { message: (_kind: string, text: string) => { told.messages.push(text); } } }));
 
 const device = (over: Record<string, unknown> = {}) => ({
   id: 96, branch_id: 3, place_id: 1, label: "Плейстейшен 5", kind: "ps",
@@ -46,11 +50,13 @@ beforeEach(async () => {
   pcs.calls = 0;
   sessions.data = [];
   reported.calls = [];
+  told.messages = [];
   decided.branches = [];
   decided.deliver = null;
   bridge.answer = "awake";
   bridge.probes = 0;
   bridge.rests = 0;
+  bridge.restResult = { sent: true };
 
   (globalThis as Record<string, unknown>).cyberplacePS5 = {
     discover: async () => ({ consoles: [], probed: [], warnings: [] }),
@@ -67,7 +73,7 @@ beforeEach(async () => {
     },
     capabilities: async () => ({ discover: true, observe: true, wake: true, rest: true }),
     wake: async () => ({ sent: true }),
-    rest: async () => { bridge.rests += 1; return { sent: true }; },
+    rest: async () => { bridge.rests += 1; return bridge.restResult; },
   };
 
   ({ Ps5ControlProvider } = await import("./Ps5ControlProvider"));
@@ -220,6 +226,27 @@ describe("watching without a board on screen", () => {
     await act(async () => { await vi.advanceTimersByTimeAsync(20_000); });
 
     expect(bridge.rests).toBe(0);
+  });
+
+  test("a console that refuses to sleep is not left to be noticed by accident", async () => {
+    // The console answers with its own "a Remote Play session is already in
+    // use". The panel goes on trying, but the person who just answered "no"
+    // about that console should not have to spot a chip on a tile to learn it
+    // is still awake.
+    bridge.restResult = { sent: false, code: "IN_USE" };
+    pcs.data = [device()];
+
+    render(<Ps5ControlProvider><div /></Ps5ControlProvider>);
+    await settle();
+    await waitFor(() => expect(reported.calls.length).toBe(1));
+    const eventId = (reported.calls[0] as unknown[])[1] as string;
+
+    await act(async () => {
+      decided.deliver?.({ device_id: 96, event_uuid: eventId, approved: false });
+      await vi.advanceTimersByTimeAsync(2_000);
+    });
+
+    await waitFor(() => expect(told.messages).toContain("ps5.error.IN_USE"));
   });
 
   test("without the desktop bridge it does nothing at all", async () => {

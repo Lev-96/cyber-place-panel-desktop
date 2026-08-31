@@ -169,7 +169,21 @@ export const useConsoleControl = ({ devices, sessionDeviceIds, enabled = true }:
           // caller records it and the screen says the console is still awake.
           return { sent: false, code: "UNSUPPORTED_BY_TRANSPORT" };
         }
-        return api.rest(hostId, address);
+
+        const result = await api.rest(hostId, address);
+        // A console that would not go to sleep is the one thing nobody should
+        // have to notice for themselves — least of all after answering "no" to
+        // a question about it. The panel keeps trying either way; this is so
+        // the person knows it has not simply happened.
+        if (!result.sent) {
+          const last = toldAt.current[hostId] ?? 0;
+          if (Date.now() - last > 60_000) {
+            toldAt.current[hostId] = Date.now();
+            notify.message("error", tActive(`ps5.error.${result.code ?? "TRANSPORT_ERROR"}`));
+          }
+        }
+
+        return result;
       },
       reportUnexpectedWake: async ({ deviceId, eventId }) => {
         await apiReportUnexpectedWake(deviceId, eventId);
