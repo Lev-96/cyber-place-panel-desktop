@@ -106,6 +106,8 @@ export interface MachineSnapshot {
   wakeSeenAt: number | null;
   /** An unexpected wake the owner allowed. Cleared the moment the console sleeps. */
   approvedEventId: string | null;
+  /** When this console was first asked to wake, while it is still asleep. */
+  wakingSince: number | null;
   /** Set when a command could not be carried out. Shown, never swallowed. */
   error: string | null;
 }
@@ -118,12 +120,26 @@ export interface Step {
 /** How long the owner has to answer before the console is put back to sleep. */
 export const UNEXPECTED_WAKE_GRACE_MS = 10_000;
 
+/**
+ * How long a console may be asked to wake before the asking is called a
+ * failure.
+ *
+ * A console that has been sent a wake and is still asleep three quarters of a
+ * minute later is not slow — it is ignoring us, and there is exactly one common
+ * reason: "Enable Turning On PS5 from Network" is off in its own settings. Two
+ * independent implementations sending the same packet with the same genuine
+ * registration both get nowhere against a console with that switch off, so it
+ * is worth naming rather than leaving as "waking…" forever.
+ */
+export const WAKE_GIVE_UP_MS = 45_000;
+
 export const initialSnapshot = (): MachineSnapshot => ({
   state: "UNKNOWN",
   desired: "rest",
   wakeEventId: null,
   wakeSeenAt: null,
   approvedEventId: null,
+  wakingSince: null,
   error: null,
 });
 
@@ -172,6 +188,7 @@ export const step = (prev: MachineSnapshot, obs: Observation, newEventId: string
   // it says the network is in the way. Never act on silence.
   if (obs.actual === "unreachable" || obs.actual === "unknown") {
     next.state = obs.actual === "unreachable" ? "OFFLINE" : "UNKNOWN";
+    next.wakingSince = null;
     // A pending unexpected wake does not survive the console vanishing: when it
     // comes back it is a new situation and gets asked about again.
     next.wakeEventId = null;
@@ -187,10 +204,22 @@ export const step = (prev: MachineSnapshot, obs: Observation, newEventId: string
     next.approvedEventId = null;
 
     if (desired === "active") {
+      next.wakingSince = prev.wakingSince ?? obs.now;
+
+      if (obs.now - next.wakingSince >= WAKE_GIVE_UP_MS) {
+        // Asked, repeatedly, and still asleep. The packet is leaving this
+        // machine — that much is known — so what is left is the console's own
+        // "turn on from network" setting.
+        next.state = "ERROR";
+        next.error = "WAKE_IGNORED";
+        return { next, commands };
+      }
+
       next.state = "WAKING";
       commands.push({ kind: "wake" });
     } else {
       next.state = "REST";
+      next.wakingSince = null;
     }
 
     return { next, commands };
@@ -199,6 +228,7 @@ export const step = (prev: MachineSnapshot, obs: Observation, newEventId: string
   // From here the console is awake.
   if (desired === "active") {
     next.state = "ACTIVE";
+    next.wakingSince = null;
     next.wakeEventId = null;
     next.wakeSeenAt = null;
     // Reaching ACTIVE through a session ends any approval: the next manual

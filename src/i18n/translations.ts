@@ -292,6 +292,11 @@ export const TRANSLATIONS: Dict = {
     ru: "Эта сборка не умеет усыплять приставку по сети",
     am: "Այս տարբերակը չի կարող կոնսոլը քնեցնել ցանցով",
   },
+  "ps5.error.WAKE_IGNORED": {
+    en: "The console is ignoring the wake — switch on \"Enable Turning On PS5 from Network\" in its Power Saving settings",
+    ru: "Приставка игнорирует пробуждение — включите на ней «Включение PS5 по сети» в настройках энергосбережения",
+    am: "Կոնսոլն անտեսում է արթնացումը — միացրեք «Միացնել PS5-ը ցանցից» էներգախնայման կարգավորումներում",
+  },
   "ps5.error.TRANSPORT_ERROR": {
     en: "Could not reach the console",
     ru: "Не удалось достучаться до приставки",

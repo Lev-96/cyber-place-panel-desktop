@@ -3,6 +3,7 @@ import {
   initialSnapshot,
   step,
   UNEXPECTED_WAKE_GRACE_MS,
+  WAKE_GIVE_UP_MS,
   type MachineSnapshot,
   type Observation,
 } from "./machine";
@@ -76,6 +77,50 @@ describe("a console with a session on it", () => {
 
     expect(next.state).toBe("ACTIVE");
     expect(commands).toEqual([]);
+  });
+});
+
+describe("a console that will not wake", () => {
+  test("after three quarters of a minute it stops being called waking", () => {
+    // The console is asleep, has been asked, and is still asleep. Two separate
+    // implementations behave this way against a console whose "turn on from
+    // network" setting is off — so at some point "waking…" is a lie.
+    const { steps } = run(initialSnapshot(), [
+      { actual: "rest", starting: true },
+      { actual: "rest", starting: true, now: 1_000_000 + WAKE_GIVE_UP_MS - 1 },
+      { actual: "rest", starting: true, now: 1_000_000 + WAKE_GIVE_UP_MS },
+    ]);
+
+    expect(steps[1].next.state).toBe("WAKING");
+    expect(steps[2].next.state).toBe("ERROR");
+    expect(steps[2].next.error).toBe("WAKE_IGNORED");
+    // And it stops asking, rather than shouting at a console that is not
+    // listening for the rest of the shift.
+    expect(steps[2].commands).toEqual([]);
+  });
+
+  test("a console that does wake never reaches that state", () => {
+    const { steps } = run(initialSnapshot(), [
+      { actual: "rest", starting: true },
+      { actual: "awake", hasSession: true, now: 1_000_000 + WAKE_GIVE_UP_MS + 10_000 },
+    ]);
+
+    expect(steps[1].next.state).toBe("ACTIVE");
+    expect(steps[1].next.error).toBeNull();
+  });
+
+  test("the clock starts again for the next session, not from the last one", () => {
+    // A console that ignored a wake this morning must still be asked properly
+    // this afternoon.
+    const { steps } = run(initialSnapshot(), [
+      { actual: "rest", starting: true },
+      { actual: "rest", now: 1_000_000 + 60_000 },
+      { actual: "rest", starting: true, now: 1_000_000 + 61_000 },
+    ]);
+
+    expect(steps[1].next.state).toBe("REST");
+    expect(steps[2].next.state).toBe("WAKING");
+    expect(steps[2].commands).toEqual([{ kind: "wake" }]);
   });
 });
 
