@@ -159,6 +159,12 @@ export const TRANSLATIONS: Dict = {
     ru: "На этом компьютере нет хранилища ключей ОС — ключ негде хранить безопасно",
     am: "Այս համակարգիչը չունի ՕՀ բանալիների պահոց — բանալին ապահով պահել հնարավոր չէ",
   },
+  "ps5.key.test": { en: "Test wake", ru: "Проверить пробуждение", am: "Ստուգել արթնացումը" },
+  "ps5.key.testSent": {
+    en: "Signal sent — the console should wake within a few seconds",
+    ru: "Сигнал отправлен — приставка должна проснуться за несколько секунд",
+    am: "Ազդանշանն ուղարկվեց — կոնսոլը պետք է արթնանա մի քանի վայրկյանում",
+  },
   "ps5.key.hint": {
     en: "From pairing the console with a PlayStation account. Stored encrypted by this computer, never sent to the server.",
     ru: "Выдаётся при привязке приставки к аккаунту PlayStation. Хранится в зашифрованном виде на этом компьютере и никогда не уходит на сервер.",

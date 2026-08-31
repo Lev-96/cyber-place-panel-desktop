@@ -304,6 +304,28 @@ app.whenReady().then(async () => {
   ipcMain.handle("ps5:capabilities", () => activeTransport.capabilities);
 
   /**
+   * Wake a console with a key that is used once and not kept.
+   *
+   * The storing path refuses a machine whose OS offers no keystore, which is
+   * right — a key written as readable text on a computer the whole shift walks
+   * past is not a lesser evil. But it also blocks the very first thing anybody
+   * needs to do with a new console: find out whether the key they were given
+   * actually works.
+   *
+   * This is that check. The key comes straight from the field the owner typed
+   * it into, goes into one datagram, and is referenced nowhere afterwards —
+   * nothing writes it to disk, nothing logs it, and there is no path that reads
+   * it back.
+   */
+  ipcMain.handle("ps5:wake-once", async (_e: unknown, address: unknown, registKey: unknown) => {
+    if (typeof address !== "string" || typeof registKey !== "string") {
+      return { sent: false, reason: "bad-request" };
+    }
+
+    return wakePlayStation(address, registKey);
+  });
+
+  /**
    * Remember a console's wake key. The renderer can write one and ask whether
    * one exists; it can never read one back.
    */

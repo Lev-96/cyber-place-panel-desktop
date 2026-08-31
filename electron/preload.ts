@@ -52,6 +52,13 @@ contextBridge.exposeInMainWorld("cyberplacePS5", {
   rest: (hostId: string, address: string) => ipcRenderer.invoke("ps5:rest", hostId, address),
   capabilities: () => ipcRenderer.invoke("ps5:capabilities"),
   /**
+   * Try a key once without storing it — the first thing anybody does with a new
+   * console, and the only way to check a key on a machine whose OS has no
+   * keystore to put one in.
+   */
+  wakeOnce: (address: string, registKey: string) =>
+    ipcRenderer.invoke("ps5:wake-once", address, registKey),
+  /**
    * The wake key: writable, checkable, never readable. There is deliberately no
    * `getCredential` — a secret a web page can read is a secret in the devtools
    * of whoever opens them.

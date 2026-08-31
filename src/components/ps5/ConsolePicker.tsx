@@ -1,4 +1,5 @@
 import Button from "@/components/ui/Button";
+import Input from "@/components/ui/Input";
 import Modal from "@/components/ui/Modal";
 import { ListSkeleton } from "@/components/ui/Skeleton";
 import { useAsync } from "@/hooks/useAsync";
@@ -6,7 +7,7 @@ import { tr } from "@/i18n/translated";
 import { useLang } from "@/i18n/LanguageContext";
 import { pcRepository } from "@/repositories/PcRepository";
 import { PS5_STATE_LOOK } from "@/ps5/stateLook";
-import { ps5DiscoveryAvailable, usePs5Discovery, type Ps5Console } from "@/ps5/usePs5Discovery";
+import { ps5Bridge, ps5DiscoveryAvailable, usePs5Discovery, type CredentialState, type Ps5Console } from "@/ps5/usePs5Discovery";
 import { IPcApi } from "@/types/sessions";
 import { useEffect, useState } from "react";
 
@@ -40,10 +41,162 @@ const ConsolePicker = ({ branchId, onClose }: Props) => {
   const available = ps5DiscoveryAvailable();
   const devices = useAsync(() => pcRepository.listConsoleDevices(branchId), [branchId]);
   const [busyHostId, setBusyHostId] = useState<string | null>(null);
+  /**
+   * Whether each console has a wake key on THIS machine — never the key itself.
+   * The bridge deliberately offers no reader: a secret a web page can read is a
+   * secret in the devtools of whoever opens them.
+   */
+  const [keys, setKeys] = useState<Record<string, CredentialState>>({});
+  /** What the owner is typing, per console. Never persisted, never logged. */
+  const [typedKey, setTypedKey] = useState<Record<string, string>>({});
+  const [keyError, setKeyError] = useState<Record<string, string>>({});
   /** Per-console choice of place, before the operator presses attach. */
   const [choice, setChoice] = useState<Record<string, number>>({});
 
   useEffect(() => { if (available) void scan(); }, [available, scan]);
+
+  // Ask, for each console found, whether this machine already holds its key.
+  useEffect(() => {
+    const api = ps5Bridge();
+    if (!api?.hasCredential || !consoles?.length) return;
+
+    let alive = true;
+    void Promise.all(consoles.map(async (c) => [c.hostId, await api.hasCredential!(c.hostId)] as const))
+      .then((pairs) => { if (alive) setKeys(Object.fromEntries(pairs)); })
+      .catch(() => { /* an older preload; the row simply offers no key control */ });
+
+    return () => { alive = false; };
+  }, [consoles]);
+
+  const saveKey = async (hostId: string) => {
+    const api = ps5Bridge();
+    const value = (typedKey[hostId] ?? "").trim();
+    if (!api?.setCredential || !value) return;
+
+    setBusyHostId(hostId);
+    setKeyError((e) => ({ ...e, [hostId]: "" }));
+    try {
+      const result = await api.setCredential(hostId, value);
+      if (!result.saved) {
+        // The one case worth spelling out: no OS keystore means the key would
+        // have to be written as readable text, and that is refused rather than
+        // done quietly.
+        setKeyError((e) => ({ ...e, [hostId]: t("ps5.key.noKeystore") }));
+        return;
+      }
+
+      // Cleared immediately: the typed value has done its job and has no reason
+      // to sit in a React state tree for the rest of the shift.
+      setTypedKey((k) => ({ ...k, [hostId]: "" }));
+      setKeys((s2) => ({ ...s2, [hostId]: { has: true, available: true } }));
+    } finally {
+      setBusyHostId(null);
+    }
+  };
+
+  /**
+   * Send one wake with the key as typed, storing nothing.
+   *
+   * The first question about a new console is always "does this key work?", and
+   * it must be answerable before anything is saved — including on a machine
+   * whose OS has no keystore, where saving is refused outright.
+   */
+  const testWake = async (console_: Ps5Console) => {
+    const api = ps5Bridge();
+    const value = (typedKey[console_.hostId] ?? "").trim();
+    if (!api?.wakeOnce || !value) return;
+
+    setBusyHostId(console_.hostId);
+    setKeyError((e) => ({ ...e, [console_.hostId]: "" }));
+    try {
+      const result = await api.wakeOnce(console_.address, value);
+      setKeyError((e) => ({
+        ...e,
+        // "Sent" is not "it woke" — nothing answers a wake datagram. The console
+        // saying so is what the ten-second monitor reports, a few seconds later.
+        [console_.hostId]: result.sent
+          ? t("ps5.key.testSent")
+          : t(result.reason === "bad-credential" ? "ps5.error.BAD_CREDENTIAL" : "ps5.error.TRANSPORT_ERROR"),
+      }));
+    } finally {
+      setBusyHostId(null);
+    }
+  };
+
+  const forgetKey = async (hostId: string) => {
+    const api = ps5Bridge();
+    if (!api?.forgetCredential) return;
+
+    setBusyHostId(hostId);
+    try {
+      await api.forgetCredential(hostId);
+      setKeys((s2) => ({ ...s2, [hostId]: { has: false, available: s2[hostId]?.available ?? true } }));
+    } finally {
+      setBusyHostId(null);
+    }
+  };
+
+  /**
+   * The wake key for one console.
+   *
+   * Only shown for a console that is bound to a place: a key is what makes a
+   * session able to wake it, and there is nothing to wake before that.
+   */
+  const keyControl = (console_: Ps5Console) => {
+    const api = ps5Bridge();
+    if (!api?.setCredential) return null;
+
+    const hostId = console_.hostId;
+    const state = keys[hostId];
+    const busy = busyHostId === hostId;
+    const typed = (typedKey[hostId] ?? "").trim();
+
+    if (state?.has) {
+      return (
+        <div className="ps5-attach">
+          <span className="muted" style={{ fontSize: 11, flex: "1 1 160px", minWidth: 0 }}>
+            ✓ {t("ps5.key.saved")}
+          </span>
+          <Button variant="secondary" disabled={busy} onClick={() => void forgetKey(hostId)}>
+            {t("ps5.key.forget")}
+          </Button>
+        </div>
+      );
+    }
+
+    return (
+      <div className="col" style={{ gap: 6 }}>
+        <div className="ps5-attach">
+          <Input
+            type="password"
+            autoComplete="off"
+            spellCheck={false}
+            placeholder={t("ps5.key.placeholder")}
+            value={typedKey[hostId] ?? ""}
+            onChange={(e) => setTypedKey((k) => ({ ...k, [hostId]: e.target.value }))}
+            style={{ flex: "1 1 160px", minWidth: 0 }}
+          />
+          {/* Try it before trusting it. Sends one datagram with the key as
+              typed and keeps nothing — the only way to check a key on a machine
+              whose OS has no keystore, and the sensible first step anywhere. */}
+          <Button variant="secondary" disabled={busy || !typed} onClick={() => void testWake(console_)}>
+            {t("ps5.key.test")}
+          </Button>
+          {/* Saving needs somewhere safe to save it. Where there is nowhere,
+              the button is not offered and the reason is given. */}
+          {state?.available !== false && (
+            <Button disabled={busy || !typed} onClick={() => void saveKey(hostId)}>
+              {t("ps5.key.save")}
+            </Button>
+          )}
+        </div>
+        <span className="muted" style={{ fontSize: 11 }}>
+          {state?.available === false ? t("ps5.key.noKeystore") : t("ps5.key.hint")}
+        </span>
+        {keyError[hostId] && <span className="muted" style={{ fontSize: 11 }}>{keyError[hostId]}</span>}
+      </div>
+    );
+  };
 
   const boundTo = (hostId: string): IPcApi | undefined =>
     (devices.data ?? []).find((d) => d.console_host_id === hostId);
@@ -244,6 +397,7 @@ const ConsolePicker = ({ branchId, onClose }: Props) => {
                               {maintenanceActive(bound) ? t("ps5.maintenance.stop") : t("ps5.maintenance.start")}
                             </Button>
                           </div>
+                          {keyControl(console_)}
                         </>
                       ) : attachControl(console_)}
                     </div>

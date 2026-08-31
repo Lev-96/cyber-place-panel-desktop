@@ -70,6 +70,11 @@ export interface Ps5Bridge {
    * function nobody handles.
    */
   rest?: (hostId: string, address: string) => Promise<WakeOutcome>;
+  /**
+   * Try a key once, without storing it. For checking a key that was just handed
+   * over, and for machines whose OS offers no keystore at all.
+   */
+  wakeOnce?: (address: string, registKey: string) => Promise<WakeOutcome>;
   /** Write a wake key. There is deliberately no reader. */
   setCredential?: (hostId: string, registKey: string) => Promise<{ saved: boolean; reason?: string }>;
   hasCredential?: (hostId: string) => Promise<CredentialState>;
