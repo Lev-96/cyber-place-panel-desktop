@@ -203,6 +203,40 @@ const createWindow = async () => {
   mainWindow.on("closed", () => { mainWindow = null; });
 };
 
+/**
+ * Point Electron at the secret store this machine actually has.
+ *
+ * On Linux, Electron picks a backend from the desktop environment: KDE means
+ * kwallet, GNOME means libsecret. A KDE session with no kwallet running — which
+ * is an ordinary state, and what one venue's computer turned out to be — leaves
+ * `safeStorage` reporting that nothing is available, even with gnome-keyring
+ * running right beside it. The console wake key then could not be stored at
+ * all, and a session had nothing to wake the console with.
+ *
+ * So: if gnome-keyring is running, say so. Its control socket in the user's
+ * runtime directory is the check, and it is the daemon's own socket rather than
+ * a guess from an environment variable. Where the socket is absent nothing is
+ * overridden and Electron's own choice stands.
+ *
+ * Must run before `whenReady` — the backend cannot be chosen afterwards.
+ */
+const preferAvailableSecretStore = (): void => {
+  if (process.platform !== "linux") return;
+
+  const runtimeDir = process.env.XDG_RUNTIME_DIR;
+  if (!runtimeDir) return;
+
+  try {
+    if (!existsSync(join(runtimeDir, "keyring", "control"))) return;
+  } catch {
+    return;
+  }
+
+  app.commandLine.appendSwitch("password-store", "gnome-libsecret");
+};
+
+preferAvailableSecretStore();
+
 app.whenReady().then(async () => {
   store = new Store(join(app.getPath("userData"), "cyberplace.kv.json"));
   wakeKeys = new WakeKeys(join(app.getPath("userData"), "cyberplace.ps5-keys.json"));
