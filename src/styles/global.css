@@ -3595,3 +3595,34 @@ button.login-flip-back:hover {
   font-size: 13px;
   color: var(--color-muted);
 }
+
+/* A screen header that carries actions beside its intro text.
+   Scoped to the headers that opt in — `row-between` itself is used all over the
+   app and is not the place to change how anything wraps.
+
+   The rules are all about who gives way when the window narrows: the paragraph
+   shrinks, the buttons never do, and if there is genuinely no room the whole
+   group drops onto its own line rather than squeezing two labels into three
+   lines each. */
+.screen-actions {
+  flex-wrap: wrap;
+  row-gap: 10px;
+}
+.screen-actions > .muted {
+  /* The only flexible thing in the row, and it may shrink below its content —
+     without min-width:0 a flex child refuses to, and pushes the buttons out. */
+  flex: 1 1 320px;
+  min-width: 0;
+}
+.screen-actions__buttons {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+  flex: 0 0 auto;
+  /* Pushed to the right edge on its own line once the row has wrapped. */
+  margin-left: auto;
+}
+.screen-actions__buttons .btn {
+  /* A label on one line is what makes the two buttons the same height. */
+  white-space: nowrap;
+}

@@ -210,9 +210,13 @@ const BranchPlaces = () => {
 
   return (
     <ScreenWithBg bg="./bg/branch.jpg" title={`${t("branchPlaces.title")} · №${id}`}>
-      <div className="row-between">
+      {/* `screen-actions` is a modifier for THIS header only — it never touches
+          the shared `row-between` used across the app. Two buttons beside a
+          paragraph is what broke the row: both shrank until their labels wrapped
+          onto three ragged lines. */}
+      <div className="row-between screen-actions">
         <span className="muted">{t("branchPlaces.intro")}</span>
-        <div className="row" style={{ gap: 8 }}>
+        <div className="row screen-actions__buttons">
           {/* Owner only: pairing a console to a place is an act of arranging
               the venue, alongside creating the place itself. */}
           {can(role, "branch.places") && (
