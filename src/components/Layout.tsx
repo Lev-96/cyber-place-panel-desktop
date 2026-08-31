@@ -2,11 +2,18 @@ import { Outlet } from "react-router-dom";
 import ExpenseReminderNotifier from "./notifications/ExpenseReminderNotifier";
 import GlobalBookingNotifier from "./notifications/GlobalBookingNotifier";
 import SupportNotifier from "./notifications/SupportNotifier";
+import { Ps5ControlProvider } from "@/ps5/Ps5ControlProvider";
 import UnexpectedWakeDialog from "./ps5/UnexpectedWakeDialog";
 import Sidebar from "./Sidebar";
 import BackButton from "./ui/BackButton";
 
 const Layout = () => (
+  /*
+    The console watcher wraps the whole shell, not one screen. Detecting a
+    console somebody switched on by hand cannot depend on which page is open —
+    that is precisely how an owner ended up never being asked.
+  */
+  <Ps5ControlProvider>
   <div className="app-shell">
     <Sidebar />
     <main className="main">
@@ -33,6 +40,7 @@ const Layout = () => (
     */}
     <ExpenseReminderNotifier />
   </div>
+  </Ps5ControlProvider>
 );
 
 export default Layout;

@@ -18,7 +18,7 @@ import {
   SESSION_CELL_COLOR,
 } from "@/domain/SessionCellState";
 import { platformGroup, platformLabel } from "@/utils/platform";
-import { useConsoleControl } from "@/ps5/useConsoleControl";
+import { usePs5Control } from "@/ps5/Ps5ControlProvider";
 import { PS5_STATE_LOOK } from "@/ps5/stateLook";
 import { DragEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
@@ -72,26 +72,15 @@ const SessionsBoard = ({ branchId }: Props) => {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const reservedPlaceIds = useReservedPlaceIds(branchId);
 
-  // The consoles this branch has bound, and the rules that govern them. The
-  // board is where this belongs: it is the screen that knows which places have
-  // a session on them, and this machine is the only component that can reach a
-  // console at all — the backend shares no network with any venue.
+  // Read from the app-wide watcher rather than starting a second one: two would
+  // each raise their own question about the same console, and the owner would
+  // be asked twice. It watches every venue this account can see, so a console
+  // switched on by hand is noticed whatever screen is open — which is the whole
+  // reason it no longer lives here.
   //
   // PC places are untouched by every line of it: a device with no console bound
-  // is not in `devices` at all, and nothing below runs for one.
-  const consoleDevices = useMemo(
-    () => (pcs.data ?? []).filter((pc) => pc.console_host_id),
-    [pcs.data],
-  );
-  const sessionDeviceIds = useMemo(
-    () => new Set((sessions.data ?? []).map((s) => s.pc_id)),
-    [sessions.data],
-  );
-  const { views: consoleViews, statuses: consoleStatuses, sessionStarting, sessionStopped } = useConsoleControl({
-    branchId,
-    devices: consoleDevices,
-    sessionDeviceIds,
-  });
+  // is not watched at all.
+  const { views: consoleViews, statuses: consoleStatuses, sessionStarting, sessionStopped } = usePs5Control();
 
   usePlaceAvailability(
     branchId,

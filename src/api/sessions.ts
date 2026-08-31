@@ -20,6 +20,17 @@ export interface ExtendSessionBody {
 export const apiListActiveSessions = (branchId: number) =>
   request<{ data: ISessionApi[] }>("/sessions", { params: { branch_id: branchId, status: "active" } });
 
+/**
+ * Every session running right now, in every venue this account may see.
+ *
+ * The endpoint's `branch_id` is optional and its scope is applied server-side,
+ * so leaving it out returns exactly the caller's own branches and nothing more.
+ * Used by the console watcher, which has to know whether a console is
+ * authorised to be awake whatever screen the panel happens to be showing.
+ */
+export const apiListAllActiveSessions = () =>
+  request<{ data: ISessionApi[] }>("/sessions", { params: { status: "active" } });
+
 export interface ListSessionsParams {
   branch_id?: number;
   pc_id?: number;

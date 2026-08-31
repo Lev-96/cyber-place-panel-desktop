@@ -47,6 +47,17 @@ export const apiListPcsForBranch = (branchId: number, kind?: PcKind) =>
     params: { branch_id: branchId, ...(kind ? { kind } : {}) },
   });
 
+/**
+ * Every device of a kind across the venues this account may see.
+ *
+ * Same reasoning as the sessions listing: `branch_id` is optional and the scope
+ * is the server's, so this is the caller's own branches and nothing else. The
+ * console watcher needs it because a console can be switched on in a venue
+ * nobody is currently looking at.
+ */
+export const apiListPcsEverywhere = (kind?: PcKind) =>
+  request<{ data: IPcApi[] }>("/pcs", { params: { ...(kind ? { kind } : {}) } });
+
 export const apiCreatePc = (body: CreatePcBody) =>
   request<{ pc: IPcApi }>("/pcs", { method: "POST", body });
 
