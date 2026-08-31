@@ -62,7 +62,20 @@ export interface MoneyDisplay {
    * target=AMD; ignored otherwise. Optional for back-compat with
    * call sites that don't have the lang in scope.
    */
-  format(amountInBase: number, target: Currency, lang?: Lang): string;
+  format(amountInBase: number, target: Currency, lang?: Lang, options?: MoneyFormatOptions): string;
+}
+
+/**
+ * How much of a fraction to show.
+ *
+ * Money is written in whole units everywhere it is a PRICE — a tariff, a
+ * receipt, a day's revenue — and that is the default here and stays the
+ * default. A running total is the one place where it is wrong: a session at
+ * twelve per hour earns two hundredths of a unit in its first minute, and a
+ * counter that reads "0" while the clock moves looks broken.
+ */
+export interface MoneyFormatOptions {
+  maximumFractionDigits?: number;
 }
 
 export class StaticRateMoneyDisplay implements MoneyDisplay {
@@ -77,7 +90,7 @@ export class StaticRateMoneyDisplay implements MoneyDisplay {
     const rTo = this.rates[to] ?? 1;
     return (amount / rFrom) * rTo;
   }
-  format(amountInBase: number, target: Currency, lang: Lang = "am"): string {
+  format(amountInBase: number, target: Currency, lang: Lang = "am", options?: MoneyFormatOptions): string {
     const value = this.convert(amountInBase, target);
     if (target === "AMD") {
       // Hand-format AMD to skip the ISO-code spell-out and pick the
@@ -85,14 +98,14 @@ export class StaticRateMoneyDisplay implements MoneyDisplay {
       // via toLocaleString so a Russian UI reads "1 500 драм" while
       // an English one reads "1,500 dram".
       const number = value.toLocaleString(CURRENCY_LOCALE[target], {
-        maximumFractionDigits: 0,
+        maximumFractionDigits: options?.maximumFractionDigits ?? 0,
       });
       return `${number} ${AMD_UNIT[lang]}`;
     }
     return new Intl.NumberFormat(CURRENCY_LOCALE[target], {
       style: "currency",
       currency: target,
-      maximumFractionDigits: 2,
+      maximumFractionDigits: options?.maximumFractionDigits ?? 2,
     }).format(value);
   }
 }

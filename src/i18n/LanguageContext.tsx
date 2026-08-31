@@ -2,7 +2,7 @@ import { apiCache } from "@/api/client";
 import { AppConfig } from "@/infrastructure/AppConfig";
 import { keyValueStore } from "@/infrastructure/KeyValueStore";
 import { ReactNode, createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
-import { Currency, moneyDisplay } from "./currency";
+import { Currency, moneyDisplay, type MoneyFormatOptions } from "./currency";
 import { Lang, setActiveLang, t as translate } from "./translations";
 import { hasChosenLang, readStoredLang, rememberLang } from "./languagePreference";
 
@@ -18,7 +18,7 @@ interface LangState {
   setLang: (l: Lang) => void;
   setCurrencyOverride: (c: Currency | null) => void;
   t: (key: string) => string;
-  money: (amountInBaseAmd: number) => string;
+  money: (amountInBaseAmd: number, options?: MoneyFormatOptions) => string;
   /**
    * Has the stored preference finished loading?
    *
@@ -95,7 +95,11 @@ export const LanguageProvider = ({ children }: { children: ReactNode }) => {
       t: (key: string) => translate(key, lang),
       // Pass `lang` so AMD renders as the localized unit word
       // ("dram" / "драм" / "դрам"), never the "AMD" ISO code.
-      money: (amount: number) => moneyDisplay.format(amount, currency, lang),
+      // The options are a passthrough with no default of their own, so every
+      // existing caller — receipts, revenue, tariffs — formats exactly as it
+      // did before.
+      money: (amount: number, options?: MoneyFormatOptions) =>
+        moneyDisplay.format(amount, currency, lang, options),
     };
     // AppConfig touched to silence unused import; remove if never referenced
     void AppConfig;
