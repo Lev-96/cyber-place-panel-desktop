@@ -21,8 +21,12 @@ describe("asking a console to sleep again", () => {
     expect(isPermanentRefusal(undefined)).toBe(false);
   });
 
-  test("a console that says it is busy is not asked again in four seconds", () => {
-    expect(isPermanentRefusal("IN_USE")).toBe(true);
+  test("a console that says it is busy is asked again anyway", () => {
+    // It sticks when something really holds the console — three minutes of
+    // silence did not shift it — but with the socket closed politely it has
+    // also been seen to clear on the very next attempt. Eight seconds of
+    // asking again is cheaper than the times it would have worked.
+    expect(isPermanentRefusal("IN_USE")).toBe(false);
   });
 
   test("neither is one that has not been paired", () => {

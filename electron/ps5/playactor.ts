@@ -169,13 +169,18 @@ const STANDBY_RETRY_MS = 4_000;
 /**
  * Refusals that will not change by asking again in a few seconds.
  *
- * A console holding a Remote Play session says so until something on the
- * console frees it — measured at three minutes of complete silence and still
- * refusing — and an unpaired console will not pair itself. Retrying either is
- * noise. Everything else has been seen to clear on the next attempt.
+ * Only one: an unpaired console will not pair itself, and asking again is
+ * pointless.
+ *
+ * "Already in use" was on this list, and it has been taken off. It DOES stick
+ * when something really holds the console — three minutes of silence did not
+ * shift it — but with the socket now closed politely it has also been seen to
+ * clear on the very next attempt. Eight seconds of asking again is a cheap
+ * price for the times it is the second kind, and when it is the first kind the
+ * operator gets the same message eight seconds later.
  */
 export const isPermanentRefusal = (code: PairResult["code"]): boolean =>
-  code === "REJECTED" || code === "IN_USE";
+  code === "REJECTED";
 
 /**
  * Hang up on the console rather than pulling the wire out.
