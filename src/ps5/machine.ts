@@ -79,6 +79,16 @@ export interface Observation {
   /** Owner put this console into maintenance, and the window has not expired. */
   maintenance: boolean;
   /**
+   * Whether the transport underneath can put a console to rest at all.
+   *
+   * False today: the local protocol has no such command. Passing it in rather
+   * than assuming keeps the machine honest in both directions — it does not
+   * emit a command that cannot be carried out (which is how "going to rest…"
+   * became a state a console sat in forever, retried every ten seconds), and it
+   * needs no change on the day a transport can.
+   */
+  canRest: boolean;
+  /**
    * The owner's answer to the unexpected wake with this id, if they have given
    * one. `null` while nobody has answered.
    */
@@ -206,6 +216,15 @@ export const step = (prev: MachineSnapshot, obs: Observation, newEventId: string
   // Awake with no reason to be. Either the operator has just stopped a session
   // and it has not gone to sleep yet, or somebody switched it on.
   if (obs.stopping) {
+    if (!obs.canRest) {
+      // Nothing to send. Saying so once beats "going to rest…" on a console
+      // that is still on, and beats a command retried every ten seconds for the
+      // rest of the shift.
+      next.state = "ERROR";
+      next.error = "UNSUPPORTED_BY_TRANSPORT";
+      return { next, commands };
+    }
+
     next.state = "GOING_TO_REST";
     commands.push({ kind: "rest" });
     return { next, commands };
@@ -226,6 +245,15 @@ export const step = (prev: MachineSnapshot, obs: Observation, newEventId: string
   const expired = obs.now - prev.wakeSeenAt >= UNEXPECTED_WAKE_GRACE_MS;
 
   if (refused || expired) {
+    if (!obs.canRest) {
+      // The owner said no, or said nothing — and this build cannot act on
+      // either. The console stays on and the screen says why, which is the
+      // whole of what can honestly be reported.
+      next.state = "ERROR";
+      next.error = "UNSUPPORTED_BY_TRANSPORT";
+      return { next, commands };
+    }
+
     next.state = "GOING_TO_REST";
     commands.push({ kind: "rest", eventId: prev.wakeEventId });
     return { next, commands };

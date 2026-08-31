@@ -69,6 +69,8 @@ export interface ConsoleInput {
   starting: boolean;
   stopping: boolean;
   maintenance: boolean;
+  /** Whether the transport can put this console to rest. False today. */
+  canRest: boolean;
   decision: Observation["decision"];
 }
 
@@ -140,6 +142,7 @@ export class Ps5Controller {
       starting: input.starting,
       stopping: input.stopping,
       maintenance: input.maintenance,
+      canRest: input.canRest,
       decision: input.decision,
       now: this.ports.now(),
     }, this.ports.newId());

@@ -1,4 +1,6 @@
 import { apiReportUnexpectedWake } from "@/api/ps5";
+import { notify } from "@/ui/notify";
+import { tActive } from "@/i18n/translations";
 import { usePs5WakeDecided } from "@/realtime/usePs5Realtime";
 import { ps5Bridge } from "@/ps5/usePs5Discovery";
 import { useConsoleWatch, type WatchedConsole } from "@/ps5/useConsoleWatch";
@@ -68,7 +70,31 @@ export const useConsoleControl = ({ branchId, devices, sessionDeviceIds, enabled
   const [decisions, setDecisions] = useState<Record<string, { eventId: string; approved: boolean }>>({});
   /** Forces a control pass outside the ten-second rhythm, right after a press. */
   const [nudge, setNudge] = useState(0);
+  /**
+   * What the transport underneath can actually do.
+   *
+   * Asked once rather than assumed, so the machine never issues a command that
+   * will be refused — which is what left a console sitting in "going to rest…"
+   * while the request was reissued every ten seconds. Defaults to "cannot",
+   * because claiming a capability we have not confirmed is the failure that
+   * shows up as a console still running after a shift ends.
+   */
+  const [canRest, setCanRest] = useState(false);
 
+  useEffect(() => {
+    const api = ps5Bridge();
+    if (!api?.capabilities) return;
+
+    let alive = true;
+    void api.capabilities()
+      .then((caps) => { if (alive) setCanRest(Boolean(caps?.rest)); })
+      .catch(() => { /* an older preload: leave it at "cannot" */ });
+
+    return () => { alive = false; };
+  }, []);
+
+  /** When each console last had a failure announced, so a retry is not a nag. */
+  const toldAt = useRef<Record<string, number>>({});
   const controllerRef = useRef<Ps5Controller | null>(null);
   const [views, setViews] = useState<Record<string, ReturnType<Ps5Controller["view"]>>>({});
 
@@ -77,7 +103,26 @@ export const useConsoleControl = ({ branchId, devices, sessionDeviceIds, enabled
       wake: async (hostId, address) => {
         const api = ps5Bridge();
         if (!api?.wake) return { sent: false, code: "UNSUPPORTED_BY_TRANSPORT" };
-        return api.wake(hostId, address);
+
+        const result = await api.wake(hostId, address);
+        // A wake that could not even be attempted has to reach the person who
+        // pressed Start. Without this it was a chip on a tile they were not
+        // looking at, and the console simply "did nothing" — which is what a
+        // missing key looked like from the floor.
+        if (!result.sent && result.reason) {
+          const key = result.reason === "no-credential" ? "ps5.error.NO_CREDENTIAL"
+            : result.reason === "bad-credential" ? "ps5.error.BAD_CREDENTIAL"
+              : "ps5.error.TRANSPORT_ERROR";
+          // Once per console per minute: the monitor retries, and the operator
+          // does not need the same sentence every time it does.
+          const last = toldAt.current[hostId] ?? 0;
+          if (Date.now() - last > 60_000) {
+            toldAt.current[hostId] = Date.now();
+            notify.message("error", tActive(key));
+          }
+        }
+
+        return result;
       },
       rest: async (hostId, address) => {
         const api = ps5Bridge();
@@ -161,6 +206,7 @@ export const useConsoleControl = ({ branchId, devices, sessionDeviceIds, enabled
         starting: Boolean(startIntent) && now - (startIntent?.at ?? 0) < INTENT_TTL_MS,
         stopping: Boolean(stopIntent) && now - (stopIntent?.at ?? 0) < INTENT_TTL_MS,
         maintenance: maintenanceUntil > now,
+        canRest,
         decision: decisions[hostId] ?? null,
       };
     });
@@ -172,7 +218,7 @@ export const useConsoleControl = ({ branchId, devices, sessionDeviceIds, enabled
     // Consoles that are no longer bound must not linger in the controller.
     const live = new Set(bound.map((d) => d.console_host_id as string));
     controller.forget(Object.keys(statuses).filter((h) => !live.has(h)));
-  }, [statuses, bound, sessionDeviceIds, starting, stopping, decisions, enabled, nudge]);
+  }, [statuses, bound, sessionDeviceIds, starting, stopping, decisions, enabled, nudge, canRest]);
 
   // A session that has actually started clears the local intent — from here the
   // backend is the source of truth again.

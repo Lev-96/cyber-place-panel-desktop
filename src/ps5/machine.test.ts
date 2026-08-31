@@ -26,6 +26,10 @@ const observe = (over: Partial<Observation> = {}): Observation => ({
   starting: false,
   stopping: false,
   maintenance: false,
+  // The tests below describe the lifecycle a rest-capable transport produces —
+  // the one this is written against. The cases where it cannot rest are their
+  // own block at the end.
+  canRest: true,
   decision: null,
   now: 1_000_000,
   ...over,
@@ -256,6 +260,55 @@ describe("maintenance", () => {
 
     expect(next.state).toBe("ACTIVE");
     expect(commands).toEqual([]);
+  });
+});
+
+describe("a transport that cannot put a console to rest", () => {
+  test("a stop says so once instead of trying forever", () => {
+    // What the owner actually saw: "going to rest…" on a console that was
+    // still on, for as long as they watched, because the command was reissued
+    // every ten seconds and refused every time.
+    const { next, commands } = step(
+      initialSnapshot(),
+      observe({ actual: "awake", stopping: true, canRest: false }),
+      "e1",
+    );
+
+    expect(commands).toEqual([]);
+    expect(next.state).toBe("ERROR");
+    expect(next.error).toBe("UNSUPPORTED_BY_TRANSPORT");
+  });
+
+  test("the owner refusing an unexpected wake is answered honestly", () => {
+    const { steps } = run(initialSnapshot(), [
+      { actual: "awake", canRest: false },
+      { actual: "awake", canRest: false, now: 1_002_000, decision: { eventId: "e1", approved: false } },
+    ]);
+
+    expect(steps[1].commands).toEqual([]);
+    expect(steps[1].next.state).toBe("ERROR");
+    expect(steps[1].next.error).toBe("UNSUPPORTED_BY_TRANSPORT");
+  });
+
+  test("a countdown that runs out is answered the same way", () => {
+    const { steps } = run(initialSnapshot(), [
+      { actual: "awake", canRest: false },
+      { actual: "awake", canRest: false, now: 1_000_000 + UNEXPECTED_WAKE_GRACE_MS },
+    ]);
+
+    expect(steps[1].commands).toEqual([]);
+    expect(steps[1].next.state).toBe("ERROR");
+  });
+
+  test("waking still works — only the sleeping half is missing", () => {
+    const { next, commands } = step(
+      initialSnapshot(),
+      observe({ actual: "rest", starting: true, canRest: false }),
+      "e1",
+    );
+
+    expect(next.state).toBe("WAKING");
+    expect(commands).toEqual([{ kind: "wake" }]);
   });
 });
 

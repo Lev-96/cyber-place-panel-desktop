@@ -28,6 +28,9 @@ const input = (over: Partial<ConsoleInput> = {}): ConsoleInput => ({
   starting: false,
   stopping: false,
   maintenance: false,
+  // These describe a rest-capable transport; the refusal path has its own tests
+  // on the machine, which is where that decision is made.
+  canRest: true,
   decision: null,
   ...over,
 });

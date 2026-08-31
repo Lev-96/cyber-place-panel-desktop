@@ -38,10 +38,12 @@ export interface WakeOutcome {
 }
 
 export interface CredentialState {
-  /** Whether this console has a wake key stored on THIS machine. */
+  /** Whether this console has a wake key on THIS machine, saved or held for the run. */
   has: boolean;
-  /** Whether the OS offers a keystore at all. False means a key cannot be stored. */
+  /** Whether the OS offers a keystore. False means the key lasts only until the panel closes. */
   available: boolean;
+  /** Whether the key we hold survives a restart. */
+  persisted?: boolean;
 }
 
 export interface Ps5Bridge {
@@ -75,8 +77,10 @@ export interface Ps5Bridge {
    * over, and for machines whose OS offers no keystore at all.
    */
   wakeOnce?: (address: string, registKey: string) => Promise<WakeOutcome>;
+  /** What this build can actually do to a console — asked, never assumed. */
+  capabilities?: () => Promise<{ discover: boolean; observe: boolean; wake: boolean; rest: boolean }>;
   /** Write a wake key. There is deliberately no reader. */
-  setCredential?: (hostId: string, registKey: string) => Promise<{ saved: boolean; reason?: string }>;
+  setCredential?: (hostId: string, registKey: string) => Promise<{ saved: boolean; persisted?: boolean; reason?: string }>;
   hasCredential?: (hostId: string) => Promise<CredentialState>;
   forgetCredential?: (hostId: string) => Promise<{ ok: boolean }>;
 }
