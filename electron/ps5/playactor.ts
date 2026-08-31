@@ -177,6 +177,43 @@ const STANDBY_RETRY_MS = 4_000;
 export const isPermanentRefusal = (code: PairResult["code"]): boolean =>
   code === "REJECTED" || code === "IN_USE";
 
+/**
+ * Hang up on the console rather than pulling the wire out.
+ *
+ * The library's close destroys the socket, which is a reset — the console never
+ * sees the connection end, so it goes on holding the session. Reproduced on a
+ * real console: one successful sleep, and every later attempt was refused as
+ * "already in use" until the console was restarted.
+ *
+ * A half-close first lets the console read the end of the stream and tear the
+ * session down itself; the destroy that follows is then only cleaning up our
+ * own side. Written defensively because it reaches past the library's public
+ * shape: if any of it is missing, the ordinary close still happens.
+ */
+const endGracefully = async (connection: unknown): Promise<void> => {
+  try {
+    const stream = (connection as { socket?: { stream?: { end?: (cb?: () => void) => void } } })
+      .socket?.stream;
+
+    const end = stream?.end;
+    if (typeof end === "function") {
+      await new Promise<void>((resolve) => {
+        let done = false;
+        const finish = () => { if (!done) { done = true; resolve(); } };
+        // A console that has just been told to sleep may never answer, so the
+        // goodbye is bounded rather than waited on.
+        setTimeout(finish, 2_000);
+        end.call(stream, finish);
+      });
+    }
+  } catch {
+    // Reaching past a library's shape is allowed to fail; the close below is
+    // what has to happen either way.
+  }
+
+  await (connection as { close: () => Promise<void> }).close().catch(() => {});
+};
+
 export const standby = async (address: string, keys: WakeKeys): Promise<PairResult> => {
   let last: PairResult = { ok: false, code: "FAILED" };
 
@@ -221,7 +258,7 @@ const standbyOnce = async (address: string, keys: WakeKeys): Promise<PairResult>
       // Always, even when the request above threw. A session left open is one
       // the console goes on holding, and the next attempt is then refused with
       // "already in use" — by us, against ourselves.
-      await connection.close().catch(() => {});
+      await endGracefully(connection);
     }
 
     return { ok: true };
