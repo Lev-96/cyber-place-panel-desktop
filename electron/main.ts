@@ -8,7 +8,7 @@ import { UpdateService, broadcastUpdateState } from "./updates/UpdateService";
 import { bundledIconPath, ensureLinuxDesktopIntegration } from "./linuxIntegration";
 import { mayNavigateTo, mayOpenExternally, navigationKeyFor } from "./urlPolicy";
 import { discover as discoverPlayStations, probe as probePlayStations } from "./ps5/discovery";
-import { activeTransport } from "./ps5/transport";
+import { activeTransport, useCredentialVault } from "./ps5/transport";
 import { WakeKeys } from "./ps5/credentials";
 import { wake as wakePlayStation } from "./ps5/wake";
 
@@ -241,6 +241,9 @@ app.whenReady().then(async () => {
   store = new Store(join(app.getPath("userData"), "cyberplace.kv.json"));
   wakeKeys = new WakeKeys(join(app.getPath("userData"), "cyberplace.ps5-keys.json"));
   await wakeKeys.load();
+  // The transport can rest a console only once it can reach the pairing
+  // credentials, so it is told about the vault rather than reaching for one.
+  useCredentialVault(wakeKeys);
   await store.load();
 
   // Linux only: register a .desktop file in ~/.local/share/applications/
@@ -331,11 +334,11 @@ app.whenReady().then(async () => {
       return { sent: false, code: "INVALID_STATE" };
     }
 
-    return activeTransport.requestRest(address);
+    return activeTransport().requestRest(address);
   });
 
   /** What the current transport can actually do, for a screen that must not promise more. */
-  ipcMain.handle("ps5:capabilities", () => activeTransport.capabilities);
+  ipcMain.handle("ps5:capabilities", () => activeTransport().capabilities);
 
   /**
    * Wake a console with a key that is used once and not kept.

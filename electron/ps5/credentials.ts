@@ -101,6 +101,32 @@ export class WakeKeys {
   }
 
   /**
+   * Pairing credentials for a console, as playactor produced them.
+   *
+   * Kept in the same vault and under the same rules as the wake key: encrypted
+   * by the OS where it can, held only for the run where it cannot, and never
+   * readable from the renderer. They include the console's registration key,
+   * which is what lets anyone on the network switch it on — so a JSON file in
+   * the home directory, which is what the library would write by itself, is not
+   * where they go.
+   */
+  readCredentials(deviceId: string): string | null {
+    return this.read(`creds:${deviceId}`);
+  }
+
+  async setCredentials(deviceId: string, json: string): Promise<void> {
+    await this.set(`creds:${deviceId}`, json);
+  }
+
+  hasCredentials(deviceId: string): boolean {
+    return this.has(`creds:${deviceId}`);
+  }
+
+  async forgetCredentials(deviceId: string): Promise<void> {
+    await this.forget(`creds:${deviceId}`);
+  }
+
+  /**
    * The plaintext key, for building one datagram.
    *
    * Deliberately not exposed over IPC — the only caller is the wake handler in

@@ -1,5 +1,7 @@
 import { discover, probe } from "./discovery";
+import { standby } from "./playactor";
 import { wake } from "./wake";
+import type { WakeKeys } from "./credentials";
 import type { PsConsole } from "./protocol";
 
 /**
@@ -81,15 +83,25 @@ export interface Ps5Transport {
 export class DiscoveryTransport implements Ps5Transport {
   readonly name = "sony-discovery-udp";
 
-  readonly capabilities: TransportCapabilities = {
-    discover: true,
-    observe: true,
-    wake: true,
-    // Not a stub waiting to be filled in: this protocol has no such command.
-    // The state machine reads this flag and reports an honest failure rather
-    // than pretending a console was put to sleep.
-    rest: false,
-  };
+  /**
+   * @param keys  The vault holding pairing credentials. Resting a console needs
+   *   them — it happens inside an authenticated session — so a transport built
+   *   without them can find and wake, and says it cannot rest.
+   */
+  constructor(private readonly keys?: WakeKeys) {}
+
+  get capabilities(): TransportCapabilities {
+    return {
+      discover: true,
+      observe: true,
+      wake: true,
+      // Resting is not a datagram: it is a request inside a Remote Play session,
+      // which exists only for a console that has been paired. Reported as a
+      // capability rather than assumed, so the state machine never issues a
+      // command that cannot be carried out.
+      rest: Boolean(this.keys),
+    };
+  }
 
   async discover(timeoutMs?: number): Promise<PsConsole[]> {
     return (await discover(timeoutMs === undefined ? {} : { timeoutMs })).consoles;
@@ -112,14 +124,42 @@ export class DiscoveryTransport implements Ps5Transport {
     };
   }
 
-  async requestRest(_address: string): Promise<CommandResult> {
+  async requestRest(address: string): Promise<CommandResult> {
+    if (!this.keys) {
+      return {
+        sent: false,
+        code: "UNSUPPORTED_BY_TRANSPORT",
+        detail: "No credential vault: resting a console needs a paired session.",
+      };
+    }
+
+    const result = await standby(address, this.keys);
+    if (result.ok) return { sent: true };
+
     return {
       sent: false,
-      code: "UNSUPPORTED_BY_TRANSPORT",
-      detail: "The local discovery protocol has no rest command; that needs a Remote Play session.",
+      // A console nobody paired cannot be rested, and that is a different
+      // sentence from one that could not be reached.
+      code: result.code === "REJECTED" ? "NO_CREDENTIAL"
+        : result.code === "UNREACHABLE" ? "DEVICE_NOT_FOUND"
+          : "TRANSPORT_ERROR",
+      detail: result.detail,
     };
   }
 }
 
-/** The transport the app runs on. One object, swapped when a better one exists. */
-export const activeTransport: Ps5Transport = new DiscoveryTransport();
+/**
+ * The transport the app runs on.
+ *
+ * Built once the vault exists, because what it can do depends on having one.
+ * Until then it is the find-and-wake half, which is also exactly what a panel
+ * with no paired console can honestly offer.
+ */
+let transport: Ps5Transport = new DiscoveryTransport();
+
+export const activeTransport = (): Ps5Transport => transport;
+
+/** Called at startup, once the credential vault has been loaded. */
+export const useCredentialVault = (keys: WakeKeys): void => {
+  transport = new DiscoveryTransport(keys);
+};
