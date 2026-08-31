@@ -50,6 +50,9 @@ const ConsolePicker = ({ branchId, onClose }: Props) => {
   /** What the owner is typing, per console. Never persisted, never logged. */
   const [typedKey, setTypedKey] = useState<Record<string, string>>({});
   const [keyError, setKeyError] = useState<Record<string, string>>({});
+  /** The PIN the owner is typing, per console. Eight digits, and short-lived. */
+  const [pin, setPin] = useState<Record<string, string>>({});
+  const [pairing, setPairing] = useState<string | null>(null);
   /** Per-console choice of place, before the operator presses attach. */
   const [choice, setChoice] = useState<Record<string, number>>({});
 
@@ -123,6 +126,41 @@ const ConsolePicker = ({ branchId, onClose }: Props) => {
     }
   };
 
+  /**
+   * Pair a console: PlayStation sign-in, then the PIN from its screen.
+   *
+   * The whole exchange happens in the main process — the sign-in page opens in
+   * a window of its own and nothing of the result comes back here beyond
+   * whether it worked.
+   */
+  const pairNow = async (console_: Ps5Console) => {
+    const api = ps5Bridge();
+    const typed = (pin[console_.hostId] ?? "").trim();
+    if (!api?.pair || !typed) return;
+
+    setPairing(console_.hostId);
+    setKeyError((e) => ({ ...e, [console_.hostId]: "" }));
+    try {
+      const result = await api.pair(console_.address, typed);
+      setPin((p) => ({ ...p, [console_.hostId]: "" }));
+
+      if (result.ok) {
+        setKeys((k) => ({ ...k, [console_.hostId]: { has: true, available: true, persisted: true } }));
+        setKeyError((e) => ({ ...e, [console_.hostId]: t("ps5.pair.done") }));
+        return;
+      }
+
+      // Each refusal is a different thing for the owner to do, and the console
+      // being asleep is the one that catches everybody.
+      setKeyError((e) => ({
+        ...e,
+        [console_.hostId]: t(`ps5.pair.error.${result.code ?? "FAILED"}`),
+      }));
+    } finally {
+      setPairing(null);
+    }
+  };
+
   const forgetKey = async (hostId: string) => {
     const api = ps5Bridge();
     if (!api?.forgetCredential) return;
@@ -166,8 +204,37 @@ const ConsolePicker = ({ branchId, onClose }: Props) => {
       );
     }
 
+    const busyPairing = pairing === hostId;
+
     return (
-      <div className="col" style={{ gap: 6 }}>
+      <div className="col" style={{ gap: 8 }}>
+        {/* The way in for a console nobody has paired yet: sign in, type the
+            eight digits the console is showing, done. No key to find anywhere,
+            which is what sent the last attempt looking for one. */}
+        {api.pair && (
+          <div className="col" style={{ gap: 6 }}>
+            <div className="muted" style={{ fontSize: 11 }}>{t("ps5.pair.steps")}</div>
+            <div className="ps5-attach">
+              <Input
+                inputMode="numeric"
+                autoComplete="off"
+                spellCheck={false}
+                maxLength={8}
+                placeholder={t("ps5.pair.pin")}
+                value={pin[hostId] ?? ""}
+                onChange={(e) => setPin((p) => ({ ...p, [hostId]: e.target.value.replace(/\D/g, "") }))}
+                style={{ flex: "1 1 160px", minWidth: 0 }}
+              />
+              <Button
+                disabled={busyPairing || (pin[hostId] ?? "").trim().length !== 8}
+                onClick={() => void pairNow(console_)}
+              >
+                {busyPairing ? t("ps5.pair.working") : t("ps5.pair.start")}
+              </Button>
+            </div>
+          </div>
+        )}
+
         <div className="ps5-attach">
           <Input
             type="password"

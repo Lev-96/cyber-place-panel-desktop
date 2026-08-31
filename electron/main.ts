@@ -10,7 +10,8 @@ import { mayNavigateTo, mayOpenExternally, navigationKeyFor } from "./urlPolicy"
 import { discover as discoverPlayStations, probe as probePlayStations } from "./ps5/discovery";
 import { activeTransport, useCredentialVault } from "./ps5/transport";
 import { WakeKeys } from "./ps5/credentials";
-import { wake as wakePlayStation } from "./ps5/wake";
+import { wake as wakePlayStation, wakeWithCredential } from "./ps5/wake";
+import { pairConsole } from "./ps5/pairing";
 
 // `isDev` follows how the app was BUILT, never the environment it starts in.
 // Previously a packaged panel launched with ELECTRON_DEV_URL set would load
@@ -317,7 +318,31 @@ app.whenReady().then(async () => {
       return { sent: false, reason: "bad-request" };
     }
 
+    // A paired console already has a finished credential; a console whose key
+    // was typed in has the key. Both end here, and neither is fed to the other.
+    const paired = wakeKeys?.readWakeCredential(hostId) ?? null;
+    if (paired) return wakeWithCredential(address, paired);
+
     return wakePlayStation(address, wakeKeys?.read(hostId) ?? null);
+  });
+
+  /**
+   * Pair a console with a PlayStation account.
+   *
+   * Everything happens in this process: the sign-in page opens in a window of
+   * its own, the PIN comes from the panel, and the result goes straight into
+   * the vault. The renderer names a console and is told whether it worked.
+   */
+  ipcMain.handle("ps5:pair", async (event: unknown, address: unknown, pin: unknown) => {
+    if (typeof address !== "string" || typeof pin !== "string" || !wakeKeys) {
+      return { ok: false, code: "FAILED" };
+    }
+
+    const parent = BrowserWindow.fromWebContents(
+      (event as { sender: Electron.WebContents }).sender,
+    ) ?? undefined;
+
+    return pairConsole(address, pin, wakeKeys, parent);
   });
 
   /**

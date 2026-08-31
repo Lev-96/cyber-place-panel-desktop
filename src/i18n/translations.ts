@@ -158,6 +158,36 @@ export const TRANSLATIONS: Dict = {
   // one or two words: it shares a line with the platform and the tier.
   "ps5.tile.bound": { en: "Console", ru: "Приставка", am: "Կոնսոլ" },
   // The wake key itself, in the console finder.
+  // Pairing: the whole thing, inside the panel.
+  "ps5.pair.title": { en: "Pair with PlayStation", ru: "Сопряжение с PlayStation", am: "Զուգակցում PlayStation-ի հետ" },
+  "ps5.pair.steps": {
+    en: "Turn the console ON, then open Settings → System → Remote Play → Link Device and type the 8 digits it shows.",
+    ru: "Включите приставку, откройте Настройки → Система → Дистанционное воспроизведение → «Привязать устройство» и введите показанные 8 цифр.",
+    am: "Միացրեք կոնսոլը, բացեք Կարգավորումներ → Համակարգ → Հեռախաղ → «Կապել սարքը» և մուտքագրեք ցուցադրվող 8 թվանշանը։",
+  },
+  "ps5.pair.pin": { en: "8 digits from the console", ru: "8 цифр с экрана приставки", am: "8 թվանշան կոնսոլի էկրանից" },
+  "ps5.pair.start": { en: "Pair", ru: "Сопрячь", am: "Զուգակցել" },
+  "ps5.pair.working": { en: "Pairing…", ru: "Сопрягаем…", am: "Զուգակցում…" },
+  "ps5.pair.done": { en: "Paired — waking and sleeping now work", ru: "Сопряжено — пробуждение и сон работают", am: "Զուգակցված է — արթնացումն ու քունը աշխատում են" },
+  "ps5.pair.error.CANCELLED": { en: "Sign-in was closed", ru: "Вход отменён", am: "Մուտքը չեղարկվեց" },
+  "ps5.pair.error.NOT_AWAKE": {
+    en: "The console must be switched ON to pair — it cannot be paired from rest",
+    ru: "Для сопряжения приставка должна быть ВКЛЮЧЕНА — из режима покоя не выйдет",
+    am: "Զուգակցման համար կոնսոլը պետք է ՄԻԱՑՎԱԾ լինի — քնի ռեժիմից չի ստացվի",
+  },
+  "ps5.pair.error.BAD_PIN": {
+    en: "The console did not accept that PIN — it expires, so take a fresh one",
+    ru: "Приставка не приняла PIN — он одноразовый, возьмите новый с её экрана",
+    am: "Կոնսոլը չընդունեց PIN-ը — այն ժամանակավոր է, վերցրեք նորը",
+  },
+  "ps5.pair.error.NO_LOGIN": {
+    en: "The PlayStation sign-in did not complete",
+    ru: "Вход в аккаунт PlayStation не завершился",
+    am: "PlayStation հաշվի մուտքը չավարտվեց",
+  },
+  "ps5.pair.error.UNREACHABLE": { en: "The console did not answer", ru: "Приставка не ответила", am: "Կոնսոլը չպատասխանեց" },
+  "ps5.pair.error.FAILED": { en: "Pairing failed", ru: "Сопряжение не удалось", am: "Զուգակցումը ձախողվեց" },
+  // The manual route stays for anyone who already holds a key.
   "ps5.key.title": { en: "Wake key", ru: "Ключ пробуждения", am: "Արթնացման բանալի" },
   "ps5.key.saved": { en: "Key saved on this computer", ru: "Ключ сохранён на этом компьютере", am: "Բանալին պահված է այս համակարգչում" },
   "ps5.key.placeholder": {

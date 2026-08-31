@@ -52,6 +52,11 @@ contextBridge.exposeInMainWorld("cyberplacePS5", {
   rest: (hostId: string, address: string) => ipcRenderer.invoke("ps5:rest", hostId, address),
   capabilities: () => ipcRenderer.invoke("ps5:capabilities"),
   /**
+   * Pair a console: opens the PlayStation sign-in, then registers with the PIN.
+   * Nothing of the result crosses back — only whether it worked.
+   */
+  pair: (address: string, pin: string) => ipcRenderer.invoke("ps5:pair", address, pin),
+  /**
    * Try a key once without storing it — the first thing anybody does with a new
    * console, and the only way to check a key on a machine whose OS has no
    * keystore to put one in.

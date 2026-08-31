@@ -62,6 +62,20 @@ export const wakePacket = (credential: bigint): Buffer =>
     "utf8",
   );
 
+/**
+ * Send a wake carrying a credential that is already a credential.
+ *
+ * Pairing produces the finished value; a key typed in by hand still has to be
+ * converted. Keeping the two entry points apart is what stops one being fed to
+ * the other, which produces a datagram the console ignores without a word.
+ */
+export const wakeWithCredential = async (address: string, credential: string | null): Promise<WakeResult> => {
+  if (!credential) return { sent: false, reason: "no-credential" };
+  if (!/^\d+$/.test(credential.trim())) return { sent: false, reason: "bad-credential" };
+
+  return send(address, BigInt(credential.trim()));
+};
+
 export interface WakeResult {
   /** The datagram left this machine. Says nothing about the console. */
   sent: boolean;
@@ -81,6 +95,11 @@ export const wake = async (address: string, registKey: string | null): Promise<W
   const credential = credentialFromRegistKey(registKey);
   if (credential === null) return { sent: false, reason: "bad-credential" };
 
+  return send(address, credential);
+};
+
+/** The datagram itself, once there is a credential to put in it. */
+const send = async (address: string, credential: bigint): Promise<WakeResult> => {
   const socket = createSocket({ type: "udp4" });
 
   return new Promise<WakeResult>((resolve) => {

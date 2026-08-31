@@ -77,6 +77,16 @@ export interface Ps5Bridge {
    * over, and for machines whose OS offers no keystore at all.
    */
   wakeOnce?: (address: string, registKey: string) => Promise<WakeOutcome>;
+  /**
+   * Pair a console with a PlayStation account. Opens Sony's sign-in in its own
+   * window, then registers using the PIN from the console's screen.
+   */
+  pair?: (address: string, pin: string) => Promise<{
+    ok: boolean;
+    code?: string;
+    detail?: string;
+    consoleName?: string;
+  }>;
   /** What this build can actually do to a console — asked, never assumed. */
   capabilities?: () => Promise<{ discover: boolean; observe: boolean; wake: boolean; rest: boolean }>;
   /** Write a wake key. There is deliberately no reader. */

@@ -72,13 +72,19 @@ export class WakeKeys {
   }
 
   has(hostId: string): boolean {
-    return (typeof this.vault[hostId] === "string" && this.vault[hostId].length > 0)
-      || this.session.has(hostId);
+    return this.holds(hostId) || this.holds(`cred:${hostId}`);
   }
 
-  /** Whether the key we hold for this console survives a restart. */
+  /** Whether one slot holds something, saved or held for the run. */
+  private holds(slot: string): boolean {
+    return (typeof this.vault[slot] === "string" && this.vault[slot].length > 0)
+      || this.session.has(slot);
+  }
+
+  /** Whether what we hold for this console survives a restart. */
   isPersisted(hostId: string): boolean {
-    return typeof this.vault[hostId] === "string" && this.vault[hostId].length > 0;
+    return (typeof this.vault[hostId] === "string" && this.vault[hostId].length > 0)
+      || (typeof this.vault[`cred:${hostId}`] === "string" && this.vault[`cred:${hostId}`].length > 0);
   }
 
   async set(hostId: string, registKey: string): Promise<SaveOutcome> {
@@ -95,9 +101,36 @@ export class WakeKeys {
   }
 
   async forget(hostId: string): Promise<void> {
-    delete this.vault[hostId];
-    this.session.delete(hostId);
+    // Everything about this console goes: the typed key, the credential pairing
+    // produced, and the pairing itself. A half-forgotten console is one that
+    // still answers to somebody.
+    for (const slot of [hostId, `cred:${hostId}`, `creds:${hostId}`]) {
+      delete this.vault[slot];
+      this.session.delete(slot);
+    }
     await this.flush();
+  }
+
+  /**
+   * The wake credential, as pairing produced it.
+   *
+   * Kept apart from the registration key an owner can type in, because they are
+   * NOT the same value: a key is hex the console issued, the credential is the
+   * number that hex spells. Storing one where the other is expected would send
+   * a wake the console silently ignores — which is exactly the failure this
+   * feature spent a day chasing.
+   */
+  async setWakeCredential(deviceId: string, credential: string): Promise<void> {
+    await this.set(`cred:${deviceId}`, credential);
+  }
+
+  /** The credential a wake datagram should carry, whichever route provided it. */
+  readWakeCredential(deviceId: string): string | null {
+    return this.read(`cred:${deviceId}`);
+  }
+
+  hasWakeCredential(deviceId: string): boolean {
+    return this.has(`cred:${deviceId}`);
   }
 
   /**
