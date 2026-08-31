@@ -133,6 +133,15 @@ export const TRANSLATIONS: Dict = {
   // Not the same thing as the line above, and telling an owner "every console
   // place already has one" when the branch has no console place at all sends
   // them looking for a place that does not exist.
+  // The places that already have a console — including ones whose console is
+  // nowhere on this network, which is the only way to free them up again.
+  "ps5.bound.title": { en: "Places with a console", ru: "Места с привязанной приставкой", am: "Տեղեր՝ կապված կոնսոլով" },
+  "ps5.bound.here": { en: "on this network", ru: "в этой сети", am: "այս ցանցում" },
+  "ps5.bound.elsewhere": {
+    en: "not found on this network",
+    ru: "в этой сети не найдена",
+    am: "այս ցանցում չի գտնվել",
+  },
   "ps5.bind.loadingPlaces": { en: "Loading places…", ru: "Загружаем места…", am: "Բեռնում ենք տեղերը…" },
   "ps5.bind.placesFailed": {
     en: "Could not load this branch's places",

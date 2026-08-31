@@ -251,6 +251,17 @@ const ConsolePicker = ({ branchId, onClose }: Props) => {
 
   /** PlayStation places that have no console yet — the only ones worth offering. */
   const free = (devices.data ?? []).filter((d) => !d.console_host_id);
+  /**
+   * Places that already have one, whether or not that console is in the room.
+   *
+   * Listed separately for the case that has no other way out: a place bound to
+   * a console this network cannot see. Detaching used to be offered only on a
+   * console the sweep had just found, so a venue whose console was replaced, or
+   * a place bound at another address, had a place nobody could free — and every
+   * new console then reported "every console place already has one".
+   */
+  const boundDevices = (devices.data ?? []).filter((d) => d.console_host_id);
+  const seenNow = new Set((consoles ?? []).map((c) => c.hostId));
 
   /**
    * The attach control, and the three things that can be true instead of it.
@@ -408,6 +419,39 @@ const ConsolePicker = ({ branchId, onClose }: Props) => {
 
             {error && error !== "unavailable" && <div className="error">{error}</div>}
           </>
+        )}
+
+        {boundDevices.length > 0 && (
+          <div className="col" style={{ gap: 6 }}>
+            <div className="muted" style={{ fontSize: 12, fontWeight: 600 }}>{t("ps5.bound.title")}</div>
+            <div className="ps5-list" style={{ maxHeight: 180 }}>
+              {boundDevices.map((device) => {
+                const hostId = device.console_host_id as string;
+                const busy = busyHostId === hostId;
+                return (
+                  <div key={device.id} className="ps5-row">
+                    <div className="ps5-row__head">
+                      <span
+                        className="ps5-row__dot"
+                        style={{ background: seenNow.has(hostId) ? "#3ddc97" : "#8794ae" }}
+                        aria-hidden
+                      />
+                      <span className="ps5-row__name" title={placeLabel(device)}>{placeLabel(device)}</span>
+                      <span className="ps5-row__state muted">
+                        {t(seenNow.has(hostId) ? "ps5.bound.here" : "ps5.bound.elsewhere")}
+                      </span>
+                    </div>
+                    <div className="ps5-attach">
+                      <span className="muted mono" style={{ fontSize: 10, flex: "1 1 120px", minWidth: 0 }}>{hostId}</span>
+                      <Button variant="secondary" disabled={busy} onClick={() => void detach(device, hostId)}>
+                        {t("ps5.bind.detach")}
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         )}
 
         <div className="row-between">
