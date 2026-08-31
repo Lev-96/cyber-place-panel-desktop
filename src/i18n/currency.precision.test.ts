@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { StaticRateMoneyDisplay } from "./currency";
+import { preciseWhenSmall, StaticRateMoneyDisplay } from "./currency";
 
 /**
  * Money is written in whole units everywhere it is a PRICE — a tariff, a
@@ -32,6 +32,23 @@ describe("money formatting", () => {
     for (const amount of [0, 0.5, 7, 12.5, 1500, 999_999]) {
       expect(display.format(amount, "AMD", "ru", undefined)).toBe(display.format(amount, "AMD", "ru"));
     }
+  });
+
+  test("a calculated amount shows its fraction only while it would vanish", () => {
+    // Nothing to show a fraction of.
+    expect(preciseWhenSmall(0)).toBeUndefined();
+    // The case this exists for: a third of a unit is not "nothing charged".
+    expect(preciseWhenSmall(0.35)).toEqual({ maximumFractionDigits: 2 });
+    expect(preciseWhenSmall(12.5)).toEqual({ maximumFractionDigits: 2 });
+    // Big enough that the hundredths are noise on a bill.
+    expect(preciseWhenSmall(100)).toBeUndefined();
+    expect(preciseWhenSmall(1500)).toBeUndefined();
+  });
+
+  test("a total under one unit reads as itself, not as zero", () => {
+    const amount = 0.35;
+    expect(display.format(amount, "AMD", "ru")).toBe("0 драм");
+    expect(display.format(amount, "AMD", "ru", preciseWhenSmall(amount))).toBe("0,35 драм");
   });
 
   test("other currencies keep their own default too", () => {

@@ -1,12 +1,5 @@
+import { preciseWhenSmall } from "@/i18n/currency";
 import { useEffect, useState } from "react";
-
-/**
- * Below this, a running total is shown with decimals.
- *
- * Above it the fraction is noise — nobody reads the hundredths on a four-figure
- * bill — and whole units are what every other price in the panel uses.
- */
-const SMALL_AMOUNT = 100;
 
 const fmt = (ms: number) => {
   const total = Math.max(0, Math.floor(ms / 1000));
@@ -50,7 +43,7 @@ const SessionTimer = ({ endsAt, startedAt, hourlyRate, formatMoney }: Props) => 
     // Prices elsewhere are untouched: this asks for the precision, nothing
     // else does.
     const costLabel = formatMoney
-      ? formatMoney(cost, cost < SMALL_AMOUNT ? { maximumFractionDigits: 2 } : undefined)
+      ? formatMoney(cost, preciseWhenSmall(cost))
       : cost.toFixed(2);
     return (
       <span style={{ fontWeight: 700, fontVariantNumeric: "tabular-nums", color: "#07ddf1" }}>

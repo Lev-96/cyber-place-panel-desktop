@@ -4,6 +4,7 @@ import Modal from "@/components/ui/Modal";
 import Spinner from "@/components/ui/Spinner";
 import { IBillBreakdown } from "@/api/sessions";
 import { useLang } from "@/i18n/LanguageContext";
+import { preciseWhenSmall } from "@/i18n/currency";
 import { sessionRepository } from "@/repositories/SessionRepository";
 import { ISessionApi } from "@/types/sessions";
 import { useEffect, useState } from "react";
@@ -103,7 +104,12 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved }: Prop
                   {money(Number(view.hourly_rate))}/{t("time.hourShort") || "h"}
                 </span>
               )}
-              <span style={{ fontWeight: 700 }}>{money(Number(view.time_cost))}</span>
+              {/* Arithmetic, not a typed price: a short session at twelve an
+                  hour is a third of a unit, and "0" reads as "nothing was
+                  charged". */}
+              <span style={{ fontWeight: 700 }}>
+                {money(Number(view.time_cost), preciseWhenSmall(Number(view.time_cost)))}
+              </span>
             </div>
 
             {/* Items */}
@@ -125,7 +131,9 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved }: Prop
             {/* Total */}
             <div style={{ ...row, borderTop: "2px solid #07ddf1", marginTop: 6, paddingTop: 12 }}>
               <span style={{ flex: 1, fontWeight: 700, fontSize: 16 }}>{t("session.totalDue")}</span>
-              <span style={{ fontWeight: 800, fontSize: 18, color: "#07ddf1" }}>{money(Number(view.total))}</span>
+              <span style={{ fontWeight: 800, fontSize: 18, color: "#07ddf1" }}>
+                {money(Number(view.total), preciseWhenSmall(Number(view.total)))}
+              </span>
             </div>
           </div>
         )}

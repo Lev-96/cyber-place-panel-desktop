@@ -113,6 +113,21 @@ export class StaticRateMoneyDisplay implements MoneyDisplay {
 export const moneyDisplay = new StaticRateMoneyDisplay();
 
 /**
+ * Formatting options for an amount that was CALCULATED rather than set.
+ *
+ * A price somebody typed is a whole number and reads best as one. A time cost
+ * is arithmetic — a rate times a duration — and at twelve an hour a short
+ * session comes to a third of a unit. Rounded to whole units that is "0", which
+ * an operator reads as "the system did not charge anything", and it is the
+ * difference between a total and no total at all.
+ *
+ * So: show the fraction only while the amount would otherwise disappear, and
+ * whole units as soon as there is something to round.
+ */
+export const preciseWhenSmall = (amount: number): MoneyFormatOptions | undefined =>
+  Math.abs(amount) > 0 && Math.abs(amount) < 100 ? { maximumFractionDigits: 2 } : undefined;
+
+/**
  * Format an amount that is ALREADY denominated in `currency` — no base
  * conversion. `moneyDisplay.format` assumes an AMD-base input, so it is
  * the wrong tool when a value is literally "$12 USD" (the expense
