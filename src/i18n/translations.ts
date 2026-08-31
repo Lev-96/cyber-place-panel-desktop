@@ -160,7 +160,11 @@ export const TRANSLATIONS: Dict = {
   // The wake key itself, in the console finder.
   "ps5.key.title": { en: "Wake key", ru: "Ключ пробуждения", am: "Արթնացման բանալի" },
   "ps5.key.saved": { en: "Key saved on this computer", ru: "Ключ сохранён на этом компьютере", am: "Բանալին պահված է այս համակարգչում" },
-  "ps5.key.placeholder": { en: "8 hex characters", ru: "8 hex-символов", am: "8 hex նիշ" },
+  "ps5.key.placeholder": {
+    en: "Remote Play registration key",
+    ru: "Ключ регистрации Remote Play",
+    am: "Remote Play գրանցման բանալի",
+  },
   "ps5.key.save": { en: "Save key", ru: "Сохранить ключ", am: "Պահել բանալին" },
   "ps5.key.forget": { en: "Remove key", ru: "Удалить ключ", am: "Ջնջել բանալին" },
   "ps5.key.noKeystore": {
@@ -179,10 +183,14 @@ export const TRANSLATIONS: Dict = {
     ru: "Сигнал отправлен — приставка должна проснуться за несколько секунд",
     am: "Ազդանշանն ուղարկվեց — կոնսոլը պետք է արթնանա մի քանի վայրկյանում",
   },
+  // The mistake this line exists to prevent: the eight digits on the console's
+  // "Link Device" screen are a one-time PIN for pairing, not the key. The key is
+  // what a Remote Play client is given once pairing completes, and the console
+  // ignores a wake carrying anything else.
   "ps5.key.hint": {
-    en: "From pairing the console with a PlayStation account. Stored encrypted by this computer, never sent to the server.",
-    ru: "Выдаётся при привязке приставки к аккаунту PlayStation. Хранится в зашифрованном виде на этом компьютере и никогда не уходит на сервер.",
-    am: "Տրվում է կոնսոլը PlayStation հաշվին կապելիս։ Պահվում է գաղտնագրված այս համակարգչում և երբեք չի ուղարկվում սերվեր։",
+    en: "NOT the 8-digit code on the console screen — that is a one-time pairing PIN. This is the registration key a Remote Play client receives after pairing. Stored encrypted on this computer, never sent to the server.",
+    ru: "Это НЕ 8-значный код с экрана приставки — тот код одноразовый, для сопряжения. Нужен ключ регистрации, который клиент Remote Play получает после сопряжения. Хранится зашифрованным на этом компьютере и на сервер не уходит.",
+    am: "Սա ՈՉ թե կոնսոլի էկրանի 8-նիշանոց կոդն է — այն միանվագ է, զուգակցման համար։ Պետք է գրանցման բանալին, որը Remote Play հաճախորդը ստանում է զուգակցումից հետո։ Պահվում է գաղտնագրված այս համակարգչում և սերվեր չի ուղարկվում։",
   },
   // The question the owner is asked when a console is on with no session.
   "ps5.wake.dialogTitle": {
