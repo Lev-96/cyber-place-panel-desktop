@@ -16,8 +16,10 @@ import { safeStorage } from "electron";
  *    console has a key, never what it is. A secret that reaches a web page is a
  *    secret in the devtools of anyone who opens them.
  *  - **It is never written in the clear.** If the OS has no keystore to offer,
- *    storing is refused outright rather than quietly falling back to a file
- *    anyone can read.
+ *    nothing is written to disk at all. The key is kept in this process's
+ *    memory for as long as the panel runs and is gone when it closes — which
+ *    is worse for the operator than a saved key and better than a file anyone
+ *    with the machine can read. The screen says which of the two happened.
  *  - **It never reaches a log.** Nothing here formats the key into a message,
  *    and the callers say "no credential", never which one.
  *
@@ -29,8 +31,22 @@ import { safeStorage } from "electron";
 /** hostId → the OS-encrypted key, base64 for JSON. */
 type Vault = Record<string, string>;
 
+export interface SaveOutcome {
+  saved: boolean;
+  /** False when the key lives only until the panel closes. */
+  persisted: boolean;
+}
+
 export class WakeKeys {
   private vault: Vault = {};
+  /**
+   * Keys held only for this run, on a machine whose OS offers no keystore.
+   *
+   * Never written anywhere. The alternative — refusing outright — is what made
+   * the feature unusable on such a machine: a session could not wake anything,
+   * and the operator was given no way to change that.
+   */
+  private readonly session = new Map<string, string>();
 
   constructor(private readonly filePath: string) {}
 
@@ -56,20 +72,31 @@ export class WakeKeys {
   }
 
   has(hostId: string): boolean {
+    return (typeof this.vault[hostId] === "string" && this.vault[hostId].length > 0)
+      || this.session.has(hostId);
+  }
+
+  /** Whether the key we hold for this console survives a restart. */
+  isPersisted(hostId: string): boolean {
     return typeof this.vault[hostId] === "string" && this.vault[hostId].length > 0;
   }
 
-  /** @returns false when the OS has no keystore — the key is then NOT stored. */
-  async set(hostId: string, registKey: string): Promise<boolean> {
-    if (!this.available()) return false;
+  async set(hostId: string, registKey: string): Promise<SaveOutcome> {
+    if (!this.available()) {
+      // Nothing reaches the disk. It works until the panel closes, and the
+      // screen says so rather than implying it was saved.
+      this.session.set(hostId, registKey);
+      return { saved: true, persisted: false };
+    }
 
     this.vault[hostId] = safeStorage.encryptString(registKey).toString("base64");
     await this.flush();
-    return true;
+    return { saved: true, persisted: true };
   }
 
   async forget(hostId: string): Promise<void> {
     delete this.vault[hostId];
+    this.session.delete(hostId);
     await this.flush();
   }
 
@@ -81,7 +108,7 @@ export class WakeKeys {
    */
   read(hostId: string): string | null {
     const stored = this.vault[hostId];
-    if (!stored) return null;
+    if (!stored) return this.session.get(hostId) ?? null;
 
     try {
       return safeStorage.decryptString(Buffer.from(stored, "base64"));

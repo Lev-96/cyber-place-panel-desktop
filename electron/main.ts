@@ -334,16 +334,17 @@ app.whenReady().then(async () => {
       return { saved: false, reason: "bad-request" };
     }
 
-    return await wakeKeys.set(hostId, registKey)
-      ? { saved: true }
-      // No OS keystore. Storing the key as readable text on a machine the whole
-      // shift walks past is not a lesser evil, so it is simply refused.
-      : { saved: false, reason: "no-os-keystore" };
+    // Always accepted. Where the OS offers a keystore the key survives a
+    // restart; where it does not, it lives in this process and nothing is
+    // written to disk. `persisted` is which of the two happened, and the screen
+    // tells the operator rather than leaving them to find out tomorrow.
+    return wakeKeys.set(hostId, registKey);
   });
 
   ipcMain.handle("ps5:credential:has", (_e: unknown, hostId: unknown) => ({
     has: typeof hostId === "string" && (wakeKeys?.has(hostId) ?? false),
     available: wakeKeys?.available() ?? false,
+    persisted: typeof hostId === "string" && (wakeKeys?.isPersisted(hostId) ?? false),
   }));
 
   ipcMain.handle("ps5:credential:forget", async (_e: unknown, hostId: unknown) => {

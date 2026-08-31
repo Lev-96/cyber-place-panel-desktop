@@ -78,17 +78,17 @@ const ConsolePicker = ({ branchId, onClose }: Props) => {
     try {
       const result = await api.setCredential(hostId, value);
       if (!result.saved) {
-        // The one case worth spelling out: no OS keystore means the key would
-        // have to be written as readable text, and that is refused rather than
-        // done quietly.
-        setKeyError((e) => ({ ...e, [hostId]: t("ps5.key.noKeystore") }));
+        setKeyError((e) => ({ ...e, [hostId]: t("ps5.error.TRANSPORT_ERROR") }));
         return;
       }
 
       // Cleared immediately: the typed value has done its job and has no reason
       // to sit in a React state tree for the rest of the shift.
       setTypedKey((k) => ({ ...k, [hostId]: "" }));
-      setKeys((s2) => ({ ...s2, [hostId]: { has: true, available: true } }));
+      setKeys((s2) => ({
+        ...s2,
+        [hostId]: { has: true, available: result.persisted !== false, persisted: result.persisted !== false },
+      }));
     } finally {
       setBusyHostId(null);
     }
@@ -155,7 +155,9 @@ const ConsolePicker = ({ branchId, onClose }: Props) => {
       return (
         <div className="ps5-attach">
           <span className="muted" style={{ fontSize: 11, flex: "1 1 160px", minWidth: 0 }}>
-            ✓ {t("ps5.key.saved")}
+            {/* Saved and held-for-the-run are different promises, and an
+                operator who is told the wrong one loses a console tomorrow. */}
+            ✓ {t(state.persisted === false ? "ps5.key.savedForRun" : "ps5.key.saved")}
           </span>
           <Button variant="secondary" disabled={busy} onClick={() => void forgetKey(hostId)}>
             {t("ps5.key.forget")}
@@ -182,13 +184,13 @@ const ConsolePicker = ({ branchId, onClose }: Props) => {
           <Button variant="secondary" disabled={busy || !typed} onClick={() => void testWake(console_)}>
             {t("ps5.key.test")}
           </Button>
-          {/* Saving needs somewhere safe to save it. Where there is nowhere,
-              the button is not offered and the reason is given. */}
-          {state?.available !== false && (
-            <Button disabled={busy || !typed} onClick={() => void saveKey(hostId)}>
-              {t("ps5.key.save")}
-            </Button>
-          )}
+          {/* Offered everywhere. Where the OS has a keystore the key survives a
+              restart; where it has none it lives only until the panel closes,
+              and the line below says which. Refusing outright is what made a
+              session unable to wake anything on such a machine. */}
+          <Button disabled={busy || !typed} onClick={() => void saveKey(hostId)}>
+            {t("ps5.key.save")}
+          </Button>
         </div>
         <span className="muted" style={{ fontSize: 11 }}>
           {state?.available === false ? t("ps5.key.noKeystore") : t("ps5.key.hint")}

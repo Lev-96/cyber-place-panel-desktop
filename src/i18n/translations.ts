@@ -164,9 +164,14 @@ export const TRANSLATIONS: Dict = {
   "ps5.key.save": { en: "Save key", ru: "Сохранить ключ", am: "Պահել բանալին" },
   "ps5.key.forget": { en: "Remove key", ru: "Удалить ключ", am: "Ջնջել բանալին" },
   "ps5.key.noKeystore": {
-    en: "This computer has no OS keystore, so a key cannot be stored safely",
-    ru: "На этом компьютере нет хранилища ключей ОС — ключ негде хранить безопасно",
-    am: "Այս համակարգիչը չունի ՕՀ բանալիների պահոց — բանալին ապահով պահել հնարավոր չէ",
+    en: "No OS keystore here — the key will work until the panel is closed, and is never written to disk",
+    ru: "Хранилища ключей ОС здесь нет — ключ будет работать до закрытия панели и на диск не записывается",
+    am: "Այստեղ ՕՀ բանալիների պահոց չկա — բանալին կաշխատի մինչև վահանակի փակումը և սկավառակին չի գրվում",
+  },
+  "ps5.key.savedForRun": {
+    en: "Key held until the panel is closed",
+    ru: "Ключ действует до закрытия панели",
+    am: "Բանալին գործում է մինչև վահանակի փակումը",
   },
   "ps5.key.test": { en: "Test wake", ru: "Проверить пробуждение", am: "Ստուգել արթնացումը" },
   "ps5.key.testSent": {
