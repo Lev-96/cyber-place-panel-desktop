@@ -55,7 +55,10 @@ contextBridge.exposeInMainWorld("cyberplacePS5", {
    * Pair a console: opens the PlayStation sign-in, then registers with the PIN.
    * Nothing of the result crosses back — only whether it worked.
    */
-  pair: (address: string, pin: string) => ipcRenderer.invoke("ps5:pair", address, pin),
+  pair: (address: string, pin: string, redirectUrl?: string) =>
+    ipcRenderer.invoke("ps5:pair", address, pin, redirectUrl),
+  /** Open Sony's sign-in in the owner's own browser, for when the embedded one is refused. */
+  psnLoginExternal: () => ipcRenderer.invoke("ps5:psn-login-external"),
   /**
    * Try a key once without storing it — the first thing anybody does with a new
    * console, and the only way to check a key on a machine whose OS has no

@@ -81,12 +81,14 @@ export interface Ps5Bridge {
    * Pair a console with a PlayStation account. Opens Sony's sign-in in its own
    * window, then registers using the PIN from the console's screen.
    */
-  pair?: (address: string, pin: string) => Promise<{
+  pair?: (address: string, pin: string, redirectUrl?: string) => Promise<{
     ok: boolean;
     code?: string;
     detail?: string;
     consoleName?: string;
   }>;
+  /** Open the PlayStation sign-in in the owner's own browser. */
+  psnLoginExternal?: () => Promise<{ url: string }>;
   /** What this build can actually do to a console — asked, never assumed. */
   capabilities?: () => Promise<{ discover: boolean; observe: boolean; wake: boolean; rest: boolean }>;
   /** Write a wake key. There is deliberately no reader. */

@@ -11,7 +11,7 @@ import { discover as discoverPlayStations, probe as probePlayStations } from "./
 import { activeTransport, useCredentialVault } from "./ps5/transport";
 import { WakeKeys } from "./ps5/credentials";
 import { wake as wakePlayStation, wakeWithCredential } from "./ps5/wake";
-import { pairConsole } from "./ps5/pairing";
+import { openPsnLoginExternally, pairConsole, psnLoginUrl } from "./ps5/pairing";
 
 // `isDev` follows how the app was BUILT, never the environment it starts in.
 // Previously a packaged panel launched with ELECTRON_DEV_URL set would load
@@ -333,7 +333,7 @@ app.whenReady().then(async () => {
    * its own, the PIN comes from the panel, and the result goes straight into
    * the vault. The renderer names a console and is told whether it worked.
    */
-  ipcMain.handle("ps5:pair", async (event: unknown, address: unknown, pin: unknown) => {
+  ipcMain.handle("ps5:pair", async (event: unknown, address: unknown, pin: unknown, redirectUrl?: unknown) => {
     if (typeof address !== "string" || typeof pin !== "string" || !wakeKeys) {
       return { ok: false, code: "FAILED" };
     }
@@ -342,7 +342,26 @@ app.whenReady().then(async () => {
       (event as { sender: Electron.WebContents }).sender,
     ) ?? undefined;
 
-    return pairConsole(address, pin, wakeKeys, parent);
+    return pairConsole(
+      address,
+      pin,
+      wakeKeys,
+      parent,
+      typeof redirectUrl === "string" && redirectUrl ? redirectUrl : undefined,
+    );
+  });
+
+  /**
+   * Open the PlayStation sign-in in the owner's own browser.
+   *
+   * Sony's page refuses some embedded clients with an edge-server error that
+   * says nothing about the account. Their own browser, where they are probably
+   * signed in already, does not hit it — and the only thing that has to come
+   * back is the address it ends up at.
+   */
+  ipcMain.handle("ps5:psn-login-external", async () => {
+    await openPsnLoginExternally();
+    return { url: psnLoginUrl() };
   });
 
   /**

@@ -53,6 +53,8 @@ const ConsolePicker = ({ branchId, onClose }: Props) => {
   /** The PIN the owner is typing, per console. Eight digits, and short-lived. */
   const [pin, setPin] = useState<Record<string, string>>({});
   const [pairing, setPairing] = useState<string | null>(null);
+  /** Where the browser landed after signing in, when that route was used. */
+  const [redirect, setRedirect] = useState<Record<string, string>>({});
   /** Per-console choice of place, before the operator presses attach. */
   const [choice, setChoice] = useState<Record<string, number>>({});
 
@@ -141,7 +143,7 @@ const ConsolePicker = ({ branchId, onClose }: Props) => {
     setPairing(console_.hostId);
     setKeyError((e) => ({ ...e, [console_.hostId]: "" }));
     try {
-      const result = await api.pair(console_.address, typed);
+      const result = await api.pair(console_.address, typed, (redirect[console_.hostId] ?? "").trim() || undefined);
       setPin((p) => ({ ...p, [console_.hostId]: "" }));
 
       if (result.ok) {
@@ -232,6 +234,27 @@ const ConsolePicker = ({ branchId, onClose }: Props) => {
                 {busyPairing ? t("ps5.pair.working") : t("ps5.pair.start")}
               </Button>
             </div>
+            {/* Sony's page refuses some embedded windows with an edge-server
+                error that has nothing to do with the account. The owner's own
+                browser — where they are probably signed in already — does not
+                hit it, and only the address it ends up at has to come back. */}
+            {api.psnLoginExternal && (
+              <div className="col" style={{ gap: 6 }}>
+                <div className="ps5-attach">
+                  <Button variant="secondary" onClick={() => void api.psnLoginExternal!()}>
+                    {t("ps5.pair.browser")}
+                  </Button>
+                </div>
+                <div className="muted" style={{ fontSize: 11 }}>{t("ps5.pair.browserSteps")}</div>
+                <Input
+                  autoComplete="off"
+                  spellCheck={false}
+                  placeholder={t("ps5.pair.redirect")}
+                  value={redirect[hostId] ?? ""}
+                  onChange={(e) => setRedirect((r) => ({ ...r, [hostId]: e.target.value }))}
+                />
+              </div>
+            )}
           </div>
         )}
 

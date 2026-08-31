@@ -1,4 +1,4 @@
-import { BrowserWindow } from "electron";
+import { BrowserWindow, net, shell } from "electron";
 import { probe } from "./discovery";
 import type { WakeKeys } from "./credentials";
 
@@ -27,6 +27,93 @@ import type { WakeKeys } from "./credentials";
 
 /** Where Sony sends the browser once the owner has signed in. */
 const REDIRECT_PREFIX = "https://remoteplay.dl.playstation.net/remoteplay/redirect";
+
+/**
+ * Sony's own Remote Play client identity, and the endpoints that go with it.
+ *
+ * These are what a Remote Play client presents when it asks an account for
+ * permission to pair a console. They are not secrets — every client that does
+ * this shows the same ones — and there is no alternative set: the console will
+ * only accept a registration made under this identity.
+ */
+const CLIENT_ID = "ba495a24-818c-472b-b12d-ff231c1b5745";
+const CLIENT_SECRET = "mvaiZkRsAsI1IBkY";
+const TOKEN_URL = "https://auth.api.sonyentertainmentnetwork.com/2.0/oauth/token";
+
+export const psnLoginUrl = (): string =>
+  "https://auth.api.sonyentertainmentnetwork.com/2.0/oauth/authorize"
+  + "?service_entity=urn:service-entity:psn&response_type=code"
+  + `&client_id=${CLIENT_ID}&redirect_uri=${REDIRECT_PREFIX}`
+  + "&scope=psn:clientapp&request_locale=en_US&ui=pr&service_logo=ps"
+  + "&layout_type=popup&smcid=remoteplay&prompt=always&PlatformPrivacyWs1=minimal&";
+
+/** Open the sign-in in the owner's own browser, where they are probably signed in already. */
+export const openPsnLoginExternally = async (): Promise<void> => {
+  await shell.openExternal(psnLoginUrl());
+};
+
+/** A small JSON request through Electron's own networking stack. */
+const request = async (url: string, init: { method?: string; body?: string; type?: string }) => {
+  const response = await net.fetch(url, {
+    method: init.method ?? "GET",
+    headers: {
+      // The client identity travels as basic auth, exactly as Sony's own
+      // client sends it.
+      Authorization: `Basic ${Buffer.from(`${CLIENT_ID}:${CLIENT_SECRET}`).toString("base64")}`,
+      ...(init.type ? { "Content-Type": init.type } : {}),
+    },
+    body: init.body,
+  });
+
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+  return response.json() as Promise<Record<string, unknown>>;
+};
+
+/**
+ * The account identifier a console registration is made under.
+ *
+ * Sony's account id is a decimal number; what the console expects is its eight
+ * bytes, little-endian, base64. Getting this wrong produces a registration the
+ * console refuses without saying why.
+ */
+const accountIdFrom = (userId: string): string => {
+  const buffer = Buffer.alloc(8);
+  buffer.writeBigUInt64LE(BigInt(userId));
+
+  return buffer.toString("base64");
+};
+
+/**
+ * Turn the address the browser ended up at into an account identifier.
+ *
+ * The owner signs in wherever they like — in the window this app opens, or in
+ * their own browser — and what comes back is a URL carrying a one-time code.
+ * The exchange after that never involves their password.
+ */
+export const accountIdFromRedirect = async (redirectUrl: string): Promise<string> => {
+  const code = new URL(redirectUrl).searchParams.get("code");
+  if (!code) throw new Error("NO_CODE");
+
+  const token = await request(TOKEN_URL, {
+    method: "POST",
+    type: "application/x-www-form-urlencoded",
+    body: new URLSearchParams({
+      code,
+      grant_type: "authorization_code",
+      redirect_uri: REDIRECT_PREFIX,
+    }).toString(),
+  });
+
+  const accessToken = token["access_token"];
+  if (typeof accessToken !== "string") throw new Error("NO_TOKEN");
+
+  const account = await request(`${TOKEN_URL}/${accessToken}`, {});
+  const userId = account["user_id"];
+  if (typeof userId !== "string" && typeof userId !== "number") throw new Error("NO_ACCOUNT");
+
+  return accountIdFrom(String(userId));
+};
 
 export interface PairOutcome {
   ok: boolean;
@@ -98,6 +185,14 @@ export const pairConsole = async (
   pin: string,
   keys: WakeKeys,
   parent?: BrowserWindow,
+  /**
+   * The URL the browser was redirected to after signing in, when the owner did
+   * that in their own browser rather than in the window this opens. Sony's page
+   * refuses some clients outright — with an edge-server error that has nothing
+   * to do with the credentials typed into it — and a venue cannot be left with
+   * no way through because of that.
+   */
+  redirectUrl?: string,
 ): Promise<PairOutcome> => {
   if (!/^\d{8}$/.test(pin.trim())) {
     return { ok: false, code: "BAD_PIN", detail: "A pairing PIN is eight digits." };
@@ -140,7 +235,13 @@ export const pairConsole = async (
 
     const strategy = { performLogin: (url: string) => signInToPlayStation(url, parent) };
 
-    const requester = new OauthCredentialRequester(io as never, strategy as never);
+    // Either the owner signs in here, or they already did it in their own
+    // browser and pasted back where it sent them. The rest is identical.
+    const strategyToUse = redirectUrl
+      ? { performLogin: async () => redirectUrl }
+      : strategy;
+
+    const requester = new OauthCredentialRequester(io as never, strategyToUse as never);
     const credentials = await requester.requestForDevice(device);
 
     // Everything the console agreed to, including the registration key. It goes

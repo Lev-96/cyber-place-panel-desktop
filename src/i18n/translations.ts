@@ -166,6 +166,22 @@ export const TRANSLATIONS: Dict = {
     am: "Միացրեք կոնսոլը, բացեք Կարգավորումներ → Համակարգ → Հեռախաղ → «Կապել սարքը» և մուտքագրեք ցուցադրվող 8 թվանշանը։",
   },
   "ps5.pair.pin": { en: "8 digits from the console", ru: "8 цифр с экрана приставки", am: "8 թվանշան կոնսոլի էկրանից" },
+  // The way through when Sony's page refuses the embedded window.
+  "ps5.pair.browser": {
+    en: "Sign in through your browser instead",
+    ru: "Войти через обычный браузер",
+    am: "Մուտք գործել սովորական դիտարկիչով",
+  },
+  "ps5.pair.browserSteps": {
+    en: "Sign in there, then copy the address of the page it lands on and paste it below.",
+    ru: "Войдите там, затем скопируйте адрес страницы, на которую вас перекинуло, и вставьте сюда.",
+    am: "Մուտք գործեք այնտեղ, ապա պատճենեք էջի հասցեն, ուր ձեզ տեղափոխեց, և տեղադրեք ստորև։",
+  },
+  "ps5.pair.redirect": {
+    en: "The address you were redirected to",
+    ru: "Адрес, на который вас перекинуло",
+    am: "Հասցեն, ուր ձեզ տեղափոխեց",
+  },
   "ps5.pair.start": { en: "Pair", ru: "Сопрячь", am: "Զուգակցել" },
   "ps5.pair.working": { en: "Pairing…", ru: "Сопрягаем…", am: "Զուգակցում…" },
   "ps5.pair.done": { en: "Paired — waking and sleeping now work", ru: "Сопряжено — пробуждение и сон работают", am: "Զուգակցված է — արթնացումն ու քունը աշխատում են" },
