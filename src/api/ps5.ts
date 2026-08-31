@@ -60,5 +60,7 @@ export const apiExpireWakeEvent = (id: number) =>
  * whoever was listening at the time, and a console that woke while nobody had a
  * tab open is still awake now.
  */
-export const apiPendingWakeEvents = (branchId: number) =>
-  request<{ data: Ps5WakeEventApi[] }>("/ps5-wake-events", { params: { branch_id: branchId } });
+export const apiPendingWakeEvents = (branchId?: number) =>
+  request<{ data: Ps5WakeEventApi[] }>("/ps5-wake-events", {
+    params: branchId ? { branch_id: branchId } : {},
+  });

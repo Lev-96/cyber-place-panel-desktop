@@ -13,11 +13,13 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 const decide = vi.hoisted(() => vi.fn(async () => ({ wake_event: {} })));
 const expire = vi.hoisted(() => vi.fn(async () => ({ wake_event: {} })));
+const pending = vi.hoisted(() => ({ data: [] as unknown[], calls: 0 }));
 const subscribers = vi.hoisted(() => ({ current: [] as Array<(e: unknown) => void>, owner: null as number | null }));
 
 vi.mock("@/api/ps5", () => ({
   apiDecideWakeEvent: (...a: unknown[]) => decide(...(a as [])),
   apiExpireWakeEvent: (...a: unknown[]) => expire(...(a as [])),
+  apiPendingWakeEvents: async () => { pending.calls += 1; return pending; },
 }));
 
 vi.mock("@/realtime/usePs5Realtime", () => ({
@@ -53,6 +55,8 @@ beforeEach(async () => {
   decide.mockClear();
   expire.mockClear();
   role.current = "company_owner";
+  pending.data = [];
+  pending.calls = 0;
   subscribers.current = [];
   ({ default: UnexpectedWakeDialog } = await import("./UnexpectedWakeDialog"));
 });
@@ -126,6 +130,63 @@ describe("the three ways it ends", () => {
     });
 
     await waitFor(() => expect(decide).toHaveBeenCalledTimes(1));
+  });
+});
+
+describe("a question nobody was listening for", () => {
+  test("it still reaches the owner", async () => {
+    // The bug this exists for: a broadcast reaches whoever was listening at
+    // that second. A console switched on while the owner was on another screen
+    // raised a question that then waited, unanswered, for hours.
+    pending.data = [{
+      id: 77, event_uuid: "u-old", device_id: 3, branch_id: 1,
+      decision: "pending", detected_at: "2026-08-31T18:03:33.000000Z",
+      place_label: "№1 · Плейстейшен 5",
+    }];
+
+    render(<UnexpectedWakeDialog />);
+
+    await waitFor(() => expect(screen.getByText("№1 · Плейстейшен 5")).toBeTruthy());
+
+    act(() => { fireEvent.click(screen.getByText("ps5.wake.yes")); });
+    await waitFor(() => expect(decide).toHaveBeenCalledWith(77, true));
+  });
+
+  test("a manager is not shown one either", async () => {
+    role.current = "manager";
+    pending.data = [{
+      id: 77, event_uuid: "u-old", device_id: 3, branch_id: 1,
+      decision: "pending", detected_at: "2026-08-31T18:03:33.000000Z",
+      place_label: "№1 · Плейстейшен 5",
+    }];
+
+    render(<UnexpectedWakeDialog />);
+    await act(async () => { await vi.advanceTimersByTimeAsync(1_000); });
+
+    expect(screen.queryByText("№1 · Плейстейшен 5")).toBeNull();
+    // And does not ask for them at all: a manager's panel has no business
+    // fetching a list of questions put to the owner, on any schedule.
+    expect(pending.calls).toBe(0);
+  });
+
+  test("one already answered here is not asked again", async () => {
+    // The list is fetched every minute; a question answered thirty seconds ago
+    // is still pending on the server until that write lands.
+    pending.data = [{
+      id: 78, event_uuid: "u-1", device_id: 3, branch_id: 1,
+      decision: "pending", detected_at: "2026-08-31T18:03:33.000000Z",
+      place_label: "№1 · Плейстейшен 5",
+    }];
+
+    render(<UnexpectedWakeDialog />);
+    await waitFor(() => expect(screen.getByText("№1 · Плейстейшен 5")).toBeTruthy());
+    act(() => { fireEvent.click(screen.getByText("ps5.wake.no")); });
+    await waitFor(() => expect(decide).toHaveBeenCalledTimes(1));
+
+    // The next minute's fetch brings the same row back.
+    await act(async () => { await vi.advanceTimersByTimeAsync(61_000); });
+    expect(decide).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText("№1 · Плейстейшен 5")).toBeNull();
   });
 });
 

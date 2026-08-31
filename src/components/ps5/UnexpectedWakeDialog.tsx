@@ -1,6 +1,6 @@
 import Button from "@/components/ui/Button";
 import Modal from "@/components/ui/Modal";
-import { apiDecideWakeEvent, apiExpireWakeEvent } from "@/api/ps5";
+import { apiDecideWakeEvent, apiExpireWakeEvent, apiPendingWakeEvents } from "@/api/ps5";
 import { useAuth } from "@/auth/AuthContext";
 import { can } from "@/auth/permissions";
 import { useLang } from "@/i18n/LanguageContext";
@@ -27,6 +27,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
  * switching on in the same minute is two questions, and stacking them into one
  * dialog would answer the second with the first one's click.
  */
+/** The countdown a question carries when it was fetched rather than broadcast. */
+const GRACE_SECONDS = 10;
+
 const UnexpectedWakeDialog = () => {
   const { t } = useLang();
   const { user } = useAuth();
@@ -54,6 +57,50 @@ const UnexpectedWakeDialog = () => {
   }, []);
 
   usePs5UnexpectedWake(isOwner ? (user?.id ?? null) : null, enqueue);
+
+  /**
+   * Ask for questions nobody answered.
+   *
+   * A broadcast reaches whoever was listening at that second and nobody else —
+   * so a console switched on while the owner was on another screen, or before
+   * this panel was open, raised a question that then sat unanswered forever.
+   * That is what happened: three of them, hours old, still waiting.
+   *
+   * Asked on mount and then slowly. The socket stays the fast path; this is the
+   * net underneath it, and it must not become a poll that talks over it.
+   */
+  useEffect(() => {
+    if (!isOwner) return;
+
+    let alive = true;
+    const pull = async () => {
+      try {
+        const events = await apiPendingWakeEvents();
+        if (!alive) return;
+
+        for (const event of events.data) {
+          // Anything already answered on this machine stays answered.
+          if (answeredRef.current.has(event.event_uuid)) continue;
+
+          enqueue({
+            id: event.id,
+            event_uuid: event.event_uuid,
+            device_id: event.device_id,
+            branch_id: event.branch_id,
+            place_label: event.place_label ?? "",
+            grace_seconds: GRACE_SECONDS,
+          });
+        }
+      } catch {
+        // Offline, or an older backend. The socket path is unaffected.
+      }
+    };
+
+    void pull();
+    const timer = setInterval(() => void pull(), 60_000);
+
+    return () => { alive = false; clearInterval(timer); };
+  }, [isOwner, enqueue]);
 
   // Each question gets its own deadline; none inherits the remainder of
   // another's.
