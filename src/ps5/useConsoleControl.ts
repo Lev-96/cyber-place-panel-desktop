@@ -1,7 +1,6 @@
 import { apiReportUnexpectedWake } from "@/api/ps5";
 import { notify } from "@/ui/notify";
 import { tActive } from "@/i18n/translations";
-import { usePs5WakeDecided } from "@/realtime/usePs5Realtime";
 import { ps5Bridge } from "@/ps5/usePs5Discovery";
 import { useConsoleWatch, type WatchedConsole } from "@/ps5/useConsoleWatch";
 import { Ps5Controller, type ConsoleInput, type ControllerPorts } from "@/ps5/Ps5Controller";
@@ -41,7 +40,6 @@ const INTENT_TTL_MS = 60_000;
 const URGENT_WINDOW_MS = 15_000;
 
 interface Options {
-  branchId: number;
   /** Console devices of this branch, as the board has them. */
   devices: IPcApi[];
   /** Device ids that currently have a running session. */
@@ -52,7 +50,7 @@ interface Options {
 
 interface Intent { at: number }
 
-export const useConsoleControl = ({ branchId, devices, sessionDeviceIds, enabled = true }: Options) => {
+export const useConsoleControl = ({ devices, sessionDeviceIds, enabled = true }: Options) => {
   /** Bound consoles only: a device with no console is not this feature's business. */
   const bound = useMemo(
     () => devices.filter((d) => d.console_host_id),
@@ -63,6 +61,13 @@ export const useConsoleControl = ({ branchId, devices, sessionDeviceIds, enabled
     () => bound.map((d) => ({ hostId: d.console_host_id as string, address: d.console_address ?? null })),
     [bound],
   );
+
+  /**
+   * Which console belongs to which device, as a value the callbacks can read
+   * without being rebuilt every time the list changes.
+   */
+  const boundRef = useRef<Array<{ deviceId: number; hostId: string }>>([]);
+  boundRef.current = bound.map((d) => ({ deviceId: d.id, hostId: d.console_host_id as string }));
 
   const { statuses, refreshNow } = useConsoleWatch(watched, {
     onAddressChanged: useCallback((hostId: string, address: string) => {
@@ -167,17 +172,23 @@ export const useConsoleControl = ({ branchId, devices, sessionDeviceIds, enabled
     controllerRef.current = new Ps5Controller(ports);
   }
 
-  /** The owner answered. Feed it to the machine for the console it names. */
-  usePs5WakeDecided(branchId, useCallback((event) => {
-    const device = devices.find((d) => d.id === event.device_id);
-    if (!device?.console_host_id) return;
+  /**
+   * The owner answered.
+   *
+   * Fed in from outside rather than subscribed to here: the watcher covers every
+   * venue this account can see, and a hook cannot subscribe to a list of
+   * branches. The provider mounts one listener per branch and calls this.
+   */
+  const wakeDecided = useCallback((deviceId: number, eventUuid: string, approved: boolean) => {
+    const device = boundRef.current.find((d) => d.deviceId === deviceId);
+    if (!device) return;
 
-    setDecisions((d) => ({
-      ...d,
-      [device.console_host_id as string]: { eventId: event.event_uuid, approved: event.approved },
-    }));
+    setDecisions((d) => ({ ...d, [device.hostId]: { eventId: eventUuid, approved } }));
     setNudge((n) => n + 1);
-  }, [devices]));
+    // The console is about to change state one way or the other, and the
+    // operator should not wait ten seconds to see which.
+    refreshNow();
+  }, [refreshNow]);
 
   /** Call when the operator presses Start: the console may wake from now on. */
   const sessionStarting = useCallback((deviceId: number) => {
@@ -258,5 +269,5 @@ export const useConsoleControl = ({ branchId, devices, sessionDeviceIds, enabled
     });
   }, [sessionDeviceIds]);
 
-  return { views, statuses, sessionStarting, sessionStopped };
+  return { views, statuses, sessionStarting, sessionStopped, wakeDecided };
 };

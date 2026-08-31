@@ -14,14 +14,19 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 const pcs = vi.hoisted(() => ({ data: [] as unknown[], calls: 0 }));
 const sessions = vi.hoisted(() => ({ data: [] as unknown[] }));
 const reported = vi.hoisted(() => ({ calls: [] as unknown[] }));
-const bridge = vi.hoisted(() => ({ answer: "awake" as string, probes: 0 }));
+const bridge = vi.hoisted(() => ({ answer: "awake" as string, probes: 0, rests: 0 }));
 
 vi.mock("@/api/pcs", () => ({ apiListPcsEverywhere: async () => { pcs.calls += 1; return pcs; } }));
 vi.mock("@/api/sessions", () => ({ apiListAllActiveSessions: async () => sessions }));
 vi.mock("@/api/ps5", () => ({
   apiReportUnexpectedWake: async (...a: unknown[]) => { reported.calls.push(a); },
 }));
-vi.mock("@/realtime/usePs5Realtime", () => ({ usePs5WakeDecided: () => {} }));
+const decided = vi.hoisted(() => ({ branches: [] as number[], deliver: null as null | ((e: unknown) => void) }));
+vi.mock("@/realtime/usePs5Realtime", () => ({
+  usePs5WakeDecided: (branchId: number, onEvent: (e: unknown) => void) => {
+    if (branchId) { decided.branches.push(branchId); decided.deliver = onEvent; }
+  },
+}));
 vi.mock("@/auth/AuthContext", () => ({ useAuth: () => ({ user: { id: 3, role: "company_owner" } }) }));
 vi.mock("@/ui/notify", () => ({ notify: { message: () => {} } }));
 
@@ -41,8 +46,11 @@ beforeEach(async () => {
   pcs.calls = 0;
   sessions.data = [];
   reported.calls = [];
+  decided.branches = [];
+  decided.deliver = null;
   bridge.answer = "awake";
   bridge.probes = 0;
+  bridge.rests = 0;
 
   (globalThis as Record<string, unknown>).cyberplacePS5 = {
     discover: async () => ({ consoles: [], probed: [], warnings: [] }),
@@ -59,7 +67,7 @@ beforeEach(async () => {
     },
     capabilities: async () => ({ discover: true, observe: true, wake: true, rest: true }),
     wake: async () => ({ sent: true }),
-    rest: async () => ({ sent: true }),
+    rest: async () => { bridge.rests += 1; return { sent: true }; },
   };
 
   ({ Ps5ControlProvider } = await import("./Ps5ControlProvider"));
@@ -130,6 +138,56 @@ describe("watching without a board on screen", () => {
     await act(async () => { await vi.advanceTimersByTimeAsync(11_000); });
 
     expect(reported.calls).toEqual([]);
+  });
+
+  test("the owner's answer is listened for in every venue that has a console", async () => {
+    // The answer travels on the branch feed. Listening only to the first venue
+    // is how a second one would never hear "no" — and never go to sleep.
+    pcs.data = [
+      device({ id: 96, branch_id: 3 }),
+      device({ id: 97, branch_id: 4, console_host_id: "AABBCCDDEEFF", place: { id: 2, number: 2, name: "PS5 II", type: "standard", platform: "ps5" } }),
+    ];
+
+    render(<Ps5ControlProvider><div /></Ps5ControlProvider>);
+    await settle();
+
+    expect([...new Set(decided.branches)].sort()).toEqual([3, 4]);
+  });
+
+  test("a refusal puts that console to sleep", async () => {
+    pcs.data = [device()];
+    render(<Ps5ControlProvider><div /></Ps5ControlProvider>);
+    await settle();
+
+    // The console was reported as switched on with nothing authorising it.
+    await waitFor(() => expect(reported.calls.length).toBe(1));
+    const eventId = (reported.calls[0] as unknown[])[1] as string;
+
+    // The owner says no, and it is asked to sleep — without waiting out the
+    // ten seconds, because the answer already arrived.
+    await act(async () => {
+      decided.deliver?.({ device_id: 96, event_uuid: eventId, approved: false });
+      await vi.advanceTimersByTimeAsync(2_000);
+    });
+
+    await waitFor(() => expect(bridge.rests).toBeGreaterThan(0));
+  });
+
+  test("an approval leaves it alone, past the ten seconds", async () => {
+    pcs.data = [device()];
+    render(<Ps5ControlProvider><div /></Ps5ControlProvider>);
+    await settle();
+    await waitFor(() => expect(reported.calls.length).toBe(1));
+    const eventId = (reported.calls[0] as unknown[])[1] as string;
+
+    await act(async () => {
+      decided.deliver?.({ device_id: 96, event_uuid: eventId, approved: true });
+      await vi.advanceTimersByTimeAsync(2_000);
+    });
+    // Well past the grace window: "yes, that was me" is an answer, not a pause.
+    await act(async () => { await vi.advanceTimersByTimeAsync(20_000); });
+
+    expect(bridge.rests).toBe(0);
   });
 
   test("without the desktop bridge it does nothing at all", async () => {

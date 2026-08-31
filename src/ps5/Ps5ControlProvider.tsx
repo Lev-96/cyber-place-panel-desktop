@@ -2,6 +2,7 @@ import { apiListPcsEverywhere } from "@/api/pcs";
 import { apiListAllActiveSessions } from "@/api/sessions";
 import { useAuth } from "@/auth/AuthContext";
 import { useConsoleControl } from "@/ps5/useConsoleControl";
+import { usePs5WakeDecided } from "@/realtime/usePs5Realtime";
 import { ps5DiscoveryAvailable } from "@/ps5/usePs5Discovery";
 import { IPcApi } from "@/types/sessions";
 import { platformGroup } from "@/utils/platform";
@@ -88,13 +89,23 @@ export const Ps5ControlProvider = ({ children }: { children: ReactNode }) => {
   }, [signedIn, available, reload]);
 
   const control = useConsoleControl({
-    // Every venue at once: the branch only ever narrowed which consoles were
-    // watched, and a console in the other one still has to be noticed.
-    branchId: devices[0]?.branch_id ?? 0,
     devices,
     sessionDeviceIds,
     enabled: signedIn && available,
   });
+
+  /**
+   * Every venue with a bound console, so the owner's answer reaches the panel
+   * that has to act on it.
+   *
+   * One listener per branch: the answer travels on the branch feed, and a hook
+   * cannot subscribe to a list. Watching only the first venue is what would
+   * leave a second one never hearing "no".
+   */
+  const branchIds = useMemo(
+    () => [...new Set(devices.map((d) => d.branch_id))].sort((a, b) => a - b),
+    [devices],
+  );
 
   // The lists are re-read as soon as a session starts or stops, so the watcher
   // is not deciding from a list that is up to thirty seconds old.
@@ -117,7 +128,35 @@ export const Ps5ControlProvider = ({ children }: { children: ReactNode }) => {
     },
   }), [control, reload]);
 
-  return <Ps5ControlContext.Provider value={value}>{children}</Ps5ControlContext.Provider>;
+  return (
+    <Ps5ControlContext.Provider value={value}>
+      {branchIds.map((id) => (
+        <WakeDecisionListener key={id} branchId={id} onDecided={control.wakeDecided} />
+      ))}
+      {children}
+    </Ps5ControlContext.Provider>
+  );
+};
+
+/**
+ * One branch's answers.
+ *
+ * A component rather than a loop of hooks, because a subscription per branch is
+ * exactly what React components are for — and the number of branches changes as
+ * the device list loads.
+ */
+const WakeDecisionListener = ({
+  branchId,
+  onDecided,
+}: {
+  branchId: number;
+  onDecided: (deviceId: number, eventUuid: string, approved: boolean) => void;
+}) => {
+  usePs5WakeDecided(branchId, useCallback((event) => {
+    onDecided(event.device_id, event.event_uuid, event.approved);
+  }, [onDecided]));
+
+  return null;
 };
 
 /** What a screen needs from the watcher: the states, and the two intents. */
