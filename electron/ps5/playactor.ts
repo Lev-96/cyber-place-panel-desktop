@@ -153,7 +153,47 @@ export const pair = async (
  * console to have been paired, and it needs it to be awake — asking a sleeping
  * console to sleep is not an error worth reporting as a failure.
  */
+/**
+ * How many times to ask before calling it a failure, and how long to wait
+ * between.
+ *
+ * Measured on a real console: the first session request is sometimes refused
+ * with a transient 403 and the next one, eight seconds later, is accepted — the
+ * console then sleeps within five. Reporting the first refusal as the answer is
+ * what made "press No and nothing happens" true: the panel gave up and waited
+ * out its backoff while the console was perfectly willing to be asked again.
+ */
+const STANDBY_ATTEMPTS = 3;
+const STANDBY_RETRY_MS = 4_000;
+
+/**
+ * Refusals that will not change by asking again in a few seconds.
+ *
+ * A console holding a Remote Play session says so until something on the
+ * console frees it — measured at three minutes of complete silence and still
+ * refusing — and an unpaired console will not pair itself. Retrying either is
+ * noise. Everything else has been seen to clear on the next attempt.
+ */
+export const isPermanentRefusal = (code: PairResult["code"]): boolean =>
+  code === "REJECTED" || code === "IN_USE";
+
 export const standby = async (address: string, keys: WakeKeys): Promise<PairResult> => {
+  let last: PairResult = { ok: false, code: "FAILED" };
+
+  for (let attempt = 1; attempt <= STANDBY_ATTEMPTS; attempt++) {
+    last = await standbyOnce(address, keys);
+    if (last.ok || isPermanentRefusal(last.code)) return last;
+
+    if (attempt < STANDBY_ATTEMPTS) {
+      await new Promise((resolve) => setTimeout(resolve, STANDBY_RETRY_MS));
+    }
+  }
+
+  return last;
+};
+
+/** One attempt: open the session, ask, and close whatever happened. */
+const standbyOnce = async (address: string, keys: WakeKeys): Promise<PairResult> => {
   try {
     const { PendingDevice } = await import("playactor/dist/device/pending");
     const { CredentialManager } = await import("playactor/dist/credentials");
