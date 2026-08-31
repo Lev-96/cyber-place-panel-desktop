@@ -28,6 +28,25 @@ import { useCallback, useEffect, useRef, useState } from "react";
 export const WATCH_INTERVAL_MS = 10_000;
 
 /**
+ * How often to ask while something is expected to change.
+ *
+ * A console that has just been told to wake, or to sleep, changes state within
+ * a few seconds — and until the next observation the screen keeps showing what
+ * was true before the command. Ten seconds of that reads as "nothing is
+ * happening", which is what an operator standing at the counter reports.
+ */
+export const WATCH_INTERVAL_FAST_MS = 1_500;
+
+/**
+ * How long the fast rhythm lasts before the ten-second one returns.
+ *
+ * Long enough to cover a console waking (a few seconds) or going to rest, short
+ * enough that a console which is not going to obey does not get asked forty
+ * times a minute for the rest of the shift.
+ */
+export const WATCH_FAST_WINDOW_MS = 20_000;
+
+/**
  * Silent ticks before the watcher stops trusting the address it has and
  * sweeps. Two, so a single dropped datagram (which UDP is entitled to) costs a
  * slower answer rather than a network-wide broadcast.
@@ -48,6 +67,8 @@ export interface ConsoleStatus {
 
 interface Options {
   intervalMs?: number;
+  /** How often to ask while a change is expected. */
+  fastIntervalMs?: number;
   /**
    * Called when a console turns up at an address other than the one we had.
    * The caller decides whether that is worth persisting — the watcher itself
@@ -60,7 +81,7 @@ interface Options {
  * @param bound  The consoles to watch. An empty list starts no timer at all.
  */
 export const useConsoleWatch = (bound: WatchedConsole[], options: Options = {}) => {
-  const { intervalMs = WATCH_INTERVAL_MS } = options;
+  const { intervalMs = WATCH_INTERVAL_MS, fastIntervalMs = WATCH_INTERVAL_FAST_MS } = options;
   const [statuses, setStatuses] = useState<Record<string, ConsoleStatus>>({});
 
   // The watched set as a value, not an identity: callers build this array
@@ -77,6 +98,15 @@ export const useConsoleWatch = (bound: WatchedConsole[], options: Options = {}) 
   const misses = useRef<Record<string, number>>({});
   /** Addresses learned since mount, which are fresher than the props. */
   const learned = useRef<Record<string, string>>({});
+  /**
+   * Until when to ask quickly, because something was just asked to change.
+   *
+   * A moment rather than a flag: it lapses on its own, so a console that never
+   * obeys cannot leave the panel polling it for the rest of the day.
+   */
+  const fastUntil = useRef(0);
+  /** Wakes the loop out of its wait, for when there is no reason to wait. */
+  const wakeLoop = useRef<(() => void) | null>(null);
 
   const tick = useCallback(async () => {
     const api = ps5Bridge();
@@ -144,21 +174,45 @@ export const useConsoleWatch = (bound: WatchedConsole[], options: Options = {}) 
     // Chained timeouts rather than an interval: a probe that takes longer than
     // the interval must delay the next tick, not stack another one on top of
     // it. The wait is measured from when the tick STARTED, so the check happens
-    // every ten seconds — not every ten seconds plus however long the network
-    // took, which is how a "ten-second" check quietly becomes a twelve-second
-    // one.
+    // on its period — not the period plus however long the network took, which
+    // is how a "ten-second" check quietly becomes a twelve-second one.
     const run = async () => {
       const startedAt = Date.now();
       await tick();
-      if (!stopped) timer = setTimeout(() => void run(), Math.max(0, intervalMs - (Date.now() - startedAt)));
+      if (stopped) return;
+
+      // Quickly while a change is expected, at the usual rhythm otherwise.
+      const period = Date.now() < fastUntil.current ? fastIntervalMs : intervalMs;
+      const wait = Math.max(0, period - (Date.now() - startedAt));
+
+      timer = setTimeout(() => void run(), wait);
+      // …and the wait can be cut short: pressing Start should not mean waiting
+      // out a period that began before the operator touched anything.
+      wakeLoop.current = () => {
+        clearTimeout(timer);
+        void run();
+      };
     };
     void run();
 
     return () => {
       stopped = true;
+      wakeLoop.current = null;
       clearTimeout(timer);
     };
-  }, [key, intervalMs, tick]);
+  }, [key, intervalMs, fastIntervalMs, tick]);
 
-  return { statuses, watching: key !== "" && Boolean(ps5Bridge()?.probe) };
+  /**
+   * Ask now, and keep asking quickly for a short while.
+   *
+   * Called when something has just been asked to change, so the screen shows
+   * what happened within a second or two rather than at the next ten-second
+   * tick — which is the whole of what "it takes ages" was.
+   */
+  const refreshNow = useCallback(() => {
+    fastUntil.current = Date.now() + WATCH_FAST_WINDOW_MS;
+    wakeLoop.current?.();
+  }, []);
+
+  return { statuses, refreshNow, watching: key !== "" && Boolean(ps5Bridge()?.probe) };
 };

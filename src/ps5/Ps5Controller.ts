@@ -71,6 +71,15 @@ export interface ConsoleInput {
   maintenance: boolean;
   /** Whether the transport can put this console to rest. False today. */
   canRest: boolean;
+  /**
+   * An operator has just pressed Start or Stop on this console.
+   *
+   * The cooldowns exist so a monitor running all shift does not shout at a
+   * console every ten seconds. They must not apply to somebody standing at the
+   * counter who has just asked for something: waiting out a backoff that began
+   * before they touched anything is exactly what "it takes ages" means.
+   */
+  urgent?: boolean;
   decision: Observation["decision"];
 }
 
@@ -197,17 +206,22 @@ export class Ps5Controller {
   }
 
   private async execute(input: ConsoleInput, command: Command): Promise<void> {
-    // Pressing Start three times must produce one wake, not three.
+    // Pressing Start three times must produce one wake, not three. This one
+    // holds even for an urgent request: a command already on the wire is not
+    // made faster by sending it twice.
     if (this.inFlight.has(input.hostId)) return;
 
-    const failedAt = this.failedAt.get(input.hostId);
-    if (failedAt !== undefined && this.ports.now() - failedAt < RETRY_BACKOFF_MS) return;
-
-    // The same command, to the same console, is a retry — worth doing, but not
-    // on every tick of a ten-second monitor.
     const sentKey = `${input.hostId}:${command.kind}`;
-    const sentAt = this.sentAt.get(sentKey);
-    if (sentAt !== undefined && this.ports.now() - sentAt < RESEND_COOLDOWN_MS) return;
+
+    if (!input.urgent) {
+      const failedAt = this.failedAt.get(input.hostId);
+      if (failedAt !== undefined && this.ports.now() - failedAt < RETRY_BACKOFF_MS) return;
+
+      // The same command, to the same console, is a retry — worth doing, but
+      // not on every tick of a ten-second monitor.
+      const sentAt = this.sentAt.get(sentKey);
+      if (sentAt !== undefined && this.ports.now() - sentAt < RESEND_COOLDOWN_MS) return;
+    }
 
     if (!input.address) {
       // Bound but never located. Nothing to aim at until a sweep finds it.

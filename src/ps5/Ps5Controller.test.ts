@@ -156,6 +156,73 @@ describe("failures are surfaced", () => {
   });
 });
 
+describe("an operator who has just pressed something", () => {
+  test("a press is not made to wait out a cooldown it did not cause", async () => {
+    // The monitor's rate limit exists so a console is not shouted at every ten
+    // seconds all shift. Somebody standing at the counter who has just pressed
+    // Start is not the monitor, and waiting out a window that began before they
+    // touched anything is exactly what "it takes ages" means.
+    const c = new Ps5Controller(ports);
+
+    await c.tick([input({ starting: true })]);
+    expect(wake).toHaveBeenCalledTimes(1);
+
+    clock += 2_000;
+    await c.tick([input({ starting: true, urgent: true })]);
+
+    expect(wake).toHaveBeenCalledTimes(2);
+  });
+
+  test("a press gets past a recent failure too", async () => {
+    wake.mockResolvedValueOnce({ sent: false, code: "TRANSPORT_ERROR" });
+    const c = new Ps5Controller(ports);
+
+    await c.tick([input({ starting: true })]);
+    expect(wake).toHaveBeenCalledTimes(1);
+
+    // The backoff would normally hold this for half a minute.
+    clock += 3_000;
+    await c.tick([input({ starting: true, urgent: true })]);
+
+    expect(wake).toHaveBeenCalledTimes(2);
+  });
+
+  test("but two presses do not put two commands on the wire at once", async () => {
+    // Urgency skips the waiting, not the guard: a command already in flight is
+    // not made faster by sending it again.
+    // Held open deliberately: the second tick must find the first command still
+    // on the wire.
+    let release = () => {};
+    wake.mockImplementation(async () => {
+      await new Promise<void>((resolve) => { release = resolve; });
+      return { sent: true };
+    });
+    const c = new Ps5Controller(ports);
+
+    const first = c.tick([input({ starting: true, urgent: true })]);
+    await Promise.resolve();
+    await c.tick([input({ starting: true, urgent: true })]);
+
+    expect(wake).toHaveBeenCalledTimes(1);
+    release();
+    await first;
+  });
+
+  test("the monitor itself still waits its turn", async () => {
+    // Without a press, the cooldown is exactly as it was: one datagram, not one
+    // per tick.
+    const c = new Ps5Controller(ports);
+
+    await c.tick([input({ starting: true })]);
+    clock += 2_000;
+    await c.tick([input({ starting: true })]);
+    clock += 2_000;
+    await c.tick([input({ starting: true })]);
+
+    expect(wake).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe("several consoles", () => {
   test("starting a session on one does not touch the other", async () => {
     const c = new Ps5Controller(ports);

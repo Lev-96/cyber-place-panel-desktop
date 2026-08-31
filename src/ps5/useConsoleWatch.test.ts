@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import { useConsoleWatch, WATCH_INTERVAL_MS } from "./useConsoleWatch";
+import { useConsoleWatch, WATCH_INTERVAL_FAST_MS, WATCH_INTERVAL_MS } from "./useConsoleWatch";
 import type { Ps5Console, Ps5SweepResult } from "./usePs5Discovery";
 
 /**
@@ -60,6 +60,55 @@ afterEach(() => {
 
 /** Let the pending probe promise settle before asserting on what it produced. */
 const settle = async () => { await act(async () => { await Promise.resolve(); await Promise.resolve(); }); };
+
+describe("asking again straight away", () => {
+  test("a press asks now instead of waiting out the period", async () => {
+    // The operator is looking at the tile. The next scheduled look could be ten
+    // seconds away, and ten seconds of the previous state on screen is what
+    // "nothing happens when I press Start" was.
+    answerToProbe = () => [consoleAt("AAA", "192.168.1.10")];
+    const { result } = renderHook(() => useConsoleWatch([{ hostId: "AAA", address: "192.168.1.10" }]));
+
+    await settle();
+    expect(probeCalls).toHaveLength(1);
+
+    await act(async () => { result.current.refreshNow(); await Promise.resolve(); });
+    await settle();
+
+    expect(probeCalls).toHaveLength(2);
+  });
+
+  test("and keeps asking quickly while something is expected to change", async () => {
+    answerToProbe = () => [consoleAt("AAA", "192.168.1.10")];
+    const { result } = renderHook(() => useConsoleWatch([{ hostId: "AAA", address: "192.168.1.10" }]));
+    await settle();
+
+    await act(async () => { result.current.refreshNow(); await Promise.resolve(); });
+    await settle();
+    const after = probeCalls.length;
+
+    // Three fast periods, three more looks — not one.
+    await act(async () => { await vi.advanceTimersByTimeAsync(WATCH_INTERVAL_FAST_MS * 3); });
+
+    expect(probeCalls.length).toBeGreaterThan(after + 1);
+  });
+
+  test("the fast rhythm lapses on its own", async () => {
+    // A console that never obeys must not leave the panel polling it all day.
+    answerToProbe = () => [consoleAt("AAA", "192.168.1.10")];
+    const { result } = renderHook(() => useConsoleWatch([{ hostId: "AAA", address: "192.168.1.10" }]));
+    await settle();
+
+    await act(async () => { result.current.refreshNow(); await Promise.resolve(); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(30_000); });
+    const settled = probeCalls.length;
+
+    // Well past the window: back to one look per ten seconds.
+    await act(async () => { await vi.advanceTimersByTimeAsync(WATCH_INTERVAL_MS); });
+
+    expect(probeCalls.length - settled).toBeLessThanOrEqual(2);
+  });
+});
 
 describe("the ten-second console check", () => {
   test("asks the bound consoles at their own addresses, not the whole network", async () => {

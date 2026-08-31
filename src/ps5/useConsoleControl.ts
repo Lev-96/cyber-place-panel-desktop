@@ -31,6 +31,15 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 /** How long a local "starting" intent stands before it is assumed to have failed. */
 const INTENT_TTL_MS = 60_000;
 
+/**
+ * How long a press counts as urgent.
+ *
+ * Enough to carry the command and its confirmation past the rate limits that
+ * exist for the monitor, and no longer — those limits are what keep a console
+ * from being asked something forty times a minute.
+ */
+const URGENT_WINDOW_MS = 15_000;
+
 interface Options {
   branchId: number;
   /** Console devices of this branch, as the board has them. */
@@ -55,7 +64,7 @@ export const useConsoleControl = ({ branchId, devices, sessionDeviceIds, enabled
     [bound],
   );
 
-  const { statuses } = useConsoleWatch(watched, {
+  const { statuses, refreshNow } = useConsoleWatch(watched, {
     onAddressChanged: useCallback((hostId: string, address: string) => {
       const device = bound.find((d) => d.console_host_id === hostId);
       if (device) void import("@/repositories/PcRepository").then(({ pcRepository }) =>
@@ -70,6 +79,15 @@ export const useConsoleControl = ({ branchId, devices, sessionDeviceIds, enabled
   const [decisions, setDecisions] = useState<Record<string, { eventId: string; approved: boolean }>>({});
   /** Forces a control pass outside the ten-second rhythm, right after a press. */
   const [nudge, setNudge] = useState(0);
+  /**
+   * Consoles an operator has just acted on, and until when that counts.
+   *
+   * A press is not a monitor tick: it must not wait out a cooldown that started
+   * before anybody touched anything. The window is short — long enough to cover
+   * the command and the confirmation, not long enough to disable the rate
+   * limits that keep a console from being shouted at all shift.
+   */
+  const urgentUntil = useRef<Record<number, number>>({});
   /**
    * What the transport underneath can actually do.
    *
@@ -163,12 +181,17 @@ export const useConsoleControl = ({ branchId, devices, sessionDeviceIds, enabled
 
   /** Call when the operator presses Start: the console may wake from now on. */
   const sessionStarting = useCallback((deviceId: number) => {
+    urgentUntil.current[deviceId] = Date.now() + URGENT_WINDOW_MS;
     setStarting((s) => ({ ...s, [deviceId]: { at: Date.now() } }));
     setNudge((n) => n + 1);
-  }, []);
+    // Ask the console now, and keep asking quickly: the operator is watching
+    // the tile, and the next scheduled look could be ten seconds away.
+    refreshNow();
+  }, [refreshNow]);
 
   /** Call when a session has actually stopped on the backend. */
   const sessionStopped = useCallback((deviceId: number) => {
+    urgentUntil.current[deviceId] = Date.now() + URGENT_WINDOW_MS;
     setStopping((s) => ({ ...s, [deviceId]: { at: Date.now() } }));
     setStarting((s) => {
       const next = { ...s };
@@ -176,7 +199,8 @@ export const useConsoleControl = ({ branchId, devices, sessionDeviceIds, enabled
       return next;
     });
     setNudge((n) => n + 1);
-  }, []);
+    refreshNow();
+  }, [refreshNow]);
 
   // One control pass per observation, plus one immediately after a press. The
   // observations arrive every ten seconds from the monitor, which is what makes
@@ -207,6 +231,7 @@ export const useConsoleControl = ({ branchId, devices, sessionDeviceIds, enabled
         stopping: Boolean(stopIntent) && now - (stopIntent?.at ?? 0) < INTENT_TTL_MS,
         maintenance: maintenanceUntil > now,
         canRest,
+        urgent: (urgentUntil.current[device.id] ?? 0) > now,
         decision: decisions[hostId] ?? null,
       };
     });
