@@ -87,7 +87,7 @@ class SuppliedPin {
 
 export interface PairResult {
   ok: boolean;
-  code?: "NO_PIN" | "NOT_AWAKE" | "REJECTED" | "UNREACHABLE" | "FAILED";
+  code?: "NO_PIN" | "NOT_AWAKE" | "REJECTED" | "UNREACHABLE" | "FAILED" | "IN_USE";
   detail?: string;
 }
 
@@ -175,8 +175,14 @@ export const standby = async (address: string, keys: WakeKeys): Promise<PairResu
     );
 
     const connection = await device.openConnection();
-    await connection.standby();
-    await connection.close();
+    try {
+      await connection.standby();
+    } finally {
+      // Always, even when the request above threw. A session left open is one
+      // the console goes on holding, and the next attempt is then refused with
+      // "already in use" — by us, against ourselves.
+      await connection.close().catch(() => {});
+    }
 
     return { ok: true };
   } catch (error) {
@@ -184,9 +190,12 @@ export const standby = async (address: string, keys: WakeKeys): Promise<PairResu
 
     return {
       ok: false,
-      code: /NOT_PAIRED|credential/i.test(message) ? "REJECTED"
-        : /not found|no device|timed out/i.test(message) ? "UNREACHABLE"
-          : "FAILED",
+      // The console's own refusals, kept apart because they need different
+      // things done about them. "Already in use" is not a failure to reach it.
+      code: /already in use|in use/i.test(message) ? "IN_USE"
+        : /NOT_PAIRED|credential/i.test(message) ? "REJECTED"
+          : /not found|no device|timed out|unable to locate/i.test(message) ? "UNREACHABLE"
+            : "FAILED",
       detail: message.slice(0, 200),
     };
   }

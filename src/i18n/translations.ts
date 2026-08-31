@@ -287,6 +287,11 @@ export const TRANSLATIONS: Dict = {
     ru: "Эту приставку не видно в сети",
     am: "Այս կոնսոլը ցանցում չի երևում",
   },
+  "ps5.error.IN_USE": {
+    en: "The console says a Remote Play session is already in use — close it on the console or wait a moment",
+    ru: "Приставка отвечает, что сессия Remote Play уже занята — закройте её на приставке или подождите немного",
+    am: "Կոնսոլն ասում է, որ Remote Play սեսիան արդեն զբաղված է — փակեք այն կոնսոլի վրա կամ սպասեք",
+  },
   "ps5.error.UNSUPPORTED_BY_TRANSPORT": {
     en: "This build cannot put a console to rest over the network",
     ru: "Эта сборка не умеет усыплять приставку по сети",

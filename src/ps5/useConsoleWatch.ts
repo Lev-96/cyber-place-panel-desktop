@@ -24,8 +24,21 @@ import { useCallback, useEffect, useRef, useState } from "react";
  * remember it.
  */
 
-/** Ten seconds — how often a bound console is asked how it is doing. */
+/** Ten seconds — how often a console with a session running is checked. */
 export const WATCH_INTERVAL_MS = 10_000;
+
+/**
+ * How often a console that SHOULD be asleep is checked.
+ *
+ * This is the state where the interesting thing is somebody pressing the
+ * console's own power button, and the owner is meant to be asked about it at
+ * once. Ten seconds of silence before the question appears is most of what
+ * "it does not notify me straight away" was. A unicast datagram costs a console
+ * about a hundred and thirty milliseconds to answer, so asking every three
+ * seconds is nothing to a venue's network and the difference between "at once"
+ * and "eventually" to the person watching.
+ */
+export const WATCH_INTERVAL_WATCHFUL_MS = 3_000;
 
 /**
  * How often to ask while something is expected to change.

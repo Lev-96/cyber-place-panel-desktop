@@ -33,6 +33,7 @@ export type ConsoleObservation = "awake" | "rest" | "unreachable" | "unknown";
 
 /** Why a command did not happen. Each is a different thing to do about it. */
 export type Ps5ErrorCode =
+  | "IN_USE"
   | "NO_CREDENTIAL"
   | "BAD_CREDENTIAL"
   | "DEVICE_NOT_FOUND"
@@ -140,9 +141,12 @@ export class DiscoveryTransport implements Ps5Transport {
       sent: false,
       // A console nobody paired cannot be rested, and that is a different
       // sentence from one that could not be reached.
-      code: result.code === "REJECTED" ? "NO_CREDENTIAL"
-        : result.code === "UNREACHABLE" ? "DEVICE_NOT_FOUND"
-          : "TRANSPORT_ERROR",
+      // Each of the console's answers means something different to whoever is
+      // standing in front of it.
+      code: result.code === "IN_USE" ? "IN_USE"
+        : result.code === "REJECTED" ? "NO_CREDENTIAL"
+          : result.code === "UNREACHABLE" ? "DEVICE_NOT_FOUND"
+            : "TRANSPORT_ERROR",
       detail: result.detail,
     };
   }

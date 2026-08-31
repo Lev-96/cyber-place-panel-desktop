@@ -140,6 +140,38 @@ describe("watching without a board on screen", () => {
     expect(reported.calls).toEqual([]);
   });
 
+  test("a console with no session is checked every few seconds, not every ten", async () => {
+    // The state where the interesting thing is somebody pressing the console's
+    // own power button — and the owner is meant to be asked at once, not after
+    // a ten-second silence.
+    pcs.data = [device()];
+    bridge.answer = "rest";
+
+    render(<Ps5ControlProvider><div /></Ps5ControlProvider>);
+    await settle();
+    const after = bridge.probes;
+
+    await act(async () => { await vi.advanceTimersByTimeAsync(10_000); });
+
+    // Three seconds apart is at least three looks in ten, not one.
+    expect(bridge.probes - after).toBeGreaterThanOrEqual(2);
+  });
+
+  test("a console in use is left on the slower rhythm", async () => {
+    // Nothing to catch here: the console is authorised to be awake, so asking
+    // it twenty times a minute buys nothing and costs the venue's network.
+    pcs.data = [device()];
+    sessions.data = [{ id: 5, pc_id: 96, status: "active" }];
+
+    render(<Ps5ControlProvider><div /></Ps5ControlProvider>);
+    await settle();
+    const after = bridge.probes;
+
+    await act(async () => { await vi.advanceTimersByTimeAsync(9_000); });
+
+    expect(bridge.probes - after).toBeLessThanOrEqual(1);
+  });
+
   test("the owner's answer is listened for in every venue that has a console", async () => {
     // The answer travels on the branch feed. Listening only to the first venue
     // is how a second one would never hear "no" — and never go to sleep.

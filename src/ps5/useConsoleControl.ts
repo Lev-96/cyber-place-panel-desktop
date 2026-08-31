@@ -2,7 +2,7 @@ import { apiReportUnexpectedWake } from "@/api/ps5";
 import { notify } from "@/ui/notify";
 import { tActive } from "@/i18n/translations";
 import { ps5Bridge } from "@/ps5/usePs5Discovery";
-import { useConsoleWatch, type WatchedConsole } from "@/ps5/useConsoleWatch";
+import { useConsoleWatch, WATCH_INTERVAL_MS, WATCH_INTERVAL_WATCHFUL_MS, type WatchedConsole } from "@/ps5/useConsoleWatch";
 import { Ps5Controller, type ConsoleInput, type ControllerPorts } from "@/ps5/Ps5Controller";
 import { IPcApi } from "@/types/sessions";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -69,7 +69,22 @@ export const useConsoleControl = ({ devices, sessionDeviceIds, enabled = true }:
   const boundRef = useRef<Array<{ deviceId: number; hostId: string }>>([]);
   boundRef.current = bound.map((d) => ({ deviceId: d.id, hostId: d.console_host_id as string }));
 
+  /**
+   * How closely to watch.
+   *
+   * A console with no session on it is one that ought to be asleep, and the
+   * event worth catching is somebody switching it on by hand — so it is checked
+   * every few seconds and the owner is asked almost immediately. A console with
+   * a session running is simply in use; ten seconds is plenty to notice it drop
+   * off the network.
+   */
+  const watchful = useMemo(
+    () => bound.some((d) => !sessionDeviceIds.has(d.id)),
+    [bound, sessionDeviceIds],
+  );
+
   const { statuses, refreshNow } = useConsoleWatch(watched, {
+    intervalMs: watchful ? WATCH_INTERVAL_WATCHFUL_MS : WATCH_INTERVAL_MS,
     onAddressChanged: useCallback((hostId: string, address: string) => {
       const device = bound.find((d) => d.console_host_id === hostId);
       if (device) void import("@/repositories/PcRepository").then(({ pcRepository }) =>
