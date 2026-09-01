@@ -65,6 +65,37 @@ export const mergeMessage = (prev: ISupportMessage[], incoming: ISupportMessage)
   return next;
 };
 
+/**
+ * How long a message may claim to be on its way before that stops being true.
+ *
+ * A queued message is one the server accepted and handed to the worker that
+ * carries it to Telegram. That normally takes a second; the status exists for
+ * the seconds in between.
+ *
+ * When the worker is not running — a deployment where nobody started it, or one
+ * whose queue moved off `sync` — the row stays `queued` forever, and the screen
+ * went on saying "reaching support…" for hours. The person had written about a
+ * problem and had no way to know nobody would see it. Two minutes is far longer
+ * than any real delivery and far shorter than a shift.
+ */
+export const DELIVERY_STUCK_AFTER_MS = 120_000;
+
+/**
+ * Whether this message should stop claiming it is on its way.
+ *
+ * Pure, and takes `now`, so the rule is testable without a clock and without a
+ * screen. Only a staff message can be undelivered — support's own messages
+ * arrive FROM Telegram and have nothing to deliver.
+ */
+export const isStuckInDelivery = (message: ISupportMessage, now: number): boolean => {
+  if (message.sender !== "staff" || message.delivery !== "queued") return false;
+  if (!message.created_at) return false;
+
+  const sentAt = Date.parse(message.created_at);
+
+  return Number.isFinite(sentAt) && now - sentAt >= DELIVERY_STUCK_AFTER_MS;
+};
+
 /** A line the user typed that has not been accepted by the server yet. */
 interface PendingMessage {
   localId: string;
@@ -88,6 +119,8 @@ const SupportChat = () => {
   /** True while the branch cards are up instead of a thread. */
   const [picking, setPicking] = useState(false);
   const [listError, setListError] = useState<string | null>(null);
+  /** The clock the delivery lines are read against; ticked only while one waits. */
+  const [now, setNow] = useState(() => Date.now());
 
   const [draft, setDraft] = useState("");
   const [files, setFiles] = useState<File[]>([]);
@@ -162,6 +195,23 @@ const SupportChat = () => {
   useEffect(() => {
     bottom.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [messages.length, pending.length]);
+
+  /**
+   * Re-read the clock while something is still waiting to be delivered.
+   *
+   * Only then: a thread with nothing queued starts no timer at all. Without it
+   * a stuck line would go on saying "reaching support…" until something else
+   * happened to re-render the screen.
+   */
+  const awaitingDelivery = messages.some((m) => m.sender === "staff" && m.delivery === "queued");
+
+  useEffect(() => {
+    if (!awaitingDelivery) return;
+
+    const timer = setInterval(() => setNow(Date.now()), 30_000);
+
+    return () => clearInterval(timer);
+  }, [awaitingDelivery]);
 
   /**
    * Live lines, for every thread this account owns.
@@ -431,10 +481,10 @@ const SupportChat = () => {
                       ))}
                       {/* Delivery is shown only when it is not the boring case:
                           a message that reached support needs no commentary. */}
-                      {m.sender === "staff" && m.delivery === "queued" && (
+                      {m.sender === "staff" && m.delivery === "queued" && !isStuckInDelivery(m, now) && (
                         <div className="support-bubble__state">{t("support.state.queued")}</div>
                       )}
-                      {m.sender === "staff" && m.delivery === "failed" && (
+                      {m.sender === "staff" && (m.delivery === "failed" || isStuckInDelivery(m, now)) && (
                         <div className="support-bubble__state is-failed">
                           {t("support.state.undelivered")}{m.delivery_error ? ` · ${m.delivery_error}` : ""}
                         </div>
