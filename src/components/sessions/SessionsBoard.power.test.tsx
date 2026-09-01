@@ -139,9 +139,10 @@ describe("the console's own power button", () => {
     expect(powerButton()).toBeUndefined();
   });
 
-  test("a seat with somebody playing on it has no power button", async () => {
+  test("a seat with somebody playing on it shows it, refused, with the reason", async () => {
     // A running session outranks everything: a console rested under one is woken
-    // again within seconds, so the button would do nothing and look broken.
+    // again within seconds, so the command is refused. Hiding the button left
+    // the operator hunting for it; showing it disabled answers the question.
     control.statuses = { [HOST]: { state: "awake", address: "192.168.1.35", name: "PS5-172" } };
     repo.listPcs.mockResolvedValue([console_()]);
     repo.listActive.mockResolvedValue([
@@ -149,7 +150,26 @@ describe("the console's own power button", () => {
     ]);
     await mount();
 
-    expect(powerButton()).toBeUndefined();
+    const button = powerButton();
+    expect(button).toBeTruthy();
+    expect(button!.disabled).toBe(true);
+    expect(button!.title).toBe("ps5.power.blockedBySession");
+  });
+
+  test("and pressing it there does nothing at all", async () => {
+    // Belt and braces: disabled is a rendering, and the command must not leave
+    // even if something contrives to click it.
+    control.statuses = { [HOST]: { state: "awake", address: "192.168.1.35", name: "PS5-172" } };
+    repo.listPcs.mockResolvedValue([console_()]);
+    repo.listActive.mockResolvedValue([
+      { id: 5, pc_id: 1, branch_id: 7, status: "active", mode: "open", hourly_rate: "1500.00", started_at: new Date().toISOString(), items: [] },
+    ]);
+    await mount();
+
+    await act(async () => { fireEvent.click(powerButton()!); });
+
+    expect(api.power).not.toHaveBeenCalled();
+    expect(control.powering).not.toHaveBeenCalled();
   });
 
   test("pressing it tells the server and this machine, in that order", async () => {

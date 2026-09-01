@@ -339,6 +339,22 @@ const SessionsBoard = ({ branchId }: Props) => {
             <div className="row" style={{ gap: 6, marginTop: 4, flexWrap: "wrap" }}>
               <Button variant="secondary" onClick={() => setAddItemTarget(sess)} style={miniBtnFlex}>{t("session.addItem")}</Button>
               <Button variant="secondary" onClick={() => setStopTarget(sess)} style={miniBtnFlex}>{t("action.stop")}</Button>
+              {/* The console's power is shown here too, and refused here too.
+                  A running session outranks everything in the state machine, so
+                  a console rested under one is woken again within seconds — the
+                  button would do nothing. Hiding it left the operator wondering
+                  where it went; showing it disabled, with the reason, answers
+                  the question they were about to ask. */}
+              {consoleState && pc.console_host_id && (
+                <Button
+                  variant="secondary"
+                  disabled
+                  title={t("ps5.power.blockedBySession")}
+                  style={miniBtnFlex}
+                >
+                  {t("ps5.power.off")}
+                </Button>
+              )}
             </div>
           </>
         ) : (

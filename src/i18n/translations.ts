@@ -245,6 +245,11 @@ export const TRANSLATIONS: Dict = {
   // no remote shutdown, and promising one on a button would be a lie.
   "ps5.power.on": { en: "Turn on", ru: "Включить", am: "Միացնել" },
   "ps5.power.off": { en: "To rest mode", ru: "В режим покоя", am: "Հանգստի ռեժիմ" },
+  "ps5.power.blockedBySession": {
+    en: "Stop the session first — stopping puts the console into rest mode by itself",
+    ru: "Сначала остановите сессию — она сама отправит приставку в режим покоя",
+    am: "Նախ դադարեցրեք սեսիան — այն ինքը կոնսոլը կտեղափոխի հանգստի ռեժիմ",
+  },
   "ps5.power.working": { en: "Working…", ru: "Выполняем…", am: "Կատարվում է…" },
   "ps5.power.hint": {
     en: "The console only — it starts no session and bills nothing. A PlayStation cannot be switched off over the network; rest mode is its off.",
