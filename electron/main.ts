@@ -378,7 +378,9 @@ app.whenReady().then(async () => {
       return { sent: false, code: "INVALID_STATE" };
     }
 
-    return activeTransport().requestRest(address);
+    // The host-id goes with it: a rest aimed only at an address can land on
+    // whichever console holds that lease right now.
+    return activeTransport().requestRest(address, hostId);
   });
 
   /** What the current transport can actually do, for a screen that must not promise more. */

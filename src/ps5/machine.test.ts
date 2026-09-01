@@ -3,6 +3,7 @@ import {
   initialSnapshot,
   step,
   UNEXPECTED_WAKE_GRACE_MS,
+  REST_SETTLE_MS,
   WAKE_GIVE_UP_MS,
   type MachineSnapshot,
   type Observation,
@@ -377,6 +378,184 @@ describe("a console that cannot be reached", () => {
     expect(steps[1].next.wakeEventId).toBeNull();
     expect(steps[2].commands).toEqual([{ kind: "report-unexpected-wake", eventId: "e3" }]);
     expect(snapshot.state).toBe("UNEXPECTED_WAKE");
+  });
+
+  test("a console with no wake key on this machine is not asked, and says why", () => {
+    // The datagram is authenticated: with no key nothing can be sent, so
+    // nothing is. Reported as the missing key rather than as silence from the
+    // console, which is what sent staff into the PlayStation's own menus.
+    const { next, commands } = step(
+      initialSnapshot(),
+      observe({ actual: "rest", hasSession: true, canWake: false }),
+      "e1",
+    );
+
+    expect(commands).toEqual([]);
+    expect(next.state).toBe("ERROR");
+    expect(next.error).toBe("NO_CREDENTIAL");
+    expect(next.wakingSince).toBeNull();
+  });
+
+  test("a missing key never becomes a verdict about the console's settings", () => {
+    // The give-up message names the console's "turn on from network" switch,
+    // and it may only do that when packets really were leaving this machine.
+    const { snapshot, steps } = run(initialSnapshot(), [
+      { actual: "rest", hasSession: true, canWake: false },
+      { actual: "rest", hasSession: true, canWake: false, now: 1_000_000 + WAKE_GIVE_UP_MS + 1_000 },
+    ]);
+
+    expect(steps.every((s) => s.commands.length === 0)).toBe(true);
+    expect(snapshot.error).toBe("NO_CREDENTIAL");
+  });
+
+  test("a key nobody has asked about yet is still tried", () => {
+    // `undefined` is "not asked", not "absent". Refusing on an unasked question
+    // would break every wake on a build whose bridge cannot answer.
+    const { next, commands } = step(
+      initialSnapshot(),
+      observe({ actual: "rest", hasSession: true }),
+      "e1",
+    );
+
+    expect(commands).toEqual([{ kind: "wake" }]);
+    expect(next.state).toBe("WAKING");
+  });
+
+  test("a console still finishing its sleep is not mistaken for a manual switch-on", () => {
+    // A sleep takes seconds. During them an awake console is a command that has
+    // not landed yet, and asking the owner "is this you?" about a console their
+    // manager just stopped is both wrong and, on a busy floor, indistinguishable
+    // from the real thing.
+    const { steps, snapshot } = run(initialSnapshot(), [
+      { actual: "awake", stopping: true },
+      { actual: "awake", now: 1_010_000 },
+      { actual: "awake", now: 1_020_000 },
+    ]);
+
+    expect(steps.map((s) => s.next.state)).toEqual(["GOING_TO_REST", "GOING_TO_REST", "GOING_TO_REST"]);
+    expect(steps.flatMap((s) => s.commands).some((c) => c.kind === "report-unexpected-wake")).toBe(false);
+    expect(steps[1].commands).toEqual([{ kind: "rest" }]);
+    expect(snapshot.wakeEventId).toBeNull();
+  });
+
+  test("but a console still awake LONG after that IS asked about", () => {
+    // Found on real hardware, and it is the reason the window above has an end.
+    // Switch a console on by hand a few seconds after a stop and the panel, still
+    // believing its own sleep was under way, put it back to sleep and never asked
+    // the owner. Safe, and wrong: being asked is the entire feature.
+    const { steps, snapshot } = run(initialSnapshot(), [
+      { actual: "awake", stopping: true },
+      { actual: "awake", now: 1_000_000 + REST_SETTLE_MS + 1_000 },
+    ]);
+
+    expect(steps[0].next.state).toBe("GOING_TO_REST");
+    expect(steps[1].next.state).toBe("UNEXPECTED_WAKE");
+    expect(steps[1].commands).toEqual([{ kind: "report-unexpected-wake", eventId: "e2" }]);
+    expect(snapshot.wakeEventId).toBe("e2");
+  });
+
+  test("a later sleep gets its own window, not the first one's", () => {
+    // The window is stamped when a sleep begins and must be cleared when the
+    // console actually sleeps. Left behind, the NEXT sleep inherits a stamp
+    // that is already expired, its protection never applies, and the false
+    // "is this you?" during a slow sleep comes straight back.
+    const { steps } = run(initialSnapshot(), [
+      // First sleep, completed.
+      { actual: "awake", stopping: true },
+      { actual: "rest", now: 1_010_000 },
+      // Much later — well past one window — a second sleep begins.
+      { actual: "awake", stopping: true, now: 1_600_000 },
+      // …and is still in progress a few seconds in.
+      { actual: "awake", now: 1_610_000 },
+    ]);
+
+    expect(steps[1].next.state).toBe("REST");
+    expect(steps[1].next.restingSince).toBeNull();
+    expect(steps[2].next.state).toBe("GOING_TO_REST");
+    // The one that matters: still protected, not turned into a question.
+    expect(steps[3].next.state).toBe("GOING_TO_REST");
+    expect(steps[3].commands).toEqual([{ kind: "rest" }]);
+  });
+
+  test("a refusal the console keeps giving stays on the screen", () => {
+    // Measured on real hardware: a console powered on by hand answers "403
+    // Forbidden: Remote is already in use" to every sleep request. The panel
+    // kept retrying and the tile kept saying "going to rest…", which reads as
+    // "working on it" when the truth is "the console is saying no".
+    const { next } = step(
+      { ...initialSnapshot(), state: "GOING_TO_REST", restingSince: 1_000_000 },
+      observe({ actual: "awake", now: 1_005_000, commandError: "IN_USE" }),
+      "e1",
+    );
+
+    expect(next.state).toBe("GOING_TO_REST");
+    expect(next.error).toBe("IN_USE");
+  });
+
+  test("and disappears the moment a command works again", () => {
+    const { next } = step(
+      { ...initialSnapshot(), state: "GOING_TO_REST", restingSince: 1_000_000, error: "IN_USE" },
+      observe({ actual: "awake", now: 1_005_000 }),
+      "e1",
+    );
+
+    expect(next.error).toBeNull();
+  });
+
+  test("a console that reaches rest and is then switched on IS a manual switch-on", () => {
+    // The other half of the rule above: once the console has actually slept,
+    // the stop is over and the next wake is a new situation with nobody behind
+    // it. Losing this would mean never asking the owner again after one stop.
+    const { steps, snapshot } = run(initialSnapshot(), [
+      { actual: "awake", stopping: true },
+      { actual: "rest", now: 1_020_000 },
+      { actual: "awake", now: 1_040_000 },
+    ]);
+
+    expect(steps[1].next.state).toBe("REST");
+    expect(steps[2].commands).toEqual([{ kind: "report-unexpected-wake", eventId: "e3" }]);
+    expect(snapshot.state).toBe("UNEXPECTED_WAKE");
+  });
+
+  test("a sleep that began as a refusal keeps naming the answer it belongs to", () => {
+    // The rest carries the event id so a late-arriving command can still be
+    // matched to the question the owner answered.
+    const { steps } = run(initialSnapshot(), [
+      { actual: "awake" },
+      { actual: "awake", now: 1_002_000, decision: { eventId: "e1", approved: false } },
+      { actual: "awake", now: 1_004_000 },
+    ]);
+
+    expect(steps[1].commands).toEqual([{ kind: "rest", eventId: "e1" }]);
+    expect(steps[2].commands).toEqual([{ kind: "rest", eventId: "e1" }]);
+  });
+
+  test("a session starting beats a sleep already under way", () => {
+    // The new "still going to rest" rule must not trap a console: a player
+    // sitting down at that seat outranks a sleep that has not landed, exactly
+    // as a running session outranks everything else.
+    const { steps } = run(initialSnapshot(), [
+      { actual: "awake", stopping: true },
+      { actual: "awake", hasSession: true, now: 1_010_000 },
+    ]);
+
+    expect(steps[0].next.state).toBe("GOING_TO_REST");
+    expect(steps[1].next.state).toBe("ACTIVE");
+    expect(steps[1].commands).toEqual([]);
+  });
+
+  test("a maintenance window beats a sleep already under way", () => {
+    // Same rule from the other direction: an owner who opens the console for
+    // servicing has said it may be awake, and a sleep still being retried from
+    // an earlier stop must not go on fighting them.
+    const { steps } = run(initialSnapshot(), [
+      { actual: "awake", stopping: true },
+      { actual: "awake", maintenance: true, now: 1_010_000 },
+    ]);
+
+    expect(steps[0].next.state).toBe("GOING_TO_REST");
+    expect(steps[1].next.state).toBe("ACTIVE");
+    expect(steps[1].commands).toEqual([]);
   });
 
   test("an unrecognised answer is UNKNOWN, not OFFLINE", () => {

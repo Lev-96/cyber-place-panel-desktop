@@ -72,6 +72,11 @@ export interface ConsoleInput {
   /** Whether the transport can put this console to rest. False today. */
   canRest: boolean;
   /**
+   * Whether this machine holds the wake key for this console. `undefined`
+   * while the vault has not been asked; see {@link Observation.canWake}.
+   */
+  canWake?: boolean;
+  /**
    * An operator has just pressed Start or Stop on this console.
    *
    * The cooldowns exist so a monitor running all shift does not shout at a
@@ -106,6 +111,8 @@ export class Ps5Controller {
   private readonly snapshots = new Map<string, MachineSnapshot>();
   private readonly inFlight = new Map<string, Command["kind"]>();
   private readonly failedAt = new Map<string, number>();
+  /** Why the last command failed, while it is still failing. */
+  private readonly lastError = new Map<string, string>();
   /** When each command was last put on the wire, keyed by console and kind. */
   private readonly sentAt = new Map<string, number>();
   /** Wakes the backend has accepted, so the owner is asked once per event. */
@@ -126,6 +133,7 @@ export class Ps5Controller {
       this.snapshots.delete(hostId);
       this.inFlight.delete(hostId);
       this.failedAt.delete(hostId);
+      this.lastError.delete(hostId);
       this.sentAt.delete(`${hostId}:wake`);
       this.sentAt.delete(`${hostId}:rest`);
     }
@@ -152,6 +160,8 @@ export class Ps5Controller {
       stopping: input.stopping,
       maintenance: input.maintenance,
       canRest: input.canRest,
+      canWake: input.canWake,
+      commandError: this.lastError.get(input.hostId) ?? null,
       decision: input.decision,
       now: this.ports.now(),
     }, this.ports.newId());
@@ -245,10 +255,12 @@ export class Ps5Controller {
         // Sent, NOT confirmed. Confirmation is the next observation's job, and
         // the state stays WAKING or GOING_TO_REST until the console says so.
         this.failedAt.delete(input.hostId);
+        this.lastError.delete(input.hostId);
         return;
       }
 
       this.failedAt.set(input.hostId, this.ports.now());
+      this.lastError.set(input.hostId, outcome.code ?? "TRANSPORT_ERROR");
       this.snapshots.set(
         input.hostId,
         withError(this.snapshots.get(input.hostId) ?? initialSnapshot(), outcome.code ?? "TRANSPORT_ERROR"),

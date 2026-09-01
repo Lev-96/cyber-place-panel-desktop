@@ -167,6 +167,50 @@ const STANDBY_ATTEMPTS = 3;
 const STANDBY_RETRY_MS = 4_000;
 
 /**
+ * The ceiling on one attempt, and on the whole call.
+ *
+ * playactor waits out its own discovery before it will say a console is not
+ * there, and asking three times turned "put this console to sleep" into a
+ * request that took **144 seconds** to fail — measured, against a console that
+ * had left the network. Nothing else may be sent to that console while one
+ * command is in flight, so those two and a half minutes were two and a half
+ * minutes in which pressing Start woke nothing. That is the whole of "it
+ * depends on what happened before".
+ *
+ * A rest that is going to work is done in a few seconds: the connection opens,
+ * the request goes, the console is asleep within five. These are generous
+ * against that and merciless against the failing path, which is the trade the
+ * floor needs — a failure reported in seconds is retried by the monitor on its
+ * next observation, with a fresh reading of what the console is actually doing.
+ */
+const STANDBY_ATTEMPT_TIMEOUT_MS = 20_000;
+const STANDBY_TOTAL_TIMEOUT_MS = 35_000;
+
+/** Resolve to a timeout result rather than hanging on a library that will not return. */
+export const withCeiling = async (
+  work: Promise<PairResult>,
+  ms: number,
+): Promise<PairResult> => {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+
+  const ceiling = new Promise<PairResult>((resolve) => {
+    timer = setTimeout(
+      () => resolve({ ok: false, code: "UNREACHABLE", detail: `Timed out after ${ms}ms` }),
+      ms,
+    );
+  });
+
+  try {
+    // The abandoned attempt is not cancellable — playactor owns that socket —
+    // but its own `finally` still closes the connection when it settles, so
+    // nothing is left holding a session on the console.
+    return await Promise.race([work, ceiling]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+};
+
+/**
  * Refusals that will not change by asking again in a few seconds.
  *
  * Only one: an unpaired console will not pair itself, and asking again is
@@ -178,9 +222,16 @@ const STANDBY_RETRY_MS = 4_000;
  * clear on the very next attempt. Eight seconds of asking again is a cheap
  * price for the times it is the second kind, and when it is the first kind the
  * operator gets the same message eight seconds later.
+ *
+ * A console that cannot be FOUND is the other one on the list, and it is there
+ * for the opposite reason: asking again is not cheap. Each retry waits out a
+ * full discovery, and the console being absent is exactly the case where every
+ * one of them will. The monitor re-reads the console every one and a half to
+ * ten seconds and re-issues from what it actually sees, so a fast honest "not
+ * there" loses nothing and returns the console to the panel's control at once.
  */
 export const isPermanentRefusal = (code: PairResult["code"]): boolean =>
-  code === "REJECTED";
+  code === "REJECTED" || code === "UNREACHABLE";
 
 /**
  * Hang up on the console rather than pulling the wire out.
@@ -219,11 +270,46 @@ const endGracefully = async (connection: unknown): Promise<void> => {
   await (connection as { close: () => Promise<void> }).close().catch(() => {});
 };
 
-export const standby = async (address: string, keys: WakeKeys): Promise<PairResult> => {
+/**
+ * @param hostId  The console's own `host-id`, when the caller knows it. An
+ *   address is a DHCP lease: with several consoles in a venue the one at
+ *   192.168.1.35 a moment ago may not be the one there now, and putting the
+ *   WRONG console to sleep is the failure this parameter exists to prevent.
+ *   Waking has always been identity-safe (the key is looked up by host-id);
+ *   this is resting catching up.
+ */
+/**
+ * Which discovered console this command is for.
+ *
+ * Identity first, address only as the fallback for a caller that has none.
+ * `id` on a discovered device IS the host-id — the same value the place is
+ * bound to and the wake key is filed under. An address is a DHCP lease: with
+ * several consoles in a venue, the one at 192.168.1.35 a moment ago may not be
+ * the one there now, and putting the WRONG console to sleep is the failure this
+ * exists to prevent.
+ */
+export const isTheConsole = (
+  address: string,
+  hostId?: string,
+): ((found: { id?: string; address?: { address?: string } }) => boolean) =>
+  (found) => (hostId ? found.id === hostId : found.address?.address === address);
+
+export const standby = async (
+  address: string,
+  keys: WakeKeys,
+  hostId?: string,
+): Promise<PairResult> => {
+  const startedAt = Date.now();
   let last: PairResult = { ok: false, code: "FAILED" };
 
   for (let attempt = 1; attempt <= STANDBY_ATTEMPTS; attempt++) {
-    last = await standbyOnce(address, keys);
+    const left = STANDBY_TOTAL_TIMEOUT_MS - (Date.now() - startedAt);
+    if (left <= 0) return last;
+
+    last = await withCeiling(
+      standbyOnce(address, keys, hostId),
+      Math.min(STANDBY_ATTEMPT_TIMEOUT_MS, left),
+    );
     if (last.ok || isPermanentRefusal(last.code)) return last;
 
     if (attempt < STANDBY_ATTEMPTS) {
@@ -235,7 +321,11 @@ export const standby = async (address: string, keys: WakeKeys): Promise<PairResu
 };
 
 /** One attempt: open the session, ask, and close whatever happened. */
-const standbyOnce = async (address: string, keys: WakeKeys): Promise<PairResult> => {
+const standbyOnce = async (
+  address: string,
+  keys: WakeKeys,
+  hostId?: string,
+): Promise<PairResult> => {
   try {
     const { PendingDevice } = await import("playactor/dist/device/pending");
     const { CredentialManager } = await import("playactor/dist/credentials");
@@ -248,8 +338,8 @@ const standbyOnce = async (address: string, keys: WakeKeys): Promise<PairResult>
     );
 
     const device = new PendingDevice(
-      `console at ${address}`,
-      (found: { address?: { address?: string } }) => found.address?.address === address,
+      hostId ? `console ${hostId}` : `console at ${address}`,
+      isTheConsole(address, hostId),
       undefined,
       undefined,
       undefined,

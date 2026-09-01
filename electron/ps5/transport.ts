@@ -72,7 +72,12 @@ export interface Ps5Transport {
   /** Ask named addresses directly. Cheap; this is what the monitor uses. */
   observe(addresses: string[], timeoutMs?: number): Promise<PsConsole[]>;
   wake(address: string, registKey: string | null): Promise<CommandResult>;
-  requestRest(address: string): Promise<CommandResult>;
+  /**
+   * @param hostId  Which console, by its own identity. The address is where it
+   *   was last seen; the host-id is what it IS, and with more than one console
+   *   in a venue only the second one is safe to act on.
+   */
+  requestRest(address: string, hostId?: string): Promise<CommandResult>;
 }
 
 /**
@@ -125,7 +130,7 @@ export class DiscoveryTransport implements Ps5Transport {
     };
   }
 
-  async requestRest(address: string): Promise<CommandResult> {
+  async requestRest(address: string, hostId?: string): Promise<CommandResult> {
     if (!this.keys) {
       return {
         sent: false,
@@ -134,7 +139,7 @@ export class DiscoveryTransport implements Ps5Transport {
       };
     }
 
-    const result = await standby(address, this.keys);
+    const result = await standby(address, this.keys, hostId);
     if (result.ok) return { sent: true };
 
     return {

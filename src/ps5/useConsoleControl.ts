@@ -92,6 +92,25 @@ export const useConsoleControl = ({ devices, sessionDeviceIds, enabled = true }:
     }, [bound]),
   });
 
+  const hostKey = watched.map((c) => c.hostId).sort().join(",");
+  useEffect(() => {
+    const api = ps5Bridge();
+    if (!api?.hasCredential || hostKey === "") return;
+
+    let alive = true;
+    void Promise.all(hostKey.split(",").map(async (hostId) => {
+      // An older preload, or a vault that cannot answer: left out of the map,
+      // which reads as "unknown" and lets the wake be attempted.
+      const answer = await api.hasCredential!(hostId).catch(() => null);
+      return answer ? [hostId, Boolean(answer.has)] as const : null;
+    })).then((pairs) => {
+      if (!alive) return;
+      setKeyed(Object.fromEntries(pairs.filter((p): p is readonly [string, boolean] => p !== null)));
+    });
+
+    return () => { alive = false; };
+  }, [hostKey]);
+
   /** Start pressed / stop confirmed, by device id, with the moment it happened. */
   const [starting, setStarting] = useState<Record<number, Intent>>({});
   const [stopping, setStopping] = useState<Record<number, Intent>>({});
@@ -131,6 +150,20 @@ export const useConsoleControl = ({ devices, sessionDeviceIds, enabled = true }:
     return () => { alive = false; };
   }, []);
 
+  /**
+   * Which consoles this machine actually holds a wake key for.
+   *
+   * Asked of the vault rather than inferred from a failure: a wake with no key
+   * never leaves the machine, so waiting for the attempt to fail spends
+   * forty-five seconds and then reports the console's power settings as the
+   * cause. `undefined` means not asked yet, and the machine treats that as
+   * "try" — only a definite `false` stops a wake.
+   *
+   * The key itself never comes back here; the bridge answers whether, never
+   * what.
+   */
+  const [keyed, setKeyed] = useState<Record<string, boolean>>({});
+
   /** When each console last had a failure announced, so a retry is not a nag. */
   const toldAt = useRef<Record<string, number>>({});
   const controllerRef = useRef<Ps5Controller | null>(null);
@@ -143,6 +176,12 @@ export const useConsoleControl = ({ devices, sessionDeviceIds, enabled = true }:
         if (!api?.wake) return { sent: false, code: "UNSUPPORTED_BY_TRANSPORT" };
 
         const result = await api.wake(hostId, address);
+        // The reason travels as a code so the tile can name it. Without this
+        // the controller recorded a bare "could not reach the console" for a
+        // key that was never on this machine.
+        const code = result.reason === "no-credential" ? "NO_CREDENTIAL"
+          : result.reason === "bad-credential" ? "BAD_CREDENTIAL"
+            : result.reason ? "TRANSPORT_ERROR" : undefined;
         // A wake that could not even be attempted has to reach the person who
         // pressed Start. Without this it was a chip on a tile they were not
         // looking at, and the console simply "did nothing" — which is what a
@@ -160,7 +199,11 @@ export const useConsoleControl = ({ devices, sessionDeviceIds, enabled = true }:
           }
         }
 
-        return result;
+        // A key the vault has since lost is worth learning about now rather
+        // than on the next mount.
+        if (result.reason === "no-credential") setKeyed((prev) => ({ ...prev, [hostId]: false }));
+
+        return code ? { ...result, code } : result;
       },
       rest: async (hostId, address) => {
         const api = ps5Bridge();
@@ -242,6 +285,35 @@ export const useConsoleControl = ({ devices, sessionDeviceIds, enabled = true }:
     refreshNow();
   }, [refreshNow]);
 
+  /**
+   * The operator pressed the console's own power button in the panel.
+   *
+   * Deliberately the SAME intents a session start and stop use, because the
+   * console cannot tell the difference and neither should the machine: what
+   * changes is only why somebody asked. Power on wants it awake, power off
+   * wants it asleep, and both are authorised — which is what keeps an owner
+   * from being asked "did you switch this on?" about a button they pressed
+   * themselves.
+   *
+   * The standing permission to be awake with no session behind it is the
+   * venue's, not this panel's: the backend records it on the device, every
+   * panel reads it, and it expires on its own.
+   */
+  const powering = useCallback((deviceId: number, on: boolean) => {
+    urgentUntil.current[deviceId] = Date.now() + URGENT_WINDOW_MS;
+
+    if (on) {
+      setStopping((s) => { const next = { ...s }; delete next[deviceId]; return next; });
+      setStarting((s) => ({ ...s, [deviceId]: { at: Date.now() } }));
+    } else {
+      setStarting((s) => { const next = { ...s }; delete next[deviceId]; return next; });
+      setStopping((s) => ({ ...s, [deviceId]: { at: Date.now() } }));
+    }
+
+    setNudge((n) => n + 1);
+    refreshNow();
+  }, [refreshNow]);
+
   // One control pass per observation, plus one immediately after a press. The
   // observations arrive every ten seconds from the monitor, which is what makes
   // this the rhythm of the whole feature.
@@ -271,19 +343,37 @@ export const useConsoleControl = ({ devices, sessionDeviceIds, enabled = true }:
         stopping: Boolean(stopIntent) && now - (stopIntent?.at ?? 0) < INTENT_TTL_MS,
         maintenance: maintenanceUntil > now,
         canRest,
+        canWake: keyed[hostId],
         urgent: (urgentUntil.current[device.id] ?? 0) > now,
         decision: decisions[hostId] ?? null,
       };
     });
 
     void controller.tick(inputs).then(() => {
-      setViews(Object.fromEntries(inputs.map((i) => [i.hostId, controller.view(i.hostId)])));
+      const views = Object.fromEntries(inputs.map((i) => [i.hostId, controller.view(i.hostId)]));
+      setViews(views);
+
+      // A console that cannot be woken because this machine holds no key for
+      // it says so out loud, once. Nothing else does now: the datagram is not
+      // attempted at all, so the failure that used to carry this sentence to
+      // the person who pressed Start no longer happens. The chip on the tile
+      // is not enough — they are looking at the console, not the board.
+      for (const [hostId, view] of Object.entries(views)) {
+        const error = view.snapshot.error;
+        if (error !== "NO_CREDENTIAL" && error !== "BAD_CREDENTIAL") continue;
+
+        const last = toldAt.current[hostId] ?? 0;
+        if (Date.now() - last <= 60_000) continue;
+
+        toldAt.current[hostId] = Date.now();
+        notify.message("error", tActive(`ps5.error.${error}`));
+      }
     });
 
     // Consoles that are no longer bound must not linger in the controller.
     const live = new Set(bound.map((d) => d.console_host_id as string));
     controller.forget(Object.keys(statuses).filter((h) => !live.has(h)));
-  }, [statuses, bound, sessionDeviceIds, starting, stopping, decisions, enabled, nudge, canRest]);
+  }, [statuses, bound, sessionDeviceIds, starting, stopping, decisions, enabled, nudge, canRest, keyed]);
 
   // A session that has actually started clears the local intent — from here the
   // backend is the source of truth again.
@@ -298,5 +388,5 @@ export const useConsoleControl = ({ devices, sessionDeviceIds, enabled = true }:
     });
   }, [sessionDeviceIds]);
 
-  return { views, statuses, sessionStarting, sessionStopped, wakeDecided };
+  return { views, statuses, sessionStarting, sessionStopped, powering, wakeDecided };
 };

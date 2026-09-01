@@ -89,6 +89,33 @@ export interface Observation {
    */
   canRest: boolean;
   /**
+   * Whether this machine holds the wake key for this console.
+   *
+   * A wake is an authenticated datagram: without the key nothing can be sent at
+   * all, and the console never hears anything. Left out — or `undefined` — the
+   * machine tries, because "we have not asked the vault yet" is not the same as
+   * "there is no key" and refusing on an unasked question would break a wake
+   * that would have worked. Only a definite `false` stops it.
+   *
+   * This exists because the honest reason had no way to reach the screen: the
+   * attempt failed instantly, the next observation cleared the error, and
+   * forty-five seconds later the tile blamed the console's own "turn on from
+   * network" setting — sending staff into the PS5's menus for a key that was
+   * never on this machine.
+   */
+  canWake?: boolean;
+  /**
+   * The reason the last command for this console failed, while it is still
+   * failing. Cleared by the caller the moment one succeeds.
+   *
+   * Without it the screen lies by omission: a sleep the console refuses
+   * ("Remote Play is already in use") left the tile saying "going to rest…"
+   * for as long as the panel kept retrying, which reads as "working on it"
+   * when the truth is "the console is saying no". Measured on real hardware —
+   * a console powered on by hand refuses the request outright.
+   */
+  commandError?: string | null;
+  /**
    * The owner's answer to the unexpected wake with this id, if they have given
    * one. `null` while nobody has answered.
    */
@@ -108,6 +135,16 @@ export interface MachineSnapshot {
   approvedEventId: string | null;
   /** When this console was first asked to wake, while it is still asleep. */
   wakingSince: number | null;
+  /**
+   * When the current sleep was started, or null when none is under way.
+   *
+   * A sleep takes seconds, not an instant, and during those seconds an awake
+   * console is a command that has not landed — not somebody switching it on.
+   * But that reading has to EXPIRE, or a console switched on by hand moments
+   * after a stop is silently put back to sleep and the owner is never asked,
+   * which is the whole point of asking.
+   */
+  restingSince: number | null;
   /** Set when a command could not be carried out. Shown, never swallowed. */
   error: string | null;
 }
@@ -133,6 +170,21 @@ export const UNEXPECTED_WAKE_GRACE_MS = 10_000;
  */
 export const WAKE_GIVE_UP_MS = 45_000;
 
+/**
+ * How long a sleep counts as still under way.
+ *
+ * Measured on a real console: from the command leaving this machine to the
+ * console reporting rest is 7-27 seconds, depending on what it was doing. Half
+ * a minute covers that with room to spare.
+ *
+ * Past it, an awake console is an awake console. The alternative was found on
+ * real hardware: switch a console on by hand a few seconds after a stop, and
+ * the panel — still believing its own sleep was in progress — put it back to
+ * sleep without ever asking the owner. Safe, and wrong: being asked is the
+ * entire feature.
+ */
+export const REST_SETTLE_MS = 30_000;
+
 export const initialSnapshot = (): MachineSnapshot => ({
   state: "UNKNOWN",
   desired: "rest",
@@ -140,6 +192,7 @@ export const initialSnapshot = (): MachineSnapshot => ({
   wakeSeenAt: null,
   approvedEventId: null,
   wakingSince: null,
+  restingSince: null,
   error: null,
 });
 
@@ -169,7 +222,9 @@ const desiredFor = (obs: Observation, approved: boolean): DesiredState => {
  */
 export const step = (prev: MachineSnapshot, obs: Observation, newEventId: string): Step => {
   const commands: Command[] = [];
-  const next: MachineSnapshot = { ...prev, error: null };
+  // A failure that is still current stays on the screen; the branches below
+  // may still name something more specific.
+  const next: MachineSnapshot = { ...prev, error: obs.commandError ?? null };
 
   // An owner's approval covers ONE wake — the one they were asked about. A new
   // unexpected wake is a new question, so the approval is dropped as soon as
@@ -204,21 +259,34 @@ export const step = (prev: MachineSnapshot, obs: Observation, newEventId: string
     next.approvedEventId = null;
 
     if (desired === "active") {
+      // Nothing can be sent without the key, so nothing is — and the reason is
+      // named instead of being spent on datagrams that never leave. Checked
+      // before `wakingSince` is set, so a console that cannot be woken never
+      // starts a give-up clock whose verdict would blame the wrong thing.
+      if (obs.canWake === false) {
+        next.state = "ERROR";
+        next.error = "NO_CREDENTIAL";
+        next.wakingSince = null;
+        return { next, commands };
+      }
+
       next.wakingSince = prev.wakingSince ?? obs.now;
 
       if (obs.now - next.wakingSince >= WAKE_GIVE_UP_MS) {
         // Asked, repeatedly, and still asleep. The packet is leaving this
-        // machine — that much is known — so what is left is the console's own
-        // "turn on from network" setting.
+        // machine — the missing-key case returned above — so what is left is
+        // the console's own "turn on from network" setting.
         next.state = "ERROR";
         next.error = "WAKE_IGNORED";
         return { next, commands };
       }
 
       next.state = "WAKING";
+      next.restingSince = null;
       commands.push({ kind: "wake" });
     } else {
       next.state = "REST";
+      next.restingSince = null;
       next.wakingSince = null;
     }
 
@@ -228,6 +296,7 @@ export const step = (prev: MachineSnapshot, obs: Observation, newEventId: string
   // From here the console is awake.
   if (desired === "active") {
     next.state = "ACTIVE";
+    next.restingSince = null;
     next.wakingSince = null;
     next.wakeEventId = null;
     next.wakeSeenAt = null;
@@ -240,6 +309,7 @@ export const step = (prev: MachineSnapshot, obs: Observation, newEventId: string
   if (desired === "unmanaged") {
     // Maintenance, or a wake the owner has approved. Awake is fine.
     next.state = "ACTIVE";
+    next.restingSince = null;
     return { next, commands };
   }
 
@@ -256,7 +326,37 @@ export const step = (prev: MachineSnapshot, obs: Observation, newEventId: string
     }
 
     next.state = "GOING_TO_REST";
+    next.restingSince = prev.restingSince ?? obs.now;
     commands.push({ kind: "rest" });
+    return { next, commands };
+  }
+
+  // A console we already told to sleep, still awake. This is a command that has
+  // not landed yet — not somebody switching it on — and calling it a new
+  // unexpected wake is how a manager's Stop turned into the owner being asked
+  // "is this you?" about a console they had just stopped. That happened once
+  // the local "stopping" intent lapsed after a minute, which a slow rest path
+  // easily outlived.
+  //
+  // The rest is re-issued rather than merely waited on: the previous one is
+  // known not to have worked. The controller's own cooldown decides how often
+  // that actually reaches the wire.
+  if (
+    prev.state === "GOING_TO_REST"
+    && prev.restingSince !== null
+    && obs.now - prev.restingSince < REST_SETTLE_MS
+  ) {
+    if (!obs.canRest) {
+      next.state = "ERROR";
+      next.error = "UNSUPPORTED_BY_TRANSPORT";
+      return { next, commands };
+    }
+
+    next.state = "GOING_TO_REST";
+    next.restingSince = prev.restingSince ?? obs.now;
+    // Carried so the answer this sleep belongs to is still named, when it began
+    // as an owner's refusal.
+    commands.push(prev.wakeEventId ? { kind: "rest", eventId: prev.wakeEventId } : { kind: "rest" });
     return { next, commands };
   }
 
@@ -264,6 +364,7 @@ export const step = (prev: MachineSnapshot, obs: Observation, newEventId: string
   // ends, so the owner's answer can be matched to the question they were asked.
   if (prev.wakeEventId === null || prev.wakeSeenAt === null) {
     next.state = "UNEXPECTED_WAKE";
+    next.restingSince = null;
     next.wakeEventId = newEventId;
     next.wakeSeenAt = obs.now;
     commands.push({ kind: "report-unexpected-wake", eventId: newEventId });
@@ -285,6 +386,7 @@ export const step = (prev: MachineSnapshot, obs: Observation, newEventId: string
     }
 
     next.state = "GOING_TO_REST";
+    next.restingSince = prev.restingSince ?? obs.now;
     commands.push({ kind: "rest", eventId: prev.wakeEventId });
     return { next, commands };
   }

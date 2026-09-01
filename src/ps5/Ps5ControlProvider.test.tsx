@@ -14,7 +14,22 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 const pcs = vi.hoisted(() => ({ data: [] as unknown[], calls: 0 }));
 const sessions = vi.hoisted(() => ({ data: [] as unknown[] }));
 const reported = vi.hoisted(() => ({ calls: [] as unknown[] }));
-const bridge = vi.hoisted(() => ({ answer: "awake" as string, probes: 0, rests: 0, restResult: { sent: true } as { sent: boolean; code?: string } }));
+const bridge = vi.hoisted(() => ({
+  answer: "awake" as string,
+  probes: 0,
+  rests: 0,
+  wakes: 0,
+  restResult: { sent: true } as { sent: boolean; code?: string },
+  /** What the machine's key vault answers, or null for a preload that cannot be asked. */
+  hasKey: true as boolean | null,
+  /** Which console each command was aimed at — the whole point with more than one. */
+  wakeTargets: [] as string[],
+  restTargets: [] as string[],
+  /** Per-console answers, for the tests that run a venue with several. */
+  answers: {} as Record<string, string>,
+  /** address → host-id, so each fake console has its own identity. */
+  hosts: {} as Record<string, string>,
+}));
 
 vi.mock("@/api/pcs", () => ({ apiListPcsEverywhere: async () => { pcs.calls += 1; return pcs; } }));
 vi.mock("@/api/sessions", () => ({ apiListAllActiveSessions: async () => sessions }));
@@ -56,24 +71,49 @@ beforeEach(async () => {
   bridge.answer = "awake";
   bridge.probes = 0;
   bridge.rests = 0;
+  bridge.wakes = 0;
   bridge.restResult = { sent: true };
+  bridge.hasKey = true;
+  bridge.wakeTargets = [];
+  bridge.restTargets = [];
+  bridge.answers = {};
+  bridge.hosts = {};
 
   (globalThis as Record<string, unknown>).cyberplacePS5 = {
     discover: async () => ({ consoles: [], probed: [], warnings: [] }),
     probe: async (addresses: string[]) => {
       bridge.probes += 1;
       return {
+        // Each address answers as ITS OWN console. A harness that replies with
+        // one host-id for every address cannot show cross-talk even when there
+        // is some, which is the failure these tests are for.
         consoles: addresses.map((address) => ({
-          hostId: "5C9666876D85", name: "PS5-172", type: "PS5",
-          address, state: bridge.answer, systemVersion: "13600007",
+          hostId: bridge.hosts[address] ?? "5C9666876D85",
+          name: "PS5-172", type: "PS5",
+          address,
+          state: bridge.answers[address] ?? bridge.answer,
+          systemVersion: "13600007",
         })),
         probed: addresses,
         warnings: [],
       };
     },
     capabilities: async () => ({ discover: true, observe: true, wake: true, rest: true }),
-    wake: async () => ({ sent: true }),
-    rest: async () => { bridge.rests += 1; return bridge.restResult; },
+    wake: async (hostId: string, address: string) => {
+      bridge.wakes += 1;
+      bridge.wakeTargets.push(`${hostId}@${address}`);
+      return { sent: true };
+    },
+    rest: async (hostId: string, address: string) => {
+      bridge.rests += 1;
+      bridge.restTargets.push(`${hostId}@${address}`);
+      return bridge.restResult;
+    },
+    // `null` stands for an older preload that has no such channel: the map
+    // then holds nothing for this console, which reads as "not asked".
+    ...(bridge.hasKey === null ? {} : {
+      hasCredential: async () => ({ has: bridge.hasKey, available: true, persisted: true }),
+    }),
   };
 
   ({ Ps5ControlProvider } = await import("./Ps5ControlProvider"));
@@ -247,6 +287,134 @@ describe("watching without a board on screen", () => {
     });
 
     await waitFor(() => expect(told.messages).toContain("ps5.error.IN_USE"));
+  });
+
+  test("a console this machine has no key for is not shouted at", async () => {
+    // The wake datagram is authenticated: with no key nothing can be sent, so
+    // nothing is. Before this the attempt failed instantly, the next
+    // observation wiped the error, and forty-five seconds later the tile
+    // blamed the console's own "turn on from network" setting — sending staff
+    // into the PlayStation's menus over a key that was never on this computer.
+    bridge.hasKey = false;
+    bridge.answer = "rest";
+    pcs.data = [device()];
+    sessions.data = [{ pc_id: 96 }];
+
+    render(<Ps5ControlProvider><div /></Ps5ControlProvider>);
+    await settle();
+    await act(async () => { await vi.advanceTimersByTimeAsync(11_000); });
+
+    expect(bridge.wakes).toBe(0);
+    expect(told.messages).toContain("ps5.error.NO_CREDENTIAL");
+  });
+
+  test("a console this machine DOES have a key for is woken for its session", async () => {
+    bridge.hasKey = true;
+    bridge.answer = "rest";
+    pcs.data = [device()];
+    sessions.data = [{ pc_id: 96 }];
+
+    render(<Ps5ControlProvider><div /></Ps5ControlProvider>);
+    await settle();
+    await act(async () => { await vi.advanceTimersByTimeAsync(3_000); });
+
+    expect(bridge.wakes).toBeGreaterThan(0);
+    expect(told.messages).not.toContain("ps5.error.NO_CREDENTIAL");
+  });
+
+  test("a preload that cannot be asked about keys still wakes the console", async () => {
+    // "Not asked" is not "absent". Refusing on an unasked question would break
+    // every wake on a build whose bridge has no such channel.
+    // Removed from the object the harness already built: a preload without
+    // the channel at all, which is what an older desktop build is.
+    delete ((globalThis as Record<string, unknown>).cyberplacePS5 as Record<string, unknown>).hasCredential;
+    bridge.answer = "rest";
+    pcs.data = [device()];
+    sessions.data = [{ pc_id: 96 }];
+
+    render(<Ps5ControlProvider><div /></Ps5ControlProvider>);
+    await settle();
+    await act(async () => { await vi.advanceTimersByTimeAsync(3_000); });
+
+    expect(bridge.wakes).toBeGreaterThan(0);
+  });
+
+  test("a session wakes ITS console and no other, across two venues", async () => {
+    // The property the venue is about to depend on: three consoles, three
+    // places, two branches, and a session on exactly one of them. Nothing here
+    // may reach the other two — not the wake, not the question, not a rest.
+    bridge.hosts = {
+      "192.168.1.35": "AAAA00000001",
+      "192.168.1.36": "BBBB00000002",
+      "192.168.1.37": "CCCC00000003",
+    };
+    bridge.answers = {
+      "192.168.1.35": "rest",
+      "192.168.1.36": "rest",
+      "192.168.1.37": "rest",
+    };
+    pcs.data = [
+      device({ id: 101, branch_id: 3, console_host_id: "AAAA00000001", console_address: "192.168.1.35" }),
+      device({ id: 102, branch_id: 3, console_host_id: "BBBB00000002", console_address: "192.168.1.36" }),
+      device({ id: 103, branch_id: 9, console_host_id: "CCCC00000003", console_address: "192.168.1.37" }),
+    ];
+    sessions.data = [{ pc_id: 102 }];
+
+    render(<Ps5ControlProvider><div /></Ps5ControlProvider>);
+    await settle();
+    await act(async () => { await vi.advanceTimersByTimeAsync(3_000); });
+
+    expect([...new Set(bridge.wakeTargets)]).toEqual(["BBBB00000002@192.168.1.36"]);
+    // The two with no session are asleep and should simply be left alone.
+    expect(bridge.restTargets).toEqual([]);
+    expect(reported.calls).toEqual([]);
+  });
+
+  test("stopping one session sleeps one console, and only that one", async () => {
+    bridge.hosts = { "192.168.1.35": "AAAA00000001", "192.168.1.36": "BBBB00000002" };
+    // Both awake, both running a session — the state after two starts.
+    bridge.answers = { "192.168.1.35": "awake", "192.168.1.36": "awake" };
+    pcs.data = [
+      device({ id: 101, branch_id: 3, console_host_id: "AAAA00000001", console_address: "192.168.1.35" }),
+      device({ id: 102, branch_id: 3, console_host_id: "BBBB00000002", console_address: "192.168.1.36" }),
+    ];
+    sessions.data = [{ pc_id: 101 }, { pc_id: 102 }];
+
+    render(<Ps5ControlProvider><div /></Ps5ControlProvider>);
+    await settle();
+    await act(async () => { await vi.advanceTimersByTimeAsync(3_000); });
+    expect(bridge.restTargets).toEqual([]);
+
+    // Session on 102 ends. 101 is still being played.
+    //
+    // No local Stop was pressed on THIS panel, which is the case of a second
+    // panel in the venue: it learns from the list, treats the awake console as
+    // a switch-on it cannot explain, asks, and sleeps it when nobody answers.
+    // So the wait covers the 30 s list refresh AND the ten-second question.
+    sessions.data = [{ pc_id: 101 }];
+    await act(async () => { await vi.advanceTimersByTimeAsync(31_000); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(15_000); });
+
+    expect([...new Set(bridge.restTargets)]).toEqual(["BBBB00000002@192.168.1.36"]);
+    // And the console still in a session is never asked to sleep, however long
+    // the panel runs.
+    expect(bridge.restTargets.some((t) => t.startsWith("AAAA00000001"))).toBe(false);
+  });
+
+  test("the question names the console that woke, not a neighbour", async () => {
+    bridge.hosts = { "192.168.1.35": "AAAA00000001", "192.168.1.36": "BBBB00000002" };
+    bridge.answers = { "192.168.1.35": "rest", "192.168.1.36": "awake" };
+    pcs.data = [
+      device({ id: 101, branch_id: 3, console_host_id: "AAAA00000001", console_address: "192.168.1.35" }),
+      device({ id: 102, branch_id: 9, console_host_id: "BBBB00000002", console_address: "192.168.1.36" }),
+    ];
+
+    render(<Ps5ControlProvider><div /></Ps5ControlProvider>);
+    await settle();
+    await waitFor(() => expect(reported.calls.length).toBe(1));
+
+    // Reported against device 102 — the one that is awake — and its branch.
+    expect((reported.calls[0] as unknown[])[0]).toBe(102);
   });
 
   test("without the desktop bridge it does nothing at all", async () => {
