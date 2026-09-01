@@ -1,3 +1,5 @@
+import { can } from "@/auth/permissions";
+import { useAuth } from "@/auth/AuthContext";
 import { ListSkeleton } from "@/components/ui/Skeleton";
 import Button from "@/components/ui/Button";
 import ProductForm from "@/components/products/ProductForm";
@@ -69,6 +71,9 @@ interface CartLine {
  * decision in progress — and it says so with its own toast.
  */
 const AddSessionItemDialog = ({ branchId, session, onClose, onAdded }: Props) => {
+  const { user } = useAuth();
+  /** Mirrors the backend's `products.manage`; the two are pinned by tests on both sides. */
+  const canCreateProducts = can(user?.role, "product.crud");
   const { money, t } = useLang();
   const [products, setProducts] = useState<IProduct[] | null>(null);
   const [search, setSearch] = useState("");
@@ -345,15 +350,23 @@ const AddSessionItemDialog = ({ branchId, session, onClose, onAdded }: Props) =>
           )}
         </div>
 
-        {/* ── Something the branch does not stock yet ──────────────────── */}
-        <div className="col" style={{ gap: 8, borderTop: "1px solid #1f2a44", paddingTop: 12 }}>
-          <div className="row-between" style={{ gap: 8 }}>
-            <span className="muted" style={{ fontSize: 12 }}>{t("session.createProductHint")}</span>
-            <Button variant="secondary" onClick={() => setCreating(true)} disabled={saving}>
-              {t("session.createProduct")}
-            </Button>
+        {/* ── Something the branch does not stock yet ──────────────────────
+            Owner-level, and only shown to one. A manager sells from the
+            catalogue; writing it is the company's, which is what the backend
+            has always answered (`products.manage` → 403). Until this gate the
+            button was drawn for everyone, so the one role that could not use it
+            was the role standing at the counter — they pressed it and got a
+            permission error mid-sale. */}
+        {canCreateProducts && (
+          <div className="col" style={{ gap: 8, borderTop: "1px solid #1f2a44", paddingTop: 12 }}>
+            <div className="row-between" style={{ gap: 8 }}>
+              <span className="muted" style={{ fontSize: 12 }}>{t("session.createProductHint")}</span>
+              <Button variant="secondary" onClick={() => setCreating(true)} disabled={saving}>
+                {t("session.createProduct")}
+              </Button>
+            </div>
           </div>
-        </div>
+        )}
 
         {err && <div className="error">{err}</div>}
         <div className="row-between">
@@ -372,7 +385,7 @@ const AddSessionItemDialog = ({ branchId, session, onClose, onAdded }: Props) =>
 
       {/* The Products screen's own form, unchanged: whatever it creates is a
           product like any other, with its three languages and its category. */}
-      {creating && (
+      {creating && canCreateProducts && (
         <ProductForm
           branchId={branchId}
           onClose={() => setCreating(false)}
