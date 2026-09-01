@@ -17,6 +17,10 @@ export interface Ps5WakeEventApi {
   event_uuid: string;
   device_id: number;
   branch_id: number;
+  /** The venue by its city and street — a branch has no name column. */
+  branch_name: string | null;
+  /** Whether this owner has more than one venue. Answered by the server. */
+  multi_branch: boolean;
   decision: "pending" | "approved" | "rejected" | "expired";
   detected_at: string;
   place_label: string | null;
@@ -37,7 +41,11 @@ export const apiStopMaintenance = (deviceId: number) =>
  * reason.
  */
 export const apiReportUnexpectedWake = (deviceId: number, eventUuid: string) =>
-  request<{ wake_event: Ps5WakeEventApi }>(`/pcs/${deviceId}/wake-events`, {
+  // `wake_event` is null when the server decides the console being on is
+  // already explained — a session running on it, or one that ended moments ago
+  // and has not finished going to sleep. Nothing was recorded and nobody was
+  // asked; the console is still put to rest by the panel that reported it.
+  request<{ wake_event: Ps5WakeEventApi | null; reason?: string }>(`/pcs/${deviceId}/wake-events`, {
     method: "POST",
     body: { event_uuid: eventUuid },
   });

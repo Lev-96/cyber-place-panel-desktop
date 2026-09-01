@@ -19,6 +19,8 @@ export interface Ps5UnexpectedWakeEvent {
   event_uuid: string;
   device_id: number;
   branch_id: number;
+  branch_name?: string | null;
+  multi_branch?: boolean;
   place_label: string;
   grace_seconds: number;
 }

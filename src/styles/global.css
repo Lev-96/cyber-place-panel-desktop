@@ -3582,6 +3582,15 @@ button.login-flip-back:hover {
    without being asked for — a wide panel would read as an alarm. */
 .ps5-wake-dialog { width: 420px; max-width: 92vw; gap: 12px; }
 .ps5-wake-dialog__title { margin: 0; font-size: 18px; }
+/* The venue the question came from, above the place and quieter than it: it is
+   context for owners with several branches, not the subject of the question. */
+.ps5-wake-dialog__branch {
+  font-size: 13px;
+  color: var(--color-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .ps5-wake-dialog__place {
   font-size: 15px;
   font-weight: 700;

@@ -87,6 +87,8 @@ const UnexpectedWakeDialog = () => {
             event_uuid: event.event_uuid,
             device_id: event.device_id,
             branch_id: event.branch_id,
+            branch_name: event.branch_name,
+            multi_branch: event.multi_branch,
             place_label: event.place_label ?? "",
             grace_seconds: GRACE_SECONDS,
           });
@@ -163,6 +165,16 @@ const UnexpectedWakeDialog = () => {
     <Modal open onClose={() => void answer(false)}>
       <div className="card col ps5-wake-dialog">
         <h2 className="ps5-wake-dialog__title">{t("ps5.wake.dialogTitle")}</h2>
+        {/* Which venue, and only when the owner has more than one. With a
+            single branch the line is a fact they already know on every question
+            they will ever be asked; with three it is the difference between an
+            answerable question and a guess about which floor it came from. The
+            server decides which of the two this owner is. */}
+        {current.multi_branch && current.branch_name && (
+          <div className="ps5-wake-dialog__branch" title={current.branch_name}>
+            {t("ps5.wake.branch")}: {current.branch_name}
+          </div>
+        )}
         <div className="ps5-wake-dialog__place" title={current.place_label}>{current.place_label}</div>
         <p className="muted" style={{ margin: 0 }}>{t("ps5.wake.dialogBody")}</p>
 
