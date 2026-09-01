@@ -71,21 +71,6 @@ export const apiRotatePcToken = (id: number) =>
   request<{ pc: IPcApi }>(`/pcs/${id}/rotate-token`, { method: "POST" });
 
 /**
- * Turn a console on, or send it to rest, without touching its session.
- *
- * Rest mode is the only "off" a PlayStation has over the network — the protocol
- * carries no shutdown — so this is honest about being a rest, not a promise of
- * a dark console.
- *
- * The endpoint records the venue's intent; the datagram itself leaves from this
- * machine, because only a panel on the venue's own LAN can reach a console.
- * Branch-scoped on the backend for both staff roles: a device of another branch
- * is refused whatever id is sent.
- */
-export const apiSetConsolePower = (id: number, state: "on" | "off") =>
-  request<{ pc: IPcApi }>(`/pcs/${id}/power`, { method: "POST", body: { state } });
-
-/**
  * Point a place's console device at a physical PlayStation found on the LAN.
  *
  * The identity is the console's own `host-id`; the address is a hint for the

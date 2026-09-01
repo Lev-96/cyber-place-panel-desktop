@@ -285,35 +285,6 @@ export const useConsoleControl = ({ devices, sessionDeviceIds, enabled = true }:
     refreshNow();
   }, [refreshNow]);
 
-  /**
-   * The operator pressed the console's own power button in the panel.
-   *
-   * Deliberately the SAME intents a session start and stop use, because the
-   * console cannot tell the difference and neither should the machine: what
-   * changes is only why somebody asked. Power on wants it awake, power off
-   * wants it asleep, and both are authorised — which is what keeps an owner
-   * from being asked "did you switch this on?" about a button they pressed
-   * themselves.
-   *
-   * The standing permission to be awake with no session behind it is the
-   * venue's, not this panel's: the backend records it on the device, every
-   * panel reads it, and it expires on its own.
-   */
-  const powering = useCallback((deviceId: number, on: boolean) => {
-    urgentUntil.current[deviceId] = Date.now() + URGENT_WINDOW_MS;
-
-    if (on) {
-      setStopping((s) => { const next = { ...s }; delete next[deviceId]; return next; });
-      setStarting((s) => ({ ...s, [deviceId]: { at: Date.now() } }));
-    } else {
-      setStarting((s) => { const next = { ...s }; delete next[deviceId]; return next; });
-      setStopping((s) => ({ ...s, [deviceId]: { at: Date.now() } }));
-    }
-
-    setNudge((n) => n + 1);
-    refreshNow();
-  }, [refreshNow]);
-
   // One control pass per observation, plus one immediately after a press. The
   // observations arrive every ten seconds from the monitor, which is what makes
   // this the rhythm of the whole feature.
@@ -388,5 +359,5 @@ export const useConsoleControl = ({ devices, sessionDeviceIds, enabled = true }:
     });
   }, [sessionDeviceIds]);
 
-  return { views, statuses, sessionStarting, sessionStopped, powering, wakeDecided };
+  return { views, statuses, sessionStarting, sessionStopped, wakeDecided };
 };

@@ -240,22 +240,6 @@ export const TRANSLATIONS: Dict = {
   },
   // The question the owner is asked when a console is on with no session.
   // Shown above the place, and only for an owner with more than one venue.
-  // The console's own power, separate from the session. "Rest mode" and not
-  // "off" because that is what the protocol actually does — a PlayStation has
-  // no remote shutdown, and promising one on a button would be a lie.
-  "ps5.power.on": { en: "Turn on", ru: "Включить", am: "Միացնել" },
-  "ps5.power.off": { en: "To rest mode", ru: "В режим покоя", am: "Հանգստի ռեժիմ" },
-  "ps5.power.blockedBySession": {
-    en: "Stop the session first — stopping puts the console into rest mode by itself",
-    ru: "Сначала остановите сессию — она сама отправит приставку в режим покоя",
-    am: "Նախ դադարեցրեք սեսիան — այն ինքը կոնսոլը կտեղափոխի հանգստի ռեժիմ",
-  },
-  "ps5.power.working": { en: "Working…", ru: "Выполняем…", am: "Կատարվում է…" },
-  "ps5.power.hint": {
-    en: "The console only — it starts no session and bills nothing. A PlayStation cannot be switched off over the network; rest mode is its off.",
-    ru: "Только приставка — сессия не начинается и деньги не считаются. Выключить PlayStation по сети нельзя, режим покоя — это её выключение.",
-    am: "Միայն կոնսոլը — սեսիա չի սկսվում և գումար չի հաշվարկվում։ PlayStation-ը ցանցով անջատել հնարավոր չէ, հանգստի ռեժիմն է դրա անջատումը։",
-  },
   "ps5.wake.branch": {
     en: "Branch",
     ru: "Филиал",

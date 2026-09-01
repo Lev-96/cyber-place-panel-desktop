@@ -37,10 +37,6 @@ interface Ps5Control {
   statuses: ReturnType<typeof useConsoleControl>["statuses"];
   sessionStarting: (deviceId: number) => void;
   sessionStopped: (deviceId: number) => void;
-  /** The operator pressed the console's own power button. */
-  powering: (deviceId: number, on: boolean) => void;
-  /** Re-read the device list now — a power window has just changed. */
-  refresh: () => void;
 }
 
 const noop = () => {};
@@ -50,8 +46,6 @@ const Ps5ControlContext = createContext<Ps5Control>({
   statuses: {},
   sessionStarting: noop,
   sessionStopped: noop,
-  powering: noop,
-  refresh: noop,
 });
 
 /** How often the watcher re-reads which consoles exist and what is running. */
@@ -123,13 +117,6 @@ export const Ps5ControlProvider = ({ children }: { children: ReactNode }) => {
       control.sessionStarting(deviceId);
       void reload();
     },
-    powering: (deviceId: number, on: boolean) => {
-      control.powering(deviceId, on);
-      // The standing permission lives on the device row, so the list has to be
-      // re-read before the machine can see it.
-      void reload();
-    },
-    refresh: () => { void reload(); },
     sessionStopped: (deviceId: number) => {
       setSessionDeviceIds((ids) => {
         const next = new Set(ids);

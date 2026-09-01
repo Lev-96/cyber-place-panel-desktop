@@ -11,9 +11,6 @@ import { useLang } from "@/i18n/LanguageContext";
 import { usePlaceAvailability } from "@/realtime/usePlaceAvailability";
 import { sessionRepository } from "@/repositories/SessionRepository";
 import { IPcApi, ISessionApi } from "@/types/sessions";
-import { apiSetConsolePower } from "@/api/pcs";
-import { localizedApiError } from "@/api/errorMessage";
-import { notify } from "@/ui/notify";
 import { PC_STATUS_COLOR, effectivePcStatus, isPs } from "@/types/pc";
 import {
   canStartSession,
@@ -83,32 +80,7 @@ const SessionsBoard = ({ branchId }: Props) => {
   //
   // PC places are untouched by every line of it: a device with no console bound
   // is not watched at all.
-  const { views: consoleViews, statuses: consoleStatuses, sessionStarting, sessionStopped, powering } = usePs5Control();
-  /** The console a power press is in flight for, so it cannot be pressed twice. */
-  const [poweringId, setPoweringId] = useState<number | null>(null);
-
-  /**
-   * Turn a console on, or send it to rest.
-   *
-   * Two steps and both are needed: the backend records the venue's standing
-   * permission (every panel reads it, and it is what stops the console being
-   * rested again or the owner being asked "did you switch this on?"), and this
-   * machine sends the datagram, because only a panel on the venue's LAN can
-   * reach a console.
-   */
-  const togglePower = async (pc: IPcApi, on: boolean) => {
-    if (poweringId !== null) return;
-
-    setPoweringId(pc.id);
-    try {
-      await apiSetConsolePower(pc.id, on ? "on" : "off");
-      powering(pc.id, on);
-    } catch (e) {
-      notify.message("error", localizedApiError(e, t));
-    } finally {
-      setPoweringId(null);
-    }
-  };
+  const { views: consoleViews, statuses: consoleStatuses, sessionStarting, sessionStopped } = usePs5Control();
 
   usePlaceAvailability(
     branchId,
@@ -339,22 +311,6 @@ const SessionsBoard = ({ branchId }: Props) => {
             <div className="row" style={{ gap: 6, marginTop: 4, flexWrap: "wrap" }}>
               <Button variant="secondary" onClick={() => setAddItemTarget(sess)} style={miniBtnFlex}>{t("session.addItem")}</Button>
               <Button variant="secondary" onClick={() => setStopTarget(sess)} style={miniBtnFlex}>{t("action.stop")}</Button>
-              {/* The console's power is shown here too, and refused here too.
-                  A running session outranks everything in the state machine, so
-                  a console rested under one is woken again within seconds — the
-                  button would do nothing. Hiding it left the operator wondering
-                  where it went; showing it disabled, with the reason, answers
-                  the question they were about to ask. */}
-              {consoleState && pc.console_host_id && (
-                <Button
-                  variant="secondary"
-                  disabled
-                  title={t("ps5.power.blockedBySession")}
-                  style={miniBtnFlex}
-                >
-                  {t("ps5.power.off")}
-                </Button>
-              )}
             </div>
           </>
         ) : (
@@ -375,37 +331,14 @@ const SessionsBoard = ({ branchId }: Props) => {
                 {t("session.deviceOfflineHint")}
               </span>
             )}
-            <div className="row" style={{ gap: 6, marginTop: 6, flexWrap: "wrap" }}>
-              <Button
-                onClick={() => setStartTarget(pc)}
-                disabled={!canStart}
-                title={isOffline ? t("session.deviceOfflineHint") : undefined}
-                style={{ padding: "6px 10px", fontSize: 12 }}
-              >
-                {t("action.start")}
-              </Button>
-              {/* The console's own power, separate from the session and only
-                  where there IS a console. A PC's power is the kiosk agent's
-                  business and nothing here touches it.
-                  Never shown on a seat with a session running: a console is
-                  woken again within seconds while one is live, so the button
-                  would do nothing and look broken. */}
-              {consoleState && pc.console_host_id && (
-                <Button
-                  variant="secondary"
-                  onClick={() => void togglePower(pc, consoleState !== "awake")}
-                  disabled={poweringId === pc.id}
-                  title={t("ps5.power.hint")}
-                  style={{ padding: "6px 10px", fontSize: 12 }}
-                >
-                  {poweringId === pc.id
-                    ? t("ps5.power.working")
-                    : consoleState !== "awake"
-                      ? t("ps5.power.on")
-                      : t("ps5.power.off")}
-                </Button>
-              )}
-            </div>
+            <Button
+              onClick={() => setStartTarget(pc)}
+              disabled={!canStart}
+              title={isOffline ? t("session.deviceOfflineHint") : undefined}
+              style={{ padding: "6px 10px", fontSize: 12, marginTop: 6 }}
+            >
+              {t("action.start")}
+            </Button>
           </>
         )}
       </div>
