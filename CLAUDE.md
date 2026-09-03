@@ -288,6 +288,7 @@ manager → `branch.{id}`, orphan → null (no subscription).
 | `PlaceAvailabilityChanged` | `place.availability.changed` | branch |
 | `BranchSubscribed` | `branch.subscribed` | branch + company + global |
 | `TournamentJoined` | `tournament.joined` | branch + company + global |
+| `SessionChanged` | `session.changed` | branch (**private**) |
 | `UserNotificationCreated` | `notification.created` | user.{id}.notifications |
 | `StaffAccessChanged` | `access.changed` | user.{id}.access |
 | `BranchVisibilityChanged` | `branch.visibility.changed` | `branches` + branch.{id} |
@@ -881,6 +882,9 @@ button is not a permission: a manager who kept the URL could still POST.
 | Товары — создать / изменить / удалить / скрыть | ✅ | ✅ | ❌ |
 | Товары — список + поиск | ✅ | ✅ | ✅ |
 | Сессии, касса, игры, ПК, турниры, подписчики | ✅ | ✅ | ✅ |
+| Джойстики, доп. время, безлимит на живой сессии | ✅ | ✅ | ✅ |
+| Бесплатная сессия (списать счёт) | ✅ | ✅ | ❌ |
+| Цены филиала — матрица, платформы, субплатформы, джойстики, округление | ✅ | ✅ | ❌ |
 
 Two things that look like oversights and are not:
 
@@ -894,6 +898,74 @@ Two things that look like oversights and are not:
 
 Product READS stay open to everyone: the POS sells from that list, and the
 manager's screen is the list plus a search box with no write control on it.
+So do PRICE reads, since 2026-09-03: the sessions board shows what a session
+will cost and the "+ joystick" button has to know a price exists before it
+offers to add one.
+
+**The line inside sessions is not "manager vs owner", it is "spend the prices
+you were given vs set them".** A manager adds a joystick, grants ten minutes
+and lifts a time limit all day — that is running the floor, and every one of
+those spends a rate the company already decided. Waiving a bill (`session.free`)
+is giving the company's takings away, and setting what anything costs is the
+company's. The backend enforces both on `sessions.free` and `prices.manage`;
+this map only decides whether the control is drawn.
+
+## 9.6 A live session's terms (2026-09-03)
+
+Four controls a cashier gets on a session that is already running, and one rule
+that governs every one of them.
+
+**The backend is the source of truth, literally.** Each action returns the WHOLE
+session and the caller replaces its row with it — `SessionOptionsDialog` and
+`SessionsBoard` both do. Nothing on this side computes a joystick count, an end
+time or a total. A card that did would be right until a second cashier touched
+the same seat, and then quietly wrong on one of the two screens with nothing
+saying so.
+
+| Control | Where | Who |
+|---|---|---|
+| 🎮 add / remove a joystick | `SessionOptionsDialog` | everyone who works the branch |
+| +10 / +30 / +60 minutes | same | same |
+| switch to unlimited | same | same |
+| Free (waive the bill) | same, behind `session.free` | admin + owner |
+| joystick prices, rounding policy | `BranchPricesPage` | admin + owner |
+
+**Joysticks are PlayStation-only, and the question is the PLACE's platform.**
+`pc.kind === "ps"` means "no kiosk agent" and is equally true of a ping-pong
+table — `platformGroup(place.platform) === "ps"` is what the dialog asks, the
+same question the backend asks.
+
+**Refusals are shown verbatim.** The server answers a blocked unlimited with
+"this place is booked in the app" and a missing rate with "no price is set for
+joystick #3 — the owner sets it in Branch → Prices". Those are sentences an
+operator can act on; a generic "failed" throws the useful half away.
+
+**The ten-minute warning is a panel-side watcher, on purpose.**
+`SessionEndingNotifier` (mounted once in `Layout`) polls
+`GET /sessions?status=active` every 30s. There is no scheduler and no queue
+worker on the backend deployment, so a server-side cron would be a job that
+never runs — and nothing needs one, because the people who must act on the
+warning are the ones in front of this screen. It is addressed correctly by
+construction: that endpoint applies the caller's branch scope server-side, so an
+owner sees their company and a manager their branch, and there is no client-side
+filtering to get wrong. One warning per session ever (`warned`), so granting
+time does not summon it again ten minutes later for a decision already made.
+The card does not auto-dismiss: a booking toast that fades is a booking still
+findable in a list, and a seat that goes dark under a player is not.
+
+**`useSessionsSummary` excludes a waived session from every money figure.** It
+used to compute `timeTotal` as `total_paid - items`, which for a free session is
+`0 - items` — a giveaway subtracting itself from the day's time revenue. Free
+sessions are still counted, and what was drunk on one is still in `itemsQty`
+and the top-items list, because those describe what left the fridge rather than
+what was earned.
+
+**`session.free` the PERMISSION vs `session.free` the old i18n key.** The key
+already existed and means "this seat is available" on the board. The
+bill-waiver copy is prefixed `session.freeBill*` so the two can never collide —
+they did, and TypeScript caught it as a duplicate object property.
+
+---
 
 ## 10. How work must be done here (MANDATORY — run it in this order)
 
