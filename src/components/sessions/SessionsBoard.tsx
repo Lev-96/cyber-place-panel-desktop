@@ -9,6 +9,7 @@ import { useLocalReorder } from "@/hooks/useLocalReorder";
 import { useReservedPlaceIds } from "@/hooks/useReservedPlaceIds";
 import { useLang } from "@/i18n/LanguageContext";
 import { usePlaceAvailability } from "@/realtime/usePlaceAvailability";
+import { useSessionChanged } from "@/realtime/useSessionChanged";
 import { sessionRepository } from "@/repositories/SessionRepository";
 import { IPcApi, ISessionApi } from "@/types/sessions";
 import { PC_STATUS_COLOR, effectivePcStatus, isPs } from "@/types/pc";
@@ -25,6 +26,7 @@ import { Link } from "react-router-dom";
 import AddSessionItemDialog from "./AddSessionItemDialog";
 import SessionTimer from "./SessionTimer";
 import StartSessionDialog from "./StartSessionDialog";
+import SessionOptionsDialog from "./SessionOptionsDialog";
 import StopReceiptModal from "./StopReceiptModal";
 
 const navBtn: React.CSSProperties = { padding: "6px 10px", border: "1px solid #1f2a44", borderRadius: 6 };
@@ -58,6 +60,7 @@ const SessionsBoard = ({ branchId }: Props) => {
   const [startTarget, setStartTarget] = useState<IPcApi | null>(null);
   const [stopTarget, setStopTarget] = useState<ISessionApi | null>(null);
   const [addItemTarget, setAddItemTarget] = useState<ISessionApi | null>(null);
+  const [optionsTarget, setOptionsTarget] = useState<ISessionApi | null>(null);
   // Local display order for tile drag-and-drop. Seeded from the server order
   // (which already reflects sort_order) and preserved across Reverb/poll
   // reloads, so a just-dragged arrangement doesn't jump back before the persist
@@ -88,6 +91,17 @@ const SessionsBoard = ({ branchId }: Props) => {
       void sessions.reload();
       void pcs.reload();
     }, [sessions, pcs]),
+  );
+
+  // A session's TERMS changed on another machine — a pad in or out, time
+  // granted, the ceiling lifted, the bill waived. Without this the second
+  // cashier's board found out on its next 30-second poll, which is half a
+  // minute of two people acting on different numbers over the same till.
+  useSessionChanged(
+    branchId,
+    useCallback(() => {
+      void sessions.reload();
+    }, [sessions]),
   );
 
   useEffect(() => {
@@ -185,6 +199,9 @@ const SessionsBoard = ({ branchId }: Props) => {
     const deviceStatus = effectivePcStatus(pc);
     const color = SESSION_CELL_COLOR[cellState];
     const itemsCount = sess?.items?.length ?? 0;
+    // Pads in play INCLUDING the session's own, as the server counts them.
+    // An older backend sends nothing, and 1 is the honest floor.
+    const joystickCount = sess?.joystick_count ?? 1;
     // The two identity lines, resolved once so the JSX below stays readable.
     // A device with no place (a legacy row) has no platform or tier to show —
     // it still renders the line, as a non-breaking space, because a tile with
@@ -303,13 +320,36 @@ const SessionsBoard = ({ branchId }: Props) => {
               />
             </span>
             <span className="until">
-              {sess.mode === "open"
-                ? `${money(Number(sess.hourly_rate ?? 0))} / ${t("time.hourShort") || "h"}`
-                : sess.package_name}
+              {sess.is_unlimited
+                ? t("session.unlimited")
+                : sess.mode === "open"
+                  ? `${money(Number(sess.hourly_rate ?? 0))} / ${t("time.hourShort") || "h"}`
+                  : sess.package_name}
               {itemsCount > 0 && <span className="muted"> · {itemsCount} {t("session.posNote")}</span>}
             </span>
+            {/* What the tile has to say at a glance and could not before: how
+                many pads this seat is paying for, and whether it is paying at
+                all. Both come from the server — the count is never derived
+                here, or two cashiers would read different numbers off the same
+                seat. The pads render only for a PlayStation, where the concept
+                exists; a computer showing "🎮 1" would be noise. */}
+            {(joystickCount > 1 || sess.is_free) && (
+              <span className="row" style={{ gap: 6, fontSize: 12, flexWrap: "wrap" }}>
+                {joystickCount > 1 && (
+                  <span title={`${t("session.joysticks")}: ${joystickCount}`}>
+                    {"🎮".repeat(joystickCount)}
+                  </span>
+                )}
+                {sess.is_free && (
+                  <span className="pill" style={{ fontSize: 10, letterSpacing: 0, textTransform: "none" }}>
+                    {t("session.freeBillShort")}
+                  </span>
+                )}
+              </span>
+            )}
             <div className="row" style={{ gap: 6, marginTop: 4, flexWrap: "wrap" }}>
               <Button variant="secondary" onClick={() => setAddItemTarget(sess)} style={miniBtnFlex}>{t("session.addItem")}</Button>
+              <Button variant="secondary" onClick={() => setOptionsTarget(sess)} style={miniBtnFlex}>{t("session.optionsShort")}</Button>
               <Button variant="secondary" onClick={() => setStopTarget(sess)} style={miniBtnFlex}>{t("action.stop")}</Button>
             </div>
           </>
@@ -428,6 +468,16 @@ const SessionsBoard = ({ branchId }: Props) => {
             void pcs.reload();
           }}
           onItemRemoved={() => { void sessions.reload(); }}
+        />
+      )}
+      {optionsTarget && (
+        <SessionOptionsDialog
+          session={optionsTarget}
+          platform={(pcs.data ?? []).find((pc) => pc.id === optionsTarget.pc_id)?.place?.platform}
+          onClose={() => { setOptionsTarget(null); void sessions.reload(); }}
+          // The server's answer replaces the dialog's copy AND the board's row,
+          // so the tile behind the dialog is never a version behind it.
+          onChanged={(updated) => { setOptionsTarget(updated); void sessions.reload(); }}
         />
       )}
       {addItemTarget && (

@@ -11,6 +11,8 @@ export interface SessionsSummary {
   sessionsTotal: number;
   stopped: number;
   active: number;
+  /** Closed sessions whose bill was waived. Counted, worth nothing. */
+  free: number;
   total: number;
   timeTotal: number;
   itemsTotal: number;
@@ -39,6 +41,17 @@ const num = (v: unknown): number => {
  * Active sessions still contribute their items to the items totals (cashier
  * has already attached them) but not to the time/total revenue, since
  * `total_paid` only finalizes when the session is stopped.
+ *
+ * A FREE session contributes to no money figure at all — not its time, not its
+ * items. It is still a session and still counted, and what was drunk on it is
+ * still in `itemsQty` and the top-items list, because those describe what left
+ * the fridge rather than what was earned. Two things this protects:
+ *
+ *   - `timeTotal` was `total_paid - items`, which for a waived bill is
+ *     0 - items, i.e. NEGATIVE. A giveaway would have subtracted itself from
+ *     the day's time revenue.
+ *   - the three money figures stay consistent with each other: a free session
+ *     adds 0 to all of them, so time + items still reconciles with the total.
  */
 export const useSessionsSummary = (sessions: ISessionApi[] | null): SessionsSummary => {
   return useMemo(() => aggregateSessionsSummary(sessions ?? []), [sessions]);
@@ -55,6 +68,7 @@ export const aggregateSessionsSummary = (sessions: ISessionApi[]): SessionsSumma
   let itemsQty = 0;
   let stopped = 0;
   let active = 0;
+  let free = 0;
   const itemMap = new Map<string, ItemAggregate>();
 
   for (const s of sessions) {
@@ -71,12 +85,21 @@ export const aggregateSessionsSummary = (sessions: ISessionApi[]): SessionsSumma
       prev.total += line;
       itemMap.set(key, prev);
     }
-    itemsTotal += sItems;
+    const isFree = s.is_free === true;
     itemsQty += sQty;
+    if (!isFree) itemsTotal += sItems;
+
     if (s.status === "stopped" || s.status === "expired") {
-      total += sTotal;
-      timeTotal += sTotal - sItems;
       stopped++;
+      if (isFree) {
+        free++;
+      } else {
+        total += sTotal;
+        // Clamped as well as gated: an older backend that does not send
+        // `is_free` would otherwise reach this line with total_paid 0 and a
+        // bill full of items, and subtract a giveaway from the day's takings.
+        timeTotal += Math.max(0, sTotal - sItems);
+      }
     } else {
       active++;
     }
@@ -90,6 +113,7 @@ export const aggregateSessionsSummary = (sessions: ISessionApi[]): SessionsSumma
     sessionsTotal: sessions.length,
     stopped,
     active,
+    free,
     total,
     timeTotal,
     itemsTotal,

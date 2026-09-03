@@ -49,6 +49,23 @@ export interface ITimePackage {
   discounted_price_now?: number | string | null;
 }
 
+/**
+ * One period a single extra joystick was in play.
+ *
+ * Not a count on the session, and the distinction is the whole feature: three
+ * pads on a three-hour session does not mean three pads for three hours. The
+ * player who joined at 15:00 pays from 15:00.
+ */
+export interface ISessionJoystick {
+  id: number;
+  /** 2..4. Slot 1 is the session itself and never appears here. */
+  slot: number;
+  hourly_rate: number;
+  started_at: string;
+  /** null while the pad is still in play. */
+  stopped_at: string | null;
+}
+
 export interface ISessionApi {
   id: number;
   branch_id: number;
@@ -63,7 +80,33 @@ export interface ISessionApi {
   ends_at: string | null;      // ISO; null for open (count-up) sessions
   status: "active" | "stopped" | "expired";
   total_paid: number;
+  opened_by_user_id?: number | null;
   items?: Array<{ id: number; name: string; price: number | string; qty: number; product_id: number | null }>;
+
+  /* ---- added 2026-09-03; every field above is unchanged ---------------- */
+
+  /**
+   * The bill is waived. The clock keeps running and the session still counts
+   * — it is simply worth 0, which is what `total_paid` will say when it stops.
+   * Optional so a panel talking to an older backend degrades to "not free".
+   */
+  is_free?: boolean;
+  /** No end: started in count-up mode, or an operator lifted the ceiling. */
+  is_unlimited?: boolean;
+  unlimited_at?: string | null;
+  /**
+   * The block that was SOLD, and where it ends. For an unlimited session this
+   * is the boundary the hourly overflow is measured from — `ends_at` is null
+   * there and cannot say it.
+   */
+  committed_until?: string | null;
+  committed_amount?: number | string | null;
+  /** Pads in play INCLUDING the session's own. 1 is the floor, never 0. */
+  joystick_count?: number;
+  /** Every period, closed ones included. Present when the relation is loaded. */
+  joysticks?: ISessionJoystick[];
+  /** Who opened it — the owner's "which of my managers ran this?". */
+  opened_by?: { id: number; name: string; role: string } | null;
 }
 
 export interface IPcApi extends Translated {

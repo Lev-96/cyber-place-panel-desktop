@@ -1,6 +1,7 @@
 import { Outlet } from "react-router-dom";
 import ExpenseReminderNotifier from "./notifications/ExpenseReminderNotifier";
 import GlobalBookingNotifier from "./notifications/GlobalBookingNotifier";
+import SessionEndingNotifier from "./notifications/SessionEndingNotifier";
 import SupportNotifier from "./notifications/SupportNotifier";
 import { Ps5ControlProvider } from "@/ps5/Ps5ControlProvider";
 import UnexpectedWakeDialog from "./ps5/UnexpectedWakeDialog";
@@ -28,6 +29,7 @@ const Layout = () => (
     */}
     <GlobalBookingNotifier />
     <SupportNotifier />
+    <SessionEndingNotifier />
     {/* Owner-only, and silent for everyone else: it renders nothing unless the
         signed-in role holds `branch.places` AND a console in their own venue
         has woken with no session on it. Mounted here so the question reaches

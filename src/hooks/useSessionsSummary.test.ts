@@ -155,3 +155,48 @@ describe("useSessionsSummary", () => {
     expect(s.topItems[4]).toEqual({ name: "Item5", qty: 1, total: 600 });
   });
 });
+
+describe("a waived bill", () => {
+  /**
+   * The one that would have gone unnoticed: `timeTotal` was
+   * `total_paid - items`, and a free session's `total_paid` is 0. A giveaway
+   * with a 700-dram cola on it used to SUBTRACT 700 from the day's time
+   * revenue.
+   */
+  it("adds nothing to any money figure, and never a negative one", () => {
+    const summary = aggregateSessionsSummary([
+      make({ status: "stopped", total_paid: 3000, items: [{ id: 1, name: "Cola", price: 700, qty: 1, product_id: null }] }),
+      make({ status: "stopped", total_paid: 0, is_free: true, items: [{ id: 1, name: "Cola", price: 700, qty: 1, product_id: null }] }),
+    ]);
+
+    expect(summary.total).toBe(3000);
+    expect(summary.itemsTotal).toBe(700);
+    expect(summary.timeTotal).toBe(2300);
+    expect(summary.timeTotal).toBeGreaterThanOrEqual(0);
+  });
+
+  it("is still a session, and what was drunk on it still left the fridge", () => {
+    const summary = aggregateSessionsSummary([
+      make({ status: "stopped", total_paid: 0, is_free: true, items: [{ id: 1, name: "Cola", price: 700, qty: 2, product_id: null }] }),
+    ]);
+
+    expect(summary.sessionsTotal).toBe(1);
+    expect(summary.stopped).toBe(1);
+    expect(summary.free).toBe(1);
+    expect(summary.itemsQty).toBe(2);
+    expect(summary.total).toBe(0);
+  });
+
+  it("counts ten paid and two free as twelve sessions and ten sessions of takings", () => {
+    const rows = [
+      ...Array.from({ length: 10 }, () => make({ status: "stopped", total_paid: 1000 })),
+      ...Array.from({ length: 2 }, () => make({ status: "stopped", total_paid: 0, is_free: true })),
+    ];
+
+    const summary = aggregateSessionsSummary(rows);
+
+    expect(summary.stopped).toBe(12);
+    expect(summary.free).toBe(2);
+    expect(summary.total).toBe(10_000);
+  });
+});

@@ -90,6 +90,17 @@ export type Permission =
   | "session.start"
   | "session.stop"
   /**
+   * Waive a running session's bill ("Free"). The clock keeps running and the
+   * session still counts — what changes is that nobody pays.
+   *
+   * Admin + owner, and deliberately NOT part of running the floor: a manager
+   * adds joysticks, grants time and lifts a time limit all day, because those
+   * spend prices the company already set. Writing a bill off is giving the
+   * company's takings away. The backend enforces the same on the
+   * `sessions.free` capability; this only decides whether the toggle is drawn.
+   */
+  | "session.free"
+  /**
    * Cashier shifts — open, close, Z-report. Declared since the first version of
    * this map and read by nothing until now; the section was open to everyone.
    * Owner-level from 2026-08-30: the shift is the cash-accountability record
@@ -123,7 +134,7 @@ const PERMS: Record<Role, ReadonlySet<Permission>> = {
     "company.block", "branch.block",
     "manager.create", "manager.delete",
     "game.crud", "game.crud.branch", "expenses.crud",
-    "session.start", "session.stop",
+    "session.start", "session.stop", "session.free",
   ]),
   company_owner: new Set<Permission>([
     "menu.branches", "menu.managers", "menu.tournaments", "menu.scan", "menu.map",
@@ -139,7 +150,7 @@ const PERMS: Record<Role, ReadonlySet<Permission>> = {
     "game.crud.branch",
     "company.edit",
     "manager.create", "manager.delete",
-    "session.start", "session.stop",
+    "session.start", "session.stop", "session.free",
   ]),
   manager: new Set<Permission>([
     // Manager = single-branch floor staff, and the floor is what they get: run

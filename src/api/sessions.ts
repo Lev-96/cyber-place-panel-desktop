@@ -63,6 +63,17 @@ export interface ISessionItem {
   qty: number;
 }
 
+export interface IJoystickCharge {
+  id: number;
+  slot: number;
+  hourly_rate: number;
+  started_at: string;
+  stopped_at: string | null;
+  is_open: boolean;
+  minutes: number;
+  amount: number;
+}
+
 export interface IBillBreakdown {
   mode: "fixed" | "open";
   elapsed_minutes: number;
@@ -71,7 +82,25 @@ export interface IBillBreakdown {
   package_name: string | null;
   items: Array<{ id: number; name: string; price: number; qty: number; line_total: number }>;
   items_total: number;
+  /** What is actually owed. Zero for a waived session. */
   total: number;
+
+  /* ---- added 2026-09-03; optional so an older backend still renders ---- */
+
+  is_free?: boolean;
+  is_unlimited?: boolean;
+  /** One line per pad period — "Joystick #3, 15:00→16:00, 700". */
+  joysticks?: IJoystickCharge[];
+  joysticks_total?: number;
+  /** Pads in play including the session's own. */
+  joystick_count?: number;
+  /** Time + joysticks + items, before the venue's rounding policy. */
+  subtotal?: number;
+  /** The rounded figure — what it would cost if it were not free. */
+  gross_total?: number;
+  /** 0 means the venue rounds nothing, which is the default. */
+  rounding_step?: number;
+  rounding_mode?: "up" | "nearest" | "down";
 }
 
 export interface AddItemBody {
@@ -118,6 +147,83 @@ export const apiSetSessionItemQty = (sessionId: number, itemId: number, qty: num
 
 export const apiRemoveSessionItem = (sessionId: number, itemId: number) =>
   request<{ session: ISessionApi }>(`/sessions/${sessionId}/items/${itemId}`, { method: "DELETE" });
+
+/* ── a live session's terms ───────────────────────────────────────────────
+ *
+ * Each of these returns the whole session, so the caller replaces its row
+ * rather than patching a field it guessed at. The backend is the source of
+ * truth for the joystick count and for whether a bill is waived; the card
+ * never computes either.
+ */
+
+/** Put the next joystick into play. The server picks the slot and its price. */
+export const apiAddSessionJoystick = (sessionId: number) =>
+  request<{ joystick: { id: number; slot: number; hourly_rate: number; started_at: string }; session: ISessionApi }>(
+    `/sessions/${sessionId}/joysticks`,
+    { method: "POST" },
+  );
+
+/**
+ * Take one out. Addressed by SLOT, not by row id: the cashier presses "remove
+ * the third pad", and the slot is what the card shows them.
+ */
+export const apiRemoveSessionJoystick = (sessionId: number, slot: number) =>
+  request<{ session: ISessionApi }>(`/sessions/${sessionId}/joysticks/${slot}`, { method: "DELETE" });
+
+/** +10 / +30 / +60, priced at the tariff the player is already on. */
+export const apiAddSessionTime = (sessionId: number, minutes: number) =>
+  request<{ session: ISessionApi }>(`/sessions/${sessionId}/time`, { method: "POST", body: { minutes } });
+
+/** Lift the ceiling. Refused (422, with a sentence) when the seat is booked. */
+export const apiMakeSessionUnlimited = (sessionId: number) =>
+  request<{ session: ISessionApi }>(`/sessions/${sessionId}/unlimited`, { method: "POST" });
+
+/** Waive the bill, or put it back. Owner-level; the server enforces it. */
+export const apiSetSessionFree = (sessionId: number, isFree: boolean) =>
+  request<{ session: ISessionApi }>(`/sessions/${sessionId}/free`, {
+    method: "POST",
+    body: { is_free: isFree },
+  });
+
+/* ── the audit trail ─────────────────────────────────────────────────── */
+
+export type SessionActionName =
+  | "started"
+  | "stopped"
+  | "joystick_added"
+  | "joystick_removed"
+  | "time_added"
+  | "made_unlimited"
+  | "free_enabled"
+  | "free_disabled";
+
+export interface ISessionEvent {
+  id: number;
+  session_id: number;
+  branch_id: number;
+  action: SessionActionName;
+  amount: number | null;
+  meta: Record<string, unknown> | null;
+  created_at: string;
+  user?: { id: number; name: string; role: string } | null;
+  pc_label?: string | null;
+  place_name?: string | null;
+}
+
+export interface ListSessionEventsParams {
+  branch_id?: number;
+  session_id?: number;
+  action?: SessionActionName;
+  from?: string;
+  to?: string;
+  limit?: number;
+}
+
+export const apiListSessionEvents = (params: ListSessionEventsParams) =>
+  request<{ data: ISessionEvent[] }>("/session-events", { params });
+
+export const apiListEventsForSession = (sessionId: number) =>
+  request<{ data: ISessionEvent[] }>(`/sessions/${sessionId}/events`);
 
 export const apiListPcs = (branchId: number) =>
   request<{ data: IPcApi[] }>("/pcs", { params: { branch_id: branchId } });

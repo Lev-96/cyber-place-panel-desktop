@@ -5,6 +5,7 @@ import { useSessionsSummary } from "@/hooks/useSessionsSummary";
 import { formatDateTime, formatTime } from "@/i18n/dates";
 import { useLang } from "@/i18n/LanguageContext";
 import { sessionRepository } from "@/repositories/SessionRepository";
+import { ISessionEvent } from "@/api/sessions";
 import { ISessionApi } from "@/types/sessions";
 import { useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
@@ -58,6 +59,14 @@ const SessionsHistory = () => {
 
   const summary = useSessionsSummary(data);
 
+  // The owner's question the session rows cannot answer: who did what. Its own
+  // request rather than a field on each session, because it is one flat list
+  // for the whole range and joining it onto rows would fetch it many times.
+  const events = useAsync(
+    () => sessionRepository.listEvents({ branch_id: id, from: fromIso, to: toIso, limit: 500 }),
+    [id, fromIso, toIso],
+  );
+
   if (!Number.isFinite(id) || id <= 0) return <div className="error">{t("hub.invalidId")}</div>;
 
   const setRange = (kind: "today" | "yesterday" | "month") => {
@@ -107,6 +116,9 @@ const SessionsHistory = () => {
             <Tile k={t("history.sumTime")} v={money(summary.timeTotal)} />
             <Tile k={t("history.sumItemsRevenue")} v={money(summary.itemsTotal)} />
             <Tile k={t("history.sumItemsQty")} v={String(summary.itemsQty)} />
+            {/* Counted, and worth nothing — which is the point of showing it
+                beside the takings rather than folded into them. */}
+            {summary.free > 0 && <Tile k={t("history.sumFree")} v={String(summary.free)} />}
           </div>
 
           {summary.topItems.length > 0 && (
@@ -131,6 +143,8 @@ const SessionsHistory = () => {
       {!loading && !error && (
         <SessionsList sessions={data ?? []} />
       )}
+
+      {!loading && !error && <ActionsLog events={events.data ?? []} />}
     </ScreenWithBg>
   );
 };
@@ -173,6 +187,16 @@ const SessionRow = ({ session }: { session: ISessionApi }) => {
           <strong style={{ fontSize: 15, color: "#07ddf1" }}>{session.pc_label || `№${session.pc_id}`}</strong>
           <span className="pill" style={{ fontSize: 11, textTransform: "none", letterSpacing: 0 }}>{modeLabel}</span>
           <span className="pill" style={{ fontSize: 11, textTransform: "none", letterSpacing: 0, opacity: isClosed ? 1 : 0.7 }}>{statusLabel}</span>
+          {session.is_free && (
+            <span className="pill" style={{ fontSize: 11, textTransform: "none", letterSpacing: 0 }}>
+              {t("session.freeBillShort")}
+            </span>
+          )}
+          {session.is_unlimited && (
+            <span className="pill" style={{ fontSize: 11, textTransform: "none", letterSpacing: 0 }}>
+              {t("session.unlimited")}
+            </span>
+          )}
         </div>
         <div className="row" style={{ gap: 8, alignItems: "baseline" }}>
           <span className="muted" style={{ fontSize: 12 }}>{dateLabel}</span>
@@ -180,10 +204,35 @@ const SessionRow = ({ session }: { session: ISessionApi }) => {
         </div>
       </div>
 
-      {(session.user_display_name || session.package_name) && (
+      {(session.user_display_name || session.package_name || session.opened_by) && (
         <div className="muted" style={{ fontSize: 12 }}>
           {session.package_name && <>{t("session.tariffField")}: {session.package_name}</>}
           {session.user_display_name && <> {session.package_name ? "· " : ""}{session.user_display_name}</>}
+          {/* An owner reading last week's takings cannot get this from
+              anywhere else — the row carried an id and nothing more. */}
+          {session.opened_by && (
+            <> {(session.package_name || session.user_display_name) ? "· " : ""}
+              {t("history.manager")}: {session.opened_by.name}</>
+          )}
+        </div>
+      )}
+
+      {/* Each pad over the interval it was actually in play. "Joystick #3,
+          15:00→16:00" is a line a cashier can defend at the counter; a count
+          multiplied by the session's length is the line that starts the
+          argument. */}
+      {(session.joysticks?.length ?? 0) > 0 && (
+        <div className="col" style={{ gap: 2, fontSize: 12 }}>
+          {(session.joysticks ?? []).map((j) => (
+            <div key={j.id} className="row-between">
+              <span className="muted">
+                {t("session.joystickSlot").replace("{0}", String(j.slot))}
+              </span>
+              <span className="muted">
+                {formatTime(new Date(j.started_at))} → {j.stopped_at ? formatTime(new Date(j.stopped_at)) : "…"}
+              </span>
+            </div>
+          ))}
         </div>
       )}
 
@@ -212,7 +261,11 @@ const SessionRow = ({ session }: { session: ISessionApi }) => {
           )}
           <div className="row-between" style={{ fontSize: 15, fontWeight: 700 }}>
             <span>{t("history.total")}</span>
-            <span>{money(total)}</span>
+            {/* A waived bill reads as the word, not as a zero. "0" on a
+                receipt line is ambiguous — it could be a session nobody
+                played. "Free" is a decision somebody made, and the log below
+                says who. */}
+            <span>{session.is_free ? t("session.freeBillShort") : money(total)}</span>
           </div>
         </>
       ) : (
@@ -222,6 +275,50 @@ const SessionRow = ({ session }: { session: ISessionApi }) => {
             <span>{money(itemsTotal)}</span>
           </div>
         )
+      )}
+    </div>
+  );
+};
+
+/**
+ * Who did what, newest first.
+ *
+ * The session rows above say what is TRUE about each session; this says how it
+ * got that way and who decided. An owner asking "why was that one free" has no
+ * other place to look — the session row carries the outcome, not the author.
+ *
+ * Deliberately not merged into the rows: the actions of a busy evening are a
+ * timeline, and splitting one across twenty collapsed cards is how a timeline
+ * stops reading like one.
+ */
+const ActionsLog = ({ events }: { events: ISessionEvent[] }) => {
+  const { t, money } = useLang();
+
+  return (
+    <div className="col" style={{ gap: 8, marginTop: 18 }}>
+      <h3 className="page-title" style={{ margin: 0, fontSize: 16 }}>{t("history.actions")}</h3>
+      {events.length === 0 ? (
+        <div className="muted">{t("history.actionsEmpty")}</div>
+      ) : (
+        <div className="col" style={{ gap: 4 }}>
+          {events.map((e) => (
+            <div key={e.id} className="row-between card" style={{ fontSize: 13, padding: "6px 10px" }}>
+              <span className="row" style={{ gap: 8, flexWrap: "wrap", alignItems: "baseline" }}>
+                <span>{t(`history.action.${e.action}`) || e.action}</span>
+                {/* The account may since have been deleted; the fact still
+                    happened, so a nameless line is shown rather than hidden. */}
+                {e.user && <span className="muted">· {e.user.name}</span>}
+                {(e.pc_label || e.place_name) && (
+                  <span className="muted">· {e.place_name || e.pc_label}</span>
+                )}
+              </span>
+              <span className="row" style={{ gap: 8, alignItems: "baseline" }}>
+                {e.amount !== null && <span>{money(e.amount)}</span>}
+                <span className="muted" style={{ fontSize: 12 }}>{formatDateTime(new Date(e.created_at))}</span>
+              </span>
+            </div>
+          ))}
+        </div>
       )}
     </div>
   );
