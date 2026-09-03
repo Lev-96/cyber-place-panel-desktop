@@ -411,6 +411,8 @@ export const TRANSLATIONS: Dict = {
   /* ── a live session's terms: joysticks, free, extra time, unlimited ──── */
   "session.options": { en: "Session options", ru: "Параметры сессии", am: "Նիստի կարգավորումներ" },
   "session.optionsShort": { en: "Options", ru: "Опции", am: "Կարգավորումներ" },
+  "session.elapsedField": { en: "Running for", ru: "Идёт", am: "Տևում է" },
+  "session.joystickNoPrice": { en: "price not set", ru: "цена не задана", am: "գինը սահմանված չէ" },
   "session.joysticks": { en: "Joysticks", ru: "Джойстики", am: "Ջոյսթիքներ" },
   "session.joystickAdd": { en: "Add a joystick", ru: "Добавить джойстик", am: "Ավելացնել ջոյսթիք" },
   "session.joystickRemove": { en: "Remove joystick #{0}", ru: "Убрать джойстик №{0}", am: "Հեռացնել №{0} ջոյսթիքը" },

@@ -37,13 +37,17 @@ vi.mock("@/repositories/SessionRepository", () => ({
     setFree: (...a: unknown[]) => repo.setFree(...a),
   },
 }));
+const prices = vi.hoisted(() => ({
+  listByBranch: vi.fn(),
+  rows: [
+    { id: 1, branch_id: 7, slot: 2, price_per_hour: 500 },
+    { id: 2, branch_id: 7, slot: 3, price_per_hour: 700 },
+    { id: 3, branch_id: 7, slot: 4, price_per_hour: 700 },
+  ] as Array<{ id: number; branch_id: number; slot: number; price_per_hour: number }>,
+}));
 vi.mock("@/repositories/JoystickPriceRepository", () => ({
   joystickPriceRepository: {
-    listByBranch: vi.fn().mockResolvedValue([
-      { id: 1, branch_id: 7, slot: 2, price_per_hour: 500 },
-      { id: 2, branch_id: 7, slot: 3, price_per_hour: 700 },
-      { id: 3, branch_id: 7, slot: 4, price_per_hour: 700 },
-    ]),
+    listByBranch: (...a: unknown[]) => prices.listByBranch(...a),
   },
 }));
 vi.mock("@/auth/AuthContext", () => ({ useAuth: () => ({ user: { id: 1, role: auth.role } }) }));
@@ -78,8 +82,40 @@ const mount = async (s: ISessionApi = session(), platform = "ps5") => {
 beforeEach(() => {
   auth.role = "company_owner";
   Object.values(repo).forEach((fn) => fn.mockReset());
+  prices.rows = [
+    { id: 1, branch_id: 7, slot: 2, price_per_hour: 500 },
+    { id: 2, branch_id: 7, slot: 3, price_per_hour: 700 },
+    { id: 3, branch_id: 7, slot: 4, price_per_hour: 700 },
+  ];
+  prices.listByBranch.mockReset();
+  prices.listByBranch.mockImplementation(() => Promise.resolve(prices.rows));
 });
 afterEach(cleanup);
+
+describe("the dialog itself", () => {
+  /**
+   * The bug this pins shipped and was reported from the floor: the dialog
+   * rendered as a transparent sheet with the sessions board legible straight
+   * through it.
+   *
+   * `Modal` deliberately renders only the backdrop and the centring wrapper —
+   * every dialog in this app supplies its own opaque surface, and `.card` is
+   * that surface (`background: var(--color-surface)` in global.css). A dialog
+   * that forgets it is invisible in exactly this way, and nothing else in the
+   * suite notices, because every assertion about content passes on a
+   * transparent dialog.
+   */
+  test("stands on an opaque surface", async () => {
+    await mount();
+
+    const surface = document.querySelector(".cp-modal-wrapper > *");
+    expect(surface, "the dialog rendered nothing inside the modal wrapper").toBeTruthy();
+    expect(
+      surface!.classList.contains("card"),
+      "the dialog's root is missing `card` — it will render transparent over the board",
+    ).toBe(true);
+  });
+});
 
 describe("the joystick controls", () => {
   test("show as many pads as the SERVER counted, never a locally derived number", async () => {
@@ -91,7 +127,12 @@ describe("the joystick controls", () => {
 
   test("offer the price the NEXT pad will actually cost", async () => {
     // Two in play, so the next is the third — and slot 3 costs 700, not 500.
-    await mount(session({ joystick_count: 2 }));
+    await mount(session({
+      joystick_count: 2,
+      joysticks: [
+        { id: 1, slot: 2, hourly_rate: 500, started_at: "2026-09-03T14:00:00.000Z", stopped_at: null },
+      ],
+    }));
 
     expect(screen.getByText(/700/)).toBeTruthy();
   });
@@ -124,6 +165,72 @@ describe("the joystick controls", () => {
     });
 
     expect(repo.removeJoystick).toHaveBeenCalledWith(42, 2);
+  });
+
+  test("quote the slot the SERVER will allocate, which is the lowest free one", async () => {
+    // Slots 2 and 4 in play, 3 removed from the middle. The count is 3, so
+    // "count + 1" would say slot 4 and quote its 700 — while the server
+    // allocates slot 3. On a venue that has not priced slot 3 the button then
+    // advertises a rate and the click is refused.
+    prices.rows = [
+      { id: 1, branch_id: 7, slot: 2, price_per_hour: 500 },
+      { id: 3, branch_id: 7, slot: 4, price_per_hour: 700 },
+    ];
+    await mount(session({
+      joystick_count: 3,
+      joysticks: [
+        { id: 1, slot: 2, hourly_rate: 500, started_at: "2026-09-03T14:00:00.000Z", stopped_at: null },
+        { id: 2, slot: 3, hourly_rate: 700, started_at: "2026-09-03T14:00:00.000Z", stopped_at: "2026-09-03T15:00:00.000Z" },
+        { id: 3, slot: 4, hourly_rate: 700, started_at: "2026-09-03T15:00:00.000Z", stopped_at: null },
+      ],
+    }));
+
+    // Scoped to the ADD button: slot 4's own 700 legitimately appears in the
+    // list of pads in play below it, and a page-wide search would match that.
+    const add = screen.getByRole("button", { name: /session.joystickAdd/ });
+    expect(add.textContent).toContain("session.joystickNoPrice");
+    expect(add.textContent).not.toContain("700");
+  });
+
+  test("say the price is not set rather than quote one the venue does not have", async () => {
+    // The button stays clickable: the server is the authority on whether a pad
+    // may be added, and its refusal names the slot and where to fix it. A
+    // disabled button would say "no" without saying why.
+    prices.rows = [{ id: 1, branch_id: 7, slot: 2, price_per_hour: 500 }];
+    await mount(session({
+      joystick_count: 2,
+      joysticks: [
+        { id: 1, slot: 2, hourly_rate: 500, started_at: "2026-09-03T14:00:00.000Z", stopped_at: null },
+      ],
+    }));
+
+    expect(screen.getByText(/session.joystickNoPrice/)).toBeTruthy();
+    const add = screen.getByRole("button", { name: /session.joystickAdd/ }) as HTMLButtonElement;
+    expect(add.disabled).toBe(false);
+  });
+
+  test("re-read the price list after a refusal, so a stale rate stops being advertised", async () => {
+    await mount(session({
+      joystick_count: 2,
+      joysticks: [
+        { id: 1, slot: 2, hourly_rate: 500, started_at: "2026-09-03T14:00:00.000Z", stopped_at: null },
+      ],
+    }));
+    expect(prices.listByBranch).toHaveBeenCalledTimes(1);
+    // 700 is on screen, from the list loaded at mount.
+    expect(screen.getByText(/700/)).toBeTruthy();
+
+    // The owner deletes that price in another window; the next add is refused.
+    prices.rows = [{ id: 1, branch_id: 7, slot: 2, price_per_hour: 500 }];
+    repo.addJoystick.mockRejectedValue(new Error("No price is set for joystick #3"));
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /session.joystickAdd/ }));
+    });
+
+    expect(prices.listByBranch).toHaveBeenCalledTimes(2);
+    expect(screen.getByText(/session.joystickNoPrice/)).toBeTruthy();
+    expect(screen.queryByText(/700/)).toBeNull();
   });
 
   test("show the server's refusal word for word", async () => {
@@ -212,6 +319,28 @@ describe("waiving the bill", () => {
     });
 
     expect(repo.setFree).toHaveBeenCalledWith(42, true);
+  });
+});
+
+describe("what the card cannot say and this must", () => {
+  test("names the tariff and how long the session has run", async () => {
+    // Without these, "+30 min" is a button pressed on faith.
+    await mount(session({
+      package_name: "Один час",
+      started_at: new Date(Date.now() - 80 * 60_000).toISOString(),
+    }));
+
+    expect(screen.getByText(/session.tariffField/)).toBeTruthy();
+    expect(screen.getByText("Один час")).toBeTruthy();
+    expect(screen.getByText(/session.elapsedField/)).toBeTruthy();
+    // 80 minutes reads as "1 h 20 min", not "80".
+    expect(screen.getByText(/1 .*20 /)).toBeTruthy();
+  });
+
+  test("says Unlimited as the tariff once the ceiling is lifted", async () => {
+    await mount(session({ is_unlimited: true, ends_at: null, package_name: "Один час" }));
+
+    expect(screen.getAllByText(/session.unlimited/).length).toBeGreaterThan(0);
   });
 });
 

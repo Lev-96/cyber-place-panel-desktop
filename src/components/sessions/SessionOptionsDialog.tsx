@@ -1,7 +1,7 @@
 import Button from "@/components/ui/Button";
 import Modal from "@/components/ui/Modal";
 import Spinner from "@/components/ui/Spinner";
-import { IJoystickPrice, MAX_JOYSTICKS } from "@/api/joystickPrices";
+import { IJoystickPrice, JOYSTICK_SLOTS, MAX_JOYSTICKS } from "@/api/joystickPrices";
 import { useAuth } from "@/auth/AuthContext";
 import { can } from "@/auth/permissions";
 import { useLang } from "@/i18n/LanguageContext";
@@ -9,7 +9,7 @@ import { joystickPriceRepository } from "@/repositories/JoystickPriceRepository"
 import { sessionRepository } from "@/repositories/SessionRepository";
 import { ISessionApi } from "@/types/sessions";
 import { platformGroup } from "@/utils/platform";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 interface Props {
   session: ISessionApi;
@@ -60,10 +60,12 @@ const SessionOptionsDialog = ({ session, platform, onClose, onChanged }: Props) 
   const isFree = current.is_free ?? false;
   const isActive = current.status === "active";
 
-  useEffect(() => {
+  const loadPrices = useCallback(() => {
     if (!isPlayStation) return;
     void joystickPriceRepository.listByBranch(current.branch_id).then(setPrices);
   }, [current.branch_id, isPlayStation]);
+
+  useEffect(loadPrices, [loadPrices]);
 
   /** Run one change, keep the server's answer, and surface its sentence. */
   const run = async (action: () => Promise<ISessionApi>) => {
@@ -75,6 +77,11 @@ const SessionOptionsDialog = ({ session, platform, onClose, onChanged }: Props) 
       onChanged(updated);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
+      // The refusal is very often "no price is set for joystick #N", and the
+      // price list this dialog drew its button from is exactly what has gone
+      // stale. Re-reading it is what stops the button advertising a rate the
+      // server has just said does not exist.
+      loadPrices();
     } finally {
       setBusy(false);
     }
@@ -83,18 +90,69 @@ const SessionOptionsDialog = ({ session, platform, onClose, onChanged }: Props) 
   const priceFor = (slot: number): number | null =>
     prices.find((p) => p.slot === slot)?.price_per_hour ?? null;
 
-  // The pad that would be added next is the (count + 1)-th, and the lowest free
-  // slot the server picks is that same number — which is why the price shown
-  // here is the price that will be charged.
-  const nextSlot = joystickCount + 1;
-  const nextPrice = priceFor(nextSlot);
+  /**
+   * The slot the server will actually allocate: the LOWEST free one, exactly as
+   * `JoystickService::add()` picks it.
+   *
+   * This was `joystickCount + 1`, which is the same number right up until a pad
+   * is removed from the middle. With slots 2 and 4 in play the count is 3, so
+   * the old sum said "next is 4" and quoted slot 4's rate — while the server
+   * would allocate slot 3. The button advertised a price for a pad nobody was
+   * about to add, and on a venue that had not priced slot 3 it advertised a
+   * price and then refused.
+   */
+  const openSlots = (current.joysticks ?? []).filter((j) => j.stopped_at === null).map((j) => j.slot);
+  const nextSlot = current.joysticks
+    ? JOYSTICK_SLOTS.find((slot) => !openSlots.includes(slot)) ?? null
+    // No interval rows to reason from — an older backend, or a session
+    // returned without the relation. The count is then the only thing known,
+    // and it is right in every case except a pad removed from the middle.
+    : (JOYSTICK_SLOTS.find((slot) => slot === joystickCount + 1) ?? null);
+  const nextPrice = nextSlot === null ? null : priceFor(nextSlot);
+
+  // Whole minutes since the session started, in the same "1 ч 20 мин" shape the
+  // receipt uses. Computed from `started_at` rather than ticked, because this
+  // dialog is open for seconds at a time and a second timer here would be one
+  // more thing that can disagree with the board's.
+  const elapsedMinutes = Math.max(
+    0,
+    Math.floor((Date.now() - new Date(current.started_at).getTime()) / 60_000),
+  );
+  const elapsedLabel = elapsedMinutes >= 60
+    ? `${Math.floor(elapsedMinutes / 60)} ${t("time.hourShort") || "h"} ${elapsedMinutes % 60} ${t("time.minShort") || "min"}`
+    : `${elapsedMinutes} ${t("time.minShort") || "min"}`;
 
   return (
     <Modal open onClose={onClose}>
-      <div className="col" style={{ gap: 18, minWidth: 340, maxWidth: 460 }}>
+      {/* `card` is what makes a dialog opaque. Modal itself renders only the
+          backdrop and the centring wrapper — every dialog in this app supplies
+          its own surface, and this one shipped without it: the panel showed a
+          transparent sheet with the board legible straight through it. Same
+          class as AddSessionItemDialog and StopReceiptModal, so it inherits the
+          design system's surface, radius and border rather than inventing one. */}
+      <div className="card col" style={{ gap: 18, width: 460, maxWidth: "92vw" }}>
         <div className="row-between" style={{ alignItems: "baseline" }}>
           <h2 style={{ margin: 0 }}>{t("session.options")}</h2>
           <span className="muted" style={{ fontSize: 13 }}>{current.pc_label}</span>
+        </div>
+
+        {/* The two facts an operator needs before deciding anything here: what
+            this session is being billed as, and how long it has run. Without
+            them "+30 min" is a button pressed on faith. */}
+        <div className="row" style={{ gap: 14, flexWrap: "wrap", fontSize: 13 }}>
+          <span className="muted">
+            {t("session.tariffField")}:{" "}
+            <span style={{ color: "var(--color-text)" }}>
+              {isUnlimited
+                ? t("session.unlimited")
+                : current.package_name
+                  ?? `${money(Number(current.hourly_rate ?? 0))} / ${t("time.hourShort") || "h"}`}
+            </span>
+          </span>
+          <span className="muted">
+            {t("session.elapsedField")}:{" "}
+            <span style={{ color: "var(--color-text)" }}>{elapsedLabel}</span>
+          </span>
         </div>
 
         {!isActive && <div className="error">{t("session.optionsClosedSession")}</div>}
@@ -122,9 +180,16 @@ const SessionOptionsDialog = ({ session, platform, onClose, onChanged }: Props) 
                 onClick={() => void run(() => sessionRepository.addJoystick(current.id))}
               >
                 {t("session.joystickAdd")}
-                {nextPrice !== null && joystickCount < MAX_JOYSTICKS && (
+                {joystickCount < MAX_JOYSTICKS && (
                   <span className="muted" style={{ marginLeft: 6 }}>
-                    · {money(nextPrice)}/{t("time.hourShort") || "h"}
+                    {/* An unpriced slot says so instead of showing a number.
+                        The button stays clickable on purpose — the server is
+                        the authority on whether a pad may be added, and its
+                        refusal names the slot and where to fix it. A disabled
+                        button would say "no" without saying why. */}
+                    · {nextPrice !== null
+                        ? `${money(nextPrice)}/${t("time.hourShort") || "h"}`
+                        : t("session.joystickNoPrice")}
                   </span>
                 )}
               </Button>
