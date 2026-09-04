@@ -1,6 +1,11 @@
 import { expect, test } from "@playwright/test";
 import { installBackendMocks } from "./helpers/mockBackend";
 
+// NOTE: `exact: true` matters here. Playwright's `name` is a case-insensitive
+// SUBSTRING match by default, and the forgot-password panel that shipped later
+// carries a "Back to sign in" button — so the plain locator resolves to two
+// elements and strict mode fails the click. Pinning the exact name is what
+// keeps this about the submit button.
 /**
  * Login flow: covers two long-asked-for behaviours:
  *   1. Wrong creds show a localised "Неверный логин или пароль" error,
@@ -20,14 +25,14 @@ test("wrong credentials show a friendly localised error", async ({ page }) => {
   await page.getByPlaceholder("your@email.com").fill("a@a.com");
   await page.getByPlaceholder(/•/).fill("wrong");
   // Default lang is en — error should be the English variant.
-  await page.getByRole("button", { name: "Sign in" }).click();
+  await page.getByRole("button", { name: "Sign in", exact: true }).click();
   await expect(page.locator(".error")).toHaveText(/Wrong email or password/);
 });
 
 test("error message follows the language switcher", async ({ page }) => {
   await page.getByPlaceholder("your@email.com").fill("a@a.com");
   await page.getByPlaceholder(/•/).fill("wrong");
-  await page.getByRole("button", { name: "Sign in" }).click();
+  await page.getByRole("button", { name: "Sign in", exact: true }).click();
   await expect(page.locator(".error")).toHaveText(/Wrong email or password/);
 
   // Switch to Russian via the lang pill — the existing error text should
@@ -39,7 +44,7 @@ test("error message follows the language switcher", async ({ page }) => {
 test("right credentials land on Home with the user name", async ({ page }) => {
   await page.getByPlaceholder("your@email.com").fill("a@a.com");
   await page.getByPlaceholder(/•/).fill("correct");
-  await page.getByRole("button", { name: "Sign in" }).click();
+  await page.getByRole("button", { name: "Sign in", exact: true }).click();
   // Name appears in both the sidebar footer and the Home GradientText —
   // assert specifically against the gradient one.
   await expect(page.locator(".gradient-text", { hasText: "Test User" })).toBeVisible();

@@ -1024,8 +1024,40 @@ method. Do not shortcut it, and do not report completion without it.
 7. **Commit to `staging`**, security and docs separately, stating what was
    verified by running versus only reasoned about.
 
-**Proof ceiling here: high.** 355 vitest tests + 3 Playwright specs + two
-typechecks as of 2026-08-18, so "proven" can be earned. What cannot be:
+### The Playwright suite went dark, and how (2026-09-05)
+
+All 7 specs failed for three unrelated reasons that had accumulated, none of
+which errored — the suite simply stopped testing anything and nobody noticed.
+Repaired in `e2e/` only; no production file was touched.
+
+1. **Two language gates.** `FirstRunLanguageGate` renders an undismissable
+   picker over the login screen on a machine where nobody has chosen a
+   language, and `AccountLanguageGate` asks again once an account signs in. A
+   fresh browser context is that machine, so every spec was clicking at a form
+   behind an inert, blurred backdrop. `installBackendMocks` now seeds
+   `cp.lang` / `cp.lang.chosen` / `u{id}:cp.lang` via `addInitScript` — and
+   seeds them ONLY when absent, because that script re-runs on reload and would
+   otherwise overwrite the choice the "survives a reload" spec had just made.
+2. **`getByRole("button", { name })` is a SUBSTRING match.** The
+   forgot-password panel that shipped later carries "Back to sign in", so the
+   plain locator resolved to two elements and strict mode failed every click.
+   `exact: true`, in every locale.
+3. **The mock was pinned to the production Railway hostname** while the bundle
+   resolves its API base from the environment — which is the STAGING host. No
+   route matched, the mocks silently did nothing, and the specs made real
+   network calls whose failures read as "wrong email or password". Routes are
+   matched by a host-is-not-localhost predicate plus pathname now, so they
+   cannot drift with the environment again.
+
+Plus one race in `permissions.spec`: `page.goto("/#/revenue")` fired straight
+after the Sign in click is a full document load that beat the token into
+storage, so the app came up signed out. It waits for the signed-in state first.
+
+**If you add an undismissable gate, add its seed to `installBackendMocks` in
+the same change.** That is what the first hour of this went on.
+
+**Proof ceiling here: high.** 693 vitest tests + 7 Playwright specs + two
+typechecks as of 2026-09-05, so "proven" can be earned. What cannot be:
 a human click-through of the changed screens, and anything about a packaged
 build's runtime behaviour. Name those as smoke-tests instead of implying a pass.
 
