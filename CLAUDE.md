@@ -1056,8 +1056,34 @@ storage, so the app came up signed out. It waits for the signed-in state first.
 **If you add an undismissable gate, add its seed to `installBackendMocks` in
 the same change.** That is what the first hour of this went on.
 
-**Proof ceiling here: high.** 693 vitest tests + 7 Playwright specs + two
-typechecks as of 2026-09-05, so "proven" can be earned. What cannot be:
+### The Electron runtime is testable too (`npm run test:electron`)
+
+`playwright.electron.config.ts` + `e2e-electron/` drive the app in REAL Electron
+under Xvfb, via `_electron.launch()`. Needs `npm run build` first and nothing
+else — an unpackaged main process with no `ELECTRON_DEV_URL` loads
+`app://localhost/index.html` from `dist/web`.
+
+This is the only place three things can be proven at all: the `app://` protocol
+actually serving the bundle, the preload surface (`desktopAPI` /
+`cyberplaceUpdates` present, `require` / `process` absent), and — the reason it
+exists — **that a confirmation is an in-app React dialog and not a native
+`window.confirm()`**. A native one blocks Electron's renderer and leaves the
+NEXT modal's inputs unable to accept keystrokes; Chromium under Playwright just
+auto-dismisses it, so the browser suite cannot see the difference. The spec
+types into a second dialog opened afterwards, which is exactly where the damage
+used to surface. Mutation-verified: restoring `window.confirm` fails it.
+
+⚠️ **Always launch with a throwaway `--user-data-dir`.** Unpackaged Electron
+defaults to the developer's real `userData`, and the first run of this file came
+up in Russian with two real email addresses autofilled — it was reading a
+person's actual profile. Note also that the KV store is a FILE reached through
+the preload bridge, not `localStorage`, so the browser suite's language seeding
+does nothing here; seed `cyberplace.kv.json` in the temp profile instead
+(values are JSON-encoded, as `KeyValueStore.set` writes them).
+
+**Proof ceiling here: high.** 693 vitest tests + 12 Playwright browser specs +
+4 real-Electron specs + two typechecks as of 2026-09-05, so "proven" can be
+earned. What cannot be:
 a human click-through of the changed screens, and anything about a packaged
 build's runtime behaviour. Name those as smoke-tests instead of implying a pass.
 

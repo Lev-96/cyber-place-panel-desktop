@@ -25,6 +25,7 @@
     "dist:win": "npm run build && electron-builder --win",
     "dist:win:staging": "npm run build:staging && electron-builder --win --config electron-builder.staging.json",
     "typecheck": "tsc -p tsconfig.app.json --noEmit && tsc -p electron/tsconfig.json --noEmit",
+    "test:electron": "xvfb-run -a playwright test --config=playwright.electron.config.ts",
     "test": "vitest run",
     "test:watch": "vitest"
   },
