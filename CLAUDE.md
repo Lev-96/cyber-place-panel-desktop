@@ -928,7 +928,29 @@ saying so.
 | +10 / +30 / +60 minutes | same | same |
 | switch to unlimited | same | same |
 | Free (waive the bill) | same, behind `session.free` | admin + owner |
+| Free (start it waived) | `StartSessionDialog`, behind `session.free` | admin + owner |
 | joystick prices, rounding policy | `BranchPricesPage` | admin + owner |
+
+**Free is offered at the START as well as on a running session (2026-09-04),**
+and it is the same capability in both places — the server asserts
+`sessions.free` on `POST /sessions` too, so a manager who sends the flag gets a
+403 and no session. The checkbox sits below the tariff and outside the
+fixed/open branch, because it applies to either and it is a decision about the
+BILL rather than about the tariff. It is deliberately not wired to the "change
+current price" override beside it: free is not a price of zero, and the two
+diverge the moment a drink goes on the bill.
+
+**The tile shows `🎮 3 / 4`, not three glyphs.** The repeat said how many pads
+were in play and never what the ceiling was, which is the half a cashier at the
+board actually needs ("can another player join?"). One glyph plus the fraction
+is also narrower than the old worst case, so the card cannot grow. Same
+fraction the options dialog shows.
+
+**No native `confirm()` anywhere in here.** The unlimited confirmation used
+`window.confirm`, which poisons the Electron renderer's keyboard focus on Linux
+— the NEXT modal's inputs stop accepting keystrokes, so the action that appears
+broken is not the one that broke it. It goes through `useConfirm()` now, and
+`SessionOptionsDialog.test.tsx` asserts the native call is never made.
 
 **Joysticks are PlayStation-only, and the question is the PLACE's platform.**
 `pc.kind === "ps"` means "no kiosk agent" and is equally true of a ping-pong
