@@ -1,5 +1,6 @@
 import Button from "@/components/ui/Button";
 import Modal from "@/components/ui/Modal";
+import { useConfirm } from "@/components/ui/ConfirmProvider";
 import Spinner from "@/components/ui/Spinner";
 import { IJoystickPrice, JOYSTICK_SLOTS, MAX_JOYSTICKS } from "@/api/joystickPrices";
 import { useAuth } from "@/auth/AuthContext";
@@ -46,6 +47,7 @@ const MINUTE_STEPS = [10, 30, 60] as const;
 const SessionOptionsDialog = ({ session, platform, onClose, onChanged }: Props) => {
   const { t, money } = useLang();
   const { user } = useAuth();
+  const confirm = useConfirm();
   const [current, setCurrent] = useState<ISessionApi>(session);
   const [prices, setPrices] = useState<IJoystickPrice[]>([]);
   const [busy, setBusy] = useState(false);
@@ -273,11 +275,19 @@ const SessionOptionsDialog = ({ session, platform, onClose, onChanged }: Props) 
               variant="secondary"
               disabled={busy || !isActive || isUnlimited}
               onClick={() => {
-                // Irreversible, so it is confirmed. The refusal path is the
-                // server's — a booked seat is answered with a sentence, not
-                // with a disabled button, because only the server knows.
-                if (!confirm(t("session.unlimitedConfirm"))) return;
-                void run(() => sessionRepository.makeUnlimited(current.id));
+                // Irreversible, so it is confirmed — through the in-app dialog,
+                // never `window.confirm`. A native one poisons the Electron
+                // renderer's keyboard focus on Linux: the next modal's inputs
+                // silently stop accepting keystrokes, and the cashier's next
+                // action is the one that appears broken.
+                //
+                // The refusal path stays the server's: a booked seat is
+                // answered with a sentence, not with a disabled button, because
+                // only the server knows.
+                void (async () => {
+                  if (!(await confirm(t("session.unlimitedConfirm")))) return;
+                  await run(() => sessionRepository.makeUnlimited(current.id));
+                })();
               }}
             >
               {isUnlimited ? t("session.unlimited") : t("session.makeUnlimited")}
