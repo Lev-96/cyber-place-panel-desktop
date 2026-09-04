@@ -432,6 +432,11 @@ export const TRANSLATIONS: Dict = {
     ru: "Дополнительные джойстики доступны только для мест PlayStation.",
     am: "Լրացուցիչ ջոյսթիքները հասանելի են միայն PlayStation տեղերի համար։",
   },
+  "session.joystickThisPlatform": {
+    en: "This place is set up as “{0}”.",
+    ru: "Это место заведено как «{0}».",
+    am: "Այս տեղը գրանցված է որպես «{0}»։",
+  },
   "session.joystickBilledFrom": {
     en: "Charged from the moment it is added, and stops the moment it is removed.",
     ru: "Считается с момента добавления и перестаёт считаться сразу после снятия.",

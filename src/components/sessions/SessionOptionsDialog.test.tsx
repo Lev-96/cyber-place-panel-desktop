@@ -52,7 +52,16 @@ vi.mock("@/repositories/JoystickPriceRepository", () => ({
 }));
 vi.mock("@/auth/AuthContext", () => ({ useAuth: () => ({ user: { id: 1, role: auth.role } }) }));
 vi.mock("@/i18n/LanguageContext", () => ({
-  useLang: () => ({ t: (k: string) => k, money: (n: number) => String(n), lang: "en" }),
+  useLang: () => ({
+    // `t` echoes the key, which keeps every other assertion here about
+    // structure rather than copy. The one exception carries a `{0}` so the
+    // component's own interpolation stays observable — otherwise a test for
+    // "the platform is named" would pass on a template that never
+    // interpolated anything.
+    t: (k: string) => (k === "session.joystickThisPlatform" ? `${k} {0}` : k),
+    money: (n: number) => String(n),
+    lang: "en",
+  }),
 }));
 
 const session = (over: Partial<ISessionApi> = {}): ISessionApi => ({
@@ -144,13 +153,44 @@ describe("the joystick controls", () => {
     expect(add.disabled).toBe(true);
   });
 
+  test("follow the SERVER's verdict even when the slug would say otherwise", async () => {
+    // Both local sources say PlayStation — the prop and the slug — and the
+    // SERVER says no. The server wins, because it is the one that will refuse
+    // the request anyway.
+    //
+    // Written this way on purpose: an earlier version passed a `ps5` slug
+    // alongside the server's yes, so the local derivation reached the same
+    // answer and the test passed with the server's field ignored entirely.
+    await mount(session({ supports_joysticks: false, place_platform: "ps5" }), "ps5");
+
+    expect(screen.queryByRole("button", { name: /session.joystickAdd/ })).toBeNull();
+  });
+
+  test("and when the local sources say nothing useful at all", async () => {
+    // The board's device list is stale, or the device has no place: the prop
+    // is "pc" and there is no slug. The session itself still knows.
+    await mount(session({ supports_joysticks: true, place_platform: null }), "pc");
+
+    expect(screen.getByRole("button", { name: /session.joystickAdd/ })).toBeTruthy();
+  });
+
+  test("names the platform when the seat is not a PlayStation", async () => {
+    // "Only for PlayStation places" on a seat the operator believes IS one is
+    // a dead end. The slug is what tells them how the place was set up.
+    await mount(session({ supports_joysticks: false, place_platform: "table-tennis" }), "table-tennis");
+
+    const text = document.body.textContent ?? "";
+    expect(text).toContain("session.joystickPsOnly");
+    expect(text).toContain("Table Tennis");
+  });
+
   test("are absent on a place that is not a PlayStation", async () => {
     // `pc.kind === "ps"` is equally true of a ping-pong table; the platform is
     // the question, and the dialog asks the same one the backend does.
     await mount(session(), "table-tennis");
 
     expect(screen.queryByRole("button", { name: /session.joystickAdd/ })).toBeNull();
-    expect(screen.getByText("session.joystickPsOnly")).toBeTruthy();
+    expect(document.body.textContent ?? "").toContain("session.joystickPsOnly");
   });
 
   test("remove a pad by its SLOT, which is what the operator can see", async () => {

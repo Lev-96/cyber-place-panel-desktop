@@ -107,6 +107,18 @@ export interface ISessionApi {
   joysticks?: ISessionJoystick[];
   /** Who opened it — the owner's "which of my managers ran this?". */
   opened_by?: { id: number; name: string; role: string } | null;
+  /**
+   * Whether extra joysticks mean anything on this seat, decided by the
+   * backend against the place's platform. `null`/absent when the relation was
+   * not loaded — the caller then falls back to what it can see itself.
+   *
+   * This exists so the panel stops holding a second copy of a backend rule:
+   * deriving it from a separately-loaded device list goes wrong the moment
+   * that list is stale, and it goes wrong by silently hiding the controls.
+   */
+  supports_joysticks?: boolean | null;
+  /** The seat's platform slug, so a refusal can name it rather than just say no. */
+  place_platform?: string | null;
 }
 
 export interface IPcApi extends Translated {

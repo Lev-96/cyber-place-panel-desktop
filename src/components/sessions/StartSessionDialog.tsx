@@ -173,7 +173,21 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
         {!packages ? <ListSkeleton rows={3} /> : (
           <>
             <div className="row" style={{ gap: 8 }}>
-              <button type="button" onClick={() => setMode("fixed")} style={tabStyle(mode === "fixed")} disabled={isPs(pc.kind)}>
+              {/* A PlayStation may be sold a package too.
+
+                  This tab was DISABLED for PS on the grounds that count-up is
+                  the sensible default there — and it is, which is why it is
+                  still the default. But disabling the tab made two features
+                  unreachable on every console in the building: a count-up
+                  session has no end, so "+30 minutes" has nothing to extend and
+                  "switch to unlimited" is already true. An operator opening
+                  Options on a PS session found both greyed out and no route to
+                  them.
+
+                  The backend has always accepted a package on any device — a
+                  console simply has no kiosk agent to notify, which the start
+                  path already handles. */}
+              <button type="button" onClick={() => setMode("fixed")} style={tabStyle(mode === "fixed")}>
                 {t("session.fixedTariff")}
               </button>
               <button type="button" onClick={() => setMode("open")} style={tabStyle(mode === "open")}>

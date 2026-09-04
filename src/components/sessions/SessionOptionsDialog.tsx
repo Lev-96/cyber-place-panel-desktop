@@ -8,7 +8,7 @@ import { useLang } from "@/i18n/LanguageContext";
 import { joystickPriceRepository } from "@/repositories/JoystickPriceRepository";
 import { sessionRepository } from "@/repositories/SessionRepository";
 import { ISessionApi } from "@/types/sessions";
-import { platformGroup } from "@/utils/platform";
+import { platformGroup, platformLabel } from "@/utils/platform";
 import { useCallback, useEffect, useState } from "react";
 
 interface Props {
@@ -51,10 +51,18 @@ const SessionOptionsDialog = ({ session, platform, onClose, onChanged }: Props) 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Joysticks are a PlayStation thing. `pcs.kind === "ps"` is NOT that
-  // question — it means "no kiosk agent" and is equally true of a ping-pong
-  // table — so this asks the place's platform, exactly as the backend does.
-  const isPlayStation = platformGroup(platform ?? "") === "ps";
+  /**
+   * Joysticks are a PlayStation thing, and the BACKEND decides it.
+   *
+   * `current.supports_joysticks` is `Platform::isPlayStation()` evaluated
+   * server-side against the seat's platform. The `platform` prop — read from
+   * the board's device list — is only the fallback, for a backend that does
+   * not send the field yet. Deriving it here was a second copy of a server
+   * rule, and it failed silently: a stale device list, or a device whose place
+   * was not loaded, hid the controls with nothing on screen to say why.
+   */
+  const seatPlatform = current.place_platform ?? platform ?? null;
+  const isPlayStation = current.supports_joysticks ?? platformGroup(seatPlatform ?? "") === "ps";
   const joystickCount = current.joystick_count ?? 1;
   const isUnlimited = current.is_unlimited ?? current.ends_at === null;
   const isFree = current.is_free ?? false;
@@ -221,7 +229,18 @@ const SessionOptionsDialog = ({ session, platform, onClose, onChanged }: Props) 
             </div>
           </section>
         ) : (
-          <span className="muted" style={{ fontSize: 12 }}>{t("session.joystickPsOnly")}</span>
+          <div className="col" style={{ gap: 4 }}>
+            <strong>{t("session.joysticks")}</strong>
+            {/* Name the platform. "Only for PlayStation places" on a seat the
+                operator believes IS a PlayStation is a dead end; the slug is
+                what tells them the place was set up under another platform. */}
+            <span className="muted" style={{ fontSize: 12 }}>
+              {t("session.joystickPsOnly")}
+              {seatPlatform && (
+                <> {t("session.joystickThisPlatform").replace("{0}", platformLabel(seatPlatform))}</>
+              )}
+            </span>
+          </div>
         )}
 
         {/* ── time ──────────────────────────────────────────────────────── */}
