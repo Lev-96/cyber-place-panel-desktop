@@ -8,6 +8,13 @@ export interface StartSessionBody {
   time_package_id?: number;
   hourly_rate?: number;
   user_display_name?: string;
+  /**
+   * Start it waived. Owner-level, and the SERVER is what enforces that — this
+   * flag reaching it from a manager's panel is answered with a 403, not with a
+   * free session. Omitted entirely unless the operator asked for one, so a
+   * backend from before this release keeps working.
+   */
+  is_free?: boolean;
 }
 
 export interface ExtendSessionBody {

@@ -4,6 +4,8 @@ import Modal from "@/components/ui/Modal";
 import Checkbox from "@/components/ui/Checkbox";
 import PriceInput from "@/components/ui/PriceInput";
 import Spinner from "@/components/ui/Spinner";
+import { useAuth } from "@/auth/AuthContext";
+import { can } from "@/auth/permissions";
 import { useLang } from "@/i18n/LanguageContext";
 import { timePackageNameOf } from "@/i18n/timePackageName";
 import { branchRepository } from "@/repositories/BranchRepository";
@@ -42,6 +44,12 @@ type Mode = "fixed" | "open";
  */
 const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
   const { t, money, lang } = useLang();
+  const { user } = useAuth();
+  // Waiving a bill is the company's decision, so the control is only drawn for
+  // a role that holds it — and the SERVER asserts the same capability on
+  // `POST /sessions`. A hidden button is not a rule; this only decides whether
+  // it is offered.
+  const mayWaive = can(user?.role, "session.free");
   const [packages, setPackages] = useState<ITimePackage[] | null>(null);
   const [pkgId, setPkgId] = useState<number | null>(null);
   // PlayStation rows are billing-only (no kiosk agent), so the open/count-up
@@ -57,6 +65,10 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
   const [editPrice, setEditPrice] = useState(false);
   const [customRate, setCustomRate] = useState("");
   const [rateSaved, setRateSaved] = useState(false);
+  // Start it waived. Deliberately NOT wired to the price override above: a free
+  // session is not "a price of zero", it is a session whose bill nobody pays,
+  // and the two behave differently the moment a drink is added to it.
+  const [isFree, setIsFree] = useState(false);
 
   useEffect(() => { void sessionRepository.listPackages(branchId).then((p) => { setPackages(p); setPkgId(p[0]?.id ?? null); }); }, [branchId]);
   useEffect(() => {
@@ -129,6 +141,9 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
           mode: "fixed",
           time_package_id: pkgId,
           user_display_name: pc.label,
+          // Omitted unless asked for, so a backend from before this release
+          // sees exactly the request it saw yesterday.
+          ...(isFree ? { is_free: true } : {}),
         });
       } else {
         if (effectiveRate === null) {
@@ -146,6 +161,7 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
           mode: "open",
           user_display_name: pc.label,
           ...(overrideApplied ? { hourly_rate: customRateNum } : {}),
+          ...(isFree ? { is_free: true } : {}),
         });
       }
       onStarted();
@@ -248,6 +264,22 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
                       <span className="muted" style={{ fontSize: 11 }}>{t("session.savePriceHint")}</span>
                     )}
                   </div>
+                )}
+              </div>
+            )}
+
+            {/* Free sits BELOW the tariff and outside the fixed/open branch on
+                purpose: it applies to either, and it is a decision about the
+                bill rather than about the tariff. Reuses the `Checkbox`
+                primitive already used above for the price override, so it
+                inherits the dark-theme control and adds no styles of its own. */}
+            {mayWaive && (
+              <div className="col" style={{ gap: 4 }}>
+                <Checkbox checked={isFree} onChange={setIsFree} label={t("session.freeBill")} />
+                {isFree && (
+                  <span className="muted" style={{ fontSize: 11 }}>
+                    {t("session.freeBillStartHint")}
+                  </span>
                 )}
               </div>
             )}

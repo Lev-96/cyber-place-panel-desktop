@@ -27,6 +27,7 @@ import AddSessionItemDialog from "./AddSessionItemDialog";
 import SessionTimer from "./SessionTimer";
 import StartSessionDialog from "./StartSessionDialog";
 import SessionOptionsDialog from "./SessionOptionsDialog";
+import { MAX_JOYSTICKS } from "@/api/joystickPrices";
 import StopReceiptModal from "./StopReceiptModal";
 
 const navBtn: React.CSSProperties = { padding: "6px 10px", border: "1px solid #1f2a44", borderRadius: 6 };
@@ -336,8 +337,14 @@ const SessionsBoard = ({ branchId }: Props) => {
             {(joystickCount > 1 || sess.is_free) && (
               <span className="row" style={{ gap: 6, fontSize: 12, flexWrap: "wrap" }}>
                 {joystickCount > 1 && (
-                  <span title={`${t("session.joysticks")}: ${joystickCount}`}>
-                    {"🎮".repeat(joystickCount)}
+                  // One glyph as an icon plus the fraction, rather than one
+                  // glyph per pad. Four glyphs is the widest this line could
+                  // get on a 160px tile, and the repeat never said what the
+                  // ceiling was — "3 / 4" answers "can another player join?"
+                  // without opening anything. Same fraction the options dialog
+                  // shows, so the two screens read identically.
+                  <span title={`${t("session.joysticks")}: ${joystickCount} / ${MAX_JOYSTICKS}`}>
+                    🎮 <span className="muted">{joystickCount} / {MAX_JOYSTICKS}</span>
                   </span>
                 )}
                 {sess.is_free && (

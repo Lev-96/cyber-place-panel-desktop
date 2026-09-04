@@ -472,6 +472,11 @@ export const TRANSLATIONS: Dict = {
     am: "Ժամանակը շարունակում է գնալ, նիստը մնում է վիճակագրության մեջ — պարզապես ոչ ոք չի վճարում։",
   },
   "session.freeBillWaived": { en: "Waived: {0}", ru: "Списано: {0}", am: "Դուրս գրված՝ {0}" },
+  "session.freeBillStartHint": {
+    en: "This session will be started free — the timer runs, nothing is charged.",
+    ru: "Сессия запустится бесплатной — таймер идёт, счёт не начисляется.",
+    am: "Նիստը կսկսվի անվճար — ժամաչափն աշխատում է, հաշիվ չի հաշվարկվում։",
+  },
   "session.optionsClosedSession": {
     en: "This session is no longer active.",
     ru: "Сессия уже не активна.",
