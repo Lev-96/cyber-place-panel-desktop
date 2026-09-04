@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
-import { act, cleanup, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, test, vi } from "vitest";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { IPcApi } from "@/types/sessions";
 import { PC_KIND, PC_STATUS } from "@/types/pc";
 import StartSessionDialog from "./StartSessionDialog";
@@ -17,16 +17,26 @@ import StartSessionDialog from "./StartSessionDialog";
  * nothing to extend and "switch to unlimited" is already true; an operator
  * opening Options on a PS session found both greyed out with no route to them.
  * The backend has always accepted a package on any device.
+ *
+ * It also pins the Free-session control, which is the same money decision the
+ * options dialog carries and therefore the same role: the checkbox is drawn for
+ * an owner, is absent for a manager, and the flag is sent only when it was
+ * actually ticked — so a backend from before this release sees the request it
+ * has always seen.
  */
+
+const repo = vi.hoisted(() => ({ start: vi.fn() }));
+const auth = vi.hoisted(() => ({ role: "company_owner" as string }));
 
 vi.mock("@/repositories/SessionRepository", () => ({
   sessionRepository: {
     listPackages: vi.fn().mockResolvedValue([
       { id: 1, branch_id: 7, name_en: "One hour", name_ru: "Час", name_am: "Ժամ", duration_minutes: 60, price: 1500 },
     ]),
-    start: vi.fn(),
+    start: (...a: unknown[]) => repo.start(...a),
   },
 }));
+vi.mock("@/auth/AuthContext", () => ({ useAuth: () => ({ user: { id: 1, role: auth.role } }) }));
 vi.mock("@/repositories/BranchRepository", () => ({
   branchRepository: { byId: vi.fn().mockResolvedValue({ id: 7, price_for_branch: { "ps5-standard": 1500 } }) },
 }));
@@ -51,6 +61,11 @@ const mount = async (pc: IPcApi) => {
   });
 };
 
+beforeEach(() => {
+  auth.role = "company_owner";
+  repo.start.mockReset();
+  repo.start.mockResolvedValue({ id: 1 });
+});
 afterEach(cleanup);
 
 describe("starting a session on a console", () => {
@@ -76,5 +91,70 @@ describe("starting a session on a console", () => {
     }));
 
     expect(screen.getByText("One hour")).toBeTruthy();
+  });
+});
+
+describe("starting a session free", () => {
+  /** A computer, so the package tab is the default and the start needs no rate. */
+  const computer = () => device({
+    kind: PC_KIND.Pc,
+    place: { id: 10, number: 1, name: "PC-1", type: "standard", platform: "pc" },
+  });
+
+  test("is offered to an owner", async () => {
+    await mount(computer());
+
+    expect(screen.getByText("session.freeBill")).toBeTruthy();
+  });
+
+  test("is not offered to a manager", async () => {
+    auth.role = "manager";
+    await mount(computer());
+
+    expect(screen.queryByText("session.freeBill")).toBeNull();
+  });
+
+  test("sends the flag only when it was actually ticked", async () => {
+    await mount(computer());
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "action.start" }));
+    });
+
+    // Absent, not `false`: a backend from before this release must see exactly
+    // the body it has always seen.
+    expect(repo.start).toHaveBeenCalledTimes(1);
+    expect(repo.start.mock.calls[0][0]).not.toHaveProperty("is_free");
+  });
+
+  test("sends it when it was", async () => {
+    await mount(computer());
+
+    await act(async () => {
+      fireEvent.click(screen.getByText("session.freeBill"));
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "action.start" }));
+    });
+
+    expect(repo.start).toHaveBeenCalledTimes(1);
+    expect(repo.start.mock.calls[0][0]).toMatchObject({ is_free: true });
+  });
+
+  /**
+   * Free is not "a price of zero". The two behave differently the moment a
+   * drink is added, so ticking one must not touch the other's control.
+   */
+  test("does not disturb the price override", async () => {
+    await mount(device());
+
+    await act(async () => {
+      fireEvent.click(screen.getByText("session.freeBill"));
+    });
+
+    const override = screen.getByText("session.editPrice")
+      .closest("label")!
+      .querySelector("input") as HTMLInputElement;
+    expect(override.checked).toBe(false);
   });
 });

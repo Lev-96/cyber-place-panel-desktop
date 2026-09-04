@@ -139,6 +139,47 @@ describe("SessionsBoard — what a tile says the seat is", () => {
     expect(nameLine()?.textContent).toBe("№Legacy device");
   });
 
+  /**
+   * The pad count on the tile.
+   *
+   * A cashier's question at the board is "can another player join this seat?",
+   * and one glyph per pad never answered it — it showed how many were in play
+   * and said nothing about the ceiling. The fraction does, and it is the same
+   * fraction the options dialog shows, so the two screens cannot disagree.
+   *
+   * The number itself is the SERVER's. Nothing on this tile derives it: two
+   * cashiers deriving it separately is how one board reads three and the other
+   * four over the same seat.
+   */
+  test("a PlayStation session says how many pads it has out of the maximum", async () => {
+    repo.listPcs.mockResolvedValue([pc({ current_session_id: 5 })]);
+    repo.listActive.mockResolvedValue([
+      {
+        id: 5, branch_id: 7, pc_id: 1, pc_label: "Seat 1",
+        started_at: "2026-09-03T14:00:00.000Z", ends_at: "2026-09-03T15:00:00.000Z",
+        status: "active", total_paid: 0, mode: "fixed", joystick_count: 3,
+      },
+    ]);
+    await mount();
+
+    expect(screen.getByText("3 / 4")).toBeTruthy();
+  });
+
+  /** One pad is every session's floor, so saying "1 / 4" on a PC is noise. */
+  test("a session with only its own pad says nothing about pads", async () => {
+    repo.listPcs.mockResolvedValue([pc({ current_session_id: 6 })]);
+    repo.listActive.mockResolvedValue([
+      {
+        id: 6, branch_id: 7, pc_id: 1, pc_label: "Seat 1",
+        started_at: "2026-09-03T14:00:00.000Z", ends_at: "2026-09-03T15:00:00.000Z",
+        status: "active", total_paid: 0, mode: "fixed", joystick_count: 1,
+      },
+    ]);
+    await mount();
+
+    expect(screen.queryByText("1 / 4")).toBeNull();
+  });
+
   test("the status line no longer repeats the platform", async () => {
     repo.listPcs.mockResolvedValue([pc({ is_startable: true })]);
     await mount();

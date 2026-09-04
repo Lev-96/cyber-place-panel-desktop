@@ -3,6 +3,7 @@ import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { ISessionApi } from "@/types/sessions";
 import SessionOptionsDialog from "./SessionOptionsDialog";
+import { ConfirmProvider } from "@/components/ui/ConfirmProvider";
 
 /**
  * What a cashier can actually reach on a running session.
@@ -80,10 +81,24 @@ const session = (over: Partial<ISessionApi> = {}): ISessionApi => ({
   ...over,
 });
 
+/**
+ * Answer the in-app ConfirmDialog. `action.confirm` / `action.cancel` are the
+ * keys its buttons fall back to, and `t` here echoes keys.
+ */
+const answerConfirm = async (yes: boolean) => {
+  await act(async () => {
+    fireEvent.click(
+      screen.getByRole("button", { name: yes ? "action.confirm" : "action.cancel" }),
+    );
+  });
+};
+
 const mount = async (s: ISessionApi = session(), platform = "ps5") => {
   await act(async () => {
     render(
-      <SessionOptionsDialog session={s} platform={platform} onClose={() => {}} onChanged={() => {}} />,
+      <ConfirmProvider>
+        <SessionOptionsDialog session={s} platform={platform} onClose={() => {}} onChanged={() => {}} />
+      </ConfirmProvider>,
     );
   });
 };
@@ -310,26 +325,47 @@ describe("time and the ceiling", () => {
   });
 
   test("show the booking refusal instead of silently doing nothing", async () => {
-    vi.spyOn(window, "confirm").mockReturnValue(true);
     repo.makeUnlimited.mockRejectedValue(new Error("This place is booked in the app."));
     await mount();
 
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: /session.makeUnlimited/ }));
     });
+    await answerConfirm(true);
 
     expect(screen.getByText("This place is booked in the app.")).toBeTruthy();
   });
 
   test("ask before lifting the ceiling, and do nothing if the answer is no", async () => {
-    vi.spyOn(window, "confirm").mockReturnValue(false);
+    await mount();
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /session.makeUnlimited/ }));
+    });
+    await answerConfirm(false);
+
+    expect(repo.makeUnlimited).not.toHaveBeenCalled();
+  });
+
+  /**
+   * A native `window.confirm` poisons the Electron renderer's keyboard focus on
+   * Linux, so this dialog must never reach for one. Asserting the absence is
+   * what keeps it out: the in-app dialog and the native call look identical
+   * from the outside right up until the cashier's next modal stops typing.
+   */
+  test("never asks through a native confirm", async () => {
+    const native = vi.spyOn(window, "confirm");
     await mount();
 
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: /session.makeUnlimited/ }));
     });
 
-    expect(repo.makeUnlimited).not.toHaveBeenCalled();
+    expect(native).not.toHaveBeenCalled();
+    // …and something was actually asked, so this is not passing on a button
+    // that quietly does nothing.
+    expect(screen.getByText("session.unlimitedConfirm")).toBeTruthy();
+    await answerConfirm(false);
   });
 });
 
