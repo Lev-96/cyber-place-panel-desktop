@@ -78,6 +78,18 @@ export interface ISessionApi {
   hourly_rate?: number | string | null;
   started_at: string;   // ISO
   ends_at: string | null;      // ISO; null for open (count-up) sessions
+  /**
+   * When the session was actually stopped. `null` while it is running.
+   *
+   * Distinct from `ends_at`, which for a fixed package is when the time was
+   * due to run out — the history page reads THIS one, because a session the
+   * cashier closed early ended when they closed it.
+   *
+   * Optional like its neighbours below: the backend always sends it, but the
+   * fixtures in this repo build sessions field by field and should not have to
+   * carry a column they are not asserting on.
+   */
+  stopped_at?: string | null;
   status: "active" | "stopped" | "expired";
   total_paid: number;
   opened_by_user_id?: number | null;
