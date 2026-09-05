@@ -845,7 +845,19 @@ export const TRANSLATIONS: Dict = {
   "rounding.example": { en: "Example: {0} → {1}", ru: "Пример: {0} → {1}", am: "Օրինակ՝ {0} → {1}" },
   "rounding.saved": { en: "Rounding saved", ru: "Округление сохранено", am: "Կլորացումը պահպանվեց" },
   "history.joysticks": { en: "Joysticks", ru: "Джойстики", am: "Ջոյսթիքներ" },
-  "history.manager": { en: "Opened by", ru: "Открыл", am: "Բացել է" },
+  // Attribution on a session row. Replaces the single "Opened by" this screen
+  // used to carry: half the answer, because the venue's real question after a
+  // long evening is who let the seat run and until WHEN — and a session that
+  // crossed a shift change was closed by somebody else entirely.
+  "history.startedAt": { en: "Started at", ru: "Начата", am: "Սկսվել է" },
+  "history.endedAt": { en: "Ended at", ru: "Завершена", am: "Ավարտվել է" },
+  "history.startedBy": { en: "Started by", ru: "Запустил", am: "Սկսել է" },
+  "history.endedBy": { en: "Ended by", ru: "Завершил", am: "Ավարտել է" },
+  // Nobody pressed Stop: the kiosk agent expired the session when its paid
+  // time ran out. Saying "—" would read as missing data rather than as the
+  // answer, which is what it is.
+  "history.endedAutomatically": { en: "Automatically", ru: "Автоматически", am: "Ավտոմատ" },
+  "history.branch": { en: "Branch", ru: "Филиал", am: "Մասնաճյուղ" },
   "history.actions": { en: "What happened", ru: "Что происходило", am: "Ինչ է տեղի ունեցել" },
   "history.actionsEmpty": { en: "Nothing beyond the start.", ru: "Кроме старта — ничего.", am: "Բացի սկսելուց՝ ոչինչ։" },
   "history.sumFree": { en: "Free sessions", ru: "Бесплатные сессии", am: "Անվճար նիստեր" },

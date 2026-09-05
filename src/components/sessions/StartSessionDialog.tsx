@@ -133,6 +133,30 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
   const submit = async () => {
     setBusy(true); setErr(null);
     try {
+      if (isFree) {
+        // A waived session is started count-up and nothing else.
+        //
+        // Every control the other two branches read — the package, the assigned
+        // rate, the override — describes what the player will be charged, and
+        // for this session that is nothing. A tariff picked here would decide
+        // exactly one thing: when the seat locks itself. A free session is given
+        // for as long as it is given, so it is opened with no end and the
+        // cashier closes it.
+        //
+        // `hourly_rate` is deliberately NOT sent. The server still resolves the
+        // venue's own rate for the seat, which is what lets the receipt say what
+        // was given away — a number typed here would only overwrite that with a
+        // guess.
+        await sessionRepository.start({
+          branch_id: branchId,
+          pc_id: pc.id,
+          mode: "open",
+          user_display_name: pc.label,
+          is_free: true,
+        });
+        onStarted();
+        return;
+      }
       if (mode === "fixed") {
         if (!pkgId) { setErr(t("session.choosePackage")); setBusy(false); return; }
         await sessionRepository.start({
@@ -141,9 +165,6 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
           mode: "fixed",
           time_package_id: pkgId,
           user_display_name: pc.label,
-          // Omitted unless asked for, so a backend from before this release
-          // sees exactly the request it saw yesterday.
-          ...(isFree ? { is_free: true } : {}),
         });
       } else {
         if (effectiveRate === null) {
@@ -161,7 +182,6 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
           mode: "open",
           user_display_name: pc.label,
           ...(overrideApplied ? { hourly_rate: customRateNum } : {}),
-          ...(isFree ? { is_free: true } : {}),
         });
       }
       onStarted();
@@ -179,8 +199,14 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
   // Open-mode is unavailable when no rate is configured AND fixed-
   // mode would be the only option; for PS-kind PCs the disabled
   // Start button surfaces the noAssignedRate hint instead.
+  // A waived session is gated on nothing but the device. The rate conditions
+  // below all guard against billing a player at a price nobody set — which is
+  // not a risk that exists when the bill is 0, and holding a free session back
+  // because the venue never configured a tariff for that seat would block the
+  // exact case free is for: a demo stand, a tournament machine, a seat given
+  // back after an outage. The server lifts the same refusal for the same reason.
   const startDisabled =
-    busy || deviceOffline || (mode === "open" && (editPrice ? !overrideApplied : assignedRate === null));
+    busy || deviceOffline || (!isFree && mode === "open" && (editPrice ? !overrideApplied : assignedRate === null));
 
   return (
     <Modal open onClose={onClose}>
@@ -188,6 +214,27 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
         <h2 style={{ margin: 0 }}>{t("session.start")} · №{pc.place?.number ?? pc.label}{isPs(pc.kind) ? " (PS)" : ""}</h2>
         {!packages ? <ListSkeleton rows={3} /> : (
           <>
+            {/* Free sits ABOVE the tariff, and turning it on takes the tariff
+                away entirely.
+
+                It used to sit below and change nothing on screen, which read as
+                "a free session, at this rate" — an operator could pick a
+                package, waive the bill, and be left looking at a price that was
+                never going to be charged. Every control below answers "what
+                does this cost", and for a waived session that question has one
+                answer, so the honest form is the one that stops asking it. */}
+            {mayWaive && (
+              <div className="col" style={{ gap: 4 }}>
+                <Checkbox checked={isFree} onChange={setIsFree} label={t("session.freeBill")} />
+                {isFree && (
+                  <span className="muted" style={{ fontSize: 11 }}>
+                    {t("session.freeBillStartHint")}
+                  </span>
+                )}
+              </div>
+            )}
+
+            {!isFree && (
             <div className="row" style={{ gap: 8 }}>
               {/* A PlayStation may be sold a package too.
 
@@ -210,8 +257,9 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
                 {t("session.openByHour")}
               </button>
             </div>
+            )}
 
-            {mode === "fixed" ? (
+            {!isFree && (mode === "fixed" ? (
               <div className="col" style={{ gap: 6 }}>
                 <span className="label">{t("session.tariffField")}</span>
                 {packages.length === 0 ? (
@@ -266,23 +314,7 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
                   </div>
                 )}
               </div>
-            )}
-
-            {/* Free sits BELOW the tariff and outside the fixed/open branch on
-                purpose: it applies to either, and it is a decision about the
-                bill rather than about the tariff. Reuses the `Checkbox`
-                primitive already used above for the price override, so it
-                inherits the dark-theme control and adds no styles of its own. */}
-            {mayWaive && (
-              <div className="col" style={{ gap: 4 }}>
-                <Checkbox checked={isFree} onChange={setIsFree} label={t("session.freeBill")} />
-                {isFree && (
-                  <span className="muted" style={{ fontSize: 11 }}>
-                    {t("session.freeBillStartHint")}
-                  </span>
-                )}
-              </div>
-            )}
+            ))}
 
             {deviceOffline && <div className="error">{t("session.deviceOfflineHint")}</div>}
             {err && <div className="error">{err}</div>}

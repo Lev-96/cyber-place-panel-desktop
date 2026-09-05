@@ -142,19 +142,91 @@ describe("starting a session free", () => {
   });
 
   /**
-   * Free is not "a price of zero". The two behave differently the moment a
-   * drink is added, so ticking one must not touch the other's control.
+   * Ticking Free takes the tariff away, rather than leaving it on screen next
+   * to a bill nobody is going to pay.
+   *
+   * It used to leave every control in place, which read as "a free session, at
+   * this rate" — an operator could pick a package, waive the bill, and be left
+   * looking at a price that was never going to be charged. Every control listed
+   * here answers "what does this cost", and for a waived session that question
+   * has exactly one answer.
    */
-  test("does not disturb the price override", async () => {
+  test("takes away every pricing control", async () => {
     await mount(device());
+
+    expect(screen.queryByText("session.fixedTariff")).toBeTruthy();
+    expect(screen.queryByText("session.editPrice")).toBeTruthy();
 
     await act(async () => {
       fireEvent.click(screen.getByText("session.freeBill"));
     });
 
-    const override = screen.getByText("session.editPrice")
-      .closest("label")!
-      .querySelector("input") as HTMLInputElement;
-    expect(override.checked).toBe(false);
+    expect(screen.queryByText("session.fixedTariff")).toBeNull();
+    expect(screen.queryByText("session.openByHour")).toBeNull();
+    expect(screen.queryByText("session.hourlyRate")).toBeNull();
+    expect(screen.queryByText("session.editPrice")).toBeNull();
+  });
+
+  test("gives them back when it is unticked", async () => {
+    await mount(device());
+
+    await act(async () => {
+      fireEvent.click(screen.getByText("session.freeBill"));
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByText("session.freeBill"));
+    });
+
+    // Turning the waiver off is a full return to the previous behaviour, not a
+    // half-restored form the operator has to re-check.
+    expect(screen.queryByText("session.fixedTariff")).toBeTruthy();
+    expect(screen.queryByText("session.editPrice")).toBeTruthy();
+  });
+
+  /**
+   * A waived session is always count-up.
+   *
+   * A tariff would decide exactly one thing about it — when the seat locks
+   * itself — and a free session is given for as long as it is given. So no
+   * package travels with the request, and no rate either: the server resolves
+   * the venue's own rate, which is what lets the receipt say what was given
+   * away instead of quoting a number typed at the till.
+   */
+  test("starts a free session count-up, with no tariff attached", async () => {
+    // A computer, whose default tab is `fixed` — so this also proves the
+    // waiver overrides the mode rather than inheriting it.
+    await mount(computer());
+
+    await act(async () => {
+      fireEvent.click(screen.getByText("session.freeBill"));
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "action.start" }));
+    });
+
+    expect(repo.start).toHaveBeenCalledTimes(1);
+    const body = repo.start.mock.calls[0][0] as Record<string, unknown>;
+    expect(body).toMatchObject({ mode: "open", is_free: true });
+    expect(body).not.toHaveProperty("time_package_id");
+    expect(body).not.toHaveProperty("hourly_rate");
+  });
+
+  /**
+   * The seat has no configured tariff anywhere — no matrix row, no per-device
+   * rate. A paying session is correctly refused here; a free one has nothing to
+   * refuse over, and blocking it would block the exact case free exists for.
+   */
+  test("can be started on a seat that has no rate at all", async () => {
+    const rateless = device({ hourly_rate: null, place: { id: 10, number: 1, name: "X", type: "vip", platform: "ps5" } });
+    await mount(rateless);
+
+    const start = () => screen.getByRole("button", { name: "action.start" }) as HTMLButtonElement;
+    expect(start().disabled).toBe(true);
+
+    await act(async () => {
+      fireEvent.click(screen.getByText("session.freeBill"));
+    });
+
+    expect(start().disabled).toBe(false);
   });
 });

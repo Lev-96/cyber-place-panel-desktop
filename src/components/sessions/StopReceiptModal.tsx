@@ -131,10 +131,27 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved }: Prop
             {/* Total */}
             <div style={{ ...row, borderTop: "2px solid #07ddf1", marginTop: 6, paddingTop: 12 }}>
               <span style={{ flex: 1, fontWeight: 700, fontSize: 16 }}>{t("session.totalDue")}</span>
+              {/* A waived bill says so in words. The figure beside it is a
+                  correct 0, and a correct 0 on a receipt is exactly what an
+                  operator double-checks: it reads as "the till failed" rather
+                  than "somebody decided this". The line below says what was
+                  given away, which is the number the venue actually wants. */}
               <span style={{ fontWeight: 800, fontSize: 18, color: "#07ddf1" }}>
-                {money(Number(view.total), preciseWhenSmall(Number(view.total)))}
+                {view.is_free
+                  ? t("session.freeBill")
+                  : money(Number(view.total), preciseWhenSmall(Number(view.total)))}
               </span>
             </div>
+            {view.is_free && (
+              <div style={{ ...row, fontSize: 13 }}>
+                <span style={{ flex: 1 }} className="muted">
+                  {t("session.freeBillWaived").replace(
+                    "{0}",
+                    money(Number(view.gross_total ?? 0), preciseWhenSmall(Number(view.gross_total ?? 0))),
+                  )}
+                </span>
+              </div>
+            )}
           </div>
         )}
 

@@ -108,6 +108,29 @@ export interface ISessionApi {
   /** Who opened it — the owner's "which of my managers ran this?". */
   opened_by?: { id: number; name: string; role: string } | null;
   /**
+   * Who ended it. `null` is a FACT rather than a missing field: the session is
+   * still running, or the kiosk agent expired it when its paid time ran out and
+   * no person closed it at all.
+   *
+   * Never resolved from the current user. A session that crossed a shift change
+   * was started by one person and stopped by another, and the person reading
+   * this page is routinely a third.
+   */
+  stopped_by_user_id?: number | null;
+  stopped_by?: { id: number; name: string; role: string } | null;
+  /**
+   * The venue this session ran at, as it was at the time. Present on the
+   * history listing; an owner reads one list across several branches and each
+   * line has to name its own.
+   */
+  branch?: {
+    id: number;
+    address: string;
+    city: string | null;
+    company_id: number;
+    company_name: string | null;
+  } | null;
+  /**
    * Whether extra joysticks mean anything on this seat, decided by the
    * backend against the place's platform. `null`/absent when the relation was
    * not loaded — the caller then falls back to what it can see itself.

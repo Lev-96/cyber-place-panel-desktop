@@ -159,19 +159,42 @@ const SessionsList = ({ sessions }: { sessions: ISessionApi[] }) => {
   );
 };
 
-const formatRange = (startedAt: string, endsAt: string | null): { dateLabel: string; durationMin: number } => {
-  const start = new Date(startedAt);
-  const end = endsAt ? new Date(endsAt) : null;
-  const dateLabel = end
-    ? `${formatDateTime(start)} → ${formatTime(end)}`
-    : formatDateTime(start);
-  const durationMs = end ? Math.max(0, end.getTime() - start.getTime()) : 0;
-  return { dateLabel, durationMin: Math.round(durationMs / 60_000) };
+/**
+ * How long the session ran, in whole minutes. 0 while it is still running —
+ * `ends_at` is null there and a duration would be a guess.
+ *
+ * This used to also build a "start → end" label for the header. The instants
+ * now live in the attribution block, labelled and each next to the person who
+ * caused it, so the header keeps only the figure it alone was showing.
+ */
+const sessionDurationMinutes = (startedAt: string, endsAt: string | null): number => {
+  if (!endsAt) return 0;
+  const durationMs = Math.max(0, new Date(endsAt).getTime() - new Date(startedAt).getTime());
+  return Math.round(durationMs / 60_000);
 };
+
+/**
+ * One "Label: value · Who" line.
+ *
+ * A component rather than three copies of the same JSX: the three lines differ
+ * only in their words, and the one that drifts is always the one edited last.
+ */
+const AttrLine = ({ label, value, by, byLabel }: {
+  label: string;
+  value: string;
+  by: string | null;
+  byLabel: string;
+}) => (
+  <div className="row" style={{ gap: 6, flexWrap: "wrap" }}>
+    <span className="muted">{label}:</span>
+    <span>{value}</span>
+    {by && <span className="muted">· {byLabel}: <span style={{ color: "#e6ebf5" }}>{by}</span></span>}
+  </div>
+);
 
 const SessionRow = ({ session }: { session: ISessionApi }) => {
   const { t, money } = useLang();
-  const { dateLabel, durationMin } = formatRange(session.started_at, session.ends_at);
+  const durationMin = sessionDurationMinutes(session.started_at, session.ends_at);
   const items = session.items ?? [];
   const itemsTotal = items.reduce((sum, it) => sum + num(it.price) * num(it.qty), 0);
   const total = num(session.total_paid);
@@ -198,24 +221,52 @@ const SessionRow = ({ session }: { session: ISessionApi }) => {
             </span>
           )}
         </div>
-        <div className="row" style={{ gap: 8, alignItems: "baseline" }}>
-          <span className="muted" style={{ fontSize: 12 }}>{dateLabel}</span>
-          {durationMin > 0 && <span className="muted" style={{ fontSize: 12 }}>· {durationMin} {t("time.minShort")}</span>}
-        </div>
+        {/* Duration only. The start and end instants moved into the
+            attribution block below, where they are labelled and carry the
+            person who caused each — printing them twice made the row taller and
+            said nothing more. */}
+        {durationMin > 0 && (
+          <span className="muted" style={{ fontSize: 12 }}>{durationMin} {t("time.minShort")}</span>
+        )}
       </div>
 
-      {(session.user_display_name || session.package_name || session.opened_by) && (
+      {(session.user_display_name || session.package_name) && (
         <div className="muted" style={{ fontSize: 12 }}>
           {session.package_name && <>{t("session.tariffField")}: {session.package_name}</>}
           {session.user_display_name && <> {session.package_name ? "· " : ""}{session.user_display_name}</>}
-          {/* An owner reading last week's takings cannot get this from
-              anywhere else — the row carried an id and nothing more. */}
-          {session.opened_by && (
-            <> {(session.package_name || session.user_display_name) ? "· " : ""}
-              {t("history.manager")}: {session.opened_by.name}</>
-          )}
         </div>
       )}
+
+      {/* Who ran this seat, when, and where — the three facts the row carried
+          an id for, or not at all. The venue's own question after a long
+          evening is "who let that table run five hours", and it has no answer
+          unless both people and the branch are on the line itself. */}
+      <div className="col" style={{ gap: 2, fontSize: 12 }}>
+        <AttrLine
+          label={t("history.startedAt")}
+          value={formatDateTime(session.started_at)}
+          by={session.opened_by?.name ?? null}
+          byLabel={t("history.startedBy")}
+        />
+        {isClosed && (
+          <AttrLine
+            label={t("history.endedAt")}
+            value={formatDateTime(session.stopped_at ?? session.ends_at)}
+            // Null is the answer, not a gap: the kiosk agent expired this
+            // session when its paid time ran out and nobody pressed Stop.
+            by={session.stopped_by?.name ?? t("history.endedAutomatically")}
+            byLabel={t("history.endedBy")}
+          />
+        )}
+        {session.branch && (
+          <AttrLine
+            label={t("history.branch")}
+            value={[session.branch.company_name, session.branch.address].filter(Boolean).join(" — ")}
+            by={null}
+            byLabel=""
+          />
+        )}
+      </div>
 
       {/* Each pad over the interval it was actually in play. "Joystick #3,
           15:00→16:00" is a line a cashier can defend at the counter; a count
@@ -261,11 +312,12 @@ const SessionRow = ({ session }: { session: ISessionApi }) => {
           )}
           <div className="row-between" style={{ fontSize: 15, fontWeight: 700 }}>
             <span>{t("history.total")}</span>
-            {/* A waived bill reads as the word, not as a zero. "0" on a
-                receipt line is ambiguous — it could be a session nobody
-                played. "Free" is a decision somebody made, and the log below
-                says who. */}
-            <span>{session.is_free ? t("session.freeBillShort") : money(total)}</span>
+            {/* A waived bill reads as the words, not as a zero. "0" on a
+                receipt line is ambiguous — it could be a session nobody played.
+                The full phrase goes here rather than the short pill used above:
+                "Free" beside a number column reads as a currency abbreviation,
+                and "Free session" cannot. */}
+            <span>{session.is_free ? t("session.freeBill") : money(total)}</span>
           </div>
         </>
       ) : (

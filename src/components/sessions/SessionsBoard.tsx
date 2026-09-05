@@ -317,15 +317,22 @@ const SessionsBoard = ({ branchId }: Props) => {
                 endsAt={sess.ends_at}
                 startedAt={sess.started_at}
                 hourlyRate={sess.hourly_rate}
+                isFree={sess.is_free}
                 formatMoney={money}
               />
             </span>
             <span className="until">
-              {sess.is_unlimited
-                ? t("session.unlimited")
-                : sess.mode === "open"
-                  ? `${money(Number(sess.hourly_rate ?? 0))} / ${t("time.hourShort") || "h"}`
-                  : sess.package_name}
+              {/* The tariff line answers "what is this seat earning per hour",
+                  and for a waived session the answer is not the venue's rate —
+                  printing it there put a price the player will never be asked
+                  for directly under a clock that was counting for free. */}
+              {sess.is_free
+                ? t("session.freeBill")
+                : sess.is_unlimited
+                  ? t("session.unlimited")
+                  : sess.mode === "open"
+                    ? `${money(Number(sess.hourly_rate ?? 0))} / ${t("time.hourShort") || "h"}`
+                    : sess.package_name}
               {itemsCount > 0 && <span className="muted"> · {itemsCount} {t("session.posNote")}</span>}
             </span>
             {/* What the tile has to say at a glance and could not before: how
