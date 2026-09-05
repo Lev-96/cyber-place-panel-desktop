@@ -99,17 +99,31 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved }: Prop
                   ? `${t("session.timePlayed")} — ${fmtDuration(view.elapsed_minutes, t)}`
                   : `${t("session.tariff")} · ${view.package_name ?? ""}`}
               </span>
-              {view.mode === "open" && view.hourly_rate != null && (
-                <span className="muted" style={{ marginRight: 12, fontSize: 12 }}>
-                  {money(Number(view.hourly_rate))}/{t("time.hourShort") || "h"}
-                </span>
+              {/* Both figures are hidden on a waived bill, and `is_free` is the
+                  only thing that decides it — never `total === 0`, which is
+                  also true of a session that ran for zero minutes.
+
+                  The rate and the time cost are what the clock WOULD have
+                  earned. On a receipt nobody is paying they are a price quoted
+                  next to "Бесплатная сессия", and a cashier reading a rate
+                  above a waiver has to work out which of the two is the truth.
+                  The played time above stays: it is a fact about the seat, not
+                  a charge. */}
+              {!view.is_free && (
+                <>
+                  {view.mode === "open" && view.hourly_rate != null && (
+                    <span className="muted" style={{ marginRight: 12, fontSize: 12 }}>
+                      {money(Number(view.hourly_rate))}/{t("time.hourShort") || "h"}
+                    </span>
+                  )}
+                  {/* Arithmetic, not a typed price: a short session at twelve an
+                      hour is a third of a unit, and "0" reads as "nothing was
+                      charged". */}
+                  <span style={{ fontWeight: 700 }}>
+                    {money(Number(view.time_cost), preciseWhenSmall(Number(view.time_cost)))}
+                  </span>
+                </>
               )}
-              {/* Arithmetic, not a typed price: a short session at twelve an
-                  hour is a third of a unit, and "0" reads as "nothing was
-                  charged". */}
-              <span style={{ fontWeight: 700 }}>
-                {money(Number(view.time_cost), preciseWhenSmall(Number(view.time_cost)))}
-              </span>
             </div>
 
             {/* Items */}
@@ -131,27 +145,18 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved }: Prop
             {/* Total */}
             <div style={{ ...row, borderTop: "2px solid #07ddf1", marginTop: 6, paddingTop: 12 }}>
               <span style={{ flex: 1, fontWeight: 700, fontSize: 16 }}>{t("session.totalDue")}</span>
-              {/* A waived bill says so in words. The figure beside it is a
-                  correct 0, and a correct 0 on a receipt is exactly what an
-                  operator double-checks: it reads as "the till failed" rather
-                  than "somebody decided this". The line below says what was
-                  given away, which is the number the venue actually wants. */}
+              {/* A waived bill says so in words. A correct 0 here is exactly
+                  what an operator double-checks — it reads as "the till
+                  failed" rather than "somebody decided this". What was given
+                  away is still on the row and in the audit log; this receipt
+                  is what the player is being handed, and it owes them one
+                  number. */}
               <span style={{ fontWeight: 800, fontSize: 18, color: "#07ddf1" }}>
                 {view.is_free
                   ? t("session.freeBill")
                   : money(Number(view.total), preciseWhenSmall(Number(view.total)))}
               </span>
             </div>
-            {view.is_free && (
-              <div style={{ ...row, fontSize: 13 }}>
-                <span style={{ flex: 1 }} className="muted">
-                  {t("session.freeBillWaived").replace(
-                    "{0}",
-                    money(Number(view.gross_total ?? 0), preciseWhenSmall(Number(view.gross_total ?? 0))),
-                  )}
-                </span>
-              </div>
-            )}
           </div>
         )}
 
