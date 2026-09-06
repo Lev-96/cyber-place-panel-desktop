@@ -956,14 +956,30 @@ than the one that was needed — and the branch rounding step, which does not
 travel at all. A seat with pads, or a branch with a rounding step, will differ
 from its receipt. The receipt is right; it comes from the server.
 
-**A fixed tariff is a PACKAGE, and that was re-confirmed on 2026-09-06 as a
-business decision, not a bug.** A block bought up front is owed in full from
-its first second: a player who buys an hour for 1500 and leaves at 00:30 owes
-1500, and the tile says 1500 the whole time. Pro-rata by elapsed time is what
-the OPEN mode already does, per second, and a cashier who wants that starts the
-session in open mode. Do not "fix" `sessionAmount.ts` or `timeCostStringAt` to
-pro-rate a package — both are pinned by tests on both sides that exist for
-exactly this reason.
+**A fixed tariff is an HOURLY RATE with an auto-stop (settled 2026-09-06).**
+`time_packages` states the rate by stating a price for a duration — 1500 for 60
+minutes is 1500/hour, 1000 for 30 minutes is 2000/hour — and a player who
+leaves at 00:30 owes 750. The tile ticks all the way there.
+
+This REVERSED on 2026-09-06, twice in one day: it was a block owed in full
+from its first second, was re-confirmed as such that morning, and was then
+changed. If you are reading a comment or a commit that says a package is owed
+in full, it predates this. `committed_amount` is no longer a price — it is
+what has been committed to, and only the unlimited branch and the
+deleted-package fallback still bill from it.
+
+**The rate lives in two places and they must move together.**
+`Session::tariffHourlyRate()` and the `tariffHourlyRate` in `sessionAmount.ts`
+are the same two-step ladder: `hourly_rate` when set, else the package's
+`price × 60 / duration_minutes`, else null — and null bills the committed
+figure rather than nothing. `time_package` is on `ISessionApi` for this, and
+the sessions listing eager-loads it.
+
+**Unlimited was left alone and is now asymmetric.** Switching a session to
+unlimited halfway through its block still charges the whole block, so it costs
+MORE than letting the same session run pro-rata. The branch exists to stop a
+switch making a bought hour cheaper, and a bought hour is no longer a thing
+this product has. It is a known open decision, not an oversight.
 
 **The tile shows `🎮 3 / 4`, not three glyphs.** The repeat said how many pads
 were in play and never what the ceiling was, which is the half a cashier at the
