@@ -11,9 +11,9 @@ import { ISessionApi } from "@/types/sessions";
  * ask the server every second, so the panel has always extrapolated locally
  * between polls; what it did NOT do was extrapolate the same way.
  *
- * The three branches below are that function, in the same order, reading the
- * fields `SessionResource` already ships. Change one and change the other, or
- * the tile and the receipt start telling a cashier different stories.
+ * The branches below are that function, in the same order, reading the fields
+ * `SessionResource` already ships. Change one and change the other, or the
+ * tile and the receipt start telling a cashier different stories.
  *
  * ## What "fixed tariff" means here, since it is the case this exists for
  *
@@ -24,9 +24,13 @@ import { ISessionApi } from "@/types/sessions";
  *
  * This REVERSED on 2026-09-06. Until then a package was a block bought up
  * front, owed in full from its first second, and `committed_amount` was what
- * the clock cost. It is now only what has been committed to: what granted time
- * accumulates, what a waiver snapshots, and what the unlimited branch adds its
- * overflow to. See CLAUDE.md §8.9.6.
+ * the clock cost. It is now only what has been committed to, and the one thing
+ * still billed from it is a session whose package row was deleted underneath
+ * it.
+ *
+ * Going UNLIMITED reversed with it: removing a session's end is a decision
+ * about the auto-stop, not about the bill, so `unlimited_at` and
+ * `committed_until` take no part in the price. See CLAUDE.md §8.9.6.
  *
  * ## Not the whole bill
  *
@@ -50,22 +54,19 @@ export const sessionTimeCostAt = (session: ISessionApi, at: number): number => {
   // same rows.
   const committed = toNumber(session.committed_amount ?? session.total_paid);
 
-  // Fixed: per second at the tariff's implied rate, from the first second. A
-  // tariff whose rate cannot be established at all — a package row deleted
+  // Fixed, unlimited or not: per second at the tariff's implied rate, from the
+  // first second. Removing a session's end is a decision about the auto-stop
+  // and not about the bill, so `unlimited_at` and `committed_until` take no
+  // part in this any more.
+  //
+  // A tariff whose rate cannot be established at all — a package row deleted
   // under a running session — bills what was committed, which is the last
   // figure anybody agreed to and is safer than billing the seat nothing.
-  if (!session.unlimited_at || !session.committed_until) {
-    const tariff = tariffHourlyRate(session);
+  const tariff = tariffHourlyRate(session);
 
-    return tariff === null
-      ? round2(committed)
-      : perSecond(tariff, secondsBetween(session.started_at, at));
-  }
-
-  // Switched to unlimited: the sold block plus whatever ran PAST it. Nothing
-  // before that boundary is recomputed — the player bought that hour, and a
-  // switch made halfway through it must not make the hour cheaper.
-  return round2(committed + perSecond(rate, secondsBetween(session.committed_until, at)));
+  return tariff === null
+    ? round2(committed)
+    : perSecond(tariff, secondsBetween(session.started_at, at));
 };
 
 /**

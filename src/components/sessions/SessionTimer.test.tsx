@@ -148,7 +148,11 @@ describe("SessionTimer", () => {
     expect(screen.getByText("3000·AMD")).toBeTruthy();
   });
 
-  test("inside its paid block an unlimited session has overflowed by nothing", () => {
+  test("a session made unlimited mid-block is not charged the whole block", () => {
+    // Half an hour played, the end removed a minute ago, the committed window
+    // still open. Until 2026-09-06 this read a flat 1500 — the block was
+    // treated as sold and the switch protected it. It is 750: the minutes
+    // played, at the tariff's rate, exactly as if nobody had touched it.
     render(<SessionTimer
       session={fixed({
         ends_at: null,
@@ -159,6 +163,6 @@ describe("SessionTimer", () => {
       formatMoney={money}
     />);
 
-    expect(screen.getByText("1500·AMD")).toBeTruthy();
+    expect(screen.getByText("750·AMD")).toBeTruthy();
   });
 });

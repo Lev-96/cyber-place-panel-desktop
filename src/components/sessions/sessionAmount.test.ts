@@ -142,7 +142,7 @@ describe("a fixed tariff is an hourly rate with an auto-stop", () => {
   });
 });
 
-describe("unlimited keeps what was already sold", () => {
+describe("unlimited only removes the end, it does not reprice", () => {
   const converted = (over: Partial<ISessionApi> = {}) => session({
     mode: "fixed",
     ends_at: null,
@@ -155,18 +155,26 @@ describe("unlimited keeps what was already sold", () => {
     ...over,
   });
 
-  test("the block plus only what ran past it", () => {
-    // 1500 sold, then one hour of overflow at 1500 — never two hours from
-    // `started_at`, which is what the tile used to compute.
+  test("every minute played, at one rate, from the start", () => {
+    // Two hours at 1500. Until 2026-09-06 this was "1500 sold + one hour of
+    // overflow", which happened to be the same figure here and was NOT the
+    // same figure anywhere the switch landed mid-block.
     expect(sessionAmountAt(converted(), AT)).toBe(3000);
   });
 
-  test("inside the paid block it has overflowed by nothing", () => {
-    expect(sessionAmountAt(converted({ committed_until: ahead(30) }), AT)).toBe(1500);
+  test("a switch made mid-block does not charge the whole block", () => {
+    // The case the old rule got wrong: still inside the committed window, so
+    // it used to read a flat 1500 no matter how long the seat had run.
+    expect(sessionAmountAt(converted({ committed_until: ahead(30) }), AT)).toBe(3000);
   });
 
-  test("at the exact boundary the overflow is zero", () => {
-    expect(sessionAmountAt(converted({ committed_until: ago(0) }), AT)).toBe(1500);
+  test("committed_until no longer takes part in the price at all", () => {
+    // Same session, boundary moved anywhere: the figure does not move with it.
+    const at = converted({ committed_until: ago(0) });
+    const ahead30 = converted({ committed_until: ahead(30) });
+
+    expect(sessionAmountAt(at, AT)).toBe(3000);
+    expect(sessionAmountAt(at, AT)).toBe(sessionAmountAt(ahead30, AT));
   });
 });
 
