@@ -65,15 +65,51 @@ export const sessionTimeCostAt = (session: ISessionApi, at: number): number => {
 };
 
 /**
- * What the session will COLLECT — the figure above, or nothing at all.
+ * What has been put ON the seat — drinks, snacks, anything sold to it.
  *
- * Mirrors `SessionPricingCalculator`, which zeroes the total for a waived
- * session and leaves the clock's own cost intact as `gross_total`. Kept as a
- * separate step for that reason: free is a decision about the total, not about
- * what the clock is worth.
+ * Mirrors the `itemsTotal` term of `SessionPricingCalculator::bill()`: each
+ * line is `price × qty` settled to cents on its own, and the lines are then
+ * summed. Per line rather than once at the end because that is the order the
+ * backend's bcmath does it in, and the two must not disagree by a cent.
+ *
+ * These do not tick. They change when a cashier adds or corrects a line, and
+ * every one of those paths already replaces the session row with the server's
+ * answer — so this reads `items` and never accumulates, which is what stops a
+ * realtime refresh from charging the same drink twice.
+ */
+export const sessionItemsTotal = (session: ISessionApi): number => {
+  const lines = session.items ?? [];
+  if (lines.length === 0) return 0;
+
+  return round2(
+    lines.reduce((sum, line) => sum + round2(toNumber(line.price) * toNumber(line.qty)), 0),
+  );
+};
+
+/**
+ * What the session will COLLECT — the clock, plus what is on the seat, or
+ * nothing at all.
+ *
+ * Mirrors `SessionPricingCalculator`, which builds `subtotal = time +
+ * joysticks + items` and then zeroes the TOTAL for a waived session. Free is
+ * applied here, to the composed figure, for that reason: a waived session
+ * gives the drinks away with the hour, and `gross_total` keeps what was given.
+ *
+ * Two terms of the server's subtotal are still missing, and both make this
+ * figure LOWER than the receipt rather than higher:
+ *
+ *  - extra joysticks. The periods DO travel on the payload with their own
+ *    rates and intervals, so this is a decision and not a limit: they tick,
+ *    and mirroring a second per-second charge here is a bigger change than
+ *    the one that was asked for. A seat with pads still under-reads.
+ *  - the branch's rounding step, which does not travel at all — the tile has
+ *    nothing to apply and a receipt on a rounding branch will differ by up to
+ *    one step.
+ *
+ * See CLAUDE.md §9.6.
  */
 export const sessionAmountAt = (session: ISessionApi, at: number): number =>
-  session.is_free ? 0 : sessionTimeCostAt(session, at);
+  session.is_free ? 0 : round2(sessionTimeCostAt(session, at) + sessionItemsTotal(session));
 
 /**
  * Whole seconds from an ISO instant to a moment, never negative.

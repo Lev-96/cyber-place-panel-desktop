@@ -149,3 +149,89 @@ describe("a waived session collects nothing, whatever it would have cost", () =>
     expect(sessionTimeCostAt(s, AT)).toBeGreaterThan(0);
   });
 });
+
+/**
+ * What is on the bill besides the clock.
+ *
+ * The backend composes `subtotal = time + joysticks + items`
+ * (`SessionPricingCalculator::bill`). The tile has always shown the first term
+ * only, so a cashier looking at a seat with two drinks on it saw a figure that
+ * was short by the price of two drinks — and the difference appeared out of
+ * nowhere at the stop receipt.
+ */
+describe("drinks on the seat are on the seat's figure", () => {
+  const withItems = (over: Partial<ISessionApi>, items: ISessionApi["items"]) =>
+    session({ ...over, items });
+
+  const cola = [{ id: 1, name: "Coca-Cola", price: 300, qty: 1, product_id: 7 }];
+
+  // The requirement's table: an open session at 1500/h with one 300 drink.
+  test.each([
+    [15, 675],
+    [30, 1050],
+    [45, 1425],
+    [60, 1800],
+    [90, 2550],
+  ])("at %s minutes with a 300 drink the seat is worth %s", (minutes, expected) => {
+    const s = withItems({ hourly_rate: 1500, started_at: ago(minutes) }, cola);
+
+    expect(sessionAmountAt(s, AT)).toBe(expected);
+  });
+
+  test("a sold package carries its drinks too", () => {
+    // The block is 1500 whatever the clock says — that rule is untouched — and
+    // the drink is 300 on top of it, not instead of it.
+    const s = withItems(
+      { mode: "fixed", started_at: ago(30), ends_at: ahead(30), committed_amount: 1500 },
+      cola,
+    );
+
+    expect(sessionAmountAt(s, AT)).toBe(1800);
+  });
+
+  test("quantity is a multiplier, not a row count", () => {
+    const s = withItems({ hourly_rate: 1500, started_at: ago(60) }, [
+      { id: 1, name: "Coca-Cola", price: 300, qty: 3, product_id: 7 },
+    ]);
+
+    expect(sessionAmountAt(s, AT)).toBe(2400);
+  });
+
+  test("prices arrive as decimal strings and still add up exactly", () => {
+    // `decimal(10,2)` reaches this payload as a string. 0.1 + 0.2 territory:
+    // the assertion is `toBe`, so a float artefact fails it.
+    const s = withItems({ hourly_rate: 1500, started_at: ago(30) }, [
+      { id: 1, name: "Water", price: "150.50", qty: 2, product_id: 8 },
+      { id: 2, name: "Bar", price: "0.10", qty: 3, product_id: 9 },
+    ]);
+
+    expect(sessionAmountAt(s, AT)).toBe(1051.3);
+  });
+
+  test("a waived session gives the drinks away with the time", () => {
+    // `SessionPricingCalculator` zeroes the TOTAL, which the items are inside
+    // of — free is not "free seat, paid drinks".
+    const s = withItems(
+      { hourly_rate: 1500, started_at: ago(60), is_free: true },
+      cola,
+    );
+
+    expect(sessionAmountAt(s, AT)).toBe(0);
+  });
+
+  test("no items is the figure it always was", () => {
+    const s = session({ hourly_rate: 1500, started_at: ago(30) });
+
+    expect(sessionAmountAt(s, AT)).toBe(750);
+    expect(sessionAmountAt({ ...s, items: [] }, AT)).toBe(750);
+  });
+
+  test("the clock's own cost stays the clock's own cost", () => {
+    // `sessionTimeCostAt` mirrors `timeCostStringAt`, which knows nothing about
+    // drinks. Keeping the two apart is what lets each be checked against its
+    // counterpart on the server.
+    const s = withItems({ hourly_rate: 1500, started_at: ago(30) }, cola);
+
+    expect(sessionTimeCostAt(s, AT)).toBe(750);
+  });
+});
