@@ -975,11 +975,12 @@ are the same two-step ladder: `hourly_rate` when set, else the package's
 figure rather than nothing. `time_package` is on `ISessionApi` for this, and
 the sessions listing eager-loads it.
 
-**Unlimited was left alone and is now asymmetric.** Switching a session to
-unlimited halfway through its block still charges the whole block, so it costs
-MORE than letting the same session run pro-rata. The branch exists to stop a
-switch making a bought hour cheaper, and a bought hour is no longer a thing
-this product has. It is a known open decision, not an oversight.
+**Unlimited went pro-rata with it, later the same day.** Removing a session's
+end is a decision about the AUTO-STOP and not about the bill: a session
+switched at 00:15 and stopped at 00:30 owes the same 750 as one nobody
+touched. `unlimited_at` and `committed_until` take no part in the price on
+either side any more — if you see a branch reading them to compute money, it
+is older than this.
 
 **The tile shows `🎮 3 / 4`, not three glyphs.** The repeat said how many pads
 were in play and never what the ceiling was, which is the half a cashier at the
