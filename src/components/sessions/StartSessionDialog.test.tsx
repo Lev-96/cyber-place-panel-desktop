@@ -107,11 +107,15 @@ describe("starting a session free", () => {
     expect(screen.getByText("session.freeBill")).toBeTruthy();
   });
 
-  test("is not offered to a manager", async () => {
+  test("is offered to a manager too", async () => {
+    // Owner-level until 2026-09-06. The person who waives a bill is the one at
+    // the counter when a machine crashes, not an owner across town, so the
+    // capability moved rather than the control being worked around. The backend
+    // holds the same rule on `sessions.free`; this is only whether it is drawn.
     auth.role = "manager";
     await mount(computer());
 
-    expect(screen.queryByText("session.freeBill")).toBeNull();
+    expect(screen.getByText("session.freeBill")).toBeTruthy();
   });
 
   test("sends the flag only when it was actually ticked", async () => {

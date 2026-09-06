@@ -377,13 +377,15 @@ describe("waiving the bill", () => {
     expect(screen.getByText("session.freeBill")).toBeTruthy();
   });
 
-  test("is NOT offered to a manager", async () => {
-    // The backend refuses it on `sessions.free` regardless — this is the half
-    // that keeps a manager from pressing a button that would only ever 403.
+  test("is offered to a manager too", async () => {
+    // Owner-level until 2026-09-06, when the capability opened to the floor: a
+    // bill is waived by whoever is at the counter. The backend agrees on
+    // `sessions.free`, so this control no longer leads to a 403 — and the
+    // waiver is still attributed, `session_events` records who did it.
     auth.role = "manager";
     await mount();
 
-    expect(screen.queryByText("session.freeBill")).toBeNull();
+    expect(screen.getByText("session.freeBill")).toBeTruthy();
   });
 
   test("sends the new value, both directions", async () => {

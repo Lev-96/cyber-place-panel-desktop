@@ -167,7 +167,13 @@ const PERMS: Record<Role, ReadonlySet<Permission>> = {
     // the place form's inline "create game" dead-ends without it. Branch-scoped
     // only — never the shared catalogue.
     "game.crud.branch",
-    "session.start", "session.stop",
+    // Waiving a bill joins start/stop here on 2026-09-06. It was owner-level on
+    // the reasoning that giving takings away is the company's decision — true
+    // of the price LIST, and not true of one seat: the person who waives a bill
+    // is the one at the counter when a machine crashes, and routing it through
+    // an owner who is not in the building means it does not happen. The backend
+    // holds the same rule on `sessions.free`; this only draws the control.
+    "session.start", "session.stop", "session.free",
   ]),
 };
 
