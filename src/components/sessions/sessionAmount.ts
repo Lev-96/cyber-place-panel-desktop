@@ -17,26 +17,22 @@ import { ISessionApi } from "@/types/sessions";
  *
  * ## What "fixed tariff" means here, since it is the case this exists for
  *
- * It is a PACKAGE — a block of time bought up front (`time_packages`:
- * duration + price), after which the kiosk agent locks the seat by itself. The
- * player who buys an hour for 1 500 and leaves at 00:30 has still bought the
- * hour, so the figure is 1 500 from the first second and does not tick.
+ * An HOURLY RATE with an auto-stop attached. `time_packages` states the rate
+ * by stating a price for a duration — 1500 for 60 minutes is 1500/hour — and
+ * the kiosk agent locks the seat when the duration is up. A player who leaves
+ * at 00:30 owes 750, and the figure ticks all the way there.
  *
- * That is the venue's rule and not an oversight: pro-rating the block would
- * make a package into an hourly rate with an auto-stop, and every early
- * departure would collect less than the player agreed to. `committed_amount`
- * exists to hold exactly this number — see CLAUDE.md §8.9.6.
- *
- * What WAS an oversight is that the tile showed no amount at all for such a
- * session: the countdown branch of `SessionTimer` rendered a clock and nothing
- * else, so a cashier could not see what the seat was worth without opening the
- * stop receipt.
+ * This REVERSED on 2026-09-06. Until then a package was a block bought up
+ * front, owed in full from its first second, and `committed_amount` was what
+ * the clock cost. It is now only what has been committed to: what granted time
+ * accumulates, what a waiver snapshots, and what the unlimited branch adds its
+ * overflow to. See CLAUDE.md §8.9.6.
  *
  * ## Not the whole bill
  *
- * The clock only — drinks and extra joysticks are not in it, exactly as they
- * were never in the open-mode counter. The full bill is the stop receipt, which
- * comes from the server.
+ * The clock plus the items on the seat. Extra joysticks and the branch's
+ * rounding step are not in it, so a seat with pads under-reads. The full bill
+ * is the stop receipt, which comes from the server.
  *
  * @param at Milliseconds since the epoch to price at; `Date.now()` in the UI,
  *           a fixed instant in tests.
@@ -49,19 +45,51 @@ export const sessionTimeCostAt = (session: ISessionApi, at: number): number => {
     return perSecond(rate, secondsBetween(session.started_at, at));
   }
 
-  // Fixed: the block that was SOLD. `total_paid` is the fallback for a session
-  // that closed before `committed_amount` existed — the same fallback the
-  // backend uses, for the same rows.
+  // `total_paid` is the fallback for a session that closed before
+  // `committed_amount` existed — the same fallback the backend uses, for the
+  // same rows.
   const committed = toNumber(session.committed_amount ?? session.total_paid);
 
+  // Fixed: per second at the tariff's implied rate, from the first second. A
+  // tariff whose rate cannot be established at all — a package row deleted
+  // under a running session — bills what was committed, which is the last
+  // figure anybody agreed to and is safer than billing the seat nothing.
   if (!session.unlimited_at || !session.committed_until) {
-    return round2(committed);
+    const tariff = tariffHourlyRate(session);
+
+    return tariff === null
+      ? round2(committed)
+      : perSecond(tariff, secondsBetween(session.started_at, at));
   }
 
   // Switched to unlimited: the sold block plus whatever ran PAST it. Nothing
   // before that boundary is recomputed — the player bought that hour, and a
   // switch made halfway through it must not make the hour cheaper.
   return round2(committed + perSecond(rate, secondsBetween(session.committed_until, at)));
+};
+
+/**
+ * The tariff's hourly rate, whatever shape the tariff was chosen in.
+ *
+ * Mirrors `Session::tariffHourlyRate()`. A package states a rate by stating a
+ * price for a duration: 1500 for 60 minutes IS 1500/hour, and 1000 for 30
+ * minutes is 2000/hour. `hourly_rate` wins when it is set — the count-up mode
+ * and any session made unlimited, both of which carry a resolved one.
+ *
+ * `null` means no rate can be established: a fixed session whose package the
+ * backend did not load, or whose package row is gone. The caller decides, and
+ * must not read that as a zero.
+ */
+const tariffHourlyRate = (session: ISessionApi): number | null => {
+  if (session.hourly_rate !== null && session.hourly_rate !== undefined) {
+    return toNumber(session.hourly_rate);
+  }
+
+  const pkg = session.time_package;
+  const minutes = toNumber(pkg?.duration_minutes);
+  if (!pkg || minutes <= 0) return null;
+
+  return (toNumber(pkg.price) * 60) / minutes;
 };
 
 /**

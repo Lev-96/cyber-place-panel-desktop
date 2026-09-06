@@ -78,28 +78,66 @@ describe("an open session is billed per second at its rate", () => {
   });
 });
 
-describe("a fixed package is the block that was sold", () => {
-  const pkg = (minutesIn: number) => session({
+describe("a fixed tariff is an hourly rate with an auto-stop", () => {
+  // 1500 for 60 minutes IS 1500/hour. The package states the rate; the player
+  // owes for the minutes played. This reversed on 2026-09-06 — it used to be
+  // a block owed in full from its first second.
+  const pkg = (minutesIn: number, over: Partial<ISessionApi> = {}) => session({
     mode: "fixed",
     started_at: ago(minutesIn),
     ends_at: ahead(60 - minutesIn),
     committed_amount: 1500,
     total_paid: 1500,
+    time_package: { duration_minutes: 60, price: 1500 } as ISessionApi["time_package"],
+    ...over,
   });
 
-  // The rule this feature exists to preserve: the player bought an hour, so
-  // the figure is 1500 from the first second and does not move. Pro-rating it
-  // would turn a package into an hourly rate with an auto-stop and collect
-  // less than the player agreed to on every early departure.
-  test.each([1, 15, 30, 45, 59, 60])("at %s minutes in it is still 1500", (minutesIn) => {
-    expect(sessionAmountAt(pkg(minutesIn), AT)).toBe(1500);
+  test.each([
+    [15, 375],
+    [30, 750],
+    [45, 1125],
+    [59, 1475],
+    [60, 1500],
+  ])("at %s minutes in the seat is worth %s", (minutesIn, expected) => {
+    expect(sessionAmountAt(pkg(minutesIn), AT)).toBe(expected);
   });
 
-  test("it falls back to total_paid when no block was recorded", () => {
-    const s = session({ mode: "fixed", committed_amount: undefined, total_paid: 900, ends_at: ahead(10) });
+  test("a tariff whose block is not an hour still states a rate", () => {
+    // 1000 for 30 minutes is 2000/hour, so a quarter of an hour is 500.
+    const s = pkg(15, {
+      committed_amount: 1000,
+      total_paid: 1000,
+      time_package: { duration_minutes: 30, price: 1000 } as ISessionApi["time_package"],
+    });
 
-    // Sessions that closed before `committed_amount` existed — the same
-    // fallback, for the same rows, as the backend's.
+    expect(sessionAmountAt(s, AT)).toBe(500);
+  });
+
+  test("past the block the same rate keeps running", () => {
+    // Reached by granting time, which is the only way a fixed session outlives
+    // its own end.
+    const s = pkg(90, { ends_at: ahead(0), committed_amount: 2250, total_paid: 2250 });
+
+    expect(sessionAmountAt(s, AT)).toBe(2250);
+  });
+
+  test("with no tariff to derive a rate from it falls back to what was committed", () => {
+    // A package row deleted out from under a running session. The last figure
+    // anybody agreed to beats billing the seat nothing — same fallback, same
+    // rows, as the backend's.
+    const s = pkg(30, { time_package: null, committed_amount: 1500 });
+
+    expect(sessionAmountAt(s, AT)).toBe(1500);
+  });
+
+  test("it falls back to total_paid when no block was recorded either", () => {
+    const s = session({
+      mode: "fixed",
+      committed_amount: undefined,
+      total_paid: 900,
+      ends_at: ahead(10),
+    });
+
     expect(sessionAmountAt(s, AT)).toBe(900);
   });
 });

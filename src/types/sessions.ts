@@ -95,6 +95,16 @@ export interface ISessionApi {
   opened_by_user_id?: number | null;
   items?: Array<{ id: number; name: string; price: number | string; qty: number; product_id: number | null }>;
 
+  /**
+   * The tariff a fixed session was started on, when the backend loaded it.
+   *
+   * Present on the sessions listing, which eager-loads `timePackage` with
+   * `duration_minutes` and `price` — the two columns a fixed session's hourly
+   * rate is derived from, since `hourly_rate` stays null until somebody makes
+   * the session unlimited. {@see sessionTimeCostAt}.
+   */
+  time_package?: ITimePackage | null;
+
   /* ---- added 2026-09-03; every field above is unchanged ---------------- */
 
   /**

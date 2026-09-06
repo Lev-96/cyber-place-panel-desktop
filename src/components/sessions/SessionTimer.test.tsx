@@ -44,6 +44,10 @@ describe("SessionTimer", () => {
     committed_amount: 1500,
     total_paid: 1500,
     is_free: false,
+    // The tariff the hourly rate is derived from: 1500 per 60 minutes is
+    // 1500/hour. Without it these would price through the no-tariff fallback
+    // and pass for the wrong reason.
+    time_package: { duration_minutes: 60, price: 1500 },
     ...over,
   } as ISessionApi);
 
@@ -81,29 +85,29 @@ describe("SessionTimer", () => {
 
   // ── the fixed package, which showed no money at all ──────────────────
 
-  test("a fixed package counts down AND says what the seat is worth", () => {
+  test("a fixed tariff counts down AND says what the seat is worth so far", () => {
     render(<SessionTimer session={fixed()} formatMoney={money} />);
 
-    // Counting down to the auto-lock, which is what a package needs. A few
-    // milliseconds of test runtime put it just under the half hour.
+    // Counting down to the auto-lock, which is what a fixed tariff needs. A
+    // few milliseconds of test runtime put it just under the half hour.
     expect(screen.getByText(/^(29:5\d|30:00)$/)).toBeTruthy();
-    // …and the block that was sold, which the tile used to omit entirely.
-    expect(screen.getByText("1500·AMD")).toBeTruthy();
+    // …and half an hour of a 1500/hour tariff is 750, not 1500.
+    expect(screen.getByText("750·AMD")).toBeTruthy();
   });
 
-  test("the sold block does not tick — the player bought the hour", () => {
-    // Half an hour in and an hour in read the same. Pro-rating a package would
-    // make it an hourly rate with an auto-stop, and every early departure would
-    // collect less than the player agreed to.
+  test("a fixed tariff ticks — it is an hourly rate with an auto-stop", () => {
+    // Five minutes in and half an hour in must NOT read the same. This
+    // reversed on 2026-09-06; before it, a package was owed in full from its
+    // first second and both of these read 1500.
     const { unmount } = render(<SessionTimer session={fixed()} formatMoney={money} />);
-    expect(screen.getByText("1500·AMD")).toBeTruthy();
+    expect(screen.getByText("750·AMD")).toBeTruthy();
     unmount();
 
     render(<SessionTimer
       session={fixed({ started_at: new Date(Date.now() - 5 * 60_000).toISOString() })}
       formatMoney={money}
     />);
-    expect(screen.getByText("1500·AMD")).toBeTruthy();
+    expect(screen.getByText("125·AMD")).toBeTruthy();
   });
 
   test("a waived package is worth nothing, block or no block", () => {
@@ -113,10 +117,15 @@ describe("SessionTimer", () => {
     expect(screen.queryByText("1500·AMD")).toBeNull();
   });
 
-  test("a session that closed before committed_amount existed falls back to total_paid", () => {
-    render(<SessionTimer session={fixed({ committed_amount: undefined })} formatMoney={money} />);
+  test("with no tariff to price from it falls back to what was committed", () => {
+    // A package row deleted under a running session. `total_paid` is the
+    // second fallback, for rows that closed before `committed_amount` existed
+    // — the same ladder the backend uses, for the same rows.
+    render(<SessionTimer
+      session={fixed({ time_package: null, committed_amount: undefined })}
+      formatMoney={money}
+    />);
 
-    // Same fallback the backend uses, for the same rows.
     expect(screen.getByText("1500·AMD")).toBeTruthy();
   });
 
