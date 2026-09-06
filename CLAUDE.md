@@ -940,6 +940,31 @@ BILL rather than about the tariff. It is deliberately not wired to the "change
 current price" override beside it: free is not a price of zero, and the two
 diverge the moment a drink goes on the bill.
 
+**The tile's figure is the clock PLUS what is on the seat (2026-09-06).**
+`sessionAmount.ts` composes it the way `SessionPricingCalculator` does —
+`sessionTimeCostAt` mirrors `Session::timeCostStringAt` and stays clock-only so
+each half can be checked against its own counterpart, and `sessionAmountAt`
+adds `sessionItemsTotal` on top, with the waiver applied to the composed figure
+(a free seat gives the drinks away with the hour, exactly as the server does).
+Items are READ from `items[]`, never accumulated, so a Reverb refresh cannot
+charge the same drink twice.
+
+Two terms of the server's subtotal are still missing and both make the tile
+read LOW rather than high: extra joysticks — a decision, since the periods do
+travel on the payload and mirroring a second ticking charge is a bigger change
+than the one that was needed — and the branch rounding step, which does not
+travel at all. A seat with pads, or a branch with a rounding step, will differ
+from its receipt. The receipt is right; it comes from the server.
+
+**A fixed tariff is a PACKAGE, and that was re-confirmed on 2026-09-06 as a
+business decision, not a bug.** A block bought up front is owed in full from
+its first second: a player who buys an hour for 1500 and leaves at 00:30 owes
+1500, and the tile says 1500 the whole time. Pro-rata by elapsed time is what
+the OPEN mode already does, per second, and a cashier who wants that starts the
+session in open mode. Do not "fix" `sessionAmount.ts` or `timeCostStringAt` to
+pro-rate a package — both are pinned by tests on both sides that exist for
+exactly this reason.
+
 **The tile shows `🎮 3 / 4`, not three glyphs.** The repeat said how many pads
 were in play and never what the ceiling was, which is the half a cashier at the
 board actually needs ("can another player join?"). One glyph plus the fraction
