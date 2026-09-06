@@ -313,13 +313,10 @@ const SessionsBoard = ({ branchId }: Props) => {
         {sess ? (
           <>
             <span className="status" style={{ color }}>
-              <SessionTimer
-                endsAt={sess.ends_at}
-                startedAt={sess.started_at}
-                hourlyRate={sess.hourly_rate}
-                isFree={sess.is_free}
-                formatMoney={money}
-              />
+              {/* The row itself, not a handful of its fields. Passing an
+                  hourly rate a fixed session does not have is what left the
+                  countdown branch with nothing to price from. */}
+              <SessionTimer session={sess} formatMoney={money} />
             </span>
             <span className="until">
               {/* The tariff line answers "what is this seat earning per hour",
