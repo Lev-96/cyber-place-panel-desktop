@@ -51,6 +51,10 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved }: Prop
   useEffect(() => {
     void reload();
     // Refresh time-cost every 5s while modal open (open sessions keep ticking).
+    // A seat that is already over has a final figure, so it is read once —
+    // re-asking would return the same number every five seconds for as long as
+    // the cashier leaves the receipt on screen.
+    if (session.status !== "active") return;
     const timer = setInterval(() => { void reload(); }, 5_000);
     return () => clearInterval(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -81,13 +85,26 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved }: Prop
 
   const view = stopped ?? bill;
 
+  /**
+   * The seat is already over — its paid period ran out and the server ended it,
+   * or another desk stopped it while this one was looking.
+   *
+   * The modal then reports rather than asks: no Confirm, no per-line remove,
+   * and the heading says the checkout is done. `preview` still supplies the
+   * figures and they are the FINAL ones — the backend prices a closed session
+   * at its `stopped_at`, never at now, so a receipt opened two hours later
+   * shows what was banked and not two hours of extra clock.
+   */
+  const endedWithoutUs = session.status !== "active";
+  const finished = stopped !== null || endedWithoutUs;
+
   const deviceLabel = session.pc_label ?? `№${session.pc_id}`;
 
   return (
     <Modal open onClose={onClose}>
       <div className="card" style={{ width: 520, maxWidth: "92vw", display: "flex", flexDirection: "column", gap: 12 }}>
         <h2 style={{ margin: 0 }}>
-          {stopped ? t("session.checkoutDone") : `${t("session.checkoutTitle")} · ${deviceLabel}`}
+          {finished ? t("session.checkoutDone") : `${t("session.checkoutTitle")} · ${deviceLabel}`}
         </h2>
 
         {!view ? <SkeletonText lines={5} /> : (
@@ -134,7 +151,7 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved }: Prop
                   {money(Number(it.price))}{it.qty > 1 ? ` × ${it.qty}` : ""}
                 </span>
                 <span style={{ fontWeight: 700, marginRight: 8 }}>{money(Number(it.line_total))}</span>
-                {!stopped && (
+                {!finished && (
                   <button type="button" onClick={() => remove(it.id)} disabled={busy} style={removeBtn} title={t("session.removeItemTitle")}>
                     ×
                   </button>
@@ -163,7 +180,7 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved }: Prop
         {err && <div className="error">{err}</div>}
 
         <div className="row-between" style={{ marginTop: 4 }}>
-          {stopped ? (
+          {finished ? (
             <Button onClick={onClose}>{t("action.close")}</Button>
           ) : (
             <>

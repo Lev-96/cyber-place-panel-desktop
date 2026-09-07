@@ -98,9 +98,24 @@ const SessionsBoard = ({ branchId }: Props) => {
   // granted, the ceiling lifted, the bill waived. Without this the second
   // cashier's board found out on its next 30-second poll, which is half a
   // minute of two people acting on different numbers over the same till.
+  //
+  // It also carries the one change nobody made: a seat whose paid period ran
+  // out and which the server ended by itself. `kind` is `stopped` for that as
+  // well — what tells the two apart is `status`, which is `expired` when the
+  // clock ended it and `stopped` when a person did. Only the first opens a
+  // receipt: a modal appearing on every desk each time a colleague presses Stop
+  // would be noise, whereas a seat that ended on its own is money somebody has
+  // to go and collect, and nothing else would say so.
   useSessionChanged(
     branchId,
-    useCallback(() => {
+    useCallback((evt) => {
+      if (evt.kind === "stopped" && evt.status === "expired") {
+        const ended = (sessions.data ?? []).find((s) => s.id === evt.session_id);
+        // Never over the top of an open receipt: a cashier mid-checkout on one
+        // seat must not have it replaced by another. The second seat is still
+        // ended and still on the board's history — what it loses is the popup.
+        if (ended) setStopTarget((current) => current ?? { ...ended, status: "expired" });
+      }
       void sessions.reload();
     }, [sessions]),
   );

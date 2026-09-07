@@ -57,13 +57,14 @@ const bill = (over: Partial<IBillBreakdown> = {}): IBillBreakdown => ({
   ...over,
 } as IBillBreakdown);
 
-const session = { id: 1, pc_id: 8, pc_label: "PS4-08" } as ISessionApi;
+const session = (over: Partial<ISessionApi> = {}): ISessionApi =>
+  ({ id: 1, pc_id: 8, pc_label: "PS4-08", status: "active", ...over }) as ISessionApi;
 
-const mount = async () => {
+const mount = async (s: ISessionApi = session()) => {
   await act(async () => {
     render(
       <StopReceiptModal
-        session={session}
+        session={s}
         onClose={() => {}}
         onConfirmed={() => {}}
         onItemRemoved={() => {}}
@@ -116,5 +117,44 @@ describe("StopReceiptModal", () => {
 
     expect(screen.getByText(/1000\.00·AMD/)).toBeTruthy();
     expect(screen.queryByText("session.freeBill")).toBeNull();
+  });
+
+  /**
+   * A seat whose paid period ran out is ended by the server, and the receipt
+   * that opens for it reports rather than asks.
+   *
+   * Offering "Confirm stop" on a session that is already over would be a button
+   * that can only fail, and the per-line remove would be an edit to a bill that
+   * has been banked.
+   */
+  describe("a seat that ended without anybody pressing Stop", () => {
+    test("reports the final bill instead of offering to stop it", async () => {
+      repo.preview.mockResolvedValue(bill({ total: 250 }));
+      await mount(session({ status: "expired" }));
+
+      expect(screen.getByText("session.checkoutDone")).toBeTruthy();
+      expect(screen.getByText("action.close")).toBeTruthy();
+      expect(screen.queryByText("session.confirmStop")).toBeNull();
+      expect(screen.getByText("250.00·AMD")).toBeTruthy();
+    });
+
+    test("its lines cannot be edited any more", async () => {
+      repo.preview.mockResolvedValue(bill({
+        items: [{ id: 7, name: "Coca-Cola", price: 300, qty: 1, line_total: 300 }],
+      }) as IBillBreakdown);
+      await mount(session({ status: "expired" }));
+
+      expect(screen.getByText("Coca-Cola")).toBeTruthy();
+      // The × on a line is what removes it; a banked bill has none.
+      expect(screen.queryByTitle("session.removeItemTitle")).toBeNull();
+    });
+
+    test("a running seat still offers the checkout", async () => {
+      repo.preview.mockResolvedValue(bill());
+      await mount();
+
+      expect(screen.getByText("session.confirmStop")).toBeTruthy();
+      expect(screen.queryByText("session.checkoutDone")).toBeNull();
+    });
   });
 });
