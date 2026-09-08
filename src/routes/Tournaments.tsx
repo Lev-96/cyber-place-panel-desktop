@@ -160,7 +160,7 @@ const Tournaments = () => {
 
                 <div className="muted" style={{ fontSize: 13, marginTop: 6 }}>
                   {t.start_date}
-                  {t.end_date ? ` — ${t.end_date}` : ""}
+                  {t.end_date ? ` - ${t.end_date}` : ""}
                   {t.price != null && (
                     <>
                       {" · "}

@@ -4,12 +4,12 @@
  * language switch never reflows widths.
  *
  * Always rendered in the user's wall-clock TZ (the JS Date does the lift).
- * If the input is null/undefined/invalid, returns the placeholder ("—").
+ * If the input is null/undefined/invalid, returns the placeholder ("-").
  */
 
 type DateLike = string | number | Date | null | undefined;
 
-const PLACEHOLDER = "—";
+const PLACEHOLDER = "-";
 const pad = (n: number): string => (n < 10 ? `0${n}` : String(n));
 
 const toDate = (input: DateLike): Date | null => {

@@ -22,7 +22,7 @@ const TournamentDetails = () => {
     <ScreenWithBg bg="./bg/owner-home.jpg" title={data.title}>
       <div className="card col" style={{ gap: 6 }}>
         <Row k={t("label.description")} v={data.description} />
-        <Row k={t("label.game")} v={`${data.game?.name ?? "—"} ${data.game?.platform ? `(${data.game.platform})` : ""}`} />
+        <Row k={t("label.game")} v={`${data.game?.name ?? "-"} ${data.game?.platform ? `(${data.game.platform})` : ""}`} />
         <Row k={t("tournament.skillLevel")} v={t(`tournament.skillLevel.${data.skill_level ?? "any"}`)} />
         <Row k={t("bookingDetails.start")} v={data.start_date} />
         {data.end_date && <Row k={t("tournamentDetails.end")} v={data.end_date} />}

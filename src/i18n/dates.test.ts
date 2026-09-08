@@ -24,10 +24,10 @@ describe("formatDate", () => {
   });
 
   it("returns placeholder for null / undefined / empty / invalid", () => {
-    expect(formatDate(null)).toBe("—");
-    expect(formatDate(undefined)).toBe("—");
-    expect(formatDate("")).toBe("—");
-    expect(formatDate("not-a-date")).toBe("—");
+    expect(formatDate(null)).toBe("-");
+    expect(formatDate(undefined)).toBe("-");
+    expect(formatDate("")).toBe("-");
+    expect(formatDate("not-a-date")).toBe("-");
   });
 });
 
@@ -39,8 +39,8 @@ describe("formatTime", () => {
   });
 
   it("returns placeholder for invalid input", () => {
-    expect(formatTime(null)).toBe("—");
-    expect(formatTime("invalid")).toBe("—");
+    expect(formatTime(null)).toBe("-");
+    expect(formatTime("invalid")).toBe("-");
   });
 });
 
@@ -50,7 +50,7 @@ describe("formatDateTime", () => {
   });
 
   it("returns placeholder for invalid input", () => {
-    expect(formatDateTime(null)).toBe("—");
+    expect(formatDateTime(null)).toBe("-");
   });
 });
 
@@ -61,6 +61,6 @@ describe("formatMonth", () => {
   });
 
   it("returns placeholder for invalid input", () => {
-    expect(formatMonth(null)).toBe("—");
+    expect(formatMonth(null)).toBe("-");
   });
 });

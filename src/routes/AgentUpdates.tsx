@@ -79,7 +79,7 @@ const AgentUpdates = () => {
     }
   };
 
-  const current = data?.current?.version ?? "—";
+  const current = data?.current?.version ?? "-";
   const approved = data?.approved ?? null;
   const venuePcCount = data?.venue_pc_count ?? 0;
   // The button is only for work that's left: an approved version this operator
@@ -121,7 +121,7 @@ const AgentUpdates = () => {
                     fontWeight: 600,
                     color: approved ? "#07ddf1" : undefined,
                   }}>
-                    {approved?.version ?? "—"}
+                    {approved?.version ?? "-"}
                   </div>
                 </div>
                 <div>

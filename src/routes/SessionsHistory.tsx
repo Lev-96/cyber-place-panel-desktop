@@ -261,7 +261,7 @@ const SessionRow = ({ session }: { session: ISessionApi }) => {
         {session.branch && (
           <AttrLine
             label={t("history.branch")}
-            value={[session.branch.company_name, session.branch.address].filter(Boolean).join(" — ")}
+            value={[session.branch.company_name, session.branch.address].filter(Boolean).join(", ")}
             by={null}
             byLabel=""
           />

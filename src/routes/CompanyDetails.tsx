@@ -44,13 +44,13 @@ const CompanyDetails = () => {
       </div>
       <div className="gradient-card"><div className="gradient-card-inner">
         <Row k={t("company.email")}       v={c.email} />
-        <Row k={t("company.phone")}       v={c.phone || "—"} />
-        <Row k={t("company.country")}     v={c.company_country || "—"} />
-        <Row k={t("company.city")}        v={c.company_city || "—"} />
-        <Row k={t("company.tin")}         v={c.tin || "—"} />
-        <Row k={t("company.website")}     v={c.website || "—"} />
-        <Row k={t("company.description")} v={c.description || "—"} />
-        <Row k={t("company.owner")}       v={c.user?.name ?? "—"} />
+        <Row k={t("company.phone")}       v={c.phone || "-"} />
+        <Row k={t("company.country")}     v={c.company_country || "-"} />
+        <Row k={t("company.city")}        v={c.company_city || "-"} />
+        <Row k={t("company.tin")}         v={c.tin || "-"} />
+        <Row k={t("company.website")}     v={c.website || "-"} />
+        <Row k={t("company.description")} v={c.description || "-"} />
+        <Row k={t("company.owner")}       v={c.user?.name ?? "-"} />
         <Row k={t("company.status")}      v={<span className={`pill ${c.status}`}>{t(`company.status.${c.status}`) || c.status}</span>} />
         {/* Shown only when it applies: an active company has nothing to say
             here, and a permanent "not blocked" row would be noise on every

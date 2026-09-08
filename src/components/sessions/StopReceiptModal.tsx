@@ -113,7 +113,7 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved }: Prop
             <div style={row}>
               <span style={{ flex: 1 }}>
                 {view.mode === "open"
-                  ? `${t("session.timePlayed")} — ${fmtDuration(view.elapsed_minutes, t)}`
+                  ? `${t("session.timePlayed")}: ${fmtDuration(view.elapsed_minutes, t)}`
                   : `${t("session.tariff")} · ${view.package_name ?? ""}`}
               </span>
               {/* Both figures are hidden on a waived bill, and `is_free` is the

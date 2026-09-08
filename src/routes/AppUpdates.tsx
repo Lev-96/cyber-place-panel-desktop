@@ -192,9 +192,9 @@ const AppUpdates = () => {
                 //     since we don't run an agent here.
                 const current =
                   app === "panel"
-                    ? local?.currentVersion ?? entry?.current?.version ?? "—"
-                    : entry?.current?.version ?? "—";
-                const available = entry?.available?.version ?? (entry?.error ? "?" : "—");
+                    ? local?.currentVersion ?? entry?.current?.version ?? "-"
+                    : entry?.current?.version ?? "-";
+                const available = entry?.available?.version ?? (entry?.error ? "?" : "-");
 
                 // Status: default green. For the Panel row the local
                 // updater state takes precedence (so the admin sees

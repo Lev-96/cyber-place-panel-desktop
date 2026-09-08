@@ -113,7 +113,7 @@ const ExpenseReminderNotifier = () => {
   const many = toast.length > 1;
   const headline = many
     ? t("expenses.reminderToastMany").replace("{n}", String(toast.length))
-    : `${toast[0].name} — ${dueLabel(toast[0].days_until_due, t)}`;
+    : `${toast[0].name}: ${dueLabel(toast[0].days_until_due, t)}`;
 
   return (
     <div

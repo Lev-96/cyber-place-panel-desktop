@@ -147,7 +147,7 @@ const Body = ({ summary, lang, t }: BodyProps) => {
               </div>
             )}
             <div className="muted" style={{ fontSize: 12, marginTop: 2 }}>
-              {[e.app_version, e.platform].filter(Boolean).join(" · ") || "—"}
+              {[e.app_version, e.platform].filter(Boolean).join(" · ") || "-"}
             </div>
           </div>
         ))}

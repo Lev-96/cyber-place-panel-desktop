@@ -437,7 +437,7 @@ const SupportChat = () => {
                   )}
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontWeight: 700 }}>
-                      {[active.company_name, active.branch_address].filter(Boolean).join(" — ") || active.reference}
+                      {[active.company_name, active.branch_address].filter(Boolean).join(", ") || active.reference}
                     </div>
                     <div className="muted" style={{ fontSize: 12 }}>
                       {active.reference} · {user?.name} · {t(`support.role.${user?.role ?? "manager"}`)}
