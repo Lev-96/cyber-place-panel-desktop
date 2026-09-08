@@ -453,7 +453,13 @@ export const TRANSLATIONS: Dict = {
   // switch rather than after, because it is the number the operator is agreeing
   // to and the moment to correct it is now.
   "session.unlimitedRate": { en: "Price per hour", ru: "Цена за час", am: "Գինը ժամում" },
-  "session.unlimitedRateChange": { en: "Change price", ru: "Изменить цену", am: "Փոխել գինը" },
+  // The section reads differently once a session already has no end: there is
+  // nothing left to decide, so it states the fact instead of offering a form.
+  "session.unlimitedAlready": {
+    en: "This session already has no end.",
+    ru: "У этой сессии уже нет ограничения по времени.",
+    am: "Այս նիստն արդեն ժամանակի սահմանափակում չունի։",
+  },
   // Shown INSTEAD of a figure when the server could derive none. A zero there
   // would read as "free from now on", a decision nobody made — and the server
   // refuses the switch in this same case.
@@ -493,6 +499,20 @@ export const TRANSLATIONS: Dict = {
   },
   "session.unlimited": { en: "Unlimited", ru: "Безлимит", am: "Անսահմանափակ" },
   "session.makeUnlimited": { en: "Switch to unlimited", ru: "Перевести на безлимит", am: "Փոխարկել անսահմանափակի" },
+  // The GATE, distinct from the button that performs it. Two controls reading
+  // the same words is ambiguous on screen and outright unusable to anything
+  // selecting by name — a test, a screen reader, a keyboard user reading the
+  // accessibility tree.
+  "session.unlimitedGate": {
+    en: "Switch to unlimited",
+    ru: "Переключить на Безлимит",
+    am: "Անցնել անսահմանափակի",
+  },
+  "session.unlimitedApply": {
+    en: "Change fixed tariff to unlimited",
+    ru: "Изменить фиксированный тариф на безлимитный",
+    am: "Փոխել ֆիքսված սակագինը անսահմանափակի",
+  },
   "session.unlimitedHint": {
     en: "The paid block stays; time past it is charged by the hour. Cannot be undone.",
     ru: "Оплаченный пакет остаётся, время сверх него считается по часам. Отменить нельзя.",

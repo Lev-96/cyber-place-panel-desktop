@@ -305,6 +305,24 @@ describe("the joystick controls", () => {
   });
 });
 
+/**
+ * Arm the unlimited switch the way the form now asks for it: tick the gate,
+ * then price it. Nothing about the switch is offered until both are done —
+ * removing a seat's end cannot be undone, so it reads as a deliberate act
+ * rather than a button sitting there waiting to be clicked.
+ */
+const armUnlimited = async (price = "1500") => {
+  await act(async () => {
+    fireEvent.click(screen.getByText("session.unlimitedGate"));
+  });
+  await act(async () => {
+    fireEvent.change(screen.getByLabelText("session.unlimitedRate"), { target: { value: price } });
+  });
+};
+
+const switchButton = () =>
+  screen.getByRole("button", { name: "session.unlimitedApply" }) as HTMLButtonElement;
+
 describe("time and the ceiling", () => {
   test("offer the three grants and send the minutes", async () => {
     repo.addTime.mockResolvedValue(session());
@@ -332,9 +350,10 @@ describe("time and the ceiling", () => {
   test("show the booking refusal instead of silently doing nothing", async () => {
     repo.makeUnlimited.mockRejectedValue(new Error("This place is booked in the app."));
     await mount();
+    await armUnlimited();
 
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: /session.makeUnlimited/ }));
+      fireEvent.click(switchButton());
     });
     await answerConfirm(true);
 
@@ -343,9 +362,10 @@ describe("time and the ceiling", () => {
 
   test("ask before lifting the ceiling, and do nothing if the answer is no", async () => {
     await mount();
+    await armUnlimited();
 
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: /session.makeUnlimited/ }));
+      fireEvent.click(switchButton());
     });
     await answerConfirm(false);
 
@@ -361,9 +381,10 @@ describe("time and the ceiling", () => {
   test("never asks through a native confirm", async () => {
     const native = vi.spyOn(window, "confirm");
     await mount();
+    await armUnlimited();
 
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: /session.makeUnlimited/ }));
+      fireEvent.click(switchButton());
     });
 
     expect(native).not.toHaveBeenCalled();
@@ -565,139 +586,108 @@ describe("a grant typed by hand", () => {
  * then keeps the tariff's own rate, exactly as every switch did before a price
  * could be named.
  */
-describe("the price a session goes unlimited at", () => {
-  const confirmed = async () => {
-    // The switch is irreversible and asks first, through the in-app dialog this
-    // suite already drives with `answerConfirm`.
-    await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: /session.makeUnlimited/ }));
-    });
-    await answerConfirm(true);
-  };
-
-  test("shows what it would carry on at", async () => {
-    await mount(session({ hourly_rate: null }));
-
-    expect(screen.getByText("session.unlimitedRate:")).toBeTruthy();
-  });
-
-  test("sends nothing when the price was not touched", async () => {
-    repo.makeUnlimited.mockResolvedValue(session({ is_unlimited: true, ends_at: null }));
+/**
+ * The unlimited switch is a gated form, not a button.
+ *
+ * The checkbox is the gate: until it is ticked nothing about the switch is
+ * offered — not the price, not the button. Removing a seat's end cannot be
+ * undone, and the form should read as a deliberate act.
+ *
+ * The price is then REQUIRED and typed. It used to be shown up front from the
+ * seat's configuration, with a "check the tariff settings" error when there was
+ * none — which tells an operator holding a player to go and edit a settings
+ * screen. It is prefilled from the seat when there is a price and typed when
+ * there is not; the server validates it either way.
+ */
+describe("switching a session to unlimited", () => {
+  test("offers nothing until the gate is ticked", async () => {
     await mount();
 
-    await confirmed();
-
-    // `undefined`, not the number on screen: an untouched price is the tariff's
-    // to decide, and echoing it back would freeze a rate nobody chose.
-    expect(repo.makeUnlimited).toHaveBeenCalledWith(42, undefined);
+    expect(screen.queryByLabelText("session.unlimitedRate")).toBeNull();
+    expect(switchButton().disabled).toBe(true);
   });
 
-  test("sends the typed price when it was", async () => {
-    repo.makeUnlimited.mockResolvedValue(session({ is_unlimited: true, ends_at: null }));
-    await mount(session({ hourly_rate: null }));
+  test("ticking it reveals a required price, prefilled from the seat", async () => {
+    await mount(session({ hourly_rate: null, tariff_hourly_rate: 1500 }));
 
     await act(async () => {
-      fireEvent.click(screen.getByText("session.unlimitedRateChange"));
+      fireEvent.click(screen.getByText("session.unlimitedGate"));
     });
+
+    const input = screen.getByLabelText("session.unlimitedRate") as HTMLInputElement;
+    expect(input.value).toBe("1500");
+    expect(switchButton().disabled).toBe(false);
+  });
+
+  test("a seat with no configured price asks for one instead of refusing", async () => {
+    await mount(session({ hourly_rate: null, tariff_hourly_rate: null }));
+
     await act(async () => {
-      fireEvent.change(screen.getByLabelText("session.unlimitedRate"), { target: { value: "2000" } });
+      fireEvent.click(screen.getByText("session.unlimitedGate"));
     });
-    await confirmed();
+
+    // An empty box to fill, not a sentence about settings.
+    const input = screen.getByLabelText("session.unlimitedRate") as HTMLInputElement;
+    expect(input.value).toBe("");
+    expect(switchButton().disabled).toBe(true);
+
+    await act(async () => {
+      fireEvent.change(input, { target: { value: "1800" } });
+    });
+    expect(switchButton().disabled).toBe(false);
+  });
+
+  test.each([
+    ["empty", ""],
+    ["a zero", "0"],
+    ["a negative", "-100"],
+    ["words", "abc"],
+  ])("keeps the switch shut on %s", async (_name, value) => {
+    await mount(session({ hourly_rate: null, tariff_hourly_rate: null }));
+    await armUnlimited(value);
+
+    expect(switchButton().disabled).toBe(true);
+    expect(repo.makeUnlimited).not.toHaveBeenCalled();
+  });
+
+  test("unticking the gate keeps the switch shut, price or no price", async () => {
+    await mount();
+    await armUnlimited("2000");
+    expect(switchButton().disabled).toBe(false);
+
+    await act(async () => {
+      fireEvent.click(screen.getByText("session.unlimitedGate"));
+    });
+
+    // The price is still in state — the form does not throw away what was
+    // typed — and the gate alone is what keeps the switch shut.
+    expect(switchButton().disabled).toBe(true);
+  });
+
+  test("sends the price that was typed", async () => {
+    repo.makeUnlimited.mockResolvedValue(session({ is_unlimited: true, ends_at: null }));
+    await mount();
+    await armUnlimited("2000");
+
+    await act(async () => { fireEvent.click(switchButton()); });
+    await answerConfirm(true);
 
     expect(repo.makeUnlimited).toHaveBeenCalledWith(42, 2000);
   });
 
-  test.each([["a zero", "0"], ["a negative", "-500"], ["words", "free"]])(
-    "refuses %s and will not switch on it",
-    async (_name, value) => {
-      await mount(session({ hourly_rate: null }));
-
-      await act(async () => {
-        fireEvent.click(screen.getByText("session.unlimitedRateChange"));
-      });
-      await act(async () => {
-        fireEvent.change(screen.getByLabelText("session.unlimitedRate"), { target: { value } });
-      });
-
-      expect((screen.getByRole("button", { name: /session.makeUnlimited/ }) as HTMLButtonElement).disabled).toBe(true);
-      expect(repo.makeUnlimited).not.toHaveBeenCalled();
-    },
-  );
-
-  test("says the rule out loud", async () => {
-    await mount(session({ hourly_rate: null }));
-
-    await act(async () => {
-      fireEvent.click(screen.getByText("session.unlimitedRateChange"));
-    });
+  test("says the rule out loud once the gate is open", async () => {
+    await mount();
+    await armUnlimited();
 
     // "From now on" is the question an operator asks, and the wrong answer
     // would be somebody's receipt.
     expect(screen.getByText("session.unlimitedRateHint")).toBeTruthy();
   });
 
-  test("is not offered on a session that already has no end", async () => {
+  test("a session that already has no end states the fact", async () => {
     await mount(session({ is_unlimited: true, ends_at: null }));
 
-    expect(screen.queryByText("session.unlimitedRateChange")).toBeNull();
-  });
-});
-
-/**
- * The price shown must be the one the SERVER would apply, and "no price" must
- * never be drawn as zero.
- *
- * A fixed session's `hourly_rate` column is null by design — its rate is
- * implied by the package — so reading that column with a `?? 0` fallback
- * offered a 1500/hour tariff as "0 драм/ч". `tariff_hourly_rate` is the
- * server's own answer, and null there means it will refuse the switch.
- */
-describe("where the unlimited price comes from", () => {
-  test("states the rate the server resolved, not the null column", async () => {
-    await mount(session({ hourly_rate: null }));
-
-    expect(screen.getByText(/1500/)).toBeTruthy();
-    expect(screen.queryByText("session.unlimitedRateUnknown")).toBeNull();
-  });
-
-  test("prefills the editor with it rather than an empty box", async () => {
-    await mount(session({ hourly_rate: null }));
-
-    await act(async () => {
-      fireEvent.click(screen.getByText("session.unlimitedRateChange"));
-    });
-
-    expect((screen.getByLabelText("session.unlimitedRate") as HTMLInputElement).value).toBe("1500");
-  });
-
-  test("says there is no price rather than showing a zero", async () => {
-    await mount(session({ hourly_rate: null, tariff_hourly_rate: null }));
-
-    // The sentence stands WHERE the figure would have been. A zero there would
-    // read as "free from now on", a decision nobody made.
-    //
-    // Asserted on the message rather than on the absence of a "0" anywhere:
-    // the dialog also prints an elapsed time and a joystick count, and a bare
-    // regex for a zero matches those instead of the thing under test.
-    expect(screen.getByText("session.unlimitedRateUnknown")).toBeTruthy();
-  });
-
-  test("and does not offer a switch the server would refuse", async () => {
-    await mount(session({ hourly_rate: null, tariff_hourly_rate: null }));
-
-    expect((screen.getByRole("button", { name: /session.makeUnlimited/ }) as HTMLButtonElement).disabled).toBe(true);
-  });
-
-  test("unless a price is typed, which the server then validates", async () => {
-    await mount(session({ hourly_rate: null, tariff_hourly_rate: null }));
-
-    await act(async () => {
-      fireEvent.click(screen.getByText("session.unlimitedRateChange"));
-    });
-    await act(async () => {
-      fireEvent.change(screen.getByLabelText("session.unlimitedRate"), { target: { value: "1800" } });
-    });
-
-    expect((screen.getByRole("button", { name: /session.makeUnlimited/ }) as HTMLButtonElement).disabled).toBe(false);
+    expect(screen.getByText("session.unlimitedAlready")).toBeTruthy();
+    expect(screen.queryByLabelText("session.unlimitedRate")).toBeNull();
   });
 });

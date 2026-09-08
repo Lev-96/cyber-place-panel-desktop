@@ -73,7 +73,11 @@ const SessionOptionsDialog = ({ session, platform, onClose, onChanged }: Props) 
   // The price the session carries on at once its end is removed. Off by
   // default: not naming one keeps the tariff's own rate, which is what every
   // switch did before a price could be named at all.
-  const [editRate, setEditRate] = useState(false);
+  // The gate for the whole unlimited operation, and the price it will carry on
+  // at. `editRate` used to mean "the operator wants to change a price we are
+  // already showing"; the price is now always entered deliberately, so the
+  // checkbox is the only state the section needs.
+  const [goUnlimited, setGoUnlimited] = useState(false);
   const [rateInput, setRateInput] = useState("");
 
   /**
@@ -421,86 +425,104 @@ const SessionOptionsDialog = ({ session, platform, onClose, onChanged }: Props) 
         </section>
 
         {/* ── unlimited ─────────────────────────────────────────────────── */}
-        <section className="col" style={{ gap: 6 }}>
+        <section className="col" style={{ gap: 8 }}>
           <strong>{t("session.unlimited")}</strong>
-          <span className="muted" style={{ fontSize: 12 }}>{t("session.unlimitedHint")}</span>
-          {!isUnlimited && isActive && (
-            <div className="col" style={{ gap: 6 }}>
-              <div className="row" style={{ gap: 8, alignItems: "baseline", flexWrap: "wrap" }}>
-                <span className="muted" style={{ fontSize: 12 }}>{t("session.unlimitedRate")}:</span>
-                <strong>
-                  {(typedRate ?? resolvedRate) !== null ? (
-                    <>{money((typedRate ?? resolvedRate) as number)} / {t("time.hourShort") || "h"}</>
-                  ) : (
-                    <span className="error">{t("session.unlimitedRateUnknown")}</span>
-                  )}
-                </strong>
-                {!editRate && (
-                  <Button
-                    variant="secondary"
-                    disabled={busy}
-                    onClick={() => { setEditRate(true); setRateInput(resolvedRate ? String(resolvedRate) : ""); }}
-                  >
-                    {t("session.unlimitedRateChange")}
-                  </Button>
-                )}
-              </div>
-              {editRate && (
-                <div className="col" style={{ gap: 4 }}>
-                  <input
-                    className="input"
-                    type="number"
-                    min={1}
-                    value={rateInput}
-                    onChange={(e) => setRateInput(e.target.value)}
-                    aria-label={t("session.unlimitedRate")}
-                    style={{ width: 140 }}
-                    autoFocus
-                  />
+
+          {isUnlimited ? (
+            <span className="muted" style={{ fontSize: 12 }}>{t("session.unlimitedAlready")}</span>
+          ) : (
+            <>
+              {/* The checkbox IS the gate. Nothing about the switch is offered
+                  until it is ticked — not the price, not the button — because
+                  removing a seat's end cannot be undone and the form should
+                  read as a deliberate act rather than a control sitting there
+                  waiting to be clicked. */}
+              <Checkbox
+                checked={goUnlimited}
+                onChange={(next) => {
+                  setGoUnlimited(next);
+                  // Prefilled from the seat when opening an EMPTY box, and left
+                  // alone otherwise: unticking must not throw away a price the
+                  // operator typed, and re-ticking should give it back rather
+                  // than make them type it twice.
+                  //
+                  // Which also makes the gate a rule of its own rather than one
+                  // that only holds because the box happens to be empty — with
+                  // a price still in state, an unticked gate must STILL keep
+                  // the switch shut, and that is now observable.
+                  if (next && rateInput.trim() === "" && resolvedRate) setRateInput(String(resolvedRate));
+                }}
+                label={t("session.unlimitedGate")}
+                disabled={busy || !isActive}
+              />
+
+              {goUnlimited && (
+                <div className="col" style={{ gap: 6, paddingLeft: 26 }}>
+                  <span className="muted" style={{ fontSize: 12 }}>{t("session.unlimitedHint")}</span>
+
+                  {/* Required, and asked for rather than assumed. A seat with
+                      no configured price used to be answered with "check the
+                      tariff settings", which tells an operator holding a player
+                      to go and edit a settings screen. The price the session
+                      carries on at is a decision they can make here — it is
+                      prefilled from the seat when there is one, and typed when
+                      there is not. The server validates it either way. */}
+                  <label className="col" style={{ gap: 4 }}>
+                    <span className="label">{t("session.unlimitedRate")} *</span>
+                    <div className="row" style={{ gap: 6, alignItems: "center" }}>
+                      <input
+                        className="input"
+                        type="number"
+                        min={1}
+                        value={rateInput}
+                        onChange={(e) => setRateInput(e.target.value)}
+                        aria-label={t("session.unlimitedRate")}
+                        style={{ width: 140 }}
+                        autoFocus
+                      />
+                      <span className="muted" style={{ fontSize: 12 }}>/ {t("time.hourShort") || "h"}</span>
+                    </div>
+                  </label>
+
+                  {/* Only once something has been typed: an empty box is not a
+                      mistake yet, and shouting at one teaches an operator to
+                      ignore the message that matters. */}
                   {rateInput.trim() !== "" && typedRate === null && (
                     <span className="error" style={{ fontSize: 12 }}>{t("session.unlimitedRateInvalid")}</span>
                   )}
                   <span className="muted" style={{ fontSize: 12 }}>{t("session.unlimitedRateHint")}</span>
                 </div>
               )}
-            </div>
+
+              <div>
+                <Button
+                  variant="secondary"
+                  // Ticked AND priced, or nothing. The server refuses a
+                  // non-price too; this only keeps the operator from earning
+                  // a 422 they would have to read.
+                  disabled={busy || !isActive || !goUnlimited || typedRate === null}
+                  onClick={() => {
+                    // Irreversible, so it is confirmed — through the in-app
+                    // dialog, never `window.confirm`. A native one poisons the
+                    // Electron renderer's keyboard focus on Linux: the next
+                    // modal's inputs silently stop accepting keystrokes, and
+                    // the cashier's next action is the one that appears broken.
+                    //
+                    // The refusal path stays the server's: a booked seat is
+                    // answered with a sentence, not a disabled button, because
+                    // only the server knows.
+                    void (async () => {
+                      if (typedRate === null) return;
+                      if (!(await confirm(t("session.unlimitedConfirm")))) return;
+                      await run(() => sessionRepository.makeUnlimited(current.id, typedRate));
+                    })();
+                  }}
+                >
+                  {t("session.unlimitedApply")}
+                </Button>
+              </div>
+            </>
           )}
-          <div>
-            <Button
-              variant="secondary"
-              disabled={
-                busy || !isActive || isUnlimited
-                || (editRate && typedRate === null)
-                // Nothing to price it at and nothing typed: the server would
-                // refuse, so the button declines the click rather than earning
-                // a 422 the operator has to read.
-                || (!editRate && resolvedRate === null)
-              }
-              onClick={() => {
-                // Irreversible, so it is confirmed — through the in-app dialog,
-                // never `window.confirm`. A native one poisons the Electron
-                // renderer's keyboard focus on Linux: the next modal's inputs
-                // silently stop accepting keystrokes, and the cashier's next
-                // action is the one that appears broken.
-                //
-                // The refusal path stays the server's: a booked seat is
-                // answered with a sentence, not with a disabled button, because
-                // only the server knows.
-                void (async () => {
-                  if (!(await confirm(t("session.unlimitedConfirm")))) return;
-                  // Only when a price was actually typed. Otherwise nothing
-                  // is sent and the server keeps the tariff's own rate — the
-                  // behaviour every switch has always had.
-                  await run(() => sessionRepository.makeUnlimited(
-                    current.id,
-                    editRate && typedRate !== null ? typedRate : undefined,
-                  ));
-                })();
-              }}
-            >
-              {isUnlimited ? t("session.unlimited") : t("session.makeUnlimited")}
-            </Button>
-          </div>
         </section>
 
         {/* ── free ──────────────────────────────────────────────────────── */}
