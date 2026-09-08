@@ -305,10 +305,10 @@ describe("time and the ceiling", () => {
     repo.addTime.mockResolvedValue(session());
     await mount();
 
-    // Three buttons match — +10, +30, +60. The first is the one asserted, and
-    // that all three exist is asserted with it.
+    // Eight presets — 10, 15, 20, 30, 45, 60, 90, 120. The first is the one
+    // clicked, and that the whole list is offered is asserted with it.
     const grants = screen.getAllByRole("button", { name: /session.addMinutes/ });
-    expect(grants).toHaveLength(3);
+    expect(grants).toHaveLength(8);
 
     await act(async () => {
       fireEvent.click(grants[0]);
@@ -392,8 +392,11 @@ describe("waiving the bill", () => {
     repo.setFree.mockResolvedValue(session({ is_free: true }));
     await mount();
 
+    // By its label, not by being the only checkbox on screen — the manual
+    // time grant has one too, and "the first checkbox" is a selector that
+    // silently starts pointing at a different control.
     await act(async () => {
-      fireEvent.click(screen.getByRole("checkbox"));
+      fireEvent.click(screen.getByText("session.freeBill"));
     });
 
     expect(repo.setFree).toHaveBeenCalledWith(42, true);
@@ -429,5 +432,121 @@ describe("a session that is over", () => {
     expect(screen.getByText("session.optionsClosedSession")).toBeTruthy();
     const add = screen.getByRole("button", { name: /session.joystickAdd/ }) as HTMLButtonElement;
     expect(add.disabled).toBe(true);
+  });
+});
+
+/**
+ * The grant no preset covers.
+ *
+ * The unit is the whole point of this form: a cashier typing "2" means two
+ * HOURS far more often than two minutes, and a number with no unit beside it is
+ * how a seat gets sold for a fiftieth of what was meant. So the button says the
+ * resolved total in minutes — seeing "Add 120 min" after typing 2 is what
+ * catches a wrong unit before it is granted.
+ */
+describe("a grant typed by hand", () => {
+  const openManual = async () => {
+    await mount();
+    await act(async () => {
+      fireEvent.click(screen.getByText("session.timeManual"));
+    });
+  };
+
+  const type = async (value: string) => {
+    await act(async () => {
+      fireEvent.change(screen.getByLabelText("session.timeAmount"), { target: { value } });
+    });
+  };
+
+  const chooseHours = async () => {
+    await act(async () => {
+      fireEvent.click(screen.getByText("session.timeUnitHours"));
+    });
+  };
+
+  const confirm = () => screen.getByRole("button", { name: /session.timeAddConfirm/ }) as HTMLButtonElement;
+
+  test("is hidden until it is asked for", async () => {
+    await mount();
+
+    expect(screen.queryByLabelText("session.timeAmount")).toBeNull();
+  });
+
+  test("sends the minutes typed", async () => {
+    repo.addTime.mockResolvedValue(session());
+    await openManual();
+    await type("30");
+
+    await act(async () => { fireEvent.click(confirm()); });
+
+    expect(repo.addTime).toHaveBeenCalledWith(42, 30);
+  });
+
+  test("converts hours before sending, and says the total first", async () => {
+    repo.addTime.mockResolvedValue(session());
+    await openManual();
+    await type("2");
+    await chooseHours();
+
+    // The label states the resolved figure rather than what was typed, but it
+    // does so through `t("…").replace("{0}", …)` and this suite's `t` returns
+    // the bare key — so there is no placeholder left to fill and nothing to
+    // read back. What the conversion actually decides is the payload, and that
+    // is what is asserted.
+    await act(async () => { fireEvent.click(confirm()); });
+
+    expect(repo.addTime).toHaveBeenCalledWith(42, 120);
+  });
+
+  test("half an hour is a legitimate thing to type", async () => {
+    repo.addTime.mockResolvedValue(session());
+    await openManual();
+    await type("1.5");
+    await chooseHours();
+
+    await act(async () => { fireEvent.click(confirm()); });
+
+    expect(repo.addTime).toHaveBeenCalledWith(42, 90);
+  });
+
+  test.each([
+    ["nothing", ""],
+    ["a zero", "0"],
+    ["a negative", "-30"],
+    ["words", "abc"],
+    ["a fraction of a minute", "1.5"],
+    ["more than the server's ceiling", "601"],
+  ])("refuses %s", async (_name, value) => {
+    await openManual();
+    await type(value);
+
+    expect(confirm().disabled).toBe(true);
+    expect(repo.addTime).not.toHaveBeenCalled();
+  });
+
+  test("says why, but only once something has been typed", async () => {
+    await openManual();
+    expect(screen.queryByText("session.timeInvalid")).toBeNull();
+
+    await type("0");
+    expect(screen.getByText("session.timeInvalid")).toBeTruthy();
+  });
+
+  test("a refused grant keeps what was typed", async () => {
+    repo.addTime.mockRejectedValue(new Error("Seat is booked at 20:00"));
+    await openManual();
+    await type("30");
+
+    await act(async () => { fireEvent.click(confirm()); });
+
+    expect(screen.getByText("Seat is booked at 20:00")).toBeTruthy();
+    // Still there to correct, rather than cleared under the refusal.
+    expect((screen.getByLabelText("session.timeAmount") as HTMLInputElement).value).toBe("30");
+  });
+
+  test("is not offered on a session that has no end", async () => {
+    await mount(session({ is_unlimited: true, ends_at: null }));
+
+    expect(screen.queryByText("session.timeManual")).toBeNull();
   });
 });

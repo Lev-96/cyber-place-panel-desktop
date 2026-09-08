@@ -444,6 +444,22 @@ export const TRANSLATIONS: Dict = {
   },
   "session.addTime": { en: "Add time", ru: "Добавить время", am: "Ավելացնել ժամանակ" },
   "session.addMinutes": { en: "+{0} min", ru: "+{0} мин", am: "+{0} րոպե" },
+  // Manual entry, for the grant no preset covers. The unit matters more than
+  // it looks: a cashier typing "2" means two hours far more often than two
+  // minutes, and a number with no unit beside it is the kind of ambiguity that
+  // ends with a seat sold for a fiftieth of what was meant.
+  "session.timeManual": { en: "Enter manually", ru: "Ввести вручную", am: "Մուտքագրել ձեռքով" },
+  "session.timeAmount": { en: "Amount", ru: "Количество", am: "Քանակ" },
+  "session.timeUnitMinutes": { en: "Minutes", ru: "Минуты", am: "Րոպե" },
+  "session.timeUnitHours": { en: "Hours", ru: "Часы", am: "Ժամ" },
+  // Says the resolved figure back before it is granted, because the mistake
+  // this catches is a unit mistake and only the total makes one visible.
+  "session.timeAddConfirm": { en: "Add {0} min", ru: "Добавить {0} мин", am: "Ավելացնել {0} րոպե" },
+  "session.timeInvalid": {
+    en: "Enter a whole number of minutes between 1 and 600.",
+    ru: "Введите целое число минут от 1 до 600.",
+    am: "Մուտքագրեք 1-ից 600 ամբողջ րոպե։",
+  },
   "session.timeAdded": { en: "{0} minutes added", ru: "Добавлено {0} минут", am: "Ավելացվեց {0} րոպե" },
   "session.timeNotApplicable": {
     en: "This session has no time limit, so there is nothing to extend.",
