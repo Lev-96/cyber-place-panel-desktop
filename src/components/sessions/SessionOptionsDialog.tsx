@@ -1,6 +1,7 @@
 import Button from "@/components/ui/Button";
 import Checkbox from "@/components/ui/Checkbox";
 import Modal from "@/components/ui/Modal";
+import Radio from "@/components/ui/Radio";
 import { useConfirm } from "@/components/ui/ConfirmProvider";
 import Spinner from "@/components/ui/Spinner";
 import { IJoystickPrice, JOYSTICK_SLOTS, MAX_JOYSTICKS } from "@/api/joystickPrices";
@@ -151,8 +152,16 @@ const SessionOptionsDialog = ({ session, platform, onClose, onChanged }: Props) 
     return Number.isFinite(value) && value > 0 ? value : null;
   })();
 
-  /** What the session would carry on at, for the line that says so. */
-  const currentRate = Number(current.hourly_rate ?? 0);
+  /**
+   * What the session would carry on at, as the SERVER resolves it.
+   *
+   * Never `hourly_rate ?? 0`: a fixed session's column is null by design, and
+   * that fallback is exactly how a 1500/hour tariff came to be offered as
+   * "0 драм/ч". `null` here means the server could derive no rate either — it
+   * will refuse the switch, so the dialog says so rather than inviting a click
+   * that cannot work.
+   */
+  const resolvedRate = current.tariff_hourly_rate ?? null;
 
   const run = async (action: () => Promise<ISessionApi>): Promise<boolean> => {
     setBusy(true);
@@ -367,16 +376,19 @@ const SessionOptionsDialog = ({ session, platform, onClose, onChanged }: Props) 
                       style={{ width: 110 }}
                       autoFocus
                     />
+                    {/* The app's own radio, not the native control — which
+                        renders washed-out against this dark UI and was the one
+                        place it had survived. Same 18px mark as the Checkbox
+                        above, so the two line up on one baseline. */}
                     {(["minutes", "hours"] as const).map((unit) => (
-                      <label key={unit} className="row" style={{ gap: 4, alignItems: "center" }}>
-                        <input
-                          type="radio"
-                          name="cp-time-unit"
-                          checked={manualUnit === unit}
-                          onChange={() => setManualUnit(unit)}
-                        />
-                        <span>{t(unit === "hours" ? "session.timeUnitHours" : "session.timeUnitMinutes")}</span>
-                      </label>
+                      <Radio
+                        key={unit}
+                        name="cp-time-unit"
+                        checked={manualUnit === unit}
+                        onChange={() => setManualUnit(unit)}
+                        disabled={busy || !isActive}
+                        label={t(unit === "hours" ? "session.timeUnitHours" : "session.timeUnitMinutes")}
+                      />
                     ))}
                   </div>
                   {/* Only once something has been typed: an empty box is not a
@@ -417,13 +429,17 @@ const SessionOptionsDialog = ({ session, platform, onClose, onChanged }: Props) 
               <div className="row" style={{ gap: 8, alignItems: "baseline", flexWrap: "wrap" }}>
                 <span className="muted" style={{ fontSize: 12 }}>{t("session.unlimitedRate")}:</span>
                 <strong>
-                  {money(typedRate ?? currentRate)} / {t("time.hourShort") || "h"}
+                  {(typedRate ?? resolvedRate) !== null ? (
+                    <>{money((typedRate ?? resolvedRate) as number)} / {t("time.hourShort") || "h"}</>
+                  ) : (
+                    <span className="error">{t("session.unlimitedRateUnknown")}</span>
+                  )}
                 </strong>
                 {!editRate && (
                   <Button
                     variant="secondary"
                     disabled={busy}
-                    onClick={() => { setEditRate(true); setRateInput(currentRate > 0 ? String(currentRate) : ""); }}
+                    onClick={() => { setEditRate(true); setRateInput(resolvedRate ? String(resolvedRate) : ""); }}
                   >
                     {t("session.unlimitedRateChange")}
                   </Button>
@@ -452,7 +468,14 @@ const SessionOptionsDialog = ({ session, platform, onClose, onChanged }: Props) 
           <div>
             <Button
               variant="secondary"
-              disabled={busy || !isActive || isUnlimited || (editRate && typedRate === null)}
+              disabled={
+                busy || !isActive || isUnlimited
+                || (editRate && typedRate === null)
+                // Nothing to price it at and nothing typed: the server would
+                // refuse, so the button declines the click rather than earning
+                // a 422 the operator has to read.
+                || (!editRate && resolvedRate === null)
+              }
               onClick={() => {
                 // Irreversible, so it is confirmed — through the in-app dialog,
                 // never `window.confirm`. A native one poisons the Electron

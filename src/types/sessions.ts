@@ -76,6 +76,20 @@ export interface ISessionApi {
   package_name?: string;
   mode?: "fixed" | "open";
   hourly_rate?: number | string | null;
+  /**
+   * The rate this session would carry on at if its end were removed, resolved
+   * by the SERVER through the same ladder the switch itself applies.
+   *
+   * `hourly_rate` above cannot answer that: a fixed session's column is null by
+   * design, because its rate is implied by the package (price ÷ duration × 60).
+   * Reading that column with a `?? 0` fallback is exactly how a 1500/hour
+   * tariff came to be offered as "0 драм/ч".
+   *
+   * `null` means no rate could be derived at all — no package, no configured
+   * price for the seat. Render that as the refusal it is; the server refuses
+   * the switch in the same case.
+   */
+  tariff_hourly_rate?: number | null;
   started_at: string;   // ISO
   ends_at: string | null;      // ISO; null for open (count-up) sessions
   /**

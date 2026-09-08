@@ -78,6 +78,11 @@ const session = (over: Partial<ISessionApi> = {}): ISessionApi => ({
   joysticks: [],
   is_free: false,
   is_unlimited: false,
+  // What the server resolved this seat's hourly rate to be. A real fixed
+  // session always has one — its `hourly_rate` column is null, and this is the
+  // field that answers instead — so the default fixture carries it and the
+  // tests that care about its ABSENCE say so explicitly.
+  tariff_hourly_rate: 1500,
   ...over,
 });
 
@@ -571,7 +576,7 @@ describe("the price a session goes unlimited at", () => {
   };
 
   test("shows what it would carry on at", async () => {
-    await mount(session({ hourly_rate: 1500 }));
+    await mount(session({ hourly_rate: null }));
 
     expect(screen.getByText("session.unlimitedRate:")).toBeTruthy();
   });
@@ -589,7 +594,7 @@ describe("the price a session goes unlimited at", () => {
 
   test("sends the typed price when it was", async () => {
     repo.makeUnlimited.mockResolvedValue(session({ is_unlimited: true, ends_at: null }));
-    await mount(session({ hourly_rate: 1500 }));
+    await mount(session({ hourly_rate: null }));
 
     await act(async () => {
       fireEvent.click(screen.getByText("session.unlimitedRateChange"));
@@ -605,7 +610,7 @@ describe("the price a session goes unlimited at", () => {
   test.each([["a zero", "0"], ["a negative", "-500"], ["words", "free"]])(
     "refuses %s and will not switch on it",
     async (_name, value) => {
-      await mount(session({ hourly_rate: 1500 }));
+      await mount(session({ hourly_rate: null }));
 
       await act(async () => {
         fireEvent.click(screen.getByText("session.unlimitedRateChange"));
@@ -620,7 +625,7 @@ describe("the price a session goes unlimited at", () => {
   );
 
   test("says the rule out loud", async () => {
-    await mount(session({ hourly_rate: 1500 }));
+    await mount(session({ hourly_rate: null }));
 
     await act(async () => {
       fireEvent.click(screen.getByText("session.unlimitedRateChange"));
@@ -635,5 +640,64 @@ describe("the price a session goes unlimited at", () => {
     await mount(session({ is_unlimited: true, ends_at: null }));
 
     expect(screen.queryByText("session.unlimitedRateChange")).toBeNull();
+  });
+});
+
+/**
+ * The price shown must be the one the SERVER would apply, and "no price" must
+ * never be drawn as zero.
+ *
+ * A fixed session's `hourly_rate` column is null by design — its rate is
+ * implied by the package — so reading that column with a `?? 0` fallback
+ * offered a 1500/hour tariff as "0 драм/ч". `tariff_hourly_rate` is the
+ * server's own answer, and null there means it will refuse the switch.
+ */
+describe("where the unlimited price comes from", () => {
+  test("states the rate the server resolved, not the null column", async () => {
+    await mount(session({ hourly_rate: null }));
+
+    expect(screen.getByText(/1500/)).toBeTruthy();
+    expect(screen.queryByText("session.unlimitedRateUnknown")).toBeNull();
+  });
+
+  test("prefills the editor with it rather than an empty box", async () => {
+    await mount(session({ hourly_rate: null }));
+
+    await act(async () => {
+      fireEvent.click(screen.getByText("session.unlimitedRateChange"));
+    });
+
+    expect((screen.getByLabelText("session.unlimitedRate") as HTMLInputElement).value).toBe("1500");
+  });
+
+  test("says there is no price rather than showing a zero", async () => {
+    await mount(session({ hourly_rate: null, tariff_hourly_rate: null }));
+
+    // The sentence stands WHERE the figure would have been. A zero there would
+    // read as "free from now on", a decision nobody made.
+    //
+    // Asserted on the message rather than on the absence of a "0" anywhere:
+    // the dialog also prints an elapsed time and a joystick count, and a bare
+    // regex for a zero matches those instead of the thing under test.
+    expect(screen.getByText("session.unlimitedRateUnknown")).toBeTruthy();
+  });
+
+  test("and does not offer a switch the server would refuse", async () => {
+    await mount(session({ hourly_rate: null, tariff_hourly_rate: null }));
+
+    expect((screen.getByRole("button", { name: /session.makeUnlimited/ }) as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  test("unless a price is typed, which the server then validates", async () => {
+    await mount(session({ hourly_rate: null, tariff_hourly_rate: null }));
+
+    await act(async () => {
+      fireEvent.click(screen.getByText("session.unlimitedRateChange"));
+    });
+    await act(async () => {
+      fireEvent.change(screen.getByLabelText("session.unlimitedRate"), { target: { value: "1800" } });
+    });
+
+    expect((screen.getByRole("button", { name: /session.makeUnlimited/ }) as HTMLButtonElement).disabled).toBe(false);
   });
 });

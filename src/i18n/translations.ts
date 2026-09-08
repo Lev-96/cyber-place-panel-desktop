@@ -454,6 +454,14 @@ export const TRANSLATIONS: Dict = {
   // to and the moment to correct it is now.
   "session.unlimitedRate": { en: "Price per hour", ru: "Цена за час", am: "Գինը ժամում" },
   "session.unlimitedRateChange": { en: "Change price", ru: "Изменить цену", am: "Փոխել գինը" },
+  // Shown INSTEAD of a figure when the server could derive none. A zero there
+  // would read as "free from now on", a decision nobody made — and the server
+  // refuses the switch in this same case.
+  "session.unlimitedRateUnknown": {
+    en: "No hourly price is set for this seat. Check the tariff settings.",
+    ru: "Для этой приставки не задана цена за час. Проверьте настройки тарифа.",
+    am: "Այս սարքի համար ժամային գին սահմանված չէ։ Ստուգեք սակագինը։",
+  },
   // Says the rule out loud, because it is the question an operator asks and
   // getting it wrong the other way would be somebody's receipt.
   "session.unlimitedRateHint": {
