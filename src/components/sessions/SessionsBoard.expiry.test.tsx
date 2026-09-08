@@ -19,7 +19,10 @@ import SessionsBoard from "./SessionsBoard";
  * each time a colleague presses Stop would be noise.
  */
 
-const repo = vi.hoisted(() => ({ listPcs: vi.fn(), listActive: vi.fn(), preview: vi.fn() }));
+const repo = vi.hoisted(() => ({
+  listPcs: vi.fn(), listActive: vi.fn(), preview: vi.fn(),
+  addJoystick: vi.fn(), removeJoystick: vi.fn(),
+}));
 // The board's `useSessionChanged` handler, captured so a test can fire an event
 // at it the way Reverb would.
 const realtime = vi.hoisted(() => ({ handler: null as null | ((e: SessionChangedEvent) => void) }));
@@ -29,6 +32,8 @@ vi.mock("@/repositories/SessionRepository", () => ({
     listPcs: (...a: unknown[]) => repo.listPcs(...a),
     listActive: (...a: unknown[]) => repo.listActive(...a),
     preview: (...a: unknown[]) => repo.preview(...a),
+    addJoystick: (...a: unknown[]) => repo.addJoystick(...a),
+    removeJoystick: (...a: unknown[]) => repo.removeJoystick(...a),
     reorderPcs: vi.fn().mockResolvedValue(undefined),
   },
 }));
@@ -203,5 +208,115 @@ describe("adding time from the card", () => {
     expect(screen.queryByRole("button", { name: "session.addTime" })).toBeNull();
     // Options is still there: a count-up session has pads and a bill to waive.
     expect(screen.getByRole("button", { name: "session.optionsShort" })).toBeTruthy();
+  });
+});
+
+/**
+ * Pads, managed from the tile.
+ *
+ * They were reachable only through the options dialog, which is two clicks and
+ * a modal for the thing a cashier does most on a console: hand somebody a
+ * second controller. The dialog is still there — this is a second door to the
+ * same endpoints, not a second implementation.
+ *
+ * Whether a seat HAS pads is the backend's answer (`supports_joysticks`,
+ * resolved from the place's platform) and never the label: "PS4-08" is a name
+ * somebody typed, and a venue that renames a seat would lose its controls.
+ */
+describe("joysticks on the tile", () => {
+  const ps = { ...running, supports_joysticks: true, joystick_count: 2,
+    joysticks: [{ id: 5, slot: 2, hourly_rate: 500, started_at: new Date().toISOString(), stopped_at: null }] } as ISessionApi;
+
+  beforeEach(() => {
+    repo.listPcs.mockResolvedValue([device]);
+    repo.addJoystick.mockResolvedValue(ps);
+    repo.removeJoystick.mockResolvedValue(ps);
+  });
+  afterEach(cleanup);
+
+  const add = () => screen.getByRole("button", { name: "session.joystickAddHere" }) as HTMLButtonElement;
+  const drop = () => screen.getByRole("button", { name: "session.joystickRemoveHere" }) as HTMLButtonElement;
+
+  test("are offered on a PlayStation seat", async () => {
+    repo.listActive.mockResolvedValue([ps]);
+    await mount();
+
+    expect(add()).toBeTruthy();
+    expect(drop()).toBeTruthy();
+    expect(screen.getByText(/2 \/ 4/)).toBeTruthy();
+  });
+
+  test("are offered even before a second pad exists", async () => {
+    // A control that only appears once you have used it is a control nobody
+    // finds.
+    repo.listActive.mockResolvedValue([{ ...ps, joystick_count: 1, joysticks: [] }]);
+    await mount();
+
+    expect(add()).toBeTruthy();
+  });
+
+  test("are absent on a seat that has none", async () => {
+    // A computer. The seat says so itself; the tile does not guess.
+    repo.listActive.mockResolvedValue([{ ...ps, supports_joysticks: false }]);
+    await mount();
+
+    expect(screen.queryByRole("button", { name: "session.joystickAddHere" })).toBeNull();
+  });
+
+  test("are absent when the backend did not say", async () => {
+    // An older payload with no field. Not drawing them is the safe direction:
+    // a missing answer must not offer an operation the seat cannot take.
+    repo.listActive.mockResolvedValue([{ ...ps, supports_joysticks: undefined }]);
+    await mount();
+
+    expect(screen.queryByRole("button", { name: "session.joystickAddHere" })).toBeNull();
+  });
+
+  test("adding calls the endpoint the dialog calls", async () => {
+    repo.listActive.mockResolvedValue([ps]);
+    await mount();
+
+    await act(async () => { fireEvent.click(add()); });
+
+    expect(repo.addJoystick).toHaveBeenCalledWith(42);
+  });
+
+  test("removing names the highest pad in play", async () => {
+    repo.listActive.mockResolvedValue([{ ...ps, joystick_count: 3, joysticks: [
+      { id: 5, slot: 2, hourly_rate: 500, started_at: new Date().toISOString(), stopped_at: null },
+      { id: 6, slot: 3, hourly_rate: 700, started_at: new Date().toISOString(), stopped_at: null },
+      { id: 7, slot: 4, hourly_rate: 700, started_at: new Date().toISOString(), stopped_at: "2026-01-01T00:00:00Z" },
+    ] }]);
+    await mount();
+
+    await act(async () => { fireEvent.click(drop()); });
+
+    // Slot 3: the last one still out. Slot 4 has already come back.
+    expect(repo.removeJoystick).toHaveBeenCalledWith(42, 3);
+  });
+
+  test("cannot remove the session's own pad", async () => {
+    repo.listActive.mockResolvedValue([{ ...ps, joystick_count: 1, joysticks: [] }]);
+    await mount();
+
+    // Slot 1 IS the session and has no row to remove.
+    expect(drop().disabled).toBe(true);
+  });
+
+  test("cannot add a fifth", async () => {
+    repo.listActive.mockResolvedValue([{ ...ps, joystick_count: 4 }]);
+    await mount();
+
+    expect(add().disabled).toBe(true);
+  });
+
+  test("shows a refusal on the tile it came from", async () => {
+    repo.listActive.mockResolvedValue([ps]);
+    repo.addJoystick.mockRejectedValue(new Error("No price is set for joystick #3"));
+    await mount();
+
+    await act(async () => { fireEvent.click(add()); });
+
+    expect(screen.getByText("No price is set for joystick #3")).toBeTruthy();
   });
 });

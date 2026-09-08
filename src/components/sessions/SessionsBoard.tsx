@@ -63,6 +63,18 @@ const SessionsBoard = ({ branchId }: Props) => {
   const [stopTarget, setStopTarget] = useState<ISessionApi | null>(null);
   const [addItemTarget, setAddItemTarget] = useState<ISessionApi | null>(null);
   const [optionsTarget, setOptionsTarget] = useState<ISessionApi | null>(null);
+  // The session whose pads are mid-change. One at a time and per session, so a
+  // second click on the SAME tile is refused while the first is in flight and a
+  // cashier working another seat is not blocked by it.
+  //
+  // Not the only guard: the server takes a row lock on the session and refuses
+  // a removal of a pad that is already gone. This one keeps the operator from
+  // sending the second request at all.
+  const [padBusy, setPadBusy] = useState<number | null>(null);
+  // The last refusal, shown on the tile it belongs to. This project has no
+  // global toast helper and the board shows its errors where they happened;
+  // keyed by session so one seat's refusal does not appear on another's.
+  const [padError, setPadError] = useState<{ id: number; message: string } | null>(null);
   // Local display order for tile drag-and-drop. Seeded from the server order
   // (which already reflects sort_order) and preserved across Reverb/poll
   // reloads, so a just-dragged arrangement doesn't jump back before the persist
@@ -128,6 +140,42 @@ const SessionsBoard = ({ branchId }: Props) => {
     }, 30_000);
     return () => clearInterval(t);
   }, [sessions, pcs]);
+
+  /**
+   * Add or remove one pad on this seat, from the tile.
+   *
+   * The SAME endpoints the options dialog calls — there is one way to change a
+   * session's pads and this is a second door to it, not a second implementation.
+   * Removal names the highest slot in play, which is the pad a "−" means: the
+   * last one handed out.
+   *
+   * The server decides everything that matters — the price, whether the period
+   * falls inside the grace window, whether the seat may have pads at all — and
+   * the board simply re-reads afterwards.
+   */
+  const changePads = useCallback(async (sess: ISessionApi, action: "add" | "remove") => {
+    if (padBusy !== null) return;
+    setPadBusy(sess.id);
+    setPadError(null);
+    try {
+      if (action === "add") {
+        await sessionRepository.addJoystick(sess.id);
+      } else {
+        const open = (sess.joysticks ?? []).filter((j) => j.stopped_at === null);
+        const slot = open.length > 0 ? Math.max(...open.map((j) => j.slot)) : null;
+        if (slot === null) return;
+        await sessionRepository.removeJoystick(sess.id, slot);
+      }
+      await sessions.reload();
+    } catch (e) {
+      // Shown, never swallowed: the refusals here are sentences a cashier has
+      // to read. No price set for that slot, four pads already in play, the
+      // session no longer active.
+      setPadError({ id: sess.id, message: e instanceof Error ? e.message : String(e) });
+    } finally {
+      setPadBusy(null);
+    }
+  }, [padBusy, sessions]);
 
   // …and one wake-up aimed at the exact instant the soonest seat runs out.
   //
@@ -234,6 +282,11 @@ const SessionsBoard = ({ branchId }: Props) => {
     // Pads in play INCLUDING the session's own, as the server counts them.
     // An older backend sends nothing, and 1 is the honest floor.
     const joystickCount = sess?.joystick_count ?? 1;
+    // The backend's answer, resolved from the place's platform. Absent on an
+    // older payload, and then the controls simply are not drawn — which is the
+    // safe direction: a missing field must not offer an operation the seat
+    // cannot take.
+    const supportsJoysticks = sess?.supports_joysticks === true;
     // The two identity lines, resolved once so the JSX below stays readable.
     // A device with no place (a legacy row) has no platform or tier to show —
     // it still renders the line, as a non-breaking space, because a tile with
@@ -369,17 +422,65 @@ const SessionsBoard = ({ branchId }: Props) => {
                 here, or two cashiers would read different numbers off the same
                 seat. The pads render only for a PlayStation, where the concept
                 exists; a computer showing "🎮 1" would be noise. */}
-            {(joystickCount > 1 || sess.is_free) && (
+            {(joystickCount > 1 || supportsJoysticks || sess.is_free) && (
               <span className="row" style={{ gap: 6, fontSize: 12, flexWrap: "wrap" }}>
-                {joystickCount > 1 && (
-                  // One glyph as an icon plus the fraction, rather than one
-                  // glyph per pad. Four glyphs is the widest this line could
-                  // get on a 160px tile, and the repeat never said what the
-                  // ceiling was — "3 / 4" answers "can another player join?"
-                  // without opening anything. Same fraction the options dialog
-                  // shows, so the two screens read identically.
-                  <span title={`${t("session.joysticks")}: ${joystickCount} / ${MAX_JOYSTICKS}`}>
-                    🎮 <span className="muted">{joystickCount} / {MAX_JOYSTICKS}</span>
+                {/* Pads are a PlayStation thing, and the seat says so itself:
+                    `supports_joysticks` is the backend's answer from the
+                    place's platform. Never the label — "PS4-08" is a name
+                    somebody typed, and a venue that renames a seat would lose
+                    its controls.
+
+                    Shown for every PlayStation seat, not only one that already
+                    has a second pad: a control that appears once you have
+                    already used it is a control nobody finds. */}
+                <span className="row" style={{ gap: 4, alignItems: "center" }}>
+                  {/* The COUNT is shown whenever there is more than one pad,
+                      which is what it did before the controls existed. Only the
+                      controls below wait for the seat's own answer: an older
+                      payload should keep reporting what a tile already
+                      reported, and lose only the buttons it cannot honour. */}
+                  {joystickCount > 1 && (
+                    // One glyph plus the fraction, not one glyph per pad. Four
+                    // glyphs is the widest this line could get on a 160px tile,
+                    // and the repeat never said what the ceiling was — "3 / 4"
+                    // answers "can another player join?" without opening
+                    // anything.
+                    <span title={`${t("session.joysticks")}: ${joystickCount} / ${MAX_JOYSTICKS}`}>
+                      🎮 <span className="muted">{joystickCount} / {MAX_JOYSTICKS}</span>
+                    </span>
+                  )}
+                  {supportsJoysticks && (
+                  <>
+                    <button
+                      type="button"
+                      style={padBtn}
+                      title={t("session.joystickRemoveHere")}
+                      aria-label={t("session.joystickRemoveHere")}
+                      // Slot 1 is the session itself and has no row to remove,
+                      // so one pad in play is the floor. `busy` is what stops a
+                      // double-click becoming two removals before the board has
+                      // heard about the first.
+                      disabled={joystickCount <= 1 || padBusy === sess.id}
+                      onClick={() => void changePads(sess, "remove")}
+                    >
+                      −
+                    </button>
+                    <button
+                      type="button"
+                      style={padBtn}
+                      title={t("session.joystickAddHere")}
+                      aria-label={t("session.joystickAddHere")}
+                      disabled={joystickCount >= MAX_JOYSTICKS || padBusy === sess.id}
+                      onClick={() => void changePads(sess, "add")}
+                    >
+                      +
+                    </button>
+                  </>
+                  )}
+                </span>
+                {padError?.id === sess.id && (
+                  <span className="error" style={{ fontSize: 11, flexBasis: "100%" }}>
+                    {padError.message}
                   </span>
                 )}
                 {sess.is_free && (
@@ -544,6 +645,20 @@ const SessionsBoard = ({ branchId }: Props) => {
       )}
     </div>
   );
+};
+
+/** A 20px square that reads as a control without competing with the tile. */
+const padBtn: React.CSSProperties = {
+  width: 20,
+  height: 20,
+  lineHeight: 1,
+  padding: 0,
+  borderRadius: 4,
+  border: "1px solid #1f2a44",
+  background: "transparent",
+  color: "#9fb0c9",
+  cursor: "pointer",
+  fontSize: 13,
 };
 
 const miniBtnFlex: React.CSSProperties = {

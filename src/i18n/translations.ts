@@ -414,6 +414,19 @@ export const TRANSLATIONS: Dict = {
   "session.elapsedField": { en: "Running for", ru: "Идёт", am: "Տևում է" },
   "session.joystickNoPrice": { en: "price not set", ru: "цена не задана", am: "գինը սահմանված չէ" },
   "session.joysticks": { en: "Joysticks", ru: "Джойстики", am: "Ջոյսթիքներ" },
+  // The tile's own controls. Distinct keys from the dialog's: on a 160px card
+  // the words are a tooltip, not a button label, and they have to say WHICH
+  // session the pad joins — a board shows a dozen at once.
+  "session.joystickAddHere": {
+    en: "Add a joystick to this session",
+    ru: "Добавить джойстик к текущей сессии",
+    am: "Ավելացնել ջոյսթիք այս նիստին",
+  },
+  "session.joystickRemoveHere": {
+    en: "Remove the last joystick from this session",
+    ru: "Убрать последний джойстик из текущей сессии",
+    am: "Հեռացնել վերջին ջոյսթիքը այս նիստից",
+  },
   "session.joystickAdd": { en: "Add a joystick", ru: "Добавить джойстик", am: "Ավելացնել ջոյսթիք" },
   "session.joystickRemove": { en: "Remove joystick #{0}", ru: "Убрать джойстик №{0}", am: "Հեռացնել №{0} ջոյսթիքը" },
   "session.joystickSlot": { en: "Joystick #{0}", ru: "Джойстик №{0}", am: "Ջոյսթիք №{0}" },
