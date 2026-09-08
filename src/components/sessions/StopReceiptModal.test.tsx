@@ -120,6 +120,57 @@ describe("StopReceiptModal", () => {
   });
 
   /**
+   * Pads on the receipt.
+   *
+   * A joystick's price is a FLAT FEE per use, owed once the pad has been out
+   * ten minutes and not owed at all below that. So a line is the whole fee or
+   * a plain 0 — never a fraction — and the 0 has to explain itself, or a
+   * cashier reads it as a charge the till lost.
+   *
+   * Every figure comes from the server. Nothing here multiplies a price by a
+   * duration, which is the arithmetic this pricing rule exists to refuse.
+   */
+  describe("joystick lines", () => {
+    const pads = [
+      { id: 1, slot: 2, price: 500, started_at: "2026-09-09T14:00:00Z",
+        stopped_at: "2026-09-09T14:20:00Z", is_open: false, minutes: 20, seconds: 1200,
+        amount: 500, is_charged: true },
+      { id: 2, slot: 3, price: 700, started_at: "2026-09-09T14:10:00Z",
+        stopped_at: "2026-09-09T14:18:00Z", is_open: false, minutes: 8, seconds: 480,
+        amount: 0, is_charged: false },
+    ];
+
+    test("a charged pad shows its whole fee, never a fraction of it", async () => {
+      repo.preview.mockResolvedValue(bill({ joysticks: pads, joysticks_total: 500, total: 517.22 }));
+      await mount();
+
+      // The stub `t` returns the bare key, so both pads carry the same label.
+      expect(screen.getAllByText("session.joystickSlot").length).toBe(2);
+      expect(screen.getByText("500.00·AMD")).toBeTruthy();
+      // Twenty minutes of a 500 rate would be 166.67. There is no rate.
+      expect(screen.queryByText(/166/)).toBeNull();
+    });
+
+    test("a pad under the threshold shows 0 and says why", async () => {
+      repo.preview.mockResolvedValue(bill({ joysticks: pads, joysticks_total: 500, total: 517.22 }));
+      await mount();
+
+      expect(screen.getByText("0.00·AMD")).toBeTruthy();
+      expect(screen.getByText(/session\.joystickUnderThreshold/)).toBeTruthy();
+    });
+
+    test("a waived bill quotes no pad charges either", async () => {
+      repo.preview.mockResolvedValue(bill({ is_free: true, joysticks: pads, total: 0 }));
+      await mount();
+
+      // The seat owes nothing, and a fee printed beside "Free session" is the
+      // same two-numbers-one-truth problem the rate and time cost had.
+      expect(screen.queryByText("500.00·AMD")).toBeNull();
+      expect(screen.getByText("session.freeBill")).toBeTruthy();
+    });
+  });
+
+  /**
    * A seat whose paid period ran out is ended by the server, and the receipt
    * that opens for it reports rather than asks.
    *

@@ -288,6 +288,13 @@ const SessionsBoard = ({ branchId }: Props) => {
     // safe direction: a missing field must not offer an operation the seat
     // cannot take.
     const supportsJoysticks = sess?.supports_joysticks === true;
+    // The two ends of the range, named once. The ceiling is the server's own
+    // limit and the floor is slot 1 — the session's own pad, which is not an
+    // extra and has no row to take away. Both are ALSO enforced on the server;
+    // these only decide whether the button can be pressed, because a control
+    // that fails on click is worse than one that says it is at its limit.
+    const atCeiling = joystickCount >= MAX_JOYSTICKS;
+    const atFloor = joystickCount <= 1;
     // The two identity lines, resolved once so the JSX below stays readable.
     // A device with no place (a legacy row) has no platform or tier to show —
     // it still renders the line, as a non-breaking space, because a tile with
@@ -468,13 +475,18 @@ const SessionsBoard = ({ branchId }: Props) => {
                     <button
                       type="button"
                       style={padBtn}
-                      title={t("session.joystickRemoveHere")}
+                      // The tooltip says WHY when the button is off. "Remove a
+                      // joystick" on a control that cannot be pressed is the
+                      // least useful sentence available.
+                      title={atFloor ? t("session.joystickMinHere") : t("session.joystickRemoveHere")}
+                      // The label stays constant so a test — and a screen
+                      // reader — always names the same control.
                       aria-label={t("session.joystickRemoveHere")}
                       // Slot 1 is the session itself and has no row to remove,
                       // so one pad in play is the floor. `busy` is what stops a
                       // double-click becoming two removals before the board has
                       // heard about the first.
-                      disabled={joystickCount <= 1 || padBusy === sess.id}
+                      disabled={atFloor || padBusy === sess.id}
                       onClick={() => void changePads(sess, "remove")}
                     >
                       −
@@ -482,9 +494,9 @@ const SessionsBoard = ({ branchId }: Props) => {
                     <button
                       type="button"
                       style={padBtn}
-                      title={t("session.joystickAddHere")}
+                      title={atCeiling ? t("session.joystickMaxHere") : t("session.joystickAddHere")}
                       aria-label={t("session.joystickAddHere")}
-                      disabled={joystickCount >= MAX_JOYSTICKS || padBusy === sess.id}
+                      disabled={atCeiling || padBusy === sess.id}
                       onClick={() => void changePads(sess, "add")}
                     >
                       +

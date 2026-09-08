@@ -1,4 +1,5 @@
 import Button from "@/components/ui/Button";
+import JoystickIcon from "@/components/ui/JoystickIcon";
 import Checkbox from "@/components/ui/Checkbox";
 import Modal from "@/components/ui/Modal";
 import Radio from "@/components/ui/Radio";
@@ -189,7 +190,7 @@ const SessionOptionsDialog = ({ session, platform, onClose, onChanged }: Props) 
   };
 
   const priceFor = (slot: number): number | null =>
-    prices.find((p) => p.slot === slot)?.price_per_hour ?? null;
+    prices.find((p) => p.slot === slot)?.price ?? null;
 
   /**
    * The slot the server will actually allocate: the LOWEST free one, exactly as
@@ -264,9 +265,15 @@ const SessionOptionsDialog = ({ session, platform, onClose, onChanged }: Props) 
           <section className="col" style={{ gap: 8 }}>
             <div className="row-between" style={{ alignItems: "baseline" }}>
               <strong>{t("session.joysticks")}</strong>
-              <span style={{ fontSize: 18, letterSpacing: 2 }} aria-label={`${joystickCount}`}>
-                {"🎮".repeat(joystickCount)}
-                <span className="muted" style={{ fontSize: 13, letterSpacing: 0, marginLeft: 6 }}>
+              {/* The same glyph the board's tiles draw, for the same reason:
+                  an emoji is rendered by whatever font the OS picked, at
+                  whatever width that font gives it, and the dialog and the
+                  tile behind it would not match. */}
+              <span className="row" style={{ gap: 3, alignItems: "center" }} aria-label={`${joystickCount}`}>
+                {Array.from({ length: joystickCount }, (_, i) => (
+                  <JoystickIcon key={i} size={16} />
+                ))}
+                <span className="muted" style={{ fontSize: 13, marginLeft: 6 }}>
                   {joystickCount} / {MAX_JOYSTICKS}
                 </span>
               </span>
@@ -288,9 +295,9 @@ const SessionOptionsDialog = ({ session, platform, onClose, onChanged }: Props) 
                         the authority on whether a pad may be added, and its
                         refusal names the slot and where to fix it. A disabled
                         button would say "no" without saying why. */}
-                    · {nextPrice !== null
-                        ? `${money(nextPrice)}/${t("time.hourShort") || "h"}`
-                        : t("session.joystickNoPrice")}
+                    {/* A flat fee, so no "/h" after it. The suffix was the
+                        whole of what made a fixed price read as a rate. */}
+                    · {nextPrice !== null ? money(nextPrice) : t("session.joystickNoPrice")}
                   </span>
                 )}
               </Button>
@@ -307,7 +314,7 @@ const SessionOptionsDialog = ({ session, platform, onClose, onChanged }: Props) 
                   <div key={j.id} className="row-between" style={{ fontSize: 13 }}>
                     <span>
                       {t("session.joystickSlot").replace("{0}", String(j.slot))}
-                      <span className="muted"> · {money(j.hourly_rate)}/{t("time.hourShort") || "h"}</span>
+                      <span className="muted"> · {money(j.price)}</span>
                     </span>
                     <Button
                       variant="secondary"

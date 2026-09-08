@@ -41,10 +41,10 @@ vi.mock("@/repositories/SessionRepository", () => ({
 const prices = vi.hoisted(() => ({
   listByBranch: vi.fn(),
   rows: [
-    { id: 1, branch_id: 7, slot: 2, price_per_hour: 500 },
-    { id: 2, branch_id: 7, slot: 3, price_per_hour: 700 },
-    { id: 3, branch_id: 7, slot: 4, price_per_hour: 700 },
-  ] as Array<{ id: number; branch_id: number; slot: number; price_per_hour: number }>,
+    { id: 1, branch_id: 7, slot: 2, price: 500 },
+    { id: 2, branch_id: 7, slot: 3, price: 700 },
+    { id: 3, branch_id: 7, slot: 4, price: 700 },
+  ] as Array<{ id: number; branch_id: number; slot: number; price: number }>,
 }));
 vi.mock("@/repositories/JoystickPriceRepository", () => ({
   joystickPriceRepository: {
@@ -112,9 +112,9 @@ beforeEach(() => {
   auth.role = "company_owner";
   Object.values(repo).forEach((fn) => fn.mockReset());
   prices.rows = [
-    { id: 1, branch_id: 7, slot: 2, price_per_hour: 500 },
-    { id: 2, branch_id: 7, slot: 3, price_per_hour: 700 },
-    { id: 3, branch_id: 7, slot: 4, price_per_hour: 700 },
+    { id: 1, branch_id: 7, slot: 2, price: 500 },
+    { id: 2, branch_id: 7, slot: 3, price: 700 },
+    { id: 3, branch_id: 7, slot: 4, price: 700 },
   ];
   prices.listByBranch.mockReset();
   prices.listByBranch.mockImplementation(() => Promise.resolve(prices.rows));
@@ -150,7 +150,11 @@ describe("the joystick controls", () => {
   test("show as many pads as the SERVER counted, never a locally derived number", async () => {
     await mount(session({ joystick_count: 3 }));
 
-    expect(screen.getByLabelText("3").textContent).toContain("🎮🎮🎮");
+    // One glyph per pad, drawn rather than typed: an emoji takes whatever
+    // shape and width the OS font gives it, and the dialog would then not
+    // match the tile that opened it.
+    expect(screen.getByLabelText("3").querySelectorAll("svg").length).toBe(3);
+    expect(screen.getByLabelText("3").textContent).not.toContain("🎮");
     expect(screen.getByText("3 / 4")).toBeTruthy();
   });
 
@@ -159,7 +163,7 @@ describe("the joystick controls", () => {
     await mount(session({
       joystick_count: 2,
       joysticks: [
-        { id: 1, slot: 2, hourly_rate: 500, started_at: "2026-09-03T14:00:00.000Z", stopped_at: null },
+        { id: 1, slot: 2, price: 500, started_at: "2026-09-03T14:00:00.000Z", stopped_at: null },
       ],
     }));
 
@@ -217,7 +221,7 @@ describe("the joystick controls", () => {
     repo.removeJoystick.mockResolvedValue(session({ joystick_count: 1, joysticks: [] }));
     await mount(session({
       joystick_count: 2,
-      joysticks: [{ id: 5, slot: 2, hourly_rate: 500, started_at: "2026-09-03T14:10:00.000Z", stopped_at: null }],
+      joysticks: [{ id: 5, slot: 2, price: 500, started_at: "2026-09-03T14:10:00.000Z", stopped_at: null }],
     }));
 
     await act(async () => {
@@ -233,15 +237,15 @@ describe("the joystick controls", () => {
     // allocates slot 3. On a venue that has not priced slot 3 the button then
     // advertises a rate and the click is refused.
     prices.rows = [
-      { id: 1, branch_id: 7, slot: 2, price_per_hour: 500 },
-      { id: 3, branch_id: 7, slot: 4, price_per_hour: 700 },
+      { id: 1, branch_id: 7, slot: 2, price: 500 },
+      { id: 3, branch_id: 7, slot: 4, price: 700 },
     ];
     await mount(session({
       joystick_count: 3,
       joysticks: [
-        { id: 1, slot: 2, hourly_rate: 500, started_at: "2026-09-03T14:00:00.000Z", stopped_at: null },
-        { id: 2, slot: 3, hourly_rate: 700, started_at: "2026-09-03T14:00:00.000Z", stopped_at: "2026-09-03T15:00:00.000Z" },
-        { id: 3, slot: 4, hourly_rate: 700, started_at: "2026-09-03T15:00:00.000Z", stopped_at: null },
+        { id: 1, slot: 2, price: 500, started_at: "2026-09-03T14:00:00.000Z", stopped_at: null },
+        { id: 2, slot: 3, price: 700, started_at: "2026-09-03T14:00:00.000Z", stopped_at: "2026-09-03T15:00:00.000Z" },
+        { id: 3, slot: 4, price: 700, started_at: "2026-09-03T15:00:00.000Z", stopped_at: null },
       ],
     }));
 
@@ -256,11 +260,11 @@ describe("the joystick controls", () => {
     // The button stays clickable: the server is the authority on whether a pad
     // may be added, and its refusal names the slot and where to fix it. A
     // disabled button would say "no" without saying why.
-    prices.rows = [{ id: 1, branch_id: 7, slot: 2, price_per_hour: 500 }];
+    prices.rows = [{ id: 1, branch_id: 7, slot: 2, price: 500 }];
     await mount(session({
       joystick_count: 2,
       joysticks: [
-        { id: 1, slot: 2, hourly_rate: 500, started_at: "2026-09-03T14:00:00.000Z", stopped_at: null },
+        { id: 1, slot: 2, price: 500, started_at: "2026-09-03T14:00:00.000Z", stopped_at: null },
       ],
     }));
 
@@ -273,7 +277,7 @@ describe("the joystick controls", () => {
     await mount(session({
       joystick_count: 2,
       joysticks: [
-        { id: 1, slot: 2, hourly_rate: 500, started_at: "2026-09-03T14:00:00.000Z", stopped_at: null },
+        { id: 1, slot: 2, price: 500, started_at: "2026-09-03T14:00:00.000Z", stopped_at: null },
       ],
     }));
     expect(prices.listByBranch).toHaveBeenCalledTimes(1);
@@ -281,7 +285,7 @@ describe("the joystick controls", () => {
     expect(screen.getByText(/700/)).toBeTruthy();
 
     // The owner deletes that price in another window; the next add is refused.
-    prices.rows = [{ id: 1, branch_id: 7, slot: 2, price_per_hour: 500 }];
+    prices.rows = [{ id: 1, branch_id: 7, slot: 2, price: 500 }];
     repo.addJoystick.mockRejectedValue(new Error("No price is set for joystick #3"));
 
     await act(async () => {

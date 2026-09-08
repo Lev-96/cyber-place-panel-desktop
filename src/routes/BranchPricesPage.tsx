@@ -123,7 +123,7 @@ const BranchPricesPage = () => {
         <h2 className="page-title" style={{ margin: 0 }}>{t("joystickPrice.sectionTitle")}</h2>
         {joystickPrices.data && (
           <JoystickPricesForm
-            key={(joystickPrices.data ?? []).map((p) => `${p.slot}:${p.price_per_hour}`).join(",")}
+            key={(joystickPrices.data ?? []).map((p) => `${p.slot}:${p.price}`).join(",")}
             branchId={id}
             prices={joystickPrices.data}
             onSaved={() => void joystickPrices.reload()}

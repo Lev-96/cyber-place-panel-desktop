@@ -230,7 +230,7 @@ describe("adding time from the card", () => {
  */
 describe("joysticks on the tile", () => {
   const ps = { ...running, supports_joysticks: true, joystick_count: 2,
-    joysticks: [{ id: 5, slot: 2, hourly_rate: 500, started_at: new Date().toISOString(), stopped_at: null }] } as ISessionApi;
+    joysticks: [{ id: 5, slot: 2, price: 500, started_at: new Date().toISOString(), stopped_at: null }] } as ISessionApi;
 
   beforeEach(() => {
     repo.listPcs.mockResolvedValue([device]);
@@ -373,9 +373,9 @@ describe("joysticks on the tile", () => {
 
   test("removing names the highest pad in play", async () => {
     repo.listActive.mockResolvedValue([{ ...ps, joystick_count: 3, joysticks: [
-      { id: 5, slot: 2, hourly_rate: 500, started_at: new Date().toISOString(), stopped_at: null },
-      { id: 6, slot: 3, hourly_rate: 700, started_at: new Date().toISOString(), stopped_at: null },
-      { id: 7, slot: 4, hourly_rate: 700, started_at: new Date().toISOString(), stopped_at: "2026-01-01T00:00:00Z" },
+      { id: 5, slot: 2, price: 500, started_at: new Date().toISOString(), stopped_at: null },
+      { id: 6, slot: 3, price: 700, started_at: new Date().toISOString(), stopped_at: null },
+      { id: 7, slot: 4, price: 700, started_at: new Date().toISOString(), stopped_at: "2026-01-01T00:00:00Z" },
     ] }]);
     await mount();
 
@@ -398,6 +398,77 @@ describe("joysticks on the tile", () => {
     await mount();
 
     expect(add().disabled).toBe(true);
+  });
+
+  /**
+   * A disabled control has to say why it is disabled. "Add a joystick to this
+   * session" on a button that cannot be pressed is the least useful sentence
+   * available, and the operator's next move is to press it again.
+   *
+   * The aria-label stays constant on purpose — it names the control, and a
+   * screen reader user should not have the button rename itself.
+   */
+  test("a button at its limit says which limit", async () => {
+    repo.listActive.mockResolvedValue([{ ...ps, joystick_count: 4 }]);
+    await mount();
+
+    expect(add().getAttribute("title")).toBe("session.joystickMaxHere");
+    // The other end, on the same board: four pads is nowhere near the floor.
+    expect(drop().getAttribute("title")).toBe("session.joystickRemoveHere");
+  });
+
+  test("and at the floor the minus says so", async () => {
+    repo.listActive.mockResolvedValue([{ ...ps, joystick_count: 1, joysticks: [] }]);
+    await mount();
+
+    expect(drop().disabled).toBe(true);
+    expect(drop().getAttribute("title")).toBe("session.joystickMinHere");
+    expect(add().getAttribute("title")).toBe("session.joystickAddHere");
+  });
+
+  /**
+   * The count on the tile is the SERVER's, never inferred from the rows the
+   * payload happens to carry.
+   *
+   * A board that counted `joysticks.length` would disagree with the server the
+   * moment a period closed — the rows stay on the payload, closed ones
+   * included, because a bill is made of them.
+   */
+  test("the count comes from the server, not from counting the rows", async () => {
+    repo.listActive.mockResolvedValue([{
+      ...ps,
+      joystick_count: 2,
+      joysticks: [
+        { id: 5, slot: 2, price: 500, started_at: "2026-09-09T14:00:00Z", stopped_at: "2026-09-09T14:20:00Z" },
+        { id: 6, slot: 3, price: 700, started_at: "2026-09-09T15:00:00Z", stopped_at: null },
+      ],
+    }]);
+    await mount();
+
+    // Two rows, one of them closed — the server says two pads are in play
+    // (slot 1 and slot 3) and the tile says two.
+    expect(screen.getByText("2 / 4")).toBeTruthy();
+  });
+
+  /**
+   * Removal names the highest OPEN slot, so the pad a "−" takes back is the
+   * last one handed out and never one that has already come back.
+   */
+  test("a closed period is not offered for removal again", async () => {
+    repo.listActive.mockResolvedValue([{
+      ...ps,
+      joystick_count: 2,
+      joysticks: [
+        { id: 5, slot: 2, price: 500, started_at: "2026-09-09T14:00:00Z", stopped_at: null },
+        { id: 6, slot: 4, price: 700, started_at: "2026-09-09T15:00:00Z", stopped_at: "2026-09-09T15:05:00Z" },
+      ],
+    }]);
+    await mount();
+
+    await act(async () => { fireEvent.click(drop()); });
+
+    // Slot 2, not slot 4 — slot 4's period is over.
+    expect(repo.removeJoystick).toHaveBeenCalledWith(42, 2);
   });
 
   test("shows a refusal on the tile it came from", async () => {

@@ -30,7 +30,7 @@ const JoystickPricesForm = ({ branchId, prices, onSaved }: Props) => {
   const { t } = useLang();
   const stored = (slot: number): string => {
     const row = prices.find((p) => p.slot === slot);
-    return row ? String(row.price_per_hour) : "";
+    return row ? String(row.price) : "";
   };
 
   const [values, setValues] = useState<Record<number, string>>(() =>
@@ -65,7 +65,7 @@ const JoystickPricesForm = ({ branchId, prices, onSaved }: Props) => {
 
         const amount = Number(typed);
         if (!Number.isFinite(amount) || amount < 0) continue;
-        if (row && Number(row.price_per_hour) === amount) continue;
+        if (row && Number(row.price) === amount) continue;
 
         // The endpoint upserts on (branch, slot), so one call covers both
         // "price it for the first time" and "change what it costs".

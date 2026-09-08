@@ -52,15 +52,18 @@ export interface ITimePackage {
 /**
  * One period a single extra joystick was in play.
  *
- * Not a count on the session, and the distinction is the whole feature: three
- * pads on a three-hour session does not mean three pads for three hours. The
- * player who joined at 15:00 pays from 15:00.
+ * Not a count on the session, and the distinction is the whole feature: the
+ * same slot handed out twice in an evening is two separate uses, each judged
+ * on its own length. What a use COSTS is a flat fee — owed in full once the
+ * period passes the server's threshold, owed not at all below it — so nothing
+ * on this side ever multiplies `price` by a duration.
  */
 export interface ISessionJoystick {
   id: number;
   /** 2..4. Slot 1 is the session itself and never appears here. */
   slot: number;
-  hourly_rate: number;
+  /** The flat fee for this use, frozen when the pad went out. Not a rate. */
+  price: number;
   started_at: string;
   /** null while the pad is still in play. */
   stopped_at: string | null;

@@ -1,12 +1,18 @@
 import { request } from "./client";
 
 /**
- * Per-hour prices for the 2nd, 3rd and 4th joystick on a PlayStation session.
+ * FIXED prices for one use of the 2nd, 3rd and 4th joystick on a PlayStation
+ * session.
  *
- * There is no price for the first: that pad is the session, and it is already
- * paid for by the place's own hourly rate. Slots are priced separately because
- * a venue may well charge less for the second than for the fourth, which a
- * single "extra pad" figure could not express.
+ * Per use, not per hour: 300 means a player who takes a second pad is charged
+ * 300 whether they keep it for eleven minutes or all evening — and nothing at
+ * all if they hand it back inside the grace window, which the server decides.
+ * Nothing on this side ever divides or multiplies these figures.
+ *
+ * There is no price for the first pad: it is the session, already paid for by
+ * the place's own hourly rate. Slots are priced separately because a venue may
+ * well charge less for the second than for the fourth, which a single "extra
+ * pad" figure could not express.
  *
  * READING is open to every staff role — the "+ joystick" button on a session
  * card has to know whether a price exists before it offers to add one. WRITING
@@ -24,7 +30,8 @@ export interface IJoystickPrice {
   id: number;
   branch_id: number;
   slot: number;
-  price_per_hour: number;
+  /** The flat fee for one use of this slot. Never a rate. */
+  price: number;
 }
 
 export const apiListJoystickPrices = (branchId: number) =>
@@ -35,21 +42,21 @@ export const apiListJoystickPrices = (branchId: number) =>
  * a cell twice is not a duplicate — it is the operator changing their mind,
  * which is what the form does.
  */
-export const apiSaveJoystickPrice = (branchId: number, slot: number, pricePerHour: number) =>
+export const apiSaveJoystickPrice = (branchId: number, slot: number, price: number) =>
   request<{ data: IJoystickPrice }>("/branch-joystick-prices", {
     method: "POST",
-    body: { branch_id: branchId, slot, price_per_hour: pricePerHour },
+    body: { branch_id: branchId, slot, price },
   });
 
-export const apiUpdateJoystickPrice = (id: number, pricePerHour: number) =>
+export const apiUpdateJoystickPrice = (id: number, price: number) =>
   request<{ data: IJoystickPrice }>(`/branch-joystick-prices/${id}`, {
     method: "PUT",
-    body: { price_per_hour: pricePerHour },
+    body: { price },
   });
 
 /**
  * Remove a slot's price. Sessions using that slot right now are untouched —
- * their rate is frozen onto their own rows — it simply stops new pads being
+ * their fee is frozen onto their own rows — it simply stops new pads being
  * added there, which is what "we do not offer that" means.
  */
 export const apiDeleteJoystickPrice = (id: number) =>

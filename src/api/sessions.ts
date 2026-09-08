@@ -70,15 +70,26 @@ export interface ISessionItem {
   qty: number;
 }
 
+/**
+ * One pad period on a bill.
+ *
+ * `amount` is `price` or zero and never anything between: the server owes the
+ * whole fee once the period reaches its threshold and nothing before that.
+ * `is_charged` says which of the two happened, so a line worth 0 can explain
+ * itself instead of reading as a bug.
+ */
 export interface IJoystickCharge {
   id: number;
   slot: number;
-  hourly_rate: number;
+  /** The flat fee for this use. Never divided, never multiplied. */
+  price: number;
   started_at: string;
   stopped_at: string | null;
   is_open: boolean;
   minutes: number;
+  seconds: number;
   amount: number;
+  is_charged: boolean;
 }
 
 export interface IBillBreakdown {
@@ -96,7 +107,7 @@ export interface IBillBreakdown {
 
   is_free?: boolean;
   is_unlimited?: boolean;
-  /** One line per pad period — "Joystick #3, 15:00→16:00, 700". */
+  /** One line per pad period — "Joystick #3, 15:00→15:20, 700". */
   joysticks?: IJoystickCharge[];
   joysticks_total?: number;
   /** Pads in play including the session's own. */

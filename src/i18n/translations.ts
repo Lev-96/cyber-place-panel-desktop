@@ -422,6 +422,16 @@ export const TRANSLATIONS: Dict = {
     ru: "Добавить джойстик к текущей сессии",
     am: "Ավելացնել ջոյսթիք այս նիստին",
   },
+  "session.joystickMaxHere": {
+    en: "Maximum number of joysticks reached",
+    ru: "Достигнуто максимальное количество джойстиков",
+    am: "Հասել է ջոյսթիքների առավելագույն քանակին",
+  },
+  "session.joystickMinHere": {
+    en: "Minimum number of joysticks reached",
+    ru: "Достигнуто минимальное количество джойстиков",
+    am: "Հասել է ջոյսթիքների նվազագույն քանակին",
+  },
   "session.joystickRemoveHere": {
     en: "Remove the last joystick from this session",
     ru: "Убрать последний джойстик из текущей сессии",
@@ -430,6 +440,13 @@ export const TRANSLATIONS: Dict = {
   "session.joystickAdd": { en: "Add a joystick", ru: "Добавить джойстик", am: "Ավելացնել ջոյսթիք" },
   "session.joystickRemove": { en: "Remove joystick #{0}", ru: "Убрать джойстик №{0}", am: "Հեռացնել №{0} ջոյսթիքը" },
   "session.joystickSlot": { en: "Joystick #{0}", ru: "Джойстик №{0}", am: "Ջոյսթիք №{0}" },
+  // Why a pad that was in play costs nothing. Without it the 0 on the receipt
+  // reads as a till that lost the charge.
+  "session.joystickUnderThreshold": {
+    en: "under 10 min, not charged",
+    ru: "меньше 10 мин, не списано",
+    am: "10 րոպեից պակաս, չի գանձվել",
+  },
   "session.joystickIncluded": {
     en: "Joystick #1 is part of the session",
     ru: "Джойстик №1 входит в сессию",
@@ -451,9 +468,9 @@ export const TRANSLATIONS: Dict = {
     am: "Այս տեղը գրանցված է որպես «{0}»։",
   },
   "session.joystickBilledFrom": {
-    en: "Charged from the moment it is added, and stops the moment it is removed.",
-    ru: "Считается с момента добавления и перестаёт считаться сразу после снятия.",
-    am: "Հաշվարկվում է ավելացնելու պահից և դադարում է հանելուն պես։",
+    en: "A flat fee per joystick, charged once it has been out for 10 minutes. Handed back sooner, it costs nothing.",
+    ru: "Фиксированная цена за джойстик, списывается после 10 минут использования. Если вернуть раньше, платить не нужно.",
+    am: "Ֆիքսված գին յուրաքանչյուր ջոյսթիքի համար՝ գանձվում է 10 րոպե օգտագործելուց հետո։ Ավելի շուտ վերադարձնելու դեպքում վճարել պետք չէ։",
   },
   "session.addTime": { en: "Add time", ru: "Добавить время", am: "Ավելացնել ժամանակ" },
   "session.addMinutes": { en: "+{0} min", ru: "+{0} мин", am: "+{0} րոպե" },
@@ -898,9 +915,9 @@ export const TRANSLATIONS: Dict = {
   /* ── the Prices screen's two new sections ─────────────────────────────── */
   "joystickPrice.sectionTitle": { en: "Joystick prices", ru: "Цены на джойстики", am: "Ջոյսթիքների գներ" },
   "joystickPrice.hint": {
-    en: "Per hour, for the 2nd, 3rd and 4th joystick on a PlayStation session. The first one is the session itself and is already in the place's rate. An empty cell means that joystick cannot be added.",
-    ru: "За час, для 2-го, 3-го и 4-го джойстика в сессии PlayStation. Первый. Это сама сессия, он уже в тарифе места. Пустая ячейка значит, что такой джойстик добавить нельзя.",
-    am: "Ժամի դիմաց՝ PlayStation-ի նիստի 2-րդ, 3-րդ և 4-րդ ջոյսթիքի համար։ Առաջինը հենց նիստն է և արդեն մտնում է տեղի սակագնի մեջ։ Դատարկ վանդակը նշանակում է, որ այդ ջոյսթիքը հնարավոր չէ ավելացնել։",
+    en: "A flat fee per use, for the 2nd, 3rd and 4th joystick on a PlayStation session. Not per hour: the fee is the same for 11 minutes and for the whole evening, and a pad handed back inside 10 minutes costs nothing. The first joystick is the session itself and is already in the place's rate. An empty cell means that joystick cannot be added.",
+    ru: "Фиксированная цена за одно использование 2-го, 3-го и 4-го джойстика в сессии PlayStation. Не за час: цена одна и та же за 11 минут и за весь вечер, а если джойстик вернули в первые 10 минут, платить не нужно. Первый джойстик. Это сама сессия, он уже в тарифе места. Пустая ячейка значит, что такой джойстик добавить нельзя.",
+    am: "Ֆիքսված գին՝ PlayStation-ի նիստի 2-րդ, 3-րդ և 4-րդ ջոյսթիքի մեկ օգտագործման համար։ Ոչ թե ժամի դիմաց՝ գինը նույնն է և՛ 11 րոպեի, և՛ ամբողջ երեկոյի համար, իսկ առաջին 10 րոպեում վերադարձված ջոյսթիքի համար վճարել պետք չէ։ Առաջին ջոյսթիքը հենց նիստն է և արդեն մտնում է տեղի սակագնի մեջ։ Դատարկ վանդակը նշանակում է, որ այդ ջոյսթիքը հնարավոր չէ ավելացնել։",
   },
   "joystickPrice.slot": { en: "Joystick #{0}", ru: "Джойстик №{0}", am: "Ջոյսթիք №{0}" },
   "joystickPrice.saved": { en: "Joystick prices saved", ru: "Цены на джойстики сохранены", am: "Ջոյսթիքների գները պահպանվեցին" },

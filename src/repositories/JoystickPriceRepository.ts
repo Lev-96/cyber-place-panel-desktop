@@ -25,12 +25,12 @@ export class JoystickPriceRepository {
     return orFallback(apiListJoystickPrices(branchId).then((r) => r.data), []);
   }
 
-  async save(branchId: number, slot: number, pricePerHour: number): Promise<IJoystickPrice> {
-    return friendlyMutation(apiSaveJoystickPrice(branchId, slot, pricePerHour).then((r) => r.data));
+  async save(branchId: number, slot: number, price: number): Promise<IJoystickPrice> {
+    return friendlyMutation(apiSaveJoystickPrice(branchId, slot, price).then((r) => r.data));
   }
 
-  async update(id: number, pricePerHour: number): Promise<IJoystickPrice> {
-    return friendlyMutation(apiUpdateJoystickPrice(id, pricePerHour).then((r) => r.data));
+  async update(id: number, price: number): Promise<IJoystickPrice> {
+    return friendlyMutation(apiUpdateJoystickPrice(id, price).then((r) => r.data));
   }
 
   async remove(id: number): Promise<void> {
