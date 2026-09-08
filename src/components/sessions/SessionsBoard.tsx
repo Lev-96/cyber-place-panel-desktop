@@ -29,6 +29,7 @@ import StartSessionDialog from "./StartSessionDialog";
 import SessionOptionsDialog from "./SessionOptionsDialog";
 import { MAX_JOYSTICKS } from "@/api/joystickPrices";
 import StopReceiptModal from "./StopReceiptModal";
+import { useExpiryNudge } from "./useExpiryNudge";
 
 const navBtn: React.CSSProperties = { padding: "6px 10px", border: "1px solid #1f2a44", borderRadius: 6 };
 
@@ -127,6 +128,21 @@ const SessionsBoard = ({ branchId }: Props) => {
     }, 30_000);
     return () => clearInterval(t);
   }, [sessions, pcs]);
+
+  // …and one wake-up aimed at the exact instant the soonest seat runs out.
+  //
+  // The server's expiry is exact but rides a request: with the thirty-second
+  // poll above as the only carrier, a tile's countdown reached 00:00 and the
+  // seat stayed busy for the rest of the interval. This asks at the deadline
+  // instead of waiting for the next tick — the server still decides, and the
+  // same read returns the board without the seat on it.
+  useExpiryNudge(
+    sessions.data,
+    useCallback(() => {
+      void sessions.reload();
+      void pcs.reload();
+    }, [sessions, pcs]),
+  );
 
   // Reconcile the local tile order with the server list: keep existing order
   // for devices still present, append new ones, drop removed ones.
