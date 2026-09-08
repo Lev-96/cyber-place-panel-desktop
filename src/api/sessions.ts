@@ -181,9 +181,20 @@ export const apiRemoveSessionJoystick = (sessionId: number, slot: number) =>
 export const apiAddSessionTime = (sessionId: number, minutes: number) =>
   request<{ session: ISessionApi }>(`/sessions/${sessionId}/time`, { method: "POST", body: { minutes } });
 
-/** Lift the ceiling. Refused (422, with a sentence) when the seat is booked. */
-export const apiMakeSessionUnlimited = (sessionId: number) =>
-  request<{ session: ISessionApi }>(`/sessions/${sessionId}/unlimited`, { method: "POST" });
+/**
+ * Lift the ceiling, optionally at a new price. Refused (422, with a sentence)
+ * when the seat is booked.
+ *
+ * The rate is omitted unless the operator actually named one: the server then
+ * keeps the tariff's own, which is what every switch did before a price could
+ * be sent. When it IS sent it means "from now on" — the server freezes what the
+ * clock had earned first, so nothing already played is repriced.
+ */
+export const apiMakeSessionUnlimited = (sessionId: number, hourlyRate?: number) =>
+  request<{ session: ISessionApi }>(`/sessions/${sessionId}/unlimited`, {
+    method: "POST",
+    body: hourlyRate === undefined ? {} : { hourly_rate: hourlyRate },
+  });
 
 /** Waive the bill, or put it back. Owner-level; the server enforces it. */
 export const apiSetSessionFree = (sessionId: number, isFree: boolean) =>

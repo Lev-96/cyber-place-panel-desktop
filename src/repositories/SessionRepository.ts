@@ -113,8 +113,8 @@ export class SessionRepository {
     return friendlyMutation(apiAddSessionTime(sessionId, minutes).then((r) => r.session));
   }
 
-  async makeUnlimited(sessionId: number): Promise<ISessionApi> {
-    return friendlyMutation(apiMakeSessionUnlimited(sessionId).then((r) => r.session));
+  async makeUnlimited(sessionId: number, hourlyRate?: number): Promise<ISessionApi> {
+    return friendlyMutation(apiMakeSessionUnlimited(sessionId, hourlyRate).then((r) => r.session));
   }
 
   async setFree(sessionId: number, isFree: boolean): Promise<ISessionApi> {

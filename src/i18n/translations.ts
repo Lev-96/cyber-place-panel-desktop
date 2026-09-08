@@ -449,6 +449,23 @@ export const TRANSLATIONS: Dict = {
   // minutes, and a number with no unit beside it is the kind of ambiguity that
   // ends with a seat sold for a fiftieth of what was meant.
   "session.timeManual": { en: "Enter manually", ru: "Ввести вручную", am: "Մուտքագրել ձեռքով" },
+  // The price a session carries on at once its end is removed. Shown before the
+  // switch rather than after, because it is the number the operator is agreeing
+  // to and the moment to correct it is now.
+  "session.unlimitedRate": { en: "Price per hour", ru: "Цена за час", am: "Գինը ժամում" },
+  "session.unlimitedRateChange": { en: "Change price", ru: "Изменить цену", am: "Փոխել գինը" },
+  // Says the rule out loud, because it is the question an operator asks and
+  // getting it wrong the other way would be somebody's receipt.
+  "session.unlimitedRateHint": {
+    en: "Applies from now on. What has already been played keeps its own price.",
+    ru: "Действует с этого момента. Уже сыгранное сохраняет свою цену.",
+    am: "Գործում է այս պահից։ Արդեն խաղացածը պահպանում է իր գինը։",
+  },
+  "session.unlimitedRateInvalid": {
+    en: "Enter a price greater than zero.",
+    ru: "Введите цену больше нуля.",
+    am: "Մուտքագրեք զրոյից մեծ գին։",
+  },
   "session.timeAmount": { en: "Amount", ru: "Количество", am: "Քանակ" },
   "session.timeUnitMinutes": { en: "Minutes", ru: "Минуты", am: "Րոպե" },
   "session.timeUnitHours": { en: "Hours", ru: "Часы", am: "Ժամ" },

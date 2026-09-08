@@ -550,3 +550,90 @@ describe("a grant typed by hand", () => {
     expect(screen.queryByText("session.timeManual")).toBeNull();
   });
 });
+
+/**
+ * The price a session carries on at once its end is removed.
+ *
+ * Shown before the switch rather than after: it is the number the operator is
+ * agreeing to, and the moment to correct it is while it can still be corrected.
+ * Sending it is optional and NOT sending it is the ordinary case — the server
+ * then keeps the tariff's own rate, exactly as every switch did before a price
+ * could be named.
+ */
+describe("the price a session goes unlimited at", () => {
+  const confirmed = async () => {
+    // The switch is irreversible and asks first, through the in-app dialog this
+    // suite already drives with `answerConfirm`.
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /session.makeUnlimited/ }));
+    });
+    await answerConfirm(true);
+  };
+
+  test("shows what it would carry on at", async () => {
+    await mount(session({ hourly_rate: 1500 }));
+
+    expect(screen.getByText("session.unlimitedRate:")).toBeTruthy();
+  });
+
+  test("sends nothing when the price was not touched", async () => {
+    repo.makeUnlimited.mockResolvedValue(session({ is_unlimited: true, ends_at: null }));
+    await mount();
+
+    await confirmed();
+
+    // `undefined`, not the number on screen: an untouched price is the tariff's
+    // to decide, and echoing it back would freeze a rate nobody chose.
+    expect(repo.makeUnlimited).toHaveBeenCalledWith(42, undefined);
+  });
+
+  test("sends the typed price when it was", async () => {
+    repo.makeUnlimited.mockResolvedValue(session({ is_unlimited: true, ends_at: null }));
+    await mount(session({ hourly_rate: 1500 }));
+
+    await act(async () => {
+      fireEvent.click(screen.getByText("session.unlimitedRateChange"));
+    });
+    await act(async () => {
+      fireEvent.change(screen.getByLabelText("session.unlimitedRate"), { target: { value: "2000" } });
+    });
+    await confirmed();
+
+    expect(repo.makeUnlimited).toHaveBeenCalledWith(42, 2000);
+  });
+
+  test.each([["a zero", "0"], ["a negative", "-500"], ["words", "free"]])(
+    "refuses %s and will not switch on it",
+    async (_name, value) => {
+      await mount(session({ hourly_rate: 1500 }));
+
+      await act(async () => {
+        fireEvent.click(screen.getByText("session.unlimitedRateChange"));
+      });
+      await act(async () => {
+        fireEvent.change(screen.getByLabelText("session.unlimitedRate"), { target: { value } });
+      });
+
+      expect((screen.getByRole("button", { name: /session.makeUnlimited/ }) as HTMLButtonElement).disabled).toBe(true);
+      expect(repo.makeUnlimited).not.toHaveBeenCalled();
+    },
+  );
+
+  test("says the rule out loud", async () => {
+    await mount(session({ hourly_rate: 1500 }));
+
+    await act(async () => {
+      fireEvent.click(screen.getByText("session.unlimitedRateChange"));
+    });
+
+    // "From now on" is the question an operator asks, and the wrong answer
+    // would be somebody's receipt.
+    expect(screen.getByText("session.unlimitedRateHint")).toBeTruthy();
+  });
+
+  test("is not offered on a session that already has no end", async () => {
+    await mount(session({ is_unlimited: true, ends_at: null }));
+
+    expect(screen.queryByText("session.unlimitedRateChange")).toBeNull();
+  });
+});

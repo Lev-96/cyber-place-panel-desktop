@@ -69,6 +69,11 @@ const SessionOptionsDialog = ({ session, platform, onClose, onChanged }: Props) 
   const [manual, setManual] = useState(false);
   const [manualAmount, setManualAmount] = useState("");
   const [manualUnit, setManualUnit] = useState<"minutes" | "hours">("minutes");
+  // The price the session carries on at once its end is removed. Off by
+  // default: not naming one keeps the tariff's own rate, which is what every
+  // switch did before a price could be named at all.
+  const [editRate, setEditRate] = useState(false);
+  const [rateInput, setRateInput] = useState("");
 
   /**
    * Joysticks are a PlayStation thing, and the BACKEND decides it.
@@ -130,6 +135,25 @@ const SessionOptionsDialog = ({ session, platform, onClose, onChanged }: Props) 
    * grant additionally needs to know, so it can keep what the cashier typed
    * instead of clearing the box under a red sentence explaining why it failed.
    */
+  /**
+   * The rate to send, or null when the box does not hold a usable one.
+   *
+   * `undefined` from the caller's point of view — "no rate named" — is the
+   * unedited case and is handled at the call site; this only answers whether
+   * what was TYPED is a price. Zero is refused here as it is on the server:
+   * a free session is a different decision with its own capability.
+   */
+  const typedRate = ((): number | null => {
+    const raw = rateInput.trim().replace(",", ".");
+    if (raw === "") return null;
+
+    const value = Number(raw);
+    return Number.isFinite(value) && value > 0 ? value : null;
+  })();
+
+  /** What the session would carry on at, for the line that says so. */
+  const currentRate = Number(current.hourly_rate ?? 0);
+
   const run = async (action: () => Promise<ISessionApi>): Promise<boolean> => {
     setBusy(true);
     setError(null);
@@ -388,10 +412,47 @@ const SessionOptionsDialog = ({ session, platform, onClose, onChanged }: Props) 
         <section className="col" style={{ gap: 6 }}>
           <strong>{t("session.unlimited")}</strong>
           <span className="muted" style={{ fontSize: 12 }}>{t("session.unlimitedHint")}</span>
+          {!isUnlimited && isActive && (
+            <div className="col" style={{ gap: 6 }}>
+              <div className="row" style={{ gap: 8, alignItems: "baseline", flexWrap: "wrap" }}>
+                <span className="muted" style={{ fontSize: 12 }}>{t("session.unlimitedRate")}:</span>
+                <strong>
+                  {money(typedRate ?? currentRate)} / {t("time.hourShort") || "h"}
+                </strong>
+                {!editRate && (
+                  <Button
+                    variant="secondary"
+                    disabled={busy}
+                    onClick={() => { setEditRate(true); setRateInput(currentRate > 0 ? String(currentRate) : ""); }}
+                  >
+                    {t("session.unlimitedRateChange")}
+                  </Button>
+                )}
+              </div>
+              {editRate && (
+                <div className="col" style={{ gap: 4 }}>
+                  <input
+                    className="input"
+                    type="number"
+                    min={1}
+                    value={rateInput}
+                    onChange={(e) => setRateInput(e.target.value)}
+                    aria-label={t("session.unlimitedRate")}
+                    style={{ width: 140 }}
+                    autoFocus
+                  />
+                  {rateInput.trim() !== "" && typedRate === null && (
+                    <span className="error" style={{ fontSize: 12 }}>{t("session.unlimitedRateInvalid")}</span>
+                  )}
+                  <span className="muted" style={{ fontSize: 12 }}>{t("session.unlimitedRateHint")}</span>
+                </div>
+              )}
+            </div>
+          )}
           <div>
             <Button
               variant="secondary"
-              disabled={busy || !isActive || isUnlimited}
+              disabled={busy || !isActive || isUnlimited || (editRate && typedRate === null)}
               onClick={() => {
                 // Irreversible, so it is confirmed — through the in-app dialog,
                 // never `window.confirm`. A native one poisons the Electron
@@ -404,7 +465,13 @@ const SessionOptionsDialog = ({ session, platform, onClose, onChanged }: Props) 
                 // only the server knows.
                 void (async () => {
                   if (!(await confirm(t("session.unlimitedConfirm")))) return;
-                  await run(() => sessionRepository.makeUnlimited(current.id));
+                  // Only when a price was actually typed. Otherwise nothing
+                  // is sent and the server keeps the tariff's own rate — the
+                  // behaviour every switch has always had.
+                  await run(() => sessionRepository.makeUnlimited(
+                    current.id,
+                    editRate && typedRate !== null ? typedRate : undefined,
+                  ));
                 })();
               }}
             >
