@@ -375,6 +375,18 @@ const SessionsBoard = ({ branchId }: Props) => {
             )}
             <div className="row" style={{ gap: 6, marginTop: 4, flexWrap: "wrap" }}>
               <Button variant="secondary" onClick={() => setAddItemTarget(sess)} style={miniBtnFlex}>{t("session.addItem")}</Button>
+              {/* Named for the thing a cashier is actually looking for on a
+                  seat that is running out. It opens the SAME dialog "Options"
+                  does — one management surface, reached by two names, because
+                  "Options" is not what somebody with eight minutes left is
+                  scanning the card for.
+
+                  Only on a seat that HAS an end: a count-up or unlimited
+                  session has nothing to extend, and the dialog says so rather
+                  than offering it. */}
+              {sess.ends_at !== null && sess.is_unlimited !== true && (
+                <Button variant="secondary" onClick={() => setOptionsTarget(sess)} style={miniBtnFlex}>{t("session.addTime")}</Button>
+              )}
               <Button variant="secondary" onClick={() => setOptionsTarget(sess)} style={miniBtnFlex}>{t("session.optionsShort")}</Button>
               <Button variant="secondary" onClick={() => setStopTarget(sess)} style={miniBtnFlex}>{t("action.stop")}</Button>
             </div>

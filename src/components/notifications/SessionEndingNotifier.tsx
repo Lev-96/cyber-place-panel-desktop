@@ -3,7 +3,7 @@ import { useLang } from "@/i18n/LanguageContext";
 import { sessionRepository } from "@/repositories/SessionRepository";
 import { ISessionApi } from "@/types/sessions";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import SessionOptionsDialog from "@/components/sessions/SessionOptionsDialog";
 
 /**
  * "This seat runs out in ten minutes — do you want to sell them more?"
@@ -50,6 +50,12 @@ interface Warning {
   branchId: number;
   label: string;
   minutesLeft: number;
+  /**
+   * The row itself, so the action can OPEN the management dialog rather than
+   * send the operator somewhere to look for it. Everything that dialog needs —
+   * the tariff, the pads, the seat's platform — is already on it.
+   */
+  session: ISessionApi;
 }
 
 const minutesLeft = (endsAt: string, now: number): number =>
@@ -78,6 +84,7 @@ export const sessionsToWarnAbout = (
       branchId: s.branch_id,
       label: s.pc_label || `#${s.pc_id}`,
       minutesLeft: minutesLeft(s.ends_at as string, now),
+      session: s,
     }))
     // Already over is not a warning, it is news — the board turns the tile
     // over on its own and there is nothing left to sell.
@@ -86,8 +93,10 @@ export const sessionsToWarnAbout = (
 const SessionEndingNotifier = () => {
   const { t } = useLang();
   const { user } = useAuth();
-  const navigate = useNavigate();
   const [warning, setWarning] = useState<Warning | null>(null);
+  // The session whose terms are being changed, if any. Deliberately separate
+  // from `warning`: the dialog outlives the card that opened it.
+  const [managing, setManaging] = useState<ISessionApi | null>(null);
   // Never cleared while the panel is open: one warning per session, ever.
   const warned = useRef<Set<number>>(new Set());
 
@@ -117,14 +126,43 @@ const SessionEndingNotifier = () => {
     return () => clearInterval(timer);
   }, [check]);
 
-  if (!warning) return null;
-
-  const openBoard = () => {
-    navigate(`/branches/${warning.branchId}/sessions`);
+  /**
+   * The button said "Add time" and NAVIGATED — to the sessions board of the
+   * warning's branch, then cleared itself.
+   *
+   * Which does nothing at all when the operator is already on that board, and
+   * that is exactly where they are when watching a seat run out: the route does
+   * not change, nothing new renders, and all the cashier sees is their warning
+   * vanishing. The button was not broken so much as pointed at the wrong thing.
+   *
+   * It now opens the management dialog — the SAME component a tile opens, not a
+   * copy of it — so the offer to sell more time is answerable from wherever the
+   * operator is standing.
+   */
+  const manage = () => {
+    if (warning) setManaging(warning.session);
     setWarning(null);
   };
 
+  // The dialog can outlive the card, so this early return has to let it
+  // through: bailing out the moment the warning is gone would unmount the
+  // dialog the warning just opened.
+  const dialog = managing === null ? null : (
+    <SessionOptionsDialog
+      session={managing}
+      platform={managing.place_platform}
+      onClose={() => setManaging(null)}
+      // Keep the dialog's own copy current after each change, exactly as the
+      // board does. The board itself re-reads on its poll and on the session
+      // event, so nothing here has to tell it.
+      onChanged={setManaging}
+    />
+  );
+
+  if (!warning) return dialog;
+
   return (
+    <>
     <div
       role="alert"
       aria-live="assertive"
@@ -174,7 +212,7 @@ const SessionEndingNotifier = () => {
       <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
         <button
           type="button"
-          onClick={openBoard}
+          onClick={manage}
           style={{
             padding: "4px 10px",
             border: "1px solid rgba(254, 243, 199, 0.35)",
@@ -189,6 +227,8 @@ const SessionEndingNotifier = () => {
         </button>
       </div>
     </div>
+      {dialog}
+    </>
   );
 };
 

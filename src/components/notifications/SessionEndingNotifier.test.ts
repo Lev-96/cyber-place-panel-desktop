@@ -86,13 +86,14 @@ describe("which sessions are about to run out", () => {
     expect(due).toEqual([]);
   });
 
-  it("carries the venue and the seat, so the card can name them and link to them", () => {
-    const [due] = sessionsToWarnAbout(
-      [session({ id: 9, branch_id: 3, pc_label: "PS5 VIP", ends_at: inMinutes(4) })],
-      new Set(),
-      NOW,
-    );
+  it("carries the venue, the seat and the session the card has to act on", () => {
+    const row = session({ id: 9, branch_id: 3, pc_label: "PS5 VIP", ends_at: inMinutes(4) });
+    const [due] = sessionsToWarnAbout([row], new Set(), NOW);
 
-    expect(due).toEqual({ sessionId: 9, branchId: 3, label: "PS5 VIP", minutesLeft: 4 });
+    expect(due).toMatchObject({ sessionId: 9, branchId: 3, label: "PS5 VIP", minutesLeft: 4 });
+    // The row itself travels with the warning: the card's action opens the
+    // management dialog, and that needs the session rather than an id it would
+    // have to go and look up.
+    expect(due.session).toBe(row);
   });
 });

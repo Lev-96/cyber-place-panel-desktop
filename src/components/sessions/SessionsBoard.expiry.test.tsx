@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
-import { act, cleanup, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
+import { ConfirmProvider } from "@/components/ui/ConfirmProvider";
 import { IPcApi, ISessionApi } from "@/types/sessions";
 import { PC_KIND, PC_STATUS } from "@/types/pc";
 import { SessionChangedEvent } from "@/realtime/useSessionChanged";
@@ -38,6 +39,9 @@ vi.mock("@/realtime/useSessionChanged", () => ({
   },
 }));
 vi.mock("@/hooks/useReservedPlaceIds", () => ({ useReservedPlaceIds: () => new Set<number>() }));
+vi.mock("@/repositories/JoystickPriceRepository", () => ({
+  joystickPriceRepository: { listByBranch: () => Promise.resolve([]) },
+}));
 vi.mock("@/auth/AuthContext", () => ({ useAuth: () => ({ user: { id: 1, role: "manager" } }) }));
 vi.mock("@/i18n/LanguageContext", () => ({
   useLang: () => ({ t: (k: string) => k, money: (n: number) => String(n), lang: "en" }),
@@ -88,9 +92,13 @@ const event = (over: Partial<SessionChangedEvent> = {}): SessionChangedEvent => 
 const mount = async () => {
   await act(async () => {
     render(
-      <MemoryRouter>
-        <SessionsBoard branchId={7} />
-      </MemoryRouter>,
+      // The management dialog a tile opens asks before lifting a ceiling, and
+      // in the app that provider comes from App.tsx above the whole shell.
+      <ConfirmProvider>
+        <MemoryRouter>
+          <SessionsBoard branchId={7} />
+        </MemoryRouter>
+      </ConfirmProvider>,
     );
   });
 };
@@ -153,5 +161,47 @@ describe("a seat that ends on its own clock", () => {
     await fire(event({ session_id: 999 }));
 
     expect(screen.queryByText("session.checkoutDone")).toBeNull();
+  });
+});
+
+/**
+ * The same management dialog, reached from the card.
+ *
+ * "Options" already opened it, and that is not what somebody with eight
+ * minutes left is scanning a tile for. The named button is a second way in to
+ * ONE surface — not a second implementation of it.
+ */
+describe("adding time from the card", () => {
+  beforeEach(() => {
+    repo.listPcs.mockResolvedValue([device]);
+    repo.listActive.mockResolvedValue([running]);
+  });
+  afterEach(cleanup);
+
+  test("is offered on a seat that has an end", async () => {
+    await mount();
+
+    expect(screen.getByRole("button", { name: "session.addTime" })).toBeTruthy();
+  });
+
+  test("opens the management dialog", async () => {
+    await mount();
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "session.addTime" }));
+    });
+
+    // The same dialog "Options" opens — asserted by its own heading, so a
+    // second modal built for the card would fail this.
+    expect(screen.getByText("session.options")).toBeTruthy();
+  });
+
+  test("is not offered on a seat with no end to extend", async () => {
+    repo.listActive.mockResolvedValue([{ ...running, ends_at: null, is_unlimited: true }]);
+    await mount();
+
+    expect(screen.queryByRole("button", { name: "session.addTime" })).toBeNull();
+    // Options is still there: a count-up session has pads and a bill to waive.
+    expect(screen.getByRole("button", { name: "session.optionsShort" })).toBeTruthy();
   });
 });
