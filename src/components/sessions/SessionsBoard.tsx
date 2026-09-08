@@ -4,6 +4,7 @@ import { can } from "@/auth/permissions";
 import Button from "@/components/ui/Button";
 import CollapsibleSection from "@/components/ui/CollapsibleSection";
 import { GridSkeleton } from "@/components/ui/Skeleton";
+import JoystickIcon from "@/components/ui/JoystickIcon";
 import { useAsync } from "@/hooks/useAsync";
 import { useLocalReorder } from "@/hooks/useLocalReorder";
 import { useReservedPlaceIds } from "@/hooks/useReservedPlaceIds";
@@ -425,8 +426,9 @@ const SessionsBoard = ({ branchId }: Props) => {
             {(joystickCount > 1 || supportsJoysticks || sess.is_free) && (
               <span className="row" style={{ gap: 6, fontSize: 12, flexWrap: "wrap" }}>
                 {/* Pads are a PlayStation thing, and the seat says so itself:
-                    `supports_joysticks` is the backend's answer from the
-                    place's platform. Never the label — "PS4-08" is a name
+                    `supports_joysticks` is the backend's answer — the place's
+                    platform where the seat has a place, the device's own kind
+                    where it has none. Never the label: "PS4-08" is a name
                     somebody typed, and a venue that renames a seat would lose
                     its controls.
 
@@ -434,19 +436,31 @@ const SessionsBoard = ({ branchId }: Props) => {
                     has a second pad: a control that appears once you have
                     already used it is a control nobody finds. */}
                 <span className="row" style={{ gap: 4, alignItems: "center" }}>
-                  {/* The COUNT is shown whenever there is more than one pad,
-                      which is what it did before the controls existed. Only the
-                      controls below wait for the seat's own answer: an older
-                      payload should keep reporting what a tile already
-                      reported, and lose only the buttons it cannot honour. */}
-                  {joystickCount > 1 && (
-                    // One glyph plus the fraction, not one glyph per pad. Four
-                    // glyphs is the widest this line could get on a 160px tile,
-                    // and the repeat never said what the ceiling was — "3 / 4"
-                    // answers "can another player join?" without opening
-                    // anything.
-                    <span title={`${t("session.joysticks")}: ${joystickCount} / ${MAX_JOYSTICKS}`}>
-                      🎮 <span className="muted">{joystickCount} / {MAX_JOYSTICKS}</span>
+                  {/* The count, with the icon and the word in front of it.
+                      Before this it appeared only from the SECOND pad onwards,
+                      so a seat that had just started showed two unlabelled 20px
+                      buttons and nothing to say what they were for — which is
+                      how a feature that was fully built read as missing.
+
+                      One glyph plus the fraction, not one glyph per pad. Four
+                      glyphs is the widest this line could get on a 160px tile,
+                      and the repeat never said what the ceiling was — "1 / 4"
+                      answers "can another player join?" without opening
+                      anything.
+
+                      `joystickCount` counts the pads IN PLAY and the session's
+                      own is one of them, so a fresh seat reads 1 / 4, not 0.
+                      That is the same number the options dialog shows for the
+                      same seat, and two screens disagreeing about one seat is
+                      worse than either wording. */}
+                  {(supportsJoysticks || joystickCount > 1) && (
+                    <span
+                      className="row"
+                      style={{ gap: 4, alignItems: "center" }}
+                      title={`${t("session.joysticks")}: ${joystickCount} / ${MAX_JOYSTICKS}`}
+                    >
+                      <JoystickIcon />
+                      <span className="muted">{joystickCount} / {MAX_JOYSTICKS}</span>
                     </span>
                   )}
                   {supportsJoysticks && (
@@ -475,6 +489,23 @@ const SessionsBoard = ({ branchId }: Props) => {
                     >
                       +
                     </button>
+                    {/* The round trip, said on the tile it belongs to. Both
+                        buttons are already disabled while it is in flight; this
+                        is what tells the cashier the click landed, on a board
+                        where the number itself only moves once the server has
+                        answered. */}
+                    {padBusy === sess.id && (
+                      // The project's own spinner class, sized down inline
+                      // rather than by widening the `Spinner` primitive: that
+                      // one is a 32px page-level element with its own margins,
+                      // and giving it a props API for one 12px use would change
+                      // a component every screen renders.
+                      <span
+                        className="spinner"
+                        style={{ width: 12, height: 12, borderWidth: 2, margin: 0 }}
+                        aria-hidden="true"
+                      />
+                    )}
                   </>
                   )}
                 </span>
@@ -648,17 +679,32 @@ const SessionsBoard = ({ branchId }: Props) => {
 };
 
 /** A 20px square that reads as a control without competing with the tile. */
+/**
+ * The pad buttons on a tile.
+ *
+ * They were 20px, transparent, and outlined in #1f2a44 — the tile's own border
+ * colour — with no label or icon beside them. On a dark card that is a control
+ * an operator has to already know is there, which is half of why a shipped
+ * feature was reported as missing. Filled, a shade lighter than the card, and
+ * 22px so the glyph has room: still small enough to sit on a 160px tile beside
+ * the count without wrapping.
+ */
 const padBtn: React.CSSProperties = {
-  width: 20,
-  height: 20,
+  width: 22,
+  height: 22,
   lineHeight: 1,
   padding: 0,
-  borderRadius: 4,
-  border: "1px solid #1f2a44",
-  background: "transparent",
-  color: "#9fb0c9",
+  borderRadius: 5,
+  border: "1px solid #2c3b5e",
+  background: "#131c31",
+  color: "#cfe0f5",
   cursor: "pointer",
-  fontSize: 13,
+  fontSize: 14,
+  fontWeight: 600,
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  flexShrink: 0,
 };
 
 const miniBtnFlex: React.CSSProperties = {

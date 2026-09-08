@@ -95,8 +95,12 @@ const event = (over: Partial<SessionChangedEvent> = {}): SessionChangedEvent => 
 });
 
 const mount = async () => {
+  // Returned so a test can read the rendered tree itself — asserting that
+  // something is NOT on screen (an emoji, a count) needs the container, not a
+  // query that would pass simply by finding nothing.
+  let result!: ReturnType<typeof render>;
   await act(async () => {
-    render(
+    result = render(
       // The management dialog a tile opens asks before lifting a ceiling, and
       // in the app that provider comes from App.tsx above the whole shell.
       <ConfirmProvider>
@@ -106,6 +110,7 @@ const mount = async () => {
       </ConfirmProvider>,
     );
   });
+  return result;
 };
 
 const fire = async (e: SessionChangedEvent) => {
@@ -253,6 +258,91 @@ describe("joysticks on the tile", () => {
     await mount();
 
     expect(add()).toBeTruthy();
+  });
+
+  /**
+   * The half that was missing, and the whole of what was reported.
+   *
+   * The buttons were drawn from the first pad; the COUNT was not — it appeared
+   * only from the second onwards. So a seat that had just started showed two
+   * 20px transparent glyphs, no icon, no number and no word, and a fully built
+   * feature read as absent. The label and the count are what make the two
+   * buttons legible as joystick controls.
+   */
+  test("a seat that has only its own pad still names and counts them", async () => {
+    repo.listActive.mockResolvedValue([{ ...ps, joystick_count: 1, joysticks: [] }]);
+    await mount();
+
+    // 1, not 0: the session's own pad is a pad in play, and the options dialog
+    // counts the same seat the same way.
+    expect(screen.getByText("1 / 4")).toBeTruthy();
+    // The word, carried on the same title the count sits under.
+    expect(screen.getByTitle("session.joysticks: 1 / 4")).toBeTruthy();
+  });
+
+  test("the count is drawn as an icon, not an emoji", async () => {
+    repo.listActive.mockResolvedValue([ps]);
+    const { container } = await mount();
+
+    // An emoji is rendered by whatever font the OS picked, at whatever width
+    // that font gives it — which a column of numbers across twenty tiles
+    // cannot have.
+    expect(container.textContent).not.toContain("🎮");
+    expect(container.querySelector("svg")).toBeTruthy();
+  });
+
+  test("the add button carries the tooltip a cashier reads", async () => {
+    repo.listActive.mockResolvedValue([ps]);
+    await mount();
+
+    expect(add().getAttribute("title")).toBe("session.joystickAddHere");
+    expect(drop().getAttribute("title")).toBe("session.joystickRemoveHere");
+  });
+
+  /**
+   * A second click before the first has been answered would hand out two pads
+   * and bill for both. Both buttons go down together — the pad that is added
+   * decides which slot a removal names, so neither may move while that is
+   * unsettled.
+   */
+  test("both buttons are held while a change is in flight", async () => {
+    repo.listActive.mockResolvedValue([ps]);
+    let release: (v: unknown) => void = () => {};
+    repo.addJoystick.mockReturnValue(new Promise((r) => { release = r; }));
+    await mount();
+
+    await act(async () => { fireEvent.click(add()); });
+
+    expect(add().disabled).toBe(true);
+    expect(drop().disabled).toBe(true);
+
+    await act(async () => { release(ps); });
+  });
+
+  test("a seat with no pads shows no count either", async () => {
+    // A computer: no icon, no number, no buttons.
+    repo.listActive.mockResolvedValue([{ ...ps, supports_joysticks: false, joystick_count: 1 }]);
+    const { container } = await mount();
+
+    expect(screen.queryByRole("button", { name: "session.joystickAddHere" })).toBeNull();
+    expect(container.textContent).not.toContain("1 / 4");
+  });
+
+  /**
+   * The row exists for two independent reasons and they do not imply each
+   * other: pads, and the waived-bill pill. A free COMPUTER draws the row for
+   * the pill alone and must still show no pad count — otherwise every waived
+   * PC session on the board reads as a console with one controller.
+   */
+  test("a waived computer shows its pill and still no pads", async () => {
+    repo.listActive.mockResolvedValue([
+      { ...ps, supports_joysticks: false, joystick_count: 1, is_free: true },
+    ]);
+    const { container } = await mount();
+
+    expect(screen.getByText("session.freeBillShort")).toBeTruthy();
+    expect(container.textContent).not.toContain("1 / 4");
+    expect(screen.queryByRole("button", { name: "session.joystickAddHere" })).toBeNull();
   });
 
   test("are absent on a seat that has none", async () => {
