@@ -1009,12 +1009,18 @@ saying so.
 
 | Control | Where | Who |
 |---|---|---|
-| 🎮 add / remove a joystick | `SessionOptionsDialog` | everyone who works the branch |
-| +10 / +30 / +60 minutes | same | same |
+| 🎮 set the pad count (select, 1–4) | the seat's tile in `SessionsBoard` | everyone who works the branch |
+| +10 / +30 / +60 minutes | `SessionOptionsDialog` | same |
 | switch to unlimited | same | same |
-| Free (waive the bill) | same, behind `session.free` | admin + owner |
 | Free (start it waived) | `StartSessionDialog`, behind `session.free` | admin + owner |
 | joystick prices, rounding policy | `BranchPricesPage` | admin + owner |
+
+⚠️ Two rows MOVED out of `SessionOptionsDialog` (2026-09-10). Pads are set on
+the tile, because a cashier looking at the board can already see how many are in
+play and opening Add Time to change them was a detour. Waiving the bill is now a
+decision made when the session STARTS and nowhere else — it is what the whole
+session costs, not an adjustment to make halfway through, and mixing it into the
+add-time dialog put an admin-only control in a dialog everyone uses.
 
 **Free is offered at the START as well as on a running session (2026-09-04),**
 and it is the same capability in both places — the server asserts
@@ -1072,6 +1078,14 @@ were in play and never what the ceiling was, which is the half a cashier at the
 board actually needs ("can another player join?"). One glyph plus the fraction
 is also narrower than the old worst case, so the card cannot grow. Same
 fraction the options dialog shows.
+
+**Next to it is a `select`, 1 to 4, and the whole row must stay on ONE line.**
+Two 22px steppers meant going from one pad to three was two presses with the
+number catching up in between; a select states the target and the board reads
+back what the SERVER returned. The row is `flex-wrap: nowrap` with the fraction
+`flex-shrink: 0` and the select fixed at 46px, because the tile is 160px and a
+full-width input pushed `1 / 4` onto a second line — where it read as another
+field rather than as the label of the control beside it.
 
 **No native `confirm()` anywhere in here.** The unlimited confirmation used
 `window.confirm`, which poisons the Electron renderer's keyboard focus on Linux

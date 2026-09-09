@@ -574,7 +574,19 @@ const SessionsBoard = ({ branchId }: Props) => {
                     Shown for every PlayStation seat, not only one that already
                     has a second pad: a control that appears once you have
                     already used it is a control nobody finds. */}
-                <span className="row" style={{ gap: 4, alignItems: "center" }}>
+                <span
+                  className="row"
+                  style={{
+                    gap: 4,
+                    alignItems: "center",
+                    // The three parts are one reading — glyph, count, control —
+                    // and they must not break across lines. The tile is 160px
+                    // and the count was dropping under the icon, which read as
+                    // a second row of something rather than as one field.
+                    flexWrap: "nowrap",
+                    whiteSpace: "nowrap",
+                  }}
+                >
                   {/* The count, with the icon and the word in front of it.
                       Before this it appeared only from the SECOND pad onwards,
                       so a seat that had just started showed two unlabelled 20px
@@ -595,7 +607,15 @@ const SessionsBoard = ({ branchId }: Props) => {
                   {(supportsJoysticks || joystickCount > 1) && (
                     <span
                       className="row"
-                      style={{ gap: 4, alignItems: "center" }}
+                      style={{
+                        gap: 4,
+                        alignItems: "center",
+                        flexWrap: "nowrap",
+                        whiteSpace: "nowrap",
+                        // "1 / 4" is three glyphs and a slash; letting it shrink
+                        // is what pushed it onto its own line.
+                        flexShrink: 0,
+                      }}
                       title={`${t("session.joysticks")}: ${joystickCount} / ${MAX_JOYSTICKS}`}
                     >
                       <JoystickIcon />
@@ -614,7 +634,17 @@ const SessionsBoard = ({ branchId }: Props) => {
                         UI choice, and the server enforces both ends. */}
                     <select
                       className="input"
-                      style={{ height: 24, padding: "0 4px", fontSize: 12 }}
+                      style={{
+                        height: 24,
+                        // One digit and the arrow, nothing more: the value is
+                        // 1..4, and a full-width input on a 160px tile is what
+                        // pushed the count off the line.
+                        width: 46,
+                        minWidth: 0,
+                        flexShrink: 0,
+                        padding: "0 2px",
+                        fontSize: 12,
+                      }}
                       title={`${t("session.joysticks")}: ${joystickCount} / ${MAX_JOYSTICKS}`}
                       aria-label={t("session.joysticks")}
                       // Disabled only while a change is in flight — the
