@@ -207,6 +207,71 @@ export const apiMakeSessionUnlimited = (sessionId: number, hourlyRate?: number) 
     body: hourlyRate === undefined ? {} : { hourly_rate: hourlyRate },
   });
 
+/**
+ * One seat the player could finish on instead.
+ *
+ * `hourly_rate` is what the SERVER resolved for that seat, not a number the
+ * panel worked out — showing a different figure from the one that will be
+ * charged is the bug this field exists to prevent.
+ */
+export interface IExtensionAlternative {
+  place_id: number;
+  pc_id: number;
+  number: number | null;
+  name: string | null;
+  platform: string | null;
+  type: string | null;
+  hourly_rate: number;
+  free_from: string;
+  free_until: string;
+}
+
+/** What the server says about extending this session by N minutes. */
+export interface IExtensionOptions {
+  can_extend_here: boolean;
+  /** `seat_reserved`, `seat_reserved_unlimited`, `unlimited`, or null. */
+  reason: string | null;
+  current: {
+    session_id: number;
+    place_id: number | null;
+    place_number: number | null;
+    place_name: string | null;
+    platform: string | null;
+    type: string | null;
+    started_at: string | null;
+    ends_at: string | null;
+    is_unlimited: boolean;
+  };
+  requested_minutes: number;
+  requested_end: string | null;
+  latest_allowed_end: string | null;
+  max_minutes_here: number | null;
+  alternatives: IExtensionAlternative[];
+}
+
+/**
+ * "Can this seat take +N, and if not, where could the player finish?"
+ *
+ * ⚠️ ADVICE. The list was true when it was drawn and a phone can reserve one of
+ * those seats a second later — `apiTransferExtension` re-checks everything
+ * under a row lock and may still refuse. Never treat this as a promise.
+ */
+export const apiSessionExtensionOptions = (sessionId: number, minutes: number) =>
+  request<IExtensionOptions>(`/sessions/${sessionId}/extension-options?minutes=${minutes}`);
+
+/**
+ * Move the session to another seat and grant the time there — one atomic
+ * operation on the server.
+ *
+ * The SAME session comes back: same id, same start, same bill, same products
+ * and pads. Nothing is re-created, so nothing is charged twice.
+ */
+export const apiTransferExtension = (sessionId: number, placeId: number, minutes: number) =>
+  request<{ session: ISessionApi }>(`/sessions/${sessionId}/transfer-extension`, {
+    method: "POST",
+    body: { place_id: placeId, minutes },
+  });
+
 /** Waive the bill, or put it back. Owner-level; the server enforces it. */
 export const apiSetSessionFree = (sessionId: number, isFree: boolean) =>
   request<{ session: ISessionApi }>(`/sessions/${sessionId}/free`, {

@@ -26,6 +26,8 @@ const repo = vi.hoisted(() => ({
   addTime: vi.fn(),
   makeUnlimited: vi.fn(),
   setFree: vi.fn(),
+  extensionOptions: vi.fn(),
+  transferExtension: vi.fn(),
 }));
 const auth = vi.hoisted(() => ({ role: "company_owner" as string }));
 
@@ -36,6 +38,8 @@ vi.mock("@/repositories/SessionRepository", () => ({
     addTime: (...a: unknown[]) => repo.addTime(...a),
     makeUnlimited: (...a: unknown[]) => repo.makeUnlimited(...a),
     setFree: (...a: unknown[]) => repo.setFree(...a),
+    extensionOptions: (...a: unknown[]) => repo.extensionOptions(...a),
+    transferExtension: (...a: unknown[]) => repo.transferExtension(...a),
   },
 }));
 const prices = vi.hoisted(() => ({
@@ -779,5 +783,108 @@ describe("when the seat is reserved ahead", () => {
     });
 
     expect(screen.queryByText(/session.seatClaimed/)).toBeNull();
+  });
+});
+
+/**
+ * "…or finish on another seat."
+ *
+ * The refusal already names the most this seat can give. When that is not what
+ * the player asked for, the server is asked where they COULD finish and the
+ * cashier gets one press per candidate. The list is stale by construction, so
+ * the press sends a normal request and a refusal is a correct outcome.
+ */
+describe("moving the player to another seat", () => {
+  const refusal = () =>
+    Object.assign(new Error("The seat is reserved"), {
+      body: {
+        message: "The seat is reserved",
+        code: "seat_reserved",
+        latest_allowed_end: "2026-09-03T14:40:00.000Z",
+        max_minutes_here: 10,
+        max_minutes: 10,
+      },
+    });
+
+  const options = (alternatives: unknown[]) => ({
+    can_extend_here: false,
+    reason: "seat_reserved",
+    current: {},
+    requested_minutes: 30,
+    alternatives,
+  });
+
+  const seat = (over: Record<string, unknown> = {}) => ({
+    place_id: 91,
+    pc_id: 191,
+    number: 9,
+    name: null,
+    platform: "ps5",
+    type: "standard",
+    hourly_rate: 1500,
+    free_from: "2026-09-03T14:20:00.000Z",
+    free_until: "2026-09-03T15:00:00.000Z",
+    ...over,
+  });
+
+  const pressAPreset = async () => {
+    await act(async () => {
+      fireEvent.click(screen.getAllByRole("button", { name: "session.addMinutes" })[0]);
+    });
+  };
+
+  test("offers the seats the server says can take the grant", async () => {
+    repo.addTime.mockRejectedValueOnce(refusal());
+    repo.extensionOptions.mockResolvedValueOnce(options([seat(), seat({ place_id: 92, number: 10 })]));
+    await mount();
+    await pressAPreset();
+
+    expect(screen.getByText("session.moveTitle")).toBeTruthy();
+    expect(screen.getAllByRole("button", { name: "session.moveHere" })).toHaveLength(2);
+  });
+
+  test("moves to the seat that was pressed, for the minutes that were refused", async () => {
+    repo.addTime.mockRejectedValueOnce(refusal());
+    repo.extensionOptions.mockResolvedValueOnce(options([seat()]));
+    await mount();
+    await pressAPreset();
+
+    repo.transferExtension.mockResolvedValueOnce(session());
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "session.moveHere" }));
+    });
+
+    // The session id, the seat, and the grant the cashier originally asked for.
+    expect(repo.transferExtension).toHaveBeenCalledWith(42, 91, expect.any(Number));
+  });
+
+  test("says so when nothing is free rather than showing an empty list", async () => {
+    repo.addTime.mockRejectedValueOnce(refusal());
+    repo.extensionOptions.mockResolvedValueOnce(options([]));
+    await mount();
+    await pressAPreset();
+
+    expect(screen.getByText("session.moveNone")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "session.moveHere" })).toBeNull();
+  });
+
+  test("asks for nothing after a refusal that is not about the seat", async () => {
+    repo.addTime.mockRejectedValueOnce(
+      Object.assign(new Error("Session not active"), { body: { message: "Session not active" } }),
+    );
+    await mount();
+    await pressAPreset();
+
+    expect(repo.extensionOptions).not.toHaveBeenCalled();
+    expect(screen.queryByText("session.moveTitle")).toBeNull();
+  });
+
+  test("a failed lookup does not bury the refusal the cashier needs to read", async () => {
+    repo.addTime.mockRejectedValueOnce(refusal());
+    repo.extensionOptions.mockRejectedValueOnce(new Error("network"));
+    await mount();
+    await pressAPreset();
+
+    expect(screen.getByText("session.moveNone")).toBeTruthy();
   });
 });

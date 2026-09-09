@@ -16,7 +16,10 @@ export interface SessionChangedEvent {
     | "joystick.removed"
     | "time.added"
     | "unlimited"
-    | "free.changed";
+    | "free.changed"
+    // The session changed SEAT. Two device rows moved with it, so the board
+    // re-reads them as well — see `SessionsBoard`.
+    | "moved";
   session_id: number;
   branch_id: number;
   pc_id: number;

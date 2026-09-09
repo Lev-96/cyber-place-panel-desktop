@@ -498,6 +498,28 @@ export const TRANSLATIONS: Dict = {
     ru: "Место забронировано. Продлить можно на:",
     am: "Այս տեղը ամրագրված է: Կարող եք երկարաձգել:",
   },
+  // …or move the player. The seat cannot give the time asked for, these can.
+  "session.moveTitle": {
+    en: "Finish on another place",
+    ru: "Продолжить на другом месте",
+    am: "Շարունակել այլ տեղում",
+  },
+  // `{0}` is the grant that was refused — the same one these seats can take.
+  "session.moveHint": {
+    en: "These places can take the full +{0} min. The session keeps its time, bill and products.",
+    ru: "Эти места могут принять все +{0} мин. Сессия сохранит время, счёт и товары.",
+    am: "Այս տեղերը կարող են ընդունել ամբողջ +{0} րոպեն։ Սեսիան պահպանում է ժամանակը, հաշիվը և ապրանքները։",
+  },
+  "session.moveHere": {
+    en: "Move here",
+    ru: "Перенести сюда",
+    am: "Տեղափոխել այստեղ",
+  },
+  "session.moveNone": {
+    en: "No free place can take this extension right now.",
+    ru: "Сейчас нет свободного места, которое примет это продление.",
+    am: "Այս պահին ազատ տեղ չկա այս երկարաձգման համար։",
+  },
   // Manual entry, for the grant no preset covers. The unit matters more than
   // it looks: a cashier typing "2" means two hours far more often than two
   // minutes, and a number with no unit beside it is the kind of ambiguity that

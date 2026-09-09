@@ -152,7 +152,17 @@ const SessionsBoard = ({ branchId }: Props) => {
         if (ended) setStopTarget((current) => current ?? { ...ended, status: "expired" });
       }
       void sessions.reload();
-    }, [sessions]),
+
+      // A MOVE changed two device rows as well as the session — the seat left
+      // behind went back to Online and the one taken went In Session. The
+      // session list alone would move the tile but leave both devices reading
+      // their old status, which is what the board colours "offline" and
+      // "startable" from. Only this kind needs it; every other change touches
+      // the session and nothing else.
+      if (evt.kind === "moved") {
+        void pcs.reload();
+      }
+    }, [sessions, pcs]),
   );
 
   /**

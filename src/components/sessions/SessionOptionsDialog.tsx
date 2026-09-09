@@ -20,6 +20,7 @@ import {
   seatUnavailableBodyOf,
   type SeatUnavailableBody,
 } from "@/api/seatUnavailable";
+import type { IExtensionAlternative } from "@/api/sessions";
 
 interface Props {
   session: ISessionApi;
@@ -80,6 +81,17 @@ const SessionOptionsDialog = ({ session, platform, onClose, onChanged }: Props) 
    * an unrelated error.
    */
   const [seatRefusal, setSeatRefusal] = useState<SeatUnavailableBody | null>(null);
+  /**
+   * The grant that was refused, and the seats the server says could take it.
+   *
+   * Held together because one is meaningless without the other: moving a
+   * player needs to know how long for, and the list is only valid for that
+   * length. Cleared on every new attempt so a stale list can never be acted
+   * on — and even then the POST re-checks, because a phone can take a seat
+   * while this modal is open.
+   */
+  const [refusedMinutes, setRefusedMinutes] = useState<number | null>(null);
+  const [alternatives, setAlternatives] = useState<IExtensionAlternative[] | null>(null);
   // Manual grant: off by default, so the ordinary case stays one tap.
   const [manual, setManual] = useState(false);
   const [manualAmount, setManualAmount] = useState("");
@@ -187,10 +199,31 @@ const SessionOptionsDialog = ({ session, platform, onClose, onChanged }: Props) 
   const offeredMinutes = offeredMinutesOf(seatRefusal);
   const claimedFrom = claimedFromOf(seatRefusal);
 
-  const run = async (action: () => Promise<ISessionApi>): Promise<boolean> => {
+  /**
+   * Ask the server for seats that could take the grant this one refused.
+   *
+   * Failures are swallowed into an empty list on purpose: the cashier already
+   * has the refusal in front of them, and a second error line about a
+   * suggestion feature would bury it.
+   */
+  const loadAlternatives = async (sessionId: number, minutes: number): Promise<void> => {
+    try {
+      const options = await sessionRepository.extensionOptions(sessionId, minutes);
+      setAlternatives(options.alternatives);
+    } catch {
+      setAlternatives([]);
+    }
+  };
+
+  const run = async (
+    action: () => Promise<ISessionApi>,
+    attemptedMinutes: number | null = null,
+  ): Promise<boolean> => {
     setBusy(true);
     setError(null);
     setSeatRefusal(null);
+    setAlternatives(null);
+    setRefusedMinutes(null);
     try {
       const updated = await action();
       setCurrent(updated);
@@ -200,8 +233,16 @@ const SessionOptionsDialog = ({ session, platform, onClose, onChanged }: Props) 
       // The seat-is-taken refusal carries the grant the server WOULD accept.
       // Kept beside the sentence so the dialog can offer it as a button
       // instead of leaving the cashier to retry by halving the number.
-      setSeatRefusal(seatUnavailableBodyOf(e));
+      const refusal = seatUnavailableBodyOf(e);
+      setSeatRefusal(refusal);
       setError(e instanceof Error ? e.message : String(e));
+
+      // …and, when it was a reservation in the way, ask where the player
+      // COULD finish. Read-only and advisory — see `apiSessionExtensionOptions`.
+      if (refusal !== null && attemptedMinutes !== null) {
+        setRefusedMinutes(attemptedMinutes);
+        void loadAlternatives(current.id, attemptedMinutes);
+      }
       // The refusal is very often "no price is set for joystick #N", and the
       // price list this dialog drew its button from is exactly what has gone
       // stale. Re-reading it is what stops the button advertising a rate the
@@ -298,13 +339,62 @@ const SessionOptionsDialog = ({ session, platform, onClose, onChanged }: Props) 
                 variant="secondary"
                 disabled={busy || !isActive}
                 onClick={() =>
-                  void run(() => sessionRepository.addTime(current.id, offeredMinutes))
+                  void run(() => sessionRepository.addTime(current.id, offeredMinutes), offeredMinutes)
                 }
               >
                 {t("session.addMinutes").replace("{0}", String(offeredMinutes))}
               </Button>
             </div>
           </div>
+        )}
+
+        {/* "…or finish the game on another seat."
+            The player is at the counter and the seat they are on cannot give
+            them the time they asked for. These are the seats that CAN — same
+            venue, same tariff, free for the whole stretch — resolved by the
+            server, never worked out here.
+
+            ⚠️ The list is stale the moment it is drawn. Pressing one of these
+            sends a normal request that re-checks under a row lock, and being
+            refused (409) is correct rather than a bug: a phone can have taken
+            the seat while this was on screen. */}
+        {alternatives !== null && refusedMinutes !== null && (
+          <section className="col" style={{ gap: 8 }}>
+            <strong>{t("session.moveTitle")}</strong>
+
+            {alternatives.length === 0 ? (
+              <span className="muted" style={{ fontSize: 12 }}>
+                {t("session.moveNone")}
+              </span>
+            ) : (
+              <div className="col" style={{ gap: 6 }}>
+                <span className="muted" style={{ fontSize: 12 }}>
+                  {t("session.moveHint").replace("{0}", String(refusedMinutes))}
+                </span>
+                {alternatives.map((alt) => (
+                  <div key={alt.place_id} className="row-between" style={{ alignItems: "center", gap: 8 }}>
+                    <span>
+                      {alt.name ?? `№${alt.number ?? alt.place_id}`}
+                      {" · "}
+                      <span className="muted">{money(alt.hourly_rate)}</span>
+                    </span>
+                    <Button
+                      variant="secondary"
+                      disabled={busy || !isActive}
+                      onClick={() =>
+                        void run(
+                          () => sessionRepository.transferExtension(current.id, alt.place_id, refusedMinutes),
+                          refusedMinutes,
+                        )
+                      }
+                    >
+                      {t("session.moveHere")}
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
         )}
 
         {/* ── joysticks ─────────────────────────────────────────────────── */}
@@ -402,7 +492,7 @@ const SessionOptionsDialog = ({ session, platform, onClose, onChanged }: Props) 
                   key={m}
                   variant="secondary"
                   disabled={busy || !isActive}
-                  onClick={() => void run(() => sessionRepository.addTime(current.id, m))}
+                  onClick={() => void run(() => sessionRepository.addTime(current.id, m), m)}
                 >
                   {t("session.addMinutes").replace("{0}", String(m))}
                 </Button>
@@ -467,7 +557,7 @@ const SessionOptionsDialog = ({ session, platform, onClose, onChanged }: Props) 
                       disabled={busy || !isActive || manualMinutes === null}
                       onClick={() => {
                         if (manualMinutes === null) return;
-                        void run(() => sessionRepository.addTime(current.id, manualMinutes))
+                        void run(() => sessionRepository.addTime(current.id, manualMinutes), manualMinutes)
                           // Only on success. A refused grant keeps the box as
                           // it was, beside the sentence saying why.
                           .then((ok) => { if (ok) { setManualAmount(""); setManual(false); } });
