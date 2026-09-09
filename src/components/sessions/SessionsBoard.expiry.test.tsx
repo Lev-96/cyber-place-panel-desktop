@@ -241,6 +241,8 @@ describe("joysticks on the tile", () => {
 
   const add = () => screen.getByRole("button", { name: "session.joystickAddHere" }) as HTMLButtonElement;
   const drop = () => screen.getByRole("button", { name: "session.joystickRemoveHere" }) as HTMLButtonElement;
+  const noAdd = () => screen.queryByRole("button", { name: "session.joystickAddHere" });
+  const noDrop = () => screen.queryByRole("button", { name: "session.joystickRemoveHere" });
 
   test("are offered on a PlayStation seat", async () => {
     repo.listActive.mockResolvedValue([ps]);
@@ -385,46 +387,40 @@ describe("joysticks on the tile", () => {
     expect(repo.removeJoystick).toHaveBeenCalledWith(42, 3);
   });
 
-  test("cannot remove the session's own pad", async () => {
+  /**
+   * At either end the button is GONE, not greyed out.
+   *
+   * On a 22px control a disabled state is a shade of grey an operator has to
+   * compare against its neighbour to read, and "why can I not press this" is a
+   * worse question than "there is nothing to press". The count beside it — 1/4
+   * or 4/4 — is what answers the question a missing button raises.
+   */
+  test("the minus is absent at the floor, and the plus is still there", async () => {
     repo.listActive.mockResolvedValue([{ ...ps, joystick_count: 1, joysticks: [] }]);
     await mount();
 
     // Slot 1 IS the session and has no row to remove.
-    expect(drop().disabled).toBe(true);
+    expect(noDrop()).toBeNull();
+    expect(add()).toBeTruthy();
   });
 
-  test("cannot add a fifth", async () => {
+  test("the plus is absent at the ceiling, and the minus is still there", async () => {
     repo.listActive.mockResolvedValue([{ ...ps, joystick_count: 4 }]);
     await mount();
 
-    expect(add().disabled).toBe(true);
+    expect(noAdd()).toBeNull();
+    expect(drop()).toBeTruthy();
   });
 
-  /**
-   * A disabled control has to say why it is disabled. "Add a joystick to this
-   * session" on a button that cannot be pressed is the least useful sentence
-   * available, and the operator's next move is to press it again.
-   *
-   * The aria-label stays constant on purpose — it names the control, and a
-   * screen reader user should not have the button rename itself.
-   */
-  test("a button at its limit says which limit", async () => {
-    repo.listActive.mockResolvedValue([{ ...ps, joystick_count: 4 }]);
+  /** Both ends move with the count, on the same board. */
+  test("in the middle both are offered", async () => {
+    repo.listActive.mockResolvedValue([{ ...ps, joystick_count: 3 }]);
     await mount();
 
-    expect(add().getAttribute("title")).toBe("session.joystickMaxHere");
-    // The other end, on the same board: four pads is nowhere near the floor.
-    expect(drop().getAttribute("title")).toBe("session.joystickRemoveHere");
+    expect(add()).toBeTruthy();
+    expect(drop()).toBeTruthy();
   });
 
-  test("and at the floor the minus says so", async () => {
-    repo.listActive.mockResolvedValue([{ ...ps, joystick_count: 1, joysticks: [] }]);
-    await mount();
-
-    expect(drop().disabled).toBe(true);
-    expect(drop().getAttribute("title")).toBe("session.joystickMinHere");
-    expect(add().getAttribute("title")).toBe("session.joystickAddHere");
-  });
 
   /**
    * The count on the tile is the SERVER's, never inferred from the rows the

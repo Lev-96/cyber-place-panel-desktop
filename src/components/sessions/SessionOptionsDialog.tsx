@@ -5,11 +5,11 @@ import Modal from "@/components/ui/Modal";
 import Radio from "@/components/ui/Radio";
 import { useConfirm } from "@/components/ui/ConfirmProvider";
 import Spinner from "@/components/ui/Spinner";
-import { IJoystickPrice, JOYSTICK_SLOTS, MAX_JOYSTICKS } from "@/api/joystickPrices";
+import { MAX_JOYSTICKS } from "@/api/joystickPrices";
 import { useAuth } from "@/auth/AuthContext";
 import { can } from "@/auth/permissions";
 import { useLang } from "@/i18n/LanguageContext";
-import { joystickPriceRepository } from "@/repositories/JoystickPriceRepository";
+import { billingSettingsRepository } from "@/repositories/BillingSettingsRepository";
 import { sessionRepository } from "@/repositories/SessionRepository";
 import { ISessionApi } from "@/types/sessions";
 import { platformGroup, platformLabel } from "@/utils/platform";
@@ -64,7 +64,8 @@ const SessionOptionsDialog = ({ session, platform, onClose, onChanged }: Props) 
   const { user } = useAuth();
   const confirm = useConfirm();
   const [current, setCurrent] = useState<ISessionApi>(session);
-  const [prices, setPrices] = useState<IJoystickPrice[]>([]);
+  // The venue's one joystick fee, or null when it does not offer extra pads.
+  const [fee, setFee] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Manual grant: off by default, so the ordinary case stays one tap.
@@ -98,9 +99,12 @@ const SessionOptionsDialog = ({ session, platform, onClose, onChanged }: Props) 
   const isFree = current.is_free ?? false;
   const isActive = current.status === "active";
 
+  // ONE fee for every pad, read from the venue's billing settings. It was a
+  // list of per-slot prices and a lookup for "which slot comes next", which
+  // could quote a figure for a pad the server was not about to allocate.
   const loadPrices = useCallback(() => {
     if (!isPlayStation) return;
-    void joystickPriceRepository.listByBranch(current.branch_id).then(setPrices);
+    void billingSettingsRepository.get(current.branch_id).then((s) => setFee(s.joystick_price));
   }, [current.branch_id, isPlayStation]);
 
   useEffect(loadPrices, [loadPrices]);
@@ -189,28 +193,15 @@ const SessionOptionsDialog = ({ session, platform, onClose, onChanged }: Props) 
     }
   };
 
-  const priceFor = (slot: number): number | null =>
-    prices.find((p) => p.slot === slot)?.price ?? null;
-
   /**
-   * The slot the server will actually allocate: the LOWEST free one, exactly as
-   * `JoystickService::add()` picks it.
+   * What the next pad will cost: the venue's one fee, whichever slot it lands
+   * in.
    *
-   * This was `joystickCount + 1`, which is the same number right up until a pad
-   * is removed from the middle. With slots 2 and 4 in play the count is 3, so
-   * the old sum said "next is 4" and quoted slot 4's rate — while the server
-   * would allocate slot 3. The button advertised a price for a pad nobody was
-   * about to add, and on a venue that had not priced slot 3 it advertised a
-   * price and then refused.
+   * This used to resolve the slot the server would allocate and look its price
+   * up, because there were three of them — a lookup that could quote a figure
+   * for a pad nobody was about to add. One fee makes the question disappear.
    */
-  const openSlots = (current.joysticks ?? []).filter((j) => j.stopped_at === null).map((j) => j.slot);
-  const nextSlot = current.joysticks
-    ? JOYSTICK_SLOTS.find((slot) => !openSlots.includes(slot)) ?? null
-    // No interval rows to reason from — an older backend, or a session
-    // returned without the relation. The count is then the only thing known,
-    // and it is right in every case except a pad removed from the middle.
-    : (JOYSTICK_SLOTS.find((slot) => slot === joystickCount + 1) ?? null);
-  const nextPrice = nextSlot === null ? null : priceFor(nextSlot);
+  const nextPrice = fee;
 
   // Whole minutes since the session started, in the same "1 ч 20 мин" shape the
   // receipt uses. Computed from `started_at` rather than ticked, because this

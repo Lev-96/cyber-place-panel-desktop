@@ -1,76 +1,66 @@
 import Button from "@/components/ui/Button";
 import PriceInput from "@/components/ui/PriceInput";
-import { IJoystickPrice, JOYSTICK_SLOTS } from "@/api/joystickPrices";
+import { IBillingSettings } from "@/api/joystickPrices";
 import { useLang } from "@/i18n/LanguageContext";
-import { joystickPriceRepository } from "@/repositories/JoystickPriceRepository";
+import { billingSettingsRepository } from "@/repositories/BillingSettingsRepository";
 import { notify } from "@/ui/notify";
 import { FormEvent, useState } from "react";
 
 interface Props {
   branchId: number;
-  prices: IJoystickPrice[];
+  settings: IBillingSettings;
   onSaved: () => void;
 }
 
 /**
- * Per-hour rates for the 2nd, 3rd and 4th joystick.
+ * What one extra joystick costs. One figure, for every pad.
  *
- * Three fixed rows rather than an add/remove list: the set is closed at four
- * pads and the first is the session itself, so "which slots exist" is not a
- * decision an operator makes. What they decide is what each one costs, and
- * whether it is offered at all.
+ * It was three inputs — the second pad, the third and the fourth — because the
+ * schema could express three prices. No venue ever set them differently, so the
+ * screen asked an operator three questions with a single answer and left two of
+ * them to be forgotten: a venue that filled in only the first found the "+"
+ * button refusing the third pad with a sentence about a slot nobody had thought
+ * about.
  *
- * **An empty cell is a value, not a gap.** It means that joystick cannot be
- * added — the session card refuses with a sentence naming the slot. Blanking a
- * priced slot therefore DELETES its price, which is the only way to withdraw
- * one; sessions already using it are untouched, because their rate was frozen
- * onto their own rows when the pad was added.
+ * **An empty box is a value, not a gap.** It means extra pads are not offered
+ * here, and the session card refuses to add one with a sentence pointing back
+ * at this screen. Clearing a set fee is therefore how a venue withdraws the
+ * offer; sessions already holding pads are untouched, because each pad's fee
+ * was frozen onto its own row when it was handed out.
+ *
+ * The fee is FIXED per use and the server owns every consequence of it: it goes
+ * onto the bill when the pad is handed out and comes off when it is handed
+ * back, whatever the time in between. Nothing here multiplies it by anything.
  */
-const JoystickPricesForm = ({ branchId, prices, onSaved }: Props) => {
+const JoystickPricesForm = ({ branchId, settings, onSaved }: Props) => {
   const { t } = useLang();
-  const stored = (slot: number): string => {
-    const row = prices.find((p) => p.slot === slot);
-    return row ? String(row.price) : "";
-  };
+  const stored = settings.joystick_price === null ? "" : String(settings.joystick_price);
 
-  const [values, setValues] = useState<Record<number, string>>(() =>
-    Object.fromEntries(JOYSTICK_SLOTS.map((slot) => [slot, stored(slot)])),
-  );
+  const [value, setValue] = useState(stored);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
   // Numeric compare so a typed "500" matches a stored "500.00", and "" matches
-  // unset — otherwise Save would light up for every render.
-  const changed = JOYSTICK_SLOTS.some((slot) => {
-    const cur = values[slot]?.trim() === "" ? null : Number(values[slot]);
-    const orig = stored(slot) === "" ? null : Number(stored(slot));
-    return cur !== orig;
-  });
+  // unset — otherwise Save would light up on every render.
+  const typed = value.trim() === "" ? null : Number(value);
+  const changed = typed !== (settings.joystick_price ?? null);
+  const invalid = typed !== null && (!Number.isFinite(typed) || typed < 0);
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!changed || busy) return;
+    if (!changed || busy || invalid) return;
     setBusy(true);
     setErr(null);
     try {
-      for (const slot of JOYSTICK_SLOTS) {
-        const typed = values[slot]?.trim() ?? "";
-        const row = prices.find((p) => p.slot === slot);
-
-        if (typed === "") {
-          // Withdrawn. Nothing to do if it was never offered.
-          if (row) await joystickPriceRepository.remove(row.id);
-          continue;
-        }
-
-        const amount = Number(typed);
-        if (!Number.isFinite(amount) || amount < 0) continue;
-        if (row && Number(row.price) === amount) continue;
-
-        // The endpoint upserts on (branch, slot), so one call covers both
-        // "price it for the first time" and "change what it costs".
-        await joystickPriceRepository.save(branchId, slot, amount);
-      }
+      // The whole policy goes back, rounding included: this is a PUT and the
+      // server validates it as one object, so sending half of it would blank
+      // the other half.
+      await billingSettingsRepository.update(
+        branchId,
+        settings.money_rounding_step,
+        settings.money_rounding_mode,
+        typed,
+      );
       notify.message("success", t("joystickPrice.saved"));
       onSaved();
     } catch (e2) {
@@ -84,23 +74,19 @@ const JoystickPricesForm = ({ branchId, prices, onSaved }: Props) => {
     <form className="col" style={{ gap: 12 }} onSubmit={submit}>
       <span className="muted" style={{ fontSize: 12 }}>{t("joystickPrice.hint")}</span>
 
-      <div className="row" style={{ gap: 12, flexWrap: "wrap" }}>
-        {JOYSTICK_SLOTS.map((slot) => (
-          <div key={slot} style={{ minWidth: 160 }}>
-            <PriceInput
-              label={t("joystickPrice.slot").replace("{0}", String(slot))}
-              value={values[slot] ?? ""}
-              onChange={(v) => setValues((prev) => ({ ...prev, [slot]: v }))}
-              disabled={busy}
-            />
-          </div>
-        ))}
+      <div style={{ maxWidth: 220 }}>
+        <PriceInput
+          label={t("joystickPrice.one")}
+          value={value}
+          onChange={setValue}
+          disabled={busy}
+        />
       </div>
 
       {err && <div className="error">{err}</div>}
 
       <div>
-        <Button type="submit" disabled={!changed || busy}>{t("action.save")}</Button>
+        <Button type="submit" disabled={!changed || busy || invalid}>{t("action.save")}</Button>
       </div>
     </form>
   );

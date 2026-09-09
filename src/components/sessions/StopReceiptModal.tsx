@@ -144,11 +144,12 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved }: Prop
             </div>
 
             {/* Joysticks — one line per USE, because that is what is charged.
-                A pad is a flat fee owed once its period passed the threshold,
-                so a line is either the whole fee or a plain 0, never a
-                fraction. The 0 lines are the reason this section exists at
-                all: without them a cashier sees a pad that was in play and no
-                charge for it, and has to guess whether the till lost it.
+                A pad's fee goes on the bill when it is handed out and comes off
+                when it is handed back, so a line is either the whole fee or a
+                plain 0, never a fraction. The 0 lines are the reason this
+                section exists at all: without them a cashier sees a pad that
+                was in play and no charge for it, and has to guess whether the
+                till lost it.
 
                 The server decides every figure here. Nothing on this side
                 multiplies, divides or sums a pad's price — `amount` is read as
@@ -160,7 +161,7 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved }: Prop
                 </span>
                 <span className="muted" style={{ marginRight: 12, fontSize: 12 }}>
                   {j.minutes} {t("time.minShort") || "m"}
-                  {!j.is_charged && ` · ${t("session.joystickUnderThreshold")}`}
+                  {!j.is_charged && ` · ${t("session.joystickReturned")}`}
                 </span>
                 <span style={{ fontWeight: 700 }}>{money(Number(j.amount))}</span>
               </div>

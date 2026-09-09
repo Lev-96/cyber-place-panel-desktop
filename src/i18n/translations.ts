@@ -422,16 +422,6 @@ export const TRANSLATIONS: Dict = {
     ru: "Добавить джойстик к текущей сессии",
     am: "Ավելացնել ջոյսթիք այս նիստին",
   },
-  "session.joystickMaxHere": {
-    en: "Maximum number of joysticks reached",
-    ru: "Достигнуто максимальное количество джойстиков",
-    am: "Հասել է ջոյսթիքների առավելագույն քանակին",
-  },
-  "session.joystickMinHere": {
-    en: "Minimum number of joysticks reached",
-    ru: "Достигнуто минимальное количество джойстиков",
-    am: "Հասել է ջոյսթիքների նվազագույն քանակին",
-  },
   "session.joystickRemoveHere": {
     en: "Remove the last joystick from this session",
     ru: "Убрать последний джойстик из текущей сессии",
@@ -442,10 +432,13 @@ export const TRANSLATIONS: Dict = {
   "session.joystickSlot": { en: "Joystick #{0}", ru: "Джойстик №{0}", am: "Ջոյսթիք №{0}" },
   // Why a pad that was in play costs nothing. Without it the 0 on the receipt
   // reads as a till that lost the charge.
-  "session.joystickUnderThreshold": {
-    en: "under 10 min, not charged",
-    ru: "меньше 10 мин, не списано",
-    am: "10 րոպեից պակաս, չի գանձվել",
+  // Why a period that was in play is worth nothing: the pad was handed back,
+  // so its fee came off. Without it the 0 on the receipt reads as a till that
+  // lost the charge.
+  "session.joystickReturned": {
+    en: "returned, fee removed",
+    ru: "вернули, цена снята",
+    am: "վերադարձվել է, գինը հանվել է",
   },
   "session.joystickIncluded": {
     en: "Joystick #1 is part of the session",
@@ -468,9 +461,9 @@ export const TRANSLATIONS: Dict = {
     am: "Այս տեղը գրանցված է որպես «{0}»։",
   },
   "session.joystickBilledFrom": {
-    en: "A flat fee per joystick, charged once it has been out for 10 minutes. Handed back sooner, it costs nothing.",
-    ru: "Фиксированная цена за джойстик, списывается после 10 минут использования. Если вернуть раньше, платить не нужно.",
-    am: "Ֆիքսված գին յուրաքանչյուր ջոյսթիքի համար՝ գանձվում է 10 րոպե օգտագործելուց հետո։ Ավելի շուտ վերադարձնելու դեպքում վճարել պետք չէ։",
+    en: "A flat fee per joystick, added to the bill the moment it is handed out and taken off again when it is handed back. How long it is out makes no difference.",
+    ru: "Фиксированная цена за джойстик: прибавляется к счёту сразу при добавлении и снимается при удалении. Время использования на цену не влияет.",
+    am: "Ֆիքսված գին յուրաքանչյուր ջոյսթիքի համար՝ ավելացվում է հաշվին անմիջապես տալու պահին և հանվում վերադարձնելիս։ Օգտագործման տևողությունը գնի վրա չի ազդում։",
   },
   "session.addTime": { en: "Add time", ru: "Добавить время", am: "Ավելացնել ժամանակ" },
   "session.addMinutes": { en: "+{0} min", ru: "+{0} мин", am: "+{0} րոպե" },
@@ -914,10 +907,11 @@ export const TRANSLATIONS: Dict = {
   "history.total": { en: "Total", ru: "Итог", am: "Ընդհանուր" },
   /* ── the Prices screen's two new sections ─────────────────────────────── */
   "joystickPrice.sectionTitle": { en: "Joystick prices", ru: "Цены на джойстики", am: "Ջոյսթիքների գներ" },
+  "joystickPrice.one": { en: "Joystick price", ru: "Цена на джойстик", am: "Ջոյսթիքի գին" },
   "joystickPrice.hint": {
-    en: "A flat fee per use, for the 2nd, 3rd and 4th joystick on a PlayStation session. Not per hour: the fee is the same for 11 minutes and for the whole evening, and a pad handed back inside 10 minutes costs nothing. The first joystick is the session itself and is already in the place's rate. An empty cell means that joystick cannot be added.",
-    ru: "Фиксированная цена за одно использование 2-го, 3-го и 4-го джойстика в сессии PlayStation. Не за час: цена одна и та же за 11 минут и за весь вечер, а если джойстик вернули в первые 10 минут, платить не нужно. Первый джойстик. Это сама сессия, он уже в тарифе места. Пустая ячейка значит, что такой джойстик добавить нельзя.",
-    am: "Ֆիքսված գին՝ PlayStation-ի նիստի 2-րդ, 3-րդ և 4-րդ ջոյսթիքի մեկ օգտագործման համար։ Ոչ թե ժամի դիմաց՝ գինը նույնն է և՛ 11 րոպեի, և՛ ամբողջ երեկոյի համար, իսկ առաջին 10 րոպեում վերադարձված ջոյսթիքի համար վճարել պետք չէ։ Առաջին ջոյսթիքը հենց նիստն է և արդեն մտնում է տեղի սակագնի մեջ։ Դատարկ վանդակը նշանակում է, որ այդ ջոյսթիքը հնարավոր չէ ավելացնել։",
+    en: "One flat fee for every extra joystick on a PlayStation session. It goes onto the bill the moment a pad is handed out and comes off when it is handed back; how long it was out makes no difference. The first joystick is the session itself and is already in the place's rate. An empty box means extra joysticks are not offered here.",
+    ru: "Одна фиксированная цена для каждого дополнительного джойстика в сессии PlayStation. Она прибавляется к счёту сразу при добавлении джойстика и снимается при удалении; время использования на цену не влияет. Первый джойстик. Это сама сессия, он уже в тарифе места. Пустое поле значит, что дополнительные джойстики здесь не выдаются.",
+    am: "Մեկ ֆիքսված գին՝ PlayStation-ի նիստի յուրաքանչյուր լրացուցիչ ջոյսթիքի համար։ Այն ավելացվում է հաշվին ջոյսթիքը տալու պահին և հանվում վերադարձնելիս. օգտագործման տևողությունը գնի վրա չի ազդում։ Առաջին ջոյսթիքը հենց նիստն է և արդեն մտնում է տեղի սակագնի մեջ։ Դատարկ դաշտը նշանակում է, որ այստեղ լրացուցիչ ջոյսթիքներ չեն տրվում։",
   },
   "joystickPrice.slot": { en: "Joystick #{0}", ru: "Джойстик №{0}", am: "Ջոյսթիք №{0}" },
   "joystickPrice.saved": { en: "Joystick prices saved", ru: "Цены на джойстики сохранены", am: "Ջոյսթիքների գները պահպանվեցին" },

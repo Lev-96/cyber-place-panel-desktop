@@ -11,7 +11,7 @@ import { useAsync } from "@/hooks/useAsync";
 import { useLang } from "@/i18n/LanguageContext";
 import { timePackageNameOf } from "@/i18n/timePackageName";
 import { branchRepository } from "@/repositories/BranchRepository";
-import { joystickPriceRepository } from "@/repositories/JoystickPriceRepository";
+import { billingSettingsRepository } from "@/repositories/BillingSettingsRepository";
 import { platformPriceRepository } from "@/repositories/PlatformPriceRepository";
 import { subplatformRepository } from "@/repositories/SubplatformRepository";
 import { timePackageRepository } from "@/repositories/TimePackageRepository";
@@ -40,8 +40,9 @@ const BranchPricesPage = () => {
   const packages = useAsync(() => timePackageRepository.listByBranch(id), [id]);
   const platformPrices = useAsync(() => platformPriceRepository.listByBranch(id), [id]);
   const subplatforms = useAsync(() => subplatformRepository.listByBranch(id), [id]);
-  const joystickPrices = useAsync(() => joystickPriceRepository.listByBranch(id), [id]);
-  const billing = useAsync(() => joystickPriceRepository.billingSettings(id), [id]);
+  // One read for both money policies — the joystick fee and the rounding rule
+  // are two fields on the same branch and the same endpoint.
+  const billing = useAsync(() => billingSettingsRepository.get(id), [id]);
 
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState<ITimePackage | null>(null);
@@ -116,17 +117,17 @@ const BranchPricesPage = () => {
       )}
 
       {/* Extra joysticks. Its own section rather than a column on the matrix
-          above: that matrix is per (platform × tier) and this is per SLOT, and
-          folding one into the other would make a grid where most cells are
-          meaningless — a computer has no second joystick. */}
+          above: that matrix is per (platform × tier) and this is one figure for
+          the venue, and folding one into the other would make a grid where most
+          cells are meaningless — a computer has no second joystick. */}
       <section className="col" style={{ gap: 12 }}>
         <h2 className="page-title" style={{ margin: 0 }}>{t("joystickPrice.sectionTitle")}</h2>
-        {joystickPrices.data && (
+        {billing.data && (
           <JoystickPricesForm
-            key={(joystickPrices.data ?? []).map((p) => `${p.slot}:${p.price}`).join(",")}
+            key={String(billing.data.joystick_price)}
             branchId={id}
-            prices={joystickPrices.data}
-            onSaved={() => void joystickPrices.reload()}
+            settings={billing.data}
+            onSaved={() => void billing.reload()}
           />
         )}
       </section>

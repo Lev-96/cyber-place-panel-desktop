@@ -1,66 +1,32 @@
 import { request } from "./client";
 
 /**
- * FIXED prices for one use of the 2nd, 3rd and 4th joystick on a PlayStation
- * session.
+ * What one extra joystick costs, and the venue's rounding policy.
  *
- * Per use, not per hour: 300 means a player who takes a second pad is charged
- * 300 whether they keep it for eleven minutes or all evening — and nothing at
- * all if they hand it back inside the grace window, which the server decides.
- * Nothing on this side ever divides or multiplies these figures.
+ * ## One fee, not one per slot
  *
- * There is no price for the first pad: it is the session, already paid for by
- * the place's own hourly rate. Slots are priced separately because a venue may
- * well charge less for the second than for the fourth, which a single "extra
- * pad" figure could not express.
+ * It was three prices — the second pad, the third and the fourth — and no
+ * venue ever set them differently, so the screen asked an operator three
+ * questions with a single answer. There is now ONE figure per branch, and it
+ * lives on the branch's billing settings beside the rounding rule: both are
+ * owner-level policy about money, and neither is worth a table.
  *
- * READING is open to every staff role — the "+ joystick" button on a session
- * card has to know whether a price exists before it offers to add one. WRITING
- * is owner-level and the backend enforces it (`prices.manage`); the permission
- * map here only decides whether the form is drawn.
+ * The fee is FIXED per use. A player who takes a pad is charged it the moment
+ * the pad leaves the counter — not per hour, not after a wait — and charged it
+ * back off if they hand the pad in. Nothing on this side computes any of that;
+ * the server owns the figure and the panel shows what it returns.
+ *
+ * `null` is a VALUE and not a missing field: it means the venue does not offer
+ * extra pads, and the server refuses the add with a sentence pointing here.
+ *
+ * READING is open to every staff role — the "+" button on a session card has
+ * to know a fee exists before it offers to add a pad. WRITING is owner-level
+ * and the backend enforces it (`prices.manage`); the permission map here only
+ * decides whether the form is drawn.
  */
 
-/** The slots a venue can price. Mirrors `BranchJoystickPrice::SLOTS`. */
-export const JOYSTICK_SLOTS = [2, 3, 4] as const;
-
-/** Pads one PlayStation session may have in total, its own included. */
+/** Pads one PlayStation session may hold in total, its own included. */
 export const MAX_JOYSTICKS = 4;
-
-export interface IJoystickPrice {
-  id: number;
-  branch_id: number;
-  slot: number;
-  /** The flat fee for one use of this slot. Never a rate. */
-  price: number;
-}
-
-export const apiListJoystickPrices = (branchId: number) =>
-  request<{ data: IJoystickPrice[] }>("/branch-joystick-prices", { params: { branch_id: branchId } });
-
-/**
- * Create or re-price a slot. The backend upserts on (branch, slot), so filling
- * a cell twice is not a duplicate — it is the operator changing their mind,
- * which is what the form does.
- */
-export const apiSaveJoystickPrice = (branchId: number, slot: number, price: number) =>
-  request<{ data: IJoystickPrice }>("/branch-joystick-prices", {
-    method: "POST",
-    body: { branch_id: branchId, slot, price },
-  });
-
-export const apiUpdateJoystickPrice = (id: number, price: number) =>
-  request<{ data: IJoystickPrice }>(`/branch-joystick-prices/${id}`, {
-    method: "PUT",
-    body: { price },
-  });
-
-/**
- * Remove a slot's price. Sessions using that slot right now are untouched —
- * their fee is frozen onto their own rows — it simply stops new pads being
- * added there, which is what "we do not offer that" means.
- */
-export const apiDeleteJoystickPrice = (id: number) =>
-  request<{ message: string }>(`/branch-joystick-prices/${id}`, { method: "DELETE" });
 
 /* ── the venue's money-rounding policy ─────────────────────────────────── */
 
@@ -71,6 +37,13 @@ export interface IBillingSettings {
   /** 0 = round nothing. The default every branch is on. */
   money_rounding_step: number;
   money_rounding_mode: MoneyRoundingMode;
+  /**
+   * The flat fee for ONE extra joystick, the same for every slot.
+   *
+   * `null` means extra pads are not offered here — a decision, not a gap, and
+   * the server refuses the add when it is set.
+   */
+  joystick_price: number | null;
 }
 
 export const apiGetBillingSettings = (branchId: number) =>
@@ -80,8 +53,15 @@ export const apiUpdateBillingSettings = (
   branchId: number,
   step: number,
   mode: MoneyRoundingMode,
+  joystickPrice: number | null,
 ) =>
   request<{ settings: IBillingSettings }>(`/branches/${branchId}/billing-settings`, {
     method: "PUT",
-    body: { money_rounding_step: step, money_rounding_mode: mode },
+    // Every field every time: this is a PUT and the server validates the whole
+    // policy, so a form that sends only its own half would blank the other's.
+    body: {
+      money_rounding_step: step,
+      money_rounding_mode: mode,
+      joystick_price: joystickPrice,
+    },
   });

@@ -289,10 +289,14 @@ const SessionsBoard = ({ branchId }: Props) => {
     // cannot take.
     const supportsJoysticks = sess?.supports_joysticks === true;
     // The two ends of the range, named once. The ceiling is the server's own
-    // limit and the floor is slot 1 — the session's own pad, which is not an
-    // extra and has no row to take away. Both are ALSO enforced on the server;
-    // these only decide whether the button can be pressed, because a control
-    // that fails on click is worse than one that says it is at its limit.
+    // limit; the floor is slot 1 — the session's own controller, which is not
+    // an extra, has no row, and cannot be handed back.
+    //
+    // A button at its end is REMOVED, not disabled. On a 22px control a
+    // disabled state is a shade of grey an operator has to compare against its
+    // neighbour to read, and "why can I not press this" is a worse question
+    // than "there is nothing to press". Both ends are enforced on the server
+    // too — this decides what is drawn, never what is allowed.
     const atCeiling = joystickCount >= MAX_JOYSTICKS;
     const atFloor = joystickCount <= 1;
     // The two identity lines, resolved once so the JSX below stays readable.
@@ -472,35 +476,40 @@ const SessionsBoard = ({ branchId }: Props) => {
                   )}
                   {supportsJoysticks && (
                   <>
-                    <button
-                      type="button"
-                      style={padBtn}
-                      // The tooltip says WHY when the button is off. "Remove a
-                      // joystick" on a control that cannot be pressed is the
-                      // least useful sentence available.
-                      title={atFloor ? t("session.joystickMinHere") : t("session.joystickRemoveHere")}
-                      // The label stays constant so a test — and a screen
-                      // reader — always names the same control.
-                      aria-label={t("session.joystickRemoveHere")}
-                      // Slot 1 is the session itself and has no row to remove,
-                      // so one pad in play is the floor. `busy` is what stops a
-                      // double-click becoming two removals before the board has
-                      // heard about the first.
-                      disabled={atFloor || padBusy === sess.id}
-                      onClick={() => void changePads(sess, "remove")}
-                    >
-                      −
-                    </button>
-                    <button
-                      type="button"
-                      style={padBtn}
-                      title={atCeiling ? t("session.joystickMaxHere") : t("session.joystickAddHere")}
-                      aria-label={t("session.joystickAddHere")}
-                      disabled={atCeiling || padBusy === sess.id}
-                      onClick={() => void changePads(sess, "add")}
-                    >
-                      +
-                    </button>
+                    {/* Gone at the floor, not greyed out. One pad in play is
+                        the session's own and there is no row to take back. */}
+                    {!atFloor && (
+                      <button
+                        type="button"
+                        style={padBtn}
+                        title={t("session.joystickRemoveHere")}
+                        aria-label={t("session.joystickRemoveHere")}
+                        // `busy` is what stops a double-click becoming two
+                        // removals before the board has heard about the first.
+                        // It is the only reason either button is ever disabled
+                        // rather than absent: the operation is legal, it is
+                        // simply already in flight.
+                        disabled={padBusy === sess.id}
+                        onClick={() => void changePads(sess, "remove")}
+                      >
+                        −
+                      </button>
+                    )}
+                    {/* …and gone at the ceiling. The count beside it already
+                        says 4 / 4, which is the answer a missing button would
+                        otherwise leave the operator looking for. */}
+                    {!atCeiling && (
+                      <button
+                        type="button"
+                        style={padBtn}
+                        title={t("session.joystickAddHere")}
+                        aria-label={t("session.joystickAddHere")}
+                        disabled={padBusy === sess.id}
+                        onClick={() => void changePads(sess, "add")}
+                      >
+                        +
+                      </button>
+                    )}
                     {/* The round trip, said on the tile it belongs to. Both
                         buttons are already disabled while it is in flight; this
                         is what tells the cashier the click landed, on a board

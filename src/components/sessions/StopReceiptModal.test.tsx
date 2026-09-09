@@ -156,7 +156,7 @@ describe("StopReceiptModal", () => {
       await mount();
 
       expect(screen.getByText("0.00·AMD")).toBeTruthy();
-      expect(screen.getByText(/session\.joystickUnderThreshold/)).toBeTruthy();
+      expect(screen.getByText(/session\.joystickReturned/)).toBeTruthy();
     });
 
     test("a waived bill quotes no pad charges either", async () => {

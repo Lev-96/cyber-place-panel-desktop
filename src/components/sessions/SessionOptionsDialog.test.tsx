@@ -39,16 +39,14 @@ vi.mock("@/repositories/SessionRepository", () => ({
   },
 }));
 const prices = vi.hoisted(() => ({
-  listByBranch: vi.fn(),
-  rows: [
-    { id: 1, branch_id: 7, slot: 2, price: 500 },
-    { id: 2, branch_id: 7, slot: 3, price: 700 },
-    { id: 3, branch_id: 7, slot: 4, price: 700 },
-  ] as Array<{ id: number; branch_id: number; slot: number; price: number }>,
+  get: vi.fn(),
+  // ONE fee for every pad. It was three prices, one per slot; no venue ever
+  // set them differently.
+  fee: 500 as number | null,
 }));
-vi.mock("@/repositories/JoystickPriceRepository", () => ({
-  joystickPriceRepository: {
-    listByBranch: (...a: unknown[]) => prices.listByBranch(...a),
+vi.mock("@/repositories/BillingSettingsRepository", () => ({
+  billingSettingsRepository: {
+    get: (...a: unknown[]) => prices.get(...a),
   },
 }));
 vi.mock("@/auth/AuthContext", () => ({ useAuth: () => ({ user: { id: 1, role: auth.role } }) }));
@@ -111,13 +109,11 @@ const mount = async (s: ISessionApi = session(), platform = "ps5") => {
 beforeEach(() => {
   auth.role = "company_owner";
   Object.values(repo).forEach((fn) => fn.mockReset());
-  prices.rows = [
-    { id: 1, branch_id: 7, slot: 2, price: 500 },
-    { id: 2, branch_id: 7, slot: 3, price: 700 },
-    { id: 3, branch_id: 7, slot: 4, price: 700 },
-  ];
-  prices.listByBranch.mockReset();
-  prices.listByBranch.mockImplementation(() => Promise.resolve(prices.rows));
+  prices.fee = 500;
+  prices.get.mockReset();
+  prices.get.mockImplementation(() => Promise.resolve({
+    branch_id: 7, money_rounding_step: 0, money_rounding_mode: "up", joystick_price: prices.fee,
+  }));
 });
 afterEach(cleanup);
 
@@ -158,8 +154,9 @@ describe("the joystick controls", () => {
     expect(screen.getByText("3 / 4")).toBeTruthy();
   });
 
-  test("offer the price the NEXT pad will actually cost", async () => {
-    // Two in play, so the next is the third — and slot 3 costs 700, not 500.
+  test("offer the venue's fee, which is the same for every pad", async () => {
+    // Two in play, so the next is the third — and it costs what the second
+    // did, because there is one fee and not one per slot.
     await mount(session({
       joystick_count: 2,
       joysticks: [
@@ -167,7 +164,8 @@ describe("the joystick controls", () => {
       ],
     }));
 
-    expect(screen.getByText(/700/)).toBeTruthy();
+    const add = screen.getByRole("button", { name: /session.joystickAdd/ });
+    expect(add.textContent).toContain("500");
   });
 
   test("stop offering a fifth", async () => {
@@ -231,36 +229,35 @@ describe("the joystick controls", () => {
     expect(repo.removeJoystick).toHaveBeenCalledWith(42, 2);
   });
 
-  test("quote the slot the SERVER will allocate, which is the lowest free one", async () => {
-    // Slots 2 and 4 in play, 3 removed from the middle. The count is 3, so
-    // "count + 1" would say slot 4 and quote its 700 — while the server
-    // allocates slot 3. On a venue that has not priced slot 3 the button then
-    // advertises a rate and the click is refused.
-    prices.rows = [
-      { id: 1, branch_id: 7, slot: 2, price: 500 },
-      { id: 3, branch_id: 7, slot: 4, price: 700 },
-    ];
+  /**
+   * The fee is the venue's, not the slot's, so the button quotes the same
+   * figure whichever pad is next.
+   *
+   * It used to resolve which slot the server would allocate and look ITS price
+   * up — a lookup that could quote a figure for a pad nobody was about to add,
+   * and that had to be kept in step with `JoystickService::add()` by hand. One
+   * fee makes the question disappear.
+   */
+  test("quote the venue's one fee, whichever pad is next", async () => {
     await mount(session({
       joystick_count: 3,
       joysticks: [
         { id: 1, slot: 2, price: 500, started_at: "2026-09-03T14:00:00.000Z", stopped_at: null },
-        { id: 2, slot: 3, price: 700, started_at: "2026-09-03T14:00:00.000Z", stopped_at: "2026-09-03T15:00:00.000Z" },
-        { id: 3, slot: 4, price: 700, started_at: "2026-09-03T15:00:00.000Z", stopped_at: null },
+        { id: 2, slot: 3, price: 500, started_at: "2026-09-03T14:00:00.000Z", stopped_at: "2026-09-03T15:00:00.000Z" },
+        { id: 3, slot: 4, price: 500, started_at: "2026-09-03T15:00:00.000Z", stopped_at: null },
       ],
     }));
 
-    // Scoped to the ADD button: slot 4's own 700 legitimately appears in the
-    // list of pads in play below it, and a page-wide search would match that.
     const add = screen.getByRole("button", { name: /session.joystickAdd/ });
-    expect(add.textContent).toContain("session.joystickNoPrice");
-    expect(add.textContent).not.toContain("700");
+    expect(add.textContent).toContain("500");
+    expect(add.textContent).not.toContain("session.joystickNoPrice");
   });
 
   test("say the price is not set rather than quote one the venue does not have", async () => {
     // The button stays clickable: the server is the authority on whether a pad
-    // may be added, and its refusal names the slot and where to fix it. A
-    // disabled button would say "no" without saying why.
-    prices.rows = [{ id: 1, branch_id: 7, slot: 2, price: 500 }];
+    // may be added, and its refusal says where to fix it. A disabled button
+    // would say "no" without saying why.
+    prices.fee = null;
     await mount(session({
       joystick_count: 2,
       joysticks: [
@@ -273,28 +270,26 @@ describe("the joystick controls", () => {
     expect(add.disabled).toBe(false);
   });
 
-  test("re-read the price list after a refusal, so a stale rate stops being advertised", async () => {
+  test("re-read the fee after a refusal, so a withdrawn one stops being advertised", async () => {
     await mount(session({
       joystick_count: 2,
       joysticks: [
         { id: 1, slot: 2, price: 500, started_at: "2026-09-03T14:00:00.000Z", stopped_at: null },
       ],
     }));
-    expect(prices.listByBranch).toHaveBeenCalledTimes(1);
-    // 700 is on screen, from the list loaded at mount.
-    expect(screen.getByText(/700/)).toBeTruthy();
+    expect(prices.get).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("button", { name: /session.joystickAdd/ }).textContent).toContain("500");
 
-    // The owner deletes that price in another window; the next add is refused.
-    prices.rows = [{ id: 1, branch_id: 7, slot: 2, price: 500 }];
-    repo.addJoystick.mockRejectedValue(new Error("No price is set for joystick #3"));
+    // The owner clears the fee in another window; the next add is refused.
+    prices.fee = null;
+    repo.addJoystick.mockRejectedValue(new Error("No joystick price is set at this branch"));
 
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: /session.joystickAdd/ }));
     });
 
-    expect(prices.listByBranch).toHaveBeenCalledTimes(2);
+    expect(prices.get).toHaveBeenCalledTimes(2);
     expect(screen.getByText(/session.joystickNoPrice/)).toBeTruthy();
-    expect(screen.queryByText(/700/)).toBeNull();
   });
 
   test("show the server's refusal word for word", async () => {
