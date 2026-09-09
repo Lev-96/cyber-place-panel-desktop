@@ -965,6 +965,27 @@ separate question — collapsing the two is what produced the week-long block.
 Pinned from both directions in `Booking.test.ts`; mutation-verified against an
 unbounded rule, a week-long horizon and a five-minute one.
 
+## 9.5.6 "Finish on another seat" (2026-09-11)
+
+When a grant is refused because the seat is reserved ahead, the dialog does two
+things beside showing the sentence: it offers the grant the seat CAN still take
+(`max_minutes`), and it asks `GET /sessions/{id}/extension-options` for seats
+that could take the full one. Pressing one calls
+`POST /sessions/{id}/transfer-extension`.
+
+⚠️ **That list is stale the moment it is drawn.** A phone can reserve one of
+those seats while the modal is open, and the server answers 409. That is a
+correct outcome, not a bug — never disable the button on the strength of the
+list, and never treat the preview as a promise.
+
+The lookup only runs for a seat refusal (`seatUnavailableBodyOf` returned a
+body). Any other failure — session not active, network — must not bury the
+sentence the cashier has to read under a suggestion feature.
+
+The session that comes back is the SAME session: same id, same start, same
+bill, same products and pads. The board patches it in place like any other
+session update.
+
 ## 9.6 A live session's terms (2026-09-03)
 
 Four controls a cashier gets on a session that is already running, and one rule
