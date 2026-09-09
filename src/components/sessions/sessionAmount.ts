@@ -116,7 +116,32 @@ export const sessionItemsTotal = (session: ISessionApi): number => {
 };
 
 /**
- * What the session will COLLECT — the clock, plus what is on the seat, or
+ * What the extra joysticks on this seat have earned.
+ *
+ * A flat fee per pad handed out, decided by the SERVER and carried on each
+ * period as `price` + `is_charged`. This sums; it never multiplies by a
+ * duration and never ticks, which is why it can live on a tile that re-renders
+ * every second without the figure moving.
+ *
+ * `is_charged` is the server's own flag and the only thing consulted. In
+ * particular a pad that has been handed BACK is still charged — removal ends
+ * the use, it is not a refund — so this counts periods, not pads in play.
+ * Rows from before that rule carry `false` and are correctly worth nothing.
+ *
+ * A payload without the flag (an older backend) contributes nothing rather
+ * than guessing, which keeps the tile under the receipt instead of over it.
+ */
+export const sessionJoysticksTotal = (session: ISessionApi): number => {
+  const pads = session.joysticks ?? [];
+  if (pads.length === 0) return 0;
+
+  return round2(
+    pads.reduce((sum, pad) => sum + (pad.is_charged ? toNumber(pad.price) : 0), 0),
+  );
+};
+
+/**
+ * What the session will COLLECT — the clock, the pads, what is on the seat, or
  * nothing at all.
  *
  * Mirrors `SessionPricingCalculator`, which builds `subtotal = time +
@@ -124,21 +149,24 @@ export const sessionItemsTotal = (session: ISessionApi): number => {
  * applied here, to the composed figure, for that reason: a waived session
  * gives the drinks away with the hour, and `gross_total` keeps what was given.
  *
- * Two terms of the server's subtotal are still missing, and both make this
- * figure LOWER than the receipt rather than higher:
+ * One term of the server's subtotal is still missing, and it makes this figure
+ * LOWER than the receipt rather than higher: the branch's rounding step does
+ * not travel at all, so the tile has nothing to apply and a receipt on a
+ * rounding branch will differ by up to one step.
  *
- *  - extra joysticks. The periods DO travel on the payload with their own
- *    rates and intervals, so this is a decision and not a limit: they tick,
- *    and mirroring a second per-second charge here is a bigger change than
- *    the one that was asked for. A seat with pads still under-reads.
- *  - the branch's rounding step, which does not travel at all — the tile has
- *    nothing to apply and a receipt on a rounding branch will differ by up to
- *    one step.
+ * Joysticks used to be missing too, for a good reason at the time — they were
+ * priced per second, and mirroring a second ticking charge here was a bigger
+ * change than the one being asked for. A flat fee removed that: the pads are
+ * a sum of figures the server already sent.
  *
  * See CLAUDE.md §9.6.
  */
 export const sessionAmountAt = (session: ISessionApi, at: number): number =>
-  session.is_free ? 0 : round2(sessionTimeCostAt(session, at) + sessionItemsTotal(session));
+  session.is_free
+    ? 0
+    : round2(
+      sessionTimeCostAt(session, at) + sessionJoysticksTotal(session) + sessionItemsTotal(session),
+    );
 
 /**
  * Whole seconds from an ISO instant to a moment, never negative.

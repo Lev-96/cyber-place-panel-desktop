@@ -417,6 +417,25 @@ export const TRANSLATIONS: Dict = {
   // The tile's own controls. Distinct keys from the dialog's: on a 160px card
   // the words are a tooltip, not a button label, and they have to say WHICH
   // session the pad joins — a board shows a dozen at once.
+  // Said out loud on the two presses. Green on the add, red on the removal —
+  // the toaster's two kinds, so a cashier reading the corner of the screen
+  // knows which way the seat moved without reading the words.
+  "session.joystickAdded": { en: "Joystick added", ru: "Джойстик добавлен", am: "Ջոյսթիքն ավելացվեց" },
+  "session.joystickRemoved": {
+    en: "Joystick removed from this session",
+    ru: "Джойстик снят с текущей сессии",
+    am: "Ջոյսթիքը հանվեց այս նիստից",
+  },
+  "session.joysticksInSession": {
+    en: "Joysticks in session:",
+    ru: "Джойстиков в сессии:",
+    am: "Ջոյսթիքներ նիստում՝",
+  },
+  // The card's own money line. "2 × 300 = 600" — a count and a flat fee, never
+  // a rate and never anything that moves with the clock.
+  "session.joysticksCost": { en: "Joysticks", ru: "Джойстики", am: "Ջոյսթիքներ" },
+  "session.sessionCost": { en: "Session", ru: "Сессия", am: "Նիստ" },
+  "session.grandTotal": { en: "Total", ru: "Итого", am: "Ընդամենը" },
   "session.joystickAddHere": {
     en: "Add a joystick to this session",
     ru: "Добавить джойстик к текущей сессии",

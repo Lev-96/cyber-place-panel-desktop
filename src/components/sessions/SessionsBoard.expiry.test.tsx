@@ -23,6 +23,10 @@ const repo = vi.hoisted(() => ({
   listPcs: vi.fn(), listActive: vi.fn(), preview: vi.fn(),
   addJoystick: vi.fn(), removeJoystick: vi.fn(),
 }));
+// The app-wide toaster, captured so a test can read what a press announced.
+const toast = vi.hoisted(() => ({ message: vi.fn() }));
+vi.mock("@/ui/notify", () => ({ notify: { message: (...a: unknown[]) => toast.message(...a) } }));
+
 // The board's `useSessionChanged` handler, captured so a test can fire an event
 // at it the way Reverb would.
 const realtime = vi.hoisted(() => ({ handler: null as null | ((e: SessionChangedEvent) => void) }));
@@ -362,6 +366,134 @@ describe("joysticks on the tile", () => {
     await mount();
 
     expect(screen.queryByRole("button", { name: "session.joystickAddHere" })).toBeNull();
+  });
+
+  /**
+   * The two presses say so out loud, in the colour that matches the direction.
+   *
+   * Green for an add, red for a removal — the toaster's two kinds — so the
+   * corner of the screen tells a cashier which way the seat moved before they
+   * have read the words. The count comes from the SERVER's answer, never from
+   * adding one here: another cashier may have moved it first.
+   */
+  describe("what a press announces", () => {
+    beforeEach(() => toast.message.mockReset());
+
+    test("an add is announced green, with the count the server returned", async () => {
+      repo.listActive.mockResolvedValue([ps]);
+      repo.addJoystick.mockResolvedValue({ ...ps, joystick_count: 3 });
+      await mount();
+
+      await act(async () => { fireEvent.click(add()); });
+
+      expect(toast.message).toHaveBeenCalledTimes(1);
+      const [kind, text] = toast.message.mock.calls[0];
+      expect(kind).toBe("success");
+      expect(text).toContain("session.joystickAdded");
+      // 3, from the response — not 3 because the tile added one to its own 2.
+      expect(text).toContain("3 / 4");
+    });
+
+    test("a removal is announced red", async () => {
+      repo.listActive.mockResolvedValue([ps]);
+      repo.removeJoystick.mockResolvedValue({ ...ps, joystick_count: 1 });
+      await mount();
+
+      await act(async () => { fireEvent.click(drop()); });
+
+      const [kind, text] = toast.message.mock.calls[0];
+      expect(kind).toBe("error");
+      expect(text).toContain("session.joystickRemoved");
+      expect(text).toContain("1 / 4");
+    });
+
+    test("a refusal announces nothing", async () => {
+      repo.listActive.mockResolvedValue([ps]);
+      repo.addJoystick.mockReset();
+      repo.addJoystick.mockImplementationOnce(() => { throw new Error("No joystick price is set"); });
+      await mount();
+
+      await act(async () => { fireEvent.click(add()); });
+
+      // The tile shows the sentence; the toaster stays quiet. A success toast
+      // over a failed operation is the worst of both.
+      expect(toast.message).not.toHaveBeenCalled();
+      expect(screen.getByText("No joystick price is set")).toBeTruthy();
+    });
+  });
+
+  /**
+   * What the pads have added to the seat, spelled out on the tile.
+   *
+   * A count and a FLAT fee. It does not move with the clock, and the count is
+   * of CHARGED periods — not of pads in play, because a pad handed back keeps
+   * its fee.
+   */
+  describe("the pad charge on the tile", () => {
+    const priced = (n: number, price = 300, chargedAll = true) => ({
+      ...ps,
+      joystick_count: 1 + n,
+      joysticks: Array.from({ length: n }, (_, i) => ({
+        id: i + 1, slot: i + 2, price, is_charged: chargedAll,
+        started_at: "2026-09-10T14:00:00Z", stopped_at: null,
+      })),
+    } as ISessionApi);
+
+    test("reads count × fee = total", async () => {
+      repo.listActive.mockResolvedValue([priced(2)]);
+      await mount();
+
+      expect(screen.getByText(/2 × .*300.* = .*600/)).toBeTruthy();
+    });
+
+    test("a pad handed back is still counted and still charged", async () => {
+      repo.listActive.mockResolvedValue([{
+        ...ps,
+        joystick_count: 1,
+        joysticks: [{
+          id: 1, slot: 2, price: 300, is_charged: true,
+          started_at: "2026-09-10T14:00:00Z", stopped_at: "2026-09-10T14:05:00Z",
+        }],
+      } as ISessionApi]);
+      await mount();
+
+      // One pad on the bill, none in play: 1/4 with a charge beside it.
+      expect(screen.getByText("1 / 4")).toBeTruthy();
+      expect(screen.getByText(/1 × .*300.* = .*300/)).toBeTruthy();
+    });
+
+    test("a seat with no pads says nothing about them", async () => {
+      repo.listActive.mockResolvedValue([{ ...ps, joystick_count: 1, joysticks: [] }]);
+      const { container } = await mount();
+
+      expect(container.textContent).not.toContain("session.joysticksCost");
+    });
+
+    test("a waived seat quotes no fee", async () => {
+      repo.listActive.mockResolvedValue([{ ...priced(2), is_free: true } as ISessionApi]);
+      const { container } = await mount();
+
+      // The pads are still counted; the money is not printed under a bill
+      // nobody is paying.
+      expect(screen.getByText("3 / 4")).toBeTruthy();
+      expect(container.textContent).not.toContain("session.joysticksCost");
+    });
+
+    test("periods frozen at different fees show the sum and no multiplication", async () => {
+      repo.listActive.mockResolvedValue([{
+        ...ps,
+        joystick_count: 3,
+        joysticks: [
+          { id: 1, slot: 2, price: 300, is_charged: true, started_at: "2026-09-10T14:00:00Z", stopped_at: null },
+          { id: 2, slot: 3, price: 500, is_charged: true, started_at: "2026-09-10T15:00:00Z", stopped_at: null },
+        ],
+      } as ISessionApi]);
+      const { container } = await mount();
+
+      // "2 × ?" would be a lie across a re-pricing; the sum is always true.
+      expect(container.textContent).toContain("800");
+      expect(container.textContent).not.toContain("×");
+    });
   });
 
   test("adding calls the endpoint the dialog calls", async () => {

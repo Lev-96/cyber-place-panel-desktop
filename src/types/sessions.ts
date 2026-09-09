@@ -64,6 +64,14 @@ export interface ISessionJoystick {
   slot: number;
   /** The flat fee for this use, frozen when the pad went out. Not a rate. */
   price: number;
+  /**
+   * Whether this period is on the bill — the SERVER's answer, never inferred.
+   *
+   * A pad that has been handed back is still charged: removal ends the use, it
+   * is not a refund. Only rows from before that rule carry `false`. Absent on
+   * an older payload, and then the tile counts nothing rather than guessing.
+   */
+  is_charged?: boolean;
   started_at: string;
   /** null while the pad is still in play. */
   stopped_at: string | null;

@@ -205,6 +205,92 @@ describe("a waived session collects nothing, whatever it would have cost", () =>
  * was short by the price of two drinks — and the difference appeared out of
  * nowhere at the stop receipt.
  */
+describe("extra joysticks are on the seat's figure too", () => {
+  /**
+   * A FLAT fee per pad handed out, decided by the server. The tile sums the
+   * periods it was sent and multiplies nothing — which is why the figure below
+   * is the same at one minute and at four hours, and why a tile that
+   * re-renders every second does not move it.
+   */
+  const pad = (id: number, slot: number, price: number, over = {}) => ({
+    id, slot, price, is_charged: true,
+    started_at: ago(30), stopped_at: null, ...over,
+  });
+
+  const withPads = (over: Partial<ISessionApi>, joysticks: unknown[]) =>
+    session({ ...over, joysticks } as Partial<ISessionApi>);
+
+  test("one pad adds its fee once, whatever the clock says", () => {
+    const at15 = withPads({ hourly_rate: 1500, started_at: ago(15) }, [pad(1, 2, 300)]);
+    const at90 = withPads({ hourly_rate: 1500, started_at: ago(90) }, [pad(1, 2, 300)]);
+
+    expect(sessionAmountAt(at15, AT)).toBe(675);    // 375 clock + 300
+    expect(sessionAmountAt(at90, AT)).toBe(2550);   // 2250 clock + 300
+  });
+
+  test("two pads are two fees", () => {
+    const s = withPads(
+      { hourly_rate: 1500, started_at: ago(60) },
+      [pad(1, 2, 300), pad(2, 3, 300)],
+    );
+
+    // 1500 + 600. The requirement's own worked example.
+    expect(sessionAmountAt(s, AT)).toBe(2100);
+  });
+
+  /**
+   * ⚠️ A pad handed BACK keeps its fee. Removal ends the use; it is not a
+   * refund, and the server says so with `is_charged`, which stays true.
+   */
+  test("a pad that was handed back is still on the figure", () => {
+    const s = withPads(
+      { hourly_rate: 1500, started_at: ago(60) },
+      [pad(1, 2, 300, { stopped_at: ago(10) })],
+    );
+
+    expect(sessionAmountAt(s, AT)).toBe(1800);
+  });
+
+  /** …and a row the SERVER marked uncharged contributes nothing. */
+  test("an uncharged period is worth nothing", () => {
+    const s = withPads(
+      { hourly_rate: 1500, started_at: ago(60) },
+      [pad(1, 2, 300, { is_charged: false })],
+    );
+
+    expect(sessionAmountAt(s, AT)).toBe(1500);
+  });
+
+  test("a payload with no flag guesses nothing", () => {
+    // An older backend. Under-reading the tile is the safe direction; inventing
+    // a charge the receipt will not have is not.
+    const s = withPads(
+      { hourly_rate: 1500, started_at: ago(60) },
+      [{ id: 1, slot: 2, price: 300, started_at: ago(30), stopped_at: null }],
+    );
+
+    expect(sessionAmountAt(s, AT)).toBe(1500);
+  });
+
+  test("a waived seat gives the pads away with the hour", () => {
+    const s = withPads(
+      { hourly_rate: 1500, started_at: ago(60), is_free: true },
+      [pad(1, 2, 300), pad(2, 3, 300)],
+    );
+
+    expect(sessionAmountAt(s, AT)).toBe(0);
+  });
+
+  test("a fixed tariff carries its pads on top of the block", () => {
+    const s = withPads(
+      { mode: "fixed", started_at: ago(30), ends_at: ahead(30), committed_amount: 1500 },
+      [pad(1, 2, 300)],
+    );
+
+    expect(sessionAmountAt(s, AT)).toBe(1800);
+  });
+});
+
 describe("drinks on the seat are on the seat's figure", () => {
   const withItems = (over: Partial<ISessionApi>, items: ISessionApi["items"]) =>
     session({ ...over, items });

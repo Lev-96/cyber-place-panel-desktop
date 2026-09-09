@@ -26,9 +26,11 @@ import { DragEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import AddSessionItemDialog from "./AddSessionItemDialog";
 import SessionTimer from "./SessionTimer";
+import { sessionJoysticksTotal } from "./sessionAmount";
 import StartSessionDialog from "./StartSessionDialog";
 import SessionOptionsDialog from "./SessionOptionsDialog";
 import { MAX_JOYSTICKS } from "@/api/joystickPrices";
+import { notify } from "@/ui/notify";
 import StopReceiptModal from "./StopReceiptModal";
 import { useExpiryNudge } from "./useExpiryNudge";
 
@@ -159,14 +161,30 @@ const SessionsBoard = ({ branchId }: Props) => {
     setPadBusy(sess.id);
     setPadError(null);
     try {
-      if (action === "add") {
-        await sessionRepository.addJoystick(sess.id);
-      } else {
-        const open = (sess.joysticks ?? []).filter((j) => j.stopped_at === null);
-        const slot = open.length > 0 ? Math.max(...open.map((j) => j.slot)) : null;
-        if (slot === null) return;
-        await sessionRepository.removeJoystick(sess.id, slot);
-      }
+      // The SERVER's answer, and the count is read off it rather than adding
+      // or subtracting one here — a tile that predicted the number would show
+      // a figure the server had not agreed to, on the one operation where
+      // another cashier may have moved it first.
+      const updated = action === "add"
+        ? await sessionRepository.addJoystick(sess.id)
+        : await (async () => {
+          const open = (sess.joysticks ?? []).filter((j) => j.stopped_at === null);
+          const slot = open.length > 0 ? Math.max(...open.map((j) => j.slot)) : null;
+          if (slot === null) return null;
+          return sessionRepository.removeJoystick(sess.id, slot);
+        })();
+
+      if (updated === null) return;
+
+      // Only now, and only for the operation that actually landed. A refusal
+      // throws and is caught below, where it becomes the tile's error line.
+      const count = updated.joystick_count ?? sess.joystick_count ?? 1;
+      notify.message(
+        action === "add" ? "success" : "error",
+        `${t(action === "add" ? "session.joystickAdded" : "session.joystickRemoved")} · `
+        + `${t("session.joysticksInSession")} ${count} / ${MAX_JOYSTICKS}`,
+      );
+
       await sessions.reload();
     } catch (e) {
       // Shown, never swallowed: the refusals here are sentences a cashier has
@@ -176,7 +194,7 @@ const SessionsBoard = ({ branchId }: Props) => {
     } finally {
       setPadBusy(null);
     }
-  }, [padBusy, sessions]);
+  }, [padBusy, sessions, t]);
 
   // …and one wake-up aimed at the exact instant the soonest seat runs out.
   //
@@ -299,6 +317,23 @@ const SessionsBoard = ({ branchId }: Props) => {
     // too — this decides what is drawn, never what is allowed.
     const atCeiling = joystickCount >= MAX_JOYSTICKS;
     const atFloor = joystickCount <= 1;
+    // The pad line: how many periods were charged, at what fee, for how much.
+    // Null when nothing was, and null on a waived seat — a fee printed under
+    // "Бесплатная сессия" is the same two-numbers-one-truth problem the rate
+    // and the time cost had on the receipt.
+    //
+    // `each` is only shown when every charged period agrees on a price. They
+    // can differ: the fee is frozen when a pad goes out, so a seat that
+    // straddles a re-pricing holds two. "3 × ?" would be a lie; the sum is
+    // always true, so the line falls back to it.
+    const padCharge = ((): { count: number; each: number | null; total: number } | null => {
+      if (sess === undefined || sess.is_free) return null;
+      const charged = (sess.joysticks ?? []).filter((j) => j.is_charged);
+      if (charged.length === 0) return null;
+      const first = Number(charged[0].price);
+      const uniform = charged.every((j) => Number(j.price) === first);
+      return { count: charged.length, each: uniform ? first : null, total: sessionJoysticksTotal(sess) };
+    })();
     // The two identity lines, resolved once so the JSX below stays readable.
     // A device with no place (a legacy row) has no platform or tier to show —
     // it still renders the line, as a non-breaking space, because a tile with
@@ -530,6 +565,23 @@ const SessionsBoard = ({ branchId }: Props) => {
                   </>
                   )}
                 </span>
+                {/* What the pads have added to this seat, spelled out.
+                    Before this the fee vanished into the running total and a
+                    cashier had no way to see it was there — which is the
+                    question a player asks when the figure jumps by 300.
+
+                    A count and a flat fee, never a rate: it does not move with
+                    the clock and re-renders every second without changing.
+                    Both figures come from the server's own rows — the count of
+                    CHARGED periods, which is not the count of pads in play,
+                    because a pad handed back keeps its fee. */}
+                {padCharge !== null && (
+                  <span className="muted" style={{ fontSize: 11, flexBasis: "100%" }}>
+                    {t("session.joysticksCost")}:{" "}
+                    {padCharge.each !== null && `${padCharge.count} × ${money(padCharge.each)} = `}
+                    {money(padCharge.total)}
+                  </span>
+                )}
                 {padError?.id === sess.id && (
                   <span className="error" style={{ fontSize: 11, flexBasis: "100%" }}>
                     {padError.message}
