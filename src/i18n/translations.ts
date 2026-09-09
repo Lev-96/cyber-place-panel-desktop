@@ -515,6 +515,45 @@ export const TRANSLATIONS: Dict = {
     ru: "Перенести сюда",
     am: "Տեղափոխել այստեղ",
   },
+  // Announced after the SERVER confirmed. `{0}` minutes, `{1}` the seat — a
+  // cashier with a queue needs to know which session just moved.
+  "session.timeAddedToast": {
+    en: "+{0} min added to the session · {1}",
+    ru: "Время +{0} мин добавлено к сессии · {1}",
+    am: "+{0} րոպե ավելացվել է սեսիային · {1}",
+  },
+  // `{0}` the seat moved to, `{1}` the minutes granted there.
+  "session.movedToast": {
+    en: "Session continues on {0} · +{1} min",
+    ru: "Сессия продолжается на {0} · +{1} мин",
+    am: "Սեսիան շարունակվում է {0}-ում · +{1} րոպե",
+  },
+  // Why the seat cannot take it. `{0}` the seat, `{1}` when it is claimed.
+  "session.moveWhyTitle": {
+    en: "This place is already booked",
+    ru: "Это место уже забронировано",
+    am: "Այս տեղն արդեն ամրագրված է",
+  },
+  "session.moveWhyFrom": {
+    en: "{0} is booked from {1}. The current session cannot continue here.",
+    ru: "{0} забронировано с {1}. Продолжить текущую сессию на этом месте невозможно.",
+    am: "{0}-ը ամրագրված է {1}-ից: Ընթացիկ սեսիան այստեղ շարունակել հնարավոր չէ:",
+  },
+  "session.moveWhy": {
+    en: "{0} is booked. The current session cannot continue here.",
+    ru: "{0} забронировано. Продолжить текущую сессию на этом месте невозможно.",
+    am: "{0}-ը ամրագրված է: Ընթացիկ սեսիան այստեղ շարունակել հնարավոր չէ:",
+  },
+  "session.moveRequested": {
+    en: "Extension: +{0} min",
+    ru: "Продление: +{0} мин",
+    am: "Երկարաձգում՝ +{0} րոպե",
+  },
+  "session.moveConfirm": {
+    en: "Continue on the selected place",
+    ru: "Продолжить на выбранном месте",
+    am: "Շարունակել ընտրված տեղում",
+  },
   "session.moveNone": {
     en: "No free place can take this extension right now.",
     ru: "Сейчас нет свободного места, которое примет это продление.",

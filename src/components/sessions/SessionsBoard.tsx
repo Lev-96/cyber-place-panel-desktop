@@ -224,43 +224,68 @@ const SessionsBoard = ({ branchId }: Props) => {
    * falls inside the grace window, whether the seat may have pads at all — and
    * the board simply re-reads afterwards.
    */
-  const changePads = useCallback(async (sess: ISessionApi, action: "add" | "remove") => {
+  /**
+   * Set the number of pads in play to `target`, using the SAME add and remove
+   * operations the buttons used.
+   *
+   * The select says how many there should be; the difference is turned into
+   * that many calls to the existing endpoints. Nothing about how a pad is
+   * priced changed — a fee is charged when one is added and is not refunded
+   * when it goes, which is why "how many are active" and "how many were
+   * charged" are different numbers and only the first is what this control
+   * sets.
+   *
+   * ⚠️ Removals read the open slots from the LAST answer, not from the row the
+   * board rendered: taking two pads back is two calls, and the second must
+   * remove the slot that is still open after the first.
+   */
+  const changePadsTo = useCallback(async (sess: ISessionApi, target: number) => {
     if (padBusy !== null) return;
+
+    const from = sess.joystick_count ?? 1;
+    const delta = target - from;
+    if (delta === 0) return;
+
     setPadBusy(sess.id);
     setPadError(null);
+
+    let updated: ISessionApi | null = null;
     try {
-      // The SERVER's answer, and the count is read off it rather than adding
-      // or subtracting one here — a tile that predicted the number would show
-      // a figure the server had not agreed to, on the one operation where
-      // another cashier may have moved it first.
-      const updated = action === "add"
-        ? await sessionRepository.addJoystick(sess.id)
-        : await (async () => {
-          const open = (sess.joysticks ?? []).filter((j) => j.stopped_at === null);
-          const slot = open.length > 0 ? Math.max(...open.map((j) => j.slot)) : null;
-          if (slot === null) return null;
-          return sessionRepository.removeJoystick(sess.id, slot);
-        })();
+      for (let step = 0; step < Math.abs(delta); step += 1) {
+        if (delta > 0) {
+          updated = await sessionRepository.addJoystick(sess.id);
+        } else {
+          const source = updated ?? sess;
+          const open = (source.joysticks ?? []).filter((j) => j.stopped_at === null);
+          if (open.length === 0) break;
+          const slot = Math.max(...open.map((j) => j.slot));
+          updated = await sessionRepository.removeJoystick(sess.id, slot);
+        }
+      }
 
       if (updated === null) return;
 
-      // Only now, and only for the operation that actually landed. A refusal
-      // throws and is caught below, where it becomes the tile's error line.
-      const count = updated.joystick_count ?? sess.joystick_count ?? 1;
+      // Only once the server has answered, and with ITS count — a tile that
+      // predicted the number would show a figure the server had not agreed to,
+      // on the one operation another cashier may have moved first. For a
+      // multi-step change this is the count after the LAST step, which is what
+      // the cashier now has.
+      const count = updated.joystick_count ?? from;
       notify.message(
-        action === "add" ? "success" : "error",
-        `${t(action === "add" ? "session.joystickAdded" : "session.joystickRemoved")} · `
+        delta > 0 ? "success" : "error",
+        `${t(delta > 0 ? "session.joystickAdded" : "session.joystickRemoved")} · `
         + `${t("session.joysticksInSession")} ${count} / ${MAX_JOYSTICKS}`,
       );
-
-      await sessions.reload();
     } catch (e) {
       // Shown, never swallowed: the refusals here are sentences a cashier has
       // to read. No price set for that slot, four pads already in play, the
-      // session no longer active.
+      // session no longer active. A change that failed HALFWAY leaves the pads
+      // it already made — the reload below is what puts the true number back
+      // on the tile rather than the one the select is showing.
       setPadError({ id: sess.id, message: e instanceof Error ? e.message : String(e) });
     } finally {
       setPadBusy(null);
+      await sessions.reload();
     }
   }, [padBusy, sessions, t]);
 
@@ -579,43 +604,35 @@ const SessionsBoard = ({ branchId }: Props) => {
                   )}
                   {supportsJoysticks && (
                   <>
-                    {/* Gone at the floor, not greyed out. One pad in play is
-                        the session's own and there is no row to take back. */}
-                    {!atFloor && (
-                      <button
-                        type="button"
-                        style={padBtn}
-                        title={t("session.joystickRemoveHere")}
-                        aria-label={t("session.joystickRemoveHere")}
-                        // `busy` is what stops a double-click becoming two
-                        // removals before the board has heard about the first.
-                        // It is the only reason either button is ever disabled
-                        // rather than absent: the operation is legal, it is
-                        // simply already in flight.
-                        disabled={padBusy === sess.id}
-                        onClick={() => void changePads(sess, "remove")}
-                      >
-                        −
-                      </button>
-                    )}
-                    {/* …and gone at the ceiling. The count beside it already
-                        says 4 / 4, which is the answer a missing button would
-                        otherwise leave the operator looking for. */}
-                    {!atCeiling && (
-                      <button
-                        type="button"
-                        style={padBtn}
-                        title={t("session.joystickAddHere")}
-                        aria-label={t("session.joystickAddHere")}
-                        disabled={padBusy === sess.id}
-                        onClick={() => void changePads(sess, "add")}
-                      >
-                        +
-                      </button>
-                    )}
-                    {/* The round trip, said on the tile it belongs to. Both
-                        buttons are already disabled while it is in flight; this
-                        is what tells the cashier the click landed, on a board
+                    {/* A SELECT, not a pair of steppers.
+                        Two 22px buttons meant a cashier going from one pad to
+                        three pressed twice and watched the number catch up
+                        between presses; the select states the destination and
+                        the board makes the calls. The floor is 1 because the
+                        session's own pad is one of them and there is no row to
+                        take back below it — that is the existing rule, not a
+                        UI choice, and the server enforces both ends. */}
+                    <select
+                      className="input"
+                      style={{ height: 24, padding: "0 4px", fontSize: 12 }}
+                      title={`${t("session.joysticks")}: ${joystickCount} / ${MAX_JOYSTICKS}`}
+                      aria-label={t("session.joysticks")}
+                      // Disabled only while a change is in flight — the
+                      // operation is legal, it is simply already happening.
+                      disabled={padBusy === sess.id}
+                      value={joystickCount}
+                      onChange={(e) => void changePadsTo(sess, Number(e.target.value))}
+                    >
+                      {Array.from(
+                        { length: MAX_JOYSTICKS },
+                        (_, i) => i + 1,
+                      ).map((n) => (
+                        <option key={n} value={n}>{n}</option>
+                      ))}
+                    </select>
+                    {/* The round trip, said on the tile it belongs to. The
+                        select is already disabled while it is in flight; this
+                        is what tells the cashier the change landed, on a board
                         where the number itself only moves once the server has
                         answered. */}
                     {padBusy === sess.id && (
@@ -627,7 +644,7 @@ const SessionsBoard = ({ branchId }: Props) => {
                       <span
                         className="spinner"
                         style={{ width: 12, height: 12, borderWidth: 2, margin: 0 }}
-                        aria-hidden="true"
+                        aria-hidden
                       />
                     )}
                   </>

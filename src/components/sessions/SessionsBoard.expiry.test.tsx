@@ -237,198 +237,185 @@ describe("joysticks on the tile", () => {
     joysticks: [{ id: 5, slot: 2, price: 500, started_at: new Date().toISOString(), stopped_at: null }] } as ISessionApi;
 
   beforeEach(() => {
+    // RESET, not just re-stub. A select can make several calls for one change,
+    // so "called twice" and "not called at all" are assertions here — and both
+    // are meaningless if the previous test's calls are still counted. The
+    // stepper-era version of this block only ever asserted "called with", which
+    // is why it never needed this.
+    repo.addJoystick.mockReset();
+    repo.removeJoystick.mockReset();
+    toast.message.mockReset();
     repo.listPcs.mockResolvedValue([device]);
     repo.addJoystick.mockResolvedValue(ps);
     repo.removeJoystick.mockResolvedValue(ps);
   });
   afterEach(cleanup);
 
-  const add = () => screen.getByRole("button", { name: "session.joystickAddHere" }) as HTMLButtonElement;
-  const drop = () => screen.getByRole("button", { name: "session.joystickRemoveHere" }) as HTMLButtonElement;
-  const noAdd = () => screen.queryByRole("button", { name: "session.joystickAddHere" });
-  const noDrop = () => screen.queryByRole("button", { name: "session.joystickRemoveHere" });
-
-  test("are offered on a PlayStation seat", async () => {
-    repo.listActive.mockResolvedValue([ps]);
-    await mount();
-
-    expect(add()).toBeTruthy();
-    expect(drop()).toBeTruthy();
-    expect(screen.getByText(/2 \/ 4/)).toBeTruthy();
-  });
-
-  test("are offered even before a second pad exists", async () => {
-    // A control that only appears once you have used it is a control nobody
-    // finds.
-    repo.listActive.mockResolvedValue([{ ...ps, joystick_count: 1, joysticks: [] }]);
-    await mount();
-
-    expect(add()).toBeTruthy();
-  });
-
   /**
-   * The half that was missing, and the whole of what was reported.
+   * The control is a SELECT, not a pair of steppers.
    *
-   * The buttons were drawn from the first pad; the COUNT was not — it appeared
-   * only from the second onwards. So a seat that had just started showed two
-   * 20px transparent glyphs, no icon, no number and no word, and a fully built
-   * feature read as absent. The label and the count are what make the two
-   * buttons legible as joystick controls.
+   * Going from one pad to three used to be two presses with the number
+   * catching up in between. The select states the destination and the board
+   * makes that many calls to the SAME endpoints — nothing about how a pad is
+   * priced changed, and a fee is still charged on add and not refunded on
+   * removal.
    */
-  test("a seat that has only its own pad still names and counts them", async () => {
-    repo.listActive.mockResolvedValue([{ ...ps, joystick_count: 1, joysticks: [] }]);
-    await mount();
+  const pads = () => screen.getByLabelText("session.joysticks") as HTMLSelectElement;
+  const setPads = async (n: number) => {
+    await act(async () => {
+      fireEvent.change(pads(), { target: { value: String(n) } });
+    });
+  };
 
-    // 1, not 0: the session's own pad is a pad in play, and the options dialog
-    // counts the same seat the same way.
-    expect(screen.getByText("1 / 4")).toBeTruthy();
-    // The word, carried on the same title the count sits under.
-    expect(screen.getByTitle("session.joysticks: 1 / 4")).toBeTruthy();
-  });
-
-  test("the count is drawn as an icon, not an emoji", async () => {
-    repo.listActive.mockResolvedValue([ps]);
-    const { container } = await mount();
-
-    // An emoji is rendered by whatever font the OS picked, at whatever width
-    // that font gives it — which a column of numbers across twenty tiles
-    // cannot have.
-    expect(container.textContent).not.toContain("🎮");
-    expect(container.querySelector("svg")).toBeTruthy();
-  });
-
-  test("the add button carries the tooltip a cashier reads", async () => {
+  test("offers exactly one through four", async () => {
     repo.listActive.mockResolvedValue([ps]);
     await mount();
 
-    expect(add().getAttribute("title")).toBe("session.joystickAddHere");
-    expect(drop().getAttribute("title")).toBe("session.joystickRemoveHere");
+    expect([...pads().options].map((o) => o.value)).toEqual(["1", "2", "3", "4"]);
   });
 
-  /**
-   * A second click before the first has been answered would hand out two pads
-   * and bill for both. Both buttons go down together — the pad that is added
-   * decides which slot a removal names, so neither may move while that is
-   * unsettled.
-   */
-  test("both buttons are held while a change is in flight", async () => {
-    repo.listActive.mockResolvedValue([ps]);
-    let release: (v: unknown) => void = () => {};
-    repo.addJoystick.mockReturnValue(new Promise((r) => { release = r; }));
+  test("shows the count the SERVER returned, never one derived here", async () => {
+    repo.listActive.mockResolvedValue([{ ...ps, joystick_count: 3 } as ISessionApi]);
     await mount();
 
-    await act(async () => { fireEvent.click(add()); });
+    expect(pads().value).toBe("3");
+  });
 
-    expect(add().disabled).toBe(true);
-    expect(drop().disabled).toBe(true);
+  test("is absent on a seat that has none", async () => {
+    repo.listActive.mockResolvedValue([
+      { ...running, supports_joysticks: false, joystick_count: 1, joysticks: [] } as ISessionApi,
+    ]);
+    await mount();
+
+    expect(screen.queryByLabelText("session.joysticks")).toBeNull();
+  });
+
+  test("one step up is one add", async () => {
+    repo.listActive.mockResolvedValue([ps]);
+    await mount();
+    await setPads(3);
+
+    expect(repo.addJoystick).toHaveBeenCalledTimes(1);
+    expect(repo.addJoystick).toHaveBeenCalledWith(42);
+    expect(repo.removeJoystick).not.toHaveBeenCalled();
+  });
+
+  test("two steps up is TWO adds, not one", async () => {
+    repo.listActive.mockResolvedValue([{ ...ps, joystick_count: 1, joysticks: [] } as ISessionApi]);
+    await mount();
+    await setPads(3);
+
+    expect(repo.addJoystick).toHaveBeenCalledTimes(2);
+  });
+
+  test("removing names the highest pad in play", async () => {
+    repo.listActive.mockResolvedValue([ps]);
+    await mount();
+    await setPads(1);
+
+    expect(repo.removeJoystick).toHaveBeenCalledWith(42, 2);
+  });
+
+  test("two steps down removes twice, each time the slot still open", async () => {
+    const three = {
+      ...ps,
+      joystick_count: 3,
+      joysticks: [
+        { id: 5, slot: 2, price: 500, started_at: "2026-09-10T14:00:00Z", stopped_at: null },
+        { id: 6, slot: 3, price: 500, started_at: "2026-09-10T14:00:00Z", stopped_at: null },
+      ],
+    } as ISessionApi;
+    repo.listActive.mockResolvedValue([three]);
+    // After the first removal the server says slot 3 is closed.
+    repo.removeJoystick.mockResolvedValueOnce({
+      ...three,
+      joystick_count: 2,
+      joysticks: [
+        { id: 5, slot: 2, price: 500, started_at: "2026-09-10T14:00:00Z", stopped_at: null },
+        { id: 6, slot: 3, price: 500, started_at: "2026-09-10T14:00:00Z", stopped_at: "2026-09-10T14:30:00Z" },
+      ],
+    } as ISessionApi);
+    await mount();
+    await setPads(1);
+
+    expect(repo.removeJoystick).toHaveBeenNthCalledWith(1, 42, 3);
+    // …the SECOND call must not name slot 3 again — it is closed now.
+    expect(repo.removeJoystick).toHaveBeenNthCalledWith(2, 42, 2);
+  });
+
+  test("a closed period is not offered for removal again", async () => {
+    repo.listActive.mockResolvedValue([
+      {
+        ...ps,
+        joystick_count: 1,
+        joysticks: [{ id: 5, slot: 2, price: 500, started_at: "x", stopped_at: "y" }],
+      } as ISessionApi,
+    ]);
+    await mount();
+    await setPads(1);
+
+    expect(repo.removeJoystick).not.toHaveBeenCalled();
+  });
+
+  test("choosing the number it already is does nothing at all", async () => {
+    repo.listActive.mockResolvedValue([ps]);
+    await mount();
+    const readsAfterMount = repo.listActive.mock.calls.length;
+
+    await setPads(2);
+
+    expect(repo.addJoystick).not.toHaveBeenCalled();
+    expect(repo.removeJoystick).not.toHaveBeenCalled();
+    // …and no re-read either. Without the early return the board would still
+    // flick the control disabled and re-fetch the list for a change that was
+    // never made.
+    expect(repo.listActive.mock.calls.length).toBe(readsAfterMount);
+  });
+
+  test("is held while a change is in flight", async () => {
+    repo.listActive.mockResolvedValue([ps]);
+    let release!: (s: ISessionApi) => void;
+    repo.addJoystick.mockReturnValueOnce(new Promise((r) => { release = r; }));
+    await mount();
+
+    await act(async () => {
+      fireEvent.change(pads(), { target: { value: "3" } });
+    });
+    expect(pads().disabled).toBe(true);
 
     await act(async () => { release(ps); });
   });
 
-  test("a seat with no pads shows no count either", async () => {
-    // A computer: no icon, no number, no buttons.
-    repo.listActive.mockResolvedValue([{ ...ps, supports_joysticks: false, joystick_count: 1 }]);
-    const { container } = await mount();
-
-    expect(screen.queryByRole("button", { name: "session.joystickAddHere" })).toBeNull();
-    expect(container.textContent).not.toContain("1 / 4");
-  });
-
-  /**
-   * The row exists for two independent reasons and they do not imply each
-   * other: pads, and the waived-bill pill. A free COMPUTER draws the row for
-   * the pill alone and must still show no pad count — otherwise every waived
-   * PC session on the board reads as a console with one controller.
-   */
-  test("a waived computer shows its pill and still no pads", async () => {
-    repo.listActive.mockResolvedValue([
-      { ...ps, supports_joysticks: false, joystick_count: 1, is_free: true },
-    ]);
-    const { container } = await mount();
-
-    expect(screen.getByText("session.freeBillShort")).toBeTruthy();
-    expect(container.textContent).not.toContain("1 / 4");
-    expect(screen.queryByRole("button", { name: "session.joystickAddHere" })).toBeNull();
-  });
-
-  test("are absent on a seat that has none", async () => {
-    // A computer. The seat says so itself; the tile does not guess.
-    repo.listActive.mockResolvedValue([{ ...ps, supports_joysticks: false }]);
-    await mount();
-
-    expect(screen.queryByRole("button", { name: "session.joystickAddHere" })).toBeNull();
-  });
-
-  test("are absent when the backend did not say", async () => {
-    // An older payload with no field. Not drawing them is the safe direction:
-    // a missing answer must not offer an operation the seat cannot take.
-    repo.listActive.mockResolvedValue([{ ...ps, supports_joysticks: undefined }]);
-    await mount();
-
-    expect(screen.queryByRole("button", { name: "session.joystickAddHere" })).toBeNull();
-  });
-
-  /**
-   * The two presses say so out loud, in the colour that matches the direction.
-   *
-   * Green for an add, red for a removal — the toaster's two kinds — so the
-   * corner of the screen tells a cashier which way the seat moved before they
-   * have read the words. The count comes from the SERVER's answer, never from
-   * adding one here: another cashier may have moved it first.
-   */
-  describe("what a press announces", () => {
-    beforeEach(() => toast.message.mockReset());
-
-    test("an add is announced green, with the count the server returned", async () => {
+  describe("what a change announces", () => {
+    test("an increase is announced green, with the count the server returned", async () => {
       repo.listActive.mockResolvedValue([ps]);
-      repo.addJoystick.mockResolvedValue({ ...ps, joystick_count: 3 });
+      repo.addJoystick.mockResolvedValue({ ...ps, joystick_count: 3 } as ISessionApi);
       await mount();
+      await setPads(3);
 
-      await act(async () => { fireEvent.click(add()); });
-
-      expect(toast.message).toHaveBeenCalledTimes(1);
-      const [kind, text] = toast.message.mock.calls[0];
-      expect(kind).toBe("success");
-      expect(text).toContain("session.joystickAdded");
-      // 3, from the response — not 3 because the tile added one to its own 2.
-      expect(text).toContain("3 / 4");
+      expect(toast.message).toHaveBeenCalledWith("success", expect.stringContaining("3 / 4"));
     });
 
-    test("a removal is announced red", async () => {
+    test("a decrease is announced red", async () => {
       repo.listActive.mockResolvedValue([ps]);
-      repo.removeJoystick.mockResolvedValue({ ...ps, joystick_count: 1 });
+      repo.removeJoystick.mockResolvedValue({ ...ps, joystick_count: 1 } as ISessionApi);
       await mount();
+      await setPads(1);
 
-      await act(async () => { fireEvent.click(drop()); });
-
-      const [kind, text] = toast.message.mock.calls[0];
-      expect(kind).toBe("error");
-      expect(text).toContain("session.joystickRemoved");
-      expect(text).toContain("1 / 4");
+      expect(toast.message).toHaveBeenCalledWith("error", expect.stringContaining("1 / 4"));
     });
 
     test("a refusal announces nothing", async () => {
       repo.listActive.mockResolvedValue([ps]);
-      repo.addJoystick.mockReset();
-      repo.addJoystick.mockImplementationOnce(() => { throw new Error("No joystick price is set"); });
+      repo.addJoystick.mockRejectedValueOnce(new Error("No price is set"));
       await mount();
+      await setPads(3);
 
-      await act(async () => { fireEvent.click(add()); });
-
-      // The tile shows the sentence; the toaster stays quiet. A success toast
-      // over a failed operation is the worst of both.
       expect(toast.message).not.toHaveBeenCalled();
-      expect(screen.getByText("No joystick price is set")).toBeTruthy();
     });
   });
 
-  /**
-   * What the pads have added to the seat, spelled out on the tile.
-   *
-   * A count and a FLAT fee. It does not move with the clock, and the count is
-   * of CHARGED periods — not of pads in play, because a pad handed back keeps
-   * its fee.
-   */
+
   describe("the pad charge on the tile", () => {
     const priced = (n: number, price = 300, chargedAll = true) => ({
       ...ps,
@@ -496,28 +483,7 @@ describe("joysticks on the tile", () => {
     });
   });
 
-  test("adding calls the endpoint the dialog calls", async () => {
-    repo.listActive.mockResolvedValue([ps]);
-    await mount();
 
-    await act(async () => { fireEvent.click(add()); });
-
-    expect(repo.addJoystick).toHaveBeenCalledWith(42);
-  });
-
-  test("removing names the highest pad in play", async () => {
-    repo.listActive.mockResolvedValue([{ ...ps, joystick_count: 3, joysticks: [
-      { id: 5, slot: 2, price: 500, started_at: new Date().toISOString(), stopped_at: null },
-      { id: 6, slot: 3, price: 700, started_at: new Date().toISOString(), stopped_at: null },
-      { id: 7, slot: 4, price: 700, started_at: new Date().toISOString(), stopped_at: "2026-01-01T00:00:00Z" },
-    ] }]);
-    await mount();
-
-    await act(async () => { fireEvent.click(drop()); });
-
-    // Slot 3: the last one still out. Slot 4 has already come back.
-    expect(repo.removeJoystick).toHaveBeenCalledWith(42, 3);
-  });
 
   /**
    * At either end the button is GONE, not greyed out.
@@ -527,31 +493,9 @@ describe("joysticks on the tile", () => {
    * worse question than "there is nothing to press". The count beside it — 1/4
    * or 4/4 — is what answers the question a missing button raises.
    */
-  test("the minus is absent at the floor, and the plus is still there", async () => {
-    repo.listActive.mockResolvedValue([{ ...ps, joystick_count: 1, joysticks: [] }]);
-    await mount();
 
-    // Slot 1 IS the session and has no row to remove.
-    expect(noDrop()).toBeNull();
-    expect(add()).toBeTruthy();
-  });
-
-  test("the plus is absent at the ceiling, and the minus is still there", async () => {
-    repo.listActive.mockResolvedValue([{ ...ps, joystick_count: 4 }]);
-    await mount();
-
-    expect(noAdd()).toBeNull();
-    expect(drop()).toBeTruthy();
-  });
 
   /** Both ends move with the count, on the same board. */
-  test("in the middle both are offered", async () => {
-    repo.listActive.mockResolvedValue([{ ...ps, joystick_count: 3 }]);
-    await mount();
-
-    expect(add()).toBeTruthy();
-    expect(drop()).toBeTruthy();
-  });
 
 
   /**
@@ -582,30 +526,21 @@ describe("joysticks on the tile", () => {
    * Removal names the highest OPEN slot, so the pad a "−" takes back is the
    * last one handed out and never one that has already come back.
    */
-  test("a closed period is not offered for removal again", async () => {
-    repo.listActive.mockResolvedValue([{
-      ...ps,
-      joystick_count: 2,
-      joysticks: [
-        { id: 5, slot: 2, price: 500, started_at: "2026-09-09T14:00:00Z", stopped_at: null },
-        { id: 6, slot: 4, price: 700, started_at: "2026-09-09T15:00:00Z", stopped_at: "2026-09-09T15:05:00Z" },
-      ],
-    }]);
-    await mount();
-
-    await act(async () => { fireEvent.click(drop()); });
-
-    // Slot 2, not slot 4 — slot 4's period is over.
-    expect(repo.removeJoystick).toHaveBeenCalledWith(42, 2);
-  });
 
   test("shows a refusal on the tile it came from", async () => {
     repo.listActive.mockResolvedValue([ps]);
     repo.addJoystick.mockRejectedValue(new Error("No price is set for joystick #3"));
     await mount();
 
-    await act(async () => { fireEvent.click(add()); });
+    await act(async () => {
+      fireEvent.change(
+        screen.getByLabelText("session.joysticks"),
+        { target: { value: "3" } },
+      );
+    });
 
+    // Word for word: "no price is set for that slot" is a sentence the cashier
+    // has to act on, and a generic failure line would send them looking.
     expect(screen.getByText("No price is set for joystick #3")).toBeTruthy();
   });
 });

@@ -5,6 +5,7 @@ import Modal from "@/components/ui/Modal";
 import Radio from "@/components/ui/Radio";
 import { useConfirm } from "@/components/ui/ConfirmProvider";
 import Spinner from "@/components/ui/Spinner";
+import { notify } from "@/ui/notify";
 import { MAX_JOYSTICKS } from "@/api/joystickPrices";
 import { useAuth } from "@/auth/AuthContext";
 import { can } from "@/auth/permissions";
@@ -92,6 +93,8 @@ const SessionOptionsDialog = ({ session, platform, onClose, onChanged }: Props) 
    */
   const [refusedMinutes, setRefusedMinutes] = useState<number | null>(null);
   const [alternatives, setAlternatives] = useState<IExtensionAlternative[] | null>(null);
+  /** Which seat the cashier has picked. Nothing is sent until one is. */
+  const [selectedPlaceId, setSelectedPlaceId] = useState<number | null>(null);
   // Manual grant: off by default, so the ordinary case stays one tap.
   const [manual, setManual] = useState(false);
   const [manualAmount, setManualAmount] = useState("");
@@ -196,6 +199,27 @@ const SessionOptionsDialog = ({ session, platform, onClose, onChanged }: Props) 
    */
   const resolvedRate = current.tariff_hourly_rate ?? null;
 
+  /**
+   * One sentence for every grant, whichever button produced it.
+   *
+   * It names the SEAT as well as the minutes: a cashier with two boards open
+   * and a queue at the counter needs to know which session just moved, and
+   * "+30 min added" alone does not say.
+   */
+  const timeAddedToast = (minutes: number): string =>
+    t("session.timeAddedToast")
+      .replace("{0}", String(minutes))
+      .replace("{1}", current.pc_label ?? "");
+
+  /**
+   * 24-hour wall clock, which is the only format this panel shows a time in.
+   * `hour12: false` explicitly — the locale would otherwise decide, and a
+   * cashier reading "2:40" cannot tell a reservation at night from one after
+   * lunch.
+   */
+  const clockOf = (at: Date): string =>
+    at.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
+
   const offeredMinutes = offeredMinutesOf(seatRefusal);
   const claimedFrom = claimedFromOf(seatRefusal);
 
@@ -218,16 +242,25 @@ const SessionOptionsDialog = ({ session, platform, onClose, onChanged }: Props) 
   const run = async (
     action: () => Promise<ISessionApi>,
     attemptedMinutes: number | null = null,
+    /**
+     * Announced ONLY after the server has answered. A toast fired on the click
+     * would tell a cashier the time was granted while the request was still in
+     * flight — and it is refused often enough (a reservation ahead) that the
+     * lie would be a regular one.
+     */
+    successToast: string | null = null,
   ): Promise<boolean> => {
     setBusy(true);
     setError(null);
     setSeatRefusal(null);
     setAlternatives(null);
     setRefusedMinutes(null);
+    setSelectedPlaceId(null);
     try {
       const updated = await action();
       setCurrent(updated);
       onChanged(updated);
+      if (successToast !== null) notify.message("success", successToast);
       return true;
     } catch (e) {
       // The seat-is-taken refusal carries the grant the server WOULD accept.
@@ -339,7 +372,11 @@ const SessionOptionsDialog = ({ session, platform, onClose, onChanged }: Props) 
                 variant="secondary"
                 disabled={busy || !isActive}
                 onClick={() =>
-                  void run(() => sessionRepository.addTime(current.id, offeredMinutes), offeredMinutes)
+                  void run(
+                    () => sessionRepository.addTime(current.id, offeredMinutes),
+                    offeredMinutes,
+                    timeAddedToast(offeredMinutes),
+                  )
                 }
               >
                 {t("session.addMinutes").replace("{0}", String(offeredMinutes))}
@@ -348,138 +385,127 @@ const SessionOptionsDialog = ({ session, platform, onClose, onChanged }: Props) 
           </div>
         )}
 
-        {/* "…or finish the game on another seat."
+        {/* "This seat is taken — finish on one of these."
             The player is at the counter and the seat they are on cannot give
-            them the time they asked for. These are the seats that CAN — same
-            venue, same tariff, free for the whole stretch — resolved by the
-            server, never worked out here.
+            the time asked for. What follows is the reason, then the seats that
+            CAN take it — same venue, same tariff, free for the whole stretch,
+            all resolved by the server.
 
-            ⚠️ The list is stale the moment it is drawn. Pressing one of these
-            sends a normal request that re-checks under a row lock, and being
-            refused (409) is correct rather than a bug: a phone can have taken
-            the seat while this was on screen. */}
+            ⚠️ The list is stale the moment it is drawn. Confirming sends a
+            normal request that re-checks under a row lock, and being refused
+            (409) is correct rather than a bug: a phone can have taken the seat
+            while this was on screen. Nothing here is disabled on the strength
+            of the list. */}
         {alternatives !== null && refusedMinutes !== null && (
-          <section className="col" style={{ gap: 8 }}>
-            <strong>{t("session.moveTitle")}</strong>
+          <section className="col" style={{ gap: 12 }}>
+            {/* The reason, in the operator's words rather than the server's. */}
+            <div
+              className="col"
+              style={{
+                gap: 4,
+                padding: 12,
+                borderRadius: 12,
+                border: "1px solid var(--color-warning)",
+                background: "color-mix(in srgb, var(--color-warning) 10%, transparent)",
+              }}
+            >
+              <strong>{t("session.moveWhyTitle")}</strong>
+              <span className="muted" style={{ fontSize: 12 }}>
+                {claimedFrom
+                  ? t("session.moveWhyFrom")
+                      .replace("{0}", current.pc_label ?? "")
+                      .replace("{1}", clockOf(claimedFrom))
+                  : t("session.moveWhy").replace("{0}", current.pc_label ?? "")}
+              </span>
+            </div>
+
+            <div className="row-between" style={{ alignItems: "baseline" }}>
+              <strong>{t("session.moveTitle")}</strong>
+              <span className="muted" style={{ fontSize: 12 }}>
+                {t("session.moveRequested").replace("{0}", String(refusedMinutes))}
+              </span>
+            </div>
 
             {alternatives.length === 0 ? (
               <span className="muted" style={{ fontSize: 12 }}>
                 {t("session.moveNone")}
               </span>
             ) : (
-              <div className="col" style={{ gap: 6 }}>
-                <span className="muted" style={{ fontSize: 12 }}>
-                  {t("session.moveHint").replace("{0}", String(refusedMinutes))}
-                </span>
-                {alternatives.map((alt) => (
-                  <div key={alt.place_id} className="row-between" style={{ alignItems: "center", gap: 8 }}>
-                    <span>
-                      {alt.name ?? `№${alt.number ?? alt.place_id}`}
-                      {" · "}
-                      <span className="muted">{money(alt.hourly_rate)}</span>
-                    </span>
-                    <Button
-                      variant="secondary"
-                      disabled={busy || !isActive}
-                      onClick={() =>
-                        void run(
-                          () => sessionRepository.transferExtension(current.id, alt.place_id, refusedMinutes),
-                          refusedMinutes,
-                        )
-                      }
-                    >
-                      {t("session.moveHere")}
-                    </Button>
-                  </div>
-                ))}
-              </div>
+              <>
+                <div className="col" style={{ gap: 8 }}>
+                  {alternatives.map((alt) => {
+                    const chosen = selectedPlaceId === alt.place_id;
+                    return (
+                      <button
+                        key={alt.place_id}
+                        type="button"
+                        className="card"
+                        aria-pressed={chosen}
+                        disabled={busy || !isActive}
+                        onClick={() => setSelectedPlaceId(alt.place_id)}
+                        style={{
+                          textAlign: "left",
+                          cursor: "pointer",
+                          padding: 12,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          gap: 12,
+                          // Selection is a BORDER, not a background: the cards
+                          // sit on the modal's own surface and a filled state
+                          // would read as disabled next to the buttons below.
+                          borderColor: chosen ? "var(--color-primary)" : "var(--color-border)",
+                          borderWidth: chosen ? 2 : 1,
+                        }}
+                      >
+                        <span className="col" style={{ gap: 2 }}>
+                          <strong>{alt.name ?? `№${alt.number ?? alt.place_id}`}</strong>
+                          <span className="muted" style={{ fontSize: 12 }}>
+                            {clockOf(new Date(alt.free_from))} – {clockOf(new Date(alt.free_until))}
+                          </span>
+                        </span>
+                        <span className="row" style={{ gap: 8, alignItems: "center" }}>
+                          <span className="muted">{money(alt.hourly_rate)}</span>
+                          {/* A tick, only on the chosen one — the border alone
+                              is easy to miss on a busy board. */}
+                          {chosen && <span style={{ color: "var(--color-primary)" }}>✓</span>}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className="row" style={{ justifyContent: "flex-end" }}>
+                  <Button
+                    variant="primary"
+                    disabled={busy || !isActive || selectedPlaceId === null}
+                    onClick={() => {
+                      const alt = alternatives.find((a) => a.place_id === selectedPlaceId);
+                      if (!alt) return;
+                      void run(
+                        () => sessionRepository.transferExtension(current.id, alt.place_id, refusedMinutes),
+                        refusedMinutes,
+                        t("session.movedToast")
+                          .replace("{0}", alt.name ?? `№${alt.number ?? ""}`)
+                          .replace("{1}", String(refusedMinutes)),
+                      );
+                    }}
+                  >
+                    {t("session.moveConfirm")}
+                  </Button>
+                </div>
+              </>
             )}
           </section>
         )}
 
-        {/* ── joysticks ─────────────────────────────────────────────────── */}
-        {isPlayStation ? (
-          <section className="col" style={{ gap: 8 }}>
-            <div className="row-between" style={{ alignItems: "baseline" }}>
-              <strong>{t("session.joysticks")}</strong>
-              {/* The same glyph the board's tiles draw, for the same reason:
-                  an emoji is rendered by whatever font the OS picked, at
-                  whatever width that font gives it, and the dialog and the
-                  tile behind it would not match. */}
-              <span className="row" style={{ gap: 3, alignItems: "center" }} aria-label={`${joystickCount}`}>
-                {Array.from({ length: joystickCount }, (_, i) => (
-                  <JoystickIcon key={i} size={16} />
-                ))}
-                <span className="muted" style={{ fontSize: 13, marginLeft: 6 }}>
-                  {joystickCount} / {MAX_JOYSTICKS}
-                </span>
-              </span>
-            </div>
-            <span className="muted" style={{ fontSize: 12 }}>{t("session.joystickBilledFrom")}</span>
-
-            <div className="row" style={{ gap: 8, flexWrap: "wrap" }}>
-              <Button
-                variant="secondary"
-                disabled={busy || !isActive || joystickCount >= MAX_JOYSTICKS}
-                title={joystickCount >= MAX_JOYSTICKS ? t("session.joystickMax") : undefined}
-                onClick={() => void run(() => sessionRepository.addJoystick(current.id))}
-              >
-                {t("session.joystickAdd")}
-                {joystickCount < MAX_JOYSTICKS && (
-                  <span className="muted" style={{ marginLeft: 6 }}>
-                    {/* An unpriced slot says so instead of showing a number.
-                        The button stays clickable on purpose — the server is
-                        the authority on whether a pad may be added, and its
-                        refusal names the slot and where to fix it. A disabled
-                        button would say "no" without saying why. */}
-                    {/* A flat fee, so no "/h" after it. The suffix was the
-                        whole of what made a fixed price read as a rate. */}
-                    · {nextPrice !== null ? money(nextPrice) : t("session.joystickNoPrice")}
-                  </span>
-                )}
-              </Button>
-            </div>
-
-            {/* One row per pad in play, so removing one is unambiguous: the
-                cashier takes out the third, not "the last". */}
-            <div className="col" style={{ gap: 4 }}>
-              <span className="muted" style={{ fontSize: 12 }}>{t("session.joystickIncluded")}</span>
-              {(current.joysticks ?? [])
-                .filter((j) => j.stopped_at === null)
-                .sort((a, b) => a.slot - b.slot)
-                .map((j) => (
-                  <div key={j.id} className="row-between" style={{ fontSize: 13 }}>
-                    <span>
-                      {t("session.joystickSlot").replace("{0}", String(j.slot))}
-                      <span className="muted"> · {money(j.price)}</span>
-                    </span>
-                    <Button
-                      variant="secondary"
-                      disabled={busy || !isActive}
-                      style={{ padding: "2px 8px", fontSize: 12 }}
-                      onClick={() => void run(() => sessionRepository.removeJoystick(current.id, j.slot))}
-                    >
-                      {t("session.joystickRemove").replace("{0}", String(j.slot))}
-                    </Button>
-                  </div>
-                ))}
-            </div>
-          </section>
-        ) : (
-          <div className="col" style={{ gap: 4 }}>
-            <strong>{t("session.joysticks")}</strong>
-            {/* Name the platform. "Only for PlayStation places" on a seat the
-                operator believes IS a PlayStation is a dead end; the slug is
-                what tells them the place was set up under another platform. */}
-            <span className="muted" style={{ fontSize: 12 }}>
-              {t("session.joystickPsOnly")}
-              {seatPlatform && (
-                <> {t("session.joystickThisPlatform").replace("{0}", platformLabel(seatPlatform))}</>
-              )}
-            </span>
-          </div>
-        )}
-
+        {/* Joysticks are managed on the SESSION CARD, not here. This dialog
+            used to carry a second set of controls for them: two places to
+            press for one thing, and two places to keep in step. The card is
+            where a cashier is already looking at the seat, so the card won.
+            The pricing, the history and the card's own controls are
+            untouched — only this duplicate is gone. */
+        }
         {/* ── time ──────────────────────────────────────────────────────── */}
         <section className="col" style={{ gap: 8 }}>
           <strong>{t("session.addTime")}</strong>
@@ -492,7 +518,13 @@ const SessionOptionsDialog = ({ session, platform, onClose, onChanged }: Props) 
                   key={m}
                   variant="secondary"
                   disabled={busy || !isActive}
-                  onClick={() => void run(() => sessionRepository.addTime(current.id, m), m)}
+                  onClick={() =>
+                    void run(
+                      () => sessionRepository.addTime(current.id, m),
+                      m,
+                      timeAddedToast(m),
+                    )
+                  }
                 >
                   {t("session.addMinutes").replace("{0}", String(m))}
                 </Button>
@@ -557,7 +589,11 @@ const SessionOptionsDialog = ({ session, platform, onClose, onChanged }: Props) 
                       disabled={busy || !isActive || manualMinutes === null}
                       onClick={() => {
                         if (manualMinutes === null) return;
-                        void run(() => sessionRepository.addTime(current.id, manualMinutes), manualMinutes)
+                        void run(
+                          () => sessionRepository.addTime(current.id, manualMinutes),
+                          manualMinutes,
+                          timeAddedToast(manualMinutes),
+                        )
                           // Only on success. A refused grant keeps the box as
                           // it was, beside the sentence saying why.
                           .then((ok) => { if (ok) { setManualAmount(""); setManual(false); } });
@@ -677,22 +713,12 @@ const SessionOptionsDialog = ({ session, platform, onClose, onChanged }: Props) 
           )}
         </section>
 
-        {/* ── free ──────────────────────────────────────────────────────── */}
-        {can(user?.role, "session.free") && (
-          <section className="col" style={{ gap: 6 }}>
-            <label className="row" style={{ gap: 8, alignItems: "center", cursor: "pointer" }}>
-              <input
-                type="checkbox"
-                checked={isFree}
-                disabled={busy || !isActive}
-                onChange={(e) => void run(() => sessionRepository.setFree(current.id, e.target.checked))}
-              />
-              <strong>{t("session.freeBill")}</strong>
-            </label>
-            <span className="muted" style={{ fontSize: 12 }}>{t("session.freeBillHint")}</span>
-          </section>
-        )}
-
+        {/* Waiving the bill lives on START SESSION, where the decision is
+            actually made. Offering it again inside "add time" invited it as
+            an afterthought, mid-session, next to a button about minutes —
+            and the two have nothing to do with each other. The capability
+            and every other entry point are unchanged. */
+        }
         <div className="row" style={{ gap: 8, justifyContent: "flex-end" }}>
           {busy && <Spinner />}
           <Button onClick={onClose}>{t("action.close")}</Button>

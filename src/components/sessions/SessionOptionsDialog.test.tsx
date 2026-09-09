@@ -30,6 +30,11 @@ const repo = vi.hoisted(() => ({
   transferExtension: vi.fn(),
 }));
 const auth = vi.hoisted(() => ({ role: "company_owner" as string }));
+// The app-wide toaster, captured so a test can read what a grant announced.
+const toast = vi.hoisted(() => ({ message: vi.fn() }));
+vi.mock("@/ui/notify", () => ({
+  notify: { message: (...a: unknown[]) => toast.message(...a) },
+}));
 
 vi.mock("@/repositories/SessionRepository", () => ({
   sessionRepository: {
@@ -113,6 +118,9 @@ const mount = async (s: ISessionApi = session(), platform = "ps5") => {
 beforeEach(() => {
   auth.role = "company_owner";
   Object.values(repo).forEach((fn) => fn.mockReset());
+  // Cleared per test: "announced nothing" is only meaningful if an earlier
+  // test's toast cannot be mistaken for this one's.
+  toast.message.mockReset();
   prices.fee = 500;
   prices.get.mockReset();
   prices.get.mockImplementation(() => Promise.resolve({
@@ -146,165 +154,64 @@ describe("the dialog itself", () => {
   });
 });
 
-describe("the joystick controls", () => {
-  test("show as many pads as the SERVER counted, never a locally derived number", async () => {
-    await mount(session({ joystick_count: 3 }));
+/**
+ * The two blocks this dialog no longer carries.
+ *
+ * Joysticks moved to the SESSION CARD and waiving the bill lives on START
+ * SESSION — two places to press for one thing is two places to keep in step,
+ * and the bill decision is made when the session begins, not halfway through
+ * a form about minutes. Both features are unchanged where they actually live;
+ * their own tests cover them there.
+ *
+ * These assertions exist so the duplicates cannot drift back in unnoticed.
+ */
+/**
+ * A grant is announced only once the SERVER has said yes.
+ *
+ * Fired on the click instead, the toast would tell a cashier the time was
+ * added while the request was still in flight — and this request is refused
+ * often enough (a reservation ahead) that the lie would be a regular one.
+ */
+describe("announcing a grant", () => {
+  test("says how many minutes and WHICH seat, after the server answered", async () => {
+    repo.addTime.mockResolvedValueOnce(session());
+    await mount();
 
-    // One glyph per pad, drawn rather than typed: an emoji takes whatever
-    // shape and width the OS font gives it, and the dialog would then not
-    // match the tile that opened it.
-    expect(screen.getByLabelText("3").querySelectorAll("svg").length).toBe(3);
-    expect(screen.getByLabelText("3").textContent).not.toContain("🎮");
-    expect(screen.getByText("3 / 4")).toBeTruthy();
+    await act(async () => {
+      fireEvent.click(screen.getAllByRole("button", { name: "session.addMinutes" })[0]);
+    });
+
+    expect(toast.message).toHaveBeenCalledWith("success", expect.stringContaining("session.timeAddedToast"));
   });
 
-  test("offer the venue's fee, which is the same for every pad", async () => {
-    // Two in play, so the next is the third — and it costs what the second
-    // did, because there is one fee and not one per slot.
-    await mount(session({
-      joystick_count: 2,
-      joysticks: [
-        { id: 1, slot: 2, price: 500, started_at: "2026-09-03T14:00:00.000Z", stopped_at: null },
-      ],
-    }));
+  test("says nothing when the grant was refused", async () => {
+    repo.addTime.mockRejectedValueOnce(
+      Object.assign(new Error("Session not active"), { body: { message: "Session not active" } }),
+    );
+    await mount();
 
-    const add = screen.getByRole("button", { name: /session.joystickAdd/ });
-    expect(add.textContent).toContain("500");
+    await act(async () => {
+      fireEvent.click(screen.getAllByRole("button", { name: "session.addMinutes" })[0]);
+    });
+
+    expect(toast.message).not.toHaveBeenCalled();
   });
+});
 
-  test("stop offering a fifth", async () => {
-    await mount(session({ joystick_count: 4 }));
-
-    const add = screen.getByRole("button", { name: /session.joystickAdd/ }) as HTMLButtonElement;
-    expect(add.disabled).toBe(true);
-  });
-
-  test("follow the SERVER's verdict even when the slug would say otherwise", async () => {
-    // Both local sources say PlayStation — the prop and the slug — and the
-    // SERVER says no. The server wins, because it is the one that will refuse
-    // the request anyway.
-    //
-    // Written this way on purpose: an earlier version passed a `ps5` slug
-    // alongside the server's yes, so the local derivation reached the same
-    // answer and the test passed with the server's field ignored entirely.
-    await mount(session({ supports_joysticks: false, place_platform: "ps5" }), "ps5");
+describe("what this dialog deliberately does NOT offer", () => {
+  test("no joystick controls — the session card owns them", async () => {
+    await mount();
 
     expect(screen.queryByRole("button", { name: /session.joystickAdd/ })).toBeNull();
+    expect(screen.queryByText("session.joysticks")).toBeNull();
   });
 
-  test("and when the local sources say nothing useful at all", async () => {
-    // The board's device list is stale, or the device has no place: the prop
-    // is "pc" and there is no slug. The session itself still knows.
-    await mount(session({ supports_joysticks: true, place_platform: null }), "pc");
+  test("no waive-the-bill checkbox — Start Session owns that decision", async () => {
+    auth.role = "company_owner";
+    await mount();
 
-    expect(screen.getByRole("button", { name: /session.joystickAdd/ })).toBeTruthy();
-  });
-
-  test("names the platform when the seat is not a PlayStation", async () => {
-    // "Only for PlayStation places" on a seat the operator believes IS one is
-    // a dead end. The slug is what tells them how the place was set up.
-    await mount(session({ supports_joysticks: false, place_platform: "table-tennis" }), "table-tennis");
-
-    const text = document.body.textContent ?? "";
-    expect(text).toContain("session.joystickPsOnly");
-    expect(text).toContain("Table Tennis");
-  });
-
-  test("are absent on a place that is not a PlayStation", async () => {
-    // `pc.kind === "ps"` is equally true of a ping-pong table; the platform is
-    // the question, and the dialog asks the same one the backend does.
-    await mount(session(), "table-tennis");
-
-    expect(screen.queryByRole("button", { name: /session.joystickAdd/ })).toBeNull();
-    expect(document.body.textContent ?? "").toContain("session.joystickPsOnly");
-  });
-
-  test("remove a pad by its SLOT, which is what the operator can see", async () => {
-    repo.removeJoystick.mockResolvedValue(session({ joystick_count: 1, joysticks: [] }));
-    await mount(session({
-      joystick_count: 2,
-      joysticks: [{ id: 5, slot: 2, price: 500, started_at: "2026-09-03T14:10:00.000Z", stopped_at: null }],
-    }));
-
-    await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: /session.joystickRemove/ }));
-    });
-
-    expect(repo.removeJoystick).toHaveBeenCalledWith(42, 2);
-  });
-
-  /**
-   * The fee is the venue's, not the slot's, so the button quotes the same
-   * figure whichever pad is next.
-   *
-   * It used to resolve which slot the server would allocate and look ITS price
-   * up — a lookup that could quote a figure for a pad nobody was about to add,
-   * and that had to be kept in step with `JoystickService::add()` by hand. One
-   * fee makes the question disappear.
-   */
-  test("quote the venue's one fee, whichever pad is next", async () => {
-    await mount(session({
-      joystick_count: 3,
-      joysticks: [
-        { id: 1, slot: 2, price: 500, started_at: "2026-09-03T14:00:00.000Z", stopped_at: null },
-        { id: 2, slot: 3, price: 500, started_at: "2026-09-03T14:00:00.000Z", stopped_at: "2026-09-03T15:00:00.000Z" },
-        { id: 3, slot: 4, price: 500, started_at: "2026-09-03T15:00:00.000Z", stopped_at: null },
-      ],
-    }));
-
-    const add = screen.getByRole("button", { name: /session.joystickAdd/ });
-    expect(add.textContent).toContain("500");
-    expect(add.textContent).not.toContain("session.joystickNoPrice");
-  });
-
-  test("say the price is not set rather than quote one the venue does not have", async () => {
-    // The button stays clickable: the server is the authority on whether a pad
-    // may be added, and its refusal says where to fix it. A disabled button
-    // would say "no" without saying why.
-    prices.fee = null;
-    await mount(session({
-      joystick_count: 2,
-      joysticks: [
-        { id: 1, slot: 2, price: 500, started_at: "2026-09-03T14:00:00.000Z", stopped_at: null },
-      ],
-    }));
-
-    expect(screen.getByText(/session.joystickNoPrice/)).toBeTruthy();
-    const add = screen.getByRole("button", { name: /session.joystickAdd/ }) as HTMLButtonElement;
-    expect(add.disabled).toBe(false);
-  });
-
-  test("re-read the fee after a refusal, so a withdrawn one stops being advertised", async () => {
-    await mount(session({
-      joystick_count: 2,
-      joysticks: [
-        { id: 1, slot: 2, price: 500, started_at: "2026-09-03T14:00:00.000Z", stopped_at: null },
-      ],
-    }));
-    expect(prices.get).toHaveBeenCalledTimes(1);
-    expect(screen.getByRole("button", { name: /session.joystickAdd/ }).textContent).toContain("500");
-
-    // The owner clears the fee in another window; the next add is refused.
-    prices.fee = null;
-    repo.addJoystick.mockRejectedValue(new Error("No joystick price is set at this branch"));
-
-    await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: /session.joystickAdd/ }));
-    });
-
-    expect(prices.get).toHaveBeenCalledTimes(2);
-    expect(screen.getByText(/session.joystickNoPrice/)).toBeTruthy();
-  });
-
-  test("show the server's refusal word for word", async () => {
-    repo.addJoystick.mockRejectedValue(new Error("No price is set for joystick #3"));
-    await mount(session({ joystick_count: 2 }));
-
-    await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: /session.joystickAdd/ }));
-    });
-
-    expect(screen.getByText("No price is set for joystick #3")).toBeTruthy();
+    expect(screen.queryByText("session.freeBill")).toBeNull();
+    expect(screen.queryByText("session.freeBillHint")).toBeNull();
   });
 });
 
@@ -398,40 +305,6 @@ describe("time and the ceiling", () => {
   });
 });
 
-describe("waiving the bill", () => {
-  test("is offered to an owner", async () => {
-    auth.role = "company_owner";
-    await mount();
-
-    expect(screen.getByText("session.freeBill")).toBeTruthy();
-  });
-
-  test("is offered to a manager too", async () => {
-    // Owner-level until 2026-09-06, when the capability opened to the floor: a
-    // bill is waived by whoever is at the counter. The backend agrees on
-    // `sessions.free`, so this control no longer leads to a 403 — and the
-    // waiver is still attributed, `session_events` records who did it.
-    auth.role = "manager";
-    await mount();
-
-    expect(screen.getByText("session.freeBill")).toBeTruthy();
-  });
-
-  test("sends the new value, both directions", async () => {
-    repo.setFree.mockResolvedValue(session({ is_free: true }));
-    await mount();
-
-    // By its label, not by being the only checkbox on screen — the manual
-    // time grant has one too, and "the first checkbox" is a selector that
-    // silently starts pointing at a different control.
-    await act(async () => {
-      fireEvent.click(screen.getByText("session.freeBill"));
-    });
-
-    expect(repo.setFree).toHaveBeenCalledWith(42, true);
-  });
-});
-
 describe("what the card cannot say and this must", () => {
   test("names the tariff and how long the session has run", async () => {
     // Without these, "+30 min" is a button pressed on faith.
@@ -459,7 +332,9 @@ describe("a session that is over", () => {
     await mount(session({ status: "stopped" }));
 
     expect(screen.getByText("session.optionsClosedSession")).toBeTruthy();
-    const add = screen.getByRole("button", { name: /session.joystickAdd/ }) as HTMLButtonElement;
+    // The time presets are what is left to disable now that the pads have gone
+    // to the card.
+    const add = screen.getAllByRole("button", { name: "session.addMinutes" })[0] as HTMLButtonElement;
     expect(add.disabled).toBe(true);
   });
 });
@@ -833,6 +708,24 @@ describe("moving the player to another seat", () => {
     });
   };
 
+  /** The card for a seat, found by the number it shows. */
+  const cardFor = (label: string) =>
+    screen.getByText(label).closest("button") as HTMLButtonElement;
+
+  const confirmButton = () =>
+    screen.getByRole("button", { name: "session.moveConfirm" }) as HTMLButtonElement;
+
+  test("explains WHY the seat cannot take it, before offering anything", async () => {
+    repo.addTime.mockRejectedValueOnce(refusal());
+    repo.extensionOptions.mockResolvedValueOnce(options([seat()]));
+    await mount();
+    await pressAPreset();
+
+    expect(screen.getByText("session.moveWhyTitle")).toBeTruthy();
+    // …and says how much was asked for, so the cards are read in context.
+    expect(screen.getByText(/session.moveRequested/)).toBeTruthy();
+  });
+
   test("offers the seats the server says can take the grant", async () => {
     repo.addTime.mockRejectedValueOnce(refusal());
     repo.extensionOptions.mockResolvedValueOnce(options([seat(), seat({ place_id: 92, number: 10 })]));
@@ -840,22 +733,60 @@ describe("moving the player to another seat", () => {
     await pressAPreset();
 
     expect(screen.getByText("session.moveTitle")).toBeTruthy();
-    expect(screen.getAllByRole("button", { name: "session.moveHere" })).toHaveLength(2);
+    expect(cardFor("№9")).toBeTruthy();
+    expect(cardFor("№10")).toBeTruthy();
   });
 
-  test("moves to the seat that was pressed, for the minutes that were refused", async () => {
+  test("cannot confirm until a seat is chosen", async () => {
     repo.addTime.mockRejectedValueOnce(refusal());
     repo.extensionOptions.mockResolvedValueOnce(options([seat()]));
     await mount();
     await pressAPreset();
 
-    repo.transferExtension.mockResolvedValueOnce(session());
+    expect(confirmButton().disabled).toBe(true);
+
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "session.moveHere" }));
+      fireEvent.click(cardFor("№9"));
     });
 
-    // The session id, the seat, and the grant the cashier originally asked for.
-    expect(repo.transferExtension).toHaveBeenCalledWith(42, 91, expect.any(Number));
+    expect(confirmButton().disabled).toBe(false);
+  });
+
+  test("moves to the seat that was CHOSEN, for the minutes that were refused", async () => {
+    repo.addTime.mockRejectedValueOnce(refusal());
+    repo.extensionOptions.mockResolvedValueOnce(
+      options([seat(), seat({ place_id: 92, number: 10 })]),
+    );
+    await mount();
+    await pressAPreset();
+
+    // Pick the SECOND one, so a hardcoded "first in the list" fails here.
+    await act(async () => {
+      fireEvent.click(cardFor("№10"));
+    });
+
+    repo.transferExtension.mockResolvedValueOnce(session());
+    await act(async () => {
+      fireEvent.click(confirmButton());
+    });
+
+    expect(repo.transferExtension).toHaveBeenCalledWith(42, 92, expect.any(Number));
+  });
+
+  test("marks the chosen seat, and only that one", async () => {
+    repo.addTime.mockRejectedValueOnce(refusal());
+    repo.extensionOptions.mockResolvedValueOnce(
+      options([seat(), seat({ place_id: 92, number: 10 })]),
+    );
+    await mount();
+    await pressAPreset();
+
+    await act(async () => {
+      fireEvent.click(cardFor("№10"));
+    });
+
+    expect(cardFor("№10").getAttribute("aria-pressed")).toBe("true");
+    expect(cardFor("№9").getAttribute("aria-pressed")).toBe("false");
   });
 
   test("says so when nothing is free rather than showing an empty list", async () => {
@@ -865,7 +796,7 @@ describe("moving the player to another seat", () => {
     await pressAPreset();
 
     expect(screen.getByText("session.moveNone")).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "session.moveHere" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "session.moveConfirm" })).toBeNull();
   });
 
   test("asks for nothing after a refusal that is not about the seat", async () => {
