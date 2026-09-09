@@ -4,7 +4,7 @@ import { useBookingChanged } from "@/realtime/useBookingChanged";
 import { BookingChangedEvent } from "@/realtime/useBookingChanged";
 import { resolveBookingScopeChannel } from "@/realtime/bookingScope";
 import { bookingRepository } from "@/repositories/BookingRepository";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 /**
  * Kinds where the booking has stopped holding its seats — the
@@ -111,10 +111,38 @@ export const useReservedPlaceIds = (branchId: number): Set<number> => {
   // scope, so an owner's or manager's machine is no longer handed the whole
   // platform's bookings just to colour one grid.
   const bookingScope = resolveBookingScopeChannel(user);
+
+  /**
+   * The last event applied per BOOKING, so an older frame cannot undo a newer
+   * one.
+   *
+   * Reverb does not promise order. This handler adds and removes seat ids
+   * straight from the payload, so a `created` arriving after the `cancelled`
+   * that followed it leaves the seat orange and `canStartSession` false — a
+   * cashier cannot seat a walk-in on a booking that no longer exists, and
+   * nothing on screen says why. The 30s sweep below repairs it eventually;
+   * this stops it happening.
+   *
+   * Keyed by booking id, not by seat: two bookings can touch the same seat and
+   * neither should silence the other.
+   */
+  const lastEventAtRef = useRef<Map<number, number>>(new Map());
+
   useBookingChanged(
     bookingScope?.name,
     useCallback((evt) => {
       if (evt.branch_id !== branchId) return;
+
+      // `at` is the server's ISO instant. An event without a readable one is
+      // applied rather than dropped: it cannot be ordered, and losing a change
+      // is worse than applying it out of turn.
+      const at = Date.parse(evt.at ?? "");
+      if (Number.isFinite(at)) {
+        const seen = lastEventAtRef.current.get(evt.booking_id);
+        if (seen !== undefined && at <= seen) return;
+        lastEventAtRef.current.set(evt.booking_id, at);
+      }
+
       const isTerminal = TERMINAL_BOOKING_KINDS.includes(evt.kind);
       setIds((prev) => {
         const next = new Set(prev);

@@ -449,3 +449,15 @@ export const getEcho = (): EchoLike | null => {
   globalThis.__cyberplace_echo__ = buildEcho(cfg);
   return globalThis.__cyberplace_echo__;
 };
+
+/**
+ * The shared Echo client IF one already exists — never builds one.
+ *
+ * For callers that want to observe the connection rather than use it. A
+ * reconnect watcher is the case this exists for: there is nothing to reconnect
+ * when nothing ever connected, so asking the question must not be what causes
+ * a client to be created. `getEcho()` builds on demand, which is right for a
+ * screen about to subscribe and wrong for anything merely watching.
+ */
+export const peekEcho = (): EchoLike | null =>
+  globalThis.__cyberplace_echo__ ?? null;

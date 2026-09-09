@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { ISessionApi } from "@/types/sessions";
 import SessionOptionsDialog from "./SessionOptionsDialog";
@@ -688,5 +688,96 @@ describe("switching a session to unlimited", () => {
 
     expect(screen.getByText("session.unlimitedAlready")).toBeTruthy();
     expect(screen.queryByLabelText("session.unlimitedRate")).toBeNull();
+  });
+});
+
+/**
+ * A refusal that names the alternative.
+ *
+ * The server answers "the seat is reserved" with the grant it WOULD accept
+ * (`max_minutes`) and the moment the seat is claimed. Before this, the dialog
+ * printed the sentence and nothing else, and a cashier found the ceiling by
+ * halving the number until one went through.
+ */
+describe("when the seat is reserved ahead", () => {
+  /** The shape `ApiError` carries — a `body` with the server's JSON. */
+  const refusal = (over: Record<string, unknown> = {}) =>
+    Object.assign(new Error("The seat is reserved"), {
+      body: {
+        message: "The seat is reserved",
+        code: "seat_reserved",
+        latest_allowed_end: "2026-09-03T15:00:00.000Z",
+        max_minutes: 50,
+        ...over,
+      },
+    });
+
+  /**
+   * Press any preset. `t` echoes keys and the presets all interpolate into the
+   * same one, so they are indistinguishable by name — the first is as good as
+   * any, and which one it was does not matter to what is being asserted.
+   */
+  const pressAPreset = async () => {
+    await act(async () => {
+      fireEvent.click(screen.getAllByRole("button", { name: "session.addMinutes" })[0]);
+    });
+  };
+
+  /** The offer's own button, found through its container rather than by name. */
+  const offerButton = () => {
+    const hint = screen.getByText(/session.seatClaimedFrom/);
+    const box = hint.parentElement as HTMLElement;
+    return within(box).getByRole("button");
+  };
+
+  test("offers exactly the grant the server said it would take", async () => {
+    repo.addTime.mockRejectedValueOnce(refusal());
+    await mount();
+    await pressAPreset();
+
+    expect(screen.getByText(/session.seatClaimedFrom/)).toBeTruthy();
+
+    repo.addTime.mockResolvedValueOnce(session());
+    await act(async () => {
+      fireEvent.click(offerButton());
+    });
+
+    // The SERVER's figure, not a preset.
+    expect(repo.addTime).toHaveBeenLastCalledWith(42, 50);
+  });
+
+  test("offers nothing when the reservation has already started", async () => {
+    // Zero headroom must not become a button that grants zero minutes.
+    repo.addTime.mockRejectedValueOnce(refusal({ max_minutes: 0 }));
+    await mount();
+    await pressAPreset();
+
+    expect(screen.queryByText(/session.seatClaimed/)).toBeNull();
+  });
+
+  test("offers nothing after an unrelated refusal", async () => {
+    repo.addTime.mockRejectedValueOnce(
+      Object.assign(new Error("Session not active"), {
+        body: { message: "Session not active" },
+      }),
+    );
+    await mount();
+    await pressAPreset();
+
+    expect(screen.queryByText(/session.seatClaimed/)).toBeNull();
+  });
+
+  test("the offer is cleared once something succeeds", async () => {
+    repo.addTime.mockRejectedValueOnce(refusal());
+    await mount();
+    await pressAPreset();
+    expect(screen.getByText(/session.seatClaimedFrom/)).toBeTruthy();
+
+    repo.addTime.mockResolvedValueOnce(session());
+    await act(async () => {
+      fireEvent.click(offerButton());
+    });
+
+    expect(screen.queryByText(/session.seatClaimed/)).toBeNull();
   });
 });

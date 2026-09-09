@@ -59,4 +59,64 @@ describe("Booking", () => {
     const b = new Booking(baseRaw({ duration_minutes: 60, rescheduled_minutes: 30 }));
     expect(b.durationHours()).toBeCloseTo(1.5, 5);
   });
+
+  /**
+   * How far ahead a reservation reaches back and takes the seat.
+   *
+   * `isReservingAt` used to ask only whether the end was still in the future,
+   * so a booking made for next Saturday held the seat every day until then and
+   * `canStartSession` refused every walk-in on it. These pin the horizon in
+   * both directions, because a rule with no test is a rule that drifts back.
+   */
+  describe("how far ahead a reservation holds the seat", () => {
+    it("holds it while it is actually running", () => {
+      const b = new Booking(baseRaw());
+      const t = new Date(b.start.getTime() + 10 * 60_000);
+      expect(b.isReservingAt(t)).toBe(true);
+    });
+
+    it("holds it shortly before it starts, so nobody is seated to be moved", () => {
+      const b = new Booking(baseRaw());
+      const t = new Date(b.start.getTime() - 60 * 60_000);
+      expect(b.isReservingAt(t)).toBe(true);
+    });
+
+    it("does NOT hold it a day ahead — the venue can sell today", () => {
+      const b = new Booking(baseRaw());
+      const t = new Date(b.start.getTime() - 24 * 60 * 60_000);
+      expect(b.isReservingAt(t)).toBe(false);
+    });
+
+    it("does NOT hold it a week ahead", () => {
+      const b = new Booking(baseRaw());
+      const t = new Date(b.start.getTime() - 7 * 24 * 60 * 60_000);
+      expect(b.isReservingAt(t)).toBe(false);
+    });
+
+    it("has let go once it is over", () => {
+      const b = new Booking(baseRaw());
+      const t = new Date(b.end.getTime() + 60_000);
+      expect(b.isReservingAt(t)).toBe(false);
+    });
+
+    it("a cancelled booking holds nothing, however close it is", () => {
+      const b = new Booking(baseRaw({ status: "cancelled" }));
+      const t = new Date(b.start.getTime() - 60_000);
+      expect(b.isReservingAt(t)).toBe(false);
+    });
+
+    it("a seat free now but booked later is upcoming, not reserved", () => {
+      const b = new Booking(baseRaw());
+      const t = new Date(b.start.getTime() - 24 * 60 * 60_000);
+      expect(b.isReservingAt(t)).toBe(false);
+      expect(b.isUpcomingAt(t)).toBe(true);
+    });
+
+    it("…and once it is near, it is reserved rather than merely upcoming", () => {
+      const b = new Booking(baseRaw());
+      const t = new Date(b.start.getTime() - 60 * 60_000);
+      expect(b.isReservingAt(t)).toBe(true);
+      expect(b.isUpcomingAt(t)).toBe(false);
+    });
+  });
 });

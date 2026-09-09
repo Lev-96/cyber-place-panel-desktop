@@ -486,6 +486,18 @@ export const TRANSLATIONS: Dict = {
   },
   "session.addTime": { en: "Add time", ru: "Добавить время", am: "Ավելացնել ժամանակ" },
   "session.addMinutes": { en: "+{0} min", ru: "+{0} мин", am: "+{0} րոպե" },
+  // A refusal that names the alternative. `{0}` is the time the next
+  // reservation takes the seat, in 24-hour form like everything else here.
+  "session.seatClaimedFrom": {
+    en: "Reserved from {0}. You can extend up to then:",
+    ru: "Забронировано с {0}. Продлить можно до этого времени:",
+    am: "Ամրագրված է {0}-ից: Կարող եք երկարաձգել մինչ այդ:",
+  },
+  "session.seatClaimed": {
+    en: "This seat is reserved. You can still extend by:",
+    ru: "Место забронировано. Продлить можно на:",
+    am: "Այս տեղը ամրագրված է: Կարող եք երկարաձգել:",
+  },
   // Manual entry, for the grant no preset covers. The unit matters more than
   // it looks: a cashier typing "2" means two hours far more often than two
   // minutes, and a number with no unit beside it is the kind of ambiguity that

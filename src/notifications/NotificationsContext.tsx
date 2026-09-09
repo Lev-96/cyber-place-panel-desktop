@@ -1,4 +1,5 @@
 import { useAuth } from "@/auth/AuthContext";
+import { useRealtimeResync } from "@/realtime/useRealtimeResync";
 import { useRealtimeVersion } from "@/realtime/useRealtimeVersion";
 import {
   apiDeleteAllNotifications,
@@ -161,46 +162,27 @@ export const NotificationsProvider = ({ children }: { children: ReactNode }) => 
     };
     channel.listen(".notification.created", listener);
 
-    // A WebSocket has no backlog: everything sent while the connection was down
-    // is simply gone. The 60s poll corrects the unread COUNT eventually, but
-    // the feed itself would keep describing the world as it was before the gap.
-    // So a reconnect re-reads the list once.
-    //
-    // Reconnects only — the first `connected` lands while the mount fetch above
-    // is already in flight.
-    const connection = (
-      echo as unknown as {
-        connector?: {
-          pusher?: {
-            connection?: {
-              bind?: (e: string, h: () => void) => void;
-              unbind?: (e: string, h: () => void) => void;
-              state?: string;
-            };
-          };
-        };
-      }
-    ).connector?.pusher?.connection;
-
-    let hasConnectedBefore = connection?.state === "connected";
-    const onConnected = () => {
-      if (hasConnectedBefore) void refreshRef.current();
-      hasConnectedBefore = true;
-    };
-    const onDropped = () => {
-      hasConnectedBefore = true;
-    };
-    connection?.bind?.("connected", onConnected);
-    connection?.bind?.("disconnected", onDropped);
-    connection?.bind?.("unavailable", onDropped);
-
     return () => {
-      connection?.unbind?.("connected", onConnected);
-      connection?.unbind?.("disconnected", onDropped);
-      connection?.unbind?.("unavailable", onDropped);
       channel.stopListening(".notification.created", listener);
     };
   }, [user, dbFeedEnabled, realtime]);
+
+  // A WebSocket has no backlog: everything sent while the connection was down
+  // is simply gone. The 60s poll corrects the unread COUNT eventually, but the
+  // feed itself would keep describing the world as it was before the gap. So a
+  // reconnect re-reads the list once.
+  //
+  // This used to be nine hand-rolled lines here, and this was the only screen
+  // in the panel that had them — the sessions board and the booking feed
+  // resumed listening with no reconciliation at all. `useRealtimeResync` is
+  // those lines, with the first-connect rule and the drop-before-connect case
+  // covered by tests they never had.
+  useRealtimeResync(
+    useCallback(() => {
+      if (!user || !dbFeedEnabled) return;
+      void refreshRef.current();
+    }, [user, dbFeedEnabled]),
+  );
 
   const markRead = useCallback(async (id: string) => {
     // Optimistic patch so the badge moves immediately; rollback on

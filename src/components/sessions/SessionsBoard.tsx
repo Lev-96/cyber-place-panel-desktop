@@ -21,8 +21,9 @@ import {
 } from "@/domain/SessionCellState";
 import { platformGroup, platformLabel } from "@/utils/platform";
 import { usePs5Control } from "@/ps5/Ps5ControlProvider";
+import { useRealtimeResync } from "@/realtime/useRealtimeResync";
 import { PS5_STATE_LOOK } from "@/ps5/stateLook";
-import { DragEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { DragEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import AddSessionItemDialog from "./AddSessionItemDialog";
 import SessionTimer from "./SessionTimer";
@@ -102,12 +103,30 @@ const SessionsBoard = ({ branchId }: Props) => {
   // is not watched at all.
   const { views: consoleViews, statuses: consoleStatuses, sessionStarting, sessionStopped } = usePs5Control();
 
+  /**
+   * A seat changed hands for a reason that is NOT a session — a reservation
+   * created, cancelled or expired.
+   *
+   * ⚠️ Session-driven reasons are dropped here on purpose. The backend now
+   * announces both events for one change (`SessionBroadcaster` fires the
+   * players' `PlaceAvailabilityChanged` beside the staff `SessionChanged`), and
+   * this board is subscribed to both — so a single "+10 minutes" produced three
+   * GETs per open panel: one from the handler below and two from this one.
+   *
+   * `session.*` is already covered, with a richer payload, by
+   * `useSessionChanged` underneath. What only reaches the board through THIS
+   * event is the booking side, and that is what it is kept for.
+   */
   usePlaceAvailability(
     branchId,
-    useCallback(() => {
-      void sessions.reload();
-      void pcs.reload();
-    }, [sessions, pcs]),
+    useCallback(
+      (evt) => {
+        if ((evt.reason ?? "").startsWith("session.")) return;
+        void sessions.reload();
+        void pcs.reload();
+      },
+      [sessions, pcs],
+    ),
   );
 
   // A session's TERMS changed on another machine — a pad in or out, time
@@ -136,13 +155,52 @@ const SessionsBoard = ({ branchId }: Props) => {
     }, [sessions]),
   );
 
-  useEffect(() => {
-    const t = setInterval(() => {
+  /**
+   * The self-healing poll — the only thing that puts this board right when a
+   * socket frame never arrives.
+   *
+   * ⚠️ It is armed ONCE, through a ref, and that is the entire point.
+   * `useAsync` returns `{ ...state, reload }` — a new object on every render —
+   * so an effect keyed on `[sessions, pcs]` cleared and restarted this
+   * interval every time anything re-rendered the board. `usePs5Control()`
+   * above re-renders it every ten seconds at a venue with a console bound
+   * (`useConsoleWatch`'s `WATCH_INTERVAL_MS`), so the thirty seconds were
+   * never reached and the poll had, in practice, never once fired.
+   *
+   * That left the board with no fallback at all: a missed `session.changed`
+   * stayed missed, and `useExpiryNudge` cannot cover it because it only looks
+   * at sessions that HAVE an end — an unlimited or count-up seat is exactly
+   * the one it filters out.
+   */
+  /**
+   * A dropped socket means everything broadcast during the gap is gone — a
+   * stop, a grant, a pad — and resuming the subscription does not bring it
+   * back. Re-read once when the connection returns.
+   *
+   * The poll below would eventually repair it too, but "eventually" is up to
+   * thirty seconds of a cashier looking at a seat that is already free, and it
+   * is the poll that this board went without for so long.
+   */
+  useRealtimeResync(
+    useCallback(() => {
       void sessions.reload();
       void pcs.reload();
-    }, 30_000);
+    }, [sessions, pcs]),
+  );
+
+  const reloadBoardRef = useRef(() => {
+    void sessions.reload();
+    void pcs.reload();
+  });
+  reloadBoardRef.current = () => {
+    void sessions.reload();
+    void pcs.reload();
+  };
+
+  useEffect(() => {
+    const t = setInterval(() => reloadBoardRef.current(), 30_000);
     return () => clearInterval(t);
-  }, [sessions, pcs]);
+  }, []);
 
   /**
    * Add or remove one pad on this seat, from the tile.

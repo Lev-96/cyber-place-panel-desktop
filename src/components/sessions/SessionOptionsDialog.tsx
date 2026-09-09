@@ -14,6 +14,12 @@ import { sessionRepository } from "@/repositories/SessionRepository";
 import { ISessionApi } from "@/types/sessions";
 import { platformGroup, platformLabel } from "@/utils/platform";
 import { useCallback, useEffect, useState } from "react";
+import {
+  claimedFromOf,
+  offeredMinutesOf,
+  seatUnavailableBodyOf,
+  type SeatUnavailableBody,
+} from "@/api/seatUnavailable";
 
 interface Props {
   session: ISessionApi;
@@ -68,6 +74,12 @@ const SessionOptionsDialog = ({ session, platform, onClose, onChanged }: Props) 
   const [fee, setFee] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /**
+   * The structured half of a "seat is taken" refusal, when the last request
+   * was one. Null for every other kind of failure, so nothing is offered after
+   * an unrelated error.
+   */
+  const [seatRefusal, setSeatRefusal] = useState<SeatUnavailableBody | null>(null);
   // Manual grant: off by default, so the ordinary case stays one tap.
   const [manual, setManual] = useState(false);
   const [manualAmount, setManualAmount] = useState("");
@@ -172,15 +184,23 @@ const SessionOptionsDialog = ({ session, platform, onClose, onChanged }: Props) 
    */
   const resolvedRate = current.tariff_hourly_rate ?? null;
 
+  const offeredMinutes = offeredMinutesOf(seatRefusal);
+  const claimedFrom = claimedFromOf(seatRefusal);
+
   const run = async (action: () => Promise<ISessionApi>): Promise<boolean> => {
     setBusy(true);
     setError(null);
+    setSeatRefusal(null);
     try {
       const updated = await action();
       setCurrent(updated);
       onChanged(updated);
       return true;
     } catch (e) {
+      // The seat-is-taken refusal carries the grant the server WOULD accept.
+      // Kept beside the sentence so the dialog can offer it as a button
+      // instead of leaving the cashier to retry by halving the number.
+      setSeatRefusal(seatUnavailableBodyOf(e));
       setError(e instanceof Error ? e.message : String(e));
       // The refusal is very often "no price is set for joystick #N", and the
       // price list this dialog drew its button from is exactly what has gone
@@ -250,6 +270,42 @@ const SessionOptionsDialog = ({ session, platform, onClose, onChanged }: Props) 
 
         {!isActive && <div className="error">{t("session.optionsClosedSession")}</div>}
         {error && <div className="error">{error}</div>}
+
+        {/* "You cannot have two hours — you can have fifty minutes."
+            A refusal that names no alternative sends the cashier to guess, and
+            the figure here comes from the same predicate that just refused, so
+            pressing it is a request the guard accepts.
+
+            It is still a normal request: a phone can take the seat between the
+            refusal and the press, and being refused a second time is correct
+            rather than a bug. */}
+        {offeredMinutes !== null && (
+          <div className="col" style={{ gap: 6 }}>
+            <span className="muted" style={{ fontSize: 12 }}>
+              {claimedFrom
+                ? t("session.seatClaimedFrom").replace(
+                    "{0}",
+                    claimedFrom.toLocaleTimeString([], {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                      hour12: false,
+                    }),
+                  )
+                : t("session.seatClaimed")}
+            </span>
+            <div className="row">
+              <Button
+                variant="secondary"
+                disabled={busy || !isActive}
+                onClick={() =>
+                  void run(() => sessionRepository.addTime(current.id, offeredMinutes))
+                }
+              >
+                {t("session.addMinutes").replace("{0}", String(offeredMinutes))}
+              </Button>
+            </div>
+          </div>
+        )}
 
         {/* ── joysticks ─────────────────────────────────────────────────── */}
         {isPlayStation ? (
@@ -367,11 +423,18 @@ const SessionOptionsDialog = ({ session, platform, onClose, onChanged }: Props) 
               {manual && (
                 <div className="col" style={{ gap: 6 }}>
                   <div className="row" style={{ gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                    {/* Text + `inputMode`, which is the mechanism
+                        `NumberStepper` itself uses — Electron swallows
+                        keystrokes in a raw `type="number"`, on one of the two
+                        boxes a cashier types into with a player waiting.
+                        `NumberStepper` is not used directly because it holds a
+                        NUMBER and this field is deliberately a string: empty is
+                        "not filled in yet" rather than zero, and the validation
+                        below depends on telling those apart. */}
                     <input
                       className="input"
-                      type="number"
-                      min={1}
-                      step={manualUnit === "hours" ? "0.5" : "1"}
+                      type="text"
+                      inputMode="decimal"
                       value={manualAmount}
                       onChange={(e) => setManualAmount(e.target.value)}
                       aria-label={t("session.timeAmount")}
@@ -468,10 +531,11 @@ const SessionOptionsDialog = ({ session, platform, onClose, onChanged }: Props) 
                   <label className="col" style={{ gap: 4 }}>
                     <span className="label">{t("session.unlimitedRate")} *</span>
                     <div className="row" style={{ gap: 6, alignItems: "center" }}>
+                      {/* Same reason as the amount box above. */}
                       <input
                         className="input"
-                        type="number"
-                        min={1}
+                        type="text"
+                        inputMode="decimal"
                         value={rateInput}
                         onChange={(e) => setRateInput(e.target.value)}
                         aria-label={t("session.unlimitedRate")}

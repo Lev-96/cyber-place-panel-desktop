@@ -14,6 +14,30 @@ const BLOCKING_STATUSES: readonly BookingStatusType[] = [
   "rescheduled",
 ];
 
+/**
+ * How long before a reservation starts the seat stops being offered to a
+ * walk-in.
+ *
+ * ⚠️ This constant exists because the rule used to have NO horizon at all:
+ * `isReservingAt` asked only whether the booking's end was still ahead, which
+ * is true of a reservation next Saturday. One booking made a week out painted
+ * the seat orange today and `canStartSession` refused every walk-in on it
+ * until the booking played out — six days of a seat a venue could not sell.
+ *
+ * Two hours is a judgement, and it is written down rather than derived because
+ * there is nothing to derive it from. It is bounded on both sides:
+ *
+ *  - `Place.test.ts` pins "an upcoming booking reserves the seat" with an hour
+ *    to go, so the horizon cannot be shorter than that without changing a
+ *    decision somebody made on purpose;
+ *  - and it has to be short enough that an evening reservation does not cost
+ *    the venue the afternoon.
+ *
+ * Change it here and every screen that asks "is this seat spoken for" changes
+ * with it.
+ */
+export const RESERVATION_LEAD_MS = 2 * 60 * 60_000;
+
 export class Booking {
   readonly id: number;
   readonly branchId: number;
@@ -100,6 +124,34 @@ export class Booking {
    *      tile silently went grey on every screen remount.
    */
   isReservingAt(t: Date): boolean {
-    return BLOCKING_STATUSES.includes(this.status) && this.end > t;
+    if (!BLOCKING_STATUSES.includes(this.status)) return false;
+
+    // Already over — it holds nothing.
+    if (this.end <= t) return false;
+
+    // ⚠️ …and it has to be near. This used to be `end > t` alone, which is
+    // true of a reservation next Saturday — see `RESERVATION_LEAD_MS` for what
+    // that cost and why the horizon is the length it is.
+    //
+    // The backend never agreed with the unbounded reading either:
+    // `PlaceAvailabilityService` and `ConflictDetector` both answer for a
+    // WINDOW, and the window this tile is asking about is the one in front of
+    // the cashier.
+    return this.start.getTime() - t.getTime() <= RESERVATION_LEAD_MS;
+  }
+
+  /**
+   * The seat is free now, but somebody has it later today — what a cashier
+   * needs in order to sell the gap without selling into the reservation.
+   *
+   * Deliberately separate from {@see isReservingAt}: "you cannot start here"
+   * and "you can, but be aware" are different answers, and collapsing them is
+   * what produced the week-long block above.
+   */
+  isUpcomingAt(t: Date): boolean {
+    return (
+      BLOCKING_STATUSES.includes(this.status) &&
+      this.start.getTime() - t.getTime() > RESERVATION_LEAD_MS
+    );
   }
 }
