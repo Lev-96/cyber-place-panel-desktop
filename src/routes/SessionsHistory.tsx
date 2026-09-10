@@ -404,14 +404,31 @@ export const eventDetail = (
       const to = metaNum(meta, "to_place_number");
       if (from !== null && to !== null) parts.push(`№${from} -> №${to}`);
 
-      const startedAt = metaStr(meta, "session_started_at");
-      if (startedAt !== null) {
-        const playedMs = new Date(e.created_at).getTime() - new Date(startedAt).getTime();
-        if (Number.isFinite(playedMs) && playedMs > 0) {
-          parts.push(
-            `${t("history.playedBeforeMove")}: ${durationLabel(playedMs / 60000, t)}`,
-          );
+      // ⚠️ The SERVER's figure first. It is computed inside the same
+      // transaction as the move, from the session's own start against the
+      // move's own instant. The subtraction below is the fallback for rows
+      // written before that field existed — an old line must still read.
+      const playedMinutes = metaNum(meta, "played_minutes_before");
+      if (playedMinutes !== null) {
+        parts.push(`${t("history.playedBeforeMove")}: ${durationLabel(playedMinutes, t)}`);
+      } else {
+        const startedAt = metaStr(meta, "session_started_at");
+        if (startedAt !== null) {
+          const playedMs = new Date(e.created_at).getTime() - new Date(startedAt).getTime();
+          if (Number.isFinite(playedMs) && playedMs > 0) {
+            parts.push(
+              `${t("history.playedBeforeMove")}: ${durationLabel(playedMs / 60000, t)}`,
+            );
+          }
         }
+      }
+
+      // What the seat that was left had run up. Only the total: the split into
+      // products and pads is detail for the row's own block, not for a line
+      // that has to read at a glance.
+      const totalBefore = metaNum(meta, "total_before");
+      if (totalBefore !== null) {
+        parts.push(`${t("history.totalBeforeMove")}: ${money(totalBefore)}`);
       }
       const granted = metaNum(meta, "requested_minutes");
       if (granted !== null && granted > 0) parts.push(`+${granted} ${t("time.minShort")}`);

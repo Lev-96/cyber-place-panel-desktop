@@ -67,6 +67,42 @@ describe("a seat migration", () => {
     expect(line).toContain("1 time.hourShort 20 time.minShort");
   });
 
+  test("prefers the server's played-before figure over subtracting timestamps", () => {
+    // ⚠️ Both are present and they DISAGREE. The server's must win: it was
+    // computed inside the move's own transaction, and the subtraction is only
+    // a fallback for rows written before that field existed.
+    const line = eventDetail(
+      event({
+        action: "moved",
+        created_at: "2026-09-10T15:20:00+04:00",
+        meta: {
+          from_place_number: 2,
+          to_place_number: 5,
+          session_started_at: "2026-09-10T14:00:00+04:00",
+          played_minutes_before: 31,
+        },
+      }),
+      t,
+      money,
+    );
+
+    expect(line).toContain("31 time.minShort");
+    expect(line).not.toContain("1 time.hourShort 20 time.minShort");
+  });
+
+  test("says what the seat that was left had run up", () => {
+    const line = eventDetail(
+      event({
+        action: "moved",
+        meta: { from_place_number: 2, to_place_number: 5, total_before: 1750 },
+      }),
+      t,
+      money,
+    );
+
+    expect(line).toContain("history.totalBeforeMove: 1750 AMD");
+  });
+
   test("carries the grant the move was made for", () => {
     const line = eventDetail(
       event({

@@ -1086,6 +1086,14 @@ export const TRANSLATIONS: Dict = {
     am: "Խաղացել է տեղափոխումից առաջ",
   },
   "history.untilLabel": { en: "until", ru: "до", am: "մինչև" },
+  // What the seat that was left had run up, as the server priced it at the
+  // moment of the move. Unrecoverable afterwards: the session row describes
+  // the NEW seat from then on.
+  "history.totalBeforeMove": {
+    en: "Bill before the move",
+    ru: "Счёт до переноса",
+    am: "Հաշիվը տեղափոխումից առաջ",
+  },
   "history.padsNow": { en: "Joysticks now", ru: "Джойстиков стало", am: "Ջոյսթիկներ այժմ" },
   "history.padUnitPrice": { en: "Price for one", ru: "Цена за 1", am: "Մեկի գինը" },
   // ⚠️ Said in words. Taking a pad out of play refunds nothing, the amount on
