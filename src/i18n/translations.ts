@@ -862,6 +862,19 @@ export const TRANSLATIONS: Dict = {
   },
   "session.toastNewBooking": { en: "New booking", ru: "Новое бронирование", am: "Նոր ամրագրում" },
   "session.toastBookingExtended": { en: "Booking extended", ru: "Бронь продлена", am: "Ամրագրումը երկարացվել է" },
+  // ── how the money was taken ─────────────────────────────────────────────
+  // One answer, so radio buttons. Cash leads: it is the common case at a
+  // counter and the default keeps an ordinary stop to one click.
+  "session.payTitle": { en: "Payment method", ru: "Способ оплаты", am: "Վճարման եղանակ" },
+  "session.payCash": { en: "Cash", ru: "Наличные", am: "Կանխիկ" },
+  "session.payCard": { en: "Card", ru: "Карта", am: "Քարտ" },
+  "session.payOther": { en: "Another method", ru: "Другой способ оплаты", am: "Այլ եղանակ" },
+  "session.payOtherPlaceholder": { en: "For example, Idram", ru: "Например, Idram", am: "Օրինակ՝ Idram" },
+  "session.payOtherRequired": {
+    en: "Say which method it was.",
+    ru: "Укажите, каким способом.",
+    am: "Նշեք, թե որ եղանակով:",
+  },
   "session.boardTitle": { en: "Sessions", ru: "Сессии", am: "Նիստեր" },
   // How much of the room is in use. Counted off the tiles on screen, so the
   // line and the grid can never disagree.

@@ -1,5 +1,7 @@
 import { SkeletonText } from "@/components/ui/Skeleton";
 import Button from "@/components/ui/Button";
+import Input from "@/components/ui/Input";
+import type { PaymentMethod } from "@/api/sessions";
 import Modal from "@/components/ui/Modal";
 import Spinner from "@/components/ui/Spinner";
 import { IBillBreakdown } from "@/api/sessions";
@@ -36,6 +38,10 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved }: Prop
   const [bill, setBill] = useState<IBillBreakdown | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  // Cash by default: it is the common case at a counter, so the ordinary stop
+  // stays one click rather than two.
+  const [method, setMethod] = useState<PaymentMethod>("cash");
+  const [other, setOther] = useState("");
   const [stopped, setStopped] = useState<IBillBreakdown | null>(null);
 
   const reload = async () => {
@@ -72,9 +78,23 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved }: Prop
   };
 
   const confirmStop = async () => {
+    // ⚠️ Checked here so the cashier is told BEFORE the request, but the server
+    // enforces the same rule and is what actually decides — this is a courtesy,
+    // not the guard. A stop refused for a missing note leaves the seat running.
+    if (method === "other" && other.trim() === "") {
+      setErr(t("session.payOtherRequired"));
+      return;
+    }
+
     setBusy(true); setErr(null);
     try {
-      const r = await sessionRepository.stop(session.id);
+      const r = await sessionRepository.stop(session.id, {
+        payment_method: method,
+        // Sent only for `other`: the server strips it for the other two, and a
+        // card payment carrying a note called "Idram" is a contradiction the
+        // history would then have to display.
+        ...(method === "other" ? { payment_method_other: other.trim() } : {}),
+      });
       setStopped(r.breakdown);
       onConfirmed();
     } catch (e) {
@@ -84,6 +104,19 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved }: Prop
   };
 
   const view = stopped ?? bill;
+
+  /**
+   * How the money is being taken.
+   *
+   * Radio rather than checkboxes: it is one answer, and a set of checkboxes
+   * invites two. Cash leads because it is the common case at a counter, and a
+   * default means the ordinary stop stays one click.
+   */
+  const methods: { key: PaymentMethod; label: string }[] = [
+    { key: "cash", label: t("session.payCash") },
+    { key: "card", label: t("session.payCard") },
+    { key: "other", label: t("session.payOther") },
+  ];
 
   /**
    * The seat is already over — its paid period ran out and the server ended it,
@@ -198,6 +231,42 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved }: Prop
                   : money(Number(view.total), preciseWhenSmall(Number(view.total)))}
               </span>
             </div>
+          </div>
+        )}
+
+        {/* ⚠️ Hidden once the session is finished: the choice has been made and
+            the receipt above is the record of it. A live radio group under a
+            closed bill invites an edit that nothing would accept. */}
+        {!finished && (
+          <div className="col" style={{ gap: 6, marginTop: 6 }}>
+            <strong style={{ fontSize: 13 }}>{t("session.payTitle")}</strong>
+            <div className="row" style={{ gap: 14, flexWrap: "wrap" }}>
+              {methods.map((m) => (
+                <label
+                  key={m.key}
+                  className="row"
+                  style={{ gap: 6, alignItems: "center", cursor: "pointer", fontSize: 13 }}
+                >
+                  <input
+                    type="radio"
+                    name={`pay-${session.id}`}
+                    value={m.key}
+                    checked={method === m.key}
+                    disabled={busy}
+                    onChange={() => { setMethod(m.key); setErr(null); }}
+                  />
+                  <span>{m.label}</span>
+                </label>
+              ))}
+            </div>
+            {method === "other" && (
+              <Input
+                value={other}
+                onChange={(e) => { setOther(e.target.value); setErr(null); }}
+                placeholder={t("session.payOtherPlaceholder")}
+                disabled={busy}
+              />
+            )}
           </div>
         )}
 

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, cleanup, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { IBillBreakdown } from "@/api/sessions";
 import { ISessionApi } from "@/types/sessions";
@@ -72,6 +72,126 @@ const mount = async (s: ISessionApi = session()) => {
     );
   });
 };
+
+/**
+ * How the money was taken.
+ *
+ * ⚠️ These check the DIALOG's half of the contract only. The server enforces
+ * the same rule and is what actually decides — a stop refused for a missing
+ * note leaves the seat running, which is the outcome that matters and is
+ * pinned on the backend. What is asserted here is that a cashier is told
+ * before the request, and that the payload carries what they chose.
+ */
+describe("the payment method", () => {
+  // By VALUE, not by label text: the labels and the placeholder share a prefix
+  // and a text query matches more than one of them.
+  const radio = (value: string) =>
+    screen
+      .getAllByRole("radio")
+      .find((r) => (r as HTMLInputElement).value === value) as HTMLInputElement;
+
+  const confirm = () => screen.getByRole("button", { name: "session.confirmStop" });
+
+  // ⚠️ Its own cleanup: the file's other describe has one, and without this
+  // the modals stack up and every query finds two of everything.
+  afterEach(cleanup);
+
+  beforeEach(() => {
+    repo.preview.mockReset();
+    repo.stop.mockReset();
+    repo.preview.mockResolvedValue(bill());
+    repo.stop.mockResolvedValue({ session: session(), breakdown: bill() });
+  });
+
+  test("cash is chosen by default, so the ordinary stop stays one click", async () => {
+    await mount();
+
+    expect(radio("cash").checked).toBe(true);
+    await act(async () => { fireEvent.click(confirm()); });
+
+    expect(repo.stop).toHaveBeenCalledWith(1, { payment_method: "cash" });
+  });
+
+  test("card sends card and no free text", async () => {
+    await mount();
+
+    await act(async () => { fireEvent.click(radio("card")); });
+    await act(async () => { fireEvent.click(confirm()); });
+
+    expect(repo.stop).toHaveBeenCalledWith(1, { payment_method: "card" });
+  });
+
+  test("the free-text field appears only for another method", async () => {
+    await mount();
+
+    expect(screen.queryByPlaceholderText("session.payOtherPlaceholder")).toBeNull();
+
+    await act(async () => { fireEvent.click(radio("other")); });
+    expect(screen.getByPlaceholderText("session.payOtherPlaceholder")).toBeTruthy();
+
+    // …and goes again when the cashier changes their mind.
+    await act(async () => { fireEvent.click(radio("cash")); });
+    expect(screen.queryByPlaceholderText("session.payOtherPlaceholder")).toBeNull();
+  });
+
+  test("another method with nothing typed does not reach the server", async () => {
+    await mount();
+
+    await act(async () => { fireEvent.click(radio("other")); });
+    await act(async () => { fireEvent.click(confirm()); });
+
+    expect(repo.stop).not.toHaveBeenCalled();
+    expect(screen.getByText("session.payOtherRequired")).toBeTruthy();
+  });
+
+  test("whitespace is not a method name", async () => {
+    await mount();
+
+    await act(async () => { fireEvent.click(radio("other")); });
+    await act(async () => {
+      fireEvent.change(screen.getByPlaceholderText("session.payOtherPlaceholder"), {
+        target: { value: "   " },
+      });
+    });
+    await act(async () => { fireEvent.click(confirm()); });
+
+    expect(repo.stop).not.toHaveBeenCalled();
+  });
+
+  test("what the cashier typed is what is sent, trimmed", async () => {
+    await mount();
+
+    await act(async () => { fireEvent.click(radio("other")); });
+    await act(async () => {
+      fireEvent.change(screen.getByPlaceholderText("session.payOtherPlaceholder"), {
+        target: { value: "  Idram " },
+      });
+    });
+    await act(async () => { fireEvent.click(confirm()); });
+
+    expect(repo.stop).toHaveBeenCalledWith(1, {
+      payment_method: "other",
+      payment_method_other: "Idram",
+    });
+  });
+
+  test("choosing cash after typing a note drops the note", async () => {
+    // The field can hold text typed before the cashier changed their mind.
+    // It must not travel with a cash payment.
+    await mount();
+
+    await act(async () => { fireEvent.click(radio("other")); });
+    await act(async () => {
+      fireEvent.change(screen.getByPlaceholderText("session.payOtherPlaceholder"), {
+        target: { value: "Idram" },
+      });
+    });
+    await act(async () => { fireEvent.click(radio("cash")); });
+    await act(async () => { fireEvent.click(confirm()); });
+
+    expect(repo.stop).toHaveBeenCalledWith(1, { payment_method: "cash" });
+  });
+});
 
 describe("StopReceiptModal", () => {
   beforeEach(() => {

@@ -117,6 +117,16 @@ export interface ISessionApi {
   stopped_at?: string | null;
   status: "active" | "stopped" | "expired";
   total_paid: number;
+  /**
+   * How the money was taken when the session was stopped.
+   *
+   * ⚠️ Optional and nullable, and both matter. NULL is every session stopped
+   * before this was recorded and every session still running; the history
+   * renders nothing for it rather than inventing a method.
+   */
+  payment_method?: "cash" | "card" | "other" | null;
+  /** The words the cashier typed. Only ever set when the method is `other`. */
+  payment_method_other?: string | null;
   opened_by_user_id?: number | null;
   items?: Array<{ id: number; name: string; price: number | string; qty: number; product_id: number | null }>;
 

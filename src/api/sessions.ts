@@ -143,8 +143,20 @@ export interface AddItemsBody {
 export const apiPreviewSession = (id: number) =>
   request<{ preview: IBillBreakdown }>(`/sessions/${id}/preview`);
 
-export const apiStopSessionWithBreakdown = (id: number) =>
-  request<{ session: ISessionApi; breakdown: IBillBreakdown }>(`/sessions/${id}/stop`, { method: "POST" });
+/** How the money was taken. `other` is the only one that carries free text. */
+export type PaymentMethod = "cash" | "card" | "other";
+
+export interface StopSessionBody {
+  payment_method?: PaymentMethod;
+  /** Required by the server ONLY when the method is `other`. */
+  payment_method_other?: string;
+}
+
+export const apiStopSessionWithBreakdown = (id: number, body?: StopSessionBody) =>
+  request<{ session: ISessionApi; breakdown: IBillBreakdown }>(`/sessions/${id}/stop`, {
+    method: "POST",
+    body,
+  });
 
 export const apiAddSessionItem = (id: number, body: AddItemBody) =>
   request<{ item: ISessionItem; session: ISessionApi }>(`/sessions/${id}/items`, { method: "POST", body });

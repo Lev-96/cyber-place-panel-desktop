@@ -749,7 +749,17 @@ const SessionsBoard = ({ branchId }: Props) => {
               {sess.ends_at !== null && sess.is_unlimited !== true && (
                 <Button variant="secondary" onClick={() => setOptionsTarget(sess)} style={miniBtnFlex}>{t("session.addTime")}</Button>
               )}
-              <Button variant="secondary" onClick={() => setOptionsTarget(sess)} style={miniBtnFlex}>{t("session.optionsShort")}</Button>
+              {/* ⚠️ "Options" is gone from the tile, and NOTHING behind it was
+                  removed. `SessionOptionsDialog` is the Add Time dialog and is
+                  still opened by the button above it, with its presets, its
+                  manual grant, the unlimited switch and the whole
+                  booking-conflict and seat-migration flow untouched.
+                  It cost the tile a third button and bought nothing: for a
+                  session with an end, it opened the same dialog the Add Time
+                  button already opens; for an unlimited one the dialog has no
+                  action at all, only two "not applicable" notices. Two buttons
+                  and one of them a duplicate is how a cashier learns to stop
+                  reading them. */}
               <Button variant="secondary" onClick={() => setStopTarget(sess)} style={miniBtnFlex}>{t("action.stop")}</Button>
             </div>
           </>

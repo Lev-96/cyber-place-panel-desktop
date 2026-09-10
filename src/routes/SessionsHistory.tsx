@@ -215,6 +215,8 @@ const SessionRow = ({ session }: { session: ISessionApi }) => {
     return { count: charged.length, each: uniform ? first : null, total: sessionJoysticksTotal(session) };
   })();
 
+  const paymentLabel = paymentLabelOf(session, t);
+
   const total = num(session.total_paid);
   const timeCost = Math.max(0, total - itemsTotal);
   const isClosed = session.status === "stopped" || session.status === "expired";
@@ -330,6 +332,19 @@ const SessionRow = ({ session }: { session: ISessionApi }) => {
             <div className="row-between" style={{ fontSize: 13 }}>
               <span className="muted">{t("history.itemsTotal")}</span>
               <span>{money(itemsTotal)}</span>
+            </div>
+          )}
+          {/* ⚠️ How the money was taken, between the cost and the total, and
+              the VALUE is the bold half. An owner reconciling a day scans for
+              "was this cash or card", not for the words "payment method" —
+              emphasising the label would put the weight on the part they
+              already know. Omitted entirely when nothing was recorded: every
+              session stopped before this existed has no method, and inventing
+              one would be worse than the gap. */}
+          {paymentLabel !== null && (
+            <div className="row-between" style={{ fontSize: 13 }}>
+              <span className="muted">{t("session.payTitle")}</span>
+              <strong>{paymentLabel}</strong>
             </div>
           )}
           <div className="row-between" style={{ fontSize: 15, fontWeight: 700 }}>
@@ -491,6 +506,34 @@ export const eventSeat = (e: ISessionEvent): string | null => {
   if (name !== null) return name;
 
   return e.place_name || e.pc_label || null;
+};
+
+/**
+ * The words to print for how a session was settled, or null.
+ *
+ * ⚠️ `other` prints what the cashier TYPED, never the word "other" — the whole
+ * point of the free text is that "Idram" is the answer the owner is looking
+ * for, and "Другой способ" tells them nothing they did not already know.
+ *
+ * Null means "not recorded", which is every session stopped before this was
+ * kept and every session still running. The row is omitted entirely for it: a
+ * bold empty gap under "Payment method" reads as a fault rather than as
+ * silence. A method of `other` with nothing typed cannot be created (the
+ * server refuses it) and is folded into the same null for the same reason.
+ */
+export const paymentLabelOf = (
+  session: Pick<ISessionApi, "payment_method" | "payment_method_other">,
+  t: (k: string) => string,
+): string | null => {
+  const method = session.payment_method;
+  if (!method) return null;
+
+  if (method === "other") {
+    const typed = (session.payment_method_other ?? "").trim();
+    return typed === "" ? null : typed;
+  }
+
+  return t(method === "cash" ? "session.payCash" : "session.payCard");
 };
 
 /** One stretch of an evening spent on ONE seat. */

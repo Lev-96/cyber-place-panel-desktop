@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { eventDetail, eventSeat, segmentsOf } from "./SessionsHistory";
+import { eventDetail, eventSeat, paymentLabelOf, segmentsOf } from "./SessionsHistory";
 import type { ISessionEvent } from "@/api/sessions";
 
 /**
@@ -266,6 +266,35 @@ describe("which seat a line was written on", () => {
     expect(eventSeat(event({ action: "started", meta: null, place_name: "Seat 5" } as never))).toBe("Seat 5");
     expect(eventSeat(event({ action: "started", meta: null, pc_label: "PS4-08" } as never))).toBe("PS4-08");
     expect(eventSeat(event({ action: "started", meta: null } as never))).toBeNull();
+  });
+});
+
+describe("how the money was taken", () => {
+  const paid = (over: Record<string, unknown>) =>
+    paymentLabelOf(over as never, t);
+
+  test("cash and card read as words", () => {
+    expect(paid({ payment_method: "cash" })).toBe("session.payCash");
+    expect(paid({ payment_method: "card" })).toBe("session.payCard");
+  });
+
+  test("another method prints what the cashier typed, not the word 'other'", () => {
+    expect(paid({ payment_method: "other", payment_method_other: "Idram" })).toBe("Idram");
+  });
+
+  test("a long custom method is passed through whole", () => {
+    // Layout is the CSS's problem; truncating here would lose the answer.
+    const long = "Перевод через банк на счёт компании, квитанция у администратора";
+    expect(paid({ payment_method: "other", payment_method_other: long })).toBe(long);
+  });
+
+  test("nothing recorded shows nothing at all", () => {
+    // ⚠️ Every session stopped before this existed, and every running one.
+    // A bold empty gap under "Payment method" reads as a fault.
+    expect(paid({})).toBeNull();
+    expect(paid({ payment_method: null })).toBeNull();
+    expect(paid({ payment_method: "other", payment_method_other: null })).toBeNull();
+    expect(paid({ payment_method: "other", payment_method_other: "   " })).toBeNull();
   });
 });
 

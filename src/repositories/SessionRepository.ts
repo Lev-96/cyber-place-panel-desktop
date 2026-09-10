@@ -1,3 +1,4 @@
+import type { StopSessionBody } from "@/api/sessions";
 import {
   AddItemBody,
   apiAddSessionItem,
@@ -71,8 +72,8 @@ export class SessionRepository {
   async preview(id: number): Promise<IBillBreakdown> {
     return friendlyMutation(apiPreviewSession(id).then((r) => r.preview));
   }
-  async stop(id: number): Promise<StopResult> {
-    return friendlyMutation(apiStopSessionWithBreakdown(id));
+  async stop(id: number, payment?: StopSessionBody): Promise<StopResult> {
+    return friendlyMutation(apiStopSessionWithBreakdown(id, payment));
   }
   async extend(id: number, packageId: number): Promise<ISessionApi> {
     return friendlyMutation(apiExtendSession(id, { time_package_id: packageId }).then((r) => r.session));

@@ -210,13 +210,41 @@ describe("adding time from the card", () => {
     expect(screen.getByText("session.options")).toBeTruthy();
   });
 
+  /**
+   * ⚠️ The button went; the dialog behind it did not.
+   *
+   * Add Time is what opens `SessionOptionsDialog`, and everything the dialog
+   * has ever done is still in it — the presets, the manual grant, the
+   * unlimited switch, and the whole booking-conflict and seat-migration flow.
+   * A test that only checked the button was gone would pass just as happily
+   * if somebody had deleted the dialog with it.
+   */
+  test("Add Time still opens the very dialog Options used to", async () => {
+    await mount();
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "session.addTime" }));
+    });
+
+    // Its own heading, so a second modal built for the tile would fail this.
+    expect(screen.getByText("session.options")).toBeTruthy();
+  });
+
   test("is not offered on a seat with no end to extend", async () => {
     repo.listActive.mockResolvedValue([{ ...running, ends_at: null, is_unlimited: true }]);
     await mount();
 
     expect(screen.queryByRole("button", { name: "session.addTime" })).toBeNull();
-    // Options is still there: a count-up session has pads and a bill to waive.
-    expect(screen.getByRole("button", { name: "session.optionsShort" })).toBeTruthy();
+    // ⚠️ And neither is "Options", on ANY tile.
+    //
+    // The reason this test used to give for keeping it — "a count-up session
+    // has pads and a bill to waive" — stopped being true when pads moved onto
+    // the tile and waiving became a decision made at the start. For an
+    // unlimited session the dialog now holds two "not applicable" notices and
+    // no action, and for every other session it is the same dialog the Add
+    // Time button opens. Nothing behind it was removed: see
+    // `SessionOptionsDialog`, still whole, still reached from Add Time.
+    expect(screen.queryByRole("button", { name: "session.optionsShort" })).toBeNull();
   });
 });
 
