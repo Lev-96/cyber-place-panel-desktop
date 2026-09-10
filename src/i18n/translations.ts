@@ -1074,6 +1074,29 @@ export const TRANSLATIONS: Dict = {
   "history.action.made_unlimited": { en: "Switched to unlimited", ru: "Перевёл на безлимит", am: "Փոխարկեց անսահմանափակի" },
   "history.action.free_enabled": { en: "Made it free", ru: "Сделал бесплатной", am: "Դարձրեց անվճար" },
   "history.action.free_disabled": { en: "Made it paid again", ru: "Вернул оплату", am: "Վերադարձրեց վճարումը" },
+  // The seat migration. Emitted by the server since the feature shipped; the
+  // log had no label for it and printed the raw key.
+  "history.action.moved": { en: "Moved the session", ru: "Перенёс сессию", am: "Տեղափոխեց նիստը" },
+
+  // ── what each line actually changed ──────────────────────────────────────
+  // Written by the server into the event's `meta` and, until now, not read.
+  "history.playedBeforeMove": {
+    en: "Played before the move",
+    ru: "Сыграно до переноса",
+    am: "Խաղացել է տեղափոխումից առաջ",
+  },
+  "history.untilLabel": { en: "until", ru: "до", am: "մինչև" },
+  "history.padsNow": { en: "Joysticks now", ru: "Джойстиков стало", am: "Ջոյսթիկներ այժմ" },
+  "history.padUnitPrice": { en: "Price for one", ru: "Цена за 1", am: "Մեկի գինը" },
+  // ⚠️ Said in words. Taking a pad out of play refunds nothing, the amount on
+  // the line is already 0, and silence there reads as an omission rather than
+  // as the rule.
+  "history.padNoRefund": { en: "Refund: 0", ru: "Возврат: 0", am: "Վերադարձ՝ 0" },
+  "history.joystickCharged": {
+    en: "Joysticks charged",
+    ru: "Джойстики в счёте",
+    am: "Ջոյսթիկները հաշվում",
+  },
   "history.modeOpen": { en: "By the hour", ru: "Почасовая", am: "Ժամային" },
   "history.modeFixed": { en: "Package", ru: "Пакет", am: "Փաթեթ" },
   "history.status.active": { en: "Active", ru: "Активна", am: "Ակտիվ" },

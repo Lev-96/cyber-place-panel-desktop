@@ -4,6 +4,7 @@ import { useAsync } from "@/hooks/useAsync";
 import { useSessionsSummary } from "@/hooks/useSessionsSummary";
 import { formatDateTime, formatTime } from "@/i18n/dates";
 import { useLang } from "@/i18n/LanguageContext";
+import { sessionJoysticksTotal } from "@/components/sessions/sessionAmount";
 import { sessionRepository } from "@/repositories/SessionRepository";
 import { ISessionEvent } from "@/api/sessions";
 import { ISessionApi } from "@/types/sessions";
@@ -197,6 +198,23 @@ const SessionRow = ({ session }: { session: ISessionApi }) => {
   const durationMin = sessionDurationMinutes(session.started_at, session.ends_at);
   const items = session.items ?? [];
   const itemsTotal = items.reduce((sum, it) => sum + num(it.price) * num(it.qty), 0);
+  /**
+   * What the extra pads put on this bill.
+   *
+   * Same shape and same rule as the tile on the board: charged pads only, and
+   * a unit price only when every one of them agrees on it. Null on a waived
+   * seat and when nothing was charged, because a fee printed under "Free
+   * session" is two numbers telling one truth.
+   */
+  const padCharge = ((): { count: number; each: number | null; total: number } | null => {
+    if (session.is_free) return null;
+    const charged = (session.joysticks ?? []).filter((j) => j.is_charged);
+    if (charged.length === 0) return null;
+    const first = num(charged[0].price);
+    const uniform = charged.every((j) => num(j.price) === first);
+    return { count: charged.length, each: uniform ? first : null, total: sessionJoysticksTotal(session) };
+  })();
+
   const total = num(session.total_paid);
   const timeCost = Math.max(0, total - itemsTotal);
   const isClosed = session.status === "stopped" || session.status === "expired";
@@ -268,22 +286,26 @@ const SessionRow = ({ session }: { session: ISessionApi }) => {
         )}
       </div>
 
-      {/* Each pad over the interval it was actually in play. "Joystick #3,
-          15:00→16:00" is a line a cashier can defend at the counter; a count
-          multiplied by the session's length is the line that starts the
-          argument. */}
-      {(session.joysticks?.length ?? 0) > 0 && (
-        <div className="col" style={{ gap: 2, fontSize: 12 }}>
-          {(session.joysticks ?? []).map((j) => (
-            <div key={j.id} className="row-between">
-              <span className="muted">
-                {t("session.joystickSlot").replace("{0}", String(j.slot))}
-              </span>
-              <span className="muted">
-                {formatTime(new Date(j.started_at))} → {j.stopped_at ? formatTime(new Date(j.stopped_at)) : "…"}
-              </span>
-            </div>
-          ))}
+      {/* ⚠️ What the pads COST, not how long each was plugged in.
+          This used to print one line per pad over the interval it was in play
+          — "Joystick #3, 15:00 → 15:01". A pad is billed at a flat fee now, so
+          an interval says nothing about the money and quietly suggests the pad
+          is priced by the minute. Three of them a minute apart read as a fault
+          rather than as three sales.
+          The count is of CHARGED pads and the total is `sessionJoysticksTotal`
+          — the same figure the receipt and the board use, so no third opinion
+          about the bill can appear here. A unit price is printed only when all
+          of them agree on one: the fee is frozen when a pad goes out, so a
+          session that straddles a re-pricing holds two, and "3 × ?" would be a
+          lie where the sum is always true. */}
+      {padCharge !== null && (
+        <div className="row-between" style={{ fontSize: 12 }}>
+          <span className="muted">{t("history.joystickCharged")}</span>
+          <span className="muted">
+            {padCharge.each !== null
+              ? `${padCharge.count} × ${money(padCharge.each)} = ${money(padCharge.total)}`
+              : `${padCharge.count} · ${money(padCharge.total)}`}
+          </span>
         </div>
       )}
 
@@ -343,8 +365,130 @@ const SessionRow = ({ session }: { session: ISessionApi }) => {
  * timeline, and splitting one across twenty collapsed cards is how a timeline
  * stops reading like one.
  */
+/** "1 h 20 min", or "45 min" when it is under the hour. */
+const durationLabel = (minutes: number, t: (k: string) => string): string => {
+  const whole = Math.max(0, Math.round(minutes));
+  const h = Math.floor(whole / 60);
+  const m = whole % 60;
+  return h > 0 ? `${h} ${t("time.hourShort")} ${m} ${t("time.minShort")}` : `${m} ${t("time.minShort")}`;
+};
+
+const metaNum = (meta: Record<string, unknown> | null, key: string): number | null => {
+  const raw = meta?.[key];
+  if (typeof raw === "number") return raw;
+  if (typeof raw === "string" && raw.trim() !== "" && Number.isFinite(Number(raw))) return Number(raw);
+  return null;
+};
+const metaStr = (meta: Record<string, unknown> | null, key: string): string | null => {
+  const raw = meta?.[key];
+  return typeof raw === "string" && raw.trim() !== "" ? raw : null;
+};
+
+/**
+ * WHAT changed, under the name of the action that changed it.
+ *
+ * Exported and dependency-injected so it can be checked without rendering the
+ * route, the way `shouldShowBookingsFeed` is in `Notifications.tsx`.
+ */
+export const eventDetail = (
+  e: ISessionEvent,
+  t: (k: string) => string,
+  money: (n: number) => string,
+): string | null => {
+  const meta = e.meta;
+  const parts: string[] = [];
+
+  switch (e.action) {
+    case "moved": {
+      const from = metaNum(meta, "from_place_number");
+      const to = metaNum(meta, "to_place_number");
+      if (from !== null && to !== null) parts.push(`№${from} -> №${to}`);
+
+      const startedAt = metaStr(meta, "session_started_at");
+      if (startedAt !== null) {
+        const playedMs = new Date(e.created_at).getTime() - new Date(startedAt).getTime();
+        if (Number.isFinite(playedMs) && playedMs > 0) {
+          parts.push(
+            `${t("history.playedBeforeMove")}: ${durationLabel(playedMs / 60000, t)}`,
+          );
+        }
+      }
+      const granted = metaNum(meta, "requested_minutes");
+      if (granted !== null && granted > 0) parts.push(`+${granted} ${t("time.minShort")}`);
+      break;
+    }
+
+    case "time_added": {
+      const minutes = metaNum(meta, "minutes");
+      if (minutes !== null) parts.push(`+${minutes} ${t("time.minShort")}`);
+      const newEnd = metaStr(meta, "new_ends_at");
+      if (newEnd !== null) parts.push(`${t("history.untilLabel")} ${formatTime(new Date(newEnd))}`);
+      break;
+    }
+
+    case "made_unlimited": {
+      // ⚠️ Only when the server said what it was BEFORE. With no `old_mode` —
+      // a row written before the key existed — the detail would be the word
+      // "unlimited" under a line that already reads "Switched to unlimited",
+      // which is a second line saying nothing.
+      const oldMode = metaStr(meta, "old_mode");
+      if (oldMode !== null) parts.push(`${oldMode} -> ${t("session.unlimited")}`);
+      const rate = metaNum(meta, "hourly_rate");
+      if (rate !== null && rate > 0) parts.push(`${money(rate)} / ${t("time.hourShort")}`);
+      break;
+    }
+
+    case "joystick_added": {
+      const after = metaNum(meta, "count_after");
+      const price = metaNum(meta, "price");
+      // The count is the seat's TOTAL after the add, which is how the floor
+      // counts pads: a PlayStation with one extra is "2 joysticks".
+      if (after !== null) parts.push(`${t("history.padsNow")}: ${after}`);
+      if (price !== null) parts.push(`${t("history.padUnitPrice")}: ${money(price)}`);
+      break;
+    }
+
+    case "joystick_removed": {
+      const after = metaNum(meta, "count_after");
+      if (after !== null) parts.push(`${t("history.padsNow")}: ${after}`);
+      // ⚠️ Spelled out, because it is the question the counter argues about.
+      // Taking a pad out of play refunds nothing, and the amount on this line
+      // is already 0 — saying so in words is what stops it reading as an
+      // omission.
+      parts.push(t("history.padNoRefund"));
+      break;
+    }
+
+    default:
+      return null;
+  }
+
+  return parts.length > 0 ? parts.join(" · ") : null;
+};
+
 const ActionsLog = ({ events }: { events: ISessionEvent[] }) => {
   const { t, money } = useLang();
+
+
+  /**
+   * WHAT changed, under the name of the action that changed it.
+   *
+   * ⚠️ The backend has always written this. `SessionAuditLogger` stores a
+   * `meta` blob on every line — the seats a move went between, the minutes a
+   * grant was worth, the fee a pad was charged at — and this log printed the
+   * action's name and threw the rest away. An owner reading "Moved" learned
+   * that something moved and nothing else, which is the whole reason the
+   * history did not answer the questions asked of it.
+   *
+   * Nothing is computed here that the server did not state. The one derived
+   * value is the time played before a move, and both of its terms are server
+   * timestamps: the event's own `created_at` and the `session_started_at` the
+   * move recorded.
+   *
+   * ⚠️ Returns null for an old row with no meta. Lines written before a key
+   * existed must still render as the plain action they always were, never as
+   * "undefined" or an empty block.
+   */
 
   return (
     <div className="col" style={{ gap: 8, marginTop: 18 }}>
@@ -353,23 +497,33 @@ const ActionsLog = ({ events }: { events: ISessionEvent[] }) => {
         <div className="muted">{t("history.actionsEmpty")}</div>
       ) : (
         <div className="col" style={{ gap: 4 }}>
-          {events.map((e) => (
-            <div key={e.id} className="row-between card" style={{ fontSize: 13, padding: "6px 10px" }}>
-              <span className="row" style={{ gap: 8, flexWrap: "wrap", alignItems: "baseline" }}>
-                <span>{t(`history.action.${e.action}`) || e.action}</span>
-                {/* The account may since have been deleted; the fact still
-                    happened, so a nameless line is shown rather than hidden. */}
-                {e.user && <span className="muted">· {e.user.name}</span>}
-                {(e.pc_label || e.place_name) && (
-                  <span className="muted">· {e.place_name || e.pc_label}</span>
+          {events.map((e) => {
+            const detail = eventDetail(e, t, money);
+            return (
+              <div key={e.id} className="card" style={{ fontSize: 13, padding: "6px 10px" }}>
+                <div className="row-between">
+                  <span className="row" style={{ gap: 8, flexWrap: "wrap", alignItems: "baseline" }}>
+                    <span>{t(`history.action.${e.action}`) || e.action}</span>
+                    {/* The account may since have been deleted; the fact still
+                        happened, so a nameless line is shown rather than hidden. */}
+                    {e.user && <span className="muted">· {e.user.name}</span>}
+                    {(e.pc_label || e.place_name) && (
+                      <span className="muted">· {e.place_name || e.pc_label}</span>
+                    )}
+                  </span>
+                  <span className="row" style={{ gap: 8, alignItems: "baseline" }}>
+                    {e.amount !== null && <span>{money(e.amount)}</span>}
+                    <span className="muted" style={{ fontSize: 12 }}>{formatDateTime(new Date(e.created_at))}</span>
+                  </span>
+                </div>
+                {/* Its own row, and only when there is something to say. An old
+                    line with no meta renders exactly as it always did. */}
+                {detail !== null && (
+                  <div className="muted" style={{ fontSize: 12, marginTop: 2 }}>{detail}</div>
                 )}
-              </span>
-              <span className="row" style={{ gap: 8, alignItems: "baseline" }}>
-                {e.amount !== null && <span>{money(e.amount)}</span>}
-                <span className="muted" style={{ fontSize: 12 }}>{formatDateTime(new Date(e.created_at))}</span>
-              </span>
-            </div>
-          ))}
+              </div>
+            );
+          })}
         </div>
       )}
     </div>

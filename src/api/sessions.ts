@@ -289,7 +289,11 @@ export type SessionActionName =
   | "time_added"
   | "made_unlimited"
   | "free_enabled"
-  | "free_disabled";
+  | "free_disabled"
+  // ⚠️ The server has emitted this since seat migration shipped; the client
+  // type never learned it, so every `moved` line arrived typed as something
+  // it is not and the history could not branch on it.
+  | "moved";
 
 export interface ISessionEvent {
   id: number;
