@@ -293,7 +293,14 @@ export type SessionActionName =
   // ⚠️ The server has emitted this since seat migration shipped; the client
   // type never learned it, so every `moved` line arrived typed as something
   // it is not and the history could not branch on it.
-  | "moved";
+  | "moved"
+  // The bill's own lines, and the two refusals. A history of successes cannot
+  // answer "why was this player moved" — the grant that was turned down is the
+  // reason the move happened at all.
+  | "item_added"
+  | "item_removed"
+  | "time_add_refused"
+  | "move_failed";
 
 export interface ISessionEvent {
   id: number;

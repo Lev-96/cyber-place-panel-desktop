@@ -1077,6 +1077,37 @@ export const TRANSLATIONS: Dict = {
   // The seat migration. Emitted by the server since the feature shipped; the
   // log had no label for it and printed the raw key.
   "history.action.moved": { en: "Moved the session", ru: "Перенёс сессию", am: "Տեղափոխեց նիստը" },
+  "history.action.item_added": { en: "Put it on the bill", ru: "Добавил в счёт", am: "Ավելացրեց հաշվին" },
+  "history.action.item_removed": { en: "Took it off the bill", ru: "Убрал из счёта", am: "Հանեց հաշվից" },
+  // ⚠️ The refusals. Named as attempts, because that is what they were: the
+  // line that explains why a move follows it.
+  "history.action.time_add_refused": {
+    en: "Could not add time here",
+    ru: "Не удалось продлить на этом месте",
+    am: "Չհաջողվեց երկարաձգել այս տեղում",
+  },
+  "history.action.move_failed": {
+    en: "The move did not go through",
+    ru: "Перенос не состоялся",
+    am: "Տեղափոխումը չկայացավ",
+  },
+  "history.seatBooked": {
+    en: "the seat is booked in the app",
+    ru: "место забронировано в приложении",
+    am: "տեղն ամրագրված է հավելվածում",
+  },
+  "history.seatTaken": {
+    en: "the seat was taken first",
+    ru: "место успели занять",
+    am: "տեղն արդեն զբաղեցված էր",
+  },
+  "history.itemsCount": { en: "Lines", ru: "Позиций", am: "Դիրքեր" },
+  // The per-session path, collapsed by default: a page of sessions must not
+  // fetch every timeline to render a summary nobody expanded.
+  "history.timelineShow": { en: "Show the path", ru: "Показать путь", am: "Ցույց տալ ընթացքը" },
+  "history.timelineHide": { en: "Hide the path", ru: "Скрыть путь", am: "Թաքցնել ընթացքը" },
+  "history.seatUnknown": { en: "Seat not recorded", ru: "Место не записано", am: "Տեղը գրանցված չէ" },
+  "history.noRefundShort": { en: "no refund", ru: "без возврата", am: "առանց վերադարձի" },
 
   // ── what each line actually changed ──────────────────────────────────────
   // Written by the server into the event's `meta` and, until now, not read.

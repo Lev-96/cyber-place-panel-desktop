@@ -350,6 +350,95 @@ const SessionRow = ({ session }: { session: ISessionApi }) => {
           </div>
         )
       )}
+
+      <SessionTimeline sessionId={session.id} />
+    </div>
+  );
+};
+
+/**
+ * One session's own path, seat by seat.
+ *
+ * ⚠️ Collapsed by default and fetched only when opened. The list above can hold
+ * a whole evening's sessions, and asking the server for every one of their
+ * timelines to render a summary card nobody has asked to expand is a page that
+ * takes seconds to load for a question nobody asked.
+ *
+ * Separate from the branch-wide feed at the bottom of the page: that one
+ * interleaves every session in the venue and cannot be cut by seat, because
+ * consecutive lines in it belong to different players.
+ */
+const SessionTimeline = ({ sessionId }: { sessionId: number }) => {
+  const { t, money } = useLang();
+  const [open, setOpen] = useState(false);
+  const events = useAsync(
+    (): Promise<ISessionEvent[]> =>
+      open ? sessionRepository.eventsForSession(sessionId) : Promise.resolve([]),
+    [open, sessionId],
+  );
+
+  const segments = useMemo(() => segmentsOf(events.data ?? []), [events.data]);
+
+  return (
+    <div className="col" style={{ gap: 6, marginTop: 6 }}>
+      <button
+        type="button"
+        className="muted"
+        onClick={() => setOpen((v) => !v)}
+        style={{
+          alignSelf: "flex-start",
+          background: "none",
+          border: "none",
+          padding: 0,
+          cursor: "pointer",
+          fontSize: 12,
+          textDecoration: "underline",
+        }}
+      >
+        {open ? t("history.timelineHide") : t("history.timelineShow")}
+      </button>
+
+      {open && events.loading && <span className="muted" style={{ fontSize: 12 }}>…</span>}
+
+      {open && !events.loading && segments.length === 0 && (
+        <span className="muted" style={{ fontSize: 12 }}>{t("history.actionsEmpty")}</span>
+      )}
+
+      {open &&
+        segments.map((seg, i) => (
+          <div
+            key={`${seg.seat ?? "?"}-${i}`}
+            className="col"
+            style={{
+              gap: 3,
+              paddingLeft: 10,
+              borderLeft: "2px solid var(--color-border)",
+            }}
+          >
+            {/* The seat this stretch was played on. A session that never moved
+                has exactly one of these, which is why it is a quiet line
+                rather than a heading. */}
+            <span style={{ fontSize: 12, fontWeight: 600 }}>
+              {seg.seat ?? t("history.seatUnknown")}
+            </span>
+            {seg.events.map((e) => {
+              const detail = eventDetail(e, t, money);
+              return (
+                <div key={e.id} className="col" style={{ gap: 1, fontSize: 12 }}>
+                  <div className="row" style={{ gap: 6, flexWrap: "wrap", alignItems: "baseline" }}>
+                    <span className="muted">{formatTime(new Date(e.created_at))}</span>
+                    <span>{t(`history.action.${e.action}`) || e.action}</span>
+                    {e.user && <span className="muted">· {e.user.name}</span>}
+                    {e.amount !== null && <span className="muted">· {money(e.amount)}</span>}
+                  </div>
+                  {detail !== null && (
+                    <span className="muted" style={{ paddingLeft: 2 }}>{detail}</span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        ))}
     </div>
   );
 };
@@ -382,6 +471,77 @@ const metaNum = (meta: Record<string, unknown> | null, key: string): number | nu
 const metaStr = (meta: Record<string, unknown> | null, key: string): string | null => {
   const raw = meta?.[key];
   return typeof raw === "string" && raw.trim() !== "" ? raw : null;
+};
+
+/**
+ * The seat a line was written on, NOT the seat the session ended up at.
+ *
+ * ⚠️ `place_name` / `pc_label` on the row are resolved by walking the session's
+ * CURRENT device, so after a move every line it ever wrote claims the new
+ * seat — including the ones that plainly did not happen there. The audit
+ * logger freezes `place_number` in `meta` at write time; that is the one to
+ * trust. The row's own fields survive only as the fallback for lines written
+ * before it did.
+ */
+export const eventSeat = (e: ISessionEvent): string | null => {
+  const frozen = metaNum(e.meta, "place_number");
+  if (frozen !== null) return `№${frozen}`;
+
+  const name = metaStr(e.meta, "place_name");
+  if (name !== null) return name;
+
+  return e.place_name || e.pc_label || null;
+};
+
+/** One stretch of an evening spent on ONE seat. */
+export interface HistorySegment {
+  /** "№2", or null when nothing in the segment says where it was. */
+  seat: string | null;
+  /** The lines that happened there, oldest first. */
+  events: ISessionEvent[];
+}
+
+/**
+ * One session's timeline, cut into the seats it was played on.
+ *
+ * ⚠️ A move is NOT a new session. The player keeps their clock, their bill,
+ * their products and their pads; only the seat changes. So the timeline is one
+ * list that changes seat partway, and a segment is a reading aid rather than a
+ * record of its own — nothing here invents an entity the server does not have.
+ *
+ * The move itself closes the segment it happened in. It was performed on the
+ * seat being left, which is where a reader looks for it.
+ *
+ * Ordering is by the server's `created_at`, ascending: a timeline reads
+ * downwards. Never by array position — the feed's order is the API's business
+ * and has changed before.
+ */
+export const segmentsOf = (events: ISessionEvent[]): HistorySegment[] => {
+  const ordered = [...events].sort(
+    (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
+  );
+
+  const segments: HistorySegment[] = [];
+  let current: HistorySegment | null = null;
+
+  for (const e of ordered) {
+    if (current === null) current = { seat: eventSeat(e), events: [] };
+    // A segment that started before anything named a seat takes the first name
+    // it is given, rather than staying anonymous for the whole stretch.
+    if (current.seat === null) current.seat = eventSeat(e);
+
+    current.events.push(e);
+
+    if (e.action === "moved") {
+      segments.push(current);
+      const to = metaNum(e.meta, "to_place_number");
+      current = { seat: to !== null ? `№${to}` : null, events: [] };
+    }
+  }
+
+  if (current !== null && current.events.length > 0) segments.push(current);
+
+  return segments;
 };
 
 /**
@@ -476,6 +636,45 @@ export const eventDetail = (
       break;
     }
 
+    case "item_added":
+    case "item_removed": {
+      const count = metaNum(meta, "count");
+      if (count !== null) parts.push(`${t("history.itemsCount")}: ${count}`);
+      // The names, so a disputed line can be found without opening the bill.
+      const lines = Array.isArray(meta?.lines) ? meta.lines : [];
+      const named = lines
+        .map((l) => (l !== null && typeof l === "object" ? (l as { name?: unknown }).name : null))
+        .filter((n): n is string => typeof n === "string" && n.trim() !== "");
+      if (named.length > 0) parts.push(named.join(", "));
+      // ⚠️ Taking a product off the bill returns nothing, the same rule the
+      // pads follow. The amount on the line is already 0; saying so is what
+      // stops it reading as an omission.
+      if (e.action === "item_removed") parts.push(t("history.noRefundShort"));
+      break;
+    }
+
+    case "time_add_refused": {
+      const minutes = metaNum(meta, "minutes");
+      if (minutes !== null) parts.push(`+${minutes} ${t("time.minShort")}`);
+      // The reason in the vocabulary of the floor. The booking's own details
+      // are not a cashier's business and are not shown.
+      if (metaStr(meta, "reason") === "seat_unavailable") parts.push(t("history.seatBooked"));
+      const max = metaNum(meta, "max_minutes");
+      if (max !== null && max > 0) {
+        parts.push(`${t("history.untilLabel")} +${max} ${t("time.minShort")}`);
+      }
+      break;
+    }
+
+    case "move_failed": {
+      const from = metaNum(meta, "from_place_number");
+      const minutes = metaNum(meta, "minutes");
+      if (from !== null) parts.push(`№${from}`);
+      if (minutes !== null) parts.push(`+${minutes} ${t("time.minShort")}`);
+      if (metaStr(meta, "reason") === "target_taken") parts.push(t("history.seatTaken"));
+      break;
+    }
+
     default:
       return null;
   }
@@ -516,6 +715,7 @@ const ActionsLog = ({ events }: { events: ISessionEvent[] }) => {
         <div className="col" style={{ gap: 4 }}>
           {events.map((e) => {
             const detail = eventDetail(e, t, money);
+            const seat = eventSeat(e);
             return (
               <div key={e.id} className="card" style={{ fontSize: 13, padding: "6px 10px" }}>
                 <div className="row-between">
@@ -524,9 +724,7 @@ const ActionsLog = ({ events }: { events: ISessionEvent[] }) => {
                     {/* The account may since have been deleted; the fact still
                         happened, so a nameless line is shown rather than hidden. */}
                     {e.user && <span className="muted">· {e.user.name}</span>}
-                    {(e.pc_label || e.place_name) && (
-                      <span className="muted">· {e.place_name || e.pc_label}</span>
-                    )}
+                    {seat !== null && <span className="muted">· {seat}</span>}
                   </span>
                   <span className="row" style={{ gap: 8, alignItems: "baseline" }}>
                     {e.amount !== null && <span>{money(e.amount)}</span>}
