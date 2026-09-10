@@ -104,7 +104,7 @@ describe("SessionsBoard — what a tile says the seat is", () => {
     expect(typeLine()?.textContent).toContain("standard");
   });
 
-  test("the name has its own line and its full text on hover", async () => {
+  test("the number leads and the name follows it", async () => {
     const long = "Плейстейшен 5 ВИП большое место";
     repo.listPcs.mockResolvedValue([
       pc({ place: { id: 10, number: 4, name: long, type: "vip", platform: "ps5" } }),
@@ -112,12 +112,38 @@ describe("SessionsBoard — what a tile says the seat is", () => {
     await mount();
 
     const name = nameLine();
-    expect(name?.textContent).toBe(long);
+    // ⚠️ A named seat used to show its name and NO number, while the player
+    // holding the booking for it was looking at «4» on their phone. The
+    // number is the shared identity, so it goes first — and because the line
+    // is one row with an ellipsis, first is also the half that survives a
+    // narrow tile.
+    expect(name?.textContent).toBe(`№4 · ${long}`);
     // Clipped visually, never clipped in the tooltip.
-    expect(name?.getAttribute("title")).toBe(long);
+    expect(name?.getAttribute("title")).toBe(`№4 · ${long}`);
     // And it is NOT inside the platform line — sharing that row is what broke
     // the card in the first place.
     expect(typeLine()?.textContent).not.toContain(long);
+  });
+
+  test("the number a tile shows is the one the phone shows", async () => {
+    // `placesSelect` renders `place.number ?? place.id`. Anything else here —
+    // the device label, a position in the array — makes a cashier and a player
+    // describe the same seat differently.
+    repo.listPcs.mockResolvedValue([
+      pc({ place: { id: 77, number: 6, name: null, type: "standard", platform: "ps5" } }),
+    ]);
+    await mount();
+
+    expect(nameLine()?.textContent).toBe("№6");
+  });
+
+  test("a place with no number of its own falls back to its id, as the phone does", async () => {
+    repo.listPcs.mockResolvedValue([
+      pc({ place: { id: 77, number: null, name: null, type: "standard", platform: "ps5" } }),
+    ]);
+    await mount();
+
+    expect(nameLine()?.textContent).toBe("№77");
   });
 
   test("a place with no name falls back to its number", async () => {
@@ -136,7 +162,11 @@ describe("SessionsBoard — what a tile says the seat is", () => {
     // The platform line is emitted empty rather than dropped, so this tile has
     // the same number of lines as every other one in the grid.
     expect(typeLine()).not.toBeNull();
-    expect(nameLine()?.textContent).toBe("№Legacy device");
+    // ⚠️ No «№» in front of a device label. With no place there is no seat
+    // number to show, and the old fallback printed "№Legacy device" — a hash
+    // sign in front of a word, which reads as a number nobody can find on the
+    // grid or on a phone.
+    expect(nameLine()?.textContent).toBe("Legacy device");
   });
 
   /**

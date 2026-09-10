@@ -31,9 +31,12 @@ const repo = vi.hoisted(() => ({
 }));
 const auth = vi.hoisted(() => ({ role: "company_owner" as string }));
 // The app-wide toaster, captured so a test can read what a grant announced.
-const toast = vi.hoisted(() => ({ message: vi.fn() }));
+const toast = vi.hoisted(() => ({ message: vi.fn(), warning: vi.fn() }));
 vi.mock("@/ui/notify", () => ({
-  notify: { message: (...a: unknown[]) => toast.message(...a) },
+  notify: {
+    message: (...a: unknown[]) => toast.message(...a),
+    warning: (...a: unknown[]) => toast.warning(...a),
+  },
 }));
 
 vi.mock("@/repositories/SessionRepository", () => ({
@@ -66,7 +69,15 @@ vi.mock("@/i18n/LanguageContext", () => ({
     // component's own interpolation stays observable — otherwise a test for
     // "the platform is named" would pass on a template that never
     // interpolated anything.
-    t: (k: string) => (k === "session.joystickThisPlatform" ? `${k} {0}` : k),
+    // The seat-move messages join the exception: both name a SEAT, and a test
+    // that could not see the number would pass on a message that named the
+    // wrong one.
+    t: (k: string) =>
+      k === "session.joystickThisPlatform" ||
+      k === "session.movedToast" ||
+      k === "session.moveTakenToast"
+        ? `${k} {0}`
+        : k,
     money: (n: number) => String(n),
     lang: "en",
   }),
@@ -708,9 +719,20 @@ describe("moving the player to another seat", () => {
     });
   };
 
-  /** The card for a seat, found by the number it shows. */
+  /**
+   * The card for a seat, found by the number it shows.
+   *
+   * ⚠️ Scoped to the seat buttons — the ones carrying `aria-pressed` — rather
+   * than searched by text across the whole dialog. The seat number now also
+   * appears in the "now on №N -> continue on №M" line above the list, and a
+   * bare `getByText` matches both and throws.
+   */
   const cardFor = (label: string) =>
-    screen.getByText(label).closest("button") as HTMLButtonElement;
+    screen
+      .getAllByRole("button")
+      .find(
+        (b) => b.getAttribute("aria-pressed") !== null && (b.textContent ?? "").includes(label),
+      ) as HTMLButtonElement;
 
   const confirmButton = () =>
     screen.getByRole("button", { name: "session.moveConfirm" }) as HTMLButtonElement;
@@ -787,6 +809,51 @@ describe("moving the player to another seat", () => {
 
     expect(cardFor("№10").getAttribute("aria-pressed")).toBe("true");
     expect(cardFor("№9").getAttribute("aria-pressed")).toBe("false");
+  });
+
+  test("a seat taken between opening and confirming is announced by number", async () => {
+    // The list was drawn from a read-only snapshot; a phone can take a seat
+    // while the modal is open. The SERVER catches it — this only checks that
+    // the refusal reaches the cashier as a sentence naming the seat, so they
+    // pick again instead of wondering what failed.
+    repo.addTime.mockRejectedValueOnce(refusal());
+    repo.extensionOptions.mockResolvedValueOnce(options([seat({ place_id: 92, number: 10 })]));
+    await mount();
+    await pressAPreset();
+    toast.warning.mockClear();
+
+    repo.transferExtension.mockRejectedValueOnce(refusal());
+    await act(async () => {
+      fireEvent.click(cardFor("№10"));
+    });
+    await act(async () => {
+      fireEvent.click(confirmButton());
+    });
+
+    expect(toast.warning).toHaveBeenCalledTimes(1);
+    expect(String(toast.warning.mock.calls[0][0])).toContain("№10");
+    // ⚠️ And it is a WARNING, not a success — the move did not happen.
+    expect(toast.message).not.toHaveBeenCalledWith("success", expect.anything());
+  });
+
+  test("a move that succeeds announces success, not a warning", async () => {
+    repo.addTime.mockRejectedValueOnce(refusal());
+    repo.extensionOptions.mockResolvedValueOnce(options([seat({ place_id: 92, number: 10 })]));
+    await mount();
+    await pressAPreset();
+    toast.warning.mockClear();
+    toast.message.mockClear();
+
+    repo.transferExtension.mockResolvedValueOnce(session());
+    await act(async () => {
+      fireEvent.click(cardFor("№10"));
+    });
+    await act(async () => {
+      fireEvent.click(confirmButton());
+    });
+
+    expect(toast.warning).not.toHaveBeenCalled();
+    expect(toast.message).toHaveBeenCalledWith("success", expect.stringContaining("№10"));
   });
 
   test("says so when nothing is free rather than showing an empty list", async () => {

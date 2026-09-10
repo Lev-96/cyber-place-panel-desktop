@@ -549,6 +549,26 @@ export const TRANSLATIONS: Dict = {
     ru: "Продление: +{0} мин",
     am: "Երկարաձգում՝ +{0} րոպե",
   },
+  // The seat the player is on now, opposite the one being offered. Two short
+  // labels rather than a sentence: they sit either side of an arrow.
+  "session.moveFromLabel": { en: "Now on", ru: "Сейчас на", am: "Այժմ՝" },
+  "session.moveToLabel": { en: "Continue on", ru: "Продолжить на", am: "Շարունակել՝" },
+  "session.moveToNothing": { en: "not chosen", ru: "не выбрано", am: "ընտրված չէ" },
+  // The window a seat is free for. Spelled out rather than shown as a bare
+  // interval so it cannot be read as the session's own end time.
+  "session.moveFreeFor": {
+    en: "Free {0} to {1}",
+    ru: "Свободно с {0} до {1}",
+    am: "Ազատ է {0}-ից {1}",
+  },
+  "session.moveAvailable": { en: "Available", ru: "Доступно", am: "Հասանելի" },
+  // The seat went while the dialog was open. Not a fault, so not red.
+  "session.moveTakenToast": {
+    en: "Seat {0} is no longer free. Pick another one.",
+    ru: "Место {0} больше недоступно. Выберите другое.",
+    am: "{0} տեղն այլևս ազատ չէ: Ընտրեք մեկ ուրիշը:",
+  },
+  "session.moveChosen": { en: "Chosen", ru: "Выбрано", am: "Ընտրված" },
   "session.moveConfirm": {
     en: "Continue on the selected place",
     ru: "Продолжить на выбранном месте",
@@ -843,6 +863,13 @@ export const TRANSLATIONS: Dict = {
   "session.toastNewBooking": { en: "New booking", ru: "Новое бронирование", am: "Նոր ամրագրում" },
   "session.toastBookingExtended": { en: "Booking extended", ru: "Бронь продлена", am: "Ամրագրումը երկարացվել է" },
   "session.boardTitle": { en: "Sessions", ru: "Сессии", am: "Նիստեր" },
+  // How much of the room is in use. Counted off the tiles on screen, so the
+  // line and the grid can never disagree.
+  "session.boardCounts": {
+    en: "{0} seats · {1} in use · {2} free",
+    ru: "Всего {0} · Занято {1} · Свободно {2}",
+    am: "Ընդամենը {0} · Զբաղված {1} · Ազատ {2}",
+  },
   "session.dragToReorder": { en: "Drag to reorder", ru: "Перетащите, чтобы изменить порядок", am: "Քաշեք՝ դասավորությունը փոխելու համար" },
   "session.dragSectionHint": { en: "Drag to reorder sections", ru: "Перетащите, чтобы изменить порядок разделов", am: "Քաշեք՝ բաժինների դասավորությունը փոխելու համար" },
   "session.posNote": { en: "items", ru: "поз.", am: "միավոր" },

@@ -21,7 +21,7 @@ import {
   seatUnavailableBodyOf,
   type SeatUnavailableBody,
 } from "@/api/seatUnavailable";
-import type { IExtensionAlternative } from "@/api/sessions";
+import type { IExtensionAlternative, IExtensionOptions } from "@/api/sessions";
 
 interface Props {
   session: ISessionApi;
@@ -93,6 +93,14 @@ const SessionOptionsDialog = ({ session, platform, onClose, onChanged }: Props) 
    */
   const [refusedMinutes, setRefusedMinutes] = useState<number | null>(null);
   const [alternatives, setAlternatives] = useState<IExtensionAlternative[] | null>(null);
+  /**
+   * The seat the player is on NOW, as the server describes it.
+   *
+   * Shown opposite the seat being offered, because "move to №6" alone asks a
+   * cashier to remember which seat they were looking at — and the whole
+   * failure this dialog exists to prevent is moving the wrong player.
+   */
+  const [moveFrom, setMoveFrom] = useState<IExtensionOptions["current"] | null>(null);
   /** Which seat the cashier has picked. Nothing is sent until one is. */
   const [selectedPlaceId, setSelectedPlaceId] = useState<number | null>(null);
   // Manual grant: off by default, so the ordinary case stays one tap.
@@ -234,8 +242,10 @@ const SessionOptionsDialog = ({ session, platform, onClose, onChanged }: Props) 
     try {
       const options = await sessionRepository.extensionOptions(sessionId, minutes);
       setAlternatives(options.alternatives);
+      setMoveFrom(options.current);
     } catch {
       setAlternatives([]);
+      setMoveFrom(null);
     }
   };
 
@@ -249,6 +259,13 @@ const SessionOptionsDialog = ({ session, platform, onClose, onChanged }: Props) 
      * lie would be a regular one.
      */
     successToast: string | null = null,
+    /**
+     * Called when the server refused because the SEAT could not take it — the
+     * case where the world moved while the dialog was open. Separate from the
+     * generic failure path because it is the only one with something specific
+     * to say, and saying it is not the same as reporting a fault.
+     */
+    onSeatRefused: (() => void) | null = null,
   ): Promise<boolean> => {
     setBusy(true);
     setError(null);
@@ -276,6 +293,7 @@ const SessionOptionsDialog = ({ session, platform, onClose, onChanged }: Props) 
         setRefusedMinutes(attemptedMinutes);
         void loadAlternatives(current.id, attemptedMinutes);
       }
+      if (refusal !== null) onSeatRefused?.();
       // The refusal is very often "no price is set for joystick #N", and the
       // price list this dialog drew its button from is exactly what has gone
       // stale. Re-reading it is what stops the button advertising a rate the
@@ -426,6 +444,38 @@ const SessionOptionsDialog = ({ session, platform, onClose, onChanged }: Props) 
               </span>
             </div>
 
+            {/* Where the player is, and where they would end up. Two lines with
+                an arrow between them, because "move to №6" on its own asks the
+                cashier to hold the current seat in their head — and the one
+                mistake that matters here is moving the wrong player. */}
+            {moveFrom && (
+              <div
+                className="row"
+                style={{ gap: 10, alignItems: "center", flexWrap: "wrap", fontSize: 12 }}
+              >
+                <span className="muted">
+                  {t("session.moveFromLabel")}{" "}
+                  <strong style={{ color: "var(--color-text)" }}>
+                    {moveFrom.place_number !== null
+                      ? `№${moveFrom.place_number}`
+                      : (moveFrom.place_name ?? current.pc_label ?? "-")}
+                  </strong>
+                </span>
+                <span aria-hidden style={{ color: "var(--color-primary)" }}>-&gt;</span>
+                <span className="muted">
+                  {t("session.moveToLabel")}{" "}
+                  <strong style={{ color: "var(--color-text)" }}>
+                    {selectedPlaceId === null
+                      ? t("session.moveToNothing")
+                      : `№${
+                          alternatives.find((a) => a.place_id === selectedPlaceId)?.number ??
+                          selectedPlaceId
+                        }`}
+                  </strong>
+                </span>
+              </div>
+            )}
+
             {alternatives.length === 0 ? (
               <span className="muted" style={{ fontSize: 12 }}>
                 {t("session.moveNone")}
@@ -458,17 +508,37 @@ const SessionOptionsDialog = ({ session, platform, onClose, onChanged }: Props) 
                           borderWidth: chosen ? 2 : 1,
                         }}
                       >
-                        <span className="col" style={{ gap: 2 }}>
-                          <strong>{alt.name ?? `№${alt.number ?? alt.place_id}`}</strong>
+                        <span className="col" style={{ gap: 3, minWidth: 0 }}>
+                          {/* ⚠️ Number first, and the same `number ?? id` the
+                              player sees on their phone. It used to lead with
+                              the name, so a cashier reading "VIP corner" had
+                              nothing to match against the seat the grid and
+                              the phone both call №6. */}
+                          <strong>
+                            {`№${alt.number ?? alt.place_id}`}
+                            {alt.name ? ` · ${alt.name}` : ""}
+                          </strong>
+                          {/* What KIND of seat it is. Moving a PS player onto a
+                              PC is a different session, and the platform was
+                              the one thing this card never said. */}
                           <span className="muted" style={{ fontSize: 12 }}>
-                            {clockOf(new Date(alt.free_from))} – {clockOf(new Date(alt.free_until))}
+                            {[alt.platform ? platformLabel(alt.platform) : null, alt.type]
+                              .filter(Boolean)
+                              .join(" · ")}
+                          </span>
+                          <span className="muted" style={{ fontSize: 12 }}>
+                            {t("session.moveFreeFor")
+                              .replace("{0}", clockOf(new Date(alt.free_from)))
+                              .replace("{1}", clockOf(new Date(alt.free_until)))}
                           </span>
                         </span>
-                        <span className="row" style={{ gap: 8, alignItems: "center" }}>
+                        <span className="col" style={{ gap: 3, alignItems: "flex-end", flexShrink: 0 }}>
                           <span className="muted">{money(alt.hourly_rate)}</span>
                           {/* A tick, only on the chosen one — the border alone
                               is easy to miss on a busy board. */}
-                          {chosen && <span style={{ color: "var(--color-primary)" }}>✓</span>}
+                          <span style={{ color: chosen ? "var(--color-primary)" : "var(--color-success)", fontSize: 12 }}>
+                            {chosen ? `✓ ${t("session.moveChosen")}` : t("session.moveAvailable")}
+                          </span>
                         </span>
                       </button>
                     );
@@ -482,12 +552,19 @@ const SessionOptionsDialog = ({ session, platform, onClose, onChanged }: Props) 
                     onClick={() => {
                       const alt = alternatives.find((a) => a.place_id === selectedPlaceId);
                       if (!alt) return;
+                      const seatNo = `№${alt.number ?? alt.place_id}`;
                       void run(
                         () => sessionRepository.transferExtension(current.id, alt.place_id, refusedMinutes),
                         refusedMinutes,
                         t("session.movedToast")
-                          .replace("{0}", alt.name ?? `№${alt.number ?? ""}`)
+                          .replace("{0}", seatNo)
                           .replace("{1}", String(refusedMinutes)),
+                        // ⚠️ The seat was free when the list was drawn and is
+                        // not now — a phone took it while this modal was open.
+                        // The server is what caught it, and this only says so
+                        // in words the cashier can act on. Amber, not red:
+                        // nothing is broken, they just pick again.
+                        () => notify.warning(t("session.moveTakenToast").replace("{0}", seatNo)),
                       );
                     }}
                   >

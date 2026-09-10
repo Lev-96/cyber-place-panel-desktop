@@ -322,6 +322,12 @@ const SessionsBoard = ({ branchId }: Props) => {
   const byId = new Map((pcs.data ?? []).map((p) => [p.id, p] as const));
   const orderedPcs = order.map((id) => byId.get(id)).filter((p): p is IPcApi => !!p);
 
+  // Seats with a session running on them, counted off the SAME map the tiles
+  // are drawn from — so the heading and the grid cannot disagree about how
+  // many are in use. Not `sessions.data.length`: a session whose device is not
+  // on this board would inflate it.
+  const occupiedCount = orderedPcs.reduce((n, pc) => n + (sessionByPc.has(pc.id) ? 1 : 0), 0);
+
   // Bucket devices into sections, preserving tile order within each.
   const grouped: Record<string, IPcApi[]> = {};
   for (const pc of orderedPcs) (grouped[sectionKeyOf(pc)] ||= []).push(pc);
@@ -437,8 +443,28 @@ const SessionsBoard = ({ branchId }: Props) => {
     // platform shrinks; the tier never does.
     const platformName = pc.place ? platformLabel(pc.place.platform) : "";
     const tierName = pc.place ? pc.place.type : "";
+    // ⚠️ The NUMBER leads, always, and it is the same value the player is
+    // given on their phone.
+    //
+    // This used to print the place's name when it had one and fall back to the
+    // device's LABEL when the number was missing. Both halves broke the one
+    // guarantee that matters here: a cashier and a player looking at the same
+    // seat must say the same thing about it. A named seat showed the operator
+    // no number at all, and an un-numbered one showed them "PS4-08" while
+    // `placesSelect` showed the player `place.id`.
+    //
+    // `place.number ?? place.id` is exactly what the mobile screen renders, so
+    // the two cannot diverge. The name follows as detail: the line is one row
+    // with an ellipsis and the full text on hover, so it is the NAME that gets
+    // cut on a narrow tile, never the number.
+    const placeNo = pc.place ? (pc.place.number ?? pc.place.id) : null;
+    const placeName = tr(pc.place, "name", lang).trim();
     const nameLine =
-      tr(pc.place, "name", lang).trim() || `№${pc.place?.number ?? tr(pc, "label", lang)}`;
+      placeNo === null
+        ? tr(pc, "label", lang)
+        : placeName
+          ? `№${placeNo} · ${placeName}`
+          : `№${placeNo}`;
     // Live state of the physical console behind this place, when one is bound.
     // Undefined covers both "this is a computer" and "the first probe has not
     // come back yet" — neither is something to show a colour for.
@@ -766,7 +792,23 @@ const SessionsBoard = ({ branchId }: Props) => {
   return (
     <div className="col" style={{ gap: 18 }}>
       <div className="row-between" style={{ flexWrap: "wrap", rowGap: 8 }}>
-        <h2 className="page-title" style={{ margin: 0 }}>{t("session.boardTitle")} · №{branchId}</h2>
+        {/* ⚠️ The heading used to read "Sessions · №{branchId}" — the BRANCH's
+            surrogate id, next to a word about sessions, in a section full of
+            numbered seats. At a venue with six seats it printed "№4" and was
+            read as a seat number, or as a count of something. It is neither.
+            What an operator actually wants from a heading here is how much of
+            the room is in use, so that is what it says now. */}
+        <div className="col" style={{ gap: 2 }}>
+          <h2 className="page-title" style={{ margin: 0 }}>{t("session.boardTitle")}</h2>
+          {orderedPcs.length > 0 && (
+            <span className="muted" style={{ fontSize: 12 }}>
+              {t("session.boardCounts")
+                .replace("{0}", String(orderedPcs.length))
+                .replace("{1}", String(occupiedCount))
+                .replace("{2}", String(orderedPcs.length - occupiedCount))}
+            </span>
+          )}
+        </div>
         <div className="row" style={{ gap: 8, flexWrap: "wrap", rowGap: 8 }}>
           <Link to={`/branches/${branchId}/sessions/history`} className="muted" style={navBtn}>{t("history.title")}</Link>
           <Link to={`/branches/${branchId}/pcs`} className="muted" style={navBtn}>{t("pcs.title")}</Link>
