@@ -4,11 +4,13 @@ import { can } from "@/auth/permissions";
 import Button from "@/components/ui/Button";
 import CollapsibleSection from "@/components/ui/CollapsibleSection";
 import { GridSkeleton } from "@/components/ui/Skeleton";
+import JoystickIcon from "@/components/ui/JoystickIcon";
 import { useAsync } from "@/hooks/useAsync";
 import { useLocalReorder } from "@/hooks/useLocalReorder";
 import { useReservedPlaceIds } from "@/hooks/useReservedPlaceIds";
 import { useLang } from "@/i18n/LanguageContext";
 import { usePlaceAvailability } from "@/realtime/usePlaceAvailability";
+import { useSessionChanged } from "@/realtime/useSessionChanged";
 import { sessionRepository } from "@/repositories/SessionRepository";
 import { IPcApi, ISessionApi } from "@/types/sessions";
 import { PC_STATUS_COLOR, effectivePcStatus, isPs } from "@/types/pc";
@@ -18,12 +20,20 @@ import {
   SESSION_CELL_COLOR,
 } from "@/domain/SessionCellState";
 import { platformGroup, platformLabel } from "@/utils/platform";
-import { DragEvent, useCallback, useEffect, useState } from "react";
+import { usePs5Control } from "@/ps5/Ps5ControlProvider";
+import { useRealtimeResync } from "@/realtime/useRealtimeResync";
+import { PS5_STATE_LOOK } from "@/ps5/stateLook";
+import { DragEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import AddSessionItemDialog from "./AddSessionItemDialog";
 import SessionTimer from "./SessionTimer";
+import { sessionJoysticksTotal } from "./sessionAmount";
 import StartSessionDialog from "./StartSessionDialog";
+import SessionOptionsDialog from "./SessionOptionsDialog";
+import { MAX_JOYSTICKS } from "@/api/joystickPrices";
+import { notify } from "@/ui/notify";
 import StopReceiptModal from "./StopReceiptModal";
+import { useExpiryNudge } from "./useExpiryNudge";
 
 const navBtn: React.CSSProperties = { padding: "6px 10px", border: "1px solid #1f2a44", borderRadius: 6 };
 
@@ -56,6 +66,19 @@ const SessionsBoard = ({ branchId }: Props) => {
   const [startTarget, setStartTarget] = useState<IPcApi | null>(null);
   const [stopTarget, setStopTarget] = useState<ISessionApi | null>(null);
   const [addItemTarget, setAddItemTarget] = useState<ISessionApi | null>(null);
+  const [optionsTarget, setOptionsTarget] = useState<ISessionApi | null>(null);
+  // The session whose pads are mid-change. One at a time and per session, so a
+  // second click on the SAME tile is refused while the first is in flight and a
+  // cashier working another seat is not blocked by it.
+  //
+  // Not the only guard: the server takes a row lock on the session and refuses
+  // a removal of a pad that is already gone. This one keeps the operator from
+  // sending the second request at all.
+  const [padBusy, setPadBusy] = useState<number | null>(null);
+  // The last refusal, shown on the tile it belongs to. This project has no
+  // global toast helper and the board shows its errors where they happened;
+  // keyed by session so one seat's refusal does not appear on another's.
+  const [padError, setPadError] = useState<{ id: number; message: string } | null>(null);
   // Local display order for tile drag-and-drop. Seeded from the server order
   // (which already reflects sort_order) and preserved across Reverb/poll
   // reloads, so a just-dragged arrangement doesn't jump back before the persist
@@ -70,21 +93,216 @@ const SessionsBoard = ({ branchId }: Props) => {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const reservedPlaceIds = useReservedPlaceIds(branchId);
 
+  // Read from the app-wide watcher rather than starting a second one: two would
+  // each raise their own question about the same console, and the owner would
+  // be asked twice. It watches every venue this account can see, so a console
+  // switched on by hand is noticed whatever screen is open — which is the whole
+  // reason it no longer lives here.
+  //
+  // PC places are untouched by every line of it: a device with no console bound
+  // is not watched at all.
+  const { views: consoleViews, statuses: consoleStatuses, sessionStarting, sessionStopped } = usePs5Control();
+
+  /**
+   * A seat changed hands for a reason that is NOT a session — a reservation
+   * created, cancelled or expired.
+   *
+   * ⚠️ Session-driven reasons are dropped here on purpose. The backend now
+   * announces both events for one change (`SessionBroadcaster` fires the
+   * players' `PlaceAvailabilityChanged` beside the staff `SessionChanged`), and
+   * this board is subscribed to both — so a single "+10 minutes" produced three
+   * GETs per open panel: one from the handler below and two from this one.
+   *
+   * `session.*` is already covered, with a richer payload, by
+   * `useSessionChanged` underneath. What only reaches the board through THIS
+   * event is the booking side, and that is what it is kept for.
+   */
   usePlaceAvailability(
     branchId,
+    useCallback(
+      (evt) => {
+        if ((evt.reason ?? "").startsWith("session.")) return;
+        void sessions.reload();
+        void pcs.reload();
+      },
+      [sessions, pcs],
+    ),
+  );
+
+  // A session's TERMS changed on another machine — a pad in or out, time
+  // granted, the ceiling lifted, the bill waived. Without this the second
+  // cashier's board found out on its next 30-second poll, which is half a
+  // minute of two people acting on different numbers over the same till.
+  //
+  // It also carries the one change nobody made: a seat whose paid period ran
+  // out and which the server ended by itself. `kind` is `stopped` for that as
+  // well — what tells the two apart is `status`, which is `expired` when the
+  // clock ended it and `stopped` when a person did. Only the first opens a
+  // receipt: a modal appearing on every desk each time a colleague presses Stop
+  // would be noise, whereas a seat that ended on its own is money somebody has
+  // to go and collect, and nothing else would say so.
+  useSessionChanged(
+    branchId,
+    useCallback((evt) => {
+      if (evt.kind === "stopped" && evt.status === "expired") {
+        const ended = (sessions.data ?? []).find((s) => s.id === evt.session_id);
+        // Never over the top of an open receipt: a cashier mid-checkout on one
+        // seat must not have it replaced by another. The second seat is still
+        // ended and still on the board's history — what it loses is the popup.
+        if (ended) setStopTarget((current) => current ?? { ...ended, status: "expired" });
+      }
+      void sessions.reload();
+
+      // A MOVE changed two device rows as well as the session — the seat left
+      // behind went back to Online and the one taken went In Session. The
+      // session list alone would move the tile but leave both devices reading
+      // their old status, which is what the board colours "offline" and
+      // "startable" from. Only this kind needs it; every other change touches
+      // the session and nothing else.
+      if (evt.kind === "moved") {
+        void pcs.reload();
+      }
+    }, [sessions, pcs]),
+  );
+
+  /**
+   * The self-healing poll — the only thing that puts this board right when a
+   * socket frame never arrives.
+   *
+   * ⚠️ It is armed ONCE, through a ref, and that is the entire point.
+   * `useAsync` returns `{ ...state, reload }` — a new object on every render —
+   * so an effect keyed on `[sessions, pcs]` cleared and restarted this
+   * interval every time anything re-rendered the board. `usePs5Control()`
+   * above re-renders it every ten seconds at a venue with a console bound
+   * (`useConsoleWatch`'s `WATCH_INTERVAL_MS`), so the thirty seconds were
+   * never reached and the poll had, in practice, never once fired.
+   *
+   * That left the board with no fallback at all: a missed `session.changed`
+   * stayed missed, and `useExpiryNudge` cannot cover it because it only looks
+   * at sessions that HAVE an end — an unlimited or count-up seat is exactly
+   * the one it filters out.
+   */
+  /**
+   * A dropped socket means everything broadcast during the gap is gone — a
+   * stop, a grant, a pad — and resuming the subscription does not bring it
+   * back. Re-read once when the connection returns.
+   *
+   * The poll below would eventually repair it too, but "eventually" is up to
+   * thirty seconds of a cashier looking at a seat that is already free, and it
+   * is the poll that this board went without for so long.
+   */
+  useRealtimeResync(
     useCallback(() => {
       void sessions.reload();
       void pcs.reload();
     }, [sessions, pcs]),
   );
 
+  const reloadBoardRef = useRef(() => {
+    void sessions.reload();
+    void pcs.reload();
+  });
+  reloadBoardRef.current = () => {
+    void sessions.reload();
+    void pcs.reload();
+  };
+
   useEffect(() => {
-    const t = setInterval(() => {
+    const t = setInterval(() => reloadBoardRef.current(), 30_000);
+    return () => clearInterval(t);
+  }, []);
+
+  /**
+   * Add or remove one pad on this seat, from the tile.
+   *
+   * The SAME endpoints the options dialog calls — there is one way to change a
+   * session's pads and this is a second door to it, not a second implementation.
+   * Removal names the highest slot in play, which is the pad a "−" means: the
+   * last one handed out.
+   *
+   * The server decides everything that matters — the price, whether the period
+   * falls inside the grace window, whether the seat may have pads at all — and
+   * the board simply re-reads afterwards.
+   */
+  /**
+   * Set the number of pads in play to `target`, using the SAME add and remove
+   * operations the buttons used.
+   *
+   * The select says how many there should be; the difference is turned into
+   * that many calls to the existing endpoints. Nothing about how a pad is
+   * priced changed — a fee is charged when one is added and is not refunded
+   * when it goes, which is why "how many are active" and "how many were
+   * charged" are different numbers and only the first is what this control
+   * sets.
+   *
+   * ⚠️ Removals read the open slots from the LAST answer, not from the row the
+   * board rendered: taking two pads back is two calls, and the second must
+   * remove the slot that is still open after the first.
+   */
+  const changePadsTo = useCallback(async (sess: ISessionApi, target: number) => {
+    if (padBusy !== null) return;
+
+    const from = sess.joystick_count ?? 1;
+    const delta = target - from;
+    if (delta === 0) return;
+
+    setPadBusy(sess.id);
+    setPadError(null);
+
+    let updated: ISessionApi | null = null;
+    try {
+      for (let step = 0; step < Math.abs(delta); step += 1) {
+        if (delta > 0) {
+          updated = await sessionRepository.addJoystick(sess.id);
+        } else {
+          const source = updated ?? sess;
+          const open = (source.joysticks ?? []).filter((j) => j.stopped_at === null);
+          if (open.length === 0) break;
+          const slot = Math.max(...open.map((j) => j.slot));
+          updated = await sessionRepository.removeJoystick(sess.id, slot);
+        }
+      }
+
+      if (updated === null) return;
+
+      // Only once the server has answered, and with ITS count — a tile that
+      // predicted the number would show a figure the server had not agreed to,
+      // on the one operation another cashier may have moved first. For a
+      // multi-step change this is the count after the LAST step, which is what
+      // the cashier now has.
+      const count = updated.joystick_count ?? from;
+      notify.message(
+        delta > 0 ? "success" : "error",
+        `${t(delta > 0 ? "session.joystickAdded" : "session.joystickRemoved")} · `
+        + `${t("session.joysticksInSession")} ${count} / ${MAX_JOYSTICKS}`,
+      );
+    } catch (e) {
+      // Shown, never swallowed: the refusals here are sentences a cashier has
+      // to read. No price set for that slot, four pads already in play, the
+      // session no longer active. A change that failed HALFWAY leaves the pads
+      // it already made — the reload below is what puts the true number back
+      // on the tile rather than the one the select is showing.
+      setPadError({ id: sess.id, message: e instanceof Error ? e.message : String(e) });
+    } finally {
+      setPadBusy(null);
+      await sessions.reload();
+    }
+  }, [padBusy, sessions, t]);
+
+  // …and one wake-up aimed at the exact instant the soonest seat runs out.
+  //
+  // The server's expiry is exact but rides a request: with the thirty-second
+  // poll above as the only carrier, a tile's countdown reached 00:00 and the
+  // seat stayed busy for the rest of the interval. This asks at the deadline
+  // instead of waiting for the next tick — the server still decides, and the
+  // same read returns the board without the seat on it.
+  useExpiryNudge(
+    sessions.data,
+    useCallback(() => {
       void sessions.reload();
       void pcs.reload();
-    }, 30_000);
-    return () => clearInterval(t);
-  }, [sessions, pcs]);
+    }, [sessions, pcs]),
+  );
 
   // Reconcile the local tile order with the server list: keep existing order
   // for devices still present, append new ones, drop removed ones.
@@ -103,6 +321,12 @@ const SessionsBoard = ({ branchId }: Props) => {
 
   const byId = new Map((pcs.data ?? []).map((p) => [p.id, p] as const));
   const orderedPcs = order.map((id) => byId.get(id)).filter((p): p is IPcApi => !!p);
+
+  // Seats with a session running on them, counted off the SAME map the tiles
+  // are drawn from — so the heading and the grid cannot disagree about how
+  // many are in use. Not `sessions.data.length`: a session whose device is not
+  // on this board would inflate it.
+  const occupiedCount = orderedPcs.reduce((n, pc) => n + (sessionByPc.has(pc.id) ? 1 : 0), 0);
 
   // Bucket devices into sections, preserving tile order within each.
   const grouped: Record<string, IPcApi[]> = {};
@@ -173,6 +397,42 @@ const SessionsBoard = ({ branchId }: Props) => {
     const deviceStatus = effectivePcStatus(pc);
     const color = SESSION_CELL_COLOR[cellState];
     const itemsCount = sess?.items?.length ?? 0;
+    // Pads in play INCLUDING the session's own, as the server counts them.
+    // An older backend sends nothing, and 1 is the honest floor.
+    const joystickCount = sess?.joystick_count ?? 1;
+    // The backend's answer, resolved from the place's platform. Absent on an
+    // older payload, and then the controls simply are not drawn — which is the
+    // safe direction: a missing field must not offer an operation the seat
+    // cannot take.
+    const supportsJoysticks = sess?.supports_joysticks === true;
+    // The two ends of the range, named once. The ceiling is the server's own
+    // limit; the floor is slot 1 — the session's own controller, which is not
+    // an extra, has no row, and cannot be handed back.
+    //
+    // A button at its end is REMOVED, not disabled. On a 22px control a
+    // disabled state is a shade of grey an operator has to compare against its
+    // neighbour to read, and "why can I not press this" is a worse question
+    // than "there is nothing to press". Both ends are enforced on the server
+    // too — this decides what is drawn, never what is allowed.
+    const atCeiling = joystickCount >= MAX_JOYSTICKS;
+    const atFloor = joystickCount <= 1;
+    // The pad line: how many periods were charged, at what fee, for how much.
+    // Null when nothing was, and null on a waived seat — a fee printed under
+    // "Бесплатная сессия" is the same two-numbers-one-truth problem the rate
+    // and the time cost had on the receipt.
+    //
+    // `each` is only shown when every charged period agrees on a price. They
+    // can differ: the fee is frozen when a pad goes out, so a seat that
+    // straddles a re-pricing holds two. "3 × ?" would be a lie; the sum is
+    // always true, so the line falls back to it.
+    const padCharge = ((): { count: number; each: number | null; total: number } | null => {
+      if (sess === undefined || sess.is_free) return null;
+      const charged = (sess.joysticks ?? []).filter((j) => j.is_charged);
+      if (charged.length === 0) return null;
+      const first = Number(charged[0].price);
+      const uniform = charged.every((j) => Number(j.price) === first);
+      return { count: charged.length, each: uniform ? first : null, total: sessionJoysticksTotal(sess) };
+    })();
     // The two identity lines, resolved once so the JSX below stays readable.
     // A device with no place (a legacy row) has no platform or tier to show —
     // it still renders the line, as a non-breaking space, because a tile with
@@ -183,8 +443,40 @@ const SessionsBoard = ({ branchId }: Props) => {
     // platform shrinks; the tier never does.
     const platformName = pc.place ? platformLabel(pc.place.platform) : "";
     const tierName = pc.place ? pc.place.type : "";
+    // ⚠️ The NUMBER leads, always, and it is the same value the player is
+    // given on their phone.
+    //
+    // This used to print the place's name when it had one and fall back to the
+    // device's LABEL when the number was missing. Both halves broke the one
+    // guarantee that matters here: a cashier and a player looking at the same
+    // seat must say the same thing about it. A named seat showed the operator
+    // no number at all, and an un-numbered one showed them "PS4-08" while
+    // `placesSelect` showed the player `place.id`.
+    //
+    // `place.number ?? place.id` is exactly what the mobile screen renders, so
+    // the two cannot diverge. The name follows as detail: the line is one row
+    // with an ellipsis and the full text on hover, so it is the NAME that gets
+    // cut on a narrow tile, never the number.
+    const placeNo = pc.place ? (pc.place.number ?? pc.place.id) : null;
+    const placeName = tr(pc.place, "name", lang).trim();
     const nameLine =
-      tr(pc.place, "name", lang).trim() || `№${pc.place?.number ?? tr(pc, "label", lang)}`;
+      placeNo === null
+        ? tr(pc, "label", lang)
+        : placeName
+          ? `№${placeNo} · ${placeName}`
+          : `№${placeNo}`;
+    // Live state of the physical console behind this place, when one is bound.
+    // Undefined covers both "this is a computer" and "the first probe has not
+    // come back yet" — neither is something to show a colour for.
+    const consoleState = pc.console_host_id ? consoleStatuses[pc.console_host_id]?.state : undefined;
+    // What the panel is DOING about it, which is a different thing from what
+    // the console said. "Waking…" is not a state a console reports; it is this
+    // machine having sent a datagram and not been answered yet — and saying so
+    // beats a stale "Rest" for the ten seconds in between.
+    const consoleView = pc.console_host_id ? consoleViews[pc.console_host_id] : undefined;
+    const lifecycle = consoleView?.snapshot.state;
+    const consoleBusy = lifecycle === "WAKING" || lifecycle === "GOING_TO_REST"
+      || lifecycle === "UNEXPECTED_WAKE" || lifecycle === "ERROR";
     return (
       <div
         key={pc.id}
@@ -236,6 +528,31 @@ const SessionsBoard = ({ branchId }: Props) => {
             {tierName && <span style={{ flexShrink: 0 }}>· {tierName}</span>}
           </span>
         </span>
+        {/* The console itself, refreshed every ten seconds from this machine.
+            On its OWN line, not beside the platform: a tile is 160px at its
+            narrowest and "Режим покоя" next to "PS5 · STANDARD" does not fit in
+            it — it pushed the line wider than the card.
+
+            Deliberately a SECOND indicator rather than folded into the device
+            dot above: that one is about the billing device and its kiosk agent,
+            this one is about a box in the room, and a single dot meaning both
+            would be unreadable the moment they disagreed. */}
+        {consoleState && (
+          <span
+            className="ps5-chip"
+            title={consoleBusy && lifecycle
+              ? `${t("ps5.tile.bound")}: ${t(`ps5.lifecycle.${lifecycle}`)}${consoleView?.snapshot.error ? ` — ${t(`ps5.error.${consoleView.snapshot.error}`)}` : ""}`
+              : `${t("ps5.tile.bound")}: ${t(PS5_STATE_LOOK[consoleState].key)}`}
+          >
+            <span
+              className="ps5-chip__dot"
+              style={{ background: lifecycle === "ERROR" ? "#ef4444" : PS5_STATE_LOOK[consoleState].dot }}
+            />
+            <span className="ps5-chip__text">
+              {consoleBusy && lifecycle ? t(`ps5.lifecycle.${lifecycle}`) : t(PS5_STATE_LOOK[consoleState].key)}
+            </span>
+          </span>
+        )}
         {/* Line 2 — WHICH seat it is. Its own line at the card's identity size,
             because a name an operator typed ("Плейстейшен 5 ВИП большое место")
             is what they actually look for, and sharing a wrapping flex row with
@@ -246,21 +563,203 @@ const SessionsBoard = ({ branchId }: Props) => {
         {sess ? (
           <>
             <span className="status" style={{ color }}>
-              <SessionTimer
-                endsAt={sess.ends_at}
-                startedAt={sess.started_at}
-                hourlyRate={sess.hourly_rate}
-                formatMoney={money}
-              />
+              {/* The row itself, not a handful of its fields. Passing an
+                  hourly rate a fixed session does not have is what left the
+                  countdown branch with nothing to price from. */}
+              <SessionTimer session={sess} formatMoney={money} />
             </span>
             <span className="until">
-              {sess.mode === "open"
-                ? `${money(Number(sess.hourly_rate ?? 0))} / ${t("time.hourShort") || "h"}`
-                : sess.package_name}
+              {/* The tariff line answers "what is this seat earning per hour",
+                  and for a waived session the answer is not the venue's rate —
+                  printing it there put a price the player will never be asked
+                  for directly under a clock that was counting for free. */}
+              {sess.is_free
+                ? t("session.freeBill")
+                : sess.is_unlimited
+                  ? t("session.unlimited")
+                  : sess.mode === "open"
+                    ? `${money(Number(sess.hourly_rate ?? 0))} / ${t("time.hourShort") || "h"}`
+                    : sess.package_name}
               {itemsCount > 0 && <span className="muted"> · {itemsCount} {t("session.posNote")}</span>}
             </span>
+            {/* What the tile has to say at a glance and could not before: how
+                many pads this seat is paying for, and whether it is paying at
+                all. Both come from the server — the count is never derived
+                here, or two cashiers would read different numbers off the same
+                seat. The pads render only for a PlayStation, where the concept
+                exists; a computer showing "🎮 1" would be noise. */}
+            {(joystickCount > 1 || supportsJoysticks || sess.is_free) && (
+              <span className="row" style={{ gap: 6, fontSize: 12, flexWrap: "wrap" }}>
+                {/* Pads are a PlayStation thing, and the seat says so itself:
+                    `supports_joysticks` is the backend's answer — the place's
+                    platform where the seat has a place, the device's own kind
+                    where it has none. Never the label: "PS4-08" is a name
+                    somebody typed, and a venue that renames a seat would lose
+                    its controls.
+
+                    Shown for every PlayStation seat, not only one that already
+                    has a second pad: a control that appears once you have
+                    already used it is a control nobody finds. */}
+                <span
+                  className="row"
+                  style={{
+                    gap: 4,
+                    alignItems: "center",
+                    // The three parts are one reading — glyph, count, control —
+                    // and they must not break across lines. The tile is 160px
+                    // and the count was dropping under the icon, which read as
+                    // a second row of something rather than as one field.
+                    flexWrap: "nowrap",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {/* The count, with the icon and the word in front of it.
+                      Before this it appeared only from the SECOND pad onwards,
+                      so a seat that had just started showed two unlabelled 20px
+                      buttons and nothing to say what they were for — which is
+                      how a feature that was fully built read as missing.
+
+                      One glyph plus the fraction, not one glyph per pad. Four
+                      glyphs is the widest this line could get on a 160px tile,
+                      and the repeat never said what the ceiling was — "1 / 4"
+                      answers "can another player join?" without opening
+                      anything.
+
+                      `joystickCount` counts the pads IN PLAY and the session's
+                      own is one of them, so a fresh seat reads 1 / 4, not 0.
+                      That is the same number the options dialog shows for the
+                      same seat, and two screens disagreeing about one seat is
+                      worse than either wording. */}
+                  {(supportsJoysticks || joystickCount > 1) && (
+                    <span
+                      className="row"
+                      style={{
+                        gap: 4,
+                        alignItems: "center",
+                        flexWrap: "nowrap",
+                        whiteSpace: "nowrap",
+                        // "1 / 4" is three glyphs and a slash; letting it shrink
+                        // is what pushed it onto its own line.
+                        flexShrink: 0,
+                      }}
+                      title={`${t("session.joysticks")}: ${joystickCount} / ${MAX_JOYSTICKS}`}
+                    >
+                      <JoystickIcon />
+                      <span className="muted">{joystickCount} / {MAX_JOYSTICKS}</span>
+                    </span>
+                  )}
+                  {supportsJoysticks && (
+                  <>
+                    {/* A SELECT, not a pair of steppers.
+                        Two 22px buttons meant a cashier going from one pad to
+                        three pressed twice and watched the number catch up
+                        between presses; the select states the destination and
+                        the board makes the calls. The floor is 1 because the
+                        session's own pad is one of them and there is no row to
+                        take back below it — that is the existing rule, not a
+                        UI choice, and the server enforces both ends. */}
+                    <select
+                      className="input"
+                      style={{
+                        height: 24,
+                        // One digit and the arrow, nothing more: the value is
+                        // 1..4, and a full-width input on a 160px tile is what
+                        // pushed the count off the line.
+                        width: 46,
+                        minWidth: 0,
+                        flexShrink: 0,
+                        padding: "0 2px",
+                        fontSize: 12,
+                      }}
+                      title={`${t("session.joysticks")}: ${joystickCount} / ${MAX_JOYSTICKS}`}
+                      aria-label={t("session.joysticks")}
+                      // Disabled only while a change is in flight — the
+                      // operation is legal, it is simply already happening.
+                      disabled={padBusy === sess.id}
+                      value={joystickCount}
+                      onChange={(e) => void changePadsTo(sess, Number(e.target.value))}
+                    >
+                      {Array.from(
+                        { length: MAX_JOYSTICKS },
+                        (_, i) => i + 1,
+                      ).map((n) => (
+                        <option key={n} value={n}>{n}</option>
+                      ))}
+                    </select>
+                    {/* The round trip, said on the tile it belongs to. The
+                        select is already disabled while it is in flight; this
+                        is what tells the cashier the change landed, on a board
+                        where the number itself only moves once the server has
+                        answered. */}
+                    {padBusy === sess.id && (
+                      // The project's own spinner class, sized down inline
+                      // rather than by widening the `Spinner` primitive: that
+                      // one is a 32px page-level element with its own margins,
+                      // and giving it a props API for one 12px use would change
+                      // a component every screen renders.
+                      <span
+                        className="spinner"
+                        style={{ width: 12, height: 12, borderWidth: 2, margin: 0 }}
+                        aria-hidden
+                      />
+                    )}
+                  </>
+                  )}
+                </span>
+                {/* What the pads have added to this seat, spelled out.
+                    Before this the fee vanished into the running total and a
+                    cashier had no way to see it was there — which is the
+                    question a player asks when the figure jumps by 300.
+
+                    A count and a flat fee, never a rate: it does not move with
+                    the clock and re-renders every second without changing.
+                    Both figures come from the server's own rows — the count of
+                    CHARGED periods, which is not the count of pads in play,
+                    because a pad handed back keeps its fee. */}
+                {padCharge !== null && (
+                  <span className="muted" style={{ fontSize: 11, flexBasis: "100%" }}>
+                    {t("session.joysticksCost")}:{" "}
+                    {padCharge.each !== null && `${padCharge.count} × ${money(padCharge.each)} = `}
+                    {money(padCharge.total)}
+                  </span>
+                )}
+                {padError?.id === sess.id && (
+                  <span className="error" style={{ fontSize: 11, flexBasis: "100%" }}>
+                    {padError.message}
+                  </span>
+                )}
+                {sess.is_free && (
+                  <span className="pill" style={{ fontSize: 10, letterSpacing: 0, textTransform: "none" }}>
+                    {t("session.freeBillShort")}
+                  </span>
+                )}
+              </span>
+            )}
             <div className="row" style={{ gap: 6, marginTop: 4, flexWrap: "wrap" }}>
               <Button variant="secondary" onClick={() => setAddItemTarget(sess)} style={miniBtnFlex}>{t("session.addItem")}</Button>
+              {/* Named for the thing a cashier is actually looking for on a
+                  seat that is running out. It opens the SAME dialog "Options"
+                  does — one management surface, reached by two names, because
+                  "Options" is not what somebody with eight minutes left is
+                  scanning the card for.
+
+                  Only on a seat that HAS an end: a count-up or unlimited
+                  session has nothing to extend, and the dialog says so rather
+                  than offering it. */}
+              {sess.ends_at !== null && sess.is_unlimited !== true && (
+                <Button variant="secondary" onClick={() => setOptionsTarget(sess)} style={miniBtnFlex}>{t("session.addTime")}</Button>
+              )}
+              {/* ⚠️ "Options" is gone from the tile, and NOTHING behind it was
+                  removed. `SessionOptionsDialog` is the Add Time dialog and is
+                  still opened by the button above it, with its presets, its
+                  manual grant, the unlimited switch and the whole
+                  booking-conflict and seat-migration flow untouched.
+                  It cost the tile a third button and bought nothing: for a
+                  session with an end, it opened the same dialog the Add Time
+                  button already opens; for an unlimited one the dialog has no
+                  action at all, only two "not applicable" notices. Two buttons
+                  and one of them a duplicate is how a cashier learns to stop
+                  reading them. */}
               <Button variant="secondary" onClick={() => setStopTarget(sess)} style={miniBtnFlex}>{t("action.stop")}</Button>
             </div>
           </>
@@ -303,7 +802,23 @@ const SessionsBoard = ({ branchId }: Props) => {
   return (
     <div className="col" style={{ gap: 18 }}>
       <div className="row-between" style={{ flexWrap: "wrap", rowGap: 8 }}>
-        <h2 className="page-title" style={{ margin: 0 }}>{t("session.boardTitle")} · №{branchId}</h2>
+        {/* ⚠️ The heading used to read "Sessions · №{branchId}" — the BRANCH's
+            surrogate id, next to a word about sessions, in a section full of
+            numbered seats. At a venue with six seats it printed "№4" and was
+            read as a seat number, or as a count of something. It is neither.
+            What an operator actually wants from a heading here is how much of
+            the room is in use, so that is what it says now. */}
+        <div className="col" style={{ gap: 2 }}>
+          <h2 className="page-title" style={{ margin: 0 }}>{t("session.boardTitle")}</h2>
+          {orderedPcs.length > 0 && (
+            <span className="muted" style={{ fontSize: 12 }}>
+              {t("session.boardCounts")
+                .replace("{0}", String(orderedPcs.length))
+                .replace("{1}", String(occupiedCount))
+                .replace("{2}", String(orderedPcs.length - occupiedCount))}
+            </span>
+          )}
+        </div>
         <div className="row" style={{ gap: 8, flexWrap: "wrap", rowGap: 8 }}>
           <Link to={`/branches/${branchId}/sessions/history`} className="muted" style={navBtn}>{t("history.title")}</Link>
           <Link to={`/branches/${branchId}/pcs`} className="muted" style={navBtn}>{t("pcs.title")}</Link>
@@ -353,15 +868,42 @@ const SessionsBoard = ({ branchId }: Props) => {
           branchId={branchId}
           pc={startTarget}
           onClose={() => setStartTarget(null)}
-          onStarted={() => { setStartTarget(null); void sessions.reload(); void pcs.reload(); }}
+          onStarted={() => {
+            // The console may legitimately wake from now on. Said BEFORE the
+            // reload, because the monitor can tick before the session row is
+            // visible — and a monitor that sees "awake, no session" is a
+            // monitor that switches the console off under the player.
+            if (startTarget.console_host_id) sessionStarting(startTarget.id);
+            setStartTarget(null);
+            void sessions.reload();
+            void pcs.reload();
+          }}
         />
       )}
       {stopTarget && (
         <StopReceiptModal
           session={stopTarget}
           onClose={() => { setStopTarget(null); void sessions.reload(); void pcs.reload(); }}
-          onConfirmed={() => { void sessions.reload(); void pcs.reload(); }}
+          onConfirmed={() => {
+            // The session is over on the backend, so the console should be
+            // asleep. Whether this build can actually ask it to is the
+            // transport's business — and its refusal is shown, not swallowed.
+            const device = (pcs.data ?? []).find((pc) => pc.id === stopTarget.pc_id);
+            if (device?.console_host_id) sessionStopped(device.id);
+            void sessions.reload();
+            void pcs.reload();
+          }}
           onItemRemoved={() => { void sessions.reload(); }}
+        />
+      )}
+      {optionsTarget && (
+        <SessionOptionsDialog
+          session={optionsTarget}
+          platform={(pcs.data ?? []).find((pc) => pc.id === optionsTarget.pc_id)?.place?.platform}
+          onClose={() => { setOptionsTarget(null); void sessions.reload(); }}
+          // The server's answer replaces the dialog's copy AND the board's row,
+          // so the tile behind the dialog is never a version behind it.
+          onChanged={(updated) => { setOptionsTarget(updated); void sessions.reload(); }}
         />
       )}
       {addItemTarget && (
@@ -374,6 +916,35 @@ const SessionsBoard = ({ branchId }: Props) => {
       )}
     </div>
   );
+};
+
+/** A 20px square that reads as a control without competing with the tile. */
+/**
+ * The pad buttons on a tile.
+ *
+ * They were 20px, transparent, and outlined in #1f2a44 — the tile's own border
+ * colour — with no label or icon beside them. On a dark card that is a control
+ * an operator has to already know is there, which is half of why a shipped
+ * feature was reported as missing. Filled, a shade lighter than the card, and
+ * 22px so the glyph has room: still small enough to sit on a 160px tile beside
+ * the count without wrapping.
+ */
+const padBtn: React.CSSProperties = {
+  width: 22,
+  height: 22,
+  lineHeight: 1,
+  padding: 0,
+  borderRadius: 5,
+  border: "1px solid #2c3b5e",
+  background: "#131c31",
+  color: "#cfe0f5",
+  cursor: "pointer",
+  fontSize: 14,
+  fontWeight: 600,
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  flexShrink: 0,
 };
 
 const miniBtnFlex: React.CSSProperties = {

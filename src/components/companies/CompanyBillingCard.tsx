@@ -66,7 +66,7 @@ const CompanyBillingCard = ({ companyId, companyName }: Props) => {
   );
 
   const rawPct = Number(billing.commission_percent);
-  const pctText = Number.isFinite(rawPct) ? `${rawPct.toFixed(2)}%` : "—";
+  const pctText = Number.isFinite(rawPct) ? `${rawPct.toFixed(2)}%` : "-";
   const days = Number.isFinite(billing.days_until_due as number) ? (billing.days_until_due as number) : null;
   const overdue = !!billing.is_overdue;
   const dueSoon = days !== null && days >= 0 && days <= 3;

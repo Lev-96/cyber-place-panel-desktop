@@ -4,6 +4,8 @@ import Modal from "@/components/ui/Modal";
 import Checkbox from "@/components/ui/Checkbox";
 import PriceInput from "@/components/ui/PriceInput";
 import Spinner from "@/components/ui/Spinner";
+import { useAuth } from "@/auth/AuthContext";
+import { can } from "@/auth/permissions";
 import { useLang } from "@/i18n/LanguageContext";
 import { timePackageNameOf } from "@/i18n/timePackageName";
 import { branchRepository } from "@/repositories/BranchRepository";
@@ -42,6 +44,12 @@ type Mode = "fixed" | "open";
  */
 const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
   const { t, money, lang } = useLang();
+  const { user } = useAuth();
+  // Waiving a bill is the company's decision, so the control is only drawn for
+  // a role that holds it — and the SERVER asserts the same capability on
+  // `POST /sessions`. A hidden button is not a rule; this only decides whether
+  // it is offered.
+  const mayWaive = can(user?.role, "session.free");
   const [packages, setPackages] = useState<ITimePackage[] | null>(null);
   const [pkgId, setPkgId] = useState<number | null>(null);
   // PlayStation rows are billing-only (no kiosk agent), so the open/count-up
@@ -57,6 +65,10 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
   const [editPrice, setEditPrice] = useState(false);
   const [customRate, setCustomRate] = useState("");
   const [rateSaved, setRateSaved] = useState(false);
+  // Start it waived. Deliberately NOT wired to the price override above: a free
+  // session is not "a price of zero", it is a session whose bill nobody pays,
+  // and the two behave differently the moment a drink is added to it.
+  const [isFree, setIsFree] = useState(false);
 
   useEffect(() => { void sessionRepository.listPackages(branchId).then((p) => { setPackages(p); setPkgId(p[0]?.id ?? null); }); }, [branchId]);
   useEffect(() => {
@@ -121,6 +133,30 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
   const submit = async () => {
     setBusy(true); setErr(null);
     try {
+      if (isFree) {
+        // A waived session is started count-up and nothing else.
+        //
+        // Every control the other two branches read — the package, the assigned
+        // rate, the override — describes what the player will be charged, and
+        // for this session that is nothing. A tariff picked here would decide
+        // exactly one thing: when the seat locks itself. A free session is given
+        // for as long as it is given, so it is opened with no end and the
+        // cashier closes it.
+        //
+        // `hourly_rate` is deliberately NOT sent. The server still resolves the
+        // venue's own rate for the seat, which is what lets the receipt say what
+        // was given away — a number typed here would only overwrite that with a
+        // guess.
+        await sessionRepository.start({
+          branch_id: branchId,
+          pc_id: pc.id,
+          mode: "open",
+          user_display_name: pc.label,
+          is_free: true,
+        });
+        onStarted();
+        return;
+      }
       if (mode === "fixed") {
         if (!pkgId) { setErr(t("session.choosePackage")); setBusy(false); return; }
         await sessionRepository.start({
@@ -163,8 +199,14 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
   // Open-mode is unavailable when no rate is configured AND fixed-
   // mode would be the only option; for PS-kind PCs the disabled
   // Start button surfaces the noAssignedRate hint instead.
+  // A waived session is gated on nothing but the device. The rate conditions
+  // below all guard against billing a player at a price nobody set — which is
+  // not a risk that exists when the bill is 0, and holding a free session back
+  // because the venue never configured a tariff for that seat would block the
+  // exact case free is for: a demo stand, a tournament machine, a seat given
+  // back after an outage. The server lifts the same refusal for the same reason.
   const startDisabled =
-    busy || deviceOffline || (mode === "open" && (editPrice ? !overrideApplied : assignedRate === null));
+    busy || deviceOffline || (!isFree && mode === "open" && (editPrice ? !overrideApplied : assignedRate === null));
 
   return (
     <Modal open onClose={onClose}>
@@ -172,16 +214,52 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
         <h2 style={{ margin: 0 }}>{t("session.start")} · №{pc.place?.number ?? pc.label}{isPs(pc.kind) ? " (PS)" : ""}</h2>
         {!packages ? <ListSkeleton rows={3} /> : (
           <>
+            {/* Free sits ABOVE the tariff, and turning it on takes the tariff
+                away entirely.
+
+                It used to sit below and change nothing on screen, which read as
+                "a free session, at this rate" — an operator could pick a
+                package, waive the bill, and be left looking at a price that was
+                never going to be charged. Every control below answers "what
+                does this cost", and for a waived session that question has one
+                answer, so the honest form is the one that stops asking it. */}
+            {mayWaive && (
+              <div className="col" style={{ gap: 4 }}>
+                <Checkbox checked={isFree} onChange={setIsFree} label={t("session.freeBill")} />
+                {isFree && (
+                  <span className="muted" style={{ fontSize: 11 }}>
+                    {t("session.freeBillStartHint")}
+                  </span>
+                )}
+              </div>
+            )}
+
+            {!isFree && (
             <div className="row" style={{ gap: 8 }}>
-              <button type="button" onClick={() => setMode("fixed")} style={tabStyle(mode === "fixed")} disabled={isPs(pc.kind)}>
+              {/* A PlayStation may be sold a package too.
+
+                  This tab was DISABLED for PS on the grounds that count-up is
+                  the sensible default there — and it is, which is why it is
+                  still the default. But disabling the tab made two features
+                  unreachable on every console in the building: a count-up
+                  session has no end, so "+30 minutes" has nothing to extend and
+                  "switch to unlimited" is already true. An operator opening
+                  Options on a PS session found both greyed out and no route to
+                  them.
+
+                  The backend has always accepted a package on any device — a
+                  console simply has no kiosk agent to notify, which the start
+                  path already handles. */}
+              <button type="button" onClick={() => setMode("fixed")} style={tabStyle(mode === "fixed")}>
                 {t("session.fixedTariff")}
               </button>
               <button type="button" onClick={() => setMode("open")} style={tabStyle(mode === "open")}>
                 {t("session.openByHour")}
               </button>
             </div>
+            )}
 
-            {mode === "fixed" ? (
+            {!isFree && (mode === "fixed" ? (
               <div className="col" style={{ gap: 6 }}>
                 <span className="label">{t("session.tariffField")}</span>
                 {packages.length === 0 ? (
@@ -236,7 +314,7 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
                   </div>
                 )}
               </div>
-            )}
+            ))}
 
             {deviceOffline && <div className="error">{t("session.deviceOfflineHint")}</div>}
             {err && <div className="error">{err}</div>}

@@ -1,6 +1,8 @@
 import { ListSkeleton, SkeletonForm } from "@/components/ui/Skeleton";
 import HourlyRatesForm from "@/components/branches/HourlyRatesForm";
 import PackageForm from "@/components/packages/PackageForm";
+import JoystickPricesForm from "@/components/prices/JoystickPricesForm";
+import MoneyRoundingForm from "@/components/prices/MoneyRoundingForm";
 import PlatformPricesForm from "@/components/prices/PlatformPricesForm";
 import SubplatformPricesForm from "@/components/prices/SubplatformPricesForm";
 import Button from "@/components/ui/Button";
@@ -9,6 +11,7 @@ import { useAsync } from "@/hooks/useAsync";
 import { useLang } from "@/i18n/LanguageContext";
 import { timePackageNameOf } from "@/i18n/timePackageName";
 import { branchRepository } from "@/repositories/BranchRepository";
+import { billingSettingsRepository } from "@/repositories/BillingSettingsRepository";
 import { platformPriceRepository } from "@/repositories/PlatformPriceRepository";
 import { subplatformRepository } from "@/repositories/SubplatformRepository";
 import { timePackageRepository } from "@/repositories/TimePackageRepository";
@@ -37,6 +40,9 @@ const BranchPricesPage = () => {
   const packages = useAsync(() => timePackageRepository.listByBranch(id), [id]);
   const platformPrices = useAsync(() => platformPriceRepository.listByBranch(id), [id]);
   const subplatforms = useAsync(() => subplatformRepository.listByBranch(id), [id]);
+  // One read for both money policies — the joystick fee and the rounding rule
+  // are two fields on the same branch and the same endpoint.
+  const billing = useAsync(() => billingSettingsRepository.get(id), [id]);
 
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState<ITimePackage | null>(null);
@@ -109,6 +115,36 @@ const BranchPricesPage = () => {
           />
         </section>
       )}
+
+      {/* Extra joysticks. Its own section rather than a column on the matrix
+          above: that matrix is per (platform × tier) and this is one figure for
+          the venue, and folding one into the other would make a grid where most
+          cells are meaningless — a computer has no second joystick. */}
+      <section className="col" style={{ gap: 12 }}>
+        <h2 className="page-title" style={{ margin: 0 }}>{t("joystickPrice.sectionTitle")}</h2>
+        {billing.data && (
+          <JoystickPricesForm
+            key={String(billing.data.joystick_price)}
+            branchId={id}
+            settings={billing.data}
+            onSaved={() => void billing.reload()}
+          />
+        )}
+      </section>
+
+      {/* Rounding. Last, and after every rate, because it is the rule applied
+          to what all of them add up to. */}
+      <section className="col" style={{ gap: 12 }}>
+        <h2 className="page-title" style={{ margin: 0 }}>{t("rounding.sectionTitle")}</h2>
+        {billing.data && (
+          <MoneyRoundingForm
+            key={`${billing.data.money_rounding_step}:${billing.data.money_rounding_mode}`}
+            branchId={id}
+            settings={billing.data}
+            onSaved={() => void billing.reload()}
+          />
+        )}
+      </section>
 
       {/* Time packages — used by StartSessionDialog fixed mode AND now
           carry the optional time-windowed discount inline. */}

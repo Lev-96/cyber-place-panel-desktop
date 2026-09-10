@@ -76,8 +76,20 @@ export const useAppUpdates = (
 
     return () => {
       try {
-        channel.stopListening(".app-update.promoted");
-        echo.leaveChannel("app-updates");
+        // ⚠️ The listener is named, and `leaveChannel` is gone. Both mattered.
+        //
+        // `app-updates` is NOT hook-owned, whatever the rule in CLAUDE.md used
+        // to say: four components mount this hook at once — `App.tsx`,
+        // `UpdatesNotificationContext`, and the two update routes. Echo caches
+        // the channel object without refcounting, so leaving it from the route
+        // that happens to unmount kills the two ROOT subscriptions for the rest
+        // of the process. Opening `/settings/updates` and walking away from it
+        // silently deafened the updater, and nothing said so.
+        //
+        // `stopListening` with no second argument removes EVERY handler on the
+        // event, which is the same bug one level down: three siblings lose
+        // their listener because a fourth unmounted.
+        channel.stopListening(".app-update.promoted", handler);
       } catch { /* echo may be torn down already during HMR */ }
     };
   }, [thisApp, realtime]);

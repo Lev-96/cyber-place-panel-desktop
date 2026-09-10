@@ -49,6 +49,34 @@ export interface ITimePackage {
   discounted_price_now?: number | string | null;
 }
 
+/**
+ * One period a single extra joystick was in play.
+ *
+ * Not a count on the session, and the distinction is the whole feature: the
+ * same slot handed out twice in an evening is two separate uses, each judged
+ * on its own length. What a use COSTS is a flat fee — owed in full once the
+ * period passes the server's threshold, owed not at all below it — so nothing
+ * on this side ever multiplies `price` by a duration.
+ */
+export interface ISessionJoystick {
+  id: number;
+  /** 2..4. Slot 1 is the session itself and never appears here. */
+  slot: number;
+  /** The flat fee for this use, frozen when the pad went out. Not a rate. */
+  price: number;
+  /**
+   * Whether this period is on the bill — the SERVER's answer, never inferred.
+   *
+   * A pad that has been handed back is still charged: removal ends the use, it
+   * is not a refund. Only rows from before that rule carry `false`. Absent on
+   * an older payload, and then the tile counts nothing rather than guessing.
+   */
+  is_charged?: boolean;
+  started_at: string;
+  /** null while the pad is still in play. */
+  stopped_at: string | null;
+}
+
 export interface ISessionApi {
   id: number;
   branch_id: number;
@@ -59,11 +87,118 @@ export interface ISessionApi {
   package_name?: string;
   mode?: "fixed" | "open";
   hourly_rate?: number | string | null;
+  /**
+   * The rate this session would carry on at if its end were removed, resolved
+   * by the SERVER through the same ladder the switch itself applies.
+   *
+   * `hourly_rate` above cannot answer that: a fixed session's column is null by
+   * design, because its rate is implied by the package (price ÷ duration × 60).
+   * Reading that column with a `?? 0` fallback is exactly how a 1500/hour
+   * tariff came to be offered as "0 драм/ч".
+   *
+   * `null` means no rate could be derived at all — no package, no configured
+   * price for the seat. Render that as the refusal it is; the server refuses
+   * the switch in the same case.
+   */
+  tariff_hourly_rate?: number | null;
   started_at: string;   // ISO
   ends_at: string | null;      // ISO; null for open (count-up) sessions
+  /**
+   * When the session was actually stopped. `null` while it is running.
+   *
+   * Distinct from `ends_at`, which for a fixed package is when the time was
+   * due to run out — the history page reads THIS one, because a session the
+   * cashier closed early ended when they closed it.
+   *
+   * Optional like its neighbours below: the backend always sends it, but the
+   * fixtures in this repo build sessions field by field and should not have to
+   * carry a column they are not asserting on.
+   */
+  stopped_at?: string | null;
   status: "active" | "stopped" | "expired";
   total_paid: number;
+  /**
+   * How the money was taken when the session was stopped.
+   *
+   * ⚠️ Optional and nullable, and both matter. NULL is every session stopped
+   * before this was recorded and every session still running; the history
+   * renders nothing for it rather than inventing a method.
+   */
+  payment_method?: "cash" | "card" | "other" | null;
+  /** The words the cashier typed. Only ever set when the method is `other`. */
+  payment_method_other?: string | null;
+  opened_by_user_id?: number | null;
   items?: Array<{ id: number; name: string; price: number | string; qty: number; product_id: number | null }>;
+
+  /**
+   * The tariff a fixed session was started on, when the backend loaded it.
+   *
+   * Present on the sessions listing, which eager-loads `timePackage` with
+   * `duration_minutes` and `price` — the two columns a fixed session's hourly
+   * rate is derived from, since `hourly_rate` stays null until somebody makes
+   * the session unlimited. {@see sessionTimeCostAt}.
+   */
+  time_package?: ITimePackage | null;
+
+  /* ---- added 2026-09-03; every field above is unchanged ---------------- */
+
+  /**
+   * The bill is waived. The clock keeps running and the session still counts
+   * — it is simply worth 0, which is what `total_paid` will say when it stops.
+   * Optional so a panel talking to an older backend degrades to "not free".
+   */
+  is_free?: boolean;
+  /** No end: started in count-up mode, or an operator lifted the ceiling. */
+  is_unlimited?: boolean;
+  unlimited_at?: string | null;
+  /**
+   * The block that was SOLD, and where it ends. For an unlimited session this
+   * is the boundary the hourly overflow is measured from — `ends_at` is null
+   * there and cannot say it.
+   */
+  committed_until?: string | null;
+  committed_amount?: number | string | null;
+  /** Pads in play INCLUDING the session's own. 1 is the floor, never 0. */
+  joystick_count?: number;
+  /** Every period, closed ones included. Present when the relation is loaded. */
+  joysticks?: ISessionJoystick[];
+  /** Who opened it — the owner's "which of my managers ran this?". */
+  opened_by?: { id: number; name: string; role: string } | null;
+  /**
+   * Who ended it. `null` is a FACT rather than a missing field: the session is
+   * still running, or the kiosk agent expired it when its paid time ran out and
+   * no person closed it at all.
+   *
+   * Never resolved from the current user. A session that crossed a shift change
+   * was started by one person and stopped by another, and the person reading
+   * this page is routinely a third.
+   */
+  stopped_by_user_id?: number | null;
+  stopped_by?: { id: number; name: string; role: string } | null;
+  /**
+   * The venue this session ran at, as it was at the time. Present on the
+   * history listing; an owner reads one list across several branches and each
+   * line has to name its own.
+   */
+  branch?: {
+    id: number;
+    address: string;
+    city: string | null;
+    company_id: number;
+    company_name: string | null;
+  } | null;
+  /**
+   * Whether extra joysticks mean anything on this seat, decided by the
+   * backend against the place's platform. `null`/absent when the relation was
+   * not loaded — the caller then falls back to what it can see itself.
+   *
+   * This exists so the panel stops holding a second copy of a backend rule:
+   * deriving it from a separately-loaded device list goes wrong the moment
+   * that list is stale, and it goes wrong by silently hiding the controls.
+   */
+  supports_joysticks?: boolean | null;
+  /** The seat's platform slug, so a refusal can name it rather than just say no. */
+  place_platform?: string | null;
 }
 
 export interface IPcApi extends Translated {
@@ -74,6 +209,22 @@ export interface IPcApi extends Translated {
   kind?: PcKind;
   hourly_rate?: number | string | null;
   mac_address?: string | null;
+  /**
+   * The physical console this device stands for, once an owner has bound one
+   * from the console finder. Null on every computer, and on every console
+   * nobody has pointed at yet — which is the normal state, not an error.
+   *
+   * Optional so a panel talking to a backend from before the binding existed
+   * degrades to "nothing bound" instead of breaking.
+   */
+  console_host_id?: string | null;
+  /** Last address it answered from. A hint the panel probes first, and allowed to be stale. */
+  console_address?: string | null;
+  /**
+   * Until when the "a console with no session must be asleep" rule is suspended
+   * for this device, or null. An owner opens the window; it closes on its own.
+   */
+  maintenance_until?: string | null;
   /**
    * EFFECTIVE availability, not the raw column — the backend already folds in
    * "a console has no agent to report in" and "this computer's heartbeat went

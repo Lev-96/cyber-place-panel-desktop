@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { notify, type ToastEvent } from "@/ui/notify";
 import { useLang } from "@/i18n/LanguageContext";
@@ -11,22 +11,43 @@ import { useLang } from "@/i18n/LanguageContext";
  * {@link UpdatesToast} (that one is the "new app version" banner).
  */
 
-const AUTO_DISMISS_MS = 3800;
+/**
+ * Long enough to read two lines in three languages without being long enough
+ * to pile up. Armenian runs longest, and 3.8s was measured short for it.
+ */
+const AUTO_DISMISS_MS = 5000;
+
+/** Must match the `cp-toast-out` keyframes; the node is removed after it. */
+const LEAVE_MS = 220;
 
 const Toaster = () => {
   const { t } = useLang();
   const [items, setItems] = useState<ToastEvent[]>([]);
+  /**
+   * Ids on their way out.
+   *
+   * A toast used to vanish on the frame its timer fired, and with several on
+   * screen the ones below jumped up to fill the gap. Marking it first lets CSS
+   * fade and collapse it, and the node is dropped once that has played.
+   */
+  const [leaving, setLeaving] = useState<number[]>([]);
+
+  const remove = useCallback((id: number) => {
+    setLeaving((cur) => (cur.includes(id) ? cur : [...cur, id]));
+    window.setTimeout(() => {
+      setItems((cur) => cur.filter((x) => x.id !== id));
+      setLeaving((cur) => cur.filter((x) => x !== id));
+    }, LEAVE_MS);
+  }, []);
 
   useEffect(() => {
     return notify.subscribe((e) => {
       setItems((cur) => [...cur, e]);
-      window.setTimeout(() => {
-        setItems((cur) => cur.filter((x) => x.id !== e.id));
-      }, AUTO_DISMISS_MS);
+      window.setTimeout(() => remove(e.id), AUTO_DISMISS_MS);
     });
-  }, []);
+  }, [remove]);
 
-  const dismiss = (id: number) => setItems((cur) => cur.filter((x) => x.id !== id));
+  const dismiss = (id: number) => remove(id);
 
   // `t()` returns the key itself when a translation is missing, which is how
   // the fallbacks below detect an absent key.
@@ -56,6 +77,12 @@ const Toaster = () => {
   const message = (e: ToastEvent): string => {
     if (e.text) return e.text; // raw-text toast (former alert())
 
+    // A warning always carries its own text — `notify.warning(text)` is the
+    // only way to raise one, and the cause is too specific for a stable key
+    // ("seat №6 is no longer free"). This is the belt-and-braces branch for a
+    // text-less one, which the API does not allow but the type does.
+    if (e.kind === "warning") return t("toast.generic.error");
+
     if (e.kind === "error") {
       return resolve(`toast.fail.${e.action}`) ?? t("toast.generic.error");
     }
@@ -74,12 +101,12 @@ const Toaster = () => {
       {items.map((e) => (
         <div
           key={e.id}
-          className={`cp-toast cp-toast-${e.kind}`}
-          role="status"
+          className={`cp-toast cp-toast-${e.kind}${leaving.includes(e.id) ? " cp-toast-leaving" : ""}`}
+          role={e.kind === "success" ? "status" : "alert"}
           onClick={() => dismiss(e.id)}
         >
           <span className="cp-toast-icon" aria-hidden>
-            {e.kind === "success" ? "✓" : "✕"}
+            {e.kind === "success" ? "✓" : e.kind === "warning" ? "!" : "✕"}
           </span>
           <span className="cp-toast-msg">{message(e)}</span>
         </div>

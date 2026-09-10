@@ -62,7 +62,20 @@ export interface MoneyDisplay {
    * target=AMD; ignored otherwise. Optional for back-compat with
    * call sites that don't have the lang in scope.
    */
-  format(amountInBase: number, target: Currency, lang?: Lang): string;
+  format(amountInBase: number, target: Currency, lang?: Lang, options?: MoneyFormatOptions): string;
+}
+
+/**
+ * How much of a fraction to show.
+ *
+ * Money is written in whole units everywhere it is a PRICE — a tariff, a
+ * receipt, a day's revenue — and that is the default here and stays the
+ * default. A running total is the one place where it is wrong: a session at
+ * twelve per hour earns two hundredths of a unit in its first minute, and a
+ * counter that reads "0" while the clock moves looks broken.
+ */
+export interface MoneyFormatOptions {
+  maximumFractionDigits?: number;
 }
 
 export class StaticRateMoneyDisplay implements MoneyDisplay {
@@ -77,7 +90,7 @@ export class StaticRateMoneyDisplay implements MoneyDisplay {
     const rTo = this.rates[to] ?? 1;
     return (amount / rFrom) * rTo;
   }
-  format(amountInBase: number, target: Currency, lang: Lang = "am"): string {
+  format(amountInBase: number, target: Currency, lang: Lang = "am", options?: MoneyFormatOptions): string {
     const value = this.convert(amountInBase, target);
     if (target === "AMD") {
       // Hand-format AMD to skip the ISO-code spell-out and pick the
@@ -85,19 +98,34 @@ export class StaticRateMoneyDisplay implements MoneyDisplay {
       // via toLocaleString so a Russian UI reads "1 500 драм" while
       // an English one reads "1,500 dram".
       const number = value.toLocaleString(CURRENCY_LOCALE[target], {
-        maximumFractionDigits: 0,
+        maximumFractionDigits: options?.maximumFractionDigits ?? 0,
       });
       return `${number} ${AMD_UNIT[lang]}`;
     }
     return new Intl.NumberFormat(CURRENCY_LOCALE[target], {
       style: "currency",
       currency: target,
-      maximumFractionDigits: 2,
+      maximumFractionDigits: options?.maximumFractionDigits ?? 2,
     }).format(value);
   }
 }
 
 export const moneyDisplay = new StaticRateMoneyDisplay();
+
+/**
+ * Formatting options for an amount that was CALCULATED rather than set.
+ *
+ * A price somebody typed is a whole number and reads best as one. A time cost
+ * is arithmetic — a rate times a duration — and at twelve an hour a short
+ * session comes to a third of a unit. Rounded to whole units that is "0", which
+ * an operator reads as "the system did not charge anything", and it is the
+ * difference between a total and no total at all.
+ *
+ * So: show the fraction only while the amount would otherwise disappear, and
+ * whole units as soon as there is something to round.
+ */
+export const preciseWhenSmall = (amount: number): MoneyFormatOptions | undefined =>
+  Math.abs(amount) > 0 && Math.abs(amount) < 100 ? { maximumFractionDigits: 2 } : undefined;
 
 /**
  * Format an amount that is ALREADY denominated in `currency` — no base

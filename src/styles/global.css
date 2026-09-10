@@ -1773,14 +1773,52 @@ button.pill:hover {
   background: rgba(255, 255, 255, 0.18);
   font-size: 13px;
 }
+/* Amber, not red: the action did not fail, the world moved under it. */
+.cp-toast-warning {
+  background: linear-gradient(135deg, rgba(146, 92, 6, 0.96), rgba(196, 128, 14, 0.96));
+  border: 1px solid rgba(245, 158, 11, 0.6);
+  box-shadow:
+    0 16px 40px rgba(0, 0, 0, 0.45),
+    0 0 24px rgba(245, 158, 11, 0.22);
+}
+/* ⚠️ Leaving is animated, and the height collapses with it. A toast used to be
+   removed on the frame its timer fired, so with several on screen the ones
+   below jumped up to fill the gap while the operator was still reading them. */
+.cp-toast-leaving {
+  animation: cp-toast-out 220ms cubic-bezier(0.4, 0, 1, 1) both;
+}
 @keyframes cp-toast-in {
   from {
     opacity: 0;
-    transform: translateX(60px);
+    transform: translateX(60px) scale(0.98);
   }
   to {
     opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+@keyframes cp-toast-out {
+  from {
+    opacity: 1;
     transform: translateX(0);
+    max-height: 200px;
+    margin-bottom: 0;
+  }
+  to {
+    opacity: 0;
+    transform: translateX(40px);
+    max-height: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+    margin-bottom: -10px; /* cancels the flex gap as the card collapses */
+  }
+}
+/* An operator who has asked for less motion gets none of it — the toast still
+   appears and still leaves, just without the slide. */
+@media (prefers-reduced-motion: reduce) {
+  .cp-toast,
+  .cp-toast-leaving {
+    animation-duration: 1ms;
   }
 }
 
@@ -2026,6 +2064,76 @@ button.pill:hover {
   border-color: var(--color-primary);
 }
 .cp-checkbox-label {
+  font-size: 14px;
+  color: var(--color-text);
+}
+
+/* Radio — the checkbox's sibling, same sizes and states so a form mixing the
+   two lines up on the same baseline and nothing shifts as options are chosen. */
+.cp-radio {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+  line-height: 1.2;
+}
+.cp-radio[data-disabled] {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+/* Real input stays for a11y/keyboard/focus but is visually hidden — arrow-key
+   navigation between a group's options is the platform's and worth keeping. */
+.cp-radio-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+.cp-radio-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  border: 1px solid var(--color-border);
+  border-radius: 50%;
+  background: var(--color-surface-2, #0b1424);
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+/* The dot is always in the DOM and only scales, so choosing an option cannot
+   reflow the row it sits in. */
+.cp-radio-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  opacity: 0;
+  transform: scale(0.4);
+  transition: opacity 120ms ease, transform 120ms ease;
+}
+.cp-radio[data-checked] .cp-radio-mark {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(7, 221, 241, 0.16);
+}
+.cp-radio[data-checked] .cp-radio-dot {
+  opacity: 1;
+  transform: scale(1);
+}
+.cp-radio-input:focus-visible + .cp-radio-mark {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(7, 221, 241, 0.30);
+}
+.cp-radio:hover:not([data-disabled]) .cp-radio-mark {
+  border-color: var(--color-primary);
+}
+.cp-radio-label {
   font-size: 14px;
   color: var(--color-text);
 }
@@ -3451,3 +3559,187 @@ button.login-flip-back:hover {
 }
 .nav-support-card__title { font-size: 13px; font-weight: 700; }
 .nav-support-card__hint { font-size: 11px; color: var(--color-muted); }
+
+/* ── PlayStation discovery ───────────────────────────────────────────────
+   A found console: a state dot, then a column that takes the slack. The name
+   and the host id both clip to one line — a console's name is whatever
+   somebody typed into it, and a long one must not widen the dialog. */
+.ps5-dialog { width: 620px; max-width: 94vw; gap: 14px; }
+/* The found consoles scroll; the dialog's header and footer do not. A venue
+   with a dozen consoles must not push the Close button off the screen. */
+.ps5-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: min(56vh, 420px);
+  overflow-y: auto;
+  /* Room for the scrollbar so the rows do not shift when it appears. */
+  padding-right: 4px;
+}
+/* One console: identity, details, then the control. Stacked rather than in a
+   row — a console named by its owner and a place named by its owner both want
+   the same horizontal space, and side by side neither of them gets it. */
+.ps5-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid #1f2a44;
+  border-radius: 10px;
+  /* Without this a grid/flex child refuses to shrink below its content, which
+     is how one long console name widens the whole dialog. */
+  min-width: 0;
+}
+.ps5-row__head { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.ps5-row__dot { flex: 0 0 9px; width: 9px; height: 9px; border-radius: 50%; }
+.ps5-row__name {
+  font-size: 13px;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  /* The name is the only part allowed to shrink; the state label beside it is
+     two words and must stay readable. */
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.ps5-row__state { flex: 0 0 auto; font-size: 12px; }
+.ps5-row__meta { font-size: 11px; overflow-wrap: anywhere; }
+.ps5-row__note { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 12px; }
+.ps5-row__error { color: #ef4444; font-size: 12px; }
+.ps5-row .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+/* Choose a place, then attach. Wraps rather than overflowing on a narrow
+   window — the dialog is 94vw on a small screen and this row is the widest
+   thing in it. */
+.ps5-attach { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.ps5-bound {
+  flex: 1 1 160px;
+  min-width: 0;
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* A native <select>, dressed. The popup is drawn by the OS, so it is never
+   clipped by the dialog's scroll container and it scrolls and keyboard-
+   navigates the way Windows and Linux each already do. Only the closed control
+   is ours. */
+.ps5-select { position: relative; flex: 1 1 200px; min-width: 0; }
+.ps5-select select {
+  width: 100%;
+  /* Room on the right for our own chevron. */
+  padding: 8px 30px 8px 10px;
+  background: #0e1626;
+  color: var(--color-text, #e6ecf7);
+  border: 1px solid #1f2a44;
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 1.3;
+  /* A long place name must ellipsis inside the control, never widen it. */
+  text-overflow: ellipsis;
+  appearance: none;
+  cursor: pointer;
+}
+.ps5-select select:focus-visible { outline: 2px solid #3ddc97; outline-offset: 1px; }
+.ps5-select select:disabled { opacity: 0.6; cursor: default; }
+.ps5-select__chevron {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  font-size: 11px;
+  color: var(--color-muted, #8794ae);
+}
+/* The OS draws the option list, and on Windows it inherits the page's colours
+   — without this the popup is black text on a black panel. */
+.ps5-select select option { background: #0e1626; color: #e6ecf7; }
+
+/* The console-state chip on a sessions-board tile.
+   Its own line, aligned left, and it never grows the card: the narrowest tile
+   in the grid is 160px, so the label ellipses rather than widening the row. */
+.ps5-chip {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  gap: 5px;
+  max-width: 100%;
+  min-width: 0;
+  padding: 1px 7px;
+  border: 1px solid #1f2a44;
+  border-radius: 999px;
+  font-size: 10px;
+  line-height: 16px;
+  color: var(--color-muted);
+}
+.ps5-chip__dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+.ps5-chip__text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  /* The tile's `.platform` rule uppercases its line; this one is a sentence
+     the operator reads, so it keeps the casing the translation gives it. */
+  text-transform: none;
+}
+
+/* The owner's question about a console that switched itself on. Narrow on
+   purpose: it is one sentence, two buttons and a countdown, and it appears
+   without being asked for — a wide panel would read as an alarm. */
+.ps5-wake-dialog { width: 420px; max-width: 92vw; gap: 12px; }
+.ps5-wake-dialog__title { margin: 0; font-size: 18px; }
+/* The venue the question came from, above the place and quieter than it: it is
+   context for owners with several branches, not the subject of the question. */
+.ps5-wake-dialog__branch {
+  font-size: 13px;
+  color: var(--color-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ps5-wake-dialog__place {
+  font-size: 15px;
+  font-weight: 700;
+  /* A place an owner named themselves can be long; it must not widen the card. */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ps5-wake-dialog__countdown {
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+  color: var(--color-muted);
+}
+
+/* A screen header that carries actions beside its intro text.
+   Scoped to the headers that opt in — `row-between` itself is used all over the
+   app and is not the place to change how anything wraps.
+
+   The rules are all about who gives way when the window narrows: the paragraph
+   shrinks, the buttons never do, and if there is genuinely no room the whole
+   group drops onto its own line rather than squeezing two labels into three
+   lines each. */
+.screen-actions {
+  flex-wrap: wrap;
+  row-gap: 10px;
+}
+.screen-actions > .muted {
+  /* The only flexible thing in the row, and it may shrink below its content —
+     without min-width:0 a flex child refuses to, and pushes the buttons out. */
+  flex: 1 1 320px;
+  min-width: 0;
+}
+.screen-actions__buttons {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+  flex: 0 0 auto;
+  /* Pushed to the right edge on its own line once the row has wrapped. */
+  margin-left: auto;
+}
+.screen-actions__buttons .btn {
+  /* A label on one line is what makes the two buttons the same height. */
+  white-space: nowrap;
+}

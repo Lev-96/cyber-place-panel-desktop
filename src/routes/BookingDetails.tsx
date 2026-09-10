@@ -45,11 +45,11 @@ const BookingDetails = () => {
             v={<span className={`pill ${data.status}`}>{statusLabel}</span>}
           />
           <Row k={t("bookingDetails.code")} v={String(data.code)} />
-          <Row k={t("bookingDetails.company")} v={data.company?.name ?? "—"} />
-          <Row k={t("bookingDetails.branch")} v={data.branch?.address ?? "—"} />
+          <Row k={t("bookingDetails.company")} v={data.company?.name ?? "-"} />
+          <Row k={t("bookingDetails.branch")} v={data.branch?.address ?? "-"} />
           <Row
             k={t("bookingDetails.game")}
-            v={`${data.game?.name ?? "—"} ${data.game?.platform ? `(${data.game.platform})` : ""}`}
+            v={`${data.game?.name ?? "-"} ${data.game?.platform ? `(${data.game.platform})` : ""}`}
           />
           <Row k={t("bookingDetails.start")} v={start} />
           <Row

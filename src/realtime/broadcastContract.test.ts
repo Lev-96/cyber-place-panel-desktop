@@ -50,6 +50,9 @@ const CONTRACT_EVENTS = [
   ".branch.visibility.changed",
   ".notification.created",
   ".place.availability.changed",
+  // A running session changed its terms — a joystick in or out, time granted,
+  // the ceiling lifted, the bill waived. Private, on the venue's staff feed.
+  ".session.changed",
   ".support.message.created",
   ".tournament.joined",
 ] as const;
@@ -233,24 +236,32 @@ describe("realtime channel names", () => {
 
 describe("contract documentation", () => {
   it("lists the same number of events the backend pins", () => {
-    // Guards against someone adding a binding here and forgetting the
-    // backend, or vice versa. Ten bound here plus one published for the phones
-    // only, verified 2026-08-30: `.branch.visibility.changed` joined with the
-    // player-facing half of a block, `.branch.platforms.changed` with the
-    // booking screen's live platform tabs, and `.support.message.created` with
-    // the in-app support desk.
-    expect(CONTRACT_EVENTS).toHaveLength(10);
+    // Guards against someone adding a binding here and forgetting the backend,
+    // or vice versa. The identity below has to add up to the backend's total,
+    // and every term is a real category rather than a fudge:
+    //
+    //   11  bound here as a double-quoted literal, which is what the scan
+    //       above can see. `.session.changed` joined on 2026-09-03 with a live
+    //       session's terms — a joystick in or out, time granted, the ceiling
+    //       lifted, the bill waived.
+    //    1  published for the phones only (`.branch.platforms.changed`).
+    //    1  BookingChangedPublic, which shares the `.booking.changed` alias
+    //       with its private twin, so it is one more backend event and not one
+    //       more binding.
+    //    2  the console pair (`.ps5.unexpected-wake`, `.ps5.wake-decided`).
+    //       Bound in usePs5Realtime.ts through a VARIABLE event name, so the
+    //       source scan cannot see them and they are counted by hand. Worth
+    //       knowing: a rename there is the one drift this file would miss.
+    expect(CONTRACT_EVENTS).toHaveLength(11);
     expect(PUBLISHED_BUT_NOT_BOUND_HERE).toHaveLength(1);
-    // The backend pins 12 in tests/Unit/Events/BroadcastContractTest.php:
-    // the ten below, the mobile-only one above, and BookingChangedPublic,
-    // which shares the `.booking.changed` alias with its private twin.
-    expect(CONTRACT_EVENTS.length + PUBLISHED_BUT_NOT_BOUND_HERE.length + 1).toBe(12);
-    // 3 public / 5 private since 2026-08-28: the two update feeds plus the
+    expect(CONTRACT_EVENTS.length + PUBLISHED_BUT_NOT_BOUND_HERE.length + 1 + 2).toBe(15);
+    // 3 public / 6 private since 2026-08-28: the two update feeds plus the
     // catalogue feed this panel joined for block state. The staff feeds moved
     // to private on 2026-08-18 — during that migration the backend still ALSO
     // broadcasts them publicly, so an un-updated panel keeps working; when the
     // public pair is dropped nothing here changes, this side already reads the
-    // private one.
+    // private one. `.session.changed` needed no new channel: it rides the
+    // private `branch.{id}` feed the panel already holds.
     expect(CONTRACT_CHANNELS.public).toHaveLength(3);
     expect(CONTRACT_CHANNELS.private).toHaveLength(6);
   });

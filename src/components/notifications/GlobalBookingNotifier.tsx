@@ -80,7 +80,7 @@ const placesLabel = (numbers: number[] | undefined, ids: number[]): string => {
   // Prefer human-readable place numbers from the backend; fall back to
   // place ids when an older backend hasn't shipped the enrichment yet.
   const list = numbers && numbers.length > 0 ? numbers : ids;
-  return list.length > 0 ? list.join(", ") : "—";
+  return list.length > 0 ? list.join(", ") : "-";
 };
 
 /**
@@ -409,7 +409,7 @@ const GlobalBookingNotifier = () => {
         {title} №{toast.code ?? toast.bookingId}
       </div>
       <div className="muted" style={{ fontSize: 13 }}>
-        {placeLabel}: {toast.placeIds.join(", ") || "—"}
+        {placeLabel}: {toast.placeIds.join(", ") || "-"}
         {isExtended && toast.rescheduledMinutes > 0 && (
           <>
             {" · +"}

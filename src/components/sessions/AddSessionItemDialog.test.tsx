@@ -52,6 +52,17 @@ vi.mock("@/i18n/LanguageContext", () => ({
     lang: "en",
   }),
 }));
+/**
+ * Who is looking at the dialog.
+ *
+ * Everything below except the two role tests is written from an owner's seat,
+ * which is what it was before the role gate existed — so the existing
+ * assertions still describe the same screen.
+ */
+const auth = vi.hoisted(() => ({ role: "company_owner" as string }));
+vi.mock("@/auth/AuthContext", () => ({
+  useAuth: () => ({ user: { id: 1, role: auth.role } }),
+}));
 const toasts = vi.hoisted(() => ({ message: vi.fn() }));
 vi.mock("@/ui/notify", () => ({ notify: { message: (...a: unknown[]) => toasts.message(...a) } }));
 
@@ -91,6 +102,7 @@ const confirmButton = () =>
 
 afterEach(() => cleanup());
 beforeEach(() => {
+  auth.role = "company_owner";
   repo.addItems.mockReset();
   repo.addItems.mockResolvedValue({ ...session, items: [] });
   repo.listProducts.mockReset();
@@ -234,6 +246,28 @@ describe("creating a product from the basket", () => {
     await act(async () => { fireEvent.click(confirmButton()!); });
 
     expect(repo.addItems).toHaveBeenCalledWith(42, [{ product_id: 77, qty: 1 }]);
+  });
+
+  test("a manager is not offered the catalogue form at all", async () => {
+    // The backend has always refused a manager here (`products.manage` → 403).
+    // The button was drawn anyway, so the one role standing at the counter
+    // pressed it mid-sale and got a permission error. They sell from the list.
+    auth.role = "manager";
+    repo.listProducts.mockResolvedValue(products);
+    await mount();
+
+    expect(screen.queryByText("session.createProduct")).toBeNull();
+    expect(screen.queryByText("session.createProductHint")).toBeNull();
+    // The catalogue itself is untouched: selling is exactly what they may do.
+    expect(plusFor("Lays")).toBeTruthy();
+  });
+
+  test("an owner still gets it", async () => {
+    auth.role = "company_owner";
+    repo.listProducts.mockResolvedValue(products);
+    await mount();
+
+    expect(screen.getByText("session.createProduct")).toBeTruthy();
   });
 });
 

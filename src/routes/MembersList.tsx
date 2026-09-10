@@ -43,7 +43,7 @@ const MembersList = () => {
             <Link key={m.id} to={`/branches/${id}/members/${m.id}`} className="list-item">
               <div>
                 <div className="name">{m.name}</div>
-                <div className="meta">{m.phone ?? "—"} · {m.email ?? "—"} {m.card_code && <>· {t("members.cardLabel")} {m.card_code}</>}</div>
+                <div className="meta">{m.phone ?? "-"} · {m.email ?? "-"} {m.card_code && <>· {t("members.cardLabel")} {m.card_code}</>}</div>
               </div>
               <div style={{ fontWeight: 700, color: "#07ddf1" }}>{money(Number(m.balance))}</div>
             </Link>

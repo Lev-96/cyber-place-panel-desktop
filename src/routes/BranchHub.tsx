@@ -242,7 +242,7 @@ const Tile = ({ to, title, hint, disabled, disabledHint, dragHint, dragging, dro
     draggable={false}
     aria-disabled={disabled || undefined}
     title={disabled ? disabledHint : undefined}
-    aria-label={disabled ? `${title} — ${disabledHint}` : undefined}
+    aria-label={disabled ? `${title}: ${disabledHint}` : undefined}
     tabIndex={disabled ? -1 : undefined}
     onClick={disabled ? (e) => e.preventDefault() : undefined}
     onDragOver={onDragOver}

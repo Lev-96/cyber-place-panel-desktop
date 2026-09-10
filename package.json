@@ -25,6 +25,7 @@
     "dist:win": "npm run build && electron-builder --win",
     "dist:win:staging": "npm run build:staging && electron-builder --win --config electron-builder.staging.json",
     "typecheck": "tsc -p tsconfig.app.json --noEmit && tsc -p electron/tsconfig.json --noEmit",
+    "test:electron": "xvfb-run -a playwright test --config=playwright.electron.config.ts",
     "test": "vitest run",
     "test:watch": "vitest"
   },
@@ -37,6 +38,7 @@
     "laravel-echo": "^2.3.4",
     "leaflet": "^1.9.4",
     "libphonenumber-js": "^1.13.7",
+    "playactor": "^0.4.1",
     "pusher-js": "^8.5.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",

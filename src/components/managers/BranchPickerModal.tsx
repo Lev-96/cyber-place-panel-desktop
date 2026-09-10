@@ -73,7 +73,7 @@ const BranchPickerModal = ({ onClose, onPicked }: Props) => {
                 >
                   <div>
                     <div className="name">{b.address}</div>
-                    <div className="meta">{b.city ?? "—"} · №{b.id}</div>
+                    <div className="meta">{b.city ?? "-"} · №{b.id}</div>
                   </div>
                 </button>
               ))}

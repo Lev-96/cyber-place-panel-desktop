@@ -46,9 +46,9 @@ const MemberCard = () => {
         </div>
       </div>
       <div className="card col" style={{ gap: 6 }}>
-        <Row k={t("label.phone")} v={member.phone ?? "—"} />
-        <Row k={t("label.email")} v={member.email ?? "—"} />
-        <Row k={t("label.cardCode")} v={member.card_code ?? "—"} />
+        <Row k={t("label.phone")} v={member.phone ?? "-"} />
+        <Row k={t("label.email")} v={member.email ?? "-"} />
+        <Row k={t("label.cardCode")} v={member.card_code ?? "-"} />
         <Row k={t("members.balance")} v={money(Number(member.balance))} highlight />
       </div>
       <div className="card col" style={{ gap: 4 }}>

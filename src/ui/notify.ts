@@ -9,7 +9,16 @@
  * `entity` + `action` descriptor — never a hard-coded string.
  */
 
-export type ToastKind = "success" | "error";
+/**
+ * ⚠️ Three kinds, and "warning" is not a shade of "error".
+ *
+ * An error says the action failed. A warning says it did not happen because
+ * the world moved: the seat a cashier picked was taken by a phone while the
+ * modal was open. Painting that red tells them something is broken and sends
+ * them looking for a fault; amber tells them to pick again, which is the
+ * whole of what they have to do.
+ */
+export type ToastKind = "success" | "error" | "warning";
 
 export interface ToastEvent {
   id: number;
@@ -40,6 +49,12 @@ export const notify = {
     dispatch({ id: ++seq, kind: "success", entity, action }),
   error: (entity: string, action: string): void =>
     dispatch({ id: ++seq, kind: "error", entity, action }),
+  /**
+   * Something the operator has to act on, but nothing failed. Raw text,
+   * because the cause is specific ("seat №6 is no longer free") and a stable
+   * entity/action pair cannot carry it.
+   */
+  warning: (text: string): void => dispatch({ id: ++seq, kind: "warning", text }),
   /** Raw-text toast — used to replace native alert() calls. */
   message: (kind: ToastKind, text: string): void =>
     dispatch({ id: ++seq, kind, text }),

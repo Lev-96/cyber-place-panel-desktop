@@ -36,6 +36,9 @@ vi.mock("@/repositories/SessionRepository", () => ({
   },
 }));
 vi.mock("@/realtime/usePlaceAvailability", () => ({ usePlaceAvailability: () => {} }));
+// Same reason as the line above: the board subscribes, and a real Echo client
+// in jsdom reaches for `window.Pusher`.
+vi.mock("@/realtime/useSessionChanged", () => ({ useSessionChanged: () => {} }));
 vi.mock("@/hooks/useReservedPlaceIds", () => ({ useReservedPlaceIds: () => new Set<number>() }));
 vi.mock("@/auth/AuthContext", () => ({ useAuth: () => ({ user: { id: 1, role: "manager" } }) }));
 vi.mock("@/i18n/LanguageContext", () => ({
@@ -101,7 +104,7 @@ describe("SessionsBoard — what a tile says the seat is", () => {
     expect(typeLine()?.textContent).toContain("standard");
   });
 
-  test("the name has its own line and its full text on hover", async () => {
+  test("the number leads and the name follows it", async () => {
     const long = "Плейстейшен 5 ВИП большое место";
     repo.listPcs.mockResolvedValue([
       pc({ place: { id: 10, number: 4, name: long, type: "vip", platform: "ps5" } }),
@@ -109,12 +112,38 @@ describe("SessionsBoard — what a tile says the seat is", () => {
     await mount();
 
     const name = nameLine();
-    expect(name?.textContent).toBe(long);
+    // ⚠️ A named seat used to show its name and NO number, while the player
+    // holding the booking for it was looking at «4» on their phone. The
+    // number is the shared identity, so it goes first — and because the line
+    // is one row with an ellipsis, first is also the half that survives a
+    // narrow tile.
+    expect(name?.textContent).toBe(`№4 · ${long}`);
     // Clipped visually, never clipped in the tooltip.
-    expect(name?.getAttribute("title")).toBe(long);
+    expect(name?.getAttribute("title")).toBe(`№4 · ${long}`);
     // And it is NOT inside the platform line — sharing that row is what broke
     // the card in the first place.
     expect(typeLine()?.textContent).not.toContain(long);
+  });
+
+  test("the number a tile shows is the one the phone shows", async () => {
+    // `placesSelect` renders `place.number ?? place.id`. Anything else here —
+    // the device label, a position in the array — makes a cashier and a player
+    // describe the same seat differently.
+    repo.listPcs.mockResolvedValue([
+      pc({ place: { id: 77, number: 6, name: null, type: "standard", platform: "ps5" } }),
+    ]);
+    await mount();
+
+    expect(nameLine()?.textContent).toBe("№6");
+  });
+
+  test("a place with no number of its own falls back to its id, as the phone does", async () => {
+    repo.listPcs.mockResolvedValue([
+      pc({ place: { id: 77, number: null, name: null, type: "standard", platform: "ps5" } }),
+    ]);
+    await mount();
+
+    expect(nameLine()?.textContent).toBe("№77");
   });
 
   test("a place with no name falls back to its number", async () => {
@@ -133,7 +162,52 @@ describe("SessionsBoard — what a tile says the seat is", () => {
     // The platform line is emitted empty rather than dropped, so this tile has
     // the same number of lines as every other one in the grid.
     expect(typeLine()).not.toBeNull();
-    expect(nameLine()?.textContent).toBe("№Legacy device");
+    // ⚠️ No «№» in front of a device label. With no place there is no seat
+    // number to show, and the old fallback printed "№Legacy device" — a hash
+    // sign in front of a word, which reads as a number nobody can find on the
+    // grid or on a phone.
+    expect(nameLine()?.textContent).toBe("Legacy device");
+  });
+
+  /**
+   * The pad count on the tile.
+   *
+   * A cashier's question at the board is "can another player join this seat?",
+   * and one glyph per pad never answered it — it showed how many were in play
+   * and said nothing about the ceiling. The fraction does, and it is the same
+   * fraction the options dialog shows, so the two screens cannot disagree.
+   *
+   * The number itself is the SERVER's. Nothing on this tile derives it: two
+   * cashiers deriving it separately is how one board reads three and the other
+   * four over the same seat.
+   */
+  test("a PlayStation session says how many pads it has out of the maximum", async () => {
+    repo.listPcs.mockResolvedValue([pc({ current_session_id: 5 })]);
+    repo.listActive.mockResolvedValue([
+      {
+        id: 5, branch_id: 7, pc_id: 1, pc_label: "Seat 1",
+        started_at: "2026-09-03T14:00:00.000Z", ends_at: "2026-09-03T15:00:00.000Z",
+        status: "active", total_paid: 0, mode: "fixed", joystick_count: 3,
+      },
+    ]);
+    await mount();
+
+    expect(screen.getByText("3 / 4")).toBeTruthy();
+  });
+
+  /** One pad is every session's floor, so saying "1 / 4" on a PC is noise. */
+  test("a session with only its own pad says nothing about pads", async () => {
+    repo.listPcs.mockResolvedValue([pc({ current_session_id: 6 })]);
+    repo.listActive.mockResolvedValue([
+      {
+        id: 6, branch_id: 7, pc_id: 1, pc_label: "Seat 1",
+        started_at: "2026-09-03T14:00:00.000Z", ends_at: "2026-09-03T15:00:00.000Z",
+        status: "active", total_paid: 0, mode: "fixed", joystick_count: 1,
+      },
+    ]);
+    await mount();
+
+    expect(screen.queryByText("1 / 4")).toBeNull();
   });
 
   test("the status line no longer repeats the platform", async () => {

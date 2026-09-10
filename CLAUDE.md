@@ -98,15 +98,55 @@ branch — so the two yml files never conflict:
 - `nodeIntegration: false`
 - `sandbox: true`
 - Preload (`electron/preload.ts`) exposes exactly the contracted APIs via
-  `contextBridge`: `desktopAPI` (kv-store + Wake-on-LAN) and
-  `cyberplaceUpdates`.
-- 7 `ipcMain.handle` channels total: `kv:get|set|remove`, `wol:send`,
-  `updates:check|install|getState`.
+  `contextBridge`: `desktopAPI` (kv-store + Wake-on-LAN), `cyberplaceUpdates`
+  and `cyberplacePS5` (PlayStation discovery + status). Each is its own global
+  so a screen can feature-detect it: the renderer can be newer than the preload
+  it loads into, and a missing bridge must produce a sentence, not a throw.
+- 13 `ipcMain.handle` channels total: `kv:get|set|remove`, `wol:send`,
+  `updates:check|install|getState`, `ps5:discover|probe|wake|rest|capabilities`,
+  `ps5:credential:set|has|forget`.
+- **The console wake key never crosses to the renderer.** It is encrypted by the
+  OS keystore (`electron/ps5/credentials.ts`, `safeStorage`), and the bridge can
+  be asked *whether* a console has one, never what it is. If the OS offers no
+  keystore, storing is refused rather than falling back to readable text.
+- **The consoles are talked to from HERE, not from the server.** The backend is
+  in a datacentre and shares no broadcast domain with any club; this process
+  runs on a machine in the room. `electron/ps5/` is read-only by construction —
+  it can find a console and report what it said, and it cannot wake or rest one.
+  `ps5:discover` sweeps the network and belongs behind a button; `ps5:probe`
+  asks named addresses and is what the ten-second status check on the sessions
+  board uses (`src/ps5/useConsoleWatch.ts`). A broadcast every ten seconds would
+  put a packet in front of every device in the venue all shift.
+- **`electron/ps5/transport.ts` is the seam.** It declares what a transport can
+  do, and today's answers `rest: false` — the local protocol has no rest
+  command; that needs a Remote Play session (TCP 9295, a key exchange). The
+  refusal is a value (`UNSUPPORTED_BY_TRANSPORT`) that reaches the screen. It is
+  never a success nothing earned, and swapping in a rest-capable transport
+  changes no logic above it.
+
+### The console lifecycle (`src/ps5/`)
+`machine.ts` is a pure function of (previous state, observation) → (next state,
+commands): UNKNOWN / OFFLINE / REST / WAKING / ACTIVE / GOING_TO_REST /
+UNEXPECTED_WAKE / ERROR, with `desired` kept apart from `actual`. Everything
+racy about this feature is a question about that function, and is asked of it
+directly in `machine.test.ts` with no console anywhere.
+
+**STARTING and STOPPING are NOT session statuses.** `gaming_sessions.status` is
+`active | stopped | expired` and feeds billing, revenue and every client; a
+session that is "starting" is this panel's own intent for the seconds between
+Start being pressed and the console answering. It lives in
+`useConsoleControl.ts` — which is what stops the monitor seeing "awake, no
+session yet" and switching the console off under the player, without touching a
+schema three clients read.
+
+State is recomputed from the current observation every tick, never from a timer.
+That is why a stale ten-second countdown cannot fire into a session that started
+meanwhile: there is no timer left to fire.
 - Custom `app://` protocol — no `file://` disclosure.
 
 ### Feature areas (folders under `src/`)
 `bookings · branches · companies · games · live · managers · members · pcs ·
-pos · places · sessions · tournaments · revenue · services · scanner`
+pos · places · ps5 · sessions · tournaments · revenue · services · scanner`
 
 ---
 
@@ -160,7 +200,11 @@ pos · places · sessions · tournaments · revenue · services · scanner`
   Use the `npm run typecheck` script which does both.
 - **Number inputs:** never use raw `<input type="number">` — Electron
   swallows keystrokes. Use the `NumberStepper` primitive (text +
-  `inputMode="decimal"`).
+  `inputMode="decimal"`). Where the field must hold a STRING rather than a
+  number — `SessionOptionsDialog`'s manual grant and unlimited rate, where
+  empty means "not filled in yet" and the validation depends on telling that
+  from zero — use the same mechanism directly (`type="text"` +
+  `inputMode="decimal"`), never `type="number"`.
 - **Confirm dialogs:** never use native `window.confirm()` — it poisons
   renderer focus on Linux WMs. Use the in-app `ConfirmDialog`.
 - **DevTools:** auto-detached DevTools also break renderer focus. Gate
@@ -248,6 +292,7 @@ manager → `branch.{id}`, orphan → null (no subscription).
 | `PlaceAvailabilityChanged` | `place.availability.changed` | branch |
 | `BranchSubscribed` | `branch.subscribed` | branch + company + global |
 | `TournamentJoined` | `tournament.joined` | branch + company + global |
+| `SessionChanged` | `session.changed` | branch (**private**) |
 | `UserNotificationCreated` | `notification.created` | user.{id}.notifications |
 | `StaffAccessChanged` | `access.changed` | user.{id}.access |
 | `BranchVisibilityChanged` | `branch.visibility.changed` | `branches` + branch.{id} |
@@ -344,8 +389,15 @@ loud `[reverb] REJECTED …` line naming the key and host; the backend has
    shared channels (`branch.{id}` / `company.{id}` / `bookings.global`).
    Those channels carry MULTIPLE events; Echo caches the channel object
    without refcounting — `leaveChannel` from one hook kills every sibling
-   subscriber. `leaveChannel` is only safe on hook-owned channels (e.g.
-   `useAppUpdates` on `app-updates`).
+   subscriber. Pass the LISTENER to `stopListening` as well: called with an
+   event name alone it removes every handler on that event, which is the same
+   bug one level down.
+   ⚠️ There is no such thing as a hook-owned channel here, and this rule used
+   to name `useAppUpdates` on `app-updates` as one. It is not: four components
+   mount that hook at once (`App.tsx`, `UpdatesNotificationContext`, and the
+   two update routes), so leaving the channel from the route that unmounted
+   deafened the root subscriptions for the rest of the process. A hook can be
+   mounted more than once — assume it is.
 10. **No HTTP refresh inside a Reverb event handler.** Optimistic-patch
     local state from the payload; periodic polling (30–60 s) handles
     canonical reconciliation.
@@ -359,6 +411,28 @@ loud `[reverb] REJECTED …` line naming the key and host; the backend has
 11. **Polling fallback is mandatory** on every realtime-critical screen
     (`useReservedPlaceIds`, `NotificationsContext` etc.) — 30–60 s. Reverb
     dropouts are silent; polling is the safety net.
+    ⚠️ **Arm the interval ONCE, through a ref.** `useAsync` returns
+    `{ ...state, reload }` — a new object every render — so an effect keyed on
+    it clears and rebuilds the interval on every re-render and the period is
+    never reached. `SessionsBoard`'s 30s poll was written that way and, at any
+    venue with a PS5 bound (`useConsoleWatch` re-renders every 10s), **had
+    never once fired**. Keep the callback in a ref and give the effect `[]`.
+    Pinned by `SessionsBoard.polling.test.tsx`, which advances the clock in
+    separate `act` blocks — inside one long advance React flushes effects only
+    at the end and the bug is invisible.
+12. **Reconnect means re-read.** A WebSocket has no backlog: everything
+    broadcast during a drop is gone, and resuming the subscription does not
+    bring it back. `useRealtimeResync(onReconnect)` is the one implementation —
+    it ignores the FIRST `connected` (which races the screen's mount fetch) and
+    fires on every one after it. Used by `SessionsBoard` and
+    `NotificationsContext`; add it to any screen that patches from a payload.
+    It calls `peekEcho()`, never `getEcho()` — a watcher must not be the thing
+    that opens the socket.
+13. **Guard against stale frames wherever state is patched from a payload.**
+    Reverb does not promise order. `useReservedPlaceIds` keys the last applied
+    `at` per BOOKING id (not per seat — two bookings can touch one seat), and
+    drops anything older. An event with no readable `at` is applied: it cannot
+    be ordered, and losing a change is worse than applying it out of turn.
     `.access.changed` gets a different safety net, not a poll: the backend has
     already revoked the account's tokens, so `src/api/client.ts` raises
     `sessionExpiry` on a 401 that carried a token and `AccessGuard` signs out.
@@ -841,6 +915,9 @@ button is not a permission: a manager who kept the URL could still POST.
 | Товары — создать / изменить / удалить / скрыть | ✅ | ✅ | ❌ |
 | Товары — список + поиск | ✅ | ✅ | ✅ |
 | Сессии, касса, игры, ПК, турниры, подписчики | ✅ | ✅ | ✅ |
+| Джойстики, доп. время, безлимит на живой сессии | ✅ | ✅ | ✅ |
+| Бесплатная сессия (списать счёт) | ✅ | ✅ | ❌ |
+| Цены филиала — матрица, платформы, субплатформы, джойстики, округление | ✅ | ✅ | ❌ |
 
 Two things that look like oversights and are not:
 
@@ -854,6 +931,204 @@ Two things that look like oversights and are not:
 
 Product READS stay open to everyone: the POS sells from that list, and the
 manager's screen is the list plus a search box with no write control on it.
+So do PRICE reads, since 2026-09-03: the sessions board shows what a session
+will cost and the "+ joystick" button has to know a price exists before it
+offers to add one.
+
+**The line inside sessions is not "manager vs owner", it is "spend the prices
+you were given vs set them".** A manager adds a joystick, grants ten minutes
+and lifts a time limit all day — that is running the floor, and every one of
+those spends a rate the company already decided. Waiving a bill (`session.free`)
+is giving the company's takings away, and setting what anything costs is the
+company's. The backend enforces both on `sessions.free` and `prices.manage`;
+this map only decides whether the control is drawn.
+
+## 9.5.5 How far ahead a reservation holds a seat (2026-09-11)
+
+`Booking.isReservingAt(t)` used to ask only whether the booking's END was still
+in the future. That is true of a reservation next Saturday — so ONE booking made
+a week out painted the seat orange today and `canStartSession` refused every
+walk-in on it until the booking played out. **Six days of a seat the venue could
+not sell.**
+
+It now also requires the start to be within `RESERVATION_LEAD_MS` (**2 hours**,
+in `src/domain/Booking.ts`). The number is a judgement, bounded on both sides:
+`Place.test.ts` pins "an upcoming booking reserves the seat" with an hour to go,
+so it cannot be shorter; and an evening reservation must not cost the afternoon,
+so it cannot be much longer. Change it there and every screen that asks "is this
+seat spoken for" changes with it — `useReservedPlaceIds`, `Place.computeStatus`,
+`PlaceAssignmentPolicy`, `RealtimeService`.
+
+`isUpcomingAt(t)` is the other half: free NOW, taken later. Deliberately a
+separate question — collapsing the two is what produced the week-long block.
+
+Pinned from both directions in `Booking.test.ts`; mutation-verified against an
+unbounded rule, a week-long horizon and a five-minute one.
+
+## 9.5.6 "Finish on another seat" (2026-09-11)
+
+When a grant is refused because the seat is reserved ahead, the dialog does two
+things beside showing the sentence: it offers the grant the seat CAN still take
+(`max_minutes`), and it asks `GET /sessions/{id}/extension-options` for seats
+that could take the full one. Pressing one calls
+`POST /sessions/{id}/transfer-extension`.
+
+⚠️ **That list is stale the moment it is drawn.** A phone can reserve one of
+those seats while the modal is open, and the server answers 409. That is a
+correct outcome, not a bug — never disable the button on the strength of the
+list, and never treat the preview as a promise.
+
+The lookup only runs for a seat refusal (`seatUnavailableBodyOf` returned a
+body). Any other failure — session not active, network — must not bury the
+sentence the cashier has to read under a suggestion feature.
+
+The session that comes back is the SAME session: same id, same start, same
+bill, same products and pads. The board patches it in place like any other
+session update.
+
+## 9.6 A live session's terms (2026-09-03)
+
+Four controls a cashier gets on a session that is already running, and one rule
+that governs every one of them.
+
+**A refusal names the alternative (2026-09-11).** When a grant or the unlimited
+switch is refused because the seat is reserved ahead, the 422 carries
+`code`, `latest_allowed_end` and `max_minutes` beside the sentence.
+`api/seatUnavailable.ts` reads it and the dialog offers exactly that grant as a
+button — the cashier used to find the ceiling by halving the number until one
+went through. ⚠️ It is ADVICE: a phone can take the seat between the refusal and
+the press, so the button sends a normal request and being refused again is
+correct. Zero headroom is never offered.
+
+**The backend is the source of truth, literally.** Each action returns the WHOLE
+session and the caller replaces its row with it — `SessionOptionsDialog` and
+`SessionsBoard` both do. Nothing on this side computes a joystick count, an end
+time or a total. A card that did would be right until a second cashier touched
+the same seat, and then quietly wrong on one of the two screens with nothing
+saying so.
+
+| Control | Where | Who |
+|---|---|---|
+| 🎮 set the pad count (select, 1–4) | the seat's tile in `SessionsBoard` | everyone who works the branch |
+| +10 / +30 / +60 minutes | `SessionOptionsDialog` | same |
+| switch to unlimited | same | same |
+| Free (start it waived) | `StartSessionDialog`, behind `session.free` | admin + owner |
+| joystick prices, rounding policy | `BranchPricesPage` | admin + owner |
+
+⚠️ Two rows MOVED out of `SessionOptionsDialog` (2026-09-10). Pads are set on
+the tile, because a cashier looking at the board can already see how many are in
+play and opening Add Time to change them was a detour. Waiving the bill is now a
+decision made when the session STARTS and nowhere else — it is what the whole
+session costs, not an adjustment to make halfway through, and mixing it into the
+add-time dialog put an admin-only control in a dialog everyone uses.
+
+**Free is offered at the START as well as on a running session (2026-09-04),**
+and it is the same capability in both places — the server asserts
+`sessions.free` on `POST /sessions` too, so a manager who sends the flag gets a
+403 and no session. The checkbox sits below the tariff and outside the
+fixed/open branch, because it applies to either and it is a decision about the
+BILL rather than about the tariff. It is deliberately not wired to the "change
+current price" override beside it: free is not a price of zero, and the two
+diverge the moment a drink goes on the bill.
+
+**The tile's figure is the clock PLUS what is on the seat (2026-09-06).**
+`sessionAmount.ts` composes it the way `SessionPricingCalculator` does —
+`sessionTimeCostAt` mirrors `Session::timeCostStringAt` and stays clock-only so
+each half can be checked against its own counterpart, and `sessionAmountAt`
+adds `sessionItemsTotal` on top, with the waiver applied to the composed figure
+(a free seat gives the drinks away with the hour, exactly as the server does).
+Items are READ from `items[]`, never accumulated, so a Reverb refresh cannot
+charge the same drink twice.
+
+Two terms of the server's subtotal are still missing and both make the tile
+read LOW rather than high: extra joysticks — a decision, since the periods do
+travel on the payload and mirroring a second ticking charge is a bigger change
+than the one that was needed — and the branch rounding step, which does not
+travel at all. A seat with pads, or a branch with a rounding step, will differ
+from its receipt. The receipt is right; it comes from the server.
+
+**A fixed tariff is an HOURLY RATE with an auto-stop (settled 2026-09-06).**
+`time_packages` states the rate by stating a price for a duration — 1500 for 60
+minutes is 1500/hour, 1000 for 30 minutes is 2000/hour — and a player who
+leaves at 00:30 owes 750. The tile ticks all the way there.
+
+This REVERSED on 2026-09-06, twice in one day: it was a block owed in full
+from its first second, was re-confirmed as such that morning, and was then
+changed. If you are reading a comment or a commit that says a package is owed
+in full, it predates this. `committed_amount` is no longer a price — it is
+what has been committed to, and only the unlimited branch and the
+deleted-package fallback still bill from it.
+
+**The rate lives in two places and they must move together.**
+`Session::tariffHourlyRate()` and the `tariffHourlyRate` in `sessionAmount.ts`
+are the same two-step ladder: `hourly_rate` when set, else the package's
+`price × 60 / duration_minutes`, else null — and null bills the committed
+figure rather than nothing. `time_package` is on `ISessionApi` for this, and
+the sessions listing eager-loads it.
+
+**Unlimited went pro-rata with it, later the same day.** Removing a session's
+end is a decision about the AUTO-STOP and not about the bill: a session
+switched at 00:15 and stopped at 00:30 owes the same 750 as one nobody
+touched. `unlimited_at` and `committed_until` take no part in the price on
+either side any more — if you see a branch reading them to compute money, it
+is older than this.
+
+**The tile shows `🎮 3 / 4`, not three glyphs.** The repeat said how many pads
+were in play and never what the ceiling was, which is the half a cashier at the
+board actually needs ("can another player join?"). One glyph plus the fraction
+is also narrower than the old worst case, so the card cannot grow. Same
+fraction the options dialog shows.
+
+**Next to it is a `select`, 1 to 4, and the whole row must stay on ONE line.**
+Two 22px steppers meant going from one pad to three was two presses with the
+number catching up in between; a select states the target and the board reads
+back what the SERVER returned. The row is `flex-wrap: nowrap` with the fraction
+`flex-shrink: 0` and the select fixed at 46px, because the tile is 160px and a
+full-width input pushed `1 / 4` onto a second line — where it read as another
+field rather than as the label of the control beside it.
+
+**No native `confirm()` anywhere in here.** The unlimited confirmation used
+`window.confirm`, which poisons the Electron renderer's keyboard focus on Linux
+— the NEXT modal's inputs stop accepting keystrokes, so the action that appears
+broken is not the one that broke it. It goes through `useConfirm()` now, and
+`SessionOptionsDialog.test.tsx` asserts the native call is never made.
+
+**Joysticks are PlayStation-only, and the question is the PLACE's platform.**
+`pc.kind === "ps"` means "no kiosk agent" and is equally true of a ping-pong
+table — `platformGroup(place.platform) === "ps"` is what the dialog asks, the
+same question the backend asks.
+
+**Refusals are shown verbatim.** The server answers a blocked unlimited with
+"this place is booked in the app" and a missing rate with "no price is set for
+joystick #3 — the owner sets it in Branch → Prices". Those are sentences an
+operator can act on; a generic "failed" throws the useful half away.
+
+**The ten-minute warning is a panel-side watcher, on purpose.**
+`SessionEndingNotifier` (mounted once in `Layout`) polls
+`GET /sessions?status=active` every 30s. There is no scheduler and no queue
+worker on the backend deployment, so a server-side cron would be a job that
+never runs — and nothing needs one, because the people who must act on the
+warning are the ones in front of this screen. It is addressed correctly by
+construction: that endpoint applies the caller's branch scope server-side, so an
+owner sees their company and a manager their branch, and there is no client-side
+filtering to get wrong. One warning per session ever (`warned`), so granting
+time does not summon it again ten minutes later for a decision already made.
+The card does not auto-dismiss: a booking toast that fades is a booking still
+findable in a list, and a seat that goes dark under a player is not.
+
+**`useSessionsSummary` excludes a waived session from every money figure.** It
+used to compute `timeTotal` as `total_paid - items`, which for a free session is
+`0 - items` — a giveaway subtracting itself from the day's time revenue. Free
+sessions are still counted, and what was drunk on one is still in `itemsQty`
+and the top-items list, because those describe what left the fridge rather than
+what was earned.
+
+**`session.free` the PERMISSION vs `session.free` the old i18n key.** The key
+already existed and means "this seat is available" on the board. The
+bill-waiver copy is prefixed `session.freeBill*` so the two can never collide —
+they did, and TypeScript caught it as a duplicate object property.
+
+---
 
 ## 10. How work must be done here (MANDATORY — run it in this order)
 
@@ -890,8 +1165,66 @@ method. Do not shortcut it, and do not report completion without it.
 7. **Commit to `staging`**, security and docs separately, stating what was
    verified by running versus only reasoned about.
 
-**Proof ceiling here: high.** 355 vitest tests + 3 Playwright specs + two
-typechecks as of 2026-08-18, so "proven" can be earned. What cannot be:
+### The Playwright suite went dark, and how (2026-09-05)
+
+All 7 specs failed for three unrelated reasons that had accumulated, none of
+which errored — the suite simply stopped testing anything and nobody noticed.
+Repaired in `e2e/` only; no production file was touched.
+
+1. **Two language gates.** `FirstRunLanguageGate` renders an undismissable
+   picker over the login screen on a machine where nobody has chosen a
+   language, and `AccountLanguageGate` asks again once an account signs in. A
+   fresh browser context is that machine, so every spec was clicking at a form
+   behind an inert, blurred backdrop. `installBackendMocks` now seeds
+   `cp.lang` / `cp.lang.chosen` / `u{id}:cp.lang` via `addInitScript` — and
+   seeds them ONLY when absent, because that script re-runs on reload and would
+   otherwise overwrite the choice the "survives a reload" spec had just made.
+2. **`getByRole("button", { name })` is a SUBSTRING match.** The
+   forgot-password panel that shipped later carries "Back to sign in", so the
+   plain locator resolved to two elements and strict mode failed every click.
+   `exact: true`, in every locale.
+3. **The mock was pinned to the production Railway hostname** while the bundle
+   resolves its API base from the environment — which is the STAGING host. No
+   route matched, the mocks silently did nothing, and the specs made real
+   network calls whose failures read as "wrong email or password". Routes are
+   matched by a host-is-not-localhost predicate plus pathname now, so they
+   cannot drift with the environment again.
+
+Plus one race in `permissions.spec`: `page.goto("/#/revenue")` fired straight
+after the Sign in click is a full document load that beat the token into
+storage, so the app came up signed out. It waits for the signed-in state first.
+
+**If you add an undismissable gate, add its seed to `installBackendMocks` in
+the same change.** That is what the first hour of this went on.
+
+### The Electron runtime is testable too (`npm run test:electron`)
+
+`playwright.electron.config.ts` + `e2e-electron/` drive the app in REAL Electron
+under Xvfb, via `_electron.launch()`. Needs `npm run build` first and nothing
+else — an unpackaged main process with no `ELECTRON_DEV_URL` loads
+`app://localhost/index.html` from `dist/web`.
+
+This is the only place three things can be proven at all: the `app://` protocol
+actually serving the bundle, the preload surface (`desktopAPI` /
+`cyberplaceUpdates` present, `require` / `process` absent), and — the reason it
+exists — **that a confirmation is an in-app React dialog and not a native
+`window.confirm()`**. A native one blocks Electron's renderer and leaves the
+NEXT modal's inputs unable to accept keystrokes; Chromium under Playwright just
+auto-dismisses it, so the browser suite cannot see the difference. The spec
+types into a second dialog opened afterwards, which is exactly where the damage
+used to surface. Mutation-verified: restoring `window.confirm` fails it.
+
+⚠️ **Always launch with a throwaway `--user-data-dir`.** Unpackaged Electron
+defaults to the developer's real `userData`, and the first run of this file came
+up in Russian with two real email addresses autofilled — it was reading a
+person's actual profile. Note also that the KV store is a FILE reached through
+the preload bridge, not `localStorage`, so the browser suite's language seeding
+does nothing here; seed `cyberplace.kv.json` in the temp profile instead
+(values are JSON-encoded, as `KeyValueStore.set` writes them).
+
+**Proof ceiling here: high.** 693 vitest tests + 12 Playwright browser specs +
+4 real-Electron specs + two typechecks as of 2026-09-05, so "proven" can be
+earned. What cannot be:
 a human click-through of the changed screens, and anything about a packaged
 build's runtime behaviour. Name those as smoke-tests instead of implying a pass.
 

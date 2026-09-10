@@ -73,7 +73,7 @@ const ProductsList = () => {
             <div key={p.id} className="list-item" style={{ opacity: p.is_active ? 1 : 0.5 }}>
               <div>
                 <div className="name">{tr(p, "name", lang)}</div>
-                <div className="meta">{tr(p, "category", lang) || "—"} · {money(Number(p.price))}</div>
+                <div className="meta">{tr(p, "category", lang) || "-"} · {money(Number(p.price))}</div>
               </div>
               {canEdit && (
                 <div className="row" style={{ gap: 6 }}>

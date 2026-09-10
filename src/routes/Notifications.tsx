@@ -189,7 +189,7 @@ const Notifications = () => {
 const ExpenseReminderCard = ({ e }: { e: IServiceExpense }) => {
   const { t, lang } = useLang();
   const navigate = useNavigate();
-  const headline = `${e.name} — ${dueLabel(e.days_until_due, t)}`;
+  const headline = `${e.name}: ${dueLabel(e.days_until_due, t)}`;
 
   return (
     <button
@@ -264,7 +264,7 @@ const DbNotificationCard = ({ n, onClick, onDelete }: { n: IDbNotification; onCl
   const interpolate = (template: string, vars: Record<string, string>): string =>
     template.replace(/\{(\w+)\}/g, (m, k: string) => vars[k] ?? m);
   const venue = [companyName, branchAddress].filter(Boolean).join(" · ");
-  const placesLabel = placeNumbers.length > 0 ? placeNumbers.join(", ") : "—";
+  const placesLabel = placeNumbers.length > 0 ? placeNumbers.join(", ") : "-";
 
   let headline: string;
   let body: string | null = null;
@@ -301,12 +301,12 @@ const DbNotificationCard = ({ n, onClick, onDelete }: { n: IDbNotification; onCl
     headline = interpolate(t("notifications.bookingCancelledPushTitle"), vars);
     body = interpolate(t("notifications.bookingCancelledPushBody"), vars);
   } else if (isBranchSubscribed) {
-    headline = `🎉 ${t("notifications.branchSubscribedHeadline") || "Congratulations — new subscriber"}`;
+    headline = `🎉 ${t("notifications.branchSubscribedHeadline") || "Congratulations. New subscriber"}`;
     const tail = [companyName, branchAddress].filter(Boolean).join(" · ");
     const verb = t("notifications.branchSubscribedBody") || "subscribed to your branch";
     body = tail ? `${playerLabel} ${verb} ${tail}` : `${playerLabel} ${verb}`;
   } else if (isTournamentJoined) {
-    headline = `🎉 ${t("notifications.tournamentJoinedHeadline") || "Congratulations — new tournament player"}`;
+    headline = `🎉 ${t("notifications.tournamentJoinedHeadline") || "Congratulations. New tournament player"}`;
     const verb = t("notifications.tournamentJoinedBody") || "joined the tournament";
     const venue = [companyName, branchAddress].filter(Boolean).join(" · ");
     // Body composition:
@@ -443,7 +443,7 @@ const ReminderCard = ({ r, isAdmin }: { r: IBillingReminder; isAdmin: boolean })
     : r.is_overdue
       ? t("notifications.youOverdue")
       // commission percent is interpolated; the surrounding sentence is fully translated.
-      : `${days} ${dayWord} — ${t("notifications.youMustPayIn").replace("{pct}", String(r.commission_percent ?? 0))}`;
+      : `${days} ${dayWord}: ${t("notifications.youMustPayIn").replace("{pct}", String(r.commission_percent ?? 0))}`;
 
   return (
     <div className="gradient-card">

@@ -64,8 +64,8 @@ const Managers = () => {
           {(data ?? []).map((m) => (
             <div key={m.id} className="list-item">
               <div>
-                <div className="name">{m.user?.name ?? "—"}</div>
-                <div className="meta">{m.user?.email ?? "—"} {m.branch && <>· {t("managers.branchLabel")} {m.branch.address}</>}</div>
+                <div className="name">{m.user?.name ?? "-"}</div>
+                <div className="meta">{m.user?.email ?? "-"} {m.branch && <>· {t("managers.branchLabel")} {m.branch.address}</>}</div>
               </div>
               <div className="row" style={{ gap: 6 }}>
                 <Button variant="secondary" onClick={() => setEditing(m)} style={btn}>{t("action.edit")}</Button>
@@ -105,7 +105,7 @@ const Managers = () => {
       )}
       <ConfirmDialog
         open={!!pendingRemove}
-        message={`${t("managers.confirmRemove")} — ${pendingRemove?.user?.name ?? ""}?`}
+        message={`${t("managers.confirmRemove")}: ${pendingRemove?.user?.name ?? ""}?`}
         confirmLabel={t("action.remove")}
         cancelLabel={t("action.cancel")}
         destructive

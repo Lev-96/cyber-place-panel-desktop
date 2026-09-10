@@ -26,6 +26,9 @@ vi.mock("@/repositories/SessionRepository", () => ({
 }));
 // Realtime + bookings are orthogonal to device availability here.
 vi.mock("@/realtime/usePlaceAvailability", () => ({ usePlaceAvailability: () => {} }));
+// Same reason as the line above: the board subscribes, and a real Echo client
+// in jsdom reaches for `window.Pusher`.
+vi.mock("@/realtime/useSessionChanged", () => ({ useSessionChanged: () => {} }));
 vi.mock("@/hooks/useReservedPlaceIds", () => ({ useReservedPlaceIds: () => new Set<number>() }));
 vi.mock("@/auth/AuthContext", () => ({ useAuth: () => ({ user: { id: 1, role: "manager" } }) }));
 vi.mock("@/i18n/LanguageContext", () => ({

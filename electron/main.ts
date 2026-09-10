@@ -7,6 +7,11 @@ import { Store } from "./storage";
 import { UpdateService, broadcastUpdateState } from "./updates/UpdateService";
 import { bundledIconPath, ensureLinuxDesktopIntegration } from "./linuxIntegration";
 import { mayNavigateTo, mayOpenExternally, navigationKeyFor } from "./urlPolicy";
+import { discover as discoverPlayStations, probe as probePlayStations } from "./ps5/discovery";
+import { activeTransport, useCredentialVault } from "./ps5/transport";
+import { WakeKeys } from "./ps5/credentials";
+import { wake as wakePlayStation, wakeWithCredential } from "./ps5/wake";
+import { openPsnLoginExternally, pairConsole, psnLoginUrl } from "./ps5/pairing";
 
 // `isDev` follows how the app was BUILT, never the environment it starts in.
 // Previously a packaged panel launched with ELECTRON_DEV_URL set would load
@@ -30,6 +35,9 @@ app.commandLine.appendSwitch("disable-features", "Autofill");
 app.commandLine.appendSwitch("disk-cache-size", String(50 * 1024 * 1024));
 
 let store: Store | null = null;
+// Console wake keys, encrypted by the OS. Loaded once at boot like the kv
+// store; a null here means the app has not finished starting, never "no keys".
+let wakeKeys: WakeKeys | null = null;
 let mainWindow: BrowserWindow | null = null;
 let updateService: UpdateService | null = null;
 
@@ -196,8 +204,47 @@ const createWindow = async () => {
   mainWindow.on("closed", () => { mainWindow = null; });
 };
 
+/**
+ * Point Electron at the secret store this machine actually has.
+ *
+ * On Linux, Electron picks a backend from the desktop environment: KDE means
+ * kwallet, GNOME means libsecret. A KDE session with no kwallet running — which
+ * is an ordinary state, and what one venue's computer turned out to be — leaves
+ * `safeStorage` reporting that nothing is available, even with gnome-keyring
+ * running right beside it. The console wake key then could not be stored at
+ * all, and a session had nothing to wake the console with.
+ *
+ * So: if gnome-keyring is running, say so. Its control socket in the user's
+ * runtime directory is the check, and it is the daemon's own socket rather than
+ * a guess from an environment variable. Where the socket is absent nothing is
+ * overridden and Electron's own choice stands.
+ *
+ * Must run before `whenReady` — the backend cannot be chosen afterwards.
+ */
+const preferAvailableSecretStore = (): void => {
+  if (process.platform !== "linux") return;
+
+  const runtimeDir = process.env.XDG_RUNTIME_DIR;
+  if (!runtimeDir) return;
+
+  try {
+    if (!existsSync(join(runtimeDir, "keyring", "control"))) return;
+  } catch {
+    return;
+  }
+
+  app.commandLine.appendSwitch("password-store", "gnome-libsecret");
+};
+
+preferAvailableSecretStore();
+
 app.whenReady().then(async () => {
   store = new Store(join(app.getPath("userData"), "cyberplace.kv.json"));
+  wakeKeys = new WakeKeys(join(app.getPath("userData"), "cyberplace.ps5-keys.json"));
+  await wakeKeys.load();
+  // The transport can rest a console only once it can reach the pairing
+  // credentials, so it is told about the vault rather than reaching for one.
+  useCredentialVault(wakeKeys);
   await store.load();
 
   // Linux only: register a .desktop file in ~/.local/share/applications/
@@ -238,6 +285,164 @@ app.whenReady().then(async () => {
   ipcMain.handle("kv:remove", (_e: unknown, key: string) => store?.remove(key));
 
   ipcMain.handle("wol:send", (_e: unknown, mac: string) => sendMagicPacket(mac));
+
+  /**
+   * Find PlayStations on the club's own network.
+   *
+   * Here rather than on the server for the same reason `wol:send` is: the
+   * backend runs in a datacentre and shares no broadcast domain with any club,
+   * while this process runs on a machine in the room with the consoles.
+   *
+   * Read-only. It asks; it cannot wake, rest, or alter a console — that needs a
+   * credential this build does not carry.
+   */
+  ipcMain.handle("ps5:discover", (_e: unknown, timeoutMs?: number) =>
+    discoverPlayStations(typeof timeoutMs === "number" ? { timeoutMs } : {}));
+
+  /**
+   * Ask the consoles we already know about how they are doing.
+   *
+   * Separate from `ps5:discover` because the two have opposite costs: a sweep
+   * shouts at the whole network and belongs behind a button, while this is a
+   * handful of unicast datagrams and runs on a timer all shift.
+   */
+  /**
+   * Wake one console.
+   *
+   * The key never leaves this process: the renderer names a console, and the
+   * main process looks up what it is allowed to send. A renderer that asked for
+   * the key itself would be a renderer that could leak it.
+   */
+  ipcMain.handle("ps5:wake", async (_e: unknown, hostId: unknown, address: unknown) => {
+    if (typeof hostId !== "string" || typeof address !== "string") {
+      return { sent: false, reason: "bad-request" };
+    }
+
+    // A paired console already has a finished credential; a console whose key
+    // was typed in has the key. Both end here, and neither is fed to the other.
+    const paired = wakeKeys?.readWakeCredential(hostId) ?? null;
+    if (paired) return wakeWithCredential(address, paired);
+
+    return wakePlayStation(address, wakeKeys?.read(hostId) ?? null);
+  });
+
+  /**
+   * Pair a console with a PlayStation account.
+   *
+   * Everything happens in this process: the sign-in page opens in a window of
+   * its own, the PIN comes from the panel, and the result goes straight into
+   * the vault. The renderer names a console and is told whether it worked.
+   */
+  ipcMain.handle("ps5:pair", async (event: unknown, address: unknown, pin: unknown, redirectUrl?: unknown) => {
+    if (typeof address !== "string" || typeof pin !== "string" || !wakeKeys) {
+      return { ok: false, code: "FAILED" };
+    }
+
+    const parent = BrowserWindow.fromWebContents(
+      (event as { sender: Electron.WebContents }).sender,
+    ) ?? undefined;
+
+    return pairConsole(
+      address,
+      pin,
+      wakeKeys,
+      parent,
+      typeof redirectUrl === "string" && redirectUrl ? redirectUrl : undefined,
+    );
+  });
+
+  /**
+   * Open the PlayStation sign-in in the owner's own browser.
+   *
+   * Sony's page refuses some embedded clients with an edge-server error that
+   * says nothing about the account. Their own browser, where they are probably
+   * signed in already, does not hit it — and the only thing that has to come
+   * back is the address it ends up at.
+   */
+  ipcMain.handle("ps5:psn-login-external", async () => {
+    await openPsnLoginExternally();
+    return { url: psnLoginUrl() };
+  });
+
+  /**
+   * Ask a console to go to rest.
+   *
+   * Routed through the transport, which today answers
+   * `UNSUPPORTED_BY_TRANSPORT`: the local discovery protocol has no such
+   * command. The refusal is returned rather than swallowed, so the panel can
+   * say the console is still awake instead of showing a sleep that never
+   * happened. When a rest-capable transport exists this channel does not change.
+   */
+  ipcMain.handle("ps5:rest", async (_e: unknown, hostId: unknown, address: unknown) => {
+    if (typeof hostId !== "string" || typeof address !== "string") {
+      return { sent: false, code: "INVALID_STATE" };
+    }
+
+    // The host-id goes with it: a rest aimed only at an address can land on
+    // whichever console holds that lease right now.
+    return activeTransport().requestRest(address, hostId);
+  });
+
+  /** What the current transport can actually do, for a screen that must not promise more. */
+  ipcMain.handle("ps5:capabilities", () => activeTransport().capabilities);
+
+  /**
+   * Wake a console with a key that is used once and not kept.
+   *
+   * The storing path refuses a machine whose OS offers no keystore, which is
+   * right — a key written as readable text on a computer the whole shift walks
+   * past is not a lesser evil. But it also blocks the very first thing anybody
+   * needs to do with a new console: find out whether the key they were given
+   * actually works.
+   *
+   * This is that check. The key comes straight from the field the owner typed
+   * it into, goes into one datagram, and is referenced nowhere afterwards —
+   * nothing writes it to disk, nothing logs it, and there is no path that reads
+   * it back.
+   */
+  ipcMain.handle("ps5:wake-once", async (_e: unknown, address: unknown, registKey: unknown) => {
+    if (typeof address !== "string" || typeof registKey !== "string") {
+      return { sent: false, reason: "bad-request" };
+    }
+
+    return wakePlayStation(address, registKey);
+  });
+
+  /**
+   * Remember a console's wake key. The renderer can write one and ask whether
+   * one exists; it can never read one back.
+   */
+  ipcMain.handle("ps5:credential:set", async (_e: unknown, hostId: unknown, registKey: unknown) => {
+    if (typeof hostId !== "string" || typeof registKey !== "string" || !wakeKeys) {
+      return { saved: false, reason: "bad-request" };
+    }
+
+    // Always accepted. Where the OS offers a keystore the key survives a
+    // restart; where it does not, it lives in this process and nothing is
+    // written to disk. `persisted` is which of the two happened, and the screen
+    // tells the operator rather than leaving them to find out tomorrow.
+    return wakeKeys.set(hostId, registKey);
+  });
+
+  ipcMain.handle("ps5:credential:has", (_e: unknown, hostId: unknown) => ({
+    has: typeof hostId === "string" && (wakeKeys?.has(hostId) ?? false),
+    available: wakeKeys?.available() ?? false,
+    persisted: typeof hostId === "string" && (wakeKeys?.isPersisted(hostId) ?? false),
+  }));
+
+  ipcMain.handle("ps5:credential:forget", async (_e: unknown, hostId: unknown) => {
+    if (typeof hostId === "string") await wakeKeys?.forget(hostId);
+    return { ok: true };
+  });
+
+  ipcMain.handle("ps5:probe", (_e: unknown, addresses: unknown, timeoutMs?: number) =>
+    probePlayStations(
+      // Whatever the renderer sends is treated as untrusted shape, not just
+      // untrusted values: this is the one boundary where a bad type would
+      // otherwise reach a socket call.
+      Array.isArray(addresses) ? addresses.filter((a): a is string => typeof a === "string") : [],
+      typeof timeoutMs === "number" ? timeoutMs : undefined,
+    ));
 
   // Auto-update bridge — the singleton service owns electron-updater's
   // event stream; we just expose three IPC channels for the renderer:

@@ -239,7 +239,7 @@ const UserMenu = ({ name, email, role, roleLabel }: UserCardProps) => {
             }}
             title={name}
           >
-            {name || "—"}
+            {name || "-"}
           </div>
           <div
             style={{
