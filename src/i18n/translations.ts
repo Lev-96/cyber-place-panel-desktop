@@ -1348,17 +1348,32 @@ export const TRANSLATIONS: Dict = {
     am: "Այս հաշիվը կապված չէ ընկերության հետ։",
   },
   "revenue.pickHint": { en: "Pick a company to see its monthly revenue and commission.", ru: "Выберите компанию, чтобы увидеть её месячную выручку и комиссию.", am: "Ընտրեք ընկերություն՝ ամսական եկամուտ և միջնորդավճար տեսնելու համար:" },
-  // The heading of the only revenue figure there is now. It used to say
-  // "sessions + POS" beside a second block that computed a different
-  // commission from bookings; that block is gone, and so is the ambiguity
-  // about which number the owner actually owes on.
-  "revenue.operationalTitle": { en: "Revenue from closed sessions", ru: "Выручка по закрытым сессиям", am: "Եկամուտ փակված սեանսներից" },
+  // The heading of the month's figures. It used to read "revenue from closed
+  // sessions"; tournament entry fees are part of the takings now, so the
+  // heading names the period rather than one of the sources.
+  "revenue.summaryTitle": { en: "Revenue for the month", ru: "Выручка за месяц", am: "Ամսվա եկամուտը" },
   "revenue.closedSessions": { en: "Closed sessions", ru: "Закрытых сессий", am: "Փակված սեանսներ" },
   "revenue.sourceSessions": { en: "Sessions", ru: "Сессии", am: "Սեանսներ" },
   "revenue.sourcePos": { en: "POS orders", ru: "Заказы кассы", am: "Դրամարկղի վաճառք" },
-  "revenue.gross": { en: "Gross", ru: "Итого выручка", am: "Ընդհանուր" },
-  "revenue.commissionPercent": { en: "Commission", ru: "Комиссия", am: "Միջնորդավճար" },
+  "revenue.tournamentEntries": { en: "Paid tournament entries", ru: "Оплаченных участий в турнирах", am: "Վճարված մասնակցություններ մրցաշարերում" },
+  "revenue.sourceTournaments": { en: "Tournament entry fees", ru: "Взносы за участие в турнирах", am: "Մրցաշարերի մասնակցության վճարներ" },
+  "revenue.totalRevenue": { en: "Total revenue", ru: "Общая выручка", am: "Ընդհանուր եկամուտ" },
+  "revenue.cyberPlaceCommission": { en: "Cyber Place commission", ru: "Комиссия Cyber Place", am: "Cyber Place-ի միջնորդավճար" },
   "revenue.amountOwed": { en: "You owe us this period", ru: "К оплате за период", am: "Վճարման ենթակա ժամանակահատվածում" },
+  "revenue.ownerIncome": { en: "Owner income", ru: "Доход владельца", am: "Սեփականատիրոջ եկամուտ" },
+  // Per-branch breakdown (shown only when the company has more than one branch).
+  // The counts sit under an amount as "label: n" so no language needs plural forms.
+  "revenue.byBranch": { en: "By branch", ru: "По филиалам", am: "Ըստ մասնաճյուղերի" },
+  "revenue.colBranch": { en: "Branch", ru: "Филиал", am: "Մասնաճյուղ" },
+  "revenue.colTournaments": { en: "Tournaments", ru: "Турниры", am: "Մրցաշարեր" },
+  "revenue.closedCount": { en: "Closed: {0}", ru: "Закрыто: {0}", am: "Փակված՝ {0}" },
+  // am: "participants", not "participations" — the longer word alone set the
+  // width of the whole column in Armenian and squeezed the address column.
+  "revenue.entriesCount": { en: "Entries: {0}", ru: "Участий: {0}", am: "Մասնակից՝ {0}" },
+  "revenue.prevMonth": { en: "Previous month", ru: "Предыдущий месяц", am: "Նախորդ ամիս" },
+  "revenue.nextMonth": { en: "Next month", ru: "Следующий месяц", am: "Հաջորդ ամիս" },
+  "revenue.loadFailed": { en: "Couldn't load the revenue report.", ru: "Не удалось загрузить отчёт о выручке.", am: "Չհաջողվեց բեռնել եկամտի հաշվետվությունը։" },
+  "revenue.retry": { en: "Retry", ru: "Повторить", am: "Կրկնել" },
 
   // Managers
   "managers.title": { en: "Managers", ru: "Менеджеры", am: "Մենեջերներ" },
@@ -1623,6 +1638,97 @@ export const TRANSLATIONS: Dict = {
   "branch.city": { en: "City", ru: "Город", am: "Քաղաք" },
   "branch.coordinates": { en: "Coordinates (lat / lng)", ru: "Координаты (широта / долгота)", am: "Կոորդինատներ (լայն. / երկ.)" },
   "branch.logo": { en: "Logo (optional)", ru: "Логотип (необязательно)", am: "Լոգո (ընտրովի)" },
+
+  // ── PA-1: branch status (`branches.status`) ──────────────────────────────
+  // Active / Inactive = may players see this branch. The owner's switch (and
+  // the admin's), on create and on edit. The badge and the notice exist so
+  // whoever looks learns WHY players cannot find the venue. Not the block:
+  // that is `blocking.*`.
+  "branch.status": { en: "Status", ru: "Статус", am: "Կարգավիճակ" },
+  "branch.status.active": { en: "Active", ru: "Активен", am: "Ակտիվ" },
+  "branch.status.inactive": { en: "Inactive", ru: "Неактивен", am: "Ոչ ակտիվ" },
+  "branch.statusHint": {
+    en: "Inactive — players can't see this branch in the app. Staff keep working in it as usual.",
+    ru: "Неактивен — игроки не видят этот филиал в приложении. Персонал работает в нём как обычно.",
+    am: "Ոչ ակտիվ — խաղացողները հավելվածում չեն տեսնում այս մասնաճյուղը։ Անձնակազմը շարունակում է աշխատել դրանում սովորականի պես։",
+  },
+  "branch.inactive.hint": {
+    en: "Inactive — players can't see this branch.",
+    ru: "Неактивен — игроки не видят этот филиал.",
+    am: "Ոչ ակտիվ — խաղացողները չեն տեսնում այս մասնաճյուղը։",
+  },
+  "branch.inactive.notice": {
+    en: "Inactive — players can't see this branch in the app. Staff can keep working in it.",
+    ru: "Неактивен — игроки не видят этот филиал в приложении. Персонал может продолжать в нём работать.",
+    am: "Ոչ ակտիվ — խաղացողները հավելվածում չեն տեսնում այս մասնաճյուղը։ Անձնակազմը կարող է շարունակել աշխատել դրանում։",
+  },
+  // Appended for whoever can flip it (owner, admin). {0} = the hub's Settings
+  // tile, {1} = the "Edit info" button, {2} = the "Active" toggle label — the
+  // path to the switch, named with the labels they will actually see.
+  "branch.inactive.noticeWhere": {
+    en: "To show it to players, switch it to {2} in {0} → {1}.",
+    ru: "Чтобы игроки его увидели, переключите на «{2}»: {0} → {1}.",
+    am: "Որպեսզի խաղացողները տեսնեն այն, ընտրեք «{2}»՝ {0} → {1}։",
+  },
+  // ── PA-1: sidebar ─────────────────────────────────────────────────────────
+  "nav.createBranch": { en: "+ New branch", ru: "+ Создать филиал", am: "+ Ստեղծել մասնաճյուղ" },
+  // ── PA-2: admin Owners section ───────────────────────────────────────────
+  "nav.owners": { en: "Owners", ru: "Владельцы", am: "Սեփականատերեր" },
+  "owners.title": { en: "Owners", ru: "Владельцы", am: "Սեփականատերեր" },
+  "owners.search": {
+    en: "Search by name, email or company",
+    ru: "Поиск по имени, email или компании",
+    am: "Որոնում ըստ անվան, էլ. փոստի կամ ընկերության",
+  },
+  "owners.empty": { en: "No owners.", ru: "Владельцев нет.", am: "Սեփականատերեր չկան։" },
+  "owners.emptySearch": { en: "Nobody matches this search.", ru: "По этому запросу никого нет.", am: "Այս որոնմամբ ոչ ոք չի գտնվել։" },
+  "owners.noCompany": { en: "No company", ru: "Нет компании", am: "Ընկերություն չկա" },
+  "owners.openCompany": { en: "Open the company", ru: "Открыть компанию", am: "Բացել ընկերությունը" },
+  "owners.branches": { en: "Branches: {0}", ru: "Филиалов: {0}", am: "Մասնաճյուղեր՝ {0}" },
+  "owners.managers": { en: "Managers: {0}", ru: "Менеджеров: {0}", am: "Մենեջերներ՝ {0}" },
+  "owner.titleEdit": { en: "Edit owner", ru: "Редактировать владельца", am: "Խմբագրել սեփականատիրոջը" },
+  "owners.delete.question": {
+    en: "Delete owner {0} and everything they own?",
+    ru: "Удалить владельца {0} и всё, что ему принадлежит?",
+    am: "Ջնջե՞լ {0} սեփականատիրոջը և այն ամենը, ինչ պատկանում է նրան։",
+  },
+  "owners.delete.loading": {
+    en: "Checking what would be deleted…",
+    ru: "Проверяем, что будет удалено…",
+    am: "Ստուգում ենք, թե ինչ կջնջվի…",
+  },
+  "owners.delete.loadFailed": {
+    en: "Could not check what would be deleted, so nothing can be deleted now. Close and try again.",
+    ru: "Не удалось проверить, что будет удалено, поэтому удаление сейчас недоступно. Закройте и попробуйте ещё раз.",
+    am: "Չհաջողվեց ստուգել, թե ինչ կջնջվի, ուստի ջնջումը հիմա հասանելի չէ։ Փակեք և փորձեք կրկին։",
+  },
+  "owners.delete.takes": { en: "This permanently deletes:", ru: "Будет удалено безвозвратно:", am: "Անվերադարձ կջնջվի՝" },
+  "owners.delete.companies": { en: "Companies: {0}", ru: "Компаний: {0}", am: "Ընկերություններ՝ {0}" },
+  "owners.delete.branches": { en: "Branches: {0}", ru: "Филиалов: {0}", am: "Մասնաճյուղեր՝ {0}" },
+  "owners.delete.managers": { en: "Manager accounts: {0}", ru: "Аккаунтов менеджеров: {0}", am: "Մենեջերների հաշիվներ՝ {0}" },
+  "owners.delete.places": { en: "Places: {0}", ru: "Мест: {0}", am: "Տեղեր՝ {0}" },
+  "owners.delete.sessions": { en: "Sessions in history: {0}", ru: "Сессий в истории: {0}", am: "Սեսիաներ պատմության մեջ՝ {0}" },
+  "owners.delete.members": {
+    en: "Member cards with a balance: {0}",
+    ru: "Клиентских карт с балансом: {0}",
+    am: "Հաճախորդի քարտեր մնացորդով՝ {0}",
+  },
+  "owners.delete.irreversible": { en: "This cannot be undone.", ru: "Это нельзя отменить.", am: "Սա հնարավոր չէ հետարկել։" },
+  "owners.delete.blocked": { en: "It can't be deleted yet:", ru: "Удалить пока нельзя:", am: "Դեռ հնարավոր չէ ջնջել՝" },
+  // Keyed by the backend's `TenantDeletionBlocker` code; {0} = the count.
+  "owners.blocker.running_sessions": {
+    en: "Running sessions: {0} — stop them first.",
+    ru: "Идущих сессий: {0} — сначала остановите их.",
+    am: "Ընթացիկ սեսիաներ՝ {0} — նախ դադարեցրեք դրանք։",
+  },
+  "owners.blocker.upcoming_bookings": {
+    en: "Upcoming bookings: {0} — cancel them first (players are notified).",
+    ru: "Предстоящих бронирований: {0} — сначала отмените их (игроки получат уведомление).",
+    am: "Առաջիկա ամրագրումներ՝ {0} — նախ չեղարկեք դրանք (խաղացողները կծանուցվեն)։",
+  },
+  "toast.owner.updated": { en: "Owner updated", ru: "Владелец обновлён", am: "Սեփականատերը թարմացվեց" },
+  "toast.owner.deleted": { en: "Owner deleted", ru: "Владелец удалён", am: "Սեփականատերը ջնջվեց" },
+  // ── end PA-1 / PA-2 ───────────────────────────────────────────────────────
 
   // Company form
   "company.titleNew": { en: "New company", ru: "Новая компания", am: "Նոր ընկերություն" },

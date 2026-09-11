@@ -195,6 +195,31 @@ describe("request() caching", () => {
     expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 
+  // The branch update is method-spoofed (`POST /branches/7?_method=PUT`, so a
+  // logo can ride as multipart). Switching a branch Active / Inactive goes
+  // through it, and the hub and both lists must show the new status on their
+  // next read rather than a cached "Inactive" for another 30 seconds.
+  it("a method-spoofed branch update drops the branch and the branch lists", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({ branch: { id: 7, status: "inactive" } }));
+    await request("/branches/7");
+    fetchMock.mockResolvedValueOnce(jsonResponse({ data: [{ id: 7, status: "inactive" }] }));
+    await request("/branches", { params: { company_id: 3 } });
+    // Both really are held — otherwise "gone after the write" proves nothing.
+    expect(apiCache.lookup("/branches/7")).toBeDefined();
+    expect(apiCache.lookup("/branches?company_id=3")).toBeDefined();
+
+    fetchMock.mockResolvedValueOnce(jsonResponse({ branch: { id: 7, status: "active" } }));
+    await request("/branches/7?_method=PUT", { method: "POST", body: { status: "active" } });
+
+    expect(apiCache.lookup("/branches/7")).toBeUndefined();
+    expect(apiCache.lookup("/branches?company_id=3")).toBeUndefined();
+
+    fetchMock.mockResolvedValueOnce(jsonResponse({ branch: { id: 7, status: "active" } }));
+    const after = await request<{ branch: { status: string } }>("/branches/7");
+    expect(after.branch.status).toBe("active");
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+  });
+
   it("a failed write leaves the cache intact", async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse({ data: [] }));
     await request("/products");

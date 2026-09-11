@@ -9,10 +9,18 @@ import ProfileModal from "@/components/profile/ProfileModal";
 import { useLang } from "@/i18n/LanguageContext";
 import { useNotifications } from "@/notifications/NotificationsContext";
 import { useUpdatesNotification } from "@/realtime/UpdatesNotificationContext";
-import { useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useAnchoredPopover } from "@/hooks/useAnchoredPopover";
 import { NavLink, useNavigate } from "react-router-dom";
+
+/**
+ * THE branch form — the same component the company screens open, not a second
+ * one. Lazy because the sidebar is in the first paint of every screen and the
+ * form brings the map and the phone-number library with it; only an owner who
+ * presses "+ New branch" pays for them.
+ */
+const BranchForm = lazy(() => import("@/components/branches/BranchForm"));
 
 const UnreadBadge = ({ count }: { count: number }) => {
   if (count <= 0) return null;
@@ -301,8 +309,14 @@ const Sidebar = () => {
   const adminUpdateCount =
     (panelUpd?.has_update ? 1 : 0) + (agentUpd?.has_update ? 1 : 0);
   const agentUpdateCount = agentUpd?.has_update ? 1 : 0;
-  const dash = (user?.dashboard ?? {}) as { branch_id?: number | null };
-  const myBranchId = typeof dash.branch_id === "number" ? dash.branch_id : null;
+  const navigate = useNavigate();
+  const dash = user?.dashboard;
+  const myBranchId = typeof dash?.branch_id === "number" ? dash.branch_id : null;
+  // The owner's company (single company per owner, as everywhere in the panel).
+  const myCompanyId = typeof dash?.company_id === "number" ? dash.company_id : null;
+  // Local, like UserMenu's profile modal: the sidebar opens the form itself,
+  // there is no global modal host to route it through.
+  const [creatingBranch, setCreatingBranch] = useState(false);
 
   return (
     <aside className="sidebar">
@@ -367,10 +381,28 @@ const Sidebar = () => {
         <NavLink to="/metrics">{t("nav.metrics")}</NavLink>
       )}
       {can(role, "menu.myCompany") && (
-        <NavLink to="/my-company">{t("nav.myCompany")}</NavLink>
+        // Straight to the company's own page, the way "My branch" links to the
+        // branch. `/my-company` only redirects, and a link to a route that only
+        // redirects is never the current page — so it never lit up. Prefix
+        // matching now covers the company's branches and revenue pages too.
+        // An owner with no company still goes to `/my-company`, which is where
+        // that is explained.
+        <NavLink to={myCompanyId !== null ? `/companies/${myCompanyId}` : "/my-company"}>
+          {t("nav.myCompany")}
+        </NavLink>
+      )}
+      {can(role, "branch.create") && myCompanyId !== null && (
+        // An action, not a page: opens the branch form over whatever screen
+        // the owner is on, and lands them on the new branch afterwards.
+        <button type="button" className="sidebar-action" onClick={() => setCreatingBranch(true)}>
+          {t("nav.createBranch")}
+        </button>
       )}
       {can(role, "menu.managers") && (
         <NavLink to="/managers">{t("nav.managers")}</NavLink>
+      )}
+      {can(role, "owner.view") && (
+        <NavLink to="/owners">{t("nav.owners")}</NavLink>
       )}
       <NavLink to="/notifications">
         {t("nav.notifications")}
@@ -420,6 +452,22 @@ const Sidebar = () => {
           {t("nav.signOut")}
         </button>
       </div>
+
+      {/* The form is a portal-based Modal, so the sidebar's overflow clipping
+          does not reach it. After saving, the new branch's own page — a fresh
+          read, and the POST already dropped every cached branch listing. */}
+      {creatingBranch && myCompanyId !== null && (
+        <Suspense fallback={null}>
+          <BranchForm
+            companyId={myCompanyId}
+            onClose={() => setCreatingBranch(false)}
+            onSaved={(branch) => {
+              setCreatingBranch(false);
+              navigate(`/branches/${branch.id}`);
+            }}
+          />
+        </Suspense>
+      )}
     </aside>
   );
 };

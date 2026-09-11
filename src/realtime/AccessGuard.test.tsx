@@ -191,6 +191,35 @@ describe("AccessGuard", () => {
     expect(toasts.messages).toEqual([{ kind: "error", text: "Server wording." }]);
   });
 
+  // What `DestroyCompanyTreeService` sends every staff account whose company
+  // was deleted with its owner: a company-scope block, locked out, the
+  // sentence `response.owner.account-deleted`, and NO reason — so `code` is
+  // null on the wire (and absent from an older payload). There is no panel
+  // wording for "your account was deleted", so the server's sentence is what
+  // the person must read, and they must be signed out.
+  test.each([
+    ["null", { code: null, reason: null }],
+    ["absent", {}],
+  ])("an account deleted with its owner's company is signed out with the server's sentence (code %s)", async (_label, codeFields) => {
+    mountAt("/branches/5/sessions");
+
+    await emit({
+      scope: "company",
+      company_id: 3,
+      branch_ids: [5, 6],
+      locked_out: true,
+      message: "Your account has been deleted.",
+      ...codeFields,
+    });
+
+    expect(auth.logout).toHaveBeenCalledTimes(1);
+    expect(toasts.messages).toEqual([{ kind: "error", text: "Your account has been deleted." }]);
+    // Signing out is the whole answer — no relocation, no refresh of a user
+    // whose tokens are already gone.
+    expect(path).toBe("/branches/5/sessions");
+    expect(auth.refreshUser).not.toHaveBeenCalled();
+  });
+
   test("falls back to its own wording when the server sent no sentence", async () => {
     mountAt("/");
     await emit({ locked_out: true, message: null });

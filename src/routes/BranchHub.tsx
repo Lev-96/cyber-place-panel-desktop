@@ -2,6 +2,7 @@ import { GridSkeleton } from "@/components/ui/Skeleton";
 import { useAuth } from "@/auth/AuthContext";
 import { can } from "@/auth/permissions";
 import BlockToggle from "@/components/blocking/BlockToggle";
+import BranchStatusPill from "@/components/branches/BranchStatusPill";
 import BranchLiveScreen from "@/components/live/BranchLiveScreen";
 import Avatar from "@/components/ui/Avatar";
 import ScreenWithBg from "@/components/ui/ScreenWithBg";
@@ -9,8 +10,10 @@ import Spinner from "@/components/ui/Spinner";
 import { useAsync } from "@/hooks/useAsync";
 import { useLocalReorder } from "@/hooks/useLocalReorder";
 import { useLang } from "@/i18n/LanguageContext";
+import { fmt } from "@/i18n/translations";
 import { useAccessVersion } from "@/realtime/accessVersion";
 import { branchRepository } from "@/repositories/BranchRepository";
+import { isBranchInactive } from "@/types/branch";
 import { DragEvent, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 
@@ -71,6 +74,19 @@ const BranchHub = () => {
   // closed because its company is. Two different sentences, because only one of
   // them can be undone by unblocking the branch.
   const readOnlyNotice = t(readOnlyNoticeKey(data?.blocked_at));
+  // Inactive = invisible to players, yet fully workable for staff, so it
+  // explains itself without disabling anything. Owner and admin read the same
+  // sentence — either of them can switch it — plus where the switch is; a
+  // manager, who cannot, gets the sentence alone.
+  const inactive = isBranchInactive(data?.status);
+  const inactiveNotice = can(role, "branch.status")
+    ? `${t("branch.inactive.notice")} ${fmt(
+        t("branch.inactive.noticeWhere"),
+        t("hub.tile.settings"),
+        t("branchEdit.editInfo"),
+        t("branch.status.active"),
+      )}`
+    : t("branch.inactive.notice");
   const [dragKey, setDragKey] = useState<string | null>(null);
   const [dropKey, setDropKey] = useState<string | null>(null);
 
@@ -131,6 +147,7 @@ const BranchHub = () => {
                   {data.blocked_at ? t("blocking.state.branch") : t("blocking.state.byCompany")}
                 </span>
               )}
+              {inactive && <BranchStatusPill />}
             </div>
             <div className="muted">{data.company?.name ?? ""} · {data.country}, {data.city}</div>
           </div>
@@ -154,19 +171,13 @@ const BranchHub = () => {
       {/* State before consequence: read WHY the tiles below are grey, in one
           sentence, before meeting them. */}
       {readOnly && (
-        <div
-          className="card"
-          role="status"
-          style={{
-            width: "100%",
-            borderColor: "#f0a202",
-            background: "rgba(240,162,2,0.08)",
-            color: "#ffd88a",
-            fontSize: 13,
-            lineHeight: 1.4,
-          }}
-        >
+        <div className="card state-notice" role="status">
           {readOnlyNotice}
+        </div>
+      )}
+      {inactive && (
+        <div className="card state-notice" role="status">
+          {inactiveNotice}
         </div>
       )}
 

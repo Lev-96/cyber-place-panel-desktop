@@ -714,6 +714,35 @@ a.card:hover {
   border-color: var(--color-primary);
 }
 
+/* An ACTION inside the nav column (the owner's "+ New branch"): it opens a form
+   instead of a page, so it has no active state. Same box as `.sidebar a` so the
+   column keeps one rhythm; the accent colour says "does something" and the
+   dashed border says "adds something", which keeps it from reading as the
+   current section. Long translations wrap instead of widening the sidebar. */
+.sidebar .sidebar-action {
+  padding: 10px 12px;
+  border: 1px dashed var(--color-border);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--color-primary);
+  font: inherit;
+  font-weight: 500;
+  text-align: left;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease;
+}
+.sidebar .sidebar-action:hover {
+  background: var(--color-surface-alt);
+  border-color: var(--color-primary);
+}
+.sidebar .sidebar-action:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
 .main {
   padding: 24px 32px;
   overflow-y: auto;
@@ -1336,9 +1365,11 @@ input[type="time"]::-webkit-datetime-edit-field:focus {
   align-items: center;
   gap: 12px;
 }
+/* 40px: the desktop minimum for a pointer target — the month is flipped in
+   quick repeated clicks, so the button must be easy to hit and must not move. */
 .month-picker .month-btn {
-  width: 36px;
-  height: 36px;
+  width: 40px;
+  height: 40px;
   border: 1px solid var(--color-primary);
   background: var(--color-surface);
   color: var(--color-primary);
@@ -1346,8 +1377,11 @@ input[type="time"]::-webkit-datetime-edit-field:focus {
   font-size: 18px;
   cursor: pointer;
 }
+/* Tabular digits keep "11.2026" as wide as "09.2026", so the next-month button
+   stays under the cursor while the months are flipped through. */
 .month-picker .month-label {
   font-weight: 600;
+  font-variant-numeric: tabular-nums;
 }
 
 .kv-row {
@@ -1371,6 +1405,85 @@ input[type="time"]::-webkit-datetime-edit-field:focus {
   height: 1px;
   background: var(--color-border);
   margin: 6px 0;
+}
+
+/* ── Revenue (CompanyRevenueScreen) ──────────────────────────────────────
+   Two `.card`s: the month's summary as `.kv-row`s, and — for a company with
+   more than one branch — the same figures per branch as a table. A table,
+   not a card per branch: the reader compares branches down a column, and
+   the columns only line up if they are one grid. */
+.revenue-card {
+  gap: 4px;
+}
+/* Same weight, size and colour as the `.kv-row` heading row this replaces,
+   as a real heading. */
+.revenue-card-title {
+  margin: 0;
+  padding: 6px 0;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.4;
+  color: var(--color-muted);
+}
+/* Scrolls only below the panel's 1280px floor; at every supported width the
+   headers wrap and the addresses break first. */
+.revenue-table-scroll {
+  min-width: 0;
+  overflow-x: auto;
+}
+.revenue-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+  line-height: 1.4;
+}
+.revenue-table th,
+.revenue-table td {
+  padding: 12px;
+  text-align: left;
+  vertical-align: top;
+  border-top: 1px solid var(--color-border);
+}
+/* The outer columns sit on the card's content edges, like the summary card's
+   labels and values above — and give the address the width back. */
+.revenue-table tr > :first-child {
+  padding-left: 0;
+}
+.revenue-table tr > :last-child {
+  padding-right: 0;
+}
+.revenue-table thead th {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  border-top: none;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-muted);
+  vertical-align: bottom;
+}
+/* The branch address: the column that takes the slack and wraps. `break-word`
+   (not `anywhere`) so its narrowest width stays its longest word — the table
+   never squeezes an address down to a letter per line. */
+.revenue-table tbody th {
+  font-weight: 600;
+  overflow-wrap: break-word;
+}
+/* Amounts line up on the right edge, digit under digit; an amount never breaks
+   from its currency unit (the headers above them are free to wrap). */
+.revenue-table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.revenue-table td.num {
+  font-weight: 600;
+  white-space: nowrap;
+}
+/* The count under an amount ("Closed: 3"): label and number stay together. */
+.revenue-table-sub {
+  display: block;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--color-muted);
 }
 
 .login-shell {
@@ -3176,6 +3289,24 @@ button.login-flip-back:hover {
   font-size: 12px;
   line-height: 1.35;
   max-width: 34ch;
+}
+
+/* One-sentence state notice under the branch header ("this branch is blocked",
+   "this branch is inactive"): state before consequence, read before
+   the tiles it explains. Layered on `.card` (which sets the padding, radius and
+   surface), so it must stay after `.card` in this file to win the border and
+   background. Warning amber, not the danger red — the pill carries severity,
+   the notice carries the explanation. The values are the ones the blocked-branch
+   banner always had inline — moving it onto this class must not change a pixel
+   of it. The text colour is a light amber with no theme token: `--color-warning`
+   itself is too dark to read at 13px on the tinted surface. */
+.state-notice {
+  width: 100%;
+  border-color: #f0a202;
+  background: rgba(240, 162, 2, 0.08);
+  color: #ffd88a;
+  font-size: 13px;
+  line-height: 1.4;
 }
 
 /* ── Support desk ────────────────────────────────────────────────────────

@@ -43,6 +43,7 @@ const CompanyRevenue = lazy(() => import("@/routes/CompanyRevenue"));
 const Expenses = lazy(() => import("@/routes/Expenses"));
 const Metrics = lazy(() => import("@/routes/Metrics"));
 const MyCompany = lazy(() => import("@/routes/MyCompany"));
+const Owners = lazy(() => import("@/routes/Owners"));
 const Revenue = lazy(() => import("@/routes/Revenue"));
 const ConfirmByCode = lazy(() => import("@/routes/ConfirmByCode"));
 const GamesList = lazy(() => import("@/routes/GamesList"));
@@ -253,6 +254,16 @@ const Authed = () => {
           element={
             <RoleGuard perm="menu.managers">
               <Managers />
+            </RoleGuard>
+          }
+        />
+        {/* Admin only — every company owner on the platform. The backend
+            holds the same line with the `admin` middleware on /admin/owners. */}
+        <Route
+          path="/owners"
+          element={
+            <RoleGuard perm="owner.view">
+              <Owners />
             </RoleGuard>
           }
         />

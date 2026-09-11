@@ -1,5 +1,6 @@
 import { useAuth } from "@/auth/AuthContext";
 import { can } from "@/auth/permissions";
+import BranchStatusPill from "@/components/branches/BranchStatusPill";
 import BranchForm from "@/components/branches/BranchForm";
 import Avatar from "@/components/ui/Avatar";
 import Button from "@/components/ui/Button";
@@ -9,6 +10,7 @@ import { useAsync } from "@/hooks/useAsync";
 import { useLang } from "@/i18n/LanguageContext";
 import { fmt } from "@/i18n/translations";
 import { branchRepository } from "@/repositories/BranchRepository";
+import { isBranchInactive } from "@/types/branch";
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 
@@ -51,6 +53,7 @@ const CompanyBranches = () => {
                         {b.blocked_at ? t("blocking.state.branch") : t("blocking.state.byCompany")}
                       </span></>
                     )}
+                    {isBranchInactive(b.status) && <> · <BranchStatusPill /></>}
                   </div>
                 </div>
               </div>
