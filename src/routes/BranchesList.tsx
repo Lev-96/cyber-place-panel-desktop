@@ -7,7 +7,6 @@ import { useAsync } from "@/hooks/useAsync";
 import { useLang } from "@/i18n/LanguageContext";
 import { useAccessVersion } from "@/realtime/accessVersion";
 import { branchRepository } from "@/repositories/BranchRepository";
-import { isBranchInactive } from "@/types/branch";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 
@@ -49,10 +48,10 @@ const BranchesList = () => {
                         {b.blocked_at ? t("blocking.state.branch") : t("blocking.state.byCompany")}
                       </span></>
                     )}
-                    {/* Same for a branch switched off for players: whoever is
-                        looking learns why players cannot find it without
-                        opening every row. */}
-                    {isBranchInactive(b.status) && <> · <BranchStatusPill /></>}
+                    {/* Every branch says whether players can see it, so an
+                        inactive one stands out against its active siblings
+                        without opening every row. */}
+                    {" · "}<BranchStatusPill status={b.status} />
                   </div>
                   <div className="meta">
                     {b.country}, {b.city} · {t("branchesList.placesShort")} {b.places_count ?? 0}

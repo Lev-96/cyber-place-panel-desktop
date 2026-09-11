@@ -10,7 +10,6 @@ import { useAsync } from "@/hooks/useAsync";
 import { useLang } from "@/i18n/LanguageContext";
 import { fmt } from "@/i18n/translations";
 import { branchRepository } from "@/repositories/BranchRepository";
-import { isBranchInactive } from "@/types/branch";
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 
@@ -53,7 +52,9 @@ const CompanyBranches = () => {
                         {b.blocked_at ? t("blocking.state.branch") : t("blocking.state.byCompany")}
                       </span></>
                     )}
-                    {isBranchInactive(b.status) && <> · <BranchStatusPill /></>}
+                    {/* Every branch, active or not: "Active" beside
+                        "Inactive" is what makes the inactive one readable. */}
+                    {" · "}<BranchStatusPill status={b.status} />
                   </div>
                 </div>
               </div>

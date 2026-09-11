@@ -742,6 +742,12 @@ a.card:hover {
   outline: 2px solid var(--color-primary);
   outline-offset: 2px;
 }
+/* A sub-entry of the link above it ("+ New branch" under Branches): indented so
+   it reads as part of that section, not as a section of its own. Margin, not
+   padding, so the dashed box itself moves in. */
+.sidebar .sidebar-action--nested {
+  margin-left: 16px;
+}
 
 .main {
   padding: 24px 32px;
@@ -3873,4 +3879,91 @@ button.login-flip-back:hover {
 .screen-actions__buttons .btn {
   /* A label on one line is what makes the two buttons the same height. */
   white-space: nowrap;
+}
+
+/* ── Owners (the admin's list + one owner's page, `/owners/:ownerId`) ─────── */
+
+/* One of an owner's companies in a line (`OwnerCompanyLine`): name link,
+   counts, status, block. Wraps as whole pieces, so a long company name or the
+   Russian "Заблокирована" moves to the next line instead of widening the row. */
+.owner-company-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.owner-company-line .pill {
+  white-space: nowrap;
+}
+
+/* The owner's name (→ their page) and a company name (→ the company page) are
+   links inside a row that is not one; links inherit the text colour here, so
+   the accent on hover is what says "this opens something". */
+.owner-link,
+.owner-company-line a {
+  transition: color 120ms ease;
+}
+.owner-link:hover,
+.owner-company-line a:hover {
+  color: var(--color-primary);
+}
+.owner-link:focus-visible,
+.owner-company-line a:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+/* Section heading above the company cards: same size and weight as the
+   revenue card titles, as a real heading. */
+.owner-section-title {
+  margin: 8px 0 0;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+/* A company card on the owner's page: its line on top, its branches under it. */
+.owner-company {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+.owner-company__head {
+  font-weight: 600;
+}
+
+/* A branch row's text block takes the free width and may shrink below its
+   content (min-width: 0), so a long address wraps instead of pushing "Open →"
+   out of the row. */
+.owner-branch {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+/* Address, status and block are siblings in a wrapping row, the same
+   treatment as `.entity-header__title`: a pill moves to the next line whole. */
+.owner-branch__title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.owner-branch__title .pill {
+  white-space: nowrap;
+}
+
+/* A destructive secondary button (Delete). The danger colour on a dark-red
+   edge derived from the tokens, and a red hover ring instead of the cyan one
+   every other secondary button gets. */
+.btn.secondary.is-danger {
+  color: var(--color-danger);
+  border-color: color-mix(in srgb, var(--color-danger) 30%, var(--color-bg));
+}
+.btn.secondary.is-danger:hover {
+  border-color: var(--color-danger);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-danger) 60%, transparent);
 }

@@ -1,4 +1,5 @@
 import type { IBranchRevenueSummary } from "@/api/billing";
+import { centsWhenFractional } from "@/i18n/currency";
 import { useLang } from "@/i18n/LanguageContext";
 import { fmt } from "@/i18n/translations";
 import { useId } from "react";
@@ -13,10 +14,14 @@ import { useId } from "react";
  * commission by a rounding hundredth — so there is deliberately no totals row
  * adding the column up: the company figures are in the card above, and they
  * are the authoritative ones.
+ *
+ * Amounts with cents print both digits, whole ones none — the card's rule
+ * (`centsWhenFractional`), so a row reads the same way the card above does.
  */
 const BranchRevenueTable = ({ branches }: { branches: IBranchRevenueSummary[] }) => {
   const { t, money } = useLang();
   const titleId = useId();
+  const amount = (value: number) => money(value, centsWhenFractional(value));
   // Same rule as the summary: the till is gone, so its column appears only
   // for a month in which some branch actually took till money.
   const showPos = branches.some((b) => b.pos_total > 0);
@@ -42,17 +47,17 @@ const BranchRevenueTable = ({ branches }: { branches: IBranchRevenueSummary[] })
               <tr key={b.branch_id}>
                 <th scope="row">{b.address || `№${b.branch_id}`}</th>
                 <td className="num">
-                  {money(b.sessions_total)}
+                  {amount(b.sessions_total)}
                   <span className="revenue-table-sub">{fmt(t("revenue.closedCount"), b.sessions_count)}</span>
                 </td>
-                {showPos && <td className="num">{money(b.pos_total)}</td>}
+                {showPos && <td className="num">{amount(b.pos_total)}</td>}
                 <td className="num">
-                  {money(b.tournaments_total)}
+                  {amount(b.tournaments_total)}
                   <span className="revenue-table-sub">{fmt(t("revenue.entriesCount"), b.tournaments_count)}</span>
                 </td>
-                <td className="num">{money(b.total_gross)}</td>
-                <td className="num">{money(b.commission_amount)}</td>
-                <td className="num">{money(b.owner_income)}</td>
+                <td className="num">{amount(b.total_gross)}</td>
+                <td className="num">{amount(b.commission_amount)}</td>
+                <td className="num">{amount(b.owner_income)}</td>
               </tr>
             ))}
           </tbody>

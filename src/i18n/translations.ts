@@ -825,6 +825,14 @@ export const TRANSLATIONS: Dict = {
     ru: "Удалить эту регистрацию?",
     am: "Ջնջե՞լ այս գրանցումը:",
   },
+  // Under the question, for a VERIFIED player only (nobody else ever paid).
+  // States the backend's rule (TournamentRefundService); whether a refund
+  // happens is the server's decision, so this never promises one.
+  "registrations.removeRefundNote": {
+    en: "This player is verified. If the tournament has not ended yet, their entry fee is refunded and no longer counts in revenue.",
+    ru: "Игрок подтверждён. Если турнир ещё не закончился, его взнос за участие возвращается и больше не учитывается в выручке.",
+    am: "Խաղացողը հաստատված է։ Եթե մրցաշարը դեռ չի ավարտվել, նրա մասնակցության վճարը վերադարձվում է և այլևս չի հաշվվում եկամտում։",
+  },
   "registrations.empty": {
     en: "No registrations yet.",
     ru: "Регистраций пока нет.",
@@ -1657,6 +1665,12 @@ export const TRANSLATIONS: Dict = {
     ru: "Неактивен — игроки не видят этот филиал.",
     am: "Ոչ ակտիվ — խաղացողները չեն տեսնում այս մասնաճյուղը։",
   },
+  // Tooltip of the green "Active" pill, the counterpart of the one above.
+  "branch.active.hint": {
+    en: "Active — players can see this branch.",
+    ru: "Активен — игроки видят этот филиал.",
+    am: "Ակտիվ — խաղացողները տեսնում են այս մասնաճյուղը։",
+  },
   "branch.inactive.notice": {
     en: "Inactive — players can't see this branch in the app. Staff can keep working in it.",
     ru: "Неактивен — игроки не видят этот филиал в приложении. Персонал может продолжать в нём работать.",
@@ -1728,7 +1742,16 @@ export const TRANSLATIONS: Dict = {
   },
   "toast.owner.updated": { en: "Owner updated", ru: "Владелец обновлён", am: "Սեփականատերը թարմացվեց" },
   "toast.owner.deleted": { en: "Owner deleted", ru: "Владелец удалён", am: "Սեփականատերը ջնջվեց" },
-  // ── end PA-1 / PA-2 ───────────────────────────────────────────────────────
+  // ── PA-C: one owner's page (`/owners/:ownerId`) ──────────────────────────
+  "owners.openOwner": { en: "Open the owner", ru: "Открыть владельца", am: "Բացել սեփականատիրոջը" },
+  "owner.back": { en: "← Owners", ru: "← Владельцы", am: "← Սեփականատերեր" },
+  // {0} = the owner id, shown while the page loads or when it failed.
+  "owner.fallbackTitle": { en: "Owner №{0}", ru: "Владелец №{0}", am: "Սեփականատեր №{0}" },
+  "owner.invalidId": { en: "Invalid owner id", ru: "Неверный ID владельца", am: "Սեփականատիրոջ սխալ ID" },
+  "owner.created": { en: "Registered", ru: "Зарегистрирован", am: "Գրանցվել է" },
+  "owner.companies": { en: "Companies", ru: "Компании", am: "Ընկերություններ" },
+  "owner.noBranches": { en: "No branches yet.", ru: "Филиалов пока нет.", am: "Մասնաճյուղեր դեռ չկան։" },
+  // ── end PA-1 / PA-2 / PA-C ────────────────────────────────────────────────
 
   // Company form
   "company.titleNew": { en: "New company", ru: "Новая компания", am: "Նոր ընկերություն" },
@@ -2295,6 +2318,15 @@ export const TRANSLATIONS: Dict = {
     en: "This branch is blocked. You can view it, but nothing here can be changed.",
     ru: "Филиал заблокирован. Его можно просматривать, но изменения недоступны.",
     am: "Մասնաճյուղն արգելափակված է։ Կարող եք դիտել, բայց փոփոխություններն անհասանելի են։",
+  },
+  // Not a block: an admin deleted this account's owner, and the company with
+  // them. Arrives on the access channel as `code: "account_deleted"`; the same
+  // sentence as the server's `response.owner.account-deleted`, in the panel's
+  // language instead of the admin's.
+  "blocking.reason.account_deleted": {
+    en: "Your account has been deleted.",
+    ru: "Ваша учётная запись удалена.",
+    am: "Ձեր հաշիվը ջնջվել է։",
   },
   // Shown on the branch page itself while it is out of service. States the
   // rule the whole screen then obeys, so a disabled tile never reads as a bug.

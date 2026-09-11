@@ -4,14 +4,17 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, describe, expect, test, vi } from "vitest";
 
 /**
- * "Inactive" wherever staff meet a branch.
+ * A branch's status wherever staff meet it — "Branch 1 Active / Branch 2
+ * Inactive", every branch carrying its own state.
  *
  * An inactive branch is invisible to players and fully workable for staff.
  * Nothing on a staff screen used to say so, which is how production players
  * ended up seeing zero venues while every owner saw theirs. These cases pin
- * the indicator to exactly the inactive branches — never to an active one,
- * never to one whose backend predates the field — on the hub and on both
- * lists, and pin the hub's sentence: the same for owner and admin (either can
+ * one pill per branch with the RIGHT state — amber "Inactive" on exactly the
+ * inactive ones, green "Active" on the rest, including a branch whose backend
+ * predates the field (absent reads as active, never as inactive) — on the hub,
+ * on both lists and on the settings page. They also pin the hub's sentence,
+ * which only an inactive branch gets: the same for owner and admin (either can
  * switch it) plus where the switch is, and the sentence alone for a manager.
  */
 
@@ -21,6 +24,8 @@ vi.mock("@/i18n/LanguageContext", () => ({ useLang: () => ({ t: (k: string) => k
 vi.mock("@/components/blocking/BlockToggle", () => ({ default: () => null }));
 vi.mock("@/components/live/BranchLiveScreen", () => ({ default: () => null }));
 vi.mock("@/components/branches/BranchForm", () => ({ default: () => null }));
+vi.mock("@/components/branches/BranchOpenDaysForm", () => ({ default: () => null }));
+vi.mock("@/components/branches/BranchUnlockPinCard", () => ({ default: () => null }));
 vi.mock("@/components/ui/Avatar", () => ({ default: () => null }));
 vi.mock("@/components/ui/ScreenWithBg", () => ({
   default: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
@@ -39,9 +44,13 @@ vi.mock("@/repositories/BranchRepository", () => ({
   },
 }));
 
+import BranchEdit from "./BranchEdit";
 import BranchHub from "./BranchHub";
 import BranchesList from "./BranchesList";
 import CompanyBranches from "./CompanyBranches";
+
+const ACTIVE = "branch.status.active";
+const INACTIVE = "branch.status.inactive";
 
 const branch = (id: number, address: string, status?: string): Row => ({
   id,
@@ -56,16 +65,32 @@ const branch = (id: number, address: string, status?: string): Row => ({
   ...(status === undefined ? {} : { status }),
 });
 
-const mountHub = async () => {
+const mountAt = async (entry: string, path: string, element: React.ReactElement) => {
   render(
-    <MemoryRouter initialEntries={["/branches/5"]}>
+    <MemoryRouter initialEntries={[entry]}>
       <Routes>
-        <Route path="/branches/:branchId" element={<BranchHub />} />
+        <Route path={path} element={element} />
       </Routes>
     </MemoryRouter>,
   );
+};
+
+const mountHub = async () => {
+  await mountAt("/branches/5", "/branches/:branchId", <BranchHub />);
   // The address renders once the branch has been fetched.
   await screen.findByText(String(data.branch.address));
+};
+
+/** The one pill a surface draws, and that it is the right one. */
+const expectPill = (scope: Pick<typeof screen, "getByText" | "queryByText">, state: "active" | "inactive") => {
+  const [label, other, className, hint] =
+    state === "active"
+      ? [ACTIVE, INACTIVE, "pill confirmed", "branch.active.hint"]
+      : [INACTIVE, ACTIVE, "pill pending", "branch.inactive.hint"];
+  const pill = scope.getByText(label);
+  expect(pill.className).toBe(className);
+  expect(pill.getAttribute("title")).toBe(hint);
+  expect(scope.queryByText(other)).toBeNull();
 };
 
 // The i18n mock returns keys and `fmt` leaves a key with no placeholders
@@ -86,9 +111,7 @@ describe("the branch hub", () => {
       data.branch = branch(5, "Abovyan 5", "inactive");
       await mountHub();
 
-      const pill = screen.getByText("branch.status.inactive");
-      expect(pill.className).toBe("pill pending");
-      expect(pill.getAttribute("title")).toBe("branch.inactive.hint");
+      expectPill(screen, "inactive");
       expect(screen.getByRole("status").textContent).toBe(NOTICE_WITH_WHERE);
     },
   );
@@ -100,7 +123,7 @@ describe("the branch hub", () => {
     data.branch = branch(5, "Abovyan 5", "inactive");
     await mountHub();
 
-    expect(screen.getByText("branch.status.inactive")).toBeTruthy();
+    expectPill(screen, "inactive");
     expect(screen.getByRole("status").textContent).toBe(NOTICE);
   });
 
@@ -115,13 +138,28 @@ describe("the branch hub", () => {
     }
   });
 
-  test.each([["active"], [undefined]])("status %s shows neither badge nor notice", async (status) => {
+  // Every branch says what it is — an active one is labelled Active, not left
+  // blank. There is nothing to explain, so no notice.
+  test.each([["active"], [undefined]])("status %s reads Active in the header, with no notice", async (status) => {
     data.branch = branch(5, "Abovyan 5", status);
     await mountHub();
 
-    expect(screen.queryByText("branch.status.inactive")).toBeNull();
+    expectPill(screen, "active");
     expect(screen.queryByRole("status")).toBeNull();
   });
+});
+
+describe("the branch settings page", () => {
+  test.each([["inactive", "inactive"], ["active", "active"], [undefined, "active"]] as const)(
+    "status %s shows %s",
+    async (status, shown) => {
+      data.branch = branch(5, "Abovyan 5", status);
+      await mountAt("/branches/5/edit", "/branches/:branchId/edit", <BranchEdit />);
+      await screen.findByText("Abovyan 5");
+
+      expectPill(screen, shown);
+    },
+  );
 });
 
 const LISTED = [
@@ -137,37 +175,34 @@ const rowOf = (address: string): HTMLElement => {
   return row as HTMLElement;
 };
 
-const expectOnlyInactiveBadged = () => {
-  expect(screen.getAllByText("branch.status.inactive")).toHaveLength(1);
-  expect(within(rowOf("Inactive street 1")).getByText("branch.status.inactive")).toBeTruthy();
-  expect(within(rowOf("Active street 2")).queryByText("branch.status.inactive")).toBeNull();
-  expect(within(rowOf("Legacy street 3")).queryByText("branch.status.inactive")).toBeNull();
+const expectEveryRowWithItsState = () => {
+  // One pill per branch — none missing, none doubled.
+  expect(screen.getAllByText(INACTIVE)).toHaveLength(1);
+  expect(screen.getAllByText(ACTIVE)).toHaveLength(2);
+  expectPill(within(rowOf("Inactive street 1")), "inactive");
+  expectPill(within(rowOf("Active street 2")), "active");
+  // A backend that predates the field: active, never a false "Inactive".
+  expectPill(within(rowOf("Legacy street 3")), "active");
 };
 
 describe("the global branch list", () => {
-  test.each(["admin", "company_owner"])("%s: only the inactive branch is badged", async (role) => {
+  test.each(["admin", "company_owner"])("%s: every branch shows its own state", async (role) => {
     auth.user = { id: 1, role };
     data.list = LISTED;
     render(<MemoryRouter><BranchesList /></MemoryRouter>);
     await screen.findByText("Inactive street 1", { exact: false });
 
-    expectOnlyInactiveBadged();
+    expectEveryRowWithItsState();
   });
 });
 
 describe("a company's branch list", () => {
-  test.each(["admin", "company_owner"])("%s: only the inactive branch is badged", async (role) => {
+  test.each(["admin", "company_owner"])("%s: every branch shows its own state", async (role) => {
     auth.user = { id: 1, role };
     data.list = LISTED;
-    render(
-      <MemoryRouter initialEntries={["/companies/3/branches"]}>
-        <Routes>
-          <Route path="/companies/:companyId/branches" element={<CompanyBranches />} />
-        </Routes>
-      </MemoryRouter>,
-    );
+    await mountAt("/companies/3/branches", "/companies/:companyId/branches", <CompanyBranches />);
     await screen.findByText("Inactive street 1");
 
-    expectOnlyInactiveBadged();
+    expectEveryRowWithItsState();
   });
 });

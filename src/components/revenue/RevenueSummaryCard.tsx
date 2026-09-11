@@ -1,4 +1,5 @@
 import type { ICompanyRevenueSummary } from "@/api/billing";
+import { centsWhenFractional } from "@/i18n/currency";
 import { useLang } from "@/i18n/LanguageContext";
 import { useId } from "react";
 
@@ -14,10 +15,16 @@ import { useId } from "react";
  * WAS what was owed — or its row is left out. None is derived here: owner
  * income as "total minus commission" would be a second copy of a server
  * formula, and would drift from it the first time its rounding changes.
+ *
+ * ## Printed to the hundredth when the server's figure has one
+ * The figures are exact to the cent and are read against each other; rounded
+ * to whole units 9000.50 / 900.05 / 8100.45 read "9,001 − 900 = 8,100".
+ * `centsWhenFractional` decides per figure — formatting only, no arithmetic.
  */
 const RevenueSummaryCard = ({ summary }: { summary: ICompanyRevenueSummary }) => {
   const { t, money } = useLang();
   const titleId = useId();
+  const amount = (value: number) => money(value, centsWhenFractional(value));
 
   const { tournaments_count: tournamentsCount, tournaments_total: tournamentsTotal } = summary;
   const totalRevenue = summary.total_gross ?? summary.gross_total;
@@ -28,25 +35,25 @@ const RevenueSummaryCard = ({ summary }: { summary: ICompanyRevenueSummary }) =>
       <h3 id={titleId} className="revenue-card-title">{t("revenue.summaryTitle")}</h3>
 
       <Row k={t("revenue.closedSessions")} v={String(summary.sessions_count ?? 0)} />
-      <Row k={t("revenue.sourceSessions")} v={money(summary.sessions_total)} />
+      <Row k={t("revenue.sourceSessions")} v={amount(summary.sessions_total)} />
       {/* Till takings only ever appear for a month that had any: the
           section is gone, so for every month from here it is zero and a
           row of zeroes is a question nobody needs to ask. */}
-      {summary.pos_total > 0 && <Row k={t("revenue.sourcePos")} v={money(summary.pos_total)} />}
+      {summary.pos_total > 0 && <Row k={t("revenue.sourcePos")} v={amount(summary.pos_total)} />}
       {/* Tournament fees are a live source, so a month without any shows
           zeros — the card keeps its shape from one month to the next. */}
       {tournamentsCount != null && tournamentsTotal != null && (
         <>
           <Row k={t("revenue.tournamentEntries")} v={String(tournamentsCount)} />
-          <Row k={t("revenue.sourceTournaments")} v={money(tournamentsTotal)} />
+          <Row k={t("revenue.sourceTournaments")} v={amount(tournamentsTotal)} />
         </>
       )}
 
       <div className="divider" />
-      <Row k={t("revenue.totalRevenue")} v={money(totalRevenue)} />
+      <Row k={t("revenue.totalRevenue")} v={amount(totalRevenue)} />
       <Row k={t("revenue.cyberPlaceCommission")} v={`${summary.commission_percent}%`} />
-      <Row k={t("revenue.amountOwed")} v={money(owed)} highlight />
-      {summary.owner_income != null && <Row k={t("revenue.ownerIncome")} v={money(summary.owner_income)} />}
+      <Row k={t("revenue.amountOwed")} v={amount(owed)} highlight />
+      {summary.owner_income != null && <Row k={t("revenue.ownerIncome")} v={amount(summary.owner_income)} />}
     </section>
   );
 };

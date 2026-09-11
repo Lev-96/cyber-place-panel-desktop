@@ -130,7 +130,10 @@ describe("the list", () => {
 
     const ann = rowOf("Ann Owner");
     expect(within(ann).getByText("ann@club.test")).toBeTruthy();
-    // The company name is the "view" action: the existing company page.
+    // The owner's name opens the owner's own page; the company name still
+    // opens the existing company page.
+    expect(within(ann).getByRole("link", { name: "Ann Owner" }).getAttribute("href")).toBe("/owners/1");
+    expect(within(rowOf("Bob Nocompany")).getByRole("link", { name: "Bob Nocompany" }).getAttribute("href")).toBe("/owners/2");
     expect(within(ann).getByRole("link", { name: "Cyber Zone" }).getAttribute("href")).toBe("/companies/3");
     expect(within(ann).getByText("Branches: 2")).toBeTruthy();
     expect(within(ann).getByText("Managers: 1")).toBeTruthy();

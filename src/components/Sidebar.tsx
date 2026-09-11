@@ -352,6 +352,19 @@ const Sidebar = () => {
       {can(role, "menu.branches") && (
         <NavLink to="/branches">{t("nav.branches")}</NavLink>
       )}
+      {can(role, "branch.create") && myCompanyId !== null && (
+        // Part of the Branches section, so it is the entry right under it,
+        // indented (`--nested`). An action, not a page: it opens the branch
+        // form over whatever screen the owner is on, and lands them on the
+        // new branch afterwards.
+        <button
+          type="button"
+          className="sidebar-action sidebar-action--nested"
+          onClick={() => setCreatingBranch(true)}
+        >
+          {t("nav.createBranch")}
+        </button>
+      )}
       {role === "manager" && myBranchId !== null && (
         <NavLink to={`/branches/${myBranchId}`}>{t("nav.myBranch")}</NavLink>
       )}
@@ -390,13 +403,6 @@ const Sidebar = () => {
         <NavLink to={myCompanyId !== null ? `/companies/${myCompanyId}` : "/my-company"}>
           {t("nav.myCompany")}
         </NavLink>
-      )}
-      {can(role, "branch.create") && myCompanyId !== null && (
-        // An action, not a page: opens the branch form over whatever screen
-        // the owner is on, and lands them on the new branch afterwards.
-        <button type="button" className="sidebar-action" onClick={() => setCreatingBranch(true)}>
-          {t("nav.createBranch")}
-        </button>
       )}
       {can(role, "menu.managers") && (
         <NavLink to="/managers">{t("nav.managers")}</NavLink>

@@ -87,6 +87,12 @@ describe("the route table", () => {
     const app = readFileSync(path.resolve(__dirname, "../App.tsx"), "utf8");
     expect(app).toMatch(/path="\/owners"\s+element=\{\s*<RoleGuard perm="owner\.view">\s*<Owners \/>/);
   });
+
+  // The owner's own page is as admin-only as the list it opens from.
+  test("guards /owners/:ownerId with the same permission", () => {
+    const app = readFileSync(path.resolve(__dirname, "../App.tsx"), "utf8");
+    expect(app).toMatch(/path="\/owners\/:ownerId"\s+element=\{\s*<RoleGuard perm="owner\.view">\s*<OwnerDetails \/>/);
+  });
 });
 
 describe("owner — My company", () => {
@@ -116,6 +122,23 @@ describe("owner — My company", () => {
 });
 
 describe("owner — + New branch", () => {
+  // Product wording: "the sidebar already has Branches; put Create branch
+  // INSIDE that section". So it is the very next entry after the Branches
+  // link, indented under it — not somewhere further down the column.
+  test("sits directly under Branches, indented as part of that section", () => {
+    signIn("company_owner", { company_id: 5 });
+    mountAt("/");
+
+    const branches = screen.getByRole("link", { name: "nav.branches" });
+    expect(branches.nextElementSibling).toBe(createButton());
+    expect(createButton()!.className).toBe("sidebar-action sidebar-action--nested");
+  });
+
+  test("the nested modifier indents it in the stylesheet", () => {
+    const css = readFileSync(path.resolve(__dirname, "../styles/global.css"), "utf8");
+    expect(css).toMatch(/\.sidebar \.sidebar-action--nested\s*\{[^}]*margin-left:\s*\d+px/);
+  });
+
   test("opens THE branch form for the owner's company", async () => {
     signIn("company_owner", { company_id: 5 });
     mountAt("/");
@@ -182,6 +205,14 @@ describe("admin — Owners", () => {
     const link = screen.getByRole("link", { name: "nav.owners" });
     expect(link.getAttribute("href")).toBe("/owners");
     expect(link.getAttribute("aria-current")).toBe("page");
+  });
+
+  // An owner's own page is inside the section, so the section stays lit.
+  test("stays the current item on an owner's page", () => {
+    signIn("admin");
+    mountAt("/owners/7");
+
+    expect(screen.getByRole("link", { name: "nav.owners" }).getAttribute("aria-current")).toBe("page");
   });
 
   test.each(["company_owner", "manager"] as const)("%s does not", (role) => {

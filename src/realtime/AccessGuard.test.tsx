@@ -3,6 +3,7 @@ import { act, cleanup, render } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { sessionExpiry } from "@/auth/sessionExpiry";
+import { t as translate, type Lang } from "@/i18n/translations";
 import AccessGuard, { branchIdFromPath } from "./AccessGuard";
 
 /**
@@ -24,7 +25,10 @@ const auth = vi.hoisted(() => ({
 }));
 vi.mock("@/auth/AuthContext", () => ({ useAuth: () => auth }));
 
-vi.mock("@/i18n/LanguageContext", () => ({ useLang: () => ({ t: (k: string) => k }) }));
+// `t` echoes the key unless a test swaps in a real language (see the
+// deleted-account cases, which have to prove the sentence follows the panel).
+const i18n = vi.hoisted(() => ({ t: (k: string) => k }));
+vi.mock("@/i18n/LanguageContext", () => ({ useLang: () => ({ t: (k: string) => i18n.t(k) }) }));
 
 const cache = vi.hoisted(() => ({ cleared: 0 }));
 vi.mock("@/api/client", () => ({ apiCache: { clear: () => { cache.cleared += 1; } } }));
@@ -111,6 +115,7 @@ describe("AccessGuard", () => {
     echo.listeners.clear();
     echo.channels = [];
     path = "";
+    i18n.t = (k: string) => k;
   });
 
   test("an unblock makes the open screens re-read themselves", async () => {
@@ -191,12 +196,11 @@ describe("AccessGuard", () => {
     expect(toasts.messages).toEqual([{ kind: "error", text: "Server wording." }]);
   });
 
-  // What `DestroyCompanyTreeService` sends every staff account whose company
-  // was deleted with its owner: a company-scope block, locked out, the
-  // sentence `response.owner.account-deleted`, and NO reason — so `code` is
-  // null on the wire (and absent from an older payload). There is no panel
-  // wording for "your account was deleted", so the server's sentence is what
-  // the person must read, and they must be signed out.
+  // What `DestroyCompanyTreeService` sent before it carried a code (and what a
+  // backend older than this panel still sends): a company-scope block, locked
+  // out, the sentence `response.owner.account-deleted`, and `code` null on the
+  // wire (or absent). Nothing to translate from, so the server's sentence is
+  // what the person must read, and they must be signed out.
   test.each([
     ["null", { code: null, reason: null }],
     ["absent", {}],
@@ -218,6 +222,50 @@ describe("AccessGuard", () => {
     // whose tokens are already gone.
     expect(path).toBe("/branches/5/sessions");
     expect(auth.refreshUser).not.toHaveBeenCalled();
+  });
+
+  // The same deletion, from a backend that sends the reason as a code. The
+  // server's sentence is in the ADMIN's language (their request negotiated
+  // it); the person being signed out must read it in THEIRS.
+  test.each(["en", "ru", "am"] as const)(
+    "an account deleted with its company (code account_deleted) reads in the panel's language: %s",
+    async (lang: Lang) => {
+      i18n.t = (k: string) => translate(k, lang);
+      mountAt("/branches/5/sessions");
+
+      await emit({
+        scope: "company",
+        company_id: 3,
+        branch_ids: [5, 6],
+        locked_out: true,
+        code: "account_deleted",
+        message: "Your account has been deleted.",
+      });
+
+      const own = translate("blocking.reason.account_deleted", lang);
+      expect(own).not.toBe("blocking.reason.account_deleted");
+      expect(toasts.messages).toEqual([{ kind: "error", text: own }]);
+      if (lang !== "en") expect(own).not.toBe("Your account has been deleted.");
+      expect(auth.logout).toHaveBeenCalledTimes(1);
+      expect(path).toBe("/branches/5/sessions");
+      expect(auth.refreshUser).not.toHaveBeenCalled();
+    },
+  );
+
+  // How every panel already in the field treats a code it has never heard of,
+  // and how THIS one must go on treating the next one: the server's sentence,
+  // or — with none — the generic lock-out line. Never the code, never the key.
+  test.each([
+    ["account_suspended", "Suspended by support.", "Suspended by support."],
+    ["account_suspended", null, "blocking.evicted.lockedOut"],
+    ["", "Server wording.", "Server wording."],
+  ])("an unknown code %j is still the server's sentence (message %j)", async (code, message, shown) => {
+    mountAt("/");
+
+    await emit({ locked_out: true, code, message });
+
+    expect(toasts.messages).toEqual([{ kind: "error", text: shown }]);
+    expect(auth.logout).toHaveBeenCalledTimes(1);
   });
 
   test("falls back to its own wording when the server sent no sentence", async () => {

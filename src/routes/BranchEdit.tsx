@@ -10,7 +10,6 @@ import { useAsync } from "@/hooks/useAsync";
 import { useLang } from "@/i18n/LanguageContext";
 import { fmt } from "@/i18n/translations";
 import { branchRepository } from "@/repositories/BranchRepository";
-import { isBranchInactive } from "@/types/branch";
 import { ReactNode, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
@@ -48,12 +47,7 @@ const BranchEdit = () => {
         <Row k={t("branch.rating")} v={data.ratings_avg_rating != null ? Number(data.ratings_avg_rating).toFixed(1) : "-"} />
         {/* Re-read from the server after every save (`reload`), so whoever
             just switched the branch on or off sees the pill turn here. */}
-        <Row
-          k={t("branch.status")}
-          v={isBranchInactive(data.status)
-            ? <BranchStatusPill />
-            : <span className="pill confirmed">{t("branch.status.active")}</span>}
-        />
+        <Row k={t("branch.status")} v={<BranchStatusPill status={data.status} />} />
         <div className="row" style={{ gap: 8, flexWrap: "wrap", marginTop: 6 }}>
           <Button variant="secondary" onClick={() => setEdit(true)}>{t("branchEdit.editInfo")}</Button>
           <Button variant="secondary" onClick={() => setHours(true)}>{t("branch.editTabs.hours")}</Button>

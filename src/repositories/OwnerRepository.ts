@@ -25,7 +25,10 @@ export class OwnerRepository {
     return apiListOwners({ page, search: search || undefined, per_page: OWNERS_PER_PAGE });
   }
 
-  /** The owner with the deletion preview the confirmation is built from. */
+  /**
+   * The owner, their companies' branches and the deletion preview — one read
+   * behind both the owner's page and the delete confirmation.
+   */
   async byId(id: number): Promise<IOwnerDetailApi> {
     return (await apiGetOwner(id)).data;
   }

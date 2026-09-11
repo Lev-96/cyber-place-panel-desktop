@@ -1,6 +1,7 @@
-import type { IOwnerApi, IOwnerCompanyApi } from "@/api/owners";
+import type { IOwnerApi } from "@/api/owners";
 import { useAuth } from "@/auth/AuthContext";
 import { can } from "@/auth/permissions";
+import OwnerCompanyLine from "@/components/owners/OwnerCompanyLine";
 import OwnerDeleteDialog from "@/components/owners/OwnerDeleteDialog";
 import OwnerForm from "@/components/owners/OwnerForm";
 import Button from "@/components/ui/Button";
@@ -10,7 +11,6 @@ import { ListSkeleton } from "@/components/ui/Skeleton";
 import { useAsync } from "@/hooks/useAsync";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useLang } from "@/i18n/LanguageContext";
-import { fmt } from "@/i18n/translations";
 import { ownerRepository } from "@/repositories/OwnerRepository";
 import { memo, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
@@ -24,8 +24,9 @@ const SEARCH_DEBOUNCE_MS = 400;
  * Looks like the Managers screen (same list rows, same inline Edit / Delete),
  * plus what that screen never had: a server-side search (name, email or
  * company name) and pagination — this list is the whole partner base, not one
- * company's staff. "View" is the company link on each row, which opens the
- * company page that already exists; an owner has no page of their own.
+ * company's staff. The owner's name opens their own page (`OwnerDetails`:
+ * companies with their branches); each company name still opens the company
+ * page that already exists.
  */
 const Owners = () => {
   const { t } = useLang();
@@ -115,10 +116,12 @@ const OwnerRow = memo(({ owner, onEdit, onDelete }: RowProps) => {
   return (
     <div className="list-item">
       <div className="col" style={{ gap: 4, flex: 1, minWidth: 0 }}>
-        <div className="name">{owner.name}</div>
+        <div className="name">
+          <Link to={`/owners/${owner.id}`} className="owner-link" title={t("owners.openOwner")}>{owner.name}</Link>
+        </div>
         <div className="meta">{owner.email}</div>
         {companies.length === 0 && <div className="meta">{t("owners.noCompany")}</div>}
-        {companies.map((c) => <CompanyLine key={c.id} company={c} />)}
+        {companies.map((c) => <OwnerCompanyLine key={c.id} company={c} />)}
       </div>
       {(onEdit || onDelete) && (
         <div className="row" style={{ gap: 8, flexShrink: 0 }}>
@@ -134,20 +137,6 @@ const OwnerRow = memo(({ owner, onEdit, onDelete }: RowProps) => {
   );
 });
 OwnerRow.displayName = "OwnerRow";
-
-/** A company of the owner: its name opens the company page (the "view"), then counts and state. */
-const CompanyLine = ({ company: c }: { company: IOwnerCompanyApi }) => {
-  const { t } = useLang();
-  return (
-    <div className="meta row" style={{ gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-      <Link to={`/companies/${c.id}`} title={t("owners.openCompany")}>{c.name}</Link>
-      <span>{fmt(t("owners.branches"), c.branches_count)}</span>
-      <span>{fmt(t("owners.managers"), c.managers_count)}</span>
-      <span className={`pill ${c.status}`}>{t(`company.status.${c.status}`)}</span>
-      {c.is_blocked && <span className="pill blocked">{t("blocking.state.company")}</span>}
-    </div>
-  );
-};
 
 // Same compact inline buttons as the Managers rows.
 const btn: React.CSSProperties = { padding: "6px 10px", fontSize: 12, minWidth: 80, textAlign: "center" };

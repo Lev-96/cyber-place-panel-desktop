@@ -147,7 +147,9 @@ const BranchHub = () => {
                   {data.blocked_at ? t("blocking.state.branch") : t("blocking.state.byCompany")}
                 </span>
               )}
-              {inactive && <BranchStatusPill />}
+              {/* Always drawn: an active branch is labelled Active too. Only
+                  an inactive one also gets the notice below. */}
+              <BranchStatusPill status={data.status} />
             </div>
             <div className="muted">{data.company?.name ?? ""} · {data.country}, {data.city}</div>
           </div>

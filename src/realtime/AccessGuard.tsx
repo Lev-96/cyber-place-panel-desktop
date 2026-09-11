@@ -1,4 +1,4 @@
-import { blockingKeyFor } from "@/api/blockingErrors";
+import { lockoutKeyFor } from "@/api/blockingErrors";
 import { useRealtimeVersion } from "@/realtime/useRealtimeVersion";
 import { apiCache } from "@/api/client";
 import { accessVersion } from "@/realtime/accessVersion";
@@ -54,7 +54,10 @@ interface AccessChangedPayload {
   branch_ids: number[];
   locked_out: boolean;
   message: string | null;
-  /** Machine-readable reason (`company_blocked` / `branch_blocked`), for translation. */
+  /**
+   * Machine-readable reason, for translation: a block code (`company_blocked` /
+   * `branch_blocked`) or `account_deleted`. Null/absent on an older backend.
+   */
   code?: string | null;
   reason?: "company" | "branch" | null;
   at: string;
@@ -112,7 +115,7 @@ const AccessGuard = () => {
         // The panel's own wording, keyed off the code, so the person reads the
         // reason in the language they are working in. `message` is the server's
         // sentence and is only reached for a code this build does not know.
-        const key = blockingKeyFor(payload.code);
+        const key = lockoutKeyFor(payload.code);
         notify.message(
           "error",
           key ? now.t(key) : (payload.message || now.t("blocking.evicted.lockedOut")),

@@ -1,4 +1,5 @@
 import type { CompanyStatusType, PaginatedList } from "@/types/api";
+import type { BranchStatus } from "@/types/branch";
 import type { ApiError } from "./client";
 import { request } from "./client";
 
@@ -74,8 +75,34 @@ export interface IOwnerDeletionPreviewApi {
   blockers: ITenantDeletionBlockerApi[];
 }
 
-/** `GET /admin/owners/{id}` — the owner plus the deletion preview (only here). */
+/**
+ * A branch of one of the owner's companies — `companies[].branches[]`, single
+ * read only. Nullable exactly where `OwnerResource::branch()` declares it
+ * (`?string`): the page falls back to `№{id}` / "-" and reads a null status
+ * as active, the same rule as an absent one.
+ */
+export interface IOwnerBranchApi {
+  id: number;
+  address: string | null;
+  city: string | null;
+  status: BranchStatus | null;
+  /** Effective block: the branch's own or its company's (`Branch::isEffectivelyBlocked()`). */
+  is_blocked: boolean;
+}
+
+/** A company on the single read: the list row's fields plus its branches. */
+export interface IOwnerDetailCompanyApi extends IOwnerCompanyApi {
+  /**
+   * Present only on `GET /admin/owners/{id}` (the list does not pay for it).
+   * Optional because a backend that predates it omits the key — the page then
+   * shows the counts alone. An empty array means the company has no branches.
+   */
+  branches?: IOwnerBranchApi[];
+}
+
+/** `GET /admin/owners/{id}` — the owner, their companies' branches and the deletion preview (only here). */
 export interface IOwnerDetailApi extends IOwnerApi {
+  companies?: IOwnerDetailCompanyApi[];
   deletion: IOwnerDeletionPreviewApi;
 }
 
