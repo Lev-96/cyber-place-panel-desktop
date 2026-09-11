@@ -218,6 +218,18 @@ pos · places · ps5 · sessions · tournaments · revenue · services · scanne
 - **i18n:** language codes are `en` / `ru` / `am` (NOT `hy`). Use the
   `t()` helper from `LanguageContext` and `money()` for currency.
   Watch for duplicate translation keys.
+- **No em dash in user-facing text.** A rendered string must never contain
+  `—`: use a hyphen, a colon, or two sentences instead; in Armenian use `՝`
+  or `։`, as the other repos now do. It covers `src/i18n/translations.ts`
+  values, toast/notification/dialog copy and any literal rendered in JSX.
+  Comments and docs (this file included) are out of scope.
+  Check: `git grep -n "—" -- src`, then classify each hit as (a) user-facing
+  (fix), (b) technical or log output (leave), (c) comment or doc (leave).
+  A sweep on 2026-09-12 fixed 24 strings here (5 in the backend, 3 in the
+  kiosk agent); what remains in `src` is comments and log/dev output only.
+  ⚠️ The **en dash** `–` is deliberate in ranges and must stay: `0–100%`
+  (`commission.hint`), `4–6` digits (`unlockPin.*`) and the `HH:MM–HH:MM`
+  discount window on `BranchPricesPage`.
 - **24-hour clock everywhere.** No AM/PM on any surface. Never call
   `toLocaleTimeString` without `hour12: false`.
 - **Currency follows language.** Live FX rates (open.er-api.com) cached
@@ -983,18 +995,36 @@ sides. If you meet "awaiting approval" wording anywhere, it predates this.)
     value would let a form opened before somebody else switched the branch
     quietly switch it back. The backend applies it for admin and the owner of
     the branch's company and drops it for anyone else.
-- Indicator: `BranchStatusPill status={…}` — drawn for EVERY branch, both
-  states, so a list reads "Branch 1 Active / Branch 2 Inactive". Inactive =
-  `pill pending` (amber), tooltip `branch.inactive.hint`; Active = `pill
-  confirmed` (green), tooltip `branch.active.hint`. Absent `status` (older
-  backend) renders Active via `branchStatusOf`. One component, one lookup
-  table (`LOOK`, `satisfies Record<BranchStatus, …>`); callers no longer gate
-  it with `isBranchInactive`. Used on `BranchesList`, `CompanyBranches`, the
-  `BranchHub` header, the `BranchEdit` status row and the owner page
-  (§9.5.8). The hub still adds the `state-notice` for an inactive branch
-  ONLY: the same sentence for owner and admin plus where the switch is
-  (Settings → Edit info → Active); a manager, who cannot switch it, gets the
-  sentence alone. An inactive branch is NOT read-only.
+  - **Position (2026-09-12): the status block is the LAST block of the
+    form** — after the location block (map, Latitude / Longitude and the
+    auto-locate hint), directly before Cancel / Save. The venue is described
+    first; whether players can see it is the decision next to the button that
+    commits it. Order only: create still ALWAYS sends `status` (starting on
+    Active), edit still sends it ONLY when moved. Pinned by the "toggle's
+    position" cases in `BranchForm.status.test.tsx` (DOM order, create and
+    edit).
+- Indicator: `BranchStatusPill status={…}`, unchanged. In every branch LIST
+  (`BranchesList`, `CompanyBranches`, the admin's owner page) the row is
+  `BranchListRow` (`src/components/branches/BranchListRow.tsx`), one component
+  for all three: logo, then a text block (name, meta under it), then the pills
+  as their OWN flex item, then "Open". Status is always the last pill,
+  "Blocked" (when it applies) right before it. The pill used to be inline text
+  inside the name or the meta line and read "Abovyan 5Active"; it may never go
+  back inside `.name`. CSS `.branch-row__*` (global.css, after
+  `.list-item .meta`): only the text block shrinks (`flex: 1 1 auto;
+  min-width: 0`) and wraps (`overflow-wrap: anywhere`); pills and "Open" are
+  `flex: 0 0 auto` + `nowrap`, so a long address can neither push nor clip
+  them, and the status pills line up in one column down the list. The old
+  `.owner-branch*` rules are gone. Inactive = `pill pending` (amber), tooltip
+  `branch.inactive.hint`; Active = `pill confirmed` (green), tooltip
+  `branch.active.hint`. Absent `status` (older backend) renders Active via
+  `branchStatusOf`. One component, one lookup table (`LOOK`, `satisfies
+  Record<BranchStatus, …>`); callers no longer gate it with
+  `isBranchInactive`. The `BranchHub` header and the `BranchEdit` status row
+  still use the bare pill. The hub still adds the `state-notice` for an
+  inactive branch ONLY: the same sentence for owner and admin plus where the
+  switch is (Settings → Edit info → Active); a manager, who cannot switch it,
+  gets the sentence alone. An inactive branch is NOT read-only.
 - Refresh after saving is the existing path: the update is
   `POST /branches/{id}?_method=PUT`, whose write fans out to every `/branches`
   entry in `httpCache`, and `BranchEdit` re-reads via `reload()`. Pinned in
@@ -1007,6 +1037,12 @@ getting the hub pointer: each fails the suite). `BranchStatus.indicator.test.tsx
 now pins one pill per branch with the right state on the hub, both lists and the
 settings page (active, inactive, absent → active). Mutation-verified (active
 pill returns null; absent read as inactive; hub header back to inactive-only).
+Since 2026-09-12 it also carries "row layout" for both lists (the name holds
+the title only, the pills are the text block's next sibling, order
+Blocked-then-status, "Open" after, plus the CSS rules), and
+`OwnerDetails.test.tsx` carries the same check for the owner page.
+Mutation-verified: pill back inside the name; status before Blocked;
+`min-width: 0` removed.
 
 ## 9.5.5 How far ahead a reservation holds a seat (2026-09-11)
 
@@ -1060,28 +1096,46 @@ session update.
   matching now covers `/companies/{id}/branches` and `/companies/{id}/revenue`.
   `/my-company` stays for old hash bookmarks and is still the target for an
   owner with no company (it explains that).
-- **"+ New branch"** (`branch.create` AND a `dashboard.company_id`) is the entry
-  DIRECTLY UNDER the "Branches" link — part of that section, per the product
-  owner ("inside Branches, a Create branch button"). Indented with
-  `.sidebar .sidebar-action--nested` (margin-left 16px) on top of
-  `.sidebar-action` (dashed border, accent text, no active state — it opens a
-  form, not a page). It opens THE `BranchForm` from the sidebar's local state —
-  the `UserMenu → ProfileModal` idiom; there is no global modal host. It is
-  lazy-imported there so the map and phone libraries stay out of the first
-  paint. After saving it navigates to `/branches/{id}` (a fresh read; the POST
-  already dropped cached listings).
+- **There is no create action in the sidebar** (removed 2026-09-12). The nav
+  column holds links only. Creating a branch is the primary button in the header
+  of the Branches page (`BranchesList`, §9.5.7a). The `.sidebar-action` /
+  `.sidebar-action--nested` styles and the sidebar's lazy `BranchForm` import
+  went with it.
 
-Tests: `Sidebar.ownerNav.test.tsx` — active on all three company routes (and
-asserts over `App.tsx` that those routes and the `/owners` guard still exist),
-not active elsewhere, fallback, the form opened is the mocked BranchForm module
-with the owner's company id, navigation after save, hidden without company or
-permission. Mutation-verified (link back to `/my-company`, `end` on the link,
-button without the company check, no navigate). It also asserts the button is
-the `nextElementSibling` of the Branches link with class
-`sidebar-action sidebar-action--nested`, that `global.css` indents the modifier,
-that `/owners/:ownerId` is guarded by `owner.view` in `App.tsx`, and that the
-Owners item stays current on `/owners/7`. Mutation-verified (button back after
-"My company"; button without the nested class).
+Tests: `Sidebar.ownerNav.test.tsx` — "My company" active on all three company
+routes (and the route-table asserts over `App.tsx`, including that
+`/owners/:ownerId` is guarded by `owner.view`), not active elsewhere,
+`/my-company` fallback, Owners for admin only and lit on `/owners/7`; and the
+navigation holds no button for owner / admin / manager, Branches is followed by
+a link, `Sidebar.tsx` does not mention `BranchForm`, `global.css` has no
+`sidebar-action`. Mutation-verified (link back to `/my-company`, `end` on the
+link, create button put back under Branches).
+
+## 9.5.7a "+ New branch" on the Branches page (2026-09-12)
+
+- `BranchesList` (`/branches`) draws "+ New branch" (`branchesList.newBranch`,
+  en "+ New branch" / ru "+ Создать филиал" / am "+ Ստեղծել մասնաճյուղ") as the
+  header action: a `row-between` row above the list with the `Button` on the
+  right, the same shape as Managers. Visible exactly when the sidebar entry was:
+  `branch.create` AND a numeric `dashboard.company_id`. That means the owner; an
+  admin has the permission but no company of their own and creates from a
+  company page, and a manager lacks the permission.
+- It opens THE `BranchForm` with `companyId = dashboard.company_id`, create mode.
+- After saving: close the form and `reload()` the page on screen, the same
+  handling as `CompanyBranches` / `CompanyDetails`. No navigation. The POST
+  already dropped every cached `/branches` listing, and the repository's
+  "created" toast confirms the save even when the new branch lands on a later
+  page (the backend lists in id order, 12 per page).
+- `CompanyBranches` keeps its own "+ New branch" button (same form). Its label
+  key is `companyBranches.newBranch` ("+ Новый филиал" in ru), and the company
+  page's is `company.addBranch`: three wordings for one action, left as they
+  were.
+
+Tests: `src/routes/BranchesList.create.test.tsx` (7): header button above the
+list and last in its row, opens the mocked `BranchForm` module with company 5
+and no `initial`, save closes + re-reads page 1 and stays on `/branches`, cancel
+asks nothing, hidden for an owner without company, for admin, for manager.
+Mutation-verified (no company check; save without re-read).
 
 ## 9.5.8 Owners (admin, 2026-09-11)
 
@@ -1109,8 +1163,9 @@ middleware; `{owner}` resolves only a `company_owner`, anything else is 404).
   `ownerRepository.byId` → `GET /admin/owners/{id}` — the same read the delete
   dialog uses; `/admin/*` GETs are not in the `httpCache` policies, so both are
   fresh. Shows name, email, registered date (`formatDate`), then a card per
-  company: its `OwnerCompanyLine`, and under it `companies[].branches` as list
-  rows (address, city, `BranchStatusPill`, "Blocked" when `is_blocked`) linking
+  company: its `OwnerCompanyLine`, and under it `companies[].branches` as
+  `BranchListRow` rows (address, city, then the pills as their own element,
+  "Blocked" when `is_blocked` and the `BranchStatusPill` last — §9.5.4) linking
   to `/branches/{id}`. `branches` is typed optional
   (`IOwnerDetailCompanyApi.branches?`): **absent = older backend → counts only,
   never "No branches yet."**; `[]` = the company really has none. A
@@ -1210,8 +1265,8 @@ present.
 The server's figures are exact to the cent, and the card is read as a
 statement: total, what is owed, and owner income. Rounded to whole units,
 9000.50 / 900.05 / 8100.45 printed as "9,001 − 900 = 8,100", which does not add
-up. On THIS screen only (`RevenueSummaryCard`, `BranchRevenueTable`), every
-amount goes through `money(value, centsWhenFractional(value))`:
+up. On THIS screen only (`RevenueSummaryCard`, for the company card and for a
+branch's), every amount goes through `money(value, centsWhenFractional(value))`:
 
 - the server value has non-zero cents: exactly two decimals ("9,000.50", never
   "9,000.5");
@@ -1226,16 +1281,46 @@ Intl throws a RangeError for min 2 with the AMD default max 0. The global
 `money()` default (whole units) is unchanged. `currency.precision.test.ts`
 pins "asking for nothing changes nothing".
 
-### Per-branch table (`BranchRevenueTable.tsx`)
-Shown only when `branches.length > 1`. With one branch, the table would repeat
-the card. The server lists every branch in id order, zero rows included, so
-the table keeps the same shape from month to month. Columns: Branch (address,
-or `№{id}` when it is null), Sessions (+ "Closed: n"), POS (only when some
-branch has `pos_total > 0`), Tournaments (+ "Entries: n"), Total revenue
-(`total_gross`), Cyber Place commission (the branch's `commission_amount`,
-which is on its `total_gross`), Owner income. There is no totals row: a branch
-commission can differ from its share of the company commission by 0.01, and the
-company figures in the card above are the authoritative ones.
+### Branch selector (replaced the per-branch table, 2026-09-12)
+`BranchRevenueTable` is gone; no per-branch TABLE is rendered any more. The
+toolbar under the title holds the month picker and, when the response lists
+MORE THAN ONE branch, a branch selector: the repo's picker idiom (a `.label` +
+native `select.input`, as on the Revenue screen's company picker; there is no
+Select component in `src/components/ui`). Options: "All branches"
+(`revenue.allBranches`, the default) then every row of `branches[]` in the
+server's order, labelled by address or `№{branch_id}` (`branchLabel`). The
+closed control is `flex: 0 1 360px` and ellipsizes a long label, with the full
+label in its `title` and each option's.
+
+- **Hidden when `branches` is absent (older backend), empty, or has ONE row**
+  (`selectableBranches`): one branch is the company, and offering it beside
+  "All branches" would show the same figures twice.
+- **All branches** = the company card exactly as before (same keys, same
+  older-backend fallbacks, title `revenue.summaryTitle`).
+- **A branch** = the SAME card (`RevenueSummaryCard`) with that branch's row,
+  titled `revenue.branchSummaryTitle` ("Revenue for the month: {0}") so a
+  branch's figures are never read as the company's. Rows: `sessions_count`,
+  `sessions_total`, `pos_total` (only if > 0), `tournaments_count` /
+  `tournaments_total` (always, zeros included), `total_gross`, the COMPANY's
+  `commission_percent` (a branch has no rate of its own; its
+  `commission_amount` is charged at the company rate on its `total_gross`),
+  the branch's `commission_amount` as the highlighted owed row, `owner_income`.
+  A branch with nothing that month prints zeros, the existing convention. The
+  cents rule applies per figure as before.
+- Picking is a filter over the response on screen: no request.
+- **Across months:** the choice is kept if the new answer still lists that
+  branch as a choice; otherwise the screen falls back to All AND forgets the id
+  (a branch that reappears a month later is not re-selected on its own). A
+  month with one branch hides the selector and shows the company. While a month
+  loads: the skeleton, no card, and the select is disabled, so a choice only
+  ever applies to figures on screen. A failed load keeps the choice for Retry.
+- Key picking lives in `src/components/revenue/revenueFigures.ts`
+  (`companyFigures`, `branchFigures`, `branchLabel`, `selectableBranches`),
+  pure and arithmetic-free; `RevenueSummaryCard` takes `figures` + `title`.
+- i18n: added `revenue.branch`, `revenue.allBranches`,
+  `revenue.branchSummaryTitle`; removed the table's `revenue.byBranch`,
+  `revenue.colBranch`, `revenue.colTournaments`, `revenue.closedCount`,
+  `revenue.entriesCount` (the Armenian "Մասնակից՝ n" note no longer applies).
 
 ### Loading behaviour
 - Only the latest request lands (`requestSeq` ref). Flipping months quickly can
@@ -1250,21 +1335,30 @@ company figures in the card above are the authoritative ones.
 
 ### Styles
 `global.css` → "Revenue (CompanyRevenueScreen)" block: `.revenue-card`,
-`.revenue-card-title`, `.revenue-table*`. The month picker buttons are 40px
+`.revenue-card-title` (now `overflow-wrap: anywhere` for a long branch title),
+`.revenue-toolbar` (flex, wrap, bottoms aligned, gap 16/24),
+`.revenue-branch-field`, `.revenue-branch-select` (min-height 40, ellipsis).
+All `.revenue-table*` rules are removed. The month picker buttons are 40px
 (desktop target minimum) and the month label uses tabular digits, so the next
-button stays under the cursor. The Armenian "Entries: n" label is "Մասնակից՝ n"
-on purpose. The longer "Մասնակցություններ" set the width of the whole column
-at 1280px.
+button stays under the cursor.
 
 ### Tests
-`src/components/revenue/CompanyRevenueScreen.test.tsx` (9 tests): `money` is
-mocked to print the number exactly as received, so a re-derived figure shows up
-in the output. `RevenueAmounts.test.tsx` (4 tests): the REAL formatter with the
-live E2E figures, covering cents where the server has them and none where it
-does not, on the card and in the table. `currency.precision.test.ts` covers the
-helper. Mutation-verified: helper without a minimum; helper that gives whole
-amounts cents; card or table back on plain `money()`; formatter without the
-max≥min clamp; `Number.isInteger` instead of the cent test.
+`src/components/revenue/CompanyRevenueScreen.test.tsx`: `money` is mocked to
+print the number exactly as received, so a re-derived figure shows up in the
+output — summary (4), selector (7: hidden for one branch / empty list / older
+backend; default All with options; a branch's row verbatim with no extra
+request and owner income deliberately NOT total minus commission; empty branch
+zeros; back to All), across months (3: kept with the new month's figures and
+nothing painted or selectable while loading; gone, back to All and stays there;
+one-branch month), loading (2). `RevenueAmounts.test.tsx`: the REAL formatter
+with the live E2E figures, on the company card and on a branch card.
+`revenueFigures.test.ts`: the key mapping, labels, `selectableBranches`.
+`currency.precision.test.ts` covers the helper. Mutation-verified: helper
+without a minimum; helper that gives whole amounts cents; card back on plain
+`money()`; formatter without the max≥min clamp; `Number.isInteger` instead of
+the cent test; branch owner income derived; branch owed computed from the rate;
+selector for a single branch; stale selection kept; select not locked while
+loading; card painted while loading; first branch selected by default.
 
 ## 9.5.10 Tournament registrations — removing one (2026-09-11)
 
