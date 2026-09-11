@@ -207,6 +207,12 @@ pos · places · ps5 · sessions · tournaments · revenue · services · scanne
   `inputMode="decimal"`), never `type="number"`.
 - **Confirm dialogs:** never use native `window.confirm()` — it poisons
   renderer focus on Linux WMs. Use the in-app `ConfirmDialog`.
+  ⚠️ **Known debt — the rule is not yet true of the whole app.** Three native
+  `confirm()` calls are still in HEAD. They predate PA-D and are out of its
+  scope: `src/routes/BranchEdit.tsx:34` (delete branch),
+  `src/routes/Notifications.tsx:119` (clear all), and
+  `src/routes/BranchPricesPage.tsx:53` (delete tariff). Each should move to
+  `useConfirm()` in its own change.
 - **DevTools:** auto-detached DevTools also break renderer focus. Gate
   with `ELECTRON_DEVTOOLS=1` env var.
 - **i18n:** language codes are `en` / `ru` / `am` (NOT `hy`). Use the
@@ -977,11 +983,17 @@ sides. If you meet "awaiting approval" wording anywhere, it predates this.)
     value would let a form opened before somebody else switched the branch
     quietly switch it back. The backend applies it for admin and the owner of
     the branch's company and drops it for anyone else.
-- Indicator: `BranchStatusPill` ("Inactive", `pill pending`, tooltip "players
-  can't see this branch") on `BranchesList`, `CompanyBranches`, the
-  `BranchHub` header and the `BranchEdit` status row. The hub adds a
-  `state-notice`: the same sentence for owner and admin plus where the switch
-  is (Settings → Edit info → Active); a manager, who cannot switch it, gets the
+- Indicator: `BranchStatusPill status={…}` — drawn for EVERY branch, both
+  states, so a list reads "Branch 1 Active / Branch 2 Inactive". Inactive =
+  `pill pending` (amber), tooltip `branch.inactive.hint`; Active = `pill
+  confirmed` (green), tooltip `branch.active.hint`. Absent `status` (older
+  backend) renders Active via `branchStatusOf`. One component, one lookup
+  table (`LOOK`, `satisfies Record<BranchStatus, …>`); callers no longer gate
+  it with `isBranchInactive`. Used on `BranchesList`, `CompanyBranches`, the
+  `BranchHub` header, the `BranchEdit` status row and the owner page
+  (§9.5.8). The hub still adds the `state-notice` for an inactive branch
+  ONLY: the same sentence for owner and admin plus where the switch is
+  (Settings → Edit info → Active); a manager, who cannot switch it, gets the
   sentence alone. An inactive branch is NOT read-only.
 - Refresh after saving is the existing path: the update is
   `POST /branches/{id}?_method=PUT`, whose write fans out to every `/branches`
@@ -991,7 +1003,10 @@ sides. If you meet "awaiting approval" wording anywhere, it predates this.)
 Tests: `BranchForm.status.test.tsx`, `BranchStatus.indicator.test.tsx`,
 `types/branch.test.ts`, `permissions.test.ts` — mutation-verified (edit
 always-sends, create never-sends, owner without `branch.status`, manager
-getting the hub pointer: each fails the suite).
+getting the hub pointer: each fails the suite). `BranchStatus.indicator.test.tsx`
+now pins one pill per branch with the right state on the hub, both lists and the
+settings page (active, inactive, absent → active). Mutation-verified (active
+pill returns null; absent read as inactive; hub header back to inactive-only).
 
 ## 9.5.5 How far ahead a reservation holds a seat (2026-09-11)
 
@@ -1045,20 +1060,28 @@ session update.
   matching now covers `/companies/{id}/branches` and `/companies/{id}/revenue`.
   `/my-company` stays for old hash bookmarks and is still the target for an
   owner with no company (it explains that).
-- **"+ New branch"** (`branch.create` AND a `dashboard.company_id`) opens THE
-  `BranchForm` from the sidebar's local state — the `UserMenu → ProfileModal`
-  idiom; there is no global modal host. It is lazy-imported there so the map
-  and phone libraries stay out of the first paint. After saving it navigates to
-  `/branches/{id}` (a fresh read; the POST already dropped cached listings).
-  Styled `.sidebar .sidebar-action` (dashed border, accent text, no active
-  state — it opens a form, not a page).
+- **"+ New branch"** (`branch.create` AND a `dashboard.company_id`) is the entry
+  DIRECTLY UNDER the "Branches" link — part of that section, per the product
+  owner ("inside Branches, a Create branch button"). Indented with
+  `.sidebar .sidebar-action--nested` (margin-left 16px) on top of
+  `.sidebar-action` (dashed border, accent text, no active state — it opens a
+  form, not a page). It opens THE `BranchForm` from the sidebar's local state —
+  the `UserMenu → ProfileModal` idiom; there is no global modal host. It is
+  lazy-imported there so the map and phone libraries stay out of the first
+  paint. After saving it navigates to `/branches/{id}` (a fresh read; the POST
+  already dropped cached listings).
 
 Tests: `Sidebar.ownerNav.test.tsx` — active on all three company routes (and
 asserts over `App.tsx` that those routes and the `/owners` guard still exist),
 not active elsewhere, fallback, the form opened is the mocked BranchForm module
 with the owner's company id, navigation after save, hidden without company or
 permission. Mutation-verified (link back to `/my-company`, `end` on the link,
-button without the company check, no navigate).
+button without the company check, no navigate). It also asserts the button is
+the `nextElementSibling` of the Branches link with class
+`sidebar-action sidebar-action--nested`, that `global.css` indents the modifier,
+that `/owners/:ownerId` is guarded by `owner.view` in `App.tsx`, and that the
+Owners item stays current on `/owners/7`. Mutation-verified (button back after
+"My company"; button without the nested class).
 
 ## 9.5.8 Owners (admin, 2026-09-11)
 
@@ -1077,9 +1100,23 @@ middleware; `{owner}` resolves only a `company_owner`, anything else is 404).
   to the query it was chosen for, so a new search requests page 1 once — no
   reset effect, no wasted request. A page that vanishes after a delete steps
   back to the last existing page. Rows are memoised.
-- Each row: name, email, and per company a link to the EXISTING company page
-  (that is the "view" — owners have no page of their own), branches / managers
-  counts, the company status pill and the blocked pill.
+- Each row: the owner's NAME links to `/owners/{id}` (the owner page, below);
+  email; and per company (`OwnerCompanyLine`, shared with the owner page) a
+  link to the EXISTING company page, branches / managers counts, the company
+  status pill and the blocked pill.
+- **Owner page** `/owners/:ownerId` (`src/routes/OwnerDetails.tsx`, RoleGuard
+  `owner.view`; the Owners sidebar item stays lit by prefix match). One read,
+  `ownerRepository.byId` → `GET /admin/owners/{id}` — the same read the delete
+  dialog uses; `/admin/*` GETs are not in the `httpCache` policies, so both are
+  fresh. Shows name, email, registered date (`formatDate`), then a card per
+  company: its `OwnerCompanyLine`, and under it `companies[].branches` as list
+  rows (address, city, `BranchStatusPill`, "Blocked" when `is_blocked`) linking
+  to `/branches/{id}`. `branches` is typed optional
+  (`IOwnerDetailCompanyApi.branches?`): **absent = older backend → counts only,
+  never "No branches yet."**; `[]` = the company really has none. A
+  non-integer id renders "Invalid owner id" and asks nothing. Edit = THE
+  `OwnerForm` → re-read; Delete = THE `OwnerDeleteDialog` → `navigate("/owners",
+  {replace: true})` (there is nothing left to show).
 - Edit: `OwnerForm` modal, name + email only (no password — the reset flow
   stays), `PUT`; a taken email is the server's 422, shown per field.
 - Delete: `OwnerDeleteDialog` on the in-app `ConfirmDialog` (never native
@@ -1093,16 +1130,51 @@ middleware; `{owner}` resolves only a `company_owner`, anything else is 404).
   After a delete the list re-reads.
 - `ConfirmDialog` gained `confirmDisabled` (additive; `ConfirmProvider`
   unchanged).
+- `.btn.secondary.is-danger` (global.css, Owners block) is the destructive
+  secondary button — token-derived colours. Older screens still carry the
+  inline `color/borderColor` pair; migrate them when touched.
 - The people whose company was deleted get `StaffAccessChanged {action: block,
-  locked_out: true, code: null, message: "Your account has been deleted."}`.
-  `AccessGuard` already signs them out and shows the message — pinned in
-  `AccessGuard.test.tsx` for both `code: null` and an absent `code`. The
-  sentence is in the language the ADMIN's request negotiated, because the event
-  carries no code the panel could translate from.
+  locked_out: true, code: "account_deleted", message: "Your account has been
+  deleted."}`. `AccessGuard` signs them out and shows the panel's OWN sentence
+  for that code (`blocking.reason.account_deleted`, en/ru/am), not the
+  server's, which is in the language the ADMIN's delete request negotiated.
+  The code is mapped by `lockoutKeyFor` (`src/api/blockingErrors.ts`): every
+  block code plus the lock-out-only reasons (`LOCKOUT_ONLY`). It is
+  deliberately NOT in the block set (`KNOWN`), because `blockedBodyOf` answers
+  the login screen's "was this a block?" and a deletion is a different fact.
+  An unknown code (or a null/absent one, which is what a backend older than
+  this sends) still shows the server's `message`, falling back to
+  `blocking.evicted.lockedOut` when there is none. That is the committed
+  behaviour of every panel in the field, and it is pinned.
+  Tests: `AccessGuard.test.tsx` (account_deleted in en/ru/am with the real
+  translations; unknown code with and without a message; code null/absent) and
+  `blockingErrors.test.ts` (`lockoutKeyFor`; account_deleted is not a block;
+  the key exists in all three languages). Mutation-verified: AccessGuard back
+  on `blockingKeyFor`; `LOCKOUT_ONLY` dropped; account_deleted added to
+  `KNOWN`; every string code given a key; server message ignored for an
+  unknown code.
 
-Tests: `Owners.test.tsx` (transport-level: URL, verb, body), mutation-verified
-(confirm allowed despite blockers, 409 not parsed, no reload after delete,
-PUT→PATCH, confirm without a preview, search keeping the old page).
+**Contract:** `GET /admin/owners/{id}` → `data.companies[].branches[]`:
+`{id, address: ?string, city: ?string, status: "active"|"inactive"|null,
+is_blocked}` (nullability as `OwnerResource::branch()` declares it) — single
+read only, not on the list. Mirrored in `src/api/owners.ts`
+(`IOwnerBranchApi`, `IOwnerDetailCompanyApi`, `IOwnerDetailApi.companies`).
+The page renders a null address as `№{id}`, a null city as "-", a null status
+as Active (`BranchStatusPill` accepts `BranchStatus | null | undefined`).
+Pinned by the "null fields" case in `OwnerDetails.test.tsx` (mutation-verified:
+unguarded `LOOK[status]` crashes the page; raw null address).
+
+Tests: `Owners.test.tsx` (transport-level: URL, verb, body; also pins the name
+link), mutation-verified (confirm allowed despite blockers, 409 not parsed, no
+reload after delete, PUT→PATCH, confirm without a preview, search keeping the
+old page, list name not a link). `OwnerDetails.test.tsx` (14, transport-level
+like `Owners.test.tsx`): identity + date, companies with link/counts/status/
+blocked, branches with address/city/status/link inside their company card, empty
+list, missing `branches` key (counts only), no company, failed read, invalid id
+(zero requests), back link, edit → PUT + re-read, delete → DELETE + `/owners`,
+cancel, no buttons without permissions, null fields. Mutation-verified (branches ignored;
+missing key treated as `[]`; delete re-reads instead of leaving; edit without
+re-read).
 
 ## 9.5.9 Revenue screen — tournaments, owner income, per branch (2026-09-11)
 
@@ -1133,6 +1205,26 @@ inconsistent fixture figures.
 Company-level `commission_amount` keeps its old meaning: commission on sessions
 plus POS only. Do not print it as "owed" when `total_commission_amount` is
 present.
+
+### Amounts to the hundredth (2026-09-11)
+The server's figures are exact to the cent, and the card is read as a
+statement: total, what is owed, and owner income. Rounded to whole units,
+9000.50 / 900.05 / 8100.45 printed as "9,001 − 900 = 8,100", which does not add
+up. On THIS screen only (`RevenueSummaryCard`, `BranchRevenueTable`), every
+amount goes through `money(value, centsWhenFractional(value))`:
+
+- the server value has non-zero cents: exactly two decimals ("9,000.50", never
+  "9,000.5");
+- a whole value: no decimals, byte-identical to plain `money()`;
+- decided per amount, from the server's own value. The screen still does no
+  arithmetic. Sub-cent float noise (9000.004) counts as whole.
+
+`centsWhenFractional` lives in `src/i18n/currency.ts` next to
+`preciseWhenSmall`. `MoneyFormatOptions` gained `minimumFractionDigits`
+(additive). The formatter widens the maximum to at least the minimum, because
+Intl throws a RangeError for min 2 with the AMD default max 0. The global
+`money()` default (whole units) is unchanged. `currency.precision.test.ts`
+pins "asking for nothing changes nothing".
 
 ### Per-branch table (`BranchRevenueTable.tsx`)
 Shown only when `branches.length > 1`. With one branch, the table would repeat
@@ -1165,9 +1257,39 @@ on purpose. The longer "Մասնակցություններ" set the width of the
 at 1280px.
 
 ### Tests
-`src/components/revenue/CompanyRevenueScreen.test.tsx` (9 tests). `money` is
-mocked to print the number exactly as received, so a re-derived figure shows
-up in the output.
+`src/components/revenue/CompanyRevenueScreen.test.tsx` (9 tests): `money` is
+mocked to print the number exactly as received, so a re-derived figure shows up
+in the output. `RevenueAmounts.test.tsx` (4 tests): the REAL formatter with the
+live E2E figures, covering cents where the server has them and none where it
+does not, on the card and in the table. `currency.precision.test.ts` covers the
+helper. Mutation-verified: helper without a minimum; helper that gives whole
+amounts cents; card or table back on plain `money()`; formatter without the
+max≥min clamp; `Number.isInteger` instead of the cent test.
+
+## 9.5.10 Tournament registrations — removing one (2026-09-11)
+
+`RegistrationsList` (tournament page) removes a registration with
+`DELETE /tournament-registration/{id}`. Since 2026-09-11 the backend REFUNDS a
+verified player's entry fee when the tournament has not ended
+(`TournamentRefundService`): the payment is stamped `refunded_at` and drops out
+of revenue and commission.
+
+- The confirmation is the in-app `useConfirm()` (destructive), never a native
+  `confirm()`, which it used until this change.
+- A VERIFIED player's question carries `registrations.removeRefundNote` under
+  `registrations.confirmRemove`: "This player is verified. If the tournament
+  has not ended yet, their entry fee is refunded and no longer counts in
+  revenue." A spectator or an unverified player never paid (the backend creates
+  a payment only on verification), so they get the plain question. The note
+  states the server's rule. It does not predict the outcome, because "has the
+  tournament ended" is the server's call.
+- Confirm → one DELETE for that registration id, then the list is re-read.
+  Cancel → no request. A refused delete shows the server's reason and keeps
+  the row.
+
+Tests: `RegistrationsList.test.tsx` (10, transport-level: only `request()` is
+replaced). Mutation-verified: native `confirm()` restored; answer ignored; note
+shown for everyone; note never shown; delete by guest id.
 
 ## 9.6 A live session's terms (2026-09-03)
 
@@ -1270,7 +1392,8 @@ back what the SERVER returned. The row is `flex-wrap: nowrap` with the fraction
 full-width input pushed `1 / 4` onto a second line — where it read as another
 field rather than as the label of the control beside it.
 
-**No native `confirm()` anywhere in here.** The unlimited confirmation used
+**No native `confirm()` in the session dialogs** (the app as a whole still has
+three — §4 traps, "Confirm dialogs"). The unlimited confirmation used
 `window.confirm`, which poisons the Electron renderer's keyboard focus on Linux
 — the NEXT modal's inputs stop accepting keystrokes, so the action that appears
 broken is not the one that broke it. It goes through `useConfirm()` now, and
