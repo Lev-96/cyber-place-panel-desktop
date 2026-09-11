@@ -1,11 +1,17 @@
 import { SkeletonStats } from "@/components/ui/Skeleton";
 import { apiCompanyRevenueSummary, ICompanyRevenueSummary } from "@/api/billing";
-import BranchRevenueTable from "@/components/revenue/BranchRevenueTable";
 import RevenueSummaryCard from "@/components/revenue/RevenueSummaryCard";
+import {
+  branchFigures,
+  branchLabel,
+  companyFigures,
+  selectableBranches,
+} from "@/components/revenue/revenueFigures";
 import Button from "@/components/ui/Button";
 import { formatMonth } from "@/i18n/dates";
 import { useLang } from "@/i18n/LanguageContext";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { fmt } from "@/i18n/translations";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 
 interface Props {
   companyId: number;
@@ -26,11 +32,13 @@ const monthBoundsIso = (sel: { year: number; month: number }) => {
 
 /**
  * A company's takings for one calendar month and what it owes Cyber Place,
- * with a per-branch table when there is more than one branch to compare.
+ * with a branch selector when there is more than one branch to look at.
  *
  * Every amount is the server's (`GET /company/{id}/revenue-summary`); this
- * screen formats, it does not add up. See `RevenueSummaryCard` for how it
- * reads an older backend that has no tournament figures yet.
+ * screen formats, it does not add up. "All branches" prints the company's
+ * figures; a branch prints that branch's row from the SAME response in the
+ * same card. Picking a branch is a filter over what is already here, never a
+ * second request. See `revenueFigures.ts` for which key feeds which row.
  */
 const CompanyRevenueScreen = ({ companyId, companyName, initialPercent }: Props) => {
   const { t } = useLang();
@@ -39,6 +47,9 @@ const CompanyRevenueScreen = ({ companyId, companyName, initialPercent }: Props)
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [sel, setSel] = useState(currentMonth());
+  // null = All branches (the company card).
+  const [branchId, setBranchId] = useState<number | null>(null);
+  const branchSelectId = useId();
   // Only the latest request may land: months flipped quickly would otherwise
   // let a slow earlier answer paint last month's figures under this month.
   const requestSeq = useRef(0);
@@ -59,7 +70,14 @@ const CompanyRevenueScreen = ({ companyId, companyName, initialPercent }: Props)
     setLoading(true); setErr(null);
     try {
       const summary = await apiCompanyRevenueSummary(companyId, monthBoundsIso(sel));
-      if (seq === requestSeq.current) setOpRevenue(summary);
+      if (seq !== requestSeq.current) return;
+      setOpRevenue(summary);
+      // The branch the owner was looking at stays selected if this answer
+      // still lists it as a choice; otherwise the screen goes back to All
+      // branches rather than holding an id that may match again months later.
+      setBranchId((cur) =>
+        cur !== null && selectableBranches(summary).some((b) => b.branch_id === cur) ? cur : null,
+      );
     } catch (e) {
       if (seq !== requestSeq.current) return;
       // A failed month must not leave the previous month's figures on screen
@@ -82,7 +100,9 @@ const CompanyRevenueScreen = ({ companyId, companyName, initialPercent }: Props)
     setSel({ year: d.getFullYear(), month: d.getMonth() + 1 });
   };
 
-  const branches = opRevenue?.branches ?? [];
+  const choices = selectableBranches(opRevenue);
+  const branch = choices.find((b) => b.branch_id === branchId) ?? null;
+  const scopeLabel = branch ? branchLabel(branch) : t("revenue.allBranches");
 
   return (
     <div className="col" style={{ gap: 18 }}>
@@ -90,10 +110,38 @@ const CompanyRevenueScreen = ({ companyId, companyName, initialPercent }: Props)
         {(companyName ?? `№${companyId}`) + " · " + t("revenue.title")}
       </h2>
 
-      <div className="month-picker">
-        <button className="month-btn" onClick={() => shift(-1)} aria-label={t("revenue.prevMonth")}>‹</button>
-        <span className="month-label">{monthLabel}</span>
-        <button className="month-btn" onClick={() => shift(1)} aria-label={t("revenue.nextMonth")}>›</button>
+      <div className="revenue-toolbar">
+        <div className="month-picker">
+          <button className="month-btn" onClick={() => shift(-1)} aria-label={t("revenue.prevMonth")}>‹</button>
+          <span className="month-label">{monthLabel}</span>
+          <button className="month-btn" onClick={() => shift(1)} aria-label={t("revenue.nextMonth")}>›</button>
+        </div>
+
+        {/* The repo's picker idiom (label + native `select.input`, as on the
+            Revenue screen's company picker): the OS draws the list, so it is
+            never clipped and keyboard navigation is the platform's. Locked
+            while a month loads, so a choice can only ever apply to figures
+            that are on screen. */}
+        {choices.length > 0 && (
+          <div className="revenue-branch-field">
+            <label className="label" htmlFor={branchSelectId}>{t("revenue.branch")}</label>
+            <select
+              id={branchSelectId}
+              className="input revenue-branch-select"
+              value={branch ? String(branch.branch_id) : ""}
+              onChange={(e) => setBranchId(e.target.value ? Number(e.target.value) : null)}
+              disabled={loading}
+              title={scopeLabel}
+            >
+              <option value="">{t("revenue.allBranches")}</option>
+              {choices.map((b) => (
+                <option key={b.branch_id} value={b.branch_id} title={branchLabel(b)}>
+                  {branchLabel(b)}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
       </div>
 
       {loading && <SkeletonStats tiles={3} />}
@@ -105,12 +153,14 @@ const CompanyRevenueScreen = ({ companyId, companyName, initialPercent }: Props)
       )}
 
       {opRevenue && !loading && (
-        <>
-          <RevenueSummaryCard summary={opRevenue} />
-          {/* One branch is the whole company: a table repeating the card
-              above would be a second copy of the same numbers. */}
-          {branches.length > 1 && <BranchRevenueTable branches={branches} />}
-        </>
+        branch ? (
+          <RevenueSummaryCard
+            figures={branchFigures(branch, opRevenue.commission_percent)}
+            title={fmt(t("revenue.branchSummaryTitle"), scopeLabel)}
+          />
+        ) : (
+          <RevenueSummaryCard figures={companyFigures(opRevenue)} title={t("revenue.summaryTitle")} />
+        )
       )}
     </div>
   );

@@ -93,9 +93,6 @@ const rowValue = (card: HTMLElement, label: string) =>
 
 const highlight = (card: HTMLElement) => card.querySelector(".kv-row .v.hi")?.textContent;
 
-/** The amount of a table cell, without the count printed under it. */
-const amountOf = (cell: HTMLElement) => cell.firstChild?.textContent;
-
 describe("CompanyRevenueScreen — the month's summary", () => {
   test("prints every figure of the response on its own row", async () => {
     api.summary.mockResolvedValue(CURRENT);
@@ -130,7 +127,7 @@ describe("CompanyRevenueScreen — the month's summary", () => {
     expect(within(card).queryByText("Tournament entry fees")).toBeNull();
     // No owner income on a backend that does not send it — never derived here.
     expect(within(card).queryByText("Owner income")).toBeNull();
-    expect(screen.queryByRole("table")).toBeNull();
+    expect(screen.queryByRole("combobox")).toBeNull();
     expect(document.body.textContent).not.toMatch(/undefined|NaN/);
   });
 
@@ -144,58 +141,185 @@ describe("CompanyRevenueScreen — the month's summary", () => {
   });
 });
 
-describe("CompanyRevenueScreen — per-branch breakdown", () => {
-  test("one branch is the whole company: no breakdown", async () => {
-    api.summary.mockResolvedValue(CURRENT);
+/** A third branch, for the months in which the first one is not listed. */
+const BRANCH_KOMITAS: IBranchRevenueSummary = {
+  ...BRANCH_EMPTY,
+  branch_id: 3,
+  address: "Komitas 40",
+  sessions_count: 1,
+  sessions_total: 1000,
+  gross_total: 1000,
+  total_gross: 1000,
+  commission_amount: 75,
+  owner_income: 925,
+};
+
+const TWO: ICompanyRevenueSummary = { ...CURRENT, branches: [BRANCH_ABOVYAN, BRANCH_EMPTY] };
+
+const COMPANY_TITLE = "Revenue for the month";
+const branchTitle = (label: string) => `Revenue for the month: ${label}`;
+
+const picker = () => screen.getByRole("combobox", { name: "Branch" }) as HTMLSelectElement;
+const pick = async (value: string) => {
+  await act(async () => { fireEvent.change(picker(), { target: { value } }); });
+};
+const optionLabels = () => Array.from(picker().options).map((o) => o.textContent);
+const shownOption = () => picker().selectedOptions[0]?.textContent;
+
+const nextMonth = async () => {
+  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Next month" })); });
+};
+
+describe("CompanyRevenueScreen: the branch selector", () => {
+  // One branch IS the company: a selector would offer the same figures twice.
+  test.each([
+    ["one branch", CURRENT],
+    ["an empty list", { ...CURRENT, branches: [] }],
+    ["an older backend without the list", LEGACY],
+  ])("%s: no selector, the company card", async (_case, response) => {
+    api.summary.mockResolvedValue(response);
     await renderScreen();
 
-    expect(screen.queryByRole("table")).toBeNull();
-    expect(screen.queryByText("By branch")).toBeNull();
+    expect(screen.queryByRole("combobox")).toBeNull();
+    expect(screen.queryByText("All branches")).toBeNull();
   });
 
-  test("two branches: one row each, every cell the server's figure as sent", async () => {
-    api.summary.mockResolvedValue({ ...CURRENT, branches: [BRANCH_ABOVYAN, BRANCH_EMPTY] });
+  test("two branches: All branches by default, every branch offered by its address", async () => {
+    api.summary.mockResolvedValue(TWO);
+    const card = await renderScreen();
+
+    expect(picker().value).toBe("");
+    expect(shownOption()).toBe("All branches");
+    // A null address is still identifiable.
+    expect(optionLabels()).toEqual(["All branches", "Abovyan 1", "№2"]);
+    // The company's card, exactly as without a selector.
+    expect(highlight(card)).toBe("571.41 AMD");
+    expect(rowValue(card, "Total revenue")).toBe("7618.79 AMD");
+    expect(rowValue(card, "Owner income")).toBe("7000 AMD");
+  });
+
+  test("picking a branch prints that branch's row as sent, in the same card, without a request", async () => {
+    api.summary.mockResolvedValue(TWO);
     await renderScreen();
 
-    const table = screen.getByRole("table", { name: "By branch" });
-    const [, first, second] = within(table).getAllByRole("row");
-    expect(within(table).getAllByRole("row")).toHaveLength(3);
+    await pick("1");
 
-    expect(within(first).getByRole("rowheader").textContent).toBe("Abovyan 1");
-    const [sessions, pos, tournaments, total, commission, income] = within(first).getAllByRole("cell");
-    expect(amountOf(sessions)).toBe("2734.81 AMD");
-    expect(within(sessions).getByText("Closed: 3")).toBeTruthy();
-    expect(amountOf(pos)).toBe("250.5 AMD");
-    expect(amountOf(tournaments)).toBe("2000 AMD");
-    expect(within(tournaments).getByText("Entries: 2")).toBeTruthy();
-    expect(amountOf(total)).toBe("4985.31 AMD");
-    expect(amountOf(commission)).toBe("373.9 AMD");
-    expect(amountOf(income)).toBe("4600 AMD");
+    expect(screen.queryByRole("region", { name: COMPANY_TITLE })).toBeNull();
+    const card = screen.getByRole("region", { name: branchTitle("Abovyan 1") });
+    expect(rowValue(card, "Closed sessions")).toBe("3");
+    expect(rowValue(card, "Sessions")).toBe("2734.81 AMD");
+    expect(rowValue(card, "POS orders")).toBe("250.5 AMD");
+    expect(rowValue(card, "Paid tournament entries")).toBe("2");
+    expect(rowValue(card, "Tournament entry fees")).toBe("2000 AMD");
+    expect(rowValue(card, "Total revenue")).toBe("4985.31 AMD");
+    // The company's rate: a branch has none of its own.
+    expect(rowValue(card, "Cyber Place commission")).toBe("7.5%");
+    // The branch's own commission, highlighted where the company's owed amount was.
+    expect(highlight(card)).toBe("373.9 AMD");
+    // 4600, not total_gross − commission_amount (4611.41): never derived here.
+    expect(rowValue(card, "Owner income")).toBe("4600 AMD");
+    expect(shownOption()).toBe("Abovyan 1");
+    // A filter over the answer on screen, never a second request.
+    expect(api.summary).toHaveBeenCalledTimes(1);
+  });
 
-    // A branch with no address is still identifiable, and a zero row is a row.
-    expect(within(second).getByRole("rowheader").textContent).toBe("№2");
-    expect(within(second).getAllByRole("cell").map(amountOf)).toEqual([
-      "0 AMD", "0 AMD", "0 AMD", "0 AMD", "0 AMD", "0 AMD",
-    ]);
+  test("a branch with nothing this month prints zeros, and no till row", async () => {
+    api.summary.mockResolvedValue(TWO);
+    await renderScreen();
+
+    await pick("2");
+
+    const card = screen.getByRole("region", { name: branchTitle("№2") });
+    expect(rowValue(card, "Closed sessions")).toBe("0");
+    expect(rowValue(card, "Sessions")).toBe("0 AMD");
+    expect(within(card).queryByText("POS orders")).toBeNull();
+    expect(rowValue(card, "Paid tournament entries")).toBe("0");
+    expect(rowValue(card, "Tournament entry fees")).toBe("0 AMD");
+    expect(rowValue(card, "Total revenue")).toBe("0 AMD");
+    expect(highlight(card)).toBe("0 AMD");
+    expect(rowValue(card, "Owner income")).toBe("0 AMD");
     expect(document.body.textContent).not.toMatch(/undefined|NaN/);
   });
 
-  test("the till column appears only when some branch took till money", async () => {
-    const noTill = { ...BRANCH_ABOVYAN, pos_total: 0 };
-    api.summary.mockResolvedValue({ ...CURRENT, pos_total: 0, branches: [noTill, BRANCH_EMPTY] });
+  test("back to All branches restores the company's figures", async () => {
+    api.summary.mockResolvedValue(TWO);
     await renderScreen();
+    await pick("1");
 
-    const table = screen.getByRole("table", { name: "By branch" });
-    expect(within(table).queryByRole("columnheader", { name: "POS orders" })).toBeNull();
-    expect(within(within(table).getAllByRole("row")[1]).getAllByRole("cell")).toHaveLength(5);
+    await pick("");
+
+    const card = screen.getByRole("region", { name: COMPANY_TITLE });
+    expect(highlight(card)).toBe("571.41 AMD");
+    expect(rowValue(card, "Closed sessions")).toBe("5");
+    expect(api.summary).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("CompanyRevenueScreen: the selection across months", () => {
+  test("a branch still listed next month stays selected, with that month's figures", async () => {
+    let answer: (value: ICompanyRevenueSummary) => void = () => {};
+    api.summary
+      .mockResolvedValueOnce(TWO)
+      .mockImplementationOnce(() => new Promise((resolve) => { answer = resolve; }));
+    await renderScreen();
+    await pick("1");
+
+    await nextMonth();
+
+    // While the month loads: the loading state, no card at all (never last
+    // month's figures under this month's label), and the choice locked.
+    expect(screen.queryByRole("region")).toBeNull();
+    expect(picker().disabled).toBe(true);
+
+    const october = { ...BRANCH_ABOVYAN, sessions_total: 111.11, total_gross: 222.22, commission_amount: 16.67, owner_income: 205 };
+    await act(async () => { answer({ ...TWO, branches: [october, BRANCH_EMPTY] }); });
+
+    const card = screen.getByRole("region", { name: branchTitle("Abovyan 1") });
+    expect(rowValue(card, "Sessions")).toBe("111.11 AMD");
+    expect(highlight(card)).toBe("16.67 AMD");
+    expect(rowValue(card, "Owner income")).toBe("205 AMD");
+    expect(picker().disabled).toBe(false);
+    expect(shownOption()).toBe("Abovyan 1");
+  });
+
+  test("a branch not listed next month falls back to All branches, and stays there", async () => {
+    api.summary
+      .mockResolvedValueOnce(TWO)
+      .mockResolvedValueOnce({ ...TWO, branches: [BRANCH_EMPTY, BRANCH_KOMITAS] })
+      .mockResolvedValueOnce(TWO);
+    await renderScreen();
+    await pick("1");
+
+    await nextMonth();
+
+    expect(shownOption()).toBe("All branches");
+    expect(highlight(screen.getByRole("region", { name: COMPANY_TITLE }))).toBe("571.41 AMD");
+
+    // The branch is back a month later: the owner chose nothing since, so the
+    // screen does not quietly switch back to it.
+    await nextMonth();
+
+    expect(shownOption()).toBe("All branches");
+    expect(screen.getByRole("region", { name: COMPANY_TITLE })).toBeTruthy();
+  });
+
+  test("a month with one branch hides the selector and shows the company", async () => {
+    api.summary.mockResolvedValueOnce(TWO).mockResolvedValueOnce(CURRENT).mockResolvedValueOnce(TWO);
+    await renderScreen();
+    await pick("1");
+
+    await nextMonth();
+
+    expect(screen.queryByRole("combobox")).toBeNull();
+    expect(highlight(screen.getByRole("region", { name: COMPANY_TITLE }))).toBe("571.41 AMD");
+
+    await nextMonth();
+
+    expect(shownOption()).toBe("All branches");
   });
 });
 
 describe("CompanyRevenueScreen — loading the month", () => {
-  const nextMonth = async () => {
-    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Next month" })); });
-  };
-
   test("a failed month clears the previous figures and offers a retry that re-asks", async () => {
     api.summary.mockResolvedValueOnce(CURRENT).mockRejectedValueOnce(new Error("Server unavailable"));
     await renderScreen();

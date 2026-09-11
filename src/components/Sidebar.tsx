@@ -9,18 +9,10 @@ import ProfileModal from "@/components/profile/ProfileModal";
 import { useLang } from "@/i18n/LanguageContext";
 import { useNotifications } from "@/notifications/NotificationsContext";
 import { useUpdatesNotification } from "@/realtime/UpdatesNotificationContext";
-import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useAnchoredPopover } from "@/hooks/useAnchoredPopover";
 import { NavLink, useNavigate } from "react-router-dom";
-
-/**
- * THE branch form — the same component the company screens open, not a second
- * one. Lazy because the sidebar is in the first paint of every screen and the
- * form brings the map and the phone-number library with it; only an owner who
- * presses "+ New branch" pays for them.
- */
-const BranchForm = lazy(() => import("@/components/branches/BranchForm"));
 
 const UnreadBadge = ({ count }: { count: number }) => {
   if (count <= 0) return null;
@@ -309,14 +301,10 @@ const Sidebar = () => {
   const adminUpdateCount =
     (panelUpd?.has_update ? 1 : 0) + (agentUpd?.has_update ? 1 : 0);
   const agentUpdateCount = agentUpd?.has_update ? 1 : 0;
-  const navigate = useNavigate();
   const dash = user?.dashboard;
   const myBranchId = typeof dash?.branch_id === "number" ? dash.branch_id : null;
   // The owner's company (single company per owner, as everywhere in the panel).
   const myCompanyId = typeof dash?.company_id === "number" ? dash.company_id : null;
-  // Local, like UserMenu's profile modal: the sidebar opens the form itself,
-  // there is no global modal host to route it through.
-  const [creatingBranch, setCreatingBranch] = useState(false);
 
   return (
     <aside className="sidebar">
@@ -350,20 +338,9 @@ const Sidebar = () => {
         {t("nav.dashboard")}
       </NavLink>
       {can(role, "menu.branches") && (
+        // Creating a branch is an action on the Branches page (its header
+        // button), not an entry in the navigation.
         <NavLink to="/branches">{t("nav.branches")}</NavLink>
-      )}
-      {can(role, "branch.create") && myCompanyId !== null && (
-        // Part of the Branches section, so it is the entry right under it,
-        // indented (`--nested`). An action, not a page: it opens the branch
-        // form over whatever screen the owner is on, and lands them on the
-        // new branch afterwards.
-        <button
-          type="button"
-          className="sidebar-action sidebar-action--nested"
-          onClick={() => setCreatingBranch(true)}
-        >
-          {t("nav.createBranch")}
-        </button>
       )}
       {role === "manager" && myBranchId !== null && (
         <NavLink to={`/branches/${myBranchId}`}>{t("nav.myBranch")}</NavLink>
@@ -458,22 +435,6 @@ const Sidebar = () => {
           {t("nav.signOut")}
         </button>
       </div>
-
-      {/* The form is a portal-based Modal, so the sidebar's overflow clipping
-          does not reach it. After saving, the new branch's own page — a fresh
-          read, and the POST already dropped every cached branch listing. */}
-      {creatingBranch && myCompanyId !== null && (
-        <Suspense fallback={null}>
-          <BranchForm
-            companyId={myCompanyId}
-            onClose={() => setCreatingBranch(false)}
-            onSaved={(branch) => {
-              setCreatingBranch(false);
-              navigate(`/branches/${branch.id}`);
-            }}
-          />
-        </Suspense>
-      )}
     </aside>
   );
 };

@@ -1278,6 +1278,8 @@ export const TRANSLATIONS: Dict = {
   // Branches list / map
   "branchesList.title": { en: "Branches", ru: "Филиалы", am: "Մասնաճյուղեր" },
   "branchesList.placesShort": { en: "places", ru: "места", am: "տեղեր" },
+  // The owner's create action in the list header (it was a sidebar entry).
+  "branchesList.newBranch": { en: "+ New branch", ru: "+ Создать филиал", am: "+ Ստեղծել մասնաճյուղ" },
   "branchesMap.title": { en: "Branches map", ru: "Карта филиалов", am: "Մասնաճյուղերի քարտեզ" },
   "branchesMap.geoCount": { en: "of {total} branches geo-located", ru: "из {total} филиалов с координатами", am: "{total}-ից աշխարհագրականորեն տեղորոշված" },
   "branchesMap.noGeoTitle": { en: "No branches geo-located yet.", ru: "Координаты филиалов ещё не заданы.", am: "Մասնաճյուղերի կոորդինատներ դեռ չեն սահմանված:" },
@@ -1369,15 +1371,13 @@ export const TRANSLATIONS: Dict = {
   "revenue.cyberPlaceCommission": { en: "Cyber Place commission", ru: "Комиссия Cyber Place", am: "Cyber Place-ի միջնորդավճար" },
   "revenue.amountOwed": { en: "You owe us this period", ru: "К оплате за период", am: "Վճարման ենթակա ժամանակահատվածում" },
   "revenue.ownerIncome": { en: "Owner income", ru: "Доход владельца", am: "Սեփականատիրոջ եկամուտ" },
-  // Per-branch breakdown (shown only when the company has more than one branch).
-  // The counts sit under an amount as "label: n" so no language needs plural forms.
-  "revenue.byBranch": { en: "By branch", ru: "По филиалам", am: "Ըստ մասնաճյուղերի" },
-  "revenue.colBranch": { en: "Branch", ru: "Филиал", am: "Մասնաճյուղ" },
-  "revenue.colTournaments": { en: "Tournaments", ru: "Турниры", am: "Մրցաշարեր" },
-  "revenue.closedCount": { en: "Closed: {0}", ru: "Закрыто: {0}", am: "Փակված՝ {0}" },
-  // am: "participants", not "participations" — the longer word alone set the
-  // width of the whole column in Armenian and squeezed the address column.
-  "revenue.entriesCount": { en: "Entries: {0}", ru: "Участий: {0}", am: "Մասնակից՝ {0}" },
+  // Branch selector (shown only when the company has more than one branch).
+  // "All branches" is the company card; a branch is the same card with that
+  // branch's figures, and its title names the branch so a branch's figures
+  // are never read as the company's.
+  "revenue.branch": { en: "Branch", ru: "Филиал", am: "Մասնաճյուղ" },
+  "revenue.allBranches": { en: "All branches", ru: "Все филиалы", am: "Բոլոր մասնաճյուղերը" },
+  "revenue.branchSummaryTitle": { en: "Revenue for the month: {0}", ru: "Выручка за месяц: {0}", am: "Ամսվա եկամուտը՝ {0}" },
   "revenue.prevMonth": { en: "Previous month", ru: "Предыдущий месяц", am: "Նախորդ ամիս" },
   "revenue.nextMonth": { en: "Next month", ru: "Следующий месяц", am: "Հաջորդ ամիս" },
   "revenue.loadFailed": { en: "Couldn't load the revenue report.", ru: "Не удалось загрузить отчёт о выручке.", am: "Չհաջողվեց բեռնել եկամտի հաշվետվությունը։" },
@@ -1656,25 +1656,25 @@ export const TRANSLATIONS: Dict = {
   "branch.status.active": { en: "Active", ru: "Активен", am: "Ակտիվ" },
   "branch.status.inactive": { en: "Inactive", ru: "Неактивен", am: "Ոչ ակտիվ" },
   "branch.statusHint": {
-    en: "Inactive — players can't see this branch in the app. Staff keep working in it as usual.",
-    ru: "Неактивен — игроки не видят этот филиал в приложении. Персонал работает в нём как обычно.",
-    am: "Ոչ ակտիվ — խաղացողները հավելվածում չեն տեսնում այս մասնաճյուղը։ Անձնակազմը շարունակում է աշխատել դրանում սովորականի պես։",
+    en: "Inactive: players can't see this branch in the app. Staff keep working in it as usual.",
+    ru: "Неактивен: игроки не видят этот филиал в приложении. Персонал работает в нём как обычно.",
+    am: "Ոչ ակտիվ՝ խաղացողները հավելվածում չեն տեսնում այս մասնաճյուղը։ Անձնակազմը շարունակում է աշխատել դրանում սովորականի պես։",
   },
   "branch.inactive.hint": {
-    en: "Inactive — players can't see this branch.",
-    ru: "Неактивен — игроки не видят этот филиал.",
-    am: "Ոչ ակտիվ — խաղացողները չեն տեսնում այս մասնաճյուղը։",
+    en: "Inactive: players can't see this branch.",
+    ru: "Неактивен: игроки не видят этот филиал.",
+    am: "Ոչ ակտիվ՝ խաղացողները չեն տեսնում այս մասնաճյուղը։",
   },
   // Tooltip of the green "Active" pill, the counterpart of the one above.
   "branch.active.hint": {
-    en: "Active — players can see this branch.",
-    ru: "Активен — игроки видят этот филиал.",
-    am: "Ակտիվ — խաղացողները տեսնում են այս մասնաճյուղը։",
+    en: "Active: players can see this branch.",
+    ru: "Активен: игроки видят этот филиал.",
+    am: "Ակտիվ՝ խաղացողները տեսնում են այս մասնաճյուղը։",
   },
   "branch.inactive.notice": {
-    en: "Inactive — players can't see this branch in the app. Staff can keep working in it.",
-    ru: "Неактивен — игроки не видят этот филиал в приложении. Персонал может продолжать в нём работать.",
-    am: "Ոչ ակտիվ — խաղացողները հավելվածում չեն տեսնում այս մասնաճյուղը։ Անձնակազմը կարող է շարունակել աշխատել դրանում։",
+    en: "Inactive: players can't see this branch in the app. Staff can keep working in it.",
+    ru: "Неактивен: игроки не видят этот филиал в приложении. Персонал может продолжать в нём работать.",
+    am: "Ոչ ակտիվ՝ խաղացողները հավելվածում չեն տեսնում այս մասնաճյուղը։ Անձնակազմը կարող է շարունակել աշխատել դրանում։",
   },
   // Appended for whoever can flip it (owner, admin). {0} = the hub's Settings
   // tile, {1} = the "Edit info" button, {2} = the "Active" toggle label — the
@@ -1684,8 +1684,6 @@ export const TRANSLATIONS: Dict = {
     ru: "Чтобы игроки его увидели, переключите на «{2}»: {0} → {1}.",
     am: "Որպեսզի խաղացողները տեսնեն այն, ընտրեք «{2}»՝ {0} → {1}։",
   },
-  // ── PA-1: sidebar ─────────────────────────────────────────────────────────
-  "nav.createBranch": { en: "+ New branch", ru: "+ Создать филиал", am: "+ Ստեղծել մասնաճյուղ" },
   // ── PA-2: admin Owners section ───────────────────────────────────────────
   "nav.owners": { en: "Owners", ru: "Владельцы", am: "Սեփականատերեր" },
   "owners.title": { en: "Owners", ru: "Владельцы", am: "Սեփականատերեր" },
@@ -1731,14 +1729,14 @@ export const TRANSLATIONS: Dict = {
   "owners.delete.blocked": { en: "It can't be deleted yet:", ru: "Удалить пока нельзя:", am: "Դեռ հնարավոր չէ ջնջել՝" },
   // Keyed by the backend's `TenantDeletionBlocker` code; {0} = the count.
   "owners.blocker.running_sessions": {
-    en: "Running sessions: {0} — stop them first.",
-    ru: "Идущих сессий: {0} — сначала остановите их.",
-    am: "Ընթացիկ սեսիաներ՝ {0} — նախ դադարեցրեք դրանք։",
+    en: "Running sessions: {0}. Stop them first.",
+    ru: "Идущих сессий: {0}. Сначала остановите их.",
+    am: "Ընթացիկ սեսիաներ՝ {0}։ Նախ դադարեցրեք դրանք։",
   },
   "owners.blocker.upcoming_bookings": {
-    en: "Upcoming bookings: {0} — cancel them first (players are notified).",
-    ru: "Предстоящих бронирований: {0} — сначала отмените их (игроки получат уведомление).",
-    am: "Առաջիկա ամրագրումներ՝ {0} — նախ չեղարկեք դրանք (խաղացողները կծանուցվեն)։",
+    en: "Upcoming bookings: {0}. Cancel them first (players are notified).",
+    ru: "Предстоящих бронирований: {0}. Сначала отмените их (игроки получат уведомление).",
+    am: "Առաջիկա ամրագրումներ՝ {0}։ Նախ չեղարկեք դրանք (խաղացողները կծանուցվեն)։",
   },
   "toast.owner.updated": { en: "Owner updated", ru: "Владелец обновлён", am: "Սեփականատերը թարմացվեց" },
   "toast.owner.deleted": { en: "Owner deleted", ru: "Владелец удалён", am: "Սեփականատերը ջնջվեց" },

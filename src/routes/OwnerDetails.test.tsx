@@ -185,6 +185,21 @@ describe("the owner's page", () => {
     expect(companyCard("Cyber Zone").contains(inactive)).toBe(true);
   });
 
+  // The same row as both branch lists (`BranchListRow`): the address alone in
+  // the name, the pills as their own item after the text, status last.
+  test("a branch row keeps the pills apart from the address", async () => {
+    await mountLoaded();
+
+    const row = branchRow("Komitas 40");
+    const name = row.querySelector(".name") as HTMLElement;
+    expect(name.textContent).toBe("Komitas 40");
+    expect(name.querySelector(".pill")).toBeNull();
+    const group = row.querySelector(".branch-row__pills") as HTMLElement;
+    expect(group.parentElement).toBe(row);
+    expect(row.querySelector(".branch-row__text")!.nextElementSibling).toBe(group);
+    expect(Array.from(group.children).map((c) => c.textContent)).toEqual(["Blocked", "Inactive"]);
+  });
+
   // `OwnerResource::branch()` declares address, city and status nullable.
   test("a branch with null fields still renders: №id, a dash, Active", async () => {
     show = {

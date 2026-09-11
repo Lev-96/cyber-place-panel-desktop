@@ -240,3 +240,42 @@ describe("a manager", () => {
     expect(await sentCreate()).not.toHaveProperty("status");
   });
 });
+
+/**
+ * Where the toggle sits: at the BOTTOM of the fields, directly after the
+ * latitude / longitude pair and its hint, directly before Cancel / Save. The
+ * venue is described first; whether players can see it is the decision next
+ * to the button that commits it. Order only: the defaults and send rules above
+ * are unchanged.
+ */
+describe.each(["create", "edit"] as const)("the toggle's position (%s)", (mode) => {
+  beforeEach(() => {
+    auth.user = { id: 1, role: "company_owner" };
+  });
+
+  const follows = (a: Node, b: Node) => Boolean(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
+
+  test("comes after every field and the coordinates, right before the actions", async () => {
+    if (mode === "create") render(<BranchForm companyId={3} onClose={() => {}} onSaved={() => {}} />);
+    else await mountEdit(existing());
+
+    const group = toggle()!;
+    const block = group.parentElement!;
+    const form = group.closest("form")!;
+    const cancel = screen.getByRole("button", { name: "action.cancel" });
+    const save = screen.getByRole("button", { name: "action.save" });
+
+    expect(follows(screen.getByText("branchForm.latitude"), group)).toBe(true);
+    expect(follows(screen.getByText("branchForm.longitude"), group)).toBe(true);
+    expect(follows(screen.getByText("branchForm.autoLocateHint"), group)).toBe(true);
+    // Every input and select of the form comes before it (the address first).
+    const fields = Array.from(form.querySelectorAll("input, select, textarea"));
+    expect(fields.length).toBeGreaterThan(0);
+    for (const field of fields) expect(follows(field, group)).toBe(true);
+    // Then nothing but the actions row: Cancel and Save.
+    const actions = cancel.closest(".row-between")!;
+    expect(block.nextElementSibling).toBe(actions);
+    expect(actions.contains(save)).toBe(true);
+    expect(form.lastElementChild).toBe(actions);
+  });
+});

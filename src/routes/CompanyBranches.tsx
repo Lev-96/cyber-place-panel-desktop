@@ -1,7 +1,7 @@
 import { useAuth } from "@/auth/AuthContext";
 import { can } from "@/auth/permissions";
-import BranchStatusPill from "@/components/branches/BranchStatusPill";
 import BranchForm from "@/components/branches/BranchForm";
+import BranchListRow from "@/components/branches/BranchListRow";
 import Avatar from "@/components/ui/Avatar";
 import Button from "@/components/ui/Button";
 import ScreenWithBg from "@/components/ui/ScreenWithBg";
@@ -37,29 +37,17 @@ const CompanyBranches = () => {
       {!loading && !error && (
         <div className="list">
           {(branches ?? []).map((b) => (
-            <Link key={b.id} to={`/branches/${b.id}`} className="list-item">
-              <div className="row" style={{ gap: 12, flex: 1 }}>
-                <Avatar src={b.branch_logo_path} name={b.address} size={44} />
-                <div style={{ flex: 1 }}>
-                  <div className="name">{b.address}</div>
-                  <div className="meta">
-                    {b.country}, {b.city} · {t("label.places")} {b.places_count ?? 0}
-                    {/* Tells a branch closed on its own apart from one closed
-                        with its company — only the first can be reopened from
-                        the branch screen. */}
-                    {b.is_blocked && (
-                      <> · <span className="pill blocked">
-                        {b.blocked_at ? t("blocking.state.branch") : t("blocking.state.byCompany")}
-                      </span></>
-                    )}
-                    {/* Every branch, active or not: "Active" beside
-                        "Inactive" is what makes the inactive one readable. */}
-                    {" · "}<BranchStatusPill status={b.status} />
-                  </div>
-                </div>
-              </div>
-              <span className="muted">{t("common.open")}</span>
-            </Link>
+            <BranchListRow
+              key={b.id}
+              to={`/branches/${b.id}`}
+              leading={<Avatar src={b.branch_logo_path} name={b.address} size={44} />}
+              title={b.address}
+              meta={`${b.country}, ${b.city} · ${t("label.places")} ${b.places_count ?? 0}`}
+              status={b.status}
+              // Tells a branch closed on its own apart from one closed with its
+              // company: only the first can be reopened from the branch screen.
+              blockedLabel={b.is_blocked ? (b.blocked_at ? t("blocking.state.branch") : t("blocking.state.byCompany")) : null}
+            />
           ))}
           {!branches?.length && <div className="muted">{t("companyBranches.empty")}</div>}
         </div>

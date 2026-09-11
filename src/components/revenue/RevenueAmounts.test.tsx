@@ -2,8 +2,8 @@
 import type { IBranchRevenueSummary, ICompanyRevenueSummary } from "@/api/billing";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, test, vi } from "vitest";
-import BranchRevenueTable from "./BranchRevenueTable";
 import RevenueSummaryCard from "./RevenueSummaryCard";
+import { branchFigures, companyFigures } from "./revenueFigures";
 
 /**
  * How the revenue screen PRINTS the server's figures — the half
@@ -14,7 +14,8 @@ import RevenueSummaryCard from "./RevenueSummaryCard";
  * The figures are the live E2E's: 9000.50 / 900.05 / 8100.45. Rounded to whole
  * units the card read "9,001 − 900 = 8,100", which does not add up. The rule
  * pinned: an amount whose server value has cents shows exactly two decimals; a
- * whole amount shows none. Decided per amount — nothing is summed here.
+ * whole amount shows none. Decided per amount; nothing is summed here. The
+ * same card prints one branch's row when a branch is picked, by the same rule.
  */
 
 vi.mock("@/i18n/LanguageContext", async () => {
@@ -78,6 +79,8 @@ const SAYAT_NOVA: IBranchRevenueSummary = {
   owner_income: 3600,
 };
 
+const TITLE = "Revenue for the month";
+
 const rowValue = (card: HTMLElement, label: string) =>
   within(card).getByText(label).closest(".kv-row")?.querySelector(".v")?.textContent;
 
@@ -88,7 +91,7 @@ const wholeOnly = (whole: string) => new RegExp(`^${grouped(whole)} AMD$`);
 
 describe("RevenueSummaryCard — amounts to the hundredth", () => {
   test("the three figures that must add up print their cents", () => {
-    render(<RevenueSummaryCard summary={SUMMARY} />);
+    render(<RevenueSummaryCard figures={companyFigures(SUMMARY)} title={TITLE} />);
     const card = screen.getByRole("region", { name: "Revenue for the month" });
 
     expect(rowValue(card, "Total revenue")).toMatch(withCents("9000", "50"));
@@ -98,7 +101,7 @@ describe("RevenueSummaryCard — amounts to the hundredth", () => {
   });
 
   test("a whole amount on the same card prints without decimals", () => {
-    render(<RevenueSummaryCard summary={SUMMARY} />);
+    render(<RevenueSummaryCard figures={companyFigures(SUMMARY)} title={TITLE} />);
     const card = screen.getByRole("region", { name: "Revenue for the month" });
 
     expect(rowValue(card, "Tournament entry fees")).toMatch(wholeOnly("1500"));
@@ -107,7 +110,8 @@ describe("RevenueSummaryCard — amounts to the hundredth", () => {
   test("a month of whole figures looks exactly as it always did", () => {
     render(
       <RevenueSummaryCard
-        summary={{ ...SUMMARY, sessions_total: 7500, total_gross: 9000, total_commission_amount: 900, owner_income: 8100 }}
+        figures={companyFigures({ ...SUMMARY, sessions_total: 7500, total_gross: 9000, total_commission_amount: 900, owner_income: 8100 })}
+        title={TITLE}
       />,
     );
     const card = screen.getByRole("region", { name: "Revenue for the month" });
@@ -118,25 +122,27 @@ describe("RevenueSummaryCard — amounts to the hundredth", () => {
   });
 });
 
-describe("BranchRevenueTable — amounts to the hundredth", () => {
-  test("each cell follows its own server value: cents where it has them, none where it has not", () => {
-    render(<BranchRevenueTable branches={[TUMANYAN, SAYAT_NOVA]} />);
-    const table = screen.getByRole("table", { name: "By branch" });
-    const [, first, second] = within(table).getAllByRole("row");
-    const amounts = (row: HTMLElement) => within(row).getAllByRole("cell").map((c) => c.firstChild?.textContent);
+describe("RevenueSummaryCard for one branch: amounts to the hundredth", () => {
+  test("each figure follows its own server value: cents where it has them, none where it has not", () => {
+    render(<RevenueSummaryCard figures={branchFigures(TUMANYAN, SUMMARY.commission_percent)} title="Tumanyan" />);
+    const card = screen.getByRole("region", { name: "Tumanyan" });
 
-    const [sessions, tournaments, total, commission, income] = amounts(first);
-    expect(sessions).toMatch(withCents("3500", "50"));
-    expect(tournaments).toMatch(wholeOnly("1500"));
-    expect(total).toMatch(withCents("5000", "50"));
-    expect(commission).toMatch(withCents("500", "05"));
-    expect(income).toMatch(withCents("4500", "45"));
+    expect(rowValue(card, "Sessions")).toMatch(withCents("3500", "50"));
+    expect(rowValue(card, "Tournament entry fees")).toMatch(wholeOnly("1500"));
+    expect(rowValue(card, "Total revenue")).toMatch(withCents("5000", "50"));
+    expect(rowValue(card, "You owe us this period")).toMatch(withCents("500", "05"));
+    expect(rowValue(card, "Owner income")).toMatch(withCents("4500", "45"));
+    expect(rowValue(card, "Cyber Place commission")).toBe("10%");
+  });
 
-    const whole = amounts(second);
-    expect(whole[0]).toMatch(wholeOnly("4000"));
-    expect(whole[1]).toBe("0 AMD");
-    expect(whole[2]).toMatch(wholeOnly("4000"));
-    expect(whole[3]).toMatch(wholeOnly("400"));
-    expect(whole[4]).toMatch(wholeOnly("3600"));
+  test("a branch of whole figures prints no decimals, and its zeros as zeros", () => {
+    render(<RevenueSummaryCard figures={branchFigures(SAYAT_NOVA, SUMMARY.commission_percent)} title="Sayat-Nova" />);
+    const card = screen.getByRole("region", { name: "Sayat-Nova" });
+
+    expect(rowValue(card, "Sessions")).toMatch(wholeOnly("4000"));
+    expect(rowValue(card, "Tournament entry fees")).toBe("0 AMD");
+    expect(rowValue(card, "Total revenue")).toMatch(wholeOnly("4000"));
+    expect(rowValue(card, "You owe us this period")).toMatch(wholeOnly("400"));
+    expect(rowValue(card, "Owner income")).toMatch(wholeOnly("3600"));
   });
 });

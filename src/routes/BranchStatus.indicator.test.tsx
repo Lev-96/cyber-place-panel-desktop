@@ -1,4 +1,6 @@
 // @vitest-environment jsdom
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, describe, expect, test, vi } from "vitest";
@@ -204,5 +206,75 @@ describe("a company's branch list", () => {
     await screen.findByText("Inactive street 1");
 
     expectEveryRowWithItsState();
+  });
+});
+
+/**
+ * The row layout. The status used to be a run of inline text inside the name
+ * (or the meta line), so it read "Abovyan 5Active" and moved with every line
+ * break. Now the name element holds the title and nothing else, and the pills
+ * are their own flex item AFTER the text block, a sibling of it inside the row
+ * link: status last, "Blocked" (when it applies) right before it, then "Open".
+ */
+const expectPillsApartFromName = (row: HTMLElement, title: string, pills: string[]) => {
+  const name = row.querySelector(".name") as HTMLElement;
+  expect(name.textContent).toBe(title);
+  expect(name.querySelector(".pill")).toBeNull();
+  const text = row.querySelector(".branch-row__text") as HTMLElement;
+  const group = row.querySelector(".branch-row__pills") as HTMLElement;
+  expect(text.contains(name)).toBe(true);
+  expect(text.querySelector(".pill")).toBeNull();
+  expect(text.parentElement).toBe(row);
+  expect(group.parentElement).toBe(row);
+  expect(text.nextElementSibling).toBe(group);
+  expect(Array.from(group.children).map((c) => c.textContent)).toEqual(pills);
+  expect(group.nextElementSibling?.textContent).toBe("common.open");
+};
+
+const LAYOUT = [
+  { ...branch(1, "Inactive street 1", "inactive") },
+  { ...branch(2, "Blocked street 2", "active"), is_blocked: true, blocked_at: "2026-09-01T00:00:00Z" },
+  { ...branch(3, "Blocked with company 3", "inactive"), is_blocked: true, blocked_at: null },
+];
+
+describe("row layout: the status is never glued to the name", () => {
+  test("the global list", async () => {
+    auth.user = { id: 1, role: "company_owner" };
+    data.list = LAYOUT;
+    render(<MemoryRouter><BranchesList /></MemoryRouter>);
+    await screen.findByText("Cyber Zone · Inactive street 1");
+
+    expectPillsApartFromName(rowOf("Inactive street 1"), "Cyber Zone · Inactive street 1", [INACTIVE]);
+    expectPillsApartFromName(rowOf("Blocked street 2"), "Cyber Zone · Blocked street 2", ["blocking.state.branch", ACTIVE]);
+    expectPillsApartFromName(rowOf("Blocked with company 3"), "Cyber Zone · Blocked with company 3", ["blocking.state.byCompany", INACTIVE]);
+  });
+
+  test("a company's list", async () => {
+    auth.user = { id: 1, role: "company_owner" };
+    data.list = LAYOUT;
+    await mountAt("/companies/3/branches", "/companies/:companyId/branches", <CompanyBranches />);
+    await screen.findByText("Inactive street 1");
+
+    expectPillsApartFromName(rowOf("Inactive street 1"), "Inactive street 1", [INACTIVE]);
+    expectPillsApartFromName(rowOf("Blocked street 2"), "Blocked street 2", ["blocking.state.branch", ACTIVE]);
+    expectPillsApartFromName(rowOf("Blocked with company 3"), "Blocked with company 3", ["blocking.state.byCompany", INACTIVE]);
+  });
+
+  // jsdom lays nothing out, so the rules that keep a long address from pushing
+  // or clipping the pills are pinned where they live: the text block is the
+  // one item that may shrink (min-width: 0) and wrap; the pills never shrink
+  // and never break inside a label.
+  test("the stylesheet lets only the text block give way", () => {
+    const css = readFileSync(path.resolve(__dirname, "../styles/global.css"), "utf8");
+    const rule = (selector: string) => {
+      const m = css.match(new RegExp(`(^|\\n)${selector.replace(/[.]/g, "\\.")}\\s*\\{([^}]*)\\}`));
+      expect(m, selector).not.toBeNull();
+      return m![2];
+    };
+    expect(rule(".branch-row__text")).toMatch(/min-width:\s*0/);
+    expect(rule(".branch-row__text")).toMatch(/flex:\s*1 1 auto/);
+    expect(rule(".branch-row__pills")).toMatch(/flex:\s*0 0 auto/);
+    expect(css).toMatch(/\.branch-row__pills \.pill,\s*\n\.branch-row__open\s*\{[^}]*white-space:\s*nowrap/);
+    expect(css).toMatch(/\.branch-row__name,\s*\n\.branch-row__text \.meta\s*\{[^}]*overflow-wrap:\s*anywhere/);
   });
 });

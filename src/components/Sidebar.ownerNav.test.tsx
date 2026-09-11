@@ -2,20 +2,19 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import type { AuthUser, Role } from "@/types/api";
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { MemoryRouter, useLocation } from "react-router-dom";
-import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
+import { cleanup, render, screen, within } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
+import { afterEach, describe, expect, test, vi } from "vitest";
 import Sidebar from "./Sidebar";
 
 /**
- * The owner's two sidebar entries and the admin's Owners link.
+ * The owner's sidebar entries and the admin's Owners link.
  *
  *  - "My company" must light up on every page of the owner's company. It used
- *    to link to `/my-company`, a route that only redirects — so the pathname
- *    was never `/my-company…` and the item was never active anywhere.
- *  - "+ New branch" opens THE branch form (the module the company screens
- *    import, mocked here so the test can see it is that one) for the owner's
- *    company, and lands on the new branch after saving.
+ *    to link to `/my-company`, a route that only redirects, so the pathname
+ *    was never `/my-company...` and the item was never active anywhere.
+ *  - The navigation is links only. "+ New branch" used to be a button in it;
+ *    it moved to the header of the Branches page (`BranchesList.create.test`).
  */
 
 const auth = vi.hoisted(() => ({ user: null as AuthUser | null }));
@@ -27,26 +26,6 @@ vi.mock("@/components/profile/AccountSwitchPanel", () => ({ default: () => null 
 vi.mock("@/components/profile/ProfileModal", () => ({ default: () => null }));
 vi.mock("@/components/profile/AccountSwitchModal", () => ({ default: () => null }));
 
-interface FormProps {
-  companyId?: number;
-  initial?: unknown;
-  onClose: () => void;
-  onSaved: (b: { id: number }) => void;
-}
-const form = vi.hoisted(() => ({ props: null as FormProps | null }));
-vi.mock("@/components/branches/BranchForm", () => ({
-  default: (p: FormProps) => {
-    form.props = p;
-    return <div data-testid="branch-form" />;
-  },
-}));
-
-let currentPath = "";
-const LocationProbe = () => {
-  currentPath = useLocation().pathname;
-  return null;
-};
-
 const signIn = (role: Role, dashboard?: AuthUser["dashboard"]) => {
   auth.user = { id: 1, name: "Test User", email: "user@t.test", role, dashboard };
 };
@@ -55,17 +34,10 @@ const mountAt = (entry: string) =>
   render(
     <MemoryRouter initialEntries={[entry]}>
       <Sidebar />
-      <LocationProbe />
     </MemoryRouter>,
   );
 
 const myCompanyLink = () => screen.getByRole("link", { name: "nav.myCompany" });
-const createButton = () => screen.queryByRole("button", { name: "nav.createBranch" });
-
-beforeEach(() => {
-  form.props = null;
-  currentPath = "";
-});
 afterEach(() => cleanup());
 
 /**
@@ -121,79 +93,38 @@ describe("owner — My company", () => {
   });
 });
 
-describe("owner — + New branch", () => {
-  // Product wording: "the sidebar already has Branches; put Create branch
-  // INSIDE that section". So it is the very next entry after the Branches
-  // link, indented under it — not somewhere further down the column.
-  test("sits directly under Branches, indented as part of that section", () => {
+describe("owner, no create button in the navigation", () => {
+  // The create action lives on the Branches page now. The column goes straight
+  // from "Branches" to the next section, and holds nothing that is not a link.
+  test("Branches is followed by the next link, not by an action", () => {
     signIn("company_owner", { company_id: 5 });
     mountAt("/");
 
     const branches = screen.getByRole("link", { name: "nav.branches" });
-    expect(branches.nextElementSibling).toBe(createButton());
-    expect(createButton()!.className).toBe("sidebar-action sidebar-action--nested");
-  });
-
-  test("the nested modifier indents it in the stylesheet", () => {
-    const css = readFileSync(path.resolve(__dirname, "../styles/global.css"), "utf8");
-    expect(css).toMatch(/\.sidebar \.sidebar-action--nested\s*\{[^}]*margin-left:\s*\d+px/);
-  });
-
-  test("opens THE branch form for the owner's company", async () => {
-    signIn("company_owner", { company_id: 5 });
-    mountAt("/");
-    expect(screen.queryByTestId("branch-form")).toBeNull();
-
-    await act(async () => { fireEvent.click(createButton()!); });
-
-    expect(await screen.findByTestId("branch-form")).toBeTruthy();
-    expect(form.props?.companyId).toBe(5);
-    // Create mode: nothing to prefill.
-    expect(form.props?.initial).toBeUndefined();
-  });
-
-  test("after saving, closes and lands on the new branch", async () => {
-    signIn("company_owner", { company_id: 5 });
-    mountAt("/companies/5");
-    await act(async () => { fireEvent.click(createButton()!); });
-    await screen.findByTestId("branch-form");
-
-    await act(async () => { form.props!.onSaved({ id: 42 }); });
-
-    expect(currentPath).toBe("/branches/42");
-    expect(screen.queryByTestId("branch-form")).toBeNull();
-  });
-
-  test("cancel closes it and goes nowhere", async () => {
-    signIn("company_owner", { company_id: 5 });
-    mountAt("/companies/5");
-    await act(async () => { fireEvent.click(createButton()!); });
-    await screen.findByTestId("branch-form");
-
-    await act(async () => { form.props!.onClose(); });
-
-    expect(screen.queryByTestId("branch-form")).toBeNull();
-    expect(currentPath).toBe("/companies/5");
-  });
-
-  // The create request requires a company id; with none the form could only
-  // fail, so the entry is not drawn at all.
-  test("is hidden from an owner with no company", () => {
-    signIn("company_owner", {});
-    mountAt("/");
-
-    expect(createButton()).toBeNull();
+    expect(branches.nextElementSibling?.tagName).toBe("A");
+    expect(screen.queryByText("branchesList.newBranch")).toBeNull();
+    expect(screen.queryByText("nav.createBranch")).toBeNull();
   });
 
   test.each([
+    ["company_owner", { company_id: 5 }],
     ["admin", {}],
-    // A manager's dashboard may name the company; `branch.create` is what they lack.
     ["manager", { company_id: 5, branch_id: 3 }],
-  ] as const)("is hidden from %s", (role, dashboard) => {
+  ] as const)("%s: the navigation holds links only", (role, dashboard) => {
     signIn(role, dashboard);
-    mountAt("/");
+    const { container } = mountAt("/");
 
-    expect(createButton()).toBeNull();
+    const nav = container.querySelector("nav.sidebar-nav") as HTMLElement;
+    expect(within(nav).queryAllByRole("button")).toHaveLength(0);
+  });
+
+  // The sidebar is in the first paint of every screen; the form (with the map
+  // and the phone library) must not come back into it by way of a lazy import.
+  test("the sidebar does not carry the branch form, and its button styles are gone", () => {
+    const sidebar = readFileSync(path.resolve(__dirname, "Sidebar.tsx"), "utf8");
+    expect(sidebar).not.toContain("BranchForm");
+    const css = readFileSync(path.resolve(__dirname, "../styles/global.css"), "utf8");
+    expect(css).not.toContain("sidebar-action");
   });
 });
 

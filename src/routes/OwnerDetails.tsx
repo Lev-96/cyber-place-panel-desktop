@@ -1,7 +1,7 @@
 import type { IOwnerBranchApi, IOwnerDetailApi, IOwnerDetailCompanyApi } from "@/api/owners";
 import { useAuth } from "@/auth/AuthContext";
 import { can } from "@/auth/permissions";
-import BranchStatusPill from "@/components/branches/BranchStatusPill";
+import BranchListRow from "@/components/branches/BranchListRow";
 import OwnerCompanyLine from "@/components/owners/OwnerCompanyLine";
 import OwnerDeleteDialog from "@/components/owners/OwnerDeleteDialog";
 import OwnerForm from "@/components/owners/OwnerForm";
@@ -127,17 +127,13 @@ const CompanyCard = ({ company }: { company: IOwnerDetailCompanyApi }) => {
 const BranchRow = memo(({ branch: b }: { branch: IOwnerBranchApi }) => {
   const { t } = useLang();
   return (
-    <Link to={`/branches/${b.id}`} className="list-item">
-      <div className="owner-branch">
-        <div className="name owner-branch__title">
-          <span>{b.address || `№${b.id}`}</span>
-          <BranchStatusPill status={b.status} />
-          {b.is_blocked && <span className="pill blocked">{t("blocking.state.branch")}</span>}
-        </div>
-        <div className="meta">{b.city || "-"}</div>
-      </div>
-      <span className="muted">{t("common.open")}</span>
-    </Link>
+    <BranchListRow
+      to={`/branches/${b.id}`}
+      title={b.address || `№${b.id}`}
+      meta={b.city || "-"}
+      status={b.status}
+      blockedLabel={b.is_blocked ? t("blocking.state.branch") : null}
+    />
   );
 });
 BranchRow.displayName = "OwnerBranchRow";
