@@ -739,6 +739,12 @@ Hard rules:
   (`useBookingChanged`, `usePlaceAvailability`) invalidate too, so a
   change made on another machine lands immediately instead of waiting
   out a TTL.
+  - `/admin/*` writes fan out to every venue-scoped cached prefix (`/branches`,
+    `/places`, `/branch-platform-prices`, `/branch-subplatforms`,
+    `/time-packages`, `/products`, `/games`, `/tournaments`): deleting an owner
+    removes whole tenants and a block changes `is_blocked` on every branch
+    payload. Admin writes are rare, so over-invalidating is the cheap side.
+    Pinned in `httpCache.test.ts`.
 - Pass `noCache: true` to `request()` for a forced refresh; it also
   sends `Cache-Control: no-cache`, which makes the backend recompute.
 
@@ -916,8 +922,11 @@ button is not a permission: a manager who kept the URL could still POST.
 | Товары — список + поиск | ✅ | ✅ | ✅ |
 | Сессии, касса, игры, ПК, турниры, подписчики | ✅ | ✅ | ✅ |
 | Джойстики, доп. время, безлимит на живой сессии | ✅ | ✅ | ✅ |
-| Бесплатная сессия (списать счёт) | ✅ | ✅ | ❌ |
+| Бесплатная сессия (списать счёт) | ✅ | ✅ | ✅ (since 2026-09-06) |
 | Цены филиала — матрица, платформы, субплатформы, джойстики, округление | ✅ | ✅ | ❌ |
+| Выручка и комиссия (`revenue.view`, §9.5.9) | ✅ | ✅ | ❌ |
+| Статус филиала Active / Inactive (`branch.status`) | ✅ | ✅ | ❌ |
+| Владельцы — список, изменить, удалить (`owner.view` / `owner.edit` / `owner.delete`) | ✅ | ❌ | ❌ |
 
 Two things that look like oversights and are not:
 
@@ -938,10 +947,51 @@ offers to add one.
 **The line inside sessions is not "manager vs owner", it is "spend the prices
 you were given vs set them".** A manager adds a joystick, grants ten minutes
 and lifts a time limit all day — that is running the floor, and every one of
-those spends a rate the company already decided. Waiving a bill (`session.free`)
-is giving the company's takings away, and setting what anything costs is the
-company's. The backend enforces both on `sessions.free` and `prices.manage`;
-this map only decides whether the control is drawn.
+those spends a rate the company already decided. Setting what anything costs is
+the company's; the backend enforces it on `prices.manage`, and this map only
+decides whether the control is drawn. Waiving a bill (`session.free`) sat on the
+owner's side of that line until 2026-09-06 and is now the manager's too: the
+person who waives a bill is whoever is at the counter when a machine crashes
+(the backend moved `sessions.free` the same day).
+
+## 9.5.4 Branch status: Active / Inactive (2026-09-11)
+
+`branches.status` is `active | inactive` and means **whether players can see
+the branch** — nothing else. It is the OWNER's switch (and the admin's). It is
+not the block (`blocked_at` / `is_blocked`): the block is imposed on a company
+by an admin and its owner cannot lift it. Players see only branches that are
+`active` AND not blocked; an inactive branch stays fully workable for its
+staff. (An earlier same-day version made `inactive` mean "awaiting admin
+approval" with an admin-only `branch.approve`; that gate is gone on both
+sides. If you meet "awaiting approval" wording anywhere, it predates this.)
+
+- Vocabulary lives in `src/types/branch.ts` (`BranchStatus`, `BRANCH_STATUS`,
+  `DEFAULT_BRANCH_STATUS`, `isBranchInactive`, `branchStatusOf`).
+  `IBranchApi.status` is optional — an older backend omits it, and **absent
+  reads as active**, never as inactive.
+- The toggle is in THE `BranchForm`, drawn for `branch.status` (admin +
+  owner, never manager), on **create and edit**:
+  - create ALWAYS sends `status` (the form starts on Active, the backend
+    default), so a branch starts exactly as the form showed it;
+  - edit sends `status` ONLY when the user moved it — echoing the prefilled
+    value would let a form opened before somebody else switched the branch
+    quietly switch it back. The backend applies it for admin and the owner of
+    the branch's company and drops it for anyone else.
+- Indicator: `BranchStatusPill` ("Inactive", `pill pending`, tooltip "players
+  can't see this branch") on `BranchesList`, `CompanyBranches`, the
+  `BranchHub` header and the `BranchEdit` status row. The hub adds a
+  `state-notice`: the same sentence for owner and admin plus where the switch
+  is (Settings → Edit info → Active); a manager, who cannot switch it, gets the
+  sentence alone. An inactive branch is NOT read-only.
+- Refresh after saving is the existing path: the update is
+  `POST /branches/{id}?_method=PUT`, whose write fans out to every `/branches`
+  entry in `httpCache`, and `BranchEdit` re-reads via `reload()`. Pinned in
+  `client.cache.test.ts`.
+
+Tests: `BranchForm.status.test.tsx`, `BranchStatus.indicator.test.tsx`,
+`types/branch.test.ts`, `permissions.test.ts` — mutation-verified (edit
+always-sends, create never-sends, owner without `branch.status`, manager
+getting the hub pointer: each fails the suite).
 
 ## 9.5.5 How far ahead a reservation holds a seat (2026-09-11)
 
@@ -986,6 +1036,139 @@ The session that comes back is the SAME session: same id, same start, same
 bill, same products and pads. The board patches it in place like any other
 session update.
 
+## 9.5.7 The owner's sidebar (2026-09-11)
+
+- **"My company" links to `/companies/{dashboard.company_id}`**, the way
+  "My branch" links to `/branches/{dashboard.branch_id}`. It used to link to
+  `/my-company`, a route whose only job is `<Navigate replace>` — a link to a
+  redirect is never the current page, so the item never lit up anywhere. Prefix
+  matching now covers `/companies/{id}/branches` and `/companies/{id}/revenue`.
+  `/my-company` stays for old hash bookmarks and is still the target for an
+  owner with no company (it explains that).
+- **"+ New branch"** (`branch.create` AND a `dashboard.company_id`) opens THE
+  `BranchForm` from the sidebar's local state — the `UserMenu → ProfileModal`
+  idiom; there is no global modal host. It is lazy-imported there so the map
+  and phone libraries stay out of the first paint. After saving it navigates to
+  `/branches/{id}` (a fresh read; the POST already dropped cached listings).
+  Styled `.sidebar .sidebar-action` (dashed border, accent text, no active
+  state — it opens a form, not a page).
+
+Tests: `Sidebar.ownerNav.test.tsx` — active on all three company routes (and
+asserts over `App.tsx` that those routes and the `/owners` guard still exist),
+not active elsewhere, fallback, the form opened is the mocked BranchForm module
+with the owner's company id, navigation after save, hidden without company or
+permission. Mutation-verified (link back to `/my-company`, `end` on the link,
+button without the company check, no navigate).
+
+## 9.5.8 Owners (admin, 2026-09-11)
+
+`/owners` (RoleGuard `owner.view`; sidebar item after Managers), backed by
+`GET|PUT|DELETE /admin/owners[/{id}]` (`Admin\OwnerController`, `admin`
+middleware; `{owner}` resolves only a `company_owner`, anything else is 404).
+
+- Transport `src/api/owners.ts` — types mirror `OwnerResource`,
+  `DeletionPreviewResource`, `OwnerDeletionResource` and the 409
+  `TenantDeletionBlockedException` body field for field. Repository
+  `src/repositories/OwnerRepository.ts`. Deliberately NO `orFallback` (a failed
+  list must not read as "no owners") and NO `friendlyMutation` (a 404 here
+  means the owner is already gone, not "endpoint not deployed").
+- List: server search (name / email / company name) through
+  `useDebouncedValue` (400 ms) + `Pagination` (20 per page). The page belongs
+  to the query it was chosen for, so a new search requests page 1 once — no
+  reset effect, no wasted request. A page that vanishes after a delete steps
+  back to the last existing page. Rows are memoised.
+- Each row: name, email, and per company a link to the EXISTING company page
+  (that is the "view" — owners have no page of their own), branches / managers
+  counts, the company status pill and the blocked pill.
+- Edit: `OwnerForm` modal, name + email only (no password — the reset flow
+  stays), `PUT`; a taken email is the server's 422, shown per field.
+- Delete: `OwnerDeleteDialog` on the in-app `ConfirmDialog` (never native
+  `confirm()`). It asks `GET /admin/owners/{id}` FIRST and shows the preview
+  counts (companies, branches, manager accounts, places, sessions in history,
+  member cards with a balance). Confirm is refused while the preview is loading
+  or failed, when `can_delete` is false, and after a 409 — whose blockers
+  (computed under the delete's own locks) replace the preview's. Blockers are
+  worded by the panel from their code (`running_sessions`,
+  `upcoming_bookings`); an unknown code falls back to the server's `message`.
+  After a delete the list re-reads.
+- `ConfirmDialog` gained `confirmDisabled` (additive; `ConfirmProvider`
+  unchanged).
+- The people whose company was deleted get `StaffAccessChanged {action: block,
+  locked_out: true, code: null, message: "Your account has been deleted."}`.
+  `AccessGuard` already signs them out and shows the message — pinned in
+  `AccessGuard.test.tsx` for both `code: null` and an absent `code`. The
+  sentence is in the language the ADMIN's request negotiated, because the event
+  carries no code the panel could translate from.
+
+Tests: `Owners.test.tsx` (transport-level: URL, verb, body), mutation-verified
+(confirm allowed despite blockers, 409 not parsed, no reload after delete,
+PUT→PATCH, confirm without a preview, search keeping the old page).
+
+## 9.5.9 Revenue screen — tournaments, owner income, per branch (2026-09-11)
+
+`/revenue` and `/companies/:id/revenue` both render
+`src/components/revenue/CompanyRevenueScreen.tsx` (behind `revenue.view`: admin
+and company_owner, never manager). One call: `GET /company/{id}/revenue-summary`
+with the LOCAL calendar month's bounds as `from`/`to`.
+
+**Every amount comes from the server and is printed as-is. The screen formats
+figures and never computes them.** No subtraction, no multiplication, no totals
+row. Owner income is the server's `owner_income`, never "total − commission",
+because a second copy of that formula would drift from the server the first time
+its rounding changes. The component test pins this with deliberately
+inconsistent fixture figures.
+
+### Which key is printed where
+
+| Row | Key (current backend) | Older backend (no tournament keys) |
+|---|---|---|
+| Closed sessions / Sessions | `sessions_count` / `sessions_total` | same |
+| POS orders (only if > 0) | `pos_total` | same |
+| Paid tournament entries / Tournament entry fees | `tournaments_count` / `tournaments_total` (shown even at 0) | row hidden |
+| Total revenue | `total_gross` | falls back to `gross_total` |
+| Cyber Place commission | `commission_percent` + `%` | same |
+| **You owe us this period** (highlight) | `total_commission_amount` | falls back to `commission_amount` |
+| Owner income | `owner_income` | row hidden, never derived |
+
+Company-level `commission_amount` keeps its old meaning: commission on sessions
+plus POS only. Do not print it as "owed" when `total_commission_amount` is
+present.
+
+### Per-branch table (`BranchRevenueTable.tsx`)
+Shown only when `branches.length > 1`. With one branch, the table would repeat
+the card. The server lists every branch in id order, zero rows included, so
+the table keeps the same shape from month to month. Columns: Branch (address,
+or `№{id}` when it is null), Sessions (+ "Closed: n"), POS (only when some
+branch has `pos_total > 0`), Tournaments (+ "Entries: n"), Total revenue
+(`total_gross`), Cyber Place commission (the branch's `commission_amount`,
+which is on its `total_gross`), Owner income. There is no totals row: a branch
+commission can differ from its share of the company commission by 0.01, and the
+company figures in the card above are the authoritative ones.
+
+### Loading behaviour
+- Only the latest request lands (`requestSeq` ref). Flipping months quickly can
+  never paint an earlier month's figures under the current label.
+- A failed load clears the figures and shows the error with a **Retry** button.
+  The previous month is never left on screen under the new month's label.
+- The `percent`/`initialPercent` state is NOT dead code. It is never shown or
+  used in a sum, but it acts as a reload trigger. `useAsync` background
+  refreshes can deliver a changed `commission_percent` for the same company
+  while the screen stays mounted, and the summary is then asked for again.
+  Keep it, or replace it with an equivalent trigger.
+
+### Styles
+`global.css` → "Revenue (CompanyRevenueScreen)" block: `.revenue-card`,
+`.revenue-card-title`, `.revenue-table*`. The month picker buttons are 40px
+(desktop target minimum) and the month label uses tabular digits, so the next
+button stays under the cursor. The Armenian "Entries: n" label is "Մասնակից՝ n"
+on purpose. The longer "Մասնակցություններ" set the width of the whole column
+at 1280px.
+
+### Tests
+`src/components/revenue/CompanyRevenueScreen.test.tsx` (9 tests). `money` is
+mocked to print the number exactly as received, so a re-derived figure shows
+up in the output.
+
 ## 9.6 A live session's terms (2026-09-03)
 
 Four controls a cashier gets on a session that is already running, and one rule
@@ -1012,7 +1195,7 @@ saying so.
 | 🎮 set the pad count (select, 1–4) | the seat's tile in `SessionsBoard` | everyone who works the branch |
 | +10 / +30 / +60 minutes | `SessionOptionsDialog` | same |
 | switch to unlimited | same | same |
-| Free (start it waived) | `StartSessionDialog`, behind `session.free` | admin + owner |
+| Free (start it waived) | `StartSessionDialog`, behind `session.free` | same (managers since 2026-09-06) |
 | joystick prices, rounding policy | `BranchPricesPage` | admin + owner |
 
 ⚠️ Two rows MOVED out of `SessionOptionsDialog` (2026-09-10). Pads are set on
@@ -1024,12 +1207,12 @@ add-time dialog put an admin-only control in a dialog everyone uses.
 
 **Free is offered at the START as well as on a running session (2026-09-04),**
 and it is the same capability in both places — the server asserts
-`sessions.free` on `POST /sessions` too, so a manager who sends the flag gets a
-403 and no session. The checkbox sits below the tariff and outside the
-fixed/open branch, because it applies to either and it is a decision about the
-BILL rather than about the tariff. It is deliberately not wired to the "change
-current price" override beside it: free is not a price of zero, and the two
-diverge the moment a drink goes on the bill.
+`sessions.free` on `POST /sessions` too, so a caller without it who sends the
+flag gets a 403 and no session. The checkbox sits below the tariff and outside
+the fixed/open branch, because it applies to either and it is a decision about
+the BILL rather than about the tariff. It is deliberately not wired to the
+"change current price" override beside it: free is not a price of zero, and the
+two diverge the moment a drink goes on the bill.
 
 **The tile's figure is the clock PLUS what is on the seat (2026-09-06).**
 `sessionAmount.ts` composes it the way `SessionPricingCalculator` does —
