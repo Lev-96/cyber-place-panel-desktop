@@ -219,7 +219,7 @@ const CompanyForm = ({ initial, onClose, onSaved }: Props) => {
                 onChange={(e) => onCountryChange(e.target.value)}
                 aria-label={t("branch.country")}
               >
-                <option value="">+—</option>
+                <option value="">-</option>
                 {COUNTRIES.map((c) => (
                   <option key={c.code} value={c.code}>{flagOf(c.code)} +{c.dial}</option>
                 ))}

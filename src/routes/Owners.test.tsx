@@ -235,8 +235,8 @@ describe("deleting", () => {
 
     const text = dialogText();
     expect(text).toContain("It can't be deleted yet:");
-    expect(text).toContain("Running sessions: 2 — stop them first.");
-    expect(text).toContain("Upcoming bookings: 3 — cancel them first (players are notified).");
+    expect(text).toContain("Running sessions: 2. Stop them first.");
+    expect(text).toContain("Upcoming bookings: 3. Cancel them first (players are notified).");
     expect(text).not.toContain("This cannot be undone.");
     expect(dialogConfirm().disabled).toBe(true);
 
@@ -255,7 +255,7 @@ describe("deleting", () => {
 
     await act(async () => { fireEvent.click(dialogConfirm()); });
 
-    await waitFor(() => expect(dialogText()).toContain("Running sessions: 2 — stop them first."));
+    await waitFor(() => expect(dialogText()).toContain("Running sessions: 2. Stop them first."));
     expect(dialogConfirm().disabled).toBe(true);
     expect(callsTo("DELETE", "/admin/owners/1")).toHaveLength(1);
     expect(listCalls().length).toBe(before);
