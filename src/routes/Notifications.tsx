@@ -1,5 +1,5 @@
 import { ListSkeleton } from "@/components/ui/Skeleton";
-import { apiBillingReminders, IBillingReminder } from "@/api/billing";
+import { apiBillingReminders, apiCompanyBilling, IBillingReminder, ICompanyBilling } from "@/api/billing";
 import type { IServiceExpense } from "@/api/expenses";
 import { dueLabel, dueTone } from "@/components/expenses/expenseFormat";
 import type { IDbNotification } from "@/api/notifications";
@@ -50,6 +50,44 @@ export const shouldShowBookingsFeed = (role: string | undefined): boolean =>
 export const shouldShowBillingFeed = (role: string | undefined): boolean =>
   role === "admin" || role === "company_owner";
 
+/** How far ahead a payment counts as "worth reminding about", for both roles. */
+const REMINDER_WITHIN_DAYS = 7;
+
+/**
+ * The owner's own company, shaped like one row of the admin's reminder list.
+ *
+ * The two roles read two different doors for the same fact.
+ * `/company-billing/reminders` is the ADMIN's cross-tenant list — every
+ * company that owes money, with its name, email and commission — so the
+ * backend refuses it to an owner (`assertAdmin`, 403), and asking for it here
+ * used to replace this whole screen with "no permission" for the one role
+ * whose only section it is. `/company/{id}/billing` is the same fact scoped to
+ * the caller's own company (`assertCompanyAllowed`), and is what
+ * `CompanyBillingResource` was written for.
+ *
+ * `name` and `email` stay empty on purpose: `ReminderCard` reads them only on
+ * its admin branch, and an owner has no business seeing another tenant's
+ * contact anyway. Returning at most one row keeps the section's meaning
+ * identical for both roles — a payment due inside the window, or nothing.
+ */
+export const ownCompanyReminders = (billing: ICompanyBilling): IBillingReminder[] => {
+  const days = billing.days_until_due;
+  const due = billing.is_overdue || (days != null && days <= REMINDER_WITHIN_DAYS);
+  if (!due) return [];
+
+  return [{
+    id: billing.company_id,
+    name: "",
+    email: "",
+    commission_percent: billing.commission_percent,
+    last_paid_at: billing.last_paid_at,
+    next_due_at: billing.next_due_at,
+    days_until_due: billing.days_until_due,
+    is_overdue: billing.is_overdue,
+    status: billing.status,
+  }];
+};
+
 const Notifications = () => {
   const { user } = useAuth();
   const { t } = useLang();
@@ -68,11 +106,24 @@ const Notifications = () => {
     deleteAll,
   } = useNotifications();
 
+  // An owner reads their own company; only an admin may read the list of
+  // everybody's. An owner account with no company on its dashboard payload
+  // asks for nothing rather than guessing an id.
+  const ownCompanyId = user?.dashboard?.company_id;
   const billing = useAsync(
-    () => showBilling
-      ? orFallback(apiBillingReminders(7), { data: [] as IBillingReminder[] })
-      : Promise.resolve({ data: [] as IBillingReminder[] }),
-    [showBilling],
+    () => {
+      if (!showBilling) return Promise.resolve({ data: [] as IBillingReminder[] });
+      if (isAdmin) {
+        return orFallback(apiBillingReminders(REMINDER_WITHIN_DAYS), { data: [] as IBillingReminder[] });
+      }
+      if (ownCompanyId == null) return Promise.resolve({ data: [] as IBillingReminder[] });
+
+      return orFallback(
+        apiCompanyBilling(ownCompanyId).then((b) => ({ data: ownCompanyReminders(b) })),
+        { data: [] as IBillingReminder[] },
+      );
+    },
+    [showBilling, isAdmin, ownCompanyId],
   );
 
   // Admin-only recurring-services expense reminders (on-demand "remind me
