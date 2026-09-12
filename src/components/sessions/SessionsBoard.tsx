@@ -541,7 +541,7 @@ const SessionsBoard = ({ branchId }: Props) => {
           <span
             className="ps5-chip"
             title={consoleBusy && lifecycle
-              ? `${t("ps5.tile.bound")}: ${t(`ps5.lifecycle.${lifecycle}`)}${consoleView?.snapshot.error ? ` — ${t(`ps5.error.${consoleView.snapshot.error}`)}` : ""}`
+              ? `${t("ps5.tile.bound")}: ${t(`ps5.lifecycle.${lifecycle}`)}${consoleView?.snapshot.error ? ` - ${t(`ps5.error.${consoleView.snapshot.error}`)}` : ""}`
               : `${t("ps5.tile.bound")}: ${t(PS5_STATE_LOOK[consoleState].key)}`}
           >
             <span

@@ -301,8 +301,10 @@ const Sidebar = () => {
   const adminUpdateCount =
     (panelUpd?.has_update ? 1 : 0) + (agentUpd?.has_update ? 1 : 0);
   const agentUpdateCount = agentUpd?.has_update ? 1 : 0;
-  const dash = (user?.dashboard ?? {}) as { branch_id?: number | null };
-  const myBranchId = typeof dash.branch_id === "number" ? dash.branch_id : null;
+  const dash = user?.dashboard;
+  const myBranchId = typeof dash?.branch_id === "number" ? dash.branch_id : null;
+  // The owner's company (single company per owner, as everywhere in the panel).
+  const myCompanyId = typeof dash?.company_id === "number" ? dash.company_id : null;
 
   return (
     <aside className="sidebar">
@@ -336,6 +338,8 @@ const Sidebar = () => {
         {t("nav.dashboard")}
       </NavLink>
       {can(role, "menu.branches") && (
+        // Creating a branch is an action on the Branches page (its header
+        // button), not an entry in the navigation.
         <NavLink to="/branches">{t("nav.branches")}</NavLink>
       )}
       {role === "manager" && myBranchId !== null && (
@@ -367,10 +371,21 @@ const Sidebar = () => {
         <NavLink to="/metrics">{t("nav.metrics")}</NavLink>
       )}
       {can(role, "menu.myCompany") && (
-        <NavLink to="/my-company">{t("nav.myCompany")}</NavLink>
+        // Straight to the company's own page, the way "My branch" links to the
+        // branch. `/my-company` only redirects, and a link to a route that only
+        // redirects is never the current page — so it never lit up. Prefix
+        // matching now covers the company's branches and revenue pages too.
+        // An owner with no company still goes to `/my-company`, which is where
+        // that is explained.
+        <NavLink to={myCompanyId !== null ? `/companies/${myCompanyId}` : "/my-company"}>
+          {t("nav.myCompany")}
+        </NavLink>
       )}
       {can(role, "menu.managers") && (
         <NavLink to="/managers">{t("nav.managers")}</NavLink>
+      )}
+      {can(role, "owner.view") && (
+        <NavLink to="/owners">{t("nav.owners")}</NavLink>
       )}
       <NavLink to="/notifications">
         {t("nav.notifications")}

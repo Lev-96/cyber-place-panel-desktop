@@ -184,7 +184,7 @@ const PcForm = ({ branchId, initial, takenPlaceIds = [], onClose, onSaved }: Pro
                   place's platform/type, but the operator still sees it plainly. */}
               <select className="input" value={tier!.key} style={selectInner} disabled>
                 <option value={tier!.key}>
-                  {tier!.label} — {money(tier!.amount!)}/{t("time.hourShort")}
+                  {tier!.label} - {money(tier!.amount!)}/{t("time.hourShort")}
                 </option>
               </select>
               <span aria-hidden style={selectCaret}>▾</span>

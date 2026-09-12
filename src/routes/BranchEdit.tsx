@@ -1,4 +1,5 @@
 import { SkeletonForm } from "@/components/ui/Skeleton";
+import BranchStatusPill from "@/components/branches/BranchStatusPill";
 import BranchForm from "@/components/branches/BranchForm";
 import BranchOpenDaysForm from "@/components/branches/BranchOpenDaysForm";
 import BranchUnlockPinCard from "@/components/branches/BranchUnlockPinCard";
@@ -9,7 +10,7 @@ import { useAsync } from "@/hooks/useAsync";
 import { useLang } from "@/i18n/LanguageContext";
 import { fmt } from "@/i18n/translations";
 import { branchRepository } from "@/repositories/BranchRepository";
-import { useState } from "react";
+import { ReactNode, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
 // Pricing has its own dedicated page — see /branches/:id/tariffs
@@ -44,6 +45,9 @@ const BranchEdit = () => {
         <Row k={t("label.phone")} v={Array.isArray(data.phone) ? data.phone.join(", ") : (data.phone ?? "-")} />
         <Row k={t("label.places")} v={String(data.places_count ?? 0)} />
         <Row k={t("branch.rating")} v={data.ratings_avg_rating != null ? Number(data.ratings_avg_rating).toFixed(1) : "-"} />
+        {/* Re-read from the server after every save (`reload`), so whoever
+            just switched the branch on or off sees the pill turn here. */}
+        <Row k={t("branch.status")} v={<BranchStatusPill status={data.status} />} />
         <div className="row" style={{ gap: 8, flexWrap: "wrap", marginTop: 6 }}>
           <Button variant="secondary" onClick={() => setEdit(true)}>{t("branchEdit.editInfo")}</Button>
           <Button variant="secondary" onClick={() => setHours(true)}>{t("branch.editTabs.hours")}</Button>
@@ -63,7 +67,7 @@ const BranchEdit = () => {
   );
 };
 
-const Row = ({ k, v }: { k: string; v: string }) => (
+const Row = ({ k, v }: { k: string; v: ReactNode }) => (
   <div className="kv-row"><span className="k">{k}</span><span className="v">{v}</span></div>
 );
 

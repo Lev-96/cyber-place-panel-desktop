@@ -1,4 +1,5 @@
 import { IBranchApi, PaginatedList } from "@/types/api";
+import type { BranchStatus } from "@/types/branch";
 import { request } from "./client";
 
 export interface GetBranchesParams {
@@ -18,8 +19,22 @@ export interface CreateBranchBody {
   address_lng: number;
   company_id?: number;
   branch_logo_path?: File | null;
+  /**
+   * Whether players can see the branch (`active`) or not (`inactive`).
+   * Optional on the wire — absent means `active` (backend StoreRequest /
+   * StoreService) — but `BranchForm` always sends it for the roles that draw
+   * the toggle, so the branch starts exactly as the form showed it.
+   */
+  status?: BranchStatus;
 }
 
+/**
+ * Everything optional. `status` in particular is sent ONLY when the user moved
+ * the toggle: echoing the prefilled value on every save would let a form opened
+ * before someone else switched the branch quietly switch it back. The backend
+ * applies it for admin and the owner of the branch's company and drops it for
+ * anyone else.
+ */
 export type UpdateBranchBody = Partial<CreateBranchBody>;
 
 const buildBranchForm = (body: Record<string, unknown>): FormData => {

@@ -231,6 +231,16 @@ const MUTATION_FANOUT: Readonly<Record<string, readonly string[]>> = {
   "/sessions": ["/places", "/branches"],
   "/bookings": ["/places", "/branches"],
   "/translations": ["/products", "/places", "/time-packages", "/games", "/branches"],
+  // Administrative writes reach whole tenants: deleting an owner removes their
+  // companies with every branch, seat, tariff, product and tournament under
+  // them, and a block changes `is_blocked` on every branch payload. They are
+  // rare (an admin pressing a button), so dropping everything venue-scoped is
+  // the cheap side of the trade — a cached list still showing a deleted
+  // branch for 30 seconds is the expensive one.
+  "/admin": [
+    "/branches", "/places", "/branch-platform-prices", "/branch-subplatforms",
+    "/time-packages", "/products", "/games", "/tournaments",
+  ],
 };
 
 export const invalidationTargets = (path: string): readonly string[] => {

@@ -38,6 +38,27 @@ const KNOWN = new Set([
 export const blockingKeyFor = (code: unknown): string | null =>
   typeof code === "string" && KNOWN.has(code) ? `blocking.reason.${code}` : null;
 
+/**
+ * Reasons the access channel (`StaffAccessChanged`, `.access.changed`) can
+ * sign somebody out for that are NOT blocks. No request is ever refused with
+ * one of these, so they stay out of {@link KNOWN}: `blockedBodyOf` answers the
+ * login screen's "was this a block?", and a deletion is a different fact.
+ */
+const LOCKOUT_ONLY = new Set([
+  // Their owner — and with the owner their company — was deleted by an admin.
+  "account_deleted",
+]);
+
+/**
+ * The translation key for why a `locked_out` access event signed this account
+ * out: every block code, plus the lock-out-only reasons. Null for anything
+ * else (null, absent, a code newer than this build) — the caller then shows the
+ * server's `message`, which is how every panel before this one behaves.
+ */
+export const lockoutKeyFor = (code: unknown): string | null =>
+  blockingKeyFor(code)
+  ?? (typeof code === "string" && LOCKOUT_ONLY.has(code) ? `blocking.reason.${code}` : null);
+
 /** The block body of a failed request, or null if it was not a block. */
 export const blockedBodyOf = (error: unknown): BlockedErrorBody | null => {
   const body = (error as ApiError | undefined)?.body;

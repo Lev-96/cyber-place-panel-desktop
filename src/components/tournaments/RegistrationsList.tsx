@@ -8,6 +8,7 @@ import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import Spinner from "@/components/ui/Spinner";
 import VerifyCodeForm from "@/components/tournaments/VerifyCodeForm";
+import { useConfirm } from "@/components/ui/ConfirmProvider";
 import { useLang } from "@/i18n/LanguageContext";
 import { formatDateTime } from "@/i18n/dates";
 import { useEffect, useMemo, useState } from "react";
@@ -23,12 +24,21 @@ interface Props {
  * each row has a Remove button that deletes via the existing
  * `DELETE /tournament-registration/{id}` endpoint.
  *
+ * Remove asks first, in the in-app dialog (`useConfirm`) — never a native
+ * `confirm()`, which poisons the Electron renderer's focus. For a VERIFIED
+ * player the question carries the refund rule: the backend refunds their entry
+ * fee (and drops it from revenue) when the tournament has not ended yet. Only a
+ * verified player can have paid — a spectator or an unverified player never
+ * has a fee — so only they get the note. Whether a refund actually happens is
+ * the server's call; the note states the rule, it does not predict it.
+ *
  * Pure presenter on top of the registrations API. State machine is
  * the standard load/loading/error/empty quartet — no realtime hooks
  * here, the staff opens this page on demand.
  */
 const RegistrationsList = ({ tournamentId }: Props) => {
   const { t } = useLang();
+  const confirm = useConfirm();
   const [items, setItems] = useState<ITournamentRegistration[] | null>(null);
   const [search, setSearch] = useState("");
   const [err, setErr] = useState<string | null>(null);
@@ -50,10 +60,12 @@ const RegistrationsList = ({ tournamentId }: Props) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tournamentId]);
 
-  const remove = async (id: number) => {
-    if (!confirm(t("registrations.confirmRemove") || "Remove registration?")) return;
+  const remove = async (reg: ITournamentRegistration) => {
+    const question = t("registrations.confirmRemove");
+    const message = reg.verified_at ? `${question}\n\n${t("registrations.removeRefundNote")}` : question;
+    if (!(await confirm(message, { destructive: true }))) return;
     try {
-      await apiDeleteTournamentRegistration(id);
+      await apiDeleteTournamentRegistration(reg.id);
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Failed to remove");
       return;
@@ -99,7 +111,7 @@ const RegistrationsList = ({ tournamentId }: Props) => {
       ) : (
         <div className="list">
           {filtered.map((r) => (
-            <RegistrationRow key={r.id} reg={r} onRemove={() => void remove(r.id)} />
+            <RegistrationRow key={r.id} reg={r} onRemove={() => void remove(r)} />
           ))}
           {!filtered.length && (
             <div className="muted">

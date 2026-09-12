@@ -1166,6 +1166,39 @@ input[type="time"]::-webkit-datetime-edit-field:focus {
   font-size: 12px;
 }
 
+/* ── Branch rows (`BranchListRow`) ───────────────────────────────────────
+   A `.list-item` with four flex items: logo, text, pills, "Open". Only the
+   text block gives way when the row narrows: it takes the free width, may
+   shrink below its content (min-width: 0) and wraps. The pills and "Open"
+   never shrink, so a long address can push neither out of the row nor clip
+   them, and the status pills line up in one column down the list. */
+.branch-row__text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+/* `anywhere`: even one unbroken string (a long street name, a pasted code)
+   wraps instead of widening the row. */
+.branch-row__name,
+.branch-row__text .meta {
+  overflow-wrap: anywhere;
+}
+.branch-row__pills {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+.branch-row__pills .pill,
+.branch-row__open {
+  white-space: nowrap;
+}
+.branch-row__open {
+  flex: 0 0 auto;
+}
+
 .live-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
@@ -1336,9 +1369,11 @@ input[type="time"]::-webkit-datetime-edit-field:focus {
   align-items: center;
   gap: 12px;
 }
+/* 40px: the desktop minimum for a pointer target — the month is flipped in
+   quick repeated clicks, so the button must be easy to hit and must not move. */
 .month-picker .month-btn {
-  width: 36px;
-  height: 36px;
+  width: 40px;
+  height: 40px;
   border: 1px solid var(--color-primary);
   background: var(--color-surface);
   color: var(--color-primary);
@@ -1346,8 +1381,11 @@ input[type="time"]::-webkit-datetime-edit-field:focus {
   font-size: 18px;
   cursor: pointer;
 }
+/* Tabular digits keep "11.2026" as wide as "09.2026", so the next-month button
+   stays under the cursor while the months are flipped through. */
 .month-picker .month-label {
   font-weight: 600;
+  font-variant-numeric: tabular-nums;
 }
 
 .kv-row {
@@ -1371,6 +1409,54 @@ input[type="time"]::-webkit-datetime-edit-field:focus {
   height: 1px;
   background: var(--color-border);
   margin: 6px 0;
+}
+
+/* ── Revenue (CompanyRevenueScreen) ──────────────────────────────────────
+   One `.card` with the month's figures as `.kv-row`s, for the whole company
+   or, picked in the toolbar above it, for one branch. */
+.revenue-card {
+  gap: 4px;
+}
+/* Same weight, size and colour as the `.kv-row` heading row this replaces,
+   as a real heading. With a branch picked it carries the branch's address,
+   which may be long: it wraps rather than widening the card. */
+.revenue-card-title {
+  margin: 0;
+  padding: 6px 0;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.4;
+  color: var(--color-muted);
+  overflow-wrap: anywhere;
+}
+/* The card's two filters, period then scope, as one group on the left. The
+   bottoms line up (the branch field has its label above it), and if a long
+   label ever leaves no room the field drops to its own line whole. */
+.revenue-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 16px 24px;
+}
+/* 360px holds a typical "Street 12, City" address in full; past that the
+   selected label ellipsizes (full text in the tooltip) instead of the control
+   growing into a bar. It may shrink below that on a narrow window. */
+.revenue-branch-field {
+  display: flex;
+  flex-direction: column;
+  flex: 0 1 360px;
+  min-width: 0;
+}
+.revenue-branch-select {
+  min-height: 40px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+.revenue-branch-select:disabled {
+  opacity: 0.6;
+  cursor: default;
 }
 
 .login-shell {
@@ -3178,6 +3264,24 @@ button.login-flip-back:hover {
   max-width: 34ch;
 }
 
+/* One-sentence state notice under the branch header ("this branch is blocked",
+   "this branch is inactive"): state before consequence, read before
+   the tiles it explains. Layered on `.card` (which sets the padding, radius and
+   surface), so it must stay after `.card` in this file to win the border and
+   background. Warning amber, not the danger red — the pill carries severity,
+   the notice carries the explanation. The values are the ones the blocked-branch
+   banner always had inline — moving it onto this class must not change a pixel
+   of it. The text colour is a light amber with no theme token: `--color-warning`
+   itself is too dark to read at 13px on the tinted surface. */
+.state-notice {
+  width: 100%;
+  border-color: #f0a202;
+  background: rgba(240, 162, 2, 0.08);
+  color: #ffd88a;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
 /* ── Support desk ────────────────────────────────────────────────────────
    Two columns on a desk-sized window, one on a narrow one: the conversation
    list is a way to switch threads, not something worth keeping a 260px column
@@ -3742,4 +3846,69 @@ button.login-flip-back:hover {
 .screen-actions__buttons .btn {
   /* A label on one line is what makes the two buttons the same height. */
   white-space: nowrap;
+}
+
+/* ── Owners (the admin's list + one owner's page, `/owners/:ownerId`) ─────── */
+
+/* One of an owner's companies in a line (`OwnerCompanyLine`): name link,
+   counts, status, block. Wraps as whole pieces, so a long company name or the
+   Russian "Заблокирована" moves to the next line instead of widening the row. */
+.owner-company-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.owner-company-line .pill {
+  white-space: nowrap;
+}
+
+/* The owner's name (→ their page) and a company name (→ the company page) are
+   links inside a row that is not one; links inherit the text colour here, so
+   the accent on hover is what says "this opens something". */
+.owner-link,
+.owner-company-line a {
+  transition: color 120ms ease;
+}
+.owner-link:hover,
+.owner-company-line a:hover {
+  color: var(--color-primary);
+}
+.owner-link:focus-visible,
+.owner-company-line a:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+/* Section heading above the company cards: same size and weight as the
+   revenue card titles, as a real heading. */
+.owner-section-title {
+  margin: 8px 0 0;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+/* A company card on the owner's page: its line on top, its branches under it. */
+.owner-company {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+.owner-company__head {
+  font-weight: 600;
+}
+
+/* A destructive secondary button (Delete). The danger colour on a dark-red
+   edge derived from the tokens, and a red hover ring instead of the cyan one
+   every other secondary button gets. */
+.btn.secondary.is-danger {
+  color: var(--color-danger);
+  border-color: color-mix(in srgb, var(--color-danger) 30%, var(--color-bg));
+}
+.btn.secondary.is-danger:hover {
+  border-color: var(--color-danger);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-danger) 60%, transparent);
 }

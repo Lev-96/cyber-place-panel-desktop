@@ -1,4 +1,5 @@
 import { Translated } from "@/i18n/translated";
+import type { BranchStatus } from "@/types/branch";
 
 export type PlatformType = "pc" | "ps4" | "ps5";
 export type PlaceType = "standard" | "vip";
@@ -171,7 +172,13 @@ export interface IBranchApi extends Translated {
   address_lng?: number | string | null;
   phone: string | string[] | null;
   branch_logo_path: string;
-  status: string;
+  /**
+   * Whether players can see the branch (`BranchResource.status`): `inactive`
+   * = switched off for players by its owner or an admin, still workable for
+   * staff. Optional: an older backend may omit it, which reads as `active`.
+   * See `@/types/branch`.
+   */
+  status?: BranchStatus;
   /**
    * Administrative block — deliberately two fields, not one:
    *

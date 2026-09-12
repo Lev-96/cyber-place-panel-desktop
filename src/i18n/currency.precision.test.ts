@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { preciseWhenSmall, StaticRateMoneyDisplay } from "./currency";
+import { centsWhenFractional, preciseWhenSmall, StaticRateMoneyDisplay } from "./currency";
 
 /**
  * Money is written in whole units everywhere it is a PRICE — a tariff, a
@@ -55,5 +55,53 @@ describe("money formatting", () => {
     const usd = display.format(1000, "USD", "en");
     expect(usd).toBe(display.format(1000, "USD", "en", undefined));
     expect(display.format(1000, "USD", "en", { maximumFractionDigits: 0 })).not.toContain(".");
+  });
+});
+
+/**
+ * The revenue screen is a statement of account: its figures come from the
+ * server to the hundredth (9000.50 / 900.05 / 8100.45), and rounded to whole
+ * units they stop adding up on the card — 9,001 − 900 ≠ 8,100. There, and only
+ * there, an amount with a fraction shows both of its digits.
+ *
+ * The rule: the SERVER value has non-zero cents → exactly two decimals; a whole
+ * amount → no decimals at all. Decided per amount, never derived from others.
+ */
+describe("centsWhenFractional — the revenue screen's rule", () => {
+  const display = new StaticRateMoneyDisplay();
+  const shown = (amount: number) => display.format(amount, "AMD", "en", centsWhenFractional(amount));
+
+  test("an amount with cents asks for exactly two decimals", () => {
+    expect(centsWhenFractional(9000.5)).toEqual({ minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    expect(centsWhenFractional(900.05)).toEqual({ minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    expect(centsWhenFractional(-12.5)).toEqual({ minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  });
+
+  test("a whole amount asks for nothing, so it prints exactly as money() always did", () => {
+    expect(centsWhenFractional(9000)).toBeUndefined();
+    expect(centsWhenFractional(0)).toBeUndefined();
+    // Float noise below a cent is not a fraction anybody was charged.
+    expect(centsWhenFractional(9000.004)).toBeUndefined();
+    expect(centsWhenFractional(1500.0000001)).toBeUndefined();
+  });
+
+  test("9000.50 prints its .50 — not 9,001, and not 9,000.5", () => {
+    // Separators follow the ICU data (Node: "9000,50"; the Electron build:
+    // "9,000.50"); the two decimal digits are what this pins.
+    expect(shown(9000.5)).toMatch(/^9\D?000[.,]50 AMD$/);
+    expect(shown(900.05)).toMatch(/^900[.,]05 AMD$/);
+    expect(shown(8100.45)).toMatch(/^8\D?100[.,]45 AMD$/);
+  });
+
+  test("9000 prints without decimals", () => {
+    expect(shown(9000)).toMatch(/^9\D?000 AMD$/);
+    expect(shown(9000)).toBe(display.format(9000, "AMD", "en"));
+    expect(shown(0)).toBe("0 AMD");
+  });
+
+  test("a minimum alone never collides with the whole-unit default", () => {
+    // Intl throws a RangeError for minimumFractionDigits 2 with a maximum of 0,
+    // which is what the AMD default maximum is. The formatter must widen it.
+    expect(display.format(1, "AMD", "ru", { minimumFractionDigits: 2 })).toBe("1,00 драм");
   });
 });

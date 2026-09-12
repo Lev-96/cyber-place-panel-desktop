@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { TRANSLATIONS } from "@/i18n/translations";
-import { blockedBodyOf, blockingKeyFor, blockingKeyOf, blockingMessage } from "./blockingErrors";
+import { blockedBodyOf, blockingKeyFor, blockingKeyOf, blockingMessage, lockoutKeyFor } from "./blockingErrors";
 
 /**
  * The rule this module exists for: a refusal caused by an administrative block
@@ -47,6 +47,48 @@ describe("every code has real wording behind it", () => {
       }
     },
   );
+});
+
+describe("lockoutKeyFor — why the access channel signed somebody out", () => {
+  /**
+   * `StaffAccessChanged` carries every block code AND reasons that are not a
+   * block at all: an account deleted with its owner's company arrives as
+   * `code: "account_deleted"`. The panel says it in its own language, exactly
+   * like a block.
+   */
+  test("an account deleted with its company has the panel's own wording", () => {
+    expect(lockoutKeyFor("account_deleted")).toBe("blocking.reason.account_deleted");
+  });
+
+  test("every block code is a lock-out reason too, with the same key", () => {
+    for (const code of ["company_blocked", "branch_blocked", "branch_operation_blocked"]) {
+      expect(lockoutKeyFor(code)).toBe(blockingKeyFor(code));
+    }
+  });
+
+  test("an unknown code, a null and an absent one have no key — the caller shows the server's sentence", () => {
+    expect(lockoutKeyFor("account_suspended")).toBeNull();
+    expect(lockoutKeyFor(null)).toBeNull();
+    expect(lockoutKeyFor(undefined)).toBeNull();
+    expect(lockoutKeyFor(7)).toBeNull();
+  });
+
+  test("a deleted account is NOT a block: a request refused with that code is not dressed up as one", () => {
+    // The login screen asks `blockingKeyOf` "was this a block?". A deletion is
+    // a different fact, and widening the block set would change that answer.
+    expect(blockingKeyFor("account_deleted")).toBeNull();
+    expect(blockedBodyOf(apiError(403, { code: "account_deleted", message: "x" }))).toBeNull();
+  });
+
+  test("the deleted-account wording exists in all three languages", () => {
+    const entry = TRANSLATIONS["blocking.reason.account_deleted"];
+    expect(entry, "no translation entry for blocking.reason.account_deleted").toBeDefined();
+    for (const lang of ["en", "ru", "am"] as const) {
+      expect(entry[lang]?.length ?? 0).toBeGreaterThan(0);
+    }
+    // Three different sentences — not one language pasted into the others.
+    expect(new Set([entry.en, entry.ru, entry.am]).size).toBe(3);
+  });
 });
 
 describe("blockedBodyOf", () => {

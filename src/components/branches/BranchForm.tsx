@@ -1,4 +1,7 @@
 import { formatApiError } from "@/api/errors";
+import type { CreateBranchBody } from "@/api/branches";
+import { useAuth } from "@/auth/AuthContext";
+import { can } from "@/auth/permissions";
 import BranchMap from "@/components/map/BranchMap";
 import Button from "@/components/ui/Button";
 import ImageUpload from "@/components/ui/ImageUpload";
@@ -11,6 +14,7 @@ import { branchRepository } from "@/repositories/BranchRepository";
 import { geocodeAddress, GeocodeResult } from "@/services/geocoding";
 import { COUNTRIES, countryByCode, flagOf, resolveCountryCode } from "@/data/countries";
 import { IBranchApi } from "@/types/api";
+import { BRANCH_STATUSES, BranchStatus, branchStatusOf } from "@/types/branch";
 import { parsePhoneNumberFromString, type CountryCode } from "libphonenumber-js";
 import { FormEvent, useEffect, useRef, useState } from "react";
 
@@ -34,6 +38,13 @@ type GeoStatus = "idle" | "searching" | "found" | "not-found" | "error";
 
 const BranchForm = ({ initial, companyId, onClose, onSaved }: Props) => {
   const { t } = useLang();
+  const { user } = useAuth();
+  // Active / Inactive = may players see this branch. The owner's switch (and
+  // the admin's), on create and on edit alike; a manager never draws it.
+  const canSetStatus = can(user?.role, "branch.status");
+  // A new branch starts Active — the same default the backend applies.
+  const savedStatus = branchStatusOf(initial?.status);
+  const [status, setStatus] = useState<BranchStatus>(savedStatus);
   const [address, setAddress] = useState(initial?.address ?? "");
   const [city, setCity] = useState(initial?.city ?? "");
   // `country` holds an ISO alpha-2 code (drives the strict dropdown + phone
@@ -220,7 +231,7 @@ const BranchForm = ({ initial, companyId, onClose, onSaved }: Props) => {
     setBusy(true);
     setErr(null);
     try {
-      const body = {
+      const body: CreateBranchBody = {
         address,
         city,
         country: countryName,
@@ -231,8 +242,19 @@ const BranchForm = ({ initial, companyId, onClose, onSaved }: Props) => {
         ...(logo ? { branch_logo_path: logo } : {}),
       };
       const b = initial
-        ? await branchRepository.update(initial.id, body)
-        : await branchRepository.create(body as Required<typeof body>);
+        ? await branchRepository.update(initial.id, {
+            ...body,
+            // Only when the user actually MOVED it. Echoing the prefilled value
+            // on every save would let a form opened before somebody else
+            // switched the branch quietly switch it back while fixing a phone.
+            ...(canSetStatus && status !== savedStatus ? { status } : {}),
+          })
+        : await branchRepository.create({
+            ...body,
+            // Always, on create: the branch starts exactly as the form showed
+            // it rather than as whatever the server's default is today.
+            ...(canSetStatus ? { status } : {}),
+          });
       onSaved(b);
     } catch (e) {
       setErr(formatApiError(e));
@@ -380,6 +402,34 @@ const BranchForm = ({ initial, companyId, onClose, onSaved }: Props) => {
             {t("branchForm.autoLocateHint")}
           </span>
         </div>
+
+        {/* Last, right above Save: the venue is described first, then the
+            owner decides whether players can see it, and that decision is the
+            one next to the button that commits it. Same two-button toggle as
+            the company status in CompanyForm; flex: 1 keeps both halves one
+            width whatever the language. */}
+        {canSetStatus && (
+          <div className="col" style={{ gap: 6 }}>
+            <span className="label">{t("branch.status")}</span>
+            <div className="row" role="group" aria-label={t("branch.status")} style={{ gap: 6 }}>
+              {BRANCH_STATUSES.map((s) => (
+                <Button
+                  key={s}
+                  type="button"
+                  variant={status === s ? "primary" : "secondary"}
+                  aria-pressed={status === s}
+                  onClick={() => setStatus(s)}
+                  style={{ flex: 1 }}
+                >
+                  {t(`branch.status.${s}`)}
+                </Button>
+              ))}
+            </div>
+            <span className="muted" style={{ fontSize: 11 }}>
+              {t("branch.statusHint")}
+            </span>
+          </div>
+        )}
 
         {err && (
           <div className="error" style={{ whiteSpace: "pre-line" }}>

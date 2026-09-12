@@ -8,6 +8,12 @@ interface Props {
   confirmLabel?: string;
   cancelLabel?: string;
   destructive?: boolean;
+  /**
+   * Draws the confirm button but refuses it — for a confirmation whose facts
+   * are still loading, or that the server has said cannot go ahead. The
+   * message says why; Cancel always works.
+   */
+  confirmDisabled?: boolean;
   onConfirm: () => void;
   onCancel: () => void;
 }
@@ -18,6 +24,7 @@ const ConfirmDialog = ({
   confirmLabel,
   cancelLabel,
   destructive,
+  confirmDisabled = false,
   onConfirm,
   onCancel,
 }: Props) => {
@@ -40,6 +47,7 @@ const ConfirmDialog = ({
           <Button
             type="button"
             onClick={onConfirm}
+            disabled={confirmDisabled}
             style={destructive ? { background: "#7a1f1f", borderColor: "#4a1a1a" } : undefined}
           >
             {confirmLabel ?? t("action.confirm")}

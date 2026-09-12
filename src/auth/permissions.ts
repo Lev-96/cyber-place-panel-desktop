@@ -120,7 +120,30 @@ export type Permission =
    * whether the button is drawn.
    */
   | "company.block"
-  | "branch.block";
+  | "branch.block"
+  /**
+   * Switch a branch Active ↔ Inactive (`branches.status`) — whether players
+   * can see it. The owner's decision about their own venue (and the admin's):
+   * chosen in the create form, flipped in the edit form. A manager runs the
+   * floor of a branch that is already open or closed and never draws the
+   * toggle. The backend accepts `status` on `POST /branches` and applies it on
+   * `PUT /branches/{id}` for admin and for the owner of that branch's company,
+   * and never for anyone else; this only decides whether the toggle is drawn.
+   *
+   * Not the block: `branch.block` stays admin-only because the block is used
+   * AGAINST a company and its owner must not be able to lift it.
+   */
+  | "branch.status"
+  /**
+   * The admin's Owners section (`/owners`, backend `/admin/owners`): list and
+   * search every company owner on the platform, correct their name/email, and
+   * delete one with every company they own. Network-wide partner data and an
+   * irreversible delete — admin only, enforced by the backend's `admin`
+   * middleware; these only decide what is drawn.
+   */
+  | "owner.view"
+  | "owner.edit"
+  | "owner.delete";
 
 const PERMS: Record<Role, ReadonlySet<Permission>> = {
   admin: new Set<Permission>([
@@ -131,8 +154,9 @@ const PERMS: Record<Role, ReadonlySet<Permission>> = {
     "branch.create", "branch.edit", "branch.delete", "branch.prices",
     "branch.places", "branch.members", "product.crud",
     "company.create", "company.edit", "company.delete",
-    "company.block", "branch.block",
+    "company.block", "branch.block", "branch.status",
     "manager.create", "manager.delete",
+    "owner.view", "owner.edit", "owner.delete",
     "game.crud", "game.crud.branch", "expenses.crud",
     "session.start", "session.stop", "session.free",
   ]),
@@ -140,6 +164,9 @@ const PERMS: Record<Role, ReadonlySet<Permission>> = {
     "menu.branches", "menu.managers", "menu.tournaments", "menu.scan", "menu.map",
     "menu.myCompany", "menu.agentUpdates", "menu.support", "revenue.view",
     "branch.create", "branch.edit", "branch.delete", "branch.prices",
+    // Whether players can see the venue is the owner's call; the admin
+    // approval gate this replaced is gone on both sides.
+    "branch.status",
     // Seats, shifts and the product catalogue are the company's to arrange;
     // "branch.members" is deliberately NOT here — member cards and deposits are
     // administrative, and the section is gone from an owner's branch.

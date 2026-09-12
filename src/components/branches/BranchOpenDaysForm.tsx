@@ -52,7 +52,7 @@ const BranchOpenDaysForm = ({ branch, onClose, onSaved }: Props) => {
               <span>{t(DAY_KEYS[i])}</span>
             </label>
             <input className="input" type="time" value={r.start_time} disabled={!r.enabled} onChange={(e) => setRows(rows.map((x, j) => j === i ? { ...x, start_time: e.target.value } : x))} />
-            <span className="muted">—</span>
+            <span className="muted">-</span>
             <input className="input" type="time" value={r.end_time} disabled={!r.enabled} onChange={(e) => setRows(rows.map((x, j) => j === i ? { ...x, end_time: e.target.value } : x))} />
           </div>
         ))}

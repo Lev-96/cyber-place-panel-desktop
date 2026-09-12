@@ -254,7 +254,7 @@ app.whenReady().then(async () => {
   ensureLinuxDesktopIntegration({
     appId: "cyberplace-panel",
     displayName: "Cyberplace Panel",
-    comment: "Cyber Place staff panel — bookings, sessions, billing",
+    comment: "Cyber Place staff panel: bookings, sessions, billing",
     iconSourcePath: bundledIconPath(),
   });
 

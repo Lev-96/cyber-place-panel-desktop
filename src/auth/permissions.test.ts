@@ -63,6 +63,37 @@ describe("can(role, perm)", () => {
     });
   });
 
+  // Whether players can see a branch is the owner's switch (and the admin's).
+  // A manager runs the floor of a branch that is already on or off. The
+  // backend applies `status` for admin and the owner of the branch's company
+  // only; this pins the toggle that sends it. The status switch must not drag
+  // the block along with it — that one stays admin-only.
+  describe("branch status (Active / Inactive)", () => {
+    it("is granted to an admin", () => {
+      expect(can("admin", "branch.status")).toBe(true);
+    });
+
+    it("is granted to an owner, without the block", () => {
+      expect(can("company_owner", "branch.status")).toBe(true);
+      expect(can("company_owner", "branch.block")).toBe(false);
+    });
+
+    it("is denied to a manager", () => {
+      expect(can("manager", "branch.status")).toBe(false);
+    });
+  });
+
+  // Every partner on the platform, their emails, and an irreversible delete of
+  // everything they own. The backend holds it behind the `admin` middleware;
+  // this pins the menu, the route and the two buttons.
+  describe("the Owners section is admin-only", () => {
+    it.each(["owner.view", "owner.edit", "owner.delete"] as const)("%s: admin yes, owner and manager no", (perm) => {
+      expect(can("admin", perm)).toBe(true);
+      expect(can("company_owner", perm)).toBe(false);
+      expect(can("manager", perm)).toBe(false);
+    });
+  });
+
   // Website analytics and server health are network-wide data — a single
   // company's owner (let alone a branch manager) must never see them. The
   // backend enforces the same on the `admin` guard; this pins the UI half so

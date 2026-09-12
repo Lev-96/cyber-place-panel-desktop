@@ -76,7 +76,31 @@ export interface MoneyDisplay {
  */
 export interface MoneyFormatOptions {
   maximumFractionDigits?: number;
+  /**
+   * Digits to always print, trailing zeros included ("9,000.50", not
+   * "9,000.5"). The maximum is widened to at least this, so asking for a
+   * minimum alone never collides with the whole-unit default.
+   */
+  minimumFractionDigits?: number;
 }
+
+/**
+ * The digit options handed to Intl. With no minimum this is exactly the object
+ * the formatter always built, so a caller that passes nothing gets
+ * byte-identical output.
+ */
+const fractionDigits = (
+  options: MoneyFormatOptions | undefined,
+  defaultMaximum: number,
+): Intl.NumberFormatOptions => {
+  const maximumFractionDigits = options?.maximumFractionDigits ?? defaultMaximum;
+  const minimumFractionDigits = options?.minimumFractionDigits;
+  if (minimumFractionDigits === undefined) return { maximumFractionDigits };
+  return {
+    minimumFractionDigits,
+    maximumFractionDigits: Math.max(maximumFractionDigits, minimumFractionDigits),
+  };
+};
 
 export class StaticRateMoneyDisplay implements MoneyDisplay {
   constructor(private rates: Record<Currency, number> = DEFAULT_RATES) {}
@@ -97,15 +121,13 @@ export class StaticRateMoneyDisplay implements MoneyDisplay {
       // localized unit word. Thousands separator follows the locale
       // via toLocaleString so a Russian UI reads "1 500 драм" while
       // an English one reads "1,500 dram".
-      const number = value.toLocaleString(CURRENCY_LOCALE[target], {
-        maximumFractionDigits: options?.maximumFractionDigits ?? 0,
-      });
+      const number = value.toLocaleString(CURRENCY_LOCALE[target], fractionDigits(options, 0));
       return `${number} ${AMD_UNIT[lang]}`;
     }
     return new Intl.NumberFormat(CURRENCY_LOCALE[target], {
       style: "currency",
       currency: target,
-      maximumFractionDigits: options?.maximumFractionDigits ?? 2,
+      ...fractionDigits(options, 2),
     }).format(value);
   }
 }
@@ -126,6 +148,21 @@ export const moneyDisplay = new StaticRateMoneyDisplay();
  */
 export const preciseWhenSmall = (amount: number): MoneyFormatOptions | undefined =>
   Math.abs(amount) > 0 && Math.abs(amount) < 100 ? { maximumFractionDigits: 2 } : undefined;
+
+/**
+ * Formatting options for a figure on a STATEMENT — the revenue screen, where
+ * the server's amounts are exact to the hundredth and are read against each
+ * other. Rounded to whole units, 9000.50 / 900.05 / 8100.45 print as
+ * "9,001 − 900 = 8,100", which does not add up and reads as a billing bug.
+ *
+ * So: an amount with cents prints exactly two decimals; a whole amount prints
+ * none, as everywhere else. Decided per amount from the server's own value —
+ * this formats, it never computes. Sub-cent float noise counts as whole.
+ */
+export const centsWhenFractional = (amount: number): MoneyFormatOptions | undefined =>
+  Math.round(Math.abs(amount) * 100) % 100 !== 0
+    ? { minimumFractionDigits: 2, maximumFractionDigits: 2 }
+    : undefined;
 
 /**
  * Format an amount that is ALREADY denominated in `currency` — no base

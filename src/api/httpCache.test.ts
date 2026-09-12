@@ -161,4 +161,14 @@ describe("invalidationTargets", () => {
   it("falls back to the resource itself for anything unmapped", () => {
     expect(invalidationTargets("/whatever/5")).toEqual(["/whatever"]);
   });
+
+  // Deleting an owner removes every branch of every company they own. The
+  // branch lists are cached for 30s; without this the admin's next visit to
+  // Branches still offers the venues that were just deleted.
+  it("an admin tenant delete drops every venue-scoped listing", () => {
+    const targets = invalidationTargets("/admin/owners/12");
+    for (const prefix of ["/branches", "/places", "/tournaments", "/products", "/games", "/time-packages"]) {
+      expect(targets).toContain(prefix);
+    }
+  });
 });
