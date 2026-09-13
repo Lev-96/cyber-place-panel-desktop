@@ -27,7 +27,7 @@ import { DragEvent, useCallback, useEffect, useMemo, useRef, useState } from "re
 import { Link } from "react-router-dom";
 import AddSessionItemDialog from "./AddSessionItemDialog";
 import SessionTimer from "./SessionTimer";
-import { sessionJoysticksTotal } from "./sessionAmount";
+import { sessionCurrentHourlyRate, sessionJoysticksTotal } from "./sessionAmount";
 import StartSessionDialog from "./StartSessionDialog";
 import SessionOptionsDialog from "./SessionOptionsDialog";
 import { MAX_JOYSTICKS } from "@/api/joystickPrices";
@@ -447,13 +447,29 @@ const SessionsBoard = ({ branchId }: Props) => {
     // can differ: the fee is frozen when a pad goes out, so a seat that
     // straddles a re-pricing holds two. "3 × ?" would be a lie; the sum is
     // always true, so the line falls back to it.
-    const padCharge = ((): { count: number; each: number | null; total: number } | null => {
+    const padCharge = ((): { count: number; each: number | null; total: number; hourly: boolean } | null => {
       if (sess === undefined || sess.is_free) return null;
       const charged = (sess.joysticks ?? []).filter((j) => j.is_charged);
       if (charged.length === 0) return null;
       const first = Number(charged[0].price);
       const uniform = charged.every((j) => Number(j.price) === first);
-      return { count: charged.length, each: uniform ? first : null, total: sessionJoysticksTotal(sess) };
+      // An hourly pad's "500" is a rate, not a sum, and the line has to say so
+      // or the cashier reads the venue's rate as the money already owed. Mixed
+      // rows are possible on one session (the venue switched models while it
+      // ran), and they read as hourly only when every charged row is.
+      const hourly = charged.every((j) => j.is_hourly === true);
+      return { count: charged.length, each: uniform ? first : null, total: sessionJoysticksTotal(sess), hourly };
+    })();
+
+    // What the seat costs an hour right now. Only shown under the hourly
+    // model, and only when a pad is actually moving it: on the fee model the
+    // rate never changes and a line repeating it would be noise on a 160px
+    // card.
+    const currentRate = ((): number | null => {
+      if (sess === undefined || sess.is_free) return null;
+      const active = (sess.joysticks ?? []).filter((j) => j.is_hourly && j.stopped_at === null);
+      if (active.length === 0) return null;
+      return sessionCurrentHourlyRate(sess);
     })();
     // The two identity lines, resolved once so the JSX below stays readable.
     // A device with no place (a legacy row) has no platform or tier to show —
@@ -739,10 +755,22 @@ const SessionsBoard = ({ branchId }: Props) => {
                     Both figures come from the server's own rows — the count of
                     CHARGED periods, which is not the count of pads in play,
                     because a pad handed back keeps its fee. */}
+                {currentRate !== null && (
+                  <span className="muted" style={{ fontSize: 11, flexBasis: "100%" }}>
+                    {t("session.currentRate")}: {money(currentRate)}
+                    {t("session.perHourShort")}
+                  </span>
+                )}
                 {padCharge !== null && (
                   <span className="muted" style={{ fontSize: 11, flexBasis: "100%" }}>
                     {t("session.joysticksCost")}:{" "}
-                    {padCharge.each !== null && `${padCharge.count} × ${money(padCharge.each)} = `}
+                    {padCharge.each !== null && (
+                      padCharge.hourly
+                        // A rate, so it reads "2 × 500/h" and the total beside
+                        // it is what those pads have earned so far.
+                        ? `${padCharge.count} × ${money(padCharge.each)}${t("session.perHourShort")} = `
+                        : `${padCharge.count} × ${money(padCharge.each)} = `
+                    )}
                     {money(padCharge.total)}
                   </span>
                 )}

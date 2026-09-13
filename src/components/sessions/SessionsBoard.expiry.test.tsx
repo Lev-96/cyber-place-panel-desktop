@@ -51,6 +51,24 @@ vi.mock("@/hooks/useReservedPlaceIds", () => ({ useReservedPlaceIds: () => new S
 vi.mock("@/repositories/JoystickPriceRepository", () => ({
   joystickPriceRepository: { listByBranch: () => Promise.resolve([]) },
 }));
+// The management dialog a tile can open reads the venue's billing policy, and
+// without this stub that read left the process as a REAL request to the staging
+// backend — which answered 401 and surfaced as an unhandled rejection attributed
+// to whichever test happened to be running. A unit test must not depend on a
+// server being reachable, so the policy is answered here.
+vi.mock("@/repositories/BillingSettingsRepository", () => ({
+  billingSettingsRepository: {
+    get: () => Promise.resolve({
+      branch_id: 7,
+      money_rounding_step: 0,
+      money_rounding_mode: "up",
+      joystick_price: 500,
+      joystick_included: 2,
+      joystick_charged_slots: null,
+      joystick_pricing_mode: "fixed",
+    }),
+  },
+}));
 vi.mock("@/auth/AuthContext", () => ({ useAuth: () => ({ user: { id: 1, role: "manager" } }) }));
 vi.mock("@/i18n/LanguageContext", () => ({
   useLang: () => ({ t: (k: string) => k, money: (n: number) => String(n), lang: "en" }),
@@ -583,5 +601,80 @@ describe("joysticks on the tile", () => {
     // Word for word: "no price is set for that slot" is a sentence the cashier
     // has to act on, and a generic failure line would send them looking.
     expect(screen.getByText("No price is set for joystick #3")).toBeTruthy();
+  });
+
+  // ── what the tile says under each pricing model ───────────────────────
+
+  test("an hourly pad puts the live rate on the tile and marks the line as a rate", async () => {
+    repo.listActive.mockResolvedValue([{
+      ...ps,
+      hourly_rate: 1000,
+      joystick_count: 3,
+      joysticks: [
+        { id: 2, slot: 3, price: 500, is_charged: true, is_hourly: true,
+          started_at: new Date(Date.now() - 3600_000).toISOString(), stopped_at: null },
+      ],
+    } as unknown as ISessionApi]);
+    await mount();
+
+    // The seat plus the pad currently out. `t()` is mocked to return the key,
+    // so the assertion is on the key rather than on translated copy.
+    expect(screen.getByText(/session\.currentRate/)).toBeTruthy();
+    // And the pad line reads as a RATE, not as money already owed: the
+    // per-hour suffix sits right after the unit price.
+    //
+    // Asserted on THAT line and not on the document, which an earlier version
+    // of this test did and which passed for the wrong reason: the rate line
+    // above reads "1500session.perHourShort", and the substring it was looking
+    // for lived inside it. Dropping the suffix from the pad line did not fail
+    // the test, so the test proved nothing about the line it names.
+    //
+    // The line is built from several JSX expressions, so it lands as several
+    // text nodes and `getByText` cannot see it whole. The question is what the
+    // cashier reads, which is the element's own text content.
+    const padLine = [...document.querySelectorAll("span")].find((el) =>
+      (el.textContent ?? "").startsWith("session.joysticksCost"));
+    expect(padLine?.textContent).toContain("1 \u00d7 500session.perHourShort");
+  });
+
+  // A session CAN hold both: the venue switched strategy while the seat ran,
+  // and each pad kept the model it was handed out under. The pad line quotes a
+  // unit price for the whole group, so it may only call that price a rate when
+  // every charged row actually is one — otherwise the line would put "/h" on a
+  // fee the player owes in full.
+  test("a session holding both kinds does not call the unit price a rate", async () => {
+    repo.listActive.mockResolvedValue([{
+      ...ps,
+      hourly_rate: 1000,
+      joystick_count: 4,
+      joysticks: [
+        { id: 2, slot: 3, price: 500, is_charged: true, is_hourly: true,
+          started_at: new Date(Date.now() - 3600_000).toISOString(), stopped_at: null },
+        { id: 3, slot: 4, price: 500, is_charged: true, is_hourly: false,
+          started_at: new Date(Date.now() - 3600_000).toISOString(), stopped_at: null },
+      ],
+    } as unknown as ISessionApi]);
+    await mount();
+
+    const padLine = [...document.querySelectorAll("span")].find((el) =>
+      (el.textContent ?? "").startsWith("session.joysticksCost"));
+    expect(padLine?.textContent).not.toContain("500session.perHourShort");
+    // The hourly pad still moves the seat's rate, so that line stays.
+    expect(screen.getByText(/session\.currentRate/)).toBeTruthy();
+  });
+
+  test("a flat fee shows no rate line, because the rate never moved", async () => {
+    repo.listActive.mockResolvedValue([{
+      ...ps,
+      hourly_rate: 1000,
+      joystick_count: 3,
+      joysticks: [
+        { id: 2, slot: 3, price: 500, is_charged: true, is_hourly: false,
+          started_at: new Date(Date.now() - 3600_000).toISOString(), stopped_at: null },
+      ],
+    } as unknown as ISessionApi]);
+    await mount();
+
+    expect(screen.queryByText(/session\.currentRate/)).toBeNull();
   });
 });

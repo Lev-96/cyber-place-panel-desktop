@@ -72,6 +72,14 @@ export interface ISessionJoystick {
    * an older payload, and then the tile counts nothing rather than guessing.
    */
   is_charged?: boolean;
+  /**
+   * Whether `price` is a rate per hour or a one-off fee.
+   *
+   * Snapshotted on the row when the pad was handed out, so a venue that
+   * switches models mid session cannot move what a pad already out costs.
+   * Absent on an older backend, which only ever charged the one-off fee.
+   */
+  is_hourly?: boolean;
   started_at: string;
   /** null while the pad is still in play. */
   stopped_at: string | null;

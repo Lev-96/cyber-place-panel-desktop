@@ -1,7 +1,7 @@
 import Button from "@/components/ui/Button";
 import PriceInput from "@/components/ui/PriceInput";
 import Radio from "@/components/ui/Radio";
-import { CHARGED_SLOT_CHOICES, ChargedSlots, chargedSlotsOf, IBillingSettings, includedJoysticks } from "@/api/joystickPrices";
+import { CHARGED_SLOT_CHOICES, ChargedSlots, chargedSlotsOf, IBillingSettings, includedJoysticks, JoystickPricingMode, PRICING_MODES, pricingModeOf } from "@/api/joystickPrices";
 import { useLang } from "@/i18n/LanguageContext";
 import { billingSettingsRepository } from "@/repositories/BillingSettingsRepository";
 import { notify } from "@/ui/notify";
@@ -83,6 +83,8 @@ const JoystickPricesForm = ({ branchId, settings, onSaved }: Props) => {
   const [mode, setMode] = useState<ExtraMode>(() => modeOf(storedPrice));
   const storedSlots = chargedSlotsOf(settings);
   const [slots, setSlots] = useState<ChargedSlots | "">(storedSlots ?? "");
+  const storedMode = pricingModeOf(settings);
+  const [pricingMode, setPricingMode] = useState<JoystickPricingMode>(storedMode);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -103,7 +105,8 @@ const JoystickPricesForm = ({ branchId, settings, onSaved }: Props) => {
     mode === "none" ? null : mode === "free" ? 0 : typed;
   const invalid =
     outgoing === undefined || (outgoing !== null && (!Number.isFinite(outgoing) || outgoing < 0));
-  const changed = outgoing !== storedPrice || slots !== (storedSlots ?? "");
+  const changed =
+    outgoing !== storedPrice || slots !== (storedSlots ?? "") || pricingMode !== storedMode;
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -121,6 +124,7 @@ const JoystickPricesForm = ({ branchId, settings, onSaved }: Props) => {
         outgoing,
         storedIncluded,
         slots === "" ? null : slots,
+        pricingMode,
       );
       notify.message("success", t("joystickPrice.saved"));
       onSaved();
@@ -134,6 +138,26 @@ const JoystickPricesForm = ({ branchId, settings, onSaved }: Props) => {
   return (
     <form className="col" style={{ gap: 12 }} onSubmit={submit}>
       <span className="muted" style={{ fontSize: 12 }}>{t("joystickPrice.hint")}</span>
+
+      {/* HOW a pad is priced. First, because it changes what the price box
+          below means: the same 500 is either a fee owed once or a rate the
+          hour carries while the pad is out. */}
+      <label className="col" style={{ gap: 4, maxWidth: 320 }}>
+        <span className="muted" style={{ fontSize: 12 }}>{t("joystickPrice.strategy")}</span>
+        <select
+          className="input"
+          value={pricingMode}
+          disabled={busy}
+          onChange={(e) => setPricingMode(e.target.value as JoystickPricingMode)}
+        >
+          {PRICING_MODES.map((m) => (
+            <option key={m} value={m}>{t(`joystickPrice.strategy.${m}`)}</option>
+          ))}
+        </select>
+      </label>
+      <span className="muted" style={{ fontSize: 12 }}>
+        {t(`joystickPrice.strategyExplain.${pricingMode}`)}
+      </span>
 
       {/* WHICH pads are sold, not how many are free. The first two are the
           kit every seat comes with; this names the ones beyond it that carry

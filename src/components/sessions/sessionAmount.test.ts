@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { ISessionApi } from "@/types/sessions";
-import { sessionAmountAt, sessionTimeCostAt } from "./sessionAmount";
+import { sessionAmountAt, sessionCurrentHourlyRate, sessionJoysticksTotalAt, sessionTimeCostAt } from "./sessionAmount";
 
 /**
  * The one place the panel decides what a running session's clock is worth.
@@ -365,5 +365,81 @@ describe("drinks on the seat are on the seat's figure", () => {
     const s = withItems({ hourly_rate: 1500, started_at: ago(30) }, cola);
 
     expect(sessionTimeCostAt(s, AT)).toBe(750);
+  });
+
+  // ── the hourly model ──────────────────────────────────────────────────
+
+  /**
+   * An hourly pad is priced for the time it was actually out, and the tile has
+   * to agree with the receipt about that, or the cashier reads one number
+   * while the player is charged another.
+   */
+  test("an hourly pad bills the time it was out, not a flat fee", () => {
+    const s = session({
+      hourly_rate: 1000,
+      started_at: ago(120),
+      joysticks: [
+        // Out for half an hour: 250, a figure no flat fee can produce.
+        { id: 1, slot: 3, price: 500, is_charged: true, is_hourly: true,
+          started_at: ago(120), stopped_at: ago(90) },
+      ],
+    } as Partial<ISessionApi>);
+
+    expect(sessionJoysticksTotalAt(s, AT)).toBeCloseTo(250, 2);
+  });
+
+  test("a pad still out keeps ticking, and one handed back stopped when it did", () => {
+    const s = session({
+      hourly_rate: 1000,
+      started_at: ago(60),
+      joysticks: [
+        { id: 1, slot: 3, price: 500, is_charged: true, is_hourly: true,
+          started_at: ago(60), stopped_at: null },
+      ],
+    } as Partial<ISessionApi>);
+
+    expect(sessionJoysticksTotalAt(s, AT)).toBeCloseTo(500, 2);
+    expect(sessionJoysticksTotalAt(s, AT + 3600_000)).toBeCloseTo(1000, 2);
+  });
+
+  test("a flat fee is untouched by the clock", () => {
+    const s = session({
+      hourly_rate: 1000,
+      started_at: ago(60),
+      joysticks: [
+        { id: 1, slot: 3, price: 500, is_charged: true, is_hourly: false,
+          started_at: ago(60), stopped_at: null },
+      ],
+    } as Partial<ISessionApi>);
+
+    expect(sessionJoysticksTotalAt(s, AT)).toBeCloseTo(500, 2);
+    expect(sessionJoysticksTotalAt(s, AT + 36000_000)).toBeCloseTo(500, 2);
+  });
+
+  test("the rate shown is the seat plus the pads currently out", () => {
+    const s = session({
+      hourly_rate: 1000,
+      joysticks: [
+        { id: 1, slot: 3, price: 500, is_charged: true, is_hourly: true,
+          started_at: ago(60), stopped_at: null },
+        // Handed back, so it no longer moves the rate.
+        { id: 2, slot: 4, price: 500, is_charged: true, is_hourly: true,
+          started_at: ago(60), stopped_at: ago(30) },
+      ],
+    } as Partial<ISessionApi>);
+
+    expect(sessionCurrentHourlyRate(s)).toBeCloseTo(1500, 2);
+  });
+
+  test("a flat fee never moves the rate", () => {
+    const s = session({
+      hourly_rate: 1000,
+      joysticks: [
+        { id: 1, slot: 3, price: 500, is_charged: true, is_hourly: false,
+          started_at: ago(60), stopped_at: null },
+      ],
+    } as Partial<ISessionApi>);
+
+    expect(sessionCurrentHourlyRate(s)).toBeCloseTo(1000, 2);
   });
 });

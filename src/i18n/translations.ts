@@ -433,6 +433,8 @@ export const TRANSLATIONS: Dict = {
   },
   // The card's own money line. "2 × 300 = 600" — a count and a flat fee, never
   // a rate and never anything that moves with the clock.
+  "session.currentRate": { en: "Rate now", ru: "Тариф сейчас", am: "Ընթացիկ սակագին" },
+  "session.perHourShort": { en: "/h", ru: "/ч", am: "/ժ" },
   "session.joysticksCost": { en: "Joysticks", ru: "Джойстики", am: "Ջոյսթիքներ" },
   "session.sessionCost": { en: "Session", ru: "Сессия", am: "Նիստ" },
   "session.grandTotal": { en: "Total", ru: "Итого", am: "Ընդամենը" },
@@ -1051,6 +1053,19 @@ export const TRANSLATIONS: Dict = {
     en: "One flat fee for every joystick beyond the ones the rate already includes. It goes onto the bill the moment a pad is handed out and stays there when the pad is handed back; how long it was out makes no difference. The first joystick is the session itself, so the allowance is never below one. Below you choose whether extra joysticks are charged, free, or not offered at all.",
     ru: "Одна фиксированная цена за каждый джойстик сверх тех, что уже входят в тариф. Она прибавляется к счёту в момент выдачи и остаётся в нём, даже если джойстик вернули; время использования на цену не влияет. Первый джойстик это сама сессия, поэтому меньше одного включить нельзя. Ниже выбирается, выдаются ли дополнительные джойстики платно, бесплатно или не выдаются вовсе.",
     am: "Մեկ ֆիքսված գին՝ սակագնում արդեն ներառված ջոյսթիքներից ավելի յուրաքանչյուրի համար։ Այն ավելացվում է հաշվին ջոյսթիքը տալու պահին և մնում է հաշվին, նույնիսկ եթե ջոյսթիքը վերադարձնեն. օգտագործման տևողությունը գնի վրա չի ազդում։ Առաջին ջոյսթիքը հենց նիստն է, ուստի մեկից քիչ ներառել հնարավոր չէ։ Ստորև ընտրվում է՝ լրացուցիչ ջոյսթիքները վճարովի են, անվճար, թե ընդհանրապես չեն տրվում։",
+  },
+  "joystickPrice.strategy": { en: "Joystick pricing", ru: "Стратегия джойстиков", am: "Ջոյսթիքների սակագին" },
+  "joystickPrice.strategy.fixed": { en: "Fixed price", ru: "Фиксированная цена", am: "Ֆիքսված գին" },
+  "joystickPrice.strategy.hourly": { en: "Changes the hourly rate", ru: "Изменение тарифа", am: "Փոխում է ժամավճարը" },
+  "joystickPrice.strategyExplain.fixed": {
+    en: "Every time an extra joystick is handed out, its price is added to the session. Handing it back does not give the money back.",
+    ru: "При каждой выдаче дополнительного джойстика его цена добавляется к сессии. Возврат джойстика деньги не возвращает.",
+    am: "Յուրաքանչյուր լրացուցիչ ջոյսթիք տալիս դրա գինը ավելանում է նիստին։ Ջոյսթիքը հետ բերելը գումարը չի վերադարձնում։",
+  },
+  "joystickPrice.strategyExplain.hourly": {
+    en: "The hour costs more while an extra joystick is in play, and costs what it did before once the joystick is handed back.",
+    ru: "Пока дополнительный джойстик на руках, час стоит дороже. Когда джойстик вернули, час снова стоит как раньше.",
+    am: "Քանի դեռ լրացուցիչ ջոյսթիքը խաղում է, ժամն ավելի թանկ է։ Ջոյսթիքը վերադարձնելուց հետո ժամը կրկին արժե այնքան, որքան առաջ։",
   },
   "joystickPrice.appliesTo": { en: "Price applies to", ru: "Цена применяется к", am: "Գինը վերաբերում է" },
   "joystickPrice.appliesNotSet": { en: "Not chosen yet", ru: "Пока не выбрано", am: "Դեռ ընտրված չէ" },

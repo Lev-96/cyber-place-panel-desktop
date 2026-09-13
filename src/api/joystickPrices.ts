@@ -68,6 +68,15 @@ export interface IBillingSettings {
    */
   joystick_charged_slots?: string | null;
   /**
+   * HOW a pad is priced here.
+   *
+   * "fixed" is a fee owed the moment the pad is handed out, and handing it
+   * back does not give it back. "hourly" prices the pad like the seat: the
+   * hour costs more while it is out, and costs what it did before once it is
+   * returned. Absent on an older backend, which only ever had the fee.
+   */
+  joystick_pricing_mode?: JoystickPricingMode;
+  /**
    * The ceiling a seat may hold, as the SERVER states it.
    *
    * `MAX_JOYSTICKS` above is this panel's own copy of the same number and is
@@ -87,6 +96,14 @@ export interface IBillingSettings {
  */
 export const includedJoysticks = (settings: IBillingSettings): number =>
   settings.joystick_included ?? 1;
+
+/** The two ways a venue can price a pad, and the only ones the server accepts. */
+export const PRICING_MODES = ["fixed", "hourly"] as const;
+export type JoystickPricingMode = (typeof PRICING_MODES)[number];
+
+/** What the venue charges by, with the older backend's answer filled in. */
+export const pricingModeOf = (settings: IBillingSettings): JoystickPricingMode =>
+  settings.joystick_pricing_mode === "hourly" ? "hourly" : "fixed";
 
 /** The three answers the screen offers, and the only ones the server accepts. */
 export const CHARGED_SLOT_CHOICES = ["3", "4", "3,4"] as const;
@@ -108,6 +125,7 @@ export const apiUpdateBillingSettings = (
   joystickPrice: number | null,
   joystickIncluded: number,
   joystickChargedSlots: string | null,
+  joystickPricingMode: JoystickPricingMode,
 ) =>
   request<{ settings: IBillingSettings }>(`/branches/${branchId}/billing-settings`, {
     method: "PUT",
@@ -119,5 +137,6 @@ export const apiUpdateBillingSettings = (
       joystick_price: joystickPrice,
       joystick_included: joystickIncluded,
       joystick_charged_slots: joystickChargedSlots,
+      joystick_pricing_mode: joystickPricingMode,
     },
   });

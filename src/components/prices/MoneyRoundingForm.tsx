@@ -1,5 +1,5 @@
 import Button from "@/components/ui/Button";
-import { chargedSlotsOf, IBillingSettings, includedJoysticks, MoneyRoundingMode } from "@/api/joystickPrices";
+import { chargedSlotsOf, IBillingSettings, includedJoysticks, MoneyRoundingMode, pricingModeOf } from "@/api/joystickPrices";
 import { useLang } from "@/i18n/LanguageContext";
 import { billingSettingsRepository } from "@/repositories/BillingSettingsRepository";
 import { notify } from "@/ui/notify";
@@ -71,6 +71,7 @@ const MoneyRoundingForm = ({ branchId, settings, onSaved }: Props) => {
         settings.joystick_price,
         includedJoysticks(settings),
         chargedSlotsOf(settings),
+        pricingModeOf(settings),
       );
       notify.message("success", t("rounding.saved"));
       onSaved();

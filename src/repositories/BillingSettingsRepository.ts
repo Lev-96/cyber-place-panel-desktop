@@ -2,6 +2,7 @@ import {
   apiGetBillingSettings,
   apiUpdateBillingSettings,
   IBillingSettings,
+  JoystickPricingMode,
   MoneyRoundingMode,
 } from "@/api/joystickPrices";
 import { friendlyMutation, orFallback } from "@/api/fallback";
@@ -31,6 +32,7 @@ export class BillingSettingsRepository {
       // what a panel talking to one has to show.
       joystick_included: 1,
       joystick_charged_slots: null,
+      joystick_pricing_mode: "fixed" as JoystickPricingMode,
     });
   }
 
@@ -48,9 +50,10 @@ export class BillingSettingsRepository {
     joystickPrice: number | null,
     joystickIncluded: number,
     joystickChargedSlots: string | null,
+    joystickPricingMode: JoystickPricingMode,
   ): Promise<IBillingSettings> {
     return friendlyMutation(
-      apiUpdateBillingSettings(branchId, step, mode, joystickPrice, joystickIncluded, joystickChargedSlots)
+      apiUpdateBillingSettings(branchId, step, mode, joystickPrice, joystickIncluded, joystickChargedSlots, joystickPricingMode)
         .then((r) => r.settings),
     );
   }

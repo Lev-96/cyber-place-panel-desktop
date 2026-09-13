@@ -118,26 +118,75 @@ export const sessionItemsTotal = (session: ISessionApi): number => {
 /**
  * What the extra joysticks on this seat have earned.
  *
- * A flat fee per pad handed out, decided by the SERVER and carried on each
- * period as `price` + `is_charged`. This sums; it never multiplies by a
- * duration and never ticks, which is why it can live on a tile that re-renders
- * every second without the figure moving.
+ * Two strategies, and the SERVER says which priced each pad: `is_hourly` on
+ * the period itself, frozen when the pad was handed out.
  *
- * `is_charged` is the server's own flag and the only thing consulted. In
- * particular a pad that has been handed BACK is still charged — removal ends
- * the use, it is not a refund — so this counts periods, not pads in play.
- * Rows from before that rule carry `false` and are correctly worth nothing.
+ * FIXED — a flat fee per pad, carried as `price` + `is_charged`. It sums, it
+ * never multiplies by a duration and it never ticks, which is why it can live
+ * on a tile that re-renders every second without the figure moving.
+ * `is_charged` is then the only thing consulted, and a pad handed BACK is
+ * still charged: removal ends the use, it is not a refund, so this counts
+ * periods and not pads in play. Rows from before that rule carry `false` and
+ * are correctly worth nothing.
  *
- * A payload without the flag (an older backend) contributes nothing rather
+ * HOURLY — the pad is priced like the seat, for the time it was actually out,
+ * so this term DOES tick while a pad is in play. The period is the interval,
+ * clamped to `at`, which is exactly what the backend does.
+ *
+ * A payload without the flags (an older backend) contributes nothing rather
  * than guessing, which keeps the tile under the receipt instead of over it.
  */
-export const sessionJoysticksTotal = (session: ISessionApi): number => {
+export const sessionJoysticksTotalAt = (session: ISessionApi, at: number): number => {
   const pads = session.joysticks ?? [];
   if (pads.length === 0) return 0;
 
   return round2(
-    pads.reduce((sum, pad) => sum + (pad.is_charged ? toNumber(pad.price) : 0), 0),
+    pads.reduce((sum, pad) => {
+      // An HOURLY pad is priced like the seat: for the time it was actually
+      // out. The row is the interval, so this mirrors
+      // `SessionPricingCalculator` exactly — the end is clamped to the instant
+      // being shown, so a pad still in play ticks and one handed back stopped
+      // ticking when it was handed back. `Money::forSeconds` is
+      // rate × seconds / 3600, and rounding is deliberately NOT applied per
+      // term on either side: a bill is rounded once, on its total.
+      if (pad.is_hourly) {
+        const from = Date.parse(pad.started_at);
+        if (Number.isNaN(from)) return sum;
+        const stopped = pad.stopped_at ? Date.parse(pad.stopped_at) : NaN;
+        const to = Number.isNaN(stopped) ? at : Math.min(stopped, at);
+        const seconds = Math.max(0, Math.floor((to - from) / 1000));
+        return sum + (toNumber(pad.price) * seconds) / 3600;
+      }
+
+      return sum + (pad.is_charged ? toNumber(pad.price) : 0);
+    }, 0),
   );
+};
+
+/**
+ * The pads as of now.
+ *
+ * Every caller that is not the ticking tile wants this: the history row, the
+ * summary, anything rendering a session that has already stopped. A stopped
+ * session's pads are all closed, so "now" cannot make one of them accrue.
+ */
+export const sessionJoysticksTotal = (session: ISessionApi): number =>
+  sessionJoysticksTotalAt(session, Date.now());
+
+/**
+ * What the seat costs an hour RIGHT NOW, pads included.
+ *
+ * The base rate plus every hourly pad currently out. Only meaningful under the
+ * hourly model: a one-off fee does not move the rate, and this deliberately
+ * returns the base rate unchanged there rather than inventing a number.
+ */
+export const sessionCurrentHourlyRate = (session: ISessionApi): number => {
+  const base = toNumber(session.hourly_rate ?? session.tariff_hourly_rate ?? 0);
+  const extra = (session.joysticks ?? [])
+    .filter((pad) => pad.is_hourly && pad.stopped_at === null)
+    .reduce((sum, pad) => sum + toNumber(pad.price), 0);
+
+  return round2(base + extra);
 };
 
 /**
@@ -154,10 +203,10 @@ export const sessionJoysticksTotal = (session: ISessionApi): number => {
  * not travel at all, so the tile has nothing to apply and a receipt on a
  * rounding branch will differ by up to one step.
  *
- * Joysticks used to be missing too, for a good reason at the time — they were
- * priced per second, and mirroring a second ticking charge here was a bigger
- * change than the one being asked for. A flat fee removed that: the pads are
- * a sum of figures the server already sent.
+ * Joysticks used to be missing too, for a good reason at the time — mirroring
+ * a second ticking charge here was a bigger change than the one being asked
+ * for. They are in now under both strategies, because the arithmetic is the
+ * backend's own and is stated once, in `sessionJoysticksTotalAt`.
  *
  * See CLAUDE.md §9.6.
  */
@@ -165,7 +214,7 @@ export const sessionAmountAt = (session: ISessionApi, at: number): number =>
   session.is_free
     ? 0
     : round2(
-      sessionTimeCostAt(session, at) + sessionJoysticksTotal(session) + sessionItemsTotal(session),
+      sessionTimeCostAt(session, at) + sessionJoysticksTotalAt(session, at) + sessionItemsTotal(session),
     );
 
 /**

@@ -65,11 +65,22 @@ const box = () => {
   return boxes()[0];
 };
 const save = () => screen.getByRole("button", { name: "action.save" }) as HTMLButtonElement;
-/** The "price applies to" select. The form has exactly one <select>. */
+/**
+ * The form has two selects, in the order the operator reads them: HOW a pad is
+ * priced, then WHICH pads carry that price.
+ */
+const strategy = () => {
+  const selects = dom.querySelectorAll("select");
+  expect(selects.length).toBe(2);
+  return selects[0] as HTMLSelectElement;
+};
 const allowance = () => {
   const selects = dom.querySelectorAll("select");
-  expect(selects.length).toBe(1);
-  return selects[0] as HTMLSelectElement;
+  expect(selects.length).toBe(2);
+  return selects[1] as HTMLSelectElement;
+};
+const chooseStrategy = async (v: string) => {
+  await act(async () => { fireEvent.change(strategy(), { target: { value: v } }); });
 };
 const chooseSlots = async (v: string) => {
   await act(async () => { fireEvent.change(allowance(), { target: { value: v } }); });
@@ -106,7 +117,7 @@ describe("JoystickPricesForm", () => {
 
     // Step and mode go back untouched. This is a PUT of the whole policy, so a
     // form that sent only its own field would clear the venue's rounding.
-    expect(repo.update).toHaveBeenCalledWith(7, 100, "nearest", 500, 1, null);
+    expect(repo.update).toHaveBeenCalledWith(7, 100, "nearest", 500, 1, null, "fixed");
   });
 
   // ── the three choices, and the two that used to share one box ─────────
@@ -123,7 +134,7 @@ describe("JoystickPricesForm", () => {
     await act(async () => { fireEvent.click(save()); });
     // 0, never null. A free pad is still handed out, still counted and still a
     // line on the bill; null is the venue not offering pads at all.
-    expect(repo.update).toHaveBeenCalledWith(7, 100, "nearest", 0, 1, null);
+    expect(repo.update).toHaveBeenCalledWith(7, 100, "nearest", 0, 1, null, "fixed");
   });
 
   test("Not offered withdraws the offer rather than pricing it at zero", async () => {
@@ -136,7 +147,7 @@ describe("JoystickPricesForm", () => {
     await act(async () => { fireEvent.click(save()); });
     // Null, not 0. Zero is a real and different setting — hand pads out for
     // nothing — and the server refuses the add only on null.
-    expect(repo.update).toHaveBeenCalledWith(7, 100, "nearest", null, 1, null);
+    expect(repo.update).toHaveBeenCalledWith(7, 100, "nearest", null, 1, null, "fixed");
   });
 
   test("a venue on a zero fee opens on Free, not on an empty price box", async () => {
@@ -177,7 +188,7 @@ describe("JoystickPricesForm", () => {
     // whether it is remembered.
     expect(box().value).toBe("500");
     await act(async () => { fireEvent.click(save()); });
-    expect(repo.update).toHaveBeenCalledWith(7, 100, "nearest", 500, 1, null);
+    expect(repo.update).toHaveBeenCalledWith(7, 100, "nearest", 500, 1, null, "fixed");
   });
 
   test("Save stays down until something actually changes", async () => {
@@ -238,7 +249,7 @@ describe("JoystickPricesForm", () => {
 
     // The venue's figures travel together: the server validates the policy as
     // one object, and a half-sent policy is how the other half gets reset.
-    expect(repo.update).toHaveBeenCalledWith(7, 100, "nearest", 300, 1, "3,4");
+    expect(repo.update).toHaveBeenCalledWith(7, 100, "nearest", 300, 1, "3,4", "fixed");
   });
 
   test("the first two joysticks are never an option", async () => {
@@ -272,7 +283,7 @@ describe("JoystickPricesForm", () => {
     await chooseSlots("3");
     await act(async () => { fireEvent.click(save()); });
 
-    expect(repo.update).toHaveBeenCalledWith(7, 100, "nearest", 300, 3, "3");
+    expect(repo.update).toHaveBeenCalledWith(7, 100, "nearest", 300, 3, "3", "fixed");
   });
 
   test("a venue can name the sold pads and still hand them out for nothing", async () => {
@@ -285,6 +296,40 @@ describe("JoystickPricesForm", () => {
     await act(async () => { fireEvent.click(screen.getByText("joystickPrice.extraFree")); });
     await act(async () => { fireEvent.click(save()); });
 
-    expect(repo.update).toHaveBeenCalledWith(7, 100, "nearest", 0, 1, "3,4");
+    expect(repo.update).toHaveBeenCalledWith(7, 100, "nearest", 0, 1, "3,4", "fixed");
+  });
+
+  // ── how a pad is priced ───────────────────────────────────────────────
+
+  test("the venue picks between a fee and an hourly rate, and nothing else", () => {
+    return mount().then(() => {
+      expect([...strategy().querySelectorAll("option")].map((o) => o.value))
+        .toEqual(["fixed", "hourly"]);
+      // A venue that has never chosen bills the way it always did.
+      expect(strategy().value).toBe("fixed");
+    });
+  });
+
+  test("the chosen model goes back with the rest of the policy", async () => {
+    await mount();
+
+    await chooseStrategy("hourly");
+    await act(async () => { fireEvent.click(save()); });
+
+    expect(repo.update).toHaveBeenCalledWith(7, 100, "nearest", 300, 1, null, "hourly");
+  });
+
+  test("a venue already on the hourly model opens on it", async () => {
+    await mount(settings({ joystick_pricing_mode: "hourly" }));
+
+    expect(strategy().value).toBe("hourly");
+  });
+
+  test("changing only the model is enough to enable Save", async () => {
+    await mount();
+
+    expect(save().disabled).toBe(true);
+    await chooseStrategy("hourly");
+    expect(save().disabled).toBe(false);
   });
 });
