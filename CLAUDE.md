@@ -1513,6 +1513,23 @@ still a line in the log.
 table — `platformGroup(place.platform) === "ps"` is what the dialog asks, the
 same question the backend asks.
 
+**The fee's three states are three named choices, not one box.** The wire is
+one nullable number: a figure is the fee, `0` hands extra pads out for nothing
+and `null` means this venue does not offer them. Two of those used to be typed
+into the same field and one of them was typing nothing, so `JoystickPricesForm`
+asks the question instead — Charged / Free / Not offered, with the price box
+drawn only under Charged. "Charged with nothing typed" is deliberately NOT an
+answer: it holds Save down rather than guessing, because both guesses (0 and
+null) are settings the operator can pick by name one row up.
+
+**A place may override the branch, and empty means inherit.** `places`
+carries `joystick_included` and `joystick_price`, both nullable, and null is
+INHERIT rather than the branch's "not offered" — the same empty-means-inherit
+shape `hourly_rate` has in the same form. `PlaceForm` draws the pair for
+PlayStation places only, sends `null` for anything else (so a seat that stops
+being a PlayStation drops the override it had), and a typed `0` is a real
+per-place setting: this seat gives extra pads away.
+
 **Refusals are shown verbatim.** The server answers a blocked unlimited with
 "this place is booked in the app" and a missing rate with "no price is set for
 joystick #3 — the owner sets it in Branch → Prices". Those are sentences an

@@ -72,6 +72,28 @@ export interface IBranchPlace extends Translated {
   } | null;
   /** Manual per-hour rate for custom platforms (null for known ones). */
   hourly_rate?: number | string | null;
+  /**
+   * This PLACE's own joystick allowance, or null to follow the branch.
+   *
+   * The venue's rule lives on the branch (`branches.joystick_included`) and is
+   * what almost every seat runs on. A VIP room quoted with four pads is the
+   * exception the override exists for, and null is how a seat says it is not
+   * one: the same empty-means-inherit shape `hourly_rate` above already uses.
+   * PlayStation places only, which is the PLATFORM's question and never the
+   * agent's (`platformGroup(place.platform) === "ps"`).
+   */
+  joystick_included?: number | null;
+  /**
+   * This place's own fee per extra joystick, or null to follow the branch.
+   *
+   * Null here is INHERIT and is not the branch's null, which means "extra pads
+   * are not offered". A place that wants to hand them out for nothing states
+   * 0, exactly as the branch does.
+   *
+   * Typed like `hourly_rate` above: a decimal column reaches the panel as a
+   * string on some endpoints, and a number on others.
+   */
+  joystick_price?: number | string | null;
   games: IGame[];
 }
 

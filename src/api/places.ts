@@ -18,6 +18,17 @@ export interface CreatePlaceBody {
   platform: string;
   hourly_rate?: number | null;
   /**
+   * Per-place joystick policy. Null is INHERIT: the place falls back to the
+   * branch's `joystick_included` / `joystick_price`, which is where the rule
+   * lives for every seat that has no reason to differ.
+   *
+   * Sent for PlayStation places only. For anything else the panel sends null,
+   * so a seat that stops being a PlayStation stops carrying an override for
+   * one — the same thing `hourly_rate` does when a platform stops being custom.
+   */
+  joystick_included?: number | null;
+  joystick_price?: number | null;
+  /**
    * Display наименование for a brand-new custom platform's branch price. Only
    * meaningful when the platform is custom AND not yet priced; ignored
    * otherwise. Not a Place column — the backend forwards it to the price row.

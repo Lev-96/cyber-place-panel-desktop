@@ -20,8 +20,9 @@ import { platformPriceNameOf } from "@/i18n/platformPriceName";
 import { gameRepository } from "@/repositories/GameRepository";
 import { placeRepository } from "@/repositories/PlaceRepository";
 import { subplatformRepository } from "@/repositories/SubplatformRepository";
+import { MAX_JOYSTICKS } from "@/api/joystickPrices";
 import { IBranchPlace, IBranchPlatformPrice, PlaceType } from "@/types/api";
-import { isKnownPlatform, platformLabel, slugifyPlatform } from "@/utils/platform";
+import { isKnownPlatform, platformGroup, platformLabel, slugifyPlatform } from "@/utils/platform";
 import { FormEvent, useEffect, useState } from "react";
 
 const EMPTY_NAMES: LangNames = { en: "", ru: "", am: "" };
@@ -64,6 +65,21 @@ const PlaceForm = ({ branchId, initial, platformSuggestions, platformPrices, onC
   // below settles it to Default once this platform's list has loaded.
   const [subplatformId, setSubplatformId] = useState<number | null>(initial?.subplatform_id ?? null);
   const [hourlyRate, setHourlyRate] = useState(initial?.hourly_rate != null ? String(initial.hourly_rate) : "");
+  /**
+   * This place's own joystick policy. Empty string is INHERIT, the same way an
+   * empty `hourlyRate` above means "this platform's price applies".
+   *
+   * A venue's joystick rule belongs on the branch and almost every seat runs
+   * on it. The exception is the room quoted with four pads in the rate, or the
+   * one seat whose fifth hour of Mortal Kombat is sold with a free second pad:
+   * one seat differing must not become a reason to move the whole branch.
+   */
+  const [joystickIncluded, setJoystickIncluded] = useState(
+    initial?.joystick_included != null ? String(initial.joystick_included) : "",
+  );
+  const [joystickPrice, setJoystickPrice] = useState(
+    initial?.joystick_price != null ? String(initial.joystick_price) : "",
+  );
   const [gameIds, setGameIds] = useState<Set<number>>(new Set((initial?.games ?? []).map((g) => g.id)));
   // A custom platform may legitimately have NO games (table tennis, a poker
   // table…). Instead of dumping an empty "no games" list on the operator, we
@@ -75,6 +91,15 @@ const PlaceForm = ({ branchId, initial, platformSuggestions, platformPrices, onC
   // A custom (non-pc/ps4/ps5) platform has no cell in the branch tariff
   // matrix, so it carries its own per-hour price entered right here.
   const isCustomPlatform = !isKnownPlatform(platform);
+  /**
+   * Joysticks are a PlayStation question, and the question is the PLATFORM's.
+   *
+   * Deliberately NOT `pc.kind`: that says "no kiosk agent runs here" and is
+   * equally true of a ping-pong table. `platformGroup` matches every console
+   * generation (ps4, ps5, ps6, …), which is the same question the backend and
+   * the session dialog ask.
+   */
+  const isPlayStation = platformGroup(platform) === "ps";
   // The branch price already defined for this custom platform, if any. Its
   // presence flips the price UI from "set a rate" to "this price applies" —
   // the operator picks the existing rate instead of inventing a new one.
@@ -264,6 +289,11 @@ const PlaceForm = ({ branchId, initial, platformSuggestions, platformPrices, onC
         hourly_rate: isCustomPlatform
           ? (tierLocked ? Number(tierPrice) : (hourlyRate ? Number(hourlyRate) : null))
           : null,
+        // Per-place joystick policy. Empty box = null = inherit the branch's
+        // rule. A place that is not a PlayStation carries no override at all,
+        // so switching ps5 → pc drops one rather than leaving it behind.
+        joystick_included: isPlayStation && joystickIncluded !== "" ? Number(joystickIncluded) : null,
+        joystick_price: isPlayStation && joystickPrice !== "" ? Number(joystickPrice) : null,
         platform_name_en: customNew ? (names.en.trim() || undefined) : undefined,
         platform_name_ru: customNew ? (names.ru.trim() || undefined) : undefined,
         platform_name_am: customNew ? (names.am.trim() || undefined) : undefined,
@@ -438,6 +468,43 @@ const PlaceForm = ({ branchId, initial, platformSuggestions, platformPrices, onC
             <span className="muted" style={{ fontSize: 11 }}>{t("place.customPlatformNote")}</span>
           </div>
         ))}
+
+        {/* Per-place joystick policy, for PlayStation seats only. Both boxes
+            empty is the normal case and means "the branch's rule applies", the
+            same empty-means-inherit the rate above uses. */}
+        {isPlayStation && (
+          <div className="col" style={{ gap: 6 }}>
+            <div className="row" style={{ gap: 10, flexWrap: "wrap", alignItems: "flex-end" }}>
+              <label className="col" style={{ gap: 6 }}>
+                <span className="label">{t("place.joystickIncluded")}</span>
+                {/* A select and not a number box: the answer is inherit or one
+                    of four, and a free-typed 0 is a seat with no controller. */}
+                <select
+                  className="input"
+                  value={joystickIncluded}
+                  disabled={busy}
+                  onChange={(e) => setJoystickIncluded(e.target.value)}
+                  style={{ width: 160 }}
+                >
+                  <option value="">{t("place.joystickInherit")}</option>
+                  {Array.from({ length: MAX_JOYSTICKS }, (_, i) => i + 1).map((n) => (
+                    <option key={n} value={n}>{n}</option>
+                  ))}
+                </select>
+              </label>
+              <div style={{ flex: 1, minWidth: 160 }}>
+                <PriceInput
+                  label={t("place.joystickPrice")}
+                  value={joystickPrice}
+                  onChange={setJoystickPrice}
+                  placeholder={t("place.joystickInherit")}
+                  disabled={busy}
+                />
+              </div>
+            </div>
+            <span className="muted" style={{ fontSize: 11 }}>{t("place.joystickOverrideNote")}</span>
+          </div>
+        )}
 
         {isCustomPlatform ? (
           <div className="col" style={{ gap: 6 }}>

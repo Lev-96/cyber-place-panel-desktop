@@ -5,7 +5,8 @@ import { IBillingSettings } from "@/api/joystickPrices";
 import JoystickPricesForm from "./JoystickPricesForm";
 
 /**
- * One fee for every extra joystick.
+ * One fee for every extra joystick, and the three things a venue can decide
+ * about those joysticks.
  *
  * It was three inputs — the second pad, the third and the fourth — because the
  * schema could express three prices. No venue ever set them differently, so the
@@ -13,10 +14,15 @@ import JoystickPricesForm from "./JoystickPricesForm";
  * them to be forgotten: fill in only the first, and the "+" button refused the
  * third pad with a sentence about a slot nobody had thought about.
  *
- * The two things worth pinning here are that the form writes the WHOLE billing
- * policy (it shares a PUT with the rounding rule, and sending half of it would
- * blank the other half), and that an empty box is a value — "we do not offer
- * extra pads" — rather than a field the operator forgot.
+ * What this file pins now:
+ *
+ *  - the form writes the WHOLE billing policy (it shares a PUT with the
+ *    rounding rule, and sending half of it would blank the other half);
+ *  - each of the wire's three states has a NAMED choice, and the two that used
+ *    to share one box do not collide: Free sends `0`, Not offered sends `null`,
+ *    and a stored figure is read back as the choice that produced it;
+ *  - "Charged" with nothing typed is not an answer and never reaches the
+ *    server as a guess.
  */
 
 const repo = vi.hoisted(() => ({ update: vi.fn() }));
@@ -49,13 +55,14 @@ const mount = async (s: IBillingSettings = settings()) => {
   });
 };
 
-// The one box on the form. `PriceInput` renders its label as a sibling span
-// rather than a real <label>, so there is nothing to query by label text —
-// and "the one box" is the assertion this file is making anyway.
+// The price box. `PriceInput` renders its label as a sibling span rather than a
+// real <label>, so there is nothing to query by label text — and "the one box"
+// is an assertion this file is making anyway. Selected by type, because the
+// choice above it is made of radios and those are inputs too.
+const boxes = () => dom.querySelectorAll<HTMLInputElement>('input[type="text"]');
 const box = () => {
-  const inputs = dom.querySelectorAll("input");
-  expect(inputs.length).toBe(1);
-  return inputs[0] as HTMLInputElement;
+  expect(boxes().length).toBe(1);
+  return boxes()[0];
 };
 const save = () => screen.getByRole("button", { name: "action.save" }) as HTMLButtonElement;
 /** The allowance select. The form has exactly one <select>. */
@@ -70,16 +77,23 @@ const chooseIncluded = async (n: number) => {
 const type = async (v: string) => {
   await act(async () => { fireEvent.change(box(), { target: { value: v } }); });
 };
+/** One of the three named choices, by the label an operator reads. */
+const choice = (m: "Paid" | "Free" | "None") =>
+  screen.getByRole("radio", { name: `joystickPrice.extra${m}` }) as HTMLInputElement;
+const choose = async (m: "Paid" | "Free" | "None") => {
+  await act(async () => { fireEvent.click(choice(m)); });
+};
 
 describe("JoystickPricesForm", () => {
   beforeEach(() => repo.update.mockReset().mockResolvedValue(settings()));
   afterEach(cleanup);
 
-  test("shows exactly one price box, holding the venue's fee", async () => {
+  test("a priced venue opens on Charged, with one box holding its fee", async () => {
     await mount();
 
+    expect(choice("Paid").checked).toBe(true);
     expect(box().value).toBe("300");
-    expect(screen.getByText("joystickPrice.one")).toBeTruthy();
+    expect(screen.getByText("joystickPrice.extraPrice")).toBeTruthy();
     // The per-slot inputs are gone. Their label was "Joystick #N", which is the
     // string a re-introduction would bring back with it.
     expect(screen.queryByText(/joystickPrice\.slot/)).toBeNull();
@@ -95,21 +109,75 @@ describe("JoystickPricesForm", () => {
     expect(repo.update).toHaveBeenCalledWith(7, 100, "nearest", 500, 1);
   });
 
-  test("an empty box withdraws the offer rather than pricing it at zero", async () => {
-    await mount();
-    await type("");
-    await act(async () => { fireEvent.click(save()); });
+  // ── the three choices, and the two that used to share one box ─────────
 
+  test("Free sends a zero fee, not a withdrawn offer", async () => {
+    await mount();
+    await choose("Free");
+
+    // No box: under Free there is no figure to give, and a box that cannot
+    // mean anything is a box that gets filled in.
+    expect(boxes().length).toBe(0);
+    expect(screen.getByText("joystickPrice.freeNote")).toBeTruthy();
+
+    await act(async () => { fireEvent.click(save()); });
+    // 0, never null. A free pad is still handed out, still counted and still a
+    // line on the bill; null is the venue not offering pads at all.
+    expect(repo.update).toHaveBeenCalledWith(7, 100, "nearest", 0, 1);
+  });
+
+  test("Not offered withdraws the offer rather than pricing it at zero", async () => {
+    await mount();
+    await choose("None");
+
+    expect(boxes().length).toBe(0);
+    expect(screen.getByText("joystickPrice.noneNote")).toBeTruthy();
+
+    await act(async () => { fireEvent.click(save()); });
     // Null, not 0. Zero is a real and different setting — hand pads out for
     // nothing — and the server refuses the add only on null.
     expect(repo.update).toHaveBeenCalledWith(7, 100, "nearest", null, 1);
   });
 
-  test("a venue that offers no pads starts with an empty box", async () => {
+  test("a venue on a zero fee opens on Free, not on an empty price box", async () => {
+    await mount(settings({ joystick_price: 0 }));
+
+    expect(choice("Free").checked).toBe(true);
+    expect(boxes().length).toBe(0);
+    expect(save().disabled).toBe(true);
+  });
+
+  test("a venue that offers no pads opens on Not offered", async () => {
     await mount(settings({ joystick_price: null }));
 
-    expect(box().value).toBe("");
+    expect(choice("None").checked).toBe(true);
+    expect(boxes().length).toBe(0);
     expect(save().disabled).toBe(true);
+  });
+
+  test("Charged with an empty box is not an answer, and is never sent as one", async () => {
+    await mount();
+    await type("");
+
+    // Neither 0 nor null is guessed here: both are settings the operator can
+    // pick by name one row up, so the form asks instead of choosing.
+    expect(screen.getByText("joystickPrice.paidNeedsPrice")).toBeTruthy();
+    expect(save().disabled).toBe(true);
+    await act(async () => { fireEvent.click(save()); });
+    expect(repo.update).not.toHaveBeenCalled();
+  });
+
+  test("a fee survives a trip through Free and back", async () => {
+    await mount();
+    await type("500");
+    await choose("Free");
+    await choose("Paid");
+
+    // Nothing to retype: the choice decides whether the figure is used, not
+    // whether it is remembered.
+    expect(box().value).toBe("500");
+    await act(async () => { fireEvent.click(save()); });
+    expect(repo.update).toHaveBeenCalledWith(7, 100, "nearest", 500, 1);
   });
 
   test("Save stays down until something actually changes", async () => {
@@ -194,14 +262,14 @@ describe("JoystickPricesForm", () => {
     expect(save().disabled).toBe(false);
   });
 
-  test("including every pad says the price will not be charged", async () => {
+  test("including every pad says nothing here will be charged", async () => {
     await mount();
     expect(screen.queryByText("joystickPrice.allIncluded")).toBeNull();
 
     await chooseIncluded(4);
 
-    // The price box stays, and stays saveable: a venue that sets four included
-    // today and three tomorrow should not have to retype the fee.
+    // The fee stays, and stays saveable: a venue that sets four included today
+    // and three tomorrow should not have to retype it.
     expect(screen.getByText("joystickPrice.allIncluded")).toBeTruthy();
     expect(box().value).toBe("300");
   });
