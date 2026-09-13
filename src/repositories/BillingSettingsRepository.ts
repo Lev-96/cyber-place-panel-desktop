@@ -30,6 +30,7 @@ export class BillingSettingsRepository {
       // One included pad is what a backend without this field does, so it is
       // what a panel talking to one has to show.
       joystick_included: 1,
+      joystick_charged_slots: null,
     });
   }
 
@@ -46,9 +47,10 @@ export class BillingSettingsRepository {
     mode: MoneyRoundingMode,
     joystickPrice: number | null,
     joystickIncluded: number,
+    joystickChargedSlots: string | null,
   ): Promise<IBillingSettings> {
     return friendlyMutation(
-      apiUpdateBillingSettings(branchId, step, mode, joystickPrice, joystickIncluded)
+      apiUpdateBillingSettings(branchId, step, mode, joystickPrice, joystickIncluded, joystickChargedSlots)
         .then((r) => r.settings),
     );
   }

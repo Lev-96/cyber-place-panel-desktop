@@ -1,7 +1,7 @@
 import Button from "@/components/ui/Button";
 import PriceInput from "@/components/ui/PriceInput";
 import Radio from "@/components/ui/Radio";
-import { IBillingSettings, includedJoysticks, MAX_JOYSTICKS } from "@/api/joystickPrices";
+import { CHARGED_SLOT_CHOICES, ChargedSlots, chargedSlotsOf, IBillingSettings, includedJoysticks } from "@/api/joystickPrices";
 import { useLang } from "@/i18n/LanguageContext";
 import { billingSettingsRepository } from "@/repositories/BillingSettingsRepository";
 import { notify } from "@/ui/notify";
@@ -81,7 +81,8 @@ const JoystickPricesForm = ({ branchId, settings, onSaved }: Props) => {
 
   const [value, setValue] = useState(stored);
   const [mode, setMode] = useState<ExtraMode>(() => modeOf(storedPrice));
-  const [included, setIncluded] = useState(storedIncluded);
+  const storedSlots = chargedSlotsOf(settings);
+  const [slots, setSlots] = useState<ChargedSlots | "">(storedSlots ?? "");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -102,7 +103,7 @@ const JoystickPricesForm = ({ branchId, settings, onSaved }: Props) => {
     mode === "none" ? null : mode === "free" ? 0 : typed;
   const invalid =
     outgoing === undefined || (outgoing !== null && (!Number.isFinite(outgoing) || outgoing < 0));
-  const changed = outgoing !== storedPrice || included !== storedIncluded;
+  const changed = outgoing !== storedPrice || slots !== (storedSlots ?? "");
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -118,7 +119,8 @@ const JoystickPricesForm = ({ branchId, settings, onSaved }: Props) => {
         settings.money_rounding_step,
         settings.money_rounding_mode,
         outgoing,
-        included,
+        storedIncluded,
+        slots === "" ? null : slots,
       );
       notify.message("success", t("joystickPrice.saved"));
       onSaved();
@@ -133,23 +135,33 @@ const JoystickPricesForm = ({ branchId, settings, onSaved }: Props) => {
     <form className="col" style={{ gap: 12 }} onSubmit={submit}>
       <span className="muted" style={{ fontSize: 12 }}>{t("joystickPrice.hint")}</span>
 
-      {/* How many pads the seat's rate already covers. A select and not a
-          number box: the answer is one of four and a free-typed "0" is a seat
-          with no controller, which the server refuses anyway. */}
-      <label className="col" style={{ gap: 4, maxWidth: 220 }}>
-        <span className="muted" style={{ fontSize: 12 }}>{t("joystickPrice.included")}</span>
+      {/* WHICH pads are sold, not how many are free. The first two are the
+          kit every seat comes with; this names the ones beyond it that carry
+          the price below. A select, because the answer is one of three. */}
+      <label className="col" style={{ gap: 4, maxWidth: 260 }}>
+        <span className="muted" style={{ fontSize: 12 }}>{t("joystickPrice.appliesTo")}</span>
         <select
           className="input"
-          value={included}
+          value={slots}
           disabled={busy}
-          onChange={(e) => setIncluded(Number(e.target.value))}
-          style={{ width: 90 }}
+          onChange={(e) => setSlots(e.target.value as ChargedSlots | "")}
         >
-          {Array.from({ length: MAX_JOYSTICKS }, (_, i) => i + 1).map((n) => (
-            <option key={n} value={n}>{n}</option>
+          {/* Only shown while nothing has been chosen: once an owner answers,
+              "not chosen" is not an answer they can go back to by accident. */}
+          {storedSlots === null && <option value="">{t("joystickPrice.appliesNotSet")}</option>}
+          {CHARGED_SLOT_CHOICES.map((c) => (
+            <option key={c} value={c}>{t(`joystickPrice.applies.${c}`)}</option>
           ))}
         </select>
       </label>
+
+      {/* What the choice means in a sentence, because "3" on its own does not
+          say whether the fourth pad is free. */}
+      <span className="muted" style={{ fontSize: 12 }}>
+        {slots === ""
+          ? t("joystickPrice.appliesFallback").replace("{0}", String(storedIncluded + 1))
+          : t(`joystickPrice.appliesExplain.${slots}`)}
+      </span>
 
       <div className="col" style={{ gap: 8 }}>
         <span className="muted" style={{ fontSize: 12 }}>{t("joystickPrice.extra")}</span>
@@ -198,13 +210,6 @@ const JoystickPricesForm = ({ branchId, settings, onSaved }: Props) => {
       )}
       {mode === "none" && (
         <span className="muted" style={{ fontSize: 12 }}>{t("joystickPrice.noneNote")}</span>
-      )}
-
-      {/* The allowance already covers every pad a seat can hold, so whatever
-          the choice says is unreachable. Said and not enforced: a venue on
-          four today and three tomorrow should not have to re-enter its fee. */}
-      {included >= MAX_JOYSTICKS && (
-        <span className="muted" style={{ fontSize: 12 }}>{t("joystickPrice.allIncluded")}</span>
       )}
 
       {err && <div className="error">{err}</div>}

@@ -59,6 +59,15 @@ export interface IBillingSettings {
    */
   joystick_included?: number;
   /**
+   * WHICH extra pads this venue charges for: "3", "4" or "3,4".
+   *
+   * Null means the venue has not answered, and the count above decides, which
+   * is what every branch is on until somebody opens the screen. A count can
+   * only ever say "everything above N"; this can say "the third and not the
+   * fourth", which is the rule an operator asked to be able to name.
+   */
+  joystick_charged_slots?: string | null;
+  /**
    * The ceiling a seat may hold, as the SERVER states it.
    *
    * `MAX_JOYSTICKS` above is this panel's own copy of the same number and is
@@ -79,6 +88,16 @@ export interface IBillingSettings {
 export const includedJoysticks = (settings: IBillingSettings): number =>
   settings.joystick_included ?? 1;
 
+/** The three answers the screen offers, and the only ones the server accepts. */
+export const CHARGED_SLOT_CHOICES = ["3", "4", "3,4"] as const;
+export type ChargedSlots = (typeof CHARGED_SLOT_CHOICES)[number];
+
+/** What the venue has chosen, or null while it has chosen nothing. */
+export const chargedSlotsOf = (settings: IBillingSettings): ChargedSlots | null => {
+  const raw = settings.joystick_charged_slots;
+  return CHARGED_SLOT_CHOICES.includes(raw as ChargedSlots) ? (raw as ChargedSlots) : null;
+};
+
 export const apiGetBillingSettings = (branchId: number) =>
   request<{ settings: IBillingSettings }>(`/branches/${branchId}/billing-settings`);
 
@@ -88,6 +107,7 @@ export const apiUpdateBillingSettings = (
   mode: MoneyRoundingMode,
   joystickPrice: number | null,
   joystickIncluded: number,
+  joystickChargedSlots: string | null,
 ) =>
   request<{ settings: IBillingSettings }>(`/branches/${branchId}/billing-settings`, {
     method: "PUT",
@@ -98,5 +118,6 @@ export const apiUpdateBillingSettings = (
       money_rounding_mode: mode,
       joystick_price: joystickPrice,
       joystick_included: joystickIncluded,
+      joystick_charged_slots: joystickChargedSlots,
     },
   });

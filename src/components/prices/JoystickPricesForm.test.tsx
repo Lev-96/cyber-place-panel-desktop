@@ -65,14 +65,14 @@ const box = () => {
   return boxes()[0];
 };
 const save = () => screen.getByRole("button", { name: "action.save" }) as HTMLButtonElement;
-/** The allowance select. The form has exactly one <select>. */
+/** The "price applies to" select. The form has exactly one <select>. */
 const allowance = () => {
   const selects = dom.querySelectorAll("select");
   expect(selects.length).toBe(1);
   return selects[0] as HTMLSelectElement;
 };
-const chooseIncluded = async (n: number) => {
-  await act(async () => { fireEvent.change(allowance(), { target: { value: String(n) } }); });
+const chooseSlots = async (v: string) => {
+  await act(async () => { fireEvent.change(allowance(), { target: { value: v } }); });
 };
 const type = async (v: string) => {
   await act(async () => { fireEvent.change(box(), { target: { value: v } }); });
@@ -106,7 +106,7 @@ describe("JoystickPricesForm", () => {
 
     // Step and mode go back untouched. This is a PUT of the whole policy, so a
     // form that sent only its own field would clear the venue's rounding.
-    expect(repo.update).toHaveBeenCalledWith(7, 100, "nearest", 500, 1);
+    expect(repo.update).toHaveBeenCalledWith(7, 100, "nearest", 500, 1, null);
   });
 
   // ── the three choices, and the two that used to share one box ─────────
@@ -123,7 +123,7 @@ describe("JoystickPricesForm", () => {
     await act(async () => { fireEvent.click(save()); });
     // 0, never null. A free pad is still handed out, still counted and still a
     // line on the bill; null is the venue not offering pads at all.
-    expect(repo.update).toHaveBeenCalledWith(7, 100, "nearest", 0, 1);
+    expect(repo.update).toHaveBeenCalledWith(7, 100, "nearest", 0, 1, null);
   });
 
   test("Not offered withdraws the offer rather than pricing it at zero", async () => {
@@ -136,7 +136,7 @@ describe("JoystickPricesForm", () => {
     await act(async () => { fireEvent.click(save()); });
     // Null, not 0. Zero is a real and different setting — hand pads out for
     // nothing — and the server refuses the add only on null.
-    expect(repo.update).toHaveBeenCalledWith(7, 100, "nearest", null, 1);
+    expect(repo.update).toHaveBeenCalledWith(7, 100, "nearest", null, 1, null);
   });
 
   test("a venue on a zero fee opens on Free, not on an empty price box", async () => {
@@ -177,7 +177,7 @@ describe("JoystickPricesForm", () => {
     // whether it is remembered.
     expect(box().value).toBe("500");
     await act(async () => { fireEvent.click(save()); });
-    expect(repo.update).toHaveBeenCalledWith(7, 100, "nearest", 500, 1);
+    expect(repo.update).toHaveBeenCalledWith(7, 100, "nearest", 500, 1, null);
   });
 
   test("Save stays down until something actually changes", async () => {
@@ -223,65 +223,68 @@ describe("JoystickPricesForm", () => {
     expect(screen.getByText("Only the owner sets prices")).toBeTruthy();
   });
 
-  // ── the allowance ────────────────────────────────────────────────────
+  // ── which pads are sold ──────────────────────────────────────────────
 
-  test("the allowance goes back with the fee, and offers every pad a seat can hold", async () => {
+  test("the choice goes back with the fee, and offers exactly three answers", async () => {
     await mount();
 
-    expect(allowance().value).toBe("1");
-    expect(allowance().querySelectorAll("option").length).toBe(4);
+    // Nothing chosen in the fixture, so the placeholder is there too.
+    expect(allowance().value).toBe("");
+    expect([...allowance().querySelectorAll("option")].map((o) => o.value))
+      .toEqual(["", "3", "4", "3,4"]);
 
-    await chooseIncluded(2);
+    await chooseSlots("3,4");
     await act(async () => { fireEvent.click(save()); });
 
-    // The venue's two numbers travel together, because the server validates
-    // them as one policy and a half-sent policy is how the other half gets
-    // reset to a default nobody chose.
-    expect(repo.update).toHaveBeenCalledWith(7, 100, "nearest", 300, 2);
+    // The venue's figures travel together: the server validates the policy as
+    // one object, and a half-sent policy is how the other half gets reset.
+    expect(repo.update).toHaveBeenCalledWith(7, 100, "nearest", 300, 1, "3,4");
   });
 
-  test("a backend that does not know the field is read as one included pad", async () => {
-    // `joystick_included` absent, which is exactly what an older backend sends.
-    await mount(settings({ joystick_included: undefined }));
+  test("the first two joysticks are never an option", async () => {
+    await mount();
 
-    expect(allowance().value).toBe("1");
-
-    await type("500");
-    await act(async () => { fireEvent.click(save()); });
-
-    // 1, not undefined: the panel states the rule that backend actually applies
-    // rather than passing its silence along.
-    expect(repo.update).toHaveBeenCalledWith(7, 100, "nearest", 500, 1);
+    const values = [...allowance().querySelectorAll("option")].map((o) => o.value);
+    expect(values).not.toContain("1");
+    expect(values).not.toContain("2");
   });
 
-  test("changing only the allowance is enough to enable Save", async () => {
+  test("a venue that has chosen opens on its choice, with no empty option left", async () => {
+    await mount(settings({ joystick_charged_slots: "4" }));
+
+    expect(allowance().value).toBe("4");
+    expect([...allowance().querySelectorAll("option")].map((o) => o.value)).toEqual(["3", "4", "3,4"]);
+  });
+
+  test("changing only the choice is enough to enable Save", async () => {
     await mount();
 
     expect(save().disabled).toBe(true);
-    await chooseIncluded(3);
+    await chooseSlots("4");
     expect(save().disabled).toBe(false);
   });
 
-  test("including every pad says nothing here will be charged", async () => {
-    await mount();
-    expect(screen.queryByText("joystickPrice.allIncluded")).toBeNull();
+  test("the allowance is passed through untouched, not edited here", async () => {
+    // This screen names WHICH pads are sold. How many the rate covers is a
+    // separate number the place card owns, and saving here must not move it.
+    await mount(settings({ joystick_included: 3 }));
 
-    await chooseIncluded(4);
-
-    // The fee stays, and stays saveable: a venue that sets four included today
-    // and three tomorrow should not have to retype it.
-    expect(screen.getByText("joystickPrice.allIncluded")).toBeTruthy();
-    expect(box().value).toBe("300");
-  });
-
-  test("a venue that includes every pad can save with no price at all", async () => {
-    await mount(settings({ joystick_price: null }));
-
-    await chooseIncluded(4);
+    await chooseSlots("3");
     await act(async () => { fireEvent.click(save()); });
 
-    // Null price plus a full allowance is the VIP room: every pad is in the
-    // rate, so there is no fee to enter and the add is never refused.
-    expect(repo.update).toHaveBeenCalledWith(7, 100, "nearest", null, 4);
+    expect(repo.update).toHaveBeenCalledWith(7, 100, "nearest", 300, 3, "3");
+  });
+
+  test("a venue can name the sold pads and still hand them out for nothing", async () => {
+    // The old screen said this with "all four included". It is now two
+    // answers: which pads are extra, and that an extra one costs zero. Both
+    // have to survive the same save, or the VIP room loses its rule.
+    await mount(settings({ joystick_price: null }));
+
+    await chooseSlots("3,4");
+    await act(async () => { fireEvent.click(screen.getByText("joystickPrice.extraFree")); });
+    await act(async () => { fireEvent.click(save()); });
+
+    expect(repo.update).toHaveBeenCalledWith(7, 100, "nearest", 0, 1, "3,4");
   });
 });
