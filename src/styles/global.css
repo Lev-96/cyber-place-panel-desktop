@@ -3912,3 +3912,112 @@ button.login-flip-back:hover {
   border-color: var(--color-danger);
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-danger) 60%, transparent);
 }
+
+/* === Selects, everywhere ==============================================
+   Every dropdown in the panel: the pad count on a session tile, the
+   rounding step and the joystick rule on Branch prices, the branch picker
+   on Revenue, the subject on the contact form, the language boxes.
+
+   They were the one control the app never dressed. A native select on this
+   dark ground paints a light system triangle and a system-height box, so a
+   select and the `.input` beside it read as two different eras of the same
+   form, and on a lit venue floor the triangle is the brightest thing on the
+   card.
+
+   ⚠️ Every select in this app also carries `class="input"`, and `.input` sets
+   the `background` SHORTHAND, which resets `background-image` to none. A bare
+   `select` rule therefore loses: the chevron never appears, and on the one
+   state whose specificity DID win (`:disabled`) it tiled across the box,
+   because repeat/position/size were still coming from the shorthand. So every
+   rule below is written for `select.input` as well, and sets
+   `background-color` rather than `background`. Verified by rendering, not by
+   reading the cascade.
+
+   Deliberately no `select { width: 100% }`: the board's pad select is 46px by
+   design (the tile is 160px and a full-width box pushes "1 / 4" onto a second
+   line), and the revenue picker sets its own width. Width stays with the
+   screen that knows what it is for. */
+
+select,
+select.input {
+  /* The native arrow goes, and ours is drawn in the box's own padding.
+     All three prefixes because Electron ships Chromium but the app is also
+     opened in a browser during development. */
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+
+  background-color: var(--color-surface);
+  /* A chevron in the accent colour, as a data URI: the CSP allows no external
+     image, and an inline SVG cannot be a background. The colour is baked in
+     because `currentColor` is not available to a background image. */
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5 6 6.5l5-5' fill='none' stroke='%2307ddf1' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 12px 8px;
+
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  color: var(--color-text);
+  /* Room for the chevron on the right, and the same vertical rhythm as
+     `.input` so the two line up in a row. */
+  padding: 10px 32px 10px 12px;
+  cursor: pointer;
+
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    background-color 160ms ease;
+}
+
+/* The tile's pad count: 46px on a 160px card, so it cannot afford 32px of
+   right padding or the digit would be pushed out of its own box. Keyed by a
+   class rather than by the inline width it used to match on, because that
+   match disappeared the moment anybody wrote 48 instead of 46 and the arrow
+   then sat on top of the number. */
+.pad-select,
+select.input.pad-select {
+  padding: 0 14px 0 5px;
+  background-position: right 3px center;
+  background-size: 8px 6px;
+  text-align: center;
+}
+
+select:hover:not(:disabled),
+select.input:hover:not(:disabled) {
+  border-color: var(--color-primary);
+  background-color: var(--color-surface-alt);
+}
+
+/* Focus is never removed, only replaced: this is a keyboard-reachable control
+   on a screen a cashier drives at speed. */
+select:focus,
+select:focus-visible,
+select.input:focus,
+select.input:focus-visible {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(7, 221, 241, 0.15);
+}
+
+select:disabled,
+select.input:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  /* The chevron goes grey with the rest, so a disabled box does not keep the
+     brightest accent on the card. */
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5 6 6.5l5-5' fill='none' stroke='%2394a3b8' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+
+/* The popup list. Chromium honours these on Linux, which is what the venue
+   runs; where a platform ignores them the control above is still correct and
+   the list simply stays the system's. */
+select option,
+select.input option {
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+select option:disabled,
+select.input option:disabled {
+  color: var(--color-muted);
+}

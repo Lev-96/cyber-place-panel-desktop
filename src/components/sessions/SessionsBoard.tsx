@@ -681,7 +681,12 @@ const SessionsBoard = ({ branchId }: Props) => {
                         take back below it — that is the existing rule, not a
                         UI choice, and the server enforces both ends. */}
                     <select
-                      className="input"
+                      // `pad-select` is what the stylesheet sizes the chevron
+                      // and the padding by. It used to key off the inline
+                      // width, which silently stopped applying the moment
+                      // anybody changed 46 to 48 and let the arrow sit on top
+                      // of the digit.
+                      className="input pad-select"
                       style={{
                         height: 24,
                         // One digit and the arrow, nothing more: the value is
@@ -690,7 +695,6 @@ const SessionsBoard = ({ branchId }: Props) => {
                         width: 46,
                         minWidth: 0,
                         flexShrink: 0,
-                        padding: "0 2px",
                         fontSize: 12,
                       }}
                       title={`${t("session.joysticks")}: ${joystickCount} / ${MAX_JOYSTICKS}`}
