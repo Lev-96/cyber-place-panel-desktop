@@ -295,11 +295,24 @@ describe("joysticks on the tile", () => {
     });
   };
 
-  test("offers exactly one through four", async () => {
+  test("offers the base kit upwards, not below it", async () => {
+    // A PlayStation seat comes with two controllers, so two is the floor a
+    // cashier chooses from. The fixture holds two.
     repo.listActive.mockResolvedValue([ps]);
     await mount();
 
+    expect([...pads().options].map((o) => o.value)).toEqual(["2", "3", "4"]);
+  });
+
+  test("a seat still below the kit can see and keep its own count", async () => {
+    // The moment between opening a session and handing over the second pad. A
+    // select whose value is missing from its options renders blank and tells
+    // the cashier nothing about what the seat is actually holding.
+    repo.listActive.mockResolvedValue([{ ...ps, joystick_count: 1 } as ISessionApi]);
+    await mount();
+
     expect([...pads().options].map((o) => o.value)).toEqual(["1", "2", "3", "4"]);
+    expect(pads().value).toBe("1");
   });
 
   test("shows the count the SERVER returned, never one derived here", async () => {

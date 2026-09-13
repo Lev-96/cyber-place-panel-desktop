@@ -57,6 +57,28 @@ interface Props {
   branchId: number;
 }
 
+/**
+ * The pad counts a cashier may choose on a tile.
+ *
+ * A PlayStation seat comes with two controllers, so going below two is not a
+ * thing the floor does: the list starts there. The one exception is a seat that
+ * IS below it, which a session is for the moment between opening and the second
+ * pad being handed over. Its own count is always offered, because a select
+ * whose value is missing from its options renders blank and tells the cashier
+ * nothing about what the seat is holding.
+ *
+ * Deliberately not the pricing question. What a pad COSTS is the venue's rule
+ * on the Prices screen ("3", "4", "3/4"); this is how many are in play, and the
+ * two must not be confused: the server takes a target COUNT here and works out
+ * which slot to open or close from it.
+ */
+export const padTargets = (current: number): number[] => {
+  const BASE_KIT = 2;
+  const targets: number[] = [];
+  for (let n = Math.min(BASE_KIT, current); n <= MAX_JOYSTICKS; n += 1) targets.push(n);
+  return targets;
+};
+
 const SessionsBoard = ({ branchId }: Props) => {
   const { money, t, lang } = useLang();
   const { user } = useAuth();
@@ -679,10 +701,7 @@ const SessionsBoard = ({ branchId }: Props) => {
                       value={joystickCount}
                       onChange={(e) => void changePadsTo(sess, Number(e.target.value))}
                     >
-                      {Array.from(
-                        { length: MAX_JOYSTICKS },
-                        (_, i) => i + 1,
-                      ).map((n) => (
+                      {padTargets(joystickCount).map((n) => (
                         <option key={n} value={n}>{n}</option>
                       ))}
                     </select>

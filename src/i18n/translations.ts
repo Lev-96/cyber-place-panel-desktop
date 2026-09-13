@@ -1054,9 +1054,13 @@ export const TRANSLATIONS: Dict = {
   },
   "joystickPrice.appliesTo": { en: "Price applies to", ru: "Цена применяется к", am: "Գինը վերաբերում է" },
   "joystickPrice.appliesNotSet": { en: "Not chosen yet", ru: "Пока не выбрано", am: "Դեռ ընտրված չէ" },
-  "joystickPrice.applies.3": { en: "The 3rd joystick", ru: "3-му джойстику", am: "3-րդ ջոյսթիքին" },
-  "joystickPrice.applies.4": { en: "The 4th joystick", ru: "4-му джойстику", am: "4-րդ ջոյսթիքին" },
-  "joystickPrice.applies.3,4": { en: "The 3rd and the 4th", ru: "3-му и 4-му", am: "3-րդ և 4-րդ ջոյսթիքներին" },
+  // The options read as the operator says them out loud: "3", "4", "3/4".
+  // The sentence under the select is what makes each one unambiguous, so the
+  // option itself does not have to carry the explanation.
+  "joystickPrice.applies.3": { en: "3", ru: "3", am: "3" },
+  "joystickPrice.applies.4": { en: "4", ru: "4", am: "4" },
+  "joystickPrice.applies.3,4": { en: "3/4", ru: "3/4", am: "3/4" },
+
   "joystickPrice.appliesExplain.3": {
     en: "The first two joysticks are included. The 3rd is charged, the 4th is not.",
     ru: "Первые два джойстика входят в тариф. 3-й платный, 4-й нет.",
@@ -2619,7 +2623,6 @@ export const TRANSLATIONS: Dict = {
   "toast.product.created": { en: "Product created", ru: "Товар создан", am: "Ապրանքը ստեղծվեց" },
   "toast.product.updated": { en: "Product updated", ru: "Товар обновлён", am: "Ապրանքը թարմացվեց" },
   "toast.product.deleted": { en: "Product deleted", ru: "Товар удалён", am: "Ապրանքը ջնջվեց" },
-
 
   "toast.manager.created": { en: "Manager created", ru: "Менеджер создан", am: "Մենեջերը ստեղծվեց" },
   "toast.manager.updated": { en: "Manager updated", ru: "Менеджер обновлён", am: "Մենեջերը թարմացվեց" },
