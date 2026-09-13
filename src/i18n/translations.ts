@@ -1049,9 +1049,15 @@ export const TRANSLATIONS: Dict = {
   "joystickPrice.sectionTitle": { en: "Joystick prices", ru: "Цены на джойстики", am: "Ջոյսթիքների գներ" },
   "joystickPrice.one": { en: "Joystick price", ru: "Цена на джойстик", am: "Ջոյսթիքի գին" },
   "joystickPrice.hint": {
-    en: "One flat fee for every extra joystick on a PlayStation session. It goes onto the bill the moment a pad is handed out and comes off when it is handed back; how long it was out makes no difference. The first joystick is the session itself and is already in the place's rate. An empty box means extra joysticks are not offered here.",
-    ru: "Одна фиксированная цена для каждого дополнительного джойстика в сессии PlayStation. Она прибавляется к счёту сразу при добавлении джойстика и снимается при удалении; время использования на цену не влияет. Первый джойстик. Это сама сессия, он уже в тарифе места. Пустое поле значит, что дополнительные джойстики здесь не выдаются.",
-    am: "Մեկ ֆիքսված գին՝ PlayStation-ի նիստի յուրաքանչյուր լրացուցիչ ջոյսթիքի համար։ Այն ավելացվում է հաշվին ջոյսթիքը տալու պահին և հանվում վերադարձնելիս. օգտագործման տևողությունը գնի վրա չի ազդում։ Առաջին ջոյսթիքը հենց նիստն է և արդեն մտնում է տեղի սակագնի մեջ։ Դատարկ դաշտը նշանակում է, որ այստեղ լրացուցիչ ջոյսթիքներ չեն տրվում։",
+    en: "One flat fee for every joystick beyond the ones the rate already includes. It goes onto the bill the moment a pad is handed out and stays there when the pad is handed back; how long it was out makes no difference. The first joystick is the session itself, so the allowance is never below one. An empty price box means extra joysticks are not offered here.",
+    ru: "Одна фиксированная цена за каждый джойстик сверх тех, что уже входят в тариф. Она прибавляется к счёту в момент выдачи и остаётся в нём, даже если джойстик вернули; время использования на цену не влияет. Первый джойстик это сама сессия, поэтому меньше одного включить нельзя. Пустое поле цены значит, что дополнительные джойстики здесь не выдаются.",
+    am: "Մեկ ֆիքսված գին՝ սակագնում արդեն ներառված ջոյսթիքներից ավելի յուրաքանչյուրի համար։ Այն ավելացվում է հաշվին ջոյսթիքը տալու պահին և մնում է հաշվին, նույնիսկ եթե ջոյսթիքը վերադարձնեն. օգտագործման տևողությունը գնի վրա չի ազդում։ Առաջին ջոյսթիքը հենց նիստն է, ուստի մեկից քիչ ներառել հնարավոր չէ։ Դատարկ գնի դաշտը նշանակում է, որ այստեղ լրացուցիչ ջոյսթիքներ չեն տրվում։",
+  },
+  "joystickPrice.included": { en: "Included in the rate", ru: "Входит в тариф", am: "Ներառված է սակագնում" },
+  "joystickPrice.allIncluded": {
+    en: "Every joystick a seat can hold is in the rate, so the price above is never charged.",
+    ru: "Все джойстики места входят в тариф, цена выше не начисляется.",
+    am: "Տեղի բոլոր ջոյսթիքները ներառված են սակագնում, վերևի գինը չի գանձվում։",
   },
   "joystickPrice.slot": { en: "Joystick #{0}", ru: "Джойстик №{0}", am: "Ջոյսթիք №{0}" },
   "joystickPrice.saved": { en: "Joystick prices saved", ru: "Цены на джойстики сохранены", am: "Ջոյսթիքների գները պահպանվեցին" },

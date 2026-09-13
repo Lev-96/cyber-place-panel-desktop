@@ -58,6 +58,15 @@ const box = () => {
   return inputs[0] as HTMLInputElement;
 };
 const save = () => screen.getByRole("button", { name: "action.save" }) as HTMLButtonElement;
+/** The allowance select. The form has exactly one <select>. */
+const allowance = () => {
+  const selects = dom.querySelectorAll("select");
+  expect(selects.length).toBe(1);
+  return selects[0] as HTMLSelectElement;
+};
+const chooseIncluded = async (n: number) => {
+  await act(async () => { fireEvent.change(allowance(), { target: { value: String(n) } }); });
+};
 const type = async (v: string) => {
   await act(async () => { fireEvent.change(box(), { target: { value: v } }); });
 };
@@ -83,7 +92,7 @@ describe("JoystickPricesForm", () => {
 
     // Step and mode go back untouched. This is a PUT of the whole policy, so a
     // form that sent only its own field would clear the venue's rounding.
-    expect(repo.update).toHaveBeenCalledWith(7, 100, "nearest", 500);
+    expect(repo.update).toHaveBeenCalledWith(7, 100, "nearest", 500, 1);
   });
 
   test("an empty box withdraws the offer rather than pricing it at zero", async () => {
@@ -93,7 +102,7 @@ describe("JoystickPricesForm", () => {
 
     // Null, not 0. Zero is a real and different setting — hand pads out for
     // nothing — and the server refuses the add only on null.
-    expect(repo.update).toHaveBeenCalledWith(7, 100, "nearest", null);
+    expect(repo.update).toHaveBeenCalledWith(7, 100, "nearest", null, 1);
   });
 
   test("a venue that offers no pads starts with an empty box", async () => {
@@ -144,5 +153,67 @@ describe("JoystickPricesForm", () => {
     await act(async () => { fireEvent.click(save()); });
 
     expect(screen.getByText("Only the owner sets prices")).toBeTruthy();
+  });
+
+  // ── the allowance ────────────────────────────────────────────────────
+
+  test("the allowance goes back with the fee, and offers every pad a seat can hold", async () => {
+    await mount();
+
+    expect(allowance().value).toBe("1");
+    expect(allowance().querySelectorAll("option").length).toBe(4);
+
+    await chooseIncluded(2);
+    await act(async () => { fireEvent.click(save()); });
+
+    // The venue's two numbers travel together, because the server validates
+    // them as one policy and a half-sent policy is how the other half gets
+    // reset to a default nobody chose.
+    expect(repo.update).toHaveBeenCalledWith(7, 100, "nearest", 300, 2);
+  });
+
+  test("a backend that does not know the field is read as one included pad", async () => {
+    // `joystick_included` absent, which is exactly what an older backend sends.
+    await mount(settings({ joystick_included: undefined }));
+
+    expect(allowance().value).toBe("1");
+
+    await type("500");
+    await act(async () => { fireEvent.click(save()); });
+
+    // 1, not undefined: the panel states the rule that backend actually applies
+    // rather than passing its silence along.
+    expect(repo.update).toHaveBeenCalledWith(7, 100, "nearest", 500, 1);
+  });
+
+  test("changing only the allowance is enough to enable Save", async () => {
+    await mount();
+
+    expect(save().disabled).toBe(true);
+    await chooseIncluded(3);
+    expect(save().disabled).toBe(false);
+  });
+
+  test("including every pad says the price will not be charged", async () => {
+    await mount();
+    expect(screen.queryByText("joystickPrice.allIncluded")).toBeNull();
+
+    await chooseIncluded(4);
+
+    // The price box stays, and stays saveable: a venue that sets four included
+    // today and three tomorrow should not have to retype the fee.
+    expect(screen.getByText("joystickPrice.allIncluded")).toBeTruthy();
+    expect(box().value).toBe("300");
+  });
+
+  test("a venue that includes every pad can save with no price at all", async () => {
+    await mount(settings({ joystick_price: null }));
+
+    await chooseIncluded(4);
+    await act(async () => { fireEvent.click(save()); });
+
+    // Null price plus a full allowance is the VIP room: every pad is in the
+    // rate, so there is no fee to enter and the add is never refused.
+    expect(repo.update).toHaveBeenCalledWith(7, 100, "nearest", null, 4);
   });
 });

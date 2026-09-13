@@ -1493,6 +1493,21 @@ three — §4 traps, "Confirm dialogs"). The unlimited confirmation used
 broken is not the one that broke it. It goes through `useConfirm()` now, and
 `SessionOptionsDialog.test.tsx` asserts the native call is never made.
 
+**How many pads the rate covers is the venue's setting, not a constant.**
+`branches.joystick_included` (1..4, default 1) sits beside the fee on Branch →
+Prices and travels in the billing-settings payload as `joystick_included`, with
+`joystick_max` alongside it. Both forms on that screen PUT the WHOLE policy, so
+both send both joystick figures — `MoneyRoundingForm` passing the joystick half
+through untouched is the reason the fee survives a rounding change, and the
+allowance now rides with it. `includedJoysticks()` in `api/joystickPrices.ts` is
+the single place that fills in 1 for a backend that predates the field.
+
+Nothing on the board changed and nothing needed to: a pad inside the allowance
+comes back from the server priced 0.00, so `sessionAmount`, the tile's pad line,
+the receipt and the history all reach the right figure with the arithmetic they
+already had. A free pad is still a row, still counted in `joystick_count` and
+still a line in the log.
+
 **Joysticks are PlayStation-only, and the question is the PLACE's platform.**
 `pc.kind === "ps"` means "no kiosk agent" and is equally true of a ping-pong
 table — `platformGroup(place.platform) === "ps"` is what the dialog asks, the

@@ -44,7 +44,40 @@ export interface IBillingSettings {
    * the server refuses the add when it is set.
    */
   joystick_price: number | null;
+  /**
+   * How many pads this venue's hourly rate already pays for, the session's own
+   * controller always among them.
+   *
+   * This is the half venues differ on: one sells a seat with a single
+   * controller and charges for every other, another quotes a room with four
+   * and charges for none. 1 is the floor, because a PlayStation session with
+   * no controller is not a thing anybody sells, and `joystick_max` is the top.
+   *
+   * Optional on the wire only so a panel talking to a backend from before this
+   * shipped still reads; the repository fills in 1, which is exactly what that
+   * backend does.
+   */
+  joystick_included?: number;
+  /**
+   * The ceiling a seat may hold, as the SERVER states it.
+   *
+   * `MAX_JOYSTICKS` above is this panel's own copy of the same number and is
+   * still what the board draws with. Server-provided is the one to prefer
+   * wherever a new screen needs it: a constant on this side is a second answer
+   * to a question only the server can settle.
+   */
+  joystick_max?: number;
 }
+
+/**
+ * The venue's allowance, with the older backend's answer filled in.
+ *
+ * One included pad is exactly what a backend without the field does, so a
+ * panel talking to one must show the same thing. Lives here rather than in the
+ * forms so the two that write this policy cannot disagree about the default.
+ */
+export const includedJoysticks = (settings: IBillingSettings): number =>
+  settings.joystick_included ?? 1;
 
 export const apiGetBillingSettings = (branchId: number) =>
   request<{ settings: IBillingSettings }>(`/branches/${branchId}/billing-settings`);
@@ -54,6 +87,7 @@ export const apiUpdateBillingSettings = (
   step: number,
   mode: MoneyRoundingMode,
   joystickPrice: number | null,
+  joystickIncluded: number,
 ) =>
   request<{ settings: IBillingSettings }>(`/branches/${branchId}/billing-settings`, {
     method: "PUT",
@@ -63,5 +97,6 @@ export const apiUpdateBillingSettings = (
       money_rounding_step: step,
       money_rounding_mode: mode,
       joystick_price: joystickPrice,
+      joystick_included: joystickIncluded,
     },
   });

@@ -1,5 +1,5 @@
 import Button from "@/components/ui/Button";
-import { IBillingSettings, MoneyRoundingMode } from "@/api/joystickPrices";
+import { IBillingSettings, includedJoysticks, MoneyRoundingMode } from "@/api/joystickPrices";
 import { useLang } from "@/i18n/LanguageContext";
 import { billingSettingsRepository } from "@/repositories/BillingSettingsRepository";
 import { notify } from "@/ui/notify";
@@ -61,9 +61,16 @@ const MoneyRoundingForm = ({ branchId, settings, onSaved }: Props) => {
     setBusy(true);
     setErr(null);
     try {
-      // The joystick fee goes back untouched: this is a PUT of the whole
-      // policy, and sending only the rounding half would clear the fee.
-      await billingSettingsRepository.update(branchId, step, mode, settings.joystick_price);
+      // The joystick half goes back untouched, BOTH figures of it: this is a
+      // PUT of the whole policy, and sending only the rounding part would
+      // clear the fee and reset the allowance.
+      await billingSettingsRepository.update(
+        branchId,
+        step,
+        mode,
+        settings.joystick_price,
+        includedJoysticks(settings),
+      );
       notify.message("success", t("rounding.saved"));
       onSaved();
     } catch (e2) {

@@ -27,6 +27,9 @@ export class BillingSettingsRepository {
       money_rounding_step: 0,
       money_rounding_mode: "up" as MoneyRoundingMode,
       joystick_price: null,
+      // One included pad is what a backend without this field does, so it is
+      // what a panel talking to one has to show.
+      joystick_included: 1,
     });
   }
 
@@ -42,9 +45,11 @@ export class BillingSettingsRepository {
     step: number,
     mode: MoneyRoundingMode,
     joystickPrice: number | null,
+    joystickIncluded: number,
   ): Promise<IBillingSettings> {
     return friendlyMutation(
-      apiUpdateBillingSettings(branchId, step, mode, joystickPrice).then((r) => r.settings),
+      apiUpdateBillingSettings(branchId, step, mode, joystickPrice, joystickIncluded)
+        .then((r) => r.settings),
     );
   }
 }
