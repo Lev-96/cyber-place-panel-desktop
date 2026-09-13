@@ -208,6 +208,21 @@ export interface IPcApi extends Translated {
   label: string;
   kind?: PcKind;
   hourly_rate?: number | string | null;
+  /**
+   * What an hour on this seat actually costs, resolved BY THE SERVER with the
+   * same service the session start uses.
+   *
+   * The Start dialog used to work this out from the tariff matrix plus this
+   * device's own rate, and could not do better: the place arrives without its
+   * rate, so a subcategory like "PS5 + VR" was invisible to the panel. It
+   * offered the plain platform price while the server billed the
+   * subcategory's, and on a platform priced only through a subcategory it
+   * refused to start at all.
+   *
+   * Optional so a panel talking to an older backend falls back to the chain it
+   * always had rather than showing nothing.
+   */
+  assigned_hourly_rate?: number | null;
   mac_address?: string | null;
   /**
    * The physical console this device stands for, once an owner has bound one

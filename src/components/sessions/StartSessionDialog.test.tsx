@@ -233,4 +233,45 @@ describe("starting a session free", () => {
 
     expect(start().disabled).toBe(false);
   });
+
+  // ── the rate the dialog offers ────────────────────────────────────────
+
+  /**
+   * The seat's price comes from the SERVER, because only the server can see it.
+   *
+   * A subcategory ("PS5 + VR") prices the place, and the place's rate never
+   * reaches this dialog: `/pcs` sends the place without it. Working the number
+   * out from the tariff matrix, which is what this component used to do, showed
+   * the plain platform price while the session was started at the subcategory's.
+   */
+  test("the server's resolved rate wins over the tariff matrix", async () => {
+    await mount(device({ assigned_hourly_rate: 2500 }));
+
+    // The matrix in this file says 1500 for ps5-standard. The seat says 2500.
+    expect(screen.getByText(/2500/)).toBeTruthy();
+    expect(screen.queryByText(/1500 /)).toBeNull();
+  });
+
+  test("without the server field the dialog falls back to the matrix", async () => {
+    // A panel pointed at a backend from before the field existed shows exactly
+    // what it always showed, rather than nothing.
+    await mount(device({ assigned_hourly_rate: undefined }));
+
+    expect(screen.getByText(/1500/)).toBeTruthy();
+  });
+
+  test("a seat priced only through a subcategory can be started", async () => {
+    // No matrix row for this platform at all: the old chain would offer
+    // nothing and block Start, while the server would have started it happily.
+    const odd = device({
+      assigned_hourly_rate: 3000,
+      hourly_rate: null,
+      place: { id: 10, number: 1, name: "VR", type: "standard", platform: "vr-room" },
+    });
+    await mount(odd);
+
+    const start = screen.getByRole("button", { name: "action.start" }) as HTMLButtonElement;
+    expect(start.disabled).toBe(false);
+    expect(screen.getByText(/3000/)).toBeTruthy();
+  });
 });

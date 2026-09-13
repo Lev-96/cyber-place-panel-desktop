@@ -81,13 +81,27 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
     return () => { cancelled = true; };
   }, [branchId]);
 
-  // Resolve the assigned hourly rate for this PC.
+  // What this seat costs an hour, as the SERVER resolves it.
+  //
+  // `assigned_hourly_rate` is the answer `POST /sessions` would give: the
+  // place's own rate first (which is where a subcategory's price is written,
+  // "PS5 + VR" costing more than "PS5"), then the tariff matrix. The panel
+  // used to work this out itself from the matrix alone and could not see a
+  // subcategory at all, so the dialog offered one price while the session was
+  // billed at another, and a seat priced only through a subcategory could not
+  // be started because the matrix had no row for it.
+  //
+  // The old chain stays as the fallback, and only as that: a panel pointed at
+  // a backend from before this field shows exactly what it always showed.
   //   1. price_for_branches.<place.platform>-<place.type> — the matrix
   //      managed on the Branch prices page; same row mobile shows the
   //      player and that auto-sessions bill against.
   //   2. pc.hourly_rate — legacy per-PC override.
   //   3. null — nothing configured; Start is blocked with a message.
   const assignedRate = useMemo<number | null>(() => {
+    const fromServer = pc.assigned_hourly_rate;
+    if (fromServer != null && Number(fromServer) > 0) return Number(fromServer);
+
     const place = pc.place;
     const matrix = branch?.price_for_branch;
     if (place && matrix) {
