@@ -1151,14 +1151,14 @@ export const TRANSLATIONS: Dict = {
     am: "Մասնաճյուղը տրամադրում է երեք կարգավորիչ։ Չորրորդը ընդհանրապես չի տրվում։",
   },
   "joystickPrice.setupExplain.separate": {
-    en: "The third and the fourth joystick have their own prices.",
-    ru: "3-й и 4-й джойстики имеют собственные цены.",
-    am: "3-րդ և 4-րդ ջոյսթիքներն ունեն իրենց գները։",
+    en: "3 | 4 — the third and the fourth joystick have their own prices.",
+    ru: "3 | 4 — 3-й и 4-й джойстики имеют собственные цены.",
+    am: "3 | 4 — 3-րդ և 4-րդ ջոյսթիքներն ունեն իրենց գները։",
   },
   "joystickPrice.setupExplain.shared": {
-    en: "One price for an extra controller, whether it is the third or the fourth.",
-    ru: "Одна цена за дополнительный контроллер, будь он 3-м или 4-м.",
-    am: "Մեկ գին լրացուցիչ կարգավորիչի համար՝ լինի այն երրորդը, թե չորրորդը։",
+    en: "3/4 — one price for an extra controller, whether it is the third or the fourth.",
+    ru: "3/4 — одна цена за дополнительный контроллер, будь он 3-м или 4-м.",
+    am: "3/4 — մեկ գին լրացուցիչ կարգավորիչի համար՝ լինի այն երրորդը, թե չորրորդը։",
   },
   "joystickPrice.fourthNeedsPrice": {
     en: "Enter the fourth joystick's price, or answer No above.",

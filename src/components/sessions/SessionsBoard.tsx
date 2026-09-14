@@ -30,7 +30,7 @@ import SessionTimer from "./SessionTimer";
 import { sessionCurrentHourlyRate, sessionJoysticksTotal } from "./sessionAmount";
 import StartSessionDialog from "./StartSessionDialog";
 import SessionOptionsDialog from "./SessionOptionsDialog";
-import { MAX_JOYSTICKS } from "@/api/joystickPrices";
+import { BASE_JOYSTICKS, MAX_JOYSTICKS } from "@/api/joystickPrices";
 import { notify } from "@/ui/notify";
 import StopReceiptModal from "./StopReceiptModal";
 import { useExpiryNudge } from "./useExpiryNudge";
@@ -503,25 +503,15 @@ const SessionsBoard = ({ branchId }: Props) => {
     const deviceStatus = effectivePcStatus(pc);
     const color = SESSION_CELL_COLOR[cellState];
     const itemsCount = sess?.items?.length ?? 0;
-    // Pads in play INCLUDING the session's own, as the server counts them.
-    // An older backend sends nothing, and 1 is the honest floor.
-    const joystickCount = sess?.joystick_count ?? 1;
+    // How many controllers this seat is holding, as the SERVER counts them.
+    // An older backend sends nothing, and the base kit is the honest floor: a
+    // PlayStation comes with two and they are in play from the first second.
+    const joystickCount = sess?.joystick_count ?? BASE_JOYSTICKS;
     // The backend's answer, resolved from the place's platform. Absent on an
     // older payload, and then the controls simply are not drawn — which is the
     // safe direction: a missing field must not offer an operation the seat
     // cannot take.
     const supportsJoysticks = sess?.supports_joysticks === true;
-    // The two ends of the range, named once. The ceiling is the server's own
-    // limit; the floor is slot 1 — the session's own controller, which is not
-    // an extra, has no row, and cannot be handed back.
-    //
-    // A button at its end is REMOVED, not disabled. On a 22px control a
-    // disabled state is a shade of grey an operator has to compare against its
-    // neighbour to read, and "why can I not press this" is a worse question
-    // than "there is nothing to press". Both ends are enforced on the server
-    // too — this decides what is drawn, never what is allowed.
-    const atCeiling = joystickCount >= MAX_JOYSTICKS;
-    const atFloor = joystickCount <= 1;
     // The pad line: how many periods were charged, at what fee, for how much.
     // Null when nothing was, and null on a waived seat — a fee printed under
     // "Бесплатная сессия" is the same two-numbers-one-truth problem the rate
@@ -776,7 +766,14 @@ const SessionsBoard = ({ branchId }: Props) => {
                       title={`${t("session.joysticks")}: ${joystickCount} / ${padMax}`}
                     >
                       <JoystickIcon />
-                      <span className="muted">{joystickCount} / {padMax}</span>
+                      {/* The number the seat is HOLDING, on its own.
+                          It was a fraction, and the fraction was the thing an
+                          operator could not read: "1 / 4" on a PlayStation with
+                          two controllers on the table, and "2 / 3/4" once the
+                          ceiling started carrying a venue's pricing shape. The
+                          ceiling is still worth knowing and is in the tooltip,
+                          where it cannot be mistaken for arithmetic. */}
+                      <span className="muted">{joystickCount}</span>
                     </span>
                   )}
                   {supportsJoysticks && (
@@ -841,7 +838,7 @@ const SessionsBoard = ({ branchId }: Props) => {
                         the select above hands ONE named pad over and a control
                         that both charges and refunds by direction is how a
                         mis-click becomes money. */}
-                    {joystickCount > 1 && (
+                    {joystickCount > BASE_JOYSTICKS && (
                       <Button
                         variant="secondary"
                         style={{ height: 24, padding: "0 8px", fontSize: 12, flexShrink: 0 }}

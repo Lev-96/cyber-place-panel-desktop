@@ -192,10 +192,10 @@ describe("SessionsBoard — what a tile says the seat is", () => {
     ]);
     await mount();
 
-    expect(screen.getByText("3 / 4")).toBeTruthy();
+    expect(screen.getByText("3")).toBeTruthy();
   });
 
-  /** One pad is every session's floor, so saying "1 / 4" on a PC is noise. */
+  /** A seat with no extras out says nothing about pads on a non-PlayStation. */
   test("a session with only its own pad says nothing about pads", async () => {
     repo.listPcs.mockResolvedValue([pc({ current_session_id: 6 })]);
     repo.listActive.mockResolvedValue([

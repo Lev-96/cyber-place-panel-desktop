@@ -295,8 +295,10 @@ describe("joysticks on the tile", () => {
     charged_slots: [3, 4],
     hourly: false,
     shared: true,
+    // The kit is NOT here, and that is the contract: the server offers only
+    // the pads a cashier hands over, which never includes the two the seat
+    // came with.
     options: [
-      { slot: 2, price: 0, shared: false },
       { slot: 3, price: 500, shared: true },
       { slot: 4, price: 500, shared: true },
     ],
@@ -350,6 +352,36 @@ describe("joysticks on the tile", () => {
     });
   };
 
+  /**
+   * A fresh PlayStation seat is holding TWO controllers, and the menu offers
+   * the venue's product rather than one of them.
+   *
+   * The three symptoms this pins had one cause: the second controller was
+   * modelled as an addable pad. The tile read "1 / 4" because the count was
+   * "1 + rows", the menu carried "the 2nd joystick, free" because slot 2 was an
+   * option, and the venue's own "3/4" sat DISABLED behind it because the menu
+   * enables the pad that comes next, which was that free second one.
+   */
+  test("a fresh seat holds two and offers the venue's pad, not one of its own", async () => {
+    repo.listActive.mockResolvedValue([ps]);
+    await mount();
+
+    // The count.
+    expect(screen.getByText("2")).toBeTruthy();
+    expect(screen.queryByText("1 / 4")).toBeNull();
+    expect(screen.queryByText("2 / 3/4")).toBeNull();
+
+    // The menu: no kit pad, and nothing described as free.
+    const labels = padOptions().map((o) => o.textContent ?? "");
+    expect(labels.some((l) => l.includes("session.padFree"))).toBe(false);
+    expect(padOptions().map((o) => o.value)).not.toContain("2");
+
+    // …and the venue's shared pad is the one a cashier can actually pick.
+    const shared = padOptions().find((o) => (o.textContent ?? "").includes("session.padSharedOption"));
+    expect(shared).toBeTruthy();
+    expect(shared?.disabled).toBe(false);
+  });
+
   test("nothing is selected when the tile opens", async () => {
     repo.listActive.mockResolvedValue([ps]);
     await mount();
@@ -363,7 +395,6 @@ describe("joysticks on the tile", () => {
     repo.listActive.mockResolvedValue([withRule(ps, {
       shared: false,
       options: [
-        { slot: 2, price: 0, shared: false },
         { slot: 3, price: 500, shared: false },
         { slot: 4, price: 700, shared: false },
       ],
@@ -386,14 +417,15 @@ describe("joysticks on the tile", () => {
       max_slot: 3,
       shared: false,
       options: [
-        { slot: 2, price: 0, shared: false },
         { slot: 3, price: 500, shared: false },
       ],
     })]);
     await mount();
 
-    expect(padOptions().map((o) => o.value)).toEqual(["", "2", "3"]);
-    expect(screen.getByText("2 / 3")).toBeTruthy();
+    // The kit is never on the menu, so a venue that hands out three pads has
+    // exactly one entry, and the tile reads the number it is HOLDING.
+    expect(padOptions().map((o) => o.value)).toEqual(["", "3"]);
+    expect(screen.getByText("2")).toBeTruthy();
   });
 
   /** One shared figure is ONE entry, not the same price listed twice. */
@@ -402,8 +434,11 @@ describe("joysticks on the tile", () => {
     await mount();
 
     const labels = padOptions().map((o) => o.textContent ?? "");
+    // One entry for the pair, not the same price listed twice — and nothing
+    // else beside the placeholder, because the kit is not on the menu.
     expect(labels.filter((l) => l.includes("session.padSharedOption")).length).toBe(1);
-    expect(labels.some((l) => l.includes("session.padOption"))).toBe(true);
+    expect(labels.some((l) => l.includes("session.padOption"))).toBe(false);
+    expect(padOptions()).toHaveLength(2);
   });
 
   /**
@@ -418,7 +453,6 @@ describe("joysticks on the tile", () => {
     repo.listActive.mockResolvedValue([withRule(ps, {
       shared: false,
       options: [
-        { slot: 2, price: 0, shared: false },
         { slot: 3, price: 500, shared: false },
         { slot: 4, price: 700, shared: false },
       ],
@@ -426,17 +460,27 @@ describe("joysticks on the tile", () => {
     await mount();
 
     const byValue = Object.fromEntries(padOptions().map((o) => [o.value, o.disabled]));
-    // Slot 2 is already in play on this fixture, slot 3 comes next, slot 4 does not.
-    expect(byValue["2"]).toBe(true);
+    // Nothing is out on this fixture, so the third comes next and the fourth
+    // does not: a fourth controller with no third one is not a thing a floor
+    // does, and picking it would charge the fourth pad's fee for the third
+    // pad's use.
     expect(byValue["3"]).toBe(false);
     expect(byValue["4"]).toBe(true);
   });
 
-  test("the count line counts to what the venue offers", async () => {
+  /**
+   * The number is what the seat is HOLDING, on its own.
+   *
+   * It was a fraction, and the fraction was the thing an operator could not
+   * read: "1 / 4" on a PlayStation with two controllers on the table, and
+   * "2 / 3/4" once the ceiling carried the venue's pricing shape.
+   */
+  test("the tile shows the pads the seat is holding, not a fraction", async () => {
     repo.listActive.mockResolvedValue([{ ...ps, joystick_count: 3 } as ISessionApi]);
     await mount();
 
-    expect(screen.getByText("3 / 4")).toBeTruthy();
+    expect(screen.getByText("3")).toBeTruthy();
+    expect(screen.queryByText("3 / 4")).toBeNull();
   });
 
   test("is absent on a seat that has none", async () => {
@@ -490,14 +534,51 @@ describe("joysticks on the tile", () => {
     expect(repo.removeJoystick).toHaveBeenCalledWith(42, 3);
   });
 
-  /** Nothing in play, nothing to take back: the control is not there at all. */
-  test("a seat holding only its own pad offers nothing to take back", async () => {
+  /**
+   * No EXTRA in play, nothing to take back: the control is not there at all.
+   *
+   * The floor is the kit, not one. A seat holding exactly the two controllers
+   * it came with has nothing a cashier can hand back, and a "−" beside it
+   * offers an operation the server refuses.
+   */
+  test("a seat holding only the kit offers nothing to take back", async () => {
     repo.listActive.mockResolvedValue([
-      { ...ps, joystick_count: 1, joysticks: [] } as ISessionApi,
+      { ...ps, joystick_count: 2, joysticks: [] } as ISessionApi,
     ]);
     await mount();
 
     expect(screen.queryByLabelText("session.padRemove")).toBeNull();
+  });
+
+  /** …and one extra out is exactly when it appears. */
+  test("a seat holding an extra can hand it back", async () => {
+    repo.listActive.mockResolvedValue([{
+      ...ps,
+      joystick_count: 3,
+      joysticks: [{ id: 6, slot: 3, price: 500, is_charged: true,
+        started_at: new Date().toISOString(), stopped_at: null }],
+    } as unknown as ISessionApi]);
+    await mount();
+
+    expect(screen.getByLabelText("session.padRemove")).toBeTruthy();
+  });
+
+  /**
+   * A payload from a backend that predates the count still reads as a seat
+   * holding its kit, never as one holding a single controller.
+   */
+  test("a session that reports no count is still holding its kit", async () => {
+    const { joystick_count: _omitted, ...withoutCount } = ps as ISessionApi & { joystick_count?: number };
+    repo.listActive.mockResolvedValue([withoutCount as ISessionApi]);
+    await mount();
+
+    // Asserted on the joystick line itself, not on the document: a bare "1"
+    // matches the board's own section counter, which would let this pass while
+    // the tile said one controller.
+    const line = [...document.querySelectorAll("span[title]")]
+      .find((el) => (el.getAttribute("title") ?? "").startsWith("session.joysticks"));
+    expect(line?.textContent).toContain("2");
+    expect(line?.textContent).not.toContain("1");
   });
 
   test("is held while a change is in flight", async () => {
@@ -523,12 +604,19 @@ describe("joysticks on the tile", () => {
     });
 
     test("a removal is announced red", async () => {
-      repo.listActive.mockResolvedValue([ps]);
-      repo.removeJoystick.mockResolvedValue({ ...ps, joystick_count: 1 } as ISessionApi);
+      // A seat with an extra actually out, or there is nothing to take back
+      // and the control is not drawn at all.
+      repo.listActive.mockResolvedValue([{
+        ...ps,
+        joystick_count: 3,
+        joysticks: [{ id: 6, slot: 3, price: 500, is_charged: true,
+          started_at: new Date().toISOString(), stopped_at: null }],
+      } as unknown as ISessionApi]);
+      repo.removeJoystick.mockResolvedValue({ ...ps, joystick_count: 2 } as ISessionApi);
       await mount();
       await takeBack();
 
-      expect(toast.message).toHaveBeenCalledWith("error", expect.stringContaining("1 / 4"));
+      expect(toast.message).toHaveBeenCalledWith("error", expect.stringContaining("2 / 4"));
     });
 
     test("a refusal announces nothing", async () => {
@@ -562,16 +650,17 @@ describe("joysticks on the tile", () => {
     test("a pad handed back is still counted and still charged", async () => {
       repo.listActive.mockResolvedValue([{
         ...ps,
-        joystick_count: 1,
+        joystick_count: 2,
         joysticks: [{
-          id: 1, slot: 2, price: 300, is_charged: true,
+          id: 1, slot: 3, price: 300, is_charged: true,
           started_at: "2026-09-10T14:00:00Z", stopped_at: "2026-09-10T14:05:00Z",
         }],
       } as ISessionApi]);
       await mount();
 
-      // One pad on the bill, none in play: 1/4 with a charge beside it.
-      expect(screen.getByText("1 / 4")).toBeTruthy();
+      // One pad on the bill, no extras in play: the seat is back to the two it
+      // came with, and the charge still stands beside them.
+      expect(screen.getByText("2")).toBeTruthy();
       expect(screen.getByText(/1 × .*300.* = .*300/)).toBeTruthy();
     });
 
@@ -588,7 +677,7 @@ describe("joysticks on the tile", () => {
 
       // The pads are still counted; the money is not printed under a bill
       // nobody is paying.
-      expect(screen.getByText("3 / 4")).toBeTruthy();
+      expect(screen.getByText("3")).toBeTruthy();
       expect(container.textContent).not.toContain("session.joysticksCost");
     });
 
@@ -643,9 +732,10 @@ describe("joysticks on the tile", () => {
     }]);
     await mount();
 
-    // Two rows, one of them closed — the server says two pads are in play
-    // (slot 1 and slot 3) and the tile says two.
-    expect(screen.getByText("2 / 4")).toBeTruthy();
+    // Two rows, one of them closed — the server says the seat is holding two
+    // controllers, and the tile says two. It is the SERVER's number: a board
+    // that counted the rows would say three.
+    expect(screen.getByText("2")).toBeTruthy();
   });
 
   /**

@@ -28,6 +28,20 @@ import { request } from "./client";
 /** Pads one PlayStation session may hold in total, its own included. */
 export const MAX_JOYSTICKS = 4;
 
+/**
+ * The controllers a PlayStation seat COMES WITH.
+ *
+ * Two, free, in play from the first second. They are not extras: they are never
+ * on the "add a joystick" menu, never priced, and never rows on the server. The
+ * card's floor when the server sends no count, because a seat that reports
+ * nothing is still holding these.
+ *
+ * The server's own `SessionJoystick::BASE_KIT`, mirrored rather than recomputed
+ * — every number the card DRAWS comes from the payload; this is only what it
+ * falls back to when the payload is from a backend that predates the field.
+ */
+export const BASE_JOYSTICKS = 2;
+
 /* ── the venue's money-rounding policy ─────────────────────────────────── */
 
 export type MoneyRoundingMode = "up" | "nearest" | "down";
