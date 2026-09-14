@@ -12,7 +12,7 @@ import { useLang } from "@/i18n/LanguageContext";
 import { usePlaceAvailability } from "@/realtime/usePlaceAvailability";
 import { useSessionChanged } from "@/realtime/useSessionChanged";
 import { sessionRepository } from "@/repositories/SessionRepository";
-import { IPcApi, ISessionApi } from "@/types/sessions";
+import { IJoystickRule, IPcApi, ISessionApi } from "@/types/sessions";
 import { PC_STATUS_COLOR, effectivePcStatus, isPs } from "@/types/pc";
 import {
   canStartSession,
@@ -58,25 +58,85 @@ interface Props {
 }
 
 /**
- * The pad counts a cashier may choose on a tile.
+ * How many pads THIS seat counts to.
  *
- * A PlayStation seat comes with two controllers, so going below two is not a
- * thing the floor does: the list starts there. The one exception is a seat that
- * IS below it, which a session is for the moment between opening and the second
- * pad being handed over. Its own count is always offered, because a select
- * whose value is missing from its options renders blank and tells the cashier
- * nothing about what the seat is holding.
- *
- * Deliberately not the pricing question. What a pad COSTS is the venue's rule
- * on the Prices screen ("3", "4", "3/4"); this is how many are in play, and the
- * two must not be confused: the server takes a target COUNT here and works out
- * which slot to open or close from it.
+ * The venue's own ceiling, not this repo's constant: a branch that hands out
+ * three controllers must read "2 / 3" and not "2 / 4". Null when the server did
+ * not send the rule, and the caller then falls back to what a seat can hold,
+ * which is the number the card drew before the rule existed.
  */
-export const padTargets = (current: number): number[] => {
-  const BASE_KIT = 2;
-  const targets: number[] = [];
-  for (let n = Math.min(BASE_KIT, current); n <= MAX_JOYSTICKS; n += 1) targets.push(n);
-  return targets;
+export const padCeiling = (session: ISessionApi): number | null =>
+  session.joystick_rule?.max_slot ?? null;
+
+/** One entry of the "which joystick" menu on a tile. */
+export interface PadChoice {
+  /** The slot this entry hands out. For a shared pair, the next free one of it. */
+  slot: number;
+  /** True when this entry stands for the 3/4 pair the venue priced as one. */
+  shared: boolean;
+  /** The venue's figure. Null means no price is set and the add is refused. */
+  price: number | null;
+  /** Selectable right now: it is the pad that comes next on this seat. */
+  enabled: boolean;
+}
+
+/**
+ * The pads a cashier may hand out on this seat, from the VENUE's rule.
+ *
+ * It was a list of target COUNTS — 2, 3, 4 — built from a ceiling constant in
+ * this repo, and it could not survive a venue that hands out three controllers
+ * or prices the fourth apart from the third: the same "4" meant a different
+ * amount of money at two branches and the card had no way to know. So the
+ * server sends what it offers and what each costs, and this only arranges it.
+ *
+ * ## Why the pair collapses
+ *
+ * When a venue prices the third and the fourth as one figure ("3/4"), listing
+ * them apart shows the same price twice and asks the cashier a question the
+ * venue did not ask them: which of two identical things. One entry, and the
+ * slot it opens is whichever of the pair comes next.
+ *
+ * ## Why everything else is disabled rather than absent
+ *
+ * A fourth controller with no third one is not a thing a floor does, and the
+ * server refuses it. Showing the entry greyed keeps the venue's prices visible
+ * to the cashier — which is what the screen is for — while making the mis-click
+ * that charges the fourth pad's fee for the third pad's use impossible.
+ */
+export const padChoices = (rule: IJoystickRule | undefined, openSlots: number[]): PadChoice[] => {
+  if (rule === undefined) return [];
+
+  const free = rule.options
+    .map((o) => o.slot)
+    .filter((slot) => !openSlots.includes(slot))
+    .sort((a, b) => a - b);
+  const next = free.length > 0 ? free[0] : null;
+
+  const out: PadChoice[] = [];
+  let pairDone = false;
+
+  for (const option of rule.options) {
+    if (option.shared) {
+      if (pairDone) continue;
+      pairDone = true;
+      const pairFree = rule.options
+        .filter((o) => o.shared && !openSlots.includes(o.slot))
+        .map((o) => o.slot)
+        .sort((a, b) => a - b);
+      const slot = pairFree.length > 0 ? pairFree[0] : option.slot;
+      out.push({ slot, shared: true, price: option.price, enabled: slot === next });
+      continue;
+    }
+
+    out.push({
+      slot: option.slot,
+      shared: false,
+      price: option.price,
+      enabled: option.slot === next,
+    });
+  }
+
+  return out;
 };
 
 const SessionsBoard = ({ branchId }: Props) => {
@@ -261,49 +321,73 @@ const SessionsBoard = ({ branchId }: Props) => {
    * board rendered: taking two pads back is two calls, and the second must
    * remove the slot that is still open after the first.
    */
-  const changePadsTo = useCallback(async (sess: ISessionApi, target: number) => {
+  /**
+   * Hand ONE pad over, the one the cashier named.
+   *
+   * It was a target count and a loop: going from one pad to three made two
+   * calls and the server picked both slots. That could not survive a venue
+   * pricing the third and the fourth apart, because "add two" no longer says
+   * what it costs. One press is now one pad, named, and the server agrees or
+   * refuses — it never takes the price from here.
+   */
+  const addPad = useCallback(async (sess: ISessionApi, slot: number) => {
     if (padBusy !== null) return;
-
-    const from = sess.joystick_count ?? 1;
-    const delta = target - from;
-    if (delta === 0) return;
 
     setPadBusy(sess.id);
     setPadError(null);
 
-    let updated: ISessionApi | null = null;
     try {
-      for (let step = 0; step < Math.abs(delta); step += 1) {
-        if (delta > 0) {
-          updated = await sessionRepository.addJoystick(sess.id);
-        } else {
-          const source = updated ?? sess;
-          const open = (source.joysticks ?? []).filter((j) => j.stopped_at === null);
-          if (open.length === 0) break;
-          const slot = Math.max(...open.map((j) => j.slot));
-          updated = await sessionRepository.removeJoystick(sess.id, slot);
-        }
-      }
-
-      if (updated === null) return;
-
-      // Only once the server has answered, and with ITS count — a tile that
-      // predicted the number would show a figure the server had not agreed to,
-      // on the one operation another cashier may have moved first. For a
-      // multi-step change this is the count after the LAST step, which is what
-      // the cashier now has.
-      const count = updated.joystick_count ?? from;
+      const updated = await sessionRepository.addJoystick(sess.id, slot);
+      // The server's own count, never one predicted here: another cashier may
+      // have moved this seat first, and a tile showing a number the server has
+      // not agreed to is how two screens start disagreeing about one seat.
+      const count = updated.joystick_count ?? (sess.joystick_count ?? 1);
       notify.message(
-        delta > 0 ? "success" : "error",
-        `${t(delta > 0 ? "session.joystickAdded" : "session.joystickRemoved")} · `
-        + `${t("session.joysticksInSession")} ${count} / ${MAX_JOYSTICKS}`,
+        "success",
+        `${t("session.joystickAdded")} · ${t("session.joysticksInSession")} `
+        + `${count} / ${padCeiling(updated) ?? padCeiling(sess) ?? MAX_JOYSTICKS}`,
       );
     } catch (e) {
       // Shown, never swallowed: the refusals here are sentences a cashier has
-      // to read. No price set for that slot, four pads already in play, the
-      // session no longer active. A change that failed HALFWAY leaves the pads
-      // it already made — the reload below is what puts the true number back
-      // on the tile rather than the one the select is showing.
+      // to read. This branch does not hand out that pad, it is already in play,
+      // another one comes first, no price is set, the session is over.
+      setPadError({ id: sess.id, message: e instanceof Error ? e.message : String(e) });
+    } finally {
+      setPadBusy(null);
+      await sessions.reload();
+    }
+  }, [padBusy, sessions, t]);
+
+  /**
+   * Take the last pad handed out back.
+   *
+   * The highest OPEN slot, which is the pad that went out most recently — the
+   * same rule the count select used, kept because it is the one the floor
+   * expects: a player gets up, the controller that comes back is theirs.
+   *
+   * Removal is NOT a refund under either strategy, and nothing here pretends
+   * otherwise: the fixed fee stays on the bill and the hourly meter simply
+   * stops. That is the server's rule and this only asks for it.
+   */
+  const removeTopPad = useCallback(async (sess: ISessionApi) => {
+    if (padBusy !== null) return;
+
+    const open = (sess.joysticks ?? []).filter((j) => j.stopped_at === null);
+    if (open.length === 0) return;
+    const slot = Math.max(...open.map((j) => j.slot));
+
+    setPadBusy(sess.id);
+    setPadError(null);
+
+    try {
+      const updated = await sessionRepository.removeJoystick(sess.id, slot);
+      const count = updated.joystick_count ?? (sess.joystick_count ?? 1);
+      notify.message(
+        "error",
+        `${t("session.joystickRemoved")} · ${t("session.joysticksInSession")} `
+        + `${count} / ${padCeiling(updated) ?? padCeiling(sess) ?? MAX_JOYSTICKS}`,
+      );
+    } catch (e) {
       setPadError({ id: sess.id, message: e instanceof Error ? e.message : String(e) });
     } finally {
       setPadBusy(null);
@@ -465,6 +549,15 @@ const SessionsBoard = ({ branchId }: Props) => {
     // model, and only when a pad is actually moving it: on the fee model the
     // rate never changes and a line repeating it would be noise on a 160px
     // card.
+    // What this VENUE hands out on this seat, and which pad comes next. Both
+    // from the server's rule; the fallback is what a seat can physically hold,
+    // which is the number the card drew before the rule travelled with it.
+    const padMax = (sess === undefined ? null : padCeiling(sess)) ?? MAX_JOYSTICKS;
+    const padMenu = padChoices(
+      sess?.joystick_rule,
+      (sess?.joysticks ?? []).filter((j) => j.stopped_at === null).map((j) => j.slot),
+    );
+
     const currentRate = ((): number | null => {
       if (sess === undefined || sess.is_free) return null;
       const active = (sess.joysticks ?? []).filter((j) => j.is_hourly && j.stopped_at === null);
@@ -680,22 +773,25 @@ const SessionsBoard = ({ branchId }: Props) => {
                         // is what pushed it onto its own line.
                         flexShrink: 0,
                       }}
-                      title={`${t("session.joysticks")}: ${joystickCount} / ${MAX_JOYSTICKS}`}
+                      title={`${t("session.joysticks")}: ${joystickCount} / ${padMax}`}
                     >
                       <JoystickIcon />
-                      <span className="muted">{joystickCount} / {MAX_JOYSTICKS}</span>
+                      <span className="muted">{joystickCount} / {padMax}</span>
                     </span>
                   )}
                   {supportsJoysticks && (
                   <>
-                    {/* A SELECT, not a pair of steppers.
-                        Two 22px buttons meant a cashier going from one pad to
-                        three pressed twice and watched the number catch up
-                        between presses; the select states the destination and
-                        the board makes the calls. The floor is 1 because the
-                        session's own pad is one of them and there is no row to
-                        take back below it — that is the existing rule, not a
-                        UI choice, and the server enforces both ends. */}
+                    {/* WHICH pad, not how many.
+                        It was a select of target counts and the server picked
+                        the slots. A venue may now hand out three controllers
+                        or price the fourth apart from the third, so "make it
+                        four" stopped saying what it costs. The cashier names
+                        the pad and sees its price before they choose it.
+
+                        Nothing is selected when the tile opens, deliberately:
+                        a control that starts on a value is one mis-scroll away
+                        from charging a player for a controller nobody handed
+                        over. It goes back to empty after every add. */}
                     <select
                       // `pad-select` is what the stylesheet sizes the chevron
                       // and the padding by. It used to key off the inline
@@ -705,26 +801,58 @@ const SessionsBoard = ({ branchId }: Props) => {
                       className="input pad-select"
                       style={{
                         height: 24,
-                        // One digit and the arrow, nothing more: the value is
-                        // 1..4, and a full-width input on a 160px tile is what
-                        // pushed the count off the line.
-                        width: 46,
                         minWidth: 0,
-                        flexShrink: 0,
+                        flexShrink: 1,
                         fontSize: 12,
                       }}
-                      title={`${t("session.joysticks")}: ${joystickCount} / ${MAX_JOYSTICKS}`}
+                      title={t("session.padChoose")}
                       aria-label={t("session.joysticks")}
-                      // Disabled only while a change is in flight — the
-                      // operation is legal, it is simply already happening.
-                      disabled={padBusy === sess.id}
-                      value={joystickCount}
-                      onChange={(e) => void changePadsTo(sess, Number(e.target.value))}
+                      // Disabled while a change is in flight, and when this
+                      // venue has nothing left to hand out on this seat.
+                      disabled={padBusy === sess.id || padMenu.every((c) => !c.enabled)}
+                      value=""
+                      onChange={(e) => {
+                        const slot = Number(e.target.value);
+                        if (Number.isFinite(slot) && slot > 0) void addPad(sess, slot);
+                      }}
                     >
-                      {padTargets(joystickCount).map((n) => (
-                        <option key={n} value={n}>{n}</option>
+                      <option value="">{t("session.padChoose")}</option>
+                      {padMenu.map((c) => (
+                        <option
+                          key={c.shared ? "shared" : c.slot}
+                          value={c.slot}
+                          // Everything but the pad that comes next. The server
+                          // refuses those too; this is what stops the cashier
+                          // reaching them at all.
+                          disabled={!c.enabled}
+                        >
+                          {(c.shared
+                            ? t("session.padSharedOption")
+                            : t("session.padOption").replace("{0}", String(c.slot)))
+                            + " · "
+                            + (c.price === null
+                              ? t("session.padNoPrice")
+                              : c.price === 0 ? t("session.padFree") : money(c.price))}
+                        </option>
                       ))}
                     </select>
+                    {/* Taking one back, which the count select used to do by
+                        being set lower. It is a separate control now because
+                        the select above hands ONE named pad over and a control
+                        that both charges and refunds by direction is how a
+                        mis-click becomes money. */}
+                    {joystickCount > 1 && (
+                      <Button
+                        variant="secondary"
+                        style={{ height: 24, padding: "0 8px", fontSize: 12, flexShrink: 0 }}
+                        title={t("session.padRemove")}
+                        aria-label={t("session.padRemove")}
+                        disabled={padBusy === sess.id}
+                        onClick={() => void removeTopPad(sess)}
+                      >
+                        −
+                      </Button>
+                    )}
                     {/* The round trip, said on the tile it belongs to. The
                         select is already disabled while it is in flight; this
                         is what tells the cashier the change landed, on a board

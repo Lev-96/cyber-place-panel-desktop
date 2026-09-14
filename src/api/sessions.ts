@@ -186,11 +186,22 @@ export const apiRemoveSessionItem = (sessionId: number, itemId: number) =>
  * never computes either.
  */
 
-/** Put the next joystick into play. The server picks the slot and its price. */
-export const apiAddSessionJoystick = (sessionId: number) =>
+/**
+ * Put one joystick into play.
+ *
+ * The SLOT is the cashier naming which pad they are handing over, which a venue
+ * that prices the third and the fourth apart needs them to be able to say.
+ * Omitting it is "the next one", which is what this call always did and what
+ * the server still does when nothing is named.
+ *
+ * No price travels here in either case. What a pad costs is resolved on the
+ * server from the venue's own rule on every add; a figure sent from this side
+ * would be a figure nobody at the venue agreed to.
+ */
+export const apiAddSessionJoystick = (sessionId: number, slot?: number) =>
   request<{ joystick: { id: number; slot: number; hourly_rate: number; started_at: string }; session: ISessionApi }>(
     `/sessions/${sessionId}/joysticks`,
-    { method: "POST" },
+    { method: "POST", body: slot === undefined ? undefined : { slot } },
   );
 
 /**

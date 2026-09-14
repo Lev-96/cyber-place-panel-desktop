@@ -58,6 +58,34 @@ export interface ITimePackage {
  * period passes the server's threshold, owed not at all below it — so nothing
  * on this side ever multiplies `price` by a duration.
  */
+/** One pad the venue hands out, with the figure the server will charge for it. */
+export interface IJoystickRuleOption {
+  /** 2..4. The slot IS the controller's number, the seat's own included. */
+  slot: number;
+  /** Null means this venue has no price for it and the add will be refused. */
+  price: number | null;
+  /**
+   * True when this pad shares one figure with the other extra pad, which is
+   * the "3/4" answer on the Prices screen. The card collapses the pair into a
+   * single option when it is set, and names them apart when it is not.
+   */
+  shared: boolean;
+}
+
+export interface IJoystickRule {
+  included: number;
+  price: number | null;
+  price_4: number | null;
+  /** What a SEAT can physically hold. Not configurable. */
+  max: number;
+  /** What THIS venue hands out, which is the number the card counts to. */
+  max_slot: number;
+  charged_slots: number[];
+  hourly: boolean;
+  shared: boolean;
+  options: IJoystickRuleOption[];
+}
+
 export interface ISessionJoystick {
   id: number;
   /** 2..4. Slot 1 is the session itself and never appears here. */
@@ -168,6 +196,17 @@ export interface ISessionApi {
   committed_amount?: number | string | null;
   /** Pads in play INCLUDING the session's own. 1 is the floor, never 0. */
   joystick_count?: number;
+  /**
+   * The venue's joystick rule as it applies to THIS seat: which pads it hands
+   * out and what each costs.
+   *
+   * From the server, and only from the server. The card used to build its
+   * control from a ceiling constant of its own and a single fee, which draws a
+   * button for a pad the branch does not hand out and cannot show two prices
+   * when the venue set two. Absent when the server did not load the relations
+   * it needs, and the card then falls back to what it can draw safely.
+   */
+  joystick_rule?: IJoystickRule;
   /** Every period, closed ones included. Present when the relation is loaded. */
   joysticks?: ISessionJoystick[];
   /** Who opened it — the owner's "which of my managers ran this?". */

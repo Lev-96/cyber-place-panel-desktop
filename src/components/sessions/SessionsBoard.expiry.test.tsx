@@ -3,7 +3,7 @@ import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 import { ConfirmProvider } from "@/components/ui/ConfirmProvider";
-import { IPcApi, ISessionApi } from "@/types/sessions";
+import { IJoystickRule, IPcApi, ISessionApi } from "@/types/sessions";
 import { PC_KIND, PC_STATUS } from "@/types/pc";
 import { SessionChangedEvent } from "@/realtime/useSessionChanged";
 import SessionsBoard from "./SessionsBoard";
@@ -279,7 +279,33 @@ describe("adding time from the card", () => {
  * somebody typed, and a venue that renames a seat would lose its controls.
  */
 describe("joysticks on the tile", () => {
-  const ps = { ...running, supports_joysticks: true, joystick_count: 2,
+  /**
+   * The venue's rule, as the server sends it with every session.
+   *
+   * The fixture default is the ordinary club: two controllers in the kit, and
+   * an extra one at 500 whether it is the third or the fourth. Tests that are
+   * about a different venue say so with `withRule`.
+   */
+  const RULE: IJoystickRule = {
+    included: 2,
+    price: 500,
+    price_4: null,
+    max: 4,
+    max_slot: 4,
+    charged_slots: [3, 4],
+    hourly: false,
+    shared: true,
+    options: [
+      { slot: 2, price: 0, shared: false },
+      { slot: 3, price: 500, shared: true },
+      { slot: 4, price: 500, shared: true },
+    ],
+  };
+
+  const withRule = (session: ISessionApi, over: Partial<IJoystickRule>): ISessionApi =>
+    ({ ...session, joystick_rule: { ...RULE, ...over } } as ISessionApi);
+
+  const ps = { ...running, supports_joysticks: true, joystick_count: 2, joystick_rule: RULE,
     joysticks: [{ id: 5, slot: 2, price: 500, started_at: new Date().toISOString(), stopped_at: null }] } as ISessionApi;
 
   beforeEach(() => {
@@ -298,46 +324,119 @@ describe("joysticks on the tile", () => {
   afterEach(cleanup);
 
   /**
-   * The control is a SELECT, not a pair of steppers.
+   * The control names WHICH pad, and it starts on nothing.
    *
-   * Going from one pad to three used to be two presses with the number
-   * catching up in between. The select states the destination and the board
-   * makes that many calls to the SAME endpoints — nothing about how a pad is
-   * priced changed, and a fee is still charged on add and not refunded on
-   * removal.
+   * It was a select of target COUNTS and the board looped: "make it four" from
+   * two made two calls and the server chose both slots. That could not survive
+   * a venue handing out three controllers, or pricing the fourth apart from the
+   * third, because the same "4" then meant a different amount of money at two
+   * branches and the card had no way to know which.
+   *
+   * So the menu is the venue's own list, priced, and nothing is selected when
+   * the tile opens: a control that starts on a value is one mis-scroll away
+   * from charging a player for a controller nobody handed over.
    */
   const pads = () => screen.getByLabelText("session.joysticks") as HTMLSelectElement;
-  const setPads = async (n: number) => {
+  const padOptions = () => [...pads().options];
+  const pickPad = async (slot: number) => {
     await act(async () => {
-      fireEvent.change(pads(), { target: { value: String(n) } });
+      fireEvent.change(pads(), { target: { value: String(slot) } });
+    });
+  };
+  /** Taking the last pad back, which is its own control now and not a direction. */
+  const takeBack = async () => {
+    await act(async () => {
+      fireEvent.click(screen.getByLabelText("session.padRemove"));
     });
   };
 
-  test("offers the base kit upwards, not below it", async () => {
-    // A PlayStation seat comes with two controllers, so two is the floor a
-    // cashier chooses from. The fixture holds two.
+  test("nothing is selected when the tile opens", async () => {
     repo.listActive.mockResolvedValue([ps]);
     await mount();
 
-    expect([...pads().options].map((o) => o.value)).toEqual(["2", "3", "4"]);
+    expect(pads().value).toBe("");
+    expect(padOptions()[0].value).toBe("");
   });
 
-  test("a seat still below the kit can see and keep its own count", async () => {
-    // The moment between opening a session and handing over the second pad. A
-    // select whose value is missing from its options renders blank and tells
-    // the cashier nothing about what the seat is actually holding.
-    repo.listActive.mockResolvedValue([{ ...ps, joystick_count: 1 } as ISessionApi]);
+  test("offers the pads the VENUE hands out, priced", async () => {
+    // Two priced apart: the third at 500, the fourth at 700.
+    repo.listActive.mockResolvedValue([withRule(ps, {
+      shared: false,
+      options: [
+        { slot: 2, price: 0, shared: false },
+        { slot: 3, price: 500, shared: false },
+        { slot: 4, price: 700, shared: false },
+      ],
+    })]);
     await mount();
 
-    expect([...pads().options].map((o) => o.value)).toEqual(["1", "2", "3", "4"]);
-    expect(pads().value).toBe("1");
+    const labels = padOptions().map((o) => o.textContent ?? "");
+    expect(labels.some((l) => l.includes("500"))).toBe(true);
+    expect(labels.some((l) => l.includes("700"))).toBe(true);
   });
 
-  test("shows the count the SERVER returned, never one derived here", async () => {
+  /**
+   * A venue that hands out three controllers has no fourth entry at all.
+   *
+   * The whole reason the ceiling is a venue answer rather than a constant here:
+   * the card used to draw a fourth option at every branch.
+   */
+  test("a pad the venue does not offer is not on the menu", async () => {
+    repo.listActive.mockResolvedValue([withRule(ps, {
+      max_slot: 3,
+      shared: false,
+      options: [
+        { slot: 2, price: 0, shared: false },
+        { slot: 3, price: 500, shared: false },
+      ],
+    })]);
+    await mount();
+
+    expect(padOptions().map((o) => o.value)).toEqual(["", "2", "3"]);
+    expect(screen.getByText("2 / 3")).toBeTruthy();
+  });
+
+  /** One shared figure is ONE entry, not the same price listed twice. */
+  test("a venue on one figure collapses the pair into a single entry", async () => {
+    repo.listActive.mockResolvedValue([ps]);
+    await mount();
+
+    const labels = padOptions().map((o) => o.textContent ?? "");
+    expect(labels.filter((l) => l.includes("session.padSharedOption")).length).toBe(1);
+    expect(labels.some((l) => l.includes("session.padOption"))).toBe(true);
+  });
+
+  /**
+   * Everything but the pad that comes next is unreachable.
+   *
+   * A fourth controller with no third one is not a thing a floor does, and
+   * letting it be picked would charge the fourth pad's price for the third
+   * pad's use. The server refuses it too; this is what stops the cashier
+   * reaching it at all.
+   */
+  test("only the pad that comes next can be chosen", async () => {
+    repo.listActive.mockResolvedValue([withRule(ps, {
+      shared: false,
+      options: [
+        { slot: 2, price: 0, shared: false },
+        { slot: 3, price: 500, shared: false },
+        { slot: 4, price: 700, shared: false },
+      ],
+    })]);
+    await mount();
+
+    const byValue = Object.fromEntries(padOptions().map((o) => [o.value, o.disabled]));
+    // Slot 2 is already in play on this fixture, slot 3 comes next, slot 4 does not.
+    expect(byValue["2"]).toBe(true);
+    expect(byValue["3"]).toBe(false);
+    expect(byValue["4"]).toBe(true);
+  });
+
+  test("the count line counts to what the venue offers", async () => {
     repo.listActive.mockResolvedValue([{ ...ps, joystick_count: 3 } as ISessionApi]);
     await mount();
 
-    expect(pads().value).toBe("3");
+    expect(screen.getByText("3 / 4")).toBeTruthy();
   });
 
   test("is absent on a seat that has none", async () => {
@@ -349,86 +448,56 @@ describe("joysticks on the tile", () => {
     expect(screen.queryByLabelText("session.joysticks")).toBeNull();
   });
 
-  test("one step up is one add", async () => {
+  /** One press is ONE pad, and the server is told which. */
+  test("choosing a pad hands over exactly that pad", async () => {
     repo.listActive.mockResolvedValue([ps]);
     await mount();
-    await setPads(3);
+    await pickPad(3);
 
     expect(repo.addJoystick).toHaveBeenCalledTimes(1);
-    expect(repo.addJoystick).toHaveBeenCalledWith(42);
+    expect(repo.addJoystick).toHaveBeenCalledWith(42, 3);
     expect(repo.removeJoystick).not.toHaveBeenCalled();
   });
 
-  test("two steps up is TWO adds, not one", async () => {
-    repo.listActive.mockResolvedValue([{ ...ps, joystick_count: 1, joysticks: [] } as ISessionApi]);
-    await mount();
-    await setPads(3);
-
-    expect(repo.addJoystick).toHaveBeenCalledTimes(2);
-  });
-
-  test("removing names the highest pad in play", async () => {
+  test("the placeholder hands over nothing", async () => {
     repo.listActive.mockResolvedValue([ps]);
     await mount();
-    await setPads(1);
+    const readsAfterMount = repo.listActive.mock.calls.length;
 
-    expect(repo.removeJoystick).toHaveBeenCalledWith(42, 2);
+    await act(async () => {
+      fireEvent.change(pads(), { target: { value: "" } });
+    });
+
+    expect(repo.addJoystick).not.toHaveBeenCalled();
+    // …and no re-read either. Without the guard the board would flick the
+    // control disabled and re-fetch the list for a change that was never made.
+    expect(repo.listActive.mock.calls.length).toBe(readsAfterMount);
   });
 
-  test("two steps down removes twice, each time the slot still open", async () => {
-    const three = {
+  test("taking one back names the highest pad in play", async () => {
+    repo.listActive.mockResolvedValue([{
       ...ps,
       joystick_count: 3,
       joysticks: [
         { id: 5, slot: 2, price: 500, started_at: "2026-09-10T14:00:00Z", stopped_at: null },
         { id: 6, slot: 3, price: 500, started_at: "2026-09-10T14:00:00Z", stopped_at: null },
       ],
-    } as ISessionApi;
-    repo.listActive.mockResolvedValue([three]);
-    // After the first removal the server says slot 3 is closed.
-    repo.removeJoystick.mockResolvedValueOnce({
-      ...three,
-      joystick_count: 2,
-      joysticks: [
-        { id: 5, slot: 2, price: 500, started_at: "2026-09-10T14:00:00Z", stopped_at: null },
-        { id: 6, slot: 3, price: 500, started_at: "2026-09-10T14:00:00Z", stopped_at: "2026-09-10T14:30:00Z" },
-      ],
-    } as ISessionApi);
+    } as ISessionApi]);
     await mount();
-    await setPads(1);
+    await takeBack();
 
-    expect(repo.removeJoystick).toHaveBeenNthCalledWith(1, 42, 3);
-    // …the SECOND call must not name slot 3 again — it is closed now.
-    expect(repo.removeJoystick).toHaveBeenNthCalledWith(2, 42, 2);
+    expect(repo.removeJoystick).toHaveBeenCalledTimes(1);
+    expect(repo.removeJoystick).toHaveBeenCalledWith(42, 3);
   });
 
-  test("a closed period is not offered for removal again", async () => {
+  /** Nothing in play, nothing to take back: the control is not there at all. */
+  test("a seat holding only its own pad offers nothing to take back", async () => {
     repo.listActive.mockResolvedValue([
-      {
-        ...ps,
-        joystick_count: 1,
-        joysticks: [{ id: 5, slot: 2, price: 500, started_at: "x", stopped_at: "y" }],
-      } as ISessionApi,
+      { ...ps, joystick_count: 1, joysticks: [] } as ISessionApi,
     ]);
     await mount();
-    await setPads(1);
 
-    expect(repo.removeJoystick).not.toHaveBeenCalled();
-  });
-
-  test("choosing the number it already is does nothing at all", async () => {
-    repo.listActive.mockResolvedValue([ps]);
-    await mount();
-    const readsAfterMount = repo.listActive.mock.calls.length;
-
-    await setPads(2);
-
-    expect(repo.addJoystick).not.toHaveBeenCalled();
-    expect(repo.removeJoystick).not.toHaveBeenCalled();
-    // …and no re-read either. Without the early return the board would still
-    // flick the control disabled and re-fetch the list for a change that was
-    // never made.
-    expect(repo.listActive.mock.calls.length).toBe(readsAfterMount);
+    expect(screen.queryByLabelText("session.padRemove")).toBeNull();
   });
 
   test("is held while a change is in flight", async () => {
@@ -437,29 +506,27 @@ describe("joysticks on the tile", () => {
     repo.addJoystick.mockReturnValueOnce(new Promise((r) => { release = r; }));
     await mount();
 
-    await act(async () => {
-      fireEvent.change(pads(), { target: { value: "3" } });
-    });
+    await pickPad(3);
     expect(pads().disabled).toBe(true);
 
     await act(async () => { release(ps); });
   });
 
   describe("what a change announces", () => {
-    test("an increase is announced green, with the count the server returned", async () => {
+    test("an add is announced green, with the count the server returned", async () => {
       repo.listActive.mockResolvedValue([ps]);
       repo.addJoystick.mockResolvedValue({ ...ps, joystick_count: 3 } as ISessionApi);
       await mount();
-      await setPads(3);
+      await pickPad(3);
 
       expect(toast.message).toHaveBeenCalledWith("success", expect.stringContaining("3 / 4"));
     });
 
-    test("a decrease is announced red", async () => {
+    test("a removal is announced red", async () => {
       repo.listActive.mockResolvedValue([ps]);
       repo.removeJoystick.mockResolvedValue({ ...ps, joystick_count: 1 } as ISessionApi);
       await mount();
-      await setPads(1);
+      await takeBack();
 
       expect(toast.message).toHaveBeenCalledWith("error", expect.stringContaining("1 / 4"));
     });
@@ -468,7 +535,7 @@ describe("joysticks on the tile", () => {
       repo.listActive.mockResolvedValue([ps]);
       repo.addJoystick.mockRejectedValueOnce(new Error("No price is set"));
       await mount();
-      await setPads(3);
+      await pickPad(3);
 
       expect(toast.message).not.toHaveBeenCalled();
     });

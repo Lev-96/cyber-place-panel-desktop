@@ -105,8 +105,8 @@ export class SessionRepository {
    * button that does nothing for no stated reason.
    */
 
-  async addJoystick(sessionId: number): Promise<ISessionApi> {
-    return friendlyMutation(apiAddSessionJoystick(sessionId).then((r) => r.session));
+  async addJoystick(sessionId: number, slot?: number): Promise<ISessionApi> {
+    return friendlyMutation(apiAddSessionJoystick(sessionId, slot).then((r) => r.session));
   }
 
   async removeJoystick(sessionId: number, slot: number): Promise<ISessionApi> {

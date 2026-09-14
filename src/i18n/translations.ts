@@ -1048,6 +1048,17 @@ export const TRANSLATIONS: Dict = {
   "history.itemsTotal": { en: "Items", ru: "Товары", am: "Ապրանքներ" },
   "history.total": { en: "Total", ru: "Итог", am: "Ընդհանուր" },
   /* ── the Prices screen's two new sections ─────────────────────────────── */
+  "session.padChoose": { en: "Choose a joystick", ru: "Выберите джойстик", am: "Ընտրեք ջոյսթիք" },
+  "session.padOption": { en: "Joystick #{0}", ru: "{0}-й джойстик", am: "{0}-րդ ջոյսթիք" },
+  "session.padSharedOption": { en: "Joystick 3/4", ru: "Джойстик 3/4", am: "Ջոյսթիք 3/4" },
+  "session.padFree": { en: "free", ru: "бесплатно", am: "անվճար" },
+  "session.padNoPrice": { en: "no price set", ru: "цена не задана", am: "գինը սահմանված չէ" },
+  "session.padNoneAvailable": {
+    en: "No extra joysticks are offered at this branch",
+    ru: "Нет доступных дополнительных джойстиков",
+    am: "Այս մասնաճյուղում լրացուցիչ ջոյսթիքներ չեն տրամադրվում",
+  },
+  "session.padRemove": { en: "Take the last joystick back", ru: "Снять последний джойстик", am: "Հետ վերցնել վերջին ջոյսթիքը" },
   "joystickPrice.sectionTitle": { en: "Joystick prices", ru: "Цены на джойстики", am: "Ջոյսթիքների գներ" },
   "joystickPrice.hint": {
     en: "One flat fee for every joystick beyond the ones the rate already includes. It goes onto the bill the moment a pad is handed out and stays there when the pad is handed back; how long it was out makes no difference. The first joystick is the session itself, so the allowance is never below one. Below you choose whether extra joysticks are charged, free, or not offered at all.",
@@ -1123,6 +1134,37 @@ export const TRANSLATIONS: Dict = {
     am: "Տեղի բոլոր ջոյսթիքները ներառված են սակագնում, ուստի այստեղից ոչինչ չի գանձվում։",
   },
   "joystickPrice.slot": { en: "Joystick #{0}", ru: "Джойстик №{0}", am: "Ջոյսթիք №{0}" },
+  "joystickPrice.charging": { en: "Charging for extras", ru: "Плата за дополнительные", am: "Վճար լրացուցիչների համար" },
+  "joystickPrice.useFourth": {
+    en: "Will you hand out a fourth joystick?",
+    ru: "Будете ли вы использовать 4-й джойстик?",
+    am: "Կտրամադրե՞ք չորրորդ ջոյսթիքը",
+  },
+  "joystickPrice.yes": { en: "Yes", ru: "Да", am: "Այո" },
+  "joystickPrice.no": { en: "No", ru: "Нет", am: "Ոչ" },
+  "joystickPrice.price3": { en: "Price of the 3rd joystick", ru: "Цена 3-го джойстика", am: "3-րդ ջոյսթիքի գին" },
+  "joystickPrice.price4": { en: "Price of the 4th joystick", ru: "Цена 4-го джойстика", am: "4-րդ ջոյսթիքի գին" },
+  "joystickPrice.priceShared": { en: "Price of the 3rd/4th joystick", ru: "Цена 3/4 джойстика", am: "3/4 ջոյսթիքի գին" },
+  "joystickPrice.setupExplain.only3": {
+    en: "This branch hands out three controllers. A fourth is not offered at all.",
+    ru: "Филиал выдаёт три контроллера. Четвёртый не выдаётся вообще.",
+    am: "Մասնաճյուղը տրամադրում է երեք կարգավորիչ։ Չորրորդը ընդհանրապես չի տրվում։",
+  },
+  "joystickPrice.setupExplain.separate": {
+    en: "The third and the fourth joystick have their own prices.",
+    ru: "3-й и 4-й джойстики имеют собственные цены.",
+    am: "3-րդ և 4-րդ ջոյսթիքներն ունեն իրենց գները։",
+  },
+  "joystickPrice.setupExplain.shared": {
+    en: "One price for an extra controller, whether it is the third or the fourth.",
+    ru: "Одна цена за дополнительный контроллер, будь он 3-м или 4-м.",
+    am: "Մեկ գին լրացուցիչ կարգավորիչի համար՝ լինի այն երրորդը, թե չորրորդը։",
+  },
+  "joystickPrice.fourthNeedsPrice": {
+    en: "Enter the fourth joystick's price, or answer No above.",
+    ru: "Укажите цену 4-го джойстика или ответьте «Нет» выше.",
+    am: "Նշեք 4-րդ ջոյսթիքի գինը կամ վերևում պատասխանեք «Ոչ»։",
+  },
   "joystickPrice.saved": { en: "Joystick prices saved", ru: "Цены на джойстики сохранены", am: "Ջոյսթիքների գները պահպանվեցին" },
   "rounding.sectionTitle": { en: "Rounding the bill", ru: "Округление счёта", am: "Հաշվի կլորացում" },
   "rounding.hint": {

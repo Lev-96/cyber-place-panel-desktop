@@ -1,7 +1,7 @@
 import Button from "@/components/ui/Button";
 import PriceInput from "@/components/ui/PriceInput";
 import Radio from "@/components/ui/Radio";
-import { CHARGED_SLOT_CHOICES, ChargedSlots, chargedSlotsOf, IBillingSettings, includedJoysticks, JoystickPricingMode, PRICING_MODES, pricingModeOf } from "@/api/joystickPrices";
+import { chargedSlotsOf, IBillingSettings, includedJoysticks, JoystickPricingMode, joystickSetupOf, MAX_JOYSTICKS, maxJoystickSlotOf, PRICING_MODES, pricingModeOf } from "@/api/joystickPrices";
 import { useLang } from "@/i18n/LanguageContext";
 import { billingSettingsRepository } from "@/repositories/BillingSettingsRepository";
 import { notify } from "@/ui/notify";
@@ -71,28 +71,81 @@ const MODE_LABEL: Record<ExtraMode, string> = {
  * counted and still logged, at zero. The floor is 1 because the session's own
  * controller is always one of them.
  */
+
+/**
+ * The shapes the screen offers, which are not the shapes the column can hold.
+ *
+ * "3" and "3/4" are the two an owner picks between; the question underneath
+ * turns the first into either "only the third" or "the third and the fourth,
+ * priced apart". "4" is not on the menu — it is the legacy answer "only the
+ * fourth pad is charged", kept selectable ONLY for a branch already on it so
+ * that opening this screen cannot quietly re-price that venue.
+ */
+type Scope = "" | "3" | "3/4" | "4";
+
+/**
+ * `""` is "this venue has not answered", which is what every branch is until
+ * somebody opens this screen, and it must stay expressible: without it the form
+ * would light Save the instant it rendered and an owner who only came to read
+ * the page could save a choice they never made.
+ */
+const scopeChoices = (stored: string | null): Scope[] => {
+  if (stored === null) return ["", "3", "3/4"];
+
+  return stored === "4" ? ["3", "4", "3/4"] : ["3", "3/4"];
+};
+
+const scopeOf = (setup: "only3" | "separate" | "shared", stored: string | null): Scope => {
+  if (stored === null) return "";
+  if (stored === "4") return "4";
+
+  return setup === "shared" ? "3/4" : "3";
+};
+
 const JoystickPricesForm = ({ branchId, settings, onSaved }: Props) => {
   const { t } = useLang();
   const storedPrice = settings.joystick_price ?? null;
+  const storedPrice4 = settings.joystick_price_4 ?? null;
   const storedIncluded = includedJoysticks(settings);
+  const storedMaxSlot = maxJoystickSlotOf(settings);
+  const storedSlots = chargedSlotsOf(settings);
+  const storedMode = pricingModeOf(settings);
+  const storedSetup = joystickSetupOf(settings);
   // A stored 0 belongs to the Free choice and not to the box: a price field
   // showing "0" is the very ambiguity this form exists to remove.
   const stored = storedPrice === null || storedPrice === 0 ? "" : String(storedPrice);
+  const stored4 = storedPrice4 === null ? "" : String(storedPrice4);
 
   const [value, setValue] = useState(stored);
+  const [value4, setValue4] = useState(stored4);
   const [mode, setMode] = useState<ExtraMode>(() => modeOf(storedPrice));
-  const storedSlots = chargedSlotsOf(settings);
-  const [slots, setSlots] = useState<ChargedSlots | "">(storedSlots ?? "");
-  const storedMode = pricingModeOf(settings);
+  const [scope, setScope] = useState<Scope>(() => scopeOf(storedSetup, storedSlots));
+  // The answer to "will you hand out a fourth?", which only the "3" scope asks.
+  const [fourth, setFourth] = useState(storedSetup === "separate");
   const [pricingMode, setPricingMode] = useState<JoystickPricingMode>(storedMode);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+
+  // The three shapes, derived from the two controls rather than stored as a
+  // third piece of state that could disagree with them.
+  const separate = scope === "3" && fourth;
+  const setup = scope !== "3" ? "shared" : fourth ? "separate" : "only3";
+  // What the server is told. A venue on the legacy "only the fourth is
+  // charged" answer keeps it: the screen no longer offers that shape, but
+  // silently rewriting a branch's prices because its answer is not on the menu
+  // any more is not a thing a price screen may do.
+  const outgoingSlots: string | null =
+    scope === "" ? null : scope === "4" ? "4" : scope === "3/4" || fourth ? "3,4" : "3";
+  // An unanswered venue keeps the ceiling it already had: choosing nothing is
+  // not a decision to start or stop offering a fourth pad.
+  const outgoingMaxSlot = scope === "" ? storedMaxSlot : setup === "only3" ? 3 : MAX_JOYSTICKS;
 
   // Numeric compare so a typed "500" matches a stored "500.00" — otherwise
   // Save would light up on every render. An empty box is `undefined` and NOT
   // null: null is a setting the operator picks by name below, and letting the
   // box mean it again is exactly the collision this form removed.
   const typed = value.trim() === "" ? undefined : Number(value);
+  const typed4 = value4.trim() === "" ? undefined : Number(value4);
   /**
    * The one figure the choice resolves to.
    *
@@ -103,29 +156,45 @@ const JoystickPricesForm = ({ branchId, settings, onSaved }: Props) => {
    */
   const outgoing: number | null | undefined =
     mode === "none" ? null : mode === "free" ? 0 : typed;
-  const invalid =
-    outgoing === undefined || (outgoing !== null && (!Number.isFinite(outgoing) || outgoing < 0));
+  /**
+   * The fourth pad's own figure, and `null` in every shape that does not have
+   * one. Null is what puts the venue back on a single shared price, so it is
+   * the correct value for "3/4", for "only the third", and for a venue that
+   * hands its pads out free or not at all.
+   */
+  const outgoing4: number | null | undefined =
+    separate && mode === "paid" ? typed4 : null;
+
+  const badFigure = (n: number | null | undefined): boolean =>
+    n === undefined || (n !== null && (!Number.isFinite(n) || n < 0));
+  const invalid = badFigure(outgoing) || badFigure(outgoing4);
+
   const changed =
-    outgoing !== storedPrice || slots !== (storedSlots ?? "") || pricingMode !== storedMode;
+    outgoing !== storedPrice
+    || outgoing4 !== storedPrice4
+    || outgoingSlots !== storedSlots
+    || outgoingMaxSlot !== storedMaxSlot
+    || pricingMode !== storedMode;
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!changed || busy || invalid || outgoing === undefined) return;
+    if (!changed || busy || invalid || outgoing === undefined || outgoing4 === undefined) return;
     setBusy(true);
     setErr(null);
     try {
       // The whole policy goes back, rounding included: this is a PUT and the
       // server validates it as one object, so sending half of it would blank
       // the other half.
-      await billingSettingsRepository.update(
-        branchId,
-        settings.money_rounding_step,
-        settings.money_rounding_mode,
-        outgoing,
-        storedIncluded,
-        slots === "" ? null : slots,
-        pricingMode,
-      );
+      await billingSettingsRepository.update(branchId, {
+        money_rounding_step: settings.money_rounding_step,
+        money_rounding_mode: settings.money_rounding_mode,
+        joystick_price: outgoing,
+        joystick_included: storedIncluded,
+        joystick_charged_slots: outgoingSlots,
+        joystick_pricing_mode: pricingMode,
+        joystick_price_4: outgoing4,
+        joystick_max_slot: outgoingMaxSlot,
+      });
       notify.message("success", t("joystickPrice.saved"));
       onSaved();
     } catch (e2) {
@@ -139,8 +208,8 @@ const JoystickPricesForm = ({ branchId, settings, onSaved }: Props) => {
     <form className="col" style={{ gap: 12 }} onSubmit={submit}>
       <span className="muted" style={{ fontSize: 12 }}>{t("joystickPrice.hint")}</span>
 
-      {/* HOW a pad is priced. First, because it changes what the price box
-          below means: the same 500 is either a fee owed once or a rate the
+      {/* HOW a pad is priced. First, because it changes what the price boxes
+          below mean: the same 500 is either a fee owed once or a rate the
           hour carries while the pad is out. */}
       <label className="col" style={{ gap: 4, maxWidth: 320 }}>
         <span className="muted" style={{ fontSize: 12 }}>{t("joystickPrice.strategy")}</span>
@@ -159,43 +228,72 @@ const JoystickPricesForm = ({ branchId, settings, onSaved }: Props) => {
         {t(`joystickPrice.strategyExplain.${pricingMode}`)}
       </span>
 
-      {/* WHICH pads are sold, not how many are free. The first two are the
-          kit every seat comes with; this names the ones beyond it that carry
-          the price below. A select, because the answer is one of three. */}
+      {/* WHICH pads this venue hands out. The first two are the kit every seat
+          comes with; this names the ones beyond it. */}
       <label className="col" style={{ gap: 4, maxWidth: 260 }}>
-        <span className="muted" style={{ fontSize: 12 }}>{t("joystickPrice.appliesTo")}</span>
+        <span className="muted" style={{ fontSize: 12 }}>{t("joystickPrice.extra")}</span>
         <select
           className="input"
-          value={slots}
+          value={scope}
           disabled={busy}
-          onChange={(e) => setSlots(e.target.value as ChargedSlots | "")}
+          onChange={(e) => setScope(e.target.value as Scope)}
         >
-          {/* Only shown while nothing has been chosen: once an owner answers,
-              "not chosen" is not an answer they can go back to by accident. */}
-          {storedSlots === null && <option value="">{t("joystickPrice.appliesNotSet")}</option>}
-          {CHARGED_SLOT_CHOICES.map((c) => (
-            <option key={c} value={c}>{t(`joystickPrice.applies.${c}`)}</option>
+          {scopeChoices(storedSlots).map((c) => (
+            <option key={c} value={c}>
+              {c === "" ? t("joystickPrice.appliesNotSet") : t(`joystickPrice.applies.${c === "3/4" ? "3,4" : c}`)}
+            </option>
           ))}
         </select>
       </label>
 
-      {/* What the choice means in a sentence, because "3" on its own does not
-          say whether the fourth pad is free. */}
+      {/* Asked only for "3", because "3/4" has already answered it: one price
+          for an extra pad whichever one it is. */}
+      {scope === "3" && (
+        <div className="col" style={{ gap: 8 }}>
+          <span className="muted" style={{ fontSize: 12 }}>{t("joystickPrice.useFourth")}</span>
+          <div
+            className="row"
+            role="radiogroup"
+            aria-label={t("joystickPrice.useFourth")}
+            style={{ gap: 16, flexWrap: "wrap" }}
+          >
+            <Radio
+              name="cp-joystick-fourth"
+              checked={!fourth}
+              onChange={() => setFourth(false)}
+              disabled={busy}
+              label={t("joystickPrice.no")}
+            />
+            <Radio
+              name="cp-joystick-fourth"
+              checked={fourth}
+              onChange={() => setFourth(true)}
+              disabled={busy}
+              label={t("joystickPrice.yes")}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* What the shape means in a sentence, because "3" on its own does not
+          say whether a fourth pad exists at this venue. */}
       <span className="muted" style={{ fontSize: 12 }}>
-        {slots === ""
+        {scope === ""
           ? t("joystickPrice.appliesFallback").replace("{0}", String(storedIncluded + 1))
-          : t(`joystickPrice.appliesExplain.${slots}`)}
+          : scope === "4"
+            ? t("joystickPrice.appliesExplain.4")
+            : t(`joystickPrice.setupExplain.${setup}`)}
       </span>
 
       <div className="col" style={{ gap: 8 }}>
-        <span className="muted" style={{ fontSize: 12 }}>{t("joystickPrice.extra")}</span>
+        <span className="muted" style={{ fontSize: 12 }}>{t("joystickPrice.charging")}</span>
         {/* The app's own radio and not the native control, which renders
             washed-out against this dark UI. The row wraps because "Not
             offered" is a good deal wider in Armenian than in English. */}
         <div
           className="row"
           role="radiogroup"
-          aria-label={t("joystickPrice.extra")}
+          aria-label={t("joystickPrice.charging")}
           style={{ gap: 16, flexWrap: "wrap" }}
         >
           {MODES.map((m) => (
@@ -212,15 +310,29 @@ const JoystickPricesForm = ({ branchId, settings, onSaved }: Props) => {
       </div>
 
       {/* Only under Charged. Under the other two there is no figure to give,
-          and a box that cannot mean anything is a box that gets filled in. */}
+          and a box that cannot mean anything is a box that gets filled in.
+          One box or two, decided by the shape above — the fourth pad gets its
+          own only when the venue said it prices it apart. */}
       {mode === "paid" && (
-        <div style={{ maxWidth: 220 }}>
-          <PriceInput
-            label={t("joystickPrice.extraPrice")}
-            value={value}
-            onChange={setValue}
-            disabled={busy}
-          />
+        <div className="row" style={{ gap: 12, flexWrap: "wrap" }}>
+          <div style={{ maxWidth: 220 }}>
+            <PriceInput
+              label={t(setup === "shared" ? "joystickPrice.priceShared" : "joystickPrice.price3")}
+              value={value}
+              onChange={setValue}
+              disabled={busy}
+            />
+          </div>
+          {separate && (
+            <div style={{ maxWidth: 220 }}>
+              <PriceInput
+                label={t("joystickPrice.price4")}
+                value={value4}
+                onChange={setValue4}
+                disabled={busy}
+              />
+            </div>
+          )}
         </div>
       )}
 
@@ -228,6 +340,9 @@ const JoystickPricesForm = ({ branchId, settings, onSaved }: Props) => {
           and not by what is in a box. */}
       {mode === "paid" && typed === undefined && (
         <span className="muted" style={{ fontSize: 12 }}>{t("joystickPrice.paidNeedsPrice")}</span>
+      )}
+      {mode === "paid" && separate && typed4 === undefined && (
+        <span className="muted" style={{ fontSize: 12 }}>{t("joystickPrice.fourthNeedsPrice")}</span>
       )}
       {mode === "free" && (
         <span className="muted" style={{ fontSize: 12 }}>{t("joystickPrice.freeNote")}</span>

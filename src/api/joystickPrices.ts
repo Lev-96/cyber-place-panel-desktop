@@ -77,6 +77,25 @@ export interface IBillingSettings {
    */
   joystick_pricing_mode?: JoystickPricingMode;
   /**
+   * The FOURTH pad's own fee, when this venue prices it apart from the third.
+   *
+   * `null` is not "free" and not "missing": it is "the fourth is priced like
+   * the third", which is what every venue did before the two could differ and
+   * what the "3/4" answer on the Prices screen means. A figure here is the
+   * venue saying the two are separate decisions, even when the two figures
+   * happen to be equal today.
+   */
+  joystick_price_4?: number | null;
+  /**
+   * The highest slot this venue hands out at all.
+   *
+   * Different from the allowance above, and the difference is the point:
+   * `joystick_included` says how many pads are FREE, this says how many EXIST.
+   * A venue that hands out three controllers and never a fourth sets this to 3,
+   * and the fourth stops being offered rather than merely being free.
+   */
+  joystick_max_slot?: number;
+  /**
    * The ceiling a seat may hold, as the SERVER states it.
    *
    * `MAX_JOYSTICKS` above is this panel's own copy of the same number and is
@@ -115,28 +134,55 @@ export const chargedSlotsOf = (settings: IBillingSettings): ChargedSlots | null 
   return CHARGED_SLOT_CHOICES.includes(raw as ChargedSlots) ? (raw as ChargedSlots) : null;
 };
 
+/**
+ * The three shapes a venue's extra pads can take, read off the stored pair.
+ *
+ * One function rather than the same two comparisons on three screens: "does
+ * this venue price the fourth pad apart" is a question about the configuration
+ * and it must have exactly one answer, or the Prices form and the session card
+ * will eventually disagree about what the owner chose.
+ */
+export type JoystickSetup = "only3" | "separate" | "shared";
+
+export const maxJoystickSlotOf = (settings: IBillingSettings): number =>
+  settings.joystick_max_slot ?? MAX_JOYSTICKS;
+
+export const joystickSetupOf = (settings: IBillingSettings): JoystickSetup => {
+  if (maxJoystickSlotOf(settings) <= 3) return "only3";
+
+  return settings.joystick_price_4 !== null && settings.joystick_price_4 !== undefined
+    ? "separate"
+    : "shared";
+};
+
+/**
+ * The whole venue policy, as one object rather than a row of positional
+ * arguments.
+ *
+ * It was seven positional parameters and the seventh had just been added. Six
+ * of them are `number | null`, they are all about money, and the compiler
+ * cannot tell one from another — which is the shape a wrong bill ships in.
+ * Named fields make a miswritten call a type error instead of a silent
+ * reordering of somebody's prices.
+ */
+export interface IBillingPolicy {
+  money_rounding_step: number;
+  money_rounding_mode: MoneyRoundingMode;
+  joystick_price: number | null;
+  joystick_included: number;
+  joystick_charged_slots: string | null;
+  joystick_pricing_mode: JoystickPricingMode;
+  joystick_price_4: number | null;
+  joystick_max_slot: number;
+}
+
 export const apiGetBillingSettings = (branchId: number) =>
   request<{ settings: IBillingSettings }>(`/branches/${branchId}/billing-settings`);
 
-export const apiUpdateBillingSettings = (
-  branchId: number,
-  step: number,
-  mode: MoneyRoundingMode,
-  joystickPrice: number | null,
-  joystickIncluded: number,
-  joystickChargedSlots: string | null,
-  joystickPricingMode: JoystickPricingMode,
-) =>
+export const apiUpdateBillingSettings = (branchId: number, policy: IBillingPolicy) =>
   request<{ settings: IBillingSettings }>(`/branches/${branchId}/billing-settings`, {
     method: "PUT",
     // Every field every time: this is a PUT and the server validates the whole
     // policy, so a form that sends only its own half would blank the other's.
-    body: {
-      money_rounding_step: step,
-      money_rounding_mode: mode,
-      joystick_price: joystickPrice,
-      joystick_included: joystickIncluded,
-      joystick_charged_slots: joystickChargedSlots,
-      joystick_pricing_mode: joystickPricingMode,
-    },
+    body: { ...policy },
   });

@@ -94,6 +94,16 @@ const choice = (m: "Paid" | "Free" | "None") =>
 const choose = async (m: "Paid" | "Free" | "None") => {
   await act(async () => { fireEvent.click(choice(m)); });
 };
+/** The "will you hand out a fourth?" answer, by the word an operator reads. */
+const radio = (a: "yes" | "no") =>
+  screen.getByRole("radio", { name: `joystickPrice.${a}` }) as HTMLInputElement;
+const answerFourth = async (a: "yes" | "no") => {
+  await act(async () => { fireEvent.click(radio(a)); });
+};
+/** By position, because the two price boxes are told apart by their order. */
+const typeIn = async (i: number, v: string) => {
+  await act(async () => { fireEvent.change(boxes()[i], { target: { value: v } }); });
+};
 
 describe("JoystickPricesForm", () => {
   beforeEach(() => repo.update.mockReset().mockResolvedValue(settings()));
@@ -104,7 +114,7 @@ describe("JoystickPricesForm", () => {
 
     expect(choice("Paid").checked).toBe(true);
     expect(box().value).toBe("300");
-    expect(screen.getByText("joystickPrice.extraPrice")).toBeTruthy();
+    expect(screen.getByText("joystickPrice.priceShared")).toBeTruthy();
     // The per-slot inputs are gone. Their label was "Joystick #N", which is the
     // string a re-introduction would bring back with it.
     expect(screen.queryByText(/joystickPrice\.slot/)).toBeNull();
@@ -117,7 +127,16 @@ describe("JoystickPricesForm", () => {
 
     // Step and mode go back untouched. This is a PUT of the whole policy, so a
     // form that sent only its own field would clear the venue's rounding.
-    expect(repo.update).toHaveBeenCalledWith(7, 100, "nearest", 500, 1, null, "fixed");
+    expect(repo.update).toHaveBeenCalledWith(7, expect.objectContaining({
+      money_rounding_step: 100,
+      money_rounding_mode: "nearest",
+      joystick_price: 500,
+      joystick_included: 1,
+      joystick_charged_slots: null,
+      joystick_pricing_mode: "fixed",
+      joystick_price_4: null,
+      joystick_max_slot: 4,
+    }));
   });
 
   // ── the three choices, and the two that used to share one box ─────────
@@ -134,7 +153,16 @@ describe("JoystickPricesForm", () => {
     await act(async () => { fireEvent.click(save()); });
     // 0, never null. A free pad is still handed out, still counted and still a
     // line on the bill; null is the venue not offering pads at all.
-    expect(repo.update).toHaveBeenCalledWith(7, 100, "nearest", 0, 1, null, "fixed");
+    expect(repo.update).toHaveBeenCalledWith(7, expect.objectContaining({
+      money_rounding_step: 100,
+      money_rounding_mode: "nearest",
+      joystick_price: 0,
+      joystick_included: 1,
+      joystick_charged_slots: null,
+      joystick_pricing_mode: "fixed",
+      joystick_price_4: null,
+      joystick_max_slot: 4,
+    }));
   });
 
   test("Not offered withdraws the offer rather than pricing it at zero", async () => {
@@ -147,7 +175,16 @@ describe("JoystickPricesForm", () => {
     await act(async () => { fireEvent.click(save()); });
     // Null, not 0. Zero is a real and different setting — hand pads out for
     // nothing — and the server refuses the add only on null.
-    expect(repo.update).toHaveBeenCalledWith(7, 100, "nearest", null, 1, null, "fixed");
+    expect(repo.update).toHaveBeenCalledWith(7, expect.objectContaining({
+      money_rounding_step: 100,
+      money_rounding_mode: "nearest",
+      joystick_price: null,
+      joystick_included: 1,
+      joystick_charged_slots: null,
+      joystick_pricing_mode: "fixed",
+      joystick_price_4: null,
+      joystick_max_slot: 4,
+    }));
   });
 
   test("a venue on a zero fee opens on Free, not on an empty price box", async () => {
@@ -188,7 +225,16 @@ describe("JoystickPricesForm", () => {
     // whether it is remembered.
     expect(box().value).toBe("500");
     await act(async () => { fireEvent.click(save()); });
-    expect(repo.update).toHaveBeenCalledWith(7, 100, "nearest", 500, 1, null, "fixed");
+    expect(repo.update).toHaveBeenCalledWith(7, expect.objectContaining({
+      money_rounding_step: 100,
+      money_rounding_mode: "nearest",
+      joystick_price: 500,
+      joystick_included: 1,
+      joystick_charged_slots: null,
+      joystick_pricing_mode: "fixed",
+      joystick_price_4: null,
+      joystick_max_slot: 4,
+    }));
   });
 
   test("Save stays down until something actually changes", async () => {
@@ -239,17 +285,174 @@ describe("JoystickPricesForm", () => {
   test("the choice goes back with the fee, and offers exactly three answers", async () => {
     await mount();
 
-    // Nothing chosen in the fixture, so the placeholder is there too.
+    // Nothing chosen in the fixture, so the placeholder is there too. The
+    // legacy "only the fourth is charged" answer is NOT offered to a venue
+    // that never picked it: the screen now asks "3" or "3/4", and the fourth
+    // pad's own price is the question underneath.
     expect(allowance().value).toBe("");
     expect([...allowance().querySelectorAll("option")].map((o) => o.value))
-      .toEqual(["", "3", "4", "3,4"]);
+      .toEqual(["", "3", "3/4"]);
 
-    await chooseSlots("3,4");
+    await chooseSlots("3/4");
     await act(async () => { fireEvent.click(save()); });
 
     // The venue's figures travel together: the server validates the policy as
     // one object, and a half-sent policy is how the other half gets reset.
-    expect(repo.update).toHaveBeenCalledWith(7, 100, "nearest", 300, 1, "3,4", "fixed");
+    expect(repo.update).toHaveBeenCalledWith(7, expect.objectContaining({
+      money_rounding_step: 100,
+      money_rounding_mode: "nearest",
+      joystick_price: 300,
+      joystick_included: 1,
+      joystick_charged_slots: "3,4",
+      joystick_pricing_mode: "fixed",
+      joystick_price_4: null,
+      joystick_max_slot: 4,
+    }));
+  });
+
+  // ── the three shapes a venue's extra pads can take ───────────────────
+
+  /**
+   * "3" and No: this venue hands out three controllers and there is no fourth.
+   *
+   * The distinction the whole section exists for. "The fourth is free" and
+   * "there is no fourth here" used to be the same stored row, so a floor with
+   * three pads per seat had a fourth entry its staff could pick and a fourth
+   * line its players could be charged.
+   */
+  test("three and No offers one box and takes the fourth pad off the menu", async () => {
+    await mount();
+    await chooseSlots("3");
+    await answerFourth("no");
+
+    expect(boxes().length).toBe(1);
+    expect(screen.getByText("joystickPrice.price3")).toBeTruthy();
+    expect(screen.queryByText("joystickPrice.price4")).toBeNull();
+    expect(screen.getByText("joystickPrice.setupExplain.only3")).toBeTruthy();
+
+    await act(async () => { fireEvent.click(save()); });
+    expect(repo.update).toHaveBeenCalledWith(7, expect.objectContaining({
+      joystick_charged_slots: "3",
+      joystick_max_slot: 3,
+      joystick_price_4: null,
+    }));
+  });
+
+  /** "3" and Yes: two pads, two prices, and they are two decisions. */
+  test("three and Yes offers a second box and sends the fourth pads own price", async () => {
+    await mount();
+    await chooseSlots("3");
+    await answerFourth("yes");
+
+    expect(boxes().length).toBe(2);
+    expect(screen.getByText("joystickPrice.price3")).toBeTruthy();
+    expect(screen.getByText("joystickPrice.price4")).toBeTruthy();
+
+    await typeIn(0, "500");
+    await typeIn(1, "700");
+    await act(async () => { fireEvent.click(save()); });
+
+    expect(repo.update).toHaveBeenCalledWith(7, expect.objectContaining({
+      joystick_price: 500,
+      joystick_price_4: 700,
+      joystick_charged_slots: "3,4",
+      joystick_max_slot: 4,
+    }));
+  });
+
+  /** "3/4": one figure for an extra pad, whichever one it is. */
+  test("three over four asks no question and sends one shared figure", async () => {
+    await mount();
+    await chooseSlots("3/4");
+
+    // The question belongs to "3" alone: "3/4" has already answered it.
+    expect(screen.queryByText("joystickPrice.useFourth")).toBeNull();
+    expect(boxes().length).toBe(1);
+    expect(screen.getByText("joystickPrice.priceShared")).toBeTruthy();
+
+    await typeIn(0, "500");
+    await act(async () => { fireEvent.click(save()); });
+
+    expect(repo.update).toHaveBeenCalledWith(7, expect.objectContaining({
+      joystick_price: 500,
+      joystick_price_4: null,
+      joystick_charged_slots: "3,4",
+      joystick_max_slot: 4,
+    }));
+  });
+
+  /** Yes with nothing typed is not an answer, and must not be guessed at. */
+  test("Yes with an empty fourth box holds Save down", async () => {
+    await mount();
+    await chooseSlots("3");
+    await answerFourth("yes");
+    await typeIn(0, "500");
+
+    expect(boxes()[1].value).toBe("");
+    expect(save().disabled).toBe(true);
+    expect(screen.getByText("joystickPrice.fourthNeedsPrice")).toBeTruthy();
+
+    await typeIn(1, "700");
+    expect(save().disabled).toBe(false);
+  });
+
+  /** Each stored shape opens on itself, or the owner cannot read their own rule. */
+  test("a venue that prices the fourth apart opens on three and Yes", async () => {
+    await mount(settings({ joystick_charged_slots: "3,4", joystick_price_4: 700, joystick_max_slot: 4 }));
+
+    expect(allowance().value).toBe("3");
+    expect(radio("yes").checked).toBe(true);
+    expect(boxes().length).toBe(2);
+    expect(boxes()[1].value).toBe("700");
+  });
+
+  test("a venue that hands out three pads opens on three and No", async () => {
+    await mount(settings({ joystick_charged_slots: "3", joystick_max_slot: 3 }));
+
+    expect(allowance().value).toBe("3");
+    expect(radio("no").checked).toBe(true);
+    expect(boxes().length).toBe(1);
+  });
+
+  test("a venue on one shared figure opens on three over four", async () => {
+    await mount(settings({ joystick_charged_slots: "3,4", joystick_max_slot: 4 }));
+
+    expect(allowance().value).toBe("3/4");
+    expect(screen.queryByText("joystickPrice.useFourth")).toBeNull();
+  });
+
+  /**
+   * Going back to a shared figure has to CLEAR the fourth pad's own price.
+   *
+   * Leaving it stored would keep the venue on two prices while the screen says
+   * one, which is the state an owner cannot see and cannot undo.
+   */
+  test("moving from two prices to one sends the fourth price back as null", async () => {
+    await mount(settings({ joystick_charged_slots: "3,4", joystick_price_4: 700, joystick_max_slot: 4 }));
+    await chooseSlots("3/4");
+    await act(async () => { fireEvent.click(save()); });
+
+    expect(repo.update).toHaveBeenCalledWith(7, expect.objectContaining({
+      joystick_price_4: null,
+      joystick_charged_slots: "3,4",
+      joystick_max_slot: 4,
+    }));
+  });
+
+  /** Free and Not offered have no figure to give, under any shape. */
+  test("the fourth box is gone under Free, and no fourth price is sent", async () => {
+    await mount();
+    await chooseSlots("3");
+    await answerFourth("yes");
+    await choose("Free");
+
+    expect(boxes().length).toBe(0);
+
+    await act(async () => { fireEvent.click(save()); });
+    expect(repo.update).toHaveBeenCalledWith(7, expect.objectContaining({
+      joystick_price: 0,
+      joystick_price_4: null,
+    }));
   });
 
   test("the first two joysticks are never an option", async () => {
@@ -260,18 +463,26 @@ describe("JoystickPricesForm", () => {
     expect(values).not.toContain("2");
   });
 
-  test("a venue that has chosen opens on its choice, with no empty option left", async () => {
+  /**
+   * A venue already on the legacy answer keeps it, and keeps it SELECTABLE.
+   *
+   * "Only the fourth pad is charged" is not a shape this screen offers any
+   * more. Dropping it from the menu for a branch that is on it would re-price
+   * that venue the first time somebody opened the page to read it, which is
+   * not a thing a price screen may do.
+   */
+  test("a venue on the legacy answer keeps it, and loses the empty option", async () => {
     await mount(settings({ joystick_charged_slots: "4" }));
 
     expect(allowance().value).toBe("4");
-    expect([...allowance().querySelectorAll("option")].map((o) => o.value)).toEqual(["3", "4", "3,4"]);
+    expect([...allowance().querySelectorAll("option")].map((o) => o.value)).toEqual(["3", "4", "3/4"]);
   });
 
   test("changing only the choice is enough to enable Save", async () => {
     await mount();
 
     expect(save().disabled).toBe(true);
-    await chooseSlots("4");
+    await chooseSlots("3/4");
     expect(save().disabled).toBe(false);
   });
 
@@ -283,7 +494,16 @@ describe("JoystickPricesForm", () => {
     await chooseSlots("3");
     await act(async () => { fireEvent.click(save()); });
 
-    expect(repo.update).toHaveBeenCalledWith(7, 100, "nearest", 300, 3, "3", "fixed");
+    expect(repo.update).toHaveBeenCalledWith(7, expect.objectContaining({
+      money_rounding_step: 100,
+      money_rounding_mode: "nearest",
+      joystick_price: 300,
+      joystick_included: 3,
+      joystick_charged_slots: "3",
+      joystick_pricing_mode: "fixed",
+      joystick_price_4: null,
+      joystick_max_slot: 3,
+    }));
   });
 
   test("a venue can name the sold pads and still hand them out for nothing", async () => {
@@ -292,11 +512,20 @@ describe("JoystickPricesForm", () => {
     // have to survive the same save, or the VIP room loses its rule.
     await mount(settings({ joystick_price: null }));
 
-    await chooseSlots("3,4");
+    await chooseSlots("3/4");
     await act(async () => { fireEvent.click(screen.getByText("joystickPrice.extraFree")); });
     await act(async () => { fireEvent.click(save()); });
 
-    expect(repo.update).toHaveBeenCalledWith(7, 100, "nearest", 0, 1, "3,4", "fixed");
+    expect(repo.update).toHaveBeenCalledWith(7, expect.objectContaining({
+      money_rounding_step: 100,
+      money_rounding_mode: "nearest",
+      joystick_price: 0,
+      joystick_included: 1,
+      joystick_charged_slots: "3,4",
+      joystick_pricing_mode: "fixed",
+      joystick_price_4: null,
+      joystick_max_slot: 4,
+    }));
   });
 
   // ── how a pad is priced ───────────────────────────────────────────────
@@ -316,7 +545,16 @@ describe("JoystickPricesForm", () => {
     await chooseStrategy("hourly");
     await act(async () => { fireEvent.click(save()); });
 
-    expect(repo.update).toHaveBeenCalledWith(7, 100, "nearest", 300, 1, null, "hourly");
+    expect(repo.update).toHaveBeenCalledWith(7, expect.objectContaining({
+      money_rounding_step: 100,
+      money_rounding_mode: "nearest",
+      joystick_price: 300,
+      joystick_included: 1,
+      joystick_charged_slots: null,
+      joystick_pricing_mode: "hourly",
+      joystick_price_4: null,
+      joystick_max_slot: 4,
+    }));
   });
 
   test("a venue already on the hourly model opens on it", async () => {

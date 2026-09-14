@@ -1,9 +1,11 @@
 import {
   apiGetBillingSettings,
   apiUpdateBillingSettings,
+  IBillingPolicy,
   IBillingSettings,
   JoystickPricingMode,
   MoneyRoundingMode,
+  MAX_JOYSTICKS,
 } from "@/api/joystickPrices";
 import { friendlyMutation, orFallback } from "@/api/fallback";
 
@@ -33,6 +35,11 @@ export class BillingSettingsRepository {
       joystick_included: 1,
       joystick_charged_slots: null,
       joystick_pricing_mode: "fixed" as JoystickPricingMode,
+      // No separate figure for the fourth pad and no ceiling below four is
+      // exactly what a backend from before these fields does, so it is what a
+      // panel talking to one has to show.
+      joystick_price_4: null,
+      joystick_max_slot: MAX_JOYSTICKS,
     });
   }
 
@@ -43,18 +50,9 @@ export class BillingSettingsRepository {
    * only its own half would blank the other's — the rounding form and the
    * joystick form each pass the values they did not change straight through.
    */
-  async update(
-    branchId: number,
-    step: number,
-    mode: MoneyRoundingMode,
-    joystickPrice: number | null,
-    joystickIncluded: number,
-    joystickChargedSlots: string | null,
-    joystickPricingMode: JoystickPricingMode,
-  ): Promise<IBillingSettings> {
+  async update(branchId: number, policy: IBillingPolicy): Promise<IBillingSettings> {
     return friendlyMutation(
-      apiUpdateBillingSettings(branchId, step, mode, joystickPrice, joystickIncluded, joystickChargedSlots, joystickPricingMode)
-        .then((r) => r.settings),
+      apiUpdateBillingSettings(branchId, policy).then((r) => r.settings),
     );
   }
 }

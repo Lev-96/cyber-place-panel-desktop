@@ -1,5 +1,5 @@
 import Button from "@/components/ui/Button";
-import { chargedSlotsOf, IBillingSettings, includedJoysticks, MoneyRoundingMode, pricingModeOf } from "@/api/joystickPrices";
+import { chargedSlotsOf, IBillingSettings, includedJoysticks, maxJoystickSlotOf, MoneyRoundingMode, pricingModeOf } from "@/api/joystickPrices";
 import { useLang } from "@/i18n/LanguageContext";
 import { billingSettingsRepository } from "@/repositories/BillingSettingsRepository";
 import { notify } from "@/ui/notify";
@@ -61,18 +61,21 @@ const MoneyRoundingForm = ({ branchId, settings, onSaved }: Props) => {
     setBusy(true);
     setErr(null);
     try {
-      // The joystick half goes back untouched, BOTH figures of it: this is a
-      // PUT of the whole policy, and sending only the rounding part would
-      // clear the fee and reset the allowance.
-      await billingSettingsRepository.update(
-        branchId,
-        step,
-        mode,
-        settings.joystick_price,
-        includedJoysticks(settings),
-        chargedSlotsOf(settings),
-        pricingModeOf(settings),
-      );
+      // The joystick half goes back untouched, EVERY figure of it: this is a
+      // PUT of the whole policy, and sending only the rounding part would clear
+      // the fee, reset the allowance and put the fourth pad back on a shared
+      // price. Spread from the stored settings so a field added to the policy
+      // tomorrow is carried here without this form having to learn about it.
+      await billingSettingsRepository.update(branchId, {
+        money_rounding_step: step,
+        money_rounding_mode: mode,
+        joystick_price: settings.joystick_price,
+        joystick_included: includedJoysticks(settings),
+        joystick_charged_slots: chargedSlotsOf(settings),
+        joystick_pricing_mode: pricingModeOf(settings),
+        joystick_price_4: settings.joystick_price_4 ?? null,
+        joystick_max_slot: maxJoystickSlotOf(settings),
+      });
       notify.message("success", t("rounding.saved"));
       onSaved();
     } catch (e2) {
