@@ -72,7 +72,10 @@ vi.mock("@/repositories/BillingSettingsRepository", () => ({
 vi.mock("@/auth/AuthContext", () => ({ useAuth: () => ({ user: { id: 1, role: "manager" } }) }));
 vi.mock("@/i18n/LanguageContext", () => ({
   useLang: () => ({
-    t: (k: string) => k,
+    // Echoes the key, EXCEPT for the one string that carries a placeholder:
+    // the pad line interpolates the slot numbers into it, and a mock that
+    // returned the bare key would swallow exactly the part under test.
+    t: (k: string) => (k === "session.joystickSlot" ? "Joystick #{0}" : k),
     // HONOURS the precision options it is handed. It used to drop them, which
     // made every figure look identical to this suite whether the component
     // asked for cents or not — so a pad line rounding to whole units under a
@@ -493,6 +496,57 @@ describe("joysticks on the tile", () => {
     expect(screen.queryByText("3 / 4")).toBeNull();
   });
 
+  /**
+   * A seat that is not a PlayStation says nothing about pads at all.
+   *
+   * The regression this pins was found by driving the real panel: a poker table
+   * announced "2 joysticks" it does not have, because the tile inferred "has
+   * pads" from a count above one — a heuristic that was true of every seat the
+   * moment a fresh PlayStation started counting its base kit of two.
+   */
+  test("a seat that is not a PlayStation shows no pad count at all", async () => {
+    repo.listActive.mockResolvedValue([{
+      ...ps,
+      supports_joysticks: false,
+      supports_chips: true,
+      joystick_count: 2,
+      joysticks: [],
+      joystick_rule: undefined,
+    } as unknown as ISessionApi]);
+    await mount();
+
+    expect(screen.queryByLabelText("session.joysticks")).toBeNull();
+    const padLine = [...document.querySelectorAll("span[title]")]
+      .find((el) => (el.getAttribute("title") ?? "").startsWith("session.joysticks"));
+    expect(padLine).toBeUndefined();
+  });
+
+  /**
+   * …and a WAIVED seat that is not a PlayStation still says it is waived while
+   * saying nothing about pads.
+   *
+   * The two facts share a row, so one gate cannot serve both: the free marker
+   * belongs to every seat and the pad count belongs to PlayStations. Written as
+   * its own case because it is the only one that can tell the two gates apart.
+   */
+  test("a waived poker table shows it is free and still no pad count", async () => {
+    repo.listActive.mockResolvedValue([{
+      ...ps,
+      supports_joysticks: false,
+      supports_chips: true,
+      is_free: true,
+      joystick_count: 2,
+      joysticks: [],
+      joystick_rule: undefined,
+    } as unknown as ISessionApi]);
+    await mount();
+
+    const padLine = [...document.querySelectorAll("span[title]")]
+      .find((el) => (el.getAttribute("title") ?? "").startsWith("session.joysticks"));
+    expect(padLine).toBeUndefined();
+    expect(screen.queryByLabelText("session.joysticks")).toBeNull();
+  });
+
   test("is absent on a seat that has none", async () => {
     repo.listActive.mockResolvedValue([
       { ...running, supports_joysticks: false, joystick_count: 1, joysticks: [] } as ISessionApi,
@@ -660,7 +714,7 @@ describe("joysticks on the tile", () => {
     await mount();
 
     const padLine = [...document.querySelectorAll("span")]
-      .find((el) => (el.textContent ?? "").startsWith("session.joysticksCost"));
+      .find((el) => (el.textContent ?? "").startsWith("Joystick #"));
     // 50/h for 80 seconds is about 1.11, and the line has to say so rather
     // than rounding it to a whole unit.
     expect(padLine?.textContent).toMatch(/1\.1/);
@@ -680,7 +734,11 @@ describe("joysticks on the tile", () => {
       repo.listActive.mockResolvedValue([priced(2)]);
       await mount();
 
-      expect(screen.getByText(/2 × .*300.* = .*600/)).toBeTruthy();
+      // Named, not multiplied: "Joystick #2, 3 · 300 = 600". A count times a
+      // unit price is correct arithmetic that reads as nonsense beside numbers
+      // which are slot identities.
+      expect(screen.getByText(/Joystick #2, 3 · .*300.* = .*600/)).toBeTruthy();
+      expect(screen.queryByText(/2 × /)).toBeNull();
     });
 
     test("a pad handed back is still counted and still charged", async () => {
@@ -697,7 +755,7 @@ describe("joysticks on the tile", () => {
       // One pad on the bill, no extras in play: the seat is back to the two it
       // came with, and the charge still stands beside them.
       expect(screen.getByText("2")).toBeTruthy();
-      expect(screen.getByText(/1 × .*300.* = .*300/)).toBeTruthy();
+      expect(screen.getByText(/Joystick #3 · .*300.* = .*300/)).toBeTruthy();
     });
 
     test("a seat with no pads says nothing about them", async () => {
@@ -825,9 +883,12 @@ describe("joysticks on the tile", () => {
     // The line is built from several JSX expressions, so it lands as several
     // text nodes and `getByText` cannot see it whole. The question is what the
     // cashier reads, which is the element's own text content.
+    // The pad line names the controllers it is about, so that is what finds
+    // it: the label it used to carry ("joystick cost") is gone, because
+    // "Joystick #3 · 500/h = 1.53" says the same thing in the same space.
     const padLine = [...document.querySelectorAll("span")].find((el) =>
-      (el.textContent ?? "").startsWith("session.joysticksCost"));
-    expect(padLine?.textContent).toContain("1 \u00d7 500session.perHourShort");
+      (el.textContent ?? "").startsWith("Joystick #"));
+    expect(padLine?.textContent).toContain("Joystick #3 · 500session.perHourShort");
   });
 
   // A session CAN hold both: the venue switched strategy while the seat ran,
@@ -849,8 +910,11 @@ describe("joysticks on the tile", () => {
     } as unknown as ISessionApi]);
     await mount();
 
+    // The pad line names the controllers it is about, so that is what finds
+    // it: the label it used to carry ("joystick cost") is gone, because
+    // "Joystick #3 · 500/h = 1.53" says the same thing in the same space.
     const padLine = [...document.querySelectorAll("span")].find((el) =>
-      (el.textContent ?? "").startsWith("session.joysticksCost"));
+      (el.textContent ?? "").startsWith("Joystick #"));
     expect(padLine?.textContent).not.toContain("500session.perHourShort");
     // The hourly pad still moves the seat's rate, so that line stays.
     expect(screen.getByText(/session\.currentRate/)).toBeTruthy();

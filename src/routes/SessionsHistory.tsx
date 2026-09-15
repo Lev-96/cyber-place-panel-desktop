@@ -309,10 +309,15 @@ const SessionRow = ({ session }: { session: ISessionApi }) => {
                 session can still be read a month later without guessing which
                 strategy priced it. "2 × 500 = 1000" and "2 × 500/h = 250" are
                 different facts and used to print identically. */}
+            {/* Named, not multiplied. "2 × 500" is a count times a unit price
+                and reads as nonsense beside numbers that are slot identities;
+                "Joystick #3, 4 · 500/h = 250" is the same money, said about
+                the controllers it was actually for. */}
+            {t("session.joystickSlot").replace("{0}", padCharge.slots.join(", "))}
             {padCharge.each !== null
-              ? `${padCharge.count} × ${money(padCharge.each)}${padCharge.hourly ? t("session.perHourShort") : ""}`
+              ? ` · ${money(padCharge.each)}${padCharge.hourly ? t("session.perHourShort") : ""}`
                 + ` = ${money(padCharge.total, preciseWhenSmall(padCharge.total))}`
-              : `${padCharge.count} · ${money(padCharge.total, preciseWhenSmall(padCharge.total))}`}
+              : ` · ${money(padCharge.total, preciseWhenSmall(padCharge.total))}`}
           </span>
         </div>
       )}
@@ -529,6 +534,8 @@ export const eventSeat = (e: ISessionEvent): string | null => {
  */
 /** What a finished session's charged pads cost, and how that figure is quoted. */
 export interface IPadCharge {
+  /** WHICH pads, by number, deduped and in order. A slot is an identity. */
+  slots: number[];
   count: number;
   /** The unit figure, only when every charged period agrees on one. */
   each: number | null;
@@ -558,6 +565,9 @@ export const padChargeOf = (session: ISessionApi): IPadCharge | null => {
   const uniform = charged.every((j) => Number(j.price ?? 0) === first);
 
   return {
+    // The same slot handed out twice is one identity and two periods, so the
+    // list is deduped and the count is kept beside it rather than derived.
+    slots: [...new Set(charged.map((j) => Number(j.slot)))].sort((a, b) => a - b),
     count: charged.length,
     each: uniform ? first : null,
     total: sessionJoysticksTotal(session),

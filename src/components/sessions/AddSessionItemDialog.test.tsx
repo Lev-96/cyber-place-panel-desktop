@@ -304,3 +304,57 @@ describe("taking a line off the bill", () => {
     expect(onAdded).not.toHaveBeenCalled();
   });
 });
+
+
+describe("chips belong to a poker table", () => {
+  const withChips = [
+    ...products,
+    { id: 20, branch_id: 1, name: "Chips 100", category: "chips", price: 100, is_active: true },
+  ];
+
+  beforeEach(() => {
+    repo.listProducts.mockReset();
+    repo.listProducts.mockResolvedValue(withChips);
+  });
+
+  /**
+   * The catalogue is one list per branch, so a venue that sells chips offers
+   * them to every screen that reads it. This is where a PlayStation stops
+   * seeing them.
+   */
+  test("a seat that is not a poker table is not offered chips", async () => {
+    await mount({ session: { ...session, supports_chips: false } as unknown as ISessionApi });
+
+    expect(screen.getByText("Lays")).toBeTruthy();
+    expect(screen.queryByText("Chips 100")).toBeNull();
+  });
+
+  test("a poker table is", async () => {
+    await mount({ session: { ...session, supports_chips: true } as unknown as ISessionApi });
+
+    expect(screen.getByText("Chips 100")).toBeTruthy();
+    // …and it still sells everything else, because a poker table has a bar too.
+    expect(screen.getByText("Lays")).toBeTruthy();
+  });
+
+  /**
+   * A payload from a backend that predates the field reads as "not a poker
+   * table", which is the safe direction: a missing answer must not offer an
+   * operation the server would refuse.
+   */
+  test("a seat that does not say is not offered chips", async () => {
+    await mount({ session: { ...session } as unknown as ISessionApi });
+
+    expect(screen.queryByText("Chips 100")).toBeNull();
+  });
+
+  /** Searching cannot reach past the rule. */
+  test("chips stay hidden even when searched for by name", async () => {
+    await mount({ session: { ...session, supports_chips: false } as unknown as ISessionApi });
+
+    const search = screen.getByRole("textbox");
+    await act(async () => { fireEvent.change(search, { target: { value: "chips" } }); });
+
+    expect(screen.queryByText("Chips 100")).toBeNull();
+  });
+});

@@ -12,7 +12,7 @@ import { productRepository } from "@/repositories/ProductRepository";
 import { sessionRepository } from "@/repositories/SessionRepository";
 import { notify } from "@/ui/notify";
 import { ISessionApi } from "@/types/sessions";
-import { IProduct } from "@/types/pos";
+import { IProduct, isChipsProduct } from "@/types/pos";
 import { useEffect, useMemo, useState } from "react";
 
 interface Props {
@@ -208,12 +208,25 @@ const AddSessionItemDialog = ({ branchId, session, onClose, onAdded }: Props) =>
     }
   };
 
+  /**
+   * Chips are a poker table's product, and only a poker table's.
+   *
+   * The catalogue is one list per branch, so a venue that sells chips sells
+   * them to every screen that reads it. This is where a PlayStation stops
+   * seeing them — and the server refuses the sale on the same answer, so the
+   * two cannot disagree about what a seat may be charged for.
+   *
+   * `supports_chips` is the server's own, from the seat's place. Absent on an
+   * older payload, which reads as "not a poker table": the safe direction.
+   */
+  const sellsChips = session.supports_chips === true;
+
   const filtered = useMemo(() => {
     const needle = search.trim().toLowerCase();
-    const all = products ?? [];
-    if (!needle) return all;
-    return all.filter((p) => `${p.name} ${p.category ?? ""}`.toLowerCase().includes(needle));
-  }, [products, search]);
+    const sellable = (products ?? []).filter((p) => sellsChips || !isChipsProduct(p));
+    if (!needle) return sellable;
+    return sellable.filter((p) => `${p.name} ${p.category ?? ""}`.toLowerCase().includes(needle));
+  }, [products, search, sellsChips]);
 
   const cartTotal = cart.reduce((sum, l) => sum + l.price * l.qty, 0);
   const onBill = bill;

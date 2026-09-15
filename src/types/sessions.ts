@@ -250,6 +250,14 @@ export interface ISessionApi {
    * that list is stale, and it goes wrong by silently hiding the controls.
    */
   supports_joysticks?: boolean | null;
+  /**
+   * Whether CHIPS mean anything on this seat — a poker table and nothing else.
+   *
+   * From the server, which refuses the sale on the same answer. Absent or null
+   * on a payload that did not load the place, and the control is then not
+   * drawn: a missing field must not offer an operation the seat cannot take.
+   */
+  supports_chips?: boolean | null;
   /** The seat's platform slug, so a refusal can name it rather than just say no. */
   place_platform?: string | null;
 }

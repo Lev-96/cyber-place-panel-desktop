@@ -522,7 +522,9 @@ const SessionsBoard = ({ branchId }: Props) => {
     // can differ: the fee is frozen when a pad goes out, so a seat that
     // straddles a re-pricing holds two. "3 × ?" would be a lie; the sum is
     // always true, so the line falls back to it.
-    const padCharge = ((): { count: number; each: number | null; total: number; hourly: boolean } | null => {
+    const padCharge = ((): {
+      slots: number[]; count: number; each: number | null; total: number; hourly: boolean;
+    } | null => {
       if (sess === undefined || sess.is_free) return null;
       const charged = (sess.joysticks ?? []).filter((j) => j.is_charged);
       if (charged.length === 0) return null;
@@ -533,7 +535,19 @@ const SessionsBoard = ({ branchId }: Props) => {
       // rows are possible on one session (the venue switched models while it
       // ran), and they read as hourly only when every charged row is.
       const hourly = charged.every((j) => j.is_hourly === true);
-      return { count: charged.length, each: uniform ? first : null, total: sessionJoysticksTotal(sess), hourly };
+      // WHICH pads, by their number. A slot is an identity — "the third
+      // controller" — and the line names it instead of multiplying by a count,
+      // because "3 × 500" reads as three joysticks to everyone who has not
+      // read this code. The same slot handed out twice is one identity and two
+      // periods, so the list is deduped and the count is kept separately.
+      const slots = [...new Set(charged.map((j) => j.slot))].sort((a, b) => a - b);
+      return {
+        slots,
+        count: charged.length,
+        each: uniform ? first : null,
+        total: sessionJoysticksTotal(sess),
+        hourly,
+      };
     })();
 
     // What the seat costs an hour right now. Only shown under the hourly
@@ -710,7 +724,7 @@ const SessionsBoard = ({ branchId }: Props) => {
                 here, or two cashiers would read different numbers off the same
                 seat. The pads render only for a PlayStation, where the concept
                 exists; a computer showing "🎮 1" would be noise. */}
-            {(joystickCount > 1 || supportsJoysticks || sess.is_free) && (
+            {(supportsJoysticks || sess.is_free) && (
               <span className="row" style={{ gap: 6, fontSize: 12, flexWrap: "wrap" }}>
                 {/* Pads are a PlayStation thing, and the seat says so itself:
                     `supports_joysticks` is the backend's answer — the place's
@@ -752,7 +766,14 @@ const SessionsBoard = ({ branchId }: Props) => {
                       That is the same number the options dialog shows for the
                       same seat, and two screens disagreeing about one seat is
                       worse than either wording. */}
-                  {(supportsJoysticks || joystickCount > 1) && (
+                  {/* Only where controllers are a thing.
+                      It used to read `supportsJoysticks || joystickCount > 1`,
+                      and the second half was a heuristic for "this seat has
+                      extras out" back when a fresh seat counted 1. The base kit
+                      made it 2, so the fraction appeared on every seat — a
+                      poker table announcing two joysticks it does not have.
+                      The server's own answer is the only one that decides. */}
+                  {supportsJoysticks && (
                     <span
                       className="row"
                       style={{
@@ -890,13 +911,18 @@ const SessionsBoard = ({ branchId }: Props) => {
                 )}
                 {padCharge !== null && (
                   <span className="muted" style={{ fontSize: 11, flexBasis: "100%" }}>
-                    {t("session.joysticksCost")}:{" "}
+                    {/* The pads BY NUMBER, then what they have earned.
+                        It read "2 × 500 = 1000", which multiplies a count by a
+                        unit price — correct arithmetic that reads as nonsense
+                        the moment the numbers beside it are slot identities.
+                        "Joystick 3, 4 · 500/h = 1000" says the same money and
+                        names which controllers it is for. */}
+                    {t("session.joystickSlot").replace("{0}", padCharge.slots.join(", "))}
+                    {" · "}
                     {padCharge.each !== null && (
                       padCharge.hourly
-                        // A rate, so it reads "2 × 500/h" and the total beside
-                        // it is what those pads have earned so far.
-                        ? `${padCharge.count} × ${money(padCharge.each, preciseWhenSmall(padCharge.each))}${t("session.perHourShort")} = `
-                        : `${padCharge.count} × ${money(padCharge.each, preciseWhenSmall(padCharge.each))} = `
+                        ? `${money(padCharge.each, preciseWhenSmall(padCharge.each))}${t("session.perHourShort")} = `
+                        : `${money(padCharge.each, preciseWhenSmall(padCharge.each))} = `
                     )}
                     {/* The same precision rule as the running total above it.
                         Under the hourly strategy a pad's earnings are normally

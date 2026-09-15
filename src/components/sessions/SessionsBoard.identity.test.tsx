@@ -188,6 +188,11 @@ describe("SessionsBoard — what a tile says the seat is", () => {
         id: 5, branch_id: 7, pc_id: 1, pc_label: "Seat 1",
         started_at: "2026-09-03T14:00:00.000Z", ends_at: "2026-09-03T15:00:00.000Z",
         status: "active", total_paid: 0, mode: "fixed", joystick_count: 3,
+        // The SEAT says pads apply to it. The tile used to infer that from the
+        // count being above one, which stopped meaning anything once a fresh
+        // PlayStation started counting its base kit of two — and put a pad
+        // fraction on poker tables and computers alike.
+        supports_joysticks: true,
       },
     ]);
     await mount();

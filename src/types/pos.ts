@@ -8,6 +8,19 @@ import { Translated } from "@/i18n/translated";
  * must go through `tr(product, "name", lang)` — reading `.name` directly shows
  * every user the author's language.
  */
+/**
+ * The catalogue category that makes a product POKER CHIPS.
+ *
+ * Mirrors `App\Models\Pos\Product::CATEGORY_CHIPS`. Chips are billed exactly
+ * like every other line on a session — a name, a price and a quantity — and
+ * what makes them different is only WHERE they may be sold.
+ */
+export const CHIPS_CATEGORY = "chips";
+
+/** Is this catalogue entry poker chips? Matched on meaning, not on spelling. */
+export const isChipsProduct = (product: { category?: string | null }): boolean =>
+  (product.category ?? "").trim().toLowerCase() === CHIPS_CATEGORY;
+
 export interface IProduct extends Translated {
   id: number;
   branch_id: number;

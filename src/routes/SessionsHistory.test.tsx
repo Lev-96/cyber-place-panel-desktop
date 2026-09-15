@@ -479,6 +479,23 @@ describe("what a finished session's pads cost", () => {
    * facts: "2 × 500 = 1000" is what a fee model took, "2 × 500/h = 250" is what
    * an hourly one did. A month later nobody can tell them apart from the figure.
    */
+  /**
+   * A slot is an identity, so the charge names it rather than multiplying by
+   * a count. The same slot used twice is one identity and two periods.
+   */
+  test("names the pads by number, deduped and in order", () => {
+    const charge = padChargeOf(session({
+      joysticks: [
+        pad({ id: 1, slot: 4 }),
+        pad({ id: 2, slot: 3 }),
+        pad({ id: 3, slot: 3 }),
+      ],
+    } as Partial<ISessionApi>));
+
+    expect(charge?.slots).toEqual([3, 4]);
+    expect(charge?.count).toBe(3);
+  });
+
   test("an hourly session says its unit figure is a rate", () => {
     const charge = padChargeOf(session({ joysticks: [pad({ is_hourly: true })] } as Partial<ISessionApi>));
 
