@@ -1,3 +1,4 @@
+import { sessionJoysticksTotal } from "@/components/sessions/sessionAmount";
 import { ISessionApi } from "@/types/sessions";
 import { useMemo } from "react";
 
@@ -74,6 +75,10 @@ export const aggregateSessionsSummary = (sessions: ISessionApi[]): SessionsSumma
   for (const s of sessions) {
     const sTotal = num(s.total_paid);
     let sItems = 0;
+    // Pads are not clock. Leaving them in showed a venue that sells joysticks
+    // a "time" figure inflated by its pad revenue, on the same screen as the
+    // pad figure itself.
+    const sPads = s.is_free === true ? 0 : sessionJoysticksTotal(s);
     let sQty = 0;
     for (const it of s.items ?? []) {
       const line = num(it.price) * num(it.qty);
@@ -98,7 +103,7 @@ export const aggregateSessionsSummary = (sessions: ISessionApi[]): SessionsSumma
         // Clamped as well as gated: an older backend that does not send
         // `is_free` would otherwise reach this line with total_paid 0 and a
         // bill full of items, and subtract a giveaway from the day's takings.
-        timeTotal += Math.max(0, sTotal - sItems);
+        timeTotal += Math.max(0, sTotal - sItems - sPads);
       }
     } else {
       active++;

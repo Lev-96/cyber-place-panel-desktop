@@ -6,7 +6,7 @@ import Modal from "@/components/ui/Modal";
 import Spinner from "@/components/ui/Spinner";
 import { IBillBreakdown } from "@/api/sessions";
 import { useLang } from "@/i18n/LanguageContext";
-import { preciseWhenSmall } from "@/i18n/currency";
+import { sharedPrecision } from "@/i18n/currency";
 import { sessionRepository } from "@/repositories/SessionRepository";
 import { ISessionApi } from "@/types/sessions";
 import { useEffect, useState } from "react";
@@ -105,6 +105,18 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved }: Prop
 
   const view = stopped ?? bill;
 
+  // ONE precision decision for the whole receipt, taken from every figure on
+  // it. Deciding per figure printed "4.72", "500" and "505" on the same bill:
+  // the first is under the per-figure threshold and the other two are over it,
+  // so the column stopped adding up. A receipt is read as a column.
+  const receiptPrecision = view === null ? undefined : sharedPrecision([
+    Number(view.time_cost),
+    Number(view.total),
+    ...(view.joysticks ?? []).map((j) => Number(j.amount)),
+    ...view.items.map((it) => Number(it.line_total)),
+  ]);
+
+
   /**
    * How the money is being taken.
    *
@@ -163,14 +175,14 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved }: Prop
                 <>
                   {view.mode === "open" && view.hourly_rate != null && (
                     <span className="muted" style={{ marginRight: 12, fontSize: 12 }}>
-                      {money(Number(view.hourly_rate))}/{t("time.hourShort") || "h"}
+                      {money(Number(view.hourly_rate), receiptPrecision)}/{t("time.hourShort") || "h"}
                     </span>
                   )}
                   {/* Arithmetic, not a typed price: a short session at twelve an
                       hour is a third of a unit, and "0" reads as "nothing was
                       charged". */}
                   <span style={{ fontWeight: 700 }}>
-                    {money(Number(view.time_cost), preciseWhenSmall(Number(view.time_cost)))}
+                    {money(Number(view.time_cost), receiptPrecision)}
                   </span>
                 </>
               )}
@@ -196,7 +208,16 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved }: Prop
                   {j.minutes} {t("time.minShort") || "m"}
                   {!j.is_charged && ` · ${t("session.joystickReturned")}`}
                 </span>
-                <span style={{ fontWeight: 700 }}>{money(Number(j.amount))}</span>
+                {/* The same precision rule as the total below, deliberately.
+                    This line used to round to whole units while the time cost
+                    and the total printed cents, so a receipt read "21.94 + 1 =
+                    23.05" — three figures that do not add up, on the one screen
+                    a cashier checks with their eyes. Under the hourly strategy
+                    a pad's share of a short session is normally a fraction, so
+                    it was not an edge case; it was every receipt. */}
+                <span style={{ fontWeight: 700 }}>
+                  {money(Number(j.amount), receiptPrecision)}
+                </span>
               </div>
             ))}
 
@@ -205,9 +226,11 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved }: Prop
               <div key={it.id} style={row}>
                 <span style={{ flex: 1 }}>{it.name}{it.qty > 1 ? ` × ${it.qty}` : ""}</span>
                 <span className="muted" style={{ marginRight: 12, fontSize: 12 }}>
-                  {money(Number(it.price))}{it.qty > 1 ? ` × ${it.qty}` : ""}
+                  {money(Number(it.price), receiptPrecision)}{it.qty > 1 ? ` × ${it.qty}` : ""}
                 </span>
-                <span style={{ fontWeight: 700, marginRight: 8 }}>{money(Number(it.line_total))}</span>
+                <span style={{ fontWeight: 700, marginRight: 8 }}>
+                  {money(Number(it.line_total), receiptPrecision)}
+                </span>
                 {!finished && (
                   <button type="button" onClick={() => remove(it.id)} disabled={busy} style={removeBtn} title={t("session.removeItemTitle")}>
                     ×
@@ -228,7 +251,7 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved }: Prop
               <span style={{ fontWeight: 800, fontSize: 18, color: "#07ddf1" }}>
                 {view.is_free
                   ? t("session.freeBill")
-                  : money(Number(view.total), preciseWhenSmall(Number(view.total)))}
+                  : money(Number(view.total), receiptPrecision)}
               </span>
             </div>
           </div>

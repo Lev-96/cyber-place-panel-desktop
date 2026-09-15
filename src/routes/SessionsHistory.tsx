@@ -1,3 +1,4 @@
+import { preciseWhenSmall } from "@/i18n/currency";
 import ScreenWithBg from "@/components/ui/ScreenWithBg";
 import { ListSkeleton } from "@/components/ui/Skeleton";
 import { useAsync } from "@/hooks/useAsync";
@@ -206,19 +207,19 @@ const SessionRow = ({ session }: { session: ISessionApi }) => {
    * seat and when nothing was charged, because a fee printed under "Free
    * session" is two numbers telling one truth.
    */
-  const padCharge = ((): { count: number; each: number | null; total: number } | null => {
-    if (session.is_free) return null;
-    const charged = (session.joysticks ?? []).filter((j) => j.is_charged);
-    if (charged.length === 0) return null;
-    const first = num(charged[0].price);
-    const uniform = charged.every((j) => num(j.price) === first);
-    return { count: charged.length, each: uniform ? first : null, total: sessionJoysticksTotal(session) };
-  })();
+  const padCharge = padChargeOf(session);
 
   const paymentLabel = paymentLabelOf(session, t);
 
   const total = num(session.total_paid);
-  const timeCost = Math.max(0, total - itemsTotal);
+  // What the CLOCK earned: the bill less everything that is not the clock.
+  //
+  // Joysticks used to be left in, so a seat that sold two pads at 500 showed
+  // 1000 of them as "time" and the line disagreed with the pad line printed
+  // directly beneath it. Subtracted from the same figure the pad line quotes,
+  // so the two cannot drift.
+  const padTotal = padCharge?.total ?? 0;
+  const timeCost = Math.max(0, total - itemsTotal - padTotal);
   const isClosed = session.status === "stopped" || session.status === "expired";
   const statusLabel = t(`history.status.${session.status}`) || session.status;
   const modeLabel = session.mode === "open" ? t("history.modeOpen") : t("history.modeFixed");
@@ -304,9 +305,14 @@ const SessionRow = ({ session }: { session: ISessionApi }) => {
         <div className="row-between" style={{ fontSize: 12 }}>
           <span className="muted">{t("history.joystickCharged")}</span>
           <span className="muted">
+            {/* The unit figure is suffixed when it is a RATE, so a finished
+                session can still be read a month later without guessing which
+                strategy priced it. "2 × 500 = 1000" and "2 × 500/h = 250" are
+                different facts and used to print identically. */}
             {padCharge.each !== null
-              ? `${padCharge.count} × ${money(padCharge.each)} = ${money(padCharge.total)}`
-              : `${padCharge.count} · ${money(padCharge.total)}`}
+              ? `${padCharge.count} × ${money(padCharge.each)}${padCharge.hourly ? t("session.perHourShort") : ""}`
+                + ` = ${money(padCharge.total, preciseWhenSmall(padCharge.total))}`
+              : `${padCharge.count} · ${money(padCharge.total, preciseWhenSmall(padCharge.total))}`}
           </span>
         </div>
       )}
@@ -521,6 +527,44 @@ export const eventSeat = (e: ISessionEvent): string | null => {
  * silence. A method of `other` with nothing typed cannot be created (the
  * server refuses it) and is folded into the same null for the same reason.
  */
+/** What a finished session's charged pads cost, and how that figure is quoted. */
+export interface IPadCharge {
+  count: number;
+  /** The unit figure, only when every charged period agrees on one. */
+  each: number | null;
+  total: number;
+  /** True when that unit figure is a RATE per hour rather than a one-off fee. */
+  hourly: boolean;
+}
+
+/**
+ * The pad line of a finished session.
+ *
+ * `hourly` is read from the ROWS and never from the branch as it stands today:
+ * a session that ran under the fee model is still a fee-model session after the
+ * owner switches the venue, and a history that re-read the branch would re-label
+ * a bill that was already taken. Mixed rows read as the fee model, because the
+ * unit price the line quotes is only a rate when every charged period is one.
+ *
+ * Null on a waived seat and when nothing was charged: a fee printed under "Free
+ * session" is two numbers telling one truth.
+ */
+export const padChargeOf = (session: ISessionApi): IPadCharge | null => {
+  if (session.is_free) return null;
+  const charged = (session.joysticks ?? []).filter((j) => j.is_charged);
+  if (charged.length === 0) return null;
+
+  const first = Number(charged[0].price ?? 0);
+  const uniform = charged.every((j) => Number(j.price ?? 0) === first);
+
+  return {
+    count: charged.length,
+    each: uniform ? first : null,
+    total: sessionJoysticksTotal(session),
+    hourly: charged.every((j) => j.is_hourly === true),
+  };
+};
+
 export const paymentLabelOf = (
   session: Pick<ISessionApi, "payment_method" | "payment_method_other">,
   t: (k: string) => string,
@@ -661,10 +705,18 @@ export const eventDetail = (
     case "joystick_added": {
       const after = metaNum(meta, "count_after");
       const price = metaNum(meta, "price");
+      // WHICH strategy priced this pad, written on the event by the server.
+      // Without it the line printed a per-hour RATE as a plain sum: "Price for
+      // one: 500 AMD" on a pad that put about nothing on the bill at that
+      // instant and would earn 500 only after a full hour.
+      const hourly = meta !== null && (meta as Record<string, unknown>).hourly === true;
       // The count is the seat's TOTAL after the add, which is how the floor
       // counts pads: a PlayStation with one extra is "2 joysticks".
       if (after !== null) parts.push(`${t("history.padsNow")}: ${after}`);
-      if (price !== null) parts.push(`${t("history.padUnitPrice")}: ${money(price)}`);
+      if (price !== null) {
+        parts.push(`${t("history.padUnitPrice")}: ${money(price)}`
+          + (hourly ? t("session.perHourShort") : ""));
+      }
       break;
     }
 

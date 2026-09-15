@@ -73,15 +73,21 @@ export interface ISessionItem {
 /**
  * One pad period on a bill.
  *
- * `amount` is `price` or zero and never anything between: the server owes the
- * whole fee once the period reaches its threshold and nothing before that.
- * `is_charged` says which of the two happened, so a line worth 0 can explain
- * itself instead of reading as a bug.
+ * `is_hourly` says what `price` MEANS, and therefore what `amount` is:
+ *
+ *  - fee strategy: `price` is a one-off charge, and `amount` is that whole fee
+ *    or zero and never anything between. `is_charged` says which of the two
+ *    happened, so a line worth 0 can explain itself instead of reading as a bug.
+ *  - hourly strategy: `price` is a rate per hour, and `amount` is this period's
+ *    own share of it. A fraction is the normal case, not an edge one.
+ *
+ * `amount` is the server's figure under both. Nothing on this side multiplies
+ * or divides a `price`.
  */
 export interface IJoystickCharge {
   id: number;
   slot: number;
-  /** The flat fee for this use. Never divided, never multiplied. */
+  /** A fee or a rate per hour. `is_hourly` below says which. */
   price: number;
   started_at: string;
   stopped_at: string | null;
@@ -90,6 +96,8 @@ export interface IJoystickCharge {
   seconds: number;
   amount: number;
   is_charged: boolean;
+  /** Which strategy priced this period, frozen on the row when it opened. */
+  is_hourly?: boolean;
 }
 
 export interface IBillBreakdown {

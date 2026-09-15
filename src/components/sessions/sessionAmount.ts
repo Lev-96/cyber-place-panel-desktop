@@ -213,9 +213,47 @@ export const sessionCurrentHourlyRate = (session: ISessionApi): number => {
 export const sessionAmountAt = (session: ISessionApi, at: number): number =>
   session.is_free
     ? 0
-    : round2(
-      sessionTimeCostAt(session, at) + sessionJoysticksTotalAt(session, at) + sessionItemsTotal(session),
+    : applyRounding(
+      round2(
+        sessionTimeCostAt(session, at) + sessionJoysticksTotalAt(session, at) + sessionItemsTotal(session),
+      ),
+      session.rounding_step ?? 0,
+      session.rounding_mode ?? "up",
     );
+
+/**
+ * The venue's rounding policy, applied ONCE to a composed subtotal.
+ *
+ * Mirrors `Money::applyRounding`, including the detail that decides real
+ * money: a remainder of exactly half a step goes UP, which is the venue's
+ * favour and what every cash register in the country already does.
+ *
+ * A step of 0 is "no policy" and returns the amount untouched — the default
+ * every branch starts on, and the reason this cannot move an existing venue's
+ * figures by itself.
+ *
+ * Here because the tile was the only screen that did NOT round: the receipt
+ * rounds and the card did not, so on a venue rounding to 100 the two disagreed
+ * by up to a step, constantly, on every seat.
+ */
+export const applyRounding = (
+  amount: number,
+  step: number,
+  mode: "up" | "nearest" | "down",
+): number => {
+  if (step <= 0 || amount === 0) return round2(amount);
+
+  const floorUnits = Math.floor(round2(amount) / step);
+  const floor = round2(floorUnits * step);
+  const remainder = round2(round2(amount) - floor);
+
+  if (remainder === 0) return floor;
+
+  if (mode === "down") return floor;
+  if (mode === "up") return round2(floor + step);
+
+  return remainder * 2 >= step ? round2(floor + step) : floor;
+};
 
 /**
  * Whole seconds from an ISO instant to a moment, never negative.

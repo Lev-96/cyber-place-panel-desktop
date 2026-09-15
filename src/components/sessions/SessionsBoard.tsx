@@ -1,3 +1,4 @@
+import { preciseWhenSmall } from "@/i18n/currency";
 import { useAuth } from "@/auth/AuthContext";
 import { tr } from "@/i18n/translated";
 import { can } from "@/auth/permissions";
@@ -875,14 +876,15 @@ const SessionsBoard = ({ branchId }: Props) => {
                     cashier had no way to see it was there — which is the
                     question a player asks when the figure jumps by 300.
 
-                    A count and a flat fee, never a rate: it does not move with
-                    the clock and re-renders every second without changing.
-                    Both figures come from the server's own rows — the count of
-                    CHARGED periods, which is not the count of pads in play,
-                    because a pad handed back keeps its fee. */}
+                    Under the FEE strategy it is a count and a flat fee that
+                    does not move with the clock. Under the HOURLY one it is a
+                    count, a rate, and a figure that ticks — and the line says
+                    which by suffixing the rate. Both come from the server's own
+                    rows: the count of CHARGED periods, which is not the count
+                    of pads in play, because a pad handed back keeps its fee. */}
                 {currentRate !== null && (
                   <span className="muted" style={{ fontSize: 11, flexBasis: "100%" }}>
-                    {t("session.currentRate")}: {money(currentRate)}
+                    {t("session.currentRate")}: {money(currentRate, preciseWhenSmall(currentRate))}
                     {t("session.perHourShort")}
                   </span>
                 )}
@@ -893,10 +895,15 @@ const SessionsBoard = ({ branchId }: Props) => {
                       padCharge.hourly
                         // A rate, so it reads "2 × 500/h" and the total beside
                         // it is what those pads have earned so far.
-                        ? `${padCharge.count} × ${money(padCharge.each)}${t("session.perHourShort")} = `
-                        : `${padCharge.count} × ${money(padCharge.each)} = `
+                        ? `${padCharge.count} × ${money(padCharge.each, preciseWhenSmall(padCharge.each))}${t("session.perHourShort")} = `
+                        : `${padCharge.count} × ${money(padCharge.each, preciseWhenSmall(padCharge.each))} = `
                     )}
-                    {money(padCharge.total)}
+                    {/* The same precision rule as the running total above it.
+                        Under the hourly strategy a pad's earnings are normally
+                        a fraction, and rounding this line to whole units while
+                        the total beside it prints cents is how a tile shows two
+                        figures that do not add up. */}
+                    {money(padCharge.total, preciseWhenSmall(padCharge.total))}
                   </span>
                 )}
                 {padError?.id === sess.id && (

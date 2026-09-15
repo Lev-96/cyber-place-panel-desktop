@@ -200,3 +200,73 @@ describe("a waived bill", () => {
     expect(summary.total).toBe(10_000);
   });
 });
+
+describe("what counts as clock, and what does not", () => {
+  /**
+   * The joystick revenue used to land in `timeTotal`.
+   *
+   * `timeTotal` was `total_paid − items`, so a seat that sold two pads showed
+   * their money as time. The summary and the pad line beneath it then quoted
+   * the same drams twice, under two different names, on one screen.
+   */
+  it("keeps pad revenue out of the time figure", () => {
+    const s = summarize([
+      make({
+        id: 1,
+        status: "stopped",
+        total_paid: 2000,
+        items: [{ id: 1, name: "Cola", price: 500, qty: 1, product_id: null }],
+        joysticks: [
+          { id: 1, slot: 3, price: 500, is_charged: true, is_hourly: false,
+            started_at: "2026-05-01T10:00:00.000Z", stopped_at: "2026-05-01T10:30:00.000Z" },
+        ],
+      } as Partial<ISessionApi>),
+    ]);
+
+    // 2000 taken, 500 of it drinks, 500 of it a pad: 1000 was the clock.
+    expect(s.total).toBe(2000);
+    expect(s.itemsTotal).toBe(500);
+    expect(s.timeTotal).toBe(1000);
+    // The figure it used to report, which double-counted the pad.
+    expect(s.timeTotal).not.toBe(1500);
+  });
+
+  /** An hourly pad counts for what it earned, not for its rate. */
+  it("counts an hourly pad at its earnings", () => {
+    const s = summarize([
+      make({
+        id: 1,
+        status: "stopped",
+        total_paid: 1250,
+        joysticks: [
+          { id: 1, slot: 3, price: 500, is_charged: true, is_hourly: true,
+            started_at: "2026-05-01T10:00:00.000Z", stopped_at: "2026-05-01T10:30:00.000Z" },
+        ],
+      } as Partial<ISessionApi>),
+    ]);
+
+    // Half an hour at 500/h is 250, so the clock earned 1000.
+    expect(s.timeTotal).toBe(1000);
+    // Not 750, which is what subtracting the whole RATE would give.
+    expect(s.timeTotal).not.toBe(750);
+  });
+
+  /** A waived seat contributes nothing to either figure. */
+  it("a giveaway is not clock and not pads", () => {
+    const s = summarize([
+      make({
+        id: 1,
+        status: "stopped",
+        is_free: true,
+        total_paid: 0,
+        joysticks: [
+          { id: 1, slot: 3, price: 500, is_charged: true, is_hourly: false,
+            started_at: "2026-05-01T10:00:00.000Z", stopped_at: "2026-05-01T10:30:00.000Z" },
+        ],
+      } as Partial<ISessionApi>),
+    ]);
+
+    expect(s.timeTotal).toBe(0);
+    expect(s.total).toBe(0);
+  });
+});

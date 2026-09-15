@@ -71,7 +71,17 @@ vi.mock("@/repositories/BillingSettingsRepository", () => ({
 }));
 vi.mock("@/auth/AuthContext", () => ({ useAuth: () => ({ user: { id: 1, role: "manager" } }) }));
 vi.mock("@/i18n/LanguageContext", () => ({
-  useLang: () => ({ t: (k: string) => k, money: (n: number) => String(n), lang: "en" }),
+  useLang: () => ({
+    t: (k: string) => k,
+    // HONOURS the precision options it is handed. It used to drop them, which
+    // made every figure look identical to this suite whether the component
+    // asked for cents or not — so a pad line rounding to whole units under a
+    // total that printed cents was invisible here. A mock that discards the
+    // argument under test proves nothing about it.
+    money: (n: number, opts?: { maximumFractionDigits?: number }) =>
+      opts?.maximumFractionDigits === 2 ? String(Number(n.toFixed(2))) : String(Math.round(n)),
+    lang: "en",
+  }),
 }));
 
 const device: IPcApi = {
@@ -629,6 +639,32 @@ describe("joysticks on the tile", () => {
     });
   });
 
+
+  /**
+   * The tile has ONE rounding rule, the same as the total ticking above it.
+   *
+   * Under the hourly strategy a pad's earnings are a fraction as a matter of
+   * course, and the pad line used to round to whole units while the running
+   * total printed cents — two figures on one 160px card that do not add up.
+   */
+  test("a fractional pad total prints cents, like the total above it", async () => {
+    repo.listActive.mockResolvedValue([{
+      ...ps,
+      hourly_rate: 1000,
+      joystick_count: 3,
+      joysticks: [{
+        id: 2, slot: 3, price: 50, is_charged: true, is_hourly: true,
+        started_at: new Date(Date.now() - 80_000).toISOString(), stopped_at: null,
+      }],
+    } as unknown as ISessionApi]);
+    await mount();
+
+    const padLine = [...document.querySelectorAll("span")]
+      .find((el) => (el.textContent ?? "").startsWith("session.joysticksCost"));
+    // 50/h for 80 seconds is about 1.11, and the line has to say so rather
+    // than rounding it to a whole unit.
+    expect(padLine?.textContent).toMatch(/1\.1/);
+  });
 
   describe("the pad charge on the tile", () => {
     const priced = (n: number, price = 300, chargedAll = true) => ({

@@ -207,6 +207,12 @@ export interface ISessionApi {
    * it needs, and the card then falls back to what it can draw safely.
    */
   joystick_rule?: IJoystickRule;
+  /**
+   * The venue's rounding policy, so a ticking figure can land where the
+   * receipt does. 0 is "no policy", which is what every branch starts on.
+   */
+  rounding_step?: number;
+  rounding_mode?: "up" | "nearest" | "down";
   /** Every period, closed ones included. Present when the relation is loaded. */
   joysticks?: ISessionJoystick[];
   /** Who opened it — the owner's "which of my managers ran this?". */

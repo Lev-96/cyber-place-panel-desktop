@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
-import { eventDetail, eventSeat, paymentLabelOf, segmentsOf } from "./SessionsHistory";
+import { eventDetail, eventSeat, padChargeOf, paymentLabelOf, segmentsOf } from "./SessionsHistory";
 import type { ISessionEvent } from "@/api/sessions";
+import type { ISessionApi } from "@/types/sessions";
 
 /**
  * What a line in the session's audit log actually SAYS.
@@ -146,6 +147,43 @@ describe("the tariff going unlimited", () => {
 });
 
 describe("joysticks", () => {
+  /**
+   * A pad priced by the HOUR says so on its own log line.
+   *
+   * Without the marker the feed printed "Price for one: 500 AMD" on a pad that
+   * put about nothing on the bill at that instant and would reach 500 only
+   * after a full hour. The rate and the fee are different facts and used to
+   * print identically.
+   */
+  test("an hourly add marks its figure as a rate", () => {
+    const line = eventDetail(
+      event({
+        action: "joystick_added",
+        amount: 500,
+        meta: { slot: 3, price: 500, count_before: 2, count_after: 3, hourly: true },
+      }),
+      t,
+      money,
+    );
+
+    expect(line).toContain("history.padUnitPrice: 500 AMDsession.perHourShort");
+  });
+
+  test("a fee add does not", () => {
+    const line = eventDetail(
+      event({
+        action: "joystick_added",
+        amount: 500,
+        meta: { slot: 3, price: 500, count_before: 2, count_after: 3, hourly: false },
+      }),
+      t,
+      money,
+    );
+
+    expect(line).toContain("history.padUnitPrice: 500 AMD");
+    expect(line).not.toContain("session.perHourShort");
+  });
+
   test("an add says how many there are now and what one costs", () => {
     const line = eventDetail(
       event({
@@ -414,5 +452,85 @@ describe("rows written before any of this existed", () => {
     );
 
     expect(line).toBe("№4 -> №6");
+  });
+});
+
+
+describe("what a finished session's pads cost", () => {
+  const session = (over: Partial<ISessionApi> = {}): ISessionApi => ({
+    id: 7, branch_id: 1, pc_id: 1, status: "stopped", mode: "open",
+    started_at: "2026-09-01T10:00:00.000Z",
+    stopped_at: "2026-09-01T11:00:00.000Z",
+    total_paid: 1500, is_free: false,
+    ...over,
+  } as ISessionApi);
+
+  // Dates in the PAST deliberately. The figure clamps an open-ended period to
+  // "now", so a fixture dated in the future measures a negative interval and
+  // every hourly assertion quietly reads zero.
+  const pad = (over: Record<string, unknown> = {}) => ({
+    id: 1, slot: 3, price: 500, is_charged: true,
+    started_at: "2026-09-01T10:00:00.000Z", stopped_at: "2026-09-01T11:00:00.000Z",
+    ...over,
+  });
+
+  /**
+   * A rate and a fee print identically without this, and they are different
+   * facts: "2 × 500 = 1000" is what a fee model took, "2 × 500/h = 250" is what
+   * an hourly one did. A month later nobody can tell them apart from the figure.
+   */
+  test("an hourly session says its unit figure is a rate", () => {
+    const charge = padChargeOf(session({ joysticks: [pad({ is_hourly: true })] } as Partial<ISessionApi>));
+
+    expect(charge?.hourly).toBe(true);
+    expect(charge?.each).toBe(500);
+    // One hour at 500/h: the interval's share, not the whole rate.
+    expect(charge?.total).toBeCloseTo(500, 2);
+  });
+
+  test("a fee session does not", () => {
+    const charge = padChargeOf(session({ joysticks: [pad({ is_hourly: false })] } as Partial<ISessionApi>));
+
+    expect(charge?.hourly).toBe(false);
+    expect(charge?.total).toBeCloseTo(500, 2);
+  });
+
+  /**
+   * A payload from a backend that predates the flag must not be labelled a
+   * rate. Absent is not "hourly": it is "this backend does not say", and the
+   * fee model is what such a backend actually ran.
+   */
+  test("a period that does not say is not called a rate", () => {
+    const charge = padChargeOf(session({ joysticks: [pad()] } as Partial<ISessionApi>));
+
+    expect(charge?.hourly).toBe(false);
+  });
+
+  /** One rate and one fee on the same seat is not a rate. */
+  test("mixed periods read as a fee, because the unit figure is not a rate for all of them", () => {
+    const charge = padChargeOf(session({
+      joysticks: [pad({ is_hourly: true }), pad({ id: 2, slot: 4, is_hourly: false })],
+    } as Partial<ISessionApi>));
+
+    expect(charge?.hourly).toBe(false);
+    expect(charge?.count).toBe(2);
+  });
+
+  test("a waived seat quotes no pad figure at all", () => {
+    expect(padChargeOf(session({ is_free: true, joysticks: [pad()] } as Partial<ISessionApi>))).toBeNull();
+  });
+
+  test("a seat that was charged for nothing quotes none either", () => {
+    expect(padChargeOf(session({ joysticks: [pad({ is_charged: false })] } as Partial<ISessionApi>))).toBeNull();
+  });
+
+  /** Two periods frozen at different fees have no single unit figure to quote. */
+  test("periods that disagree on a price quote the sum alone", () => {
+    const charge = padChargeOf(session({
+      joysticks: [pad(), pad({ id: 2, slot: 4, price: 700 })],
+    } as Partial<ISessionApi>));
+
+    expect(charge?.each).toBeNull();
+    expect(charge?.total).toBeCloseTo(1200, 2);
   });
 });
