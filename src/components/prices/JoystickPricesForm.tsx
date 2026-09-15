@@ -1,7 +1,7 @@
 import Button from "@/components/ui/Button";
 import PriceInput from "@/components/ui/PriceInput";
 import Radio from "@/components/ui/Radio";
-import { chargedSlotsOf, IBillingSettings, includedJoysticks, JoystickPricingMode, joystickSetupOf, MAX_JOYSTICKS, maxJoystickSlotOf, PRICING_MODES, pricingModeOf } from "@/api/joystickPrices";
+import { IBillingSettings, JoystickPricingMode, JoystickStrategyMode, MAX_JOYSTICKS, PRICING_MODES, STRATEGY_MODES, chargedSlotsOf, includedJoysticks, joystickSetupOf, maxJoystickSlotOf, pricingModeOf, strategyModeOf } from "@/api/joystickPrices";
 import { useLang } from "@/i18n/LanguageContext";
 import { billingSettingsRepository } from "@/repositories/BillingSettingsRepository";
 import { notify } from "@/ui/notify";
@@ -110,6 +110,7 @@ const JoystickPricesForm = ({ branchId, settings, onSaved }: Props) => {
   const storedMaxSlot = maxJoystickSlotOf(settings);
   const storedSlots = chargedSlotsOf(settings);
   const storedMode = pricingModeOf(settings);
+  const storedClubMode = strategyModeOf(settings);
   const storedSetup = joystickSetupOf(settings);
   // A stored 0 belongs to the Free choice and not to the box: a price field
   // showing "0" is the very ambiguity this form exists to remove.
@@ -123,6 +124,10 @@ const JoystickPricesForm = ({ branchId, settings, onSaved }: Props) => {
   // The answer to "will you hand out a fourth?", which only the "3" scope asks.
   const [fourth, setFourth] = useState(storedSetup === "separate");
   const [pricingMode, setPricingMode] = useState<JoystickPricingMode>(storedMode);
+  // WHICH strategies this club allows. A separate question from the venue's own
+  // answer above: one club runs everything on the hourly model, another lets
+  // the cashier decide seat by seat.
+  const [clubMode, setClubMode] = useState<JoystickStrategyMode>(storedClubMode);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -174,7 +179,8 @@ const JoystickPricesForm = ({ branchId, settings, onSaved }: Props) => {
     || outgoing4 !== storedPrice4
     || outgoingSlots !== storedSlots
     || outgoingMaxSlot !== storedMaxSlot
-    || pricingMode !== storedMode;
+    || pricingMode !== storedMode
+    || clubMode !== storedClubMode;
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -194,6 +200,7 @@ const JoystickPricesForm = ({ branchId, settings, onSaved }: Props) => {
         joystick_pricing_mode: pricingMode,
         joystick_price_4: outgoing4,
         joystick_max_slot: outgoingMaxSlot,
+        joystick_strategy_mode: clubMode,
       });
       notify.message("success", t("joystickPrice.saved"));
       onSaved();
@@ -208,9 +215,40 @@ const JoystickPricesForm = ({ branchId, settings, onSaved }: Props) => {
     <form className="col" style={{ gap: 12 }} onSubmit={submit}>
       <span className="muted" style={{ fontSize: 12 }}>{t("joystickPrice.hint")}</span>
 
-      {/* HOW a pad is priced. First, because it changes what the price boxes
-          below mean: the same 500 is either a fee owed once or a rate the
-          hour carries while the pad is out. */}
+      {/* WHICH strategies this club allows at all.
+          First, because it decides whether the select below is the venue's
+          single answer or merely its default: under "both" the cashier picks
+          one when they start a seat, and that choice is frozen for the session. */}
+      <div className="col" style={{ gap: 8 }}>
+        <span className="muted" style={{ fontSize: 12 }}>{t("joystickPrice.clubMode")}</span>
+        <div
+          className="col"
+          role="radiogroup"
+          aria-label={t("joystickPrice.clubMode")}
+          style={{ gap: 8 }}
+        >
+          {STRATEGY_MODES.map((m) => (
+            <Radio
+              key={m}
+              name="cp-joystick-club-mode"
+              checked={clubMode === m}
+              onChange={() => setClubMode(m)}
+              disabled={busy}
+              label={t(`joystickPrice.clubMode.${m}`)}
+            />
+          ))}
+        </div>
+        <span className="muted" style={{ fontSize: 12 }}>
+          {t(clubMode === "both"
+            ? "joystickPrice.clubModeExplain.both"
+            : "joystickPrice.clubModeExplain.single")}
+        </span>
+      </div>
+
+      {/* HOW a pad is priced by default. Under "both" this is what a seat
+          falls back to when nobody chooses; otherwise it is the only answer.
+          The same 500 is either a fee owed once or a rate the hour carries
+          while the pad is out. */}
       <label className="col" style={{ gap: 4, maxWidth: 320 }}>
         <span className="muted" style={{ fontSize: 12 }}>{t("joystickPrice.strategy")}</span>
         <select

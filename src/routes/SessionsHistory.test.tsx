@@ -1,5 +1,7 @@
 import { describe, expect, test } from "vitest";
-import { eventDetail, eventSeat, padChargeOf, paymentLabelOf, segmentsOf } from "./SessionsHistory";
+import { eventDetail, eventSeat, paymentLabelOf, segmentsOf } from "./SessionsHistory";
+// The pad line is shared with the board now, so its tests follow it there.
+import { padChargeOf } from "@/components/sessions/joystickView";
 import type { ISessionEvent } from "@/api/sessions";
 import type { ISessionApi } from "@/types/sessions";
 

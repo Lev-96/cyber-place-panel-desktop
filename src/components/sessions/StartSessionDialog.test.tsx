@@ -37,6 +37,27 @@ vi.mock("@/repositories/SessionRepository", () => ({
   },
 }));
 vi.mock("@/auth/AuthContext", () => ({ useAuth: () => ({ user: { id: 1, role: auth.role } }) }));
+// The dialog reads the club's billing policy to decide whether to ask which
+// joystick strategy this seat runs on. Without this stub that read left the
+// process as a real request to the backend, which answered 401 and surfaced as
+// an unhandled rejection attributed to whichever test was running.
+const club = vi.hoisted(() => ({ mode: "fixed_price" as string }));
+vi.mock("@/repositories/BillingSettingsRepository", () => ({
+  billingSettingsRepository: {
+    get: () => Promise.resolve({
+      branch_id: 7,
+      money_rounding_step: 0,
+      money_rounding_mode: "up",
+      joystick_price: 500,
+      joystick_included: 2,
+      joystick_charged_slots: "3,4",
+      joystick_pricing_mode: "fixed",
+      joystick_price_4: null,
+      joystick_max_slot: 4,
+      joystick_strategy_mode: club.mode,
+    }),
+  },
+}));
 vi.mock("@/repositories/BranchRepository", () => ({
   branchRepository: { byId: vi.fn().mockResolvedValue({ id: 7, price_for_branch: { "ps5-standard": 1500 } }) },
 }));
@@ -273,5 +294,63 @@ describe("starting a session free", () => {
     const start = screen.getByRole("button", { name: "action.start" }) as HTMLButtonElement;
     expect(start.disabled).toBe(false);
     expect(screen.getByText(/3000/)).toBeTruthy();
+  });
+});
+
+
+describe("which joystick strategy this seat will run on", () => {
+  afterEach(() => { club.mode = "fixed_price"; });
+
+  /**
+   * A club that permits one strategy needs nobody to restate it, and the dialog
+   * does not ask. The server fills it in, so omitting the field is not a
+   * decision made by accident.
+   */
+  test("a club on one strategy is not asked", async () => {
+    club.mode = "change_tariff";
+    await mount(device());
+
+    expect(screen.queryByText("session.strategyChoice")).toBeNull();
+  });
+
+  /** A club that permits both asks, once, before the seat starts. */
+  test("a club that allows both offers the choice", async () => {
+    club.mode = "both";
+    await mount(device());
+
+    expect(screen.getByText("session.strategyChoice")).toBeTruthy();
+    expect(screen.getByRole("radio", { name: "joystickPrice.strategy.hourly" })).toBeTruthy();
+    expect(screen.getByRole("radio", { name: "joystickPrice.strategy.fixed" })).toBeTruthy();
+  });
+
+  /** …and what the cashier picked is what the server is told. */
+  test("the chosen strategy is sent with the start", async () => {
+    club.mode = "both";
+    await mount(device());
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("radio", { name: "joystickPrice.strategy.hourly" }));
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "action.start" }));
+    });
+
+    expect(repo.start).toHaveBeenCalledWith(
+      expect.objectContaining({ joystick_strategy: "hourly" }),
+    );
+  });
+
+  /** Nothing picked sends nothing, and the server resolves it as it always did. */
+  test("no choice sends no strategy at all", async () => {
+    club.mode = "both";
+    await mount(device());
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "action.start" }));
+    });
+
+    expect(repo.start).toHaveBeenCalledWith(
+      expect.not.objectContaining({ joystick_strategy: expect.anything() }),
+    );
   });
 });

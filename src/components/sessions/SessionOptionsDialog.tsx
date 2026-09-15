@@ -74,6 +74,7 @@ const SessionOptionsDialog = ({ session, platform, onClose, onChanged }: Props) 
   const [current, setCurrent] = useState<ISessionApi>(session);
   // The venue's one joystick fee, or null when it does not offer extra pads.
   const [fee, setFee] = useState<number | null>(null);
+
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   /**
@@ -129,6 +130,19 @@ const SessionOptionsDialog = ({ session, platform, onClose, onChanged }: Props) 
    */
   const seatPlatform = current.place_platform ?? platform ?? null;
   const isPlayStation = current.supports_joysticks ?? platformGroup(seatPlatform ?? "") === "ps";
+  /**
+   * Correcting a strategy picked in error, while that is still free.
+   *
+   * The SERVER decides the window and sends it: the club allows both, the seat
+   * is running, and no pad has gone out — not one in play, not one already
+   * handed back, whose fee stands. This screen used to compose those three
+   * conditions itself out of the venue's settings and a count of pads, which is
+   * the server's rule copied into a client and went wrong the first time the
+   * listing stopped carrying a column: the control was drawn and the request
+   * refused.
+   */
+  const strategyChoices = current.joystick_strategy_options ?? [];
+  const canCorrectStrategy = strategyChoices.length > 1;
   const joystickCount = current.joystick_count ?? 1;
   const isUnlimited = current.is_unlimited ?? current.ends_at === null;
   const isFree = current.is_free ?? false;
@@ -139,7 +153,9 @@ const SessionOptionsDialog = ({ session, platform, onClose, onChanged }: Props) 
   // could quote a figure for a pad the server was not about to allocate.
   const loadPrices = useCallback(() => {
     if (!isPlayStation) return;
-    void billingSettingsRepository.get(current.branch_id).then((s) => setFee(s.joystick_price));
+    void billingSettingsRepository.get(current.branch_id).then((s) => {
+      setFee(s.joystick_price);
+    });
   }, [current.branch_id, isPlayStation]);
 
   useEffect(loadPrices, [loadPrices]);
@@ -687,6 +703,26 @@ const SessionOptionsDialog = ({ session, platform, onClose, onChanged }: Props) 
             </div>
           )}
         </section>
+
+        {/* ── the strategy this seat runs on ────────────────────────────── */}
+        {canCorrectStrategy && (
+          <section className="col" style={{ gap: 8 }}>
+            <strong>{t("session.strategyChoice")}</strong>
+            <span className="muted" style={{ fontSize: 12 }}>{t("session.strategyCorrectHint")}</span>
+            <div className="row" role="radiogroup" aria-label={t("session.strategyChoice")} style={{ gap: 16, flexWrap: "wrap" }}>
+              {strategyChoices.map((m) => (
+                <Radio
+                  key={m}
+                  name="cp-correct-strategy"
+                  checked={(current.joystick_strategy ?? null) === m}
+                  onChange={() => void run(() => sessionRepository.setJoystickStrategy(current.id, m))}
+                  disabled={busy}
+                  label={t(`joystickPrice.strategy.${m}`)}
+                />
+              ))}
+            </div>
+          </section>
+        )}
 
         {/* ── unlimited ─────────────────────────────────────────────────── */}
         <section className="col" style={{ gap: 8 }}>

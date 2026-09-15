@@ -9,6 +9,15 @@ export interface StartSessionBody {
   hourly_rate?: number;
   user_display_name?: string;
   /**
+   * WHICH joystick strategy this seat runs on.
+   *
+   * Sent only when the club allows both and the cashier picked one; the server
+   * fills it in itself when the club permits a single strategy, so a client
+   * that omits it is not making a decision by accident. The server refuses a
+   * strategy the club does not allow.
+   */
+  joystick_strategy?: "fixed" | "hourly";
+  /**
    * Start it waived. Owner-level, and the SERVER is what enforces that — this
    * flag reaching it from a manager's panel is answered with a 403, not with a
    * free session. Omitted entirely unless the operator asked for one, so a
@@ -218,6 +227,19 @@ export const apiAddSessionJoystick = (sessionId: number, slot?: number) =>
  */
 export const apiRemoveSessionJoystick = (sessionId: number, slot: number) =>
   request<{ session: ISessionApi }>(`/sessions/${sessionId}/joysticks/${slot}`, { method: "DELETE" });
+
+/**
+ * Correct the strategy a seat was started on.
+ *
+ * The server allows it only while the session has handed out NO pad — with no
+ * period on the seat there is no money that could be re-priced. It refuses the
+ * moment one exists, and refuses a strategy the club does not allow.
+ */
+export const apiSetJoystickStrategy = (sessionId: number, strategy: "fixed" | "hourly") =>
+  request<{ session: ISessionApi }>(`/sessions/${sessionId}/joystick-strategy`, {
+    method: "POST",
+    body: { joystick_strategy: strategy },
+  });
 
 /** +10 / +30 / +60, priced at the tariff the player is already on. */
 export const apiAddSessionTime = (sessionId: number, minutes: number) =>

@@ -110,6 +110,14 @@ export interface IBillingSettings {
    */
   joystick_max_slot?: number;
   /**
+   * WHICH strategies this club allows its cashiers to use.
+   *
+   * Not the same question as `joystick_pricing_mode`, which is the venue's own
+   * answer when a session carries none. This is what the club PERMITS: one, the
+   * other, or the choice made per seat when a session starts.
+   */
+  joystick_strategy_mode?: JoystickStrategyMode;
+  /**
    * The ceiling a seat may hold, as the SERVER states it.
    *
    * `MAX_JOYSTICKS` above is this panel's own copy of the same number and is
@@ -129,6 +137,25 @@ export interface IBillingSettings {
  */
 export const includedJoysticks = (settings: IBillingSettings): number =>
   settings.joystick_included ?? 1;
+
+/**
+ * The three answers a club may give about which strategies it allows.
+ *
+ * `both` is the one that changes behaviour elsewhere: it is what makes the
+ * session-start screen ask, and what makes two seats in one club able to run on
+ * different strategies at the same time.
+ */
+export const STRATEGY_MODES = ["change_tariff", "fixed_price", "both"] as const;
+export type JoystickStrategyMode = (typeof STRATEGY_MODES)[number];
+
+/** What the club allows, with the older backend's single answer filled in. */
+export const strategyModeOf = (settings: IBillingSettings): JoystickStrategyMode =>
+  settings.joystick_strategy_mode
+  ?? (pricingModeOf(settings) === "hourly" ? "change_tariff" : "fixed_price");
+
+/** The strategies a cashier may actually pick, given what the club allows. */
+export const allowedStrategies = (mode: JoystickStrategyMode): JoystickPricingMode[] =>
+  mode === "both" ? ["hourly", "fixed"] : mode === "change_tariff" ? ["hourly"] : ["fixed"];
 
 /** The two ways a venue can price a pad, and the only ones the server accepts. */
 export const PRICING_MODES = ["fixed", "hourly"] as const;
@@ -180,6 +207,7 @@ export const joystickSetupOf = (settings: IBillingSettings): JoystickSetup => {
  * reordering of somebody's prices.
  */
 export interface IBillingPolicy {
+  joystick_strategy_mode: JoystickStrategyMode;
   money_rounding_step: number;
   money_rounding_mode: MoneyRoundingMode;
   joystick_price: number | null;

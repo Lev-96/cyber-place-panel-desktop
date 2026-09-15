@@ -5,7 +5,7 @@ import { useAsync } from "@/hooks/useAsync";
 import { useSessionsSummary } from "@/hooks/useSessionsSummary";
 import { formatDateTime, formatTime } from "@/i18n/dates";
 import { useLang } from "@/i18n/LanguageContext";
-import { sessionJoysticksTotal } from "@/components/sessions/sessionAmount";
+import { padChargeOf } from "@/components/sessions/joystickView";
 import { sessionRepository } from "@/repositories/SessionRepository";
 import { ISessionEvent } from "@/api/sessions";
 import { ISessionApi } from "@/types/sessions";
@@ -533,48 +533,6 @@ export const eventSeat = (e: ISessionEvent): string | null => {
  * server refuses it) and is folded into the same null for the same reason.
  */
 /** What a finished session's charged pads cost, and how that figure is quoted. */
-export interface IPadCharge {
-  /** WHICH pads, by number, deduped and in order. A slot is an identity. */
-  slots: number[];
-  count: number;
-  /** The unit figure, only when every charged period agrees on one. */
-  each: number | null;
-  total: number;
-  /** True when that unit figure is a RATE per hour rather than a one-off fee. */
-  hourly: boolean;
-}
-
-/**
- * The pad line of a finished session.
- *
- * `hourly` is read from the ROWS and never from the branch as it stands today:
- * a session that ran under the fee model is still a fee-model session after the
- * owner switches the venue, and a history that re-read the branch would re-label
- * a bill that was already taken. Mixed rows read as the fee model, because the
- * unit price the line quotes is only a rate when every charged period is one.
- *
- * Null on a waived seat and when nothing was charged: a fee printed under "Free
- * session" is two numbers telling one truth.
- */
-export const padChargeOf = (session: ISessionApi): IPadCharge | null => {
-  if (session.is_free) return null;
-  const charged = (session.joysticks ?? []).filter((j) => j.is_charged);
-  if (charged.length === 0) return null;
-
-  const first = Number(charged[0].price ?? 0);
-  const uniform = charged.every((j) => Number(j.price ?? 0) === first);
-
-  return {
-    // The same slot handed out twice is one identity and two periods, so the
-    // list is deduped and the count is kept beside it rather than derived.
-    slots: [...new Set(charged.map((j) => Number(j.slot)))].sort((a, b) => a - b),
-    count: charged.length,
-    each: uniform ? first : null,
-    total: sessionJoysticksTotal(session),
-    hourly: charged.every((j) => j.is_hourly === true),
-  };
-};
-
 export const paymentLabelOf = (
   session: Pick<ISessionApi, "payment_method" | "payment_method_other">,
   t: (k: string) => string,

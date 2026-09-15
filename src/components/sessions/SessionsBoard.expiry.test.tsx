@@ -488,6 +488,59 @@ describe("joysticks on the tile", () => {
    * read: "1 / 4" on a PlayStation with two controllers on the table, and
    * "2 / 3/4" once the ceiling carried the venue's pricing shape.
    */
+  /**
+   * A pad already handed over says so, and stays on the menu.
+   *
+   * Hiding it would leave the cashier wondering where it went; greying it with
+   * no reason reads as a broken control. It says "already in use", and it
+   * clears itself the moment the pad comes back.
+   */
+  test("a pad already in play is shown disabled and says why", async () => {
+    repo.listActive.mockResolvedValue([withRule({
+      ...ps,
+      joystick_count: 3,
+      joysticks: [{ id: 6, slot: 3, price: 500, is_charged: true, is_hourly: false,
+        started_at: new Date().toISOString(), stopped_at: null }],
+    } as unknown as ISessionApi, {
+      shared: false,
+      options: [
+        { slot: 3, price: 500, shared: false },
+        { slot: 4, price: 700, shared: false },
+      ],
+    })]);
+    await mount();
+
+    const third = padOptions().find((o) => o.value === "3");
+    const fourth = padOptions().find((o) => o.value === "4");
+
+    expect(third?.disabled).toBe(true);
+    expect(third?.textContent).toContain("session.padTaken");
+    // …and the one still free is neither disabled nor labelled.
+    expect(fourth?.disabled).toBe(false);
+    expect(fourth?.textContent).not.toContain("session.padTaken");
+  });
+
+  /** Handing it back puts it straight back on the menu. */
+  test("a pad handed back is available again and no longer says otherwise", async () => {
+    repo.listActive.mockResolvedValue([withRule({
+      ...ps,
+      joystick_count: 2,
+      joysticks: [{ id: 6, slot: 3, price: 500, is_charged: true, is_hourly: false,
+        started_at: "2026-09-10T14:00:00Z", stopped_at: "2026-09-10T14:20:00Z" }],
+    } as unknown as ISessionApi, {
+      shared: false,
+      options: [
+        { slot: 3, price: 500, shared: false },
+        { slot: 4, price: 700, shared: false },
+      ],
+    })]);
+    await mount();
+
+    const third = padOptions().find((o) => o.value === "3");
+    expect(third?.disabled).toBe(false);
+    expect(third?.textContent).not.toContain("session.padTaken");
+  });
+
   test("the tile shows the pads the seat is holding, not a fraction", async () => {
     repo.listActive.mockResolvedValue([{ ...ps, joystick_count: 3 } as ISessionApi]);
     await mount();
@@ -769,9 +822,10 @@ describe("joysticks on the tile", () => {
       repo.listActive.mockResolvedValue([{ ...priced(2), is_free: true } as ISessionApi]);
       const { container } = await mount();
 
-      // The pads are still counted; the money is not printed under a bill
-      // nobody is paying.
-      expect(screen.getByText("3")).toBeTruthy();
+      // The pads are still NAMED; the money is not printed under a bill
+      // nobody is paying. This venue prices the pair as one figure, so the pad
+      // in play is "3/4" rather than the position it happened to open.
+      expect(screen.getByText("3/4")).toBeTruthy();
       expect(container.textContent).not.toContain("session.joysticksCost");
     });
 
@@ -826,10 +880,10 @@ describe("joysticks on the tile", () => {
     }]);
     await mount();
 
-    // Two rows, one of them closed — the server says the seat is holding two
-    // controllers, and the tile says two. It is the SERVER's number: a board
-    // that counted the rows would say three.
-    expect(screen.getByText("2")).toBeTruthy();
+    // Two rows, one of them closed. The closed one is not in play, so the seat
+    // is holding its kit plus the third pad — and this venue prices the pair as
+    // one figure, so that pad is named "3/4".
+    expect(screen.getByText("3/4")).toBeTruthy();
   });
 
   /**
@@ -933,5 +987,59 @@ describe("joysticks on the tile", () => {
     await mount();
 
     expect(screen.queryByText(/session\.currentRate/)).toBeNull();
+  });
+});
+
+/**
+ * The way to the strategy correction, on the one screen that has every seat.
+ *
+ * The options dialog holds the control, and until now the only button that
+ * opened it was "Add time" — which the tile draws only for a seat that HAS an
+ * end. A PlayStation usually runs open-ended, so on exactly the seats where a
+ * cashier picks a strategy there was no door to the correction at all.
+ *
+ * Whether there is anything to correct is the SERVER's answer, sent with the
+ * session. The board does not recompute it from the venue's settings and a
+ * count of pads — that rule lives on the backend, and a copy of it here drew a
+ * button for a request the server refused.
+ */
+describe("reaching the strategy correction from a tile", () => {
+  const openEnded = {
+    ...running, ends_at: null, is_unlimited: true, supports_joysticks: true,
+  } as ISessionApi;
+
+  beforeEach(() => {
+    repo.listPcs.mockResolvedValue([device]);
+  });
+  afterEach(cleanup);
+
+  test("an open-ended seat that can still be moved carries the button", async () => {
+    repo.listActive.mockResolvedValue([
+      { ...openEnded, joystick_strategy_options: ["fixed", "hourly"] } as ISessionApi,
+    ]);
+    await mount();
+
+    // The dialog it opens is the one that holds the radio group.
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "session.strategyShort" }));
+    });
+    expect(screen.getByText("session.strategyChoice")).toBeTruthy();
+  });
+
+  test("a seat whose window has closed carries no button", async () => {
+    repo.listActive.mockResolvedValue([
+      { ...openEnded, joystick_strategy_options: [] } as ISessionApi,
+    ]);
+    await mount();
+
+    expect(screen.queryByRole("button", { name: "session.strategyShort" })).toBeNull();
+  });
+
+  /** A backend that does not send the field reads as "nothing to correct". */
+  test("a seat from a server that never sends the field carries no button", async () => {
+    repo.listActive.mockResolvedValue([openEnded]);
+    await mount();
+
+    expect(screen.queryByRole("button", { name: "session.strategyShort" })).toBeNull();
   });
 });

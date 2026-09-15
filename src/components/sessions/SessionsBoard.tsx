@@ -13,7 +13,8 @@ import { useLang } from "@/i18n/LanguageContext";
 import { usePlaceAvailability } from "@/realtime/usePlaceAvailability";
 import { useSessionChanged } from "@/realtime/useSessionChanged";
 import { sessionRepository } from "@/repositories/SessionRepository";
-import { IJoystickRule, IPcApi, ISessionApi } from "@/types/sessions";
+import { IPcApi, ISessionApi } from "@/types/sessions";
+import { PAD_CEILING_FALLBACK, padCeiling, padChargeOf, padChoices, padIdentity } from "./joystickView";
 import { PC_STATUS_COLOR, effectivePcStatus, isPs } from "@/types/pc";
 import {
   canStartSession,
@@ -57,88 +58,6 @@ const sectionKeyOf = (pc: IPcApi): string => {
 interface Props {
   branchId: number;
 }
-
-/**
- * How many pads THIS seat counts to.
- *
- * The venue's own ceiling, not this repo's constant: a branch that hands out
- * three controllers must read "2 / 3" and not "2 / 4". Null when the server did
- * not send the rule, and the caller then falls back to what a seat can hold,
- * which is the number the card drew before the rule existed.
- */
-export const padCeiling = (session: ISessionApi): number | null =>
-  session.joystick_rule?.max_slot ?? null;
-
-/** One entry of the "which joystick" menu on a tile. */
-export interface PadChoice {
-  /** The slot this entry hands out. For a shared pair, the next free one of it. */
-  slot: number;
-  /** True when this entry stands for the 3/4 pair the venue priced as one. */
-  shared: boolean;
-  /** The venue's figure. Null means no price is set and the add is refused. */
-  price: number | null;
-  /** Selectable right now: it is the pad that comes next on this seat. */
-  enabled: boolean;
-}
-
-/**
- * The pads a cashier may hand out on this seat, from the VENUE's rule.
- *
- * It was a list of target COUNTS — 2, 3, 4 — built from a ceiling constant in
- * this repo, and it could not survive a venue that hands out three controllers
- * or prices the fourth apart from the third: the same "4" meant a different
- * amount of money at two branches and the card had no way to know. So the
- * server sends what it offers and what each costs, and this only arranges it.
- *
- * ## Why the pair collapses
- *
- * When a venue prices the third and the fourth as one figure ("3/4"), listing
- * them apart shows the same price twice and asks the cashier a question the
- * venue did not ask them: which of two identical things. One entry, and the
- * slot it opens is whichever of the pair comes next.
- *
- * ## Why everything else is disabled rather than absent
- *
- * A fourth controller with no third one is not a thing a floor does, and the
- * server refuses it. Showing the entry greyed keeps the venue's prices visible
- * to the cashier — which is what the screen is for — while making the mis-click
- * that charges the fourth pad's fee for the third pad's use impossible.
- */
-export const padChoices = (rule: IJoystickRule | undefined, openSlots: number[]): PadChoice[] => {
-  if (rule === undefined) return [];
-
-  const free = rule.options
-    .map((o) => o.slot)
-    .filter((slot) => !openSlots.includes(slot))
-    .sort((a, b) => a - b);
-  const next = free.length > 0 ? free[0] : null;
-
-  const out: PadChoice[] = [];
-  let pairDone = false;
-
-  for (const option of rule.options) {
-    if (option.shared) {
-      if (pairDone) continue;
-      pairDone = true;
-      const pairFree = rule.options
-        .filter((o) => o.shared && !openSlots.includes(o.slot))
-        .map((o) => o.slot)
-        .sort((a, b) => a - b);
-      const slot = pairFree.length > 0 ? pairFree[0] : option.slot;
-      out.push({ slot, shared: true, price: option.price, enabled: slot === next });
-      continue;
-    }
-
-    out.push({
-      slot: option.slot,
-      shared: false,
-      price: option.price,
-      enabled: option.slot === next,
-    });
-  }
-
-  return out;
-};
 
 const SessionsBoard = ({ branchId }: Props) => {
   const { money, t, lang } = useLang();
@@ -522,33 +441,7 @@ const SessionsBoard = ({ branchId }: Props) => {
     // can differ: the fee is frozen when a pad goes out, so a seat that
     // straddles a re-pricing holds two. "3 × ?" would be a lie; the sum is
     // always true, so the line falls back to it.
-    const padCharge = ((): {
-      slots: number[]; count: number; each: number | null; total: number; hourly: boolean;
-    } | null => {
-      if (sess === undefined || sess.is_free) return null;
-      const charged = (sess.joysticks ?? []).filter((j) => j.is_charged);
-      if (charged.length === 0) return null;
-      const first = Number(charged[0].price);
-      const uniform = charged.every((j) => Number(j.price) === first);
-      // An hourly pad's "500" is a rate, not a sum, and the line has to say so
-      // or the cashier reads the venue's rate as the money already owed. Mixed
-      // rows are possible on one session (the venue switched models while it
-      // ran), and they read as hourly only when every charged row is.
-      const hourly = charged.every((j) => j.is_hourly === true);
-      // WHICH pads, by their number. A slot is an identity — "the third
-      // controller" — and the line names it instead of multiplying by a count,
-      // because "3 × 500" reads as three joysticks to everyone who has not
-      // read this code. The same slot handed out twice is one identity and two
-      // periods, so the list is deduped and the count is kept separately.
-      const slots = [...new Set(charged.map((j) => j.slot))].sort((a, b) => a - b);
-      return {
-        slots,
-        count: charged.length,
-        each: uniform ? first : null,
-        total: sessionJoysticksTotal(sess),
-        hourly,
-      };
-    })();
+    const padCharge = sess === undefined ? null : padChargeOf(sess);
 
     // What the seat costs an hour right now. Only shown under the hourly
     // model, and only when a pad is actually moving it: on the fee model the
@@ -795,7 +688,15 @@ const SessionsBoard = ({ branchId }: Props) => {
                           ceiling started carrying a venue's pricing shape. The
                           ceiling is still worth knowing and is in the tooltip,
                           where it cannot be mistaken for arithmetic. */}
-                      <span className="muted">{joystickCount}</span>
+                      {/* WHICH controllers, once any extra is out.
+                          The base kit is a count — two come with the console and
+                          nobody hands them over — so an untouched seat reads
+                          "2". The moment an extra is in play the useful fact
+                          stops being how many there are and becomes which ones,
+                          and a venue that prices the pair as one figure calls
+                          that "3/4" rather than naming the position it happened
+                          to open. */}
+                      <span className="muted">{padIdentity(sess, BASE_JOYSTICKS)}</span>
                     </span>
                   )}
                   {supportsJoysticks && (
@@ -851,7 +752,12 @@ const SessionsBoard = ({ branchId }: Props) => {
                             + " · "
                             + (c.price === null
                               ? t("session.padNoPrice")
-                              : c.price === 0 ? t("session.padFree") : money(c.price))}
+                              : c.price === 0 ? t("session.padFree") : money(c.price))
+                            // A pad in somebody's hands says so. Greyed with no
+                            // reason reads as broken; greyed with a reason reads
+                            // as the floor's own state, and it clears itself the
+                            // moment the pad comes back.
+                            + (c.taken ? ` · ${t("session.padTaken")}` : "")}
                         </option>
                       ))}
                     </select>
@@ -969,6 +875,19 @@ const SessionsBoard = ({ branchId }: Props) => {
                   action at all, only two "not applicable" notices. Two buttons
                   and one of them a duplicate is how a cashier learns to stop
                   reading them. */}
+              {/* The strategy this seat runs on, while it can still be moved.
+                  The SERVER says whether it can: the club allows both and no
+                  pad has gone out yet. It is its own button rather than a line
+                  inside "Add time" because a count-up seat has no Add Time
+                  button at all, and that is exactly the seat a PlayStation
+                  usually runs on — a correction nobody can reach is not one.
+                  It disappears at the first handout, so no tile carries it for
+                  long. */}
+              {(sess.joystick_strategy_options ?? []).length > 1 && (
+                <Button variant="secondary" onClick={() => setOptionsTarget(sess)} style={miniBtnFlex}>
+                  {t("session.strategyShort")}
+                </Button>
+              )}
               <Button variant="secondary" onClick={() => setStopTarget(sess)} style={miniBtnFlex}>{t("action.stop")}</Button>
             </div>
           </>

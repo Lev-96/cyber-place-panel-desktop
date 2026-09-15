@@ -94,6 +94,12 @@ const choice = (m: "Paid" | "Free" | "None") =>
 const choose = async (m: "Paid" | "Free" | "None") => {
   await act(async () => { fireEvent.click(choice(m)); });
 };
+/** The club's allowed-strategies answer, by the label an operator reads. */
+const clubRadio = (m: "change_tariff" | "fixed_price" | "both") =>
+  screen.getByRole("radio", { name: `joystickPrice.clubMode.${m}` }) as HTMLInputElement;
+const pickClubMode = async (m: "change_tariff" | "fixed_price" | "both") => {
+  await act(async () => { fireEvent.click(clubRadio(m)); });
+};
 /** The "will you hand out a fourth?" answer, by the word an operator reads. */
 const radio = (a: "yes" | "no") =>
   screen.getByRole("radio", { name: `joystickPrice.${a}` }) as HTMLInputElement;
@@ -308,6 +314,54 @@ describe("JoystickPricesForm", () => {
       joystick_price_4: null,
       joystick_max_slot: 4,
     }));
+  });
+
+  // ── which strategies the club allows ─────────────────────────────────
+
+  /** The club's answer rides with the rest of the policy, like every field. */
+  test("the club's allowed strategies go back with the policy", async () => {
+    await mount();
+    await pickClubMode("both");
+    await act(async () => { fireEvent.click(save()); });
+
+    expect(repo.update).toHaveBeenCalledWith(7, expect.objectContaining({
+      joystick_strategy_mode: "both",
+    }));
+  });
+
+  /**
+   * A club that never chose is shown the one strategy it already uses, not an
+   * empty third state: the setting is derived from what it bills today.
+   */
+  test("a club that never chose opens on the strategy it already uses", async () => {
+    await mount(settings({ joystick_pricing_mode: "hourly" }));
+
+    expect(clubRadio("change_tariff").checked).toBe(true);
+    expect(clubRadio("both").checked).toBe(false);
+  });
+
+  test("a fee club opens on fixed price only", async () => {
+    await mount(settings({ joystick_pricing_mode: "fixed" }));
+
+    expect(clubRadio("fixed_price").checked).toBe(true);
+  });
+
+  /** Changing only the club's answer is enough to enable Save. */
+  test("changing only the allowed strategies enables Save", async () => {
+    await mount();
+
+    expect(save().disabled).toBe(true);
+    await pickClubMode("both");
+    expect(save().disabled).toBe(false);
+  });
+
+  /** "Both" says in words what it changes, because it changes another screen. */
+  test("choosing both explains that the cashier will pick per session", async () => {
+    await mount();
+    await pickClubMode("both");
+
+    expect(screen.getByText("joystickPrice.clubModeExplain.both")).toBeTruthy();
+    expect(screen.queryByText("joystickPrice.clubModeExplain.single")).toBeNull();
   });
 
   // ── the three shapes a venue's extra pads can take ───────────────────

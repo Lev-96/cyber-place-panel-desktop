@@ -208,6 +208,28 @@ export interface ISessionApi {
    */
   joystick_rule?: IJoystickRule;
   /**
+   * WHICH strategy this seat froze when it started, if it froze one.
+   *
+   * Null on a session started before the club could offer a choice; the venue's
+   * own answer then applies, resolved server-side when a pad is handed out.
+   */
+  joystick_strategy?: "fixed" | "hourly" | null;
+  /**
+   * …and which strategies this seat may still be MOVED to, decided by the
+   * server.
+   *
+   * Empty is the ordinary answer and means there is nothing to ask: the club
+   * allows one strategy, the seat is not running, or a pad has already gone out
+   * and a figure has been quoted to a player. A screen draws the control from
+   * this and from nothing else — deriving it from the venue's settings plus a
+   * count of pads is the server's own rule copied into a client, and it drew
+   * buttons the server then refused.
+   *
+   * Absent when the server did not load the relations it needs, which reads the
+   * same as empty: nothing offered.
+   */
+  joystick_strategy_options?: ("fixed" | "hourly")[];
+  /**
    * The venue's rounding policy, so a ticking figure can land where the
    * receipt does. 0 is "no policy", which is what every branch starts on.
    */

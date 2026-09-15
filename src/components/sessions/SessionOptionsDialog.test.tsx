@@ -28,6 +28,7 @@ const repo = vi.hoisted(() => ({
   setFree: vi.fn(),
   extensionOptions: vi.fn(),
   transferExtension: vi.fn(),
+  setJoystickStrategy: vi.fn(),
 }));
 const auth = vi.hoisted(() => ({ role: "company_owner" as string }));
 // The app-wide toaster, captured so a test can read what a grant announced.
@@ -48,6 +49,7 @@ vi.mock("@/repositories/SessionRepository", () => ({
     setFree: (...a: unknown[]) => repo.setFree(...a),
     extensionOptions: (...a: unknown[]) => repo.extensionOptions(...a),
     transferExtension: (...a: unknown[]) => repo.transferExtension(...a),
+    setJoystickStrategy: (...a: unknown[]) => repo.setJoystickStrategy(...a),
   },
 }));
 const prices = vi.hoisted(() => ({
@@ -884,5 +886,80 @@ describe("moving the player to another seat", () => {
     await pressAPreset();
 
     expect(screen.getByText("session.moveNone")).toBeTruthy();
+  });
+});
+
+
+describe("correcting the strategy a seat was started on", () => {
+  /**
+   * The window is the SERVER's answer, not a rule restated here. A seat that
+   * offers nothing — a club on one strategy, a pad already out, a finished
+   * session — draws no control at all rather than one that is inert.
+   */
+  test("is absent when the seat offers no choice", async () => {
+    await mount(session({ joystick_strategy_options: [] } as Partial<ISessionApi>));
+
+    expect(screen.queryByText("session.strategyChoice")).toBeNull();
+  });
+
+  /** An older backend that does not send the field at all reads as "no". */
+  test("is absent when the server did not send the field", async () => {
+    await mount(session());
+
+    expect(screen.queryByText("session.strategyChoice")).toBeNull();
+  });
+
+  test("is offered when the seat still carries both answers", async () => {
+    await mount(session({
+      joystick_strategy_options: ["fixed", "hourly"], joystick_strategy: "fixed",
+    } as Partial<ISessionApi>));
+
+    expect(await screen.findByText("session.strategyChoice")).toBeTruthy();
+    expect(screen.getByText("session.strategyCorrectHint")).toBeTruthy();
+    // …and the one it is on now is the one shown as picked.
+    expect((screen.getByRole("radio", { name: "joystickPrice.strategy.fixed" }) as HTMLInputElement).checked).toBe(true);
+    expect((screen.getByRole("radio", { name: "joystickPrice.strategy.hourly" }) as HTMLInputElement).checked).toBe(false);
+  });
+
+  /** Only what the server offers: a club's forbidden answer is never drawn. */
+  test("offers exactly the answers the server listed", async () => {
+    await mount(session({ joystick_strategy_options: ["hourly"] } as Partial<ISessionApi>));
+
+    expect(screen.queryByText("session.strategyChoice")).toBeNull();
+  });
+
+  /** Picking one sends it, and the server's answer replaces the seat. */
+  test("sends the correction and keeps what the server answers", async () => {
+    repo.setJoystickStrategy.mockResolvedValue(session({
+      joystick_strategy: "hourly", joystick_strategy_options: ["fixed", "hourly"],
+    } as Partial<ISessionApi>));
+    await mount(session({
+      joystick_strategy_options: ["fixed", "hourly"], joystick_strategy: "fixed",
+    } as Partial<ISessionApi>));
+
+    await act(async () => {
+      fireEvent.click(await screen.findByRole("radio", { name: "joystickPrice.strategy.hourly" }));
+    });
+
+    expect(repo.setJoystickStrategy).toHaveBeenCalledWith(42, "hourly");
+    expect((screen.getByRole("radio", { name: "joystickPrice.strategy.hourly" }) as HTMLInputElement).checked).toBe(true);
+  });
+
+  /**
+   * A seat whose window has closed between the board's poll and this click:
+   * the refusal is shown verbatim, because "the joystick strategy is fixed
+   * once a joystick has been handed out" is a sentence a cashier can act on.
+   */
+  test("shows the server's refusal when the window has closed", async () => {
+    repo.setJoystickStrategy.mockRejectedValue(new Error("Strategy is locked: a joystick is out"));
+    await mount(session({
+      joystick_strategy_options: ["fixed", "hourly"], joystick_strategy: "fixed",
+    } as Partial<ISessionApi>));
+
+    await act(async () => {
+      fireEvent.click(await screen.findByRole("radio", { name: "joystickPrice.strategy.hourly" }));
+    });
+
+    expect(await screen.findByText("Strategy is locked: a joystick is out")).toBeTruthy();
   });
 });

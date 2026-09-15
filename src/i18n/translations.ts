@@ -1134,6 +1134,36 @@ export const TRANSLATIONS: Dict = {
     am: "Տեղի բոլոր ջոյսթիքները ներառված են սակագնում, ուստի այստեղից ոչինչ չի գանձվում։",
   },
   "joystickPrice.slot": { en: "Joystick #{0}", ru: "Джойстик №{0}", am: "Ջոյսթիք №{0}" },
+  "joystickPrice.clubMode": { en: "Strategies allowed here", ru: "Разрешённые стратегии", am: "Թույլատրված ռազմավարություններ" },
+  "joystickPrice.clubMode.change_tariff": {
+    en: "Changes the hourly rate only", ru: "Только изменение тарифа", am: "Միայն ժամավճարի փոփոխություն",
+  },
+  "joystickPrice.clubMode.fixed_price": {
+    en: "Fixed price only", ru: "Только фиксированная цена", am: "Միայն ֆիքսված գին",
+  },
+  "joystickPrice.clubMode.both": {
+    en: "Both, chosen per session", ru: "Обе, выбор при старте сессии", am: "Երկուսն էլ՝ ընտրությամբ",
+  },
+  "joystickPrice.clubModeExplain.both": {
+    en: "The cashier picks one when they start a seat, and it stays fixed for that session.",
+    ru: "Кассир выбирает одну при запуске места, и для этой сессии она уже не меняется.",
+    am: "Գանձապահն ընտրում է մեկը տեղը սկսելիս, և այդ նիստի համար այն այլևս չի փոխվում։",
+  },
+  "joystickPrice.clubModeExplain.single": {
+    en: "Every session here uses this strategy. Nobody is asked to choose.",
+    ru: "Все сессии здесь считаются этой стратегией. Выбирать никого не просят.",
+    am: "Այստեղ բոլոր նիստերը հաշվարկվում են այս ռազմավարությամբ։",
+  },
+  "session.strategyCorrectHint": {
+    en: "Can still be changed: no joystick has been handed out on this session yet.",
+    ru: "Ещё можно изменить: в этой сессии джойстик пока не выдавался.",
+    am: "Դեռ կարելի է փոխել․ այս նիստում ջոյսթիք դեռ չի տրվել։",
+  },
+  "session.strategyChoice": { en: "Joystick strategy", ru: "Стратегия джойстиков", am: "Ջոյսթիքների ռազմավարություն" },
+  // On the tile, where a button carries what a whole dialog section can spell
+  // out: the word alone is what a cashier scans for.
+  "session.strategyShort": { en: "Strategy", ru: "Стратегия", am: "Ռազմավարություն" },
+  "session.padTaken": { en: "already in use", ru: "уже используется", am: "արդեն օգտագործվում է" },
   "joystickPrice.charging": { en: "Charging for extras", ru: "Плата за дополнительные", am: "Վճար լրացուցիչների համար" },
   "joystickPrice.useFourth": {
     en: "Will you hand out a fourth joystick?",
