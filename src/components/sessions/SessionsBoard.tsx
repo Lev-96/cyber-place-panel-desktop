@@ -697,6 +697,16 @@ const SessionsBoard = ({ branchId }: Props) => {
                           that "3/4" rather than naming the position it happened
                           to open. */}
                       <span className="muted">{padIdentity(sess, BASE_JOYSTICKS)}</span>
+                      {/* The seat's one fee, already taken: every controller
+                          after it is handed over for nothing, and saying so
+                          here is what stops the zeros in the menu below
+                          reading as a fault. */}
+                      {sess.joystick_rule?.charge_once === true
+                        && sess.joystick_rule?.fee_taken === true && (
+                        <span className="muted" style={{ fontSize: 10 }}>
+                          · {t("session.padFeeTaken")}
+                        </span>
+                      )}
                     </span>
                   )}
                   {supportsJoysticks && (
@@ -752,7 +762,13 @@ const SessionsBoard = ({ branchId }: Props) => {
                             + " · "
                             + (c.price === null
                               ? t("session.padNoPrice")
-                              : c.price === 0 ? t("session.padFree") : money(c.price))
+                              // Two different zeros. "Free" is what this venue
+                              // charges for a pad; "already charged" is a
+                              // payment that happened on THIS seat and covers
+                              // every controller after it.
+                              : c.feeTaken
+                                ? t("session.padFeeTaken")
+                                : c.price === 0 ? t("session.padFree") : money(c.price))
                             // A pad in somebody's hands says so. Greyed with no
                             // reason reads as broken; greyed with a reason reads
                             // as the floor's own state, and it clears itself the
@@ -875,19 +891,6 @@ const SessionsBoard = ({ branchId }: Props) => {
                   action at all, only two "not applicable" notices. Two buttons
                   and one of them a duplicate is how a cashier learns to stop
                   reading them. */}
-              {/* The strategy this seat runs on, while it can still be moved.
-                  The SERVER says whether it can: the club allows both and no
-                  pad has gone out yet. It is its own button rather than a line
-                  inside "Add time" because a count-up seat has no Add Time
-                  button at all, and that is exactly the seat a PlayStation
-                  usually runs on — a correction nobody can reach is not one.
-                  It disappears at the first handout, so no tile carries it for
-                  long. */}
-              {(sess.joystick_strategy_options ?? []).length > 1 && (
-                <Button variant="secondary" onClick={() => setOptionsTarget(sess)} style={miniBtnFlex}>
-                  {t("session.strategyShort")}
-                </Button>
-              )}
               <Button variant="secondary" onClick={() => setStopTarget(sess)} style={miniBtnFlex}>{t("action.stop")}</Button>
             </div>
           </>

@@ -1,7 +1,6 @@
 import { ListSkeleton, SkeletonForm } from "@/components/ui/Skeleton";
 import HourlyRatesForm from "@/components/branches/HourlyRatesForm";
 import PackageForm from "@/components/packages/PackageForm";
-import JoystickPricesForm from "@/components/prices/JoystickPricesForm";
 import MoneyRoundingForm from "@/components/prices/MoneyRoundingForm";
 import PlatformPricesForm from "@/components/prices/PlatformPricesForm";
 import SubplatformPricesForm from "@/components/prices/SubplatformPricesForm";
@@ -116,22 +115,13 @@ const BranchPricesPage = () => {
         </section>
       )}
 
-      {/* Extra joysticks. Its own section rather than a column on the matrix
-          above: that matrix is per (platform × tier) and this is one figure for
-          the venue, and folding one into the other would make a grid where most
-          cells are meaningless — a computer has no second joystick. */}
-      <section className="col" style={{ gap: 12 }}>
-        <h2 className="page-title" style={{ margin: 0 }}>{t("joystickPrice.sectionTitle")}</h2>
-        {billing.data && (
-          <JoystickPricesForm
-            key={String(billing.data.joystick_price)}
-            branchId={id}
-            settings={billing.data}
-            onSaved={() => void billing.reload()}
-          />
-        )}
-      </section>
-
+      {/* ⚠️ Extra joysticks had a section here and it is gone from this page
+          ON PURPOSE, with nothing behind it removed. What a pad costs, how it
+          is priced and how often it is charged are answers a ROOM gives — a
+          club sells its VIP's controllers differently from its floor's — so
+          they live in the place's own form, beside that room's rate, and are
+          written by the same owner-level permission. The branch columns remain
+          as the fallback every room inherits until it says otherwise. */}
       {/* Rounding. Last, and after every rate, because it is the rule applied
           to what all of them add up to. */}
       <section className="col" style={{ gap: 12 }}>

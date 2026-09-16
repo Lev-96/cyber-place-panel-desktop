@@ -116,7 +116,7 @@ export interface IBillingSettings {
    * answer when a session carries none. This is what the club PERMITS: one, the
    * other, or the choice made per seat when a session starts.
    */
-  joystick_strategy_mode?: JoystickStrategyMode;
+  joystick_strategy_mode?: JoystickStrategyMode | "both";
   /**
    * The ceiling a seat may hold, as the SERVER states it.
    *
@@ -139,23 +139,43 @@ export const includedJoysticks = (settings: IBillingSettings): number =>
   settings.joystick_included ?? 1;
 
 /**
- * The three answers a club may give about which strategies it allows.
+ * The venue-level spelling of the two strategies.
  *
- * `both` is the one that changes behaviour elsewhere: it is what makes the
- * session-start screen ask, and what makes two seats in one club able to run on
- * different strategies at the same time.
+ * A third value — `both`, "the cashier picks per seat" — was briefly storable.
+ * The strategy is a ROOM's setting now and offers exactly two answers, so
+ * nothing writes that word any more; a branch still carrying it reads back as
+ * the single answer it resolves to, which is what the server already sends.
  */
-export const STRATEGY_MODES = ["change_tariff", "fixed_price", "both"] as const;
+export const STRATEGY_MODES = ["change_tariff", "fixed_price"] as const;
 export type JoystickStrategyMode = (typeof STRATEGY_MODES)[number];
 
-/** What the club allows, with the older backend's single answer filled in. */
+/**
+ * What the club allows, with the older backend's single answer filled in.
+ *
+ * A RECOGNISED value wins; anything else — an absent field, the retired "both",
+ * a word from a future version — falls through to the venue's own strategy.
+ * That is `JoystickRule::strategyModeOf()` on the server, and the two must
+ * agree: this one is what the panel PUTs back, so a reading of its own would
+ * quietly rewrite a venue's policy on the next save of an unrelated form.
+ */
 export const strategyModeOf = (settings: IBillingSettings): JoystickStrategyMode =>
-  settings.joystick_strategy_mode
-  ?? (pricingModeOf(settings) === "hourly" ? "change_tariff" : "fixed_price");
+  STRATEGY_MODES.includes(settings.joystick_strategy_mode as JoystickStrategyMode)
+    ? (settings.joystick_strategy_mode as JoystickStrategyMode)
+    : pricingModeOf(settings) === "hourly"
+      ? "change_tariff"
+      : "fixed_price";
 
-/** The strategies a cashier may actually pick, given what the club allows. */
-export const allowedStrategies = (mode: JoystickStrategyMode): JoystickPricingMode[] =>
-  mode === "both" ? ["hourly", "fixed"] : mode === "change_tariff" ? ["hourly"] : ["fixed"];
+/**
+ * How the extra-pad fee is added.
+ *
+ * `each` adds it every time a pad is handed over. `once` adds it for the FIRST
+ * pad and for nothing after it, however many times controllers change hands —
+ * including after one is handed back, which is not a second sale.
+ *
+ * Absent on an older backend, which only ever charged per handout.
+ */
+export const CHARGE_MODES = ["each", "once"] as const;
+export type JoystickChargeMode = (typeof CHARGE_MODES)[number];
 
 /** The two ways a venue can price a pad, and the only ones the server accepts. */
 export const PRICING_MODES = ["fixed", "hourly"] as const;

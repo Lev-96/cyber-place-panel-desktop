@@ -98,9 +98,6 @@ test.beforeEach(async () => {
       options: [{ slot: 3, price: 500, shared: true }, { slot: 4, price: 500, shared: true }],
     },
     joystick_strategy: "fixed",
-    // No pad had gone out when the cashier started it, so the correction is
-    // still open — this is the seat that draws the tile's Strategy button.
-    joystick_strategy_options: [],
     is_free: false, is_unlimited: false, supports_joysticks: true,
     place_platform: "ps5",
   };
@@ -133,12 +130,6 @@ test.beforeEach(async () => {
       return route.fulfill({
         status: 200, contentType: "application/json",
         body: JSON.stringify({ data: [session] }),
-      });
-    }
-    if (p === "/sessions/5/joystick-strategy") {
-      return route.fulfill({
-        status: 200, contentType: "application/json",
-        body: JSON.stringify({ session: { ...session, joystick_strategy: "hourly" } }),
       });
     }
     if (p === "/products") {
@@ -247,39 +238,30 @@ test("the unlimited confirmation is an in-app dialog, and the renderer keeps typ
 });
 
 /**
- * The strategy correction, in the shell it ships in.
+ * The seat whose extra controllers are ONE payment, in the shell it ships in.
  *
- * The browser suite proves the component and the backend suite proves the rule.
- * What only Electron can show is that the whole path survives the real runtime:
- * the bundle over `app://`, the CSP on a POST to a new endpoint, and a control
- * that appears on the tile of a seat which has no "Add time" button at all.
+ * The money rule is the server's and the unit tests pin the component; what
+ * only Electron can show is that a cashier looking at the real bundle sees WHY
+ * a controller is about to be handed over for nothing. A zero with no reason
+ * beside it is read as a fault and phoned in as one.
  */
-test("a seat that can still be moved offers the correction, in Electron", async () => {
-  // A seat with NO pad out and both strategies still open — the state the
-  // server describes with `joystick_strategy_options`, and the only one that
-  // draws this control.
-  const fresh = {
+test("a seat whose fee was already charged says so, in Electron", async () => {
+  const paid = {
     ...session,
-    joysticks: [],
-    joystick_count: 2,
-    joystick_strategy: "fixed",
-    joystick_strategy_options: ["fixed", "hourly"],
+    joystick_rule: {
+      included: 2, price: 500, price_4: null, max: 4, max_slot: 4,
+      charged_slots: [3, 4], hourly: false, shared: true,
+      charge_once: true, fee_taken: true,
+      // Priced by the server at what the next pad will actually cost.
+      options: [{ slot: 4, price: 0, shared: true }],
+    },
   };
-  let posted: unknown = null;
 
   await page.route((url) => isBackend(url), async (route) => {
-    const p = new URL(route.request().url()).pathname;
-    if (p === "/sessions") {
+    if (new URL(route.request().url()).pathname === "/sessions") {
       return route.fulfill({
         status: 200, contentType: "application/json",
-        body: JSON.stringify({ data: [fresh] }),
-      });
-    }
-    if (p === "/sessions/5/joystick-strategy") {
-      posted = route.request().postDataJSON();
-      return route.fulfill({
-        status: 200, contentType: "application/json",
-        body: JSON.stringify({ session: { ...fresh, joystick_strategy: "hourly" } }),
+        body: JSON.stringify({ data: [paid] }),
       });
     }
     return route.fallback();
@@ -293,17 +275,11 @@ test("a seat that can still be moved offers the correction, in Electron", async 
 
   await page.evaluate(() => { window.location.hash = "#/branches/1/sessions"; });
 
-  // An untouched seat counts its kit rather than naming a pad: two came with
-  // the console and nobody handed them over.
-  await expect(page.getByText("2", { exact: true }).first()).toBeVisible();
+  // On the pad line, without opening anything…
+  await expect(page.getByText("fee already charged").first()).toBeVisible();
 
-  await page.getByRole("button", { name: "Strategy", exact: true }).click();
-  await expect(page.getByText("Joystick strategy")).toBeVisible();
-  await expect(
-    page.getByText("Can still be changed: no joystick has been handed out on this session yet."),
-  ).toBeVisible();
-
-  await page.getByText("Changes the hourly rate", { exact: true }).click();
-
-  await expect.poll(() => posted).toEqual({ joystick_strategy: "hourly" });
+  // …and on the entry that hands the next one over for nothing.
+  const menu = page.getByLabel("Joysticks").first();
+  await expect(menu.locator("option", { hasText: "fee already charged" })).toHaveCount(1);
+  await expect(menu.locator("option", { hasText: "Free" })).toHaveCount(0);
 });

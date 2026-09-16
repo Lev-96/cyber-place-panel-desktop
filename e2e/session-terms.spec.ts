@@ -85,7 +85,7 @@ const seedFloor = async (page: import("@playwright/test").Page) => {
                 { slot: 4, price: 500, shared: true },
               ],
             },
-            joystick_strategy: "fixed", joystick_strategy_options: [],
+            joystick_strategy: "fixed",
             is_free: false, is_unlimited: false,
             supports_joysticks: true, place_platform: "ps5",
           }],

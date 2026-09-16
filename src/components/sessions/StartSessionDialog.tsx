@@ -1,8 +1,5 @@
 import { ListSkeleton } from "@/components/ui/Skeleton";
-import { allowedStrategies, IBillingSettings, JoystickPricingMode, strategyModeOf } from "@/api/joystickPrices";
-import { billingSettingsRepository } from "@/repositories/BillingSettingsRepository";
 import Radio from "@/components/ui/Radio";
-import { platformGroup } from "@/utils/platform";
 import Button from "@/components/ui/Button";
 import Modal from "@/components/ui/Modal";
 import Checkbox from "@/components/ui/Checkbox";
@@ -27,16 +24,6 @@ interface Props {
 }
 
 type Mode = "fixed" | "open";
-
-/**
- * Whether this seat can take extra joysticks at all.
- *
- * The strategy question is only worth asking where pads exist: a PC and a poker
- * table have none, and a dialog that asked anyway would be asking about money
- * that cannot be charged.
- */
-const seatTakesPads = (pc: IPcApi): boolean =>
-  pc.place?.platform !== undefined && platformGroup(String(pc.place?.platform)) === "ps";
 
 /**
  * Start-a-session dialog.
@@ -77,30 +64,6 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
   // cashier types a one-off rate, presses Save to confirm it, and only THEN
   // can start — so editing the price never starts the session by itself.
   const [editPrice, setEditPrice] = useState(false);
-  /**
-   * The joystick strategy this seat will run on, when the club lets the cashier
-   * decide and the seat has pads at all.
-   *
-   * Null means "do not send one": either the club permits a single strategy —
-   * and the server fills it in, so no client has to know the rule — or this seat
-   * takes no pads. Asking anyway would be asking about money that cannot be
-   * charged here.
-   */
-  const [padStrategy, setPadStrategy] = useState<JoystickPricingMode | null>(null);
-  const [billing, setBilling] = useState<IBillingSettings | null>(null);
-
-  useEffect(() => {
-    let alive = true;
-    void billingSettingsRepository.get(branchId).then((s) => { if (alive) setBilling(s); });
-    return () => { alive = false; };
-  }, [branchId]);
-
-  // The choice is offered only where it means something: a club that allows
-  // both, on a seat that takes pads.
-  const strategyChoices = billing !== null && seatTakesPads(pc)
-    ? allowedStrategies(strategyModeOf(billing))
-    : [];
-  const asksStrategy = strategyChoices.length > 1;
   const [customRate, setCustomRate] = useState("");
   const [rateSaved, setRateSaved] = useState(false);
   // Start it waived. Deliberately NOT wired to the price override above: a free
@@ -217,7 +180,6 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
           mode: "fixed",
           time_package_id: pkgId,
           user_display_name: pc.label,
-          ...(padStrategy ? { joystick_strategy: padStrategy } : {}),
         });
       } else {
         if (effectiveRate === null) {
@@ -235,7 +197,6 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
           mode: "open",
           user_display_name: pc.label,
           ...(overrideApplied ? { hourly_rate: customRateNum } : {}),
-          ...(padStrategy ? { joystick_strategy: padStrategy } : {}),
         });
       }
       onStarted();
@@ -288,28 +249,6 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
               </div>
             )}
 
-            {/* WHICH strategy the pads on this seat will be priced by.
-                Shown only when the club allows both — a club on one strategy
-                needs nobody to restate it, and the server fills it in. Frozen
-                onto the session at start, so it cannot be changed later into a
-                re-pricing of time already played. */}
-            {!isFree && asksStrategy && (
-              <div className="col" style={{ gap: 6 }}>
-                <span className="muted" style={{ fontSize: 12 }}>{t("session.strategyChoice")}</span>
-                <div className="row" role="radiogroup" aria-label={t("session.strategyChoice")} style={{ gap: 16, flexWrap: "wrap" }}>
-                  {strategyChoices.map((m) => (
-                    <Radio
-                      key={m}
-                      name="cp-start-strategy"
-                      checked={padStrategy === m}
-                      onChange={() => setPadStrategy(m)}
-                      disabled={busy}
-                      label={t(`joystickPrice.strategy.${m}`)}
-                    />
-                  ))}
-                </div>
-              </div>
-            )}
             {!isFree && (
             <div className="row" style={{ gap: 8 }}>
               {/* A PlayStation may be sold a package too.

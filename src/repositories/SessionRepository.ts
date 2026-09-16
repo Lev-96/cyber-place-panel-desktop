@@ -5,7 +5,6 @@ import {
   apiAddSessionItems,
   apiAddSessionJoystick,
   apiAddSessionTime,
-  apiSetJoystickStrategy,
   apiSessionExtensionOptions,
   apiTransferExtension,
   type IExtensionOptions,
@@ -130,10 +129,6 @@ export class SessionRepository {
   /** Move and extend, atomically. May still be refused — the list is stale. */
   async transferExtension(sessionId: number, placeId: number, minutes: number): Promise<ISessionApi> {
     return friendlyMutation(apiTransferExtension(sessionId, placeId, minutes).then((r) => r.session));
-  }
-
-  async setJoystickStrategy(sessionId: number, strategy: "fixed" | "hourly"): Promise<ISessionApi> {
-    return friendlyMutation(apiSetJoystickStrategy(sessionId, strategy).then((r) => r.session));
   }
 
   async setFree(sessionId: number, isFree: boolean): Promise<ISessionApi> {

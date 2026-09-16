@@ -64,8 +64,17 @@ const MoneyRoundingForm = ({ branchId, settings, onSaved }: Props) => {
       // The joystick half goes back untouched, EVERY figure of it: this is a
       // PUT of the whole policy, and sending only the rounding part would clear
       // the fee, reset the allowance and put the fourth pad back on a shared
-      // price. Spread from the stored settings so a field added to the policy
-      // tomorrow is carried here without this form having to learn about it.
+      // price.
+      //
+      // The one field that is not sent back verbatim is the strategy mode: a
+      // branch may still hold the retired "both", which nothing may write any
+      // more, so what goes back is the single answer it already resolves to.
+      // That is the same answer the server computes for it, so the venue's
+      // bills do not move — it is a word being tidied, not a policy changing.
+      //
+      // `joystick_charge_mode` is deliberately absent: this endpoint does not
+      // accept it, and a field it never receives is a field it never writes.
+      // The room's own form owns that answer.
       await billingSettingsRepository.update(branchId, {
         money_rounding_step: step,
         money_rounding_mode: mode,

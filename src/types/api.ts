@@ -94,6 +94,16 @@ export interface IBranchPlace extends Translated {
    * string on some endpoints, and a number on others.
    */
   joystick_price?: number | string | null;
+  /**
+   * HOW this room prices an extra pad — a fee owed on handout, or a higher
+   * hourly rate while the pad is out. Null follows the branch.
+   */
+  joystick_pricing_mode?: "fixed" | "hourly" | null;
+  /**
+   * …and how OFTEN it charges: every handout, or once for the whole session
+   * however many times controllers change hands. Null follows the branch.
+   */
+  joystick_charge_mode?: "each" | "once" | null;
   games: IGame[];
 }
 

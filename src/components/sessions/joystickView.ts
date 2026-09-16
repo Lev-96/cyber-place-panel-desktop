@@ -91,6 +91,15 @@ export interface PadChoice {
   /** Selectable right now: it is the pad that comes next on this seat. */
   enabled: boolean;
   /**
+   * True when this entry is free because the seat's ONE fee has already been
+   * taken — not because the venue hands pads out for nothing.
+   *
+   * Two different zeros, and a cashier needs to tell them apart: one is a
+   * venue's policy, the other is a payment that already happened on this
+   * session. A price of zero with no explanation reads as a mistake.
+   */
+  feeTaken: boolean;
+  /**
    * Already handed over on THIS seat.
    *
    * Told apart from "not selectable" on purpose: a cashier looking at a greyed
@@ -131,6 +140,10 @@ export const padChoices = (rule: IJoystickRule | undefined, openSlots: number[])
     .sort((a, b) => a - b);
   const next = free.length > 0 ? free[0] : null;
 
+  // The SERVER's answer about this seat's one fee, and the reason the prices
+  // below may already be zero.
+  const feeTaken = rule.charge_once === true && rule.fee_taken === true;
+
   const out: PadChoice[] = [];
   let pairDone = false;
 
@@ -149,6 +162,7 @@ export const padChoices = (rule: IJoystickRule | undefined, openSlots: number[])
         slot,
         shared: true,
         price: option.price,
+        feeTaken,
         enabled: slot === next,
         // The pair is taken only when NEITHER position is free: one of two is
         // still a pad this venue can hand over.
@@ -161,6 +175,7 @@ export const padChoices = (rule: IJoystickRule | undefined, openSlots: number[])
       slot: option.slot,
       shared: false,
       price: option.price,
+      feeTaken,
       enabled: option.slot === next,
       taken: openSlots.includes(option.slot),
     });

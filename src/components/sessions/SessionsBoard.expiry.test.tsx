@@ -991,55 +991,101 @@ describe("joysticks on the tile", () => {
 });
 
 /**
- * The way to the strategy correction, on the one screen that has every seat.
+ * A venue whose extra pads are one payment for the whole session.
  *
- * The options dialog holds the control, and until now the only button that
- * opened it was "Add time" — which the tile draws only for a seat that HAS an
- * end. A PlayStation usually runs open-ended, so on exactly the seats where a
- * cashier picks a strategy there was no door to the correction at all.
+ * The tile is where a cashier meets it: the fee is taken on the first handout,
+ * every controller after it goes out for nothing, and the card has to say WHY
+ * it is offering something for nothing. A zero with no reason beside it is read
+ * as a fault and phoned in as one.
  *
- * Whether there is anything to correct is the SERVER's answer, sent with the
- * session. The board does not recompute it from the venue's settings and a
- * count of pads — that rule lives on the backend, and a copy of it here drew a
- * button for a request the server refused.
+ * Whether the fee was taken is the SERVER's answer, on the session's rule.
  */
-describe("reaching the strategy correction from a tile", () => {
-  const openEnded = {
-    ...running, ends_at: null, is_unlimited: true, supports_joysticks: true,
-  } as ISessionApi;
+describe("a seat whose joystick fee is charged once", () => {
+  const onceRule = {
+    included: 2, price: 500, price_4: null, max: 4, max_slot: 4,
+    charged_slots: [3, 4], hourly: false, shared: true,
+    charge_once: true,
+  };
+  const seat = (over: Record<string, unknown>) => ({
+    ...running,
+    supports_joysticks: true,
+    ...over,
+  } as unknown as ISessionApi);
 
   beforeEach(() => {
     repo.listPcs.mockResolvedValue([device]);
   });
   afterEach(cleanup);
 
-  test("an open-ended seat that can still be moved carries the button", async () => {
-    repo.listActive.mockResolvedValue([
-      { ...openEnded, joystick_strategy_options: ["fixed", "hourly"] } as ISessionApi,
-    ]);
+  test("says the fee was taken, on the pad line and in the menu", async () => {
+    repo.listActive.mockResolvedValue([seat({
+      joystick_count: 3,
+      joysticks: [{
+        id: 7, slot: 3, price: 500, is_charged: true, is_hourly: false,
+        started_at: new Date(Date.now() - 60_000).toISOString(), stopped_at: null,
+      }],
+      joystick_rule: {
+        ...onceRule,
+        fee_taken: true,
+        options: [{ slot: 4, price: 0, shared: true }],
+      },
+    })]);
     await mount();
 
-    // The dialog it opens is the one that holds the radio group.
-    await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "session.strategyShort" }));
-    });
-    expect(screen.getByText("session.strategyChoice")).toBeTruthy();
+    // Once on the pad line, so it is visible without opening the menu at all.
+    //
+    // Asserted on the LEAF that carries the words and nowhere else: an
+    // <option> says the same thing, and every ancestor of either inherits the
+    // text — so a looser query passes with this line deleted, which is how the
+    // first version of this assertion proved nothing.
+    const onTheLine = [...document.querySelectorAll("span")]
+      .filter((el) => el.children.length === 0
+        && (el.textContent ?? "").includes("session.padFeeTaken"));
+    expect(onTheLine.length).toBe(1);
+    // …and on the entry that is about to hand one over for nothing.
+    const menu = screen.getByLabelText("session.joysticks") as HTMLSelectElement;
+    const text = [...menu.options].map((o) => o.textContent ?? "").join(" | ");
+    expect(text).toContain("session.padFeeTaken");
+    expect(text).not.toContain("session.padFree");
   });
 
-  test("a seat whose window has closed carries no button", async () => {
-    repo.listActive.mockResolvedValue([
-      { ...openEnded, joystick_strategy_options: [] } as ISessionApi,
-    ]);
+  test("says nothing of the sort before the fee is taken", async () => {
+    repo.listActive.mockResolvedValue([seat({
+      joystick_count: 2,
+      joysticks: [],
+      joystick_rule: {
+        ...onceRule,
+        fee_taken: false,
+        options: [{ slot: 3, price: 500, shared: true }, { slot: 4, price: 500, shared: true }],
+      },
+    })]);
     await mount();
 
-    expect(screen.queryByRole("button", { name: "session.strategyShort" })).toBeNull();
+    expect(screen.queryByText(/session\.padFeeTaken/)).toBeNull();
+    const menu = screen.getByLabelText("session.joysticks") as HTMLSelectElement;
+    expect([...menu.options].map((o) => o.textContent ?? "").join(" | ")).toContain("500");
   });
 
-  /** A backend that does not send the field reads as "nothing to correct". */
-  test("a seat from a server that never sends the field carries no button", async () => {
-    repo.listActive.mockResolvedValue([openEnded]);
+  /**
+   * A venue that hands pads out free is a different thing, and the tile must
+   * not tell a cashier that somebody has paid.
+   */
+  test("a free pad is still called free, not charged", async () => {
+    repo.listActive.mockResolvedValue([seat({
+      joystick_count: 2,
+      joysticks: [],
+      joystick_rule: {
+        ...onceRule,
+        charge_once: false,
+        fee_taken: false,
+        options: [{ slot: 3, price: 0, shared: true }, { slot: 4, price: 0, shared: true }],
+      },
+    })]);
     await mount();
 
-    expect(screen.queryByRole("button", { name: "session.strategyShort" })).toBeNull();
+    const menu = screen.getByLabelText("session.joysticks") as HTMLSelectElement;
+    const text = [...menu.options].map((o) => o.textContent ?? "").join(" | ");
+    expect(text).toContain("session.padFree");
+    expect(text).not.toContain("session.padFeeTaken");
   });
 });

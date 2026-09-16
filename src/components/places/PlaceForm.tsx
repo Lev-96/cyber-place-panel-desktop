@@ -7,6 +7,7 @@ import Modal from "@/components/ui/Modal";
 import Input from "@/components/ui/Input";
 import PriceInput from "@/components/ui/PriceInput";
 import Checkbox from "@/components/ui/Checkbox";
+import Radio from "@/components/ui/Radio";
 import PlatformPicker from "@/components/ui/PlatformPicker";
 import PlatformNameInput, { LangNames } from "@/components/ui/PlatformNameInput";
 import SubplatformTabs from "@/components/ui/SubplatformTabs";
@@ -20,7 +21,7 @@ import { platformPriceNameOf } from "@/i18n/platformPriceName";
 import { gameRepository } from "@/repositories/GameRepository";
 import { placeRepository } from "@/repositories/PlaceRepository";
 import { subplatformRepository } from "@/repositories/SubplatformRepository";
-import { MAX_JOYSTICKS } from "@/api/joystickPrices";
+import { CHARGE_MODES, JoystickChargeMode, JoystickPricingMode, MAX_JOYSTICKS, PRICING_MODES } from "@/api/joystickPrices";
 import { IBranchPlace, IBranchPlatformPrice, PlaceType } from "@/types/api";
 import { isKnownPlatform, platformGroup, platformLabel, slugifyPlatform } from "@/utils/platform";
 import { FormEvent, useEffect, useState } from "react";
@@ -79,6 +80,20 @@ const PlaceForm = ({ branchId, initial, platformSuggestions, platformPrices, onC
   );
   const [joystickPrice, setJoystickPrice] = useState(
     initial?.joystick_price != null ? String(initial.joystick_price) : "",
+  );
+  /**
+   * HOW this room prices an extra pad, and HOW OFTEN it charges for one.
+   *
+   * Empty is inherit, like every other box here. The two questions are
+   * deliberately separate: the first is what the money is (a fee owed on
+   * handout, or a higher hourly rate while the pad is out), the second is
+   * whether it is owed again the next time a controller changes hands.
+   */
+  const [joystickStrategy, setJoystickStrategy] = useState<JoystickPricingMode | "">(
+    initial?.joystick_pricing_mode ?? "",
+  );
+  const [joystickChargeMode, setJoystickChargeMode] = useState<JoystickChargeMode | "">(
+    initial?.joystick_charge_mode ?? "",
   );
   const [gameIds, setGameIds] = useState<Set<number>>(new Set((initial?.games ?? []).map((g) => g.id)));
   // A custom platform may legitimately have NO games (table tennis, a poker
@@ -294,6 +309,8 @@ const PlaceForm = ({ branchId, initial, platformSuggestions, platformPrices, onC
         // so switching ps5 → pc drops one rather than leaving it behind.
         joystick_included: isPlayStation && joystickIncluded !== "" ? Number(joystickIncluded) : null,
         joystick_price: isPlayStation && joystickPrice !== "" ? Number(joystickPrice) : null,
+        joystick_pricing_mode: isPlayStation && joystickStrategy !== "" ? joystickStrategy : null,
+        joystick_charge_mode: isPlayStation && joystickChargeMode !== "" ? joystickChargeMode : null,
         platform_name_en: customNew ? (names.en.trim() || undefined) : undefined,
         platform_name_ru: customNew ? (names.ru.trim() || undefined) : undefined,
         platform_name_am: customNew ? (names.am.trim() || undefined) : undefined,
@@ -502,6 +519,58 @@ const PlaceForm = ({ branchId, initial, platformSuggestions, platformPrices, onC
                 />
               </div>
             </div>
+            {/* HOW a pad is priced here. Two answers and no third: a club
+                ran both models at once for a day, and a choice made per seat
+                is a choice a cashier can get wrong on money. */}
+            <div className="col" style={{ gap: 6 }}>
+              <span className="label">{t("place.joystickStrategy")}</span>
+              <div className="row" role="radiogroup" aria-label={t("place.joystickStrategy")} style={{ gap: 16, flexWrap: "wrap" }}>
+                <Radio
+                  name="cp-place-joystick-strategy"
+                  checked={joystickStrategy === ""}
+                  onChange={() => setJoystickStrategy("")}
+                  disabled={busy}
+                  label={t("place.joystickInherit")}
+                />
+                {PRICING_MODES.map((m) => (
+                  <Radio
+                    key={m}
+                    name="cp-place-joystick-strategy"
+                    checked={joystickStrategy === m}
+                    onChange={() => setJoystickStrategy(m)}
+                    disabled={busy}
+                    label={t(`joystickPrice.strategy.${m}`)}
+                  />
+                ))}
+              </div>
+            </div>
+
+            {/* …and how often it is charged. The old screen spelled these "3"
+                and "3/4" — slot numbers an operator had to translate into
+                money. They say what they do now. */}
+            <div className="col" style={{ gap: 6 }}>
+              <span className="label">{t("place.joystickChargeMode")}</span>
+              <div className="row" role="radiogroup" aria-label={t("place.joystickChargeMode")} style={{ gap: 16, flexWrap: "wrap" }}>
+                <Radio
+                  name="cp-place-joystick-charge"
+                  checked={joystickChargeMode === ""}
+                  onChange={() => setJoystickChargeMode("")}
+                  disabled={busy}
+                  label={t("place.joystickInherit")}
+                />
+                {CHARGE_MODES.map((m) => (
+                  <Radio
+                    key={m}
+                    name="cp-place-joystick-charge"
+                    checked={joystickChargeMode === m}
+                    onChange={() => setJoystickChargeMode(m)}
+                    disabled={busy}
+                    label={t(`joystickPrice.chargeMode.${m}`)}
+                  />
+                ))}
+              </div>
+            </div>
+
             <span className="muted" style={{ fontSize: 11 }}>{t("place.joystickOverrideNote")}</span>
           </div>
         )}

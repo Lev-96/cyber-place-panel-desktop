@@ -228,19 +228,6 @@ export const apiAddSessionJoystick = (sessionId: number, slot?: number) =>
 export const apiRemoveSessionJoystick = (sessionId: number, slot: number) =>
   request<{ session: ISessionApi }>(`/sessions/${sessionId}/joysticks/${slot}`, { method: "DELETE" });
 
-/**
- * Correct the strategy a seat was started on.
- *
- * The server allows it only while the session has handed out NO pad — with no
- * period on the seat there is no money that could be re-priced. It refuses the
- * moment one exists, and refuses a strategy the club does not allow.
- */
-export const apiSetJoystickStrategy = (sessionId: number, strategy: "fixed" | "hourly") =>
-  request<{ session: ISessionApi }>(`/sessions/${sessionId}/joystick-strategy`, {
-    method: "POST",
-    body: { joystick_strategy: strategy },
-  });
-
 /** +10 / +30 / +60, priced at the tariff the player is already on. */
 export const apiAddSessionTime = (sessionId: number, minutes: number) =>
   request<{ session: ISessionApi }>(`/sessions/${sessionId}/time`, { method: "POST", body: { minutes } });

@@ -298,50 +298,29 @@ describe("starting a session free", () => {
 });
 
 
-describe("which joystick strategy this seat will run on", () => {
+/**
+ * The dialog does NOT ask which strategy the pads will run on, and that is the
+ * claim now.
+ *
+ * It asked for a day, on clubs that allowed both. The setting became a ROOM's —
+ * two answers, chosen where the room's price is chosen — so there is nothing
+ * left for a cashier to decide at the counter, and the server freezes the
+ * room's answer without being told.
+ */
+describe("what the start dialog deliberately does not ask", () => {
   afterEach(() => { club.mode = "fixed_price"; });
 
-  /**
-   * A club that permits one strategy needs nobody to restate it, and the dialog
-   * does not ask. The server fills it in, so omitting the field is not a
-   * decision made by accident.
-   */
-  test("a club on one strategy is not asked", async () => {
-    club.mode = "change_tariff";
-    await mount(device());
+  test("never asks about the joystick strategy, whatever the club is set to", async () => {
+    for (const mode of ["change_tariff", "fixed_price", "both"]) {
+      club.mode = mode;
+      await mount(device());
 
-    expect(screen.queryByText("session.strategyChoice")).toBeNull();
+      expect(screen.queryByText("session.strategyChoice")).toBeNull();
+      cleanup();
+    }
   });
 
-  /** A club that permits both asks, once, before the seat starts. */
-  test("a club that allows both offers the choice", async () => {
-    club.mode = "both";
-    await mount(device());
-
-    expect(screen.getByText("session.strategyChoice")).toBeTruthy();
-    expect(screen.getByRole("radio", { name: "joystickPrice.strategy.hourly" })).toBeTruthy();
-    expect(screen.getByRole("radio", { name: "joystickPrice.strategy.fixed" })).toBeTruthy();
-  });
-
-  /** …and what the cashier picked is what the server is told. */
-  test("the chosen strategy is sent with the start", async () => {
-    club.mode = "both";
-    await mount(device());
-
-    await act(async () => {
-      fireEvent.click(screen.getByRole("radio", { name: "joystickPrice.strategy.hourly" }));
-    });
-    await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "action.start" }));
-    });
-
-    expect(repo.start).toHaveBeenCalledWith(
-      expect.objectContaining({ joystick_strategy: "hourly" }),
-    );
-  });
-
-  /** Nothing picked sends nothing, and the server resolves it as it always did. */
-  test("no choice sends no strategy at all", async () => {
+  test("and never sends one", async () => {
     club.mode = "both";
     await mount(device());
 

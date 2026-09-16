@@ -1059,60 +1059,16 @@ export const TRANSLATIONS: Dict = {
     am: "Այս մասնաճյուղում լրացուցիչ ջոյսթիքներ չեն տրամադրվում",
   },
   "session.padRemove": { en: "Take the last joystick back", ru: "Снять последний джойстик", am: "Հետ վերցնել վերջին ջոյսթիքը" },
-  "joystickPrice.sectionTitle": { en: "Joystick prices", ru: "Цены на джойстики", am: "Ջոյսթիքների գներ" },
-  "joystickPrice.hint": {
-    en: "One flat fee for every joystick beyond the ones the rate already includes. It goes onto the bill the moment a pad is handed out and stays there when the pad is handed back; how long it was out makes no difference. The first joystick is the session itself, so the allowance is never below one. Below you choose whether extra joysticks are charged, free, or not offered at all.",
-    ru: "Одна фиксированная цена за каждый джойстик сверх тех, что уже входят в тариф. Она прибавляется к счёту в момент выдачи и остаётся в нём, даже если джойстик вернули; время использования на цену не влияет. Первый джойстик это сама сессия, поэтому меньше одного включить нельзя. Ниже выбирается, выдаются ли дополнительные джойстики платно, бесплатно или не выдаются вовсе.",
-    am: "Մեկ ֆիքսված գին՝ սակագնում արդեն ներառված ջոյսթիքներից ավելի յուրաքանչյուրի համար։ Այն ավելացվում է հաշվին ջոյսթիքը տալու պահին և մնում է հաշվին, նույնիսկ եթե ջոյսթիքը վերադարձնեն. օգտագործման տևողությունը գնի վրա չի ազդում։ Առաջին ջոյսթիքը հենց նիստն է, ուստի մեկից քիչ ներառել հնարավոր չէ։ Ստորև ընտրվում է՝ լրացուցիչ ջոյսթիքները վճարովի են, անվճար, թե ընդհանրապես չեն տրվում։",
-  },
   "joystickPrice.strategy": { en: "Joystick pricing", ru: "Стратегия джойстиков", am: "Ջոյսթիքների սակագին" },
   "joystickPrice.strategy.fixed": { en: "Fixed price", ru: "Фиксированная цена", am: "Ֆիքսված գին" },
   "joystickPrice.strategy.hourly": { en: "Changes the hourly rate", ru: "Изменение тарифа", am: "Փոխում է ժամավճարը" },
-  "joystickPrice.strategyExplain.fixed": {
-    en: "Every time an extra joystick is handed out, its price is added to the session. Handing it back does not give the money back.",
-    ru: "При каждой выдаче дополнительного джойстика его цена добавляется к сессии. Возврат джойстика деньги не возвращает.",
-    am: "Յուրաքանչյուր լրացուցիչ ջոյսթիք տալիս դրա գինը ավելանում է նիստին։ Ջոյսթիքը հետ բերելը գումարը չի վերադարձնում։",
-  },
-  "joystickPrice.strategyExplain.hourly": {
-    en: "The hour costs more while an extra joystick is in play, and costs what it did before once the joystick is handed back.",
-    ru: "Пока дополнительный джойстик на руках, час стоит дороже. Когда джойстик вернули, час снова стоит как раньше.",
-    am: "Քանի դեռ լրացուցիչ ջոյսթիքը խաղում է, ժամն ավելի թանկ է։ Ջոյսթիքը վերադարձնելուց հետո ժամը կրկին արժե այնքան, որքան առաջ։",
-  },
   "joystickPrice.appliesTo": { en: "Price applies to", ru: "Цена применяется к", am: "Գինը վերաբերում է" },
-  "joystickPrice.appliesNotSet": { en: "Not chosen yet", ru: "Пока не выбрано", am: "Դեռ ընտրված չէ" },
-  // The options read as the operator says them out loud: "3", "4", "3/4".
-  // The sentence under the select is what makes each one unambiguous, so the
-  // option itself does not have to carry the explanation.
-  "joystickPrice.applies.3": { en: "3", ru: "3", am: "3" },
-  "joystickPrice.applies.4": { en: "4", ru: "4", am: "4" },
-  "joystickPrice.applies.3,4": { en: "3/4", ru: "3/4", am: "3/4" },
 
-  "joystickPrice.appliesExplain.3": {
-    en: "The first two joysticks are included. The 3rd is charged, the 4th is not.",
-    ru: "Первые два джойстика входят в тариф. 3-й платный, 4-й нет.",
-    am: "Առաջին երկու ջոյսթիքները ներառված են։ 3-րդը վճարովի է, 4-րդը՝ ոչ։",
-  },
-  "joystickPrice.appliesExplain.4": {
-    en: "The first three joysticks are included. Only the 4th is charged.",
-    ru: "Первые три джойстика входят в тариф. Платный только 4-й.",
-    am: "Առաջին երեք ջոյսթիքները ներառված են։ Վճարովի է միայն 4-րդը։",
-  },
-  "joystickPrice.appliesExplain.3,4": {
-    en: "The first two joysticks are included. The 3rd and the 4th are charged, each at the price below.",
-    ru: "Первые два джойстика входят в тариф. 3-й и 4-й платные, каждый по цене ниже.",
-    am: "Առաջին երկու ջոյսթիքները ներառված են։ 3-րդը և 4-րդը վճարովի են՝ ստորև նշված գնով։",
-  },
   "joystickPrice.appliesFallback": {
     en: "Nothing chosen yet, so every joystick from the {0} one onwards is charged, as before.",
     ru: "Пока ничего не выбрано, поэтому платными считаются джойстики начиная с {0}-го, как и раньше.",
     am: "Դեռ ոչինչ ընտրված չէ, ուստի վճարովի են {0}-րդից սկսած ջոյսթիքները, ինչպես նախկինում։",
   },
-  "joystickPrice.included": { en: "Included in the rate", ru: "Входит в тариф", am: "Ներառված է սակագնում" },
-  "joystickPrice.extra": { en: "Extra joysticks", ru: "Дополнительные джойстики", am: "Լրացուցիչ ջոյսթիքներ" },
-  "joystickPrice.extraPaid": { en: "Charged", ru: "Платно", am: "Վճարովի" },
-  "joystickPrice.extraFree": { en: "Free", ru: "Бесплатно", am: "Անվճար" },
-  "joystickPrice.extraNone": { en: "Not offered", ru: "Не выдаются", am: "Չեն տրվում" },
-  "joystickPrice.extraPrice": { en: "Price per extra joystick", ru: "Цена дополнительного джойстика", am: "Լրացուցիչ ջոյսթիքի գին" },
   "joystickPrice.freeNote": {
     en: "Extra joysticks are handed out for nothing. Each one is still a line on the bill, at zero.",
     ru: "Дополнительные джойстики выдаются бесплатно. Каждый всё равно попадает в счёт, по нулевой цене.",
@@ -1134,41 +1090,13 @@ export const TRANSLATIONS: Dict = {
     am: "Տեղի բոլոր ջոյսթիքները ներառված են սակագնում, ուստի այստեղից ոչինչ չի գանձվում։",
   },
   "joystickPrice.slot": { en: "Joystick #{0}", ru: "Джойстик №{0}", am: "Ջոյսթիք №{0}" },
-  "joystickPrice.clubMode": { en: "Strategies allowed here", ru: "Разрешённые стратегии", am: "Թույլատրված ռազմավարություններ" },
-  "joystickPrice.clubMode.change_tariff": {
-    en: "Changes the hourly rate only", ru: "Только изменение тарифа", am: "Միայն ժամավճարի փոփոխություն",
-  },
-  "joystickPrice.clubMode.fixed_price": {
-    en: "Fixed price only", ru: "Только фиксированная цена", am: "Միայն ֆիքսված գին",
-  },
-  "joystickPrice.clubMode.both": {
-    en: "Both, chosen per session", ru: "Обе, выбор при старте сессии", am: "Երկուսն էլ՝ ընտրությամբ",
-  },
-  "joystickPrice.clubModeExplain.both": {
-    en: "The cashier picks one when they start a seat, and it stays fixed for that session.",
-    ru: "Кассир выбирает одну при запуске места, и для этой сессии она уже не меняется.",
-    am: "Գանձապահն ընտրում է մեկը տեղը սկսելիս, և այդ նիստի համար այն այլևս չի փոխվում։",
-  },
-  "joystickPrice.clubModeExplain.single": {
-    en: "Every session here uses this strategy. Nobody is asked to choose.",
-    ru: "Все сессии здесь считаются этой стратегией. Выбирать никого не просят.",
-    am: "Այստեղ բոլոր նիստերը հաշվարկվում են այս ռազմավարությամբ։",
-  },
-  "session.strategyCorrectHint": {
-    en: "Can still be changed: no joystick has been handed out on this session yet.",
-    ru: "Ещё можно изменить: в этой сессии джойстик пока не выдавался.",
-    am: "Դեռ կարելի է փոխել․ այս նիստում ջոյսթիք դեռ չի տրվել։",
-  },
-  "session.strategyChoice": { en: "Joystick strategy", ru: "Стратегия джойстиков", am: "Ջոյսթիքների ռազմավարություն" },
-  // On the tile, where a button carries what a whole dialog section can spell
-  // out: the word alone is what a cashier scans for.
-  "session.strategyShort": { en: "Strategy", ru: "Стратегия", am: "Ռազմավարություն" },
   "session.padTaken": { en: "already in use", ru: "уже используется", am: "արդեն օգտագործվում է" },
-  "joystickPrice.charging": { en: "Charging for extras", ru: "Плата за дополнительные", am: "Վճար լրացուցիչների համար" },
-  "joystickPrice.useFourth": {
-    en: "Will you hand out a fourth joystick?",
-    ru: "Будете ли вы использовать 4-й джойстик?",
-    am: "Կտրամադրե՞ք չորրորդ ջոյսթիքը",
+  // The seat's ONE fee, already taken. A different thing from a venue that
+  // hands pads out free, and a cashier has to be able to tell them apart.
+  "session.padFeeTaken": {
+    en: "fee already charged",
+    ru: "плата уже списана",
+    am: "վճարն արդեն գանձվել է",
   },
   "joystickPrice.yes": { en: "Yes", ru: "Да", am: "Այո" },
   "joystickPrice.no": { en: "No", ru: "Нет", am: "Ոչ" },
@@ -1195,7 +1123,6 @@ export const TRANSLATIONS: Dict = {
     ru: "Укажите цену 4-го джойстика или ответьте «Нет» выше.",
     am: "Նշեք 4-րդ ջոյսթիքի գինը կամ վերևում պատասխանեք «Ոչ»։",
   },
-  "joystickPrice.saved": { en: "Joystick prices saved", ru: "Цены на джойстики сохранены", am: "Ջոյսթիքների գները պահպանվեցին" },
   "rounding.sectionTitle": { en: "Rounding the bill", ru: "Округление счёта", am: "Հաշվի կլորացում" },
   "rounding.hint": {
     en: "Time is always billed for the minutes actually played. This rounds the FINAL amount, once. A 45-minute session at 1500/h is 1125 before rounding.",
@@ -1691,11 +1618,38 @@ export const TRANSLATIONS: Dict = {
   "place.tierUnpricedNote": { en: "This tier of the platform isn't priced yet. Set its rate once here.", ru: "Для этого тарифа платформы цена ещё не задана. Задайте её здесь один раз.", am: "Հարթակի այս սակագինը դեռ գնավորված չէ։ Սահմանեք այն այստեղ մեկ անգամ:" },
   "place.joystickIncluded": { en: "Joysticks in the rate", ru: "Джойстики в тарифе", am: "Ջոյսթիքները սակագնում" },
   "place.joystickPrice": { en: "Price per extra joystick", ru: "Цена дополнительного джойстика", am: "Լրացուցիչ ջոյսթիքի գին" },
+  "place.joystickStrategy": {
+    en: "Extra joystick pricing",
+    ru: "Тариф доп. джойстика",
+    am: "Լրացուցիչ ջոյսթիքի սակագին",
+  },
+  "place.joystickChargeMode": {
+    en: "When the fee is charged",
+    ru: "Когда взимается плата",
+    am: "Երբ է գանձվում վճարը",
+  },
+  // The two answers, spelled as what they DO. The screen used to print the
+  // slot numbers "3" and "3/4" and left an operator to translate them into
+  // money — which is exactly the translation they got wrong.
+  "joystickPrice.chargeMode.each": {
+    en: "Charged for every joystick handed out",
+    ru: "Плата добавляется при каждом добавлении джойстика",
+    am: "Վճարը գանձվում է յուրաքանչյուր տրված ջոյսթիքի համար",
+  },
+  "joystickPrice.chargeMode.once": {
+    en: "One charge per session, however many are handed out",
+    ru: "Единоразовая плата за доп. джойстики (1 раз за сессию)",
+    am: "Մեկանգամյա վճար նիստի համար՝ անկախ ջոյսթիքների քանակից",
+  },
   "place.joystickInherit": { en: "As in the branch", ru: "Как в филиале", am: "Ինչպես մասնաճյուղում" },
+  // ⚠️ Says "the branch's rule" and names no SCREEN on purpose: the venue-wide
+  // joystick section is gone, and its columns are only a fallback now. Sending
+  // an operator to a page that no longer has the setting is worse than saying
+  // nothing about where it lives.
   "place.joystickOverrideNote": {
-    en: "Left empty, this place follows the branch joystick policy from Branch > Prices. A value here applies to this place only.",
-    ru: "Если поля пустые, место работает по правилу филиала из раздела Филиал > Цены. Значение здесь действует только для этого места.",
-    am: "Եթե դաշտերը դատարկ են, տեղը գործում է մասնաճյուղի կանոնով՝ Մասնաճյուղ > Գներ բաժնից։ Այստեղի արժեքը գործում է միայն այս տեղի համար։",
+    en: "Left empty, these follow the branch's joystick rule. A value here applies to this place only.",
+    ru: "Если поля пустые, место работает по правилу филиала. Значение здесь действует только для этого места.",
+    am: "Եթե դաշտերը դատարկ են, տեղը գործում է մասնաճյուղի կանոնով։ Այստեղի արժեքը գործում է միայն այս տեղի համար։",
   },
   // Multilingual platform-name widget (place form, custom platform).
   "platformName.placeholder": { en: "Name", ru: "Наименование", am: "Անվանում" },

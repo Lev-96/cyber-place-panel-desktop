@@ -219,3 +219,97 @@ describe("PlaceForm joystick override", () => {
     expect(body.joystick_price).toBeNull();
   });
 });
+
+/**
+ * The room's pricing answers, which moved here from the branch's Prices page.
+ *
+ * What a pad costs, HOW it is priced and HOW OFTEN it is charged are answers a
+ * ROOM gives — a club sells its VIP's controllers differently from its floor's
+ * — so they are set where that room's rate is set, by the same owner-level
+ * permission, and inherit the branch until the room says otherwise.
+ */
+describe("the room's own joystick pricing", () => {
+  const radio = (name: string) =>
+    screen.getByRole("radio", { name }) as HTMLInputElement;
+  const pick = async (name: string) => {
+    await act(async () => { fireEvent.click(radio(name)); });
+  };
+
+  beforeEach(() => {
+    repo.create.mockReset();
+    repo.update.mockReset();
+    repo.create.mockResolvedValue({ id: 12 });
+    repo.update.mockResolvedValue({ id: 12 });
+    repo.nextNumber.mockResolvedValue(3);
+  });
+  afterEach(cleanup);
+
+  test("a PlayStation room offers both questions, on inherit by default", async () => {
+    await mount(place());
+
+    expect(screen.getByText("place.joystickStrategy")).toBeTruthy();
+    expect(screen.getByText("place.joystickChargeMode")).toBeTruthy();
+    // Two groups, each with its own "follow the branch" answer selected.
+    const inherits = screen.getAllByRole("radio", { name: "place.joystickInherit" }) as HTMLInputElement[];
+    expect(inherits.length).toBe(2);
+    expect(inherits.every((i) => i.checked)).toBe(true);
+  });
+
+  /** Exactly two strategies, and the retired third is not among them. */
+  test("the strategy offers the two answers and no others", async () => {
+    await mount(place());
+
+    expect(radio("joystickPrice.strategy.fixed")).toBeTruthy();
+    expect(radio("joystickPrice.strategy.hourly")).toBeTruthy();
+    expect(screen.queryByRole("radio", { name: /both/i })).toBeNull();
+  });
+
+  /** The charge mode says what it DOES, not which slot number it is. */
+  test("the charge mode is named for what it does", async () => {
+    await mount(place());
+
+    expect(radio("joystickPrice.chargeMode.each")).toBeTruthy();
+    expect(radio("joystickPrice.chargeMode.once")).toBeTruthy();
+    // The slot numbers the old screen printed are gone from this form.
+    expect(screen.queryByText("3/4")).toBeNull();
+  });
+
+  test("untouched, both travel as null — which is inherit and not a setting", async () => {
+    await mount(place());
+    await save();
+
+    const body = await sent();
+    expect(body.joystick_pricing_mode).toBeNull();
+    expect(body.joystick_charge_mode).toBeNull();
+  });
+
+  test("what the room picks is what the server is told", async () => {
+    await mount(place());
+
+    await pick("joystickPrice.strategy.hourly");
+    await pick("joystickPrice.chargeMode.once");
+    await save();
+
+    const body = await sent();
+    expect(body.joystick_pricing_mode).toBe("hourly");
+    expect(body.joystick_charge_mode).toBe("once");
+  });
+
+  test("a saved answer comes back selected", async () => {
+    await mount(place({
+      joystick_pricing_mode: "hourly", joystick_charge_mode: "once",
+    } as Partial<IBranchPlace>));
+
+    expect(radio("joystickPrice.strategy.hourly").checked).toBe(true);
+    expect(radio("joystickPrice.chargeMode.once").checked).toBe(true);
+    expect(radio("joystickPrice.strategy.fixed").checked).toBe(false);
+  });
+
+  /** A seat with no pads is never asked about how they are priced. */
+  test("a PC room is asked neither question", async () => {
+    await mount(place({ platform: "pc" }));
+
+    expect(screen.queryByText("place.joystickStrategy")).toBeNull();
+    expect(screen.queryByText("place.joystickChargeMode")).toBeNull();
+  });
+});

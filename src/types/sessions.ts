@@ -83,6 +83,19 @@ export interface IJoystickRule {
   charged_slots: number[];
   hourly: boolean;
   shared: boolean;
+  /**
+   * True when the fee is owed ONCE for the whole session rather than per
+   * handout — the shape a club means by "one payment for extra controllers".
+   */
+  charge_once?: boolean;
+  /**
+   * …and whether it has already been taken on THIS seat.
+   *
+   * The server's answer, not a count of rows done here: the options below are
+   * already priced at zero when it is true, and the card says "already charged"
+   * so that a zero reads as a rule rather than as a mistake.
+   */
+  fee_taken?: boolean;
   options: IJoystickRuleOption[];
 }
 
@@ -214,21 +227,6 @@ export interface ISessionApi {
    * own answer then applies, resolved server-side when a pad is handed out.
    */
   joystick_strategy?: "fixed" | "hourly" | null;
-  /**
-   * …and which strategies this seat may still be MOVED to, decided by the
-   * server.
-   *
-   * Empty is the ordinary answer and means there is nothing to ask: the club
-   * allows one strategy, the seat is not running, or a pad has already gone out
-   * and a figure has been quoted to a player. A screen draws the control from
-   * this and from nothing else — deriving it from the venue's settings plus a
-   * count of pads is the server's own rule copied into a client, and it drew
-   * buttons the server then refused.
-   *
-   * Absent when the server did not load the relations it needs, which reads the
-   * same as empty: nothing offered.
-   */
-  joystick_strategy_options?: ("fixed" | "hourly")[];
   /**
    * The venue's rounding policy, so a ticking figure can land where the
    * receipt does. 0 is "no policy", which is what every branch starts on.

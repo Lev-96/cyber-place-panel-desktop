@@ -205,3 +205,62 @@ describe("how far the seat counts", () => {
     expect(padCeiling(session({ joystick_rule: undefined } as Partial<ISessionApi>))).toBeNull();
   });
 });
+
+/**
+ * The seat's ONE fee, and the two different zeros it creates.
+ *
+ * A venue may sell its extra controllers for a single fee that covers the whole
+ * session, however many times pads change hands. Once that fee is taken, the
+ * server prices every later pad at zero — and a zero with no explanation reads
+ * on screen as a fault, so the menu has to be able to say which zero it is.
+ *
+ * The answer is the SERVER's, carried on the rule. Nothing here counts rows to
+ * work it out: that would be the billing rule copied into a client, and the
+ * client would get it wrong the first time a pad was handed back.
+ */
+describe("a fee that is charged once for the seat", () => {
+  const once: IJoystickRule = {
+    ...RULE,
+    charge_once: true,
+    fee_taken: true,
+    // Priced by the server at what the next pad will actually cost.
+    options: [
+      { slot: 3, price: 0, shared: true },
+      { slot: 4, price: 0, shared: true },
+    ],
+  };
+
+  test("an entry says the fee was already taken", () => {
+    const choices = padChoices(once, [3]);
+
+    expect(choices).toHaveLength(1);
+    expect(choices[0].feeTaken).toBe(true);
+    expect(choices[0].price).toBe(0);
+  });
+
+  /** Before it is taken, the same venue's entry is an ordinary priced one. */
+  test("…and does not while the fee is still owed", () => {
+    const choices = padChoices({ ...RULE, charge_once: true, fee_taken: false }, []);
+
+    expect(choices[0].feeTaken).toBe(false);
+    expect(choices[0].price).toBe(500);
+  });
+
+  /**
+   * A venue that hands pads out free is a different thing entirely, and must
+   * not be labelled as a payment that happened.
+   */
+  test("a venue whose pads are free is not a fee that was taken", () => {
+    const free: IJoystickRule = {
+      ...RULE,
+      options: [{ slot: 3, price: 0, shared: true }, { slot: 4, price: 0, shared: true }],
+    };
+
+    expect(padChoices(free, [])[0].feeTaken).toBe(false);
+  });
+
+  /** A backend that never sends the fields reads as "charged per handout". */
+  test("an older payload reads as the ordinary per-pad venue", () => {
+    expect(padChoices(RULE, [])[0].feeTaken).toBe(false);
+  });
+});
