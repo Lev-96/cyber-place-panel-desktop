@@ -190,7 +190,12 @@ test("the changed session screens render in Electron", async () => {
   // because this venue prices the third and the fourth as one figure.
   await expect(page.getByText("3/4").first()).toBeVisible();
   // …and the charge line names it too, at the fee it froze.
-  await expect(page.getByText(/Joystick #3/)).toBeVisible();
+  // …and what they have earned, on the SAME line. The card used to carry a
+  // second one naming the controllers again ("Joystick #3 · 500 AMD = 500
+  // AMD"); on a 160px tile that was most of the card, and every number on it
+  // is either printed beside it or on the receipt.
+  await expect(page.getByText(/^3\/4 · /)).toBeVisible();
+  await expect(page.getByText(/Joystick #3/)).toHaveCount(0);
 });
 
 /**
@@ -276,7 +281,9 @@ test("a seat whose fee was already charged says so, in Electron", async () => {
   await page.evaluate(() => { window.location.hash = "#/branches/1/sessions"; });
 
   // On the pad line, without pressing anything…
-  await expect(page.getByText("fee already charged").first()).toBeVisible();
+  // One word now: the figure on the same line already says how much was
+  // charged, and what this adds is that the NEXT controller costs nothing.
+  await expect(page.getByText("paid").first()).toBeVisible();
 
   // …and the control is the SWITCH this venue gets instead of a menu: one
   // payment, one controller, and with it out the button offers its return.

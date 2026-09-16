@@ -1098,10 +1098,12 @@ export const TRANSLATIONS: Dict = {
   // separate state line would cost more room than it is worth.
   "session.padAddOne": { en: "Add joystick", ru: "Выдать джойстик", am: "Տալ ջոյսթիք" },
   "session.padRemoveOne": { en: "Remove joystick", ru: "Забрать джойстик", am: "Վերցնել ջոյսթիքը" },
+  // One word. The figure beside it on the same line already says how much was
+  // charged; what this adds is that the NEXT controller costs nothing.
   "session.padFeeTaken": {
-    en: "fee already charged",
-    ru: "плата уже списана",
-    am: "վճարն արդեն գանձվել է",
+    en: "paid",
+    ru: "оплачено",
+    am: "վճարված",
   },
   "joystickPrice.yes": { en: "Yes", ru: "Да", am: "Այո" },
   "joystickPrice.no": { en: "No", ru: "Нет", am: "Ոչ" },
@@ -1627,6 +1629,25 @@ export const TRANSLATIONS: Dict = {
   // `place.hourlyRate`, which labels the box that prices a PLATFORM or a
   // sub-category: the two mean different things to an operator and only one of
   // them is ever on screen at a time.
+  // The branch's tariff matrix, shown on a place as the price it inherits.
+  "place.branchDefaultRate": { en: "Branch price", ru: "Цена филиала", am: "Մասնաճյուղի գինը" },
+  "place.branchDefaultNote": {
+    en: "This place bills at the branch price for its platform and tier. Set a price below to depart from it.",
+    ru: "Место считается по цене филиала для его платформы и тарифа. Задайте цену ниже, чтобы отличаться от неё.",
+    am: "Տեղը հաշվարկվում է իր հարթակի և սակագնի համար մասնաճյուղի գնով։ Ստորև սահմանեք գին՝ դրանից տարբերվելու համար։",
+  },
+  // A price of zero is stored, shown, and never charged — the seat falls back
+  // to the branch figure. The server refuses it; this is the same sentence.
+  "place.zeroNotAPriceHint": {
+    en: "A price of zero is not billed. Leave the box empty to use the branch price, or start a Free session to give the seat away.",
+    ru: "Цена «0» не тарифицируется. Оставьте поле пустым, чтобы считать по цене филиала, или запустите бесплатную сессию, чтобы отдать место даром.",
+    am: "Զրո գինը չի հաշվարկվում։ Թողեք դաշտը դատարկ՝ մասնաճյուղի գնով հաշվարկելու համար, կամ սկսեք անվճար նիստ՝ տեղն անվճար տրամադրելու համար։",
+  },
+  "place.noBranchRateHint": {
+    en: "The branch has no price for this platform and tier, so this place needs its own — otherwise no session can be started on it.",
+    ru: "У филиала нет цены для этой платформы и тарифа, поэтому месту нужна своя — иначе сессию на нём не запустить.",
+    am: "Մասնաճյուղն այս հարթակի և սակագնի համար գին չունի, ուստի տեղին պետք է սեփականը, այլապես դրա վրա նիստ հնարավոր չէ սկսել։",
+  },
   "place.ownRate": { en: "Price for this place", ru: "Цена этого места", am: "Այս տեղի գինը" },
   "place.ownRateInherit": { en: "As set for the platform", ru: "Как у платформы", am: "Ինչպես հարթակի համար" },
   "place.ownRateNote": {

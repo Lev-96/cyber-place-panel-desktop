@@ -26,6 +26,12 @@ import type { IBranchPlace, IBranchPlatformPrice } from "@/types/api";
  */
 
 const repo = vi.hoisted(() => ({ create: vi.fn(), update: vi.fn(), nextNumber: vi.fn() }));
+// The branch's tariff matrix, which the modal reads to show what a seat
+// inherits. Answered here so a unit test never reaches for a server.
+const branch = vi.hoisted(() => ({ byId: vi.fn() }));
+vi.mock("@/repositories/BranchRepository", () => ({
+  branchRepository: { byId: (...a: unknown[]) => branch.byId(...a) },
+}));
 vi.mock("@/repositories/PlaceRepository", () => ({
   placeRepository: {
     create: (...a: unknown[]) => repo.create(...a),
@@ -99,6 +105,15 @@ beforeEach(() => {
   repo.create.mockResolvedValue({ id: 12 });
   repo.update.mockResolvedValue({ id: 12 });
   repo.nextNumber.mockResolvedValue(3);
+  branch.byId.mockReset();
+  // An ORDINARY branch: one that prices the PlayStation seats it hands out.
+  // A branch with no cell at all is a state of its own — the seat cannot be
+  // billed and the form says so — and it belongs in the cases below that are
+  // about exactly that, not underneath every other question this file asks.
+  branch.byId.mockResolvedValue({
+    id: 7,
+    price_for_branch: { id: 1, branch_id: 7, "ps5-standard": 3000, "ps5-vip": 5000 },
+  });
 });
 afterEach(cleanup);
 
@@ -131,13 +146,28 @@ describe("a place's own price per hour", () => {
     expect(sent().hourly_rate).toBe(2500);
   });
 
-  /** A seat given away costs 0, which is a decision and not an empty box. */
-  test("zero is a price and not inherit", async () => {
+  /**
+   * Zero is refused, and this is a correction of what this file used to claim.
+   *
+   * It read "a seat given away costs 0, which is a decision and not an empty
+   * box" — a good intention the billing side does not implement. The session
+   * price resolver takes a figure only when it is greater than zero, from the
+   * seat exactly as from the matrix, so a zero here is stored, shown on this
+   * screen, and then quietly not charged: the seat bills at the branch's price
+   * while its own form says 0. Giving a seat away is `Free session`, which is
+   * explicit, separate, and decided per session rather than per place.
+   */
+  test("zero is refused rather than stored as a price", async () => {
     await mount(place());
     await type(ownRate(), "0");
     await save();
 
-    expect(sent().hourly_rate).toBe(0);
+    // Twice on screen after a save attempt: under the box, and in the form's
+    // own error line. Both are the same sentence on purpose — one explains the
+    // box, the other answers the click.
+    expect(screen.getAllByText("place.zeroNotAPriceHint").length).toBeGreaterThan(0);
+    expect(repo.create).not.toHaveBeenCalled();
+    expect(repo.update).not.toHaveBeenCalled();
   });
 
   test("a saved price comes back in the box", async () => {
@@ -188,5 +218,109 @@ describe("a place's own price per hour", () => {
     await save();
 
     expect(sent().hourly_rate).toBe(1200);
+  });
+});
+
+/**
+ * The branch's default, made visible on the seat that inherits it.
+ *
+ * The chain is `places.hourly_rate` then the branch's tariff matrix cell for
+ * this platform and tier, and the first half became editable before the second
+ * half was ever shown — so "use the branch price" was a thing you did by
+ * leaving a box empty, with no way to see what that price was.
+ *
+ * A seat with nothing to bill at is the state this screen must not produce: the
+ * server refuses it, and without the warning the operator finds out at the
+ * counter, on a seat they thought was finished.
+ */
+describe("the branch price a place inherits", () => {
+  const branchWith = (cells: Record<string, number | null>) => ({
+    id: 7, price_for_branch: { id: 1, branch_id: 7, ...cells },
+  });
+
+  test("a PlayStation seat shows the branch's price for its tier", async () => {
+    branch.byId.mockResolvedValue(branchWith({ "ps5-standard": 3000, "ps5-vip": 5000 }));
+    await mount(place());
+
+    expect(screen.getByText("place.branchDefaultRate")).toBeTruthy();
+    expect(screen.getByText("3000")).toBeTruthy();
+  });
+
+  test("…and the VIP tier shows the VIP cell", async () => {
+    branch.byId.mockResolvedValue(branchWith({ "ps5-standard": 3000, "ps5-vip": 5000 }));
+    await mount(place({ type: "vip" }));
+
+    expect(screen.getByText("5000")).toBeTruthy();
+  });
+
+  /** Leaving the box empty is how a seat says "bill me at the branch price". */
+  test("inheriting sends no rate at all", async () => {
+    branch.byId.mockResolvedValue(branchWith({ "ps5-standard": 3000 }));
+    await mount(place());
+    await save();
+
+    expect(sent().hourly_rate).toBeNull();
+  });
+
+  /** A branch with no cell for this tier cannot bill the seat. */
+  test("warns when the branch has no price for this platform and tier", async () => {
+    branch.byId.mockResolvedValue(branchWith({ "ps5-standard": null }));
+    await mount(place());
+
+    expect(screen.getByText("place.noBranchRateHint")).toBeTruthy();
+    expect(screen.queryByText("place.branchDefaultRate")).toBeNull();
+  });
+
+  /** …and the warning goes the moment the seat carries its own price. */
+  test("the warning clears once the place names a price", async () => {
+    branch.byId.mockResolvedValue(branchWith({ "ps5-standard": null }));
+    await mount(place());
+    await type(ownRate(), "2500");
+
+    expect(screen.queryByText("place.noBranchRateHint")).toBeNull();
+  });
+
+  /**
+   * Zero is not a price: a seat resolving to nothing cannot start a paid
+   * session, and giving one away is `Free session` — explicit and separate.
+   */
+  test("a branch cell of zero is not treated as a price", async () => {
+    branch.byId.mockResolvedValue(branchWith({ "ps5-standard": 0 }));
+    await mount(place());
+
+    expect(screen.getByText("place.noBranchRateHint")).toBeTruthy();
+  });
+
+  /**
+   * …and a zero TYPED INTO THE SEAT is the same absence wearing a number.
+   *
+   * The box accepts it, the server steps over it exactly as it steps over an
+   * empty column, and the seat is then created looking finished and refused at
+   * session start — which is the whole of what this warning exists to prevent.
+   */
+  test("a price of zero on the place is not treated as a price", async () => {
+    branch.byId.mockResolvedValue(branchWith({ "ps5-standard": null }));
+    await mount(place());
+    await type(ownRate(), "0");
+
+    expect(screen.getByText("place.zeroNotAPriceHint")).toBeTruthy();
+  });
+
+  /** …and the form refuses to send it rather than spending a round trip. */
+  test("a seat with nothing to bill at is not submitted", async () => {
+    branch.byId.mockResolvedValue(branchWith({ "ps5-standard": null }));
+    await mount(place());
+    await save();
+
+    expect(repo.create).not.toHaveBeenCalled();
+    expect(repo.update).not.toHaveBeenCalled();
+  });
+
+  /** A PC seat is not warned: computers are not this rule's subject. */
+  test("a PC seat is never warned about the branch price", async () => {
+    branch.byId.mockResolvedValue(branchWith({ "pc-standard": null }));
+    await mount(place({ platform: "pc" }));
+
+    expect(screen.queryByText("place.noBranchRateHint")).toBeNull();
   });
 });

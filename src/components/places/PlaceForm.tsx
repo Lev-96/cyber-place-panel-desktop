@@ -13,6 +13,7 @@ import PlatformNameInput, { LangNames } from "@/components/ui/PlatformNameInput"
 import SubplatformTabs from "@/components/ui/SubplatformTabs";
 import Spinner from "@/components/ui/Spinner";
 import GameForm from "@/components/games/GameForm";
+import { branchRepository } from "@/repositories/BranchRepository";
 import { useAuth } from "@/auth/AuthContext";
 import { can } from "@/auth/permissions";
 import { useAsync } from "@/hooks/useAsync";
@@ -22,7 +23,7 @@ import { gameRepository } from "@/repositories/GameRepository";
 import { placeRepository } from "@/repositories/PlaceRepository";
 import { subplatformRepository } from "@/repositories/SubplatformRepository";
 import { CHARGE_MODES, JoystickChargeMode, JoystickPricingMode, MAX_JOYSTICKS, PRICING_MODES } from "@/api/joystickPrices";
-import { IBranchPlace, IBranchPlatformPrice, PlaceType } from "@/types/api";
+import { IBranchApi, IBranchPlace, IBranchPlatformPrice, PlaceType } from "@/types/api";
 import { isKnownPlatform, platformGroup, platformLabel, slugifyPlatform } from "@/utils/platform";
 import { FormEvent, useEffect, useState } from "react";
 
@@ -230,6 +231,52 @@ const PlaceForm = ({ branchId, initial, platformSuggestions, platformPrices, onC
    */
   const needsSubplatformRate = ownsRate && subplatformRate == null;
   /**
+   * The BRANCH's default price for this platform and tier — the tariff matrix
+   * cell a known platform bills from when the seat carries no price of its own
+   * (`ResolveSessionRateService`: the place first, then this).
+   *
+   * Loaded here rather than passed down because the modal is the only screen
+   * that asks the question, and it already fetches what it needs to answer the
+   * others (sub-categories, games). One GET when it opens.
+   */
+  const branch = useAsync(() => branchRepository.byId(branchId), [branchId]);
+  const branchRate = ((): number | null => {
+    const cell = branch.data?.price_for_branch?.[
+      `${platform}-${type === "vip" ? "vip" : "standard"}` as keyof NonNullable<IBranchApi["price_for_branch"]>
+    ];
+    const value = typeof cell === "number" ? cell : null;
+
+    // Zero is not a price here for the same reason it is not one on the
+    // server: a seat resolving to nothing cannot start a paid session, and
+    // giving one away is `Free session`, which is explicit and separate.
+    return value !== null && value > 0 ? value : null;
+  })();
+  /**
+   * A PlayStation seat with no branch price and no price of its own cannot run
+   * a paid session — the server refuses it, and this is what stops the operator
+   * finding that out at the counter instead of here.
+   *
+   * Zero is not a price on either side: the server bills from a figure greater
+   * than zero and steps over a zero exactly as it steps over an empty column,
+   * so a box reading "0" is this same seat with a number in it. Giving a seat
+   * away is `Free session`, which is a different, explicit thing.
+   *
+   * Silent while the branch is still loading — the matrix is unknown then, and
+   * an error that appears for a moment on every open is noise, not a warning.
+   */
+  const ownRate = Number(placeRate.trim());
+  const hasOwnRate = placeRate.trim() !== "" && Number.isFinite(ownRate) && ownRate > 0;
+  const needsOwnRate = isPlayStation && !branch.loading && branchRate === null && !hasOwnRate;
+  /**
+   * A figure was typed and it is not one the seat can be billed at.
+   *
+   * Separate from `needsOwnRate` because it is a different mistake: the box is
+   * filled in, and what is wrong is the number in it. The server refuses it on
+   * its own sentence too — a zero stored beside a priced branch is written
+   * down, shown here, and never charged.
+   */
+  const ownRateIsNotAPrice = isPlayStation && placeRate.trim() !== "" && !hasOwnRate;
+  /**
    * Whether the form is ALREADY asking for a rate — an unpriced sub-category,
    * or a custom platform whose tier has no price yet.
    *
@@ -308,6 +355,15 @@ const PlaceForm = ({ branchId, initial, platformSuggestions, platformPrices, onC
     }
     if (!ownsRate && isCustomPlatform && !tierLocked && !hourlyRate) {
       return setErr(t("place.errors.priceRequired"));
+    }
+    // A PlayStation seat with nothing to bill at. The server refuses it either
+    // way; saying so here is what keeps the operator from discovering it at the
+    // counter, on a seat they thought was finished.
+    if (ownRateIsNotAPrice) {
+      return setErr(t("place.zeroNotAPriceHint"));
+    }
+    if (needsOwnRate) {
+      return setErr(t("place.noBranchRateHint"));
     }
     setBusy(true); setErr(null);
     try {
@@ -474,6 +530,22 @@ const PlaceForm = ({ branchId, initial, platformSuggestions, platformPrices, onC
             />
             <span className="muted" style={{ fontSize: 11 }}>{t("subplatform.tierUnpricedNote")}</span>
           </div>
+        ) : !isCustomPlatform && branchRate !== null ? (
+          // A known platform bills from the branch's tariff matrix. Shown as
+          // APPLIED, exactly like a sub-category's or a custom platform's
+          // price: it belongs to the branch and is changed in Branch Prices,
+          // not per place. The box below is how one seat departs from it.
+          <div className="col" style={{ gap: 6 }}>
+            <span className="label">{t("place.hourlyRate")} · {typeLabel}</span>
+            <div
+              className="card"
+              style={{ padding: "10px 12px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}
+            >
+              <span>{t("place.branchDefaultRate")}</span>
+              <strong style={{ color: "#07ddf1" }}>{money(branchRate)}</strong>
+            </div>
+            <span className="muted" style={{ fontSize: 11 }}>{t("place.branchDefaultNote")}</span>
+          </div>
         ) : isCustomPlatform && (tierLocked ? (
           // This platform + tier is already priced — applied, not re-entered.
           <div className="col" style={{ gap: 6 }}>
@@ -532,6 +604,15 @@ const PlaceForm = ({ branchId, initial, platformSuggestions, platformPrices, onC
               disabled={busy}
             />
             <span className="muted" style={{ fontSize: 11 }}>{t("place.ownRateNote")}</span>
+            {/* A PlayStation seat with nothing to bill at. The server refuses
+                it; this is what stops the operator finding that out at the
+                counter, on a seat they thought was finished. */}
+            {ownRateIsNotAPrice && (
+              <span className="error" style={{ fontSize: 11 }}>{t("place.zeroNotAPriceHint")}</span>
+            )}
+            {needsOwnRate && (
+              <span className="error" style={{ fontSize: 11 }}>{t("place.noBranchRateHint")}</span>
+            )}
           </div>
         )}
 
