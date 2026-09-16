@@ -1623,7 +1623,6 @@ export const TRANSLATIONS: Dict = {
   "place.priceName": { en: "Platform name (наименование)", ru: "Наименование платформы", am: "Հարթակի անվանումը" },
   "place.priceLockedNote": { en: "This platform already has a branch price. It will be applied to this place.", ru: "Для этой платформы уже задана цена филиала. Она будет применена к этому месту.", am: "Այս հարթակի համար արդեն սահմանված է մասնաճյուղի գին։ Այն կկիրառվի այս տեղի համար:" },
   "place.tierUnpricedNote": { en: "This tier of the platform isn't priced yet. Set its rate once here.", ru: "Для этого тарифа платформы цена ещё не задана. Задайте её здесь один раз.", am: "Հարթակի այս սակագինը դեռ գնավորված չէ։ Սահմանեք այն այստեղ մեկ անգամ:" },
-  "place.joystickIncluded": { en: "Joysticks in the rate", ru: "Джойстики в тарифе", am: "Ջոյսթիքները սակագնում" },
   "place.joystickPrice": { en: "Price per extra joystick", ru: "Цена дополнительного джойстика", am: "Լրացուցիչ ջոյսթիքի գին" },
   // This seat's own price per hour. Its own three keys rather than reusing
   // `place.hourlyRate`, which labels the box that prices a PLATFORM or a
@@ -1683,10 +1682,44 @@ export const TRANSLATIONS: Dict = {
   // joystick section is gone, and its columns are only a fallback now. Sending
   // an operator to a page that no longer has the setting is worse than saying
   // nothing about where it lives.
-  "place.joystickOverrideNote": {
-    en: "Left empty, these follow the branch's joystick rule. A value here applies to this place only.",
-    ru: "Если поля пустые, место работает по правилу филиала. Значение здесь действует только для этого места.",
-    am: "Եթե դաշտերը դատարկ են, տեղը գործում է մասնաճյուղի կանոնով։ Այստեղի արժեքը գործում է միայն այս տեղի համար։",
+  // WHICH extra pads a room charges for. The controllers by number, because
+  // that is how a cashier hands them over; the seat's own two come with the
+  // console and are never on this list.
+  // The venue's own joystick fee, on Branch · Prices. The figure every room
+  // inherits until it prices its own pads.
+  "branchJoystick.sectionTitle": { en: "Joysticks", ru: "Джойстики", am: "Ջոյսթիքներ" },
+  "branchJoystick.hint": {
+    en: "What one extra joystick costs at this branch. Every place uses this until it sets a price of its own.",
+    ru: "Сколько стоит один дополнительный джойстик в этом филиале. Все места считают по нему, пока не зададут свою цену.",
+    am: "Որքան արժե մեկ լրացուցիչ ջոյսթիք այս մասնաճյուղում։ Բոլոր տեղերն օգտագործում են այս գինը, քանի դեռ չեն սահմանել իրենցը։",
+  },
+  "branchJoystick.unset": { en: "Not set", ru: "Не задано", am: "Սահմանված չէ" },
+  "branchJoystick.priceRequired": {
+    en: "Name the price for the joysticks you charge for.",
+    ru: "Укажите цену джойстиков, за которые берёте плату.",
+    am: "Նշեք ջոյսթիքների գինը, որոնց համար վճար եք վերցնում։",
+  },
+  "place.joystickScope": { en: "Charged joysticks", ru: "Платные джойстики", am: "Վճարովի ջոյսթիքներ" },
+  "place.joystickScope.3": { en: "3rd only", ru: "Только 3-й", am: "Միայն 3-րդը" },
+  "place.joystickScope.4": { en: "4th only", ru: "Только 4-й", am: "Միայն 4-րդը" },
+  "place.joystickScope.3,4": { en: "3rd and 4th", ru: "3-й и 4-й", am: "3-րդը և 4-րդը" },
+  // Shown only to a room already on an older answer, so that opening the form
+  // cannot quietly re-price a seat nobody meant to touch.
+  "place.joystickScopeLegacy": { en: "As set before", ru: "Как было задано раньше", am: "Ինչպես նախկինում էր" },
+  "place.joystickBranchNote": {
+    en: "This place charges what the branch charges. Change it in Branch, Prices.",
+    ru: "Место берёт плату как филиал. Изменить — в разделе «Филиал, Цены».",
+    am: "Տեղը գանձում է այնպես, ինչպես մասնաճյուղը։ Փոփոխեք «Մասնաճյուղ, Գներ» բաժնում։",
+  },
+  "place.joystickOwnNote": {
+    en: "The joysticks named above are charged at this price on this place. The rest are handed out free.",
+    ru: "Джойстики, выбранные выше, стоят на этом месте эту цену. Остальные выдаются бесплатно.",
+    am: "Վերևում նշված ջոյսթիքներն այս տեղում արժեն այս գինը։ Մնացածը տրվում են անվճար։",
+  },
+  "place.joystickLegacyNote": {
+    en: "This place is on an earlier setting. Pick one of the options above to replace it.",
+    ru: "На месте осталась прежняя настройка. Выберите вариант выше, чтобы заменить её.",
+    am: "Այս տեղում մնացել է նախկին կարգավորումը։ Ընտրեք վերևի տարբերակներից մեկը՝ այն փոխարինելու համար։",
   },
   // Multilingual platform-name widget (place form, custom platform).
   "platformName.placeholder": { en: "Name", ru: "Наименование", am: "Անվանում" },

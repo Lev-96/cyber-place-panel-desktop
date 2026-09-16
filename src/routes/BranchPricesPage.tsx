@@ -1,6 +1,7 @@
 import { ListSkeleton, SkeletonForm } from "@/components/ui/Skeleton";
 import HourlyRatesForm from "@/components/branches/HourlyRatesForm";
 import PackageForm from "@/components/packages/PackageForm";
+import BranchJoystickForm from "@/components/prices/BranchJoystickForm";
 import MoneyRoundingForm from "@/components/prices/MoneyRoundingForm";
 import PlatformPricesForm from "@/components/prices/PlatformPricesForm";
 import SubplatformPricesForm from "@/components/prices/SubplatformPricesForm";
@@ -122,6 +123,23 @@ const BranchPricesPage = () => {
           they live in the place's own form, beside that room's rate, and are
           written by the same owner-level permission. The branch columns remain
           as the fallback every room inherits until it says otherwise. */}
+      {/* The venue's joystick fee — the figure every room inherits until it
+          prices its own pads. Small on purpose: which pads cost money and how
+          much, and nothing else. HOW a pad is priced and how often it is
+          charged are the room's questions and are asked on the place's form.
+          The two must not both ask, or one venue gets two answers. */}
+      <section className="col" style={{ gap: 12 }}>
+        <h2 className="page-title" style={{ margin: 0 }}>{t("branchJoystick.sectionTitle")}</h2>
+        {billing.data && (
+          <BranchJoystickForm
+            key={`${billing.data.joystick_price}:${billing.data.joystick_charged_slots}`}
+            branchId={id}
+            settings={billing.data}
+            onSaved={() => void billing.reload()}
+          />
+        )}
+      </section>
+
       {/* Rounding. Last, and after every rate, because it is the rule applied
           to what all of them add up to. */}
       <section className="col" style={{ gap: 12 }}>
