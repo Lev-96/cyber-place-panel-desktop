@@ -97,15 +97,20 @@ const mount = async (initial?: IBranchPlace) => {
 
 /**
  * The override's price box. A PlayStation place on a Default sub-category has
- * no rate field of its own, so the joystick fee is the form's only
- * `PriceInput` — and `inputMode="decimal"` is what tells it from the plain
- * number field beside it.
+ * no rate field of its own, so the joystick fee used to be the form's only
+ * `PriceInput`. It is not any more — the seat's own price per hour sits above
+ * it — so the box is found by its LABEL rather than by being the only one.
+ * Counting was what made this helper wrong the moment a second price appeared.
  */
 const priceBoxes = () => dom.querySelectorAll<HTMLInputElement>('input[inputmode="decimal"]');
-const priceBox = () => {
-  expect(priceBoxes().length).toBe(1);
-  return priceBoxes()[0];
+const priceBoxFor = (label: string): HTMLInputElement => {
+  const heading = [...dom.querySelectorAll("span.label")].find((el) => el.textContent === label);
+  expect(heading, `no price box labelled ${label}`).toBeTruthy();
+  const box = heading!.parentElement!.querySelector<HTMLInputElement>('input[inputmode="decimal"]');
+  expect(box, `the box labelled ${label} has no input`).toBeTruthy();
+  return box!;
 };
+const priceBox = () => priceBoxFor("place.joystickPrice");
 /** The allowance select. `SubplatformTabs` is mocked away, so there is one. */
 const allowances = () => dom.querySelectorAll<HTMLSelectElement>("select");
 const allowance = () => {
@@ -196,7 +201,9 @@ describe("PlaceForm joystick override", () => {
     await mount(place({ platform: "pc" }));
 
     expect(screen.queryByText("place.joystickIncluded")).toBeNull();
-    expect(priceBoxes().length).toBe(0);
+    // No JOYSTICK price box. The seat still has its own hourly-rate box, which
+    // every place has and which is a different question.
+    expect(screen.queryByText("place.joystickPrice")).toBeNull();
 
     await save();
     const body = await sent();
@@ -209,7 +216,7 @@ describe("PlaceForm joystick override", () => {
     // The picker's own button, the way an operator moves a seat to another
     // platform. The boxes go with the question.
     await act(async () => { fireEvent.click(screen.getByRole("button", { name: "PC" })); });
-    expect(priceBoxes().length).toBe(0);
+    expect(screen.queryByText("place.joystickPrice")).toBeNull();
 
     await save();
     const body = await sent();

@@ -1017,7 +1017,7 @@ describe("a seat whose joystick fee is charged once", () => {
   });
   afterEach(cleanup);
 
-  test("says the fee was taken, on the pad line and in the menu", async () => {
+  test("says the fee was taken on the pad line, and offers to take it back", async () => {
     repo.listActive.mockResolvedValue([seat({
       joystick_count: 3,
       joysticks: [{
@@ -1032,21 +1032,21 @@ describe("a seat whose joystick fee is charged once", () => {
     })]);
     await mount();
 
-    // Once on the pad line, so it is visible without opening the menu at all.
+    // On the pad line, so it is visible without pressing anything.
     //
-    // Asserted on the LEAF that carries the words and nowhere else: an
-    // <option> says the same thing, and every ancestor of either inherits the
-    // text — so a looser query passes with this line deleted, which is how the
-    // first version of this assertion proved nothing.
+    // Asserted on the LEAF that carries the words and nowhere else: every
+    // ancestor inherits the text, so a looser query passes with this line
+    // deleted — which is how the first version of this assertion proved
+    // nothing.
     const onTheLine = [...document.querySelectorAll("span")]
       .filter((el) => el.children.length === 0
         && (el.textContent ?? "").includes("session.padFeeTaken"));
     expect(onTheLine.length).toBe(1);
-    // …and on the entry that is about to hand one over for nothing.
-    const menu = screen.getByLabelText("session.joysticks") as HTMLSelectElement;
-    const text = [...menu.options].map((o) => o.textContent ?? "").join(" | ");
-    expect(text).toContain("session.padFeeTaken");
-    expect(text).not.toContain("session.padFree");
+    // A venue that charges once gets a switch, not a menu, and with the pad
+    // out the switch offers the other direction.
+    expect(screen.queryByLabelText("session.joysticks")).toBeNull();
+    expect(screen.getByRole("button", { name: "session.padRemoveOne" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "session.padAddOne" })).toBeNull();
   });
 
   test("says nothing of the sort before the fee is taken", async () => {
@@ -1062,8 +1062,9 @@ describe("a seat whose joystick fee is charged once", () => {
     await mount();
 
     expect(screen.queryByText(/session\.padFeeTaken/)).toBeNull();
-    const menu = screen.getByLabelText("session.joysticks") as HTMLSelectElement;
-    expect([...menu.options].map((o) => o.textContent ?? "").join(" | ")).toContain("500");
+    // Nothing out yet, so the switch offers the pad rather than its return.
+    expect(screen.getByRole("button", { name: "session.padAddOne" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "session.padRemoveOne" })).toBeNull();
   });
 
   /**
@@ -1087,5 +1088,223 @@ describe("a seat whose joystick fee is charged once", () => {
     const text = [...menu.options].map((o) => o.textContent ?? "").join(" | ");
     expect(text).toContain("session.padFree");
     expect(text).not.toContain("session.padFeeTaken");
+  });
+});
+
+/**
+ * The switch a "one payment" venue gets instead of the pad menu.
+ *
+ * The venue sells its extras as one charge, so it sells ONE extra: the seat
+ * either has the controller or it does not, and a menu of named slots asks a
+ * question the venue did not ask. The control is a button that says what
+ * pressing it will do.
+ *
+ * ## Why every assertion here reads the SERVER's answer
+ *
+ * The button holds no state of its own. Which way it points comes from the
+ * session's own rows, so another cashier's press, a socket event or a poll
+ * flips it without this component being told twice — which is what keeps two
+ * screens on one seat from disagreeing, and what stops a press being counted
+ * against a stale view.
+ */
+describe("the joystick switch on a venue that charges once", () => {
+  const onceRule = {
+    included: 2, price: 500, price_4: null, max: 4, max_slot: 4,
+    charged_slots: [3, 4], hourly: false, shared: true, charge_once: true,
+  };
+  const pad = (over: Record<string, unknown> = {}) => ({
+    id: 7, slot: 3, price: 500, is_charged: true, is_hourly: false,
+    started_at: new Date(Date.now() - 60_000).toISOString(), stopped_at: null, ...over,
+  });
+  const seat = (over: Record<string, unknown>) =>
+    ({ ...running, supports_joysticks: true, ...over } as unknown as ISessionApi);
+
+  /** Nothing out: one entry left to give, the fee not yet taken. */
+  const idle = seat({
+    joystick_count: 2,
+    joysticks: [],
+    joystick_rule: {
+      ...onceRule, fee_taken: false,
+      options: [{ slot: 3, price: 500, shared: true }, { slot: 4, price: 500, shared: true }],
+    },
+  });
+  /** One out: the fee taken, and the next entry priced at nothing. */
+  const holding = seat({
+    joystick_count: 3,
+    joysticks: [pad()],
+    joystick_rule: { ...onceRule, fee_taken: true, options: [{ slot: 4, price: 0, shared: true }] },
+  });
+
+  beforeEach(() => {
+    realtime.handler = null;
+    repo.addJoystick.mockReset();
+    repo.removeJoystick.mockReset();
+    repo.listPcs.mockResolvedValue([device]);
+  });
+  afterEach(cleanup);
+
+  test("replaces the pad menu entirely", async () => {
+    repo.listActive.mockResolvedValue([idle]);
+    await mount();
+
+    expect(screen.queryByLabelText("session.joysticks")).toBeNull();
+    expect(screen.getByRole("button", { name: "session.padAddOne" })).toBeTruthy();
+    // …and the separate "−" the menu needed is gone with it: one control, one
+    // direction at a time.
+    expect(screen.queryByRole("button", { name: "session.padRemove" })).toBeNull();
+  });
+
+  test("hands the venue's next pad over when pressed", async () => {
+    repo.listActive.mockResolvedValue([idle]);
+    repo.addJoystick.mockResolvedValue(holding);
+    await mount();
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "session.padAddOne" }));
+    });
+
+    expect(repo.addJoystick).toHaveBeenCalledWith(running.id, 3);
+    expect(repo.addJoystick).toHaveBeenCalledTimes(1);
+  });
+
+  test("and takes it back when pressed again", async () => {
+    repo.listActive.mockResolvedValue([holding]);
+    repo.removeJoystick.mockResolvedValue(idle);
+    await mount();
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "session.padRemoveOne" }));
+    });
+
+    expect(repo.removeJoystick).toHaveBeenCalledWith(running.id, 3);
+    expect(repo.addJoystick).not.toHaveBeenCalled();
+  });
+
+  /**
+   * The rule the requirement is about: the same controller cannot go out
+   * twice. With one out there is no "add" to press at all — and the server
+   * refuses it as well, which is what makes this a rule rather than a hidden
+   * button.
+   */
+  test("offers no way to hand out a second one while the first is out", async () => {
+    repo.listActive.mockResolvedValue([holding]);
+    await mount();
+
+    expect(screen.queryByRole("button", { name: "session.padAddOne" })).toBeNull();
+    expect(screen.getByRole("button", { name: "session.padRemoveOne" })).toBeTruthy();
+  });
+
+  /**
+   * After the controller comes back, the switch offers it again.
+   *
+   * The seat still carries the returned period — it is what the receipt names
+   * and what records that the fee was taken — so "is a pad out" has to read
+   * only the OPEN ones. Counting the row itself would leave the button stuck
+   * on "remove" with nothing to remove.
+   */
+  test("points back at 'add' once the pad has been handed back", async () => {
+    repo.listActive.mockResolvedValue([seat({
+      joystick_count: 2,
+      joysticks: [pad({ stopped_at: new Date().toISOString() })],
+      joystick_rule: {
+        ...onceRule, fee_taken: true,
+        // The fee is spent, so what is left costs nothing.
+        options: [{ slot: 3, price: 0, shared: true }, { slot: 4, price: 0, shared: true }],
+      },
+    })]);
+    await mount();
+
+    expect(screen.getByRole("button", { name: "session.padAddOne" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "session.padRemoveOne" })).toBeNull();
+  });
+
+  /** …and pressing it hands one over again, for nothing. */
+  test("and hands another over, which the venue does not charge for", async () => {
+    const returned = seat({
+      joystick_count: 2,
+      joysticks: [pad({ stopped_at: new Date().toISOString() })],
+      joystick_rule: {
+        ...onceRule, fee_taken: true,
+        options: [{ slot: 3, price: 0, shared: true }, { slot: 4, price: 0, shared: true }],
+      },
+    });
+    repo.listActive.mockResolvedValue([returned]);
+    repo.addJoystick.mockResolvedValue(holding);
+    await mount();
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "session.padAddOne" }));
+    });
+
+    expect(repo.addJoystick).toHaveBeenCalledWith(running.id, 3);
+  });
+
+  /** A venue with nothing left to hand out says so, rather than hiding. */
+  test("is disabled when the venue has no pad to give", async () => {
+    repo.listActive.mockResolvedValue([seat({
+      joystick_count: 2,
+      joysticks: [],
+      joystick_rule: { ...onceRule, fee_taken: false, options: [] },
+    })]);
+    await mount();
+
+    const button = screen.getByRole("button", { name: "session.padAddOne" }) as HTMLButtonElement;
+    expect(button.disabled).toBe(true);
+  });
+
+  /**
+   * A socket event turns the button around, because the button only ever
+   * reflected the server's rows in the first place.
+   */
+  test("follows a change made on another screen", async () => {
+    repo.listActive.mockResolvedValueOnce([idle]);
+    await mount();
+    expect(screen.getByRole("button", { name: "session.padAddOne" })).toBeTruthy();
+
+    // The other cashier's handout arrives the way Reverb delivers it: an
+    // event, then this board re-reading the seat from the server.
+    repo.listActive.mockResolvedValue([holding]);
+    await fire({
+      kind: "joystick.added", session_id: running.id, branch_id: 7, pc_id: device.id,
+      place_id: 10, status: "active", mode: "open", is_free: false, is_unlimited: false,
+      joystick_count: 3, ends_at: null, at: new Date().toISOString(),
+    } as SessionChangedEvent);
+
+    expect(screen.getByRole("button", { name: "session.padRemoveOne" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "session.padAddOne" })).toBeNull();
+    // Nothing was sent from this screen: it watched, it did not act.
+    expect(repo.addJoystick).not.toHaveBeenCalled();
+  });
+
+  /** Every other venue keeps the menu it has, untouched. */
+  test("a venue that charges per pad still gets the menu", async () => {
+    repo.listActive.mockResolvedValue([seat({
+      joystick_count: 2,
+      joysticks: [],
+      joystick_rule: {
+        ...onceRule, charge_once: false, fee_taken: false,
+        options: [{ slot: 3, price: 500, shared: true }, { slot: 4, price: 500, shared: true }],
+      },
+    })]);
+    await mount();
+
+    expect(screen.getByLabelText("session.joysticks")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "session.padAddOne" })).toBeNull();
+  });
+
+  /** …including one from a backend that never sends the field. */
+  test("an older payload still gets the menu", async () => {
+    repo.listActive.mockResolvedValue([seat({
+      joystick_count: 2,
+      joysticks: [],
+      joystick_rule: {
+        included: 2, price: 500, price_4: null, max: 4, max_slot: 4,
+        charged_slots: [3, 4], hourly: false, shared: true,
+        options: [{ slot: 3, price: 500, shared: true }, { slot: 4, price: 500, shared: true }],
+      },
+    })]);
+    await mount();
+
+    expect(screen.getByLabelText("session.joysticks")).toBeTruthy();
   });
 });

@@ -456,6 +456,25 @@ const SessionsBoard = ({ branchId }: Props) => {
       (sess?.joysticks ?? []).filter((j) => j.stopped_at === null).map((j) => j.slot),
     );
 
+    /**
+     * A venue that sells its extras as ONE payment sells ONE extra, so its
+     * card is a switch and not a menu: the controller is either out or it is
+     * not, and the button says which.
+     *
+     * Both halves are read from the SERVER's answer — the rule says the venue
+     * charges once, the session's own rows say whether a pad is out — so a
+     * socket update or another cashier's press flips the button by itself.
+     * Nothing about it is held in local state, which is what keeps two screens
+     * on one seat from disagreeing.
+     */
+    const padSwitch = sess?.joystick_rule?.charge_once === true;
+    const padOut = (sess?.joysticks ?? []).some(
+      (j) => j.stopped_at === null && Number(j.slot) > BASE_JOYSTICKS,
+    );
+    // The pad this venue would hand over next, and null when it has none left
+    // to give — a venue with no price set, or a ceiling already reached.
+    const padNext = padMenu.find((c) => c.enabled)?.slot ?? null;
+
     const currentRate = ((): number | null => {
       if (sess === undefined || sess.is_free) return null;
       const active = (sess.joysticks ?? []).filter((j) => j.is_hourly && j.stopped_at === null);
@@ -709,7 +728,7 @@ const SessionsBoard = ({ branchId }: Props) => {
                       )}
                     </span>
                   )}
-                  {supportsJoysticks && (
+                  {supportsJoysticks && !padSwitch && (
                   <>
                     {/* WHICH pad, not how many.
                         It was a select of target counts and the server picked
@@ -795,23 +814,26 @@ const SessionsBoard = ({ branchId }: Props) => {
                       </Button>
                     )}
                     {/* The round trip, said on the tile it belongs to. The
-                        select is already disabled while it is in flight; this
-                        is what tells the cashier the change landed, on a board
-                        where the number itself only moves once the server has
-                        answered. */}
-                    {padBusy === sess.id && (
-                      // The project's own spinner class, sized down inline
-                      // rather than by widening the `Spinner` primitive: that
-                      // one is a 32px page-level element with its own margins,
-                      // and giving it a props API for one 12px use would change
-                      // a component every screen renders.
-                      <span
-                        className="spinner"
-                        style={{ width: 12, height: 12, borderWidth: 2, margin: 0 }}
-                        aria-hidden
-                      />
-                    )}
+                      select is already disabled while it is in flight; this
+                      is what tells the cashier the change landed, on a board
+                      where the number itself only moves once the server has
+                      answered. */}
                   </>
+                  )}
+                  {/* The round trip, said on the tile it belongs to — for the
+                      menu and for the switch alike, since either can be in
+                      flight. */}
+                  {supportsJoysticks && padBusy === sess.id && (
+                    // The project's own spinner class, sized down inline
+                    // rather than by widening the `Spinner` primitive: that
+                    // one is a 32px page-level element with its own margins,
+                    // and giving it a props API for one 12px use would change
+                    // a component every screen renders.
+                    <span
+                      className="spinner"
+                      style={{ width: 12, height: 12, borderWidth: 2, margin: 0 }}
+                      aria-hidden
+                    />
                   )}
                 </span>
                 {/* What the pads have added to this seat, spelled out.
@@ -867,6 +889,38 @@ const SessionsBoard = ({ branchId }: Props) => {
               </span>
             )}
             <div className="row" style={{ gap: 6, marginTop: 4, flexWrap: "wrap" }}>
+              {/* One payment, one controller: a switch rather than a menu.
+                  The label says what pressing it does AND what the seat is
+                  holding, which is the whole of the state a cashier needs.
+
+                  It sits with the tile's other ACTIONS rather than on the pad
+                  line, and that is not a style choice: the pad line is a
+                  no-wrap 160px row built for a glyph, a count and a control
+                  that can shrink to nothing. A button with a word in it cannot,
+                  and putting one there pushed it out of the tile and under the
+                  neighbouring seat — where a click landed on somebody else's
+                  card. The row below wraps, which is what makes the label safe
+                  in three languages.
+
+                  The venue that hands pads out one at a time is the only one
+                  that gets this; every other keeps its menu, untouched. */}
+              {supportsJoysticks && padSwitch && (
+                <Button
+                  variant="secondary"
+                  style={miniBtnFlex}
+                  title={padOut ? t("session.padRemoveOne") : t("session.padAddOne")}
+                  // Nothing to hand out is a disabled button rather than a
+                  // hidden one: a venue with no price set is a thing the
+                  // cashier can see and ask about.
+                  disabled={padBusy === sess.id || (!padOut && padNext === null)}
+                  onClick={() => {
+                    if (padOut) { void removeTopPad(sess); return; }
+                    if (padNext !== null) void addPad(sess, padNext);
+                  }}
+                >
+                  {padOut ? t("session.padRemoveOne") : t("session.padAddOne")}
+                </Button>
+              )}
               <Button variant="secondary" onClick={() => setAddItemTarget(sess)} style={miniBtnFlex}>{t("session.addItem")}</Button>
               {/* Named for the thing a cashier is actually looking for on a
                   seat that is running out. It opens the SAME dialog "Options"

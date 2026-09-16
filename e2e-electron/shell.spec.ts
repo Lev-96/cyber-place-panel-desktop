@@ -275,11 +275,12 @@ test("a seat whose fee was already charged says so, in Electron", async () => {
 
   await page.evaluate(() => { window.location.hash = "#/branches/1/sessions"; });
 
-  // On the pad line, without opening anything…
+  // On the pad line, without pressing anything…
   await expect(page.getByText("fee already charged").first()).toBeVisible();
 
-  // …and on the entry that hands the next one over for nothing.
-  const menu = page.getByLabel("Joysticks").first();
-  await expect(menu.locator("option", { hasText: "fee already charged" })).toHaveCount(1);
-  await expect(menu.locator("option", { hasText: "Free" })).toHaveCount(0);
+  // …and the control is the SWITCH this venue gets instead of a menu: one
+  // payment, one controller, and with it out the button offers its return.
+  await expect(page.getByLabel("Joysticks")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Remove joystick" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Add joystick" })).toHaveCount(0);
 });

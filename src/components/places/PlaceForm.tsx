@@ -67,6 +67,18 @@ const PlaceForm = ({ branchId, initial, platformSuggestions, platformPrices, onC
   const [subplatformId, setSubplatformId] = useState<number | null>(initial?.subplatform_id ?? null);
   const [hourlyRate, setHourlyRate] = useState(initial?.hourly_rate != null ? String(initial.hourly_rate) : "");
   /**
+   * THIS place's own price per hour, when the form is not already collecting a
+   * rate for something bigger than the place.
+   *
+   * Empty is inherit, the same empty-means-inherit every other box here uses:
+   * the seat then bills from its sub-category, its custom platform or the
+   * branch's tariff matrix, exactly as it always has. A figure beats all three,
+   * which is the order the server already resolves in
+   * (`ResolveSessionRateService`: the place's own rate first, then the matrix)
+   * — so this box states what a seat costs rather than adding a fourth rule.
+   */
+  const [placeRate, setPlaceRate] = useState(initial?.hourly_rate != null ? String(initial.hourly_rate) : "");
+  /**
    * This place's own joystick policy. Empty string is INHERIT, the same way an
    * empty `hourlyRate` above means "this platform's price applies".
    *
@@ -217,6 +229,17 @@ const PlaceForm = ({ branchId, initial, platformSuggestions, platformPrices, onC
    * Standard rate for VIP would silently erase the VIP premium.
    */
   const needsSubplatformRate = ownsRate && subplatformRate == null;
+  /**
+   * Whether the form is ALREADY asking for a rate — an unpriced sub-category,
+   * or a custom platform whose tier has no price yet.
+   *
+   * In those cases the box on screen IS this place's rate (and seeds the
+   * sub-category's or the platform's), so a second one would be two fields for
+   * one number. Everywhere else — a known platform on the matrix, a locked
+   * custom tier, a sub-category that already prices this tier — nothing was
+   * editable at all, and that is where the place's own price goes.
+   */
+  const collectsPlatformRate = needsSubplatformRate || (isCustomPlatform && !tierLocked);
 
   // Auto-suggest next available number on create
   useEffect(() => {
@@ -297,13 +320,21 @@ const PlaceForm = ({ branchId, initial, platformSuggestions, platformPrices, onC
         // The sub-category this place bills from. Null is normal — it simply
         // means the place bills from its platform, as every place did before.
         subplatform_id: subplatformId,
-        // Known platforms bill from the matrix (null). An already-priced tier
-        // reuses that rate (server ignores any override). An unpriced tier
-        // sends its rate — the server seeds that tier's price; a brand-new
-        // platform additionally carries the per-locale platform_name below.
-        hourly_rate: isCustomPlatform
-          ? (tierLocked ? Number(tierPrice) : (hourlyRate ? Number(hourlyRate) : null))
-          : null,
+        // One field, three cases, in the order the form asks them:
+        //
+        //   collecting a platform/sub-category rate → that box, which the
+        //     server also seeds the bigger price from;
+        //   this place priced on its own            → that box, which beats the
+        //     matrix for this seat and nothing else;
+        //   neither                                  → a locked custom tier
+        //     keeps re-sending its platform's figure, and a known platform
+        //     sends null, which is "bill from the matrix" — what every place
+        //     did before this box existed.
+        hourly_rate: collectsPlatformRate
+          ? (hourlyRate ? Number(hourlyRate) : null)
+          : placeRate.trim() !== ""
+            ? Number(placeRate)
+            : (isCustomPlatform && tierLocked ? Number(tierPrice) : null),
         // Per-place joystick policy. Empty box = null = inherit the branch's
         // rule. A place that is not a PlayStation carries no override at all,
         // so switching ps5 → pc drops one rather than leaving it behind.
@@ -485,6 +516,24 @@ const PlaceForm = ({ branchId, initial, platformSuggestions, platformPrices, onC
             <span className="muted" style={{ fontSize: 11 }}>{t("place.customPlatformNote")}</span>
           </div>
         ))}
+
+        {/* This seat's own price per hour.
+            Shown only where the form is not already asking for a rate, so a
+            place never carries two price boxes for one number. Empty is the
+            normal case and means the price above applies — the sub-category's,
+            the custom platform's, or the branch's matrix cell. */}
+        {!collectsPlatformRate && (
+          <div className="col" style={{ gap: 6 }}>
+            <PriceInput
+              label={t("place.ownRate")}
+              value={placeRate}
+              onChange={setPlaceRate}
+              placeholder={t("place.ownRateInherit")}
+              disabled={busy}
+            />
+            <span className="muted" style={{ fontSize: 11 }}>{t("place.ownRateNote")}</span>
+          </div>
+        )}
 
         {/* Per-place joystick policy, for PlayStation seats only. Both boxes
             empty is the normal case and means "the branch's rule applies", the

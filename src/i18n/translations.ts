@@ -1093,6 +1093,11 @@ export const TRANSLATIONS: Dict = {
   "session.padTaken": { en: "already in use", ru: "уже используется", am: "արդեն օգտագործվում է" },
   // The seat's ONE fee, already taken. A different thing from a venue that
   // hands pads out free, and a cashier has to be able to tell them apart.
+  // The switch a "one payment" venue gets instead of the menu. The label says
+  // what pressing it does AND what the seat is holding — on a tile this size a
+  // separate state line would cost more room than it is worth.
+  "session.padAddOne": { en: "Add joystick", ru: "Выдать джойстик", am: "Տալ ջոյսթիք" },
+  "session.padRemoveOne": { en: "Remove joystick", ru: "Забрать джойстик", am: "Վերցնել ջոյսթիքը" },
   "session.padFeeTaken": {
     en: "fee already charged",
     ru: "плата уже списана",
@@ -1618,6 +1623,17 @@ export const TRANSLATIONS: Dict = {
   "place.tierUnpricedNote": { en: "This tier of the platform isn't priced yet. Set its rate once here.", ru: "Для этого тарифа платформы цена ещё не задана. Задайте её здесь один раз.", am: "Հարթակի այս սակագինը դեռ գնավորված չէ։ Սահմանեք այն այստեղ մեկ անգամ:" },
   "place.joystickIncluded": { en: "Joysticks in the rate", ru: "Джойстики в тарифе", am: "Ջոյսթիքները սակագնում" },
   "place.joystickPrice": { en: "Price per extra joystick", ru: "Цена дополнительного джойстика", am: "Լրացուցիչ ջոյսթիքի գին" },
+  // This seat's own price per hour. Its own three keys rather than reusing
+  // `place.hourlyRate`, which labels the box that prices a PLATFORM or a
+  // sub-category: the two mean different things to an operator and only one of
+  // them is ever on screen at a time.
+  "place.ownRate": { en: "Price for this place", ru: "Цена этого места", am: "Այս տեղի գինը" },
+  "place.ownRateInherit": { en: "As set for the platform", ru: "Как у платформы", am: "Ինչպես հարթակի համար" },
+  "place.ownRateNote": {
+    en: "Left empty, this place bills at the price shown above. A value here applies to this place only.",
+    ru: "Если поле пустое, место считается по цене выше. Значение здесь действует только для этого места.",
+    am: "Եթե դաշտը դատարկ է, տեղը հաշվարկվում է վերևի գնով։ Այստեղի արժեքը գործում է միայն այս տեղի համար։",
+  },
   "place.joystickStrategy": {
     en: "Extra joystick pricing",
     ru: "Тариф доп. джойстика",
