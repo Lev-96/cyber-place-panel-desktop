@@ -1,3 +1,5 @@
+import fs from "node:fs";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { fmt, LANGUAGES, TRANSLATIONS, t } from "./translations";
 
@@ -43,6 +45,54 @@ describe("translations dictionary", () => {
         ).toBeGreaterThan(0);
       }
     }
+  });
+
+  /**
+   * Every literal `t("…")` in the app resolves to a key that exists.
+   *
+   * The cases above check the shape of the keys that ARE here; none of them
+   * could see a key the code asks for and the dictionary does not have. `t()`
+   * falls back to returning the key itself — a caller-friendly default that is
+   * also how "joystickPrice.saved" reached a venue's screen as the text of a
+   * success toast, after the form that owned that key was deleted and a new
+   * one kept calling it.
+   *
+   * Literal calls only. A key built from a template is checked by the test of
+   * the screen that builds it, and guessing at its shape here would be a
+   * second, worse implementation of the same question.
+   */
+  it("resolves every literal t() key used in the app", () => {
+    const root = path.resolve(__dirname, "..");
+    const dictionary = path.join(root, "i18n", "translations.ts");
+    const used = new Map<string, string>();
+    // `t("some.key")`, but not `import("…")`, `split("…")` or anything else
+    // whose name happens to end in t.
+    const call = /(?<![A-Za-z0-9_$.])t\(\s*"([^"]+)"\s*\)/g;
+
+    const walk = (dir: string): void => {
+      for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+        const full = path.join(dir, entry.name);
+        if (entry.isDirectory()) { walk(full); continue; }
+        if (! /\.tsx?$/.test(entry.name) || entry.name.includes(".test.")) continue;
+        if (full === dictionary) continue;
+
+        const source = fs.readFileSync(full, "utf8");
+        for (const match of source.matchAll(call)) {
+          if (! used.has(match[1])) used.set(match[1], path.relative(root, full));
+        }
+      }
+    };
+    walk(root);
+
+    const missing = [...used.entries()].filter(([key]) => !(key in TRANSLATIONS));
+
+    expect(
+      missing.map(([key, file]) => `${key} (${file})`),
+      "these keys are asked for in code and are not in the dictionary, so the screen shows the key itself",
+    ).toEqual([]);
+    // …and the scan itself has to be finding something, or it passes by
+    // looking at nothing.
+    expect(used.size).toBeGreaterThan(200);
   });
 
   it("LANGUAGES list matches the dictionary lang codes", () => {

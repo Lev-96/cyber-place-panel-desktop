@@ -91,7 +91,7 @@ const BranchJoystickForm = ({ branchId, settings, onSaved }: Props) => {
         joystick_max_slot: maxJoystickSlotOf(settings),
         joystick_strategy_mode: strategyModeOf(settings),
       });
-      notify.message("success", t("joystickPrice.saved"));
+      notify.message("success", t("branchJoystick.saved"));
       onSaved();
     } catch (e2) {
       setErr(e2 instanceof Error ? e2.message : String(e2));

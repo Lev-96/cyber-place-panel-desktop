@@ -1693,6 +1693,13 @@ export const TRANSLATIONS: Dict = {
     ru: "Сколько стоит один дополнительный джойстик в этом филиале. Все места считают по нему, пока не зададут свою цену.",
     am: "Որքան արժե մեկ լրացուցիչ ջոյսթիք այս մասնաճյուղում։ Բոլոր տեղերն օգտագործում են այս գինը, քանի դեռ չեն սահմանել իրենցը։",
   },
+  // The toast after a save. It used to reach for `joystickPrice.saved`, which
+  // went with the screen that owned it — so the bar showed the KEY itself.
+  "branchJoystick.saved": {
+    en: "Joystick price saved",
+    ru: "Цена джойстика сохранена",
+    am: "Ջոյսթիքի գինը պահպանված է",
+  },
   "branchJoystick.unset": { en: "Not set", ru: "Не задано", am: "Սահմանված չէ" },
   "branchJoystick.priceRequired": {
     en: "Name the price for the joysticks you charge for.",
