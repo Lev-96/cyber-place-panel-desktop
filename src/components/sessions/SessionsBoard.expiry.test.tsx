@@ -766,10 +766,11 @@ describe("joysticks on the tile", () => {
     } as unknown as ISessionApi]);
     await mount();
 
-    const padLine = [...document.querySelectorAll("span")]
-      .find((el) => (el.textContent ?? "").startsWith("Joystick #"));
     // 50/h for 80 seconds is about 1.11, and the line has to say so rather
-    // than rounding it to a whole unit.
+    // than rounding it to a whole unit. The pad line is the identity plus the
+    // figure, so that is what finds it.
+    const padLine = [...document.querySelectorAll("span")]
+      .find((el) => el.children.length === 0 && /^[\d/,\s]+ · /.test(el.textContent ?? ""));
     expect(padLine?.textContent).toMatch(/1\.1/);
   });
 
@@ -783,14 +784,27 @@ describe("joysticks on the tile", () => {
       })),
     } as ISessionApi);
 
-    test("reads count × fee = total", async () => {
+    /**
+     * Identity and figure, on ONE line.
+     *
+     * It was this line plus a second one — "Joystick #2, 3 · 300 = 600" — and
+     * on a 160px card two lines about the same pads is most of the card. The
+     * slot numbers are printed here anyway, the unit price is on the menu that
+     * hands the pad over, and the multiplication is what made the old wording
+     * read as nonsense beside numbers that are identities.
+     */
+    test("says which pads are out and what they have earned, on one line", async () => {
       repo.listActive.mockResolvedValue([priced(2)]);
       await mount();
 
-      // Named, not multiplied: "Joystick #2, 3 · 300 = 600". A count times a
-      // unit price is correct arithmetic that reads as nonsense beside numbers
-      // which are slot identities.
-      expect(screen.getByText(/Joystick #2, 3 · .*300.* = .*600/)).toBeTruthy();
+      // The line lands as two text nodes (identity, then the figure), so
+      // `getByText` cannot see it whole — the question is what the cashier
+      // reads, which is the element's own text content.
+      const padLine = [...document.querySelectorAll("span")].find((el) =>
+        el.children.length === 0 && /^[\d/,\s]+ · /.test(el.textContent ?? ""));
+      expect(padLine?.textContent).toMatch(/600/);
+      // No second line naming them again, and no multiplication.
+      expect(screen.queryByText(/Joystick #/)).toBeNull();
       expect(screen.queryByText(/2 × /)).toBeNull();
     });
 
@@ -806,9 +820,9 @@ describe("joysticks on the tile", () => {
       await mount();
 
       // One pad on the bill, no extras in play: the seat is back to the two it
-      // came with, and the charge still stands beside them.
-      expect(screen.getByText("2")).toBeTruthy();
-      expect(screen.getByText(/Joystick #3 · .*300.* = .*300/)).toBeTruthy();
+      // came with, and the charge still stands beside them — on the same line,
+      // which is the whole of what the card says about pads now.
+      expect(screen.getByText(/^2 · .*300/)).toBeTruthy();
     });
 
     test("a seat with no pads says nothing about them", async () => {
@@ -925,24 +939,18 @@ describe("joysticks on the tile", () => {
     // The seat plus the pad currently out. `t()` is mocked to return the key,
     // so the assertion is on the key rather than on translated copy.
     expect(screen.getByText(/session\.currentRate/)).toBeTruthy();
-    // And the pad line reads as a RATE, not as money already owed: the
-    // per-hour suffix sits right after the unit price.
+    // And the pad line does NOT repeat it. The tile names the controller and
+    // what it has earned so far; the rate is one line above and saying it
+    // twice is most of a 160px card.
     //
-    // Asserted on THAT line and not on the document, which an earlier version
-    // of this test did and which passed for the wrong reason: the rate line
-    // above reads "1500session.perHourShort", and the substring it was looking
-    // for lived inside it. Dropping the suffix from the pad line did not fail
-    // the test, so the test proved nothing about the line it names.
-    //
-    // The line is built from several JSX expressions, so it lands as several
-    // text nodes and `getByText` cannot see it whole. The question is what the
-    // cashier reads, which is the element's own text content.
-    // The pad line names the controllers it is about, so that is what finds
-    // it: the label it used to carry ("joystick cost") is gone, because
-    // "Joystick #3 · 500/h = 1.53" says the same thing in the same space.
+    // The unit price and its per-hour suffix still exist where a unit price is
+    // the point — the receipt and the history — and are pinned there.
     const padLine = [...document.querySelectorAll("span")].find((el) =>
-      (el.textContent ?? "").startsWith("Joystick #"));
-    expect(padLine?.textContent).toContain("Joystick #3 · 500session.perHourShort");
+      el.children.length === 0 && /^[\d/,\s]+ · /.test(el.textContent ?? ""));
+    expect(padLine, "the pad line is missing").toBeTruthy();
+    expect(padLine?.textContent).not.toContain("session.perHourShort");
+    // …and it is the EARNED figure, not the rate: an hour of a 500/h pad.
+    expect(padLine?.textContent).toMatch(/500/);
   });
 
   // A session CAN hold both: the venue switched strategy while the seat ran,
@@ -964,12 +972,12 @@ describe("joysticks on the tile", () => {
     } as unknown as ISessionApi]);
     await mount();
 
-    // The pad line names the controllers it is about, so that is what finds
-    // it: the label it used to carry ("joystick cost") is gone, because
-    // "Joystick #3 · 500/h = 1.53" says the same thing in the same space.
+    // The tile quotes no unit price at all now, so it cannot call a fee a
+    // rate: what it shows is the identity and the money earned.
     const padLine = [...document.querySelectorAll("span")].find((el) =>
-      (el.textContent ?? "").startsWith("Joystick #"));
-    expect(padLine?.textContent).not.toContain("500session.perHourShort");
+      el.children.length === 0 && /^[\d/,\s]+ · /.test(el.textContent ?? ""));
+    expect(padLine, "the pad line is missing").toBeTruthy();
+    expect(padLine?.textContent).not.toContain("session.perHourShort");
     // The hourly pad still moves the seat's rate, so that line stays.
     expect(screen.getByText(/session\.currentRate/)).toBeTruthy();
   });

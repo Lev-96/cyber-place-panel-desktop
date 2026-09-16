@@ -112,7 +112,12 @@ test("the tile names the extra controller in play", async ({ page }) => {
 
   // The identity, not a quantity: the pair this venue prices as one figure.
   await expect(page.getByText("3/4").first()).toBeVisible();
-  await expect(page.getByText(/Joystick #3/)).toBeVisible();
+  // …and what they have earned, on the SAME line. The card used to carry a
+  // second one naming the controllers again ("Joystick #3 · 500 AMD = 500
+  // AMD"); on a 160px tile that was most of the card, and every number on it
+  // is either printed beside it or on the receipt.
+  await expect(page.getByText(/^3\/4 · /)).toBeVisible();
+  await expect(page.getByText(/Joystick #3/)).toHaveCount(0);
 });
 
 /**

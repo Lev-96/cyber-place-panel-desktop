@@ -715,11 +715,29 @@ const SessionsBoard = ({ branchId }: Props) => {
                           and a venue that prices the pair as one figure calls
                           that "3/4" rather than naming the position it happened
                           to open. */}
-                      <span className="muted">{padIdentity(sess, BASE_JOYSTICKS)}</span>
+                      {/* WHICH controllers, and what they have earned — on one
+                          line, because a 160px card cannot afford two.
+
+                          It used to be this line plus a second one reading
+                          "Joystick #3, 4 · 500 AMD = 1,000 AMD": the slot
+                          numbers were already printed here, the unit price is
+                          on the menu that hands the pad over, and under the
+                          hourly model the rate is on the line above. What was
+                          left that a cashier needs is the identity and the
+                          figure, so that is what this says.
+
+                          No money on a waived seat and none before anything is
+                          charged: `padChargeOf` answers null for both, and a
+                          fee printed under "Free session" is two numbers
+                          telling one truth. */}
+                      <span className="muted">
+                        {padIdentity(sess, BASE_JOYSTICKS)}
+                        {padCharge !== null
+                          && ` · ${money(padCharge.total, preciseWhenSmall(padCharge.total))}`}
+                      </span>
                       {/* The seat's one fee, already taken: every controller
-                          after it is handed over for nothing, and saying so
-                          here is what stops the zeros in the menu below
-                          reading as a fault. */}
+                          after it is handed over for nothing. One word, because
+                          the figure beside it already says how much. */}
                       {sess.joystick_rule?.charge_once === true
                         && sess.joystick_rule?.fee_taken === true && (
                         <span className="muted" style={{ fontSize: 10 }}>
@@ -851,29 +869,6 @@ const SessionsBoard = ({ branchId }: Props) => {
                   <span className="muted" style={{ fontSize: 11, flexBasis: "100%" }}>
                     {t("session.currentRate")}: {money(currentRate, preciseWhenSmall(currentRate))}
                     {t("session.perHourShort")}
-                  </span>
-                )}
-                {padCharge !== null && (
-                  <span className="muted" style={{ fontSize: 11, flexBasis: "100%" }}>
-                    {/* The pads BY NUMBER, then what they have earned.
-                        It read "2 × 500 = 1000", which multiplies a count by a
-                        unit price — correct arithmetic that reads as nonsense
-                        the moment the numbers beside it are slot identities.
-                        "Joystick 3, 4 · 500/h = 1000" says the same money and
-                        names which controllers it is for. */}
-                    {t("session.joystickSlot").replace("{0}", padCharge.slots.join(", "))}
-                    {" · "}
-                    {padCharge.each !== null && (
-                      padCharge.hourly
-                        ? `${money(padCharge.each, preciseWhenSmall(padCharge.each))}${t("session.perHourShort")} = `
-                        : `${money(padCharge.each, preciseWhenSmall(padCharge.each))} = `
-                    )}
-                    {/* The same precision rule as the running total above it.
-                        Under the hourly strategy a pad's earnings are normally
-                        a fraction, and rounding this line to whole units while
-                        the total beside it prints cents is how a tile shows two
-                        figures that do not add up. */}
-                    {money(padCharge.total, preciseWhenSmall(padCharge.total))}
                   </span>
                 )}
                 {padError?.id === sess.id && (
