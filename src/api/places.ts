@@ -28,6 +28,8 @@ export interface CreatePlaceBody {
    */
   joystick_included?: number | null;
   joystick_price?: number | null;
+  /** Which extra pads this room charges for: "3", "4" or "3,4". Null inherits. */
+  joystick_charged_slots?: string | null;
   /**
    * Display наименование for a brand-new custom platform's branch price. Only
    * meaningful when the platform is custom AND not yet priced; ignored

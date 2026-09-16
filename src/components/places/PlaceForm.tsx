@@ -13,6 +13,7 @@ import PlatformNameInput, { LangNames } from "@/components/ui/PlatformNameInput"
 import SubplatformTabs from "@/components/ui/SubplatformTabs";
 import Spinner from "@/components/ui/Spinner";
 import GameForm from "@/components/games/GameForm";
+import { billingSettingsRepository } from "@/repositories/BillingSettingsRepository";
 import { branchRepository } from "@/repositories/BranchRepository";
 import { useAuth } from "@/auth/AuthContext";
 import { can } from "@/auth/permissions";
@@ -22,7 +23,7 @@ import { platformPriceNameOf } from "@/i18n/platformPriceName";
 import { gameRepository } from "@/repositories/GameRepository";
 import { placeRepository } from "@/repositories/PlaceRepository";
 import { subplatformRepository } from "@/repositories/SubplatformRepository";
-import { CHARGE_MODES, JoystickChargeMode, JoystickPricingMode, MAX_JOYSTICKS, PRICING_MODES } from "@/api/joystickPrices";
+import { CHARGE_MODES, JoystickChargeMode, JoystickPricingMode, PRICING_MODES } from "@/api/joystickPrices";
 import { IBranchApi, IBranchPlace, IBranchPlatformPrice, PlaceType } from "@/types/api";
 import { isKnownPlatform, platformGroup, platformLabel, slugifyPlatform } from "@/utils/platform";
 import { FormEvent, useEffect, useState } from "react";
@@ -46,6 +47,35 @@ interface Props {
 }
 
 const TYPES: PlaceType[] = ["standard", "vip"];
+
+/**
+ * WHICH extra pads this room charges for, as the form asks it.
+ *
+ * `""` is "as the branch does" — the room names nothing and its venue decides,
+ * which is what every seat is until somebody chooses. The other three are the
+ * shapes the server accepts, spelled the way an operator says them: the third
+ * controller, the fourth, or the pair at one figure.
+ *
+ * `legacy` is not on the menu. It is what a room ALREADY on an older answer
+ * shows — a count, or a bare price with no slots named — so that opening this
+ * form cannot quietly re-price a seat by translating a setting nobody asked to
+ * change. Picking anything else replaces it; leaving it alone sends it back
+ * untouched.
+ */
+const JOYSTICK_SCOPES = ["3", "4", "3,4"] as const;
+type JoystickScope = "" | (typeof JOYSTICK_SCOPES)[number] | "legacy";
+
+const joystickScopeOf = (place?: IBranchPlace): JoystickScope => {
+  const slots = place?.joystick_charged_slots;
+  if (JOYSTICK_SCOPES.includes(slots as (typeof JOYSTICK_SCOPES)[number])) {
+    return slots as JoystickScope;
+  }
+
+  // Nothing named. An untouched room follows its branch; one carrying the
+  // older answer keeps it rather than being translated into a shape it never
+  // chose.
+  return place?.joystick_included == null && place?.joystick_price == null ? "" : "legacy";
+};
 
 const PlaceForm = ({ branchId, initial, platformSuggestions, platformPrices, onClose, onSaved }: Props) => {
   const { t, money, lang } = useLang();
@@ -88,9 +118,7 @@ const PlaceForm = ({ branchId, initial, platformSuggestions, platformPrices, onC
    * one seat whose fifth hour of Mortal Kombat is sold with a free second pad:
    * one seat differing must not become a reason to move the whole branch.
    */
-  const [joystickIncluded, setJoystickIncluded] = useState(
-    initial?.joystick_included != null ? String(initial.joystick_included) : "",
-  );
+  const [joystickScope, setJoystickScope] = useState<JoystickScope>(() => joystickScopeOf(initial));
   const [joystickPrice, setJoystickPrice] = useState(
     initial?.joystick_price != null ? String(initial.joystick_price) : "",
   );
@@ -240,6 +268,26 @@ const PlaceForm = ({ branchId, initial, platformSuggestions, platformPrices, onC
    * others (sub-categories, games). One GET when it opens.
    */
   const branch = useAsync(() => branchRepository.byId(branchId), [branchId]);
+  /**
+   * The VENUE's joystick policy — what an extra pad costs here when a room
+   * does not price its own.
+   *
+   * Read rather than recomputed: it is the same figure `JoystickRule` resolves
+   * on the server when a room's own column is null, and a form that guessed it
+   * would be a second answer to a question the server already answers.
+   */
+  const branchJoysticks = useAsync(() => billingSettingsRepository.get(branchId), [branchId]);
+  const branchJoystickPrice = branchJoysticks.data?.joystick_price ?? null;
+  /**
+   * Is this room pricing its own pads?
+   *
+   * True only for the three answers the menu offers. `""` is the branch's rule
+   * and `legacy` is an older one being left alone — under both the price box
+   * is read-only, because under both the figure it shows was not decided here.
+   */
+  const isOwnJoystickRule = JOYSTICK_SCOPES.includes(joystickScope as (typeof JOYSTICK_SCOPES)[number]);
+  /** What the read-only box shows: the venue's figure, or the room's older one. */
+  const joystickPriceShown = joystickScope === "" ? branchJoystickPrice : null;
   const branchRate = ((): number | null => {
     const cell = branch.data?.price_for_branch?.[
       `${platform}-${type === "vip" ? "vip" : "standard"}` as keyof NonNullable<IBranchApi["price_for_branch"]>
@@ -394,8 +442,25 @@ const PlaceForm = ({ branchId, initial, platformSuggestions, platformPrices, onC
         // Per-place joystick policy. Empty box = null = inherit the branch's
         // rule. A place that is not a PlayStation carries no override at all,
         // so switching ps5 → pc drops one rather than leaving it behind.
-        joystick_included: isPlayStation && joystickIncluded !== "" ? Number(joystickIncluded) : null,
-        joystick_price: isPlayStation && joystickPrice !== "" ? Number(joystickPrice) : null,
+        // WHICH pads this room charges for, and what they cost here.
+        //
+        //   ""        as the branch does — every column null, and the price
+        //             box was read-only showing the venue's figure;
+        //   3|4|3,4   this room's own answer, with its own price;
+        //   legacy    a room already on the older answer, sent back exactly as
+        //             it came so that opening this form re-prices nothing.
+        //
+        // `joystick_included` is no longer asked here — the slots say what the
+        // count used to approximate — but a room that carries one keeps it,
+        // because clearing a setting the operator did not touch is a price
+        // change nobody made.
+        joystick_charged_slots: isPlayStation && isOwnJoystickRule ? joystickScope : null,
+        joystick_included: isPlayStation && joystickScope !== ""
+          ? (initial?.joystick_included ?? null)
+          : null,
+        joystick_price: isPlayStation && joystickScope !== "" && joystickPrice !== ""
+          ? Number(joystickPrice)
+          : null,
         joystick_pricing_mode: isPlayStation && joystickStrategy !== "" ? joystickStrategy : null,
         joystick_charge_mode: isPlayStation && joystickChargeMode !== "" ? joystickChargeMode : null,
         platform_name_en: customNew ? (names.en.trim() || undefined) : undefined,
@@ -623,29 +688,45 @@ const PlaceForm = ({ branchId, initial, platformSuggestions, platformPrices, onC
           <div className="col" style={{ gap: 6 }}>
             <div className="row" style={{ gap: 10, flexWrap: "wrap", alignItems: "flex-end" }}>
               <label className="col" style={{ gap: 6 }}>
-                <span className="label">{t("place.joystickIncluded")}</span>
-                {/* A select and not a number box: the answer is inherit or one
-                    of four, and a free-typed 0 is a seat with no controller. */}
+                <span className="label">{t("place.joystickScope")}</span>
+                {/* WHICH extra pads this room charges for — the controllers by
+                    number, because that is how a cashier hands them over. The
+                    seat's own two come with the PlayStation and are never on
+                    this list. It was a count of pads "included in the rate",
+                    which offered 1 and 2 to a seat that always has two and
+                    could not say "the third and not the fourth" at all. */}
                 <select
                   className="input"
-                  value={joystickIncluded}
+                  value={joystickScope}
                   disabled={busy}
-                  onChange={(e) => setJoystickIncluded(e.target.value)}
-                  style={{ width: 160 }}
+                  onChange={(e) => setJoystickScope(e.target.value as JoystickScope)}
+                  style={{ width: 180 }}
                 >
                   <option value="">{t("place.joystickInherit")}</option>
-                  {Array.from({ length: MAX_JOYSTICKS }, (_, i) => i + 1).map((n) => (
-                    <option key={n} value={n}>{n}</option>
+                  {JOYSTICK_SCOPES.map((scope) => (
+                    <option key={scope} value={scope}>{t(`place.joystickScope.${scope}`)}</option>
                   ))}
+                  {/* Only for a room already on an older answer, and only until
+                      it picks one of the three above. Offering it to everybody
+                      would be offering a setting nobody can explain. */}
+                  {joystickScope === "legacy" && (
+                    <option value="legacy">{t("place.joystickScopeLegacy")}</option>
+                  )}
                 </select>
               </label>
               <div style={{ flex: 1, minWidth: 160 }}>
+                {/* The price is this room's only where the room prices its own
+                    pads. Under "as the branch does" the box shows the VENUE's
+                    figure and is read-only: an editable box that silently
+                    discards what is typed into it is worse than no box. */}
                 <PriceInput
                   label={t("place.joystickPrice")}
-                  value={joystickPrice}
+                  value={isOwnJoystickRule
+                    ? joystickPrice
+                    : joystickPriceShown !== null ? String(joystickPriceShown) : joystickPrice}
                   onChange={setJoystickPrice}
                   placeholder={t("place.joystickInherit")}
-                  disabled={busy}
+                  disabled={busy || ! isOwnJoystickRule}
                 />
               </div>
             </div>
@@ -701,7 +782,13 @@ const PlaceForm = ({ branchId, initial, platformSuggestions, platformPrices, onC
               </div>
             </div>
 
-            <span className="muted" style={{ fontSize: 11 }}>{t("place.joystickOverrideNote")}</span>
+            <span className="muted" style={{ fontSize: 11 }}>
+              {isOwnJoystickRule
+                ? t("place.joystickOwnNote")
+                : joystickScope === "legacy"
+                  ? t("place.joystickLegacyNote")
+                  : t("place.joystickBranchNote")}
+            </span>
           </div>
         )}
 

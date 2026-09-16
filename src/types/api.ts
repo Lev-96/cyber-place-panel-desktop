@@ -95,6 +95,15 @@ export interface IBranchPlace extends Translated {
    */
   joystick_price?: number | string | null;
   /**
+   * WHICH extra pads this room charges for: "3", "4" or "3,4".
+   *
+   * Null is INHERIT — the room has not answered and its branch decides, which
+   * is what every place is until somebody chooses on the form. A count could
+   * only ever say "everything above N"; this says "the third and not the
+   * fourth", which is the rule an operator asked to be able to name per room.
+   */
+  joystick_charged_slots?: string | null;
+  /**
    * HOW this room prices an extra pad — a fee owed on handout, or a higher
    * hourly rate while the pad is out. Null follows the branch.
    */

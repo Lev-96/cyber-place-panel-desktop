@@ -40,6 +40,18 @@ vi.mock("@/repositories/PlaceRepository", () => ({
 vi.mock("@/repositories/GameRepository", () => ({
   gameRepository: { list: async () => [] },
 }));
+// The VENUE's joystick policy — what a room inherits when it prices no pads of
+// its own. Answered here so a unit test never reaches for a server.
+const BRANCH_POLICY = { branch_id: 7, joystick_price: 500, joystick_charged_slots: null };
+// Seeded at hoist time AND re-seeded before every test below, because a
+// `vi.fn()` with no implementation returns `undefined` and the form awaits
+// this. That is not a failing assertion — it is a rejected promise landing
+// wherever the event loop happens to be, which is a test that fails in a full
+// run and passes on its own.
+const billing = vi.hoisted(() => ({ get: vi.fn(async (..._a: unknown[]) => ({ branch_id: 7, joystick_price: 500, joystick_charged_slots: null })) }));
+vi.mock("@/repositories/BillingSettingsRepository", () => ({
+  billingSettingsRepository: { get: (...a: unknown[]) => billing.get(...a) },
+}));
 vi.mock("@/repositories/SubplatformRepository", () => ({
   // One Default sub-category, which is what every branch has and what makes
   // the place bill from its platform rather than from a sub-category's rate.
@@ -72,6 +84,12 @@ vi.mock("@/components/ui/MultiLangInput", () => ({
 vi.mock("@/components/ui/SubplatformTabs", () => ({ default: () => null }));
 
 import PlaceForm from "./PlaceForm";
+
+// Every describe below mounts the form, and the form asks the venue for its
+// joystick policy. One seeding, in one place, so no block can forget it.
+beforeEach(() => {
+  billing.get.mockReset().mockResolvedValue({ ...BRANCH_POLICY });
+});
 
 const place = (over: Partial<IBranchPlace> = {}): IBranchPlace => ({
   id: 12,
@@ -120,7 +138,7 @@ const allowance = () => {
 const typePrice = async (v: string) => {
   await act(async () => { fireEvent.change(priceBox(), { target: { value: v } }); });
 };
-const chooseIncluded = async (v: string) => {
+const chooseScope = async (v: string) => {
   await act(async () => { fireEvent.change(allowance(), { target: { value: v } }); });
 };
 const save = async () => {
@@ -143,64 +161,170 @@ describe("PlaceForm joystick override", () => {
   });
   afterEach(cleanup);
 
-  test("a PlayStation place offers both boxes, on inherit by default", async () => {
+  test("a PlayStation place asks which pads it charges for, on the branch by default", async () => {
     await mount(place());
 
-    expect(screen.getByText("place.joystickIncluded")).toBeTruthy();
+    expect(screen.getByText("place.joystickScope")).toBeTruthy();
     expect(screen.getByText("place.joystickPrice")).toBeTruthy();
-    // The copy has to name what an empty box falls back to, or "empty" reads
-    // as "unset" and an operator fills it in to be safe.
-    expect(screen.getByText("place.joystickOverrideNote")).toBeTruthy();
+    // The copy has to name what the untouched answer falls back to, or
+    // "empty" reads as "unset" and an operator fills it in to be safe.
+    expect(screen.getByText("place.joystickBranchNote")).toBeTruthy();
     expect(allowance().value).toBe("");
-    expect(priceBox().value).toBe("");
-    // Inherit, plus the four a seat can hold.
-    expect(allowance().querySelectorAll("option").length).toBe(5);
   });
 
-  test("both boxes left empty send null, which is inherit and not zero", async () => {
+  /**
+   * The menu is the controllers by NUMBER, not a count of pads.
+   *
+   * It offered 1, 2, 3 and 4 — an allowance — which asked a PlayStation seat
+   * how many of its two built-in controllers were included, and could not
+   * express "the third and not the fourth" at all.
+   */
+  test("the menu names the third, the fourth and the pair, and nothing else", async () => {
+    await mount(place());
+
+    const options = [...allowance().querySelectorAll("option")].map((o) => o.value);
+    expect(options).toEqual(["", "3", "4", "3,4"]);
+  });
+
+  /**
+   * Under "as the branch does" the box is READ-ONLY.
+   *
+   * The figure it shows was decided on another screen, and an editable box
+   * that silently discards what is typed into it is worse than no box.
+   */
+  test("the price box is read-only while the room follows its branch", async () => {
+    await mount(place());
+
+    expect(priceBox().disabled).toBe(true);
+  });
+
+  /**
+   * …and it shows the VENUE's figure, which is the one that will be charged.
+   *
+   * The whole point of the read-only state: an operator looking at a seat set
+   * to "as the branch does" can see what that costs without leaving the form
+   * for another screen.
+   */
+  test("the read-only box shows the branch's own fee", async () => {
+    await mount(place());
+
+    await waitFor(() => expect(priceBox().value).toBe("500"));
+  });
+
+  /** …and it opens the moment the room names pads of its own. */
+  test("naming pads of its own opens the price box", async () => {
+    await mount(place());
+    await chooseScope("3");
+
+    expect(priceBox().disabled).toBe(false);
+    expect(screen.getByText("place.joystickOwnNote")).toBeTruthy();
+  });
+
+  test("following the branch sends every column null, which is inherit and not zero", async () => {
     await mount(place());
     await save();
 
     const body = await sent();
+    expect(body.joystick_charged_slots).toBeNull();
     expect(body.joystick_included).toBeNull();
     expect(body.joystick_price).toBeNull();
   });
 
-  test("an override travels as numbers, for this place only", async () => {
+  test("a room's own answer travels as the slots and the figure", async () => {
     await mount(place());
-    await chooseIncluded("3");
+    await chooseScope("3,4");
     await typePrice("700");
     await save();
 
     const body = await sent();
-    expect(body.joystick_included).toBe(3);
+    expect(body.joystick_charged_slots).toBe("3,4");
     expect(body.joystick_price).toBe(700);
   });
 
-  test("a seat that hands extra pads out free sends 0, not an empty override", async () => {
+  test("a room that charges for the fourth only says so", async () => {
     await mount(place());
+    await chooseScope("4");
+    await typePrice("700");
+    await save();
+
+    const body = await sent();
+    expect(body.joystick_charged_slots).toBe("4");
+  });
+
+  test("a seat that hands its named pads out free sends 0, not an empty override", async () => {
+    await mount(place());
+    await chooseScope("3");
     await typePrice("0");
     await save();
 
-    // 0 and null are different settings on the wire: this seat is free, it is
-    // not a seat falling back to whatever the branch charges.
+    // 0 and null are different settings on the wire: this seat gives its third
+    // pad away, it is not a seat falling back to whatever the branch charges.
     const body = await sent();
     expect(body.joystick_price).toBe(0);
   });
 
-  test("a saved override comes back in the boxes", async () => {
+  test("a saved answer comes back in the boxes", async () => {
     // Decimal string, which is how the column reaches the panel on the
     // endpoints that serialise it that way.
-    await mount(place({ joystick_included: 4, joystick_price: "250.00" }));
+    await mount(place({ joystick_charged_slots: "4", joystick_price: "250.00" }));
 
     expect(allowance().value).toBe("4");
     expect(priceBox().value).toBe("250");
+    expect(priceBox().disabled).toBe(false);
+  });
+
+  /**
+   * Switching back to the branch drops the room's answer rather than leaving
+   * half of it behind — a seat with a price and no slots is the older shape,
+   * and choosing "as the branch does" is not a way to arrive at it.
+   */
+  test("switching back to the branch clears what the room had named", async () => {
+    await mount(place({ joystick_charged_slots: "3", joystick_price: 700 }));
+    await chooseScope("");
+    await save();
+
+    const body = await sent();
+    expect(body.joystick_charged_slots).toBeNull();
+    expect(body.joystick_price).toBeNull();
+    expect(body.joystick_included).toBeNull();
+  });
+
+  /**
+   * A room already on the older answer keeps it.
+   *
+   * Its setting has no name on this menu, so the menu grows one for it rather
+   * than translating a count into slots nobody chose. Saving without touching
+   * it must re-price nothing.
+   */
+  test("a room on the older count keeps it until it picks something else", async () => {
+    await mount(place({ joystick_included: 3, joystick_price: "250.00" }));
+
+    expect(allowance().value).toBe("legacy");
+    expect(priceBox().disabled).toBe(true);
+
+    await save();
+    const body = await sent();
+    expect(body.joystick_charged_slots).toBeNull();
+    expect(body.joystick_included).toBe(3);
+    expect(body.joystick_price).toBe(250);
+  });
+
+  /** …and picking one of the three replaces it outright. */
+  test("picking an answer replaces the older one", async () => {
+    await mount(place({ joystick_included: 3, joystick_price: "250.00" }));
+    await chooseScope("3,4");
+    await typePrice("700");
+    await save();
+
+    const body = await sent();
+    expect(body.joystick_charged_slots).toBe("3,4");
+    expect(body.joystick_price).toBe(700);
   });
 
   test("a PC place is never asked the question", async () => {
     await mount(place({ platform: "pc" }));
 
-    expect(screen.queryByText("place.joystickIncluded")).toBeNull();
+    expect(screen.queryByText("place.joystickScope")).toBeNull();
     // No JOYSTICK price box. The seat still has its own hourly-rate box, which
     // every place has and which is a different question.
     expect(screen.queryByText("place.joystickPrice")).toBeNull();
@@ -212,7 +336,7 @@ describe("PlaceForm joystick override", () => {
   });
 
   test("a seat that stops being a PlayStation drops the override it had", async () => {
-    await mount(place({ joystick_included: 4, joystick_price: 250 }));
+    await mount(place({ joystick_charged_slots: "3,4", joystick_price: 250 }));
     // The picker's own button, the way an operator moves a seat to another
     // platform. The boxes go with the question.
     await act(async () => { fireEvent.click(screen.getByRole("button", { name: "PC" })); });
