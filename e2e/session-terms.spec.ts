@@ -134,6 +134,43 @@ test("the tile names the extra controller in play", async ({ page }) => {
  * week. What is pinned here now is the placement, per role, at the level a
  * cashier meets it.
  */
+/**
+ * The menu that hands a pad over keeps its room once a pad is out.
+ *
+ * Measured, because this broke by arithmetic rather than by anything visible
+ * in the markup. The pad line carries the identity AND what it earned, and
+ * that plus the menu plus the take-back button wants 252px on a 160px tile.
+ * The row was `nowrap` and the menu was the only item that could shrink, so it
+ * was squeezed to 21px — a control with no room for a word, showing nothing
+ * but its own chevron hard against the border, which is what an operator
+ * reported as "the arrow is outside the box".
+ *
+ * The row wraps now. The assertion is on the WIDTH rather than on a screenshot
+ * because that is the thing that went wrong, and it fails the moment anybody
+ * makes the line beside it longer again.
+ */
+test("the pad menu keeps its width when a controller is out", async ({ page }) => {
+  await installBackendMocks(page, { role: "company_owner", company_id: 1, name: "Owner One" });
+  await seedFloor(page);
+  await signIn(page, "o@o");
+  await expect(page.getByText("Owner One").first()).toBeVisible();
+  await page.evaluate(() => { window.location.hash = "#/branches/1/sessions"; });
+
+  const menu = page.locator("select.pad-select").first();
+  await expect(menu).toBeVisible();
+
+  const box = await menu.boundingBox();
+  expect(box, "the pad menu is on the tile").not.toBeNull();
+  // Its own chevron is 8px and sits 3px from the right edge. Anything near
+  // that number is the arrow alone; 90 is a word plus the arrow.
+  expect(box!.width).toBeGreaterThanOrEqual(90);
+
+  // …and the tile it sits on does not scroll sideways to hold it.
+  const overflows = await page.locator(".place-cell").first()
+    .evaluate((el) => (el as HTMLElement).scrollWidth > (el as HTMLElement).clientWidth);
+  expect(overflows).toBe(false);
+});
+
 test("the running-session dialog does not carry the waiver", async ({ page }) => {
   await installBackendMocks(page, { role: "company_owner", company_id: 1, name: "Owner One" });
   await seedFloor(page);

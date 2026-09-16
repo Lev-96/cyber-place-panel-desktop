@@ -653,11 +653,19 @@ const SessionsBoard = ({ branchId }: Props) => {
                   style={{
                     gap: 4,
                     alignItems: "center",
-                    // The three parts are one reading — glyph, count, control —
-                    // and they must not break across lines. The tile is 160px
-                    // and the count was dropping under the icon, which read as
-                    // a second row of something rather than as one field.
-                    flexWrap: "nowrap",
+                    // The glyph and what it says stay together — that is the
+                    // span below, which is `nowrap` and does not shrink, so the
+                    // count can never drop under the icon.
+                    //
+                    // This row wraps, and has to. Once an extra pad is out the
+                    // line carries the identity AND what it earned, and that
+                    // plus the menu plus the take-back button wants 252px on a
+                    // 160px tile. Nowrap made the menu the only thing that could
+                    // give, so it was squeezed to 21px — a control with no room
+                    // for a word, showing nothing but its own chevron hard
+                    // against the border. Measured, not guessed.
+                    flexWrap: "wrap",
+                    rowGap: 4,
                     whiteSpace: "nowrap",
                   }}
                 >
@@ -768,7 +776,20 @@ const SessionsBoard = ({ branchId }: Props) => {
                       className="input pad-select"
                       style={{
                         height: 24,
-                        minWidth: 0,
+                        // Never narrower than a word plus its chevron. It was
+                        // 0, which on a full tile collapsed the control to the
+                        // arrow alone; the row above wraps instead now, and
+                        // this is what makes it wrap rather than shrink.
+                        //
+                        // The basis is the MINIMUM and not the content's width
+                        // on purpose: at its natural 136px the menu fills the
+                        // line by itself and pushes the take-back button onto a
+                        // third, which is a taller tile for no more information.
+                        // Asking for 96 and growing into what is left keeps the
+                        // two controls together on one line.
+                        minWidth: 96,
+                        flexBasis: 96,
+                        flexGrow: 1,
                         flexShrink: 1,
                         fontSize: 12,
                       }}
