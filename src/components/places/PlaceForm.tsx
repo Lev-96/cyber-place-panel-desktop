@@ -62,12 +62,49 @@ const TYPES: PlaceType[] = ["standard", "vip"];
  * change. Picking anything else replaces it; leaving it alone sends it back
  * untouched.
  */
-const JOYSTICK_SCOPES = ["3", "4", "3,4"] as const;
-type JoystickScope = "" | (typeof JOYSTICK_SCOPES)[number] | "legacy";
+/**
+ * What the MENU offers: follow the branch, charge for the third, or charge for
+ * the pair at one figure.
+ *
+ * The bare fourth ("only the fourth costs money") left the menu on 2026-09-17.
+ * It answered a question no venue turned out to ask, and it sat next to "3"
+ * and "3,4" as a third shape an operator had to reason about before pricing
+ * anything. What replaced it is a question asked only where it matters: pick
+ * the third, and the form asks whether a fourth pad is sold at all.
+ */
+const JOYSTICK_SCOPES = ["3", "3,4"] as const;
+
+/**
+ * What a room may CARRY, which is deliberately more than the menu offers.
+ *
+ * A room stored as "4" keeps it: the option is gone from the menu, and erasing
+ * the value on open would re-price a seat nobody touched. It stays selectable
+ * for that room alone until an operator picks something else — the same
+ * courtesy `legacy` gets, and for the same reason.
+ */
+const OWN_JOYSTICK_SCOPES = ["3", "4", "3,4"] as const;
+type JoystickScope = "" | (typeof OWN_JOYSTICK_SCOPES)[number] | "legacy";
+
+/**
+ * Does this room price its fourth pad APART from its third?
+ *
+ * Stored as `joystick_charged_slots = "3,4"` plus a `joystick_price_4`, which
+ * is the same shape the branch uses. The menu spells that "the third, and a
+ * fourth of its own" rather than offering a fourth entry, so the two figures
+ * stay one decision instead of two settings that can disagree.
+ */
+const pricesFourthApart = (place?: IBranchPlace): boolean =>
+  place?.joystick_charged_slots === "3,4" && place?.joystick_price_4 != null;
 
 const joystickScopeOf = (place?: IBranchPlace): JoystickScope => {
   const slots = place?.joystick_charged_slots;
-  if (JOYSTICK_SCOPES.includes(slots as (typeof JOYSTICK_SCOPES)[number])) {
+
+  // The pair priced APART reopens as "the third" with the fourth-pad question
+  // answered yes — which is how it was entered, and the only reading under
+  // which both figures stay visible and editable.
+  if (pricesFourthApart(place)) return "3";
+
+  if (OWN_JOYSTICK_SCOPES.includes(slots as (typeof OWN_JOYSTICK_SCOPES)[number])) {
     return slots as JoystickScope;
   }
 
@@ -121,6 +158,19 @@ const PlaceForm = ({ branchId, initial, platformSuggestions, platformPrices, onC
   const [joystickScope, setJoystickScope] = useState<JoystickScope>(() => joystickScopeOf(initial));
   const [joystickPrice, setJoystickPrice] = useState(
     initial?.joystick_price != null ? String(initial.joystick_price) : "",
+  );
+  /**
+   * Does this room sell a FOURTH pad, and at what price?
+   *
+   * Asked only under "the third", because that is the only answer where the
+   * fourth is still open: "3,4" already prices the pair together and "as the
+   * branch does" prices nothing here at all. A yes with an empty box holds
+   * Save rather than guessing — both guesses (nothing, or the third's figure)
+   * are money the operator did not name.
+   */
+  const [wantsFourthPad, setWantsFourthPad] = useState<boolean>(() => pricesFourthApart(initial));
+  const [joystickPrice4, setJoystickPrice4] = useState(
+    initial?.joystick_price_4 != null ? String(initial.joystick_price_4) : "",
   );
   /**
    * HOW this room prices an extra pad, and HOW OFTEN it charges for one.
@@ -285,7 +335,17 @@ const PlaceForm = ({ branchId, initial, platformSuggestions, platformPrices, onC
    * and `legacy` is an older one being left alone — under both the price box
    * is read-only, because under both the figure it shows was not decided here.
    */
-  const isOwnJoystickRule = JOYSTICK_SCOPES.includes(joystickScope as (typeof JOYSTICK_SCOPES)[number]);
+  const isOwnJoystickRule = OWN_JOYSTICK_SCOPES.includes(
+    joystickScope as (typeof OWN_JOYSTICK_SCOPES)[number],
+  );
+  /** The fourth-pad question is only open under "the third". */
+  const asksFourthPad = joystickScope === "3";
+  /**
+   * What travels as the room's charged pads. Saying yes to a fourth pad IS the
+   * pair — the server stores one column, and a second spelling of "3 plus a
+   * fourth" is how the form and the bill start disagreeing.
+   */
+  const outgoingScope = asksFourthPad && wantsFourthPad ? "3,4" : joystickScope;
   /** What the read-only box shows: the venue's figure, or the room's older one. */
   const joystickPriceShown = joystickScope === "" ? branchJoystickPrice : null;
   const branchRate = ((): number | null => {
@@ -395,6 +455,12 @@ const PlaceForm = ({ branchId, initial, platformSuggestions, platformPrices, onC
     // tier isn't priced yet. A locked tier needs neither.
     const finalPlatform = customNew ? slugifyPlatform(names.en.trim()) : platform;
     if (customNew && !finalPlatform) return setErr(t("place.errors.nameRequired"));
+    // A fourth pad the room says it sells must carry a price. Both fallbacks
+    // are money nobody named: nothing at all would hand the pad over free, and
+    // the third's figure would be a second price invented by this form.
+    if (isPlayStation && asksFourthPad && wantsFourthPad && joystickPrice4.trim() === "") {
+      return setErr(t("place.errors.joystickFourthPriceRequired"));
+    }
     // The subcategory owns the rate: priced → nothing to ask, unpriced → the
     // rate is mandatory. Only when no subcategory owns it does the platform's
     // own "price this tier" rule apply.
@@ -454,7 +520,15 @@ const PlaceForm = ({ branchId, initial, platformSuggestions, platformPrices, onC
         // count used to approximate — but a room that carries one keeps it,
         // because clearing a setting the operator did not touch is a price
         // change nobody made.
-        joystick_charged_slots: isPlayStation && isOwnJoystickRule ? joystickScope : null,
+        joystick_charged_slots: isPlayStation && isOwnJoystickRule ? outgoingScope : null,
+        // The fourth pad's own figure, and only where the room actually sells
+        // one: under "as the branch does", the shared pair or a legacy answer
+        // it is null, which is the server's "this room did not price the pair
+        // apart". A typed 0 is a real setting and travels as 0.
+        joystick_price_4: isPlayStation && isOwnJoystickRule && asksFourthPad
+          && wantsFourthPad && joystickPrice4.trim() !== ""
+          ? Number(joystickPrice4)
+          : null,
         joystick_included: isPlayStation && joystickScope !== ""
           ? (initial?.joystick_included ?? null)
           : null,
@@ -699,13 +773,30 @@ const PlaceForm = ({ branchId, initial, platformSuggestions, platformPrices, onC
                   className="input"
                   value={joystickScope}
                   disabled={busy}
-                  onChange={(e) => setJoystickScope(e.target.value as JoystickScope)}
+                  onChange={(e) => {
+                    const next = e.target.value as JoystickScope;
+                    setJoystickScope(next);
+                    // Leaving "the third" closes the fourth-pad question, so
+                    // its answer goes with it. A figure left behind in state
+                    // is a price the operator can no longer see and would be
+                    // saved by the next click.
+                    if (next !== "3") {
+                      setWantsFourthPad(false);
+                      setJoystickPrice4("");
+                    }
+                  }}
                   style={{ width: 180 }}
                 >
                   <option value="">{t("place.joystickInherit")}</option>
                   {JOYSTICK_SCOPES.map((scope) => (
                     <option key={scope} value={scope}>{t(`place.joystickScope.${scope}`)}</option>
                   ))}
+                  {/* The bare fourth is no longer offered. A room already on it
+                      keeps it — and only that room sees it — because clearing
+                      the answer on open would re-price a seat nobody touched. */}
+                  {joystickScope === "4" && (
+                    <option value="4">{t("place.joystickScope.4")}</option>
+                  )}
                   {/* Only for a room already on an older answer, and only until
                       it picks one of the three above. Offering it to everybody
                       would be offering a setting nobody can explain. */}
@@ -730,6 +821,45 @@ const PlaceForm = ({ branchId, initial, platformSuggestions, platformPrices, onC
                 />
               </div>
             </div>
+            {/* Is a FOURTH pad sold at all, and for how much?
+                Asked only under "the third", where it is the one thing still
+                open. Yes turns the room's answer into the charged pair with
+                two figures; no leaves the third priced alone and the fourth
+                handed over at 0.00. The box is mandatory under yes: a price
+                nobody named is a price the receipt would invent. */}
+            {asksFourthPad && (
+              <div className="col" style={{ gap: 6 }}>
+                <span className="label">{t("place.joystickFourth")}</span>
+                <div className="row" role="radiogroup" aria-label={t("place.joystickFourth")} style={{ gap: 16, flexWrap: "wrap", alignItems: "flex-end" }}>
+                  <Radio
+                    name="cp-place-joystick-fourth"
+                    checked={! wantsFourthPad}
+                    onChange={() => { setWantsFourthPad(false); setJoystickPrice4(""); }}
+                    disabled={busy}
+                    label={t("action.no")}
+                  />
+                  <Radio
+                    name="cp-place-joystick-fourth"
+                    checked={wantsFourthPad}
+                    onChange={() => setWantsFourthPad(true)}
+                    disabled={busy}
+                    label={t("action.yes")}
+                  />
+                  {wantsFourthPad && (
+                    <div style={{ minWidth: 180 }}>
+                      <PriceInput
+                        label={t("place.joystickFourthPrice")}
+                        value={joystickPrice4}
+                        onChange={setJoystickPrice4}
+                        disabled={busy}
+                      />
+                    </div>
+                  )}
+                </div>
+                <span className="muted" style={{ fontSize: 11 }}>{t("place.joystickFourthHint")}</span>
+              </div>
+            )}
+
             {/* HOW a pad is priced here. Two answers and no third: a club
                 ran both models at once for a day, and a choice made per seat
                 is a choice a cashier can get wrong on money. */}

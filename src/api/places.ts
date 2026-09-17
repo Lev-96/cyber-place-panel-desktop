@@ -31,6 +31,13 @@ export interface CreatePlaceBody {
   /** Which extra pads this room charges for: "3", "4" or "3,4". Null inherits. */
   joystick_charged_slots?: string | null;
   /**
+   * The fourth pad's own price, when this room prices it apart from the third.
+   * Null means the pair shares one figure; 0 means the fourth is handed over
+   * for nothing. The server refuses a figure here unless the room charges for
+   * the fourth pad and names a base price too.
+   */
+  joystick_price_4?: number | null;
+  /**
    * Display наименование for a brand-new custom platform's branch price. Only
    * meaningful when the platform is custom AND not yet priced; ignored
    * otherwise. Not a Place column — the backend forwards it to the price row.

@@ -104,6 +104,16 @@ export interface IBranchPlace extends Translated {
    */
   joystick_charged_slots?: string | null;
   /**
+   * The FOURTH pad's own figure, when this room prices it apart from the
+   * third. Null is "priced like the third" — never "free", which is a typed 0
+   * — and it is what every room is until somebody answers the form's question
+   * about a fourth pad.
+   *
+   * Typed like `joystick_price` above: a decimal column reaches the panel as a
+   * string on some endpoints and a number on others.
+   */
+  joystick_price_4?: number | string | null;
+  /**
    * HOW this room prices an extra pad — a fee owed on handout, or a higher
    * hourly rate while the pad is out. Null follows the branch.
    */

@@ -73,6 +73,12 @@ export const TRANSLATIONS: Dict = {
   "action.save": { en: "Save", ru: "Сохранить", am: "Պահպանել" },
   "action.continue": { en: "Continue", ru: "Продолжить", am: "Շարունակել" },
   "action.cancel": { en: "Cancel", ru: "Отмена", am: "Չեղարկել" },
+  // A plain yes/no pair. Introduced for the place form's "is a 4th joystick
+  // needed?" question, which is a question and not a toggle: a switch would
+  // have to be labelled with what it does when it is ON, and "4th joystick"
+  // beside a switch reads as "this seat has one".
+  "action.yes": { en: "Yes", ru: "Да", am: "Այո" },
+  "action.no": { en: "No", ru: "Нет", am: "Ոչ" },
   "action.edit": { en: "Edit", ru: "Изменить", am: "Խմբագրել" },
   "action.delete": { en: "Delete", ru: "Удалить", am: "Ջնջել" },
   "action.add": { en: "Add", ru: "Добавить", am: "Ավելացնել" },
@@ -1618,6 +1624,11 @@ export const TRANSLATIONS: Dict = {
   "place.hasGamesHint": { en: "Turn on to attach games; leave off for a games-free platform (e.g. table tennis).", ru: "Включите, чтобы прикрепить игры; оставьте выключенным для платформы без игр (напр. настольный теннис).", am: "Միացրեք՝ խաղեր կցելու համար; թողեք անջատած՝ առանց խաղերի հարթակի համար (օր. սեղանի թենիս):" },
   "place.createGame": { en: "+ Create game", ru: "+ Создать игру", am: "+ Ստեղծել խաղ" },
   "place.errors.number": { en: "Number must be a positive integer", ru: "Номер должен быть положительным целым числом", am: "Համարը պետք է լինի դրական ամբողջ թիվ" },
+  "place.errors.joystickFourthPriceRequired": {
+    en: "Name the price of the 4th joystick, or answer No.",
+    ru: "Укажите цену 4-го джойстика или ответьте «Нет».",
+    am: "Նշեք 4-րդ ջոյսթիքի գինը կամ պատասխանեք «Ոչ»։",
+  },
   "place.errors.priceRequired": { en: "Set a price for this new platform", ru: "Задайте цену для новой платформы", am: "Սահմանեք գին այս նոր հարթակի համար" },
   "place.errors.nameRequired": { en: "Enter the platform name (English is required)", ru: "Введите наименование платформы (английское обязательно)", am: "Մուտքագրեք հարթակի անվանումը (անգլերենը պարտադիր է)" },
   "place.priceName": { en: "Platform name (наименование)", ru: "Наименование платформы", am: "Հարթակի անվանումը" },
@@ -1705,6 +1716,24 @@ export const TRANSLATIONS: Dict = {
     en: "Name the price for the joysticks you charge for.",
     ru: "Укажите цену джойстиков, за которые берёте плату.",
     am: "Նշեք ջոյսթիքների գինը, որոնց համար վճար եք վերցնում։",
+  },
+  // Asked only under "3rd only", where whether a fourth pad is sold at all is
+  // the one thing still open. Yes turns the answer into the charged pair with
+  // two figures of its own.
+  "place.joystickFourth": {
+    en: "Is a 4th joystick needed?",
+    ru: "Нужен 4-й джойстик?",
+    am: "Անհրաժեշտ է 4-րդ ջոյսթիք՞",
+  },
+  "place.joystickFourthPrice": {
+    en: "Price of the 4th joystick",
+    ru: "Цена 4-го джойстика",
+    am: "4-րդ ջոյսթիքի գին",
+  },
+  "place.joystickFourthHint": {
+    en: "No: the 3rd is charged and the 4th is handed over free. Yes: each is charged at its own price.",
+    ru: "Нет: плата за 3-й, 4-й выдаётся бесплатно. Да: за каждый своя цена.",
+    am: "Ոչ՝ վճար 3-րդի համար, 4-րդը տրվում է անվճար։ Այո՝ յուրաքանչյուրն իր գնով։",
   },
   "place.joystickScope": { en: "Charged joysticks", ru: "Платные джойстики", am: "Վճարովի ջոյսթիքներ" },
   "place.joystickScope.3": { en: "3rd only", ru: "Только 3-й", am: "Միայն 3-րդը" },

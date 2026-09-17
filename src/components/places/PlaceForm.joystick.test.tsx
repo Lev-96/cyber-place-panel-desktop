@@ -179,11 +179,18 @@ describe("PlaceForm joystick override", () => {
    * how many of its two built-in controllers were included, and could not
    * express "the third and not the fourth" at all.
    */
-  test("the menu names the third, the fourth and the pair, and nothing else", async () => {
+  /**
+   * The bare fourth left the menu on 2026-09-17: it answered a question no
+   * venue asked, and it sat beside "3" and "3,4" as a third shape to reason
+   * about. A room that sells a fourth pad now says so under "3", with a price
+   * of its own — see `PlaceForm.fourthJoystick.test.tsx`, which also pins that
+   * a room already stored on "4" keeps it.
+   */
+  test("the menu names the third and the pair, and nothing else", async () => {
     await mount(place());
 
     const options = [...allowance().querySelectorAll("option")].map((o) => o.value);
-    expect(options).toEqual(["", "3", "4", "3,4"]);
+    expect(options).toEqual(["", "3", "3,4"]);
   });
 
   /**
@@ -241,14 +248,16 @@ describe("PlaceForm joystick override", () => {
     expect(body.joystick_price).toBe(700);
   });
 
-  test("a room that charges for the fourth only says so", async () => {
+  /**
+   * A FRESH room cannot be put on the bare fourth any more — the option is not
+   * in the menu to choose. The stored answer is a different question, and the
+   * suite next door pins that it survives untouched.
+   */
+  test("a fresh room cannot be put on the bare fourth", async () => {
     await mount(place());
-    await chooseScope("4");
-    await typePrice("700");
-    await save();
 
-    const body = await sent();
-    expect(body.joystick_charged_slots).toBe("4");
+    const options = [...allowance().querySelectorAll("option")].map((o) => o.value);
+    expect(options).not.toContain("4");
   });
 
   test("a seat that hands its named pads out free sends 0, not an empty override", async () => {
