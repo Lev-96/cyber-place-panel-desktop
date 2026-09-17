@@ -1550,12 +1550,25 @@ setting: this seat gives extra pads away.
 `PlaceForm` asks four, and every one of them maps to a column the backend
 resolves room-first (see the backend's own `JoystickRule`):
 
-- **Which pads cost money** — a select over `"3" | "4" | "3,4"` plus "as the
-  branch does" (`""`). It replaced a COUNT of pads included in the rate, which
-  offered 1 and 2 to a seat that always holds two and could not say "the third
-  and not the fourth" at all. A room still on the old shape keeps a `legacy`
-  option, shown only to that room and only until it picks one of the three —
-  offering it to everybody would be offering a setting nobody can explain.
+- **Which pads cost money** — a select over `"3" | "3,4"` plus "as the branch
+  does" (`""`). It replaced a COUNT of pads included in the rate, which offered
+  1 and 2 to a seat that always holds two and could not say "the third and not
+  the fourth" at all. Two answers keep their place in the menu without being
+  offered: `legacy` (a room on the older count) and `"4"` — the bare fourth,
+  dropped from the menu on 2026-09-17 because it answered a question no venue
+  asked. Both are shown to the room that carries them and to no one else,
+  because clearing an answer on open would re-price a seat nobody touched.
+- **Is a fourth pad sold, and for how much** — asked only under `"3"`, where it
+  is the one thing still open (`"3,4"` already prices the pair together, and
+  "as the branch does" prices nothing here). `Нет` leaves the third charged and
+  the fourth handed over at 0.00; `Да` reveals a MANDATORY price box and the
+  room's answer travels as the charged pair with two figures —
+  `joystick_charged_slots: "3,4"` plus `joystick_price_4`. An empty box under
+  `Да` holds Save: both fallbacks (nothing, or the third's figure) are money
+  the operator did not name. Leaving `"3"` clears the answer and the figure,
+  so a price the operator can no longer see cannot be saved by the next click.
+  A room stored as the pair WITH its own fourth figure reopens as `"3"` + `Да`
+  with both boxes filled, which is how it was entered.
 - **The price**, editable only where the room prices its own pads. Under "as the
   branch does" the box shows the VENUE's figure, read-only, fetched with the
   branch's billing settings: a box that silently discards what is typed into it
@@ -1581,12 +1594,19 @@ disagree about. `padChargeOf()` prints `n × fee` only when every charged period
 agrees on a price — fees are frozen per pad, so a seat that straddles a
 re-pricing holds two, and "3 × ?" would be a lie where the sum is always true.
 
+`places.joystick_price_4` is the room's own fourth-pad figure (null = the pair
+shares one, 0 = the fourth is free), mirroring `branches.joystick_price_4`. The
+server refuses it unless the room charges for the fourth pad and names a base
+price, so the form's own gate and the API's answer agree.
+
 `api/joystickPrices.ts` is the one place that fills in a default for an older
 backend: `includedJoysticks`, `chargedSlotsOf`, `pricingModeOf`, `strategyModeOf`,
 `maxJoystickSlotOf`, plus `CHARGED_SLOT_CHOICES`, `PRICING_MODES`,
 `CHARGE_MODES`, `STRATEGY_MODES`, `BASE_JOYSTICKS` and `MAX_JOYSTICKS`. Pinned by
 `PlaceForm.joystick.test.tsx`, `PlaceForm.rate.test.tsx`,
-`BranchJoystickForm.test.tsx` and `SessionsBoard.expiry.test.tsx`.
+`BranchJoystickForm.test.tsx`, `PlaceForm.fourthJoystick.test.tsx` (the menu,
+the question, the mandatory box and the carried `"4"`) and
+`SessionsBoard.expiry.test.tsx`.
 
 **Refusals are shown verbatim.** The server answers a blocked unlimited with
 "this place is booked in the app" and a missing rate with "no price is set for
