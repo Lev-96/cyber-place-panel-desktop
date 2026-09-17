@@ -1472,19 +1472,28 @@ touched. `unlimited_at` and `committed_until` take no part in the price on
 either side any more — if you see a branch reading them to compute money, it
 is older than this.
 
-**The tile shows `🎮 3 / 4`, not three glyphs.** The repeat said how many pads
-were in play and never what the ceiling was, which is the half a cashier at the
-board actually needs ("can another player join?"). One glyph plus the fraction
-is also narrower than the old worst case, so the card cannot grow. Same
-fraction the options dialog shows.
+**The tile names the pads that are OUT, not a fraction of a ceiling.**
+`padIdentity()` prints the seat's count while nothing extra is out, and the
+slots themselves once something is — `"3"`, `"3, 4"`, or `"3/4"` where the venue
+prices the pair as one figure and naming the position it happened to open would
+tell a cashier something the venue deliberately did not distinguish. It began as
+`🎮 3 / 4` against a constant ceiling of four; the ceiling is the venue's now
+(`padCeiling()` → `joystick_rule.max_slot`), and a fraction against a number that
+changes per room reads as a different question than the one it answers.
 
-**Next to it is a `select`, 1 to 4, and the whole row must stay on ONE line.**
-Two 22px steppers meant going from one pad to three was two presses with the
-number catching up in between; a select states the target and the board reads
-back what the SERVER returned. The row is `flex-wrap: nowrap` with the fraction
-`flex-shrink: 0` and the select fixed at 46px, because the tile is 160px and a
-full-width input pushed `1 / 4` onto a second line — where it read as another
-field rather than as the label of the control beside it.
+**Next to it is a `select` of PADS — which one, not how many — and the whole row
+must stay on ONE line.** Each option carries the slot and what it costs
+(`Joystick #3 · 500`, `Joystick 3/4` where the venue shares one figure, and a
+tail of `free` / `already charged` / `no price set` / `already in use`), so
+the figure the cashier sees is the figure the server will freeze onto the row.
+Handing one BACK is a separate `−` button, drawn only above the base kit: the
+select used to be a target COUNT and the server picked the slot, and a single
+control that both charges and refunds by direction is how a mis-click becomes
+money. A once-per-seat venue gets neither — `padSwitch` draws one button, out or
+back. The row is `flex-wrap: nowrap` with the count `flex-shrink: 0` and the
+select fixed in width, because the tile is 160px and a full-width input pushed
+the count onto a second line, where it read as another field rather than as the
+label of the control beside it.
 
 **No native `confirm()` in the session dialogs** (the app as a whole still has
 three — §4 traps, "Confirm dialogs"). The unlimited confirmation used
@@ -1516,19 +1525,68 @@ same question the backend asks.
 **The fee's three states are three named choices, not one box.** The wire is
 one nullable number: a figure is the fee, `0` hands extra pads out for nothing
 and `null` means this venue does not offer them. Two of those used to be typed
-into the same field and one of them was typing nothing, so `JoystickPricesForm`
-asks the question instead — Charged / Free / Not offered, with the price box
-drawn only under Charged. "Charged with nothing typed" is deliberately NOT an
-answer: it holds Save down rather than guessing, because both guesses (0 and
-null) are settings the operator can pick by name one row up.
+into the same field and one of them was typing nothing, so the branch's form
+asks the question instead. That form is `BranchJoystickForm` since 2026-09-17
+(`JoystickPricesForm` before it, and the file is gone): it now asks the venue's
+TWO questions — which pads cost money, and how much — and deliberately nothing
+else. The strategy, the charge mode and the fourth pad's separate figure are the
+ROOM's questions, asked on the place form, because asking them twice in two
+places is how two screens end up disagreeing about one venue. `""` is "this
+venue has not answered", which every branch is until somebody chooses; without
+it the page would light Save the moment it rendered and an owner who came to
+read the screen could save a choice they never made.
 
 **A place may override the branch, and empty means inherit.** `places`
-carries `joystick_included` and `joystick_price`, both nullable, and null is
+carries `joystick_included`, `joystick_price`, `joystick_charged_slots`,
+`joystick_pricing_mode` and `joystick_charge_mode`, all nullable, and null is
 INHERIT rather than the branch's "not offered" — the same empty-means-inherit
-shape `hourly_rate` has in the same form. `PlaceForm` draws the pair for
-PlayStation places only, sends `null` for anything else (so a seat that stops
-being a PlayStation drops the override it had), and a typed `0` is a real
-per-place setting: this seat gives extra pads away.
+shape `hourly_rate` has in the same form. `PlaceForm` draws them for PlayStation
+places only, sends `null` for anything else (so a seat that stops being a
+PlayStation drops the override it had), and a typed `0` is a real per-place
+setting: this seat gives extra pads away.
+
+### The room answers the joystick questions now (2026-09-15 → 09-17)
+
+`PlaceForm` asks four, and every one of them maps to a column the backend
+resolves room-first (see the backend's own `JoystickRule`):
+
+- **Which pads cost money** — a select over `"3" | "4" | "3,4"` plus "as the
+  branch does" (`""`). It replaced a COUNT of pads included in the rate, which
+  offered 1 and 2 to a seat that always holds two and could not say "the third
+  and not the fourth" at all. A room still on the old shape keeps a `legacy`
+  option, shown only to that room and only until it picks one of the three —
+  offering it to everybody would be offering a setting nobody can explain.
+- **The price**, editable only where the room prices its own pads. Under "as the
+  branch does" the box shows the VENUE's figure, read-only, fetched with the
+  branch's billing settings: a box that silently discards what is typed into it
+  is worse than no box.
+- **Fee or hourly rate** (`joystick_pricing_mode`) and **per handout or once for
+  the seat** (`joystick_charge_mode`) — deliberately two questions and not one
+  dropdown of four combinations. The first is what the money IS, the second is
+  how often it lands, and a cashier who confuses them is confusing money.
+- **The seat's own hourly rate**, which is a different box from the platform /
+  sub-category rate beside it. The server takes the place's own rate first and
+  the branch's matrix second, and a PlayStation seat that resolves to nothing —
+  or to a typed `0` — is refused on save rather than at the counter, hours
+  later, with the card's Start greyed out in front of a player.
+
+**The board draws the venue's menu, never its own.** `padChoices(session.joystick_rule, openSlots)`
+builds the pad menu from the SERVER's `options[]`, `padCeiling()` reads the
+venue's `max_slot` (falling back to `MAX_JOYSTICKS` only for an older payload),
+and the floor is `BASE_JOYSTICKS` — two, the kit a PlayStation ships with, which
+no button can hand back. A once-per-seat venue gets a SWITCH instead of a menu:
+one extra pad, out or not, with both halves read from the server's answer so a
+socket update or another cashier's press flips it with no local state to
+disagree about. `padChargeOf()` prints `n × fee` only when every charged period
+agrees on a price — fees are frozen per pad, so a seat that straddles a
+re-pricing holds two, and "3 × ?" would be a lie where the sum is always true.
+
+`api/joystickPrices.ts` is the one place that fills in a default for an older
+backend: `includedJoysticks`, `chargedSlotsOf`, `pricingModeOf`, `strategyModeOf`,
+`maxJoystickSlotOf`, plus `CHARGED_SLOT_CHOICES`, `PRICING_MODES`,
+`CHARGE_MODES`, `STRATEGY_MODES`, `BASE_JOYSTICKS` and `MAX_JOYSTICKS`. Pinned by
+`PlaceForm.joystick.test.tsx`, `PlaceForm.rate.test.tsx`,
+`BranchJoystickForm.test.tsx` and `SessionsBoard.expiry.test.tsx`.
 
 **Refusals are shown verbatim.** The server answers a blocked unlimited with
 "this place is booked in the app" and a missing rate with "no price is set for
