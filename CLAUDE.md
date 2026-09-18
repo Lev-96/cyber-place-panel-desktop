@@ -1569,8 +1569,9 @@ was rearranged on 2026-09-18 — only where it is asked.
   the option inside it.
 
   ⚠️ That group has **no "as in the branch"**: the room states the tariff it
-  bills a pad on, and `fixed` is the default. A room carrying no answer of its
-  own opens on the one it INHERITS — read from the venue's billing settings
+  bills a pad on, and `fixed` is the default — including for a place being
+  CREATED, which has no bill behind it and therefore no tariff to be moved off.
+  A SAVED room carrying no answer of its own opens on the one it INHERITS — read from the venue's billing settings
   once they load — so saving it pins the figure it was already billing by
   instead of moving it. A screen that showed `fixed` to a room billing hourly
   through its branch would be a lie about money, and the save would make the

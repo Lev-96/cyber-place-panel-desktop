@@ -209,9 +209,18 @@ const PlaceForm = ({ branchId, initial, platformSuggestions, platformPrices, onC
   const [joystickStrategy, setJoystickStrategy] = useState<JoystickPricingMode>(
     initial?.joystick_pricing_mode ?? "fixed",
   );
-  /** True until the branch's own answer has been read, for a room with none. */
+  /**
+   * True until the branch's own answer has been read — for an EXISTING room
+   * that carries none.
+   *
+   * A room being created inherits nothing: it has no bill behind it and no
+   * tariff it was already billing by, so it opens on the default like every
+   * other new setting on this form. Only a saved room that never answered
+   * opens on the tariff it is actually being billed at, which is the case
+   * where showing the default would be a lie about money.
+   */
   const [strategyFollowsBranch, setStrategyFollowsBranch] = useState(
-    initial?.joystick_pricing_mode == null,
+    initial != null && initial.joystick_pricing_mode == null,
   );
   const [gameIds, setGameIds] = useState<Set<number>>(new Set((initial?.games ?? []).map((g) => g.id)));
   // A custom platform may legitimately have NO games (table tennis, a poker

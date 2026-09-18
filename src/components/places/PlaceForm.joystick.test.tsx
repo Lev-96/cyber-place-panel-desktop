@@ -469,6 +469,21 @@ describe("PlaceForm joystick settings", () => {
   });
 
   /**
+   * A place being CREATED has no tariff behind it to be moved off, so it opens
+   * on the default whatever the venue bills by.
+   */
+  test("a new place defaults to the fixed tariff, even at an hourly venue", async () => {
+    billing.get.mockResolvedValue({ ...BRANCH_POLICY, joystick_pricing_mode: "hourly" });
+    await mount();
+    // A place is created on PC and becomes a PlayStation when the operator
+    // picks one, which is when the joystick block appears at all.
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "PS5" })); });
+
+    expect(radioIn(tariffGroup(), "joystickPrice.strategy.fixed").checked).toBe(true);
+    expect(radioIn(tariffGroup(), "joystickPrice.strategy.hourly").checked).toBe(false);
+  });
+
+  /**
    * ⚠️ A room that never answered opens on the answer it INHERITS, not on the
    * default: a screen showing "fixed" to a room billing hourly through its
    * branch would be a lie about money, and saving it would make the lie true.
