@@ -23,7 +23,7 @@ import { platformPriceNameOf } from "@/i18n/platformPriceName";
 import { gameRepository } from "@/repositories/GameRepository";
 import { placeRepository } from "@/repositories/PlaceRepository";
 import { subplatformRepository } from "@/repositories/SubplatformRepository";
-import { CHARGE_MODES, JoystickChargeMode, JoystickPricingMode, PRICING_MODES } from "@/api/joystickPrices";
+import { CHARGE_MODES, JoystickChargeMode, JoystickPricingMode, PRICING_MODES, pricingModeOf } from "@/api/joystickPrices";
 import { IBranchApi, IBranchPlace, IBranchPlatformPrice, PlaceType } from "@/types/api";
 import { isKnownPlatform, platformGroup, platformLabel, slugifyPlatform } from "@/utils/platform";
 import { FormEvent, useEffect, useState } from "react";
@@ -195,8 +195,23 @@ const PlaceForm = ({ branchId, initial, platformSuggestions, platformPrices, onC
    * handout, or a higher hourly rate while the pad is out), the second is
    * whether it is owed again the next time a controller changes hands.
    */
-  const [joystickStrategy, setJoystickStrategy] = useState<JoystickPricingMode | "">(
-    initial?.joystick_pricing_mode ?? "",
+  /**
+   * HOW this room prices an extra pad: a fee owed on handout, or a higher
+   * hourly rate while the pad is out.
+   *
+   * Two answers and no "as in the branch": the room states the rule it bills
+   * by. The default is `fixed`, which is what every venue bills by, and a room
+   * that carries no answer of its own opens on the figure it INHERITS — the
+   * effect below settles that once the branch's policy has loaded. A screen
+   * that showed "fixed" to a room billing hourly by inheritance would be a lie
+   * about money.
+   */
+  const [joystickStrategy, setJoystickStrategy] = useState<JoystickPricingMode>(
+    initial?.joystick_pricing_mode ?? "fixed",
+  );
+  /** True until the branch's own answer has been read, for a room with none. */
+  const [strategyFollowsBranch, setStrategyFollowsBranch] = useState(
+    initial?.joystick_pricing_mode == null,
   );
   const [gameIds, setGameIds] = useState<Set<number>>(new Set((initial?.games ?? []).map((g) => g.id)));
   // A custom platform may legitimately have NO games (table tennis, a poker
@@ -340,6 +355,16 @@ const PlaceForm = ({ branchId, initial, platformSuggestions, platformPrices, onC
    */
   const branchJoysticks = useAsync(() => billingSettingsRepository.get(branchId), [branchId]);
   const branchJoystickPrice = branchJoysticks.data?.joystick_price ?? null;
+  /**
+   * A room that never answered the tariff question opens on the answer it
+   * inherits, once the venue's policy has been read. Settled once and then
+   * left alone: after this, the radios are the operator's.
+   */
+  useEffect(() => {
+    if (! strategyFollowsBranch || ! branchJoysticks.data) return;
+    setJoystickStrategy(pricingModeOf(branchJoysticks.data));
+    setStrategyFollowsBranch(false);
+  }, [strategyFollowsBranch, branchJoysticks.data]);
   /**
    * Is this room pricing its own pads?
    *
@@ -578,7 +603,11 @@ const PlaceForm = ({ branchId, initial, platformSuggestions, platformPrices, onC
         joystick_price: isPlayStation && isOwnJoystickRule && hasOwnJoystickPrice
           ? Number(joystickPrice)
           : null,
-        joystick_pricing_mode: isPlayStation && joystickStrategy !== "" ? joystickStrategy : null,
+        // Stated, never left empty: the room says which tariff it bills a pad
+        // on. For a room that carried no answer this is the one it already
+        // inherited — read from the venue above — so the figure on the bill
+        // does not move, it only stops depending on the branch.
+        joystick_pricing_mode: isPlayStation ? joystickStrategy : null,
         // Written only by a deliberate click. A room that carries no answer
         // inherits its branch's, and a branch that charges once would start
         // charging per pad the moment this form saved a value nobody chose.
@@ -935,13 +964,6 @@ const PlaceForm = ({ branchId, initial, platformSuggestions, platformPrices, onC
             <div className="col" style={{ gap: 6 }}>
               <span className="label">{t("place.joystickTariffChange")}</span>
               <div className="row" role="radiogroup" aria-label={t("place.joystickTariffChange")} style={{ gap: 16, flexWrap: "wrap" }}>
-                <Radio
-                  name="cp-place-joystick-strategy"
-                  checked={joystickStrategy === ""}
-                  onChange={() => setJoystickStrategy("")}
-                  disabled={busy}
-                  label={t("place.joystickInherit")}
-                />
                 {PRICING_MODES.map((m) => (
                   <Radio
                     key={m}

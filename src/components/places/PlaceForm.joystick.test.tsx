@@ -42,13 +42,21 @@ vi.mock("@/repositories/GameRepository", () => ({
 }));
 // The VENUE's joystick policy — what a room inherits when it prices no pads of
 // its own. Answered here so a unit test never reaches for a server.
-const BRANCH_POLICY = { branch_id: 7, joystick_price: 500, joystick_charged_slots: null };
+const BRANCH_POLICY: Record<string, unknown> = {
+  branch_id: 7, joystick_price: 500, joystick_charged_slots: null, joystick_pricing_mode: "fixed",
+};
 // Seeded at hoist time AND re-seeded before every test below, because a
 // `vi.fn()` with no implementation returns `undefined` and the form awaits
 // this. That is not a failing assertion — it is a rejected promise landing
 // wherever the event loop happens to be, which is a test that fails in a full
 // run and passes on its own.
-const billing = vi.hoisted(() => ({ get: vi.fn(async (..._a: unknown[]) => ({ branch_id: 7, joystick_price: 500, joystick_charged_slots: null })) }));
+const billing = vi.hoisted(() => ({
+  // Typed loosely on purpose: a block below hands it a venue on the hourly
+  // tariff, and the inferred shape of one literal is not the contract.
+  get: vi.fn(async (..._a: unknown[]): Promise<Record<string, unknown>> => ({
+    branch_id: 7, joystick_price: 500, joystick_charged_slots: null, joystick_pricing_mode: "fixed",
+  })),
+}));
 vi.mock("@/repositories/BillingSettingsRepository", () => ({
   billingSettingsRepository: { get: (...a: unknown[]) => billing.get(...a) },
 }));
@@ -446,14 +454,37 @@ describe("PlaceForm joystick settings", () => {
     expect(within(dom).queryAllByLabelText("joystickPrice.strategy.fixed").length).toBe(1);
   });
 
-  test("the hourly question is its own radio group, inherit by default", async () => {
+  /**
+   * Two answers and no "as in the branch": the room states the tariff it bills
+   * a pad on. Fixed is the default, which is what every venue bills by.
+   */
+  test("the tariff question offers two answers, fixed by default", async () => {
     await mount(place());
 
     const group = tariffGroup();
-    expect(group.querySelectorAll('input[type="radio"]').length).toBe(3);
-    expect(radioIn(group, INHERIT).checked).toBe(true);
-    expect(radioIn(group, "joystickPrice.strategy.fixed")).toBeTruthy();
-    expect(radioIn(group, "joystickPrice.strategy.hourly")).toBeTruthy();
+    expect(group.querySelectorAll('input[type="radio"]').length).toBe(2);
+    expect(within(group).queryByLabelText(INHERIT)).toBeNull();
+    expect(radioIn(group, "joystickPrice.strategy.fixed").checked).toBe(true);
+    expect(radioIn(group, "joystickPrice.strategy.hourly").checked).toBe(false);
+  });
+
+  /**
+   * ⚠️ A room that never answered opens on the answer it INHERITS, not on the
+   * default: a screen showing "fixed" to a room billing hourly through its
+   * branch would be a lie about money, and saving it would make the lie true.
+   */
+  test("a room with no answer of its own opens on the venue's", async () => {
+    billing.get.mockResolvedValue({ ...BRANCH_POLICY, joystick_pricing_mode: "hourly" });
+    await mount(place());
+
+    expect(radioIn(tariffGroup(), "joystickPrice.strategy.hourly").checked).toBe(true);
+  });
+
+  test("a room that stated its own keeps it", async () => {
+    billing.get.mockResolvedValue({ ...BRANCH_POLICY, joystick_pricing_mode: "hourly" });
+    await mount(place({ joystick_pricing_mode: "fixed" }));
+
+    expect(radioIn(tariffGroup(), "joystickPrice.strategy.fixed").checked).toBe(true);
   });
 
   test("what the room picks for the tariff is what the server is told", async () => {
@@ -464,8 +495,25 @@ describe("PlaceForm joystick settings", () => {
     expect((await sent()).joystick_pricing_mode).toBe("hourly");
   });
 
-  test("untouched, the tariff travels as null — which is inherit and not a setting", async () => {
+  /** The tariff is always stated — for a fresh room that is the default. */
+  test("the tariff travels stated, never empty", async () => {
     await mount(place());
+    await save();
+
+    expect((await sent()).joystick_pricing_mode).toBe("fixed");
+  });
+
+  /** …and for a room that inherited one, it is the figure it already billed by. */
+  test("an inherited tariff travels as the one it was already billing by", async () => {
+    billing.get.mockResolvedValue({ ...BRANCH_POLICY, joystick_pricing_mode: "hourly" });
+    await mount(place());
+    await save();
+
+    expect((await sent()).joystick_pricing_mode).toBe("hourly");
+  });
+
+  test("a PC seat still states none of it", async () => {
+    await mount(place({ platform: "pc" }));
     await save();
 
     expect((await sent()).joystick_pricing_mode).toBeNull();

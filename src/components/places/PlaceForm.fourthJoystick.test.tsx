@@ -43,13 +43,21 @@ vi.mock("@/repositories/GameRepository", () => ({
 }));
 // The VENUE's joystick policy — what a room inherits when it prices no pads of
 // its own. Answered here so a unit test never reaches for a server.
-const BRANCH_POLICY = { branch_id: 7, joystick_price: 500, joystick_charged_slots: null };
+const BRANCH_POLICY: Record<string, unknown> = {
+  branch_id: 7, joystick_price: 500, joystick_charged_slots: null, joystick_pricing_mode: "fixed",
+};
 // Seeded at hoist time AND re-seeded before every test below, because a
 // `vi.fn()` with no implementation returns `undefined` and the form awaits
 // this. That is not a failing assertion — it is a rejected promise landing
 // wherever the event loop happens to be, which is a test that fails in a full
 // run and passes on its own.
-const billing = vi.hoisted(() => ({ get: vi.fn(async (..._a: unknown[]) => ({ branch_id: 7, joystick_price: 500, joystick_charged_slots: null })) }));
+const billing = vi.hoisted(() => ({
+  // Typed loosely on purpose: a block below hands it a venue on the hourly
+  // tariff, and the inferred shape of one literal is not the contract.
+  get: vi.fn(async (..._a: unknown[]): Promise<Record<string, unknown>> => ({
+    branch_id: 7, joystick_price: 500, joystick_charged_slots: null, joystick_pricing_mode: "fixed",
+  })),
+}));
 vi.mock("@/repositories/BillingSettingsRepository", () => ({
   billingSettingsRepository: { get: (...a: unknown[]) => billing.get(...a) },
 }));

@@ -1563,10 +1563,18 @@ was rearranged on 2026-09-18 — only where it is asked.
   Switching methods hides the other's boxes and clears nothing in state — the
   payload is what decides, and a figure typed is still there on the way back.
 - **The tariff** — `Тариф доп. джойстика` states the default and offers no
-  choice; the hourly answer is its own radio group below it
+  choice; the answer is its own radio group below it
   (`place.joystickTariffChange`), same field `joystick_pricing_mode`, same two
   values, same server rule. The heading is deliberately NOT the same string as
   the option inside it.
+
+  ⚠️ That group has **no "as in the branch"**: the room states the tariff it
+  bills a pad on, and `fixed` is the default. A room carrying no answer of its
+  own opens on the one it INHERITS — read from the venue's billing settings
+  once they load — so saving it pins the figure it was already billing by
+  instead of moving it. A screen that showed `fixed` to a room billing hourly
+  through its branch would be a lie about money, and the save would make the
+  lie true.
 
 ⚠️ **The select that asked WHICH pads are charged is gone, and the column is
 not.** A room that prices its own pads charges for the pair, which is what
