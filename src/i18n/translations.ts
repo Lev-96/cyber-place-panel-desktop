@@ -1624,10 +1624,10 @@ export const TRANSLATIONS: Dict = {
   "place.hasGamesHint": { en: "Turn on to attach games; leave off for a games-free platform (e.g. table tennis).", ru: "Включите, чтобы прикрепить игры; оставьте выключенным для платформы без игр (напр. настольный теннис).", am: "Միացրեք՝ խաղեր կցելու համար; թողեք անջատած՝ առանց խաղերի հարթակի համար (օր. սեղանի թենիս):" },
   "place.createGame": { en: "+ Create game", ru: "+ Создать игру", am: "+ Ստեղծել խաղ" },
   "place.errors.number": { en: "Number must be a positive integer", ru: "Номер должен быть положительным целым числом", am: "Համարը պետք է լինի դրական ամբողջ թիվ" },
-  "place.errors.joystickFourthPriceRequired": {
-    en: "Name the price of the 4th joystick, or answer No.",
-    ru: "Укажите цену 4-го джойстика или ответьте «Нет».",
-    am: "Նշեք 4-րդ ջոյսթիքի գինը կամ պատասխանեք «Ոչ»։",
+  "place.errors.joystickPriceRequired": {
+    en: "Name the price this place charges for an extra joystick, or set it to follow the branch.",
+    ru: "Укажите цену, которую это место берёт за дополнительный джойстик, или выберите «Как в филиале».",
+    am: "Նշեք գինը, որը այս տեղը վերցնում է լրացուցիչ ջոյսթիքի համար, կամ ընտրեք «Ինչպես մասնաճյուղում»։",
   },
   "place.errors.priceRequired": { en: "Set a price for this new platform", ru: "Задайте цену для новой платформы", am: "Սահմանեք գին այս նոր հարթակի համար" },
   "place.errors.nameRequired": { en: "Enter the platform name (English is required)", ru: "Введите наименование платформы (английское обязательно)", am: "Մուտքագրեք հարթակի անվանումը (անգլերենը պարտադիր է)" },
@@ -1717,31 +1717,69 @@ export const TRANSLATIONS: Dict = {
     ru: "Укажите цену джойстиков, за которые берёте плату.",
     am: "Նշեք ջոյսթիքների գինը, որոնց համար վճար եք վերցնում։",
   },
-  // Asked only under "3rd only", where whether a fourth pad is sold at all is
-  // the one thing still open. Yes turns the answer into the charged pair with
-  // two figures of its own.
-  "place.joystickFourth": {
-    en: "Is a 4th joystick needed?",
-    ru: "Нужен 4-й джойстик?",
-    am: "Անհրաժեշտ է 4-րդ ջոյսթիք՞",
-  },
   "place.joystickFourthPrice": {
     en: "Price of the 4th joystick",
     ru: "Цена 4-го джойстика",
     am: "4-րդ ջոյսթիքի գին",
   },
-  "place.joystickFourthHint": {
-    en: "No: the 3rd is charged and the 4th is handed over free. Yes: each is charged at its own price.",
-    ru: "Нет: плата за 3-й, 4-й выдаётся бесплатно. Да: за каждый своя цена.",
-    am: "Ոչ՝ վճար 3-րդի համար, 4-րդը տրվում է անվճար։ Այո՝ յուրաքանչյուրն իր գնով։",
+  // The room's joystick section, as the form asks it since 2026-09-18: what
+  // the room follows, then how it sells its own pads.
+  "place.joysticks": { en: "Joysticks", ru: "Джойстики", am: "Ջոյսթիքներ" },
+  "place.joystickPayment": {
+    en: "How extra joysticks are paid for",
+    ru: "Способ оплаты дополнительных джойстиков",
+    am: "Լրացուցիչ ջոյսթիքների վճարման եղանակը",
+  },
+  "place.joystickThirdPrice": {
+    en: "Price of the 3rd joystick",
+    ru: "Цена 3-го джойстика",
+    am: "3-րդ ջոյսթիքի գին",
+  },
+  "place.joystickThirdPlaceholder": {
+    en: "Enter the price of the 3rd joystick",
+    ru: "Введите цену для 3-го джойстика",
+    am: "Մուտքագրեք 3-րդ ջոյսթիքի գինը",
+  },
+  // Says what happens when it is left empty, because that IS the setting: the
+  // server prices the fourth pad like the third for a null here.
+  "place.joystickFourthPlaceholder": {
+    en: "Same price as the 3rd joystick",
+    ru: "Такая же цена, как у 3-го джойстика",
+    am: "Նույն գինը, ինչ 3-րդ ջոյսթիքինը",
+  },
+  "place.joystickPairPrice": {
+    en: "Price of the 3rd/4th joysticks",
+    ru: "Цена 3/4 джойстиков",
+    am: "3/4 ջոյսթիքների գին",
+  },
+  "place.joystickPairPlaceholder": {
+    en: "Enter the price of the 3rd/4th joysticks",
+    ru: "Введите цену для 3/4 джойстиков",
+    am: "Մուտքագրեք 3/4 ջոյսթիքների գինը",
+  },
+  // The section title, deliberately NOT the same string as the option inside
+  // it: a heading that repeats one of its own answers reads as that answer.
+  "place.joystickTariffChange": {
+    en: "Hourly rate change",
+    ru: "Изменение тарифа",
+    am: "Սակագնի փոփոխություն",
+  },
+  "place.joystickStrategyFixed": {
+    en: "Fixed price (default)",
+    ru: "Фиксированная цена (по умолчанию)",
+    am: "Ֆիքսված գին (կանխադրված)",
+  },
+  // Shown only to a room carrying a shape this form no longer draws, so the
+  // operator knows why its pads are billed the way they are.
+  "place.joystickLegacySlotsNote": {
+    en: "This place charges for one of the pads only, as set earlier. Choosing a payment method above replaces that.",
+    ru: "Место берёт плату только за один из джойстиков — так было задано раньше. Выбор способа оплаты выше заменит эту настройку.",
+    am: "Տեղը վճար է վերցնում միայն մեկ ջոյսթիքի համար՝ ինչպես նախկինում էր սահմանված։ Վերևում վճարման եղանակ ընտրելը կփոխարինի այդ կարգավորումը։",
   },
   "place.joystickScope": { en: "Charged joysticks", ru: "Платные джойстики", am: "Վճարովի ջոյսթիքներ" },
   "place.joystickScope.3": { en: "3rd only", ru: "Только 3-й", am: "Միայն 3-րդը" },
   "place.joystickScope.4": { en: "4th only", ru: "Только 4-й", am: "Միայն 4-րդը" },
   "place.joystickScope.3,4": { en: "3rd and 4th", ru: "3-й и 4-й", am: "3-րդը և 4-րդը" },
-  // Shown only to a room already on an older answer, so that opening the form
-  // cannot quietly re-price a seat nobody meant to touch.
-  "place.joystickScopeLegacy": { en: "As set before", ru: "Как было задано раньше", am: "Ինչպես նախկինում էր" },
   "place.joystickBranchNote": {
     en: "This place charges what the branch charges. Change it in Branch, Prices.",
     ru: "Место берёт плату как филиал. Изменить — в разделе «Филиал, Цены».",
@@ -1751,11 +1789,6 @@ export const TRANSLATIONS: Dict = {
     en: "The joysticks named above are charged at this price on this place. The rest are handed out free.",
     ru: "Джойстики, выбранные выше, стоят на этом месте эту цену. Остальные выдаются бесплатно.",
     am: "Վերևում նշված ջոյսթիքներն այս տեղում արժեն այս գինը։ Մնացածը տրվում են անվճար։",
-  },
-  "place.joystickLegacyNote": {
-    en: "This place is on an earlier setting. Pick one of the options above to replace it.",
-    ru: "На месте осталась прежняя настройка. Выберите вариант выше, чтобы заменить её.",
-    am: "Այս տեղում մնացել է նախկին կարգավորումը։ Ընտրեք վերևի տարբերակներից մեկը՝ այն փոխարինելու համար։",
   },
   // Multilingual platform-name widget (place form, custom platform).
   "platformName.placeholder": { en: "Name", ru: "Наименование", am: "Անվանում" },

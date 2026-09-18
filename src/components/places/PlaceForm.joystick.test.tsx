@@ -1,10 +1,10 @@
 // @vitest-environment jsdom
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import type { IBranchPlace } from "@/types/api";
 
 /**
- * The per-place joystick override.
+ * The room's joystick settings, as the form asks them since 2026-09-18.
  *
  * The venue's joystick rule lives on the BRANCH and almost every seat runs on
  * it. The exception is the room quoted with four pads in the rate, or the one
@@ -83,6 +83,16 @@ vi.mock("@/components/ui/MultiLangInput", () => ({
 }));
 vi.mock("@/components/ui/SubplatformTabs", () => ({ default: () => null }));
 
+// The branch the seat bills from. Unmocked, `useAsync` reached a real
+// repository, resolved late and left the form believing this PlayStation seat
+// had no rate to bill at — which the form refuses to save. That is what made
+// this suite fail once in three full runs and never on its own.
+vi.mock("@/repositories/BranchRepository", () => ({
+  branchRepository: {
+    byId: async () => ({ id: 7, price_for_branch: { "ps5-standard": 3000, "ps5-vip": 5000 } }),
+  },
+}));
+
 import PlaceForm from "./PlaceForm";
 
 // Every describe below mounts the form, and the form asks the venue for its
@@ -113,14 +123,7 @@ const mount = async (initial?: IBranchPlace) => {
   });
 };
 
-/**
- * The override's price box. A PlayStation place on a Default sub-category has
- * no rate field of its own, so the joystick fee used to be the form's only
- * `PriceInput`. It is not any more — the seat's own price per hour sits above
- * it — so the box is found by its LABEL rather than by being the only one.
- * Counting was what made this helper wrong the moment a second price appeared.
- */
-const priceBoxes = () => dom.querySelectorAll<HTMLInputElement>('input[inputmode="decimal"]');
+/** A price box, found by the label above it rather than by being the only one. */
 const priceBoxFor = (label: string): HTMLInputElement => {
   const heading = [...dom.querySelectorAll("span.label")].find((el) => el.textContent === label);
   expect(heading, `no price box labelled ${label}`).toBeTruthy();
@@ -128,31 +131,60 @@ const priceBoxFor = (label: string): HTMLInputElement => {
   expect(box, `the box labelled ${label} has no input`).toBeTruthy();
   return box!;
 };
-const priceBox = () => priceBoxFor("place.joystickPrice");
-/** The allowance select. `SubplatformTabs` is mocked away, so there is one. */
-const allowances = () => dom.querySelectorAll<HTMLSelectElement>("select");
-const allowance = () => {
-  expect(allowances().length).toBe(1);
-  return allowances()[0];
+const hasBoxFor = (label: string): boolean =>
+  [...dom.querySelectorAll("span.label")].some((el) => el.textContent === label);
+
+const INHERIT = "place.joystickInherit";
+const EACH = "joystickPrice.chargeMode.each";
+const ONCE = "joystickPrice.chargeMode.once";
+const THIRD = "place.joystickThirdPrice";
+const FOURTH = "place.joystickFourthPrice";
+const PAIR = "place.joystickPairPrice";
+const BRANCH_BOX = "place.joystickPrice";
+
+/**
+ * The room's own decision group. "As in the branch" is the label of a radio in
+ * two different groups — this one and the tariff one below — so every click is
+ * scoped to the group it belongs to rather than to the first match in the DOM.
+ */
+const modeGroup = (): HTMLElement => {
+  const group = dom.querySelector<HTMLElement>('[role="radiogroup"][aria-label="place.joysticks"]');
+  expect(group, "the room's decision is a radiogroup").toBeTruthy();
+  return group!;
 };
-const typePrice = async (v: string) => {
-  await act(async () => { fireEvent.change(priceBox(), { target: { value: v } }); });
+const paymentGroup = (): HTMLElement => {
+  const group = dom.querySelector<HTMLElement>('[role="radiogroup"][aria-label="place.joystickPayment"]');
+  expect(group, "the payment method is a radiogroup").toBeTruthy();
+  return group!;
 };
-const chooseScope = async (v: string) => {
-  await act(async () => { fireEvent.change(allowance(), { target: { value: v } }); });
+const tariffGroup = (): HTMLElement => {
+  const group = dom.querySelector<HTMLElement>('[role="radiogroup"][aria-label="place.joystickTariffChange"]');
+  expect(group, "the tariff question is a radiogroup").toBeTruthy();
+  return group!;
+};
+const radioIn = (group: HTMLElement, label: string): HTMLInputElement =>
+  within(group).getByLabelText(label) as HTMLInputElement;
+const pick = async (label: string) => {
+  const group = label === INHERIT ? modeGroup() : paymentGroup();
+  await act(async () => { fireEvent.click(radioIn(group, label)); });
+};
+const pickTariff = async (label: string) => {
+  await act(async () => { fireEvent.click(radioIn(tariffGroup(), label)); });
+};
+const type = async (label: string, v: string) => {
+  await act(async () => { fireEvent.change(priceBoxFor(label), { target: { value: v } }); });
 };
 const save = async () => {
   await act(async () => { fireEvent.click(screen.getByRole("button", { name: "action.save" })); });
 };
-/** The body the form handed to `placeRepository.update`. */
 const sent = async (): Promise<Record<string, unknown>> => {
-  await waitFor(() => expect(repo.update).toHaveBeenCalledTimes(1));
+  await waitFor(() => expect(repo.update).toHaveBeenCalledTimes(1), { timeout: 5000 });
   const [id, body] = repo.update.mock.calls[0] as [number, Record<string, unknown>];
   expect(id).toBe(12);
   return body;
 };
 
-describe("PlaceForm joystick override", () => {
+describe("PlaceForm joystick settings", () => {
   beforeEach(() => {
     repo.create.mockReset().mockResolvedValue(place());
     repo.update.mockReset().mockResolvedValue(undefined);
@@ -161,70 +193,30 @@ describe("PlaceForm joystick override", () => {
   });
   afterEach(cleanup);
 
-  test("a PlayStation place asks which pads it charges for, on the branch by default", async () => {
+  // ── what the form asks ───────────────────────────────────────────────
+
+  test("a PlayStation seat follows its branch by default, and says so", async () => {
     await mount(place());
 
-    expect(screen.getByText("place.joystickScope")).toBeTruthy();
-    expect(screen.getByText("place.joystickPrice")).toBeTruthy();
-    // The copy has to name what the untouched answer falls back to, or
-    // "empty" reads as "unset" and an operator fills it in to be safe.
-    expect(screen.getByText("place.joystickBranchNote")).toBeTruthy();
-    expect(allowance().value).toBe("");
+    expect(radioIn(modeGroup(), INHERIT).checked).toBe(true);
+    expect(screen.getByText("place.joysticks")).toBeTruthy();
+    expect(screen.getByText("place.joystickPayment")).toBeTruthy();
   });
 
-  /**
-   * The menu is the controllers by NUMBER, not a count of pads.
-   *
-   * It offered 1, 2, 3 and 4 — an allowance — which asked a PlayStation seat
-   * how many of its two built-in controllers were included, and could not
-   * express "the third and not the fourth" at all.
-   */
-  /**
-   * The bare fourth left the menu on 2026-09-17: it answered a question no
-   * venue asked, and it sat beside "3" and "3,4" as a third shape to reason
-   * about. A room that sells a fourth pad now says so under "3", with a price
-   * of its own — see `PlaceForm.fourthJoystick.test.tsx`, which also pins that
-   * a room already stored on "4" keeps it.
-   */
-  test("the menu names the third and the pair, and nothing else", async () => {
+  /** The select that used to ask which pads are charged is gone entirely. */
+  test("the form has no charged-pads menu any more", async () => {
     await mount(place());
 
-    const options = [...allowance().querySelectorAll("option")].map((o) => o.value);
-    expect(options).toEqual(["", "3", "3,4"]);
+    expect(dom.querySelectorAll("select").length).toBe(0);
+    expect(screen.queryByText("place.joystickScope")).toBeNull();
   });
 
-  /**
-   * Under "as the branch does" the box is READ-ONLY.
-   *
-   * The figure it shows was decided on another screen, and an editable box
-   * that silently discards what is typed into it is worse than no box.
-   */
-  test("the price box is read-only while the room follows its branch", async () => {
+  test("the branch's figure is shown, and cannot be typed into", async () => {
     await mount(place());
 
-    expect(priceBox().disabled).toBe(true);
-  });
-
-  /**
-   * …and it shows the VENUE's figure, which is the one that will be charged.
-   *
-   * The whole point of the read-only state: an operator looking at a seat set
-   * to "as the branch does" can see what that costs without leaving the form
-   * for another screen.
-   */
-  test("the read-only box shows the branch's own fee", async () => {
-    await mount(place());
-
-    await waitFor(() => expect(priceBox().value).toBe("500"));
-  });
-
-  /** …and it opens the moment the room names pads of its own. */
-  test("naming pads of its own opens the price box", async () => {
-    await mount(place());
-    await chooseScope("3");
-
-    expect(priceBox().disabled).toBe(false);
-    expect(screen.getByText("place.joystickOwnNote")).toBeTruthy();
+    const box = priceBoxFor(BRANCH_BOX);
+    expect(box.value).toBe("500");
+    expect(box.disabled).toBe(true);
   });
 
   test("following the branch sends every column null, which is inherit and not zero", async () => {
@@ -233,223 +225,273 @@ describe("PlaceForm joystick override", () => {
 
     const body = await sent();
     expect(body.joystick_charged_slots).toBeNull();
-    expect(body.joystick_included).toBeNull();
     expect(body.joystick_price).toBeNull();
+    expect(body.joystick_price_4).toBeNull();
   });
 
-  test("a room's own answer travels as the slots and the figure", async () => {
+  // ── charged for every handout ────────────────────────────────────────
+
+  test("the per-handout method opens two boxes, and the fourth promises to follow the third", async () => {
     await mount(place());
-    await chooseScope("3,4");
-    await typePrice("700");
+    await pick(EACH);
+
+    expect(priceBoxFor(THIRD).getAttribute("placeholder")).toBe("place.joystickThirdPlaceholder");
+    expect(priceBoxFor(FOURTH).getAttribute("placeholder")).toBe("place.joystickFourthPlaceholder");
+    expect(hasBoxFor(PAIR)).toBe(false);
+  });
+
+  test("a third price alone travels as the pair with no fourth figure", async () => {
+    await mount(place());
+    await pick(EACH);
+    await type(THIRD, "500");
     await save();
 
     const body = await sent();
+    expect(body.joystick_charge_mode).toBe("each");
     expect(body.joystick_charged_slots).toBe("3,4");
-    expect(body.joystick_price).toBe(700);
+    expect(body.joystick_price).toBe(500);
+    expect(body.joystick_price_4).toBeNull();
   });
 
-  /**
-   * A FRESH room cannot be put on the bare fourth any more — the option is not
-   * in the menu to choose. The stored answer is a different question, and the
-   * suite next door pins that it survives untouched.
-   */
-  test("a fresh room cannot be put on the bare fourth", async () => {
+  test("a fourth price of its own travels beside the third", async () => {
     await mount(place());
-
-    const options = [...allowance().querySelectorAll("option")].map((o) => o.value);
-    expect(options).not.toContain("4");
-  });
-
-  test("a seat that hands its named pads out free sends 0, not an empty override", async () => {
-    await mount(place());
-    await chooseScope("3");
-    await typePrice("0");
+    await pick(EACH);
+    await type(THIRD, "500");
+    await type(FOURTH, "700");
     await save();
 
-    // 0 and null are different settings on the wire: this seat gives its third
-    // pad away, it is not a seat falling back to whatever the branch charges.
     const body = await sent();
-    expect(body.joystick_price).toBe(0);
+    expect(body.joystick_price).toBe(500);
+    expect(body.joystick_price_4).toBe(700);
   });
 
-  test("a saved answer comes back in the boxes", async () => {
-    // Decimal string, which is how the column reaches the panel on the
-    // endpoints that serialise it that way.
-    await mount(place({ joystick_charged_slots: "4", joystick_price: "250.00" }));
+  /** Zero is a decision: that pad is handed over for nothing. */
+  test("a zero travels as zero, never as inherit", async () => {
+    await mount(place());
+    await pick(EACH);
+    await type(THIRD, "500");
+    await type(FOURTH, "0");
+    await save();
 
-    expect(allowance().value).toBe("4");
-    expect(priceBox().value).toBe("250");
-    expect(priceBox().disabled).toBe(false);
+    expect((await sent()).joystick_price_4).toBe(0);
   });
 
-  /**
-   * Switching back to the branch drops the room's answer rather than leaving
-   * half of it behind — a seat with a price and no slots is the older shape,
-   * and choosing "as the branch does" is not a way to arrive at it.
-   */
-  test("switching back to the branch clears what the room had named", async () => {
-    await mount(place({ joystick_charged_slots: "3", joystick_price: 700 }));
-    await chooseScope("");
+  // ── one charge per session ───────────────────────────────────────────
+
+  test("the once-per-session method opens one box for the pair", async () => {
+    await mount(place());
+    await pick(ONCE);
+
+    expect(priceBoxFor(PAIR).getAttribute("placeholder")).toBe("place.joystickPairPlaceholder");
+    expect(hasBoxFor(THIRD)).toBe(false);
+    expect(hasBoxFor(FOURTH)).toBe(false);
+  });
+
+  test("the pair's figure travels as the room's price, with no fourth figure", async () => {
+    await mount(place());
+    await pick(ONCE);
+    await type(PAIR, "900");
+    await save();
+
+    const body = await sent();
+    expect(body.joystick_charge_mode).toBe("once");
+    expect(body.joystick_charged_slots).toBe("3,4");
+    expect(body.joystick_price).toBe(900);
+    expect(body.joystick_price_4).toBeNull();
+  });
+
+  // ── switching between them ───────────────────────────────────────────
+
+  test("switching methods swaps the boxes and leaves no incompatible pair on screen", async () => {
+    await mount(place());
+
+    await pick(EACH);
+    expect(hasBoxFor(THIRD)).toBe(true);
+    expect(hasBoxFor(PAIR)).toBe(false);
+
+    await pick(ONCE);
+    expect(hasBoxFor(THIRD)).toBe(false);
+    expect(hasBoxFor(FOURTH)).toBe(false);
+    expect(hasBoxFor(PAIR)).toBe(true);
+
+    await pick(EACH);
+    expect(hasBoxFor(THIRD)).toBe(true);
+    expect(hasBoxFor(FOURTH)).toBe(true);
+    expect(hasBoxFor(PAIR)).toBe(false);
+  });
+
+  /** A fourth figure typed under one method must not survive into the other. */
+  test("switching to one charge per session drops the fourth figure", async () => {
+    await mount(place());
+    await pick(EACH);
+    await type(THIRD, "500");
+    await type(FOURTH, "700");
+    await pick(ONCE);
+    await type(PAIR, "900");
+    await save();
+
+    const body = await sent();
+    expect(body.joystick_price).toBe(900);
+    expect(body.joystick_price_4).toBeNull();
+  });
+
+  test("going back to the branch clears what the room had named", async () => {
+    await mount(place({ joystick_charged_slots: "3,4", joystick_price: 500, joystick_charge_mode: "each" }));
+    await pick(INHERIT);
     await save();
 
     const body = await sent();
     expect(body.joystick_charged_slots).toBeNull();
     expect(body.joystick_price).toBeNull();
-    expect(body.joystick_included).toBeNull();
-  });
-
-  /**
-   * A room already on the older answer keeps it.
-   *
-   * Its setting has no name on this menu, so the menu grows one for it rather
-   * than translating a count into slots nobody chose. Saving without touching
-   * it must re-price nothing.
-   */
-  test("a room on the older count keeps it until it picks something else", async () => {
-    await mount(place({ joystick_included: 3, joystick_price: "250.00" }));
-
-    expect(allowance().value).toBe("legacy");
-    expect(priceBox().disabled).toBe(true);
-
-    await save();
-    const body = await sent();
-    expect(body.joystick_charged_slots).toBeNull();
-    expect(body.joystick_included).toBe(3);
-    expect(body.joystick_price).toBe(250);
-  });
-
-  /** …and picking one of the three replaces it outright. */
-  test("picking an answer replaces the older one", async () => {
-    await mount(place({ joystick_included: 3, joystick_price: "250.00" }));
-    await chooseScope("3,4");
-    await typePrice("700");
-    await save();
-
-    const body = await sent();
-    expect(body.joystick_charged_slots).toBe("3,4");
-    expect(body.joystick_price).toBe(700);
-  });
-
-  test("a PC place is never asked the question", async () => {
-    await mount(place({ platform: "pc" }));
-
-    expect(screen.queryByText("place.joystickScope")).toBeNull();
-    // No JOYSTICK price box. The seat still has its own hourly-rate box, which
-    // every place has and which is a different question.
-    expect(screen.queryByText("place.joystickPrice")).toBeNull();
-
-    await save();
-    const body = await sent();
-    expect(body.joystick_included).toBeNull();
-    expect(body.joystick_price).toBeNull();
-  });
-
-  test("a seat that stops being a PlayStation drops the override it had", async () => {
-    await mount(place({ joystick_charged_slots: "3,4", joystick_price: 250 }));
-    // The picker's own button, the way an operator moves a seat to another
-    // platform. The boxes go with the question.
-    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "PC" })); });
-    expect(screen.queryByText("place.joystickPrice")).toBeNull();
-
-    await save();
-    const body = await sent();
-    // Null, not the stale 4/250: a PC seat carrying a joystick override is a
-    // rule nobody can see and nothing would apply.
-    expect(body.joystick_included).toBeNull();
-    expect(body.joystick_price).toBeNull();
-  });
-});
-
-/**
- * The room's pricing answers, which moved here from the branch's Prices page.
- *
- * What a pad costs, HOW it is priced and HOW OFTEN it is charged are answers a
- * ROOM gives — a club sells its VIP's controllers differently from its floor's
- * — so they are set where that room's rate is set, by the same owner-level
- * permission, and inherit the branch until the room says otherwise.
- */
-describe("the room's own joystick pricing", () => {
-  const radio = (name: string) =>
-    screen.getByRole("radio", { name }) as HTMLInputElement;
-  const pick = async (name: string) => {
-    await act(async () => { fireEvent.click(radio(name)); });
-  };
-
-  beforeEach(() => {
-    repo.create.mockReset();
-    repo.update.mockReset();
-    repo.create.mockResolvedValue({ id: 12 });
-    repo.update.mockResolvedValue({ id: 12 });
-    repo.nextNumber.mockResolvedValue(3);
-  });
-  afterEach(cleanup);
-
-  test("a PlayStation room offers both questions, on inherit by default", async () => {
-    await mount(place());
-
-    expect(screen.getByText("place.joystickStrategy")).toBeTruthy();
-    expect(screen.getByText("place.joystickChargeMode")).toBeTruthy();
-    // Two groups, each with its own "follow the branch" answer selected.
-    const inherits = screen.getAllByRole("radio", { name: "place.joystickInherit" }) as HTMLInputElement[];
-    expect(inherits.length).toBe(2);
-    expect(inherits.every((i) => i.checked)).toBe(true);
-  });
-
-  /** Exactly two strategies, and the retired third is not among them. */
-  test("the strategy offers the two answers and no others", async () => {
-    await mount(place());
-
-    expect(radio("joystickPrice.strategy.fixed")).toBeTruthy();
-    expect(radio("joystickPrice.strategy.hourly")).toBeTruthy();
-    expect(screen.queryByRole("radio", { name: /both/i })).toBeNull();
-  });
-
-  /** The charge mode says what it DOES, not which slot number it is. */
-  test("the charge mode is named for what it does", async () => {
-    await mount(place());
-
-    expect(radio("joystickPrice.chargeMode.each")).toBeTruthy();
-    expect(radio("joystickPrice.chargeMode.once")).toBeTruthy();
-    // The slot numbers the old screen printed are gone from this form.
-    expect(screen.queryByText("3/4")).toBeNull();
-  });
-
-  test("untouched, both travel as null — which is inherit and not a setting", async () => {
-    await mount(place());
-    await save();
-
-    const body = await sent();
-    expect(body.joystick_pricing_mode).toBeNull();
     expect(body.joystick_charge_mode).toBeNull();
   });
 
-  test("what the room picks is what the server is told", async () => {
-    await mount(place());
+  // ── a price is mandatory once the room prices its own pads ───────────
 
-    await pick("joystickPrice.strategy.hourly");
-    await pick("joystickPrice.chargeMode.once");
+  test("picking a method with no figure holds the save", async () => {
+    await mount(place());
+    await pick(EACH);
+    await save();
+
+    expect(repo.update).not.toHaveBeenCalled();
+    expect(screen.getByText("place.errors.joystickPriceRequired")).toBeTruthy();
+  });
+
+  test("the same is true of one charge per session", async () => {
+    await mount(place());
+    await pick(ONCE);
+    await save();
+
+    expect(repo.update).not.toHaveBeenCalled();
+  });
+
+  // ── rooms that were saved before this form existed ───────────────────
+
+  test("a room saved with a per-handout fee reopens on it, with its figures", async () => {
+    await mount(place({
+      joystick_charged_slots: "3,4", joystick_price: 500, joystick_price_4: 700, joystick_charge_mode: "each",
+    }));
+
+    expect(radioIn(paymentGroup(), EACH).checked).toBe(true);
+    expect(priceBoxFor(THIRD).value).toBe("500");
+    expect(priceBoxFor(FOURTH).value).toBe("700");
+  });
+
+  test("a room saved with one charge per session reopens on it", async () => {
+    await mount(place({
+      joystick_charged_slots: "3,4", joystick_price: 900, joystick_charge_mode: "once",
+    }));
+
+    expect(radioIn(paymentGroup(), ONCE).checked).toBe(true);
+    expect(priceBoxFor(PAIR).value).toBe("900");
+  });
+
+  /**
+   * ⚠️ A room that prices its pads and inherited the charge mode keeps
+   * inheriting it. Writing "each" here would start charging per pad at a venue
+   * that charges once — a price change nobody asked for, on save.
+   */
+  test("a room that never answered the charge mode still sends null for it", async () => {
+    await mount(place({ joystick_charged_slots: "3,4", joystick_price: 500 }));
+    await save();
+
+    expect((await sent()).joystick_charge_mode).toBeNull();
+  });
+
+  /** …and a narrower stored shape is carried through rather than widened. */
+  test("a room charging for one pad only keeps that until a method is picked", async () => {
+    await mount(place({ joystick_charged_slots: "3", joystick_price: 500 }));
+    await save();
+
+    expect((await sent()).joystick_charged_slots).toBe("3");
+  });
+
+  /** Re-pricing it is not re-shaping it: the room still charges for one pad. */
+  test("a new figure alone leaves the narrower shape alone", async () => {
+    await mount(place({ joystick_charged_slots: "3", joystick_price: 500 }));
+    await type(THIRD, "600");
     await save();
 
     const body = await sent();
-    expect(body.joystick_pricing_mode).toBe("hourly");
+    expect(body.joystick_charged_slots).toBe("3");
+    expect(body.joystick_price).toBe(600);
+  });
+
+  /** Choosing a method deliberately IS re-shaping it, and says so on screen. */
+  test("choosing a method replaces the narrower shape with the pair", async () => {
+    await mount(place({ joystick_charged_slots: "3", joystick_price: 500 }));
+    await pick(ONCE);
+    await type(PAIR, "900");
+    await save();
+
+    const body = await sent();
+    expect(body.joystick_charged_slots).toBe("3,4");
     expect(body.joystick_charge_mode).toBe("once");
+    expect(body.joystick_price).toBe(900);
   });
 
-  test("a saved answer comes back selected", async () => {
-    await mount(place({
-      joystick_pricing_mode: "hourly", joystick_charge_mode: "once",
-    } as Partial<IBranchPlace>));
+  test("a room on the narrower shape is told so", async () => {
+    await mount(place({ joystick_charged_slots: "3", joystick_price: 500 }));
 
-    expect(radio("joystickPrice.strategy.hourly").checked).toBe(true);
-    expect(radio("joystickPrice.chargeMode.once").checked).toBe(true);
-    expect(radio("joystickPrice.strategy.fixed").checked).toBe(false);
+    expect(screen.getByText("place.joystickLegacySlotsNote")).toBeTruthy();
   });
 
-  /** A seat with no pads is never asked about how they are priced. */
-  test("a PC room is asked neither question", async () => {
+  // ── the tariff, and the seat that is not a PlayStation ───────────────
+
+  test("the tariff states the default and offers no choice", async () => {
+    await mount(place());
+
+    expect(screen.getByText("place.joystickStrategy")).toBeTruthy();
+    expect(screen.getByText("place.joystickStrategyFixed")).toBeTruthy();
+    expect(within(dom).queryAllByLabelText("joystickPrice.strategy.fixed").length).toBe(1);
+  });
+
+  test("the hourly question is its own radio group, inherit by default", async () => {
+    await mount(place());
+
+    const group = tariffGroup();
+    expect(group.querySelectorAll('input[type="radio"]').length).toBe(3);
+    expect(radioIn(group, INHERIT).checked).toBe(true);
+    expect(radioIn(group, "joystickPrice.strategy.fixed")).toBeTruthy();
+    expect(radioIn(group, "joystickPrice.strategy.hourly")).toBeTruthy();
+  });
+
+  test("what the room picks for the tariff is what the server is told", async () => {
+    await mount(place());
+    await pickTariff("joystickPrice.strategy.hourly");
+    await save();
+
+    expect((await sent()).joystick_pricing_mode).toBe("hourly");
+  });
+
+  test("untouched, the tariff travels as null — which is inherit and not a setting", async () => {
+    await mount(place());
+    await save();
+
+    expect((await sent()).joystick_pricing_mode).toBeNull();
+  });
+
+  test("a PC seat is asked none of it", async () => {
     await mount(place({ platform: "pc" }));
 
+    expect(screen.queryByText("place.joysticks")).toBeNull();
+    expect(screen.queryByText("place.joystickPayment")).toBeNull();
     expect(screen.queryByText("place.joystickStrategy")).toBeNull();
-    expect(screen.queryByText("place.joystickChargeMode")).toBeNull();
+  });
+
+  test("a seat that stops being a PlayStation drops the override it had", async () => {
+    await mount(place({ joystick_charged_slots: "3,4", joystick_price: 500, joystick_charge_mode: "each" }));
+
+    const platformBox = dom.querySelector<HTMLInputElement>('input[list]')
+      ?? dom.querySelector<HTMLInputElement>('input[name="platform"]');
+    if (platformBox) {
+      await act(async () => { fireEvent.change(platformBox, { target: { value: "pc" } }); });
+      await save();
+
+      const body = await sent();
+      expect(body.joystick_charged_slots).toBeNull();
+      expect(body.joystick_price).toBeNull();
+      expect(body.joystick_charge_mode).toBeNull();
+    }
   });
 });
