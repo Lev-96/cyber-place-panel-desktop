@@ -1545,43 +1545,41 @@ places only, sends `null` for anything else (so a seat that stops being a
 PlayStation drops the override it had), and a typed `0` is a real per-place
 setting: this seat gives extra pads away.
 
-### The room answers the joystick questions now (2026-09-15 → 09-17)
+### The room answers the joystick questions now (2026-09-15 → 09-18)
 
-`PlaceForm` asks four, and every one of them maps to a column the backend
-resolves room-first (see the backend's own `JoystickRule`):
+`PlaceForm` asks a PlayStation seat three things, and every one of them maps to
+a column the backend already had. Nothing about the money moved when the form
+was rearranged on 2026-09-18 — only where it is asked.
 
-- **Which pads cost money** — a select over `"3" | "3,4"` plus "as the branch
-  does" (`""`). It replaced a COUNT of pads included in the rate, which offered
-  1 and 2 to a seat that always holds two and could not say "the third and not
-  the fourth" at all. Two answers keep their place in the menu without being
-  offered: `legacy` (a room on the older count) and `"4"` — the bare fourth,
-  dropped from the menu on 2026-09-17 because it answered a question no venue
-  asked. Both are shown to the room that carries them and to no one else,
-  because clearing an answer on open would re-price a seat nobody touched.
-- **Is a fourth pad sold, and for how much** — asked only under `"3"`, where it
-  is the one thing still open (`"3,4"` already prices the pair together, and
-  "as the branch does" prices nothing here). `Нет` leaves the third charged and
-  the fourth handed over at 0.00; `Да` reveals a MANDATORY price box and the
-  room's answer travels as the charged pair with two figures —
-  `joystick_charged_slots: "3,4"` plus `joystick_price_4`. An empty box under
-  `Да` holds Save: both fallbacks (nothing, or the third's figure) are money
-  the operator did not name. Leaving `"3"` clears the answer and the figure,
-  so a price the operator can no longer see cannot be saved by the next click.
-  A room stored as the pair WITH its own fourth figure reopens as `"3"` + `Да`
-  with both boxes filled, which is how it was entered.
-- **The price**, editable only where the room prices its own pads. Under "as the
-  branch does" the box shows the VENUE's figure, read-only, fetched with the
-  branch's billing settings: a box that silently discards what is typed into it
-  is worse than no box.
-- **Fee or hourly rate** (`joystick_pricing_mode`) and **per handout or once for
-  the seat** (`joystick_charge_mode`) — deliberately two questions and not one
-  dropdown of four combinations. The first is what the money IS, the second is
-  how often it lands, and a cashier who confuses them is confusing money.
-- **The seat's own hourly rate**, which is a different box from the platform /
-  sub-category rate beside it. The server takes the place's own rate first and
-  the branch's matrix second, and a PlayStation seat that resolves to nothing —
-  or to a typed `0` — is refused on save rather than at the counter, hours
-  later, with the card's Start greyed out in front of a player.
+- **What the room follows** — one radio group with three answers. `Как в
+  филиале` is the default and means every joystick column stays null: the room
+  prices nothing and the box beside it shows the VENUE's figure, read-only,
+  fetched with the branch's billing settings. The other two answers are the
+  values `places.joystick_charge_mode` has always held.
+- **How it sells its own pads** — `each` opens two boxes (the third's price,
+  and the fourth's, which may be left empty because a null `joystick_price_4`
+  already means "priced like the third" on the server). `once` opens ONE box:
+  the fee is taken once for the seat, so the pair cannot be priced apart.
+  Switching methods hides the other's boxes and clears nothing in state — the
+  payload is what decides, and a figure typed is still there on the way back.
+- **The tariff** — `Тариф доп. джойстика` states the default and offers no
+  choice; the hourly answer is its own radio group below it
+  (`place.joystickTariffChange`), same field `joystick_pricing_mode`, same two
+  values, same server rule. The heading is deliberately NOT the same string as
+  the option inside it.
+
+⚠️ **The select that asked WHICH pads are charged is gone, and the column is
+not.** A room that prices its own pads charges for the pair, which is what
+every answer the menu could produce already said. Two stored shapes are carried
+through untouched instead of being widened: `"3"` / `"4"` (charge for one pad
+only — the room keeps it, is told so on screen, and only a deliberate click on
+a payment method replaces it with `"3,4"`), and a null `joystick_charge_mode`
+on a room that prices its pads (it inherits the venue's answer, and writing
+`each` into it would start charging per pad at a venue that charges once).
+
+The client gate mirrors the server's: a room that picks a payment method must
+name a figure, which is what `JoystickSlotsRule` refuses without. A room saved
+before, without one, is not asked for it just for being opened.
 
 **The board draws the venue's menu, never its own.** `padChoices(session.joystick_rule, openSlots)`
 builds the pad menu from the SERVER's `options[]`, `padCeiling()` reads the
@@ -1604,9 +1602,16 @@ backend: `includedJoysticks`, `chargedSlotsOf`, `pricingModeOf`, `strategyModeOf
 `maxJoystickSlotOf`, plus `CHARGED_SLOT_CHOICES`, `PRICING_MODES`,
 `CHARGE_MODES`, `STRATEGY_MODES`, `BASE_JOYSTICKS` and `MAX_JOYSTICKS`. Pinned by
 `PlaceForm.joystick.test.tsx`, `PlaceForm.rate.test.tsx`,
-`BranchJoystickForm.test.tsx`, `PlaceForm.fourthJoystick.test.tsx` (the menu,
-the question, the mandatory box and the carried `"4"`) and
-`SessionsBoard.expiry.test.tsx`.
+`BranchJoystickForm.test.tsx`, `PlaceForm.joystick.test.tsx` (the three
+answers, the read-only branch figure, what each method sends, and the stored
+shapes that are carried through), `PlaceForm.fourthJoystick.test.tsx` (the
+shape of the block: which control holds what, and what the empty fourth box
+promises) and `SessionsBoard.expiry.test.tsx`.
+
+⚠️ Those two `PlaceForm` suites mock `BranchRepository`. Without it the form
+reaches a real repository, resolves late, decides the seat has no rate to bill
+at and refuses to save — which failed roughly one full run in three and never
+on its own.
 
 **Refusals are shown verbatim.** The server answers a blocked unlimited with
 "this place is booked in the app" and a missing rate with "no price is set for
