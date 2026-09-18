@@ -4,6 +4,7 @@ import { ListSkeleton } from "@/components/ui/Skeleton";
 import Button from "@/components/ui/Button";
 import ProductForm from "@/components/products/ProductForm";
 import Modal from "@/components/ui/Modal";
+import Radio from "@/components/ui/Radio";
 import Input from "@/components/ui/Input";
 import Spinner from "@/components/ui/Spinner";
 import { fmt } from "@/i18n/translations";
@@ -12,6 +13,7 @@ import { productRepository } from "@/repositories/ProductRepository";
 import { sessionRepository } from "@/repositories/SessionRepository";
 import { notify } from "@/ui/notify";
 import { ISessionApi } from "@/types/sessions";
+import { IResolvedItems } from "@/api/sessions";
 import { IProduct, isChipsProduct } from "@/types/pos";
 import { useEffect, useMemo, useState } from "react";
 
@@ -80,6 +82,18 @@ const AddSessionItemDialog = ({ branchId, session, onClose, onAdded }: Props) =>
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [cart, setCart] = useState<CartLine[]>([]);
+  /**
+   * Which way the cashier is adding things.
+   *
+   * `picker` is the way this dialog has always worked and the way it opens:
+   * nothing about it changes, and a cashier who never touches the switch never
+   * sees the difference. `text` is the shortcut for an order of five things,
+   * where finding each one in a list is the slow part.
+   */
+  const [mode, setMode] = useState<"picker" | "text">("picker");
+  const [text, setText] = useState("");
+  const [resolved, setResolved] = useState<IResolvedItems | null>(null);
+  const [resolving, setResolving] = useState(false);
 
   const [creating, setCreating] = useState(false);
   /**
@@ -171,6 +185,77 @@ const AddSessionItemDialog = ({ branchId, session, onClose, onAdded }: Props) =>
    * the cashier has to be able to fix whatever the server objected to and try
    * again, not rebuild a selection the app threw away on their behalf.
    */
+  /**
+   * Reads the box as the cashier types, 400ms after they stop.
+   *
+   * One request per pause rather than one per line, and it writes nothing —
+   * the server is only being asked which products these words are. An empty
+   * box asks nothing at all: the field is `required` there, and a refusal for
+   * a box nobody has typed in yet is noise.
+   */
+  useEffect(() => {
+    if (mode !== "text") return;
+
+    const typed = text.trim();
+    if (typed === "") {
+      setResolved(null);
+      setResolving(false);
+      return;
+    }
+
+    setResolving(true);
+    let dropped = false;
+    const timer = setTimeout(() => {
+      sessionRepository.resolveItemsText(session.id, typed)
+        .then((r) => { if (!dropped) { setResolved(r); setErr(null); } })
+        .catch((e) => {
+          if (dropped) return;
+          setResolved(null);
+          // The server's own sentence is kept as it came. Translating in here
+          // would put `t` in the dependency list below, and a `t` that is a new
+          // function on every render restarts the debounce forever — the box
+          // would read as busy and the confirm would never unlock.
+          setErr(e instanceof Error && e.message ? e.message : null);
+        })
+        .finally(() => { if (!dropped) setResolving(false); });
+    }, 400);
+
+    return () => { dropped = true; clearTimeout(timer); };
+  }, [mode, text, session.id]);
+
+  /**
+   * The typed batch, confirmed — through the SAME endpoint the basket uses.
+   *
+   * The resolver handed back the exact `items` that endpoint expects, so this
+   * is the picker's write path with a different way of filling it: one
+   * request, one transaction, one audit line, and the same refusal if the
+   * session stopped meanwhile.
+   */
+  const confirmText = async () => {
+    if (!resolved?.ok || !resolved.items.length || saving) return;
+    setSaving(true);
+    setErr(null);
+    try {
+      await sessionRepository.addItems(session.id, resolved.items);
+
+      const summary = resolved.lines
+        .filter((l) => l.product_id !== null)
+        .map((l) => `${l.name} × ${l.qty}`)
+        .join(", ");
+      notify.message("success", fmt(t("session.addedMany"), summary));
+
+      setText("");
+      setResolved(null);
+      onAdded();
+      onClose();
+    } catch (e) {
+      const reason = e instanceof Error && e.message ? e.message : t("session.failUnknown");
+      setErr(`${t("session.addFailedMany")} ${fmt(t("session.failReason"), reason)}`);
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const confirm = async () => {
     if (!cart.length || saving) return;
     setSaving(true);
@@ -239,6 +324,28 @@ const AddSessionItemDialog = ({ branchId, session, onClose, onAdded }: Props) =>
         <h2 style={{ margin: 0 }}>{t("session.addItem")}</h2>
         <span className="muted" style={{ fontSize: 12 }}>{deviceLabel}</span>
 
+        {/* Two ways in, and the one that has always been here is the one the
+            dialog opens on. The switch is a radiogroup rather than a tab strip
+            because it is a choice about how to work, not a place to navigate
+            to — and because the picker's own state survives the trip: a basket
+            half-filled is still there when the cashier comes back. */}
+        <div className="row" role="radiogroup" aria-label={t("session.addMode")} style={{ gap: 16, flexWrap: "wrap" }}>
+          <Radio
+            name="cp-session-add-mode"
+            checked={mode === "picker"}
+            onChange={() => setMode("picker")}
+            disabled={saving}
+            label={t("session.addModePicker")}
+          />
+          <Radio
+            name="cp-session-add-mode"
+            checked={mode === "text"}
+            onChange={() => setMode("text")}
+            disabled={saving}
+            label={t("session.addModeText")}
+          />
+        </div>
+
         {/* What the session already holds. Listed rather than summarised in a
             sentence, because each line needs its own way off the bill — and
             because a cashier about to add a second coffee should see the first
@@ -270,6 +377,8 @@ const AddSessionItemDialog = ({ branchId, session, onClose, onAdded }: Props) =>
           </div>
         )}
 
+        {mode === "picker" && (
+          <>
         {/* ── The branch catalogue ─────────────────────────────────────── */}
         <span className="label" style={{ fontSize: 12 }}>{t("session.availableProducts")}</span>
         {(products?.length ?? 0) > 0 && (
@@ -380,19 +489,92 @@ const AddSessionItemDialog = ({ branchId, session, onClose, onAdded }: Props) =>
             </div>
           </div>
         )}
+          </>
+        )}
 
-        {err && <div className="error">{err}</div>}
+        {/* ── Quick entry ──────────────────────────────────────────────────
+            One line per product, the number at either end. Nothing is on the
+            bill until the cashier presses the confirm below: what this shows
+            is the server's reading of the text, priced from the catalogue. */}
+        {mode === "text" && (
+          <div className="col" style={{ gap: 8 }}>
+            <span className="label" style={{ fontSize: 12 }}>{t("session.quickEntry")}</span>
+            <textarea
+              className="input"
+              rows={5}
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              disabled={saving}
+              placeholder={t("session.quickEntryPlaceholder")}
+              aria-label={t("session.quickEntry")}
+              style={{ resize: "vertical", fontFamily: "inherit", lineHeight: 1.5 }}
+            />
+            <span className="muted" style={{ fontSize: 11 }}>{t("session.quickEntryHint")}</span>
+
+            {resolving && (
+              <span className="muted" style={{ fontSize: 11 }}>{t("session.quickEntryReading")}</span>
+            )}
+
+            {resolved !== null && resolved.lines.length > 0 && (
+              <div className="col" style={{ gap: 6 }}>
+                <span className="label" style={{ fontSize: 12 }}>{t("session.quickEntryPreview")}</span>
+                <div className="col" style={{ gap: 6, maxHeight: 220, overflowY: "auto" }}>
+                  {resolved.lines.map((line, i) => (
+                    <div key={`${line.raw}-${i}`} className="col" style={{ gap: 2 }}>
+                      {line.error === null ? (
+                        <div className="row-between" style={{ gap: 8 }}>
+                          <span>{line.name} × {line.qty}</span>
+                          <span className="muted" style={{ fontSize: 12 }}>
+                            {money(line.price ?? 0)} · {money(line.line_total ?? 0)}
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="col" style={{ gap: 2 }}>
+                          <span className="error" style={{ fontSize: 12 }}>
+                            {fmt(t("session.quickEntryLine"), line.raw)} {line.error}
+                          </span>
+                          {line.candidates.length > 0 && (
+                            <span className="muted" style={{ fontSize: 11 }}>
+                              {fmt(t("session.quickEntryCandidates"), line.candidates.join(", "))}
+                            </span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                {resolved.ok && (
+                  <div className="row-between" style={{ gap: 8 }}>
+                    <span className="label" style={{ fontSize: 12 }}>{t("session.quickEntryTotal")}</span>
+                    <span>{money(resolved.total)}</span>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {err !== null && <div className="error">{err || t("session.failUnknown")}</div>}
         <div className="row-between">
           <Button variant="secondary" onClick={onClose} disabled={saving}>{t("action.cancel")}</Button>
           {/* Disabled while the request is in flight, so a second press cannot
               send the same basket twice. */}
-          <Button onClick={confirm} disabled={saving || cart.length === 0}>
-            {saving
-              ? t("session.adding")
-              : cart.length === 1
-                ? t("session.cartConfirmOne")
-                : t("session.cartConfirmMany")}
-          </Button>
+          {mode === "picker" ? (
+            <Button onClick={confirm} disabled={saving || cart.length === 0}>
+              {saving
+                ? t("session.adding")
+                : cart.length === 1
+                  ? t("session.cartConfirmOne")
+                  : t("session.cartConfirmMany")}
+            </Button>
+          ) : (
+            /* Held down until every typed line resolved. A batch with one bad
+               line is not saved in part — the server would refuse it anyway,
+               and a bill missing its middle line is one nobody chose. */
+            <Button onClick={confirmText} disabled={saving || resolving || !resolved?.ok}>
+              {saving ? t("session.adding") : t("session.quickEntryConfirm")}
+            </Button>
+          )}
         </div>
       </div>
 

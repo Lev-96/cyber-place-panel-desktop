@@ -20,6 +20,7 @@ const repo = vi.hoisted(() => ({
   addItems: vi.fn(),
   listProducts: vi.fn(),
   removeItem: vi.fn(),
+  resolveItemsText: vi.fn(),
 }));
 /** Stands in for the Products screen's own form. */
 const form = vi.hoisted(() => ({ saved: null as ((p: unknown) => void) | null }));
@@ -31,6 +32,7 @@ vi.mock("@/repositories/SessionRepository", () => ({
     addItem: vi.fn(),
     setItemQty: vi.fn(),
     removeItem: (...a: unknown[]) => repo.removeItem(...a),
+    resolveItemsText: (...a: unknown[]) => repo.resolveItemsText(...a),
   },
 }));
 vi.mock("@/components/products/ProductForm", () => ({
@@ -42,12 +44,23 @@ vi.mock("@/components/products/ProductForm", () => ({
 vi.mock("@/repositories/ProductRepository", () => ({
   productRepository: { listByBranch: (...a: unknown[]) => repo.listProducts(...a) },
 }));
+/**
+ * Keys whose real translation carries a `{0}`. They echo back WITH it, so the
+ * value `fmt` substitutes — a server sentence, a product name — survives into
+ * the DOM and an assertion about it means something.
+ */
+const PLACEHOLDER_KEYS = new Set([
+  "session.failReason",
+  "session.quickEntryLine",
+  "session.quickEntryCandidates",
+]);
+
 vi.mock("@/i18n/LanguageContext", () => ({
   useLang: () => ({
     // Keys echo back, except the one whose real translation carries a
     // placeholder — the reason has to survive `fmt` for the assertion below to
     // mean anything.
-    t: (k: string) => (k === "session.failReason" ? "session.failReason: {0}" : k),
+    t: (k: string) => (PLACEHOLDER_KEYS.has(k) ? `${k}: {0}` : k),
     money: (n: number) => String(n),
     lang: "en",
   }),
@@ -107,6 +120,7 @@ beforeEach(() => {
   repo.addItems.mockResolvedValue({ ...session, items: [] });
   repo.listProducts.mockReset();
   repo.listProducts.mockResolvedValue(products);
+  repo.resolveItemsText.mockReset();
   toasts.message.mockReset();
 });
 
@@ -356,5 +370,197 @@ describe("chips belong to a poker table", () => {
     await act(async () => { fireEvent.change(search, { target: { value: "chips" } }); });
 
     expect(screen.queryByText("Chips 100")).toBeNull();
+  });
+});
+
+
+/**
+ * The second way in: type the order instead of finding each product.
+ *
+ * What is pinned here is mostly what the dialog must NOT do — open on the new
+ * mode, send anything while the cashier is still typing, or offer a confirm
+ * for a batch the server said it could not read. The matching itself is the
+ * server's and is tested there; this side must only be honest about the answer.
+ */
+describe("AddSessionItemDialog — typing the order", () => {
+  const RESOLVED_OK = {
+    lines: [
+      { raw: "20 lays", product_id: 10, name: "Lays", price: 400, qty: 20, line_total: 8000, error: null, candidates: [] },
+      { raw: "2 coffee", product_id: 15, name: "Coffee", price: 600, qty: 2, line_total: 1200, error: null, candidates: [] },
+    ],
+    items: [{ product_id: 10, qty: 20 }, { product_id: 15, qty: 2 }],
+    total: 9200,
+    ok: true,
+  };
+  const RESOLVED_BAD = {
+    lines: [
+      { raw: "20 lays", product_id: 10, name: "Lays", price: 400, qty: 20, line_total: 8000, error: null, candidates: [] },
+      { raw: "lola 5", product_id: null, name: null, price: null, qty: null, line_total: null,
+        error: "Не удалось определить продукт: lola.", candidates: ["Coffee", "Lays"] },
+    ],
+    items: [],
+    total: 0,
+    ok: false,
+  };
+
+  const switchToText = async () => {
+    await act(async () => { fireEvent.click(screen.getByLabelText("session.addModeText")); });
+  };
+  const box = () => screen.getByLabelText("session.quickEntry") as HTMLTextAreaElement;
+  const type = async (value: string) => {
+    await act(async () => { fireEvent.change(box(), { target: { value } }); });
+    // The read is debounced: nothing is asked until the typing stops, and the
+    // answer lands a few microtasks later — the button is only released when
+    // it has.
+    await act(async () => { vi.advanceTimersByTime(400); });
+    for (let i = 0; i < 5; i++) {
+      await act(async () => { await Promise.resolve(); });
+    }
+  };
+  const textConfirm = () =>
+    screen.getAllByRole("button").find((b) =>
+      b.textContent === "session.quickEntryConfirm" || b.textContent === "session.adding") as HTMLButtonElement;
+
+  beforeEach(() => { vi.useFakeTimers({ shouldAdvanceTime: true }); });
+  afterEach(() => { vi.useRealTimers(); });
+
+  test("the dialog opens on the picker, not on the box", async () => {
+    await mount();
+
+    expect((screen.getByLabelText("session.addModePicker") as HTMLInputElement).checked).toBe(true);
+    expect(screen.queryByLabelText("session.quickEntry")).toBeNull();
+    expect(screen.getByText("session.availableProducts")).toBeTruthy();
+  });
+
+  test("switching puts the box in the catalogue's place, and back", async () => {
+    await mount();
+    await switchToText();
+
+    expect(box()).toBeTruthy();
+    expect(screen.queryByText("session.availableProducts")).toBeNull();
+
+    await act(async () => { fireEvent.click(screen.getByLabelText("session.addModePicker")); });
+    expect(screen.queryByLabelText("session.quickEntry")).toBeNull();
+    expect(screen.getByText("session.availableProducts")).toBeTruthy();
+  });
+
+  test("an empty box asks the server nothing", async () => {
+    await mount();
+    await switchToText();
+    await type("   ");
+
+    expect(repo.resolveItemsText).not.toHaveBeenCalled();
+  });
+
+  test("typing is read once the typing stops, and shows what would be added", async () => {
+    repo.resolveItemsText.mockResolvedValue(RESOLVED_OK);
+    await mount();
+    await switchToText();
+    await type("20 lays\n2 coffee");
+
+    expect(repo.resolveItemsText).toHaveBeenCalledTimes(1);
+    expect(repo.resolveItemsText).toHaveBeenCalledWith(42, "20 lays\n2 coffee");
+    expect(screen.getByText("Lays × 20")).toBeTruthy();
+    expect(screen.getByText("Coffee × 2")).toBeTruthy();
+    expect(screen.getByText("session.quickEntryTotal")).toBeTruthy();
+  });
+
+  /**
+   * One request per PAUSE, not per keystroke. A cashier typing four lines
+   * would otherwise ask the server forty times for an answer they are still
+   * in the middle of writing.
+   */
+  test("keystrokes in quick succession ask once", async () => {
+    repo.resolveItemsText.mockResolvedValue(RESOLVED_OK);
+    await mount();
+    await switchToText();
+
+    await act(async () => { fireEvent.change(box(), { target: { value: "20 la" } }); });
+    await act(async () => { vi.advanceTimersByTime(150); });
+    await act(async () => { fireEvent.change(box(), { target: { value: "20 lays" } }); });
+    await act(async () => { vi.advanceTimersByTime(150); });
+
+    expect(repo.resolveItemsText).not.toHaveBeenCalled();
+
+    await act(async () => { vi.advanceTimersByTime(400); });
+    for (let i = 0; i < 5; i++) {
+      await act(async () => { await Promise.resolve(); });
+    }
+
+    expect(repo.resolveItemsText).toHaveBeenCalledTimes(1);
+    expect(repo.resolveItemsText).toHaveBeenCalledWith(42, "20 lays");
+  });
+
+  /** Reading is not adding: nothing reaches the bill until the confirm. */
+  test("reading the box writes nothing", async () => {
+    repo.resolveItemsText.mockResolvedValue(RESOLVED_OK);
+    await mount();
+    await switchToText();
+    await type("20 lays");
+
+    expect(repo.addItems).not.toHaveBeenCalled();
+  });
+
+  test("the confirm sends the resolved items through the basket's own endpoint", async () => {
+    repo.resolveItemsText.mockResolvedValue(RESOLVED_OK);
+    const { onAdded, onClose } = await mount();
+    await switchToText();
+    await type("20 lays\n2 coffee");
+
+    await act(async () => { fireEvent.click(textConfirm()); });
+
+    expect(repo.addItems).toHaveBeenCalledTimes(1);
+    expect(repo.addItems).toHaveBeenCalledWith(42, [{ product_id: 10, qty: 20 }, { product_id: 15, qty: 2 }]);
+    expect(onAdded).toHaveBeenCalled();
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  test("a line the server could not read is shown, with what it suggests", async () => {
+    repo.resolveItemsText.mockResolvedValue(RESOLVED_BAD);
+    await mount();
+    await switchToText();
+    await type("20 lays\nlola 5");
+
+    // The box itself holds the typed word too, so the assertion is about the
+    // error line: the span carrying the server's sentence.
+    const errorLine = [...document.querySelectorAll("span.error")]
+      .find((el) => /lola/.test(el.textContent ?? ""));
+    expect(errorLine, "the unreadable line is named").toBeTruthy();
+    expect(errorLine!.textContent).toContain("Не удалось определить продукт");
+    expect(screen.getByText(/Coffee, Lays/)).toBeTruthy();
+  });
+
+  /** One bad line holds the whole batch: nothing is added in part. */
+  test("the confirm is dead while any line is unreadable", async () => {
+    repo.resolveItemsText.mockResolvedValue(RESOLVED_BAD);
+    await mount();
+    await switchToText();
+    await type("20 lays\nlola 5");
+
+    expect(textConfirm().disabled).toBe(true);
+
+    await act(async () => { fireEvent.click(textConfirm()); });
+    expect(repo.addItems).not.toHaveBeenCalled();
+  });
+
+  test("the confirm is dead before anything has been typed", async () => {
+    await mount();
+    await switchToText();
+
+    expect(textConfirm().disabled).toBe(true);
+  });
+
+  test("a refusal from the server keeps the text and says why", async () => {
+    repo.resolveItemsText.mockResolvedValue(RESOLVED_OK);
+    repo.addItems.mockRejectedValue(new Error("This session is no longer active"));
+    await mount();
+    await switchToText();
+    await type("20 lays\n2 coffee");
+
+    await act(async () => { fireEvent.click(textConfirm()); });
+
+    expect(box().value).toBe("20 lays\n2 coffee");
+    const failure = document.querySelector(".error");
+    expect(failure?.textContent).toContain("This session is no longer active");
   });
 });

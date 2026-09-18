@@ -704,6 +704,33 @@ export const TRANSLATIONS: Dict = {
   "session.removeFromBill": { en: "Remove from the bill", ru: "Убрать из счёта", am: "Հեռացնել հաշվից" },
   "session.removedOne": { en: "{0} removed", ru: "Товар «{0}» успешно удалён", am: "«{0}» ապրանքը հեռացվեց" },
   "session.removeFailed": { en: "Could not remove the product.", ru: "Не удалось удалить товар.", am: "Չհաջողվեց հեռացնել ապրանքը։" },
+  // Two ways to put something on a bill. The picker is the original and the
+  // default; quick entry is for an order of five things, where finding each
+  // one in a list is the slow part.
+  "session.addMode": { en: "How to add", ru: "Способ добавления", am: "Ավելացնելու եղանակը" },
+  "session.addModePicker": { en: "Choose from the list", ru: "Выбрать из списка", am: "Ընտրել ցանկից" },
+  "session.addModeText": { en: "Type the order", ru: "Ввести списком", am: "Մուտքագրել ցանկով" },
+  "session.quickEntry": { en: "Quick entry", ru: "Быстрый ввод", am: "Արագ մուտքագրում" },
+  "session.quickEntryPlaceholder": {
+    en: "20 lays\n30 cola",
+    ru: "20 lays\n30 cola",
+    am: "20 lays\n30 cola",
+  },
+  "session.quickEntryHint": {
+    en: "One product per line, with the quantity before or after the name. Nothing is added until you confirm.",
+    ru: "По одному продукту в строке, количество до или после названия. Ничего не добавится, пока вы не подтвердите.",
+    am: "Մեկ ապրանք՝ մեկ տողում, քանակը՝ անվանումից առաջ կամ հետո։ Ոչինչ չի ավելացվի, քանի դեռ չեք հաստատել։",
+  },
+  "session.quickEntryReading": { en: "Reading…", ru: "Разбираем…", am: "Վերծանում ենք…" },
+  "session.quickEntryPreview": { en: "Will be added", ru: "Будет добавлено", am: "Կավելացվի" },
+  "session.quickEntryTotal": { en: "Total", ru: "Итого", am: "Ընդամենը" },
+  "session.quickEntryLine": { en: "Line “{0}”:", ru: "Строка «{0}»:", am: "«{0}» տողը՝" },
+  "session.quickEntryCandidates": { en: "Did you mean: {0}", ru: "Возможно, вы имели в виду: {0}", am: "Հնարավոր է նկատի ունեիք՝ {0}" },
+  "session.quickEntryConfirm": {
+    en: "Add to this session",
+    ru: "Добавить товар к этой сессии",
+    am: "Ավելացնել այս նիստին",
+  },
   "session.addItem": { en: "Add a product", ru: "Добавить товар", am: "Ավելացնել ապրանք" },
   "session.availableProducts": { en: "Available products", ru: "Доступные товары", am: "Հասանելի ապրանքներ" },
   "session.addedProducts": { en: "Added products", ru: "Добавленные товары", am: "Ավելացված ապրանքներ" },

@@ -181,6 +181,45 @@ export const apiAddSessionItem = (id: number, body: AddItemBody) =>
 export const apiAddSessionItems = (id: number, body: AddItemsBody) =>
   request<{ session: ISessionApi }>(`/sessions/${id}/items`, { method: "POST", body });
 
+/** One typed line, as the server read it: a priced product, or a refusal. */
+export interface IResolvedItemLine {
+  /** Exactly what the cashier typed, so an error can point at the line. */
+  raw: string;
+  product_id: number | null;
+  name: string | null;
+  price: number | null;
+  qty: number | null;
+  line_total: number | null;
+  /** The server's own sentence. Null when the line resolved. */
+  error: string | null;
+  /** Names worth trying, when the word matched nothing or matched two things. */
+  candidates: string[];
+}
+
+export interface IResolvedItems {
+  lines: IResolvedItemLine[];
+  /** What to send to `apiAddSessionItems`. Empty unless every line resolved. */
+  items: Array<{ product_id: number; qty: number }>;
+  total: number;
+  ok: boolean;
+}
+
+/**
+ * Reads the quick-entry box WITHOUT touching the bill.
+ *
+ * The server owns the matching rules — which product a word is, and whether it
+ * is sure enough to say so — because the till and the mobile app would
+ * otherwise each grow their own answer to the same question. What comes back is
+ * a preview plus, when every line resolved, the exact `items` the existing add
+ * endpoint expects. Confirming goes through THAT endpoint: this one never
+ * writes.
+ */
+export const apiResolveSessionItemsText = (id: number, text: string) =>
+  request<{ resolved: IResolvedItems }>(`/sessions/${id}/items/resolve`, {
+    method: "POST",
+    body: { text },
+  });
+
 /**
  * Set the quantity of a line the session already has. `qty: 0` removes it —
  * the minus button walks a count to zero and a zero-quantity line on a bill is
