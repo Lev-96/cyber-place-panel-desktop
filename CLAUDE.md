@@ -1689,6 +1689,35 @@ method. Do not shortcut it, and do not report completion without it.
 7. **Commit to `staging`**, security and docs separately, stating what was
    verified by running versus only reasoned about.
 
+### The add-item dialog has two ways in (2026-09-18)
+
+`AddSessionItemDialog` opens on the picker it has always opened on — the
+catalogue, the search box, the basket, the "new product" form, all unchanged and
+all still the default. A radiogroup at the top switches to **quick entry**: a
+textarea, one product per line, the quantity at either end.
+
+- The box is read by the SERVER (`sessionRepository.resolveItemsText`), 400ms
+  after the typing stops. One request per pause, not per keystroke and not per
+  line, and it writes nothing — what comes back is a preview plus the exact
+  `items[]` the existing add endpoint expects.
+- The confirm calls `sessionRepository.addItems` — the basket's own call. So the
+  two ways of filling a bill share one write path, one transaction and one
+  history. Nothing about the picker's flow changed.
+- The confirm is held down while any line is unreadable: a batch is all or
+  nothing, which is what the server would enforce anyway.
+- Switching modes keeps both sides' state. A half-filled basket is still there
+  when the cashier switches back, and a typed block survives a trip to the
+  catalogue.
+
+⚠️ **The debounce effect must not depend on `t`.** `useLang()` returns a fresh
+`t` on every render, so listing it restarts the timer on every render: the box
+reads as busy forever and the confirm never unlocks. The server's own sentence
+is stored untranslated and rendered through `t` at render time instead.
+
+Pinned by `AddSessionItemDialog.test.tsx` — the dialog opening on the picker,
+the switch, one request per pause, the preview, the dead confirm on a bad line,
+and that the picker's sixteen original cases still pass unchanged.
+
 ### The Playwright suite went dark, and how (2026-09-05)
 
 All 7 specs failed for three unrelated reasons that had accumulated, none of
