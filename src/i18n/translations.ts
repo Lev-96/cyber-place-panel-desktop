@@ -1152,14 +1152,14 @@ export const TRANSLATIONS: Dict = {
     am: "Մասնաճյուղը տրամադրում է երեք կարգավորիչ։ Չորրորդը ընդհանրապես չի տրվում։",
   },
   "joystickPrice.setupExplain.separate": {
-    en: "3 | 4 — the third and the fourth joystick have their own prices.",
-    ru: "3 | 4 — 3-й и 4-й джойстики имеют собственные цены.",
-    am: "3 | 4 — 3-րդ և 4-րդ ջոյսթիքներն ունեն իրենց գները։",
+    en: "3 | 4: the third and the fourth joystick have their own prices.",
+    ru: "3 | 4: 3-й и 4-й джойстики имеют собственные цены.",
+    am: "3 | 4: 3-րդ և 4-րդ ջոյսթիքներն ունեն իրենց գները։",
   },
   "joystickPrice.setupExplain.shared": {
-    en: "3/4 — one price for an extra controller, whether it is the third or the fourth.",
-    ru: "3/4 — одна цена за дополнительный контроллер, будь он 3-м или 4-м.",
-    am: "3/4 — մեկ գին լրացուցիչ կարգավորիչի համար՝ լինի այն երրորդը, թե չորրորդը։",
+    en: "3/4: one price for an extra controller, whether it is the third or the fourth.",
+    ru: "3/4: одна цена за дополнительный контроллер, будь он 3-м или 4-м.",
+    am: "3/4: մեկ գին լրացուցիչ կարգավորիչի համար՝ լինի այն երրորդը, թե չորրորդը։",
   },
   "joystickPrice.fourthNeedsPrice": {
     en: "Enter the fourth joystick's price, or answer No above.",
@@ -1684,8 +1684,8 @@ export const TRANSLATIONS: Dict = {
     am: "Զրո գինը չի հաշվարկվում։ Թողեք դաշտը դատարկ՝ մասնաճյուղի գնով հաշվարկելու համար, կամ սկսեք անվճար նիստ՝ տեղն անվճար տրամադրելու համար։",
   },
   "place.noBranchRateHint": {
-    en: "The branch has no price for this platform and tier, so this place needs its own — otherwise no session can be started on it.",
-    ru: "У филиала нет цены для этой платформы и тарифа, поэтому месту нужна своя — иначе сессию на нём не запустить.",
+    en: "The branch has no price for this platform and tier, so this place needs its own. Otherwise no session can be started on it.",
+    ru: "У филиала нет цены для этой платформы и тарифа, поэтому месту нужна своя. Иначе сессию на нём не запустить.",
     am: "Մասնաճյուղն այս հարթակի և սակագնի համար գին չունի, ուստի տեղին պետք է սեփականը, այլապես դրա վրա նիստ հնարավոր չէ սկսել։",
   },
   "place.ownRate": { en: "Price for this place", ru: "Цена этого места", am: "Այս տեղի գինը" },
@@ -1803,7 +1803,7 @@ export const TRANSLATIONS: Dict = {
   // operator knows why its pads are billed the way they are.
   "place.joystickLegacySlotsNote": {
     en: "This place charges for one of the pads only, as set earlier. Choosing a payment method above replaces that.",
-    ru: "Место берёт плату только за один из джойстиков — так было задано раньше. Выбор способа оплаты выше заменит эту настройку.",
+    ru: "Место берёт плату только за один из джойстиков: так было задано раньше. Выбор способа оплаты выше заменит эту настройку.",
     am: "Տեղը վճար է վերցնում միայն մեկ ջոյսթիքի համար՝ ինչպես նախկինում էր սահմանված։ Վերևում վճարման եղանակ ընտրելը կփոխարինի այդ կարգավորումը։",
   },
   "place.joystickScope": { en: "Charged joysticks", ru: "Платные джойстики", am: "Վճարովի ջոյսթիքներ" },
@@ -1812,7 +1812,7 @@ export const TRANSLATIONS: Dict = {
   "place.joystickScope.3,4": { en: "3rd and 4th", ru: "3-й и 4-й", am: "3-րդը և 4-րդը" },
   "place.joystickBranchNote": {
     en: "This place charges what the branch charges. Change it in Branch, Prices.",
-    ru: "Место берёт плату как филиал. Изменить — в разделе «Филиал, Цены».",
+    ru: "Место берёт плату как филиал. Изменить можно в разделе «Филиал, Цены».",
     am: "Տեղը գանձում է այնպես, ինչպես մասնաճյուղը։ Փոփոխեք «Մասնաճյուղ, Գներ» բաժնում։",
   },
   "place.joystickOwnNote": {
