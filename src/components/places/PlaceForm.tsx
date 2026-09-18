@@ -849,15 +849,15 @@ const PlaceForm = ({ branchId, initial, platformSuggestions, platformPrices, onC
             VENUE's figure, read-only. */}
         {isPlayStation && (
           <div className="col" style={{ gap: 16 }}>
-            <div className="col" style={{ gap: 6 }}>
+            {/* One decision with three answers, and each answer carries the
+                fields it owns. They were four bare radios across two headings
+                with the branch's price box across the row from the radio that
+                explained it, which reads as unrelated lines rather than as a
+                choice. */}
+            <div className="col" style={{ gap: 8 }}>
               <span className="label">{t("place.joysticks")}</span>
-              <div className="row" style={{ gap: 10, flexWrap: "wrap", alignItems: "flex-end" }}>
-                <div
-                  className="col"
-                  role="radiogroup"
-                  aria-label={t("place.joysticks")}
-                  style={{ gap: 6, width: 180 }}
-                >
+              <div className="col" role="radiogroup" aria-label={t("place.joysticks")} style={{ gap: 8 }}>
+                <div className={`cp-choice${joystickMode === "" ? " is-active" : ""}`}>
                   <Radio
                     name="cp-place-joystick-mode"
                     checked={joystickMode === ""}
@@ -865,20 +865,20 @@ const PlaceForm = ({ branchId, initial, platformSuggestions, platformPrices, onC
                     disabled={busy}
                     label={t("place.joystickInherit")}
                   />
-                </div>
-                <div style={{ flex: 1, minWidth: 160 }}>
-                  {/* Under "as in the branch" this shows the venue's figure and
-                      cannot be typed into: the price is the branch's, and a box
-                      that discards what is typed into it is worse than no box.
-                      Under either payment method the room's own figures are
-                      asked below, where they belong to the method. */}
-                  <PriceInput
-                    label={t("place.joystickPrice")}
-                    value={joystickPriceShown !== null ? String(joystickPriceShown) : ""}
-                    onChange={() => {}}
-                    placeholder={t("place.joystickInherit")}
-                    disabled
-                  />
+                  {/* The venue's figure, shown where the answer is made and not
+                      typeable: the price is the branch's, and a box that
+                      discards what is typed into it is worse than no box. */}
+                  {joystickMode === "" && (
+                    <div className="cp-choice__body" style={{ maxWidth: 260 }}>
+                      <PriceInput
+                        label={t("place.joystickPrice")}
+                        value={joystickPriceShown !== null ? String(joystickPriceShown) : ""}
+                        onChange={() => {}}
+                        placeholder={t("place.joystickInherit")}
+                        disabled
+                      />
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -893,9 +893,9 @@ const PlaceForm = ({ branchId, initial, platformSuggestions, platformPrices, onC
                 className="col"
                 role="radiogroup"
                 aria-label={t("place.joystickPayment")}
-                style={{ gap: 12 }}
+                style={{ gap: 8 }}
               >
-                <div className="col" style={{ gap: 6 }}>
+                <div className={`cp-choice${joystickMode === "each" ? " is-active" : ""}`}>
                   <Radio
                     name="cp-place-joystick-mode"
                     checked={joystickMode === "each"}
@@ -908,30 +908,32 @@ const PlaceForm = ({ branchId, initial, platformSuggestions, platformPrices, onC
                       like the third, which is the fallback it has always had
                       for a null here. */}
                   {joystickMode === "each" && (
-                    <div className="row" style={{ gap: 10, flexWrap: "wrap", alignItems: "flex-end" }}>
-                      <div style={{ flex: 1, minWidth: 160 }}>
-                        <PriceInput
-                          label={t("place.joystickThirdPrice")}
-                          value={joystickPrice}
-                          onChange={setJoystickPrice}
-                          placeholder={t("place.joystickThirdPlaceholder")}
-                          disabled={busy}
-                        />
-                      </div>
-                      <div style={{ flex: 1, minWidth: 160 }}>
-                        <PriceInput
-                          label={t("place.joystickFourthPrice")}
-                          value={joystickPrice4}
-                          onChange={setJoystickPrice4}
-                          placeholder={t("place.joystickFourthPlaceholder")}
-                          disabled={busy}
-                        />
+                    <div className="cp-choice__body">
+                      <div className="row" style={{ gap: 10, flexWrap: "wrap", alignItems: "flex-end" }}>
+                        <div style={{ flex: 1, minWidth: 160 }}>
+                          <PriceInput
+                            label={t("place.joystickThirdPrice")}
+                            value={joystickPrice}
+                            onChange={setJoystickPrice}
+                            placeholder={t("place.joystickThirdPlaceholder")}
+                            disabled={busy}
+                          />
+                        </div>
+                        <div style={{ flex: 1, minWidth: 160 }}>
+                          <PriceInput
+                            label={t("place.joystickFourthPrice")}
+                            value={joystickPrice4}
+                            onChange={setJoystickPrice4}
+                            placeholder={t("place.joystickFourthPlaceholder")}
+                            disabled={busy}
+                          />
+                        </div>
                       </div>
                     </div>
                   )}
                 </div>
 
-                <div className="col" style={{ gap: 6 }}>
+                <div className={`cp-choice${joystickMode === "once" ? " is-active" : ""}`}>
                   <Radio
                     name="cp-place-joystick-mode"
                     checked={joystickMode === "once"}
@@ -942,16 +944,14 @@ const PlaceForm = ({ branchId, initial, platformSuggestions, platformPrices, onC
                   {/* One figure: the fee is taken once for the seat, so the
                       pair cannot be priced apart. */}
                   {joystickMode === "once" && (
-                    <div className="row" style={{ gap: 10, flexWrap: "wrap", alignItems: "flex-end" }}>
-                      <div style={{ flex: 1, minWidth: 160 }}>
-                        <PriceInput
-                          label={t("place.joystickPairPrice")}
-                          value={joystickPrice}
-                          onChange={setJoystickPrice}
-                          placeholder={t("place.joystickPairPlaceholder")}
-                          disabled={busy}
-                        />
-                      </div>
+                    <div className="cp-choice__body" style={{ maxWidth: 260 }}>
+                      <PriceInput
+                        label={t("place.joystickPairPrice")}
+                        value={joystickPrice}
+                        onChange={setJoystickPrice}
+                        placeholder={t("place.joystickPairPlaceholder")}
+                        disabled={busy}
+                      />
                     </div>
                   )}
                 </div>
@@ -964,7 +964,10 @@ const PlaceForm = ({ branchId, initial, platformSuggestions, platformPrices, onC
                 either way. */}
             <div className="col" style={{ gap: 6 }}>
               <span className="label">{t("place.joystickStrategy")}</span>
-              <span className="muted" style={{ fontSize: 12 }}>{t("place.joystickStrategyFixed")}</span>
+              {/* A stated value rather than a greyed line: the section has no
+                  choice to make, and muted text beside real controls reads as
+                  something disabled. */}
+              <span className="pill">{t("place.joystickStrategyFixed")}</span>
             </div>
 
             {/* …and whether this room bills a pad by the hour instead. Same
@@ -972,16 +975,20 @@ const PlaceForm = ({ branchId, initial, platformSuggestions, platformPrices, onC
                 way the venue's own settings ask it. */}
             <div className="col" style={{ gap: 6 }}>
               <span className="label">{t("place.joystickTariffChange")}</span>
-              <div className="row" role="radiogroup" aria-label={t("place.joystickTariffChange")} style={{ gap: 16, flexWrap: "wrap" }}>
+              {/* Two answers, side by side and boxed like the ones above, so
+                  the form reads as one family of choices rather than as a
+                  stack of loose radios. */}
+              <div className="cp-choice-row" role="radiogroup" aria-label={t("place.joystickTariffChange")}>
                 {PRICING_MODES.map((m) => (
-                  <Radio
-                    key={m}
-                    name="cp-place-joystick-strategy"
-                    checked={joystickStrategy === m}
-                    onChange={() => setJoystickStrategy(m)}
-                    disabled={busy}
-                    label={t(`joystickPrice.strategy.${m}`)}
-                  />
+                  <div key={m} className={`cp-choice${joystickStrategy === m ? " is-active" : ""}`}>
+                    <Radio
+                      name="cp-place-joystick-strategy"
+                      checked={joystickStrategy === m}
+                      onChange={() => setJoystickStrategy(m)}
+                      disabled={busy}
+                      label={t(`joystickPrice.strategy.${m}`)}
+                    />
+                  </div>
                 ))}
               </div>
             </div>

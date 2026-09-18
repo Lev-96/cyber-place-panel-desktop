@@ -200,6 +200,44 @@ describe("PlaceForm joystick block: shape and promises", () => {
     expect(groupFor("place.joystickTariffChange")).toBeTruthy();
   });
 
+  // ── the answers look like answers ────────────────────────────────────
+
+  /**
+   * Each answer is a box, and the chosen one is marked.
+   *
+   * Bare radios stacked under a label read as unrelated lines: an owner could
+   * not tell there were alternatives, and the price box belonging to "as in
+   * the branch" sat across the row from the radio explaining it. The boxes are
+   * what say "pick one of these", so they are pinned here.
+   */
+  test("every answer is a choice card, and the chosen one is marked", async () => {
+    await mount(place());
+
+    const cards = dom.querySelectorAll(".cp-choice");
+    expect(cards.length).toBeGreaterThanOrEqual(3);
+
+    const active = dom.querySelectorAll(".cp-choice.is-active");
+    expect(active.length).toBeGreaterThanOrEqual(1);
+    // The default answer is the marked one.
+    expect(active[0].querySelector('input[type="radio"]')).toBe(
+      within(groupFor("place.joysticks")).getByLabelText("place.joystickInherit"),
+    );
+  });
+
+  /** The fields an answer owns live inside that answer, not beside it. */
+  test("the price boxes sit inside the answer that opened them", async () => {
+    await mount(place());
+    await pick(EACH);
+
+    const card = priceBoxFor(THIRD).closest(".cp-choice");
+    expect(card, "the third's box is inside a choice card").toBeTruthy();
+    expect(card!.classList.contains("is-active")).toBe(true);
+    expect(card!.querySelector('input[type="radio"]')).toBe(
+      within(groupFor("place.joystickPayment")).getByLabelText(EACH),
+    );
+    expect(priceBoxFor(FOURTH).closest(".cp-choice")).toBe(card);
+  });
+
   // ── nothing incompatible on screen at once ───────────────────────────
 
   test("the two methods never show their boxes together", async () => {

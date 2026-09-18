@@ -2225,6 +2225,69 @@ button.pill:hover {
 }
 
 /* ---------------------------------------------------------------------------
+   Choice cards — one decision, several answers, each carrying its own fields.
+
+   The sibling of `.cp-langpick-option`, laid out as a row instead of a tile.
+   Bare radios stacked under a label read as unrelated lines: the place form's
+   joystick section offered four of them across two headings, and the price box
+   belonging to the first sat across the row from it. Boxing each answer says
+   "these are alternatives" without a word of copy, and puts the fields an
+   answer owns inside the answer.
+
+   Presentation only: the radio inside is the app's own `.cp-radio`, so
+   keyboard navigation, focus and the group's semantics are untouched.
+   --------------------------------------------------------------------------- */
+.cp-choice {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-surface-alt);
+  /* Colour and shadow only. A choice that resized on selection would push the
+     rest of the form down the moment an operator moved between options. */
+  transition: border-color 140ms ease, box-shadow 140ms ease;
+}
+.cp-choice:hover {
+  border-color: rgba(7, 221, 241, 0.35);
+}
+.cp-choice.is-active {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 1px var(--color-primary) inset;
+}
+/* Indented to where the radio's own text starts: the 18px mark plus the 8px
+   gap `.cp-radio` puts after it. So a field reads as belonging to the answer
+   above it rather than to the card. */
+.cp-choice__body,
+.cp-choice__hint {
+  padding-left: calc(18px + 8px);
+}
+.cp-choice__body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.cp-choice__hint {
+  font-size: 11px;
+  color: var(--color-muted);
+}
+/* A row of answers too narrow to be worth a line each. */
+.cp-choice-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.cp-choice-row > .cp-choice {
+  flex: 1 1 160px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .cp-choice {
+    transition: none;
+  }
+}
+
+/* ---------------------------------------------------------------------------
    Account popover — two faces (menu ⇄ manager accounts) inside one surface.
    Both slide in on transform/opacity only, so switching faces never reflows
    the sidebar underneath.
