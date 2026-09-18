@@ -711,10 +711,13 @@ export const TRANSLATIONS: Dict = {
   "session.addModePicker": { en: "Choose from the list", ru: "Выбрать из списка", am: "Ընտրել ցանկից" },
   "session.addModeText": { en: "Type the order", ru: "Ввести списком", am: "Մուտքագրել ցանկով" },
   "session.quickEntry": { en: "Quick entry", ru: "Быстрый ввод", am: "Արագ մուտքագրում" },
+  // Says what to do, not what a made-up order looks like: two product names a
+  // venue may not even sell read as a format to copy rather than as an
+  // instruction, and the line below already explains the format.
   "session.quickEntryPlaceholder": {
-    en: "20 lays\n30 cola",
-    ru: "20 lays\n30 cola",
-    am: "20 lays\n30 cola",
+    en: "Enter the product name and the quantity",
+    ru: "Введите название продукта и количество",
+    am: "Մուտքագրեք ապրանքի անվանումը և քանակը",
   },
   "session.quickEntryHint": {
     en: "One product per line, with the quantity before or after the name. Nothing is added until you confirm.",
