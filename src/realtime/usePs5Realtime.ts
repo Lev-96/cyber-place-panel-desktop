@@ -65,7 +65,7 @@ const usePs5Channel = <T,>(
     try {
       const echo = getEcho();
       if (!echo) {
-        console.warn(`[reverb] echo not initialised — ${eventName} will not arrive`);
+        console.warn(`[reverb] echo not initialised: ${eventName} will not arrive`);
         return;
       }
 

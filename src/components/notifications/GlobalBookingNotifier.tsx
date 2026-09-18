@@ -193,14 +193,14 @@ const resolveBookingChannel = (user: AuthUser | null): BookingScopeChannel | nul
   if (scope === null && user) {
     if (user.role === "company_owner" && !user.dashboard?.company_id) {
       console.warn(
-        "[GlobalBookingNotifier] company_owner without dashboard.company_id — no realtime subscription. " +
+        "[GlobalBookingNotifier] company_owner without dashboard.company_id: no realtime subscription. " +
         "DB feed still works via backend admin-backstop. " +
         "Run `php artisan notifications:audit-scope` to fix the orphan link."
       );
     }
     if (user.role === "manager" && !user.dashboard?.branch_id) {
       console.warn(
-        "[GlobalBookingNotifier] manager without dashboard.branch_id — no realtime subscription. " +
+        "[GlobalBookingNotifier] manager without dashboard.branch_id: no realtime subscription. " +
         "DB feed still works via backend admin-backstop. " +
         "Run `php artisan notifications:audit-scope` to fix the orphan link."
       );
