@@ -550,6 +550,24 @@ describe("AddSessionItemDialog — typing the order", () => {
     expect(textConfirm().disabled).toBe(true);
   });
 
+  /**
+   * A 200 carrying something that is not a reading of the box must not take
+   * the screen down. Found by a screenshot run against a stub backend, where
+   * the catch-all answered `{data: []}` and the dialog reached into
+   * `undefined.lines` — a white screen over a live floor.
+   */
+  test("an answer that is not a reading is refused, not reached into", async () => {
+    repo.resolveItemsText.mockResolvedValue({ data: [], meta: { total: 0 } } as never);
+    await mount();
+    await switchToText();
+    await type("20 lays");
+
+    // Still standing, still on the box, and nothing to confirm.
+    expect(box().value).toBe("20 lays");
+    expect(textConfirm().disabled).toBe(true);
+    expect(document.querySelector(".error")).toBeTruthy();
+  });
+
   test("a refusal from the server keeps the text and says why", async () => {
     repo.resolveItemsText.mockResolvedValue(RESOLVED_OK);
     repo.addItems.mockRejectedValue(new Error("This session is no longer active"));

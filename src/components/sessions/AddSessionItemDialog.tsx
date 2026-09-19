@@ -207,7 +207,21 @@ const AddSessionItemDialog = ({ branchId, session, onClose, onAdded }: Props) =>
     let dropped = false;
     const timer = setTimeout(() => {
       sessionRepository.resolveItemsText(session.id, typed)
-        .then((r) => { if (!dropped) { setResolved(r); setErr(null); } })
+        .then((r) => {
+          if (dropped) return;
+          // A 200 is not a promise about the shape. An older backend without
+          // this endpoint, a proxy that rewrote the body, a deploy half-way
+          // through — any of them can answer something that is not a reading
+          // of the box, and reaching into it would take the whole sessions
+          // board down with a white screen over a live floor.
+          const readable = Array.isArray(r?.lines);
+          setResolved(readable ? r : null);
+          // Empty string, not a translated sentence: `t` inside this effect
+          // would have to join its dependency list, and a `t` that is a new
+          // function on every render restarts the debounce forever. The
+          // render turns an empty reason into the generic one.
+          setErr(readable ? null : "");
+        })
         .catch((e) => {
           if (dropped) return;
           setResolved(null);
