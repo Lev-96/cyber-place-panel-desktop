@@ -191,6 +191,17 @@ const PlaceForm = ({ branchId, initial, platformSuggestions, platformPrices, onC
   const [extraChargeMode, setExtraChargeMode] = useState<"each" | "once">(
     initial?.extra_item_charge_mode === "once" ? "once" : "each",
   );
+  /**
+   * …and whether that figure is a FEE or a RATE.
+   *
+   * The same second question the pads answer one section up
+   * (`joystick_pricing_mode`), with the same two values and the same default:
+   * a room prices its extra per piece until somebody says it rents it by the
+   * hour.
+   */
+  const [extraPricingMode, setExtraPricingMode] = useState<JoystickPricingMode>(
+    initial?.extra_item_pricing_mode === "hourly" ? "hourly" : "fixed",
+  );
   const [joystickPrice, setJoystickPrice] = useState(
     initial?.joystick_price != null ? String(initial.joystick_price) : "",
   );
@@ -661,6 +672,7 @@ const PlaceForm = ({ branchId, initial, platformSuggestions, platformPrices, onC
           ? Number(extraPrice)
           : null,
         extra_item_charge_mode: isCustomPlatform && extraName.trim() !== "" ? extraChargeMode : null,
+        extra_item_pricing_mode: isCustomPlatform && extraName.trim() !== "" ? extraPricingMode : null,
         platform_name_en: customNew ? (names.en.trim() || undefined) : undefined,
         platform_name_ru: customNew ? (names.ru.trim() || undefined) : undefined,
         platform_name_am: customNew ? (names.am.trim() || undefined) : undefined,
@@ -1069,37 +1081,82 @@ const PlaceForm = ({ branchId, initial, platformSuggestions, platformPrices, onC
               </div>
             </div>
 
-            {/* HOW it is charged. Asked only once there is a thing to charge
-                for, and phrased with the operator's own word so the choice
-                reads as a sentence about chips rather than about "items". */}
+            {/* From here down this is the PADS' section, asked in the
+                operator's own word: the same three questions in the same
+                order, laid out the same way, because a venue that has learned
+                one has learned both. Asked only once there is a thing to
+                charge for. */}
             {extraName.trim() !== "" && (
-              <div className="col" style={{ gap: 6 }}>
-                <span className="label">{t("place.extraItemPayment")}</span>
-                <div
-                  className="cp-choice-row"
-                  role="radiogroup"
-                  aria-label={t("place.extraItemPayment")}
-                >
-                  <div className={`cp-choice${extraChargeMode === "each" ? " is-active" : ""}`}>
-                    <Radio
-                      name="cp-place-extra-mode"
-                      checked={extraChargeMode === "each"}
-                      onChange={() => setExtraChargeMode("each")}
-                      disabled={busy}
-                      label={fmt(t("place.extraItemEach"), extraName.trim())}
-                    />
-                  </div>
-                  <div className={`cp-choice${extraChargeMode === "once" ? " is-active" : ""}`}>
-                    <Radio
-                      name="cp-place-extra-mode"
-                      checked={extraChargeMode === "once"}
-                      onChange={() => setExtraChargeMode("once")}
-                      disabled={busy}
-                      label={t("place.extraItemOnce")}
-                    />
+              <>
+                {/* 1. The payment method: two full-width cards, stacked, as
+                       the pads' own question is. */}
+                <div className="col" style={{ gap: 6 }}>
+                  <span className="label">{t("place.extraItemPayment")}</span>
+                  <div
+                    className="col"
+                    role="radiogroup"
+                    aria-label={t("place.extraItemPayment")}
+                    style={{ gap: 8 }}
+                  >
+                    <div className={`cp-choice${extraChargeMode === "each" ? " is-active" : ""}`}>
+                      <Radio
+                        name="cp-place-extra-mode"
+                        checked={extraChargeMode === "each"}
+                        onChange={() => setExtraChargeMode("each")}
+                        disabled={busy}
+                        label={fmt(t("place.extraItemEach"), extraName.trim())}
+                      />
+                    </div>
+                    <div className={`cp-choice${extraChargeMode === "once" ? " is-active" : ""}`}>
+                      <Radio
+                        name="cp-place-extra-mode"
+                        checked={extraChargeMode === "once"}
+                        onChange={() => setExtraChargeMode("once")}
+                        disabled={busy}
+                        label={fmt(t("place.extraItemOnce"), extraName.trim())}
+                      />
+                    </div>
                   </div>
                 </div>
-              </div>
+
+                {/* 2. The tariff, stated rather than chosen — one answer, the
+                       one every room uses, and the choice below is what moves
+                       it. A stated value rather than a greyed control, for the
+                       same reason the pads' section gives. */}
+                <div className="col" style={{ gap: 6 }}>
+                  <span className="label">{fmt(t("place.extraItemStrategy"), extraName.trim())}</span>
+                  <span className="pill">{t("place.extraItemStrategyFixed")}</span>
+                </div>
+
+                {/* 3. …and whether the room rents it by the hour instead. Same
+                       field, same two values, same server rule as the pads. */}
+                <div className="col" style={{ gap: 6 }}>
+                  <span className="label">{t("place.extraItemTariffChange")}</span>
+                  <div
+                    className="cp-choice-row"
+                    role="radiogroup"
+                    aria-label={t("place.extraItemTariffChange")}
+                  >
+                    {PRICING_MODES.map((m) => (
+                      <div key={m} className={`cp-choice${extraPricingMode === m ? " is-active" : ""}`}>
+                        <Radio
+                          name="cp-place-extra-strategy"
+                          checked={extraPricingMode === m}
+                          onChange={() => setExtraPricingMode(m)}
+                          disabled={busy}
+                          label={t(`joystickPrice.strategy.${m}`)}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <span className="muted" style={{ fontSize: 11 }}>
+                  {extraPricingMode === "hourly"
+                    ? fmt(t("place.extraItemHourlyNote"), extraName.trim())
+                    : fmt(t("place.extraItemFixedNote"), extraName.trim())}
+                </span>
+              </>
             )}
           </div>
         )}

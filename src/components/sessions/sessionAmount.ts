@@ -111,7 +111,19 @@ export const sessionItemsTotal = (session: ISessionApi): number => {
   if (lines.length === 0) return 0;
 
   return round2(
-    lines.reduce((sum, line) => sum + round2(toNumber(line.price) * toNumber(line.qty)), 0),
+    lines.reduce((sum, line) => {
+      // An HOURLY line is a rate, not a price, and the server is the one
+      // counting its minutes — the row carries `line_total` already computed
+      // against the instant the payload was built. Recomputing it here would
+      // mean mirroring a clock the panel does not own; taking the server's
+      // figure keeps the tile and the receipt on the same number, and the
+      // next poll moves it.
+      if (line.is_hourly) {
+        return sum + round2(toNumber(line.line_total ?? 0));
+      }
+
+      return sum + round2(toNumber(line.price) * toNumber(line.qty));
+    }, 0),
   );
 };
 

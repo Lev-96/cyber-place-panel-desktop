@@ -291,6 +291,54 @@ describe("extra joysticks are on the seat's figure too", () => {
   });
 });
 
+describe("an hourly extra is taken from the server, not recomputed", () => {
+  /**
+   * A room may rent its extra by the hour, and the minutes belong to the
+   * server: the payload carries `line_total` already counted against the
+   * instant it was built. The mirror must take that figure rather than
+   * multiply a rate by a count — the second is a different number and the
+   * tile would disagree with the receipt, which is the exact failure the
+   * hourly PADS already taught this file.
+   */
+  const cue = (over: Record<string, unknown> = {}) => [{
+    id: 9, name: "Кий", price: 700, qty: 2, product_id: null,
+    is_extra: true, is_hourly: true, minutes: 90, line_total: 2100, ...over,
+  }] as ISessionApi["items"];
+
+  test("the server's figure is what lands on the tile", () => {
+    const s = session({ hourly_rate: 0, started_at: ago(90), items: cue() });
+
+    expect(sessionAmountAt(s, AT)).toBe(2100);
+  });
+
+  test("a rate times a count is NOT what lands on the tile", () => {
+    // 700 × 2 = 1400 is the fixed-price answer, and it is the wrong one here.
+    const s = session({ hourly_rate: 0, started_at: ago(90), items: cue() });
+
+    expect(sessionAmountAt(s, AT)).not.toBe(1400);
+  });
+
+  test("a fixed extra is still price × qty", () => {
+    const s = session({
+      hourly_rate: 0,
+      started_at: ago(90),
+      items: cue({ is_hourly: false, minutes: null, line_total: 1400 }),
+    });
+
+    expect(sessionAmountAt(s, AT)).toBe(1400);
+  });
+
+  test("a line the server never flagged is priced the way it always was", () => {
+    const s = session({
+      hourly_rate: 0,
+      started_at: ago(90),
+      items: [{ id: 1, name: "Coca-Cola", price: 300, qty: 3, product_id: 7 }],
+    });
+
+    expect(sessionAmountAt(s, AT)).toBe(900);
+  });
+});
+
 describe("drinks on the seat are on the seat's figure", () => {
   const withItems = (over: Partial<ISessionApi>, items: ISessionApi["items"]) =>
     session({ ...over, items });

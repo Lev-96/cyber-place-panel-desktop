@@ -49,6 +49,7 @@ export interface CreatePlaceBody {
   extra_item_name?: string | null;
   extra_item_price?: number | null;
   extra_item_charge_mode?: "each" | "once" | null;
+  extra_item_pricing_mode?: "fixed" | "hourly" | null;
   /**
    * Display наименование for a brand-new custom platform's branch price. Only
    * meaningful when the platform is custom AND not yet priced; ignored

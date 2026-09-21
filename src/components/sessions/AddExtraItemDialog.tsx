@@ -52,6 +52,10 @@ export default function AddExtraItemDialog({
 
   const ceiling = extra.max_qty > 0 ? extra.max_qty : 999;
   const unit = Number(extra.unit_price);
+  // A RATE, not a price: the room rents this by the hour, so there is no
+  // total to quote before it goes out — only what an hour of it costs. Saying
+  // "700 × 3 = 2 100" here would be a promise the bill does not keep.
+  const hourly = extra.pricing_mode === "hourly";
   // "Once for the session" charges for one whatever the count, which is what
   // the receipt will say, so it is what this line says too.
   const total = extra.charge_mode === "once" ? unit : unit * qty;
@@ -110,9 +114,15 @@ export default function AddExtraItemDialog({
             the thing still goes out, and the receipt still lists it. */}
         <div className="row row-between" style={{ gap: 8 }}>
           <span className="muted">
-            {extra.charge_mode === "once" ? t("session.extraOnceNote") : `${money(unit)} × ${qty}`}
+            {hourly
+              ? fmt(t("session.extraHourlyNote"), extra.name)
+              : extra.charge_mode === "once"
+                ? t("session.extraOnceNote")
+                : `${money(unit)} × ${qty}`}
           </span>
-          <span className="label">{money(total)}</span>
+          <span className="label">
+            {hourly ? `${money(unit)}${t("session.extraPerHour")} × ${qty}` : money(total)}
+          </span>
         </div>
 
         {err && <span className="error">{err}</span>}

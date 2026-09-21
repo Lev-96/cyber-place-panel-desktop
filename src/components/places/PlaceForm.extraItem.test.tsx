@@ -272,6 +272,66 @@ describe("the room's own extra", () => {
     expect(body.extra_item_charge_mode).toBe("once");
   });
 
+  test("the tariff question appears with the rest, and defaults to fixed", async () => {
+    await mount(place());
+    await act(async () => { fireEvent.change(nameBox()!, { target: { value: "Кий" } }); });
+
+    const group = dom.querySelector('[role="radiogroup"][aria-label="place.extraItemTariffChange"]');
+    expect(group).toBeTruthy();
+
+    const fixed = within(group as HTMLElement).getByText("joystickPrice.strategy.fixed")
+      .closest(".cp-choice")!
+      .querySelector<HTMLInputElement>("input[type=radio]")!;
+    expect(fixed.checked).toBe(true);
+
+    // The stated default sits above it, as it does for the pads.
+    expect([...dom.querySelectorAll("span.pill")].some(
+      (el) => el.textContent === "place.extraItemStrategyFixed",
+    )).toBe(true);
+  });
+
+  test("choosing the hourly tariff is what is saved", async () => {
+    await mount(place());
+    await act(async () => { fireEvent.change(nameBox()!, { target: { value: "Кий" } }); });
+    await act(async () => { fireEvent.change(priceBox()!, { target: { value: "700" } }); });
+
+    const group = dom.querySelector('[role="radiogroup"][aria-label="place.extraItemTariffChange"]')!;
+    const hourly = within(group as HTMLElement).getByText("joystickPrice.strategy.hourly")
+      .closest(".cp-choice")!
+      .querySelector("input[type=radio]")!;
+    await act(async () => { fireEvent.click(hourly); });
+    await save();
+
+    const body = repo.update.mock.calls[0][1] as Record<string, unknown>;
+
+    expect(body.extra_item_pricing_mode).toBe("hourly");
+  });
+
+  test("an existing hourly room comes back on the hourly answer", async () => {
+    await mount(place({
+      extra_item_name: "Кий",
+      extra_item_price: 700,
+      extra_item_charge_mode: "each",
+      extra_item_pricing_mode: "hourly",
+    }));
+
+    const group = dom.querySelector('[role="radiogroup"][aria-label="place.extraItemTariffChange"]')!;
+    const hourly = within(group as HTMLElement).getByText("joystickPrice.strategy.hourly")
+      .closest(".cp-choice")!
+      .querySelector<HTMLInputElement>("input[type=radio]")!;
+
+    expect(hourly.checked).toBe(true);
+  });
+
+  test("a room that hands out nothing saves a null tariff too", async () => {
+    await mount(place());
+    await save();
+
+    const body = repo.update.mock.calls[0][1] as Record<string, unknown>;
+
+    expect(body.extra_item_pricing_mode).toBeNull();
+  });
+
   test("a name with no price holds the save rather than guessing one", async () => {
     await mount(place());
     await act(async () => { fireEvent.change(nameBox()!, { target: { value: "Фишки" } }); });

@@ -177,7 +177,26 @@ export interface ISessionApi {
   /** The words the cashier typed. Only ever set when the method is `other`. */
   payment_method_other?: string | null;
   opened_by_user_id?: number | null;
-  items?: Array<{ id: number; name: string; price: number | string; qty: number; product_id: number | null }>;
+  items?: Array<{
+    id: number;
+    name: string;
+    price: number | string;
+    qty: number;
+    product_id: number | null;
+    /**
+     * The room's own extra, billed BY THE HOUR rather than by the piece.
+     *
+     * Absent on every catalogue line and on every line sold before the room
+     * had the choice, which is why the mirror reads it as false by default:
+     * `price × qty` is the old arithmetic and must stay exactly that.
+     */
+    is_extra?: boolean;
+    is_hourly?: boolean;
+    /** Minutes this hourly line has been running, as the server counted them. */
+    minutes?: number | null;
+    /** What the server says this line costs right now. */
+    line_total?: number | string;
+  }>;
 
   /**
    * The tariff a fixed session was started on, when the backend loaded it.
@@ -301,6 +320,12 @@ export interface IExtraItem {
   name: string;
   price: string;
   charge_mode: "each" | "once";
+  /**
+   * A fee per piece, or a RATE per hour per piece — the same second question
+   * a pad answers. Absent on a server that predates the choice, and read as
+   * "fixed" there.
+   */
+  pricing_mode?: "fixed" | "hourly";
   fee_taken: boolean;
   unit_price: string;
   max_qty: number;

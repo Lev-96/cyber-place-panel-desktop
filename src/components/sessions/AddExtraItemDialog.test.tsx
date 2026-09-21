@@ -25,7 +25,7 @@ vi.mock("@/i18n/LanguageContext", () => ({
     // Two keys come back as templates so the case that proves the word is
     // dynamic has a `{0}` to land in; everything else is its own key.
     t: (k: string) =>
-      k === "session.extraAdd" ? "add {0}" : k === "session.extraQty" ? "how many ({0})" : k,
+      k === "session.extraAdd" ? "add {0}" : k === "session.extraQty" ? "how many ({0})" : k === "session.extraHourlyNote" ? "per hour of {0}" : k,
     money: (n: number) => `${n} AMD`,
     currency: "AMD",
     lang: "ru",
@@ -140,6 +140,39 @@ describe("handing out the room's extra", () => {
     await act(async () => { fireEvent.change(qtyBox(), { target: { value: "3.7" } }); });
 
     expect(qtyBox().value).toBe("3");
+  });
+
+  test("an hourly room is quoted as a rate, never as a total", async () => {
+    await mount({ ...chips, name: "Кий", price: "700.00", unit_price: "700.00", pricing_mode: "hourly" });
+
+    await act(async () => { fireEvent.change(qtyBox(), { target: { value: "3" } }); });
+
+    // A rate times a count is not a bill: the hours are not known yet, and a
+    // dialog promising "2100" would be promising something the receipt will
+    // not say.
+    expect(dom.textContent).toContain("700 AMD");
+    expect(dom.textContent).toContain("session.extraPerHour");
+    expect(dom.textContent).not.toContain("2100 AMD");
+    expect(dom.textContent).toContain("Кий");
+  });
+
+  test("a fixed room still quotes the total", async () => {
+    await mount({ ...chips, pricing_mode: "fixed" });
+
+    await act(async () => { fireEvent.change(qtyBox(), { target: { value: "4" } }); });
+
+    expect(dom.textContent).toContain("2000 AMD");
+    expect(dom.textContent).not.toContain("session.extraPerHour");
+  });
+
+  test("a server that never heard of the tariff is treated as fixed", async () => {
+    const { pricing_mode: _drop, ...older } = { ...chips, pricing_mode: "hourly" as const };
+    await mount(older);
+
+    await act(async () => { fireEvent.change(qtyBox(), { target: { value: "2" } }); });
+
+    expect(dom.textContent).toContain("1000 AMD");
+    expect(dom.textContent).not.toContain("session.extraPerHour");
   });
 
   test("the write carries a count and no price at all", async () => {

@@ -139,6 +139,8 @@ export interface IBranchPlace extends Translated {
   extra_item_name?: string | null;
   extra_item_price?: number | string | null;
   extra_item_charge_mode?: "each" | "once" | null;
+  /** A fee per piece, or a RATE per hour per piece. Null reads as "fixed". */
+  extra_item_pricing_mode?: "fixed" | "hourly" | null;
   games: IGame[];
 }
 

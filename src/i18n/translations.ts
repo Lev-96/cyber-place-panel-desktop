@@ -740,6 +740,12 @@ export const TRANSLATIONS: Dict = {
   // invented tomorrow reads correctly without a key being added.
   "session.extraAdd": { en: "Add {0}", ru: "Добавить: {0}", am: "Ավելացնել՝ {0}" },
   "session.extraQty": { en: "How many ({0})", ru: "Количество ({0})", am: "Քանակը ({0})" },
+  "session.extraPerHour": { en: "/h", ru: "/час", am: "/ժամ" },
+  "session.extraHourlyNote": {
+    en: "Charged for every hour {0} stays with the player",
+    ru: "Начисляется за каждый час, пока {0} у игрока",
+    am: "Հաշվարկվում է ամեն ժամի համար, քանի դեռ {0} խաղացողի մոտ է",
+  },
   "session.extraOnceNote": {
     en: "One charge for the session, whatever the count",
     ru: "Одна плата за сессию, независимо от количества",
@@ -1784,9 +1790,26 @@ export const TRANSLATIONS: Dict = {
     am: "Վճար յուրաքանչյուր միավորի համար ({0} × քանակ)",
   },
   "place.extraItemOnce": {
-    en: "One charge for the session, whatever the count",
-    ru: "Одна плата за сессию, независимо от количества",
-    am: "Մեկ վճար սեսիայի համար՝ անկախ քանակից",
+    en: "One charge for the session ({0}), whatever the count",
+    ru: "Единоразовая плата за {0} (1 раз за сессию)",
+    am: "Միանվագ վճար {0}-ի համար (1 անգամ սեսիայի ընթացքում)",
+  },
+  "place.extraItemStrategy": { en: "Tariff for {0}", ru: "Тариф: {0}", am: "Սակագին՝ {0}" },
+  "place.extraItemStrategyFixed": {
+    en: "FIXED PRICE (DEFAULT)",
+    ru: "ФИКСИРОВАННАЯ ЦЕНА (ПО УМОЛЧАНИЮ)",
+    am: "ՖԻՔՍՎԱԾ ԳԻՆ (ԿԱՆԽԱԴՐՎԱԾ)",
+  },
+  "place.extraItemTariffChange": { en: "Tariff change", ru: "Изменение тарифа", am: "Սակագնի փոփոխություն" },
+  "place.extraItemFixedNote": {
+    en: "The price is charged as entered, per {0}.",
+    ru: "Цена берётся как указано, за одну единицу: {0}.",
+    am: "Գինը վերցվում է ինչպես նշված է՝ մեկ միավորի համար՝ {0}։",
+  },
+  "place.extraItemHourlyNote": {
+    en: "The price becomes an hourly rate: it is charged for every hour {0} stays with the player.",
+    ru: "Цена становится почасовой: она начисляется за каждый час, пока {0} у игрока.",
+    am: "Գինը դառնում է ժամային՝ այն հաշվարկվում է ամեն ժամի համար, քանի դեռ {0} խաղացողի մոտ է։",
   },
   "place.errors.extraPriceRequired": {
     en: "Give the extra item a price, or clear its name.",
