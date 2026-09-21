@@ -38,6 +38,18 @@ export interface CreatePlaceBody {
    */
   joystick_price_4?: number | null;
   /**
+   * What a room on a CUSTOM platform hands out besides the seat, in the word
+   * the room uses for it: chips on a poker table, a cue on a billiard table.
+   *
+   * Null on every other platform and on every room nobody has configured.
+   * Unlike the joystick fields above these inherit NOTHING — a branch holds
+   * one PlayStation policy, but not one policy for every custom platform in
+   * the building — so null here means "hands out nothing", full stop.
+   */
+  extra_item_name?: string | null;
+  extra_item_price?: number | null;
+  extra_item_charge_mode?: "each" | "once" | null;
+  /**
    * Display наименование for a brand-new custom platform's branch price. Only
    * meaningful when the platform is custom AND not yet priced; ignored
    * otherwise. Not a Place column — the backend forwards it to the price row.

@@ -122,7 +122,23 @@ export interface IBranchPlace extends Translated {
    * …and how OFTEN it charges: every handout, or once for the whole session
    * however many times controllers change hands. Null follows the branch.
    */
+  /**
+   * …and how OFTEN it charges: every handout, or once for the whole session
+   * however many times controllers change hands. Null follows the branch.
+   */
   joystick_charge_mode?: "each" | "once" | null;
+  /**
+   * What a room on a CUSTOM platform hands out besides the seat, in the word
+   * the room uses for it: chips on a poker table, a cue on a billiard table.
+   *
+   * Null on every other platform and on every room nobody has configured.
+   * Unlike the joystick fields above these inherit NOTHING — a branch holds
+   * one PlayStation policy, but not one policy for every custom platform in
+   * the building — so null here means "hands out nothing", full stop.
+   */
+  extra_item_name?: string | null;
+  extra_item_price?: number | string | null;
+  extra_item_charge_mode?: "each" | "once" | null;
   games: IGame[];
 }
 

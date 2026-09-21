@@ -19,6 +19,7 @@ import { useAuth } from "@/auth/AuthContext";
 import { can } from "@/auth/permissions";
 import { useAsync } from "@/hooks/useAsync";
 import { useLang } from "@/i18n/LanguageContext";
+import { fmt } from "@/i18n/translations";
 import { platformPriceNameOf } from "@/i18n/platformPriceName";
 import { gameRepository } from "@/repositories/GameRepository";
 import { placeRepository } from "@/repositories/PlaceRepository";
@@ -171,6 +172,25 @@ const PlaceForm = ({ branchId, initial, platformSuggestions, platformPrices, onC
   const [joystickModeTouched, setJoystickModeTouched] = useState(false);
   /** A shape this form cannot draw, carried through untouched. */
   const legacySlots = legacySlotsOf(initial);
+  /**
+   * What a room on a CUSTOM platform hands out besides the seat.
+   *
+   * The same question the pads above answer, in the word the room uses for
+   * it: chips on a poker table, a cue on a billiard table. It is asked only
+   * here because a PlayStation already answers it in its own vocabulary, and
+   * two answers on one seat is an argument at the till.
+   *
+   * Empty name is "this room hands out nothing", which is what every room is
+   * until somebody fills it in — so the section opens closed and costs an
+   * operator who does not need it one line of screen.
+   */
+  const [extraName, setExtraName] = useState(initial?.extra_item_name ?? "");
+  const [extraPrice, setExtraPrice] = useState(
+    initial?.extra_item_price != null ? String(initial.extra_item_price) : "",
+  );
+  const [extraChargeMode, setExtraChargeMode] = useState<"each" | "once">(
+    initial?.extra_item_charge_mode === "once" ? "once" : "each",
+  );
   const [joystickPrice, setJoystickPrice] = useState(
     initial?.joystick_price != null ? String(initial.joystick_price) : "",
   );
@@ -541,6 +561,13 @@ const PlaceForm = ({ branchId, initial, platformSuggestions, platformPrices, onC
     if (ownRateIsNotAPrice) {
       return setErr(t("place.zeroNotAPriceHint"));
     }
+    // Named but not priced is the one half-configuration the server refuses,
+    // and it is worth catching here: the operator is looking at both boxes.
+    if (isCustomPlatform && extraName.trim() !== "" && extraPrice.trim() === "") {
+      setErr(t("place.errors.extraPriceRequired"));
+      return;
+    }
+
     if (needsOwnRate) {
       return setErr(t("place.noBranchRateHint"));
     }
@@ -625,6 +652,15 @@ const PlaceForm = ({ branchId, initial, platformSuggestions, platformPrices, onC
           : joystickModeTouched
             ? (joystickMode === "" ? null : joystickMode)
             : (initial?.joystick_charge_mode ?? null),
+        // What THIS room hands out, and how it charges for it. Sent only for
+        // a custom platform: the server refuses these three on pc/ps4/ps5, and
+        // a form that posted them anyway would turn a stale radio into a
+        // rejected save the operator cannot see the cause of.
+        extra_item_name: isCustomPlatform && extraName.trim() !== "" ? extraName.trim() : null,
+        extra_item_price: isCustomPlatform && extraName.trim() !== "" && extraPrice.trim() !== ""
+          ? Number(extraPrice)
+          : null,
+        extra_item_charge_mode: isCustomPlatform && extraName.trim() !== "" ? extraChargeMode : null,
         platform_name_en: customNew ? (names.en.trim() || undefined) : undefined,
         platform_name_ru: customNew ? (names.ru.trim() || undefined) : undefined,
         platform_name_am: customNew ? (names.am.trim() || undefined) : undefined,
@@ -999,6 +1035,72 @@ const PlaceForm = ({ branchId, initial, platformSuggestions, platformPrices, onC
             <span className="muted" style={{ fontSize: 11 }}>
               {isOwnJoystickRule ? t("place.joystickOwnNote") : t("place.joystickBranchNote")}
             </span>
+          </div>
+        )}
+
+        {/* What a room on a custom platform hands out besides the seat.
+            The PlayStation section above asks the same question in its own
+            vocabulary; this is the version for a table that deals chips or
+            lends a cue, and the operator supplies the word. Empty is the
+            answer for a room that hands out nothing, so the pricing half
+            stays out of the way until there is something to price. */}
+        {isCustomPlatform && (
+          <div className="col" style={{ gap: 8 }}>
+            <div className="col" style={{ gap: 4 }}>
+              <span className="label">{t("place.extraItem")}</span>
+              <span className="muted" style={{ fontSize: 11 }}>{t("place.extraItemHint")}</span>
+            </div>
+            <div className="row" style={{ gap: 12, flexWrap: "wrap" }}>
+              <Input
+                label={t("place.extraItemName")}
+                value={extraName}
+                onChange={(e) => setExtraName(e.target.value)}
+                placeholder={t("place.extraItemNamePlaceholder")}
+                maxLength={40}
+                disabled={busy}
+              />
+              <div style={{ maxWidth: 200 }}>
+                <PriceInput
+                  label={t("place.extraItemPrice")}
+                  value={extraPrice}
+                  onChange={setExtraPrice}
+                  disabled={busy || extraName.trim() === ""}
+                />
+              </div>
+            </div>
+
+            {/* HOW it is charged. Asked only once there is a thing to charge
+                for, and phrased with the operator's own word so the choice
+                reads as a sentence about chips rather than about "items". */}
+            {extraName.trim() !== "" && (
+              <div className="col" style={{ gap: 6 }}>
+                <span className="label">{t("place.extraItemPayment")}</span>
+                <div
+                  className="cp-choice-row"
+                  role="radiogroup"
+                  aria-label={t("place.extraItemPayment")}
+                >
+                  <div className={`cp-choice${extraChargeMode === "each" ? " is-active" : ""}`}>
+                    <Radio
+                      name="cp-place-extra-mode"
+                      checked={extraChargeMode === "each"}
+                      onChange={() => setExtraChargeMode("each")}
+                      disabled={busy}
+                      label={fmt(t("place.extraItemEach"), extraName.trim())}
+                    />
+                  </div>
+                  <div className={`cp-choice${extraChargeMode === "once" ? " is-active" : ""}`}>
+                    <Radio
+                      name="cp-place-extra-mode"
+                      checked={extraChargeMode === "once"}
+                      onChange={() => setExtraChargeMode("once")}
+                      disabled={busy}
+                      label={t("place.extraItemOnce")}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
 

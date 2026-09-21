@@ -143,6 +143,15 @@ export interface AddItemBody {
   name?: string;
   price?: number;
   qty?: number;
+  /**
+   * The ROOM's own extra: chips, a cue, darts.
+   *
+   * Carries a count and nothing else. The name and the price come from the
+   * place, which is why the server refuses `name`, `price` and `product_id`
+   * beside it rather than ignoring them — and also why a manager may sell one
+   * without the right to type prices onto a bill.
+   */
+  extra?: true;
 }
 
 /**

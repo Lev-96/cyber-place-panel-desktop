@@ -734,6 +734,17 @@ export const TRANSLATIONS: Dict = {
     ru: "Добавить товар к этой сессии",
     am: "Ավելացնել այս նիստին",
   },
+  // ── the room's own extra on a running session ─────────────────────────
+  // `{0}` is the word the OWNER typed on the place form — "chips", "cue",
+  // "darts". Nothing here names a thing, which is the whole point: a room
+  // invented tomorrow reads correctly without a key being added.
+  "session.extraAdd": { en: "Add {0}", ru: "Добавить: {0}", am: "Ավելացնել՝ {0}" },
+  "session.extraQty": { en: "How many ({0})", ru: "Количество ({0})", am: "Քանակը ({0})" },
+  "session.extraOnceNote": {
+    en: "One charge for the session, whatever the count",
+    ru: "Одна плата за сессию, независимо от количества",
+    am: "Մեկ վճար սեսիայի համար՝ անկախ քանակից",
+  },
   "session.addItem": { en: "Add a product", ru: "Добавить товар", am: "Ավելացնել ապրանք" },
   "session.availableProducts": { en: "Available products", ru: "Доступные товары", am: "Հասանելի ապրանքներ" },
   "session.addedProducts": { en: "Added products", ru: "Добавленные товары", am: "Ավելացված ապրանքներ" },
@@ -1754,6 +1765,34 @@ export const TRANSLATIONS: Dict = {
   },
   // The room's joystick section, as the form asks it since 2026-09-18: what
   // the room follows, then how it sells its own pads.
+  // ── the room's own extra: chips, a cue, darts ──────────────────────────
+  // Static labels only. The THING is named by the operator and travels as
+  // data, so nothing here spells "chips": `{0}` is where their word lands.
+  "place.extraItem": { en: "Extra item", ru: "Дополнительный предмет", am: "Լրացուցիչ իր" },
+  "place.extraItemHint": {
+    en: "What this place hands out besides the seat: chips, a cue, darts. Leave empty if there is nothing.",
+    ru: "Что это место выдаёт помимо самого места: фишки, кий, дротики. Оставьте пустым, если ничего нет.",
+    am: "Ինչ է տրամադրում այս տեղը բացի տեղից՝ ֆիշկաներ, կիյ, նետիկներ։ Թողեք դատարկ, եթե ոչինչ չկա։",
+  },
+  "place.extraItemName": { en: "Name", ru: "Название", am: "Անվանում" },
+  "place.extraItemNamePlaceholder": { en: "Chips, cue, darts…", ru: "Фишки, кий, дротики…", am: "Ֆիշկաներ, կիյ, նետիկներ…" },
+  "place.extraItemPrice": { en: "Price per item", ru: "Цена за штуку", am: "Գինը մեկ հատի համար" },
+  "place.extraItemPayment": { en: "How it is charged", ru: "Как берётся плата", am: "Ինչպես է վերցվում վճարը" },
+  "place.extraItemEach": {
+    en: "Charged every time ({0} × count)",
+    ru: "Плата за каждую единицу ({0} × количество)",
+    am: "Վճար յուրաքանչյուր միավորի համար ({0} × քանակ)",
+  },
+  "place.extraItemOnce": {
+    en: "One charge for the session, whatever the count",
+    ru: "Одна плата за сессию, независимо от количества",
+    am: "Մեկ վճար սեսիայի համար՝ անկախ քանակից",
+  },
+  "place.errors.extraPriceRequired": {
+    en: "Give the extra item a price, or clear its name.",
+    ru: "Укажите цену дополнительного предмета или очистите его название.",
+    am: "Նշեք լրացուցիչ իրի գինը կամ մաքրեք դրա անվանումը։",
+  },
   "place.joysticks": { en: "Joysticks", ru: "Джойстики", am: "Ջոյսթիքներ" },
   "place.joystickPayment": {
     en: "How extra joysticks are paid for",

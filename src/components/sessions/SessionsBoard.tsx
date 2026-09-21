@@ -10,6 +10,7 @@ import { useAsync } from "@/hooks/useAsync";
 import { useLocalReorder } from "@/hooks/useLocalReorder";
 import { useReservedPlaceIds } from "@/hooks/useReservedPlaceIds";
 import { useLang } from "@/i18n/LanguageContext";
+import { fmt } from "@/i18n/translations";
 import { usePlaceAvailability } from "@/realtime/usePlaceAvailability";
 import { useSessionChanged } from "@/realtime/useSessionChanged";
 import { sessionRepository } from "@/repositories/SessionRepository";
@@ -27,6 +28,7 @@ import { useRealtimeResync } from "@/realtime/useRealtimeResync";
 import { PS5_STATE_LOOK } from "@/ps5/stateLook";
 import { DragEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
+import AddExtraItemDialog from "./AddExtraItemDialog";
 import AddSessionItemDialog from "./AddSessionItemDialog";
 import SessionTimer from "./SessionTimer";
 import { sessionCurrentHourlyRate, sessionJoysticksTotal } from "./sessionAmount";
@@ -68,6 +70,14 @@ const SessionsBoard = ({ branchId }: Props) => {
   const [startTarget, setStartTarget] = useState<IPcApi | null>(null);
   const [stopTarget, setStopTarget] = useState<ISessionApi | null>(null);
   const [addItemTarget, setAddItemTarget] = useState<ISessionApi | null>(null);
+  /**
+   * The seat whose OWN extra is being handed out — chips, a cue, darts.
+   *
+   * A separate target from the product dialog above because they are separate
+   * questions: that one sells from the branch catalogue, this one hands over
+   * what the room itself is configured to hand over, at the room's price.
+   */
+  const [extraTarget, setExtraTarget] = useState<ISessionApi | null>(null);
   const [optionsTarget, setOptionsTarget] = useState<ISessionApi | null>(null);
   // The session whose pads are mid-change. One at a time and per session, so a
   // second click on the SAME tile is refused while the first is in flight and a
@@ -938,6 +948,20 @@ const SessionsBoard = ({ branchId }: Props) => {
                 </Button>
               )}
               <Button variant="secondary" onClick={() => setAddItemTarget(sess)} style={miniBtnFlex}>{t("session.addItem")}</Button>
+              {/* Only on a seat whose room hands something out, and labelled
+                  with that room's own word. The server sends the object or
+                  null, so a control that appears here is one the server will
+                  honour — the same rule the pad menu follows. */}
+              {sess.extra_item && (
+                <Button
+                  variant="secondary"
+                  onClick={() => setExtraTarget(sess)}
+                  style={miniBtnFlex}
+                  title={fmt(t("session.extraAdd"), sess.extra_item.name)}
+                >
+                  {fmt(t("session.extraAdd"), sess.extra_item.name)}
+                </Button>
+              )}
               {/* Named for the thing a cashier is actually looking for on a
                   seat that is running out. It opens the SAME dialog "Options"
                   does — one management surface, reached by two names, because
@@ -1112,6 +1136,13 @@ const SessionsBoard = ({ branchId }: Props) => {
           branchId={branchId}
           session={addItemTarget}
           onClose={() => { setAddItemTarget(null); void sessions.reload(); }}
+          onAdded={() => { void sessions.reload(); }}
+        />
+      )}
+      {extraTarget && (
+        <AddExtraItemDialog
+          session={extraTarget}
+          onClose={() => { setExtraTarget(null); void sessions.reload(); }}
           onAdded={() => { void sessions.reload(); }}
         />
       )}

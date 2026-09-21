@@ -278,8 +278,32 @@ export interface ISessionApi {
    * drawn: a missing field must not offer an operation the seat cannot take.
    */
   supports_chips?: boolean | null;
+  /**
+   * What THIS seat hands out besides itself, when its room configured one.
+   *
+   * One object or null rather than a flag plus a name: a control asking "may
+   * I sell an extra here" and "what is it called" separately has two ways to
+   * be half-drawn. Null is every PlayStation, every PC and every room nobody
+   * configured — and also a payload that did not load the place, which is the
+   * same instruction either way: do not offer the control.
+   *
+   * `unit_price` is what the NEXT hand-out costs, so a button can quote a
+   * figure; on a seat that charges once for the session it is "0.00" as soon
+   * as `fee_taken` is true, while `price` still reports what the charge was.
+   */
+  extra_item?: IExtraItem | null;
   /** The seat's platform slug, so a refusal can name it rather than just say no. */
   place_platform?: string | null;
+}
+
+/** The room's own extra, as the server resolves it for one session. */
+export interface IExtraItem {
+  name: string;
+  price: string;
+  charge_mode: "each" | "once";
+  fee_taken: boolean;
+  unit_price: string;
+  max_qty: number;
 }
 
 export interface IPcApi extends Translated {
