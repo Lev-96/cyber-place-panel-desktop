@@ -1689,6 +1689,46 @@ method. Do not shortcut it, and do not report completion without it.
 7. **Commit to `staging`**, security and docs separately, stating what was
    verified by running versus only reasoned about.
 
+### Every OTHER room hands out its own extra (2026-09-21)
+
+The joystick section above is PlayStation-only, and on purpose. A room on a
+custom platform — the picker's «Другое» — answers the same question in its own
+word, and the word is data, not code: a poker table deals `Фишки`, a billiard
+table lends a `Кий`, and the room invented next month reads correctly without a
+key being added.
+
+- **In `PlaceForm`,** gated on `isCustomPlatform`: a name, a price, and — only
+  once there is a name — two `cp-choice` cards for `each` / `once`. No new CSS;
+  it is the same choice-card pattern the pads use. An empty name is "hands out
+  nothing" and posts three nulls, so a room nobody configured costs the
+  operator one line of screen.
+- **The payload is `extra_item_name` / `extra_item_price` /
+  `extra_item_charge_mode`**, sent as null for every known platform. The server
+  refuses them on pc/ps4/ps5, so a stale value would be a rejected save with no
+  visible cause.
+- **On the board,** the button appears only when `session.extra_item` is an
+  object — the server's answer, exactly as `supports_joysticks` gates the pad
+  menu — and its label is `fmt(t("session.extraAdd"), extra.name)`. Nothing in
+  the panel spells "chips".
+- **`AddExtraItemDialog` is the one dialog for all of them.** A count, a live
+  total, and a confirm that sends `[{extra: true, qty}]` through the SAME
+  `sessionRepository.addItems` the product dialog uses — one write path, one
+  history. It never sends a name or a price: the room prices it, which is what
+  lets a manager hand one out without `products.manage`.
+- **`once` quotes one charge, not `unit × qty`**, and a seat that has already
+  paid it quotes 0.00 (`unit_price` from the server, `fee_taken` beside it).
+- **Nothing in `sessionAmount` changed.** A sold extra is a `session_items`
+  row, so the running total, the receipt and the history already add it up.
+- ⚠️ **`Modal` takes `open` and has no `title` prop.** The first version of
+  this dialog passed a title and no `open`, so the button was on the board and
+  pressing it did nothing at all. Neither the unit tests nor the typecheck saw
+  it — the tests MOCKED `Modal` and the mock ignored the prop. The mock honours
+  `open` now, and removing it fails nine cases. Two lessons worth keeping: a
+  mock that drops a required prop hides the bug that prop exists to prevent,
+  and **the typecheck is `npm run typecheck`** (`tsconfig.app.json`), not a
+  bare `tsc -p tsconfig.json`, which type-checks nothing in `src` and will sit
+  there reporting success while the app does not compile.
+
 ### The add-item dialog has two ways in (2026-09-18)
 
 `AddSessionItemDialog` opens on the picker it has always opened on — the
