@@ -1,4 +1,4 @@
-import { sessionJoysticksTotal } from "@/components/sessions/sessionAmount";
+import { sessionItemLineTotal, sessionJoysticksTotal } from "@/components/sessions/sessionAmount";
 import { ISessionApi } from "@/types/sessions";
 import { useMemo } from "react";
 
@@ -81,7 +81,7 @@ export const aggregateSessionsSummary = (sessions: ISessionApi[]): SessionsSumma
     const sPads = s.is_free === true ? 0 : sessionJoysticksTotal(s);
     let sQty = 0;
     for (const it of s.items ?? []) {
-      const line = num(it.price) * num(it.qty);
+      const line = sessionItemLineTotal(it);
       sItems += line;
       sQty += num(it.qty);
       const key = it.name ?? "-";

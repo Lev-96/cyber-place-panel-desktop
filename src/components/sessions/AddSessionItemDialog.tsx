@@ -11,6 +11,7 @@ import { fmt } from "@/i18n/translations";
 import { useLang } from "@/i18n/LanguageContext";
 import { productRepository } from "@/repositories/ProductRepository";
 import { sessionRepository } from "@/repositories/SessionRepository";
+import { sessionItemLineTotal } from "@/components/sessions/sessionAmount";
 import { notify } from "@/ui/notify";
 import { ISessionApi } from "@/types/sessions";
 import { IResolvedItems } from "@/api/sessions";
@@ -373,7 +374,7 @@ const AddSessionItemDialog = ({ branchId, session, onClose, onAdded }: Props) =>
                   <span style={ellipsis} title={item.name}>{item.name}</span>
                   <span style={{ minWidth: 40, textAlign: "center", fontWeight: 700 }}>× {item.qty}</span>
                   <span className="muted" style={{ fontSize: 11, minWidth: 74, textAlign: "right" }}>
-                    {money(Number(item.price) * item.qty)}
+                    {money(sessionItemLineTotal(item))}
                   </span>
                   <Button
                     variant="secondary"

@@ -582,3 +582,42 @@ describe("AddSessionItemDialog — typing the order", () => {
     expect(failure?.textContent).toContain("This session is no longer active");
   });
 });
+
+/**
+ * The room's hourly extra, seen from the basket dialog.
+ *
+ * `price` on such a line is a RATE. Printing `price x qty` here quoted a cue
+ * rented at 700/h as a flat 700 next to a receipt that said 1 050, on the one
+ * screen a cashier opens to check what is already on the bill.
+ */
+describe("an hourly extra already on the bill", () => {
+  const rented = {
+    ...session,
+    items: [{
+      id: 11, name: "\u041a\u0438\u0439", qty: 1, price: 700,
+      is_extra: true, is_hourly: true, minutes: 90, line_total: 1050, returned_at: null,
+    }],
+  } as unknown as ISessionApi;
+
+  test("shows what the server has counted, not the rate", async () => {
+    repo.listProducts.mockResolvedValue(products);
+    await mount({ session: rented });
+
+    expect(screen.getByText("1050")).toBeTruthy();
+    expect(screen.queryByText("700")).toBeNull();
+  });
+
+  test("a fixed line is still priced the old way", async () => {
+    repo.listProducts.mockResolvedValue(products);
+    await mount({
+      session: {
+        ...session,
+        items: [{ id: 12, name: "Cola", qty: 2, price: 250, line_total: 9999 }],
+      } as unknown as ISessionApi,
+    });
+
+    // 500, a figure no product in the catalogue carries.
+    expect(screen.getByText("500")).toBeTruthy();
+    expect(screen.queryByText("9999")).toBeNull();
+  });
+});

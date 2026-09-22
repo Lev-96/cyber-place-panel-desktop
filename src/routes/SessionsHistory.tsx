@@ -6,6 +6,7 @@ import { useSessionsSummary } from "@/hooks/useSessionsSummary";
 import { formatDateTime, formatTime } from "@/i18n/dates";
 import { useLang } from "@/i18n/LanguageContext";
 import { padChargeOf } from "@/components/sessions/joystickView";
+import { sessionItemLineTotal } from "@/components/sessions/sessionAmount";
 import { sessionRepository } from "@/repositories/SessionRepository";
 import { ISessionEvent } from "@/api/sessions";
 import { ISessionApi } from "@/types/sessions";
@@ -198,7 +199,7 @@ const SessionRow = ({ session }: { session: ISessionApi }) => {
   const { t, money } = useLang();
   const durationMin = sessionDurationMinutes(session.started_at, session.ends_at);
   const items = session.items ?? [];
-  const itemsTotal = items.reduce((sum, it) => sum + num(it.price) * num(it.qty), 0);
+  const itemsTotal = items.reduce((sum, it) => sum + sessionItemLineTotal(it), 0);
   /**
    * What the extra pads put on this bill.
    *
@@ -327,7 +328,7 @@ const SessionRow = ({ session }: { session: ISessionApi }) => {
           {items.map((it) => (
             <div key={it.id} className="row-between" style={{ fontSize: 13 }}>
               <span>{it.name} {num(it.qty) > 1 && <span className="muted">× {num(it.qty)}</span>}</span>
-              <span>{money(num(it.price) * num(it.qty))}</span>
+              <span>{money(sessionItemLineTotal(it))}</span>
             </div>
           ))}
         </div>

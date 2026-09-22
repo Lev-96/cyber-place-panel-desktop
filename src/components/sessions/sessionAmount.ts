@@ -106,25 +106,32 @@ const tariffHourlyRate = (session: ISessionApi): number | null => {
  * answer — so this reads `items` and never accumulates, which is what stops a
  * realtime refresh from charging the same drink twice.
  */
+/** One line of a session's bill, as `SessionResource` ships it. */
+export type SessionItemLine = NonNullable<ISessionApi["items"]>[number];
+
+/**
+ * What ONE line on the bill is worth.
+ *
+ * An HOURLY line is a rate and a duration, not a price and a count: the server
+ * counts its minutes and ships `line_total` already computed against the
+ * instant the payload was built. Recomputing it here would mean mirroring a
+ * clock the panel does not own, and quoting `price x qty` instead would print
+ * a cue rented at 700/h as a flat 700 — which is what the summary, the history
+ * row and the "already on this session" list each did, one screen at a time.
+ *
+ * Every other line is still `price x qty`, and a payload from a backend that
+ * never heard of an hourly extra is priced exactly as it always was.
+ */
+export const sessionItemLineTotal = (line: SessionItemLine): number =>
+  line.is_hourly
+    ? round2(toNumber(line.line_total ?? 0))
+    : round2(toNumber(line.price) * toNumber(line.qty));
+
 export const sessionItemsTotal = (session: ISessionApi): number => {
   const lines = session.items ?? [];
   if (lines.length === 0) return 0;
 
-  return round2(
-    lines.reduce((sum, line) => {
-      // An HOURLY line is a rate, not a price, and the server is the one
-      // counting its minutes — the row carries `line_total` already computed
-      // against the instant the payload was built. Recomputing it here would
-      // mean mirroring a clock the panel does not own; taking the server's
-      // figure keeps the tile and the receipt on the same number, and the
-      // next poll moves it.
-      if (line.is_hourly) {
-        return sum + round2(toNumber(line.line_total ?? 0));
-      }
-
-      return sum + round2(toNumber(line.price) * toNumber(line.qty));
-    }, 0),
-  );
+  return round2(lines.reduce((sum, line) => sum + sessionItemLineTotal(line), 0));
 };
 
 /**

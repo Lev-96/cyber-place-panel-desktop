@@ -1261,7 +1261,6 @@ export const TRANSLATIONS: Dict = {
   "history.timelineShow": { en: "Show the path", ru: "Показать путь", am: "Ցույց տալ ընթացքը" },
   "history.timelineHide": { en: "Hide the path", ru: "Скрыть путь", am: "Թաքցնել ընթացքը" },
   "history.seatUnknown": { en: "Seat not recorded", ru: "Место не записано", am: "Տեղը գրանցված չէ" },
-  "history.itemReturned": { en: "returned", ru: "возвращено", am: "վերադարձված" },
   "history.noRefundShort": { en: "no refund", ru: "без возврата", am: "առանց վերադարձի" },
 
   // ── what each line actually changed ──────────────────────────────────────

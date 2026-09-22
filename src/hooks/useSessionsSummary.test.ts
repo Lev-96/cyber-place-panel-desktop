@@ -270,3 +270,37 @@ describe("what counts as clock, and what does not", () => {
     expect(s.total).toBe(0);
   });
 });
+
+/**
+ * An hourly extra is a rate and a duration, and the summary is the one screen
+ * that adds every seat's lines together. Multiplying `price x qty` reported a
+ * venue that rents cues a figure built from rates it never charged, and the
+ * "time" figure beside it is derived by subtraction from the same number.
+ */
+describe("the room's hourly extra in the summary", () => {
+  it("takes the server's line total, not the rate times the count", () => {
+    const s = summarize([
+      make({
+        id: 1, status: "stopped", total_paid: 2050,
+        items: [{
+          id: 11, name: "\u041a\u0438\u0439", qty: 1, price: 700,
+          is_extra: true, is_hourly: true, minutes: 90, line_total: 1050, returned_at: null,
+        }],
+      } as Partial<ISessionApi>),
+    ]);
+
+    expect(s.itemsTotal).toBe(1050);
+    expect(s.topItems[0]?.total).toBe(1050);
+  });
+
+  it("prices a drink the way it always did", () => {
+    const s = summarize([
+      make({
+        id: 1, status: "stopped", total_paid: 600,
+        items: [{ id: 12, name: "Cola", qty: 2, price: 300, line_total: 9999 }],
+      } as Partial<ISessionApi>),
+    ]);
+
+    expect(s.itemsTotal).toBe(600);
+  });
+});
