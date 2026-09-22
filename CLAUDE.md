@@ -1710,6 +1710,25 @@ key being added.
   object — the server's answer, exactly as `supports_joysticks` gates the pad
   menu — and its label is `fmt(t("session.extraAdd"), extra.name)`. Nothing in
   the panel spells "chips".
+- **The room's extra has the pads' WHOLE strategy (2026-09-23).** `PlaceForm`
+  asks a custom-platform room the same questions the joystick section asks a
+  PlayStation one, and every answer falls back to the BRANCH when the room
+  leaves it empty:
+
+      name · price · price for each one after the first · per piece or per
+      hour · every time or once a session · how many are included · how many
+      exist · which ones are charged
+
+  - **The venue answers once** on Prices → `BranchExtraItemForm`, beside the
+    joystick form and for the same reason. It PUTs the WHOLE policy back: the
+    endpoint validates it as one object, so a form sending only its own half
+    would blank the rounding rule and every joystick answer with it.
+  - ⚠️ **An empty box and a zero are different answers.** `Number("")` is 0,
+    and that is exactly the confusion the forms keep out of the payload: empty
+    travels as `null` ("not answered" / "priced like the first"), a typed 0
+    travels as `0` (given away / none are in the rate).
+  - **Clearing the NAME withdraws the whole answer** and nulls every number
+    with it — a ceiling on a thing nobody hands out is a number about nothing.
 - **`AddExtraItemDialog` is the one dialog for all of them.** A count, a live
   total, and a confirm that sends `[{extra: true, qty}]` through the SAME
   `sessionRepository.addItems` the product dialog uses — one write path, one
@@ -1717,6 +1736,30 @@ key being added.
   lets a manager hand one out without `products.manage`.
 - **`once` quotes one charge, not `unit × qty`**, and a seat that has already
   paid it quotes 0.00 (`unit_price` from the server, `fee_taken` beside it).
+  ⚠️ For a while the panel was right here and the SERVER was not: `putOnBill()`
+  wrote the room's figure with the whole count, so one press of "3" on a
+  500-once seat quoted 500 and billed 1500. Fixed backend-side on 2026-09-22
+  (`ExtraItemRule::split()` clamps the charged part to one and hands the rest
+  over at 0.00), so this dialog needed no change — but do not "fix" the quote
+  to match a bill that disagrees with it again without checking which side is
+  wrong.
+- ⚠️ **The room's rate may cover the first N units, and exactly one function
+  may quote a hand-out** (2026-09-22). `extra_item_included` on the place is
+  the allowance — empty box posts `null`, which the server reads as 0: every
+  unit charged, exactly as every room billed before the box existed. Posting a
+  `0` where the room carries `null` is the same request to the server but a
+  price change nobody made to the form, so the payload keeps the distinction
+  and three cases pin it. There is deliberately NO branch-level default: a
+  poker table and a billiard table in one venue hand out different things, so
+  there is nothing for a venue to say — unlike the pads, which inherit.
+  `extraItemQuote(extra, qty)` in `sessionAmount.ts` is the ONLY place the
+  split is computed: `freeQty = min(qty, included_remaining)`, `paidQty` is the
+  rest, `once` charges 1 or 0 of them, and an hourly extra still quotes a RATE
+  and never a total. `unit × qty` in the JSX was correct until the day an
+  allowance existed and became a lie for every hand-out that straddles the
+  boundary — three chips with one still free is one free and two paid. An
+  older server omits `included` / `included_remaining`, which read as 0 and
+  give exactly the pre-feature arithmetic back.
 - **A FIXED extra changes nothing in `sessionAmount`.** It is a `session_items`
   row, so the running total, the receipt and the history already add it up as
   `price x qty`.
