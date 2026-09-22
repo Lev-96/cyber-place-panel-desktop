@@ -1717,8 +1717,35 @@ key being added.
   lets a manager hand one out without `products.manage`.
 - **`once` quotes one charge, not `unit × qty`**, and a seat that has already
   paid it quotes 0.00 (`unit_price` from the server, `fee_taken` beside it).
-- **Nothing in `sessionAmount` changed.** A sold extra is a `session_items`
-  row, so the running total, the receipt and the history already add it up.
+- **A FIXED extra changes nothing in `sessionAmount`.** It is a `session_items`
+  row, so the running total, the receipt and the history already add it up as
+  `price x qty`.
+- ⚠️ **An HOURLY extra is a rate, and exactly one function may price a line.**
+  `sessionItemLineTotal(line)` in `sessionAmount.ts` takes the server's
+  `line_total` when `line.is_hourly` and `price x qty` otherwise. The minutes
+  belong to the backend; mirroring a clock the panel does not own is how the
+  hourly PADS once made a tile quote 500 for a charge the server billed at 0.69.
+  Every screen that adds up a bill line calls it — `sessionItemsTotal`, the
+  history summary (`useSessionsSummary`), the history row and its per-line
+  amount (`SessionsHistory`), and the "already on this session" list
+  (`AddSessionItemDialog`). Four of those five computed `price x qty` inline for
+  a day and quoted a cue rented at 700/h as a flat 700; the history row also
+  derives `timeCost` by subtracting that figure, so the clock read wrong beside
+  it. If you add a sixth screen, call the helper — do not re-derive it.
+- **Handing it back: `PATCH /sessions/{id}/items/{itemId}` with
+  `{returned: true}`** (`sessionRepository.returnItem`), the same endpoint a
+  quantity correction uses because it is the same kind of thing — a change to a
+  line already on the bill. `DELETE` still means "this was never sold". The
+  board offers the button only for a line with `is_hourly && !returned_at`, the
+  way `supports_joysticks` gates the pad menu; the clock stops, the charge
+  stays, and the receipt prints `90 min - 700/h - returned` rather than a count.
+  The history action is `item_returned` — NOT `item_removed`: the line keeps
+  what it earned, so the row says how long it was out and that nothing came
+  back.
+- **`useSessionChanged`'s `kind` union carries `extra.added` and
+  `extra.returned`.** The board reloads on any kind, so a missing one is a
+  type-level hole rather than a runtime break — which is exactly why it sat
+  there unnoticed.
 - ⚠️ **`Modal` takes `open` and has no `title` prop.** The first version of
   this dialog passed a title and no `open`, so the button was on the board and
   pressing it did nothing at all. Neither the unit tests nor the typecheck saw
