@@ -753,6 +753,24 @@ export const TRANSLATIONS: Dict = {
     ru: "Одна плата за сессию, независимо от количества",
     am: "Մեկ վճար սեսիայի համար՝ անկախ քանակից",
   },
+  // The room's allowance, quoted on the hand-out that uses it. `{0}` is a
+  // COUNT here, never the word for the thing: the sentence has to read for a
+  // room invented tomorrow.
+  "session.extraIncluded": {
+    en: "The rate covers {0} per session, {1} left",
+    ru: "Тариф покрывает {0} за сессию, осталось {1}",
+    am: "Սակագինը ծածկում է {0} մեկ սեսիայի համար, մնացել է {1}",
+  },
+  "session.extraPartFree": {
+    en: "{0} of {1} free: covered by the rate",
+    ru: "{0} из {1} бесплатно: входит в тариф",
+    am: "{0}-ը {1}-ից անվճար է՝ ներառված է սակագնում",
+  },
+  "session.extraAllFree": {
+    en: "Free: covered by the rate ({0})",
+    ru: "Бесплатно: входит в тариф ({0})",
+    am: "Անվճար՝ ներառված է սակագնում ({0})",
+  },
   "session.addItem": { en: "Add a product", ru: "Добавить товар", am: "Ավելացնել ապրանք" },
   "session.availableProducts": { en: "Available products", ru: "Доступные товары", am: "Հասանելի ապրանքներ" },
   "session.addedProducts": { en: "Added products", ru: "Добавленные товары", am: "Ավելացված ապրանքներ" },
@@ -1804,6 +1822,46 @@ export const TRANSLATIONS: Dict = {
     en: "FIXED PRICE (DEFAULT)",
     ru: "ФИКСИРОВАННАЯ ЦЕНА (ПО УМОЛЧАНИЮ)",
     am: "ՖԻՔՍՎԱԾ ԳԻՆ (ԿԱՆԽԱԴՐՎԱԾ)",
+  },
+  "place.extraItemIncluded": {
+    en: "Included in the rate",
+    ru: "Входит в тариф",
+    am: "Ներառված է սակագնում",
+  },
+  "place.extraItemIncludedNote": {
+    en: "How many {0} the rate already covers. The first ones on a session are free, everything past that is charged. Empty means every one is charged.",
+    ru: "Сколько {0} уже входит в тариф. Первые за сессию бесплатны, всё сверх этого оплачивается. Пусто: оплачивается каждая единица.",
+    am: "Քանի {0} արդեն ներառված է սակագնում։ Սեսիայի առաջինները անվճար են, դրանից ավելին վճարովի է։ Դատարկ՝ վճարվում է յուրաքանչյուրը։",
+  },
+  "place.extraItemMax": { en: "How many exist", ru: "\u0421\u043a\u043e\u043b\u044c\u043a\u043e \u0432\u0441\u0435\u0433\u043e", am: "\u0554\u0561\u0576\u056b\u057d\u0568 \u0568\u0576\u0564\u0561\u0574\u0565\u0576\u0568" },
+  "place.extraItemMaxNote": {
+    en: "How many of {0} this room owns. Beyond it a hand-out is refused rather than charged. Empty is no limit.",
+    ru: "\u0421\u043a\u043e\u043b\u044c\u043a\u043e \u0435\u0434\u0438\u043d\u0438\u0446 \u00ab{0}\u00bb \u0435\u0441\u0442\u044c \u0432 \u044d\u0442\u043e\u0439 \u043a\u043e\u043c\u043d\u0430\u0442\u0435. \u0421\u0432\u0435\u0440\u0445 \u044d\u0442\u043e\u0433\u043e \u0432\u044b\u0434\u0430\u0447\u0430 \u043e\u0442\u043a\u043b\u043e\u043d\u044f\u0435\u0442\u0441\u044f, \u0430 \u043d\u0435 \u043e\u043f\u043b\u0430\u0447\u0438\u0432\u0430\u0435\u0442\u0441\u044f. \u041f\u0443\u0441\u0442\u043e \u2014 \u0431\u0435\u0437 \u043e\u0433\u0440\u0430\u043d\u0438\u0447\u0435\u043d\u0438\u044f.",
+    am: "\u0554\u0561\u0576\u056b \u00ab{0}\u00bb \u0561\u0575\u057d \u057d\u0565\u0576\u0575\u0561\u056f\u0578\u0582\u0574. \u0534\u0580\u0561\u0576\u056b\u0581 \u0561\u057e\u0565\u056c\u056b\u0576 \u057f\u0580\u0561\u0574\u0561\u0564\u0580\u0578\u0582\u0574\u0568 \u0574\u0565\u0580\u056a\u057e\u0578\u0582\u0574 \u0567\u0589",
+  },
+  "place.extraItemChargedUnits": { en: "Which are charged", ru: "\u041a\u0430\u043a\u0438\u0435 \u043f\u043b\u0430\u0442\u043d\u044b\u0435", am: "\u0548\u0580\u0578\u0576\u0584 \u0565\u0576 \u057e\u0573\u0561\u0580\u0578\u057e\u056b" },
+  "place.extraItemChargedUnitsNote": {
+    en: "Unit numbers, comma separated \u2014 \u201c3,4\u201d charges the third and fourth {0} and hands over every other one free. Empty lets the allowance above decide.",
+    ru: "\u041d\u043e\u043c\u0435\u0440\u0430 \u0435\u0434\u0438\u043d\u0438\u0446 \u0447\u0435\u0440\u0435\u0437 \u0437\u0430\u043f\u044f\u0442\u0443\u044e: \u00ab3,4\u00bb \u2014 \u0442\u0440\u0435\u0442\u0438\u0439 \u0438 \u0447\u0435\u0442\u0432\u0451\u0440\u0442\u044b\u0439 \u00ab{0}\u00bb \u043f\u043b\u0430\u0442\u043d\u044b\u0435, \u043e\u0441\u0442\u0430\u043b\u044c\u043d\u044b\u0435 \u0432\u044b\u0434\u0430\u044e\u0442\u0441\u044f \u0434\u0430\u0440\u043e\u043c. \u041f\u0443\u0441\u0442\u043e \u2014 \u0440\u0435\u0448\u0430\u0435\u0442 \u0447\u0438\u0441\u043b\u043e \u0432\u044b\u0448\u0435.",
+    am: "\u0544\u056b\u0561\u057e\u0578\u0580\u0576\u0565\u0580\u056b \u0570\u0561\u0574\u0561\u0580\u0565\u0580\u0568\u055d \u057d\u057f\u0578\u0580\u0561\u056f\u0565\u057f\u0565\u0580\u0578\u057e\u0589 \u0534\u0561\u057f\u0561\u0580\u056f \u0567\u055d \u0578\u0580\u0578\u0577\u0578\u0582\u0574 \u0567 \u057e\u0565\u0580\u0565\u0582\u056b \u0569\u056b\u057e\u0568\u0589",
+  },
+  "place.extraItemModeFixed": { en: "Fixed price", ru: "\u0424\u0438\u043a\u0441\u0438\u0440\u043e\u0432\u0430\u043d\u043d\u0430\u044f \u0446\u0435\u043d\u0430", am: "\u0556\u056b\u0584\u057d\u057e\u0561\u056e \u0563\u056b\u0576" },
+  "place.extraItemModeHourly": { en: "Per hour", ru: "\u0417\u0430 \u0447\u0430\u0441", am: "\u053a\u0561\u0574\u0561\u056f\u0561\u0576" },
+  "place.extraItemPriceNext": { en: "Each one after", ru: "\u041a\u0430\u0436\u0434\u044b\u0439 \u0441\u043b\u0435\u0434\u0443\u044e\u0449\u0438\u0439", am: "\u0540\u0561\u057b\u0578\u0580\u0564 \u0575\u0578\u0582\u0580\u0561\u0584\u0561\u0576\u0579\u0575\u0578\u0582\u0580" },
+  "branchExtraItem.sectionTitle": { en: "The room's own extra", ru: "\u0414\u043e\u043f. \u043f\u0440\u0435\u0434\u043c\u0435\u0442 \u043a\u043e\u043c\u043d\u0430\u0442\u044b", am: "\u054d\u0565\u0576\u0575\u0561\u056f\u056b \u056c\u0580\u0561\u0581\u0578\u0582\u0581\u056b\u0579" },
+  "branchExtraItem.name": { en: "What the venue hands out", ru: "\u0427\u0442\u043e \u0432\u044b\u0434\u0430\u0451\u0442 \u0437\u0430\u0432\u0435\u0434\u0435\u043d\u0438\u0435", am: "\u053b\u0576\u0579 \u0567 \u057f\u0580\u0561\u0574\u0561\u0564\u0580\u0578\u0582\u0574" },
+  "branchExtraItem.pricingMode": { en: "Tariff", ru: "\u0422\u0430\u0440\u0438\u0444", am: "\u054d\u0561\u056f\u0561\u0563\u056b\u0576" },
+  "branchExtraItem.chargeMode": { en: "Charged", ru: "\u041e\u043f\u043b\u0430\u0442\u0430", am: "\u054e\u0573\u0561\u0580\u0578\u0582\u0574" },
+  "branchExtraItem.saved": { en: "Saved", ru: "\u0421\u043e\u0445\u0440\u0430\u043d\u0435\u043d\u043e", am: "\u054a\u0561\u0570\u057e\u0565\u0581" },
+  "branchExtraItem.priceRequired": {
+    en: "Name it and price it, or leave both empty.",
+    ru: "\u0423\u043a\u0430\u0436\u0438\u0442\u0435 \u043d\u0430\u0437\u0432\u0430\u043d\u0438\u0435 \u0438 \u0446\u0435\u043d\u0443 \u0438\u043b\u0438 \u043e\u0441\u0442\u0430\u0432\u044c\u0442\u0435 \u043e\u0431\u0430 \u043f\u043e\u043b\u044f \u043f\u0443\u0441\u0442\u044b\u043c\u0438.",
+    am: "\u0546\u0577\u0565\u0584 \u0561\u0576\u0578\u0582\u0576\u0568 \u0587 \u0563\u056b\u0576\u0568 \u056f\u0561\u0574 \u0569\u0578\u0572\u0565\u0584 \u0564\u0561\u057f\u0561\u0580\u056f\u0589",
+  },
+  "branchExtraItem.hint": {
+    en: "The venue's answer for the rooms that have not given one. A room with its own settings ignores this. Empty means every room decides for itself.",
+    ru: "\u041e\u0442\u0432\u0435\u0442 \u0437\u0430\u0432\u0435\u0434\u0435\u043d\u0438\u044f \u0434\u043b\u044f \u043a\u043e\u043c\u043d\u0430\u0442, \u043a\u043e\u0442\u043e\u0440\u044b\u0435 \u043d\u0435 \u043e\u0442\u0432\u0435\u0442\u0438\u043b\u0438 \u0441\u0430\u043c\u0438. \u041a\u043e\u043c\u043d\u0430\u0442\u0430 \u0441\u043e \u0441\u0432\u043e\u0438\u043c\u0438 \u043d\u0430\u0441\u0442\u0440\u043e\u0439\u043a\u0430\u043c\u0438 \u044d\u0442\u043e \u0438\u0433\u043d\u043e\u0440\u0438\u0440\u0443\u0435\u0442. \u041f\u0443\u0441\u0442\u043e \u2014 \u043a\u0430\u0436\u0434\u0430\u044f \u043a\u043e\u043c\u043d\u0430\u0442\u0430 \u0440\u0435\u0448\u0430\u0435\u0442 \u0441\u0430\u043c\u0430.",
+    am: "\u0540\u0561\u057d\u057f\u0561\u057f\u0578\u0582\u0569\u0575\u0561\u0576 \u057a\u0561\u057f\u0561\u057d\u056d\u0561\u0576\u0568 \u0561\u0575\u0576 \u057d\u0565\u0576\u0575\u0561\u056f\u0576\u0565\u0580\u056b \u0570\u0561\u0574\u0561\u0580, \u0578\u0580\u0578\u0576\u0584 \u0579\u0565\u0576 \u057a\u0561\u057f\u0561\u057d\u056d\u0561\u0576\u0565\u056c\u0589",
   },
   "place.extraItemTariffChange": { en: "Tariff change", ru: "Изменение тарифа", am: "Սակագնի փոփոխություն" },
   "place.extraItemFixedNote": {

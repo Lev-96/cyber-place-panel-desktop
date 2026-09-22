@@ -25,7 +25,15 @@ vi.mock("@/i18n/LanguageContext", () => ({
     // Two keys come back as templates so the case that proves the word is
     // dynamic has a `{0}` to land in; everything else is its own key.
     t: (k: string) =>
-      k === "session.extraAdd" ? "add {0}" : k === "session.extraQty" ? "how many ({0})" : k === "session.extraHourlyNote" ? "per hour of {0}" : k,
+      k === "session.extraAdd" ? "add {0}"
+        : k === "session.extraQty" ? "how many ({0})"
+          : k === "session.extraHourlyNote" ? "per hour of {0}"
+            // The allowance sentences are templates too, so a case can prove
+            // the COUNTS reach them and not just that a key was rendered.
+            : k === "session.extraIncluded" ? "rate covers {0}, {1} left"
+              : k === "session.extraPartFree" ? "{0} of {1} free"
+                : k === "session.extraAllFree" ? "all free ({0})"
+                  : k,
     money: (n: number) => `${n} AMD`,
     currency: "AMD",
     lang: "ru",
@@ -208,5 +216,116 @@ describe("handing out the room's extra", () => {
 
     expect(onAdded).not.toHaveBeenCalled();
     expect(dom.querySelector(".error")).toBeTruthy();
+  });
+});
+
+/**
+ * The room's allowance: the first N hand-outs of a session are covered by the
+ * rate, everything past N is charged.
+ *
+ * The arithmetic itself is proved in `sessionAmount.test.ts` against the one
+ * function that owns it. What is proved HERE is that the dialog quotes that
+ * function rather than `unit x qty`, and that it says out loud why a figure
+ * is lower than the count suggests: an operator handing over three and being
+ * charged for one has to be able to see the reason without asking anybody.
+ */
+describe("the room's allowance", () => {
+  test("a room without one says nothing about it", async () => {
+    await mount(chips);
+
+    expect(dom.textContent).not.toContain("rate covers");
+    expect(dom.textContent).not.toContain("free");
+  });
+
+  test("the allowance and what is left of it are stated up front", async () => {
+    await mount({ ...chips, included: 2, included_remaining: 2 });
+
+    expect(dom.textContent).toContain("rate covers 2, 2 left");
+  });
+
+  test("a hand-out the allowance covers is quoted as free, not as a price", async () => {
+    await mount({ ...chips, included: 2, included_remaining: 2 });
+
+    await act(async () => { fireEvent.change(qtyBox(), { target: { value: "2" } }); });
+
+    expect(dom.textContent).toContain("all free (2)");
+    expect(dom.textContent).toContain("0 AMD");
+    expect(dom.textContent).not.toContain("1000 AMD");
+  });
+
+  test("a hand-out that straddles the boundary charges only what is past it", async () => {
+    // One left in the rate, three going out: the operator is charged for two,
+    // and the line that says so is the difference between a correct bill and
+    // an argument at the counter.
+    await mount({ ...chips, included: 2, included_remaining: 1 });
+
+    await act(async () => { fireEvent.change(qtyBox(), { target: { value: "3" } }); });
+
+    expect(dom.textContent).toContain("1000 AMD");
+    expect(dom.textContent).not.toContain("1500 AMD");
+    expect(dom.textContent).toContain("1 of 3 free");
+  });
+
+  test("a once room counts the surplus as free, the way the receipt will", async () => {
+    // ⚠️ The sentence must describe the BILL, not the allowance. One unit is
+    // covered by the rate and two are past it, but `once` charges one of
+    // those and the server hands the other over at 0.00 — so the receipt
+    // shows TWO zero units, and "1 of 3 free" would send the operator to the
+    // counter with a different story than the paper in their hand.
+    await mount({ ...chips, charge_mode: "once", included: 2, included_remaining: 1 });
+
+    await act(async () => { fireEvent.change(qtyBox(), { target: { value: "3" } }); });
+
+    expect(dom.textContent).toContain("2 of 3 free");
+    expect(dom.textContent).not.toContain("1 of 3 free");
+    expect(dom.textContent).toContain("500 AMD");
+  });
+
+  test("once for the session still takes one charge past the allowance", async () => {
+    await mount({ ...chips, charge_mode: "once", included: 1, included_remaining: 1 });
+
+    await act(async () => { fireEvent.change(qtyBox(), { target: { value: "3" } }); });
+
+    expect(dom.textContent).toContain("500 AMD");
+    expect(dom.textContent).not.toContain("1000 AMD");
+  });
+
+  test("an hourly hand-out inside the allowance owes no rate at all", async () => {
+    await mount({
+      ...chips, name: "Кий", pricing_mode: "hourly", unit_price: "700.00",
+      included: 3, included_remaining: 3,
+    });
+
+    await act(async () => { fireEvent.change(qtyBox(), { target: { value: "3" } }); });
+
+    expect(dom.textContent).toContain("0 AMD");
+    expect(dom.textContent).not.toContain("700 AMD");
+    expect(dom.textContent).not.toContain("session.extraPerHour");
+  });
+
+  test("an hourly hand-out past the allowance quotes the rate for the charged units only", async () => {
+    await mount({
+      ...chips, name: "Кий", pricing_mode: "hourly", unit_price: "700.00",
+      included: 2, included_remaining: 1,
+    });
+
+    await act(async () => { fireEvent.change(qtyBox(), { target: { value: "3" } }); });
+
+    expect(dom.textContent).toContain("700 AMD");
+    expect(dom.textContent).toContain("session.extraPerHour");
+    expect(dom.textContent).toContain("× 2");
+    expect(dom.textContent).not.toContain("× 3");
+  });
+
+  test("the write still carries the FULL count, free units included", async () => {
+    // The server prices the hand-out and counts the allowance down; sending
+    // only the paid units would hand two chips over and record one, and the
+    // seat's allowance would never run out.
+    await mount({ ...chips, included: 2, included_remaining: 1 });
+
+    await act(async () => { fireEvent.change(qtyBox(), { target: { value: "3" } }); });
+    await confirm();
+
+    expect(repo.addItems.mock.calls[0][1]).toEqual([{ extra: true, qty: 3 }]);
   });
 });

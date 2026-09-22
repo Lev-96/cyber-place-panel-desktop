@@ -188,6 +188,14 @@ const PlaceForm = ({ branchId, initial, platformSuggestions, platformPrices, onC
   const [extraPrice, setExtraPrice] = useState(
     initial?.extra_item_price != null ? String(initial.extra_item_price) : "",
   );
+  /**
+   * What each CHARGED unit AFTER THE FIRST costs, when the room prices them
+   * apart — the pads' `joystick_price_4`, generalised to a counted thing.
+   * Empty is "priced like the first", never "free".
+   */
+  const [extraPriceNext, setExtraPriceNext] = useState(
+    initial?.extra_item_price_next != null ? String(initial.extra_item_price_next) : "",
+  );
   const [extraChargeMode, setExtraChargeMode] = useState<"each" | "once">(
     initial?.extra_item_charge_mode === "once" ? "once" : "each",
   );
@@ -202,6 +210,36 @@ const PlaceForm = ({ branchId, initial, platformSuggestions, platformPrices, onC
   const [extraPricingMode, setExtraPricingMode] = useState<JoystickPricingMode>(
     initial?.extra_item_pricing_mode === "hourly" ? "hourly" : "fixed",
   );
+  /**
+   * How many of them the rate already covers: the one strategy the pads had
+   * and this did not.
+   *
+   * `branches.joystick_included` says how many controllers a PlayStation's
+   * rate includes; this says the same about whatever THIS room hands out. The
+   * first N on a session go out free and everything past N is charged, which
+   * the server counts and this form only states.
+   *
+   * Empty is the answer every room carries until somebody sets one, and it
+   * travels as `null` - which the server reads as 0, every unit charged. That
+   * default is the whole no-regression story here: a room nobody opens bills
+   * exactly as it billed yesterday.
+   *
+   * Deliberately NOT inherited from the branch, unlike the pads. One venue's
+   * poker table deals chips and its billiard table lends a cue; a single
+   * number above them both would be a number about nothing.
+   */
+  const [extraIncluded, setExtraIncluded] = useState(
+    initial?.extra_item_included != null ? String(initial.extra_item_included) : "",
+  );
+  /** How many EXIST, which is not how many are free. Empty is "no ceiling". */
+  const [extraMax, setExtraMax] = useState(
+    initial?.extra_item_max != null ? String(initial.extra_item_max) : "",
+  );
+  /**
+   * WHICH units are charged, when a count cannot say it. Empty is "the count
+   * answers", which is every room until somebody names them.
+   */
+  const [extraUnits, setExtraUnits] = useState(initial?.extra_item_charged_units ?? "");
   const [joystickPrice, setJoystickPrice] = useState(
     initial?.joystick_price != null ? String(initial.joystick_price) : "",
   );
@@ -671,8 +709,26 @@ const PlaceForm = ({ branchId, initial, platformSuggestions, platformPrices, onC
         extra_item_price: isCustomPlatform && extraName.trim() !== "" && extraPrice.trim() !== ""
           ? Number(extraPrice)
           : null,
+        extra_item_price_next:
+          isCustomPlatform && extraName.trim() !== "" && extraPriceNext.trim() !== ""
+            ? Number(extraPriceNext)
+            : null,
         extra_item_charge_mode: isCustomPlatform && extraName.trim() !== "" ? extraChargeMode : null,
         extra_item_pricing_mode: isCustomPlatform && extraName.trim() !== "" ? extraPricingMode : null,
+        // How many the rate covers before anything is charged. Empty is null,
+        // which the server reads as 0 - every unit charged, exactly as every
+        // room billed before this box existed. A typed 0 is the same rule
+        // stated out loud, and travels as 0.
+        extra_item_max: isCustomPlatform && extraName.trim() !== "" && extraMax.trim() !== ""
+          ? Number(extraMax)
+          : null,
+        extra_item_charged_units:
+          isCustomPlatform && extraName.trim() !== "" && extraUnits.trim() !== ""
+            ? extraUnits.trim()
+            : null,
+        extra_item_included: isCustomPlatform && extraName.trim() !== "" && extraIncluded.trim() !== ""
+          ? Number(extraIncluded)
+          : null,
         platform_name_en: customNew ? (names.en.trim() || undefined) : undefined,
         platform_name_ru: customNew ? (names.ru.trim() || undefined) : undefined,
         platform_name_am: customNew ? (names.am.trim() || undefined) : undefined,
@@ -1079,6 +1135,19 @@ const PlaceForm = ({ branchId, initial, platformSuggestions, platformPrices, onC
                   disabled={busy || extraName.trim() === ""}
                 />
               </div>
+              {/* …and the SECOND figure, when the room prices the ones after
+                  the first apart. The pads name the fourth pad's own price for
+                  exactly this reason; an extra is counted rather than slotted,
+                  so what generalises is "the first, then the rest". Empty is
+                  "priced like the first" and is what every room is. */}
+              <div style={{ maxWidth: 200 }}>
+                <PriceInput
+                  label={t("place.extraItemPriceNext")}
+                  value={extraPriceNext}
+                  onChange={setExtraPriceNext}
+                  disabled={busy || extraName.trim() === ""}
+                />
+              </div>
             </div>
 
             {/* From here down this is the PADS' section, asked in the
@@ -1119,7 +1188,80 @@ const PlaceForm = ({ branchId, initial, platformSuggestions, platformPrices, onC
                   </div>
                 </div>
 
-                {/* 2. The tariff, stated rather than chosen — one answer, the
+                {/* 2. How many of them the rate already covers.
+                       The pads answer this on the BRANCH, once for the venue.
+                       This one is the room's alone: a poker table and a
+                       billiard table in one building hand out different
+                       things, so a single number above them both would be a
+                       number about nothing. Empty is "none", which is what
+                       every room is until somebody answers. */}
+                <div className="col" style={{ gap: 6 }}>
+                  <div style={{ maxWidth: 200 }}>
+                    <Input
+                      label={t("place.extraItemIncluded")}
+                      value={extraIncluded}
+                      onChange={(e) => setExtraIncluded(e.target.value.replace(/[^0-9]/g, ""))}
+                      type="text"
+                      inputMode="numeric"
+                      placeholder="0"
+                      maxLength={3}
+                      disabled={busy}
+                    />
+                  </div>
+                  <span className="muted" style={{ fontSize: 11 }}>
+                    {fmt(t("place.extraItemIncludedNote"), extraName.trim())}
+                  </span>
+                </div>
+
+                {/* 2b. How many EXIST. The pads carry both numbers for the
+                       same reason: the one above says how many are FREE, this
+                       says how many there ARE, and a room owning three cues
+                       needs the fourth to stop being addable rather than
+                       merely cost money. Empty is "no ceiling of its own",
+                       which is every room until somebody answers. */}
+                <div className="col" style={{ gap: 6 }}>
+                  <div style={{ maxWidth: 200 }}>
+                    <Input
+                      label={t("place.extraItemMax")}
+                      value={extraMax}
+                      onChange={(e) => setExtraMax(e.target.value.replace(/[^0-9]/g, ""))}
+                      type="text"
+                      inputMode="numeric"
+                      placeholder="∞"
+                      maxLength={3}
+                      disabled={busy}
+                    />
+                  </div>
+                  <span className="muted" style={{ fontSize: 11 }}>
+                    {fmt(t("place.extraItemMaxNote"), extraName.trim())}
+                  </span>
+                </div>
+
+                {/* 2c. WHICH ones are charged. The allowance above is a count,
+                       and everything above a count is above it — "the third
+                       costs money and the fourth does not" is a sentence it
+                       cannot speak. The pads grew `joystick_charged_slots` for
+                       exactly this. Empty is "the count answers", which is
+                       every room until somebody names them. */}
+                <div className="col" style={{ gap: 6 }}>
+                  <div style={{ maxWidth: 200 }}>
+                    <Input
+                      label={t("place.extraItemChargedUnits")}
+                      value={extraUnits}
+                      onChange={(e) => setExtraUnits(e.target.value.replace(/[^0-9,]/g, ""))}
+                      type="text"
+                      inputMode="numeric"
+                      placeholder="3,4"
+                      maxLength={64}
+                      disabled={busy}
+                    />
+                  </div>
+                  <span className="muted" style={{ fontSize: 11 }}>
+                    {fmt(t("place.extraItemChargedUnitsNote"), extraName.trim())}
+                  </span>
+                </div>
+
+                {/* 3. The tariff, stated rather than chosen — one answer, the
                        one every room uses, and the choice below is what moves
                        it. A stated value rather than a greyed control, for the
                        same reason the pads' section gives. */}
@@ -1128,7 +1270,7 @@ const PlaceForm = ({ branchId, initial, platformSuggestions, platformPrices, onC
                   <span className="pill">{t("place.extraItemStrategyFixed")}</span>
                 </div>
 
-                {/* 3. …and whether the room rents it by the hour instead. Same
+                {/* 4. …and whether the room rents it by the hour instead. Same
                        field, same two values, same server rule as the pads. */}
                 <div className="col" style={{ gap: 6 }}>
                   <span className="label">{t("place.extraItemTariffChange")}</span>

@@ -126,6 +126,35 @@ export interface IBillingSettings {
    * to a question only the server can settle.
    */
   joystick_max?: number;
+
+  // ── the venue's answer for the rooms that gave none ──────────────
+  //
+  // The same seven questions a custom-platform ROOM answers on its own form,
+  // asked once for the building. NULL at this level is "we do not offer one",
+  // which is what every branch carries until somebody answers — and what lets
+  // each room speak for itself, exactly as it did before the venue could.
+  //
+  // All optional on the wire: a panel talking to a backend from before this
+  // shipped reads them as absent and shows an unanswered screen.
+  /** What this venue hands out where a room has not said: '\u0424\u0438\u0448\u043a\u0438', '\u041a\u0438\u0439'. */
+  extra_item_name?: string | null;
+  /** What ONE of them costs. Zero is a decision — handing them out free. */
+  extra_item_price?: string | null;
+  extra_item_charge_mode?: "each" | "once" | null;
+  extra_item_pricing_mode?: "fixed" | "hourly" | null;
+  /** How many the seat's rate already covers. */
+  extra_item_included?: number | null;
+  /** How many EXIST, which is not how many are free. */
+  extra_item_max?: number | null;
+  /** WHICH units are charged — the sentence a count cannot speak. */
+  extra_item_charged_units?: string | null;
+  /**
+   * What each CHARGED unit AFTER THE FIRST costs.
+   *
+   * NULL is "priced like the first", never "free" — the meaning
+   * `joystick_price_4` carries. A 0 is the venue giving the rest away.
+   */
+  extra_item_price_next?: string | null;
 }
 
 /**
@@ -236,6 +265,21 @@ export interface IBillingPolicy {
   joystick_pricing_mode: JoystickPricingMode;
   joystick_price_4: number | null;
   joystick_max_slot: number;
+  // ── the venue's answer for the rooms that gave none ──────────────
+  //
+  // Optional on the WRITE side, unlike the joystick fields above, and the
+  // asymmetry is deliberate: the server treats an absent key as "this client
+  // does not know about the field" and leaves the venue's answer alone, so a
+  // form that predates these cannot blank them. A key sent as `null` IS the
+  // venue withdrawing its answer.
+  extra_item_name?: string | null;
+  extra_item_price?: number | null;
+  extra_item_charge_mode?: "each" | "once" | null;
+  extra_item_pricing_mode?: "fixed" | "hourly" | null;
+  extra_item_included?: number | null;
+  extra_item_max?: number | null;
+  extra_item_charged_units?: string | null;
+  extra_item_price_next?: number | null;
 }
 
 export const apiGetBillingSettings = (branchId: number) =>

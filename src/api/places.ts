@@ -51,6 +51,16 @@ export interface CreatePlaceBody {
   extra_item_charge_mode?: "each" | "once" | null;
   extra_item_pricing_mode?: "fixed" | "hourly" | null;
   /**
+   * How many units the room's rate covers before anything is charged. Null is
+   * "none", which is what the server reads an absent value as. Sent as null
+   * for every known platform, exactly as the four fields above are.
+   */
+  extra_item_included?: number | null;
+  extra_item_max?: number | null;
+  extra_item_charged_units?: string | null;
+  /** What each CHARGED unit after the first costs. NULL = priced like it. */
+  extra_item_price_next?: number | string | null;
+  /**
    * Display наименование for a brand-new custom platform's branch price. Only
    * meaningful when the platform is custom AND not yet priced; ignored
    * otherwise. Not a Place column — the backend forwards it to the price row.

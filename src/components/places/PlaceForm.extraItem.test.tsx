@@ -100,6 +100,28 @@ vi.mock("@/components/ui/MultiLangInput", () => ({
   primaryValue: () => "Seat",
 }));
 vi.mock("@/components/ui/SubplatformTabs", () => ({ default: () => null }));
+/**
+ * The three-language platform namer, reduced to the ONE thing a create flow
+ * needs from it: adopting a platform the branch has already priced.
+ *
+ * Stubbed rather than driven because the real one auto-translates as you
+ * type - a network round trip this file has no business making - and because
+ * what is under test is what the form POSTS once a platform is settled, not
+ * how the operator got there. The props kept are the props the form passes,
+ * so a rename still fails the typecheck.
+ */
+vi.mock("@/components/ui/PlatformNameInput", () => ({
+  default: ({ suggestions, onPickExisting }: {
+    suggestions?: { id: number; platform: string }[];
+    onPickExisting?: (p: { id: number; platform: string }) => void;
+  }) => (
+    <div>
+      {(suggestions ?? []).map((p) => (
+        <button key={p.id} type="button" onClick={() => onPickExisting?.(p)}>{`pick-${p.platform}`}</button>
+      ))}
+    </div>
+  ),
+}));
 
 // The branch the seat bills from. Unmocked, `useAsync` reached a real
 // repository, resolved late and left the form believing this PlayStation seat
@@ -166,10 +188,38 @@ const mount = async (initial?: IBranchPlace) => {
 const nameBox = (): HTMLInputElement | null =>
   dom.querySelector<HTMLInputElement>('input[placeholder="place.extraItemNamePlaceholder"]');
 
+/** The room's SECOND figure — each charged unit after the first. */
+const priceNextBox = (): HTMLInputElement | null => {
+  const heading = [...dom.querySelectorAll("span.label")]
+    .find((el) => el.textContent === "place.extraItemPriceNext");
+  return heading?.parentElement?.querySelector<HTMLInputElement>('input[inputmode="decimal"]') ?? null;
+};
+
 const priceBox = (): HTMLInputElement | null => {
   const heading = [...dom.querySelectorAll("span.label")]
     .find((el) => el.textContent === "place.extraItemPrice");
   return heading?.parentElement?.querySelector<HTMLInputElement>('input[inputmode="decimal"]') ?? null;
+};
+
+/** How many of them the room's rate already covers. Empty is "none". */
+/** The box naming WHICH units are charged. */
+const unitsBox = (): HTMLInputElement | null => {
+  const heading = [...dom.querySelectorAll("span.label")]
+    .find((el) => el.textContent === "place.extraItemChargedUnits");
+  return heading?.parentElement?.querySelector<HTMLInputElement>('input[inputmode="numeric"]') ?? null;
+};
+
+/** The room's CEILING box — how many exist, not how many are free. */
+const maxBox = (): HTMLInputElement | null => {
+  const heading = [...dom.querySelectorAll("span.label")]
+    .find((el) => el.textContent === "place.extraItemMax");
+  return heading?.parentElement?.querySelector<HTMLInputElement>('input[inputmode="numeric"]') ?? null;
+};
+
+const includedBox = (): HTMLInputElement | null => {
+  const heading = [...dom.querySelectorAll("span.label")]
+    .find((el) => el.textContent === "place.extraItemIncluded");
+  return heading?.parentElement?.querySelector<HTMLInputElement>('input[inputmode="numeric"]') ?? null;
 };
 
 const save = async () => {
@@ -378,5 +428,341 @@ describe("the room's own extra", () => {
       expect(body.extra_item_price).toBeNull();
       expect(body.extra_item_charge_mode).toBeNull();
     }
+  });
+});
+
+/**
+ * How many the room's rate already covers.
+ *
+ * The one strategy the pads had and the extra did not: a poker table whose
+ * rate includes two stacks of chips, a billiard table whose rate includes the
+ * cue. The first N handed out on a session are free and everything past N is
+ * charged - the server counts them, this form only states the number.
+ *
+ * There is deliberately no branch-level inheritance: one venue's poker table
+ * and its billiard table hand out different things, so a single figure above
+ * both would be a figure about nothing.
+ *
+ * Three cases here are the ones that would be silent when they break, and all
+ * three are about money:
+ *
+ *  - EMPTY travels as `null`, which the server reads as 0. That is today's
+ *    behaviour and the no-regression invariant of the whole feature: a room
+ *    nobody opens bills exactly as it billed yesterday;
+ *  - a typed 0 is the same rule said out loud and travels as 0, not as a
+ *    missing field;
+ *  - a KNOWN platform sends `null`, because the server refuses extra fields
+ *    on pc/ps4/ps5 and a stale value would be a rejected save with no visible
+ *    cause.
+ */
+describe("what the room's rate already covers", () => {
+  test("the allowance is asked only once there is a thing to hand out", async () => {
+    await mount(place());
+
+    expect(includedBox()).toBeNull();
+
+    await act(async () => { fireEvent.change(nameBox()!, { target: { value: "Фишки" } }); });
+
+    expect(includedBox()).toBeTruthy();
+  });
+
+  test("a PlayStation is not asked - its pads answer this on the branch", async () => {
+    await mount(place({ platform: "ps5" }));
+
+    expect(includedBox()).toBeNull();
+  });
+
+  test("an empty box saves null, and every unit stays charged", async () => {
+    await mount(place());
+
+    await act(async () => { fireEvent.change(nameBox()!, { target: { value: "Фишки" } }); });
+    await act(async () => { fireEvent.change(priceBox()!, { target: { value: "500" } }); });
+    await save();
+
+    const body = repo.update.mock.calls[0][1] as Record<string, unknown>;
+
+    expect(body.extra_item_included).toBeNull();
+  });
+
+  test("a typed allowance is what is saved", async () => {
+    await mount(place());
+
+    await act(async () => { fireEvent.change(nameBox()!, { target: { value: "Фишки" } }); });
+    await act(async () => { fireEvent.change(priceBox()!, { target: { value: "500" } }); });
+    await act(async () => { fireEvent.change(includedBox()!, { target: { value: "2" } }); });
+    await save();
+
+    const body = repo.update.mock.calls[0][1] as Record<string, unknown>;
+
+    expect(body.extra_item_included).toBe(2);
+  });
+
+  test("a typed zero is a real answer and travels as zero", async () => {
+    await mount(place());
+
+    await act(async () => { fireEvent.change(nameBox()!, { target: { value: "Фишки" } }); });
+    await act(async () => { fireEvent.change(priceBox()!, { target: { value: "500" } }); });
+    await act(async () => { fireEvent.change(includedBox()!, { target: { value: "0" } }); });
+    await save();
+
+    const body = repo.update.mock.calls[0][1] as Record<string, unknown>;
+
+    expect(body.extra_item_included).toBe(0);
+  });
+
+  test("a room that hands out nothing saves a null allowance too", async () => {
+    await mount(place());
+    await save();
+
+    const body = repo.update.mock.calls[0][1] as Record<string, unknown>;
+
+    expect(body.extra_item_included).toBeNull();
+  });
+
+  test("a new room sends the allowance on CREATE as well as on update", async () => {
+    // The create path is the one that decides what a brand-new poker table
+    // bills from its first session. It builds the same body the update path
+    // does, and this is what proves it rather than assuming it.
+    await mount();
+
+    const other = [...dom.querySelectorAll("button")].find((b) => b.textContent === "platform.other");
+    expect(other, "no Other button on the platform picker").toBeTruthy();
+    await act(async () => { fireEvent.click(other!); });
+
+    const poker = [...dom.querySelectorAll("button")].find((b) => b.textContent === "pick-poker");
+    expect(poker, "no priced custom platform to adopt").toBeTruthy();
+    await act(async () => { fireEvent.click(poker!); });
+
+    await act(async () => { fireEvent.change(nameBox()!, { target: { value: "Фишки" } }); });
+    await act(async () => { fireEvent.change(priceBox()!, { target: { value: "500" } }); });
+    await act(async () => { fireEvent.change(includedBox()!, { target: { value: "3" } }); });
+    await save();
+
+    expect(repo.create).toHaveBeenCalledTimes(1);
+    const body = repo.create.mock.calls[0][0] as Record<string, unknown>;
+
+    expect(body.extra_item_included).toBe(3);
+  });
+
+  test("an existing allowance comes back into the form", async () => {
+    await mount(place({
+      extra_item_name: "Фишки",
+      extra_item_price: 500,
+      extra_item_charge_mode: "each",
+      extra_item_included: 2,
+    }));
+
+    expect(includedBox()!.value).toBe("2");
+  });
+
+  test("a seat that stops being custom drops the allowance with the rest", async () => {
+    await mount(place({ extra_item_name: "Фишки", extra_item_price: 500, extra_item_included: 2 }));
+
+    const ps = [...dom.querySelectorAll("button")].find((b) => b.textContent === "PS5");
+    await act(async () => { fireEvent.click(ps!); });
+    await save();
+
+    const body = repo.update.mock.calls[0]?.[1] as Record<string, unknown> | undefined;
+
+    if (body) expect(body.extra_item_included).toBeNull();
+  });
+
+  test("the box takes digits and nothing else", async () => {
+    // A count, not a price: a typed comma or a minus sign is a figure the
+    // server would refuse, and refusing it here costs the operator nothing.
+    await mount(place());
+
+    await act(async () => { fireEvent.change(nameBox()!, { target: { value: "Фишки" } }); });
+    await act(async () => { fireEvent.change(includedBox()!, { target: { value: "-2,5x" } }); });
+
+    expect(includedBox()!.value).toBe("25");
+  });
+});
+
+/**
+ * The room's second number, the one the pads have always had.
+ *
+ * `included` says how many are FREE, this says how many EXIST — a room owning
+ * three cues needs the fourth to stop being addable rather than merely cost
+ * money, which is exactly what `joystick_max_slot` does for a venue.
+ */
+describe("how many of the extra exist", () => {
+  test("an empty box saves null, which is no ceiling of its own", async () => {
+    await mount(place());
+
+    await act(async () => { fireEvent.change(nameBox()!, { target: { value: "\u041a\u0438\u0439" } }); });
+    await act(async () => { fireEvent.change(priceBox()!, { target: { value: "700" } }); });
+    await save();
+
+    const body = repo.update.mock.calls[0][1] as Record<string, unknown>;
+
+    expect(body.extra_item_max).toBeNull();
+  });
+
+  test("a typed ceiling is what is saved", async () => {
+    await mount(place());
+
+    await act(async () => { fireEvent.change(nameBox()!, { target: { value: "\u041a\u0438\u0439" } }); });
+    await act(async () => { fireEvent.change(priceBox()!, { target: { value: "700" } }); });
+    await act(async () => { fireEvent.change(maxBox()!, { target: { value: "3" } }); });
+    await save();
+
+    const body = repo.update.mock.calls[0][1] as Record<string, unknown>;
+
+    expect(body.extra_item_max).toBe(3);
+  });
+
+  test("an existing ceiling comes back into the form", async () => {
+    await mount(place({
+      extra_item_name: "\u041a\u0438\u0439",
+      extra_item_price: 700,
+      extra_item_max: 4,
+    } as Partial<IBranchPlace>));
+
+    expect(maxBox()!.value).toBe("4");
+  });
+
+  test("a room that hands out nothing saves a null ceiling too", async () => {
+    await mount(place());
+
+    // No name, so the box is not offered at all — a ceiling on a room
+    // that hands out nothing is a number about nothing.
+    expect(maxBox()).toBeNull();
+    await save();
+
+    const body = repo.update.mock.calls[0][1] as Record<string, unknown>;
+
+    expect(body.extra_item_max).toBeNull();
+  });
+
+  test("the box takes digits and nothing else", async () => {
+    await mount(place());
+
+    await act(async () => { fireEvent.change(nameBox()!, { target: { value: "\u041a\u0438\u0439" } }); });
+    await act(async () => { fireEvent.change(maxBox()!, { target: { value: "2a\u04445" } }); });
+
+    expect(maxBox()!.value).toBe("25");
+  });
+});
+
+/**
+ * WHICH units are charged — the sentence the allowance cannot speak.
+ *
+ * "The third costs money and the fourth does not" is not a count, and the pads
+ * grew `joystick_charged_slots` for exactly this.
+ */
+describe("which units are charged", () => {
+  test("an empty box saves null, and the allowance decides", async () => {
+    await mount(place());
+
+    await act(async () => { fireEvent.change(nameBox()!, { target: { value: "\u041a\u0438\u0439" } }); });
+    await act(async () => { fireEvent.change(priceBox()!, { target: { value: "700" } }); });
+    await save();
+
+    const body = repo.update.mock.calls[0][1] as Record<string, unknown>;
+
+    expect(body.extra_item_charged_units).toBeNull();
+  });
+
+  test("a typed list is what is saved", async () => {
+    await mount(place());
+
+    await act(async () => { fireEvent.change(nameBox()!, { target: { value: "\u041a\u0438\u0439" } }); });
+    await act(async () => { fireEvent.change(priceBox()!, { target: { value: "700" } }); });
+    await act(async () => { fireEvent.change(unitsBox()!, { target: { value: "3,4" } }); });
+    await save();
+
+    const body = repo.update.mock.calls[0][1] as Record<string, unknown>;
+
+    expect(body.extra_item_charged_units).toBe("3,4");
+  });
+
+  test("an existing list comes back into the form", async () => {
+    await mount(place({
+      extra_item_name: "\u041a\u0438\u0439",
+      extra_item_price: 700,
+      extra_item_charged_units: "3",
+    } as Partial<IBranchPlace>));
+
+    expect(unitsBox()!.value).toBe("3");
+  });
+
+  test("the box takes digits and commas and nothing else", async () => {
+    await mount(place());
+
+    await act(async () => { fireEvent.change(nameBox()!, { target: { value: "\u041a\u0438\u0439" } }); });
+    await act(async () => { fireEvent.change(unitsBox()!, { target: { value: "3;a,4 " } }); });
+
+    expect(unitsBox()!.value).toBe("3,4");
+  });
+});
+
+/**
+ * The room's SECOND figure — `joystick_price_4` for a counted thing.
+ *
+ * Empty is "priced like the first", never "free": the distinction the pads'
+ * fourth-pad price carries, and the one a falsy test destroys.
+ */
+describe("the units after the first", () => {
+  test("a typed second figure is what is saved", async () => {
+    await mount(place());
+
+    await act(async () => { fireEvent.change(nameBox()!, { target: { value: "\u041a\u0438\u0439" } }); });
+    await act(async () => { fireEvent.change(priceBox()!, { target: { value: "700" } }); });
+    await act(async () => { fireEvent.change(priceNextBox()!, { target: { value: "500" } }); });
+    await save();
+
+    const body = repo.update.mock.calls[0][1] as Record<string, unknown>;
+
+    expect(body.extra_item_price).toBe(700);
+    expect(body.extra_item_price_next).toBe(500);
+  });
+
+  test("an empty box saves null, which is 'priced like the first'", async () => {
+    await mount(place());
+
+    await act(async () => { fireEvent.change(nameBox()!, { target: { value: "\u041a\u0438\u0439" } }); });
+    await act(async () => { fireEvent.change(priceBox()!, { target: { value: "700" } }); });
+    await save();
+
+    const body = repo.update.mock.calls[0][1] as Record<string, unknown>;
+
+    expect(body.extra_item_price_next).toBeNull();
+  });
+
+  test("\u26a0\ufe0f a zero is a decision \u2014 the rest given away \u2014 and travels as zero", async () => {
+    await mount(place());
+
+    await act(async () => { fireEvent.change(nameBox()!, { target: { value: "\u041a\u0438\u0439" } }); });
+    await act(async () => { fireEvent.change(priceBox()!, { target: { value: "700" } }); });
+    await act(async () => { fireEvent.change(priceNextBox()!, { target: { value: "0" } }); });
+    await save();
+
+    const body = repo.update.mock.calls[0][1] as Record<string, unknown>;
+
+    expect(body.extra_item_price_next).toBe(0);
+  });
+
+  test("an existing second figure comes back into the form", async () => {
+    await mount(place({
+      extra_item_name: "\u041a\u0438\u0439",
+      extra_item_price: 700,
+      extra_item_price_next: 500,
+    } as Partial<IBranchPlace>));
+
+    expect(priceNextBox()!.value).toBe("500");
+  });
+
+  test("a seat that stops being custom drops it with the rest", async () => {
+    await mount(place({
+      extra_item_name: "\u041a\u0438\u0439", extra_item_price: 700, extra_item_price_next: 500,
+    } as Partial<IBranchPlace>));
+
+    await act(async () => { fireEvent.change(nameBox()!, { target: { value: "" } }); });
+    await save();
+
+    const body = repo.update.mock.calls[0]?.[1] as Record<string, unknown> | undefined;
+
+    if (body) expect(body.extra_item_price_next).toBeNull();
   });
 });

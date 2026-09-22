@@ -141,6 +141,20 @@ export interface IBranchPlace extends Translated {
   extra_item_charge_mode?: "each" | "once" | null;
   /** A fee per piece, or a RATE per hour per piece. Null reads as "fixed". */
   extra_item_pricing_mode?: "fixed" | "hourly" | null;
+  /**
+   * How many units the room's rate already covers: the first N handed out on
+   * a session are free, everything past N is charged.
+   *
+   * Null is the default and means 0 - every unit charged, which is what every
+   * room did before this column existed. There is deliberately NO branch-level
+   * inheritance here: a poker table and a billiard table in one venue hand out
+   * different things, so the allowance is the ROOM's alone.
+   */
+  extra_item_included?: number | null;
+  extra_item_max?: number | null;
+  extra_item_charged_units?: string | null;
+  /** What each CHARGED unit after the first costs. NULL = priced like it. */
+  extra_item_price_next?: number | string | null;
   games: IGame[];
 }
 

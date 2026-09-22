@@ -1,6 +1,7 @@
 import { ListSkeleton, SkeletonForm } from "@/components/ui/Skeleton";
 import HourlyRatesForm from "@/components/branches/HourlyRatesForm";
 import PackageForm from "@/components/packages/PackageForm";
+import BranchExtraItemForm from "@/components/prices/BranchExtraItemForm";
 import BranchJoystickForm from "@/components/prices/BranchJoystickForm";
 import MoneyRoundingForm from "@/components/prices/MoneyRoundingForm";
 import PlatformPricesForm from "@/components/prices/PlatformPricesForm";
@@ -133,6 +134,23 @@ const BranchPricesPage = () => {
         {billing.data && (
           <BranchJoystickForm
             key={`${billing.data.joystick_price}:${billing.data.joystick_charged_slots}`}
+            branchId={id}
+            settings={billing.data}
+            onSaved={() => void billing.reload()}
+          />
+        )}
+      </section>
+
+      {/* And the same question for a room on a CUSTOM platform — a billiard
+          table's cue, a poker table's chips. The pads answer it for
+          PlayStation seats above; this answers it for everything else, and a
+          room that has set its own ignores both. A venue with ten billiard
+          tables answers once. */}
+      <section className="col" style={{ gap: 12 }}>
+        <h2 className="page-title" style={{ margin: 0 }}>{t("branchExtraItem.sectionTitle")}</h2>
+        {billing.data && (
+          <BranchExtraItemForm
+            key={`${billing.data.extra_item_name}:${billing.data.extra_item_price}`}
             branchId={id}
             settings={billing.data}
             onSaved={() => void billing.reload()}

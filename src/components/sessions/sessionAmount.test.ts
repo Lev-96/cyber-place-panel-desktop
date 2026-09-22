@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
 import { ISessionApi } from "@/types/sessions";
-import { sessionAmountAt, sessionCurrentHourlyRate, sessionJoysticksTotalAt, sessionTimeCostAt } from "./sessionAmount";
+import { IExtraItem } from "@/types/sessions";
+import { extraItemQuote, sessionAmountAt, sessionCurrentHourlyRate, sessionJoysticksTotalAt, sessionTimeCostAt } from "./sessionAmount";
 
 /**
  * The one place the panel decides what a running session's clock is worth.
@@ -489,5 +490,135 @@ describe("drinks on the seat are on the seat's figure", () => {
     } as Partial<ISessionApi>);
 
     expect(sessionCurrentHourlyRate(s)).toBeCloseTo(1000, 2);
+  });
+});
+
+/**
+ * What one hand-out of the room's extra costs, allowance and all.
+ *
+ * The room may include the first few in its rate - chips on a poker table, a
+ * cue on a billiard table - exactly the way a branch includes the first pads
+ * in a PlayStation's. The rule is the server's; this is the panel's one
+ * mirror of it, and every figure the hand-out dialog draws comes from here.
+ *
+ * Two of these cases are the ones that would be silent when they break: a
+ * hand-out that STRADDLES the boundary (part free, part paid, which no
+ * `unit x qty` can express), and a payload with no allowance at all, which
+ * must price exactly as it priced before the field existed.
+ */
+describe("what a hand-out of the room's extra costs", () => {
+  const chips = (over: Partial<IExtraItem> = {}): IExtraItem => ({
+    name: "Chips",
+    price: "500.00",
+    charge_mode: "each",
+    fee_taken: false,
+    unit_price: "500.00",
+    max_qty: 999,
+    ...over,
+  });
+
+  test("a room with no allowance charges every unit", () => {
+    const q = extraItemQuote(chips(), 3);
+
+    expect(q).toMatchObject({ qty: 3, freeQty: 0, paidQty: 3, chargedQty: 3, total: 1500 });
+  });
+
+  test("a payload that predates the allowance prices exactly as it always did", () => {
+    // The no-regression invariant, stated as a case: no `included`, no
+    // `included_remaining`, and the figure is the old `unit x qty`.
+    const older = chips();
+
+    expect("included_remaining" in older).toBe(false);
+    expect(extraItemQuote(older, 4).total).toBe(2000);
+  });
+
+  test("the allowance covers the whole hand-out and nothing is owed", () => {
+    const q = extraItemQuote(chips({ included: 3, included_remaining: 3 }), 3);
+
+    expect(q).toMatchObject({ freeQty: 3, paidQty: 0, chargedQty: 0, total: 0 });
+  });
+
+  test("a hand-out that straddles the boundary is part free and part paid", () => {
+    // One left in the rate, three going out: one free, two charged. This is
+    // the case `unit x qty` cannot say at all.
+    const q = extraItemQuote(chips({ included: 2, included_remaining: 1 }), 3);
+
+    expect(q).toMatchObject({ freeQty: 1, paidQty: 2, chargedQty: 2, total: 1000 });
+  });
+
+  test("an allowance bigger than the hand-out frees only what went out", () => {
+    const q = extraItemQuote(chips({ included: 10, included_remaining: 10 }), 2);
+
+    expect(q).toMatchObject({ qty: 2, freeQty: 2, paidQty: 0, total: 0 });
+  });
+
+  test("once for the session takes ONE charge once the allowance runs out", () => {
+    const q = extraItemQuote(chips({ charge_mode: "once", included: 2, included_remaining: 1 }), 3);
+
+    expect(q).toMatchObject({ freeQty: 1, paidQty: 2, chargedQty: 1, total: 500 });
+  });
+
+  test("once reports the surplus as zero-priced, matching what the server writes", () => {
+    // `freeQty` answers "how many did the rate cover" and `zeroQty` answers
+    // "how many will print at 0.00". Under `once` they differ, because
+    // `ExtraItemRule::split()` moves the unsold surplus into the zero row.
+    const q = extraItemQuote(chips({ charge_mode: "once", included: 2, included_remaining: 1 }), 3);
+
+    expect(q).toMatchObject({ freeQty: 1, paidQty: 2, chargedQty: 1, zeroQty: 2, total: 500 });
+  });
+
+  test("each keeps zeroQty and freeQty the same number", () => {
+    const q = extraItemQuote(chips({ charge_mode: "each", included: 2, included_remaining: 1 }), 3);
+
+    expect(q).toMatchObject({ freeQty: 1, zeroQty: 1, chargedQty: 2, total: 1000 });
+  });
+
+  test("once for the session takes nothing while the allowance still covers it", () => {
+    const q = extraItemQuote(chips({ charge_mode: "once", included: 2, included_remaining: 2 }), 2);
+
+    expect(q).toMatchObject({ chargedQty: 0, total: 0 });
+  });
+
+  test("a seat that already paid the one-off is quoted zero, allowance or not", () => {
+    // The server has already zeroed `unit_price`; nothing here needs to know
+    // why, which is the point of quoting the server's figure.
+    const q = extraItemQuote(chips({ charge_mode: "once", fee_taken: true, unit_price: "0.00" }), 4);
+
+    expect(q.total).toBe(0);
+  });
+
+  test("an hourly extra quotes no total, only the units that are charged", () => {
+    const q = extraItemQuote(
+      chips({ pricing_mode: "hourly", unit_price: "700.00", included: 1, included_remaining: 1 }),
+      3,
+    );
+
+    // A rate is not a bill: the minutes belong to the backend. What the
+    // allowance changes is how many units that rate is owed on.
+    expect(q).toMatchObject({ hourly: true, total: 0, freeQty: 1, chargedQty: 2, unit: 700 });
+  });
+
+  test("an hourly extra covered by the allowance owes no rate at all", () => {
+    const q = extraItemQuote(
+      chips({ pricing_mode: "hourly", unit_price: "700.00", included: 2, included_remaining: 2 }),
+      2,
+    );
+
+    expect(q).toMatchObject({ hourly: true, chargedQty: 0, total: 0 });
+  });
+
+  test("a count below one costs nothing", () => {
+    expect(extraItemQuote(chips(), 0)).toMatchObject({ qty: 0, chargedQty: 0, total: 0 });
+    expect(extraItemQuote(chips(), -5)).toMatchObject({ qty: 0, chargedQty: 0, total: 0 });
+  });
+
+  test("a nonsense allowance is read as none rather than as free units", () => {
+    // Money: guessing wrong here gives the room's stock away.
+    expect(extraItemQuote(chips({ included_remaining: -3 }), 2).total).toBe(1000);
+    expect(extraItemQuote(chips({ included_remaining: Number.NaN }), 2).total).toBe(1000);
+  });
+
+  test("a fractional count is truncated before anything is priced", () => {
+    expect(extraItemQuote(chips(), 3.9)).toMatchObject({ qty: 3, total: 1500 });
   });
 });

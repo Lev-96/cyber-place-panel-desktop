@@ -3,6 +3,7 @@ import Modal from "@/components/ui/Modal";
 import { fmt } from "@/i18n/translations";
 import { formatApiError } from "@/api/errors";
 import { ISessionApi } from "@/types/sessions";
+import { extraItemQuote } from "@/components/sessions/sessionAmount";
 import { sessionRepository } from "@/repositories/SessionRepository";
 import { useLang } from "@/i18n/LanguageContext";
 import { useState } from "react";
@@ -51,14 +52,31 @@ export default function AddExtraItemDialog({
   if (!extra) return null;
 
   const ceiling = extra.max_qty > 0 ? extra.max_qty : 999;
-  const unit = Number(extra.unit_price);
-  // A RATE, not a price: the room rents this by the hour, so there is no
-  // total to quote before it goes out — only what an hour of it costs. Saying
-  // "700 × 3 = 2 100" here would be a promise the bill does not keep.
-  const hourly = extra.pricing_mode === "hourly";
-  // "Once for the session" charges for one whatever the count, which is what
-  // the receipt will say, so it is what this line says too.
-  const total = extra.charge_mode === "once" ? unit : unit * qty;
+  /**
+   * Every figure on this screen, from the ONE function that prices a
+   * hand-out.
+   *
+   * Not `unit × qty` inline: the room may include the first few in its rate,
+   * and a hand-out that straddles that boundary is part free and part paid.
+   * The rule is the server's, it is stated once in `sessionAmount.ts` beside
+   * every other mirror of the backend's arithmetic, and this dialog renders
+   * what it returns.
+   *
+   * `hourly` is a RATE, not a price: there is no total to quote before the
+   * thing goes out, only what an hour of the CHARGED units costs. Saying
+   * "700 × 3 = 2 100" would be a promise the bill does not keep, and saying
+   * "700/h × 3" where one of the three is free would be a smaller version of
+   * the same lie.
+   */
+  const quote = extraItemQuote(extra, qty);
+  const unit = quote.unit;
+  const hourly = quote.hourly;
+  // What the room's rate covers per session, and what is left of it here.
+  const allowance = Math.max(0, Math.trunc(Number(extra.included ?? 0)) || 0);
+  const remaining = Math.max(0, Math.trunc(Number(extra.included_remaining ?? 0)) || 0);
+  // Nothing is owed for this hand-out, and the reason is the allowance rather
+  // than a price of zero.
+  const allFree = quote.zeroQty > 0 && quote.chargedQty === 0;
 
   const clamp = (n: number) => Math.min(ceiling, Math.max(1, Math.trunc(n) || 1));
 
@@ -112,18 +130,42 @@ export default function AddExtraItemDialog({
         {/* What it will cost, before anything is written. On a seat that
             charges once and already has, this is a real zero and says so —
             the thing still goes out, and the receipt still lists it. */}
+        {/* The room's allowance, stated before the arithmetic that uses it:
+            an operator handing over three and being charged for one needs to
+            see why, and "the rate covers two" is that why. Drawn only where
+            the room has one, so nothing changes for the rooms that do not. */}
+        {allowance > 0 && (
+          <span className="muted">{fmt(t("session.extraIncluded"), allowance, remaining)}</span>
+        )}
+
         <div className="row row-between" style={{ gap: 8 }}>
           <span className="muted">
-            {hourly
-              ? fmt(t("session.extraHourlyNote"), extra.name)
-              : extra.charge_mode === "once"
-                ? t("session.extraOnceNote")
-                : `${money(unit)} × ${qty}`}
+            {allFree
+              ? fmt(t("session.extraAllFree"), quote.zeroQty)
+              : hourly
+                ? fmt(t("session.extraHourlyNote"), extra.name)
+                : extra.charge_mode === "once"
+                  ? t("session.extraOnceNote")
+                  : `${money(unit)} × ${quote.chargedQty}`}
           </span>
           <span className="label">
-            {hourly ? `${money(unit)}${t("session.extraPerHour")} × ${qty}` : money(total)}
+            {/* An hourly extra quotes a RATE and a count of the units that
+                are actually charged; when the allowance covers them all there
+                is no rate owed, and the honest figure is zero. */}
+            {hourly && quote.chargedQty > 0
+              ? `${money(unit)}${t("session.extraPerHour")} × ${quote.chargedQty}`
+              : money(quote.total)}
           </span>
         </div>
+
+        {/* Part free, part paid: the split that makes the figure above look
+            wrong until it is spelled out. */}
+        {/* What the RECEIPT will show at zero, not what the allowance covers:
+            a `once` surplus is handed over at 0.00 too, so `freeQty` here
+            would print one while the bill prints two. */}
+        {quote.zeroQty > 0 && quote.chargedQty > 0 && (
+          <span className="muted">{fmt(t("session.extraPartFree"), quote.zeroQty, quote.qty)}</span>
+        )}
 
         {err && <span className="error">{err}</span>}
 

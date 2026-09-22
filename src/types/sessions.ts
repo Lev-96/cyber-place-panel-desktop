@@ -334,6 +334,23 @@ export interface IExtraItem {
   fee_taken: boolean;
   unit_price: string;
   max_qty: number;
+  /**
+   * How many units the ROOM's rate already covers, the way
+   * `branches.joystick_included` covers a pad: the first N handed out on a
+   * session are free and everything past N is charged. `0` is "none of
+   * them", which is what every room is until somebody sets one.
+   *
+   * Optional because a server that predates the allowance omits it, and the
+   * absence must read as today's behaviour - every unit charged - rather than
+   * as a room giving its first hand-out away.
+   */
+  included?: number;
+  /**
+   * How many of those are still free on THIS session, after what has already
+   * gone out. The SERVER counts them; the panel only quotes what it is told,
+   * which is what keeps the dialog and the receipt on one figure.
+   */
+  included_remaining?: number;
 }
 
 export interface IPcApi extends Translated {
