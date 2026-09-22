@@ -127,6 +127,59 @@ export const sessionItemLineTotal = (line: SessionItemLine): number =>
     ? round2(toNumber(line.line_total ?? 0))
     : round2(toNumber(line.price) * toNumber(line.qty));
 
+/**
+ * What the bill's lines are worth AT a given instant.
+ *
+ * The pads' own pair, one domain over: {@see sessionJoysticksTotalAt} ticks and
+ * {@see sessionJoysticksTotal} is its "now" wrapper, and a rented extra needs
+ * exactly the same treatment for exactly the same reason.
+ *
+ * ## Why this is not just `line_total`
+ *
+ * `line_total` is what the SERVER counted when the payload was built. On a
+ * ticking tile that froze the chips' share between polls and then jumped it,
+ * beside a seat figure moving every second — two numbers on one card
+ * disagreeing about what time it is. The row carries `created_at`, so this
+ * extrapolates from the same instant the backend measures from, and
+ * `SessionPricingCalculator::itemSeconds()` is the function it mirrors.
+ *
+ * The clamps are that function's, in its order: the clock stops at
+ * `returned_at` when the thing came back BEFORE the instant being shown — a
+ * preview drawn at 20:00 must not know about 20:30 — and a row dated before
+ * the session bills from the session, so a clock skew cannot charge for a
+ * night nobody was here for.
+ *
+ * Every other line is a price and a count and takes no part in any of this.
+ */
+export const sessionItemsTotalAt = (session: ISessionApi, at: number): number => {
+  const lines = session.items ?? [];
+  if (lines.length === 0) return 0;
+
+  const startedAt = session.started_at ? Date.parse(session.started_at) : NaN;
+
+  return round2(
+    lines.reduce((sum, line) => {
+      if (!line.is_hourly) {
+        return sum + toNumber(line.price) * toNumber(line.qty);
+      }
+
+      const created = line.created_at ? Date.parse(line.created_at) : NaN;
+      if (Number.isNaN(created)) {
+        // No instant to measure from: fall back to the server's own figure
+        // rather than to zero, which would read as "this is free".
+        return sum + toNumber(line.line_total ?? 0);
+      }
+
+      const from = !Number.isNaN(startedAt) && created < startedAt ? startedAt : created;
+      const returned = line.returned_at ? Date.parse(line.returned_at) : NaN;
+      const to = Number.isNaN(returned) ? at : Math.min(returned, at);
+      const seconds = Math.max(0, Math.floor((to - from) / 1000));
+
+      return sum + (toNumber(line.price) * toNumber(line.qty) * seconds) / 3600;
+    }, 0),
+  );
+};
+
 export const sessionItemsTotal = (session: ISessionApi): number => {
   const lines = session.items ?? [];
   if (lines.length === 0) return 0;
@@ -134,104 +187,7 @@ export const sessionItemsTotal = (session: ISessionApi): number => {
   return round2(lines.reduce((sum, line) => sum + sessionItemLineTotal(line), 0));
 };
 
-/** What one hand-out of the room's extra comes to. {@see extraItemQuote} */
-export interface ExtraItemQuote {
-  /** What was asked for, floored at 0. */
-  qty: number;
-  /** Of those, how many the room's rate covers. */
-  freeQty: number;
-  /** Of those, how many are past the allowance and therefore payable. */
-  paidQty: number;
-  /**
-   * What the money is multiplied by. Equal to `paidQty` under `each`; 1 or 0
-   * under `once`, which takes one charge for the session however many go out.
-   */
-  chargedQty: number;
-  /** The server's price for one unit: a fee, or an hourly rate per unit. */
-  unit: number;
-  /**
-   * How many units land on the bill at 0.00 — what the RECEIPT will show as
-   * free, which is not always `freeQty`.
-   *
-   * Under `each` the two are equal. Under `once` they are not: the server
-   * charges one unit and hands the rest over at zero, allowance or no
-   * allowance, so a hand-out of three with one still covered prints two zero
-   * units and one at the fee. Saying `freeQty` there would describe the
-   * allowance correctly and the receipt wrongly, and the operator is holding
-   * the receipt.
-   */
-  zeroQty: number;
-  /** True when `unit` is a rate per hour and `total` is therefore not a bill. */
-  hourly: boolean;
-  /**
-   * What this hand-out costs NOW. Always 0 for an hourly extra - the clock
-   * has not run yet and the panel does not own it.
-   */
-  total: number;
-}
 
-/**
- * What ONE hand-out of the room's extra will cost, before anything is written.
- *
- * ## Why this is a function and not two lines of JSX
- *
- * It is the same rule the pads' allowance follows and the same rule the server
- * applies: the first N units a session takes are covered by the room's rate
- * and everything past N is charged. The moment an allowance exists, `unit x
- * qty` is a lie for every hand-out that straddles the boundary - three chips
- * with one still free is one free and two paid, not three paid and not three
- * free. A dialog that quoted either would be quoting a figure the receipt
- * never prints.
- *
- * ## The four inputs, and who owns each
- *
- * All four come from the SERVER, on `session.extra_item`:
- *
- *  - `unit_price` - what the next unit costs. Already 0.00 on a once-per-
- *    session seat that has paid, which is why "already paid" needs no branch
- *    here;
- *  - `included_remaining` - how many are still free on THIS session. The
- *    server counts them against what has already gone out; nothing here
- *    tracks a running tally, so a second cashier on the same seat cannot make
- *    the two screens disagree;
- *  - `charge_mode` - `once` bills one charge for the session however many
- *    change hands, `each` bills per unit;
- *  - `pricing_mode` - `hourly` makes the figure a RATE, so there is no total
- *    to quote at all: the minutes belong to the backend
- *    ({@see sessionItemLineTotal}), and the only honest thing to say up front
- *    is what an hour of the CHARGED units costs.
- *
- * An older server omits `included_remaining`, which reads as 0 and gives
- * exactly today's arithmetic back - the no-regression invariant this was
- * built against.
- *
- * @param qty how many the operator asked for; below 1 is read as none.
- */
-export const extraItemQuote = (extra: IExtraItem, qty: number): ExtraItemQuote => {
-  const asked = Math.max(0, Math.trunc(qty) || 0);
-  // A negative or absent allowance is "none". Absent is the older server, and
-  // it must price exactly as it always did.
-  const remaining = Math.max(0, Math.trunc(toNumber(extra.included_remaining)));
-  const freeQty = Math.min(asked, remaining);
-  const paidQty = asked - freeQty;
-  const chargedQty = extra.charge_mode === "once" ? (paidQty > 0 ? 1 : 0) : paidQty;
-  const unit = toNumber(extra.unit_price);
-  const hourly = extra.pricing_mode === "hourly";
-
-  return {
-    qty: asked,
-    freeQty,
-    paidQty,
-    chargedQty,
-    // Everything the bill will not charge for, which mirrors
-    // `ExtraItemRule::split()` on the server: it moves a `once` surplus into
-    // the zero row rather than dropping it.
-    zeroQty: asked - chargedQty,
-    unit,
-    hourly,
-    total: hourly ? 0 : round2(unit * chargedQty),
-  };
-};
 
 /**
  * What the extra joysticks on this seat have earned.
@@ -300,11 +256,28 @@ export const sessionJoysticksTotal = (session: ISessionApi): number =>
  */
 export const sessionCurrentHourlyRate = (session: ISessionApi): number => {
   const base = toNumber(session.hourly_rate ?? session.tariff_hourly_rate ?? 0);
-  const extra = (session.joysticks ?? [])
+  const pads = (session.joysticks ?? [])
     .filter((pad) => pad.is_hourly && pad.stopped_at === null)
     .reduce((sum, pad) => sum + toNumber(pad.price), 0);
 
-  return round2(base + extra);
+  /**
+   * ⚠️ The room's own extra moves the rate too, on the pads' own rule.
+   *
+   * A poker table at 1 000/h lending 500/h chips IS a 1 500/h seat while they
+   * are out, and the cashier quotes what the tile says. The money already came
+   * to 1 500 — the chips accrue on their own bill line — so this was never a
+   * pricing bug; the tile simply did not say the sentence, and a cashier
+   * reading "1 000/h" beside a bill growing at 1 500 has to work out why.
+   *
+   * `qty` multiplies, because two cues out is two rates running. `returned_at`
+   * is this table's `stopped_at`: handed back, the rate goes with it. A FIXED
+   * extra is a price and never a tariff, exactly as a pad's flat fee is not.
+   */
+  const rented = (session.items ?? [])
+    .filter((line) => line.is_hourly && !line.returned_at)
+    .reduce((sum, line) => sum + toNumber(line.price) * toNumber(line.qty), 0);
+
+  return round2(base + pads + rented);
 };
 
 /**
@@ -333,7 +306,7 @@ export const sessionAmountAt = (session: ISessionApi, at: number): number =>
     ? 0
     : applyRounding(
       round2(
-        sessionTimeCostAt(session, at) + sessionJoysticksTotalAt(session, at) + sessionItemsTotal(session),
+        sessionTimeCostAt(session, at) + sessionJoysticksTotalAt(session, at) + sessionItemsTotalAt(session, at),
       ),
       session.rounding_step ?? 0,
       session.rounding_mode ?? "up",

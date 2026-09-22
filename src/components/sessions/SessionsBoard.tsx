@@ -28,7 +28,6 @@ import { useRealtimeResync } from "@/realtime/useRealtimeResync";
 import { PS5_STATE_LOOK } from "@/ps5/stateLook";
 import { DragEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import AddExtraItemDialog from "./AddExtraItemDialog";
 import AddSessionItemDialog from "./AddSessionItemDialog";
 import SessionTimer from "./SessionTimer";
 import { sessionCurrentHourlyRate, sessionJoysticksTotal } from "./sessionAmount";
@@ -70,16 +69,10 @@ const SessionsBoard = ({ branchId }: Props) => {
   const [startTarget, setStartTarget] = useState<IPcApi | null>(null);
   const [stopTarget, setStopTarget] = useState<ISessionApi | null>(null);
   const [addItemTarget, setAddItemTarget] = useState<ISessionApi | null>(null);
-  /**
-   * The seat whose OWN extra is being handed out — chips, a cue, darts.
-   *
-   * A separate target from the product dialog above because they are separate
-   * questions: that one sells from the branch catalogue, this one hands over
-   * what the room itself is configured to hand over, at the room's price.
-   */
-  const [extraTarget, setExtraTarget] = useState<ISessionApi | null>(null);
   /** The line a return is in flight for, so its button cannot be pressed twice. */
   const [returningItem, setReturningItem] = useState<number | null>(null);
+  /** The seat a hand-out is in flight for, so a double press is one thing. */
+  const [extraBusy, setExtraBusy] = useState<number | null>(null);
 
   /**
    * The room's hourly extra that is still out, if any.
@@ -91,6 +84,37 @@ const SessionsBoard = ({ branchId }: Props) => {
    */
   const openHourlyExtra = (sess: ISessionApi) =>
     (sess.items ?? []).find((i) => i.is_hourly && !i.returned_at) ?? null;
+
+  /**
+   * Hand ONE over. One press, one thing, no menu — the pad control's own
+   * shape, for the pad control's own reason.
+   *
+   * A FIXED extra simply puts its price on the bill. An HOURLY one starts its
+   * rate: the tile's tariff goes from 1 000/h to 1 500/h the moment the chips
+   * go out, and `returnExtra` below stops it again. The count that used to be
+   * asked for in a dialog was a question nobody at the counter asks about a
+   * controller, and it is not one they ask about chips either.
+   *
+   * The name and the price are the ROOM's — the write carries `extra: true`
+   * and a count of one, and the server prices it. That is also what lets a
+   * manager hand one out: a typed price needs `products.manage`.
+   */
+  const handOutExtra = async (sess: ISessionApi) => {
+    if (extraBusy !== null) return;
+
+    setExtraBusy(sess.id);
+    setPadError(null);
+    try {
+      await sessionRepository.addItems(sess.id, [{ extra: true, qty: 1 }]);
+    } catch (e) {
+      // On the tile it belongs to, like every other refusal here: no price
+      // set, nothing left to hand out, the session is over.
+      setPadError({ id: sess.id, message: e instanceof Error ? e.message : String(e) });
+    } finally {
+      setExtraBusy(null);
+      await sessions.reload();
+    }
+  };
 
   /**
    * Hand it back. The charge it earned stays on the bill, exactly as a
@@ -988,7 +1012,8 @@ const SessionsBoard = ({ branchId }: Props) => {
               {sess.extra_item && (
                 <Button
                   variant="secondary"
-                  onClick={() => setExtraTarget(sess)}
+                  onClick={() => void handOutExtra(sess)}
+                  disabled={extraBusy === sess.id}
                   style={miniBtnFlex}
                   title={fmt(t("session.extraAdd"), sess.extra_item.name)}
                 >
@@ -1189,13 +1214,6 @@ const SessionsBoard = ({ branchId }: Props) => {
           branchId={branchId}
           session={addItemTarget}
           onClose={() => { setAddItemTarget(null); void sessions.reload(); }}
-          onAdded={() => { void sessions.reload(); }}
-        />
-      )}
-      {extraTarget && (
-        <AddExtraItemDialog
-          session={extraTarget}
-          onClose={() => { setExtraTarget(null); void sessions.reload(); }}
           onAdded={() => { void sessions.reload(); }}
         />
       )}

@@ -1,7 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { ISessionApi } from "@/types/sessions";
-import { IExtraItem } from "@/types/sessions";
-import { extraItemQuote, sessionAmountAt, sessionCurrentHourlyRate, sessionJoysticksTotalAt, sessionTimeCostAt } from "./sessionAmount";
+import { sessionAmountAt, sessionCurrentHourlyRate, sessionItemsTotalAt, sessionJoysticksTotalAt, sessionTimeCostAt } from "./sessionAmount";
 
 /**
  * The one place the panel decides what a running session's clock is worth.
@@ -480,6 +479,145 @@ describe("drinks on the seat are on the seat's figure", () => {
     expect(sessionCurrentHourlyRate(s)).toBeCloseTo(1500, 2);
   });
 
+  /**
+   * ⚠️ The rented extra TICKS, like a pad, instead of jumping on each poll.
+   *
+   * `line_total` is what the SERVER counted when the payload was built. Using
+   * it on a ticking tile froze the chips' share between polls and then jumped
+   * it, beside a seat figure moving every second — the same defect the pads
+   * were given `sessionJoysticksTotalAt` to avoid. The row carries
+   * `created_at`, so the panel extrapolates from the same instant the server
+   * does.
+   */
+  test("an hourly extra accrues by the second, not by the poll", () => {
+    const s = session({
+      hourly_rate: 1000,
+      // The seat opened before the chips went out, or the clamp below would
+      // (correctly) bill from the session instead.
+      started_at: ago(90),
+      items: [
+        { id: 11, name: "\u0424\u0438\u0448\u043a\u0438", price: 500, qty: 1, is_extra: true, is_hourly: true,
+          created_at: ago(60), returned_at: null, line_total: 0 },
+      ],
+    } as Partial<ISessionApi>);
+
+    // An hour out at 500/h, however stale the server's own figure is.
+    expect(sessionItemsTotalAt(s, AT)).toBeCloseTo(500, 2);
+    // …and half an hour earlier it was worth half that.
+    expect(sessionItemsTotalAt(s, AT - 30 * 60_000)).toBeCloseTo(250, 2);
+  });
+
+  test("a returned extra stops accruing where it was handed back", () => {
+    const s = session({
+      started_at: ago(90),
+      items: [
+        { id: 11, name: "\u0424\u0438\u0448\u043a\u0438", price: 500, qty: 1, is_extra: true, is_hourly: true,
+          created_at: ago(60), returned_at: ago(30), line_total: 0 },
+      ],
+    } as Partial<ISessionApi>);
+
+    expect(sessionItemsTotalAt(s, AT)).toBeCloseTo(250, 2);
+  });
+
+  /**
+   * A line dated BEFORE the session bills from the session.
+   *
+   * Reachable by a clock skew, a seeded row or a restored backup rather than
+   * by the panel — which is exactly why it is pinned on both sides. Without it
+   * the hour count runs from whenever the row claims it was written, and a row
+   * dated yesterday hands the guest a bill for a night they were not here for.
+   */
+  test("a line older than the session bills from the session", () => {
+    const s = session({
+      started_at: ago(30),
+      items: [
+        { id: 11, name: "\u041a\u0438\u0439", price: 500, qty: 1, is_extra: true, is_hourly: true,
+          created_at: ago(24 * 60), returned_at: null, line_total: 0 },
+      ],
+    } as Partial<ISessionApi>);
+
+    // Half an hour of the seat's life, not a day of the row's.
+    expect(sessionItemsTotalAt(s, AT)).toBeCloseTo(250, 2);
+  });
+
+  test("a drink is still a price times a count, whatever the clock says", () => {
+    const s = session({
+      items: [
+        { id: 12, name: "Cola", price: 300, qty: 2, created_at: ago(60), line_total: 600 },
+      ],
+    } as Partial<ISessionApi>);
+
+    expect(sessionItemsTotalAt(s, AT)).toBeCloseTo(600, 2);
+  });
+
+  test("two rented units accrue twice over", () => {
+    const s = session({
+      started_at: ago(90),
+      items: [
+        { id: 11, name: "\u041a\u0438\u0439", price: 500, qty: 2, is_extra: true, is_hourly: true,
+          created_at: ago(60), returned_at: null, line_total: 0 },
+      ],
+    } as Partial<ISessionApi>);
+
+    expect(sessionItemsTotalAt(s, AT)).toBeCloseTo(1000, 2);
+  });
+
+  /**
+   * The room's own extra moves the rate exactly as a pad does.
+   *
+   * A poker table at 1 000/h that lends 500/h chips is a 1 500/h seat while
+   * they are out, and the tile has to say so — the cashier quotes what the
+   * tile shows. The money already worked out to 1 500 because the chips accrue
+   * on their own line; what was missing was the SENTENCE.
+   */
+  test("the rate shown is the seat plus the hourly extra it is holding", () => {
+    const s = session({
+      hourly_rate: 1000,
+      items: [
+        { id: 11, name: "\u0424\u0438\u0448\u043a\u0438", price: 500, qty: 1, is_extra: true, is_hourly: true,
+          created_at: ago(60), returned_at: null, line_total: 500 },
+      ],
+    } as Partial<ISessionApi>);
+
+    expect(sessionCurrentHourlyRate(s)).toBeCloseTo(1500, 2);
+  });
+
+  test("an extra handed back stops moving the rate", () => {
+    const s = session({
+      hourly_rate: 1000,
+      items: [
+        { id: 11, name: "\u0424\u0438\u0448\u043a\u0438", price: 500, qty: 1, is_extra: true, is_hourly: true,
+          created_at: ago(60), returned_at: ago(30), line_total: 250 },
+      ],
+    } as Partial<ISessionApi>);
+
+    expect(sessionCurrentHourlyRate(s)).toBeCloseTo(1000, 2);
+  });
+
+  test("a FIXED extra never moves the rate — it is a price, not a tariff", () => {
+    const s = session({
+      hourly_rate: 1000,
+      items: [
+        { id: 11, name: "\u0424\u0438\u0448\u043a\u0438", price: 500, qty: 1, is_extra: true, is_hourly: false,
+          created_at: ago(60), returned_at: null, line_total: 500 },
+      ],
+    } as Partial<ISessionApi>);
+
+    expect(sessionCurrentHourlyRate(s)).toBeCloseTo(1000, 2);
+  });
+
+  test("two hourly units out add their rate twice", () => {
+    const s = session({
+      hourly_rate: 1000,
+      items: [
+        { id: 11, name: "\u0424\u0438\u0448\u043a\u0438", price: 500, qty: 2, is_extra: true, is_hourly: true,
+          created_at: ago(60), returned_at: null, line_total: 1000 },
+      ],
+    } as Partial<ISessionApi>);
+
+    expect(sessionCurrentHourlyRate(s)).toBeCloseTo(2000, 2);
+  });
+
   test("a flat fee never moves the rate", () => {
     const s = session({
       hourly_rate: 1000,
@@ -490,135 +628,5 @@ describe("drinks on the seat are on the seat's figure", () => {
     } as Partial<ISessionApi>);
 
     expect(sessionCurrentHourlyRate(s)).toBeCloseTo(1000, 2);
-  });
-});
-
-/**
- * What one hand-out of the room's extra costs, allowance and all.
- *
- * The room may include the first few in its rate - chips on a poker table, a
- * cue on a billiard table - exactly the way a branch includes the first pads
- * in a PlayStation's. The rule is the server's; this is the panel's one
- * mirror of it, and every figure the hand-out dialog draws comes from here.
- *
- * Two of these cases are the ones that would be silent when they break: a
- * hand-out that STRADDLES the boundary (part free, part paid, which no
- * `unit x qty` can express), and a payload with no allowance at all, which
- * must price exactly as it priced before the field existed.
- */
-describe("what a hand-out of the room's extra costs", () => {
-  const chips = (over: Partial<IExtraItem> = {}): IExtraItem => ({
-    name: "Chips",
-    price: "500.00",
-    charge_mode: "each",
-    fee_taken: false,
-    unit_price: "500.00",
-    max_qty: 999,
-    ...over,
-  });
-
-  test("a room with no allowance charges every unit", () => {
-    const q = extraItemQuote(chips(), 3);
-
-    expect(q).toMatchObject({ qty: 3, freeQty: 0, paidQty: 3, chargedQty: 3, total: 1500 });
-  });
-
-  test("a payload that predates the allowance prices exactly as it always did", () => {
-    // The no-regression invariant, stated as a case: no `included`, no
-    // `included_remaining`, and the figure is the old `unit x qty`.
-    const older = chips();
-
-    expect("included_remaining" in older).toBe(false);
-    expect(extraItemQuote(older, 4).total).toBe(2000);
-  });
-
-  test("the allowance covers the whole hand-out and nothing is owed", () => {
-    const q = extraItemQuote(chips({ included: 3, included_remaining: 3 }), 3);
-
-    expect(q).toMatchObject({ freeQty: 3, paidQty: 0, chargedQty: 0, total: 0 });
-  });
-
-  test("a hand-out that straddles the boundary is part free and part paid", () => {
-    // One left in the rate, three going out: one free, two charged. This is
-    // the case `unit x qty` cannot say at all.
-    const q = extraItemQuote(chips({ included: 2, included_remaining: 1 }), 3);
-
-    expect(q).toMatchObject({ freeQty: 1, paidQty: 2, chargedQty: 2, total: 1000 });
-  });
-
-  test("an allowance bigger than the hand-out frees only what went out", () => {
-    const q = extraItemQuote(chips({ included: 10, included_remaining: 10 }), 2);
-
-    expect(q).toMatchObject({ qty: 2, freeQty: 2, paidQty: 0, total: 0 });
-  });
-
-  test("once for the session takes ONE charge once the allowance runs out", () => {
-    const q = extraItemQuote(chips({ charge_mode: "once", included: 2, included_remaining: 1 }), 3);
-
-    expect(q).toMatchObject({ freeQty: 1, paidQty: 2, chargedQty: 1, total: 500 });
-  });
-
-  test("once reports the surplus as zero-priced, matching what the server writes", () => {
-    // `freeQty` answers "how many did the rate cover" and `zeroQty` answers
-    // "how many will print at 0.00". Under `once` they differ, because
-    // `ExtraItemRule::split()` moves the unsold surplus into the zero row.
-    const q = extraItemQuote(chips({ charge_mode: "once", included: 2, included_remaining: 1 }), 3);
-
-    expect(q).toMatchObject({ freeQty: 1, paidQty: 2, chargedQty: 1, zeroQty: 2, total: 500 });
-  });
-
-  test("each keeps zeroQty and freeQty the same number", () => {
-    const q = extraItemQuote(chips({ charge_mode: "each", included: 2, included_remaining: 1 }), 3);
-
-    expect(q).toMatchObject({ freeQty: 1, zeroQty: 1, chargedQty: 2, total: 1000 });
-  });
-
-  test("once for the session takes nothing while the allowance still covers it", () => {
-    const q = extraItemQuote(chips({ charge_mode: "once", included: 2, included_remaining: 2 }), 2);
-
-    expect(q).toMatchObject({ chargedQty: 0, total: 0 });
-  });
-
-  test("a seat that already paid the one-off is quoted zero, allowance or not", () => {
-    // The server has already zeroed `unit_price`; nothing here needs to know
-    // why, which is the point of quoting the server's figure.
-    const q = extraItemQuote(chips({ charge_mode: "once", fee_taken: true, unit_price: "0.00" }), 4);
-
-    expect(q.total).toBe(0);
-  });
-
-  test("an hourly extra quotes no total, only the units that are charged", () => {
-    const q = extraItemQuote(
-      chips({ pricing_mode: "hourly", unit_price: "700.00", included: 1, included_remaining: 1 }),
-      3,
-    );
-
-    // A rate is not a bill: the minutes belong to the backend. What the
-    // allowance changes is how many units that rate is owed on.
-    expect(q).toMatchObject({ hourly: true, total: 0, freeQty: 1, chargedQty: 2, unit: 700 });
-  });
-
-  test("an hourly extra covered by the allowance owes no rate at all", () => {
-    const q = extraItemQuote(
-      chips({ pricing_mode: "hourly", unit_price: "700.00", included: 2, included_remaining: 2 }),
-      2,
-    );
-
-    expect(q).toMatchObject({ hourly: true, chargedQty: 0, total: 0 });
-  });
-
-  test("a count below one costs nothing", () => {
-    expect(extraItemQuote(chips(), 0)).toMatchObject({ qty: 0, chargedQty: 0, total: 0 });
-    expect(extraItemQuote(chips(), -5)).toMatchObject({ qty: 0, chargedQty: 0, total: 0 });
-  });
-
-  test("a nonsense allowance is read as none rather than as free units", () => {
-    // Money: guessing wrong here gives the room's stock away.
-    expect(extraItemQuote(chips({ included_remaining: -3 }), 2).total).toBe(1000);
-    expect(extraItemQuote(chips({ included_remaining: Number.NaN }), 2).total).toBe(1000);
-  });
-
-  test("a fractional count is truncated before anything is priced", () => {
-    expect(extraItemQuote(chips(), 3.9)).toMatchObject({ qty: 3, total: 1500 });
   });
 });

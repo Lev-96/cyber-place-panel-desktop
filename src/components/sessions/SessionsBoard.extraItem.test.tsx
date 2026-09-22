@@ -17,13 +17,14 @@ import { PC_KIND, PC_STATUS } from "@/types/pc";
  * be wrong on a billiard table the day somebody opened one.
  */
 
-const repo = vi.hoisted(() => ({ listPcs: vi.fn(), listActive: vi.fn(), returnItem: vi.fn() }));
+const repo = vi.hoisted(() => ({ listPcs: vi.fn(), listActive: vi.fn(), returnItem: vi.fn(), addItems: vi.fn() }));
 
 vi.mock("@/repositories/SessionRepository", () => ({
   sessionRepository: {
     listPcs: (...a: unknown[]) => repo.listPcs(...a),
     listActive: (...a: unknown[]) => repo.listActive(...a),
     returnItem: (...a: unknown[]) => repo.returnItem(...a),
+    addItems: (...a: unknown[]) => repo.addItems(...a),
     reorderPcs: vi.fn().mockResolvedValue(undefined),
   },
 }));
@@ -87,6 +88,7 @@ beforeEach(() => {
   repo.listPcs.mockReset().mockResolvedValue([pc()]);
   repo.listActive.mockReset().mockResolvedValue([]);
   repo.returnItem.mockReset().mockResolvedValue({ id: 5 });
+  repo.addItems.mockReset().mockResolvedValue({ id: 5 });
   localStorage.clear();
 });
 
@@ -174,5 +176,59 @@ describe("SessionsBoard — the room's own extra", () => {
     await mount();
 
     expect(buttons().some((label) => label.startsWith("add "))).toBe(false);
+  });
+});
+
+/**
+ * Handing it out is ONE PRESS, exactly as handing out a pad is.
+ *
+ * The button used to open a dialog with a quantity stepper. A cashier putting
+ * chips on a poker table is doing what a cashier putting a controller on a
+ * PlayStation does — one press, one thing, no menu — and the count was a
+ * question nobody at the counter was asking. A FIXED extra simply adds its
+ * price; an HOURLY one starts its rate, and the "return" button stops it.
+ */
+describe("handing the room's extra out", () => {
+  const seatWith = (over: Record<string, unknown> = {}) => ({
+    ...session({
+      name: "\u0424\u0438\u0448\u043a\u0438", price: "500.00", charge_mode: "each", pricing_mode: "fixed",
+      fee_taken: false, unit_price: "500.00", max_qty: 999,
+    }),
+    ...over,
+  });
+
+  test("one press hands over exactly one, with no dialog in between", async () => {
+    repo.listActive.mockResolvedValue([seatWith()]);
+    await mount();
+
+    const button = [...document.querySelectorAll("button")]
+      .find((b) => b.textContent === "add \u0424\u0438\u0448\u043a\u0438")!;
+    await act(async () => { button.click(); });
+
+    expect(repo.addItems).toHaveBeenCalledWith(5, [{ extra: true, qty: 1 }]);
+  });
+
+  test("no quantity is ever asked for", async () => {
+    repo.listActive.mockResolvedValue([seatWith()]);
+    await mount();
+
+    const button = [...document.querySelectorAll("button")]
+      .find((b) => b.textContent === "add \u0424\u0438\u0448\u043a\u0438")!;
+    await act(async () => { button.click(); });
+
+    // A stepper would put a number input on the screen; there is none.
+    expect(document.querySelector('input[type="number"]')).toBeNull();
+  });
+
+  test("a second press hands over a second one", async () => {
+    repo.listActive.mockResolvedValue([seatWith()]);
+    await mount();
+
+    const button = () => [...document.querySelectorAll("button")]
+      .find((b) => b.textContent === "add \u0424\u0438\u0448\u043a\u0438")!;
+    await act(async () => { button().click(); });
+    await act(async () => { button().click(); });
+
+    expect(repo.addItems).toHaveBeenCalledTimes(2);
   });
 });

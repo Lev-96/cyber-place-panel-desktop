@@ -199,6 +199,11 @@ export interface ISessionApi {
      * clock" — this table's `stopped_at`.
      */
     returned_at?: string | null;
+    /**
+     * When it was handed over. This table's `started_at`, and what lets the
+     * panel tick a rented line instead of waiting for the next poll.
+     */
+    created_at?: string | null;
     /** What the server says this line costs right now. */
     line_total?: number | string;
   }>;

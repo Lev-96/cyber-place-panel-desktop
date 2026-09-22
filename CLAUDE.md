@@ -1729,11 +1729,31 @@ key being added.
     travels as `0` (given away / none are in the rate).
   - **Clearing the NAME withdraws the whole answer** and nulls every number
     with it — a ceiling on a thing nobody hands out is a number about nothing.
-- **`AddExtraItemDialog` is the one dialog for all of them.** A count, a live
-  total, and a confirm that sends `[{extra: true, qty}]` through the SAME
-  `sessionRepository.addItems` the product dialog uses — one write path, one
-  history. It never sends a name or a price: the room prices it, which is what
-  lets a manager hand one out without `products.manage`.
+- ⚠️ **Handing it out is ONE PRESS. There is no dialog and no count
+  (2026-09-23).** `AddExtraItemDialog` and `extraItemQuote` are DELETED, not
+  deprecated: their only content was a quantity stepper and the quote that fed
+  it, and the count was a question nobody at the counter asks. A cashier
+  putting chips on a poker table does what a cashier putting a controller on a
+  PlayStation does — one press, one thing, no menu — so the board calls
+  `addItems(id, [{extra: true, qty: 1}])` straight from the button, the way it
+  calls `addJoystick`.
+  - The room's allowance still works: it is spent per UNIT, so the first N
+    presses are the free ones. What went with the dialog is the on-screen
+    "2 included, 1 left" line; nothing shows that count today.
+  - A FIXED extra puts its price on the bill and nothing else moves.
+  - ⚠️ **An HOURLY extra moves the TARIFF**, exactly as an hourly pad does:
+    `sessionCurrentHourlyRate` adds `price x qty` for every unit with no
+    `returned_at`, so a 1 000/h poker table lending 500/h chips reads 1 500/h
+    while they are out and 1 000/h again once they come back. The money always
+    came to 1 500 — the chips accrue on their own bill line — so this was never
+    a pricing bug; the tile simply did not say the sentence.
+  - ⚠️ **And it TICKS.** `sessionItemsTotalAt` extrapolates a rented line from
+    its own `created_at`, mirroring `SessionPricingCalculator::itemSeconds()`
+    and clamped the same two ways — to `returned_at` when it came back before
+    the instant shown, and to the session's start when the row predates it.
+    `sessionItemsTotal` (no `at`) stays for HISTORY, where the server's
+    `line_total` is the right answer; the pads carry the identical pair for the
+    identical reason.
 - **`once` quotes one charge, not `unit × qty`**, and a seat that has already
   paid it quotes 0.00 (`unit_price` from the server, `fee_taken` beside it).
   ⚠️ For a while the panel was right here and the SERVER was not: `putOnBill()`
