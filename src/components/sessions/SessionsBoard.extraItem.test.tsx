@@ -17,12 +17,13 @@ import { PC_KIND, PC_STATUS } from "@/types/pc";
  * be wrong on a billiard table the day somebody opened one.
  */
 
-const repo = vi.hoisted(() => ({ listPcs: vi.fn(), listActive: vi.fn() }));
+const repo = vi.hoisted(() => ({ listPcs: vi.fn(), listActive: vi.fn(), returnItem: vi.fn() }));
 
 vi.mock("@/repositories/SessionRepository", () => ({
   sessionRepository: {
     listPcs: (...a: unknown[]) => repo.listPcs(...a),
     listActive: (...a: unknown[]) => repo.listActive(...a),
+    returnItem: (...a: unknown[]) => repo.returnItem(...a),
     reorderPcs: vi.fn().mockResolvedValue(undefined),
   },
 }));
@@ -34,7 +35,8 @@ vi.mock("@/i18n/LanguageContext", () => ({
   useLang: () => ({
     // A template for the one key the owner's word lands in; everything else
     // is its own key, so an assertion names a key and not a sentence.
-    t: (k: string) => (k === "session.extraAdd" ? "add {0}" : k),
+    t: (k: string) =>
+      k === "session.extraAdd" ? "add {0}" : k === "session.extraReturn" ? "return {0}" : k,
     money: (n: number) => String(n),
     lang: "en",
   }),
@@ -84,8 +86,15 @@ afterEach(() => cleanup());
 beforeEach(() => {
   repo.listPcs.mockReset().mockResolvedValue([pc()]);
   repo.listActive.mockReset().mockResolvedValue([]);
+  repo.returnItem.mockReset().mockResolvedValue({ id: 5 });
   localStorage.clear();
 });
+
+/** A line the room rented out by the hour, still with the player. */
+const outLine = (over: Record<string, unknown> = {}) => ([{
+  id: 11, name: "Кий", price: 700, qty: 1, product_id: null,
+  is_extra: true, is_hourly: true, minutes: 30, line_total: 350, returned_at: null, ...over,
+}] as ISessionApi["items"]);
 
 describe("SessionsBoard — the room's own extra", () => {
   test("the button carries the room's word", async () => {
@@ -113,6 +122,49 @@ describe("SessionsBoard — the room's own extra", () => {
     await mount();
 
     expect(buttons().some((label) => label.startsWith("add "))).toBe(false);
+  });
+
+  test("what is still out can be handed back", async () => {
+    repo.listActive.mockResolvedValue([{
+      ...session({ name: "Кий", price: "700.00", charge_mode: "each", pricing_mode: "hourly", fee_taken: false, unit_price: "700.00", max_qty: 999 }),
+      items: outLine(),
+    }]);
+    await mount();
+
+    expect(buttons()).toContain("return Кий");
+  });
+
+  test("a line already handed back offers no second return", async () => {
+    repo.listActive.mockResolvedValue([{
+      ...session({ name: "Кий", price: "700.00", charge_mode: "each", pricing_mode: "hourly", fee_taken: false, unit_price: "700.00", max_qty: 999 }),
+      items: outLine({ returned_at: "2026-09-22T01:00:00+04:00" }),
+    }]);
+    await mount();
+
+    expect(buttons().some((l) => l.startsWith("return "))).toBe(false);
+  });
+
+  test("a FIXED extra is never offered a return", async () => {
+    repo.listActive.mockResolvedValue([{
+      ...session({ name: "Фишки", price: "500.00", charge_mode: "each", pricing_mode: "fixed", fee_taken: false, unit_price: "500.00", max_qty: 999 }),
+      items: outLine({ name: "Фишки", is_hourly: false, minutes: null }),
+    }]);
+    await mount();
+
+    expect(buttons().some((l) => l.startsWith("return "))).toBe(false);
+  });
+
+  test("pressing it hands that line back", async () => {
+    repo.listActive.mockResolvedValue([{
+      ...session({ name: "Кий", price: "700.00", charge_mode: "each", pricing_mode: "hourly", fee_taken: false, unit_price: "700.00", max_qty: 999 }),
+      items: outLine(),
+    }]);
+    await mount();
+
+    const button = [...document.querySelectorAll("button")].find((b) => b.textContent === "return Кий")!;
+    await act(async () => { button.click(); });
+
+    expect(repo.returnItem).toHaveBeenCalledWith(5, 11);
   });
 
   test("a payload that never mentioned the field shows no button either", async () => {

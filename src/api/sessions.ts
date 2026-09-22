@@ -115,7 +115,24 @@ export interface IBillBreakdown {
   time_cost: number;
   hourly_rate: number | null;
   package_name: string | null;
-  items: Array<{ id: number; name: string; price: number; qty: number; line_total: number }>;
+  items: Array<{
+    id: number;
+    name: string;
+    price: number;
+    qty: number;
+    line_total: number;
+    /**
+     * The room's own extra, RENTED by the hour: `price` is then a rate and
+     * `line_total` is what the server has counted for it so far.
+     *
+     * Optional, so a bill from an older backend still renders as the drinks
+     * it used to be.
+     */
+    is_hourly?: boolean;
+    minutes?: number | null;
+    /** When it was handed back. Null is "still out, still on the clock". */
+    returned_at?: string | null;
+  }>;
   items_total: number;
   /** What is actually owed. Zero for a waived session. */
   total: number;
@@ -238,6 +255,19 @@ export const apiSetSessionItemQty = (sessionId: number, itemId: number, qty: num
   request<{ session: ISessionApi }>(`/sessions/${sessionId}/items/${itemId}`, {
     method: "PATCH",
     body: { qty },
+  });
+
+/**
+ * Hand an HOURLY extra back: the clock stops, the charge stays.
+ *
+ * The same endpoint a quantity correction uses, because it is the same kind
+ * of thing — a change to a line already on the bill. Removing the line is
+ * still `apiRemoveSessionItem` and still means "this was never sold".
+ */
+export const apiReturnSessionItem = (sessionId: number, itemId: number) =>
+  request<{ session: ISessionApi }>(`/sessions/${sessionId}/items/${itemId}`, {
+    method: "PATCH",
+    body: { returned: true },
   });
 
 export const apiRemoveSessionItem = (sessionId: number, itemId: number) =>
@@ -387,6 +417,8 @@ export type SessionActionName =
   // reason the move happened at all.
   | "item_added"
   | "item_removed"
+  // An hourly extra handed back: the clock stopped, the charge stayed.
+  | "item_returned"
   | "time_add_refused"
   | "move_failed";
 

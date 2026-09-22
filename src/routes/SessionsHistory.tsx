@@ -700,7 +700,8 @@ export const eventDetail = (
     }
 
     case "item_added":
-    case "item_removed": {
+    case "item_removed":
+    case "item_returned": {
       const count = metaNum(meta, "count");
       if (count !== null) parts.push(`${t("history.itemsCount")}: ${count}`);
       // The names, so a disputed line can be found without opening the bill.
@@ -713,6 +714,13 @@ export const eventDetail = (
       // pads follow. The amount on the line is already 0; saying so is what
       // stops it reading as an omission.
       if (e.action === "item_removed") parts.push(t("history.noRefundShort"));
+      // How long it was out, and that nothing came back over the counter —
+      // the two things a returned pad's line already says.
+      if (e.action === "item_returned") {
+        const minutes = metaNum(meta, "minutes");
+        if (minutes !== null) parts.push(`${minutes} ${t("time.minShort")}`);
+        parts.push(t("history.noRefundShort"));
+      }
       break;
     }
 

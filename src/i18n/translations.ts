@@ -741,6 +741,8 @@ export const TRANSLATIONS: Dict = {
   "session.extraAdd": { en: "Add {0}", ru: "Добавить: {0}", am: "Ավելացնել՝ {0}" },
   "session.extraQty": { en: "How many ({0})", ru: "Количество ({0})", am: "Քանակը ({0})" },
   "session.extraPerHour": { en: "/h", ru: "/час", am: "/ժամ" },
+  "session.extraReturn": { en: "Return {0}", ru: "Вернуть: {0}", am: "Վերադարձնել՝ {0}" },
+  "session.extraReturned": { en: "returned", ru: "возвращено", am: "վերադարձված" },
   "session.extraHourlyNote": {
     en: "Charged for every hour {0} stays with the player",
     ru: "Начисляется за каждый час, пока {0} у игрока",
@@ -1228,6 +1230,9 @@ export const TRANSLATIONS: Dict = {
   "history.action.moved": { en: "Moved the session", ru: "Перенёс сессию", am: "Տեղափոխեց նիստը" },
   "history.action.item_added": { en: "Put it on the bill", ru: "Добавил в счёт", am: "Ավելացրեց հաշվին" },
   "history.action.item_removed": { en: "Took it off the bill", ru: "Убрал из счёта", am: "Հանեց հաշվից" },
+  // Not a removal: the line stays on the bill with what it earned, and only
+  // its clock stopped — the same distinction a returned pad carries.
+  "history.action.item_returned": { en: "Took the item back", ru: "Принял предмет обратно", am: "Հետ ընդունեց իրը" },
   // ⚠️ The refusals. Named as attempts, because that is what they were: the
   // line that explains why a move follows it.
   "history.action.time_add_refused": {
@@ -1256,6 +1261,7 @@ export const TRANSLATIONS: Dict = {
   "history.timelineShow": { en: "Show the path", ru: "Показать путь", am: "Ցույց տալ ընթացքը" },
   "history.timelineHide": { en: "Hide the path", ru: "Скрыть путь", am: "Թաքցնել ընթացքը" },
   "history.seatUnknown": { en: "Seat not recorded", ru: "Место не записано", am: "Տեղը գրանցված չէ" },
+  "history.itemReturned": { en: "returned", ru: "возвращено", am: "վերադարձված" },
   "history.noRefundShort": { en: "no refund", ru: "без возврата", am: "առանց վերադարձի" },
 
   // ── what each line actually changed ──────────────────────────────────────

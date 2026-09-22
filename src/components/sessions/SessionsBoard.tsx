@@ -78,6 +78,39 @@ const SessionsBoard = ({ branchId }: Props) => {
    * what the room itself is configured to hand over, at the room's price.
    */
   const [extraTarget, setExtraTarget] = useState<ISessionApi | null>(null);
+  /** The line a return is in flight for, so its button cannot be pressed twice. */
+  const [returningItem, setReturningItem] = useState<number | null>(null);
+
+  /**
+   * The room's hourly extra that is still out, if any.
+   *
+   * A pad answers this from its own row (`stopped_at`), and so does this: a
+   * line billed by the hour with no `returned_at` is still with the player and
+   * still on the clock. The FIRST one is the one the button hands back, the
+   * way the pad control takes the top pad — one press, one thing, no menu.
+   */
+  const openHourlyExtra = (sess: ISessionApi) =>
+    (sess.items ?? []).find((i) => i.is_hourly && !i.returned_at) ?? null;
+
+  /**
+   * Hand it back. The charge it earned stays on the bill, exactly as a
+   * returned pad's does, and the board re-reads the session afterwards rather
+   * than patching a figure it does not own.
+   */
+  const returnExtra = async (sess: ISessionApi, itemId: number) => {
+    setPadError(null);
+    setReturningItem(itemId);
+    try {
+      await sessionRepository.returnItem(sess.id, itemId);
+    } catch (e) {
+      // Shown on the tile it belongs to, like every other refusal here: this
+      // project has no global toast.
+      setPadError({ id: sess.id, message: e instanceof Error ? e.message : String(e) });
+    } finally {
+      setReturningItem(null);
+      await sessions.reload();
+    }
+  };
   const [optionsTarget, setOptionsTarget] = useState<ISessionApi | null>(null);
   // The session whose pads are mid-change. One at a time and per session, so a
   // second click on the SAME tile is refused while the first is in flight and a
@@ -962,6 +995,26 @@ const SessionsBoard = ({ branchId }: Props) => {
                   {fmt(t("session.extraAdd"), sess.extra_item.name)}
                 </Button>
               )}
+              {/* …and hand it back, which only exists while something IS out.
+                  The pad row's "−" is the same control for the same reason:
+                  the clock stops, the charge stays, and the line keeps its
+                  place on the receipt. */}
+              {(() => {
+                const out = openHourlyExtra(sess);
+                if (!out) return null;
+
+                return (
+                  <Button
+                    variant="secondary"
+                    style={miniBtnFlex}
+                    disabled={returningItem === out.id}
+                    title={fmt(t("session.extraReturn"), out.name)}
+                    onClick={() => void returnExtra(sess, out.id)}
+                  >
+                    {fmt(t("session.extraReturn"), out.name)}
+                  </Button>
+                );
+              })()}
               {/* Named for the thing a cashier is actually looking for on a
                   seat that is running out. It opens the SAME dialog "Options"
                   does — one management surface, reached by two names, because

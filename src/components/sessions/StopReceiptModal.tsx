@@ -225,8 +225,15 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved }: Prop
             {view.items.map((it) => (
               <div key={it.id} style={row}>
                 <span style={{ flex: 1 }}>{it.name}{it.qty > 1 ? ` × ${it.qty}` : ""}</span>
+                {/* An HOURLY line is a rate and a duration, so it reads like a
+                    pad's line rather than like a drink's: "90 m · 700/h", and
+                    "returned" once its clock has stopped. Printing "700 × 1"
+                    beside an amount of 1 050 is three figures that do not add
+                    up, on the one screen a cashier checks with their eyes. */}
                 <span className="muted" style={{ marginRight: 12, fontSize: 12 }}>
-                  {money(Number(it.price), receiptPrecision)}{it.qty > 1 ? ` × ${it.qty}` : ""}
+                  {it.is_hourly
+                    ? `${it.minutes ?? 0} ${t("time.minShort") || "m"} · ${money(Number(it.price), receiptPrecision)}${t("session.extraPerHour")}${it.qty > 1 ? ` × ${it.qty}` : ""}${it.returned_at ? ` · ${t("session.extraReturned")}` : ""}`
+                    : `${money(Number(it.price), receiptPrecision)}${it.qty > 1 ? ` × ${it.qty}` : ""}`}
                 </span>
                 <span style={{ fontWeight: 700, marginRight: 8 }}>
                   {money(Number(it.line_total), receiptPrecision)}

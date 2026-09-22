@@ -429,3 +429,54 @@ describe("StopReceiptModal", () => {
     });
   });
 });
+
+/**
+ * The room's own extra on the closing receipt.
+ *
+ * A rented cue is a RATE and a DURATION. Printing "700 x 1" beside an amount
+ * of 1 050 is three figures that do not add up, on the one screen a cashier
+ * checks with their eyes — so an hourly line reads like a pad's line instead,
+ * and says so once its clock has stopped.
+ */
+describe("an hourly extra on the receipt", () => {
+  const line = (over: Record<string, unknown> = {}) => ({
+    id: 11, name: "\u041a\u0438\u0439", price: 700, qty: 1, line_total: 1050,
+    is_hourly: true, minutes: 90, returned_at: null, ...over,
+  });
+  /** The grey note beside each line, which is where the shape under test is. */
+  const notes = () =>
+    [...document.querySelectorAll("span.muted")].map((n) => n.textContent ?? "");
+
+  test("reads as a duration and a rate, never as a count", async () => {
+    repo.preview.mockResolvedValue(bill({
+      items: [line()] as unknown as IBillBreakdown["items"],
+      items_total: 1050, subtotal: 1067.22, gross_total: 1067.22, total: 1067.22,
+    }));
+    await mount();
+
+    expect(notes().some((n) => n.includes("90 time.minShort") && n.includes("session.extraPerHour"))).toBe(true);
+    expect(notes().some((n) => n.includes("session.extraReturned"))).toBe(false);
+  });
+
+  test("says so once it has been handed back", async () => {
+    repo.preview.mockResolvedValue(bill({
+      items: [line({ returned_at: "2026-09-22T01:00:00+04:00" })] as unknown as IBillBreakdown["items"],
+      items_total: 1050, subtotal: 1067.22, gross_total: 1067.22, total: 1067.22,
+    }));
+    await mount();
+
+    expect(notes().some((n) => n.includes("session.extraReturned"))).toBe(true);
+  });
+
+  test("a drink keeps the price it always printed", async () => {
+    repo.preview.mockResolvedValue(bill({
+      items: [{ id: 12, name: "Cola", price: 300, qty: 2, line_total: 600 }] as unknown as IBillBreakdown["items"],
+      items_total: 600, subtotal: 617.22, gross_total: 617.22, total: 617.22,
+    }));
+    await mount();
+
+    // Exactly the old shape: a price and a count, no duration and no rate.
+    // (`time.minShort` on its own would match the receipt's elapsed-time line.)
+    expect(notes()).toContain("300.00\u00b7AMD \u00d7 2");
+  });
+});

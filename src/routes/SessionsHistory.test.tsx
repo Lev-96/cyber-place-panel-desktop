@@ -256,6 +256,27 @@ describe("the bill's own lines", () => {
 
     expect(line).toBe("history.itemsCount: 1");
   });
+
+  /**
+   * A return is NOT a removal, and the row has to say the difference: the line
+   * stays on the bill with what it earned while it was out, so the only two
+   * facts worth the width are how long that was and that no money came back.
+   */
+  test("a return says how long it was out and that nothing came back", () => {
+    const line = eventDetail(
+      event({
+        action: "item_returned",
+        amount: 0,
+        meta: { count: 1, minutes: 90, lines: [{ name: "\u041a\u0438\u0439", price: 700, qty: 1, extra: true }] },
+      }),
+      t,
+      money,
+    );
+
+    expect(line).toContain("\u041a\u0438\u0439");
+    expect(line).toContain("90 time.minShort");
+    expect(line).toContain("history.noRefundShort");
+  });
 });
 
 describe("the two refusals", () => {

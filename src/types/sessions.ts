@@ -194,6 +194,11 @@ export interface ISessionApi {
     is_hourly?: boolean;
     /** Minutes this hourly line has been running, as the server counted them. */
     minutes?: number | null;
+    /**
+     * When it was handed back, if it was. Null is "still out and still on the
+     * clock" — this table's `stopped_at`.
+     */
+    returned_at?: string | null;
     /** What the server says this line costs right now. */
     line_total?: number | string;
   }>;
