@@ -102,7 +102,17 @@ const SessionsBoard = ({ branchId }: Props) => {
   const applyItems = (updated: ISessionApi) => {
     if (!Array.isArray(updated.items)) return;
     sessions.mutate((list) =>
-      list?.map((s) => (s.id === updated.id ? { ...s, items: updated.items } : s)) ?? list);
+      list?.map((s) => (s.id === updated.id
+        ? {
+          ...s,
+          items: updated.items,
+          // …and the button's own state when the answer carries it (a server
+          // from 2026-09-23 on loads the seat's place for exactly this), so a
+          // fixed room greys its button on the press. Absent, the board's
+          // copy stands until the reload.
+          ...(updated.extra_item !== undefined ? { extra_item: updated.extra_item } : {}),
+        }
+        : s)) ?? list);
   };
 
   /**
@@ -1045,19 +1055,33 @@ const SessionsBoard = ({ branchId }: Props) => {
                 // rate, on a fixed room or an hourly one. The owner's call
                 // (2026-09-23): the button says what it does; the bill says
                 // what it cost.
-                const out = openExtra(sess);
-                const label = out
-                  ? fmt(t("session.extraReturn"), sess.extra_item!.name)
-                  : fmt(t("session.extraAdd"), sess.extra_item!.name);
+                //
+                // ⚠️ WHAT it does is the server's answer (2026-09-23): a fixed
+                // room sells once per session, so after its sale the button
+                // is greyed and offers no return (`can_hand_out` false,
+                // `return_item_id` null); an hourly room names the line to
+                // take back. `openExtra` is only the fallback for a server
+                // that predates the two keys.
+                const extra = sess.extra_item!;
+                const backId = extra.return_item_id !== undefined
+                  ? extra.return_item_id
+                  : openExtra(sess)?.id ?? null;
+                const label = backId !== null
+                  ? fmt(t("session.extraReturn"), extra.name)
+                  : fmt(t("session.extraAdd"), extra.name);
 
                 return (
                   <Button
                     variant="secondary"
                     onClick={() => {
-                      if (out) { void returnExtra(sess, out.id); return; }
+                      if (backId !== null) { void returnExtra(sess, backId); return; }
                       void handOutExtra(sess);
                     }}
-                    disabled={extraBusy === sess.id || returningItem === out?.id}
+                    disabled={
+                      extraBusy === sess.id
+                      || (backId !== null && returningItem === backId)
+                      || (backId === null && extra.can_hand_out === false)
+                    }
                     style={miniBtnFlex}
                     title={label}
                   >

@@ -356,6 +356,19 @@ export interface IExtraItem {
    * which is what keeps the dialog and the receipt on one figure.
    */
   included_remaining?: number;
+  /**
+   * May the board hand ONE more over right now — the server's answer. False
+   * after a FIXED room's one sale per session, or when the room's ceiling is
+   * reached; the button is greyed then. Absent on an older server, which
+   * never refused a second hand-out.
+   */
+  can_hand_out?: boolean;
+  /**
+   * The line the button would hand BACK, or null when there is none — only
+   * ever something on a clock, never a fixed sale. Absent on an older server,
+   * and the board then falls back to "the first extra line not returned".
+   */
+  return_item_id?: number | null;
 }
 
 export interface IPcApi extends Translated {

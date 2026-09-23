@@ -442,3 +442,85 @@ describe("a hand-out is announced", () => {
     expect(toasts).toEqual([]);
   });
 });
+
+/**
+ * ⚠️ A FIXED room sells its extra ONCE per session (the owner's rule,
+ * 2026-09-23), and what the button does is the SERVER's answer:
+ * `can_hand_out` greys it, `return_item_id` names the line it would take
+ * back. The board draws those and works nothing out — and a server that
+ * predates them gets the old toggle, which the suites above pin.
+ */
+describe("the server decides what the one button does", () => {
+  const fixed = {
+    name: "Фишки", price: "500.00", charge_mode: "each", pricing_mode: "fixed",
+    fee_taken: false, unit_price: "500.00", max_qty: 999,
+  };
+  const soldLine = { id: 41, name: "Фишки", price: 500, qty: 1, product_id: null, is_extra: true, is_hourly: false, returned_at: null };
+  const buttonNamed = (label: string) =>
+    [...document.querySelectorAll("button")].find((b) => b.textContent === label) as HTMLButtonElement | undefined;
+
+  test("after a fixed room's sale the button is greyed and offers no return", async () => {
+    repo.listActive.mockResolvedValue([{
+      ...session({ ...fixed, can_hand_out: false, return_item_id: null } as ISessionApi["extra_item"]),
+      items: [soldLine],
+    }]);
+    await mount();
+
+    // An unreturned fixed line is on the tile, and still there is no return.
+    expect(buttons()).not.toContain("return Фишки");
+    expect(buttonNamed("add Фишки")?.disabled).toBe(true);
+  });
+
+  test("a greyed button hands nothing out when pressed", async () => {
+    repo.listActive.mockResolvedValue([
+      session({ ...fixed, can_hand_out: false, return_item_id: null } as ISessionApi["extra_item"]),
+    ]);
+    await mount();
+
+    await act(async () => { buttonNamed("add Фишки")!.click(); });
+
+    expect(repo.addItems).not.toHaveBeenCalled();
+  });
+
+  test("before the sale it is live", async () => {
+    repo.listActive.mockResolvedValue([
+      session({ ...fixed, can_hand_out: true, return_item_id: null } as ISessionApi["extra_item"]),
+    ]);
+    await mount();
+
+    expect(buttonNamed("add Фишки")?.disabled).toBe(false);
+  });
+
+  test("the press greys it at once, from the write's own answer", async () => {
+    repo.listActive
+      .mockResolvedValueOnce([session({ ...fixed, can_hand_out: true, return_item_id: null } as ISessionApi["extra_item"])])
+      .mockReturnValue(new Promise(() => {}));
+    repo.addItems.mockResolvedValue({
+      id: 5, items: [soldLine], extra_item: { ...fixed, can_hand_out: false, return_item_id: null },
+    });
+    await mount();
+
+    await act(async () => { buttonNamed("add Фишки")!.click(); });
+
+    expect(buttons()).not.toContain("return Фишки");
+    expect(buttonNamed("add Фишки")?.disabled).toBe(true);
+  });
+
+  test("an hourly room's answer names the line, and the button takes it back", async () => {
+    const hourly = { ...fixed, name: "Кий", pricing_mode: "hourly" };
+    repo.listActive
+      .mockResolvedValueOnce([session({ ...hourly, can_hand_out: true, return_item_id: null } as ISessionApi["extra_item"])])
+      .mockReturnValue(new Promise(() => {}));
+    repo.addItems.mockResolvedValue({
+      id: 5,
+      items: [{ ...soldLine, id: 77, name: "Кий", is_hourly: true }],
+      extra_item: { ...hourly, can_hand_out: true, return_item_id: 77 },
+    });
+    await mount();
+
+    await act(async () => { buttonNamed("add Кий")!.click(); });
+    await act(async () => { buttonNamed("return Кий")!.click(); });
+
+    expect(repo.returnItem).toHaveBeenCalledWith(5, 77);
+  });
+});
