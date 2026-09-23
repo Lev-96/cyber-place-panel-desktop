@@ -1738,16 +1738,25 @@ key being added.
   `addItems(id, [{extra: true, qty: 1}])` straight from the button, the way it
   calls `addJoystick`.
   - The room's allowance still works: it is spent per UNIT, so the first N
-    presses are the free ones. ⚠️ **The button quotes what the NEXT press
-    costs (2026-09-23), from the server's `extra_item.next_fee`** — `Добавить:
-    Кий · 500`, `· 700/ч` on an hourly room, `· бесплатно` inside the
-    allowance, `· оплачено` on a `once` seat that has paid (the pad menu's
-    own two zeros, and its own keys). It replaced the dialog's "2 included,
-    1 left" line and is deliberately NOT rebuilt from `included_remaining`:
-    a room that charges only its third unit has an allowance of 0 and a free
-    second press, so any count-based quote lies there. The server's figure
-    is `ExtraItemRule::feeFor($session, 1)` — the bill's own arithmetic. An
-    older server omits the key and the button shows its bare label.
+    presses are the free ones. ⚠️ **The button carries the room's word and
+    NOTHING else** — no price, no "paid", no "/ч", on a fixed, `once` or
+    hourly room alike (the owner's call, 2026-09-23). A short-lived version
+    quoted the server's `next_fee` beside it; the owner rejected it and the
+    key is gone from the server too. Do not bring a figure back to the
+    button: the bill says what it cost.
+  - ⚠️ **The toggle flips on the PRESS, not on the next board read
+    (2026-09-23).** `handOutExtra` / `returnExtra` hand the write's own
+    answer to `applyItems()`, which puts ONLY its `items` on that seat via
+    `useAsync`'s `mutate`; the `reload()` after it is unchanged. Only
+    `items`, because those endpoints load nothing else — the rest of that
+    session is partial (no `pc`, so no `extra_item`), and taking it whole
+    blanks the very button being flipped. `mutate` bumps the generation so
+    a poll already in flight (older than the write) cannot paint over it.
+    It waited for the read before, which on Railway is a second round trip:
+    the cashier saw "add" for seconds after handing chips over.
+  - A `once` room charges its fee once per SESSION: hand out, take back,
+    hand out again and the second is 0.00. That is the pads' `once` rule
+    exactly, not a bug — an `each` room charges every hand-out.
   - ⚠️ **ONE control that toggles**, exactly as the pad button does: hand it
     out and the same button becomes "take it back". `openExtra` looks for an
     `is_extra` line with no `returned_at` — deliberately NOT gated on
@@ -1784,8 +1793,8 @@ key being added.
   and three cases pin it. (The "no branch-level default" this paragraph once
   recorded is superseded: since 2026-09-23 every answer inherits from the
   branch — see the strategy bullet above.) The panel computes NO split:
-  `extraItemQuote` was deleted with the dialog, and the one figure the board
-  shows is the server's `next_fee`.
+  `extraItemQuote` was deleted with the dialog, and the figure the button
+  shows is none — see the one-press bullet above.
 - **A FIXED extra changes nothing in `sessionAmount`.** It is a `session_items`
   row, so the running total, the receipt and the history already add it up as
   `price x qty`.
