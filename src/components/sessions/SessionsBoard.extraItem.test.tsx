@@ -37,13 +37,17 @@ vi.mock("@/i18n/LanguageContext", () => ({
     // A template for the one key the owner's word lands in; everything else
     // is its own key, so an assertion names a key and not a sentence.
     t: (k: string) =>
-      k === "session.extraAdd" ? "add {0}" : k === "session.extraReturn" ? "return {0}" : k,
+      k === "session.extraAdd" ? "add {0}"
+        : k === "session.extraReturn" ? "return {0}"
+        : k === "session.extraAdded" ? "added {0}"
+        : k,
     money: (n: number) => String(n),
     lang: "en",
   }),
 }));
 
 import SessionsBoard from "./SessionsBoard";
+import { notify, ToastEvent } from "@/ui/notify";
 
 const pc = (over: Partial<IPcApi> = {}): IPcApi => ({
   id: 1,
@@ -367,5 +371,47 @@ describe("the toggle follows the write, not the next read", () => {
 
     expect(buttons()).toContain("add Фишки");
     expect(repo.listActive).toHaveBeenCalledTimes(2);
+  });
+});
+
+/**
+ * A hand-out says so the way a pad does: a GREEN toast naming the thing —
+ * "Добавлено: Фишки", in the room's own word. Only a hand-out the server
+ * accepted: a refusal keeps its message on the tile and raises no toast.
+ */
+describe("a hand-out is announced", () => {
+  const extra = {
+    name: "Кий", price: "500.00", charge_mode: "each", pricing_mode: "fixed",
+    fee_taken: false, unit_price: "500.00", max_qty: 999,
+  } as ISessionApi["extra_item"];
+  const toasts: ToastEvent[] = [];
+  let off: () => void = () => {};
+
+  beforeEach(() => { toasts.length = 0; off = notify.subscribe((e) => toasts.push(e)); });
+  afterEach(() => off());
+
+  const press = async (label: string) => {
+    const button = [...document.querySelectorAll("button")].find((b) => b.textContent === label)!;
+    await act(async () => { button.click(); });
+  };
+
+  test("a green toast names what went out", async () => {
+    repo.listActive.mockResolvedValue([session(extra)]);
+    repo.addItems.mockResolvedValue({ id: 5, items: [] });
+    await mount();
+
+    await press("add Кий");
+
+    expect(toasts).toEqual([expect.objectContaining({ kind: "success", text: "added Кий" })]);
+  });
+
+  test("a refused hand-out raises no toast", async () => {
+    repo.listActive.mockResolvedValue([session(extra)]);
+    repo.addItems.mockRejectedValue(new Error("nothing left"));
+    await mount();
+
+    await press("add Кий");
+
+    expect(toasts).toEqual([]);
   });
 });

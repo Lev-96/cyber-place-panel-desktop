@@ -126,6 +126,10 @@ const SessionsBoard = ({ branchId }: Props) => {
     setPadError(null);
     try {
       applyItems(await sessionRepository.addItems(sess.id, [{ extra: true, qty: 1 }]));
+      // Green, naming the thing in the room's word — the pads' own toast
+      // after a hand-out. Only after the server accepted it: a refusal stays
+      // on the tile below and says why.
+      notify.message("success", fmt(t("session.extraAdded"), sess.extra_item?.name ?? ""));
     } catch (e) {
       // On the tile it belongs to, like every other refusal here: no price
       // set, nothing left to hand out, the session is over.

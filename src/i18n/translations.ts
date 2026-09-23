@@ -739,6 +739,9 @@ export const TRANSLATIONS: Dict = {
   // "darts". Nothing here names a thing, which is the whole point: a room
   // invented tomorrow reads correctly without a key being added.
   "session.extraAdd": { en: "Add {0}", ru: "Добавить: {0}", am: "Ավելացնել՝ {0}" },
+  // The green toast after a hand-out, in the room's own word — the pads say
+  // "Джойстик добавлен" the same way.
+  "session.extraAdded": { en: "Added: {0}", ru: "Добавлено: {0}", am: "Ավելացվեց՝ {0}" },
   "session.extraQty": { en: "How many ({0})", ru: "Количество ({0})", am: "Քանակը ({0})" },
   "session.extraPerHour": { en: "/h", ru: "/час", am: "/ժամ" },
   "session.extraReturn": { en: "Return {0}", ru: "Вернуть: {0}", am: "Վերադարձնել՝ {0}" },
