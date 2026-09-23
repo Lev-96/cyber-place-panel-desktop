@@ -1754,6 +1754,11 @@ key being added.
     a poll already in flight (older than the write) cannot paint over it.
     It waited for the read before, which on Railway is a second round trip:
     the cashier saw "add" for seconds after handing chips over.
+  - **A hand-out raises the pads' GREEN toast** (2026-09-23):
+    `notify.message("success", fmt(t("session.extraAdded"), name))` →
+    «Добавлено: Фишки», in the room's own word. Only after the server
+    accepted it; a refusal stays on the tile and raises nothing. A return
+    raises none — the owner asked for the hand-out only.
   - A `once` room charges its fee once per SESSION: hand out, take back,
     hand out again and the second is 0.00. That is the pads' `once` rule
     exactly, not a bug — an `each` room charges every hand-out.
