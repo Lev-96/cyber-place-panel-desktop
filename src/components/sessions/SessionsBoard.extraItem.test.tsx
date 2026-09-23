@@ -264,3 +264,69 @@ describe("handing the room's extra out", () => {
     expect(repo.addItems).toHaveBeenCalledTimes(2);
   });
 });
+
+/**
+ * What the NEXT press costs, beside the button — the line the quantity dialog
+ * used to carry as "2 included, 1 left".
+ *
+ * It is the SERVER's `next_fee`, quoted and never computed: a count read from
+ * `included_remaining` would say "none left" on a room that charges only its
+ * third unit, while the second press there is still free. The two zeros are
+ * told apart the way the pad menu tells them apart — "free" is what the room
+ * charges, "paid" is a one-off fee this seat has already covered.
+ */
+describe("the next press quotes its figure", () => {
+  const seatWith = (extra: Record<string, unknown>, over: Record<string, unknown> = {}) => ({
+    ...session({
+      name: "Кий", price: "500.00", charge_mode: "each", pricing_mode: "fixed",
+      fee_taken: false, unit_price: "500.00", max_qty: 999, ...extra,
+    } as ISessionApi["extra_item"]),
+    ...over,
+  });
+
+  test("a charged press shows the figure the bill will take", async () => {
+    repo.listActive.mockResolvedValue([seatWith({ next_fee: "300.00" })]);
+    await mount();
+
+    expect(buttons()).toContain("add Кий · 300");
+  });
+
+  test("a press inside the allowance says it is free", async () => {
+    repo.listActive.mockResolvedValue([seatWith({ next_fee: "0.00", included: 2, included_remaining: 1 })]);
+    await mount();
+
+    expect(buttons()).toContain("add Кий · session.padFree");
+  });
+
+  test("an hourly room quotes a rate, not a total", async () => {
+    repo.listActive.mockResolvedValue([seatWith({ pricing_mode: "hourly", next_fee: "700.00" })]);
+    await mount();
+
+    expect(buttons()).toContain("add Кий · 700session.perHourShort");
+  });
+
+  test("a once seat that has paid says so rather than calling it free", async () => {
+    repo.listActive.mockResolvedValue([
+      seatWith({ charge_mode: "once", fee_taken: true, unit_price: "0.00", next_fee: "0.00" }),
+    ]);
+    await mount();
+
+    expect(buttons()).toContain("add Кий · session.padFeeTaken");
+  });
+
+  test("the take-it-back button quotes nothing", async () => {
+    repo.listActive.mockResolvedValue([
+      seatWith({ pricing_mode: "hourly", next_fee: "700.00" }, { items: outLine() }),
+    ]);
+    await mount();
+
+    expect(buttons()).toContain("return Кий");
+  });
+
+  test("an older server without the figure keeps the bare label", async () => {
+    repo.listActive.mockResolvedValue([seatWith({})]);
+    await mount();
+
+    expect(buttons()).toContain("add Кий");
+  });
+});

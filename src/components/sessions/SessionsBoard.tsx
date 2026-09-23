@@ -1018,10 +1018,22 @@ const SessionsBoard = ({ branchId }: Props) => {
                 // hand it out, and the same button becomes "take it back".
                 // Two buttons side by side made the board ask a question the
                 // seat had already answered.
+                const extra = sess.extra_item!;
                 const out = openExtra(sess);
+                // What the next press costs — the SERVER's figure, never ours:
+                // it already knows the allowance, the units the room named as
+                // charged and the second price. The two zeros read apart the
+                // way the pad menu reads them: "paid" is a one-off fee this
+                // seat has covered, "free" is what the room charges.
+                const fee = extra.next_fee;
+                const feeTail = fee == null
+                  ? ""
+                  : " · " + (Number(fee) === 0
+                    ? t(extra.charge_mode === "once" && extra.fee_taken ? "session.padFeeTaken" : "session.padFree")
+                    : money(Number(fee)) + (extra.pricing_mode === "hourly" ? t("session.perHourShort") : ""));
                 const label = out
-                  ? fmt(t("session.extraReturn"), sess.extra_item!.name)
-                  : fmt(t("session.extraAdd"), sess.extra_item!.name);
+                  ? fmt(t("session.extraReturn"), extra.name)
+                  : fmt(t("session.extraAdd"), extra.name) + feeTail;
 
                 return (
                   <Button
