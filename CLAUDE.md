@@ -1760,17 +1760,19 @@ key being added.
     accepted it; a refusal stays on the tile and raises nothing. A return
     raises the RED one, as a pad's removal does: `notify.message("error",
     fmt(t("session.extraReturnedToast"), name))` → «Возвращено: Фишки».
-  - A `once` room charges its fee once per SESSION: hand out, take back,
-    hand out again and the second is 0.00. That is the pads' `once` rule
-    exactly, not a bug — an `each` room charges every hand-out.
-  - ⚠️ **ONE control that toggles**, exactly as the pad button does: hand it
-    out and the same button becomes "take it back". `openExtra` looks for an
-    `is_extra` line with no `returned_at` — deliberately NOT gated on
-    `is_hourly`, because handing something back means "the thing came back",
-    which is as true of chips sold at a flat price as of a rented cue. Two
-    buttons side by side asked a question the seat had already answered.
-  - A FIXED extra puts its price on the bill, and handing it back keeps that
-    price — a fee pad refunds nothing either.
+  - ⚠️ **A FIXED room sells ONCE per session; an HOURLY room lends
+    (the owner's rule, 2026-09-23).** What the one button does is the
+    SERVER's answer: `extra_item.can_hand_out` false → the button stays
+    «Добавить: …» and is greyed (a fixed room after its sale, or a ceiling
+    reached); `extra_item.return_item_id` → the button is «Вернуть: …» for
+    THAT line (only ever something on a clock). A fixed sale is never
+    offered a return — the server refuses one too. `applyItems()` takes
+    `extra_item` from the write's answer as well as `items`, so the button
+    greys on the press. `openExtra` (first extra line not returned) is only
+    the fallback for a server that predates the two keys.
+  - The toggle is still ONE control, exactly as the pad button is — in an
+    hourly room: hand out, the same button becomes "take it back", and
+    back again.
   - ⚠️ **An HOURLY extra moves the TARIFF**, exactly as an hourly pad does:
     `sessionCurrentHourlyRate` adds `price x qty` for every unit with no
     `returned_at`, so a 1 000/h poker table lending 500/h chips reads 1 500/h
@@ -1820,9 +1822,9 @@ key being added.
   `{returned: true}`** (`sessionRepository.returnItem`), the same endpoint a
   quantity correction uses because it is the same kind of thing — a change to a
   line already on the bill. `DELETE` still means "this was never sold". The
-  board offers it for any `is_extra` line with no `returned_at` (the toggle
-  above — no longer only hourly ones); on an hourly line the clock stops, the
-  charge stays, and the receipt prints `90 min - 700/h - returned` rather than a count.
+  board offers it only for the line the server names in
+  `extra_item.return_item_id` (something on a clock — never a fixed sale); the
+  clock stops, the charge stays, and the receipt prints `90 min - 700/h - returned` rather than a count.
   The history action is `item_returned` — NOT `item_removed`: the line keeps
   what it earned, so the row says how long it was out and that nothing came
   back.
