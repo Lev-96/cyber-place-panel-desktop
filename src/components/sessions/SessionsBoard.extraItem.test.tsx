@@ -265,68 +265,107 @@ describe("handing the room's extra out", () => {
   });
 });
 
+
 /**
- * What the NEXT press costs, beside the button — the line the quantity dialog
- * used to carry as "2 included, 1 left".
- *
- * It is the SERVER's `next_fee`, quoted and never computed: a count read from
- * `included_remaining` would say "none left" on a room that charges only its
- * third unit, while the second press there is still free. The two zeros are
- * told apart the way the pad menu tells them apart — "free" is what the room
- * charges, "paid" is a one-off fee this seat has already covered.
+ * The label is the room's word and nothing else (the owner's call,
+ * 2026-09-23): no price, no "paid", no rate — on a fixed room, a paid `once`
+ * room and an hourly one alike. The bill says what it cost.
  */
-describe("the next press quotes its figure", () => {
-  const seatWith = (extra: Record<string, unknown>, over: Record<string, unknown> = {}) => ({
-    ...session({
-      name: "Кий", price: "500.00", charge_mode: "each", pricing_mode: "fixed",
-      fee_taken: false, unit_price: "500.00", max_qty: 999, ...extra,
-    } as ISessionApi["extra_item"]),
-    ...over,
-  });
+describe("the button names the thing, never its price", () => {
+  const seatWith = (extra: Record<string, unknown>) => session({
+    name: "Фишки", price: "500.00", charge_mode: "each", pricing_mode: "fixed",
+    fee_taken: false, unit_price: "500.00", max_qty: 999, ...extra,
+  } as ISessionApi["extra_item"]);
 
-  test("a charged press shows the figure the bill will take", async () => {
-    repo.listActive.mockResolvedValue([seatWith({ next_fee: "300.00" })]);
+  test.each([
+    ["a fixed room", {}],
+    ["a once room that has paid", { charge_mode: "once", fee_taken: true, unit_price: "0.00" }],
+    ["an hourly room", { pricing_mode: "hourly" }],
+    ["a payload still carrying a quote", { next_fee: "500.00" }],
+  ])("%s", async (_label, extra) => {
+    repo.listActive.mockResolvedValue([seatWith(extra)]);
     await mount();
 
-    expect(buttons()).toContain("add Кий · 300");
+    expect(buttons()).toContain("add Фишки");
+    expect(buttons().join(" ")).not.toMatch(/500|session\.(padFree|padFeeTaken|perHourShort)/);
   });
+});
 
-  test("a press inside the allowance says it is free", async () => {
-    repo.listActive.mockResolvedValue([seatWith({ next_fee: "0.00", included: 2, included_remaining: 1 })]);
+/**
+ * ⚠️ The button flips ON THE PRESS — the server's answer to the write is put
+ * on the tile at once, and the board read that follows no longer gates it.
+ *
+ * It waited for that read, which on a real backend is a second round trip,
+ * and a cashier saw "add" for seconds after handing chips over. Each case
+ * holds the follow-up read open forever, so the only thing that can flip the
+ * button is the write's own answer.
+ */
+describe("the toggle follows the write, not the next read", () => {
+  const extra = {
+    name: "Фишки", price: "500.00", charge_mode: "each", pricing_mode: "fixed",
+    fee_taken: false, unit_price: "500.00", max_qty: 999,
+  } as ISessionApi["extra_item"];
+  const line = (over: Record<string, unknown> = {}) => ({
+    id: 21, name: "Фишки", price: 500, qty: 1, product_id: null,
+    is_extra: true, is_hourly: false, returned_at: null, ...over,
+  });
+  const press = async (label: string) => {
+    const button = [...document.querySelectorAll("button")].find((b) => b.textContent === label)!;
+    await act(async () => { button.click(); });
+  };
+
+  test("handing one out turns the button into take-it-back at once", async () => {
+    repo.listActive
+      .mockResolvedValueOnce([session(extra)])
+      .mockReturnValue(new Promise(() => {}));
+    // The endpoint's own answer: items only, no pc, no extra_item.
+    repo.addItems.mockResolvedValue({ id: 5, items: [line()] });
     await mount();
 
-    expect(buttons()).toContain("add Кий · session.padFree");
+    await press("add Фишки");
+
+    expect(buttons()).toContain("return Фишки");
+    expect(buttons()).not.toContain("add Фишки");
   });
 
-  test("an hourly room quotes a rate, not a total", async () => {
-    repo.listActive.mockResolvedValue([seatWith({ pricing_mode: "hourly", next_fee: "700.00" })]);
+  test("handing it back turns it into hand-out at once", async () => {
+    repo.listActive
+      .mockResolvedValueOnce([{ ...session(extra), items: [line()] }])
+      .mockReturnValue(new Promise(() => {}));
+    repo.returnItem.mockResolvedValue({ id: 5, items: [line({ returned_at: "2026-09-23T16:00:00+04:00" })] });
     await mount();
 
-    expect(buttons()).toContain("add Кий · 700session.perHourShort");
+    await press("return Фишки");
+
+    expect(buttons()).toContain("add Фишки");
   });
 
-  test("a once seat that has paid says so rather than calling it free", async () => {
-    repo.listActive.mockResolvedValue([
-      seatWith({ charge_mode: "once", fee_taken: true, unit_price: "0.00", next_fee: "0.00" }),
-    ]);
+  test("a partial answer never blanks the button or another seat", async () => {
+    const other = { ...session(extra), id: 6, pc_id: 2 };
+    repo.listPcs.mockResolvedValue([pc(), pc({ id: 2, place_id: 11, label: "Table 2" })]);
+    repo.listActive
+      .mockResolvedValueOnce([session(extra), other])
+      .mockReturnValue(new Promise(() => {}));
+    repo.addItems.mockResolvedValue({ id: 5, items: [line()] });
     await mount();
 
-    expect(buttons()).toContain("add Кий · session.padFeeTaken");
+    await press("add Фишки");
+
+    // Seat 5 flipped and kept its button; seat 6 was not touched.
+    expect(buttons().filter((b) => b === "return Фишки")).toHaveLength(1);
+    expect(buttons().filter((b) => b === "add Фишки")).toHaveLength(1);
   });
 
-  test("the take-it-back button quotes nothing", async () => {
-    repo.listActive.mockResolvedValue([
-      seatWith({ pricing_mode: "hourly", next_fee: "700.00" }, { items: outLine() }),
-    ]);
+  test("a refused write changes nothing on the tile", async () => {
+    repo.listActive
+      .mockResolvedValueOnce([session(extra)])
+      .mockReturnValue(new Promise(() => {}));
+    repo.addItems.mockRejectedValue(new Error("nothing left"));
     await mount();
 
-    expect(buttons()).toContain("return Кий");
-  });
+    await press("add Фишки");
 
-  test("an older server without the figure keeps the bare label", async () => {
-    repo.listActive.mockResolvedValue([seatWith({})]);
-    await mount();
-
-    expect(buttons()).toContain("add Кий");
+    expect(buttons()).toContain("add Фишки");
+    expect(repo.listActive).toHaveBeenCalledTimes(2);
   });
 });

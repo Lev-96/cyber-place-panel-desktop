@@ -21,7 +21,8 @@ interface State<T> { data: T | null; loading: boolean; error: Error | null; }
  *    cache is already fresh) and one render, and is what stops a screen
  *    showing data that was correct a minute ago.
  *
- * The public shape (`{data, loading, error, reload}`) is unchanged.
+ * The public shape is `{data, loading, error, reload, mutate}`; `mutate` was
+ * added later and nothing that ignores it changes.
  */
 export const useAsync = <T,>(fn: () => Promise<T>, deps: unknown[]) => {
   const [state, setState] = useState<State<T>>({ data: null, loading: true, error: null });
@@ -57,5 +58,19 @@ export const useAsync = <T,>(fn: () => Promise<T>, deps: unknown[]) => {
   // held, so an unchanged endpoint re-renders nothing.
   useEffect(() => apiCache.subscribe(() => { void run(); }), [run]);
 
-  return { ...state, reload: run };
+  /**
+   * Put what a WRITE already answered on screen now, instead of after the
+   * read-back round trip. Callers still `reload()` right after: this is the
+   * write's own answer arriving early, not a replacement for the server's.
+   *
+   * ⚠️ Bumps the generation, so a read already in flight is dropped: it
+   * started before the write landed and carries the older state. Clearing
+   * `loading` goes with it — the dropped read will never do it.
+   */
+  const mutate = useCallback((update: (data: T | null) => T | null) => {
+    ++genRef.current;
+    setState((s) => ({ data: update(s.data), loading: false, error: s.error }));
+  }, []);
+
+  return { ...state, reload: run, mutate };
 };

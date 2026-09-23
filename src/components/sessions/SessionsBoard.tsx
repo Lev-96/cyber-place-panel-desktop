@@ -90,6 +90,22 @@ const SessionsBoard = ({ branchId }: Props) => {
     (sess.items ?? []).find((i) => i.is_extra && !i.returned_at) ?? null;
 
   /**
+   * Put the bill lines a hand-out or a return just answered with on the tile
+   * NOW, so the button flips on the press instead of a board read later.
+   *
+   * ONLY `items`: those two endpoints load nothing else, so the rest of their
+   * session is partial — no `pc`, so no `extra_item`, and taking it whole
+   * would blank the very button it is meant to flip. The lines are the same
+   * shape the board list sends. The `reload()` that always follows brings
+   * everything else back, and the server's own word on the lines too.
+   */
+  const applyItems = (updated: ISessionApi) => {
+    if (!Array.isArray(updated.items)) return;
+    sessions.mutate((list) =>
+      list?.map((s) => (s.id === updated.id ? { ...s, items: updated.items } : s)) ?? list);
+  };
+
+  /**
    * Hand ONE over. One press, one thing, no menu — the pad control's own
    * shape, for the pad control's own reason.
    *
@@ -109,7 +125,7 @@ const SessionsBoard = ({ branchId }: Props) => {
     setExtraBusy(sess.id);
     setPadError(null);
     try {
-      await sessionRepository.addItems(sess.id, [{ extra: true, qty: 1 }]);
+      applyItems(await sessionRepository.addItems(sess.id, [{ extra: true, qty: 1 }]));
     } catch (e) {
       // On the tile it belongs to, like every other refusal here: no price
       // set, nothing left to hand out, the session is over.
@@ -122,14 +138,14 @@ const SessionsBoard = ({ branchId }: Props) => {
 
   /**
    * Hand it back. The charge it earned stays on the bill, exactly as a
-   * returned pad's does, and the board re-reads the session afterwards rather
-   * than patching a figure it does not own.
+   * returned pad's does. The tile takes the server's answer at once and the
+   * board re-reads afterwards — it never patches a figure it computed.
    */
   const returnExtra = async (sess: ISessionApi, itemId: number) => {
     setPadError(null);
     setReturningItem(itemId);
     try {
-      await sessionRepository.returnItem(sess.id, itemId);
+      applyItems(await sessionRepository.returnItem(sess.id, itemId));
     } catch (e) {
       // Shown on the tile it belongs to, like every other refusal here: this
       // project has no global toast.
@@ -1018,22 +1034,14 @@ const SessionsBoard = ({ branchId }: Props) => {
                 // hand it out, and the same button becomes "take it back".
                 // Two buttons side by side made the board ask a question the
                 // seat had already answered.
-                const extra = sess.extra_item!;
+                // The room's word and nothing else — no price, no "paid", no
+                // rate, on a fixed room or an hourly one. The owner's call
+                // (2026-09-23): the button says what it does; the bill says
+                // what it cost.
                 const out = openExtra(sess);
-                // What the next press costs — the SERVER's figure, never ours:
-                // it already knows the allowance, the units the room named as
-                // charged and the second price. The two zeros read apart the
-                // way the pad menu reads them: "paid" is a one-off fee this
-                // seat has covered, "free" is what the room charges.
-                const fee = extra.next_fee;
-                const feeTail = fee == null
-                  ? ""
-                  : " · " + (Number(fee) === 0
-                    ? t(extra.charge_mode === "once" && extra.fee_taken ? "session.padFeeTaken" : "session.padFree")
-                    : money(Number(fee)) + (extra.pricing_mode === "hourly" ? t("session.perHourShort") : ""));
                 const label = out
-                  ? fmt(t("session.extraReturn"), extra.name)
-                  : fmt(t("session.extraAdd"), extra.name) + feeTail;
+                  ? fmt(t("session.extraReturn"), sess.extra_item!.name)
+                  : fmt(t("session.extraAdd"), sess.extra_item!.name);
 
                 return (
                   <Button

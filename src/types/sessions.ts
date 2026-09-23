@@ -356,17 +356,6 @@ export interface IExtraItem {
    * which is what keeps the dialog and the receipt on one figure.
    */
   included_remaining?: number;
-  /**
-   * What the NEXT press of the board's button puts on the bill, as the server
-   * prices it: "0.00" inside the allowance, on a unit the room did not name as
-   * charged, and on a `once` seat that has paid; a RATE on an hourly room.
-   *
-   * The board quotes this and computes nothing — `included_remaining` alone
-   * cannot say it, because a room may charge only its third unit. Optional:
-   * a server that predates it omits it, and the button then shows its bare
-   * label rather than a figure it would have to guess.
-   */
-  next_fee?: string | null;
 }
 
 export interface IPcApi extends Translated {
