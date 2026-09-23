@@ -1758,7 +1758,8 @@ key being added.
     `notify.message("success", fmt(t("session.extraAdded"), name))` →
     «Добавлено: Фишки», in the room's own word. Only after the server
     accepted it; a refusal stays on the tile and raises nothing. A return
-    raises none — the owner asked for the hand-out only.
+    raises the RED one, as a pad's removal does: `notify.message("error",
+    fmt(t("session.extraReturnedToast"), name))` → «Возвращено: Фишки».
   - A `once` room charges its fee once per SESSION: hand out, take back,
     hand out again and the second is 0.00. That is the pads' `once` rule
     exactly, not a bug — an `each` room charges every hand-out.
