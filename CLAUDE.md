@@ -1738,8 +1738,16 @@ key being added.
   `addItems(id, [{extra: true, qty: 1}])` straight from the button, the way it
   calls `addJoystick`.
   - The room's allowance still works: it is spent per UNIT, so the first N
-    presses are the free ones. What went with the dialog is the on-screen
-    "2 included, 1 left" line; nothing shows that count today.
+    presses are the free ones. ⚠️ **The button quotes what the NEXT press
+    costs (2026-09-23), from the server's `extra_item.next_fee`** — `Добавить:
+    Кий · 500`, `· 700/ч` on an hourly room, `· бесплатно` inside the
+    allowance, `· оплачено` on a `once` seat that has paid (the pad menu's
+    own two zeros, and its own keys). It replaced the dialog's "2 included,
+    1 left" line and is deliberately NOT rebuilt from `included_remaining`:
+    a room that charges only its third unit has an allowance of 0 and a free
+    second press, so any count-based quote lies there. The server's figure
+    is `ExtraItemRule::feeFor($session, 1)` — the bill's own arithmetic. An
+    older server omits the key and the button shows its bare label.
   - ⚠️ **ONE control that toggles**, exactly as the pad button does: hand it
     out and the same button becomes "take it back". `openExtra` looks for an
     `is_extra` line with no `returned_at` — deliberately NOT gated on
@@ -1761,32 +1769,23 @@ key being added.
     `sessionItemsTotal` (no `at`) stays for HISTORY, where the server's
     `line_total` is the right answer; the pads carry the identical pair for the
     identical reason.
-- **`once` quotes one charge, not `unit × qty`**, and a seat that has already
-  paid it quotes 0.00 (`unit_price` from the server, `fee_taken` beside it).
-  ⚠️ For a while the panel was right here and the SERVER was not: `putOnBill()`
-  wrote the room's figure with the whole count, so one press of "3" on a
-  500-once seat quoted 500 and billed 1500. Fixed backend-side on 2026-09-22
-  (`ExtraItemRule::split()` clamps the charged part to one and hands the rest
-  over at 0.00), so this dialog needed no change — but do not "fix" the quote
-  to match a bill that disagrees with it again without checking which side is
-  wrong.
+- **`once` charges once, not `unit × qty`**, and a seat that has already
+  paid it is quoted "paid" (`fee_taken` from the server). ⚠️ For a while the
+  SERVER billed a press of "3" on a 500-once seat at 1500; fixed backend-side on
+  2026-09-22 (`ExtraItemRule::split()` clamps the charged part to one). If the
+  quote and the bill ever disagree again, check which side is wrong before
+  "fixing" either.
 - ⚠️ **The room's rate may cover the first N units, and exactly one function
   may quote a hand-out** (2026-09-22). `extra_item_included` on the place is
   the allowance — empty box posts `null`, which the server reads as 0: every
   unit charged, exactly as every room billed before the box existed. Posting a
   `0` where the room carries `null` is the same request to the server but a
   price change nobody made to the form, so the payload keeps the distinction
-  and three cases pin it. There is deliberately NO branch-level default: a
-  poker table and a billiard table in one venue hand out different things, so
-  there is nothing for a venue to say — unlike the pads, which inherit.
-  `extraItemQuote(extra, qty)` in `sessionAmount.ts` is the ONLY place the
-  split is computed: `freeQty = min(qty, included_remaining)`, `paidQty` is the
-  rest, `once` charges 1 or 0 of them, and an hourly extra still quotes a RATE
-  and never a total. `unit × qty` in the JSX was correct until the day an
-  allowance existed and became a lie for every hand-out that straddles the
-  boundary — three chips with one still free is one free and two paid. An
-  older server omits `included` / `included_remaining`, which read as 0 and
-  give exactly the pre-feature arithmetic back.
+  and three cases pin it. (The "no branch-level default" this paragraph once
+  recorded is superseded: since 2026-09-23 every answer inherits from the
+  branch — see the strategy bullet above.) The panel computes NO split:
+  `extraItemQuote` was deleted with the dialog, and the one figure the board
+  shows is the server's `next_fee`.
 - **A FIXED extra changes nothing in `sessionAmount`.** It is a `session_items`
   row, so the running total, the receipt and the history already add it up as
   `price x qty`.
@@ -1806,9 +1805,9 @@ key being added.
   `{returned: true}`** (`sessionRepository.returnItem`), the same endpoint a
   quantity correction uses because it is the same kind of thing — a change to a
   line already on the bill. `DELETE` still means "this was never sold". The
-  board offers the button only for a line with `is_hourly && !returned_at`, the
-  way `supports_joysticks` gates the pad menu; the clock stops, the charge
-  stays, and the receipt prints `90 min - 700/h - returned` rather than a count.
+  board offers it for any `is_extra` line with no `returned_at` (the toggle
+  above — no longer only hourly ones); on an hourly line the clock stops, the
+  charge stays, and the receipt prints `90 min - 700/h - returned` rather than a count.
   The history action is `item_returned` — NOT `item_removed`: the line keeps
   what it earned, so the row says how long it was out and that nothing came
   back.
