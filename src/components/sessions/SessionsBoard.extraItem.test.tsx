@@ -40,6 +40,7 @@ vi.mock("@/i18n/LanguageContext", () => ({
       k === "session.extraAdd" ? "add {0}"
         : k === "session.extraReturn" ? "return {0}"
         : k === "session.extraAdded" ? "added {0}"
+        : k === "session.extraReturnedToast" ? "returned {0}"
         : k,
     money: (n: number) => String(n),
     lang: "en",
@@ -403,6 +404,32 @@ describe("a hand-out is announced", () => {
     await press("add Кий");
 
     expect(toasts).toEqual([expect.objectContaining({ kind: "success", text: "added Кий" })]);
+  });
+
+  test("taking it back raises a RED toast naming it", async () => {
+    repo.listActive.mockResolvedValue([{
+      ...session(extra),
+      items: [{ id: 31, name: "Кий", price: 500, qty: 1, product_id: null, is_extra: true, is_hourly: false, returned_at: null }],
+    }]);
+    repo.returnItem.mockResolvedValue({ id: 5, items: [] });
+    await mount();
+
+    await press("return Кий");
+
+    expect(toasts).toEqual([expect.objectContaining({ kind: "error", text: "returned Кий" })]);
+  });
+
+  test("a refused return raises no toast", async () => {
+    repo.listActive.mockResolvedValue([{
+      ...session(extra),
+      items: [{ id: 31, name: "Кий", price: 500, qty: 1, product_id: null, is_extra: true, is_hourly: false, returned_at: null }],
+    }]);
+    repo.returnItem.mockRejectedValue(new Error("already back"));
+    await mount();
+
+    await press("return Кий");
+
+    expect(toasts).toEqual([]);
   });
 
   test("a refused hand-out raises no toast", async () => {

@@ -150,6 +150,9 @@ const SessionsBoard = ({ branchId }: Props) => {
     setReturningItem(itemId);
     try {
       applyItems(await sessionRepository.returnItem(sess.id, itemId));
+      // Red, as a pad's removal toast is, naming the thing in the room's
+      // word. Only once the server took it back.
+      notify.message("error", fmt(t("session.extraReturnedToast"), sess.extra_item?.name ?? ""));
     } catch (e) {
       // Shown on the tile it belongs to, like every other refusal here: this
       // project has no global toast.

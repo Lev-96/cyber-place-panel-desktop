@@ -742,6 +742,8 @@ export const TRANSLATIONS: Dict = {
   // The green toast after a hand-out, in the room's own word — the pads say
   // "Джойстик добавлен" the same way.
   "session.extraAdded": { en: "Added: {0}", ru: "Добавлено: {0}", am: "Ավելացվեց՝ {0}" },
+  // …and the RED one after it comes back, as a pad's removal toast is.
+  "session.extraReturnedToast": { en: "Returned: {0}", ru: "Возвращено: {0}", am: "Վերադարձվեց՝ {0}" },
   "session.extraQty": { en: "How many ({0})", ru: "Количество ({0})", am: "Քանակը ({0})" },
   "session.extraPerHour": { en: "/h", ru: "/час", am: "/ժամ" },
   "session.extraReturn": { en: "Return {0}", ru: "Вернуть: {0}", am: "Վերադարձնել՝ {0}" },
