@@ -146,13 +146,45 @@ describe("SessionsBoard — the room's own extra", () => {
     expect(buttons().some((l) => l.startsWith("return "))).toBe(false);
   });
 
-  test("a FIXED extra is never offered a return", async () => {
+  /**
+   * ⚠️ A FIXED extra is offered a return too.
+   *
+   * It was not, back when handing something back meant stopping a charge. It
+   * means "the thing came back" now — as true of chips sold at a flat price as
+   * of a rented cue — and the charge stays either way, exactly as a fee pad's
+   * does.
+   */
+  test("a FIXED extra out is offered a return", async () => {
     repo.listActive.mockResolvedValue([{
-      ...session({ name: "Фишки", price: "500.00", charge_mode: "each", pricing_mode: "fixed", fee_taken: false, unit_price: "500.00", max_qty: 999 }),
-      items: outLine({ name: "Фишки", is_hourly: false, minutes: null }),
+      ...session({ name: "\u0424\u0438\u0448\u043a\u0438", price: "500.00", charge_mode: "each", pricing_mode: "fixed", fee_taken: false, unit_price: "500.00", max_qty: 999 }),
+      items: outLine({ name: "\u0424\u0438\u0448\u043a\u0438", is_hourly: false, minutes: null }),
     }]);
     await mount();
 
+    expect(buttons()).toContain("return \u0424\u0438\u0448\u043a\u0438");
+  });
+
+  /** ONE control, not two: what is out cannot also be offered again. */
+  test("while something is out the hand-out button is gone", async () => {
+    repo.listActive.mockResolvedValue([{
+      ...session({ name: "\u041a\u0438\u0439", price: "700.00", charge_mode: "each", pricing_mode: "hourly", fee_taken: false, unit_price: "700.00", max_qty: 999 }),
+      items: outLine(),
+    }]);
+    await mount();
+
+    expect(buttons().some((l) => l.startsWith("add "))).toBe(false);
+    expect(buttons()).toContain("return \u041a\u0438\u0439");
+  });
+
+  /** …and once it is back, the same button offers it again. */
+  test("a seat with everything returned is offered the hand-out again", async () => {
+    repo.listActive.mockResolvedValue([{
+      ...session({ name: "\u041a\u0438\u0439", price: "700.00", charge_mode: "each", pricing_mode: "hourly", fee_taken: false, unit_price: "700.00", max_qty: 999 }),
+      items: outLine({ returned_at: "2026-09-23T01:00:00+04:00" }),
+    }]);
+    await mount();
+
+    expect(buttons()).toContain("add \u041a\u0438\u0439");
     expect(buttons().some((l) => l.startsWith("return "))).toBe(false);
   });
 

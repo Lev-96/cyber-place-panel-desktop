@@ -1740,7 +1740,14 @@ key being added.
   - The room's allowance still works: it is spent per UNIT, so the first N
     presses are the free ones. What went with the dialog is the on-screen
     "2 included, 1 left" line; nothing shows that count today.
-  - A FIXED extra puts its price on the bill and nothing else moves.
+  - ⚠️ **ONE control that toggles**, exactly as the pad button does: hand it
+    out and the same button becomes "take it back". `openExtra` looks for an
+    `is_extra` line with no `returned_at` — deliberately NOT gated on
+    `is_hourly`, because handing something back means "the thing came back",
+    which is as true of chips sold at a flat price as of a rented cue. Two
+    buttons side by side asked a question the seat had already answered.
+  - A FIXED extra puts its price on the bill, and handing it back keeps that
+    price — a fee pad refunds nothing either.
   - ⚠️ **An HOURLY extra moves the TARIFF**, exactly as an hourly pad does:
     `sessionCurrentHourlyRate` adds `price x qty` for every unit with no
     `returned_at`, so a 1 000/h poker table lending 500/h chips reads 1 500/h

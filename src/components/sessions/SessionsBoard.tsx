@@ -75,15 +75,19 @@ const SessionsBoard = ({ branchId }: Props) => {
   const [extraBusy, setExtraBusy] = useState<number | null>(null);
 
   /**
-   * The room's hourly extra that is still out, if any.
+   * The room's extra that is still OUT, if any — hourly or fixed.
    *
-   * A pad answers this from its own row (`stopped_at`), and so does this: a
-   * line billed by the hour with no `returned_at` is still with the player and
-   * still on the clock. The FIRST one is the one the button hands back, the
-   * way the pad control takes the top pad — one press, one thing, no menu.
+   * A pad answers this from its own row (`stopped_at`), and so does this: an
+   * `is_extra` line with no `returned_at` is still with the player. The FIRST
+   * one is the one the button hands back, the way the pad control takes the
+   * top pad — one press, one thing, no menu.
+   *
+   * ⚠️ Deliberately NOT gated on `is_hourly`. It was, back when handing
+   * something back meant stopping a charge; it means "the thing came back"
+   * now, which is as true of chips sold at a flat price as of a rented cue.
    */
-  const openHourlyExtra = (sess: ISessionApi) =>
-    (sess.items ?? []).find((i) => i.is_hourly && !i.returned_at) ?? null;
+  const openExtra = (sess: ISessionApi) =>
+    (sess.items ?? []).find((i) => i.is_extra && !i.returned_at) ?? null;
 
   /**
    * Hand ONE over. One press, one thing, no menu — the pad control's own
@@ -1009,34 +1013,28 @@ const SessionsBoard = ({ branchId }: Props) => {
                   with that room's own word. The server sends the object or
                   null, so a control that appears here is one the server will
                   honour — the same rule the pad menu follows. */}
-              {sess.extra_item && (
-                <Button
-                  variant="secondary"
-                  onClick={() => void handOutExtra(sess)}
-                  disabled={extraBusy === sess.id}
-                  style={miniBtnFlex}
-                  title={fmt(t("session.extraAdd"), sess.extra_item.name)}
-                >
-                  {fmt(t("session.extraAdd"), sess.extra_item.name)}
-                </Button>
-              )}
-              {/* …and hand it back, which only exists while something IS out.
-                  The pad row's "−" is the same control for the same reason:
-                  the clock stops, the charge stays, and the line keeps its
-                  place on the receipt. */}
-              {(() => {
-                const out = openHourlyExtra(sess);
-                if (!out) return null;
+              {sess.extra_item && (() => {
+                // ONE control that toggles, exactly as the pad button does:
+                // hand it out, and the same button becomes "take it back".
+                // Two buttons side by side made the board ask a question the
+                // seat had already answered.
+                const out = openExtra(sess);
+                const label = out
+                  ? fmt(t("session.extraReturn"), sess.extra_item!.name)
+                  : fmt(t("session.extraAdd"), sess.extra_item!.name);
 
                 return (
                   <Button
                     variant="secondary"
+                    onClick={() => {
+                      if (out) { void returnExtra(sess, out.id); return; }
+                      void handOutExtra(sess);
+                    }}
+                    disabled={extraBusy === sess.id || returningItem === out?.id}
                     style={miniBtnFlex}
-                    disabled={returningItem === out.id}
-                    title={fmt(t("session.extraReturn"), out.name)}
-                    onClick={() => void returnExtra(sess, out.id)}
+                    title={label}
                   >
-                    {fmt(t("session.extraReturn"), out.name)}
+                    {label}
                   </Button>
                 );
               })()}
