@@ -1,8 +1,8 @@
 import { SkeletonText } from "@/components/ui/Skeleton";
 import Button from "@/components/ui/Button";
-import Input from "@/components/ui/Input";
 import type { PaymentMethod } from "@/api/sessions";
 import Modal from "@/components/ui/Modal";
+import PaymentMethodPicker, { paymentNoteMissing } from "@/components/payments/PaymentMethodPicker";
 import Spinner from "@/components/ui/Spinner";
 import { IBillBreakdown } from "@/api/sessions";
 import { useLang } from "@/i18n/LanguageContext";
@@ -81,7 +81,7 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved }: Prop
     // ⚠️ Checked here so the cashier is told BEFORE the request, but the server
     // enforces the same rule and is what actually decides — this is a courtesy,
     // not the guard. A stop refused for a missing note leaves the seat running.
-    if (method === "other" && other.trim() === "") {
+    if (paymentNoteMissing(method, other)) {
       setErr(t("session.payOtherRequired"));
       return;
     }
@@ -116,19 +116,6 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved }: Prop
     ...view.items.map((it) => Number(it.line_total)),
   ]);
 
-
-  /**
-   * How the money is being taken.
-   *
-   * Radio rather than checkboxes: it is one answer, and a set of checkboxes
-   * invites two. Cash leads because it is the common case at a counter, and a
-   * default means the ordinary stop stays one click.
-   */
-  const methods: { key: PaymentMethod; label: string }[] = [
-    { key: "cash", label: t("session.payCash") },
-    { key: "card", label: t("session.payCard") },
-    { key: "other", label: t("session.payOther") },
-  ];
 
   /**
    * The seat is already over — its paid period ran out and the server ended it,
@@ -268,36 +255,15 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved }: Prop
             the receipt above is the record of it. A live radio group under a
             closed bill invites an edit that nothing would accept. */}
         {!finished && (
-          <div className="col" style={{ gap: 6, marginTop: 6 }}>
-            <strong style={{ fontSize: 13 }}>{t("session.payTitle")}</strong>
-            <div className="row" style={{ gap: 14, flexWrap: "wrap" }}>
-              {methods.map((m) => (
-                <label
-                  key={m.key}
-                  className="row"
-                  style={{ gap: 6, alignItems: "center", cursor: "pointer", fontSize: 13 }}
-                >
-                  <input
-                    type="radio"
-                    name={`pay-${session.id}`}
-                    value={m.key}
-                    checked={method === m.key}
-                    disabled={busy}
-                    onChange={() => { setMethod(m.key); setErr(null); }}
-                  />
-                  <span>{m.label}</span>
-                </label>
-              ))}
-            </div>
-            {method === "other" && (
-              <Input
-                value={other}
-                onChange={(e) => { setOther(e.target.value); setErr(null); }}
-                placeholder={t("session.payOtherPlaceholder")}
-                disabled={busy}
-              />
-            )}
-          </div>
+          // The one list of methods, shared with the till (PaymentMethodPicker).
+          <PaymentMethodPicker
+            name={`pay-${session.id}`}
+            method={method}
+            onMethod={(m) => { setMethod(m); setErr(null); }}
+            note={other}
+            onNote={(v) => { setOther(v); setErr(null); }}
+            disabled={busy}
+          />
         )}
 
         {err && <div className="error">{err}</div>}

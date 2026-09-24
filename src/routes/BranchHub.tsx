@@ -101,6 +101,7 @@ const BranchHub = () => {
     { key: "pcs", to: `/branches/${id}/pcs`, title: t("hub.tile.pcs"), hint: t("hub.tile.pcsHint"), show: true },
     { key: "tariffs", to: `/branches/${id}/tariffs`, title: t("hub.tile.prices"), hint: t("hub.tile.pricesHint"), show: can(role, "branch.prices") },
     { key: "products", to: `/branches/${id}/products`, title: t("hub.tile.products"), hint: t("hub.tile.productsHint"), show: true },
+    { key: "till", to: `/branches/${id}/pos`, title: t("hub.tile.till"), hint: t("hub.tile.tillHint"), show: true },
     { key: "managers", to: `/branches/${id}/managers`, title: t("hub.tile.managers"), hint: t("hub.tile.managersHint"), show: can(role, "manager.create") },
     { key: "tournaments", to: `/branches/${id}/tournaments`, title: t("hub.tile.tournaments"), hint: t("hub.tile.tournamentsHint"), show: true },
     { key: "subscribers", to: `/branches/${id}/subscribers`, title: t("hub.tile.subscribers"), hint: t("hub.tile.subscribersHint"), show: true },

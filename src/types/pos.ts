@@ -54,7 +54,10 @@ export interface IOrder {
   member_id?: number | null;
   subtotal: number;
   total: number;
-  payment_method: "cash" | "card" | "deposit";
+  /** The session's three (`PAYMENT_METHODS`), plus a member's `deposit` on older rows. */
+  payment_method: "cash" | "card" | "other" | "deposit";
+  /** What an `other` payment was; null otherwise. */
+  payment_method_other?: string | null;
   status: "paid" | "voided";
   created_at: string;
   items?: IOrderItem[];
