@@ -1385,6 +1385,33 @@ Tests: `RegistrationsList.test.tsx` (10, transport-level: only `request()` is
 replaced). Mutation-verified: native `confirm()` restored; answer ignored; note
 shown for everyone; note never shown; delete by guest id.
 
+## 9.5.1 Pause / Resume on the tile (2026-09-23)
+
+One control, «Пауза» ↔ «Продолжить», on every kind of seat, before Stop. The
+SERVER owns the state (`paused_at`, `pauses[]`); the session stays `active`
+while paused, so the PS5 watcher, BranchLive and every "seat in use" reading
+are unchanged — do not add a `paused` status here either.
+
+- `togglePause` calls `sessionRepository.pause/resume`, puts ONLY the answer's
+  `paused_at` / `pauses` / `ends_at` on the tile via `useAsync().mutate` (so
+  the clock freezes on the press), then reloads as every action does. A
+  `useRef` guard stops a double click sending two requests; a refusal (409 —
+  another cashier got there first) shows on the tile via `pauseError`, which
+  renders under the action row for EVERY seat kind (unlike `padError`).
+- **Figures**: `pausedSecondsBetween()` / `playedSecondsBetween()` in
+  `sessionAmount.ts` mirror `Session::pausedSecondsBetween()` and are
+  subtracted by the seat, hourly pads and hourly extras over their own
+  intervals — `sessionAmount.pause.test.ts` pins the backend's worked
+  example. A payload with `paused_at` but no `pauses` reads as one open pause.
+- **SessionTimer**: while paused the countdown holds at `ends_at − paused_at`
+  (server instants, so a reload shows the same frozen figure), no warn/crit
+  colours, a ⏸ mark; a count-up clock shows time PLAYED.
+- While paused: «Добавить время» is hidden (the server refuses end moves),
+  a «На паузе» pill shows, `useExpiryNudge` and `SessionEndingNotifier` skip
+  the seat. History renders `paused` / `resumed` (with "Пауза длилась").
+- Kinds `paused` / `resumed` are in `useSessionChanged`'s union; the board
+  reloads on any kind.
+
 ## 9.6 A live session's terms (2026-09-03)
 
 Four controls a cashier gets on a session that is already running, and one rule
