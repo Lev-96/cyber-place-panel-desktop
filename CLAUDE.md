@@ -491,6 +491,48 @@ loud `[reverb] REJECTED …` line naming the key and host; the backend has
 
 ---
 
+## 7.4 Every dialog closes one way (2026-09-24)
+
+`src/components/ui/Modal.tsx` is the only modal; 32 dialogs use it and none was
+edited for this. Its props are unchanged (`open`, `onClose`, `closeOnBackdrop`)
+plus two optional ones (`dirty`, `confirmOnDirty`).
+
+- **The ×, a backdrop click and Escape all go through `requestClose`.** A
+  clean dialog leaves at once; one holding changes asks «Вы действительно
+  хотите выйти?» (`modal.leaveConfirm`, answered `action.yes` / `action.no`) —
+  No keeps the dialog AND what was typed, Yes closes it. **Cancel and Save
+  are not second-guessed**: they are the form's own explicit answers and call
+  the parent directly, as before.
+- **"Changes" is measured, not guessed**: `snapshotFields()` serialises every
+  input/select/textarea in the dialog, the baseline is taken on the person's
+  FIRST press or keystroke inside it (so values a form loads after opening are
+  not changes), and the close compares — an edit put back is clean again. No
+  form tracks anything. A form whose state is not in native fields can pass
+  `dirty`; `confirmOnDirty={false}` never asks.
+- **The ×** (`.cp-modal-close`) sits on the card's top-right corner, outside
+  its padding, last in the DOM (the first field stays the first Tab stop),
+  `aria-label` = `action.close`; drawn only when `onClose` exists. The dialog
+  box is `.cp-modal-dialog` (`role="dialog"`, `aria-modal`), so the card is
+  `.cp-modal-dialog > *` now, not `.cp-modal-wrapper > *`.
+- **Stacked dialogs**: a module stack ordered by NESTING (`AncestorsCtx` —
+  React runs a child's effects before its parent's). Only the top dialog
+  answers Escape and traps Tab; a backdrop click counts only on the dialog's
+  OWN backdrop (refs, not class names — a nested dialog's React events bubble
+  through the portal). Before this, one Escape closed a confirmation AND the
+  form under it, and a child's backdrop click closed the parent too. An
+  Escape a field already used (`e.defaultPrevented` — SuggestInput, BranchForm
+  address suggestions) leaves the dialog alone.
+- **Exit animation**: `.cp-modal-leaving` (`cp-fade-out` + `cp-modal-out`,
+  160 ms = `MODAL_LEAVE_MS`), THEN `onClose`. A parent closing via
+  `open={false}` while keeping the Modal mounted gets the same exit. A parent
+  that REFUSES the close (`onClose` a no-op while saving) is detected in the
+  same render (`pendingClose`) and the dialog comes back — no invisible
+  overlay. Reduced motion: no wait, 1 ms animations (enter was unguarded before).
+- Labels use `tActive()`, so Modal needs no LanguageProvider (tests render it
+  bare). Tests: `Modal.close.test.tsx` (24) + the updated `Modal.test.tsx`;
+  a test that closes a dialog via ×/backdrop/Escape must wait
+  `MODAL_LEAVE_MS` before asserting `onClose`.
+
 ## 7.5 CSS / Styling Standards (NON-NEGOTIABLE)
 
 ### CSS Quality Rules
