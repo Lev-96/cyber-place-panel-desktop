@@ -88,6 +88,13 @@ export const TRANSLATIONS: Dict = {
   "action.confirm": { en: "Confirm", ru: "Подтвердить", am: "Հաստատել" },
   "action.refresh": { en: "Refresh", ru: "Обновить", am: "Թարմացնել" },
   "action.close": { en: "Close", ru: "Закрыть", am: "Փակել" },
+  // Asked by every dialog before a close that would throw typed changes away
+  // (the ×, a backdrop click, Escape). Answered with action.yes / action.no.
+  "modal.leaveConfirm": {
+    en: "Are you sure you want to leave?",
+    ru: "Вы действительно хотите выйти?",
+    am: "Իսկապե՞ս ուզում եք դուրս գալ։",
+  },
   "action.back": { en: "Back", ru: "Назад", am: "Հետ" },
 
   // Sessions

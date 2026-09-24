@@ -175,6 +175,9 @@ const BranchForm = ({ initial, companyId, onClose, onSaved }: Props) => {
       e.preventDefault();
       onPickSuggestion(suggestions[activeIdx]);
     } else if (e.key === "Escape") {
+      // Closes the suggestions only: the prevented default tells the dialog
+      // around this field that the Escape has been used.
+      e.preventDefault();
       setShowSuggestions(false);
     }
   };

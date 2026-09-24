@@ -195,6 +195,54 @@ html {
   /* Card shrinks to fit a narrow window; keeps its declared width below this. */
   max-width: 100%;
 }
+/* The dialog box: the card plus its × (2026-09-24). Relative so the × sits on
+   the card's corner, whatever the card's own width. */
+.cp-modal-dialog {
+  position: relative;
+}
+.cp-modal-dialog > * {
+  max-width: 100%;
+}
+/* The ×: a small round control ON the card's top-right corner — outside the
+   card's padding, so it never covers a title or a button a dialog already
+   keeps there. The wrapper's 16px gutter keeps it on screen on a narrow window. */
+.cp-modal-close {
+  position: absolute;
+  top: -10px;
+  right: -10px;
+  z-index: 1;
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    box-shadow 160ms ease,
+    background 160ms ease,
+    transform 160ms ease;
+}
+.cp-modal-close:hover {
+  box-shadow: inset 0 0 0 1px rgba(7, 221, 241, 0.6);
+  transform: scale(1.06);
+}
+.cp-modal-close:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(7, 221, 241, 0.35);
+}
+.cp-modal-confirm {
+  width: 360px;
+  max-width: 90vw;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
 
 /* === Animations & transitions ============================================== */
 /* All animations are skipped if user prefers reduced motion. */
@@ -542,6 +590,26 @@ a.card:hover {
 .cp-modal-wrapper > * {
   animation: cp-modal-in 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
+/* …and exit: the backdrop fades and the card settles back, THEN the dialog is
+   removed (Modal waits MODAL_LEAVE_MS = 160ms). `both` holds the last frame, so
+   nothing flashes back in the instant before it unmounts. */
+.cp-modal.cp-modal-leaving {
+  animation: cp-fade-out 160ms ease-in both;
+  pointer-events: none;
+}
+.cp-modal-leaving .cp-modal-wrapper > * {
+  animation: cp-modal-out 160ms cubic-bezier(0.4, 0, 1, 1) both;
+}
+/* Less motion asked for: the dialog still appears and leaves, without the
+   movement (Modal also skips its wait). */
+@media (prefers-reduced-motion: reduce) {
+  .cp-modal,
+  .cp-modal-wrapper > *,
+  .cp-modal.cp-modal-leaving,
+  .cp-modal-leaving .cp-modal-wrapper > * {
+    animation-duration: 1ms;
+  }
+}
 
 /* Page-title subtle slide */
 .page-title {
@@ -584,6 +652,24 @@ a.card:hover {
   }
   to {
     opacity: 1;
+  }
+}
+@keyframes cp-fade-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+@keyframes cp-modal-out {
+  from {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.96) translateY(6px);
   }
 }
 @keyframes cp-modal-in {
