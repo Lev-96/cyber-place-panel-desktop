@@ -1411,6 +1411,13 @@ are unchanged — do not add a `paused` status here either.
   the seat. History renders `paused` / `resumed` (with "Пауза длилась").
 - Kinds `paused` / `resumed` are in `useSessionChanged`'s union; the board
   reloads on any kind.
+- **Toasts after the three presses (2026-09-24)**, raised only once the
+  server accepted the action, naming the seat as its tile does (`seatOf()` →
+  `№{place.number ?? place.id}`, else the device label): «Сессия на паузе · №3»
+  amber (`warning`), «Сессия продолжена · №3» green, «Сессия завершена · №3»
+  red — the stop one from `StopReceiptModal`'s `onConfirmed`, which only a
+  confirmed stop reaches (an auto-ended seat's receipt never calls it). A
+  refusal raises nothing; its sentence stays on the tile / in the modal.
 
 ## 9.6 A live session's terms (2026-09-03)
 
