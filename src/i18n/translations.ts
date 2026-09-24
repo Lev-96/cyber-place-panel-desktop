@@ -744,6 +744,11 @@ export const TRANSLATIONS: Dict = {
   "session.pause": { en: "Pause", ru: "Пауза", am: "Դադար" },
   "session.resume": { en: "Resume", ru: "Продолжить", am: "Շարունակել" },
   "session.pausedBadge": { en: "Paused", ru: "На паузе", am: "Դադարեցված" },
+  // The toast after each of the three presses, naming the seat as its tile
+  // does. Raised only once the server accepted the action.
+  "session.toastPaused": { en: "Session paused · {0}", ru: "Сессия на паузе · {0}", am: "Նիստը դադարեցված է · {0}" },
+  "session.toastResumed": { en: "Session resumed · {0}", ru: "Сессия продолжена · {0}", am: "Նիստը շարունակվեց · {0}" },
+  "session.toastStopped": { en: "Session stopped · {0}", ru: "Сессия завершена · {0}", am: "Նիստն ավարտվեց · {0}" },
   // The green toast after a hand-out, in the room's own word — the pads say
   // "Джойстик добавлен" the same way.
   "session.extraAdded": { en: "Added: {0}", ru: "Добавлено: {0}", am: "Ավելացվեց՝ {0}" },

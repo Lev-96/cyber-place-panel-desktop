@@ -172,6 +172,17 @@ const SessionsBoard = ({ branchId }: Props) => {
       await sessions.reload();
     }
   };
+  /**
+   * The seat as a toast names it: `№{place.number ?? place.id}`, which is what
+   * its tile and the player's phone show, or the device's label when it has
+   * no place. Read from the board's own device list at the moment of the toast.
+   */
+  const seatOf = (pcId: number): string => {
+    const pc = (pcs.data ?? []).find((p) => p.id === pcId);
+    if (!pc) return "";
+    return pc.place ? `№${pc.place.number ?? pc.place.id}` : tr(pc, "label", lang);
+  };
+
   /** The seat a pause or resume is in flight for, so a double press is one. */
   const [pauseBusy, setPauseBusy] = useState<number | null>(null);
   // The same guard as a ref: two clicks landing before the re-render that
@@ -196,13 +207,21 @@ const SessionsBoard = ({ branchId }: Props) => {
     setPauseBusy(sess.id);
     setPauseError(null);
     try {
-      const updated = sess.paused_at
+      const resuming = !!sess.paused_at;
+      const updated = resuming
         ? await sessionRepository.resume(sess.id)
         : await sessionRepository.pause(sess.id);
       sessions.mutate((list) =>
         list?.map((s) => (s.id === updated.id
           ? { ...s, paused_at: updated.paused_at ?? null, pauses: updated.pauses ?? s.pauses, ends_at: updated.ends_at }
           : s)) ?? list);
+      // Only after the server accepted it: a refusal stays on the tile below.
+      // Amber for a pause (the clock is waiting on somebody), green for the
+      // clock running again.
+      notify.message(
+        resuming ? "success" : "warning",
+        fmt(t(resuming ? "session.toastResumed" : "session.toastPaused"), seatOf(sess.pc_id)),
+      );
     } catch (e) {
       setPauseError({ id: sess.id, message: e instanceof Error ? e.message : String(e) });
     } finally {
@@ -1302,6 +1321,10 @@ const SessionsBoard = ({ branchId }: Props) => {
             // transport's business — and its refusal is shown, not swallowed.
             const device = (pcs.data ?? []).find((pc) => pc.id === stopTarget.pc_id);
             if (device?.console_host_id) sessionStopped(device.id);
+            // Red, as a pad's removal is: the seat's session is over. Only a
+            // stop the server confirmed reaches here — an auto-ended seat's
+            // receipt never calls this.
+            notify.message("error", fmt(t("session.toastStopped"), seatOf(stopTarget.pc_id)));
             void sessions.reload();
             void pcs.reload();
           }}
