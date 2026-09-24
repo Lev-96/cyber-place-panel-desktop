@@ -1461,6 +1461,33 @@ are unchanged — do not add a `paused` status here either.
   confirmed stop reaches (an auto-ended seat's receipt never calls it). A
   refusal raises nothing; its sentence stays on the tile / in the modal.
 
+## 9.5.2 Касса — selling with no session (2026-09-24)
+
+The till is back at `/branches/:id/pos` (hub tile «Касса», every staff role at
+its own branch — the server decides). It was removed on 2026-08-30 ("selling
+happens on the session bill"); the owner asked for it again, as a sale that
+needs no seat. A sale is a backend ORDER, never a session.
+
+- **One basket, two dialogs.** `components/pos/useProductBasket` (catalogue,
+  search, cart, quick-entry read) and `ProductBasketPanels` (mode switch,
+  picker, quick entry + preview, "new product") were moved verbatim out of
+  `AddSessionItemDialog`, which now keeps only what is the SESSION's: the
+  "already on the bill" list, chips off a poker table, the write to the bill.
+  `SellProductsDialog` is the till's: the same basket, `orderRepository`
+  resolve (`POST /orders/resolve`) and create (`POST /orders`). The session
+  dialog's 30 tests pass unchanged — that is the proof the move changed
+  nothing there.
+- **One payment choice**: `components/payments/PaymentMethodPicker` +
+  `PAYMENT_METHODS` + `paymentNoteMissing`, used by `StopReceiptModal` and the
+  till; backend twin `App\Support\PaymentMethod::ALL`.
+- **No price leaves the panel**; the server prices from the catalogue.
+  `client_request_id` is minted once per open dialog and reused on a retry, so
+  a sale the server made before the answer was lost is found, not repeated; a
+  ref guard stops a double click sending two requests.
+- `routes/Till.tsx`: today's sales from local midnight, totals by method over
+  PAID sales only (a voided one stays listed and counts nothing). The list is
+  NOT behind `orFallback` — a failed read shows the error, never "no sales".
+
 ## 9.6 A live session's terms (2026-09-03)
 
 Four controls a cashier gets on a session that is already running, and one rule
