@@ -172,6 +172,45 @@ const SessionsBoard = ({ branchId }: Props) => {
       await sessions.reload();
     }
   };
+  /** The seat a pause or resume is in flight for, so a double press is one. */
+  const [pauseBusy, setPauseBusy] = useState<number | null>(null);
+  // The same guard as a ref: two clicks landing before the re-render that
+  // greys the button both read the state as idle, and the second would be a
+  // second request. The server refuses it (409) — this keeps it from leaving.
+  const pauseInFlight = useRef(false);
+  /** A refused pause/resume, on the tile it belongs to — every kind of seat. */
+  const [pauseError, setPauseError] = useState<{ id: number; message: string } | null>(null);
+
+  /**
+   * Stop or restart the seat's clock. The SERVER decides and answers with the
+   * row; the tile takes its pause fields at once — so the clock freezes on
+   * the press — and then re-reads the board as every action here does. Only
+   * those fields, because the answer is the server's own and the rest of the
+   * row the reload brings back. A wrong state (another cashier paused it a
+   * second earlier, or stopped it) comes back as a sentence and is shown.
+   */
+  const togglePause = async (sess: ISessionApi) => {
+    if (pauseInFlight.current) return;
+
+    pauseInFlight.current = true;
+    setPauseBusy(sess.id);
+    setPauseError(null);
+    try {
+      const updated = sess.paused_at
+        ? await sessionRepository.resume(sess.id)
+        : await sessionRepository.pause(sess.id);
+      sessions.mutate((list) =>
+        list?.map((s) => (s.id === updated.id
+          ? { ...s, paused_at: updated.paused_at ?? null, pauses: updated.pauses ?? s.pauses, ends_at: updated.ends_at }
+          : s)) ?? list);
+    } catch (e) {
+      setPauseError({ id: sess.id, message: e instanceof Error ? e.message : String(e) });
+    } finally {
+      pauseInFlight.current = false;
+      setPauseBusy(null);
+      await sessions.reload();
+    }
+  };
   const [optionsTarget, setOptionsTarget] = useState<ISessionApi | null>(null);
   // The session whose pads are mid-change. One at a time and per session, so a
   // second click on the SAME tile is refused while the first is in flight and a
@@ -733,6 +772,11 @@ const SessionsBoard = ({ branchId }: Props) => {
                     ? `${money(Number(sess.hourly_rate ?? 0))} / ${t("time.hourShort") || "h"}`
                     : sess.package_name}
               {itemsCount > 0 && <span className="muted"> · {itemsCount} {t("session.posNote")}</span>}
+              {sess.paused_at && (
+                <span className="pill" style={{ fontSize: 10, letterSpacing: 0, textTransform: "none", marginLeft: 6 }}>
+                  {t("session.pausedBadge")}
+                </span>
+              )}
             </span>
             {/* What the tile has to say at a glance and could not before: how
                 many pads this seat is paying for, and whether it is paying at
@@ -1098,9 +1142,22 @@ const SessionsBoard = ({ branchId }: Props) => {
                   Only on a seat that HAS an end: a count-up or unlimited
                   session has nothing to extend, and the dialog says so rather
                   than offering it. */}
-              {sess.ends_at !== null && sess.is_unlimited !== true && (
+              {/* Not while PAUSED: the server refuses to move the end then —
+                  resume moves it by the pause. */}
+              {sess.ends_at !== null && sess.is_unlimited !== true && !sess.paused_at && (
                 <Button variant="secondary" onClick={() => setOptionsTarget(sess)} style={miniBtnFlex}>{t("session.addTime")}</Button>
               )}
+              {/* Pause ↔ Resume, one control, on every kind of seat. The
+                  session stays active either way — the seat stays taken and a
+                  console stays awake — only the clock and the bill hold. */}
+              <Button
+                variant="secondary"
+                onClick={() => { void togglePause(sess); }}
+                disabled={pauseBusy === sess.id}
+                style={miniBtnFlex}
+              >
+                {sess.paused_at ? t("session.resume") : t("session.pause")}
+              </Button>
               {/* ⚠️ "Options" is gone from the tile, and NOTHING behind it was
                   removed. `SessionOptionsDialog` is the Add Time dialog and is
                   still opened by the button above it, with its presets, its
@@ -1114,6 +1171,9 @@ const SessionsBoard = ({ branchId }: Props) => {
                   reading them. */}
               <Button variant="secondary" onClick={() => setStopTarget(sess)} style={miniBtnFlex}>{t("action.stop")}</Button>
             </div>
+            {pauseError?.id === sess.id && (
+              <span className="error" style={{ fontSize: 11 }}>{pauseError.message}</span>
+            )}
           </>
         ) : (
           <>

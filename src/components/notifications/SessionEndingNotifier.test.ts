@@ -50,6 +50,16 @@ describe("which sessions are about to run out", () => {
     expect(due).toEqual([]);
   });
 
+  it("says nothing about a paused session — its clock is not moving", () => {
+    const due = sessionsToWarnAbout(
+      [session({ id: 1, ends_at: inMinutes(5), paused_at: inMinutes(-10) })],
+      new Set(),
+      NOW,
+    );
+
+    expect(due).toEqual([]);
+  });
+
   it("says nothing about a session that cannot run out", () => {
     // Count-up mode, and one an operator has already lifted the ceiling on.
     const due = sessionsToWarnAbout(

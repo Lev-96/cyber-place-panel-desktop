@@ -397,6 +397,17 @@ export const apiSetSessionFree = (sessionId: number, isFree: boolean) =>
     body: { is_free: isFree },
   });
 
+/**
+ * Stop / restart a running session's clock. The seat stays taken and the
+ * session stays `active`; the server answers with the whole row, `paused_at`
+ * and `pauses` included, and refuses a wrong state with a sentence (409).
+ */
+export const apiPauseSession = (sessionId: number) =>
+  request<{ session: ISessionApi }>(`/sessions/${sessionId}/pause`, { method: "POST" });
+
+export const apiResumeSession = (sessionId: number) =>
+  request<{ session: ISessionApi }>(`/sessions/${sessionId}/resume`, { method: "POST" });
+
 /* ── the audit trail ─────────────────────────────────────────────────── */
 
 export type SessionActionName =
@@ -406,6 +417,9 @@ export type SessionActionName =
   | "joystick_removed"
   | "time_added"
   | "made_unlimited"
+  // The clock stopped and started again; `resumed` carries how long.
+  | "paused"
+  | "resumed"
   | "free_enabled"
   | "free_disabled"
   // ⚠️ The server has emitted this since seat migration shipped; the client

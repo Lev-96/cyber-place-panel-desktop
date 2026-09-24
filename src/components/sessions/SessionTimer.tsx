@@ -1,6 +1,6 @@
 import { preciseWhenSmall } from "@/i18n/currency";
 import { ISessionApi } from "@/types/sessions";
-import { sessionAmountAt } from "./sessionAmount";
+import { playedSecondsBetween, sessionAmountAt } from "./sessionAmount";
 import { useEffect, useState } from "react";
 
 const fmt = (ms: number) => {
@@ -44,6 +44,9 @@ interface Props {
  * place it is answered — mirroring the backend's `timeCostStringAt`. Before
  * this, only the count-up branch showed an amount and it computed its own.
  */
+/** A clock that is not running: neither the live cyan nor a warning colour. */
+const PAUSED_COLOR = "#94a3b8";
+
 const SessionTimer = ({ session, formatMoney }: Props) => {
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
@@ -70,25 +73,34 @@ const SessionTimer = ({ session, formatMoney }: Props) => {
   ) : null;
 
   const isOpen = !session.ends_at && !!session.started_at;
+  // PAUSED: every figure here holds still — the SERVER's instants decide it,
+  // not a stopped interval, so a reload or a dropped socket shows the same
+  // frozen clock. The money already holds (the open pause runs to `now` and
+  // is subtracted); the countdown holds at `ends_at − paused_at`, which is
+  // exactly the time the player gets back on resume.
+  const pausedAt = session.paused_at ? Date.parse(session.paused_at) : NaN;
+  const paused = !Number.isNaN(pausedAt);
+  const pausedMark = paused ? <span aria-hidden="true">⏸ </span> : null;
 
   if (isOpen) {
-    const elapsedMs = now - new Date(session.started_at).getTime();
+    // Time PLAYED, which is what the bill charges for — not wall time.
+    const elapsedMs = playedSecondsBetween(session, session.started_at, now) * 1000;
     return (
-      <span style={{ fontWeight: 700, fontVariantNumeric: "tabular-nums", color: "#07ddf1" }}>
-        ▲ {fmt(elapsedMs)}
+      <span style={{ fontWeight: 700, fontVariantNumeric: "tabular-nums", color: paused ? PAUSED_COLOR : "#07ddf1" }}>
+        {pausedMark}▲ {fmt(elapsedMs)}
         {cost}
       </span>
     );
   }
 
   if (!session.ends_at) return null;
-  const remaining = new Date(session.ends_at).getTime() - now;
-  const warn = remaining <= 5 * 60_000;
-  const crit = remaining <= 60_000;
-  const color = crit ? "#ef4444" : warn ? "#f59e0b" : "#07ddf1";
+  const remaining = new Date(session.ends_at).getTime() - (paused ? pausedAt : now);
+  const warn = !paused && remaining <= 5 * 60_000;
+  const crit = !paused && remaining <= 60_000;
+  const color = paused ? PAUSED_COLOR : crit ? "#ef4444" : warn ? "#f59e0b" : "#07ddf1";
   return (
     <span style={{ fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>
-      <span style={{ color }}>{fmt(remaining)}</span>
+      <span style={{ color }}>{pausedMark}{fmt(remaining)}</span>
       {cost}
     </span>
   );

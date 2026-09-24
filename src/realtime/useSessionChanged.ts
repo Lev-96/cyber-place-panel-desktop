@@ -24,7 +24,10 @@ export interface SessionChangedEvent {
     | "extra.returned"
     // The session changed SEAT. Two device rows moved with it, so the board
     // re-reads them as well — see `SessionsBoard`.
-    | "moved";
+    | "moved"
+    // The clock stopped / started again. The seat stays taken either way.
+    | "paused"
+    | "resumed";
   session_id: number;
   branch_id: number;
   pc_id: number;

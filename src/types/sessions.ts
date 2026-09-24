@@ -165,6 +165,18 @@ export interface ISessionApi {
    */
   stopped_at?: string | null;
   status: "active" | "stopped" | "expired";
+  /**
+   * Paused since this instant; null while the clock runs. The session stays
+   * `active` while paused — the seat stays taken and a console stays awake —
+   * so nothing that asks "is this seat in use" changes; only the clock stops.
+   * Optional so an older backend reads as "never paused".
+   */
+  paused_at?: string | null;
+  /**
+   * Every stretch the clock was stopped. The ticking figures subtract these
+   * exactly as the bill does (`pausedSecondsBetween` in sessionAmount.ts).
+   */
+  pauses?: Array<{ paused_at: string; resumed_at: string | null }>;
   total_paid: number;
   /**
    * How the money was taken when the session was stopped.

@@ -659,6 +659,16 @@ export const eventDetail = (
       break;
     }
 
+    case "resumed": {
+      // How long the player was away, and where the end moved to — the
+      // server's own figures, written in the resume's transaction.
+      const seconds = metaNum(meta, "paused_seconds");
+      if (seconds !== null) parts.push(`${t("history.pausedFor")}: ${durationLabel(seconds / 60, t)}`);
+      const newEnd = metaStr(meta, "new_ends_at");
+      if (newEnd !== null) parts.push(`${t("history.untilLabel")} ${formatTime(new Date(newEnd))}`);
+      break;
+    }
+
     case "made_unlimited": {
       // ⚠️ Only when the server said what it was BEFORE. With no `old_mode` —
       // a row written before the key existed — the detail would be the word

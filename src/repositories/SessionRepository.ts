@@ -16,6 +16,8 @@ import {
   apiMakeSessionUnlimited,
   apiRemoveSessionJoystick,
   apiSetSessionFree,
+  apiPauseSession,
+  apiResumeSession,
   ISessionEvent,
   ListSessionEventsParams,
   apiListActiveSessions,
@@ -147,6 +149,14 @@ export class SessionRepository {
 
   async setFree(sessionId: number, isFree: boolean): Promise<ISessionApi> {
     return friendlyMutation(apiSetSessionFree(sessionId, isFree).then((r) => r.session));
+  }
+
+  async pause(sessionId: number): Promise<ISessionApi> {
+    return friendlyMutation(apiPauseSession(sessionId).then((r) => r.session));
+  }
+
+  async resume(sessionId: number): Promise<ISessionApi> {
+    return friendlyMutation(apiResumeSession(sessionId).then((r) => r.session));
   }
 
   /* ── the audit trail ─────────────────────────────────────────────────── */

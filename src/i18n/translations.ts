@@ -739,6 +739,11 @@ export const TRANSLATIONS: Dict = {
   // "darts". Nothing here names a thing, which is the whole point: a room
   // invented tomorrow reads correctly without a key being added.
   "session.extraAdd": { en: "Add {0}", ru: "Добавить: {0}", am: "Ավելացնել՝ {0}" },
+  // Pause / resume on the tile. A paused session is still ACTIVE — the seat
+  // stays taken — only its clock and its bill hold still.
+  "session.pause": { en: "Pause", ru: "Пауза", am: "Դադար" },
+  "session.resume": { en: "Resume", ru: "Продолжить", am: "Շարունակել" },
+  "session.pausedBadge": { en: "Paused", ru: "На паузе", am: "Դադարեցված" },
   // The green toast after a hand-out, in the room's own word — the pads say
   // "Джойстик добавлен" the same way.
   "session.extraAdded": { en: "Added: {0}", ru: "Добавлено: {0}", am: "Ավելացվեց՝ {0}" },
@@ -1246,6 +1251,9 @@ export const TRANSLATIONS: Dict = {
   "history.action.joystick_removed": { en: "Removed a joystick", ru: "Убрал джойстик", am: "Հեռացրեց ջոյսթիք" },
   "history.action.time_added": { en: "Added time", ru: "Добавил время", am: "Ավելացրեց ժամանակ" },
   "history.action.made_unlimited": { en: "Switched to unlimited", ru: "Перевёл на безлимит", am: "Փոխարկեց անսահմանափակի" },
+  "history.action.paused": { en: "Paused the session", ru: "Поставил сессию на паузу", am: "Դադարեցրեց նիստը" },
+  "history.action.resumed": { en: "Resumed the session", ru: "Продолжил сессию", am: "Շարունակեց նիստը" },
+  "history.pausedFor": { en: "Paused for", ru: "Пауза длилась", am: "Դադարը տևեց" },
   "history.action.free_enabled": { en: "Made it free", ru: "Сделал бесплатной", am: "Դարձրեց անվճար" },
   "history.action.free_disabled": { en: "Made it paid again", ru: "Вернул оплату", am: "Վերադարձրեց վճարումը" },
   // The seat migration. Emitted by the server since the feature shipped; the

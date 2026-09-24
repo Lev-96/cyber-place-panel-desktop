@@ -46,7 +46,7 @@ export const sessionTimeCostAt = (session: ISessionApi, at: number): number => {
 
   // Open / count-up: per second at the assigned rate, from the first second.
   if (session.mode === "open") {
-    return perSecond(rate, secondsBetween(session.started_at, at));
+    return perSecond(rate, playedSecondsBetween(session, session.started_at, at));
   }
 
   // `total_paid` is the fallback for a session that closed before
@@ -66,7 +66,7 @@ export const sessionTimeCostAt = (session: ISessionApi, at: number): number => {
 
   return tariff === null
     ? round2(committed)
-    : perSecond(tariff, secondsBetween(session.started_at, at));
+    : perSecond(tariff, playedSecondsBetween(session, session.started_at, at));
 };
 
 /**
@@ -173,7 +173,8 @@ export const sessionItemsTotalAt = (session: ISessionApi, at: number): number =>
       const from = !Number.isNaN(startedAt) && created < startedAt ? startedAt : created;
       const returned = line.returned_at ? Date.parse(line.returned_at) : NaN;
       const to = Number.isNaN(returned) ? at : Math.min(returned, at);
-      const seconds = Math.max(0, Math.floor((to - from) / 1000));
+      // A pause stops this meter with the seat's, as the calculator does.
+      const seconds = Math.max(0, Math.floor((to - from) / 1000) - pausedSecondsBetween(session, from, to));
 
       return sum + (toNumber(line.price) * toNumber(line.qty) * seconds) / 3600;
     }, 0),
@@ -228,7 +229,8 @@ export const sessionJoysticksTotalAt = (session: ISessionApi, at: number): numbe
         if (Number.isNaN(from)) return sum;
         const stopped = pad.stopped_at ? Date.parse(pad.stopped_at) : NaN;
         const to = Number.isNaN(stopped) ? at : Math.min(stopped, at);
-        const seconds = Math.max(0, Math.floor((to - from) / 1000));
+        // A pause stops this meter with the seat's, as the calculator does.
+        const seconds = Math.max(0, Math.floor((to - from) / 1000) - pausedSecondsBetween(session, from, to));
         return sum + (toNumber(pad.price) * seconds) / 3600;
       }
 
@@ -359,6 +361,55 @@ const secondsBetween = (fromIso: string | null | undefined, at: number): number 
   if (Number.isNaN(from)) return 0;
 
   return Math.max(0, Math.floor((at - from) / 1000));
+};
+
+/**
+ * How many seconds of `[from, to)` fell inside a pause.
+ *
+ * Mirrors `Session::pausedSecondsBetween()` — THE one answer every time-based
+ * term subtracts (the seat, an hourly pad, an hourly extra), each over its
+ * OWN interval, which is why the pauses travel as intervals. An open pause
+ * runs to `to`, which is what holds every figure still while the session is
+ * paused. A payload that carries `paused_at` but not the intervals (a partial
+ * answer) is read as that one open pause, so it never under-states a pause
+ * the server says is running.
+ *
+ * 0 for a session never paused — nothing that existed before moves.
+ */
+export const pausedSecondsBetween = (session: ISessionApi, from: number, to: number): number => {
+  if (!(to > from)) return 0;
+
+  const pauses = session.pauses
+    ?? (session.paused_at ? [{ paused_at: session.paused_at, resumed_at: null }] : []);
+
+  let paused = 0;
+  for (const pause of pauses) {
+    const pausedAt = Date.parse(pause.paused_at);
+    if (Number.isNaN(pausedAt)) continue;
+
+    const start = Math.max(pausedAt, from);
+    const resumed = pause.resumed_at ? Date.parse(pause.resumed_at) : NaN;
+    const end = !Number.isNaN(resumed) && resumed < to ? resumed : to;
+
+    if (end > start) paused += Math.floor((end - start) / 1000);
+  }
+
+  return paused;
+};
+
+/**
+ * Seconds PLAYED from an ISO instant to a moment: elapsed minus paused.
+ * `Session::secondsBetween()` on the server, pauses and all.
+ */
+export const playedSecondsBetween = (
+  session: ISessionApi,
+  fromIso: string | null | undefined,
+  at: number,
+): number => {
+  const elapsed = secondsBetween(fromIso, at);
+  if (elapsed === 0) return 0;
+
+  return Math.max(0, elapsed - pausedSecondsBetween(session, new Date(fromIso as string).getTime(), at));
 };
 
 /**

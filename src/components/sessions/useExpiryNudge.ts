@@ -54,7 +54,9 @@ export const useExpiryNudge = (
   // every thirty-second poll. There is no behaviour here to pin, and no test
   // below pretends otherwise.
   const soonest = (sessions ?? [])
-    .filter((s) => s.status === "active" && s.ends_at !== null && s.is_unlimited !== true)
+    // A PAUSED seat is not due: its end moves on resume, and the server will
+    // not expire it however far the old one lies behind.
+    .filter((s) => s.status === "active" && s.ends_at !== null && s.is_unlimited !== true && !s.paused_at)
     .map((s) => new Date(s.ends_at as string).getTime())
     .filter((t) => Number.isFinite(t))
     .sort((a, b) => a - b)[0];
