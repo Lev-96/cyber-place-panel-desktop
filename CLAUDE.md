@@ -1546,6 +1546,23 @@ its own branch — the server decides). It was removed on 2026-08-30 ("selling
 happens on the session bill"); the owner asked for it again, as a sale that
 needs no seat. A sale is a backend ORDER, never a session.
 
+- **A typed name that fits several products (2026-09-25).** The server
+  answers such a line `status: "ambiguous"` with `options` (id, name, price,
+  price × qty) and keeps its `qty`. `BasketQuickEntry` renders a `QuickEntryPick`
+  under that line — a radio group (unique `name` per line via `useId`), nothing
+  pre-selected, amber until answered — in BOTH dialogs (session and till). A
+  pick is stored in `useProductBasket.choices`, keyed by line index AND text
+  (`components/pos/quickEntryChoices.ts`, pure + tested), and re-reads the box
+  AT ONCE with `choices` (typing still waits 400ms); the server resolves the
+  line, merges, prices and totals — the panel computes none of it. Picks whose
+  line changed or whose product left the options are pruned after each answer;
+  a cleared box forgets them. Confirm stays on the existing rule
+  (`resolved.ok`), so it is off until every ambiguous line is answered; a hint
+  counts the lines still waiting. An ordinary read sends NO `choices` (the old
+  request, byte for byte). The session picker and quick entry no longer offer
+  withdrawn products (`is_active === false`), as the till never did — the
+  server refuses them on the bill. `confirmText` has a ref guard against a
+  double press inside one frame.
 - **One basket, two dialogs.** `components/pos/useProductBasket` (catalogue,
   search, cart, quick-entry read) and `ProductBasketPanels` (mode switch,
   picker, quick entry + preview, "new product") were moved verbatim out of
