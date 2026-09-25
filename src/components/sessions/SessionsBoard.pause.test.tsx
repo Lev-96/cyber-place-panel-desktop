@@ -119,6 +119,10 @@ describe("SessionsBoard — pause and resume", () => {
     expect(named("session.addItem").textContent).toBe("session.card.addItem");
     expect(named("session.relocate").textContent).toBe("session.card.relocate");
     expect(named("session.addTime").getAttribute("title")).toBe("session.addTime");
+    // «Пересадить» spans the row like Stop; the half-width actions do not.
+    expect(named("session.relocate").classList.contains("session-card__btn--wide")).toBe(true);
+    expect(named("action.stop").classList.contains("session-card__btn--wide")).toBe(true);
+    expect(named("session.addTime").classList.contains("session-card__btn--wide")).toBe(false);
   });
 
   test("a running seat offers «Move player»", async () => {

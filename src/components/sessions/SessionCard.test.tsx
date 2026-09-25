@@ -77,6 +77,13 @@ describe("SessionCardAction", () => {
     expect(button.classList.contains("session-card__btn--wide")).toBe(true);
   });
 
+  test("wide spans the row without being red", () => {
+    render(<SessionCardAction label="Пересадить" fullLabel="Переместить игрока" wide />);
+    const button = screen.getByRole("button", { name: "Переместить игрока" });
+    expect(button.classList.contains("session-card__btn--wide")).toBe(true);
+    expect(button.classList.contains("is-danger")).toBe(false);
+  });
+
   test("disabled stays disabled", () => {
     render(<SessionCardAction label="Пауза" fullLabel="Пауза" disabled />);
     expect((screen.getByRole("button", { name: "Пауза" }) as HTMLButtonElement).disabled).toBe(true);

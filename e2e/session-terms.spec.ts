@@ -217,3 +217,95 @@ test("and so can a manager", async ({ page }) => {
   await expect(page.getByRole("button", { name: "Start", exact: true })).toHaveCount(2);
   await expect(page.getByText("Free session", { exact: true })).toBeVisible();
 });
+
+/**
+ * The action grid is EVEN, in a real browser with the real CSS: every row is
+ * two equal buttons or one full-width button, all one height, no label clipped,
+ * and «Пересадить» (Move) spans the row like Stop. An odd count of half-width
+ * actions must not leave a hole — the last one takes the row (a `:has()` rule
+ * jsdom cannot evaluate, which is why this lives here).
+ */
+test("the session card's actions are even rows with nothing clipped", async ({ page }) => {
+  await installBackendMocks(page, { role: "company_owner", company_id: 1, name: "Owner One" });
+  await seedFloor(page);
+  await signIn(page, "o@o");
+  await expect(page.getByText("Owner One").first()).toBeVisible();
+  await page.evaluate(() => { window.location.hash = "#/branches/1/sessions"; });
+  await expect(page.locator(".session-card--running").first()).toBeVisible();
+
+  const layout = await page.locator(".session-card--running").first().evaluate((card) => {
+    const grid = card.querySelector(".session-card__actions") as HTMLElement;
+    const gridWidth = grid.getBoundingClientRect().width;
+    const buttons = [...grid.querySelectorAll(".btn")] as HTMLElement[];
+    const rows: Record<number, number[]> = {};
+    for (const b of buttons) {
+      const r = b.getBoundingClientRect();
+      (rows[Math.round(r.top)] ??= []).push(Math.round(r.width));
+    }
+    const named = (n: string) => buttons.find((b) => b.getAttribute("aria-label") === n)!;
+    return {
+      gridWidth: Math.round(gridWidth),
+      rows: Object.values(rows),
+      heights: [...new Set(buttons.map((b) => Math.round(b.getBoundingClientRect().height)))],
+      clipped: buttons.filter((b) => b.scrollWidth > b.clientWidth).map((b) => b.textContent),
+      move: Math.round(named("Move player").getBoundingClientRect().width),
+      stop: Math.round(named("Stop").getBoundingClientRect().width),
+    };
+  });
+
+  expect(layout.heights).toHaveLength(1);
+  expect(layout.clipped).toEqual([]);
+  for (const row of layout.rows) {
+    if (row.length === 2) expect(Math.abs(row[0] - row[1])).toBeLessThanOrEqual(1);
+    else expect(row).toEqual([layout.gridWidth]);
+  }
+  expect(layout.move).toBe(layout.gridWidth);
+  expect(layout.stop).toBe(layout.gridWidth);
+});
+
+/** A free seat's Start sits under its status, not at the foot of a stretched card. */
+test("a free seat is not stretched to its neighbours and Start keeps its padding", async ({ page }) => {
+  await installBackendMocks(page, { role: "company_owner", company_id: 1, name: "Owner One" });
+  await seedFloor(page);
+  // A FREE PlayStation in the same row as the running one — the case where a
+  // stretched card pushed Start to its very bottom edge.
+  await page.route(
+    (url) => isBackend(url) && url.pathname === "/pcs",
+    async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ data: [
+          { id: 1, branch_id: 1, place_id: 10, label: "PS5 VIP", kind: "ps", status: "online", is_startable: true, current_session_id: 5, place: PLACE },
+          { id: 3, branch_id: 1, place_id: 12, label: "PS5 free", kind: "ps", status: "online", is_startable: true,
+            place: { id: 12, number: 3, name: "PS5 free", type: "standard", platform: "ps5" } },
+        ] }),
+      });
+    },
+  );
+  await signIn(page, "o@o");
+  await expect(page.getByText("Owner One").first()).toBeVisible();
+  await page.evaluate(() => { window.location.hash = "#/branches/1/sessions"; });
+  await expect(page.locator(".session-card--running").first()).toBeVisible();
+  const free = page.locator(".session-card--idle", { hasText: "PS5 free" });
+  await expect(free).toBeVisible();
+
+  const { gap, above } = await free.evaluate((card) => {
+    const start = card.querySelector(".session-card__start") as HTMLElement;
+    const status = card.querySelector(".status") as HTMLElement;
+    return {
+      gap: Math.round(card.getBoundingClientRect().bottom - start.getBoundingClientRect().bottom),
+      above: Math.round(start.getBoundingClientRect().top - status.getBoundingClientRect().bottom),
+    };
+  });
+  // Air between the status and Start, not the two touching.
+  expect(above).toBeGreaterThanOrEqual(10);
+  // The card's own padding (10px) plus its border — never a stretched void.
+  expect(gap).toBeGreaterThanOrEqual(9);
+  expect(gap).toBeLessThanOrEqual(13);
+
+  // …and it is shorter than the running card beside it, not stretched to it.
+  const running = await page.locator(".session-card--running").first().evaluate((c) => c.getBoundingClientRect().height);
+  const idle = await free.evaluate((c) => c.getBoundingClientRect().height);
+  expect(idle).toBeLessThan(running - 40);
+});

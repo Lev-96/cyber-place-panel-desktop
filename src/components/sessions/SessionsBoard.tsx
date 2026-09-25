@@ -1218,6 +1218,7 @@ const SessionsBoard = ({ branchId }: Props) => {
                 <SessionCardAction
                   label={t("session.card.relocate")}
                   fullLabel={t("session.relocate")}
+                  wide
                   onClick={() => setRelocateTarget(sess)}
                 />
               )}

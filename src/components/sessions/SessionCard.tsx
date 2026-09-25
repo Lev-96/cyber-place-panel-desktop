@@ -88,20 +88,26 @@ interface ActionProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, "chi
   fullLabel: string;
   /** Destructive (Stop): red, and it spans the row. */
   danger?: boolean;
+  /** Spans the whole row, like Stop (e.g. «Пересадить»). */
+  wide?: boolean;
 }
 
 /**
  * One button in a card's action grid. Every action on a session card goes
  * through this, which is what keeps them one height, one line and one style.
  */
-export const SessionCardAction = ({ label, fullLabel, danger = false, className, ...rest }: ActionProps) => (
+export const SessionCardAction = ({ label, fullLabel, danger = false, wide = false, className, ...rest }: ActionProps) => (
   <Button
     variant="secondary"
     {...rest}
     title={fullLabel}
     aria-label={fullLabel}
-    className={["session-card__btn", danger ? "session-card__btn--wide is-danger" : "", className ?? ""]
-      .filter(Boolean).join(" ")}
+    className={[
+      "session-card__btn",
+      danger || wide ? "session-card__btn--wide" : "",
+      danger ? "is-danger" : "",
+      className ?? "",
+    ].filter(Boolean).join(" ")}
   >
     {label}
   </Button>
