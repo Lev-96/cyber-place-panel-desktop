@@ -1,4 +1,4 @@
-import { ListSkeleton, SkeletonForm } from "@/components/ui/Skeleton";
+import { ListSkeleton } from "@/components/ui/Skeleton";
 import HourlyRatesForm from "@/components/branches/HourlyRatesForm";
 import PackageForm from "@/components/packages/PackageForm";
 import BranchExtraItemForm from "@/components/prices/BranchExtraItemForm";
@@ -8,7 +8,8 @@ import PauseLimitForm from "@/components/prices/PauseLimitForm";
 import PlatformPricesForm from "@/components/prices/PlatformPricesForm";
 import SubplatformPricesForm from "@/components/prices/SubplatformPricesForm";
 import Button from "@/components/ui/Button";
-import Spinner from "@/components/ui/Spinner";
+import SettingsSection from "@/components/ui/SettingsSection";
+import { useConfirm } from "@/components/ui/ConfirmProvider";
 import { useAsync } from "@/hooks/useAsync";
 import { useLang } from "@/i18n/LanguageContext";
 import { timePackageNameOf } from "@/i18n/timePackageName";
@@ -42,9 +43,11 @@ const BranchPricesPage = () => {
   const packages = useAsync(() => timePackageRepository.listByBranch(id), [id]);
   const platformPrices = useAsync(() => platformPriceRepository.listByBranch(id), [id]);
   const subplatforms = useAsync(() => subplatformRepository.listByBranch(id), [id]);
-  // One read for both money policies — the joystick fee and the rounding rule
-  // are two fields on the same branch and the same endpoint.
-  const billing = useAsync(() => billingSettingsRepository.get(id), [id]);
+  // One read for every billing rule below — they are fields of the same
+  // branch policy and the same endpoint. STRICT (`getForEdit`): a failed load
+  // shows an error and a retry, never defaults a Save could write back.
+  const billing = useAsync(() => billingSettingsRepository.getForEdit(id), [id]);
+  const confirm = useConfirm();
 
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState<ITimePackage | null>(null);
@@ -52,7 +55,13 @@ const BranchPricesPage = () => {
   if (!Number.isFinite(id) || id <= 0) return <div className="error">{t("hub.invalidId")}</div>;
 
   const removePackage = async (pkg: ITimePackage) => {
-    if (!confirm(`${t("tariffs.confirmDelete")} "${timePackageNameOf(pkg, lang)}"?`)) return;
+    // The app's own dialog: a native confirm() poisons the Electron renderer's
+    // focus (see ConfirmProvider).
+    const ok = await confirm(`${t("tariffs.confirmDelete")} "${timePackageNameOf(pkg, lang)}"?`, {
+      destructive: true,
+      confirmLabel: t("action.delete"),
+    });
+    if (!ok) return;
     await timePackageRepository.remove(pkg.id);
     void packages.reload();
   };
@@ -73,217 +82,215 @@ const BranchPricesPage = () => {
       .join(" · ");
 
   return (
-    <div className="col" style={{ gap: 24 }}>
-      {/* Hourly rates matrix — primary section, what the player sees */}
-      <section className="col" style={{ gap: 12 }}>
-        <h2 className="page-title" style={{ margin: 0 }}>
-          {t("branch.prices.title")}
-        </h2>
-        {branch.loading && <SkeletonForm fields={3} />}
-        {branch.error && <div className="error">{branch.error.message}</div>}
-        {branch.data && (
-          <HourlyRatesForm branch={branch.data} onSaved={() => void branch.reload()} />
+    <div className="col prices-page">
+      <h2 className="page-title" style={{ margin: 0 }}>{t("branch.prices.title")}</h2>
+
+      {/* ── What a seat costs ─────────────────────────────────────────── */}
+      <div className="prices-group prices-group--rates">
+        <h3 className="prices-group__title">{t("prices.group.rates")}</h3>
+
+        {/* Hourly rates matrix — what the player sees. */}
+        <SettingsSection
+          title={t("prices.hourlyTitle")}
+          loading={branch.loading && !branch.data}
+          error={branch.data ? null : branch.error}
+          onRetry={() => void branch.reload()}
+        >
+          {branch.data && (
+            <HourlyRatesForm branch={branch.data} onSaved={() => void branch.reload()} />
+          )}
+        </SettingsSection>
+
+        {/* Custom-platform hourly rates — same shape as the matrix above so a
+            custom platform reads exactly like pc/ps4/ps5 (a Standard column and
+            a VIP column). Created automatically when a place of that type is
+            added (in Places) — never by hand here — and editable (name in 3
+            languages + each tier). Editing a tier re-points its places + devices. */}
+        {(platformPrices.data?.length ?? 0) > 0 && (
+          <SettingsSection title={t("platformPrice.sectionTitle")}>
+            <PlatformPricesForm
+              key={(platformPrices.data ?? []).map((p) => p.id).join(",")}
+              prices={platformPrices.data ?? []}
+              onSaved={() => void platformPrices.reload()}
+            />
+          </SettingsSection>
         )}
 
-      </section>
-
-      {/* Custom-platform hourly rates — same shape as the matrix above so a
-          custom platform reads exactly like pc/ps4/ps5 (a Standard column and
-          a VIP column). Created automatically when a place of that type is
-          added (in Places) — never by hand here — and editable (name in 3
-          languages + each tier). Editing a tier re-points its places + devices. */}
-      {(platformPrices.data?.length ?? 0) > 0 && (
-        <section className="col" style={{ gap: 12 }}>
-          <h2 className="page-title" style={{ margin: 0 }}>{t("platformPrice.sectionTitle")}</h2>
-          <PlatformPricesForm
-            key={(platformPrices.data ?? []).map((p) => p.id).join(",")}
-            prices={platformPrices.data ?? []}
-            onSaved={() => void platformPrices.reload()}
-          />
-        </section>
-      )}
-
-      {/* Subplatform rates — the sub-categories of a platform ("PS5 + VR").
-          Created in Places on the second row of tabs; here they are renamed (in
-          3 languages) and priced. An empty cell is a value, not a gap: it means
-          "bill the same as the platform". */}
-      {(subplatforms.data?.length ?? 0) > 0 && (
-        <section className="col" style={{ gap: 12 }}>
-          <h2 className="page-title" style={{ margin: 0 }}>{t("subplatform.sectionTitle")}</h2>
-          <SubplatformPricesForm
-            key={(subplatforms.data ?? []).map((s) => s.id).join(",")}
-            subplatforms={subplatforms.data ?? []}
-            onSaved={() => void subplatforms.reload()}
-          />
-        </section>
-      )}
-
-      {/* ⚠️ Extra joysticks had a section here and it is gone from this page
-          ON PURPOSE, with nothing behind it removed. What a pad costs, how it
-          is priced and how often it is charged are answers a ROOM gives — a
-          club sells its VIP's controllers differently from its floor's — so
-          they live in the place's own form, beside that room's rate, and are
-          written by the same owner-level permission. The branch columns remain
-          as the fallback every room inherits until it says otherwise. */}
-      {/* The venue's joystick fee — the figure every room inherits until it
-          prices its own pads. Small on purpose: which pads cost money and how
-          much, and nothing else. HOW a pad is priced and how often it is
-          charged are the room's questions and are asked on the place's form.
-          The two must not both ask, or one venue gets two answers. */}
-      <section className="col" style={{ gap: 12 }}>
-        <h2 className="page-title" style={{ margin: 0 }}>{t("branchJoystick.sectionTitle")}</h2>
-        {billing.data && (
-          <BranchJoystickForm
-            key={`${billing.data.joystick_price}:${billing.data.joystick_charged_slots}`}
-            branchId={id}
-            settings={billing.data}
-            onSaved={() => void billing.reload()}
-          />
+        {/* Subplatform rates — the sub-categories of a platform ("PS5 + VR").
+            Created in Places on the second row of tabs; here they are renamed
+            (in 3 languages) and priced. An empty cell is a value, not a gap: it
+            means "bill the same as the platform". */}
+        {(subplatforms.data?.length ?? 0) > 0 && (
+          <SettingsSection title={t("subplatform.sectionTitle")}>
+            <SubplatformPricesForm
+              key={(subplatforms.data ?? []).map((s) => s.id).join(",")}
+              subplatforms={subplatforms.data ?? []}
+              onSaved={() => void subplatforms.reload()}
+            />
+          </SettingsSection>
         )}
-      </section>
+      </div>
 
-      {/* And the same question for a room on a CUSTOM platform — a billiard
-          table's cue, a poker table's chips. The pads answer it for
-          PlayStation seats above; this answers it for everything else, and a
-          room that has set its own ignores both. A venue with ten billiard
-          tables answers once. */}
-      <section className="col" style={{ gap: 12 }}>
-        <h2 className="page-title" style={{ margin: 0 }}>{t("branchExtraItem.sectionTitle")}</h2>
-        {billing.data && (
-          <BranchExtraItemForm
-            key={`${billing.data.extra_item_name}:${billing.data.extra_item_price}`}
-            branchId={id}
-            settings={billing.data}
-            onSaved={() => void billing.reload()}
-          />
-        )}
-      </section>
-
-      {/* Rounding. Last, and after every rate, because it is the rule applied
-          to what all of them add up to. */}
-      <section className="col" style={{ gap: 12 }}>
-        <h2 className="page-title" style={{ margin: 0 }}>{t("rounding.sectionTitle")}</h2>
-        {billing.data && (
-          <MoneyRoundingForm
-            key={`${billing.data.money_rounding_step}:${billing.data.money_rounding_mode}`}
-            branchId={id}
-            settings={billing.data}
-            onSaved={() => void billing.reload()}
-          />
-        )}
-      </section>
-
-      {/* The longest one pause may last before the server resumes it. */}
-      <section className="col" style={{ gap: 12 }}>
-        <h2 className="page-title" style={{ margin: 0 }}>{t("pauseLimit.sectionTitle")}</h2>
-        {billing.data && (
-          <PauseLimitForm
-            key={String(billing.data.pause_limit_minutes ?? "")}
-            branchId={id}
-            settings={billing.data}
-            onSaved={() => void billing.reload()}
-          />
-        )}
-      </section>
-
-      {/* Time packages — used by StartSessionDialog fixed mode AND now
-          carry the optional time-windowed discount inline. */}
-      <section className="col" style={{ gap: 12 }}>
-        <div className="row-between">
-          <h2 className="page-title" style={{ margin: 0 }}>
-            {t("branch.prices.packagesSubtitle")}
-          </h2>
-          <Button onClick={() => setCreating(true)}>{t("tariffs.new")}</Button>
-        </div>
-        {packages.loading && <ListSkeleton rows={4} />}
-        {packages.error && <div className="error">{packages.error.message}</div>}
-        {!packages.loading && !packages.error && (
-          <div className="list">
-            {(packages.data ?? []).map((p) => {
-              const active = p.is_active !== false;
-              const hasDiscount =
-                typeof p.discount_price === "number" &&
-                !!p.discount_start_time &&
-                !!p.discount_end_time &&
-                Array.isArray(p.discount_days_of_week) &&
-                p.discount_days_of_week.length > 0;
-              return (
-                <div key={p.id} className="list-item" style={{ opacity: active ? 1 : 0.5 }}>
-                  <div>
-                    <div className="name">
-                      {timePackageNameOf(p, lang)}
-                      {p.platform && (
-                        <span
-                          style={{
-                            marginLeft: 8,
-                            fontSize: 11,
-                            padding: "2px 6px",
-                            borderRadius: 4,
-                            background: "rgba(7, 221, 241, 0.18)",
-                            color: "#07ddf1",
-                            fontWeight: 700,
-                            textTransform: "uppercase",
-                            letterSpacing: 0.5,
-                          }}
-                        >
-                          {p.platform}
-                        </span>
-                      )}
-                      {hasDiscount && p.is_discount_currently_active && (
-                        <span
-                          style={{
-                            marginLeft: 8,
-                            fontSize: 11,
-                            padding: "2px 6px",
-                            borderRadius: 4,
-                            background: "#1f3a1f",
-                            color: "#7ee87e",
-                            fontWeight: 600,
-                          }}
-                        >
-                          {t("tariff.discount.activeNow")}
-                        </span>
-                      )}
+      {/* ── What is sold as a package ─────────────────────────────────── */}
+      {/* Time packages — used by StartSessionDialog fixed mode AND carrying the
+          optional time-windowed discount inline. */}
+      <div className="prices-group">
+        <h3 className="prices-group__title">{t("prices.group.packages")}</h3>
+        <SettingsSection
+          title={t("branch.prices.packagesSubtitle")}
+          description={t("prices.packagesHint")}
+          actions={<Button onClick={() => setCreating(true)}>{t("tariffs.new")}</Button>}
+          error={packages.data ? null : packages.error}
+          onRetry={() => void packages.reload()}
+        >
+          {packages.loading && !packages.data ? (
+            <ListSkeleton rows={4} />
+          ) : (packages.data ?? []).length === 0 ? (
+            <div className="prices-empty">
+              <span className="muted">{t("tariffs.empty")}</span>
+              <Button variant="secondary" onClick={() => setCreating(true)}>{t("tariffs.new")}</Button>
+            </div>
+          ) : (
+            <div className="list">
+              {(packages.data ?? []).map((p) => {
+                const active = p.is_active !== false;
+                const hasDiscount =
+                  typeof p.discount_price === "number" &&
+                  !!p.discount_start_time &&
+                  !!p.discount_end_time &&
+                  Array.isArray(p.discount_days_of_week) &&
+                  p.discount_days_of_week.length > 0;
+                return (
+                  <div
+                    key={p.id}
+                    className={`list-item list-item--static package-row${active ? "" : " package-row--inactive"}`}
+                  >
+                    <div className="package-row__main">
+                      <div className="name">
+                        {timePackageNameOf(p, lang)}
+                        {p.platform && <span className="price-badge price-badge--platform">{p.platform}</span>}
+                        {hasDiscount && p.is_discount_currently_active && (
+                          <span className="price-badge price-badge--success">{t("tariff.discount.activeNow")}</span>
+                        )}
+                        {!active && <span className="price-badge price-badge--muted">{t("prices.packageInactive")}</span>}
+                      </div>
+                      <div className="meta">
+                        {p.duration_minutes} {t("time.minShort")} · {money(Number(p.price))}
+                        {hasDiscount && (
+                          <>
+                            {" "}·{" "}
+                            <span className="package-row__discount">
+                              {t("tariff.discount.tag")}{" "}
+                              {money(Number(p.discount_price))}{" "}
+                              ({p.discount_start_time?.slice(0, 5)}–{p.discount_end_time?.slice(0, 5)}{" "}
+                              {renderDays(p.discount_days_of_week)})
+                            </span>
+                          </>
+                        )}
+                      </div>
                     </div>
-                    <div className="meta">
-                      {p.duration_minutes} {t("time.minShort")} · {money(Number(p.price))}
-                      {hasDiscount && (
-                        <>
-                          {" "}·{" "}
-                          <span style={{ color: "#07ddf1", fontWeight: 600 }}>
-                            {t("tariff.discount.tag")}{" "}
-                            {money(Number(p.discount_price))}{" "}
-                            ({p.discount_start_time?.slice(0, 5)}–{p.discount_end_time?.slice(0, 5)}{" "}
-                            {renderDays(p.discount_days_of_week)})
-                          </span>
-                        </>
-                      )}
+                    <div className="package-row__actions">
+                      <Button variant="secondary" onClick={() => togglePackage(p)} className="package-row__btn">
+                        {active ? t("action.deactivate") : t("action.activate")}
+                      </Button>
+                      <Button variant="secondary" onClick={() => setEditing(p)} className="package-row__btn">
+                        {t("action.edit")}
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        onClick={() => removePackage(p)}
+                        className="package-row__btn is-danger"
+                      >
+                        {t("action.delete")}
+                      </Button>
                     </div>
                   </div>
-                  <div className="row" style={{ gap: 6 }}>
-                    <Button variant="secondary" onClick={() => togglePackage(p)} style={btn}>
-                      {active ? t("action.deactivate") : t("action.activate")}
-                    </Button>
-                    <Button variant="secondary" onClick={() => setEditing(p)} style={btn}>
-                      {t("action.edit")}
-                    </Button>
-                    <Button
-                      variant="secondary"
-                      onClick={() => removePackage(p)}
-                      style={{ ...btn, color: "#ef4444", borderColor: "#4a1a1a" }}
-                    >
-                      {t("action.delete")}
-                    </Button>
-                  </div>
-                </div>
-              );
-            })}
-            {!packages.data?.length && (
-              <div className="muted">{t("tariffs.empty")}</div>
+                );
+              })}
+            </div>
+          )}
+        </SettingsSection>
+      </div>
+
+      {/* ── The rules applied on top of every bill ────────────────────── */}
+      {/* Each block saves on its own; each PUTs the WHOLE policy it was drawn
+          from and the page re-reads it after every save (the `key`s remount a
+          form when the server's answer changes its values). */}
+      <div className="prices-group">
+        <h3 className="prices-group__title">{t("prices.group.rules")}</h3>
+        <div className="prices-rules">
+          {/* The venue's joystick fee — the figure every room inherits until it
+              prices its own pads. HOW a pad is priced and how often it is
+              charged are the room's questions, asked on the place's form. */}
+          <SettingsSection
+            title={t("branchJoystick.sectionTitle")}
+            loading={billing.loading && !billing.data}
+            error={billing.data ? null : billing.error}
+            onRetry={() => void billing.reload()}
+          >
+            {billing.data && (
+              <BranchJoystickForm
+                key={`${billing.data.joystick_price}:${billing.data.joystick_charged_slots}`}
+                branchId={id}
+                settings={billing.data}
+                onSaved={() => void billing.reload()}
+              />
             )}
-          </div>
-        )}
-      </section>
+          </SettingsSection>
+
+          {/* The same question for a room on a CUSTOM platform — a billiard
+              table's cue, a poker table's chips. */}
+          <SettingsSection
+            title={t("branchExtraItem.sectionTitle")}
+            loading={billing.loading && !billing.data}
+            error={billing.data ? null : billing.error}
+            onRetry={() => void billing.reload()}
+          >
+            {billing.data && (
+              <BranchExtraItemForm
+                key={`${billing.data.extra_item_name}:${billing.data.extra_item_price}`}
+                branchId={id}
+                settings={billing.data}
+                onSaved={() => void billing.reload()}
+              />
+            )}
+          </SettingsSection>
+
+          {/* Rounding: the rule applied to what every rate adds up to. */}
+          <SettingsSection
+            title={t("rounding.sectionTitle")}
+            loading={billing.loading && !billing.data}
+            error={billing.data ? null : billing.error}
+            onRetry={() => void billing.reload()}
+          >
+            {billing.data && (
+              <MoneyRoundingForm
+                key={`${billing.data.money_rounding_step}:${billing.data.money_rounding_mode}`}
+                branchId={id}
+                settings={billing.data}
+                onSaved={() => void billing.reload()}
+              />
+            )}
+          </SettingsSection>
+
+          {/* The longest one pause may last before the server resumes it. */}
+          <SettingsSection
+            title={t("pauseLimit.sectionTitle")}
+            loading={billing.loading && !billing.data}
+            error={billing.data ? null : billing.error}
+            onRetry={() => void billing.reload()}
+          >
+            {billing.data && (
+              <PauseLimitForm
+                key={String(billing.data.pause_limit_minutes ?? "")}
+                branchId={id}
+                settings={billing.data}
+                onSaved={() => void billing.reload()}
+              />
+            )}
+          </SettingsSection>
+        </div>
+      </div>
 
       {creating && (
         <PackageForm
@@ -308,13 +315,6 @@ const BranchPricesPage = () => {
       )}
     </div>
   );
-};
-
-const btn: React.CSSProperties = {
-  padding: "6px 10px",
-  fontSize: 12,
-  minWidth: 80,
-  textAlign: "center",
 };
 
 export default BranchPricesPage;

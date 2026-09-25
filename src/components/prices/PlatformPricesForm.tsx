@@ -100,7 +100,7 @@ const PlatformPricesForm = ({ prices, onSaved }: Props) => {
 
   return (
     <>
-    <form onSubmit={submit} className="card" style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+    <form onSubmit={submit} className="col" style={{ gap: 14 }}>
       <div style={{ display: "grid", gridTemplateColumns: "100px 1fr 1fr", gap: 10, alignItems: "center" }}>
         <span />
         <span className="muted" style={{ fontSize: 12, textTransform: "uppercase" }}>{t("branch.prices.standard")}</span>

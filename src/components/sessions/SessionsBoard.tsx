@@ -7,6 +7,7 @@ import CollapsibleSection from "@/components/ui/CollapsibleSection";
 import { GridSkeleton } from "@/components/ui/Skeleton";
 import JoystickIcon from "@/components/ui/JoystickIcon";
 import { useAsync } from "@/hooks/useAsync";
+import { useKeyedBusy } from "@/hooks/useKeyedBusy";
 import { useLocalReorder } from "@/hooks/useLocalReorder";
 import { useReservedPlaceIds } from "@/hooks/useReservedPlaceIds";
 import { useLang } from "@/i18n/LanguageContext";
@@ -33,6 +34,7 @@ import SessionTimer from "./SessionTimer";
 import { autoResumeAtOf, sessionCurrentHourlyRate, sessionJoysticksTotal } from "./sessionAmount";
 import StartSessionDialog from "./StartSessionDialog";
 import SessionOptionsDialog from "./SessionOptionsDialog";
+import SessionCard from "./SessionCard";
 import RelocateSessionDialog from "./RelocateSessionDialog";
 import { BASE_JOYSTICKS, MAX_JOYSTICKS } from "@/api/joystickPrices";
 import { notify } from "@/ui/notify";
@@ -72,8 +74,11 @@ const SessionsBoard = ({ branchId }: Props) => {
   const [addItemTarget, setAddItemTarget] = useState<ISessionApi | null>(null);
   /** The line a return is in flight for, so its button cannot be pressed twice. */
   const [returningItem, setReturningItem] = useState<number | null>(null);
-  /** The seat a hand-out is in flight for, so a double press is one thing. */
-  const [extraBusy, setExtraBusy] = useState<number | null>(null);
+  /**
+   * The seats a hand-out is in flight for — per seat, so a double press on one
+   * is one thing and a press on another still goes through (useKeyedBusy).
+   */
+  const extraBusy = useKeyedBusy();
 
   /**
    * The room's extra that is still OUT, if any — hourly or fixed.
@@ -131,9 +136,8 @@ const SessionsBoard = ({ branchId }: Props) => {
    * manager hand one out: a typed price needs `products.manage`.
    */
   const handOutExtra = async (sess: ISessionApi) => {
-    if (extraBusy !== null) return;
+    if (!extraBusy.begin(sess.id)) return;
 
-    setExtraBusy(sess.id);
     setPadError(null);
     try {
       applyItems(await sessionRepository.addItems(sess.id, [{ extra: true, qty: 1 }]));
@@ -146,7 +150,7 @@ const SessionsBoard = ({ branchId }: Props) => {
       // set, nothing left to hand out, the session is over.
       setPadError({ id: sess.id, message: e instanceof Error ? e.message : String(e) });
     } finally {
-      setExtraBusy(null);
+      extraBusy.end(sess.id);
       await sessions.reload();
     }
   };
@@ -184,12 +188,13 @@ const SessionsBoard = ({ branchId }: Props) => {
     return pc.place ? `№${pc.place.number ?? pc.place.id}` : tr(pc, "label", lang);
   };
 
-  /** The seat a pause or resume is in flight for, so a double press is one. */
-  const [pauseBusy, setPauseBusy] = useState<number | null>(null);
-  // The same guard as a ref: two clicks landing before the re-render that
-  // greys the button both read the state as idle, and the second would be a
-  // second request. The server refuses it (409) — this keeps it from leaving.
-  const pauseInFlight = useRef(false);
+  /**
+   * The seats a pause or resume is in flight for. Per seat, and ref-backed
+   * inside useKeyedBusy: two clicks landing before the re-render that greys
+   * the button are still one request (the server would refuse the second with
+   * a 409 — this keeps it from leaving), while another seat is never blocked.
+   */
+  const pauseBusy = useKeyedBusy();
   /** A refused pause/resume, on the tile it belongs to — every kind of seat. */
   const [pauseError, setPauseError] = useState<{ id: number; message: string } | null>(null);
 
@@ -217,10 +222,8 @@ const SessionsBoard = ({ branchId }: Props) => {
   };
 
   const togglePause = async (sess: ISessionApi) => {
-    if (pauseInFlight.current) return;
+    if (!pauseBusy.begin(sess.id)) return;
 
-    pauseInFlight.current = true;
-    setPauseBusy(sess.id);
     setPauseError(null);
     try {
       const resuming = !!sess.paused_at;
@@ -241,22 +244,22 @@ const SessionsBoard = ({ branchId }: Props) => {
     } catch (e) {
       setPauseError({ id: sess.id, message: e instanceof Error ? e.message : String(e) });
     } finally {
-      pauseInFlight.current = false;
-      setPauseBusy(null);
+      pauseBusy.end(sess.id);
       await sessions.reload();
     }
   };
   const [optionsTarget, setOptionsTarget] = useState<ISessionApi | null>(null);
   // The session being moved to another seat («Переместить игрока»).
   const [relocateTarget, setRelocateTarget] = useState<ISessionApi | null>(null);
-  // The session whose pads are mid-change. One at a time and per session, so a
+  // The sessions whose pads are mid-change. Per session (useKeyedBusy), so a
   // second click on the SAME tile is refused while the first is in flight and a
-  // cashier working another seat is not blocked by it.
+  // cashier working another seat is not blocked by it — which is what the old
+  // single `number | null` promised here and did not do.
   //
   // Not the only guard: the server takes a row lock on the session and refuses
   // a removal of a pad that is already gone. This one keeps the operator from
   // sending the second request at all.
-  const [padBusy, setPadBusy] = useState<number | null>(null);
+  const padBusy = useKeyedBusy();
   // The last refusal, shown on the tile it belongs to. This project has no
   // global toast helper and the board shows its errors where they happened;
   // keyed by session so one seat's refusal does not appear on another's.
@@ -431,9 +434,8 @@ const SessionsBoard = ({ branchId }: Props) => {
    * refuses — it never takes the price from here.
    */
   const addPad = useCallback(async (sess: ISessionApi, slot: number) => {
-    if (padBusy !== null) return;
+    if (!padBusy.begin(sess.id)) return;
 
-    setPadBusy(sess.id);
     setPadError(null);
 
     try {
@@ -453,7 +455,7 @@ const SessionsBoard = ({ branchId }: Props) => {
       // another one comes first, no price is set, the session is over.
       setPadError({ id: sess.id, message: e instanceof Error ? e.message : String(e) });
     } finally {
-      setPadBusy(null);
+      padBusy.end(sess.id);
       await sessions.reload();
     }
   }, [padBusy, sessions, t]);
@@ -470,13 +472,11 @@ const SessionsBoard = ({ branchId }: Props) => {
    * stops. That is the server's rule and this only asks for it.
    */
   const removeTopPad = useCallback(async (sess: ISessionApi) => {
-    if (padBusy !== null) return;
-
     const open = (sess.joysticks ?? []).filter((j) => j.stopped_at === null);
     if (open.length === 0) return;
     const slot = Math.max(...open.map((j) => j.slot));
 
-    setPadBusy(sess.id);
+    if (!padBusy.begin(sess.id)) return;
     setPadError(null);
 
     try {
@@ -490,7 +490,7 @@ const SessionsBoard = ({ branchId }: Props) => {
     } catch (e) {
       setPadError({ id: sess.id, message: e instanceof Error ? e.message : String(e) });
     } finally {
-      setPadBusy(null);
+      padBusy.end(sess.id);
       await sessions.reload();
     }
   }, [padBusy, sessions, t]);
@@ -706,12 +706,13 @@ const SessionsBoard = ({ branchId }: Props) => {
     const consoleBusy = lifecycle === "WAKING" || lifecycle === "GOING_TO_REST"
       || lifecycle === "UNEXPECTED_WAKE" || lifecycle === "ERROR";
     return (
-      <div
+      <SessionCard
         key={pc.id}
-        className={`place-cell${dragId === pc.id ? " is-dragging" : ""}${
-          dragOverId === pc.id && dragId != null && dragId !== pc.id ? " is-drop-before" : ""
-        }`}
-        style={{ borderColor: color, minHeight: 160 }}
+        session={sess}
+        baseColor={color}
+        seatState={cellState}
+        dragging={dragId === pc.id}
+        dropBefore={dragOverId === pc.id && dragId != null && dragId !== pc.id}
         onDragOver={(e) => {
           e.preventDefault();
           if (dragId != null && dragId !== pc.id) {
@@ -721,7 +722,8 @@ const SessionsBoard = ({ branchId }: Props) => {
         }}
         onDrop={() => dropOn(pc.id)}
       >
-        <span className="dot" style={{ background: color }} />
+        {/* Coloured by the card (`--card-accent`), so it follows urgency too. */}
+        <span className="dot" />
         <span
           className="cell-grip"
           draggable
@@ -774,7 +776,7 @@ const SessionsBoard = ({ branchId }: Props) => {
           >
             <span
               className="ps5-chip__dot"
-              style={{ background: lifecycle === "ERROR" ? "#ef4444" : PS5_STATE_LOOK[consoleState].dot }}
+              style={{ background: lifecycle === "ERROR" ? "var(--color-danger)" : PS5_STATE_LOOK[consoleState].dot }}
             />
             <span className="ps5-chip__text">
               {consoleBusy && lifecycle ? t(`ps5.lifecycle.${lifecycle}`) : t(PS5_STATE_LOOK[consoleState].key)}
@@ -790,7 +792,7 @@ const SessionsBoard = ({ branchId }: Props) => {
         <span className="id cell-line" title={nameLine}>{nameLine}</span>
         {sess ? (
           <>
-            <span className="status" style={{ color }}>
+            <span className="status">
               {/* The row itself, not a handful of its fields. Passing an
                   hourly rate a fixed session does not have is what left the
                   countdown branch with nothing to price from. */}
@@ -810,7 +812,7 @@ const SessionsBoard = ({ branchId }: Props) => {
                     : sess.package_name}
               {itemsCount > 0 && <span className="muted"> · {itemsCount} {t("session.posNote")}</span>}
               {sess.paused_at && (
-                <span className="pill" style={{ fontSize: 10, letterSpacing: 0, textTransform: "none", marginLeft: 6 }}>
+                <span className="pill session-card__pill">
                   {(() => {
                     // A limited pause says when the server will resume it.
                     const until = autoResumeAtOf(sess);
@@ -988,7 +990,7 @@ const SessionsBoard = ({ branchId }: Props) => {
                       aria-label={t("session.joysticks")}
                       // Disabled while a change is in flight, and when this
                       // venue has nothing left to hand out on this seat.
-                      disabled={padBusy === sess.id || padMenu.every((c) => !c.enabled)}
+                      disabled={padBusy.isBusy(sess.id) || padMenu.every((c) => !c.enabled)}
                       value=""
                       onChange={(e) => {
                         const slot = Number(e.target.value);
@@ -1037,7 +1039,7 @@ const SessionsBoard = ({ branchId }: Props) => {
                         style={{ height: 24, padding: "0 8px", fontSize: 12, flexShrink: 0 }}
                         title={t("session.padRemove")}
                         aria-label={t("session.padRemove")}
-                        disabled={padBusy === sess.id}
+                        disabled={padBusy.isBusy(sess.id)}
                         onClick={() => void removeTopPad(sess)}
                       >
                         −
@@ -1053,7 +1055,7 @@ const SessionsBoard = ({ branchId }: Props) => {
                   {/* The round trip, said on the tile it belongs to — for the
                       menu and for the switch alike, since either can be in
                       flight. */}
-                  {supportsJoysticks && padBusy === sess.id && (
+                  {supportsJoysticks && padBusy.isBusy(sess.id) && (
                     // The project's own spinner class, sized down inline
                     // rather than by widening the `Spinner` primitive: that
                     // one is a 32px page-level element with its own margins,
@@ -1083,19 +1085,14 @@ const SessionsBoard = ({ branchId }: Props) => {
                     {t("session.perHourShort")}
                   </span>
                 )}
-                {padError?.id === sess.id && (
-                  <span className="error" style={{ fontSize: 11, flexBasis: "100%" }}>
-                    {padError.message}
-                  </span>
-                )}
                 {sess.is_free && (
-                  <span className="pill" style={{ fontSize: 10, letterSpacing: 0, textTransform: "none" }}>
+                  <span className="pill session-card__pill">
                     {t("session.freeBillShort")}
                   </span>
                 )}
               </span>
             )}
-            <div className="row" style={{ gap: 6, marginTop: 4, flexWrap: "wrap" }}>
+            <div className="session-card__actions">
               {/* One payment, one controller: a switch rather than a menu.
                   The label says what pressing it does AND what the seat is
                   holding, which is the whole of the state a cashier needs.
@@ -1114,12 +1111,12 @@ const SessionsBoard = ({ branchId }: Props) => {
               {supportsJoysticks && padSwitch && (
                 <Button
                   variant="secondary"
-                  style={miniBtnFlex}
+                  className="session-card__btn"
                   title={padOut ? t("session.padRemoveOne") : t("session.padAddOne")}
                   // Nothing to hand out is a disabled button rather than a
                   // hidden one: a venue with no price set is a thing the
                   // cashier can see and ask about.
-                  disabled={padBusy === sess.id || (!padOut && padNext === null)}
+                  disabled={padBusy.isBusy(sess.id) || (!padOut && padNext === null)}
                   onClick={() => {
                     if (padOut) { void removeTopPad(sess); return; }
                     if (padNext !== null) void addPad(sess, padNext);
@@ -1128,7 +1125,7 @@ const SessionsBoard = ({ branchId }: Props) => {
                   {padOut ? t("session.padRemoveOne") : t("session.padAddOne")}
                 </Button>
               )}
-              <Button variant="secondary" onClick={() => setAddItemTarget(sess)} style={miniBtnFlex}>{t("session.addItem")}</Button>
+              <Button variant="secondary" onClick={() => setAddItemTarget(sess)} className="session-card__btn">{t("session.addItem")}</Button>
               {/* Only on a seat whose room hands something out, and labelled
                   with that room's own word. The server sends the object or
                   null, so a control that appears here is one the server will
@@ -1165,11 +1162,11 @@ const SessionsBoard = ({ branchId }: Props) => {
                       void handOutExtra(sess);
                     }}
                     disabled={
-                      extraBusy === sess.id
+                      extraBusy.isBusy(sess.id)
                       || (backId !== null && returningItem === backId)
                       || (backId === null && extra.can_hand_out === false)
                     }
-                    style={miniBtnFlex}
+                    className="session-card__btn"
                     title={label}
                   >
                     {label}
@@ -1188,7 +1185,7 @@ const SessionsBoard = ({ branchId }: Props) => {
               {/* Not while PAUSED: the server refuses to move the end then —
                   resume moves it by the pause. */}
               {sess.ends_at !== null && sess.is_unlimited !== true && !sess.paused_at && (
-                <Button variant="secondary" onClick={() => setOptionsTarget(sess)} style={miniBtnFlex}>{t("session.addTime")}</Button>
+                <Button variant="secondary" onClick={() => setOptionsTarget(sess)} className="session-card__btn">{t("session.addTime")}</Button>
               )}
               {/* Pause ↔ Resume, one control, on every kind of seat. The
                   session stays active either way — the seat stays taken and a
@@ -1196,8 +1193,8 @@ const SessionsBoard = ({ branchId }: Props) => {
               <Button
                 variant="secondary"
                 onClick={() => { void togglePause(sess); }}
-                disabled={pauseBusy === sess.id}
-                style={miniBtnFlex}
+                disabled={pauseBusy.isBusy(sess.id)}
+                className="session-card__btn"
               >
                 {sess.paused_at ? t("session.resume") : t("session.pause")}
               </Button>
@@ -1215,12 +1212,27 @@ const SessionsBoard = ({ branchId }: Props) => {
               {/* Not while PAUSED: the server refuses a move then — a pause
                   belongs to the seat it began on, so resume first. */}
               {!sess.paused_at && (
-                <Button variant="secondary" onClick={() => setRelocateTarget(sess)} style={miniBtnFlex}>{t("session.relocate")}</Button>
+                <Button variant="secondary" onClick={() => setRelocateTarget(sess)} className="session-card__btn">{t("session.relocate")}</Button>
               )}
-              <Button variant="secondary" onClick={() => setStopTarget(sess)} style={miniBtnFlex}>{t("action.stop")}</Button>
+              {/* Destructive, so it reads as such and spans the row: the one
+                  button on the card a slip must not land on by accident. */}
+              <Button
+                variant="secondary"
+                onClick={() => setStopTarget(sess)}
+                className="session-card__btn session-card__stop is-danger"
+              >
+                {t("action.stop")}
+              </Button>
             </div>
+            {/* Refusals, on the seat they belong to — for EVERY kind of seat.
+                The pad/extra refusal used to live inside the PlayStation-only
+                pad block, so a refused hand-out on a custom room (where extras
+                exist and pads do not) showed nothing at all. */}
+            {padError?.id === sess.id && (
+              <span className="error session-card__error">{padError.message}</span>
+            )}
             {pauseError?.id === sess.id && (
-              <span className="error" style={{ fontSize: 11 }}>{pauseError.message}</span>
+              <span className="error session-card__error">{pauseError.message}</span>
             )}
           </>
         ) : (
@@ -1229,7 +1241,7 @@ const SessionsBoard = ({ branchId }: Props) => {
                 the header could not be trusted to show it. It has its own line
                 now, with the tier, so the status says only what it is for: the
                 state of the seat. */}
-            <span className="status" style={{ color }}>
+            <span className="status">
               {isOffline
                 ? t("session.deviceOffline")
                 : isReserved
@@ -1237,7 +1249,9 @@ const SessionsBoard = ({ branchId }: Props) => {
                   : t("session.free")}
             </span>
             {isOffline && (
-              <span className="until muted" style={{ fontSize: 11 }} title={t("session.deviceOfflineHint")}>
+              // Two lines, never an ellipsis: this is the sentence that tells
+              // the cashier WHY the seat cannot start.
+              <span className="session-card__hint" title={t("session.deviceOfflineHint")}>
                 {t("session.deviceOfflineHint")}
               </span>
             )}
@@ -1245,13 +1259,13 @@ const SessionsBoard = ({ branchId }: Props) => {
               onClick={() => setStartTarget(pc)}
               disabled={!canStart}
               title={isOffline ? t("session.deviceOfflineHint") : undefined}
-              style={{ padding: "6px 10px", fontSize: 12, marginTop: 6 }}
+              className="session-card__start"
             >
               {t("action.start")}
             </Button>
           </>
         )}
-      </div>
+      </SessionCard>
     );
   };
 
@@ -1314,7 +1328,7 @@ const SessionsBoard = ({ branchId }: Props) => {
                 }}
                 onDrop={() => onSectionDrop(key)}
               >
-                <div className={`live-grid${dragId != null ? " is-reordering" : ""}`}>
+                <div className={`live-grid live-grid--sessions${dragId != null ? " is-reordering" : ""}`}>
                   {items.map(renderCell)}
                 </div>
               </CollapsibleSection>
@@ -1398,42 +1412,6 @@ const SessionsBoard = ({ branchId }: Props) => {
       )}
     </div>
   );
-};
-
-/** A 20px square that reads as a control without competing with the tile. */
-/**
- * The pad buttons on a tile.
- *
- * They were 20px, transparent, and outlined in #1f2a44 — the tile's own border
- * colour — with no label or icon beside them. On a dark card that is a control
- * an operator has to already know is there, which is half of why a shipped
- * feature was reported as missing. Filled, a shade lighter than the card, and
- * 22px so the glyph has room: still small enough to sit on a 160px tile beside
- * the count without wrapping.
- */
-const padBtn: React.CSSProperties = {
-  width: 22,
-  height: 22,
-  lineHeight: 1,
-  padding: 0,
-  borderRadius: 5,
-  border: "1px solid #2c3b5e",
-  background: "#131c31",
-  color: "#cfe0f5",
-  cursor: "pointer",
-  fontSize: 14,
-  fontWeight: 600,
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-  flexShrink: 0,
-};
-
-const miniBtnFlex: React.CSSProperties = {
-  padding: "4px 8px",
-  fontSize: 12,
-  flex: "1 0 auto",
-  minWidth: 0,
 };
 
 export default SessionsBoard;

@@ -44,6 +44,20 @@ export class BillingSettingsRepository {
   }
 
   /**
+   * The policy for EDITING it — strict: any failure is thrown, never replaced.
+   *
+   * `get()` above falls back to defaults when the endpoint is "missing", and
+   * `isMissingEndpoint` counts a network failure as missing. For a screen that
+   * only READS the fee that is harmless; for the Prices page it was a data-loss
+   * path: a dropped connection loaded "no joystick fee, no rounding", and the
+   * next Save on any billing form PUT those defaults over the venue's real
+   * policy. The page shows the error and a retry instead of a form.
+   */
+  async getForEdit(branchId: number): Promise<IBillingSettings> {
+    return apiGetBillingSettings(branchId).then((r) => r.settings);
+  }
+
+  /**
    * The whole policy goes back every time.
    *
    * It is a PUT and the server validates it as one object, so a form that sent

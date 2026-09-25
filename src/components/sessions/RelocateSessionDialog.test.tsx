@@ -72,7 +72,7 @@ const mount = async () => {
 };
 
 const seat = (n: number) => screen.getByText(`№${n}`, { selector: "strong" }).closest("button") as HTMLButtonElement;
-const moveButton = () => screen.getByRole("button", { name: "session.relocateConfirm" });
+const moveButton = () => screen.getByRole("button", { name: "session.relocateConfirm" }) as HTMLButtonElement;
 const press = async (el: Element) => { await act(async () => { fireEvent.click(el); }); };
 
 beforeEach(() => {

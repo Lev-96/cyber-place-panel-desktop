@@ -118,7 +118,7 @@ const SubplatformPricesForm = ({ subplatforms, onSaved }: Props) => {
 
   return (
     <>
-      <form onSubmit={submit} className="card" style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+      <form onSubmit={submit} className="col" style={{ gap: 14 }}>
         {platforms.map((platform) => (
           <div key={platform} className="col" style={{ gap: 8 }}>
             <span className="muted" style={{ fontSize: 12, textTransform: "uppercase", letterSpacing: 0.5 }}>

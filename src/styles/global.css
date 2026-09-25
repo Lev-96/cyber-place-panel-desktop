@@ -4170,3 +4170,285 @@ select option:disabled,
 select.input option:disabled {
   color: var(--color-muted);
 }
+
+/* ── Session card (sessions board) ───────────────────────────────────────
+   Everything here is scoped under `.session-card` / `.live-grid--sessions`:
+   `.place-cell` and `.live-grid` are shared with the places board, the live
+   screen and the skeleton, and must not change under them.
+
+   Zones, top to bottom: identity (platform line, console chip, name), the
+   hero (clock + money), the tariff line and pads, then the actions grid pinned
+   to the bottom so buttons line up across a row of cards. The frame colour is
+   `--card-accent`, set by <SessionCard> from the seat state and its urgency. */
+.live-grid.live-grid--sessions {
+  /* 200px is what a 2-column action grid needs to hold «Переместить игрока» /
+     «Տեղափոխել խաղացողին» without clipping. */
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+}
+.place-cell.session-card {
+  min-height: 160px;
+  gap: 6px;
+}
+/* A staff tool: no decorative lift under the cursor, only the frame. */
+.place-cell.session-card:hover {
+  transform: none;
+}
+.place-cell.session-card .dot {
+  background: var(--card-accent);
+}
+.place-cell.session-card .status {
+  color: var(--card-accent);
+}
+/* The hero: time left is what a cashier scans the board for. */
+.place-cell.session-card--running .status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  row-gap: 2px;
+  font-size: 20px;
+  line-height: 1.2;
+  white-space: normal;
+}
+.place-cell.session-card--running .session-timer__cost {
+  font-size: 15px;
+  /* The amount wraps as a whole onto the next line, never mid-figure. */
+  white-space: nowrap;
+}
+.place-cell.session-card--idle .status {
+  font-size: 15px;
+}
+/* Urgency is the frame as well as the digits. */
+.place-cell.session-card--warn,
+.place-cell.session-card--crit {
+  border-width: 2px;
+}
+.place-cell.session-card--crit {
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--color-danger) 35%, transparent),
+    0 0 18px color-mix(in srgb, var(--color-danger) 28%, transparent);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .place-cell.session-card--crit {
+    animation: session-card-pulse 1.6s ease-in-out infinite;
+  }
+}
+@keyframes session-card-pulse {
+  0%, 100% { box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-danger) 35%, transparent), 0 0 10px color-mix(in srgb, var(--color-danger) 18%, transparent); }
+  50% { box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-danger) 55%, transparent), 0 0 22px color-mix(in srgb, var(--color-danger) 38%, transparent); }
+}
+.place-cell.session-card--paused {
+  background: color-mix(in srgb, var(--color-surface) 88%, var(--color-muted));
+}
+.place-cell.session-card--seat-offline {
+  border-style: dashed;
+}
+/* A free seat's word in readable grey (the frame keeps the seat's colour). */
+.place-cell.session-card--seat-free .status {
+  color: var(--color-muted);
+}
+/* A limited pause's own countdown sits beside the frozen clock, smaller, so
+   it can never be read as the time left. */
+.place-cell.session-card--running [data-testid="auto-resume"] {
+  font-size: 13px;
+  font-weight: 600;
+}
+.session-card__pill.pill {
+  font-size: 11px;
+  letter-spacing: 0;
+  text-transform: none;
+  margin-left: 6px;
+}
+/* The actions: a 2-column grid of equal buttons, labels allowed to wrap onto
+   two lines in any language. Stop spans the row. */
+.session-card__actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  margin-top: auto;
+  padding-top: 6px;
+}
+.session-card__btn.btn {
+  min-width: 0;
+  min-height: 36px;
+  padding: 6px 8px;
+  font-size: 12px;
+  line-height: 1.2;
+  white-space: normal;
+  text-align: center;
+  overflow-wrap: break-word;
+  hyphens: auto;
+}
+.session-card__stop {
+  grid-column: 1 / -1;
+}
+.session-card__start.btn {
+  width: 100%;
+  min-height: 40px;
+  margin-top: auto;
+  font-size: 13px;
+}
+.session-card__hint {
+  font-size: 11px;
+  color: var(--color-muted);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.session-card__error {
+  font-size: 11px;
+}
+/* Keyboard focus on a card is never the browser default ring. */
+.place-cell.session-card .btn:focus-visible,
+.place-cell.session-card select:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+/* ── Settings sections + Branch → Prices ─────────────────────────────────
+   <SettingsSection> is the reusable block (card, title, description, header
+   actions, loading/error). The page groups them: rates, packages, rules. */
+.settings-section {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+.settings-section__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.settings-section__titles {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.settings-section__title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+}
+.settings-section__desc {
+  margin: 0;
+  font-size: 12px;
+  color: var(--color-muted);
+  max-width: 64ch;
+}
+.settings-section__actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.settings-section__error {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.prices-page {
+  gap: 28px;
+  max-width: 1400px;
+}
+.prices-group {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.prices-group__title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+/* The billing rules: one column, two side by side on a wide screen. */
+.prices-rules {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+@media (min-width: 1500px) {
+  .prices-rules {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+/* A price matrix needs no more than this; wider only spreads the eye. */
+.prices-group--rates .settings-section > form {
+  max-width: 760px;
+}
+.prices-empty {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+/* A package row: its buttons act, the row itself does not — so no pointer
+   and no hover lift suggesting it is clickable. */
+.list-item.list-item--static {
+  cursor: default;
+}
+.list-item.list-item--static:hover {
+  transform: none;
+}
+.package-row {
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.package-row__main {
+  min-width: 0;
+}
+.package-row--inactive .name,
+.package-row--inactive .meta {
+  color: var(--color-muted);
+}
+.package-row__discount {
+  color: var(--color-primary);
+  font-weight: 600;
+}
+.package-row__actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.package-row__btn.btn {
+  min-height: 34px;
+  min-width: 88px;
+  padding: 6px 12px;
+  font-size: 12px;
+}
+.price-badge {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  vertical-align: middle;
+}
+.price-badge--platform {
+  background: color-mix(in srgb, var(--color-primary) 18%, transparent);
+  color: var(--color-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.price-badge--success {
+  background: color-mix(in srgb, var(--color-success) 18%, transparent);
+  color: var(--color-success);
+}
+.price-badge--muted {
+  background: color-mix(in srgb, var(--color-muted) 18%, transparent);
+  color: var(--color-muted);
+}
+.settings-section .btn:focus-visible,
+.package-row .btn:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}

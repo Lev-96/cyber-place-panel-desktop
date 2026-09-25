@@ -119,7 +119,7 @@ const HourlyRatesForm = ({ branch, onSaved }: Props) => {
   });
 
   return (
-    <form onSubmit={submit} className="card" style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+    <form onSubmit={submit} className="col" style={{ gap: 14 }}>
       <div
         style={{
           display: "grid",

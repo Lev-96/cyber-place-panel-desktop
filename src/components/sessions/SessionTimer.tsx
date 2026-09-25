@@ -2,6 +2,7 @@ import { preciseWhenSmall } from "@/i18n/currency";
 import { ISessionApi } from "@/types/sessions";
 import { autoResumeAtOf, playedSecondsBetween, sessionAmountAt } from "./sessionAmount";
 import { useEffect, useState } from "react";
+import { sessionUrgency } from "./sessionUrgency";
 
 const fmt = (ms: number) => {
   const total = Math.max(0, Math.floor(ms / 1000));
@@ -45,7 +46,7 @@ interface Props {
  * this, only the count-up branch showed an amount and it computed its own.
  */
 /** A clock that is not running: neither the live cyan nor a warning colour. */
-const PAUSED_COLOR = "#94a3b8";
+const PAUSED_COLOR = "var(--color-muted)";
 
 const SessionTimer = ({ session, formatMoney }: Props) => {
   const [now, setNow] = useState(Date.now());
@@ -67,7 +68,7 @@ const SessionTimer = ({ session, formatMoney }: Props) => {
   // Prices elsewhere are untouched: this asks for the precision, nothing else
   // does.
   const cost = showCost ? (
-    <span style={{ marginLeft: 8, color: "#d152fa" }}>
+    <span className="session-timer__cost" style={{ marginLeft: 8, color: "var(--color-accent-purple)" }}>
       {formatMoney ? formatMoney(amount, preciseWhenSmall(amount)) : amount.toFixed(2)}
     </span>
   ) : null;
@@ -86,7 +87,7 @@ const SessionTimer = ({ session, formatMoney }: Props) => {
   // until the board's next read brings the resumed row.
   const autoResumeAt = autoResumeAtOf(session);
   const autoResume = autoResumeAt !== null ? (
-    <span data-testid="auto-resume" style={{ marginLeft: 8, color: "#f59e0b" }}>
+    <span data-testid="auto-resume" style={{ marginLeft: 8, color: "var(--color-warning)" }}>
       ▶ {fmt(Math.max(0, autoResumeAt - now))}
     </span>
   ) : null;
@@ -95,7 +96,7 @@ const SessionTimer = ({ session, formatMoney }: Props) => {
     // Time PLAYED, which is what the bill charges for — not wall time.
     const elapsedMs = playedSecondsBetween(session, session.started_at, now) * 1000;
     return (
-      <span style={{ fontWeight: 700, fontVariantNumeric: "tabular-nums", color: paused ? PAUSED_COLOR : "#07ddf1" }}>
+      <span style={{ fontWeight: 700, fontVariantNumeric: "tabular-nums", color: paused ? PAUSED_COLOR : "var(--color-primary)" }}>
         {pausedMark}▲ {fmt(elapsedMs)}
         {autoResume}
         {cost}
@@ -105,9 +106,13 @@ const SessionTimer = ({ session, formatMoney }: Props) => {
 
   if (!session.ends_at) return null;
   const remaining = new Date(session.ends_at).getTime() - (paused ? pausedAt : now);
-  const warn = !paused && remaining <= 5 * 60_000;
-  const crit = !paused && remaining <= 60_000;
-  const color = paused ? PAUSED_COLOR : crit ? "#ef4444" : warn ? "#f59e0b" : "#07ddf1";
+  // The one urgency rule the card's frame reads too (sessionUrgency.ts).
+  const urgency = sessionUrgency(session, now);
+  const color = paused
+    ? PAUSED_COLOR
+    : urgency === "crit" ? "var(--color-danger)"
+    : urgency === "warn" ? "var(--color-warning)"
+    : "var(--color-primary)";
   return (
     <span style={{ fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>
       <span style={{ color }}>{pausedMark}{fmt(remaining)}</span>

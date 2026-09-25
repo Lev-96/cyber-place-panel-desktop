@@ -73,6 +73,7 @@ export const TRANSLATIONS: Dict = {
   "action.save": { en: "Save", ru: "Сохранить", am: "Պահպանել" },
   "action.continue": { en: "Continue", ru: "Продолжить", am: "Շարունակել" },
   "action.cancel": { en: "Cancel", ru: "Отмена", am: "Չեղարկել" },
+  "action.retry": { en: "Retry", ru: "Повторить", am: "Կրկնել" },
   // A plain yes/no pair. Introduced for the place form's "is a 4th joystick
   // needed?" question, which is a question and not a toggle: a switch would
   // have to be labelled with what it does when it is ON, and "4th joystick"
@@ -2320,6 +2321,18 @@ export const TRANSLATIONS: Dict = {
   },
   "branch.prices.saved": { en: "Saved", ru: "Сохранено", am: "Պահպանված է" },
   "branch.prices.packagesSubtitle": { en: "Time packages", ru: "Тарифные пакеты", am: "Ժամանակային փաթեթներ" },
+  // Branch → Prices, grouped: what a seat costs, what is sold as a package,
+  // and the rules applied on top of every bill.
+  "prices.group.rates": { en: "Rates", ru: "Ставки", am: "Դրույքաչափեր" },
+  "prices.hourlyTitle": { en: "Hourly rates", ru: "Почасовые ставки", am: "Ժամային դրույքաչափեր" },
+  "prices.group.packages": { en: "Packages", ru: "Пакеты", am: "Փաթեթներ" },
+  "prices.group.rules": { en: "Billing rules", ru: "Правила оплаты", am: "Վճարման կանոններ" },
+  "prices.packagesHint": {
+    en: "Fixed-length sessions sold at one price.",
+    ru: "Сессии фиксированной длины по одной цене.",
+    am: "Ֆիքսված տևողությամբ նիստեր մեկ գնով։",
+  },
+  "prices.packageInactive": { en: "Inactive", ru: "Неактивен", am: "Ոչ ակտիվ" },
   "tariff.platform": { en: "Platform", ru: "Платформа", am: "Պլատֆորմա" },
   "tariff.platformAll": { en: "All platforms", ru: "Все платформы", am: "Բոլոր պլատֆորմները" },
   "tariff.discount.toggle": {
