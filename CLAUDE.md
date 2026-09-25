@@ -1427,6 +1427,48 @@ Tests: `RegistrationsList.test.tsx` (10, transport-level: only `request()` is
 replaced). Mutation-verified: native `confirm()` restored; answer ignored; note
 shown for everyone; note never shown; delete by guest id.
 
+## 9.5.0 The session card and Branch → Prices layout (2026-09-25)
+
+**Session card.** The tile frame is `<SessionCard>` (`components/sessions/
+SessionCard.tsx`) — presentation only; every handler, guard, realtime hook and
+PS5 call stays in `SessionsBoard`.
+- The frame colour is `--card-accent`: the seat's `SESSION_CELL_COLOR`, overridden
+  on a running seat by `useSessionUrgency` (amber ≤5 min, red ≤1 min + pulse,
+  muted while paused). `sessionUrgency()` is the ONE rule; `SessionTimer`'s
+  digits read it too. The hook sleeps until the next threshold — no per-second
+  tick per card.
+- Classes: `place-cell session-card session-card--{running|idle}
+  session-card--{warn|crit|paused} session-card--seat-{busy|free|reserved|offline}`.
+  ⚠️ `.place-cell` / `.live-grid` are shared with the places board, the live
+  screen and `GridSkeleton` — style the board ONLY under `.session-card` /
+  `.live-grid--sessions` (min column 200px, so the 2-column action grid fits
+  ru/am labels).
+- Actions are a 2-column grid (`.session-card__actions`, buttons
+  `.session-card__btn`, min 36px); Stop spans the row as `.is-danger`. Button
+  TEXT is a test contract (tests find buttons by exact textContent) — no glyphs
+  or counters inside buttons.
+- In-flight guards are PER SEAT via `useKeyedBusy()` (pads, extra, pause): a
+  second press on the same seat is one request, a press on another seat goes
+  through. They used to be one `number | null` each and silently dropped the
+  other seat's press.
+- Refusals (`padError`, `pauseError`) render at card level for every seat — an
+  extra refused on a custom room used to be invisible (pinned by
+  `SessionsBoard.perSeat.test.tsx`).
+
+**Branch → Prices.** Grouped into Rates / Packages / Billing rules, each block a
+reusable `<SettingsSection>` (`components/ui/SettingsSection.tsx`: title,
+description, header actions, loading and error-with-retry states; it never
+renders its body on error). The billing rules load with
+`billingSettingsRepository.getForEdit()` — STRICT. `get()` falls back to
+defaults on a network failure (fine for read-only screens), which on this page
+let the next Save overwrite the real policy with defaults. The forms, their
+whole-policy PUT and their remount `key`s are unchanged. Package delete uses
+`useConfirm` (never `window.confirm`). Pinned by `BranchPricesPage.test.tsx`
+and `BillingSettingsRepository.test.ts`.
+
+**Typecheck:** `npm run typecheck` (tsconfig.app + electron). `npx tsc -p .`
+checks NOTHING — the root tsconfig has `"files": []`.
+
 ## 9.5.1 Pause / Resume on the tile (2026-09-23)
 
 One control, «Пауза» ↔ «Продолжить», on every kind of seat, before Stop. The
