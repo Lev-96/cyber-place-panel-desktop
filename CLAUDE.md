@@ -1452,10 +1452,14 @@ PS5 call stays in `SessionsBoard`.
   buttons by accessible name (`nameOf()` in the board tests), not by text.
   `wide` spans the row (Пересадить, and Stop via `danger`); wide actions come
   LAST, and a CSS `:has()` rule makes an odd last half-width button take its
-  row, so no state (pad switch, extra, pause) leaves a hole. A free seat is
-  `align-self: start` (not stretched to running neighbours) with Start 10px
-  under its status. Pinned in a real browser by the two layout specs in
-  `e2e/session-terms.spec.ts` (jsdom cannot evaluate the CSS).
+  row, so no state (pad switch, extra, pause) leaves a hole. Cards in a row
+  share one height and every card's bottom control is pinned to its foot
+  (running: `.session-card__actions`; free: `.session-card__foot` around Start,
+  `margin-top: auto` + 10px air above), so Start and Stop sit on ONE line
+  across a row whatever is above them (console chip, offline hint); the card
+  keeps 14px under it. Pinned in a real browser by the layout specs in
+  `e2e/session-terms.spec.ts` (jsdom cannot evaluate the CSS; they wait for
+  the cards' fade-in before measuring).
 - Sizing (2026-09-25, "medium"): column `minmax(198px, 1fr)` — measured as the
   narrowest width at which no card label is clipped in en/ru/am (Armenian clips
   at 192–193px); clock 17px, money 13px, card padding 8px. A label that still
