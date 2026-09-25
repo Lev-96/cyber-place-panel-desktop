@@ -4188,7 +4188,9 @@ select.input option:disabled {
 }
 .place-cell.session-card {
   min-height: 140px;
-  padding: 10px;
+  /* More air under the bottom button than elsewhere: the card's last line is
+     a control, and it must not sit on the frame. */
+  padding: 10px 10px 14px;
   gap: 4px;
 }
 /* A staff tool: no decorative lift under the cursor, only the frame. */
@@ -4295,14 +4297,16 @@ select.input option:disabled {
 }
 /* A free seat keeps its own height instead of stretching to the running cards
    beside it — which pushed Start down to the very bottom edge. */
-.place-cell.session-card--idle {
-  align-self: start;
-  min-height: 0;
+/* A free seat's foot: pinned to the bottom like the running card's actions,
+   so Start lines up across a row (cards in a row share one height), with at
+   least 10px of air above it on the shortest card. */
+.session-card__foot {
+  margin-top: auto;
+  padding-top: 10px;
 }
 .session-card__start.btn {
   width: 100%;
   height: 34px;
-  margin-top: 10px;
   font-size: 13px;
 }
 .session-card__hint {

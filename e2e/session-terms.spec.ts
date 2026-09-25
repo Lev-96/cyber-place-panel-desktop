@@ -263,49 +263,92 @@ test("the session card's actions are even rows with nothing clipped", async ({ p
   expect(layout.stop).toBe(layout.gridWidth);
 });
 
-/** A free seat's Start sits under its status, not at the foot of a stretched card. */
-test("a free seat is not stretched to its neighbours and Start keeps its padding", async ({ page }) => {
+/**
+ * Start lines up across a row and keeps its distance from the frame.
+ *
+ * Cards in a row share one height and every card's bottom control is pinned to
+ * its foot, so a free seat's Start sits on the same line as a running
+ * neighbour's Stop and as a free seat whose content is taller (an offline hint,
+ * a console chip) — with 14px of the card under it, never on the border.
+ */
+test("Start lines up across a row, with air under it", async ({ page }) => {
   await installBackendMocks(page, { role: "company_owner", company_id: 1, name: "Owner One" });
   await seedFloor(page);
-  // A FREE PlayStation in the same row as the running one — the case where a
-  // stretched card pushed Start to its very bottom edge.
+  // One row of three PlayStations: running, free, and free-but-offline.
   await page.route(
     (url) => isBackend(url) && url.pathname === "/pcs",
     async (route) => {
+      const ps = (id: number, number: number, label: string, extra: Record<string, unknown> = {}) => ({
+        id, branch_id: 1, place_id: 10 + id, label, kind: "ps", status: "online", is_startable: true,
+        place: { id: 10 + id, number, name: label, type: "standard", platform: "ps5" }, ...extra,
+      });
       await route.fulfill({
         status: 200,
         contentType: "application/json",
         body: JSON.stringify({ data: [
           { id: 1, branch_id: 1, place_id: 10, label: "PS5 VIP", kind: "ps", status: "online", is_startable: true, current_session_id: 5, place: PLACE },
-          { id: 3, branch_id: 1, place_id: 12, label: "PS5 free", kind: "ps", status: "online", is_startable: true,
-            place: { id: 12, number: 3, name: "PS5 free", type: "standard", platform: "ps5" } },
+          ps(3, 3, "PS5 free"),
+          // A kiosk PC bound to a PS5 place whose agent is silent: offline, with
+          // the two-line hint above its Start.
+          ps(4, 4, "PS5 offline", { kind: "pc", status: "offline", is_startable: false, last_seen_at: null }),
+          // …and a free seat alone in its own row, where nothing stretches it.
+          { id: 2, branch_id: 1, place_id: 11, label: "PC-1", kind: "pc", status: "online", is_startable: true,
+            last_seen_at: new Date().toISOString(), place: FREE_PLACE },
+          // An offline seat alone in ITS row: taller than the card's minimum,
+          // so only the foot's own padding keeps Start off the hint.
+          { id: 5, branch_id: 1, place_id: 15, label: "Pool", kind: "pc", status: "offline", is_startable: false, last_seen_at: null,
+            place: { id: 15, number: 9, name: "Pool", type: "standard", platform: "billiard" } },
         ] }),
       });
     },
   );
+  await page.setViewportSize({ width: 1600, height: 900 });
   await signIn(page, "o@o");
   await expect(page.getByText("Owner One").first()).toBeVisible();
   await page.evaluate(() => { window.location.hash = "#/branches/1/sessions"; });
   await expect(page.locator(".session-card--running").first()).toBeVisible();
-  const free = page.locator(".session-card--idle", { hasText: "PS5 free" });
-  await expect(free).toBeVisible();
 
-  const { gap, above } = await free.evaluate((card) => {
-    const start = card.querySelector(".session-card__start") as HTMLElement;
-    const status = card.querySelector(".status") as HTMLElement;
+  // Cards fade in; measure the settled layout, not a frame of the animation.
+  // (The page's decorative background loops forever, so only finite ones count.)
+  await page.waitForFunction(() => document.getAnimations()
+    .filter((a) => a.effect?.getTiming().iterations !== Infinity)
+    .every((a) => a.playState !== "running"));
+  const box = async (sel: string) => page.locator(sel).first().evaluate((el) => {
+    const r = el.getBoundingClientRect();
+    return { top: r.top, bottom: r.bottom };
+  });
+  const stop = await box(".session-card--running .session-card__btn.is-danger");
+  const free = page.locator(".session-card--idle", { hasText: "PS5 free" });
+  const offline = page.locator(".session-card--idle", { hasText: "PS5 offline" });
+
+  const measure = (card: import("@playwright/test").Locator) => card.evaluate((c) => {
+    const start = c.querySelector(".session-card__start") as HTMLElement;
+    // Whatever sits right above the foot: the status, or an offline hint.
+    const prev = (c.querySelector(".session-card__foot") as HTMLElement).previousElementSibling as HTMLElement;
+    const r = c.getBoundingClientRect();
+    const s = start.getBoundingClientRect();
     return {
-      gap: Math.round(card.getBoundingClientRect().bottom - start.getBoundingClientRect().bottom),
-      above: Math.round(start.getBoundingClientRect().top - status.getBoundingClientRect().bottom),
+      startBottom: s.bottom,
+      below: Math.round(r.bottom - s.bottom),
+      above: Math.round(s.top - prev.getBoundingClientRect().bottom),
     };
   });
-  // Air between the status and Start, not the two touching.
-  expect(above).toBeGreaterThanOrEqual(10);
-  // The card's own padding (10px) plus its border — never a stretched void.
-  expect(gap).toBeGreaterThanOrEqual(9);
-  expect(gap).toBeLessThanOrEqual(13);
+  const a = await measure(free);
+  const b = await measure(offline);
 
-  // …and it is shorter than the running card beside it, not stretched to it.
-  const running = await page.locator(".session-card--running").first().evaluate((c) => c.getBoundingClientRect().height);
-  const idle = await free.evaluate((c) => c.getBoundingClientRect().height);
-  expect(idle).toBeLessThan(running - 40);
+  // One line across the row.
+  expect(Math.abs(a.startBottom - stop.bottom)).toBeLessThanOrEqual(1);
+  expect(Math.abs(b.startBottom - stop.bottom)).toBeLessThanOrEqual(1);
+  // Distance from the frame (14px padding + the border), and air above Start.
+  expect(a.below).toBeGreaterThanOrEqual(14);
+  expect(a.below).toBeLessThanOrEqual(17);
+  expect(a.above).toBeGreaterThanOrEqual(10);
+  expect(b.above).toBeGreaterThanOrEqual(10);
+
+  const alone = await measure(page.locator(".session-card--idle", { hasText: "PC-1" }));
+  expect(alone.above).toBeGreaterThanOrEqual(10);
+  expect(alone.below).toBeGreaterThanOrEqual(14);
+  const tall = await measure(page.locator(".session-card--idle", { hasText: "Pool" }));
+  expect(tall.above).toBeGreaterThanOrEqual(10);
+  expect(tall.below).toBeGreaterThanOrEqual(14);
 });

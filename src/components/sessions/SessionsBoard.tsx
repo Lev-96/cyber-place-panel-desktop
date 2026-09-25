@@ -1262,14 +1262,19 @@ const SessionsBoard = ({ branchId }: Props) => {
                 {t("session.deviceOfflineHint")}
               </span>
             )}
-            <Button
-              onClick={() => setStartTarget(pc)}
-              disabled={!canStart}
-              title={isOffline ? t("session.deviceOfflineHint") : undefined}
-              className="session-card__start"
-            >
-              {t("action.start")}
-            </Button>
+            {/* The card's foot, like the running card's action grid: pinned to
+                the bottom, so every Start in a row sits on one line whatever
+                is above it (a console chip, an offline hint). */}
+            <div className="session-card__foot">
+              <Button
+                onClick={() => setStartTarget(pc)}
+                disabled={!canStart}
+                title={isOffline ? t("session.deviceOfflineHint") : undefined}
+                className="session-card__start"
+              >
+                {t("action.start")}
+              </Button>
+            </div>
           </>
         )}
       </SessionCard>
