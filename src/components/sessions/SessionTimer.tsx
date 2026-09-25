@@ -1,6 +1,6 @@
 import { preciseWhenSmall } from "@/i18n/currency";
 import { ISessionApi } from "@/types/sessions";
-import { playedSecondsBetween, sessionAmountAt } from "./sessionAmount";
+import { autoResumeAtOf, playedSecondsBetween, sessionAmountAt } from "./sessionAmount";
 import { useEffect, useState } from "react";
 
 const fmt = (ms: number) => {
@@ -81,6 +81,15 @@ const SessionTimer = ({ session, formatMoney }: Props) => {
   const pausedAt = session.paused_at ? Date.parse(session.paused_at) : NaN;
   const paused = !Number.isNaN(pausedAt);
   const pausedMark = paused ? <span aria-hidden="true">⏸ </span> : null;
+  // A LIMITED pause counts down to the instant the server resumes it. Shown
+  // beside the frozen clock, never instead of it; past zero it holds at 0:00
+  // until the board's next read brings the resumed row.
+  const autoResumeAt = autoResumeAtOf(session);
+  const autoResume = autoResumeAt !== null ? (
+    <span data-testid="auto-resume" style={{ marginLeft: 8, color: "#f59e0b" }}>
+      ▶ {fmt(Math.max(0, autoResumeAt - now))}
+    </span>
+  ) : null;
 
   if (isOpen) {
     // Time PLAYED, which is what the bill charges for — not wall time.
@@ -88,6 +97,7 @@ const SessionTimer = ({ session, formatMoney }: Props) => {
     return (
       <span style={{ fontWeight: 700, fontVariantNumeric: "tabular-nums", color: paused ? PAUSED_COLOR : "#07ddf1" }}>
         {pausedMark}▲ {fmt(elapsedMs)}
+        {autoResume}
         {cost}
       </span>
     );
@@ -101,6 +111,7 @@ const SessionTimer = ({ session, formatMoney }: Props) => {
   return (
     <span style={{ fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>
       <span style={{ color }}>{pausedMark}{fmt(remaining)}</span>
+      {autoResume}
       {cost}
     </span>
   );

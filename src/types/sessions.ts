@@ -176,7 +176,15 @@ export interface ISessionApi {
    * Every stretch the clock was stopped. The ticking figures subtract these
    * exactly as the bill does (`pausedSecondsBetween` in sessionAmount.ts).
    */
-  pauses?: Array<{ paused_at: string; resumed_at: string | null }>;
+  pauses?: Array<{
+    paused_at: string;
+    resumed_at: string | null;
+    /**
+     * When the branch limits pauses: the instant the SERVER resumes this one
+     * by itself. Fixed when the pause began; null when there is no limit.
+     */
+    auto_resume_at?: string | null;
+  }>;
   total_paid: number;
   /**
    * How the money was taken when the session was stopped.
@@ -248,6 +256,13 @@ export interface ISessionApi {
    */
   committed_until?: string | null;
   committed_amount?: number | string | null;
+  /**
+   * A rate change mid-way — the player moved to a seat priced differently.
+   * What the clock had earned at `rate_changed_at` is frozen in
+   * `amount_before_rate_change`; only later time runs at `hourly_rate`.
+   */
+  rate_changed_at?: string | null;
+  amount_before_rate_change?: number | string | null;
   /** Pads in play INCLUDING the session's own. 1 is the floor, never 0. */
   joystick_count?: number;
   /**

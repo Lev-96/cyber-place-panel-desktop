@@ -9,6 +9,10 @@ import {
   apiAddSessionTime,
   apiSessionExtensionOptions,
   apiTransferExtension,
+  apiRelocationOptions,
+  apiRelocateSession,
+  type IRelocationOptions,
+  type RelocateSessionBody,
   type IExtensionOptions,
   apiExtendSession,
   apiListEventsForSession,
@@ -145,6 +149,16 @@ export class SessionRepository {
   /** Move and extend, atomically. May still be refused — the list is stale. */
   async transferExtension(sessionId: number, placeId: number, minutes: number): Promise<ISessionApi> {
     return friendlyMutation(apiTransferExtension(sessionId, placeId, minutes).then((r) => r.session));
+  }
+
+  /** Read-only advice: see `apiRelocationOptions`. */
+  async relocationOptions(sessionId: number): Promise<IRelocationOptions> {
+    return apiRelocationOptions(sessionId);
+  }
+
+  /** «Переместить игрока», atomically. May still be refused — the list is stale. */
+  async relocate(sessionId: number, body: RelocateSessionBody): Promise<ISessionApi> {
+    return friendlyMutation(apiRelocateSession(sessionId, body).then((r) => r.session));
   }
 
   async setFree(sessionId: number, isFree: boolean): Promise<ISessionApi> {

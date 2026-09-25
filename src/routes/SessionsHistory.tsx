@@ -648,6 +648,23 @@ export const eventDetail = (
       }
       const granted = metaNum(meta, "requested_minutes");
       if (granted !== null && granted > 0) parts.push(`+${granted} ${t("time.minShort")}`);
+
+      // «Переместить игрока»: the price on each side, as the server wrote it.
+      if (metaStr(meta, "reason") === "relocation") {
+        const before = metaNum(meta, "rate_before");
+        const after = metaNum(meta, "rate_after");
+        const perHour = ` / ${t("time.hourShort")}`;
+        if (before !== null && after !== null && before !== after) {
+          parts.push(`${money(before)}${perHour} -> ${money(after)}${perHour}`);
+        } else if (after !== null) {
+          parts.push(`${money(after)}${perHour}`);
+        }
+        if (meta !== null && (meta as Record<string, unknown>).rate_overridden === true) {
+          parts.push(t("history.rateSetByHand"));
+        }
+        const limitedUntil = metaStr(meta, "limited_until");
+        if (limitedUntil !== null) parts.push(`${t("history.untilLabel")} ${formatTime(new Date(limitedUntil))}`);
+      }
       break;
     }
 
@@ -662,6 +679,8 @@ export const eventDetail = (
     case "resumed": {
       // How long the player was away, and where the end moved to — the
       // server's own figures, written in the resume's transaction.
+      // Resumed by the SERVER at the branch's pause limit — nobody pressed it.
+      if (metaStr(meta, "reason") === "pause_limit") parts.push(t("history.autoResumed"));
       const seconds = metaNum(meta, "paused_seconds");
       if (seconds !== null) parts.push(`${t("history.pausedFor")}: ${durationLabel(seconds / 60, t)}`);
       const newEnd = metaStr(meta, "new_ends_at");

@@ -751,11 +751,47 @@ export const TRANSLATIONS: Dict = {
   "session.pause": { en: "Pause", ru: "Пауза", am: "Դադար" },
   "session.resume": { en: "Resume", ru: "Продолжить", am: "Շարունակել" },
   "session.pausedBadge": { en: "Paused", ru: "На паузе", am: "Դադարեցված" },
+  // A pause the branch limits: the server resumes it by itself at {0}.
+  "session.pausedUntil": { en: "Paused · until {0}", ru: "Пауза · до {0}", am: "Դադար · մինչև {0}" },
   // The toast after each of the three presses, naming the seat as its tile
   // does. Raised only once the server accepted the action.
   "session.toastPaused": { en: "Session paused · {0}", ru: "Сессия на паузе · {0}", am: "Նիստը դադարեցված է · {0}" },
   "session.toastResumed": { en: "Session resumed · {0}", ru: "Сессия продолжена · {0}", am: "Նիստը շարունակվեց · {0}" },
   "session.toastStopped": { en: "Session stopped · {0}", ru: "Сессия завершена · {0}", am: "Նիստն ավարտվեց · {0}" },
+  // «Переместить игрока» — a running session moved to another seat.
+  "session.relocate": { en: "Move player", ru: "Переместить игрока", am: "Տեղափոխել խաղացողին" },
+  "session.relocateCurrentRate": { en: "Current price:", ru: "Текущая цена:", am: "Ընթացիկ գինը՝" },
+  "session.relocateSameRate": { en: "Same price", ru: "С той же ценой", am: "Նույն գնով" },
+  "session.relocateOtherRate": { en: "Other places", ru: "Другие места", am: "Այլ տեղեր" },
+  "session.relocateNone": {
+    en: "No free place of this platform right now.",
+    ru: "Сейчас нет свободных мест этой платформы.",
+    am: "Այս պահին այս հարթակի ազատ տեղ չկա։",
+  },
+  // A seat a reservation cuts short: when it is booked, and how long is left.
+  "session.relocateLimited": {
+    en: "Booked from {0}, can play {1} min",
+    ru: "Забронировано с {0}, играть можно {1} мин",
+    am: "Ամրագրված է {0}-ից, կարելի է խաղալ {1} րոպե",
+  },
+  "session.relocateAcceptLimit": {
+    en: "I understand: the session will end at {0}",
+    ru: "Понимаю: сессия закончится в {0}",
+    am: "Հասկանում եմ՝ նիստը կավարտվի {0}-ին",
+  },
+  "session.relocateChangePrice": { en: "Change price", ru: "Изменить цену", am: "Փոխել գինը" },
+  "session.relocateSummaryRate": {
+    en: "From now on: {0}",
+    ru: "С этого момента: {0}",
+    am: "Այս պահից՝ {0}",
+  },
+  "session.relocateSummaryKept": {
+    en: "Time already played keeps its price; items and joysticks move with the player.",
+    ru: "Уже сыгранное время сохраняет свою цену; товары и джойстики переходят вместе с игроком.",
+    am: "Արդեն խաղացած ժամանակը պահպանում է իր գինը․ ապրանքներն ու ջոյսթիքները տեղափոխվում են խաղացողի հետ։",
+  },
+  "session.relocateConfirm": { en: "Move", ru: "Переместить", am: "Տեղափոխել" },
+  "session.relocatedToast": { en: "Player moved to {0}", ru: "Игрок перемещён на {0}", am: "Խաղացողը տեղափոխվեց {0}" },
   // The green toast after a hand-out, in the room's own word — the pads say
   // "Джойстик добавлен" the same way.
   "session.extraAdded": { en: "Added: {0}", ru: "Добавлено: {0}", am: "Ավելացվեց՝ {0}" },
@@ -1239,6 +1275,21 @@ export const TRANSLATIONS: Dict = {
     ru: "Укажите цену 4-го джойстика или ответьте «Нет» выше.",
     am: "Նշեք 4-րդ ջոյսթիքի գինը կամ վերևում պատասխանեք «Ոչ»։",
   },
+  // The owner's limit on one pause; at the limit the server resumes by itself.
+  "pauseLimit.sectionTitle": { en: "Pause limit", ru: "Лимит паузы", am: "Դադարի սահմանաչափ" },
+  "pauseLimit.label": { en: "Maximum pause", ru: "Максимальная пауза", am: "Առավելագույն դադար" },
+  "pauseLimit.none": { en: "No limit", ru: "Без лимита", am: "Առանց սահմանաչափի" },
+  "pauseLimit.hint": {
+    en: "When a pause reaches this length, the session resumes by itself and billing continues. Leave empty for no limit. Applies to pauses started after saving.",
+    ru: "Когда пауза достигает этой длины, сессия продолжается сама и оплата снова идёт. Пусто — без лимита. Действует на паузы, начатые после сохранения.",
+    am: "Երբ դադարը հասնում է այս տևողությանը, նիստն ինքնաբերաբար շարունակվում է, և վճարումը վերսկսվում է։ Դատարկ՝ առանց սահմանաչափի։ Կիրառվում է պահպանելուց հետո սկսված դադարների վրա։",
+  },
+  "pauseLimit.invalid": {
+    en: "Enter whole minutes from 1 to {0}, or leave empty.",
+    ru: "Введите целое число минут от 1 до {0} или оставьте пустым.",
+    am: "Մուտքագրեք ամբողջ րոպեներ 1-ից {0}, կամ թողեք դատարկ։",
+  },
+  "pauseLimit.saved": { en: "Pause limit saved", ru: "Лимит паузы сохранён", am: "Դադարի սահմանաչափը պահպանվեց" },
   "rounding.sectionTitle": { en: "Rounding the bill", ru: "Округление счёта", am: "Հաշվի կլորացում" },
   "rounding.hint": {
     en: "Time is always billed for the minutes actually played. This rounds the FINAL amount, once. A 45-minute session at 1500/h is 1125 before rounding.",
@@ -1280,6 +1331,12 @@ export const TRANSLATIONS: Dict = {
   "history.action.paused": { en: "Paused the session", ru: "Поставил сессию на паузу", am: "Դադարեցրեց նիստը" },
   "history.action.resumed": { en: "Resumed the session", ru: "Продолжил сессию", am: "Շարունակեց նիստը" },
   "history.pausedFor": { en: "Paused for", ru: "Пауза длилась", am: "Դադարը տևեց" },
+  "history.autoResumed": {
+    en: "Automatically, at the pause limit",
+    ru: "Автоматически, по лимиту паузы",
+    am: "Ինքնաբերաբար՝ դադարի սահմանաչափով",
+  },
+  "history.rateSetByHand": { en: "price set by hand", ru: "цена изменена вручную", am: "գինը փոխվել է ձեռքով" },
   "history.action.free_enabled": { en: "Made it free", ru: "Сделал бесплатной", am: "Դարձրեց անվճար" },
   "history.action.free_disabled": { en: "Made it paid again", ru: "Вернул оплату", am: "Վերադարձրեց վճարումը" },
   // The seat migration. Emitted by the server since the feature shipped; the

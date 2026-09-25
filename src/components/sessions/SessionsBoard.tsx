@@ -30,9 +30,10 @@ import { DragEvent, useCallback, useEffect, useMemo, useRef, useState } from "re
 import { Link } from "react-router-dom";
 import AddSessionItemDialog from "./AddSessionItemDialog";
 import SessionTimer from "./SessionTimer";
-import { sessionCurrentHourlyRate, sessionJoysticksTotal } from "./sessionAmount";
+import { autoResumeAtOf, sessionCurrentHourlyRate, sessionJoysticksTotal } from "./sessionAmount";
 import StartSessionDialog from "./StartSessionDialog";
 import SessionOptionsDialog from "./SessionOptionsDialog";
+import RelocateSessionDialog from "./RelocateSessionDialog";
 import { BASE_JOYSTICKS, MAX_JOYSTICKS } from "@/api/joystickPrices";
 import { notify } from "@/ui/notify";
 import StopReceiptModal from "./StopReceiptModal";
@@ -200,6 +201,21 @@ const SessionsBoard = ({ branchId }: Props) => {
    * row the reload brings back. A wrong state (another cashier paused it a
    * second earlier, or stopped it) comes back as a sentence and is shown.
    */
+  /**
+   * A session moved seats: the console it left is stopped, the one it went to
+   * is starting — told BEFORE the reload, for the reason Start gives below
+   * (a monitor seeing "awake, no session" switches the console off under the
+   * player). Only for consoles; a no-op when the seat did not change.
+   */
+  const consolesFollowMove = (fromPcId: number, toPcId: number) => {
+    if (fromPcId === toPcId) return;
+    const devices = pcs.data ?? [];
+    const from = devices.find((pc) => pc.id === fromPcId);
+    const to = devices.find((pc) => pc.id === toPcId);
+    if (from?.console_host_id) sessionStopped(from.id);
+    if (to?.console_host_id) sessionStarting(to.id);
+  };
+
   const togglePause = async (sess: ISessionApi) => {
     if (pauseInFlight.current) return;
 
@@ -231,6 +247,8 @@ const SessionsBoard = ({ branchId }: Props) => {
     }
   };
   const [optionsTarget, setOptionsTarget] = useState<ISessionApi | null>(null);
+  // The session being moved to another seat («Переместить игрока»).
+  const [relocateTarget, setRelocateTarget] = useState<ISessionApi | null>(null);
   // The session whose pads are mid-change. One at a time and per session, so a
   // second click on the SAME tile is refused while the first is in flight and a
   // cashier working another seat is not blocked by it.
@@ -793,7 +811,13 @@ const SessionsBoard = ({ branchId }: Props) => {
               {itemsCount > 0 && <span className="muted"> · {itemsCount} {t("session.posNote")}</span>}
               {sess.paused_at && (
                 <span className="pill" style={{ fontSize: 10, letterSpacing: 0, textTransform: "none", marginLeft: 6 }}>
-                  {t("session.pausedBadge")}
+                  {(() => {
+                    // A limited pause says when the server will resume it.
+                    const until = autoResumeAtOf(sess);
+                    return until === null
+                      ? t("session.pausedBadge")
+                      : fmt(t("session.pausedUntil"), new Date(until).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false }));
+                  })()}
                 </span>
               )}
             </span>
@@ -1188,6 +1212,11 @@ const SessionsBoard = ({ branchId }: Props) => {
                   action at all, only two "not applicable" notices. Two buttons
                   and one of them a duplicate is how a cashier learns to stop
                   reading them. */}
+              {/* Not while PAUSED: the server refuses a move then — a pause
+                  belongs to the seat it began on, so resume first. */}
+              {!sess.paused_at && (
+                <Button variant="secondary" onClick={() => setRelocateTarget(sess)} style={miniBtnFlex}>{t("session.relocate")}</Button>
+              )}
               <Button variant="secondary" onClick={() => setStopTarget(sess)} style={miniBtnFlex}>{t("action.stop")}</Button>
             </div>
             {pauseError?.id === sess.id && (
@@ -1338,7 +1367,25 @@ const SessionsBoard = ({ branchId }: Props) => {
           onClose={() => { setOptionsTarget(null); void sessions.reload(); }}
           // The server's answer replaces the dialog's copy AND the board's row,
           // so the tile behind the dialog is never a version behind it.
-          onChanged={(updated) => { setOptionsTarget(updated); void sessions.reload(); }}
+          onChanged={(updated) => {
+            // A grant refused here can end in a MOVE to another seat; the
+            // consoles on both sides must hear of it as a relocation does.
+            consolesFollowMove(optionsTarget.pc_id, updated.pc_id);
+            setOptionsTarget(updated);
+            void sessions.reload();
+          }}
+        />
+      )}
+      {relocateTarget && (
+        <RelocateSessionDialog
+          session={relocateTarget}
+          onClose={() => { setRelocateTarget(null); void sessions.reload(); }}
+          onMoved={(updated, from) => {
+            consolesFollowMove(from.pcId, updated.pc_id);
+            setRelocateTarget(null);
+            void sessions.reload();
+            void pcs.reload();
+          }}
         />
       )}
       {addItemTarget && (

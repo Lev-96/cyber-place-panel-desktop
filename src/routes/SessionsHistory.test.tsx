@@ -574,3 +574,49 @@ describe("what a finished session's pads cost", () => {
     expect(charge?.total).toBeCloseTo(1200, 2);
   });
 });
+
+describe("a relocation («Переместить игрока»)", () => {
+  test("shows the price on each side when it changed, and a hand-set price", () => {
+    const line = eventDetail(
+      event({
+        action: "moved",
+        meta: { reason: "relocation", from_place_number: 1, to_place_number: 3, rate_before: 1500, rate_after: 1800, rate_overridden: true },
+      }),
+      t,
+      money,
+    );
+
+    expect(line).toContain("1500 AMD / time.hourShort -> 1800 AMD / time.hourShort");
+    expect(line).toContain("history.rateSetByHand");
+  });
+
+  test("an unchanged price is stated once, and nothing says it was set by hand", () => {
+    const line = eventDetail(
+      event({ action: "moved", meta: { reason: "relocation", from_place_number: 1, to_place_number: 2, rate_before: 1500, rate_after: 1500, rate_overridden: false } }),
+      t,
+      money,
+    );
+
+    expect(line).toContain("1500 AMD / time.hourShort");
+    expect(line).not.toContain("->  ");
+    expect(line).not.toContain("1500 AMD / time.hourShort -> ");
+    expect(line).not.toContain("history.rateSetByHand");
+  });
+
+  test("an extension move says nothing about rates", () => {
+    const line = eventDetail(event({ action: "moved", meta: { from_place_number: 1, to_place_number: 2, rate_after: 1500 } }), t, money);
+    expect(line).not.toContain("AMD / time.hourShort");
+  });
+});
+
+describe("a resume", () => {
+  test("made by the server at the pause limit says so", () => {
+    const line = eventDetail(event({ action: "resumed", meta: { reason: "pause_limit", paused_seconds: 600 } }), t, money);
+    expect(line).toContain("history.autoResumed");
+  });
+
+  test("pressed by a cashier does not", () => {
+    const line = eventDetail(event({ action: "resumed", meta: { reason: "manual", paused_seconds: 60 } }), t, money);
+    expect(line).not.toContain("history.autoResumed");
+  });
+});

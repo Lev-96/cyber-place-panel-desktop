@@ -48,6 +48,12 @@ export type MoneyRoundingMode = "up" | "nearest" | "down";
 
 export interface IBillingSettings {
   branch_id: number;
+  /**
+   * The owner's limit on one pause, in minutes, or null for none. At the limit
+   * the SERVER resumes the session by itself. Optional: an older backend has
+   * no limit, and absent reads as exactly that.
+   */
+  pause_limit_minutes?: number | null;
   /** 0 = round nothing. The default every branch is on. */
   money_rounding_step: number;
   money_rounding_mode: MoneyRoundingMode;
@@ -280,6 +286,11 @@ export interface IBillingPolicy {
   extra_item_max?: number | null;
   extra_item_charged_units?: string | null;
   extra_item_price_next?: number | null;
+  /**
+   * How long a pause may last here, in minutes; `null` = no limit. Optional
+   * on the write side like the room's answer above: absent leaves it alone.
+   */
+  pause_limit_minutes?: number | null;
 }
 
 export const apiGetBillingSettings = (branchId: number) =>

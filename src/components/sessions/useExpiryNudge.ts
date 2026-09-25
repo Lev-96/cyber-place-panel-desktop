@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { autoResumeAtOf } from "./sessionAmount";
 import { ISessionApi } from "@/types/sessions";
 
 /**
@@ -53,11 +54,17 @@ export const useExpiryNudge = (
   // it happens. Depending on the array instead would merely churn a timer on
   // every thirty-second poll. There is no behaviour here to pin, and no test
   // below pretends otherwise.
-  const soonest = (sessions ?? [])
-    // A PAUSED seat is not due: its end moves on resume, and the server will
+  const active = (sessions ?? []).filter((s) => s.status === "active");
+  const soonest = [
+    // A PAUSED seat's end is not due: it moves on resume, and the server will
     // not expire it however far the old one lies behind.
-    .filter((s) => s.status === "active" && s.ends_at !== null && s.is_unlimited !== true && !s.paused_at)
-    .map((s) => new Date(s.ends_at as string).getTime())
+    ...active
+      .filter((s) => s.ends_at !== null && s.is_unlimited !== true && !s.paused_at)
+      .map((s) => new Date(s.ends_at as string).getTime()),
+    // …but a LIMITED pause is due at its limit: the board read that follows
+    // is what lets the server resume it on the spot (`sweepDuePauses`).
+    ...active.map(autoResumeAtOf).filter((t): t is number => t !== null),
+  ]
     .filter((t) => Number.isFinite(t))
     .sort((a, b) => a - b)[0];
 

@@ -390,6 +390,62 @@ export const apiTransferExtension = (sessionId: number, placeId: number, minutes
     body: { place_id: placeId, minutes },
   });
 
+/**
+ * One seat a running session could move to right now — «Переместить игрока».
+ *
+ * Every figure is the SERVER's: `hourly_rate` is what that seat would bill,
+ * `same_rate` compares it with the session's current effective rate, and
+ * `free_until` is the start of a reservation that would cut the session short
+ * (null when none does). `free_minutes` is counted from when the list was drawn.
+ */
+export interface IRelocationPlace {
+  place_id: number;
+  number: number | null;
+  name: string | null;
+  platform: string | null;
+  type: string | null;
+  hourly_rate: number;
+  same_rate: boolean;
+  free_until: string | null;
+  free_minutes: number | null;
+}
+
+export interface IRelocationOptions {
+  current: {
+    place_id: number | null;
+    number: number | null;
+    name: string | null;
+    platform: string | null;
+    type: string | null;
+    hourly_rate: number | null;
+    ends_at: string | null;
+    paused: boolean;
+  };
+  /** Same-rate seats first, then the rest; unlimited before limited in each. */
+  places: IRelocationPlace[];
+}
+
+/** ⚠️ ADVICE, like `apiSessionExtensionOptions`: `apiRelocateSession` re-checks. */
+export const apiRelocationOptions = (sessionId: number) =>
+  request<IRelocationOptions>(`/sessions/${sessionId}/relocation-options`);
+
+export interface RelocateSessionBody {
+  place_id: number;
+  /** Only when the operator changed the price; omitted = the seat's own rate. */
+  hourly_rate?: number;
+  /** The reservation limit the operator saw and accepted, echoed back verbatim. */
+  until?: string;
+}
+
+/**
+ * Move the running session to another seat. The SAME session comes back; the
+ * time already played keeps its price and only what follows runs at the new
+ * rate. A seat taken, reserved, or limited differently since the list was drawn
+ * is refused (409) — pick again.
+ */
+export const apiRelocateSession = (sessionId: number, body: RelocateSessionBody) =>
+  request<{ session: ISessionApi }>(`/sessions/${sessionId}/relocate`, { method: "POST", body });
+
 /** Waive the bill, or put it back. Owner-level; the server enforces it. */
 export const apiSetSessionFree = (sessionId: number, isFree: boolean) =>
   request<{ session: ISessionApi }>(`/sessions/${sessionId}/free`, {

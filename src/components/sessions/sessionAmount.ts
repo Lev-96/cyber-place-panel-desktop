@@ -29,8 +29,15 @@ import { IExtraItem, ISessionApi } from "@/types/sessions";
  * it.
  *
  * Going UNLIMITED reversed with it: removing a session's end is a decision
- * about the auto-stop, not about the bill, so `unlimited_at` and
- * `committed_until` take no part in the price. See CLAUDE.md §8.9.6.
+ * about the auto-stop, not about the bill. What the switch DOES keep is a
+ * rate boundary: the backend freezes what the clock had earned at that instant
+ * into `committed_amount` (with `committed_until` = the switch) and prices only
+ * the time after it at `hourly_rate` — so a new price named at the switch is
+ * "from now on". Invisible when the rate does not change.
+ *
+ * A MOVE to a seat priced differently (2026-09-25) sets the same kind of
+ * boundary in its own pair, `rate_changed_at` + `amount_before_rate_change`;
+ * when both exist the LATER one decides, exactly as on the server.
  *
  * ## Not the whole bill
  *
@@ -44,6 +51,24 @@ import { IExtraItem, ISessionApi } from "@/types/sessions";
 export const sessionTimeCostAt = (session: ISessionApi, at: number): number => {
   const rate = toNumber(session.hourly_rate);
 
+  // A rate change mid-way (a move): what was earned is frozen, only the time
+  // after it runs at the new rate. Outranks the unlimited boundary unless that
+  // one came later.
+  if (session.rate_changed_at && session.amount_before_rate_change !== null
+      && session.amount_before_rate_change !== undefined
+      && (!session.unlimited_at || !session.committed_until
+        || !(Date.parse(session.rate_changed_at) < Date.parse(session.committed_until)))) {
+    return round2(toNumber(session.amount_before_rate_change)
+      + perSecond(rate, playedSecondsBetween(session, session.rate_changed_at, at)));
+  }
+
+  // The unlimited switch's boundary: frozen at the switch, the rest at the rate.
+  if (session.unlimited_at && session.committed_until
+      && session.committed_amount !== null && session.committed_amount !== undefined) {
+    return round2(toNumber(session.committed_amount)
+      + perSecond(rate, playedSecondsBetween(session, session.committed_until, at)));
+  }
+
   // Open / count-up: per second at the assigned rate, from the first second.
   if (session.mode === "open") {
     return perSecond(rate, playedSecondsBetween(session, session.started_at, at));
@@ -54,10 +79,7 @@ export const sessionTimeCostAt = (session: ISessionApi, at: number): number => {
   // same rows.
   const committed = toNumber(session.committed_amount ?? session.total_paid);
 
-  // Fixed, unlimited or not: per second at the tariff's implied rate, from the
-  // first second. Removing a session's end is a decision about the auto-stop
-  // and not about the bill, so `unlimited_at` and `committed_until` take no
-  // part in this any more.
+  // Fixed: per second at the tariff's implied rate, from the first second.
   //
   // A tariff whose rate cannot be established at all — a package row deleted
   // under a running session — bills what was committed, which is the last
@@ -388,13 +410,31 @@ export const pausedSecondsBetween = (session: ISessionApi, from: number, to: num
     if (Number.isNaN(pausedAt)) continue;
 
     const start = Math.max(pausedAt, from);
-    const resumed = pause.resumed_at ? Date.parse(pause.resumed_at) : NaN;
+    // An open pause ends at its limit even before anyone presses Resume:
+    // the server resumes it there (`auto_resume_at`) and bills from there.
+    const until = pause.resumed_at ?? pause.auto_resume_at ?? null;
+    const resumed = until ? Date.parse(until) : NaN;
     const end = !Number.isNaN(resumed) && resumed < to ? resumed : to;
 
     if (end > start) paused += Math.floor((end - start) / 1000);
   }
 
   return paused;
+};
+
+/**
+ * When the SERVER will resume this paused session by itself, or null.
+ *
+ * The open pause's `auto_resume_at`, fixed when the pause began from the
+ * branch's limit. Null when the session is not paused or the branch sets no
+ * limit. The panel only shows it and wakes up at it — the resume itself is
+ * the backend's, and happens whether or not any panel is open.
+ */
+export const autoResumeAtOf = (session: ISessionApi): number | null => {
+  if (!session.paused_at) return null;
+  const open = (session.pauses ?? []).find((p) => p.resumed_at === null);
+  const at = open?.auto_resume_at ? Date.parse(open.auto_resume_at) : NaN;
+  return Number.isNaN(at) ? null : at;
 };
 
 /**

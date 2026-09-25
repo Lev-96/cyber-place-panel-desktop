@@ -98,6 +98,29 @@ describe("SessionsBoard — pause and resume", () => {
     expect(buttons()).toContain("session.resume");
     expect(buttons()).not.toContain("session.addTime");
     expect(document.body.textContent).toContain("session.pausedBadge");
+    // A pause belongs to the seat it began on: no move until it is resumed.
+    expect(buttons()).not.toContain("session.relocate");
+  });
+
+  test("a running seat offers «Move player»", async () => {
+    repo.listActive.mockResolvedValue([running()]);
+    await mount();
+
+    expect(buttons()).toContain("session.relocate");
+  });
+
+  test("a limited pause says until when, from the server's instant", async () => {
+    const pausedAt = new Date().toISOString();
+    const until = new Date(Date.now() + 10 * 60_000).toISOString();
+    repo.listActive.mockResolvedValue([running({
+      paused_at: pausedAt,
+      pauses: [{ paused_at: pausedAt, resumed_at: null, auto_resume_at: until }],
+    })]);
+    await mount();
+
+    expect(document.body.textContent).toContain("session.pausedUntil");
+    expect(document.body.textContent).not.toContain("session.pausedBadge");
+    expect(document.querySelector('[data-testid="auto-resume"]')).not.toBeNull();
   });
 
   test("Pause flips to Resume on the press, from the server's answer", async () => {

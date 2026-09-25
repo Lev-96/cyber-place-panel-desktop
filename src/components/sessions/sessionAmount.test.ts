@@ -162,19 +162,16 @@ describe("unlimited only removes the end, it does not reprice", () => {
     expect(sessionAmountAt(converted(), AT)).toBe(3000);
   });
 
-  test("a switch made mid-block does not charge the whole block", () => {
-    // The case the old rule got wrong: still inside the committed window, so
-    // it used to read a flat 1500 no matter how long the seat had run.
-    expect(sessionAmountAt(converted({ committed_until: ahead(30) }), AT)).toBe(3000);
+  test("the switch is a rate boundary: a new price applies only from it", () => {
+    // Switched 60 min ago with 1500 earned by then, at 3000 from now on.
+    // Mirrors the backend's unlimited branch in `timeCostStringAt`.
+    expect(sessionAmountAt(converted({ hourly_rate: 3000 }), AT)).toBe(1500 + 3000);
   });
 
-  test("committed_until no longer takes part in the price at all", () => {
-    // Same session, boundary moved anywhere: the figure does not move with it.
-    const at = converted({ committed_until: ago(0) });
-    const ahead30 = converted({ committed_until: ahead(30) });
-
-    expect(sessionAmountAt(at, AT)).toBe(3000);
-    expect(sessionAmountAt(at, AT)).toBe(sessionAmountAt(ahead30, AT));
+  test("a switch the clock has not passed yet adds nothing on top", () => {
+    // `secondsBetween` is never negative: before the boundary, the frozen
+    // figure is the whole time cost.
+    expect(sessionAmountAt(converted({ committed_until: ahead(30) }), AT)).toBe(1500);
   });
 });
 
@@ -628,5 +625,57 @@ describe("drinks on the seat are on the seat's figure", () => {
     } as Partial<ISessionApi>);
 
     expect(sessionCurrentHourlyRate(s)).toBeCloseTo(1000, 2);
+  });
+});
+
+describe("a move to a seat priced differently never reprices the past", () => {
+  const moved = (over: Partial<ISessionApi> = {}) => session({
+    mode: "fixed",
+    started_at: ago(60),
+    ends_at: ahead(60),
+    hourly_rate: 2000,
+    rate_changed_at: ago(30),
+    amount_before_rate_change: 750,
+    ...over,
+  });
+
+  test("frozen before the move, the new rate after it", () => {
+    expect(sessionAmountAt(moved(), AT)).toBe(750 + 1000);
+  });
+
+  test("an unlimited switch made after the move decides from its own boundary", () => {
+    const s = moved({ unlimited_at: ago(10), committed_until: ago(10), committed_amount: 1416.67, hourly_rate: 3000, ends_at: null });
+    expect(sessionAmountAt(s, AT)).toBe(1416.67 + 500);
+  });
+
+  test("a move made after going unlimited decides from the move", () => {
+    const s = moved({ unlimited_at: ago(50), committed_until: ago(50), committed_amount: 250, ends_at: null });
+    expect(sessionAmountAt(s, AT)).toBe(750 + 1000);
+  });
+
+  test("a pause after the move is not billed at the new rate", () => {
+    const s = moved({ pauses: [{ paused_at: ago(20), resumed_at: ago(5) }] });
+    expect(sessionAmountAt(s, AT)).toBe(750 + 500);
+  });
+});
+
+describe("a limited pause stops counting at its limit, before anyone presses Resume", () => {
+  test("the open pause ends at auto_resume_at", () => {
+    const s = session({
+      mode: "open", hourly_rate: 1500, started_at: ago(60),
+      paused_at: ago(30),
+      pauses: [{ paused_at: ago(30), resumed_at: null, auto_resume_at: ago(20) }],
+    });
+    // 60 elapsed − 10 paused = 50 min at 1500.
+    expect(sessionTimeCostAt(s, AT)).toBe(1250);
+  });
+
+  test("a limit still ahead changes nothing yet", () => {
+    const s = session({
+      mode: "open", hourly_rate: 1500, started_at: ago(60),
+      paused_at: ago(30),
+      pauses: [{ paused_at: ago(30), resumed_at: null, auto_resume_at: ahead(5) }],
+    });
+    expect(sessionTimeCostAt(s, AT)).toBe(750);
   });
 });

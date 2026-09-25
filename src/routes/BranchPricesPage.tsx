@@ -4,6 +4,7 @@ import PackageForm from "@/components/packages/PackageForm";
 import BranchExtraItemForm from "@/components/prices/BranchExtraItemForm";
 import BranchJoystickForm from "@/components/prices/BranchJoystickForm";
 import MoneyRoundingForm from "@/components/prices/MoneyRoundingForm";
+import PauseLimitForm from "@/components/prices/PauseLimitForm";
 import PlatformPricesForm from "@/components/prices/PlatformPricesForm";
 import SubplatformPricesForm from "@/components/prices/SubplatformPricesForm";
 import Button from "@/components/ui/Button";
@@ -165,6 +166,19 @@ const BranchPricesPage = () => {
         {billing.data && (
           <MoneyRoundingForm
             key={`${billing.data.money_rounding_step}:${billing.data.money_rounding_mode}`}
+            branchId={id}
+            settings={billing.data}
+            onSaved={() => void billing.reload()}
+          />
+        )}
+      </section>
+
+      {/* The longest one pause may last before the server resumes it. */}
+      <section className="col" style={{ gap: 12 }}>
+        <h2 className="page-title" style={{ margin: 0 }}>{t("pauseLimit.sectionTitle")}</h2>
+        {billing.data && (
+          <PauseLimitForm
+            key={String(billing.data.pause_limit_minutes ?? "")}
             branchId={id}
             settings={billing.data}
             onSaved={() => void billing.reload()}
