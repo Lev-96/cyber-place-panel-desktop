@@ -1443,10 +1443,18 @@ PS5 call stays in `SessionsBoard`.
   screen and `GridSkeleton` — style the board ONLY under `.session-card` /
   `.live-grid--sessions` (min column 200px, so the 2-column action grid fits
   ru/am labels).
-- Actions are a 2-column grid (`.session-card__actions`, buttons
-  `.session-card__btn`, min 36px); Stop spans the row as `.is-danger`. Button
-  TEXT is a test contract (tests find buttons by exact textContent) — no glyphs
-  or counters inside buttons.
+- Actions are a 2-column grid of `<SessionCardAction>` (in `SessionCard.tsx`):
+  every button 32px, ONE line, same style; Stop (`danger`) spans the row. The
+  card shows SHORT labels (`session.card.*`: «+ Время», «+ Товар»,
+  «Пересадить», «Վերսկսել»…) while the full action («Добавить время») is the
+  button's `aria-label` and tooltip — so screen readers, hovers and tests keep
+  the full name, and every other screen keeps the full keys. Tests find card
+  buttons by accessible name (`nameOf()` in the board tests), not by text.
+- Sizing (2026-09-25, "medium"): column `minmax(198px, 1fr)` — measured as the
+  narrowest width at which no card label is clipped in en/ru/am (Armenian clips
+  at 192–193px); clock 17px, money 13px, card padding 8px. A label that still
+  does not fit ends in an ellipsis, never a second line. Re-measure with a
+  Playwright sweep (scrollWidth > clientWidth per button) if a label changes.
 - In-flight guards are PER SEAT via `useKeyedBusy()` (pads, extra, pause): a
   second press on the same seat is one request, a press on another seat goes
   through. They used to be one `number | null` each and silently dropped the
