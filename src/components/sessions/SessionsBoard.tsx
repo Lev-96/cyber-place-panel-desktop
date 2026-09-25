@@ -34,7 +34,7 @@ import SessionTimer from "./SessionTimer";
 import { autoResumeAtOf, sessionCurrentHourlyRate, sessionJoysticksTotal } from "./sessionAmount";
 import StartSessionDialog from "./StartSessionDialog";
 import SessionOptionsDialog from "./SessionOptionsDialog";
-import SessionCard from "./SessionCard";
+import SessionCard, { SessionCardAction } from "./SessionCard";
 import RelocateSessionDialog from "./RelocateSessionDialog";
 import { BASE_JOYSTICKS, MAX_JOYSTICKS } from "@/api/joystickPrices";
 import { notify } from "@/ui/notify";
@@ -1109,10 +1109,9 @@ const SessionsBoard = ({ branchId }: Props) => {
                   The venue that hands pads out one at a time is the only one
                   that gets this; every other keeps its menu, untouched. */}
               {supportsJoysticks && padSwitch && (
-                <Button
-                  variant="secondary"
-                  className="session-card__btn"
-                  title={padOut ? t("session.padRemoveOne") : t("session.padAddOne")}
+                <SessionCardAction
+                  label={padOut ? t("session.card.padRemove") : t("session.card.padAdd")}
+                  fullLabel={padOut ? t("session.padRemoveOne") : t("session.padAddOne")}
                   // Nothing to hand out is a disabled button rather than a
                   // hidden one: a venue with no price set is a thing the
                   // cashier can see and ask about.
@@ -1121,11 +1120,13 @@ const SessionsBoard = ({ branchId }: Props) => {
                     if (padOut) { void removeTopPad(sess); return; }
                     if (padNext !== null) void addPad(sess, padNext);
                   }}
-                >
-                  {padOut ? t("session.padRemoveOne") : t("session.padAddOne")}
-                </Button>
+                />
               )}
-              <Button variant="secondary" onClick={() => setAddItemTarget(sess)} className="session-card__btn">{t("session.addItem")}</Button>
+              <SessionCardAction
+                label={t("session.card.addItem")}
+                fullLabel={t("session.addItem")}
+                onClick={() => setAddItemTarget(sess)}
+              />
               {/* Only on a seat whose room hands something out, and labelled
                   with that room's own word. The server sends the object or
                   null, so a control that appears here is one the server will
@@ -1153,10 +1154,14 @@ const SessionsBoard = ({ branchId }: Props) => {
                 const label = backId !== null
                   ? fmt(t("session.extraReturn"), extra.name)
                   : fmt(t("session.extraAdd"), extra.name);
+                const shortLabel = backId !== null
+                  ? fmt(t("session.card.extraReturn"), extra.name)
+                  : fmt(t("session.card.extraAdd"), extra.name);
 
                 return (
-                  <Button
-                    variant="secondary"
+                  <SessionCardAction
+                    label={shortLabel}
+                    fullLabel={label}
                     onClick={() => {
                       if (backId !== null) { void returnExtra(sess, backId); return; }
                       void handOutExtra(sess);
@@ -1166,11 +1171,7 @@ const SessionsBoard = ({ branchId }: Props) => {
                       || (backId !== null && returningItem === backId)
                       || (backId === null && extra.can_hand_out === false)
                     }
-                    className="session-card__btn"
-                    title={label}
-                  >
-                    {label}
-                  </Button>
+                  />
                 );
               })()}
               {/* Named for the thing a cashier is actually looking for on a
@@ -1185,19 +1186,21 @@ const SessionsBoard = ({ branchId }: Props) => {
               {/* Not while PAUSED: the server refuses to move the end then —
                   resume moves it by the pause. */}
               {sess.ends_at !== null && sess.is_unlimited !== true && !sess.paused_at && (
-                <Button variant="secondary" onClick={() => setOptionsTarget(sess)} className="session-card__btn">{t("session.addTime")}</Button>
+                <SessionCardAction
+                  label={t("session.card.addTime")}
+                  fullLabel={t("session.addTime")}
+                  onClick={() => setOptionsTarget(sess)}
+                />
               )}
               {/* Pause ↔ Resume, one control, on every kind of seat. The
                   session stays active either way — the seat stays taken and a
                   console stays awake — only the clock and the bill hold. */}
-              <Button
-                variant="secondary"
+              <SessionCardAction
+                label={sess.paused_at ? t("session.card.resume") : t("session.pause")}
+                fullLabel={sess.paused_at ? t("session.resume") : t("session.pause")}
                 onClick={() => { void togglePause(sess); }}
                 disabled={pauseBusy.isBusy(sess.id)}
-                className="session-card__btn"
-              >
-                {sess.paused_at ? t("session.resume") : t("session.pause")}
-              </Button>
+              />
               {/* ⚠️ "Options" is gone from the tile, and NOTHING behind it was
                   removed. `SessionOptionsDialog` is the Add Time dialog and is
                   still opened by the button above it, with its presets, its
@@ -1212,17 +1215,20 @@ const SessionsBoard = ({ branchId }: Props) => {
               {/* Not while PAUSED: the server refuses a move then — a pause
                   belongs to the seat it began on, so resume first. */}
               {!sess.paused_at && (
-                <Button variant="secondary" onClick={() => setRelocateTarget(sess)} className="session-card__btn">{t("session.relocate")}</Button>
+                <SessionCardAction
+                  label={t("session.card.relocate")}
+                  fullLabel={t("session.relocate")}
+                  onClick={() => setRelocateTarget(sess)}
+                />
               )}
               {/* Destructive, so it reads as such and spans the row: the one
                   button on the card a slip must not land on by accident. */}
-              <Button
-                variant="secondary"
+              <SessionCardAction
+                label={t("action.stop")}
+                fullLabel={t("action.stop")}
+                danger
                 onClick={() => setStopTarget(sess)}
-                className="session-card__btn session-card__stop is-danger"
-              >
-                {t("action.stop")}
-              </Button>
+              />
             </div>
             {/* Refusals, on the seat they belong to — for EVERY kind of seat.
                 The pad/extra refusal used to live inside the PlayStation-only

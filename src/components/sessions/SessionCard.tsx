@@ -1,4 +1,5 @@
-import { CSSProperties, DragEventHandler, ReactNode } from "react";
+import { ButtonHTMLAttributes, CSSProperties, DragEventHandler, ReactNode } from "react";
+import Button from "@/components/ui/Button";
 import { ISessionApi } from "@/types/sessions";
 import type { SessionCellState } from "@/domain/SessionCellState";
 import { SessionUrgency, useSessionUrgency } from "./sessionUrgency";
@@ -75,5 +76,35 @@ const SessionCard = ({
     </div>
   );
 };
+
+interface ActionProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, "children" | "title" | "aria-label"> {
+  /** What the button SHOWS: short, one line, so every button is one height. */
+  label: string;
+  /**
+   * What it DOES, in full — its accessible name and its tooltip. The card
+   * shows "+ Время"; a screen reader, a hover and every test that finds the
+   * button by name get "Добавить время".
+   */
+  fullLabel: string;
+  /** Destructive (Stop): red, and it spans the row. */
+  danger?: boolean;
+}
+
+/**
+ * One button in a card's action grid. Every action on a session card goes
+ * through this, which is what keeps them one height, one line and one style.
+ */
+export const SessionCardAction = ({ label, fullLabel, danger = false, className, ...rest }: ActionProps) => (
+  <Button
+    variant="secondary"
+    {...rest}
+    title={fullLabel}
+    aria-label={fullLabel}
+    className={["session-card__btn", danger ? "session-card__btn--wide is-danger" : "", className ?? ""]
+      .filter(Boolean).join(" ")}
+  >
+    {label}
+  </Button>
+);
 
 export default SessionCard;

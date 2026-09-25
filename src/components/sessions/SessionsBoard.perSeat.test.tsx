@@ -36,6 +36,14 @@ vi.mock("@/i18n/LanguageContext", () => ({
 
 import SessionsBoard from "./SessionsBoard";
 
+/**
+ * A button's ACCESSIBLE name — what a screen reader announces and what the
+ * card's tooltip says. The session card shows a short label ("+ Время") and
+ * names the button in full ("Добавить время"), so tests find buttons by what
+ * they do, not by how the card abbreviates it.
+ */
+const nameOf = (b: Element): string => b.getAttribute("aria-label") ?? b.textContent ?? "";
+
 const seat = (id: number): IPcApi => ({
   id, branch_id: 7, place_id: 10 + id, label: `Table ${id}`, kind: PC_KIND.Ps, status: PC_STATUS.InSession,
   place: { id: 10 + id, number: id, name: `Table ${id}`, type: "standard", platform: "poker" },
@@ -49,7 +57,7 @@ const running = (id: number): ISessionApi => ({
 } as unknown as ISessionApi);
 
 const buttonsLabelled = (label: string) =>
-  [...document.querySelectorAll("button")].filter((b) => b.textContent === label) as HTMLButtonElement[];
+  [...document.querySelectorAll("button")].filter((b) => nameOf(b) === label) as HTMLButtonElement[];
 
 const mount = async () => {
   await act(async () => { render(<MemoryRouter><SessionsBoard branchId={7} /></MemoryRouter>); });

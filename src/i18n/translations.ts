@@ -761,6 +761,17 @@ export const TRANSLATIONS: Dict = {
   "session.toastStopped": { en: "Session stopped · {0}", ru: "Сессия завершена · {0}", am: "Նիստն ավարտվեց · {0}" },
   // «Переместить игрока» — a running session moved to another seat.
   "session.relocate": { en: "Move player", ru: "Переместить игрока", am: "Տեղափոխել խաղացողին" },
+  // Short labels for the session CARD's action grid: one line each, so every
+  // button is one height. The full sentence stays the button's accessible
+  // name and tooltip (SessionCardAction), and every other screen keeps it.
+  "session.card.addItem": { en: "+ Product", ru: "+ Товар", am: "+Ապրանք" },
+  "session.card.addTime": { en: "+ Time", ru: "+ Время", am: "+Ժամանակ" },
+  "session.card.relocate": { en: "Move", ru: "Пересадить", am: "Տեղափոխել" },
+  "session.card.resume": { en: "Resume", ru: "Продолжить", am: "Վերսկսել" },
+  "session.card.padAdd": { en: "+ Joystick", ru: "+ Джойстик", am: "+Ջոյսթիք" },
+  "session.card.padRemove": { en: "− Joystick", ru: "− Джойстик", am: "−Ջոյսթիք" },
+  "session.card.extraAdd": { en: "+ {0}", ru: "+ {0}", am: "+ {0}" },
+  "session.card.extraReturn": { en: "Return {0}", ru: "Вернуть {0}", am: "Վերադարձ {0}" },
   "session.relocateCurrentRate": { en: "Current price:", ru: "Текущая цена:", am: "Ընթացիկ գինը՝" },
   "session.relocateSameRate": { en: "Same price", ru: "С той же ценой", am: "Նույն գնով" },
   "session.relocateOtherRate": { en: "Other places", ru: "Другие места", am: "Այլ տեղեր" },

@@ -43,6 +43,14 @@ vi.mock("@/i18n/LanguageContext", () => ({
 import SessionsBoard from "./SessionsBoard";
 import { notify, ToastEvent } from "@/ui/notify";
 
+/**
+ * A button's ACCESSIBLE name — what a screen reader announces and what the
+ * card's tooltip says. The session card shows a short label ("+ Время") and
+ * names the button in full ("Добавить время"), so tests find buttons by what
+ * they do, not by how the card abbreviates it.
+ */
+const nameOf = (b: Element): string => b.getAttribute("aria-label") ?? b.textContent ?? "";
+
 const pc = (): IPcApi => ({
   id: 1, branch_id: 7, place_id: 10, label: "PC 1",
   kind: PC_KIND.Pc, status: PC_STATUS.InSession,
@@ -65,9 +73,9 @@ const mount = async () => {
     render(<MemoryRouter><SessionsBoard branchId={7} /></MemoryRouter>);
   });
 };
-const buttons = () => [...document.querySelectorAll("button")].map((b) => b.textContent ?? "");
+const buttons = () => [...document.querySelectorAll("button")].map(nameOf);
 const press = async (label: string) => {
-  const b = [...document.querySelectorAll("button")].find((x) => x.textContent === label)!;
+  const b = [...document.querySelectorAll("button")].find((x) => nameOf(x) === label)!;
   await act(async () => { b.click(); });
 };
 
@@ -100,6 +108,17 @@ describe("SessionsBoard — pause and resume", () => {
     expect(document.body.textContent).toContain("session.pausedBadge");
     // A pause belongs to the seat it began on: no move until it is resumed.
     expect(buttons()).not.toContain("session.relocate");
+  });
+
+  test("the card shows SHORT labels, each button named by its full action", async () => {
+    repo.listActive.mockResolvedValue([running()]);
+    await mount();
+
+    const named = (name: string) => [...document.querySelectorAll("button")].find((b) => b.getAttribute("aria-label") === name)!;
+    expect(named("session.addTime").textContent).toBe("session.card.addTime");
+    expect(named("session.addItem").textContent).toBe("session.card.addItem");
+    expect(named("session.relocate").textContent).toBe("session.card.relocate");
+    expect(named("session.addTime").getAttribute("title")).toBe("session.addTime");
   });
 
   test("a running seat offers «Move player»", async () => {
@@ -175,7 +194,7 @@ describe("SessionsBoard — pause and resume", () => {
     repo.pause.mockReturnValue(new Promise<ISessionApi>((r) => { release = r; }));
     await mount();
 
-    const b = [...document.querySelectorAll("button")].find((x) => x.textContent === "session.pause")!;
+    const b = [...document.querySelectorAll("button")].find((x) => nameOf(x) === "session.pause")!;
     await act(async () => { b.click(); b.click(); });
 
     expect(repo.pause).toHaveBeenCalledTimes(1);

@@ -2,7 +2,9 @@
 import { cleanup, render } from "@testing-library/react";
 import { afterEach, describe, expect, test } from "vitest";
 import { ISessionApi } from "@/types/sessions";
-import SessionCard from "./SessionCard";
+import SessionCard, { SessionCardAction } from "./SessionCard";
+import { fireEvent, screen } from "@testing-library/react";
+import { vi } from "vitest";
 
 /**
  * The frame says "act now" as well as the digits: amber in the last five
@@ -50,5 +52,33 @@ describe("SessionCard frame", () => {
     expect(el.classList.contains("session-card--seat-offline")).toBe(true);
     expect(el.classList.contains("is-dragging")).toBe(true);
     expect(el.classList.contains("is-drop-before")).toBe(true);
+  });
+});
+
+describe("SessionCardAction", () => {
+  test("shows the short label, and is NAMED by the full one (reader, tooltip, tests)", () => {
+    const onClick = vi.fn();
+    render(<SessionCardAction label="+ Время" fullLabel="Добавить время" onClick={onClick} />);
+
+    const button = screen.getByRole("button", { name: "Добавить время" });
+    expect(button.textContent).toBe("+ Время");
+    expect(button.getAttribute("title")).toBe("Добавить время");
+    expect(button.classList.contains("session-card__btn")).toBe(true);
+    expect(button.classList.contains("is-danger")).toBe(false);
+
+    fireEvent.click(button);
+    expect(onClick).toHaveBeenCalledTimes(1);
+  });
+
+  test("a destructive action is red and spans the row", () => {
+    render(<SessionCardAction label="Стоп" fullLabel="Стоп" danger />);
+    const button = screen.getByRole("button", { name: "Стоп" });
+    expect(button.classList.contains("is-danger")).toBe(true);
+    expect(button.classList.contains("session-card__btn--wide")).toBe(true);
+  });
+
+  test("disabled stays disabled", () => {
+    render(<SessionCardAction label="Пауза" fullLabel="Пауза" disabled />);
+    expect((screen.getByRole("button", { name: "Пауза" }) as HTMLButtonElement).disabled).toBe(true);
   });
 });

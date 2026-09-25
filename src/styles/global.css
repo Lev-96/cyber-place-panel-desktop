@@ -4181,13 +4181,15 @@ select.input option:disabled {
    to the bottom so buttons line up across a row of cards. The frame colour is
    `--card-accent`, set by <SessionCard> from the seat state and its urgency. */
 .live-grid.live-grid--sessions {
-  /* 200px is what a 2-column action grid needs to hold «Переместить игрока» /
-     «Տեղափոխել խաղացողին» without clipping. */
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  /* Medium: the card's short action labels ("+ Время", "Переместить") fit a
+     2-column grid on one line from 184px. */
+  grid-template-columns: repeat(auto-fill, minmax(198px, 1fr));
+  gap: 10px;
 }
 .place-cell.session-card {
-  min-height: 160px;
-  gap: 6px;
+  min-height: 140px;
+  padding: 8px 8px 9px;
+  gap: 4px;
 }
 /* A staff tool: no decorative lift under the cursor, only the frame. */
 .place-cell.session-card:hover {
@@ -4205,17 +4207,17 @@ select.input option:disabled {
   flex-wrap: wrap;
   align-items: baseline;
   row-gap: 2px;
-  font-size: 20px;
+  font-size: 17px;
   line-height: 1.2;
   white-space: normal;
 }
 .place-cell.session-card--running .session-timer__cost {
-  font-size: 15px;
+  font-size: 13px;
   /* The amount wraps as a whole onto the next line, never mid-figure. */
   white-space: nowrap;
 }
 .place-cell.session-card--idle .status {
-  font-size: 15px;
+  font-size: 14px;
 }
 /* Urgency is the frame as well as the digits. */
 .place-cell.session-card--warn,
@@ -4249,7 +4251,7 @@ select.input option:disabled {
 /* A limited pause's own countdown sits beside the frozen clock, smaller, so
    it can never be read as the time left. */
 .place-cell.session-card--running [data-testid="auto-resume"] {
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
 }
 .session-card__pill.pill {
@@ -4263,27 +4265,31 @@ select.input option:disabled {
 .session-card__actions {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 6px;
+  gap: 4px;
   margin-top: auto;
   padding-top: 6px;
 }
+/* Every action one height and one line: the labels are short on purpose
+   (SessionCardAction), and anything that still does not fit ends in an
+   ellipsis with the full text in the tooltip — never a second line. */
 .session-card__btn.btn {
   min-width: 0;
-  min-height: 36px;
-  padding: 6px 8px;
-  font-size: 12px;
-  line-height: 1.2;
-  white-space: normal;
+  height: 32px;
+  padding: 0 3px;
+  font-size: 11.5px;
+  line-height: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block;
   text-align: center;
-  overflow-wrap: break-word;
-  hyphens: auto;
 }
-.session-card__stop {
+.session-card__btn--wide {
   grid-column: 1 / -1;
 }
 .session-card__start.btn {
   width: 100%;
-  min-height: 40px;
+  height: 34px;
   margin-top: auto;
   font-size: 13px;
 }

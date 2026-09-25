@@ -50,6 +50,14 @@ vi.mock("@/i18n/LanguageContext", () => ({
 import SessionsBoard from "./SessionsBoard";
 import { notify, ToastEvent } from "@/ui/notify";
 
+/**
+ * A button's ACCESSIBLE name — what a screen reader announces and what the
+ * card's tooltip says. The session card shows a short label ("+ Время") and
+ * names the button in full ("Добавить время"), so tests find buttons by what
+ * they do, not by how the card abbreviates it.
+ */
+const nameOf = (b: Element): string => b.getAttribute("aria-label") ?? b.textContent ?? "";
+
 const pc = (over: Partial<IPcApi> = {}): IPcApi => ({
   id: 1,
   branch_id: 7,
@@ -86,7 +94,7 @@ const mount = async () => {
   });
 };
 
-const buttons = () => [...document.querySelectorAll("button")].map((b) => b.textContent ?? "");
+const buttons = () => [...document.querySelectorAll("button")].map(nameOf);
 
 afterEach(() => cleanup());
 beforeEach(() => {
@@ -200,7 +208,7 @@ describe("SessionsBoard — the room's own extra", () => {
     }]);
     await mount();
 
-    const button = [...document.querySelectorAll("button")].find((b) => b.textContent === "return Кий")!;
+    const button = [...document.querySelectorAll("button")].find((b) => nameOf(b) === "return Кий")!;
     await act(async () => { button.click(); });
 
     expect(repo.returnItem).toHaveBeenCalledWith(5, 11);
@@ -239,7 +247,7 @@ describe("handing the room's extra out", () => {
     await mount();
 
     const button = [...document.querySelectorAll("button")]
-      .find((b) => b.textContent === "add \u0424\u0438\u0448\u043a\u0438")!;
+      .find((b) => nameOf(b) === "add \u0424\u0438\u0448\u043a\u0438")!;
     await act(async () => { button.click(); });
 
     expect(repo.addItems).toHaveBeenCalledWith(5, [{ extra: true, qty: 1 }]);
@@ -250,7 +258,7 @@ describe("handing the room's extra out", () => {
     await mount();
 
     const button = [...document.querySelectorAll("button")]
-      .find((b) => b.textContent === "add \u0424\u0438\u0448\u043a\u0438")!;
+      .find((b) => nameOf(b) === "add \u0424\u0438\u0448\u043a\u0438")!;
     await act(async () => { button.click(); });
 
     // A stepper would put a number input on the screen; there is none.
@@ -262,7 +270,7 @@ describe("handing the room's extra out", () => {
     await mount();
 
     const button = () => [...document.querySelectorAll("button")]
-      .find((b) => b.textContent === "add \u0424\u0438\u0448\u043a\u0438")!;
+      .find((b) => nameOf(b) === "add \u0424\u0438\u0448\u043a\u0438")!;
     await act(async () => { button().click(); });
     await act(async () => { button().click(); });
 
@@ -315,7 +323,7 @@ describe("the toggle follows the write, not the next read", () => {
     is_extra: true, is_hourly: false, returned_at: null, ...over,
   });
   const press = async (label: string) => {
-    const button = [...document.querySelectorAll("button")].find((b) => b.textContent === label)!;
+    const button = [...document.querySelectorAll("button")].find((b) => nameOf(b) === label)!;
     await act(async () => { button.click(); });
   };
 
@@ -392,7 +400,7 @@ describe("a hand-out is announced", () => {
   afterEach(() => off());
 
   const press = async (label: string) => {
-    const button = [...document.querySelectorAll("button")].find((b) => b.textContent === label)!;
+    const button = [...document.querySelectorAll("button")].find((b) => nameOf(b) === label)!;
     await act(async () => { button.click(); });
   };
 
@@ -457,7 +465,7 @@ describe("the server decides what the one button does", () => {
   };
   const soldLine = { id: 41, name: "Фишки", price: 500, qty: 1, product_id: null, is_extra: true, is_hourly: false, returned_at: null };
   const buttonNamed = (label: string) =>
-    [...document.querySelectorAll("button")].find((b) => b.textContent === label) as HTMLButtonElement | undefined;
+    [...document.querySelectorAll("button")].find((b) => nameOf(b) === label) as HTMLButtonElement | undefined;
 
   test("after a fixed room's sale the button is greyed and offers no return", async () => {
     repo.listActive.mockResolvedValue([{
