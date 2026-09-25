@@ -1450,6 +1450,12 @@ PS5 call stays in `SessionsBoard`.
   button's `aria-label` and tooltip — so screen readers, hovers and tests keep
   the full name, and every other screen keeps the full keys. Tests find card
   buttons by accessible name (`nameOf()` in the board tests), not by text.
+  `wide` spans the row (Пересадить, and Stop via `danger`); wide actions come
+  LAST, and a CSS `:has()` rule makes an odd last half-width button take its
+  row, so no state (pad switch, extra, pause) leaves a hole. A free seat is
+  `align-self: start` (not stretched to running neighbours) with Start 10px
+  under its status. Pinned in a real browser by the two layout specs in
+  `e2e/session-terms.spec.ts` (jsdom cannot evaluate the CSS).
 - Sizing (2026-09-25, "medium"): column `minmax(198px, 1fr)` — measured as the
   narrowest width at which no card label is clipped in en/ru/am (Armenian clips
   at 192–193px); clock 17px, money 13px, card padding 8px. A label that still
