@@ -1453,6 +1453,24 @@ are unchanged — do not add a `paused` status here either.
   the seat. History renders `paused` / `resumed` (with "Пауза длилась").
 - Kinds `paused` / `resumed` are in `useSessionChanged`'s union; the board
   reloads on any kind.
+- **Pause limit (2026-09-25)**: the owner sets it in Branch → Prices
+  (`PauseLimitForm`, empty = none, 1..240, sent with the whole policy as the
+  rounding form does). The SERVER resumes at `pauses[].auto_resume_at`; the
+  panel only shows it — pill «Пауза · до HH:MM», a ▶ countdown in
+  `SessionTimer`, `useExpiryNudge` wakes at it (the board read is what lets the
+  server sweep), `pausedSecondsBetween` caps an open pause there
+  (`autoResumeAtOf()` in `sessionAmount.ts`). History: a `resumed` with
+  `reason: pause_limit` reads «Автоматически, по лимиту паузы».
+- **«Переместить игрока» (2026-09-25)**: a tile button (hidden while paused)
+  opens `RelocateSessionDialog`: `relocation-options` lists same-price seats
+  first, then others; a booking-limited seat shows «Забронировано с HH:MM,
+  играть можно N мин» and needs an explicit acceptance, and its `free_until` is
+  sent back verbatim as `until`; «Изменить цену» sends `hourly_rate`, otherwise
+  no rate is sent. A 409 warns, redraws the list and disarms the choice. After
+  ANY move (this or the extension move) the board calls
+  `consolesFollowMove(from, to)` → `sessionStopped(old)` /
+  `sessionStarting(new)` for consoles, before the reload. History shows
+  «1500 / ч -> 1800 / ч · цена изменена вручную».
 - **Toasts after the three presses (2026-09-24)**, raised only once the
   server accepted the action, naming the seat as its tile does (`seatOf()` →
   `№{place.number ?? place.id}`, else the device label): «Сессия на паузе · №3»
@@ -1571,9 +1589,13 @@ the sessions listing eager-loads it.
 **Unlimited went pro-rata with it, later the same day.** Removing a session's
 end is a decision about the AUTO-STOP and not about the bill: a session
 switched at 00:15 and stopped at 00:30 owes the same 750 as one nobody
-touched. `unlimited_at` and `committed_until` take no part in the price on
-either side any more — if you see a branch reading them to compute money, it
-is older than this.
+touched. The switch is a RATE BOUNDARY only (mirrored from the backend on
+2026-09-25): `committed_amount` = what was earned at `committed_until` (the
+switch instant), the rest at `hourly_rate` — invisible when the rate is
+unchanged, "from now on" when a new one was named. A move to a differently
+priced seat sets `rate_changed_at` + `amount_before_rate_change` the same way;
+with both, the later boundary decides. `sessionTimeCostAt` checks them in the
+backend's order (rate change → unlimited → open → fixed).
 
 **The tile names the pads that are OUT, not a fraction of a ceiling.**
 `padIdentity()` prints the seat's count while nothing extra is out, and the
