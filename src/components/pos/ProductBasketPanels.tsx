@@ -6,6 +6,9 @@ import ProductForm from "@/components/products/ProductForm";
 import { fmt } from "@/i18n/translations";
 import { useLang } from "@/i18n/LanguageContext";
 import { ProductBasket } from "./useProductBasket";
+import { choiceKey } from "./quickEntryChoices";
+import type { IResolvedItemLine } from "@/api/sessions";
+import { useId } from "react";
 
 /**
  * The parts of a sale dialog that do not care what the sale is for — the
@@ -187,6 +190,8 @@ interface QuickEntryProps {
 export const BasketQuickEntry = ({ basket, saving }: QuickEntryProps) => {
   const { money, t } = useLang();
   const { resolved } = basket;
+  // Radio names unique to this box: every line's choice is its own group.
+  const pickGroup = useId();
 
   return (
     <div className="col" style={{ gap: 8 }}>
@@ -213,7 +218,15 @@ export const BasketQuickEntry = ({ basket, saving }: QuickEntryProps) => {
           <div className="col" style={{ gap: 6, maxHeight: 220, overflowY: "auto" }}>
             {resolved.lines.map((line, i) => (
               <div key={`${line.raw}-${i}`} className="col" style={{ gap: 2 }}>
-                {line.error === null ? (
+                {(line.options?.length ?? 0) > 0 ? (
+                  <QuickEntryPick
+                    line={line}
+                    index={i}
+                    group={`${pickGroup}-pick-${i}`}
+                    basket={basket}
+                    saving={saving}
+                  />
+                ) : line.error === null ? (
                   <div className="row-between" style={{ gap: 8 }}>
                     <span>{line.name} × {line.qty}</span>
                     <span className="muted" style={{ fontSize: 12 }}>
@@ -235,6 +248,11 @@ export const BasketQuickEntry = ({ basket, saving }: QuickEntryProps) => {
               </div>
             ))}
           </div>
+          {basket.pendingPicks > 0 && (
+            <span className="quick-pick__pending" role="status">
+              {fmt(t("session.quickEntryPickPending"), basket.pendingPicks)}
+            </span>
+          )}
           {resolved.ok && (
             <div className="row-between" style={{ gap: 8 }}>
               <span className="label" style={{ fontSize: 12 }}>{t("session.quickEntryTotal")}</span>
@@ -243,6 +261,70 @@ export const BasketQuickEntry = ({ basket, saving }: QuickEntryProps) => {
           )}
         </div>
       )}
+    </div>
+  );
+};
+
+interface PickProps {
+  line: IResolvedItemLine;
+  index: number;
+  /** This line's radio-group name — unique per line and per dialog. */
+  group: string;
+  basket: ProductBasket;
+  saving: boolean;
+}
+
+/**
+ * A line whose words fit SEVERAL products (2026-09-25): the operator says
+ * which one. Nothing is picked for them — the line waits, the total waits,
+ * and the confirm stays off until every such line has an answer.
+ *
+ * Every option is the server's (id, name, price, price × quantity); choosing
+ * one only asks the server to read the box again with that pick, and the
+ * server prices, merges and totals it. After the answer the line reads as
+ * resolved and keeps its options, so the pick can still be changed.
+ */
+const QuickEntryPick = ({ line, index, group, basket, saving }: PickProps) => {
+  const { money, t } = useLang();
+  // The pick just made, before the server's answer lands; then the server's.
+  const picked = basket.choices[choiceKey(index, line.raw)]
+    ?? (line.status === "matched" ? line.product_id : null);
+  const ask = fmt(t("session.quickEntryPick"), line.raw);
+
+  return (
+    <div className="quick-pick" role="radiogroup" aria-label={ask}>
+      {line.status === "ambiguous" ? (
+        <span className="quick-pick__ask">{ask}</span>
+      ) : line.error !== null ? (
+        <span className="error" style={{ fontSize: 12 }}>
+          {fmt(t("session.quickEntryLine"), line.raw)} {line.error}
+        </span>
+      ) : (
+        <div className="row-between" style={{ gap: 8 }}>
+          <span>✓ {line.name} × {line.qty}</span>
+          <span className="muted" style={{ fontSize: 12 }}>
+            {money(line.price ?? 0)} · {money(line.line_total ?? 0)}
+          </span>
+        </div>
+      )}
+      {(line.options ?? []).map((o) => (
+        <Radio
+          key={o.product_id}
+          name={group}
+          checked={picked === o.product_id}
+          disabled={saving}
+          onChange={() => basket.choose(index, line.raw, o.product_id)}
+          style={{ width: "100%" }}
+          label={
+            <span className="quick-pick__option">
+              <span className="quick-pick__name">{o.name}</span>
+              <span className="muted quick-pick__price">
+                {money(o.price)} × {line.qty} = {money(o.line_total ?? 0)}
+              </span>
+            </span>
+          }
+        />
+      ))}
     </div>
   );
 };

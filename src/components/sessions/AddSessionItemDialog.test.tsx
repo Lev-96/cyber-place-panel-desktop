@@ -621,3 +621,153 @@ describe("an hourly extra already on the bill", () => {
     expect(screen.queryByText("9999")).toBeNull();
   });
 });
+
+describe("AddSessionItemDialog — a typed name that fits several products", () => {
+  const opt = (product_id: number, name: string, price: number, qty: number) => ({ product_id, name, price, line_total: price * qty });
+  const AMBIGUOUS = {
+    lines: [
+      { raw: "cola 5", status: "ambiguous", product_id: null, name: null, price: null, qty: 5, line_total: null,
+        error: "More than one product is called cola.", candidates: ["Coca Cola", "Coca Cola can"],
+        options: [opt(20, "Coca Cola", 500, 5), opt(21, "Coca Cola can", 700, 5)] },
+      { raw: "20 lays", status: "matched", product_id: 10, name: "Lays", price: 400, qty: 20, line_total: 8000, error: null, candidates: [], options: [] },
+    ],
+    items: [], total: 0, ok: false,
+  };
+  const PICKED = {
+    lines: [
+      { raw: "cola 5", status: "matched", product_id: 21, name: "Coca Cola can", price: 700, qty: 5, line_total: 3500, error: null,
+        candidates: [], options: [opt(20, "Coca Cola", 500, 5), opt(21, "Coca Cola can", 700, 5)] },
+      { raw: "20 lays", status: "matched", product_id: 10, name: "Lays", price: 400, qty: 20, line_total: 8000, error: null, candidates: [], options: [] },
+    ],
+    items: [{ product_id: 21, qty: 5 }, { product_id: 10, qty: 20 }], total: 11500, ok: true,
+  };
+
+  const settle = async () => {
+    await act(async () => { vi.advanceTimersByTime(400); });
+    for (let i = 0; i < 6; i++) await act(async () => { await Promise.resolve(); });
+  };
+  const toText = async () => { await act(async () => { fireEvent.click(screen.getByLabelText("session.addModeText")); }); };
+  const type = async (value: string) => {
+    await act(async () => { fireEvent.change(screen.getByLabelText("session.quickEntry"), { target: { value } }); });
+    await settle();
+  };
+  const confirm = () => screen.getAllByRole("button").find((b) =>
+    b.textContent === "session.quickEntryConfirm" || b.textContent === "session.adding") as HTMLButtonElement;
+  const option = (name: string) => screen.getAllByRole("radio").find((r) =>
+    r.closest("label")?.textContent?.includes(name) && r.closest("[role=radiogroup]")) as HTMLInputElement;
+
+  beforeEach(() => { vi.useFakeTimers({ shouldAdvanceTime: true }); });
+  afterEach(() => { vi.useRealTimers(); });
+
+  test("the line asks which product, offers each with its price × the quantity, and blocks the add", async () => {
+    repo.resolveItemsText.mockResolvedValue(AMBIGUOUS);
+    await mount();
+    await toText();
+    await type("cola 5\n20 lays");
+
+    expect(screen.getByRole("radiogroup", { name: "session.quickEntryPick" })).toBeTruthy();
+    const labels = screen.getAllByRole("radio").map((r) => r.closest("label")?.textContent ?? "");
+    expect(labels).toContain("Coca Cola500 × 5 = 2500");
+    expect(labels).toContain("Coca Cola can700 × 5 = 3500");
+    // Nothing is picked for the operator.
+    const pickRadios = [...document.querySelectorAll(".quick-pick input[type=radio]")] as HTMLInputElement[];
+    expect(pickRadios).toHaveLength(2);
+    expect(pickRadios.some((r) => r.checked)).toBe(false);
+    // The unique line reads exactly as before.
+    expect(screen.getByText("Lays × 20")).toBeTruthy();
+    expect(confirm().disabled).toBe(true);
+    expect(document.body.textContent).toContain("session.quickEntryPickPending");
+  });
+
+  test("a pick re-reads WITH it, keeps the quantity, and the server's items are what is added", async () => {
+    repo.resolveItemsText.mockResolvedValueOnce(AMBIGUOUS).mockResolvedValue(PICKED);
+    const { onAdded } = await mount();
+    await toText();
+    await type("cola 5\n20 lays");
+
+    await act(async () => { fireEvent.click(option("Coca Cola can")); });
+    await settle();
+
+    expect(repo.resolveItemsText).toHaveBeenLastCalledWith(42, "cola 5\n20 lays", [{ line: 0, raw: "cola 5", product_id: 21 }]);
+    expect(screen.getByText("✓ Coca Cola can × 5")).toBeTruthy();
+    expect(option("Coca Cola can").checked).toBe(true);
+    expect(confirm().disabled).toBe(false);
+
+    await act(async () => { fireEvent.click(confirm()); });
+    expect(repo.addItems).toHaveBeenCalledWith(42, [{ product_id: 21, qty: 5 }, { product_id: 10, qty: 20 }]);
+    expect(onAdded).toHaveBeenCalled();
+  });
+
+  test("an ordinary read sends no choices at all (the request it always was)", async () => {
+    repo.resolveItemsText.mockResolvedValue(AMBIGUOUS);
+    await mount();
+    await toText();
+    await type("cola 5\n20 lays");
+
+    expect(repo.resolveItemsText).toHaveBeenCalledWith(42, "cola 5\n20 lays");
+  });
+
+  test("two ambiguous lines each need their own pick; one is not enough", async () => {
+    const TWO = {
+      ...AMBIGUOUS,
+      lines: [AMBIGUOUS.lines[0], { ...AMBIGUOUS.lines[0], raw: "cola 2", qty: 2,
+        options: [opt(20, "Coca Cola", 500, 2), opt(21, "Coca Cola can", 700, 2)] }],
+    };
+    const ONE_PICKED = { ...TWO, lines: [PICKED.lines[0], TWO.lines[1]] };
+    repo.resolveItemsText.mockResolvedValueOnce(TWO).mockResolvedValue(ONE_PICKED);
+    await mount();
+    await toText();
+    await type("cola 5\ncola 2");
+
+    const groups = [...document.querySelectorAll(".quick-pick")] as HTMLElement[];
+    expect(groups).toHaveLength(2);
+    // Each line is its own group: picking in one never unpicks the other.
+    const names = groups.map((g) => (g.querySelector("input") as HTMLInputElement).name);
+    expect(new Set(names).size).toBe(2);
+
+    await act(async () => { fireEvent.click(groups[0].querySelectorAll("input")[1]); });
+    await settle();
+    expect(confirm().disabled).toBe(true);
+  });
+
+  test("editing the text drops a pick made for the old text", async () => {
+    repo.resolveItemsText.mockResolvedValueOnce(AMBIGUOUS).mockResolvedValueOnce(PICKED)
+      .mockResolvedValue({ ...AMBIGUOUS, lines: [{ ...AMBIGUOUS.lines[0], raw: "cola 7", qty: 7 }, AMBIGUOUS.lines[1]] });
+    await mount();
+    await toText();
+    await type("cola 5\n20 lays");
+    await act(async () => { fireEvent.click(option("Coca Cola can")); });
+    await settle();
+
+    await type("cola 7\n20 lays");
+    await settle();
+
+    // The pick for "cola 5" is not sent for "cola 7".
+    const last = repo.resolveItemsText.mock.calls.at(-1)!;
+    expect(last.length === 2 || (last[2] as unknown[]).every((c) => (c as { raw: string }).raw !== "cola 5")).toBe(true);
+    expect(confirm().disabled).toBe(true);
+  });
+
+  test("a double press adds once", async () => {
+    repo.resolveItemsText.mockResolvedValueOnce(AMBIGUOUS).mockResolvedValue(PICKED);
+    repo.addItems.mockReturnValue(new Promise(() => {}));
+    await mount();
+    await toText();
+    await type("cola 5\n20 lays");
+    await act(async () => { fireEvent.click(option("Coca Cola can")); });
+    await settle();
+
+    await act(async () => { fireEvent.click(confirm()); fireEvent.click(confirm()); });
+    expect(repo.addItems).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("AddSessionItemDialog — withdrawn products", () => {
+  test("the picker does not offer a withdrawn product", async () => {
+    repo.listProducts.mockResolvedValue([...products, { id: 30, branch_id: 1, name: "Old Tea", category: "Drinks", price: 100, is_active: false }]);
+    await mount();
+    expect(screen.queryByText("Old Tea")).toBeNull();
+    expect(screen.getByText("Lays")).toBeTruthy();
+  });
+});
+

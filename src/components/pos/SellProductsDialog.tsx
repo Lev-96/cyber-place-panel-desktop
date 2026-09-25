@@ -3,7 +3,7 @@ import { useAuth } from "@/auth/AuthContext";
 import Button from "@/components/ui/Button";
 import Modal from "@/components/ui/Modal";
 import PaymentMethodPicker, { paymentNoteMissing } from "@/components/payments/PaymentMethodPicker";
-import { PaymentMethod } from "@/api/sessions";
+import { IItemChoice, PaymentMethod } from "@/api/sessions";
 import { fmt } from "@/i18n/translations";
 import { useLang } from "@/i18n/LanguageContext";
 import { orderRepository } from "@/repositories/OrderRepository";
@@ -50,7 +50,12 @@ const SellProductsDialog = ({ branchId, onClose, onSold }: Props) => {
 
   // The till sells what the branch still sells; the server refuses the rest.
   const allow = useCallback((p: IProduct) => p.is_active !== false, []);
-  const resolve = useCallback((typed: string) => orderRepository.resolveItemsText(branchId, typed), [branchId]);
+  const resolve = useCallback(
+    (typed: string, choices: IItemChoice[]) => (choices.length > 0
+      ? orderRepository.resolveItemsText(branchId, typed, choices)
+      : orderRepository.resolveItemsText(branchId, typed)),
+    [branchId],
+  );
   const basket = useProductBasket({ branchId, resolve, resolveKey: branchId, allow });
   const { cart, mode, resolved, resolving, err, setErr } = basket;
 

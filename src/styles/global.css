@@ -4474,3 +4474,53 @@ select.input option:disabled {
   outline: 2px solid var(--color-primary);
   outline-offset: 2px;
 }
+
+/* ── Quick entry: a line whose words fit several products ───────────────
+   The choice sits under its own line, inside the preview — no second dialog.
+   Amber frame while the line waits for the operator, neutral once picked. */
+.quick-pick {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+}
+.quick-pick:has(.quick-pick__ask) {
+  border-color: color-mix(in srgb, var(--color-warning) 60%, transparent);
+  background: color-mix(in srgb, var(--color-warning) 7%, transparent);
+}
+.quick-pick__ask {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-warning);
+}
+/* Full-width rows so every option's price lines up on the right. */
+.quick-pick .cp-radio {
+  display: flex;
+  width: 100%;
+}
+.quick-pick .cp-radio-label {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.quick-pick__option {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+}
+.quick-pick__name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.quick-pick__price {
+  flex-shrink: 0;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.quick-pick__pending {
+  font-size: 12px;
+  color: var(--color-warning);
+}

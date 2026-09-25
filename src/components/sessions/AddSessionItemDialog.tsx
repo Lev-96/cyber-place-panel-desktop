@@ -19,7 +19,8 @@ import {
   rowStyle,
   stepBtn,
 } from "@/components/pos/ProductBasketPanels";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { IItemChoice } from "@/api/sessions";
 
 interface Props {
   branchId: number;
@@ -72,6 +73,7 @@ const AddSessionItemDialog = ({ branchId, session, onClose, onAdded }: Props) =>
   const canCreateProducts = can(user?.role, "product.crud");
   const { money, t } = useLang();
   const [saving, setSaving] = useState(false);
+  const confirmingRef = useRef(false);
 
   /**
    * Chips are a poker table's product, and only a poker table's.
@@ -85,8 +87,20 @@ const AddSessionItemDialog = ({ branchId, session, onClose, onAdded }: Props) =>
    * older payload, which reads as "not a poker table": the safe direction.
    */
   const sellsChips = session.supports_chips === true;
-  const allow = useCallback((p: IProduct) => sellsChips || !isChipsProduct(p), [sellsChips]);
-  const resolve = useCallback((typed: string) => sessionRepository.resolveItemsText(session.id, typed), [session.id]);
+  // A withdrawn product is not for sale here either (2026-09-25): the server
+  // refuses it on the bill, as the till always did.
+  const allow = useCallback(
+    (p: IProduct) => p.is_active !== false && (sellsChips || !isChipsProduct(p)),
+    [sellsChips],
+  );
+  // The picks travel only when there are some, so an ordinary read is the
+  // request it always was.
+  const resolve = useCallback(
+    (typed: string, choices: IItemChoice[]) => (choices.length > 0
+      ? sessionRepository.resolveItemsText(session.id, typed, choices)
+      : sessionRepository.resolveItemsText(session.id, typed)),
+    [session.id],
+  );
 
   // The catalogue, the basket and the quick entry — shared with the till's
   // sale dialog (components/pos). What the basket is FOR stays here: this
@@ -144,7 +158,10 @@ const AddSessionItemDialog = ({ branchId, session, onClose, onAdded }: Props) =>
    * session stopped meanwhile.
    */
   const confirmText = async () => {
-    if (!resolved?.ok || !resolved.items.length || saving) return;
+    // The ref answers a double press inside one frame; `saving` only greys
+    // the button once React has rendered.
+    if (!resolved?.ok || !resolved.items.length || saving || confirmingRef.current) return;
+    confirmingRef.current = true;
     setSaving(true);
     setErr(null);
     try {
@@ -164,6 +181,7 @@ const AddSessionItemDialog = ({ branchId, session, onClose, onAdded }: Props) =>
       const reason = e instanceof Error && e.message ? e.message : t("session.failUnknown");
       setErr(`${t("session.addFailedMany")} ${fmt(t("session.failReason"), reason)}`);
     } finally {
+      confirmingRef.current = false;
       setSaving(false);
     }
   };

@@ -207,6 +207,32 @@ export const apiAddSessionItem = (id: number, body: AddItemBody) =>
 export const apiAddSessionItems = (id: number, body: AddItemsBody) =>
   request<{ session: ISessionApi }>(`/sessions/${id}/items`, { method: "POST", body });
 
+/**
+ * What the server made of a line (2026-09-25). Absent on a backend from before
+ * it, where `error === null` still means "matched".
+ */
+export type ResolvedLineStatus = "matched" | "ambiguous" | "unmatched" | "invalid";
+
+/** One product an ambiguous line could mean — the server's, priced by it. */
+export interface IResolvedOption {
+  product_id: number;
+  name: string;
+  price: number;
+  /** price × the line's quantity, as the server computed it. */
+  line_total: number | null;
+}
+
+/**
+ * The operator's pick for an ambiguous line: which line (by index and by its
+ * text, so a pick never lands on a line that changed) and which product. The
+ * server applies it only if that product is one of THAT line's options.
+ */
+export interface IItemChoice {
+  line: number;
+  raw: string;
+  product_id: number;
+}
+
 /** One typed line, as the server read it: a priced product, or a refusal. */
 export interface IResolvedItemLine {
   /** Exactly what the cashier typed, so an error can point at the line. */
@@ -220,6 +246,12 @@ export interface IResolvedItemLine {
   error: string | null;
   /** Names worth trying, when the word matched nothing or matched two things. */
   candidates: string[];
+  status?: ResolvedLineStatus;
+  /**
+   * The products an ambiguous line could mean (and, once one was picked, the
+   * same list, so the pick can be changed). Empty otherwise.
+   */
+  options?: IResolvedOption[];
 }
 
 export interface IResolvedItems {
@@ -240,10 +272,12 @@ export interface IResolvedItems {
  * endpoint expects. Confirming goes through THAT endpoint: this one never
  * writes.
  */
-export const apiResolveSessionItemsText = (id: number, text: string) =>
+export const apiResolveSessionItemsText = (id: number, text: string, choices?: IItemChoice[]) =>
   request<{ resolved: IResolvedItems }>(`/sessions/${id}/items/resolve`, {
     method: "POST",
-    body: { text },
+    // `choices` only when there are some: the body of an ordinary read stays
+    // exactly what it always was.
+    body: choices && choices.length > 0 ? { text, choices } : { text },
   });
 
 /**

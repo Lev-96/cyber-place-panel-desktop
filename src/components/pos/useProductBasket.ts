@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { IResolvedItems } from "@/api/sessions";
+import { IItemChoice, IResolvedItems } from "@/api/sessions";
+import { QuickEntryChoices, choiceKey, pendingPicks, pruneChoices, toChoicePayload } from "./quickEntryChoices";
 import { productRepository } from "@/repositories/ProductRepository";
 import { IProduct } from "@/types/pos";
 
@@ -20,8 +21,11 @@ interface Options {
    * `/sessions/{id}/items/resolve` or the till's `/orders/resolve`. Both answer
    * with the one backend `ProductTextResolver`, so "20 lays" means the same on
    * a seat's bill and at the counter.
+   *
+   * `choices` are the operator's picks for ambiguous lines — empty unless one
+   * was made, and a caller passes them on only then.
    */
-  resolve: (text: string) => Promise<IResolvedItems>;
+  resolve: (text: string, choices: IItemChoice[]) => Promise<IResolvedItems>;
   /**
    * What the reader is about (the session id, the branch). The debounced read
    * restarts when it changes; `resolve` itself is held in a ref, because an
@@ -59,6 +63,19 @@ export const useProductBasket = ({ branchId, resolve, resolveKey, allow }: Optio
   const [resolving, setResolving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
+  /**
+   * The product picked for each ambiguous line, keyed by line and text
+   * (quickEntryChoices). Sent with the next read; the server resolves the line
+   * with it and still merges, prices and totals everything itself.
+   */
+  const [choices, setChoices] = useState<QuickEntryChoices>({});
+  const choicesKey = JSON.stringify(toChoicePayload(choices));
+  /** The text of the last read — a pick alone re-reads at once, typing waits. */
+  const lastTypedRef = useRef<string | null>(null);
+
+  /** Pick the product an ambiguous line means. */
+  const choose = (line: number, raw: string, productId: number) =>
+    setChoices((prev) => ({ ...prev, [choiceKey(line, raw)]: productId }));
 
   const resolveRef = useRef(resolve);
   useEffect(() => { resolveRef.current = resolve; }, [resolve]);
@@ -118,13 +135,20 @@ export const useProductBasket = ({ branchId, resolve, resolveKey, allow }: Optio
     if (typed === "") {
       setResolved(null);
       setResolving(false);
+      // A cleared box forgets its picks: they were about lines that are gone.
+      setChoices((prev) => (Object.keys(prev).length === 0 ? prev : {}));
+      lastTypedRef.current = null;
       return;
     }
 
     setResolving(true);
     let dropped = false;
+    const payload = JSON.parse(choicesKey) as IItemChoice[];
+    // Typing waits for a pause; a pick (same text) is answered at once.
+    const delay = lastTypedRef.current === typed ? 0 : 400;
     const timer = setTimeout(() => {
-      resolveRef.current(typed)
+      lastTypedRef.current = typed;
+      resolveRef.current(typed, payload)
         .then((r) => {
           if (dropped) return;
           // A 200 is not a promise about the shape. An older backend without
@@ -133,6 +157,10 @@ export const useProductBasket = ({ branchId, resolve, resolveKey, allow }: Optio
           // of the box, and reaching into it would take the screen down.
           const readable = Array.isArray(r?.lines);
           setResolved(readable ? r : null);
+          // Drop picks the answer no longer stands behind (the line changed,
+          // the product left the catalogue). Same object when none is dropped,
+          // so this does not re-trigger the read.
+          if (readable) setChoices((prev) => pruneChoices(prev, r));
           // Empty string, not a translated sentence: `t` inside this effect
           // would have to join its dependency list, and a `t` that is a new
           // function on every render restarts the debounce forever. The
@@ -146,10 +174,10 @@ export const useProductBasket = ({ branchId, resolve, resolveKey, allow }: Optio
           setErr(e instanceof Error && e.message ? e.message : null);
         })
         .finally(() => { if (!dropped) setResolving(false); });
-    }, 400);
+    }, delay);
 
     return () => { dropped = true; clearTimeout(timer); };
-  }, [mode, text, resolveKey]);
+  }, [mode, text, resolveKey, choicesKey]);
 
   const filtered = useMemo(() => {
     const needle = search.trim().toLowerCase();
@@ -164,6 +192,7 @@ export const useProductBasket = ({ branchId, resolve, resolveKey, allow }: Optio
     products, search, setSearch, filtered,
     cart, setCart, put, step, drop, cartTotal,
     mode, setMode, text, setText, resolved, setResolved, resolving,
+    choices, choose, pendingPicks: pendingPicks(resolved),
     err, setErr,
     creating, setCreating, onProductCreated,
     loading: products === null,

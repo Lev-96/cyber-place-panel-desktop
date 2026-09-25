@@ -209,6 +209,39 @@ describe("typed lines", () => {
     expect(repo.create.mock.calls[0][0].items).toEqual([{ product_id: 1, quantity: 2 }, { product_id: 2, quantity: 3 }]);
   });
 
+  test("a name that fits several products holds the sale until one is picked, then sells the pick", async () => {
+    const options = [
+      { product_id: 2, name: "Coca-Cola", price: 700, line_total: 2100 },
+      { product_id: 4, name: "Coca-Cola can", price: 900, line_total: 2700 },
+    ];
+    repo.resolve
+      .mockResolvedValueOnce({
+        lines: [{ raw: "cola 3", status: "ambiguous", product_id: null, name: null, price: null, qty: 3, line_total: null,
+          error: "ambiguous", candidates: ["Coca-Cola", "Coca-Cola can"], options }],
+        items: [], total: 0, ok: false,
+      })
+      .mockResolvedValue({
+        lines: [{ raw: "cola 3", status: "matched", product_id: 4, name: "Coca-Cola can", price: 900, qty: 3, line_total: 2700,
+          error: null, candidates: [], options }],
+        items: [{ product_id: 4, qty: 3 }], total: 2700, ok: true,
+      });
+    await mount();
+    await typeLines("cola 3");
+
+    expect(sellButton().disabled).toBe(true);
+    const can = [...document.querySelectorAll(".quick-pick input[type=radio]")]
+      .find((r) => r.closest("label")?.textContent?.includes("Coca-Cola can")) as HTMLInputElement;
+    await act(async () => {
+      fireEvent.click(can);
+      await new Promise((r) => setTimeout(r, 50));
+    });
+
+    expect(repo.resolve).toHaveBeenLastCalledWith(7, "cola 3", [{ line: 0, raw: "cola 3", product_id: 4 }]);
+    expect(sellButton().disabled).toBe(false);
+    await sell();
+    expect(repo.create.mock.calls[0][0].items).toEqual([{ product_id: 4, quantity: 3 }]);
+  });
+
   test("a line the reader could not place holds the sale", async () => {
     repo.resolve.mockResolvedValue({
       lines: [{ raw: "2 pizza", product_id: null, name: null, price: null, qty: 2, line_total: null, error: "unknown", candidates: [] }],

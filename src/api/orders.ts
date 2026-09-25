@@ -1,5 +1,5 @@
 import { IOrder } from "@/types/pos";
-import { IResolvedItems, PaymentMethod } from "./sessions";
+import { IItemChoice, IResolvedItems, PaymentMethod } from "./sessions";
 import { request } from "./client";
 
 /**
@@ -36,8 +36,8 @@ export const apiListOrders = (params: ListOrdersParams) =>
  * Typed lines read against the branch's catalogue — the SAME resolver the
  * session bill's quick entry uses, for a sale with no seat. Writes nothing.
  */
-export const apiResolveOrderItems = (branchId: number, text: string) =>
+export const apiResolveOrderItems = (branchId: number, text: string, choices?: IItemChoice[]) =>
   request<{ resolved: IResolvedItems }>("/orders/resolve", {
     method: "POST",
-    body: { branch_id: branchId, text },
+    body: choices && choices.length > 0 ? { branch_id: branchId, text, choices } : { branch_id: branchId, text },
   });

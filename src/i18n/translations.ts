@@ -736,6 +736,17 @@ export const TRANSLATIONS: Dict = {
   "session.quickEntryPreview": { en: "Will be added", ru: "Будет добавлено", am: "Կավելացվի" },
   "session.quickEntryTotal": { en: "Total", ru: "Итого", am: "Ընդամենը" },
   "session.quickEntryLine": { en: "Line “{0}”:", ru: "Строка «{0}»:", am: "«{0}» տողը՝" },
+  // A typed line whose words fit several products: the operator picks one.
+  "session.quickEntryPick": {
+    en: "Which product is “{0}”?",
+    ru: "Какой товар в строке «{0}»?",
+    am: "Ո՞ր ապրանքն է «{0}» տողում",
+  },
+  "session.quickEntryPickPending": {
+    en: "Choose the product in the highlighted lines ({0}) to continue.",
+    ru: "Выберите товар в отмеченных строках ({0}), чтобы продолжить.",
+    am: "Ընտրեք ապրանքը նշված տողերում ({0})՝ շարունակելու համար։",
+  },
   "session.quickEntryCandidates": { en: "Did you mean: {0}", ru: "Возможно, вы имели в виду: {0}", am: "Հնարավոր է նկատի ունեիք՝ {0}" },
   "session.quickEntryConfirm": {
     en: "Add to this session",

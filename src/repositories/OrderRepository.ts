@@ -3,7 +3,7 @@ import {
   CreateOrderBody, ListOrdersParams,
 } from "@/api/orders";
 import { friendlyMutation } from "@/api/fallback";
-import { IResolvedItems } from "@/api/sessions";
+import { IItemChoice, IResolvedItems } from "@/api/sessions";
 import { IOrder } from "@/types/pos";
 
 /**
@@ -18,8 +18,8 @@ export class OrderRepository {
   async list(params: ListOrdersParams): Promise<IOrder[]> {
     return apiListOrders(params).then((r) => r.data);
   }
-  async resolveItemsText(branchId: number, text: string): Promise<IResolvedItems> {
-    return friendlyMutation(apiResolveOrderItems(branchId, text).then((r) => r.resolved));
+  async resolveItemsText(branchId: number, text: string, choices?: IItemChoice[]): Promise<IResolvedItems> {
+    return friendlyMutation(apiResolveOrderItems(branchId, text, choices).then((r) => r.resolved));
   }
 }
 

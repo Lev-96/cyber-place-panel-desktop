@@ -5,6 +5,7 @@ import {
   apiAddSessionItems,
   apiResolveSessionItemsText,
   IResolvedItems,
+  type IItemChoice,
   apiAddSessionJoystick,
   apiAddSessionTime,
   apiSessionExtensionOptions,
@@ -98,8 +99,8 @@ export class SessionRepository {
    * What the typed lines would put on the bill. Reads only — the confirm still
    * goes through `addItems`, so there is one write path and one history.
    */
-  async resolveItemsText(sessionId: number, text: string): Promise<IResolvedItems> {
-    return friendlyMutation(apiResolveSessionItemsText(sessionId, text).then((r) => r.resolved));
+  async resolveItemsText(sessionId: number, text: string, choices?: IItemChoice[]): Promise<IResolvedItems> {
+    return friendlyMutation(apiResolveSessionItemsText(sessionId, text, choices).then((r) => r.resolved));
   }
   async setItemQty(sessionId: number, itemId: number, qty: number): Promise<ISessionApi> {
     return friendlyMutation(apiSetSessionItemQty(sessionId, itemId, qty).then((r) => r.session));
