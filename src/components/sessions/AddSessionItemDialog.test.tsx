@@ -653,8 +653,10 @@ describe("AddSessionItemDialog — a typed name that fits several products", () 
   };
   const confirm = () => screen.getAllByRole("button").find((b) =>
     b.textContent === "session.quickEntryConfirm" || b.textContent === "session.adding") as HTMLButtonElement;
-  const option = (name: string) => screen.getAllByRole("radio").find((r) =>
-    r.closest("label")?.textContent?.includes(name) && r.closest("[role=radiogroup]")) as HTMLInputElement;
+  const option = (name: string) => [...document.querySelectorAll(".quick-pick [role=option]")]
+    .find((o) => o.querySelector(".quick-pick__name")?.textContent === name) as HTMLElement;
+  const lists = () => [...document.querySelectorAll(".quick-pick [role=listbox]")] as HTMLElement[];
+  const press = async (el: Element, key: string) => { await act(async () => { fireEvent.keyDown(el, { key }); }); };
 
   beforeEach(() => { vi.useFakeTimers({ shouldAdvanceTime: true }); });
   afterEach(() => { vi.useRealTimers(); });
@@ -665,14 +667,15 @@ describe("AddSessionItemDialog — a typed name that fits several products", () 
     await toText();
     await type("cola 5\n20 lays");
 
-    expect(screen.getByRole("radiogroup", { name: "session.quickEntryPick" })).toBeTruthy();
-    const labels = screen.getAllByRole("radio").map((r) => r.closest("label")?.textContent ?? "");
+    expect(screen.getByRole("listbox", { name: "session.quickEntryPick" })).toBeTruthy();
+    const labels = screen.getAllByRole("option").map((o) => o.textContent ?? "");
     expect(labels).toContain("Coca Cola500 × 5 = 2500");
     expect(labels).toContain("Coca Cola can700 × 5 = 3500");
-    // Nothing is picked for the operator.
-    const pickRadios = [...document.querySelectorAll(".quick-pick input[type=radio]")] as HTMLInputElement[];
-    expect(pickRadios).toHaveLength(2);
-    expect(pickRadios.some((r) => r.checked)).toBe(false);
+    // A list, not radio buttons — and nothing is picked for the operator.
+    expect(document.querySelectorAll(".quick-pick input[type=radio]")).toHaveLength(0);
+    const opts = [...document.querySelectorAll(".quick-pick [role=option]")];
+    expect(opts).toHaveLength(2);
+    expect(opts.some((o) => o.getAttribute("aria-selected") === "true")).toBe(false);
     // The unique line reads exactly as before.
     expect(screen.getByText("Lays × 20")).toBeTruthy();
     expect(confirm().disabled).toBe(true);
@@ -690,7 +693,7 @@ describe("AddSessionItemDialog — a typed name that fits several products", () 
 
     expect(repo.resolveItemsText).toHaveBeenLastCalledWith(42, "cola 5\n20 lays", [{ line: 0, raw: "cola 5", product_id: 21 }]);
     expect(screen.getByText("✓ Coca Cola can × 5")).toBeTruthy();
-    expect(option("Coca Cola can").checked).toBe(true);
+    expect(option("Coca Cola can").getAttribute("aria-selected")).toBe("true");
     expect(confirm().disabled).toBe(false);
 
     await act(async () => { fireEvent.click(confirm()); });
@@ -721,11 +724,10 @@ describe("AddSessionItemDialog — a typed name that fits several products", () 
 
     const groups = [...document.querySelectorAll(".quick-pick")] as HTMLElement[];
     expect(groups).toHaveLength(2);
-    // Each line is its own group: picking in one never unpicks the other.
-    const names = groups.map((g) => (g.querySelector("input") as HTMLInputElement).name);
-    expect(new Set(names).size).toBe(2);
+    // Each line is its own list: picking in one never unpicks the other.
+    expect(groups.map((g) => g.querySelectorAll("[role=listbox]").length)).toEqual([1, 1]);
 
-    await act(async () => { fireEvent.click(groups[0].querySelectorAll("input")[1]); });
+    await act(async () => { fireEvent.click(groups[0].querySelectorAll("[role=option]")[1]); });
     await settle();
     expect(confirm().disabled).toBe(true);
   });
@@ -759,6 +761,159 @@ describe("AddSessionItemDialog — a typed name that fits several products", () 
 
     await act(async () => { fireEvent.click(confirm()); fireEvent.click(confirm()); });
     expect(repo.addItems).toHaveBeenCalledTimes(1);
+  });
+
+  test("keyboard only: ↓ then Enter picks the highlighted product for THAT line, keeping its quantity", async () => {
+    repo.resolveItemsText.mockResolvedValueOnce(AMBIGUOUS).mockResolvedValue(PICKED);
+    await mount();
+    await toText();
+    await type("cola 5\n20 lays");
+
+    const [list] = lists();
+    act(() => { list.focus(); });
+    await press(list, "ArrowDown");
+    await press(list, "Enter");
+    await settle();
+
+    expect(repo.resolveItemsText).toHaveBeenLastCalledWith(42, "cola 5\n20 lays", [{ line: 0, raw: "cola 5", product_id: 21 }]);
+    expect(screen.getByText("✓ Coca Cola can × 5")).toBeTruthy();
+    // Enter only picked: nothing was added.
+    expect(repo.addItems).not.toHaveBeenCalled();
+  });
+
+  test("↑ from the top wraps to the last option; Enter picks it", async () => {
+    repo.resolveItemsText.mockResolvedValueOnce(AMBIGUOUS).mockResolvedValue(PICKED);
+    await mount();
+    await toText();
+    await type("cola 5\n20 lays");
+
+    const [list] = lists();
+    act(() => { list.focus(); });
+    await press(list, "ArrowUp");
+    await press(list, "Enter");
+    await settle();
+    expect(repo.resolveItemsText).toHaveBeenLastCalledWith(42, "cola 5\n20 lays", [{ line: 0, raw: "cola 5", product_id: 21 }]);
+  });
+
+  test("once the last line is answered the focus is on the add button, which adds once", async () => {
+    repo.resolveItemsText.mockResolvedValueOnce(AMBIGUOUS).mockResolvedValue(PICKED);
+    repo.addItems.mockReturnValue(new Promise(() => {}));
+    await mount();
+    await toText();
+    await type("cola 5\n20 lays");
+
+    const [list] = lists();
+    act(() => { list.focus(); });
+    await press(list, "End");
+    await press(list, "Enter");
+    await settle();
+
+    expect(document.activeElement).toBe(confirm());
+    expect(confirm().disabled).toBe(false);
+    // The next Enter is that button's own press (a click, in a browser) — and
+    // a second one while the first is in flight sends nothing more.
+    await act(async () => { fireEvent.click(confirm()); fireEvent.click(confirm()); });
+    expect(repo.addItems).toHaveBeenCalledTimes(1);
+    expect(repo.addItems).toHaveBeenCalledWith(42, [{ product_id: 21, qty: 5 }, { product_id: 10, qty: 20 }]);
+  });
+
+  test("a fast double Enter on the list picks, never adds", async () => {
+    repo.resolveItemsText.mockResolvedValueOnce(AMBIGUOUS).mockResolvedValue(PICKED);
+    await mount();
+    await toText();
+    await type("cola 5\n20 lays");
+
+    const [list] = lists();
+    act(() => { list.focus(); });
+    await press(list, "Enter");
+    await press(list, "Enter");
+    await settle();
+    expect(repo.addItems).not.toHaveBeenCalled();
+  });
+
+  test("two ambiguous lines: answering the first moves the focus to the second, each keeps its own product and quantity", async () => {
+    const second = { ...AMBIGUOUS.lines[0], raw: "cola 2", qty: 2, options: [opt(20, "Coca Cola", 500, 2), opt(21, "Coca Cola can", 700, 2)] };
+    const TWO = { ...AMBIGUOUS, lines: [AMBIGUOUS.lines[0], second] };
+    const FIRST = { ...TWO, lines: [PICKED.lines[0], second] };
+    const BOTH = {
+      lines: [PICKED.lines[0], { ...second, status: "matched", product_id: 20, name: "Coca Cola", price: 500, line_total: 1000, error: null, candidates: [] }],
+      items: [{ product_id: 21, qty: 5 }, { product_id: 20, qty: 2 }], total: 4500, ok: true,
+    };
+    repo.resolveItemsText.mockResolvedValueOnce(TWO).mockResolvedValueOnce(FIRST).mockResolvedValue(BOTH);
+    await mount();
+    await toText();
+    await type("cola 5\ncola 2");
+
+    act(() => { lists()[0].focus(); });
+    await press(lists()[0], "ArrowDown");
+    await press(lists()[0], "Enter");
+    await settle();
+    expect(document.activeElement).toBe(lists()[1]);
+
+    await press(lists()[1], "Enter");
+    await settle();
+    expect(repo.resolveItemsText).toHaveBeenLastCalledWith(42, "cola 5\ncola 2", [
+      { line: 0, raw: "cola 5", product_id: 21 },
+      { line: 1, raw: "cola 2", product_id: 20 },
+    ]);
+    expect(document.activeElement).toBe(confirm());
+    await act(async () => { fireEvent.click(confirm()); });
+    expect(repo.addItems).toHaveBeenCalledWith(42, [{ product_id: 21, qty: 5 }, { product_id: 20, qty: 2 }]);
+  });
+
+  test("Escape in the list goes back to the box and the dialog stays open", async () => {
+    repo.resolveItemsText.mockResolvedValue(AMBIGUOUS);
+    const { onClose } = await mount();
+    await toText();
+    await type("cola 5\n20 lays");
+
+    const [list] = lists();
+    act(() => { list.focus(); });
+    await press(list, "Escape");
+    await act(async () => { vi.advanceTimersByTime(400); });
+
+    expect(document.activeElement).toBe(screen.getByLabelText("session.quickEntry"));
+    expect(onClose).not.toHaveBeenCalled();
+    expect(document.body.textContent).not.toContain("modal.leaveConfirm");
+  });
+
+  test("a click picks, and the list keeps the keyboard", async () => {
+    repo.resolveItemsText.mockResolvedValueOnce(AMBIGUOUS).mockResolvedValue(PICKED);
+    await mount();
+    await toText();
+    await type("cola 5\n20 lays");
+
+    await act(async () => { fireEvent.mouseDown(option("Coca Cola")); fireEvent.click(option("Coca Cola")); });
+    // Even once the server's answer has landed, the focus stays on the list.
+    await settle();
+    expect(document.activeElement).toBe(lists()[0]);
+    await press(lists()[0], "ArrowDown");
+    await press(lists()[0], "Enter");
+    await settle();
+    expect(repo.resolveItemsText).toHaveBeenLastCalledWith(42, "cola 5\n20 lays", [{ line: 0, raw: "cola 5", product_id: 21 }]);
+  });
+
+  test("the focus does not jump when the operator went back to typing before the answer", async () => {
+    repo.resolveItemsText.mockResolvedValueOnce(AMBIGUOUS).mockResolvedValue(PICKED);
+    await mount();
+    await toText();
+    await type("cola 5\n20 lays");
+
+    await act(async () => { fireEvent.click(option("Coca Cola can")); });
+    const box = screen.getByLabelText("session.quickEntry") as HTMLTextAreaElement;
+    act(() => { box.focus(); });
+    await settle();
+    expect(document.activeElement).toBe(box);
+  });
+
+  test("a unique line shows no list at all", async () => {
+    repo.resolveItemsText.mockResolvedValue({ ...PICKED, lines: [PICKED.lines[1]], items: [{ product_id: 10, qty: 20 }], total: 8000 });
+    await mount();
+    await toText();
+    await type("20 lays");
+    expect(screen.queryByRole("listbox")).toBeNull();
+    expect(screen.getByText("Lays × 20")).toBeTruthy();
+    expect(confirm().disabled).toBe(false);
   });
 });
 

@@ -229,15 +229,19 @@ describe("typed lines", () => {
     await typeLines("cola 3");
 
     expect(sellButton().disabled).toBe(true);
-    const can = [...document.querySelectorAll(".quick-pick input[type=radio]")]
-      .find((r) => r.closest("label")?.textContent?.includes("Coca-Cola can")) as HTMLInputElement;
+    expect(document.querySelectorAll(".quick-pick input[type=radio]")).toHaveLength(0);
+    // Keyboard only: the till shares the session's list.
+    const list = screen.getByRole("listbox");
+    await act(async () => { list.focus(); fireEvent.keyDown(list, { key: "End" }); });
     await act(async () => {
-      fireEvent.click(can);
+      fireEvent.keyDown(list, { key: "Enter" });
       await new Promise((r) => setTimeout(r, 50));
     });
 
     expect(repo.resolve).toHaveBeenLastCalledWith(7, "cola 3", [{ line: 0, raw: "cola 3", product_id: 4 }]);
+    expect(repo.create).not.toHaveBeenCalled();
     expect(sellButton().disabled).toBe(false);
+    expect(document.activeElement).toBe(sellButton());
     await sell();
     expect(repo.create.mock.calls[0][0].items).toEqual([{ product_id: 4, quantity: 3 }]);
   });

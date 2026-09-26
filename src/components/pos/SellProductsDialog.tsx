@@ -47,6 +47,8 @@ const SellProductsDialog = ({ branchId, onClose, onSold }: Props) => {
   const [note, setNote] = useState("");
   const requestIdRef = useRef(newRequestId());
   const inFlightRef = useRef(false);
+  /** Where the focus lands once every typed line's pick is made. */
+  const sellRef = useRef<HTMLButtonElement>(null);
 
   // The till sells what the branch still sells; the server refuses the rest.
   const allow = useCallback((p: IProduct) => p.is_active !== false, []);
@@ -111,7 +113,7 @@ const SellProductsDialog = ({ branchId, onClose, onSold }: Props) => {
         {mode === "picker" && (
           <BasketPicker basket={basket} saving={saving} canCreateProducts={canCreateProducts} />
         )}
-        {mode === "text" && <BasketQuickEntry basket={basket} saving={saving} />}
+        {mode === "text" && <BasketQuickEntry basket={basket} saving={saving} confirmRef={sellRef} />}
 
         <PaymentMethodPicker
           name={`till-pay-${branchId}`}
@@ -133,7 +135,7 @@ const SellProductsDialog = ({ branchId, onClose, onSold }: Props) => {
           {/* Held down until there is something to sell and, for typed
               lines, until every one of them resolved: a sale with one bad
               line is refused whole, never saved in part. */}
-          <Button onClick={() => { void sell(); }} disabled={saving || !ready}>
+          <Button ref={sellRef} onClick={() => { void sell(); }} disabled={saving || !ready}>
             {saving ? t("till.selling") : t("till.sellConfirm")}
           </Button>
         </div>

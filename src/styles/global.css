@@ -4496,13 +4496,43 @@ select.input option:disabled {
   color: var(--color-warning);
 }
 /* Full-width rows so every option's price lines up on the right. */
-.quick-pick .cp-radio {
+/* ── OptionList: one tab stop, the highlight follows the keys ────────────
+   Selected = the primary frame (the choice stands). Active = the keyboard's
+   place, ringed only while the list has focus so a resting list shows just
+   the choice. Same cyan wash as the suggestion lists (.cp-suggest-option). */
+.cp-option-list {
   display: flex;
-  width: 100%;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 200px;
+  overflow-y: auto;
+  border-radius: 8px;
+  outline: none;
 }
-.quick-pick .cp-radio-label {
-  flex: 1 1 auto;
-  min-width: 0;
+.cp-option-list[aria-disabled="true"] {
+  opacity: 0.6;
+  pointer-events: none;
+}
+.cp-option {
+  padding: 8px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 140ms ease, border-color 140ms ease;
+}
+.cp-option:hover {
+  background: rgba(7, 221, 241, 0.06);
+}
+.cp-option.is-selected {
+  background: rgba(7, 221, 241, 0.1);
+  border-color: var(--color-primary);
+}
+.cp-option-list:focus-visible .cp-option.is-active {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px rgba(7, 221, 241, 0.35);
+}
+@media (prefers-reduced-motion: reduce) {
+  .cp-option { transition: none; }
 }
 .quick-pick__option {
   display: flex;

@@ -1,6 +1,7 @@
-import { ButtonHTMLAttributes } from "react";
+import { ComponentPropsWithRef } from "react";
 
-interface Props extends ButtonHTMLAttributes<HTMLButtonElement> {
+// With its ref (React 19 passes it as a prop): a dialog can move focus to its button.
+interface Props extends ComponentPropsWithRef<"button"> {
   variant?: "primary" | "secondary";
 }
 

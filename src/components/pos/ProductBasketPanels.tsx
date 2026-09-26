@@ -2,13 +2,14 @@ import { ListSkeleton } from "@/components/ui/Skeleton";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import Radio from "@/components/ui/Radio";
+import OptionList from "@/components/ui/OptionList";
 import ProductForm from "@/components/products/ProductForm";
 import { fmt } from "@/i18n/translations";
 import { useLang } from "@/i18n/LanguageContext";
 import { ProductBasket } from "./useProductBasket";
 import { choiceKey } from "./quickEntryChoices";
 import type { IResolvedItemLine } from "@/api/sessions";
-import { useId } from "react";
+import { RefObject, useCallback, useEffect, useRef } from "react";
 
 /**
  * The parts of a sale dialog that do not care what the sale is for — the
@@ -180,6 +181,12 @@ export const BasketPicker = ({ basket, saving, canCreateProducts }: PickerProps)
 interface QuickEntryProps {
   basket: ProductBasket;
   saving: boolean;
+  /**
+   * The dialog's own add/sell button. Once the last ambiguous line is answered
+   * the focus goes there, so the next Enter presses THAT button — through its
+   * own guarded handler; this panel never submits anything itself.
+   */
+  confirmRef?: RefObject<HTMLButtonElement | null>;
 }
 
 /**
@@ -187,16 +194,49 @@ interface QuickEntryProps {
  * cashier presses the confirm below: what this shows is the server's reading
  * of the text, priced from the catalogue.
  */
-export const BasketQuickEntry = ({ basket, saving }: QuickEntryProps) => {
+export const BasketQuickEntry = ({ basket, saving, confirmRef }: QuickEntryProps) => {
   const { money, t } = useLang();
-  const { resolved } = basket;
-  // Radio names unique to this box: every line's choice is its own group.
-  const pickGroup = useId();
+  const { resolved, resolving } = basket;
+  const textRef = useRef<HTMLTextAreaElement>(null);
+  const previewRef = useRef<HTMLDivElement>(null);
+  /** Each ambiguous line's option list, by line index. */
+  const pickLists = useRef(new Map<number, HTMLDivElement>());
+  /** A pick is waiting for the server's answer before the focus moves on. */
+  const advanceRef = useRef(false);
+
+  /**
+   * After a pick made with Enter: the next line still waiting for one, else
+   * the dialog's button when the whole box reads clean. Only while the focus
+   * is still in the preview — an operator who went back to typing keeps their
+   * caret. A click leaves the focus on its list: the mouse goes to the button
+   * itself, and the arrows keep working where the operator is.
+   */
+  const advance = useCallback(() => {
+    if (!previewRef.current?.contains(document.activeElement)) return;
+    const waiting = (resolved?.lines ?? []).findIndex((l) => l.status === "ambiguous");
+    if (waiting >= 0) pickLists.current.get(waiting)?.focus();
+    else if (resolved?.ok) confirmRef?.current?.focus();
+  }, [resolved, confirmRef]);
+
+  useEffect(() => {
+    if (!advanceRef.current || resolving) return;
+    advanceRef.current = false;
+    advance();
+  }, [resolving, advance]);
+
+  const pick = (index: number, raw: string, productId: number, answered: boolean, byKeyboard: boolean) => {
+    basket.choose(index, raw, productId);
+    if (!byKeyboard) return;
+    // The same product again asks the server nothing: move on at once.
+    if (answered) advance();
+    else advanceRef.current = true;
+  };
 
   return (
     <div className="col" style={{ gap: 8 }}>
       <span className="label" style={{ fontSize: 12 }}>{t("session.quickEntry")}</span>
       <textarea
+        ref={textRef}
         className="input"
         rows={5}
         value={basket.text}
@@ -215,16 +255,21 @@ export const BasketQuickEntry = ({ basket, saving }: QuickEntryProps) => {
       {resolved !== null && resolved.lines.length > 0 && (
         <div className="col" style={{ gap: 6 }}>
           <span className="label" style={{ fontSize: 12 }}>{t("session.quickEntryPreview")}</span>
-          <div className="col" style={{ gap: 6, maxHeight: 220, overflowY: "auto" }}>
+          <div ref={previewRef} className="col" style={{ gap: 6, maxHeight: 220, overflowY: "auto" }}>
             {resolved.lines.map((line, i) => (
               <div key={`${line.raw}-${i}`} className="col" style={{ gap: 2 }}>
                 {(line.options?.length ?? 0) > 0 ? (
                   <QuickEntryPick
                     line={line}
                     index={i}
-                    group={`${pickGroup}-pick-${i}`}
-                    basket={basket}
+                    picked={basket.choices[choiceKey(i, line.raw)] ?? (line.status === "matched" ? line.product_id : null)}
                     saving={saving}
+                    onPick={pick}
+                    onEscape={() => textRef.current?.focus()}
+                    listRef={(el) => {
+                      if (el) pickLists.current.set(i, el);
+                      else pickLists.current.delete(i);
+                    }}
                   />
                 ) : line.error === null ? (
                   <div className="row-between" style={{ gap: 8 }}>
@@ -268,10 +313,13 @@ export const BasketQuickEntry = ({ basket, saving }: QuickEntryProps) => {
 interface PickProps {
   line: IResolvedItemLine;
   index: number;
-  /** This line's radio-group name — unique per line and per dialog. */
-  group: string;
-  basket: ProductBasket;
+  /** The pick just made, before the server's answer lands; then the server's. */
+  picked: number | null;
   saving: boolean;
+  /** `answered`: the server already resolved the line to this very product. */
+  onPick: (index: number, raw: string, productId: number, answered: boolean, byKeyboard: boolean) => void;
+  onEscape: () => void;
+  listRef: (el: HTMLDivElement | null) => void;
 }
 
 /**
@@ -283,16 +331,16 @@ interface PickProps {
  * one only asks the server to read the box again with that pick, and the
  * server prices, merges and totals it. After the answer the line reads as
  * resolved and keeps its options, so the pick can still be changed.
+ *
+ * The options are a keyboard list (OptionList, 2026-09-26): Tab from the box
+ * lands on it, ↑/↓ move, Enter picks, Escape goes back to the box.
  */
-const QuickEntryPick = ({ line, index, group, basket, saving }: PickProps) => {
+const QuickEntryPick = ({ line, index, picked, saving, onPick, onEscape, listRef }: PickProps) => {
   const { money, t } = useLang();
-  // The pick just made, before the server's answer lands; then the server's.
-  const picked = basket.choices[choiceKey(index, line.raw)]
-    ?? (line.status === "matched" ? line.product_id : null);
   const ask = fmt(t("session.quickEntryPick"), line.raw);
 
   return (
-    <div className="quick-pick" role="radiogroup" aria-label={ask}>
+    <div className="quick-pick">
       {line.status === "ambiguous" ? (
         <span className="quick-pick__ask">{ask}</span>
       ) : line.error !== null ? (
@@ -307,24 +355,28 @@ const QuickEntryPick = ({ line, index, group, basket, saving }: PickProps) => {
           </span>
         </div>
       )}
-      {(line.options ?? []).map((o) => (
-        <Radio
-          key={o.product_id}
-          name={group}
-          checked={picked === o.product_id}
-          disabled={saving}
-          onChange={() => basket.choose(index, line.raw, o.product_id)}
-          style={{ width: "100%" }}
-          label={
-            <span className="quick-pick__option">
-              <span className="quick-pick__name">{o.name}</span>
-              <span className="muted quick-pick__price">
-                {money(o.price)} × {line.qty} = {money(o.line_total ?? 0)}
-              </span>
+      <OptionList
+        options={line.options ?? []}
+        optionKey={(o) => o.product_id}
+        selectedKey={picked}
+        onChoose={(o, via) => onPick(
+          index, line.raw, o.product_id,
+          line.status === "matched" && line.product_id === o.product_id,
+          via === "keyboard",
+        )}
+        label={ask}
+        disabled={saving}
+        onEscape={onEscape}
+        listRef={listRef}
+        renderOption={(o) => (
+          <span className="quick-pick__option">
+            <span className="quick-pick__name">{o.name}</span>
+            <span className="muted quick-pick__price">
+              {money(o.price)} × {line.qty} = {money(o.line_total ?? 0)}
             </span>
-          }
-        />
-      ))}
+          </span>
+        )}
+      />
     </div>
   );
 };
