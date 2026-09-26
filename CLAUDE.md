@@ -1564,7 +1564,12 @@ are unchanged — do not add a `paused` status here either.
 - **Staff filter** (native `<select class="input">`, «Все сотрудники» + «Name ·
   role»): choices from `GET /session-events/actors?branch_id` (server-scoped);
   a pick adds `user_id` to the ONE feed request (the server narrows, the panel
-  never sifts the whole log). Cards = sessions with at least one of that
+  never sifts the whole log) and fetches the cards from `GET /sessions?acted_by=`
+  — the sessions that person acted in, BRANCH-WIDE for every role (the owner's
+  rule, 2026-09-26: a manager who picks their owner sees everything the owner
+  did in the manager's branch, not only the manager's own shifts; without a
+  pick, the own-shift rule stands). A card's own fetch sends `?user_id=` too.
+  The stat tiles keep the unfiltered list. Cards = sessions with at least one of that
   person's lines; a card that fetches its own list narrows it the same way
   (`e.user?.id === actorId` — a system line is nobody's) and hides itself if
   nothing is left. The choice is stored WITH its branch, so another branch
