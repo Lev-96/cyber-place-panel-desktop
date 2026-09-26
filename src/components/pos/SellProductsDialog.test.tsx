@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import SellProductsDialog from "./SellProductsDialog";
 
@@ -233,10 +233,9 @@ describe("typed lines", () => {
     // Keyboard only: the till shares the session's combobox.
     const box = screen.getByLabelText("session.quickEntry");
     await act(async () => { fireEvent.keyDown(box, { key: "ArrowDown" }); });
-    await act(async () => {
-      fireEvent.keyDown(box, { key: "Enter" });
-      await new Promise((r) => setTimeout(r, 50));
-    });
+    await act(async () => { fireEvent.keyDown(box, { key: "Enter" }); });
+    // Until the server's answer to the pick has landed — however loaded the machine.
+    await waitFor(() => expect(sellButton().disabled).toBe(false));
 
     expect(repo.resolve).toHaveBeenLastCalledWith(7, "cola 3", [{ line: 0, raw: "cola 3", product_id: 4 }]);
     expect(repo.create).not.toHaveBeenCalled();

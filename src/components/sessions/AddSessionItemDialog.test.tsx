@@ -831,7 +831,12 @@ describe("AddSessionItemDialog — a typed name that fits several products", () 
       lines: [picked("cola 5", 5, 21), LAYS, picked("cola 3", 3, 20)],
       items: [{ product_id: 21, qty: 5 }, { product_id: 10, qty: 20 }, { product_id: 20, qty: 3 }], total: 13000, ok: true,
     };
-    repo.resolveItemsText.mockResolvedValueOnce(TWO).mockResolvedValueOnce(FIRST).mockResolvedValue(BOTH);
+    // The answer to the first pick is held back, so "before the answer" is a
+    // fact of the test, not a race against the machine's load.
+    let answerFirst: (v: unknown) => void = () => {};
+    repo.resolveItemsText.mockResolvedValueOnce(TWO)
+      .mockReturnValueOnce(new Promise((r) => { answerFirst = r; }))
+      .mockResolvedValue(BOTH);
     await mount();
     await toText();
     await type("cola 5\n20 lays\ncola 3");
@@ -840,8 +845,11 @@ describe("AddSessionItemDialog — a typed name that fits several products", () 
     expect(screen.getByRole("listbox").getAttribute("aria-label")).toContain("cola 5");
     await press("ArrowDown");
     await press("Enter");
+    await settle();
     // A fast second Enter before the answer lands on nothing.
+    expect(lists()).toHaveLength(0);
     expect(await press("Enter")).toBe(true);
+    await act(async () => { answerFirst(FIRST); });
     await settle();
 
     expect(lastRead()).toEqual([42, "cola 5\n20 lays\ncola 3", [{ line: 0, raw: "cola 5", product_id: 21 }]]);
