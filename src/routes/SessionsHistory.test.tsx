@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { eventDetail, eventSeat, paymentLabelOf, segmentsOf } from "./SessionsHistory";
+import { eventDetailParts, eventSeat, paymentLabelOf, segmentsOf } from "@/components/sessions/sessionHistoryModel";
 // The pad line is shared with the board now, so its tests follow it there.
 import { padChargeOf } from "@/components/sessions/joystickView";
 import type { ISessionEvent } from "@/api/sessions";
@@ -23,6 +23,12 @@ import type { ISessionApi } from "@/types/sessions";
 // `t` echoes the key, so the assertions stay about structure rather than copy.
 const t = (k: string) => k;
 const money = (n: number) => `${n} AMD`;
+
+/** The detail as one sentence — how these pins were written; the card puts each part on its own line. */
+const eventDetail = (e: ISessionEvent, tt: (k: string) => string, m: (n: number) => string): string | null => {
+  const parts = eventDetailParts(e, tt, m);
+  return parts.length > 0 ? parts.join(" · ") : null;
+};
 
 const event = (over: Partial<ISessionEvent>): ISessionEvent => ({
   id: 1,
@@ -612,11 +618,11 @@ describe("a relocation («Переместить игрока»)", () => {
 describe("a resume", () => {
   test("made by the server at the pause limit says so", () => {
     const line = eventDetail(event({ action: "resumed", meta: { reason: "pause_limit", paused_seconds: 600 } }), t, money);
-    expect(line).toContain("history.autoResumed");
+    expect(line).toContain("history.pauseLimitReason");
   });
 
   test("pressed by a cashier does not", () => {
     const line = eventDetail(event({ action: "resumed", meta: { reason: "manual", paused_seconds: 60 } }), t, money);
-    expect(line).not.toContain("history.autoResumed");
+    expect(line).not.toContain("history.pauseLimitReason");
   });
 });

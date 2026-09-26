@@ -1334,16 +1334,23 @@ export const TRANSLATIONS: Dict = {
   // used to carry: half the answer, because the venue's real question after a
   // long evening is who let the seat run and until WHEN — and a session that
   // crossed a shift change was closed by somebody else entirely.
-  "history.startedAt": { en: "Started at", ru: "Начата", am: "Սկսվել է" },
-  "history.endedAt": { en: "Ended at", ru: "Завершена", am: "Ավարտվել է" },
   "history.startedBy": { en: "Started by", ru: "Запустил", am: "Սկսել է" },
   "history.endedBy": { en: "Ended by", ru: "Завершил", am: "Ավարտել է" },
   // Nobody pressed Stop: the kiosk agent expired the session when its paid
   // time ran out. Saying "-" would read as missing data rather than as the
   // answer, which is what it is.
   "history.endedAutomatically": { en: "Automatically", ru: "Автоматически", am: "Ավտոմատ" },
+  // The session card (2026-09-26): its facts and its activity timeline.
+  "history.timeLabel": { en: "Time", ru: "Время", am: "Ժամանակ" },
+  "history.seatsLabel": { en: "Seats", ru: "Места", am: "Տեղեր" },
+  "history.timelineLoading": { en: "Loading the history…", ru: "Загружаем историю…", am: "Բեռնում ենք պատմությունը…" },
+  // `{0}` is how many events the folded card is not showing.
+  "history.showMore": { en: "Show {0} more", ru: "Показать ещё {0}", am: "Ցույց տալ ևս {0}" },
+  "history.collapse": { en: "Show less", ru: "Свернуть", am: "Ծալել" },
+  // A resume nobody pressed: the server's, at the branch's pause limit.
+  "history.autoResumeTitle": { en: "Resumed automatically", ru: "Автоматическое продолжение", am: "Ավտոմատ շարունակում" },
+  "history.pauseLimitReason": { en: "At the pause limit", ru: "По лимиту паузы", am: "Դադարի սահմանաչափով" },
   "history.branch": { en: "Branch", ru: "Филиал", am: "Մասնաճյուղ" },
-  "history.actions": { en: "What happened", ru: "Что происходило", am: "Ինչ է տեղի ունեցել" },
   "history.actionsEmpty": { en: "Nothing beyond the start.", ru: "Кроме старта. Ничего.", am: "Բացի սկսելուց՝ ոչինչ։" },
   "history.sumFree": { en: "Free sessions", ru: "Бесплатные сессии", am: "Անվճար նիստեր" },
   "history.sumWaived": { en: "Waived", ru: "Списано", am: "Դուրս գրված" },
@@ -1356,11 +1363,6 @@ export const TRANSLATIONS: Dict = {
   "history.action.paused": { en: "Paused the session", ru: "Поставил сессию на паузу", am: "Դադարեցրեց նիստը" },
   "history.action.resumed": { en: "Resumed the session", ru: "Продолжил сессию", am: "Շարունակեց նիստը" },
   "history.pausedFor": { en: "Paused for", ru: "Пауза длилась", am: "Դադարը տևեց" },
-  "history.autoResumed": {
-    en: "Automatically, at the pause limit",
-    ru: "Автоматически, по лимиту паузы",
-    am: "Ինքնաբերաբար՝ դադարի սահմանաչափով",
-  },
   "history.rateSetByHand": { en: "price set by hand", ru: "цена изменена вручную", am: "գինը փոխվել է ձեռքով" },
   "history.action.free_enabled": { en: "Made it free", ru: "Сделал бесплатной", am: "Դարձրեց անվճար" },
   "history.action.free_disabled": { en: "Made it paid again", ru: "Вернул оплату", am: "Վերադարձրեց վճարումը" },
@@ -1395,10 +1397,6 @@ export const TRANSLATIONS: Dict = {
     am: "տեղն արդեն զբաղեցված էր",
   },
   "history.itemsCount": { en: "Lines", ru: "Позиций", am: "Դիրքեր" },
-  // The per-session path, collapsed by default: a page of sessions must not
-  // fetch every timeline to render a summary nobody expanded.
-  "history.timelineShow": { en: "Show the path", ru: "Показать путь", am: "Ցույց տալ ընթացքը" },
-  "history.timelineHide": { en: "Hide the path", ru: "Скрыть путь", am: "Թաքցնել ընթացքը" },
   "history.seatUnknown": { en: "Seat not recorded", ru: "Место не записано", am: "Տեղը գրանցված չէ" },
   "history.noRefundShort": { en: "no refund", ru: "без возврата", am: "առանց վերադարձի" },
 
