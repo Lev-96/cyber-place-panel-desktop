@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import type { IResolvedItems } from "@/api/sessions";
-import { choiceKey, pendingPicks, pruneChoices, toChoicePayload } from "./quickEntryChoices";
+import { choiceKey, pendingPicks, pruneChoices, removeTypedLine, toChoicePayload } from "./quickEntryChoices";
 
 const line = (over: Record<string, unknown>) => ({
   raw: "Cola 5", product_id: null, name: null, price: null, qty: 5, line_total: null,
@@ -51,5 +51,36 @@ describe("quickEntryChoices", () => {
   test("pending picks count only the ambiguous lines", () => {
     expect(pendingPicks(resolved([line({}), line({ status: "matched" }), line({ status: "unmatched" })]))).toBe(1);
     expect(pendingPicks(null)).toBe(0);
+  });
+});
+
+describe("removeTypedLine — taking one line out of the draft", () => {
+  test("removes the n-th NON-BLANK line, as the server counts them, and nothing else", () => {
+    const text = "cola 5\n\n  20 lays  \r\ncola 2\n";
+    const out = removeTypedLine(text, {}, 1);
+    expect(out.text).toBe("cola 5\n\ncola 2\n");
+  });
+
+  test("drops the removed line's pick and moves the later picks up with their lines", () => {
+    const choices = { [choiceKey(0, "cola 5")]: 21, [choiceKey(1, "cola 3")]: 20, [choiceKey(2, "cola 2")]: 22 };
+    const out = removeTypedLine("cola 5\ncola 3\ncola 2", choices, 1);
+    expect(out.text).toBe("cola 5\ncola 2");
+    expect(out.choices).toEqual({ [choiceKey(0, "cola 5")]: 21, [choiceKey(1, "cola 2")]: 22 });
+  });
+
+  test("a line of only a no-break space is a line to the server (PHP trim keeps it), so it is counted", () => {
+    const out = removeTypedLine("cola 5\n\u00a0\ncola 2", {}, 2);
+    expect(out.text).toBe("cola 5\n\u00a0");
+  });
+
+  test("an index past the end changes nothing", () => {
+    const choices = { [choiceKey(0, "cola 5")]: 21 };
+    const out = removeTypedLine("cola 5", choices, 3);
+    expect(out.text).toBe("cola 5");
+    expect(out.choices).toBe(choices);
+  });
+
+  test("the last line removed leaves an empty draft", () => {
+    expect(removeTypedLine("  cola 5  ", {}, 0).text).toBe("");
   });
 });

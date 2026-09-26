@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { IItemChoice, IResolvedItems } from "@/api/sessions";
-import { QuickEntryChoices, choiceKey, pendingPicks, pruneChoices, toChoicePayload } from "./quickEntryChoices";
+import { QuickEntryChoices, choiceKey, pendingPicks, pruneChoices, removeTypedLine, toChoicePayload } from "./quickEntryChoices";
 import { productRepository } from "@/repositories/ProductRepository";
 import { IProduct } from "@/types/pos";
 
@@ -76,6 +76,19 @@ export const useProductBasket = ({ branchId, resolve, resolveKey, allow }: Optio
   /** Pick the product an ambiguous line means. */
   const choose = (line: number, raw: string, productId: number) =>
     setChoices((prev) => ({ ...prev, [choiceKey(line, raw)]: productId }));
+
+  /**
+   * Take one typed line (the server's index) out of the draft, with its pick;
+   * later picks move up with their lines. A deliberate edit, not typing, so
+   * the box is re-read at once rather than after the typing pause.
+   */
+  const removeLine = (line: number) => {
+    const next = removeTypedLine(text, choices, line);
+    if (next.text === text) return;
+    lastTypedRef.current = next.text.trim();
+    setText(next.text);
+    setChoices(next.choices);
+  };
 
   const resolveRef = useRef(resolve);
   useEffect(() => { resolveRef.current = resolve; }, [resolve]);
@@ -192,7 +205,7 @@ export const useProductBasket = ({ branchId, resolve, resolveKey, allow }: Optio
     products, search, setSearch, filtered,
     cart, setCart, put, step, drop, cartTotal,
     mode, setMode, text, setText, resolved, setResolved, resolving,
-    choices, choose, pendingPicks: pendingPicks(resolved),
+    choices, choose, removeLine, pendingPicks: pendingPicks(resolved),
     err, setErr,
     creating, setCreating, onProductCreated,
     loading: products === null,

@@ -742,6 +742,8 @@ export const TRANSLATIONS: Dict = {
     ru: "Какой товар в строке «{0}»?",
     am: "Ո՞ր ապրանքն է «{0}» տողում",
   },
+  // Reopens a list folded away with Escape.
+  "session.quickEntryPickOpen": { en: "Choose", ru: "Выбрать", am: "Ընտրել" },
   "session.quickEntryPickPending": {
     en: "Choose the product in the highlighted lines ({0}) to continue.",
     ru: "Выберите товар в отмеченных строках ({0}), чтобы продолжить.",

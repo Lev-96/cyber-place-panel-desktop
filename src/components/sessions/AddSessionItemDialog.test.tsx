@@ -53,6 +53,7 @@ const PLACEHOLDER_KEYS = new Set([
   "session.failReason",
   "session.quickEntryLine",
   "session.quickEntryCandidates",
+  "session.quickEntryPick",
 ]);
 
 vi.mock("@/i18n/LanguageContext", () => ({
@@ -624,21 +625,19 @@ describe("an hourly extra already on the bill", () => {
 
 describe("AddSessionItemDialog — a typed name that fits several products", () => {
   const opt = (product_id: number, name: string, price: number, qty: number) => ({ product_id, name, price, line_total: price * qty });
-  const AMBIGUOUS = {
-    lines: [
-      { raw: "cola 5", status: "ambiguous", product_id: null, name: null, price: null, qty: 5, line_total: null,
-        error: "More than one product is called cola.", candidates: ["Coca Cola", "Coca Cola can"],
-        options: [opt(20, "Coca Cola", 500, 5), opt(21, "Coca Cola can", 700, 5)] },
-      { raw: "20 lays", status: "matched", product_id: 10, name: "Lays", price: 400, qty: 20, line_total: 8000, error: null, candidates: [], options: [] },
-    ],
-    items: [], total: 0, ok: false,
+  const colaOptions = (qty: number) => [opt(20, "Coca Cola", 500, qty), opt(21, "Coca Cola can", 700, qty), opt(22, "Coca Cola 1L", 1000, qty)];
+  const ambiguous = (raw: string, qty: number) => ({
+    raw, status: "ambiguous", product_id: null, name: null, price: null, qty, line_total: null,
+    error: "More than one product is called cola.", candidates: ["Coca Cola", "Coca Cola can", "Coca Cola 1L"], options: colaOptions(qty),
+  });
+  const picked = (raw: string, qty: number, id: number) => {
+    const o = colaOptions(qty).find((x) => x.product_id === id)!;
+    return { raw, status: "matched", product_id: id, name: o.name, price: o.price, qty, line_total: o.line_total, error: null, candidates: [], options: colaOptions(qty) };
   };
+  const LAYS = { raw: "20 lays", status: "matched", product_id: 10, name: "Lays", price: 400, qty: 20, line_total: 8000, error: null, candidates: [], options: [] };
+  const AMBIGUOUS = { lines: [ambiguous("cola 5", 5), LAYS], items: [], total: 0, ok: false };
   const PICKED = {
-    lines: [
-      { raw: "cola 5", status: "matched", product_id: 21, name: "Coca Cola can", price: 700, qty: 5, line_total: 3500, error: null,
-        candidates: [], options: [opt(20, "Coca Cola", 500, 5), opt(21, "Coca Cola can", 700, 5)] },
-      { raw: "20 lays", status: "matched", product_id: 10, name: "Lays", price: 400, qty: 20, line_total: 8000, error: null, candidates: [], options: [] },
-    ],
+    lines: [picked("cola 5", 5, 21), LAYS],
     items: [{ product_id: 21, qty: 5 }, { product_id: 10, qty: 20 }], total: 11500, ok: true,
   };
 
@@ -647,273 +646,315 @@ describe("AddSessionItemDialog — a typed name that fits several products", () 
     for (let i = 0; i < 6; i++) await act(async () => { await Promise.resolve(); });
   };
   const toText = async () => { await act(async () => { fireEvent.click(screen.getByLabelText("session.addModeText")); }); };
+  const box = () => screen.getByLabelText("session.quickEntry") as HTMLTextAreaElement;
   const type = async (value: string) => {
-    await act(async () => { fireEvent.change(screen.getByLabelText("session.quickEntry"), { target: { value } }); });
+    await act(async () => { box().focus(); fireEvent.change(box(), { target: { value } }); });
     await settle();
+  };
+  /** A key on the textarea; true when nothing prevented its default. */
+  const press = async (key: string, init: KeyboardEventInit = {}) => {
+    let untouched = true;
+    await act(async () => { untouched = fireEvent.keyDown(box(), { key, ...init }); });
+    return untouched;
   };
   const confirm = () => screen.getAllByRole("button").find((b) =>
     b.textContent === "session.quickEntryConfirm" || b.textContent === "session.adding") as HTMLButtonElement;
-  const option = (name: string) => [...document.querySelectorAll(".quick-pick [role=option]")]
+  const lists = () => screen.queryAllByRole("listbox");
+  /** The option the textarea points at — the keyboard's place. */
+  const highlighted = () => document.getElementById(box().getAttribute("aria-activedescendant") ?? "")
+    ?.querySelector(".quick-pick__name")?.textContent ?? null;
+  const option = (name: string) => screen.getAllByRole("option")
     .find((o) => o.querySelector(".quick-pick__name")?.textContent === name) as HTMLElement;
-  const lists = () => [...document.querySelectorAll(".quick-pick [role=listbox]")] as HTMLElement[];
-  const press = async (el: Element, key: string) => { await act(async () => { fireEvent.keyDown(el, { key }); }); };
+  const lastRead = () => repo.resolveItemsText.mock.calls.at(-1)!;
 
-  beforeEach(() => { vi.useFakeTimers({ shouldAdvanceTime: true }); });
+  beforeEach(() => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    Element.prototype.scrollIntoView = () => {};
+  });
   afterEach(() => { vi.useRealTimers(); });
 
-  test("the line asks which product, offers each with its price × the quantity, and blocks the add", async () => {
+  test("a unique name shows no list and reads as before", async () => {
+    repo.resolveItemsText.mockResolvedValue({ lines: [LAYS], items: [{ product_id: 10, qty: 20 }], total: 8000, ok: true });
+    await mount();
+    await toText();
+    await type("20 lays");
+
+    expect(lists()).toHaveLength(0);
+    expect(box().getAttribute("aria-activedescendant")).toBeNull();
+    expect(screen.getByText("Lays × 20")).toBeTruthy();
+    expect(confirm().disabled).toBe(false);
+  });
+
+  test("a name matching nothing keeps its old refusal and no list", async () => {
+    repo.resolveItemsText.mockResolvedValue({
+      lines: [{ raw: "random 5", status: "unmatched", product_id: null, name: null, price: null, qty: 5, line_total: null,
+        error: "No such product.", candidates: [], options: [] }],
+      items: [], total: 0, ok: false,
+    });
+    await mount();
+    await toText();
+    await type("random 5");
+
+    expect(lists()).toHaveLength(0);
+    expect(screen.getByText(/No such product\./)).toBeTruthy();
+    expect(confirm().disabled).toBe(true);
+    expect(await press("Enter")).toBe(true);
+  });
+
+  test("an ambiguous line opens its list: every option with its price, the FIRST highlighted, nothing chosen", async () => {
     repo.resolveItemsText.mockResolvedValue(AMBIGUOUS);
     await mount();
     await toText();
     await type("cola 5\n20 lays");
 
-    expect(screen.getByRole("listbox", { name: "session.quickEntryPick" })).toBeTruthy();
-    const labels = screen.getAllByRole("option").map((o) => o.textContent ?? "");
-    expect(labels).toContain("Coca Cola500 × 5 = 2500");
-    expect(labels).toContain("Coca Cola can700 × 5 = 3500");
-    // A list, not radio buttons — and nothing is picked for the operator.
+    expect(lists()).toHaveLength(1);
     expect(document.querySelectorAll(".quick-pick input[type=radio]")).toHaveLength(0);
-    const opts = [...document.querySelectorAll(".quick-pick [role=option]")];
-    expect(opts).toHaveLength(2);
-    expect(opts.some((o) => o.getAttribute("aria-selected") === "true")).toBe(false);
-    // The unique line reads exactly as before.
-    expect(screen.getByText("Lays × 20")).toBeTruthy();
+    expect(screen.getAllByRole("option").map((o) => o.textContent)).toEqual(["Coca Cola500", "Coca Cola can700", "Coca Cola 1L1000"]);
+    expect(highlighted()).toBe("Coca Cola");
+    // The focus stayed in the box — typing goes on uninterrupted.
+    expect(document.activeElement).toBe(box());
+    // Highlighted is not chosen: no pick was sent, the add waits.
+    expect(repo.resolveItemsText).toHaveBeenCalledTimes(1);
+    expect(lastRead()).toEqual([42, "cola 5\n20 lays"]);
     expect(confirm().disabled).toBe(true);
     expect(document.body.textContent).toContain("session.quickEntryPickPending");
+    expect(screen.getByText("Lays × 20")).toBeTruthy();
   });
 
-  test("a pick re-reads WITH it, keeps the quantity, and the server's items are what is added", async () => {
-    repo.resolveItemsText.mockResolvedValueOnce(AMBIGUOUS).mockResolvedValue(PICKED);
-    const { onAdded } = await mount();
-    await toText();
-    await type("cola 5\n20 lays");
-
-    await act(async () => { fireEvent.click(option("Coca Cola can")); });
-    await settle();
-
-    expect(repo.resolveItemsText).toHaveBeenLastCalledWith(42, "cola 5\n20 lays", [{ line: 0, raw: "cola 5", product_id: 21 }]);
-    expect(screen.getByText("✓ Coca Cola can × 5")).toBeTruthy();
-    expect(option("Coca Cola can").getAttribute("aria-selected")).toBe("true");
-    expect(confirm().disabled).toBe(false);
-
-    await act(async () => { fireEvent.click(confirm()); });
-    expect(repo.addItems).toHaveBeenCalledWith(42, [{ product_id: 21, qty: 5 }, { product_id: 10, qty: 20 }]);
-    expect(onAdded).toHaveBeenCalled();
-  });
-
-  test("an ordinary read sends no choices at all (the request it always was)", async () => {
+  test("↓ and ↑ move the highlight (wrapping), not the caret", async () => {
     repo.resolveItemsText.mockResolvedValue(AMBIGUOUS);
     await mount();
     await toText();
     await type("cola 5\n20 lays");
 
-    expect(repo.resolveItemsText).toHaveBeenCalledWith(42, "cola 5\n20 lays");
+    expect(await press("ArrowDown")).toBe(false);
+    expect(highlighted()).toBe("Coca Cola can");
+    await press("ArrowDown");
+    expect(highlighted()).toBe("Coca Cola 1L");
+    await press("ArrowUp");
+    expect(highlighted()).toBe("Coca Cola can");
+    await press("ArrowUp");
+    await press("ArrowUp");
+    expect(highlighted()).toBe("Coca Cola 1L");
+    expect(repo.resolveItemsText).toHaveBeenCalledTimes(1);
   });
 
-  test("two ambiguous lines each need their own pick; one is not enough", async () => {
-    const TWO = {
-      ...AMBIGUOUS,
-      lines: [AMBIGUOUS.lines[0], { ...AMBIGUOUS.lines[0], raw: "cola 2", qty: 2,
-        options: [opt(20, "Coca Cola", 500, 2), opt(21, "Coca Cola can", 700, 2)] }],
-    };
-    const ONE_PICKED = { ...TWO, lines: [PICKED.lines[0], TWO.lines[1]] };
-    repo.resolveItemsText.mockResolvedValueOnce(TWO).mockResolvedValue(ONE_PICKED);
-    await mount();
-    await toText();
-    await type("cola 5\ncola 2");
-
-    const groups = [...document.querySelectorAll(".quick-pick")] as HTMLElement[];
-    expect(groups).toHaveLength(2);
-    // Each line is its own list: picking in one never unpicks the other.
-    expect(groups.map((g) => g.querySelectorAll("[role=listbox]").length)).toEqual([1, 1]);
-
-    await act(async () => { fireEvent.click(groups[0].querySelectorAll("[role=option]")[1]); });
-    await settle();
-    expect(confirm().disabled).toBe(true);
-  });
-
-  test("editing the text drops a pick made for the old text", async () => {
-    repo.resolveItemsText.mockResolvedValueOnce(AMBIGUOUS).mockResolvedValueOnce(PICKED)
-      .mockResolvedValue({ ...AMBIGUOUS, lines: [{ ...AMBIGUOUS.lines[0], raw: "cola 7", qty: 7 }, AMBIGUOUS.lines[1]] });
-    await mount();
-    await toText();
-    await type("cola 5\n20 lays");
-    await act(async () => { fireEvent.click(option("Coca Cola can")); });
-    await settle();
-
-    await type("cola 7\n20 lays");
-    await settle();
-
-    // The pick for "cola 5" is not sent for "cola 7".
-    const last = repo.resolveItemsText.mock.calls.at(-1)!;
-    expect(last.length === 2 || (last[2] as unknown[]).every((c) => (c as { raw: string }).raw !== "cola 5")).toBe(true);
-    expect(confirm().disabled).toBe(true);
-  });
-
-  test("a double press adds once", async () => {
-    repo.resolveItemsText.mockResolvedValueOnce(AMBIGUOUS).mockResolvedValue(PICKED);
-    repo.addItems.mockReturnValue(new Promise(() => {}));
-    await mount();
-    await toText();
-    await type("cola 5\n20 lays");
-    await act(async () => { fireEvent.click(option("Coca Cola can")); });
-    await settle();
-
-    await act(async () => { fireEvent.click(confirm()); fireEvent.click(confirm()); });
-    expect(repo.addItems).toHaveBeenCalledTimes(1);
-  });
-
-  test("keyboard only: ↓ then Enter picks the highlighted product for THAT line, keeping its quantity", async () => {
+  test("Enter picks the highlighted product: the list closes, the line reads ✓ with its quantity and price, typing goes on", async () => {
     repo.resolveItemsText.mockResolvedValueOnce(AMBIGUOUS).mockResolvedValue(PICKED);
     await mount();
     await toText();
     await type("cola 5\n20 lays");
 
-    const [list] = lists();
-    act(() => { list.focus(); });
-    await press(list, "ArrowDown");
-    await press(list, "Enter");
+    await press("ArrowDown");
+    expect(await press("Enter")).toBe(false);
+    // Closed at once, before the answer: no second Enter can land on it.
+    expect(lists()).toHaveLength(0);
     await settle();
 
-    expect(repo.resolveItemsText).toHaveBeenLastCalledWith(42, "cola 5\n20 lays", [{ line: 0, raw: "cola 5", product_id: 21 }]);
+    expect(lastRead()).toEqual([42, "cola 5\n20 lays", [{ line: 0, raw: "cola 5", product_id: 21 }]]);
+    expect(lists()).toHaveLength(0);
     expect(screen.getByText("✓ Coca Cola can × 5")).toBeTruthy();
-    // Enter only picked: nothing was added.
+    expect(screen.getByText("700 × 5 = 3500")).toBeTruthy();
+    expect(document.activeElement).toBe(box());
+    expect(box().getAttribute("aria-activedescendant")).toBeNull();
+    // Enter only picked.
     expect(repo.addItems).not.toHaveBeenCalled();
-  });
-
-  test("↑ from the top wraps to the last option; Enter picks it", async () => {
-    repo.resolveItemsText.mockResolvedValueOnce(AMBIGUOUS).mockResolvedValue(PICKED);
-    await mount();
-    await toText();
-    await type("cola 5\n20 lays");
-
-    const [list] = lists();
-    act(() => { list.focus(); });
-    await press(list, "ArrowUp");
-    await press(list, "Enter");
-    await settle();
-    expect(repo.resolveItemsText).toHaveBeenLastCalledWith(42, "cola 5\n20 lays", [{ line: 0, raw: "cola 5", product_id: 21 }]);
-  });
-
-  test("once the last line is answered the focus is on the add button, which adds once", async () => {
-    repo.resolveItemsText.mockResolvedValueOnce(AMBIGUOUS).mockResolvedValue(PICKED);
-    repo.addItems.mockReturnValue(new Promise(() => {}));
-    await mount();
-    await toText();
-    await type("cola 5\n20 lays");
-
-    const [list] = lists();
-    act(() => { list.focus(); });
-    await press(list, "End");
-    await press(list, "Enter");
-    await settle();
-
-    expect(document.activeElement).toBe(confirm());
     expect(confirm().disabled).toBe(false);
-    // The next Enter is that button's own press (a click, in a browser) — and
-    // a second one while the first is in flight sends nothing more.
-    await act(async () => { fireEvent.click(confirm()); fireEvent.click(confirm()); });
-    expect(repo.addItems).toHaveBeenCalledTimes(1);
-    expect(repo.addItems).toHaveBeenCalledWith(42, [{ product_id: 21, qty: 5 }, { product_id: 10, qty: 20 }]);
+    // The box is a textarea again: Enter and the arrows are its own.
+    expect(await press("Enter")).toBe(true);
+    expect(await press("ArrowDown")).toBe(true);
   });
 
-  test("a fast double Enter on the list picks, never adds", async () => {
+  test("a click picks through the same path and puts the focus back in the box", async () => {
     repo.resolveItemsText.mockResolvedValueOnce(AMBIGUOUS).mockResolvedValue(PICKED);
     await mount();
     await toText();
     await type("cola 5\n20 lays");
+    act(() => { (document.activeElement as HTMLElement | null)?.blur(); });
 
-    const [list] = lists();
-    act(() => { list.focus(); });
-    await press(list, "Enter");
-    await press(list, "Enter");
+    await act(async () => { fireEvent.mouseDown(option("Coca Cola can")); fireEvent.click(option("Coca Cola can")); });
     await settle();
-    expect(repo.addItems).not.toHaveBeenCalled();
+
+    expect(lastRead()).toEqual([42, "cola 5\n20 lays", [{ line: 0, raw: "cola 5", product_id: 21 }]]);
+    expect(screen.getByText("✓ Coca Cola can × 5")).toBeTruthy();
+    expect(lists()).toHaveLength(0);
+    expect(document.activeElement).toBe(box());
   });
 
-  test("two ambiguous lines: answering the first moves the focus to the second, each keeps its own product and quantity", async () => {
-    const second = { ...AMBIGUOUS.lines[0], raw: "cola 2", qty: 2, options: [opt(20, "Coca Cola", 500, 2), opt(21, "Coca Cola can", 700, 2)] };
-    const TWO = { ...AMBIGUOUS, lines: [AMBIGUOUS.lines[0], second] };
-    const FIRST = { ...TWO, lines: [PICKED.lines[0], second] };
-    const BOTH = {
-      lines: [PICKED.lines[0], { ...second, status: "matched", product_id: 20, name: "Coca Cola", price: 500, line_total: 1000, error: null, candidates: [] }],
-      items: [{ product_id: 21, qty: 5 }, { product_id: 20, qty: 2 }], total: 4500, ok: true,
-    };
-    repo.resolveItemsText.mockResolvedValueOnce(TWO).mockResolvedValueOnce(FIRST).mockResolvedValue(BOTH);
+  test("a held Enter picks once; Shift+Enter is still a new line", async () => {
+    repo.resolveItemsText.mockResolvedValue(AMBIGUOUS);
     await mount();
     await toText();
-    await type("cola 5\ncola 2");
+    await type("cola 5\n20 lays");
 
-    act(() => { lists()[0].focus(); });
-    await press(lists()[0], "ArrowDown");
-    await press(lists()[0], "Enter");
+    expect(await press("Enter", { shiftKey: true })).toBe(true);
+    expect(await press("Enter", { repeat: true })).toBe(false);
     await settle();
-    expect(document.activeElement).toBe(lists()[1]);
-
-    await press(lists()[1], "Enter");
-    await settle();
-    expect(repo.resolveItemsText).toHaveBeenLastCalledWith(42, "cola 5\ncola 2", [
-      { line: 0, raw: "cola 5", product_id: 21 },
-      { line: 1, raw: "cola 2", product_id: 20 },
-    ]);
-    expect(document.activeElement).toBe(confirm());
-    await act(async () => { fireEvent.click(confirm()); });
-    expect(repo.addItems).toHaveBeenCalledWith(42, [{ product_id: 21, qty: 5 }, { product_id: 20, qty: 2 }]);
+    expect(repo.resolveItemsText).toHaveBeenCalledTimes(1);
+    expect(lists()).toHaveLength(1);
   });
 
-  test("Escape in the list goes back to the box and the dialog stays open", async () => {
+  test("Escape folds the list — the dialog, the text and the pending line stay — and «Choose» reopens it", async () => {
     repo.resolveItemsText.mockResolvedValue(AMBIGUOUS);
     const { onClose } = await mount();
     await toText();
     await type("cola 5\n20 lays");
 
-    const [list] = lists();
-    act(() => { list.focus(); });
-    await press(list, "Escape");
+    expect(await press("Escape")).toBe(false);
     await act(async () => { vi.advanceTimersByTime(400); });
-
-    expect(document.activeElement).toBe(screen.getByLabelText("session.quickEntry"));
     expect(onClose).not.toHaveBeenCalled();
     expect(document.body.textContent).not.toContain("modal.leaveConfirm");
+    expect(lists()).toHaveLength(0);
+    expect(box().value).toBe("cola 5\n20 lays");
+    expect(confirm().disabled).toBe(true);
+    // Folded, the keys are the textarea's again.
+    expect(await press("Enter")).toBe(true);
+    expect(await press("ArrowDown")).toBe(true);
+
+    await act(async () => { fireEvent.click(screen.getByText("session.quickEntryPickOpen")); });
+    expect(lists()).toHaveLength(1);
+    expect(document.activeElement).toBe(box());
   });
 
-  test("a click picks, and the list keeps the keyboard", async () => {
-    repo.resolveItemsText.mockResolvedValueOnce(AMBIGUOUS).mockResolvedValue(PICKED);
-    await mount();
-    await toText();
-    await type("cola 5\n20 lays");
-
-    await act(async () => { fireEvent.mouseDown(option("Coca Cola")); fireEvent.click(option("Coca Cola")); });
-    // Even once the server's answer has landed, the focus stays on the list.
-    await settle();
-    expect(document.activeElement).toBe(lists()[0]);
-    await press(lists()[0], "ArrowDown");
-    await press(lists()[0], "Enter");
-    await settle();
-    expect(repo.resolveItemsText).toHaveBeenLastCalledWith(42, "cola 5\n20 lays", [{ line: 0, raw: "cola 5", product_id: 21 }]);
-  });
-
-  test("the focus does not jump when the operator went back to typing before the answer", async () => {
-    repo.resolveItemsText.mockResolvedValueOnce(AMBIGUOUS).mockResolvedValue(PICKED);
-    await mount();
-    await toText();
-    await type("cola 5\n20 lays");
-
-    await act(async () => { fireEvent.click(option("Coca Cola can")); });
-    const box = screen.getByLabelText("session.quickEntry") as HTMLTextAreaElement;
-    act(() => { box.focus(); });
-    await settle();
-    expect(document.activeElement).toBe(box);
-  });
-
-  test("a unique line shows no list at all", async () => {
-    repo.resolveItemsText.mockResolvedValue({ ...PICKED, lines: [PICKED.lines[1]], items: [{ product_id: 10, qty: 20 }], total: 8000 });
+  test("with no list open, Escape is the dialog's", async () => {
+    repo.resolveItemsText.mockResolvedValue({ lines: [LAYS], items: [{ product_id: 10, qty: 20 }], total: 8000, ok: true });
     await mount();
     await toText();
     await type("20 lays");
-    expect(screen.queryByRole("listbox")).toBeNull();
+    expect(await press("Escape")).toBe(true);
+  });
+
+  test("two ambiguous lines: one list at a time, the next opens after the answer, each keeps its product and quantity", async () => {
+    const TWO = { lines: [ambiguous("cola 5", 5), LAYS, ambiguous("cola 3", 3)], items: [], total: 0, ok: false };
+    const FIRST = { ...TWO, lines: [picked("cola 5", 5, 21), LAYS, ambiguous("cola 3", 3)] };
+    const BOTH = {
+      lines: [picked("cola 5", 5, 21), LAYS, picked("cola 3", 3, 20)],
+      items: [{ product_id: 21, qty: 5 }, { product_id: 10, qty: 20 }, { product_id: 20, qty: 3 }], total: 13000, ok: true,
+    };
+    repo.resolveItemsText.mockResolvedValueOnce(TWO).mockResolvedValueOnce(FIRST).mockResolvedValue(BOTH);
+    await mount();
+    await toText();
+    await type("cola 5\n20 lays\ncola 3");
+
+    expect(lists()).toHaveLength(1);
+    expect(screen.getByRole("listbox").getAttribute("aria-label")).toContain("cola 5");
+    await press("ArrowDown");
+    await press("Enter");
+    // A fast second Enter before the answer lands on nothing.
+    expect(await press("Enter")).toBe(true);
+    await settle();
+
+    expect(lastRead()).toEqual([42, "cola 5\n20 lays\ncola 3", [{ line: 0, raw: "cola 5", product_id: 21 }]]);
+    expect(lists()).toHaveLength(1);
+    expect(screen.getByRole("listbox").getAttribute("aria-label")).toContain("cola 3");
+    expect(highlighted()).toBe("Coca Cola");
+
+    await press("Enter");
+    await settle();
+    expect(lastRead()).toEqual([42, "cola 5\n20 lays\ncola 3", [
+      { line: 0, raw: "cola 5", product_id: 21 },
+      { line: 2, raw: "cola 3", product_id: 20 },
+    ]]);
+    expect(lists()).toHaveLength(0);
+
+    await act(async () => { fireEvent.click(confirm()); });
+    expect(repo.addItems).toHaveBeenCalledWith(42, [{ product_id: 21, qty: 5 }, { product_id: 10, qty: 20 }, { product_id: 20, qty: 3 }]);
+  });
+
+  test("× takes a wrong pick out of the draft — its product id with it — and leaves the other lines alone", async () => {
+    repo.resolveItemsText.mockResolvedValueOnce(AMBIGUOUS).mockResolvedValueOnce(PICKED)
+      .mockResolvedValueOnce({ lines: [LAYS], items: [{ product_id: 10, qty: 20 }], total: 8000, ok: true })
+      .mockResolvedValueOnce({ lines: [LAYS, ambiguous("cola 5", 5)], items: [], total: 0, ok: false })
+      .mockResolvedValue({ lines: [LAYS, picked("cola 5", 5, 20)], items: [{ product_id: 10, qty: 20 }, { product_id: 20, qty: 5 }], total: 10500, ok: true });
+    await mount();
+    await toText();
+    await type("cola 5\n20 lays");
+    await press("ArrowDown");
+    await press("Enter");
+    await settle();
+
+    const removedBefore = repo.removeItem.mock.calls.length;
+    await act(async () => { fireEvent.click(screen.getByLabelText("action.remove: Coca Cola can × 5")); });
+    await settle();
+
+    expect(box().value).toBe("20 lays");
+    // Read again at once, with no pick left over.
+    expect(lastRead()).toEqual([42, "20 lays"]);
     expect(screen.getByText("Lays × 20")).toBeTruthy();
-    expect(confirm().disabled).toBe(false);
+    expect(screen.queryByText("✓ Coca Cola can × 5")).toBeNull();
+    expect(document.activeElement).toBe(box());
+    // A draft edit: nothing written, nothing removed from the bill.
+    expect(repo.addItems).not.toHaveBeenCalled();
+    expect(repo.removeItem.mock.calls.length).toBe(removedBefore);
+
+    // Typed again, it asks again — and the right product can be chosen.
+    await type("20 lays\ncola 5");
+    expect(lists()).toHaveLength(1);
+    expect(highlighted()).toBe("Coca Cola");
+    await press("Enter");
+    await settle();
+    expect(lastRead()).toEqual([42, "20 lays\ncola 5", [{ line: 1, raw: "cola 5", product_id: 20 }]]);
+    await act(async () => { fireEvent.click(confirm()); });
+    expect(repo.addItems).toHaveBeenCalledWith(42, [{ product_id: 10, qty: 20 }, { product_id: 20, qty: 5 }]);
+  });
+
+  test("removing one picked line keeps the other line's pick, moved up with it", async () => {
+    const TWO = { lines: [ambiguous("cola 5", 5), ambiguous("cola 3", 3)], items: [], total: 0, ok: false };
+    const FIRST = { ...TWO, lines: [picked("cola 5", 5, 21), ambiguous("cola 3", 3)] };
+    const BOTH = { lines: [picked("cola 5", 5, 21), picked("cola 3", 3, 22)], items: [{ product_id: 21, qty: 5 }, { product_id: 22, qty: 3 }], total: 6500, ok: true };
+    const REST = { lines: [picked("cola 3", 3, 22)], items: [{ product_id: 22, qty: 3 }], total: 3000, ok: true };
+    repo.resolveItemsText.mockResolvedValueOnce(TWO).mockResolvedValueOnce(FIRST).mockResolvedValueOnce(BOTH).mockResolvedValue(REST);
+    await mount();
+    await toText();
+    await type("cola 5\ncola 3");
+    await press("ArrowDown");
+    await press("Enter");
+    await settle();
+    await press("ArrowUp");
+    await press("Enter");
+    await settle();
+
+    await act(async () => { fireEvent.click(screen.getByLabelText("action.remove: Coca Cola can × 5")); });
+    await settle();
+    expect(box().value).toBe("cola 3");
+    expect(lastRead()).toEqual([42, "cola 3", [{ line: 0, raw: "cola 3", product_id: 22 }]]);
+    expect(screen.getByText("✓ Coca Cola 1L × 3")).toBeTruthy();
+  });
+
+  test("the add stays off while any line waits, and a double press adds once", async () => {
+    repo.resolveItemsText.mockResolvedValueOnce(AMBIGUOUS).mockResolvedValue(PICKED);
+    repo.addItems.mockReturnValue(new Promise(() => {}));
+    await mount();
+    await toText();
+    await type("cola 5\n20 lays");
+    expect(confirm().disabled).toBe(true);
+    await act(async () => { fireEvent.click(confirm()); });
+    expect(repo.addItems).not.toHaveBeenCalled();
+
+    await press("ArrowDown");
+    await press("Enter");
+    await settle();
+    await act(async () => { fireEvent.click(confirm()); fireEvent.click(confirm()); });
+    expect(repo.addItems).toHaveBeenCalledTimes(1);
+    expect(repo.addItems).toHaveBeenCalledWith(42, [{ product_id: 21, qty: 5 }, { product_id: 10, qty: 20 }]);
+  });
+
+  test("editing the text drops a pick made for the old text", async () => {
+    repo.resolveItemsText.mockResolvedValueOnce(AMBIGUOUS).mockResolvedValueOnce(PICKED)
+      .mockResolvedValue({ ...AMBIGUOUS, lines: [ambiguous("cola 7", 7), LAYS] });
+    await mount();
+    await toText();
+    await type("cola 5\n20 lays");
+    await press("Enter");
+    await settle();
+
+    await type("cola 7\n20 lays");
+    await settle();
+
+    const last = lastRead();
+    expect(last.length === 2 || (last[2] as unknown[]).every((c) => (c as { raw: string }).raw !== "cola 5")).toBe(true);
+    expect(confirm().disabled).toBe(true);
+    expect(lists()).toHaveLength(1);
   });
 });
 

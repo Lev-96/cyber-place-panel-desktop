@@ -74,8 +74,6 @@ const AddSessionItemDialog = ({ branchId, session, onClose, onAdded }: Props) =>
   const { money, t } = useLang();
   const [saving, setSaving] = useState(false);
   const confirmingRef = useRef(false);
-  /** The typed list's add button — where the focus lands once every pick is made. */
-  const confirmTextRef = useRef<HTMLButtonElement>(null);
 
   /**
    * Chips are a poker table's product, and only a poker table's.
@@ -280,7 +278,7 @@ const AddSessionItemDialog = ({ branchId, session, onClose, onAdded }: Props) =>
 
         {/* ── Quick entry ──────────────────────────────────────────────────
             Nothing is on the bill until the cashier presses the confirm below. */}
-        {mode === "text" && <BasketQuickEntry basket={basket} saving={saving} confirmRef={confirmTextRef} />}
+        {mode === "text" && <BasketQuickEntry basket={basket} saving={saving} />}
 
         {err !== null && <div className="error">{err || t("session.failUnknown")}</div>}
         <div className="row-between">
@@ -299,7 +297,7 @@ const AddSessionItemDialog = ({ branchId, session, onClose, onAdded }: Props) =>
             /* Held down until every typed line resolved. A batch with one bad
                line is not saved in part — the server would refuse it anyway,
                and a bill missing its middle line is one nobody chose. */
-            <Button ref={confirmTextRef} onClick={confirmText} disabled={saving || resolving || !resolved?.ok}>
+            <Button onClick={confirmText} disabled={saving || resolving || !resolved?.ok}>
               {saving ? t("session.adding") : t("session.quickEntryConfirm")}
             </Button>
           )}

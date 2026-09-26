@@ -50,3 +50,45 @@ export const pruneChoices = (choices: QuickEntryChoices, resolved: IResolvedItem
 /** How many lines still wait for the operator to say which product they mean. */
 export const pendingPicks = (resolved: IResolvedItems | null): number =>
   (resolved?.lines ?? []).filter((l) => l.status === "ambiguous").length;
+
+/** PHP's `trim()` set — the server's, NOT JavaScript's wider `String.trim`. */
+const serverTrim = (s: string): string => s.replace(/^[ \t\n\r\0\x0B]+|[ \t\n\r\0\x0B]+$/g, "");
+/** PHP's `\R`: any line break. */
+const LINE_BREAK = /\r\n|[\n\v\f\r\u0085\u2028\u2029]/;
+
+/**
+ * Take one typed line out of the draft (2026-09-26) — the × on a picked line.
+ *
+ * `index` is the server's: the n-th NON-BLANK line after its trim
+ * (`ProductTextResolver::split`), so blank lines between entries never shift
+ * which line goes. The other lines are left exactly as typed. Picks follow
+ * their lines: the removed line's pick is dropped (its product id must not
+ * come back with a retyped line), later picks move up one. Nothing is
+ * written — the next read of the box is the only request.
+ */
+export const removeTypedLine = (
+  text: string,
+  choices: QuickEntryChoices,
+  index: number,
+): { text: string; choices: QuickEntryChoices } => {
+  const physical = text.split(LINE_BREAK);
+  let seen = -1;
+  const at = physical.findIndex((l) => serverTrim(l) !== "" && ++seen === index);
+  if (at < 0) return { text, choices };
+
+  // Rebuild with the original breaks: split with a capture keeps them.
+  const parts = text.split(new RegExp(`(${LINE_BREAK.source})`));
+  // parts = [line0, br0, line1, br1, …]; line k is parts[2k], its break parts[2k+1].
+  const lineAt = at * 2;
+  const next = at < physical.length - 1
+    ? [...parts.slice(0, lineAt), ...parts.slice(lineAt + 2)]
+    : [...parts.slice(0, Math.max(lineAt - 1, 0))];
+
+  const moved: Record<string, number> = {};
+  for (const { line, raw, product_id } of toChoicePayload(choices)) {
+    if (line < index) moved[choiceKey(line, raw)] = product_id;
+    else if (line > index) moved[choiceKey(line - 1, raw)] = product_id;
+  }
+
+  return { text: next.join(""), choices: moved };
+};
