@@ -56,6 +56,11 @@ export interface ListSessionsParams {
   /** ISO date (YYYY-MM-DD); inclusive — backend expands to endOfDay. */
   to?: string;
   limit?: number;
+  /**
+   * Only the sessions this person acted in, across the caller's branches (the
+   * History staff filter): the server reads past the "own shift" rule for them.
+   */
+  acted_by?: number;
 }
 
 export const apiListSessions = (params: ListSessionsParams) =>
@@ -553,8 +558,12 @@ export interface ListSessionEventsParams {
 export const apiListSessionEvents = (params: ListSessionEventsParams) =>
   request<{ data: ISessionEvent[] }>("/session-events", { params });
 
-export const apiListEventsForSession = (sessionId: number) =>
-  request<{ data: ISessionEvent[] }>(`/sessions/${sessionId}/events`);
+/** One session's log; with `userId`, only that person's lines (the History staff filter). */
+export const apiListEventsForSession = (sessionId: number, userId?: number) =>
+  request<{ data: ISessionEvent[] }>(
+    `/sessions/${sessionId}/events`,
+    userId !== undefined ? { params: { user_id: userId } } : undefined,
+  );
 
 /** A person whose actions a branch's log may hold: its owner, its managers, whoever acted there. */
 export interface ISessionEventActor {

@@ -182,8 +182,8 @@ export class SessionRepository {
     return orFallback(apiListSessionEvents(params).then((r) => r.data), []);
   }
 
-  async eventsForSession(sessionId: number): Promise<ISessionEvent[]> {
-    return orFallback(apiListEventsForSession(sessionId).then((r) => r.data), []);
+  async eventsForSession(sessionId: number, userId?: number): Promise<ISessionEvent[]> {
+    return orFallback(apiListEventsForSession(sessionId, userId).then((r) => r.data), []);
   }
 
   async listEventActors(branchId: number): Promise<ISessionEventActor[]> {

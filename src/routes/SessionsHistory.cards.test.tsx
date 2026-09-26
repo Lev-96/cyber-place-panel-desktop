@@ -152,7 +152,7 @@ describe("SessionsHistory — the cards", () => {
     await mount();
 
     expect(repo.eventsForSession).toHaveBeenCalledTimes(1);
-    expect(repo.eventsForSession).toHaveBeenCalledWith(9);
+    expect(repo.eventsForSession).toHaveBeenCalledWith(9, undefined);
     expect(titlesIn(cardOf("№9"))).toEqual(["history.action.started", "history.action.stopped"]);
   });
 
@@ -162,7 +162,7 @@ describe("SessionsHistory — the cards", () => {
     repo.listEvents.mockResolvedValue([...filler.slice(0, 998), event(10, 8, "started", 0, 0), event(9, 9, "stopped", 60, 100)]);
     await mount();
     expect(repo.eventsForSession).toHaveBeenCalledTimes(1);
-    expect(repo.eventsForSession).toHaveBeenCalledWith(9);
+    expect(repo.eventsForSession).toHaveBeenCalledWith(9, undefined);
   });
 
   test("showing more of a long history asks the server nothing", async () => {
@@ -316,7 +316,7 @@ describe("SessionsHistory — whose actions", () => {
     await mount();
     await pick("11");
 
-    expect(repo.eventsForSession).toHaveBeenCalledWith(9);
+    expect(repo.eventsForSession).toHaveBeenCalledWith(9, 11);
     expect(titlesIn(cardOf("№9"))).toEqual(["history.action.started"]);
   });
 
@@ -344,6 +344,55 @@ describe("SessionsHistory — whose actions", () => {
     expect(dts).not.toContain("history.seatsLabel");
     // The steps still say where each of her actions happened.
     expect([...cardOf("№8").querySelectorAll(".hs-seat__chip")].map((c) => c.textContent)).toEqual(["№9", "№14"]);
+  });
+
+  test("a manager picking the owner gets the sessions the owner acted in — even shifts the manager did not open", async () => {
+    repo.listEventActors.mockResolvedValue([anna, zed]);
+    // The manager's own list: only their shift (the server's own-shift rule).
+    const mine = session(8);
+    // A colleague's shift the owner stepped into — only the owner-filtered list has it.
+    const colleagues = session(9);
+    repo.list.mockImplementation(async (p: Record<string, unknown>) => (p.acted_by === 12 ? [colleagues] : [mine]));
+    repo.listEvents.mockImplementation(async (p: Record<string, unknown>) =>
+      (p.user_id === 12 ? [by(event(5, 9, "stopped", 60, 900), zed)] : [event(1, 8, "started", 0, 0)]));
+    await mount();
+    expect(titlesIn(cardOf("№8"))).toEqual(["history.action.started"]);
+
+    await pick("12");
+    const actedCall = repo.list.mock.calls.map((c) => c[0] as Record<string, unknown>).find((p) => p.acted_by === 12);
+    expect(actedCall).toMatchObject({ branch_id: 1, acted_by: 12, limit: 1000 });
+    expect(cardOf("№9")).toBeTruthy();
+    expect(cardOf("№8")).toBeUndefined();
+    expect(titlesIn(cardOf("№9"))).toEqual(["history.action.stopped"]);
+    // The day's tiles still come from the list as it always was.
+    expect(repo.list.mock.calls.some((c) => (c[0] as Record<string, unknown>).acted_by === undefined)).toBe(true);
+
+    // «All staff» brings the manager's own list back.
+    await pick("");
+    expect(cardOf("№8")).toBeTruthy();
+    expect(cardOf("№9")).toBeUndefined();
+  });
+
+  test("while the person's sessions are still loading, no card is shown under their name", async () => {
+    repo.listEventActors.mockResolvedValue([zed]);
+    repo.list.mockImplementation((p: Record<string, unknown>) => (p.acted_by === 12 ? new Promise(() => {}) : Promise.resolve([session(8)])));
+    repo.listEvents.mockResolvedValue([event(1, 8, "started", 0, 0)]);
+    await mount();
+    await pick("12");
+    expect(document.querySelectorAll(".hs-card")).toHaveLength(0);
+    expect(document.querySelector('[aria-busy="true"]')).toBeTruthy();
+  });
+
+  test("Refresh re-reads the person's sessions too", async () => {
+    repo.listEventActors.mockResolvedValue([zed]);
+    repo.list.mockResolvedValue([]);
+    repo.listEvents.mockResolvedValue([]);
+    await mount();
+    await pick("12");
+    const before = repo.list.mock.calls.filter((c) => (c[0] as Record<string, unknown>).acted_by === 12).length;
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "action.refresh" })); });
+    for (let i = 0; i < 5; i++) await act(async () => { await Promise.resolve(); });
+    expect(repo.list.mock.calls.filter((c) => (c[0] as Record<string, unknown>).acted_by === 12).length).toBe(before + 1);
   });
 
   test("the person and the dates narrow together", async () => {

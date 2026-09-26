@@ -71,6 +71,19 @@ const SessionsHistory = () => {
 
   const summary = useSessionsSummary(data);
 
+  /**
+   * With a person picked, the cards are the sessions THEY acted in — asked of
+   * the server, which answers that branch-wide (for a manager too: every
+   * session their owner touched in their branch, not only their own shifts).
+   * The stat tiles above keep the day's totals from the list as it always was.
+   */
+  const acted = useAsync(
+    () => (actorId === null
+      ? Promise.resolve(null)
+      : sessionRepository.list({ branch_id: id, from: fromIso, to: toIso, limit: 1000, acted_by: actorId })),
+    [id, fromIso, toIso, actorId],
+  );
+
   // Who did what, for every card at once: ONE request for the whole range,
   // split by session below, rather than one per card. A card whose slice the
   // feed cannot vouch for fetches its own (see `SessionRow`). With a person
@@ -142,7 +155,7 @@ const SessionsHistory = () => {
               <button type="button" className="pill" onClick={() => setRange("month")}>{t("history.month")}</button>
               {/* Both: the cards read their events from the feed, so a refresh
                   of the sessions alone would show a new stop with an old story. */}
-              <button type="button" className="pill" onClick={() => { void reload(); void events.reload(); }}>
+              <button type="button" className="pill" onClick={() => { void reload(); void events.reload(); void acted.reload(); }}>
                 {t("action.refresh")}
               </button>
             </div>
@@ -183,10 +196,10 @@ const SessionsHistory = () => {
 
       {/* A new person's feed is loading: a skeleton, never the previous
           person's cards under the new name. */}
-      {!loading && !error && actorId !== null && events.loading && <ListSkeleton />}
-      {!loading && !error && !(actorId !== null && events.loading) && (
+      {!loading && !error && actorId !== null && (events.loading || acted.loading) && <ListSkeleton />}
+      {!loading && !error && !(actorId !== null && (events.loading || acted.loading)) && (
         <SessionsList
-          sessions={data ?? []}
+          sessions={actorId === null ? data ?? [] : acted.data ?? []}
           feed={events.loading ? null : { ...feed, to: toIso }}
           actorId={actorId}
         />
@@ -231,7 +244,7 @@ const SessionsList = ({ sessions, feed, actorId }: { sessions: ISessionApi[]; fe
  * list — fetched only once the card comes near the screen, so a month of old
  * sessions is not a burst of requests on load. Null while not known yet.
  */
-const useCardEvents = (sessionId: number, feedEvents: ISessionEvent[] | null, covered: boolean) => {
+const useCardEvents = (sessionId: number, feedEvents: ISessionEvent[] | null, covered: boolean, actorId: number | null) => {
   const ref = useRef<HTMLDivElement>(null);
   const [near, setNear] = useState(false);
   const needOwn = feedEvents !== null && !covered;
@@ -251,8 +264,10 @@ const useCardEvents = (sessionId: number, feedEvents: ISessionEvent[] | null, co
   }, [needOwn, near]);
 
   const own = useAsync(
-    (): Promise<ISessionEvent[] | null> => (needOwn && near ? sessionRepository.eventsForSession(sessionId) : Promise.resolve(null)),
-    [needOwn, near, sessionId],
+    (): Promise<ISessionEvent[] | null> => (needOwn && near
+      ? sessionRepository.eventsForSession(sessionId, actorId ?? undefined)
+      : Promise.resolve(null)),
+    [needOwn, near, sessionId, actorId],
   );
 
   return { ref, events: covered ? feedEvents : own.data };
@@ -279,10 +294,10 @@ const SessionRow = ({ session, feedEvents, covered, actorId }: {
   actorId: number | null;
 }) => {
   const { t, money } = useLang();
-  const { ref, events: loaded } = useCardEvents(session.id, feedEvents, covered);
-  // The feed is already narrowed by the server; a session's own list is not,
-  // so it is narrowed here — the same rule: a line with no author (the
-  // system's) is nobody's.
+  const { ref, events: loaded } = useCardEvents(session.id, feedEvents, covered, actorId);
+  // Both lists are narrowed by the server when a person is picked; this is the
+  // same rule again, so a backend that ignored the parameter could not put
+  // someone else's line — or the system's, which has no author — on the card.
   const events = loaded === null || actorId === null ? loaded : loaded.filter((e) => e.user?.id === actorId);
   // Fetched on its own and nothing of theirs in it: not this person's card.
   // (After every hook, so the hook order never changes.)
