@@ -1539,6 +1539,36 @@ are unchanged — do not add a `paused` status here either.
   confirmed stop reaches (an auto-ended seat's receipt never calls it). A
   refusal raises nothing; its sentence stays on the tile / in the modal.
 
+## 9.5.1 Sessions → History: the card and its timeline (2026-09-26)
+
+- **One card per session, three parts:** facts (`<dl class="hs-facts">`: time
+  range — an end on another day carries its date — seats `№9 → №14` when it
+  moved, started/ended by, branch), the bill (unchanged math: `timeCost`,
+  `sessionItemLineTotal`, `padChargeOf`, `paymentLabelOf`), and the activity
+  timeline (`components/sessions/SessionHistoryTimeline`). The old «Показать
+  путь / Скрыть путь» toggle and the branch-wide «Что происходило» list are
+  gone; every event is shown once, in its own session's card.
+- **Where the events come from:** ONE `GET /session-events` for the range
+  (`FEED_LIMIT` 1000 = the server's max), grouped by `session_id`. Sessions are
+  listed by `started_at` in range, events by `created_at` in range, so
+  `feedCoversSession` vouches for a card only when the session ended by the
+  range end (or is running while the range reaches now) and the feed was not
+  cut — or its `started` survived the cut. Otherwise the card fetches
+  `GET /sessions/{id}/events` itself, once it scrolls near (IntersectionObserver).
+  «Обновить» reloads the sessions AND the feed. An event of a session started
+  before the range shows on the day that session started, in its card.
+- **The pure reading** lives in `components/sessions/sessionHistoryModel.ts`:
+  `eventDetailParts` (one fact per line; product lines are `name × qty` from
+  `meta.lines`), `eventPresentation` (an action → title/tone/icon table; a
+  server resume at the pause limit is its own entry — «Автоматическое
+  продолжение», actor «Автоматически», reason «По лимиту паузы»; an unknown
+  action renders a humanized name plus its scalar meta, never nothing),
+  `foldedIndexes` (≤ 7 events → all; more → first 3 + last 2, a dashed gap, and
+  ONE real `<button aria-expanded>` «Показать ещё N» / «Свернуть» that stays
+  mounted so focus is kept and fetches nothing), `groupBySession`,
+  `feedCoversSession`, plus `eventSeat` / `segmentsOf` / `paymentLabelOf`.
+- The screen subscribes to no realtime channel (it never did).
+
 ## 9.5.2 Касса — selling with no session (2026-09-24)
 
 The till is back at `/branches/:id/pos` (hub tile «Касса», every staff role at
