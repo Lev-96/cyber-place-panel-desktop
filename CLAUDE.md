@@ -1541,11 +1541,39 @@ are unchanged — do not add a `paused` status here either.
 
 ## 9.5.1 Sessions → History: the card and its timeline (2026-09-26)
 
-- **One card per session, three parts:** facts (`<dl class="hs-facts">`: time
-  range — an end on another day carries its date — seats `№9 → №14` when it
-  moved, started/ended by, branch), the bill (unchanged math: `timeCost`,
-  `sessionItemLineTotal`, `padChargeOf`, `paymentLabelOf`), and the activity
-  timeline (`components/sessions/SessionHistoryTimeline`). The old «Показать
+- **One card per session, three parts, in this order:** facts (`<dl
+  class="hs-facts">`: time range — an end on another day carries its date —
+  seats `№9 → №14` when it moved, started/ended by, branch), the activity
+  timeline (`components/sessions/SessionHistoryTimeline`), then the bill as its
+  outcome — `components/sessions/SessionHistoryBill`, a full-width `<table>`
+  in four equal columns (name left, qty/price centred, amount right): Позиция · Кол-во · Цена · Сумма; rows = play time, each product
+  (a rented extra's price marked «/ч», its sum the server's `line_total`), the
+  products' subtotal when more than one line, the pads (count, fee each only
+  when all agree, «/ч» for a rate); `<tfoot>` = Итог, Способ оплаты. Math moved
+  verbatim from the row: `timeCost` = total − products − pads,
+  `sessionItemLineTotal`, `padChargeOf`, `paymentLabelOf`. Running session:
+  products and pads only, no clock/total. The timeline is HORIZONTAL: 200px steps left to right on
+  ONE line (time + seat chip where the seat changes · tone-coloured marker ·
+  title · amount · actor · details). When it does not fit, ONLY its own
+  viewport `.hs-scroll` scrolls sideways (`overflow-x: auto`, a scroll
+  container's min width is 0, so card and page keep theirs). It is a focusable
+  `role="region"` (← → once focused); no wheel handler — the vertical wheel
+  stays `.main`'s, Shift+wheel/trackpad scroll the line (headless-measured).
+  Pure-CSS edge shadows hint "more". Cards sit 20px apart (`.hs-list`), 14px
+  between their parts.
+- **Staff filter** (native `<select class="input">`, «Все сотрудники» + «Name ·
+  role»): choices from `GET /session-events/actors?branch_id` (server-scoped);
+  a pick adds `user_id` to the ONE feed request (the server narrows, the panel
+  never sifts the whole log). Cards = sessions with at least one of that
+  person's lines; a card that fetches its own list narrows it the same way
+  (`e.user?.id === actorId` — a system line is nobody's) and hides itself if
+  nothing is left. The choice is stored WITH its branch, so another branch
+  starts from «all». While a person's feed loads: skeleton, never the previous
+  cards. Empty: «Нет действий за выбранный период». The seat route in the
+  facts is hidden under a filter (one person's lines may skip a seat); seat
+  chips are per event (`seatSteps`: the seat frozen on the line, else the last
+  move's destination) so they stay right on a filtered list. The stat tiles
+  above stay the day's totals. The old «Показать
   путь / Скрыть путь» toggle and the branch-wide «Что происходило» list are
   gone; every event is shown once, in its own session's card.
 - **Where the events come from:** ONE `GET /session-events` for the range
@@ -1563,10 +1591,10 @@ are unchanged — do not add a `paused` status here either.
   server resume at the pause limit is its own entry — «Автоматическое
   продолжение», actor «Автоматически», reason «По лимиту паузы»; an unknown
   action renders a humanized name plus its scalar meta, never nothing),
-  `foldedIndexes` (≤ 7 events → all; more → first 3 + last 2, a dashed gap, and
+  `foldedIndexes` (≤ 7 events → all; more → first 3 + last 2, a dashed «⋯» step, and
   ONE real `<button aria-expanded>` «Показать ещё N» / «Свернуть» that stays
   mounted so focus is kept and fetches nothing), `groupBySession`,
-  `feedCoversSession`, plus `eventSeat` / `segmentsOf` / `paymentLabelOf`.
+  `feedCoversSession`, `seatSteps` / `seatRoute`, plus `eventSeat` / `paymentLabelOf`.
 - The screen subscribes to no realtime channel (it never did).
 
 ## 9.5.2 Касса — selling with no session (2026-09-24)
