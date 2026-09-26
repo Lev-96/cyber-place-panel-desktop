@@ -1549,8 +1549,8 @@ needs no seat. A sale is a backend ORDER, never a session.
 - **A typed name that fits several products (2026-09-25).** The server
   answers such a line `status: "ambiguous"` with `options` (id, name, price,
   price × qty) and keeps its `qty`. `BasketQuickEntry` renders a `QuickEntryPick`
-  under that line — a radio group (unique `name` per line via `useId`), nothing
-  pre-selected, amber until answered — in BOTH dialogs (session and till). A
+  under that line — an `OptionList` (see below; no radios since 2026-09-26),
+  nothing pre-selected, amber until answered — in BOTH dialogs (session and till). A
   pick is stored in `useProductBasket.choices`, keyed by line index AND text
   (`components/pos/quickEntryChoices.ts`, pure + tested), and re-reads the box
   AT ONCE with `choices` (typing still waits 400ms); the server resolves the
@@ -1563,6 +1563,25 @@ needs no seat. A sale is a backend ORDER, never a session.
   withdrawn products (`is_active === false`), as the till never did — the
   server refuses them on the bill. `confirmText` has a ref guard against a
   double press inside one frame.
+- **Picking with the keyboard (2026-09-26).** `components/ui/OptionList` is a
+  generic single-choice listbox: ONE tab stop (`role="listbox"`,
+  `aria-activedescendant`, options are `role="option"` + `aria-selected`).
+  ↑/↓ wrap (as `SuggestInput` / the language picker do), Home/End jump, the
+  active option is `scrollIntoView({block:"nearest"})`, the list scrolls itself
+  (max 200px). Enter chooses the active option ONLY — `preventDefault` +
+  `stopPropagation`, a held key (`repeat`) is ignored — it never submits.
+  Escape calls `onEscape` and prevents its default, so the Modal stays (the
+  `SuggestInput` convention); in quick entry it returns focus to the textarea.
+  A click chooses and focuses the list. `onChoose(option, via)` says whether
+  it was `"keyboard"` or `"pointer"`.
+  In `BasketQuickEntry`, after a KEYBOARD pick and the server's answer (and
+  only while focus is still inside the preview), focus moves to the next
+  still-ambiguous line's list, else — when `resolved.ok` — to the dialog's own
+  add/sell button (`confirmRef`), so the next Enter presses THAT button through
+  its existing guarded handler. There is no second submit path. A mouse pick
+  leaves focus on its list. Focus is NOT moved onto a list when options first
+  appear: they arrive 400ms after a typing pause, often mid-typing — Tab from
+  the textarea reaches the first list. `Button` takes a `ref` (React 19 prop).
 - **One basket, two dialogs.** `components/pos/useProductBasket` (catalogue,
   search, cart, quick-entry read) and `ProductBasketPanels` (mode switch,
   picker, quick entry + preview, "new product") were moved verbatim out of
