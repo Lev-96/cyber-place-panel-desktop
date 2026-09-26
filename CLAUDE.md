@@ -1563,25 +1563,29 @@ needs no seat. A sale is a backend ORDER, never a session.
   withdrawn products (`is_active === false`), as the till never did — the
   server refuses them on the bill. `confirmText` has a ref guard against a
   double press inside one frame.
-- **Picking with the keyboard (2026-09-26).** `components/ui/OptionList` is a
-  generic single-choice listbox: ONE tab stop (`role="listbox"`,
-  `aria-activedescendant`, options are `role="option"` + `aria-selected`).
-  ↑/↓ wrap (as `SuggestInput` / the language picker do), Home/End jump, the
-  active option is `scrollIntoView({block:"nearest"})`, the list scrolls itself
-  (max 200px). Enter chooses the active option ONLY — `preventDefault` +
-  `stopPropagation`, a held key (`repeat`) is ignored — it never submits.
-  Escape calls `onEscape` and prevents its default, so the Modal stays (the
-  `SuggestInput` convention); in quick entry it returns focus to the textarea.
-  A click chooses and focuses the list. `onChoose(option, via)` says whether
-  it was `"keyboard"` or `"pointer"`.
-  In `BasketQuickEntry`, after a KEYBOARD pick and the server's answer (and
-  only while focus is still inside the preview), focus moves to the next
-  still-ambiguous line's list, else — when `resolved.ok` — to the dialog's own
-  add/sell button (`confirmRef`), so the next Enter presses THAT button through
-  its existing guarded handler. There is no second submit path. A mouse pick
-  leaves focus on its list. Focus is NOT moved onto a list when options first
-  appear: they arrive 400ms after a typing pause, often mid-typing — Tab from
-  the textarea reaches the first list. `Button` takes a `ref` (React 19 prop).
+- **Picking with the keyboard (2026-09-26, v2).** The quick-entry textarea is a
+  combobox, the `SuggestInput` way: DOM focus STAYS in the textarea (typing
+  never loses a key when options arrive 400ms after a pause), and
+  `aria-activedescendant` points at the highlighted option.
+  `components/ui/OptionList` only SHOWS options (`role="listbox"`, ids from
+  `optionId`, highlight wash, `scrollIntoView` on the highlight, mousedown
+  prevented so a click never steals focus, hover moves the highlight);
+  `stepActive` (↑/↓, wrapping) is the owner's.
+  ONE list is open at a time: the first ambiguous line, and none while a pick
+  is waiting for the server (a line with a pick that still reads ambiguous) —
+  so a fast second Enter cannot land on the next line's list. A new list starts
+  on its FIRST option, nothing chosen. `onKeyDown` on the textarea only, and
+  only while a list is open (never with Alt/Ctrl/Meta/Shift or mid-IME): ↑/↓
+  move, Enter picks (a held Enter — `repeat` — does not), Escape folds the list
+  (preventDefault → the Modal stays; a «Выбрать» button reopens it; an edit to
+  the line reopens it too). Closed, every key is the textarea's. Enter and click
+  both call `selectCandidate` → `basket.choose` (unchanged) and refocus the box.
+  A picked line folds to `✓ name × qty` + `price × qty = total` (server
+  numbers) with a × that takes THAT typed line out of the draft:
+  `quickEntryChoices.removeTypedLine` counts lines exactly as
+  `ProductTextResolver::split` does (`\R`, PHP `trim` set, blank lines dropped),
+  drops that line's pick and moves later picks up with their lines;
+  `useProductBasket.removeLine` re-reads at once. No write endpoint is called.
 - **One basket, two dialogs.** `components/pos/useProductBasket` (catalogue,
   search, cart, quick-entry read) and `ProductBasketPanels` (mode switch,
   picker, quick entry + preview, "new product") were moved verbatim out of
