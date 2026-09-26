@@ -1350,6 +1350,24 @@ export const TRANSLATIONS: Dict = {
   // A resume nobody pressed: the server's, at the branch's pause limit.
   "history.autoResumeTitle": { en: "Resumed automatically", ru: "Автоматическое продолжение", am: "Ավտոմատ շարունակում" },
   "history.pauseLimitReason": { en: "At the pause limit", ru: "По лимиту паузы", am: "Դադարի սահմանաչափով" },
+  // The staff filter (2026-09-26): whose actions the page shows.
+  "history.actorLabel": { en: "Staff member", ru: "Сотрудник", am: "Աշխատակից" },
+  "history.actorAll": { en: "All staff", ru: "Все сотрудники", am: "Բոլոր աշխատակիցները" },
+  "history.noActions": {
+    en: "No actions in the selected period.",
+    ru: "Нет действий за выбранный период.",
+    am: "Ընտրված ժամանակահատվածում գործողություններ չկան։",
+  },
+  // The timeline's scroll region, for a screen reader and the keyboard.
+  "history.activityLabel": { en: "Activity", ru: "Действия", am: "Գործողություններ" },
+  // The bill on a History card, laid out as a receipt (2026-09-26).
+  "history.billTitle": { en: "Bill", ru: "Счёт", am: "Հաշիվ" },
+  // Its columns, and the play-time row.
+  "history.billItem": { en: "Item", ru: "Позиция", am: "Դիրք" },
+  "history.billQty": { en: "Qty", ru: "Кол-во", am: "Քանակ" },
+  "history.billPrice": { en: "Price", ru: "Цена", am: "Գին" },
+  "history.billSum": { en: "Amount", ru: "Сумма", am: "Գումար" },
+  "history.billTime": { en: "Play time", ru: "Игровое время", am: "Խաղային ժամանակ" },
   "history.branch": { en: "Branch", ru: "Филиал", am: "Մասնաճյուղ" },
   "history.actionsEmpty": { en: "Nothing beyond the start.", ru: "Кроме старта. Ничего.", am: "Բացի սկսելուց՝ ոչինչ։" },
   "history.sumFree": { en: "Free sessions", ru: "Бесплатные сессии", am: "Անվճար նիստեր" },
@@ -1422,11 +1440,6 @@ export const TRANSLATIONS: Dict = {
   // the line is already 0, and silence there reads as an omission rather than
   // as the rule.
   "history.padNoRefund": { en: "Refund: 0", ru: "Возврат: 0", am: "Վերադարձ՝ 0" },
-  "history.joystickCharged": {
-    en: "Joysticks charged",
-    ru: "Джойстики в счёте",
-    am: "Ջոյսթիկները հաշվում",
-  },
   "history.modeOpen": { en: "By the hour", ru: "Почасовая", am: "Ժամային" },
   "history.modeFixed": { en: "Package", ru: "Пакет", am: "Փաթեթ" },
   "history.status.active": { en: "Active", ru: "Активна", am: "Ակտիվ" },

@@ -1,14 +1,12 @@
-import { preciseWhenSmall } from "@/i18n/currency";
 import ScreenWithBg from "@/components/ui/ScreenWithBg";
 import { ListSkeleton } from "@/components/ui/Skeleton";
 import { useAsync } from "@/hooks/useAsync";
 import { useSessionsSummary } from "@/hooks/useSessionsSummary";
 import { formatDate, formatDateTime, formatTime } from "@/i18n/dates";
 import { useLang } from "@/i18n/LanguageContext";
-import { padChargeOf } from "@/components/sessions/joystickView";
-import { sessionItemLineTotal } from "@/components/sessions/sessionAmount";
+import SessionHistoryBill from "@/components/sessions/SessionHistoryBill";
 import SessionHistoryTimeline from "@/components/sessions/SessionHistoryTimeline";
-import { feedCoversSession, groupBySession, paymentLabelOf, segmentsOf } from "@/components/sessions/sessionHistoryModel";
+import { feedCoversSession, groupBySession, seatRoute, seatSteps } from "@/components/sessions/sessionHistoryModel";
 import { sessionRepository } from "@/repositories/SessionRepository";
 import { ISessionEvent } from "@/api/sessions";
 import { ISessionApi } from "@/types/sessions";
@@ -43,15 +41,6 @@ const toLocalBoundary = (dateInput: string, side: "start" | "end"): string => {
  */
 const FEED_LIMIT = 1000;
 
-const num = (v: unknown): number => {
-  if (typeof v === "number") return v;
-  if (typeof v === "string" && v.trim() !== "") {
-    const n = Number(v);
-    return Number.isFinite(n) ? n : 0;
-  }
-  return 0;
-};
-
 const SessionsHistory = () => {
   const { branchId } = useParams();
   const id = Number(branchId);
@@ -64,6 +53,17 @@ const SessionsHistory = () => {
   const fromIso = useMemo(() => toLocalBoundary(from, "start"), [from]);
   const toIso = useMemo(() => toLocalBoundary(to, "end"), [to]);
 
+  /**
+   * Whose actions to show — null for everyone. Remembered WITH its branch, so
+   * opening another branch starts from «everyone» without an effect to reset
+   * it: a person picked in one venue means nothing in the next.
+   */
+  const [actor, setActor] = useState<{ branch: number; id: number } | null>(null);
+  const actorId = actor !== null && actor.branch === id ? actor.id : null;
+
+  // The people this branch's log may hold — the server's list, scoped to the caller.
+  const actors = useAsync(() => sessionRepository.listEventActors(id), [id]);
+
   const { data, loading, error, reload } = useAsync(
     () => sessionRepository.list({ branch_id: id, from: fromIso, to: toIso, limit: 1000 }),
     [id, fromIso, toIso],
@@ -73,10 +73,15 @@ const SessionsHistory = () => {
 
   // Who did what, for every card at once: ONE request for the whole range,
   // split by session below, rather than one per card. A card whose slice the
-  // feed cannot vouch for fetches its own (see `SessionRow`).
+  // feed cannot vouch for fetches its own (see `SessionRow`). With a person
+  // picked the SERVER narrows it — the filter never pulls the whole log to
+  // sift it here.
   const events = useAsync(
-    () => sessionRepository.listEvents({ branch_id: id, from: fromIso, to: toIso, limit: FEED_LIMIT }),
-    [id, fromIso, toIso],
+    () => sessionRepository.listEvents({
+      branch_id: id, from: fromIso, to: toIso, limit: FEED_LIMIT,
+      ...(actorId !== null ? { user_id: actorId } : {}),
+    }),
+    [id, fromIso, toIso, actorId],
   );
   const feed = useMemo(() => ({
     bySession: groupBySession(events.data ?? []),
@@ -115,6 +120,22 @@ const SessionsHistory = () => {
               <span className="label">{t("history.to")}</span>
               <input type="date" value={to} min={from} onChange={(e) => setTo(e.target.value)} className="input" />
             </div>
+            {/* Whose actions. A native select: keyboard, screen reader and
+                Escape behave as everywhere else in the panel. «All» is the
+                screen as it always was. */}
+            <label className="col" style={{ gap: 4 }}>
+              <span className="label">{t("history.actorLabel")}</span>
+              <select
+                className="input"
+                value={actorId ?? ""}
+                onChange={(e) => setActor(e.target.value === "" ? null : { branch: id, id: Number(e.target.value) })}
+              >
+                <option value="">{t("history.actorAll")}</option>
+                {(actors.data ?? []).map((a) => (
+                  <option key={a.id} value={a.id}>{a.name} · {t(`role.${a.role}`) || a.role}</option>
+                ))}
+              </select>
+            </label>
             <div className="row" style={{ gap: 6, flexWrap: "wrap" }}>
               <button type="button" className="pill" onClick={() => setRange("today")}>{t("history.today")}</button>
               <button type="button" className="pill" onClick={() => setRange("yesterday")}>{t("history.yesterday")}</button>
@@ -160,10 +181,14 @@ const SessionsHistory = () => {
       {loading && <ListSkeleton />}
       {error && <div className="error">{error.message}</div>}
 
-      {!loading && !error && (
+      {/* A new person's feed is loading: a skeleton, never the previous
+          person's cards under the new name. */}
+      {!loading && !error && actorId !== null && events.loading && <ListSkeleton />}
+      {!loading && !error && !(actorId !== null && events.loading) && (
         <SessionsList
           sessions={data ?? []}
           feed={events.loading ? null : { ...feed, to: toIso }}
+          actorId={actorId}
         />
       )}
     </ScreenWithBg>
@@ -177,17 +202,26 @@ interface Feed {
   to: string;
 }
 
-const SessionsList = ({ sessions, feed }: { sessions: ISessionApi[]; feed: Feed | null }) => {
+const SessionsList = ({ sessions, feed, actorId }: { sessions: ISessionApi[]; feed: Feed | null; actorId: number | null }) => {
   const { t } = useLang();
   if (sessions.length === 0) return <div className="muted">{t("history.empty")}</div>;
   const now = Date.now();
+  const cards = sessions.map((s) => {
+    const slice = feed?.bySession.get(s.id) ?? [];
+    const covered = feed !== null && feedCoversSession(s, slice, { truncated: feed.truncated, to: feed.to, now });
+    return { s, slice, covered };
+  })
+    // With a person picked, a card is there because they did something in it.
+    // One the feed cannot vouch for stays, fetches its own and shows only
+    // their lines (or nothing, see `SessionRow`).
+    .filter(({ slice, covered }) => actorId === null || feed === null || slice.length > 0 || !covered);
+
+  if (cards.length === 0) return <div className="muted">{t("history.noActions")}</div>;
   return (
-    <div className="col" style={{ gap: 8 }}>
-      {sessions.map((s) => {
-        const slice = feed?.bySession.get(s.id) ?? [];
-        const covered = feed !== null && feedCoversSession(s, slice, { truncated: feed.truncated, to: feed.to, now });
-        return <SessionRow key={s.id} session={s} feedEvents={feed === null ? null : slice} covered={covered} />;
-      })}
+    <div className="col hs-list">
+      {cards.map(({ s, slice, covered }) => (
+        <SessionRow key={s.id} session={s} feedEvents={feed === null ? null : slice} covered={covered} actorId={actorId} />
+      ))}
     </div>
   );
 };
@@ -238,43 +272,31 @@ const sessionDurationMinutes = (startedAt: string, endsAt: string | null): numbe
   return Math.round(durationMs / 60_000);
 };
 
-const SessionRow = ({ session, feedEvents, covered }: {
+const SessionRow = ({ session, feedEvents, covered, actorId }: {
   session: ISessionApi;
   feedEvents: ISessionEvent[] | null;
   covered: boolean;
+  actorId: number | null;
 }) => {
   const { t, money } = useLang();
-  const { ref, events } = useCardEvents(session.id, feedEvents, covered);
+  const { ref, events: loaded } = useCardEvents(session.id, feedEvents, covered);
+  // The feed is already narrowed by the server; a session's own list is not,
+  // so it is narrowed here — the same rule: a line with no author (the
+  // system's) is nobody's.
+  const events = loaded === null || actorId === null ? loaded : loaded.filter((e) => e.user?.id === actorId);
+  // Fetched on its own and nothing of theirs in it: not this person's card.
+  // (After every hook, so the hook order never changes.)
+  if (actorId !== null && events !== null && events.length === 0) return <div ref={ref} />;
   const durationMin = sessionDurationMinutes(session.started_at, session.ends_at);
-  const items = session.items ?? [];
-  const itemsTotal = items.reduce((sum, it) => sum + sessionItemLineTotal(it), 0);
-  /**
-   * What the extra pads put on this bill.
-   *
-   * Same shape and same rule as the tile on the board: charged pads only, and
-   * a unit price only when every one of them agrees on it. Null on a waived
-   * seat and when nothing was charged, because a fee printed under "Free
-   * session" is two numbers telling one truth.
-   */
-  const padCharge = padChargeOf(session);
-
-  const paymentLabel = paymentLabelOf(session, t);
-
-  const total = num(session.total_paid);
-  // What the CLOCK earned: the bill less everything that is not the clock.
-  //
-  // Joysticks used to be left in, so a seat that sold two pads at 500 showed
-  // 1000 of them as "time" and the line disagreed with the pad line printed
-  // directly beneath it. Subtracted from the same figure the pad line quotes,
-  // so the two cannot drift.
-  const padTotal = padCharge?.total ?? 0;
-  const timeCost = Math.max(0, total - itemsTotal - padTotal);
   const isClosed = session.status === "stopped" || session.status === "expired";
   const statusLabel = t(`history.status.${session.status}`) || session.status;
   const modeLabel = session.mode === "open" ? t("history.modeOpen") : t("history.modeFixed");
   // The seats it was played on, in order — from the events, which froze each
-  // seat when it was written. Only worth a line when there was a move.
-  const seats = events === null ? [] : segmentsOf(events).map((seg) => seg.seat ?? t("history.seatUnknown"));
+  // seat when it was written. Only worth a line when there was a move, and
+  // only from the whole story: one person's lines may skip a seat.
+  const seats = events === null || actorId !== null
+    ? []
+    : seatRoute(seatSteps(events)).map((seat) => seat ?? t("history.seatUnknown"));
   const endAt = isClosed ? session.stopped_at ?? session.ends_at : null;
 
   return (
@@ -350,100 +372,11 @@ const SessionRow = ({ session, feedEvents, covered }: {
         )}
       </dl>
 
-      {/* How much — the bill, as the board and the receipt compute it. */}
-      <div className="hs-summary">
-      {/* ⚠️ What the pads COST, not how long each was plugged in.
-          This used to print one line per pad over the interval it was in play
-          — "Joystick #3, 15:00 → 15:01". A pad is billed at a flat fee now, so
-          an interval says nothing about the money and quietly suggests the pad
-          is priced by the minute. Three of them a minute apart read as a fault
-          rather than as three sales.
-          The count is of CHARGED pads and the total is `sessionJoysticksTotal`
-          — the same figure the receipt and the board use, so no third opinion
-          about the bill can appear here. A unit price is printed only when all
-          of them agree on one: the fee is frozen when a pad goes out, so a
-          session that straddles a re-pricing holds two, and "3 × ?" would be a
-          lie where the sum is always true. */}
-      {padCharge !== null && (
-        <div className="row-between" style={{ fontSize: 12 }}>
-          <span className="muted">{t("history.joystickCharged")}</span>
-          <span className="muted">
-            {/* The unit figure is suffixed when it is a RATE, so a finished
-                session can still be read a month later without guessing which
-                strategy priced it. "2 × 500 = 1000" and "2 × 500/h = 250" are
-                different facts and used to print identically. */}
-            {/* Named, not multiplied. "2 × 500" is a count times a unit price
-                and reads as nonsense beside numbers that are slot identities;
-                "Joystick #3, 4 · 500/h = 250" is the same money, said about
-                the controllers it was actually for. */}
-            {t("session.joystickSlot").replace("{0}", padCharge.slots.join(", "))}
-            {padCharge.each !== null
-              ? ` · ${money(padCharge.each)}${padCharge.hourly ? t("session.perHourShort") : ""}`
-                + ` = ${money(padCharge.total, preciseWhenSmall(padCharge.total))}`
-              : ` · ${money(padCharge.total, preciseWhenSmall(padCharge.total))}`}
-          </span>
-        </div>
-      )}
-
-      {items.length > 0 && (
-        <div className="col" style={{ gap: 2, marginTop: 4 }}>
-          {items.map((it) => (
-            <div key={it.id} className="row-between" style={{ fontSize: 13 }}>
-              <span>{it.name} {num(it.qty) > 1 && <span className="muted">× {num(it.qty)}</span>}</span>
-              <span>{money(sessionItemLineTotal(it))}</span>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {isClosed ? (
-        <>
-          <div className="row-between" style={{ borderTop: "1px solid #1f2a44", paddingTop: 6, marginTop: 4, fontSize: 13 }}>
-            <span className="muted">{t("history.timeCost")}</span>
-            <span>{money(timeCost)}</span>
-          </div>
-          {items.length > 0 && (
-            <div className="row-between" style={{ fontSize: 13 }}>
-              <span className="muted">{t("history.itemsTotal")}</span>
-              <span>{money(itemsTotal)}</span>
-            </div>
-          )}
-          {/* ⚠️ How the money was taken, between the cost and the total, and
-              the VALUE is the bold half. An owner reconciling a day scans for
-              "was this cash or card", not for the words "payment method" —
-              emphasising the label would put the weight on the part they
-              already know. Omitted entirely when nothing was recorded: every
-              session stopped before this existed has no method, and inventing
-              one would be worse than the gap. */}
-          {paymentLabel !== null && (
-            <div className="row-between" style={{ fontSize: 13 }}>
-              <span className="muted">{t("session.payTitle")}</span>
-              <strong>{paymentLabel}</strong>
-            </div>
-          )}
-          <div className="row-between" style={{ fontSize: 15, fontWeight: 700 }}>
-            <span>{t("history.total")}</span>
-            {/* A waived bill reads as the words, not as a zero. "0" on a
-                receipt line is ambiguous — it could be a session nobody played.
-                The full phrase goes here rather than the short pill used above:
-                "Free" beside a number column reads as a currency abbreviation,
-                and "Free session" cannot. */}
-            <span>{session.is_free ? t("session.freeBill") : money(total)}</span>
-          </div>
-        </>
-      ) : (
-        items.length > 0 && (
-          <div className="row-between" style={{ fontSize: 13, borderTop: "1px solid #1f2a44", paddingTop: 6, marginTop: 4 }}>
-            <span className="muted">{t("history.itemsTotal")}</span>
-            <span>{money(itemsTotal)}</span>
-          </div>
-        )
-      )}
-
-      </div>
-
       {/* What happened — every event of the session, once. */}
       <SessionHistoryTimeline events={events} startedAt={session.started_at} />
+
+      {/* How much — after what happened, as its outcome. */}
+      <SessionHistoryBill session={session} closed={isClosed} />
     </div>
   );
 };

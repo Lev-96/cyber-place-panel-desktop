@@ -542,6 +542,8 @@ export interface ISessionEvent {
 export interface ListSessionEventsParams {
   branch_id?: number;
   session_id?: number;
+  /** Only this person's actions (the History staff filter). Lines the system wrote have no author. */
+  user_id?: number;
   action?: SessionActionName;
   from?: string;
   to?: string;
@@ -553,6 +555,17 @@ export const apiListSessionEvents = (params: ListSessionEventsParams) =>
 
 export const apiListEventsForSession = (sessionId: number) =>
   request<{ data: ISessionEvent[] }>(`/sessions/${sessionId}/events`);
+
+/** A person whose actions a branch's log may hold: its owner, its managers, whoever acted there. */
+export interface ISessionEventActor {
+  id: number;
+  name: string;
+  role: string;
+}
+
+/** The staff filter's choices for one branch — the server's list, scoped to the caller. */
+export const apiListSessionEventActors = (branchId: number) =>
+  request<{ data: ISessionEventActor[] }>("/session-events/actors", { params: { branch_id: branchId } });
 
 export const apiListPcs = (branchId: number) =>
   request<{ data: IPcApi[] }>("/pcs", { params: { branch_id: branchId } });

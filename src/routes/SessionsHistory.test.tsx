@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { eventDetailParts, eventSeat, paymentLabelOf, segmentsOf } from "@/components/sessions/sessionHistoryModel";
+import { eventDetailParts, eventSeat, paymentLabelOf, seatRoute, seatSteps } from "@/components/sessions/sessionHistoryModel";
 // The pad line is shared with the board now, so its tests follow it there.
 import { padChargeOf } from "@/components/sessions/joystickView";
 import type { ISessionEvent } from "@/api/sessions";
@@ -365,23 +365,24 @@ describe("how the money was taken", () => {
   });
 });
 
-describe("cutting one session into the seats it was played on", () => {
+describe("the seat each thing happened on", () => {
   const at = (iso: string, over: Partial<ISessionEvent> = {}) =>
     event({ created_at: iso, ...over });
+  const chips = (steps: ReturnType<typeof seatSteps>) => steps.filter((s) => s.chip).map((s) => s.seat);
 
-  test("a session that never moved is one segment", () => {
-    const segments = segmentsOf([
+  test("a session that never moved names no seat on its steps", () => {
+    const steps = seatSteps([
       at("2026-09-10T12:00:00+04:00", { id: 1, action: "started", meta: { place_number: 2 } }),
       at("2026-09-10T12:10:00+04:00", { id: 2, action: "item_added", meta: { place_number: 2 } }),
     ]);
 
-    expect(segments).toHaveLength(1);
-    expect(segments[0].seat).toBe("№2");
-    expect(segments[0].events).toHaveLength(2);
+    expect(steps.map((s) => s.seat)).toEqual(["№2", "№2"]);
+    expect(chips(steps)).toEqual([]);
+    expect(seatRoute(steps)).toEqual([]);
   });
 
-  test("a move closes the seat it happened on and opens the next", () => {
-    const segments = segmentsOf([
+  test("a move happens on the seat being left; the next step opens the new one", () => {
+    const steps = seatSteps([
       at("2026-09-10T12:00:00+04:00", { id: 1, action: "started", meta: { place_number: 2 } }),
       at("2026-09-10T12:31:00+04:00", {
         id: 2,
@@ -391,62 +392,92 @@ describe("cutting one session into the seats it was played on", () => {
       at("2026-09-10T12:40:00+04:00", { id: 3, action: "joystick_added", meta: { place_number: 5 } }),
     ]);
 
-    expect(segments.map((s) => s.seat)).toEqual(["№2", "№5"]);
-    // ⚠️ The move belongs to the seat being LEFT. That is where a reader looks
-    // for it, and it is where it was performed.
-    expect(segments[0].events.map((e) => e.action)).toEqual(["started", "moved"]);
-    expect(segments[1].events.map((e) => e.action)).toEqual(["joystick_added"]);
+    // ⚠️ The move belongs to the seat being LEFT — where it was performed.
+    expect(steps.map((s) => s.seat)).toEqual(["№2", "№2", "№5"]);
+    expect(steps.map((s) => s.chip)).toEqual([true, false, true]);
+    expect(seatRoute(steps)).toEqual(["№2", "№5"]);
   });
 
-  test("two moves make three segments", () => {
-    const segments = segmentsOf([
+  test("two moves, three seats", () => {
+    const steps = seatSteps([
       at("2026-09-10T12:00:00+04:00", { id: 1, action: "started", meta: { place_number: 2 } }),
       at("2026-09-10T12:31:00+04:00", { id: 2, action: "moved", meta: { place_number: 2, to_place_number: 5 } }),
       at("2026-09-10T13:00:00+04:00", { id: 3, action: "moved", meta: { place_number: 5, to_place_number: 9 } }),
       at("2026-09-10T13:10:00+04:00", { id: 4, action: "stopped", meta: { place_number: 9 } }),
     ]);
 
-    expect(segments.map((s) => s.seat)).toEqual(["№2", "№5", "№9"]);
+    expect(seatRoute(steps)).toEqual(["№2", "№5", "№9"]);
   });
 
   test("order comes from the server's timestamp, never from the array", () => {
     // Handed back newest-first, which is how the branch feed arrives.
-    const segments = segmentsOf([
+    const steps = seatSteps([
       at("2026-09-10T12:40:00+04:00", { id: 3, action: "joystick_added", meta: { place_number: 5 } }),
       at("2026-09-10T12:31:00+04:00", { id: 2, action: "moved", meta: { place_number: 2, to_place_number: 5 } }),
       at("2026-09-10T12:00:00+04:00", { id: 1, action: "started", meta: { place_number: 2 } }),
     ]);
 
-    expect(segments.map((s) => s.seat)).toEqual(["№2", "№5"]);
-    expect(segments[0].events[0].action).toBe("started");
+    expect(steps.map((s) => s.event.action)).toEqual(["started", "moved", "joystick_added"]);
+    expect(seatRoute(steps)).toEqual(["№2", "№5"]);
+  });
+
+  test("one person's lines still say where each happened, even without the move itself", () => {
+    // The move was somebody else's and is not in this list.
+    const steps = seatSteps([
+      at("2026-09-10T12:00:00+04:00", { id: 1, action: "started", meta: { place_number: 2 } }),
+      at("2026-09-10T12:50:00+04:00", { id: 4, action: "stopped", meta: { place_number: 9 } }),
+    ]);
+
+    expect(steps.map((s) => s.seat)).toEqual(["№2", "№9"]);
+    expect(chips(steps)).toEqual(["№2", "№9"]);
+  });
+
+  test("the seat a line froze beats the last move seen — a later move may be someone else's", () => {
+    // One person's lines: their move 2 → 5, then a stop on №9 after a move
+    // somebody else made (not in this list).
+    const steps = seatSteps([
+      at("2026-09-10T12:00:00+04:00", { id: 1, action: "started", meta: { place_number: 2 } }),
+      at("2026-09-10T12:31:00+04:00", { id: 2, action: "moved", meta: { place_number: 2, to_place_number: 5 } }),
+      at("2026-09-10T13:10:00+04:00", { id: 4, action: "stopped", meta: { place_number: 9 } }),
+    ]);
+
+    expect(steps.map((s) => s.seat)).toEqual(["№2", "№2", "№9"]);
   });
 
   test("an old session whose lines never named a seat still reads", () => {
-    // ⚠️ Backward compatibility: rows written before the seat was frozen have
-    // nothing to group by, and one anonymous segment is the honest answer.
-    const segments = segmentsOf([
+    // ⚠️ Backward compatibility: rows written before the seat was frozen.
+    const steps = seatSteps([
       at("2026-09-10T12:00:00+04:00", { id: 1, action: "started", meta: null }),
       at("2026-09-10T12:10:00+04:00", { id: 2, action: "time_added", meta: { minutes: 30 } }),
     ]);
 
-    expect(segments).toHaveLength(1);
-    expect(segments[0].seat).toBeNull();
-    expect(segments[0].events).toHaveLength(2);
+    expect(steps).toHaveLength(2);
+    expect(steps.map((s) => s.seat)).toEqual([null, null]);
+    expect(chips(steps)).toEqual([]);
   });
 
-  test("no events is no segments, not one empty one", () => {
-    expect(segmentsOf([])).toEqual([]);
+  test("an old line after a move takes the move's destination", () => {
+    const steps = seatSteps([
+      at("2026-09-10T12:00:00+04:00", { id: 1, action: "started", meta: { place_number: 2 } }),
+      at("2026-09-10T12:31:00+04:00", { id: 2, action: "moved", meta: { place_number: 2, to_place_number: 5 } }),
+      at("2026-09-10T12:40:00+04:00", { id: 3, action: "stopped", meta: null }),
+    ]);
+
+    expect(steps.map((s) => s.seat)).toEqual(["№2", "№2", "№5"]);
+  });
+
+  test("no events is no steps", () => {
+    expect(seatSteps([])).toEqual([]);
   });
 
   test("a move with no destination recorded does not invent one", () => {
-    const segments = segmentsOf([
+    const steps = seatSteps([
       at("2026-09-10T12:00:00+04:00", { id: 1, action: "started", meta: { place_number: 2 } }),
       at("2026-09-10T12:31:00+04:00", { id: 2, action: "moved", meta: { place_number: 2 } }),
       at("2026-09-10T12:40:00+04:00", { id: 3, action: "stopped", meta: null }),
     ]);
 
-    expect(segments).toHaveLength(2);
-    expect(segments[1].seat).toBeNull();
+    expect(seatRoute(steps)).toEqual(["№2", null]);
   });
 });
 

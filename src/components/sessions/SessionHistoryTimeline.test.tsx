@@ -87,11 +87,15 @@ describe("SessionHistoryTimeline", () => {
       "1000 AMD / time.hourShort -> 1500 AMD / time.hourShort",
     ]);
     expect([...document.querySelectorAll(".hs-seat__chip")].map((n) => n.textContent)).toEqual(["№9", "№14"]);
+    // Each chip sits on the step that opened its stretch: the start, and the stop after the move.
+    const steps = [...document.querySelectorAll(".hs-event")];
+    expect(steps[0].querySelector(".hs-seat__chip")?.textContent).toBe("№9");
+    expect(steps[5].querySelector(".hs-seat__chip")?.textContent).toBe("№14");
   });
 
   test("a session that never moved has no seat chips", () => {
     mount(EVENING.slice(0, 3));
-    expect(document.querySelectorAll(".hs-seat")).toHaveLength(0);
+    expect(document.querySelectorAll(".hs-seat__chip")).toHaveLength(0);
   });
 
   test("a long history folds its middle: start and finish stay, the button counts the rest", () => {

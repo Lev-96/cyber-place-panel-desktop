@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useNavigate } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import type { ISessionEvent } from "@/api/sessions";
 import type { ISessionApi } from "@/types/sessions";
@@ -26,12 +26,14 @@ const repo = vi.hoisted(() => ({
   list: vi.fn(),
   listEvents: vi.fn(),
   eventsForSession: vi.fn(),
+  listEventActors: vi.fn(),
 }));
 vi.mock("@/repositories/SessionRepository", () => ({
   sessionRepository: {
     list: (...a: unknown[]) => repo.list(...a),
     listEvents: (...a: unknown[]) => repo.listEvents(...a),
     eventsForSession: (...a: unknown[]) => repo.eventsForSession(...a),
+    listEventActors: (...a: unknown[]) => repo.listEventActors(...a),
   },
 }));
 
@@ -65,10 +67,19 @@ const event = (id: number, session_id: number, action: ISessionEvent["action"], 
   user: { id: 1, name: "Giorgi Beridze", role: "manager" },
 });
 
+/** Lets a test open another branch the way the app does — by route. */
+const nav = { go: (_to: string) => {} };
+const NavProbe = () => {
+  const navigate = useNavigate();
+  nav.go = navigate;
+  return null;
+};
+
 const mount = async () => {
   await act(async () => {
     render(
       <MemoryRouter initialEntries={["/branches/1/sessions/history"]}>
+        <NavProbe />
         <Routes>
           <Route path="/branches/:branchId/sessions/history" element={<SessionsHistory />} />
         </Routes>
@@ -87,6 +98,8 @@ beforeEach(() => {
   repo.listEvents.mockReset();
   repo.eventsForSession.mockReset();
   repo.eventsForSession.mockResolvedValue([]);
+  repo.listEventActors.mockReset();
+  repo.listEventActors.mockResolvedValue([]);
 });
 afterEach(() => cleanup());
 
@@ -126,6 +139,10 @@ describe("SessionsHistory — the cards", () => {
     expect(card.textContent).toContain("NextLevel Esports, Azatutyan Avenue");
     expect(card.textContent).toContain("session.payCard");
     expect(card.textContent).toContain("1003 AMD");
+    // Facts, then what happened, then the bill as its outcome.
+    const order = [...card.children].map((c) => c.className.split(" ")[0]);
+    expect(order.indexOf("hs-facts")).toBeLessThan(order.indexOf("hs-activity"));
+    expect(order.indexOf("hs-activity")).toBeLessThan(order.indexOf("hs-bill"));
   });
 
   test("a session that ran past the range fetches its own events — and only it", async () => {
@@ -167,7 +184,12 @@ describe("SessionsHistory — the cards", () => {
       meta: { place_number: 9, from_place_number: 9, to_place_number: 14 },
     };
     repo.list.mockResolvedValue([session(8)]);
-    repo.listEvents.mockResolvedValue([event(3, 8, "stopped", 20, 10), move, { ...event(1, 8, "started", 0, 0), meta: { place_number: 9 } }]);
+    // Each line froze the seat it was written on, as the server does.
+    repo.listEvents.mockResolvedValue([
+      { ...event(3, 8, "stopped", 20, 10), meta: { place_number: 14 } },
+      move,
+      { ...event(1, 8, "started", 0, 0), meta: { place_number: 9 } },
+    ]);
     await mount();
     const card = cardOf("№8");
     const dts = [...card.querySelectorAll(".hs-facts dt")];
@@ -189,5 +211,172 @@ describe("SessionsHistory — refresh", () => {
 
     expect(repo.listEvents).toHaveBeenCalledTimes(2);
     expect(titlesIn(cardOf("№8"))).toEqual(["history.action.started", "history.action.stopped"]);
+  });
+});
+
+describe("SessionsHistory — the timeline's own scroll", () => {
+  test("the line sits in its own keyboard-reachable region; nothing else is a scroller", async () => {
+    repo.list.mockResolvedValue([session(8)]);
+    repo.listEvents.mockResolvedValue([event(2, 8, "stopped", 60, 1003), event(1, 8, "started", 0, 0)]);
+    await mount();
+    const region = screen.getByRole("region", { name: "history.activityLabel" });
+    expect(region.classList.contains("hs-scroll")).toBe(true);
+    expect(region.tabIndex).toBe(0);
+    expect(region.querySelector("ol.hs-timeline")).toBeTruthy();
+    // The card and the list carry no scroll of their own.
+    expect(cardOf("№8").classList.contains("hs-scroll")).toBe(false);
+    expect(document.querySelectorAll(".hs-scroll")).toHaveLength(1);
+  });
+});
+
+describe("SessionsHistory — whose actions", () => {
+  const anna = { id: 11, name: "Anna", role: "manager" };
+  const zed = { id: 12, name: "Zed", role: "company_owner" };
+  const by = (e: ISessionEvent, who: { id: number; name: string } | null): ISessionEvent =>
+    ({ ...e, user: who === null ? null : { id: who.id, name: who.name, role: "manager" } });
+  const select = () => screen.getByLabelText("history.actorLabel") as HTMLSelectElement;
+  const pick = async (value: string) => {
+    await act(async () => { fireEvent.change(select(), { target: { value } }); });
+    for (let i = 0; i < 5; i++) await act(async () => { await Promise.resolve(); });
+  };
+  const lastFeedCall = () => repo.listEvents.mock.calls.at(-1)![0] as Record<string, unknown>;
+
+  test("the choices are the server's list for this branch, after «all staff»", async () => {
+    repo.listEventActors.mockResolvedValue([anna, zed]);
+    repo.list.mockResolvedValue([]);
+    repo.listEvents.mockResolvedValue([]);
+    await mount();
+
+    expect(repo.listEventActors).toHaveBeenCalledWith(1);
+    expect([...select().options].map((o) => o.textContent)).toEqual([
+      "history.actorAll", "Anna · role.manager", "Zed · role.company_owner",
+    ]);
+    expect(select().value).toBe("");
+    expect(lastFeedCall()).not.toHaveProperty("user_id");
+  });
+
+  test("picking someone asks the SERVER for their lines, and shows only the sessions they acted in", async () => {
+    repo.listEventActors.mockResolvedValue([anna, zed]);
+    repo.list.mockResolvedValue([session(8), session(9)]);
+    repo.listEvents
+      .mockResolvedValueOnce([event(4, 9, "stopped", 60, 1), event(3, 8, "stopped", 30, 1), event(2, 9, "started", 0, 0), event(1, 8, "started", 0, 0)])
+      .mockResolvedValue([by(event(3, 8, "stopped", 30, 1), anna)]);
+    await mount();
+    expect(document.querySelectorAll(".hs-card")).toHaveLength(2);
+
+    await pick("11");
+    expect(lastFeedCall()).toMatchObject({ branch_id: 1, user_id: 11, limit: 1000 });
+    expect(document.querySelectorAll(".hs-card")).toHaveLength(1);
+    expect(titlesIn(cardOf("№8"))).toEqual(["history.action.stopped"]);
+  });
+
+  test("«all staff» brings the whole screen back, with no author in the request", async () => {
+    repo.listEventActors.mockResolvedValue([anna]);
+    repo.list.mockResolvedValue([session(8), session(9)]);
+    const all = [event(2, 9, "started", 0, 0), event(1, 8, "started", 0, 0)];
+    repo.listEvents.mockResolvedValueOnce(all).mockResolvedValueOnce([by(event(1, 8, "started", 0, 0), anna)]).mockResolvedValue(all);
+    await mount();
+    await pick("11");
+    expect(document.querySelectorAll(".hs-card")).toHaveLength(1);
+
+    await pick("");
+    expect(lastFeedCall()).not.toHaveProperty("user_id");
+    expect(document.querySelectorAll(".hs-card")).toHaveLength(2);
+  });
+
+  test("nobody's actions in the period says so", async () => {
+    repo.listEventActors.mockResolvedValue([anna]);
+    repo.list.mockResolvedValue([session(8)]);
+    repo.listEvents.mockResolvedValueOnce([event(1, 8, "started", 0, 0)]).mockResolvedValue([]);
+    await mount();
+    await pick("11");
+    expect(document.querySelectorAll(".hs-card")).toHaveLength(0);
+    expect(document.body.textContent).toContain("history.noActions");
+  });
+
+  test("while a new person's lines load, the previous cards are not shown under their name", async () => {
+    repo.listEventActors.mockResolvedValue([anna]);
+    repo.list.mockResolvedValue([session(8)]);
+    repo.listEvents.mockResolvedValueOnce([event(1, 8, "started", 0, 0)]).mockReturnValue(new Promise(() => {}));
+    await mount();
+    await pick("11");
+    expect(document.querySelectorAll(".hs-card")).toHaveLength(0);
+    expect(document.querySelector('[aria-busy="true"]')).toBeTruthy();
+  });
+
+  test("a card fetched on its own keeps only that person's lines — the system's are nobody's", async () => {
+    repo.listEventActors.mockResolvedValue([anna]);
+    repo.list.mockResolvedValue([session(9, { stopped_at: tomorrow, ends_at: tomorrow } as Partial<ISessionApi>)]);
+    repo.listEvents.mockResolvedValue([by(event(2, 9, "started", 0, 0), anna)]);
+    repo.eventsForSession.mockResolvedValue([
+      by(event(2, 9, "started", 0, 0), anna),
+      by(event(3, 9, "resumed", 5), null),
+      by(event(4, 9, "stopped", 24 * 60, 900), zed),
+    ]);
+    await mount();
+    await pick("11");
+
+    expect(repo.eventsForSession).toHaveBeenCalledWith(9);
+    expect(titlesIn(cardOf("№9"))).toEqual(["history.action.started"]);
+  });
+
+  test("a card fetched on its own with nothing of theirs is not shown", async () => {
+    repo.listEventActors.mockResolvedValue([anna]);
+    repo.list.mockResolvedValue([session(9, { stopped_at: tomorrow, ends_at: tomorrow } as Partial<ISessionApi>)]);
+    repo.listEvents.mockResolvedValue([]);
+    repo.eventsForSession.mockResolvedValue([by(event(4, 9, "stopped", 24 * 60, 900), zed)]);
+    await mount();
+    await pick("11");
+    expect(document.querySelectorAll(".hs-card")).toHaveLength(0);
+  });
+
+  test("with one person's lines the card does not claim a seat route from them", async () => {
+    repo.listEventActors.mockResolvedValue([anna]);
+    repo.list.mockResolvedValue([session(8)]);
+    const annas = [
+      by({ ...event(1, 8, "started", 0, 0), meta: { place_number: 9 } }, anna),
+      by({ ...event(3, 8, "stopped", 20, 10), meta: { place_number: 14 } }, anna),
+    ];
+    repo.listEvents.mockResolvedValue(annas);
+    await mount();
+    await pick("11");
+    const dts = [...cardOf("№8").querySelectorAll(".hs-facts dt")].map((d) => d.textContent);
+    expect(dts).not.toContain("history.seatsLabel");
+    // The steps still say where each of her actions happened.
+    expect([...cardOf("№8").querySelectorAll(".hs-seat__chip")].map((c) => c.textContent)).toEqual(["№9", "№14"]);
+  });
+
+  test("the person and the dates narrow together", async () => {
+    repo.listEventActors.mockResolvedValue([anna]);
+    repo.list.mockResolvedValue([]);
+    repo.listEvents.mockResolvedValue([]);
+    await mount();
+    await pick("11");
+    await act(async () => { fireEvent.click(screen.getByText("history.yesterday")); });
+    for (let i = 0; i < 5; i++) await act(async () => { await Promise.resolve(); });
+
+    const call = lastFeedCall();
+    expect(call.user_id).toBe(11);
+    const yesterdayStart = new Date(today);
+    yesterdayStart.setDate(yesterdayStart.getDate() - 1);
+    yesterdayStart.setHours(0, 0, 0, 0);
+    expect(call.from).toBe(yesterdayStart.toISOString());
+  });
+
+  test("another branch starts from «all staff» and its own list of people", async () => {
+    repo.listEventActors.mockResolvedValue([anna]);
+    repo.list.mockResolvedValue([]);
+    repo.listEvents.mockResolvedValue([]);
+    await mount();
+    await pick("11");
+    expect(lastFeedCall().user_id).toBe(11);
+
+    await act(async () => { nav.go("/branches/2/sessions/history"); });
+    for (let i = 0; i < 5; i++) await act(async () => { await Promise.resolve(); });
+
+    expect(repo.listEventActors).toHaveBeenLastCalledWith(2);
+    expect(lastFeedCall()).toMatchObject({ branch_id: 2 });
+    expect(lastFeedCall()).not.toHaveProperty("user_id");
+    expect(select().value).toBe("");
   });
 });

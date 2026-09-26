@@ -17,6 +17,7 @@ import {
   type IExtensionOptions,
   apiExtendSession,
   apiListEventsForSession,
+  apiListSessionEventActors,
   apiListSessionEvents,
   apiMakeSessionUnlimited,
   apiRemoveSessionJoystick,
@@ -24,6 +25,7 @@ import {
   apiPauseSession,
   apiResumeSession,
   ISessionEvent,
+  ISessionEventActor,
   ListSessionEventsParams,
   apiListActiveSessions,
   apiListAllActiveSessions,
@@ -182,6 +184,10 @@ export class SessionRepository {
 
   async eventsForSession(sessionId: number): Promise<ISessionEvent[]> {
     return orFallback(apiListEventsForSession(sessionId).then((r) => r.data), []);
+  }
+
+  async listEventActors(branchId: number): Promise<ISessionEventActor[]> {
+    return orFallback(apiListSessionEventActors(branchId).then((r) => r.data), []);
   }
 }
 

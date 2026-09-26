@@ -75,56 +75,57 @@ export const paymentLabelOf = (
   return t(method === "cash" ? "session.payCash" : "session.payCard");
 };
 
-/** One stretch of an evening spent on ONE seat. */
-export interface HistorySegment {
-  /** "№2", or null when nothing in the segment says where it was. */
+/** One event on the timeline, with the seat it happened on. */
+export interface SeatStep {
+  event: ISessionEvent;
+  /** "№2", or null when nothing says where it was. */
   seat: string | null;
-  /** The lines that happened there, oldest first. */
-  events: ISessionEvent[];
+  /** True where the seat is worth naming: the first step, and every change. */
+  chip: boolean;
 }
 
 /**
- * One session's timeline, cut into the seats it was played on.
+ * A session's events, oldest first, each with the seat it happened on
+ * (2026-09-26: per event, replacing the per-move segments, so a list narrowed
+ * to one person's actions — where the move itself may be somebody else's —
+ * still says where each thing happened).
  *
- * ⚠️ A move is NOT a new session. The player keeps their clock, their bill,
- * their products and their pads; only the seat changes. So the timeline is one
- * list that changes seat partway, and a segment is a reading aid rather than a
- * record of its own — nothing here invents an entity the server does not have.
+ * ⚠️ A move is NOT a new session: the player keeps clock, bill, products and
+ * pads; only the seat changes. The seat is the one frozen on the line
+ * (`eventSeat`); a line written before seats were frozen takes the destination
+ * of the move before it, and only then the row's own (current) seat.
  *
- * The move itself closes the segment it happened in. It was performed on the
- * seat being left, which is where a reader looks for it.
- *
- * Ordering is by the server's `created_at`, ascending: a timeline reads
- * downwards. Never by array position — the feed's order is the API's business
- * and has changed before.
+ * Ordering is by the server's `created_at`, never by array position — the
+ * feed's order is the API's business and has changed before. Chips appear only
+ * when the session was on more than one seat.
  */
-export const segmentsOf = (events: ISessionEvent[]): HistorySegment[] => {
+export const seatSteps = (events: ISessionEvent[]): SeatStep[] => {
   const ordered = [...events].sort(
     (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
   );
 
-  const segments: HistorySegment[] = [];
-  let current: HistorySegment | null = null;
-
-  for (const e of ordered) {
-    if (current === null) current = { seat: eventSeat(e), events: [] };
-    // A segment that started before anything named a seat takes the first name
-    // it is given, rather than staying anonymous for the whole stretch.
-    if (current.seat === null) current.seat = eventSeat(e);
-
-    current.events.push(e);
-
+  let afterMove: string | null = null;
+  const seats = ordered.map((e) => {
+    const frozen = metaNum(e.meta, "place_number");
+    const seat = frozen !== null ? `№${frozen}` : afterMove ?? eventSeat(e);
     if (e.action === "moved") {
-      segments.push(current);
       const to = metaNum(e.meta, "to_place_number");
-      current = { seat: to !== null ? `№${to}` : null, events: [] };
+      afterMove = to !== null ? `№${to}` : null;
     }
-  }
+    return seat;
+  });
 
-  if (current !== null && current.events.length > 0) segments.push(current);
-
-  return segments;
+  const moved = new Set(seats).size > 1;
+  return ordered.map((event, i) => ({
+    event,
+    seat: seats[i],
+    chip: moved && (i === 0 || seats[i] !== seats[i - 1]),
+  }));
 };
+
+/** The seats a session was played on, in order — "№9 → №14". */
+export const seatRoute = (steps: SeatStep[]): (string | null)[] =>
+  steps.filter((s) => s.chip).map((s) => s.seat);
 
 /**
  * WHAT changed, under the name of the action that changed it — one fact per
