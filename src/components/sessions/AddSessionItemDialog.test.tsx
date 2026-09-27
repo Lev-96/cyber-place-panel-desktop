@@ -1018,20 +1018,43 @@ describe("additional items — chips, a cue — handed out once per session", ()
     expect(screen.getAllByText("Poker Chips")).toHaveLength(1);
   });
 
-  test("added once: the button says so, a second press adds nothing, its count cannot be raised", async () => {
+  const row = (name: string) => [...document.querySelectorAll(".basket-extras__row")]
+    .find((r) => r.querySelector(".basket-extras__name")?.textContent === name) as HTMLElement;
+
+  test("chosen, it is ticked in its own place — no count, not in the products list — and «Remove» un-chooses it", async () => {
     await mount();
     await act(async () => { fireEvent.click(addButton("Billiard Cue")); });
-    expect(addButton("Billiard Cue").disabled).toBe(true);
-    expect(addButton("Billiard Cue").textContent).toBe("session.additionalInCart");
+
+    expect(row("Billiard Cue").classList.contains("is-chosen")).toBe(true);
+    expect(row("Billiard Cue").querySelector(".basket-extras__mark")?.textContent).toBe("✓");
+    // No stepper anywhere, and the products basket does not list it.
+    expect(screen.queryAllByLabelText("session.increase")).toHaveLength(0);
+    expect(screen.queryAllByLabelText("session.decrease")).toHaveLength(0);
+    expect(screen.queryByText("session.addedProducts")).toBeNull();
+    expect(section().textContent).toContain("session.additionalChosen");
+
+    await act(async () => { fireEvent.click(screen.getByLabelText("session.additionalRemove: Billiard Cue")); });
+    expect(row("Billiard Cue").classList.contains("is-chosen")).toBe(false);
+    expect(addButton("Billiard Cue").disabled).toBe(false);
+
     await act(async () => { fireEvent.click(addButton("Billiard Cue")); });
-
-    // In the basket once, and its + is dead.
-    const increase = screen.getAllByLabelText("session.increase") as HTMLButtonElement[];
-    expect(increase).toHaveLength(1);
-    expect(increase[0].disabled).toBe(true);
-
     await act(async () => { fireEvent.click(screen.getByText("session.cartConfirmOne")); });
     expect(repo.addItems).toHaveBeenCalledWith(42, [{ product_id: 41, qty: 1 }]);
+  });
+
+  test("next to a product, the product keeps its stepper and the item stays in its own place", async () => {
+    await mount();
+    await act(async () => { fireEvent.click(addButton("Poker Chips")); });
+    await act(async () => { fireEvent.click(plusFor("Lays")); });
+    // One stepper: the product's.
+    expect(screen.getAllByLabelText("session.increase")).toHaveLength(1);
+    const basket = screen.getByText("session.addedProducts").closest(".col") as HTMLElement;
+    expect(basket.textContent).toContain("Lays");
+    expect(basket.textContent).not.toContain("Poker Chips");
+    // The products' total is the products' (Lays 400), not with the chips (300).
+    expect(basket.textContent).toContain("session.itemsTotal: 400");
+    expect(basket.textContent).not.toContain("700");
+    expect(row("Poker Chips").classList.contains("is-chosen")).toBe(true);
   });
 
   test("several different ones and a drink go in one confirm", async () => {
@@ -1046,13 +1069,16 @@ describe("additional items — chips, a cue — handed out once per session", ()
     ]);
   });
 
-  test("one already handed out on this session cannot be added again, and is labelled on the bill", async () => {
+  test("one already handed out on this session cannot be added again, and reads without a count on the bill", async () => {
     const withCue = { ...session, items: [{ id: 9, name: "Billiard Cue", qty: 1, price: 500, product_id: 41 }] } as unknown as ISessionApi;
     await mount({ session: withCue });
-    expect(addButton("Billiard Cue").disabled).toBe(true);
-    expect(addButton("Billiard Cue").textContent).toBe("session.additionalOnBill");
+    expect(row("Billiard Cue").classList.contains("is-given")).toBe(true);
+    expect(row("Billiard Cue").textContent).toContain("session.additionalOnBill");
+    expect(screen.queryByLabelText("action.add: Billiard Cue")).toBeNull();
     expect(addButton("Poker Chips").disabled).toBe(false);
     expect(screen.getAllByText("product.kindAdditionalShort").length).toBeGreaterThan(0);
+    // On the bill: no "× 1" for it.
+    expect(screen.queryByText("× 1")).toBeNull();
   });
 
   test("taken off the bill, it can be added again", async () => {

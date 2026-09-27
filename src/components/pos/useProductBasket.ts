@@ -207,11 +207,17 @@ export const useProductBasket = ({ branchId, resolve, resolveKey, allow }: Optio
     return sellable.filter((p) => `${p.name} ${p.category ?? ""}`.toLowerCase().includes(needle));
   }, [products, search, allow]);
 
-  const cartTotal = cart.reduce((sum, l) => sum + l.price * l.qty, 0);
+  const sumOf = (lines: CartLine[]) => lines.reduce((sum, l) => sum + l.price * l.qty, 0);
+  const cartTotal = sumOf(cart);
+  // The basket in its two parts (2026-09-27): products, counted; additional
+  // items (`once`), chosen or not — each shown in its own place in the dialog.
+  const productLines = cart.filter((l) => !l.once);
+  const itemLines = cart.filter((l) => l.once);
 
   return {
     products, search, setSearch, filtered,
     cart, setCart, put, step, drop, cartTotal,
+    productLines, productLinesTotal: sumOf(productLines), itemLines, itemLinesTotal: sumOf(itemLines),
     mode, setMode, text, setText, resolved, setResolved, resolving,
     choices, choose, removeLine, pendingPicks: pendingPicks(resolved),
     err, setErr,

@@ -270,7 +270,10 @@ const AddSessionItemDialog = ({ branchId, session, onClose, onAdded }: Props) =>
                       </span>
                     )}
                   </span>
-                  <span style={{ minWidth: 40, textAlign: "center", fontWeight: 700 }}>× {item.qty}</span>
+                  {/* An additional item has no count: it was handed out or not. */}
+                  <span style={{ minWidth: 40, textAlign: "center", fontWeight: 700 }}>
+                    {item.product_id != null && additionalIds.has(item.product_id) ? "" : `× ${item.qty}`}
+                  </span>
                   <span className="muted" style={{ fontSize: 11, minWidth: 74, textAlign: "right" }}>
                     {money(sessionItemLineTotal(item))}
                   </span>

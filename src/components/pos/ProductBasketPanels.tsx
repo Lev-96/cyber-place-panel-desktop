@@ -66,7 +66,7 @@ interface PickerProps {
 /** The branch catalogue, the basket, and "a product the branch does not stock yet". */
 export const BasketPicker = ({ basket, saving, canCreateProducts, between }: PickerProps) => {
   const { money, t } = useLang();
-  const { products, filtered, cart, cartTotal } = basket;
+  const { products, filtered, cart, productLines, productLinesTotal } = basket;
 
   return (
     <>
@@ -106,13 +106,17 @@ export const BasketPicker = ({ basket, saving, canCreateProducts, between }: Pic
 
       {between}
 
-      {/* ── The basket ───────────────────────────────────────────────── */}
+      {/* ── The basket: the PRODUCTS chosen, each with its count ─────────
+          Additional items are chosen in their own section above and carry no
+          count, so they are not listed here. When only they are chosen, this
+          block steps aside rather than claiming the basket is empty. */}
+      {(productLines.length > 0 || cart.length === 0) && (
       <div className="col" style={{ gap: 8, borderTop: "1px solid #1f2a44", paddingTop: 12 }}>
         <div className="row-between">
           <span className="label" style={{ fontSize: 12 }}>{t("session.addedProducts")}</span>
-          {cart.length > 0 && (
+          {productLines.length > 0 && (
             <span className="muted" style={{ fontSize: 12 }}>
-              {t("session.itemsTotal")}: <b>{money(cartTotal)}</b>
+              {t("session.itemsTotal")}: <b>{money(productLinesTotal)}</b>
             </span>
           )}
         </div>
@@ -121,7 +125,7 @@ export const BasketPicker = ({ basket, saving, canCreateProducts, between }: Pic
           <div className="muted" style={{ fontSize: 13 }}>{t("session.cartEmpty")}</div>
         ) : (
           <div className="col" style={{ gap: 6, maxHeight: 190, overflowY: "auto" }}>
-            {cart.map((line) => (
+            {productLines.map((line) => (
               <div key={line.key} style={rowStyle}>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={ellipsis} title={line.name}>{line.name}</div>
@@ -143,8 +147,7 @@ export const BasketPicker = ({ basket, saving, canCreateProducts, between }: Pic
                 <Button
                   variant="secondary"
                   onClick={() => basket.step(line.key, 1)}
-                  // An additional item is one per session: its count stays 1.
-                  disabled={saving || line.once === true}
+                  disabled={saving}
                   style={stepBtn}
                   aria-label={t("session.increase")}
                   title={t("session.increase")}
@@ -165,6 +168,7 @@ export const BasketPicker = ({ basket, saving, canCreateProducts, between }: Pic
           </div>
         )}
       </div>
+      )}
 
       {/* ── Something the branch does not stock yet ──────────────────────
           Owner-level, and only shown to one. A manager sells from the
@@ -193,14 +197,12 @@ interface AdditionalProps {
 
 /**
  * Additional items — chips, a cue, a racket — handed out with the seat
- * (2026-09-27). Their own section, so what is SOLD and what is HANDED OUT are
- * never confused, but the same mechanic as a product: it goes into the basket
- * and lands with the confirm below.
- *
- * One per session, said three ways: already on the bill → «Уже выдано»; in
- * the basket → «В корзине»; otherwise «Добавить». The server refuses a second
- * one whatever this shows. Any seat: the chips-only-at-poker rule is the
- * regular catalogue's, not this section's.
+ * (2026-09-27). Their OWN place in the dialog, and the only place they appear
+ * while being chosen: an additional item has no count, so it is chosen or not,
+ * never "× 2". A row is «Добавить»; chosen, it is ticked with «Убрать»; already
+ * on this session's bill, «Уже выдано». What is chosen here lands with the same
+ * confirm as the products, and the server refuses a second one whatever this
+ * shows. Any seat: the chips-only-at-poker rule is the regular catalogue's.
  */
 export const BasketAdditionalItems = ({ basket, saving, onBill }: AdditionalProps) => {
   const { money, t } = useLang();
@@ -208,32 +210,52 @@ export const BasketAdditionalItems = ({ basket, saving, onBill }: AdditionalProp
   if (items.length === 0) return null;
 
   return (
-    <section className="col" style={{ gap: 6 }} aria-label={t("session.additionalTitle")}>
+    <section className="basket-extras" aria-label={t("session.additionalTitle")}>
       <div className="row-between" style={{ gap: 8, flexWrap: "wrap" }}>
         <span className="label" style={{ fontSize: 12, marginBottom: 0 }}>{t("session.additionalTitle")}</span>
         <span className="muted" style={{ fontSize: 11 }}>{t("session.additionalHint")}</span>
       </div>
-      <div className="col" style={{ gap: 6 }}>
+      <ul className="basket-extras__list">
         {items.map((p) => {
           const given = onBill.has(p.id);
-          const inCart = basket.cart.some((l) => l.product_id === p.id);
+          const chosen = basket.itemLines.some((l) => l.product_id === p.id);
+          const key = `p:${p.id}`;
           return (
-            <div key={p.id} style={rowStyle}>
-              <span style={ellipsis} title={p.name}>{p.name}</span>
-              <span style={{ fontWeight: 700, minWidth: 80, textAlign: "right" }}>{money(Number(p.price))}</span>
-              <Button
-                variant={given || inCart ? "secondary" : "primary"}
-                disabled={saving || given || inCart}
-                onClick={() => basket.put({ key: `p:${p.id}`, product_id: p.id, name: p.name, price: Number(p.price), once: true })}
-                style={{ ...stepBtn, minWidth: 110 }}
-                aria-label={`${t("action.add")}: ${p.name}`}
-              >
-                {given ? t("session.additionalOnBill") : inCart ? t("session.additionalInCart") : t("action.add")}
-              </Button>
-            </div>
+            <li key={p.id} className={`basket-extras__row${chosen ? " is-chosen" : ""}${given ? " is-given" : ""}`}>
+              <span className="basket-extras__mark" aria-hidden="true">{chosen || given ? "✓" : ""}</span>
+              <span className="basket-extras__name" title={p.name}>{p.name}</span>
+              <span className="basket-extras__price">{money(Number(p.price))}</span>
+              {given ? (
+                <span className="basket-extras__state">{t("session.additionalOnBill")}</span>
+              ) : chosen ? (
+                <Button
+                  variant="secondary"
+                  disabled={saving}
+                  onClick={() => basket.drop(key)}
+                  style={{ ...stepBtn, minWidth: 96 }}
+                  aria-label={`${t("session.additionalRemove")}: ${p.name}`}
+                >
+                  {t("session.additionalRemove")}
+                </Button>
+              ) : (
+                <Button
+                  disabled={saving}
+                  onClick={() => basket.put({ key, product_id: p.id, name: p.name, price: Number(p.price), once: true })}
+                  style={{ ...stepBtn, minWidth: 96 }}
+                  aria-label={`${t("action.add")}: ${p.name}`}
+                >
+                  {t("action.add")}
+                </Button>
+              )}
+            </li>
           );
         })}
-      </div>
+      </ul>
+      {basket.itemLines.length > 0 && (
+        <div className="basket-extras__sum" role="status">
+          {fmt(t("session.additionalChosen"), basket.itemLines.length, money(basket.itemLinesTotal))}
+        </div>
+      )}
     </section>
   );
 };

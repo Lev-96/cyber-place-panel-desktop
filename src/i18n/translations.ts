@@ -1379,7 +1379,8 @@ export const TRANSLATIONS: Dict = {
     ru: "Выдаётся один раз за сессию",
     am: "Տրվում է նիստում մեկ անգամ",
   },
-  "session.additionalInCart": { en: "In the basket", ru: "В корзине", am: "Զամբյուղում է" },
+  "session.additionalRemove": { en: "Remove", ru: "Убрать", am: "Հանել" },
+  "session.additionalChosen": { en: "Chosen: {0} · {1}", ru: "Выбрано: {0} · {1}", am: "Ընտրված է՝ {0} · {1}" },
   "session.additionalOnBill": { en: "Handed out", ru: "Уже выдано", am: "Արդեն տրված է" },
   "session.removeConfirm": {
     en: "Take «{0}» off this bill?",
