@@ -1543,23 +1543,27 @@ are unchanged — do not add a `paused` status here either.
 
 - A product is `regular` (sold by the unit) or `additional` (handed out with the
   seat, once per session, any seat) — `IProduct.kind`, `isAdditionalProduct()`
-  (absent = regular). Owner ticks «Дополнительный предмет» in `ProductForm`;
-  `ProductsList` labels them.
-- Add Product dialog (session): the regular picker's `allow` excludes them; they
-  get their own section `BasketAdditionalItems` (between catalogue and basket via
-  `BasketPicker`'s `between` slot) and are chosen ONLY there, with no count: a
-  row is «Добавить»; chosen, it is ticked (primary frame, `.is-chosen`) with
-  «Убрать»; on this session's bill, dimmed «Уже выдано». «Выбрано: N · sum»
-  under the list. They land with the one confirm as `once: true` basket lines
-  (`put`/`step(+1)` ignore a second one). The products basket («Добавленные
-  товары») lists `productLines` only, with its steppers and `productLinesTotal`;
-  the hook also exposes `itemLines`/`itemLinesTotal`. Bill lines of additional
-  products carry a «Доп. предмет» pill and no «× 1». The chips-only-poker rule is the regular catalogue's, not
-  this section's. The till (`SellProductsDialog`) never offers them; typed quick
-  entry never matches them (server-side `regular()`).
-- Taking any line off a bill asks first — `useConfirm` («Удалить «X» из
-  счёта?», destructive) in `AddSessionItemDialog` and `StopReceiptModal`; «Нет»
-  sends nothing. Toasts after add/remove as before.
+  (absent = regular). The KIND IS THE SECTION, not a checkbox: the Products
+  screen has tabs «Товары / Дополнительные предметы» (`ui/SectionTabs`, the
+  `.cp-subtabs` look with tab semantics and ← →), each listing its own, «+ New»
+  creating the open section's kind (`ProductForm` `kind` prop; an edit keeps the
+  entry's kind and never sends it).
+- Toasts name what it is: `ProductRepository` picks `toast.product.*` or
+  `toast.additionalItem.*` by kind (create from the body, update/remove from an
+  explicit `kind` arg).
+- Add Product dialog (session): when the branch has any active additional item,
+  tabs «Товары / Дополнительные предметы» with chosen counts; none → no tabs,
+  the dialog as before. «Товары» = mode switch + picker / quick entry (regular
+  only). «Дополнительные предметы» = `BasketAdditionalItems`: chosen or not, no
+  count — «Добавить»; chosen, ticked with «Убрать»; on the bill, «Уже выдано»;
+  «Выбрано: N · sum». ONE confirm sends everything: picker mode the whole cart,
+  typed mode the resolved lines + the chosen items (typed empty → items alone;
+  unresolved text holds all). The products basket lists `productLines` only.
+- Popups: after adding, products get the usual «Добавлено…» toast and items
+  their own «Выдано: …». Removing asks «Убрать дополнительный предмет «X» из
+  счёта?» and reports «Дополнительный предмет «X» убран из счёта» (products
+  keep their wording) — in `AddSessionItemDialog` and in `StopReceiptModal`,
+  which reads the bill line's server flag `is_additional`.
 - Realtime: `SessionChangedEvent.kind` gains `additional.added` /
   `additional.removed`; the board reloads on any kind.
 
