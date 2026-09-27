@@ -1547,11 +1547,14 @@ are unchanged — do not add a `paused` status here either.
   `ProductsList` labels them.
 - Add Product dialog (session): the regular picker's `allow` excludes them; they
   get their own section `BasketAdditionalItems` (between catalogue and basket via
-  `BasketPicker`'s `between` slot): «Добавить» / «В корзине» / «Уже выдано» (on
-  the bill). Same mechanic as products — into the basket, landing with the one
-  confirm. A basket line `once: true` holds exactly 1 (`put` and `step(+1)`
-  ignore it; the + is disabled). Bill lines of additional products carry a
-  «Доп. предмет» pill. The chips-only-poker rule is the regular catalogue's, not
+  `BasketPicker`'s `between` slot) and are chosen ONLY there, with no count: a
+  row is «Добавить»; chosen, it is ticked (primary frame, `.is-chosen`) with
+  «Убрать»; on this session's bill, dimmed «Уже выдано». «Выбрано: N · sum»
+  under the list. They land with the one confirm as `once: true` basket lines
+  (`put`/`step(+1)` ignore a second one). The products basket («Добавленные
+  товары») lists `productLines` only, with its steppers and `productLinesTotal`;
+  the hook also exposes `itemLines`/`itemLinesTotal`. Bill lines of additional
+  products carry a «Доп. предмет» pill and no «× 1». The chips-only-poker rule is the regular catalogue's, not
   this section's. The till (`SellProductsDialog`) never offers them; typed quick
   entry never matches them (server-side `regular()`).
 - Taking any line off a bill asks first — `useConfirm` («Удалить «X» из
