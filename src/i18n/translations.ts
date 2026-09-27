@@ -711,6 +711,18 @@ export const TRANSLATIONS: Dict = {
   },
   "session.removeFromBill": { en: "Remove from the bill", ru: "Убрать из счёта", am: "Հեռացնել հաշվից" },
   "session.removedOne": { en: "{0} removed", ru: "Товар «{0}» успешно удалён", am: "«{0}» ապրանքը հեռացվեց" },
+  // The same moments for an additional item, said as what it is.
+  "session.additionalGiven": { en: "Handed out: {0}.", ru: "Выдано: {0}.", am: "Տրված է՝ {0}։" },
+  "session.additionalRemoved": {
+    en: "Additional item «{0}» taken off the bill",
+    ru: "Дополнительный предмет «{0}» убран из счёта",
+    am: "«{0}» լրացուցիչ իրը հանվեց հաշվից",
+  },
+  "session.additionalRemoveConfirm": {
+    en: "Take the additional item «{0}» off this bill?",
+    ru: "Убрать дополнительный предмет «{0}» из счёта?",
+    am: "Հանե՞լ «{0}» լրացուցիչ իրը հաշվից։",
+  },
   "session.removeFailed": { en: "Could not remove the product.", ru: "Не удалось удалить товар.", am: "Չհաջողվեց հեռացնել ապրանքը։" },
   // Two ways to put something on a bill. The picker is the original and the
   // default; quick entry is for an order of five things, where finding each
@@ -1362,16 +1374,6 @@ export const TRANSLATIONS: Dict = {
   "history.activityLabel": { en: "Activity", ru: "Действия", am: "Գործողություններ" },
   // The bill on a History card, laid out as a receipt (2026-09-26).
   // A product handed out with the seat, once per session (2026-09-27).
-  "product.kindAdditional": {
-    en: "Additional item — handed out with the seat",
-    ru: "Дополнительный предмет — выдаётся вместе с местом",
-    am: "Լրացուցիչ իր՝ տրվում է տեղի հետ",
-  },
-  "product.kindAdditionalHint": {
-    en: "Chips, a cue, a racket: added to a running session once, on any seat, and not sold at the till.",
-    ru: "Фишки, кий, ракетка: добавляется к идущей сессии один раз, на любом месте; на кассе не продаётся.",
-    am: "Ֆիշկաներ, կիյ, ռակետ՝ ավելացվում է ընթացիկ նիստին մեկ անգամ, ցանկացած տեղում, դրամարկղում չի վաճառվում։",
-  },
   // The Add Product dialog's section for them, and taking a line off a bill.
   "session.additionalTitle": { en: "Additional items", ru: "Дополнительные предметы", am: "Լրացուցիչ իրեր" },
   "session.additionalHint": {
@@ -1379,6 +1381,9 @@ export const TRANSLATIONS: Dict = {
     ru: "Выдаётся один раз за сессию",
     am: "Տրվում է նիստում մեկ անգամ",
   },
+  // The Add Product dialog's two sections.
+  "session.addSections": { en: "What to add", ru: "Что добавить", am: "Ինչ ավելացնել" },
+  "session.sectionProducts": { en: "Products", ru: "Товары", am: "Ապրանքներ" },
   "session.additionalRemove": { en: "Remove", ru: "Убрать", am: "Հանել" },
   "session.additionalChosen": { en: "Chosen: {0} · {1}", ru: "Выбрано: {0} · {1}", am: "Ընտրված է՝ {0} · {1}" },
   "session.additionalOnBill": { en: "Handed out", ru: "Уже выдано", am: "Արդեն տրված է" },
@@ -1819,6 +1824,8 @@ export const TRANSLATIONS: Dict = {
 
   // Product form
   "product.titleNew": { en: "New product", ru: "Новый товар", am: "Նոր ապրանք" },
+  "product.titleNewAdditional": { en: "New additional item", ru: "Новый дополнительный предмет", am: "Նոր լրացուցիչ իր" },
+  "product.titleEditAdditional": { en: "Edit additional item", ru: "Редактировать дополнительный предмет", am: "Խմբագրել լրացուցիչ իրը" },
   "product.titleEdit": { en: "Edit product", ru: "Редактировать товар", am: "Խմբագրել ապրանքը" },
   "product.errors.price": { en: "Price must be a non-negative number", ru: "Цена должна быть неотрицательной", am: "Գինը չպետք է լինի բացասական" },
 
@@ -2355,6 +2362,12 @@ export const TRANSLATIONS: Dict = {
 
   "products.title": { en: "Products", ru: "Товары", am: "Ապրանքներ" },
   "products.new": { en: "+ New product", ru: "+ Новый товар", am: "+ Նոր ապրանք" },
+  "products.newAdditional": { en: "+ New additional item", ru: "+ Новый доп. предмет", am: "+ Նոր լրացուցիչ իր" },
+  "products.emptyAdditional": {
+    en: "No additional items yet — chips, a cue, a racket handed out with the seat.",
+    ru: "Дополнительных предметов пока нет — фишки, кий, ракетка, которые выдаются вместе с местом.",
+    am: "Լրացուցիչ իրեր դեռ չկան՝ ֆիշկաներ, կիյ, ռակետ, որոնք տրվում են տեղի հետ։",
+  },
   "products.empty": { en: "No products yet.", ru: "Товаров пока нет.", am: "Ապրանքներ դեռ չկան:" },
   "products.search": {
     en: "Search by name or category…",
@@ -3129,6 +3142,10 @@ export const TRANSLATIONS: Dict = {
   "toast.product.created": { en: "Product created", ru: "Товар создан", am: "Ապրանքը ստեղծվեց" },
   "toast.product.updated": { en: "Product updated", ru: "Товар обновлён", am: "Ապրանքը թարմացվեց" },
   "toast.product.deleted": { en: "Product deleted", ru: "Товар удалён", am: "Ապրանքը ջնջվեց" },
+  // An additional item (chips, a cue) — said as what it is, not as "product".
+  "toast.additionalItem.created": { en: "Additional item created", ru: "Дополнительный предмет создан", am: "Լրացուցիչ իրը ստեղծվեց" },
+  "toast.additionalItem.updated": { en: "Additional item updated", ru: "Дополнительный предмет обновлён", am: "Լրացուցիչ իրը թարմացվեց" },
+  "toast.additionalItem.deleted": { en: "Additional item deleted", ru: "Дополнительный предмет удалён", am: "Լրացուցիչ իրը ջնջվեց" },
 
   "toast.manager.created": { en: "Manager created", ru: "Менеджер создан", am: "Մենեջերը ստեղծվեց" },
   "toast.manager.updated": { en: "Manager updated", ru: "Менеджер обновлён", am: "Մենեջերը թարմացվեց" },

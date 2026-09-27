@@ -8,6 +8,7 @@ import { IBillBreakdown } from "@/api/sessions";
 import { useLang } from "@/i18n/LanguageContext";
 import { fmt } from "@/i18n/translations";
 import { useConfirm } from "@/components/ui/ConfirmProvider";
+import { notify } from "@/ui/notify";
 import { sharedPrecision } from "@/i18n/currency";
 import { sessionRepository } from "@/repositories/SessionRepository";
 import { ISessionApi } from "@/types/sessions";
@@ -69,13 +70,16 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved }: Prop
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session.id]);
 
-  const remove = async (itemId: number, name: string) => {
+  const remove = async (itemId: number, name: string, additional: boolean) => {
     // Asked first, as on the Add Product dialog: one misplaced click must not
-    // take a line off the bill a guest is about to pay.
-    if (!(await ask(fmt(t("session.removeConfirm"), name), { destructive: true }))) return;
+    // take a line off the bill a guest is about to pay. An additional item is
+    // asked about — and reported — as what it is.
+    const question = additional ? "session.additionalRemoveConfirm" : "session.removeConfirm";
+    if (!(await ask(fmt(t(question), name), { destructive: true }))) return;
     setBusy(true);
     try {
       await sessionRepository.removeItem(session.id, itemId);
+      notify.message("error", fmt(t(additional ? "session.additionalRemoved" : "session.removedOne"), name));
       onItemRemoved();
       await reload();
     } catch (e) {
@@ -232,7 +236,7 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved }: Prop
                   {money(Number(it.line_total), receiptPrecision)}
                 </span>
                 {!finished && (
-                  <button type="button" onClick={() => void remove(it.id, it.name)} disabled={busy} style={removeBtn} title={t("session.removeItemTitle")}>
+                  <button type="button" onClick={() => void remove(it.id, it.name, it.is_additional === true)} disabled={busy} style={removeBtn} title={t("session.removeItemTitle")}>
                     ×
                   </button>
                 )}

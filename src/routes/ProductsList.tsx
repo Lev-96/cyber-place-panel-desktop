@@ -11,7 +11,8 @@ import { productRepository } from "@/repositories/ProductRepository";
 import { IProduct } from "@/types/pos";
 import { useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
-import { isAdditionalProduct } from "@/types/pos";
+import { isAdditionalProduct, ProductKind } from "@/types/pos";
+import SectionTabs from "@/components/ui/SectionTabs";
 
 const ProductsList = () => {
   const { branchId } = useParams();
@@ -26,6 +27,11 @@ const ProductsList = () => {
   const confirm = useConfirm();
   const { data, loading, error, reload } = useAsync(() => productRepository.listByBranch(id), [id]);
   const [creating, setCreating] = useState(false);
+  /**
+   * Which catalogue is open (2026-09-27): what is SOLD, or what is HANDED OUT
+   * with the seat. A new entry is created as the kind of the open section.
+   */
+  const [section, setSection] = useState<ProductKind>("regular");
   const [editing, setEditing] = useState<IProduct | null>(null);
   const [search, setSearch] = useState("");
 
@@ -36,21 +42,22 @@ const ProductsList = () => {
   // cashier narrows a long list.
   const visible = useMemo(() => {
     const needle = search.trim().toLowerCase();
-    if (!needle) return data ?? [];
-    return (data ?? []).filter((p) =>
+    const inSection = (data ?? []).filter((p) => (isAdditionalProduct(p) ? "additional" : "regular") === section);
+    if (!needle) return inSection;
+    return inSection.filter((p) =>
       `${tr(p, "name", lang)} ${tr(p, "category", lang)}`.toLowerCase().includes(needle),
     );
-  }, [data, search, lang]);
+  }, [data, search, lang, section]);
 
   if (!Number.isFinite(id) || id <= 0) return <div className="error">{t("hub.invalidId")}</div>;
 
   const remove = async (p: IProduct) => {
     if (!(await confirm(`${t("action.delete")} ${tr(p, "name", lang)}?`, { destructive: true }))) return;
-    await productRepository.remove(p.id);
+    await productRepository.remove(p.id, p.kind);
     void reload();
   };
   const toggle = async (p: IProduct) => {
-    await productRepository.update(p.id, { is_active: !p.is_active });
+    await productRepository.update(p.id, { is_active: !p.is_active }, p.kind);
     void reload();
   };
 
@@ -58,8 +65,21 @@ const ProductsList = () => {
     <div className="col" style={{ gap: 18 }}>
       <div className="row-between">
         <h2 className="page-title" style={{ margin: 0 }}>{t("products.title")} · №{id}</h2>
-        {canEdit && <Button onClick={() => setCreating(true)}>{t("products.new")}</Button>}
+        {canEdit && (
+          <Button onClick={() => setCreating(true)}>
+            {t(section === "additional" ? "products.newAdditional" : "products.new")}
+          </Button>
+        )}
       </div>
+      <SectionTabs
+        label={t("session.addSections")}
+        value={section}
+        onChange={(k) => { setSection(k); setSearch(""); }}
+        tabs={[
+          { key: "regular", label: t("session.sectionProducts") },
+          { key: "additional", label: t("session.additionalTitle") },
+        ]}
+      />
       <input
         className="input"
         placeholder={t("products.search")}
@@ -74,14 +94,7 @@ const ProductsList = () => {
             <div key={p.id} className="list-item" style={{ opacity: p.is_active ? 1 : 0.5 }}>
               <div>
                 <div className="name">{tr(p, "name", lang)}</div>
-                <div className="meta">
-                  {tr(p, "category", lang) || "-"} · {money(Number(p.price))}
-                  {isAdditionalProduct(p) && (
-                    <span className="pill" style={{ marginLeft: 8, fontSize: 10, textTransform: "none", letterSpacing: 0 }}>
-                      {t("product.kindAdditionalShort")}
-                    </span>
-                  )}
-                </div>
+                <div className="meta">{tr(p, "category", lang) || "-"} · {money(Number(p.price))}</div>
               </div>
               {canEdit && (
                 <div className="row" style={{ gap: 6 }}>
@@ -96,11 +109,11 @@ const ProductsList = () => {
             </div>
           ))}
           {!visible.length && (
-            <div className="muted">{search.trim() ? t("products.noMatches") : t("products.empty")}</div>
+            <div className="muted">{search.trim() ? t("products.noMatches") : t(section === "additional" ? "products.emptyAdditional" : "products.empty")}</div>
           )}
         </div>
       )}
-      {creating && <ProductForm branchId={id} onClose={() => setCreating(false)} onSaved={() => { setCreating(false); void reload(); }} />}
+      {creating && <ProductForm branchId={id} kind={section} onClose={() => setCreating(false)} onSaved={() => { setCreating(false); void reload(); }} />}
       {editing && <ProductForm branchId={id} initial={editing} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); void reload(); }} />}
     </div>
   );

@@ -54,6 +54,9 @@ const PLACEHOLDER_KEYS = new Set([
   "session.quickEntryLine",
   "session.quickEntryCandidates",
   "session.quickEntryPick",
+  "session.additionalGiven",
+  "session.additionalRemoved",
+  "session.additionalRemoveConfirm",
 ]);
 
 vi.mock("@/i18n/LanguageContext", () => ({
@@ -1001,103 +1004,191 @@ describe("additional items — chips, a cue — handed out once per session", ()
   const catalogue = [...products, chips, cue];
   const section = () => screen.getByRole("region", { name: "session.additionalTitle" });
   const addButton = (name: string) => screen.getByLabelText(`action.add: ${name}`) as HTMLButtonElement;
+  const tab = (name: string) => screen.getAllByRole("tab").find((b) => (b.textContent ?? "").startsWith(name)) as HTMLButtonElement;
+  const openItems = async () => { await act(async () => { fireEvent.click(tab("session.additionalTitle")); }); };
+  const openProducts = async () => { await act(async () => { fireEvent.click(tab("session.sectionProducts")); }); };
+  const row = (name: string) => [...document.querySelectorAll(".basket-extras__row")]
+    .find((r) => r.querySelector(".basket-extras__name")?.textContent === name) as HTMLElement;
+  const toastTexts = () => toasts.message.mock.calls.map((c) => `${c[0]}|${c[1]}`);
 
   beforeEach(() => {
     repo.listProducts.mockReset();
     repo.listProducts.mockResolvedValue(catalogue);
     repo.addItems.mockReset();
     repo.addItems.mockResolvedValue({ ...session, items: [] });
+    repo.resolveItemsText.mockReset();
+    repo.removeItem.mockReset();
   });
 
-  test("they have their own section and are not in the products list", async () => {
+  test("two tabs — products and additional items — each showing only its own", async () => {
     await mount();
+    expect(screen.getByRole("tablist", { name: "session.addSections" })).toBeTruthy();
+    expect(tab("session.sectionProducts").getAttribute("aria-selected")).toBe("true");
+    expect(screen.getByText("Lays")).toBeTruthy();
+    expect(screen.getByLabelText("session.addModeText")).toBeTruthy();
+    expect(screen.queryByRole("region", { name: "session.additionalTitle" })).toBeNull();
+    expect(screen.queryByText("Poker Chips")).toBeNull();
+
+    await openItems();
+    expect(tab("session.additionalTitle").getAttribute("aria-selected")).toBe("true");
     expect(section().textContent).toContain("Poker Chips");
     expect(section().textContent).toContain("Billiard Cue");
-    // The regular catalogue still lists the drinks and not these.
-    expect(screen.getByText("Lays")).toBeTruthy();
-    expect(screen.getAllByText("Poker Chips")).toHaveLength(1);
+    expect(screen.queryByText("Lays")).toBeNull();
+    expect(screen.queryByLabelText("session.addModeText")).toBeNull();
   });
 
-  const row = (name: string) => [...document.querySelectorAll(".basket-extras__row")]
-    .find((r) => r.querySelector(".basket-extras__name")?.textContent === name) as HTMLElement;
-
-  test("chosen, it is ticked in its own place — no count, not in the products list — and «Remove» un-chooses it", async () => {
+  test("a branch with no additional items has no tabs — the dialog as it was", async () => {
+    repo.listProducts.mockResolvedValue(products);
     await mount();
+    expect(screen.queryByRole("tablist")).toBeNull();
+    expect(screen.getByText("Lays")).toBeTruthy();
+  });
+
+  test("← → move between the tabs", async () => {
+    await mount();
+    await act(async () => { fireEvent.keyDown(screen.getByRole("tablist"), { key: "ArrowRight" }); });
+    expect(tab("session.additionalTitle").getAttribute("aria-selected")).toBe("true");
+    await act(async () => { fireEvent.keyDown(screen.getByRole("tablist"), { key: "ArrowLeft" }); });
+    expect(tab("session.sectionProducts").getAttribute("aria-selected")).toBe("true");
+  });
+
+  test("chosen, it is ticked — no count — «Remove» un-chooses it, and its tab counts it", async () => {
+    await mount();
+    await openItems();
     await act(async () => { fireEvent.click(addButton("Billiard Cue")); });
 
     expect(row("Billiard Cue").classList.contains("is-chosen")).toBe(true);
     expect(row("Billiard Cue").querySelector(".basket-extras__mark")?.textContent).toBe("✓");
-    // No stepper anywhere, and the products basket does not list it.
     expect(screen.queryAllByLabelText("session.increase")).toHaveLength(0);
-    expect(screen.queryAllByLabelText("session.decrease")).toHaveLength(0);
-    expect(screen.queryByText("session.addedProducts")).toBeNull();
     expect(section().textContent).toContain("session.additionalChosen");
+    expect(tab("session.additionalTitle").textContent).toBe("session.additionalTitle · 1");
 
     await act(async () => { fireEvent.click(screen.getByLabelText("session.additionalRemove: Billiard Cue")); });
     expect(row("Billiard Cue").classList.contains("is-chosen")).toBe(false);
-    expect(addButton("Billiard Cue").disabled).toBe(false);
-
-    await act(async () => { fireEvent.click(addButton("Billiard Cue")); });
-    await act(async () => { fireEvent.click(screen.getByText("session.cartConfirmOne")); });
-    expect(repo.addItems).toHaveBeenCalledWith(42, [{ product_id: 41, qty: 1 }]);
+    expect(tab("session.additionalTitle").textContent).toBe("session.additionalTitle");
   });
 
-  test("next to a product, the product keeps its stepper and the item stays in its own place", async () => {
+  test("items and products go in one confirm, and each is announced in its own words", async () => {
     await mount();
-    await act(async () => { fireEvent.click(addButton("Poker Chips")); });
     await act(async () => { fireEvent.click(plusFor("Lays")); });
-    // One stepper: the product's.
+    await act(async () => { fireEvent.click(plusFor("Lays")); });
+    expect(tab("session.sectionProducts").textContent).toBe("session.sectionProducts · 1");
+    await openItems();
+    await act(async () => { fireEvent.click(addButton("Poker Chips")); });
+    await act(async () => { fireEvent.click(addButton("Billiard Cue")); });
+    await act(async () => { fireEvent.click(screen.getByText("session.cartConfirmMany")); });
+
+    expect(repo.addItems).toHaveBeenCalledTimes(1);
+    expect(repo.addItems).toHaveBeenCalledWith(42, [
+      { product_id: 10, qty: 2 }, { product_id: 40, qty: 1 }, { product_id: 41, qty: 1 },
+    ]);
+    // The product as always; the items as handed out — never "Cue × 1".
+    expect(toastTexts()).toContain("success|session.addedOne");
+    expect(toastTexts()).toContain("success|session.additionalGiven: Poker Chips, Billiard Cue");
+    expect(toastTexts().join(" ")).not.toContain("Billiard Cue × 1");
+  });
+
+  test("only items chosen: one toast, the handed-out one", async () => {
+    await mount();
+    await openItems();
+    await act(async () => { fireEvent.click(addButton("Billiard Cue")); });
+    await act(async () => { fireEvent.click(screen.getByText("session.cartConfirmOne")); });
+    expect(toastTexts()).toEqual(["success|session.additionalGiven: Billiard Cue"]);
+  });
+
+  test("the products basket lists products only, and totals them only", async () => {
+    await mount();
+    await openItems();
+    await act(async () => { fireEvent.click(addButton("Poker Chips")); });
+    await openProducts();
+    await act(async () => { fireEvent.click(plusFor("Lays")); });
     expect(screen.getAllByLabelText("session.increase")).toHaveLength(1);
     const basket = screen.getByText("session.addedProducts").closest(".col") as HTMLElement;
     expect(basket.textContent).toContain("Lays");
     expect(basket.textContent).not.toContain("Poker Chips");
-    // The products' total is the products' (Lays 400), not with the chips (300).
     expect(basket.textContent).toContain("session.itemsTotal: 400");
     expect(basket.textContent).not.toContain("700");
-    expect(row("Poker Chips").classList.contains("is-chosen")).toBe(true);
   });
 
-  test("several different ones and a drink go in one confirm", async () => {
+  test("typed products and chosen items go in one confirm — an item is never dropped for typing", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      repo.resolveItemsText.mockResolvedValue({
+        lines: [{ raw: "2 lays", status: "matched", product_id: 10, name: "Lays", price: 400, qty: 2, line_total: 800, error: null, candidates: [], options: [] }],
+        items: [{ product_id: 10, qty: 2 }], total: 800, ok: true,
+      });
+      await mount();
+      await act(async () => { fireEvent.click(screen.getByLabelText("session.addModeText")); });
+      await act(async () => { fireEvent.change(screen.getByLabelText("session.quickEntry"), { target: { value: "2 lays" } }); });
+      await act(async () => { vi.advanceTimersByTime(400); });
+      for (let i = 0; i < 5; i++) await act(async () => { await Promise.resolve(); });
+      await openItems();
+      await act(async () => { fireEvent.click(addButton("Billiard Cue")); });
+      await act(async () => { fireEvent.click(screen.getByText("session.quickEntryConfirm")); });
+      expect(repo.addItems).toHaveBeenCalledWith(42, [{ product_id: 10, qty: 2 }, { product_id: 41, qty: 1 }]);
+      expect(toastTexts()).toContain("success|session.additionalGiven: Billiard Cue");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  test("in typed mode with nothing typed, the chosen items alone can be added", async () => {
     await mount();
-    await act(async () => { fireEvent.click(addButton("Poker Chips")); });
+    await act(async () => { fireEvent.click(screen.getByLabelText("session.addModeText")); });
+    const confirmBtn = () => screen.getByText("session.quickEntryConfirm").closest("button") as HTMLButtonElement;
+    expect(confirmBtn().disabled).toBe(true);
+    await openItems();
     await act(async () => { fireEvent.click(addButton("Billiard Cue")); });
-    await act(async () => { fireEvent.click(plusFor("Lays")); });
-    await act(async () => { fireEvent.click(plusFor("Lays")); });
-    await act(async () => { fireEvent.click(screen.getByText("session.cartConfirmMany")); });
-    expect(repo.addItems).toHaveBeenCalledWith(42, [
-      { product_id: 40, qty: 1 }, { product_id: 41, qty: 1 }, { product_id: 10, qty: 2 },
-    ]);
+    expect(confirmBtn().disabled).toBe(false);
+    await act(async () => { fireEvent.click(confirmBtn()); });
+    expect(repo.addItems).toHaveBeenCalledWith(42, [{ product_id: 41, qty: 1 }]);
+    expect(repo.resolveItemsText).not.toHaveBeenCalled();
   });
 
-  test("one already handed out on this session cannot be added again, and reads without a count on the bill", async () => {
+  test("one already handed out cannot be added again, and reads without a count on the bill", async () => {
     const withCue = { ...session, items: [{ id: 9, name: "Billiard Cue", qty: 1, price: 500, product_id: 41 }] } as unknown as ISessionApi;
     await mount({ session: withCue });
+    expect(screen.getAllByText("product.kindAdditionalShort").length).toBeGreaterThan(0);
+    expect(screen.queryByText("× 1")).toBeNull();
+    await openItems();
     expect(row("Billiard Cue").classList.contains("is-given")).toBe(true);
     expect(row("Billiard Cue").textContent).toContain("session.additionalOnBill");
     expect(screen.queryByLabelText("action.add: Billiard Cue")).toBeNull();
     expect(addButton("Poker Chips").disabled).toBe(false);
-    expect(screen.getAllByText("product.kindAdditionalShort").length).toBeGreaterThan(0);
-    // On the bill: no "× 1" for it.
-    expect(screen.queryByText("× 1")).toBeNull();
   });
 
-  test("taken off the bill, it can be added again", async () => {
+  test("taking one off the bill asks and reports it as an additional item, then it can be added again", async () => {
     const withCue = { ...session, items: [{ id: 9, name: "Billiard Cue", qty: 1, price: 500, product_id: 41 }] } as unknown as ISessionApi;
     repo.removeItem.mockResolvedValue({ ...session, items: [] });
     await mount({ session: withCue });
     await act(async () => { fireEvent.click(screen.getByLabelText("action.delete: Billiard Cue")); });
+
+    expect(asked.fn).toHaveBeenCalledWith("session.additionalRemoveConfirm: Billiard Cue", { destructive: true });
+    expect(toastTexts()).toContain("error|session.additionalRemoved: Billiard Cue");
+    await openItems();
     expect(addButton("Billiard Cue").disabled).toBe(false);
+  });
+
+  test("a product off the bill is still asked about and reported as a product", async () => {
+    const withCola = { ...session, items: [{ id: 5, name: "Cola", qty: 2, price: 300, product_id: 15 }] } as unknown as ISessionApi;
+    repo.removeItem.mockResolvedValue({ ...session, items: [] });
+    await mount({ session: withCola });
+    await act(async () => { fireEvent.click(screen.getByLabelText("action.delete: Cola")); });
+    expect(asked.fn).toHaveBeenCalledWith("session.removeConfirm", { destructive: true });
+    expect(toastTexts().some((x) => x.startsWith("error|session.removedOne"))).toBe(true);
   });
 
   test("chips as an additional item are offered on a seat that is not a poker table", async () => {
     await mount({ session: { ...session, supports_chips: false } as unknown as ISessionApi });
+    await openItems();
     expect(section().textContent).toContain("Poker Chips");
     expect(addButton("Poker Chips").disabled).toBe(false);
   });
 
-  test("a withdrawn one is not offered", async () => {
+  test("a withdrawn one is not offered — and with none left, there are no tabs", async () => {
     repo.listProducts.mockResolvedValue([...products, { ...cue, is_active: false }]);
     await mount();
+    expect(screen.queryByRole("tablist")).toBeNull();
     expect(screen.queryByRole("region", { name: "session.additionalTitle" })).toBeNull();
   });
 });

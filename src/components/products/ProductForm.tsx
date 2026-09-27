@@ -12,11 +12,15 @@ import { useLang } from "@/i18n/LanguageContext";
 import { productRepository } from "@/repositories/ProductRepository";
 import { IProduct, isAdditionalProduct, ProductKind } from "@/types/pos";
 import { FormEvent, useState } from "react";
-import Checkbox from "@/components/ui/Checkbox";
 
 interface Props {
   branchId: number;
   initial?: IProduct;
+  /**
+   * What a NEW entry is — the section it is created from (Products, or
+   * Additional items). An edit keeps the entry's own kind.
+   */
+  kind?: ProductKind;
   onClose: () => void;
   onSaved: (p: IProduct) => void;
 }
@@ -37,7 +41,7 @@ interface Props {
  * other languages — the same translations the form already primed into the
  * translation memory, so it costs nothing.
  */
-const ProductForm = ({ branchId, initial, onClose, onSaved }: Props) => {
+const ProductForm = ({ branchId, initial, onClose, onSaved, kind: kindProp = "regular" }: Props) => {
   const { t, lang } = useLang();
   const [name, setName] = useState<LangValues>(
     () => langValuesFromField(initial?.i18n, "name", initial?.name, lang),
@@ -46,9 +50,7 @@ const ProductForm = ({ branchId, initial, onClose, onSaved }: Props) => {
     () => langValuesFromField(initial?.i18n, "category", initial?.category, lang),
   );
   const [price, setPrice] = useState(String(initial?.price ?? ""));
-  // Handed out with the seat, once per session — chips, a cue, a racket.
-  const [additional, setAdditional] = useState(initial ? isAdditionalProduct(initial) : false);
-  const kind: ProductKind = additional ? "additional" : "regular";
+  const kind: ProductKind = initial ? (isAdditionalProduct(initial) ? "additional" : "regular") : kindProp;
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -68,9 +70,8 @@ const ProductForm = ({ branchId, initial, onClose, onSaved }: Props) => {
             name: nameValue,
             category: categoryValue || null,
             price: pr,
-            kind,
             source_locale: lang,
-          })
+          }, kind)
         : await productRepository.create({
             branch_id: branchId,
             name: nameValue,
@@ -95,7 +96,11 @@ const ProductForm = ({ branchId, initial, onClose, onSaved }: Props) => {
   return (
     <Modal open onClose={onClose}>
       <form className="card" style={{ width: 560, maxWidth: "92vw", display: "flex", flexDirection: "column", gap: 16 }} onSubmit={submit}>
-        <h2 style={{ margin: 0 }}>{initial ? t("product.titleEdit") : t("product.titleNew")}</h2>
+        <h2 style={{ margin: 0 }}>
+          {kind === "additional"
+            ? t(initial ? "product.titleEditAdditional" : "product.titleNewAdditional")
+            : t(initial ? "product.titleEdit" : "product.titleNew")}
+        </h2>
 
         <MultiLangInput
           label={t("label.name")}
@@ -118,17 +123,6 @@ const ProductForm = ({ branchId, initial, onClose, onSaved }: Props) => {
         />
 
         <PriceInput label={t("label.price")} value={price} onChange={setPrice} required />
-
-        {/* Not a separate catalogue: the same product, used differently. */}
-        <div className="col" style={{ gap: 4 }}>
-          <Checkbox
-            checked={additional}
-            onChange={setAdditional}
-            disabled={busy}
-            label={t("product.kindAdditional")}
-          />
-          <span className="muted" style={{ fontSize: 12 }}>{t("product.kindAdditionalHint")}</span>
-        </div>
 
         {err && <div className="error">{err}</div>}
         <div className="row-between">

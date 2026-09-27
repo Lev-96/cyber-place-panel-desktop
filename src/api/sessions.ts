@@ -137,6 +137,8 @@ export interface IBillBreakdown {
     minutes?: number | null;
     /** When it was handed back. Null is "still out, still on the clock". */
     returned_at?: string | null;
+    /** An additional item (chips, a cue — once per session). Absent on an older backend. */
+    is_additional?: boolean;
   }>;
   items_total: number;
   /** What is actually owed. Zero for a waived session. */

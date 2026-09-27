@@ -49,6 +49,9 @@ vi.mock("@/i18n/LanguageContext", () => ({
   }),
 }));
 
+const toasts = vi.hoisted(() => ({ message: vi.fn() }));
+vi.mock("@/ui/notify", () => ({ notify: { message: (...a: unknown[]) => toasts.message(...a) } }));
+
 /** The in-app confirmation: «yes» unless a test says otherwise. */
 const asked = vi.hoisted(() => ({ fn: vi.fn(async (_m: string, _o?: unknown) => true) }));
 vi.mock("@/components/ui/ConfirmProvider", () => ({ useConfirm: () => asked.fn }));
@@ -503,6 +506,36 @@ describe("taking a line off the bill before the stop", () => {
     await act(async () => { fireEvent.click(screen.getByTitle("session.removeItemTitle")); });
     expect(asked.fn).toHaveBeenCalledWith("session.removeConfirm", { destructive: true });
     expect(repo.removeItem).toHaveBeenCalledWith(1, 7);
+  });
+
+  test("an additional item is asked about and reported as one", async () => {
+    repo.preview.mockResolvedValue(bill({
+      items: [{ id: 8, name: "Billiard Cue", price: 500, qty: 1, line_total: 500, is_additional: true }],
+    } as Partial<IBillBreakdown>));
+    repo.removeItem.mockReset();
+    repo.removeItem.mockResolvedValue({});
+    toasts.message.mockReset();
+    asked.fn.mockReset();
+    asked.fn.mockImplementation(async () => true);
+    await mount();
+
+    await act(async () => { fireEvent.click(screen.getByTitle("session.removeItemTitle")); });
+    expect(asked.fn).toHaveBeenCalledWith("session.additionalRemoveConfirm", { destructive: true });
+    expect(repo.removeItem).toHaveBeenCalledWith(1, 8);
+    expect(toasts.message).toHaveBeenCalledWith("error", "session.additionalRemoved");
+  });
+
+  test("a product removed here says so too", async () => {
+    repo.preview.mockResolvedValue(withCola());
+    repo.removeItem.mockReset();
+    repo.removeItem.mockResolvedValue({});
+    toasts.message.mockReset();
+    asked.fn.mockReset();
+    asked.fn.mockImplementation(async () => true);
+    await mount();
+
+    await act(async () => { fireEvent.click(screen.getByTitle("session.removeItemTitle")); });
+    expect(toasts.message).toHaveBeenCalledWith("error", "session.removedOne");
   });
 
   test("answering «no» removes nothing", async () => {

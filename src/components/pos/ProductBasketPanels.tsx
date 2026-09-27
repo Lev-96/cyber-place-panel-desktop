@@ -10,7 +10,6 @@ import { ProductBasket } from "./useProductBasket";
 import { choiceKey } from "./quickEntryChoices";
 import { KeyboardEvent, useId, useRef, useState } from "react";
 import { isAdditionalProduct } from "@/types/pos";
-import type { ReactNode } from "react";
 
 /**
  * The parts of a sale dialog that do not care what the sale is for — the
@@ -57,14 +56,12 @@ export const BasketModeSwitch = ({ basket, name, disabled }: ModeSwitchProps) =>
 interface PickerProps {
   basket: ProductBasket;
   saving: boolean;
-  /** Shown between the catalogue and the basket — the session's additional items. */
-  between?: ReactNode;
   /** Mirrors the backend's `products.manage`: owner-level, never a manager. */
   canCreateProducts: boolean;
 }
 
 /** The branch catalogue, the basket, and "a product the branch does not stock yet". */
-export const BasketPicker = ({ basket, saving, canCreateProducts, between }: PickerProps) => {
+export const BasketPicker = ({ basket, saving, canCreateProducts }: PickerProps) => {
   const { money, t } = useLang();
   const { products, filtered, cart, productLines, productLinesTotal } = basket;
 
@@ -103,8 +100,6 @@ export const BasketPicker = ({ basket, saving, canCreateProducts, between }: Pic
           ))}
         </div>
       )}
-
-      {between}
 
       {/* ── The basket: the PRODUCTS chosen, each with its count ─────────
           Additional items are chosen in their own section above and carry no
@@ -211,10 +206,8 @@ export const BasketAdditionalItems = ({ basket, saving, onBill }: AdditionalProp
 
   return (
     <section className="basket-extras" aria-label={t("session.additionalTitle")}>
-      <div className="row-between" style={{ gap: 8, flexWrap: "wrap" }}>
-        <span className="label" style={{ fontSize: 12, marginBottom: 0 }}>{t("session.additionalTitle")}</span>
-        <span className="muted" style={{ fontSize: 11 }}>{t("session.additionalHint")}</span>
-      </div>
+      {/* Its tab already names it; this says the one rule that makes it different. */}
+      <span className="muted" style={{ fontSize: 12 }}>{t("session.additionalHint")}</span>
       <ul className="basket-extras__list">
         {items.map((p) => {
           const given = onBill.has(p.id);

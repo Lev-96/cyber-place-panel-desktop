@@ -4841,15 +4841,13 @@ select.input option:disabled {
 }
 
 /* ── Add Product: additional items (chips, a cue, a racket) ───────────────
-   Their own place in the dialog. Chosen or not — no count — so a chosen row is
+   Their own tab in the dialog. Chosen or not — no count — so a chosen row is
    marked (tick, primary frame) rather than given a stepper; one already handed
    out on this session is dimmed and says so. */
 .basket-extras {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding-top: 12px;
-  border-top: 1px solid var(--color-border);
 }
 .basket-extras__list {
   list-style: none;

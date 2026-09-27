@@ -5,9 +5,9 @@ import type { IProduct } from "@/types/pos";
 import ProductForm from "./ProductForm";
 
 /**
- * The product form's one new question (2026-09-27): is this sold by the unit,
- * or handed out with the seat? It travels as `kind`; everything else about the
- * form is unchanged.
+ * What a new entry is — sold by the unit, or handed out with the seat — is
+ * decided by the section it is created from (2026-09-27), not by a checkbox.
+ * It travels as `kind` on create; an edit never changes it.
  */
 
 const repo = vi.hoisted(() => ({ create: vi.fn(), update: vi.fn() }));
@@ -30,12 +30,17 @@ vi.mock("@/components/ui/PriceInput", () => ({
   ),
 }));
 
-const mount = async (initial?: IProduct) => {
+const mount = async (initial?: IProduct, kind?: "regular" | "additional") => {
   const onSaved = vi.fn();
-  await act(async () => { render(<ProductForm branchId={3} initial={initial} onClose={() => {}} onSaved={onSaved} />); });
+  await act(async () => { render(<ProductForm branchId={3} initial={initial} kind={kind} onClose={() => {}} onSaved={onSaved} />); });
   return { onSaved };
 };
-const checkbox = () => screen.getByRole("checkbox") as HTMLInputElement;
+const fill = async (name: string, price: string) => {
+  await act(async () => {
+    fireEvent.change(screen.getByLabelText("label.name"), { target: { value: name } });
+    fireEvent.change(screen.getByLabelText("label.price"), { target: { value: price } });
+  });
+};
 const save = async () => { await act(async () => { fireEvent.click(screen.getByText("action.save")); }); };
 
 beforeEach(() => {
@@ -46,39 +51,35 @@ beforeEach(() => {
 });
 afterEach(() => cleanup());
 
-describe("ProductForm — additional item", () => {
-  test("a new product is sold by the unit unless the box is ticked", async () => {
+describe("ProductForm — the section decides the kind", () => {
+  test("from the products section: a product, and no checkbox to change it", async () => {
     await mount();
-    expect(checkbox().checked).toBe(false);
-    await act(async () => {
-      fireEvent.change(screen.getByLabelText("label.name"), { target: { value: "Tea" } });
-      fireEvent.change(screen.getByLabelText("label.price"), { target: { value: "300" } });
-    });
+    expect(screen.queryByRole("checkbox")).toBeNull();
+    expect(screen.getByText("product.titleNew")).toBeTruthy();
+    await fill("Tea", "300");
     await save();
     expect(repo.create).toHaveBeenCalledWith(expect.objectContaining({ name: "Tea", price: 300, kind: "regular" }));
   });
 
-  test("ticked, it is created as an additional item", async () => {
-    await mount();
-    await act(async () => {
-      fireEvent.change(screen.getByLabelText("label.name"), { target: { value: "Billiard Cue" } });
-      fireEvent.change(screen.getByLabelText("label.price"), { target: { value: "500" } });
-      fireEvent.click(checkbox());
-    });
+  test("from the additional items section: created as an additional item, and titled so", async () => {
+    await mount(undefined, "additional");
+    expect(screen.getByText("product.titleNewAdditional")).toBeTruthy();
+    await fill("Billiard Cue", "500");
     await save();
     expect(repo.create).toHaveBeenCalledWith(expect.objectContaining({ name: "Billiard Cue", kind: "additional" }));
   });
 
-  test("editing one opens ticked and can turn it back into a product", async () => {
+  test("editing keeps the entry's own kind and names it for the toast", async () => {
     await mount({ id: 5, branch_id: 3, name: "Billiard Cue", category: null, price: 500, is_active: true, kind: "additional" });
-    expect(checkbox().checked).toBe(true);
-    await act(async () => { fireEvent.click(checkbox()); });
+    expect(screen.getByText("product.titleEditAdditional")).toBeTruthy();
     await save();
-    expect(repo.update).toHaveBeenCalledWith(5, expect.objectContaining({ kind: "regular" }));
+    expect(repo.update).toHaveBeenCalledWith(5, expect.not.objectContaining({ kind: expect.anything() }), "additional");
   });
 
-  test("a product from an older server, with no kind, opens as a regular one", async () => {
+  test("a product from an older server, with no kind, edits as a product", async () => {
     await mount({ id: 6, branch_id: 3, name: "Tea", category: null, price: 300, is_active: true });
-    expect(checkbox().checked).toBe(false);
+    expect(screen.getByText("product.titleEdit")).toBeTruthy();
+    await save();
+    expect(repo.update).toHaveBeenCalledWith(6, expect.anything(), "regular");
   });
 });

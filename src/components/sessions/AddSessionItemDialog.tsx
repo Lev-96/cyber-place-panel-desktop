@@ -11,6 +11,7 @@ import { ISessionApi } from "@/types/sessions";
 import { IProduct, isAdditionalProduct, isChipsProduct } from "@/types/pos";
 import { useConfirm } from "@/components/ui/ConfirmProvider";
 import { useProductBasket } from "@/components/pos/useProductBasket";
+import SectionTabs from "@/components/ui/SectionTabs";
 import {
   BasketAdditionalItems,
   BasketCreateProduct,
@@ -76,6 +77,8 @@ const AddSessionItemDialog = ({ branchId, session, onClose, onAdded }: Props) =>
   const { money, t } = useLang();
   const [saving, setSaving] = useState(false);
   const confirmingRef = useRef(false);
+  /** Which part of the dialog is open: the products, or the additional items. */
+  const [section, setSection] = useState<"products" | "additional">("products");
 
   /**
    * Chips are a poker table's product, and only a poker table's.
@@ -127,6 +130,14 @@ const AddSessionItemDialog = ({ branchId, session, onClose, onAdded }: Props) =>
   const ask = useConfirm();
   // The catalogue's additional items, by id — to label them on the bill.
   const additionalIds = new Set((basket.products ?? []).filter(isAdditionalProduct).map((p) => p.id));
+  /** The branch hands something out with the seat — only then are there two sections. */
+  const hasAdditional = (basket.products ?? []).some((p) => isAdditionalProduct(p) && p.is_active !== false);
+  const shown = hasAdditional ? section : "products";
+  const itemPayload = basket.itemLines.map((l) => ({ product_id: l.product_id as number, qty: 1 }));
+  // Typed mode: the typed lines must all resolve (a batch is never saved in
+  // part), or the box is empty and only additional items are being added.
+  const textEmpty = basket.text.trim() === "";
+  const textReady = !resolving && (textEmpty ? itemPayload.length > 0 : resolved?.ok === true && resolved.items.length > 0);
   const onBillIds = new Set(bill.map((i) => i.product_id).filter((id): id is number => id !== null && id !== undefined));
 
   // A fresh session from the parent (after a confirm, or a realtime update)
@@ -141,16 +152,32 @@ const AddSessionItemDialog = ({ branchId, session, onClose, onAdded }: Props) =>
    * removed. The row is disabled while it is in flight, and a refusal says why
    * instead of claiming success.
    */
-  const removeFromBill = async (itemId: number, name: string) => {
+  /**
+   * What landed, said in two parts: the products as always («… × 2»), and the
+   * additional items as what happened to them — handed out — in a toast of
+   * their own, so a cue never reads as "Cue × 1 sold".
+   */
+  const announceAdded = (products: Array<{ name: string; qty: number }>, items: string[]) => {
+    if (products.length === 1) {
+      notify.message("success", fmt(t("session.addedOne"), products[0].name, products[0].qty));
+    } else if (products.length > 1) {
+      notify.message("success", fmt(t("session.addedMany"), products.map((l) => `${l.name} × ${l.qty}`).join(", ")));
+    }
+    if (items.length > 0) notify.message("success", fmt(t("session.additionalGiven"), items.join(", ")));
+  };
+
+  const removeFromBill = async (itemId: number, name: string, additional: boolean) => {
     if (removing.includes(itemId)) return;
     // Taking something off a bill is asked first: one misplaced click must
-    // not un-sell a drink or take a cue back.
-    if (!(await ask(fmt(t("session.removeConfirm"), name), { destructive: true }))) return;
+    // not un-sell a drink or take a cue back. An additional item is asked
+    // about — and reported — as what it is.
+    const question = additional ? "session.additionalRemoveConfirm" : "session.removeConfirm";
+    if (!(await ask(fmt(t(question), name), { destructive: true }))) return;
     setRemoving((prev) => [...prev, itemId]);
     try {
       const updated = await sessionRepository.removeItem(session.id, itemId);
       setBill(updated?.items ?? bill.filter((i) => i.id !== itemId));
-      notify.message("error", fmt(t("session.removedOne"), name));
+      notify.message("error", fmt(t(additional ? "session.additionalRemoved" : "session.removedOne"), name));
       onAdded();
     } catch (e) {
       const reason = e instanceof Error && e.message ? e.message : t("session.failUnknown");
@@ -171,18 +198,23 @@ const AddSessionItemDialog = ({ branchId, session, onClose, onAdded }: Props) =>
   const confirmText = async () => {
     // The ref answers a double press inside one frame; `saving` only greys
     // the button once React has rendered.
-    if (!resolved?.ok || !resolved.items.length || saving || confirmingRef.current) return;
+    if (!textReady || saving || confirmingRef.current) return;
     confirmingRef.current = true;
     setSaving(true);
     setErr(null);
     try {
-      await sessionRepository.addItems(session.id, resolved.items);
+      // The typed lines AND the additional items chosen on their tab, in the
+      // one request: an item picked there must not be dropped because the
+      // products were typed rather than picked.
+      const typed = resolved?.ok ? resolved.items : [];
+      await sessionRepository.addItems(session.id, [...typed, ...itemPayload]);
 
-      const summary = resolved.lines
-        .filter((l) => l.product_id !== null)
-        .map((l) => `${l.name} × ${l.qty}`)
-        .join(", ");
-      notify.message("success", fmt(t("session.addedMany"), summary));
+      announceAdded(
+        (resolved?.ok ? resolved.lines : [])
+          .filter((l) => l.product_id !== null)
+          .map((l) => ({ name: l.name ?? "", qty: l.qty ?? 0 })),
+        basket.itemLines.map((l) => l.name),
+      );
 
       setText("");
       setResolved(null);
@@ -214,13 +246,7 @@ const AddSessionItemDialog = ({ branchId, session, onClose, onAdded }: Props) =>
           : { name: l.name, price: l.price, qty: l.qty })),
       );
 
-      const summary = cart.map((l) => `${l.name} × ${l.qty}`).join(", ");
-      notify.message(
-        "success",
-        cart.length === 1
-          ? fmt(t("session.addedOne"), cart[0].name, cart[0].qty)
-          : fmt(t("session.addedMany"), summary),
-      );
+      announceAdded(basket.productLines, basket.itemLines.map((l) => l.name));
 
       setCart([]);
       onAdded();
@@ -248,9 +274,25 @@ const AddSessionItemDialog = ({ branchId, session, onClose, onAdded }: Props) =>
         <h2 style={{ margin: 0 }}>{t("session.addItem")}</h2>
         <span className="muted" style={{ fontSize: 12 }}>{deviceLabel}</span>
 
+        {/* Two sections when the branch hands things out with the seat:
+            what is SOLD (products) and what is HANDED OUT (additional items).
+            One basket and one confirm behind both. */}
+        {hasAdditional && (
+          <SectionTabs
+            label={t("session.addSections")}
+            value={shown}
+            onChange={setSection}
+            disabled={saving}
+            tabs={[
+              { key: "products", label: t("session.sectionProducts"), count: mode === "picker" ? basket.productLines.length : (resolved?.ok ? resolved.items.length : 0) },
+              { key: "additional", label: t("session.additionalTitle"), count: basket.itemLines.length },
+            ]}
+          />
+        )}
+
         {/* Two ways in — the picker, as this dialog always opened, and the
             quick-entry box. */}
-        <BasketModeSwitch basket={basket} name="cp-session-add-mode" disabled={saving} />
+        {shown === "products" && <BasketModeSwitch basket={basket} name="cp-session-add-mode" disabled={saving} />}
 
         {/* What the session already holds. Listed rather than summarised in a
             sentence, because each line needs its own way off the bill — and
@@ -279,7 +321,7 @@ const AddSessionItemDialog = ({ branchId, session, onClose, onAdded }: Props) =>
                   </span>
                   <Button
                     variant="secondary"
-                    onClick={() => void removeFromBill(item.id, item.name)}
+                    onClick={() => void removeFromBill(item.id, item.name, item.product_id != null && additionalIds.has(item.product_id))}
                     disabled={saving || removing.includes(item.id)}
                     style={{ ...stepBtn, color: "#ef4444", borderColor: "#4a1a1a" }}
                     aria-label={`${t("action.delete")}: ${item.name}`}
@@ -293,18 +335,15 @@ const AddSessionItemDialog = ({ branchId, session, onClose, onAdded }: Props) =>
           </div>
         )}
 
-        {mode === "picker" && (
-          <BasketPicker
-            basket={basket}
-            saving={saving}
-            canCreateProducts={canCreateProducts}
-            between={<BasketAdditionalItems basket={basket} saving={saving} onBill={onBillIds} />}
-          />
+        {shown === "products" && mode === "picker" && (
+          <BasketPicker basket={basket} saving={saving} canCreateProducts={canCreateProducts} />
         )}
 
         {/* ── Quick entry ──────────────────────────────────────────────────
             Nothing is on the bill until the cashier presses the confirm below. */}
-        {mode === "text" && <BasketQuickEntry basket={basket} saving={saving} />}
+        {shown === "products" && mode === "text" && <BasketQuickEntry basket={basket} saving={saving} />}
+
+        {shown === "additional" && <BasketAdditionalItems basket={basket} saving={saving} onBill={onBillIds} />}
 
         {err !== null && <div className="error">{err || t("session.failUnknown")}</div>}
         <div className="row-between">
@@ -323,7 +362,7 @@ const AddSessionItemDialog = ({ branchId, session, onClose, onAdded }: Props) =>
             /* Held down until every typed line resolved. A batch with one bad
                line is not saved in part — the server would refuse it anyway,
                and a bill missing its middle line is one nobody chose. */
-            <Button onClick={confirmText} disabled={saving || resolving || !resolved?.ok}>
+            <Button onClick={confirmText} disabled={saving || !textReady}>
               {saving ? t("session.adding") : t("session.quickEntryConfirm")}
             </Button>
           )}
