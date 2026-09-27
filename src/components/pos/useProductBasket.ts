@@ -12,6 +12,12 @@ export interface CartLine {
   name: string;
   price: number;
   qty: number;
+  /**
+   * An additional item (chips, a cue): one per session, so its count is fixed
+   * at 1 — a second press does nothing and the stepper cannot raise it. The
+   * server refuses more either way.
+   */
+  once?: boolean;
 }
 
 interface Options {
@@ -102,6 +108,7 @@ export const useProductBasket = ({ branchId, resolve, resolveKey, allow }: Optio
     setCart((prev) => {
       const at = prev.findIndex((l) => l.key === line.key);
       if (at < 0) return [...prev, { ...line, qty: 1 }];
+      if (prev[at].once) return prev;
       const next = [...prev];
       next[at] = { ...next[at], qty: next[at].qty + 1 };
       return next;
@@ -112,6 +119,7 @@ export const useProductBasket = ({ branchId, resolve, resolveKey, allow }: Optio
     setCart((prev) =>
       prev.flatMap((l) => {
         if (l.key !== key) return [l];
+        if (l.once && by > 0) return [l];
         const qty = l.qty + by;
         return qty > 0 ? [{ ...l, qty }] : [];
       }),

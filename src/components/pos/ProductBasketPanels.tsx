@@ -9,6 +9,8 @@ import { useLang } from "@/i18n/LanguageContext";
 import { ProductBasket } from "./useProductBasket";
 import { choiceKey } from "./quickEntryChoices";
 import { KeyboardEvent, useId, useRef, useState } from "react";
+import { isAdditionalProduct } from "@/types/pos";
+import type { ReactNode } from "react";
 
 /**
  * The parts of a sale dialog that do not care what the sale is for — the
@@ -55,12 +57,14 @@ export const BasketModeSwitch = ({ basket, name, disabled }: ModeSwitchProps) =>
 interface PickerProps {
   basket: ProductBasket;
   saving: boolean;
+  /** Shown between the catalogue and the basket — the session's additional items. */
+  between?: ReactNode;
   /** Mirrors the backend's `products.manage`: owner-level, never a manager. */
   canCreateProducts: boolean;
 }
 
 /** The branch catalogue, the basket, and "a product the branch does not stock yet". */
-export const BasketPicker = ({ basket, saving, canCreateProducts }: PickerProps) => {
+export const BasketPicker = ({ basket, saving, canCreateProducts, between }: PickerProps) => {
   const { money, t } = useLang();
   const { products, filtered, cart, cartTotal } = basket;
 
@@ -100,6 +104,8 @@ export const BasketPicker = ({ basket, saving, canCreateProducts }: PickerProps)
         </div>
       )}
 
+      {between}
+
       {/* ── The basket ───────────────────────────────────────────────── */}
       <div className="col" style={{ gap: 8, borderTop: "1px solid #1f2a44", paddingTop: 12 }}>
         <div className="row-between">
@@ -137,7 +143,8 @@ export const BasketPicker = ({ basket, saving, canCreateProducts }: PickerProps)
                 <Button
                   variant="secondary"
                   onClick={() => basket.step(line.key, 1)}
-                  disabled={saving}
+                  // An additional item is one per session: its count stays 1.
+                  disabled={saving || line.once === true}
                   style={stepBtn}
                   aria-label={t("session.increase")}
                   title={t("session.increase")}
@@ -174,6 +181,60 @@ export const BasketPicker = ({ basket, saving, canCreateProducts }: PickerProps)
         </div>
       )}
     </>
+  );
+};
+
+interface AdditionalProps {
+  basket: ProductBasket;
+  saving: boolean;
+  /** Products already on this session's bill — an additional item there is not offered again. */
+  onBill: ReadonlySet<number>;
+}
+
+/**
+ * Additional items — chips, a cue, a racket — handed out with the seat
+ * (2026-09-27). Their own section, so what is SOLD and what is HANDED OUT are
+ * never confused, but the same mechanic as a product: it goes into the basket
+ * and lands with the confirm below.
+ *
+ * One per session, said three ways: already on the bill → «Уже выдано»; in
+ * the basket → «В корзине»; otherwise «Добавить». The server refuses a second
+ * one whatever this shows. Any seat: the chips-only-at-poker rule is the
+ * regular catalogue's, not this section's.
+ */
+export const BasketAdditionalItems = ({ basket, saving, onBill }: AdditionalProps) => {
+  const { money, t } = useLang();
+  const items = (basket.products ?? []).filter((p) => isAdditionalProduct(p) && p.is_active !== false);
+  if (items.length === 0) return null;
+
+  return (
+    <section className="col" style={{ gap: 6 }} aria-label={t("session.additionalTitle")}>
+      <div className="row-between" style={{ gap: 8, flexWrap: "wrap" }}>
+        <span className="label" style={{ fontSize: 12, marginBottom: 0 }}>{t("session.additionalTitle")}</span>
+        <span className="muted" style={{ fontSize: 11 }}>{t("session.additionalHint")}</span>
+      </div>
+      <div className="col" style={{ gap: 6 }}>
+        {items.map((p) => {
+          const given = onBill.has(p.id);
+          const inCart = basket.cart.some((l) => l.product_id === p.id);
+          return (
+            <div key={p.id} style={rowStyle}>
+              <span style={ellipsis} title={p.name}>{p.name}</span>
+              <span style={{ fontWeight: 700, minWidth: 80, textAlign: "right" }}>{money(Number(p.price))}</span>
+              <Button
+                variant={given || inCart ? "secondary" : "primary"}
+                disabled={saving || given || inCart}
+                onClick={() => basket.put({ key: `p:${p.id}`, product_id: p.id, name: p.name, price: Number(p.price), once: true })}
+                style={{ ...stepBtn, minWidth: 110 }}
+                aria-label={`${t("action.add")}: ${p.name}`}
+              >
+                {given ? t("session.additionalOnBill") : inCart ? t("session.additionalInCart") : t("action.add")}
+              </Button>
+            </div>
+          );
+        })}
+      </div>
+    </section>
   );
 };
 

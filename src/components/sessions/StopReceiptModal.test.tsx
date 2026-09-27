@@ -49,6 +49,10 @@ vi.mock("@/i18n/LanguageContext", () => ({
   }),
 }));
 
+/** The in-app confirmation: «yes» unless a test says otherwise. */
+const asked = vi.hoisted(() => ({ fn: vi.fn(async (_m: string, _o?: unknown) => true) }));
+vi.mock("@/components/ui/ConfirmProvider", () => ({ useConfirm: () => asked.fn }));
+
 const bill = (over: Partial<IBillBreakdown> = {}): IBillBreakdown => ({
   mode: "open",
   is_free: false,
@@ -478,5 +482,37 @@ describe("an hourly extra on the receipt", () => {
     // Exactly the old shape: a price and a count, no duration and no rate.
     // (`time.minShort` on its own would match the receipt's elapsed-time line.)
     expect(notes()).toContain("300.00\u00b7AMD \u00d7 2");
+  });
+});
+
+describe("taking a line off the bill before the stop", () => {
+  // Whatever an earlier block left mounted is not this block's receipt.
+  beforeEach(() => cleanup());
+  afterEach(() => cleanup());
+
+  const withCola = () => bill({ items: [{ id: 7, name: "Coca-Cola", price: 300, qty: 1, line_total: 300 }] } as Partial<IBillBreakdown>);
+
+  test("it asks first, naming the line, and then removes it", async () => {
+    repo.preview.mockResolvedValue(withCola());
+    repo.removeItem.mockReset();
+    repo.removeItem.mockResolvedValue({});
+    asked.fn.mockReset();
+    asked.fn.mockImplementation(async () => true);
+    await mount();
+
+    await act(async () => { fireEvent.click(screen.getByTitle("session.removeItemTitle")); });
+    expect(asked.fn).toHaveBeenCalledWith("session.removeConfirm", { destructive: true });
+    expect(repo.removeItem).toHaveBeenCalledWith(1, 7);
+  });
+
+  test("answering «no» removes nothing", async () => {
+    repo.preview.mockResolvedValue(withCola());
+    repo.removeItem.mockReset();
+    asked.fn.mockReset();
+    asked.fn.mockImplementation(async () => false);
+    await mount();
+
+    await act(async () => { fireEvent.click(screen.getByTitle("session.removeItemTitle")); });
+    expect(repo.removeItem).not.toHaveBeenCalled();
   });
 });

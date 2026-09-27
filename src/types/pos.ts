@@ -21,6 +21,13 @@ export const CHIPS_CATEGORY = "chips";
 export const isChipsProduct = (product: { category?: string | null }): boolean =>
   (product.category ?? "").trim().toLowerCase() === CHIPS_CATEGORY;
 
+/**
+ * How a product is used (2026-09-27): `regular` is sold by the unit;
+ * `additional` is handed out with the seat — chips, a cue, a racket — at most
+ * one per session, on any seat. The server enforces it; absent means regular.
+ */
+export type ProductKind = "regular" | "additional";
+
 export interface IProduct extends Translated {
   id: number;
   branch_id: number;
@@ -28,7 +35,12 @@ export interface IProduct extends Translated {
   category?: string | null;
   price: number;
   is_active: boolean;
+  kind?: ProductKind;
 }
+
+/** Handed out with the seat, once per session (an older backend sends no kind: regular). */
+export const isAdditionalProduct = (product: { kind?: string | null }): boolean =>
+  product.kind === "additional";
 
 export interface IOrderItem {
   id: number;

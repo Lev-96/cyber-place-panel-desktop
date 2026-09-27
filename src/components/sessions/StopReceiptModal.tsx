@@ -6,6 +6,8 @@ import PaymentMethodPicker, { paymentNoteMissing } from "@/components/payments/P
 import Spinner from "@/components/ui/Spinner";
 import { IBillBreakdown } from "@/api/sessions";
 import { useLang } from "@/i18n/LanguageContext";
+import { fmt } from "@/i18n/translations";
+import { useConfirm } from "@/components/ui/ConfirmProvider";
 import { sharedPrecision } from "@/i18n/currency";
 import { sessionRepository } from "@/repositories/SessionRepository";
 import { ISessionApi } from "@/types/sessions";
@@ -35,6 +37,7 @@ const fmtDuration = (mins: number, t: (k: string) => string) => {
  */
 const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved }: Props) => {
   const { money, t } = useLang();
+  const ask = useConfirm();
   const [bill, setBill] = useState<IBillBreakdown | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -66,7 +69,10 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved }: Prop
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session.id]);
 
-  const remove = async (itemId: number) => {
+  const remove = async (itemId: number, name: string) => {
+    // Asked first, as on the Add Product dialog: one misplaced click must not
+    // take a line off the bill a guest is about to pay.
+    if (!(await ask(fmt(t("session.removeConfirm"), name), { destructive: true }))) return;
     setBusy(true);
     try {
       await sessionRepository.removeItem(session.id, itemId);
@@ -226,7 +232,7 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved }: Prop
                   {money(Number(it.line_total), receiptPrecision)}
                 </span>
                 {!finished && (
-                  <button type="button" onClick={() => remove(it.id)} disabled={busy} style={removeBtn} title={t("session.removeItemTitle")}>
+                  <button type="button" onClick={() => void remove(it.id, it.name)} disabled={busy} style={removeBtn} title={t("session.removeItemTitle")}>
                     ×
                   </button>
                 )}

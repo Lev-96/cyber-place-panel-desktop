@@ -42,6 +42,7 @@ vi.mock("@/i18n/LanguageContext", () => ({
 
 import SessionsBoard from "./SessionsBoard";
 import { notify, ToastEvent } from "@/ui/notify";
+import { ConfirmProvider } from "@/components/ui/ConfirmProvider";
 
 /**
  * A button's ACCESSIBLE name — what a screen reader announces and what the
@@ -70,7 +71,9 @@ const running = (over: Partial<ISessionApi> = {}): ISessionApi => ({
 
 const mount = async () => {
   await act(async () => {
-    render(<MemoryRouter><SessionsBoard branchId={7} /></MemoryRouter>);
+    // Inside the app's confirm provider, as every other board test renders it:
+    // the stop receipt asks before taking a line off the bill.
+    render(<ConfirmProvider><MemoryRouter><SessionsBoard branchId={7} /></MemoryRouter></ConfirmProvider>);
   });
 };
 const buttons = () => [...document.querySelectorAll("button")].map(nameOf);

@@ -10,8 +10,9 @@ import PriceInput from "@/components/ui/PriceInput";
 import { apiSaveEntityTranslations } from "@/api/translations";
 import { useLang } from "@/i18n/LanguageContext";
 import { productRepository } from "@/repositories/ProductRepository";
-import { IProduct } from "@/types/pos";
+import { IProduct, isAdditionalProduct, ProductKind } from "@/types/pos";
 import { FormEvent, useState } from "react";
+import Checkbox from "@/components/ui/Checkbox";
 
 interface Props {
   branchId: number;
@@ -45,6 +46,9 @@ const ProductForm = ({ branchId, initial, onClose, onSaved }: Props) => {
     () => langValuesFromField(initial?.i18n, "category", initial?.category, lang),
   );
   const [price, setPrice] = useState(String(initial?.price ?? ""));
+  // Handed out with the seat, once per session — chips, a cue, a racket.
+  const [additional, setAdditional] = useState(initial ? isAdditionalProduct(initial) : false);
+  const kind: ProductKind = additional ? "additional" : "regular";
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -64,6 +68,7 @@ const ProductForm = ({ branchId, initial, onClose, onSaved }: Props) => {
             name: nameValue,
             category: categoryValue || null,
             price: pr,
+            kind,
             source_locale: lang,
           })
         : await productRepository.create({
@@ -72,6 +77,7 @@ const ProductForm = ({ branchId, initial, onClose, onSaved }: Props) => {
             category: categoryValue || null,
             price: pr,
             is_active: true,
+            kind,
             source_locale: lang,
           });
 
@@ -112,6 +118,17 @@ const ProductForm = ({ branchId, initial, onClose, onSaved }: Props) => {
         />
 
         <PriceInput label={t("label.price")} value={price} onChange={setPrice} required />
+
+        {/* Not a separate catalogue: the same product, used differently. */}
+        <div className="col" style={{ gap: 4 }}>
+          <Checkbox
+            checked={additional}
+            onChange={setAdditional}
+            disabled={busy}
+            label={t("product.kindAdditional")}
+          />
+          <span className="muted" style={{ fontSize: 12 }}>{t("product.kindAdditionalHint")}</span>
+        </div>
 
         {err && <div className="error">{err}</div>}
         <div className="row-between">

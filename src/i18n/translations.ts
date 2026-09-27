@@ -1361,6 +1361,32 @@ export const TRANSLATIONS: Dict = {
   // The timeline's scroll region, for a screen reader and the keyboard.
   "history.activityLabel": { en: "Activity", ru: "Действия", am: "Գործողություններ" },
   // The bill on a History card, laid out as a receipt (2026-09-26).
+  // A product handed out with the seat, once per session (2026-09-27).
+  "product.kindAdditional": {
+    en: "Additional item — handed out with the seat",
+    ru: "Дополнительный предмет — выдаётся вместе с местом",
+    am: "Լրացուցիչ իր՝ տրվում է տեղի հետ",
+  },
+  "product.kindAdditionalHint": {
+    en: "Chips, a cue, a racket: added to a running session once, on any seat, and not sold at the till.",
+    ru: "Фишки, кий, ракетка: добавляется к идущей сессии один раз, на любом месте; на кассе не продаётся.",
+    am: "Ֆիշկաներ, կիյ, ռակետ՝ ավելացվում է ընթացիկ նիստին մեկ անգամ, ցանկացած տեղում, դրամարկղում չի վաճառվում։",
+  },
+  // The Add Product dialog's section for them, and taking a line off a bill.
+  "session.additionalTitle": { en: "Additional items", ru: "Дополнительные предметы", am: "Լրացուցիչ իրեր" },
+  "session.additionalHint": {
+    en: "Handed out once per session",
+    ru: "Выдаётся один раз за сессию",
+    am: "Տրվում է նիստում մեկ անգամ",
+  },
+  "session.additionalInCart": { en: "In the basket", ru: "В корзине", am: "Զամբյուղում է" },
+  "session.additionalOnBill": { en: "Handed out", ru: "Уже выдано", am: "Արդեն տրված է" },
+  "session.removeConfirm": {
+    en: "Take «{0}» off this bill?",
+    ru: "Удалить «{0}» из счёта?",
+    am: "Հեռացնե՞լ «{0}»-ը հաշվից։",
+  },
+  "product.kindAdditionalShort": { en: "Additional item", ru: "Доп. предмет", am: "Լրացուցիչ իր" },
   "history.billTitle": { en: "Bill", ru: "Счёт", am: "Հաշիվ" },
   // Its columns, and the play-time row.
   "history.billItem": { en: "Item", ru: "Позиция", am: "Դիրք" },

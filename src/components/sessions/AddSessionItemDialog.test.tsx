@@ -78,6 +78,9 @@ vi.mock("@/auth/AuthContext", () => ({
   useAuth: () => ({ user: { id: 1, role: auth.role } }),
 }));
 const toasts = vi.hoisted(() => ({ message: vi.fn() }));
+/** The in-app confirmation: answers «yes» unless a test says otherwise. */
+const asked = vi.hoisted(() => ({ fn: vi.fn(async (_m: string, _o?: unknown) => true) }));
+vi.mock("@/components/ui/ConfirmProvider", () => ({ useConfirm: () => asked.fn }));
 vi.mock("@/ui/notify", () => ({ notify: { message: (...a: unknown[]) => toasts.message(...a) } }));
 
 const session = { id: 42, pc_id: 7, pc_label: "№1", items: [] } as unknown as ISessionApi;
@@ -123,6 +126,8 @@ beforeEach(() => {
   repo.listProducts.mockResolvedValue(products);
   repo.resolveItemsText.mockReset();
   toasts.message.mockReset();
+  asked.fn.mockReset();
+  asked.fn.mockImplementation(async () => true);
 });
 
 describe("AddSessionItemDialog — the basket", () => {
@@ -296,6 +301,8 @@ describe("taking a line off the bill", () => {
 
     await act(async () => { fireEvent.click(screen.getByLabelText("action.delete: Cola")); });
 
+    // Asked first, as a destructive question naming the line.
+    expect(asked.fn).toHaveBeenCalledWith("session.removeConfirm", { destructive: true });
     expect(repo.removeItem).toHaveBeenCalledWith(42, 5);
     expect(toasts.message).toHaveBeenCalledWith("error", expect.stringContaining("session.removedOne"));
     // The screen behind is told, so the bill it shows is the bill there is.
@@ -303,6 +310,19 @@ describe("taking a line off the bill", () => {
     // And the line is off THIS dialog too: the parent's refresh does not reach
     // an open modal, and a line that stays looks like a removal that failed.
     expect(screen.queryByLabelText("action.delete: Cola")).toBeNull();
+  });
+
+  test("answering «no» leaves the line where it is and asks the server nothing", async () => {
+    repo.listProducts.mockResolvedValue(products);
+    repo.removeItem.mockClear();
+    asked.fn.mockImplementation(async () => false);
+    const { onAdded } = await mount({ session: withBill });
+
+    await act(async () => { fireEvent.click(screen.getByLabelText("action.delete: Cola")); });
+
+    expect(repo.removeItem).not.toHaveBeenCalled();
+    expect(onAdded).not.toHaveBeenCalled();
+    expect(screen.getByLabelText("action.delete: Cola")).toBeTruthy();
   });
 
   test("a refusal does not claim the line was removed", async () => {
@@ -975,3 +995,83 @@ describe("AddSessionItemDialog — withdrawn products", () => {
   });
 });
 
+describe("additional items — chips, a cue — handed out once per session", () => {
+  const chips = { id: 40, branch_id: 1, name: "Poker Chips", category: "chips", price: 300, is_active: true, kind: "additional" };
+  const cue = { id: 41, branch_id: 1, name: "Billiard Cue", category: "rentals", price: 500, is_active: true, kind: "additional" };
+  const catalogue = [...products, chips, cue];
+  const section = () => screen.getByRole("region", { name: "session.additionalTitle" });
+  const addButton = (name: string) => screen.getByLabelText(`action.add: ${name}`) as HTMLButtonElement;
+
+  beforeEach(() => {
+    repo.listProducts.mockReset();
+    repo.listProducts.mockResolvedValue(catalogue);
+    repo.addItems.mockReset();
+    repo.addItems.mockResolvedValue({ ...session, items: [] });
+  });
+
+  test("they have their own section and are not in the products list", async () => {
+    await mount();
+    expect(section().textContent).toContain("Poker Chips");
+    expect(section().textContent).toContain("Billiard Cue");
+    // The regular catalogue still lists the drinks and not these.
+    expect(screen.getByText("Lays")).toBeTruthy();
+    expect(screen.getAllByText("Poker Chips")).toHaveLength(1);
+  });
+
+  test("added once: the button says so, a second press adds nothing, its count cannot be raised", async () => {
+    await mount();
+    await act(async () => { fireEvent.click(addButton("Billiard Cue")); });
+    expect(addButton("Billiard Cue").disabled).toBe(true);
+    expect(addButton("Billiard Cue").textContent).toBe("session.additionalInCart");
+    await act(async () => { fireEvent.click(addButton("Billiard Cue")); });
+
+    // In the basket once, and its + is dead.
+    const increase = screen.getAllByLabelText("session.increase") as HTMLButtonElement[];
+    expect(increase).toHaveLength(1);
+    expect(increase[0].disabled).toBe(true);
+
+    await act(async () => { fireEvent.click(screen.getByText("session.cartConfirmOne")); });
+    expect(repo.addItems).toHaveBeenCalledWith(42, [{ product_id: 41, qty: 1 }]);
+  });
+
+  test("several different ones and a drink go in one confirm", async () => {
+    await mount();
+    await act(async () => { fireEvent.click(addButton("Poker Chips")); });
+    await act(async () => { fireEvent.click(addButton("Billiard Cue")); });
+    await act(async () => { fireEvent.click(plusFor("Lays")); });
+    await act(async () => { fireEvent.click(plusFor("Lays")); });
+    await act(async () => { fireEvent.click(screen.getByText("session.cartConfirmMany")); });
+    expect(repo.addItems).toHaveBeenCalledWith(42, [
+      { product_id: 40, qty: 1 }, { product_id: 41, qty: 1 }, { product_id: 10, qty: 2 },
+    ]);
+  });
+
+  test("one already handed out on this session cannot be added again, and is labelled on the bill", async () => {
+    const withCue = { ...session, items: [{ id: 9, name: "Billiard Cue", qty: 1, price: 500, product_id: 41 }] } as unknown as ISessionApi;
+    await mount({ session: withCue });
+    expect(addButton("Billiard Cue").disabled).toBe(true);
+    expect(addButton("Billiard Cue").textContent).toBe("session.additionalOnBill");
+    expect(addButton("Poker Chips").disabled).toBe(false);
+    expect(screen.getAllByText("product.kindAdditionalShort").length).toBeGreaterThan(0);
+  });
+
+  test("taken off the bill, it can be added again", async () => {
+    const withCue = { ...session, items: [{ id: 9, name: "Billiard Cue", qty: 1, price: 500, product_id: 41 }] } as unknown as ISessionApi;
+    repo.removeItem.mockResolvedValue({ ...session, items: [] });
+    await mount({ session: withCue });
+    await act(async () => { fireEvent.click(screen.getByLabelText("action.delete: Billiard Cue")); });
+    expect(addButton("Billiard Cue").disabled).toBe(false);
+  });
+
+  test("chips as an additional item are offered on a seat that is not a poker table", async () => {
+    await mount({ session: { ...session, supports_chips: false } as unknown as ISessionApi });
+    expect(section().textContent).toContain("Poker Chips");
+    expect(addButton("Poker Chips").disabled).toBe(false);
+  });
+
+  test("a withdrawn one is not offered", async () => {
+    repo.listProducts.mockResolvedValue([...products, { ...cue, is_active: false }]);
+    await mount();
+    expect(screen.queryByRole("region", { name: "session.additionalTitle" })).toBeNull();
+  });
+});

@@ -8,7 +8,7 @@ import { fmt } from "@/i18n/translations";
 import { useLang } from "@/i18n/LanguageContext";
 import { orderRepository } from "@/repositories/OrderRepository";
 import { notify } from "@/ui/notify";
-import { IProduct } from "@/types/pos";
+import { IProduct, isAdditionalProduct } from "@/types/pos";
 import { useCallback, useRef, useState } from "react";
 import { useProductBasket } from "./useProductBasket";
 import { BasketCreateProduct, BasketModeSwitch, BasketPicker, BasketQuickEntry } from "./ProductBasketPanels";
@@ -49,7 +49,8 @@ const SellProductsDialog = ({ branchId, onClose, onSold }: Props) => {
   const inFlightRef = useRef(false);
 
   // The till sells what the branch still sells; the server refuses the rest.
-  const allow = useCallback((p: IProduct) => p.is_active !== false, []);
+  // Nor an additional item: it is handed out with a seat, never sold here.
+  const allow = useCallback((p: IProduct) => p.is_active !== false && !isAdditionalProduct(p), []);
   const resolve = useCallback(
     (typed: string, choices: IItemChoice[]) => (choices.length > 0
       ? orderRepository.resolveItemsText(branchId, typed, choices)

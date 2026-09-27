@@ -8,9 +8,11 @@ import { sessionRepository } from "@/repositories/SessionRepository";
 import { sessionItemLineTotal } from "@/components/sessions/sessionAmount";
 import { notify } from "@/ui/notify";
 import { ISessionApi } from "@/types/sessions";
-import { IProduct, isChipsProduct } from "@/types/pos";
+import { IProduct, isAdditionalProduct, isChipsProduct } from "@/types/pos";
+import { useConfirm } from "@/components/ui/ConfirmProvider";
 import { useProductBasket } from "@/components/pos/useProductBasket";
 import {
+  BasketAdditionalItems,
   BasketCreateProduct,
   BasketModeSwitch,
   BasketPicker,
@@ -89,8 +91,10 @@ const AddSessionItemDialog = ({ branchId, session, onClose, onAdded }: Props) =>
   const sellsChips = session.supports_chips === true;
   // A withdrawn product is not for sale here either (2026-09-25): the server
   // refuses it on the bill, as the till always did.
+  // An additional item (chips, a cue — handed out once, on any seat) is not
+  // in this list: it has its own section below, with its own rule.
   const allow = useCallback(
-    (p: IProduct) => p.is_active !== false && (sellsChips || !isChipsProduct(p)),
+    (p: IProduct) => p.is_active !== false && !isAdditionalProduct(p) && (sellsChips || !isChipsProduct(p)),
     [sellsChips],
   );
   // The picks travel only when there are some, so an ordinary read is the
@@ -120,6 +124,10 @@ const AddSessionItemDialog = ({ branchId, session, onClose, onAdded }: Props) =>
   const [bill, setBill] = useState(session.items ?? []);
   /** Items being taken off the bill, so their row can say so. */
   const [removing, setRemoving] = useState<number[]>([]);
+  const ask = useConfirm();
+  // The catalogue's additional items, by id — to label them on the bill.
+  const additionalIds = new Set((basket.products ?? []).filter(isAdditionalProduct).map((p) => p.id));
+  const onBillIds = new Set(bill.map((i) => i.product_id).filter((id): id is number => id !== null && id !== undefined));
 
   // A fresh session from the parent (after a confirm, or a realtime update)
   // replaces what we hold, so the two never drift.
@@ -135,6 +143,9 @@ const AddSessionItemDialog = ({ branchId, session, onClose, onAdded }: Props) =>
    */
   const removeFromBill = async (itemId: number, name: string) => {
     if (removing.includes(itemId)) return;
+    // Taking something off a bill is asked first: one misplaced click must
+    // not un-sell a drink or take a cue back.
+    if (!(await ask(fmt(t("session.removeConfirm"), name), { destructive: true }))) return;
     setRemoving((prev) => [...prev, itemId]);
     try {
       const updated = await sessionRepository.removeItem(session.id, itemId);
@@ -251,7 +262,14 @@ const AddSessionItemDialog = ({ branchId, session, onClose, onAdded }: Props) =>
             <div className="col" style={{ gap: 6, maxHeight: 150, overflowY: "auto" }}>
               {onBill.map((item) => (
                 <div key={item.id} style={rowStyle}>
-                  <span style={ellipsis} title={item.name}>{item.name}</span>
+                  <span style={ellipsis} title={item.name}>
+                    {item.name}
+                    {item.product_id != null && additionalIds.has(item.product_id) && (
+                      <span className="pill" style={{ marginLeft: 6, fontSize: 10, textTransform: "none", letterSpacing: 0 }}>
+                        {t("product.kindAdditionalShort")}
+                      </span>
+                    )}
+                  </span>
                   <span style={{ minWidth: 40, textAlign: "center", fontWeight: 700 }}>× {item.qty}</span>
                   <span className="muted" style={{ fontSize: 11, minWidth: 74, textAlign: "right" }}>
                     {money(sessionItemLineTotal(item))}
@@ -273,7 +291,12 @@ const AddSessionItemDialog = ({ branchId, session, onClose, onAdded }: Props) =>
         )}
 
         {mode === "picker" && (
-          <BasketPicker basket={basket} saving={saving} canCreateProducts={canCreateProducts} />
+          <BasketPicker
+            basket={basket}
+            saving={saving}
+            canCreateProducts={canCreateProducts}
+            between={<BasketAdditionalItems basket={basket} saving={saving} onBill={onBillIds} />}
+          />
         )}
 
         {/* ── Quick entry ──────────────────────────────────────────────────

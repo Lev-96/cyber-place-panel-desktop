@@ -27,7 +27,11 @@ export interface SessionChangedEvent {
     | "moved"
     // The clock stopped / started again. The seat stays taken either way.
     | "paused"
-    | "resumed";
+    | "resumed"
+    // An additional item (chips, a cue, a racket) went onto the bill / came off
+    // it (2026-09-27). The board reloads on any kind.
+    | "additional.added"
+    | "additional.removed";
   session_id: number;
   branch_id: number;
   pc_id: number;

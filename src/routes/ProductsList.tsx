@@ -11,6 +11,7 @@ import { productRepository } from "@/repositories/ProductRepository";
 import { IProduct } from "@/types/pos";
 import { useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
+import { isAdditionalProduct } from "@/types/pos";
 
 const ProductsList = () => {
   const { branchId } = useParams();
@@ -73,7 +74,14 @@ const ProductsList = () => {
             <div key={p.id} className="list-item" style={{ opacity: p.is_active ? 1 : 0.5 }}>
               <div>
                 <div className="name">{tr(p, "name", lang)}</div>
-                <div className="meta">{tr(p, "category", lang) || "-"} · {money(Number(p.price))}</div>
+                <div className="meta">
+                  {tr(p, "category", lang) || "-"} · {money(Number(p.price))}
+                  {isAdditionalProduct(p) && (
+                    <span className="pill" style={{ marginLeft: 8, fontSize: 10, textTransform: "none", letterSpacing: 0 }}>
+                      {t("product.kindAdditionalShort")}
+                    </span>
+                  )}
+                </div>
               </div>
               {canEdit && (
                 <div className="row" style={{ gap: 6 }}>

@@ -259,3 +259,16 @@ describe("typed lines", () => {
     expect(repo.create).not.toHaveBeenCalled();
   });
 });
+
+describe("additional items", () => {
+  test("the till does not offer one — it is handed out with a seat, never sold here", async () => {
+    repo.listProducts.mockResolvedValue([
+      ...PRODUCTS,
+      { id: 8, branch_id: 7, name: "Billiard Cue", category: "rentals", price: 500, is_active: true, kind: "additional" },
+    ]);
+    await mount();
+    expect(screen.getByText("Tea")).toBeTruthy();
+    expect(screen.queryByText("Billiard Cue")).toBeNull();
+    expect(screen.queryByRole("region", { name: "session.additionalTitle" })).toBeNull();
+  });
+});
