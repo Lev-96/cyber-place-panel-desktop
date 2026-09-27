@@ -1539,6 +1539,27 @@ are unchanged — do not add a `paused` status here either.
   confirmed stop reaches (an auto-ended seat's receipt never calls it). A
   refusal raises nothing; its sentence stays on the tile / in the modal.
 
+## 9.5.0a Additional items — chips, a cue, a racket (2026-09-27)
+
+- A product is `regular` (sold by the unit) or `additional` (handed out with the
+  seat, once per session, any seat) — `IProduct.kind`, `isAdditionalProduct()`
+  (absent = regular). Owner ticks «Дополнительный предмет» in `ProductForm`;
+  `ProductsList` labels them.
+- Add Product dialog (session): the regular picker's `allow` excludes them; they
+  get their own section `BasketAdditionalItems` (between catalogue and basket via
+  `BasketPicker`'s `between` slot): «Добавить» / «В корзине» / «Уже выдано» (on
+  the bill). Same mechanic as products — into the basket, landing with the one
+  confirm. A basket line `once: true` holds exactly 1 (`put` and `step(+1)`
+  ignore it; the + is disabled). Bill lines of additional products carry a
+  «Доп. предмет» pill. The chips-only-poker rule is the regular catalogue's, not
+  this section's. The till (`SellProductsDialog`) never offers them; typed quick
+  entry never matches them (server-side `regular()`).
+- Taking any line off a bill asks first — `useConfirm` («Удалить «X» из
+  счёта?», destructive) in `AddSessionItemDialog` and `StopReceiptModal`; «Нет»
+  sends nothing. Toasts after add/remove as before.
+- Realtime: `SessionChangedEvent.kind` gains `additional.added` /
+  `additional.removed`; the board reloads on any kind.
+
 ## 9.5.1 Sessions → History: the card and its timeline (2026-09-26)
 
 - **One card per session, three parts, in this order:** facts (`<dl
