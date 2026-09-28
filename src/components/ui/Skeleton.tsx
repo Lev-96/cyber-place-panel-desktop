@@ -1,4 +1,5 @@
 import { CSSProperties } from "react";
+import { tActive } from "@/i18n/translations";
 
 /**
  * Shimmer skeleton primitive + ready-made list / grid variants used as the
@@ -23,7 +24,7 @@ export const Skeleton = ({ width = "100%", height = 12, radius = 8, style }: Ske
 
 /** N placeholder rows shaped like `.list-item` (avatar + two text lines + pill). */
 export const ListSkeleton = ({ rows = 6 }: { rows?: number }) => (
-  <div className="list" aria-busy="true" aria-label="loading">
+  <div className="list" aria-busy="true" aria-label={tActive("a11y.loading")}>
     {Array.from({ length: rows }).map((_, i) => (
       <div key={i} className="list-item" style={{ cursor: "default" }}>
         <div className="row" style={{ gap: 12, flex: 1, alignItems: "center" }}>
@@ -41,7 +42,7 @@ export const ListSkeleton = ({ rows = 6 }: { rows?: number }) => (
 
 /** Placeholder cells shaped like the places/live grid tiles. */
 export const GridSkeleton = ({ cells = 8 }: { cells?: number }) => (
-  <div className="live-grid" aria-busy="true" aria-label="loading">
+  <div className="live-grid" aria-busy="true" aria-label={tActive("a11y.loading")}>
     {Array.from({ length: cells }).map((_, i) => (
       <div key={i} className="place-cell" style={{ minHeight: 130, cursor: "default" }}>
         <Skeleton width="55%" height={11} />
@@ -55,7 +56,7 @@ export const GridSkeleton = ({ cells = 8 }: { cells?: number }) => (
 
 /** A paragraph of placeholder lines, last one short like real text. */
 export const SkeletonText = ({ lines = 3, width = "100%" }: { lines?: number; width?: number | string }) => (
-  <div className="col" style={{ gap: 8, width }} aria-busy="true" aria-label="loading">
+  <div className="col" style={{ gap: 8, width }} aria-busy="true" aria-label={tActive("a11y.loading")}>
     {Array.from({ length: lines }).map((_, i) => (
       <Skeleton key={i} width={i === lines - 1 ? "55%" : "100%"} height={11} />
     ))}
@@ -74,7 +75,7 @@ export const SkeletonAvatar = ({ size = 44 }: { size?: number }) => (
  * (once to show it, once to replace it), which is worse than no skeleton.
  */
 export const SkeletonCard = ({ lines = 2, height }: { lines?: number; height?: number }) => (
-  <div className="card col" style={{ gap: 10, minHeight: height }} aria-busy="true" aria-label="loading">
+  <div className="card col" style={{ gap: 10, minHeight: height }} aria-busy="true" aria-label={tActive("a11y.loading")}>
     <Skeleton width="45%" height={14} />
     <SkeletonText lines={lines} />
     <Skeleton width={110} height={30} radius={8} style={{ marginTop: 4 }} />
@@ -83,7 +84,7 @@ export const SkeletonCard = ({ lines = 2, height }: { lines?: number; height?: n
 
 /** A header row and N body rows, in the proportions of a real table. */
 export const SkeletonTable = ({ rows = 6, columns = 4 }: { rows?: number; columns?: number }) => (
-  <div className="col" style={{ gap: 8 }} aria-busy="true" aria-label="loading">
+  <div className="col" style={{ gap: 8 }} aria-busy="true" aria-label={tActive("a11y.loading")}>
     <div className="row" style={{ gap: 12 }}>
       {Array.from({ length: columns }).map((_, i) => (
         <Skeleton key={i} width={`${100 / columns}%`} height={12} />
@@ -108,7 +109,7 @@ export const SkeletonInput = ({ label = true }: { label?: boolean }) => (
 );
 
 export const SkeletonForm = ({ fields = 4 }: { fields?: number }) => (
-  <div className="col" style={{ gap: 14 }} aria-busy="true" aria-label="loading">
+  <div className="col" style={{ gap: 14 }} aria-busy="true" aria-label={tActive("a11y.loading")}>
     {Array.from({ length: fields }).map((_, i) => <SkeletonInput key={i} />)}
     <div className="row" style={{ gap: 8, justifyContent: "flex-end", marginTop: 4 }}>
       <Skeleton width={100} height={34} radius={8} />
@@ -119,7 +120,7 @@ export const SkeletonForm = ({ fields = 4 }: { fields?: number }) => (
 
 /** Number-over-label tiles, the shape of every statistics strip here. */
 export const SkeletonStats = ({ tiles = 4 }: { tiles?: number }) => (
-  <div className="row" style={{ gap: 12, flexWrap: "wrap" }} aria-busy="true" aria-label="loading">
+  <div className="row" style={{ gap: 12, flexWrap: "wrap" }} aria-busy="true" aria-label={tActive("a11y.loading")}>
     {Array.from({ length: tiles }).map((_, i) => (
       <div key={i} className="card col" style={{ gap: 10, flex: "1 1 160px", minWidth: 150 }}>
         <Skeleton width="60%" height={10} />
@@ -136,7 +137,7 @@ export const SkeletonStats = ({ tiles = 4 }: { tiles?: number }) => (
  * look like a thread, so the eye is already in the right place when it does.
  */
 export const SkeletonMessages = ({ bubbles = 4 }: { bubbles?: number }) => (
-  <div className="col" style={{ gap: 10 }} aria-busy="true" aria-label="loading">
+  <div className="col" style={{ gap: 10 }} aria-busy="true" aria-label={tActive("a11y.loading")}>
     {Array.from({ length: bubbles }).map((_, i) => (
       <div
         key={i}
@@ -167,7 +168,7 @@ export const SkeletonMessages = ({ bubbles = 4 }: { bubbles?: number }) => (
  * its job is only to stop the window going blank between them.
  */
 export const RouteSkeleton = () => (
-  <div className="col" style={{ gap: 18, padding: 4 }} aria-busy="true" aria-label="loading">
+  <div className="col" style={{ gap: 18, padding: 4 }} aria-busy="true" aria-label={tActive("a11y.loading")}>
     <Skeleton width={220} height={26} radius={8} />
     <SkeletonStats tiles={3} />
     <ListSkeleton rows={4} />

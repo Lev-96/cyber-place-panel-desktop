@@ -436,7 +436,7 @@ const GlobalBookingNotifier = () => {
         <button
           type="button"
           onClick={() => setToast(null)}
-          aria-label="Dismiss"
+          aria-label={t("action.close")}
           style={{
             marginLeft: "auto",
             padding: "4px 10px",

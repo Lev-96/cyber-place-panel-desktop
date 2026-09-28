@@ -1,3 +1,4 @@
+import { tActive } from "@/i18n/translations";
 /**
  * Page navigation for the paginated lists (branches, bookings, tournaments).
  * Renders ‹ prev, a windowed set of page numbers with ellipses, and next ›.
@@ -43,13 +44,13 @@ const Pagination = ({ page, lastPage, onChange, disabled = false }: Props) => {
   };
 
   return (
-    <nav className="cp-pagination" aria-label="pagination">
+    <nav className="cp-pagination" aria-label={tActive("a11y.pagination")}>
       <button
         type="button"
         className="cp-page-btn"
         onClick={() => go(page - 1)}
         disabled={disabled || page <= 1}
-        aria-label="previous page"
+        aria-label={tActive("a11y.prevPage")}
       >
         ‹
       </button>
@@ -76,7 +77,7 @@ const Pagination = ({ page, lastPage, onChange, disabled = false }: Props) => {
         className="cp-page-btn"
         onClick={() => go(page + 1)}
         disabled={disabled || page >= lastPage}
-        aria-label="next page"
+        aria-label={tActive("a11y.nextPage")}
       >
         ›
       </button>

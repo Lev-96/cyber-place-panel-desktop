@@ -38,7 +38,7 @@ export const TRANSLATIONS: Dict = {
   "nav.myBranch": { en: "My branch", ru: "Мой филиал", am: "Իմ մասնաճյուղը" },
   "nav.map": { en: "Map", ru: "Карта", am: "Քարտեզ" },
   "nav.bookings": { en: "Bookings", ru: "Бронирования", am: "Ամրագրումներ" },
-  "nav.scan": { en: "Scan / Confirm", ru: "Сканировать", am: "Սկանավորել" },
+  "nav.scan": { en: "Scan / Confirm", ru: "Сканировать", am: "Սկան / Հաստատում" },
   "nav.tournaments": { en: "Tournaments", ru: "Турниры", am: "Մրցաշարեր" },
   "nav.games": { en: "Games", ru: "Игры", am: "Խաղեր" },
   "nav.companies": { en: "Companies", ru: "Компании", am: "Ընկերություններ" },
@@ -66,7 +66,7 @@ export const TRANSLATIONS: Dict = {
   "auth.forgot": {
     en: "Forgot password?",
     ru: "Забыли пароль?",
-    am: "Մոռացե՞լ եք",
+    am: "Մոռացե՞լ եք գաղտնաբառը",
   },
 
   // Common actions
@@ -84,11 +84,23 @@ export const TRANSLATIONS: Dict = {
   "action.delete": { en: "Delete", ru: "Удалить", am: "Ջնջել" },
   "action.add": { en: "Add", ru: "Добавить", am: "Ավելացնել" },
   "action.create": { en: "Create", ru: "Создать", am: "Ստեղծել" },
-  "action.start": { en: "Start", ru: "Старт", am: "Մեկնարկ" },
-  "action.stop": { en: "Stop", ru: "Стоп", am: "Կանգ" },
+  "action.start": { en: "Start", ru: "Старт", am: "Սկսել" },
+  "action.stop": { en: "Stop", ru: "Стоп", am: "Կանգնեցնել" },
   "action.confirm": { en: "Confirm", ru: "Подтвердить", am: "Հաստատել" },
   "action.refresh": { en: "Refresh", ru: "Обновить", am: "Թարմացնել" },
   "action.close": { en: "Close", ru: "Закрыть", am: "Փակել" },
+  // For screen readers — controls that show only an icon or a spinner.
+  "a11y.loading": { en: "Loading", ru: "Загрузка", am: "Բեռնվում է" },
+  "a11y.increase": { en: "Increase", ru: "Увеличить", am: "Ավելացնել" },
+  "a11y.decrease": { en: "Decrease", ru: "Уменьшить", am: "Պակասեցնել" },
+  "a11y.pagination": { en: "Pages", ru: "Страницы", am: "Էջեր" },
+  "a11y.prevPage": { en: "Previous page", ru: "Предыдущая страница", am: "Նախորդ էջ" },
+  "a11y.nextPage": { en: "Next page", ru: "Следующая страница", am: "Հաջորդ էջ" },
+  // The short date field's hint: day.month.year in each language's letters.
+  "date.placeholderShort": { en: "dd.mm.yy", ru: "дд.мм.гг", am: "օօ.աա.տտ" },
+  "company.commissionExample": { en: "e.g. 2", ru: "напр. 2", am: "օր. 2" },
+  "updates.colApp": { en: "App", ru: "Приложение", am: "Հավելված" },
+  "qr.tooLong": { en: "Too much data for a QR code", ru: "Слишком много данных для QR-кода", am: "QR կոդի համար տվյալները շատ են" },
   // Asked by every dialog before a close that would throw typed changes away
   // (the ×, a backdrop click, Escape). Answered with action.yes / action.no.
   "modal.leaveConfirm": {
@@ -99,7 +111,7 @@ export const TRANSLATIONS: Dict = {
   "action.back": { en: "Back", ru: "Назад", am: "Հետ" },
 
   // Sessions
-  "session.start": { en: "Start session", ru: "Старт сессии", am: "Սկսել նիստը" },
+  "session.start": { en: "Start session", ru: "Старт сессии", am: "Սկսել սեսիան" },
   // "Товар", not "позиция": what the cashier adds is a product off the shelf,
   // and the branch's own catalogue screen already calls them товары.
   // ── Support desk ───────────────────────────────────────────────────────
@@ -110,8 +122,8 @@ export const TRANSLATIONS: Dict = {
   },
   // PlayStation discovery — phase one of the console integration. The wording
   // promises exactly what it does: it looks, it does not control.
-  "ps5.discover.open": { en: "Find PlayStations", ru: "Найти PlayStation", am: "Գտնել PlayStation" },
-  "ps5.discover.title": { en: "PlayStations on this network", ru: "PlayStation в этой сети", am: "PlayStation այս ցանցում" },
+  "ps5.discover.open": { en: "Find PlayStations", ru: "Найти PlayStation", am: "Գտնել PlayStation-ներ" },
+  "ps5.discover.title": { en: "PlayStations on this network", ru: "PlayStation в этой сети", am: "PlayStation-ներն այս ցանցում" },
   "ps5.discover.hint": {
     en: "Scanned from this computer, not from the server.",
     ru: "Поиск идёт с этого компьютера, а не с сервера.",
@@ -120,7 +132,7 @@ export const TRANSLATIONS: Dict = {
   "ps5.discover.none": {
     en: "Nothing answered. The consoles must be on the same network as this computer and switched on or resting.",
     ru: "Никто не ответил. Консоли должны быть в той же сети, что и этот компьютер, и быть включены или в режиме покоя.",
-    am: "Ոչ ոք չպատասխանեց։ Կոնսոլները պետք է լինեն նույն ցանցում և միացված կամ քնած վիճակում։",
+    am: "Ոչ մի սարք չպատասխանեց։ Կոնսոլները պետք է լինեն այս համակարգչի հետ նույն ցանցում և լինեն միացված կամ քնի ռեժիմում։",
   },
   "ps5.discover.probed": { en: "Looked at", ru: "Опрошено", am: "Հարցվել է" },
   "ps5.discover.scanning": { en: "Searching…", ru: "Ищем…", am: "Որոնում…" },
@@ -128,10 +140,10 @@ export const TRANSLATIONS: Dict = {
   "ps5.discover.desktopOnly": {
     en: "Console search works only in the desktop app.",
     ru: "Поиск консолей работает только в десктопном приложении.",
-    am: "Կոնսոլների որոնումն աշխատում է միայն desktop հավելվածում։",
+    am: "Կոնսոլների որոնումն աշխատում է միայն դեսքթոփ հավելվածում։",
   },
   "ps5.state.awake": { en: "On", ru: "Включена", am: "Միացված" },
-  "ps5.state.rest": { en: "Resting", ru: "Режим покоя", am: "Քնած ռեժիմ" },
+  "ps5.state.rest": { en: "Resting", ru: "Режим покоя", am: "Քնի ռեժիմ" },
   "ps5.state.unreachable": { en: "Unreachable", ru: "Недоступна", am: "Անհասանելի" },
   "ps5.state.unknown": { en: "Unrecognised answer", ru: "Ответ не распознан", am: "Պատասխանը չի ճանաչվել" },
   // Binding a found console to the place it stands in. Owner-level wording:
@@ -142,14 +154,14 @@ export const TRANSLATIONS: Dict = {
   "ps5.bind.noFreePlaces": {
     en: "Every console place already has one",
     ru: "У всех консольных мест уже есть приставка",
-    am: "Բոլոր կոնսոլային տեղերն արդեն ունեն",
+    am: "Բոլոր կոնսոլային տեղերն արդեն ունեն կոնսոլ",
   },
   // Not the same thing as the line above, and telling an owner "every console
   // place already has one" when the branch has no console place at all sends
   // them looking for a place that does not exist.
   // The places that already have a console — including ones whose console is
   // nowhere on this network, which is the only way to free them up again.
-  "ps5.bound.title": { en: "Places with a console", ru: "Места с привязанной приставкой", am: "Տեղեր՝ կապված կոնսոլով" },
+  "ps5.bound.title": { en: "Places with a console", ru: "Места с привязанной приставкой", am: "Կոնսոլով տեղեր" },
   "ps5.bound.here": { en: "on this network", ru: "в этой сети", am: "այս ցանցում" },
   "ps5.bound.elsewhere": {
     en: "not found on this network",
@@ -177,24 +189,24 @@ export const TRANSLATIONS: Dict = {
   "ps5.pair.steps": {
     en: "Turn the console ON, then open Settings → System → Remote Play → Link Device and type the 8 digits it shows.",
     ru: "Включите приставку, откройте Настройки → Система → Дистанционное воспроизведение → «Привязать устройство» и введите показанные 8 цифр.",
-    am: "Միացրեք կոնսոլը, բացեք Կարգավորումներ → Համակարգ → Հեռախաղ → «Կապել սարքը» և մուտքագրեք ցուցադրվող 8 թվանշանը։",
+    am: "Միացրեք կոնսոլը, բացեք Settings → System → Remote Play → Link Device և մուտքագրեք էկրանին երևացող 8 թվանշանը։",
   },
   "ps5.pair.pin": { en: "8 digits from the console", ru: "8 цифр с экрана приставки", am: "8 թվանշան կոնսոլի էկրանից" },
   // The way through when Sony's page refuses the embedded window.
   "ps5.pair.browser": {
     en: "Sign in through your browser instead",
     ru: "Войти через обычный браузер",
-    am: "Մուտք գործել սովորական դիտարկիչով",
+    am: "Փոխարենը մուտք գործել դիտարկիչով",
   },
   "ps5.pair.browserSteps": {
     en: "Sign in there, then copy the address of the page it lands on and paste it below.",
     ru: "Войдите там, затем скопируйте адрес страницы, на которую вас перекинуло, и вставьте сюда.",
-    am: "Մուտք գործեք այնտեղ, ապա պատճենեք էջի հասցեն, ուր ձեզ տեղափոխեց, և տեղադրեք ստորև։",
+    am: "Մուտք գործեք այնտեղ, ապա պատճենեք բացված էջի հասցեն և տեղադրեք ստորև։",
   },
   "ps5.pair.redirect": {
     en: "The address you were redirected to",
     ru: "Адрес, на который вас перекинуло",
-    am: "Հասցեն, ուր ձեզ տեղափոխեց",
+    am: "Վերահղման էջի հասցեն",
   },
   "ps5.pair.start": { en: "Pair", ru: "Сопрячь", am: "Զուգակցել" },
   "ps5.pair.working": { en: "Pairing…", ru: "Сопрягаем…", am: "Զուգակցում…" },
@@ -250,7 +262,7 @@ export const TRANSLATIONS: Dict = {
   "ps5.key.hint": {
     en: "NOT the 8-digit code on the console screen. That is a one-time pairing PIN. This is the registration key a Remote Play client receives after pairing. Stored encrypted on this computer, never sent to the server.",
     ru: "Это НЕ 8-значный код с экрана приставки. Тот код одноразовый, для сопряжения. Нужен ключ регистрации, который клиент Remote Play получает после сопряжения. Хранится зашифрованным на этом компьютере и на сервер не уходит.",
-    am: "Սա ՈՉ թե կոնսոլի էկրանի 8-նիշանոց կոդն է։ Այն միանվագ է, զուգակցման համար։ Պետք է գրանցման բանալին, որը Remote Play հաճախորդը ստանում է զուգակցումից հետո։ Պահվում է գաղտնագրված այս համակարգչում և սերվեր չի ուղարկվում։",
+    am: "Սա կոնսոլի էկրանի 8-նիշանոց կոդը ՉԷ․ այն զուգակցման միանվագ PIN է։ Այստեղ պետք է գրանցման բանալին, որը Remote Play ծրագիրը ստանում է զուգակցումից հետո։ Պահվում է գաղտնագրված այս համակարգչում և սերվեր չի ուղարկվում։",
   },
   // The question the owner is asked when a console is on with no session.
   // Shown above the place, and only for an owner with more than one venue.
@@ -267,12 +279,12 @@ export const TRANSLATIONS: Dict = {
   "ps5.wake.dialogBody": {
     en: "There is no session on it. Did you switch it on yourself?",
     ru: "Активной сессии на ней нет. Вы включили её сами?",
-    am: "Դրա վրա ակտիվ սեսիա չկա։ Դուք ինքներդ եք միացրել:",
+    am: "Դրա վրա ակտիվ սեսիա չկա։ Ինքնե՞րդ եք միացրել։",
   },
   "ps5.wake.dialogCountdown": {
     en: "Goes back to rest in {s} s",
     ru: "Уйдёт в режим сна через {s} с",
-    am: "Կանցնի քնի ռեժիմ {s} վրկ հետո",
+    am: "{s} վրկ հետո կանցնի քնի ռեժիմի",
   },
   "ps5.wake.yes": { en: "Yes, that was me", ru: "Да, это я", am: "Այո, ես էի" },
   "ps5.wake.no": { en: "No", ru: "Нет", am: "Ոչ" },
@@ -281,14 +293,14 @@ export const TRANSLATIONS: Dict = {
   "ps5.maintenance.hint": {
     en: "While it lasts, this console may stay on without a session.",
     ru: "Пока оно длится, приставка может быть включена без сессии.",
-    am: "Քանի դեռ այն տևում է, կոնսոլը կարող է միացված մնալ առանց սեսիայի։",
+    am: "Սպասարկման ընթացքում կոնսոլը կարող է միացված մնալ առանց սեսիայի։",
   },
   "ps5.maintenance.start": { en: "Suspend for an hour", ru: "Приостановить на час", am: "Կասեցնել մեկ ժամով" },
   "ps5.maintenance.stop": { en: "Resume protection", ru: "Вернуть защиту", am: "Վերականգնել պաշտպանությունը" },
   "ps5.maintenance.until": { en: "Suspended until {t}", ru: "Приостановлено до {t}", am: "Կասեցված է մինչև {t}" },
   // Lifecycle, as the board shows it.
   "ps5.lifecycle.WAKING": { en: "Waking…", ru: "Просыпается…", am: "Արթնանում է…" },
-  "ps5.lifecycle.GOING_TO_REST": { en: "Going to rest…", ru: "Уходит в сон…", am: "Անցնում է քնի…" },
+  "ps5.lifecycle.GOING_TO_REST": { en: "Going to rest…", ru: "Уходит в сон…", am: "Անցնում է քնի ռեժիմի…" },
   "ps5.lifecycle.UNEXPECTED_WAKE": { en: "On without a session", ru: "Включена без сессии", am: "Միացված է առանց սեսիայի" },
   "ps5.lifecycle.ERROR": { en: "Command failed", ru: "Команда не прошла", am: "Հրամանը ձախողվեց" },
   // What went wrong, in words an operator can act on.
@@ -310,7 +322,7 @@ export const TRANSLATIONS: Dict = {
   "ps5.error.IN_USE": {
     en: "The console says a Remote Play session is already in use. Close it on the console or wait a moment",
     ru: "Приставка отвечает, что сессия Remote Play уже занята. Закройте её на приставке или подождите немного",
-    am: "Կոնսոլն ասում է, որ Remote Play սեսիան արդեն զբաղված է։ Փակեք այն կոնսոլի վրա կամ սպասեք",
+    am: "Կոնսոլի Remote Play սեսիան արդեն զբաղված է։ Փակեք այն կոնսոլի վրա կամ մի փոքր սպասեք",
   },
   "ps5.error.UNSUPPORTED_BY_TRANSPORT": {
     en: "This build cannot put a console to rest over the network",
@@ -320,12 +332,12 @@ export const TRANSLATIONS: Dict = {
   "ps5.error.WAKE_IGNORED": {
     en: "The console is ignoring the wake. Switch on \"Enable Turning On PS5 from Network\" in its Power Saving settings",
     ru: "Приставка игнорирует пробуждение. Включите на ней «Включение PS5 по сети» в настройках энергосбережения",
-    am: "Կոնսոլն անտեսում է արթնացումը։ Միացրեք «Միացնել PS5-ը ցանցից» էներգախնայման կարգավորումներում",
+    am: "Կոնսոլն անտեսում է արթնացումը։ Միացրեք «Enable Turning On PS5 from Network» կարգավորումը Power Saving բաժնում",
   },
   "ps5.error.TRANSPORT_ERROR": {
     en: "Could not reach the console",
     ru: "Не удалось достучаться до приставки",
-    am: "Չհաջողվեց հասնել կոնսոլին",
+    am: "Չհաջողվեց կապ հաստատել կոնսոլի հետ",
   },
   // What the protocol does NOT offer, said once, where the owner sets things up.
   "ps5.sleep.impossible": {
@@ -338,25 +350,25 @@ export const TRANSLATIONS: Dict = {
   "support.intro": {
     en: "Write to the Cyber Place support team. Your company, branch and role travel with the message. There is nothing to fill in.",
     ru: "Напишите в поддержку Cyber Place. Компания, филиал и роль передаются вместе с сообщением. Заполнять ничего не нужно.",
-    am: "Գրեք Cyber Place-ի աջակցության թիմին։ Ընկերությունը, մասնաճյուղը և դերը փոխանցվում են հաղորդագրության հետ:",
+    am: "Գրեք Cyber Place-ի աջակցության թիմին։ Ընկերությունը, մասնաճյուղը և դերը ինքնաշխատ կցվում են հաղորդագրությանը։ Ոչինչ լրացնել պետք չէ։",
   },
   "support.conversations": { en: "Conversations", ru: "Обращения", am: "Դիմումներ" },
   "support.noConversations": {
     en: "No requests yet. Start one below.",
     ru: "Обращений пока нет. Создайте первое ниже.",
-    am: "Դիմումներ դեռ չկան: Ստեղծեք առաջինը ներքևում:",
+    am: "Դիմումներ դեռ չկան։ Ստեղծեք առաջինը ներքևում։",
   },
   "support.newRequest": { en: "+ New request", ru: "+ Новое обращение", am: "+ Նոր դիմում" },
   "support.starting": { en: "Opening…", ru: "Открываем…", am: "Բացվում է…" },
   "support.pickConversation": {
     en: "Pick a conversation on the left.",
     ru: "Выберите обращение слева.",
-    am: "Ընտրեք դիմումը ձախից:",
+    am: "Ընտրեք դիմումը ձախից։",
   },
   "support.emptyThread": {
     en: "Nothing here yet. Describe the problem and we will pick it up.",
     ru: "Здесь пока пусто. Опишите проблему, мы её получим.",
-    am: "Այստեղ դեռ դատարկ է։ Նկարագրեք խնդիրը:",
+    am: "Այստեղ դեռ դատարկ է։ Նկարագրեք խնդիրը, և մենք կզբաղվենք դրանով։",
   },
   "support.placeholder": { en: "Write a message…", ru: "Напишите сообщение…", am: "Գրեք հաղորդագրություն…" },
   // Attachment rules, in the operator's words. Each names the actual limit
@@ -370,7 +382,7 @@ export const TRANSLATIONS: Dict = {
   "support.file.empty": {
     en: "The file is empty. It may not have been read correctly",
     ru: "Файл пустой. Возможно, он не прочитался",
-    am: "Ֆայլը դատարկ է։ Հնարավոր է՝ այն չի կարդացվել",
+    am: "Ֆայլը դատարկ է։ Հնարավոր է՝ այն ճիշտ չի կարդացվել",
   },
   "support.file.tooMany": {
     en: "Too many files. Maximum: {0}",
@@ -380,7 +392,7 @@ export const TRANSLATIONS: Dict = {
   "support.file.totalTooLarge": {
     en: "The message is too heavy altogether. Maximum: {0} MB",
     ru: "Сообщение слишком тяжёлое целиком. Максимум: {0} МБ",
-    am: "Հաղորդագրությունը չափազանց ծանր է։ Առավելագույնը՝ {0} ՄԲ",
+    am: "Ֆայլերի ընդհանուր չափը չափազանց մեծ է։ Առավելագույնը՝ {0} ՄԲ",
   },
   "support.file.fixBeforeSending": {
     en: "Remove the files marked in red to send this message.",
@@ -394,13 +406,13 @@ export const TRANSLATIONS: Dict = {
   "support.sendFailed": {
     en: "The message was not sent.",
     ru: "Сообщение не отправлено.",
-    am: "Հաղորդագրությունը չուղարկվեց:",
+    am: "Հաղորդագրությունը չուղարկվեց։",
   },
   "support.state.sending": { en: "Sending…", ru: "Отправляется…", am: "Ուղարկվում է…" },
   "support.state.queued": {
     en: "Saved. Reaching support…",
     ru: "Сохранено. Доставляем в поддержку…",
-    am: "Պահպանված է։ Հասնում է աջակցությանը…",
+    am: "Պահպանված է։ Ուղարկվում է աջակցությանը…",
   },
   "support.state.undelivered": {
     en: "Saved, but support has not received it yet",
@@ -413,7 +425,7 @@ export const TRANSLATIONS: Dict = {
   "support.chooseBranchHint": {
     en: "Support requests are kept per branch, so the team sees which venue you are writing about.",
     ru: "Обращения ведутся по филиалам. Так поддержка сразу видит, о какой площадке речь.",
-    am: "Դիմումները վարվում են ըստ մասնաճյուղերի, որպեսզի թիմը տեսնի, թե որ վայրի մասին է խոսքը:",
+    am: "Դիմումները պահվում են ըստ մասնաճյուղերի, որպեսզի թիմը տեսնի, թե որ ակումբի մասին է խոսքը։",
   },
   "support.searchBranch": { en: "Search a branch…", ru: "Поиск филиала…", am: "Որոնել մասնաճյուղ…" },
   "support.noBranchMatches": { en: "No branches found", ru: "Филиалы не найдены", am: "Մասնաճյուղեր չեն գտնվել" },
@@ -423,7 +435,7 @@ export const TRANSLATIONS: Dict = {
   "support.role.manager": { en: "Manager", ru: "Менеджер", am: "Մենեջեր" },
   "support.role.admin": { en: "Admin", ru: "Админ", am: "Ադմին" },
   /* ── a live session's terms: joysticks, free, extra time, unlimited ──── */
-  "session.options": { en: "Session options", ru: "Параметры сессии", am: "Նիստի կարգավորումներ" },
+  "session.options": { en: "Session options", ru: "Параметры сессии", am: "Սեսիայի կարգավորումներ" },
   "session.optionsShort": { en: "Options", ru: "Опции", am: "Կարգավորումներ" },
   "session.elapsedField": { en: "Running for", ru: "Идёт", am: "Տևում է" },
   "session.joystickNoPrice": { en: "price not set", ru: "цена не задана", am: "գինը սահմանված չէ" },
@@ -438,29 +450,29 @@ export const TRANSLATIONS: Dict = {
   "session.joystickRemoved": {
     en: "Joystick removed from this session",
     ru: "Джойстик снят с текущей сессии",
-    am: "Ջոյսթիքը հանվեց այս նիստից",
+    am: "Ջոյսթիքը հանվեց այս սեսիայից",
   },
   "session.joysticksInSession": {
     en: "Joysticks in session:",
     ru: "Джойстиков в сессии:",
-    am: "Ջոյսթիքներ նիստում՝",
+    am: "Ջոյսթիքներ սեսիայում՝",
   },
   // The card's own money line. "2 × 300 = 600" — a count and a flat fee, never
   // a rate and never anything that moves with the clock.
   "session.currentRate": { en: "Rate now", ru: "Тариф сейчас", am: "Ընթացիկ սակագին" },
   "session.perHourShort": { en: "/h", ru: "/ч", am: "/ժ" },
   "session.joysticksCost": { en: "Joysticks", ru: "Джойстики", am: "Ջոյսթիքներ" },
-  "session.sessionCost": { en: "Session", ru: "Сессия", am: "Նիստ" },
+  "session.sessionCost": { en: "Session", ru: "Сессия", am: "Սեսիա" },
   "session.grandTotal": { en: "Total", ru: "Итого", am: "Ընդամենը" },
   "session.joystickAddHere": {
     en: "Add a joystick to this session",
     ru: "Добавить джойстик к текущей сессии",
-    am: "Ավելացնել ջոյսթիք այս նիստին",
+    am: "Ավելացնել ջոյսթիք այս սեսիային",
   },
   "session.joystickRemoveHere": {
     en: "Remove the last joystick from this session",
     ru: "Убрать последний джойстик из текущей сессии",
-    am: "Հեռացնել վերջին ջոյսթիքը այս նիստից",
+    am: "Հեռացնել վերջին ջոյսթիքն այս սեսիայից",
   },
   "session.joystickAdd": { en: "Add a joystick", ru: "Добавить джойстик", am: "Ավելացնել ջոյսթիք" },
   "session.joystickRemove": { en: "Remove joystick #{0}", ru: "Убрать джойстик №{0}", am: "Հեռացնել №{0} ջոյսթիքը" },
@@ -478,12 +490,12 @@ export const TRANSLATIONS: Dict = {
   "session.joystickIncluded": {
     en: "Joystick #1 is part of the session",
     ru: "Джойстик №1 входит в сессию",
-    am: "№1 ջոյսթիքը մտնում է նիստի մեջ",
+    am: "№1 ջոյսթիքը ներառված է սեսիայում",
   },
   "session.joystickMax": {
     en: "A PlayStation session takes at most 4 joysticks.",
     ru: "В сессии PlayStation может быть не больше 4 джойстиков.",
-    am: "PlayStation-ի նիստում կարող է լինել առավելագույնը 4 ջոյսթիք։",
+    am: "PlayStation-ի սեսիայում կարող է լինել առավելագույնը 4 ջոյսթիք։",
   },
   "session.joystickPsOnly": {
     en: "Extra joysticks apply to PlayStation places only.",
@@ -507,12 +519,12 @@ export const TRANSLATIONS: Dict = {
   "session.seatClaimedFrom": {
     en: "Reserved from {0}. You can extend up to then:",
     ru: "Забронировано с {0}. Продлить можно до этого времени:",
-    am: "Ամրագրված է {0}-ից: Կարող եք երկարաձգել մինչ այդ:",
+    am: "Ամրագրված է {0}-ից։ Կարող եք երկարաձգել մինչ այդ:",
   },
   "session.seatClaimed": {
     en: "This seat is reserved. You can still extend by:",
     ru: "Место забронировано. Продлить можно на:",
-    am: "Այս տեղը ամրագրված է: Կարող եք երկարաձգել:",
+    am: "Այս տեղն ամրագրված է։ Դեռ կարող եք երկարաձգել:",
   },
   // …or move the player. The seat cannot give the time asked for, these can.
   "session.moveTitle": {
@@ -553,12 +565,12 @@ export const TRANSLATIONS: Dict = {
   "session.moveWhyFrom": {
     en: "{0} is booked from {1}. The current session cannot continue here.",
     ru: "{0} забронировано с {1}. Продолжить текущую сессию на этом месте невозможно.",
-    am: "{0}-ը ամրագրված է {1}-ից: Ընթացիկ սեսիան այստեղ շարունակել հնարավոր չէ:",
+    am: "{0}-ն ամրագրված է {1}-ից։ Ընթացիկ սեսիան այստեղ չի կարող շարունակվել։",
   },
   "session.moveWhy": {
     en: "{0} is booked. The current session cannot continue here.",
     ru: "{0} забронировано. Продолжить текущую сессию на этом месте невозможно.",
-    am: "{0}-ը ամրագրված է: Ընթացիկ սեսիան այստեղ շարունակել հնարավոր չէ:",
+    am: "{0}-ն ամրագրված է։ Ընթացիկ սեսիան այստեղ չի կարող շարունակվել։",
   },
   "session.moveRequested": {
     en: "Extension: +{0} min",
@@ -575,14 +587,14 @@ export const TRANSLATIONS: Dict = {
   "session.moveFreeFor": {
     en: "Free {0} to {1}",
     ru: "Свободно с {0} до {1}",
-    am: "Ազատ է {0}-ից {1}",
+    am: "Ազատ է {0}-ից մինչև {1}",
   },
   "session.moveAvailable": { en: "Available", ru: "Доступно", am: "Հասանելի" },
   // The seat went while the dialog was open. Not a fault, so not red.
   "session.moveTakenToast": {
     en: "Seat {0} is no longer free. Pick another one.",
     ru: "Место {0} больше недоступно. Выберите другое.",
-    am: "{0} տեղն այլևս ազատ չէ: Ընտրեք մեկ ուրիշը:",
+    am: "{0} տեղն այլևս ազատ չէ։ Ընտրեք մեկ ուրիշը։",
   },
   "session.moveChosen": { en: "Chosen", ru: "Выбрано", am: "Ընտրված" },
   "session.moveConfirm": {
@@ -609,7 +621,7 @@ export const TRANSLATIONS: Dict = {
   "session.unlimitedAlready": {
     en: "This session already has no end.",
     ru: "У этой сессии уже нет ограничения по времени.",
-    am: "Այս նիստն արդեն ժամանակի սահմանափակում չունի։",
+    am: "Այս սեսիան արդեն ժամանակի սահմանափակում չունի։",
   },
   // Shown INSTEAD of a figure when the server could derive none. A zero there
   // would read as "free from now on", a decision nobody made — and the server
@@ -617,7 +629,7 @@ export const TRANSLATIONS: Dict = {
   "session.unlimitedRateUnknown": {
     en: "No hourly price is set for this seat. Check the tariff settings.",
     ru: "Для этой приставки не задана цена за час. Проверьте настройки тарифа.",
-    am: "Այս սարքի համար ժամային գին սահմանված չէ։ Ստուգեք սակագինը։",
+    am: "Այս տեղի համար ժամային գին սահմանված չէ։ Ստուգեք սակագների կարգավորումները։",
   },
   // Says the rule out loud, because it is the question an operator asks and
   // getting it wrong the other way would be somebody's receipt.
@@ -640,16 +652,16 @@ export const TRANSLATIONS: Dict = {
   "session.timeInvalid": {
     en: "Enter a whole number of minutes between 1 and 600.",
     ru: "Введите целое число минут от 1 до 600.",
-    am: "Մուտքագրեք 1-ից 600 ամբողջ րոպե։",
+    am: "Մուտքագրեք րոպեների ամբողջ թիվ՝ 1-ից 600։",
   },
   "session.timeAdded": { en: "{0} minutes added", ru: "Добавлено {0} минут", am: "Ավելացվեց {0} րոպե" },
   "session.timeNotApplicable": {
     en: "This session has no time limit, so there is nothing to extend.",
     ru: "У этой сессии нет ограничения по времени. Продлевать нечего.",
-    am: "Այս նիստը ժամանակային սահմանափակում չունի։ Երկարացնելու բան չկա։",
+    am: "Այս սեսիան ժամանակի սահմանափակում չունի, երկարաձգելու բան չկա։",
   },
   "session.unlimited": { en: "Unlimited", ru: "Безлимит", am: "Անսահմանափակ" },
-  "session.makeUnlimited": { en: "Switch to unlimited", ru: "Перевести на безлимит", am: "Փոխարկել անսահմանափակի" },
+  "session.makeUnlimited": { en: "Switch to unlimited", ru: "Перевести на безлимит", am: "Անցնել անսահմանափակի" },
   // The GATE, distinct from the button that performs it. Two controls reading
   // the same words is ambiguous on screen and outright unusable to anything
   // selecting by name — a test, a screen reader, a keyboard user reading the
@@ -662,7 +674,7 @@ export const TRANSLATIONS: Dict = {
   "session.unlimitedApply": {
     en: "Change fixed tariff to unlimited",
     ru: "Изменить фиксированный тариф на безлимитный",
-    am: "Փոխել ֆիքսված սակագինը անսահմանափակի",
+    am: "Փոխել ֆիքսված սակագինն անսահմանափակով",
   },
   "session.unlimitedHint": {
     en: "The paid block stays; time past it is charged by the hour. Cannot be undone.",
@@ -672,30 +684,30 @@ export const TRANSLATIONS: Dict = {
   "session.unlimitedConfirm": {
     en: "Switch this session to unlimited?",
     ru: "Перевести сессию на безлимит?",
-    am: "Փոխարկե՞լ նիստն անսահմանափակի։",
+    am: "Սեսիան դարձնե՞լ անսահմանափակ։",
   },
   // NOTE: `session.free` already means "this seat is available" on the board.
   // The bill-waiver keys are prefixed `freeBill` so the two can never collide.
-  "session.freeBill": { en: "Free session", ru: "Бесплатная сессия", am: "Անվճար նիստ" },
+  "session.freeBill": { en: "Free session", ru: "Бесплатная сессия", am: "Անվճար սեսիա" },
   "session.freeBillShort": { en: "Free", ru: "Бесплатно", am: "Անվճար" },
   "session.freeBillHint": {
     en: "The clock keeps running and the session still counts. Nobody pays.",
     ru: "Время продолжает идти и сессия остаётся в статистике. Просто никто не платит.",
-    am: "Ժամանակը շարունակում է գնալ, նիստը մնում է վիճակագրության մեջ։ Պարզապես ոչ ոք չի վճարում։",
+    am: "Ժամանակը շարունակում է հաշվվել, սեսիան մնում է վիճակագրության մեջ։ Պարզապես ոչ ոք չի վճարում։",
   },
   "session.freeBillWaived": { en: "Waived: {0}", ru: "Списано: {0}", am: "Դուրս գրված՝ {0}" },
   "session.freeBillStartHint": {
     en: "This session will be started free. The timer runs, nothing is charged.",
     ru: "Сессия запустится бесплатной. Таймер идёт, счёт не начисляется.",
-    am: "Նիստը կսկսվի անվճար։ Ժամաչափն աշխատում է, հաշիվ չի հաշվարկվում։",
+    am: "Սեսիան կսկսվի անվճար։ Ժամաչափն աշխատում է, գումար չի հաշվարկվում։",
   },
   "session.optionsClosedSession": {
     en: "This session is no longer active.",
     ru: "Сессия уже не активна.",
-    am: "Նիստն այլևս ակտիվ չէ։",
+    am: "Սեսիան այլևս ակտիվ չէ։",
   },
   /* ── the ten-minute warning ───────────────────────────────────────────── */
-  "session.endingSoonTitle": { en: "Session ending soon", ru: "Сессия скоро закончится", am: "Նիստը շուտով կավարտվի" },
+  "session.endingSoonTitle": { en: "Session ending soon", ru: "Сессия скоро закончится", am: "Սեսիան շուտով կավարտվի" },
   "session.endingSoonBody": {
     en: "{place}. {minutes} min left. Add more time?",
     ru: "{place}. Осталось {minutes} мин. Добавить время?",
@@ -729,7 +741,7 @@ export const TRANSLATIONS: Dict = {
   // one in a list is the slow part.
   "session.addMode": { en: "How to add", ru: "Способ добавления", am: "Ավելացնելու եղանակը" },
   "session.addModePicker": { en: "Choose from the list", ru: "Выбрать из списка", am: "Ընտրել ցանկից" },
-  "session.addModeText": { en: "Type the order", ru: "Ввести списком", am: "Մուտքագրել ցանկով" },
+  "session.addModeText": { en: "Type the order", ru: "Ввести списком", am: "Մուտքագրել տեքստով" },
   "session.quickEntry": { en: "Quick entry", ru: "Быстрый ввод", am: "Արագ մուտքագրում" },
   // Says what to do, not what a made-up order looks like: two product names a
   // venue may not even sell read as a format to copy rather than as an
@@ -765,7 +777,7 @@ export const TRANSLATIONS: Dict = {
   "session.quickEntryConfirm": {
     en: "Add to this session",
     ru: "Добавить товар к этой сессии",
-    am: "Ավելացնել այս նիստին",
+    am: "Ավելացնել այս սեսիային",
   },
   // ── the room's own extra on a running session ─────────────────────────
   // `{0}` is the word the OWNER typed on the place form — "chips", "cue",
@@ -781,9 +793,9 @@ export const TRANSLATIONS: Dict = {
   "session.pausedUntil": { en: "Paused · until {0}", ru: "Пауза · до {0}", am: "Դադար · մինչև {0}" },
   // The toast after each of the three presses, naming the seat as its tile
   // does. Raised only once the server accepted the action.
-  "session.toastPaused": { en: "Session paused · {0}", ru: "Сессия на паузе · {0}", am: "Նիստը դադարեցված է · {0}" },
-  "session.toastResumed": { en: "Session resumed · {0}", ru: "Сессия продолжена · {0}", am: "Նիստը շարունակվեց · {0}" },
-  "session.toastStopped": { en: "Session stopped · {0}", ru: "Сессия завершена · {0}", am: "Նիստն ավարտվեց · {0}" },
+  "session.toastPaused": { en: "Session paused · {0}", ru: "Сессия на паузе · {0}", am: "Սեսիան դադարեցված է · {0}" },
+  "session.toastResumed": { en: "Session resumed · {0}", ru: "Сессия продолжена · {0}", am: "Սեսիան շարունակվեց · {0}" },
+  "session.toastStopped": { en: "Session stopped · {0}", ru: "Сессия завершена · {0}", am: "Սեսիան ավարտվեց · {0}" },
   // «Переместить игрока» — a running session moved to another seat.
   "session.relocate": { en: "Move player", ru: "Переместить игрока", am: "Տեղափոխել խաղացողին" },
   // Short labels for the session CARD's action grid: one line each, so every
@@ -814,7 +826,7 @@ export const TRANSLATIONS: Dict = {
   "session.relocateAcceptLimit": {
     en: "I understand: the session will end at {0}",
     ru: "Понимаю: сессия закончится в {0}",
-    am: "Հասկանում եմ՝ նիստը կավարտվի {0}-ին",
+    am: "Հասկանում եմ՝ սեսիան կավարտվի {0}-ին",
   },
   "session.relocateChangePrice": { en: "Change price", ru: "Изменить цену", am: "Փոխել գինը" },
   "session.relocateSummaryRate": {
@@ -828,14 +840,14 @@ export const TRANSLATIONS: Dict = {
     am: "Արդեն խաղացած ժամանակը պահպանում է իր գինը․ ապրանքներն ու ջոյսթիքները տեղափոխվում են խաղացողի հետ։",
   },
   "session.relocateConfirm": { en: "Move", ru: "Переместить", am: "Տեղափոխել" },
-  "session.relocatedToast": { en: "Player moved to {0}", ru: "Игрок перемещён на {0}", am: "Խաղացողը տեղափոխվեց {0}" },
+  "session.relocatedToast": { en: "Player moved to {0}", ru: "Игрок перемещён на {0}", am: "Խաղացողը տեղափոխվեց՝ {0}" },
   // The green toast after a hand-out, in the room's own word — the pads say
   // "Джойстик добавлен" the same way.
   "session.extraAdded": { en: "Added: {0}", ru: "Добавлено: {0}", am: "Ավելացվեց՝ {0}" },
   // …and the RED one after it comes back, as a pad's removal toast is.
   "session.extraReturnedToast": { en: "Returned: {0}", ru: "Возвращено: {0}", am: "Վերադարձվեց՝ {0}" },
   "session.extraQty": { en: "How many ({0})", ru: "Количество ({0})", am: "Քանակը ({0})" },
-  "session.extraPerHour": { en: "/h", ru: "/час", am: "/ժամ" },
+  "session.extraPerHour": { en: "/h", ru: "/час", am: "/ժ" },
   "session.extraReturn": { en: "Return {0}", ru: "Вернуть: {0}", am: "Վերադարձնել՝ {0}" },
   "session.extraReturned": { en: "returned", ru: "возвращено", am: "վերադարձված" },
   "session.extraHourlyNote": {
@@ -854,7 +866,7 @@ export const TRANSLATIONS: Dict = {
   "session.extraIncluded": {
     en: "The rate covers {0} per session, {1} left",
     ru: "Тариф покрывает {0} за сессию, осталось {1}",
-    am: "Սակագինը ծածկում է {0} մեկ սեսիայի համար, մնացել է {1}",
+    am: "Սակագինը ներառում է {0} մեկ սեսիայի համար, մնացել է {1}",
   },
   "session.extraPartFree": {
     en: "{0} of {1} free: covered by the rate",
@@ -872,66 +884,66 @@ export const TRANSLATIONS: Dict = {
   "session.nothingAdded": {
     en: "Nothing added yet. Pick a product above.",
     ru: "Пока ничего не добавлено. Выберите товар выше.",
-    am: "Դեռ ոչինչ ավելացված չէ։ Ընտրեք ապրանք վերևում:",
+    am: "Դեռ ոչինչ ավելացված չէ։ Ընտրեք ապրանք վերևում։",
   },
-  "session.noSearchMatches": { en: "Nothing matches that search.", ru: "Ничего не найдено.", am: "Ոչինչ չի գտնվել:" },
+  "session.noSearchMatches": { en: "Nothing matches that search.", ru: "Ничего не найдено.", am: "Ոչինչ չի գտնվել։" },
   "session.itemsTotal": { en: "Products total", ru: "Итого за товары", am: "Ընդամենը ապրանքների համար" },
   "session.decrease": { en: "One fewer", ru: "Убрать одну", am: "Մեկով պակաս" },
   "session.increase": { en: "One more", ru: "Добавить одну", am: "Մեկով ավելի" },
-  "session.removeItem": { en: "Remove from the session", ru: "Удалить из сессии", am: "Հեռացնել նիստից" },
+  "session.removeItem": { en: "Remove from the session", ru: "Удалить из сессии", am: "Հեռացնել սեսիայից" },
   // The dialog is a basket: nothing reaches the session until it is confirmed,
   // so the button says what confirming will do, and the count decides the word.
   "session.cartConfirmOne": {
     en: "Add the product to this session",
     ru: "Добавить товар к этой сессии",
-    am: "Ավելացնել ապրանքը այս նիստին",
+    am: "Ավելացնել ապրանքն այս սեսիային",
   },
   "session.cartConfirmMany": {
     en: "Add the products to this session",
     ru: "Добавить товары к этой сессии",
-    am: "Ավելացնել ապրանքները այս նիստին",
+    am: "Ավելացնել ապրանքներն այս սեսիային",
   },
   "session.adding": { en: "Adding…", ru: "Добавление…", am: "Ավելացվում է…" },
   "session.cartEmpty": {
     en: "Nothing selected yet. Pick a product above.",
     ru: "Пока ничего не выбрано. Выберите товар выше.",
-    am: "Դեռ ոչինչ ընտրված չէ։ Ընտրեք ապրանք վերևում:",
+    am: "Դեռ ոչինչ ընտրված չէ։ Ընտրեք ապրանք վերևում։",
   },
   "session.alreadyInSession": { en: "Already on the bill", ru: "Уже в сессии", am: "Արդեն հաշվին" },
   "session.addedOne": {
     en: "{0} × {1} added to the current session.",
     ru: "{0} × {1} успешно добавлен к текущей сессии.",
-    am: "{0} × {1} ավելացվեց ընթացիկ նիստին:",
+    am: "{0} × {1} ավելացվեց ընթացիկ սեսիային։",
   },
   "session.addedMany": {
     en: "Added to the current session: {0}.",
     ru: "Товары успешно добавлены к текущей сессии: {0}.",
-    am: "Ավելացվեց ընթացիկ նիստին՝ {0}:",
+    am: "Ավելացվեց ընթացիկ սեսիային՝ {0}։",
   },
   "session.addFailedOne": {
     en: "The product was not added to the current session.",
     ru: "Товар не добавлен к текущей сессии.",
-    am: "Ապրանքը չավելացվեց ընթացիկ նիստին:",
+    am: "Ապրանքը չավելացվեց ընթացիկ սեսիային։",
   },
   "session.addFailedMany": {
     en: "The products were not added to the current session.",
     ru: "Товары не добавлены к текущей сессии.",
-    am: "Ապրանքները չավելացվեցին ընթացիկ նիստին:",
+    am: "Ապրանքները չավելացվեցին ընթացիկ սեսիային։",
   },
   "session.failReason": { en: "Reason: {0}", ru: "Причина: {0}", am: "Պատճառը՝ {0}" },
   "session.failUnknown": {
     en: "the server did not say why.",
     ru: "сервер не сообщил причину.",
-    am: "սերվերը պատճառ չնշեց:",
+    am: "սերվերը պատճառը չնշեց։",
   },
   "session.search": { en: "Search by name…", ru: "Поиск по названию…", am: "Որոնում անունով…" },
   "session.noProducts": { en: "No products in this branch yet. Create the first one below.", ru: "В этом филиале ещё нет товаров. Создайте первый ниже.", am: "Այս մասնաճյուղում ապրանքներ դեռ չկան։ Ստեղծեք առաջինը ներքևում։" },
   "session.added": { en: "Added", ru: "Добавлено", am: "Ավելացված է" },
-  "session.checkoutTitle": { en: "Close session", ru: "Закрыть сессию", am: "Փակել նիստը" },
+  "session.checkoutTitle": { en: "Close session", ru: "Закрыть сессию", am: "Փակել սեսիան" },
   "session.checkoutDone": { en: "Receipt closed", ru: "Чек закрыт", am: "Հաշիվը փակված է" },
   "session.timePlayed": { en: "Time played", ru: "Время игры", am: "Խաղի ժամանակը" },
   "session.tariff": { en: "Tariff", ru: "Тариф", am: "Սակագին" },
-  "session.totalDue": { en: "Total to pay", ru: "Итого к оплате", am: "Ընդամենը վճարման" },
+  "session.totalDue": { en: "Total to pay", ru: "Итого к оплате", am: "Ընդամենը վճարելու" },
   "session.confirmStop": { en: "Confirm and close", ru: "Подтвердить и закрыть", am: "Հաստատել և փակել" },
   "session.closing": { en: "Closing…", ru: "Закрываем…", am: "Փակվում է…" },
   "session.fixedTariff": { en: "Fixed tariff", ru: "Фиксированный тариф", am: "Ֆիքսված սակագին" },
@@ -941,13 +953,13 @@ export const TRANSLATIONS: Dict = {
   "session.editPrice": { en: "Change current price", ru: "Изменить текущую цену", am: "Փոխել ընթացիկ գինը" },
   "session.newHourlyRate": { en: "New price per hour", ru: "Новая цена за час", am: "Նոր գին մեկ ժամի համար" },
   "session.priceSaved": { en: "Saved", ru: "Сохранено", am: "Պահպանված է" },
-  "session.savePriceHint": { en: "Save the new price, then press Start.", ru: "Сохраните новую цену, затем нажмите «Старт».", am: "Պահպանեք նոր գինը, ապա սեղմեք «Սկսել»:" },
+  "session.savePriceHint": { en: "Save the new price, then press Start.", ru: "Сохраните новую цену, затем нажмите «Старт».", am: "Պահպանեք նոր գինը, ապա սեղմեք «Սկսել»։" },
   "session.groupComputers": { en: "Computer places", ru: "Места для компьютеров", am: "Համակարգիչների տեղեր" },
   "session.groupPs": { en: "PS places", ru: "Места для PS", am: "PS-ի տեղեր" },
   "session.groupOther": { en: "Other places", ru: "Другие места", am: "Այլ տեղեր" },
-  "session.noPcs": { en: "No devices registered.", ru: "Устройства не зарегистрированы.", am: "Սարքեր գրանցված չեն:" },
-  "session.openHint": { en: "Time counts up. Cost is pro-rated by minute.", ru: "Время идёт вверх. Сумма считается пропорционально.", am: "Ժամանակը հաշվվում է աճողաբար: Գումարը հաշվվում է համամասնորեն:" },
-  "session.noPackages": { en: "No time packages yet. Add one on the «Branch prices» page.", ru: "Пакетов пока нет. Добавь на странице «Цены филиала».", am: "Փաթեթներ դեռ չկան: Ավելացնել «Մասնաճյուղի գները» էջում:" },
+  "session.noPcs": { en: "No devices registered.", ru: "Устройства не зарегистрированы.", am: "Սարքեր գրանցված չեն։" },
+  "session.openHint": { en: "Time counts up. Cost is pro-rated by minute.", ru: "Время идёт вверх. Сумма считается пропорционально.", am: "Ժամանակը հաշվվում է աճողաբար։ Գումարը հաշվարկվում է ըստ րոպեների։" },
+  "session.noPackages": { en: "No time packages yet. Add one on the «Branch prices» page.", ru: "Пакетов пока нет. Добавь на странице «Цены филиала».", am: "Ժամային փաթեթներ դեռ չկան։ Ավելացրեք «Մասնաճյուղի գները» էջում։" },
   "session.choosePackage": { en: "Choose a tariff", ru: "Выберите тариф", am: "Ընտրեք սակագինը" },
   "session.enterRate": { en: "Enter hourly rate", ru: "Укажите ставку за час", am: "Նշեք ժամային սակագինը" },
   "notifications.branchSubscribedTitle": {
@@ -993,7 +1005,7 @@ export const TRANSLATIONS: Dict = {
   "registrations.confirmRemove": {
     en: "Remove this registration?",
     ru: "Удалить эту регистрацию?",
-    am: "Ջնջե՞լ այս գրանցումը:",
+    am: "Ջնջե՞լ այս գրանցումը։",
   },
   // Under the question, for a VERIFIED player only (nobody else ever paid).
   // States the backend's rule (TournamentRefundService); whether a refund
@@ -1006,12 +1018,12 @@ export const TRANSLATIONS: Dict = {
   "registrations.empty": {
     en: "No registrations yet.",
     ru: "Регистраций пока нет.",
-    am: "Գրանցումներ դեռ չկան:",
+    am: "Գրանցումներ դեռ չկան։",
   },
   "registrations.noMatches": {
     en: "No matches.",
     ru: "Совпадений не найдено.",
-    am: "Համընկնումներ չեն գտնվել:",
+    am: "Համընկնումներ չեն գտնվել։",
   },
   "registrations.rolePlayer": {
     en: "Player",
@@ -1026,7 +1038,7 @@ export const TRANSLATIONS: Dict = {
   "session.noAssignedRate": {
     en: "No price configured for this PC's place. Set one on the «Branch prices» page first.",
     ru: "Для места этого PC не задана цена. Сначала установите её на странице «Цены филиала».",
-    am: "Այս PC-ի տեղի համար գին սահմանված չէ: Սահմանեք այն «Մասնաճյուղի գները» էջում:",
+    am: "Այս PC-ի տեղի համար գին սահմանված չէ։ Նախ սահմանեք այն «Մասնաճյուղի գները» էջում։",
   },
   "session.free": { en: "Free", ru: "Свободно", am: "Ազատ" },
   "session.reserved": { en: "Reserved", ru: "Зарезервировано", am: "Ամրագրված" },
@@ -1036,10 +1048,10 @@ export const TRANSLATIONS: Dict = {
   "session.deviceOfflineHint": {
     en: "The device agent is not connected. A session cannot be started.",
     ru: "Агент устройства не подключён. Сессию начать нельзя.",
-    am: "Սարքի գործակալը միացված չէ։ Նիստը հնարավոր չէ սկսել:",
+    am: "Սարքի Agent-ը միացված չէ։ Սեսիան հնարավոր չէ սկսել։",
   },
   "session.toastNewBooking": { en: "New booking", ru: "Новое бронирование", am: "Նոր ամրագրում" },
-  "session.toastBookingExtended": { en: "Booking extended", ru: "Бронь продлена", am: "Ամրագրումը երկարացվել է" },
+  "session.toastBookingExtended": { en: "Booking extended", ru: "Бронь продлена", am: "Ամրագրումը երկարաձգվել է" },
   // ── how the money was taken ─────────────────────────────────────────────
   // One answer, so radio buttons. Cash leads: it is the common case at a
   // counter and the default keeps an ordinary stop to one click.
@@ -1051,9 +1063,9 @@ export const TRANSLATIONS: Dict = {
   "session.payOtherRequired": {
     en: "Say which method it was.",
     ru: "Укажите, каким способом.",
-    am: "Նշեք, թե որ եղանակով:",
+    am: "Նշեք վճարման եղանակը։",
   },
-  "session.boardTitle": { en: "Sessions", ru: "Сессии", am: "Նիստեր" },
+  "session.boardTitle": { en: "Sessions", ru: "Сессии", am: "Սեսիաներ" },
   // How much of the room is in use. Counted off the tiles on screen, so the
   // line and the grid can never disagree.
   "session.boardCounts": {
@@ -1071,18 +1083,18 @@ export const TRANSLATIONS: Dict = {
   "pcs.editDevice": { en: "Edit computer", ru: "Редактировать компьютер", am: "Խմբագրել համակարգիչը" },
   "pcs.newDevice": { en: "Register computer", ru: "Зарегистрировать компьютер", am: "Գրանցել համակարգիչ" },
   "pcs.kind": { en: "Device type", ru: "Тип устройства", am: "Սարքի տեսակը" },
-  "pcs.kindPc": { en: "PC (with agent)", ru: "ПК (с агентом)", am: "ՀՀ (գործակալով)" },
+  "pcs.kindPc": { en: "PC (with agent)", ru: "ПК (с агентом)", am: "PC (Agent-ով)" },
   "pcs.kindPs": { en: "PlayStation / console", ru: "PlayStation / консоль", am: "PlayStation / կոնսոլ" },
-  "pcs.psHint": { en: "No agent runs on a console. Billing-only device: timer + cost.", ru: "На консоль агент не ставится. Это билинг-устройство: только таймер и расчёт стоимости.", am: "Կոնսոլի վրա գործակալ չի տեղադրվում։ Միայն ժամանաչափ և գումար:" },
+  "pcs.psHint": { en: "No agent runs on a console. Billing-only device: timer + cost.", ru: "На консоль агент не ставится. Это билинг-устройство: только таймер и расчёт стоимости.", am: "Կոնսոլի վրա Agent չի տեղադրվում։ Միայն ժամաչափ և գումար։" },
   "pcs.label": { en: "Label (e.g. PC #5)", ru: "Метка (напр. PC #5)", am: "Պիտակ (օր. PC #5)" },
-  "pcs.macHint": { en: "Used only for Wake-on-LAN. The PC connects via the agent app paired with the token.", ru: "Используется только для Wake-on-LAN. ПК подключается через агент с токеном, не через MAC.", am: "Օգտագործվում է միայն Wake-on-LAN-ի համար:" },
+  "pcs.macHint": { en: "Used only for Wake-on-LAN. The PC connects via the agent app paired with the token.", ru: "Используется только для Wake-on-LAN. ПК подключается через агент с токеном, не через MAC.", am: "Օգտագործվում է միայն Wake-on-LAN-ի համար։ Համակարգիչը միանում է թոքենով զուգակցված Agent ծրագրի միջոցով։" },
   "pcs.placeId": { en: "Linked place", ru: "Связанное место", am: "Կապված տեղ" },
-  "pcs.placeRequired": { en: "Linked place is required.", ru: "Связанное место обязательно.", am: "Կապված տեղը պարտադիր է:" },
+  "pcs.placeRequired": { en: "Linked place is required.", ru: "Связанное место обязательно.", am: "Կապված տեղը պարտադիր է։" },
   "pcs.placeNone": { en: "none", ru: "нет", am: "չկա" },
   "pcs.placeEmpty": {
     en: "No places in this branch yet. Add places first to link this device to one.",
     ru: "В этом филиале ещё нет мест. Сначала создайте места, чтобы связать с ними устройство.",
-    am: "Այս մասնաճյուղում տեղեր դեռ չկան: Նախ ավելացրեք տեղեր, որպեսզի կապեք սարքը դրանց հետ:",
+    am: "Այս մասնաճյուղում տեղեր դեռ չկան։ Նախ ավելացրեք տեղեր, որպեսզի սարքը կապեք դրանցից մեկին։",
   },
   "pcs.placeOption": {
     en: "№{0} · {1} · {2}",
@@ -1092,18 +1104,18 @@ export const TRANSLATIONS: Dict = {
   // Price-tier selector — replaces the old free-text hourly_rate input
   // so PCs draw their price from the branch matrix and can't drift.
   "pcs.tierLabel": { en: "Price tier", ru: "Тариф", am: "Սակագին" },
-  "pcs.tierPickPlace": { en: "Select a place first. Its tariff appears here.", ru: "Сначала выберите место. Его тариф появится здесь.", am: "Սկզբում ընտրեք տեղը։ Դրա սակագինը կհայտնվի այստեղ:" },
+  "pcs.tierPickPlace": { en: "Select a place first. Its tariff appears here.", ru: "Сначала выберите место. Его тариф появится здесь.", am: "Նախ ընտրեք տեղը։ Դրա սակագինը կհայտնվի այստեղ։" },
   "pcs.tierPlaceholder": { en: "Choose a tier…", ru: "Выберите тариф…", am: "Ընտրեք սակագինը…" },
   "pcs.tierNoPrices": {
     en: "Branch prices are not configured yet. Set them in Tariffs first, then come back.",
     ru: "Цены филиала ещё не настроены. Сначала задайте их в «Тарифах», потом вернитесь сюда.",
-    am: "Մասնաճյուղի գները դեռ կարգավորված չեն: Սկզբում սահմանեք դրանք «Սակագներ»-ում:",
+    am: "Մասնաճյուղի գները դեռ կարգավորված չեն։ Նախ սահմանեք դրանք «Սակագներ» բաժնում, ապա վերադարձեք։",
   },
   "pcs.tierEmpty": { en: "no price set", ru: "цена не задана", am: "գին նշված չէ" },
   "pcs.tierOverwrite": {
     en: "Current rate differs from the selected tier. Saving will overwrite it.",
     ru: "Текущая цена не совпадает с выбранным тарифом. Сохранение перезапишет её.",
-    am: "Ընթացիկ սակագինը տարբերվում է ընտրված սակագնից։ Պահպանումը կփոխարինի այն:",
+    am: "Ընթացիկ սակագինը տարբերվում է ընտրվածից։ Պահպանելիս այն կփոխարինվի։",
   },
   "pcs.tier.pcStandard":  { en: "Standard",     ru: "Стандарт",     am: "Ստանդարտ" },
   "pcs.tier.pcVip":       { en: "VIP",          ru: "VIP",          am: "VIP" },
@@ -1119,25 +1131,25 @@ export const TRANSLATIONS: Dict = {
   "live.updated": { en: "updated", ru: "обновлено", am: "թարմացված է" },
   "live.failedLoad": { en: "Failed to load live data", ru: "Не удалось загрузить данные", am: "Չհաջողվեց բեռնել տվյալները" },
   "live.total": { en: "Total", ru: "Всего", am: "Ընդամենը" },
-  "live.till": { en: "till", ru: "до", am: "մինչ" },
-  "live.from": { en: "from", ru: "с", am: "ից" },
+  "live.till": { en: "till", ru: "до", am: "մինչև" },
+  "live.from": { en: "from", ru: "с", am: "սկսած" },
   "place.free": { en: "Free", ru: "Свободно", am: "Ազատ" },
   "place.busy": { en: "Busy", ru: "Занято", am: "Զբաղված" },
   "place.reserved": { en: "Reserved", ru: "Зарезервировано", am: "Ամրագրված" },
   "place.maintenance": { en: "Maintenance", ru: "На обслуживании", am: "Սպասարկման մեջ" },
 
   // Branch hub tiles
-  "hub.invalidId": { en: "Invalid branch id.", ru: "Неверный идентификатор филиала.", am: "Մասնաճյուղի սխալ ID:" },
-  "hub.tile.sessions": { en: "Sessions", ru: "Сессии", am: "Նիստեր" },
+  "hub.invalidId": { en: "Invalid branch id.", ru: "Неверный идентификатор филиала.", am: "Մասնաճյուղի ID-ն սխալ է։" },
+  "hub.tile.sessions": { en: "Sessions", ru: "Сессии", am: "Սեսիաներ" },
   "hub.tile.sessionsHint": { en: "Start / stop · billing", ru: "Старт / стоп · биллинг", am: "Մեկնարկ / ավարտ · վճարում" },
-  "hub.tile.members": { en: "Members", ru: "Клиенты", am: "Անդամներ" },
+  "hub.tile.members": { en: "Members", ru: "Клиенты", am: "Հաճախորդներ" },
   "hub.tile.membersHint": { en: "Cards & deposits", ru: "Карты и депозиты", am: "Քարտեր և ավանդներ" },
   "hub.tile.places": { en: "Places", ru: "Места", am: "Տեղեր" },
   "hub.tile.placesHint": { en: "Bookable seats · games", ru: "Места для бронирования · игры", am: "Ամրագրման տեղեր · խաղեր" },
   "hub.tile.games": { en: "Games", ru: "Игры", am: "Խաղեր" },
   "hub.tile.gamesHint": { en: "This branch's game library", ru: "Библиотека игр филиала", am: "Մասնաճյուղի խաղերի գրադարան" },
   "hub.tile.pcs": { en: "PCs", ru: "ПК", am: "Համակարգիչներ" },
-  "hub.tile.pcsHint": { en: "Agent registration", ru: "Регистрация агента", am: "Գործակալի գրանցում" },
+  "hub.tile.pcsHint": { en: "Agent registration", ru: "Регистрация агента", am: "Agent-ի գրանցում" },
   "hub.tile.prices": { en: "Branch prices", ru: "Цены филиала", am: "Մասնաճյուղի գները" },
   "hub.tile.pricesHint": { en: "Hourly rates per place type", ru: "Ставки за час по типам мест", am: "Ժամային սակագներ ըստ տեղի տեսակի" },
   "hub.tile.subscribers": { en: "Subscribers", ru: "Подписчики", am: "Բաժանորդներ" },
@@ -1156,18 +1168,18 @@ export const TRANSLATIONS: Dict = {
   "subscribers.empty": {
     en: "No subscribers yet.",
     ru: "Подписчиков пока нет.",
-    am: "Բաժանորդներ դեռ չկան:",
+    am: "Բաժանորդներ դեռ չկան։",
   },
   "subscribers.noMatches": {
     en: "No matches.",
     ru: "Совпадений не найдено.",
-    am: "Համընկնումներ չեն գտնվել:",
+    am: "Համընկնումներ չեն գտնվել։",
   },
   "hub.tile.products": { en: "Products", ru: "Товары", am: "Ապրանքներ" },
-  "hub.tile.productsHint": { en: "Sold on the session bill", ru: "Продаются в счёт сессии", am: "Վաճառվում են սեանսի հաշվին" },
+  "hub.tile.productsHint": { en: "Sold on the session bill", ru: "Продаются в счёт сессии", am: "Վաճառք սեսիայի հաշվում" },
   // Касса: selling at the counter with no gaming session (2026-09-24).
   "hub.tile.till": { en: "Till", ru: "Касса", am: "Դրամարկղ" },
-  "hub.tile.tillHint": { en: "Sell products without a session", ru: "Продажа товаров без сессии", am: "Ապրանքների վաճառք առանց նիստի" },
+  "hub.tile.tillHint": { en: "Sell products without a session", ru: "Продажа товаров без сессии", am: "Ապրանքների վաճառք առանց սեսիայի" },
   "till.title": { en: "Till", ru: "Касса", am: "Դրամարկղ" },
   "till.sell": { en: "Sell products", ru: "Продать товар", am: "Վաճառել ապրանք" },
   "till.sellTitle": { en: "Product sale", ru: "Продажа товара", am: "Ապրանքի վաճառք" },
@@ -1178,9 +1190,9 @@ export const TRANSLATIONS: Dict = {
   "till.today": { en: "Today's sales", ru: "Продажи за сегодня", am: "Այսօրվա վաճառքը" },
   "till.empty": { en: "No sales today yet.", ru: "Сегодня продаж ещё не было.", am: "Այսօր դեռ վաճառք չի եղել։" },
   "till.voided": { en: "voided", ru: "отменена", am: "չեղարկված" },
-  "till.payDeposit": { en: "Member balance", ru: "Баланс участника", am: "Անդամի հաշվեկշիռ" },
+  "till.payDeposit": { en: "Member balance", ru: "Баланс участника", am: "Հաճախորդի հաշվեկշիռ" },
   "hub.tile.managers": { en: "Managers", ru: "Менеджеры", am: "Մենեջերներ" },
-  "hub.tile.managersHint": { en: "Branch staff", ru: "Сотрудники филиала", am: "Մասնաճյուղի անձնակազմ" },
+  "hub.tile.managersHint": { en: "Branch staff", ru: "Сотрудники филиала", am: "Մասնաճյուղի աշխատակազմ" },
   "hub.tile.tournaments": { en: "Tournaments", ru: "Турниры", am: "Մրցաշարեր" },
   "hub.tile.tournamentsHint": { en: "Events", ru: "События", am: "Միջոցառումներ" },
   "hub.tile.settings": { en: "Settings", ru: "Настройки", am: "Կարգավորումներ" },
@@ -1202,7 +1214,7 @@ export const TRANSLATIONS: Dict = {
   "switchAccount.empty": { en: "No other accounts available yet", ru: "Других аккаунтов пока нет", am: "Այլ հաշիվներ դեռ չկան" },
   "switchAccount.noMatch": { en: "No account matches", ru: "Ничего не найдено", am: "Համընկնում չկա" },
   "switchAccount.unnamed": { en: "Unnamed account", ru: "Без имени", am: "Անանուն հաշիվ" },
-  "switchAccount.passwordHint": { en: "Enter this account's password to continue as them.", ru: "Введите пароль этого аккаунта, чтобы войти под ним.", am: "Մուտքագրեք այս հաշվի գաղտնաբառը՝ նրա անունից շարունակելու համար:" },
+  "switchAccount.passwordHint": { en: "Enter this account's password to continue as them.", ru: "Введите пароль этого аккаунта, чтобы войти под ним.", am: "Մուտքագրեք այս հաշվի գաղտնաբառը՝ նրա անունից շարունակելու համար։" },
   "switchAccount.signIn": { en: "Sign in to this account", ru: "Войти в этот аккаунт", am: "Մուտք գործել այս հաշիվ" },
   "switchAccount.forgot": { en: "Reset the password", ru: "Сбросить пароль", am: "Վերականգնել գաղտնաբառը" },
   "switchAccount.done": { en: "Signed in as {0}", ru: "Вы вошли как {0}", am: "Մուտք գործեցիք որպես {0}" },
@@ -1218,20 +1230,20 @@ export const TRANSLATIONS: Dict = {
   "history.today": { en: "Today", ru: "Сегодня", am: "Այսօր" },
   "history.yesterday": { en: "Yesterday", ru: "Вчера", am: "Երեկ" },
   "history.month": { en: "This month", ru: "Текущий месяц", am: "Ընթացիկ ամիս" },
-  "history.backToBoard": { en: "Back to board", ru: "К доске сессий", am: "Վերադառնալ սեանսներին" },
-  "history.sumSessions": { en: "Sessions", ru: "Сессии", am: "Սեանսներ" },
+  "history.backToBoard": { en: "Back to board", ru: "К доске сессий", am: "Վերադառնալ սեսիաներին" },
+  "history.sumSessions": { en: "Sessions", ru: "Сессии", am: "Սեսիաներ" },
   "history.sumTotal": { en: "Total revenue", ru: "Выручка", am: "Ընդհանուր եկամուտ" },
   "history.sumTime": { en: "Time revenue", ru: "За время", am: "Ժամանակի դիմաց" },
   "history.sumItemsRevenue": { en: "Items revenue", ru: "Товары · сумма", am: "Ապրանքների գումար" },
-  "history.sumItemsQty": { en: "Items sold", ru: "Продано позиций", am: "Վաճառվել է" },
-  "history.topItems": { en: "Top items", ru: "Топ позиций", am: "Լավագույն դիրքեր" },
-  "history.empty": { en: "No sessions in this range.", ru: "В выбранном периоде нет сессий.", am: "Ընտրված ժամանակահատվածում սեանսներ չկան:" },
+  "history.sumItemsQty": { en: "Items sold", ru: "Продано позиций", am: "Վաճառված ապրանքներ" },
+  "history.topItems": { en: "Top items", ru: "Топ позиций", am: "Ամենավաճառվածները" },
+  "history.empty": { en: "No sessions in this range.", ru: "В выбранном периоде нет сессий.", am: "Ընտրված ժամանակահատվածում սեսիաներ չկան։" },
   "history.timeCost": { en: "Time", ru: "За время", am: "Ժամանակի դիմաց" },
   "history.itemsTotal": { en: "Items", ru: "Товары", am: "Ապրանքներ" },
   "history.total": { en: "Total", ru: "Итог", am: "Ընդհանուր" },
   /* ── the Prices screen's two new sections ─────────────────────────────── */
   "session.padChoose": { en: "Choose a joystick", ru: "Выберите джойстик", am: "Ընտրեք ջոյսթիք" },
-  "session.padOption": { en: "Joystick #{0}", ru: "{0}-й джойстик", am: "{0}-րդ ջոյսթիք" },
+  "session.padOption": { en: "Joystick #{0}", ru: "{0}-й джойстик", am: "Ջոյսթիք №{0}" },
   "session.padSharedOption": { en: "Joystick 3/4", ru: "Джойстик 3/4", am: "Ջոյսթիք 3/4" },
   "session.padFree": { en: "free", ru: "бесплатно", am: "անվճար" },
   "session.padNoPrice": { en: "no price set", ru: "цена не задана", am: "գինը սահմանված չէ" },
@@ -1254,12 +1266,12 @@ export const TRANSLATIONS: Dict = {
   "joystickPrice.freeNote": {
     en: "Extra joysticks are handed out for nothing. Each one is still a line on the bill, at zero.",
     ru: "Дополнительные джойстики выдаются бесплатно. Каждый всё равно попадает в счёт, по нулевой цене.",
-    am: "Լրացուցիչ ջոյսթիքները տրվում են անվճար։ Յուրաքանչյուրը միևնույն է հաշվում առանձին տող է՝ զրո գնով։",
+    am: "Լրացուցիչ ջոյսթիքները տրվում են անվճար։ Յուրաքանչյուրը, միևնույն է, հաշվում առանձին տող է՝ զրո գնով։",
   },
   "joystickPrice.noneNote": {
     en: "Extra joysticks are not offered at this branch. The session card refuses to add one.",
     ru: "В этом филиале дополнительные джойстики не выдаются. Карточка сессии откажет в добавлении.",
-    am: "Այս մասնաճյուղում լրացուցիչ ջոյսթիքներ չեն տրվում։ Նիստի քարտը կմերժի ավելացումը։",
+    am: "Այս մասնաճյուղում լրացուցիչ ջոյսթիքներ չեն տրվում։ Սեսիայի քարտը թույլ չի տա ավելացնել։",
   },
   "joystickPrice.paidNeedsPrice": {
     en: "Enter the price, or choose Free or Not offered.",
@@ -1295,7 +1307,7 @@ export const TRANSLATIONS: Dict = {
   "joystickPrice.setupExplain.only3": {
     en: "This branch hands out three controllers. A fourth is not offered at all.",
     ru: "Филиал выдаёт три контроллера. Четвёртый не выдаётся вообще.",
-    am: "Մասնաճյուղը տրամադրում է երեք կարգավորիչ։ Չորրորդը ընդհանրապես չի տրվում։",
+    am: "Մասնաճյուղը տրամադրում է երեք ջոյսթիք։ Չորրորդը ընդհանրապես չի տրվում։",
   },
   "joystickPrice.setupExplain.separate": {
     en: "3 | 4: the third and the fourth joystick have their own prices.",
@@ -1305,7 +1317,7 @@ export const TRANSLATIONS: Dict = {
   "joystickPrice.setupExplain.shared": {
     en: "3/4: one price for an extra controller, whether it is the third or the fourth.",
     ru: "3/4: одна цена за дополнительный контроллер, будь он 3-м или 4-м.",
-    am: "3/4: մեկ գին լրացուցիչ կարգավորիչի համար՝ լինի այն երրորդը, թե չորրորդը։",
+    am: "3/4: մեկ գին լրացուցիչ ջոյսթիքի համար՝ լինի այն երրորդը, թե չորրորդը։",
   },
   "joystickPrice.fourthNeedsPrice": {
     en: "Enter the fourth joystick's price, or answer No above.",
@@ -1319,12 +1331,12 @@ export const TRANSLATIONS: Dict = {
   "pauseLimit.hint": {
     en: "When a pause reaches this length, the session resumes by itself and billing continues. Leave empty for no limit. Applies to pauses started after saving.",
     ru: "Когда пауза достигает этой длины, сессия продолжается сама и оплата снова идёт. Пусто — без лимита. Действует на паузы, начатые после сохранения.",
-    am: "Երբ դադարը հասնում է այս տևողությանը, նիստն ինքնաբերաբար շարունակվում է, և վճարումը վերսկսվում է։ Դատարկ՝ առանց սահմանաչափի։ Կիրառվում է պահպանելուց հետո սկսված դադարների վրա։",
+    am: "Երբ դադարը հասնում է այս տևողությանը, սեսիան ինքնաբերաբար շարունակվում է, և վճարումը վերսկսվում է։ Դատարկ՝ առանց սահմանաչափի։ Կիրառվում է պահպանելուց հետո սկսված դադարների վրա։",
   },
   "pauseLimit.invalid": {
     en: "Enter whole minutes from 1 to {0}, or leave empty.",
     ru: "Введите целое число минут от 1 до {0} или оставьте пустым.",
-    am: "Մուտքագրեք ամբողջ րոպեներ 1-ից {0}, կամ թողեք դատարկ։",
+    am: "Մուտքագրեք ամբողջ թիվ՝ 1-ից {0} րոպե, կամ թողեք դատարկ։",
   },
   "pauseLimit.saved": { en: "Pause limit saved", ru: "Лимит паузы сохранён", am: "Դադարի սահմանաչափը պահպանվեց" },
   "rounding.sectionTitle": { en: "Rounding the bill", ru: "Округление счёта", am: "Հաշվի կլորացում" },
@@ -1379,7 +1391,7 @@ export const TRANSLATIONS: Dict = {
   "session.additionalHint": {
     en: "Handed out once per session",
     ru: "Выдаётся один раз за сессию",
-    am: "Տրվում է նիստում մեկ անգամ",
+    am: "Տրվում է մեկ անգամ յուրաքանչյուր սեսիայում",
   },
   // The Add Product dialog's two sections.
   "session.addSections": { en: "What to add", ru: "Что добавить", am: "Ինչ ավելացնել" },
@@ -1395,30 +1407,30 @@ export const TRANSLATIONS: Dict = {
   "product.kindAdditionalShort": { en: "Additional item", ru: "Доп. предмет", am: "Լրացուցիչ իր" },
   "history.billTitle": { en: "Bill", ru: "Счёт", am: "Հաշիվ" },
   // Its columns, and the play-time row.
-  "history.billItem": { en: "Item", ru: "Позиция", am: "Դիրք" },
+  "history.billItem": { en: "Item", ru: "Позиция", am: "Ապրանք" },
   "history.billQty": { en: "Qty", ru: "Кол-во", am: "Քանակ" },
   "history.billPrice": { en: "Price", ru: "Цена", am: "Գին" },
   "history.billSum": { en: "Amount", ru: "Сумма", am: "Գումար" },
   "history.billTime": { en: "Play time", ru: "Игровое время", am: "Խաղային ժամանակ" },
   "history.branch": { en: "Branch", ru: "Филиал", am: "Մասնաճյուղ" },
   "history.actionsEmpty": { en: "Nothing beyond the start.", ru: "Кроме старта. Ничего.", am: "Բացի սկսելուց՝ ոչինչ։" },
-  "history.sumFree": { en: "Free sessions", ru: "Бесплатные сессии", am: "Անվճար նիստեր" },
+  "history.sumFree": { en: "Free sessions", ru: "Бесплатные сессии", am: "Անվճար սեսիաներ" },
   "history.sumWaived": { en: "Waived", ru: "Списано", am: "Դուրս գրված" },
-  "history.action.started": { en: "Started the session", ru: "Начал сессию", am: "Սկսեց նիստը" },
-  "history.action.stopped": { en: "Stopped the session", ru: "Завершил сессию", am: "Ավարտեց նիստը" },
+  "history.action.started": { en: "Started the session", ru: "Начал сессию", am: "Սկսեց սեսիան" },
+  "history.action.stopped": { en: "Stopped the session", ru: "Завершил сессию", am: "Ավարտեց սեսիան" },
   "history.action.joystick_added": { en: "Added a joystick", ru: "Добавил джойстик", am: "Ավելացրեց ջոյսթիք" },
   "history.action.joystick_removed": { en: "Removed a joystick", ru: "Убрал джойстик", am: "Հեռացրեց ջոյսթիք" },
   "history.action.time_added": { en: "Added time", ru: "Добавил время", am: "Ավելացրեց ժամանակ" },
-  "history.action.made_unlimited": { en: "Switched to unlimited", ru: "Перевёл на безлимит", am: "Փոխարկեց անսահմանափակի" },
-  "history.action.paused": { en: "Paused the session", ru: "Поставил сессию на паузу", am: "Դադարեցրեց նիստը" },
-  "history.action.resumed": { en: "Resumed the session", ru: "Продолжил сессию", am: "Շարունակեց նիստը" },
+  "history.action.made_unlimited": { en: "Switched to unlimited", ru: "Перевёл на безлимит", am: "Դարձրեց անսահմանափակ" },
+  "history.action.paused": { en: "Paused the session", ru: "Поставил сессию на паузу", am: "Սեսիան դրեց դադարի" },
+  "history.action.resumed": { en: "Resumed the session", ru: "Продолжил сессию", am: "Շարունակեց սեսիան" },
   "history.pausedFor": { en: "Paused for", ru: "Пауза длилась", am: "Դադարը տևեց" },
   "history.rateSetByHand": { en: "price set by hand", ru: "цена изменена вручную", am: "գինը փոխվել է ձեռքով" },
   "history.action.free_enabled": { en: "Made it free", ru: "Сделал бесплатной", am: "Դարձրեց անվճար" },
-  "history.action.free_disabled": { en: "Made it paid again", ru: "Вернул оплату", am: "Վերադարձրեց վճարումը" },
+  "history.action.free_disabled": { en: "Made it paid again", ru: "Вернул оплату", am: "Կրկին դարձրեց վճարովի" },
   // The seat migration. Emitted by the server since the feature shipped; the
   // log had no label for it and printed the raw key.
-  "history.action.moved": { en: "Moved the session", ru: "Перенёс сессию", am: "Տեղափոխեց նիստը" },
+  "history.action.moved": { en: "Moved the session", ru: "Перенёс сессию", am: "Տեղափոխեց սեսիան" },
   "history.action.item_added": { en: "Put it on the bill", ru: "Добавил в счёт", am: "Ավելացրեց հաշվին" },
   "history.action.item_removed": { en: "Took it off the bill", ru: "Убрал из счёта", am: "Հանեց հաշվից" },
   // Not a removal: the line stays on the bill with what it earned, and only
@@ -1446,7 +1458,7 @@ export const TRANSLATIONS: Dict = {
     ru: "место успели занять",
     am: "տեղն արդեն զբաղեցված էր",
   },
-  "history.itemsCount": { en: "Lines", ru: "Позиций", am: "Դիրքեր" },
+  "history.itemsCount": { en: "Lines", ru: "Позиций", am: "Ապրանքներ" },
   "history.seatUnknown": { en: "Seat not recorded", ru: "Место не записано", am: "Տեղը գրանցված չէ" },
   "history.noRefundShort": { en: "no refund", ru: "без возврата", am: "առանց վերադարձի" },
 
@@ -1466,7 +1478,7 @@ export const TRANSLATIONS: Dict = {
     ru: "Счёт до переноса",
     am: "Հաշիվը տեղափոխումից առաջ",
   },
-  "history.padsNow": { en: "Joysticks now", ru: "Джойстиков стало", am: "Ջոյսթիկներ այժմ" },
+  "history.padsNow": { en: "Joysticks now", ru: "Джойстиков стало", am: "Ջոյսթիքներ այժմ" },
   "history.padUnitPrice": { en: "Price for one", ru: "Цена за 1", am: "Մեկի գինը" },
   // ⚠️ Said in words. Taking a pad out of play refunds nothing, the amount on
   // the line is already 0, and silence there reads as an omission rather than
@@ -1480,7 +1492,7 @@ export const TRANSLATIONS: Dict = {
 
   // Branch places admin (CRUD seats per branch)
   "branchPlaces.title": { en: "Places", ru: "Места", am: "Տեղեր" },
-  "branchPlaces.intro": { en: "A place is a bookable seat (e.g. PC #1, PS5 VIP #2). Each place gets games linked.", ru: "Место. Это место для бронирования (например, ПК №1, PS5 VIP №2). К каждому месту привязываются игры.", am: "Տեղը ամրագրվող նստատեղ է (օր.՝ PC #1, PS5 VIP #2): Յուրաքանչյուր տեղին կապվում են խաղեր:" },
+  "branchPlaces.intro": { en: "A place is a bookable seat (e.g. PC #1, PS5 VIP #2). Each place gets games linked.", ru: "Место. Это место для бронирования (например, ПК №1, PS5 VIP №2). К каждому месту привязываются игры.", am: "Տեղն ամրագրվող նստատեղ է (օր.՝ PC #1, PS5 VIP #2)։ Յուրաքանչյուր տեղին կապվում են խաղեր։" },
   "branchPlaces.new": { en: "+ New place", ru: "+ Новое место", am: "+ Նոր տեղ" },
   // Deleting a place takes the device that makes it billable and every session
   // recorded on that device. Two wordings, because a PC place owns a computer
@@ -1489,14 +1501,14 @@ export const TRANSLATIONS: Dict = {
   "branchPlaces.confirmDelete": {
     en: "Delete place #{0}?\n\nIts device and every session recorded on it will be deleted as well. This cannot be undone.",
     ru: "Удалить место №{0}?\n\nВместе с ним будут удалены его устройство и все записанные на нём сессии. Действие необратимо.",
-    am: "Ջնջե՞լ #{0} տեղը:\n\nՆրա հետ կջնջվեն դրա սարքը և դրանում գրանցված բոլոր սեսիաները: Գործողությունն անդարձելի է:",
+    am: "Ջնջե՞լ #{0} տեղը։\n\nՆրա հետ կջնջվեն դրա սարքը և դրանում գրանցված բոլոր սեսիաները։ Գործողությունն անդարձելի է։",
   },
   "branchPlaces.confirmDeletePc": {
     en: "Delete place #{0}?\n\nIts computer will disappear from Computers, and every session recorded on it will be deleted as well. This cannot be undone.",
     ru: "Удалить место №{0}?\n\nСвязанный компьютер исчезнет из раздела «Компьютеры», а все записанные на нём сессии будут удалены. Действие необратимо.",
-    am: "Ջնջե՞լ #{0} տեղը:\n\nԿապված համակարգիչը կվերանա «Համակարգիչներ» բաժնից, իսկ դրանում գրանցված բոլոր սեսիաները կջնջվեն: Գործողությունն անդարձելի է:",
+    am: "Ջնջե՞լ #{0} տեղը։\n\nԿապված համակարգիչը կվերանա «Համակարգիչներ» բաժնից, իսկ դրանում գրանցված բոլոր սեսիաները կջնջվեն։ Գործողությունն անդարձելի է։",
   },
-  "branchPlaces.empty": { en: "No places yet. Click 'New place' to add the first one.", ru: "Мест ещё нет. Нажмите «Новое место», чтобы добавить первое.", am: "Տեղեր դեռ չկան: Սեղմեք «Նոր տեղ»՝ առաջինը ավելացնելու համար:" },
+  "branchPlaces.empty": { en: "No places yet. Click 'New place' to add the first one.", ru: "Мест ещё нет. Нажмите «Новое место», чтобы добавить первое.", am: "Տեղեր դեռ չկան։ Սեղմեք «Նոր տեղ»՝ առաջինն ավելացնելու համար։" },
   "branchPlaces.games": { en: "game(s)", ru: "игр", am: "խաղ" },
   "branchPlaces.status.active": { en: "active", ru: "активно", am: "ակտիվ" },
   "branchPlaces.status.inactive": { en: "inactive", ru: "неактивно", am: "ոչ ակտիվ" },
@@ -1528,7 +1540,7 @@ export const TRANSLATIONS: Dict = {
   "pcs.confirmDelete": {
     en: "Delete computer \u201c{0}\u201d?\n\nThe place it serves (#{1}) will be deleted with it, along with every session recorded on it. This cannot be undone.",
     ru: "Удалить компьютер «{0}»?\n\nВместе с ним будет удалено обслуживаемое место (№{1}) и все записанные на нём сессии. Действие необратимо.",
-    am: "Ջնջե՞լ «{0}» համակարգիչը:\n\nՆրա հետ կջնջվի սպասարկվող տեղը (#{1}) և դրանում գրանցված բոլոր սեսիաները: Գործողությունն անդարձելի է:",
+    am: "Ջնջե՞լ «{0}» համակարգիչը։\n\nՆրա հետ կջնջվի սպասարկվող տեղը (#{1}) և դրանում գրանցված բոլոր սեսիաները։ Գործողությունն անդարձելի է։",
   },
   // Same action for a device that serves no place — a legacy row from before
   // one-device-per-place. Nothing else goes with it, and saying so avoids
@@ -1536,26 +1548,26 @@ export const TRANSLATIONS: Dict = {
   "pcs.confirmDeleteUnlinked": {
     en: "Delete computer \u201c{0}\u201d?\n\nEvery session recorded on it will be deleted as well. This cannot be undone.",
     ru: "Удалить компьютер «{0}»?\n\nВсе записанные на нём сессии будут удалены. Действие необратимо.",
-    am: "Ջնջե՞լ «{0}» համակարգիչը:\n\nԴրանում գրանցված բոլոր սեսիաները կջնջվեն: Գործողությունն անդարձելի է:",
+    am: "Ջնջե՞լ «{0}» համակարգիչը։\n\nԴրանում գրանցված բոլոր սեսիաները կջնջվեն։ Գործողությունն անդարձելի է։",
   },
-  "pcs.confirmRotate": { en: "Rotate pairing token for '{0}'? The agent on this PC will stop working until updated.", ru: "Сменить токен сопряжения для «{0}»? Агент на этом ПК перестанет работать, пока его не обновят.", am: "Թարմացնե՞լ «{0}»-ի զուգակցման թոքենը: PC-ի գործակալը կդադարի աշխատել մինչև թարմացում:" },
-  "pcs.macRequired": { en: "Set a MAC address on this PC before using Wake-on-LAN.", ru: "Сначала задайте MAC-адрес для этого ПК. Без него Wake-on-LAN не сработает.", am: "Նախ նշեք PC-ի MAC հասցեն։ Առանց դրա Wake-on-LAN չի աշխատի:" },
-  "pcs.packetsSent": { en: "Packets sent: {0}", ru: "Пакетов отправлено: {0}", am: "Փաթեթներ ուղարկվել են՝ {0}" },
+  "pcs.confirmRotate": { en: "Rotate pairing token for '{0}'? The agent on this PC will stop working until updated.", ru: "Сменить токен сопряжения для «{0}»? Агент на этом ПК перестанет работать, пока его не обновят.", am: "Թարմացնե՞լ «{0}»-ի զուգակցման թոքենը։ Այս PC-ի Agent-ը չի աշխատի, մինչև այն չթարմացնեք։" },
+  "pcs.macRequired": { en: "Set a MAC address on this PC before using Wake-on-LAN.", ru: "Сначала задайте MAC-адрес для этого ПК. Без него Wake-on-LAN не сработает.", am: "Նախ նշեք PC-ի MAC հասցեն։ Առանց դրա Wake-on-LAN չի աշխատի։" },
+  "pcs.packetsSent": { en: "Packets sent: {0}", ru: "Пакетов отправлено: {0}", am: "Ուղարկված փաթեթներ՝ {0}" },
   "pcs.errorsHeader": { en: "Errors:", ru: "Ошибки:", am: "Սխալներ՝" },
-  "pcs.wolReminder": { en: "PC must have Wake-on-LAN enabled in BIOS and NIC settings, and be on the same LAN as this cashier.", ru: "На ПК должен быть включён Wake-on-LAN в BIOS и в настройках сетевой карты, и он должен быть в одной сети с кассой.", am: "PC-ի BIOS-ում և ցանցային քարտի կարգավորումներում պետք է միացված լինի Wake-on-LAN, և PC-ն պետք է լինի դրամարկղի հետ նույն ցանցում:" },
+  "pcs.wolReminder": { en: "PC must have Wake-on-LAN enabled in BIOS and NIC settings, and be on the same LAN as this cashier.", ru: "На ПК должен быть включён Wake-on-LAN в BIOS и в настройках сетевой карты, и он должен быть в одной сети с кассой.", am: "PC-ի BIOS-ում և ցանցային քարտի կարգավորումներում պետք է միացված լինի Wake-on-LAN, և PC-ն պետք է լինի դրամարկղի հետ նույն ցանցում։" },
   "pcs.wakeFailed": { en: "Wake failed: {0}", ru: "Не удалось разбудить: {0}", am: "Արթնացման սխալ՝ {0}" },
   "pcs.howConnects": { en: "How a PC actually connects:", ru: "Как ПК подключается:", am: "Ինչպես PC-ն իրականում միանում է՝" },
-  "pcs.connect.step1": { en: "Register the PC here. You get a pairing token.", ru: "Зарегистрируйте ПК. Получите токен сопряжения.", am: "Գրանցեք PC-ն այստեղ։ Կստանաք զուգակցման թոքեն:" },
-  "pcs.connect.step2": { en: "Install the agent on the PC and enter the PC ID + token.", ru: "Установите агента на ПК и введите ID и токен.", am: "Տեղադրեք գործակալը PC-ում և մուտքագրեք PC ID-ն և թոքենը:" },
-  "pcs.connect.step3": { en: "The MAC address is optional. Used only for Wake-on-LAN, not for authentication.", ru: "MAC-адрес опционален. Нужен только для Wake-on-LAN, не для авторизации.", am: "MAC-հասցեն ոչ պարտադիր է։ Օգտագործվում է միայն Wake-on-LAN-ի համար, ոչ նույնականացման:" },
+  "pcs.connect.step1": { en: "Register the PC here. You get a pairing token.", ru: "Зарегистрируйте ПК. Получите токен сопряжения.", am: "Գրանցեք PC-ն այստեղ։ Կստանաք զուգակցման թոքեն։" },
+  "pcs.connect.step2": { en: "Install the agent on the PC and enter the PC ID + token.", ru: "Установите агента на ПК и введите ID и токен.", am: "Տեղադրեք Agent-ը PC-ում և մուտքագրեք PC ID-ն ու թոքենը։" },
+  "pcs.connect.step3": { en: "The MAC address is optional. Used only for Wake-on-LAN, not for authentication.", ru: "MAC-адрес опционален. Нужен только для Wake-on-LAN, не для авторизации.", am: "MAC-հասցեն պարտադիր չէ։ Պետք է միայն Wake-on-LAN-ի համար, ոչ թե նույնականացման։" },
   "pcs.lastSeen": { en: "last seen", ru: "последний раз", am: "վերջին անգամ" },
-  "pcs.notPaired": { en: "not paired yet. Install agent", ru: "ещё не сопряжён. Установите агента", am: "դեռ չզուգակցված։ Տեղադրեք գործակալը" },
+  "pcs.notPaired": { en: "not paired yet. Install agent", ru: "ещё не сопряжён. Установите агента", am: "դեռ զուգակցված չէ։ Տեղադրեք Agent-ը" },
   "pcs.sending": { en: "Sending…", ru: "Отправка…", am: "Ուղարկում…" },
   "pcs.wake": { en: "Wake", ru: "Разбудить", am: "Արթնացնել" },
   "pcs.getToken": { en: "Get token", ru: "Получить токен", am: "Ստանալ թոքեն" },
   "pcs.rotateToken": { en: "Rotate token", ru: "Сменить токен", am: "Թարմացնել թոքենը" },
-  "pcs.empty": { en: "No PCs registered yet. Click Register to add the first one.", ru: "ПК ещё не зарегистрированы. Нажмите «Зарегистрировать», чтобы добавить первый.", am: "PC-ներ դեռ չեն գրանցվել։ Սեղմեք «Գրանցել»՝ առաջինը ավելացնելու համար:" },
-  "pcs.statusInSession": { en: "In session", ru: "В сессии", am: "Սեանսում" },
+  "pcs.empty": { en: "No PCs registered yet. Click Register to add the first one.", ru: "ПК ещё не зарегистрированы. Нажмите «Зарегистрировать», чтобы добавить первый.", am: "PC-ներ դեռ չեն գրանցվել։ Սեղմեք «Գրանցել»՝ առաջինն ավելացնելու համար։" },
+  "pcs.statusInSession": { en: "In session", ru: "В сессии", am: "Սեսիայում" },
   "pcs.statusOnline": { en: "Online", ru: "В сети", am: "Առցանց" },
   "pcs.statusOffline": { en: "Offline", ru: "Не в сети", am: "Անցանց" },
 
@@ -1563,7 +1575,7 @@ export const TRANSLATIONS: Dict = {
 
   // Settings extras
   "settings.role": { en: "Role", ru: "Роль", am: "Դեր" },
-  "settings.ratesNote": { en: "Stored prices are in AMD. We convert at fixed rates: 1 USD ≈ 400 AMD, 1 RUB ≈ 4.2 AMD. Sample: 1000 AMD =", ru: "Цены хранятся в драмах. Конвертация по фиксированному курсу: 1 USD ≈ 400 драм, 1 ₽ ≈ 4.2 драм. Пример: 1000 драм =", am: "Գները պահվում են դրամով: Փոխարկում ֆիքսված կուրսով: 1 USD ≈ 400 դրամ, 1 ₽ ≈ 4.2 դրամ: Օրինակ՝ 1000 դրամ =" },
+  "settings.ratesNote": { en: "Stored prices are in AMD. We convert at fixed rates: 1 USD ≈ 400 AMD, 1 RUB ≈ 4.2 AMD. Sample: 1000 AMD =", ru: "Цены хранятся в драмах. Конвертация по фиксированному курсу: 1 USD ≈ 400 драм, 1 ₽ ≈ 4.2 драм. Пример: 1000 драм =", am: "Գները պահվում են դրամով։ Փոխարկում ֆիքսված կուրսով։ 1 USD ≈ 400 դրամ, 1 ₽ ≈ 4.2 դրամ։ Օրինակ՝ 1000 դրամ =" },
   "settings.currentPassword": { en: "Current password", ru: "Текущий пароль", am: "Ընթացիկ գաղտնաբառ" },
   "settings.newPassword": { en: "New password", ru: "Новый пароль", am: "Նոր գաղտնաբառ" },
   "settings.confirmPassword": { en: "Confirm new password", ru: "Подтвердите новый пароль", am: "Հաստատեք նոր գաղտնաբառը" },
@@ -1571,18 +1583,18 @@ export const TRANSLATIONS: Dict = {
   "settings.passwordsMismatch": { en: "Passwords do not match", ru: "Пароли не совпадают", am: "Գաղտնաբառերը չեն համընկնում" },
   "settings.updatePassword": { en: "Update password", ru: "Обновить пароль", am: "Թարմացնել գաղտնաբառը" },
   "settings.subscribed": { en: "Subscribed", ru: "Подписка оформлена", am: "Բաժանորդագրվել եք" },
-  "settings.subscribeHint": { en: "Subscribe an email to product updates.", ru: "Подпишите email на обновления продукта.", am: "Բաժանորդագրվել հաղորդագրությունների:" },
+  "settings.subscribeHint": { en: "Subscribe an email to product updates.", ru: "Подпишите email на обновления продукта.", am: "Բաժանորդագրեք էլ. հասցեն ծրագրի թարմացումներին։" },
 
   // Common
   "common.back": { en: "Back", ru: "Назад", am: "Հետ" },
   "common.open": { en: "Open →", ru: "Открыть →", am: "Բացել →" },
-  "common.empty.branches": { en: "No branches yet.", ru: "Филиалов пока нет.", am: "Մասնաճյուղեր դեռ չկան:" },
-  "common.empty.bookings": { en: "No bookings.", ru: "Бронирований нет.", am: "Ամրագրումներ չկան:" },
-  "common.empty.tournaments": { en: "No tournaments.", ru: "Турниров нет.", am: "Մրցաշարեր չկան:" },
-  "common.empty.games": { en: "No games.", ru: "Игр нет.", am: "Խաղեր չկան:" },
-  "common.empty.companies": { en: "No companies.", ru: "Компаний нет.", am: "Ընկերություններ չկան:" },
-  "common.empty.managers": { en: "No managers.", ru: "Менеджеров нет.", am: "Մենեջերներ չկան:" },
-  "common.empty.notifications": { en: "No notifications right now.", ru: "Сейчас уведомлений нет.", am: "Ծանուցումներ չկան:" },
+  "common.empty.branches": { en: "No branches yet.", ru: "Филиалов пока нет.", am: "Մասնաճյուղեր դեռ չկան։" },
+  "common.empty.bookings": { en: "No bookings.", ru: "Бронирований нет.", am: "Ամրագրումներ չկան։" },
+  "common.empty.tournaments": { en: "No tournaments.", ru: "Турниров нет.", am: "Մրցաշարեր չկան։" },
+  "common.empty.games": { en: "No games.", ru: "Игр нет.", am: "Խաղեր չկան։" },
+  "common.empty.companies": { en: "No companies.", ru: "Компаний нет.", am: "Ընկերություններ չկան։" },
+  "common.empty.managers": { en: "No managers.", ru: "Менеджеров нет.", am: "Մենեջերներ չկան։" },
+  "common.empty.notifications": { en: "No notifications right now.", ru: "Сейчас уведомлений нет.", am: "Ծանուցումներ չկան։" },
   "common.checking": { en: "Checking…", ru: "Проверяем…", am: "Ստուգում…" },
   "label.code": { en: "Code", ru: "Код", am: "Կոդ" },
   "label.status": { en: "Status", ru: "Статус", am: "Կարգավիճակ" },
@@ -1594,11 +1606,11 @@ export const TRANSLATIONS: Dict = {
   "branchesList.title": { en: "Branches", ru: "Филиалы", am: "Մասնաճյուղեր" },
   "branchesList.placesShort": { en: "places", ru: "места", am: "տեղեր" },
   // The owner's create action in the list header (it was a sidebar entry).
-  "branchesList.newBranch": { en: "+ New branch", ru: "+ Создать филиал", am: "+ Ստեղծել մասնաճյուղ" },
+  "branchesList.newBranch": { en: "+ New branch", ru: "+ Создать филиал", am: "+ Նոր մասնաճյուղ" },
   "branchesMap.title": { en: "Branches map", ru: "Карта филиалов", am: "Մասնաճյուղերի քարտեզ" },
-  "branchesMap.geoCount": { en: "of {total} branches geo-located", ru: "из {total} филиалов с координатами", am: "{total}-ից աշխարհագրականորեն տեղորոշված" },
-  "branchesMap.noGeoTitle": { en: "No branches geo-located yet.", ru: "Координаты филиалов ещё не заданы.", am: "Մասնաճյուղերի կոորդինատներ դեռ չեն սահմանված:" },
-  "branchesMap.noGeoHint": { en: "Open a branch → Edit → save with a pin on the map. The map will show all branches with non-zero coordinates.", ru: "Откройте филиал → Изменить → сохраните с меткой на карте. На карте появятся все филиалы с заданными координатами.", am: "Բացեք մասնաճյուղ → Խմբագրել → պահպանեք քարտեզի վրա կետով: Քարտեզում կհայտնվեն բոլոր մասնաճյուղերը:" },
+  "branchesMap.geoCount": { en: "of {total} branches geo-located", ru: "из {total} филиалов с координатами", am: "/ {total} մասնաճյուղ ունի կոորդինատներ" },
+  "branchesMap.noGeoTitle": { en: "No branches geo-located yet.", ru: "Координаты филиалов ещё не заданы.", am: "Մասնաճյուղերի կոորդինատներ դեռ չեն սահմանված։" },
+  "branchesMap.noGeoHint": { en: "Open a branch → Edit → save with a pin on the map. The map will show all branches with non-zero coordinates.", ru: "Откройте филиал → Изменить → сохраните с меткой на карте. На карте появятся все филиалы с заданными координатами.", am: "Բացեք մասնաճյուղ → Խմբագրել → պահպանեք քարտեզի վրա կետով։ Քարտեզում կհայտնվեն կոորդինատներ ունեցող բոլոր մասնաճյուղերը։" },
 
   // Bookings
   "bookings.title": { en: "Bookings", ru: "Бронирования", am: "Ամրագրումներ" },
@@ -1611,11 +1623,11 @@ export const TRANSLATIONS: Dict = {
 
   // Tournaments
   "tournaments.title": { en: "Tournaments", ru: "Турниры", am: "Մրցաշարեր" },
-  "tournaments.scopeHint": { en: "Open a branch and click \"Tournaments\" to create one. Tournaments belong to a specific branch.", ru: "Откройте филиал и нажмите «Турниры», чтобы создать. Турниры привязаны к конкретному филиалу.", am: "Բացեք մասնաճյուղ և սեղմեք «Մրցաշարեր»՝ ստեղծելու համար: Մրցաշարը պատկանում է որոշակի մասնաճյուղի:" },
+  "tournaments.scopeHint": { en: "Open a branch and click \"Tournaments\" to create one. Tournaments belong to a specific branch.", ru: "Откройте филиал и нажмите «Турниры», чтобы создать. Турниры привязаны к конкретному филиалу.", am: "Բացեք մասնաճյուղ և սեղմեք «Մրցաշարեր»՝ ստեղծելու համար։ Մրցաշարը պատկանում է որոշակի մասնաճյուղի։" },
   "tournaments.new": { en: "+ New tournament", ru: "+ Новый турнир", am: "+ Նոր մրցաշար" },
   "tournaments.goToMyBranch": { en: "Go to my branch tournaments", ru: "Перейти к турнирам моего филиала", am: "Անցնել իմ մասնաճյուղի մրցաշարերին" },
   "tournaments.pickBranch": { en: "Choose a branch", ru: "Выберите филиал", am: "Ընտրեք մասնաճյուղ" },
-  "tournaments.noBranch": { en: "No branch is assigned to your account.", ru: "К вашему аккаунту не привязан филиал.", am: "Ձեր հաշվին մասնաճյուղ կցված չէ:" },
+  "tournaments.noBranch": { en: "No branch is assigned to your account.", ru: "К вашему аккаунту не привязан филиал.", am: "Ձեր հաշվին մասնաճյուղ կցված չէ։" },
   "tournaments.price": { en: "price", ru: "цена", am: "գին" },
   "tournaments.players": { en: "players", ru: "игроков", am: "խաղացողներ" },
   "tournaments.confirmDelete": { en: "Delete tournament", ru: "Удалить турнир", am: "Ջնջել մրցաշարը" },
@@ -1626,11 +1638,11 @@ export const TRANSLATIONS: Dict = {
   "games.confirmDelete": { en: "Delete", ru: "Удалить", am: "Ջնջել" },
   "branchGames.title": { en: "Branch games", ru: "Игры филиала", am: "Մասնաճյուղի խաղեր" },
   "branchGames.intro": { en: "Games attached to this branch", ru: "Игры, привязанные к этому филиалу", am: "Այս մասնաճյուղին կցված խաղեր" },
-  "branchGames.empty": { en: "No games for this branch yet.", ru: "Пока нет игр для этого филиала.", am: "Այս մասնաճյուղի համար դեռ խաղեր չկան:" },
+  "branchGames.empty": { en: "No games for this branch yet.", ru: "Пока нет игр для этого филиала.", am: "Այս մասնաճյուղի համար դեռ խաղեր չկան։" },
 
   // Recurring-services expense tracker (admin only)
   "expenses.title": { en: "Expenses", ru: "Расходы", am: "Ծախսեր" },
-  "expenses.subtitle": { en: "Recurring services you pay for monthly (domain, Gmail Workspace, hosting…).", ru: "Регулярные сервисы, за которые ты платишь каждый месяц (домен, Gmail Workspace, хостинг…).", am: "Կրկնվող ծառայություններ, որոնց համար ամսական վճարում ես (դոմեն, Gmail Workspace, հոստինգ…):" },
+  "expenses.subtitle": { en: "Recurring services you pay for monthly (domain, Gmail Workspace, hosting…).", ru: "Регулярные сервисы, за которые ты платишь каждый месяц (домен, Gmail Workspace, хостинг…).", am: "Կրկնվող ծառայություններ, որոնց համար ամսական վճարում ես (դոմեն, Gmail Workspace, հոստինգ…)։" },
   "expenses.new": { en: "+ New expense", ru: "+ Новый расход", am: "+ Նոր ծախս" },
   "expenses.edit": { en: "Edit expense", ru: "Редактировать расход", am: "Խմբագրել ծախսը" },
   "expenses.name": { en: "Service name", ru: "Название сервиса", am: "Ծառայության անունը" },
@@ -1639,15 +1651,15 @@ export const TRANSLATIONS: Dict = {
   "expenses.currency": { en: "Currency", ru: "Валюта", am: "Արժույթ" },
   "expenses.purchasedAt": { en: "Purchase date", ru: "Дата покупки", am: "Գնման ամսաթիվ" },
   "expenses.isActive": { en: "Active (count in monthly total)", ru: "Активен (учитывать в месячном итоге)", am: "Ակտիվ (հաշվել ամսական գումարում)" },
-  "expenses.invalidForm": { en: "Fill in a name, a non-negative amount and a purchase date.", ru: "Укажи название, неотрицательную сумму и дату покупки.", am: "Լրացրու անունը, ոչ բացասական գումարը և գնման ամսաթիվը:" },
+  "expenses.invalidForm": { en: "Fill in a name, a non-negative amount and a purchase date.", ru: "Укажи название, неотрицательную сумму и дату покупки.", am: "Լրացրու անունը, ոչ բացասական գումարը և գնման ամսաթիվը։" },
   "expenses.monthlyTotal": { en: "Monthly total", ru: "Итого в месяц", am: "Ամսական ընդամենը" },
   "expenses.perMonth": { en: "per month", ru: "в месяц", am: "ամսական" },
-  "expenses.empty": { en: "No services tracked yet.", ru: "Пока нет добавленных сервисов.", am: "Դեռ ավելացված ծառայություններ չկան:" },
+  "expenses.empty": { en: "No services tracked yet.", ru: "Пока нет добавленных сервисов.", am: "Դեռ ավելացված ծառայություններ չկան։" },
   "expenses.upcomingTitle": { en: "Upcoming charges (within 3 days)", ru: "Ближайшие платежи (в течение 3 дней)", am: "Մոտալուտ վճարումներ (3 օրվա ընթացքում)" },
   "expenses.dueToday": { en: "due today", ru: "платёж сегодня", am: "վճարումն այսօր է" },
   "expenses.dueIn": { en: "in", ru: "через", am: "ևս" },
-  "expenses.overdue": { en: "overdue by", ru: "просрочено на", am: "ժամկետանց" },
-  "expenses.markPaid": { en: "Paid", ru: "Заплатил", am: "Վճարված է" },
+  "expenses.overdue": { en: "overdue by", ru: "просрочено на", am: "ուշացում՝" },
+  "expenses.markPaid": { en: "Paid", ru: "Заплатил", am: "Նշել վճարված" },
   "expenses.lastPaid": { en: "last paid", ru: "оплачено", am: "վերջին վճարում" },
   "expenses.openToPay": { en: "open to pay →", ru: "открыть, чтобы оплатить →", am: "բացել վճարելու համար →" },
   "expenses.dayShort": { en: "day", ru: "день", am: "օր" },
@@ -1672,19 +1684,19 @@ export const TRANSLATIONS: Dict = {
     ru: "К этому аккаунту не привязана компания.",
     am: "Այս հաշիվը կապված չէ ընկերության հետ։",
   },
-  "revenue.pickHint": { en: "Pick a company to see its monthly revenue and commission.", ru: "Выберите компанию, чтобы увидеть её месячную выручку и комиссию.", am: "Ընտրեք ընկերություն՝ ամսական եկամուտ և միջնորդավճար տեսնելու համար:" },
+  "revenue.pickHint": { en: "Pick a company to see its monthly revenue and commission.", ru: "Выберите компанию, чтобы увидеть её месячную выручку и комиссию.", am: "Ընտրեք ընկերություն՝ ամսական եկամուտ և միջնորդավճար տեսնելու համար։" },
   // The heading of the month's figures. It used to read "revenue from closed
   // sessions"; tournament entry fees are part of the takings now, so the
   // heading names the period rather than one of the sources.
   "revenue.summaryTitle": { en: "Revenue for the month", ru: "Выручка за месяц", am: "Ամսվա եկամուտը" },
-  "revenue.closedSessions": { en: "Closed sessions", ru: "Закрытых сессий", am: "Փակված սեանսներ" },
-  "revenue.sourceSessions": { en: "Sessions", ru: "Сессии", am: "Սեանսներ" },
+  "revenue.closedSessions": { en: "Closed sessions", ru: "Закрытых сессий", am: "Փակված սեսիաներ" },
+  "revenue.sourceSessions": { en: "Sessions", ru: "Сессии", am: "Սեսիաներ" },
   "revenue.sourcePos": { en: "POS orders", ru: "Заказы кассы", am: "Դրամարկղի վաճառք" },
   "revenue.tournamentEntries": { en: "Paid tournament entries", ru: "Оплаченных участий в турнирах", am: "Վճարված մասնակցություններ մրցաշարերում" },
   "revenue.sourceTournaments": { en: "Tournament entry fees", ru: "Взносы за участие в турнирах", am: "Մրցաշարերի մասնակցության վճարներ" },
   "revenue.totalRevenue": { en: "Total revenue", ru: "Общая выручка", am: "Ընդհանուր եկամուտ" },
   "revenue.cyberPlaceCommission": { en: "Cyber Place commission", ru: "Комиссия Cyber Place", am: "Cyber Place-ի միջնորդավճար" },
-  "revenue.amountOwed": { en: "You owe us this period", ru: "К оплате за период", am: "Վճարման ենթակա ժամանակահատվածում" },
+  "revenue.amountOwed": { en: "You owe us this period", ru: "К оплате за период", am: "Վճարման ենթակա գումար" },
   "revenue.ownerIncome": { en: "Owner income", ru: "Доход владельца", am: "Սեփականատիրոջ եկամուտ" },
   // Branch selector (shown only when the company has more than one branch).
   // "All branches" is the company card; a branch is the same card with that
@@ -1709,23 +1721,23 @@ export const TRANSLATIONS: Dict = {
   "managers.pickBranchHint": {
     en: "The manager will be bound to the branch you choose and will only see that one.",
     ru: "Менеджер будет привязан к выбранному филиалу и увидит только его.",
-    am: "Մենեջերը կկապվի ընտրված մասնաճյուղին և կտեսնի միայն այն:",
+    am: "Մենեջերը կկապվի ընտրված մասնաճյուղին և կտեսնի միայն այն։",
   },
   "managers.noBranches": {
     en: "You have no branches yet. Create one first, then add a manager to it.",
     ru: "У вас пока нет филиалов. Сначала создайте филиал, затем добавьте в него менеджера.",
-    am: "Դուք դեռ մասնաճյուղ չունեք։ Նախ ստեղծեք մասնաճյուղ, ապա ավելացրեք մենեջեր:",
+    am: "Դուք դեռ մասնաճյուղ չունեք։ Նախ ստեղծեք մասնաճյուղ, ապա ավելացրեք մենեջեր։",
   },
   "action.remove": { en: "Remove", ru: "Удалить", am: "Հեռացնել" },
 
   // Notifications
   "notifications.title": { en: "Notifications", ru: "Уведомления", am: "Ծանուցումներ" },
   "notifications.companyOverdue": { en: "is overdue on payment", ru: "просрочила оплату", am: "ուշացրել է վճարումը" },
-  "notifications.companyMustPayIn": { en: "must pay in", ru: "должна оплатить через", am: "պետք է վճարի" },
+  "notifications.companyMustPayIn": { en: "must pay in", ru: "должна оплатить через", am: "պետք է վճարի, մնացել է" },
   "notifications.dayShort": { en: "day", ru: "день", am: "օր" },
   "notifications.daysShort": { en: "days", ru: "дн.", am: "օր" },
   "notifications.youOverdue": { en: "You are overdue on your Cyber Place payment", ru: "Вы просрочили оплату Cyber Place", am: "Դուք ուշացրել եք Cyber Place-ի վճարումը" },
-  "notifications.youMustPayIn": { en: "you must pay Cyber Place. {pct}% commission", ru: "вам нужно оплатить Cyber Place. Комиссия {pct}%", am: "դուք պետք է վճարեք Cyber Place՝ {pct}% միջնորդավճար" },
+  "notifications.youMustPayIn": { en: "you must pay Cyber Place. {pct}% commission", ru: "вам нужно оплатить Cyber Place. Комиссия {pct}%", am: "պետք է վճարեք Cyber Place-ին։ Միջնորդավճար՝ {pct}%" },
   "notifications.lastPaid": { en: "Last paid", ru: "Последний платёж", am: "Վերջին վճարում" },
   "notifications.neverPaid": { en: "Never paid", ru: "Не оплачивалось", am: "Չի վճարվել" },
   "notifications.due": { en: "Due", ru: "Срок", am: "Ժամկետ" },
@@ -1739,12 +1751,12 @@ export const TRANSLATIONS: Dict = {
   "notifications.bookingCreatedPushTitle": {
     en: "🎉 You have a booking!",
     ru: "🎉 У вас есть бронирование!",
-    am: "🎉 Դուք ունեք ամրագրում!",
+    am: "🎉 Նոր ամրագրում ունեք։",
   },
   "notifications.bookingCreatedPushBody": {
     en: "Player {name} booked place {places} at {company} {address}",
     ru: "Игрок {name} забронировал место {places} в {company} {address}",
-    am: "Խաղացող {name}-ը ամրագրեց տեղ {places} {company} {address}-ում",
+    am: "Խաղացող {name}-ը ամրագրեց տեղ №{places}՝ {company}, {address}",
   },
   "notifications.bookingExtendedPushTitle": {
     en: "⏰ Booking extended",
@@ -1754,7 +1766,7 @@ export const TRANSLATIONS: Dict = {
   "notifications.bookingExtendedPushBody": {
     en: "Player {name} extended time by {minutes} {minShort} at {company} {address}",
     ru: "Игрок {name} продлил время на {minutes} {minShort} в {company} {address}",
-    am: "Խաղացող {name}-ը երկարացրեց ժամանակը {minutes} {minShort}-ով {company} {address}-ում",
+    am: "Խաղացող {name}-ը երկարացրեց ժամանակը +{minutes} {minShort}՝ {company}, {address}",
   },
   "notifications.bookingCancelledPushTitle": {
     en: "😢 Booking cancelled",
@@ -1764,14 +1776,14 @@ export const TRANSLATIONS: Dict = {
   "notifications.bookingCancelledPushBody": {
     en: "Sadly, player {name} cancelled place {places} at {company} {address}",
     ru: "К сожалению, игрок {name} отменил место {places} в {company} {address}",
-    am: "Ցավոք, խաղացող {name}-ը չեղարկեց տեղ {places} {company} {address}-ում",
+    am: "Ցավոք, խաղացող {name}-ը չեղարկեց տեղ №{places}՝ {company}, {address}",
   },
   "notifications.guestFallback": { en: "Guest", ru: "Гость", am: "Հյուր" },
   "notifications.bookingPlaces": { en: "Place", ru: "Место", am: "Տեղ" },
   "notifications.bookingPlacesPlural": { en: "Places", ru: "Места", am: "Տեղեր" },
   "notifications.bookingMinShort": { en: "min", ru: "мин", am: "րոպե" },
-  "notifications.openBoard": { en: "Open board", ru: "К сессиям", am: "Բացել տախտակը" },
-  "notifications.markAllRead": { en: "Mark all as read", ru: "Отметить все прочитанными", am: "Նշել բոլորը կարդացած" },
+  "notifications.openBoard": { en: "Open board", ru: "К сессиям", am: "Բացել սեսիաները" },
+  "notifications.markAllRead": { en: "Mark all as read", ru: "Отметить все прочитанными", am: "Նշել բոլորը որպես կարդացված" },
   "notifications.unreadDot": { en: "Unread", ru: "Не прочитано", am: "Չկարդացված" },
   "notifications.bookingFeedTitle": { en: "Bookings", ru: "Бронирования", am: "Ամրագրումներ" },
   "notifications.billingFeedTitle": { en: "Billing", ru: "Биллинг", am: "Հաշվարկ" },
@@ -1779,7 +1791,7 @@ export const TRANSLATIONS: Dict = {
   "notifications.bookingForDate": { en: "for", ru: "на", am: "-" },
   "notifications.deleteOne": { en: "Delete", ru: "Удалить", am: "Ջնջել" },
   "notifications.clearAll": { en: "Clear all", ru: "Очистить все", am: "Մաքրել բոլորը" },
-  "notifications.confirmClearAll": { en: "Delete all notifications? This cannot be undone.", ru: "Удалить все уведомления? Это действие нельзя отменить.", am: "Ջնջե՞լ բոլոր ծանուցումները։ Այս գործողությունը չի կարող չեղարկվել։" },
+  "notifications.confirmClearAll": { en: "Delete all notifications? This cannot be undone.", ru: "Удалить все уведомления? Это действие нельзя отменить.", am: "Ջնջե՞լ բոլոր ծանուցումները։ Սա հնարավոր չէ հետարկել։" },
 
   // Generic form helpers
   "label.title": { en: "Title", ru: "Название", am: "Անվանում" },
@@ -1800,7 +1812,7 @@ export const TRANSLATIONS: Dict = {
   "label.confirmPassword": { en: "Confirm password", ru: "Подтвердите пароль", am: "Հաստատեք գաղտնաբառը" },
   "label.number": { en: "Number", ru: "Номер", am: "Համար" },
   "label.type": { en: "Type", ru: "Тип", am: "Տեսակ" },
-  "label.participantsLimit": { en: "Participants limit", ru: "Лимит участников", am: "Մասնակիցների սահման" },
+  "label.participantsLimit": { en: "Participants limit", ru: "Лимит участников", am: "Մասնակիցների առավելագույն քանակ" },
   "label.game": { en: "Game", ru: "Игра", am: "Խաղ" },
   "label.pick": { en: "pick", ru: "выберите", am: "ընտրեք" },
   "form.errors.failedSave": { en: "Failed to save", ru: "Не удалось сохранить", am: "Չհաջողվեց պահպանել" },
@@ -1809,7 +1821,7 @@ export const TRANSLATIONS: Dict = {
   // Game form
   "game.titleNew": { en: "New game", ru: "Новая игра", am: "Նոր խաղ" },
   "game.titleEdit": { en: "Edit game", ru: "Редактировать игру", am: "Խմբագրել խաղը" },
-  "game.platformLocked": { en: "Platform cannot be changed after creation.", ru: "Платформу нельзя изменить после создания.", am: "Հարթակը հնարավոր չէ փոխել ստեղծումից հետո:" },
+  "game.platformLocked": { en: "Platform cannot be changed after creation.", ru: "Платформу нельзя изменить после создания.", am: "Ստեղծելուց հետո հարթակը հնարավոր չէ փոխել։" },
 
   // Tariff (TimePackage) form
   "tariff.titleNew": { en: "New tariff", ru: "Новый тариф", am: "Նոր սակագին" },
@@ -1832,44 +1844,44 @@ export const TRANSLATIONS: Dict = {
   // Manager form
   "manager.titleNew": { en: "New manager", ru: "Новый менеджер", am: "Նոր մենեջեր" },
   "manager.titleEdit": { en: "Edit manager", ru: "Редактировать менеджера", am: "Խմբագրել մենեջերին" },
-  "manager.errors.companyMissing": { en: "Company not resolved yet. Try again", ru: "Компания ещё не определена. Попробуйте ещё раз", am: "Ընկերությունը դեռ չի հայտնաբերվել՝ կրկնեք" },
+  "manager.errors.companyMissing": { en: "Company not resolved yet. Try again", ru: "Компания ещё не определена. Попробуйте ещё раз", am: "Ընկերությունը դեռ չի որոշվել։ Փորձեք կրկին։" },
 
   // Member form
-  "member.titleNew": { en: "New member", ru: "Новый клиент", am: "Նոր անդամ" },
-  "member.titleEdit": { en: "Edit member", ru: "Редактировать клиента", am: "Խմբագրել անդամին" },
+  "member.titleNew": { en: "New member", ru: "Новый клиент", am: "Նոր հաճախորդ" },
+  "member.titleEdit": { en: "Edit member", ru: "Редактировать клиента", am: "Խմբագրել հաճախորդին" },
 
   // Topup
   "topup.title": { en: "Top up", ru: "Пополнить", am: "Համալրել" },
   "topup.balance": { en: "Current balance", ru: "Текущий баланс", am: "Ընթացիկ մնացորդ" },
   "topup.processing": { en: "Processing…", ru: "Обработка…", am: "Մշակում…" },
-  "topup.errors.amount": { en: "Amount must be > 0", ru: "Сумма должна быть больше 0", am: "Գումարը պետք է լինի > 0" },
+  "topup.errors.amount": { en: "Amount must be > 0", ru: "Сумма должна быть больше 0", am: "Գումարը պետք է լինի 0-ից մեծ" },
 
   // Place form
   "place.titleNew": { en: "New place", ru: "Новое место", am: "Նոր տեղ" },
   "place.titleEdit": { en: "Edit place", ru: "Редактировать место", am: "Խմբագրել տեղը" },
   "place.name": { en: "Place name (optional)", ru: "Название места (необязательно)", am: "Տեղի անվանումը (ընտրովի)" },
   "place.namePlaceholder": { en: "e.g. Corner PS5, Poker table", ru: "напр. Угловая PS5, Стол для покера", am: "օր. Անկյունային PS5, Պոկերի սեղան" },
-  "place.hourlyRate": { en: "Price per hour", ru: "Цена за час", am: "Գինը մեկ ժամում" },
-  "place.customPlatformNote": { en: "Custom platform. Set its own price per hour (no branch tariff matrix).", ru: "Кастомная платформа. Задайте свою цену за час (без тарифной матрицы филиала).", am: "Հատուկ հարթակ։ Սահմանեք սեփական ժամային գինը (առանց մասնաճյուղի սակագների):" },
+  "place.hourlyRate": { en: "Price per hour", ru: "Цена за час", am: "Մեկ ժամի գինը" },
+  "place.customPlatformNote": { en: "Custom platform. Set its own price per hour (no branch tariff matrix).", ru: "Кастомная платформа. Задайте свою цену за час (без тарифной матрицы филиала).", am: "Հատուկ հարթակ։ Սահմանեք սեփական ժամային գինը (առանց մասնաճյուղի սակագների)։" },
   "platform.other": { en: "Other", ru: "Другое", am: "Այլ" },
   "platform.customPlaceholder": { en: "e.g. table-tennis, poker, vr", ru: "напр. table-tennis, poker, vr", am: "օր. table-tennis, poker, vr" },
   "place.gamesAvailable": { en: "Games available on this place", ru: "Доступные игры на этом месте", am: "Հասանելի խաղեր այս տեղում" },
-  "place.noGamesPlatform": { en: "No games for", ru: "Нет игр для", am: "Խաղեր չկան" },
+  "place.noGamesPlatform": { en: "No games for", ru: "Нет игр для", am: "Խաղեր չկան՝" },
   "place.selected": { en: "selected", ru: "выбрано", am: "ընտրված" },
-  "place.hasGames": { en: "Does this platform have games?", ru: "У этой платформы есть игры?", am: "Այս հարթակը ունի՞ խաղեր" },
-  "place.hasGamesHint": { en: "Turn on to attach games; leave off for a games-free platform (e.g. table tennis).", ru: "Включите, чтобы прикрепить игры; оставьте выключенным для платформы без игр (напр. настольный теннис).", am: "Միացրեք՝ խաղեր կցելու համար; թողեք անջատած՝ առանց խաղերի հարթակի համար (օր. սեղանի թենիս):" },
+  "place.hasGames": { en: "Does this platform have games?", ru: "У этой платформы есть игры?", am: "Այս հարթակն ունի՞ խաղեր" },
+  "place.hasGamesHint": { en: "Turn on to attach games; leave off for a games-free platform (e.g. table tennis).", ru: "Включите, чтобы прикрепить игры; оставьте выключенным для платформы без игр (напр. настольный теннис).", am: "Միացրեք՝ խաղեր կցելու համար։ Թողեք անջատված, եթե հարթակը խաղեր չունի (օր.՝ սեղանի թենիս)։" },
   "place.createGame": { en: "+ Create game", ru: "+ Создать игру", am: "+ Ստեղծել խաղ" },
   "place.errors.number": { en: "Number must be a positive integer", ru: "Номер должен быть положительным целым числом", am: "Համարը պետք է լինի դրական ամբողջ թիվ" },
   "place.errors.joystickPriceRequired": {
     en: "Name the price this place charges for an extra joystick, or set it to follow the branch.",
     ru: "Укажите цену, которую это место берёт за дополнительный джойстик, или выберите «Как в филиале».",
-    am: "Նշեք գինը, որը այս տեղը վերցնում է լրացուցիչ ջոյսթիքի համար, կամ ընտրեք «Ինչպես մասնաճյուղում»։",
+    am: "Նշեք այս տեղի լրացուցիչ ջոյսթիքի գինը կամ ընտրեք «Ինչպես մասնաճյուղում»։",
   },
   "place.errors.priceRequired": { en: "Set a price for this new platform", ru: "Задайте цену для новой платформы", am: "Սահմանեք գին այս նոր հարթակի համար" },
   "place.errors.nameRequired": { en: "Enter the platform name (English is required)", ru: "Введите наименование платформы (английское обязательно)", am: "Մուտքագրեք հարթակի անվանումը (անգլերենը պարտադիր է)" },
   "place.priceName": { en: "Platform name (наименование)", ru: "Наименование платформы", am: "Հարթակի անվանումը" },
-  "place.priceLockedNote": { en: "This platform already has a branch price. It will be applied to this place.", ru: "Для этой платформы уже задана цена филиала. Она будет применена к этому месту.", am: "Այս հարթակի համար արդեն սահմանված է մասնաճյուղի գին։ Այն կկիրառվի այս տեղի համար:" },
-  "place.tierUnpricedNote": { en: "This tier of the platform isn't priced yet. Set its rate once here.", ru: "Для этого тарифа платформы цена ещё не задана. Задайте её здесь один раз.", am: "Հարթակի այս սակագինը դեռ գնավորված չէ։ Սահմանեք այն այստեղ մեկ անգամ:" },
+  "place.priceLockedNote": { en: "This platform already has a branch price. It will be applied to this place.", ru: "Для этой платформы уже задана цена филиала. Она будет применена к этому месту.", am: "Այս հարթակի համար արդեն սահմանված է մասնաճյուղի գին։ Այն կկիրառվի այս տեղի համար։" },
+  "place.tierUnpricedNote": { en: "This tier of the platform isn't priced yet. Set its rate once here.", ru: "Для этого тарифа платформы цена ещё не задана. Задайте её здесь один раз.", am: "Հարթակի այս սակագնի գինը դեռ սահմանված չէ։ Սահմանեք այն այստեղ՝ մեկ անգամ։" },
   "place.joystickPrice": { en: "Price per extra joystick", ru: "Цена дополнительного джойстика", am: "Լրացուցիչ ջոյսթիքի գին" },
   // This seat's own price per hour. Its own three keys rather than reusing
   // `place.hourlyRate`, which labels the box that prices a PLATFORM or a
@@ -1880,19 +1892,19 @@ export const TRANSLATIONS: Dict = {
   "place.branchDefaultNote": {
     en: "This place bills at the branch price for its platform and tier. Set a price below to depart from it.",
     ru: "Место считается по цене филиала для его платформы и тарифа. Задайте цену ниже, чтобы отличаться от неё.",
-    am: "Տեղը հաշվարկվում է իր հարթակի և սակագնի համար մասնաճյուղի գնով։ Ստորև սահմանեք գին՝ դրանից տարբերվելու համար։",
+    am: "Այս տեղի համար գործում է մասնաճյուղի գինը՝ ըստ հարթակի և սակագնի։ Այլ գին կիրառելու համար սահմանեք այն ստորև։",
   },
   // A price of zero is stored, shown, and never charged — the seat falls back
   // to the branch figure. The server refuses it; this is the same sentence.
   "place.zeroNotAPriceHint": {
     en: "A price of zero is not billed. Leave the box empty to use the branch price, or start a Free session to give the seat away.",
     ru: "Цена «0» не тарифицируется. Оставьте поле пустым, чтобы считать по цене филиала, или запустите бесплатную сессию, чтобы отдать место даром.",
-    am: "Զրո գինը չի հաշվարկվում։ Թողեք դաշտը դատարկ՝ մասնաճյուղի գնով հաշվարկելու համար, կամ սկսեք անվճար նիստ՝ տեղն անվճար տրամադրելու համար։",
+    am: "0 գինը չի կիրառվում։ Թողեք դաշտը դատարկ՝ մասնաճյուղի գինը կիրառելու համար, կամ սկսեք անվճար սեսիա՝ տեղն անվճար տրամադրելու համար։",
   },
   "place.noBranchRateHint": {
     en: "The branch has no price for this platform and tier, so this place needs its own. Otherwise no session can be started on it.",
     ru: "У филиала нет цены для этой платформы и тарифа, поэтому месту нужна своя. Иначе сессию на нём не запустить.",
-    am: "Մասնաճյուղն այս հարթակի և սակագնի համար գին չունի, ուստի տեղին պետք է սեփականը, այլապես դրա վրա նիստ հնարավոր չէ սկսել։",
+    am: "Մասնաճյուղն այս հարթակի և սակագնի համար գին չունի, ուստի այս տեղին պետք է սեփական գին։ Այլապես դրա վրա սեսիա հնարավոր չէ սկսել։",
   },
   "place.ownRate": { en: "Price for this place", ru: "Цена этого места", am: "Այս տեղի գինը" },
   "place.ownRateInherit": { en: "As set for the platform", ru: "Как у платформы", am: "Ինչպես հարթակի համար" },
@@ -1909,7 +1921,7 @@ export const TRANSLATIONS: Dict = {
   "place.joystickChargeMode": {
     en: "When the fee is charged",
     ru: "Когда взимается плата",
-    am: "Երբ է գանձվում վճարը",
+    am: "Ե՞րբ է գանձվում վճարը",
   },
   // The two answers, spelled as what they DO. The screen used to print the
   // slot numbers "3" and "3/4" and left an operator to translate them into
@@ -1922,7 +1934,7 @@ export const TRANSLATIONS: Dict = {
   "joystickPrice.chargeMode.once": {
     en: "One charge per session, however many are handed out",
     ru: "Единоразовая плата за доп. джойстики (1 раз за сессию)",
-    am: "Մեկանգամյա վճար նիստի համար՝ անկախ ջոյսթիքների քանակից",
+    am: "Մեկ վճար ամբողջ սեսիայի համար՝ անկախ ջոյսթիքների քանակից",
   },
   "place.joystickInherit": { en: "As in the branch", ru: "Как в филиале", am: "Ինչպես մասնաճյուղում" },
   // ⚠️ Says "the branch's rule" and names no SCREEN on purpose: the venue-wide
@@ -1972,7 +1984,7 @@ export const TRANSLATIONS: Dict = {
   "place.extraItemName": { en: "Name", ru: "Название", am: "Անվանում" },
   "place.extraItemNamePlaceholder": { en: "Chips, cue, darts…", ru: "Фишки, кий, дротики…", am: "Ֆիշկաներ, կիյ, նետիկներ…" },
   "place.extraItemPrice": { en: "Price per item", ru: "Цена за штуку", am: "Գինը մեկ հատի համար" },
-  "place.extraItemPayment": { en: "How it is charged", ru: "Как берётся плата", am: "Ինչպես է վերցվում վճարը" },
+  "place.extraItemPayment": { en: "How it is charged", ru: "Как берётся плата", am: "Ինչպես է գանձվում վճարը" },
   "place.extraItemEach": {
     en: "Charged every time ({0} × count)",
     ru: "Плата за каждую единицу ({0} × количество)",
@@ -1981,7 +1993,7 @@ export const TRANSLATIONS: Dict = {
   "place.extraItemOnce": {
     en: "One charge for the session ({0}), whatever the count",
     ru: "Единоразовая плата за {0} (1 раз за сессию)",
-    am: "Միանվագ վճար {0}-ի համար (1 անգամ սեսիայի ընթացքում)",
+    am: "Մեկանգամյա վճար ({0})՝ սեսիայի համար, անկախ քանակից",
   },
   "place.extraItemStrategy": { en: "Tariff for {0}", ru: "Тариф: {0}", am: "Սակագին՝ {0}" },
   "place.extraItemStrategyFixed": {
@@ -1999,41 +2011,41 @@ export const TRANSLATIONS: Dict = {
     ru: "Сколько {0} уже входит в тариф. Первые за сессию бесплатны, всё сверх этого оплачивается. Пусто: оплачивается каждая единица.",
     am: "Քանի {0} արդեն ներառված է սակագնում։ Սեսիայի առաջինները անվճար են, դրանից ավելին վճարովի է։ Դատարկ՝ վճարվում է յուրաքանչյուրը։",
   },
-  "place.extraItemMax": { en: "How many exist", ru: "\u0421\u043a\u043e\u043b\u044c\u043a\u043e \u0432\u0441\u0435\u0433\u043e", am: "\u0554\u0561\u0576\u056b\u057d\u0568 \u0568\u0576\u0564\u0561\u0574\u0565\u0576\u0568" },
+  "place.extraItemMax": { en: "How many exist", ru: "\u0421\u043a\u043e\u043b\u044c\u043a\u043e \u0432\u0441\u0435\u0433\u043e", am: "Ընդհանուր քանակ" },
   "place.extraItemMaxNote": {
     en: "How many of {0} this room owns. Beyond it a hand-out is refused rather than charged. Empty is no limit.",
     ru: "\u0421\u043a\u043e\u043b\u044c\u043a\u043e \u0435\u0434\u0438\u043d\u0438\u0446 \u00ab{0}\u00bb \u0435\u0441\u0442\u044c \u0432 \u044d\u0442\u043e\u0439 \u043a\u043e\u043c\u043d\u0430\u0442\u0435. \u0421\u0432\u0435\u0440\u0445 \u044d\u0442\u043e\u0433\u043e \u0432\u044b\u0434\u0430\u0447\u0430 \u043e\u0442\u043a\u043b\u043e\u043d\u044f\u0435\u0442\u0441\u044f, \u0430 \u043d\u0435 \u043e\u043f\u043b\u0430\u0447\u0438\u0432\u0430\u0435\u0442\u0441\u044f. \u041f\u0443\u0441\u0442\u043e \u2014 \u0431\u0435\u0437 \u043e\u0433\u0440\u0430\u043d\u0438\u0447\u0435\u043d\u0438\u044f.",
-    am: "\u0554\u0561\u0576\u056b \u00ab{0}\u00bb \u0561\u0575\u057d \u057d\u0565\u0576\u0575\u0561\u056f\u0578\u0582\u0574. \u0534\u0580\u0561\u0576\u056b\u0581 \u0561\u057e\u0565\u056c\u056b\u0576 \u057f\u0580\u0561\u0574\u0561\u0564\u0580\u0578\u0582\u0574\u0568 \u0574\u0565\u0580\u056a\u057e\u0578\u0582\u0574 \u0567\u0589",
+    am: "Քանի «{0}» կա այս սենյակում։ Դրանից ավելի տրամադրելը մերժվում է, ոչ թե վճարվում։ Դատարկ՝ առանց սահմանափակման։",
   },
   "place.extraItemChargedUnits": { en: "Which are charged", ru: "\u041a\u0430\u043a\u0438\u0435 \u043f\u043b\u0430\u0442\u043d\u044b\u0435", am: "\u0548\u0580\u0578\u0576\u0584 \u0565\u0576 \u057e\u0573\u0561\u0580\u0578\u057e\u056b" },
   "place.extraItemChargedUnitsNote": {
     en: "Unit numbers, comma separated \u2014 \u201c3,4\u201d charges the third and fourth {0} and hands over every other one free. Empty lets the allowance above decide.",
     ru: "\u041d\u043e\u043c\u0435\u0440\u0430 \u0435\u0434\u0438\u043d\u0438\u0446 \u0447\u0435\u0440\u0435\u0437 \u0437\u0430\u043f\u044f\u0442\u0443\u044e: \u00ab3,4\u00bb \u2014 \u0442\u0440\u0435\u0442\u0438\u0439 \u0438 \u0447\u0435\u0442\u0432\u0451\u0440\u0442\u044b\u0439 \u00ab{0}\u00bb \u043f\u043b\u0430\u0442\u043d\u044b\u0435, \u043e\u0441\u0442\u0430\u043b\u044c\u043d\u044b\u0435 \u0432\u044b\u0434\u0430\u044e\u0442\u0441\u044f \u0434\u0430\u0440\u043e\u043c. \u041f\u0443\u0441\u0442\u043e \u2014 \u0440\u0435\u0448\u0430\u0435\u0442 \u0447\u0438\u0441\u043b\u043e \u0432\u044b\u0448\u0435.",
-    am: "\u0544\u056b\u0561\u057e\u0578\u0580\u0576\u0565\u0580\u056b \u0570\u0561\u0574\u0561\u0580\u0565\u0580\u0568\u055d \u057d\u057f\u0578\u0580\u0561\u056f\u0565\u057f\u0565\u0580\u0578\u057e\u0589 \u0534\u0561\u057f\u0561\u0580\u056f \u0567\u055d \u0578\u0580\u0578\u0577\u0578\u0582\u0574 \u0567 \u057e\u0565\u0580\u0565\u0582\u056b \u0569\u056b\u057e\u0568\u0589",
+    am: "Միավորների համարները՝ ստորակետով։ «3,4»՝ վճարովի են երրորդ և չորրորդ «{0}»-ը, մնացածը տրվում են անվճար։ Դատարկ՝ որոշում է վերևի թիվը։",
   },
   "place.extraItemModeFixed": { en: "Fixed price", ru: "\u0424\u0438\u043a\u0441\u0438\u0440\u043e\u0432\u0430\u043d\u043d\u0430\u044f \u0446\u0435\u043d\u0430", am: "\u0556\u056b\u0584\u057d\u057e\u0561\u056e \u0563\u056b\u0576" },
-  "place.extraItemModeHourly": { en: "Per hour", ru: "\u0417\u0430 \u0447\u0430\u0441", am: "\u053a\u0561\u0574\u0561\u056f\u0561\u0576" },
-  "place.extraItemPriceNext": { en: "Each one after", ru: "\u041a\u0430\u0436\u0434\u044b\u0439 \u0441\u043b\u0435\u0434\u0443\u044e\u0449\u0438\u0439", am: "\u0540\u0561\u057b\u0578\u0580\u0564 \u0575\u0578\u0582\u0580\u0561\u0584\u0561\u0576\u0579\u0575\u0578\u0582\u0580" },
-  "branchExtraItem.sectionTitle": { en: "The room's own extra", ru: "\u0414\u043e\u043f. \u043f\u0440\u0435\u0434\u043c\u0435\u0442 \u043a\u043e\u043c\u043d\u0430\u0442\u044b", am: "\u054d\u0565\u0576\u0575\u0561\u056f\u056b \u056c\u0580\u0561\u0581\u0578\u0582\u0581\u056b\u0579" },
-  "branchExtraItem.name": { en: "What the venue hands out", ru: "\u0427\u0442\u043e \u0432\u044b\u0434\u0430\u0451\u0442 \u0437\u0430\u0432\u0435\u0434\u0435\u043d\u0438\u0435", am: "\u053b\u0576\u0579 \u0567 \u057f\u0580\u0561\u0574\u0561\u0564\u0580\u0578\u0582\u0574" },
+  "place.extraItemModeHourly": { en: "Per hour", ru: "\u0417\u0430 \u0447\u0430\u0441", am: "Ժամային" },
+  "place.extraItemPriceNext": { en: "Each one after", ru: "\u041a\u0430\u0436\u0434\u044b\u0439 \u0441\u043b\u0435\u0434\u0443\u044e\u0449\u0438\u0439", am: "Յուրաքանչյուր հաջորդը" },
+  "branchExtraItem.sectionTitle": { en: "The room's own extra", ru: "\u0414\u043e\u043f. \u043f\u0440\u0435\u0434\u043c\u0435\u0442 \u043a\u043e\u043c\u043d\u0430\u0442\u044b", am: "Սենյակի լրացուցիչ իրը" },
+  "branchExtraItem.name": { en: "What the venue hands out", ru: "\u0427\u0442\u043e \u0432\u044b\u0434\u0430\u0451\u0442 \u0437\u0430\u0432\u0435\u0434\u0435\u043d\u0438\u0435", am: "Ինչ է տրամադրում ակումբը" },
   "branchExtraItem.pricingMode": { en: "Tariff", ru: "\u0422\u0430\u0440\u0438\u0444", am: "\u054d\u0561\u056f\u0561\u0563\u056b\u0576" },
   "branchExtraItem.chargeMode": { en: "Charged", ru: "\u041e\u043f\u043b\u0430\u0442\u0430", am: "\u054e\u0573\u0561\u0580\u0578\u0582\u0574" },
-  "branchExtraItem.saved": { en: "Saved", ru: "\u0421\u043e\u0445\u0440\u0430\u043d\u0435\u043d\u043e", am: "\u054a\u0561\u0570\u057e\u0565\u0581" },
+  "branchExtraItem.saved": { en: "Saved", ru: "\u0421\u043e\u0445\u0440\u0430\u043d\u0435\u043d\u043e", am: "Պահպանվեց" },
   "branchExtraItem.priceRequired": {
     en: "Name it and price it, or leave both empty.",
     ru: "\u0423\u043a\u0430\u0436\u0438\u0442\u0435 \u043d\u0430\u0437\u0432\u0430\u043d\u0438\u0435 \u0438 \u0446\u0435\u043d\u0443 \u0438\u043b\u0438 \u043e\u0441\u0442\u0430\u0432\u044c\u0442\u0435 \u043e\u0431\u0430 \u043f\u043e\u043b\u044f \u043f\u0443\u0441\u0442\u044b\u043c\u0438.",
-    am: "\u0546\u0577\u0565\u0584 \u0561\u0576\u0578\u0582\u0576\u0568 \u0587 \u0563\u056b\u0576\u0568 \u056f\u0561\u0574 \u0569\u0578\u0572\u0565\u0584 \u0564\u0561\u057f\u0561\u0580\u056f\u0589",
+    am: "Նշեք անվանումը և գինը կամ թողեք երկուսն էլ դատարկ։",
   },
   "branchExtraItem.hint": {
     en: "The venue's answer for the rooms that have not given one. A room with its own settings ignores this. Empty means every room decides for itself.",
     ru: "\u041e\u0442\u0432\u0435\u0442 \u0437\u0430\u0432\u0435\u0434\u0435\u043d\u0438\u044f \u0434\u043b\u044f \u043a\u043e\u043c\u043d\u0430\u0442, \u043a\u043e\u0442\u043e\u0440\u044b\u0435 \u043d\u0435 \u043e\u0442\u0432\u0435\u0442\u0438\u043b\u0438 \u0441\u0430\u043c\u0438. \u041a\u043e\u043c\u043d\u0430\u0442\u0430 \u0441\u043e \u0441\u0432\u043e\u0438\u043c\u0438 \u043d\u0430\u0441\u0442\u0440\u043e\u0439\u043a\u0430\u043c\u0438 \u044d\u0442\u043e \u0438\u0433\u043d\u043e\u0440\u0438\u0440\u0443\u0435\u0442. \u041f\u0443\u0441\u0442\u043e \u2014 \u043a\u0430\u0436\u0434\u0430\u044f \u043a\u043e\u043c\u043d\u0430\u0442\u0430 \u0440\u0435\u0448\u0430\u0435\u0442 \u0441\u0430\u043c\u0430.",
-    am: "\u0540\u0561\u057d\u057f\u0561\u057f\u0578\u0582\u0569\u0575\u0561\u0576 \u057a\u0561\u057f\u0561\u057d\u056d\u0561\u0576\u0568 \u0561\u0575\u0576 \u057d\u0565\u0576\u0575\u0561\u056f\u0576\u0565\u0580\u056b \u0570\u0561\u0574\u0561\u0580, \u0578\u0580\u0578\u0576\u0584 \u0579\u0565\u0576 \u057a\u0561\u057f\u0561\u057d\u056d\u0561\u0576\u0565\u056c\u0589",
+    am: "Ակումբի կարգավորումը այն սենյակների համար, որոնք սեփականը չունեն։ Սեփական կարգավորումներով սենյակն այն անտեսում է։ Դատարկ՝ յուրաքանչյուր սենյակ ինքն է որոշում։",
   },
   "place.extraItemTariffChange": { en: "Tariff change", ru: "Изменение тарифа", am: "Սակագնի փոփոխություն" },
   "place.extraItemFixedNote": {
     en: "The price is charged as entered, per {0}.",
     ru: "Цена берётся как указано, за одну единицу: {0}.",
-    am: "Գինը վերցվում է ինչպես նշված է՝ մեկ միավորի համար՝ {0}։",
+    am: "Գինը գանձվում է նշված չափով՝ յուրաքանչյուր միավորի համար ({0})։",
   },
   "place.extraItemHourlyNote": {
     en: "The price becomes an hourly rate: it is charged for every hour {0} stays with the player.",
@@ -2117,8 +2129,8 @@ export const TRANSLATIONS: Dict = {
   "platformName.suggestions": { en: "Existing platforms", ru: "Существующие платформы", am: "Առկա հարթակներ" },
   // Custom-platform prices — read + edit block on the Branch prices page.
   "platformPrice.sectionTitle": { en: "Custom platform prices", ru: "Цены кастомных платформ", am: "Հատուկ հարթակների գներ" },
-  "platformPrice.perHour": { en: "per hour", ru: "за час", am: "մեկ ժամում" },
-  "platformPrice.managedInPlaces": { en: "Added automatically when you create a place on the platform (in Places). Click a name to rename it; edit the rates here.", ru: "Добавляются автоматически при создании места на платформе (в разделе Места). Нажмите на название, чтобы переименовать; цены изменяются здесь.", am: "Ավելացվում են ինքնաշխատ՝ հարթակի վրա տեղ ստեղծելիս (Տեղեր բաժնում): Սեղմեք անվան վրա՝ վերանվանելու համար; գները փոխվում են այստեղ:" },
+  "platformPrice.perHour": { en: "per hour", ru: "за час", am: "ժամը" },
+  "platformPrice.managedInPlaces": { en: "Added automatically when you create a place on the platform (in Places). Click a name to rename it; edit the rates here.", ru: "Добавляются автоматически при создании места на платформе (в разделе Места). Нажмите на название, чтобы переименовать; цены изменяются здесь.", am: "Ավելացվում են ավտոմատ՝ հարթակում տեղ ստեղծելիս («Տեղեր» բաժնում)։ Սեղմեք անվան վրա՝ վերանվանելու համար։ Գները փոխվում են այստեղ։" },
   "platformPrice.titleEdit": { en: "Edit platform price", ru: "Редактировать цену платформы", am: "Խմբագրել հարթակի գինը" },
   "platformPrice.renameTitle": { en: "Rename platform", ru: "Изменить наименование платформы", am: "Վերանվանել հարթակը" },
   "platformPrice.renameHint": { en: "Click to rename", ru: "Нажмите, чтобы изменить наименование", am: "Սեղմեք վերանվանելու համար" },
@@ -2130,44 +2142,44 @@ export const TRANSLATIONS: Dict = {
   "subplatform.other": { en: "Other", ru: "Другое", am: "Այլ" },
   "subplatform.name": { en: "Name", ru: "Название", am: "Անվանում" },
   "subplatform.add": { en: "Add", ru: "Добавить", am: "Ավելացնել" },
-  "subplatform.price": { en: "Price per hour", ru: "Цена за час", am: "Գինը մեկ ժամում" },
+  "subplatform.price": { en: "Price per hour", ru: "Цена за час", am: "Մեկ ժամի գինը" },
   "subplatform.priceRequiredHint": {
     en: "Required. This is what every place in this subcategory will be charged.",
     ru: "Обязательно. По этой цене будут считаться все места этой подкатегории.",
-    am: "Պարտադիր է։ Այս գնով կհաշվարկվեն այս ենթակատեգորիայի բոլոր տեղերը:",
+    am: "Պարտադիր է։ Այս գնով կհաշվարկվեն այս ենթակատեգորիայի բոլոր տեղերը։",
   },
   "subplatform.tierUnpricedNote": {
     en: "This subcategory has no rate for this type yet. Set it here.",
     ru: "У этой подкатегории ещё нет цены для этого типа. Задайте её здесь.",
-    am: "Այս ենթակատեգորիան դեռ չունի գին այս տեսակի համար։ Սահմանեք այն այստեղ:",
+    am: "Այս ենթակատեգորիան դեռ չունի գին այս տեսակի համար։ Սահմանեք այն այստեղ։",
   },
   "subplatform.errors.priceRequired": {
     en: "Enter a price for this subcategory.",
     ru: "Введите цену подкатегории.",
-    am: "Մուտքագրեք ենթակատեգորիայի գինը:",
+    am: "Մուտքագրեք ենթակատեգորիայի գինը։",
   },
   "subplatform.priceAppliedNote": {
     en: "This subcategory's rate applies. Change it in Branch prices.",
     ru: "Применяется цена этой подкатегории. Изменить её можно в «Ценах филиала».",
-    am: "Կիրառվում է այս ենթակատեգորիայի գինը: Փոխեք այն «Մասնաճյուղի գներ» բաժնում:",
+    am: "Կիրառվում է այս ենթակատեգորիայի գինը։ Փոխեք այն «Մասնաճյուղի գներ» բաժնում։",
   },
-  "subplatform.inherits": { en: "as the platform", ru: "как у платформы", am: "ինչպես հարթակը" },
+  "subplatform.inherits": { en: "as the platform", ru: "как у платформы", am: "ինչպես հարթակինը" },
   "subplatform.errors.nameRequired": {
     en: "Enter a name for the subcategory.",
     ru: "Введите название подкатегории.",
-    am: "Մուտքագրեք ենթակատեգորիայի անվանումը:",
+    am: "Մուտքագրեք ենթակատեգորիայի անվանումը։",
   },
   "subplatform.sectionTitle": { en: "Subcategory prices", ru: "Цены подкатегорий", am: "Ենթակատեգորիաների գներ" },
   "subplatform.renameTitle": { en: "Rename subcategory", ru: "Изменить название подкатегории", am: "Վերանվանել ենթակատեգորիան" },
   "subplatform.managedHint": {
     en: "Created in Places, on the second row of tabs. Rename them and edit each rate here. A subcategory disappears on its own once its last place is deleted. It cannot be removed while a place still uses it.",
     ru: "Создаются в разделе «Места», во втором ряду вкладок. Здесь их можно переименовать и изменить цену. Подкатегория исчезает сама, когда удалено её последнее место. Пока хотя бы одно место её использует, удалить её нельзя.",
-    am: "Ստեղծվում են «Տեղեր» բաժնում՝ ներդիրների երկրորդ շարքում: Այստեղ կարող եք վերանվանել և փոխել գինը: Ենթակատեգորիան անհետանում է ինքնաշխատ, երբ ջնջվում է նրա վերջին տեղը:",
+    am: "Ստեղծվում են «Տեղեր» բաժնում՝ ներդիրների երկրորդ շարքում։ Այստեղ կարող եք վերանվանել դրանք և փոխել գինը։ Ենթակատեգորիան ինքնին անհետանում է, երբ ջնջվում է դրա վերջին տեղը։ Քանի դեռ որևէ տեղ այն օգտագործում է, այն հնարավոր չէ ջնջել։",
   },
   "subplatform.defaultUndeletable": {
     en: "The Default subcategory cannot be deleted.",
     ru: "Подкатегорию «По умолчанию» удалить нельзя.",
-    am: "«Կանխադրված» ենթակատեգորիան հնարավոր չէ ջնջել:",
+    am: "«Կանխադրված» ենթակատեգորիան հնարավոր չէ ջնջել։",
   },
 
   // Tournament form
@@ -2176,7 +2188,7 @@ export const TRANSLATIONS: Dict = {
   "tournament.errors.pickGame": { en: "Pick a game", ru: "Выберите игру", am: "Ընտրեք խաղ" },
   "tournament.errors.descRequired": { en: "Description is required", ru: "Укажите описание", am: "Նկարագրությունը պարտադիր է" },
   "tournament.errors.startRequired": { en: "Start date is required", ru: "Укажите дату начала", am: "Մեկնարկի ամսաթիվը պարտադիր է" },
-  "tournament.errors.companyMissing": { en: "Branch is missing company id. Reload and retry", ru: "У филиала нет компании. Перезагрузите страницу", am: "Մասնաճյուղին ընկերություն չի կցված" },
+  "tournament.errors.companyMissing": { en: "Branch is missing company id. Reload and retry", ru: "У филиала нет компании. Перезагрузите страницу", am: "Մասնաճյուղին ընկերություն կցված չէ։ Թարմացրեք և կրկնեք։" },
   "tournament.branchLoadFailed": { en: "Branch load failed", ru: "Не удалось загрузить филиал", am: "Չհաջողվեց բեռնել մասնաճյուղը" },
 
   // Skill level (tournament create/edit select + list/detail chip)
@@ -2188,7 +2200,7 @@ export const TRANSLATIONS: Dict = {
 
   // Verify-code section on the tournament detail page
   "registrations.verifyCodeTitle":      { en: "Verify player code", ru: "Подтвердить код игрока", am: "Հաստատել խաղացողի կոդը" },
-  "registrations.verifyCodeHint":       { en: "Enter the 6-character code the player shows on their phone, or scan their QR.", ru: "Введите 6-значный код, который игрок показывает на телефоне, или отсканируйте QR.", am: "Մուտքագրեք 6 նիշանոց կոդը, որը խաղացողը ցույց է տալիս հեռախոսին, կամ սկանավորեք QR-ը:" },
+  "registrations.verifyCodeHint":       { en: "Enter the 6-character code the player shows on their phone, or scan their QR.", ru: "Введите 6-значный код, который игрок показывает на телефоне, или отсканируйте QR.", am: "Մուտքագրեք 6 նիշանոց կոդը, որը խաղացողը ցույց է տալիս իր հեռախոսում, կամ սկանավորեք QR-ը։" },
   "registrations.verifyCodePlaceholder":{ en: "e.g. A3K9P2",       ru: "напр. A3K9P2",         am: "օր. A3K9P2" },
   "registrations.verifyButton":         { en: "Verify",            ru: "Подтвердить",          am: "Հաստատել" },
   "registrations.scanQrButton":         { en: "Scan QR",           ru: "Сканировать QR",       am: "Սկանավորել QR" },
@@ -2196,7 +2208,7 @@ export const TRANSLATIONS: Dict = {
   "registrations.verifyFailed":         { en: "Verification failed", ru: "Не удалось подтвердить", am: "Չհաջողվեց հաստատել" },
   "registrations.verifyAlready":        { en: "Already verified",  ru: "Уже подтверждено",     am: "Արդեն հաստատված է" },
   "registrations.verifiedBadge":        { en: "✓ Verified",        ru: "✓ Подтверждён",        am: "✓ Հաստատված" },
-  "registrations.verifiedBy":           { en: "by",                ru: "-",                   am: "կողմից" },
+  "registrations.verifiedBy":           { en: "by",                ru: "-",                   am: "—" },
   "registrations.pendingBadge":         { en: "Pending",           ru: "Ожидает",              am: "Սպասում է" },
 
   // Branch form
@@ -2221,7 +2233,7 @@ export const TRANSLATIONS: Dict = {
   "branch.statusHint": {
     en: "Inactive: players can't see this branch in the app. Staff keep working in it as usual.",
     ru: "Неактивен: игроки не видят этот филиал в приложении. Персонал работает в нём как обычно.",
-    am: "Ոչ ակտիվ՝ խաղացողները հավելվածում չեն տեսնում այս մասնաճյուղը։ Անձնակազմը շարունակում է աշխատել դրանում սովորականի պես։",
+    am: "Ոչ ակտիվ՝ խաղացողները հավելվածում չեն տեսնում այս մասնաճյուղը։ Աշխատակազմը շարունակում է աշխատել դրանում սովորականի պես։",
   },
   "branch.inactive.hint": {
     en: "Inactive: players can't see this branch.",
@@ -2237,7 +2249,7 @@ export const TRANSLATIONS: Dict = {
   "branch.inactive.notice": {
     en: "Inactive: players can't see this branch in the app. Staff can keep working in it.",
     ru: "Неактивен: игроки не видят этот филиал в приложении. Персонал может продолжать в нём работать.",
-    am: "Ոչ ակտիվ՝ խաղացողները հավելվածում չեն տեսնում այս մասնաճյուղը։ Անձնակազմը կարող է շարունակել աշխատել դրանում։",
+    am: "Ոչ ակտիվ՝ խաղացողները հավելվածում չեն տեսնում այս մասնաճյուղը։ Աշխատակազմը կարող է շարունակել աշխատել դրանում։",
   },
   // Appended for whoever can flip it (owner, admin). {0} = the hub's Settings
   // tile, {1} = the "Edit info" button, {2} = the "Active" toggle label — the
@@ -2332,8 +2344,8 @@ export const TRANSLATIONS: Dict = {
   // Pairing token modal
   "pairing.title": { en: "Pairing token", ru: "Токен сопряжения", am: "Զուգակցման տոկեն" },
   "pairing.copy": { en: "Copy", ru: "Копировать", am: "Պատճենել" },
-  "pairing.copied": { en: "Copied!", ru: "Скопировано!", am: "Պատճենվել է!" },
-  "pairing.hint": { en: "Use this token in the agent app on the gaming PC.", ru: "Используйте этот токен в агенте на игровом ПК.", am: "Օգտագործեք այս տոկենը խաղային ՀՀ-ի վրա:" },
+  "pairing.copied": { en: "Copied!", ru: "Скопировано!", am: "Պատճենվեց" },
+  "pairing.hint": { en: "Use this token in the agent app on the gaming PC.", ru: "Используйте этот токен в агенте на игровом ПК.", am: "Օգտագործեք այս տոկենը խաղային համակարգչի Agent ծրագրում։" },
 
   // Image upload
   "image.choose": { en: "Choose file", ru: "Выберите файл", am: "Ընտրել ֆայլ" },
@@ -2349,15 +2361,15 @@ export const TRANSLATIONS: Dict = {
   "auth.resetTitle": { en: "Reset password", ru: "Сброс пароля", am: "Վերակայել գաղտնաբառը" },
   "auth.sendResetLink": { en: "Send reset link", ru: "Отправить ссылку", am: "Ուղարկել հղում" },
   "auth.backToLogin": { en: "Back to sign in", ru: "Вернуться к входу", am: "Վերադառնալ մուտքին" },
-  "auth.resetSent": { en: "If the email exists, a reset link was sent.", ru: "Если email существует, ссылка отправлена.", am: "Եթե էլ. հասցեն գոյություն ունի, հղումն ուղարկվել է:" },
+  "auth.resetSent": { en: "If the email exists, a reset link was sent.", ru: "Если email существует, ссылка отправлена.", am: "Եթե այդ էլ. հասցեն գոյություն ունի, հղումն ուղարկվել է։" },
 
   // Member card / list / shifts / pos / booking details
-  "members.title": { en: "Members", ru: "Клиенты", am: "Անդամներ" },
-  "members.new": { en: "+ New member", ru: "+ Новый клиент", am: "+ Նոր անդամ" },
+  "members.title": { en: "Members", ru: "Клиенты", am: "Հաճախորդներ" },
+  "members.new": { en: "+ New member", ru: "+ Новый клиент", am: "+ Նոր հաճախորդ" },
   "members.search": { en: "Search by name / phone / card…", ru: "Поиск по имени / телефону / карте…", am: "Որոնում անունով / հեռախոսով / քարտով…" },
   "members.balance": { en: "Balance", ru: "Баланс", am: "Մնացորդ" },
-  "members.empty": { en: "No members yet.", ru: "Клиентов пока нет.", am: "Անդամներ դեռ չկան:" },
-  "members.deposits": { en: "Deposits", ru: "Депозиты", am: "Ավանդներ" },
+  "members.empty": { en: "No members yet.", ru: "Клиентов пока нет.", am: "Հաճախորդներ դեռ չկան։" },
+  "members.deposits": { en: "Deposits", ru: "Депозиты", am: "Համալրումներ" },
   "members.lastVisit": { en: "Last visit", ru: "Последний визит", am: "Վերջին այց" },
 
   "products.title": { en: "Products", ru: "Товары", am: "Ապրանքներ" },
@@ -2368,7 +2380,7 @@ export const TRANSLATIONS: Dict = {
     ru: "Дополнительных предметов пока нет — фишки, кий, ракетка, которые выдаются вместе с местом.",
     am: "Լրացուցիչ իրեր դեռ չկան՝ ֆիշկաներ, կիյ, ռակետ, որոնք տրվում են տեղի հետ։",
   },
-  "products.empty": { en: "No products yet.", ru: "Товаров пока нет.", am: "Ապրանքներ դեռ չկան:" },
+  "products.empty": { en: "No products yet.", ru: "Товаров пока нет.", am: "Ապրանքներ դեռ չկան։" },
   "products.search": {
     en: "Search by name or category…",
     ru: "Поиск по названию или категории…",
@@ -2377,7 +2389,7 @@ export const TRANSLATIONS: Dict = {
   "products.noMatches": {
     en: "Nothing matches that search.",
     ru: "Ничего не найдено.",
-    am: "Ոչինչ չի գտնվել:",
+    am: "Ոչինչ չի գտնվել։",
   },
   "pos.total": { en: "Total", ru: "Итого", am: "Ընդամենը" },
 
@@ -2392,36 +2404,36 @@ export const TRANSLATIONS: Dict = {
   "branch.prices.hint": {
     en: "Per-hour rate (AMD). Sessions and the mobile app bill from this matrix.",
     ru: "Ставка за час (драм). Сессии и мобильное приложение считают по этой таблице.",
-    am: "Ժամային սակագինը (դրամ). Սեսիաներն ու հավելվածը հաշվարկում են այս աղյուսակից:",
+    am: "Ժամային սակագին (դրամ)։ Սեսիաներն ու բջջային հավելվածը հաշվարկում են ըստ այս աղյուսակի։",
   },
   "branch.prices.saved": { en: "Saved", ru: "Сохранено", am: "Պահպանված է" },
   "branch.prices.packagesSubtitle": { en: "Time packages", ru: "Тарифные пакеты", am: "Ժամանակային փաթեթներ" },
   // Branch → Prices, grouped: what a seat costs, what is sold as a package,
   // and the rules applied on top of every bill.
-  "prices.group.rates": { en: "Rates", ru: "Ставки", am: "Դրույքաչափեր" },
-  "prices.hourlyTitle": { en: "Hourly rates", ru: "Почасовые ставки", am: "Ժամային դրույքաչափեր" },
+  "prices.group.rates": { en: "Rates", ru: "Ставки", am: "Սակագներ" },
+  "prices.hourlyTitle": { en: "Hourly rates", ru: "Почасовые ставки", am: "Ժամային սակագներ" },
   "prices.group.packages": { en: "Packages", ru: "Пакеты", am: "Փաթեթներ" },
   "prices.group.rules": { en: "Billing rules", ru: "Правила оплаты", am: "Վճարման կանոններ" },
   "prices.packagesHint": {
     en: "Fixed-length sessions sold at one price.",
     ru: "Сессии фиксированной длины по одной цене.",
-    am: "Ֆիքսված տևողությամբ նիստեր մեկ գնով։",
+    am: "Ֆիքսված տևողությամբ սեսիաներ՝ մեկ գնով։",
   },
   "prices.packageInactive": { en: "Inactive", ru: "Неактивен", am: "Ոչ ակտիվ" },
-  "tariff.platform": { en: "Platform", ru: "Платформа", am: "Պլատֆորմա" },
-  "tariff.platformAll": { en: "All platforms", ru: "Все платформы", am: "Բոլոր պլատֆորմները" },
+  "tariff.platform": { en: "Platform", ru: "Платформа", am: "Հարթակ" },
+  "tariff.platformAll": { en: "All platforms", ru: "Все платформы", am: "Բոլոր հարթակները" },
   "tariff.discount.toggle": {
     en: "Add a time-windowed discount",
     ru: "Добавить скидку по времени",
-    am: "Ավելացնել ժամային զեղչ",
+    am: "Ավելացնել զեղչ ըստ ժամերի",
   },
   "tariff.discount.hint": {
     en: "Discount applies on selected weekdays inside the window. Players see it on the duration picker only while active.",
     ru: "Скидка действует в выбранные дни недели и часы. Игроки видят её на экране выбора длительности только пока она активна.",
-    am: "Զեղչը գործում է ընտրված շաբաթվա օրերին և ժամերին։ Խաղացողները տեսնում են այն տևողության էկրանում միայն ակտիվ ընթացքում։",
+    am: "Զեղչը գործում է ընտրված օրերին՝ նշված ժամերին։ Խաղացողները այն տեսնում են տևողության ընտրության էկրանում միայն զեղչի գործելու ժամանակ։",
   },
   "tariff.discount.price": { en: "Discount price", ru: "Цена со скидкой", am: "Զեղչային գին" },
-  "tariff.discount.startTime": { en: "Start time", ru: "Время начала", am: "Սկսի ժամ" },
+  "tariff.discount.startTime": { en: "Start time", ru: "Время начала", am: "Սկզբի ժամ" },
   "tariff.discount.endTime": { en: "End time", ru: "Время окончания", am: "Ավարտի ժամ" },
   "tariff.discount.days": { en: "Weekdays", ru: "Дни недели", am: "Շաբաթվա օրեր" },
   "tariff.discount.tag": { en: "Promo:", ru: "Акция:", am: "Ակցիա՝" },
@@ -2455,21 +2467,21 @@ export const TRANSLATIONS: Dict = {
   "branchForm.locationLabel": { en: "Location", ru: "Местоположение", am: "Տեղադրություն" },
   "branchForm.latitude": { en: "Latitude", ru: "Широта", am: "Լայնություն" },
   "branchForm.longitude": { en: "Longitude", ru: "Долгота", am: "Երկայնություն" },
-  "branchForm.autoLocateHint": { en: "We auto-locate the address as you type. Click on the map to override the pin.", ru: "Адрес ищется автоматически по мере ввода. Кликните на карте, чтобы поставить точку вручную.", am: "Հասցեն գտնվում է ինքնաբերաբար: Սեղմեք քարտեզի վրա ձեռքով կետ դնելու համար:" },
-  "branchForm.searching": { en: "Searching address…", ru: "Поиск адреса…", am: "Հասցեն որոնում…" },
+  "branchForm.autoLocateHint": { en: "We auto-locate the address as you type. Click on the map to override the pin.", ru: "Адрес ищется автоматически по мере ввода. Кликните на карте, чтобы поставить точку вручную.", am: "Հասցեն որոնվում է ավտոմատ՝ մուտքագրելիս։ Սեղմեք քարտեզի վրա՝ կետը ձեռքով դնելու համար։" },
+  "branchForm.searching": { en: "Searching address…", ru: "Поиск адреса…", am: "Հասցեի որոնում…" },
   "branchForm.pinned": { en: "Pinned ✓", ru: "Точка установлена ✓", am: "Կետը նշված է ✓" },
   "branchForm.addrNotFound": { en: "Address not found. Click the map to pick", ru: "Адрес не найден. Кликните на карте", am: "Հասցեն չի գտնվել։ Սեղմեք քարտեզի վրա" },
   "branchForm.geoFailed": { en: "Geocoding failed. Click the map to pick", ru: "Не удалось определить координаты. Кликните на карте", am: "Կոորդինատների որոնումը ձախողվեց։ Սեղմեք քարտեզի վրա" },
-  "branchForm.typeOrClick": { en: "Type address or click the map", ru: "Введите адрес или кликните на карте", am: "Մուտքագրեք հասցեն կամ սեղմեք քարտեզին" },
+  "branchForm.typeOrClick": { en: "Type address or click the map", ru: "Введите адрес или кликните на карте", am: "Մուտքագրեք հասցեն կամ սեղմեք քարտեզի վրա" },
   "branchForm.selectedLocation": { en: "Selected location", ru: "Выбранная точка", am: "Ընտրված կետ" },
-  "branchForm.pickLocationFirst": { en: "Pick a location on the map (or fill the address so it can be auto-located).", ru: "Укажите точку на карте (или заполните адрес для авто-определения).", am: "Ընտրեք կետ քարտեզի վրա (կամ լրացրեք հասցեն ինքնաբերաբար գտնելու համար):" },
-  "branchForm.pickFromList": { en: "Pick a real address from the suggestions so the location is verified.", ru: "Выберите реальный адрес из подсказок, чтобы точка была подтверждена.", am: "Ընտրեք իրական հասցե ցանկից, որպեսզի կետը հաստատվի:" },
-  "branchForm.cityRequired": { en: "City is required.", ru: "Укажите город.", am: "Քաղաքը պարտադիր է:" },
+  "branchForm.pickLocationFirst": { en: "Pick a location on the map (or fill the address so it can be auto-located).", ru: "Укажите точку на карте (или заполните адрес для авто-определения).", am: "Ընտրեք կետ քարտեզի վրա (կամ լրացրեք հասցեն՝ այն ավտոմատ գտնելու համար)։" },
+  "branchForm.pickFromList": { en: "Pick a real address from the suggestions so the location is verified.", ru: "Выберите реальный адрес из подсказок, чтобы точка была подтверждена.", am: "Ընտրեք իրական հասցե առաջարկներից, որպեսզի կետը հաստատվի։" },
+  "branchForm.cityRequired": { en: "City is required.", ru: "Укажите город.", am: "Քաղաքը պարտադիր է։" },
   "branchForm.cityFromAddress": { en: "Filled from the address", ru: "Заполняется из адреса", am: "Լրացվում է հասցեից" },
-  "branchForm.invalidPhone": { en: "Enter a valid phone number for the selected country.", ru: "Введите корректный номер телефона для выбранной страны.", am: "Մուտքագրեք վավեր հեռախոսահամար ընտրված երկրի համար:" },
+  "branchForm.invalidPhone": { en: "Enter a valid phone number for the selected country.", ru: "Введите корректный номер телефона для выбранной страны.", am: "Մուտքագրեք ընտրված երկրի վավեր հեռախոսահամար։" },
 
   // Company details page
-  "company.invalidId": { en: "Invalid company id.", ru: "Неверный идентификатор компании.", am: "Ընկերության սխալ ID:" },
+  "company.invalidId": { en: "Invalid company id.", ru: "Неверный идентификатор компании.", am: "Ընկերության սխալ ID։" },
   "company.email": { en: "Email", ru: "Email", am: "Էլ. հասցե" },
   "company.phone": { en: "Phone", ru: "Телефон", am: "Հեռախոս" },
   "company.country": { en: "Country", ru: "Страна", am: "Երկիր" },
@@ -2488,7 +2500,7 @@ export const TRANSLATIONS: Dict = {
   "company.step2": { en: "step 2/2", ru: "шаг 2/2", am: "քայլ 2/2" },
   "company.owner": { en: "Owner", ru: "Владелец", am: "Սեփականատեր" },
   "company.section": { en: "Company", ru: "Компания", am: "Ընկերություն" },
-  "company.ownerName": { en: "Owner full name", ru: "Имя владельца", am: "Սեփականատիրոջ անունը" },
+  "company.ownerName": { en: "Owner full name", ru: "Имя владельца", am: "Սեփականատիրոջ անուն, ազգանուն" },
   "company.ownerEmail": { en: "Owner email", ru: "Email владельца", am: "Սեփականատիրոջ էլ. հասցե" },
   "company.creatingOwner": { en: "Creating owner…", ru: "Создание владельца…", am: "Սեփականատերը ստեղծվում է…" },
   "company.next": { en: "Next", ru: "Далее", am: "Հաջորդը" },
@@ -2499,9 +2511,9 @@ export const TRANSLATIONS: Dict = {
   "company.website": { en: "Website", ru: "Веб-сайт", am: "Կայք" },
   "company.statusAdmin": { en: "Status (admin only)", ru: "Статус (только админ)", am: "Կարգավիճակ (միայն ադմին)" },
   "company.commissionAdmin": { en: "Commission % (admin only)", ru: "Комиссия % (только админ)", am: "Միջնորդավճար % (միայն ադմին)" },
-  "company.commissionHint": { en: "Owner pays this percent of monthly gross revenue to Cyber Place.", ru: "Владелец платит этот процент с месячной выручки Cyber Place.", am: "Սեփականատերը վճարում է ամսական հասույթից այս տոկոսը Cyber Place-ին:" },
+  "company.commissionHint": { en: "Owner pays this percent of monthly gross revenue to Cyber Place.", ru: "Владелец платит этот процент с месячной выручки Cyber Place.", am: "Սեփականատերը Cyber Place-ին վճարում է ամսական համախառն հասույթի այս տոկոսը։" },
   "company.saving": { en: "Saving…", ru: "Сохранение…", am: "Պահպանվում է…" },
-  "company.saved": { en: "Saved.", ru: "Сохранено.", am: "Պահպանված է:" },
+  "company.saved": { en: "Saved.", ru: "Сохранено.", am: "Պահպանված է։" },
   "company.logoRequired": { en: "Logo is required for a new company", ru: "Для новой компании нужен логотип", am: "Նոր ընկերության համար անհրաժեշտ է լոգո" },
   "company.ownerNotCreated": { en: "Owner user not created yet", ru: "Владелец ещё не создан", am: "Սեփականատերը դեռ չի ստեղծվել" },
   "company.replaceLogo": { en: "Replace logo (optional)", ru: "Заменить логотип (необязательно)", am: "Փոխել լոգոն (ընտրովի)" },
@@ -2511,56 +2523,56 @@ export const TRANSLATIONS: Dict = {
   // surface that needs to render a humane name for `users.role`.
   "role.admin": { en: "Admin", ru: "Админ", am: "Ադմին" },
   "role.company_owner": { en: "Owner", ru: "Владелец", am: "Սեփականատեր" },
-  "role.manager": { en: "Manager", ru: "Менеджер", am: "Մենеջեր" },
+  "role.manager": { en: "Manager", ru: "Менеджер", am: "Մենեջեր" },
 
   // Profile
   "profile.title": { en: "Profile", ru: "Профиль", am: "Պրոֆիլ" },
   "profile.firstName": { en: "First name", ru: "Имя", am: "Անուն" },
   "profile.lastName": { en: "Last name", ru: "Фамилия", am: "Ազգանուն" },
-  "profile.emailChangeSoon": { en: "Email change with verification is coming soon.", ru: "Изменение email с подтверждением появится скоро.", am: "Էլ. հասցեի փոփոխությունը հաստատմամբ՝ շուտով:" },
+  "profile.emailChangeSoon": { en: "Email change with verification is coming soon.", ru: "Изменение email с подтверждением появится скоро.", am: "Հաստատմամբ էլ. հասցեի փոփոխությունը հասանելի կլինի շուտով։" },
   "profile.saved": { en: "Profile saved", ru: "Профиль сохранён", am: "Պրոֆիլը պահպանվեց" },
   "profile.nameRequired": { en: "Enter a name", ru: "Введите имя", am: "Մուտքագրեք անուն" },
   "profile.pwKnow": { en: "I know my password", ru: "Помню пароль", am: "Հիշում եմ գաղտնաբառը" },
   "profile.pwForgot": { en: "I forgot it", ru: "Забыл пароль", am: "Մոռացել եմ" },
-  "profile.forgotHint": { en: "We'll email a reset code to your address.", ru: "Отправим код сброса на вашу почту.", am: "Վերակայման կոդը կուղարկենք ձեր էլ. հասցեին:" },
+  "profile.forgotHint": { en: "We'll email a reset code to your address.", ru: "Отправим код сброса на вашу почту.", am: "Վերակայման կոդը կուղարկենք ձեր էլ. հասցեին։" },
   "profile.sendCode": { en: "Send code", ru: "Отправить код", am: "Ուղարկել կոդը" },
   "profile.resendCode": { en: "Resend", ru: "Отправить снова", am: "Ուղարկել կրկին" },
-  "profile.codeSent": { en: "Code sent to your email.", ru: "Код отправлен на почту.", am: "Կոդն ուղարկվեց ձեր էլ. հասցեին:" },
+  "profile.codeSent": { en: "Code sent to your email.", ru: "Код отправлен на почту.", am: "Կոդն ուղարկվեց ձեր էլ. հասցեին։" },
   "profile.codePlaceholder": { en: "Code from email", ru: "Код из письма", am: "Կոդ նամակից" },
   "profile.passwordUpdated": { en: "Password updated", ru: "Пароль обновлён", am: "Գաղտնաբառը թարմացվեց" },
   "profile.pwRuleLength": { en: "At least 8 characters", ru: "Минимум 8 символов", am: "Առնվազն 8 նիշ" },
   "profile.pwRuleMatch": { en: "Passwords match", ru: "Пароли совпадают", am: "Գաղտնաբառերը համընկնում են" },
   "profile.wrongCurrentPassword": { en: "Current password is incorrect", ru: "Текущий пароль неверный", am: "Ընթացիկ գաղտնաբառը սխալ է" },
   "profile.changeEmail": { en: "Change email", ru: "Изменить email", am: "Փոխել էլ. հասցեն" },
-  "profile.newEmail": { en: "New email", ru: "Новый email", am: "Նոր էл. հասցե" },
-  "profile.codeSentCurrent": { en: "Code sent to the new email.", ru: "Код отправлен на новую почту.", am: "Կոդն ուղարկվեց նոր էл. հասցեին:" },
+  "profile.newEmail": { en: "New email", ru: "Новый email", am: "Նոր էլ. հասցե" },
+  "profile.codeSentCurrent": { en: "Code sent to the new email.", ru: "Код отправлен на новую почту.", am: "Կոդն ուղարկվեց նոր էլ. հասցեին։" },
   "profile.emailUpdated": { en: "Email updated", ru: "Email обновлён", am: "Էլ. հասցեն թարմացվեց" },
-  "profile.emailCodeHint": { en: "Enter the code we sent to the new email.", ru: "Введите код, отправленный на новую почту.", am: "Մուտքագրեք նոր էл. հասցեին ուղարկված կոդը:" },
+  "profile.emailCodeHint": { en: "Enter the code we sent to the new email.", ru: "Введите код, отправленный на новую почту.", am: "Մուտքագրեք նոր էլ. հասցեին ուղարկված կոդը։" },
   "profile.confirmEmail": { en: "Confirm & change", ru: "Подтвердить и изменить", am: "Հաստատել և փոխել" },
-  "profile.errEmailTaken": { en: "This email is already in use.", ru: "Этот email уже используется.", am: "Այս էլ. հասցեն արդեն օգտագործվում է:" },
-  "profile.errInvalidCode": { en: "The code is invalid or has expired.", ru: "Код неверный или истёк.", am: "Կոդը սխալ է կամ ժամկետը լրացել է:" },
-  "profile.emailChangedToast": { en: "You have successfully changed your email", ru: "Вы успешно изменили почтовый ящик", am: "Դուք հաջողությամբ փոխեցիք էл. հասցեն" },
+  "profile.errEmailTaken": { en: "This email is already in use.", ru: "Этот email уже используется.", am: "Այս էլ. հասցեն արդեն օգտագործվում է։" },
+  "profile.errInvalidCode": { en: "The code is invalid or has expired.", ru: "Код неверный или истёк.", am: "Կոդը սխալ է կամ ժամկետն անցել է։" },
+  "profile.emailChangedToast": { en: "You have successfully changed your email", ru: "Вы успешно изменили почтовый ящик", am: "Դուք հաջողությամբ փոխեցիք էլ. հասցեն" },
   "profile.passwordChangedToast": { en: "You have successfully changed your password", ru: "Вы успешно изменили ваш пароль", am: "Դուք հաջողությամբ փոխեցիք ձեր գաղտնաբառը" },
   "profile.confirmCode": { en: "Confirm code", ru: "Подтвердить код", am: "Հաստատել կոդը" },
-  "profile.enterCodeHint": { en: "Enter the one-time code we sent to your email.", ru: "Введите одноразовый код, отправленный на вашу почту.", am: "Մուտքագրեք ձեր էլ. հասցեին ուղարկված միանգամյա կոдn:" },
+  "profile.enterCodeHint": { en: "Enter the one-time code we sent to your email.", ru: "Введите одноразовый код, отправленный на вашу почту.", am: "Մուտքագրեք ձեր էլ. հասցեին ուղարկված միանգամյա կոդը։" },
 
   // Pairing token modal
   "pairing.titleFor": { en: "Pairing token", ru: "Токен сопряжения", am: "Զուգակցման տոկեն" },
-  "pairing.saveNow": { en: "Save this token now. It will not be shown again. You'll need it on the agent during PC setup, along with PC ID", ru: "Сохрани этот токен сейчас. Он больше не будет показан. Он понадобится для настройки агента вместе с ID ПК", am: "Պահպանեք այս տոկենն այժմ։ Այն այլևս չի ցուցադրվի: Այն կպահանջվի գործակալի կարգավորման ժամանակ՝ ՀՀ ID-ի հետ" },
+  "pairing.saveNow": { en: "Save this token now. It will not be shown again. You'll need it on the agent during PC setup, along with PC ID", ru: "Сохрани этот токен сейчас. Он больше не будет показан. Он понадобится для настройки агента вместе с ID ПК", am: "Պահպանեք այս տոկենը հիմա։ Այն այլևս չի ցուցադրվի։ Այն պետք կլինի Agent-ում համակարգիչը կարգավորելիս՝ համակարգչի ID-ի հետ։" },
   "pairing.copyToken": { en: "Copy token", ru: "Скопировать токен", am: "Պատճենել տոկենը" },
   "pairing.iSaved": { en: "I saved it", ru: "Сохранил", am: "Պահպանեցի" },
 
   // Booking action modals
   "booking.cancelTitleId": { en: "Cancel booking", ru: "Отменить бронь", am: "Չեղարկել ամրագրումը" },
   "booking.cancelReasonField": { en: "Reason (optional, kept for your records)", ru: "Причина (необязательно)", am: "Պատճառ (ընտրովի)" },
-  "booking.cancelReasonHint": { en: "Backend doesn't currently store reason. This stays in your local notes only.", ru: "Бэкенд пока не сохраняет причину. Текст остаётся только в локальных заметках.", am: "Բեքենդը դեռ չի պահպանում պատճառը:" },
+  "booking.cancelReasonHint": { en: "Backend doesn't currently store reason. This stays in your local notes only.", ru: "Бэкенд пока не сохраняет причину. Текст остаётся только в локальных заметках.", am: "Սերվերը դեռ չի պահպանում պատճառը։ Այն կմնա միայն ձեր տեղային նշումներում։" },
   "booking.keep": { en: "Keep booking", ru: "Оставить бронь", am: "Թողնել ամրագրումը" },
   "booking.cancelling": { en: "Cancelling…", ru: "Отмена…", am: "Չեղարկվում է…" },
   "booking.cancelDo": { en: "Cancel booking", ru: "Отменить бронь", am: "Չեղարկել ամրագրումը" },
 
   // QR scanner
   "qr.requesting": { en: "Requesting camera access…", ru: "Запрос доступа к камере…", am: "Տեսախցիկի թույլտվության հարցում…" },
-  "qr.aim": { en: "Point the camera at the QR code on the customer's screen.", ru: "Наведите камеру на QR-код на экране клиента.", am: "Ուղղեք տեսախցիկը հաճախորդի էկրանի QR կոդին:" },
+  "qr.aim": { en: "Point the camera at the QR code on the customer's screen.", ru: "Наведите камеру на QR-код на экране клиента.", am: "Ուղղեք տեսախցիկը հաճախորդի էկրանի QR կոդին։" },
   "qr.stopScan": { en: "Stop scanning", ru: "Остановить сканирование", am: "Կանգնեցնել սկանավորումը" },
   "qr.deniedPrefix": { en: "Camera access denied", ru: "Доступ к камере запрещён", am: "Տեսախցիկի մուտքն արգելված է" },
 
@@ -2579,29 +2591,29 @@ export const TRANSLATIONS: Dict = {
   "action.search": { en: "Search", ru: "Найти", am: "Որոնել" },
   "tariffs.title": { en: "Tariffs", ru: "Тарифы", am: "Սակագներ" },
   "tariffs.new": { en: "+ New tariff", ru: "+ Новый тариф", am: "+ Նոր սակագին" },
-  "tariffs.empty": { en: "No tariffs yet. Add at least one to start sessions.", ru: "Тарифов пока нет. Добавьте хотя бы один.", am: "Սակագներ դեռ չկան: Ավելացրեք առնվազն մեկը:" },
+  "tariffs.empty": { en: "No tariffs yet. Add at least one to start sessions.", ru: "Тарифов пока нет. Добавьте хотя бы один.", am: "Սակագներ դեռ չկան։ Ավելացրեք առնվազն մեկը՝ սեսիաներ սկսելու համար։" },
   "tariffs.confirmDelete": { en: "Delete tariff", ru: "Удалить тариф", am: "Ջնջել սակագինը" },
   "products.confirmDelete": { en: "Delete", ru: "Удалить", am: "Ջնջել" },
   "members.cardLabel": { en: "card", ru: "карта", am: "քարտ" },
 
   // Forgot/reset
-  "forgot.successPrefix": { en: "If the email exists, a reset link has been sent.", ru: "Если email существует, ссылка на сброс отправлена.", am: "Եթե էլ. հասցեն գոյություն ունի, վերակայման հղումն ուղարկվել է:" },
+  "forgot.successPrefix": { en: "If the email exists, a reset link has been sent.", ru: "Если email существует, ссылка на сброс отправлена.", am: "Եթե էլ. հասցեն գրանցված է, վերակայման հղումն ուղարկվել է։" },
   "forgot.toastSent": { en: "Password reset link sent to your email", ru: "Ссылка для сброса пароля отправлена на почту", am: "Գաղտնաբառի վերակայման հղումն ուղարկվել է ձեր էլ. փոստին" },
   "auth.sending": { en: "Sending…", ru: "Отправка…", am: "Ուղարկվում է…" },
   "reset.token": { en: "Reset token", ru: "Токен сброса", am: "Վերակայման տոկեն" },
-  "reset.successDone": { en: "Password updated. You can now sign in.", ru: "Пароль обновлён. Можно войти.", am: "Գաղտնաբառը թարմացվել է: Կարող եք մուտք գործել:" },
-  "reset.cardHint": { en: "A one-time code will be sent to {0}. Enter it together with the new password.", ru: "Одноразовый код придёт на {0}. Введите его вместе с новым паролем.", am: "Միանգամյա կոդը կուղարկվի {0} հասցեին: Մուտքագրեք այն նոր գաղտնաբառի հետ:" },
+  "reset.successDone": { en: "Password updated. You can now sign in.", ru: "Пароль обновлён. Можно войти.", am: "Գաղտնաբառը թարմացվել է։ Կարող եք մուտք գործել։" },
+  "reset.cardHint": { en: "A one-time code will be sent to {0}. Enter it together with the new password.", ru: "Одноразовый код придёт на {0}. Введите его вместе с новым паролем.", am: "Միանգամյա կոդը կուղարկվի {0} հասցեին։ Մուտքագրեք այն նոր գաղտնաբառի հետ։" },
   "reset.codeSentTo": { en: "Code sent to {0}", ru: "Код отправлен на {0}", am: "Կոդն ուղարկվել է {0} հասցեին" },
 
   // Member card
   "memberCard.transactions": { en: "Transactions", ru: "Транзакции", am: "Գործարքներ" },
-  "memberCard.noTx": { en: "No transactions yet.", ru: "Транзакций пока нет.", am: "Գործարքներ դեռ չկան:" },
+  "memberCard.noTx": { en: "No transactions yet.", ru: "Транзакций пока нет.", am: "Գործարքներ դեռ չկան։" },
   "memberCard.topup": { en: "Top up", ru: "Пополнение", am: "Համալրում" },
   "memberCard.spend": { en: "Spend", ru: "Списание", am: "Ծախս" },
   "memberCard.adjust": { en: "Adjust", ru: "Корректировка", am: "Շտկում" },
 
   // Branch hub tiles
-  "tile.sessions": { en: "Sessions", ru: "Сессии", am: "Նիստեր" },
+  "tile.sessions": { en: "Sessions", ru: "Сессии", am: "Սեսիաներ" },
   "tile.members": { en: "Members", ru: "Клиенты", am: "Հաճախորդներ" },
   "tile.places": { en: "Places", ru: "Места", am: "Տեղեր" },
   "tile.pcs": { en: "PCs", ru: "ПК", am: "Համակարգիչներ" },
@@ -2618,15 +2630,15 @@ export const TRANSLATIONS: Dict = {
     am: "Սպասարկում",
   },
   "status.online": { en: "Online", ru: "Онлайн", am: "Առցանց" },
-  "status.offline": { en: "Offline", ru: "Оффлайн", am: "Անջատված" },
-  "status.in_session": { en: "In session", ru: "В сессии", am: "Նիստում" },
+  "status.offline": { en: "Offline", ru: "Оффлайн", am: "Անցանց" },
+  "status.in_session": { en: "In session", ru: "В сессии", am: "Սեսիայում" },
 
   // Settings
   "settings.account": { en: "Account", ru: "Аккаунт", am: "Հաշիվ" },
   "settings.changePassword": {
     en: "Change password",
     ru: "Сменить пароль",
-    am: "Փոխել գաղտնաբառ",
+    am: "Փոխել գաղտնաբառը",
   },
   "settings.language": { en: "Language", ru: "Язык", am: "Լեզու" },
   "settings.currency": {
@@ -2672,7 +2684,7 @@ export const TRANSLATIONS: Dict = {
   "home.menu.branchesSub": {
     en: "Live, sessions, products, members",
     ru: "Мониторинг, сеансы, товары, игроки",
-    am: "Մոնիթորինգ, սեանսներ, ապրանքներ, խաղացողներ",
+    am: "Մոնիտորինգ, սեսիաներ, ապրանքներ, հաճախորդներ",
   },
   "home.menu.bookings": {
     en: "Bookings",
@@ -2692,7 +2704,7 @@ export const TRANSLATIONS: Dict = {
   "home.menu.companiesSub": {
     en: "Commission & revenue",
     ru: "Комиссии и доход",
-    am: "Կոմիստոն ու եկամուտ",
+    am: "Միջնորդավճար և եկամուտ",
   },
   "home.menu.myBranch": {
     en: "My branch",
@@ -2702,7 +2714,7 @@ export const TRANSLATIONS: Dict = {
   "home.menu.myBranchSub": {
     en: "Sessions, products, members",
     ru: "Сеансы, товары, клиенты",
-    am: "Սեանսներ, ապրանքներ, հաճախորդներ",
+    am: "Սեսիաներ, ապրանքներ, հաճախորդներ",
   },
   "home.menu.expenses": {
     en: "Expenses",
@@ -2712,7 +2724,7 @@ export const TRANSLATIONS: Dict = {
   "home.menu.expensesSub": {
     en: "Recurring services you pay monthly",
     ru: "Регулярные сервисы, оплата ежемесячно",
-    am: "Կրկնվող ծառայություններ, ամսական վճարում",
+    am: "Ամսական վճարվող ծառայություններ",
   },
   // Admin "Metrics" section — Yandex.Metrica website analytics.
   "home.menu.metrics": {
@@ -2731,19 +2743,19 @@ export const TRANSLATIONS: Dict = {
   "monitoring.title": { en: "Monitoring", ru: "Мониторинг", am: "Մոնիտորինգ" },
   "monitoring.app.mobile": { en: "Mobile app", ru: "Мобильное приложение", am: "Բջջային հավելված" },
   "monitoring.app.panel": { en: "Desktop panel", ru: "Десктоп-панель", am: "Դեսքթոփ վահանակ" },
-  "monitoring.app.agent": { en: "Desktop agent", ru: "Десктоп-агент", am: "Դեսքթոփ գործակալ" },
+  "monitoring.app.agent": { en: "Desktop agent", ru: "Десктоп-агент", am: "Դեսքթոփ Agent" },
   "monitoring.app.website": { en: "Website", ru: "Веб-сайт", am: "Կայք" },
   "monitoring.installs": { en: "Installs", ru: "Установки", am: "Տեղադրումներ" },
-  "monitoring.installsShort": { en: "inst.", ru: "уст.", am: "տեղ." },
+  "monitoring.installsShort": { en: "inst.", ru: "уст.", am: "տեղադր." },
   "monitoring.viewsShort": { en: "views", ru: "просм.", am: "դիտում" },
   "monitoring.launches": { en: "Launches", ru: "Запуски", am: "Գործարկումներ" },
   "monitoring.events": { en: "Events", ru: "События", am: "Իրադարձություններ" },
   "monitoring.errors": { en: "Errors", ru: "Ошибки", am: "Սխալներ" },
-  "monitoring.errorRate": { en: "Error rate", ru: "Доля ошибок", am: "Սխալների բաժինը" },
+  "monitoring.errorRate": { en: "Error rate", ru: "Доля ошибок", am: "Սխալների տոկոս" },
   "monitoring.activity": { en: "Activity", ru: "Активность", am: "Ակտիվություն" },
   "monitoring.versions": { en: "Versions", ru: "Версии", am: "Տարբերակներ" },
   "monitoring.platforms": { en: "Platforms", ru: "Платформы", am: "Հարթակներ" },
-  "monitoring.screens": { en: "Top screens", ru: "Популярные экраны", am: "Հանրաճանաչ էկրաններ" },
+  "monitoring.screens": { en: "Top screens", ru: "Популярные экраны", am: "Ամենադիտված էկրաններ" },
   "monitoring.recentErrors": { en: "Recent errors", ru: "Последние ошибки", am: "Վերջին սխալները" },
   "monitoring.noErrors": {
     en: "No errors in this period.",
@@ -2764,7 +2776,7 @@ export const TRANSLATIONS: Dict = {
   "monitoring.neverReported": {
     en: "This app has never reported. It starts once a version with monitoring is installed.",
     ru: "Приложение ещё ни разу не отчитывалось. Данные появятся после установки версии с мониторингом.",
-    am: "Հավելվածը դեռ երբեք չի հաշվետվել։ Տվյալները կհայտնվեն մոնիտորինգով տարբերակը տեղադրելուց հետո։",
+    am: "Հավելվածը դեռ տվյալներ չի ուղարկել։ Դրանք կհայտնվեն մոնիտորինգով տարբերակը տեղադրելուց հետո։",
   },
   "monitoring.disabled": {
     en: "Monitoring is switched off",
@@ -2874,7 +2886,7 @@ export const TRANSLATIONS: Dict = {
   "blocking.branchClosed": {
     en: "This branch is out of service. Its sections are unavailable",
     ru: "Филиал отключён. Его разделы недоступны",
-    am: "Մասնաճյուղն անջատված է։ Նրա բաժինները հասանելի չեն",
+    am: "Մասնաճյուղը չի գործում։ Նրա բաժինները հասանելի չեն",
   },
   // The server's refusals, said in the operator's own language.
   //
@@ -2942,19 +2954,19 @@ export const TRANSLATIONS: Dict = {
   "metrics.visits": { en: "Visits", ru: "Визиты", am: "Այցեր" },
   "metrics.users": { en: "Visitors", ru: "Посетители", am: "Այցելուներ" },
   "metrics.bounceRate": { en: "Bounce rate", ru: "Отказы", am: "Մերժումներ" },
-  "metrics.pageDepth": { en: "Pages / visit", ru: "Глубина просмотра", am: "Դիտման խորություն" },
-  "metrics.avgVisit": { en: "Avg. visit", ru: "Время на сайте", am: "Կայքում անցկացրած ժամանակ" },
+  "metrics.pageDepth": { en: "Pages / visit", ru: "Глубина просмотра", am: "Էջ / այց" },
+  "metrics.avgVisit": { en: "Avg. visit", ru: "Время на сайте", am: "Այցի միջին տևողություն" },
   "metrics.trend": { en: "Trend", ru: "Динамика", am: "Դինամիկա" },
   "metrics.sources": { en: "Traffic sources", ru: "Источники трафика", am: "Թրաֆիկի աղբյուրներ" },
   "metrics.noData": {
     en: "No data for this period yet.",
     ru: "За этот период данных пока нет.",
-    am: "Այս ժամանակահատվածի տվյալներ դեռ չկան:",
+    am: "Այս ժամանակահատվածի տվյալներ դեռ չկան։",
   },
   "metrics.sampled": {
     en: "Figures are estimated (Yandex sampling).",
     ru: "Данные приблизительные (сэмплирование Яндекса).",
-    am: "Տվյալները մոտավոր են (Yandex-ի ընտրանք):",
+    am: "Տվյալները մոտավոր են (Yandex-ի ընտրանք)։",
   },
   "metrics.notConfigured": {
     en: "Analytics is not set up for this environment",
@@ -2964,7 +2976,7 @@ export const TRANSLATIONS: Dict = {
   "metrics.notConfiguredSub": {
     en: "Add the counter and token to this environment's settings, then reload.",
     ru: "Добавьте счётчик и токен в настройки этого окружения и обновите страницу.",
-    am: "Ավելացրեք հաշվիչը և թոքենը այս միջավայրի կարգավորումներում և թարմացրեք:",
+    am: "Ավելացրեք հաշվիչը և տոկենը այս միջավայրի կարգավորումներում, ապա վերաբեռնեք։",
   },
   "metrics.unavailable": {
     en: "Yandex.Metrica is unavailable",
@@ -2974,7 +2986,7 @@ export const TRANSLATIONS: Dict = {
   "metrics.unavailableSub": {
     en: "The service did not respond. The figures will return on their own once it does.",
     ru: "Сервис не ответил. Данные появятся сами, как только он снова заработает.",
-    am: "Ծառայությունը չպատասխանեց: Տվյալները կվերադառնան ինքնաբերաբար:",
+    am: "Ծառայությունը չպատասխանեց։ Տվյալները կհայտնվեն ինքնաբերաբար, երբ այն պատասխանի։",
   },
   "metrics.loadFailed": {
     en: "Could not load metrics",
@@ -2984,7 +2996,7 @@ export const TRANSLATIONS: Dict = {
   "metrics.loadFailedSub": {
     en: "Check the connection to the server and try again.",
     ru: "Проверьте связь с сервером и попробуйте ещё раз.",
-    am: "Ստուգեք կապը սերվերի հետ և փորձեք կրկին:",
+    am: "Ստուգեք կապը սերվերի հետ և փորձեք կրկին։",
   },
   "metrics.retry": { en: "Retry", ru: "Повторить", am: "Կրկնել" },
   // Backend monitoring dashboard (Laravel Pulse) — admin only.
@@ -3006,7 +3018,7 @@ export const TRANSLATIONS: Dict = {
   "home.menu.pulseError": {
     en: "Could not open monitoring. Try again.",
     ru: "Не удалось открыть мониторинг. Попробуйте ещё раз.",
-    am: "Չհաջողվեց բացել մոնիտորինգը: Փորձեք կրկին:",
+    am: "Չհաջողվեց բացել մոնիտորինգը։ Փորձեք կրկին։",
   },
   "home.menu.settings": {
     en: "Settings",
@@ -3027,22 +3039,22 @@ export const TRANSLATIONS: Dict = {
   "nav.agentUpdates": {
     en: "Agent updates",
     ru: "Обновления агента",
-    am: "Գործակալի թարմացումներ",
+    am: "Agent-ի թարմացումներ",
   },
   "agentUpdates.title": {
     en: "Kiosk agent updates",
     ru: "Обновления агента-киоска",
-    am: "Կիոսկ-գործակալի թարմացումներ",
+    am: "Կիոսկի Agent-ի թարմացումներ",
   },
   "agentUpdates.subtitle": {
     en: "Roll out a new version of the kiosk agent to every gaming PC in your branches. Updates download in the background and prompt the cashier on the lock screen.",
     ru: "Обновите версию агента на всех игровых ПК ваших филиалов. Обновление скачается фоном и предложит кассиру перезапустить на экране блокировки.",
-    am: "Թարմացրեք գործակալի տարբերակը ձեր մասնաճյուղերի բոլոր խաղային համակարգիչներում: Թարմացումը կներբեռնվի և կհուշի կասսային:",
+    am: "Թարմացրեք Agent-ը ձեր մասնաճյուղերի բոլոր խաղային համակարգիչներում։ Թարմացումը ներբեռնվում է ֆոնում, և գանձապահը հուշում է ստանում կողպման էկրանին։",
   },
   "agentUpdates.loading": {
     en: "Loading agent status…",
     ru: "Загрузка состояния агента…",
-    am: "Բեռնվում է գործակալի վիճակը…",
+    am: "Բեռնվում է Agent-ի վիճակը…",
   },
   "agentUpdates.currentVersion": {
     en: "Current version",
@@ -3052,22 +3064,22 @@ export const TRANSLATIONS: Dict = {
   "agentUpdates.latestVersion": {
     en: "Latest version",
     ru: "Новая версия",
-    am: "Նոր տարբերակը",
+    am: "Վերջին տարբերակը",
   },
   "agentUpdates.upToDate": {
     en: "Every agent is up to date.",
     ru: "Все агенты обновлены.",
-    am: "Բոլոր գործակալները թարմ են:",
+    am: "Բոլոր Agent-ները թարմացված են։",
   },
   "agentUpdates.hasUpdate": {
     en: "A newer version is available. Install it for every agent in your branches.",
     ru: "Доступна новая версия. Установите её на всех агентах ваших филиалов.",
-    am: "Հասանելի է նոր տարբերակ: Տեղադրեք այն ձեր մասնաճյուղերի բոլոր գործակալներում:",
+    am: "Հասանելի է նոր տարբերակ։ Տեղադրեք այն ձեր մասնաճյուղերի բոլոր Agent-ներում։",
   },
   "agentUpdates.promoteBtn": {
     en: "Install new version on all agents and restart",
     ru: "Установить новую версию на всех агентах и перезапустить",
-    am: "Տեղադրել նոր տարբերակը բոլոր գործակալներում և վերագործարկել",
+    am: "Տեղադրել նոր տարբերակը բոլոր Agent-ներում և վերագործարկել",
   },
   "agentUpdates.promoting": {
     en: "Applying…",
@@ -3077,7 +3089,7 @@ export const TRANSLATIONS: Dict = {
   "agentUpdates.cannotPromote": {
     en: "Cannot apply. Backend could not fetch the latest release from GitHub.",
     ru: "Не удалось применить. Backend не смог получить релиз с GitHub.",
-    am: "Չհաջողվեց կիրառել։ Backend-ը չի կարողացել ստանալ թողարկումը GitHub-ից:",
+    am: "Չհաջողվեց կիրառել։ Սերվերը չկարողացավ ստանալ վերջին թողարկումը GitHub-ից։",
   },
   "agentUpdates.approvedVersion": {
     en: "Approved by administrator",
@@ -3087,7 +3099,7 @@ export const TRANSLATIONS: Dict = {
   "agentUpdates.notApprovedYet": {
     en: "No update has been approved by an administrator yet. You will be able to roll it out to your branches once it is approved.",
     ru: "Администратор ещё не одобрил обновление. Как только он его одобрит, вы сможете применить его в своих филиалах.",
-    am: "Ադմինիստրատորը դեռ չի հաստատել թարմացումը: Հաստատվելուց հետո դուք կկարողանաք կիրառել այն ձեր մասնաճյուղերում:",
+    am: "Ադմինիստրատորը դեռ չի հաստատել թարմացումը։ Հաստատվելուց հետո կկարողանաք կիրառել այն ձեր մասնաճյուղերում։",
   },
   "agentUpdates.venuePcs": {
     en: "PCs in your branches",
@@ -3102,12 +3114,12 @@ export const TRANSLATIONS: Dict = {
   "agentUpdates.applied": {
     en: "Sent to your PCs. Each agent downloads in the background and prompts the cashier to restart.",
     ru: "Отправлено на ваши ПК. Каждый агент скачает обновление фоном и предложит кассиру перезапуск.",
-    am: "Ուղարկվեց ձեր համակարգիչներին: Յուրաքանչյուր գործակալ ֆոնում կներբեռնի և կհուշի կասսային վերագործարկել:",
+    am: "Ուղարկվեց ձեր համակարգիչներին։ Յուրաքանչյուր Agent ֆոնում կներբեռնի թարմացումը և կառաջարկի գանձապահին վերագործարկել։",
   },
   "agentUpdates.noVenuePcs": {
     en: "No PCs are registered in your branches yet.",
     ru: "В ваших филиалах пока нет зарегистрированных ПК.",
-    am: "Ձեր մասնաճյուղերում դեռ գրանցված համակարգիչներ չկան:",
+    am: "Ձեր մասնաճյուղերում դեռ գրանցված համակարգիչներ չկան։",
   },
   // ── CRUD toast messages (top-right notifications) ──────────────────────
   "toast.generic.created": { en: "Created successfully", ru: "Успешно создано", am: "Հաջողությամբ ստեղծվեց" },
@@ -3170,7 +3182,7 @@ export const TRANSLATIONS: Dict = {
   "updates.title": {
     en: "Desktop app updates",
     ru: "Обновления десктоп-приложений",
-    am: "Աշխատասեղանի հավելվածների թարմացումներ",
+    am: "Դեսքթոփ հավելվածների թարմացումներ",
   },
   "updates.checkBtn": {
     en: "Check for updates",
@@ -3180,31 +3192,31 @@ export const TRANSLATIONS: Dict = {
   "updates.promoteBtn": {
     en: "Apply updates to all installations",
     ru: "Внести обновления во всех приложениях",
-    am: "Կիրառել թարմացումները բոլոր ինստալյացիաներում",
+    am: "Կիրառել թարմացումները բոլոր տեղադրումներում",
   },
-  "updates.checking": { en: "Checking…", ru: "Проверяем…", am: "Ստուգում…" },
+  "updates.checking": { en: "Checking…", ru: "Проверяем…", am: "Ստուգվում է…" },
   "updates.promoting": { en: "Applying…", ru: "Применяем…", am: "Կիրառվում է…" },
-  "updates.noUpdates": { en: "All apps are up to date.", ru: "Обновлений нет.", am: "Բոլոր հավելվածները թարմ են:" },
+  "updates.noUpdates": { en: "All apps are up to date.", ru: "Обновлений нет.", am: "Բոլոր հավելվածները թարմացված են։" },
   "updates.hasUpdates": {
     en: "Updates available. Apply to roll out to all partner installations.",
     ru: "Доступны обновления. Нажмите, чтобы применить их во всех инсталляциях у партнёров.",
-    am: "Կան թարմացումներ։ Սեղմեք, որպեսզի կիրառեք բոլոր ինստալյացիաներում:",
+    am: "Կան թարմացումներ։ Կիրառեք՝ գործընկերների բոլոր տեղադրումներում տարածելու համար։",
   },
   "updates.appPanel": { en: "Staff panel", ru: "Десктоп для персонала", am: "Աշխատակազմի վահանակ" },
-  "updates.appAgent": { en: "Kiosk agent", ru: "Агент-киоск", am: "Կիոսկ-գործակալ" },
+  "updates.appAgent": { en: "Kiosk agent", ru: "Агент-киоск", am: "Կիոսկի Agent" },
   "updates.colCurrent": { en: "Current version", ru: "Текущая версия", am: "Ընթացիկ տարբերակը" },
   "updates.colAvailable": { en: "Latest on GitHub", ru: "Последняя на GitHub", am: "Վերջինը GitHub-ում" },
   "updates.colStatus": { en: "Status", ru: "Статус", am: "Կարգավիճակ" },
-  "updates.statusUpToDate": { en: "Up to date", ru: "Актуально", am: "Թարմ է" },
+  "updates.statusUpToDate": { en: "Up to date", ru: "Актуально", am: "Թարմացված է" },
   "updates.statusUpdateAvailable": { en: "Update available", ru: "Доступно обновление", am: "Հասանելի թարմացում" },
   "updates.statusNoPromoted": { en: "Not promoted yet", ru: "Не опубликовано", am: "Դեռ չի հրապարակվել" },
   "updates.statusError": { en: "Error", ru: "Ошибка", am: "Սխալ" },
-  "updates.localTitle": { en: "This installation", ru: "Эта установка", am: "Այս ինստալյացիան" },
-  "updates.localIdle": { en: "No active update operation.", ru: "Активного обновления нет.", am: "Ակտիվ թարմացում չկա:" },
+  "updates.localTitle": { en: "This installation", ru: "Эта установка", am: "Այս տեղադրումը" },
+  "updates.localIdle": { en: "No active update operation.", ru: "Активного обновления нет.", am: "Ակտիվ թարմացում չկա։" },
   "updates.localChecking": { en: "Checking GitHub for a newer version…", ru: "Проверяем GitHub на новую версию…", am: "Ստուգում ենք GitHub-ը նոր տարբերակի համար…" },
-  "updates.localAvailable": { en: "Found v{0}. Downloading…", ru: "Найдена v{0}. Загружаем…", am: "Գտնվեց v{0}. ներբեռնում…" },
-  "updates.localDownloading": { en: "Downloading {0}%…", ru: "Загрузка {0}%…", am: "Ներբեռնում {0}%…" },
-  "updates.localDownloaded": { en: "v{0} is ready. Click Install & restart.", ru: "v{0} готова. Нажмите «Установить и перезапустить».", am: "v{0}-ը պատրաստ է։ Սեղմեք «Տեղադրել և վերագործարկել»:" },
+  "updates.localAvailable": { en: "Found v{0}. Downloading…", ru: "Найдена v{0}. Загружаем…", am: "Գտնվեց v{0}։ Ներբեռնվում է…" },
+  "updates.localDownloading": { en: "Downloading {0}%…", ru: "Загрузка {0}%…", am: "Ներբեռնվում է՝ {0}%…" },
+  "updates.localDownloaded": { en: "v{0} is ready. Click Install & restart.", ru: "v{0} готова. Нажмите «Установить и перезапустить».", am: "v{0}-ը պատրաստ է։ Սեղմեք «Տեղադրել և վերագործարկել»։" },
   "updates.localError": { en: "Error: {0}", ru: "Ошибка: {0}", am: "Սխալ՝ {0}" },
   "updates.installNow": { en: "Install & restart", ru: "Установить и перезапустить", am: "Տեղադրել և վերագործարկել" },
   "updates.toastTitle": {
@@ -3215,12 +3227,12 @@ export const TRANSLATIONS: Dict = {
   "updates.toastPanel": {
     en: "You have a new update for your desktop app.",
     ru: "У вас есть новое обновление для вашего десктоп-приложения.",
-    am: "Ձեր դեսքթոփ-հավելվածի համար նոր թարմացում կա:",
+    am: "Ձեր դեսքթոփ հավելվածի համար նոր թարմացում կա։",
   },
   "updates.toastAgent": {
     en: "You have a new update for your kiosk locker.",
     ru: "У вас есть новое обновление для вашего блокировщика.",
-    am: "Ձեր կիոսկ-արգելափակիչի համար նոր թարմացում կա:",
+    am: "Կիոսկի Agent-ի համար նոր թարմացում կա։",
   },
   "updates.toastCta": {
     en: "Click to open the updates section",
@@ -3235,7 +3247,7 @@ export const TRANSLATIONS: Dict = {
   "updates.readyModalBody": {
     en: "Version {0} has been downloaded. Restart the app to finish the update.",
     ru: "Версия {0} загружена. Перезапустите приложение, чтобы завершить обновление.",
-    am: "Տարբերակ {0}-ը ներբեռնված է: Վերագործարկեք հավելվածը՝ թարմացումն ավարտելու համար:",
+    am: "{0} տարբերակը ներբեռնվել է։ Վերագործարկեք հավելվածը՝ թարմացումն ավարտելու համար։",
   },
   "updates.readyModalRestart": {
     en: "Restart application",
@@ -3245,26 +3257,26 @@ export const TRANSLATIONS: Dict = {
   "updates.cannotPromote": {
     en: "Cannot apply. Backend could not fetch the latest release from GitHub. Check the GH_RELEASES_REPO_* env vars on the server.",
     ru: "Не удалось применить. Backend не смог получить релиз с GitHub. Проверьте переменные GH_RELEASES_REPO_* на сервере.",
-    am: "Չհաջողվեց կիրառել։ Backend-ը չի կարողացել ստանալ թողարկումը GitHub-ից:",
+    am: "Չհաջողվեց կիրառել։ Սերվերը չկարողացավ ստանալ վերջին թողարկումը GitHub-ից։ Ստուգեք GH_RELEASES_REPO_* փոփոխականները սերվերում։",
   },
 
   // ─── i18n audit fixes (2026-05-30): previously hardcoded strings ───
-  "error.invalidBranchId": { en: "Invalid branch id.", ru: "Неверный ID филиала.", am: "Մասնաճյուղի սխալ ID:" },
-  "error.invalidCompanyId": { en: "Invalid company id.", ru: "Неверный ID компании.", am: "Ընկերության սխալ ID:" },
-  "error.invalidTournamentId": { en: "Invalid tournament id.", ru: "Неверный ID турнира.", am: "Մրցաշարի սխալ ID:" },
-  "error.noCompanyLinked": { en: "No company linked to this account.", ru: "К этому аккаунту не привязана компания.", am: "Այս հաշվին ընկերություն կապված չէ:" },
+  "error.invalidBranchId": { en: "Invalid branch id.", ru: "Неверный ID филиала.", am: "Մասնաճյուղի սխալ ID։" },
+  "error.invalidCompanyId": { en: "Invalid company id.", ru: "Неверный ID компании.", am: "Ընկերության սխալ ID։" },
+  "error.invalidTournamentId": { en: "Invalid tournament id.", ru: "Неверный ID турнира.", am: "Մրցաշարի սխալ ID։" },
+  "error.noCompanyLinked": { en: "No company linked to this account.", ru: "К этому аккаунту не привязана компания.", am: "Այս հաշվին ընկերություն կապված չէ։" },
   "branch.rating": { en: "Rating", ru: "Рейтинг", am: "Վարկանիշ" },
 
   // BranchEdit overview
   "branchEdit.title": { en: "Branch · {0}", ru: "Филиал · {0}", am: "Մասնաճյուղ · {0}" },
   "branchEdit.editInfo": { en: "Edit info", ru: "Изменить данные", am: "Խմբագրել տվյալները" },
-  "branchEdit.confirmDelete": { en: "Delete this branch and all related data?", ru: "Удалить этот филиал и все связанные данные?", am: "Ջնջե՞լ այս մասնաճյուղը և բոլոր կապված տվյալները:" },
+  "branchEdit.confirmDelete": { en: "Delete this branch and all related data?", ru: "Удалить этот филиал и все связанные данные?", am: "Ջնջե՞լ այս մասնաճյուղը և դրա հետ կապված բոլոր տվյալները։" },
 
   // CompanyBranches list
   "companyBranches.title": { en: "Branches of company №{0}", ru: "Филиалы компании №{0}", am: "№{0} ընկերության մասնաճյուղերը" },
-  "companyBranches.back": { en: "← Back to company", ru: "← Назад к компании", am: "← Վերադառնալ ընկերություն" },
+  "companyBranches.back": { en: "← Back to company", ru: "← Назад к компании", am: "← Վերադառնալ ընկերության էջ" },
   "companyBranches.newBranch": { en: "+ New branch", ru: "+ Новый филиал", am: "+ Նոր մասնաճյուղ" },
-  "companyBranches.empty": { en: "No branches yet for this company.", ru: "У этой компании ещё нет филиалов.", am: "Այս ընկերությունը դեռ մասնաճյուղեր չունի:" },
+  "companyBranches.empty": { en: "No branches yet for this company.", ru: "У этой компании ещё нет филиалов.", am: "Այս ընկերությունը դեռ մասնաճյուղեր չունի։" },
 
   // Working-hours form title
   "openDays.title": { en: "Working hours · {0}", ru: "Часы работы · {0}", am: "Աշխատանքային ժամեր · {0}" },
@@ -3276,18 +3288,18 @@ export const TRANSLATIONS: Dict = {
   // ErrorBoundary
   "errorBoundary.title": { en: "Something went wrong", ru: "Что-то пошло не так", am: "Ինչ-որ բան սխալ գնաց" },
   "errorBoundary.tryAgain": { en: "Try again", ru: "Повторить", am: "Կրկնել" },
-  "errorBoundary.reload": { en: "Reload app", ru: "Перезапустить приложение", am: "Վերագործարկել հավելվածը" },
+  "errorBoundary.reload": { en: "Reload app", ru: "Перезапустить приложение", am: "Վերաբեռնել հավելվածը" },
 
   // CommissionInput
   "commission.label": { en: "Commission percent", ru: "Процент комиссии", am: "Միջնորդավճարի տոկոս" },
-  "commission.hint": { en: "0–100%. Stored locally on this device.", ru: "0–100%. Хранится локально на этом устройстве.", am: "0–100%: Պահվում է տեղում՝ այս սարքում:" },
+  "commission.hint": { en: "0–100%. Stored locally on this device.", ru: "0–100%. Хранится локально на этом устройстве.", am: "0–100%։ Պահվում է միայն այս սարքում։" },
 
   // PcForm
   "pcForm.macAddress": { en: "MAC address", ru: "MAC-адрес", am: "MAC հասցե" },
 
   // Emergency unlock PIN (BranchUnlockPinCard)
   "unlockPin.title": { en: "Emergency unlock PIN", ru: "PIN экстренного разблокирования", am: "Արտակարգ ապակողպման PIN" },
-  "unlockPin.desc": { en: "The cashier can enter this PIN right on a locked PC if the link to the panel or server is lost. Works even offline. A 4–6 digit PIN.", ru: "Кассир сможет ввести этот PIN прямо на заблокированном ПК, если связь с панелью или сервером пропала. Работает даже офлайн. PIN из 4–6 цифр.", am: "Գանձապահը կարող է մուտքագրել այս PIN-ը անմիջապես կողպված ՀՀ-ի վրա, եթե կապը վահանակի կամ սերվերի հետ կորել է: Աշխատում է նույնիսկ օֆլայն: 4–6 թվանշանից PIN:" },
+  "unlockPin.desc": { en: "The cashier can enter this PIN right on a locked PC if the link to the panel or server is lost. Works even offline. A 4–6 digit PIN.", ru: "Кассир сможет ввести этот PIN прямо на заблокированном ПК, если связь с панелью или сервером пропала. Работает даже офлайн. PIN из 4–6 цифр.", am: "Գանձապահը կարող է մուտքագրել այս PIN-ը անմիջապես կողպված համակարգչի վրա, եթե վահանակի կամ սերվերի հետ կապը կորել է։ Աշխատում է նույնիսկ անցանց։ PIN՝ 4–6 թվանշան։" },
   "unlockPin.current": { en: "Current PIN", ru: "Текущий PIN", am: "Ընթացիկ PIN" },
   "unlockPin.notSet": { en: "PIN not set yet", ru: "PIN ещё не установлен", am: "PIN-ը դեռ սահմանված չէ" },
   "unlockPin.hide": { en: "Hide PIN", ru: "Скрыть PIN", am: "Թաքցնել PIN-ը" },
@@ -3299,25 +3311,25 @@ export const TRANSLATIONS: Dict = {
   "unlockPin.invalid": { en: "PIN must be 4–6 digits", ru: "PIN должен содержать 4–6 цифр", am: "PIN-ը պետք է լինի 4–6 թվանշան" },
   "unlockPin.saveFailed": { en: "Failed to save PIN", ru: "Не удалось сохранить PIN", am: "Չհաջողվեց պահպանել PIN-ը" },
   "unlockPin.setAt": { en: "Set · {0}", ru: "Установлен · {0}", am: "Սահմանված է · {0}" },
-  "unlockPin.saved": { en: "Saved.", ru: "Сохранено.", am: "Պահպանված է:" },
+  "unlockPin.saved": { en: "Saved.", ru: "Сохранено.", am: "Պահպանված է։" },
 
   // CompanyBillingCard
   "billing.title": { en: "Billing", ru: "Оплата", am: "Վճարում" },
-  "billing.markPaidConfirm": { en: "Mark {0} as paid? This shifts the next-due date by one month.", ru: "Отметить {0} как оплачено? Дата следующего платежа сдвинется на месяц.", am: "Նշե՞լ {0}-ը որպես վճարված: Հաջորդ վճարման ամսաթիվը կտեղափոխվի մեկ ամսով:" },
-  "billing.notDeployed": { en: "Billing endpoints not deployed yet.", ru: "Эндпоинты оплаты ещё не развёрнуты.", am: "Վճարման endpoint-ները դեռ տեղադրված չեն:" },
-  "billing.noInfo": { en: "No billing info.", ru: "Нет данных об оплате.", am: "Վճարման տվյալներ չկան:" },
+  "billing.markPaidConfirm": { en: "Mark {0} as paid? This shifts the next-due date by one month.", ru: "Отметить {0} как оплачено? Дата следующего платежа сдвинется на месяц.", am: "Նշե՞լ {0}-ը որպես վճարված։ Հաջորդ վճարման ամսաթիվը կտեղափոխվի մեկ ամսով։" },
+  "billing.notDeployed": { en: "Billing endpoints not deployed yet.", ru: "Эндпоинты оплаты ещё не развёрнуты.", am: "Վճարման endpoint-ները դեռ տեղադրված չեն։" },
+  "billing.noInfo": { en: "No billing info.", ru: "Нет данных об оплате.", am: "Վճարման տվյալներ չկան։" },
   "billing.commissionRate": { en: "Commission rate", ru: "Ставка комиссии", am: "Միջնորդավճարի դրույք" },
   "billing.lastPaid": { en: "Last paid", ru: "Последняя оплата", am: "Վերջին վճարում" },
   "billing.nextDue": { en: "Next due", ru: "Следующий платёж", am: "Հաջորդ վճարում" },
   "billing.timeLeft": { en: "Time left", ru: "Осталось", am: "Մնացել է" },
   "billing.overdueBy": { en: "Overdue by {0} day(s)", ru: "Просрочено на {0} дн.", am: "Ուշացած {0} օրով" },
   "billing.daysLeft": { en: "{0} day(s) left", ru: "Осталось {0} дн.", am: "Մնացել է {0} օր" },
-  "billing.adminReminder": { en: "⚠ Company {0} must pay for the program in {1} day(s).", ru: "⚠ Компания {0} должна оплатить программу через {1} дн.", am: "⚠ {0} ընկերությունը պետք է վճարի ծրագրի համար {1} օրից:" },
-  "billing.ownerReminder": { en: "⚠ In {0} day(s) you must pay Cyber Place.", ru: "⚠ Через {0} дн. вам нужно оплатить Cyber Place.", am: "⚠ {0} օրից դուք պետք է վճարեք Cyber Place:" },
-  "billing.adminOverdue": { en: "Company {0} is overdue. Status will switch to pending automatically.", ru: "Компания {0} просрочила оплату. Статус переключится на «ожидание» автоматически.", am: "{0} ընկերությունը ուշացրել է վճարումը: Կարգավիճակն ավտոմատ կփոխվի «սպասման»:" },
-  "billing.ownerOverdue": { en: "Payment to Cyber Place is overdue. Your company status has been set to pending.", ru: "Оплата Cyber Place просрочена. Статус вашей компании переведён в «ожидание».", am: "Cyber Place-ի վճարումը ուշացած է: Ձեր ընկերության կարգավիճակը դրվել է «սպասման»:" },
-  "billing.markPaidHint": { en: "Marking as paid sets last paid = now and next due = +1 month.", ru: "Отметка «оплачено» ставит последнюю оплату = сейчас и следующий платёж = +1 месяц.", am: "«Վճարված» նշումը սահմանում է վերջին վճարումը = հիմա, հաջորդը = +1 ամիս:" },
-  "billing.markPaid": { en: "Mark as paid", ru: "Отметить оплаченным", am: "Նշել վճարված" },
+  "billing.adminReminder": { en: "⚠ Company {0} must pay for the program in {1} day(s).", ru: "⚠ Компания {0} должна оплатить программу через {1} дн.", am: "⚠ {0} ընկերությունը {1} օրից պետք է վճարի ծրագրի համար։" },
+  "billing.ownerReminder": { en: "⚠ In {0} day(s) you must pay Cyber Place.", ru: "⚠ Через {0} дн. вам нужно оплатить Cyber Place.", am: "⚠ {0} օրից դուք պետք է վճարեք Cyber Place-ին։" },
+  "billing.adminOverdue": { en: "Company {0} is overdue. Status will switch to pending automatically.", ru: "Компания {0} просрочила оплату. Статус переключится на «ожидание» автоматически.", am: "{0} ընկերությունն ուշացրել է վճարումը։ Կարգավիճակն ավտոմատ կդառնա «Սպասման մեջ»։" },
+  "billing.ownerOverdue": { en: "Payment to Cyber Place is overdue. Your company status has been set to pending.", ru: "Оплата Cyber Place просрочена. Статус вашей компании переведён в «ожидание».", am: "Cyber Place-ին վճարումն ուշացած է։ Ձեր ընկերության կարգավիճակը փոխվել է «Սպասման մեջ»։" },
+  "billing.markPaidHint": { en: "Marking as paid sets last paid = now and next due = +1 month.", ru: "Отметка «оплачено» ставит последнюю оплату = сейчас и следующий платёж = +1 месяц.", am: "«Վճարված» նշելիս վերջին վճարումը դառնում է այսօր, իսկ հաջորդը՝ +1 ամիս։" },
+  "billing.markPaid": { en: "Mark as paid", ru: "Отметить оплаченным", am: "Նշել որպես վճարված" },
 
   // PosTerminal
 
@@ -3359,7 +3371,7 @@ export const TRANSLATIONS: Dict = {
   "multilang.reason.auth": {
     en: "The translation service rejected the server's credentials. Contact the administrator.",
     ru: "Сервис перевода отклонил доступ сервера. Обратитесь к администратору.",
-    am: "Թարգմանության ծառայությունը մերժեց սերվերի հասանելիությունը։ Դիմեք ադմինիստրատորին։",
+    am: "Թարգմանության ծառայությունը մերժեց սերվերի մուտքի տվյալները։ Դիմեք ադմինիստրատորին։",
   },
   "multilang.reason.quota": {
     en: "The translation quota is used up. Fill the languages in by hand for now.",
@@ -3372,7 +3384,7 @@ export const TRANSLATIONS: Dict = {
   "multilang.reason.quota_retry": {
     en: "Too many translations at once. Retrying automatically in",
     ru: "Слишком много переводов подряд. Повторим автоматически через",
-    am: "Չափազանց շատ թարգմանություններ անընդմեջ։ Ավտոմատ կկրկնվի",
+    am: "Չափազանց շատ թարգմանություններ միաժամանակ։ Նոր փորձ՝",
   },
   "multilang.seconds": { en: "s", ru: "с", am: "վրկ" },
   "multilang.reason.provider_error": {
@@ -3430,7 +3442,7 @@ export const TRANSLATIONS: Dict = {
   "i18n.overrideHint": {
     en: "Editing a language here locks it. Automatic translation will not overwrite your wording.",
     ru: "Правка языка здесь блокирует его. Автоперевод не перезапишет вашу формулировку.",
-    am: "Այստեղ լեզուն խմբագրելը կողպում է այն։ Ավտոթարգմանությունը չի վերագրի ձեր ձևակերպումը։",
+    am: "Այստեղ լեզուն խմբագրելը կողպում է այն։ Ավտոթարգմանությունը չի փոխարինի ձեր ձևակերպումը։",
   },
   "i18n.status.pending": { en: "translating…", ru: "переводится…", am: "թարգմանվում է…" },
   "i18n.status.pending.hint": {
@@ -3448,7 +3460,7 @@ export const TRANSLATIONS: Dict = {
   "i18n.status.stale.hint": {
     en: "The source changed. The previous translation is shown until the new one is ready.",
     ru: "Исходник изменился. Показывается прежний перевод, пока не готов новый.",
-    am: "Սկզբնաղբյուրը փոխվել է։ Ցուցադրվում է նախորդ թարգմանությունը, մինչև նորը պատրաստ լինի։",
+    am: "Սկզբնական տեքստը փոխվել է։ Ցուցադրվում է նախորդ թարգմանությունը, մինչև նորը պատրաստ լինի։",
   },
   "i18n.status.failed": { en: "translation failed", ru: "ошибка перевода", am: "թարգմանության սխալ" },
   "i18n.status.failed.hint": {
@@ -3460,7 +3472,7 @@ export const TRANSLATIONS: Dict = {
   "i18n.status.needs_review.hint": {
     en: "You edited this language by hand and the source has changed since. Automatic translation will not touch it.",
     ru: "Вы правили этот язык вручную, а исходник с тех пор изменился. Автоперевод его не тронет.",
-    am: "Դուք ձեռքով խմբագրել եք այս լեզուն, իսկ սկզբնաղբյուրն այդ ժամանակից փոխվել է։ Ավտոթարգմանությունը այն չի փոխի։",
+    am: "Դուք ձեռքով խմբագրել եք այս լեզուն, իսկ սկզբնական տեքստն այդ ընթացքում փոխվել է։ Ավտոթարգմանությունն այն չի փոխի։",
   },
   "i18n.status.skipped": { en: "not translated", ru: "без перевода", am: "առանց թարգմանության" },
   "i18n.status.skipped.hint": {

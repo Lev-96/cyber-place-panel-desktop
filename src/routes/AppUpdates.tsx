@@ -175,7 +175,7 @@ const AppUpdates = () => {
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead>
               <tr style={{ textAlign: "left", color: "#94a3b8", fontSize: 12 }}>
-                <th style={{ padding: "8px 6px" }}>App</th>
+                <th style={{ padding: "8px 6px" }}>{t("updates.colApp")}</th>
                 <th style={{ padding: "8px 6px" }}>{t("updates.colCurrent")}</th>
                 <th style={{ padding: "8px 6px" }}>{t("updates.colAvailable")}</th>
                 <th style={{ padding: "8px 6px" }}>{t("updates.colStatus")}</th>

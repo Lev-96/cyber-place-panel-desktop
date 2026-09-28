@@ -1,5 +1,6 @@
 import { dmyToIso, isoToDmy, maskDmy } from "@/utils/dateMask";
 import { useState } from "react";
+import { tActive } from "@/i18n/translations";
 
 interface Props {
   label?: string;
@@ -38,7 +39,7 @@ const MaskedDateInput = ({ label, valueIso, onChangeIso, required, autoFocus }: 
       <input
         className="input"
         inputMode="numeric"
-        placeholder="дд.мм.гг"
+        placeholder={tActive("date.placeholderShort")}
         value={text}
         onChange={(e) => handle(e.target.value)}
         required={required}

@@ -111,3 +111,54 @@ describe("t() resolver", () => {
     expect(t("does.not.exist", "en")).toBe("does.not.exist");
   });
 });
+
+/**
+ * The Armenian copy (2026-09-28 audit): the defects it fixed must not come
+ * back. Terms follow the official site (cyberplace.pro, hy).
+ */
+describe("Armenian copy", () => {
+  const entries = Object.entries(TRANSLATIONS);
+  const placeholders = (s: string) => (s.match(/\{[^}]+\}/g) ?? []).sort().join(",");
+  /** A standalone word (Armenian has no \b in JS regex). */
+  const word = (w: string) => new RegExp(`(^|[^\\u0530-\\u058F])${w}`, "iu");
+
+  it("carries every placeholder the English does", () => {
+    for (const [key, dict] of entries) {
+      expect(placeholders(dict.am), key).toBe(placeholders(dict.en));
+    }
+  });
+
+  it("has no Cyrillic or Latin letter glued inside an Armenian word", () => {
+    for (const [key, dict] of entries) {
+      expect(/[А-Яа-яЁё]/.test(dict.am), `${key}: ${dict.am}`).toBe(false);
+      // Latin next to an Armenian LETTER (U+0531–0556, U+0561–0587); Armenian
+      // punctuation such as «՝» after "PIN" is fine.
+      expect(/[\u0531-\u0556\u0561-\u0587][A-Za-z]|[A-Za-z][\u0531-\u0556\u0561-\u0587]/.test(dict.am), `${key}: ${dict.am}`).toBe(false);
+    }
+  });
+
+  it("calls a session «սեսիա», never «նիստ» or «սեանս»", () => {
+    for (const [key, dict] of entries) {
+      expect(word("նիստ").test(dict.am) || word("սեանս").test(dict.am), `${key}: ${dict.am}`).toBe(false);
+    }
+  });
+
+  it("names the kiosk program «Agent», not «գործակալ»", () => {
+    for (const [key, dict] of entries) {
+      expect(word("գործակալ").test(dict.am), `${key}: ${dict.am}`).toBe(false);
+    }
+  });
+
+  it("uses «ՀՀ» only for the Republic of Armenia (the tax number), never for a computer", () => {
+    const withHH = entries.filter(([, dict]) => /ՀՀ(?!Հ)/.test(dict.am.replace(/ՀՎՀՀ/g, ""))).map(([key]) => key);
+    expect(withHH).toEqual([]);
+  });
+
+  it("ends Armenian sentences with «։», not a Latin full stop", () => {
+    for (const [key, dict] of entries) {
+      // A sentence (it has a space); a lone abbreviation like «տեղադր.» keeps its dot.
+      const sentence = dict.am.trim().includes(" ");
+      expect(sentence && /[\u0531-\u0556\u0561-\u0587]\.\s*$/.test(dict.am), `${key}: ${dict.am}`).toBe(false);
+    }
+  });
+});
