@@ -28,6 +28,8 @@ vi.mock("@/components/live/BranchLiveScreen", () => ({ default: () => null }));
 vi.mock("@/components/branches/BranchForm", () => ({ default: () => null }));
 vi.mock("@/components/branches/BranchOpenDaysForm", () => ({ default: () => null }));
 vi.mock("@/components/branches/BranchUnlockPinCard", () => ({ default: () => null }));
+// BranchEdit asks before a delete; this file only reads the status pill.
+vi.mock("@/components/ui/ConfirmProvider", () => ({ useConfirm: () => async () => false }));
 vi.mock("@/components/ui/Avatar", () => ({ default: () => null }));
 vi.mock("@/components/ui/ScreenWithBg", () => ({
   default: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,

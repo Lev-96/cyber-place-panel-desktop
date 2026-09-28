@@ -212,7 +212,7 @@ describe("SessionsBoard — pause and resume", () => {
 /**
  * Each of the three presses is announced — only once the server accepted it,
  * naming the seat as its tile does (`№1`): amber for a pause, green for the
- * clock running again, red for the session ending. A refusal raises nothing;
+ * clock running again, green for a completed stop. A refusal raises nothing;
  * its sentence stays on the tile.
  */
 describe("SessionsBoard — the toasts after stop, pause and resume", () => {
@@ -253,7 +253,7 @@ describe("SessionsBoard — the toasts after stop, pause and resume", () => {
     expect(toasts).toEqual([]);
   });
 
-  test("a confirmed stop raises a red one; a cancelled stop raises nothing", async () => {
+  test("a confirmed stop raises a green one; a cancelled stop raises nothing", async () => {
     repo.listActive.mockResolvedValue([running()]);
     repo.preview.mockResolvedValue({
       mode: "fixed", is_free: false, is_unlimited: false, elapsed_minutes: 10,
@@ -278,7 +278,7 @@ describe("SessionsBoard — the toasts after stop, pause and resume", () => {
     await press("session.confirmStop");
 
     expect(repo.stop).toHaveBeenCalledTimes(1);
-    expect(toasts).toEqual([expect.objectContaining({ kind: "error", text: "session.toastStopped №1" })]);
+    expect(toasts).toEqual([expect.objectContaining({ kind: "success", text: "session.toastStopped №1" })]);
   });
 
   test("a refused stop raises nothing", async () => {

@@ -162,3 +162,22 @@ describe("Armenian copy", () => {
     }
   });
 });
+
+describe("Section names and punctuation", () => {
+  it("names the running-seats section Active Places everywhere it is linked to (2026-09-28)", () => {
+    const section = { en: "Active Places", ru: "Активные места", am: "Ակտիվ տեղեր" };
+    expect(TRANSLATIONS["session.boardTitle"]).toEqual(section);
+    expect(TRANSLATIONS["hub.tile.sessions"]).toEqual(section);
+    // A count or a sum OF sessions is still about sessions, not the section.
+    expect(TRANSLATIONS["history.sumSessions"].en).toBe("Sessions");
+    expect(TRANSLATIONS["revenue.sourceSessions"].en).toBe("Sessions");
+  });
+
+  it("never renders an em dash, in any language", () => {
+    for (const [key, dict] of Object.entries(TRANSLATIONS)) {
+      for (const { code } of LANGUAGES) {
+        expect(dict[code].includes("—"), `${key}.${code}: ${dict[code]}`).toBe(false);
+      }
+    }
+  });
+});

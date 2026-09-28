@@ -1376,10 +1376,10 @@ const SessionsBoard = ({ branchId }: Props) => {
             // transport's business — and its refusal is shown, not swallowed.
             const device = (pcs.data ?? []).find((pc) => pc.id === stopTarget.pc_id);
             if (device?.console_host_id) sessionStopped(device.id);
-            // Red, as a pad's removal is: the seat's session is over. Only a
-            // stop the server confirmed reaches here — an auto-ended seat's
-            // receipt never calls this.
-            notify.message("error", fmt(t("session.toastStopped"), seatOf(stopTarget.pc_id)));
+            // Green (2026-09-28): a stop the server confirmed is a completed
+            // checkout, not a failure. Only such a stop reaches here — an
+            // auto-ended seat's receipt never calls this.
+            notify.message("success", fmt(t("session.toastStopped"), seatOf(stopTarget.pc_id)));
             void sessions.reload();
             void pcs.reload();
           }}

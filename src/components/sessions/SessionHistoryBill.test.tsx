@@ -51,7 +51,7 @@ describe("SessionHistoryBill", () => {
     ]);
     expect(body()).toEqual([
       // The clock: the total less the products and the pads — 5318 − 4800 − 500.
-      ["history.billTime", "—", "—", "18 AMD"],
+      ["history.billTime", "-", "-", "18 AMD"],
       ["Cola 0.5L", "6", "600 AMD", "3600 AMD"],
       ["Bottled water", "1", "300 AMD", "300 AMD"],
       ["Cappuccino", "1", "900 AMD", "900 AMD"],
@@ -96,7 +96,7 @@ describe("SessionHistoryBill", () => {
 
   test("pads that disagree on a price show no unit price, only the sum", () => {
     mount(session({ joysticks: [pad(3, 500), pad(4, 700)], total_paid: 6018 }));
-    expect(body().at(-1)).toEqual(["Pad #3, 4", "2", "—", "1200 AMD"]);
+    expect(body().at(-1)).toEqual(["Pad #3, 4", "2", "-", "1200 AMD"]);
   });
 
   test("an hourly extra shows its rate and the server's sum, not price × qty", () => {
@@ -106,7 +106,7 @@ describe("SessionHistoryBill", () => {
 
   test("no products, no pads: the play time, the total and the payment", () => {
     mount(session({ items: [], joysticks: [], total_paid: 1003, payment_method: "card" }));
-    expect(body()).toEqual([["history.billTime", "—", "—", "1003 AMD"]]);
+    expect(body()).toEqual([["history.billTime", "-", "-", "1003 AMD"]]);
     expect(foot()).toEqual([["history.total", "1003 AMD"], ["session.payTitle", "session.payCard"]]);
   });
 

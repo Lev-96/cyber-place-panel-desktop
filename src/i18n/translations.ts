@@ -33,7 +33,7 @@ type Dict = Record<string, { en: string; ru: string; am: string }>;
 
 export const TRANSLATIONS: Dict = {
   // Navigation
-  "nav.dashboard": { en: "Dashboard", ru: "Панель", am: "Վահանակ" },
+  "nav.dashboard": { en: "Dashboard", ru: "Панель", am: "Կառավարման էջ" },
   "nav.branches": { en: "Branches", ru: "Филиалы", am: "Մասնաճյուղեր" },
   "nav.myBranch": { en: "My branch", ru: "Мой филиал", am: "Իմ մասնաճյուղը" },
   "nav.map": { en: "Map", ru: "Карта", am: "Քարտեզ" },
@@ -1065,7 +1065,7 @@ export const TRANSLATIONS: Dict = {
     ru: "Укажите, каким способом.",
     am: "Նշեք վճարման եղանակը։",
   },
-  "session.boardTitle": { en: "Sessions", ru: "Сессии", am: "Սեսիաներ" },
+  "session.boardTitle": { en: "Active Places", ru: "Активные места", am: "Ակտիվ տեղեր" },
   // How much of the room is in use. Counted off the tiles on screen, so the
   // line and the grid can never disagree.
   "session.boardCounts": {
@@ -1140,7 +1140,7 @@ export const TRANSLATIONS: Dict = {
 
   // Branch hub tiles
   "hub.invalidId": { en: "Invalid branch id.", ru: "Неверный идентификатор филиала.", am: "Մասնաճյուղի ID-ն սխալ է։" },
-  "hub.tile.sessions": { en: "Sessions", ru: "Сессии", am: "Սեսիաներ" },
+  "hub.tile.sessions": { en: "Active Places", ru: "Активные места", am: "Ակտիվ տեղեր" },
   "hub.tile.sessionsHint": { en: "Start / stop · billing", ru: "Старт / стоп · биллинг", am: "Մեկնարկ / ավարտ · վճարում" },
   "hub.tile.members": { en: "Members", ru: "Клиенты", am: "Հաճախորդներ" },
   "hub.tile.membersHint": { en: "Cards & deposits", ru: "Карты и депозиты", am: "Քարտեր և ավանդներ" },
@@ -1230,7 +1230,7 @@ export const TRANSLATIONS: Dict = {
   "history.today": { en: "Today", ru: "Сегодня", am: "Այսօր" },
   "history.yesterday": { en: "Yesterday", ru: "Вчера", am: "Երեկ" },
   "history.month": { en: "This month", ru: "Текущий месяц", am: "Ընթացիկ ամիս" },
-  "history.backToBoard": { en: "Back to board", ru: "К доске сессий", am: "Վերադառնալ սեսիաներին" },
+  "history.backToBoard": { en: "Back to Active Places", ru: "К активным местам", am: "Վերադառնալ ակտիվ տեղերին" },
   "history.sumSessions": { en: "Sessions", ru: "Сессии", am: "Սեսիաներ" },
   "history.sumTotal": { en: "Total revenue", ru: "Выручка", am: "Ընդհանուր եկամուտ" },
   "history.sumTime": { en: "Time revenue", ru: "За время", am: "Ժամանակի դիմաց" },
@@ -1330,7 +1330,7 @@ export const TRANSLATIONS: Dict = {
   "pauseLimit.none": { en: "No limit", ru: "Без лимита", am: "Առանց սահմանաչափի" },
   "pauseLimit.hint": {
     en: "When a pause reaches this length, the session resumes by itself and billing continues. Leave empty for no limit. Applies to pauses started after saving.",
-    ru: "Когда пауза достигает этой длины, сессия продолжается сама и оплата снова идёт. Пусто — без лимита. Действует на паузы, начатые после сохранения.",
+    ru: "Когда пауза достигает этой длины, сессия продолжается сама и оплата снова идёт. Если поле пустое, лимита нет. Действует на паузы, начатые после сохранения.",
     am: "Երբ դադարը հասնում է այս տևողությանը, սեսիան ինքնաբերաբար շարունակվում է, և վճարումը վերսկսվում է։ Դատարկ՝ առանց սահմանաչափի։ Կիրառվում է պահպանելուց հետո սկսված դադարների վրա։",
   },
   "pauseLimit.invalid": {
@@ -1782,7 +1782,7 @@ export const TRANSLATIONS: Dict = {
   "notifications.bookingPlaces": { en: "Place", ru: "Место", am: "Տեղ" },
   "notifications.bookingPlacesPlural": { en: "Places", ru: "Места", am: "Տեղեր" },
   "notifications.bookingMinShort": { en: "min", ru: "мин", am: "րոպե" },
-  "notifications.openBoard": { en: "Open board", ru: "К сессиям", am: "Բացել սեսիաները" },
+  "notifications.openBoard": { en: "Open Active Places", ru: "К активным местам", am: "Բացել ակտիվ տեղերը" },
   "notifications.markAllRead": { en: "Mark all as read", ru: "Отметить все прочитанными", am: "Նշել բոլորը որպես կարդացված" },
   "notifications.unreadDot": { en: "Unread", ru: "Не прочитано", am: "Չկարդացված" },
   "notifications.bookingFeedTitle": { en: "Bookings", ru: "Бронирования", am: "Ամրագրումներ" },
@@ -2014,13 +2014,13 @@ export const TRANSLATIONS: Dict = {
   "place.extraItemMax": { en: "How many exist", ru: "\u0421\u043a\u043e\u043b\u044c\u043a\u043e \u0432\u0441\u0435\u0433\u043e", am: "Ընդհանուր քանակ" },
   "place.extraItemMaxNote": {
     en: "How many of {0} this room owns. Beyond it a hand-out is refused rather than charged. Empty is no limit.",
-    ru: "\u0421\u043a\u043e\u043b\u044c\u043a\u043e \u0435\u0434\u0438\u043d\u0438\u0446 \u00ab{0}\u00bb \u0435\u0441\u0442\u044c \u0432 \u044d\u0442\u043e\u0439 \u043a\u043e\u043c\u043d\u0430\u0442\u0435. \u0421\u0432\u0435\u0440\u0445 \u044d\u0442\u043e\u0433\u043e \u0432\u044b\u0434\u0430\u0447\u0430 \u043e\u0442\u043a\u043b\u043e\u043d\u044f\u0435\u0442\u0441\u044f, \u0430 \u043d\u0435 \u043e\u043f\u043b\u0430\u0447\u0438\u0432\u0430\u0435\u0442\u0441\u044f. \u041f\u0443\u0441\u0442\u043e \u2014 \u0431\u0435\u0437 \u043e\u0433\u0440\u0430\u043d\u0438\u0447\u0435\u043d\u0438\u044f.",
+    ru: "Сколько единиц «{0}» есть в этой комнате. Сверх этого выдача отклоняется, а не оплачивается. Если поле пустое, ограничения нет.",
     am: "Քանի «{0}» կա այս սենյակում։ Դրանից ավելի տրամադրելը մերժվում է, ոչ թե վճարվում։ Դատարկ՝ առանց սահմանափակման։",
   },
   "place.extraItemChargedUnits": { en: "Which are charged", ru: "\u041a\u0430\u043a\u0438\u0435 \u043f\u043b\u0430\u0442\u043d\u044b\u0435", am: "\u0548\u0580\u0578\u0576\u0584 \u0565\u0576 \u057e\u0573\u0561\u0580\u0578\u057e\u056b" },
   "place.extraItemChargedUnitsNote": {
-    en: "Unit numbers, comma separated \u2014 \u201c3,4\u201d charges the third and fourth {0} and hands over every other one free. Empty lets the allowance above decide.",
-    ru: "\u041d\u043e\u043c\u0435\u0440\u0430 \u0435\u0434\u0438\u043d\u0438\u0446 \u0447\u0435\u0440\u0435\u0437 \u0437\u0430\u043f\u044f\u0442\u0443\u044e: \u00ab3,4\u00bb \u2014 \u0442\u0440\u0435\u0442\u0438\u0439 \u0438 \u0447\u0435\u0442\u0432\u0451\u0440\u0442\u044b\u0439 \u00ab{0}\u00bb \u043f\u043b\u0430\u0442\u043d\u044b\u0435, \u043e\u0441\u0442\u0430\u043b\u044c\u043d\u044b\u0435 \u0432\u044b\u0434\u0430\u044e\u0442\u0441\u044f \u0434\u0430\u0440\u043e\u043c. \u041f\u0443\u0441\u0442\u043e \u2014 \u0440\u0435\u0448\u0430\u0435\u0442 \u0447\u0438\u0441\u043b\u043e \u0432\u044b\u0448\u0435.",
+    en: "Unit numbers, comma separated: “3,4” charges the third and fourth {0} and hands over every other one free. Empty lets the allowance above decide.",
+    ru: "Номера единиц через запятую. При «3,4» третий и четвёртый «{0}» платные, остальные выдаются даром. Если поле пустое, решает число выше.",
     am: "Միավորների համարները՝ ստորակետով։ «3,4»՝ վճարովի են երրորդ և չորրորդ «{0}»-ը, մնացածը տրվում են անվճար։ Դատարկ՝ որոշում է վերևի թիվը։",
   },
   "place.extraItemModeFixed": { en: "Fixed price", ru: "\u0424\u0438\u043a\u0441\u0438\u0440\u043e\u0432\u0430\u043d\u043d\u0430\u044f \u0446\u0435\u043d\u0430", am: "\u0556\u056b\u0584\u057d\u057e\u0561\u056e \u0563\u056b\u0576" },
@@ -2038,7 +2038,7 @@ export const TRANSLATIONS: Dict = {
   },
   "branchExtraItem.hint": {
     en: "The venue's answer for the rooms that have not given one. A room with its own settings ignores this. Empty means every room decides for itself.",
-    ru: "\u041e\u0442\u0432\u0435\u0442 \u0437\u0430\u0432\u0435\u0434\u0435\u043d\u0438\u044f \u0434\u043b\u044f \u043a\u043e\u043c\u043d\u0430\u0442, \u043a\u043e\u0442\u043e\u0440\u044b\u0435 \u043d\u0435 \u043e\u0442\u0432\u0435\u0442\u0438\u043b\u0438 \u0441\u0430\u043c\u0438. \u041a\u043e\u043c\u043d\u0430\u0442\u0430 \u0441\u043e \u0441\u0432\u043e\u0438\u043c\u0438 \u043d\u0430\u0441\u0442\u0440\u043e\u0439\u043a\u0430\u043c\u0438 \u044d\u0442\u043e \u0438\u0433\u043d\u043e\u0440\u0438\u0440\u0443\u0435\u0442. \u041f\u0443\u0441\u0442\u043e \u2014 \u043a\u0430\u0436\u0434\u0430\u044f \u043a\u043e\u043c\u043d\u0430\u0442\u0430 \u0440\u0435\u0448\u0430\u0435\u0442 \u0441\u0430\u043c\u0430.",
+    ru: "Ответ заведения для комнат, которые не ответили сами. Комната со своими настройками это игнорирует. Если поле пустое, каждая комната решает сама.",
     am: "Ակումբի կարգավորումը այն սենյակների համար, որոնք սեփականը չունեն։ Սեփական կարգավորումներով սենյակն այն անտեսում է։ Դատարկ՝ յուրաքանչյուր սենյակ ինքն է որոշում։",
   },
   "place.extraItemTariffChange": { en: "Tariff change", ru: "Изменение тарифа", am: "Սակագնի փոփոխություն" },
@@ -2208,7 +2208,7 @@ export const TRANSLATIONS: Dict = {
   "registrations.verifyFailed":         { en: "Verification failed", ru: "Не удалось подтвердить", am: "Չհաջողվեց հաստատել" },
   "registrations.verifyAlready":        { en: "Already verified",  ru: "Уже подтверждено",     am: "Արդեն հաստատված է" },
   "registrations.verifiedBadge":        { en: "✓ Verified",        ru: "✓ Подтверждён",        am: "✓ Հաստատված" },
-  "registrations.verifiedBy":           { en: "by",                ru: "-",                   am: "—" },
+  "registrations.verifiedBy":           { en: "by",                ru: "-",                   am: "-" },
   "registrations.pendingBadge":         { en: "Pending",           ru: "Ожидает",              am: "Սպասում է" },
 
   // Branch form
@@ -2376,8 +2376,8 @@ export const TRANSLATIONS: Dict = {
   "products.new": { en: "+ New product", ru: "+ Новый товар", am: "+ Նոր ապրանք" },
   "products.newAdditional": { en: "+ New additional item", ru: "+ Новый доп. предмет", am: "+ Նոր լրացուցիչ իր" },
   "products.emptyAdditional": {
-    en: "No additional items yet — chips, a cue, a racket handed out with the seat.",
-    ru: "Дополнительных предметов пока нет — фишки, кий, ракетка, которые выдаются вместе с местом.",
+    en: "No additional items yet. These are chips, a cue or a racket handed out with the seat.",
+    ru: "Дополнительных предметов пока нет. Это фишки, кий, ракетка, которые выдаются вместе с местом.",
     am: "Լրացուցիչ իրեր դեռ չկան՝ ֆիշկաներ, կիյ, ռակետ, որոնք տրվում են տեղի հետ։",
   },
   "products.empty": { en: "No products yet.", ru: "Товаров пока нет.", am: "Ապրանքներ դեռ չկան։" },
@@ -3174,6 +3174,12 @@ export const TRANSLATIONS: Dict = {
   "toast.game.created": { en: "Game added", ru: "Игра добавлена", am: "Խաղն ավելացվեց" },
   "toast.game.updated": { en: "Game updated", ru: "Игра обновлена", am: "Խաղը թարմացվեց" },
   "toast.game.deleted": { en: "Game removed", ru: "Игра удалена", am: "Խաղը հեռացվեց" },
+  "toast.expense.created": { en: "Expense added", ru: "Расход добавлен", am: "Ծախսն ավելացվեց" },
+  "toast.expense.updated": { en: "Expense updated", ru: "Расход обновлён", am: "Ծախսը թարմացվեց" },
+  "toast.expense.deleted": { en: "Expense deleted", ru: "Расход удалён", am: "Ծախսը ջնջվեց" },
+  "toast.package.created": { en: "Tariff created", ru: "Тариф создан", am: "Սակագինը ստեղծվեց" },
+  "toast.package.updated": { en: "Tariff updated", ru: "Тариф обновлён", am: "Սակագինը թարմացվեց" },
+  "toast.package.deleted": { en: "Tariff deleted", ru: "Тариф удалён", am: "Սակագինը ջնջվեց" },
 
   "toast.tournament.created": { en: "Tournament created", ru: "Турнир создан", am: "Մրցաշարը ստեղծվեց" },
   "toast.tournament.updated": { en: "Tournament updated", ru: "Турнир обновлён", am: "Մրցաշարը թարմացվեց" },

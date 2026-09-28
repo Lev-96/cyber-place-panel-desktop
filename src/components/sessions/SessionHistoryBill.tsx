@@ -139,8 +139,8 @@ const SessionHistoryBill = ({ session, closed }: Props) => {
 const BillRow = ({ label, qty, price, sum }: { label: string; qty: number | null; price: string | null; sum: string }) => (
   <tr>
     <th scope="row">{label}</th>
-    <td className="mid">{qty ?? "—"}</td>
-    <td className="mid">{price ?? "—"}</td>
+    <td className="mid">{qty ?? "-"}</td>
+    <td className="mid">{price ?? "-"}</td>
     <td className="num">{sum}</td>
   </tr>
 );
