@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { tActive } from "@/i18n/translations";
 
 interface Props {
   label?: string;
@@ -85,7 +86,7 @@ const NumberStepper = ({
           <button
             type="button"
             className="num-stepper-arrow"
-            aria-label="Increase"
+            aria-label={tActive("a11y.increase")}
             disabled={disabled}
             onClick={() => bump(1)}
           >
@@ -96,7 +97,7 @@ const NumberStepper = ({
           <button
             type="button"
             className="num-stepper-arrow"
-            aria-label="Decrease"
+            aria-label={tActive("a11y.decrease")}
             disabled={disabled}
             onClick={() => bump(-1)}
           >

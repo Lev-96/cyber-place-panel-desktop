@@ -7,21 +7,26 @@ import Modal from "@/components/ui/Modal";
 import Input from "@/components/ui/Input";
 import PriceInput from "@/components/ui/PriceInput";
 import Checkbox from "@/components/ui/Checkbox";
+import Radio from "@/components/ui/Radio";
 import PlatformPicker from "@/components/ui/PlatformPicker";
 import PlatformNameInput, { LangNames } from "@/components/ui/PlatformNameInput";
 import SubplatformTabs from "@/components/ui/SubplatformTabs";
 import Spinner from "@/components/ui/Spinner";
 import GameForm from "@/components/games/GameForm";
+import { billingSettingsRepository } from "@/repositories/BillingSettingsRepository";
+import { branchRepository } from "@/repositories/BranchRepository";
 import { useAuth } from "@/auth/AuthContext";
 import { can } from "@/auth/permissions";
 import { useAsync } from "@/hooks/useAsync";
 import { useLang } from "@/i18n/LanguageContext";
+import { fmt } from "@/i18n/translations";
 import { platformPriceNameOf } from "@/i18n/platformPriceName";
 import { gameRepository } from "@/repositories/GameRepository";
 import { placeRepository } from "@/repositories/PlaceRepository";
 import { subplatformRepository } from "@/repositories/SubplatformRepository";
-import { IBranchPlace, IBranchPlatformPrice, PlaceType } from "@/types/api";
-import { isKnownPlatform, platformLabel, slugifyPlatform } from "@/utils/platform";
+import { CHARGE_MODES, JoystickChargeMode, JoystickPricingMode, PRICING_MODES, pricingModeOf } from "@/api/joystickPrices";
+import { IBranchApi, IBranchPlace, IBranchPlatformPrice, PlaceType } from "@/types/api";
+import { isKnownPlatform, platformGroup, platformLabel, slugifyPlatform } from "@/utils/platform";
 import { FormEvent, useEffect, useState } from "react";
 
 const EMPTY_NAMES: LangNames = { en: "", ru: "", am: "" };
@@ -44,6 +49,76 @@ interface Props {
 
 const TYPES: PlaceType[] = ["standard", "vip"];
 
+/**
+ * WHICH extra pads this room charges for, as the form asks it.
+ *
+ * `""` is "as the branch does" — the room names nothing and its venue decides,
+ * which is what every seat is until somebody chooses. The other three are the
+ * shapes the server accepts, spelled the way an operator says them: the third
+ * controller, the fourth, or the pair at one figure.
+ *
+ * `legacy` is not on the menu. It is what a room ALREADY on an older answer
+ * shows — a count, or a bare price with no slots named — so that opening this
+ * form cannot quietly re-price a seat by translating a setting nobody asked to
+ * change. Picking anything else replaces it; leaving it alone sends it back
+ * untouched.
+ */
+/**
+ * What a room may CARRY in `joystick_charged_slots`.
+ *
+ * The menu that offered these is gone as of 2026-09-18 — the room now says HOW
+ * it sells extra pads and the slots follow from that — but the stored values
+ * are untouched, and a room on one of the narrower shapes keeps it. Erasing an
+ * answer on open would re-price a seat nobody touched.
+ */
+const OWN_JOYSTICK_SCOPES = ["3", "4", "3,4"] as const;
+
+/**
+ * The room's joystick decision, as the form asks it.
+ *
+ *   ""      as the branch does — the room prices nothing and the box above it
+ *           shows the venue's figure, read-only
+ *   "each"  this room prices its pads, and the fee is added every time one is
+ *           handed over: a figure for the third and, optionally, one for the
+ *           fourth
+ *   "once"  this room prices its pads, and the fee is taken once for the seat
+ *           however many pads change hands: ONE figure for the pair
+ *
+ * `each` / `once` are the values `places.joystick_charge_mode` has always
+ * held, and they mean on the server exactly what they meant before this form
+ * was rearranged. Nothing about the money moved; only where it is asked.
+ */
+type JoystickMode = "" | JoystickChargeMode;
+
+/**
+ * Which shape a saved room reopens in.
+ *
+ * A room that prices nothing of its own follows its branch. Anything else is
+ * read from the charge mode it carries, and a room that carries none of it
+ * reopens under "each" — which is what the server resolves an unanswered
+ * charge mode to anyway ({@see JoystickRule::chargeModeOf}), so the screen
+ * shows the rule that will actually be applied.
+ */
+const joystickModeOf = (place?: IBranchPlace): JoystickMode => {
+  const pricesItsOwn = place?.joystick_price != null || place?.joystick_charged_slots != null;
+  if (! pricesItsOwn) return "";
+
+  return place?.joystick_charge_mode === "once" ? "once" : "each";
+};
+
+/**
+ * A stored shape the new form cannot draw: "only the third" or "only the
+ * fourth". Kept and sent back untouched, so a room on it is not re-priced by
+ * being opened. Null for every room on the ordinary pair.
+ */
+const legacySlotsOf = (place?: IBranchPlace): string | null => {
+  const slots = place?.joystick_charged_slots;
+
+  return slots != null && slots !== "3,4" && OWN_JOYSTICK_SCOPES.includes(slots as (typeof OWN_JOYSTICK_SCOPES)[number])
+    ? slots
+    : null;
+};
+
 const PlaceForm = ({ branchId, initial, platformSuggestions, platformPrices, onClose, onSaved }: Props) => {
   const { t, money, lang } = useLang();
   const { user } = useAuth();
@@ -64,6 +139,158 @@ const PlaceForm = ({ branchId, initial, platformSuggestions, platformPrices, onC
   // below settles it to Default once this platform's list has loaded.
   const [subplatformId, setSubplatformId] = useState<number | null>(initial?.subplatform_id ?? null);
   const [hourlyRate, setHourlyRate] = useState(initial?.hourly_rate != null ? String(initial.hourly_rate) : "");
+  /**
+   * THIS place's own price per hour, when the form is not already collecting a
+   * rate for something bigger than the place.
+   *
+   * Empty is inherit, the same empty-means-inherit every other box here uses:
+   * the seat then bills from its sub-category, its custom platform or the
+   * branch's tariff matrix, exactly as it always has. A figure beats all three,
+   * which is the order the server already resolves in
+   * (`ResolveSessionRateService`: the place's own rate first, then the matrix)
+   * — so this box states what a seat costs rather than adding a fourth rule.
+   */
+  const [placeRate, setPlaceRate] = useState(initial?.hourly_rate != null ? String(initial.hourly_rate) : "");
+  /**
+   * This place's own joystick policy. Empty string is INHERIT, the same way an
+   * empty `hourlyRate` above means "this platform's price applies".
+   *
+   * A venue's joystick rule belongs on the branch and almost every seat runs
+   * on it. The exception is the room quoted with four pads in the rate, or the
+   * one seat whose fifth hour of Mortal Kombat is sold with a free second pad:
+   * one seat differing must not become a reason to move the whole branch.
+   */
+  const [joystickMode, setJoystickMode] = useState<JoystickMode>(() => joystickModeOf(initial));
+  /**
+   * Has the operator answered the charge-mode question on THIS visit?
+   *
+   * A room that carries no answer inherits its branch's, and a branch that
+   * charges once would start charging per pad the moment this form wrote a
+   * value nobody chose. So an untouched room sends back exactly what it came
+   * with, and only a deliberate click writes one.
+   */
+  const [joystickModeTouched, setJoystickModeTouched] = useState(false);
+  /** A shape this form cannot draw, carried through untouched. */
+  const legacySlots = legacySlotsOf(initial);
+  /**
+   * What a room on a CUSTOM platform hands out besides the seat.
+   *
+   * The same question the pads above answer, in the word the room uses for
+   * it: chips on a poker table, a cue on a billiard table. It is asked only
+   * here because a PlayStation already answers it in its own vocabulary, and
+   * two answers on one seat is an argument at the till.
+   *
+   * Empty name is "this room hands out nothing", which is what every room is
+   * until somebody fills it in — so the section opens closed and costs an
+   * operator who does not need it one line of screen.
+   */
+  const [extraName, setExtraName] = useState(initial?.extra_item_name ?? "");
+  const [extraPrice, setExtraPrice] = useState(
+    initial?.extra_item_price != null ? String(initial.extra_item_price) : "",
+  );
+  /**
+   * What each CHARGED unit AFTER THE FIRST costs, when the room prices them
+   * apart — the pads' `joystick_price_4`, generalised to a counted thing.
+   * Empty is "priced like the first", never "free".
+   */
+  const [extraPriceNext, setExtraPriceNext] = useState(
+    initial?.extra_item_price_next != null ? String(initial.extra_item_price_next) : "",
+  );
+  const [extraChargeMode, setExtraChargeMode] = useState<"each" | "once">(
+    initial?.extra_item_charge_mode === "once" ? "once" : "each",
+  );
+  /**
+   * …and whether that figure is a FEE or a RATE.
+   *
+   * The same second question the pads answer one section up
+   * (`joystick_pricing_mode`), with the same two values and the same default:
+   * a room prices its extra per piece until somebody says it rents it by the
+   * hour.
+   */
+  const [extraPricingMode, setExtraPricingMode] = useState<JoystickPricingMode>(
+    initial?.extra_item_pricing_mode === "hourly" ? "hourly" : "fixed",
+  );
+  /**
+   * How many of them the rate already covers: the one strategy the pads had
+   * and this did not.
+   *
+   * `branches.joystick_included` says how many controllers a PlayStation's
+   * rate includes; this says the same about whatever THIS room hands out. The
+   * first N on a session go out free and everything past N is charged, which
+   * the server counts and this form only states.
+   *
+   * Empty is the answer every room carries until somebody sets one, and it
+   * travels as `null` - which the server reads as 0, every unit charged. That
+   * default is the whole no-regression story here: a room nobody opens bills
+   * exactly as it billed yesterday.
+   *
+   * Deliberately NOT inherited from the branch, unlike the pads. One venue's
+   * poker table deals chips and its billiard table lends a cue; a single
+   * number above them both would be a number about nothing.
+   */
+  const [extraIncluded, setExtraIncluded] = useState(
+    initial?.extra_item_included != null ? String(initial.extra_item_included) : "",
+  );
+  /** How many EXIST, which is not how many are free. Empty is "no ceiling". */
+  const [extraMax, setExtraMax] = useState(
+    initial?.extra_item_max != null ? String(initial.extra_item_max) : "",
+  );
+  /**
+   * WHICH units are charged, when a count cannot say it. Empty is "the count
+   * answers", which is every room until somebody names them.
+   */
+  const [extraUnits, setExtraUnits] = useState(initial?.extra_item_charged_units ?? "");
+  const [joystickPrice, setJoystickPrice] = useState(
+    initial?.joystick_price != null ? String(initial.joystick_price) : "",
+  );
+  /**
+   * Does this room sell a FOURTH pad, and at what price?
+   *
+   * Asked only under "the third", because that is the only answer where the
+   * fourth is still open: "3,4" already prices the pair together and "as the
+   * branch does" prices nothing here at all. A yes with an empty box holds
+   * Save rather than guessing — both guesses (nothing, or the third's figure)
+   * are money the operator did not name.
+   */
+
+  const [joystickPrice4, setJoystickPrice4] = useState(
+    initial?.joystick_price_4 != null ? String(initial.joystick_price_4) : "",
+  );
+  /**
+   * HOW this room prices an extra pad, and HOW OFTEN it charges for one.
+   *
+   * Empty is inherit, like every other box here. The two questions are
+   * deliberately separate: the first is what the money is (a fee owed on
+   * handout, or a higher hourly rate while the pad is out), the second is
+   * whether it is owed again the next time a controller changes hands.
+   */
+  /**
+   * HOW this room prices an extra pad: a fee owed on handout, or a higher
+   * hourly rate while the pad is out.
+   *
+   * Two answers and no "as in the branch": the room states the rule it bills
+   * by. The default is `fixed`, which is what every venue bills by, and a room
+   * that carries no answer of its own opens on the figure it INHERITS — the
+   * effect below settles that once the branch's policy has loaded. A screen
+   * that showed "fixed" to a room billing hourly by inheritance would be a lie
+   * about money.
+   */
+  const [joystickStrategy, setJoystickStrategy] = useState<JoystickPricingMode>(
+    initial?.joystick_pricing_mode ?? "fixed",
+  );
+  /**
+   * True until the branch's own answer has been read — for an EXISTING room
+   * that carries none.
+   *
+   * A room being created inherits nothing: it has no bill behind it and no
+   * tariff it was already billing by, so it opens on the default like every
+   * other new setting on this form. Only a saved room that never answered
+   * opens on the tariff it is actually being billed at, which is the case
+   * where showing the default would be a lie about money.
+   */
+  const [strategyFollowsBranch, setStrategyFollowsBranch] = useState(
+    initial != null && initial.joystick_pricing_mode == null,
+  );
   const [gameIds, setGameIds] = useState<Set<number>>(new Set((initial?.games ?? []).map((g) => g.id)));
   // A custom platform may legitimately have NO games (table tennis, a poker
   // table…). Instead of dumping an empty "no games" list on the operator, we
@@ -75,6 +302,15 @@ const PlaceForm = ({ branchId, initial, platformSuggestions, platformPrices, onC
   // A custom (non-pc/ps4/ps5) platform has no cell in the branch tariff
   // matrix, so it carries its own per-hour price entered right here.
   const isCustomPlatform = !isKnownPlatform(platform);
+  /**
+   * Joysticks are a PlayStation question, and the question is the PLATFORM's.
+   *
+   * Deliberately NOT `pc.kind`: that says "no kiosk agent runs here" and is
+   * equally true of a ping-pong table. `platformGroup` matches every console
+   * generation (ps4, ps5, ps6, …), which is the same question the backend and
+   * the session dialog ask.
+   */
+  const isPlayStation = platformGroup(platform) === "ps";
   // The branch price already defined for this custom platform, if any. Its
   // presence flips the price UI from "set a rate" to "this price applies" —
   // the operator picks the existing rate instead of inventing a new one.
@@ -177,6 +413,120 @@ const PlaceForm = ({ branchId, initial, platformSuggestions, platformPrices, onC
    * Standard rate for VIP would silently erase the VIP premium.
    */
   const needsSubplatformRate = ownsRate && subplatformRate == null;
+  /**
+   * The BRANCH's default price for this platform and tier — the tariff matrix
+   * cell a known platform bills from when the seat carries no price of its own
+   * (`ResolveSessionRateService`: the place first, then this).
+   *
+   * Loaded here rather than passed down because the modal is the only screen
+   * that asks the question, and it already fetches what it needs to answer the
+   * others (sub-categories, games). One GET when it opens.
+   */
+  const branch = useAsync(() => branchRepository.byId(branchId), [branchId]);
+  /**
+   * The VENUE's joystick policy — what an extra pad costs here when a room
+   * does not price its own.
+   *
+   * Read rather than recomputed: it is the same figure `JoystickRule` resolves
+   * on the server when a room's own column is null, and a form that guessed it
+   * would be a second answer to a question the server already answers.
+   */
+  const branchJoysticks = useAsync(() => billingSettingsRepository.get(branchId), [branchId]);
+  const branchJoystickPrice = branchJoysticks.data?.joystick_price ?? null;
+  /**
+   * A room that never answered the tariff question opens on the answer it
+   * inherits, once the venue's policy has been read. Settled once and then
+   * left alone: after this, the radios are the operator's.
+   */
+  useEffect(() => {
+    if (! strategyFollowsBranch || ! branchJoysticks.data) return;
+    setJoystickStrategy(pricingModeOf(branchJoysticks.data));
+    setStrategyFollowsBranch(false);
+  }, [strategyFollowsBranch, branchJoysticks.data]);
+  /**
+   * Is this room pricing its own pads?
+   *
+   * True for both payment methods and false under "as the branch does", where
+   * the price box shows the VENUE's figure and is read-only: the figure was
+   * decided on another screen, and an editable box that discards what is typed
+   * into it is worse than no box.
+   */
+  const isOwnJoystickRule = joystickMode !== "";
+  /** Only the per-handout method prices the two pads apart. */
+  const asksFourthPad = joystickMode === "each";
+  /** Has the operator named a figure for this room at all? */
+  const hasOwnJoystickPrice = joystickPrice.trim() !== "";
+  /**
+   * The pads this room charges for.
+   *
+   * The form no longer asks: a room that prices its own pads charges for the
+   * pair, which is what every room the menu could produce already said. A
+   * narrower stored shape ("only the third") is carried through untouched, and
+   * a room that names no figure keeps whatever it came with — that is the room
+   * which overrides only the charge mode and still inherits the price.
+   */
+  const outgoingScope = ! isOwnJoystickRule
+    ? null
+    : hasOwnJoystickPrice
+      ? (joystickModeTouched ? "3,4" : (legacySlots ?? "3,4"))
+      : (initial?.joystick_charged_slots ?? null);
+  /** What the read-only box shows: the venue's figure, under "as the branch does". */
+  const joystickPriceShown = isOwnJoystickRule ? null : branchJoystickPrice;
+  /**
+   * A figure is mandatory once the operator picks a payment method for THIS
+   * room — under either method. It is not demanded of a room that was already
+   * saved without one and is only being opened: that room inherits the price
+   * and overrides nothing about it.
+   */
+  const joystickPriceRequired = isOwnJoystickRule
+    && (joystickModeTouched || initial?.joystick_charged_slots != null);
+  const branchRate = ((): number | null => {
+    const cell = branch.data?.price_for_branch?.[
+      `${platform}-${type === "vip" ? "vip" : "standard"}` as keyof NonNullable<IBranchApi["price_for_branch"]>
+    ];
+    const value = typeof cell === "number" ? cell : null;
+
+    // Zero is not a price here for the same reason it is not one on the
+    // server: a seat resolving to nothing cannot start a paid session, and
+    // giving one away is `Free session`, which is explicit and separate.
+    return value !== null && value > 0 ? value : null;
+  })();
+  /**
+   * A PlayStation seat with no branch price and no price of its own cannot run
+   * a paid session — the server refuses it, and this is what stops the operator
+   * finding that out at the counter instead of here.
+   *
+   * Zero is not a price on either side: the server bills from a figure greater
+   * than zero and steps over a zero exactly as it steps over an empty column,
+   * so a box reading "0" is this same seat with a number in it. Giving a seat
+   * away is `Free session`, which is a different, explicit thing.
+   *
+   * Silent while the branch is still loading — the matrix is unknown then, and
+   * an error that appears for a moment on every open is noise, not a warning.
+   */
+  const ownRate = Number(placeRate.trim());
+  const hasOwnRate = placeRate.trim() !== "" && Number.isFinite(ownRate) && ownRate > 0;
+  const needsOwnRate = isPlayStation && !branch.loading && branchRate === null && !hasOwnRate;
+  /**
+   * A figure was typed and it is not one the seat can be billed at.
+   *
+   * Separate from `needsOwnRate` because it is a different mistake: the box is
+   * filled in, and what is wrong is the number in it. The server refuses it on
+   * its own sentence too — a zero stored beside a priced branch is written
+   * down, shown here, and never charged.
+   */
+  const ownRateIsNotAPrice = isPlayStation && placeRate.trim() !== "" && !hasOwnRate;
+  /**
+   * Whether the form is ALREADY asking for a rate — an unpriced sub-category,
+   * or a custom platform whose tier has no price yet.
+   *
+   * In those cases the box on screen IS this place's rate (and seeds the
+   * sub-category's or the platform's), so a second one would be two fields for
+   * one number. Everywhere else — a known platform on the matrix, a locked
+   * custom tier, a sub-category that already prices this tier — nothing was
+   * editable at all, and that is where the place's own price goes.
+   */
+  const collectsPlatformRate = needsSubplatformRate || (isCustomPlatform && !tierLocked);
 
   // Auto-suggest next available number on create
   useEffect(() => {
@@ -237,6 +587,14 @@ const PlaceForm = ({ branchId, initial, platformSuggestions, platformPrices, onC
     // tier isn't priced yet. A locked tier needs neither.
     const finalPlatform = customNew ? slugifyPlatform(names.en.trim()) : platform;
     if (customNew && !finalPlatform) return setErr(t("place.errors.nameRequired"));
+    // A room that prices its own pads must name the figure. Under "every
+    // handout" that is the third pad's price (the fourth may be left to follow
+    // it); under "one charge per session" it is the single figure for the
+    // pair. The server refuses the same shape — this is what stops the
+    // operator finding that out after a save.
+    if (isPlayStation && joystickPriceRequired && ! hasOwnJoystickPrice) {
+      return setErr(t("place.errors.joystickPriceRequired"));
+    }
     // The subcategory owns the rate: priced → nothing to ask, unpriced → the
     // rate is mandatory. Only when no subcategory owns it does the platform's
     // own "price this tier" rule apply.
@@ -245,6 +603,22 @@ const PlaceForm = ({ branchId, initial, platformSuggestions, platformPrices, onC
     }
     if (!ownsRate && isCustomPlatform && !tierLocked && !hourlyRate) {
       return setErr(t("place.errors.priceRequired"));
+    }
+    // A PlayStation seat with nothing to bill at. The server refuses it either
+    // way; saying so here is what keeps the operator from discovering it at the
+    // counter, on a seat they thought was finished.
+    if (ownRateIsNotAPrice) {
+      return setErr(t("place.zeroNotAPriceHint"));
+    }
+    // Named but not priced is the one half-configuration the server refuses,
+    // and it is worth catching here: the operator is looking at both boxes.
+    if (isCustomPlatform && extraName.trim() !== "" && extraPrice.trim() === "") {
+      setErr(t("place.errors.extraPriceRequired"));
+      return;
+    }
+
+    if (needsOwnRate) {
+      return setErr(t("place.noBranchRateHint"));
     }
     setBusy(true); setErr(null);
     try {
@@ -257,12 +631,103 @@ const PlaceForm = ({ branchId, initial, platformSuggestions, platformPrices, onC
         // The sub-category this place bills from. Null is normal — it simply
         // means the place bills from its platform, as every place did before.
         subplatform_id: subplatformId,
-        // Known platforms bill from the matrix (null). An already-priced tier
-        // reuses that rate (server ignores any override). An unpriced tier
-        // sends its rate — the server seeds that tier's price; a brand-new
-        // platform additionally carries the per-locale platform_name below.
-        hourly_rate: isCustomPlatform
-          ? (tierLocked ? Number(tierPrice) : (hourlyRate ? Number(hourlyRate) : null))
+        // One field, three cases, in the order the form asks them:
+        //
+        //   collecting a platform/sub-category rate → that box, which the
+        //     server also seeds the bigger price from;
+        //   this place priced on its own            → that box, which beats the
+        //     matrix for this seat and nothing else;
+        //   neither                                  → a locked custom tier
+        //     keeps re-sending its platform's figure, and a known platform
+        //     sends null, which is "bill from the matrix" — what every place
+        //     did before this box existed.
+        hourly_rate: collectsPlatformRate
+          ? (hourlyRate ? Number(hourlyRate) : null)
+          : placeRate.trim() !== ""
+            ? Number(placeRate)
+            : (isCustomPlatform && tierLocked ? Number(tierPrice) : null),
+        // Per-place joystick policy. Empty box = null = inherit the branch's
+        // rule. A place that is not a PlayStation carries no override at all,
+        // so switching ps5 → pc drops one rather than leaving it behind.
+        // WHICH pads this room charges for, and what they cost here.
+        //
+        //   ""        as the branch does — every column null, and the price
+        //             box was read-only showing the venue's figure;
+        //   3|4|3,4   this room's own answer, with its own price;
+        //   legacy    a room already on the older answer, sent back exactly as
+        //             it came so that opening this form re-prices nothing.
+        //
+        // `joystick_included` is no longer asked here — the slots say what the
+        // count used to approximate — but a room that carries one keeps it,
+        // because clearing a setting the operator did not touch is a price
+        // change nobody made.
+        joystick_charged_slots: isPlayStation ? outgoingScope : null,
+        // The fourth pad's own figure, and only where the room actually sells
+        // one: under "as the branch does", the shared pair or a legacy answer
+        // it is null, which is the server's "this room did not price the pair
+        // apart". A typed 0 is a real setting and travels as 0.
+        // The fourth pad's own figure, and only where the room sells its pads
+        // one at a time. Switching methods clears nothing in state on purpose:
+        // the boxes of the other method are not on screen, this payload is the
+        // only thing that decides what is stored, and a figure the operator
+        // typed is still there if they switch back. Empty means "priced like the third", which is what
+        // `JoystickRule` already does with a null here — the fallback is the
+        // server's, not a number this form invents. A room that carries one
+        // and is merely being opened keeps it.
+        joystick_price_4: isPlayStation && asksFourthPad && joystickPrice4.trim() !== ""
+          ? Number(joystickPrice4)
+          : isPlayStation && ! joystickModeTouched && ! asksFourthPad
+            ? (initial?.joystick_price_4 != null ? Number(initial.joystick_price_4) : null)
+            : null,
+        // A count nobody is asked for any more, kept exactly as the room
+        // carries it: clearing a setting the operator did not touch is a price
+        // change nobody made.
+        joystick_included: isPlayStation && isOwnJoystickRule
+          ? (initial?.joystick_included ?? null)
+          : null,
+        joystick_price: isPlayStation && isOwnJoystickRule && hasOwnJoystickPrice
+          ? Number(joystickPrice)
+          : null,
+        // Stated, never left empty: the room says which tariff it bills a pad
+        // on. For a room that carried no answer this is the one it already
+        // inherited — read from the venue above — so the figure on the bill
+        // does not move, it only stops depending on the branch.
+        joystick_pricing_mode: isPlayStation ? joystickStrategy : null,
+        // Written only by a deliberate click. A room that carries no answer
+        // inherits its branch's, and a branch that charges once would start
+        // charging per pad the moment this form saved a value nobody chose.
+        joystick_charge_mode: ! isPlayStation
+          ? null
+          : joystickModeTouched
+            ? (joystickMode === "" ? null : joystickMode)
+            : (initial?.joystick_charge_mode ?? null),
+        // What THIS room hands out, and how it charges for it. Sent only for
+        // a custom platform: the server refuses these three on pc/ps4/ps5, and
+        // a form that posted them anyway would turn a stale radio into a
+        // rejected save the operator cannot see the cause of.
+        extra_item_name: isCustomPlatform && extraName.trim() !== "" ? extraName.trim() : null,
+        extra_item_price: isCustomPlatform && extraName.trim() !== "" && extraPrice.trim() !== ""
+          ? Number(extraPrice)
+          : null,
+        extra_item_price_next:
+          isCustomPlatform && extraName.trim() !== "" && extraPriceNext.trim() !== ""
+            ? Number(extraPriceNext)
+            : null,
+        extra_item_charge_mode: isCustomPlatform && extraName.trim() !== "" ? extraChargeMode : null,
+        extra_item_pricing_mode: isCustomPlatform && extraName.trim() !== "" ? extraPricingMode : null,
+        // How many the rate covers before anything is charged. Empty is null,
+        // which the server reads as 0 - every unit charged, exactly as every
+        // room billed before this box existed. A typed 0 is the same rule
+        // stated out loud, and travels as 0.
+        extra_item_max: isCustomPlatform && extraName.trim() !== "" && extraMax.trim() !== ""
+          ? Number(extraMax)
+          : null,
+        extra_item_charged_units:
+          isCustomPlatform && extraName.trim() !== "" && extraUnits.trim() !== ""
+            ? extraUnits.trim()
+            : null,
+        extra_item_included: isCustomPlatform && extraName.trim() !== "" && extraIncluded.trim() !== ""
+          ? Number(extraIncluded)
           : null,
         platform_name_en: customNew ? (names.en.trim() || undefined) : undefined,
         platform_name_ru: customNew ? (names.ru.trim() || undefined) : undefined,
@@ -396,6 +861,22 @@ const PlaceForm = ({ branchId, initial, platformSuggestions, platformPrices, onC
             />
             <span className="muted" style={{ fontSize: 11 }}>{t("subplatform.tierUnpricedNote")}</span>
           </div>
+        ) : !isCustomPlatform && branchRate !== null ? (
+          // A known platform bills from the branch's tariff matrix. Shown as
+          // APPLIED, exactly like a sub-category's or a custom platform's
+          // price: it belongs to the branch and is changed in Branch Prices,
+          // not per place. The box below is how one seat departs from it.
+          <div className="col" style={{ gap: 6 }}>
+            <span className="label">{t("place.hourlyRate")} · {typeLabel}</span>
+            <div
+              className="card"
+              style={{ padding: "10px 12px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}
+            >
+              <span>{t("place.branchDefaultRate")}</span>
+              <strong style={{ color: "#07ddf1" }}>{money(branchRate)}</strong>
+            </div>
+            <span className="muted" style={{ fontSize: 11 }}>{t("place.branchDefaultNote")}</span>
+          </div>
         ) : isCustomPlatform && (tierLocked ? (
           // This platform + tier is already priced — applied, not re-entered.
           <div className="col" style={{ gap: 6 }}>
@@ -438,6 +919,389 @@ const PlaceForm = ({ branchId, initial, platformSuggestions, platformPrices, onC
             <span className="muted" style={{ fontSize: 11 }}>{t("place.customPlatformNote")}</span>
           </div>
         ))}
+
+        {/* This seat's own price per hour.
+            Shown only where the form is not already asking for a rate, so a
+            place never carries two price boxes for one number. Empty is the
+            normal case and means the price above applies — the sub-category's,
+            the custom platform's, or the branch's matrix cell. */}
+        {!collectsPlatformRate && (
+          <div className="col" style={{ gap: 6 }}>
+            <PriceInput
+              label={t("place.ownRate")}
+              value={placeRate}
+              onChange={setPlaceRate}
+              placeholder={t("place.ownRateInherit")}
+              disabled={busy}
+            />
+            <span className="muted" style={{ fontSize: 11 }}>{t("place.ownRateNote")}</span>
+            {/* A PlayStation seat with nothing to bill at. The server refuses
+                it; this is what stops the operator finding that out at the
+                counter, on a seat they thought was finished. */}
+            {ownRateIsNotAPrice && (
+              <span className="error" style={{ fontSize: 11 }}>{t("place.zeroNotAPriceHint")}</span>
+            )}
+            {needsOwnRate && (
+              <span className="error" style={{ fontSize: 11 }}>{t("place.noBranchRateHint")}</span>
+            )}
+          </div>
+        )}
+
+        {/* The room's joystick policy, for PlayStation seats only.
+            "As in the branch" is the normal case and the one every seat starts
+            on: the room prices nothing, and the box beside it shows the
+            VENUE's figure, read-only. */}
+        {isPlayStation && (
+          <div className="col" style={{ gap: 16 }}>
+            {/* One decision with three answers, and each answer carries the
+                fields it owns. They were four bare radios across two headings
+                with the branch's price box across the row from the radio that
+                explained it, which reads as unrelated lines rather than as a
+                choice. */}
+            <div className="col" style={{ gap: 8 }}>
+              <span className="label">{t("place.joysticks")}</span>
+              <div className="col" role="radiogroup" aria-label={t("place.joysticks")} style={{ gap: 8 }}>
+                <div className={`cp-choice${joystickMode === "" ? " is-active" : ""}`}>
+                  <Radio
+                    name="cp-place-joystick-mode"
+                    checked={joystickMode === ""}
+                    onChange={() => { setJoystickMode(""); setJoystickModeTouched(true); }}
+                    disabled={busy}
+                    label={t("place.joystickInherit")}
+                  />
+                  {/* The venue's figure, shown where the answer is made and not
+                      typeable: the price is the branch's, and a box that
+                      discards what is typed into it is worse than no box. */}
+                  {joystickMode === "" && (
+                    <div className="cp-choice__body" style={{ maxWidth: 260 }}>
+                      <PriceInput
+                        label={t("place.joystickPrice")}
+                        value={joystickPriceShown !== null ? String(joystickPriceShown) : ""}
+                        onChange={() => {}}
+                        placeholder={t("place.joystickInherit")}
+                        disabled
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* HOW this room sells its extra pads. The two answers are the ones
+                `places.joystick_charge_mode` has always held — a fee every time
+                a pad is handed over, or one fee for the seat however many change
+                hands — and each collects the figures its own shape needs. */}
+            <div className="col" style={{ gap: 6 }}>
+              <span className="label">{t("place.joystickPayment")}</span>
+              <div
+                className="col"
+                role="radiogroup"
+                aria-label={t("place.joystickPayment")}
+                style={{ gap: 8 }}
+              >
+                <div className={`cp-choice${joystickMode === "each" ? " is-active" : ""}`}>
+                  <Radio
+                    name="cp-place-joystick-mode"
+                    checked={joystickMode === "each"}
+                    onChange={() => { setJoystickMode("each"); setJoystickModeTouched(true); }}
+                    disabled={busy}
+                    label={t("joystickPrice.chargeMode.each")}
+                  />
+                  {/* Two figures, because this method prices the pads one at a
+                      time. The fourth may be left empty: the server prices it
+                      like the third, which is the fallback it has always had
+                      for a null here. */}
+                  {joystickMode === "each" && (
+                    <div className="cp-choice__body">
+                      <div className="row" style={{ gap: 10, flexWrap: "wrap", alignItems: "flex-end" }}>
+                        <div style={{ flex: 1, minWidth: 160 }}>
+                          <PriceInput
+                            label={t("place.joystickThirdPrice")}
+                            value={joystickPrice}
+                            onChange={setJoystickPrice}
+                            placeholder={t("place.joystickThirdPlaceholder")}
+                            disabled={busy}
+                          />
+                        </div>
+                        <div style={{ flex: 1, minWidth: 160 }}>
+                          <PriceInput
+                            label={t("place.joystickFourthPrice")}
+                            value={joystickPrice4}
+                            onChange={setJoystickPrice4}
+                            placeholder={t("place.joystickFourthPlaceholder")}
+                            disabled={busy}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className={`cp-choice${joystickMode === "once" ? " is-active" : ""}`}>
+                  <Radio
+                    name="cp-place-joystick-mode"
+                    checked={joystickMode === "once"}
+                    onChange={() => { setJoystickMode("once"); setJoystickModeTouched(true); }}
+                    disabled={busy}
+                    label={t("joystickPrice.chargeMode.once")}
+                  />
+                  {/* One figure: the fee is taken once for the seat, so the
+                      pair cannot be priced apart. */}
+                  {joystickMode === "once" && (
+                    <div className="cp-choice__body" style={{ maxWidth: 260 }}>
+                      <PriceInput
+                        label={t("place.joystickPairPrice")}
+                        value={joystickPrice}
+                        onChange={setJoystickPrice}
+                        placeholder={t("place.joystickPairPlaceholder")}
+                        disabled={busy}
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* The tariff a pad is billed on. One answer is offered, because it
+                is the one every venue uses and the other is the club's decision
+                rather than the room's; the stored value is sent back untouched
+                either way. */}
+            <div className="col" style={{ gap: 6 }}>
+              <span className="label">{t("place.joystickStrategy")}</span>
+              {/* A stated value rather than a greyed line: the section has no
+                  choice to make, and muted text beside real controls reads as
+                  something disabled. */}
+              <span className="pill">{t("place.joystickStrategyFixed")}</span>
+            </div>
+
+            {/* …and whether this room bills a pad by the hour instead. Same
+                field, same two values, same server rule — asked on its own, the
+                way the venue's own settings ask it. */}
+            <div className="col" style={{ gap: 6 }}>
+              <span className="label">{t("place.joystickTariffChange")}</span>
+              {/* Two answers, side by side and boxed like the ones above, so
+                  the form reads as one family of choices rather than as a
+                  stack of loose radios. */}
+              <div className="cp-choice-row" role="radiogroup" aria-label={t("place.joystickTariffChange")}>
+                {PRICING_MODES.map((m) => (
+                  <div key={m} className={`cp-choice${joystickStrategy === m ? " is-active" : ""}`}>
+                    <Radio
+                      name="cp-place-joystick-strategy"
+                      checked={joystickStrategy === m}
+                      onChange={() => setJoystickStrategy(m)}
+                      disabled={busy}
+                      label={t(`joystickPrice.strategy.${m}`)}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {legacySlots !== null && (
+              <span className="muted" style={{ fontSize: 11 }}>{t("place.joystickLegacySlotsNote")}</span>
+            )}
+            <span className="muted" style={{ fontSize: 11 }}>
+              {isOwnJoystickRule ? t("place.joystickOwnNote") : t("place.joystickBranchNote")}
+            </span>
+          </div>
+        )}
+
+        {/* What a room on a custom platform hands out besides the seat.
+            The PlayStation section above asks the same question in its own
+            vocabulary; this is the version for a table that deals chips or
+            lends a cue, and the operator supplies the word. Empty is the
+            answer for a room that hands out nothing, so the pricing half
+            stays out of the way until there is something to price. */}
+        {isCustomPlatform && (
+          <div className="col" style={{ gap: 8 }}>
+            <div className="col" style={{ gap: 4 }}>
+              <span className="label">{t("place.extraItem")}</span>
+              <span className="muted" style={{ fontSize: 11 }}>{t("place.extraItemHint")}</span>
+            </div>
+            <div className="row" style={{ gap: 12, flexWrap: "wrap" }}>
+              <Input
+                label={t("place.extraItemName")}
+                value={extraName}
+                onChange={(e) => setExtraName(e.target.value)}
+                placeholder={t("place.extraItemNamePlaceholder")}
+                maxLength={40}
+                disabled={busy}
+              />
+              <div style={{ maxWidth: 200 }}>
+                <PriceInput
+                  label={t("place.extraItemPrice")}
+                  value={extraPrice}
+                  onChange={setExtraPrice}
+                  disabled={busy || extraName.trim() === ""}
+                />
+              </div>
+              {/* …and the SECOND figure, when the room prices the ones after
+                  the first apart. The pads name the fourth pad's own price for
+                  exactly this reason; an extra is counted rather than slotted,
+                  so what generalises is "the first, then the rest". Empty is
+                  "priced like the first" and is what every room is. */}
+              <div style={{ maxWidth: 200 }}>
+                <PriceInput
+                  label={t("place.extraItemPriceNext")}
+                  value={extraPriceNext}
+                  onChange={setExtraPriceNext}
+                  disabled={busy || extraName.trim() === ""}
+                />
+              </div>
+            </div>
+
+            {/* From here down this is the PADS' section, asked in the
+                operator's own word: the same three questions in the same
+                order, laid out the same way, because a venue that has learned
+                one has learned both. Asked only once there is a thing to
+                charge for. */}
+            {extraName.trim() !== "" && (
+              <>
+                {/* 1. The payment method: two full-width cards, stacked, as
+                       the pads' own question is. */}
+                <div className="col" style={{ gap: 6 }}>
+                  <span className="label">{t("place.extraItemPayment")}</span>
+                  <div
+                    className="col"
+                    role="radiogroup"
+                    aria-label={t("place.extraItemPayment")}
+                    style={{ gap: 8 }}
+                  >
+                    <div className={`cp-choice${extraChargeMode === "each" ? " is-active" : ""}`}>
+                      <Radio
+                        name="cp-place-extra-mode"
+                        checked={extraChargeMode === "each"}
+                        onChange={() => setExtraChargeMode("each")}
+                        disabled={busy}
+                        label={fmt(t("place.extraItemEach"), extraName.trim())}
+                      />
+                    </div>
+                    <div className={`cp-choice${extraChargeMode === "once" ? " is-active" : ""}`}>
+                      <Radio
+                        name="cp-place-extra-mode"
+                        checked={extraChargeMode === "once"}
+                        onChange={() => setExtraChargeMode("once")}
+                        disabled={busy}
+                        label={fmt(t("place.extraItemOnce"), extraName.trim())}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* 2. How many of them the rate already covers.
+                       The pads answer this on the BRANCH, once for the venue.
+                       This one is the room's alone: a poker table and a
+                       billiard table in one building hand out different
+                       things, so a single number above them both would be a
+                       number about nothing. Empty is "none", which is what
+                       every room is until somebody answers. */}
+                <div className="col" style={{ gap: 6 }}>
+                  <div style={{ maxWidth: 200 }}>
+                    <Input
+                      label={t("place.extraItemIncluded")}
+                      value={extraIncluded}
+                      onChange={(e) => setExtraIncluded(e.target.value.replace(/[^0-9]/g, ""))}
+                      type="text"
+                      inputMode="numeric"
+                      placeholder="0"
+                      maxLength={3}
+                      disabled={busy}
+                    />
+                  </div>
+                  <span className="muted" style={{ fontSize: 11 }}>
+                    {fmt(t("place.extraItemIncludedNote"), extraName.trim())}
+                  </span>
+                </div>
+
+                {/* 2b. How many EXIST. The pads carry both numbers for the
+                       same reason: the one above says how many are FREE, this
+                       says how many there ARE, and a room owning three cues
+                       needs the fourth to stop being addable rather than
+                       merely cost money. Empty is "no ceiling of its own",
+                       which is every room until somebody answers. */}
+                <div className="col" style={{ gap: 6 }}>
+                  <div style={{ maxWidth: 200 }}>
+                    <Input
+                      label={t("place.extraItemMax")}
+                      value={extraMax}
+                      onChange={(e) => setExtraMax(e.target.value.replace(/[^0-9]/g, ""))}
+                      type="text"
+                      inputMode="numeric"
+                      placeholder="∞"
+                      maxLength={3}
+                      disabled={busy}
+                    />
+                  </div>
+                  <span className="muted" style={{ fontSize: 11 }}>
+                    {fmt(t("place.extraItemMaxNote"), extraName.trim())}
+                  </span>
+                </div>
+
+                {/* 2c. WHICH ones are charged. The allowance above is a count,
+                       and everything above a count is above it — "the third
+                       costs money and the fourth does not" is a sentence it
+                       cannot speak. The pads grew `joystick_charged_slots` for
+                       exactly this. Empty is "the count answers", which is
+                       every room until somebody names them. */}
+                <div className="col" style={{ gap: 6 }}>
+                  <div style={{ maxWidth: 200 }}>
+                    <Input
+                      label={t("place.extraItemChargedUnits")}
+                      value={extraUnits}
+                      onChange={(e) => setExtraUnits(e.target.value.replace(/[^0-9,]/g, ""))}
+                      type="text"
+                      inputMode="numeric"
+                      placeholder="3,4"
+                      maxLength={64}
+                      disabled={busy}
+                    />
+                  </div>
+                  <span className="muted" style={{ fontSize: 11 }}>
+                    {fmt(t("place.extraItemChargedUnitsNote"), extraName.trim())}
+                  </span>
+                </div>
+
+                {/* 3. The tariff, stated rather than chosen — one answer, the
+                       one every room uses, and the choice below is what moves
+                       it. A stated value rather than a greyed control, for the
+                       same reason the pads' section gives. */}
+                <div className="col" style={{ gap: 6 }}>
+                  <span className="label">{fmt(t("place.extraItemStrategy"), extraName.trim())}</span>
+                  <span className="pill">{t("place.extraItemStrategyFixed")}</span>
+                </div>
+
+                {/* 4. …and whether the room rents it by the hour instead. Same
+                       field, same two values, same server rule as the pads. */}
+                <div className="col" style={{ gap: 6 }}>
+                  <span className="label">{t("place.extraItemTariffChange")}</span>
+                  <div
+                    className="cp-choice-row"
+                    role="radiogroup"
+                    aria-label={t("place.extraItemTariffChange")}
+                  >
+                    {PRICING_MODES.map((m) => (
+                      <div key={m} className={`cp-choice${extraPricingMode === m ? " is-active" : ""}`}>
+                        <Radio
+                          name="cp-place-extra-strategy"
+                          checked={extraPricingMode === m}
+                          onChange={() => setExtraPricingMode(m)}
+                          disabled={busy}
+                          label={t(`joystickPrice.strategy.${m}`)}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <span className="muted" style={{ fontSize: 11 }}>
+                  {extraPricingMode === "hourly"
+                    ? fmt(t("place.extraItemHourlyNote"), extraName.trim())
+                    : fmt(t("place.extraItemFixedNote"), extraName.trim())}
+                </span>
+              </>
+            )}
+          </div>
+        )}
 
         {isCustomPlatform ? (
           <div className="col" style={{ gap: 6 }}>

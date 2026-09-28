@@ -149,15 +149,18 @@ describe("SessionTimer", () => {
   });
 
   test("a session made unlimited mid-block is not charged the whole block", () => {
-    // Half an hour played, the end removed a minute ago, the committed window
-    // still open. Until 2026-09-06 this read a flat 1500 — the block was
-    // treated as sold and the switch protected it. It is 750: the minutes
-    // played, at the tariff's rate, exactly as if nobody had touched it.
+    // Half an hour played, the end removed a minute ago. Until 2026-09-06 this
+    // read a flat 1500 — the block was treated as sold. It is 750: the minutes
+    // played, at the tariff's rate. The row is the shape the server writes on
+    // the switch: `committed_until` = the switch instant and
+    // `committed_amount` = what 29 minutes had earned (725), then one minute
+    // more at the same rate.
     render(<SessionTimer
       session={fixed({
         ends_at: null,
         unlimited_at: new Date(Date.now() - 60_000).toISOString(),
-        committed_until: new Date(Date.now() + 30 * 60_000).toISOString(),
+        committed_until: new Date(Date.now() - 60_000).toISOString(),
+        committed_amount: 725,
         hourly_rate: 1500,
       })}
       formatMoney={money}

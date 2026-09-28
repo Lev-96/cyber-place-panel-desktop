@@ -3,18 +3,29 @@ import {
   AddItemBody,
   apiAddSessionItem,
   apiAddSessionItems,
+  apiResolveSessionItemsText,
+  IResolvedItems,
+  type IItemChoice,
   apiAddSessionJoystick,
   apiAddSessionTime,
   apiSessionExtensionOptions,
   apiTransferExtension,
+  apiRelocationOptions,
+  apiRelocateSession,
+  type IRelocationOptions,
+  type RelocateSessionBody,
   type IExtensionOptions,
   apiExtendSession,
   apiListEventsForSession,
+  apiListSessionEventActors,
   apiListSessionEvents,
   apiMakeSessionUnlimited,
   apiRemoveSessionJoystick,
   apiSetSessionFree,
+  apiPauseSession,
+  apiResumeSession,
   ISessionEvent,
+  ISessionEventActor,
   ListSessionEventsParams,
   apiListActiveSessions,
   apiListAllActiveSessions,
@@ -23,6 +34,7 @@ import {
   apiListSessions,
   apiPreviewSession,
   apiRemoveSessionItem,
+  apiReturnSessionItem,
   apiSetSessionItemQty,
   apiStartSession,
   apiStopSessionWithBreakdown,
@@ -85,8 +97,19 @@ export class SessionRepository {
   async addItems(sessionId: number, items: AddItemBody[]): Promise<ISessionApi> {
     return friendlyMutation(apiAddSessionItems(sessionId, { items }).then((r) => r.session));
   }
+  /**
+   * What the typed lines would put on the bill. Reads only — the confirm still
+   * goes through `addItems`, so there is one write path and one history.
+   */
+  async resolveItemsText(sessionId: number, text: string, choices?: IItemChoice[]): Promise<IResolvedItems> {
+    return friendlyMutation(apiResolveSessionItemsText(sessionId, text, choices).then((r) => r.resolved));
+  }
   async setItemQty(sessionId: number, itemId: number, qty: number): Promise<ISessionApi> {
     return friendlyMutation(apiSetSessionItemQty(sessionId, itemId, qty).then((r) => r.session));
+  }
+  /** The room's hourly extra came back: stop its clock, keep its charge. */
+  async returnItem(sessionId: number, itemId: number): Promise<ISessionApi> {
+    return friendlyMutation(apiReturnSessionItem(sessionId, itemId).then((r) => r.session));
   }
   async removeItem(sessionId: number, itemId: number): Promise<ISessionApi> {
     return friendlyMutation(apiRemoveSessionItem(sessionId, itemId).then((r) => r.session));
@@ -105,8 +128,8 @@ export class SessionRepository {
    * button that does nothing for no stated reason.
    */
 
-  async addJoystick(sessionId: number): Promise<ISessionApi> {
-    return friendlyMutation(apiAddSessionJoystick(sessionId).then((r) => r.session));
+  async addJoystick(sessionId: number, slot?: number): Promise<ISessionApi> {
+    return friendlyMutation(apiAddSessionJoystick(sessionId, slot).then((r) => r.session));
   }
 
   async removeJoystick(sessionId: number, slot: number): Promise<ISessionApi> {
@@ -131,8 +154,26 @@ export class SessionRepository {
     return friendlyMutation(apiTransferExtension(sessionId, placeId, minutes).then((r) => r.session));
   }
 
+  /** Read-only advice: see `apiRelocationOptions`. */
+  async relocationOptions(sessionId: number): Promise<IRelocationOptions> {
+    return apiRelocationOptions(sessionId);
+  }
+
+  /** «Переместить игрока», atomically. May still be refused — the list is stale. */
+  async relocate(sessionId: number, body: RelocateSessionBody): Promise<ISessionApi> {
+    return friendlyMutation(apiRelocateSession(sessionId, body).then((r) => r.session));
+  }
+
   async setFree(sessionId: number, isFree: boolean): Promise<ISessionApi> {
     return friendlyMutation(apiSetSessionFree(sessionId, isFree).then((r) => r.session));
+  }
+
+  async pause(sessionId: number): Promise<ISessionApi> {
+    return friendlyMutation(apiPauseSession(sessionId).then((r) => r.session));
+  }
+
+  async resume(sessionId: number): Promise<ISessionApi> {
+    return friendlyMutation(apiResumeSession(sessionId).then((r) => r.session));
   }
 
   /* ── the audit trail ─────────────────────────────────────────────────── */
@@ -141,8 +182,12 @@ export class SessionRepository {
     return orFallback(apiListSessionEvents(params).then((r) => r.data), []);
   }
 
-  async eventsForSession(sessionId: number): Promise<ISessionEvent[]> {
-    return orFallback(apiListEventsForSession(sessionId).then((r) => r.data), []);
+  async eventsForSession(sessionId: number, userId?: number): Promise<ISessionEvent[]> {
+    return orFallback(apiListEventsForSession(sessionId, userId).then((r) => r.data), []);
+  }
+
+  async listEventActors(branchId: number): Promise<ISessionEventActor[]> {
+    return orFallback(apiListSessionEventActors(branchId).then((r) => r.data), []);
   }
 }
 

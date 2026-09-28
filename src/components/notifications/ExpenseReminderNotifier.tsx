@@ -155,7 +155,7 @@ const ExpenseReminderNotifier = () => {
         <button
           type="button"
           onClick={() => setToast(null)}
-          aria-label="Dismiss"
+          aria-label={t("action.close")}
           style={{ ...toastBtn, marginLeft: "auto", color: "#9ca3af" }}
         >
           ×

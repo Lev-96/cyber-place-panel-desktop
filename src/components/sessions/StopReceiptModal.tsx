@@ -1,12 +1,15 @@
 import { SkeletonText } from "@/components/ui/Skeleton";
 import Button from "@/components/ui/Button";
-import Input from "@/components/ui/Input";
 import type { PaymentMethod } from "@/api/sessions";
 import Modal from "@/components/ui/Modal";
+import PaymentMethodPicker, { paymentNoteMissing } from "@/components/payments/PaymentMethodPicker";
 import Spinner from "@/components/ui/Spinner";
 import { IBillBreakdown } from "@/api/sessions";
 import { useLang } from "@/i18n/LanguageContext";
-import { preciseWhenSmall } from "@/i18n/currency";
+import { fmt } from "@/i18n/translations";
+import { useConfirm } from "@/components/ui/ConfirmProvider";
+import { notify } from "@/ui/notify";
+import { sharedPrecision } from "@/i18n/currency";
 import { sessionRepository } from "@/repositories/SessionRepository";
 import { ISessionApi } from "@/types/sessions";
 import { useEffect, useState } from "react";
@@ -35,6 +38,7 @@ const fmtDuration = (mins: number, t: (k: string) => string) => {
  */
 const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved }: Props) => {
   const { money, t } = useLang();
+  const ask = useConfirm();
   const [bill, setBill] = useState<IBillBreakdown | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -66,10 +70,16 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved }: Prop
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session.id]);
 
-  const remove = async (itemId: number) => {
+  const remove = async (itemId: number, name: string, additional: boolean) => {
+    // Asked first, as on the Add Product dialog: one misplaced click must not
+    // take a line off the bill a guest is about to pay. An additional item is
+    // asked about — and reported — as what it is.
+    const question = additional ? "session.additionalRemoveConfirm" : "session.removeConfirm";
+    if (!(await ask(fmt(t(question), name), { destructive: true }))) return;
     setBusy(true);
     try {
       await sessionRepository.removeItem(session.id, itemId);
+      notify.message("error", fmt(t(additional ? "session.additionalRemoved" : "session.removedOne"), name));
       onItemRemoved();
       await reload();
     } catch (e) {
@@ -81,7 +91,7 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved }: Prop
     // ⚠️ Checked here so the cashier is told BEFORE the request, but the server
     // enforces the same rule and is what actually decides — this is a courtesy,
     // not the guard. A stop refused for a missing note leaves the seat running.
-    if (method === "other" && other.trim() === "") {
+    if (paymentNoteMissing(method, other)) {
       setErr(t("session.payOtherRequired"));
       return;
     }
@@ -105,18 +115,17 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved }: Prop
 
   const view = stopped ?? bill;
 
-  /**
-   * How the money is being taken.
-   *
-   * Radio rather than checkboxes: it is one answer, and a set of checkboxes
-   * invites two. Cash leads because it is the common case at a counter, and a
-   * default means the ordinary stop stays one click.
-   */
-  const methods: { key: PaymentMethod; label: string }[] = [
-    { key: "cash", label: t("session.payCash") },
-    { key: "card", label: t("session.payCard") },
-    { key: "other", label: t("session.payOther") },
-  ];
+  // ONE precision decision for the whole receipt, taken from every figure on
+  // it. Deciding per figure printed "4.72", "500" and "505" on the same bill:
+  // the first is under the per-figure threshold and the other two are over it,
+  // so the column stopped adding up. A receipt is read as a column.
+  const receiptPrecision = view === null ? undefined : sharedPrecision([
+    Number(view.time_cost),
+    Number(view.total),
+    ...(view.joysticks ?? []).map((j) => Number(j.amount)),
+    ...view.items.map((it) => Number(it.line_total)),
+  ]);
+
 
   /**
    * The seat is already over — its paid period ran out and the server ended it,
@@ -163,14 +172,14 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved }: Prop
                 <>
                   {view.mode === "open" && view.hourly_rate != null && (
                     <span className="muted" style={{ marginRight: 12, fontSize: 12 }}>
-                      {money(Number(view.hourly_rate))}/{t("time.hourShort") || "h"}
+                      {money(Number(view.hourly_rate), receiptPrecision)}/{t("time.hourShort") || "h"}
                     </span>
                   )}
                   {/* Arithmetic, not a typed price: a short session at twelve an
                       hour is a third of a unit, and "0" reads as "nothing was
                       charged". */}
                   <span style={{ fontWeight: 700 }}>
-                    {money(Number(view.time_cost), preciseWhenSmall(Number(view.time_cost)))}
+                    {money(Number(view.time_cost), receiptPrecision)}
                   </span>
                 </>
               )}
@@ -196,7 +205,16 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved }: Prop
                   {j.minutes} {t("time.minShort") || "m"}
                   {!j.is_charged && ` · ${t("session.joystickReturned")}`}
                 </span>
-                <span style={{ fontWeight: 700 }}>{money(Number(j.amount))}</span>
+                {/* The same precision rule as the total below, deliberately.
+                    This line used to round to whole units while the time cost
+                    and the total printed cents, so a receipt read "21.94 + 1 =
+                    23.05" — three figures that do not add up, on the one screen
+                    a cashier checks with their eyes. Under the hourly strategy
+                    a pad's share of a short session is normally a fraction, so
+                    it was not an edge case; it was every receipt. */}
+                <span style={{ fontWeight: 700 }}>
+                  {money(Number(j.amount), receiptPrecision)}
+                </span>
               </div>
             ))}
 
@@ -204,12 +222,21 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved }: Prop
             {view.items.map((it) => (
               <div key={it.id} style={row}>
                 <span style={{ flex: 1 }}>{it.name}{it.qty > 1 ? ` × ${it.qty}` : ""}</span>
+                {/* An HOURLY line is a rate and a duration, so it reads like a
+                    pad's line rather than like a drink's: "90 m · 700/h", and
+                    "returned" once its clock has stopped. Printing "700 × 1"
+                    beside an amount of 1 050 is three figures that do not add
+                    up, on the one screen a cashier checks with their eyes. */}
                 <span className="muted" style={{ marginRight: 12, fontSize: 12 }}>
-                  {money(Number(it.price))}{it.qty > 1 ? ` × ${it.qty}` : ""}
+                  {it.is_hourly
+                    ? `${it.minutes ?? 0} ${t("time.minShort") || "m"} · ${money(Number(it.price), receiptPrecision)}${t("session.extraPerHour")}${it.qty > 1 ? ` × ${it.qty}` : ""}${it.returned_at ? ` · ${t("session.extraReturned")}` : ""}`
+                    : `${money(Number(it.price), receiptPrecision)}${it.qty > 1 ? ` × ${it.qty}` : ""}`}
                 </span>
-                <span style={{ fontWeight: 700, marginRight: 8 }}>{money(Number(it.line_total))}</span>
+                <span style={{ fontWeight: 700, marginRight: 8 }}>
+                  {money(Number(it.line_total), receiptPrecision)}
+                </span>
                 {!finished && (
-                  <button type="button" onClick={() => remove(it.id)} disabled={busy} style={removeBtn} title={t("session.removeItemTitle")}>
+                  <button type="button" onClick={() => void remove(it.id, it.name, it.is_additional === true)} disabled={busy} style={removeBtn} title={t("session.removeItemTitle")}>
                     ×
                   </button>
                 )}
@@ -228,7 +255,7 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved }: Prop
               <span style={{ fontWeight: 800, fontSize: 18, color: "#07ddf1" }}>
                 {view.is_free
                   ? t("session.freeBill")
-                  : money(Number(view.total), preciseWhenSmall(Number(view.total)))}
+                  : money(Number(view.total), receiptPrecision)}
               </span>
             </div>
           </div>
@@ -238,36 +265,15 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved }: Prop
             the receipt above is the record of it. A live radio group under a
             closed bill invites an edit that nothing would accept. */}
         {!finished && (
-          <div className="col" style={{ gap: 6, marginTop: 6 }}>
-            <strong style={{ fontSize: 13 }}>{t("session.payTitle")}</strong>
-            <div className="row" style={{ gap: 14, flexWrap: "wrap" }}>
-              {methods.map((m) => (
-                <label
-                  key={m.key}
-                  className="row"
-                  style={{ gap: 6, alignItems: "center", cursor: "pointer", fontSize: 13 }}
-                >
-                  <input
-                    type="radio"
-                    name={`pay-${session.id}`}
-                    value={m.key}
-                    checked={method === m.key}
-                    disabled={busy}
-                    onChange={() => { setMethod(m.key); setErr(null); }}
-                  />
-                  <span>{m.label}</span>
-                </label>
-              ))}
-            </div>
-            {method === "other" && (
-              <Input
-                value={other}
-                onChange={(e) => { setOther(e.target.value); setErr(null); }}
-                placeholder={t("session.payOtherPlaceholder")}
-                disabled={busy}
-              />
-            )}
-          </div>
+          // The one list of methods, shared with the till (PaymentMethodPicker).
+          <PaymentMethodPicker
+            name={`pay-${session.id}`}
+            method={method}
+            onMethod={(m) => { setMethod(m); setErr(null); }}
+            note={other}
+            onNote={(v) => { setOther(v); setErr(null); }}
+            disabled={busy}
+          />
         )}
 
         {err && <div className="error">{err}</div>}

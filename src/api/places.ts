@@ -18,6 +18,49 @@ export interface CreatePlaceBody {
   platform: string;
   hourly_rate?: number | null;
   /**
+   * Per-place joystick policy. Null is INHERIT: the place falls back to the
+   * branch's `joystick_included` / `joystick_price`, which is where the rule
+   * lives for every seat that has no reason to differ.
+   *
+   * Sent for PlayStation places only. For anything else the panel sends null,
+   * so a seat that stops being a PlayStation stops carrying an override for
+   * one — the same thing `hourly_rate` does when a platform stops being custom.
+   */
+  joystick_included?: number | null;
+  joystick_price?: number | null;
+  /** Which extra pads this room charges for: "3", "4" or "3,4". Null inherits. */
+  joystick_charged_slots?: string | null;
+  /**
+   * The fourth pad's own price, when this room prices it apart from the third.
+   * Null means the pair shares one figure; 0 means the fourth is handed over
+   * for nothing. The server refuses a figure here unless the room charges for
+   * the fourth pad and names a base price too.
+   */
+  joystick_price_4?: number | null;
+  /**
+   * What a room on a CUSTOM platform hands out besides the seat, in the word
+   * the room uses for it: chips on a poker table, a cue on a billiard table.
+   *
+   * Null on every other platform and on every room nobody has configured.
+   * Unlike the joystick fields above these inherit NOTHING — a branch holds
+   * one PlayStation policy, but not one policy for every custom platform in
+   * the building — so null here means "hands out nothing", full stop.
+   */
+  extra_item_name?: string | null;
+  extra_item_price?: number | null;
+  extra_item_charge_mode?: "each" | "once" | null;
+  extra_item_pricing_mode?: "fixed" | "hourly" | null;
+  /**
+   * How many units the room's rate covers before anything is charged. Null is
+   * "none", which is what the server reads an absent value as. Sent as null
+   * for every known platform, exactly as the four fields above are.
+   */
+  extra_item_included?: number | null;
+  extra_item_max?: number | null;
+  extra_item_charged_units?: string | null;
+  /** What each CHARGED unit after the first costs. NULL = priced like it. */
+  extra_item_price_next?: number | string | null;
+  /**
    * Display наименование for a brand-new custom platform's branch price. Only
    * meaningful when the platform is custom AND not yet priced; ignored
    * otherwise. Not a Place column — the backend forwards it to the price row.

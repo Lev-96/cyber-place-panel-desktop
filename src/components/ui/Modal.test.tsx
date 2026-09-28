@@ -1,14 +1,16 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, test, vi } from "vitest";
-import Modal from "./Modal";
+import Modal, { MODAL_LEAVE_MS } from "./Modal";
 
 afterEach(() => cleanup());
 
 const flush = () => new Promise<void>((r) => setTimeout(r, 0));
+/** Past the leave animation: a close the MODAL starts reaches `onClose` then. */
+const afterLeave = () => act(async () => { await new Promise<void>((r) => setTimeout(r, MODAL_LEAVE_MS + 30)); });
 
 describe("Modal — backdrop close (mousedown→mouseup)", () => {
-  test("closes when both mousedown and mouseup land on backdrop", () => {
+  test("closes when both mousedown and mouseup land on backdrop", async () => {
     const onClose = vi.fn();
     render(
       <Modal open onClose={onClose}>
@@ -20,6 +22,9 @@ describe("Modal — backdrop close (mousedown→mouseup)", () => {
     fireEvent.mouseDown(wrapper, { target: wrapper });
     fireEvent.mouseUp(wrapper, { target: wrapper });
 
+    // After the leave animation, once.
+    expect(onClose).not.toHaveBeenCalled();
+    await afterLeave();
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
@@ -72,6 +77,7 @@ describe("Modal — keyboard", () => {
       window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
       await flush();
     });
+    await afterLeave();
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
@@ -84,7 +90,9 @@ describe("Modal — keyboard", () => {
       </Modal>,
     );
     const first = screen.getByTestId("first");
-    const last = screen.getByTestId("last");
+    // The × is the dialog's last control — last in the DOM on purpose, so a
+    // form's first field stays the first stop.
+    const last = document.querySelector(".cp-modal-close") as HTMLElement;
 
     last.focus();
     expect(document.activeElement).toBe(last);
@@ -105,7 +113,7 @@ describe("Modal — keyboard", () => {
       </Modal>,
     );
     const first = screen.getByTestId("first");
-    const last = screen.getByTestId("last");
+    const last = document.querySelector(".cp-modal-close") as HTMLElement;
 
     first.focus();
     expect(document.activeElement).toBe(first);

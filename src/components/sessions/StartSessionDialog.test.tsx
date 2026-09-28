@@ -37,6 +37,27 @@ vi.mock("@/repositories/SessionRepository", () => ({
   },
 }));
 vi.mock("@/auth/AuthContext", () => ({ useAuth: () => ({ user: { id: 1, role: auth.role } }) }));
+// The dialog reads the club's billing policy to decide whether to ask which
+// joystick strategy this seat runs on. Without this stub that read left the
+// process as a real request to the backend, which answered 401 and surfaced as
+// an unhandled rejection attributed to whichever test was running.
+const club = vi.hoisted(() => ({ mode: "fixed_price" as string }));
+vi.mock("@/repositories/BillingSettingsRepository", () => ({
+  billingSettingsRepository: {
+    get: () => Promise.resolve({
+      branch_id: 7,
+      money_rounding_step: 0,
+      money_rounding_mode: "up",
+      joystick_price: 500,
+      joystick_included: 2,
+      joystick_charged_slots: "3,4",
+      joystick_pricing_mode: "fixed",
+      joystick_price_4: null,
+      joystick_max_slot: 4,
+      joystick_strategy_mode: club.mode,
+    }),
+  },
+}));
 vi.mock("@/repositories/BranchRepository", () => ({
   branchRepository: { byId: vi.fn().mockResolvedValue({ id: 7, price_for_branch: { "ps5-standard": 1500 } }) },
 }));
@@ -232,5 +253,83 @@ describe("starting a session free", () => {
     });
 
     expect(start().disabled).toBe(false);
+  });
+
+  // ── the rate the dialog offers ────────────────────────────────────────
+
+  /**
+   * The seat's price comes from the SERVER, because only the server can see it.
+   *
+   * A subcategory ("PS5 + VR") prices the place, and the place's rate never
+   * reaches this dialog: `/pcs` sends the place without it. Working the number
+   * out from the tariff matrix, which is what this component used to do, showed
+   * the plain platform price while the session was started at the subcategory's.
+   */
+  test("the server's resolved rate wins over the tariff matrix", async () => {
+    await mount(device({ assigned_hourly_rate: 2500 }));
+
+    // The matrix in this file says 1500 for ps5-standard. The seat says 2500.
+    expect(screen.getByText(/2500/)).toBeTruthy();
+    expect(screen.queryByText(/1500 /)).toBeNull();
+  });
+
+  test("without the server field the dialog falls back to the matrix", async () => {
+    // A panel pointed at a backend from before the field existed shows exactly
+    // what it always showed, rather than nothing.
+    await mount(device({ assigned_hourly_rate: undefined }));
+
+    expect(screen.getByText(/1500/)).toBeTruthy();
+  });
+
+  test("a seat priced only through a subcategory can be started", async () => {
+    // No matrix row for this platform at all: the old chain would offer
+    // nothing and block Start, while the server would have started it happily.
+    const odd = device({
+      assigned_hourly_rate: 3000,
+      hourly_rate: null,
+      place: { id: 10, number: 1, name: "VR", type: "standard", platform: "vr-room" },
+    });
+    await mount(odd);
+
+    const start = screen.getByRole("button", { name: "action.start" }) as HTMLButtonElement;
+    expect(start.disabled).toBe(false);
+    expect(screen.getByText(/3000/)).toBeTruthy();
+  });
+});
+
+
+/**
+ * The dialog does NOT ask which strategy the pads will run on, and that is the
+ * claim now.
+ *
+ * It asked for a day, on clubs that allowed both. The setting became a ROOM's —
+ * two answers, chosen where the room's price is chosen — so there is nothing
+ * left for a cashier to decide at the counter, and the server freezes the
+ * room's answer without being told.
+ */
+describe("what the start dialog deliberately does not ask", () => {
+  afterEach(() => { club.mode = "fixed_price"; });
+
+  test("never asks about the joystick strategy, whatever the club is set to", async () => {
+    for (const mode of ["change_tariff", "fixed_price", "both"]) {
+      club.mode = mode;
+      await mount(device());
+
+      expect(screen.queryByText("session.strategyChoice")).toBeNull();
+      cleanup();
+    }
+  });
+
+  test("and never sends one", async () => {
+    club.mode = "both";
+    await mount(device());
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "action.start" }));
+    });
+
+    expect(repo.start).toHaveBeenCalledWith(
+      expect.not.objectContaining({ joystick_strategy: expect.anything() }),
+    );
   });
 });

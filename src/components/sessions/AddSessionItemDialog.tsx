@@ -1,35 +1,35 @@
 import { can } from "@/auth/permissions";
 import { useAuth } from "@/auth/AuthContext";
-import { ListSkeleton } from "@/components/ui/Skeleton";
 import Button from "@/components/ui/Button";
-import ProductForm from "@/components/products/ProductForm";
 import Modal from "@/components/ui/Modal";
-import Input from "@/components/ui/Input";
-import Spinner from "@/components/ui/Spinner";
 import { fmt } from "@/i18n/translations";
 import { useLang } from "@/i18n/LanguageContext";
-import { productRepository } from "@/repositories/ProductRepository";
 import { sessionRepository } from "@/repositories/SessionRepository";
+import { sessionItemLineTotal } from "@/components/sessions/sessionAmount";
 import { notify } from "@/ui/notify";
 import { ISessionApi } from "@/types/sessions";
-import { IProduct } from "@/types/pos";
-import { useEffect, useMemo, useState } from "react";
+import { IProduct, isAdditionalProduct, isChipsProduct } from "@/types/pos";
+import { useConfirm } from "@/components/ui/ConfirmProvider";
+import { useProductBasket } from "@/components/pos/useProductBasket";
+import SectionTabs from "@/components/ui/SectionTabs";
+import {
+  BasketAdditionalItems,
+  BasketCreateProduct,
+  BasketModeSwitch,
+  BasketPicker,
+  BasketQuickEntry,
+  ellipsis,
+  rowStyle,
+  stepBtn,
+} from "@/components/pos/ProductBasketPanels";
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { IItemChoice } from "@/api/sessions";
 
 interface Props {
   branchId: number;
   session: ISessionApi;
   onClose: () => void;
   onAdded: () => void;
-}
-
-/** A line the cashier has selected but not yet confirmed. */
-interface CartLine {
-  /** Stable within the dialog: the product id, or the typed name + price. */
-  key: string;
-  product_id?: number;
-  name: string;
-  price: number;
-  qty: number;
 }
 
 /**
@@ -75,13 +75,46 @@ const AddSessionItemDialog = ({ branchId, session, onClose, onAdded }: Props) =>
   /** Mirrors the backend's `products.manage`; the two are pinned by tests on both sides. */
   const canCreateProducts = can(user?.role, "product.crud");
   const { money, t } = useLang();
-  const [products, setProducts] = useState<IProduct[] | null>(null);
-  const [search, setSearch] = useState("");
   const [saving, setSaving] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
-  const [cart, setCart] = useState<CartLine[]>([]);
+  const confirmingRef = useRef(false);
+  /** Which part of the dialog is open: the products, or the additional items. */
+  const [section, setSection] = useState<"products" | "additional">("products");
 
-  const [creating, setCreating] = useState(false);
+  /**
+   * Chips are a poker table's product, and only a poker table's.
+   *
+   * The catalogue is one list per branch, so a venue that sells chips sells
+   * them to every screen that reads it. This is where a PlayStation stops
+   * seeing them — and the server refuses the sale on the same answer, so the
+   * two cannot disagree about what a seat may be charged for.
+   *
+   * `supports_chips` is the server's own, from the seat's place. Absent on an
+   * older payload, which reads as "not a poker table": the safe direction.
+   */
+  const sellsChips = session.supports_chips === true;
+  // A withdrawn product is not for sale here either (2026-09-25): the server
+  // refuses it on the bill, as the till always did.
+  // An additional item (chips, a cue — handed out once, on any seat) is not
+  // in this list: it has its own section below, with its own rule.
+  const allow = useCallback(
+    (p: IProduct) => p.is_active !== false && !isAdditionalProduct(p) && (sellsChips || !isChipsProduct(p)),
+    [sellsChips],
+  );
+  // The picks travel only when there are some, so an ordinary read is the
+  // request it always was.
+  const resolve = useCallback(
+    (typed: string, choices: IItemChoice[]) => (choices.length > 0
+      ? sessionRepository.resolveItemsText(session.id, typed, choices)
+      : sessionRepository.resolveItemsText(session.id, typed)),
+    [session.id],
+  );
+
+  // The catalogue, the basket and the quick entry — shared with the till's
+  // sale dialog (components/pos). What the basket is FOR stays here: this
+  // seat's bill.
+  const basket = useProductBasket({ branchId, resolve, resolveKey: session.id, allow });
+  const { cart, setCart, mode, resolved, setResolved, setText, resolving, err, setErr } = basket;
+
   /**
    * The bill, as this dialog knows it.
    *
@@ -94,53 +127,22 @@ const AddSessionItemDialog = ({ branchId, session, onClose, onAdded }: Props) =>
   const [bill, setBill] = useState(session.items ?? []);
   /** Items being taken off the bill, so their row can say so. */
   const [removing, setRemoving] = useState<number[]>([]);
-
-  useEffect(() => {
-    void productRepository.listByBranch(branchId).then(setProducts);
-  }, [branchId]);
+  const ask = useConfirm();
+  // The catalogue's additional items, by id — to label them on the bill.
+  const additionalIds = new Set((basket.products ?? []).filter(isAdditionalProduct).map((p) => p.id));
+  /** The branch hands something out with the seat — only then are there two sections. */
+  const hasAdditional = (basket.products ?? []).some((p) => isAdditionalProduct(p) && p.is_active !== false);
+  const shown = hasAdditional ? section : "products";
+  const itemPayload = basket.itemLines.map((l) => ({ product_id: l.product_id as number, qty: 1 }));
+  // Typed mode: the typed lines must all resolve (a batch is never saved in
+  // part), or the box is empty and only additional items are being added.
+  const textEmpty = basket.text.trim() === "";
+  const textReady = !resolving && (textEmpty ? itemPayload.length > 0 : resolved?.ok === true && resolved.items.length > 0);
+  const onBillIds = new Set(bill.map((i) => i.product_id).filter((id): id is number => id !== null && id !== undefined));
 
   // A fresh session from the parent (after a confirm, or a realtime update)
   // replaces what we hold, so the two never drift.
   useEffect(() => { setBill(session.items ?? []); }, [session]);
-
-  /** Add one, or raise the count of the line that is already in the basket. */
-  const put = (line: Omit<CartLine, "qty">) =>
-    setCart((prev) => {
-      const at = prev.findIndex((l) => l.key === line.key);
-      if (at < 0) return [...prev, { ...line, qty: 1 }];
-      const next = [...prev];
-      next[at] = { ...next[at], qty: next[at].qty + 1 };
-      return next;
-    });
-
-  /** Move a count, dropping the line when it reaches zero. */
-  const step = (key: string, by: number) =>
-    setCart((prev) =>
-      prev.flatMap((l) => {
-        if (l.key !== key) return [l];
-        const qty = l.qty + by;
-        return qty > 0 ? [{ ...l, qty }] : [];
-      }),
-    );
-
-  const drop = (key: string) => setCart((prev) => prev.filter((l) => l.key !== key));
-
-  /**
-   * A product that now exists everywhere, and is in the basket besides.
-   *
-   * Two steps that cannot be one: the product is a row of its own, the basket
-   * is a decision not yet committed. Doing it this way means neither can leave
-   * the other half-done — the catalogue keeps the product whatever happens to
-   * the basket next, and nothing reaches the bill until the cashier confirms
-   * it, so there is no window in which a product exists "only for this
-   * session" or a bill line points at a product that was never created.
-   */
-  const onProductCreated = (p: IProduct) => {
-    setCreating(false);
-    setProducts((prev) => (prev ? [p, ...prev.filter((x) => x.id !== p.id)] : [p]));
-    put({ key: `p:${p.id}`, product_id: p.id, name: p.name, price: Number(p.price) });
-    setErr(null);
-  };
 
   /**
    * Take a line off the bill.
@@ -150,19 +152,80 @@ const AddSessionItemDialog = ({ branchId, session, onClose, onAdded }: Props) =>
    * removed. The row is disabled while it is in flight, and a refusal says why
    * instead of claiming success.
    */
-  const removeFromBill = async (itemId: number, name: string) => {
+  /**
+   * What landed, said in two parts: the products as always («… × 2»), and the
+   * additional items as what happened to them — handed out — in a toast of
+   * their own, so a cue never reads as "Cue × 1 sold".
+   */
+  const announceAdded = (products: Array<{ name: string; qty: number }>, items: string[]) => {
+    if (products.length === 1) {
+      notify.message("success", fmt(t("session.addedOne"), products[0].name, products[0].qty));
+    } else if (products.length > 1) {
+      notify.message("success", fmt(t("session.addedMany"), products.map((l) => `${l.name} × ${l.qty}`).join(", ")));
+    }
+    if (items.length > 0) notify.message("success", fmt(t("session.additionalGiven"), items.join(", ")));
+  };
+
+  const removeFromBill = async (itemId: number, name: string, additional: boolean) => {
     if (removing.includes(itemId)) return;
+    // Taking something off a bill is asked first: one misplaced click must
+    // not un-sell a drink or take a cue back. An additional item is asked
+    // about — and reported — as what it is.
+    const question = additional ? "session.additionalRemoveConfirm" : "session.removeConfirm";
+    if (!(await ask(fmt(t(question), name), { destructive: true }))) return;
     setRemoving((prev) => [...prev, itemId]);
     try {
       const updated = await sessionRepository.removeItem(session.id, itemId);
       setBill(updated?.items ?? bill.filter((i) => i.id !== itemId));
-      notify.message("error", fmt(t("session.removedOne"), name));
+      notify.message("error", fmt(t(additional ? "session.additionalRemoved" : "session.removedOne"), name));
       onAdded();
     } catch (e) {
       const reason = e instanceof Error && e.message ? e.message : t("session.failUnknown");
       notify.message("error", `${t("session.removeFailed")} ${fmt(t("session.failReason"), reason)}`);
     } finally {
       setRemoving((prev) => prev.filter((id) => id !== itemId));
+    }
+  };
+
+  /**
+   * The typed batch, confirmed — through the SAME endpoint the basket uses.
+   *
+   * The resolver handed back the exact `items` that endpoint expects, so this
+   * is the picker's write path with a different way of filling it: one
+   * request, one transaction, one audit line, and the same refusal if the
+   * session stopped meanwhile.
+   */
+  const confirmText = async () => {
+    // The ref answers a double press inside one frame; `saving` only greys
+    // the button once React has rendered.
+    if (!textReady || saving || confirmingRef.current) return;
+    confirmingRef.current = true;
+    setSaving(true);
+    setErr(null);
+    try {
+      // The typed lines AND the additional items chosen on their tab, in the
+      // one request: an item picked there must not be dropped because the
+      // products were typed rather than picked.
+      const typed = resolved?.ok ? resolved.items : [];
+      await sessionRepository.addItems(session.id, [...typed, ...itemPayload]);
+
+      announceAdded(
+        (resolved?.ok ? resolved.lines : [])
+          .filter((l) => l.product_id !== null)
+          .map((l) => ({ name: l.name ?? "", qty: l.qty ?? 0 })),
+        basket.itemLines.map((l) => l.name),
+      );
+
+      setText("");
+      setResolved(null);
+      onAdded();
+      onClose();
+    } catch (e) {
+      const reason = e instanceof Error && e.message ? e.message : t("session.failUnknown");
+      setErr(`${t("session.addFailedMany")} ${fmt(t("session.failReason"), reason)}`);
+    } finally {
+      confirmingRef.current = false;
+      setSaving(false);
     }
   };
 
@@ -183,13 +246,7 @@ const AddSessionItemDialog = ({ branchId, session, onClose, onAdded }: Props) =>
           : { name: l.name, price: l.price, qty: l.qty })),
       );
 
-      const summary = cart.map((l) => `${l.name} × ${l.qty}`).join(", ");
-      notify.message(
-        "success",
-        cart.length === 1
-          ? fmt(t("session.addedOne"), cart[0].name, cart[0].qty)
-          : fmt(t("session.addedMany"), summary),
-      );
+      announceAdded(basket.productLines, basket.itemLines.map((l) => l.name));
 
       setCart([]);
       onAdded();
@@ -208,23 +265,34 @@ const AddSessionItemDialog = ({ branchId, session, onClose, onAdded }: Props) =>
     }
   };
 
-  const filtered = useMemo(() => {
-    const needle = search.trim().toLowerCase();
-    const all = products ?? [];
-    if (!needle) return all;
-    return all.filter((p) => `${p.name} ${p.category ?? ""}`.toLowerCase().includes(needle));
-  }, [products, search]);
-
-  const cartTotal = cart.reduce((sum, l) => sum + l.price * l.qty, 0);
   const onBill = bill;
   const deviceLabel = session.pc_label ?? `№${session.pc_id}`;
-  const loading = products === null;
 
   return (
     <Modal open onClose={saving ? () => {} : onClose}>
       <div className="card" style={{ width: 560, maxWidth: "92vw", display: "flex", flexDirection: "column", gap: 12 }}>
         <h2 style={{ margin: 0 }}>{t("session.addItem")}</h2>
         <span className="muted" style={{ fontSize: 12 }}>{deviceLabel}</span>
+
+        {/* Two sections when the branch hands things out with the seat:
+            what is SOLD (products) and what is HANDED OUT (additional items).
+            One basket and one confirm behind both. */}
+        {hasAdditional && (
+          <SectionTabs
+            label={t("session.addSections")}
+            value={shown}
+            onChange={setSection}
+            disabled={saving}
+            tabs={[
+              { key: "products", label: t("session.sectionProducts"), count: mode === "picker" ? basket.productLines.length : (resolved?.ok ? resolved.items.length : 0) },
+              { key: "additional", label: t("session.additionalTitle"), count: basket.itemLines.length },
+            ]}
+          />
+        )}
+
+        {/* Two ways in — the picker, as this dialog always opened, and the
+            quick-entry box. */}
+        {shown === "products" && <BasketModeSwitch basket={basket} name="cp-session-add-mode" disabled={saving} />}
 
         {/* What the session already holds. Listed rather than summarised in a
             sentence, because each line needs its own way off the bill — and
@@ -236,14 +304,24 @@ const AddSessionItemDialog = ({ branchId, session, onClose, onAdded }: Props) =>
             <div className="col" style={{ gap: 6, maxHeight: 150, overflowY: "auto" }}>
               {onBill.map((item) => (
                 <div key={item.id} style={rowStyle}>
-                  <span style={ellipsis} title={item.name}>{item.name}</span>
-                  <span style={{ minWidth: 40, textAlign: "center", fontWeight: 700 }}>× {item.qty}</span>
+                  <span style={ellipsis} title={item.name}>
+                    {item.name}
+                    {item.product_id != null && additionalIds.has(item.product_id) && (
+                      <span className="pill" style={{ marginLeft: 6, fontSize: 10, textTransform: "none", letterSpacing: 0 }}>
+                        {t("product.kindAdditionalShort")}
+                      </span>
+                    )}
+                  </span>
+                  {/* An additional item has no count: it was handed out or not. */}
+                  <span style={{ minWidth: 40, textAlign: "center", fontWeight: 700 }}>
+                    {item.product_id != null && additionalIds.has(item.product_id) ? "" : `× ${item.qty}`}
+                  </span>
                   <span className="muted" style={{ fontSize: 11, minWidth: 74, textAlign: "right" }}>
-                    {money(Number(item.price) * item.qty)}
+                    {money(sessionItemLineTotal(item))}
                   </span>
                   <Button
                     variant="secondary"
-                    onClick={() => void removeFromBill(item.id, item.name)}
+                    onClick={() => void removeFromBill(item.id, item.name, item.product_id != null && additionalIds.has(item.product_id))}
                     disabled={saving || removing.includes(item.id)}
                     style={{ ...stepBtn, color: "#ef4444", borderColor: "#4a1a1a" }}
                     aria-label={`${t("action.delete")}: ${item.name}`}
@@ -257,157 +335,45 @@ const AddSessionItemDialog = ({ branchId, session, onClose, onAdded }: Props) =>
           </div>
         )}
 
-        {/* ── The branch catalogue ─────────────────────────────────────── */}
-        <span className="label" style={{ fontSize: 12 }}>{t("session.availableProducts")}</span>
-        {(products?.length ?? 0) > 0 && (
-          <Input placeholder={t("session.search")} value={search} onChange={(e) => setSearch(e.target.value)} />
+        {shown === "products" && mode === "picker" && (
+          <BasketPicker basket={basket} saving={saving} canCreateProducts={canCreateProducts} />
         )}
 
-        {loading ? <ListSkeleton rows={3} /> : (
-          <div className="col" style={{ gap: 6, maxHeight: 190, overflowY: "auto" }}>
-            {products?.length === 0 && (
-              <div className="muted" style={{ fontSize: 13 }}>{t("session.noProducts")}</div>
-            )}
-            {products?.length !== 0 && filtered.length === 0 && (
-              <div className="muted" style={{ fontSize: 13 }}>{t("session.noSearchMatches")}</div>
-            )}
-            {filtered.map((p) => (
-              <div key={p.id} style={rowStyle}>
-                <span style={ellipsis} title={p.name}>{p.name}</span>
-                <span className="muted" style={{ fontSize: 11 }}>{p.category || t("session.products")}</span>
-                <span style={{ fontWeight: 700, minWidth: 80, textAlign: "right" }}>{money(Number(p.price))}</span>
-                <Button
-                  onClick={() => put({ key: `p:${p.id}`, product_id: p.id, name: p.name, price: Number(p.price) })}
-                  disabled={saving}
-                  style={plusBtn}
-                  // Named per product: a column of identical "Add" buttons is
-                  // unreadable to a screen reader, and to a test.
-                  aria-label={`${t("action.add")}: ${p.name}`}
-                >
-                  +
-                </Button>
-              </div>
-            ))}
-          </div>
-        )}
+        {/* ── Quick entry ──────────────────────────────────────────────────
+            Nothing is on the bill until the cashier presses the confirm below. */}
+        {shown === "products" && mode === "text" && <BasketQuickEntry basket={basket} saving={saving} />}
 
-        {/* ── The basket ───────────────────────────────────────────────── */}
-        <div className="col" style={{ gap: 8, borderTop: "1px solid #1f2a44", paddingTop: 12 }}>
-          <div className="row-between">
-            <span className="label" style={{ fontSize: 12 }}>{t("session.addedProducts")}</span>
-            {cart.length > 0 && (
-              <span className="muted" style={{ fontSize: 12 }}>
-                {t("session.itemsTotal")}: <b>{money(cartTotal)}</b>
-              </span>
-            )}
-          </div>
+        {shown === "additional" && <BasketAdditionalItems basket={basket} saving={saving} onBill={onBillIds} />}
 
-          {cart.length === 0 ? (
-            <div className="muted" style={{ fontSize: 13 }}>{t("session.cartEmpty")}</div>
-          ) : (
-            <div className="col" style={{ gap: 6, maxHeight: 190, overflowY: "auto" }}>
-              {cart.map((line) => (
-                <div key={line.key} style={rowStyle}>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={ellipsis} title={line.name}>{line.name}</div>
-                    <div className="muted" style={{ fontSize: 11 }}>
-                      {money(line.price)} · {money(line.price * line.qty)}
-                    </div>
-                  </div>
-                  <Button
-                    variant="secondary"
-                    onClick={() => step(line.key, -1)}
-                    disabled={saving}
-                    style={stepBtn}
-                    aria-label={t("session.decrease")}
-                    title={t("session.decrease")}
-                  >
-                    −
-                  </Button>
-                  <span style={{ minWidth: 28, textAlign: "center", fontWeight: 700 }}>{line.qty}</span>
-                  <Button
-                    variant="secondary"
-                    onClick={() => step(line.key, 1)}
-                    disabled={saving}
-                    style={stepBtn}
-                    aria-label={t("session.increase")}
-                    title={t("session.increase")}
-                  >
-                    +
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    onClick={() => drop(line.key)}
-                    disabled={saving}
-                    style={{ ...stepBtn, color: "#ef4444", borderColor: "#4a1a1a" }}
-                    title={t("action.delete")}
-                  >
-                    {t("action.delete")}
-                  </Button>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* ── Something the branch does not stock yet ──────────────────────
-            Owner-level, and only shown to one. A manager sells from the
-            catalogue; writing it is the company's, which is what the backend
-            has always answered (`products.manage` → 403). Until this gate the
-            button was drawn for everyone, so the one role that could not use it
-            was the role standing at the counter — they pressed it and got a
-            permission error mid-sale. */}
-        {canCreateProducts && (
-          <div className="col" style={{ gap: 8, borderTop: "1px solid #1f2a44", paddingTop: 12 }}>
-            <div className="row-between" style={{ gap: 8 }}>
-              <span className="muted" style={{ fontSize: 12 }}>{t("session.createProductHint")}</span>
-              <Button variant="secondary" onClick={() => setCreating(true)} disabled={saving}>
-                {t("session.createProduct")}
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {err && <div className="error">{err}</div>}
+        {err !== null && <div className="error">{err || t("session.failUnknown")}</div>}
         <div className="row-between">
           <Button variant="secondary" onClick={onClose} disabled={saving}>{t("action.cancel")}</Button>
           {/* Disabled while the request is in flight, so a second press cannot
               send the same basket twice. */}
-          <Button onClick={confirm} disabled={saving || cart.length === 0}>
-            {saving
-              ? t("session.adding")
-              : cart.length === 1
-                ? t("session.cartConfirmOne")
-                : t("session.cartConfirmMany")}
-          </Button>
+          {mode === "picker" ? (
+            <Button onClick={confirm} disabled={saving || cart.length === 0}>
+              {saving
+                ? t("session.adding")
+                : cart.length === 1
+                  ? t("session.cartConfirmOne")
+                  : t("session.cartConfirmMany")}
+            </Button>
+          ) : (
+            /* Held down until every typed line resolved. A batch with one bad
+               line is not saved in part — the server would refuse it anyway,
+               and a bill missing its middle line is one nobody chose. */
+            <Button onClick={confirmText} disabled={saving || !textReady}>
+              {saving ? t("session.adding") : t("session.quickEntryConfirm")}
+            </Button>
+          )}
         </div>
       </div>
 
       {/* The Products screen's own form, unchanged: whatever it creates is a
           product like any other, with its three languages and its category. */}
-      {creating && canCreateProducts && (
-        <ProductForm
-          branchId={branchId}
-          onClose={() => setCreating(false)}
-          onSaved={onProductCreated}
-        />
-      )}
+      <BasketCreateProduct basket={basket} branchId={branchId} canCreateProducts={canCreateProducts} />
     </Modal>
   );
 };
-
-const rowStyle: React.CSSProperties = {
-  display: "flex", gap: 8, alignItems: "center",
-  border: "1px solid #1f2a44",
-  borderRadius: 8, padding: "8px 10px",
-};
-
-const ellipsis: React.CSSProperties = {
-  flex: 1, minWidth: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
-};
-
-const plusBtn: React.CSSProperties = { padding: "4px 12px", fontSize: 16, lineHeight: 1.2, minWidth: 40 };
-
-const stepBtn: React.CSSProperties = { padding: "4px 10px", fontSize: 13, lineHeight: 1.2, minWidth: 36 };
 
 export default AddSessionItemDialog;

@@ -17,9 +17,21 @@ export interface SessionChangedEvent {
     | "time.added"
     | "unlimited"
     | "free.changed"
+    // The room's own extra went out and came back. Both are already broadcast
+    // by `SessionChanged`; the board reloads on either, and leaving them out
+    // of the union meant a narrowing on `kind` could not name them.
+    | "extra.added"
+    | "extra.returned"
     // The session changed SEAT. Two device rows moved with it, so the board
     // re-reads them as well — see `SessionsBoard`.
-    | "moved";
+    | "moved"
+    // The clock stopped / started again. The seat stays taken either way.
+    | "paused"
+    | "resumed"
+    // An additional item (chips, a cue, a racket) went onto the bill / came off
+    // it (2026-09-27). The board reloads on any kind.
+    | "additional.added"
+    | "additional.removed";
   session_id: number;
   branch_id: number;
   pc_id: number;

@@ -78,6 +78,9 @@ export const sessionsToWarnAbout = (
     // or an operator has already lifted its ceiling. `is_unlimited` is checked
     // too, so an older backend that only nulls `ends_at` behaves the same.
     .filter((s) => s.ends_at !== null && s.is_unlimited !== true)
+    // Paused: nothing is running out. The end moves on resume, and a warning
+    // about a clock that is not moving would be a false alarm.
+    .filter((s) => !s.paused_at)
     .filter((s) => !warned.has(s.id))
     .map((s) => ({
       sessionId: s.id,

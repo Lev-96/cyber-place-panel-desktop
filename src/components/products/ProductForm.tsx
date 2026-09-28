@@ -10,12 +10,17 @@ import PriceInput from "@/components/ui/PriceInput";
 import { apiSaveEntityTranslations } from "@/api/translations";
 import { useLang } from "@/i18n/LanguageContext";
 import { productRepository } from "@/repositories/ProductRepository";
-import { IProduct } from "@/types/pos";
+import { IProduct, isAdditionalProduct, ProductKind } from "@/types/pos";
 import { FormEvent, useState } from "react";
 
 interface Props {
   branchId: number;
   initial?: IProduct;
+  /**
+   * What a NEW entry is — the section it is created from (Products, or
+   * Additional items). An edit keeps the entry's own kind.
+   */
+  kind?: ProductKind;
   onClose: () => void;
   onSaved: (p: IProduct) => void;
 }
@@ -36,7 +41,7 @@ interface Props {
  * other languages — the same translations the form already primed into the
  * translation memory, so it costs nothing.
  */
-const ProductForm = ({ branchId, initial, onClose, onSaved }: Props) => {
+const ProductForm = ({ branchId, initial, onClose, onSaved, kind: kindProp = "regular" }: Props) => {
   const { t, lang } = useLang();
   const [name, setName] = useState<LangValues>(
     () => langValuesFromField(initial?.i18n, "name", initial?.name, lang),
@@ -45,6 +50,7 @@ const ProductForm = ({ branchId, initial, onClose, onSaved }: Props) => {
     () => langValuesFromField(initial?.i18n, "category", initial?.category, lang),
   );
   const [price, setPrice] = useState(String(initial?.price ?? ""));
+  const kind: ProductKind = initial ? (isAdditionalProduct(initial) ? "additional" : "regular") : kindProp;
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -65,13 +71,14 @@ const ProductForm = ({ branchId, initial, onClose, onSaved }: Props) => {
             category: categoryValue || null,
             price: pr,
             source_locale: lang,
-          })
+          }, kind)
         : await productRepository.create({
             branch_id: branchId,
             name: nameValue,
             category: categoryValue || null,
             price: pr,
             is_active: true,
+            kind,
             source_locale: lang,
           });
 
@@ -89,7 +96,11 @@ const ProductForm = ({ branchId, initial, onClose, onSaved }: Props) => {
   return (
     <Modal open onClose={onClose}>
       <form className="card" style={{ width: 560, maxWidth: "92vw", display: "flex", flexDirection: "column", gap: 16 }} onSubmit={submit}>
-        <h2 style={{ margin: 0 }}>{initial ? t("product.titleEdit") : t("product.titleNew")}</h2>
+        <h2 style={{ margin: 0 }}>
+          {kind === "additional"
+            ? t(initial ? "product.titleEditAdditional" : "product.titleNewAdditional")
+            : t(initial ? "product.titleEdit" : "product.titleNew")}
+        </h2>
 
         <MultiLangInput
           label={t("label.name")}

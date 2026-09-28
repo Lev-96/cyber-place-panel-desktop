@@ -1,6 +1,9 @@
 import { describe, expect, test } from "vitest";
-import { eventDetail, eventSeat, paymentLabelOf, segmentsOf } from "./SessionsHistory";
+import { eventDetailParts, eventSeat, paymentLabelOf, seatRoute, seatSteps } from "@/components/sessions/sessionHistoryModel";
+// The pad line is shared with the board now, so its tests follow it there.
+import { padChargeOf } from "@/components/sessions/joystickView";
 import type { ISessionEvent } from "@/api/sessions";
+import type { ISessionApi } from "@/types/sessions";
 
 /**
  * What a line in the session's audit log actually SAYS.
@@ -20,6 +23,12 @@ import type { ISessionEvent } from "@/api/sessions";
 // `t` echoes the key, so the assertions stay about structure rather than copy.
 const t = (k: string) => k;
 const money = (n: number) => `${n} AMD`;
+
+/** The detail as one sentence — how these pins were written; the card puts each part on its own line. */
+const eventDetail = (e: ISessionEvent, tt: (k: string) => string, m: (n: number) => string): string | null => {
+  const parts = eventDetailParts(e, tt, m);
+  return parts.length > 0 ? parts.join(" · ") : null;
+};
 
 const event = (over: Partial<ISessionEvent>): ISessionEvent => ({
   id: 1,
@@ -146,6 +155,43 @@ describe("the tariff going unlimited", () => {
 });
 
 describe("joysticks", () => {
+  /**
+   * A pad priced by the HOUR says so on its own log line.
+   *
+   * Without the marker the feed printed "Price for one: 500 AMD" on a pad that
+   * put about nothing on the bill at that instant and would reach 500 only
+   * after a full hour. The rate and the fee are different facts and used to
+   * print identically.
+   */
+  test("an hourly add marks its figure as a rate", () => {
+    const line = eventDetail(
+      event({
+        action: "joystick_added",
+        amount: 500,
+        meta: { slot: 3, price: 500, count_before: 2, count_after: 3, hourly: true },
+      }),
+      t,
+      money,
+    );
+
+    expect(line).toContain("history.padUnitPrice: 500 AMDsession.perHourShort");
+  });
+
+  test("a fee add does not", () => {
+    const line = eventDetail(
+      event({
+        action: "joystick_added",
+        amount: 500,
+        meta: { slot: 3, price: 500, count_before: 2, count_after: 3, hourly: false },
+      }),
+      t,
+      money,
+    );
+
+    expect(line).toContain("history.padUnitPrice: 500 AMD");
+    expect(line).not.toContain("session.perHourShort");
+  });
+
   test("an add says how many there are now and what one costs", () => {
     const line = eventDetail(
       event({
@@ -215,6 +261,27 @@ describe("the bill's own lines", () => {
     );
 
     expect(line).toBe("history.itemsCount: 1");
+  });
+
+  /**
+   * A return is NOT a removal, and the row has to say the difference: the line
+   * stays on the bill with what it earned while it was out, so the only two
+   * facts worth the width are how long that was and that no money came back.
+   */
+  test("a return says how long it was out and that nothing came back", () => {
+    const line = eventDetail(
+      event({
+        action: "item_returned",
+        amount: 0,
+        meta: { count: 1, minutes: 90, lines: [{ name: "\u041a\u0438\u0439", price: 700, qty: 1, extra: true }] },
+      }),
+      t,
+      money,
+    );
+
+    expect(line).toContain("\u041a\u0438\u0439");
+    expect(line).toContain("90 time.minShort");
+    expect(line).toContain("history.noRefundShort");
   });
 });
 
@@ -298,23 +365,24 @@ describe("how the money was taken", () => {
   });
 });
 
-describe("cutting one session into the seats it was played on", () => {
+describe("the seat each thing happened on", () => {
   const at = (iso: string, over: Partial<ISessionEvent> = {}) =>
     event({ created_at: iso, ...over });
+  const chips = (steps: ReturnType<typeof seatSteps>) => steps.filter((s) => s.chip).map((s) => s.seat);
 
-  test("a session that never moved is one segment", () => {
-    const segments = segmentsOf([
+  test("a session that never moved names no seat on its steps", () => {
+    const steps = seatSteps([
       at("2026-09-10T12:00:00+04:00", { id: 1, action: "started", meta: { place_number: 2 } }),
       at("2026-09-10T12:10:00+04:00", { id: 2, action: "item_added", meta: { place_number: 2 } }),
     ]);
 
-    expect(segments).toHaveLength(1);
-    expect(segments[0].seat).toBe("№2");
-    expect(segments[0].events).toHaveLength(2);
+    expect(steps.map((s) => s.seat)).toEqual(["№2", "№2"]);
+    expect(chips(steps)).toEqual([]);
+    expect(seatRoute(steps)).toEqual([]);
   });
 
-  test("a move closes the seat it happened on and opens the next", () => {
-    const segments = segmentsOf([
+  test("a move happens on the seat being left; the next step opens the new one", () => {
+    const steps = seatSteps([
       at("2026-09-10T12:00:00+04:00", { id: 1, action: "started", meta: { place_number: 2 } }),
       at("2026-09-10T12:31:00+04:00", {
         id: 2,
@@ -324,62 +392,92 @@ describe("cutting one session into the seats it was played on", () => {
       at("2026-09-10T12:40:00+04:00", { id: 3, action: "joystick_added", meta: { place_number: 5 } }),
     ]);
 
-    expect(segments.map((s) => s.seat)).toEqual(["№2", "№5"]);
-    // ⚠️ The move belongs to the seat being LEFT. That is where a reader looks
-    // for it, and it is where it was performed.
-    expect(segments[0].events.map((e) => e.action)).toEqual(["started", "moved"]);
-    expect(segments[1].events.map((e) => e.action)).toEqual(["joystick_added"]);
+    // ⚠️ The move belongs to the seat being LEFT — where it was performed.
+    expect(steps.map((s) => s.seat)).toEqual(["№2", "№2", "№5"]);
+    expect(steps.map((s) => s.chip)).toEqual([true, false, true]);
+    expect(seatRoute(steps)).toEqual(["№2", "№5"]);
   });
 
-  test("two moves make three segments", () => {
-    const segments = segmentsOf([
+  test("two moves, three seats", () => {
+    const steps = seatSteps([
       at("2026-09-10T12:00:00+04:00", { id: 1, action: "started", meta: { place_number: 2 } }),
       at("2026-09-10T12:31:00+04:00", { id: 2, action: "moved", meta: { place_number: 2, to_place_number: 5 } }),
       at("2026-09-10T13:00:00+04:00", { id: 3, action: "moved", meta: { place_number: 5, to_place_number: 9 } }),
       at("2026-09-10T13:10:00+04:00", { id: 4, action: "stopped", meta: { place_number: 9 } }),
     ]);
 
-    expect(segments.map((s) => s.seat)).toEqual(["№2", "№5", "№9"]);
+    expect(seatRoute(steps)).toEqual(["№2", "№5", "№9"]);
   });
 
   test("order comes from the server's timestamp, never from the array", () => {
     // Handed back newest-first, which is how the branch feed arrives.
-    const segments = segmentsOf([
+    const steps = seatSteps([
       at("2026-09-10T12:40:00+04:00", { id: 3, action: "joystick_added", meta: { place_number: 5 } }),
       at("2026-09-10T12:31:00+04:00", { id: 2, action: "moved", meta: { place_number: 2, to_place_number: 5 } }),
       at("2026-09-10T12:00:00+04:00", { id: 1, action: "started", meta: { place_number: 2 } }),
     ]);
 
-    expect(segments.map((s) => s.seat)).toEqual(["№2", "№5"]);
-    expect(segments[0].events[0].action).toBe("started");
+    expect(steps.map((s) => s.event.action)).toEqual(["started", "moved", "joystick_added"]);
+    expect(seatRoute(steps)).toEqual(["№2", "№5"]);
+  });
+
+  test("one person's lines still say where each happened, even without the move itself", () => {
+    // The move was somebody else's and is not in this list.
+    const steps = seatSteps([
+      at("2026-09-10T12:00:00+04:00", { id: 1, action: "started", meta: { place_number: 2 } }),
+      at("2026-09-10T12:50:00+04:00", { id: 4, action: "stopped", meta: { place_number: 9 } }),
+    ]);
+
+    expect(steps.map((s) => s.seat)).toEqual(["№2", "№9"]);
+    expect(chips(steps)).toEqual(["№2", "№9"]);
+  });
+
+  test("the seat a line froze beats the last move seen — a later move may be someone else's", () => {
+    // One person's lines: their move 2 → 5, then a stop on №9 after a move
+    // somebody else made (not in this list).
+    const steps = seatSteps([
+      at("2026-09-10T12:00:00+04:00", { id: 1, action: "started", meta: { place_number: 2 } }),
+      at("2026-09-10T12:31:00+04:00", { id: 2, action: "moved", meta: { place_number: 2, to_place_number: 5 } }),
+      at("2026-09-10T13:10:00+04:00", { id: 4, action: "stopped", meta: { place_number: 9 } }),
+    ]);
+
+    expect(steps.map((s) => s.seat)).toEqual(["№2", "№2", "№9"]);
   });
 
   test("an old session whose lines never named a seat still reads", () => {
-    // ⚠️ Backward compatibility: rows written before the seat was frozen have
-    // nothing to group by, and one anonymous segment is the honest answer.
-    const segments = segmentsOf([
+    // ⚠️ Backward compatibility: rows written before the seat was frozen.
+    const steps = seatSteps([
       at("2026-09-10T12:00:00+04:00", { id: 1, action: "started", meta: null }),
       at("2026-09-10T12:10:00+04:00", { id: 2, action: "time_added", meta: { minutes: 30 } }),
     ]);
 
-    expect(segments).toHaveLength(1);
-    expect(segments[0].seat).toBeNull();
-    expect(segments[0].events).toHaveLength(2);
+    expect(steps).toHaveLength(2);
+    expect(steps.map((s) => s.seat)).toEqual([null, null]);
+    expect(chips(steps)).toEqual([]);
   });
 
-  test("no events is no segments, not one empty one", () => {
-    expect(segmentsOf([])).toEqual([]);
+  test("an old line after a move takes the move's destination", () => {
+    const steps = seatSteps([
+      at("2026-09-10T12:00:00+04:00", { id: 1, action: "started", meta: { place_number: 2 } }),
+      at("2026-09-10T12:31:00+04:00", { id: 2, action: "moved", meta: { place_number: 2, to_place_number: 5 } }),
+      at("2026-09-10T12:40:00+04:00", { id: 3, action: "stopped", meta: null }),
+    ]);
+
+    expect(steps.map((s) => s.seat)).toEqual(["№2", "№2", "№5"]);
+  });
+
+  test("no events is no steps", () => {
+    expect(seatSteps([])).toEqual([]);
   });
 
   test("a move with no destination recorded does not invent one", () => {
-    const segments = segmentsOf([
+    const steps = seatSteps([
       at("2026-09-10T12:00:00+04:00", { id: 1, action: "started", meta: { place_number: 2 } }),
       at("2026-09-10T12:31:00+04:00", { id: 2, action: "moved", meta: { place_number: 2 } }),
       at("2026-09-10T12:40:00+04:00", { id: 3, action: "stopped", meta: null }),
     ]);
 
-    expect(segments).toHaveLength(2);
-    expect(segments[1].seat).toBeNull();
+    expect(seatRoute(steps)).toEqual(["№2", null]);
   });
 });
 
@@ -414,5 +512,148 @@ describe("rows written before any of this existed", () => {
     );
 
     expect(line).toBe("№4 -> №6");
+  });
+});
+
+
+describe("what a finished session's pads cost", () => {
+  const session = (over: Partial<ISessionApi> = {}): ISessionApi => ({
+    id: 7, branch_id: 1, pc_id: 1, status: "stopped", mode: "open",
+    started_at: "2026-09-01T10:00:00.000Z",
+    stopped_at: "2026-09-01T11:00:00.000Z",
+    total_paid: 1500, is_free: false,
+    ...over,
+  } as ISessionApi);
+
+  // Dates in the PAST deliberately. The figure clamps an open-ended period to
+  // "now", so a fixture dated in the future measures a negative interval and
+  // every hourly assertion quietly reads zero.
+  const pad = (over: Record<string, unknown> = {}) => ({
+    id: 1, slot: 3, price: 500, is_charged: true,
+    started_at: "2026-09-01T10:00:00.000Z", stopped_at: "2026-09-01T11:00:00.000Z",
+    ...over,
+  });
+
+  /**
+   * A rate and a fee print identically without this, and they are different
+   * facts: "2 × 500 = 1000" is what a fee model took, "2 × 500/h = 250" is what
+   * an hourly one did. A month later nobody can tell them apart from the figure.
+   */
+  /**
+   * A slot is an identity, so the charge names it rather than multiplying by
+   * a count. The same slot used twice is one identity and two periods.
+   */
+  test("names the pads by number, deduped and in order", () => {
+    const charge = padChargeOf(session({
+      joysticks: [
+        pad({ id: 1, slot: 4 }),
+        pad({ id: 2, slot: 3 }),
+        pad({ id: 3, slot: 3 }),
+      ],
+    } as Partial<ISessionApi>));
+
+    expect(charge?.slots).toEqual([3, 4]);
+    expect(charge?.count).toBe(3);
+  });
+
+  test("an hourly session says its unit figure is a rate", () => {
+    const charge = padChargeOf(session({ joysticks: [pad({ is_hourly: true })] } as Partial<ISessionApi>));
+
+    expect(charge?.hourly).toBe(true);
+    expect(charge?.each).toBe(500);
+    // One hour at 500/h: the interval's share, not the whole rate.
+    expect(charge?.total).toBeCloseTo(500, 2);
+  });
+
+  test("a fee session does not", () => {
+    const charge = padChargeOf(session({ joysticks: [pad({ is_hourly: false })] } as Partial<ISessionApi>));
+
+    expect(charge?.hourly).toBe(false);
+    expect(charge?.total).toBeCloseTo(500, 2);
+  });
+
+  /**
+   * A payload from a backend that predates the flag must not be labelled a
+   * rate. Absent is not "hourly": it is "this backend does not say", and the
+   * fee model is what such a backend actually ran.
+   */
+  test("a period that does not say is not called a rate", () => {
+    const charge = padChargeOf(session({ joysticks: [pad()] } as Partial<ISessionApi>));
+
+    expect(charge?.hourly).toBe(false);
+  });
+
+  /** One rate and one fee on the same seat is not a rate. */
+  test("mixed periods read as a fee, because the unit figure is not a rate for all of them", () => {
+    const charge = padChargeOf(session({
+      joysticks: [pad({ is_hourly: true }), pad({ id: 2, slot: 4, is_hourly: false })],
+    } as Partial<ISessionApi>));
+
+    expect(charge?.hourly).toBe(false);
+    expect(charge?.count).toBe(2);
+  });
+
+  test("a waived seat quotes no pad figure at all", () => {
+    expect(padChargeOf(session({ is_free: true, joysticks: [pad()] } as Partial<ISessionApi>))).toBeNull();
+  });
+
+  test("a seat that was charged for nothing quotes none either", () => {
+    expect(padChargeOf(session({ joysticks: [pad({ is_charged: false })] } as Partial<ISessionApi>))).toBeNull();
+  });
+
+  /** Two periods frozen at different fees have no single unit figure to quote. */
+  test("periods that disagree on a price quote the sum alone", () => {
+    const charge = padChargeOf(session({
+      joysticks: [pad(), pad({ id: 2, slot: 4, price: 700 })],
+    } as Partial<ISessionApi>));
+
+    expect(charge?.each).toBeNull();
+    expect(charge?.total).toBeCloseTo(1200, 2);
+  });
+});
+
+describe("a relocation («Переместить игрока»)", () => {
+  test("shows the price on each side when it changed, and a hand-set price", () => {
+    const line = eventDetail(
+      event({
+        action: "moved",
+        meta: { reason: "relocation", from_place_number: 1, to_place_number: 3, rate_before: 1500, rate_after: 1800, rate_overridden: true },
+      }),
+      t,
+      money,
+    );
+
+    expect(line).toContain("1500 AMD / time.hourShort -> 1800 AMD / time.hourShort");
+    expect(line).toContain("history.rateSetByHand");
+  });
+
+  test("an unchanged price is stated once, and nothing says it was set by hand", () => {
+    const line = eventDetail(
+      event({ action: "moved", meta: { reason: "relocation", from_place_number: 1, to_place_number: 2, rate_before: 1500, rate_after: 1500, rate_overridden: false } }),
+      t,
+      money,
+    );
+
+    expect(line).toContain("1500 AMD / time.hourShort");
+    expect(line).not.toContain("->  ");
+    expect(line).not.toContain("1500 AMD / time.hourShort -> ");
+    expect(line).not.toContain("history.rateSetByHand");
+  });
+
+  test("an extension move says nothing about rates", () => {
+    const line = eventDetail(event({ action: "moved", meta: { from_place_number: 1, to_place_number: 2, rate_after: 1500 } }), t, money);
+    expect(line).not.toContain("AMD / time.hourShort");
+  });
+});
+
+describe("a resume", () => {
+  test("made by the server at the pause limit says so", () => {
+    const line = eventDetail(event({ action: "resumed", meta: { reason: "pause_limit", paused_seconds: 600 } }), t, money);
+    expect(line).toContain("history.pauseLimitReason");
+  });
+
+  test("pressed by a cashier does not", () => {
+    const line = eventDetail(event({ action: "resumed", meta: { reason: "manual", paused_seconds: 60 } }), t, money);
+    expect(line).not.toContain("history.pauseLimitReason");
   });
 });

@@ -1,0 +1,2091 @@
+{
+  "samples": [
+    {
+      "label": "hourly / fresh",
+      "at": 1789413804184,
+      "session": {
+        "id": 1,
+        "branch_id": 1,
+        "pc_id": 1,
+        "pc_label": "PS5-08",
+        "user_display_name": null,
+        "time_package_id": null,
+        "mode": "open",
+        "hourly_rate": "1000.00",
+        "tariff_hourly_rate": null,
+        "started_at": "2026-09-14T19:23:22.000000Z",
+        "ends_at": null,
+        "stopped_at": null,
+        "status": "active",
+        "total_paid": "0.00",
+        "payment_method": null,
+        "payment_method_other": null,
+        "opened_by_user_id": 1,
+        "package_name": null,
+        "items": [],
+        "pc": {
+          "id": 1,
+          "label": "PS5-08",
+          "branch_id": 1,
+          "kind": "ps",
+          "hourly_rate": null,
+          "place_id": 1,
+          "place": {
+            "id": 1,
+            "platform": "ps5",
+            "type": "standard",
+            "hourly_rate": null
+          },
+          "branch": {
+            "id": 1,
+            "price_for_branch": null
+          }
+        },
+        "time_package": null,
+        "is_free": false,
+        "is_unlimited": true,
+        "unlimited_at": null,
+        "committed_until": null,
+        "committed_amount": null,
+        "joystick_count": 2,
+        "joysticks": [],
+        "supports_joysticks": true,
+        "rounding_step": 0,
+        "rounding_mode": "up",
+        "joystick_rule": {
+          "included": 2,
+          "price": 500,
+          "price_4": null,
+          "max": 4,
+          "max_slot": 4,
+          "charged_slots": [
+            3,
+            4
+          ],
+          "hourly": true,
+          "shared": true,
+          "options": [
+            {
+              "slot": 3,
+              "price": 500,
+              "shared": true
+            },
+            {
+              "slot": 4,
+              "price": 500,
+              "shared": true
+            }
+          ]
+        },
+        "place_platform": "ps5",
+        "opened_by": {
+          "id": 1,
+          "name": "Owner Check",
+          "role": "company_owner"
+        },
+        "stopped_by_user_id": null,
+        "stopped_by": null,
+        "branch": {
+          "id": 1,
+          "address": "Kentron 1",
+          "city": "Yerevan",
+          "company_id": 1,
+          "company_name": "Strategy Check Co"
+        }
+      },
+      "server_total": 0.28,
+      "server_joysticks_total": 0,
+      "server_time_cost": 0.28
+    },
+    {
+      "label": "hourly / 3s no pads",
+      "at": 1789413808272,
+      "session": {
+        "id": 1,
+        "branch_id": 1,
+        "pc_id": 1,
+        "pc_label": "PS5-08",
+        "user_display_name": null,
+        "time_package_id": null,
+        "mode": "open",
+        "hourly_rate": "1000.00",
+        "tariff_hourly_rate": null,
+        "started_at": "2026-09-14T19:23:22.000000Z",
+        "ends_at": null,
+        "stopped_at": null,
+        "status": "active",
+        "total_paid": "0.00",
+        "payment_method": null,
+        "payment_method_other": null,
+        "opened_by_user_id": 1,
+        "package_name": null,
+        "items": [],
+        "pc": {
+          "id": 1,
+          "label": "PS5-08",
+          "branch_id": 1,
+          "kind": "ps",
+          "hourly_rate": null,
+          "place_id": 1,
+          "place": {
+            "id": 1,
+            "platform": "ps5",
+            "type": "standard",
+            "hourly_rate": null
+          },
+          "branch": {
+            "id": 1,
+            "price_for_branch": null
+          }
+        },
+        "time_package": null,
+        "is_free": false,
+        "is_unlimited": true,
+        "unlimited_at": null,
+        "committed_until": null,
+        "committed_amount": null,
+        "joystick_count": 2,
+        "joysticks": [],
+        "supports_joysticks": true,
+        "rounding_step": 0,
+        "rounding_mode": "up",
+        "joystick_rule": {
+          "included": 2,
+          "price": 500,
+          "price_4": null,
+          "max": 4,
+          "max_slot": 4,
+          "charged_slots": [
+            3,
+            4
+          ],
+          "hourly": true,
+          "shared": true,
+          "options": [
+            {
+              "slot": 3,
+              "price": 500,
+              "shared": true
+            },
+            {
+              "slot": 4,
+              "price": 500,
+              "shared": true
+            }
+          ]
+        },
+        "place_platform": "ps5",
+        "opened_by": {
+          "id": 1,
+          "name": "Owner Check",
+          "role": "company_owner"
+        },
+        "stopped_by_user_id": null,
+        "stopped_by": null,
+        "branch": {
+          "id": 1,
+          "address": "Kentron 1",
+          "city": "Yerevan",
+          "company_id": 1,
+          "company_name": "Strategy Check Co"
+        }
+      },
+      "server_total": 1.39,
+      "server_joysticks_total": 0,
+      "server_time_cost": 1.39
+    },
+    {
+      "label": "hourly / pad 3 out",
+      "at": 1789413813857,
+      "session": {
+        "id": 1,
+        "branch_id": 1,
+        "pc_id": 1,
+        "pc_label": "PS5-08",
+        "user_display_name": null,
+        "time_package_id": null,
+        "mode": "open",
+        "hourly_rate": "1000.00",
+        "tariff_hourly_rate": null,
+        "started_at": "2026-09-14T19:23:22.000000Z",
+        "ends_at": null,
+        "stopped_at": null,
+        "status": "active",
+        "total_paid": "0.00",
+        "payment_method": null,
+        "payment_method_other": null,
+        "opened_by_user_id": 1,
+        "package_name": null,
+        "items": [],
+        "pc": {
+          "id": 1,
+          "label": "PS5-08",
+          "branch_id": 1,
+          "kind": "ps",
+          "hourly_rate": null,
+          "place_id": 1,
+          "place": {
+            "id": 1,
+            "platform": "ps5",
+            "type": "standard",
+            "hourly_rate": null
+          },
+          "branch": {
+            "id": 1,
+            "price_for_branch": null
+          }
+        },
+        "time_package": null,
+        "is_free": false,
+        "is_unlimited": true,
+        "unlimited_at": null,
+        "committed_until": null,
+        "committed_amount": null,
+        "joystick_count": 3,
+        "joysticks": [
+          {
+            "id": 1,
+            "slot": 3,
+            "price": 500,
+            "is_charged": true,
+            "is_hourly": true,
+            "started_at": "2026-09-14T19:23:28.000000Z",
+            "stopped_at": null
+          }
+        ],
+        "supports_joysticks": true,
+        "rounding_step": 0,
+        "rounding_mode": "up",
+        "joystick_rule": {
+          "included": 2,
+          "price": 500,
+          "price_4": null,
+          "max": 4,
+          "max_slot": 4,
+          "charged_slots": [
+            3,
+            4
+          ],
+          "hourly": true,
+          "shared": true,
+          "options": [
+            {
+              "slot": 3,
+              "price": 500,
+              "shared": true
+            },
+            {
+              "slot": 4,
+              "price": 500,
+              "shared": true
+            }
+          ]
+        },
+        "place_platform": "ps5",
+        "opened_by": {
+          "id": 1,
+          "name": "Owner Check",
+          "role": "company_owner"
+        },
+        "stopped_by_user_id": null,
+        "stopped_by": null,
+        "branch": {
+          "id": 1,
+          "address": "Kentron 1",
+          "city": "Yerevan",
+          "company_id": 1,
+          "company_name": "Strategy Check Co"
+        }
+      },
+      "server_total": 3.75,
+      "server_joysticks_total": 0.69,
+      "server_time_cost": 3.06
+    },
+    {
+      "label": "hourly / two pads out",
+      "at": 1789413819426,
+      "session": {
+        "id": 1,
+        "branch_id": 1,
+        "pc_id": 1,
+        "pc_label": "PS5-08",
+        "user_display_name": null,
+        "time_package_id": null,
+        "mode": "open",
+        "hourly_rate": "1000.00",
+        "tariff_hourly_rate": null,
+        "started_at": "2026-09-14T19:23:22.000000Z",
+        "ends_at": null,
+        "stopped_at": null,
+        "status": "active",
+        "total_paid": "0.00",
+        "payment_method": null,
+        "payment_method_other": null,
+        "opened_by_user_id": 1,
+        "package_name": null,
+        "items": [],
+        "pc": {
+          "id": 1,
+          "label": "PS5-08",
+          "branch_id": 1,
+          "kind": "ps",
+          "hourly_rate": null,
+          "place_id": 1,
+          "place": {
+            "id": 1,
+            "platform": "ps5",
+            "type": "standard",
+            "hourly_rate": null
+          },
+          "branch": {
+            "id": 1,
+            "price_for_branch": null
+          }
+        },
+        "time_package": null,
+        "is_free": false,
+        "is_unlimited": true,
+        "unlimited_at": null,
+        "committed_until": null,
+        "committed_amount": null,
+        "joystick_count": 4,
+        "joysticks": [
+          {
+            "id": 1,
+            "slot": 3,
+            "price": 500,
+            "is_charged": true,
+            "is_hourly": true,
+            "started_at": "2026-09-14T19:23:28.000000Z",
+            "stopped_at": null
+          },
+          {
+            "id": 2,
+            "slot": 4,
+            "price": 500,
+            "is_charged": true,
+            "is_hourly": true,
+            "started_at": "2026-09-14T19:23:33.000000Z",
+            "stopped_at": null
+          }
+        ],
+        "supports_joysticks": true,
+        "rounding_step": 0,
+        "rounding_mode": "up",
+        "joystick_rule": {
+          "included": 2,
+          "price": 500,
+          "price_4": null,
+          "max": 4,
+          "max_slot": 4,
+          "charged_slots": [
+            3,
+            4
+          ],
+          "hourly": true,
+          "shared": true,
+          "options": [
+            {
+              "slot": 3,
+              "price": 500,
+              "shared": true
+            },
+            {
+              "slot": 4,
+              "price": 500,
+              "shared": true
+            }
+          ]
+        },
+        "place_platform": "ps5",
+        "opened_by": {
+          "id": 1,
+          "name": "Owner Check",
+          "role": "company_owner"
+        },
+        "stopped_by_user_id": null,
+        "stopped_by": null,
+        "branch": {
+          "id": 1,
+          "address": "Kentron 1",
+          "city": "Yerevan",
+          "company_id": 1,
+          "company_name": "Strategy Check Co"
+        }
+      },
+      "server_total": 6.52,
+      "server_joysticks_total": 2.08,
+      "server_time_cost": 4.44
+    },
+    {
+      "label": "hourly / pad 4 back",
+      "at": 1789413824006,
+      "session": {
+        "id": 1,
+        "branch_id": 1,
+        "pc_id": 1,
+        "pc_label": "PS5-08",
+        "user_display_name": null,
+        "time_package_id": null,
+        "mode": "open",
+        "hourly_rate": "1000.00",
+        "tariff_hourly_rate": null,
+        "started_at": "2026-09-14T19:23:22.000000Z",
+        "ends_at": null,
+        "stopped_at": null,
+        "status": "active",
+        "total_paid": "0.00",
+        "payment_method": null,
+        "payment_method_other": null,
+        "opened_by_user_id": 1,
+        "package_name": null,
+        "items": [],
+        "pc": {
+          "id": 1,
+          "label": "PS5-08",
+          "branch_id": 1,
+          "kind": "ps",
+          "hourly_rate": null,
+          "place_id": 1,
+          "place": {
+            "id": 1,
+            "platform": "ps5",
+            "type": "standard",
+            "hourly_rate": null
+          },
+          "branch": {
+            "id": 1,
+            "price_for_branch": null
+          }
+        },
+        "time_package": null,
+        "is_free": false,
+        "is_unlimited": true,
+        "unlimited_at": null,
+        "committed_until": null,
+        "committed_amount": null,
+        "joystick_count": 3,
+        "joysticks": [
+          {
+            "id": 1,
+            "slot": 3,
+            "price": 500,
+            "is_charged": true,
+            "is_hourly": true,
+            "started_at": "2026-09-14T19:23:28.000000Z",
+            "stopped_at": null
+          },
+          {
+            "id": 2,
+            "slot": 4,
+            "price": 500,
+            "is_charged": true,
+            "is_hourly": true,
+            "started_at": "2026-09-14T19:23:33.000000Z",
+            "stopped_at": "2026-09-14T19:23:39.000000Z"
+          }
+        ],
+        "supports_joysticks": true,
+        "rounding_step": 0,
+        "rounding_mode": "up",
+        "joystick_rule": {
+          "included": 2,
+          "price": 500,
+          "price_4": null,
+          "max": 4,
+          "max_slot": 4,
+          "charged_slots": [
+            3,
+            4
+          ],
+          "hourly": true,
+          "shared": true,
+          "options": [
+            {
+              "slot": 3,
+              "price": 500,
+              "shared": true
+            },
+            {
+              "slot": 4,
+              "price": 500,
+              "shared": true
+            }
+          ]
+        },
+        "place_platform": "ps5",
+        "opened_by": {
+          "id": 1,
+          "name": "Owner Check",
+          "role": "company_owner"
+        },
+        "stopped_by_user_id": null,
+        "stopped_by": null,
+        "branch": {
+          "id": 1,
+          "address": "Kentron 1",
+          "city": "Yerevan",
+          "company_id": 1,
+          "company_name": "Strategy Check Co"
+        }
+      },
+      "server_total": 8.74,
+      "server_joysticks_total": 2.91,
+      "server_time_cost": 5.83
+    },
+    {
+      "label": "hourly / both back",
+      "at": 1789413828602,
+      "session": {
+        "id": 1,
+        "branch_id": 1,
+        "pc_id": 1,
+        "pc_label": "PS5-08",
+        "user_display_name": null,
+        "time_package_id": null,
+        "mode": "open",
+        "hourly_rate": "1000.00",
+        "tariff_hourly_rate": null,
+        "started_at": "2026-09-14T19:23:22.000000Z",
+        "ends_at": null,
+        "stopped_at": null,
+        "status": "active",
+        "total_paid": "0.00",
+        "payment_method": null,
+        "payment_method_other": null,
+        "opened_by_user_id": 1,
+        "package_name": null,
+        "items": [],
+        "pc": {
+          "id": 1,
+          "label": "PS5-08",
+          "branch_id": 1,
+          "kind": "ps",
+          "hourly_rate": null,
+          "place_id": 1,
+          "place": {
+            "id": 1,
+            "platform": "ps5",
+            "type": "standard",
+            "hourly_rate": null
+          },
+          "branch": {
+            "id": 1,
+            "price_for_branch": null
+          }
+        },
+        "time_package": null,
+        "is_free": false,
+        "is_unlimited": true,
+        "unlimited_at": null,
+        "committed_until": null,
+        "committed_amount": null,
+        "joystick_count": 2,
+        "joysticks": [
+          {
+            "id": 2,
+            "slot": 4,
+            "price": 500,
+            "is_charged": true,
+            "is_hourly": true,
+            "started_at": "2026-09-14T19:23:33.000000Z",
+            "stopped_at": "2026-09-14T19:23:39.000000Z"
+          },
+          {
+            "id": 1,
+            "slot": 3,
+            "price": 500,
+            "is_charged": true,
+            "is_hourly": true,
+            "started_at": "2026-09-14T19:23:28.000000Z",
+            "stopped_at": "2026-09-14T19:23:44.000000Z"
+          }
+        ],
+        "supports_joysticks": true,
+        "rounding_step": 0,
+        "rounding_mode": "up",
+        "joystick_rule": {
+          "included": 2,
+          "price": 500,
+          "price_4": null,
+          "max": 4,
+          "max_slot": 4,
+          "charged_slots": [
+            3,
+            4
+          ],
+          "hourly": true,
+          "shared": true,
+          "options": [
+            {
+              "slot": 3,
+              "price": 500,
+              "shared": true
+            },
+            {
+              "slot": 4,
+              "price": 500,
+              "shared": true
+            }
+          ]
+        },
+        "place_platform": "ps5",
+        "opened_by": {
+          "id": 1,
+          "name": "Owner Check",
+          "role": "company_owner"
+        },
+        "stopped_by_user_id": null,
+        "stopped_by": null,
+        "branch": {
+          "id": 1,
+          "address": "Kentron 1",
+          "city": "Yerevan",
+          "company_id": 1,
+          "company_name": "Strategy Check Co"
+        }
+      },
+      "server_total": 10.27,
+      "server_joysticks_total": 3.05,
+      "server_time_cost": 7.22
+    },
+    {
+      "label": "fixed / fresh",
+      "at": 1789413831279,
+      "session": {
+        "id": 2,
+        "branch_id": 1,
+        "pc_id": 1,
+        "pc_label": "PS5-08",
+        "user_display_name": null,
+        "time_package_id": null,
+        "mode": "open",
+        "hourly_rate": "1000.00",
+        "tariff_hourly_rate": null,
+        "started_at": "2026-09-14T19:23:49.000000Z",
+        "ends_at": null,
+        "stopped_at": null,
+        "status": "active",
+        "total_paid": "0.00",
+        "payment_method": null,
+        "payment_method_other": null,
+        "opened_by_user_id": 1,
+        "package_name": null,
+        "items": [],
+        "pc": {
+          "id": 1,
+          "label": "PS5-08",
+          "branch_id": 1,
+          "kind": "ps",
+          "hourly_rate": null,
+          "place_id": 1,
+          "place": {
+            "id": 1,
+            "platform": "ps5",
+            "type": "standard",
+            "hourly_rate": null
+          },
+          "branch": {
+            "id": 1,
+            "price_for_branch": null
+          }
+        },
+        "time_package": null,
+        "is_free": false,
+        "is_unlimited": true,
+        "unlimited_at": null,
+        "committed_until": null,
+        "committed_amount": null,
+        "joystick_count": 2,
+        "joysticks": [],
+        "supports_joysticks": true,
+        "rounding_step": 0,
+        "rounding_mode": "up",
+        "joystick_rule": {
+          "included": 2,
+          "price": 500,
+          "price_4": null,
+          "max": 4,
+          "max_slot": 4,
+          "charged_slots": [
+            3,
+            4
+          ],
+          "hourly": false,
+          "shared": true,
+          "options": [
+            {
+              "slot": 3,
+              "price": 500,
+              "shared": true
+            },
+            {
+              "slot": 4,
+              "price": 500,
+              "shared": true
+            }
+          ]
+        },
+        "place_platform": "ps5",
+        "opened_by": {
+          "id": 1,
+          "name": "Owner Check",
+          "role": "company_owner"
+        },
+        "stopped_by_user_id": null,
+        "stopped_by": null,
+        "branch": {
+          "id": 1,
+          "address": "Kentron 1",
+          "city": "Yerevan",
+          "company_id": 1,
+          "company_name": "Strategy Check Co"
+        }
+      },
+      "server_total": 0.28,
+      "server_joysticks_total": 0,
+      "server_time_cost": 0.28
+    },
+    {
+      "label": "fixed / 3s no pads",
+      "at": 1789413835497,
+      "session": {
+        "id": 2,
+        "branch_id": 1,
+        "pc_id": 1,
+        "pc_label": "PS5-08",
+        "user_display_name": null,
+        "time_package_id": null,
+        "mode": "open",
+        "hourly_rate": "1000.00",
+        "tariff_hourly_rate": null,
+        "started_at": "2026-09-14T19:23:49.000000Z",
+        "ends_at": null,
+        "stopped_at": null,
+        "status": "active",
+        "total_paid": "0.00",
+        "payment_method": null,
+        "payment_method_other": null,
+        "opened_by_user_id": 1,
+        "package_name": null,
+        "items": [],
+        "pc": {
+          "id": 1,
+          "label": "PS5-08",
+          "branch_id": 1,
+          "kind": "ps",
+          "hourly_rate": null,
+          "place_id": 1,
+          "place": {
+            "id": 1,
+            "platform": "ps5",
+            "type": "standard",
+            "hourly_rate": null
+          },
+          "branch": {
+            "id": 1,
+            "price_for_branch": null
+          }
+        },
+        "time_package": null,
+        "is_free": false,
+        "is_unlimited": true,
+        "unlimited_at": null,
+        "committed_until": null,
+        "committed_amount": null,
+        "joystick_count": 2,
+        "joysticks": [],
+        "supports_joysticks": true,
+        "rounding_step": 0,
+        "rounding_mode": "up",
+        "joystick_rule": {
+          "included": 2,
+          "price": 500,
+          "price_4": null,
+          "max": 4,
+          "max_slot": 4,
+          "charged_slots": [
+            3,
+            4
+          ],
+          "hourly": false,
+          "shared": true,
+          "options": [
+            {
+              "slot": 3,
+              "price": 500,
+              "shared": true
+            },
+            {
+              "slot": 4,
+              "price": 500,
+              "shared": true
+            }
+          ]
+        },
+        "place_platform": "ps5",
+        "opened_by": {
+          "id": 1,
+          "name": "Owner Check",
+          "role": "company_owner"
+        },
+        "stopped_by_user_id": null,
+        "stopped_by": null,
+        "branch": {
+          "id": 1,
+          "address": "Kentron 1",
+          "city": "Yerevan",
+          "company_id": 1,
+          "company_name": "Strategy Check Co"
+        }
+      },
+      "server_total": 1.39,
+      "server_joysticks_total": 0,
+      "server_time_cost": 1.39
+    },
+    {
+      "label": "fixed / pad 3 out",
+      "at": 1789413842588,
+      "session": {
+        "id": 2,
+        "branch_id": 1,
+        "pc_id": 1,
+        "pc_label": "PS5-08",
+        "user_display_name": null,
+        "time_package_id": null,
+        "mode": "open",
+        "hourly_rate": "1000.00",
+        "tariff_hourly_rate": null,
+        "started_at": "2026-09-14T19:23:49.000000Z",
+        "ends_at": null,
+        "stopped_at": null,
+        "status": "active",
+        "total_paid": "0.00",
+        "payment_method": null,
+        "payment_method_other": null,
+        "opened_by_user_id": 1,
+        "package_name": null,
+        "items": [],
+        "pc": {
+          "id": 1,
+          "label": "PS5-08",
+          "branch_id": 1,
+          "kind": "ps",
+          "hourly_rate": null,
+          "place_id": 1,
+          "place": {
+            "id": 1,
+            "platform": "ps5",
+            "type": "standard",
+            "hourly_rate": null
+          },
+          "branch": {
+            "id": 1,
+            "price_for_branch": null
+          }
+        },
+        "time_package": null,
+        "is_free": false,
+        "is_unlimited": true,
+        "unlimited_at": null,
+        "committed_until": null,
+        "committed_amount": null,
+        "joystick_count": 3,
+        "joysticks": [
+          {
+            "id": 3,
+            "slot": 3,
+            "price": 500,
+            "is_charged": true,
+            "is_hourly": false,
+            "started_at": "2026-09-14T19:23:55.000000Z",
+            "stopped_at": null
+          }
+        ],
+        "supports_joysticks": true,
+        "rounding_step": 0,
+        "rounding_mode": "up",
+        "joystick_rule": {
+          "included": 2,
+          "price": 500,
+          "price_4": null,
+          "max": 4,
+          "max_slot": 4,
+          "charged_slots": [
+            3,
+            4
+          ],
+          "hourly": false,
+          "shared": true,
+          "options": [
+            {
+              "slot": 3,
+              "price": 500,
+              "shared": true
+            },
+            {
+              "slot": 4,
+              "price": 500,
+              "shared": true
+            }
+          ]
+        },
+        "place_platform": "ps5",
+        "opened_by": {
+          "id": 1,
+          "name": "Owner Check",
+          "role": "company_owner"
+        },
+        "stopped_by_user_id": null,
+        "stopped_by": null,
+        "branch": {
+          "id": 1,
+          "address": "Kentron 1",
+          "city": "Yerevan",
+          "company_id": 1,
+          "company_name": "Strategy Check Co"
+        }
+      },
+      "server_total": 503.61,
+      "server_joysticks_total": 500,
+      "server_time_cost": 3.61
+    },
+    {
+      "label": "fixed / two pads out",
+      "at": 1789413849213,
+      "session": {
+        "id": 2,
+        "branch_id": 1,
+        "pc_id": 1,
+        "pc_label": "PS5-08",
+        "user_display_name": null,
+        "time_package_id": null,
+        "mode": "open",
+        "hourly_rate": "1000.00",
+        "tariff_hourly_rate": null,
+        "started_at": "2026-09-14T19:23:49.000000Z",
+        "ends_at": null,
+        "stopped_at": null,
+        "status": "active",
+        "total_paid": "0.00",
+        "payment_method": null,
+        "payment_method_other": null,
+        "opened_by_user_id": 1,
+        "package_name": null,
+        "items": [],
+        "pc": {
+          "id": 1,
+          "label": "PS5-08",
+          "branch_id": 1,
+          "kind": "ps",
+          "hourly_rate": null,
+          "place_id": 1,
+          "place": {
+            "id": 1,
+            "platform": "ps5",
+            "type": "standard",
+            "hourly_rate": null
+          },
+          "branch": {
+            "id": 1,
+            "price_for_branch": null
+          }
+        },
+        "time_package": null,
+        "is_free": false,
+        "is_unlimited": true,
+        "unlimited_at": null,
+        "committed_until": null,
+        "committed_amount": null,
+        "joystick_count": 4,
+        "joysticks": [
+          {
+            "id": 3,
+            "slot": 3,
+            "price": 500,
+            "is_charged": true,
+            "is_hourly": false,
+            "started_at": "2026-09-14T19:23:55.000000Z",
+            "stopped_at": null
+          },
+          {
+            "id": 4,
+            "slot": 4,
+            "price": 500,
+            "is_charged": true,
+            "is_hourly": false,
+            "started_at": "2026-09-14T19:24:02.000000Z",
+            "stopped_at": null
+          }
+        ],
+        "supports_joysticks": true,
+        "rounding_step": 0,
+        "rounding_mode": "up",
+        "joystick_rule": {
+          "included": 2,
+          "price": 500,
+          "price_4": null,
+          "max": 4,
+          "max_slot": 4,
+          "charged_slots": [
+            3,
+            4
+          ],
+          "hourly": false,
+          "shared": true,
+          "options": [
+            {
+              "slot": 3,
+              "price": 500,
+              "shared": true
+            },
+            {
+              "slot": 4,
+              "price": 500,
+              "shared": true
+            }
+          ]
+        },
+        "place_platform": "ps5",
+        "opened_by": {
+          "id": 1,
+          "name": "Owner Check",
+          "role": "company_owner"
+        },
+        "stopped_by_user_id": null,
+        "stopped_by": null,
+        "branch": {
+          "id": 1,
+          "address": "Kentron 1",
+          "city": "Yerevan",
+          "company_id": 1,
+          "company_name": "Strategy Check Co"
+        }
+      },
+      "server_total": 1005.28,
+      "server_joysticks_total": 1000,
+      "server_time_cost": 5.28
+    },
+    {
+      "label": "fixed / pad 4 back",
+      "at": 1789413853811,
+      "session": {
+        "id": 2,
+        "branch_id": 1,
+        "pc_id": 1,
+        "pc_label": "PS5-08",
+        "user_display_name": null,
+        "time_package_id": null,
+        "mode": "open",
+        "hourly_rate": "1000.00",
+        "tariff_hourly_rate": null,
+        "started_at": "2026-09-14T19:23:49.000000Z",
+        "ends_at": null,
+        "stopped_at": null,
+        "status": "active",
+        "total_paid": "0.00",
+        "payment_method": null,
+        "payment_method_other": null,
+        "opened_by_user_id": 1,
+        "package_name": null,
+        "items": [],
+        "pc": {
+          "id": 1,
+          "label": "PS5-08",
+          "branch_id": 1,
+          "kind": "ps",
+          "hourly_rate": null,
+          "place_id": 1,
+          "place": {
+            "id": 1,
+            "platform": "ps5",
+            "type": "standard",
+            "hourly_rate": null
+          },
+          "branch": {
+            "id": 1,
+            "price_for_branch": null
+          }
+        },
+        "time_package": null,
+        "is_free": false,
+        "is_unlimited": true,
+        "unlimited_at": null,
+        "committed_until": null,
+        "committed_amount": null,
+        "joystick_count": 3,
+        "joysticks": [
+          {
+            "id": 3,
+            "slot": 3,
+            "price": 500,
+            "is_charged": true,
+            "is_hourly": false,
+            "started_at": "2026-09-14T19:23:55.000000Z",
+            "stopped_at": null
+          },
+          {
+            "id": 4,
+            "slot": 4,
+            "price": 500,
+            "is_charged": true,
+            "is_hourly": false,
+            "started_at": "2026-09-14T19:24:02.000000Z",
+            "stopped_at": "2026-09-14T19:24:09.000000Z"
+          }
+        ],
+        "supports_joysticks": true,
+        "rounding_step": 0,
+        "rounding_mode": "up",
+        "joystick_rule": {
+          "included": 2,
+          "price": 500,
+          "price_4": null,
+          "max": 4,
+          "max_slot": 4,
+          "charged_slots": [
+            3,
+            4
+          ],
+          "hourly": false,
+          "shared": true,
+          "options": [
+            {
+              "slot": 3,
+              "price": 500,
+              "shared": true
+            },
+            {
+              "slot": 4,
+              "price": 500,
+              "shared": true
+            }
+          ]
+        },
+        "place_platform": "ps5",
+        "opened_by": {
+          "id": 1,
+          "name": "Owner Check",
+          "role": "company_owner"
+        },
+        "stopped_by_user_id": null,
+        "stopped_by": null,
+        "branch": {
+          "id": 1,
+          "address": "Kentron 1",
+          "city": "Yerevan",
+          "company_id": 1,
+          "company_name": "Strategy Check Co"
+        }
+      },
+      "server_total": 1006.67,
+      "server_joysticks_total": 1000,
+      "server_time_cost": 6.67
+    },
+    {
+      "label": "fixed / both back",
+      "at": 1789413858392,
+      "session": {
+        "id": 2,
+        "branch_id": 1,
+        "pc_id": 1,
+        "pc_label": "PS5-08",
+        "user_display_name": null,
+        "time_package_id": null,
+        "mode": "open",
+        "hourly_rate": "1000.00",
+        "tariff_hourly_rate": null,
+        "started_at": "2026-09-14T19:23:49.000000Z",
+        "ends_at": null,
+        "stopped_at": null,
+        "status": "active",
+        "total_paid": "0.00",
+        "payment_method": null,
+        "payment_method_other": null,
+        "opened_by_user_id": 1,
+        "package_name": null,
+        "items": [],
+        "pc": {
+          "id": 1,
+          "label": "PS5-08",
+          "branch_id": 1,
+          "kind": "ps",
+          "hourly_rate": null,
+          "place_id": 1,
+          "place": {
+            "id": 1,
+            "platform": "ps5",
+            "type": "standard",
+            "hourly_rate": null
+          },
+          "branch": {
+            "id": 1,
+            "price_for_branch": null
+          }
+        },
+        "time_package": null,
+        "is_free": false,
+        "is_unlimited": true,
+        "unlimited_at": null,
+        "committed_until": null,
+        "committed_amount": null,
+        "joystick_count": 2,
+        "joysticks": [
+          {
+            "id": 4,
+            "slot": 4,
+            "price": 500,
+            "is_charged": true,
+            "is_hourly": false,
+            "started_at": "2026-09-14T19:24:02.000000Z",
+            "stopped_at": "2026-09-14T19:24:09.000000Z"
+          },
+          {
+            "id": 3,
+            "slot": 3,
+            "price": 500,
+            "is_charged": true,
+            "is_hourly": false,
+            "started_at": "2026-09-14T19:23:55.000000Z",
+            "stopped_at": "2026-09-14T19:24:13.000000Z"
+          }
+        ],
+        "supports_joysticks": true,
+        "rounding_step": 0,
+        "rounding_mode": "up",
+        "joystick_rule": {
+          "included": 2,
+          "price": 500,
+          "price_4": null,
+          "max": 4,
+          "max_slot": 4,
+          "charged_slots": [
+            3,
+            4
+          ],
+          "hourly": false,
+          "shared": true,
+          "options": [
+            {
+              "slot": 3,
+              "price": 500,
+              "shared": true
+            },
+            {
+              "slot": 4,
+              "price": 500,
+              "shared": true
+            }
+          ]
+        },
+        "place_platform": "ps5",
+        "opened_by": {
+          "id": 1,
+          "name": "Owner Check",
+          "role": "company_owner"
+        },
+        "stopped_by_user_id": null,
+        "stopped_by": null,
+        "branch": {
+          "id": 1,
+          "address": "Kentron 1",
+          "city": "Yerevan",
+          "company_id": 1,
+          "company_name": "Strategy Check Co"
+        }
+      },
+      "server_total": 1007.78,
+      "server_joysticks_total": 1000,
+      "server_time_cost": 7.78
+    },
+    {
+      "label": "hourly, rounds to 100 / fresh",
+      "at": 1789413861109,
+      "session": {
+        "id": 3,
+        "branch_id": 1,
+        "pc_id": 1,
+        "pc_label": "PS5-08",
+        "user_display_name": null,
+        "time_package_id": null,
+        "mode": "open",
+        "hourly_rate": "1000.00",
+        "tariff_hourly_rate": null,
+        "started_at": "2026-09-14T19:24:19.000000Z",
+        "ends_at": null,
+        "stopped_at": null,
+        "status": "active",
+        "total_paid": "0.00",
+        "payment_method": null,
+        "payment_method_other": null,
+        "opened_by_user_id": 1,
+        "package_name": null,
+        "items": [],
+        "pc": {
+          "id": 1,
+          "label": "PS5-08",
+          "branch_id": 1,
+          "kind": "ps",
+          "hourly_rate": null,
+          "place_id": 1,
+          "place": {
+            "id": 1,
+            "platform": "ps5",
+            "type": "standard",
+            "hourly_rate": null
+          },
+          "branch": {
+            "id": 1,
+            "price_for_branch": null
+          }
+        },
+        "time_package": null,
+        "is_free": false,
+        "is_unlimited": true,
+        "unlimited_at": null,
+        "committed_until": null,
+        "committed_amount": null,
+        "joystick_count": 2,
+        "joysticks": [],
+        "supports_joysticks": true,
+        "rounding_step": 100,
+        "rounding_mode": "nearest",
+        "joystick_rule": {
+          "included": 2,
+          "price": 500,
+          "price_4": null,
+          "max": 4,
+          "max_slot": 4,
+          "charged_slots": [
+            3,
+            4
+          ],
+          "hourly": true,
+          "shared": true,
+          "options": [
+            {
+              "slot": 3,
+              "price": 500,
+              "shared": true
+            },
+            {
+              "slot": 4,
+              "price": 500,
+              "shared": true
+            }
+          ]
+        },
+        "place_platform": "ps5",
+        "opened_by": {
+          "id": 1,
+          "name": "Owner Check",
+          "role": "company_owner"
+        },
+        "stopped_by_user_id": null,
+        "stopped_by": null,
+        "branch": {
+          "id": 1,
+          "address": "Kentron 1",
+          "city": "Yerevan",
+          "company_id": 1,
+          "company_name": "Strategy Check Co"
+        }
+      },
+      "server_total": 0,
+      "server_joysticks_total": 0,
+      "server_time_cost": 0.28
+    },
+    {
+      "label": "hourly, rounds to 100 / 3s no pads",
+      "at": 1789413865155,
+      "session": {
+        "id": 3,
+        "branch_id": 1,
+        "pc_id": 1,
+        "pc_label": "PS5-08",
+        "user_display_name": null,
+        "time_package_id": null,
+        "mode": "open",
+        "hourly_rate": "1000.00",
+        "tariff_hourly_rate": null,
+        "started_at": "2026-09-14T19:24:19.000000Z",
+        "ends_at": null,
+        "stopped_at": null,
+        "status": "active",
+        "total_paid": "0.00",
+        "payment_method": null,
+        "payment_method_other": null,
+        "opened_by_user_id": 1,
+        "package_name": null,
+        "items": [],
+        "pc": {
+          "id": 1,
+          "label": "PS5-08",
+          "branch_id": 1,
+          "kind": "ps",
+          "hourly_rate": null,
+          "place_id": 1,
+          "place": {
+            "id": 1,
+            "platform": "ps5",
+            "type": "standard",
+            "hourly_rate": null
+          },
+          "branch": {
+            "id": 1,
+            "price_for_branch": null
+          }
+        },
+        "time_package": null,
+        "is_free": false,
+        "is_unlimited": true,
+        "unlimited_at": null,
+        "committed_until": null,
+        "committed_amount": null,
+        "joystick_count": 2,
+        "joysticks": [],
+        "supports_joysticks": true,
+        "rounding_step": 100,
+        "rounding_mode": "nearest",
+        "joystick_rule": {
+          "included": 2,
+          "price": 500,
+          "price_4": null,
+          "max": 4,
+          "max_slot": 4,
+          "charged_slots": [
+            3,
+            4
+          ],
+          "hourly": true,
+          "shared": true,
+          "options": [
+            {
+              "slot": 3,
+              "price": 500,
+              "shared": true
+            },
+            {
+              "slot": 4,
+              "price": 500,
+              "shared": true
+            }
+          ]
+        },
+        "place_platform": "ps5",
+        "opened_by": {
+          "id": 1,
+          "name": "Owner Check",
+          "role": "company_owner"
+        },
+        "stopped_by_user_id": null,
+        "stopped_by": null,
+        "branch": {
+          "id": 1,
+          "address": "Kentron 1",
+          "city": "Yerevan",
+          "company_id": 1,
+          "company_name": "Strategy Check Co"
+        }
+      },
+      "server_total": 0,
+      "server_joysticks_total": 0,
+      "server_time_cost": 1.39
+    },
+    {
+      "label": "hourly, rounds to 100 / pad 3 out",
+      "at": 1789413870755,
+      "session": {
+        "id": 3,
+        "branch_id": 1,
+        "pc_id": 1,
+        "pc_label": "PS5-08",
+        "user_display_name": null,
+        "time_package_id": null,
+        "mode": "open",
+        "hourly_rate": "1000.00",
+        "tariff_hourly_rate": null,
+        "started_at": "2026-09-14T19:24:19.000000Z",
+        "ends_at": null,
+        "stopped_at": null,
+        "status": "active",
+        "total_paid": "0.00",
+        "payment_method": null,
+        "payment_method_other": null,
+        "opened_by_user_id": 1,
+        "package_name": null,
+        "items": [],
+        "pc": {
+          "id": 1,
+          "label": "PS5-08",
+          "branch_id": 1,
+          "kind": "ps",
+          "hourly_rate": null,
+          "place_id": 1,
+          "place": {
+            "id": 1,
+            "platform": "ps5",
+            "type": "standard",
+            "hourly_rate": null
+          },
+          "branch": {
+            "id": 1,
+            "price_for_branch": null
+          }
+        },
+        "time_package": null,
+        "is_free": false,
+        "is_unlimited": true,
+        "unlimited_at": null,
+        "committed_until": null,
+        "committed_amount": null,
+        "joystick_count": 3,
+        "joysticks": [
+          {
+            "id": 5,
+            "slot": 3,
+            "price": 500,
+            "is_charged": true,
+            "is_hourly": true,
+            "started_at": "2026-09-14T19:24:25.000000Z",
+            "stopped_at": null
+          }
+        ],
+        "supports_joysticks": true,
+        "rounding_step": 100,
+        "rounding_mode": "nearest",
+        "joystick_rule": {
+          "included": 2,
+          "price": 500,
+          "price_4": null,
+          "max": 4,
+          "max_slot": 4,
+          "charged_slots": [
+            3,
+            4
+          ],
+          "hourly": true,
+          "shared": true,
+          "options": [
+            {
+              "slot": 3,
+              "price": 500,
+              "shared": true
+            },
+            {
+              "slot": 4,
+              "price": 500,
+              "shared": true
+            }
+          ]
+        },
+        "place_platform": "ps5",
+        "opened_by": {
+          "id": 1,
+          "name": "Owner Check",
+          "role": "company_owner"
+        },
+        "stopped_by_user_id": null,
+        "stopped_by": null,
+        "branch": {
+          "id": 1,
+          "address": "Kentron 1",
+          "city": "Yerevan",
+          "company_id": 1,
+          "company_name": "Strategy Check Co"
+        }
+      },
+      "server_total": 0,
+      "server_joysticks_total": 0.69,
+      "server_time_cost": 3.06
+    },
+    {
+      "label": "hourly, rounds to 100 / two pads out",
+      "at": 1789413876346,
+      "session": {
+        "id": 3,
+        "branch_id": 1,
+        "pc_id": 1,
+        "pc_label": "PS5-08",
+        "user_display_name": null,
+        "time_package_id": null,
+        "mode": "open",
+        "hourly_rate": "1000.00",
+        "tariff_hourly_rate": null,
+        "started_at": "2026-09-14T19:24:19.000000Z",
+        "ends_at": null,
+        "stopped_at": null,
+        "status": "active",
+        "total_paid": "0.00",
+        "payment_method": null,
+        "payment_method_other": null,
+        "opened_by_user_id": 1,
+        "package_name": null,
+        "items": [],
+        "pc": {
+          "id": 1,
+          "label": "PS5-08",
+          "branch_id": 1,
+          "kind": "ps",
+          "hourly_rate": null,
+          "place_id": 1,
+          "place": {
+            "id": 1,
+            "platform": "ps5",
+            "type": "standard",
+            "hourly_rate": null
+          },
+          "branch": {
+            "id": 1,
+            "price_for_branch": null
+          }
+        },
+        "time_package": null,
+        "is_free": false,
+        "is_unlimited": true,
+        "unlimited_at": null,
+        "committed_until": null,
+        "committed_amount": null,
+        "joystick_count": 4,
+        "joysticks": [
+          {
+            "id": 5,
+            "slot": 3,
+            "price": 500,
+            "is_charged": true,
+            "is_hourly": true,
+            "started_at": "2026-09-14T19:24:25.000000Z",
+            "stopped_at": null
+          },
+          {
+            "id": 6,
+            "slot": 4,
+            "price": 500,
+            "is_charged": true,
+            "is_hourly": true,
+            "started_at": "2026-09-14T19:24:30.000000Z",
+            "stopped_at": null
+          }
+        ],
+        "supports_joysticks": true,
+        "rounding_step": 100,
+        "rounding_mode": "nearest",
+        "joystick_rule": {
+          "included": 2,
+          "price": 500,
+          "price_4": null,
+          "max": 4,
+          "max_slot": 4,
+          "charged_slots": [
+            3,
+            4
+          ],
+          "hourly": true,
+          "shared": true,
+          "options": [
+            {
+              "slot": 3,
+              "price": 500,
+              "shared": true
+            },
+            {
+              "slot": 4,
+              "price": 500,
+              "shared": true
+            }
+          ]
+        },
+        "place_platform": "ps5",
+        "opened_by": {
+          "id": 1,
+          "name": "Owner Check",
+          "role": "company_owner"
+        },
+        "stopped_by_user_id": null,
+        "stopped_by": null,
+        "branch": {
+          "id": 1,
+          "address": "Kentron 1",
+          "city": "Yerevan",
+          "company_id": 1,
+          "company_name": "Strategy Check Co"
+        }
+      },
+      "server_total": 0,
+      "server_joysticks_total": 2.08,
+      "server_time_cost": 4.44
+    },
+    {
+      "label": "hourly, rounds to 100 / pad 4 back",
+      "at": 1789413880933,
+      "session": {
+        "id": 3,
+        "branch_id": 1,
+        "pc_id": 1,
+        "pc_label": "PS5-08",
+        "user_display_name": null,
+        "time_package_id": null,
+        "mode": "open",
+        "hourly_rate": "1000.00",
+        "tariff_hourly_rate": null,
+        "started_at": "2026-09-14T19:24:19.000000Z",
+        "ends_at": null,
+        "stopped_at": null,
+        "status": "active",
+        "total_paid": "0.00",
+        "payment_method": null,
+        "payment_method_other": null,
+        "opened_by_user_id": 1,
+        "package_name": null,
+        "items": [],
+        "pc": {
+          "id": 1,
+          "label": "PS5-08",
+          "branch_id": 1,
+          "kind": "ps",
+          "hourly_rate": null,
+          "place_id": 1,
+          "place": {
+            "id": 1,
+            "platform": "ps5",
+            "type": "standard",
+            "hourly_rate": null
+          },
+          "branch": {
+            "id": 1,
+            "price_for_branch": null
+          }
+        },
+        "time_package": null,
+        "is_free": false,
+        "is_unlimited": true,
+        "unlimited_at": null,
+        "committed_until": null,
+        "committed_amount": null,
+        "joystick_count": 3,
+        "joysticks": [
+          {
+            "id": 5,
+            "slot": 3,
+            "price": 500,
+            "is_charged": true,
+            "is_hourly": true,
+            "started_at": "2026-09-14T19:24:25.000000Z",
+            "stopped_at": null
+          },
+          {
+            "id": 6,
+            "slot": 4,
+            "price": 500,
+            "is_charged": true,
+            "is_hourly": true,
+            "started_at": "2026-09-14T19:24:30.000000Z",
+            "stopped_at": "2026-09-14T19:24:36.000000Z"
+          }
+        ],
+        "supports_joysticks": true,
+        "rounding_step": 100,
+        "rounding_mode": "nearest",
+        "joystick_rule": {
+          "included": 2,
+          "price": 500,
+          "price_4": null,
+          "max": 4,
+          "max_slot": 4,
+          "charged_slots": [
+            3,
+            4
+          ],
+          "hourly": true,
+          "shared": true,
+          "options": [
+            {
+              "slot": 3,
+              "price": 500,
+              "shared": true
+            },
+            {
+              "slot": 4,
+              "price": 500,
+              "shared": true
+            }
+          ]
+        },
+        "place_platform": "ps5",
+        "opened_by": {
+          "id": 1,
+          "name": "Owner Check",
+          "role": "company_owner"
+        },
+        "stopped_by_user_id": null,
+        "stopped_by": null,
+        "branch": {
+          "id": 1,
+          "address": "Kentron 1",
+          "city": "Yerevan",
+          "company_id": 1,
+          "company_name": "Strategy Check Co"
+        }
+      },
+      "server_total": 0,
+      "server_joysticks_total": 2.91,
+      "server_time_cost": 5.83
+    },
+    {
+      "label": "hourly, rounds to 100 / both back",
+      "at": 1789413885567,
+      "session": {
+        "id": 3,
+        "branch_id": 1,
+        "pc_id": 1,
+        "pc_label": "PS5-08",
+        "user_display_name": null,
+        "time_package_id": null,
+        "mode": "open",
+        "hourly_rate": "1000.00",
+        "tariff_hourly_rate": null,
+        "started_at": "2026-09-14T19:24:19.000000Z",
+        "ends_at": null,
+        "stopped_at": null,
+        "status": "active",
+        "total_paid": "0.00",
+        "payment_method": null,
+        "payment_method_other": null,
+        "opened_by_user_id": 1,
+        "package_name": null,
+        "items": [],
+        "pc": {
+          "id": 1,
+          "label": "PS5-08",
+          "branch_id": 1,
+          "kind": "ps",
+          "hourly_rate": null,
+          "place_id": 1,
+          "place": {
+            "id": 1,
+            "platform": "ps5",
+            "type": "standard",
+            "hourly_rate": null
+          },
+          "branch": {
+            "id": 1,
+            "price_for_branch": null
+          }
+        },
+        "time_package": null,
+        "is_free": false,
+        "is_unlimited": true,
+        "unlimited_at": null,
+        "committed_until": null,
+        "committed_amount": null,
+        "joystick_count": 2,
+        "joysticks": [
+          {
+            "id": 6,
+            "slot": 4,
+            "price": 500,
+            "is_charged": true,
+            "is_hourly": true,
+            "started_at": "2026-09-14T19:24:30.000000Z",
+            "stopped_at": "2026-09-14T19:24:36.000000Z"
+          },
+          {
+            "id": 5,
+            "slot": 3,
+            "price": 500,
+            "is_charged": true,
+            "is_hourly": true,
+            "started_at": "2026-09-14T19:24:25.000000Z",
+            "stopped_at": "2026-09-14T19:24:40.000000Z"
+          }
+        ],
+        "supports_joysticks": true,
+        "rounding_step": 100,
+        "rounding_mode": "nearest",
+        "joystick_rule": {
+          "included": 2,
+          "price": 500,
+          "price_4": null,
+          "max": 4,
+          "max_slot": 4,
+          "charged_slots": [
+            3,
+            4
+          ],
+          "hourly": true,
+          "shared": true,
+          "options": [
+            {
+              "slot": 3,
+              "price": 500,
+              "shared": true
+            },
+            {
+              "slot": 4,
+              "price": 500,
+              "shared": true
+            }
+          ]
+        },
+        "place_platform": "ps5",
+        "opened_by": {
+          "id": 1,
+          "name": "Owner Check",
+          "role": "company_owner"
+        },
+        "stopped_by_user_id": null,
+        "stopped_by": null,
+        "branch": {
+          "id": 1,
+          "address": "Kentron 1",
+          "city": "Yerevan",
+          "company_id": 1,
+          "company_name": "Strategy Check Co"
+        }
+      },
+      "server_total": 0,
+      "server_joysticks_total": 2.91,
+      "server_time_cost": 7.22
+    }
+  ],
+  "stopped": {
+    "hourly": {
+      "mode": "open",
+      "elapsed_minutes": 0,
+      "time_cost": 7.22,
+      "hourly_rate": 1000,
+      "package_name": null,
+      "items": [],
+      "items_total": 0,
+      "total": 10.27,
+      "is_free": false,
+      "is_unlimited": true,
+      "joysticks": [
+        {
+          "id": 1,
+          "slot": 3,
+          "price": 500,
+          "started_at": "2026-09-14T23:23:28+04:00",
+          "stopped_at": "2026-09-14T23:23:44+04:00",
+          "is_open": false,
+          "minutes": 0,
+          "seconds": 16,
+          "amount": 2.22,
+          "is_charged": true,
+          "is_hourly": true
+        },
+        {
+          "id": 2,
+          "slot": 4,
+          "price": 500,
+          "started_at": "2026-09-14T23:23:33+04:00",
+          "stopped_at": "2026-09-14T23:23:39+04:00",
+          "is_open": false,
+          "minutes": 0,
+          "seconds": 6,
+          "amount": 0.83,
+          "is_charged": true,
+          "is_hourly": true
+        }
+      ],
+      "joysticks_total": 3.05,
+      "joystick_count": 2,
+      "subtotal": 10.27,
+      "gross_total": 10.27,
+      "rounding_step": 0,
+      "rounding_mode": "up"
+    },
+    "fixed": {
+      "mode": "open",
+      "elapsed_minutes": 0,
+      "time_cost": 8.06,
+      "hourly_rate": 1000,
+      "package_name": null,
+      "items": [],
+      "items_total": 0,
+      "total": 1008.06,
+      "is_free": false,
+      "is_unlimited": true,
+      "joysticks": [
+        {
+          "id": 3,
+          "slot": 3,
+          "price": 500,
+          "started_at": "2026-09-14T23:23:55+04:00",
+          "stopped_at": "2026-09-14T23:24:13+04:00",
+          "is_open": false,
+          "minutes": 0,
+          "seconds": 18,
+          "amount": 500,
+          "is_charged": true,
+          "is_hourly": false
+        },
+        {
+          "id": 4,
+          "slot": 4,
+          "price": 500,
+          "started_at": "2026-09-14T23:24:02+04:00",
+          "stopped_at": "2026-09-14T23:24:09+04:00",
+          "is_open": false,
+          "minutes": 0,
+          "seconds": 7,
+          "amount": 500,
+          "is_charged": true,
+          "is_hourly": false
+        }
+      ],
+      "joysticks_total": 1000,
+      "joystick_count": 2,
+      "subtotal": 1008.06,
+      "gross_total": 1008.06,
+      "rounding_step": 0,
+      "rounding_mode": "up"
+    },
+    "rounded": {
+      "mode": "open",
+      "elapsed_minutes": 0,
+      "time_cost": 7.22,
+      "hourly_rate": 1000,
+      "package_name": null,
+      "items": [],
+      "items_total": 0,
+      "total": 0,
+      "is_free": false,
+      "is_unlimited": true,
+      "joysticks": [
+        {
+          "id": 5,
+          "slot": 3,
+          "price": 500,
+          "started_at": "2026-09-14T23:24:25+04:00",
+          "stopped_at": "2026-09-14T23:24:40+04:00",
+          "is_open": false,
+          "minutes": 0,
+          "seconds": 15,
+          "amount": 2.08,
+          "is_charged": true,
+          "is_hourly": true
+        },
+        {
+          "id": 6,
+          "slot": 4,
+          "price": 500,
+          "started_at": "2026-09-14T23:24:30+04:00",
+          "stopped_at": "2026-09-14T23:24:36+04:00",
+          "is_open": false,
+          "minutes": 0,
+          "seconds": 6,
+          "amount": 0.83,
+          "is_charged": true,
+          "is_hourly": true
+        }
+      ],
+      "joysticks_total": 2.91,
+      "joystick_count": 2,
+      "subtotal": 10.13,
+      "gross_total": 0,
+      "rounding_step": 100,
+      "rounding_mode": "nearest"
+    }
+  }
+}

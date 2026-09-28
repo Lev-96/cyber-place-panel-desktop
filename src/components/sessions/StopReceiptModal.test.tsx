@@ -34,10 +34,27 @@ vi.mock("@/repositories/SessionRepository", () => ({
 vi.mock("@/i18n/LanguageContext", () => ({
   useLang: () => ({
     t: (k: string) => k,
-    // Distinctive enough that a match cannot come from anywhere else on screen.
-    money: (n: number) => `${Number(n).toFixed(2)}·AMD`,
+    // Distinctive enough that a match cannot come from anywhere else on
+    // screen, and it HONOURS the precision options it is handed.
+    //
+    // It used to discard them, which meant every figure on the receipt looked
+    // identical to this suite whether the component asked for cents or not —
+    // so the defect where a joystick line rounded to whole units under a total
+    // that printed cents was invisible here. A mock that drops the argument
+    // under test proves nothing about it.
+    money: (n: number, opts?: { maximumFractionDigits?: number }) =>
+      opts?.maximumFractionDigits === 2
+        ? `${Number(n).toFixed(2)}·AMD`
+        : `${Math.round(Number(n))}·AMD`,
   }),
 }));
+
+const toasts = vi.hoisted(() => ({ message: vi.fn() }));
+vi.mock("@/ui/notify", () => ({ notify: { message: (...a: unknown[]) => toasts.message(...a) } }));
+
+/** The in-app confirmation: «yes» unless a test says otherwise. */
+const asked = vi.hoisted(() => ({ fn: vi.fn(async (_m: string, _o?: unknown) => true) }));
+vi.mock("@/components/ui/ConfirmProvider", () => ({ useConfirm: () => asked.fn }));
 
 const bill = (over: Partial<IBillBreakdown> = {}): IBillBreakdown => ({
   mode: "open",
@@ -235,7 +252,9 @@ describe("StopReceiptModal", () => {
     repo.preview.mockResolvedValue(bill({ time_cost: 0, subtotal: 0, gross_total: 0, total: 0 }));
     await mount();
 
-    expect(screen.getByText(/1000\.00·AMD/)).toBeTruthy();
+    // No figure on THIS receipt has cents, so none of them prints any. The
+    // precision is one decision for the whole bill, not one per number.
+    expect(screen.getByText(/\b1000·AMD/)).toBeTruthy();
     expect(screen.queryByText("session.freeBill")).toBeNull();
   });
 
@@ -309,6 +328,94 @@ describe("StopReceiptModal", () => {
       expect(screen.getByText("250.00·AMD")).toBeTruthy();
     });
 
+    /**
+     * The precision is decided from EVERY figure, not from the clock.
+     *
+     * A whole hour of seat and a fractional pad: reading the decision off the
+     * time cost alone would print "1000", "0" and "1000.69" — the line that
+     * carries the cents being the only one that hides them.
+     */
+    test("a fractional pad alone is enough to put cents on the whole receipt", async () => {
+      repo.preview.mockResolvedValue(bill({
+        time_cost: 1000,
+        joysticks: [{
+          id: 1, slot: 3, price: 500, started_at: "2026-09-15T14:00:00Z", stopped_at: null,
+          is_open: true, minutes: 0, seconds: 5, amount: 0.69, is_charged: true, is_hourly: true,
+        }],
+        joysticks_total: 0.69,
+        subtotal: 1000.69,
+        gross_total: 1000.69,
+        total: 1000.69,
+      }));
+      await mount();
+
+      expect(screen.getByText("0.69·AMD")).toBeTruthy();
+      expect(screen.getByText("1000.00·AMD")).toBeTruthy();
+      expect(screen.getByText("1000.69·AMD")).toBeTruthy();
+      // The figure a clock-only decision would have printed for the pad.
+      expect(screen.queryByText("1·AMD")).toBeNull();
+    });
+
+    /**
+     * The other direction of the same defect, found by driving the real panel.
+     *
+     * A fee-strategy bill of 4.72 of clock and 500 of pad printed "4.72", "500"
+     * and "505": the first figure is under the per-figure threshold and the
+     * other two are over it, so the column stopped adding up at the opposite
+     * end from the case below. The precision is one decision for the receipt.
+     */
+    test("a whole-unit pad beside a fractional clock still adds up", async () => {
+      repo.preview.mockResolvedValue(bill({
+        time_cost: 4.72,
+        joysticks: [{
+          id: 1, slot: 3, price: 500, started_at: "2026-09-15T14:00:00Z", stopped_at: null,
+          is_open: true, minutes: 0, seconds: 7, amount: 500, is_charged: true, is_hourly: false,
+        }],
+        joysticks_total: 500,
+        subtotal: 504.72,
+        gross_total: 504.72,
+        total: 504.72,
+      }));
+      await mount();
+
+      expect(screen.getByText("4.72·AMD")).toBeTruthy();
+      expect(screen.getByText("500.00·AMD")).toBeTruthy();
+      expect(screen.getByText("504.72·AMD")).toBeTruthy();
+      // What it used to print for the total while the pad line said "500".
+      expect(screen.queryByText("505·AMD")).toBeNull();
+    });
+
+    /**
+     * The receipt has ONE rounding rule, and the lines add up to the total.
+     *
+     * The reported defect: a bill of 21.94 of clock and 1.11 of pad printed as
+     * "21.94", "1" and "23.05" — three figures a cashier cannot reconcile,
+     * because the pad line rounded to whole units while the time cost and the
+     * total printed cents. Under the hourly strategy a pad's share of a short
+     * session is a fraction as a matter of course, so this was every receipt,
+     * not an edge case.
+     */
+    test("a fractional pad line prints the same precision as the total above it", async () => {
+      repo.preview.mockResolvedValue(bill({
+        time_cost: 21.94,
+        joysticks: [{
+          id: 1, slot: 3, price: 50, started_at: "2026-09-15T14:00:00Z", stopped_at: null,
+          is_open: true, minutes: 1, seconds: 80, amount: 1.11, is_charged: true, is_hourly: true,
+        }],
+        joysticks_total: 1.11,
+        subtotal: 23.05,
+        gross_total: 23.05,
+        total: 23.05,
+      }));
+      await mount();
+
+      expect(screen.getByText("21.94·AMD")).toBeTruthy();
+      expect(screen.getByText("1.11·AMD")).toBeTruthy();
+      expect(screen.getByText("23.05·AMD")).toBeTruthy();
+      // The figure that used to be there instead of 1.11.
+      expect(screen.queryByText("1·AMD")).toBeNull();
+    });
+
     test("its lines cannot be edited any more", async () => {
       repo.preview.mockResolvedValue(bill({
         items: [{ id: 7, name: "Coca-Cola", price: 300, qty: 1, line_total: 300 }],
@@ -327,5 +434,118 @@ describe("StopReceiptModal", () => {
       expect(screen.getByText("session.confirmStop")).toBeTruthy();
       expect(screen.queryByText("session.checkoutDone")).toBeNull();
     });
+  });
+});
+
+/**
+ * The room's own extra on the closing receipt.
+ *
+ * A rented cue is a RATE and a DURATION. Printing "700 x 1" beside an amount
+ * of 1 050 is three figures that do not add up, on the one screen a cashier
+ * checks with their eyes — so an hourly line reads like a pad's line instead,
+ * and says so once its clock has stopped.
+ */
+describe("an hourly extra on the receipt", () => {
+  const line = (over: Record<string, unknown> = {}) => ({
+    id: 11, name: "\u041a\u0438\u0439", price: 700, qty: 1, line_total: 1050,
+    is_hourly: true, minutes: 90, returned_at: null, ...over,
+  });
+  /** The grey note beside each line, which is where the shape under test is. */
+  const notes = () =>
+    [...document.querySelectorAll("span.muted")].map((n) => n.textContent ?? "");
+
+  test("reads as a duration and a rate, never as a count", async () => {
+    repo.preview.mockResolvedValue(bill({
+      items: [line()] as unknown as IBillBreakdown["items"],
+      items_total: 1050, subtotal: 1067.22, gross_total: 1067.22, total: 1067.22,
+    }));
+    await mount();
+
+    expect(notes().some((n) => n.includes("90 time.minShort") && n.includes("session.extraPerHour"))).toBe(true);
+    expect(notes().some((n) => n.includes("session.extraReturned"))).toBe(false);
+  });
+
+  test("says so once it has been handed back", async () => {
+    repo.preview.mockResolvedValue(bill({
+      items: [line({ returned_at: "2026-09-22T01:00:00+04:00" })] as unknown as IBillBreakdown["items"],
+      items_total: 1050, subtotal: 1067.22, gross_total: 1067.22, total: 1067.22,
+    }));
+    await mount();
+
+    expect(notes().some((n) => n.includes("session.extraReturned"))).toBe(true);
+  });
+
+  test("a drink keeps the price it always printed", async () => {
+    repo.preview.mockResolvedValue(bill({
+      items: [{ id: 12, name: "Cola", price: 300, qty: 2, line_total: 600 }] as unknown as IBillBreakdown["items"],
+      items_total: 600, subtotal: 617.22, gross_total: 617.22, total: 617.22,
+    }));
+    await mount();
+
+    // Exactly the old shape: a price and a count, no duration and no rate.
+    // (`time.minShort` on its own would match the receipt's elapsed-time line.)
+    expect(notes()).toContain("300.00\u00b7AMD \u00d7 2");
+  });
+});
+
+describe("taking a line off the bill before the stop", () => {
+  // Whatever an earlier block left mounted is not this block's receipt.
+  beforeEach(() => cleanup());
+  afterEach(() => cleanup());
+
+  const withCola = () => bill({ items: [{ id: 7, name: "Coca-Cola", price: 300, qty: 1, line_total: 300 }] } as Partial<IBillBreakdown>);
+
+  test("it asks first, naming the line, and then removes it", async () => {
+    repo.preview.mockResolvedValue(withCola());
+    repo.removeItem.mockReset();
+    repo.removeItem.mockResolvedValue({});
+    asked.fn.mockReset();
+    asked.fn.mockImplementation(async () => true);
+    await mount();
+
+    await act(async () => { fireEvent.click(screen.getByTitle("session.removeItemTitle")); });
+    expect(asked.fn).toHaveBeenCalledWith("session.removeConfirm", { destructive: true });
+    expect(repo.removeItem).toHaveBeenCalledWith(1, 7);
+  });
+
+  test("an additional item is asked about and reported as one", async () => {
+    repo.preview.mockResolvedValue(bill({
+      items: [{ id: 8, name: "Billiard Cue", price: 500, qty: 1, line_total: 500, is_additional: true }],
+    } as Partial<IBillBreakdown>));
+    repo.removeItem.mockReset();
+    repo.removeItem.mockResolvedValue({});
+    toasts.message.mockReset();
+    asked.fn.mockReset();
+    asked.fn.mockImplementation(async () => true);
+    await mount();
+
+    await act(async () => { fireEvent.click(screen.getByTitle("session.removeItemTitle")); });
+    expect(asked.fn).toHaveBeenCalledWith("session.additionalRemoveConfirm", { destructive: true });
+    expect(repo.removeItem).toHaveBeenCalledWith(1, 8);
+    expect(toasts.message).toHaveBeenCalledWith("error", "session.additionalRemoved");
+  });
+
+  test("a product removed here says so too", async () => {
+    repo.preview.mockResolvedValue(withCola());
+    repo.removeItem.mockReset();
+    repo.removeItem.mockResolvedValue({});
+    toasts.message.mockReset();
+    asked.fn.mockReset();
+    asked.fn.mockImplementation(async () => true);
+    await mount();
+
+    await act(async () => { fireEvent.click(screen.getByTitle("session.removeItemTitle")); });
+    expect(toasts.message).toHaveBeenCalledWith("error", "session.removedOne");
+  });
+
+  test("answering «no» removes nothing", async () => {
+    repo.preview.mockResolvedValue(withCola());
+    repo.removeItem.mockReset();
+    asked.fn.mockReset();
+    asked.fn.mockImplementation(async () => false);
+    await mount();
+
+    await act(async () => { fireEvent.click(screen.getByTitle("session.removeItemTitle")); });
+    expect(repo.removeItem).not.toHaveBeenCalled();
   });
 });

@@ -25,6 +25,8 @@ const isBackend = (url: URL): boolean => url.protocol.startsWith("http");
 let app: ElectronApplication;
 let page: Page;
 let userDataDir: string;
+/** The seat the routes answer with, so a test can re-answer with its own. */
+let session: Record<string, unknown>;
 
 /**
  * A THROWAWAY profile, and this is not a nicety.
@@ -71,6 +73,35 @@ test.beforeEach(async () => {
   const user = { id: 1, name: "Owner One", email: "o@o", role: "company_owner" };
   const dashboard = { branch_id: null, company_id: 1 };
 
+  /**
+   * A PlayStation with one extra pad out, on a club that allows both joystick
+   * strategies and has not handed anything over yet.
+   *
+   * The counts are the ones the current model produces and not free numbers: a
+   * PlayStation comes with a kit of TWO controllers nobody hands over, so a
+   * seat holding one extra reads three in play and names the extra `3/4` —
+   * `3/4` because this venue prices the pair as one figure, which is what
+   * `joystick_rule.shared` says.
+   */
+  session = {
+    id: 5, branch_id: 1, pc_id: 1, pc_label: "PS5 VIP", mode: "fixed",
+    started_at: new Date(Date.now() - 20 * 60_000).toISOString(),
+    ends_at: new Date(Date.now() + 40 * 60_000).toISOString(),
+    status: "active", total_paid: 1500, joystick_count: 3,
+    joysticks: [{
+      id: 9, slot: 3, price: 500, is_charged: true, is_hourly: false,
+      started_at: new Date(Date.now() - 10 * 60_000).toISOString(), stopped_at: null,
+    }],
+    joystick_rule: {
+      included: 2, price: 500, price_4: null, max: 4, max_slot: 4,
+      charged_slots: [3, 4], hourly: false, shared: true,
+      options: [{ slot: 3, price: 500, shared: true }, { slot: 4, price: 500, shared: true }],
+    },
+    joystick_strategy: "fixed",
+    is_free: false, is_unlimited: false, supports_joysticks: true,
+    place_platform: "ps5",
+  };
+
   await page.route((url) => isBackend(url), async (route) => {
     const p = new URL(route.request().url()).pathname;
     if (p === "/user/me") {
@@ -98,14 +129,7 @@ test.beforeEach(async () => {
     if (p === "/sessions") {
       return route.fulfill({
         status: 200, contentType: "application/json",
-        body: JSON.stringify({ data: [{
-          id: 5, branch_id: 1, pc_id: 1, pc_label: "PS5 VIP", mode: "fixed",
-          started_at: new Date(Date.now() - 20 * 60_000).toISOString(),
-          ends_at: new Date(Date.now() + 40 * 60_000).toISOString(),
-          status: "active", total_paid: 1500, joystick_count: 3, joysticks: [],
-          is_free: false, is_unlimited: false, supports_joysticks: true,
-          place_platform: "ps5",
-        }] }),
+        body: JSON.stringify({ data: [session] }),
       });
     }
     if (p === "/products") {
@@ -162,7 +186,16 @@ test("the changed session screens render in Electron", async () => {
 
   await page.evaluate(() => { window.location.hash = "#/branches/1/sessions"; });
 
-  await expect(page.getByText("3 / 4")).toBeVisible();
+  // The pad line NAMES the extra rather than counting to a ceiling: `3/4`,
+  // because this venue prices the third and the fourth as one figure.
+  await expect(page.getByText("3/4").first()).toBeVisible();
+  // …and the charge line names it too, at the fee it froze.
+  // …and what they have earned, on the SAME line. The card used to carry a
+  // second one naming the controllers again ("Joystick #3 · 500 AMD = 500
+  // AMD"); on a 160px tile that was most of the card, and every number on it
+  // is either printed beside it or on the receipt.
+  await expect(page.getByText(/^3\/4 · /)).toBeVisible();
+  await expect(page.getByText(/Joystick #3/)).toHaveCount(0);
 });
 
 /**
@@ -179,8 +212,17 @@ test("the unlimited confirmation is an in-app dialog, and the renderer keeps typ
   await expect(page.getByText("Owner One").first()).toBeVisible();
 
   await page.evaluate(() => { window.location.hash = "#/branches/1/sessions"; });
-  await page.getByRole("button", { name: "Options" }).first().click();
-  await page.getByRole("button", { name: "Switch to unlimited" }).click();
+  // The tile lost its "Options" button; this dialog is reached by the name a
+  // cashier actually scans for on a seat that is running out.
+  await page.getByRole("button", { name: "Add time" }).first().click();
+
+  // Ticked AND priced, or the apply button stays disabled: the price a seat
+  // carries on at is now always entered deliberately.
+  // Clicked the way a cashier clicks it — on the label. The input itself sits
+  // behind the styled box, so targeting it directly is a click no human makes.
+  await page.getByText("Switch to unlimited", { exact: true }).click();
+  await page.getByLabel("Price per hour").fill("1200");
+  await page.getByRole("button", { name: "Change fixed tariff to unlimited" }).click();
 
   // A React dialog, in the DOM — not an OS window.
   await expect(page.getByText("Switch this session to unlimited?")).toBeVisible();
@@ -198,4 +240,54 @@ test("the unlimited confirmation is an in-app dialog, and the renderer keeps typ
   await expect(search).toBeVisible();
   await search.fill("cola");
   await expect(search).toHaveValue("cola");
+});
+
+/**
+ * The seat whose extra controllers are ONE payment, in the shell it ships in.
+ *
+ * The money rule is the server's and the unit tests pin the component; what
+ * only Electron can show is that a cashier looking at the real bundle sees WHY
+ * a controller is about to be handed over for nothing. A zero with no reason
+ * beside it is read as a fault and phoned in as one.
+ */
+test("a seat whose fee was already charged says so, in Electron", async () => {
+  const paid = {
+    ...session,
+    joystick_rule: {
+      included: 2, price: 500, price_4: null, max: 4, max_slot: 4,
+      charged_slots: [3, 4], hourly: false, shared: true,
+      charge_once: true, fee_taken: true,
+      // Priced by the server at what the next pad will actually cost.
+      options: [{ slot: 4, price: 0, shared: true }],
+    },
+  };
+
+  await page.route((url) => isBackend(url), async (route) => {
+    if (new URL(route.request().url()).pathname === "/sessions") {
+      return route.fulfill({
+        status: 200, contentType: "application/json",
+        body: JSON.stringify({ data: [paid] }),
+      });
+    }
+    return route.fallback();
+  });
+  await page.reload();
+
+  await page.getByPlaceholder("your@email.com").fill("o@o");
+  await page.getByPlaceholder(/•/).fill("ok");
+  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await expect(page.getByText("Owner One").first()).toBeVisible();
+
+  await page.evaluate(() => { window.location.hash = "#/branches/1/sessions"; });
+
+  // On the pad line, without pressing anything…
+  // One word now: the figure on the same line already says how much was
+  // charged, and what this adds is that the NEXT controller costs nothing.
+  await expect(page.getByText("paid").first()).toBeVisible();
+
+  // …and the control is the SWITCH this venue gets instead of a menu: one
+  // payment, one controller, and with it out the button offers its return.
+  await expect(page.getByLabel("Joysticks")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Remove joystick" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Add joystick" })).toHaveCount(0);
 });

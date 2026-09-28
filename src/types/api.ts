@@ -72,6 +72,89 @@ export interface IBranchPlace extends Translated {
   } | null;
   /** Manual per-hour rate for custom platforms (null for known ones). */
   hourly_rate?: number | string | null;
+  /**
+   * This PLACE's own joystick allowance, or null to follow the branch.
+   *
+   * The venue's rule lives on the branch (`branches.joystick_included`) and is
+   * what almost every seat runs on. A VIP room quoted with four pads is the
+   * exception the override exists for, and null is how a seat says it is not
+   * one: the same empty-means-inherit shape `hourly_rate` above already uses.
+   * PlayStation places only, which is the PLATFORM's question and never the
+   * agent's (`platformGroup(place.platform) === "ps"`).
+   */
+  joystick_included?: number | null;
+  /**
+   * This place's own fee per extra joystick, or null to follow the branch.
+   *
+   * Null here is INHERIT and is not the branch's null, which means "extra pads
+   * are not offered". A place that wants to hand them out for nothing states
+   * 0, exactly as the branch does.
+   *
+   * Typed like `hourly_rate` above: a decimal column reaches the panel as a
+   * string on some endpoints, and a number on others.
+   */
+  joystick_price?: number | string | null;
+  /**
+   * WHICH extra pads this room charges for: "3", "4" or "3,4".
+   *
+   * Null is INHERIT — the room has not answered and its branch decides, which
+   * is what every place is until somebody chooses on the form. A count could
+   * only ever say "everything above N"; this says "the third and not the
+   * fourth", which is the rule an operator asked to be able to name per room.
+   */
+  joystick_charged_slots?: string | null;
+  /**
+   * The FOURTH pad's own figure, when this room prices it apart from the
+   * third. Null is "priced like the third" — never "free", which is a typed 0
+   * — and it is what every room is until somebody answers the form's question
+   * about a fourth pad.
+   *
+   * Typed like `joystick_price` above: a decimal column reaches the panel as a
+   * string on some endpoints and a number on others.
+   */
+  joystick_price_4?: number | string | null;
+  /**
+   * HOW this room prices an extra pad — a fee owed on handout, or a higher
+   * hourly rate while the pad is out. Null follows the branch.
+   */
+  joystick_pricing_mode?: "fixed" | "hourly" | null;
+  /**
+   * …and how OFTEN it charges: every handout, or once for the whole session
+   * however many times controllers change hands. Null follows the branch.
+   */
+  /**
+   * …and how OFTEN it charges: every handout, or once for the whole session
+   * however many times controllers change hands. Null follows the branch.
+   */
+  joystick_charge_mode?: "each" | "once" | null;
+  /**
+   * What a room on a CUSTOM platform hands out besides the seat, in the word
+   * the room uses for it: chips on a poker table, a cue on a billiard table.
+   *
+   * Null on every other platform and on every room nobody has configured.
+   * Unlike the joystick fields above these inherit NOTHING — a branch holds
+   * one PlayStation policy, but not one policy for every custom platform in
+   * the building — so null here means "hands out nothing", full stop.
+   */
+  extra_item_name?: string | null;
+  extra_item_price?: number | string | null;
+  extra_item_charge_mode?: "each" | "once" | null;
+  /** A fee per piece, or a RATE per hour per piece. Null reads as "fixed". */
+  extra_item_pricing_mode?: "fixed" | "hourly" | null;
+  /**
+   * How many units the room's rate already covers: the first N handed out on
+   * a session are free, everything past N is charged.
+   *
+   * Null is the default and means 0 - every unit charged, which is what every
+   * room did before this column existed. There is deliberately NO branch-level
+   * inheritance here: a poker table and a billiard table in one venue hand out
+   * different things, so the allowance is the ROOM's alone.
+   */
+  extra_item_included?: number | null;
+  extra_item_max?: number | null;
+  extra_item_charged_units?: string | null;
+  /** What each CHARGED unit after the first costs. NULL = priced like it. */
+  extra_item_price_next?: number | string | null;
   games: IGame[];
 }
 

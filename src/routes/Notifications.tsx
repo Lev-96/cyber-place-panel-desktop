@@ -5,6 +5,7 @@ import { dueLabel, dueTone } from "@/components/expenses/expenseFormat";
 import type { IDbNotification } from "@/api/notifications";
 import { orFallback } from "@/api/fallback";
 import { useAuth } from "@/auth/AuthContext";
+import { useConfirm } from "@/components/ui/ConfirmProvider";
 import ScreenWithBg from "@/components/ui/ScreenWithBg";
 import Spinner from "@/components/ui/Spinner";
 import { useAsync } from "@/hooks/useAsync";
@@ -91,6 +92,7 @@ export const ownCompanyReminders = (billing: ICompanyBilling): IBillingReminder[
 const Notifications = () => {
   const { user } = useAuth();
   const { t } = useLang();
+  const confirm = useConfirm();
   const isAdmin = user?.role === "admin";
   const showBookings = shouldShowBookingsFeed(user?.role);
   const showBilling = shouldShowBillingFeed(user?.role);
@@ -166,10 +168,14 @@ const Notifications = () => {
               {list.length > 0 && (
                 <button
                   type="button"
-                  onClick={() => {
-                    if (window.confirm(t("notifications.confirmClearAll") || "Delete all?")) {
-                      void deleteAll();
-                    }
+                  onClick={async () => {
+                    // The app's own dialog: a native confirm() poisons the
+                    // Electron renderer's focus (see ConfirmProvider).
+                    const ok = await confirm(t("notifications.confirmClearAll"), {
+                      destructive: true,
+                      confirmLabel: t("notifications.clearAll"),
+                    });
+                    if (ok) void deleteAll();
                   }}
                   style={{ ...feedActionBtn, color: "#ef4444", borderColor: "#7f1d1d" }}
                 >

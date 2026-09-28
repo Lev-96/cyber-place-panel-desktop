@@ -8,6 +8,7 @@ import {
   IServiceExpense,
   ServiceExpenseBody,
 } from "@/api/expenses";
+import { withToast } from "@/ui/notify";
 
 export class ExpenseRepository {
   async list(): Promise<IServiceExpense[]> {
@@ -19,19 +20,17 @@ export class ExpenseRepository {
     return res.data;
   }
   async create(body: ServiceExpenseBody): Promise<IServiceExpense> {
-    const res = await apiCreateServiceExpense(body);
-    return res.data;
+    return withToast("expense", "created", () => apiCreateServiceExpense(body).then((r) => r.data));
   }
   async update(id: number, body: Partial<ServiceExpenseBody>): Promise<IServiceExpense> {
-    const res = await apiUpdateServiceExpense(id, body);
-    return res.data;
+    return withToast("expense", "updated", () => apiUpdateServiceExpense(id, body).then((r) => r.data));
   }
   async markPaid(id: number): Promise<IServiceExpense> {
     const res = await apiMarkServiceExpensePaid(id);
     return res.data;
   }
   async remove(id: number): Promise<void> {
-    await apiDeleteServiceExpense(id);
+    await withToast("expense", "deleted", () => apiDeleteServiceExpense(id));
   }
 }
 

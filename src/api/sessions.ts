@@ -9,6 +9,15 @@ export interface StartSessionBody {
   hourly_rate?: number;
   user_display_name?: string;
   /**
+   * WHICH joystick strategy this seat runs on.
+   *
+   * Sent only when the club allows both and the cashier picked one; the server
+   * fills it in itself when the club permits a single strategy, so a client
+   * that omits it is not making a decision by accident. The server refuses a
+   * strategy the club does not allow.
+   */
+  joystick_strategy?: "fixed" | "hourly";
+  /**
    * Start it waived. Owner-level, and the SERVER is what enforces that — this
    * flag reaching it from a manager's panel is answered with a 403, not with a
    * free session. Omitted entirely unless the operator asked for one, so a
@@ -47,6 +56,11 @@ export interface ListSessionsParams {
   /** ISO date (YYYY-MM-DD); inclusive — backend expands to endOfDay. */
   to?: string;
   limit?: number;
+  /**
+   * Only the sessions this person acted in, across the caller's branches (the
+   * History staff filter): the server reads past the "own shift" rule for them.
+   */
+  acted_by?: number;
 }
 
 export const apiListSessions = (params: ListSessionsParams) =>
@@ -73,15 +87,21 @@ export interface ISessionItem {
 /**
  * One pad period on a bill.
  *
- * `amount` is `price` or zero and never anything between: the server owes the
- * whole fee once the period reaches its threshold and nothing before that.
- * `is_charged` says which of the two happened, so a line worth 0 can explain
- * itself instead of reading as a bug.
+ * `is_hourly` says what `price` MEANS, and therefore what `amount` is:
+ *
+ *  - fee strategy: `price` is a one-off charge, and `amount` is that whole fee
+ *    or zero and never anything between. `is_charged` says which of the two
+ *    happened, so a line worth 0 can explain itself instead of reading as a bug.
+ *  - hourly strategy: `price` is a rate per hour, and `amount` is this period's
+ *    own share of it. A fraction is the normal case, not an edge one.
+ *
+ * `amount` is the server's figure under both. Nothing on this side multiplies
+ * or divides a `price`.
  */
 export interface IJoystickCharge {
   id: number;
   slot: number;
-  /** The flat fee for this use. Never divided, never multiplied. */
+  /** A fee or a rate per hour. `is_hourly` below says which. */
   price: number;
   started_at: string;
   stopped_at: string | null;
@@ -90,6 +110,8 @@ export interface IJoystickCharge {
   seconds: number;
   amount: number;
   is_charged: boolean;
+  /** Which strategy priced this period, frozen on the row when it opened. */
+  is_hourly?: boolean;
 }
 
 export interface IBillBreakdown {
@@ -98,7 +120,26 @@ export interface IBillBreakdown {
   time_cost: number;
   hourly_rate: number | null;
   package_name: string | null;
-  items: Array<{ id: number; name: string; price: number; qty: number; line_total: number }>;
+  items: Array<{
+    id: number;
+    name: string;
+    price: number;
+    qty: number;
+    line_total: number;
+    /**
+     * The room's own extra, RENTED by the hour: `price` is then a rate and
+     * `line_total` is what the server has counted for it so far.
+     *
+     * Optional, so a bill from an older backend still renders as the drinks
+     * it used to be.
+     */
+    is_hourly?: boolean;
+    minutes?: number | null;
+    /** When it was handed back. Null is "still out, still on the clock". */
+    returned_at?: string | null;
+    /** An additional item (chips, a cue — once per session). Absent on an older backend. */
+    is_additional?: boolean;
+  }>;
   items_total: number;
   /** What is actually owed. Zero for a waived session. */
   total: number;
@@ -126,6 +167,15 @@ export interface AddItemBody {
   name?: string;
   price?: number;
   qty?: number;
+  /**
+   * The ROOM's own extra: chips, a cue, darts.
+   *
+   * Carries a count and nothing else. The name and the price come from the
+   * place, which is why the server refuses `name`, `price` and `product_id`
+   * beside it rather than ignoring them — and also why a manager may sell one
+   * without the right to type prices onto a bill.
+   */
+  extra?: true;
 }
 
 /**
@@ -165,6 +215,79 @@ export const apiAddSessionItems = (id: number, body: AddItemsBody) =>
   request<{ session: ISessionApi }>(`/sessions/${id}/items`, { method: "POST", body });
 
 /**
+ * What the server made of a line (2026-09-25). Absent on a backend from before
+ * it, where `error === null` still means "matched".
+ */
+export type ResolvedLineStatus = "matched" | "ambiguous" | "unmatched" | "invalid";
+
+/** One product an ambiguous line could mean — the server's, priced by it. */
+export interface IResolvedOption {
+  product_id: number;
+  name: string;
+  price: number;
+  /** price × the line's quantity, as the server computed it. */
+  line_total: number | null;
+}
+
+/**
+ * The operator's pick for an ambiguous line: which line (by index and by its
+ * text, so a pick never lands on a line that changed) and which product. The
+ * server applies it only if that product is one of THAT line's options.
+ */
+export interface IItemChoice {
+  line: number;
+  raw: string;
+  product_id: number;
+}
+
+/** One typed line, as the server read it: a priced product, or a refusal. */
+export interface IResolvedItemLine {
+  /** Exactly what the cashier typed, so an error can point at the line. */
+  raw: string;
+  product_id: number | null;
+  name: string | null;
+  price: number | null;
+  qty: number | null;
+  line_total: number | null;
+  /** The server's own sentence. Null when the line resolved. */
+  error: string | null;
+  /** Names worth trying, when the word matched nothing or matched two things. */
+  candidates: string[];
+  status?: ResolvedLineStatus;
+  /**
+   * The products an ambiguous line could mean (and, once one was picked, the
+   * same list, so the pick can be changed). Empty otherwise.
+   */
+  options?: IResolvedOption[];
+}
+
+export interface IResolvedItems {
+  lines: IResolvedItemLine[];
+  /** What to send to `apiAddSessionItems`. Empty unless every line resolved. */
+  items: Array<{ product_id: number; qty: number }>;
+  total: number;
+  ok: boolean;
+}
+
+/**
+ * Reads the quick-entry box WITHOUT touching the bill.
+ *
+ * The server owns the matching rules — which product a word is, and whether it
+ * is sure enough to say so — because the till and the mobile app would
+ * otherwise each grow their own answer to the same question. What comes back is
+ * a preview plus, when every line resolved, the exact `items` the existing add
+ * endpoint expects. Confirming goes through THAT endpoint: this one never
+ * writes.
+ */
+export const apiResolveSessionItemsText = (id: number, text: string, choices?: IItemChoice[]) =>
+  request<{ resolved: IResolvedItems }>(`/sessions/${id}/items/resolve`, {
+    method: "POST",
+    // `choices` only when there are some: the body of an ordinary read stays
+    // exactly what it always was.
+    body: choices && choices.length > 0 ? { text, choices } : { text },
+  });
+
+/**
  * Set the quantity of a line the session already has. `qty: 0` removes it —
  * the minus button walks a count to zero and a zero-quantity line on a bill is
  * not a thing that should exist, so the server deletes the row.
@@ -173,6 +296,19 @@ export const apiSetSessionItemQty = (sessionId: number, itemId: number, qty: num
   request<{ session: ISessionApi }>(`/sessions/${sessionId}/items/${itemId}`, {
     method: "PATCH",
     body: { qty },
+  });
+
+/**
+ * Hand an HOURLY extra back: the clock stops, the charge stays.
+ *
+ * The same endpoint a quantity correction uses, because it is the same kind
+ * of thing — a change to a line already on the bill. Removing the line is
+ * still `apiRemoveSessionItem` and still means "this was never sold".
+ */
+export const apiReturnSessionItem = (sessionId: number, itemId: number) =>
+  request<{ session: ISessionApi }>(`/sessions/${sessionId}/items/${itemId}`, {
+    method: "PATCH",
+    body: { returned: true },
   });
 
 export const apiRemoveSessionItem = (sessionId: number, itemId: number) =>
@@ -186,11 +322,22 @@ export const apiRemoveSessionItem = (sessionId: number, itemId: number) =>
  * never computes either.
  */
 
-/** Put the next joystick into play. The server picks the slot and its price. */
-export const apiAddSessionJoystick = (sessionId: number) =>
+/**
+ * Put one joystick into play.
+ *
+ * The SLOT is the cashier naming which pad they are handing over, which a venue
+ * that prices the third and the fourth apart needs them to be able to say.
+ * Omitting it is "the next one", which is what this call always did and what
+ * the server still does when nothing is named.
+ *
+ * No price travels here in either case. What a pad costs is resolved on the
+ * server from the venue's own rule on every add; a figure sent from this side
+ * would be a figure nobody at the venue agreed to.
+ */
+export const apiAddSessionJoystick = (sessionId: number, slot?: number) =>
   request<{ joystick: { id: number; slot: number; hourly_rate: number; started_at: string }; session: ISessionApi }>(
     `/sessions/${sessionId}/joysticks`,
-    { method: "POST" },
+    { method: "POST", body: slot === undefined ? undefined : { slot } },
   );
 
 /**
@@ -284,12 +431,79 @@ export const apiTransferExtension = (sessionId: number, placeId: number, minutes
     body: { place_id: placeId, minutes },
   });
 
+/**
+ * One seat a running session could move to right now — «Переместить игрока».
+ *
+ * Every figure is the SERVER's: `hourly_rate` is what that seat would bill,
+ * `same_rate` compares it with the session's current effective rate, and
+ * `free_until` is the start of a reservation that would cut the session short
+ * (null when none does). `free_minutes` is counted from when the list was drawn.
+ */
+export interface IRelocationPlace {
+  place_id: number;
+  number: number | null;
+  name: string | null;
+  platform: string | null;
+  type: string | null;
+  hourly_rate: number;
+  same_rate: boolean;
+  free_until: string | null;
+  free_minutes: number | null;
+}
+
+export interface IRelocationOptions {
+  current: {
+    place_id: number | null;
+    number: number | null;
+    name: string | null;
+    platform: string | null;
+    type: string | null;
+    hourly_rate: number | null;
+    ends_at: string | null;
+    paused: boolean;
+  };
+  /** Same-rate seats first, then the rest; unlimited before limited in each. */
+  places: IRelocationPlace[];
+}
+
+/** ⚠️ ADVICE, like `apiSessionExtensionOptions`: `apiRelocateSession` re-checks. */
+export const apiRelocationOptions = (sessionId: number) =>
+  request<IRelocationOptions>(`/sessions/${sessionId}/relocation-options`);
+
+export interface RelocateSessionBody {
+  place_id: number;
+  /** Only when the operator changed the price; omitted = the seat's own rate. */
+  hourly_rate?: number;
+  /** The reservation limit the operator saw and accepted, echoed back verbatim. */
+  until?: string;
+}
+
+/**
+ * Move the running session to another seat. The SAME session comes back; the
+ * time already played keeps its price and only what follows runs at the new
+ * rate. A seat taken, reserved, or limited differently since the list was drawn
+ * is refused (409) — pick again.
+ */
+export const apiRelocateSession = (sessionId: number, body: RelocateSessionBody) =>
+  request<{ session: ISessionApi }>(`/sessions/${sessionId}/relocate`, { method: "POST", body });
+
 /** Waive the bill, or put it back. Owner-level; the server enforces it. */
 export const apiSetSessionFree = (sessionId: number, isFree: boolean) =>
   request<{ session: ISessionApi }>(`/sessions/${sessionId}/free`, {
     method: "POST",
     body: { is_free: isFree },
   });
+
+/**
+ * Stop / restart a running session's clock. The seat stays taken and the
+ * session stays `active`; the server answers with the whole row, `paused_at`
+ * and `pauses` included, and refuses a wrong state with a sentence (409).
+ */
+export const apiPauseSession = (sessionId: number) =>
+  request<{ session: ISessionApi }>(`/sessions/${sessionId}/pause`, { method: "POST" });
+
+export const apiResumeSession = (sessionId: number) =>
+  request<{ session: ISessionApi }>(`/sessions/${sessionId}/resume`, { method: "POST" });
 
 /* ── the audit trail ─────────────────────────────────────────────────── */
 
@@ -300,6 +514,9 @@ export type SessionActionName =
   | "joystick_removed"
   | "time_added"
   | "made_unlimited"
+  // The clock stopped and started again; `resumed` carries how long.
+  | "paused"
+  | "resumed"
   | "free_enabled"
   | "free_disabled"
   // ⚠️ The server has emitted this since seat migration shipped; the client
@@ -311,6 +528,8 @@ export type SessionActionName =
   // reason the move happened at all.
   | "item_added"
   | "item_removed"
+  // An hourly extra handed back: the clock stopped, the charge stayed.
+  | "item_returned"
   | "time_add_refused"
   | "move_failed";
 
@@ -330,6 +549,8 @@ export interface ISessionEvent {
 export interface ListSessionEventsParams {
   branch_id?: number;
   session_id?: number;
+  /** Only this person's actions (the History staff filter). Lines the system wrote have no author. */
+  user_id?: number;
   action?: SessionActionName;
   from?: string;
   to?: string;
@@ -339,8 +560,23 @@ export interface ListSessionEventsParams {
 export const apiListSessionEvents = (params: ListSessionEventsParams) =>
   request<{ data: ISessionEvent[] }>("/session-events", { params });
 
-export const apiListEventsForSession = (sessionId: number) =>
-  request<{ data: ISessionEvent[] }>(`/sessions/${sessionId}/events`);
+/** One session's log; with `userId`, only that person's lines (the History staff filter). */
+export const apiListEventsForSession = (sessionId: number, userId?: number) =>
+  request<{ data: ISessionEvent[] }>(
+    `/sessions/${sessionId}/events`,
+    userId !== undefined ? { params: { user_id: userId } } : undefined,
+  );
+
+/** A person whose actions a branch's log may hold: its owner, its managers, whoever acted there. */
+export interface ISessionEventActor {
+  id: number;
+  name: string;
+  role: string;
+}
+
+/** The staff filter's choices for one branch — the server's list, scoped to the caller. */
+export const apiListSessionEventActors = (branchId: number) =>
+  request<{ data: ISessionEventActor[] }>("/session-events/actors", { params: { branch_id: branchId } });
 
 export const apiListPcs = (branchId: number) =>
   request<{ data: IPcApi[] }>("/pcs", { params: { branch_id: branchId } });

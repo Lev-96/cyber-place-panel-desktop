@@ -283,7 +283,7 @@ const CompanyForm = ({ initial, onClose, onSaved }: Props) => {
               max={100}
               step={1}
               precision={2}
-              placeholder="e.g. 2"
+              placeholder={t("company.commissionExample")}
               suffix="%"
               disabled={commissionSaving}
             />

@@ -150,6 +150,25 @@ export const preciseWhenSmall = (amount: number): MoneyFormatOptions | undefined
   Math.abs(amount) > 0 && Math.abs(amount) < 100 ? { maximumFractionDigits: 2 } : undefined;
 
 /**
+ * One precision decision for a whole RECEIPT, taken from every figure on it.
+ *
+ * `preciseWhenSmall` decides per figure, which is right for a lone number and
+ * wrong for a column that has to add up: a bill of 4.72 of clock and 500 of pad
+ * printed "4.72", "500" and "505", because the first is under the threshold and
+ * the other two are over it. Three figures, one of which is not the sum of the
+ * other two.
+ *
+ * So the caller hands in every figure it is about to print and gets ONE answer:
+ * cents everywhere if any of them has cents, whole units everywhere if none
+ * does. Sub-cent float noise counts as whole, the way `centsWhenFractional`
+ * already treats it.
+ */
+export const sharedPrecision = (amounts: readonly number[]): MoneyFormatOptions | undefined =>
+  amounts.some((a) => Number.isFinite(a) && Math.round(Math.abs(a) * 100) % 100 !== 0)
+    ? { maximumFractionDigits: 2 }
+    : undefined;
+
+/**
  * Formatting options for a figure on a STATEMENT — the revenue screen, where
  * the server's amounts are exact to the hundredth and are read against each
  * other. Rounded to whole units, 9000.50 / 900.05 / 8100.45 print as

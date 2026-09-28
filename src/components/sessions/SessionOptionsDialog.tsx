@@ -74,6 +74,7 @@ const SessionOptionsDialog = ({ session, platform, onClose, onChanged }: Props) 
   const [current, setCurrent] = useState<ISessionApi>(session);
   // The venue's one joystick fee, or null when it does not offer extra pads.
   const [fee, setFee] = useState<number | null>(null);
+
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   /**
@@ -139,7 +140,9 @@ const SessionOptionsDialog = ({ session, platform, onClose, onChanged }: Props) 
   // could quote a figure for a pad the server was not about to allocate.
   const loadPrices = useCallback(() => {
     if (!isPlayStation) return;
-    void billingSettingsRepository.get(current.branch_id).then((s) => setFee(s.joystick_price));
+    void billingSettingsRepository.get(current.branch_id).then((s) => {
+      setFee(s.joystick_price);
+    });
   }, [current.branch_id, isPlayStation]);
 
   useEffect(loadPrices, [loadPrices]);

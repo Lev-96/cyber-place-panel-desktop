@@ -195,6 +195,54 @@ html {
   /* Card shrinks to fit a narrow window; keeps its declared width below this. */
   max-width: 100%;
 }
+/* The dialog box: the card plus its × (2026-09-24). Relative so the × sits on
+   the card's corner, whatever the card's own width. */
+.cp-modal-dialog {
+  position: relative;
+}
+.cp-modal-dialog > * {
+  max-width: 100%;
+}
+/* The ×: a small round control ON the card's top-right corner — outside the
+   card's padding, so it never covers a title or a button a dialog already
+   keeps there. The wrapper's 16px gutter keeps it on screen on a narrow window. */
+.cp-modal-close {
+  position: absolute;
+  top: -10px;
+  right: -10px;
+  z-index: 1;
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    box-shadow 160ms ease,
+    background 160ms ease,
+    transform 160ms ease;
+}
+.cp-modal-close:hover {
+  box-shadow: inset 0 0 0 1px rgba(7, 221, 241, 0.6);
+  transform: scale(1.06);
+}
+.cp-modal-close:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(7, 221, 241, 0.35);
+}
+.cp-modal-confirm {
+  width: 360px;
+  max-width: 90vw;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
 
 /* === Animations & transitions ============================================== */
 /* All animations are skipped if user prefers reduced motion. */
@@ -542,6 +590,26 @@ a.card:hover {
 .cp-modal-wrapper > * {
   animation: cp-modal-in 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
+/* …and exit: the backdrop fades and the card settles back, THEN the dialog is
+   removed (Modal waits MODAL_LEAVE_MS = 160ms). `both` holds the last frame, so
+   nothing flashes back in the instant before it unmounts. */
+.cp-modal.cp-modal-leaving {
+  animation: cp-fade-out 160ms ease-in both;
+  pointer-events: none;
+}
+.cp-modal-leaving .cp-modal-wrapper > * {
+  animation: cp-modal-out 160ms cubic-bezier(0.4, 0, 1, 1) both;
+}
+/* Less motion asked for: the dialog still appears and leaves, without the
+   movement (Modal also skips its wait). */
+@media (prefers-reduced-motion: reduce) {
+  .cp-modal,
+  .cp-modal-wrapper > *,
+  .cp-modal.cp-modal-leaving,
+  .cp-modal-leaving .cp-modal-wrapper > * {
+    animation-duration: 1ms;
+  }
+}
 
 /* Page-title subtle slide */
 .page-title {
@@ -584,6 +652,24 @@ a.card:hover {
   }
   to {
     opacity: 1;
+  }
+}
+@keyframes cp-fade-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+@keyframes cp-modal-out {
+  from {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.96) translateY(6px);
   }
 }
 @keyframes cp-modal-in {
@@ -2222,6 +2308,69 @@ button.pill:hover {
 .cp-radio-label {
   font-size: 14px;
   color: var(--color-text);
+}
+
+/* ---------------------------------------------------------------------------
+   Choice cards — one decision, several answers, each carrying its own fields.
+
+   The sibling of `.cp-langpick-option`, laid out as a row instead of a tile.
+   Bare radios stacked under a label read as unrelated lines: the place form's
+   joystick section offered four of them across two headings, and the price box
+   belonging to the first sat across the row from it. Boxing each answer says
+   "these are alternatives" without a word of copy, and puts the fields an
+   answer owns inside the answer.
+
+   Presentation only: the radio inside is the app's own `.cp-radio`, so
+   keyboard navigation, focus and the group's semantics are untouched.
+   --------------------------------------------------------------------------- */
+.cp-choice {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-surface-alt);
+  /* Colour and shadow only. A choice that resized on selection would push the
+     rest of the form down the moment an operator moved between options. */
+  transition: border-color 140ms ease, box-shadow 140ms ease;
+}
+.cp-choice:hover {
+  border-color: rgba(7, 221, 241, 0.35);
+}
+.cp-choice.is-active {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 1px var(--color-primary) inset;
+}
+/* Indented to where the radio's own text starts: the 18px mark plus the 8px
+   gap `.cp-radio` puts after it. So a field reads as belonging to the answer
+   above it rather than to the card. */
+.cp-choice__body,
+.cp-choice__hint {
+  padding-left: calc(18px + 8px);
+}
+.cp-choice__body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.cp-choice__hint {
+  font-size: 11px;
+  color: var(--color-muted);
+}
+/* A row of answers too narrow to be worth a line each. */
+.cp-choice-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.cp-choice-row > .cp-choice {
+  flex: 1 1 160px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .cp-choice {
+    transition: none;
+  }
 }
 
 /* ---------------------------------------------------------------------------
@@ -3911,4 +4060,847 @@ button.login-flip-back:hover {
 .btn.secondary.is-danger:hover {
   border-color: var(--color-danger);
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-danger) 60%, transparent);
+}
+
+/* === Selects, everywhere ==============================================
+   Every dropdown in the panel: the pad count on a session tile, the
+   rounding step and the joystick rule on Branch prices, the branch picker
+   on Revenue, the subject on the contact form, the language boxes.
+
+   They were the one control the app never dressed. A native select on this
+   dark ground paints a light system triangle and a system-height box, so a
+   select and the `.input` beside it read as two different eras of the same
+   form, and on a lit venue floor the triangle is the brightest thing on the
+   card.
+
+   ⚠️ Every select in this app also carries `class="input"`, and `.input` sets
+   the `background` SHORTHAND, which resets `background-image` to none. A bare
+   `select` rule therefore loses: the chevron never appears, and on the one
+   state whose specificity DID win (`:disabled`) it tiled across the box,
+   because repeat/position/size were still coming from the shorthand. So every
+   rule below is written for `select.input` as well, and sets
+   `background-color` rather than `background`. Verified by rendering, not by
+   reading the cascade.
+
+   Deliberately no `select { width: 100% }`: the board's pad select is 46px by
+   design (the tile is 160px and a full-width box pushes "1 / 4" onto a second
+   line), and the revenue picker sets its own width. Width stays with the
+   screen that knows what it is for. */
+
+select,
+select.input {
+  /* The native arrow goes, and ours is drawn in the box's own padding.
+     All three prefixes because Electron ships Chromium but the app is also
+     opened in a browser during development. */
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+
+  background-color: var(--color-surface);
+  /* A chevron in the accent colour, as a data URI: the CSP allows no external
+     image, and an inline SVG cannot be a background. The colour is baked in
+     because `currentColor` is not available to a background image. */
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5 6 6.5l5-5' fill='none' stroke='%2307ddf1' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 12px 8px;
+
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  color: var(--color-text);
+  /* Room for the chevron on the right, and the same vertical rhythm as
+     `.input` so the two line up in a row. */
+  padding: 10px 32px 10px 12px;
+  cursor: pointer;
+
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    background-color 160ms ease;
+}
+
+/* The tile's pad count: 46px on a 160px card, so it cannot afford 32px of
+   right padding or the digit would be pushed out of its own box. Keyed by a
+   class rather than by the inline width it used to match on, because that
+   match disappeared the moment anybody wrote 48 instead of 46 and the arrow
+   then sat on top of the number. */
+.pad-select,
+select.input.pad-select {
+  padding: 0 14px 0 5px;
+  background-position: right 3px center;
+  background-size: 8px 6px;
+  text-align: center;
+}
+
+select:hover:not(:disabled),
+select.input:hover:not(:disabled) {
+  border-color: var(--color-primary);
+  background-color: var(--color-surface-alt);
+}
+
+/* Focus is never removed, only replaced: this is a keyboard-reachable control
+   on a screen a cashier drives at speed. */
+select:focus,
+select:focus-visible,
+select.input:focus,
+select.input:focus-visible {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(7, 221, 241, 0.15);
+}
+
+select:disabled,
+select.input:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  /* The chevron goes grey with the rest, so a disabled box does not keep the
+     brightest accent on the card. */
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5 6 6.5l5-5' fill='none' stroke='%2394a3b8' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+
+/* The popup list. Chromium honours these on Linux, which is what the venue
+   runs; where a platform ignores them the control above is still correct and
+   the list simply stays the system's. */
+select option,
+select.input option {
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+select option:disabled,
+select.input option:disabled {
+  color: var(--color-muted);
+}
+
+/* ── Session card (sessions board) ───────────────────────────────────────
+   Everything here is scoped under `.session-card` / `.live-grid--sessions`:
+   `.place-cell` and `.live-grid` are shared with the places board, the live
+   screen and the skeleton, and must not change under them.
+
+   Zones, top to bottom: identity (platform line, console chip, name), the
+   hero (clock + money), the tariff line and pads, then the actions grid pinned
+   to the bottom so buttons line up across a row of cards. The frame colour is
+   `--card-accent`, set by <SessionCard> from the seat state and its urgency. */
+.live-grid.live-grid--sessions {
+  /* Medium: the card's short action labels ("+ Время", "Переместить") fit a
+     2-column grid on one line from 184px. */
+  grid-template-columns: repeat(auto-fill, minmax(198px, 1fr));
+  gap: 10px;
+}
+.place-cell.session-card {
+  min-height: 140px;
+  /* More air under the bottom button than elsewhere: the card's last line is
+     a control, and it must not sit on the frame. */
+  padding: 10px 10px 14px;
+  gap: 4px;
+}
+/* A staff tool: no decorative lift under the cursor, only the frame. */
+.place-cell.session-card:hover {
+  transform: none;
+}
+.place-cell.session-card .dot {
+  background: var(--card-accent);
+}
+.place-cell.session-card .status {
+  color: var(--card-accent);
+}
+/* The hero: time left is what a cashier scans the board for. */
+.place-cell.session-card--running .status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  row-gap: 2px;
+  font-size: 17px;
+  line-height: 1.2;
+  white-space: normal;
+}
+.place-cell.session-card--running .session-timer__cost {
+  font-size: 13px;
+  /* The amount wraps as a whole onto the next line, never mid-figure. */
+  white-space: nowrap;
+}
+.place-cell.session-card--idle .status {
+  font-size: 14px;
+}
+/* Urgency is the frame as well as the digits. */
+.place-cell.session-card--warn,
+.place-cell.session-card--crit {
+  border-width: 2px;
+}
+.place-cell.session-card--crit {
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--color-danger) 35%, transparent),
+    0 0 18px color-mix(in srgb, var(--color-danger) 28%, transparent);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .place-cell.session-card--crit {
+    animation: session-card-pulse 1.6s ease-in-out infinite;
+  }
+}
+@keyframes session-card-pulse {
+  0%, 100% { box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-danger) 35%, transparent), 0 0 10px color-mix(in srgb, var(--color-danger) 18%, transparent); }
+  50% { box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-danger) 55%, transparent), 0 0 22px color-mix(in srgb, var(--color-danger) 38%, transparent); }
+}
+.place-cell.session-card--paused {
+  background: color-mix(in srgb, var(--color-surface) 88%, var(--color-muted));
+}
+.place-cell.session-card--seat-offline {
+  border-style: dashed;
+}
+/* A free seat's word in readable grey (the frame keeps the seat's colour). */
+.place-cell.session-card--seat-free .status {
+  color: var(--color-muted);
+}
+/* A limited pause's own countdown sits beside the frozen clock, smaller, so
+   it can never be read as the time left. */
+.place-cell.session-card--running [data-testid="auto-resume"] {
+  font-size: 12px;
+  font-weight: 600;
+}
+.session-card__pill.pill {
+  font-size: 11px;
+  letter-spacing: 0;
+  text-transform: none;
+  margin-left: 6px;
+}
+/* The actions: a 2-column grid of equal buttons, labels allowed to wrap onto
+   two lines in any language. Stop spans the row. */
+.session-card__actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+  margin-top: auto;
+  padding-top: 6px;
+}
+/* Every action one height and one line: the labels are short on purpose
+   (SessionCardAction), and anything that still does not fit ends in an
+   ellipsis with the full text in the tooltip — never a second line. */
+.session-card__btn.btn {
+  min-width: 0;
+  height: 32px;
+  padding: 0 3px;
+  font-size: 11.5px;
+  line-height: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block;
+  text-align: center;
+}
+.session-card__btn--wide {
+  grid-column: 1 / -1;
+}
+/* Half-width buttons come first and the wide ones (Пересадить, Стоп) last, so
+   an odd count leaves the last half alone in its row — it takes the whole row
+   instead of leaving a hole beside it. */
+.session-card__actions > .session-card__btn:not(.session-card__btn--wide):nth-child(odd):has(+ .session-card__btn--wide) {
+  grid-column: 1 / -1;
+}
+/* A free seat keeps its own height instead of stretching to the running cards
+   beside it — which pushed Start down to the very bottom edge. */
+/* A free seat's foot: pinned to the bottom like the running card's actions,
+   so Start lines up across a row (cards in a row share one height), with at
+   least 10px of air above it on the shortest card. */
+.session-card__foot {
+  margin-top: auto;
+  padding-top: 10px;
+}
+.session-card__start.btn {
+  width: 100%;
+  height: 34px;
+  font-size: 13px;
+}
+.session-card__hint {
+  font-size: 11px;
+  color: var(--color-muted);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.session-card__error {
+  font-size: 11px;
+}
+/* Keyboard focus on a card is never the browser default ring. */
+.place-cell.session-card .btn:focus-visible,
+.place-cell.session-card select:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+/* ── Settings sections + Branch → Prices ─────────────────────────────────
+   <SettingsSection> is the reusable block (card, title, description, header
+   actions, loading/error). The page groups them: rates, packages, rules. */
+.settings-section {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+.settings-section__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.settings-section__titles {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.settings-section__title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+}
+.settings-section__desc {
+  margin: 0;
+  font-size: 12px;
+  color: var(--color-muted);
+  max-width: 64ch;
+}
+.settings-section__actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.settings-section__error {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.prices-page {
+  gap: 28px;
+  max-width: 1400px;
+}
+.prices-group {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.prices-group__title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+/* The billing rules: one column, two side by side on a wide screen. */
+.prices-rules {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+@media (min-width: 1500px) {
+  .prices-rules {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+/* A price matrix needs no more than this; wider only spreads the eye. */
+.prices-group--rates .settings-section > form {
+  max-width: 760px;
+}
+.prices-empty {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+/* A package row: its buttons act, the row itself does not — so no pointer
+   and no hover lift suggesting it is clickable. */
+.list-item.list-item--static {
+  cursor: default;
+}
+.list-item.list-item--static:hover {
+  transform: none;
+}
+.package-row {
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.package-row__main {
+  min-width: 0;
+}
+.package-row--inactive .name,
+.package-row--inactive .meta {
+  color: var(--color-muted);
+}
+.package-row__discount {
+  color: var(--color-primary);
+  font-weight: 600;
+}
+.package-row__actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.package-row__btn.btn {
+  min-height: 34px;
+  min-width: 88px;
+  padding: 6px 12px;
+  font-size: 12px;
+}
+.price-badge {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  vertical-align: middle;
+}
+.price-badge--platform {
+  background: color-mix(in srgb, var(--color-primary) 18%, transparent);
+  color: var(--color-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.price-badge--success {
+  background: color-mix(in srgb, var(--color-success) 18%, transparent);
+  color: var(--color-success);
+}
+.price-badge--muted {
+  background: color-mix(in srgb, var(--color-muted) 18%, transparent);
+  color: var(--color-muted);
+}
+.settings-section .btn:focus-visible,
+.package-row .btn:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+/* ── Quick entry: a line whose words fit several products ───────────────
+   The choice sits under its own line, inside the preview — no second dialog.
+   Amber frame while the line waits for the operator, neutral once picked. */
+.quick-pick {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+}
+.quick-pick:has(.quick-pick__ask) {
+  border-color: color-mix(in srgb, var(--color-warning) 60%, transparent);
+  background: color-mix(in srgb, var(--color-warning) 7%, transparent);
+}
+.quick-pick__ask {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-warning);
+}
+/* ── OptionList: the options of a combobox whose field keeps the focus ──
+   The highlight is always shown (the focus is in the textarea, not here) —
+   the same cyan wash as the suggestion lists (.cp-suggest-option). */
+.cp-option-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+.cp-option {
+  padding: 8px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 140ms ease, border-color 140ms ease;
+}
+.cp-option.is-active {
+  background: rgba(7, 221, 241, 0.1);
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 1px rgba(7, 221, 241, 0.35);
+}
+@media (prefers-reduced-motion: reduce) {
+  .cp-option { transition: none; }
+}
+.quick-pick__option {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  min-width: 0;
+}
+.quick-pick__name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.quick-pick__price {
+  flex-shrink: 0;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.quick-pick__pending {
+  font-size: 12px;
+  color: var(--color-warning);
+}
+
+/* ── Sessions → History: one session's card ─────────────────────────────────
+   Facts (who, when, where) · the bill · the activity timeline. The timeline
+   is the one accent: a thin rail with a marker per event, coloured by the KIND
+   of event, so a pause, an automatic resume or a move is found by eye. */
+/* Room between sessions, so each card reads as its own story rather than a
+   wall of one. */
+.hs-list {
+  gap: 20px;
+}
+.hs-card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.hs-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 8px 16px;
+  margin: 0;
+  font-size: 13px;
+}
+.hs-facts dt {
+  font-size: 11px;
+  color: var(--color-muted);
+  margin-bottom: 2px;
+}
+.hs-facts dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.hs-activity {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border-top: 1px solid var(--color-border);
+  padding-top: 10px;
+}
+.hs-note {
+  font-size: 12px;
+}
+/* The ONLY sideways scroll on the screen: the timeline's own viewport. A
+   scroll container's minimum width is zero, so however long the line gets the
+   card and the page keep theirs. Soft shadows at an edge say "more this way"
+   (pure CSS: the covers scroll with the content, the shadows stay put).
+   overscroll-behavior stops a trackpad swipe at the end from turning into
+   browser back/forward. */
+.hs-scroll {
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  padding-bottom: 8px;
+  border-radius: 8px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border) transparent;
+  background:
+    linear-gradient(to right, var(--color-surface) 30%, transparent) left / 32px 100% no-repeat local,
+    linear-gradient(to left, var(--color-surface) 30%, transparent) right / 32px 100% no-repeat local,
+    radial-gradient(farthest-side at 0 50%, rgba(0, 0, 0, 0.55), transparent) left / 12px 100% no-repeat scroll,
+    radial-gradient(farthest-side at 100% 50%, rgba(0, 0, 0, 0.55), transparent) right / 12px 100% no-repeat scroll;
+}
+.hs-scroll:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+/* Steps left to right on ONE line. Each: time · marker on the line · text. */
+.hs-timeline {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: nowrap;
+  width: max-content;
+}
+.hs-event,
+.hs-gap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.hs-event {
+  flex: 0 0 200px;
+  padding-right: 14px;
+}
+.hs-gap {
+  flex: 0 0 56px;
+}
+.hs-event__top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 20px;
+}
+.hs-event__time {
+  font-size: 12px;
+  color: var(--color-muted);
+  font-variant-numeric: tabular-nums;
+}
+/* The line: from this step's marker to the next step. */
+.hs-event__rail {
+  position: relative;
+  display: flex;
+  align-items: center;
+  height: 22px;
+}
+.hs-event__rail::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: -14px;
+  top: 50%;
+  border-top: 1px solid var(--color-border);
+}
+.hs-gap .hs-event__rail::after {
+  right: 0;
+  border-top-style: dashed;
+}
+.hs-timeline > .hs-event:last-child .hs-event__rail::after {
+  display: none;
+}
+.hs-event__marker,
+.hs-gap__dots {
+  position: relative;
+  z-index: 1;
+}
+.hs-event__marker {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  font-size: 10px;
+  line-height: 1;
+  color: var(--tone);
+  border: 1px solid color-mix(in srgb, var(--tone) 55%, transparent);
+  background: color-mix(in srgb, var(--tone) 14%, var(--color-surface));
+}
+.hs-gap__dots {
+  margin: 0 auto;
+  padding: 0 4px;
+  background: var(--color-surface);
+  color: var(--color-muted);
+  font-size: 14px;
+  line-height: 1;
+}
+.hs-event__body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.hs-event__title {
+  font-size: 13px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.hs-event__amount {
+  font-size: 13px;
+  color: var(--color-primary);
+  font-variant-numeric: tabular-nums;
+}
+.hs-event__actor {
+  font-size: 12px;
+  color: var(--color-text);
+  opacity: 0.8;
+  overflow-wrap: anywhere;
+}
+.hs-event__detail {
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--color-muted);
+  overflow-wrap: anywhere;
+}
+.hs-seat__chip {
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-accent-blue);
+  border: 1px solid color-mix(in srgb, var(--color-accent-blue) 55%, transparent);
+}
+.hs-tone-start,
+.hs-tone-resume { --tone: var(--color-primary); }
+.hs-tone-stop { --tone: var(--color-success); }
+.hs-tone-pause { --tone: var(--color-warning); }
+.hs-tone-auto { --tone: var(--color-accent-purple); }
+.hs-tone-move { --tone: var(--color-accent-blue); }
+.hs-tone-charge { --tone: var(--color-text); }
+.hs-tone-neutral { --tone: var(--color-muted); }
+.hs-tone-refused { --tone: var(--color-danger); }
+.hs-more {
+  align-self: flex-start;
+  padding: 4px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: none;
+  color: var(--color-primary);
+  font-size: 12px;
+  cursor: pointer;
+  transition: border-color 140ms ease, background 140ms ease;
+}
+.hs-more:hover {
+  border-color: var(--color-primary);
+  background: rgba(7, 221, 241, 0.08);
+}
+.hs-more:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .hs-revealed {
+    animation: cp-fade-in 200ms ease both;
+  }
+}
+
+/* ── The bill on a History card, as a compact table ──────────────────────
+   One row per thing charged: item · qty · price · amount. Numbers right-
+   aligned in tabular figures so columns line up; a long product name wraps
+   inside its own cell. Header and total are the only emphasis. */
+.hs-bill {
+  border-top: 1px solid var(--color-border);
+  padding-top: 12px;
+}
+/* Edge to edge in four equal columns: the name on the left, quantity and
+   price centred in theirs, the amount on the right. */
+.hs-bill__table {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.hs-bill__title {
+  caption-side: top;
+  text-align: left;
+  padding-bottom: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-muted);
+}
+.hs-bill__table th,
+.hs-bill__table td {
+  padding: 5px 8px;
+  text-align: left;
+  font-weight: 400;
+  vertical-align: baseline;
+}
+.hs-bill__table th:first-child {
+  padding-left: 0;
+  overflow-wrap: anywhere;
+}
+.hs-bill__table td:last-child {
+  padding-right: 0;
+}
+.hs-bill__table thead th {
+  width: 25%;
+}
+.hs-bill__table .num,
+.hs-bill__table .mid {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.hs-bill__table .num {
+  text-align: right;
+}
+.hs-bill__table .mid {
+  text-align: center;
+}
+.hs-bill__table thead th {
+  font-size: 11px;
+  color: var(--color-muted);
+  border-bottom: 1px solid var(--color-border);
+}
+.hs-bill__table tbody tr + tr > * {
+  border-top: 1px solid color-mix(in srgb, var(--color-border) 55%, transparent);
+}
+.hs-bill__table tbody td:not(:last-child) {
+  color: var(--color-muted);
+}
+.hs-bill__subtotal > * {
+  color: var(--color-muted);
+  font-size: 12px;
+}
+.hs-bill__total > * {
+  padding-top: 10px;
+  border-top: 1px solid var(--color-border);
+  font-size: 15px;
+  font-weight: 700 !important;
+}
+.hs-bill__total td {
+  color: var(--color-primary);
+}
+.hs-bill__pay > * {
+  padding-top: 2px;
+  color: var(--color-muted);
+}
+.hs-bill__pay strong {
+  color: var(--color-text);
+}
+
+/* ── Add Product: additional items (chips, a cue, a racket) ───────────────
+   Their own tab in the dialog. Chosen or not — no count — so a chosen row is
+   marked (tick, primary frame) rather than given a stepper; one already handed
+   out on this session is dimmed and says so. */
+.basket-extras {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.basket-extras__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.basket-extras__row {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  transition: border-color 140ms ease, background 140ms ease;
+}
+.basket-extras__row.is-chosen {
+  border-color: var(--color-primary);
+  background: rgba(7, 221, 241, 0.08);
+}
+.basket-extras__row.is-given {
+  opacity: 0.6;
+}
+.basket-extras__mark {
+  color: var(--color-primary);
+  font-weight: 700;
+  text-align: center;
+}
+.basket-extras__name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.basket-extras__price {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.basket-extras__state {
+  min-width: 96px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--color-muted);
+}
+.basket-extras__sum {
+  align-self: flex-end;
+  font-size: 12px;
+  color: var(--color-muted);
+}
+@media (prefers-reduced-motion: reduce) {
+  .basket-extras__row { transition: none; }
 }

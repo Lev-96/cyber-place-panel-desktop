@@ -217,7 +217,26 @@ pos · places · ps5 · sessions · tournaments · revenue · services · scanne
   with `ELECTRON_DEVTOOLS=1` env var.
 - **i18n:** language codes are `en` / `ru` / `am` (NOT `hy`). Use the
   `t()` helper from `LanguageContext` and `money()` for currency.
-  Watch for duplicate translation keys.
+  Watch for duplicate translation keys. Outside a component (UI kit
+  primitives, aria-labels in shared widgets) use `tActive(key)` from
+  `@/i18n/translations`: never a hardcoded literal, never a second dictionary.
+- **"Active Places" is the name of the running-seats section** (2026-09-28):
+  `session.boardTitle`, `hub.tile.sessions`, `history.backToBoard`,
+  `notifications.openBoard` say Active Places / Активные места / Ակտիվ տեղեր.
+  Only the section was renamed: the entity is still a session everywhere
+  (`history.sumSessions`, `revenue.sourceSessions`, route `/sessions`, API,
+  events). The sidebar's Dashboard is `Կառավարման էջ` in Armenian.
+- **Armenian copy (audit 2026-09-28).** Terminology follows cyberplace.pro:
+  session = `սեսիա` (never `նիստ`/`սեանս`), booking = `ամրագրում`, place =
+  `տեղ`, branch = `մասնաճյուղ`, customer = `հաճախորդ` (not `անդամ`), product =
+  `ապրանք`, computer = `համակարգիչ` / PC (`ՀՀ` means the Republic of Armenia,
+  only in `ՀՎՀՀ`), joystick = `ջոյսթիք`, tariff = `սակագին`, the kiosk
+  program = Latin `Agent` (not `գործակալ`), PS5 menu names stay Latin. A
+  sentence ends with `։`, a label colon stays `:`. Session-card buttons must
+  fit a 198px card (`session.pause` = `Դադար`, `session.card.resume` =
+  `Վերսկսել` are short on purpose; the full text is the tooltip). Guarded by
+  the "Armenian copy" block in `src/i18n/translations.test.ts`
+  (placeholders, homoglyphs, the terms above, sentence stop).
 - **No em dash in user-facing text.** A rendered string must never contain
   `—`: use a hyphen, a colon, or two sentences instead; in Armenian use `՝`
   or `։`, as the other repos now do. It covers `src/i18n/translations.ts`
@@ -226,7 +245,12 @@ pos · places · ps5 · sessions · tournaments · revenue · services · scanne
   Check: `git grep -n "—" -- src`, then classify each hit as (a) user-facing
   (fix), (b) technical or log output (leave), (c) comment or doc (leave).
   A sweep on 2026-09-12 fixed 24 strings here (5 in the backend, 3 in the
-  kiosk agent); what remains in `src` is comments and log/dev output only.
+  kiosk agent); a second on 2026-09-28 fixed 8 more dictionary values and the
+  history bill's empty cell (now `-`, the project's empty-value mark). The
+  dictionary is guarded by "never renders an em dash" in
+  `src/i18n/translations.test.ts`; `git grep` cannot tell a comment from a
+  string, so re-check JSX literals with a TypeScript AST scan of string,
+  template and JSX-text nodes.
   ⚠️ The **en dash** `–` is deliberate in ranges and must stay: `0–100%`
   (`commission.hint`), `4–6` digits (`unlockPin.*`) and the `HH:MM–HH:MM`
   discount window on `BranchPricesPage`.
@@ -490,6 +514,48 @@ loud `[reverb] REJECTED …` line naming the key and host; the backend has
   of truth; never compute the "discounted" badge client-side.
 
 ---
+
+## 7.4 Every dialog closes one way (2026-09-24)
+
+`src/components/ui/Modal.tsx` is the only modal; 32 dialogs use it and none was
+edited for this. Its props are unchanged (`open`, `onClose`, `closeOnBackdrop`)
+plus two optional ones (`dirty`, `confirmOnDirty`).
+
+- **The ×, a backdrop click and Escape all go through `requestClose`.** A
+  clean dialog leaves at once; one holding changes asks «Вы действительно
+  хотите выйти?» (`modal.leaveConfirm`, answered `action.yes` / `action.no`) —
+  No keeps the dialog AND what was typed, Yes closes it. **Cancel and Save
+  are not second-guessed**: they are the form's own explicit answers and call
+  the parent directly, as before.
+- **"Changes" is measured, not guessed**: `snapshotFields()` serialises every
+  input/select/textarea in the dialog, the baseline is taken on the person's
+  FIRST press or keystroke inside it (so values a form loads after opening are
+  not changes), and the close compares — an edit put back is clean again. No
+  form tracks anything. A form whose state is not in native fields can pass
+  `dirty`; `confirmOnDirty={false}` never asks.
+- **The ×** (`.cp-modal-close`) sits on the card's top-right corner, outside
+  its padding, last in the DOM (the first field stays the first Tab stop),
+  `aria-label` = `action.close`; drawn only when `onClose` exists. The dialog
+  box is `.cp-modal-dialog` (`role="dialog"`, `aria-modal`), so the card is
+  `.cp-modal-dialog > *` now, not `.cp-modal-wrapper > *`.
+- **Stacked dialogs**: a module stack ordered by NESTING (`AncestorsCtx` —
+  React runs a child's effects before its parent's). Only the top dialog
+  answers Escape and traps Tab; a backdrop click counts only on the dialog's
+  OWN backdrop (refs, not class names — a nested dialog's React events bubble
+  through the portal). Before this, one Escape closed a confirmation AND the
+  form under it, and a child's backdrop click closed the parent too. An
+  Escape a field already used (`e.defaultPrevented` — SuggestInput, BranchForm
+  address suggestions) leaves the dialog alone.
+- **Exit animation**: `.cp-modal-leaving` (`cp-fade-out` + `cp-modal-out`,
+  160 ms = `MODAL_LEAVE_MS`), THEN `onClose`. A parent closing via
+  `open={false}` while keeping the Modal mounted gets the same exit. A parent
+  that REFUSES the close (`onClose` a no-op while saving) is detected in the
+  same render (`pendingClose`) and the dialog comes back — no invisible
+  overlay. Reduced motion: no wait, 1 ms animations (enter was unguarded before).
+- Labels use `tActive()`, so Modal needs no LanguageProvider (tests render it
+  bare). Tests: `Modal.close.test.tsx` (24) + the updated `Modal.test.tsx`;
+  a test that closes a dialog via ×/backdrop/Escape must wait
+  `MODAL_LEAVE_MS` before asserting `onClose`.
 
 ## 7.5 CSS / Styling Standards (NON-NEGOTIABLE)
 
@@ -1385,6 +1451,276 @@ Tests: `RegistrationsList.test.tsx` (10, transport-level: only `request()` is
 replaced). Mutation-verified: native `confirm()` restored; answer ignored; note
 shown for everyone; note never shown; delete by guest id.
 
+## 9.5.0 The session card and Branch → Prices layout (2026-09-25)
+
+**Session card.** The tile frame is `<SessionCard>` (`components/sessions/
+SessionCard.tsx`) — presentation only; every handler, guard, realtime hook and
+PS5 call stays in `SessionsBoard`.
+- The frame colour is `--card-accent`: the seat's `SESSION_CELL_COLOR`, overridden
+  on a running seat by `useSessionUrgency` (amber ≤5 min, red ≤1 min + pulse,
+  muted while paused). `sessionUrgency()` is the ONE rule; `SessionTimer`'s
+  digits read it too. The hook sleeps until the next threshold — no per-second
+  tick per card.
+- Classes: `place-cell session-card session-card--{running|idle}
+  session-card--{warn|crit|paused} session-card--seat-{busy|free|reserved|offline}`.
+  ⚠️ `.place-cell` / `.live-grid` are shared with the places board, the live
+  screen and `GridSkeleton` — style the board ONLY under `.session-card` /
+  `.live-grid--sessions` (min column 200px, so the 2-column action grid fits
+  ru/am labels).
+- Actions are a 2-column grid of `<SessionCardAction>` (in `SessionCard.tsx`):
+  every button 32px, ONE line, same style; Stop (`danger`) spans the row. The
+  card shows SHORT labels (`session.card.*`: «+ Время», «+ Товар»,
+  «Пересадить», «Վերսկսել»…) while the full action («Добавить время») is the
+  button's `aria-label` and tooltip — so screen readers, hovers and tests keep
+  the full name, and every other screen keeps the full keys. Tests find card
+  buttons by accessible name (`nameOf()` in the board tests), not by text.
+  `wide` spans the row (Пересадить, and Stop via `danger`); wide actions come
+  LAST, and a CSS `:has()` rule makes an odd last half-width button take its
+  row, so no state (pad switch, extra, pause) leaves a hole. Cards in a row
+  share one height and every card's bottom control is pinned to its foot
+  (running: `.session-card__actions`; free: `.session-card__foot` around Start,
+  `margin-top: auto` + 10px air above), so Start and Stop sit on ONE line
+  across a row whatever is above them (console chip, offline hint); the card
+  keeps 14px under it. Pinned in a real browser by the layout specs in
+  `e2e/session-terms.spec.ts` (jsdom cannot evaluate the CSS; they wait for
+  the cards' fade-in before measuring).
+- Sizing (2026-09-25, "medium"): column `minmax(198px, 1fr)` — measured as the
+  narrowest width at which no card label is clipped in en/ru/am (Armenian clips
+  at 192–193px); clock 17px, money 13px, card padding 8px. A label that still
+  does not fit ends in an ellipsis, never a second line. Re-measure with a
+  Playwright sweep (scrollWidth > clientWidth per button) if a label changes.
+- In-flight guards are PER SEAT via `useKeyedBusy()` (pads, extra, pause): a
+  second press on the same seat is one request, a press on another seat goes
+  through. They used to be one `number | null` each and silently dropped the
+  other seat's press.
+- Refusals (`padError`, `pauseError`) render at card level for every seat — an
+  extra refused on a custom room used to be invisible (pinned by
+  `SessionsBoard.perSeat.test.tsx`).
+
+**Branch → Prices.** Grouped into Rates / Packages / Billing rules, each block a
+reusable `<SettingsSection>` (`components/ui/SettingsSection.tsx`: title,
+description, header actions, loading and error-with-retry states; it never
+renders its body on error). The billing rules load with
+`billingSettingsRepository.getForEdit()` — STRICT. `get()` falls back to
+defaults on a network failure (fine for read-only screens), which on this page
+let the next Save overwrite the real policy with defaults. The forms, their
+whole-policy PUT and their remount `key`s are unchanged. Package delete uses
+`useConfirm` (never `window.confirm`). Pinned by `BranchPricesPage.test.tsx`
+and `BillingSettingsRepository.test.ts`.
+
+**Typecheck:** `npm run typecheck` (tsconfig.app + electron). `npx tsc -p .`
+checks NOTHING — the root tsconfig has `"files": []`.
+
+## 9.5.1 Pause / Resume on the tile (2026-09-23)
+
+One control, «Пауза» ↔ «Продолжить», on every kind of seat, before Stop. The
+SERVER owns the state (`paused_at`, `pauses[]`); the session stays `active`
+while paused, so the PS5 watcher, BranchLive and every "seat in use" reading
+are unchanged — do not add a `paused` status here either.
+
+- `togglePause` calls `sessionRepository.pause/resume`, puts ONLY the answer's
+  `paused_at` / `pauses` / `ends_at` on the tile via `useAsync().mutate` (so
+  the clock freezes on the press), then reloads as every action does. A
+  `useRef` guard stops a double click sending two requests; a refusal (409 —
+  another cashier got there first) shows on the tile via `pauseError`, which
+  renders under the action row for EVERY seat kind (unlike `padError`).
+- **Figures**: `pausedSecondsBetween()` / `playedSecondsBetween()` in
+  `sessionAmount.ts` mirror `Session::pausedSecondsBetween()` and are
+  subtracted by the seat, hourly pads and hourly extras over their own
+  intervals — `sessionAmount.pause.test.ts` pins the backend's worked
+  example. A payload with `paused_at` but no `pauses` reads as one open pause.
+- **SessionTimer**: while paused the countdown holds at `ends_at − paused_at`
+  (server instants, so a reload shows the same frozen figure), no warn/crit
+  colours, a ⏸ mark; a count-up clock shows time PLAYED.
+- While paused: «Добавить время» is hidden (the server refuses end moves),
+  a «На паузе» pill shows, `useExpiryNudge` and `SessionEndingNotifier` skip
+  the seat. History renders `paused` / `resumed` (with "Пауза длилась").
+- Kinds `paused` / `resumed` are in `useSessionChanged`'s union; the board
+  reloads on any kind.
+- **Pause limit (2026-09-25)**: the owner sets it in Branch → Prices
+  (`PauseLimitForm`, empty = none, 1..240, sent with the whole policy as the
+  rounding form does). The SERVER resumes at `pauses[].auto_resume_at`; the
+  panel only shows it — pill «Пауза · до HH:MM», a ▶ countdown in
+  `SessionTimer`, `useExpiryNudge` wakes at it (the board read is what lets the
+  server sweep), `pausedSecondsBetween` caps an open pause there
+  (`autoResumeAtOf()` in `sessionAmount.ts`). History: a `resumed` with
+  `reason: pause_limit` reads «Автоматически, по лимиту паузы».
+- **«Переместить игрока» (2026-09-25)**: a tile button (hidden while paused)
+  opens `RelocateSessionDialog`: `relocation-options` lists same-price seats
+  first, then others; a booking-limited seat shows «Забронировано с HH:MM,
+  играть можно N мин» and needs an explicit acceptance, and its `free_until` is
+  sent back verbatim as `until`; «Изменить цену» sends `hourly_rate`, otherwise
+  no rate is sent. A 409 warns, redraws the list and disarms the choice. After
+  ANY move (this or the extension move) the board calls
+  `consolesFollowMove(from, to)` → `sessionStopped(old)` /
+  `sessionStarting(new)` for consoles, before the reload. History shows
+  «1500 / ч -> 1800 / ч · цена изменена вручную».
+- **Toasts after the three presses (2026-09-24)**, raised only once the
+  server accepted the action, naming the seat as its tile does (`seatOf()` →
+  `№{place.number ?? place.id}`, else the device label): «Сессия на паузе · №3»
+  amber (`warning`), «Сессия продолжена · №3» green, «Сессия завершена · №3»
+  red — the stop one from `StopReceiptModal`'s `onConfirmed`, which only a
+  confirmed stop reaches (an auto-ended seat's receipt never calls it). A
+  refusal raises nothing; its sentence stays on the tile / in the modal.
+
+## 9.5.0a Additional items — chips, a cue, a racket (2026-09-27)
+
+- A product is `regular` (sold by the unit) or `additional` (handed out with the
+  seat, once per session, any seat) — `IProduct.kind`, `isAdditionalProduct()`
+  (absent = regular). The KIND IS THE SECTION, not a checkbox: the Products
+  screen has tabs «Товары / Дополнительные предметы» (`ui/SectionTabs`, the
+  `.cp-subtabs` look with tab semantics and ← →), each listing its own, «+ New»
+  creating the open section's kind (`ProductForm` `kind` prop; an edit keeps the
+  entry's kind and never sends it).
+- Toasts name what it is: `ProductRepository` picks `toast.product.*` or
+  `toast.additionalItem.*` by kind (create from the body, update/remove from an
+  explicit `kind` arg).
+- Add Product dialog (session): when the branch has any active additional item,
+  tabs «Товары / Дополнительные предметы» with chosen counts; none → no tabs,
+  the dialog as before. «Товары» = mode switch + picker / quick entry (regular
+  only). «Дополнительные предметы» = `BasketAdditionalItems`: chosen or not, no
+  count — «Добавить»; chosen, ticked with «Убрать»; on the bill, «Уже выдано»;
+  «Выбрано: N · sum». ONE confirm sends everything: picker mode the whole cart,
+  typed mode the resolved lines + the chosen items (typed empty → items alone;
+  unresolved text holds all). The products basket lists `productLines` only.
+- Popups: after adding, products get the usual «Добавлено…» toast and items
+  their own «Выдано: …». Removing asks «Убрать дополнительный предмет «X» из
+  счёта?» and reports «Дополнительный предмет «X» убран из счёта» (products
+  keep their wording) — in `AddSessionItemDialog` and in `StopReceiptModal`,
+  which reads the bill line's server flag `is_additional`.
+- Realtime: `SessionChangedEvent.kind` gains `additional.added` /
+  `additional.removed`; the board reloads on any kind.
+
+## 9.5.1 Sessions → History: the card and its timeline (2026-09-26)
+
+- **One card per session, three parts, in this order:** facts (`<dl
+  class="hs-facts">`: time range — an end on another day carries its date —
+  seats `№9 → №14` when it moved, started/ended by, branch), the activity
+  timeline (`components/sessions/SessionHistoryTimeline`), then the bill as its
+  outcome — `components/sessions/SessionHistoryBill`, a full-width `<table>`
+  in four equal columns (name left, qty/price centred, amount right): Позиция · Кол-во · Цена · Сумма; rows = play time, each product
+  (a rented extra's price marked «/ч», its sum the server's `line_total`), the
+  products' subtotal when more than one line, the pads (count, fee each only
+  when all agree, «/ч» for a rate); `<tfoot>` = Итог, Способ оплаты. Math moved
+  verbatim from the row: `timeCost` = total − products − pads,
+  `sessionItemLineTotal`, `padChargeOf`, `paymentLabelOf`. Running session:
+  products and pads only, no clock/total. The timeline is HORIZONTAL: 200px steps left to right on
+  ONE line (time + seat chip where the seat changes · tone-coloured marker ·
+  title · amount · actor · details). When it does not fit, ONLY its own
+  viewport `.hs-scroll` scrolls sideways (`overflow-x: auto`, a scroll
+  container's min width is 0, so card and page keep theirs). It is a focusable
+  `role="region"` (← → once focused); no wheel handler — the vertical wheel
+  stays `.main`'s, Shift+wheel/trackpad scroll the line (headless-measured).
+  Pure-CSS edge shadows hint "more". Cards sit 20px apart (`.hs-list`), 14px
+  between their parts.
+- **Staff filter** (native `<select class="input">`, «Все сотрудники» + «Name ·
+  role»): choices from `GET /session-events/actors?branch_id` (server-scoped);
+  a pick adds `user_id` to the ONE feed request (the server narrows, the panel
+  never sifts the whole log) and fetches the cards from `GET /sessions?acted_by=`
+  — the sessions that person acted in, BRANCH-WIDE for every role (the owner's
+  rule, 2026-09-26: a manager who picks their owner sees everything the owner
+  did in the manager's branch, not only the manager's own shifts; without a
+  pick, the own-shift rule stands). A card's own fetch sends `?user_id=` too.
+  The stat tiles keep the unfiltered list. Cards = sessions with at least one of that
+  person's lines; a card that fetches its own list narrows it the same way
+  (`e.user?.id === actorId` — a system line is nobody's) and hides itself if
+  nothing is left. The choice is stored WITH its branch, so another branch
+  starts from «all». While a person's feed loads: skeleton, never the previous
+  cards. Empty: «Нет действий за выбранный период». The seat route in the
+  facts is hidden under a filter (one person's lines may skip a seat); seat
+  chips are per event (`seatSteps`: the seat frozen on the line, else the last
+  move's destination) so they stay right on a filtered list. The stat tiles
+  above stay the day's totals. The old «Показать
+  путь / Скрыть путь» toggle and the branch-wide «Что происходило» list are
+  gone; every event is shown once, in its own session's card.
+- **Where the events come from:** ONE `GET /session-events` for the range
+  (`FEED_LIMIT` 1000 = the server's max), grouped by `session_id`. Sessions are
+  listed by `started_at` in range, events by `created_at` in range, so
+  `feedCoversSession` vouches for a card only when the session ended by the
+  range end (or is running while the range reaches now) and the feed was not
+  cut — or its `started` survived the cut. Otherwise the card fetches
+  `GET /sessions/{id}/events` itself, once it scrolls near (IntersectionObserver).
+  «Обновить» reloads the sessions AND the feed. An event of a session started
+  before the range shows on the day that session started, in its card.
+- **The pure reading** lives in `components/sessions/sessionHistoryModel.ts`:
+  `eventDetailParts` (one fact per line; product lines are `name × qty` from
+  `meta.lines`), `eventPresentation` (an action → title/tone/icon table; a
+  server resume at the pause limit is its own entry — «Автоматическое
+  продолжение», actor «Автоматически», reason «По лимиту паузы»; an unknown
+  action renders a humanized name plus its scalar meta, never nothing),
+  `foldedIndexes` (≤ 7 events → all; more → first 3 + last 2, a dashed «⋯» step, and
+  ONE real `<button aria-expanded>` «Показать ещё N» / «Свернуть» that stays
+  mounted so focus is kept and fetches nothing), `groupBySession`,
+  `feedCoversSession`, `seatSteps` / `seatRoute`, plus `eventSeat` / `paymentLabelOf`.
+- The screen subscribes to no realtime channel (it never did).
+
+## 9.5.2 Касса — selling with no session (2026-09-24)
+
+The till is back at `/branches/:id/pos` (hub tile «Касса», every staff role at
+its own branch — the server decides). It was removed on 2026-08-30 ("selling
+happens on the session bill"); the owner asked for it again, as a sale that
+needs no seat. A sale is a backend ORDER, never a session.
+
+- **A typed name that fits several products (2026-09-25).** The server
+  answers such a line `status: "ambiguous"` with `options` (id, name, price,
+  price × qty) and keeps its `qty`. `BasketQuickEntry` renders a `QuickEntryPick`
+  under that line — an `OptionList` (see below; no radios since 2026-09-26),
+  nothing pre-selected, amber until answered — in BOTH dialogs (session and till). A
+  pick is stored in `useProductBasket.choices`, keyed by line index AND text
+  (`components/pos/quickEntryChoices.ts`, pure + tested), and re-reads the box
+  AT ONCE with `choices` (typing still waits 400ms); the server resolves the
+  line, merges, prices and totals — the panel computes none of it. Picks whose
+  line changed or whose product left the options are pruned after each answer;
+  a cleared box forgets them. Confirm stays on the existing rule
+  (`resolved.ok`), so it is off until every ambiguous line is answered; a hint
+  counts the lines still waiting. An ordinary read sends NO `choices` (the old
+  request, byte for byte). The session picker and quick entry no longer offer
+  withdrawn products (`is_active === false`), as the till never did — the
+  server refuses them on the bill. `confirmText` has a ref guard against a
+  double press inside one frame.
+- **Picking with the keyboard (2026-09-26, v2).** The quick-entry textarea is a
+  combobox, the `SuggestInput` way: DOM focus STAYS in the textarea (typing
+  never loses a key when options arrive 400ms after a pause), and
+  `aria-activedescendant` points at the highlighted option.
+  `components/ui/OptionList` only SHOWS options (`role="listbox"`, ids from
+  `optionId`, highlight wash, `scrollIntoView` on the highlight, mousedown
+  prevented so a click never steals focus, hover moves the highlight);
+  `stepActive` (↑/↓, wrapping) is the owner's.
+  ONE list is open at a time: the first ambiguous line, and none while a pick
+  is waiting for the server (a line with a pick that still reads ambiguous) —
+  so a fast second Enter cannot land on the next line's list. A new list starts
+  on its FIRST option, nothing chosen. `onKeyDown` on the textarea only, and
+  only while a list is open (never with Alt/Ctrl/Meta/Shift or mid-IME): ↑/↓
+  move, Enter picks (a held Enter — `repeat` — does not), Escape folds the list
+  (preventDefault → the Modal stays; a «Выбрать» button reopens it; an edit to
+  the line reopens it too). Closed, every key is the textarea's. Enter and click
+  both call `selectCandidate` → `basket.choose` (unchanged) and refocus the box.
+  A picked line folds to `✓ name × qty` + `price × qty = total` (server
+  numbers) with a × that takes THAT typed line out of the draft:
+  `quickEntryChoices.removeTypedLine` counts lines exactly as
+  `ProductTextResolver::split` does (`\R`, PHP `trim` set, blank lines dropped),
+  drops that line's pick and moves later picks up with their lines;
+  `useProductBasket.removeLine` re-reads at once. No write endpoint is called.
+- **One basket, two dialogs.** `components/pos/useProductBasket` (catalogue,
+  search, cart, quick-entry read) and `ProductBasketPanels` (mode switch,
+  picker, quick entry + preview, "new product") were moved verbatim out of
+  `AddSessionItemDialog`, which now keeps only what is the SESSION's: the
+  "already on the bill" list, chips off a poker table, the write to the bill.
+  `SellProductsDialog` is the till's: the same basket, `orderRepository`
+  resolve (`POST /orders/resolve`) and create (`POST /orders`). The session
+  dialog's 30 tests pass unchanged — that is the proof the move changed
+  nothing there.
+- **One payment choice**: `components/payments/PaymentMethodPicker` +
+  `PAYMENT_METHODS` + `paymentNoteMissing`, used by `StopReceiptModal` and the
+  till; backend twin `App\Support\PaymentMethod::ALL`.
+- **No price leaves the panel**; the server prices from the catalogue.
+  `client_request_id` is minted once per open dialog and reused on a retry, so
+  a sale the server made before the answer was lost is found, not repeated; a
+  ref guard stops a double click sending two requests.
+- `routes/Till.tsx`: today's sales from local midnight, totals by method over
+  PAID sales only (a voided one stays listed and counts nothing). The list is
+  NOT behind `orFallback` — a failed read shows the error, never "no sales".
+
 ## 9.6 A live session's terms (2026-09-03)
 
 Four controls a cashier gets on a session that is already running, and one rule
@@ -1468,23 +1804,36 @@ the sessions listing eager-loads it.
 **Unlimited went pro-rata with it, later the same day.** Removing a session's
 end is a decision about the AUTO-STOP and not about the bill: a session
 switched at 00:15 and stopped at 00:30 owes the same 750 as one nobody
-touched. `unlimited_at` and `committed_until` take no part in the price on
-either side any more — if you see a branch reading them to compute money, it
-is older than this.
+touched. The switch is a RATE BOUNDARY only (mirrored from the backend on
+2026-09-25): `committed_amount` = what was earned at `committed_until` (the
+switch instant), the rest at `hourly_rate` — invisible when the rate is
+unchanged, "from now on" when a new one was named. A move to a differently
+priced seat sets `rate_changed_at` + `amount_before_rate_change` the same way;
+with both, the later boundary decides. `sessionTimeCostAt` checks them in the
+backend's order (rate change → unlimited → open → fixed).
 
-**The tile shows `🎮 3 / 4`, not three glyphs.** The repeat said how many pads
-were in play and never what the ceiling was, which is the half a cashier at the
-board actually needs ("can another player join?"). One glyph plus the fraction
-is also narrower than the old worst case, so the card cannot grow. Same
-fraction the options dialog shows.
+**The tile names the pads that are OUT, not a fraction of a ceiling.**
+`padIdentity()` prints the seat's count while nothing extra is out, and the
+slots themselves once something is — `"3"`, `"3, 4"`, or `"3/4"` where the venue
+prices the pair as one figure and naming the position it happened to open would
+tell a cashier something the venue deliberately did not distinguish. It began as
+`🎮 3 / 4` against a constant ceiling of four; the ceiling is the venue's now
+(`padCeiling()` → `joystick_rule.max_slot`), and a fraction against a number that
+changes per room reads as a different question than the one it answers.
 
-**Next to it is a `select`, 1 to 4, and the whole row must stay on ONE line.**
-Two 22px steppers meant going from one pad to three was two presses with the
-number catching up in between; a select states the target and the board reads
-back what the SERVER returned. The row is `flex-wrap: nowrap` with the fraction
-`flex-shrink: 0` and the select fixed at 46px, because the tile is 160px and a
-full-width input pushed `1 / 4` onto a second line — where it read as another
-field rather than as the label of the control beside it.
+**Next to it is a `select` of PADS — which one, not how many — and the whole row
+must stay on ONE line.** Each option carries the slot and what it costs
+(`Joystick #3 · 500`, `Joystick 3/4` where the venue shares one figure, and a
+tail of `free` / `already charged` / `no price set` / `already in use`), so
+the figure the cashier sees is the figure the server will freeze onto the row.
+Handing one BACK is a separate `−` button, drawn only above the base kit: the
+select used to be a target COUNT and the server picked the slot, and a single
+control that both charges and refunds by direction is how a mis-click becomes
+money. A once-per-seat venue gets neither — `padSwitch` draws one button, out or
+back. The row is `flex-wrap: nowrap` with the count `flex-shrink: 0` and the
+select fixed in width, because the tile is 160px and a full-width input pushed
+the count onto a second line, where it read as another field rather than as the
+label of the control beside it.
 
 **No native `confirm()` in the session dialogs** (the app as a whole still has
 three — §4 traps, "Confirm dialogs"). The unlimited confirmation used
@@ -1493,10 +1842,125 @@ three — §4 traps, "Confirm dialogs"). The unlimited confirmation used
 broken is not the one that broke it. It goes through `useConfirm()` now, and
 `SessionOptionsDialog.test.tsx` asserts the native call is never made.
 
+**How many pads the rate covers is the venue's setting, not a constant.**
+`branches.joystick_included` (1..4, default 1) sits beside the fee on Branch →
+Prices and travels in the billing-settings payload as `joystick_included`, with
+`joystick_max` alongside it. Both forms on that screen PUT the WHOLE policy, so
+both send both joystick figures — `MoneyRoundingForm` passing the joystick half
+through untouched is the reason the fee survives a rounding change, and the
+allowance now rides with it. `includedJoysticks()` in `api/joystickPrices.ts` is
+the single place that fills in 1 for a backend that predates the field.
+
+Nothing on the board changed and nothing needed to: a pad inside the allowance
+comes back from the server priced 0.00, so `sessionAmount`, the tile's pad line,
+the receipt and the history all reach the right figure with the arithmetic they
+already had. A free pad is still a row, still counted in `joystick_count` and
+still a line in the log.
+
 **Joysticks are PlayStation-only, and the question is the PLACE's platform.**
 `pc.kind === "ps"` means "no kiosk agent" and is equally true of a ping-pong
 table — `platformGroup(place.platform) === "ps"` is what the dialog asks, the
 same question the backend asks.
+
+**The fee's three states are three named choices, not one box.** The wire is
+one nullable number: a figure is the fee, `0` hands extra pads out for nothing
+and `null` means this venue does not offer them. Two of those used to be typed
+into the same field and one of them was typing nothing, so the branch's form
+asks the question instead. That form is `BranchJoystickForm` since 2026-09-17
+(`JoystickPricesForm` before it, and the file is gone): it now asks the venue's
+TWO questions — which pads cost money, and how much — and deliberately nothing
+else. The strategy, the charge mode and the fourth pad's separate figure are the
+ROOM's questions, asked on the place form, because asking them twice in two
+places is how two screens end up disagreeing about one venue. `""` is "this
+venue has not answered", which every branch is until somebody chooses; without
+it the page would light Save the moment it rendered and an owner who came to
+read the screen could save a choice they never made.
+
+**A place may override the branch, and empty means inherit.** `places`
+carries `joystick_included`, `joystick_price`, `joystick_charged_slots`,
+`joystick_pricing_mode` and `joystick_charge_mode`, all nullable, and null is
+INHERIT rather than the branch's "not offered" — the same empty-means-inherit
+shape `hourly_rate` has in the same form. `PlaceForm` draws them for PlayStation
+places only, sends `null` for anything else (so a seat that stops being a
+PlayStation drops the override it had), and a typed `0` is a real per-place
+setting: this seat gives extra pads away.
+
+### The room answers the joystick questions now (2026-09-15 → 09-18)
+
+`PlaceForm` asks a PlayStation seat three things, and every one of them maps to
+a column the backend already had. Nothing about the money moved when the form
+was rearranged on 2026-09-18 — only where it is asked.
+
+- **What the room follows** — one radio group with three answers. `Как в
+  филиале` is the default and means every joystick column stays null: the room
+  prices nothing and the box beside it shows the VENUE's figure, read-only,
+  fetched with the branch's billing settings. The other two answers are the
+  values `places.joystick_charge_mode` has always held.
+- **How it sells its own pads** — `each` opens two boxes (the third's price,
+  and the fourth's, which may be left empty because a null `joystick_price_4`
+  already means "priced like the third" on the server). `once` opens ONE box:
+  the fee is taken once for the seat, so the pair cannot be priced apart.
+  Switching methods hides the other's boxes and clears nothing in state — the
+  payload is what decides, and a figure typed is still there on the way back.
+- **The tariff** — `Тариф доп. джойстика` states the default and offers no
+  choice; the answer is its own radio group below it
+  (`place.joystickTariffChange`), same field `joystick_pricing_mode`, same two
+  values, same server rule. The heading is deliberately NOT the same string as
+  the option inside it.
+
+  ⚠️ That group has **no "as in the branch"**: the room states the tariff it
+  bills a pad on, and `fixed` is the default — including for a place being
+  CREATED, which has no bill behind it and therefore no tariff to be moved off.
+  A SAVED room carrying no answer of its own opens on the one it INHERITS — read from the venue's billing settings
+  once they load — so saving it pins the figure it was already billing by
+  instead of moving it. A screen that showed `fixed` to a room billing hourly
+  through its branch would be a lie about money, and the save would make the
+  lie true.
+
+⚠️ **The select that asked WHICH pads are charged is gone, and the column is
+not.** A room that prices its own pads charges for the pair, which is what
+every answer the menu could produce already said. Two stored shapes are carried
+through untouched instead of being widened: `"3"` / `"4"` (charge for one pad
+only — the room keeps it, is told so on screen, and only a deliberate click on
+a payment method replaces it with `"3,4"`), and a null `joystick_charge_mode`
+on a room that prices its pads (it inherits the venue's answer, and writing
+`each` into it would start charging per pad at a venue that charges once).
+
+The client gate mirrors the server's: a room that picks a payment method must
+name a figure, which is what `JoystickSlotsRule` refuses without. A room saved
+before, without one, is not asked for it just for being opened.
+
+**The board draws the venue's menu, never its own.** `padChoices(session.joystick_rule, openSlots)`
+builds the pad menu from the SERVER's `options[]`, `padCeiling()` reads the
+venue's `max_slot` (falling back to `MAX_JOYSTICKS` only for an older payload),
+and the floor is `BASE_JOYSTICKS` — two, the kit a PlayStation ships with, which
+no button can hand back. A once-per-seat venue gets a SWITCH instead of a menu:
+one extra pad, out or not, with both halves read from the server's answer so a
+socket update or another cashier's press flips it with no local state to
+disagree about. `padChargeOf()` prints `n × fee` only when every charged period
+agrees on a price — fees are frozen per pad, so a seat that straddles a
+re-pricing holds two, and "3 × ?" would be a lie where the sum is always true.
+
+`places.joystick_price_4` is the room's own fourth-pad figure (null = the pair
+shares one, 0 = the fourth is free), mirroring `branches.joystick_price_4`. The
+server refuses it unless the room charges for the fourth pad and names a base
+price, so the form's own gate and the API's answer agree.
+
+`api/joystickPrices.ts` is the one place that fills in a default for an older
+backend: `includedJoysticks`, `chargedSlotsOf`, `pricingModeOf`, `strategyModeOf`,
+`maxJoystickSlotOf`, plus `CHARGED_SLOT_CHOICES`, `PRICING_MODES`,
+`CHARGE_MODES`, `STRATEGY_MODES`, `BASE_JOYSTICKS` and `MAX_JOYSTICKS`. Pinned by
+`PlaceForm.joystick.test.tsx`, `PlaceForm.rate.test.tsx`,
+`BranchJoystickForm.test.tsx`, `PlaceForm.joystick.test.tsx` (the three
+answers, the read-only branch figure, what each method sends, and the stored
+shapes that are carried through), `PlaceForm.fourthJoystick.test.tsx` (the
+shape of the block: which control holds what, and what the empty fourth box
+promises) and `SessionsBoard.expiry.test.tsx`.
+
+⚠️ Those two `PlaceForm` suites mock `BranchRepository`. Without it the form
+reaches a real repository, resolves late, decides the seat has no rate to bill
+at and refuses to save — which failed roughly one full run in three and never
+on its own.
 
 **Refusals are shown verbatim.** The server answers a blocked unlimited with
 "this place is booked in the app" and a missing rate with "no price is set for
@@ -1564,6 +2028,188 @@ method. Do not shortcut it, and do not report completion without it.
 
 7. **Commit to `staging`**, security and docs separately, stating what was
    verified by running versus only reasoned about.
+
+### Every OTHER room hands out its own extra (2026-09-21)
+
+The joystick section above is PlayStation-only, and on purpose. A room on a
+custom platform — the picker's «Другое» — answers the same question in its own
+word, and the word is data, not code: a poker table deals `Фишки`, a billiard
+table lends a `Кий`, and the room invented next month reads correctly without a
+key being added.
+
+- **In `PlaceForm`,** gated on `isCustomPlatform`: a name, a price, and — only
+  once there is a name — two `cp-choice` cards for `each` / `once`. No new CSS;
+  it is the same choice-card pattern the pads use. An empty name is "hands out
+  nothing" and posts three nulls, so a room nobody configured costs the
+  operator one line of screen.
+- **The payload is `extra_item_name` / `extra_item_price` /
+  `extra_item_charge_mode`**, sent as null for every known platform. The server
+  refuses them on pc/ps4/ps5, so a stale value would be a rejected save with no
+  visible cause.
+- **On the board,** the button appears only when `session.extra_item` is an
+  object — the server's answer, exactly as `supports_joysticks` gates the pad
+  menu — and its label is `fmt(t("session.extraAdd"), extra.name)`. Nothing in
+  the panel spells "chips".
+- **The room's extra has the pads' WHOLE strategy (2026-09-23).** `PlaceForm`
+  asks a custom-platform room the same questions the joystick section asks a
+  PlayStation one, and every answer falls back to the BRANCH when the room
+  leaves it empty:
+
+      name · price · price for each one after the first · per piece or per
+      hour · every time or once a session · how many are included · how many
+      exist · which ones are charged
+
+  - **The venue answers once** on Prices → `BranchExtraItemForm`, beside the
+    joystick form and for the same reason. It PUTs the WHOLE policy back: the
+    endpoint validates it as one object, so a form sending only its own half
+    would blank the rounding rule and every joystick answer with it.
+  - ⚠️ **An empty box and a zero are different answers.** `Number("")` is 0,
+    and that is exactly the confusion the forms keep out of the payload: empty
+    travels as `null` ("not answered" / "priced like the first"), a typed 0
+    travels as `0` (given away / none are in the rate).
+  - **Clearing the NAME withdraws the whole answer** and nulls every number
+    with it — a ceiling on a thing nobody hands out is a number about nothing.
+- ⚠️ **Handing it out is ONE PRESS. There is no dialog and no count
+  (2026-09-23).** `AddExtraItemDialog` and `extraItemQuote` are DELETED, not
+  deprecated: their only content was a quantity stepper and the quote that fed
+  it, and the count was a question nobody at the counter asks. A cashier
+  putting chips on a poker table does what a cashier putting a controller on a
+  PlayStation does — one press, one thing, no menu — so the board calls
+  `addItems(id, [{extra: true, qty: 1}])` straight from the button, the way it
+  calls `addJoystick`.
+  - The room's allowance still works: it is spent per UNIT, so the first N
+    presses are the free ones. ⚠️ **The button carries the room's word and
+    NOTHING else** — no price, no "paid", no "/ч", on a fixed, `once` or
+    hourly room alike (the owner's call, 2026-09-23). A short-lived version
+    quoted the server's `next_fee` beside it; the owner rejected it and the
+    key is gone from the server too. Do not bring a figure back to the
+    button: the bill says what it cost.
+  - ⚠️ **The toggle flips on the PRESS, not on the next board read
+    (2026-09-23).** `handOutExtra` / `returnExtra` hand the write's own
+    answer to `applyItems()`, which puts ONLY its `items` on that seat via
+    `useAsync`'s `mutate`; the `reload()` after it is unchanged. Only
+    `items`, because those endpoints load nothing else — the rest of that
+    session is partial (no `pc`, so no `extra_item`), and taking it whole
+    blanks the very button being flipped. `mutate` bumps the generation so
+    a poll already in flight (older than the write) cannot paint over it.
+    It waited for the read before, which on Railway is a second round trip:
+    the cashier saw "add" for seconds after handing chips over.
+  - **A hand-out raises the pads' GREEN toast** (2026-09-23):
+    `notify.message("success", fmt(t("session.extraAdded"), name))` →
+    «Добавлено: Фишки», in the room's own word. Only after the server
+    accepted it; a refusal stays on the tile and raises nothing. A return
+    raises the RED one, as a pad's removal does: `notify.message("error",
+    fmt(t("session.extraReturnedToast"), name))` → «Возвращено: Фишки».
+  - ⚠️ **A FIXED room sells ONCE per session; an HOURLY room lends
+    (the owner's rule, 2026-09-23).** What the one button does is the
+    SERVER's answer: `extra_item.can_hand_out` false → the button stays
+    «Добавить: …» and is greyed (a fixed room after its sale, or a ceiling
+    reached); `extra_item.return_item_id` → the button is «Вернуть: …» for
+    THAT line (only ever something on a clock). A fixed sale is never
+    offered a return — the server refuses one too. `applyItems()` takes
+    `extra_item` from the write's answer as well as `items`, so the button
+    greys on the press. `openExtra` (first extra line not returned) is only
+    the fallback for a server that predates the two keys.
+  - The toggle is still ONE control, exactly as the pad button is — in an
+    hourly room: hand out, the same button becomes "take it back", and
+    back again.
+  - ⚠️ **An HOURLY extra moves the TARIFF**, exactly as an hourly pad does:
+    `sessionCurrentHourlyRate` adds `price x qty` for every unit with no
+    `returned_at`, so a 1 000/h poker table lending 500/h chips reads 1 500/h
+    while they are out and 1 000/h again once they come back. The money always
+    came to 1 500 — the chips accrue on their own bill line — so this was never
+    a pricing bug; the tile simply did not say the sentence.
+  - ⚠️ **And it TICKS.** `sessionItemsTotalAt` extrapolates a rented line from
+    its own `created_at`, mirroring `SessionPricingCalculator::itemSeconds()`
+    and clamped the same two ways — to `returned_at` when it came back before
+    the instant shown, and to the session's start when the row predates it.
+    `sessionItemsTotal` (no `at`) stays for HISTORY, where the server's
+    `line_total` is the right answer; the pads carry the identical pair for the
+    identical reason.
+- **`once` charges once, not `unit × qty`**, and a seat that has already
+  paid it is quoted "paid" (`fee_taken` from the server). ⚠️ For a while the
+  SERVER billed a press of "3" on a 500-once seat at 1500; fixed backend-side on
+  2026-09-22 (`ExtraItemRule::split()` clamps the charged part to one). If the
+  quote and the bill ever disagree again, check which side is wrong before
+  "fixing" either.
+- ⚠️ **The room's rate may cover the first N units, and exactly one function
+  may quote a hand-out** (2026-09-22). `extra_item_included` on the place is
+  the allowance — empty box posts `null`, which the server reads as 0: every
+  unit charged, exactly as every room billed before the box existed. Posting a
+  `0` where the room carries `null` is the same request to the server but a
+  price change nobody made to the form, so the payload keeps the distinction
+  and three cases pin it. (The "no branch-level default" this paragraph once
+  recorded is superseded: since 2026-09-23 every answer inherits from the
+  branch — see the strategy bullet above.) The panel computes NO split:
+  `extraItemQuote` was deleted with the dialog, and the figure the button
+  shows is none — see the one-press bullet above.
+- **A FIXED extra changes nothing in `sessionAmount`.** It is a `session_items`
+  row, so the running total, the receipt and the history already add it up as
+  `price x qty`.
+- ⚠️ **An HOURLY extra is a rate, and exactly one function may price a line.**
+  `sessionItemLineTotal(line)` in `sessionAmount.ts` takes the server's
+  `line_total` when `line.is_hourly` and `price x qty` otherwise. The minutes
+  belong to the backend; mirroring a clock the panel does not own is how the
+  hourly PADS once made a tile quote 500 for a charge the server billed at 0.69.
+  Every screen that adds up a bill line calls it — `sessionItemsTotal`, the
+  history summary (`useSessionsSummary`), the history row and its per-line
+  amount (`SessionsHistory`), and the "already on this session" list
+  (`AddSessionItemDialog`). Four of those five computed `price x qty` inline for
+  a day and quoted a cue rented at 700/h as a flat 700; the history row also
+  derives `timeCost` by subtracting that figure, so the clock read wrong beside
+  it. If you add a sixth screen, call the helper — do not re-derive it.
+- **Handing it back: `PATCH /sessions/{id}/items/{itemId}` with
+  `{returned: true}`** (`sessionRepository.returnItem`), the same endpoint a
+  quantity correction uses because it is the same kind of thing — a change to a
+  line already on the bill. `DELETE` still means "this was never sold". The
+  board offers it only for the line the server names in
+  `extra_item.return_item_id` (something on a clock — never a fixed sale); the
+  clock stops, the charge stays, and the receipt prints `90 min - 700/h - returned` rather than a count.
+  The history action is `item_returned` — NOT `item_removed`: the line keeps
+  what it earned, so the row says how long it was out and that nothing came
+  back.
+- **`useSessionChanged`'s `kind` union carries `extra.added` and
+  `extra.returned`.** The board reloads on any kind, so a missing one is a
+  type-level hole rather than a runtime break — which is exactly why it sat
+  there unnoticed.
+- ⚠️ **`Modal` takes `open` and has no `title` prop.** The first version of
+  this dialog passed a title and no `open`, so the button was on the board and
+  pressing it did nothing at all. Neither the unit tests nor the typecheck saw
+  it — the tests MOCKED `Modal` and the mock ignored the prop. The mock honours
+  `open` now, and removing it fails nine cases. Two lessons worth keeping: a
+  mock that drops a required prop hides the bug that prop exists to prevent,
+  and **the typecheck is `npm run typecheck`** (`tsconfig.app.json`), not a
+  bare `tsc -p tsconfig.json`, which type-checks nothing in `src` and will sit
+  there reporting success while the app does not compile.
+
+### The add-item dialog has two ways in (2026-09-18)
+
+`AddSessionItemDialog` opens on the picker it has always opened on — the
+catalogue, the search box, the basket, the "new product" form, all unchanged and
+all still the default. A radiogroup at the top switches to **quick entry**: a
+textarea, one product per line, the quantity at either end.
+
+- The box is read by the SERVER (`sessionRepository.resolveItemsText`), 400ms
+  after the typing stops. One request per pause, not per keystroke and not per
+  line, and it writes nothing — what comes back is a preview plus the exact
+  `items[]` the existing add endpoint expects.
+- The confirm calls `sessionRepository.addItems` — the basket's own call. So the
+  two ways of filling a bill share one write path, one transaction and one
+  history. Nothing about the picker's flow changed.
+- The confirm is held down while any line is unreadable: a batch is all or
+  nothing, which is what the server would enforce anyway.
+- Switching modes keeps both sides' state. A half-filled basket is still there
+  when the cashier switches back, and a typed block survives a trip to the
+  catalogue.
+
+⚠️ **The debounce effect must not depend on `t`.** `useLang()` returns a fresh
+`t` on every render, so listing it restarts the timer on every render: the box
+reads as busy forever and the confirm never unlocks. The server's own sentence
+is stored untranslated and rendered through `t` at render time instead.
+
+Pinned by `AddSessionItemDialog.test.tsx` — the dialog opening on the picker,
+the switch, one request per pause, the preview, the dead confirm on a bad line,
+and that the picker's sixteen original cases still pass unchanged.
 
 ### The Playwright suite went dark, and how (2026-09-05)
 

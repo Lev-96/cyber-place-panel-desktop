@@ -1,7 +1,8 @@
 import { preciseWhenSmall } from "@/i18n/currency";
 import { ISessionApi } from "@/types/sessions";
-import { sessionAmountAt } from "./sessionAmount";
+import { autoResumeAtOf, playedSecondsBetween, sessionAmountAt } from "./sessionAmount";
 import { useEffect, useState } from "react";
+import { sessionUrgency } from "./sessionUrgency";
 
 const fmt = (ms: number) => {
   const total = Math.max(0, Math.floor(ms / 1000));
@@ -44,6 +45,9 @@ interface Props {
  * place it is answered — mirroring the backend's `timeCostStringAt`. Before
  * this, only the count-up branch showed an amount and it computed its own.
  */
+/** A clock that is not running: neither the live cyan nor a warning colour. */
+const PAUSED_COLOR = "var(--color-muted)";
+
 const SessionTimer = ({ session, formatMoney }: Props) => {
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
@@ -64,31 +68,55 @@ const SessionTimer = ({ session, formatMoney }: Props) => {
   // Prices elsewhere are untouched: this asks for the precision, nothing else
   // does.
   const cost = showCost ? (
-    <span style={{ marginLeft: 8, color: "#d152fa" }}>
+    <span className="session-timer__cost" style={{ marginLeft: 8, color: "var(--color-accent-purple)" }}>
       {formatMoney ? formatMoney(amount, preciseWhenSmall(amount)) : amount.toFixed(2)}
     </span>
   ) : null;
 
   const isOpen = !session.ends_at && !!session.started_at;
+  // PAUSED: every figure here holds still — the SERVER's instants decide it,
+  // not a stopped interval, so a reload or a dropped socket shows the same
+  // frozen clock. The money already holds (the open pause runs to `now` and
+  // is subtracted); the countdown holds at `ends_at − paused_at`, which is
+  // exactly the time the player gets back on resume.
+  const pausedAt = session.paused_at ? Date.parse(session.paused_at) : NaN;
+  const paused = !Number.isNaN(pausedAt);
+  const pausedMark = paused ? <span aria-hidden="true">⏸ </span> : null;
+  // A LIMITED pause counts down to the instant the server resumes it. Shown
+  // beside the frozen clock, never instead of it; past zero it holds at 0:00
+  // until the board's next read brings the resumed row.
+  const autoResumeAt = autoResumeAtOf(session);
+  const autoResume = autoResumeAt !== null ? (
+    <span data-testid="auto-resume" style={{ marginLeft: 8, color: "var(--color-warning)" }}>
+      ▶ {fmt(Math.max(0, autoResumeAt - now))}
+    </span>
+  ) : null;
 
   if (isOpen) {
-    const elapsedMs = now - new Date(session.started_at).getTime();
+    // Time PLAYED, which is what the bill charges for — not wall time.
+    const elapsedMs = playedSecondsBetween(session, session.started_at, now) * 1000;
     return (
-      <span style={{ fontWeight: 700, fontVariantNumeric: "tabular-nums", color: "#07ddf1" }}>
-        ▲ {fmt(elapsedMs)}
+      <span style={{ fontWeight: 700, fontVariantNumeric: "tabular-nums", color: paused ? PAUSED_COLOR : "var(--color-primary)" }}>
+        {pausedMark}▲ {fmt(elapsedMs)}
+        {autoResume}
         {cost}
       </span>
     );
   }
 
   if (!session.ends_at) return null;
-  const remaining = new Date(session.ends_at).getTime() - now;
-  const warn = remaining <= 5 * 60_000;
-  const crit = remaining <= 60_000;
-  const color = crit ? "#ef4444" : warn ? "#f59e0b" : "#07ddf1";
+  const remaining = new Date(session.ends_at).getTime() - (paused ? pausedAt : now);
+  // The one urgency rule the card's frame reads too (sessionUrgency.ts).
+  const urgency = sessionUrgency(session, now);
+  const color = paused
+    ? PAUSED_COLOR
+    : urgency === "crit" ? "var(--color-danger)"
+    : urgency === "warn" ? "var(--color-warning)"
+    : "var(--color-primary)";
   return (
     <span style={{ fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>
-      <span style={{ color }}>{fmt(remaining)}</span>
+      <span style={{ color }}>{pausedMark}{fmt(remaining)}</span>
+      {autoResume}
       {cost}
     </span>
   );

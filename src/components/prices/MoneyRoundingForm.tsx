@@ -1,5 +1,5 @@
 import Button from "@/components/ui/Button";
-import { IBillingSettings, MoneyRoundingMode } from "@/api/joystickPrices";
+import { IBillingSettings, MoneyRoundingMode, chargedSlotsOf, includedJoysticks, maxJoystickSlotOf, pricingModeOf, strategyModeOf } from "@/api/joystickPrices";
 import { useLang } from "@/i18n/LanguageContext";
 import { billingSettingsRepository } from "@/repositories/BillingSettingsRepository";
 import { notify } from "@/ui/notify";
@@ -61,9 +61,31 @@ const MoneyRoundingForm = ({ branchId, settings, onSaved }: Props) => {
     setBusy(true);
     setErr(null);
     try {
-      // The joystick fee goes back untouched: this is a PUT of the whole
-      // policy, and sending only the rounding half would clear the fee.
-      await billingSettingsRepository.update(branchId, step, mode, settings.joystick_price);
+      // The joystick half goes back untouched, EVERY figure of it: this is a
+      // PUT of the whole policy, and sending only the rounding part would clear
+      // the fee, reset the allowance and put the fourth pad back on a shared
+      // price.
+      //
+      // The one field that is not sent back verbatim is the strategy mode: a
+      // branch may still hold the retired "both", which nothing may write any
+      // more, so what goes back is the single answer it already resolves to.
+      // That is the same answer the server computes for it, so the venue's
+      // bills do not move — it is a word being tidied, not a policy changing.
+      //
+      // `joystick_charge_mode` is deliberately absent: this endpoint does not
+      // accept it, and a field it never receives is a field it never writes.
+      // The room's own form owns that answer.
+      await billingSettingsRepository.update(branchId, {
+        money_rounding_step: step,
+        money_rounding_mode: mode,
+        joystick_price: settings.joystick_price,
+        joystick_included: includedJoysticks(settings),
+        joystick_charged_slots: chargedSlotsOf(settings),
+        joystick_pricing_mode: pricingModeOf(settings),
+        joystick_price_4: settings.joystick_price_4 ?? null,
+        joystick_max_slot: maxJoystickSlotOf(settings),
+        joystick_strategy_mode: strategyModeOf(settings),
+      });
       notify.message("success", t("rounding.saved"));
       onSaved();
     } catch (e2) {

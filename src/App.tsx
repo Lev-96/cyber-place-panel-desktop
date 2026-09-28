@@ -55,6 +55,7 @@ const Notifications = lazy(() => import("@/routes/Notifications"));
 const SupportChat = lazy(() => import("@/routes/SupportChat"));
 const PcsList = lazy(() => import("@/routes/PcsList"));
 const ProductsList = lazy(() => import("@/routes/ProductsList"));
+const Till = lazy(() => import("@/routes/Till"));
 const ResetPassword = lazy(() => import("@/routes/ResetPassword"));
 const SessionsHistory = lazy(() => import("@/routes/SessionsHistory"));
 const Settings = lazy(() => import("@/routes/Settings"));
@@ -162,6 +163,9 @@ const Authed = () => {
             element={<BranchSubscribersPage />}
           />
           <Route path="/branches/:branchId/products" element={<ProductsList />} />
+          {/* Касса: selling at the counter with no session. Every staff role at
+              its own branch, as the session bill — the server decides. */}
+          <Route path="/branches/:branchId/pos" element={<Till />} />
           {/* Member cards and deposits are administrative. Guarding the route
               as well as the tile is the point: a bookmarked URL is the other
               way into a section, and the backend refuses these reads too. */}

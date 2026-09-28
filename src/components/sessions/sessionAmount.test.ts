@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { ISessionApi } from "@/types/sessions";
-import { sessionAmountAt, sessionTimeCostAt } from "./sessionAmount";
+import { sessionAmountAt, sessionCurrentHourlyRate, sessionItemsTotalAt, sessionJoysticksTotalAt, sessionTimeCostAt } from "./sessionAmount";
 
 /**
  * The one place the panel decides what a running session's clock is worth.
@@ -162,19 +162,16 @@ describe("unlimited only removes the end, it does not reprice", () => {
     expect(sessionAmountAt(converted(), AT)).toBe(3000);
   });
 
-  test("a switch made mid-block does not charge the whole block", () => {
-    // The case the old rule got wrong: still inside the committed window, so
-    // it used to read a flat 1500 no matter how long the seat had run.
-    expect(sessionAmountAt(converted({ committed_until: ahead(30) }), AT)).toBe(3000);
+  test("the switch is a rate boundary: a new price applies only from it", () => {
+    // Switched 60 min ago with 1500 earned by then, at 3000 from now on.
+    // Mirrors the backend's unlimited branch in `timeCostStringAt`.
+    expect(sessionAmountAt(converted({ hourly_rate: 3000 }), AT)).toBe(1500 + 3000);
   });
 
-  test("committed_until no longer takes part in the price at all", () => {
-    // Same session, boundary moved anywhere: the figure does not move with it.
-    const at = converted({ committed_until: ago(0) });
-    const ahead30 = converted({ committed_until: ahead(30) });
-
-    expect(sessionAmountAt(at, AT)).toBe(3000);
-    expect(sessionAmountAt(at, AT)).toBe(sessionAmountAt(ahead30, AT));
+  test("a switch the clock has not passed yet adds nothing on top", () => {
+    // `secondsBetween` is never negative: before the boundary, the frozen
+    // figure is the whole time cost.
+    expect(sessionAmountAt(converted({ committed_until: ahead(30) }), AT)).toBe(1500);
   });
 });
 
@@ -291,6 +288,54 @@ describe("extra joysticks are on the seat's figure too", () => {
   });
 });
 
+describe("an hourly extra is taken from the server, not recomputed", () => {
+  /**
+   * A room may rent its extra by the hour, and the minutes belong to the
+   * server: the payload carries `line_total` already counted against the
+   * instant it was built. The mirror must take that figure rather than
+   * multiply a rate by a count — the second is a different number and the
+   * tile would disagree with the receipt, which is the exact failure the
+   * hourly PADS already taught this file.
+   */
+  const cue = (over: Record<string, unknown> = {}) => [{
+    id: 9, name: "Кий", price: 700, qty: 2, product_id: null,
+    is_extra: true, is_hourly: true, minutes: 90, line_total: 2100, ...over,
+  }] as ISessionApi["items"];
+
+  test("the server's figure is what lands on the tile", () => {
+    const s = session({ hourly_rate: 0, started_at: ago(90), items: cue() });
+
+    expect(sessionAmountAt(s, AT)).toBe(2100);
+  });
+
+  test("a rate times a count is NOT what lands on the tile", () => {
+    // 700 × 2 = 1400 is the fixed-price answer, and it is the wrong one here.
+    const s = session({ hourly_rate: 0, started_at: ago(90), items: cue() });
+
+    expect(sessionAmountAt(s, AT)).not.toBe(1400);
+  });
+
+  test("a fixed extra is still price × qty", () => {
+    const s = session({
+      hourly_rate: 0,
+      started_at: ago(90),
+      items: cue({ is_hourly: false, minutes: null, line_total: 1400 }),
+    });
+
+    expect(sessionAmountAt(s, AT)).toBe(1400);
+  });
+
+  test("a line the server never flagged is priced the way it always was", () => {
+    const s = session({
+      hourly_rate: 0,
+      started_at: ago(90),
+      items: [{ id: 1, name: "Coca-Cola", price: 300, qty: 3, product_id: 7 }],
+    });
+
+    expect(sessionAmountAt(s, AT)).toBe(900);
+  });
+});
+
 describe("drinks on the seat are on the seat's figure", () => {
   const withItems = (over: Partial<ISessionApi>, items: ISessionApi["items"]) =>
     session({ ...over, items });
@@ -364,6 +409,273 @@ describe("drinks on the seat are on the seat's figure", () => {
     // counterpart on the server.
     const s = withItems({ hourly_rate: 1500, started_at: ago(30) }, cola);
 
+    expect(sessionTimeCostAt(s, AT)).toBe(750);
+  });
+
+  // ── the hourly model ──────────────────────────────────────────────────
+
+  /**
+   * An hourly pad is priced for the time it was actually out, and the tile has
+   * to agree with the receipt about that, or the cashier reads one number
+   * while the player is charged another.
+   */
+  test("an hourly pad bills the time it was out, not a flat fee", () => {
+    const s = session({
+      hourly_rate: 1000,
+      started_at: ago(120),
+      joysticks: [
+        // Out for half an hour: 250, a figure no flat fee can produce.
+        { id: 1, slot: 3, price: 500, is_charged: true, is_hourly: true,
+          started_at: ago(120), stopped_at: ago(90) },
+      ],
+    } as Partial<ISessionApi>);
+
+    expect(sessionJoysticksTotalAt(s, AT)).toBeCloseTo(250, 2);
+  });
+
+  test("a pad still out keeps ticking, and one handed back stopped when it did", () => {
+    const s = session({
+      hourly_rate: 1000,
+      started_at: ago(60),
+      joysticks: [
+        { id: 1, slot: 3, price: 500, is_charged: true, is_hourly: true,
+          started_at: ago(60), stopped_at: null },
+      ],
+    } as Partial<ISessionApi>);
+
+    expect(sessionJoysticksTotalAt(s, AT)).toBeCloseTo(500, 2);
+    expect(sessionJoysticksTotalAt(s, AT + 3600_000)).toBeCloseTo(1000, 2);
+  });
+
+  test("a flat fee is untouched by the clock", () => {
+    const s = session({
+      hourly_rate: 1000,
+      started_at: ago(60),
+      joysticks: [
+        { id: 1, slot: 3, price: 500, is_charged: true, is_hourly: false,
+          started_at: ago(60), stopped_at: null },
+      ],
+    } as Partial<ISessionApi>);
+
+    expect(sessionJoysticksTotalAt(s, AT)).toBeCloseTo(500, 2);
+    expect(sessionJoysticksTotalAt(s, AT + 36000_000)).toBeCloseTo(500, 2);
+  });
+
+  test("the rate shown is the seat plus the pads currently out", () => {
+    const s = session({
+      hourly_rate: 1000,
+      joysticks: [
+        { id: 1, slot: 3, price: 500, is_charged: true, is_hourly: true,
+          started_at: ago(60), stopped_at: null },
+        // Handed back, so it no longer moves the rate.
+        { id: 2, slot: 4, price: 500, is_charged: true, is_hourly: true,
+          started_at: ago(60), stopped_at: ago(30) },
+      ],
+    } as Partial<ISessionApi>);
+
+    expect(sessionCurrentHourlyRate(s)).toBeCloseTo(1500, 2);
+  });
+
+  /**
+   * ⚠️ The rented extra TICKS, like a pad, instead of jumping on each poll.
+   *
+   * `line_total` is what the SERVER counted when the payload was built. Using
+   * it on a ticking tile froze the chips' share between polls and then jumped
+   * it, beside a seat figure moving every second — the same defect the pads
+   * were given `sessionJoysticksTotalAt` to avoid. The row carries
+   * `created_at`, so the panel extrapolates from the same instant the server
+   * does.
+   */
+  test("an hourly extra accrues by the second, not by the poll", () => {
+    const s = session({
+      hourly_rate: 1000,
+      // The seat opened before the chips went out, or the clamp below would
+      // (correctly) bill from the session instead.
+      started_at: ago(90),
+      items: [
+        { id: 11, name: "\u0424\u0438\u0448\u043a\u0438", price: 500, qty: 1, is_extra: true, is_hourly: true,
+          created_at: ago(60), returned_at: null, line_total: 0 },
+      ],
+    } as Partial<ISessionApi>);
+
+    // An hour out at 500/h, however stale the server's own figure is.
+    expect(sessionItemsTotalAt(s, AT)).toBeCloseTo(500, 2);
+    // …and half an hour earlier it was worth half that.
+    expect(sessionItemsTotalAt(s, AT - 30 * 60_000)).toBeCloseTo(250, 2);
+  });
+
+  test("a returned extra stops accruing where it was handed back", () => {
+    const s = session({
+      started_at: ago(90),
+      items: [
+        { id: 11, name: "\u0424\u0438\u0448\u043a\u0438", price: 500, qty: 1, is_extra: true, is_hourly: true,
+          created_at: ago(60), returned_at: ago(30), line_total: 0 },
+      ],
+    } as Partial<ISessionApi>);
+
+    expect(sessionItemsTotalAt(s, AT)).toBeCloseTo(250, 2);
+  });
+
+  /**
+   * A line dated BEFORE the session bills from the session.
+   *
+   * Reachable by a clock skew, a seeded row or a restored backup rather than
+   * by the panel — which is exactly why it is pinned on both sides. Without it
+   * the hour count runs from whenever the row claims it was written, and a row
+   * dated yesterday hands the guest a bill for a night they were not here for.
+   */
+  test("a line older than the session bills from the session", () => {
+    const s = session({
+      started_at: ago(30),
+      items: [
+        { id: 11, name: "\u041a\u0438\u0439", price: 500, qty: 1, is_extra: true, is_hourly: true,
+          created_at: ago(24 * 60), returned_at: null, line_total: 0 },
+      ],
+    } as Partial<ISessionApi>);
+
+    // Half an hour of the seat's life, not a day of the row's.
+    expect(sessionItemsTotalAt(s, AT)).toBeCloseTo(250, 2);
+  });
+
+  test("a drink is still a price times a count, whatever the clock says", () => {
+    const s = session({
+      items: [
+        { id: 12, name: "Cola", price: 300, qty: 2, created_at: ago(60), line_total: 600 },
+      ],
+    } as Partial<ISessionApi>);
+
+    expect(sessionItemsTotalAt(s, AT)).toBeCloseTo(600, 2);
+  });
+
+  test("two rented units accrue twice over", () => {
+    const s = session({
+      started_at: ago(90),
+      items: [
+        { id: 11, name: "\u041a\u0438\u0439", price: 500, qty: 2, is_extra: true, is_hourly: true,
+          created_at: ago(60), returned_at: null, line_total: 0 },
+      ],
+    } as Partial<ISessionApi>);
+
+    expect(sessionItemsTotalAt(s, AT)).toBeCloseTo(1000, 2);
+  });
+
+  /**
+   * The room's own extra moves the rate exactly as a pad does.
+   *
+   * A poker table at 1 000/h that lends 500/h chips is a 1 500/h seat while
+   * they are out, and the tile has to say so — the cashier quotes what the
+   * tile shows. The money already worked out to 1 500 because the chips accrue
+   * on their own line; what was missing was the SENTENCE.
+   */
+  test("the rate shown is the seat plus the hourly extra it is holding", () => {
+    const s = session({
+      hourly_rate: 1000,
+      items: [
+        { id: 11, name: "\u0424\u0438\u0448\u043a\u0438", price: 500, qty: 1, is_extra: true, is_hourly: true,
+          created_at: ago(60), returned_at: null, line_total: 500 },
+      ],
+    } as Partial<ISessionApi>);
+
+    expect(sessionCurrentHourlyRate(s)).toBeCloseTo(1500, 2);
+  });
+
+  test("an extra handed back stops moving the rate", () => {
+    const s = session({
+      hourly_rate: 1000,
+      items: [
+        { id: 11, name: "\u0424\u0438\u0448\u043a\u0438", price: 500, qty: 1, is_extra: true, is_hourly: true,
+          created_at: ago(60), returned_at: ago(30), line_total: 250 },
+      ],
+    } as Partial<ISessionApi>);
+
+    expect(sessionCurrentHourlyRate(s)).toBeCloseTo(1000, 2);
+  });
+
+  test("a FIXED extra never moves the rate — it is a price, not a tariff", () => {
+    const s = session({
+      hourly_rate: 1000,
+      items: [
+        { id: 11, name: "\u0424\u0438\u0448\u043a\u0438", price: 500, qty: 1, is_extra: true, is_hourly: false,
+          created_at: ago(60), returned_at: null, line_total: 500 },
+      ],
+    } as Partial<ISessionApi>);
+
+    expect(sessionCurrentHourlyRate(s)).toBeCloseTo(1000, 2);
+  });
+
+  test("two hourly units out add their rate twice", () => {
+    const s = session({
+      hourly_rate: 1000,
+      items: [
+        { id: 11, name: "\u0424\u0438\u0448\u043a\u0438", price: 500, qty: 2, is_extra: true, is_hourly: true,
+          created_at: ago(60), returned_at: null, line_total: 1000 },
+      ],
+    } as Partial<ISessionApi>);
+
+    expect(sessionCurrentHourlyRate(s)).toBeCloseTo(2000, 2);
+  });
+
+  test("a flat fee never moves the rate", () => {
+    const s = session({
+      hourly_rate: 1000,
+      joysticks: [
+        { id: 1, slot: 3, price: 500, is_charged: true, is_hourly: false,
+          started_at: ago(60), stopped_at: null },
+      ],
+    } as Partial<ISessionApi>);
+
+    expect(sessionCurrentHourlyRate(s)).toBeCloseTo(1000, 2);
+  });
+});
+
+describe("a move to a seat priced differently never reprices the past", () => {
+  const moved = (over: Partial<ISessionApi> = {}) => session({
+    mode: "fixed",
+    started_at: ago(60),
+    ends_at: ahead(60),
+    hourly_rate: 2000,
+    rate_changed_at: ago(30),
+    amount_before_rate_change: 750,
+    ...over,
+  });
+
+  test("frozen before the move, the new rate after it", () => {
+    expect(sessionAmountAt(moved(), AT)).toBe(750 + 1000);
+  });
+
+  test("an unlimited switch made after the move decides from its own boundary", () => {
+    const s = moved({ unlimited_at: ago(10), committed_until: ago(10), committed_amount: 1416.67, hourly_rate: 3000, ends_at: null });
+    expect(sessionAmountAt(s, AT)).toBe(1416.67 + 500);
+  });
+
+  test("a move made after going unlimited decides from the move", () => {
+    const s = moved({ unlimited_at: ago(50), committed_until: ago(50), committed_amount: 250, ends_at: null });
+    expect(sessionAmountAt(s, AT)).toBe(750 + 1000);
+  });
+
+  test("a pause after the move is not billed at the new rate", () => {
+    const s = moved({ pauses: [{ paused_at: ago(20), resumed_at: ago(5) }] });
+    expect(sessionAmountAt(s, AT)).toBe(750 + 500);
+  });
+});
+
+describe("a limited pause stops counting at its limit, before anyone presses Resume", () => {
+  test("the open pause ends at auto_resume_at", () => {
+    const s = session({
+      mode: "open", hourly_rate: 1500, started_at: ago(60),
+      paused_at: ago(30),
+      pauses: [{ paused_at: ago(30), resumed_at: null, auto_resume_at: ago(20) }],
+    });
+    // 60 elapsed − 10 paused = 50 min at 1500.
+    expect(sessionTimeCostAt(s, AT)).toBe(1250);
+  });
+
+  test("a limit still ahead changes nothing yet", () => {
+    const s = session({
+      mode: "open", hourly_rate: 1500, started_at: ago(60),
+      paused_at: ago(30),
+      pauses: [{ paused_at: ago(30), resumed_at: null, auto_resume_at: ahead(5) }],
+    });
     expect(sessionTimeCostAt(s, AT)).toBe(750);
   });
 });

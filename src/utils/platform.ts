@@ -9,6 +9,25 @@ import { PlatformType } from "@/types/api";
  */
 export const KNOWN_PLATFORMS: readonly PlatformType[] = ["pc", "ps4", "ps5"];
 
+/**
+ * The custom platform a poker table runs on.
+ *
+ * Mirrors `App\Support\Platform::POKER`. A slug and not a place `type`: the
+ * type is the room grade (standard / vip) and a poker table can stand in
+ * either. It is the same custom-platform mechanism a table-tennis table uses.
+ */
+export const POKER_PLATFORM = "poker";
+
+/**
+ * Does this slug name a poker table?
+ *
+ * The one question that decides whether chips exist on a seat. The server asks
+ * the same one and refuses the sale on the same answer, so a control drawn from
+ * this is a control the server will honour.
+ */
+export const isPokerPlatform = (p: string | null | undefined): boolean =>
+  (p ?? "").trim().toLowerCase() === POKER_PLATFORM;
+
 export const isKnownPlatform = (p: string): p is PlatformType =>
   (KNOWN_PLATFORMS as readonly string[]).includes(p);
 

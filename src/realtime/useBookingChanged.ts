@@ -78,12 +78,12 @@ export const useBookingChanged = (
 
   useEffect(() => {
     if (!channelName) {
-      console.warn("[reverb] useBookingChanged got no channel — booking notifications won't fire");
+      console.warn("[reverb] useBookingChanged got no channel: booking notifications won't fire");
       return;
     }
     const echo = getEcho();
     if (!echo) {
-      console.warn("[reverb] echo not initialised — booking notifications won't fire (check VITE_REVERB_* env)");
+      console.warn("[reverb] echo not initialised: booking notifications won't fire (check VITE_REVERB_* env)");
       return;
     }
 

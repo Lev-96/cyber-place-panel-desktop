@@ -1,4 +1,4 @@
-import { IProduct } from "@/types/pos";
+import { IProduct, ProductKind } from "@/types/pos";
 import { Lang } from "@/i18n/translations";
 import { request } from "./client";
 
@@ -8,6 +8,8 @@ export interface CreateProductBody {
   category?: string | null;
   price: number;
   is_active?: boolean;
+  /** Sold by the unit, or handed out with a seat. Omitted: the server keeps/defaults `regular`. */
+  kind?: ProductKind;
   /**
    * Language `name` / `category` were typed in. The backend treats that locale
    * as the source of truth and machine-translates the others — it never writes

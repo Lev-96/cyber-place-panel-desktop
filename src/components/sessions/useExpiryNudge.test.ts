@@ -78,6 +78,8 @@ describe("waking at a seat's deadline", () => {
   test.each([
     ["a session with no end", { ends_at: null }],
     ["one already unlimited", { is_unlimited: true }],
+    // Its end moves on resume and the server will not expire it meanwhile.
+    ["one that is paused", { ends_at: new Date(NOW - 60_000).toISOString(), paused_at: new Date(NOW - 120_000).toISOString() }],
     ["one that is over", { status: "stopped" as const }],
   ])("never wakes for %s", async (_name, over) => {
     const onDue = vi.fn();

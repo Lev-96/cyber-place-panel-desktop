@@ -156,7 +156,8 @@ describe("the dialog itself", () => {
   test("stands on an opaque surface", async () => {
     await mount();
 
-    const surface = document.querySelector(".cp-modal-wrapper > *");
+    // The dialog's own root inside the modal's box (which also holds the ×).
+    const surface = document.querySelector(".cp-modal-dialog > *");
     expect(surface, "the dialog rendered nothing inside the modal wrapper").toBeTruthy();
     expect(
       surface!.classList.contains("card"),

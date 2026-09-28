@@ -217,7 +217,7 @@ export const primeRealtimeConfig = async (): Promise<void> => {
     };
 
     if (!body?.enabled || !body.key || !body.host) {
-      console.warn("[reverb] backend reports realtime disabled — polling only");
+      console.warn("[reverb] backend reports realtime disabled: polling only");
       return;
     }
 
@@ -235,7 +235,7 @@ export const primeRealtimeConfig = async (): Promise<void> => {
     // be established — see `refusedKeys`.
     if (refusedKeys.has(next.key)) {
       console.warn(
-        `[reverb] backend still advertises the refused app key "${next.key}" — staying on the built-in one`,
+        `[reverb] backend still advertises the refused app key "${next.key}", staying on the built-in one`,
       );
       return;
     }
@@ -298,10 +298,10 @@ const attachConnectionFailureWarnings = (echo: EchoLike, cfg: ReverbConfig): voi
   };
 
   conn.bind("unavailable", () =>
-    sayOnce("unavailable", "[reverb] unavailable — backing off, falling back to polling"),
+    sayOnce("unavailable", "[reverb] unavailable: backing off, falling back to polling"),
   );
   conn.bind("failed", () =>
-    sayOnce("failed", "[reverb] failed — WebSocket unsupported by runtime?"),
+    sayOnce("failed", "[reverb] failed: WebSocket unsupported by runtime?"),
   );
   conn.bind("error", (err: unknown) => {
     const code = errorCodeOf(err);
@@ -325,7 +325,7 @@ const attachConnectionFailureWarnings = (echo: EchoLike, cfg: ReverbConfig): voi
       sayOnce(
         "4001",
         `[reverb] REJECTED: this build's app key "${cfg.key}" does not exist on ${cfg.host}. ` +
-          "Realtime is OFF for the whole session — every screen falls back to polling. " +
+          "Realtime is OFF for the whole session: every screen falls back to polling. " +
           "VITE_REVERB_KEY must equal REVERB_APP_KEY on the Reverb service AND on the backend " +
           "that broadcasts to it; all three have to be the same string.",
       );
@@ -335,7 +335,7 @@ const attachConnectionFailureWarnings = (echo: EchoLike, cfg: ReverbConfig): voi
     if (isFatalProtocolError(code)) {
       sayOnce(
         `fatal-${code}`,
-        `[reverb] REJECTED with protocol code ${code} by ${cfg.host} — retrying will not help. ` +
+        `[reverb] REJECTED with protocol code ${code} by ${cfg.host}. Retrying will not help. ` +
           "Realtime is OFF; screens fall back to polling.",
       );
       return;

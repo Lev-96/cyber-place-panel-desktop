@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import type { ICompanyBilling } from "@/api/billing";
 import Notifications, { shouldShowBookingsFeed, shouldShowBillingFeed } from "./Notifications";
@@ -78,18 +78,21 @@ vi.mock("@/i18n/LanguageContext", async () => {
   const { t } = await import("@/i18n/translations");
   return { useLang: () => ({ t: (k: string) => t(k, "en"), lang: "en" }) };
 });
+const feed = vi.hoisted(() => ({ list: [] as unknown[], deleteAll: vi.fn() }));
 vi.mock("@/notifications/NotificationsContext", () => ({
   useNotifications: () => ({
-    list: [],
+    list: feed.list,
     unreadCount: 0,
     loading: false,
     error: null,
     markRead: vi.fn(),
     markAllRead: vi.fn(),
     deleteOne: vi.fn(),
-    deleteAll: vi.fn(),
+    deleteAll: feed.deleteAll,
   }),
 }));
+const asked = vi.hoisted(() => ({ fn: vi.fn(async (_m: string, _o?: unknown) => false) }));
+vi.mock("@/components/ui/ConfirmProvider", () => ({ useConfirm: () => asked.fn }));
 vi.mock("@/repositories/ExpenseRepository", () => ({
   expenseRepository: { reminders: () => Promise.resolve([]) },
 }));
@@ -160,5 +163,41 @@ describe("Notifications billing feed, per role", () => {
 
     await waitFor(() => expect(screen.getByText(/Billing/i)).toBeTruthy());
     expect(api.calls).toEqual([]);
+  });
+});
+
+/**
+ * "Clear all" asks through the app's own destructive dialog (2026-09-28), not
+ * `window.confirm`, which poisons the Electron renderer's focus.
+ */
+describe("Notifications clear all", () => {
+  beforeEach(() => {
+    auth.user = { id: 1, role: "manager" };
+    api.handler = () => Promise.resolve({ data: [] });
+    feed.list = [{ id: "n1", type: "App\\Notifications\\BookingCreated", data: {}, read_at: null, created_at: "2026-09-28T10:00:00+04:00" }];
+    feed.deleteAll.mockClear();
+    asked.fn.mockClear();
+  });
+  afterEach(() => { cleanup(); feed.list = []; });
+
+  const clearAll = () => fireEvent.click(screen.getByRole("button", { name: "Clear all" }));
+
+  test("asks with the destructive dialog and deletes nothing on No", async () => {
+    vi.spyOn(window, "confirm").mockImplementation(() => { throw new Error("native confirm used"); });
+    asked.fn.mockResolvedValueOnce(false);
+    render(<Notifications />);
+    clearAll();
+    await waitFor(() => expect(asked.fn).toHaveBeenCalledTimes(1));
+    expect(asked.fn.mock.calls[0][0]).toBe("Delete all notifications? This cannot be undone.");
+    expect(asked.fn.mock.calls[0][1]).toMatchObject({ destructive: true });
+    expect(feed.deleteAll).not.toHaveBeenCalled();
+    vi.restoreAllMocks();
+  });
+
+  test("deletes everything once confirmed", async () => {
+    asked.fn.mockResolvedValueOnce(true);
+    render(<Notifications />);
+    clearAll();
+    await waitFor(() => expect(feed.deleteAll).toHaveBeenCalledTimes(1));
   });
 });

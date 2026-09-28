@@ -8,6 +8,7 @@
  */
 
 import { useMemo } from "react";
+import { tActive } from "@/i18n/translations";
 
 // === Tiny QR encoder (bitmap matrix), MIT-style minimalist implementation ===
 // Adapted from public-domain Project Nayuki QR code generator (simplified).
@@ -172,7 +173,7 @@ interface Props {
 
 const QrCode = ({ value, size: px = 220 }: Props) => {
   const matrix = useMemo(() => buildMatrix(value || " "), [value]);
-  if (!matrix) return <div className="error">QR data too long</div>;
+  if (!matrix) return <div className="error">{tActive("qr.tooLong")}</div>;
   const n = matrix.length;
   const cell = px / n;
   return (

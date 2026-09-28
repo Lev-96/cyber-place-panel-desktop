@@ -4,6 +4,7 @@ import BranchForm from "@/components/branches/BranchForm";
 import BranchOpenDaysForm from "@/components/branches/BranchOpenDaysForm";
 import BranchUnlockPinCard from "@/components/branches/BranchUnlockPinCard";
 import Button from "@/components/ui/Button";
+import { useConfirm } from "@/components/ui/ConfirmProvider";
 import ScreenWithBg from "@/components/ui/ScreenWithBg";
 import Spinner from "@/components/ui/Spinner";
 import { useAsync } from "@/hooks/useAsync";
@@ -21,6 +22,7 @@ const BranchEdit = () => {
   const id = Number(branchId);
   const nav = useNavigate();
   const { t } = useLang();
+  const confirm = useConfirm();
   const { data, loading, error, reload } = useAsync(() => branchRepository.byId(id), [id]);
   const [edit, setEdit] = useState(false);
   const [hours, setHours] = useState(false);
@@ -31,7 +33,13 @@ const BranchEdit = () => {
   if (!data) return null;
 
   const remove = async () => {
-    if (!confirm(t("branchEdit.confirmDelete"))) return;
+    // The app's own dialog: a native confirm() poisons the Electron renderer's
+    // focus (see ConfirmProvider).
+    const ok = await confirm(t("branchEdit.confirmDelete"), {
+      destructive: true,
+      confirmLabel: t("action.delete"),
+    });
+    if (!ok) return;
     await branchRepository.remove(id);
     nav("/branches");
   };
