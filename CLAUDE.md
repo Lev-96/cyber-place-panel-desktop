@@ -220,6 +220,12 @@ pos · places · ps5 · sessions · tournaments · revenue · services · scanne
   Watch for duplicate translation keys. Outside a component (UI kit
   primitives, aria-labels in shared widgets) use `tActive(key)` from
   `@/i18n/translations`: never a hardcoded literal, never a second dictionary.
+- **"Active Places" is the name of the running-seats section** (2026-09-28):
+  `session.boardTitle`, `hub.tile.sessions`, `history.backToBoard`,
+  `notifications.openBoard` say Active Places / Активные места / Ակտիվ տեղեր.
+  Only the section was renamed: the entity is still a session everywhere
+  (`history.sumSessions`, `revenue.sourceSessions`, route `/sessions`, API,
+  events). The sidebar's Dashboard is `Կառավարման էջ` in Armenian.
 - **Armenian copy (audit 2026-09-28).** Terminology follows cyberplace.pro:
   session = `սեսիա` (never `նիստ`/`սեանս`), booking = `ամրագրում`, place =
   `տեղ`, branch = `մասնաճյուղ`, customer = `հաճախորդ` (not `անդամ`), product =
@@ -239,7 +245,12 @@ pos · places · ps5 · sessions · tournaments · revenue · services · scanne
   Check: `git grep -n "—" -- src`, then classify each hit as (a) user-facing
   (fix), (b) technical or log output (leave), (c) comment or doc (leave).
   A sweep on 2026-09-12 fixed 24 strings here (5 in the backend, 3 in the
-  kiosk agent); what remains in `src` is comments and log/dev output only.
+  kiosk agent); a second on 2026-09-28 fixed 8 more dictionary values and the
+  history bill's empty cell (now `-`, the project's empty-value mark). The
+  dictionary is guarded by "never renders an em dash" in
+  `src/i18n/translations.test.ts`; `git grep` cannot tell a comment from a
+  string, so re-check JSX literals with a TypeScript AST scan of string,
+  template and JSX-text nodes.
   ⚠️ The **en dash** `–` is deliberate in ranges and must stay: `0–100%`
   (`commission.hint`), `4–6` digits (`unlockPin.*`) and the `HH:MM–HH:MM`
   discount window on `BranchPricesPage`.
