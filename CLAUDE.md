@@ -217,7 +217,20 @@ pos · places · ps5 · sessions · tournaments · revenue · services · scanne
   with `ELECTRON_DEVTOOLS=1` env var.
 - **i18n:** language codes are `en` / `ru` / `am` (NOT `hy`). Use the
   `t()` helper from `LanguageContext` and `money()` for currency.
-  Watch for duplicate translation keys.
+  Watch for duplicate translation keys. Outside a component (UI kit
+  primitives, aria-labels in shared widgets) use `tActive(key)` from
+  `@/i18n/translations`: never a hardcoded literal, never a second dictionary.
+- **Armenian copy (audit 2026-09-28).** Terminology follows cyberplace.pro:
+  session = `սեսիա` (never `նիստ`/`սեանս`), booking = `ամրագրում`, place =
+  `տեղ`, branch = `մասնաճյուղ`, customer = `հաճախորդ` (not `անդամ`), product =
+  `ապրանք`, computer = `համակարգիչ` / PC (`ՀՀ` means the Republic of Armenia,
+  only in `ՀՎՀՀ`), joystick = `ջոյսթիք`, tariff = `սակագին`, the kiosk
+  program = Latin `Agent` (not `գործակալ`), PS5 menu names stay Latin. A
+  sentence ends with `։`, a label colon stays `:`. Session-card buttons must
+  fit a 198px card (`session.pause` = `Դադար`, `session.card.resume` =
+  `Վերսկսել` are short on purpose; the full text is the tooltip). Guarded by
+  the "Armenian copy" block in `src/i18n/translations.test.ts`
+  (placeholders, homoglyphs, the terms above, sentence stop).
 - **No em dash in user-facing text.** A rendered string must never contain
   `—`: use a hyphen, a colon, or two sentences instead; in Armenian use `՝`
   or `։`, as the other repos now do. It covers `src/i18n/translations.ts`
