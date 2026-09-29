@@ -2247,7 +2247,11 @@ Repaired in `e2e/` only; no production file was touched.
 
 1. **Two language gates.** `FirstRunLanguageGate` renders an undismissable
    picker over the login screen on a machine where nobody has chosen a
-   language, and `AccountLanguageGate` asks again once an account signs in. A
+   language, and `AccountLanguageGate` asks again once an account signs in.
+   (2026-09-30: `LanguageContext` imports `@/i18n/languagePreference` by
+   ALIAS, not `./languagePreference` — same file for the desktop, but the
+   owner web replaces that module by alias to keep the account's language on
+   the server, and a relative import would bypass it. Keep it an alias.) A
    fresh browser context is that machine, so every spec was clicking at a form
    behind an inert, blurred backdrop. `installBackendMocks` now seeds
    `cp.lang` / `cp.lang.chosen` / `u{id}:cp.lang` via `addInitScript` — and
