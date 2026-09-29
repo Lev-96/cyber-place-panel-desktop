@@ -55,6 +55,19 @@ describe("AccountSwitchPanel", () => {
     expect(screen.getByText("switchAccount.empty")).toBeTruthy();
   });
 
+  test("a list that failed to load is reported with a retry, not as an empty company", async () => {
+    repo.targets.mockRejectedValueOnce(new Error("Forbidden")).mockResolvedValueOnce([OWNER]);
+    await mount();
+
+    expect(screen.queryByText("switchAccount.empty")).toBeNull();
+    expect(screen.getByRole("alert").textContent).toContain("Forbidden");
+
+    await act(async () => { fireEvent.click(screen.getByText("action.retry")); });
+
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(repo.targets).toHaveBeenCalledTimes(2);
+  });
+
   test("back returns to the account menu", async () => {
     repo.targets.mockResolvedValue([OWNER]);
     const onBack = vi.fn();
