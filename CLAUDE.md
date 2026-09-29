@@ -1178,6 +1178,13 @@ a link, `Sidebar.tsx` does not mention `BranchForm`, `global.css` has no
 `sidebar-action`. Mutation-verified (link back to `/my-company`, `end` on the
 link, create button put back under Branches).
 
+### Sidebar footer slot (2026-09-29)
+
+`<Sidebar footerExtra={…} />` draws extra entries in the pinned footer, after
+Support and before the account card. The desktop Layout passes nothing, so its
+footer is unchanged (`Sidebar.footerExtra.test.tsx`); the owner web passes its
+"Telegram" card (styled with `.nav-support-card`).
+
 ## 9.5.7a "+ New branch" on the Branches page (2026-09-12)
 
 - `BranchesList` (`/branches`) draws "+ New branch" (`branchesList.newBranch`,
