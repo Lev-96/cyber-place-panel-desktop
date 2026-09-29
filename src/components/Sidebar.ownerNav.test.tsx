@@ -153,3 +153,21 @@ describe("admin — Owners", () => {
     expect(screen.queryByRole("link", { name: "nav.owners" })).toBeNull();
   });
 });
+
+describe("admin — Security", () => {
+  test("the admin gets the Security section, lit on any of its tabs", () => {
+    signIn("admin");
+    mountAt("/security?tab=audit");
+
+    const link = screen.getByRole("link", { name: "nav.security" });
+    expect(link.getAttribute("href")).toBe("/security");
+    expect(link.getAttribute("aria-current")).toBe("page");
+  });
+
+  test.each(["company_owner", "manager"] as const)("%s does not", (role) => {
+    signIn(role, { company_id: 5, branch_id: 9 });
+    mountAt("/");
+
+    expect(screen.queryByRole("link", { name: "nav.security" })).toBeNull();
+  });
+});

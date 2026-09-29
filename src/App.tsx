@@ -46,6 +46,7 @@ const MyCompany = lazy(() => import("@/routes/MyCompany"));
 const Owners = lazy(() => import("@/routes/Owners"));
 const OwnerDetails = lazy(() => import("@/routes/OwnerDetails"));
 const Revenue = lazy(() => import("@/routes/Revenue"));
+const Security = lazy(() => import("@/routes/Security"));
 const ConfirmByCode = lazy(() => import("@/routes/ConfirmByCode"));
 const GamesList = lazy(() => import("@/routes/GamesList"));
 const Managers = lazy(() => import("@/routes/Managers"));
@@ -303,6 +304,17 @@ const Authed = () => {
           element={
             <RoleGuard perm="menu.metrics">
               <Metrics />
+            </RoleGuard>
+          }
+        />
+        {/* Admin only — web / Telegram access, sessions, blocked IPs and
+            countries, audit log. The backend's `admin` middleware on every
+            route behind it holds the same line. */}
+        <Route
+          path="/security"
+          element={
+            <RoleGuard perm="menu.security">
+              <Security />
             </RoleGuard>
           }
         />

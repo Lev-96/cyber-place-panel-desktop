@@ -387,6 +387,9 @@ const Sidebar = () => {
       {can(role, "owner.view") && (
         <NavLink to="/owners">{t("nav.owners")}</NavLink>
       )}
+      {can(role, "menu.security") && (
+        <NavLink to="/security">{t("nav.security")}</NavLink>
+      )}
       <NavLink to="/notifications">
         {t("nav.notifications")}
         <UnreadBadge count={unreadCount} />
