@@ -1011,6 +1011,7 @@ button is not a permission: a manager who kept the URL could still POST.
 | Выручка и комиссия (`revenue.view`, §9.5.9) | ✅ | ✅ | ❌ |
 | Статус филиала Active / Inactive (`branch.status`) | ✅ | ✅ | ❌ |
 | Владельцы — список, изменить, удалить (`owner.view` / `owner.edit` / `owner.delete`) | ✅ | ❌ | ❌ |
+| Безопасность — веб/Telegram доступы, сессии, IP, страны, журнал (`menu.security`) | ✅ | ❌ | ❌ |
 
 Two things that look like oversights and are not:
 
@@ -1296,6 +1297,30 @@ list, missing `branches` key (counts only), no company, failed read, invalid id
 cancel, no buttons without permissions, null fields. Mutation-verified (branches ignored;
 missing key treated as `[]`; delete re-reads instead of leaving; edit without
 re-read).
+
+## 9.5.8a Security (admin, 2026-09-29)
+
+`/security` (RoleGuard `menu.security`, admin only; sidebar item after
+Owners), tabs by `?tab=access|ips|countries|audit` (unknown → access). Built on
+the backend's admin security API (`/admin/client-access`,
+`/admin/staff/{id}/client-access/{client}`, `/admin/staff/{id}/sessions`,
+`/admin/ip-address`, `/admin/security/countries`, `/admin/security/audit`;
+backend CLAUDE.md §8.9.11). Files: `src/api/security.ts`,
+`src/repositories/SecurityRepository.ts`, `src/types/security.ts`
+(`clientAccessCell()` picks the button from the SERVER's status, never derives
+it), `src/routes/Security.tsx`, `src/components/security/*`.
+
+- Access: owners and managers, search/role/company/branch/"app: status"
+  filters (branch after company; existing `GET /company` and
+  `GET /branches?company_id=`), Grant / Revoke (confirm), a sessions modal with
+  end-one / end-all (confirm; warns it signs the desktop out too). A client the
+  role can never have (`allowed:false`, Telegram for managers) shows `-`.
+- IPs / countries: the server's 422 sentence is shown as is (self-lockout,
+  duplicate, invalid). Country names via `Intl.DisplayNames` (`am` → `hy`,
+  never passed raw: `am` is Amharic). Banner when `geoip.available` is false.
+- Audit: paged, action filter, labels per action code; an unknown code shows raw.
+- Layout: tables scroll in their own frame; ≤640px rows become cards from
+  `data-label`; the owner-web app renders the same screen in a browser.
 
 ## 9.5.9 Revenue screen — tournaments, owner income, per branch (2026-09-11)
 
