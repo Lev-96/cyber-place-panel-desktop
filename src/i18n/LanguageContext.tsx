@@ -4,7 +4,7 @@ import { keyValueStore } from "@/infrastructure/KeyValueStore";
 import { ReactNode, createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { Currency, moneyDisplay, type MoneyFormatOptions } from "./currency";
 import { Lang, setActiveLang, t as translate } from "./translations";
-import { hasChosenLang, readStoredLang, rememberLang } from "./languagePreference";
+import { hasChosenLang, readStoredLang, rememberLang } from "@/i18n/languagePreference";
 
 /** Display currency when the user hasn't picked one in Settings. The
  *  Cyber Place network base currency is AMD (dram), so the panel shows
