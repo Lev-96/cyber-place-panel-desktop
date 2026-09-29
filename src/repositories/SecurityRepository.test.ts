@@ -36,51 +36,22 @@ afterEach(() => unsubscribe());
 const last = () => api.calls.at(-1);
 
 describe("reads", () => {
-  test("access list passes the filters as the query", async () => {
-    api.reply = async () => ({ data: [], meta: { current_page: 2, last_page: 2, total: 26, per_page: 25 } });
-    const page = await securityRepository.listAccess({ search: "ann", role: "manager", company_id: 3, branch_id: 7, client: "telegram", status: "pending", page: 2 });
-    expect(last()).toEqual({
-      path: "/admin/client-access",
-      method: "GET",
-      params: { search: "ann", role: "manager", company_id: 3, branch_id: 7, client: "telegram", status: "pending", page: 2 },
-      body: undefined,
-    });
-    expect(page.meta.last_page).toBe(2);
-  });
-
-  test("sessions unwrap `data`", async () => {
-    api.reply = async () => ({ data: [{ id: 1 }] });
-    expect(await securityRepository.sessions(12)).toEqual([{ id: 1 }]);
-    expect(last()?.path).toBe("/admin/staff/12/sessions");
-  });
-
-  test("lists and the audit hit their own routes", async () => {
+  test("the two lists hit their own routes", async () => {
     await securityRepository.blockedIps();
     expect(last()?.path).toBe("/admin/ip-address");
     await securityRepository.blockedCountries();
     expect(last()?.path).toBe("/admin/security/countries");
-    await securityRepository.audit({ action: "ip.blocked", page: 3 });
-    expect(last()).toMatchObject({ path: "/admin/security/audit", method: "GET", params: { action: "ip.blocked", page: 3 } });
   });
 });
 
 describe("writes", () => {
   test.each([
-    ["grant", () => securityRepository.grantAccess(12, "owner_web"), "PUT", "/admin/staff/12/client-access/owner_web"],
-    ["revoke", () => securityRepository.revokeAccess(12, "telegram"), "DELETE", "/admin/staff/12/client-access/telegram"],
-    ["end one session", () => securityRepository.revokeSession(12, 991), "DELETE", "/admin/staff/12/sessions/991"],
     ["unblock IP", () => securityRepository.unblockIp(4), "DELETE", "/admin/ip-address/4"],
     ["unblock country", () => securityRepository.unblockCountry(5), "DELETE", "/admin/security/countries/5"],
   ] as const)("%s", async (_name, run, method, path) => {
     await run();
     expect(api.calls).toEqual([{ path, method, params: undefined, body: undefined }]);
     expect(toasts.map((e) => e.kind)).toEqual(["success"]);
-  });
-
-  test("end all sessions returns the server's count", async () => {
-    api.reply = async () => ({ message: "ok", revoked: 4 });
-    expect(await securityRepository.revokeAllSessions(12)).toBe(4);
-    expect(last()).toMatchObject({ path: "/admin/staff/12/sessions", method: "DELETE" });
   });
 
   test("block IP / country post the body as given", async () => {
@@ -91,10 +62,10 @@ describe("writes", () => {
   });
 
   test("a refused write toasts the failure and re-throws for the form", async () => {
-    const refusal = Object.assign(new Error("Forbidden"), { status: 403, body: { code: "client_access_role_not_allowed" } });
+    const refusal = Object.assign(new Error("Unprocessable"), { status: 422, body: { errors: { ip_address: ["This rule would block your own address"] } } });
     api.reply = () => Promise.reject(refusal);
-    await expect(securityRepository.grantAccess(13, "telegram")).rejects.toBe(refusal);
-    expect(toasts.map((e) => [e.kind, e.action])).toEqual([["error", "granted"]]);
+    await expect(securityRepository.blockIp({ ip_address: "198.51.100.0/24" })).rejects.toBe(refusal);
+    expect(toasts.map((e) => [e.kind, e.action])).toEqual([["error", "created"]]);
   });
 });
 

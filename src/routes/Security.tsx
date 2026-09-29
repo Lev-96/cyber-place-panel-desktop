@@ -1,5 +1,3 @@
-import AccessTab from "@/components/security/AccessTab";
-import AuditTab from "@/components/security/AuditTab";
 import BlockedCountriesTab from "@/components/security/BlockedCountriesTab";
 import BlockedIpsTab from "@/components/security/BlockedIpsTab";
 import ScreenWithBg from "@/components/ui/ScreenWithBg";
@@ -7,23 +5,23 @@ import SectionTabs, { SectionTab } from "@/components/ui/SectionTabs";
 import { useLang } from "@/i18n/LanguageContext";
 import { useSearchParams } from "react-router-dom";
 
-export type SecurityTab = "access" | "ips" | "countries" | "audit";
+export type SecurityTab = "ips" | "countries";
 
-const TABS: readonly SecurityTab[] = ["access", "ips", "countries", "audit"];
+const TABS: readonly SecurityTab[] = ["ips", "countries"];
 
 const TAB_LABEL_KEY = {
-  access: "security.tab.access",
   ips: "security.tab.ips",
   countries: "security.tab.countries",
-  audit: "security.tab.audit",
 } as const satisfies Record<SecurityTab, string>;
 
 /** `?tab=` as the URL says, or the first tab for anything it does not name. */
 export const securityTabOf = (value: string | null): SecurityTab =>
-  (TABS as readonly string[]).includes(value ?? "") ? (value as SecurityTab) : "access";
+  (TABS as readonly string[]).includes(value ?? "") ? (value as SecurityTab) : "ips";
 
 /**
- * The admin's Security section (`/security?tab=…`). The tab lives in the URL,
+ * The admin's Security section (`/security?tab=…`): blocked IP addresses and
+ * blocked countries (2026-09-29; web and Telegram access is by role, nothing
+ * to grant here). The tab lives in the URL,
  * so a link, a reload or Back lands on the same one. Each tab owns its own
  * reads and mounts only while shown: nothing here is fetched for a tab nobody
  * opened.
@@ -45,10 +43,8 @@ const Security = () => {
           label={t("security.title")}
         />
         <div role="tabpanel" className="sec-panel">
-          {tab === "access" && <AccessTab />}
           {tab === "ips" && <BlockedIpsTab />}
           {tab === "countries" && <BlockedCountriesTab />}
-          {tab === "audit" && <AuditTab />}
         </div>
       </div>
     </ScreenWithBg>

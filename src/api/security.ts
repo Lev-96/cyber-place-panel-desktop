@@ -1,12 +1,9 @@
 import type { ApiError } from "./client";
 import { request } from "./client";
-import type {
-  ClientAccessStatus, SecurityAuditAction, SessionClient, StaffClient, StaffRole,
-} from "@/types/security";
 
 /**
- * The admin's Security section: web / Telegram access of owners and managers,
- * their sessions, blocked IPs, blocked countries and the audit log.
+ * The admin's Security section: blocked IP addresses and blocked countries
+ * (web and Telegram access follow the role since 2026-09-29; nothing to grant).
  *
  * Every route sits in the backend's `routes/admin.php` behind the `admin`
  * middleware (no `/api` prefix) — that IS the authorisation boundary; the
@@ -16,76 +13,6 @@ import type {
  * The types mirror the contract of 2026-09-29 field for field. Change them
  * together with the backend.
  */
-
-/** Pagination meta as `/admin/client-access` and `/admin/security/audit` send it. */
-export interface ISecurityPageMetaApi {
-  current_page: number;
-  last_page: number;
-  total: number;
-  per_page: number;
-}
-
-export interface ISecurityPageApi<T> {
-  data: T[];
-  meta: ISecurityPageMetaApi;
-}
-
-/** One client of one staff user: the server's status, never derived here. */
-export interface IClientAccessApi {
-  status: ClientAccessStatus;
-  /** False = this role can never get this client (Telegram for a manager). */
-  allowed: boolean;
-  granted_at: string | null;
-  revoked_at: string | null;
-}
-
-export interface IStaffAccessCompanyApi {
-  id: number;
-  name: string;
-}
-
-export interface IStaffAccessBranchApi {
-  id: number;
-  address: string;
-  company_id: number;
-}
-
-/** A row of `GET /admin/client-access`. */
-export interface IStaffAccessApi {
-  id: number;
-  name: string;
-  email: string;
-  role: StaffRole;
-  companies: IStaffAccessCompanyApi[];
-  branches: IStaffAccessBranchApi[];
-  clients: Record<StaffClient, IClientAccessApi>;
-  telegram_username: string | null;
-  /** How many live sessions (tokens) the user holds, every client counted. */
-  sessions: number;
-}
-
-export interface ListClientAccessParams {
-  search?: string;
-  role?: StaffRole;
-  company_id?: number;
-  branch_id?: number;
-  /** Used together with `status`. */
-  client?: StaffClient;
-  status?: ClientAccessStatus;
-  page?: number;
-}
-
-/** A row of `GET /admin/staff/{user}/sessions`. */
-export interface IStaffSessionApi {
-  id: number;
-  client: SessionClient;
-  name: string;
-  created_at: string;
-  last_used_at: string | null;
-  expires_at: string | null;
-  last_ip: string | null;
-  user_agent: string | null;
-}
 
 /** Who created a rule, when the server still knows. */
 export interface ISecurityActorApi {
@@ -143,52 +70,9 @@ export interface CreateBlockedCountryBody {
   note?: string;
 }
 
-export interface ISecurityAuditSubjectApi {
-  type: "user" | "ip" | "country" | "session";
-  id: number;
-  label: string;
-}
-
-/** A row of `GET /admin/security/audit`. */
-export interface ISecurityAuditEntryApi {
-  id: number;
-  /** A {@link SecurityAuditAction}, or one a newer backend added. */
-  action: SecurityAuditAction | string;
-  actor: ISecurityActorApi | null;
-  subject: ISecurityAuditSubjectApi | null;
-  /** Free-form context; the contract does not pin its keys. */
-  meta: Record<string, unknown> | null;
-  ip: string | null;
-  created_at: string;
-}
-
-export interface ListAuditParams {
-  action?: SecurityAuditAction;
-  actor_id?: number;
-  page?: number;
-}
-
 export interface IMessageApi {
   message: string;
 }
-
-export const apiListClientAccess = (params: ListClientAccessParams = {}) =>
-  request<ISecurityPageApi<IStaffAccessApi>>("/admin/client-access", { params });
-
-export const apiGrantClientAccess = (userId: number, client: StaffClient) =>
-  request<IMessageApi>(`/admin/staff/${userId}/client-access/${client}`, { method: "PUT" });
-
-export const apiRevokeClientAccess = (userId: number, client: StaffClient) =>
-  request<IMessageApi>(`/admin/staff/${userId}/client-access/${client}`, { method: "DELETE" });
-
-export const apiListStaffSessions = (userId: number) =>
-  request<{ data: IStaffSessionApi[] }>(`/admin/staff/${userId}/sessions`);
-
-export const apiRevokeStaffSession = (userId: number, tokenId: number) =>
-  request<IMessageApi>(`/admin/staff/${userId}/sessions/${tokenId}`, { method: "DELETE" });
-
-export const apiRevokeAllStaffSessions = (userId: number) =>
-  request<IMessageApi & { revoked: number }>(`/admin/staff/${userId}/sessions`, { method: "DELETE" });
 
 export const apiListBlockedIps = () => request<IBlockedIpListApi>("/admin/ip-address");
 
@@ -211,9 +95,6 @@ export const apiCreateBlockedCountry = (body: CreateBlockedCountryBody) =>
 
 export const apiDeleteBlockedCountry = (id: number) =>
   request<IMessageApi>(`/admin/security/countries/${id}`, { method: "DELETE" });
-
-export const apiListSecurityAudit = (params: ListAuditParams = {}) =>
-  request<ISecurityPageApi<ISecurityAuditEntryApi>>("/admin/security/audit", { params });
 
 /**
  * The sentence a refused write should show under its field: the first

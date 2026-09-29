@@ -4078,9 +4078,8 @@ button.login-flip-back:hover {
   gap: 16px;
 }
 
-/* Filters and the add forms: whole fields wrap to the next line, none shrinks
-   below a width its longest option (ru/am) can be read at. */
-.sec-filters,
+/* The add forms: whole fields wrap to the next line, none shrinks below a
+   width its longest option (ru/am) can be read at. */
 .sec-form__fields {
   display: flex;
   flex-wrap: wrap;
@@ -4164,70 +4163,12 @@ button.login-flip-back:hover {
   overflow-wrap: anywhere;
 }
 
-.sec-user {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-.sec-user__name {
-  font-weight: 600;
-}
-.sec-user .meta {
-  font-size: 12px;
-  color: var(--color-muted);
-}
-
-/* One client of one person: the state and the one button that changes it,
-   read together as a pair. */
-.sec-access-cell {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.sec-access-cell .pill {
-  white-space: nowrap;
-}
-/* Nobody has granted anything yet: present, but quieter than any state an
-   admin has acted on. */
-.pill.is-muted {
-  background: transparent;
-  color: var(--color-muted);
-  border: 1px solid var(--color-border);
-}
 /* Compact inline action, the size of the Owners row buttons. */
 .btn.sec-btn {
   padding: 6px 12px;
   font-size: 12px;
   min-height: 32px;
   white-space: nowrap;
-}
-
-.sec-modal {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  width: min(960px, 92vw);
-  max-height: 85vh;
-  overflow-y: auto;
-}
-.sec-modal__head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-.sec-modal__title {
-  margin: 0;
-  font-size: 16px;
-  font-weight: 700;
-  line-height: 1.4;
-  overflow-wrap: anywhere;
-}
-.sec-modal__foot {
-  display: flex;
-  justify-content: flex-end;
 }
 
 .sec-sr-only {
@@ -4299,13 +4240,6 @@ button.login-flip-back:hover {
   .sec-table .sec-wrap {
     min-width: 0;
     max-width: none;
-  }
-  .sec-user {
-    align-items: flex-end;
-  }
-  .sec-access-cell {
-    flex-wrap: wrap;
-    justify-content: flex-end;
   }
 }
 

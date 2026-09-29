@@ -21,10 +21,8 @@ vi.mock("@/i18n/LanguageContext", async () => {
   return { useLang: () => ({ t: (k: string) => t(k, "en"), lang: "en" }) };
 });
 // The tabs are covered by their own tests; here only WHICH one is mounted matters.
-vi.mock("@/components/security/AccessTab", () => ({ default: () => <div>access-tab</div> }));
 vi.mock("@/components/security/BlockedIpsTab", () => ({ default: () => <div>ips-tab</div> }));
 vi.mock("@/components/security/BlockedCountriesTab", () => ({ default: () => <div>countries-tab</div> }));
-vi.mock("@/components/security/AuditTab", () => ({ default: () => <div>audit-tab</div> }));
 
 import RoleGuard from "@/auth/RoleGuard";
 import Security, { securityTabOf } from "./Security";
@@ -67,16 +65,17 @@ describe("permission", () => {
 
 describe("tabs in the URL", () => {
   test.each([
-    ["/security", "access-tab"],
-    ["/security?tab=access", "access-tab"],
+    ["/security", "ips-tab"],
     ["/security?tab=ips", "ips-tab"],
     ["/security?tab=countries", "countries-tab"],
-    ["/security?tab=audit", "audit-tab"],
-    ["/security?tab=nonsense", "access-tab"],
+    // The tabs removed on 2026-09-29: an old link lands on the first tab.
+    ["/security?tab=access", "ips-tab"],
+    ["/security?tab=audit", "ips-tab"],
+    ["/security?tab=nonsense", "ips-tab"],
   ])("%s shows %s", (entry, shown) => {
     mountAt(entry, "admin");
     expect(screen.getByText(shown)).toBeTruthy();
-    expect(screen.getAllByRole("tab")).toHaveLength(4);
+    expect(screen.getAllByRole("tab")).toHaveLength(2);
   });
 
   test("the selected tab is the URL's", () => {
@@ -84,9 +83,10 @@ describe("tabs in the URL", () => {
     expect(screen.getByRole("tab", { name: "Blocked countries" }).getAttribute("aria-selected")).toBe("true");
   });
 
-  test("securityTabOf falls back to access for anything unknown", () => {
-    expect(securityTabOf(null)).toBe("access");
-    expect(securityTabOf("audit")).toBe("audit");
-    expect(securityTabOf("toString")).toBe("access");
+  test("securityTabOf falls back to the IP tab for anything unknown", () => {
+    expect(securityTabOf(null)).toBe("ips");
+    expect(securityTabOf("countries")).toBe("countries");
+    expect(securityTabOf("audit")).toBe("ips");
+    expect(securityTabOf("toString")).toBe("ips");
   });
 });
