@@ -1010,7 +1010,7 @@ button is not a permission: a manager who kept the URL could still POST.
 | Цены филиала — матрица, платформы, субплатформы, джойстики, округление | ✅ | ✅ | ❌ |
 | Выручка и комиссия (`revenue.view`, §9.5.9) | ✅ | ✅ | ❌ |
 | Статус филиала Active / Inactive (`branch.status`) | ✅ | ✅ | ❌ |
-| Владельцы — список, изменить, удалить (`owner.view` / `owner.edit` / `owner.delete`) | ✅ | ❌ | ❌ |
+| Владельцы — список, добавить, изменить, удалить (`owner.view` / `owner.create` / `owner.edit` / `owner.delete`) | ✅ | ❌ | ❌ |
 | Безопасность — блокировка IP и стран (`menu.security`) | ✅ | ❌ | ❌ |
 
 Two things that look like oversights and are not:
@@ -1214,8 +1214,18 @@ Mutation-verified (no company check; save without re-read).
 ## 9.5.8 Owners (admin, 2026-09-11)
 
 `/owners` (RoleGuard `owner.view`; sidebar item after Managers), backed by
-`GET|PUT|DELETE /admin/owners[/{id}]` (`Admin\OwnerController`, `admin`
+`GET|POST|PUT|DELETE /admin/owners[/{id}]` (`Admin\OwnerController`, `admin`
 middleware; `{owner}` resolves only a `company_owner`, anything else is 404).
+
+- **No password is ever typed for somebody else (2026-09-30).** "Add owner"
+  (`owner.create`, `OwnerCreateForm`: a company select + an email →
+  `POST /admin/owners`, a company may have several owners), the company create
+  (`CompanyForm` step 1 = owner name + email; ONE `POST /company` carries
+  `owner_name` + `owner_email` with the company — no `POST /users` any more)
+  and the manager create (`ManagerForm`: name + email) send no password; the
+  person gets an email link and sets their own (backend §8.9.12). Every such
+  form shows `staff.inviteHint`. Pinned by `Owners.test.tsx` ("adding"),
+  `CompanyForm.test.tsx`, `ManagerForm.test.tsx`.
 
 - Transport `src/api/owners.ts` — types mirror `OwnerResource`,
   `DeletionPreviewResource`, `OwnerDeletionResource` and the 409
