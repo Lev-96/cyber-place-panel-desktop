@@ -1011,7 +1011,7 @@ button is not a permission: a manager who kept the URL could still POST.
 | Выручка и комиссия (`revenue.view`, §9.5.9) | ✅ | ✅ | ❌ |
 | Статус филиала Active / Inactive (`branch.status`) | ✅ | ✅ | ❌ |
 | Владельцы — список, добавить, изменить, удалить (`owner.view` / `owner.create` / `owner.edit` / `owner.delete`) | ✅ | ❌ | ❌ |
-| Безопасность — блокировка IP и стран (`menu.security`) | ✅ | ❌ | ❌ |
+| Безопасность — блокировка IP и стран, активность IP (`menu.security`) | ✅ | ❌ | ❌ |
 
 Two things that look like oversights and are not:
 
@@ -1318,9 +1318,10 @@ re-read).
 ## 9.5.8a Security (admin, 2026-09-29)
 
 `/security` (RoleGuard `menu.security`, admin only; sidebar item after
-Owners), two tabs by `?tab=ips|countries` (anything else → ips): blocked IP
-addresses and blocked countries, on the backend's `/admin/ip-address` and
-`/admin/security/countries` (backend CLAUDE.md §8.9.11). Files:
+Owners), three tabs by `?tab=ips|countries|activity` (anything else → ips):
+blocked IP addresses, blocked countries and the IP activity, on the backend's
+`/admin/ip-address`, `/admin/security/countries` (backend CLAUDE.md §8.9.11)
+and `/admin/ip-activity` (§8.9.13). Files:
 `src/api/security.ts`, `src/repositories/SecurityRepository.ts`,
 `src/routes/Security.tsx`, `src/components/security/*`.
 
@@ -1332,8 +1333,25 @@ backend routes.
 - IPs / countries: the server's 422 sentence is shown as is (self-lockout,
   duplicate, invalid). Country names via `Intl.DisplayNames` (`am` → `hy`,
   never passed raw: `am` is Amharic). Banner when `geoip.available` is false.
+- IP activity (2026-09-30, `IpActivityTab`, `src/api/ipActivity.ts`):
+  - server search / filters / sort / pagination; the page belongs to its query, so any change starts on page 1;
+  - clicking a user or a city narrows the list (a chip removes it);
+  - rows read as a user (name + email), a mobile player, "Anonymous", or "Telegram servers" (bot webhooks);
+  - the header sentence says the address is the SERVER's view (a VPN's address behind a VPN) and the location approximate — never "exact";
+  - source pills `.pill.ipa-source.is-*`;
+  - `IpActivityTab.test.tsx` (8).
 - Layout: tables scroll in their own frame; ≤640px rows become cards from
   `data-label`; the owner-web app renders the same screen in a browser.
+
+## 9.5.8b Address block and parity with the web (2026-10-01)
+
+- **IP / country block:**
+  - `src/auth/networkBlock.ts`: the API client (`request`, `requestBlob` and the background revalidate) raises `ip_blocked` / `country_blocked` from any 403.
+  - `NetworkBlockedScreen` then replaces the WHOLE `App` (before the spinner), clears `apiCache`, disconnects Echo and keeps the sign-in (AuthContext does not drop the token for a block). "Check again" reloads.
+  - The web and Telegram get the same screen (Telegram also from `TelegramGate`).
+  - Tests: `networkBlock.test.ts`, `NetworkBlockedScreen.test.tsx`, `AuthContext.networkBlock.test.tsx`.
+- **Add owner:** first name, last name and email are all required (`CreateOwnerBody`); the server stores "First Last".
+- **Web and Telegram owners can now do what the desktop does:** profile name/email/password, managers, kiosk PIN, agent token. Only a LAN-only action (Wake-on-LAN, the console watcher) or a destructive global one stays desktop-only (backend `client_access.denied_routes`). The web shows the same buttons, so nothing is hidden here.
 
 ## 9.5.9 Revenue screen — tournaments, owner income, per branch (2026-09-11)
 
