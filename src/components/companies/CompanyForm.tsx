@@ -1,9 +1,7 @@
-import { apiRegisterUser } from "@/api/users";
 import { useAuth } from "@/auth/AuthContext";
 import Button from "@/components/ui/Button";
 import ImageUpload from "@/components/ui/ImageUpload";
 import Input from "@/components/ui/Input";
-import PasswordInput from "@/components/ui/PasswordInput";
 import Modal from "@/components/ui/Modal";
 import NumberStepper from "@/components/ui/NumberStepper";
 import { COUNTRIES, countryByCode, flagOf, resolveCountryCode } from "@/data/countries";
@@ -38,7 +36,9 @@ interface Props {
 
 /**
  * Company form mirrors RN cyberplace-panel:
- *   - 2-step create (admin only): step 1 = owner user, step 2 = company multipart with logo
+ *   - 2-step create (admin only): step 1 = owner name + email, step 2 = company
+ *     multipart with logo. ONE request creates both; the owner gets an email
+ *     link to set their own password (nobody types one for them).
  *   - edit: in-place fields, logo optional, status visible only to admin
  */
 const CompanyForm = ({ initial, onClose, onSaved }: Props) => {
@@ -48,12 +48,9 @@ const CompanyForm = ({ initial, onClose, onSaved }: Props) => {
   const isAdmin = user?.role === "admin";
   const [step, setStep] = useState<1 | 2>(isEdit ? 2 : 1);
 
-  // Step 1 — owner user
-  const [ownerName, setOwnerName] = useState(initial?.user?.name ?? "");
-  const [ownerEmail, setOwnerEmail] = useState(initial?.user?.email ?? "");
-  const [ownerPassword, setOwnerPassword] = useState("");
-  const [ownerPassword2, setOwnerPassword2] = useState("");
-  const [userId, setUserId] = useState<number | null>(initial?.user_id ?? null);
+  // Step 1 — owner
+  const [ownerName, setOwnerName] = useState("");
+  const [ownerEmail, setOwnerEmail] = useState("");
 
   // Step 2 — company
   const [name, setName] = useState(initial?.name ?? "");
@@ -110,13 +107,9 @@ const CompanyForm = ({ initial, onClose, onSaved }: Props) => {
     setErr(null);
   };
 
-  // Step 1 no longer hits the API — it just validates locally and advances.
-  // Owner registration moved to the final step (submitStep2) so the backend
-  // welcome email fires only once the whole company is actually created,
-  // not the moment "Next" is pressed.
+  // Step 1 only collects the owner; the company create sends both at once.
   const submitStep1 = (e: FormEvent) => {
     e.preventDefault();
-    if (ownerPassword !== ownerPassword2) return setErr(t("settings.passwordsMismatch"));
     setErr(null);
     setStep(2);
   };
@@ -141,20 +134,6 @@ const CompanyForm = ({ initial, onClose, onSaved }: Props) => {
     const fullPhone = parsedPhone.formatInternational();
     setBusy(true); setErr(null);
     try {
-      // Register the owner here (not in step 1), with defer_welcome so the
-      // welcome email is held back until the company is actually created.
-      // Guard with userId so a retry after a failed company-create doesn't
-      // register — or email — twice.
-      let uid = userId;
-      if (!isEdit && uid == null) {
-        const r = await apiRegisterUser({
-          name: ownerName, email: ownerEmail,
-          password: ownerPassword, password_confirmation: ownerPassword2,
-          defer_welcome: true,
-        });
-        uid = r.register.id;
-        setUserId(uid);
-      }
       const adminFields = isAdmin
         ? { status, commission_percent: Number.isFinite(commission) ? commission : 0 }
         : {};
@@ -165,11 +144,11 @@ const CompanyForm = ({ initial, onClose, onSaved }: Props) => {
           ...adminFields,
         })
         : await companyRepository.create({
-          user_id: uid!, name, email, phone: fullPhone, company_country: countryName, company_city: city, tin,
+          // The owner is created with the company in the same transaction,
+          // so a failed create leaves no half-made account; a retry is safe.
+          owner_name: ownerName.trim(), owner_email: ownerEmail.trim(),
+          name, email, phone: fullPhone, company_country: countryName, company_city: city, tin,
           website, description, company_logo_path: logo!,
-          // Transient — backend sends the welcome email with it AFTER the
-          // company is created, then discards it (never stored).
-          owner_password: ownerPassword,
           ...adminFields,
         });
       onSaved(c.raw);
@@ -182,14 +161,13 @@ const CompanyForm = ({ initial, onClose, onSaved }: Props) => {
       <Modal open onClose={onClose}>
         <form className="card" style={cardStyle} onSubmit={submitStep1}>
           <div className="row-between"><h2 style={{ margin: 0 }}>{t("company.titleNew")} · {t("company.step1")}</h2><span className="muted">{t("company.owner")}</span></div>
-          <Input label={t("company.ownerName")} value={ownerName} onChange={(e) => setOwnerName(e.target.value)} required autoFocus />
-          <Input label={t("company.ownerEmail")} type="email" value={ownerEmail} onChange={(e) => setOwnerEmail(e.target.value)} required />
-          <PasswordInput label={t("auth.password")} value={ownerPassword} onChange={(e) => setOwnerPassword(e.target.value)} required minLength={8} />
-          <PasswordInput label={t("label.confirmPassword")} value={ownerPassword2} onChange={(e) => setOwnerPassword2(e.target.value)} required minLength={8} />
+          <Input label={t("company.ownerName")} value={ownerName} onChange={(e) => setOwnerName(e.target.value)} required maxLength={255} autoFocus />
+          <Input label={t("company.ownerEmail")} type="email" value={ownerEmail} onChange={(e) => setOwnerEmail(e.target.value)} required maxLength={255} />
+          <div className="muted" style={{ fontSize: 13 }}>{t("staff.inviteHint")}</div>
           {err && <div className="error" style={{ whiteSpace: "pre-line" }}>{err}</div>}
           <div className="row-between">
             <Button type="button" variant="secondary" onClick={onClose} disabled={busy}>{t("action.cancel")}</Button>
-            <Button disabled={busy}>{busy ? t("company.creatingOwner") : t("company.next")}</Button>
+            <Button disabled={busy}>{t("company.next")}</Button>
           </div>
         </form>
       </Modal>

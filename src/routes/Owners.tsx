@@ -2,6 +2,7 @@ import type { IOwnerApi } from "@/api/owners";
 import { useAuth } from "@/auth/AuthContext";
 import { can } from "@/auth/permissions";
 import OwnerCompanyLine from "@/components/owners/OwnerCompanyLine";
+import OwnerCreateForm from "@/components/owners/OwnerCreateForm";
 import OwnerDeleteDialog from "@/components/owners/OwnerDeleteDialog";
 import OwnerForm from "@/components/owners/OwnerForm";
 import Button from "@/components/ui/Button";
@@ -31,6 +32,7 @@ const SEARCH_DEBOUNCE_MS = 400;
 const Owners = () => {
   const { t } = useLang();
   const { user } = useAuth();
+  const canCreate = can(user?.role, "owner.create");
   const canEdit = can(user?.role, "owner.edit");
   const canDelete = can(user?.role, "owner.delete");
 
@@ -52,19 +54,24 @@ const Owners = () => {
     if (!loading && page > lastPage) setPaging({ query, page: lastPage });
   }, [loading, page, lastPage, query]);
 
+  const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState<IOwnerApi | null>(null);
   const [deleting, setDeleting] = useState<IOwnerApi | null>(null);
 
   return (
     <ScreenWithBg bg="./bg/owner-home.jpg" title={t("owners.title")}>
-      <input
-        className="input"
-        placeholder={t("owners.search")}
-        aria-label={t("owners.search")}
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        maxLength={255}
-      />
+      <div className="row" style={{ gap: 8 }}>
+        <input
+          className="input"
+          style={{ flex: 1, minWidth: 0 }}
+          placeholder={t("owners.search")}
+          aria-label={t("owners.search")}
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          maxLength={255}
+        />
+        {canCreate && <Button onClick={() => setCreating(true)} style={{ flexShrink: 0 }}>{t("owners.add")}</Button>}
+      </div>
       {error && <div className="error">{error.message}</div>}
       {loading && !data ? (
         <ListSkeleton />
@@ -85,6 +92,12 @@ const Owners = () => {
       ) : null}
       {!error && <Pagination page={page} lastPage={lastPage} onChange={setPage} disabled={loading} />}
 
+      {creating && (
+        <OwnerCreateForm
+          onClose={() => setCreating(false)}
+          onSaved={() => { setCreating(false); void reload(); }}
+        />
+      )}
       {editing && (
         <OwnerForm
           owner={editing}

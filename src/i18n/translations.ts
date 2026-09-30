@@ -2274,6 +2274,16 @@ export const TRANSLATIONS: Dict = {
   "owners.branches": { en: "Branches: {0}", ru: "Филиалов: {0}", am: "Մասնաճյուղեր՝ {0}" },
   "owners.managers": { en: "Managers: {0}", ru: "Менеджеров: {0}", am: "Մենեջերներ՝ {0}" },
   "owner.titleEdit": { en: "Edit owner", ru: "Редактировать владельца", am: "Խմբագրել սեփականատիրոջը" },
+  "owner.titleNew": { en: "Add owner", ru: "Добавить владельца", am: "Ավելացնել սեփականատեր" },
+  "owners.add": { en: "Add owner", ru: "Добавить владельца", am: "Ավելացնել սեփականատեր" },
+  "owner.pickCompany": { en: "Choose a company", ru: "Выберите компанию", am: "Ընտրեք ընկերությունը" },
+  "owner.errors.companyRequired": { en: "Choose the company", ru: "Выберите компанию", am: "Ընտրեք ընկերությունը" },
+  // One hint for every "new account" form: nobody types a password for somebody else.
+  "staff.inviteHint": {
+    en: "We will email a link to this address; the person sets their own password.",
+    ru: "На этот адрес придёт письмо со ссылкой, и человек сам задаст пароль.",
+    am: "Այս հասցեին կուղարկվի հղում, և անձն ինքը կսահմանի իր գաղտնաբառը։",
+  },
   "owners.delete.question": {
     en: "Delete owner {0} and everything they own?",
     ru: "Удалить владельца {0} и всё, что ему принадлежит?",
@@ -2313,6 +2323,7 @@ export const TRANSLATIONS: Dict = {
     ru: "Предстоящих бронирований: {0}. Сначала отмените их (игроки получат уведомление).",
     am: "Առաջիկա ամրագրումներ՝ {0}։ Նախ չեղարկեք դրանք (խաղացողները կծանուցվեն)։",
   },
+  "toast.owner.created": { en: "Owner added, invitation sent", ru: "Владелец добавлен, приглашение отправлено", am: "Սեփականատերն ավելացվեց՝ հրավերն ուղարկվեց" },
   "toast.owner.updated": { en: "Owner updated", ru: "Владелец обновлён", am: "Սեփականատերը թարմացվեց" },
   "toast.owner.deleted": { en: "Owner deleted", ru: "Владелец удалён", am: "Սեփականատերը ջնջվեց" },
   // ── PA-C: one owner's page (`/owners/:ownerId`) ──────────────────────────
@@ -2502,7 +2513,6 @@ export const TRANSLATIONS: Dict = {
   "company.section": { en: "Company", ru: "Компания", am: "Ընկերություն" },
   "company.ownerName": { en: "Owner full name", ru: "Имя владельца", am: "Սեփականատիրոջ անուն, ազգանուն" },
   "company.ownerEmail": { en: "Owner email", ru: "Email владельца", am: "Սեփականատիրոջ էլ. հասցե" },
-  "company.creatingOwner": { en: "Creating owner…", ru: "Создание владельца…", am: "Սեփականատերը ստեղծվում է…" },
   "company.next": { en: "Next", ru: "Далее", am: "Հաջորդը" },
   "company.back": { en: "← Back", ru: "← Назад", am: "← Հետ" },
   "company.create": { en: "Create company", ru: "Создать компанию", am: "Ստեղծել ընկերություն" },

@@ -97,6 +97,8 @@ beforeEach(() => {
       return { data: detail };
     }
     if (c.path === "/admin/owners/1" && c.method === "PUT") return { data: { ...ANN, ...(c.body as object) } };
+    if (c.path === "/company" && c.method === "GET") return { data: [{ id: 3, name: "Cyber Zone" }, { id: 7, name: "Arena" }] };
+    if (c.path === "/admin/owners" && c.method === "POST") return { data: { ...BOB, id: 9, email: (c.body as { email: string }).email } };
     if (c.path === "/admin/owners/1" && c.method === "DELETE") return deleteResult();
     throw new Error(`unexpected ${c.method} ${c.path}`);
   };
@@ -292,6 +294,50 @@ describe("deleting", () => {
   });
 });
 
+describe("adding", () => {
+  const openAdd = async () => {
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Add owner" })); });
+    await screen.findByRole("option", { name: "Arena" });
+  };
+  const addForm = () => screen.getByRole("heading", { name: "Add owner" }).closest("form") as HTMLElement;
+
+  test("sends the company and the email, no password, and re-reads the list", async () => {
+    await mount();
+    const before = listCalls().length;
+    await openAdd();
+
+    // The form has no password field at all: the owner sets their own.
+    expect(addForm().querySelector('input[type="password"]')).toBeNull();
+    expect(within(addForm()).getByText(/email a link/)).toBeTruthy();
+
+    fireEvent.change(within(addForm()).getByRole("combobox"), { target: { value: "7" } });
+    fireEvent.change(addForm().querySelector('input[type="email"]') as HTMLInputElement, { target: { value: " co@club.test " } });
+    await act(async () => { fireEvent.click(within(addForm()).getByRole("button", { name: "Add owner" })); });
+
+    await waitFor(() => expect(callsTo("POST", "/admin/owners")).toHaveLength(1));
+    expect(callsTo("POST", "/admin/owners")[0].body).toEqual({ company_id: 7, email: "co@club.test" });
+    await waitFor(() => expect(listCalls().length).toBe(before + 1));
+    expect(screen.queryByRole("heading", { name: "Add owner" })).toBeNull();
+  });
+
+  test("a taken email is shown and the form stays open", async () => {
+    const base = api.handler;
+    api.handler = async (c: Call) =>
+      c.method === "POST"
+        ? Promise.reject(apiError(422, { message: "invalid", errors: { email: ["The email has already been taken."] } }))
+        : base(c);
+    await mount();
+    await openAdd();
+
+    fireEvent.change(within(addForm()).getByRole("combobox"), { target: { value: "3" } });
+    fireEvent.change(addForm().querySelector('input[type="email"]') as HTMLInputElement, { target: { value: "ann@club.test" } });
+    await act(async () => { fireEvent.click(within(addForm()).getByRole("button", { name: "Add owner" })); });
+
+    expect(await screen.findByText("email: The email has already been taken.")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Add owner" })).toBeTruthy();
+  });
+});
+
 describe("without the write permissions", () => {
   // The route is admin-only; this pins that the row buttons read their own
   // permissions rather than riding on the route guard.
@@ -301,5 +347,6 @@ describe("without the write permissions", () => {
 
     expect(within(rowOf("Ann Owner")).queryByRole("button", { name: "Edit" })).toBeNull();
     expect(within(rowOf("Ann Owner")).queryByRole("button", { name: "Delete" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Add owner" })).toBeNull();
   });
 });

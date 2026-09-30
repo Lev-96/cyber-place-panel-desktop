@@ -145,12 +145,13 @@ export type Permission =
   | "branch.status"
   /**
    * The admin's Owners section (`/owners`, backend `/admin/owners`): list and
-   * search every company owner on the platform, correct their name/email, and
-   * delete one with every company they own. Network-wide partner data and an
+   * search every company owner on the platform, add one to a company, correct
+   * their name/email, and delete one with every company only they own. Network-wide partner data and an
    * irreversible delete — admin only, enforced by the backend's `admin`
    * middleware; these only decide what is drawn.
    */
   | "owner.view"
+  | "owner.create"
   | "owner.edit"
   | "owner.delete";
 
@@ -165,7 +166,7 @@ const PERMS: Record<Role, ReadonlySet<Permission>> = {
     "company.create", "company.edit", "company.delete",
     "company.block", "branch.block", "branch.status",
     "manager.create", "manager.delete",
-    "owner.view", "owner.edit", "owner.delete",
+    "owner.view", "owner.create", "owner.edit", "owner.delete",
     "game.crud", "game.crud.branch", "expenses.crud",
     "session.start", "session.stop", "session.free",
   ]),
