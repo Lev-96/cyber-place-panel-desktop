@@ -128,13 +128,14 @@ export interface ListOwnersParams {
 
 /**
  * `POST /admin/owners` — add an owner to a company (a company may have
- * several). The name defaults to the part of the email before "@"; the owner
+ * several). The server stores "First Last" as the account's name; the owner
  * gets an email link to set their own password.
  */
 export interface CreateOwnerBody {
   company_id: number;
+  first_name: string;
+  last_name: string;
   email: string;
-  name?: string;
 }
 
 /** `PUT /admin/owners/{id}` — both required; email unique ignoring this owner. */

@@ -3,6 +3,7 @@ import {
   apiListBlockedCountries, apiListBlockedIps,
   CreateBlockedCountryBody, CreateBlockedIpBody, IBlockedCountryListApi, IBlockedIpListApi,
 } from "@/api/security";
+import { apiListIpActivity, IIpActivityListApi, IpActivityQuery } from "@/api/ipActivity";
 import { withToast } from "@/ui/notify";
 
 /**
@@ -42,6 +43,11 @@ export class SecurityRepository {
 
   async unblockCountry(id: number): Promise<void> {
     await withToast("blockedCountry", "deleted", () => apiDeleteBlockedCountry(id));
+  }
+
+  /** One page of the IP activity, searched and filtered by the server. */
+  async ipActivity(query: IpActivityQuery): Promise<IIpActivityListApi> {
+    return apiListIpActivity(query);
   }
 }
 

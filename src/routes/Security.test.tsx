@@ -23,6 +23,7 @@ vi.mock("@/i18n/LanguageContext", async () => {
 // The tabs are covered by their own tests; here only WHICH one is mounted matters.
 vi.mock("@/components/security/BlockedIpsTab", () => ({ default: () => <div>ips-tab</div> }));
 vi.mock("@/components/security/BlockedCountriesTab", () => ({ default: () => <div>countries-tab</div> }));
+vi.mock("@/components/security/IpActivityTab", () => ({ default: () => <div>activity-tab</div> }));
 
 import RoleGuard from "@/auth/RoleGuard";
 import Security, { securityTabOf } from "./Security";
@@ -68,6 +69,7 @@ describe("tabs in the URL", () => {
     ["/security", "ips-tab"],
     ["/security?tab=ips", "ips-tab"],
     ["/security?tab=countries", "countries-tab"],
+    ["/security?tab=activity", "activity-tab"],
     // The tabs removed on 2026-09-29: an old link lands on the first tab.
     ["/security?tab=access", "ips-tab"],
     ["/security?tab=audit", "ips-tab"],
@@ -75,7 +77,7 @@ describe("tabs in the URL", () => {
   ])("%s shows %s", (entry, shown) => {
     mountAt(entry, "admin");
     expect(screen.getByText(shown)).toBeTruthy();
-    expect(screen.getAllByRole("tab")).toHaveLength(2);
+    expect(screen.getAllByRole("tab")).toHaveLength(3);
   });
 
   test("the selected tab is the URL's", () => {
@@ -86,6 +88,7 @@ describe("tabs in the URL", () => {
   test("securityTabOf falls back to the IP tab for anything unknown", () => {
     expect(securityTabOf(null)).toBe("ips");
     expect(securityTabOf("countries")).toBe("countries");
+    expect(securityTabOf("activity")).toBe("activity");
     expect(securityTabOf("audit")).toBe("ips");
     expect(securityTabOf("toString")).toBe("ips");
   });

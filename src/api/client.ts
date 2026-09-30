@@ -1,4 +1,5 @@
 import { AppConfig } from "@/infrastructure/AppConfig";
+import { networkBlock, networkBlockCodeOf } from "@/auth/networkBlock";
 import { sessionExpiry } from "@/auth/sessionExpiry";
 import { keyValueStore } from "@/infrastructure/KeyValueStore";
 import { HttpCache, invalidationTargets, policyFor } from "@/api/httpCache";
@@ -128,6 +129,10 @@ export const request = async <Res>(
     if (res.status === 401 && token) {
       sessionExpiry.raise();
     }
+    // The administrator blocked the address or country this device connects
+    // from: every request will be refused, so the whole app says so at once.
+    const blocked = networkBlockCodeOf(res.status, body);
+    if (blocked) networkBlock.raise(blocked);
 
     const err = new Error(extractMessage(body) ?? `HTTP ${res.status}`) as ApiError;
     err.status = res.status;
@@ -178,7 +183,10 @@ export const requestBlob = async (
     // session, and a 401 without one says nothing about it.
     if (res.status === 401 && token) sessionExpiry.raise();
     const text = await res.text();
-    const err = new Error(extractMessage(safeJson(text)) ?? `HTTP ${res.status}`) as ApiError;
+    const body = safeJson(text);
+    const blocked = networkBlockCodeOf(res.status, body);
+    if (blocked) networkBlock.raise(blocked);
+    const err = new Error(extractMessage(body) ?? `HTTP ${res.status}`) as ApiError;
     err.status = res.status;
     throw err;
   }
@@ -223,7 +231,15 @@ const revalidate = async (
       apiCache.touch(cacheKey);
       return;
     }
-    if (!res.ok) return;
+    if (!res.ok) {
+      // A background refresh is often the first request after a block: it
+      // must not be the one that keeps quiet about it.
+      if (res.status === 403) {
+        const blocked = networkBlockCodeOf(res.status, safeJson(await res.text()));
+        if (blocked) networkBlock.raise(blocked);
+      }
+      return;
+    }
 
     const text = await res.text();
     // `replace` notifies only when the body actually differs, so an endpoint

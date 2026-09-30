@@ -14,8 +14,9 @@ interface Props {
 }
 
 /**
- * The admin adds an owner to a company (`POST /admin/owners`): the company and
- * an email address, nothing else. A company may have several owners. The new
+ * The admin adds an owner to a company (`POST /admin/owners`): the company, the
+ * person's first and last name, and their email. A company may have several
+ * owners. The new
  * owner gets an email link and sets their own password — nobody types one for
  * them. A taken email comes back as a 422 naming the field, shown as the
  * server wrote it.
@@ -24,6 +25,8 @@ const OwnerCreateForm = ({ onClose, onSaved }: Props) => {
   const { t } = useLang();
   const { data: companies, loading, error } = useAsync(() => companyRepository.list(), []);
   const [companyId, setCompanyId] = useState<number | null>(null);
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -34,7 +37,12 @@ const OwnerCreateForm = ({ onClose, onSaved }: Props) => {
     setBusy(true);
     setErr(null);
     try {
-      await ownerRepository.create({ company_id: companyId, email: email.trim() });
+      await ownerRepository.create({
+        company_id: companyId,
+        first_name: firstName.trim(),
+        last_name: lastName.trim(),
+        email: email.trim(),
+      });
       onSaved();
     } catch (error) {
       setErr(formatApiError(error));
@@ -68,6 +76,8 @@ const OwnerCreateForm = ({ onClose, onSaved }: Props) => {
           </select>
         </label>
         {error && <div className="error">{error.message}</div>}
+        <Input label={t("profile.firstName")} value={firstName} onChange={(e) => setFirstName(e.target.value)} required maxLength={120} />
+        <Input label={t("profile.lastName")} value={lastName} onChange={(e) => setLastName(e.target.value)} required maxLength={120} />
         <Input label={t("label.email")} type="email" value={email} onChange={(e) => setEmail(e.target.value)} required maxLength={255} />
         <div className="muted" style={{ fontSize: 13 }}>{t("staff.inviteHint")}</div>
         {err && <div className="error" style={{ whiteSpace: "pre-line" }}>{err}</div>}

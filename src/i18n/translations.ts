@@ -2905,6 +2905,24 @@ export const TRANSLATIONS: Dict = {
   // server's text for a code it does not know. Without that, a Russian panel
   // showed "Your branch has been blocked" at the login screen, because the
   // sentence was written wherever the refusal happened to be thrown.
+  // The administrator blocked this device's address or country (2026-10-01).
+  "networkBlock.title": { en: "Access closed", ru: "Доступ закрыт", am: "Մուտքը փակ է" },
+  "networkBlock.ip": {
+    en: "Access to Cyber Place from your IP address has been closed by the administrator.",
+    ru: "Доступ к Cyber Place с вашего IP-адреса закрыт администратором.",
+    am: "Ձեր IP հասցեից Cyber Place մուտքը փակվել է ադմինիստրատորի կողմից։",
+  },
+  "networkBlock.country": {
+    en: "Access to Cyber Place from your country has been closed by the administrator.",
+    ru: "Доступ к Cyber Place из вашей страны закрыт администратором.",
+    am: "Ձեր երկրից Cyber Place մուտքը փակվել է ադմինիստրատորի կողմից։",
+  },
+  "networkBlock.hint": {
+    en: "If you think this is a mistake, contact the Cyber Place administrator.",
+    ru: "Если вы считаете, что это ошибка, свяжитесь с администратором Cyber Place.",
+    am: "Եթե կարծում եք, որ սա սխալ է, կապվեք Cyber Place-ի ադմինիստրատորի հետ։",
+  },
+  "networkBlock.retry": { en: "Check again", ru: "Проверить снова", am: "Ստուգել կրկին" },
   "blocking.reason.company_blocked": {
     en: "Your company has been blocked. Please contact the administrator.",
     ru: "Ваша компания заблокирована. Обратитесь к администратору.",
@@ -3501,6 +3519,47 @@ export const TRANSLATIONS: Dict = {
   "security.title": { en: "Security", ru: "Безопасность", am: "Անվտանգություն" },
   "security.tab.ips": { en: "Blocked IPs", ru: "Заблокированные IP", am: "Արգելափակված IP հասցեներ" },
   "security.tab.countries": { en: "Blocked countries", ru: "Заблокированные страны", am: "Արգելափակված երկրներ" },
+  "security.tab.activity": { en: "IP activity", ru: "Активность IP", am: "IP ակտիվություն" },
+  // Security → IP activity (2026-09-30): the address the SERVER saw. Never "exact location".
+  "ipActivity.about": {
+    en: "The address the Cyber Place server saw for each connection. Behind a VPN or proxy it is that service's address, not the person's. Country and city are approximate.",
+    ru: "Адрес, который сервер Cyber Place увидел при подключении. Если человек за VPN или прокси, это адрес VPN или прокси, а не его собственный. Страна и город определяются приблизительно.",
+    am: "Հասցեն, որը Cyber Place-ի սերվերը տեսել է միացման ժամանակ։ VPN-ի կամ պրոքսիի դեպքում դա այդ ծառայության հասցեն է, ոչ թե անձի։ Երկիրը և քաղաքը մոտավոր են։",
+  },
+  "ipActivity.search": { en: "Search", ru: "Поиск", am: "Որոնում" },
+  "ipActivity.searchHint": {
+    en: "IP, name, email, country or city",
+    ru: "IP, имя, email, страна или город",
+    am: "IP, անուն, էլ. հասցե, երկիր կամ քաղաք",
+  },
+  "ipActivity.all": { en: "All", ru: "Все", am: "Բոլորը" },
+  "ipActivity.from": { en: "Last seen from", ru: "Последний визит с", am: "Վերջին այցը սկսած" },
+  "ipActivity.to": { en: "Last seen to", ru: "Последний визит по", am: "Վերջին այցը մինչև" },
+  "ipActivity.sort": { en: "Sort", ru: "Сортировка", am: "Դասավորել" },
+  "ipActivity.sort.last_seen": { en: "Last seen, newest first", ru: "Последний визит, сначала новые", am: "Վերջին այցը, նորերը առաջինը" },
+  "ipActivity.sort.first_seen": { en: "First seen, newest first", ru: "Первый визит, сначала новые", am: "Առաջին այցը, նորերը առաջինը" },
+  "ipActivity.sort.visits": { en: "Most visits", ru: "Больше всего визитов", am: "Ամենաշատ այցերը" },
+  "ipActivity.clearFilter": { en: "Remove filter", ru: "Убрать фильтр", am: "Հեռացնել զտիչը" },
+  "ipActivity.onlyThisUser": { en: "Show only this user", ru: "Показать только этого пользователя", am: "Ցույց տալ միայն այս օգտատիրոջը" },
+  "ipActivity.empty": { en: "No connections match.", ru: "Подключений не найдено.", am: "Միացումներ չեն գտնվել։" },
+  "ipActivity.unknown": { en: "Unknown", ru: "Не определено", am: "Անհայտ" },
+  "ipActivity.anonymous": { en: "Anonymous", ru: "Аноним", am: "Անանուն" },
+  "ipActivity.player": { en: "Mobile player", ru: "Игрок (мобильное приложение)", am: "Խաղացող (բջջային հավելված)" },
+  "ipActivity.telegramServers": { en: "Telegram servers", ru: "Серверы Telegram", am: "Telegram-ի սերվերներ" },
+  "ipActivity.col.user": { en: "User", ru: "Пользователь", am: "Օգտատեր" },
+  "ipActivity.col.ip": { en: "IP address", ru: "IP-адрес", am: "IP հասցե" },
+  "ipActivity.col.country": { en: "Country", ru: "Страна", am: "Երկիր" },
+  "ipActivity.col.city": { en: "City", ru: "Город", am: "Քաղաք" },
+  "ipActivity.col.source": { en: "Source", ru: "Источник", am: "Աղբյուր" },
+  "ipActivity.col.firstSeen": { en: "First seen", ru: "Первый визит", am: "Առաջին այց" },
+  "ipActivity.col.lastSeen": { en: "Last seen", ru: "Последний визит", am: "Վերջին այց" },
+  "ipActivity.col.visits": { en: "Visits", ru: "Визиты", am: "Այցեր" },
+  "ipActivity.source.website": { en: "Website", ru: "Сайт", am: "Կայք" },
+  "ipActivity.source.mobile": { en: "Mobile", ru: "Мобильное приложение", am: "Բջջային հավելված" },
+  "ipActivity.source.desktop": { en: "Desktop", ru: "Десктоп", am: "Համակարգչային հավելված" },
+  "ipActivity.source.owner_web": { en: "Owner Web", ru: "Веб-кабинет", am: "Վեբ կաբինետ" },
+  "ipActivity.source.telegram": { en: "Telegram", ru: "Telegram", am: "Telegram" },
+  "ipActivity.source.telegram_bot": { en: "Telegram bot", ru: "Бот Telegram", am: "Telegram բոտ" },
 
 
 

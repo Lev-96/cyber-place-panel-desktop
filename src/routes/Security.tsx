@@ -1,17 +1,19 @@
 import BlockedCountriesTab from "@/components/security/BlockedCountriesTab";
 import BlockedIpsTab from "@/components/security/BlockedIpsTab";
+import IpActivityTab from "@/components/security/IpActivityTab";
 import ScreenWithBg from "@/components/ui/ScreenWithBg";
 import SectionTabs, { SectionTab } from "@/components/ui/SectionTabs";
 import { useLang } from "@/i18n/LanguageContext";
 import { useSearchParams } from "react-router-dom";
 
-export type SecurityTab = "ips" | "countries";
+export type SecurityTab = "ips" | "countries" | "activity";
 
-const TABS: readonly SecurityTab[] = ["ips", "countries"];
+const TABS: readonly SecurityTab[] = ["ips", "countries", "activity"];
 
 const TAB_LABEL_KEY = {
   ips: "security.tab.ips",
   countries: "security.tab.countries",
+  activity: "security.tab.activity",
 } as const satisfies Record<SecurityTab, string>;
 
 /** `?tab=` as the URL says, or the first tab for anything it does not name. */
@@ -19,8 +21,8 @@ export const securityTabOf = (value: string | null): SecurityTab =>
   (TABS as readonly string[]).includes(value ?? "") ? (value as SecurityTab) : "ips";
 
 /**
- * The admin's Security section (`/security?tab=…`): blocked IP addresses and
- * blocked countries (2026-09-29; web and Telegram access is by role, nothing
+ * The admin's Security section (`/security?tab=…`): blocked IP addresses,
+ * blocked countries and the IP activity (2026-09-29, activity 2026-09-30; web and Telegram access is by role, nothing
  * to grant here). The tab lives in the URL,
  * so a link, a reload or Back lands on the same one. Each tab owns its own
  * reads and mounts only while shown: nothing here is fetched for a tab nobody
@@ -45,6 +47,7 @@ const Security = () => {
         <div role="tabpanel" className="sec-panel">
           {tab === "ips" && <BlockedIpsTab />}
           {tab === "countries" && <BlockedCountriesTab />}
+          {tab === "activity" && <IpActivityTab />}
         </div>
       </div>
     </ScreenWithBg>

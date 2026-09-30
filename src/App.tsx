@@ -1,5 +1,6 @@
 import { RouteSkeleton } from "@/components/ui/Skeleton";
 import { useAuth } from "@/auth/AuthContext";
+import NetworkBlockedScreen, { useNetworkBlock } from "@/components/NetworkBlockedScreen";
 import AuthRouteReset from "@/auth/AuthRouteReset";
 import TelemetryTracker from "@/telemetry/TelemetryTracker";
 import RoleGuard from "@/auth/RoleGuard";
@@ -379,6 +380,7 @@ const Unauthed = () => (
 
 const App = () => {
   const { user, loading } = useAuth();
+  const blocked = useNetworkBlock();
 
   // Ask the backend which socket to connect to, before anything subscribes.
   // `VITE_REVERB_*` is only a fallback now: a build carrying a key the servers
@@ -389,6 +391,9 @@ const App = () => {
     void primeRealtimeConfig();
   }, []);
 
+  // An administrator blocked this device's address or country: nothing else
+  // is shown or kept running (see NetworkBlockedScreen).
+  if (blocked) return <NetworkBlockedScreen code={blocked} />;
   if (loading) return <Spinner />;
   return (
     <ConfirmProvider>

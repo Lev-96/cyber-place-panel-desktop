@@ -309,13 +309,18 @@ describe("adding", () => {
     // The form has no password field at all: the owner sets their own.
     expect(addForm().querySelector('input[type="password"]')).toBeNull();
     expect(within(addForm()).getByText(/email a link/)).toBeTruthy();
+    expect(within(addForm()).getByText("First name")).toBeTruthy();
+    expect(within(addForm()).getByText("Last name")).toBeTruthy();
+    expect(addForm().querySelectorAll("input[required]")).toHaveLength(3);
 
     fireEvent.change(within(addForm()).getByRole("combobox"), { target: { value: "7" } });
+    fireEvent.change(addForm().querySelectorAll("input")[0], { target: { value: " Anna " } });
+    fireEvent.change(addForm().querySelectorAll("input")[1], { target: { value: "Sargsyan " } });
     fireEvent.change(addForm().querySelector('input[type="email"]') as HTMLInputElement, { target: { value: " co@club.test " } });
     await act(async () => { fireEvent.click(within(addForm()).getByRole("button", { name: "Add owner" })); });
 
     await waitFor(() => expect(callsTo("POST", "/admin/owners")).toHaveLength(1));
-    expect(callsTo("POST", "/admin/owners")[0].body).toEqual({ company_id: 7, email: "co@club.test" });
+    expect(callsTo("POST", "/admin/owners")[0].body).toEqual({ company_id: 7, first_name: "Anna", last_name: "Sargsyan", email: "co@club.test" });
     await waitFor(() => expect(listCalls().length).toBe(before + 1));
     expect(screen.queryByRole("heading", { name: "Add owner" })).toBeNull();
   });
@@ -330,6 +335,8 @@ describe("adding", () => {
     await openAdd();
 
     fireEvent.change(within(addForm()).getByRole("combobox"), { target: { value: "3" } });
+    fireEvent.change(addForm().querySelectorAll("input")[0], { target: { value: "Ann" } });
+    fireEvent.change(addForm().querySelectorAll("input")[1], { target: { value: "Owner" } });
     fireEvent.change(addForm().querySelector('input[type="email"]') as HTMLInputElement, { target: { value: "ann@club.test" } });
     await act(async () => { fireEvent.click(within(addForm()).getByRole("button", { name: "Add owner" })); });
 

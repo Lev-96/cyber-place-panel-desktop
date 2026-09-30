@@ -4194,6 +4194,82 @@ button.login-flip-back:hover {
   }
 }
 
+/* Security → IP activity (2026-09-30). Reuses the .sec-* form and table;
+   these are only its own pieces: the filter rows, the picked-filter chips,
+   the source pills, and the clickable user / city. */
+.ipa-filters {
+  gap: 12px;
+}
+.ipa-filters .sec-field {
+  min-width: 150px;
+}
+.ipa-picks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.ipa-pick {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--color-primary);
+  background: rgba(7, 221, 241, 0.1);
+  color: var(--color-text);
+  font-size: 12px;
+  cursor: pointer;
+}
+.ipa-pick:focus-visible,
+.ipa-link:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+.ipa-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-text);
+  font: inherit;
+  text-align: inherit;
+  text-decoration: underline;
+  text-decoration-color: var(--color-border);
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.ipa-link:hover {
+  color: var(--color-primary);
+}
+.ipa-who {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.ipa-who .meta {
+  color: var(--color-muted);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.ipa-table .ipa-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.pill.ipa-source {
+  text-transform: none;
+  letter-spacing: 0;
+  white-space: nowrap;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-alt);
+  color: var(--color-text);
+}
+.pill.ipa-source.is-desktop { border-color: var(--color-primary); color: var(--color-primary); }
+.pill.ipa-source.is-owner_web { border-color: var(--color-accent-blue); color: var(--color-accent-blue); }
+.pill.ipa-source.is-mobile { border-color: var(--color-success); color: var(--color-success); }
+.pill.ipa-source.is-telegram,
+.pill.ipa-source.is-telegram_bot { border-color: var(--color-accent-purple); color: var(--color-accent-purple); }
+.pill.ipa-source.is-website { border-color: var(--color-warning); color: var(--color-warning); }
+
 /* Phone widths: every row becomes a card of label / value lines. */
 @media (max-width: 640px) {
   .sec-table-wrap {
@@ -5084,4 +5160,23 @@ select.input option:disabled {
 }
 @media (prefers-reduced-motion: reduce) {
   .basket-extras__row { transition: none; }
+}
+
+/* The address-block screen (2026-10-01): the login shell, one card. */
+.net-block__card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 440px;
+  text-align: center;
+}
+.net-block__reason {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.5;
+}
+.net-block__hint {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
 }
