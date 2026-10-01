@@ -1346,11 +1346,12 @@ backend routes.
 ## 9.5.8b Address block and parity with the web (2026-10-01)
 
 - **IP / country block:**
-  - `src/auth/networkBlock.ts`: the API client (`request`, `requestBlob` and the background revalidate) raises `ip_blocked` / `country_blocked` from any 403.
+  - `src/auth/networkBlock.ts`: the API client (`request`, `requestBlob` and the background revalidate) raises `access_blocked` → kind `blocked` / `access_suspended` → kind `suspended` from any 403 (legacy `ip_blocked` / `country_blocked` → `blocked`). The screen never says what was blocked (no IP, country or administrator).
   - `NetworkBlockedScreen` then replaces the WHOLE `App` (before the spinner), clears `apiCache`, disconnects Echo and keeps the sign-in (AuthContext does not drop the token for a block). "Check again" reloads.
   - The web and Telegram get the same screen (Telegram also from `TelegramGate`).
   - Tests: `networkBlock.test.ts`, `NetworkBlockedScreen.test.tsx`, `AuthContext.networkBlock.test.tsx`.
 - **Add owner:** first name, last name and email are all required (`CreateOwnerBody`); the server stores "First Last".
+- **Security → Blocked IPs** marks rows the system added (`reason` `auto_threat` / `auto_login`) with a pill; they unblock like any other.
 - **Web and Telegram owners can now do what the desktop does:** profile name/email/password, managers, kiosk PIN, agent token. Only a LAN-only action (Wake-on-LAN, the console watcher) or a destructive global one stays desktop-only (backend `client_access.denied_routes`). The web shows the same buttons, so nothing is hidden here.
 
 ## 9.5.9 Revenue screen — tournaments, owner income, per branch (2026-09-11)
