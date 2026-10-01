@@ -1,9 +1,9 @@
 /**
- * "This address may not use Cyber Place" — the administrator blocked the IP
- * address or the country this device connects from (2026-10-01).
- *
- * The backend refuses EVERY request from such an address with 403 and a code
- * (`ip_blocked`, `country_blocked`; NetworkAccessGuard). The API client raises
+ * "This device may not use Cyber Place" (2026-10-01): the backend refuses
+ * EVERY request from it with 403 and a code (NetworkAccessGuard) —
+ * `access_blocked` (an administrator's rule) or `access_suspended` (the
+ * system blocked it after suspicious requests). What exactly was blocked — an
+ * address, a country — is never said to the person, here or by the server. The API client raises
  * it here; the app answers by replacing the whole interface with one screen
  * that says so ({@link ../components/NetworkBlockedScreen}), dropping cached
  * responses and the realtime socket — nothing from before the block stays
@@ -18,15 +18,22 @@
  * Framework-agnostic pub/sub, like {@link ./sessionExpiry}.
  */
 
-export type NetworkBlockCode = "ip_blocked" | "country_blocked";
+/** Blocked by an administrator, or suspended by the system. */
+export type NetworkBlockCode = "blocked" | "suspended";
 
-const CODES: ReadonlySet<string> = new Set<NetworkBlockCode>(["ip_blocked", "country_blocked"]);
+const CODES: Readonly<Record<string, NetworkBlockCode>> = {
+  access_blocked: "blocked",
+  access_suspended: "suspended",
+  // Sent by the backend of 2026-10-01 morning; still understood.
+  ip_blocked: "blocked",
+  country_blocked: "blocked",
+};
 
-/** The block code of a refused response, or null when it is any other answer. */
+/** The kind of block a refused response announces, or null when it is any other answer. */
 export const networkBlockCodeOf = (status: number | undefined, body: unknown): NetworkBlockCode | null => {
   if (status !== 403 || !body || typeof body !== "object") return null;
   const code = (body as { code?: unknown }).code;
-  return typeof code === "string" && CODES.has(code) ? (code as NetworkBlockCode) : null;
+  return typeof code === "string" && Object.prototype.hasOwnProperty.call(CODES, code) ? CODES[code] : null;
 };
 
 /** Whether a thrown API error is an address block. */

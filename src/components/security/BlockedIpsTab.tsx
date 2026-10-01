@@ -124,7 +124,11 @@ const BlockedIpsTab = () => {
                 <tr key={r.id}>
                   <td data-label={t("security.ips.address")} className="sec-num">{r.ip_address}</td>
                   <td data-label={t("security.note")} className="sec-wrap">{r.note || "-"}</td>
-                  <td data-label={t("security.col.addedBy")}>{r.created_by?.name ?? "-"}</td>
+                  <td data-label={t("security.col.addedBy")}>
+                    {r.reason && r.reason !== "manual" ? (
+                      <span className="pill blocked">{t(r.reason === "auto_login" ? "security.ips.autoLogin" : "security.ips.autoThreat")}</span>
+                    ) : (r.created_by?.name ?? "-")}
+                  </td>
                   <td data-label={t("security.col.created")}>{formatDateTime(r.created_at)}</td>
                   <td data-label={t("security.col.actions")}>
                     <Button

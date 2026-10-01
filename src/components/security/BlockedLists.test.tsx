@@ -40,7 +40,11 @@ const apiError = (status: number, body: unknown) =>
   Object.assign(new Error((body as { message?: string })?.message ?? `HTTP ${status}`), { status, body });
 
 const IPS: IBlockedIpListApi = {
-  data: [{ id: 1, ip_address: "198.51.100.0/24", note: "Scraper", created_by: { id: 1, name: "Root" }, created_at: "2026-09-28T10:00:00Z" }],
+  data: [
+    { id: 1, ip_address: "198.51.100.0/24", note: "Scraper", reason: "manual", created_by: { id: 1, name: "Root" }, created_at: "2026-09-28T10:00:00Z" },
+    { id: 2, ip_address: "203.0.113.66", note: "auto: sql_injection", reason: "auto_threat", created_by: null, created_at: "2026-10-01T10:00:00Z" },
+    { id: 3, ip_address: "203.0.113.77", note: "auto: repeated failed owner-web sign-ins", reason: "auto_login", created_by: null, created_at: "2026-10-01T11:00:00Z" },
+  ],
   your_ip: "203.0.113.9",
 };
 
@@ -83,6 +87,14 @@ describe("blocked IPs", () => {
     expect(screen.getByText("203.0.113.9")).toBeTruthy();
     expect(screen.getByText("Scraper")).toBeTruthy();
     expect(screen.getByText("Root")).toBeTruthy();
+  });
+
+  test("marks what the system blocked by itself, and it unblocks like any other (2026-10-01)", async () => {
+    await mount();
+    const row = (ip: string) => screen.getByText(ip).closest("tr") as HTMLElement;
+    expect(within(row("203.0.113.66")).getByText("System: attack requests").className).toContain("pill");
+    expect(within(row("203.0.113.77")).getByText("System: password guessing")).toBeTruthy();
+    expect(within(row("203.0.113.66")).getByRole("button", { name: "Unblock" })).toBeTruthy();
   });
 
   test("adding posts the address and the note, then re-reads the list", async () => {

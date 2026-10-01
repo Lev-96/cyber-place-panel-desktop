@@ -2905,22 +2905,17 @@ export const TRANSLATIONS: Dict = {
   // server's text for a code it does not know. Without that, a Russian panel
   // showed "Your branch has been blocked" at the login screen, because the
   // sentence was written wherever the refusal happened to be thrown.
-  // The administrator blocked this device's address or country (2026-10-01).
+  // This device is blocked (2026-10-01). Never says what: an address, a country, an administrator.
   "networkBlock.title": { en: "Access closed", ru: "Доступ закрыт", am: "Մուտքը փակ է" },
-  "networkBlock.ip": {
-    en: "Access to Cyber Place from your IP address has been closed by the administrator.",
-    ru: "Доступ к Cyber Place с вашего IP-адреса закрыт администратором.",
-    am: "Ձեր IP հասցեից Cyber Place մուտքը փակվել է ադմինիստրատորի կողմից։",
+  "networkBlock.blocked": {
+    en: "You have been blocked. You no longer have access to Cyber Place.",
+    ru: "Вы заблокированы. У вас больше нет доступа к Cyber Place.",
+    am: "Դուք արգելափակված եք։ Այլևս մուտք չունեք Cyber Place։",
   },
-  "networkBlock.country": {
-    en: "Access to Cyber Place from your country has been closed by the administrator.",
-    ru: "Доступ к Cyber Place из вашей страны закрыт администратором.",
-    am: "Ձեր երկրից Cyber Place մուտքը փակվել է ադմինիստրատորի կողմից։",
-  },
-  "networkBlock.hint": {
-    en: "If you think this is a mistake, contact the Cyber Place administrator.",
-    ru: "Если вы считаете, что это ошибка, свяжитесь с администратором Cyber Place.",
-    am: "Եթե կարծում եք, որ սա սխալ է, կապվեք Cyber Place-ի ադմինիստրատորի հետ։",
+  "networkBlock.suspended": {
+    en: "Suspicious activity was detected. Your access to Cyber Place has been blocked permanently.",
+    ru: "Система обнаружила подозрительные действия. Доступ к Cyber Place для вас заблокирован навсегда.",
+    am: "Համակարգը հայտնաբերել է կասկածելի գործողություններ։ Ձեր մուտքը Cyber Place ընդմիշտ արգելափակված է։",
   },
   "networkBlock.retry": { en: "Check again", ru: "Проверить снова", am: "Ստուգել կրկին" },
   "blocking.reason.company_blocked": {
@@ -3578,6 +3573,9 @@ export const TRANSLATIONS: Dict = {
   "security.ips.addressHint": { en: "203.0.113.7 or 203.0.113.0/24", ru: "203.0.113.7 или 203.0.113.0/24", am: "203.0.113.7 կամ 203.0.113.0/24" },
   "security.ips.block": { en: "Block", ru: "Заблокировать", am: "Արգելափակել" },
   "security.ips.unblock": { en: "Unblock", ru: "Разблокировать", am: "Ապաարգելափակել" },
+  // Blocked by the system itself (2026-10-01).
+  "security.ips.autoThreat": { en: "System: attack requests", ru: "Система: атакующие запросы", am: "Համակարգ՝ հարձակողական հարցումներ" },
+  "security.ips.autoLogin": { en: "System: password guessing", ru: "Система: подбор пароля", am: "Համակարգ՝ գաղտնաբառի ընտրություն" },
   "security.ips.empty": { en: "No blocked IP addresses.", ru: "Заблокированных IP-адресов нет.", am: "Արգելափակված IP հասցեներ չկան։" },
   "security.ips.confirmDelete": {
     en: "Unblock {0}?\nRequests from it will be accepted again.",

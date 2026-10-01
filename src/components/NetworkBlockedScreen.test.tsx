@@ -30,24 +30,27 @@ describe("the blocked screen", () => {
     render(<Probe />);
     expect(screen.getByText("the app")).toBeTruthy();
 
-    act(() => networkBlock.raise("ip_blocked"));
+    act(() => networkBlock.raise("blocked"));
 
     expect(screen.queryByText("the app")).toBeNull();
-    expect(screen.getByRole("alert").textContent).toContain("Доступ к Cyber Place с вашего IP-адреса закрыт администратором.");
+    const text = screen.getByRole("alert").textContent ?? "";
+    expect(text).toContain("Вы заблокированы. У вас больше нет доступа к Cyber Place.");
+    // Nothing says what was blocked or who did it.
+    expect(text).not.toMatch(/IP|стран|администратор/i);
     expect(spies.clear).toHaveBeenCalledTimes(1);
     expect(spies.disconnect).toHaveBeenCalledTimes(1);
   });
 
-  test("a block noticed before the screen mounted is still shown", () => {
-    networkBlock.raise("country_blocked");
+  test("a block noticed before the screen mounted is still shown; the system's own block says why", () => {
+    networkBlock.raise("suspended");
     render(<Probe />);
-    expect(screen.getByText("Доступ к Cyber Place из вашей страны закрыт администратором.")).toBeTruthy();
+    expect(screen.getByText("Система обнаружила подозрительные действия. Доступ к Cyber Place для вас заблокирован навсегда.")).toBeTruthy();
   });
 
   test("check again reloads the app", () => {
     const reload = vi.fn();
     vi.stubGlobal("location", { ...window.location, reload });
-    networkBlock.raise("ip_blocked");
+    networkBlock.raise("blocked");
     render(<Probe />);
     fireEvent.click(screen.getByRole("button", { name: "Проверить снова" }));
     expect(reload).toHaveBeenCalledTimes(1);

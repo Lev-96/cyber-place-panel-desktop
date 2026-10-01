@@ -26,6 +26,12 @@ export interface IBlockedIpApi {
   /** IPv4, IPv6 or a CIDR range. */
   ip_address: string;
   note: string | null;
+  /**
+   * `manual` (an administrator), or the system blocked it by itself
+   * (2026-10-01): `auto_threat` (attack requests), `auto_login` (repeated
+   * failed owner-web sign-ins). Unblocked the same way.
+   */
+  reason?: "manual" | "auto_threat" | "auto_login" | string;
   created_by: ISecurityActorApi | null;
   created_at: string;
 }

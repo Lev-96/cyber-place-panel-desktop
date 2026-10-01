@@ -43,7 +43,7 @@ afterEach(() => cleanup());
 
 describe("saved sign-in at start-up", () => {
   test("is kept when the address is blocked", async () => {
-    store.meError = Object.assign(new Error("Your IP is blocked."), { status: 403, body: { code: "ip_blocked" } });
+    store.meError = Object.assign(new Error("You have been blocked."), { status: 403, body: { code: "access_blocked" } });
     await boot();
     expect(store.removed).toEqual([]);
   });
