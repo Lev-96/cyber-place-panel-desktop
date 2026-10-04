@@ -20,6 +20,15 @@ export type Permission =
    * `admin` guard.
    */
   | "menu.metrics"
+  /**
+   * Admin-only "Security" section (`/security`, backend `/admin/client-access`,
+   * `/admin/staff/*`, `/admin/ip-address`, `/admin/security/*`): who among the
+   * owners and managers may use the web app and the Telegram bot, their
+   * sessions, blocked IPs and countries, and the audit log of all of it.
+   * Platform-wide access control — never an owner's or a manager's, and the
+   * backend holds the same line with its `admin` middleware.
+   */
+  | "menu.security"
   | "menu.tournaments"     // see Tournaments in sidebar
   | "menu.scan"            // see Scan/Confirm in sidebar
   | "menu.map"             // see Branches map in sidebar
@@ -136,12 +145,13 @@ export type Permission =
   | "branch.status"
   /**
    * The admin's Owners section (`/owners`, backend `/admin/owners`): list and
-   * search every company owner on the platform, correct their name/email, and
-   * delete one with every company they own. Network-wide partner data and an
+   * search every company owner on the platform, add one to a company, correct
+   * their name/email, and delete one with every company only they own. Network-wide partner data and an
    * irreversible delete — admin only, enforced by the backend's `admin`
    * middleware; these only decide what is drawn.
    */
   | "owner.view"
+  | "owner.create"
   | "owner.edit"
   | "owner.delete";
 
@@ -149,14 +159,14 @@ const PERMS: Record<Role, ReadonlySet<Permission>> = {
   admin: new Set<Permission>([
     "menu.branches", "menu.companies", "menu.managers", "menu.games",
     "menu.tournaments", "menu.scan", "menu.map",
-    "menu.updates", "menu.expenses", "menu.metrics", "menu.support",
+    "menu.updates", "menu.expenses", "menu.metrics", "menu.security", "menu.support",
     "revenue.view",
     "branch.create", "branch.edit", "branch.delete", "branch.prices",
     "branch.places", "branch.members", "product.crud",
     "company.create", "company.edit", "company.delete",
     "company.block", "branch.block", "branch.status",
     "manager.create", "manager.delete",
-    "owner.view", "owner.edit", "owner.delete",
+    "owner.view", "owner.create", "owner.edit", "owner.delete",
     "game.crud", "game.crud.branch", "expenses.crud",
     "session.start", "session.stop", "session.free",
   ]),

@@ -1,6 +1,6 @@
 import {
-  apiDeleteOwner, apiGetOwner, apiListOwners, apiUpdateOwner,
-  IOwnerApi, IOwnerDeletionResultApi, IOwnerDetailApi, UpdateOwnerBody,
+  apiCreateOwner, apiDeleteOwner, apiGetOwner, apiListOwners, apiUpdateOwner,
+  CreateOwnerBody, IOwnerApi, IOwnerDeletionResultApi, IOwnerDetailApi, UpdateOwnerBody,
 } from "@/api/owners";
 import { PaginatedList } from "@/types/api";
 import { withToast } from "@/ui/notify";
@@ -31,6 +31,10 @@ export class OwnerRepository {
    */
   async byId(id: number): Promise<IOwnerDetailApi> {
     return (await apiGetOwner(id)).data;
+  }
+
+  async create(body: CreateOwnerBody): Promise<IOwnerApi> {
+    return withToast("owner", "created", async () => (await apiCreateOwner(body)).data);
   }
 
   async update(id: number, body: UpdateOwnerBody): Promise<IOwnerApi> {

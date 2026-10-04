@@ -8,7 +8,12 @@ export interface GetCompaniesParams {
 }
 
 export interface CreateCompanyBody {
-  user_id: number;
+  /**
+   * The new owner, created with the company in one transaction. They get an
+   * email link to set their own password — no password is sent.
+   */
+  owner_name: string;
+  owner_email: string;
   name: string;
   email: string;
   phone: string;
@@ -20,15 +25,9 @@ export interface CreateCompanyBody {
   company_logo_path: File;
   status?: CompanyStatusType;
   commission_percent?: number;
-  /**
-   * Owner's plaintext password, passed through transiently so the backend
-   * can send the welcome email AFTER the company is created (deferred from
-   * registration). Never persisted on the company.
-   */
-  owner_password?: string;
 }
 
-export type UpdateCompanyBody = Omit<Partial<CreateCompanyBody>, "user_id" | "company_logo_path"> & {
+export type UpdateCompanyBody = Omit<Partial<CreateCompanyBody>, "owner_name" | "owner_email" | "company_logo_path"> & {
   company_logo_path?: File | null;
   status?: CompanyStatusType;
   commission_percent?: number;

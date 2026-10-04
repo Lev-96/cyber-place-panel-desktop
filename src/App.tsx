@@ -1,5 +1,6 @@
 import { RouteSkeleton } from "@/components/ui/Skeleton";
 import { useAuth } from "@/auth/AuthContext";
+import NetworkBlockedScreen, { useNetworkBlock } from "@/components/NetworkBlockedScreen";
 import AuthRouteReset from "@/auth/AuthRouteReset";
 import TelemetryTracker from "@/telemetry/TelemetryTracker";
 import RoleGuard from "@/auth/RoleGuard";
@@ -46,6 +47,7 @@ const MyCompany = lazy(() => import("@/routes/MyCompany"));
 const Owners = lazy(() => import("@/routes/Owners"));
 const OwnerDetails = lazy(() => import("@/routes/OwnerDetails"));
 const Revenue = lazy(() => import("@/routes/Revenue"));
+const Security = lazy(() => import("@/routes/Security"));
 const ConfirmByCode = lazy(() => import("@/routes/ConfirmByCode"));
 const GamesList = lazy(() => import("@/routes/GamesList"));
 const Managers = lazy(() => import("@/routes/Managers"));
@@ -306,6 +308,17 @@ const Authed = () => {
             </RoleGuard>
           }
         />
+        {/* Admin only — web / Telegram access, sessions, blocked IPs and
+            countries, audit log. The backend's `admin` middleware on every
+            route behind it holds the same line. */}
+        <Route
+          path="/security"
+          element={
+            <RoleGuard perm="menu.security">
+              <Security />
+            </RoleGuard>
+          }
+        />
         <Route
           path="/companies"
           element={
@@ -367,6 +380,7 @@ const Unauthed = () => (
 
 const App = () => {
   const { user, loading } = useAuth();
+  const blocked = useNetworkBlock();
 
   // Ask the backend which socket to connect to, before anything subscribes.
   // `VITE_REVERB_*` is only a fallback now: a build carrying a key the servers
@@ -377,6 +391,9 @@ const App = () => {
     void primeRealtimeConfig();
   }, []);
 
+  // An administrator blocked this device's address or country: nothing else
+  // is shown or kept running (see NetworkBlockedScreen).
+  if (blocked) return <NetworkBlockedScreen code={blocked} />;
   if (loading) return <Spinner />;
   return (
     <ConfirmProvider>

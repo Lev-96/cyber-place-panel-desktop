@@ -10,13 +10,12 @@ export interface IManagerApi {
   created_at?: string;
 }
 
+/** The new manager gets an email link to set their own password — none is sent. */
 export interface CreateManagerBody {
   branch_id: number;
   company_id: number;
   email: string;
   name: string;
-  password: string;
-  password_confirmation: string;
 }
 
 export interface UpdateManagerBody {

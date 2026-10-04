@@ -1,7 +1,7 @@
+import { formatApiError } from "@/api/errors";
 import Button from "@/components/ui/Button";
 import Modal from "@/components/ui/Modal";
 import Input from "@/components/ui/Input";
-import PasswordInput from "@/components/ui/PasswordInput";
 import { useLang } from "@/i18n/LanguageContext";
 import { branchRepository } from "@/repositories/BranchRepository";
 import { managerRepository } from "@/repositories/ManagerRepository";
@@ -20,8 +20,6 @@ const ManagerForm = ({ branchId, initial, onClose, onSaved }: Props) => {
   const isEdit = !!initial;
   const [name, setName] = useState(initial?.user?.name ?? "");
   const [email, setEmail] = useState(initial?.user?.email ?? "");
-  const [pw, setPw] = useState("");
-  const [pw2, setPw2] = useState("");
   const [companyId, setCompanyId] = useState<number | null>(initial?.company_id ?? null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -48,18 +46,16 @@ const ManagerForm = ({ branchId, initial, onClose, onSaved }: Props) => {
       if (isEdit) {
         await managerRepository.update(initial!.id, { name, email });
       } else {
-        if (pw !== pw2) { setErr(t("settings.passwordsMismatch")); setBusy(false); return; }
         if (!companyId) { setErr(t("manager.errors.companyMissing")); setBusy(false); return; }
         await managerRepository.create({
           branch_id: branchId,
           company_id: companyId,
           name, email,
-          password: pw, password_confirmation: pw2,
         });
       }
       onSaved();
     } catch (e) {
-      setErr(e instanceof Error ? e.message : t("form.errors.failed"));
+      setErr(formatApiError(e));
     } finally { setBusy(false); }
   };
 
@@ -69,11 +65,8 @@ const ManagerForm = ({ branchId, initial, onClose, onSaved }: Props) => {
         <h2 style={{ margin: 0 }}>{isEdit ? t("manager.titleEdit") : t("manager.titleNew")}</h2>
         <Input ref={nameRef} label={t("label.name")} value={name} onChange={(e) => setName(e.target.value)} required />
         <Input label={t("label.email")} type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
-        {!isEdit && <>
-          <PasswordInput label={t("auth.password")} value={pw} onChange={(e) => setPw(e.target.value)} required minLength={8} />
-          <PasswordInput label={t("label.confirmPassword")} value={pw2} onChange={(e) => setPw2(e.target.value)} required minLength={8} />
-        </>}
-        {err && <div className="error">{err}</div>}
+        {!isEdit && <div className="muted" style={{ fontSize: 13 }}>{t("staff.inviteHint")}</div>}
+        {err && <div className="error" style={{ whiteSpace: "pre-line" }}>{err}</div>}
         <div className="row-between">
           <Button type="button" variant="secondary" onClick={onClose} disabled={busy}>{t("action.cancel")}</Button>
           <Button disabled={busy}>{busy ? "…" : (isEdit ? t("action.save") : t("action.create"))}</Button>

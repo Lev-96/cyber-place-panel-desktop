@@ -9,7 +9,7 @@ import ProfileModal from "@/components/profile/ProfileModal";
 import { useLang } from "@/i18n/LanguageContext";
 import { useNotifications } from "@/notifications/NotificationsContext";
 import { useUpdatesNotification } from "@/realtime/UpdatesNotificationContext";
-import { useEffect, useRef, useState } from "react";
+import { ReactNode, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useAnchoredPopover } from "@/hooks/useAnchoredPopover";
 import { NavLink, useNavigate } from "react-router-dom";
@@ -287,7 +287,17 @@ const UserMenu = ({ name, email, role, roleLabel }: UserCardProps) => {
   );
 };
 
-const Sidebar = () => {
+interface SidebarProps {
+  /**
+   * Extra entries for the pinned footer, drawn under Support and above the
+   * account card. The desktop passes nothing; the owner web puts its
+   * "Telegram access" card here (2026-09-29), so a shell can add its own
+   * entry without a second menu.
+   */
+  footerExtra?: ReactNode;
+}
+
+const Sidebar = ({ footerExtra }: SidebarProps = {}) => {
   const { user, logout } = useAuth();
   const { t } = useLang();
   const { unreadCount } = useNotifications();
@@ -387,6 +397,9 @@ const Sidebar = () => {
       {can(role, "owner.view") && (
         <NavLink to="/owners">{t("nav.owners")}</NavLink>
       )}
+      {can(role, "menu.security") && (
+        <NavLink to="/security">{t("nav.security")}</NavLink>
+      )}
       <NavLink to="/notifications">
         {t("nav.notifications")}
         <UnreadBadge count={unreadCount} />
@@ -424,6 +437,8 @@ const Sidebar = () => {
             <UnreadBadge count={supportUnread} />
           </NavLink>
         )}
+
+        {footerExtra}
 
         <UserMenu
           name={user?.name}

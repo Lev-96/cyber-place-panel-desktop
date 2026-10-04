@@ -1010,7 +1010,8 @@ button is not a permission: a manager who kept the URL could still POST.
 | Цены филиала — матрица, платформы, субплатформы, джойстики, округление | ✅ | ✅ | ❌ |
 | Выручка и комиссия (`revenue.view`, §9.5.9) | ✅ | ✅ | ❌ |
 | Статус филиала Active / Inactive (`branch.status`) | ✅ | ✅ | ❌ |
-| Владельцы — список, изменить, удалить (`owner.view` / `owner.edit` / `owner.delete`) | ✅ | ❌ | ❌ |
+| Владельцы — список, добавить, изменить, удалить (`owner.view` / `owner.create` / `owner.edit` / `owner.delete`) | ✅ | ❌ | ❌ |
+| Безопасность — блокировка IP и стран, активность IP (`menu.security`) | ✅ | ❌ | ❌ |
 
 Two things that look like oversights and are not:
 
@@ -1177,6 +1178,13 @@ a link, `Sidebar.tsx` does not mention `BranchForm`, `global.css` has no
 `sidebar-action`. Mutation-verified (link back to `/my-company`, `end` on the
 link, create button put back under Branches).
 
+### Sidebar footer slot (2026-09-29)
+
+`<Sidebar footerExtra={…} />` draws extra entries in the pinned footer, after
+Support and before the account card. The desktop Layout passes nothing, so its
+footer is unchanged (`Sidebar.footerExtra.test.tsx`); the owner web passes its
+"Telegram" card (styled with `.nav-support-card`).
+
 ## 9.5.7a "+ New branch" on the Branches page (2026-09-12)
 
 - `BranchesList` (`/branches`) draws "+ New branch" (`branchesList.newBranch`,
@@ -1206,8 +1214,18 @@ Mutation-verified (no company check; save without re-read).
 ## 9.5.8 Owners (admin, 2026-09-11)
 
 `/owners` (RoleGuard `owner.view`; sidebar item after Managers), backed by
-`GET|PUT|DELETE /admin/owners[/{id}]` (`Admin\OwnerController`, `admin`
+`GET|POST|PUT|DELETE /admin/owners[/{id}]` (`Admin\OwnerController`, `admin`
 middleware; `{owner}` resolves only a `company_owner`, anything else is 404).
+
+- **No password is ever typed for somebody else (2026-09-30).** "Add owner"
+  (`owner.create`, `OwnerCreateForm`: a company select + an email →
+  `POST /admin/owners`, a company may have several owners), the company create
+  (`CompanyForm` step 1 = owner name + email; ONE `POST /company` carries
+  `owner_name` + `owner_email` with the company — no `POST /users` any more)
+  and the manager create (`ManagerForm`: name + email) send no password; the
+  person gets an email link and sets their own (backend §8.9.12). Every such
+  form shows `staff.inviteHint`. Pinned by `Owners.test.tsx` ("adding"),
+  `CompanyForm.test.tsx`, `ManagerForm.test.tsx`.
 
 - Transport `src/api/owners.ts` — types mirror `OwnerResource`,
   `DeletionPreviewResource`, `OwnerDeletionResource` and the 409
@@ -1296,6 +1314,45 @@ list, missing `branches` key (counts only), no company, failed read, invalid id
 cancel, no buttons without permissions, null fields. Mutation-verified (branches ignored;
 missing key treated as `[]`; delete re-reads instead of leaving; edit without
 re-read).
+
+## 9.5.8a Security (admin, 2026-09-29)
+
+`/security` (RoleGuard `menu.security`, admin only; sidebar item after
+Owners), three tabs by `?tab=ips|countries|activity` (anything else → ips):
+blocked IP addresses, blocked countries and the IP activity, on the backend's
+`/admin/ip-address`, `/admin/security/countries` (backend CLAUDE.md §8.9.11)
+and `/admin/ip-activity` (§8.9.13). Files:
+`src/api/security.ts`, `src/repositories/SecurityRepository.ts`,
+`src/routes/Security.tsx`, `src/components/security/*`.
+
+There is NO access tab: since 2026-09-29 web and Telegram access follow the
+role (owners: web + Telegram, managers: web), so there is nothing to grant.
+The access / sessions / audit tabs built the same day were removed with their
+backend routes.
+
+- IPs / countries: the server's 422 sentence is shown as is (self-lockout,
+  duplicate, invalid). Country names via `Intl.DisplayNames` (`am` → `hy`,
+  never passed raw: `am` is Amharic). Banner when `geoip.available` is false.
+- IP activity (2026-09-30, `IpActivityTab`, `src/api/ipActivity.ts`):
+  - server search / filters / sort / pagination; the page belongs to its query, so any change starts on page 1;
+  - clicking a user or a city narrows the list (a chip removes it);
+  - rows read as a user (name + email), a mobile player, "Anonymous", or "Telegram servers" (bot webhooks);
+  - the header sentence says the address is the SERVER's view (a VPN's address behind a VPN) and the location approximate — never "exact";
+  - source pills `.pill.ipa-source.is-*`;
+  - `IpActivityTab.test.tsx` (8).
+- Layout: tables scroll in their own frame; ≤640px rows become cards from
+  `data-label`; the owner-web app renders the same screen in a browser.
+
+## 9.5.8b Address block and parity with the web (2026-10-01)
+
+- **IP / country block:**
+  - `src/auth/networkBlock.ts`: the API client (`request`, `requestBlob` and the background revalidate) raises `access_blocked` → kind `blocked` / `access_suspended` → kind `suspended` from any 403 (legacy `ip_blocked` / `country_blocked` → `blocked`). The screen never says what was blocked (no IP, country or administrator).
+  - `NetworkBlockedScreen` then replaces the WHOLE `App` (before the spinner), clears `apiCache`, disconnects Echo and keeps the sign-in (AuthContext does not drop the token for a block). "Check again" reloads.
+  - The web and Telegram get the same screen (Telegram also from `TelegramGate`).
+  - Tests: `networkBlock.test.ts`, `NetworkBlockedScreen.test.tsx`, `AuthContext.networkBlock.test.tsx`.
+- **Add owner:** first name, last name and email are all required (`CreateOwnerBody`); the server stores "First Last".
+- **Security → Blocked IPs** marks rows the system added (`reason` `auto_threat` / `auto_login`) with a pill; they unblock like any other.
+- **Web and Telegram owners can now do what the desktop does:** profile name/email/password, managers, kiosk PIN, agent token. Only a LAN-only action (Wake-on-LAN, the console watcher) or a destructive global one stays desktop-only (backend `client_access.denied_routes`). The web shows the same buttons, so nothing is hidden here.
 
 ## 9.5.9 Revenue screen — tournaments, owner income, per branch (2026-09-11)
 
@@ -2219,7 +2276,11 @@ Repaired in `e2e/` only; no production file was touched.
 
 1. **Two language gates.** `FirstRunLanguageGate` renders an undismissable
    picker over the login screen on a machine where nobody has chosen a
-   language, and `AccountLanguageGate` asks again once an account signs in. A
+   language, and `AccountLanguageGate` asks again once an account signs in.
+   (2026-09-30: `LanguageContext` imports `@/i18n/languagePreference` by
+   ALIAS, not `./languagePreference` — same file for the desktop, but the
+   owner web replaces that module by alias to keep the account's language on
+   the server, and a relative import would bypass it. Keep it an alias.) A
    fresh browser context is that machine, so every spec was clicking at a form
    behind an inert, blurred backdrop. `installBackendMocks` now seeds
    `cp.lang` / `cp.lang.chosen` / `u{id}:cp.lang` via `addInitScript` — and

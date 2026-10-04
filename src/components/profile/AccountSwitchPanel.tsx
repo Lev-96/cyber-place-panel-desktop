@@ -1,4 +1,5 @@
 import { IAccountSwitchTarget } from "@/api/accountSwitch";
+import Button from "@/components/ui/Button";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { useAsync } from "@/hooks/useAsync";
 import { useLang } from "@/i18n/LanguageContext";
@@ -38,7 +39,7 @@ const haystack = (a: IAccountSwitchTarget): string =>
  */
 const AccountSwitchPanel = ({ onBack, onPick }: Props) => {
   const { t } = useLang();
-  const { data, loading } = useAsync(() => accountSwitchRepository.targets(), []);
+  const { data, loading, error, reload } = useAsync(() => accountSwitchRepository.targets(), []);
   const [query, setQuery] = useState("");
 
   const all = data ?? [];
@@ -79,7 +80,16 @@ const AccountSwitchPanel = ({ onBack, onPick }: Props) => {
           </div>
         )}
 
-        {!loading && shown.length === 0 && (
+        {/* A list that failed to load is not an empty company: say so and
+            offer the retry, instead of "no other accounts". */}
+        {!loading && error && (
+          <div className="col" style={{ gap: 6, padding: "6px 4px" }} role="alert">
+            <span className="error" style={{ fontSize: 12 }}>{error.message || t("form.errors.failed")}</span>
+            <Button variant="secondary" type="button" onClick={() => void reload()}>{t("action.retry")}</Button>
+          </div>
+        )}
+
+        {!loading && !error && shown.length === 0 && (
           <div className="muted" style={{ fontSize: 12, padding: "6px 4px" }}>
             {all.length === 0 ? t("switchAccount.empty") : t("switchAccount.noMatch")}
           </div>

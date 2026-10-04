@@ -1,6 +1,7 @@
 import { apiGetMe, apiLogin, apiLogout } from "@/api/auth";
 import { disconnectEchoForSignOut } from "@/realtime/echo";
 import { apiCache } from "@/api/client";
+import { isNetworkBlockError } from "@/auth/networkBlock";
 import { recentEmails } from "@/auth/recentEmails";
 import { AppConfig } from "@/infrastructure/AppConfig";
 import { keyValueStore } from "@/infrastructure/KeyValueStore";
@@ -35,9 +36,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const me = await apiGetMe();
         setUser(me.user);
         await keyValueStore.set(AppConfig.storageKeys.user, me.user);
-      } catch {
-        await keyValueStore.remove(AppConfig.storageKeys.token);
-        await keyValueStore.remove(AppConfig.storageKeys.user);
+      } catch (error) {
+        // A blocked ADDRESS is not a dead session: keep the sign-in, so the
+        // app continues once the administrator lifts the block
+        // (NetworkBlockedScreen covers everything meanwhile).
+        if (!isNetworkBlockError(error)) {
+          await keyValueStore.remove(AppConfig.storageKeys.token);
+          await keyValueStore.remove(AppConfig.storageKeys.user);
+        }
       } finally {
         setLoading(false);
       }

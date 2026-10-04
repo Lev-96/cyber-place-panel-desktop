@@ -1,15 +1,6 @@
 import { Role } from "@/types/api";
 import { request } from "./client";
 
-export interface RegisterUserBody {
-  name: string;
-  email: string;
-  password: string;
-  password_confirmation: string;
-  /** Hold the welcome email until the company is created (company flow). */
-  defer_welcome?: boolean;
-}
-
 export interface IRegisteredUser {
   id: number;
   name: string;
@@ -18,9 +9,6 @@ export interface IRegisteredUser {
   created_at?: string;
   updated_at?: string;
 }
-
-export const apiRegisterUser = (body: RegisterUserBody) =>
-  request<{ register: IRegisteredUser; token: string; messages?: string }>("/users", { method: "POST", body });
 
 export const apiUpdateUser = (id: number, body: { name: string; email: string }) =>
   request<{ messages?: string }>(`/users/${id}`, { method: "PUT", body });

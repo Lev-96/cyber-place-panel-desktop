@@ -2274,6 +2274,16 @@ export const TRANSLATIONS: Dict = {
   "owners.branches": { en: "Branches: {0}", ru: "Филиалов: {0}", am: "Մասնաճյուղեր՝ {0}" },
   "owners.managers": { en: "Managers: {0}", ru: "Менеджеров: {0}", am: "Մենեջերներ՝ {0}" },
   "owner.titleEdit": { en: "Edit owner", ru: "Редактировать владельца", am: "Խմբագրել սեփականատիրոջը" },
+  "owner.titleNew": { en: "Add owner", ru: "Добавить владельца", am: "Ավելացնել սեփականատեր" },
+  "owners.add": { en: "Add owner", ru: "Добавить владельца", am: "Ավելացնել սեփականատեր" },
+  "owner.pickCompany": { en: "Choose a company", ru: "Выберите компанию", am: "Ընտրեք ընկերությունը" },
+  "owner.errors.companyRequired": { en: "Choose the company", ru: "Выберите компанию", am: "Ընտրեք ընկերությունը" },
+  // One hint for every "new account" form: nobody types a password for somebody else.
+  "staff.inviteHint": {
+    en: "We will email a link to this address; the person sets their own password.",
+    ru: "На этот адрес придёт письмо со ссылкой, и человек сам задаст пароль.",
+    am: "Այս հասցեին կուղարկվի հղում, և անձն ինքը կսահմանի իր գաղտնաբառը։",
+  },
   "owners.delete.question": {
     en: "Delete owner {0} and everything they own?",
     ru: "Удалить владельца {0} и всё, что ему принадлежит?",
@@ -2313,6 +2323,7 @@ export const TRANSLATIONS: Dict = {
     ru: "Предстоящих бронирований: {0}. Сначала отмените их (игроки получат уведомление).",
     am: "Առաջիկա ամրագրումներ՝ {0}։ Նախ չեղարկեք դրանք (խաղացողները կծանուցվեն)։",
   },
+  "toast.owner.created": { en: "Owner added, invitation sent", ru: "Владелец добавлен, приглашение отправлено", am: "Սեփականատերն ավելացվեց՝ հրավերն ուղարկվեց" },
   "toast.owner.updated": { en: "Owner updated", ru: "Владелец обновлён", am: "Սեփականատերը թարմացվեց" },
   "toast.owner.deleted": { en: "Owner deleted", ru: "Владелец удалён", am: "Սեփականատերը ջնջվեց" },
   // ── PA-C: one owner's page (`/owners/:ownerId`) ──────────────────────────
@@ -2502,7 +2513,6 @@ export const TRANSLATIONS: Dict = {
   "company.section": { en: "Company", ru: "Компания", am: "Ընկերություն" },
   "company.ownerName": { en: "Owner full name", ru: "Имя владельца", am: "Սեփականատիրոջ անուն, ազգանուն" },
   "company.ownerEmail": { en: "Owner email", ru: "Email владельца", am: "Սեփականատիրոջ էլ. հասցե" },
-  "company.creatingOwner": { en: "Creating owner…", ru: "Создание владельца…", am: "Սեփականատերը ստեղծվում է…" },
   "company.next": { en: "Next", ru: "Далее", am: "Հաջորդը" },
   "company.back": { en: "← Back", ru: "← Назад", am: "← Հետ" },
   "company.create": { en: "Create company", ru: "Создать компанию", am: "Ստեղծել ընկերություն" },
@@ -2895,6 +2905,19 @@ export const TRANSLATIONS: Dict = {
   // server's text for a code it does not know. Without that, a Russian panel
   // showed "Your branch has been blocked" at the login screen, because the
   // sentence was written wherever the refusal happened to be thrown.
+  // This device is blocked (2026-10-01). Never says what: an address, a country, an administrator.
+  "networkBlock.title": { en: "Access closed", ru: "Доступ закрыт", am: "Մուտքը փակ է" },
+  "networkBlock.blocked": {
+    en: "You have been blocked. You no longer have access to Cyber Place.",
+    ru: "Вы заблокированы. У вас больше нет доступа к Cyber Place.",
+    am: "Դուք արգելափակված եք։ Այլևս մուտք չունեք Cyber Place։",
+  },
+  "networkBlock.suspended": {
+    en: "Suspicious activity was detected. Your access to Cyber Place has been blocked permanently.",
+    ru: "Система обнаружила подозрительные действия. Доступ к Cyber Place для вас заблокирован навсегда.",
+    am: "Համակարգը հայտնաբերել է կասկածելի գործողություններ։ Ձեր մուտքը Cyber Place ընդմիշտ արգելափակված է։",
+  },
+  "networkBlock.retry": { en: "Check again", ru: "Проверить снова", am: "Ստուգել կրկին" },
   "blocking.reason.company_blocked": {
     en: "Your company has been blocked. Please contact the administrator.",
     ru: "Ваша компания заблокирована. Обратитесь к администратору.",
@@ -3486,6 +3509,102 @@ export const TRANSLATIONS: Dict = {
     ru: "Бренды, коды и числа копируются как есть, без перевода.",
     am: "Ապրանքանիշերը, կոդերը և թվերը պատճենվում են այնպես, ինչպես կան՝ առանց թարգմանության։",
   },
+  // ── Security (admin, `/security`) ─────────────────────────────────────────
+  "nav.security": { en: "Security", ru: "Безопасность", am: "Անվտանգություն" },
+  "security.title": { en: "Security", ru: "Безопасность", am: "Անվտանգություն" },
+  "security.tab.ips": { en: "Blocked IPs", ru: "Заблокированные IP", am: "Արգելափակված IP հասցեներ" },
+  "security.tab.countries": { en: "Blocked countries", ru: "Заблокированные страны", am: "Արգելափակված երկրներ" },
+  "security.tab.activity": { en: "IP activity", ru: "Активность IP", am: "IP ակտիվություն" },
+  // Security → IP activity (2026-09-30): the address the SERVER saw. Never "exact location".
+  "ipActivity.about": {
+    en: "The address the Cyber Place server saw for each connection. Behind a VPN or proxy it is that service's address, not the person's. Country and city are approximate.",
+    ru: "Адрес, который сервер Cyber Place увидел при подключении. Если человек за VPN или прокси, это адрес VPN или прокси, а не его собственный. Страна и город определяются приблизительно.",
+    am: "Հասցեն, որը Cyber Place-ի սերվերը տեսել է միացման ժամանակ։ VPN-ի կամ պրոքսիի դեպքում դա այդ ծառայության հասցեն է, ոչ թե անձի։ Երկիրը և քաղաքը մոտավոր են։",
+  },
+  "ipActivity.search": { en: "Search", ru: "Поиск", am: "Որոնում" },
+  "ipActivity.searchHint": {
+    en: "IP, name, email, country or city",
+    ru: "IP, имя, email, страна или город",
+    am: "IP, անուն, էլ. հասցե, երկիր կամ քաղաք",
+  },
+  "ipActivity.all": { en: "All", ru: "Все", am: "Բոլորը" },
+  "ipActivity.from": { en: "Last seen from", ru: "Последний визит с", am: "Վերջին այցը սկսած" },
+  "ipActivity.to": { en: "Last seen to", ru: "Последний визит по", am: "Վերջին այցը մինչև" },
+  "ipActivity.sort": { en: "Sort", ru: "Сортировка", am: "Դասավորել" },
+  "ipActivity.sort.last_seen": { en: "Last seen, newest first", ru: "Последний визит, сначала новые", am: "Վերջին այցը, նորերը առաջինը" },
+  "ipActivity.sort.first_seen": { en: "First seen, newest first", ru: "Первый визит, сначала новые", am: "Առաջին այցը, նորերը առաջինը" },
+  "ipActivity.sort.visits": { en: "Most visits", ru: "Больше всего визитов", am: "Ամենաշատ այցերը" },
+  "ipActivity.clearFilter": { en: "Remove filter", ru: "Убрать фильтр", am: "Հեռացնել զտիչը" },
+  "ipActivity.onlyThisUser": { en: "Show only this user", ru: "Показать только этого пользователя", am: "Ցույց տալ միայն այս օգտատիրոջը" },
+  "ipActivity.empty": { en: "No connections match.", ru: "Подключений не найдено.", am: "Միացումներ չեն գտնվել։" },
+  "ipActivity.unknown": { en: "Unknown", ru: "Не определено", am: "Անհայտ" },
+  "ipActivity.anonymous": { en: "Anonymous", ru: "Аноним", am: "Անանուն" },
+  "ipActivity.player": { en: "Mobile player", ru: "Игрок (мобильное приложение)", am: "Խաղացող (բջջային հավելված)" },
+  "ipActivity.telegramServers": { en: "Telegram servers", ru: "Серверы Telegram", am: "Telegram-ի սերվերներ" },
+  "ipActivity.col.user": { en: "User", ru: "Пользователь", am: "Օգտատեր" },
+  "ipActivity.col.ip": { en: "IP address", ru: "IP-адрес", am: "IP հասցե" },
+  "ipActivity.col.country": { en: "Country", ru: "Страна", am: "Երկիր" },
+  "ipActivity.col.city": { en: "City", ru: "Город", am: "Քաղաք" },
+  "ipActivity.col.source": { en: "Source", ru: "Источник", am: "Աղբյուր" },
+  "ipActivity.col.firstSeen": { en: "First seen", ru: "Первый визит", am: "Առաջին այց" },
+  "ipActivity.col.lastSeen": { en: "Last seen", ru: "Последний визит", am: "Վերջին այց" },
+  "ipActivity.col.visits": { en: "Visits", ru: "Визиты", am: "Այցեր" },
+  "ipActivity.source.website": { en: "Website", ru: "Сайт", am: "Կայք" },
+  "ipActivity.source.mobile": { en: "Mobile", ru: "Мобильное приложение", am: "Բջջային հավելված" },
+  "ipActivity.source.desktop": { en: "Desktop", ru: "Десктоп", am: "Համակարգչային հավելված" },
+  "ipActivity.source.owner_web": { en: "Owner Web", ru: "Веб-кабинет", am: "Վեբ կաբինետ" },
+  "ipActivity.source.telegram": { en: "Telegram", ru: "Telegram", am: "Telegram" },
+  "ipActivity.source.telegram_bot": { en: "Telegram bot", ru: "Бот Telegram", am: "Telegram բոտ" },
+
+
+
+  "security.col.created": { en: "Created", ru: "Создано", am: "Ստեղծվել է" },
+  "security.col.actions": { en: "Actions", ru: "Действия", am: "Գործողություններ" },
+  "security.col.addedBy": { en: "Added by", ru: "Кто добавил", am: "Ով է ավելացրել" },
+
+
+
+
+  "security.note": { en: "Note", ru: "Заметка", am: "Նշում" },
+  "security.yourIp": { en: "Your IP:", ru: "Ваш IP:", am: "Ձեր IP հասցեն:" },
+  "security.yourCountry": { en: "Your country:", ru: "Ваша страна:", am: "Ձեր երկիրը:" },
+
+  "security.ips.address": { en: "IP address or range", ru: "IP-адрес или диапазон", am: "IP հասցե կամ միջակայք" },
+  "security.ips.addressHint": { en: "203.0.113.7 or 203.0.113.0/24", ru: "203.0.113.7 или 203.0.113.0/24", am: "203.0.113.7 կամ 203.0.113.0/24" },
+  "security.ips.block": { en: "Block", ru: "Заблокировать", am: "Արգելափակել" },
+  "security.ips.unblock": { en: "Unblock", ru: "Разблокировать", am: "Ապաարգելափակել" },
+  // Blocked by the system itself (2026-10-01).
+  "security.ips.autoThreat": { en: "System: attack requests", ru: "Система: атакующие запросы", am: "Համակարգ՝ հարձակողական հարցումներ" },
+  "security.ips.autoLogin": { en: "System: password guessing", ru: "Система: подбор пароля", am: "Համակարգ՝ գաղտնաբառի ընտրություն" },
+  "security.ips.empty": { en: "No blocked IP addresses.", ru: "Заблокированных IP-адресов нет.", am: "Արգելափակված IP հասցեներ չկան։" },
+  "security.ips.confirmDelete": {
+    en: "Unblock {0}?\nRequests from it will be accepted again.",
+    ru: "Разблокировать {0}?\nЗапросы с него снова будут приниматься.",
+    am: "Ապաարգելափակե՞լ {0}։\nԴրանից հարցումները կրկին կընդունվեն։",
+  },
+
+  "security.countries.country": { en: "Country", ru: "Страна", am: "Երկիր" },
+  "security.countries.search": { en: "Start typing a country", ru: "Начните вводить страну", am: "Սկսեք մուտքագրել երկիրը" },
+  "security.countries.block": { en: "Block", ru: "Заблокировать", am: "Արգելափակել" },
+  "security.countries.unblock": { en: "Unblock", ru: "Разблокировать", am: "Ապաարգելափակել" },
+  "security.countries.unknown": { en: "not detected", ru: "не определена", am: "չի որոշվել" },
+  "security.countries.empty": { en: "No blocked countries.", ru: "Заблокированных стран нет.", am: "Արգելափակված երկրներ չկան։" },
+  "security.countries.geoipMissing": {
+    en: "The GeoIP database is not installed on the server. Country rules are saved but not enforced until it is.",
+    ru: "На сервере не установлена база GeoIP. Правила по странам сохраняются, но не действуют, пока её не установят.",
+    am: "Սերվերում GeoIP տվյալների բազան տեղադրված չէ։ Երկրների կանոնները պահպանվում են, բայց չեն գործում, քանի դեռ այն չի տեղադրվել։",
+  },
+  "security.countries.confirmDelete": {
+    en: "Unblock {0}?\nRequests from this country will be accepted again.",
+    ru: "Разблокировать {0}?\nЗапросы из этой страны снова будут приниматься.",
+    am: "Ապաարգելափակե՞լ {0}։\nԱյս երկրից հարցումները կրկին կընդունվեն։",
+  },
+
+
+  "toast.blockedIp.created": { en: "IP blocked", ru: "IP заблокирован", am: "IP հասցեն արգելափակվեց" },
+  "toast.blockedIp.deleted": { en: "IP unblocked", ru: "IP разблокирован", am: "IP հասցեն ապաարգելափակվեց" },
+  "toast.blockedCountry.created": { en: "Country blocked", ru: "Страна заблокирована", am: "Երկիրն արգելափակվեց" },
+  "toast.blockedCountry.deleted": { en: "Country unblocked", ru: "Страна разблокирована", am: "Երկիրն ապաարգելափակվեց" },
 };
 
 export const t = (key: string, lang: Lang): string => {

@@ -126,6 +126,18 @@ export interface ListOwnersParams {
   per_page?: number;
 }
 
+/**
+ * `POST /admin/owners` — add an owner to a company (a company may have
+ * several). The server stores "First Last" as the account's name; the owner
+ * gets an email link to set their own password.
+ */
+export interface CreateOwnerBody {
+  company_id: number;
+  first_name: string;
+  last_name: string;
+  email: string;
+}
+
 /** `PUT /admin/owners/{id}` — both required; email unique ignoring this owner. */
 export interface UpdateOwnerBody {
   name: string;
@@ -145,6 +157,9 @@ const base = "/admin/owners";
 
 export const apiListOwners = (params: ListOwnersParams = {}) =>
   request<PaginatedList<IOwnerApi>>(base, { params });
+
+export const apiCreateOwner = (body: CreateOwnerBody) =>
+  request<{ data: IOwnerApi; message?: string }>(base, { method: "POST", body });
 
 export const apiGetOwner = (id: number) =>
   request<{ data: IOwnerDetailApi }>(`${base}/${id}`);
