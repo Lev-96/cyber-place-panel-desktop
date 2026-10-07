@@ -1178,6 +1178,19 @@ a link, `Sidebar.tsx` does not mention `BranchForm`, `global.css` has no
 `sidebar-action`. Mutation-verified (link back to `/my-company`, `end` on the
 link, create button put back under Branches).
 
+### Sidebar in alphabetical order (2026-10-07)
+
+The nav entries are DATA (`navItems` in `Sidebar.tsx`: route, label key, who may
+see it, badge) sorted by `sortedNavItems` (`src/components/sidebarNav.ts`) in
+alphabetical order of the label in the CURRENT language, re-sorted when it
+changes. Collation is `compareText` from `src/i18n/collation.ts`, which maps the
+panel's `am` to `hy` (to `Intl`, `am` is Amharic) — the one place that mapping
+lives (`countryNames.ts` and `BlockedCountriesTab` use it too). The footer
+(Support, footerExtra, account, Sign out) is NOT sorted. The owner web uses the
+same Sidebar, so it sorts too after a `panel.ref` bump. Tests:
+`Sidebar.order.test.tsx` (every role × en/ru/am with real translations, the
+Armenian alphabet, re-sort on language change, links/badges kept).
+
 ### Sidebar footer slot (2026-09-29)
 
 `<Sidebar footerExtra={…} />` draws extra entries in the pinned footer, after
@@ -1352,6 +1365,7 @@ backend routes.
   - Tests: `networkBlock.test.ts`, `NetworkBlockedScreen.test.tsx`, `AuthContext.networkBlock.test.tsx`.
 - **Add owner:** first name, last name and email are all required (`CreateOwnerBody`); the server stores "First Last".
 - **Security → Blocked IPs** marks rows the system added (`reason` `auto_threat` / `auto_login`) with a pill; they unblock like any other.
+- **Security → Blocked IPs → Locked sign-ins** (2026-10-07, `LoginLockoutsSection` under the IP table): sign-ins closed after too many wrong passwords on the desktop or the owner web — account (email, name · role, or "No such account"), IP (+ "address blocked too" pill), where, attempts, locked until, Unblock (asks first, `DELETE /admin/security/login-lockouts/{id}`). Re-read after an IP unblock (lifting an `auto_login` ban lifts its locks). A backend without the endpoint hides the section. The desktop sign-in shows the server's 423 sentence ("closed for N more minutes"). Tests: `LoginLockouts.test.tsx`, `Login.blocked.test.tsx`.
 - **Web and Telegram owners can now do what the desktop does:** profile name/email/password, managers, kiosk PIN, agent token. Only a LAN-only action (Wake-on-LAN, the console watcher) or a destructive global one stays desktop-only (backend `client_access.denied_routes`). The web shows the same buttons, so nothing is hidden here.
 
 ## 9.5.9 Revenue screen — tournaments, owner income, per branch (2026-09-11)
