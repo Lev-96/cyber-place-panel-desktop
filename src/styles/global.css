@@ -2059,6 +2059,18 @@ button.pill:hover {
   color: var(--color-muted);
 }
 
+/* ── Map area: an approximate location's accuracy circle (IP activity) ──
+   Dashed and translucent on purpose: an area, never a point. SVG presentation
+   attributes Leaflet writes (stroke="#3388ff"…) lose to these properties. */
+.leaflet-container .cp-map-area {
+  stroke: var(--color-primary);
+  stroke-width: 2px;
+  stroke-dasharray: 6 6;
+  stroke-opacity: 0.9;
+  fill: var(--color-primary);
+  fill-opacity: 0.12;
+}
+
 /* ── Branch map: animated "Boom" location pin ───────────────────────────── */
 .cp-map-pin {
   position: relative;
@@ -4277,6 +4289,143 @@ button.login-flip-back:hover {
 .pill.ipa-source.is-telegram,
 .pill.ipa-source.is-telegram_bot { border-color: var(--color-accent-purple); color: var(--color-accent-purple); }
 .pill.ipa-source.is-website { border-color: var(--color-warning); color: var(--color-warning); }
+
+/* The network cell stacks like the user cell: organisation over AS number. */
+.ipa-net {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  max-width: 240px;
+}
+/* "Activity" carries its definition in a tooltip; the dotted line says so. */
+.ipa-hint {
+  text-decoration: underline dotted;
+  text-decoration-color: var(--color-muted);
+  text-underline-offset: 3px;
+  cursor: help;
+}
+/* A row opens its details: pointer, and a visible focus for Enter. */
+.ipa-table .ipa-row {
+  cursor: pointer;
+}
+.ipa-table .ipa-row:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
+}
+
+/* Security → IP activity → one row in full (2026-10-07). Facts on the left,
+   the network's area on the right; below ~760px they stack. Sized so the
+   longest Armenian labels never squeeze the values to one word a line. */
+.ipa-details {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  width: 880px;
+  max-width: 92vw;
+  min-width: 0;
+}
+.ipa-details__head {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+.ipa-details__title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+.ipa-details__ip {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: 0.2px;
+  min-width: 0;
+}
+.ipa-details__who {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+.ipa-details__who .meta {
+  color: var(--color-muted);
+  font-size: 13px;
+}
+.ipa-details__body {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+  min-width: 0;
+}
+.ipa-details__facts {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  flex: 1 1 320px;
+  min-width: 0;
+}
+.ipa-details__place {
+  flex: 1 1 360px;
+  min-width: 0;
+}
+/* Label / value pairs: a grid is the simplest way to keep the values in one
+   column whatever the label's length. Groups are separated by a rule. */
+.ipa-facts {
+  display: grid;
+  grid-template-columns: minmax(112px, max-content) minmax(0, 1fr);
+  gap: 8px 16px;
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.4;
+}
+.ipa-facts + .ipa-facts {
+  padding-top: 16px;
+  border-top: 1px solid var(--color-border);
+}
+.ipa-facts dt {
+  color: var(--color-muted);
+  font-size: 12px;
+}
+.ipa-facts dd {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.ipa-facts .meta {
+  color: var(--color-muted);
+  font-size: 12px;
+}
+.ipa-details__map {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+}
+.ipa-details__caption {
+  color: var(--color-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.ipa-details__note {
+  margin: 0;
+  padding: 16px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-surface-alt);
+  color: var(--color-muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
 
 /* Phone widths: every row becomes a card of label / value lines. */
 @media (max-width: 640px) {

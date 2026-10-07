@@ -3,6 +3,17 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 interface State<T> { data: T | null; loading: boolean; error: Error | null; }
 
+export interface UseAsyncOptions {
+  /**
+   * Re-run when the HTTP cache announces a changed body (guarantee 3 below).
+   * Default true. Turn it off for a read that has a SIDE EFFECT on the server
+   * and is never cached anyway — `GET /admin/ip-activity/{id}` writes an audit
+   * row per read, so a re-run nobody asked for would log an access that did
+   * not happen. `reload()` still works.
+   */
+  revalidateOnCacheChange?: boolean;
+}
+
 /**
  * Generic async loader with two correctness guarantees on top of plain
  * `useEffect + setState`:
@@ -24,7 +35,8 @@ interface State<T> { data: T | null; loading: boolean; error: Error | null; }
  * The public shape is `{data, loading, error, reload, mutate}`; `mutate` was
  * added later and nothing that ignores it changes.
  */
-export const useAsync = <T,>(fn: () => Promise<T>, deps: unknown[]) => {
+export const useAsync = <T,>(fn: () => Promise<T>, deps: unknown[], options: UseAsyncOptions = {}) => {
+  const { revalidateOnCacheChange = true } = options;
   const [state, setState] = useState<State<T>>({ data: null, loading: true, error: null });
   const genRef = useRef(0);
   const aliveRef = useRef(true);
@@ -56,7 +68,10 @@ export const useAsync = <T,>(fn: () => Promise<T>, deps: unknown[]) => {
 
   // Only ever fires when a cached response actually differs from what was
   // held, so an unchanged endpoint re-renders nothing.
-  useEffect(() => apiCache.subscribe(() => { void run(); }), [run]);
+  useEffect(
+    () => (revalidateOnCacheChange ? apiCache.subscribe(() => { void run(); }) : undefined),
+    [run, revalidateOnCacheChange],
+  );
 
   /**
    * Put what a WRITE already answered on screen now, instead of after the

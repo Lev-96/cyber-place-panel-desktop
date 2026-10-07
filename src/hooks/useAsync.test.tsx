@@ -2,7 +2,8 @@
 import { act, render } from "@testing-library/react";
 import { StrictMode } from "react";
 import { describe, expect, test, vi } from "vitest";
-import { useAsync } from "./useAsync";
+import { apiCache } from "@/api/client";
+import { useAsync, UseAsyncOptions } from "./useAsync";
 
 const flushMicrotasks = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
 
@@ -103,5 +104,33 @@ describe("useAsync — mutate", () => {
     await act(async () => { resolveSlow("stale"); await flushMicrotasks(); });
 
     expect(states.at(-1)).toBe("written");
+  });
+});
+
+/**
+ * A changed cached body re-runs every mounted read (guarantee 3) — except one
+ * that opted out because reading has a side effect on the server (the IP
+ * activity details are audited per read, 2026-10-07).
+ */
+describe("useAsync — cache revalidation", () => {
+  const RevProbe = ({ fn, options }: { fn: () => Promise<string>; options?: UseAsyncOptions }) => {
+    useAsync(fn, [], options);
+    return null;
+  };
+  const announce = () => apiCache.replace(`GET /probe-${Math.random()}`, "{}", null);
+
+  test("re-runs by default when the cache announces a change", async () => {
+    const fn = vi.fn(() => Promise.resolve("x"));
+    await act(async () => { render(<RevProbe fn={fn} />); await flushMicrotasks(); });
+    expect(fn).toHaveBeenCalledTimes(1);
+    await act(async () => { announce(); await flushMicrotasks(); });
+    expect(fn).toHaveBeenCalledTimes(2);
+  });
+
+  test("does not re-run with revalidateOnCacheChange: false", async () => {
+    const fn = vi.fn(() => Promise.resolve("x"));
+    await act(async () => { render(<RevProbe fn={fn} options={{ revalidateOnCacheChange: false }} />); await flushMicrotasks(); });
+    await act(async () => { announce(); await flushMicrotasks(); });
+    expect(fn).toHaveBeenCalledTimes(1);
   });
 });

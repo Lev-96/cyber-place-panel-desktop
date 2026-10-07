@@ -4,7 +4,7 @@ import {
   CreateBlockedCountryBody, CreateBlockedIpBody, IBlockedCountryListApi, IBlockedIpListApi,
   ILoginLockoutListApi,
 } from "@/api/security";
-import { apiListIpActivity, IIpActivityListApi, IpActivityQuery } from "@/api/ipActivity";
+import { apiGetIpActivity, apiListIpActivity, IIpActivityApi, IIpActivityListApi, IpActivityQuery } from "@/api/ipActivity";
 import { withToast } from "@/ui/notify";
 
 /**
@@ -58,6 +58,14 @@ export class SecurityRepository {
   /** One page of the IP activity, searched and filtered by the server. */
   async ipActivity(query: IpActivityQuery): Promise<IIpActivityListApi> {
     return apiListIpActivity(query);
+  }
+
+  /**
+   * One row for the details dialog. Read fresh every time on purpose: the
+   * server audits each read, so a stale copy would hide an access from the log.
+   */
+  async ipActivityDetails(id: number): Promise<IIpActivityApi> {
+    return (await apiGetIpActivity(id)).data;
   }
 }
 

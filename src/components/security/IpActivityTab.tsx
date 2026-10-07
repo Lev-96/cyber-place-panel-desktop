@@ -1,6 +1,6 @@
 import {
   IIpActivityApi, IP_ACTIVITY_DEVICES, IP_ACTIVITY_OS, IP_ACTIVITY_SOURCES,
-  IpActivityDevice, IpActivityOs, IpActivitySort, IpActivitySource, isKnownDevice, isKnownOs,
+  IpActivityDevice, IpActivityOs, IpActivitySort, IpActivitySource,
 } from "@/api/ipActivity";
 import Pagination from "@/components/ui/Pagination";
 import { ListSkeleton } from "@/components/ui/Skeleton";
@@ -10,20 +10,32 @@ import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { formatDateTime } from "@/i18n/dates";
 import { useLang } from "@/i18n/LanguageContext";
 import { securityRepository } from "@/repositories/SecurityRepository";
-import { useEffect, useState } from "react";
+import { KeyboardEvent, MouseEvent, useEffect, useState } from "react";
 import { countryName } from "./countryNames";
-import DeviceIcon from "./DeviceIcon";
+import IpActivityDetailsModal from "./IpActivityDetailsModal";
+import { DeviceCell, asLabel, countryText, osText, sourceLabel } from "./ipActivityText";
 
 /** Typing pause before the server is asked again. */
 const SEARCH_DEBOUNCE_MS = 400;
 const PER_PAGE = 25;
 const SORTS: readonly IpActivitySort[] = ["last_seen", "first_seen", "visits"];
 
-/** A filter picked from a row: one user, or one city. */
-type Pick = { kind: "user"; id: number; label: string } | { kind: "city"; label: string };
+/** A filter picked from a row: one user, one city, or one network. */
+type Pick =
+  | { kind: "user"; id: number; label: string }
+  | { kind: "city"; label: string }
+  | { kind: "asn"; asn: number; label: string };
 
-const isKnownSource = (value: string): value is IpActivitySource =>
-  (IP_ACTIVITY_SOURCES as readonly string[]).includes(value);
+/**
+ * A click that landed on a control inside the row (the user, the city, the
+ * network) is that control's: it filters, it does not open the details.
+ */
+const INNER_CONTROL = "button, a, input, select, textarea, label";
+
+const isInnerControl = (target: EventTarget, row: Element): boolean => {
+  const hit = target instanceof Element ? target.closest(INNER_CONTROL) : null;
+  return hit !== null && row.contains(hit);
+};
 
 /**
  * The addresses the Cyber Place server saw for connections to its own
@@ -33,7 +45,8 @@ const isKnownSource = (value: string): value is IpActivitySource =>
  * Everything is searched, filtered, sorted and paged by the server; the page
  * belongs to the query it was chosen for, so any change of search or filter
  * starts on page 1 without a second request, and a page is always replaced,
- * never appended to. Clicking a user or a city narrows the list to it.
+ * never appended to. Clicking a user, a city or a network narrows the list to
+ * it; clicking anywhere else on a row (or Enter on it) opens its details.
  */
 const IpActivityTab = () => {
   const { t, lang } = useLang();
@@ -51,8 +64,12 @@ const IpActivityTab = () => {
 
   const user = picks.find((p): p is Extract<Pick, { kind: "user" }> => p.kind === "user");
   const city = picks.find((p) => p.kind === "city");
+  const network = picks.find((p): p is Extract<Pick, { kind: "asn" }> => p.kind === "asn");
+  const [openId, setOpenId] = useState<number | null>(null);
 
-  const key = JSON.stringify([query, source, country, device, os, from, to, sort, user?.id ?? null, city?.label ?? null]);
+  const key = JSON.stringify([
+    query, source, country, device, os, from, to, sort, user?.id ?? null, city?.label ?? null, network?.asn ?? null,
+  ]);
   // Anything narrowing the list: an empty answer then means "nothing matches",
   // not "nothing recorded". (Sort orders, it does not narrow.)
   const narrowed = Boolean(query || source || country || device || os || from || to || picks.length > 0);
@@ -68,6 +85,7 @@ const IpActivityTab = () => {
       os: os || undefined,
       city: city?.label,
       user_id: user?.id,
+      asn: network?.asn,
       from: from || undefined,
       to: to || undefined,
       sort,
@@ -90,17 +108,18 @@ const IpActivityTab = () => {
   const pick = (next: Pick) => setPicks((current) => [...current.filter((p) => p.kind !== next.kind), next]);
   const unpick = (kind: Pick["kind"]) => setPicks((current) => current.filter((p) => p.kind !== kind));
 
-  const sourceLabel = (value: string) => (isKnownSource(value) ? t(`ipActivity.source.${value}`) : value);
-  // "iOS 17.8", "Windows", "Android 15"; a name this build does not know is
-  // shown as sent; nothing known → "Unknown" (also every row of an older
-  // backend, which sends neither field).
-  const osText = (r: IIpActivityApi) => {
-    if (!r.os_name) return t("ipActivity.unknown");
-    const name = isKnownOs(r.os_name) ? t(`ipActivity.os.${r.os_name}`) : r.os_name;
-    return r.os_version ? `${name} ${r.os_version}` : name;
+  // The row opens its details; a click on a control inside it, or one that
+  // ends a text selection (copying an address out of the table), does not.
+  const onRowClick = (id: number) => (e: MouseEvent<HTMLTableRowElement>) => {
+    if (isInnerControl(e.target, e.currentTarget)) return;
+    if (window.getSelection()?.toString()) return;
+    setOpenId(id);
   };
-  const countryText = (r: IIpActivityApi) =>
-    r.country_code ? countryName(r.country_code, lang) : t("ipActivity.unknown");
+  const onRowKey = (id: number) => (e: KeyboardEvent<HTMLTableRowElement>) => {
+    if (e.key !== "Enter" || e.target !== e.currentTarget) return;
+    e.preventDefault();
+    setOpenId(id);
+  };
 
   return (
     <div className="col sec-stack">
@@ -125,7 +144,7 @@ const IpActivityTab = () => {
             <span className="label">{t("ipActivity.col.source")}</span>
             <select className="input" value={source} onChange={(e) => setSource(e.target.value as IpActivitySource | "")}>
               <option value="">{t("ipActivity.all")}</option>
-              {IP_ACTIVITY_SOURCES.map((s) => <option key={s} value={s}>{sourceLabel(s)}</option>)}
+              {IP_ACTIVITY_SOURCES.map((s) => <option key={s} value={s}>{sourceLabel(t, s)}</option>)}
             </select>
           </label>
           <label className="sec-field">
@@ -196,25 +215,38 @@ const IpActivityTab = () => {
                 <th scope="col">{t("ipActivity.col.user")}</th>
                 <th scope="col">{t("ipActivity.col.device")}</th>
                 <th scope="col">{t("ipActivity.col.os")}</th>
+                <th scope="col">{t("ipActivity.col.network")}</th>
                 <th scope="col">{t("ipActivity.col.ip")}</th>
                 <th scope="col">{t("ipActivity.col.country")}</th>
                 <th scope="col">{t("ipActivity.col.city")}</th>
                 <th scope="col">{t("ipActivity.col.source")}</th>
                 <th scope="col">{t("ipActivity.col.firstSeen")}</th>
                 <th scope="col">{t("ipActivity.col.lastSeen")}</th>
-                <th scope="col" className="ipa-num">{t("ipActivity.col.visits")}</th>
+                <th scope="col" className="ipa-num">
+                  <span className="ipa-hint" title={t("ipActivity.col.visitsHint")}>{t("ipActivity.col.visits")}</span>
+                </th>
               </tr>
             </thead>
             <tbody>
               {rows.map((r) => (
-                <tr key={r.id}>
+                <tr
+                  key={r.id}
+                  className="ipa-row"
+                  tabIndex={0}
+                  title={t("ipActivity.openDetails")}
+                  onClick={onRowClick(r.id)}
+                  onKeyDown={onRowKey(r.id)}
+                >
                   <td data-label={t("ipActivity.col.user")}>
                     <Who row={r} onPickUser={(id, label) => pick({ kind: "user", id, label })} />
                   </td>
                   <td data-label={t("ipActivity.col.device")}><DeviceCell device={r.device} /></td>
-                  <td data-label={t("ipActivity.col.os")}>{osText(r)}</td>
+                  <td data-label={t("ipActivity.col.os")}>{osText(t, r)}</td>
+                  <td data-label={t("ipActivity.col.network")}>
+                    <NetworkCell row={r} onPick={(asn, label) => pick({ kind: "asn", asn, label })} />
+                  </td>
                   <td data-label={t("ipActivity.col.ip")} className="sec-num">{r.ip_address}</td>
-                  <td data-label={t("ipActivity.col.country")}>{countryText(r)}</td>
+                  <td data-label={t("ipActivity.col.country")}>{countryText(t, lang, r)}</td>
                   <td data-label={t("ipActivity.col.city")}>
                     {r.city_name ? (
                       <button type="button" className="ipa-link" onClick={() => pick({ kind: "city", label: r.city_name! })}>
@@ -223,11 +255,11 @@ const IpActivityTab = () => {
                     ) : t("ipActivity.unknown")}
                   </td>
                   <td data-label={t("ipActivity.col.source")}>
-                    <span className={`pill ipa-source is-${r.source}`}>{sourceLabel(r.source)}</span>
+                    <span className={`pill ipa-source is-${r.source}`}>{sourceLabel(t, r.source)}</span>
                   </td>
                   <td data-label={t("ipActivity.col.firstSeen")}>{formatDateTime(r.first_seen_at)}</td>
                   <td data-label={t("ipActivity.col.lastSeen")}>{formatDateTime(r.last_seen_at)}</td>
-                  <td data-label={t("ipActivity.col.visits")} className="ipa-num">{r.visits_count}</td>
+                  <td data-label={t("ipActivity.col.visits")} className="ipa-num" title={t("ipActivity.col.visitsHint")}>{r.visits_count}</td>
                 </tr>
               ))}
             </tbody>
@@ -237,20 +269,35 @@ const IpActivityTab = () => {
       {(data || !error) && (
         <Pagination page={page} lastPage={lastPage} onChange={(p) => setPaging({ key, page: p })} disabled={loading} />
       )}
+      {openId !== null && <IpActivityDetailsModal id={openId} onClose={() => setOpenId(null)} />}
     </div>
   );
 };
 
-/** The device, as an icon and its name; "Unknown" when the backend could not tell. */
-const DeviceCell = ({ device }: { device: string | null | undefined }) => {
+/**
+ * The network the address belongs to: its organisation (the provider, a
+ * host, a VPN) over its AS number. Clicking it narrows the list to that AS.
+ * Not "Wi-Fi": the server only ever sees the network, never the access point.
+ */
+const NetworkCell = ({ row, onPick }: { row: IIpActivityApi; onPick: (asn: number, label: string) => void }) => {
   const { t } = useLang();
-  if (!device) return <span className="muted">{t("ipActivity.unknown")}</span>;
-  if (!isKnownDevice(device)) return <span>{device}</span>;
+  const as = asLabel(row.asn);
+  if (!row.as_org && !as) return <span className="muted">{t("ipActivity.notDetermined")}</span>;
+  const name = row.as_org || as!;
   return (
-    <span className="ipa-device">
-      <DeviceIcon device={device} />
-      <span>{t(`ipActivity.device.${device}`)}</span>
-    </span>
+    <div className="ipa-who ipa-net">
+      {typeof row.asn === "number" ? (
+        <button
+          type="button"
+          className="ipa-link"
+          onClick={() => onPick(row.asn!, row.as_org ? `${row.as_org} (${as})` : as!)}
+          title={t("ipActivity.onlyThisNetwork")}
+        >
+          {name}
+        </button>
+      ) : <span>{name}</span>}
+      {row.as_org && as && <span className="meta sec-num">{as}</span>}
+    </div>
   );
 };
 
