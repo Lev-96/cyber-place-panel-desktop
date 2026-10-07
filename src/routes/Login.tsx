@@ -11,6 +11,7 @@ import Button from "@/components/ui/Button";
 import PasswordInput from "@/components/ui/PasswordInput";
 import SuggestInput from "@/components/ui/SuggestInput";
 import { useLang } from "@/i18n/LanguageContext";
+import { LocalizedText, renderText, textKey, textLiteral } from "@/i18n/localizedText";
 import { LANGUAGES } from "@/i18n/translations";
 import { FormEvent, lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -21,16 +22,6 @@ import { useLocation, useNavigate } from "react-router-dom";
 const LoginScene = lazy(() => import("@/components/login/LoginScene"));
 
 const LANG_LABEL: Record<string, string> = { en: "ENG", ru: "РУС", am: "ՀԱՅ" };
-
-type LoginErr =
-  | { kind: "invalid" }
-  | { kind: "generic" }
-  // An administrative block. Held as a TRANSLATION KEY, not as a sentence:
-  // the server's own wording follows the request's locale, and this way the
-  // message also re-renders when the operator switches language on this very
-  // screen (the language picker sits on the login card).
-  | { kind: "blocked"; key: string }
-  | { kind: "raw"; message: string };
 
 /**
  * The server holding sign-in back for a while (2026-10-07): a lock after too
@@ -62,7 +53,9 @@ const Login = () => {
     navigate(next === "forgot" ? "/forgot-password" : "/login", { replace: true });
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [err, setErr] = useState<LoginErr | null>(null);
+  // Held by meaning, not as a sentence: the language picker sits on this card,
+  // and a message on screen must follow a switch made after it appeared.
+  const [err, setErr] = useState<LocalizedText | null>(null);
   const [busy, setBusy] = useState(false);
   const [hold, setHold] = useState<Hold | null>(null);
   const [holdOver, setHoldOver] = useState(false);
@@ -92,18 +85,18 @@ const Login = () => {
       // and it is the one refusal the operator can act on ("call the
       // administrator") rather than retype their way out of.
       const blockedKey = blockingKeyOf(ex);
-      if (blockedKey) setErr({ kind: "blocked", key: blockedKey });
+      if (blockedKey) setErr(textKey(blockedKey));
       else if ((status === 423 || status === 429) && retryAfter !== null) {
         setHold({ kind: status === 423 ? "locked" : "throttled", seconds: retryAfter, startedAt: performance.now() });
       } else if (code === "captcha_required") {
         // A wrong password that now needs the mosaic (422), or an attempt held
         // back for it (428): the mosaic, then back to the form — never a
         // sign-in sent by the mosaic itself.
-        if (status === 422) setErr({ kind: "invalid" });
+        if (status === 422) setErr(textKey("login.invalidCredentials"));
         captcha.ask();
-      } else if (status === 401 || status === 422) setErr({ kind: "invalid" });
-      else if (ex instanceof Error) setErr({ kind: "raw", message: ex.message });
-      else setErr({ kind: "generic" });
+      } else if (status === 401 || status === 422) setErr(textKey("login.invalidCredentials"));
+      else if (ex instanceof Error) setErr(textLiteral(ex.message));
+      else setErr(textKey("login.failed"));
     }
     finally { setBusy(false); }
   };
@@ -117,12 +110,7 @@ const Login = () => {
   // The time is up: the form is open again (the server decides on the next try).
   const holdOverNow = useCallback(() => { setHold(null); setHoldOver(true); }, []);
 
-  const errText =
-    err === null ? null
-    : err.kind === "invalid" ? t("login.invalidCredentials")
-    : err.kind === "generic" ? t("login.failed")
-    : err.kind === "blocked" ? t(err.key)
-    : err.message;
+  const errText = err === null ? null : renderText(err, t);
 
   return (
     <div className="login-shell">
