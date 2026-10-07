@@ -78,13 +78,16 @@ vi.mock("@/i18n/LanguageContext", async () => {
   const { t } = await import("@/i18n/translations");
   return { useLang: () => ({ t: (k: string) => t(k, "en"), lang: "en" }) };
 });
-const feed = vi.hoisted(() => ({ list: [] as unknown[], deleteAll: vi.fn() }));
+const feed = vi.hoisted(() => ({ list: [] as unknown[], deleteAll: vi.fn(), failure: null as unknown, refresh: vi.fn(async () => {}) }));
 vi.mock("@/notifications/NotificationsContext", () => ({
   useNotifications: () => ({
     list: feed.list,
     unreadCount: 0,
     loading: false,
-    error: null,
+    error: feed.failure ? "failed" : null,
+    failure: feed.failure,
+    settled: true,
+    refresh: feed.refresh,
     markRead: vi.fn(),
     markAllRead: vi.fn(),
     deleteOne: vi.fn(),
@@ -199,5 +202,48 @@ describe("Notifications clear all", () => {
     render(<Notifications />);
     clearAll();
     await waitFor(() => expect(feed.deleteAll).toHaveBeenCalledTimes(1));
+  });
+});
+
+/**
+ * Each feed answers for itself (2026-10-07): one that could not be read is
+ * its error with Retry — never "No notifications right now", and never the
+ * whole screen replaced by a red line.
+ */
+describe("Notifications states", () => {
+  beforeEach(() => {
+    api.calls = [];
+    feed.list = [];
+    feed.failure = null;
+    feed.refresh.mockClear();
+  });
+  afterEach(() => { cleanup(); feed.failure = null; });
+
+  test("a manager whose feed failed sees the error with Retry, not «no notifications»", async () => {
+    auth.user = { id: 1, role: "manager" };
+    feed.failure = new TypeError("Failed to fetch");
+    render(<Notifications />);
+
+    expect(screen.getByText("No connection")).toBeTruthy();
+    expect(screen.queryByText("No notifications right now")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+    expect(feed.refresh).toHaveBeenCalledTimes(1);
+  });
+
+  test("a manager with an empty feed gets the empty state", async () => {
+    auth.user = { id: 1, role: "manager" };
+    render(<Notifications />);
+
+    expect(screen.getByText("No notifications right now")).toBeTruthy();
+  });
+
+  test("an owner whose billing read failed sees that feed's error, the title still there", async () => {
+    auth.user = { id: 5, role: "company_owner", dashboard: { company_id: 7 } };
+    api.handler = () => Promise.reject(Object.assign(new Error("Server Error"), { status: 500, body: { message: "Server Error" } }));
+    render(<Notifications />);
+
+    expect(await screen.findByText("Could not load notifications")).toBeTruthy();
+    expect(screen.getByText(/Billing/i)).toBeTruthy();
+    expect(screen.queryByText("No notifications right now")).toBeNull();
   });
 });

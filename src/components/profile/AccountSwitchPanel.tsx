@@ -1,5 +1,5 @@
+import { StateSwitch, deriveViewState } from "@/components/ui/state";
 import { IAccountSwitchTarget } from "@/api/accountSwitch";
-import Button from "@/components/ui/Button";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { useAsync } from "@/hooks/useAsync";
 import { useLang } from "@/i18n/LanguageContext";
@@ -66,7 +66,16 @@ const AccountSwitchPanel = ({ onBack, onPick }: Props) => {
       )}
 
       <div className="cp-switch-list">
-        {loading && (
+        {/* A list that failed to load is not an empty company: the compact
+            error state (offline / failed) with Retry, never "no other accounts". */}
+        <StateSwitch
+          view={deriveViewState({ loading, error, data: data ? shown : null, hasFilters: q !== "" })}
+          size="compact"
+          onRetry={() => void reload()}
+          error={{ titleKey: "switchAccount.state.errorTitle", descriptionKey: null }}
+          empty={{ titleKey: "switchAccount.empty", descriptionKey: null }}
+          noResults={{ titleKey: "switchAccount.noMatch", descriptionKey: null }}
+          skeleton={
           <div className="col" style={{ gap: 8, padding: 4 }} aria-busy="true">
             {[0, 1, 2].map((i) => (
               <div key={i} className="row" style={{ gap: 10, alignItems: "center" }}>
@@ -78,24 +87,9 @@ const AccountSwitchPanel = ({ onBack, onPick }: Props) => {
               </div>
             ))}
           </div>
-        )}
-
-        {/* A list that failed to load is not an empty company: say so and
-            offer the retry, instead of "no other accounts". */}
-        {!loading && error && (
-          <div className="col" style={{ gap: 6, padding: "6px 4px" }} role="alert">
-            <span className="error" style={{ fontSize: 12 }}>{error.message || t("form.errors.failed")}</span>
-            <Button variant="secondary" type="button" onClick={() => void reload()}>{t("action.retry")}</Button>
-          </div>
-        )}
-
-        {!loading && !error && shown.length === 0 && (
-          <div className="muted" style={{ fontSize: 12, padding: "6px 4px" }}>
-            {all.length === 0 ? t("switchAccount.empty") : t("switchAccount.noMatch")}
-          </div>
-        )}
-
-        {!loading && shown.map((account) => (
+          }
+        >
+          {shown.map((account) => (
           <button
             key={account.id}
             type="button"
@@ -118,7 +112,8 @@ const AccountSwitchPanel = ({ onBack, onPick }: Props) => {
               {t(`role.${account.role}`)}
             </span>
           </button>
-        ))}
+          ))}
+        </StateSwitch>
       </div>
     </div>
   );

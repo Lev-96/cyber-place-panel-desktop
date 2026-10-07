@@ -8,6 +8,7 @@ import OwnerForm from "@/components/owners/OwnerForm";
 import Button from "@/components/ui/Button";
 import ScreenWithBg from "@/components/ui/ScreenWithBg";
 import { SkeletonCard } from "@/components/ui/Skeleton";
+import { BackAction, StateSwitch, StateView, deriveViewState } from "@/components/ui/state";
 import { useAsync } from "@/hooks/useAsync";
 import { formatDate } from "@/i18n/dates";
 import { useLang } from "@/i18n/LanguageContext";
@@ -66,9 +67,19 @@ const OwnerPage = ({ id }: { id: number }) => {
         )}
       </div>
 
-      {error && <div className="error">{error.message}</div>}
-      {loading && !data && <SkeletonCard lines={4} />}
-      {data && <OwnerBody owner={data} />}
+      <StateSwitch
+        view={deriveViewState({ loading, error, data })}
+        skeleton={<SkeletonCard lines={4} />}
+        onRetry={() => void reload()}
+        error={{
+          titleKey: "owner.state.errorTitle",
+          notFoundTitleKey: "owner.state.notFoundTitle",
+          notFoundDescriptionKey: "owner.state.notFoundDescription",
+          notFoundAction: <BackAction fallback="/owners" />,
+        }}
+      >
+        {data && <OwnerBody owner={data} />}
+      </StateSwitch>
 
       {editing && data && (
         <OwnerForm
@@ -100,7 +111,9 @@ const OwnerBody = ({ owner }: { owner: IOwnerDetailApi }) => {
       </div></div>
 
       <h3 className="owner-section-title">{t("owner.companies")}</h3>
-      {companies.length === 0 && <div className="muted">{t("owners.noCompany")}</div>}
+      {companies.length === 0 && (
+        <StateView variant="empty" size="compact" titleKey="owner.state.noCompanyTitle" descriptionKey="owner.state.noCompanyDescription" />
+      )}
       {companies.map((c) => <CompanyCard key={c.id} company={c} />)}
     </>
   );
@@ -113,7 +126,9 @@ const CompanyCard = ({ company }: { company: IOwnerDetailCompanyApi }) => {
   return (
     <section className="card owner-company">
       <OwnerCompanyLine company={company} className="owner-company__head" />
-      {branches && branches.length === 0 && <div className="muted">{t("owner.noBranches")}</div>}
+      {branches && branches.length === 0 && (
+        <StateView variant="empty" size="compact" titleKey="owner.state.noBranchesTitle" descriptionKey={null} />
+      )}
       {branches && branches.length > 0 && (
         <div className="list">
           {branches.map((b) => <BranchRow key={b.id} branch={b} />)}

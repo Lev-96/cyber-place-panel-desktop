@@ -333,3 +333,21 @@ describe("what the start dialog deliberately does not ask", () => {
     );
   });
 });
+
+describe("the package list could not be read (2026-10-07)", () => {
+  test("the dialog opens anyway, says why there are no packages, and Retry reads them", async () => {
+    const { sessionRepository } = await import("@/repositories/SessionRepository");
+    const list = vi.mocked(sessionRepository.listPackages);
+    list.mockRejectedValueOnce(new TypeError("Failed to fetch"));
+    // A computer opens on the package tab.
+    await mount(device({ kind: PC_KIND.Pc, place: { id: 10, number: 1, name: "PC 1", type: "standard", platform: "pc" } }));
+
+    // Not the skeleton for ever, and not "no packages yet".
+    expect(screen.getByText("state.offline.title")).toBeTruthy();
+    expect(screen.queryByText("session.noPackages")).toBeNull();
+
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "action.retry" })); });
+    expect(screen.getByText("One hour")).toBeTruthy();
+    expect(screen.queryByText("state.offline.title")).toBeNull();
+  });
+});

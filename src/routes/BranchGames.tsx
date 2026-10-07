@@ -4,6 +4,7 @@ import { useAuth } from "@/auth/AuthContext";
 import { can } from "@/auth/permissions";
 import ScreenWithBg from "@/components/ui/ScreenWithBg";
 import { ListSkeleton } from "@/components/ui/Skeleton";
+import { StateSwitch, deriveViewState } from "@/components/ui/state";
 import { IGameApi } from "@/api/games";
 import { useAsync } from "@/hooks/useAsync";
 import { useConfirm } from "@/components/ui/ConfirmProvider";
@@ -47,9 +48,13 @@ const BranchGames = () => {
         <span className="muted">{t("branchGames.intro")}</span>
         <Button onClick={() => setCreating(true)}>{t("games.new")}</Button>
       </div>
-      {loading && <ListSkeleton />}
-      {error && <div className="error">{error.message}</div>}
-      {!loading && !error && (
+      <StateSwitch
+        view={deriveViewState({ loading, error, data })}
+        skeleton={<ListSkeleton />}
+        onRetry={() => void reload()}
+        error={{ titleKey: "games.state.errorTitle" }}
+        empty={{ titleKey: "branchGames.state.emptyTitle", descriptionKey: "branchGames.state.emptyDescription" }}
+      >
         <div className="list">
           {(data ?? []).map((g) => (
             <div key={g.id} className="list-item">
@@ -65,9 +70,8 @@ const BranchGames = () => {
               )}
             </div>
           ))}
-          {!data?.length && <div className="muted">{t("branchGames.empty")}</div>}
         </div>
-      )}
+      </StateSwitch>
       {creating && <GameForm branchId={id} onClose={() => setCreating(false)} onSaved={() => { setCreating(false); void reload(); }} />}
       {editing && <GameForm initial={editing} branchId={id} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); void reload(); }} />}
     </ScreenWithBg>

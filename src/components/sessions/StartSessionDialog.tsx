@@ -1,4 +1,5 @@
 import { ListSkeleton } from "@/components/ui/Skeleton";
+import { ErrorState, StateView } from "@/components/ui/state";
 import Radio from "@/components/ui/Radio";
 import Button from "@/components/ui/Button";
 import Modal from "@/components/ui/Modal";
@@ -14,7 +15,7 @@ import { sessionRepository } from "@/repositories/SessionRepository";
 import { IPcApi, ITimePackage } from "@/types/sessions";
 import { isDeviceStartable, isPs } from "@/types/pc";
 import { IBranchApi } from "@/types/api";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 interface Props {
   branchId: number;
@@ -71,7 +72,16 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
   // and the two behave differently the moment a drink is added to it.
   const [isFree, setIsFree] = useState(false);
 
-  useEffect(() => { void sessionRepository.listPackages(branchId).then((p) => { setPackages(p); setPkgId(p[0]?.id ?? null); }); }, [branchId]);
+  // A failed read is kept as such: the dialog used to wait on it for ever (no
+  // catch), and "no packages" would be a lie. Open mode still works without it.
+  const [pkgError, setPkgError] = useState<unknown>(null);
+  const loadPackages = useCallback(() => {
+    setPkgError(null);
+    sessionRepository.listPackages(branchId)
+      .then((p) => { setPackages(p); setPkgId(p[0]?.id ?? null); })
+      .catch((e: unknown) => setPkgError(e));
+  }, [branchId]);
+  useEffect(loadPackages, [loadPackages]);
   useEffect(() => {
     let cancelled = false;
     void branchRepository.byId(branchId).then((b) => {
@@ -227,7 +237,7 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
     <Modal open onClose={onClose}>
       <div className="card" style={{ width: 460, maxWidth: "90vw", display: "flex", flexDirection: "column", gap: 14 }}>
         <h2 style={{ margin: 0 }}>{t("session.start")} · №{pc.place?.number ?? pc.label}{isPs(pc.kind) ? " (PS)" : ""}</h2>
-        {!packages ? <ListSkeleton rows={3} /> : (
+        {!packages && !pkgError ? <ListSkeleton rows={3} /> : (
           <>
             {/* Free sits ABOVE the tariff, and turning it on takes the tariff
                 away entirely.
@@ -277,8 +287,10 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
             {!isFree && (mode === "fixed" ? (
               <div className="col" style={{ gap: 6 }}>
                 <span className="label">{t("session.tariffField")}</span>
-                {packages.length === 0 ? (
-                  <div className="muted">{t("session.noPackages")}</div>
+                {pkgError || !packages ? (
+                  <ErrorState size="compact" error={pkgError} onRetry={loadPackages} titleKey="session.state.packagesErrorTitle" descriptionKey={null} />
+                ) : packages.length === 0 ? (
+                  <StateView variant="empty" size="compact" titleKey="session.noPackages" descriptionKey={null} />
                 ) : (
                   <div className="col" style={{ gap: 6 }}>
                     {packages.map((p) => (

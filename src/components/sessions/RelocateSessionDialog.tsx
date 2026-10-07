@@ -1,3 +1,4 @@
+import { ErrorState, StaleNotice, StateView } from "@/components/ui/state";
 import Button from "@/components/ui/Button";
 import Checkbox from "@/components/ui/Checkbox";
 import Modal from "@/components/ui/Modal";
@@ -44,7 +45,7 @@ const seatOf = (p: { number: number | null; place_id?: number | null; name?: str
 const RelocateSessionDialog = ({ session, onClose, onMoved }: Props) => {
   const { t, money } = useLang();
   const [options, setOptions] = useState<IRelocationOptions | null>(null);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<unknown>(null);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [overrideOn, setOverrideOn] = useState(false);
   const [rateInput, setRateInput] = useState("");
@@ -57,7 +58,7 @@ const RelocateSessionDialog = ({ session, onClose, onMoved }: Props) => {
     try {
       setOptions(await sessionRepository.relocationOptions(session.id));
     } catch (e) {
-      setLoadError(e instanceof Error ? e.message : String(e));
+      setLoadError(e);
     }
   }, [session.id]);
 
@@ -161,7 +162,10 @@ const RelocateSessionDialog = ({ session, onClose, onMoved }: Props) => {
           <span className="muted" style={{ fontSize: 13 }}>{session.pc_label}</span>
         </div>
 
-        {loadError !== null && <span className="error">{loadError}</span>}
+        {loadError !== null && options === null && (
+          <ErrorState size="compact" error={loadError} onRetry={() => void load()} titleKey="session.state.relocateErrorTitle" descriptionKey={null} />
+        )}
+        {loadError !== null && options !== null && <StaleNotice error={loadError} onRetry={() => void load()} />}
         {options === null && loadError === null && <Spinner />}
 
         {current && (
@@ -181,7 +185,7 @@ const RelocateSessionDialog = ({ session, onClose, onMoved }: Props) => {
         )}
 
         {options !== null && options.places.length === 0 && (
-          <span className="muted" style={{ fontSize: 13 }}>{t("session.relocateNone")}</span>
+          <StateView variant="empty" size="compact" titleKey="session.relocateNone" descriptionKey={null} />
         )}
 
         {sameRate.length > 0 && (

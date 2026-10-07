@@ -217,7 +217,7 @@ describe("the owner's page", () => {
   test("a company with an empty branch list says so", async () => {
     await mountLoaded();
 
-    expect(within(companyCard("Night Club")).getByText("No branches yet.")).toBeTruthy();
+    expect(within(companyCard("Night Club")).getByText("This company has no branches yet")).toBeTruthy();
     expect(within(companyCard("Night Club")).queryAllByRole("link")).toHaveLength(1);
   });
 
@@ -235,7 +235,7 @@ describe("the owner's page", () => {
     expect(within(zone).getByText("Branches: 2")).toBeTruthy();
     expect(within(zone).getByText("Managers: 1")).toBeTruthy();
     expect(within(zone).queryAllByRole("link")).toHaveLength(1);
-    expect(screen.queryByText("No branches yet.")).toBeNull();
+    expect(screen.queryByText("This company has no branches yet")).toBeNull();
     expect(screen.queryByText("Abovyan 5")).toBeNull();
   });
 
@@ -243,14 +243,28 @@ describe("the owner's page", () => {
     show = { ...SHOW, companies: [] };
     await mountLoaded();
 
-    expect(screen.getByText("No company")).toBeTruthy();
+    expect(screen.getByText("No company yet")).toBeTruthy();
   });
 
-  test("a failed read shows the error", async () => {
-    api.handler = async () => Promise.reject(Object.assign(new Error("Server Error"), { status: 500 }));
+  test("a failed read shows the error state with Retry, the server's sentence as a detail", async () => {
+    api.handler = async () => Promise.reject(Object.assign(new Error("Server Error"), { status: 500, body: { message: "Server Error" } }));
     await mount();
 
-    expect(await screen.findByText("Server Error")).toBeTruthy();
+    expect(await screen.findByText("Could not load this owner")).toBeTruthy();
+    expect(screen.getByText("Server Error")).toBeTruthy();
+    const calls = api.calls.length;
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+    await waitFor(() => expect(api.calls.length).toBe(calls + 1));
+  });
+
+  test("a 404 is «Owner not found» with a way back, not an error", async () => {
+    api.handler = async () => Promise.reject(Object.assign(new Error("No query results"), { status: 404, body: { message: "No query results" } }));
+    await mount();
+
+    expect(await screen.findByText("Owner not found")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Go back" })).toBeTruthy();
+    expect(screen.queryByText("No query results")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Retry" })).toBeNull();
   });
 
   test("a non-numeric id asks nothing of the server", async () => {

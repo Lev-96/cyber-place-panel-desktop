@@ -7,6 +7,7 @@ import CollapsibleSection from "@/components/ui/CollapsibleSection";
 import ScreenWithBg from "@/components/ui/ScreenWithBg";
 import { GridSkeleton } from "@/components/ui/Skeleton";
 import { useAsync } from "@/hooks/useAsync";
+import { StateSwitch, deriveViewState } from "@/components/ui/state";
 import { useLocalReorder } from "@/hooks/useLocalReorder";
 import { useReservedPlaceIds } from "@/hooks/useReservedPlaceIds";
 import { useConfirm } from "@/components/ui/ConfirmProvider";
@@ -227,12 +228,13 @@ const BranchPlaces = () => {
           <Button onClick={() => setCreating(true)}>{t("branchPlaces.new")}</Button>
         </div>
       </div>
-      {loading && <GridSkeleton />}
-      {error && <div className="error">{error.message}</div>}
-      {!loading && !error && (
-        orderedPlaces.length === 0 ? (
-          <div className="muted">{t("branchPlaces.empty")}</div>
-        ) : (
+      <StateSwitch
+        view={deriveViewState({ loading, error, data: data ? orderedPlaces : null })}
+        skeleton={<GridSkeleton />}
+        onRetry={() => void reload()}
+        error={{ titleKey: "branchPlaces.state.errorTitle" }}
+        empty={{ titleKey: "branchPlaces.state.emptyTitle", descriptionKey: "branchPlaces.state.emptyDescription" }}
+      >
           <div className="col" style={{ gap: 14 }}>
             {sectionKeys.map((key) => {
               const items = grouped[key];
@@ -263,8 +265,7 @@ const BranchPlaces = () => {
               );
             })}
           </div>
-        )
-      )}
+      </StateSwitch>
 
       {findingConsoles && <ConsolePicker branchId={id} onClose={() => setFindingConsoles(false)} />}
       {creating && <PlaceForm branchId={id} platformSuggestions={customPlatforms} platformPrices={platformPrices.data ?? []} onClose={() => setCreating(false)} onSaved={() => { setCreating(false); void reload(); void platformPrices.reload(); }} />}

@@ -2,6 +2,7 @@ import { useAuth } from "@/auth/AuthContext";
 import Pagination from "@/components/ui/Pagination";
 import ScreenWithBg from "@/components/ui/ScreenWithBg";
 import { ListSkeleton } from "@/components/ui/Skeleton";
+import { StateSwitch, deriveViewState } from "@/components/ui/state";
 import { useAsync } from "@/hooks/useAsync";
 import { formatDateTime } from "@/i18n/dates";
 import { useLang } from "@/i18n/LanguageContext";
@@ -14,7 +15,7 @@ const Bookings = () => {
   const { t } = useLang();
   const [page, setPage] = useState(1);
 
-  const { data, loading, error } = useAsync(
+  const { data, loading, error, reload } = useAsync(
     () =>
       bookingRepository.listPaged(page, {
         branch_id: user?.dashboard?.branch_id || undefined,
@@ -24,12 +25,16 @@ const Bookings = () => {
   );
   const bookings = data?.data ?? [];
   const lastPage = data?.meta?.last_page ?? 1;
+  const view = deriveViewState({ loading, error, data: data ? bookings : null });
   return (
     <ScreenWithBg bg="./bg/booking.jpg" title={t("bookings.title")}>
-      {error && <div className="error">{error.message}</div>}
-      {loading ? (
-        <ListSkeleton />
-      ) : !error ? (
+      <StateSwitch
+        view={view}
+        skeleton={<ListSkeleton />}
+        onRetry={() => void reload()}
+        error={{ titleKey: "bookings.state.errorTitle" }}
+        empty={{ titleKey: "bookings.state.emptyTitle", descriptionKey: "bookings.state.emptyDescription" }}
+      >
         <div className="list">
           {bookings.map((b) => {
             const start = formatDateTime(b.start);
@@ -49,10 +54,9 @@ const Bookings = () => {
               </Link>
             );
           })}
-          {!bookings.length && <div className="muted">{t("common.empty.bookings")}</div>}
         </div>
-      ) : null}
-      {!error && <Pagination page={page} lastPage={lastPage} onChange={setPage} disabled={loading} />}
+      </StateSwitch>
+      {view.kind !== "error" && <Pagination page={page} lastPage={lastPage} onChange={setPage} disabled={loading} />}
     </ScreenWithBg>
   );
 };

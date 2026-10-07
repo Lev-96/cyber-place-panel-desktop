@@ -9,6 +9,7 @@ import PlatformPricesForm from "@/components/prices/PlatformPricesForm";
 import SubplatformPricesForm from "@/components/prices/SubplatformPricesForm";
 import Button from "@/components/ui/Button";
 import SettingsSection from "@/components/ui/SettingsSection";
+import { StateView } from "@/components/ui/state";
 import { useConfirm } from "@/components/ui/ConfirmProvider";
 import { useAsync } from "@/hooks/useAsync";
 import { useLang } from "@/i18n/LanguageContext";
@@ -106,8 +107,14 @@ const BranchPricesPage = () => {
             a VIP column). Created automatically when a place of that type is
             added (in Places) — never by hand here — and editable (name in 3
             languages + each tier). Editing a tier re-points its places + devices. */}
-        {(platformPrices.data?.length ?? 0) > 0 && (
-          <SettingsSection title={t("platformPrice.sectionTitle")}>
+        {/* Shown when there is something to price, or when the read failed —
+            a failure must not look like "no custom platforms". */}
+        {((platformPrices.data?.length ?? 0) > 0 || (platformPrices.error && !platformPrices.data)) && (
+          <SettingsSection
+            title={t("platformPrice.sectionTitle")}
+            error={platformPrices.data ? null : platformPrices.error}
+            onRetry={() => void platformPrices.reload()}
+          >
             <PlatformPricesForm
               key={(platformPrices.data ?? []).map((p) => p.id).join(",")}
               prices={platformPrices.data ?? []}
@@ -120,8 +127,12 @@ const BranchPricesPage = () => {
             Created in Places on the second row of tabs; here they are renamed
             (in 3 languages) and priced. An empty cell is a value, not a gap: it
             means "bill the same as the platform". */}
-        {(subplatforms.data?.length ?? 0) > 0 && (
-          <SettingsSection title={t("subplatform.sectionTitle")}>
+        {((subplatforms.data?.length ?? 0) > 0 || (subplatforms.error && !subplatforms.data)) && (
+          <SettingsSection
+            title={t("subplatform.sectionTitle")}
+            error={subplatforms.data ? null : subplatforms.error}
+            onRetry={() => void subplatforms.reload()}
+          >
             <SubplatformPricesForm
               key={(subplatforms.data ?? []).map((s) => s.id).join(",")}
               subplatforms={subplatforms.data ?? []}
@@ -146,10 +157,13 @@ const BranchPricesPage = () => {
           {packages.loading && !packages.data ? (
             <ListSkeleton rows={4} />
           ) : (packages.data ?? []).length === 0 ? (
-            <div className="prices-empty">
-              <span className="muted">{t("tariffs.empty")}</span>
-              <Button variant="secondary" onClick={() => setCreating(true)}>{t("tariffs.new")}</Button>
-            </div>
+            <StateView
+              variant="empty"
+              size="compact"
+              titleKey="tariffs.state.emptyTitle"
+              descriptionKey="tariffs.state.emptyDescription"
+              actions={<Button variant="secondary" onClick={() => setCreating(true)}>{t("tariffs.new")}</Button>}
+            />
           ) : (
             <div className="list">
               {(packages.data ?? []).map((p) => {

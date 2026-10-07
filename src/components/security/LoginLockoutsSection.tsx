@@ -2,6 +2,7 @@ import { isMissingEndpoint } from "@/api/fallback";
 import Button from "@/components/ui/Button";
 import { useConfirm } from "@/components/ui/ConfirmProvider";
 import { ListSkeleton } from "@/components/ui/Skeleton";
+import { StateSwitch, deriveViewState } from "@/components/ui/state";
 import { useAsync } from "@/hooks/useAsync";
 import { useKeyedBusy } from "@/hooks/useKeyedBusy";
 import { formatDateTime } from "@/i18n/dates";
@@ -59,12 +60,14 @@ const LoginLockoutsSection = ({ refreshKey }: Props) => {
         <div className="muted sec-hint">{t("security.locks.hint")}</div>
       </div>
 
-      {error && <div className="error">{error.message}</div>}
-      {loading && !data ? (
-        <ListSkeleton rows={2} />
-      ) : !error && rows.length === 0 ? (
-        <div className="muted">{t("security.locks.empty")}</div>
-      ) : !error ? (
+      <StateSwitch
+        view={deriveViewState({ loading, error, data: data ? rows : null })}
+        skeleton={<ListSkeleton rows={2} />}
+        size="compact"
+        onRetry={() => void reload()}
+        error={{ titleKey: "security.state.errorTitle" }}
+        empty={{ titleKey: "security.locks.empty", descriptionKey: null }}
+      >
         <div className="sec-table-wrap">
           <table className="sec-table">
             <thead>
@@ -113,7 +116,7 @@ const LoginLockoutsSection = ({ refreshKey }: Props) => {
             </tbody>
           </table>
         </div>
-      ) : null}
+      </StateSwitch>
     </section>
   );
 };

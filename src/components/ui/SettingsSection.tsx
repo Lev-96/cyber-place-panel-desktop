@@ -1,5 +1,5 @@
 import { ReactNode } from "react";
-import Button from "@/components/ui/Button";
+import { ErrorState } from "@/components/ui/state";
 import { SkeletonForm } from "@/components/ui/Skeleton";
 import { useLang } from "@/i18n/LanguageContext";
 
@@ -45,12 +45,9 @@ const SettingsSection = ({
         {actions && <div className="settings-section__actions">{actions}</div>}
       </header>
       {error ? (
-        <div className="settings-section__error" role="alert">
-          <span className="error">{error.message}</span>
-          {onRetry && (
-            <Button variant="secondary" type="button" onClick={onRetry}>{t("action.retry")}</Button>
-          )}
-        </div>
+        // The shared error state, compact: offline / failed / not found with
+        // Retry. Still never the body — see `error` above.
+        <ErrorState size="compact" error={error} onRetry={onRetry} />
       ) : loading ? (
         <SkeletonForm fields={skeletonFields} />
       ) : (

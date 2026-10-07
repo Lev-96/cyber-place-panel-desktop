@@ -1,7 +1,7 @@
 import { SkeletonStats } from "@/components/ui/Skeleton";
 import CompanyRevenueScreen from "@/components/revenue/CompanyRevenueScreen";
 import ScreenWithBg from "@/components/ui/ScreenWithBg";
-import Spinner from "@/components/ui/Spinner";
+import { StateSwitch, deriveViewState } from "@/components/ui/state";
 import { useAuth } from "@/auth/AuthContext";
 import { useAsync } from "@/hooks/useAsync";
 import { useLang } from "@/i18n/LanguageContext";
@@ -26,7 +26,7 @@ import { useEffect, useState } from "react";
 const Revenue = () => {
   const { t } = useLang();
   const { user } = useAuth();
-  const { data: companies, loading, error } = useAsync(() => companyRepository.list(), []);
+  const { data: companies, loading, error, reload } = useAsync(() => companyRepository.list(), []);
   const [companyId, setCompanyId] = useState<number | null>(null);
 
   const list = companies ?? [];
@@ -43,9 +43,15 @@ const Revenue = () => {
 
   return (
     <ScreenWithBg bg="./bg/company.jpg" title={t("revenue.title")}>
-      {loading && <SkeletonStats tiles={3} />}
-      {error && <div className="error">{error.message}</div>}
-      {!loading && !error && (
+      {/* A staff account attached to no company at all gets the empty state,
+          not a blank screen that looks like a failed load. */}
+      <StateSwitch
+        view={deriveViewState({ loading, error, data: companies })}
+        skeleton={<SkeletonStats tiles={3} />}
+        onRetry={() => void reload()}
+        error={{ titleKey: "companies.state.errorTitle" }}
+        empty={{ titleKey: "revenue.state.noCompanyTitle", descriptionKey: "revenue.state.noCompanyDescription" }}
+      >
         <div className="col" style={{ gap: 12 }}>
           {showPicker && (
             <div className="col" style={{ gap: 6 }}>
@@ -77,14 +83,8 @@ const Revenue = () => {
 
           {/* Only ever shown to somebody who actually has a choice to make. */}
           {!selected && showPicker && <div className="muted">{t("revenue.pickHint")}</div>}
-
-          {/* A staff account attached to no company at all: say so, rather
-              than leaving an empty screen that looks like a failed load. */}
-          {!selected && !showPicker && list.length === 0 && (
-            <div className="muted">{t("revenue.noCompany")}</div>
-          )}
         </div>
-      )}
+      </StateSwitch>
     </ScreenWithBg>
   );
 };

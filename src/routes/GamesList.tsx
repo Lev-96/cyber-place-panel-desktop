@@ -2,6 +2,7 @@ import GameForm from "@/components/games/GameForm";
 import Button from "@/components/ui/Button";
 import ScreenWithBg from "@/components/ui/ScreenWithBg";
 import { ListSkeleton } from "@/components/ui/Skeleton";
+import { StateSwitch, deriveViewState } from "@/components/ui/state";
 import { IGameApi } from "@/api/games";
 import { useAsync } from "@/hooks/useAsync";
 import { useConfirm } from "@/components/ui/ConfirmProvider";
@@ -28,9 +29,13 @@ const GamesList = () => {
         <div />
         <Button onClick={() => setCreating(true)}>{t("games.new")}</Button>
       </div>
-      {loading && <ListSkeleton />}
-      {error && <div className="error">{error.message}</div>}
-      {!loading && !error && (
+      <StateSwitch
+        view={deriveViewState({ loading, error, data })}
+        skeleton={<ListSkeleton />}
+        onRetry={() => void reload()}
+        error={{ titleKey: "games.state.errorTitle" }}
+        empty={{ titleKey: "games.state.emptyTitle", descriptionKey: "games.state.emptyDescription" }}
+      >
         <div className="list">
           {(data ?? []).map((g) => (
             <div key={g.id} className="list-item">
@@ -44,9 +49,8 @@ const GamesList = () => {
               </div>
             </div>
           ))}
-          {!data?.length && <div className="muted">{t("common.empty.games")}</div>}
         </div>
-      )}
+      </StateSwitch>
       {creating && <GameForm onClose={() => setCreating(false)} onSaved={() => { setCreating(false); void reload(); }} />}
       {editing && <GameForm initial={editing} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); void reload(); }} />}
     </ScreenWithBg>

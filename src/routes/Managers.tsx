@@ -6,6 +6,7 @@ import Button from "@/components/ui/Button";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import ScreenWithBg from "@/components/ui/ScreenWithBg";
 import { ListSkeleton } from "@/components/ui/Skeleton";
+import { StateSwitch, deriveViewState } from "@/components/ui/state";
 import { useAsync } from "@/hooks/useAsync";
 import { useLang } from "@/i18n/LanguageContext";
 import { managerRepository } from "@/repositories/ManagerRepository";
@@ -57,9 +58,19 @@ const Managers = () => {
           </Button>
         </div>
       )}
-      {loading && <ListSkeleton />}
-      {error && <div className="error">{error.message}</div>}
-      {!loading && !error && (
+      <StateSwitch
+        view={deriveViewState({ loading, error, data })}
+        skeleton={<ListSkeleton />}
+        onRetry={() => void reload()}
+        error={{ titleKey: "managers.state.errorTitle" }}
+        empty={{
+          titleKey: "managers.state.emptyTitle",
+          descriptionKey: "managers.state.emptyDescription",
+          actions: canCreate ? (
+            <Button onClick={() => (branchScoped ? setCreating(true) : setPicking(true))}>{t("managers.new")}</Button>
+          ) : undefined,
+        }}
+      >
         <div className="list">
           {(data ?? []).map((m) => (
             <div key={m.id} className="list-item">
@@ -73,9 +84,8 @@ const Managers = () => {
               </div>
             </div>
           ))}
-          {!data?.length && <div className="muted">{t("common.empty.managers")}</div>}
         </div>
-      )}
+      </StateSwitch>
       {creating && branchScoped && (
         <ManagerForm branchId={id} onClose={() => setCreating(false)} onSaved={() => { setCreating(false); void reload(); }} />
       )}

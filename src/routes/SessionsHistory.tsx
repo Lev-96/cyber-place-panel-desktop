@@ -1,5 +1,6 @@
 import ScreenWithBg from "@/components/ui/ScreenWithBg";
 import { ListSkeleton } from "@/components/ui/Skeleton";
+import { ErrorState, StaleNotice, StateSwitch, StateView, deriveViewState } from "@/components/ui/state";
 import { useAsync } from "@/hooks/useAsync";
 import { useSessionsSummary } from "@/hooks/useSessionsSummary";
 import { formatDate, formatDateTime, formatTime } from "@/i18n/dates";
@@ -96,12 +97,19 @@ const SessionsHistory = () => {
     }),
     [id, fromIso, toIso, actorId],
   );
+  // A feed that could not be read vouches for nothing: marked "cut", so every
+  // card asks for its own events instead of claiming "nothing beyond the start".
+  const feedFailed = events.error !== null && events.data === null;
   const feed = useMemo(() => ({
     bySession: groupBySession(events.data ?? []),
-    truncated: (events.data?.length ?? 0) >= FEED_LIMIT,
-  }), [events.data]);
+    truncated: feedFailed || (events.data?.length ?? 0) >= FEED_LIMIT,
+  }), [events.data, feedFailed]);
 
   if (!Number.isFinite(id) || id <= 0) return <div className="error">{t("hub.invalidId")}</div>;
+
+  // Both: the cards read their events from the feed, so a refresh of the
+  // sessions alone would show a new stop with an old story.
+  const refreshAll = () => { void reload(); void events.reload(); void acted.reload(); void actors.reload(); };
 
   const setRange = (kind: "today" | "yesterday" | "month") => {
     const now = new Date();
@@ -148,6 +156,12 @@ const SessionsHistory = () => {
                   <option key={a.id} value={a.id}>{a.name} · {t(`role.${a.role}`) || a.role}</option>
                 ))}
               </select>
+              {/* A failed list leaves only «All» — say so, and offer the retry. */}
+              {actors.error && (
+                <button type="button" className="cp-stale__retry" onClick={() => void actors.reload()}>
+                  {t("history.state.actorsFailed")}
+                </button>
+              )}
             </label>
             <div className="row" style={{ gap: 6, flexWrap: "wrap" }}>
               <button type="button" className="pill" onClick={() => setRange("today")}>{t("history.today")}</button>
@@ -155,7 +169,7 @@ const SessionsHistory = () => {
               <button type="button" className="pill" onClick={() => setRange("month")}>{t("history.month")}</button>
               {/* Both: the cards read their events from the feed, so a refresh
                   of the sessions alone would show a new stop with an old story. */}
-              <button type="button" className="pill" onClick={() => { void reload(); void events.reload(); void acted.reload(); }}>
+              <button type="button" className="pill" onClick={refreshAll}>
                 {t("action.refresh")}
               </button>
             </div>
@@ -191,19 +205,36 @@ const SessionsHistory = () => {
         </div>
       </div>
 
-      {loading && <ListSkeleton />}
-      {error && <div className="error">{error.message}</div>}
-
-      {/* A new person's feed is loading: a skeleton, never the previous
-          person's cards under the new name. */}
-      {!loading && !error && actorId !== null && (events.loading || acted.loading) && <ListSkeleton />}
-      {!loading && !error && !(actorId !== null && (events.loading || acted.loading)) && (
-        <SessionsList
-          sessions={actorId === null ? data ?? [] : acted.data ?? []}
-          feed={events.loading ? null : { ...feed, to: toIso }}
-          actorId={actorId}
-        />
-      )}
+      {/* The range is always a filter: an empty answer is "no sessions in this
+          period", never "nothing has ever happened here". The list's own
+          empty / no-actions wording is decided inside SessionsList. */}
+      <StateSwitch
+        // `data: null` while loading on purpose: a new range must not show the
+        // previous range's cards under its dates (sessions are not cached, so
+        // there is no background revalidation to protect here).
+        view={deriveViewState({ loading, error, data: loading ? null : data, isEmpty: () => false })}
+        skeleton={<ListSkeleton />}
+        onRetry={refreshAll}
+        error={{ titleKey: "history.state.errorTitle" }}
+      >
+        {actorId !== null && (acted.error || (events.error && !events.data)) ? (
+          // One person's cards could not be read: their error, not "no actions".
+          <ErrorState error={acted.error ?? events.error} onRetry={refreshAll} titleKey="history.state.errorTitle" />
+        ) : actorId !== null && (events.loading || acted.loading) ? (
+          // A new person's feed is loading: a skeleton, never the previous
+          // person's cards under the new name.
+          <ListSkeleton />
+        ) : (
+          <>
+            {feedFailed && actorId === null && <StaleNotice error={events.error} onRetry={() => void events.reload()} />}
+            <SessionsList
+              sessions={actorId === null ? data ?? [] : acted.data ?? []}
+              feed={events.loading && !feedFailed ? null : { ...feed, to: toIso }}
+              actorId={actorId}
+            />
+          </>
+        )}
+      </StateSwitch>
     </ScreenWithBg>
   );
 };
@@ -217,7 +248,9 @@ interface Feed {
 
 const SessionsList = ({ sessions, feed, actorId }: { sessions: ISessionApi[]; feed: Feed | null; actorId: number | null }) => {
   const { t } = useLang();
-  if (sessions.length === 0) return <div className="muted">{t("history.empty")}</div>;
+  if (sessions.length === 0) {
+    return <StateView variant="noResults" titleKey="history.state.noResultsTitle" descriptionKey="history.state.noResultsDescription" />;
+  }
   const now = Date.now();
   const cards = sessions.map((s) => {
     const slice = feed?.bySession.get(s.id) ?? [];
@@ -229,7 +262,9 @@ const SessionsList = ({ sessions, feed, actorId }: { sessions: ISessionApi[]; fe
     // their lines (or nothing, see `SessionRow`).
     .filter(({ slice, covered }) => actorId === null || feed === null || slice.length > 0 || !covered);
 
-  if (cards.length === 0) return <div className="muted">{t("history.noActions")}</div>;
+  if (cards.length === 0) {
+    return <StateView variant="noResults" titleKey="history.noActions" descriptionKey="history.state.noResultsDescription" />;
+  }
   return (
     <div className="col hs-list">
       {cards.map(({ s, slice, covered }) => (
@@ -270,7 +305,14 @@ const useCardEvents = (sessionId: number, feedEvents: ISessionEvent[] | null, co
     [needOwn, near, sessionId, actorId],
   );
 
-  return { ref, events: covered ? feedEvents : own.data };
+  return {
+    ref,
+    events: covered ? feedEvents : own.data,
+    // Only the card's OWN read can fail here; without this it said
+    // "loading" for ever.
+    error: covered ? null : own.error,
+    retry: own.reload,
+  };
 };
 
 /**
@@ -294,7 +336,7 @@ const SessionRow = ({ session, feedEvents, covered, actorId }: {
   actorId: number | null;
 }) => {
   const { t, money } = useLang();
-  const { ref, events: loaded } = useCardEvents(session.id, feedEvents, covered, actorId);
+  const { ref, events: loaded, error: eventsError, retry: retryEvents } = useCardEvents(session.id, feedEvents, covered, actorId);
   // Both lists are narrowed by the server when a person is picked; this is the
   // same rule again, so a backend that ignored the parameter could not put
   // someone else's line — or the system's, which has no author — on the card.
@@ -388,7 +430,12 @@ const SessionRow = ({ session, feedEvents, covered, actorId }: {
       </dl>
 
       {/* What happened — every event of the session, once. */}
-      <SessionHistoryTimeline events={events} startedAt={session.started_at} />
+      <SessionHistoryTimeline
+        events={events}
+        startedAt={session.started_at}
+        error={events === null ? eventsError : null}
+        onRetry={() => void retryEvents()}
+      />
 
       {/* How much — after what happened, as its outcome. */}
       <SessionHistoryBill session={session} closed={isClosed} />

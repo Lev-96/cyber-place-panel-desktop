@@ -72,18 +72,30 @@ describe("Касса", () => {
     expect(document.body.textContent).toContain("till.voided");
   });
 
-  test("a failed read is shown as an error, not as a day with no sales", async () => {
-    repo.list.mockRejectedValue(new Error("Server unavailable"));
+  test("a failed read is shown as an error with Retry, not as a day with no sales", async () => {
+    repo.list.mockRejectedValue(Object.assign(new Error("Server unavailable"), { status: 503, body: { message: "Server unavailable" } }));
     await mount();
 
+    expect(screen.getByText("till.state.errorTitle")).toBeTruthy();
     expect(screen.getByText("Server unavailable")).toBeTruthy();
-    expect(screen.queryByText("till.empty")).toBeNull();
+    expect(screen.queryByText("till.state.emptyTitle")).toBeNull();
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "action.retry" })); });
+    expect(repo.list).toHaveBeenCalledTimes(2);
+  });
+
+  test("offline (a request that got no answer) says so, never «no sales»", async () => {
+    repo.list.mockRejectedValue(new TypeError("Failed to fetch"));
+    await mount();
+
+    expect(screen.getByText("state.offline.title")).toBeTruthy();
+    expect(screen.queryByText("Failed to fetch")).toBeNull();
+    expect(screen.queryByText("till.state.emptyTitle")).toBeNull();
   });
 
   test("«Продать товар» opens the sale, and a sale re-reads the day", async () => {
     repo.list.mockResolvedValue([]);
     await mount();
-    expect(screen.getByText("till.empty")).toBeTruthy();
+    expect(screen.getByText("till.state.emptyTitle")).toBeTruthy();
 
     await act(async () => { fireEvent.click(screen.getByText("till.sell")); });
     expect(screen.getByTestId("sell-dialog")).toBeTruthy();

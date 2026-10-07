@@ -8,6 +8,7 @@ import { useAuth } from "@/auth/AuthContext";
 import { useConfirm } from "@/components/ui/ConfirmProvider";
 import ScreenWithBg from "@/components/ui/ScreenWithBg";
 import Spinner from "@/components/ui/Spinner";
+import { StateSwitch, deriveViewState } from "@/components/ui/state";
 import { useAsync } from "@/hooks/useAsync";
 import { formatDate } from "@/i18n/dates";
 import { formatAmount } from "@/i18n/currency";
@@ -100,8 +101,9 @@ const Notifications = () => {
   const {
     list,
     unreadCount,
-    loading: loadingDb,
-    error: errorDb,
+    failure: errorDb,
+    settled: settledDb,
+    refresh: refreshDb,
     markRead,
     markAllRead,
     deleteOne,
@@ -138,12 +140,14 @@ const Notifications = () => {
     [isAdmin],
   );
 
-  if (loadingDb && list.length === 0 && billing.loading) return <ListSkeleton rows={5} />;
-  if (errorDb && list.length === 0) return <div className="error">{errorDb}</div>;
-  if (billing.error && (billing.data?.data ?? []).length === 0) {
-    return <div className="error">{billing.error.message}</div>;
-  }
-
+  // Each feed answers for itself: one failing must not hide the other, and
+  // neither may read as "no notifications" when it could not be read.
+  const bookingsView = deriveViewState({
+    loading: !settledDb,
+    error: errorDb,
+    data: settledDb && (list.length > 0 || !errorDb) ? list : null,
+  });
+  const billingView = deriveViewState({ loading: billing.loading, error: billing.error, data: billing.data?.data });
   const billingList = billing.data?.data ?? [];
   const expensesList = expenses.data ?? [];
 
@@ -185,11 +189,14 @@ const Notifications = () => {
             </div>
           </div>
 
-          {list.length === 0 ? (
-            <div className="card">
-              <div className="muted">{t("common.empty.notifications")}</div>
-            </div>
-          ) : (
+          <StateSwitch
+            view={bookingsView}
+            skeleton={<ListSkeleton rows={5} />}
+            size="section"
+            onRetry={() => void refreshDb()}
+            error={{ titleKey: "notifications.state.errorTitle" }}
+            empty={{ titleKey: "notifications.state.emptyTitle", descriptionKey: "notifications.state.bookingsEmptyDescription" }}
+          >
             <div style={{ display: "grid", gap: 12, marginBottom: 24 }}>
               {list.map((n) => (
                 <DbNotificationCard
@@ -200,7 +207,7 @@ const Notifications = () => {
                 />
               ))}
             </div>
-          )}
+          </StateSwitch>
         </>
       )}
 
@@ -209,17 +216,20 @@ const Notifications = () => {
           <h3 className="muted" style={{ margin: showBookings ? "24px 0 12px" : "0 0 12px", fontSize: 14 }}>
             {t("notifications.billingFeedTitle") || "Billing"}
           </h3>
-          {billingList.length === 0 ? (
-            <div className="card">
-              <div className="muted">{t("common.empty.notifications")}</div>
-            </div>
-          ) : (
+          <StateSwitch
+            view={billingView}
+            skeleton={<ListSkeleton rows={3} />}
+            size="section"
+            onRetry={() => void billing.reload()}
+            error={{ titleKey: "notifications.state.errorTitle" }}
+            empty={{ titleKey: "notifications.state.emptyTitle", descriptionKey: "notifications.state.billingEmptyDescription" }}
+          >
             <div style={{ display: "grid", gap: 12 }}>
               {billingList.map((r) => (
                 <ReminderCard key={r.id} r={r} isAdmin={isAdmin} />
               ))}
             </div>
-          )}
+          </StateSwitch>
         </>
       )}
 

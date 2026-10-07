@@ -1,4 +1,5 @@
 import { SkeletonStats } from "@/components/ui/Skeleton";
+import { ErrorState, StaleNotice, StateView } from "@/components/ui/state";
 import { IMetrikaSummary, METRIKA_PERIODS, MetrikaPeriod } from "@/api/metrika";
 import { TELEMETRY_APPS, TelemetryApp } from "@/api/telemetry";
 import PulseDashboardCard from "@/components/admin/PulseDashboardCard";
@@ -208,13 +209,16 @@ const WebsiteSection = ({ period }: { period: MetrikaPeriod }) => {
           blanking the page on every period switch reads as a crash. */}
       {loading && !data && <SkeletonStats tiles={4} />}
 
-      {error && (
-        <div className="card">
-          <div style={{ fontWeight: 700 }}>{t("metrics.loadFailed")}</div>
-          <div className="muted" style={{ marginBottom: 10 }}>{t("metrics.loadFailedSub")}</div>
-          <Button variant="secondary" onClick={() => void reload()}>{t("metrics.retry")}</Button>
-        </div>
+      {error && !data && (
+        <ErrorState
+          size="section"
+          error={error}
+          onRetry={() => void reload()}
+          titleKey="metrics.loadFailed"
+          descriptionKey="metrics.loadFailedSub"
+        />
       )}
+      {error && data && <StaleNotice error={error} onRetry={() => void reload()} />}
 
       {data && <SummaryBody summary={data} lang={lang} t={t} />}
     </>
@@ -236,21 +240,11 @@ const SummaryBody = ({ summary, lang, t }: BodyProps) => {
   );
 
   if (summary.status === "not_configured") {
-    return (
-      <div className="card">
-        <div style={{ fontWeight: 700 }}>{t("metrics.notConfigured")}</div>
-        <div className="muted">{t("metrics.notConfiguredSub")}</div>
-      </div>
-    );
+    return <StateView variant="empty" size="section" titleKey="metrics.notConfigured" descriptionKey="metrics.notConfiguredSub" />;
   }
 
   if (summary.status === "unavailable") {
-    return (
-      <div className="card">
-        <div style={{ fontWeight: 700 }}>{t("metrics.unavailable")}</div>
-        <div className="muted">{t("metrics.unavailableSub")}</div>
-      </div>
-    );
+    return <StateView variant="error" size="section" titleKey="metrics.unavailable" descriptionKey="metrics.unavailableSub" />;
   }
 
   return (
@@ -279,12 +273,14 @@ const SummaryBody = ({ summary, lang, t }: BodyProps) => {
           />
         </div>
       ) : (
-        <div className="card muted">{t("metrics.noData")}</div>
+        <div className="card">
+          <StateView variant="empty" size="compact" titleKey="metrics.noData" descriptionKey={null} />
+        </div>
       )}
 
       <div className="card">
         <div style={{ fontWeight: 700, marginBottom: 8 }}>{t("metrics.sources")}</div>
-        {summary.sources.length === 0 && <div className="muted">{t("metrics.noData")}</div>}
+        {summary.sources.length === 0 && <StateView variant="empty" size="compact" titleKey="metrics.noData" descriptionKey={null} />}
         {summary.sources.map((s) => (
           <div key={s.source} style={{ marginBottom: 10 }}>
             <div className="row" style={{ justifyContent: "space-between", gap: 12 }}>

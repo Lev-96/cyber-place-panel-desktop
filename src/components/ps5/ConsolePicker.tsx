@@ -1,3 +1,4 @@
+import { StateView } from "@/components/ui/state";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import Modal from "@/components/ui/Modal";
@@ -369,7 +370,9 @@ const ConsolePicker = ({ branchId, onClose }: Props) => {
       return <div className="ps5-row__note"><span className="muted">{t("ps5.bind.loadingPlaces")}</span></div>;
     }
 
-    if (devices.error) {
+    // Only while there is no list to offer: a failed RE-read keeps the places
+    // it already had (it used to swap a working list for an error).
+    if (devices.error && devices.data === null) {
       return (
         <div className="ps5-row__note">
           <span className="ps5-row__error">{t("ps5.bind.placesFailed")}</span>
@@ -441,7 +444,7 @@ const ConsolePicker = ({ branchId, onClose }: Props) => {
 
             {consoles !== null && consoles.length === 0 && !searching && (
               <div className="col" style={{ gap: 8 }}>
-                <div className="muted" style={{ fontSize: 13 }}>{t("ps5.discover.none")}</div>
+                <StateView variant="noResults" size="compact" titleKey="ps5.discover.none" descriptionKey={null} />
                 <div className="muted" style={{ fontSize: 11 }}>
                   {t("ps5.discover.probed")}: <span className="mono">{probed.join(", ")}</span>
                 </div>

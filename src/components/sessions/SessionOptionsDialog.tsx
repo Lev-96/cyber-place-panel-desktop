@@ -140,9 +140,11 @@ const SessionOptionsDialog = ({ session, platform, onClose, onChanged }: Props) 
   // could quote a figure for a pad the server was not about to allocate.
   const loadPrices = useCallback(() => {
     if (!isPlayStation) return;
-    void billingSettingsRepository.get(current.branch_id).then((s) => {
-      setFee(s.joystick_price);
-    });
+    // A failed read (now also when offline — it no longer falls back) leaves
+    // the fee unknown, as before; the server prices the pad either way.
+    billingSettingsRepository.get(current.branch_id)
+      .then((s) => setFee(s.joystick_price))
+      .catch(() => { /* fee stays unknown */ });
   }, [current.branch_id, isPlayStation]);
 
   useEffect(loadPrices, [loadPrices]);

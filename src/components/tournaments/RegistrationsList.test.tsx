@@ -23,12 +23,15 @@ const api = vi.hoisted(() => ({
   calls: [] as Array<{ path: string; method: string; params?: Record<string, unknown> }>,
   list: [] as unknown[],
   deleteResult: (): Promise<unknown> => Promise.resolve({ message: "Deleted" }),
+  /** When set, the list read fails with it. */
+  listError: null as unknown,
 }));
 vi.mock("@/api/client", () => ({
   request: (path: string, opts: { method?: string; params?: Record<string, unknown> } = {}) => {
     const call: Call = { path, method: opts.method ?? "GET", params: opts.params };
     api.calls.push(call);
     if (call.method === "DELETE") return api.deleteResult();
+    if (api.listError) return Promise.reject(api.listError);
     return Promise.resolve({ data: api.list });
   },
 }));
@@ -109,6 +112,7 @@ beforeEach(() => {
   api.calls = [];
   api.list = [VERIFIED, PENDING, SPECTATOR];
   api.deleteResult = () => Promise.resolve({ message: "Deleted" });
+  api.listError = null;
 });
 
 describe("RegistrationsList — removing a registration", () => {
@@ -193,5 +197,53 @@ describe("the refund note is translated", () => {
     expect(note).not.toBe("registrations.removeRefundNote");
     expect(note.length).toBeGreaterThan(0);
     if (lang !== "en") expect(note).not.toBe(REFUND_NOTE);
+  });
+});
+
+describe("RegistrationsList — states (2026-10-07)", () => {
+  test("a failed read is the error with Retry — it used to leave the skeleton up for ever", async () => {
+    api.listError = Object.assign(new Error("Server Error"), { status: 500, body: { message: "Server Error" } });
+    await mount();
+
+    expect(screen.getByText("Could not load participants")).toBeTruthy();
+    expect(document.querySelector('[aria-busy="true"]')).toBeNull();
+    expect(screen.queryByText("No registrations yet")).toBeNull();
+
+    api.listError = null;
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Retry" })); });
+    expect(screen.getByText("Aram Petrosyan")).toBeTruthy();
+  });
+
+  test("offline is said as offline, in the reading language, not «Failed to load»", async () => {
+    api.listError = new TypeError("Failed to fetch");
+    await mount();
+
+    expect(screen.getByText("No connection")).toBeTruthy();
+    expect(screen.queryByText(/Failed to/)).toBeNull();
+  });
+
+  test("no registrations at all is the empty state", async () => {
+    api.list = [];
+    await mount();
+
+    expect(screen.getByText("No registrations yet")).toBeTruthy();
+  });
+
+  test("a filter that matches nobody is «nothing found», not «no registrations»", async () => {
+    await mount();
+    fireEvent.change(screen.getByPlaceholderText(translate("registrations.searchPlaceholder", "en")), { target: { value: "zzz" } });
+
+    expect(screen.getByText("Nothing found")).toBeTruthy();
+    expect(screen.queryByText("No registrations yet")).toBeNull();
+  });
+
+  test("a delete refused with no answer says so in our words, not the browser's", async () => {
+    api.deleteResult = () => Promise.reject(new TypeError("Failed to fetch"));
+    await mount();
+    await pressRemove("Lilit Hakobyan");
+    await answer(true);
+
+    expect(screen.getByRole("alert").textContent).toBe("No connection");
+    expect(rowOf("Lilit Hakobyan")).toBeTruthy();
   });
 });

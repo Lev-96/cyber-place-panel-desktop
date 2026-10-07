@@ -86,7 +86,14 @@ export const SupportUnreadProvider = ({ children }: { children: ReactNode }) => 
 
   const refresh = useCallback(async () => {
     if (!enabled) return;
-    const conversations = await supportRepository.list();
+    let conversations;
+    try {
+      conversations = await supportRepository.list();
+    } catch {
+      // Offline or failed: keep the count we had (a network blip is not
+      // "nothing unread"); the next refresh corrects it.
+      return;
+    }
     setUnread(conversations.reduce((sum, c) => sum + (c.unread ?? 0), 0));
   }, [enabled]);
 

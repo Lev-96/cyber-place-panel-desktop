@@ -21,6 +21,7 @@ import { useAppUpdates, useUpdateCatchUp } from "@/realtime/useAppUpdates";
 import { UpdatesNotificationProvider } from "@/realtime/UpdatesNotificationContext";
 import { Suspense, lazy, useEffect } from "react";
 import { HashRouter, Navigate, Route, Routes } from "react-router-dom";
+import { OfflineNotice } from "@/components/ui/state";
 
 /* Eagerly loaded — small + always needed (auth flow). */
 import Home from "@/routes/Home";
@@ -67,6 +68,7 @@ const BranchPricesPage = lazy(() => import("@/routes/BranchPricesPage"));
 const BranchSubscribersPage = lazy(() => import("@/routes/BranchSubscribersPage"));
 const TournamentDetails = lazy(() => import("@/routes/TournamentDetails"));
 const Tournaments = lazy(() => import("@/routes/Tournaments"));
+const NotFound = lazy(() => import("@/routes/NotFound"));
 
 const Authed = () => {
   // App-wide subscription to the Reverb `app-update.promoted` broadcast.
@@ -85,6 +87,7 @@ const Authed = () => {
   <Suspense fallback={<RouteSkeleton />}>
     <UpdateReadyModal />
     <UpdatesToast />
+    <OfflineNotice />
     <Routes>
       <Route element={<Layout />}>
         <Route path="/" element={<Home />} />
@@ -357,7 +360,15 @@ const Authed = () => {
           }
         />
 
-        <Route path="*" element={<Navigate to="/" replace />} />
+        {/* An address that matches no screen says so, with a way back. It used
+            to redirect to the dashboard silently, which made a broken link look
+            like the app had ignored the click. Signed out, `*` is still Login. */}
+        {/* The signed-out screens' addresses are not "not found" for a signed-in
+            person — they simply have nothing to do there. */}
+        <Route path="/login" element={<Navigate to="/" replace />} />
+        <Route path="/forgot-password" element={<Navigate to="/" replace />} />
+        <Route path="/reset-password" element={<Navigate to="/" replace />} />
+        <Route path="*" element={<NotFound />} />
       </Route>
     </Routes>
   </Suspense>

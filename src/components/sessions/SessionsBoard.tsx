@@ -5,6 +5,8 @@ import { can } from "@/auth/permissions";
 import Button from "@/components/ui/Button";
 import CollapsibleSection from "@/components/ui/CollapsibleSection";
 import { GridSkeleton } from "@/components/ui/Skeleton";
+import { ErrorState, StaleNotice, StateView } from "@/components/ui/state";
+import { reconcileOrder } from "./tileOrder";
 import JoystickIcon from "@/components/ui/JoystickIcon";
 import { useAsync } from "@/hooks/useAsync";
 import { useKeyedBusy } from "@/hooks/useKeyedBusy";
@@ -514,19 +516,18 @@ const SessionsBoard = ({ branchId }: Props) => {
   // for devices still present, append new ones, drop removed ones.
   useEffect(() => {
     const ids = (pcs.data ?? []).map((p) => p.id);
-    setOrder((prev) => {
-      const present = new Set(ids);
-      const kept = prev.filter((id) => present.has(id));
-      const added = ids.filter((id) => !kept.includes(id));
-      return [...kept, ...added];
-    });
+    setOrder((prev) => reconcileOrder(prev, ids));
   }, [pcs.data]);
 
   const sessionByPc = new Map<number, ISessionApi>();
   for (const s of sessions.data ?? []) sessionByPc.set(s.pc_id, s);
 
   const byId = new Map((pcs.data ?? []).map((p) => [p.id, p] as const));
-  const orderedPcs = order.map((id) => byId.get(id)).filter((p): p is IPcApi => !!p);
+  // Reconciled during render too: `order` catches up only after paint, and the
+  // tiles must not wait for it (see tileOrder.ts).
+  const orderedPcs = reconcileOrder(order, (pcs.data ?? []).map((p) => p.id))
+    .map((id) => byId.get(id))
+    .filter((p): p is IPcApi => !!p);
 
   // Seats with a session running on them, counted off the SAME map the tiles
   // are drawn from — so the heading and the grid cannot disagree about how
@@ -1281,9 +1282,15 @@ const SessionsBoard = ({ branchId }: Props) => {
     );
   };
 
-  if ((pcs.loading && !pcs.data) || (sessions.loading && !sessions.data)) return <GridSkeleton />;
-  if (pcs.error && !pcs.data) return <div className="error">{pcs.error.message}</div>;
-  if (sessions.error && !sessions.data) return <div className="error">{sessions.error.message}</div>;
+  // Both reads again; each keeps what it already had if this one fails too.
+  const retryBoard = () => { void pcs.reload(); void sessions.reload(); };
+  // A first load that failed: the error (offline / failed) with Retry. Never
+  // "No devices registered" — a board that could not be read is not empty.
+  if (pcs.error && !pcs.data) return <ErrorState error={pcs.error} onRetry={retryBoard} titleKey="session.state.errorTitle" />;
+  if (sessions.error && !sessions.data) return <ErrorState error={sessions.error} onRetry={retryBoard} titleKey="session.state.errorTitle" />;
+  if (!pcs.data || !sessions.data) return <GridSkeleton />;
+  // A later refresh that failed keeps the seats on screen, with a quiet line.
+  const staleError = pcs.error ?? sessions.error;
 
   return (
     <div className="col" style={{ gap: 18 }}>
@@ -1314,8 +1321,9 @@ const SessionsBoard = ({ branchId }: Props) => {
         </div>
       </div>
 
+      {staleError && <StaleNotice error={staleError} onRetry={retryBoard} />}
       {orderedPcs.length === 0 ? (
-        <div className="muted">{t("session.noPcs")}</div>
+        <StateView variant="empty" titleKey="session.state.noPcsTitle" descriptionKey="session.state.noPcsDescription" />
       ) : (
         <div className="col" style={{ gap: 14 }}>
           {sectionKeys.map((key) => {

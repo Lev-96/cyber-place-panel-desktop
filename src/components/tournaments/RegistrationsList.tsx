@@ -6,7 +6,8 @@ import {
 } from "@/api/tournamentRegistrations";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
-import Spinner from "@/components/ui/Spinner";
+import { StateSwitch, classifyError, deriveViewState } from "@/components/ui/state";
+import { LocalizedText, renderText, textKey, textLiteral } from "@/i18n/localizedText";
 import VerifyCodeForm from "@/components/tournaments/VerifyCodeForm";
 import { useConfirm } from "@/components/ui/ConfirmProvider";
 import { useLang } from "@/i18n/LanguageContext";
@@ -41,17 +42,24 @@ const RegistrationsList = ({ tournamentId }: Props) => {
   const confirm = useConfirm();
   const [items, setItems] = useState<ITournamentRegistration[] | null>(null);
   const [search, setSearch] = useState("");
-  const [err, setErr] = useState<string | null>(null);
+  /** The list read failed (it used to leave the skeleton up for ever). */
+  const [loadError, setLoadError] = useState<unknown>(null);
+  const [loading, setLoading] = useState(true);
+  /** A refused delete: the server's reason, or our own sentence. */
+  const [removeErr, setRemoveErr] = useState<LocalizedText | null>(null);
 
   const load = async () => {
-    setErr(null);
+    setLoadError(null);
+    setLoading(true);
     try {
       const { data } = await apiListTournamentRegistrations({
         tournament_id: tournamentId,
       });
       setItems(data);
     } catch (e) {
-      setErr(e instanceof Error ? e.message : "Failed to load");
+      setLoadError(e);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -64,10 +72,16 @@ const RegistrationsList = ({ tournamentId }: Props) => {
     const question = t("registrations.confirmRemove");
     const message = reg.verified_at ? `${question}\n\n${t("registrations.removeRefundNote")}` : question;
     if (!(await confirm(message, { destructive: true }))) return;
+    setRemoveErr(null);
     try {
       await apiDeleteTournamentRegistration(reg.id);
     } catch (e) {
-      setErr(e instanceof Error ? e.message : "Failed to remove");
+      // No answer at all → our sentence; the server's refusal → its reason.
+      setRemoveErr(
+        classifyError(e) === "offline" || !(e instanceof Error) || !e.message
+          ? textKey(classifyError(e) === "offline" ? "state.offline.title" : "registrations.state.removeFailed")
+          : textLiteral(e.message),
+      );
       return;
     }
     void load();
@@ -105,23 +119,22 @@ const RegistrationsList = ({ tournamentId }: Props) => {
         value={search}
         onChange={(e) => setSearch(e.target.value)}
       />
-      {err && <div className="error">{err}</div>}
-      {!filtered ? (
-        <ListSkeleton rows={4} />
-      ) : (
+      {removeErr && <div className="error" role="alert">{renderText(removeErr, t)}</div>}
+      <StateSwitch
+        view={deriveViewState({ loading, error: loadError, data: filtered, hasFilters: search.trim() !== "" })}
+        skeleton={<ListSkeleton rows={4} />}
+        size="section"
+        onRetry={() => void load()}
+        error={{ titleKey: "registrations.state.errorTitle" }}
+        empty={{ titleKey: "registrations.state.emptyTitle", descriptionKey: "registrations.state.emptyDescription" }}
+        noResults={{ titleKey: "state.noResults.title", descriptionKey: "registrations.state.noResultsDescription" }}
+      >
         <div className="list">
-          {filtered.map((r) => (
+          {(filtered ?? []).map((r) => (
             <RegistrationRow key={r.id} reg={r} onRemove={() => void remove(r)} />
           ))}
-          {!filtered.length && (
-            <div className="muted">
-              {items && items.length > 0
-                ? t("registrations.noMatches") || "No matches."
-                : t("registrations.empty") || "No registrations yet."}
-            </div>
-          )}
         </div>
-      )}
+      </StateSwitch>
     </div>
   );
 };

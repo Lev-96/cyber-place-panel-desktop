@@ -1,8 +1,8 @@
 import { SkeletonCard } from "@/components/ui/Skeleton";
+import { BackAction, ErrorState, StaleNotice, StateView } from "@/components/ui/state";
 import MemberForm from "@/components/members/MemberForm";
 import TopupDialog from "@/components/members/TopupDialog";
 import Button from "@/components/ui/Button";
-import Spinner from "@/components/ui/Spinner";
 import { formatDateTime } from "@/i18n/dates";
 import { useLang } from "@/i18n/LanguageContext";
 import { memberRepository } from "@/repositories/MemberRepository";
@@ -19,25 +19,39 @@ const MemberCard = () => {
   const [deposits, setDeposits] = useState<IMemberDeposit[]>([]);
   const [topup, setTopup] = useState(false);
   const [editing, setEditing] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
+  const [err, setErr] = useState<unknown>(null);
 
   const load = async () => {
     setErr(null);
     try {
       const [m, d] = await Promise.all([memberRepository.byId(id), memberRepository.deposits(id)]);
       setMember(m); setDeposits(d);
-    } catch (e) { setErr(e instanceof Error ? e.message : t("form.errors.failed")); }
+    } catch (e) { setErr(e); }
   };
 
   useEffect(() => { void load(); /* eslint-disable-next-line */ }, [id]);
 
-  if (err) return <div className="error">{err}</div>;
+  // A failure with a card already on screen keeps the card (a quiet notice
+  // above it); only a first load that failed replaces it.
+  if (err && !member) {
+    return (
+      <ErrorState
+        error={err}
+        onRetry={() => void load()}
+        titleKey="memberCard.state.errorTitle"
+        notFoundTitleKey="memberCard.state.notFoundTitle"
+        notFoundDescriptionKey="memberCard.state.notFoundDescription"
+        notFoundAction={<BackAction fallback={`/branches/${branch}/members`} />}
+      />
+    );
+  }
   if (!member) return <SkeletonCard lines={4} />;
 
   const labelOf = (k: IMemberDeposit["kind"]) => k === "topup" ? t("memberCard.topup") : k === "spend" ? t("memberCard.spend") : t("memberCard.adjust");
 
   return (
     <div className="col" style={{ gap: 18, maxWidth: 720 }}>
+      {err ? <StaleNotice error={err} onRetry={() => void load()} /> : null}
       <div className="row-between">
         <h2 className="page-title" style={{ margin: 0 }}>{member.name}</h2>
         <div className="row" style={{ gap: 8 }}>
@@ -53,7 +67,9 @@ const MemberCard = () => {
       </div>
       <div className="card col" style={{ gap: 4 }}>
         <h3 style={{ margin: 0 }}>{t("memberCard.transactions")}</h3>
-        {deposits.length === 0 && <div className="muted">{t("memberCard.noTx")}</div>}
+        {deposits.length === 0 && (
+          <StateView variant="empty" size="compact" titleKey="memberCard.state.noTxTitle" descriptionKey="memberCard.state.noTxDescription" />
+        )}
         {deposits.map((d) => (
           <div key={d.id} className="row-between" style={{ padding: "6px 0", borderBottom: "1px solid #1f2a44" }}>
             <div>

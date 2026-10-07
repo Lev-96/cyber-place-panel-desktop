@@ -1,3 +1,4 @@
+import { ErrorState, StateView } from "@/components/ui/state";
 import { ListSkeleton } from "@/components/ui/Skeleton";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
@@ -73,13 +74,17 @@ export const BasketPicker = ({ basket, saving, canCreateProducts }: PickerProps)
         <Input placeholder={t("session.search")} value={basket.search} onChange={(e) => basket.setSearch(e.target.value)} />
       )}
 
-      {basket.loading ? <ListSkeleton rows={3} /> : (
+      {basket.loading ? <ListSkeleton rows={3} /> : products === null ? (
+        // The catalogue could not be read: say so (offline / failed) with
+        // Retry — never "no products", which is a different fact.
+        <ErrorState size="compact" error={basket.productsError} onRetry={basket.reloadProducts} titleKey="products.state.errorTitle" descriptionKey={null} />
+      ) : (
         <div className="col" style={{ gap: 6, maxHeight: 190, overflowY: "auto" }}>
-          {products?.length === 0 && (
-            <div className="muted" style={{ fontSize: 13 }}>{t("session.noProducts")}</div>
+          {products.length === 0 && (
+            <StateView variant="empty" size="compact" titleKey="session.noProducts" descriptionKey={null} />
           )}
-          {products?.length !== 0 && filtered.length === 0 && (
-            <div className="muted" style={{ fontSize: 13 }}>{t("session.noSearchMatches")}</div>
+          {products.length !== 0 && filtered.length === 0 && (
+            <StateView variant="noResults" size="compact" titleKey="session.noSearchMatches" descriptionKey={null} />
           )}
           {filtered.map((p) => (
             <div key={p.id} style={rowStyle}>

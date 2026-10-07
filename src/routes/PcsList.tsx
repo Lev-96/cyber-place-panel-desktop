@@ -5,6 +5,7 @@ import PcForm from "@/components/pcs/PcForm";
 import Button from "@/components/ui/Button";
 import { useConfirm } from "@/components/ui/ConfirmProvider";
 import { ListSkeleton } from "@/components/ui/Skeleton";
+import { StateSwitch, deriveViewState } from "@/components/ui/state";
 import { notify } from "@/ui/notify";
 import { useAsync } from "@/hooks/useAsync";
 import { formatDateTime } from "@/i18n/dates";
@@ -105,9 +106,13 @@ const PcsList = () => {
         </ol>
       </div>
 
-      {loading && <ListSkeleton />}
-      {error && <div className="error">{error.message}</div>}
-      {!loading && !error && (
+      <StateSwitch
+        view={deriveViewState({ loading, error, data: pcs })}
+        skeleton={<ListSkeleton />}
+        onRetry={() => void reload()}
+        error={{ titleKey: "pcs.state.errorTitle" }}
+        empty={{ titleKey: "pcs.state.emptyTitle", descriptionKey: "pcs.state.emptyDescription" }}
+      >
         <div className="list">
           {(pcs ?? []).map((pc) => {
             const neverPaired = !pc.last_seen_at;
@@ -149,9 +154,8 @@ const PcsList = () => {
             </div>
             );
           })}
-          {!pcs?.length && <div className="muted">{t("pcs.empty")}</div>}
         </div>
-      )}
+      </StateSwitch>
 
       {creating && (
         <PcForm

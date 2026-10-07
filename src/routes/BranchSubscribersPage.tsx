@@ -5,7 +5,7 @@ import {
 } from "@/api/branchSubscribers";
 import Input from "@/components/ui/Input";
 import ScreenWithBg from "@/components/ui/ScreenWithBg";
-import Spinner from "@/components/ui/Spinner";
+import { StateSwitch, deriveViewState } from "@/components/ui/state";
 import { useAsync } from "@/hooks/useAsync";
 import { formatDateTime } from "@/i18n/dates";
 import { useLang } from "@/i18n/LanguageContext";
@@ -23,17 +23,13 @@ const BranchSubscribersPage = () => {
   const { branchId } = useParams();
   const id = Number(branchId);
   const { t } = useLang();
-  const { data, loading, error } = useAsync(
+  const { data, loading, error, reload } = useAsync(
     () => apiListBranchSubscribers(id),
     [id],
   );
   const [search, setSearch] = useState("");
 
-  if (!Number.isFinite(id) || id <= 0) {
-    return <div className="error">{t("hub.invalidId")}</div>;
-  }
-
-  const items = data?.data ?? [];
+  const items = useMemo(() => data?.data ?? [], [data]);
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return items;
@@ -43,6 +39,11 @@ const BranchSubscribersPage = () => {
       return first.includes(q) || last.includes(q);
     });
   }, [items, search]);
+
+  // After every hook (the memo above used to sit below this return).
+  if (!Number.isFinite(id) || id <= 0) {
+    return <div className="error">{t("hub.invalidId")}</div>;
+  }
 
   // Format a "12 subscribers" / "5 of 12" counter once and reuse it
   // in the header. When the filter is active we surface BOTH the
@@ -59,7 +60,7 @@ const BranchSubscribersPage = () => {
       bg="./bg/branch.jpg"
       title={t("subscribers.title") || "Subscribers"}
     >
-      {!loading && !error && (
+      {data && (
         <div className="muted" style={{ fontSize: 13 }}>
           {totalLabel}: <strong style={{ color: "#fff" }}>{countText}</strong>
         </div>
@@ -69,22 +70,20 @@ const BranchSubscribersPage = () => {
         value={search}
         onChange={(e) => setSearch(e.target.value)}
       />
-      {loading && <ListSkeleton rows={6} />}
-      {error && <div className="error">{error.message}</div>}
-      {!loading && !error && (
+      <StateSwitch
+        view={deriveViewState({ loading, error, data: data ? filtered : null, hasFilters: search.trim() !== "" })}
+        skeleton={<ListSkeleton rows={6} />}
+        onRetry={() => void reload()}
+        error={{ titleKey: "subscribers.state.errorTitle" }}
+        empty={{ titleKey: "subscribers.state.emptyTitle", descriptionKey: "subscribers.state.emptyDescription" }}
+        noResults={{ descriptionKey: "subscribers.state.noResultsDescription" }}
+      >
         <div className="list">
           {filtered.map((r) => (
             <SubscriberRow key={r.id} sub={r} />
           ))}
-          {!filtered.length && (
-            <div className="muted">
-              {items.length > 0
-                ? t("subscribers.noMatches") || "No matches."
-                : t("subscribers.empty") || "No subscribers yet."}
-            </div>
-          )}
         </div>
-      )}
+      </StateSwitch>
     </ScreenWithBg>
   );
 };

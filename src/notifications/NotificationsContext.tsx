@@ -33,6 +33,13 @@ interface NotificationsContextShape {
   unreadCount: number;
   loading: boolean;
   error: string | null;
+  /**
+   * The last read's failure as thrown (null after a success), so a screen can
+   * tell offline from failed; `error` keeps the sentence for older readers.
+   */
+  failure: unknown;
+  /** The first read has answered (or there is nothing to read for this role). */
+  settled: boolean;
   refresh: () => Promise<void>;
   markRead: (id: string) => Promise<void>;
   markAllRead: () => Promise<void>;
@@ -50,6 +57,8 @@ export const NotificationsProvider = ({ children }: { children: ReactNode }) => 
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [failure, setFailure] = useState<unknown>(null);
+  const [settled, setSettled] = useState(false);
 
   // Tracks whether the screen is mounted — we don't write state on a
   // late response that returned after unmount.
@@ -76,10 +85,12 @@ export const NotificationsProvider = ({ children }: { children: ReactNode }) => 
     if (!user || !dbFeedEnabled) {
       setList([]);
       setUnreadCount(0);
+      setSettled(true);
       return;
     }
     setLoading(true);
     setError(null);
+    setFailure(null);
     try {
       const page = await apiNotifications(1, 50);
       if (!aliveRef.current) return;
@@ -89,8 +100,9 @@ export const NotificationsProvider = ({ children }: { children: ReactNode }) => 
       if (!aliveRef.current) return;
       const msg = e instanceof Error ? e.message : "Failed to load notifications";
       setError(msg);
+      setFailure(e);
     } finally {
-      if (aliveRef.current) setLoading(false);
+      if (aliveRef.current) { setLoading(false); setSettled(true); }
     }
   }, [user, dbFeedEnabled]);
 
@@ -250,8 +262,8 @@ export const NotificationsProvider = ({ children }: { children: ReactNode }) => 
   }, [list, unreadCount]);
 
   const value = useMemo<NotificationsContextShape>(
-    () => ({ list, unreadCount, loading, error, refresh, markRead, markAllRead, deleteOne, deleteAll }),
-    [list, unreadCount, loading, error, refresh, markRead, markAllRead, deleteOne, deleteAll],
+    () => ({ list, unreadCount, loading, error, failure, settled, refresh, markRead, markAllRead, deleteOne, deleteAll }),
+    [list, unreadCount, loading, error, failure, settled, refresh, markRead, markAllRead, deleteOne, deleteAll],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

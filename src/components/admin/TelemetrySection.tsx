@@ -1,4 +1,5 @@
 import { SkeletonStats } from "@/components/ui/Skeleton";
+import { ErrorState, StaleNotice, StateView } from "@/components/ui/state";
 import { ITelemetryCount, ITelemetrySummary, TelemetryApp } from "@/api/telemetry";
 import { MetrikaPeriod } from "@/api/metrika";
 import Button from "@/components/ui/Button";
@@ -31,39 +32,44 @@ const TelemetrySection = ({ app, period }: { app: TelemetryApp; period: MetrikaP
     [app, period],
   );
 
-  if (loading && !data) return <SkeletonStats tiles={4} />;
-
-  if (error) {
+  // A failed first read: the shared error state (offline / failed) with
+  // Retry. A failed re-read keeps the figures on screen with a quiet line.
+  if (error && !data) {
     return (
-      <div className="card">
-        <div style={{ fontWeight: 700 }}>{t("monitoring.loadFailed")}</div>
-        <div className="muted" style={{ marginBottom: 10 }}>{t("monitoring.loadFailedSub")}</div>
-        <Button variant="secondary" onClick={() => void reload()}>{t("metrics.retry")}</Button>
-      </div>
+      <ErrorState
+        size="section"
+        error={error}
+        onRetry={() => void reload()}
+        titleKey="monitoring.loadFailed"
+        descriptionKey="monitoring.loadFailedSub"
+      />
     );
   }
 
-  if (!data) return null;
+  if (!data) return <SkeletonStats tiles={4} />;
 
   if (data.status === "disabled") {
-    return (
-      <div className="card">
-        <div style={{ fontWeight: 700 }}>{t("monitoring.disabled")}</div>
-        <div className="muted">{t("monitoring.disabledSub")}</div>
-      </div>
-    );
+    return <StateView variant="empty" size="section" titleKey="monitoring.disabled" descriptionKey="monitoring.disabledSub" />;
   }
 
   if (data.status === "unavailable") {
     return (
-      <div className="card">
-        <div style={{ fontWeight: 700 }}>{t("metrics.unavailable")}</div>
-        <div className="muted">{t("metrics.unavailableSub")}</div>
-      </div>
+      <StateView
+        variant="error"
+        size="section"
+        titleKey="metrics.unavailable"
+        descriptionKey="metrics.unavailableSub"
+        actions={<Button type="button" variant="secondary" onClick={() => void reload()}>{t("metrics.retry")}</Button>}
+      />
     );
   }
 
-  return <Body summary={data} lang={lang} t={t} />;
+  return (
+    <>
+      {error && <StaleNotice error={error} onRetry={() => void reload()} />}
+      <Body summary={data} lang={lang} t={t} />
+    </>
+  );
 };
 
 interface BodyProps {
@@ -112,7 +118,9 @@ const Body = ({ summary, lang, t }: BodyProps) => {
           />
         </div>
       ) : (
-        <div className="card muted">{t("metrics.noData")}</div>
+        <div className="card">
+          <StateView variant="empty" size="compact" titleKey="metrics.noData" descriptionKey={null} />
+        </div>
       )}
 
       <div className="row" style={{ gap: 12, flexWrap: "wrap", alignItems: "flex-start" }}>
@@ -125,7 +133,8 @@ const Body = ({ summary, lang, t }: BodyProps) => {
       <div className="card">
         <div style={{ fontWeight: 700, marginBottom: 8 }}>{t("monitoring.recentErrors")}</div>
         {summary.recent_errors.length === 0 && (
-          <div className="muted">{t("monitoring.noErrors")}</div>
+          // Good news, said as such.
+          <StateView variant="success" size="compact" titleKey="monitoring.noErrors" descriptionKey={null} />
         )}
         {summary.recent_errors.map((e, i) => (
           <div
@@ -194,7 +203,7 @@ const BarCard = ({
 }) => (
   <div className="card" style={{ flex: "1 1 280px", minWidth: 260 }}>
     <div style={{ fontWeight: 700, marginBottom: 8 }}>{title}</div>
-    {rows.length === 0 && <div className="muted">{t("metrics.noData")}</div>}
+    {rows.length === 0 && <StateView variant="empty" size="compact" titleKey="metrics.noData" descriptionKey={null} />}
     {rows.map((r) => (
       <div key={r.label} style={{ marginBottom: 10 }}>
         <div className="row" style={{ justifyContent: "space-between", gap: 12 }}>

@@ -1,7 +1,6 @@
 import { SkeletonCard } from "@/components/ui/Skeleton";
 import { useAuth } from "@/auth/AuthContext";
-import Spinner from "@/components/ui/Spinner";
-import { useLang } from "@/i18n/LanguageContext";
+import { StateView } from "@/components/ui/state";
 import { Navigate } from "react-router-dom";
 
 /**
@@ -10,10 +9,10 @@ import { Navigate } from "react-router-dom";
  */
 const MyCompany = () => {
   const { user, loading } = useAuth();
-  const { t } = useLang();
   if (loading) return <SkeletonCard lines={4} />;
   const companyId = user?.dashboard?.company_id;
-  if (!companyId) return <div className="error">{t("error.noCompanyLinked")}</div>;
+  // Not a failure: this account simply has no company yet.
+  if (!companyId) return <StateView variant="empty" titleKey="revenue.state.noCompanyTitle" descriptionKey="myCompany.state.noCompanyDescription" />;
   return <Navigate to={`/companies/${companyId}`} replace />;
 };
 

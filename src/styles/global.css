@@ -3670,15 +3670,6 @@ button.login-flip-back:hover {
   color: var(--color-primary);
   font-weight: 700;
 }
-.support-branch-empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  padding: 24px 12px;
-  border: 1px dashed #1f2a44;
-  border-radius: 10px;
-}
 .support-branch-change {
   margin-top: 12px;
   padding: 8px 10px;
@@ -4261,6 +4252,17 @@ button.login-flip-back:hover {
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
+/* Device: a 16px glyph beside its name, kept on one line with it. */
+.ipa-device {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+.ipa-device__icon {
+  flex: 0 0 auto;
+  color: var(--color-muted);
+}
 .pill.ipa-source {
   text-transform: none;
   letter-spacing: 0;
@@ -4628,12 +4630,6 @@ select.input option:disabled {
   gap: 8px;
   flex-wrap: wrap;
 }
-.settings-section__error {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-}
 
 .prices-page {
   gap: 28px;
@@ -4667,12 +4663,6 @@ select.input option:disabled {
 /* A price matrix needs no more than this; wider only spreads the eye. */
 .prices-group--rates .settings-section > form {
   max-width: 760px;
-}
-.prices-empty {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
 }
 
 /* A package row: its buttons act, the row itself does not — so no pointer
@@ -5405,4 +5395,277 @@ select.input option:disabled {
   .mosaic__skeleton {
     animation: none;
   }
+}
+
+/* ── State views (src/components/ui/state) ─────────────────────────────────
+   Empty / no results / not found / error / offline / success: ONE layout
+   (`.cp-state`), three sizes, and the hand-drawn player (`.cp-gamer`).
+   Sized to its container: centred column, text capped at a reading measure,
+   actions wrap. The player is decoration (aria-hidden); motion is transform /
+   opacity only, 3–5 s loops, and none at all under reduced motion. */
+.cp-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
+  max-width: 100%;
+  margin-inline: auto;
+  text-align: center;
+}
+.cp-state--page {
+  padding: 48px 24px;
+}
+.cp-state--section {
+  gap: 12px;
+  padding: 24px 16px;
+}
+.cp-state--compact {
+  gap: 8px;
+  padding: 12px 8px;
+}
+.cp-state__art {
+  /* 4:3 is the drawing's own viewBox (240×180), so the frame is reserved
+     before the lazy pose arrives and nothing jumps when it does. */
+  aspect-ratio: 4 / 3;
+  width: min(240px, 70%);
+  flex: 0 0 auto;
+}
+.cp-state--section .cp-state__art {
+  width: min(160px, 50%);
+}
+.cp-state__text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  max-width: 46ch;
+}
+.cp-state__title {
+  margin: 0;
+  color: var(--color-text);
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.35;
+  letter-spacing: 0.01em;
+  overflow-wrap: anywhere;
+}
+.cp-state--page .cp-state__title {
+  font-size: 18px;
+}
+.cp-state--compact .cp-state__title {
+  font-size: 14px;
+  font-weight: 500;
+}
+.cp-state__description {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 13px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.cp-state__detail {
+  margin: 4px 0 0;
+  color: var(--color-muted);
+  font-size: 12px;
+  line-height: 1.45;
+  opacity: 0.8;
+  overflow-wrap: anywhere;
+}
+.cp-state__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+
+.cp-gamer {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.cp-gamer__stop-a { stop-color: var(--color-primary); }
+.cp-gamer__stop-b { stop-color: var(--color-accent-blue); }
+.cp-gamer__stop-c { stop-color: var(--color-accent-purple); }
+.cp-gamer__fill { fill: var(--color-surface-alt); }
+.cp-gamer__skin,
+.cp-gamer__device { fill: var(--color-surface); }
+.cp-gamer__hair { fill: var(--color-accent-purple); opacity: 0.85; }
+.cp-gamer__eye,
+.cp-gamer__btn-a,
+.cp-gamer__star { fill: var(--color-primary); }
+.cp-gamer__cup,
+.cp-gamer__plug,
+.cp-gamer__mark-dot { fill: var(--color-accent-blue); }
+.cp-gamer__mic,
+.cp-gamer__btn-b,
+.cp-gamer__star--2 { fill: var(--color-accent-purple); }
+.cp-gamer__lens { fill: var(--color-primary); fill-opacity: 0.08; }
+.cp-gamer__mouth,
+.cp-gamer__glyph,
+.cp-gamer__glint,
+.cp-gamer__route,
+.cp-gamer__cross,
+.cp-gamer__mark,
+.cp-gamer__spark,
+.cp-gamer__wave {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.cp-gamer__mouth { stroke: var(--color-primary); stroke-width: 2; }
+.cp-gamer__glyph { stroke: var(--color-muted); stroke-width: 2; }
+.cp-gamer__glint { stroke: var(--color-text); stroke-opacity: 0.6; stroke-width: 2; }
+.cp-gamer__route { stroke: var(--color-primary); stroke-width: 2; stroke-dasharray: 3 4; }
+.cp-gamer__cross { stroke: var(--color-accent-purple); stroke-width: 3; }
+.cp-gamer__mark { stroke: var(--color-accent-blue); stroke-width: 3.5; }
+.cp-gamer__spark { stroke: var(--color-warning); stroke-width: 2.5; }
+.cp-gamer__wave { stroke: var(--color-muted); stroke-width: 4; }
+
+/* Every animated group turns / moves about its own box. */
+.cp-gamer__sway,
+.cp-gamer__breathe,
+.cp-gamer__eyes,
+.cp-gamer__tilt,
+.cp-gamer__scan,
+.cp-gamer__float {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.cp-gamer__sway {
+  transform-origin: 50% 100%;
+  animation: cp-gamer-sway 5s ease-in-out infinite;
+}
+.cp-gamer__breathe { animation: cp-gamer-breathe 4s ease-in-out infinite; }
+.cp-gamer__eyes { animation: cp-gamer-blink 5s ease-in-out infinite; }
+.cp-gamer__tilt { animation: cp-gamer-tilt 3s ease-in-out infinite; }
+.cp-gamer__scan { animation: cp-gamer-scan 4s ease-in-out infinite; }
+.cp-gamer__float { animation: cp-gamer-float 3s ease-in-out infinite; }
+.cp-gamer__spark { animation: cp-gamer-flicker 3s steps(1, end) infinite; }
+.cp-gamer__wave { animation: cp-gamer-pulse 3s ease-in-out infinite; }
+.cp-gamer__wave--2 { animation-delay: 0.4s; }
+.cp-gamer__wave--3 { animation-delay: 0.8s; }
+.cp-gamer__star { animation: cp-gamer-pulse 3s ease-in-out infinite; }
+.cp-gamer__star--2 { animation-delay: 1s; }
+.cp-gamer__star--3 { animation-delay: 2s; }
+/* Declared after `.cp-gamer__sway`, on the same element: replaces the sway. */
+.cp-gamer__bounce { animation: cp-gamer-bounce 3s ease-in-out infinite; }
+
+@keyframes cp-gamer-sway {
+  0%, 100% { transform: rotate(-1deg); }
+  50% { transform: rotate(1deg); }
+}
+@keyframes cp-gamer-breathe {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-1.5px); }
+}
+@keyframes cp-gamer-blink {
+  0%, 90%, 100% { transform: scaleY(1); }
+  93% { transform: scaleY(0.1); }
+}
+@keyframes cp-gamer-tilt {
+  0%, 100% { transform: rotate(-3deg); }
+  50% { transform: rotate(3deg); }
+}
+@keyframes cp-gamer-scan {
+  0%, 100% { transform: translate(0, 0); }
+  33% { transform: translate(-4px, -3px); }
+  66% { transform: translate(3px, -1px); }
+}
+@keyframes cp-gamer-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+@keyframes cp-gamer-flicker {
+  0%, 100% { opacity: 1; }
+  40% { opacity: 0.2; }
+  48% { opacity: 1; }
+  70% { opacity: 0.4; }
+}
+@keyframes cp-gamer-pulse {
+  0%, 100% { opacity: 0.25; }
+  50% { opacity: 1; }
+}
+@keyframes cp-gamer-bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+
+/* While the machine reports no network: one quiet pill, bottom centre, under
+   the CRUD toasts (z 70) and over a dialog's backdrop (z 50). Click-through. */
+.cp-offline-notice {
+  position: fixed;
+  bottom: 16px;
+  left: 50%;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: calc(100vw - 32px);
+  padding: 8px 16px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-surface-alt);
+  color: var(--color-text);
+  font-size: 13px;
+  line-height: 1.4;
+  pointer-events: none;
+  transform: translateX(-50%);
+}
+.cp-offline-notice__icon {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+  fill: none;
+  stroke: var(--color-warning);
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+/* Less motion asked for: the player stands still, and so do the loaders —
+   the skeleton keeps its tint without the shimmer, the spinner its ring. */
+@media (prefers-reduced-motion: reduce) {
+  .cp-gamer *,
+  .cp-skeleton {
+    animation: none;
+  }
+  .spinner {
+    animation-duration: 2.4s;
+  }
+}
+
+/* Data still on screen after a refresh failed: one muted line, not a banner. */
+.cp-stale {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  color: var(--color-muted);
+  font-size: 13px;
+  line-height: 1.4;
+}
+.cp-stale::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--color-warning);
+}
+.cp-stale__retry {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-primary);
+  font: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.cp-stale__retry:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+  border-radius: 4px;
 }

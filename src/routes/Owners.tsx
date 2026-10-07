@@ -9,6 +9,7 @@ import Button from "@/components/ui/Button";
 import Pagination from "@/components/ui/Pagination";
 import ScreenWithBg from "@/components/ui/ScreenWithBg";
 import { ListSkeleton } from "@/components/ui/Skeleton";
+import { StateSwitch, deriveViewState } from "@/components/ui/state";
 import { useAsync } from "@/hooks/useAsync";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useLang } from "@/i18n/LanguageContext";
@@ -47,6 +48,7 @@ const Owners = () => {
   const { data, loading, error, reload } = useAsync(() => ownerRepository.listPaged(page, query), [page, query]);
   const owners = data?.data ?? [];
   const lastPage = data?.meta?.last_page ?? 1;
+  const view = deriveViewState({ loading, error, data: data ? owners : null, hasFilters: query !== "" });
 
   // Deleting the only row of the last page leaves a page that no longer
   // exists; step back to the one that does instead of showing "no owners".
@@ -72,10 +74,18 @@ const Owners = () => {
         />
         {canCreate && <Button onClick={() => setCreating(true)} style={{ flexShrink: 0 }}>{t("owners.add")}</Button>}
       </div>
-      {error && <div className="error">{error.message}</div>}
-      {loading && !data ? (
-        <ListSkeleton />
-      ) : !error ? (
+      <StateSwitch
+        view={view}
+        skeleton={<ListSkeleton />}
+        onRetry={() => void reload()}
+        error={{ titleKey: "owners.state.errorTitle" }}
+        empty={{
+          titleKey: "owners.state.emptyTitle",
+          descriptionKey: "owners.state.emptyDescription",
+          actions: canCreate ? <Button onClick={() => setCreating(true)}>{t("owners.add")}</Button> : undefined,
+        }}
+        noResults={{ titleKey: "state.noResults.title", descriptionKey: "owners.state.noResultsDescription" }}
+      >
         <div className="list">
           {owners.map((o) => (
             <OwnerRow
@@ -85,12 +95,9 @@ const Owners = () => {
               onDelete={canDelete ? setDeleting : undefined}
             />
           ))}
-          {!owners.length && !loading && (
-            <div className="muted">{query ? t("owners.emptySearch") : t("owners.empty")}</div>
-          )}
         </div>
-      ) : null}
-      {!error && <Pagination page={page} lastPage={lastPage} onChange={setPage} disabled={loading} />}
+      </StateSwitch>
+      {view.kind !== "error" && <Pagination page={page} lastPage={lastPage} onChange={setPage} disabled={loading} />}
 
       {creating && (
         <OwnerCreateForm

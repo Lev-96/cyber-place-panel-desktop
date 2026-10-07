@@ -56,10 +56,13 @@ describe("AccountSwitchPanel", () => {
   });
 
   test("a list that failed to load is reported with a retry, not as an empty company", async () => {
-    repo.targets.mockRejectedValueOnce(new Error("Forbidden")).mockResolvedValueOnce([OWNER]);
+    repo.targets
+      .mockRejectedValueOnce(Object.assign(new Error("Forbidden"), { status: 403, body: { message: "Forbidden" } }))
+      .mockResolvedValueOnce([OWNER]);
     await mount();
 
     expect(screen.queryByText("switchAccount.empty")).toBeNull();
+    expect(screen.getByRole("alert").textContent).toContain("switchAccount.state.errorTitle");
     expect(screen.getByRole("alert").textContent).toContain("Forbidden");
 
     await act(async () => { fireEvent.click(screen.getByText("action.retry")); });

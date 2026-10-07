@@ -4,6 +4,7 @@ import Modal from "@/components/ui/Modal";
 import Input from "@/components/ui/Input";
 import Spinner from "@/components/ui/Spinner";
 import { useAsync } from "@/hooks/useAsync";
+import { ErrorState, StateView, deriveViewState } from "@/components/ui/state";
 import { useLang } from "@/i18n/LanguageContext";
 import { branchRepository } from "@/repositories/BranchRepository";
 import { pcRepository } from "@/repositories/PcRepository";
@@ -78,6 +79,7 @@ const PcForm = ({ branchId, initial, takenPlaceIds = [], onClose, onSaved }: Pro
     },
     [places.data, deviceKind, takenPlaceIds, initial?.place_id],
   );
+  const placesView = deriveViewState({ loading: places.loading, error: places.error, data: places.data ? placeOptions : null });
 
   // If the currently linked place vanished from the scoped list (e.g. it was
   // deleted while the modal was open), drop the stale link so we never submit
@@ -140,12 +142,13 @@ const PcForm = ({ branchId, initial, takenPlaceIds = [], onClose, onSaved }: Pro
 
         <div className="col" style={{ gap: 6 }}>
           <span className="label">{t("pcs.placeId")}</span>
-          {places.loading ? (
+          {placesView.kind === "loading" ? (
             <ListSkeleton rows={3} />
-          ) : placeOptions.length === 0 ? (
-            <p className="muted" style={{ margin: 0, color: "#f59e0b" }}>
-              {t("pcs.placeEmpty")}
-            </p>
+          ) : placesView.kind === "error" ? (
+            // A failed read is not "no free places": say it failed, offer Retry.
+            <ErrorState size="compact" error={placesView.error} onRetry={() => void places.reload()} titleKey="pcs.state.placesErrorTitle" descriptionKey={null} />
+          ) : placesView.kind === "empty" || placesView.kind === "noResults" ? (
+            <StateView variant="empty" size="compact" titleKey="pcs.placeEmpty" descriptionKey={null} />
           ) : (
             <div style={selectWrap}>
               <select

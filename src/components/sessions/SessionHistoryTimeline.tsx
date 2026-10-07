@@ -3,6 +3,7 @@ import { ISessionEvent } from "@/api/sessions";
 import { formatDate, formatDateTime, formatTime } from "@/i18n/dates";
 import { fmt } from "@/i18n/translations";
 import { useLang } from "@/i18n/LanguageContext";
+import { ErrorState } from "@/components/ui/state";
 import { eventPresentation, foldedIndexes, seatSteps } from "./sessionHistoryModel";
 
 interface Props {
@@ -10,6 +11,9 @@ interface Props {
   events: ISessionEvent[] | null;
   /** The session's start — an event on another day carries its date. */
   startedAt: string;
+  /** The card's own read of its events failed (with `events` still null). */
+  error?: unknown;
+  onRetry?: () => void;
 }
 
 /**
@@ -30,10 +34,14 @@ interface Props {
  * one real button — mounted in both states, so the focus never drops — shows
  * the rest or folds it again. Nothing is fetched by it.
  */
-const SessionHistoryTimeline = ({ events, startedAt }: Props) => {
+const SessionHistoryTimeline = ({ events, startedAt, error, onRetry }: Props) => {
   const { t, money } = useLang();
   const listId = useId();
   const [expanded, setExpanded] = useState(false);
+
+  if (events === null && error) {
+    return <ErrorState size="compact" error={error} onRetry={onRetry} titleKey="history.state.timelineErrorTitle" descriptionKey={null} />;
+  }
 
   if (events === null) {
     return <span className="muted hs-note">{t("history.timelineLoading")}</span>;
