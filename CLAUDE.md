@@ -1464,9 +1464,19 @@ backend routes.
       non-null and the source is not `telegram_bot` (that one shows the
       "belongs to Telegram's servers" note even if a location arrives). No
       pin: a dashed `.cp-map-area` circle. Caption always under the map:
-      approximate, the network's centre, ~N km, not the person, VPN = the
-      VPN's (`captionNoRadius` without a number). No location → compact
-      StateView "IP location not determined".
+      approximate location determined BY THE IP ADDRESS, ~N km, not the
+      person's exact location, VPN = the VPN server's (`captionNoRadius`
+      without a number). It never says "network": the place comes from the
+      MaxMind City database by IP, the provider from the separate ASN
+      database (2026-10-08). No location → compact StateView "IP location
+      not determined".
+    - **Fact groups** (2026-10-08, `FactGroup`): Device / **Location by IP**
+      (country, region, city) / **Provider / Network** (organisation, AS
+      number) / Activity — the place and the provider are separate groups
+      so neither reads as derived from the other. Table headers say
+      "Country (by IP)" / "City (by IP)" (`ipActivity.col.countryByIp` /
+      `cityByIp`). Test: "the place by IP and the provider are separate
+      groups".
     - **`BranchMap` area mode**: passing `accuracyRadiusKm` (even `null`)
       caps the map at `AREA_MAX_ZOOM` (11) so an approximate place is never
       shown at street level; a radius draws `L.circle` (metres) and
