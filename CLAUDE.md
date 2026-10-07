@@ -1435,7 +1435,50 @@ backend routes.
     (phone / tablet / desktop / laptop, inline SVG). Server filters `device` and
     `os` in the filter bar; any change starts on page 1. Empty ("No connections
     recorded yet") vs no results (any filter/search/pick) vs error + Retry;
-  - `IpActivityTab.test.tsx` (14).
+  - **Network, Activity and the details dialog** (2026-10-07). All new
+    resource fields are OPTIONAL in `src/api/ipActivity.ts` (absent = `null` =
+    "Not determined"): `region_name`, `asn`, `as_org`, `browser`
+    (`IP_ACTIVITY_BROWSERS`, typed `string`), `browser_version` (major),
+    `location: {latitude, longitude, accuracy_radius_km} | null` (the backend
+    sends null for `telegram_bot` and unknown addresses).
+    - **"Provider / Network" column** after OS: `as_org` over `AS<asn>` (muted).
+      Never called Wi-Fi: the server sees the network, not the access point.
+      Clicking it is the third click-to-filter (`asn`, chip, page 1); the
+      search box also matches the organisation and "AS<number>" server-side.
+    - **"Activity", not "Visits"**: `visits_count` counts 10-minute windows with
+      activity, not requests; the header's tooltip says so
+      (`ipActivity.col.visitsHint`), the sort is "Most activity".
+    - **Row click / Enter on a focused row** opens `IpActivityDetailsModal`.
+      Clicks on a control inside the row (user, city, network) and a click
+      that ends a text selection do not; Enter on an inner control does not.
+    - The dialog reads `GET /admin/ip-activity/{id}` through
+      `securityRepository.ipActivityDetails` (NOT the list row): the server
+      audits each read. Hence `useAsync(..., { revalidateOnCacheChange: false })`
+      (new, additive option) so a cache announcement elsewhere cannot re-read
+      it and log an access nobody made; `/admin/*` is never cached anyway.
+      Skeleton while loading; `ErrorState` compact (404 → "This record no
+      longer exists", no Retry; else error + Retry). Shows only what the
+      resource carries, never tokens / headers / bodies.
+    - **Map**: `BranchMap` lazy-loaded inside the dialog (Leaflet stays in the
+      shared `BranchMap` chunk, out of `Security`), only when `location` is
+      non-null and the source is not `telegram_bot` (that one shows the
+      "belongs to Telegram's servers" note even if a location arrives). No
+      pin: a dashed `.cp-map-area` circle. Caption always under the map:
+      approximate, the network's centre, ~N km, not the person, VPN = the
+      VPN's (`captionNoRadius` without a number). No location → compact
+      StateView "IP location not determined".
+    - **`BranchMap` area mode**: passing `accuracyRadiusKm` (even `null`)
+      caps the map at `AREA_MAX_ZOOM` (11) so an approximate place is never
+      shown at street level; a radius draws `L.circle` (metres) and
+      `fitBounds` to it. The map re-measures (`invalidateSize`) after the
+      first frame and on container resize (ResizeObserver) — needed inside a
+      dialog. Point-mode callers (BranchForm, BranchesMap) are unchanged.
+    - Shared wording for table and dialog: `security/ipActivityText.tsx`.
+  - Tests: `IpActivityTab.test.tsx` (26), `map/BranchMap.test.tsx` (7, a
+    recording Leaflet mock), `useAsync.test.tsx` (+2). Mutation-verified:
+    map for `telegram_bot`, caption dropped, inner click opens the dialog,
+    Enter on an inner control opens it, radius in km not metres, no zoom cap
+    on the fit, the useAsync opt-out ignored, `asn` not sent.
 - Layout: tables scroll in their own frame; ≤640px rows become cards from
   `data-label`; the owner-web app renders the same screen in a browser.
 
