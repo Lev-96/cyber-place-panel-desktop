@@ -1125,6 +1125,7 @@ export const TRANSLATIONS: Dict = {
   "pcs.tier.ps5Vip":      { en: "PS5 VIP",      ru: "PS5 VIP",      am: "PS5 VIP" },
   "time.hourShort": { en: "h", ru: "ч", am: "ժ" },
   "time.minShort": { en: "min", ru: "мин", am: "ր" },
+  "time.secShort": { en: "s", ru: "сек", am: "վրկ" },
 
   // Live board statuses (grammatical forms: short adjectives where natural)
   "live.title": { en: "Live", ru: "В реальном времени", am: "Իրական ժամանակում" },
@@ -1205,6 +1206,47 @@ export const TRANSLATIONS: Dict = {
   "login.signingIn": { en: "Signing in…", ru: "Вход…", am: "Մուտք…" },
   "login.failed": { en: "Login failed", ru: "Не удалось войти", am: "Մուտքը ձախողվեց" },
   "login.invalidCredentials": { en: "Wrong email or password", ru: "Неверный логин или пароль", am: "Սխալ էլ. հասցե կամ գաղտնաբառ" },
+  // The sign-in mosaic and the sign-in hold (2026-10-07), desktop and owner web.
+  "captcha.title": { en: "Confirm you are a person", ru: "Подтвердите, что вы человек", am: "Հաստատեք, որ մարդ եք" },
+  "captcha.hint": {
+    en: "Tap two pieces to swap them, until the picture is whole.",
+    ru: "Нажмите на два кусочка, чтобы поменять их местами, пока картинка не соберётся.",
+    am: "Հպեք երկու կտորի՝ դրանց տեղերը փոխելու համար, մինչև նկարն ամբողջանա։",
+  },
+  "captcha.needed": {
+    en: "Too many failed attempts. Put the mosaic together to continue.",
+    ru: "Слишком много неудачных попыток. Соберите мозаику, чтобы продолжить.",
+    am: "Չափազանց շատ անհաջող փորձեր։ Հավաքեք խճանկարը՝ շարունակելու համար։",
+  },
+  "captcha.refresh": { en: "New picture", ru: "Новая картинка", am: "Նոր նկար" },
+  "captcha.tile": { en: "Piece {0}", ru: "Кусочек {0}", am: "Կտոր {0}" },
+  "captcha.pickedHint": {
+    en: "Now tap the piece to swap it with.",
+    ru: "Теперь нажмите на кусочек, с которым поменять.",
+    am: "Այժմ հպեք այն կտորին, որի հետ պետք է փոխել։",
+  },
+  "captcha.check": { en: "Check", ru: "Проверить", am: "Ստուգել" },
+  "captcha.checking": { en: "Checking…", ru: "Проверяем…", am: "Ստուգում ենք…" },
+  "captcha.solved": { en: "Done. Signing you in…", ru: "Готово. Выполняем вход…", am: "Պատրաստ է։ Մուտք ենք գործում…" },
+  "captcha.wrong": {
+    en: "The mosaic is not put together right. Here is a new picture, try again.",
+    ru: "Мозаика собрана неправильно. Вот новая картинка, попробуйте ещё раз.",
+    am: "Խճանկարը ճիշտ չի հավաքված։ Ահա նոր նկար, փորձեք կրկին։",
+  },
+  "captcha.loadFailed": {
+    en: "The picture did not load. Check the connection and try again.",
+    ru: "Картинка не загрузилась. Проверьте подключение и попробуйте ещё раз.",
+    am: "Նկարը չբեռնվեց։ Ստուգեք կապը և փորձեք կրկին։",
+  },
+  "captcha.retry": { en: "Try again", ru: "Повторить", am: "Կրկնել" },
+  "login.hold.locked": { en: "Sign-in is temporarily closed", ru: "Вход временно заблокирован", am: "Մուտքը ժամանակավորապես արգելափակված է" },
+  "login.hold.throttled": { en: "Too many sign-in attempts", ru: "Слишком много попыток входа", am: "Չափազանց շատ մուտքի փորձեր" },
+  "login.hold.retryIn": { en: "Try again in", ru: "Попробовать снова через", am: "Մինչև նոր փորձը մնացել է" },
+  "login.hold.ready": {
+    en: "You can try to sign in again.",
+    ru: "Теперь можно попробовать войти снова.",
+    am: "Այժմ կարող եք կրկին փորձել մուտք գործել։",
+  },
   "login.forgetEmail": { en: "Forget this address", ru: "Забыть этот адрес", am: "Մոռանալ այս հասցեն" },
 
   // Switching to a manager account (owner only)

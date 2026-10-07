@@ -5186,3 +5186,223 @@ select.input option:disabled {
   font-size: 13px;
   line-height: 1.5;
 }
+
+/* ── Sign-in mosaic and sign-in hold (2026-10-07), desktop and owner web ── */
+.mosaic-dialog {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: min(360px, 100%);
+}
+.mosaic-dialog__why {
+  margin: 0;
+  color: var(--color-text-muted, #94a3b8);
+  font-size: 13px;
+  line-height: 1.45;
+}
+.mosaic {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+.mosaic__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.mosaic__title {
+  font-weight: 700;
+  font-size: 15px;
+}
+.mosaic__hint {
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--color-text-muted, #94a3b8);
+}
+.mosaic__refresh {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  border: 1px solid rgba(7, 221, 241, 0.35);
+  background: rgba(7, 221, 241, 0.08);
+  color: #07ddf1;
+  cursor: pointer;
+  transition: background 150ms ease, transform 300ms ease;
+}
+.mosaic__refresh:hover:not(:disabled) {
+  background: rgba(7, 221, 241, 0.16);
+  transform: rotate(-90deg);
+}
+.mosaic__refresh:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.mosaic__refresh:focus-visible,
+.mosaic__tile:focus-visible {
+  outline: 2px solid var(--color-primary, #07ddf1);
+  outline-offset: 2px;
+}
+.mosaic__board {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  border-radius: 12px;
+  overflow: hidden;
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  touch-action: manipulation;
+}
+.mosaic__skeleton {
+  position: absolute;
+  inset: 0;
+}
+.mosaic__failed {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 16px;
+  text-align: center;
+  font-size: 13px;
+}
+.mosaic__tile {
+  position: absolute;
+  padding: 0;
+  border: 0;
+  box-shadow: inset 0 0 0 1px rgba(2, 6, 23, 0.55);
+  background-repeat: no-repeat;
+  cursor: pointer;
+  transition: left 200ms ease, top 200ms ease, box-shadow 150ms ease, transform 150ms ease, filter 150ms ease;
+}
+.mosaic__tile:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+.mosaic__tile.is-picked {
+  z-index: 2;
+  transform: scale(0.94);
+  box-shadow: inset 0 0 0 3px #07ddf1, 0 0 18px rgba(7, 221, 241, 0.55);
+}
+.mosaic__tile:disabled {
+  cursor: default;
+}
+.mosaic__board.is-checking .mosaic__tile {
+  filter: saturate(0.7) brightness(0.92);
+}
+/* The picture closes up into one photo, then a tick. */
+.mosaic__board.is-solved .mosaic__tile {
+  box-shadow: none;
+  filter: none;
+}
+.mosaic__board.is-solved {
+  border-color: rgba(52, 211, 153, 0.8);
+  box-shadow: 0 0 24px rgba(52, 211, 153, 0.35);
+  transition: border-color 200ms ease, box-shadow 200ms ease;
+}
+.mosaic__done {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  background: radial-gradient(circle, rgba(16, 185, 129, 0.55) 0 34px, transparent 35px);
+  animation: cp-mosaic-done 320ms ease-out both;
+}
+.mosaic__board.is-wrong {
+  border-color: rgba(248, 113, 113, 0.8);
+  animation: cp-mosaic-shake 380ms ease-in-out;
+}
+.mosaic__status {
+  min-height: 18px;
+  font-size: 13px;
+  line-height: 1.4;
+}
+.mosaic__board.is-wrong + .mosaic__status {
+  color: #f87171;
+}
+.mosaic__check {
+  width: 100%;
+  min-height: 42px;
+}
+@keyframes cp-mosaic-shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-6px); }
+  40% { transform: translateX(5px); }
+  60% { transform: translateX(-4px); }
+  80% { transform: translateX(2px); }
+}
+@keyframes cp-mosaic-done {
+  from { opacity: 0; transform: scale(0.6); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.login-hold {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 7px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(251, 191, 36, 0.4);
+  background: rgba(251, 191, 36, 0.08);
+  text-align: center;
+}
+.login-hold__title {
+  font-weight: 700;
+  font-size: 13px;
+  line-height: 1.3;
+  color: #fbbf24;
+}
+.login-hold__label {
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--color-text-muted, #94a3b8);
+}
+.login-hold__time {
+  color: var(--color-text, #e6edf6);
+  font-size: 15px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+/* On a short window (the desktop's 960×600 minimum) the form fills the
+   height already; the hold is three lines taller than an error, so the
+   controller logo steps aside while it shows and the "Sign in" button stays
+   on screen. */
+@media (max-height: 700px) {
+  .login-shell:has(.login-hold) .login-logo {
+    display: none;
+  }
+}
+.login-hold.is-over {
+  border-color: rgba(52, 211, 153, 0.45);
+  background: rgba(52, 211, 153, 0.08);
+  color: #34d399;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mosaic__tile,
+  .mosaic__refresh,
+  .mosaic__board.is-solved {
+    transition: none;
+  }
+  .mosaic__refresh:hover:not(:disabled) {
+    transform: none;
+  }
+  .mosaic__board.is-wrong,
+  .mosaic__done,
+  .mosaic__skeleton {
+    animation: none;
+  }
+}
