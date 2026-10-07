@@ -220,6 +220,13 @@ pos · places · ps5 · sessions · tournaments · revenue · services · scanne
   Watch for duplicate translation keys. Outside a component (UI kit
   primitives, aria-labels in shared widgets) use `tActive(key)` from
   `@/i18n/translations`: never a hardcoded literal, never a second dictionary.
+  **A message kept in state** (an error, a notice) is stored as
+  `LocalizedText` (`src/i18n/localizedText.ts`: `textKey(key)` /
+  `textLiteral(serverSentence)`) and rendered with `renderText(text, t)` —
+  never as `t(...)`'s result, or it stays in the old language after a switch
+  (fixed 2026-10-07 on the sign-in card and the reset face; tests
+  `Login.language.test.tsx`). A known server `code` → our key; the server's
+  sentence only as the fallback for a code this build does not know.
 - **"Active Places" is the name of the running-seats section** (2026-09-28):
   `session.boardTitle`, `hub.tile.sessions`, `history.backToBoard`,
   `notifications.openBoard` say Active Places / Активные места / Ակտիվ տեղեր.
