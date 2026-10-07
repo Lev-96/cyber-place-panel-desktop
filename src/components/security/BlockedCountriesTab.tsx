@@ -11,6 +11,7 @@ import { fmt } from "@/i18n/translations";
 import { securityRepository } from "@/repositories/SecurityRepository";
 import { FormEvent, useMemo, useState } from "react";
 import { countryLabel, countryName } from "./countryNames";
+import { compareText } from "@/i18n/collation";
 
 const NOTE_MAX = 255;
 
@@ -53,7 +54,7 @@ const BlockedCountriesTab = () => {
     return (data?.codes ?? [])
       .filter((code) => !blocked.has(code.toUpperCase()))
       .map((code) => ({ code, label: countryLabel(code, lang), name: countryName(code, lang) }))
-      .sort((a, b) => a.name.localeCompare(b.name, lang === "am" ? "hy" : lang));
+      .sort((a, b) => compareText(a.name, b.name, lang));
   }, [data, rows, lang]);
   const labels = useMemo(() => options.map((o) => o.label), [options]);
   const code = resolveCountryCode(picked, options);

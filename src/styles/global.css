@@ -4109,6 +4109,12 @@ button.login-flip-back:hover {
   font-size: 12px;
   line-height: 1.4;
 }
+/* A second list on the same tab (Blocked IPs → Locked sign-ins). */
+.sec-section-title {
+  margin: 8px 0 4px;
+  font-size: 15px;
+  font-weight: 700;
+}
 
 /* The table's own frame is what scrolls; the screen does not. */
 .sec-table-wrap {

@@ -1,7 +1,8 @@
 import {
   apiCreateBlockedCountry, apiCreateBlockedIp, apiDeleteBlockedCountry, apiDeleteBlockedIp,
-  apiListBlockedCountries, apiListBlockedIps,
+  apiDeleteLoginLockout, apiListBlockedCountries, apiListBlockedIps, apiListLoginLockouts,
   CreateBlockedCountryBody, CreateBlockedIpBody, IBlockedCountryListApi, IBlockedIpListApi,
+  ILoginLockoutListApi,
 } from "@/api/security";
 import { apiListIpActivity, IIpActivityListApi, IpActivityQuery } from "@/api/ipActivity";
 import { withToast } from "@/ui/notify";
@@ -31,6 +32,15 @@ export class SecurityRepository {
 
   async unblockIp(id: number): Promise<void> {
     await withToast("blockedIp", "deleted", () => apiDeleteBlockedIp(id));
+  }
+
+  /** Sign-ins closed after too many wrong passwords, still holding (2026-10-07). */
+  async loginLockouts(): Promise<ILoginLockoutListApi> {
+    return apiListLoginLockouts();
+  }
+
+  async unlockLogin(id: number): Promise<void> {
+    await withToast("loginLockout", "deleted", () => apiDeleteLoginLockout(id));
   }
 
   async blockedCountries(): Promise<IBlockedCountryListApi> {

@@ -3605,6 +3605,27 @@ export const TRANSLATIONS: Dict = {
   "toast.blockedIp.deleted": { en: "IP unblocked", ru: "IP разблокирован", am: "IP հասցեն ապաարգելափակվեց" },
   "toast.blockedCountry.created": { en: "Country blocked", ru: "Страна заблокирована", am: "Երկիրն արգելափակվեց" },
   "toast.blockedCountry.deleted": { en: "Country unblocked", ru: "Страна разблокирована", am: "Երկիրն ապաարգելափակվեց" },
+  "toast.loginLockout.deleted": { en: "Sign-in unlocked", ru: "Вход разблокирован", am: "Մուտքն ապաարգելափակվեց" },
+
+  // Sign-ins closed after too many wrong passwords (2026-10-07), under Blocked IPs.
+  "security.locks.title": { en: "Locked sign-ins", ru: "Заблокированные входы", am: "Արգելափակված մուտքեր" },
+  "security.locks.hint": {
+    en: "Sign-in closed after too many wrong passwords. It opens by itself when the time runs out, or at once with Unlock.",
+    ru: "Вход закрыт после слишком многих неверных паролей. Он откроется сам, когда истечёт время, или сразу кнопкой «Разблокировать».",
+    am: "Մուտքը փակվել է չափազանց շատ սխալ գաղտնաբառերից հետո։ Այն կբացվի ինքնաշխատ՝ ժամկետի ավարտին, կամ անմիջապես՝ «Ապաարգելափակել» կոճակով։",
+  },
+  "security.locks.account": { en: "Account", ru: "Аккаунт", am: "Հաշիվ" },
+  "security.locks.unknownAccount": { en: "No such account", ru: "Такого аккаунта нет", am: "Այդպիսի հաշիվ չկա" },
+  "security.locks.client": { en: "Where", ru: "Где", am: "Որտեղ" },
+  "security.locks.attempts": { en: "Wrong passwords", ru: "Неверных паролей", am: "Սխալ գաղտնաբառեր" },
+  "security.locks.until": { en: "Locked until", ru: "Закрыт до", am: "Փակ է մինչև" },
+  "security.locks.alsoIp": { en: "The address is blocked too", ru: "Адрес тоже заблокирован", am: "Հասցեն նույնպես արգելափակված է" },
+  "security.locks.empty": { en: "No locked sign-ins.", ru: "Заблокированных входов нет.", am: "Արգելափակված մուտքեր չկան։" },
+  "security.locks.confirmUnlock": {
+    en: "Unlock sign-in for {0}?\nThey can sign in again at once.",
+    ru: "Разблокировать вход для {0}?\nВойти можно будет сразу.",
+    am: "Ապաարգելափակե՞լ մուտքը {0}-ի համար։\nՀնարավոր կլինի անմիջապես մուտք գործել։",
+  },
 };
 
 export const t = (key: string, lang: Lang): string => {

@@ -89,3 +89,27 @@ describe("a blocked sign-in", () => {
     await waitFor(() => expect(screen.getByText("Service unavailable")).toBeTruthy());
   });
 });
+
+describe("too many wrong passwords on the desktop (2026-10-07)", () => {
+  test("the lock is shown in the server's own words, which say for how long in the panel's language", async () => {
+    auth.login.mockRejectedValue(
+      Object.assign(new Error("Вход закрыт ещё на 50 мин. Попробуйте позже."), {
+        status: 423,
+        body: { message: "Вход закрыт ещё на 50 мин. Попробуйте позже.", code: "login_locked", retry_after: 3000 },
+      }),
+    );
+
+    await submit();
+
+    await waitFor(() => expect(screen.getByText("Вход закрыт ещё на 50 мин. Попробуйте позже.")).toBeTruthy());
+    expect(screen.queryByText("login.invalidCredentials")).toBeNull();
+  });
+
+  test("the tenth wrong password is still just a wrong password", async () => {
+    auth.login.mockRejectedValue(apiError(422, { errors: { email: ["…"] }, code: "reset_suggested" }));
+
+    await submit();
+
+    await waitFor(() => expect(screen.getByText("login.invalidCredentials")).toBeTruthy());
+  });
+});

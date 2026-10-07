@@ -7,6 +7,7 @@ import { useKeyedBusy } from "@/hooks/useKeyedBusy";
 import { formatDateTime } from "@/i18n/dates";
 import { useLang } from "@/i18n/LanguageContext";
 import { fmt } from "@/i18n/translations";
+import LoginLockoutsSection from "@/components/security/LoginLockoutsSection";
 import { securityRepository } from "@/repositories/SecurityRepository";
 import { FormEvent, useState } from "react";
 
@@ -20,6 +21,7 @@ const NOTE_MAX = 255;
  * duplicate, or a rule that would lock out the admin typing it — is the
  * server's answer (422), shown under the field in its own words; the panel
  * does not second-guess an address, it shows "your IP" so the admin can.
+ * Below it, the sign-ins closed after too many wrong passwords (2026-10-07).
  */
 const BlockedIpsTab = () => {
   const { t } = useLang();
@@ -31,6 +33,8 @@ const BlockedIpsTab = () => {
   const [note, setNote] = useState("");
   const [saving, setSaving] = useState(false);
   const [fieldError, setFieldError] = useState<string | null>(null);
+  // Unblocking an address the sign-in guard banned lifts its sign-in locks too.
+  const [locksKey, setLocksKey] = useState(0);
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -64,6 +68,7 @@ const BlockedIpsTab = () => {
       end(id);
     }
     void reload();
+    setLocksKey((k) => k + 1);
   };
 
   const rows = data?.data ?? [];
@@ -147,6 +152,8 @@ const BlockedIpsTab = () => {
           </table>
         </div>
       ) : null}
+
+      <LoginLockoutsSection refreshKey={locksKey} />
     </div>
   );
 };

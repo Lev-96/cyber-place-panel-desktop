@@ -7,6 +7,7 @@ import AccountSwitchModal from "@/components/profile/AccountSwitchModal";
 import AccountSwitchPanel from "@/components/profile/AccountSwitchPanel";
 import ProfileModal from "@/components/profile/ProfileModal";
 import { useLang } from "@/i18n/LanguageContext";
+import { sortedNavItems } from "@/components/sidebarNav";
 import { useNotifications } from "@/notifications/NotificationsContext";
 import { useUpdatesNotification } from "@/realtime/UpdatesNotificationContext";
 import { ReactNode, useEffect, useRef, useState } from "react";
@@ -299,7 +300,7 @@ interface SidebarProps {
 
 const Sidebar = ({ footerExtra }: SidebarProps = {}) => {
   const { user, logout } = useAuth();
-  const { t } = useLang();
+  const { t, lang } = useLang();
   const { unreadCount } = useNotifications();
   const { unread: supportUnread } = useSupportUnread();
   const { panel: panelUpd, agent: agentUpd } = useUpdatesNotification();
@@ -315,6 +316,68 @@ const Sidebar = ({ footerExtra }: SidebarProps = {}) => {
   const myBranchId = typeof dash?.branch_id === "number" ? dash.branch_id : null;
   // The owner's company (single company per owner, as everywhere in the panel).
   const myCompanyId = typeof dash?.company_id === "number" ? dash.company_id : null;
+
+  // Every entry this role may open, in alphabetical order of its label in the
+  // current language (2026-10-07) — re-sorted when the language changes.
+  const navItems = sortedNavItems(
+    [
+      { to: "/", labelKey: "nav.dashboard", end: true, show: true },
+      // Creating a branch is an action on the Branches page (its header
+      // button), not an entry in the navigation.
+      { to: "/branches", labelKey: "nav.branches", show: can(role, "menu.branches") },
+      {
+        to: `/branches/${myBranchId}`,
+        labelKey: "nav.myBranch",
+        show: role === "manager" && myBranchId !== null,
+      },
+      { to: "/branches-map", labelKey: "nav.map", show: can(role, "menu.map") },
+      { to: "/bookings", labelKey: "nav.bookings", show: true },
+      { to: "/bookings/confirm", labelKey: "nav.scan", show: can(role, "menu.scan") },
+      { to: "/tournaments", labelKey: "nav.tournaments", show: can(role, "menu.tournaments") },
+      { to: "/games", labelKey: "nav.games", show: can(role, "menu.games") },
+      { to: "/companies", labelKey: "nav.companies", show: can(role, "menu.companies") },
+      { to: "/revenue", labelKey: "nav.revenue", show: can(role, "revenue.view") },
+      { to: "/expenses", labelKey: "nav.expenses", show: can(role, "menu.expenses") },
+      { to: "/metrics", labelKey: "nav.metrics", show: can(role, "menu.metrics") },
+      {
+        // Straight to the company's own page, the way "My branch" links to the
+        // branch. `/my-company` only redirects, and a link to a route that only
+        // redirects is never the current page — so it never lit up. Prefix
+        // matching now covers the company's branches and revenue pages too.
+        // An owner with no company still goes to `/my-company`, which is where
+        // that is explained.
+        to: myCompanyId !== null ? `/companies/${myCompanyId}` : "/my-company",
+        labelKey: "nav.myCompany",
+        show: can(role, "menu.myCompany"),
+      },
+      { to: "/managers", labelKey: "nav.managers", show: can(role, "menu.managers") },
+      { to: "/owners", labelKey: "nav.owners", show: can(role, "owner.view") },
+      { to: "/security", labelKey: "nav.security", show: can(role, "menu.security") },
+      {
+        to: "/notifications",
+        labelKey: "nav.notifications",
+        show: true,
+        badge: <UnreadBadge count={unreadCount} />,
+      },
+      { to: "/settings", labelKey: "nav.settings", show: true },
+      {
+        to: "/settings/updates",
+        labelKey: "nav.updates",
+        show: can(role, "menu.updates"),
+        badge: <UnreadBadge count={adminUpdateCount} />,
+      },
+      {
+        // Admin already sees both apps under /settings/updates;
+        // owner+manager get this dedicated agent-only entry.
+        to: "/settings/agent-updates",
+        labelKey: "nav.agentUpdates",
+        show: can(role, "menu.agentUpdates") && !can(role, "menu.updates"),
+        badge: <UnreadBadge count={agentUpdateCount} />,
+      },
+    ],
+    t,
+    lang,
+  );
 
   return (
     <aside className="sidebar">
@@ -344,81 +407,12 @@ const Sidebar = ({ footerExtra }: SidebarProps = {}) => {
         <span>CYBER PLACE</span>
       </h1>
       <nav className="sidebar-nav">
-      <NavLink to="/" end>
-        {t("nav.dashboard")}
-      </NavLink>
-      {can(role, "menu.branches") && (
-        // Creating a branch is an action on the Branches page (its header
-        // button), not an entry in the navigation.
-        <NavLink to="/branches">{t("nav.branches")}</NavLink>
-      )}
-      {role === "manager" && myBranchId !== null && (
-        <NavLink to={`/branches/${myBranchId}`}>{t("nav.myBranch")}</NavLink>
-      )}
-      {can(role, "menu.map") && (
-        <NavLink to="/branches-map">{t("nav.map")}</NavLink>
-      )}
-      <NavLink to="/bookings">{t("nav.bookings")}</NavLink>
-      {can(role, "menu.scan") && (
-        <NavLink to="/bookings/confirm">{t("nav.scan")}</NavLink>
-      )}
-      {can(role, "menu.tournaments") && (
-        <NavLink to="/tournaments">{t("nav.tournaments")}</NavLink>
-      )}
-      {can(role, "menu.games") && (
-        <NavLink to="/games">{t("nav.games")}</NavLink>
-      )}
-      {can(role, "menu.companies") && (
-        <NavLink to="/companies">{t("nav.companies")}</NavLink>
-      )}
-      {can(role, "revenue.view") && (
-        <NavLink to="/revenue">{t("nav.revenue")}</NavLink>
-      )}
-      {can(role, "menu.expenses") && (
-        <NavLink to="/expenses">{t("nav.expenses")}</NavLink>
-      )}
-      {can(role, "menu.metrics") && (
-        <NavLink to="/metrics">{t("nav.metrics")}</NavLink>
-      )}
-      {can(role, "menu.myCompany") && (
-        // Straight to the company's own page, the way "My branch" links to the
-        // branch. `/my-company` only redirects, and a link to a route that only
-        // redirects is never the current page — so it never lit up. Prefix
-        // matching now covers the company's branches and revenue pages too.
-        // An owner with no company still goes to `/my-company`, which is where
-        // that is explained.
-        <NavLink to={myCompanyId !== null ? `/companies/${myCompanyId}` : "/my-company"}>
-          {t("nav.myCompany")}
-        </NavLink>
-      )}
-      {can(role, "menu.managers") && (
-        <NavLink to="/managers">{t("nav.managers")}</NavLink>
-      )}
-      {can(role, "owner.view") && (
-        <NavLink to="/owners">{t("nav.owners")}</NavLink>
-      )}
-      {can(role, "menu.security") && (
-        <NavLink to="/security">{t("nav.security")}</NavLink>
-      )}
-      <NavLink to="/notifications">
-        {t("nav.notifications")}
-        <UnreadBadge count={unreadCount} />
-      </NavLink>
-      <NavLink to="/settings">{t("nav.settings")}</NavLink>
-      {can(role, "menu.updates") && (
-        <NavLink to="/settings/updates">
-          {t("nav.updates")}
-          <UnreadBadge count={adminUpdateCount} />
-        </NavLink>
-      )}
-      {can(role, "menu.agentUpdates") && !can(role, "menu.updates") && (
-        // Admin already sees both apps under /settings/updates;
-        // owner+manager get this dedicated agent-only entry.
-        <NavLink to="/settings/agent-updates">
-          {t("nav.agentUpdates")}
-          <UnreadBadge count={agentUpdateCount} />
-        </NavLink>
-      )}
+        {navItems.map((item) => (
+          <NavLink key={item.to} to={item.to} end={item.end}>
+            {item.label}
+            {item.badge}
+          </NavLink>
+        ))}
       </nav>
       <div className="sidebar-footer">
         {/* Support is not another section of the product — it is the way out of

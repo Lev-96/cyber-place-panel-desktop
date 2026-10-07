@@ -29,7 +29,7 @@ export interface IBlockedIpApi {
   /**
    * `manual` (an administrator), or the system blocked it by itself
    * (2026-10-01): `auto_threat` (attack requests), `auto_login` (repeated
-   * failed owner-web sign-ins). Unblocked the same way.
+   * failed sign-ins, owner web or desktop). Unblocked the same way.
    */
   reason?: "manual" | "auto_threat" | "auto_login" | string;
   created_by: ISecurityActorApi | null;
@@ -40,6 +40,28 @@ export interface IBlockedIpListApi {
   data: IBlockedIpApi[];
   /** The address the server sees this request coming from. */
   your_ip: string;
+}
+
+/**
+ * A row of `GET /admin/security/login-lockouts` (2026-10-07): a sign-in
+ * closed after too many wrong passwords, still holding. `user` is null when
+ * the email belongs to no account.
+ */
+export interface ILoginLockoutApi {
+  id: number;
+  client: "desktop" | "owner_web" | string;
+  ip_address: string;
+  email: string;
+  user: { id: number; name: string; role: string } | null;
+  attempts: number;
+  locked_until: string;
+  /** The same lock also blocked the address (it is in the list above). */
+  ip_banned: boolean;
+  created_at: string;
+}
+
+export interface ILoginLockoutListApi {
+  data: ILoginLockoutApi[];
 }
 
 export interface CreateBlockedIpBody {
@@ -92,6 +114,11 @@ export const apiCreateBlockedIp = (body: CreateBlockedIpBody) =>
 
 export const apiDeleteBlockedIp = (id: number) =>
   request<IMessageApi>(`/admin/ip-address/${id}`, { method: "DELETE" });
+
+export const apiListLoginLockouts = () => request<ILoginLockoutListApi>("/admin/security/login-lockouts");
+
+export const apiDeleteLoginLockout = (id: number) =>
+  request<IMessageApi>(`/admin/security/login-lockouts/${id}`, { method: "DELETE" });
 
 export const apiListBlockedCountries = () => request<IBlockedCountryListApi>("/admin/security/countries");
 
