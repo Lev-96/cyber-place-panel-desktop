@@ -12,7 +12,7 @@ interface Props {
 
 type Phase = "loading" | "ready" | "checking" | "solved" | "wrong" | "failed";
 
-/** How long the "solved" moment stays on screen before the sign-in carries on. */
+/** How long the "solved" moment stays on screen before the dialog closes. */
 const SOLVED_MS = 650;
 /** How long the "wrong" shake plays before the next picture comes in. */
 const WRONG_MS = 450;

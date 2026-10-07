@@ -2,7 +2,7 @@ import { blockingKeyOf } from "@/api/blockingErrors";
 import { ApiError } from "@/api/client";
 import { useAuth } from "@/auth/AuthContext";
 import { recentEmails } from "@/auth/recentEmails";
-import { loginChallenge } from "@/auth/loginChallenge";
+import { useLoginCaptcha } from "@/auth/useLoginCaptcha";
 import CaptchaDialog from "@/components/login/CaptchaDialog";
 import ForgotPasswordForm from "@/components/login/ForgotPasswordForm";
 import HudBackdrop from "@/components/login/HudBackdrop";
@@ -12,7 +12,7 @@ import PasswordInput from "@/components/ui/PasswordInput";
 import SuggestInput from "@/components/ui/SuggestInput";
 import { useLang } from "@/i18n/LanguageContext";
 import { LANGUAGES } from "@/i18n/translations";
-import { FormEvent, lazy, Suspense, useCallback, useEffect, useState } from "react";
+import { FormEvent, lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
 // three.js is heavy and only this screen needs it — keep it out of the initial
@@ -66,7 +66,9 @@ const Login = () => {
   const [busy, setBusy] = useState(false);
   const [hold, setHold] = useState<Hold | null>(null);
   const [holdOver, setHoldOver] = useState(false);
-  const [captchaOpen, setCaptchaOpen] = useState(false);
+  const emailRef = useRef<HTMLInputElement>(null);
+  const passwordRef = useRef<HTMLInputElement>(null);
+  const captcha = useLoginCaptcha(emailRef, passwordRef);
   // Addresses that already signed in on this machine — offered while typing
   // so a returning operator types one letter instead of the whole address.
   const [known, setKnown] = useState<string[]>([]);
@@ -80,7 +82,7 @@ const Login = () => {
   };
 
   const attempt = async () => {
-    setBusy(true); setErr(null); setHoldOver(false);
+    setBusy(true); setErr(null); setHoldOver(false); captcha.attempting();
     try { await login(email, password); }
     catch (ex) {
       const status = (ex as ApiError | undefined)?.status;
@@ -95,9 +97,10 @@ const Login = () => {
         setHold({ kind: status === 423 ? "locked" : "throttled", seconds: retryAfter, startedAt: performance.now() });
       } else if (code === "captcha_required") {
         // A wrong password that now needs the mosaic (422), or an attempt held
-        // back for it (428): the mosaic, then the same attempt again.
+        // back for it (428): the mosaic, then back to the form — never a
+        // sign-in sent by the mosaic itself.
         if (status === 422) setErr({ kind: "invalid" });
-        setCaptchaOpen(true);
+        captcha.ask();
       } else if (status === 401 || status === 422) setErr({ kind: "invalid" });
       else if (ex instanceof Error) setErr({ kind: "raw", message: ex.message });
       else setErr({ kind: "generic" });
@@ -109,12 +112,6 @@ const Login = () => {
     e.preventDefault();
     if (busy || hold) return;
     await attempt();
-  };
-
-  const captchaSolved = (token: string) => {
-    loginChallenge.set(token);
-    setCaptchaOpen(false);
-    void attempt();
   };
 
   // The time is up: the form is open again (the server decides on the next try).
@@ -167,6 +164,7 @@ const Login = () => {
           <div className={`login-flip${face === "forgot" ? " is-back" : ""}`}>
             <form className="login-card" onSubmit={onSubmit} inert={face === "forgot" || undefined}>
           <SuggestInput
+            ref={emailRef}
             label={t("auth.email")}
             type="email"
             placeholder="your@email.com"
@@ -178,11 +176,13 @@ const Login = () => {
             required
             autoFocus
           />
-          <PasswordInput label={t("auth.password")} placeholder={t("login.passwordPlaceholder")} value={password} onChange={(e) => setPassword(e.target.value)} required />
+          <PasswordInput ref={passwordRef} label={t("auth.password")} placeholder={t("login.passwordPlaceholder")} value={password} onChange={(e) => setPassword(e.target.value)} required />
           {hold ? (
             <LoginHold kind={hold.kind} seconds={hold.seconds} startedAt={hold.startedAt} onOver={holdOverNow} />
           ) : holdOver ? (
             <div className="login-hold is-over" role="status">{t("login.hold.ready")}</div>
+          ) : captcha.passed ? (
+            <div className="login-hold is-over" role="status">{t("login.captchaPassed")}</div>
           ) : errText && <div className="error" role="alert" style={{ textAlign: "center" }}>{errText}</div>}
           <button
             type="button"
@@ -204,7 +204,7 @@ const Login = () => {
         </div>
       </div>
 
-      <CaptchaDialog open={captchaOpen} client="desktop" onSolved={captchaSolved} onClose={() => setCaptchaOpen(false)} />
+      <CaptchaDialog open={captcha.open} client="desktop" onSolved={captcha.solved} onClose={captcha.close} />
     </div>
   );
 };

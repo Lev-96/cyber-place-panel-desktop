@@ -13,7 +13,7 @@ import { afterEach, describe, expect, test, vi } from "vitest";
  * administrator." That is the case these tests hold shut.
  */
 
-const auth = vi.hoisted(() => ({ login: vi.fn(async () => {}) }));
+const auth = vi.hoisted(() => ({ login: vi.fn(async (_email: string, _password: string) => {}) }));
 vi.mock("@/auth/AuthContext", () => ({ useAuth: () => auth }));
 vi.mock("@/i18n/LanguageContext", () => ({
   useLang: () => ({ t: (k: string) => k, lang: "ru", setLang: () => {} }),
@@ -137,20 +137,78 @@ describe("too many wrong passwords on the desktop (2026-10-07)", () => {
     await waitFor(() => expect(screen.getByText("login.invalidCredentials")).toBeTruthy());
   });
 
-  test("when the mosaic is asked for, it opens, and solving it sends the same sign-in again with the pass", async () => {
+  // The bug of 2026-10-07: solving the mosaic re-sent the same wrong
+  // credentials by itself, which failed and opened the next mosaic at once.
+  test("solving the mosaic goes back to the form and sends nothing by itself", async () => {
     auth.login.mockRejectedValueOnce(apiError(422, { errors: { password: ["…"] }, code: "captcha_required" }));
 
     await submit();
     await waitFor(() => expect(screen.getByText("solve-mosaic")).toBeTruthy());
     expect(screen.getByText("login.invalidCredentials")).toBeTruthy();
 
-    const passes: Array<string | null> = [];
-    auth.login.mockImplementationOnce(async () => { passes.push(loginChallenge.take()); });
     fireEvent.click(screen.getByText("solve-mosaic"));
 
-    await waitFor(() => expect(auth.login).toHaveBeenCalledTimes(2));
-    expect(passes).toEqual(["pass-1"]);
     expect(screen.queryByText("solve-mosaic")).toBeNull();
+    expect(screen.getByRole("status").textContent).toBe("login.captchaPassed");
+    // No automatic sign-in, so no second mosaic; the form is open.
+    await new Promise((r) => setTimeout(r, 20));
+    expect(auth.login).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText("solve-mosaic")).toBeNull();
+    expect((screen.getByRole("button", { name: "login.title" }) as HTMLButtonElement).disabled).toBe(false);
+    // The email is empty here, so the cursor goes there first.
+    expect(document.activeElement).toBe(document.querySelector('input[type="email"]'));
+    loginChallenge.take();
+  });
+
+  test("after the mosaic the corrected credentials go once, with the pass", async () => {
+    auth.login.mockRejectedValueOnce(apiError(422, { errors: { password: ["…"] }, code: "captcha_required" }));
+    await submit();
+    fireEvent.change(document.querySelector('input[type="email"]') as HTMLInputElement, { target: { value: "op@club.am" } });
+    await waitFor(() => expect(screen.getByText("solve-mosaic")).toBeTruthy());
+    fireEvent.click(screen.getByText("solve-mosaic"));
+    // The email is filled: the cursor is in the password, ready to be retyped.
+    expect(document.activeElement).toBe(document.querySelector('input[type="password"]'));
+
+    fireEvent.change(document.querySelector('input[type="password"]') as HTMLInputElement, { target: { value: "right-one" } });
+    const sent: Array<[string, string, string | null]> = [];
+    auth.login.mockImplementationOnce(async (email: string, password: string) => { sent.push([email, password, loginChallenge.take()]); });
+    const form = document.querySelector("form") as HTMLFormElement;
+    fireEvent.submit(form);
+    fireEvent.submit(form);
+
+    await waitFor(() => expect(auth.login).toHaveBeenCalledTimes(2));
+    expect(sent).toEqual([["op@club.am", "right-one", "pass-1"]]);
+    expect(screen.queryByText("login.captchaPassed")).toBeNull();
+  });
+
+  test("a new mosaic opens only when the server asks for it again", async () => {
+    auth.login.mockRejectedValueOnce(apiError(422, { errors: { password: ["…"] }, code: "captcha_required" }));
+    await submit();
+    await waitFor(() => expect(screen.getByText("solve-mosaic")).toBeTruthy());
+    fireEvent.click(screen.getByText("solve-mosaic"));
+    expect(screen.queryByText("solve-mosaic")).toBeNull();
+
+    // Still the wrong password: the server answers captcha_required, and only now the next mosaic.
+    auth.login.mockRejectedValueOnce(apiError(422, { errors: { password: ["…"] }, code: "captcha_required" }));
+    fireEvent.submit(document.querySelector("form") as HTMLFormElement);
+
+    await waitFor(() => expect(screen.getByText("solve-mosaic")).toBeTruthy());
+    expect(screen.getByText("login.invalidCredentials")).toBeTruthy();
+    expect(screen.queryByText("login.captchaPassed")).toBeNull();
+  });
+
+  test("a lock after the mosaic is still the countdown", async () => {
+    auth.login.mockRejectedValueOnce(apiError(422, { errors: { password: ["…"] }, code: "captcha_required" }));
+    await submit();
+    await waitFor(() => expect(screen.getByText("solve-mosaic")).toBeTruthy());
+    fireEvent.click(screen.getByText("solve-mosaic"));
+
+    auth.login.mockRejectedValueOnce(apiError(423, { code: "login_locked", retry_after: 3000 }));
+    fireEvent.submit(document.querySelector("form") as HTMLFormElement);
+
+    await waitFor(() => expect(screen.getByText("login.hold.locked")).toBeTruthy());
+    expect(screen.queryByText("login.captchaPassed")).toBeNull();
+    loginChallenge.take();
   });
 
   test("a sign-in held back for the mosaic (428) opens it without calling the password wrong", async () => {

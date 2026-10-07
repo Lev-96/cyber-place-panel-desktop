@@ -1227,7 +1227,12 @@ export const TRANSLATIONS: Dict = {
   },
   "captcha.check": { en: "Check", ru: "Проверить", am: "Ստուգել" },
   "captcha.checking": { en: "Checking…", ru: "Проверяем…", am: "Ստուգում ենք…" },
-  "captcha.solved": { en: "Done. Signing you in…", ru: "Готово. Выполняем вход…", am: "Պատրաստ է։ Մուտք ենք գործում…" },
+  "captcha.solved": { en: "Done.", ru: "Готово.", am: "Պատրաստ է։" },
+  "login.captchaPassed": {
+    en: "Check passed. Make sure the email and password are right, then sign in.",
+    ru: "Проверка пройдена. Проверьте email и пароль и нажмите «Вход».",
+    am: "Ստուգումն անցավ։ Համոզվեք, որ էլ. փոստն ու գաղտնաբառը ճիշտ են, ապա մուտք գործեք։",
+  },
   "captcha.wrong": {
     en: "The mosaic is not put together right. Here is a new picture, try again.",
     ru: "Мозаика собрана неправильно. Вот новая картинка, попробуйте ещё раз.",

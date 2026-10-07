@@ -111,7 +111,7 @@ describe("the mosaic", () => {
     await waitFor(() => expect(tiles()).toHaveLength(9));
 
     await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Check" })); });
-    expect(screen.getByRole("status").textContent).toBe("Done. Signing you in…");
+    expect(screen.getByRole("status").textContent).toBe("Done.");
     expect(onSolved).not.toHaveBeenCalled();
 
     await act(async () => { vi.advanceTimersByTime(700); });
