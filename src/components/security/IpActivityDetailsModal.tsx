@@ -94,32 +94,36 @@ const Details = ({ row }: { row: IIpActivityApi }) => {
 
       <div className="ipa-details__body">
         <div className="ipa-details__facts">
-          <dl className="ipa-facts">
+          <FactGroup title={t("ipActivity.group.device")}>
             <Fact label={t("ipActivity.col.device")}><DeviceCell device={row.device} /></Fact>
             <Fact label={t("ipActivity.col.os")}>{osText(t, row)}</Fact>
             <Fact label={t("ipActivity.col.browser")}>{browserText(t, row)}</Fact>
-          </dl>
-          <dl className="ipa-facts">
-            <Fact label={t("ipActivity.col.network")}>
-              {row.as_org || as ? (
-                <span className="ipa-net">
-                  {row.as_org && <span>{row.as_org}</span>}
-                  {as && <span className="meta sec-num">{as}</span>}
-                </span>
-              ) : <span className="muted">{t("ipActivity.notDetermined")}</span>}
-            </Fact>
+          </FactGroup>
+          {/* The place and the network are two separate facts read from two
+              separate databases (MaxMind City / ASN): the country and city come
+              from the IP address itself, never from the provider. Kept in
+              their own groups so neither reads as derived from the other. */}
+          <FactGroup title={t("ipActivity.group.place")}>
             <Fact label={t("ipActivity.col.country")}>{countryText(t, lang, row)}</Fact>
             <Fact label={t("ipActivity.col.region")}>{row.region_name || <span className="muted">{t("ipActivity.notDetermined")}</span>}</Fact>
             <Fact label={t("ipActivity.col.city")}>{row.city_name || <span className="muted">{t("ipActivity.notDetermined")}</span>}</Fact>
-          </dl>
-          <dl className="ipa-facts">
+          </FactGroup>
+          <FactGroup title={t("ipActivity.col.network")}>
+            <Fact label={t("ipActivity.details.organization")}>
+              {row.as_org || <span className="muted">{t("ipActivity.notDetermined")}</span>}
+            </Fact>
+            <Fact label={t("ipActivity.details.asNumber")}>
+              {as ? <span className="sec-num">{as}</span> : <span className="muted">{t("ipActivity.notDetermined")}</span>}
+            </Fact>
+          </FactGroup>
+          <FactGroup title={t("ipActivity.group.activity")}>
             <Fact label={t("ipActivity.col.firstSeen")}>{formatDateTime(row.first_seen_at)}</Fact>
             <Fact label={t("ipActivity.col.lastSeen")}>{formatDateTime(row.last_seen_at)}</Fact>
             <Fact label={t("ipActivity.col.visits")}>
               <span className="sec-num">{row.visits_count}</span>
               <span className="meta ipa-facts__aside">{t("ipActivity.col.visitsHint")}</span>
             </Fact>
-          </dl>
+          </FactGroup>
         </div>
         <div className="ipa-details__place">
           <Place source={row.source} location={row.location ?? null} />
@@ -128,6 +132,14 @@ const Details = ({ row }: { row: IIpActivityApi }) => {
     </>
   );
 };
+
+/** A titled group of facts: device / place by IP / network / activity. */
+const FactGroup = ({ title, children }: { title: string; children: ReactNode }) => (
+  <section className="ipa-group">
+    <h3 className="ipa-group__title">{title}</h3>
+    <dl className="ipa-facts">{children}</dl>
+  </section>
+);
 
 const Fact = ({ label, children }: { label: string; children: ReactNode }) => (
   <>

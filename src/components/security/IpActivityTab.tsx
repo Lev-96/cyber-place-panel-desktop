@@ -217,8 +217,8 @@ const IpActivityTab = () => {
                 <th scope="col">{t("ipActivity.col.os")}</th>
                 <th scope="col">{t("ipActivity.col.network")}</th>
                 <th scope="col">{t("ipActivity.col.ip")}</th>
-                <th scope="col">{t("ipActivity.col.country")}</th>
-                <th scope="col">{t("ipActivity.col.city")}</th>
+                <th scope="col">{t("ipActivity.col.countryByIp")}</th>
+                <th scope="col">{t("ipActivity.col.cityByIp")}</th>
                 <th scope="col">{t("ipActivity.col.source")}</th>
                 <th scope="col">{t("ipActivity.col.firstSeen")}</th>
                 <th scope="col">{t("ipActivity.col.lastSeen")}</th>
@@ -246,8 +246,8 @@ const IpActivityTab = () => {
                     <NetworkCell row={r} onPick={(asn, label) => pick({ kind: "asn", asn, label })} />
                   </td>
                   <td data-label={t("ipActivity.col.ip")} className="sec-num">{r.ip_address}</td>
-                  <td data-label={t("ipActivity.col.country")}>{countryText(t, lang, r)}</td>
-                  <td data-label={t("ipActivity.col.city")}>
+                  <td data-label={t("ipActivity.col.countryByIp")}>{countryText(t, lang, r)}</td>
+                  <td data-label={t("ipActivity.col.cityByIp")}>
                     {r.city_name ? (
                       <button type="button" className="ipa-link" onClick={() => pick({ kind: "city", label: r.city_name! })}>
                         {r.city_name}

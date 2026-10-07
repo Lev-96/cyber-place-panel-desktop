@@ -374,7 +374,7 @@ describe("IP activity", () => {
       expect(detailCalls(1)).toBe(before + 1);
     });
 
-    test("with a location: the map of the network's area, its radius, and the caption saying what it is", async () => {
+    test("with a location: the map of the approximate area, its radius, and the caption saying what it is", async () => {
       await mount();
       await act(async () => { fireEvent.click(row("81.2.69.142")); });
       const box = await screen.findByRole("dialog");
@@ -384,10 +384,32 @@ describe("IP activity", () => {
         accuracyRadiusKm: 10,
         markers: [],
       });
-      const caption = within(box).getByText(/Approximate location of the IP address/);
+      const caption = within(box).getByText(/Approximate location determined by the IP address/);
       expect(caption.textContent).toContain("about 10 km");
-      expect(caption.textContent).toContain("not where the person is");
+      expect(caption.textContent).toContain("not the person's exact location");
       expect(caption.textContent).toContain("VPN");
+      // The place is read from the IP address, not from the provider: the
+      // caption never ties it to the network.
+      expect(caption.textContent).not.toMatch(/network/i);
+    });
+
+    test("the place by IP and the provider are separate groups", async () => {
+      await mount();
+      // The table says where its place comes from, too.
+      expect(screen.getByRole("columnheader", { name: "Country (by IP)" })).toBeTruthy();
+      expect(screen.getByRole("columnheader", { name: "City (by IP)" })).toBeTruthy();
+      await act(async () => { fireEvent.click(row("81.2.69.142")); });
+      const box = await screen.findByRole("dialog");
+      const groupOf = (title: string) => within(box).getByRole("heading", { name: title }).closest("section") as HTMLElement;
+      const place = groupOf("Location by IP");
+      const network = groupOf("Provider / Network");
+      expect(place).not.toBe(network);
+      expect(within(place).getByText("Country")).toBeTruthy();
+      expect(within(place).getByText("City")).toBeTruthy();
+      expect(within(place).queryByText("Organisation")).toBeNull();
+      expect(within(network).getByText("Organisation")).toBeTruthy();
+      expect(within(network).getByText("AS number")).toBeTruthy();
+      expect(within(network).queryByText("Country")).toBeNull();
     });
 
     test("a location without a radius still gets the caption, without a number", async () => {
@@ -397,7 +419,7 @@ describe("IP activity", () => {
       const box = await screen.findByRole("dialog");
       expect(await within(box).findByTestId("ip-map")).toBeTruthy();
       expect(map.props.at(-1)?.accuracyRadiusKm).toBeNull();
-      expect(within(box).getByText(/Approximate location of the IP address/).textContent).not.toMatch(/\d+ km/);
+      expect(within(box).getByText(/Approximate location determined by the IP address/).textContent).not.toMatch(/\d+ km/);
     });
 
     test("no location (or an older backend): no map, «IP location not determined»", async () => {

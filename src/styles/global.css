@@ -4385,9 +4385,17 @@ button.login-flip-back:hover {
   font-size: 13px;
   line-height: 1.4;
 }
-.ipa-facts + .ipa-facts {
+.ipa-group + .ipa-group {
   padding-top: 16px;
   border-top: 1px solid var(--color-border);
+}
+.ipa-group__title {
+  margin: 0 0 8px;
+  color: var(--color-muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 .ipa-facts dt {
   color: var(--color-muted);
