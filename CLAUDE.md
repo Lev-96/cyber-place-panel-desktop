@@ -845,6 +845,71 @@ mechanism from this one, and both are needed.
 
 Covered by `src/api/httpCache.test.ts` and `src/api/client.cache.test.ts`.
 
+## 7.7 Screen states: empty / no results / not found / error / offline (2026-10-07)
+
+ONE system, in `src/components/ui/state/` (import from `@/components/ui/state`):
+
+| Piece | Job |
+|---|---|
+| `deriveViewState({loading, error, data, hasFilters, isEmpty?})` (`viewState.ts`) | the ORDER, pure: data with items → `ready` (also while reloading, and after a failed refresh as `staleError`); error with nothing to show → `error`; no data + in flight → `loading`; answered empty → `noResults` if a search/filter narrowed it, else `empty` |
+| `StateSwitch` | renders exactly one of skeleton / `ErrorState` / empty / noResults / children for a `ViewState`; stale data gets `StaleNotice` above it |
+| `StateView` | the layout: player + title + description + optional detail + actions. `size` = `page` / `section` (smaller player) / `compact` (text only — dialogs, dropdowns, form rows). Copy by KEY (`titleKey`, `descriptionKey`, `null` = none), rendered with `t` so it follows a language switch |
+| `ErrorState` | `classifyError`: status-less TypeError / status 0 / `navigator.onLine === false` → **offline**; **404 → notFound** (with `notFoundAction`, usually `BackAction`, no Retry); else **error** + Retry (`onRetry` = the screen's `reload`). The server's `body.message` only as the secondary `detail` (LocalizedText literal) for a non-404 answer. Never `error.stack`, never "Failed to fetch" |
+| `StaleNotice`, `OfflineNotice` (App, bottom pill), `useOnline()` (`src/hooks`) | presentation only — no new request, no realtime wiring |
+| `BackAction` | "Go back": `navigate(-1)`, or `fallback` when the page was opened directly |
+
+Rules:
+- **Loading keeps the screen's own Skeleton.** The player is never a loader.
+- **A failed read is never "empty".** A background re-read never blanks loaded
+  data. Detail pages also ignore an answer for ANOTHER id (useAsync keeps the
+  previous answer while a new route param is read).
+- **Context copy, not generic:** each screen passes its own `*.state.*` keys
+  (en/ru/am, Armenian ends with `։`, no em dash). Defaults live under `state.*`.
+- **CTA in an empty state only where the screen already had a permission
+  check for that action** (BranchesList `branch.create`+company, CompanyBranches
+  `branch.create`, CompaniesList `company.create`, Managers `manager.create`,
+  Owners `owner.create`, ProductsList `product.crud`; the prices page's package
+  empty kept its existing button).
+- Unknown route (signed in) → `routes/NotFound.tsx`, not a silent redirect;
+  `/login`, `/forgot-password`, `/reset-password` still go to `/`; signed out,
+  `*` is still Login. Pinned by `src/App.notFound.test.tsx` (real route table).
+
+**`api/fallback.ts` (the bug this fixed):** `isMissingEndpoint` used to count an
+error with no status (network down) as "endpoint missing", so `orFallback`
+resolved `[]`/defaults offline and screens replaced real data with "nothing
+here" (the sessions board: "No devices registered", running sessions gone).
+Now ONLY 404 / 501 is missing; everything else rethrows. Every non-useAsync
+caller of an `orFallback` repository got a catch (StartSessionDialog packages,
+useProductBasket catalogue, SessionOptionsDialog joystick fee,
+SupportUnreadContext keeps its count). `friendlyMutation` no longer calls a
+dropped connection "endpoint not deployed". `NotificationsContext` gained
+`failure` (raw error) and `settled` (additive).
+
+**The player** (`poses/GamerFigure.tsx` + one module per pose: Empty =
+controller, NoResults = magnifier, NotFound = map + "?", Error = unplugged
+cable, Offline = crossed Wi-Fi, Success = thumbs up): hand-drawn inline SVG,
+colours from the tokens via `.cp-gamer__*` classes, gradient ids from
+`useId()`, `aria-hidden`. Motion: CSS keyframes on transform/opacity only,
+3–5 s loops (breathe, sway, blink, prop tilt/scan/flicker); `@media
+(prefers-reduced-motion: reduce)` stops it — and the `.cp-skeleton` shimmer —
+and slows `.spinner`. Each pose is `React.lazy`: nothing of the drawing is in
+the main chunk. Sizes (`npm run build:web`, gzip): GamerFigure 1.00 kB shared,
+poses 0.34–0.47 kB each, NotFound route 0.16 kB. Main JS 653.66 → 677.10 kB
+(gzip 213.55 → 220.20 kB, +6.65 kB), almost all of it the new en/ru/am
+dictionary entries; CSS 80.61 → 85.78 kB (gzip 15.53 → 16.53 kB). No dependency added.
+
+Tests: `viewState.test.ts`, `StateView.test.tsx` (variants, roles, lazy pose,
+CSS reduced-motion + transform/opacity-only keyframes, ErrorState
+classification + Retry, StateSwitch), `useOnline.test.tsx`,
+`api/fallback.test.ts`, `tileOrder.test.ts`, per screen:
+`SessionsBoard.states`, `BranchLiveScreen.states`, `MembersList`,
+`Expenses.states`, `useProductBasket.load`, RegistrationsList / Notifications /
+IpActivityTab / StartSessionDialog / SessionHistoryTimeline / Till /
+OwnerDetails additions. Mutation-verified: fallback back to "no status =
+missing" and "≥400 = missing"; empty/noResults swapped; stale data turned into
+an error; the basket catch dropped; the board's first-load error branch and
+stale notice removed; `*` back to `<Navigate to="/">`.
+
 ---
 
 ## 8. AI Assistant Behaviour (for me, Claude)
@@ -1359,7 +1424,18 @@ backend routes.
   - rows read as a user (name + email), a mobile player, "Anonymous", or "Telegram servers" (bot webhooks);
   - the header sentence says the address is the SERVER's view (a VPN's address behind a VPN) and the location approximate — never "exact";
   - source pills `.pill.ipa-source.is-*`;
-  - `IpActivityTab.test.tsx` (8).
+  - **Device and OS columns** (2026-10-07), right after User (`data-label`
+    for the phone cards): the resource's `device` (`iphone | ipad |
+    android_phone | android_tablet | windows_pc | mac | linux_pc |
+    chromebook | null`), `os_name` (`ios | ipados | android | windows | macos |
+    linux | chromeos | null`), `os_version` — all OPTIONAL in
+    `src/api/ipActivity.ts`: an older backend omits them and the row reads
+    "Unknown"; a value this build does not know renders as sent. OS cell = name
+    + version ("iOS 17.8", "Windows"). Icon: `security/DeviceIcon.tsx`
+    (phone / tablet / desktop / laptop, inline SVG). Server filters `device` and
+    `os` in the filter bar; any change starts on page 1. Empty ("No connections
+    recorded yet") vs no results (any filter/search/pick) vs error + Retry;
+  - `IpActivityTab.test.tsx` (14).
 - Layout: tables scroll in their own frame; ≤640px rows become cards from
   `data-label`; the owner-web app renders the same screen in a browser.
 
@@ -1587,8 +1663,9 @@ reusable `<SettingsSection>` (`components/ui/SettingsSection.tsx`: title,
 description, header actions, loading and error-with-retry states; it never
 renders its body on error). The billing rules load with
 `billingSettingsRepository.getForEdit()` — STRICT. `get()` falls back to
-defaults on a network failure (fine for read-only screens), which on this page
-let the next Save overwrite the real policy with defaults. The forms, their
+defaults when the endpoint is missing (404/501; until 2026-10-07 also on a
+network failure, see §7.7), which on this page would let the next Save
+overwrite the real policy with defaults. The forms, their
 whole-policy PUT and their remount `key`s are unchanged. Package delete uses
 `useConfirm` (never `window.confirm`). Pinned by `BranchPricesPage.test.tsx`
 and `BillingSettingsRepository.test.ts`.
