@@ -20,14 +20,14 @@ import { can } from "@/auth/permissions";
 import { useAsync } from "@/hooks/useAsync";
 import { useLang } from "@/i18n/LanguageContext";
 import { fmt } from "@/i18n/translations";
-import { platformPriceNameOf } from "@/i18n/platformPriceName";
+import { customPlatformOptions, platformPriceNameOf } from "@/i18n/platformPriceName";
 import { gameRepository } from "@/repositories/GameRepository";
 import { placeRepository } from "@/repositories/PlaceRepository";
 import { subplatformRepository } from "@/repositories/SubplatformRepository";
 import { CHARGE_MODES, JoystickChargeMode, JoystickPricingMode, PRICING_MODES, pricingModeOf } from "@/api/joystickPrices";
 import { IBranchApi, IBranchPlace, IBranchPlatformPrice, PlaceType } from "@/types/api";
 import { isKnownPlatform, platformGroup, platformLabel, slugifyPlatform } from "@/utils/platform";
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 
 const EMPTY_NAMES: LangNames = { en: "", ru: "", am: "" };
 
@@ -377,9 +377,21 @@ const PlaceForm = ({ branchId, initial, platformSuggestions, platformPrices, onC
     setPlatform(next);
   };
 
-  // Platform selection from the picker: a known slug (pc/ps4/ps5) or "" when
-  // the operator hits "Other". Switching to Other starts a fresh custom name.
+  // Platform selection from the picker: a known slug (pc/ps4/ps5), one of
+  // this branch's custom platforms (a quick button), or "" when the operator
+  // hits "Other" — which starts a fresh custom name. A custom button goes the
+  // same way as picking it from the name suggestions: its наименование in
+  // every language and its exact slug, so its existing price locks in.
   const handlePlatformPick = (v: string) => {
+    if (v !== "" && !isKnownPlatform(v)) {
+      const priced = (platformPrices ?? []).find((pp) => pp.platform === v);
+      if (priced) { handlePickExisting(priced); return; }
+      // Used by a place but never priced: name it from its slug (the English
+      // name is what the slug derives from, so it stays the same slug).
+      changePlatform(v);
+      setNames({ en: platformLabel(v), ru: "", am: "" });
+      return;
+    }
     changePlatform(v);
     if (!isKnownPlatform(v)) setNames(EMPTY_NAMES);
   };
@@ -577,6 +589,19 @@ const PlaceForm = ({ branchId, initial, platformSuggestions, platformPrices, onC
       ...(platformPrices ?? []).map((pp) => pp.platform),
       ...(games.data ?? []).map((g) => g.platform).filter((p) => !isKnownPlatform(p)),
     ]),
+  );
+
+  // This branch's custom platforms as quick buttons next to PC / PS4 / PS5:
+  // the platforms its places use plus the ones it has a price for. NOT the
+  // platforms of the shared games catalogue — those can belong to another
+  // company and must never appear as one of this branch's buttons.
+  const branchCustomPlatforms = useMemo(
+    () => customPlatformOptions(
+      [...(platformSuggestions ?? []), ...(platformPrices ?? []).map((pp) => pp.platform)],
+      platformPrices,
+      lang,
+    ),
+    [platformSuggestions, platformPrices, lang],
   );
 
   // A place targets ONE platform, so its games must all belong to that
@@ -841,7 +866,13 @@ const PlaceForm = ({ branchId, initial, platformSuggestions, platformPrices, onC
           <span className="label">{t("label.platform")}</span>
           {/* The picker owns known buttons + the Other toggle; the custom slug
               comes from the наименование below, so its own text input is hidden. */}
-          <PlatformPicker value={platform} onChange={handlePlatformPick} suggestions={platformOptions} hideOtherInput />
+          <PlatformPicker
+            value={platform}
+            onChange={handlePlatformPick}
+            suggestions={platformOptions}
+            customOptions={branchCustomPlatforms}
+            hideOtherInput
+          />
         </div>
 
         {/* Second level: which sub-category of that platform. Only once the

@@ -2,10 +2,9 @@ import type { IGameApi } from "@/api/games";
 import type { PlatformOption } from "@/components/ui/PlatformPicker";
 import { useAsync } from "@/hooks/useAsync";
 import { useLang } from "@/i18n/LanguageContext";
-import { platformDisplayNameOf } from "@/i18n/platformPriceName";
+import { customPlatformOptions } from "@/i18n/platformPriceName";
 import { gameRepository } from "@/repositories/GameRepository";
 import { platformPriceRepository } from "@/repositories/PlatformPriceRepository";
-import { isKnownPlatform } from "@/utils/platform";
 import { useMemo } from "react";
 
 interface Args {
@@ -71,9 +70,7 @@ export const useGameFormSources = ({ creating, pickerShown, branchId, globalCata
     const slugs = branchId !== undefined
       ? [...(priceRows ?? []).map((p) => p.platform), ...(branchGames ?? []).map((g) => g.platform)]
       : (own ?? []).map((g) => g.platform);
-    return Array.from(new Set(slugs.filter((s) => s && !isKnownPlatform(s))))
-      .map((slug) => ({ slug, label: platformDisplayNameOf(slug, priceRows ?? undefined, lang) }))
-      .sort((a, b) => a.label.localeCompare(b.label));
+    return customPlatformOptions(slugs, priceRows ?? undefined, lang);
   }, [pickerShown, branchId, priceRows, branchGames, own, lang]);
 
   return { catalogue, inBranch, customPlatforms };

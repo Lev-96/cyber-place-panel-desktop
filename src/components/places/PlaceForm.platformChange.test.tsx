@@ -31,7 +31,8 @@ vi.mock("@/repositories/PlaceRepository", () => ({
     nextNumber: (...a: unknown[]) => repo.nextNumber(...a),
   },
 }));
-vi.mock("@/repositories/GameRepository", () => ({ gameRepository: { list: async () => [] } }));
+const catalogue = vi.hoisted(() => ({ list: vi.fn(async () => [] as unknown[]) }));
+vi.mock("@/repositories/GameRepository", () => ({ gameRepository: catalogue }));
 // GameForm itself is covered by GameForm.test.tsx; here only whether it opens.
 vi.mock("@/components/games/GameForm", () => ({ default: () => null }));
 vi.mock("@/repositories/SubplatformRepository", () => ({
@@ -172,20 +173,44 @@ describe("creating a game from the place form", () => {
 });
 
 /**
- * PlatformPicker gained opt-in custom-platform buttons for GameForm. PlaceForm
- * does not opt in: its picker stays the known row + "Other", and the branch's
- * custom platforms keep coming through its own naming field.
+ * The place form offers THIS branch's custom platforms as buttons next to
+ * PC / PS4 / PS5 (2026-10-08): the ones it has a price for and the ones its
+ * places use — named in the active language. Never a platform that only the
+ * shared games catalogue knows (it may be another company's).
  */
 describe("the place form's platform picker", () => {
-  test("is PC / PS4 / PS5 / Other only, even when the branch prices a custom platform", async () => {
-    const billiards = {
-      id: 3, branch_id: 7, platform: "billiards", name_en: "Pool table", name_ru: "Бильярд", name_am: "Բիլյարդ", name: "Pool table",
-    } as IBranchPlatformPrice;
+  const billiards = {
+    id: 3, branch_id: 7, platform: "billiards", name_en: "Pool table", name_ru: "Бильярд", name_am: "Բիլյարդ", name: "Pool table",
+  } as IBranchPlatformPrice;
+
+  test("shows the branch's priced custom platform as a button, in the active language", async () => {
     await mount(place(), [billiards]);
 
     const row = screen.getByRole("button", { name: "PS5" }).parentElement!;
+    expect([...row.querySelectorAll("button")].map((b) => b.textContent)).toEqual(["PC", "PS4", "PS5", "Бильярд", "platform.other"]);
+  });
+
+  test("picking it selects that platform with its existing price", async () => {
+    await mount(place(), [billiards]);
+
+    fireEvent.click(screen.getByRole("button", { name: "Бильярд" }));
+
+    expect(screen.getByRole("button", { name: "Бильярд" }).getAttribute("aria-pressed")).toBe("true");
+    // The existing price applies: its name heads the price block, no "name a new platform" field.
+    expect(screen.queryByText("place.customPlatformNote")).toBeNull();
+  });
+
+  test("a custom place opens with its platform's button pressed", async () => {
+    await mount(place({ platform: "billiards" }), [billiards]);
+
+    expect(screen.getByRole("button", { name: "Бильярд" }).getAttribute("aria-pressed")).toBe("true");
+  });
+
+  test("a platform only the shared games catalogue knows is not offered as a button", async () => {
+    catalogue.list.mockResolvedValueOnce([{ id: 9, name: "Foreign", platform: "tenis" }]);
+    await mount(place(), []);
+
+    const row = screen.getByRole("button", { name: "PS5" }).parentElement!;
     expect([...row.querySelectorAll("button")].map((b) => b.textContent)).toEqual(["PC", "PS4", "PS5", "platform.other"]);
-    expect(screen.queryByRole("button", { name: "Pool table" })).toBeNull();
-    expect(screen.queryByRole("button", { name: "Бильярд" })).toBeNull();
   });
 });

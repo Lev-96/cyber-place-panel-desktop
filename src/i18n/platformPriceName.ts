@@ -35,3 +35,19 @@ export const platformDisplayNameOf = (
   const row = (prices ?? []).find((p) => p.platform === slug);
   return (row && platformPriceNameOf(row, lang)) || platformLabel(slug);
 };
+
+/**
+ * Custom platforms as quick-pick buttons (2026-10-08), shared by GameForm and
+ * PlaceForm: the distinct non-pc/ps4/ps5 slugs, each named in the active
+ * language (the branch наименование when it has a price row, else the
+ * de-slugged slug), sorted by that name. The CALLER decides which slugs are
+ * in scope — always this branch's own, never another company's.
+ */
+export const customPlatformOptions = (
+  slugs: readonly (string | null | undefined)[],
+  prices: readonly Pick<IBranchPlatformPrice, "platform" | "name_en" | "name_ru" | "name_am">[] | undefined,
+  lang: Lang,
+): { slug: string; label: string }[] =>
+  Array.from(new Set(slugs.filter((s): s is string => !!s && !isKnownPlatform(s))))
+    .map((slug) => ({ slug, label: platformDisplayNameOf(slug, prices, lang) }))
+    .sort((a, b) => a.label.localeCompare(b.label));
