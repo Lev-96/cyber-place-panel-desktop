@@ -2221,10 +2221,37 @@ they did, and TypeScript caught it as a duplicate object property.
   "Use existing" resends the same body + `use_existing: true` (success body has
   `existing: true`, toast `toast.game.linked`); with no `branchId` (admin
   `GamesList`) there is nothing to link, so it hands back the row with no
-  request and the list marks it (`.list-item--focus`). Callers pass
-  `catalogue` for a pre-check (`utils/gameName.ts`: trim, lower-case, collapse
-  spaces, same platform): advice only, the 422 decides. Double submit is
-  stopped by a ref (`inFlight`), not by `busy`.
+  request and the list marks it (`.list-item--focus`). The pre-Save check
+  (`findExistingGame`, `utils/gameName.ts`: trim, lower-case, collapse spaces,
+  same platform) runs over the GLOBAL catalogue + the branch list: advice
+  only, the 422 decides. Double submit is stopped by a ref (`inFlight`), not
+  by `busy`.
+- **Existing games are suggested while typing** (create only, 2026-10-08).
+  The branch list alone never knew a game another branch had added, so the
+  owner only learned of it on Save. `GameSuggestions` (in the flow under the
+  name, not a popup) lists up to 5 games on the SELECTED platform whose
+  normalised name contains the typed text (`suggestGames`: exact, then
+  prefix, then contains; ≥2 chars; 200 ms `useDebouncedValue`), the exact one
+  with the primary edge, a badge `game.suggest.inBranch` for games already in
+  the branch, and `game.exists.useExisting` → the SAME `takeExisting` path as
+  the notice. That path sends the picked game's exact `name` + `platform`
+  (not what was typed) with `use_existing: true`; linking is idempotent
+  server-side, so a game already in the branch is sent too (the list on
+  screen may be stale). No request per keystroke: `useGameFormSources` reads
+  `gameRepository.list()` ONCE per opened create form, only when the caller
+  did not pass `globalCatalogue` (GamesList and PlaceForm pass theirs;
+  `null` = still loading, no second read). BranchGames passes `branchGames`.
+  A failed read only removes the suggestions; Save works as before.
+- **The branch's custom platforms are quick buttons in GameForm.**
+  `PlatformPicker`'s opt-in `customOptions: {slug,label}[]` draws them between
+  PS5 and Other (a value equal to one starts on its button, not on Other).
+  Sources, scoped like their data: with a branch,
+  `platformPriceRepository.listByBranch` + the branch games' custom slugs,
+  named via `platformDisplayNameOf`; without one (admin), the custom slugs of
+  the global catalogue. Never the global catalogue for an owner: another
+  company's platform must not become a button. PlaceForm does not pass
+  `customOptions`, so its picker is exactly PC / PS4 / PS5 / Other (pinned in
+  `PlaceForm.platformChange.test.tsx`).
 - **`lockedPlatform` locks even when empty.** `lockedPlatform=""` (a place on
   "Other" with no name yet) used to fall through to the picker, so a place form
   could create a game on any platform. Now any defined value hides the picker
@@ -2253,6 +2280,7 @@ they did, and TypeScript caught it as a duplicate object property.
   `sessionRepository.extend`; none does today) → `api/packagePlatformMismatch.ts`
   → `session.errors.packagePlatformMismatch` as `LocalizedText`.
 - Tests: `GameForm.test.tsx`, `PlaceForm.platformChange.test.tsx`,
+  `PlatformPicker.test.tsx`, `utils/gameName.test.ts`,
   `StartSessionDialog.test.tsx` (PS seat / billiards seat / mismatch),
   `PcsList.psBadge.test.tsx`, `PackageForm.platform.test.tsx`,
   `api/gameExists.test.ts`, `utils/platform.test.ts`.
