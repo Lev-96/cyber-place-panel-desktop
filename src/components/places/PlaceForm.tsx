@@ -352,10 +352,35 @@ const PlaceForm = ({ branchId, initial, platformSuggestions, platformPrices, onC
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
+  /**
+   * A different platform is a different price. On edit both rate boxes open
+   * holding the place's stored `hourly_rate` — the rate of the OLD platform —
+   * and carried over unchanged it would be saved as the new platform's own
+   * override (or seed a new custom platform's price) without anyone typing
+   * it. So picking another platform empties them and the new platform's own
+   * price applies; anything typed AFTER the switch is the operator's and is
+   * kept. Going back to the stored platform restores the stored figure.
+   *
+   * Only DISCRETE picks come through here. Typing a new platform's name
+   * changes the slug on every keystroke (`handleNamesChange`) and must not
+   * wipe the rate typed next to it. Create and edit behave the same: on
+   * create there is no stored platform to return to.
+   */
+  const changePlatform = (next: string) => {
+    if (next !== platform) {
+      const stored = initial && next === initial.platform && initial.hourly_rate != null
+        ? String(initial.hourly_rate)
+        : "";
+      setPlaceRate(stored);
+      setHourlyRate(stored);
+    }
+    setPlatform(next);
+  };
+
   // Platform selection from the picker: a known slug (pc/ps4/ps5) or "" when
   // the operator hits "Other". Switching to Other starts a fresh custom name.
   const handlePlatformPick = (v: string) => {
-    setPlatform(v);
+    changePlatform(v);
     if (!isKnownPlatform(v)) setNames(EMPTY_NAMES);
   };
 
@@ -372,7 +397,7 @@ const PlaceForm = ({ branchId, initial, platformSuggestions, platformPrices, onC
   // snap to its exact slug so its already-defined price locks in.
   const handlePickExisting = (p: IBranchPlatformPrice) => {
     setNames({ en: p.name_en ?? "", ru: p.name_ru ?? "", am: p.name_am ?? "" });
-    setPlatform(p.platform);
+    changePlatform(p.platform);
   };
 
   /**
@@ -774,7 +799,11 @@ const PlaceForm = ({ branchId, initial, platformSuggestions, platformPrices, onC
   // Shown whenever the operator may create games — NOT only when the list is
   // empty: a platform that already has one game must still be extendable, and
   // for a brand-new custom platform this is the only way to get the first one.
-  const createGameButton = canCreateGames && !games.loading ? (
+  //
+  // Never while the platform is still empty ("Other" picked, no name typed
+  // yet): there is no platform to put the game on, and GameForm must not be
+  // opened with a platform the operator could then pick freely.
+  const createGameButton = canCreateGames && !games.loading && platform !== "" ? (
     <div className="row" style={{ justifyContent: "flex-end" }}>
       <Button type="button" variant="secondary" onClick={() => setGameCreating(true)} style={{ padding: "4px 10px", fontSize: 12 }}>
         {t("place.createGame")}
@@ -1339,14 +1368,17 @@ const PlaceForm = ({ branchId, initial, platformSuggestions, platformPrices, onC
         <GameForm
           branchId={branchId}
           lockedPlatform={platform}
+          catalogue={games.data ?? []}
           onClose={() => setGameCreating(false)}
           onSaved={(game) => {
             setGameCreating(false);
             void games.reload();
             // Tick the freshly created game right away — the operator opened
             // this form to attach it, so making them hunt for it in the
-            // refreshed grid would be pure friction. The prune effect keeps
-            // it: it matches the place's platform by construction.
+            // refreshed grid would be pure friction. The same holds for an
+            // EXISTING game the operator chose instead of a duplicate. The
+            // prune effect keeps it: it matches the place's platform by
+            // construction.
             if (game) setGameIds((prev) => new Set(prev).add(game.id));
           }}
         />

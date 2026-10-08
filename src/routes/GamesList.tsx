@@ -16,6 +16,9 @@ const GamesList = () => {
   const { data, loading, error, reload } = useAsync(() => gameRepository.list(), []);
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState<IGameApi | null>(null);
+  // The game the operator just saved — or the existing one they chose instead
+  // of a duplicate — marked and scrolled to, so it is found, not hunted for.
+  const [focusId, setFocusId] = useState<number | null>(null);
 
   const remove = async (g: IGameApi) => {
     if (!(await confirm(`${t("action.delete")} ${g.name}?`, { destructive: true }))) return;
@@ -38,7 +41,11 @@ const GamesList = () => {
       >
         <div className="list">
           {(data ?? []).map((g) => (
-            <div key={g.id} className="list-item">
+            <div
+              key={g.id}
+              className={g.id === focusId ? "list-item list-item--focus" : "list-item"}
+              ref={g.id === focusId ? (el) => el?.scrollIntoView?.({ block: "nearest" }) : undefined}
+            >
               <div>
                 <div className="name">{g.name}</div>
                 <div className="meta">{g.platform.toUpperCase()}</div>
@@ -51,7 +58,13 @@ const GamesList = () => {
           ))}
         </div>
       </StateSwitch>
-      {creating && <GameForm onClose={() => setCreating(false)} onSaved={() => { setCreating(false); void reload(); }} />}
+      {creating && (
+        <GameForm
+          catalogue={data ?? []}
+          onClose={() => setCreating(false)}
+          onSaved={(game) => { setCreating(false); setFocusId(game?.id ?? null); void reload(); }}
+        />
+      )}
       {editing && <GameForm initial={editing} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); void reload(); }} />}
     </ScreenWithBg>
   );

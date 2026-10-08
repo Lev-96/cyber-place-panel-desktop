@@ -5,13 +5,22 @@ import Input from "@/components/ui/Input";
 import PriceInput from "@/components/ui/PriceInput";
 import TimeInput from "@/components/ui/TimeInput";
 import { useLang } from "@/i18n/LanguageContext";
+import { platformDisplayNameOf } from "@/i18n/platformPriceName";
 import { timePackageRepository } from "@/repositories/TimePackageRepository";
+import { IBranchPlatformPrice } from "@/types/api";
 import { ITimePackage } from "@/types/sessions";
+import { KNOWN_PLATFORMS } from "@/utils/platform";
 import { FormEvent, useState } from "react";
 
 interface Props {
   branchId: number;
   initial?: ITimePackage;
+  /**
+   * The branch's custom platforms (its platform price rows — the same list
+   * Branch → Prices and the place form read). Offered after pc/ps4/ps5 so a
+   * tariff can target a billiards table as well as a console.
+   */
+  platformPrices?: readonly IBranchPlatformPrice[];
   onClose: () => void;
   onSaved: (p: ITimePackage) => void;
 }
@@ -28,8 +37,6 @@ const WEEKDAYS: { iso: number; key: string }[] = [
   { iso: 7, key: "branch.weekday.sun" },
 ];
 
-const PLATFORMS = ["pc", "ps4", "ps5"] as const;
-type PlatformValue = "" | (typeof PLATFORMS)[number];
 
 // Backend validates with date_format:H:i. Trim incoming "HH:MM:SS" to
 // "HH:MM" for the TimeInput control, and validate user input against
@@ -37,7 +44,7 @@ type PlatformValue = "" | (typeof PLATFORMS)[number];
 const toHHMM = (s: string | null | undefined): string => (s ? s.slice(0, 5) : "");
 const HHMM_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
 
-const PackageForm = ({ branchId, initial, onClose, onSaved }: Props) => {
+const PackageForm = ({ branchId, initial, platformPrices, onClose, onSaved }: Props) => {
   const { t, lang } = useLang();
   // Per-locale name, interface language first and auto-translated into the
   // rest. Tariffs still persist to the legacy `name_en/ru/am` columns rather
@@ -49,9 +56,15 @@ const PackageForm = ({ branchId, initial, onClose, onSaved }: Props) => {
   const [price, setPrice] = useState(String(initial?.price ?? ""));
   // Platform = "" means "applies to all platforms" — backend column
   // is nullable and the empty string maps to NULL on submit.
-  const [platform, setPlatform] = useState<PlatformValue>(
-    (initial?.platform as PlatformValue) ?? "",
-  );
+  const [platform, setPlatform] = useState<string>(initial?.platform ?? "");
+  // Known platforms first, then the branch's custom ones. A package already
+  // saved on a slug the branch no longer prices keeps its own option, so
+  // opening it never silently re-targets it.
+  const platformOptions = Array.from(new Set([
+    ...KNOWN_PLATFORMS,
+    ...(platformPrices ?? []).map((p) => p.platform),
+    ...(initial?.platform ? [initial.platform] : []),
+  ]));
 
   // Discount sub-form. Collapsed by default unless the package being
   // edited already carries a configured discount — staff can leave it
@@ -138,8 +151,7 @@ const PackageForm = ({ branchId, initial, onClose, onSaved }: Props) => {
     setBusy(true); setErr(null);
     try {
       const nameBody = { name_en: name.en, name_ru: name.ru, name_am: name.am };
-      const platformValue: "pc" | "ps4" | "ps5" | null =
-        platform === "" ? null : platform;
+      const platformValue: string | null = platform === "" ? null : platform;
       const pkg = initial
         ? await timePackageRepository.update(initial.id, {
             ...nameBody,
@@ -182,11 +194,11 @@ const PackageForm = ({ branchId, initial, onClose, onSaved }: Props) => {
           <select
             className="input"
             value={platform}
-            onChange={(e) => setPlatform(e.target.value as PlatformValue)}
+            onChange={(e) => setPlatform(e.target.value)}
           >
             <option value="">{t("tariff.platformAll")}</option>
-            {PLATFORMS.map((p) => (
-              <option key={p} value={p}>{p.toUpperCase()}</option>
+            {platformOptions.map((p) => (
+              <option key={p} value={p}>{platformDisplayNameOf(p, platformPrices, lang)}</option>
             ))}
           </select>
         </div>

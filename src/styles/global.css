@@ -1244,6 +1244,15 @@ input[type="time"]::-webkit-datetime-edit-field:focus {
   opacity: 1;
   transform: scaleY(1);
 }
+/* The row a screen points the operator at (e.g. the existing game chosen
+   instead of a duplicate): the hover accent, held. */
+.list-item.list-item--focus {
+  border-color: var(--color-primary);
+}
+.list-item.list-item--focus::before {
+  opacity: 1;
+  transform: scaleY(1);
+}
 .list-item .name {
   font-weight: 600;
 }

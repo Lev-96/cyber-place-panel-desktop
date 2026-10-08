@@ -1024,6 +1024,12 @@ export const TRANSLATIONS: Dict = {
     ru: "Гость",
     am: "Հյուր",
   },
+  // 422 `package_platform_mismatch`: the tariff targets another platform.
+  "session.errors.packagePlatformMismatch": {
+    en: "This tariff is for another platform. Choose a tariff for this place's platform.",
+    ru: "Этот тариф для другой платформы. Выберите тариф для платформы этого места.",
+    am: "Այս սակագինը այլ հարթակի համար է։ Ընտրեք այս տեղի հարթակի սակագինը։",
+  },
   "session.noAssignedRate": {
     en: "No price configured for this PC's place. Set one on the «Branch prices» page first.",
     ru: "Для места этого PC не задана цена. Сначала установите её на странице «Цены филиала».",
@@ -1830,6 +1836,9 @@ export const TRANSLATIONS: Dict = {
   "game.titleNew": { en: "New game", ru: "Новая игра", am: "Նոր խաղ" },
   "game.titleEdit": { en: "Edit game", ru: "Редактировать игру", am: "Խմբագրել խաղը" },
   "game.platformLocked": { en: "Platform cannot be changed after creation.", ru: "Платформу нельзя изменить после создания.", am: "Ստեղծելուց հետո հարթակը հնարավոր չէ փոխել։" },
+  // A duplicate the server refused (422 `game_exists`): asked, not failed.
+  "game.exists.notice": { en: "The game “{0}” already exists on {1}. Use it?", ru: "Игра «{0}» уже есть на {1}. Использовать её?", am: "«{0}» խաղն արդեն կա {1} հարթակում։ Օգտագործե՞լ այն։" },
+  "game.exists.useExisting": { en: "Use existing", ru: "Использовать", am: "Օգտագործել" },
 
   // Tariff (TimePackage) form
   "tariff.titleNew": { en: "New tariff", ru: "Новый тариф", am: "Նոր սակագին" },
@@ -3188,6 +3197,7 @@ export const TRANSLATIONS: Dict = {
   "toast.game.created": { en: "Game added", ru: "Игра добавлена", am: "Խաղն ավելացվեց" },
   "toast.game.updated": { en: "Game updated", ru: "Игра обновлена", am: "Խաղը թարմացվեց" },
   "toast.game.deleted": { en: "Game removed", ru: "Игра удалена", am: "Խաղը հեռացվեց" },
+  "toast.game.linked": { en: "Game added to the branch", ru: "Игра добавлена в филиал", am: "Խաղն ավելացվեց մասնաճյուղին" },
   "toast.expense.created": { en: "Expense added", ru: "Расход добавлен", am: "Ծախսն ավելացվեց" },
   "toast.expense.updated": { en: "Expense updated", ru: "Расход обновлён", am: "Ծախսը թարմացվեց" },
   "toast.expense.deleted": { en: "Expense deleted", ru: "Расход удалён", am: "Ծախսը ջնջվեց" },

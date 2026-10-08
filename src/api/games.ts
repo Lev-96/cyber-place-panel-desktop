@@ -16,6 +16,12 @@ export interface CreateGameBody {
   platform: string;
   /** Optional: scope the game to a branch via the game_branches pivot. */
   branch_id?: number;
+  /**
+   * The operator chose the game the server reported as already existing
+   * (422 `game_exists`): link that shared row to `branch_id` instead of
+   * creating a duplicate. Omitted on a normal create.
+   */
+  use_existing?: boolean;
 }
 
 export const apiListGames = (params: { platform?: string; branch_id?: number; per_page?: number; page?: number } = {}) =>
@@ -32,6 +38,8 @@ export interface GameWriteResponse {
   games?: IGameApi;
   game?: IGameApi;
   message?: string;
+  /** True when `use_existing` linked an existing row instead of creating one. */
+  existing?: boolean;
 }
 
 export const apiCreateGame = (body: CreateGameBody) =>

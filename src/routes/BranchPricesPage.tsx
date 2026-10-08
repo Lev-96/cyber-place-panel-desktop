@@ -13,6 +13,7 @@ import { StateView } from "@/components/ui/state";
 import { useConfirm } from "@/components/ui/ConfirmProvider";
 import { useAsync } from "@/hooks/useAsync";
 import { useLang } from "@/i18n/LanguageContext";
+import { platformDisplayNameOf } from "@/i18n/platformPriceName";
 import { timePackageNameOf } from "@/i18n/timePackageName";
 import { branchRepository } from "@/repositories/BranchRepository";
 import { billingSettingsRepository } from "@/repositories/BillingSettingsRepository";
@@ -182,7 +183,7 @@ const BranchPricesPage = () => {
                     <div className="package-row__main">
                       <div className="name">
                         {timePackageNameOf(p, lang)}
-                        {p.platform && <span className="price-badge price-badge--platform">{p.platform}</span>}
+                        {p.platform && <span className="price-badge price-badge--platform">{platformDisplayNameOf(p.platform, platformPrices.data ?? [], lang)}</span>}
                         {hasDiscount && p.is_discount_currently_active && (
                           <span className="price-badge price-badge--success">{t("tariff.discount.activeNow")}</span>
                         )}
@@ -309,6 +310,7 @@ const BranchPricesPage = () => {
       {creating && (
         <PackageForm
           branchId={id}
+          platformPrices={platformPrices.data ?? []}
           onClose={() => setCreating(false)}
           onSaved={() => {
             setCreating(false);
@@ -320,6 +322,7 @@ const BranchPricesPage = () => {
         <PackageForm
           branchId={id}
           initial={editing}
+          platformPrices={platformPrices.data ?? []}
           onClose={() => setEditing(null)}
           onSaved={() => {
             setEditing(null);
