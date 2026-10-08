@@ -17,14 +17,18 @@ import type { IGameApi } from "@/api/games";
  * toast it raises — or must not raise — is part of what is pinned.
  */
 
-const api = vi.hoisted(() => ({ create: vi.fn() }));
+const api = vi.hoisted(() => ({ create: vi.fn(), list: vi.fn(), prices: vi.fn() }));
 const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }));
 
 vi.mock("@/api/games", () => ({
   apiCreateGame: (...a: unknown[]) => api.create(...a),
   apiUpdateGame: vi.fn(),
   apiDeleteGame: vi.fn(),
-  apiListGames: vi.fn(),
+  apiListGames: (...a: unknown[]) => api.list(...a),
+}));
+vi.mock("@/api/platformPrices", () => ({
+  apiListPlatformPrices: (...a: unknown[]) => api.prices(...a),
+  apiUpdatePlatformPrice: vi.fn(),
 }));
 vi.mock("@/ui/notify", () => ({
   notify: { success: (...a: unknown[]) => toast.success(...a), error: (...a: unknown[]) => toast.error(...a) },
@@ -72,6 +76,8 @@ const notice = () => screen.queryByRole("alert");
 
 beforeEach(() => {
   api.create.mockReset();
+  api.list.mockReset().mockResolvedValue({ data: [] });
+  api.prices.mockReset().mockResolvedValue({ data: [] });
   toast.success.mockReset();
   toast.error.mockReset();
   onSaved = vi.fn<(game?: IGameApi | null) => void>();
@@ -147,7 +153,7 @@ describe("a game the catalogue already has", () => {
   });
 
   test("the loaded catalogue catches an obvious duplicate before any request", async () => {
-    await mount({ catalogue: [{ id: 41, name: "Dota 2", platform: "pc" }, { id: 42, name: "Dota 2", platform: "ps5" }] });
+    await mount({ globalCatalogue: [{ id: 41, name: "Dota 2", platform: "pc" }, { id: 42, name: "Dota 2", platform: "ps5" }] });
     await typeName("  dota   2 ");
     await submit();
 
@@ -157,7 +163,7 @@ describe("a game the catalogue already has", () => {
 
   test("the same name on another platform is a different game", async () => {
     api.create.mockResolvedValueOnce({ games: { id: 50, name: "Dota 2", platform: "pc" } });
-    await mount({ catalogue: [{ id: 42, name: "Dota 2", platform: "ps5" }] });
+    await mount({ globalCatalogue: [{ id: 42, name: "Dota 2", platform: "ps5" }] });
     await typeName("Dota 2");
     await submit();
 
@@ -215,5 +221,191 @@ describe("a locked but empty platform", () => {
     await submit();
 
     expect(api.create.mock.calls[0][0]).toEqual({ name: "Cue", platform: "billiards", branch_id: 7 });
+  });
+});
+
+/** Past the form's typing pause, so the suggestions follow the name. */
+const settle = async () => { await act(async () => { await new Promise((r) => setTimeout(r, 260)); }); };
+const suggestList = () => document.querySelector(".game-suggest");
+const suggestedNames = () => Array.from(document.querySelectorAll(".game-suggest__name")).map((n) => n.textContent);
+
+/**
+ * The owner on Branch → Games → New game types a name the GLOBAL catalogue
+ * already has. The branch list alone never knew it, so the form only found
+ * out on Save. Now the existing games show while typing, on the selected
+ * platform, and "Use existing" takes the same path as the duplicate notice.
+ */
+describe("suggestions while typing a new game", () => {
+  const global: IGameApi[] = [
+    { id: 41, name: "Dota 2", platform: "pc" },
+    { id: 42, name: "Dota 2", platform: "ps5" },
+    { id: 43, name: "Dota Underlords", platform: "pc" },
+    { id: 44, name: "FIFA 26", platform: "ps5" },
+  ];
+
+  test("a global game the branch does not have is offered, case and spaces ignored", async () => {
+    api.list.mockResolvedValue({ data: global });
+    await mount({ branchGames: [] });
+    await typeName("  dOTA   2");
+    await settle();
+
+    expect(api.list).toHaveBeenCalledTimes(1);
+    expect(suggestedNames()).toEqual(["Dota 2"]);
+    expect(document.querySelector(".game-suggest__row--exact")?.textContent).toContain("Dota 2");
+  });
+
+  test("only the selected platform is suggested", async () => {
+    api.list.mockResolvedValue({ data: global });
+    await mount();
+    await typeName("dota");
+    await settle();
+    expect(suggestedNames()).toEqual(["Dota 2", "Dota Underlords"]);
+
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "PS5" })); });
+    expect(suggestedNames()).toEqual(["Dota 2"]);
+  });
+
+  test("one character suggests nothing; the list is read once, not per keystroke", async () => {
+    api.list.mockResolvedValue({ data: global });
+    await mount();
+    await typeName("d");
+    await settle();
+    expect(suggestList()).toBeNull();
+    await typeName("do");
+    await typeName("dot");
+    await settle();
+
+    expect(suggestedNames()).toEqual(["Dota 2", "Dota Underlords"]);
+    expect(api.list).toHaveBeenCalledTimes(1);
+  });
+
+  test("a game already in the branch is marked", async () => {
+    api.list.mockResolvedValue({ data: global });
+    await mount({ branchGames: [global[2]] });
+    await typeName("dota");
+    await settle();
+
+    const rows = Array.from(document.querySelectorAll(".game-suggest__row"));
+    expect(rows[0].textContent).not.toContain("game.suggest.inBranch");
+    expect(rows[1].textContent).toContain("game.suggest.inBranch");
+  });
+
+  test("Use existing on a suggestion links THAT game once and hands it back", async () => {
+    api.list.mockResolvedValue({ data: global });
+    const linked: IGameApi = { id: 43, name: "Dota Underlords", platform: "pc" };
+    let release: (v: unknown) => void = () => {};
+    api.create.mockImplementationOnce(() => new Promise((r) => { release = r; }));
+    await mount();
+    await typeName("underlords");
+    await settle();
+    const use = screen.getByRole("button", { name: "game.suggest.useNamed" });
+    await act(async () => { fireEvent.click(use); fireEvent.click(use); });
+    await act(async () => { release({ games: linked, existing: true }); });
+
+    expect(api.create).toHaveBeenCalledTimes(1);
+    expect(api.create.mock.calls[0][0]).toEqual({ name: "Dota Underlords", platform: "pc", branch_id: 7, use_existing: true });
+    expect(onSaved).toHaveBeenCalledTimes(1);
+    expect(onSaved).toHaveBeenCalledWith(linked);
+  });
+
+  test("the admin catalogue (no branch) returns the suggested row without a request", async () => {
+    await mount({ branchId: undefined, globalCatalogue: global });
+    await typeName("fifa");
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "PS5" })); });
+    await settle();
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "game.suggest.useNamed" })); });
+
+    expect(api.list).not.toHaveBeenCalled();
+    expect(api.create).not.toHaveBeenCalled();
+    expect(onSaved).toHaveBeenCalledWith(global[3]);
+  });
+
+  test("editing a game suggests nothing and reads nothing", async () => {
+    await mount({ initial: { id: 43, name: "Dota Underlords", platform: "pc" } });
+    await typeName("Dota 2");
+    await settle();
+
+    expect(suggestList()).toBeNull();
+    expect(api.list).not.toHaveBeenCalled();
+    expect(api.prices).not.toHaveBeenCalled();
+  });
+
+  test("the global list failing to load leaves a form that still saves", async () => {
+    api.list.mockRejectedValue(Object.assign(new Error("down"), { status: 500 }));
+    api.create.mockResolvedValueOnce({ games: { id: 60, name: "Dota 2", platform: "pc" } });
+    await mount();
+    await typeName("Dota 2");
+    await settle();
+    expect(suggestList()).toBeNull();
+    await submit();
+
+    expect(api.create).toHaveBeenCalledWith({ name: "Dota 2", platform: "pc", branch_id: 7 });
+    expect(onSaved).toHaveBeenCalledTimes(1);
+  });
+
+  test("a caller still loading the catalogue (null) gets no second request", async () => {
+    await mount({ globalCatalogue: null, lockedPlatform: "billiards" });
+    await typeName("Cue");
+    await settle();
+    expect(api.list).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * The branch's own custom platforms (billiards, poker, …) used to be
+ * invisible here: only PC / PS4 / PS5 + Other. They are quick buttons now,
+ * named as the branch named them.
+ */
+describe("the branch's custom platforms", () => {
+  const price = (platform: string, names: [string, string, string]) => ({
+    id: 1, branch_id: 7, platform, name_en: names[0], name_ru: names[1], name_am: names[2], name: names[0],
+  });
+
+  test("come from the branch's platform prices and its games, with their names", async () => {
+    api.prices.mockResolvedValue({ data: [price("billiards", ["Pool table", "Бильярд", "Բիլյարդ"])] });
+    await mount({ branchGames: [{ id: 5, name: "Texas", platform: "poker" }, { id: 6, name: "Quake", platform: "pc" }] });
+
+    expect(api.prices).toHaveBeenCalledWith(7);
+    expect(screen.getByRole("button", { name: "Pool table" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Poker" })).toBeTruthy();
+    expect(screen.getAllByRole("button", { name: "PC" })).toHaveLength(1);
+  });
+
+  test("picking one sets its slug, filters suggestions by it and is what Save sends", async () => {
+    api.prices.mockResolvedValue({ data: [price("billiards", ["Pool table", "Бильярд", "Բիլյարդ"])] });
+    api.list.mockResolvedValue({ data: [
+      { id: 70, name: "Snooker", platform: "billiards" },
+      { id: 71, name: "Snooker", platform: "pc" },
+    ] });
+    api.create.mockResolvedValueOnce({ games: { id: 72, name: "Snooker Pro", platform: "billiards" } });
+    await mount({ branchGames: [] });
+    const button = screen.getByRole("button", { name: "Pool table" });
+    await act(async () => { fireEvent.click(button); });
+    await typeName("snooker");
+    await settle();
+
+    expect(button.getAttribute("aria-pressed")).toBe("true");
+    expect(screen.queryByPlaceholderText("platform.customPlaceholder")).toBeNull();
+    expect(Array.from(document.querySelectorAll(".game-suggest__meta")).map((n) => n.textContent)).toEqual(["Billiards"]);
+
+    await typeName("Snooker Pro");
+    await submit();
+    expect(api.create).toHaveBeenCalledWith({ name: "Snooker Pro", platform: "billiards", branch_id: 7 });
+  });
+
+  test("without a branch (admin) they are the custom platforms of the global catalogue", async () => {
+    await mount({
+      branchId: undefined,
+      globalCatalogue: [{ id: 1, name: "Texas", platform: "poker" }, { id: 2, name: "Quake", platform: "pc" }],
+    });
+
+    expect(api.prices).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "Poker" })).toBeTruthy();
+  });
+
+  test("a locked platform shows no picker and reads no prices", async () => {
+    await mount({ lockedPlatform: "billiards" });
+    expect(api.prices).not.toHaveBeenCalled();
+    expect(screen.queryByRole("button", { name: "PC" })).toBeNull();
   });
 });

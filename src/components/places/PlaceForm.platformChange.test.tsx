@@ -170,3 +170,22 @@ describe("creating a game from the place form", () => {
     expect(screen.queryByRole("button", { name: "place.createGame" })).toBeNull();
   });
 });
+
+/**
+ * PlatformPicker gained opt-in custom-platform buttons for GameForm. PlaceForm
+ * does not opt in: its picker stays the known row + "Other", and the branch's
+ * custom platforms keep coming through its own naming field.
+ */
+describe("the place form's platform picker", () => {
+  test("is PC / PS4 / PS5 / Other only, even when the branch prices a custom platform", async () => {
+    const billiards = {
+      id: 3, branch_id: 7, platform: "billiards", name_en: "Pool table", name_ru: "Бильярд", name_am: "Բիլյարդ", name: "Pool table",
+    } as IBranchPlatformPrice;
+    await mount(place(), [billiards]);
+
+    const row = screen.getByRole("button", { name: "PS5" }).parentElement!;
+    expect([...row.querySelectorAll("button")].map((b) => b.textContent)).toEqual(["PC", "PS4", "PS5", "platform.other"]);
+    expect(screen.queryByRole("button", { name: "Pool table" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Бильярд" })).toBeNull();
+  });
+});

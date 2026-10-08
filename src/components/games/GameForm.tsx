@@ -1,6 +1,8 @@
 import Button from "@/components/ui/Button";
 import { formatApiError } from "@/api/errors";
 import { existingGameOf, type ExistingGame } from "@/api/gameExists";
+import GameSuggestions from "@/components/games/GameSuggestions";
+import { useGameFormSources } from "@/components/games/useGameFormSources";
 import Modal from "@/components/ui/Modal";
 import Input from "@/components/ui/Input";
 import PlatformPicker from "@/components/ui/PlatformPicker";
@@ -9,9 +11,13 @@ import { renderText, textLiteral, type LocalizedText } from "@/i18n/localizedTex
 import { fmt } from "@/i18n/translations";
 import { gameRepository } from "@/repositories/GameRepository";
 import { IGameApi } from "@/api/games";
-import { findExistingGame } from "@/utils/gameName";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+import { findExistingGame, suggestGames } from "@/utils/gameName";
 import { platformLabel } from "@/utils/platform";
-import { FormEvent, useRef, useState } from "react";
+import { FormEvent, useMemo, useRef, useState } from "react";
+
+/** Typing pause before the suggestions follow the name (no work per keystroke). */
+const SUGGEST_DEBOUNCE_MS = 200;
 
 interface Props {
   initial?: IGameApi;
@@ -29,11 +35,18 @@ interface Props {
    */
   lockedPlatform?: string;
   /**
-   * The games already loaded on the calling screen. Lets the form spot an
-   * obvious duplicate before the request — advice only; the server's 422
-   * `game_exists` is what decides.
+   * The GLOBAL games catalogue when the calling screen already holds it
+   * (admin GamesList, PlaceForm), so the form does not read it twice. Left
+   * out, a create form reads it once itself; `null` = the caller is still
+   * loading it. Feeds the live suggestions and the pre-Save duplicate check
+   * (advice only: the server's 422 `game_exists` is what decides).
    */
-  catalogue?: readonly IGameApi[];
+  globalCatalogue?: readonly IGameApi[] | null;
+  /**
+   * THIS branch's games (BranchGames). Marks a suggestion "already in this
+   * branch" and contributes the branch's custom platforms to the picker.
+   */
+  branchGames?: readonly IGameApi[];
   onClose: () => void;
   /**
    * Called after a successful save. Receives the saved row when the backend
@@ -44,7 +57,7 @@ interface Props {
   onSaved: (game?: IGameApi | null) => void;
 }
 
-const GameForm = ({ initial, branchId, lockedPlatform, catalogue, onClose, onSaved }: Props) => {
+const GameForm = ({ initial, branchId, lockedPlatform, globalCatalogue, branchGames, onClose, onSaved }: Props) => {
   const { t } = useLang();
   const [name, setName] = useState(initial?.name ?? "");
   const [platform, setPlatform] = useState<string>(initial?.platform ?? lockedPlatform ?? "pc");
@@ -59,6 +72,22 @@ const GameForm = ({ initial, branchId, lockedPlatform, catalogue, onClose, onSav
   const isEdit = !!initial;
   const platformFixed = lockedPlatform !== undefined;
   const hasPlatform = platform.trim() !== "";
+  const { catalogue, inBranch, customPlatforms } = useGameFormSources({
+    creating: !isEdit,
+    pickerShown: !isEdit && !platformFixed,
+    branchId,
+    globalCatalogue,
+    branchGames,
+  });
+  const typed = useDebouncedValue(name, SUGGEST_DEBOUNCE_MS);
+  const suggestions = useMemo(
+    () => (isEdit ? [] : suggestGames(catalogue, typed, platform)),
+    [isEdit, catalogue, typed, platform],
+  );
+  const exactId = useMemo(
+    () => (isEdit ? null : findExistingGame(catalogue, typed, platform)?.id ?? null),
+    [isEdit, catalogue, typed, platform],
+  );
 
   const run = async (work: () => Promise<void>) => {
     if (inFlight.current) return;
@@ -92,15 +121,20 @@ const GameForm = ({ initial, branchId, lockedPlatform, catalogue, onClose, onSav
     });
   };
 
-  const chooseExisting = () => {
-    const game = conflict;
-    if (!game) return;
+  /**
+   * "Use existing", from the duplicate notice or a suggestion row: one path.
+   * The body carries THAT game's exact name and platform (not what was typed),
+   * so the server's lookup finds the very row the operator picked. Linking is
+   * idempotent on the server, so a game already in the branch is sent too:
+   * the branch list on screen may be stale, the server is not.
+   */
+  const takeExisting = (game: ExistingGame) => {
     void run(async () => {
       // The global catalogue (admin, no branch): the game is already there and
       // there is nothing to link it to — the answer is simply that row.
       if (branchId === undefined) { onSaved(game); return; }
       try {
-        const linked = await gameRepository.create({ name, platform, branch_id: branchId, use_existing: true });
+        const linked = await gameRepository.create({ name: game.name, platform: game.platform, branch_id: branchId, use_existing: true });
         onSaved(linked ?? game);
       } catch (ex) {
         // A second `game_exists` means a backend that does not know
@@ -119,9 +153,12 @@ const GameForm = ({ initial, branchId, lockedPlatform, catalogue, onClose, onSav
 
   return (
     <Modal open onClose={onClose}>
-      <form className="card" style={{ width: 380, maxWidth: "90vw", display: "flex", flexDirection: "column", gap: 12 }} onSubmit={submit}>
+      <form className="card" style={{ width: 440, maxWidth: "90vw", display: "flex", flexDirection: "column", gap: 12 }} onSubmit={submit}>
         <h2 style={{ margin: 0 }}>{isEdit ? t("game.titleEdit") : t("game.titleNew")}</h2>
-        <Input label={t("label.name")} value={name} onChange={(e) => onNameChange(e.target.value)} required autoFocus />
+        <Input label={t("label.name")} value={name} onChange={(e) => onNameChange(e.target.value)} required autoFocus autoComplete="off" />
+        {!conflict && (
+          <GameSuggestions games={suggestions} inBranch={inBranch} exactId={exactId} busy={busy} onUse={takeExisting} />
+        )}
         <div className="col" style={{ gap: 6 }}>
           <span className="label">{t("label.platform")}</span>
           {platformFixed ? (
@@ -129,7 +166,13 @@ const GameForm = ({ initial, branchId, lockedPlatform, catalogue, onClose, onSav
               {hasPlatform ? platformLabel(platform) : "-"}
             </div>
           ) : (
-            <PlatformPicker value={platform} onChange={setPlatform} disabled={isEdit} />
+            <PlatformPicker
+              value={platform}
+              onChange={setPlatform}
+              disabled={isEdit}
+              customOptions={customPlatforms}
+              suggestions={customPlatforms.map((o) => o.slug)}
+            />
           )}
           {isEdit && <span className="muted" style={{ fontSize: 11 }}>{t("game.platformLocked")}</span>}
         </div>
@@ -138,7 +181,7 @@ const GameForm = ({ initial, branchId, lockedPlatform, catalogue, onClose, onSav
             <span>{fmt(t("game.exists.notice"), conflict.name, platformLabel(conflict.platform))}</span>
             <div className="row" style={{ gap: 8, justifyContent: "flex-end", flexWrap: "wrap" }}>
               <Button type="button" variant="secondary" onClick={() => setConflict(null)} disabled={busy}>{t("action.cancel")}</Button>
-              <Button type="button" onClick={chooseExisting} disabled={busy}>{t("game.exists.useExisting")}</Button>
+              <Button type="button" onClick={() => takeExisting(conflict)} disabled={busy}>{t("game.exists.useExisting")}</Button>
             </div>
           </div>
         )}

@@ -60,7 +60,7 @@ const GamesList = () => {
       </StateSwitch>
       {creating && (
         <GameForm
-          catalogue={data ?? []}
+          globalCatalogue={data}
           onClose={() => setCreating(false)}
           onSaved={(game) => { setCreating(false); setFocusId(game?.id ?? null); void reload(); }}
         />

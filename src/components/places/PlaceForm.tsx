@@ -1368,7 +1368,7 @@ const PlaceForm = ({ branchId, initial, platformSuggestions, platformPrices, onC
         <GameForm
           branchId={branchId}
           lockedPlatform={platform}
-          catalogue={games.data ?? []}
+          globalCatalogue={games.data}
           onClose={() => setGameCreating(false)}
           onSaved={(game) => {
             setGameCreating(false);

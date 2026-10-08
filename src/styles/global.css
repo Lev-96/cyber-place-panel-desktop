@@ -1261,6 +1261,73 @@ input[type="time"]::-webkit-datetime-edit-field:focus {
   font-size: 12px;
 }
 
+/* ── GameForm: existing games matching the typed name ──────────────────
+   In the modal's flow, under the name field: a floating popup would cover the
+   platform row the list is filtered by. The exact match (the row Save would
+   flag as a duplicate) carries the primary edge, like `.list-item--focus`. */
+.game-suggest {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-surface-alt);
+}
+.game-suggest__title {
+  color: var(--color-muted);
+  font-size: 12px;
+}
+.game-suggest__list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.game-suggest__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 4px 4px 12px;
+  border-left: 2px solid transparent;
+  border-radius: 8px;
+}
+.game-suggest__row--exact {
+  border-left-color: var(--color-primary);
+  background: color-mix(in srgb, var(--color-primary) 8%, transparent);
+}
+/* The name takes the slack and truncates; platform, badge and button keep
+   their width so a long Armenian badge never pushes the button out. */
+.game-suggest__name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+.game-suggest__meta {
+  flex-shrink: 0;
+  color: var(--color-muted);
+  font-size: 12px;
+}
+.game-suggest__badge {
+  flex-shrink: 0;
+  margin-left: 0;
+  white-space: nowrap;
+}
+.game-suggest__use {
+  flex-shrink: 0;
+  padding: 4px 12px;
+  font-size: 12px;
+}
+.game-suggest__use:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
 /* ── Branch rows (`BranchListRow`) ───────────────────────────────────────
    A `.list-item` with four flex items: logo, text, pills, "Open". Only the
    text block gives way when the row narrows: it takes the free width, may

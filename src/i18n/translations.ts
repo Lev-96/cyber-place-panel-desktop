@@ -1839,6 +1839,10 @@ export const TRANSLATIONS: Dict = {
   // A duplicate the server refused (422 `game_exists`): asked, not failed.
   "game.exists.notice": { en: "The game “{0}” already exists on {1}. Use it?", ru: "Игра «{0}» уже есть на {1}. Использовать её?", am: "«{0}» խաղն արդեն կա {1} հարթակում։ Օգտագործե՞լ այն։" },
   "game.exists.useExisting": { en: "Use existing", ru: "Использовать", am: "Օգտագործել" },
+  // Live suggestions under the name of a new game (GameSuggestions).
+  "game.suggest.title": { en: "Already in the catalogue", ru: "Уже есть в каталоге", am: "Արդեն կա կատալոգում" },
+  "game.suggest.inBranch": { en: "In this branch", ru: "Уже в филиале", am: "Արդեն մասնաճյուղում է" },
+  "game.suggest.useNamed": { en: "Use existing “{0}” on {1}", ru: "Использовать «{0}» на {1}", am: "Օգտագործել «{0}» խաղը {1} հարթակում" },
 
   // Tariff (TimePackage) form
   "tariff.titleNew": { en: "New tariff", ru: "Новый тариф", am: "Նոր սակագին" },

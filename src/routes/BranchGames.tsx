@@ -72,7 +72,7 @@ const BranchGames = () => {
           ))}
         </div>
       </StateSwitch>
-      {creating && <GameForm branchId={id} catalogue={data ?? []} onClose={() => setCreating(false)} onSaved={() => { setCreating(false); void reload(); }} />}
+      {creating && <GameForm branchId={id} branchGames={data ?? undefined} onClose={() => setCreating(false)} onSaved={() => { setCreating(false); void reload(); }} />}
       {editing && <GameForm initial={editing} branchId={id} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); void reload(); }} />}
     </ScreenWithBg>
   );
