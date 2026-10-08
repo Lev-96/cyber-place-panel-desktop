@@ -2242,16 +2242,21 @@ they did, and TypeScript caught it as a duplicate object property.
   did not pass `globalCatalogue` (GamesList and PlaceForm pass theirs;
   `null` = still loading, no second read). BranchGames passes `branchGames`.
   A failed read only removes the suggestions; Save works as before.
-- **The branch's custom platforms are quick buttons in GameForm.**
+- **The branch's custom platforms are quick buttons in GameForm AND PlaceForm.**
   `PlatformPicker`'s opt-in `customOptions: {slug,label}[]` draws them between
   PS5 and Other (a value equal to one starts on its button, not on Other).
   Sources, scoped like their data: with a branch,
   `platformPriceRepository.listByBranch` + the branch games' custom slugs,
-  named via `platformDisplayNameOf`; without one (admin), the custom slugs of
-  the global catalogue. Never the global catalogue for an owner: another
-  company's platform must not become a button. PlaceForm does not pass
-  `customOptions`, so its picker is exactly PC / PS4 / PS5 / Other (pinned in
-  `PlaceForm.platformChange.test.tsx`).
+  named via `customPlatformOptions` (`i18n/platformPriceName.ts`, shared);
+  without one (admin), the custom slugs of the global catalogue. Never the
+  global catalogue for an owner: another company's platform must not become a
+  button. PlaceForm (2026-10-08) passes the branch's own: its places'
+  platforms (`platformSuggestions`) + its priced platforms — never the games
+  catalogue's. A custom button goes through `handlePlatformPick` →
+  `handlePickExisting` (names in 3 languages + exact slug, so the existing
+  price locks), like picking it from the name suggestions. Pinned in
+  `PlaceForm.platformChange.test.tsx` (buttons, pick, edit pressed, no
+  foreign platform).
 - **`lockedPlatform` locks even when empty.** `lockedPlatform=""` (a place on
   "Other" with no name yet) used to fall through to the picker, so a place form
   could create a game on any platform. Now any defined value hides the picker
