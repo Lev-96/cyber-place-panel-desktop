@@ -2209,6 +2209,54 @@ they did, and TypeScript caught it as a duplicate object property.
 
 ---
 
+## 9.5.11 Custom platforms: games, tariffs, the PS marker (2026-10-08)
+
+- **A duplicate game is a question, not an error.** `POST /games` answers a
+  duplicate (same name, same platform) with 422 + `code: "game_exists"` +
+  `game: {id, name, platform}` (old `message` / `errors.name` kept).
+  `api/gameExists.ts` (`existingGameOf`) reads it; `GameForm` draws an inline
+  notice (`game.exists.notice`, buttons `game.exists.useExisting` /
+  `action.cancel`), never the field line or a red toast:
+  `GameRepository.create` suppresses its error toast for `game_exists` only.
+  "Use existing" resends the same body + `use_existing: true` (success body has
+  `existing: true`, toast `toast.game.linked`); with no `branchId` (admin
+  `GamesList`) there is nothing to link, so it hands back the row with no
+  request and the list marks it (`.list-item--focus`). Callers pass
+  `catalogue` for a pre-check (`utils/gameName.ts`: trim, lower-case, collapse
+  spaces, same platform): advice only, the 422 decides. Double submit is
+  stopped by a ref (`inFlight`), not by `busy`.
+- **`lockedPlatform` locks even when empty.** `lockedPlatform=""` (a place on
+  "Other" with no name yet) used to fall through to the picker, so a place form
+  could create a game on any platform. Now any defined value hides the picker
+  and an empty one disables Save; `PlaceForm` does not offer "+ Create game"
+  until `platform !== ""`.
+- **Changing a place's platform drops the copied rate.** Both rate boxes open
+  with the stored `hourly_rate`, i.e. the OLD platform's figure. `changePlatform`
+  (picker or picking an existing custom platform, NOT name typing) empties them
+  so the new platform's own price applies; typing after the switch is kept;
+  going back to the stored platform restores the stored figure. Same on create.
+- **"(PS)" / the PS badge is the place's platform.** `isPlayStationSeat(pc)`
+  (`utils/platform.ts`): `platformGroup(place.platform) === "ps"`, device kind
+  only when no place is linked. `kind === "ps"` means "no kiosk agent" and is
+  true of a billiards table; it still decides MAC / Wake / pairing token in
+  `PcsList`, and the DEFAULT MODE of `StartSessionDialog` (every billing-only
+  seat — consoles and custom rooms — opens on count-up, PCs on packages; the
+  operators' flow, deliberately unchanged on 2026-10-08). Only the "(PS)"
+  heading follows the place's platform.
+- **Tariffs target any platform slug.** `ITimePackage.platform` and the
+  create/update bodies are `string | null` (null = all). `PackageForm` offers
+  All + pc/ps4/ps5 + the branch's custom platforms from
+  `platformPriceRepository.listByBranch` (passed in by `BranchPricesPage`),
+  named via `platformDisplayNameOf` (`i18n/platformPriceName.ts`); a saved
+  slug the branch no longer prices keeps its own option.
+- **422 `package_platform_mismatch`** on start (and extend, if a UI ever calls
+  `sessionRepository.extend`; none does today) → `api/packagePlatformMismatch.ts`
+  → `session.errors.packagePlatformMismatch` as `LocalizedText`.
+- Tests: `GameForm.test.tsx`, `PlaceForm.platformChange.test.tsx`,
+  `StartSessionDialog.test.tsx` (PS seat / billiards seat / mismatch),
+  `PcsList.psBadge.test.tsx`, `PackageForm.platform.test.tsx`,
+  `api/gameExists.test.ts`, `utils/platform.test.ts`.
+
 ## 10. How work must be done here (MANDATORY — run it in this order)
 
 "100% guaranteed correct" is not achievable as a claim. It is achievable as a
