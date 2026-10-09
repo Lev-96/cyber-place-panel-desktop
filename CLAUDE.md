@@ -1312,6 +1312,14 @@ middleware; `{owner}` resolves only a `company_owner`, anything else is 404).
   person gets an email link and sets their own (backend §8.9.12). Every such
   form shows `staff.inviteHint`. Pinned by `Owners.test.tsx` ("adding"),
   `CompanyForm.test.tsx`, `ManagerForm.test.tsx`.
+- **The company edit may clear its description (2026-10-09).**
+  `buildCompanyForm` drops empty fields, so an emptied description was never
+  sent and the server kept the old text while answering "saved".
+  `apiUpdateCompany` now sends the fields in `CLEARABLE_ON_UPDATE`
+  (`description`) even when empty; every other empty field and the create
+  form are unchanged. The input is capped at 255 (`maxLength`) — the backend
+  column's limit; longer was refused with 422. Pinned by
+  `api/companies.update.test.ts`.
 
 - Transport `src/api/owners.ts` — types mirror `OwnerResource`,
   `DeletionPreviewResource`, `OwnerDeletionResource` and the 409
