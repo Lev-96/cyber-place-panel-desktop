@@ -184,8 +184,9 @@ pos · places · ps5 · sessions · tournaments · revenue · services · scanne
   (`as const satisfies Record<…>`) + `pcHasAgent()` / `isPs()`. Adding a
   case is a one-file edit; a stray literal in a new diff is a bug.
   ⚠️ Do NOT conflate overlapping-but-distinct sets: `PcKind`
-  (`"pc"|"ps"`, a *device*) is not `PlatformType` (`"pc"|"ps4"|"ps5"`, a
-  *place's platform*).
+  (`"pc"|"ps"`, a *device*) is not `PlatformType` (`"pc"|"ps4"|"ps5"`, the
+  three KNOWN platforms). A place's / game's / tariff's `platform` is any
+  slug (`string`): a branch adds custom platforms, see §9.5.11.
 - **Use in-app primitives for dialogs/toasts, never native.** Confirms
   via `useConfirm()`/`ConfirmDialog`, notifications via `notify.*` — a
   native `window.confirm()`/`alert()` poisons renderer focus (see traps).
@@ -2245,8 +2246,8 @@ they did, and TypeScript caught it as a duplicate object property.
 - **The branch's custom platforms are quick buttons in GameForm AND PlaceForm.**
   `PlatformPicker`'s opt-in `customOptions: {slug,label}[]` draws them between
   PS5 and Other (a value equal to one starts on its button, not on Other).
-  Sources, scoped like their data: with a branch,
-  `platformPriceRepository.listByBranch` + the branch games' custom slugs,
+  Sources, scoped like their data: with a branch, `useBranchPlatforms` (its
+  places + price rows, since 2026-10-09) + the branch games' custom slugs,
   named via `customPlatformOptions` (`i18n/platformPriceName.ts`, shared);
   without one (admin), the custom slugs of the global catalogue. Never the
   global catalogue for an owner: another company's platform must not become a
@@ -2279,8 +2280,59 @@ they did, and TypeScript caught it as a duplicate object property.
   create/update bodies are `string | null` (null = all). `PackageForm` offers
   All + pc/ps4/ps5 + the branch's custom platforms from
   `platformPriceRepository.listByBranch` (passed in by `BranchPricesPage`),
-  named via `platformDisplayNameOf` (`i18n/platformPriceName.ts`); a saved
-  slug the branch no longer prices keeps its own option.
+  listed and named via `branchPlatformOptions` (`i18n/platformPriceName.ts`); a
+  saved slug the branch no longer prices keeps its own option (`extra`).
+- **One platform list, one picker (2026-10-09).** Every platform choice draws
+  from `branchPlatformOptions(placeSlugs, prices, lang, extra?)`
+  (`i18n/platformPriceName.ts`) → `{slug,label,known}[]`: pc/ps4/ps5 in
+  canonical order, then the branch's custom slugs (its places + its price rows)
+  sorted by display name with `compareText` (Cyrillic before Latin in ru,
+  Armenian order in am); `extra` keeps a saved slug the branch no longer has;
+  nothing is invented. `customPlatformOptions` is its custom part over exactly
+  the given slugs. Callers that do not hold places + prices use
+  `hooks/useBranchPlatforms.ts` (`useBranchPlatforms` = both reads;
+  `useBranchPlatformNames` = the price rows only, for screens that just LABEL
+  platforms). BranchPlaces / BranchPricesPage already read both and call the
+  pure helper; do not stack the hook on them. Labels: a custom platform is
+  shown by `platformDisplayNameOf` (branch name in the panel language) where
+  prices are at hand — BranchPlaces sections + tiles, SubplatformPricesForm
+  headings, BranchGames, the live floor (`PlaceCell`), the sessions board
+  sections + tiles and its Relocate / Add-time dialogs (the board makes ONE
+  cached read and passes `platformName` down) — else `platformLabel`, never
+  `toUpperCase()` (GamesList). BY DESIGN still known-only: the HourlyRatesForm
+  matrix, `PcForm.filterPlacesForKind`, StartSessionDialog's default mode,
+  PcsList MAC/Wake, PS5 control, joysticks.
+- **The picker is adaptive (`PlatformPicker` + `hooks/useFitsInline.ts`).**
+  One ordered list (known + `customOptions` + Other). It is ONE nowrap row of
+  buttons (`aria-pressed` on every one) when that row fits the width it is
+  given, and a native `select.input` with the same options + `Other…`
+  (`platform.otherOption`) when it does not — 960×600 Electron, the owner web
+  build at 360 px, Armenian labels, 8 custom platforms. Never `flex-wrap` it
+  back: a wrapped row of 8 is the bug this replaced. Fit is MEASURED: a hidden
+  copy of the full row (aria-hidden, inert, `visibility:hidden`, zero-size
+  clipped box, rendered AFTER the real control so DOM-order queries in tests
+  find the real one) vs the container's `clientWidth`, on a ResizeObserver
+  over both boxes + option/language changes; state flips only on change; no
+  RO / zero width → buttons (jsdom). The container is `width:100%;
+  min-width:0; contain:inline-size` so its width never depends on its content
+  — that is what makes the measure loop-free. Other is DERIVED
+  (`userChoseOther || value not listed`), not a mount-time snapshot (that
+  snapshot left a value on Other when its custom button loaded late). A saved
+  slug nobody lists shows as Other+slug in buttons and as its own option in
+  the select, never blank. Mode switches never touch the value or remount the
+  parent. PackageForm keeps its own `select.input` (a tariff has All, never
+  Other) but sources it from `branchPlatformOptions`. Tests:
+  `PlatformPicker.test.tsx`, `useFitsInline.test.tsx`,
+  `useBranchPlatforms.test.tsx`, `platformPriceName.test.ts`.
+- **PlaceForm on an unpriced custom slug** (legacy row, price removed) opens
+  with `names.en = platformLabel(slug)` and Save sends `platform` as held (the
+  slug of the typed English name once anything is typed): it never re-slugs
+  from the name ("a--b" does not round-trip) and Save is not blocked. Its dead
+  `suggestions` pass to the picker is gone (the slug box is hidden there).
+- **A place write invalidates `/branch-platform-prices` and
+  `/branch-subplatforms`** (`httpCache.ts` `MUTATION_FANOUT['/places']`): the
+  place lifecycle creates, renames and drops those rows server-side, and the
+  pickers read them through the 60 s cache.
 - **422 `package_platform_mismatch`** on start (and extend, if a UI ever calls
   `sessionRepository.extend`; none does today) → `api/packagePlatformMismatch.ts`
   → `session.errors.packagePlatformMismatch` as `LocalizedText`.
