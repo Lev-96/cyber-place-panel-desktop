@@ -240,7 +240,9 @@ const CompanyForm = ({ initial, onClose, onSaved }: Props) => {
           required
         />
         <Input label={t("company.website")} value={website} onChange={(e) => setWebsite(e.target.value)} />
-        <Input label={t("label.description")} value={description} onChange={(e) => setDescription(e.target.value)} />
+        {/* 255 = the backend's limit (companies.description is varchar(255)):
+            typing past it could only end in a refused save. */}
+        <Input label={t("label.description")} value={description} onChange={(e) => setDescription(e.target.value)} maxLength={255} />
 
         {isAdmin && (
           <>

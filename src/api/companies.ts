@@ -47,9 +47,12 @@ export const apiGetCompanyById = (id: number) =>
  * Typed as `object` so both CreateCompanyBody and UpdateCompanyBody fit
  * structurally — no `as any` required at the call site.
  */
-const buildCompanyForm = (body: object): FormData => {
+const buildCompanyForm = (body: object, keepEmpty: readonly string[] = []): FormData => {
   const fd = new FormData();
   for (const [k, v] of Object.entries(body)) {
+    // An emptied field the backend may clear is sent as "" (it would otherwise
+    // be dropped and silently keep its old value).
+    if (v === "" && keepEmpty.includes(k)) { fd.append(k, ""); continue; }
     if (v === undefined || v === null || v === "") continue;
     if (v instanceof File) fd.append(k, v);
     else fd.append(k, String(v));
@@ -60,8 +63,15 @@ const buildCompanyForm = (body: object): FormData => {
 export const apiCreateCompany = (body: CreateCompanyBody) =>
   request<{ companies: ICompanyApi; message?: string }>("/company", { method: "POST", body: buildCompanyForm(body) });
 
+/**
+ * Fields an edit may CLEAR (2026-10-09). An emptied description used to be
+ * dropped from the payload, so the server kept the old text and answered
+ * "saved". The backend accepts an empty one (`nullable`) and stores it as "".
+ */
+const CLEARABLE_ON_UPDATE = ["description"] as const;
+
 export const apiUpdateCompany = (id: number, body: UpdateCompanyBody) =>
-  request<{ companies: ICompanyApi; message?: string }>(`/company/${id}?_method=PUT`, { method: "POST", body: buildCompanyForm(body) });
+  request<{ companies: ICompanyApi; message?: string }>(`/company/${id}?_method=PUT`, { method: "POST", body: buildCompanyForm(body, CLEARABLE_ON_UPDATE) });
 
 export const apiDeleteCompany = (id: number) =>
   request<{ message: string }>(`/company/${id}`, { method: "DELETE" });
