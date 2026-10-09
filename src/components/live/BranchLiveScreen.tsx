@@ -3,9 +3,10 @@ import { ErrorState, StaleNotice, StateView } from "@/components/ui/state";
 import CollapsibleSection from "@/components/ui/CollapsibleSection";
 import { formatTime } from "@/i18n/dates";
 import { useLang } from "@/i18n/LanguageContext";
+import { useBranchPlatformNames } from "@/hooks/useBranchPlatforms";
 import { useRealtimeBranch } from "@/hooks/useRealtimeBranch";
 import { useLocalReorder } from "@/hooks/useLocalReorder";
-import { platformGroup, platformLabel } from "@/utils/platform";
+import { platformGroup } from "@/utils/platform";
 import { PlaceSnapshot } from "@/services/realtime/RealtimeService";
 import { DragEvent, useState } from "react";
 import Button from "@/components/ui/Button";
@@ -22,6 +23,8 @@ const sectionKeyOf = (platform: string): string => {
 const BranchLiveScreen = ({ branchId }: { branchId: number }) => {
   const { t } = useLang();
   const { snapshot, error, loading, refresh } = useRealtimeBranch(branchId);
+  // One cached read: custom platforms named as the branch named them.
+  const { nameOf: platformName } = useBranchPlatformNames(branchId);
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [dragSection, setDragSection] = useState<string | null>(null);
   const [dropSection, setDropSection] = useState<string | null>(null);
@@ -41,7 +44,7 @@ const BranchLiveScreen = ({ branchId }: { branchId: number }) => {
   if (loading || !snapshot) return <GridSkeleton cells={8} />;
 
   const sectionLabel = (key: string): string =>
-    key === "pc" ? t("session.groupComputers") : key === "ps" ? t("session.groupPs") : platformLabel(key);
+    key === "pc" ? t("session.groupComputers") : key === "ps" ? t("session.groupPs") : platformName(key);
 
   const toggleGroup = (key: string) =>
     setCollapsed((prev) => {
@@ -104,7 +107,7 @@ const BranchLiveScreen = ({ branchId }: { branchId: number }) => {
                 onDrop={() => onSectionDrop(key)}
               >
                 <div className="live-grid">
-                  {items.map((s) => <PlaceCell key={s.place.id} snapshot={s} />)}
+                  {items.map((s) => <PlaceCell key={s.place.id} snapshot={s} platformName={platformName} />)}
                 </div>
               </CollapsibleSection>
             );

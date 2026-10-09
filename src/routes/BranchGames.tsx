@@ -10,7 +10,7 @@ import { useAsync } from "@/hooks/useAsync";
 import { useConfirm } from "@/components/ui/ConfirmProvider";
 import { useLang } from "@/i18n/LanguageContext";
 import { gameRepository } from "@/repositories/GameRepository";
-import { platformLabel } from "@/utils/platform";
+import { useBranchPlatformNames } from "@/hooks/useBranchPlatforms";
 import { useState } from "react";
 import { useParams } from "react-router-dom";
 
@@ -31,6 +31,8 @@ const BranchGames = () => {
   // services enforce. Owners and managers add games to their own library.
   const canEditCatalog = can(user?.role, "game.crud");
   const { data, loading, error, reload } = useAsync(() => gameRepository.list({ branchId: id }), [id]);
+  // Custom platforms named as the branch named them (one cached read).
+  const { nameOf: platformName } = useBranchPlatformNames(Number.isFinite(id) && id > 0 ? id : undefined);
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState<IGameApi | null>(null);
 
@@ -60,7 +62,7 @@ const BranchGames = () => {
             <div key={g.id} className="list-item">
               <div>
                 <div className="name">{g.name}</div>
-                <div className="meta">{platformLabel(g.platform)}</div>
+                <div className="meta">{platformName(g.platform)}</div>
               </div>
               {canEditCatalog && (
                 <div className="row" style={{ gap: 6 }}>

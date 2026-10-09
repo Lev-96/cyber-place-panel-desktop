@@ -13,11 +13,11 @@ import { useReservedPlaceIds } from "@/hooks/useReservedPlaceIds";
 import { useConfirm } from "@/components/ui/ConfirmProvider";
 import { useLang } from "@/i18n/LanguageContext";
 import { fmt } from "@/i18n/translations";
-import { platformPriceNameOf } from "@/i18n/platformPriceName";
+import { platformDisplayNameOf, platformPriceNameOf } from "@/i18n/platformPriceName";
 import { placeRepository } from "@/repositories/PlaceRepository";
 import { platformPriceRepository } from "@/repositories/PlatformPriceRepository";
 import { IBranchPlace } from "@/types/api";
-import { platformGroup, platformLabel } from "@/utils/platform";
+import { platformGroup } from "@/utils/platform";
 import { DragEvent, useState } from "react";
 import { useParams } from "react-router-dom";
 
@@ -89,8 +89,11 @@ const BranchPlaces = () => {
 
   if (!Number.isFinite(id) || id <= 0) return <div className="error">{t("hub.invalidId")}</div>;
 
+  // A custom platform is named as the branch named it, in the panel language
+  // (its price row), falling back to the de-slugged slug.
+  const platformName = (slug: string): string => platformDisplayNameOf(slug, platformPrices.data ?? undefined, lang);
   const sectionLabel = (key: string): string =>
-    key === "pc" ? t("session.groupComputers") : key === "ps" ? t("session.groupPs") : platformLabel(key);
+    key === "pc" ? t("session.groupComputers") : key === "ps" ? t("session.groupPs") : platformName(key);
 
   const toggleGroup = (key: string) =>
     setCollapsed((prev) => {
@@ -188,7 +191,7 @@ const BranchPlaces = () => {
         >
           ⠿
         </span>
-        <span className="platform" style={{ marginLeft: 18 }}>{platformLabel(p.platform)} · {p.type}</span>
+        <span className="platform" style={{ marginLeft: 18 }}>{platformName(p.platform)} · {p.type}</span>
         <span className="id">№{p.number ?? p.id}</span>
         <span className="status" style={{ color: tone }}>{statusLabel}</span>
         <span className="until">{p.games?.length ?? 0} {t("branchPlaces.games")}</span>

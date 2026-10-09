@@ -5,11 +5,10 @@ import Input from "@/components/ui/Input";
 import PriceInput from "@/components/ui/PriceInput";
 import TimeInput from "@/components/ui/TimeInput";
 import { useLang } from "@/i18n/LanguageContext";
-import { platformDisplayNameOf } from "@/i18n/platformPriceName";
+import { branchPlatformOptions } from "@/i18n/platformPriceName";
 import { timePackageRepository } from "@/repositories/TimePackageRepository";
 import { IBranchPlatformPrice } from "@/types/api";
 import { ITimePackage } from "@/types/sessions";
-import { KNOWN_PLATFORMS } from "@/utils/platform";
 import { FormEvent, useState } from "react";
 
 interface Props {
@@ -57,14 +56,13 @@ const PackageForm = ({ branchId, initial, platformPrices, onClose, onSaved }: Pr
   // Platform = "" means "applies to all platforms" — backend column
   // is nullable and the empty string maps to NULL on submit.
   const [platform, setPlatform] = useState<string>(initial?.platform ?? "");
-  // Known platforms first, then the branch's custom ones. A package already
-  // saved on a slug the branch no longer prices keeps its own option, so
-  // opening it never silently re-targets it.
-  const platformOptions = Array.from(new Set([
-    ...KNOWN_PLATFORMS,
-    ...(platformPrices ?? []).map((p) => p.platform),
-    ...(initial?.platform ? [initial.platform] : []),
-  ]));
+  // The panel's one platform list (`branchPlatformOptions`): known platforms
+  // first, then the branch's custom ones by name. A package already saved on
+  // a slug the branch no longer prices keeps its own option (`extra`), so
+  // opening it never silently re-targets it. A select rather than the button
+  // picker on purpose: a tariff targets an EXISTING platform or all of them,
+  // never a new one, so there is no "Other" to offer.
+  const platformOptions = branchPlatformOptions([], platformPrices, lang, initial?.platform);
 
   // Discount sub-form. Collapsed by default unless the package being
   // edited already carries a configured discount — staff can leave it
@@ -197,8 +195,8 @@ const PackageForm = ({ branchId, initial, platformPrices, onClose, onSaved }: Pr
             onChange={(e) => setPlatform(e.target.value)}
           >
             <option value="">{t("tariff.platformAll")}</option>
-            {platformOptions.map((p) => (
-              <option key={p} value={p}>{platformDisplayNameOf(p, platformPrices, lang)}</option>
+            {platformOptions.map((o) => (
+              <option key={o.slug} value={o.slug}>{o.label}</option>
             ))}
           </select>
         </div>

@@ -2,8 +2,15 @@ import { useLang } from "@/i18n/LanguageContext";
 import { PlaceStatusColors } from "@/domain/PlaceStatus";
 import { PlaceSnapshot } from "@/services/realtime/RealtimeService";
 import { formatTime } from "@/i18n/dates";
+import { platformLabel } from "@/utils/platform";
 
-const PlaceCell = ({ snapshot }: { snapshot: PlaceSnapshot }) => {
+interface Props {
+  snapshot: PlaceSnapshot;
+  /** The platform's display name (the branch's own for a custom one); defaults to its label. */
+  platformName?: (slug: string) => string;
+}
+
+const PlaceCell = ({ snapshot, platformName = platformLabel }: Props) => {
   const { t } = useLang();
   const { place, status, bookings } = snapshot;
   const color = PlaceStatusColors[status];
@@ -11,7 +18,7 @@ const PlaceCell = ({ snapshot }: { snapshot: PlaceSnapshot }) => {
   return (
     <div className="place-cell" style={{ borderColor: color }}>
       <span className="dot" style={{ background: color }} />
-      <span className="platform">{place.platform.toUpperCase()} · {place.type}</span>
+      <span className="platform">{platformName(place.platform)} · {place.type}</span>
       <span className="id">№{place.number ?? place.id}</span>
       <span className="status" style={{ color }}>{t(`place.${status}`)}</span>
       {top && (

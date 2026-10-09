@@ -9,6 +9,7 @@ import { ErrorState, StaleNotice, StateView } from "@/components/ui/state";
 import { reconcileOrder } from "./tileOrder";
 import JoystickIcon from "@/components/ui/JoystickIcon";
 import { useAsync } from "@/hooks/useAsync";
+import { useBranchPlatformNames } from "@/hooks/useBranchPlatforms";
 import { useKeyedBusy } from "@/hooks/useKeyedBusy";
 import { useLocalReorder } from "@/hooks/useLocalReorder";
 import { useReservedPlaceIds } from "@/hooks/useReservedPlaceIds";
@@ -25,7 +26,7 @@ import {
   resolveSessionCellState,
   SESSION_CELL_COLOR,
 } from "@/domain/SessionCellState";
-import { platformGroup, platformLabel } from "@/utils/platform";
+import { platformGroup } from "@/utils/platform";
 import { usePs5Control } from "@/ps5/Ps5ControlProvider";
 import { useRealtimeResync } from "@/realtime/useRealtimeResync";
 import { PS5_STATE_LOOK } from "@/ps5/stateLook";
@@ -70,6 +71,10 @@ const SessionsBoard = ({ branchId }: Props) => {
   const { user } = useAuth();
   const role = user?.role;
   const pcs = useAsync(() => sessionRepository.listPcs(branchId), [branchId]);
+  // Custom platforms named as the branch named them, in the panel language.
+  // ONE cached read for the board and every dialog it opens (passed down), and
+  // best effort: until it lands, or if it fails, names fall back to the slug.
+  const { nameOf: platformName } = useBranchPlatformNames(branchId);
   const sessions = useAsync(() => sessionRepository.listActive(branchId), [branchId]);
   const [startTarget, setStartTarget] = useState<IPcApi | null>(null);
   const [stopTarget, setStopTarget] = useState<ISessionApi | null>(null);
@@ -549,7 +554,7 @@ const SessionsBoard = ({ branchId }: Props) => {
   const sectionKeys = sectionReorder.ordered;
 
   const sectionLabel = (key: string): string =>
-    key === "pc" ? t("session.groupComputers") : key === "ps" ? t("session.groupPs") : platformLabel(key);
+    key === "pc" ? t("session.groupComputers") : key === "ps" ? t("session.groupPs") : platformName(key);
 
   const toggleGroup = (key: string) =>
     setCollapsed((prev) => {
@@ -670,7 +675,7 @@ const SessionsBoard = ({ branchId }: Props) => {
     // ("is this the VIP one?"), and a long custom platform — "Table Tennis" —
     // would otherwise eat the ellipsis and take the tier down with it. The
     // platform shrinks; the tier never does.
-    const platformName = pc.place ? platformLabel(pc.place.platform) : "";
+    const seatPlatformName = pc.place ? platformName(pc.place.platform) : "";
     const tierName = pc.place ? pc.place.type : "";
     // ⚠️ The NUMBER leads, always, and it is the same value the player is
     // given on their phone.
@@ -755,7 +760,7 @@ const SessionsBoard = ({ branchId }: Props) => {
           {/* Nested so the platform is the only thing that can shrink, and the
               4px gap reads as the single space in "PS5 · VIP". */}
           <span style={{ display: "flex", alignItems: "baseline", gap: 4, minWidth: 0 }}>
-            <span className="cell-line" title={platformName || undefined}>{platformName || "\u00A0"}</span>
+            <span className="cell-line" title={seatPlatformName || undefined}>{seatPlatformName || "\u00A0"}</span>
             {tierName && <span style={{ flexShrink: 0 }}>· {tierName}</span>}
           </span>
         </span>
@@ -1398,6 +1403,7 @@ const SessionsBoard = ({ branchId }: Props) => {
         <SessionOptionsDialog
           session={optionsTarget}
           platform={(pcs.data ?? []).find((pc) => pc.id === optionsTarget.pc_id)?.place?.platform}
+          platformName={platformName}
           onClose={() => { setOptionsTarget(null); void sessions.reload(); }}
           // The server's answer replaces the dialog's copy AND the board's row,
           // so the tile behind the dialog is never a version behind it.
@@ -1413,6 +1419,7 @@ const SessionsBoard = ({ branchId }: Props) => {
       {relocateTarget && (
         <RelocateSessionDialog
           session={relocateTarget}
+          platformName={platformName}
           onClose={() => { setRelocateTarget(null); void sessions.reload(); }}
           onMoved={(updated, from) => {
             consolesFollowMove(from.pcId, updated.pc_id);

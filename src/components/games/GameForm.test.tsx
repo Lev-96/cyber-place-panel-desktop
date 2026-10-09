@@ -17,7 +17,7 @@ import type { IGameApi } from "@/api/games";
  * toast it raises — or must not raise — is part of what is pinned.
  */
 
-const api = vi.hoisted(() => ({ create: vi.fn(), list: vi.fn(), prices: vi.fn() }));
+const api = vi.hoisted(() => ({ create: vi.fn(), list: vi.fn(), prices: vi.fn(), places: vi.fn() }));
 const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }));
 
 vi.mock("@/api/games", () => ({
@@ -30,6 +30,8 @@ vi.mock("@/api/platformPrices", () => ({
   apiListPlatformPrices: (...a: unknown[]) => api.prices(...a),
   apiUpdatePlatformPrice: vi.fn(),
 }));
+// The branch's places name its platforms too (useBranchPlatforms).
+vi.mock("@/api/places", () => ({ apiGetPlaces: (...a: unknown[]) => api.places(...a) }));
 vi.mock("@/ui/notify", () => ({
   notify: { success: (...a: unknown[]) => toast.success(...a), error: (...a: unknown[]) => toast.error(...a) },
   withToast: <T,>(_e: string, _a: string, fn: () => Promise<T>) => fn(),
@@ -78,6 +80,7 @@ beforeEach(() => {
   api.create.mockReset();
   api.list.mockReset().mockResolvedValue({ data: [] });
   api.prices.mockReset().mockResolvedValue({ data: [] });
+  api.places.mockReset().mockResolvedValue({ data: [] });
   toast.success.mockReset();
   toast.error.mockReset();
   onSaved = vi.fn<(game?: IGameApi | null) => void>();
@@ -393,6 +396,17 @@ describe("the branch's custom platforms", () => {
     expect(api.create).toHaveBeenCalledWith({ name: "Snooker Pro", platform: "billiards", branch_id: 7 });
   });
 
+  // The same list PlaceForm offers: a platform a place already runs on is a
+  // button even before it has a price row or a game.
+  test("a platform only the branch's places use is a button too", async () => {
+    api.places.mockResolvedValue({ data: [{ id: 3, platform: "air-hockey" }, { id: 4, platform: "pc" }] });
+    await mount({ branchGames: [] });
+
+    expect(api.places.mock.calls[0][0]).toMatchObject({ branch_id: 7 });
+    expect(screen.getByRole("button", { name: "Air Hockey" })).toBeTruthy();
+    expect(screen.getAllByRole("button", { name: "PC" })).toHaveLength(1);
+  });
+
   test("without a branch (admin) they are the custom platforms of the global catalogue", async () => {
     await mount({
       branchId: undefined,
@@ -400,6 +414,7 @@ describe("the branch's custom platforms", () => {
     });
 
     expect(api.prices).not.toHaveBeenCalled();
+    expect(api.places).not.toHaveBeenCalled();
     expect(screen.getByRole("button", { name: "Poker" })).toBeTruthy();
   });
 

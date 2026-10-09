@@ -1885,6 +1885,9 @@ export const TRANSLATIONS: Dict = {
   "place.hourlyRate": { en: "Price per hour", ru: "Цена за час", am: "Մեկ ժամի գինը" },
   "place.customPlatformNote": { en: "Custom platform. Set its own price per hour (no branch tariff matrix).", ru: "Кастомная платформа. Задайте свою цену за час (без тарифной матрицы филиала).", am: "Հատուկ հարթակ։ Սահմանեք սեփական ժամային գինը (առանց մասնաճյուղի սակագների)։" },
   "platform.other": { en: "Other", ru: "Другое", am: "Այլ" },
+  // The "Other" entry of the compact (select) platform picker: it opens a new
+  // platform's name, so it reads as an action, not as a platform called Other.
+  "platform.otherOption": { en: "Other…", ru: "Другое…", am: "Այլ…" },
   "platform.customPlaceholder": { en: "e.g. table-tennis, poker, vr", ru: "напр. table-tennis, poker, vr", am: "օր. table-tennis, poker, vr" },
   "place.gamesAvailable": { en: "Games available on this place", ru: "Доступные игры на этом месте", am: "Հասանելի խաղեր այս տեղում" },
   "place.noGamesPlatform": { en: "No games for", ru: "Нет игр для", am: "Խաղեր չկան՝" },

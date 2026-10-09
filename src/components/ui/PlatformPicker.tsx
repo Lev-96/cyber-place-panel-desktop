@@ -1,8 +1,9 @@
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
+import { useFitsInline } from "@/hooks/useFitsInline";
 import { useLang } from "@/i18n/LanguageContext";
 import { KNOWN_PLATFORMS, isKnownPlatform, platformLabel, slugifyPlatform } from "@/utils/platform";
-import { useId, useState } from "react";
+import { useId, useMemo, useState } from "react";
 
 /** A platform offered as a quick button: its slug and the name staff read. */
 export interface PlatformOption {
@@ -15,92 +16,137 @@ interface Props {
   onChange: (platform: string) => void;
   disabled?: boolean;
   /**
-   * Existing custom-platform slugs to autocomplete in "Other" mode. Lets an
-   * operator re-pick a platform they already created (type "t" → "tennis")
-   * instead of re-inventing the slug and fragmenting the catalogue.
+   * Existing custom-platform slugs to autocomplete in the "Other" slug box.
+   * Only meaningful where that box is shown (GameForm); PlaceForm hides it.
    */
   suggestions?: string[];
   /**
-   * Suppress the built-in "Other" slug text input, keeping only the known
-   * buttons + the Other toggle. The parent then owns the custom-platform input
-   * (e.g. PlaceForm's multilingual наименование, from which it derives the
-   * slug). GameForm doesn't pass this, so its behaviour is unchanged.
+   * Suppress the built-in "Other" slug text input, keeping only the options +
+   * the Other choice. The parent then owns the custom-platform input (e.g.
+   * PlaceForm's multilingual наименование, from which it derives the slug).
    */
   hideOtherInput?: boolean;
   /**
-   * Custom platforms that already exist, drawn as quick buttons between PS5
-   * and "Other" (billiards, poker, …), so re-using one is a click instead of
-   * re-typing its slug. Opt-in: GameForm passes it; PlaceForm does not, so
-   * its picker is exactly the known row + "Other".
+   * The branch's custom platforms (billiards, poker, …), offered after PS5 so
+   * re-using one is a click instead of re-typing its slug. Both GameForm and
+   * PlaceForm pass them (`customPlatformOptions`, `i18n/platformPriceName.ts`);
+   * known slugs and duplicates are ignored.
    */
   customOptions?: readonly PlatformOption[];
 }
 
+/** The select's value for "Other": a string no slug can be (slugs start alphanumeric). */
+const OTHER = "-other";
+
 /**
- * Dynamic platform selector shared by PlaceForm and GameForm. The three known
- * platforms are quick buttons; "Other" reveals a slug input so a branch can
- * register a custom platform (table tennis, poker, …). Single source of truth
- * for how a platform is chosen anywhere in the panel — reuse it, don't
- * hand-roll the known-vs-custom toggle per form.
+ * Dynamic platform selector shared by PlaceForm and GameForm — the single
+ * place a platform is chosen in the panel; reuse it, don't hand-roll the
+ * known-vs-custom toggle per form.
+ *
+ * ONE ordered list: PC, PS4, PS5, the branch's custom platforms, then Other
+ * (which reveals a slug box, or hands the naming to the parent). Drawn as one
+ * row of buttons when that row fits on a single line, and as a native select
+ * (`select.input`, the app's select idiom) when it does not — a 960 px window,
+ * the owner web build at 360 px, Armenian labels, eight custom platforms. The
+ * switch is measured (`useFitsInline`), never guessed from a count, and it is
+ * presentation only: the value, the parent and the Other state survive it.
  */
 const PlatformPicker = ({ value, onChange, disabled, suggestions, hideOtherInput, customOptions }: Props) => {
-  const { t } = useLang();
+  const { t, lang } = useLang();
   const listId = useId();
-  // Distinct, sorted custom-platform slugs to offer as autocomplete options.
-  const options = Array.from(new Set((suggestions ?? []).filter((s) => s && !isKnownPlatform(s)))).sort();
-  // "Other" is active when the current value isn't one of the known platforms.
-  // An empty value defaults to the known row so a fresh form starts simple.
-  // A value that is one of the offered custom buttons is shown on its button.
-  const customs = (customOptions ?? []).filter((o) => o.slug && !isKnownPlatform(o.slug));
-  const [otherMode, setOtherMode] = useState<boolean>(
-    value !== "" && !isKnownPlatform(value) && !customs.some((o) => o.slug === value),
-  );
 
-  // A known or an offered custom platform: a button, so never "Other" mode.
-  const pickListed = (p: string) => {
-    setOtherMode(false);
-    onChange(p);
+  const options = useMemo<PlatformOption[]>(() => {
+    const seen = new Set<string>(KNOWN_PLATFORMS);
+    const customs = (customOptions ?? []).filter((o) => {
+      if (!o.slug || seen.has(o.slug)) return false;
+      seen.add(o.slug);
+      return true;
+    });
+    return [...KNOWN_PLATFORMS.map((slug) => ({ slug, label: platformLabel(slug) })), ...customs];
+  }, [customOptions]);
+  const listed = (slug: string) => options.some((o) => o.slug === slug);
+
+  // Other is DERIVED, not snapshotted: the operator chose it, or the value is
+  // a slug the list does not offer. A snapshot taken on mount kept a value on
+  // Other for good when its custom button arrived a moment later (async list).
+  const [userChoseOther, setUserChoseOther] = useState(false);
+  const unlisted = value !== "" && !listed(value);
+  const otherMode = userChoseOther || unlisted;
+  // A saved slug nobody offers any more is shown as itself, never as a blank.
+  const legacy = !userChoseOther && unlisted ? value : null;
+
+  const otherLabel = t("platform.other");
+  const { containerRef, measureRef, fits } = useFitsInline([options, otherLabel, lang]);
+
+  const pick = (slug: string) => {
+    setUserChoseOther(false);
+    onChange(slug);
+  };
+  const chooseOther = () => {
+    setUserChoseOther(true);
+    onChange("");
   };
 
+  const slugOptions = Array.from(new Set((suggestions ?? []).filter((s) => s && !isKnownPlatform(s)))).sort();
+  const pressed = (slug: string) => !otherMode && value === slug;
+
   return (
-    <div className="col" style={{ gap: 6 }}>
-      <div className="row" style={{ gap: 6, flexWrap: "wrap" }}>
-        {KNOWN_PLATFORMS.map((p) => (
-          <Button
-            key={p}
-            type="button"
-            variant={!otherMode && value === p ? "primary" : "secondary"}
-            onClick={() => pickListed(p)}
+    <div className="col platform-picker">
+      <div ref={containerRef} className="platform-picker__fit">
+        {fits ? (
+          <div className="platform-picker__row" role="group" aria-label={t("label.platform")}>
+            {options.map((o) => (
+              <Button
+                key={o.slug}
+                type="button"
+                variant={pressed(o.slug) ? "primary" : "secondary"}
+                aria-pressed={pressed(o.slug)}
+                onClick={() => pick(o.slug)}
+                disabled={disabled}
+                title={o.label}
+              >
+                {o.label}
+              </Button>
+            ))}
+            <Button
+              type="button"
+              variant={otherMode ? "primary" : "secondary"}
+              aria-pressed={otherMode}
+              onClick={chooseOther}
+              disabled={disabled}
+            >
+              {otherLabel}
+            </Button>
+          </div>
+        ) : (
+          <select
+            className="input platform-picker__select"
+            aria-label={t("label.platform")}
+            value={legacy ?? (otherMode ? OTHER : value)}
+            onChange={(e) => (e.target.value === OTHER ? chooseOther() : pick(e.target.value))}
             disabled={disabled}
-            style={{ flex: 1, minWidth: 72 }}
           >
-            {p.toUpperCase()}
-          </Button>
-        ))}
-        {customs.map((o) => (
-          <Button
-            key={o.slug}
-            type="button"
-            variant={!otherMode && value === o.slug ? "primary" : "secondary"}
-            aria-pressed={!otherMode && value === o.slug}
-            onClick={() => pickListed(o.slug)}
-            disabled={disabled}
-            title={o.label}
-            style={{ flex: 1, minWidth: 72 }}
-          >
-            {o.label}
-          </Button>
-        ))}
-        <Button
-          type="button"
-          variant={otherMode ? "primary" : "secondary"}
-          onClick={() => { setOtherMode(true); onChange(""); }}
-          disabled={disabled}
-          style={{ flex: 1, minWidth: 72 }}
-        >
-          {t("platform.other")}
-        </Button>
+            {/* A fresh form with nothing picked yet: say so, rather than let
+                the browser show (and imply) the first option. */}
+            {value === "" && !otherMode && <option value="" disabled>-</option>}
+            {options.map((o) => <option key={o.slug} value={o.slug}>{o.label}</option>)}
+            {legacy && <option value={legacy}>{platformLabel(legacy)}</option>}
+            <option value={OTHER}>{t("platform.otherOption")}</option>
+          </select>
+        )}
+        {/* The full row at its natural width, always rendered so the measure
+            never depends on the mode it decides. Invisible, inert, and AFTER
+            the real control so a document-order query finds the real one. */}
+        <div className="platform-picker__measure-clip" aria-hidden="true" inert>
+          <div ref={measureRef} className="platform-picker__row platform-picker__row--measure">
+            {options.map((o) => (
+              <Button key={o.slug} type="button" variant="secondary" tabIndex={-1}>{o.label}</Button>
+            ))}
+            <Button type="button" variant="secondary" tabIndex={-1}>{otherLabel}</Button>
+          </div>
+        </div>
       </div>
+
       {otherMode && !hideOtherInput && (
         <>
           <Input
@@ -109,12 +155,12 @@ const PlatformPicker = ({ value, onChange, disabled, suggestions, hideOtherInput
             onChange={(e) => onChange(slugifyPlatform(e.target.value))}
             disabled={disabled}
             autoFocus
-            list={options.length ? listId : undefined}
+            list={slugOptions.length ? listId : undefined}
             autoComplete="off"
           />
-          {options.length > 0 && (
+          {slugOptions.length > 0 && (
             <datalist id={listId}>
-              {options.map((s) => (
+              {slugOptions.map((s) => (
                 <option key={s} value={s} label={platformLabel(s)} />
               ))}
             </datalist>

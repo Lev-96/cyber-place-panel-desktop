@@ -2,16 +2,17 @@ import Button from "@/components/ui/Button";
 import PriceInput from "@/components/ui/PriceInput";
 import SubplatformNameModal from "@/components/prices/SubplatformNameModal";
 import { useLang } from "@/i18n/LanguageContext";
-import { platformPriceNameOf } from "@/i18n/platformPriceName";
+import { platformDisplayNameOf, platformPriceNameOf } from "@/i18n/platformPriceName";
 import { UpdateSubplatformBody } from "@/api/subplatforms";
 import { subplatformRepository } from "@/repositories/SubplatformRepository";
 import { notify } from "@/ui/notify";
-import { IBranchSubplatform } from "@/types/api";
-import { platformLabel } from "@/utils/platform";
+import { IBranchPlatformPrice, IBranchSubplatform } from "@/types/api";
 import { Fragment, FormEvent, useState } from "react";
 
 interface Props {
   subplatforms: IBranchSubplatform[];
+  /** The branch's platform price rows: name each custom group heading as the branch named it. */
+  platformPrices?: readonly IBranchPlatformPrice[];
   onSaved: () => void;
 }
 
@@ -44,7 +45,7 @@ interface Row {
  * last place is deleted or moved off it (server-side, on the place observer), so
  * anything still on screen is still in use.
  */
-const SubplatformPricesForm = ({ subplatforms, onSaved }: Props) => {
+const SubplatformPricesForm = ({ subplatforms, platformPrices, onSaved }: Props) => {
   const { t, lang } = useLang();
   const [rows, setRows] = useState<Row[]>(() =>
     subplatforms.map((s) => ({
@@ -122,7 +123,7 @@ const SubplatformPricesForm = ({ subplatforms, onSaved }: Props) => {
         {platforms.map((platform) => (
           <div key={platform} className="col" style={{ gap: 8 }}>
             <span className="muted" style={{ fontSize: 12, textTransform: "uppercase", letterSpacing: 0.5 }}>
-              {platformLabel(platform)}
+              {platformDisplayNameOf(platform, platformPrices, lang)}
             </span>
             <div style={{ display: "grid", gridTemplateColumns: "150px 1fr 1fr", gap: 10, alignItems: "center" }}>
               <span />

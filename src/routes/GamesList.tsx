@@ -8,6 +8,7 @@ import { useAsync } from "@/hooks/useAsync";
 import { useConfirm } from "@/components/ui/ConfirmProvider";
 import { useLang } from "@/i18n/LanguageContext";
 import { gameRepository } from "@/repositories/GameRepository";
+import { platformLabel } from "@/utils/platform";
 import { useState } from "react";
 
 const GamesList = () => {
@@ -48,7 +49,7 @@ const GamesList = () => {
             >
               <div>
                 <div className="name">{g.name}</div>
-                <div className="meta">{g.platform.toUpperCase()}</div>
+                <div className="meta">{platformLabel(g.platform)}</div>
               </div>
               <div className="row" style={{ gap: 6 }}>
                 <Button variant="secondary" onClick={() => setEditing(g)} style={btn}>{t("action.edit")}</Button>

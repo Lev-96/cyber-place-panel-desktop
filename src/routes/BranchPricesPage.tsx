@@ -137,6 +137,7 @@ const BranchPricesPage = () => {
             <SubplatformPricesForm
               key={(subplatforms.data ?? []).map((s) => s.id).join(",")}
               subplatforms={subplatforms.data ?? []}
+              platformPrices={platformPrices.data ?? undefined}
               onSaved={() => void subplatforms.reload()}
             />
           </SettingsSection>

@@ -4669,6 +4669,60 @@ select.input option:disabled {
   color: var(--color-muted);
 }
 
+/* ── Platform picker (PlaceForm, GameForm) ───────────────────────────────
+   One row of buttons when the whole row fits on a single line, a native
+   `select.input` when it does not (`useFitsInline`). The decision is measured
+   on a hidden copy of the row, so these rules exist to keep that measurement
+   honest and loop-free. */
+.platform-picker {
+  gap: 8px;
+}
+
+/* Its width comes from the form, never from its content: `contain:
+   inline-size` stops the nowrap row (visible or measuring) from widening the
+   dialog, which would make the row "fit" by pushing the dialog wider. */
+.platform-picker__fit {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+  contain: inline-size;
+}
+
+.platform-picker__row {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 8px;
+}
+
+/* Buttons share the line and never wrap their label. 72px keeps PC / PS4 /
+   PS5 the same comfortable click target they always were. */
+.platform-picker__row > .btn {
+  flex: 1 0 auto;
+  min-width: 72px;
+  white-space: nowrap;
+}
+
+/* Zero-size, clipped, invisible box that hosts the measuring row: it lays out
+   at its natural width (max-content) without overflowing anything. */
+.platform-picker__measure-clip {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.platform-picker__row--measure {
+  width: max-content;
+}
+
+.platform-picker__select {
+  width: 100%;
+}
+
 /* ── Session card (sessions board) ───────────────────────────────────────
    Everything here is scoped under `.session-card` / `.live-grid--sessions`:
    `.place-cell` and `.live-grid` are shared with the places board, the live

@@ -6,8 +6,9 @@
  * single-file edit rather than a grep-and-miss across the UI.
  *
  * NOTE: `PcKind` ("pc" | "ps") is the *device* kind and is distinct from
- * `PlatformType` ("pc" | "ps4" | "ps5") which describes a *place's* platform —
- * they overlap on "pc" but are different domains; do not conflate them.
+ * `PlatformType` ("pc" | "ps4" | "ps5"), the three KNOWN platforms a place
+ * can be on (a place's `platform` itself is any slug: a branch adds custom
+ * ones) — they overlap on "pc" but are different domains; do not conflate them.
  */
 export type PcKind = "pc" | "ps";
 

@@ -158,6 +158,14 @@ describe("invalidationTargets", () => {
     expect(invalidationTargets("/pcs/9/wake")).toContain("/places");
   });
 
+  // A place write is what creates, renames or drops a custom platform's price
+  // row and its subplatforms; the platform pickers read those lists.
+  it("a place write drops the branch's platform price and subplatform lists", () => {
+    const targets = invalidationTargets("/places/5");
+    expect(targets).toContain("/branch-platform-prices");
+    expect(targets).toContain("/branch-subplatforms");
+  });
+
   it("falls back to the resource itself for anything unmapped", () => {
     expect(invalidationTargets("/whatever/5")).toEqual(["/whatever"]);
   });

@@ -214,3 +214,27 @@ describe("the place form's platform picker", () => {
     expect([...row.querySelectorAll("button")].map((b) => b.textContent)).toEqual(["PC", "PS4", "PS5", "platform.other"]);
   });
 });
+
+/**
+ * A place on a custom platform the branch has NO price row for (a legacy row,
+ * or a price removed). The form treats it as a platform to name; it used to
+ * open with an empty name, so Save said "name required" — and naming it anew
+ * could re-slug the place. Its English name now starts as the de-slugged slug
+ * and Save sends the slug the place already had.
+ */
+describe("editing a place on an unpriced custom platform", () => {
+  test("opens named after its slug and saves without re-slugging", async () => {
+    await mount(place({ platform: "old-room", hourly_rate: 1500, subplatform_id: null }), []);
+    await save();
+
+    expect(dom.querySelector(".error")).toBeNull();
+    expect(sent()).toMatchObject({ platform: "old-room", platform_name_en: "Old Room" });
+  });
+
+  test("a slug the de-slugged name would not round-trip to is kept as stored", async () => {
+    await mount(place({ platform: "air--hockey", hourly_rate: 1500, subplatform_id: null }), []);
+    await save();
+
+    expect(sent()).toMatchObject({ platform: "air--hockey" });
+  });
+});

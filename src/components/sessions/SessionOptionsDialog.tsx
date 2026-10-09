@@ -30,6 +30,8 @@ interface Props {
   onClose: () => void;
   /** Called after every successful change with the session the server returned. */
   onChanged: (session: ISessionApi) => void;
+  /** A platform's display name; the board passes the branch's own (one shared read). */
+  platformName?: (slug: string) => string;
 }
 
 /**
@@ -67,7 +69,7 @@ const MAX_GRANT_MINUTES = 600;
  * for joystick #3, the owner sets it in Branch → Prices" — sentences an
  * operator can act on, which a generic "failed" would throw away.
  */
-const SessionOptionsDialog = ({ session, platform, onClose, onChanged }: Props) => {
+const SessionOptionsDialog = ({ session, platform, onClose, onChanged, platformName = platformLabel }: Props) => {
   const { t, money } = useLang();
   const { user } = useAuth();
   const confirm = useConfirm();
@@ -527,7 +529,7 @@ const SessionOptionsDialog = ({ session, platform, onClose, onChanged }: Props) 
                               PC is a different session, and the platform was
                               the one thing this card never said. */}
                           <span className="muted" style={{ fontSize: 12 }}>
-                            {[alt.platform ? platformLabel(alt.platform) : null, alt.type]
+                            {[alt.platform ? platformName(alt.platform) : null, alt.type]
                               .filter(Boolean)
                               .join(" · ")}
                           </span>

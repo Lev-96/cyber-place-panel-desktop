@@ -34,7 +34,7 @@ const EMPTY_NAMES: LangNames = { en: "", ru: "", am: "" };
 interface Props {
   branchId: number;
   initial?: IBranchPlace;
-  /** Existing custom-platform slugs to autocomplete in the platform picker. */
+  /** The platforms this branch's places use: with `platformPrices`, its custom-platform quick buttons. */
   platformSuggestions?: string[];
   /**
    * Existing custom-platform prices for this branch. When the chosen custom
@@ -348,7 +348,17 @@ const PlaceForm = ({ branchId, initial, platformSuggestions, platformPrices, onC
   // Multilingual наименование for that new platform's price row. The English
   // value is the identity: the platform slug is derived from it, so the same
   // platform resolves the same way regardless of the panel's language.
-  const [names, setNames] = useState<LangNames>(EMPTY_NAMES);
+  //
+  // Editing a place on a custom platform the branch has NO price row for (a
+  // legacy row, or its price was removed): the form treats it as a new
+  // platform to name, and an empty name would block Save — or, typed afresh,
+  // re-slug the place. So its English name starts as the de-slugged slug,
+  // and Save keeps the stored slug (see `finalPlatform`).
+  const [names, setNames] = useState<LangNames>(() =>
+    initial && !isKnownPlatform(initial.platform) && !(platformPrices ?? []).some((pp) => pp.platform === initial.platform)
+      ? { en: platformLabel(initial.platform), ru: "", am: "" }
+      : EMPTY_NAMES,
+  );
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -579,18 +589,6 @@ const PlaceForm = ({ branchId, initial, platformSuggestions, platformPrices, onC
 
   const filteredGames = (games.data ?? []).filter((g) => g.platform === platform);
 
-  // Existing custom platforms to autocomplete in the picker: the branch's
-  // places (passed in) plus any platform that already has games in the catalogue.
-  const platformOptions = Array.from(
-    new Set([
-      ...(platformSuggestions ?? []),
-      // Platforms that already have a branch price — offer them even if no
-      // place uses them yet, so the operator re-picks the priced platform.
-      ...(platformPrices ?? []).map((pp) => pp.platform),
-      ...(games.data ?? []).map((g) => g.platform).filter((p) => !isKnownPlatform(p)),
-    ]),
-  );
-
   // This branch's custom platforms as quick buttons next to PC / PS4 / PS5:
   // the platforms its places use plus the ones it has a price for. NOT the
   // platforms of the shared games catalogue — those can belong to another
@@ -635,8 +633,13 @@ const PlaceForm = ({ branchId, initial, platformSuggestions, platformPrices, onC
     // For a brand-new custom platform the English наименование is mandatory
     // (its slug is the platform identity). A rate is mandatory whenever THIS
     // tier isn't priced yet. A locked tier needs neither.
-    const finalPlatform = customNew ? slugifyPlatform(names.en.trim()) : platform;
-    if (customNew && !finalPlatform) return setErr(t("place.errors.nameRequired"));
+    // `platform` already IS the slug of the English name once anything was
+    // typed (`handleNamesChange`); untyped, it is the slug the place came with
+    // or the custom button picked. Re-deriving it from the name here would
+    // re-slug a stored platform whose slug the de-slugged name does not
+    // round-trip to ("a--b" → "A  B" → "a-b").
+    const finalPlatform = platform;
+    if (customNew && (!finalPlatform || !names.en.trim())) return setErr(t("place.errors.nameRequired"));
     // A room that prices its own pads must name the figure. Under "every
     // handout" that is the third pad's price (the fourth may be left to follow
     // it); under "one charge per session" it is the single figure for the
@@ -869,7 +872,6 @@ const PlaceForm = ({ branchId, initial, platformSuggestions, platformPrices, onC
           <PlatformPicker
             value={platform}
             onChange={handlePlatformPick}
-            suggestions={platformOptions}
             customOptions={branchCustomPlatforms}
             hideOtherInput
           />
