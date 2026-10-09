@@ -9,6 +9,12 @@ export interface NavItemSpec {
   show: boolean;
   end?: boolean;
   badge?: ReactNode;
+  /**
+   * Held at the top whatever the language (2026-10-09): the Dashboard is home,
+   * and sorted by its label it landed under П in Russian and Կ in Armenian.
+   * Marked on the SPEC (a stable key), never recognised by its label text.
+   */
+  pinnedFirst?: boolean;
 }
 
 export interface NavItem {
@@ -19,8 +25,9 @@ export interface NavItem {
 }
 
 /**
- * The side menu's entries for one role, in alphabetical order of their label
- * in the current language (2026-10-07). Armenian sorts in Armenian alphabetical
+ * The side menu's entries for one role: the pinned ones first (the Dashboard),
+ * in declared order, then the rest in alphabetical order of their label in the
+ * current language (2026-10-07). Armenian sorts in Armenian alphabetical
  * order. Equal labels keep the order they were declared in.
  */
 export const sortedNavItems = (
@@ -30,6 +37,11 @@ export const sortedNavItems = (
 ): NavItem[] =>
   specs
     .filter((spec) => spec.show)
-    .map((spec, index) => ({ to: spec.to, label: t(spec.labelKey), end: spec.end, badge: spec.badge, index }))
-    .sort((a, b) => compareText(a.label, b.label, lang ?? "en") || a.index - b.index)
-    .map(({ index: _index, ...item }) => item);
+    .map((spec, index) => ({
+      to: spec.to, label: t(spec.labelKey), end: spec.end, badge: spec.badge, index, pinned: spec.pinnedFirst === true,
+    }))
+    .sort((a, b) =>
+      Number(b.pinned) - Number(a.pinned)
+      || (a.pinned ? 0 : compareText(a.label, b.label, lang ?? "en"))
+      || a.index - b.index)
+    .map(({ index: _index, pinned: _pinned, ...item }) => item);

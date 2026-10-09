@@ -3168,6 +3168,10 @@ export const TRANSLATIONS: Dict = {
   "toast.fail.blocked":   { en: "Could not block", ru: "Не удалось заблокировать", am: "Չհաջողվեց արգելափակել" },
   "toast.fail.unblocked": { en: "Could not unblock", ru: "Не удалось разблокировать", am: "Չհաջողվեց ապաարգելափակել" },
   "toast.fail.prices":    { en: "Could not save prices", ru: "Не удалось сохранить цены", am: "Չհաջողվեց պահպանել գները" },
+  "toast.fail.refreshed": { en: "Could not refresh", ru: "Не удалось обновить", am: "Չհաջողվեց թարմացնել" },
+
+  // Security → Refresh (2026-10-09): every list on screen answered.
+  "toast.security.refreshed": { en: "Refreshed", ru: "Обновлено", am: "Թարմացվեց" },
 
   "toast.place.created": { en: "New place created", ru: "Новое место создано", am: "Նոր տեղ ստեղծվեց" },
   "toast.place.updated": { en: "Place updated", ru: "Место обновлено", am: "Տեղը թարմացվեց" },

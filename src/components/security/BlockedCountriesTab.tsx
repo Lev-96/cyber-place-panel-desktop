@@ -4,6 +4,7 @@ import { useConfirm } from "@/components/ui/ConfirmProvider";
 import { ListSkeleton } from "@/components/ui/Skeleton";
 import { StateSwitch, deriveViewState } from "@/components/ui/state";
 import SuggestInput from "@/components/ui/SuggestInput";
+import { useSecurityRefresh } from "@/components/security/securityRefresh";
 import { useAsync } from "@/hooks/useAsync";
 import { useKeyedBusy } from "@/hooks/useKeyedBusy";
 import { formatDateTime } from "@/i18n/dates";
@@ -43,6 +44,7 @@ const BlockedCountriesTab = () => {
   const confirm = useConfirm();
   const { begin, end, isBusy } = useKeyedBusy();
   const { data, loading, error, reload } = useAsync(() => securityRepository.blockedCountries(), []);
+  useSecurityRefresh(reload);
 
   const [picked, setPicked] = useState("");
   const [note, setNote] = useState("");

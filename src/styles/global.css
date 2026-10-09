@@ -4268,6 +4268,49 @@ button.login-flip-back:hover {
   border: 0;
 }
 
+/* The tab strip and Refresh share one row (2026-10-09): the tabs take what is
+   left, the button keeps its own width so "Թարմացնել" is never cut, and it
+   matches the tabs' 34px height so the row reads as one control bar. */
+.sec-head {
+  display: flex;
+  align-items: stretch;
+  gap: 12px;
+  min-width: 0;
+}
+.sec-head .cp-subtabs {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.btn.sec-refresh {
+  flex: 0 0 auto;
+  gap: 8px;
+  height: 34px;
+  padding: 0 16px;
+  white-space: nowrap;
+}
+/* In flight the button is disabled, but it is the thing being watched: it
+   stays legible instead of dropping to the 0.5 of a disabled button. */
+.btn.sec-refresh.is-busy:disabled {
+  opacity: 0.8;
+  cursor: progress;
+}
+.sec-refresh__icon {
+  flex-shrink: 0;
+  display: block;
+  transition: color 0.2s ease;
+}
+.sec-refresh.is-busy .sec-refresh__icon {
+  color: var(--color-primary);
+  /* Eased, not linear: each turn reads as one "read it again" rather than a
+     generic loader. */
+  animation: spin 900ms cubic-bezier(0.45, 0, 0.55, 1) infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .sec-refresh.is-busy .sec-refresh__icon {
+    animation: none;
+  }
+}
+
 /* Four tab names do not fit one line on a narrow window in Armenian: they
    wrap two by two instead of being cut to an ellipsis. */
 @media (max-width: 900px) {
@@ -4276,6 +4319,14 @@ button.login-flip-back:hover {
   }
   .sec-page .cp-subtab {
     flex: 1 1 160px;
+  }
+  /* The wrapped tabs take the whole line; Refresh goes under them, right. */
+  .sec-head {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+  .sec-head .cp-subtabs {
+    flex-basis: 100%;
   }
 }
 

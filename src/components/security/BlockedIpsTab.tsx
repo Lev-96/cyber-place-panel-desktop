@@ -9,6 +9,7 @@ import { formatDateTime } from "@/i18n/dates";
 import { useLang } from "@/i18n/LanguageContext";
 import { fmt } from "@/i18n/translations";
 import LoginLockoutsSection from "@/components/security/LoginLockoutsSection";
+import { useSecurityRefresh } from "@/components/security/securityRefresh";
 import { securityRepository } from "@/repositories/SecurityRepository";
 import { FormEvent, useState } from "react";
 
@@ -29,6 +30,7 @@ const BlockedIpsTab = () => {
   const confirm = useConfirm();
   const { begin, end, isBusy } = useKeyedBusy();
   const { data, loading, error, reload } = useAsync(() => securityRepository.blockedIps(), []);
+  useSecurityRefresh(reload);
 
   const [ip, setIp] = useState("");
   const [note, setNote] = useState("");

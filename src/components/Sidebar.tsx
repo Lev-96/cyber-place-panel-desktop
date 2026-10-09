@@ -317,11 +317,12 @@ const Sidebar = ({ footerExtra }: SidebarProps = {}) => {
   // The owner's company (single company per owner, as everywhere in the panel).
   const myCompanyId = typeof dash?.company_id === "number" ? dash.company_id : null;
 
-  // Every entry this role may open, in alphabetical order of its label in the
-  // current language (2026-10-07) — re-sorted when the language changes.
+  // Every entry this role may open: the Dashboard pinned first (2026-10-09),
+  // the rest in alphabetical order of its label in the current language
+  // (2026-10-07) — re-sorted when the language changes.
   const navItems = sortedNavItems(
     [
-      { to: "/", labelKey: "nav.dashboard", end: true, show: true },
+      { to: "/", labelKey: "nav.dashboard", end: true, show: true, pinnedFirst: true },
       // Creating a branch is an action on the Branches page (its header
       // button), not an entry in the navigation.
       { to: "/branches", labelKey: "nav.branches", show: can(role, "menu.branches") },

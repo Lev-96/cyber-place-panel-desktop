@@ -1,4 +1,5 @@
 import { isMissingEndpoint } from "@/api/fallback";
+import { useSecurityRefresh } from "@/components/security/securityRefresh";
 import Button from "@/components/ui/Button";
 import { useConfirm } from "@/components/ui/ConfirmProvider";
 import { ListSkeleton } from "@/components/ui/Skeleton";
@@ -32,8 +33,12 @@ const LoginLockoutsSection = ({ refreshKey }: Props) => {
   const confirm = useConfirm();
   const { begin, end, isBusy } = useKeyedBusy();
   const { data, loading, error, reload } = useAsync(() => securityRepository.loginLockouts(), [refreshKey]);
+  const hidden = error !== null && isMissingEndpoint(error);
+  // A hidden section is not on screen, so Refresh does not ask for it (and an
+  // older backend's 404 does not turn every refresh red).
+  useSecurityRefresh(reload, !hidden);
 
-  if (error && isMissingEndpoint(error)) return null;
+  if (hidden) return null;
 
   const unlock = async (id: number, email: string) => {
     const ok = await confirm(fmt(t("security.locks.confirmUnlock"), email), {

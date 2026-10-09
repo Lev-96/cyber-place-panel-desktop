@@ -181,3 +181,15 @@ describe("Section names and punctuation", () => {
     }
   });
 });
+
+describe("Security → Refresh (2026-10-09)", () => {
+  // The toasts are resolved by key at render time (`toast.{entity}.{action}`,
+  // `toast.fail.{action}`), so the literal-key scan above cannot see them.
+  it("labels the button and both toasts in every language", () => {
+    expect(TRANSLATIONS["action.refresh"]).toEqual({ en: "Refresh", ru: "Обновить", am: "Թարմացնել" });
+    expect(TRANSLATIONS["toast.security.refreshed"]).toEqual({ en: "Refreshed", ru: "Обновлено", am: "Թարմացվեց" });
+    expect(TRANSLATIONS["toast.fail.refreshed"]).toEqual({
+      en: "Could not refresh", ru: "Не удалось обновить", am: "Չհաջողվեց թարմացնել",
+    });
+  });
+});

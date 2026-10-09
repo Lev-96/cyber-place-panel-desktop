@@ -2,6 +2,7 @@ import {
   IIpActivityApi, IP_ACTIVITY_DEVICES, IP_ACTIVITY_OS, IP_ACTIVITY_SOURCES,
   IpActivityDevice, IpActivityOs, IpActivitySort, IpActivitySource,
 } from "@/api/ipActivity";
+import { useSecurityRefresh } from "@/components/security/securityRefresh";
 import Pagination from "@/components/ui/Pagination";
 import { ListSkeleton } from "@/components/ui/Skeleton";
 import { StateSwitch, deriveViewState } from "@/components/ui/state";
@@ -95,6 +96,9 @@ const IpActivityTab = () => {
     }),
     [key, page],
   );
+  // Refresh re-reads this query and page; a page the new answer no longer has
+  // is stepped back by the clamp below.
+  useSecurityRefresh(reload);
 
   const rows = data?.data ?? [];
   const lastPage = data?.meta?.last_page ?? 1;
