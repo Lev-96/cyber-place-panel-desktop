@@ -1264,6 +1264,20 @@ same Sidebar, so it sorts too after a `panel.ref` bump. Tests:
 `Sidebar.order.test.tsx` (every role × en/ru/am with real translations, the
 Armenian alphabet, re-sort on language change, links/badges kept).
 
+**Dashboard pinned first (2026-10-09).** Sorted by its label the Dashboard
+landed under П (ru, "Панель") and Կ (am, "Կառավարման էջ"). Its spec carries
+`pinnedFirst: true` (a stable key on the SPEC, never matched by label text or
+by `to`); `sortedNavItems` puts pinned entries first in declared order, then
+everything else locale-sorted with the declaration index as tiebreak. A pinned
+entry the role may not open (`show: false`) is still dropped. Note: a report of
+the ru menu reading "Бронирование, Выручка, Безопасность" came from an
+unsorted build (prod v1.0.50, declared order); staging sorts it as
+Безопасность → Бронирования → Выручка. Tests (`Sidebar.order.test.tsx`): every
+role × en/ru/am — Dashboard first with `href="/"`, the rest collated, no
+duplicates; the ru admin order above; role permissions unchanged by the pin;
+en → ru → am switch keeps it first. Mutation-verified (pin flag removed from
+`Sidebar.tsx`; pin ignored in the comparator).
+
 ### Sidebar footer slot (2026-09-29)
 
 `<Sidebar footerExtra={…} />` draws extra entries in the pinned footer, after
@@ -1500,6 +1514,35 @@ backend routes.
     on the fit, the useAsync opt-out ignored, `asn` not sent.
 - Layout: tables scroll in their own frame; ≤640px rows become cards from
   `data-label`; the owner-web app renders the same screen in a browser.
+- **Refresh button (2026-10-09)** in the header row next to the tabs
+  (`.sec-head`; under the tabs, right-aligned, ≤900px). `Button` secondary +
+  `ui/RefreshIcon.tsx` (inline SVG, `currentColor`), the icon spins while a
+  round is in flight (`.sec-refresh.is-busy`, transform only, stopped under
+  `prefers-reduced-motion`), `aria-busy`. Mechanism:
+  `security/securityRefresh.ts` — `SecurityRefreshContext` (provided by
+  `Security.tsx`, default no-op), `useSecurityRefresh(reload, enabled?)`
+  registers the LATEST `useAsync` reload while mounted (BlockedIpsTab,
+  LoginLockoutsSection — not while hidden by a missing endpoint,
+  BlockedCountriesTab, IpActivityTab), `refreshAll(set)` runs them in parallel.
+  A ref guards against a second round; the button is re-enabled in `finally`.
+  All true → `notify.success("security","refreshed")` ("Refreshed" /
+  "Обновлено" / "Թարմացվեց"); any false → `toast.fail.refreshed` and the
+  list's own StaleNotice / ErrorState stays. A list unmounted mid-round (tab
+  switched) is not counted as a failure. The activity tab re-reads its current
+  search / filters / page; a shrunken result is handled by its page clamp.
+  Data is replaced (useAsync), never appended. No realtime here; `/admin/*` is
+  not cached, so a refresh is always a real request.
+  - `useAsync`'s `run`/`reload` now resolves a boolean (additive): `true` only
+    when that run's answer is the one on screen; `false` on failure, when a
+    newer run or `mutate` superseded it, or after unmount. Never rejects.
+  - Tests: `routes/Security.refresh.test.tsx` (8: one request per mounted list
+    per tab, activity keeps filters + page, double click → one round, new rows
+    replace old, failure → error toast only + button back, ErrorState kept,
+    switched-away tab not asked, ru copy), `securityRefresh.test.ts` (5),
+    `useAsync.test.tsx` (+5), `translations.test.ts` (+1). Mutation-verified:
+    ref guard removed, unregister a no-op, success toast on failure, stale
+    reload registered instead of the latest, lockouts not registered,
+    superseded run reporting true.
 
 ## 9.5.8b Address block and parity with the web (2026-10-01)
 
