@@ -6011,7 +6011,12 @@ select.input option:disabled {
   transform-origin: 66px 180px;
   animation: cp-gamer-scratch 1.6s ease-in-out infinite;
 }
-.cp-gamer__float { animation: cp-gamer-float 3.4s ease-in-out infinite; }
+/* The "?" turns about its own middle (179, 38) — without an origin it swung
+   about the drawing's (0, 0) and drifted down-left instead of floating up. */
+.cp-gamer__float {
+  transform-origin: 179px 38px;
+  animation: cp-gamer-float 3.4s ease-in-out infinite;
+}
 .cp-gamer__spark { animation: cp-gamer-flicker 2.6s steps(1, end) infinite; }
 .cp-gamer__wifi { animation: cp-gamer-dim 4s ease-in-out infinite; }
 .cp-gamer__nod { animation: cp-gamer-nod 6s ease-in-out infinite; }
