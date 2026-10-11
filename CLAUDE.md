@@ -2535,6 +2535,40 @@ they did, and TypeScript caught it as a duplicate object property.
   (real drag events → shown order + payload, failed save, reload),
   `SessionCard.test.tsx`.
 
+## 9.5.13 Six small changes (2026-10-11)
+
+- **New PC place → "Register computer".** `PlaceForm.onSaved(created)` hands up
+  the place the create returned (null on edit, never called on failure);
+  BranchPlaces opens `components/pcs/RegisterPlaceComputer` only for
+  `platform === "pc"`, from the save handler (a reload or realtime refetch never
+  reopens it). The server provisions the place's `kind = pc` device WITH the
+  place (`EnsureBillingDeviceService`), so this is `PcForm` in `registering`
+  mode on THAT device: title "Register computer", dismiss "Not now", save =
+  update (a create would be the 422 second device), then the pairing token via
+  `rotateToken` only when the device never paired (`last_seen_at` null).
+- **CompanyBranches** has no inner "← Back to company" link (the shell's
+  BackButton is the way back); `companyBranches.back` is gone.
+- **Scan code (`ConfirmByCode`)**: the box keeps digits only, the first six
+  (`digits:6` server-side), as a string (leading zeros survive); no `maxLength`
+  (it would cut a paste before the spaces are dropped); Confirm and Enter send
+  only a full code.
+- **All-branch tournaments** show `Branch: <address>` per card from the row's
+  eager-loaded `branch` (`IndexService` already loads it — no API change);
+  "Branch not specified" when absent; one clipped line; not on the
+  branch-scoped page.
+- **Armenia / +374 fixed** in CompanyForm and BranchForm
+  (`data/countries.ts` `HOME_COUNTRY_CODE`, `isHomeCountryRecord`,
+  `nationalPart`; `components/ui/FixedDialPhoneInput`): on create, and on edit
+  of a record already Armenian; a record saved with another country or another
+  +code keeps its pickers and number untouched. The geocoder cannot move a
+  locked country. Saved as before ("Armenia", `formatInternational()`).
+  MemberForm (no country picker) is unchanged.
+- **Company create: website + description required** (marked " *",
+  `aria-required`, errors next to each field, nothing sent, other fields kept).
+  `normalizeWebsite` adds https:// to a bare host and refuses non-http(s), no
+  dotted host, credentials. Backend `Companies\StoreRequest`: `required` +
+  `url:http,https` (edit/UpdateRequest unchanged).
+
 ## 10. How work must be done here (MANDATORY — run it in this order)
 
 "100% guaranteed correct" is not achievable as a claim. It is achievable as a
