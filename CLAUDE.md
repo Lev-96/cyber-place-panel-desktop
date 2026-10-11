@@ -1316,6 +1316,24 @@ duplicates; the ru admin order above; role permissions unchanged by the pin;
 en → ru → am switch keeps it first. Mutation-verified (pin flag removed from
 `Sidebar.tsx`; pin ignored in the comparator).
 
+**Owner / manager menu: explicit order + menu-only wording (2026-10-11).**
+`withStaffMenu(specs, role)` (`sidebarNav.ts`, table `STAFF_MENU`, keyed by the
+entry's base label key — a stable id, never the translated text) gives an
+owner or a manager a `rank` and their menu label. `sortedNavItems` orders in
+three bands: pinned (Dashboard) → ranked by rank → the rest alphabetically
+(Settings, Agent updates, anything added later). Owner: Панель, Моя компания,
+Мои филиалы, Мои менеджеры, Выручка, Места моих филиалов на карте,
+Сканировать код, Бронирования, Уведомления, Турниры всех филиалов. Manager
+(own branch only): Панель, Мой филиал (takes the branches' place), Сканировать
+код, Бронирования, Уведомления, Турниры моего филиала — their tournaments list
+is filtered to their branch, so "all branches" would be false. Admin is NOT
+changed (sees every branch/manager: "My …" would be false; Dashboard first +
+alphabetical). Only the SIDE MENU wording changes (`nav.side.*`): page titles,
+routes, permissions untouched. Long labels wrap in the 240px column (checked
+in Chromium, ru/am/en, no overflow). Tests in `Sidebar.order.test.tsx` (per
+role × language, ru wording, language switch, manager tournaments label);
+mutation-verified (table not applied, rank ignored, manager label).
+
 ### Sidebar footer slot (2026-09-29)
 
 `<Sidebar footerExtra={…} />` draws extra entries in the pinned footer, after
