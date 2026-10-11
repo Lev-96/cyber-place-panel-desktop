@@ -56,24 +56,92 @@ const firstLink = () =>
 const collated = (names: string[], tag: string) =>
   [...names].sort(new Intl.Collator(tag, { sensitivity: "base", numeric: true }).compare);
 
+/**
+ * The owner's and the manager's menu (2026-10-11): an explicit order by the
+ * entries' stable keys — the same in every language — with menu-only wording;
+ * whatever is not in that list (Settings, Agent updates) follows
+ * alphabetically. Admin keeps Dashboard first + alphabetical.
+ */
+const STAFF_ORDER = {
+  company_owner: [
+    "nav.dashboard", "nav.myCompany", "nav.side.myBranches", "nav.side.myManagers", "nav.revenue",
+    "nav.side.branchesOnMap", "nav.side.scanCode", "nav.bookings", "nav.notifications", "nav.side.allTournaments",
+  ],
+  manager: [
+    "nav.dashboard", "nav.myBranch", "nav.side.scanCode", "nav.bookings", "nav.notifications", "nav.side.myBranchTournaments",
+  ],
+} as const;
+
 describe.each([
   ["en", "en"],
   ["ru", "ru"],
   ["am", "hy"],
 ] as const)("in %s", (code, tag) => {
-  test.each(["admin", "company_owner", "manager"] as Role[])("the %s menu: Dashboard first, the rest in alphabetical order", (role) => {
+  test("the admin menu: Dashboard first, the rest in alphabetical order", () => {
     lang.current = code;
-    mount(role);
+    mount("admin");
     const names = menuNames();
     const [first, ...rest] = names;
     expect(names.length).toBeGreaterThan(5);
     expect(first).toBe(t("nav.dashboard", code));
     expect(firstLink().getAttribute("href")).toBe("/");
     expect(rest).toEqual(collated(rest, tag));
-    // Each entry once: pinning does not copy the Dashboard into the sorted rest.
     expect(new Set(names).size).toBe(names.length);
-    expect(rest).not.toContain(first);
+    // Admin sees every branch and manager: never "My …".
+    expect(names).toContain(t("nav.branches", code));
+    expect(names).not.toContain(t("nav.side.myBranches", code));
   });
+
+  test.each(["company_owner", "manager"] as const)("the %s menu: the explicit order, then the rest alphabetically", (role) => {
+    lang.current = code;
+    mount(role);
+    const names = menuNames();
+    const head = STAFF_ORDER[role].map((key) => t(key, code));
+    expect(names.slice(0, head.length)).toEqual(head);
+    expect(firstLink().getAttribute("href")).toBe("/");
+    const tail = names.slice(head.length);
+    expect(tail.length).toBeGreaterThan(0);
+    expect(tail).toEqual(collated(tail, tag));
+    expect(new Set(names).size).toBe(names.length);
+  });
+});
+
+test("a manager reads their own branch's tournaments, not all branches'", () => {
+  lang.current = "ru";
+  mount("manager");
+  const names = menuNames();
+  expect(names).toContain("Турниры моего филиала");
+  expect(names).not.toContain("Турниры всех филиалов");
+  // A manager has no branches list, managers, revenue or map.
+  for (const key of ["nav.side.myBranches", "nav.side.myManagers", "nav.revenue", "nav.side.branchesOnMap"]) {
+    expect(names).not.toContain(t(key, "ru"));
+  }
+});
+
+test("the owner's menu wording in Russian, as asked", () => {
+  lang.current = "ru";
+  mount("company_owner");
+  expect(menuNames().slice(0, 10)).toEqual([
+    "Панель", "Моя компания", "Мои филиалы", "Мои менеджеры", "Выручка",
+    "Места моих филиалов на карте", "Сканировать код", "Бронирования", "Уведомления", "Турниры всех филиалов",
+  ]);
+});
+
+test("switching the language keeps the owner's order", () => {
+  lang.current = "en";
+  const { rerender } = mount("company_owner");
+  const en = menuNames();
+  for (const code of ["ru", "am"] as const) {
+    lang.current = code;
+    rerender(
+      <MemoryRouter initialEntries={["/"]}>
+        <Sidebar />
+      </MemoryRouter>,
+    );
+    const now = menuNames();
+    expect(now.slice(0, 10)).toEqual(STAFF_ORDER.company_owner.map((key) => t(key, code)));
+    expect(now).toHaveLength(en.length);
+  }
 });
 
 test("Russian admin menu: Безопасность, then Бронирования, then Выручка, under the pinned Панель", () => {
@@ -114,33 +182,6 @@ test("Armenian follows the Armenian alphabet, not character codes", () => {
   expect(at("Ամրագրումներ")).toBeLessThan(at("Քարտեզ"));
   expect(at("Եկամուտ")).toBeLessThan(at("Կարգավորումներ"));
   expect(at("Մասնաճյուղեր")).toBeLessThan(at("Սեփականատերեր"));
-});
-
-test("switching the language re-sorts the menu", () => {
-  lang.current = "en";
-  const { rerender } = mount("company_owner");
-  const en = menuNames();
-  lang.current = "ru";
-  rerender(
-    <MemoryRouter initialEntries={["/"]}>
-      <Sidebar />
-    </MemoryRouter>,
-  );
-  const ru = menuNames();
-  expect(en[0]).toBe("Dashboard");
-  expect(ru[0]).toBe("Панель");
-  expect(ru.slice(1)).toEqual(collated(ru.slice(1), "ru"));
-  expect(ru).not.toEqual(en);
-  lang.current = "am";
-  rerender(
-    <MemoryRouter initialEntries={["/"]}>
-      <Sidebar />
-    </MemoryRouter>,
-  );
-  const am = menuNames();
-  expect(am[0]).toBe("Կառավարման էջ");
-  expect(am.slice(1)).toEqual(collated(am.slice(1), "hy"));
-  expect(am).toHaveLength(en.length);
 });
 
 test("every entry keeps its own link and badge after sorting", () => {

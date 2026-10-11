@@ -3521,6 +3521,14 @@ export const TRANSLATIONS: Dict = {
   },
   // ── Security (admin, `/security`) ─────────────────────────────────────────
   "nav.security": { en: "Security", ru: "Безопасность", am: "Անվտանգություն" },
+  // Side-menu wording for an owner / a manager only (2026-10-11); the pages
+  // keep their own titles (nav.* above / page keys).
+  "nav.side.myBranches": { en: "My branches", ru: "Мои филиалы", am: "Իմ մասնաճյուղերը" },
+  "nav.side.myManagers": { en: "My managers", ru: "Мои менеджеры", am: "Իմ մենեջերները" },
+  "nav.side.branchesOnMap": { en: "My branches on the map", ru: "Места моих филиалов на карте", am: "Իմ մասնաճյուղերը քարտեզի վրա" },
+  "nav.side.scanCode": { en: "Scan a code", ru: "Сканировать код", am: "Սկանավորել կոդը" },
+  "nav.side.allTournaments": { en: "Tournaments in all branches", ru: "Турниры всех филиалов", am: "Բոլոր մասնաճյուղերի մրցաշարերը" },
+  "nav.side.myBranchTournaments": { en: "My branch's tournaments", ru: "Турниры моего филиала", am: "Իմ մասնաճյուղի մրցաշարերը" },
   "security.title": { en: "Security", ru: "Безопасность", am: "Անվտանգություն" },
   "security.tab.ips": { en: "Blocked IPs", ru: "Заблокированные IP", am: "Արգելափակված IP հասցեներ" },
   "security.tab.countries": { en: "Blocked countries", ru: "Заблокированные страны", am: "Արգելափակված երկրներ" },

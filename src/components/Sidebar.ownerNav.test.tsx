@@ -100,7 +100,8 @@ describe("owner, no create button in the navigation", () => {
     signIn("company_owner", { company_id: 5 });
     mountAt("/");
 
-    const branches = screen.getByRole("link", { name: "nav.branches" });
+    // An owner's menu calls it "My branches" (2026-10-11).
+    const branches = screen.getByRole("link", { name: "nav.side.myBranches" });
     expect(branches.nextElementSibling?.tagName).toBe("A");
     expect(screen.queryByText("branchesList.newBranch")).toBeNull();
     expect(screen.queryByText("nav.createBranch")).toBeNull();

@@ -7,7 +7,7 @@ import AccountSwitchModal from "@/components/profile/AccountSwitchModal";
 import AccountSwitchPanel from "@/components/profile/AccountSwitchPanel";
 import ProfileModal from "@/components/profile/ProfileModal";
 import { useLang } from "@/i18n/LanguageContext";
-import { sortedNavItems } from "@/components/sidebarNav";
+import { sortedNavItems, withStaffMenu } from "@/components/sidebarNav";
 import { useNotifications } from "@/notifications/NotificationsContext";
 import { useUpdatesNotification } from "@/realtime/UpdatesNotificationContext";
 import { ReactNode, useEffect, useRef, useState } from "react";
@@ -317,11 +317,12 @@ const Sidebar = ({ footerExtra }: SidebarProps = {}) => {
   // The owner's company (single company per owner, as everywhere in the panel).
   const myCompanyId = typeof dash?.company_id === "number" ? dash.company_id : null;
 
-  // Every entry this role may open: the Dashboard pinned first (2026-10-09),
-  // the rest in alphabetical order of its label in the current language
-  // (2026-10-07) — re-sorted when the language changes.
+  // Every entry this role may open: the Dashboard pinned first (2026-10-09);
+  // for an owner or a manager their explicit order and menu labels next
+  // (withStaffMenu, 2026-10-11); the rest in alphabetical order of the label
+  // in the current language (2026-10-07) — re-sorted when the language changes.
   const navItems = sortedNavItems(
-    [
+    withStaffMenu([
       { to: "/", labelKey: "nav.dashboard", end: true, show: true, pinnedFirst: true },
       // Creating a branch is an action on the Branches page (its header
       // button), not an entry in the navigation.
@@ -375,7 +376,7 @@ const Sidebar = ({ footerExtra }: SidebarProps = {}) => {
         show: can(role, "menu.agentUpdates") && !can(role, "menu.updates"),
         badge: <UnreadBadge count={agentUpdateCount} />,
       },
-    ],
+    ], role),
     t,
     lang,
   );
