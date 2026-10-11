@@ -69,9 +69,15 @@ const PlatformPicker = ({ value, onChange, disabled, suggestions, hideOtherInput
   // Other is DERIVED, not snapshotted: the operator chose it, or the value is
   // a slug the list does not offer. A snapshot taken on mount kept a value on
   // Other for good when its custom button arrived a moment later (async list).
+  //
+  // With `hideOtherInput` the parent names the platform, and a name it resolved
+  // to a listed one IS that platform (PlaceForm: "PC" typed under Other), so
+  // its button shows, not Other. Our own slug box keeps Other while typed: a
+  // half-typed "pc-club" passing through "pc" must not hide the box mid-word.
   const [userChoseOther, setUserChoseOther] = useState(false);
   const unlisted = value !== "" && !listed(value);
-  const otherMode = userChoseOther || unlisted;
+  const resolvedByParent = !!hideOtherInput && value !== "" && !unlisted;
+  const otherMode = (userChoseOther && !resolvedByParent) || unlisted;
   // A saved slug nobody offers any more is shown as itself, never as a blank.
   const legacy = !userChoseOther && unlisted ? value : null;
 

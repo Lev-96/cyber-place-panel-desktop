@@ -176,4 +176,35 @@ describe("PlatformPicker: data that arrives late, keyboard", () => {
     measured.forEach((b) => expect((b as HTMLButtonElement).tabIndex).toBe(-1));
     expect(document.querySelector(".platform-picker__measure-clip")!.getAttribute("aria-hidden")).toBe("true");
   });
+
+  /**
+   * Under Other, a value the list offers is shown on its own button only when
+   * the PARENT names the platform (PlaceForm, `hideOtherInput`). The picker's
+   * own slug box keeps Other while typed, so "pc-club" passing through "pc"
+   * never hides the box mid-word (GameForm, unchanged).
+   */
+  test("a parent-named value that is offered leaves Other; the picker's own box does not", async () => {
+    const Named = () => {
+      const [value, setValue] = useState("pc");
+      return (
+        <>
+          <PlatformPicker value={value} onChange={setValue} hideOtherInput />
+          <button type="button" onClick={() => setValue("ps4")}>name-it</button>
+        </>
+      );
+    };
+    render(<Named />);
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "platform.other" })); });
+    expect(screen.getByRole("button", { name: "platform.other" }).getAttribute("aria-pressed")).toBe("true");
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "name-it" })); });
+    expect(screen.getByRole("button", { name: "PS4" }).getAttribute("aria-pressed")).toBe("true");
+    expect(screen.getByRole("button", { name: "platform.other" }).getAttribute("aria-pressed")).toBe("false");
+    cleanup();
+
+    render(<Harness start="pc" />);
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "platform.other" })); });
+    await act(async () => { fireEvent.change(slugBox()!, { target: { value: "pc" } }); });
+    expect(screen.getByRole("button", { name: "platform.other" }).getAttribute("aria-pressed")).toBe("true");
+    expect((slugBox() as HTMLInputElement).value).toBe("pc");
+  });
 });

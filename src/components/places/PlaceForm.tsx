@@ -26,8 +26,9 @@ import { placeRepository } from "@/repositories/PlaceRepository";
 import { subplatformRepository } from "@/repositories/SubplatformRepository";
 import { CHARGE_MODES, JoystickChargeMode, JoystickPricingMode, PRICING_MODES, pricingModeOf } from "@/api/joystickPrices";
 import { IBranchApi, IBranchPlace, IBranchPlatformPrice, PlaceType } from "@/types/api";
-import { isKnownPlatform, platformGroup, platformLabel, slugifyPlatform } from "@/utils/platform";
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { isKnownPlatform, platformGroup, platformLabel } from "@/utils/platform";
+import { resolveTypedPlatform } from "@/utils/platformName";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 
 const EMPTY_NAMES: LangNames = { en: "", ru: "", am: "" };
 
@@ -393,6 +394,7 @@ const PlaceForm = ({ branchId, initial, platformSuggestions, platformPrices, onC
   // same way as picking it from the name suggestions: its наименование in
   // every language and its exact slug, so its existing price locks in.
   const handlePlatformPick = (v: string) => {
+    namedByOperator.current = false;
     if (v !== "" && !isKnownPlatform(v)) {
       const priced = (platformPrices ?? []).find((pp) => pp.platform === v);
       if (priced) { handlePickExisting(priced); return; }
@@ -410,14 +412,25 @@ const PlaceForm = ({ branchId, initial, platformSuggestions, platformPrices, onC
   // platform identity persisted on the place + used to match an existing price.
   // Trim before slugifying so a stray trailing space ("tennis " → "tennis-")
   // can't fork a duplicate platform past the case-insensitive match.
+  //
+  // A name that IS an existing platform ("PC", "pc", " PC ", a custom one's
+  // name in the panel language) selects that platform instead of forking a
+  // new one; the picker then shows it, not Other (`resolveTypedPlatform`).
+  // Set only by typing here and cleared by any discrete pick, so the
+  // late-data effect below never re-targets a platform the operator chose.
+  const namedByOperator = useRef(false);
+  const resolveNames = (v: LangNames) =>
+    resolveTypedPlatform(v, lang, branchCustomPlatforms.map((o) => o.slug), platformPrices);
   const handleNamesChange = (v: LangNames) => {
+    namedByOperator.current = true;
     setNames(v);
-    setPlatform(slugifyPlatform(v.en.trim()));
+    setPlatform(resolveNames(v));
   };
 
   // Adopting an existing platform from the suggestions: fill every locale and
   // snap to its exact slug so its already-defined price locks in.
   const handlePickExisting = (p: IBranchPlatformPrice) => {
+    namedByOperator.current = false;
     setNames({ en: p.name_en ?? "", ru: p.name_ru ?? "", am: p.name_am ?? "" });
     changePlatform(p.platform);
   };
@@ -601,6 +614,16 @@ const PlaceForm = ({ branchId, initial, platformSuggestions, platformPrices, onC
     ),
     [platformSuggestions, platformPrices, lang],
   );
+
+  // The branch's platforms can land after the operator started typing a name
+  // (a slow read). Resolve that name again once they do, so an existing
+  // platform is still picked rather than duplicated. Keyed on the data only:
+  // typing already resolves in `handleNamesChange`, and an untouched form —
+  // an edit above all — is never re-targeted by a list that arrived late.
+  useEffect(() => {
+    if (namedByOperator.current) setPlatform(resolveNames(names));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [branchCustomPlatforms, platformPrices]);
 
   // A place targets ONE platform, so its games must all belong to that
   // platform. When the operator switches platform (e.g. pc → ps4), drop any
