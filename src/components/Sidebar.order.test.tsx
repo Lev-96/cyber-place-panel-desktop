@@ -111,7 +111,7 @@ test("a manager reads their own branch's tournaments, not all branches'", () => 
   mount("manager");
   const names = menuNames();
   expect(names).toContain("Турниры моего филиала");
-  expect(names).not.toContain("Турниры всех филиалов");
+  expect(names).not.toContain("Турниры филиалов");
   // A manager has no branches list, managers, revenue or map.
   for (const key of ["nav.side.myBranches", "nav.side.myManagers", "nav.revenue", "nav.side.branchesOnMap"]) {
     expect(names).not.toContain(t(key, "ru"));
@@ -123,7 +123,7 @@ test("the owner's menu wording in Russian, as asked", () => {
   mount("company_owner");
   expect(menuNames().slice(0, 10)).toEqual([
     "Панель", "Моя компания", "Мои филиалы", "Мои менеджеры", "Выручка",
-    "Места филиалов на карте", "Сканировать код", "Бронирования", "Турниры всех филиалов", "Уведомления",
+    "Филиалы на карте", "Сканировать код", "Бронирования", "Турниры филиалов", "Уведомления",
   ]);
 });
 
@@ -136,9 +136,9 @@ test("the manager's menu wording in Russian, as asked", () => {
 });
 
 test("the map entry's wording in every language", () => {
-  expect(t("nav.side.branchesOnMap", "ru")).toBe("Места филиалов на карте");
-  expect(t("nav.side.branchesOnMap", "en")).toBe("Branch locations on the map");
-  expect(t("nav.side.branchesOnMap", "am")).toBe("Մասնաճյուղերի վայրերը քարտեզի վրա");
+  expect(t("nav.side.branchesOnMap", "ru")).toBe("Филиалы на карте");
+  expect(t("nav.side.branchesOnMap", "en")).toBe("Branches on the map");
+  expect(t("nav.side.branchesOnMap", "am")).toBe("Մասնաճյուղերը քարտեզի վրա");
 });
 
 test("switching the language keeps the owner's order", () => {

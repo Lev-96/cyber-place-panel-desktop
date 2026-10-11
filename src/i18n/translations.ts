@@ -3525,9 +3525,9 @@ export const TRANSLATIONS: Dict = {
   // keep their own titles (nav.* above / page keys).
   "nav.side.myBranches": { en: "My branches", ru: "Мои филиалы", am: "Իմ մասնաճյուղերը" },
   "nav.side.myManagers": { en: "My managers", ru: "Мои менеджеры", am: "Իմ մենեջերները" },
-  "nav.side.branchesOnMap": { en: "Branch locations on the map", ru: "Места филиалов на карте", am: "Մասնաճյուղերի վայրերը քարտեզի վրա" },
+  "nav.side.branchesOnMap": { en: "Branches on the map", ru: "Филиалы на карте", am: "Մասնաճյուղերը քարտեզի վրա" },
   "nav.side.scanCode": { en: "Scan a code", ru: "Сканировать код", am: "Սկանավորել կոդը" },
-  "nav.side.allTournaments": { en: "Tournaments in all branches", ru: "Турниры всех филиалов", am: "Բոլոր մասնաճյուղերի մրցաշարերը" },
+  "nav.side.allTournaments": { en: "Branch tournaments", ru: "Турниры филиалов", am: "Մասնաճյուղերի մրցաշարերը" },
   "nav.side.myBranchTournaments": { en: "My branch's tournaments", ru: "Турниры моего филиала", am: "Իմ մասնաճյուղի մրցաշարերը" },
   "security.title": { en: "Security", ru: "Безопасность", am: "Անվտանգություն" },
   "security.tab.ips": { en: "Blocked IPs", ru: "Заблокированные IP", am: "Արգելափակված IP հասցեներ" },

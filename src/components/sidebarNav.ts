@@ -78,7 +78,7 @@ export const sortedNavItems = (
  *
  * Admin keeps its own menu: it sees EVERY branch and manager, so "My …" would
  * be false there. A manager's tournaments list is filtered to their branch,
- * so they read "My branch's tournaments", not "Tournaments in all branches".
+ * so they read "My branch's tournaments", not "Branch tournaments".
  */
 const STAFF_MENU: Readonly<Record<string, { rank: number; labelKey?: string; managerLabelKey?: string }>> = {
   "nav.myCompany": { rank: 1 },

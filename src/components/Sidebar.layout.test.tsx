@@ -99,7 +99,7 @@ describe("icons", () => {
     mount("company_owner");
     const branches = screen.getByRole("link", { name: "My branches" });
     expect(branches.querySelector("svg")!.getAttribute("data-nav-icon")).toBe("nav.branches");
-    const map = screen.getByRole("link", { name: "Branch locations on the map" });
+    const map = screen.getByRole("link", { name: "Branches on the map" });
     expect(map.querySelector("svg")!.getAttribute("data-nav-icon")).toBe("nav.map");
   });
 
