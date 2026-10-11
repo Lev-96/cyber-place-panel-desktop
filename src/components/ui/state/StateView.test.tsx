@@ -18,6 +18,15 @@ import { textLiteral } from "@/i18n/localizedText";
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
 const VARIANTS = Object.keys(STATE_VARIANTS) as StateVariant[];
+/** The one prop that tells each pose apart. */
+const POSE_MARK: Record<StateVariant, string> = {
+  empty: ".cp-gamer__thumb",
+  noResults: ".cp-gamer__glass",
+  notFound: ".cp-gamer__map",
+  error: ".cp-gamer__spark",
+  offline: ".cp-gamer__z",
+  success: ".cp-gamer__thumbs-up",
+};
 
 describe("StateView", () => {
   test.each(VARIANTS)("%s: its default copy, role, and a decorative player of its own pose", async (variant) => {
@@ -38,6 +47,53 @@ describe("StateView", () => {
     expect(svg.getAttribute("aria-hidden")).toBe("true");
     expect(svg.querySelector(".cp-gamer__sway")).toBeTruthy();
     expect(svg.querySelector(".cp-gamer__eyes")).toBeTruthy();
+    // A face, not a mask: head, irises that can glance, brows, a mouth.
+    expect(svg.querySelectorAll(".cp-gamer__head").length).toBe(2); // neck + head move together
+    expect(svg.querySelectorAll(".cp-gamer__iris").length).toBe(2);
+    expect(svg.querySelector(".cp-gamer__brow")).toBeTruthy();
+    expect(svg.querySelector(".cp-gamer__mouth, .cp-gamer__lip")).toBeTruthy();
+    // …and this variant's own prop.
+    expect(svg.querySelector(POSE_MARK[variant])).toBeTruthy();
+    for (const other of VARIANTS.filter((v) => v !== variant)) {
+      expect(svg.querySelector(POSE_MARK[other])).toBeNull();
+    }
+  });
+
+  test("two players on one screen never share a gradient or clip id", async () => {
+    await act(async () => {
+      render(<><StateView variant="empty" /><StateView variant="empty" size="section" /></>);
+    });
+    await vi.waitFor(() => {
+      if (document.querySelectorAll("svg.cp-gamer").length < 2) throw new Error("poses not loaded");
+    });
+    const ids = [...document.querySelectorAll("svg.cp-gamer [id]")].map((el) => el.id);
+    expect(ids.length).toBeGreaterThan(10);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  test.each(VARIANTS)("%s: nothing moved by a CSS transform animation also carries a transform attribute (the animation would erase it)", async (variant) => {
+    const css = readFileSync(path.resolve(__dirname, "../../../styles/global.css"), "utf8");
+    const movers = new Set(
+      (css.match(/@keyframes cp-gamer-[\s\S]*?\n\}/g) ?? [])
+        .filter((k) => k.includes("transform:"))
+        .map((k) => k.match(/@keyframes (cp-gamer-[a-z-]+)/)![1]),
+    );
+    const animated = new Set<string>();
+    for (const rule of css.matchAll(/([^{}]+)\{([^}]*)\}/g)) {
+      const name = rule[2].match(/\banimation:\s*(cp-gamer-[a-z-]+)/)?.[1];
+      if (!name || !movers.has(name)) continue;
+      for (const m of rule[1].matchAll(/\.(cp-gamer__[a-z0-9-]+)/g)) animated.add(m[1]);
+    }
+    expect(animated.size).toBeGreaterThanOrEqual(10);
+    await act(async () => { render(<StateView variant={variant} />); });
+    const svg = await vi.waitFor(() => {
+      const el = document.querySelector("svg.cp-gamer");
+      if (!el) throw new Error("pose not loaded");
+      return el;
+    });
+    for (const cls of animated) {
+      for (const el of svg.querySelectorAll(`.${cls}`)) expect(el.getAttribute("transform"), cls).toBeNull();
+    }
   });
 
   test("context copy replaces the defaults, `{0}` filled, `null` drops the sentence", () => {
@@ -68,6 +124,8 @@ describe("StateView", () => {
     // Motion is transform / opacity only.
     const keyframes = css.match(/@keyframes cp-gamer-[\s\S]*?\n\}/g) ?? [];
     expect(keyframes.length).toBeGreaterThanOrEqual(8);
+    // The idle life every pose shares: breathing, head, blink, glance.
+    for (const name of ["breathe", "head", "blink", "glance"]) expect(css).toContain(`@keyframes cp-gamer-${name} {`);
     for (const k of keyframes) {
       const props = [...k.matchAll(/\{\s*([a-z-]+):/g)].map((m) => m[1]);
       for (const p of props) expect(["transform", "opacity"]).toContain(p);

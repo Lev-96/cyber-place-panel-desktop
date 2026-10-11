@@ -5740,7 +5740,7 @@ select.input option:disabled {
    (`.cp-state`), three sizes, and the hand-drawn player (`.cp-gamer`).
    Sized to its container: centred column, text capped at a reading measure,
    actions wrap. The player is decoration (aria-hidden); motion is transform /
-   opacity only, 3–5 s loops, and none at all under reduced motion. */
+   opacity only, 1.6–8 s loops, and none at all under reduced motion. */
 .cp-state {
   display: flex;
   flex-direction: column;
@@ -5817,117 +5817,296 @@ select.input option:disabled {
   gap: 8px;
 }
 
+/* The player (poses/GamerFigure.tsx). Illustration palette, scoped here: the
+   UI tokens carry the neon (rim light, LEDs, desk edge, props); skin, hair,
+   fabric and gear need their own mid-tones, which no UI surface uses. */
 .cp-gamer {
+  --gamer-skin-hi: #f8d3b4;
+  --gamer-skin: #e0a47f;
+  --gamer-skin-lo: #b06d52;
+  --gamer-blush: #ff6f91;
+  --gamer-hair-hi: #4a3486;
+  --gamer-hair: #1c1538;
+  --gamer-cloth-hi: #2c4290;
+  --gamer-cloth: #1b2a62;
+  --gamer-cloth-lo: #0c1534;
+  --gamer-gear-hi: #48516e;
+  --gamer-gear-lo: #151a2c;
+  --gamer-iris-hi: #b07a46;
+  --gamer-iris: #4a2c1c;
+  --gamer-white: #f2f5ff;
+  --gamer-ink: #0a0d1c;
+  --gamer-mouth: #5a1830;
+  --gamer-tongue: #e86a84;
+  --gamer-paper: #d9e3ff;
+  --gamer-paper-lo: #aebde6;
   display: block;
   width: 100%;
   height: 100%;
   overflow: visible;
 }
-.cp-gamer__stop-a { stop-color: var(--color-primary); }
-.cp-gamer__stop-b { stop-color: var(--color-accent-blue); }
-.cp-gamer__stop-c { stop-color: var(--color-accent-purple); }
-.cp-gamer__fill { fill: var(--color-surface-alt); }
-.cp-gamer__skin,
-.cp-gamer__device { fill: var(--color-surface); }
-.cp-gamer__hair { fill: var(--color-accent-purple); opacity: 0.85; }
-.cp-gamer__eye,
-.cp-gamer__btn-a,
-.cp-gamer__star { fill: var(--color-primary); }
-.cp-gamer__cup,
-.cp-gamer__plug,
+.cp-gamer__s-a { stop-color: var(--color-primary); }
+.cp-gamer__s-b { stop-color: var(--color-accent-blue); }
+.cp-gamer__s-c { stop-color: var(--color-accent-purple); }
+.cp-gamer__s-skin-hi { stop-color: var(--gamer-skin-hi); }
+.cp-gamer__s-skin { stop-color: var(--gamer-skin); }
+.cp-gamer__s-skin-lo { stop-color: var(--gamer-skin-lo); }
+.cp-gamer__s-hair-hi { stop-color: var(--gamer-hair-hi); }
+.cp-gamer__s-hair { stop-color: var(--gamer-hair); }
+.cp-gamer__s-cloth-hi { stop-color: var(--gamer-cloth-hi); }
+.cp-gamer__s-cloth { stop-color: var(--gamer-cloth); }
+.cp-gamer__s-cloth-lo { stop-color: var(--gamer-cloth-lo); }
+.cp-gamer__s-gear-hi { stop-color: var(--gamer-gear-hi); }
+.cp-gamer__s-gear-lo { stop-color: var(--gamer-gear-lo); }
+.cp-gamer__s-iris-hi { stop-color: var(--gamer-iris-hi); }
+.cp-gamer__s-iris { stop-color: var(--gamer-iris); }
+.cp-gamer__s-desk { stop-color: var(--color-surface-alt); }
+
+/* Face */
+.cp-gamer__white { fill: var(--gamer-white); }
+.cp-gamer__pupil { fill: var(--gamer-ink); }
+.cp-gamer__catch { fill: #fff; }
+.cp-gamer__mouth { fill: var(--gamer-mouth); }
+.cp-gamer__teeth { fill: var(--gamer-white); }
+.cp-gamer__tongue { fill: var(--gamer-tongue); }
+.cp-gamer__blush { fill: var(--gamer-blush); opacity: 0.28; }
+.cp-gamer__shadow { fill: var(--gamer-skin-lo); opacity: 0.7; }
 .cp-gamer__mark-dot { fill: var(--color-accent-blue); }
-.cp-gamer__mic,
-.cp-gamer__btn-b,
-.cp-gamer__star--2 { fill: var(--color-accent-purple); }
-.cp-gamer__lens { fill: var(--color-primary); fill-opacity: 0.08; }
-.cp-gamer__mouth,
-.cp-gamer__glyph,
-.cp-gamer__glint,
+.cp-gamer__mic { fill: var(--color-primary); }
+/* Hoodie, gear and props */
+.cp-gamer__hood { fill: var(--gamer-cloth-hi); }
+.cp-gamer__aglet { fill: var(--color-primary); }
+.cp-gamer__glass { fill: var(--color-primary); fill-opacity: 0.3; }
+.cp-gamer__rim-ring { fill: none; stroke: var(--gamer-gear-hi); stroke-width: 4; }
+.cp-gamer__glass-hi { fill: var(--gamer-white); fill-opacity: 0.14; }
+.cp-gamer__map { fill: var(--gamer-paper); }
+.cp-gamer__map-fold { fill: var(--gamer-paper-lo); }
+.cp-gamer__stick { fill: var(--gamer-gear-lo); stroke: var(--gamer-gear-hi); stroke-width: 1; }
+.cp-gamer__btn--a,
+.cp-gamer__star { fill: var(--color-primary); }
+.cp-gamer__btn--b,
+.cp-gamer__star--2,
+.cp-gamer__star--4 { fill: var(--color-accent-purple); }
+.cp-gamer__btn--c { fill: var(--color-accent-blue); }
+.cp-gamer__btn--d { fill: var(--gamer-white); }
+.cp-gamer__confetti--1 { fill: var(--color-primary); }
+.cp-gamer__confetti--2 { fill: var(--color-accent-purple); }
+.cp-gamer__confetti--3 { fill: var(--color-warning); }
+
+/* Line work: every stroked part shares caps and joins. */
+.cp-gamer__lash,
+.cp-gamer__brow,
+.cp-gamer__nose,
+.cp-gamer__lip,
+.cp-gamer__reflect,
+.cp-gamer__fold,
+.cp-gamer__hood-in,
+.cp-gamer__string,
+.cp-gamer__streak,
+.cp-gamer__strand,
+.cp-gamer__band,
+.cp-gamer__band-hi,
+.cp-gamer__led,
+.cp-gamer__boom,
+.cp-gamer__cuff,
+.cp-gamer__knuckle,
+.cp-gamer__edge-hi,
+.cp-gamer__glow-line,
+.cp-gamer__dpad,
+.cp-gamer__handle,
+.cp-gamer__sheen,
 .cp-gamer__route,
 .cp-gamer__cross,
 .cp-gamer__mark,
 .cp-gamer__spark,
-.cp-gamer__wave {
+.cp-gamer__slot,
+.cp-gamer__cable,
+.cp-gamer__prong,
+.cp-gamer__wave,
+.cp-gamer__z {
   fill: none;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
-.cp-gamer__mouth { stroke: var(--color-primary); stroke-width: 2; }
-.cp-gamer__glyph { stroke: var(--color-muted); stroke-width: 2; }
-.cp-gamer__glint { stroke: var(--color-text); stroke-opacity: 0.6; stroke-width: 2; }
-.cp-gamer__route { stroke: var(--color-primary); stroke-width: 2; stroke-dasharray: 3 4; }
-.cp-gamer__cross { stroke: var(--color-accent-purple); stroke-width: 3; }
-.cp-gamer__mark { stroke: var(--color-accent-blue); stroke-width: 3.5; }
-.cp-gamer__spark { stroke: var(--color-warning); stroke-width: 2.5; }
-.cp-gamer__wave { stroke: var(--color-muted); stroke-width: 4; }
+.cp-gamer__lash { stroke: var(--gamer-ink); stroke-width: 1.5; }
+.cp-gamer__brow { stroke: var(--gamer-hair); stroke-width: 2.6; }
+.cp-gamer__nose { stroke: var(--gamer-skin-lo); stroke-width: 1.3; }
+.cp-gamer__lip { stroke: var(--gamer-mouth); stroke-width: 1.8; }
+.cp-gamer__reflect { stroke: var(--color-primary); stroke-width: 0.9; stroke-opacity: 0.85; }
+.cp-gamer__fold { stroke: var(--gamer-cloth-lo); stroke-width: 2; stroke-opacity: 0.7; }
+.cp-gamer__hood-in { stroke: var(--gamer-cloth-lo); stroke-width: 2.4; }
+.cp-gamer__string { stroke: var(--gamer-paper-lo); stroke-width: 1.4; }
+.cp-gamer__streak { stroke: var(--color-accent-purple); stroke-width: 2.4; stroke-opacity: 0.9; }
+.cp-gamer__strand { stroke: var(--gamer-hair-hi); stroke-width: 1.4; }
+.cp-gamer__band { stroke: var(--gamer-gear-lo); stroke-width: 5; }
+.cp-gamer__band-hi { stroke: var(--gamer-gear-hi); stroke-width: 1.2; }
+.cp-gamer__led { stroke-width: 2.2; }
+.cp-gamer__led--a { stroke: var(--color-primary); }
+.cp-gamer__led--c { stroke: var(--color-accent-purple); }
+.cp-gamer__boom { stroke: var(--gamer-gear-lo); stroke-width: 2.2; }
+.cp-gamer__cuff { stroke: var(--gamer-cloth-lo); stroke-width: 5; }
+.cp-gamer__knuckle { stroke: var(--gamer-skin-lo); stroke-width: 0.9; }
+.cp-gamer__edge-hi { stroke: var(--gamer-gear-hi); stroke-width: 1; }
+.cp-gamer__glow-line { stroke: var(--color-primary); stroke-width: 1.6; }
+.cp-gamer__dpad { stroke: var(--gamer-gear-hi); stroke-width: 2.4; }
+.cp-gamer__handle { stroke: var(--gamer-gear-lo); stroke-width: 5; }
+.cp-gamer__sheen { stroke: var(--gamer-white); stroke-width: 2; stroke-opacity: 0.7; }
+.cp-gamer__route { stroke: var(--color-primary); stroke-width: 1.8; stroke-dasharray: 2.5 3; }
+.cp-gamer__cross { stroke: var(--color-accent-purple); stroke-width: 2.6; }
+.cp-gamer__mark { stroke: var(--color-accent-blue); stroke-width: 4; }
+.cp-gamer__spark { stroke: var(--color-warning); stroke-width: 2.2; }
+.cp-gamer__slot { stroke: var(--gamer-ink); stroke-width: 2.4; }
+.cp-gamer__cable { stroke: var(--gamer-gear-hi); stroke-width: 3; }
+.cp-gamer__prong { stroke: var(--gamer-paper-lo); stroke-width: 1.8; }
+.cp-gamer__wave { stroke: var(--color-muted); stroke-width: 3.4; stroke-opacity: 0.6; }
+.cp-gamer__z { stroke: var(--color-accent-blue); stroke-width: 2; }
 
-/* Every animated group turns / moves about its own box. */
+/* Motion: transform / opacity only. Loops of different lengths (4.7 s blink,
+   5.2 s breath, 6.8 s head, 7.3 s glance…) so the layers drift in and out of
+   phase and the player never moves like a metronome. Every animated group
+   turns about a point given in the drawing's own 240×180 coordinates. */
 .cp-gamer__sway,
 .cp-gamer__breathe,
+.cp-gamer__head,
 .cp-gamer__eyes,
-.cp-gamer__tilt,
-.cp-gamer__scan,
-.cp-gamer__float {
-  transform-box: fill-box;
-  transform-origin: center;
+.cp-gamer__iris,
+.cp-gamer__thumb,
+.cp-gamer__sweep,
+.cp-gamer__scratch,
+.cp-gamer__float,
+.cp-gamer__thumbs-up,
+.cp-gamer__z {
+  transform-box: view-box;
 }
 .cp-gamer__sway {
-  transform-origin: 50% 100%;
-  animation: cp-gamer-sway 5s ease-in-out infinite;
+  transform-origin: 120px 180px;
+  animation: cp-gamer-sway 8.2s ease-in-out infinite;
 }
-.cp-gamer__breathe { animation: cp-gamer-breathe 4s ease-in-out infinite; }
-.cp-gamer__eyes { animation: cp-gamer-blink 5s ease-in-out infinite; }
-.cp-gamer__tilt { animation: cp-gamer-tilt 3s ease-in-out infinite; }
-.cp-gamer__scan { animation: cp-gamer-scan 4s ease-in-out infinite; }
-.cp-gamer__float { animation: cp-gamer-float 3s ease-in-out infinite; }
-.cp-gamer__spark { animation: cp-gamer-flicker 3s steps(1, end) infinite; }
-.cp-gamer__wave { animation: cp-gamer-pulse 3s ease-in-out infinite; }
-.cp-gamer__wave--2 { animation-delay: 0.4s; }
-.cp-gamer__wave--3 { animation-delay: 0.8s; }
-.cp-gamer__star { animation: cp-gamer-pulse 3s ease-in-out infinite; }
-.cp-gamer__star--2 { animation-delay: 1s; }
-.cp-gamer__star--3 { animation-delay: 2s; }
-/* Declared after `.cp-gamer__sway`, on the same element: replaces the sway. */
-.cp-gamer__bounce { animation: cp-gamer-bounce 3s ease-in-out infinite; }
+.cp-gamer__breathe {
+  transform-origin: 120px 172px;
+  animation: cp-gamer-breathe 5.2s ease-in-out infinite;
+}
+.cp-gamer__head {
+  transform-origin: 120px 112px;
+  animation: cp-gamer-head 6.8s ease-in-out infinite;
+}
+.cp-gamer__eyes {
+  transform-origin: 120px 80px;
+  animation: cp-gamer-blink 4.7s ease-in-out infinite;
+}
+.cp-gamer__iris { animation: cp-gamer-glance 7.3s ease-in-out infinite; }
+.cp-gamer__led,
+.cp-gamer__mic,
+.cp-gamer__glow-line { animation: cp-gamer-glow 3.6s ease-in-out infinite; }
+.cp-gamer__led--c { animation-delay: -1.8s; }
+
+/* Pose actions */
+.cp-gamer__thumb { animation: cp-gamer-press 1.9s ease-in-out infinite; }
+.cp-gamer__thumb--r { animation-delay: -0.7s; animation-duration: 2.3s; }
+.cp-gamer__sweep {
+  transform-origin: 168px 180px;
+  animation: cp-gamer-sweep 4.4s ease-in-out infinite;
+}
+.cp-gamer__scratch {
+  transform-origin: 66px 180px;
+  animation: cp-gamer-scratch 1.6s ease-in-out infinite;
+}
+.cp-gamer__float { animation: cp-gamer-float 3.4s ease-in-out infinite; }
+.cp-gamer__spark { animation: cp-gamer-flicker 2.6s steps(1, end) infinite; }
+.cp-gamer__wifi { animation: cp-gamer-dim 4s ease-in-out infinite; }
+.cp-gamer__nod { animation: cp-gamer-nod 6s ease-in-out infinite; }
+.cp-gamer__z { animation: cp-gamer-zzz 4.5s ease-out infinite; }
+.cp-gamer__z--2 { animation-delay: 1.5s; }
+.cp-gamer__z--3 { animation-delay: 3s; }
+.cp-gamer__thumbs-up {
+  transform-origin: 174px 186px;
+  animation: cp-gamer-bounce 2.4s ease-in-out infinite;
+}
+.cp-gamer__star,
+.cp-gamer__confetti { animation: cp-gamer-twinkle 3s ease-in-out infinite; }
+.cp-gamer__star--2 { animation-delay: -0.8s; }
+.cp-gamer__star--3 { animation-delay: -1.6s; }
+.cp-gamer__star--4 { animation-delay: -2.3s; }
+.cp-gamer__confetti--2 { animation-delay: -1.1s; }
+.cp-gamer__confetti--3 { animation-delay: -1.9s; }
 
 @keyframes cp-gamer-sway {
-  0%, 100% { transform: rotate(-1deg); }
-  50% { transform: rotate(1deg); }
+  0%, 100% { transform: rotate(-0.5deg); }
+  50% { transform: rotate(0.5deg); }
 }
 @keyframes cp-gamer-breathe {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-1.5px); }
+  0%, 100% { transform: scaleY(1); }
+  45% { transform: scaleY(1.015); }
+}
+@keyframes cp-gamer-head {
+  0%, 100% { transform: rotate(0deg) translateY(0); }
+  30% { transform: rotate(-1.6deg) translateY(-0.6px); }
+  65% { transform: rotate(1.2deg) translateY(-0.3px); }
 }
 @keyframes cp-gamer-blink {
-  0%, 90%, 100% { transform: scaleY(1); }
-  93% { transform: scaleY(0.1); }
+  0%, 93%, 100% { transform: scaleY(1); }
+  95.5% { transform: scaleY(0.08); }
 }
-@keyframes cp-gamer-tilt {
-  0%, 100% { transform: rotate(-3deg); }
-  50% { transform: rotate(3deg); }
+@keyframes cp-gamer-glance {
+  0%, 18%, 100% { transform: translate(0, 0); }
+  24%, 44% { transform: translate(1.3px, 0.2px); }
+  52%, 70% { transform: translate(-1.1px, -0.3px); }
+  78% { transform: translate(0, 0); }
 }
-@keyframes cp-gamer-scan {
-  0%, 100% { transform: translate(0, 0); }
-  33% { transform: translate(-4px, -3px); }
-  66% { transform: translate(3px, -1px); }
+@keyframes cp-gamer-glow {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+@keyframes cp-gamer-press {
+  0%, 60%, 100% { transform: translateY(0); }
+  70% { transform: translateY(0.9px); }
+  80% { transform: translateY(0); }
+}
+@keyframes cp-gamer-sweep {
+  0%, 100% { transform: rotate(0deg); }
+  35% { transform: rotate(-4deg) translateY(-1px); }
+  70% { transform: rotate(2.5deg); }
+}
+@keyframes cp-gamer-scratch {
+  0%, 100% { transform: rotate(0deg); }
+  50% { transform: rotate(1.6deg); }
 }
 @keyframes cp-gamer-float {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-4px); }
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-4px) rotate(4deg); }
 }
 @keyframes cp-gamer-flicker {
   0%, 100% { opacity: 1; }
-  40% { opacity: 0.2; }
-  48% { opacity: 1; }
-  70% { opacity: 0.4; }
+  12% { opacity: 0.15; }
+  18% { opacity: 1; }
+  46% { opacity: 0.35; }
+  52% { opacity: 0; }
+  60% { opacity: 1; }
 }
-@keyframes cp-gamer-pulse {
-  0%, 100% { opacity: 0.25; }
-  50% { opacity: 1; }
+@keyframes cp-gamer-dim {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+@keyframes cp-gamer-nod {
+  0%, 100% { transform: rotate(0deg) translateY(0); }
+  40% { transform: rotate(2deg) translateY(1.6px); }
+  55% { transform: rotate(2.4deg) translateY(2px); }
+  68% { transform: rotate(-0.4deg) translateY(-0.4px); }
+}
+@keyframes cp-gamer-zzz {
+  0% { opacity: 0; transform: translate(0, 4px); }
+  20% { opacity: 1; }
+  80% { opacity: 0.6; }
+  100% { opacity: 0; transform: translate(6px, -10px); }
 }
 @keyframes cp-gamer-bounce {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-3px); }
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  40% { transform: translateY(-3px) rotate(-2deg); }
+  60% { transform: translateY(-1px) rotate(0.5deg); }
+}
+@keyframes cp-gamer-twinkle {
+  0%, 100% { opacity: 0.25; }
+  50% { opacity: 1; }
 }
 
 /* While the machine reports no network: one quiet pill, bottom centre, under

@@ -1,29 +1,40 @@
-import { GamerFigure, Hand, SMALL_O } from "./GamerFigure";
+import { Arm, Fist, GamerFigure } from "./GamerFigure";
 
-/** The page is not there: the player, head tilted, over a map with no road. */
+/** The page is not there: head tilted, scratching it over a map with no road. */
 const NotFoundPose = () => (
   <GamerFigure
-    mouth={SMALL_O}
-    headTilt={-7}
+    headTilt={-6}
+    face={{
+      brows: "M104 69.6 Q109 64.6 115 67.6 M125 71.2 Q131 70.2 136.4 72.4",
+      mouth: <path className="cp-gamer__lip" d="M114 98.4 Q117 96 120 98.2 Q123 100.4 126.4 97.6" />,
+      look: -1,
+    }}
     scene={() => (
       <g className="cp-gamer__float">
-        <path className="cp-gamer__mark" d="M170 34 Q170 24 179 24 Q188 24 188 32 Q188 38 180 41 V46" />
-        <circle className="cp-gamer__mark-dot" cx="180" cy="53" r="2.2" />
+        <path className="cp-gamer__mark" d="M168 34 Q168 22 179 22 Q190 22 190 31 Q190 38 181 41.5 V47" />
+        <circle className="cp-gamer__mark-dot" cx="181" cy="55" r="2.6" />
       </g>
     )}
-    front={(stroke) => (
-      <g className="cp-gamer__tilt">
-        <path
-          className="cp-gamer__device"
-          stroke={stroke}
-          strokeWidth="2.2"
-          strokeLinejoin="round"
-          d="M82 134 L101 128 L120 134 L139 128 L158 134 V162 L139 156 L120 162 L101 156 L82 162 Z"
-        />
-        <path className="cp-gamer__route" d="M90 154 Q100 140 112 148 Q124 156 132 142" />
-        <path className="cp-gamer__cross" d="M138 137 L146 145 M146 137 L138 145" />
-        <Hand cx={82} cy={150} stroke={stroke} />
-        <Hand cx={158} cy={150} stroke={stroke} />
+    arms={(paint) => (
+      <g>
+        <g className="cp-gamer__scratch">
+          <Arm paint={paint} d="M70 168 C60 150 56 128 66 112 C72 100 80 84 86 70" />
+        </g>
+        <Arm paint={paint} d="M170 168 Q166 168 156 158" />
+      </g>
+    )}
+    front={(paint) => (
+      <g>
+        <g className="cp-gamer__scratch">
+          <Fist paint={paint} transform="translate(88 64) rotate(-150)" />
+        </g>
+        <g transform="rotate(-6 136 148)">
+          <path className="cp-gamer__map" d="M112 136 L128 132 L144 136 L160 132 V156 L144 160 L128 156 L112 160 Z" />
+          <path className="cp-gamer__map-fold" d="M128 132 V156 L144 160 V136 Z" />
+          <path className="cp-gamer__route" d="M116 152 Q122 140 131 146 Q138 151 146 142" />
+          <path className="cp-gamer__cross" d="M148 139 L154 145 M154 139 L148 145" />
+        </g>
+        <Fist paint={paint} transform="translate(158 154) rotate(-20) scale(-1 1)" />
       </g>
     )}
   />
