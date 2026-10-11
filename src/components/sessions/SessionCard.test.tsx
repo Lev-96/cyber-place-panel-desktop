@@ -48,10 +48,15 @@ describe("SessionCard frame", () => {
   });
 
   test("offline and drag states are classes the board and its CSS rely on", () => {
-    const el = card({ seatState: "offline", dragging: true, dropBefore: true });
+    const el = card({ seatState: "offline", dragging: true, dropSide: "before" });
     expect(el.classList.contains("session-card--seat-offline")).toBe(true);
     expect(el.classList.contains("is-dragging")).toBe(true);
     expect(el.classList.contains("is-drop-before")).toBe(true);
+    cleanup();
+    // Dragged down, the seat lands after the target: the marker is on its trailing edge.
+    const after = card({ seatState: "free", dropSide: "after" });
+    expect(after.classList.contains("is-drop-after")).toBe(true);
+    expect(after.classList.contains("is-drop-before")).toBe(false);
   });
 });
 

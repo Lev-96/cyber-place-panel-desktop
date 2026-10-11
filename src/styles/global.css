@@ -327,7 +327,7 @@ html {
    the tile the drop will land IN FRONT OF lights up with a neon ring plus a
    glowing insertion bar on its leading edge — so it's unmistakable WHAT is
    moving and WHERE it will land. */
-.live-grid.is-reordering .place-cell:not(.is-dragging):not(.is-drop-before) {
+.live-grid.is-reordering .place-cell:not(.is-dragging):not(.is-drop-before):not(.is-drop-after) {
   opacity: 0.78;
 }
 .place-cell.is-dragging {
@@ -336,15 +336,20 @@ html {
   transform: scale(0.97);
   cursor: grabbing;
 }
-.place-cell.is-drop-before {
+.place-cell.is-drop-before,
+.place-cell.is-drop-after {
   border-color: var(--color-primary) !important;
   box-shadow:
     0 0 0 2px rgba(7, 221, 241, 0.55),
     0 0 22px rgba(7, 221, 241, 0.35);
   transform: translateX(6px);
 }
+/* Dragged DOWN the tile lands after the target (utils/reorder.ts), so the
+   target leans the other way and the bar sits on its trailing edge. */
+.place-cell.is-drop-after { transform: translateX(-6px); }
 /* Neon insertion bar on the leading edge — "the tile drops here". */
-.place-cell.is-drop-before::before {
+.place-cell.is-drop-before::before,
+.place-cell.is-drop-after::after {
   content: "";
   position: absolute;
   left: -7px;
@@ -355,6 +360,7 @@ html {
   background: var(--color-primary);
   box-shadow: 0 0 10px rgba(7, 221, 241, 0.85);
 }
+.place-cell.is-drop-after::after { left: auto; right: -7px; }
 /* Bigger, clearly-grabbable handle: a rounded hit area that glows on hover. */
 .place-cell .cell-grip {
   padding: 2px 5px;
@@ -475,12 +481,15 @@ html {
 /* Section reorder feedback: the dragged section fades to a ghost; the section
    the drop will land before gets a neon ring + an insertion bar on its top. */
 .cp-section.is-dragging { opacity: 0.5; }
-.cp-section.is-drop-before { position: relative; }
-.cp-section.is-drop-before .cp-section-toggle {
+.cp-section.is-drop-before,
+.cp-section.is-drop-after { position: relative; }
+.cp-section.is-drop-before .cp-section-toggle,
+.cp-section.is-drop-after .cp-section-toggle {
   border-color: var(--color-primary);
   box-shadow: 0 0 0 2px rgba(7, 221, 241, 0.5), 0 0 18px rgba(7, 221, 241, 0.3);
 }
-.cp-section.is-drop-before::before {
+.cp-section.is-drop-before::before,
+.cp-section.is-drop-after::after {
   content: "";
   position: absolute;
   left: 0;
@@ -491,6 +500,8 @@ html {
   background: var(--color-primary);
   box-shadow: 0 0 10px rgba(7, 221, 241, 0.8);
 }
+/* Dragged down, the section lands after the target: bar on its bottom edge. */
+.cp-section.is-drop-after::after { top: auto; bottom: -6px; }
 
 .btn {
   transition:

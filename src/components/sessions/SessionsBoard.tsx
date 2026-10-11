@@ -43,6 +43,7 @@ import { BASE_JOYSTICKS, MAX_JOYSTICKS } from "@/api/joystickPrices";
 import { notify } from "@/ui/notify";
 import StopReceiptModal from "./StopReceiptModal";
 import { useExpiryNudge } from "./useExpiryNudge";
+import { dropSideOf, moveOnto } from "@/utils/reorder";
 
 const navBtn: React.CSSProperties = { padding: "6px 10px", border: "1px solid #1f2a44", borderRadius: 6 };
 
@@ -574,9 +575,7 @@ const SessionsBoard = ({ branchId }: Props) => {
     const targetPc = byId.get(targetId);
     if (!fromPc || !targetPc || sectionKeyOf(fromPc) !== sectionKeyOf(targetPc)) return;
     setOrder((prev) => {
-      const next = prev.filter((id) => id !== from);
-      const idx = next.indexOf(targetId);
-      next.splice(idx < 0 ? next.length : idx, 0, from);
+      const next = moveOnto(prev, from, targetId);
       void sessionRepository.reorderPcs(branchId, next).catch(() => {});
       return next;
     });
@@ -718,7 +717,7 @@ const SessionsBoard = ({ branchId }: Props) => {
         baseColor={color}
         seatState={cellState}
         dragging={dragId === pc.id}
-        dropBefore={dragOverId === pc.id && dragId != null && dragId !== pc.id}
+        dropSide={dragOverId === pc.id ? dropSideOf(order, dragId, pc.id) : null}
         onDragOver={(e) => {
           e.preventDefault();
           if (dragId != null && dragId !== pc.id) {
@@ -1344,7 +1343,7 @@ const SessionsBoard = ({ branchId }: Props) => {
                 reorderable={sectionKeys.length > 1}
                 dragHint={t("session.dragSectionHint")}
                 dragging={dragSection === key}
-                dropTarget={dropSection === key && dragSection != null && dragSection !== key}
+                dropSide={dropSection === key ? dropSideOf(sectionReorder.ordered, dragSection, key) : null}
                 onDragStart={onSectionDragStart(key)}
                 onDragEnd={() => { setDragSection(null); setDropSection(null); }}
                 onDragOver={(e) => {

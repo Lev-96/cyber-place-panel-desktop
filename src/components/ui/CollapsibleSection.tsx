@@ -1,3 +1,4 @@
+import type { DropSide } from "@/utils/reorder";
 import { DragEvent, ReactNode } from "react";
 
 interface Props {
@@ -15,8 +16,8 @@ interface Props {
   onDrop?: (e: DragEvent) => void;
   /** This section is currently being dragged. */
   dragging?: boolean;
-  /** The drop will land just before this section. */
-  dropTarget?: boolean;
+  /** The drop will land on this edge of the section (`utils/reorder.ts` `dropSideOf`). */
+  dropSide?: DropSide | null;
   dragHint?: string;
 }
 
@@ -40,11 +41,11 @@ const CollapsibleSection = ({
   onDragOver,
   onDrop,
   dragging,
-  dropTarget,
+  dropSide,
   dragHint,
 }: Props) => (
   <section
-    className={`cp-section${dragging ? " is-dragging" : ""}${dropTarget ? " is-drop-before" : ""}`}
+    className={`cp-section${dragging ? " is-dragging" : ""}${dropSide ? ` is-drop-${dropSide}` : ""}`}
     onDragOver={onDragOver}
     onDrop={onDrop}
   >

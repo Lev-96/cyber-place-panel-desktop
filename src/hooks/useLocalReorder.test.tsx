@@ -71,3 +71,53 @@ describe("useLocalReorder — per-account isolation", () => {
     expect(localStorage.getItem("hub:tiles:1")).toBeNull();
   });
 });
+
+/**
+ * Every client-side reorderable list (place tiles, board sections, hub tiles)
+ * moves through this hook: a drop puts the item in the target's slot
+ * (`utils/reorder.ts`), and the saved order is exactly what is shown.
+ */
+describe("useLocalReorder — reaching every slot", () => {
+  const FIVE = ["a", "b", "c", "d", "e"];
+  let five: { ordered: string[]; move: (from: string, target: string | null) => void };
+  const Five = () => {
+    five = useLocalReorder("board:places:tiles:1", FIVE);
+    return null;
+  };
+  const saved = () => JSON.parse(localStorage.getItem("u3:board:places:tiles:1") ?? "null");
+
+  beforeEach(() => {
+    localStorage.clear();
+    auth.user = { id: 3 };
+  });
+
+  test("first to last and last to first, saved as shown", async () => {
+    render(<Five />);
+    await act(async () => { five.move("a", "e"); });
+    expect(five.ordered).toEqual(["b", "c", "d", "e", "a"]);
+    expect(saved()).toEqual(five.ordered);
+
+    await act(async () => { five.move("a", "b"); });
+    expect(five.ordered).toEqual(["a", "b", "c", "d", "e"]);
+    await act(async () => { five.move("e", "a"); });
+    expect(five.ordered).toEqual(["e", "a", "b", "c", "d"]);
+    expect(saved()).toEqual(five.ordered);
+  });
+
+  test("one step down is a move, onto itself is not", async () => {
+    render(<Five />);
+    await act(async () => { five.move("b", "c"); });
+    expect(five.ordered).toEqual(["a", "c", "b", "d", "e"]);
+    await act(async () => { five.move("c", "c"); });
+    expect(five.ordered).toEqual(["a", "c", "b", "d", "e"]);
+  });
+
+  test("the saved order comes back on the next mount", async () => {
+    const first = render(<Five />);
+    await act(async () => { five.move("a", "e"); });
+    first.unmount();
+
+    render(<Five />);
+    expect(five.ordered).toEqual(["b", "c", "d", "e", "a"]);
+  });
+});

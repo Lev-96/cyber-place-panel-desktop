@@ -12,6 +12,7 @@ import { DragEvent, useState } from "react";
 import Button from "@/components/ui/Button";
 import PlaceCell from "./PlaceCell";
 import StatusLegend from "./StatusLegend";
+import { dropSideOf } from "@/utils/reorder";
 
 const LEAD_SECTIONS = ["pc", "ps"];
 
@@ -97,7 +98,7 @@ const BranchLiveScreen = ({ branchId }: { branchId: number }) => {
                 reorderable={sectionKeys.length > 1}
                 dragHint={t("session.dragSectionHint")}
                 dragging={dragSection === key}
-                dropTarget={dropSection === key && dragSection != null && dragSection !== key}
+                dropSide={dropSection === key ? dropSideOf(sectionReorder.ordered, dragSection, key) : null}
                 onDragStart={onSectionDragStart(key)}
                 onDragEnd={() => { setDragSection(null); setDropSection(null); }}
                 onDragOver={(e) => {

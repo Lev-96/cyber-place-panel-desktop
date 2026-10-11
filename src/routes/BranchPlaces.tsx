@@ -20,6 +20,7 @@ import { IBranchPlace } from "@/types/api";
 import { platformGroup } from "@/utils/platform";
 import { DragEvent, useState } from "react";
 import { useParams } from "react-router-dom";
+import { dropSideOf } from "@/utils/reorder";
 
 // Tile border / dot palette. Reserved wins over the place's own active/inactive
 // status — a manager needs to see "this seat is currently held by a booking"
@@ -154,6 +155,7 @@ const BranchPlaces = () => {
 
   const renderCell = (p: IBranchPlace) => {
     const pid = String(p.id);
+    const dropSide = dragOverId === pid ? dropSideOf(tileReorder.ordered, dragId, pid) : null;
     const isReserved = reservedPlaceIds.has(p.id);
     const isActive = p.status === "active";
     const tone = isReserved ? COLOR_RESERVED : isActive ? COLOR_ACTIVE : COLOR_IDLE;
@@ -163,9 +165,7 @@ const BranchPlaces = () => {
     return (
       <div
         key={p.id}
-        className={`place-cell${dragId === pid ? " is-dragging" : ""}${
-          dragOverId === pid && dragId != null && dragId !== pid ? " is-drop-before" : ""
-        }`}
+        className={`place-cell${dragId === pid ? " is-dragging" : ""}${dropSide ? ` is-drop-${dropSide}` : ""}`}
         style={{ borderColor: tone, minHeight: 130 }}
         onDragOver={(e) => {
           e.preventDefault();
@@ -252,7 +252,7 @@ const BranchPlaces = () => {
                   reorderable={sectionKeys.length > 1}
                   dragHint={t("session.dragSectionHint")}
                   dragging={dragSection === key}
-                  dropTarget={dropSection === key && dragSection != null && dragSection !== key}
+                  dropSide={dropSection === key ? dropSideOf(sectionReorder.ordered, dragSection, key) : null}
                   onDragStart={onSectionDragStart(key)}
                   onDragEnd={() => { setDragSection(null); setDropSection(null); }}
                   onDragOver={(e) => {
