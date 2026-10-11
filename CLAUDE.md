@@ -1322,11 +1322,16 @@ entry's base label key — a stable id, never the translated text) gives an
 owner or a manager a `rank` and their menu label. `sortedNavItems` orders in
 three bands: pinned (Dashboard) → ranked by rank → the rest alphabetically
 (Settings, Agent updates, anything added later). Owner: Панель, Моя компания,
-Мои филиалы, Мои менеджеры, Выручка, Места моих филиалов на карте,
-Сканировать код, Бронирования, Уведомления, Турниры всех филиалов. Manager
-(own branch only): Панель, Мой филиал (takes the branches' place), Сканировать
-код, Бронирования, Уведомления, Турниры моего филиала — their tournaments list
-is filtered to their branch, so "all branches" would be false. Admin is NOT
+Мои филиалы, Мои менеджеры, Выручка, Места филиалов на карте, Сканировать код,
+Бронирования, Турниры всех филиалов, Уведомления (tournaments before
+notifications, reordered later on 2026-10-11). Manager (own branch only):
+Панель, Мой филиал (takes the branches' place), Сканировать код, Бронирования,
+Турниры моего филиала, Уведомления. Their tournaments list is filtered to their
+branch, so "all branches" would be false. `nav.side.branchesOnMap` reads
+"Места филиалов на карте" / "Branch locations on the map" /
+"Մասնաճյուղերի վայրերը քարտեզի վրա". `withStaffMenu` stores the base key in
+the spec's `id` before it swaps `labelKey`, and `NavItem.id` carries it to the
+renderer, so icons and order never key on the menu wording. Admin is NOT
 changed (sees every branch/manager: "My …" would be false; Dashboard first +
 alphabetical). Only the SIDE MENU wording changes (`nav.side.*`): page titles,
 routes, permissions untouched. Long labels wrap in the 240px column (checked
@@ -1334,12 +1339,57 @@ in Chromium, ru/am/en, no overflow). Tests in `Sidebar.order.test.tsx` (per
 role × language, ru wording, language switch, manager tournaments label);
 mutation-verified (table not applied, rank ignored, manager label).
 
+**One current entry + icons (2026-10-11).** The nav renders plain `Link`s, not
+`NavLink`s. Each NavLink decided on its own, so `/bookings/confirm` lit both
+Scan and Bookings, and `/settings/updates` lit both Settings and Updates.
+`activeNavTo(items, pathname)` (`sidebarNav.ts`) picks ONE entry: the longest
+`to` that equals the path or contains it as a whole-segment prefix. `end`
+entries (the Dashboard) match only exactly. Only that entry gets `.active` and
+`aria-current="page"`. Detail pages still light their section: `/bookings/5`
+lights Bookings, `/branches/9/...` lights a manager's My branch, and
+`/companies/4/revenue` lights My company. A page outside the menu
+(`/support`) lights nothing in the nav. Every row is `<NavIcon id={item.id}/>`
++ `.nav-label` + badge. `src/components/ui/NavIcon.tsx` is the single map from
+base key to a 24×24 outline (Lucide geometry, ISC, attributed in the file; no
+npm dependency). It uses `currentColor`, stroke 1.75 and round joins, renders
+at 18px, and carries `data-nav-icon={id}`. Unknown ids render nothing; the
+test catches that. A new nav entry needs a shape here.
+
+**Rhythm (§7.5, 4px scale).** Nav rows are 4px apart with 10/12 padding, and
+the icon sits 12px from the label. The icon aligns with the label's FIRST line:
+a 20px line-height and 1px icon offset. Wrapped labels stay under the label
+start, never under the icon. The sidebar gap is 12px. The footer has a hairline
+`border-top`, 12px top padding and 8px between cards. Footer cards (Support,
+`footerExtra`, account) share padding 10/12, radius 12, the `--color-border`
+edge and full column width. The support icon tile and the avatar are both
+34px, so the titles line up. Hover changes no geometry: the old
+`padding-left` slide and `translateY` lifts are gone. Nav-row rules are scoped
+to `.sidebar-nav a`. The old `.sidebar a` rules out-specified
+`.nav-support-card` and silently gave it radius 8 and a flat hover fill.
+Verified in Chromium at 240px (owner ru/am/en, manager ru, short viewport):
+no horizontal overflow, the nav scrolls under the pinned footer without
+overlap, and Support and the account card are both 215px from x=12.
+
 ### Sidebar footer slot (2026-09-29)
 
 `<Sidebar footerExtra={…} />` draws extra entries in the pinned footer, after
-Support and before the account card. The desktop Layout passes nothing, so its
-footer is unchanged (`Sidebar.footerExtra.test.tsx`); the owner web passes its
-"Telegram" card (styled with `.nav-support-card`).
+Support and before the account card. The desktop Layout passes nothing; the
+owner web passes its "Telegram" card (styled with `.nav-support-card`).
+
+**The account card is last (2026-10-11).** Sign-out is no longer a full-width
+button under the card. It is a 40×40 icon button (`button.logout`, the
+`nav.signOut` log-out glyph, with `aria-label` and `title` set to
+`t("nav.signOut")`, still `onClick={() => void logout()}`). `Sidebar` passes it
+to `UserMenu` through its `trailing` slot. The footer is: Support →
+`footerExtra` → `.sidebar-account` (the card: `.user-card` button that opens
+the account menu, then sign-out). Nothing comes after it. The card's edge lights
+via `:has(.user-card:hover / .active)`, and sign-out has its own red hover.
+The popover, profile and account-switch flows are unchanged. Tests:
+`Sidebar.layout.test.tsx` (icons per role, one current entry, footer order,
+sign-out calls logout) and `Sidebar.footerExtra.test.tsx`. Mutation-verified:
+first match instead of longest, `end` ignored, base id dropped on the staff
+swap, notifications ranked before tournaments, back to self-matching NavLinks,
+and sign-out moved outside the card.
 
 ## 9.5.7a "+ New branch" on the Branches page (2026-09-12)
 
