@@ -45,7 +45,12 @@ interface Props {
    */
   platformPrices?: IBranchPlatformPrice[];
   onClose: () => void;
-  onSaved: () => void;
+  /**
+   * Saved. On create it carries the place the server returned (null if the
+   * response had none); on edit nothing — BranchPlaces opens "Register
+   * computer" for a new PC place from it.
+   */
+  onSaved: (created?: IBranchPlace | null) => void;
 }
 
 const TYPES: PlaceType[] = ["standard", "vip"];
@@ -813,9 +818,9 @@ const PlaceForm = ({ branchId, initial, platformSuggestions, platformPrices, onC
       };
       // The place keeps a single `name` — the interface-language value — so
       // every existing consumer keeps working; the per-language values follow.
-      const placeId = initial
-        ? (await placeRepository.update(initial.id, body), initial.id)
-        : (await placeRepository.create(body))?.id ?? null;
+      const created = initial ? null : await placeRepository.create(body);
+      if (initial) await placeRepository.update(initial.id, body);
+      const placeId = initial ? initial.id : created?.id ?? null;
 
       if (placeId != null) {
         await apiSaveEntityTranslations("place", placeId, {
@@ -824,7 +829,7 @@ const PlaceForm = ({ branchId, initial, platformSuggestions, platformPrices, onC
         });
       }
 
-      onSaved();
+      onSaved(created);
     } catch (e) { setErr(formatApiError(e)); }
     finally { setBusy(false); }
   };

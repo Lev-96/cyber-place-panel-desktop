@@ -28,6 +28,13 @@ interface Props {
    * operator never reaches that refusal by picking the obvious option.
    */
   takenPlaceIds?: readonly number[];
+  /**
+   * Registering the computer of a place just created (2026-10-11): `initial`
+   * is the device the server provisioned with the place, so saving updates it
+   * and never adds a second one. The form reads "Register computer" and its
+   * dismiss is "Not now" — the place stays either way.
+   */
+  registering?: boolean;
   onClose: () => void;
   onSaved: (pc: IPcApi) => void;
 }
@@ -52,7 +59,7 @@ interface TierOption {
   amount: number | null;
 }
 
-const PcForm = ({ branchId, initial, takenPlaceIds = [], onClose, onSaved }: Props) => {
+const PcForm = ({ branchId, initial, takenPlaceIds = [], registering = false, onClose, onSaved }: Props) => {
   const { t, money } = useLang();
   // This form registers COMPUTERS. On create the kind is always PC; on edit
   // we keep whatever the existing device is (never silently convert it), and
@@ -138,7 +145,7 @@ const PcForm = ({ branchId, initial, takenPlaceIds = [], onClose, onSaved }: Pro
   return (
     <Modal open onClose={onClose}>
       <form className="card" style={{ width: 460, maxWidth: "90vw", display: "flex", flexDirection: "column", gap: 14 }} onSubmit={submit}>
-        <h2 style={{ margin: 0 }}>{initial ? t("pcs.editDevice") : t("pcs.newDevice")}</h2>
+        <h2 style={{ margin: 0 }}>{initial && !registering ? t("pcs.editDevice") : t("pcs.newDevice")}</h2>
 
         <div className="col" style={{ gap: 6 }}>
           <span className="label">{t("pcs.placeId")}</span>
@@ -211,7 +218,7 @@ const PcForm = ({ branchId, initial, takenPlaceIds = [], onClose, onSaved }: Pro
 
         {err && <div className="error">{err}</div>}
         <div className="row-between">
-          <Button type="button" variant="secondary" onClick={onClose} disabled={busy}>{t("action.cancel")}</Button>
+          <Button type="button" variant="secondary" onClick={onClose} disabled={busy}>{registering ? t("pcs.notNow") : t("action.cancel")}</Button>
           <Button disabled={!canSave}>{busy ? "…" : t("action.save")}</Button>
         </div>
       </form>

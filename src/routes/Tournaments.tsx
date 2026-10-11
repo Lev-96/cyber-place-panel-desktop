@@ -97,6 +97,12 @@ const Tournaments = () => {
     void reload();
   };
 
+  // "Branch: <address>", or a neutral word when the row carries no branch.
+  const branchLine = (row: ITournamentApi): string => {
+    const address = row.branch?.address?.trim();
+    return address ? `${tr("tournaments.branch")}: ${address}` : tr("tournaments.branchUnknown");
+  };
+
   return (
     <ScreenWithBg
       bg="./bg/owner-home.jpg"
@@ -163,6 +169,19 @@ const Tournaments = () => {
                     {tr(`tournament.skillLevel.${skill}`)}
                   </span>
                 </div>
+
+                {/* Across branches, say which one hosts it — from the row's own
+                    eager-loaded branch, never guessed from the title. One line,
+                    clipped, the full text on hover; the branch page needs none. */}
+                {!isBranchScoped && (
+                  <div
+                    className="muted tournament-branch"
+                    style={{ fontSize: 13, marginTop: 6, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+                    title={branchLine(t)}
+                  >
+                    {branchLine(t)}
+                  </div>
+                )}
 
                 <div className="muted" style={{ fontSize: 13, marginTop: 6 }}>
                   {t.start_date}

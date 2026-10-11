@@ -47,6 +47,13 @@ export interface ITournamentApi extends Translated {
   end_date?: string | null;
   created_at?: string;
   game?: { id: number; name: string; platform: string };
+  /**
+   * The venue, eager-loaded by `GET /tournaments` (`IndexService`): the branch
+   * is named by its address, as everywhere in the panel. Null when the row has
+   * no branch (or it was deleted); absent on other endpoints.
+   */
+  branch?: { id: number; address: string; company_id: number } | null;
+  company?: { id: number; name: string; company_logo_path?: string | null } | null;
 }
 
 export interface CreateTournamentBody {

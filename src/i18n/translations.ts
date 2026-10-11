@@ -1077,6 +1077,8 @@ export const TRANSLATIONS: Dict = {
   "pcs.register": { en: "+ Register computer", ru: "+ Зарегистрировать компьютер", am: "+ Գրանցել համակարգիչ" },
   "pcs.editDevice": { en: "Edit computer", ru: "Редактировать компьютер", am: "Խմբագրել համակարգիչը" },
   "pcs.newDevice": { en: "Register computer", ru: "Зарегистрировать компьютер", am: "Գրանցել համակարգիչ" },
+  "pcs.notNow": { en: "Not now", ru: "Не сейчас", am: "Ոչ հիմա" },
+  "pcs.registerPlace.missing": { en: "This place's computer is not ready yet. Try again in a moment, or register it later under Computers.", ru: "Компьютер этого места ещё не готов. Повторите через минуту или зарегистрируйте позже в разделе «Компьютеры».", am: "Այս տեղի համակարգիչը դեռ պատրաստ չէ։ Կրկնեք մի փոքր ուշ կամ գրանցեք այն ավելի ուշ «Համակարգիչներ» բաժնում։" },
   "pcs.kind": { en: "Device type", ru: "Тип устройства", am: "Սարքի տեսակը" },
   "pcs.kindPc": { en: "PC (with agent)", ru: "ПК (с агентом)", am: "PC (Agent-ով)" },
   "pcs.kindPs": { en: "PlayStation / console", ru: "PlayStation / консоль", am: "PlayStation / կոնսոլ" },
@@ -1651,6 +1653,8 @@ export const TRANSLATIONS: Dict = {
   "tournaments.noBranch": { en: "No branch is assigned to your account.", ru: "К вашему аккаунту не привязан филиал.", am: "Ձեր հաշվին մասնաճյուղ կցված չէ։" },
   "tournaments.price": { en: "price", ru: "цена", am: "գին" },
   "tournaments.players": { en: "players", ru: "игроков", am: "խաղացողներ" },
+  "tournaments.branch": { en: "Branch", ru: "Филиал", am: "Մասնաճյուղ" },
+  "tournaments.branchUnknown": { en: "Branch not specified", ru: "Филиал не указан", am: "Մասնաճյուղը նշված չէ" },
   "tournaments.confirmDelete": { en: "Delete tournament", ru: "Удалить турнир", am: "Ջնջել մրցաշարը" },
 
   // Games
@@ -2534,6 +2538,10 @@ export const TRANSLATIONS: Dict = {
   "company.saving": { en: "Saving…", ru: "Сохранение…", am: "Պահպանվում է…" },
   "company.saved": { en: "Saved.", ru: "Сохранено.", am: "Պահպանված է։" },
   "company.logoRequired": { en: "Logo is required for a new company", ru: "Для новой компании нужен логотип", am: "Նոր ընկերության համար անհրաժեշտ է լոգո" },
+  "company.errors.websiteRequired": { en: "Enter the company's website", ru: "Укажите сайт компании", am: "Նշեք ընկերության կայքը" },
+  "company.errors.websiteInvalid": { en: "Enter a website address, e.g. https://club.am", ru: "Укажите адрес сайта, например https://club.am", am: "Նշեք կայքի հասցեն, օրինակ՝ https://club.am" },
+  "company.errors.descriptionRequired": { en: "Enter a description", ru: "Укажите описание", am: "Նշեք նկարագրությունը" },
+  "country.armenia": { en: "Armenia", ru: "Армения", am: "Հայաստան" },
   "company.ownerNotCreated": { en: "Owner user not created yet", ru: "Владелец ещё не создан", am: "Սեփականատերը դեռ չի ստեղծվել" },
   "company.replaceLogo": { en: "Replace logo (optional)", ru: "Заменить логотип (необязательно)", am: "Փոխել լոգոն (ընտրովի)" },
   "company.logo": { en: "Logo", ru: "Логотип", am: "Լոգո" },
@@ -3314,7 +3322,6 @@ export const TRANSLATIONS: Dict = {
 
   // CompanyBranches list
   "companyBranches.title": { en: "Branches of company №{0}", ru: "Филиалы компании №{0}", am: "№{0} ընկերության մասնաճյուղերը" },
-  "companyBranches.back": { en: "← Back to company", ru: "← Назад к компании", am: "← Վերադառնալ ընկերության էջ" },
   "companyBranches.newBranch": { en: "+ New branch", ru: "+ Новый филиал", am: "+ Նոր մասնաճյուղ" },
 
   // Working-hours form title

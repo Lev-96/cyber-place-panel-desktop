@@ -2,6 +2,7 @@ import { can } from "@/auth/permissions";
 import { useAuth } from "@/auth/AuthContext";
 import ConsolePicker from "@/components/ps5/ConsolePicker";
 import PlaceForm from "@/components/places/PlaceForm";
+import RegisterPlaceComputer from "@/components/pcs/RegisterPlaceComputer";
 import Button from "@/components/ui/Button";
 import CollapsibleSection from "@/components/ui/CollapsibleSection";
 import ScreenWithBg from "@/components/ui/ScreenWithBg";
@@ -50,6 +51,8 @@ const BranchPlaces = () => {
   const { user } = useAuth();
   const role = user?.role;
   const [creating, setCreating] = useState(false);
+  // The PC place just created whose computer is being registered (null = none).
+  const [registeringPlaceId, setRegisteringPlaceId] = useState<number | null>(null);
   /**
    * The console finder. Read-only in this build — it looks at the network and
    * reports; binding a console to a place comes with the next phase.
@@ -271,7 +274,17 @@ const BranchPlaces = () => {
       </StateSwitch>
 
       {findingConsoles && <ConsolePicker branchId={id} onClose={() => setFindingConsoles(false)} />}
-      {creating && <PlaceForm branchId={id} platformSuggestions={customPlatforms} platformPrices={platformPrices.data ?? []} onClose={() => setCreating(false)} onSaved={() => { setCreating(false); void reload(); void platformPrices.reload(); }} />}
+      {creating && <PlaceForm branchId={id} platformSuggestions={customPlatforms} platformPrices={platformPrices.data ?? []} onClose={() => setCreating(false)} onSaved={(created) => {
+        setCreating(false);
+        void reload();
+        void platformPrices.reload();
+        // A new PC place: offer to register its computer at once. Set here,
+        // from the save itself, so no re-render or realtime reload reopens it.
+        if (created && created.platform === "pc") setRegisteringPlaceId(created.id);
+      }} />}
+      {registeringPlaceId != null && (
+        <RegisterPlaceComputer branchId={id} placeId={registeringPlaceId} onClose={() => setRegisteringPlaceId(null)} />
+      )}
       {editing && <PlaceForm branchId={id} initial={editing} platformSuggestions={customPlatforms} platformPrices={platformPrices.data ?? []} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); void reload(); void platformPrices.reload(); }} />}
     </ScreenWithBg>
   );

@@ -4,7 +4,8 @@ import ImageUpload from "@/components/ui/ImageUpload";
 import Input from "@/components/ui/Input";
 import Modal from "@/components/ui/Modal";
 import NumberStepper from "@/components/ui/NumberStepper";
-import { COUNTRIES, countryByCode, flagOf, resolveCountryCode } from "@/data/countries";
+import FixedDialPhoneInput from "@/components/ui/FixedDialPhoneInput";
+import { COUNTRIES, HOME_COUNTRY_CODE, countryByCode, flagOf, isHomeCountryRecord, nationalPart, resolveCountryCode } from "@/data/countries";
 import { apiGetTinRules } from "@/api/tinRules";
 import { buildTinMap, tinExample, validateTin, type TinRuleMap } from "@/data/tin";
 import { useLang } from "@/i18n/LanguageContext";
@@ -15,17 +16,25 @@ import { companyRepository } from "@/repositories/CompanyRepository";
 import { CompanyStatusType, ICompanyApi } from "@/types/api";
 import { FormEvent, useEffect, useState } from "react";
 
-const dialOf = (code: string): string => countryByCode(code)?.dial ?? "";
-
-/** Strip a leading "+<dial>" so the number input shows the national part only. */
-const stripDial = (full: string, code: string): string => {
-  const dial = dialOf(code);
-  const trimmed = full.trim();
-  if (dial) {
-    const compact = trimmed.replace(/\s+/g, "");
-    if (compact.startsWith(`+${dial}`)) return compact.slice(dial.length + 1);
+/**
+ * A company's website as it is sent: trimmed, "https://" added to a bare host
+ * ("club.am" → "https://club.am"), or null when it is not an http(s) address
+ * with a dotted host — the server's `url:http,https` rule, said early.
+ */
+export const normalizeWebsite = (raw: string): string | null => {
+  const v = raw.trim();
+  if (!v || /\s/.test(v)) return null;
+  const withScheme = /^[a-z][a-z0-9+.-]*:\/\//i.test(v) ? v : `https://${v}`;
+  try {
+    const url = new URL(withScheme);
+    if (url.protocol !== "http:" && url.protocol !== "https:") return null;
+    // "mailto:a@b.am" given https:// would parse as user "mailto" on b.am.
+    if (url.username || url.password) return null;
+    if (!url.hostname.includes(".") || url.hostname.startsWith(".") || url.hostname.endsWith(".")) return null;
+    return withScheme;
+  } catch {
+    return null;
   }
-  return trimmed;
 };
 
 interface Props {
@@ -55,12 +64,16 @@ const CompanyForm = ({ initial, onClose, onSaved }: Props) => {
   // Step 2 — company
   const [name, setName] = useState(initial?.name ?? "");
   const [email, setEmail] = useState(initial?.email ?? "");
-  // `phone` holds the national number only; the dial code comes from `country`.
-  const [phone, setPhone] = useState(() => stripDial(initial?.phone ?? "", resolveCountryCode(initial?.company_country)));
+  // Armenia and +374, fixed (2026-10-11): always on create, and on edit for a
+  // company already saved that way. One saved with another country or dial
+  // code keeps its pickers, so opening it rewrites nothing.
+  const homeLocked = !isEdit || isHomeCountryRecord(initial?.company_country, initial?.phone);
   // `country` holds the ISO alpha-2 code (drives the picker, the phone
   // dial-code prefill and TIN validation). Legacy free-text values are
   // resolved back to a code so editing still pre-selects the dropdown.
-  const [country, setCountry] = useState(resolveCountryCode(initial?.company_country));
+  const [country, setCountry] = useState(homeLocked ? HOME_COUNTRY_CODE : resolveCountryCode(initial?.company_country));
+  // `phone` holds the national number only; the dial code comes from `country`.
+  const [phone, setPhone] = useState(() => nationalPart(initial?.phone ?? "", homeLocked ? HOME_COUNTRY_CODE : resolveCountryCode(initial?.company_country)));
   const [city, setCity] = useState(initial?.company_city ?? "");
   const [tin, setTin] = useState(initial?.tin ?? "");
   const [website, setWebsite] = useState(initial?.website ?? "");
@@ -75,6 +88,8 @@ const CompanyForm = ({ initial, onClose, onSaved }: Props) => {
 
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  // Said next to the field, not in the general error line (create only).
+  const [fieldErr, setFieldErr] = useState<{ website?: string; description?: string }>({});
 
   // Per-country TIN rules from the backend (DB source of truth). Falls back
   // to the bundled static rules in src/data/tin.ts if the fetch fails.
@@ -116,6 +131,21 @@ const CompanyForm = ({ initial, onClose, onSaved }: Props) => {
 
   const submitStep2 = async (e: FormEvent) => {
     e.preventDefault();
+    // Website and description are required on create (the server says the
+    // same): blank or spaces only is empty, and the website must be an
+    // http(s) address. Both are said next to their field; nothing is sent
+    // and everything typed stays.
+    const sentWebsite = isEdit ? website : normalizeWebsite(website);
+    if (!isEdit) {
+      const missing = {
+        website: !website.trim()
+          ? t("company.errors.websiteRequired")
+          : sentWebsite === null ? t("company.errors.websiteInvalid") : undefined,
+        description: !description.trim() ? t("company.errors.descriptionRequired") : undefined,
+      };
+      setFieldErr(missing);
+      if (missing.website || missing.description) return;
+    }
     if (!isEdit && !logo) return setErr(t("company.logoRequired"));
     if (!isEdit && !country) return setErr(t("company.selectCountryFirst"));
     // Per-country TIN validation — block submit on a malformed tax id.
@@ -148,7 +178,7 @@ const CompanyForm = ({ initial, onClose, onSaved }: Props) => {
           // so a failed create leaves no half-made account; a retry is safe.
           owner_name: ownerName.trim(), owner_email: ownerEmail.trim(),
           name, email, phone: fullPhone, company_country: countryName, company_city: city, tin,
-          website, description, company_logo_path: logo!,
+          website: sentWebsite ?? "", description: description.trim(), company_logo_path: logo!,
           ...adminFields,
         });
       onSaved(c.raw);
@@ -189,6 +219,9 @@ const CompanyForm = ({ initial, onClose, onSaved }: Props) => {
           </div>
           <div style={{ flex: 1 }}>
             <span className="label">{t("label.phone")}</span>
+            {homeLocked ? (
+              <FixedDialPhoneInput countryCode={HOME_COUNTRY_CODE} value={phone} onChange={setPhone} ariaLabel={t("label.phone")} />
+            ) : (
             <div className="row" style={{ gap: 6 }}>
               <select
                 className="input"
@@ -211,11 +244,16 @@ const CompanyForm = ({ initial, onClose, onSaved }: Props) => {
                 style={{ flex: 1 }}
               />
             </div>
+            )}
           </div>
         </div>
         <div className="row" style={{ gap: 10 }}>
           <div style={{ flex: 1 }}>
             <span className="label">{t("branch.country")}</span>
+            {homeLocked ? (
+              // Fixed: shown, not offered. Saved as its English name, as before.
+              <input className="input" value={`${flagOf(HOME_COUNTRY_CODE)} ${t("country.armenia")}`} readOnly aria-readonly="true" tabIndex={-1} />
+            ) : (
             <select
               className="input"
               value={country}
@@ -227,6 +265,7 @@ const CompanyForm = ({ initial, onClose, onSaved }: Props) => {
                 <option key={c.code} value={c.code}>{flagOf(c.code)} {c.name}</option>
               ))}
             </select>
+            )}
           </div>
           <div style={{ flex: 1 }}>
             <Input label={t("branch.city")} value={city} onChange={(e) => setCity(e.target.value)} required />
@@ -239,10 +278,36 @@ const CompanyForm = ({ initial, onClose, onSaved }: Props) => {
           placeholder={tinExample(country, tinRules)}
           required
         />
-        <Input label={t("company.website")} value={website} onChange={(e) => setWebsite(e.target.value)} />
+        {/* Required on create: marked " *" (the panel's idiom) before anything
+            is sent. No native `required`: spaces would pass it, and its bubble
+            speaks the OS language, not the panel's. */}
+        <div>
+          <Input
+            label={isEdit ? t("company.website") : `${t("company.website")} *`}
+            value={website}
+            onChange={(e) => { setWebsite(e.target.value); setFieldErr((f) => ({ ...f, website: undefined })); }}
+            maxLength={255}
+            placeholder="https://"
+            aria-required={!isEdit || undefined}
+            aria-invalid={fieldErr.website ? true : undefined}
+            aria-describedby={fieldErr.website ? "company-website-error" : undefined}
+          />
+          {fieldErr.website && <span id="company-website-error" className="field-error" style={{ fontSize: 12, color: "#ef4444" }}>{fieldErr.website}</span>}
+        </div>
         {/* 255 = the backend's limit (companies.description is varchar(255)):
             typing past it could only end in a refused save. */}
-        <Input label={t("label.description")} value={description} onChange={(e) => setDescription(e.target.value)} maxLength={255} />
+        <div>
+          <Input
+            label={isEdit ? t("label.description") : `${t("label.description")} *`}
+            value={description}
+            onChange={(e) => { setDescription(e.target.value); setFieldErr((f) => ({ ...f, description: undefined })); }}
+            maxLength={255}
+            aria-required={!isEdit || undefined}
+            aria-invalid={fieldErr.description ? true : undefined}
+            aria-describedby={fieldErr.description ? "company-description-error" : undefined}
+          />
+          {fieldErr.description && <span id="company-description-error" className="field-error" style={{ fontSize: 12, color: "#ef4444" }}>{fieldErr.description}</span>}
+        </div>
 
         {isAdmin && (
           <>

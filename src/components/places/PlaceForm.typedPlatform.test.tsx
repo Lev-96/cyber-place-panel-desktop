@@ -66,11 +66,12 @@ const place = (over: Partial<IBranchPlace> = {}): IBranchPlace => ({
   status: "active", platform: "ps5", subplatform_id: 1, games: [], ...over,
 });
 
+const savedSpy = vi.fn();
 let rerender: (prices: IBranchPlatformPrice[]) => Promise<void>;
 const mount = async (initial?: IBranchPlace, prices: IBranchPlatformPrice[] = [], suggestions: string[] = []) => {
   const ui = (p: IBranchPlatformPrice[]) => (
     <PlaceForm branchId={7} initial={initial} platformPrices={p} platformSuggestions={suggestions}
-      onClose={() => {}} onSaved={() => {}} />
+      onClose={() => {}} onSaved={savedSpy} />
   );
   await act(async () => {
     const r = render(ui(prices));
@@ -255,5 +256,31 @@ describe("editing a place", () => {
     await mount(place({ platform: "ps4" }), [pool]);
 
     expect(pressed()).toEqual(["PS4"]);
+  });
+});
+
+/** The save hands the created place up, so BranchPlaces can offer "Register computer" (2026-10-11). */
+describe("what a save reports", () => {
+  test("create: the place the server returned", async () => {
+    savedSpy.mockReset();
+    await mount();
+    await save();
+    expect(savedSpy).toHaveBeenCalledWith({ id: 12 });
+  });
+
+  test("edit: no place — nothing new was created", async () => {
+    savedSpy.mockReset();
+    await mount(place({ platform: "pc" }));
+    await save();
+    expect(repo.create).not.toHaveBeenCalled();
+    expect(savedSpy).toHaveBeenCalledWith(null);
+  });
+
+  test("a failed create reports nothing", async () => {
+    savedSpy.mockReset();
+    repo.create.mockRejectedValueOnce(new Error("boom"));
+    await mount();
+    await save();
+    expect(savedSpy).not.toHaveBeenCalled();
   });
 });
