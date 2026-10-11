@@ -2473,7 +2473,8 @@ they did, and TypeScript caught it as a duplicate object property.
   RO / zero width → buttons (jsdom). The container is `width:100%;
   min-width:0; contain:inline-size` so its width never depends on its content
   — that is what makes the measure loop-free. Other is DERIVED
-  (`userChoseOther || value not listed`), not a mount-time snapshot (that
+  (`(userChoseOther && !resolvedByParent) || value not listed`), not a
+  mount-time snapshot (that
   snapshot left a value on Other when its custom button loaded late). A saved
   slug nobody lists shows as Other+slug in buttons and as its own option in
   the select, never blank. Mode switches never touch the value or remount the
@@ -2486,6 +2487,21 @@ they did, and TypeScript caught it as a duplicate object property.
   slug of the typed English name once anything is typed): it never re-slugs
   from the name ("a--b" does not round-trip) and Save is not blocked. Its dead
   `suggestions` pass to the picker is gone (the slug box is hidden there).
+- **A name typed under Other that IS an existing platform selects it**
+  (2026-10-11, `utils/platformName.ts` `resolveTypedPlatform`): first the slug
+  of the English name if the branch has it (known three, place slugs, priced
+  slugs — the picker's own list), else the ONE priced platform whose name in
+  any locale equals the text of the PANEL-LANGUAGE box (never a
+  machine-translated box), exact after trim + lower-case — no partials, two
+  matches = ambiguous = new slug. The picker shows that platform, not Other,
+  only under `hideOtherInput` (`resolvedByParent`: PlaceForm names it);
+  GameForm's own slug box keeps Other while typed ("pc-club" passes "pc").
+  `namedByOperator` (set by typing, cleared by any pick) gates a re-resolve
+  when the branch's platforms land late — an untouched/edit form is never
+  re-targeted. `useAutoTranslate` bumps its sequence on unmount, so a
+  translation in flight when the name box hides cannot write the name back
+  and re-target the place. Tests: `PlaceForm.typedPlatform.test.tsx`,
+  `platformName.test.ts`, `PlatformPicker.test.tsx`.
 - **A place write invalidates `/branch-platform-prices` and
   `/branch-subplatforms`** (`httpCache.ts` `MUTATION_FANOUT['/places']`): the
   place lifecycle creates, renames and drops those rows server-side, and the
