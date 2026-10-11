@@ -1322,14 +1322,14 @@ entry's base label key — a stable id, never the translated text) gives an
 owner or a manager a `rank` and their menu label. `sortedNavItems` orders in
 three bands: pinned (Dashboard) → ranked by rank → the rest alphabetically
 (Settings, Agent updates, anything added later). Owner: Панель, Моя компания,
-Мои филиалы, Мои менеджеры, Выручка, Места филиалов на карте, Сканировать код,
-Бронирования, Турниры всех филиалов, Уведомления (tournaments before
+Мои филиалы, Мои менеджеры, Выручка, Филиалы на карте, Сканировать код,
+Бронирования, Турниры филиалов, Уведомления (tournaments before
 notifications, reordered later on 2026-10-11). Manager (own branch only):
 Панель, Мой филиал (takes the branches' place), Сканировать код, Бронирования,
 Турниры моего филиала, Уведомления. Their tournaments list is filtered to their
 branch, so "all branches" would be false. `nav.side.branchesOnMap` reads
-"Места филиалов на карте" / "Branch locations on the map" /
-"Մասնաճյուղերի վայրերը քարտեզի վրա". `withStaffMenu` stores the base key in
+"Филиалы на карте" / "Branches on the map" /
+"Մասնաճյուղերը քարտեզի վրա". `withStaffMenu` stores the base key in
 the spec's `id` before it swaps `labelKey`, and `NavItem.id` carries it to the
 renderer, so icons and order never key on the menu wording. Admin is NOT
 changed (sees every branch/manager: "My …" would be false; Dashboard first +
