@@ -6,6 +6,13 @@ import type { Lang } from "@/i18n/translations";
 export interface NavItemSpec {
   to: string;
   labelKey: string;
+  /**
+   * The entry's stable id: its BASE label key (`nav.branches`), kept when
+   * `withStaffMenu` swaps `labelKey` for a menu-only wording. The icon and the
+   * staff order are looked up by it — never by the translated text. Defaults
+   * to `labelKey` when absent.
+   */
+  id?: string;
   show: boolean;
   end?: boolean;
   badge?: ReactNode;
@@ -25,6 +32,8 @@ export interface NavItemSpec {
 }
 
 export interface NavItem {
+  /** Stable id (base label key) — what `NavIcon` is keyed by. */
+  id: string;
   to: string;
   label: string;
   end?: boolean;
@@ -49,7 +58,7 @@ export const sortedNavItems = (
   specs
     .filter((spec) => spec.show)
     .map((spec, index) => ({
-      to: spec.to, label: t(spec.labelKey), end: spec.end, badge: spec.badge, index,
+      id: spec.id ?? spec.labelKey, to: spec.to, label: t(spec.labelKey), end: spec.end, badge: spec.badge, index,
       band: spec.pinnedFirst === true ? 0 : spec.rank !== undefined ? 1 : 2,
       rank: spec.rank ?? 0,
     }))
@@ -81,17 +90,47 @@ const STAFF_MENU: Readonly<Record<string, { rank: number; labelKey?: string; man
   "nav.map": { rank: 5, labelKey: "nav.side.branchesOnMap" },
   "nav.scan": { rank: 6, labelKey: "nav.side.scanCode" },
   "nav.bookings": { rank: 7 },
-  "nav.notifications": { rank: 8 },
-  "nav.tournaments": { rank: 9, labelKey: "nav.side.allTournaments", managerLabelKey: "nav.side.myBranchTournaments" },
+  "nav.tournaments": { rank: 8, labelKey: "nav.side.allTournaments", managerLabelKey: "nav.side.myBranchTournaments" },
+  "nav.notifications": { rank: 9 },
 };
 
 /** Applies the staff order and labels for an owner or a manager; any other role is returned unchanged. */
 export const withStaffMenu = (specs: NavItemSpec[], role: string | undefined): NavItemSpec[] => {
   if (role !== "company_owner" && role !== "manager") return specs;
   return specs.map((spec) => {
-    const entry = STAFF_MENU[spec.labelKey];
+    const id = spec.id ?? spec.labelKey;
+    const entry = STAFF_MENU[id];
     if (!entry) return spec;
     const labelKey = (role === "manager" && entry.managerLabelKey) || entry.labelKey || spec.labelKey;
-    return { ...spec, rank: entry.rank, labelKey };
+    return { ...spec, id, rank: entry.rank, labelKey };
   });
+};
+
+/** Does `pathname` sit under `to`? An `end` entry matches only exactly. */
+const matches = (to: string, end: boolean | undefined, pathname: string): boolean => {
+  const path = pathname.length > 1 ? pathname.replace(/\/+$/, "") : pathname;
+  if (path === to) return true;
+  if (end) return false;
+  const base = to.endsWith("/") ? to : `${to}/`;
+  return path.startsWith(base);
+};
+
+/**
+ * The ONE entry to light up for `pathname` (2026-10-11): of the entries whose
+ * route contains the page, the most specific — the longest `to`. Each NavLink
+ * used to match on its own, so `/bookings/confirm` lit both Scan and Bookings,
+ * and `/settings/updates` both Settings and Updates. Detail pages still light
+ * their section (`/bookings/5` → Bookings). `null` when nothing matches.
+ */
+export const activeNavTo = (
+  items: ReadonlyArray<Pick<NavItem, "to" | "end">>,
+  pathname: string,
+): string | null => {
+  let best: string | null = null;
+  for (const item of items) {
+    if (matches(item.to, item.end, pathname) && (best === null || item.to.length > best.length)) {
+      best = item.to;
+    }
+  }
+  return best;
 };

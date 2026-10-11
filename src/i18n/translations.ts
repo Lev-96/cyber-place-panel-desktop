@@ -3525,7 +3525,7 @@ export const TRANSLATIONS: Dict = {
   // keep their own titles (nav.* above / page keys).
   "nav.side.myBranches": { en: "My branches", ru: "Мои филиалы", am: "Իմ մասնաճյուղերը" },
   "nav.side.myManagers": { en: "My managers", ru: "Мои менеджеры", am: "Իմ մենեջերները" },
-  "nav.side.branchesOnMap": { en: "My branches on the map", ru: "Места моих филиалов на карте", am: "Իմ մասնաճյուղերը քարտեզի վրա" },
+  "nav.side.branchesOnMap": { en: "Branch locations on the map", ru: "Места филиалов на карте", am: "Մասնաճյուղերի վայրերը քարտեզի վրա" },
   "nav.side.scanCode": { en: "Scan a code", ru: "Сканировать код", am: "Սկանավորել կոդը" },
   "nav.side.allTournaments": { en: "Tournaments in all branches", ru: "Турниры всех филиалов", am: "Բոլոր մասնաճյուղերի մրցաշարերը" },
   "nav.side.myBranchTournaments": { en: "My branch's tournaments", ru: "Турниры моего филиала", am: "Իմ մասնաճյուղի մրցաշարերը" },

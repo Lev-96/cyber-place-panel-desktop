@@ -1,28 +1,30 @@
 import { IAccountSwitchTarget } from "@/api/accountSwitch";
 import { useAuth } from "@/auth/AuthContext";
 import { can } from "@/auth/permissions";
+import NavIcon from "@/components/ui/NavIcon";
 import SupportIcon from "@/components/ui/SupportIcon";
 import { useSupportUnread } from "@/support/SupportUnreadContext";
 import AccountSwitchModal from "@/components/profile/AccountSwitchModal";
 import AccountSwitchPanel from "@/components/profile/AccountSwitchPanel";
 import ProfileModal from "@/components/profile/ProfileModal";
 import { useLang } from "@/i18n/LanguageContext";
-import { sortedNavItems, withStaffMenu } from "@/components/sidebarNav";
+import { activeNavTo, sortedNavItems, withStaffMenu } from "@/components/sidebarNav";
 import { useNotifications } from "@/notifications/NotificationsContext";
 import { useUpdatesNotification } from "@/realtime/UpdatesNotificationContext";
 import { ReactNode, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useAnchoredPopover } from "@/hooks/useAnchoredPopover";
-import { NavLink, useNavigate } from "react-router-dom";
+import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 
 const UnreadBadge = ({ count }: { count: number }) => {
   if (count <= 0) return null;
   return (
     <span
+      className="unread-badge"
       aria-label={`${count} unread`}
       style={{
-        marginLeft: 8,
         display: "inline-block",
+        flexShrink: 0,
         minWidth: 20,
         padding: "1px 6px",
         borderRadius: 999,
@@ -93,12 +95,14 @@ interface UserCardProps {
   email: string | undefined;
   role: string | undefined;
   roleLabel: string;
+  /** Drawn inside the account card, right of the clickable part (sign-out). */
+  trailing?: ReactNode;
 }
 
 /** Which face of the account popover is showing. */
 type MenuView = "menu" | "managers";
 
-const UserMenu = ({ name, email, role, roleLabel }: UserCardProps) => {
+const UserMenu = ({ name, email, role, roleLabel, trailing }: UserCardProps) => {
   const { t } = useLang();
   const navigate = useNavigate();
   const palette = paletteFor(role);
@@ -149,7 +153,10 @@ const UserMenu = ({ name, email, role, roleLabel }: UserCardProps) => {
   }, [open, switchTarget]);
 
   return (
-    <div ref={ref} style={{ position: "relative", margin: "0 8px 10px" }}>
+    // The account card: the same surface, edge and width as the Support card
+    // above it. The clickable part opens the account menu; the trailing slot
+    // (sign-out) sits on its right, so the card is the last row of the sidebar.
+    <div ref={ref} className="sidebar-account">
       {open && anchored && createPortal(
         <div
           ref={popRef}
@@ -193,25 +200,13 @@ const UserMenu = ({ name, email, role, roleLabel }: UserCardProps) => {
         className={`user-card${open ? " active" : ""}`}
         title={name}
         onClick={() => setOpen((o) => !o)}
-        style={{
-          width: "100%",
-          padding: "10px 12px",
-          borderRadius: 12,
-          background:
-            "linear-gradient(135deg, rgba(7, 221, 241, 0.06), rgba(209, 82, 250, 0.05))",
-          border: "1px solid #1f2a44",
-          display: "flex",
-          alignItems: "center",
-          gap: 10,
-          cursor: "pointer",
-          textAlign: "left",
-        }}
       >
         <div
           aria-hidden
           style={{
-            width: 38,
-            height: 38,
+            // Same 34px as Support's icon tile, so both cards' titles line up.
+            width: 34,
+            height: 34,
             borderRadius: "50%",
             background: palette.gradient,
             display: "flex",
@@ -275,6 +270,8 @@ const UserMenu = ({ name, email, role, roleLabel }: UserCardProps) => {
         </div>
       </button>
 
+      {trailing}
+
       {profileOpen && <ProfileModal onClose={() => setProfileOpen(false)} />}
 
       {switchTarget && (
@@ -301,6 +298,7 @@ interface SidebarProps {
 const Sidebar = ({ footerExtra }: SidebarProps = {}) => {
   const { user, logout } = useAuth();
   const { t, lang } = useLang();
+  const { pathname } = useLocation();
   const { unreadCount } = useNotifications();
   const { unread: supportUnread } = useSupportUnread();
   const { panel: panelUpd, agent: agentUpd } = useUpdatesNotification();
@@ -380,6 +378,10 @@ const Sidebar = ({ footerExtra }: SidebarProps = {}) => {
     t,
     lang,
   );
+  // Exactly one entry is current: the most specific route containing the page
+  // (`/bookings/confirm` is Scan, not Scan AND Bookings). Plain `Link`s, because
+  // a NavLink decides on its own and two of them can both claim the page.
+  const activeTo = activeNavTo(navItems, pathname);
 
   return (
     <aside className="sidebar">
@@ -392,7 +394,6 @@ const Sidebar = ({ footerExtra }: SidebarProps = {}) => {
           display: "flex",
           alignItems: "center",
           gap: 10,
-          margin: "0 8px 16px",
         }}
       >
         <img
@@ -409,12 +410,21 @@ const Sidebar = ({ footerExtra }: SidebarProps = {}) => {
         <span>CYBER PLACE</span>
       </h1>
       <nav className="sidebar-nav">
-        {navItems.map((item) => (
-          <NavLink key={item.to} to={item.to} end={item.end}>
-            {item.label}
-            {item.badge}
-          </NavLink>
-        ))}
+        {navItems.map((item) => {
+          const active = item.to === activeTo;
+          return (
+            <Link
+              key={item.to}
+              to={item.to}
+              className={active ? "active" : undefined}
+              aria-current={active ? "page" : undefined}
+            >
+              <NavIcon id={item.id} />
+              <span className="nav-label">{item.label}</span>
+              {item.badge}
+            </Link>
+          );
+        })}
       </nav>
       <div className="sidebar-footer">
         {/* Support is not another section of the product — it is the way out of
@@ -441,10 +451,18 @@ const Sidebar = ({ footerExtra }: SidebarProps = {}) => {
           email={user?.email}
           role={role}
           roleLabel={role ? t(`role.${role}`) || role.replace("_", " ") : ""}
+          trailing={
+            <button
+              type="button"
+              className="logout"
+              aria-label={t("nav.signOut")}
+              title={t("nav.signOut")}
+              onClick={() => void logout()}
+            >
+              <NavIcon id="nav.signOut" />
+            </button>
+          }
         />
-        <button className="logout" onClick={() => void logout()}>
-          {t("nav.signOut")}
-        </button>
       </div>
     </aside>
   );

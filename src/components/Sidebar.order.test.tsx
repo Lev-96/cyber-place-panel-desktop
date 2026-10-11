@@ -48,7 +48,7 @@ const mount = (role: Role) => {
 const menuNames = () =>
   within(document.querySelector("nav.sidebar-nav") as HTMLElement)
     .getAllByRole("link")
-    .map((a) => (a.firstChild?.textContent ?? "").trim());
+    .map((a) => (a.querySelector(".nav-label")?.textContent ?? "").trim());
 
 const firstLink = () =>
   within(document.querySelector("nav.sidebar-nav") as HTMLElement).getAllByRole("link")[0];
@@ -65,10 +65,10 @@ const collated = (names: string[], tag: string) =>
 const STAFF_ORDER = {
   company_owner: [
     "nav.dashboard", "nav.myCompany", "nav.side.myBranches", "nav.side.myManagers", "nav.revenue",
-    "nav.side.branchesOnMap", "nav.side.scanCode", "nav.bookings", "nav.notifications", "nav.side.allTournaments",
+    "nav.side.branchesOnMap", "nav.side.scanCode", "nav.bookings", "nav.side.allTournaments", "nav.notifications",
   ],
   manager: [
-    "nav.dashboard", "nav.myBranch", "nav.side.scanCode", "nav.bookings", "nav.notifications", "nav.side.myBranchTournaments",
+    "nav.dashboard", "nav.myBranch", "nav.side.scanCode", "nav.bookings", "nav.side.myBranchTournaments", "nav.notifications",
   ],
 } as const;
 
@@ -123,8 +123,22 @@ test("the owner's menu wording in Russian, as asked", () => {
   mount("company_owner");
   expect(menuNames().slice(0, 10)).toEqual([
     "Панель", "Моя компания", "Мои филиалы", "Мои менеджеры", "Выручка",
-    "Места моих филиалов на карте", "Сканировать код", "Бронирования", "Уведомления", "Турниры всех филиалов",
+    "Места филиалов на карте", "Сканировать код", "Бронирования", "Турниры всех филиалов", "Уведомления",
   ]);
+});
+
+test("the manager's menu wording in Russian, as asked", () => {
+  lang.current = "ru";
+  mount("manager");
+  expect(menuNames().slice(0, 6)).toEqual([
+    "Панель", "Мой филиал", "Сканировать код", "Бронирования", "Турниры моего филиала", "Уведомления",
+  ]);
+});
+
+test("the map entry's wording in every language", () => {
+  expect(t("nav.side.branchesOnMap", "ru")).toBe("Места филиалов на карте");
+  expect(t("nav.side.branchesOnMap", "en")).toBe("Branch locations on the map");
+  expect(t("nav.side.branchesOnMap", "am")).toBe("Մասնաճյուղերի վայրերը քարտեզի վրա");
 });
 
 test("switching the language keeps the owner's order", () => {
@@ -198,7 +212,7 @@ test("the footer is not part of the sorted menu", () => {
   mount("company_owner");
   const footer = document.querySelector(".sidebar-footer") as HTMLElement;
   expect(footer.firstElementChild?.classList.contains("nav-support-card")).toBe(true);
-  expect(footer.lastElementChild?.classList.contains("logout")).toBe(true);
+  expect(footer.lastElementChild?.classList.contains("sidebar-account")).toBe(true);
 });
 
 describe("sortedNavItems", () => {

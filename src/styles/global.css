@@ -537,32 +537,25 @@ html {
   box-shadow: 0 6px 16px rgba(7, 221, 241, 0.22);
 }
 
-/* Sidebar nav indicator slides in on active */
-.sidebar a {
+/* Sidebar nav: the current entry carries a 3px cyan bar on its left edge, on
+   top of the cyan text + icon (state never by colour alone). No hover shift:
+   the rows stay still, which also keeps wrapped labels aligned. */
+.sidebar-nav a {
   position: relative;
-  transition:
-    background 160ms ease,
-    color 160ms ease,
-    padding-left 200ms ease;
 }
-.sidebar a::before {
+.sidebar-nav a::before {
   content: "";
   position: absolute;
   left: 4px;
-  top: 8px;
-  bottom: 8px;
+  top: 10px;
+  bottom: 10px;
   width: 3px;
   background: transparent;
   border-radius: 2px;
-  transition:
-    background 200ms ease,
-    height 200ms;
+  transition: background 160ms ease-out;
 }
-.sidebar a.active::before {
+.sidebar-nav a.active::before {
   background: var(--color-primary);
-}
-.sidebar a:hover {
-  padding-left: 16px;
 }
 
 /* Cards — soft hover lift on the action ones (Home tiles) */
@@ -711,13 +704,18 @@ a.card:hover {
   height: 100vh;
 }
 
+/* ── Sidebar rhythm (2026-10-11) — one 4px scale throughout:
+   nav rows 4px apart, row padding 10/12, icon→label 12, footer cards 8 apart,
+   12px + a hairline between the scrolling nav and the pinned footer. Cards in
+   the footer (Support, the shell's extra, the account) share one padding,
+   radius and edge, and all span the full column. */
 .sidebar {
   background: var(--color-surface);
   border-right: 1px solid var(--color-border);
   display: flex;
   flex-direction: column;
-  padding: 20px 12px;
-  gap: 6px;
+  padding: 20px 12px 12px;
+  gap: 12px;
   height: 100%;
   overflow: hidden; /* the nav scrolls; brand + footer stay pinned */
 }
@@ -730,25 +728,28 @@ a.card:hover {
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
+  overflow-x: hidden;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
 }
 
-/* Pinned bottom: profile card + sign-out, always visible. */
+/* Pinned bottom: Support, the shell's extra card, then the account card with
+   sign-out — always visible, never overlapped by the scrolling nav. */
 .sidebar-footer {
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding-top: 8px;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--color-border);
 }
 
 .sidebar h1 {
   flex-shrink: 0;
   font-size: 16px;
   font-weight: 700;
-  margin: 0 8px 16px;
+  margin: 0 12px 4px;
   color: var(--color-primary);
   letter-spacing: 0.5px;
 }
@@ -766,38 +767,73 @@ a.card:hover {
     brandGlow 5s ease-in-out infinite;
 }
 
-.sidebar a {
+/* A nav row: icon, label, badge. The icon sits on the label's first line and
+   a long label wraps under its own start, never under the icon. */
+.sidebar-nav a {
+  flex-shrink: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
   padding: 10px 12px;
   border-radius: 8px;
   font-weight: 500;
+  line-height: 20px;
   color: var(--color-muted);
   transition:
-    background 120ms,
-    color 120ms;
+    background 150ms ease-out,
+    color 150ms ease-out;
 }
-.sidebar a:hover {
+.sidebar-nav a:hover {
   background: var(--color-surface-alt);
   color: var(--color-text);
 }
-.sidebar a.active {
+.sidebar-nav a.active {
   background: var(--color-surface-alt);
   color: var(--color-primary);
+}
+.sidebar-nav a:focus-visible,
+.sidebar-account .user-card:focus-visible,
+.sidebar .logout:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
+}
+.sidebar-nav .nav-icon {
+  flex-shrink: 0;
+  margin-top: 1px; /* (20px line − 18px icon) / 2 */
+}
+.sidebar-nav .nav-label {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.sidebar-nav .unread-badge {
+  margin-top: 1px;
 }
 
 .sidebar .spacer {
   flex: 1;
 }
+
+/* Sign-out: a compact icon button inside the account card, on its right. */
 .sidebar .logout {
-  padding: 10px 12px;
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  margin-right: 8px;
+  display: grid;
+  place-items: center;
+  padding: 0;
   background: transparent;
-  border: 1px solid var(--color-border);
+  border: 1px solid transparent;
   border-radius: 8px;
   color: var(--color-muted);
   cursor: pointer;
+  transition: color 150ms ease-out, border-color 150ms ease-out, background 150ms ease-out;
 }
 .sidebar .logout:hover {
-  color: var(--color-text);
-  border-color: var(--color-primary);
+  color: var(--color-danger);
+  border-color: rgba(239, 68, 68, 0.45);
+  background: rgba(239, 68, 68, 0.08);
 }
 
 .main {
@@ -875,20 +911,36 @@ body.cp-modal-open .main {
   pointer-events: auto;
 }
 
-/* Clickable sidebar user card → opens the profile screen. */
+/* The account card: Support's surface, edge and radius, full column width.
+   The card button (avatar + name, opens the account menu) takes the slack;
+   sign-out sits on its right. The edge lights when the menu part is hovered
+   or open — not when the pointer is on sign-out, which has its own state. */
+.sidebar-account {
+  position: relative;
+  display: flex;
+  align-items: center;
+  border-radius: 12px;
+  border: 1px solid var(--color-border);
+  background: linear-gradient(135deg, rgba(7, 221, 241, 0.06), rgba(209, 82, 250, 0.05));
+  transition: border-color 150ms ease-out;
+}
+.sidebar-account:has(.user-card:hover),
+.sidebar-account:has(.user-card.active) {
+  border-color: var(--color-primary);
+}
 .user-card {
-  transition:
-    border-color 160ms ease,
-    box-shadow 200ms ease,
-    transform 160ms ease;
-}
-.user-card:hover {
-  border-color: var(--color-primary) !important;
-  box-shadow: 0 6px 18px rgba(7, 221, 241, 0.14);
-  transform: translateY(-1px);
-}
-.user-card.active {
-  border-color: var(--color-primary) !important;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
 }
 
 /* Popover above the user card — pick Profile (modal) or Settings. */
@@ -3847,16 +3899,17 @@ button.login-flip-back:hover {
 .nav-support-card {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   padding: 10px 12px;
   border-radius: 12px;
-  border: 1px solid #1f2a44;
-  background: linear-gradient(135deg, rgba(7, 221, 241, 0.07), rgba(209, 82, 250, 0.05));
-  transition: border-color 140ms ease, background 140ms ease, transform 140ms ease;
+  border: 1px solid var(--color-border);
+  background: linear-gradient(135deg, rgba(7, 221, 241, 0.06), rgba(209, 82, 250, 0.05));
+  color: var(--color-muted);
+  transition: border-color 150ms ease-out, background 150ms ease-out, color 150ms ease-out;
 }
 .nav-support-card:hover {
   border-color: rgba(7, 221, 241, 0.45);
-  transform: translateY(-1px);
+  color: var(--color-text);
 }
 /* Active means "you are inside Support" and has to be unmistakable next to the
    hover state — a brighter edge AND a filled surface, not one or the other. */

@@ -8,7 +8,7 @@ import Sidebar from "./Sidebar";
 /**
  * The footer slot (2026-09-29): a shell (the owner web) may add its own entry
  * to the pinned footer. The desktop passes nothing and its footer must stay
- * exactly Support, account card, sign-out.
+ * exactly Support, then the account card (with sign-out inside it).
  */
 
 const auth = vi.hoisted(() => ({ user: null as AuthUser | null }));
@@ -25,7 +25,7 @@ const footerOf = (container: HTMLElement) => container.querySelector(".sidebar-f
 afterEach(() => cleanup());
 
 describe("sidebar footer slot", () => {
-  test("without it the footer is Support, the account card and sign-out, as before", () => {
+  test("without it the footer is Support, then the account card with sign-out", () => {
     auth.user = { id: 1, name: "O", email: "o@t.test", role: "company_owner" };
     const { container } = render(
       <MemoryRouter>
@@ -35,7 +35,7 @@ describe("sidebar footer slot", () => {
 
     const children = [...footerOf(container).children];
     expect(children[0].classList.contains("nav-support-card")).toBe(true);
-    expect(children[children.length - 1].classList.contains("logout")).toBe(true);
+    expect(children[children.length - 1].classList.contains("sidebar-account")).toBe(true);
     expect(container.querySelector("[data-test-extra]")).toBeNull();
   });
 
@@ -51,6 +51,6 @@ describe("sidebar footer slot", () => {
     const at = children.findIndex((el) => el.hasAttribute("data-test-extra"));
     expect(at).toBe(1);
     expect(children[0].classList.contains("nav-support-card")).toBe(true);
-    expect(children[children.length - 1].classList.contains("logout")).toBe(true);
+    expect(children[children.length - 1].classList.contains("sidebar-account")).toBe(true);
   });
 });
