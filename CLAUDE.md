@@ -886,20 +886,58 @@ SupportUnreadContext keeps its count). `friendlyMutation` no longer calls a
 dropped connection "endpoint not deployed". `NotificationsContext` gained
 `failure` (raw error) and `settled` (additive).
 
-**The player** (`poses/GamerFigure.tsx` + one module per pose: Empty =
-controller, NoResults = magnifier, NotFound = map + "?", Error = unplugged
-cable, Offline = crossed Wi-Fi, Success = thumbs up): hand-drawn inline SVG,
-colours from the tokens via `.cp-gamer__*` classes, gradient ids from
-`useId()`, `aria-hidden`. Motion: CSS keyframes on transform/opacity only,
-3–5 s loops (breathe, sway, blink, prop tilt/scan/flicker); `@media
-(prefers-reduced-motion: reduce)` stops it — and the `.cp-skeleton` shimmer —
-and slows `.spinner`. Each pose is `React.lazy`: nothing of the drawing is in
-the main chunk. Sizes (`npm run build:web`, gzip): GamerFigure 1.00 kB shared,
-poses 0.34–0.47 kB each, NotFound route 0.16 kB. Main JS 653.66 → 677.10 kB
-(gzip 213.55 → 220.20 kB, +6.65 kB), almost all of it the new en/ru/am
-dictionary entries; CSS 80.61 → 85.78 kB (gzip 15.53 → 16.53 kB). No dependency added.
+**The player** (`poses/GamerFigure.tsx` + one module per pose; redrawn
+2026-10-11 from neon line-art into a lit character). A young gamer, bust
+behind the glowing edge of a desk: shaded skin (radial gradient), side-swept
+dark-violet hair with a magenta streak and a crown tuft, hazel irises with a
+catchlight and a cyan screen reflection, lashes, brows, blush, graphite
+headset with cyan / magenta LED cups and a mic, navy hoodie with hood rim,
+strings, folds and a neon trim; cyan rim light left, magenta right, soft
+brand backlight. Per pose the FACE changes (`face={{brows, mouth, lids?,
+look?}}`) plus the props: Empty = relaxed smile, thumbing a controller
+(glowing ABXY, light bar); NoResults = curious "o", one brow up, magnifier
+with glass sheen; NotFound = puzzled wavy mouth, head tilted, scratching the
+head over a folded map, floating "?"; Error = worried brows, plug pulled from
+a socket, flickering spark; Offline = sleepy lids, nodding, crossed Wi-Fi,
+rising "zzz"; Success = big grin, smiling eyes, thumbs-up, twinkling sparkles
+and confetti.
+
+Structure: `scene` (behind) → body group (neck, hoodie, head, `arms` — the
+sleeves, drawn BEHIND the desk) → desk → `front` (hands + props). Arms must
+start at y ≤ 168 so the round sleeve cap stays under the opaque desk (the
+SVG is `overflow: visible`). Gradient / clip ids from `useId()`. Colours:
+the UI tokens for the neon, plus an illustration-only palette scoped on
+`.cp-gamer` (`--gamer-skin*`, `--gamer-hair*`, `--gamer-cloth*`,
+`--gamer-gear*`, iris, mouth, paper) — gradient stops are painted by
+`.cp-gamer__s-*` classes. Two SVG gotchas pinned by tests / comments: a
+CSS `transform` animation REPLACES the element's `transform` attribute (put
+placement on a wrapper `<g>`; the test fails otherwise), and an
+objectBoundingBox gradient does not paint a perfectly horizontal line (the
+desk edge uses `userSpaceOnUse`).
+
+Motion: CSS keyframes, transform / opacity only, origins in view-box
+coordinates (`transform-box: view-box`), loops of different lengths so they
+never line up: breathe 5.2 s (hoodie scaleY 1.5 %), head bob / micro-tilt
+6.8 s (neck + head share it), blink 4.7 s, eye glance 7.3 s, body sway 8.2 s
+(±0.5°), LED / mic glow 3.6 s; pose actions: thumbs press 1.9 / 2.3 s,
+magnifier sweep 4.4 s, head scratch 1.6 s, "?" float 3.4 s, spark flicker
+2.6 s, sleepy nod 6 s + zzz 4.5 s staggered, thumbs-up bounce 2.4 s, star
+twinkle 3 s. `@media (prefers-reduced-motion: reduce)` stops all of it (and
+the `.cp-skeleton` shimmer, and slows `.spinner`); the static frame is a
+complete drawing. No filters, no blur — gradients only. Each pose is
+`React.lazy`: nothing of the drawing is in the main chunk. Sizes (`npm run
+build:web`, gzip), before → after the redraw: GamerFigure (shared chunk)
+1.00 → 2.37 kB; poses 0.34–0.47 → 0.50–0.80 kB (NoResults 0.50, Error 0.57,
+Offline 0.58, NotFound 0.65, Empty 0.68, Success 0.80); CSS 17.28 → 18.45 kB;
+main JS unchanged (222.26 kB). A screen showing one state downloads ≈ 3 kB
+gzip of drawing. Original 2026-10-07 numbers: main JS 653.66 → 677.10 kB
+(gzip 213.55 → 220.20 kB), almost all of it the en/ru/am dictionary entries.
+No dependency added.
 
 Tests: `viewState.test.ts`, `StateView.test.tsx` (variants, roles, lazy pose,
+each variant draws its own prop and a face — head, irises, brows, mouth —
+unique gradient/clip ids for two players on one screen, no transform
+attribute on a CSS-transform-animated element, the shared idle keyframes,
 CSS reduced-motion + transform/opacity-only keyframes, ErrorState
 classification + Retry, StateSwitch), `useOnline.test.tsx`,
 `api/fallback.test.ts`, `tileOrder.test.ts`, per screen:
