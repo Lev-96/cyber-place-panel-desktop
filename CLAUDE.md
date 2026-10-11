@@ -2515,6 +2515,26 @@ they did, and TypeScript caught it as a duplicate object property.
   `PcsList.psBadge.test.tsx`, `PackageForm.platform.test.tsx`,
   `api/gameExists.test.ts`, `utils/platform.test.ts`.
 
+## 9.5.12 Drag-to-reorder: a drop takes the target's slot (2026-10-11)
+
+- **One rule, one helper: `utils/reorder.ts`.** `moveOnto(list, from, target)`
+  puts `from` in `target`'s slot: dragged DOWN it lands just after the
+  target, dragged UP just before it (null or unknown target → end). The old
+  "always in front of the target" rule could never reach the last slot and
+  treated one step down as no move at all.
+- **The marker follows.** `dropSideOf` → `is-drop-before` / `is-drop-after`:
+  the bar is on the leading or trailing edge of a tile, and on the top or
+  bottom of a section. The hub tiles keep their ring, which has no side.
+- **Consumers:** `useLocalReorder.move` (place tiles, board sections on
+  Sessions / Places / Live, hub tiles; per-user localStorage) and the
+  SessionsBoard seat order (`POST /pcs/reorder`, the WHOLE order per user;
+  the server keeps ids of this branch only, de-duplicated). Never hand-roll a
+  splice at a call site again.
+- Tests: `utils/reorder.test.ts` (every from/target pair), the
+  `useLocalReorder.test.tsx` slot tests, `SessionsBoard.reorder.test.tsx`
+  (real drag events → shown order + payload, failed save, reload),
+  `SessionCard.test.tsx`.
+
 ## 10. How work must be done here (MANDATORY — run it in this order)
 
 "100% guaranteed correct" is not achievable as a claim. It is achievable as a
