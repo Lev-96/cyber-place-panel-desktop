@@ -2569,6 +2569,29 @@ they did, and TypeScript caught it as a duplicate object property.
   dotted host, credentials. Backend `Companies\StoreRequest`: `required` +
   `url:http,https` (edit/UpdateRequest unchanged).
 
+## 9.5.14 Company form, settings, session-ending warning (2026-10-12)
+
+- **Phone with a fixed code** is `components/ui/FixedDialPhoneInput`: ONE
+  `.phone-group` frame like `.input` (same height), a compact grey
+  `.phone-group__dial` segment (text, not a field: not focusable, not
+  editable, `cursor: not-allowed`) and the national number box. The locked
+  country is a DISABLED `select.input` with the one option. Company and
+  branch forms only.
+- **Required mark**: `components/ui/RequiredMark` (red `.req-mark`), opt-in via
+  `Input requiredMark` / `ImageUpload required`. CompanyForm marks what
+  `Companies\StoreRequest` requires (owner name/email, name, email, phone,
+  country, city, TIN, logo). Website and description are OPTIONAL again (a
+  typed website must still be an http(s) address; backend
+  `nullable|url:http,https`).
+- **Settings**: the "Newsletter" card is gone with `api/subscribe.ts`. The
+  backend `/subscribe` endpoints stay (the mobile app uses them).
+- **"Session ends in 15 minutes"**: the backend sends staff a
+  `session.ending_soon` row (SessionEndingSoon). `Notifications` renders it
+  (seat, minutes, end time, venue; click → `/branches/{id}/sessions`). The DB
+  feed (`NotificationsContext.dbFeedEnabled`, `shouldShowBookingsFeed`) is now
+  manager AND owner; the owner's only rows are these, so `dbFeedCopy` names
+  their feed "Sessions". Admins: unchanged (billing only).
+
 ## 10. How work must be done here (MANDATORY — run it in this order)
 
 "100% guaranteed correct" is not achievable as a claim. It is achievable as a
