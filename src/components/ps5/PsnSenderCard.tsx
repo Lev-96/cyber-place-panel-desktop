@@ -70,7 +70,12 @@ const PsnSenderCard = ({ companyId }: { companyId: number }) => {
                 <div className="kv-row"><span className="k">{t("psn.lastSent")}</span><span className="v">{formatDateTime(data.last_sent_at)}</span></div>
               )}
               {data.last_error && (
-                <div className="error" style={{ fontSize: 12 }}>{t(`psn.error.${data.last_error}`)}</div>
+                <div className="error" style={{ fontSize: 12 }}>
+                  {t(`psn.error.${data.last_error}`)}
+                  {data.last_error_detail && (
+                    <div className="muted mono" style={{ fontSize: 11 }} data-testid="psn-error-detail">{data.last_error_detail}</div>
+                  )}
+                </div>
               )}
             </div>
           ) : (

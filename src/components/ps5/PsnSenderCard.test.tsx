@@ -91,9 +91,10 @@ describe("PsnSenderCard", () => {
   });
 
   test("the last failure is named, and the owner can disconnect", async () => {
-    request.mockResolvedValueOnce({ data: { ...on, last_error: "sign_in" } }).mockResolvedValueOnce({ data: off });
+    request.mockResolvedValueOnce({ data: { ...on, last_error: "sign_in", last_error_detail: "sign_in: token HTTP 400" } }).mockResolvedValueOnce({ data: off });
     await mount();
     expect(screen.getByText("psn.error.sign_in")).toBeTruthy();
+    expect(screen.getByTestId("psn-error-detail").textContent).toBe("sign_in: token HTTP 400");
 
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "psn.disconnect" }));

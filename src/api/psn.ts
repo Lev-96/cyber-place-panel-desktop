@@ -14,6 +14,8 @@ export interface IPsnSender {
   expires_at: string | null;
   /** The last refusal: sign_in | no_such_player | refused | unavailable. */
   last_error: string | null;
+  /** Where Sony refused, e.g. "refused: message HTTP 403 code 2284054". Absent on an older backend. */
+  last_error_detail?: string | null;
   last_error_at: string | null;
   last_sent_at: string | null;
 }
