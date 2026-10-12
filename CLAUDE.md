@@ -2592,6 +2592,16 @@ they did, and TypeScript caught it as a duplicate object property.
   manager AND owner; the owner's only rows are these, so `dbFeedCopy` names
   their feed "Sessions". Admins: unchanged (billing only).
 
+- **PSN message to the PlayStation player (2026-10-12)**: `StartSessionDialog`
+  shows an optional "player's PSN name" on a PlayStation seat
+  (`isPlayStationSeat`), validated like the server (`PSN_ONLINE_ID`), sent as
+  `psn_online_id` only when filled; recent names are a per-machine datalist
+  (`src/ps5/recentPsnNames.ts`, localStorage, try/catch). The owner connects
+  the sender in Settings (`PsnSenderCard`, owner only, `user.dashboard.
+  company_id`): open playstation.com and Sony's ssocookie page in the system
+  browser, paste the page (password field; `npssoOf` extracts the 64-char
+  code), `PUT /companies/{id}/psn-sender`. No token ever reaches the panel.
+
 ## 10. How work must be done here (MANDATORY — run it in this order)
 
 "100% guaranteed correct" is not achievable as a claim. It is achievable as a
