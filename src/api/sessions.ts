@@ -9,6 +9,12 @@ export interface StartSessionBody {
   hourly_rate?: number;
   user_display_name?: string;
   /**
+   * The player's PSN name on a PlayStation seat (2026-10-12): the "ends in 15
+   * minutes" warning then reaches their screen as a PSN message. The server
+   * keeps it on console seats only and refuses a name PSN could not have.
+   */
+  psn_online_id?: string;
+  /**
    * WHICH joystick strategy this seat runs on.
    *
    * Sent only when the club allows both and the cashier picked one; the server

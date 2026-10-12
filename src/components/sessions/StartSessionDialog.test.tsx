@@ -436,3 +436,75 @@ describe("the tariffs offered fit the seat's platform (2026-10-08)", () => {
     expect(screen.queryByText("Table hour")).toBeNull();
   });
 });
+
+/**
+ * The player's PSN name (2026-10-12): optional, on a PlayStation seat only.
+ * Given, the "ends in 15 minutes" warning reaches the player's screen as a
+ * PSN message; left empty, the body is exactly what it always was.
+ */
+describe("the player's PSN name", () => {
+  const computer = () => device({
+    kind: PC_KIND.Pc,
+    place: { id: 10, number: 1, name: "PC-1", type: "standard", platform: "pc" },
+  });
+  const billiards = () => device({
+    place: { id: 10, number: 1, name: "Table", type: "standard", platform: "billiards" },
+  });
+  const type = async (value: string) => {
+    await act(async () => {
+      fireEvent.change(screen.getByTestId("psn-name"), { target: { value } });
+    });
+  };
+  const start = async () => {
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "action.start" }));
+    });
+  };
+
+  beforeEach(() => localStorage.clear());
+
+  test("is sent with the start on a PlayStation, trimmed", async () => {
+    await mount(device());
+    await type("  Player_One-7 ");
+    await start();
+
+    expect(repo.start).toHaveBeenCalledTimes(1);
+    expect(repo.start.mock.calls[0][0]).toMatchObject({ psn_online_id: "Player_One-7" });
+  });
+
+  test("left empty, the body carries no such key", async () => {
+    await mount(device());
+    await start();
+
+    expect(repo.start.mock.calls[0][0]).not.toHaveProperty("psn_online_id");
+  });
+
+  test("a name PSN could not have holds Start back and says why", async () => {
+    await mount(device());
+    await type("1 bad name");
+
+    const startButton = screen.getByRole("button", { name: "action.start" }) as HTMLButtonElement;
+    expect(startButton.disabled).toBe(true);
+    expect(screen.getByText("session.psnNameInvalid")).toBeTruthy();
+  });
+
+  test("is not asked on a computer or a billiards table", async () => {
+    await mount(computer());
+    expect(screen.queryByTestId("psn-name")).toBeNull();
+    cleanup();
+
+    await mount(billiards());
+    expect(screen.queryByTestId("psn-name")).toBeNull();
+  });
+
+  test("a name used once is offered again next time", async () => {
+    await mount(device());
+    await type("RegularGuy");
+    await start();
+    cleanup();
+
+    await mount(device());
+    const options = [...document.querySelectorAll("#psn-recent-names option")].map((o) => (o as HTMLOptionElement).value);
+    expect(options).toEqual(["RegularGuy"]);
+  });
+});

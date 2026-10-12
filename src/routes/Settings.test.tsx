@@ -9,10 +9,10 @@ import { afterEach, describe, expect, test, vi } from "vitest";
  * untouched — the mobile app still uses it.
  */
 
-const auth = vi.hoisted(() => ({ logout: vi.fn() }));
+const auth = vi.hoisted(() => ({ logout: vi.fn(), role: "manager" as string }));
 const lang = vi.hoisted(() => ({ setLang: vi.fn(), setCurrencyOverride: vi.fn() }));
 vi.mock("@/auth/AuthContext", () => ({
-  useAuth: () => ({ user: { id: 1, name: "Ann", email: "ann@club.am", role: "manager" }, logout: auth.logout }),
+  useAuth: () => ({ user: { id: 1, name: "Ann", email: "ann@club.am", role: auth.role, dashboard: { company_id: 2 } }, logout: auth.logout }),
 }));
 vi.mock("@/i18n/LanguageContext", () => ({
   useLang: () => ({ t: (k: string) => k, lang: "en", currency: "AMD", money: (n: number) => String(n), ...lang }),
@@ -22,7 +22,11 @@ vi.mock("@/api/client", () => ({ request, apiCache: { subscribe: () => () => {} 
 
 import Settings from "./Settings";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  auth.role = "manager";
+  request.mockReset();
+});
 
 describe("Settings", () => {
   test("has no newsletter card, no email box and sends nothing", () => {
@@ -44,5 +48,20 @@ describe("Settings", () => {
     expect(screen.getByText("ann@club.am")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "nav.signOut" }));
     expect(auth.logout).toHaveBeenCalled();
+  });
+
+  // The PSN account PlayStation players are messaged from is the company's:
+  // an owner's card, never a manager's (the server refuses a manager too).
+  test("an owner gets the PSN card, a manager does not", async () => {
+    render(<Settings />);
+    expect(screen.queryByTestId("psn-sender-card")).toBeNull();
+    cleanup();
+
+    auth.role = "company_owner";
+    request.mockResolvedValue({ data: { connected: false, online_id: null, expires_at: null, last_error: null, last_error_at: null, last_sent_at: null } });
+    render(<Settings />);
+    expect(screen.getByTestId("psn-sender-card")).toBeTruthy();
+    await screen.findByText("psn.notConnected");
+    expect(request).toHaveBeenCalledWith("/companies/2/psn-sender");
   });
 });

@@ -1,6 +1,7 @@
 import { useAuth } from "@/auth/AuthContext";
 import Button from "@/components/ui/Button";
 import ScreenWithBg from "@/components/ui/ScreenWithBg";
+import PsnSenderCard from "@/components/ps5/PsnSenderCard";
 import { useLang } from "@/i18n/LanguageContext";
 import { AMD_UNIT, Currency } from "@/i18n/currency";
 import { LANGUAGES, Lang } from "@/i18n/translations";
@@ -43,6 +44,12 @@ const Settings = () => {
           </span>
         </div>
       </div></div>
+
+      {/* The PSN account PlayStation players are messaged from: the owner's
+          company's, so only an owner sees it. */}
+      {user?.role === "company_owner" && typeof user.dashboard?.company_id === "number" && (
+        <PsnSenderCard companyId={user.dashboard.company_id} />
+      )}
 
       <div className="gradient-card"><div className="gradient-card-inner">
         <h3 style={{ margin: 0 }}>{t("settings.account")}</h3>

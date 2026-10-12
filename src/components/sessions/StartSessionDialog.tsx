@@ -5,6 +5,7 @@ import Button from "@/components/ui/Button";
 import Modal from "@/components/ui/Modal";
 import Checkbox from "@/components/ui/Checkbox";
 import PriceInput from "@/components/ui/PriceInput";
+import Input from "@/components/ui/Input";
 import Spinner from "@/components/ui/Spinner";
 import { useAuth } from "@/auth/AuthContext";
 import { can } from "@/auth/permissions";
@@ -16,6 +17,8 @@ import { IPcApi, ITimePackage } from "@/types/sessions";
 import { isDeviceStartable, isPs } from "@/types/pc";
 import { isPlayStationSeat, packageFitsSeat } from "@/utils/platform";
 import { packageMismatchOf } from "@/api/packagePlatformMismatch";
+import { PSN_ONLINE_ID } from "@/api/psn";
+import { recentPsnNames, rememberPsnName } from "@/ps5/recentPsnNames";
 import { renderText, textKey, textLiteral, type LocalizedText } from "@/i18n/localizedText";
 import { IBranchApi } from "@/types/api";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -64,6 +67,14 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
   // The "(PS)" marker is about the console, so it asks the PLACE's platform:
   // a billiards table is billing-only too, but it is no PlayStation.
   const playStation = isPlayStationSeat(pc);
+  // The player's PSN name, optional: given, the "ends in 15 minutes" warning
+  // reaches their screen as a PSN message (the server keeps it on console
+  // seats only). Empty is the ordinary start.
+  const [psn, setPsn] = useState("");
+  const psnName = playStation ? psn.trim() : "";
+  const psnValid = psnName === "" || PSN_ONLINE_ID.test(psnName);
+  const psnField = psnName !== "" ? { psn_online_id: psnName } : {};
+  const psnSuggestions = useMemo(() => (playStation ? recentPsnNames() : []), [playStation]);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<LocalizedText | null>(null);
   const [branch, setBranch] = useState<IBranchApi | null>(null);
@@ -192,7 +203,9 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
           mode: "open",
           user_display_name: pc.label,
           is_free: true,
+          ...psnField,
         });
+        if (psnName !== "") rememberPsnName(psnName);
         onStarted();
         return;
       }
@@ -204,6 +217,7 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
           mode: "fixed",
           time_package_id: pkgId,
           user_display_name: pc.label,
+          ...psnField,
         });
       } else {
         if (effectiveRate === null) {
@@ -221,8 +235,10 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
           mode: "open",
           user_display_name: pc.label,
           ...(overrideApplied ? { hourly_rate: customRateNum } : {}),
+          ...psnField,
         });
       }
+      if (psnName !== "") rememberPsnName(psnName);
       onStarted();
     } catch (e) {
       // A tariff for another platform is refused with a code: worded here, in
@@ -249,7 +265,7 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
   // exact case free is for: a demo stand, a tournament machine, a seat given
   // back after an outage. The server lifts the same refusal for the same reason.
   const startDisabled =
-    busy || deviceOffline || (!isFree && mode === "open" && (editPrice ? !overrideApplied : assignedRate === null));
+    busy || deviceOffline || !psnValid || (!isFree && mode === "open" && (editPrice ? !overrideApplied : assignedRate === null));
 
   return (
     <Modal open onClose={onClose}>
@@ -360,6 +376,28 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
                 )}
               </div>
             ))}
+
+            {playStation && (
+              <div className="col" style={{ gap: 4 }}>
+                <Input
+                  label={t("session.psnName")}
+                  value={psn}
+                  onChange={(e) => setPsn(e.target.value)}
+                  placeholder={t("session.psnNamePlaceholder")}
+                  maxLength={16}
+                  list="psn-recent-names"
+                  autoComplete="off"
+                  spellCheck={false}
+                  data-testid="psn-name"
+                />
+                <datalist id="psn-recent-names">
+                  {psnSuggestions.map((n) => <option key={n} value={n} />)}
+                </datalist>
+                <span className={psnValid ? "muted" : "error"} style={{ fontSize: 11 }}>
+                  {t(psnValid ? "session.psnNameHint" : "session.psnNameInvalid")}
+                </span>
+              </div>
+            )}
 
             {deviceOffline && <div className="error">{t("session.deviceOfflineHint")}</div>}
             {err && <div className="error">{renderText(err, t)}</div>}
