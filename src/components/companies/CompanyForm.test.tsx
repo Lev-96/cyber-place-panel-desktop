@@ -41,8 +41,11 @@ import CompanyForm from "./CompanyForm";
 beforeEach(() => { api.calls = []; });
 afterEach(() => cleanup());
 
-const byLabel = (label: string) =>
-  screen.getByText(label, { selector: ".label, label, span" }).parentElement!.querySelector("input") as HTMLInputElement;
+// A label may end in the red required mark (its own span), so match its text without it.
+const labelEl = (label: string) =>
+  screen.getByText((_, el) => !!el && el.matches(".label, label") && el.textContent?.replace(/\*$/, "").trim() === label);
+const byLabel = (label: string) => labelEl(label).parentElement!.querySelector("input") as HTMLInputElement;
+const isMarkedRequired = (label: string) => !!labelEl(label).querySelector(".req-mark");
 
 const toStep2 = async () => {
   fireEvent.change(document.querySelector("input:not([type])") as HTMLInputElement, { target: { value: " Nora " } });
@@ -56,8 +59,8 @@ const fillCompany = async (over: { website?: string; description?: string; phone
   fireEvent.change(document.querySelector('input[type="tel"]') as HTMLInputElement, { target: { value: over.phone ?? "91234567" } });
   fireEvent.change(byLabel("City"), { target: { value: "Yerevan" } });
   fireEvent.change(byLabel("TIN"), { target: { value: "12345678" } });
-  fireEvent.change(byLabel("Website *"), { target: { value: over.website ?? "club.am" } });
-  fireEvent.change(byLabel("Description *"), { target: { value: over.description ?? "Gaming club" } });
+  fireEvent.change(byLabel("Website"), { target: { value: over.website ?? "club.am" } });
+  fireEvent.change(byLabel("Description"), { target: { value: over.description ?? "Gaming club" } });
   fireEvent.click(screen.getByRole("button", { name: "pick logo" }));
 };
 const submit = async () => { await act(async () => { fireEvent.submit(document.querySelector("form") as HTMLFormElement); }); };
@@ -98,15 +101,20 @@ describe("creating a company with its owner", () => {
 
 /** Armenia and +374, fixed on create (2026-10-11). */
 describe("creating a company: the country and the dial code are fixed", () => {
-  test("Armenia is shown, not offered; +374 is drawn next to the number", async () => {
+  test("Armenia sits in a DISABLED picker; +374 is a grey, non-editable prefix", async () => {
     render(<CompanyForm onClose={() => {}} onSaved={() => {}} />);
     await toStep2();
 
-    expect(screen.queryAllByRole("combobox")).toHaveLength(0);
-    const country = byLabel("Country");
-    expect(country.value).toContain("Armenia");
-    expect(country.readOnly).toBe(true);
-    expect(screen.getByTestId("fixed-dial").textContent).toContain("+374");
+    const country = screen.getByRole("combobox", { name: "Country" }) as HTMLSelectElement;
+    expect(country.disabled).toBe(true);
+    expect([...country.options].map((o) => o.textContent)).toEqual(["🇦🇲 Armenia"]);
+    const dial = screen.getByTestId("fixed-dial");
+    expect(dial.textContent).toContain("+374");
+    // The prefix is text, not a field: nothing to focus or change.
+    expect(dial.querySelector("input, select")).toBeNull();
+    expect(dial.closest(".phone-group")!.querySelectorAll("input")).toHaveLength(1);
+    // The national number stays editable.
+    expect((document.querySelector('input[type="tel"]') as HTMLInputElement).disabled).toBe(false);
   });
 
   test("a pasted +374 is not doubled, and the number is sent with the code once", async () => {
@@ -134,30 +142,34 @@ describe("creating a company: the country and the dial code are fixed", () => {
   });
 });
 
-/** Website and description are required on create (2026-10-11). */
-describe("creating a company: website and description", () => {
-  test("both are marked required before anything is sent", async () => {
+/** Website and description are OPTIONAL; the fields the server requires carry the red mark (2026-10-12). */
+describe("creating a company: what is required", () => {
+  test("the required fields carry the red mark; website and description do not", async () => {
     render(<CompanyForm onClose={() => {}} onSaved={() => {}} />);
+    expect(isMarkedRequired("Owner full name")).toBe(true);
+    expect(isMarkedRequired("Owner email")).toBe(true);
     await toStep2();
-    expect(byLabel("Website *").getAttribute("aria-required")).toBe("true");
-    expect(byLabel("Description *").getAttribute("aria-required")).toBe("true");
+    // The logo picker is stubbed here; its mark is ImageUpload's own `required`.
+    for (const label of ["Company name", "Email", "Phone", "Country", "City", "TIN"]) {
+      expect(isMarkedRequired(label), label).toBe(true);
+    }
+    expect(isMarkedRequired("Website")).toBe(false);
+    expect(isMarkedRequired("Description")).toBe(false);
+    expect(byLabel("Website").getAttribute("aria-required")).toBeNull();
   });
 
-  test("empty or spaces only: said next to each field, nothing sent, the rest kept", async () => {
-    render(<CompanyForm onClose={() => {}} onSaved={() => {}} />);
+  test("no website and no description: the company is created", async () => {
+    const onSaved = vi.fn();
+    render(<CompanyForm onClose={() => {}} onSaved={onSaved} />);
     await toStep2();
-    await fillCompany({ website: "   ", description: "" });
+    await fillCompany({ website: "", description: "   " });
     await submit();
 
-    expect(posted()).toHaveLength(0);
-    expect(screen.getByText("Enter the company's website")).toBeTruthy();
-    expect(screen.getByText("Enter a description")).toBeTruthy();
-    expect(byLabel("Website *").getAttribute("aria-invalid")).toBe("true");
-    expect(byLabel("Company name").value).toBe("Probe Co");
-    expect(byLabel("City").value).toBe("Yerevan");
+    await waitFor(() => expect(onSaved).toHaveBeenCalled());
+    expect(posted()).toHaveLength(1);
   });
 
-  test("not a website address: said next to the field, nothing sent", async () => {
+  test("a typed website that is not an address: said next to the field, nothing sent, the rest kept", async () => {
     render(<CompanyForm onClose={() => {}} onSaved={() => {}} />);
     await toStep2();
     for (const bad of ["not a site", "club", "ftp://club.am"]) {
@@ -165,6 +177,8 @@ describe("creating a company: website and description", () => {
       await submit();
       expect(posted()).toHaveLength(0);
       expect(screen.getByText("Enter a website address, e.g. https://club.am")).toBeTruthy();
+      expect(byLabel("Website").getAttribute("aria-invalid")).toBe("true");
+      expect(byLabel("Company name").value).toBe("Probe Co");
     }
   });
 
@@ -193,7 +207,6 @@ describe("editing a company", () => {
     render(<CompanyForm initial={company({})} onClose={() => {}} onSaved={() => {}} />);
     expect(screen.getByTestId("fixed-dial").textContent).toContain("+374");
     expect((document.querySelector('input[type="tel"]') as HTMLInputElement).value).toBe("91234567");
-    expect(byLabel("Website").getAttribute("aria-required")).toBeNull();
   });
 
   test("a company saved in another country keeps its pickers and its number", () => {

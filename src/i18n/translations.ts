@@ -1612,8 +1612,6 @@ export const TRANSLATIONS: Dict = {
   "settings.passwordChanged": { en: "Password changed", ru: "Пароль изменён", am: "Գաղտնաբառը փոխվեց" },
   "settings.passwordsMismatch": { en: "Passwords do not match", ru: "Пароли не совпадают", am: "Գաղտնաբառերը չեն համընկնում" },
   "settings.updatePassword": { en: "Update password", ru: "Обновить пароль", am: "Թարմացնել գաղտնաբառը" },
-  "settings.subscribed": { en: "Subscribed", ru: "Подписка оформлена", am: "Բաժանորդագրվել եք" },
-  "settings.subscribeHint": { en: "Subscribe an email to product updates.", ru: "Подпишите email на обновления продукта.", am: "Բաժանորդագրեք էլ. հասցեն ծրագրի թարմացումներին։" },
 
   // Common
   "common.back": { en: "Back", ru: "Назад", am: "Հետ" },
@@ -1804,6 +1802,9 @@ export const TRANSLATIONS: Dict = {
   "notifications.markAllRead": { en: "Mark all as read", ru: "Отметить все прочитанными", am: "Նշել բոլորը որպես կարդացված" },
   "notifications.unreadDot": { en: "Unread", ru: "Не прочитано", am: "Չկարդացված" },
   "notifications.bookingFeedTitle": { en: "Bookings", ru: "Бронирования", am: "Ամրագրումներ" },
+  "notifications.sessionFeedTitle": { en: "Sessions", ru: "Сессии", am: "Սեսիաներ" },
+  "notifications.sessionEndingSoonTitle": { en: "Seat №{seat}: session ends in {minutes} min", ru: "Место №{seat}: сессия закончится через {minutes} мин", am: "Տեղ №{seat}. սեսիան կավարտվի {minutes} րոպեից" },
+  "notifications.sessionEndingSoonBody": { en: "Ends at {time} · {venue}", ru: "Окончание в {time} · {venue}", am: "Ավարտը՝ {time} · {venue}" },
   "notifications.billingFeedTitle": { en: "Billing", ru: "Биллинг", am: "Հաշվարկ" },
   "notifications.openBooking": { en: "Open", ru: "Открыть", am: "Բացել" },
   "notifications.bookingForDate": { en: "for", ru: "на", am: "-" },
@@ -2538,9 +2539,7 @@ export const TRANSLATIONS: Dict = {
   "company.saving": { en: "Saving…", ru: "Сохранение…", am: "Պահպանվում է…" },
   "company.saved": { en: "Saved.", ru: "Сохранено.", am: "Պահպանված է։" },
   "company.logoRequired": { en: "Logo is required for a new company", ru: "Для новой компании нужен логотип", am: "Նոր ընկերության համար անհրաժեշտ է լոգո" },
-  "company.errors.websiteRequired": { en: "Enter the company's website", ru: "Укажите сайт компании", am: "Նշեք ընկերության կայքը" },
   "company.errors.websiteInvalid": { en: "Enter a website address, e.g. https://club.am", ru: "Укажите адрес сайта, например https://club.am", am: "Նշեք կայքի հասցեն, օրինակ՝ https://club.am" },
-  "company.errors.descriptionRequired": { en: "Enter a description", ru: "Укажите описание", am: "Նշեք նկարագրությունը" },
   "country.armenia": { en: "Armenia", ru: "Армения", am: "Հայաստան" },
   "company.ownerNotCreated": { en: "Owner user not created yet", ru: "Владелец ещё не создан", am: "Սեփականատերը դեռ չի ստեղծվել" },
   "company.replaceLogo": { en: "Replace logo (optional)", ru: "Заменить логотип (необязательно)", am: "Փոխել լոգոն (ընտրովի)" },
@@ -2671,7 +2670,6 @@ export const TRANSLATIONS: Dict = {
     ru: "Валюта отображения",
     am: "Արժույթ",
   },
-  "settings.newsletter": { en: "Newsletter", ru: "Рассылка", am: "Տեղեկագիր" },
 
   // Common labels
   "label.total": { en: "Total", ru: "Итого", am: "Ընդամենը" },
@@ -3770,6 +3768,7 @@ export const TRANSLATIONS: Dict = {
   "notifications.state.errorTitle": { en: "Could not load notifications", ru: "Не удалось загрузить уведомления", am: "Չհաջողվեց բեռնել ծանուցումները" },
   "notifications.state.emptyTitle": { en: "No notifications right now", ru: "Сейчас уведомлений нет", am: "Այս պահին ծանուցումներ չկան" },
   "notifications.state.bookingsEmptyDescription": { en: "New bookings, subscriptions and tournament sign-ups appear here.", ru: "Здесь появятся новые бронирования, подписки и записи на турниры.", am: "Այստեղ կհայտնվեն նոր ամրագրումները, բաժանորդագրություններն ու մրցաշարային գրանցումները։" },
+  "notifications.state.sessionsEmptyDescription": { en: "Seats whose session ends in 15 minutes appear here.", ru: "Здесь появятся места, сессия на которых закончится через 15 минут.", am: "Այստեղ կհայտնվեն տեղերը, որոնց սեսիան կավարտվի 15 րոպեից։" },
   "notifications.state.billingEmptyDescription": { en: "Payment reminders appear here a few days before each due date.", ru: "Напоминания об оплате появятся здесь за несколько дней до срока.", am: "Վճարման հիշեցումները կհայտնվեն այստեղ ժամկետից մի քանի օր առաջ։" },
   "support.state.listErrorTitle": { en: "Could not load your support requests", ru: "Не удалось загрузить ваши обращения", am: "Չհաջողվեց բեռնել ձեր դիմումները" },
   "support.state.threadErrorTitle": { en: "Could not load this conversation", ru: "Не удалось загрузить переписку", am: "Չհաջողվեց բեռնել նամակագրությունը" },

@@ -79,7 +79,11 @@ export const NotificationsProvider = ({ children }: { children: ReactNode }) => 
   // booking/tournament counts for owner & admin, mirroring the display
   // gate in `Notifications.shouldShowBookingsFeed` and the corner-popup
   // gate in `GlobalBookingNotifier.shouldShowBookingToasts`.
-  const dbFeedEnabled = user?.role === "manager";
+  //
+  // 2026-10-12: owners too. The backend sends an owner exactly one kind of
+  // row — "a seat ends in 15 minutes" (`StaffNotificationDispatcher`'s owner
+  // allowlist) — so their feed and badge carry that and nothing operational.
+  const dbFeedEnabled = user?.role === "manager" || user?.role === "company_owner";
 
   const refresh = useCallback(async () => {
     if (!user || !dbFeedEnabled) {

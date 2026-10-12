@@ -35,18 +35,16 @@ export const toNationalDigits = (raw: string, dial: string): string => {
  */
 const FixedDialPhoneInput = ({ countryCode, value, onChange, ariaLabel, invalid, describedBy, disabled }: Props) => {
   const dial = countryByCode(countryCode)?.dial ?? "";
+  // ONE control, drawn like any `.input`: a compact grey prefix that is
+  // plainly not editable, then the number box inside the same frame. The
+  // prefix is text, not a field — nothing can focus, select or change it.
   return (
-    <div className="row" style={{ gap: 6 }}>
-      <span
-        className="input fixed-dial"
-        data-testid="fixed-dial"
-        aria-hidden="true"
-        style={{ flex: "0 0 auto", display: "inline-flex", alignItems: "center", gap: 6, opacity: 0.85, userSelect: "none" }}
-      >
-        {flagOf(countryCode)} +{dial}
+    <div className={`phone-group${invalid ? " is-invalid" : ""}${disabled ? " is-disabled" : ""}`}>
+      <span className="phone-group__dial" data-testid="fixed-dial" aria-hidden="true">
+        <span className="phone-group__flag">{flagOf(countryCode)}</span>+{dial}
       </span>
       <input
-        className="input"
+        className="phone-group__number"
         type="tel"
         inputMode="tel"
         autoComplete="tel-national"
@@ -55,8 +53,8 @@ const FixedDialPhoneInput = ({ countryCode, value, onChange, ariaLabel, invalid,
         aria-label={ariaLabel ? `${ariaLabel} (+${dial})` : `+${dial}`}
         aria-invalid={invalid ? true : undefined}
         aria-describedby={describedBy}
+        aria-required="true"
         disabled={disabled}
-        style={{ flex: 1, minWidth: 0 }}
       />
     </div>
   );

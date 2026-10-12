@@ -1,3 +1,4 @@
+import RequiredMark from "@/components/ui/RequiredMark";
 import SmartImage from "@/components/ui/SmartImage";
 import { useLang } from "@/i18n/LanguageContext";
 import { useEffect, useRef, useState } from "react";
@@ -49,7 +50,7 @@ const ImageUpload = ({ label, initialUrl, name, required, onChange }: Props) => 
 
   return (
     <div className="col" style={{ gap: 6 }}>
-      <span className="label">{label}{required ? " *" : ""}</span>
+      <span className="label">{label}{required && <RequiredMark />}</span>
       <div className="row" style={{ gap: 14, alignItems: "flex-start" }}>
         <div onClick={open} style={{ cursor: "pointer", position: "relative" }}>
           <SmartImage src={previewUrl} name={name ?? label} size={110} shape="square" />

@@ -1,27 +1,13 @@
 import { useAuth } from "@/auth/AuthContext";
 import Button from "@/components/ui/Button";
-import Input from "@/components/ui/Input";
 import ScreenWithBg from "@/components/ui/ScreenWithBg";
-import { apiSubscribe } from "@/api/subscribe";
 import { useLang } from "@/i18n/LanguageContext";
 import { AMD_UNIT, Currency } from "@/i18n/currency";
 import { LANGUAGES, Lang } from "@/i18n/translations";
-import { FormEvent, useState } from "react";
 
 const Settings = () => {
   const { user, logout } = useAuth();
   const { t, lang, setLang, currency, setCurrencyOverride, money } = useLang();
-  const [subEmail, setSubEmail] = useState("");
-  const [subBusy, setSubBusy] = useState(false);
-  const [subMsg, setSubMsg] = useState<string | null>(null);
-
-  const subscribe = async (e: FormEvent) => {
-    e.preventDefault();
-    setSubBusy(true); setSubMsg(null);
-    try { await apiSubscribe(subEmail); setSubMsg(t("settings.subscribed")); setSubEmail(""); }
-    catch (e) { setSubMsg(e instanceof Error ? e.message : "Failed"); }
-    finally { setSubBusy(false); }
-  };
 
   return (
     <ScreenWithBg bg="./bg/settings.jpg" title={t("nav.settings")}>
@@ -65,16 +51,6 @@ const Settings = () => {
         <div className="kv-row"><span className="k">{t("settings.role")}</span><span className="v">{user?.role ? t(`role.${user.role}`) : ""}</span></div>
         <Button variant="secondary" onClick={() => void logout()}>{t("nav.signOut")}</Button>
       </div></div>
-
-      <form className="gradient-card" onSubmit={subscribe}>
-        <div className="gradient-card-inner">
-          <h3 style={{ margin: 0 }}>{t("settings.newsletter")}</h3>
-          <span className="muted" style={{ fontSize: 12 }}>{t("settings.subscribeHint")}</span>
-          <Input label={t("auth.email")} type="email" value={subEmail} onChange={(e) => setSubEmail(e.target.value)} required />
-          {subMsg && <div className={subMsg === t("settings.subscribed") ? "muted" : "error"}>{subMsg}</div>}
-          <Button disabled={subBusy}>{subBusy ? "…" : t("action.confirm")}</Button>
-        </div>
-      </form>
     </ScreenWithBg>
   );
 };

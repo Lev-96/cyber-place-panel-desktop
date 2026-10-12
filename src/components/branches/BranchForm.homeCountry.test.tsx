@@ -87,8 +87,10 @@ afterEach(cleanup);
 describe("creating a branch: Armenia and +374", () => {
   test("the country is shown, not offered, and +374 is drawn, not typed", () => {
     render(<BranchForm companyId={3} onClose={() => {}} onSaved={() => {}} />);
-    expect(screen.queryAllByRole("combobox")).toHaveLength(0);
-    expect(screen.getByDisplayValue(/country\.armenia/)).toBeTruthy();
+    const country = screen.getByRole("combobox", { name: "branch.country" }) as HTMLSelectElement;
+    expect(country.disabled).toBe(true);
+    expect(country.options).toHaveLength(1);
+    expect(country.options[0].textContent).toContain("country.armenia");
     expect(screen.getByTestId("fixed-dial").textContent).toContain("+374");
   });
 

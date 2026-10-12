@@ -1095,6 +1095,59 @@ body.cp-modal-open .main {
   border-color: var(--color-primary);
 }
 
+/* Red "*" after a required field's label (components/ui/RequiredMark). */
+.req-mark {
+  color: var(--color-danger);
+  margin-left: 3px;
+  font-weight: 600;
+}
+
+/* A phone number with a fixed international code (FixedDialPhoneInput):
+   one frame like `.input`, same height, the code a compact grey segment that
+   reads as disabled, the national number the only editable part. */
+.phone-group {
+  display: flex;
+  align-items: stretch;
+  width: 100%;
+  min-width: 0;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  overflow: hidden;
+  transition: border-color 160ms ease, box-shadow 160ms ease;
+}
+.phone-group:focus-within {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(7, 221, 241, 0.15);
+}
+.phone-group.is-invalid { border-color: var(--color-danger); }
+.phone-group__dial {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px;
+  background: var(--color-surface-alt);
+  border-right: 1px solid var(--color-border);
+  color: var(--color-muted);
+  white-space: nowrap;
+  cursor: not-allowed;
+  user-select: none;
+}
+.phone-group__flag { filter: grayscale(0.35); }
+.phone-group__number {
+  flex: 1 1 auto;
+  min-width: 0;
+  width: 100%;
+  background: transparent;
+  border: 0;
+  outline: none;
+  color: var(--color-text);
+  padding: 10px 12px;
+  font: inherit;
+}
+.phone-group.is-disabled { opacity: 0.55; }
+
 .label {
   font-size: 12px;
   color: var(--color-muted);

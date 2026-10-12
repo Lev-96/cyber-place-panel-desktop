@@ -5,6 +5,7 @@ import Input from "@/components/ui/Input";
 import Modal from "@/components/ui/Modal";
 import NumberStepper from "@/components/ui/NumberStepper";
 import FixedDialPhoneInput from "@/components/ui/FixedDialPhoneInput";
+import RequiredMark from "@/components/ui/RequiredMark";
 import { COUNTRIES, HOME_COUNTRY_CODE, countryByCode, flagOf, isHomeCountryRecord, nationalPart, resolveCountryCode } from "@/data/countries";
 import { apiGetTinRules } from "@/api/tinRules";
 import { buildTinMap, tinExample, validateTin, type TinRuleMap } from "@/data/tin";
@@ -89,7 +90,7 @@ const CompanyForm = ({ initial, onClose, onSaved }: Props) => {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   // Said next to the field, not in the general error line (create only).
-  const [fieldErr, setFieldErr] = useState<{ website?: string; description?: string }>({});
+  const [fieldErr, setFieldErr] = useState<{ website?: string }>({});
 
   // Per-country TIN rules from the backend (DB source of truth). Falls back
   // to the bundled static rules in src/data/tin.ts if the fetch fails.
@@ -131,20 +132,16 @@ const CompanyForm = ({ initial, onClose, onSaved }: Props) => {
 
   const submitStep2 = async (e: FormEvent) => {
     e.preventDefault();
-    // Website and description are required on create (the server says the
-    // same): blank or spaces only is empty, and the website must be an
-    // http(s) address. Both are said next to their field; nothing is sent
-    // and everything typed stays.
-    const sentWebsite = isEdit ? website : normalizeWebsite(website);
+    // Website and description are OPTIONAL (2026-10-12; the server agrees).
+    // Left blank, they are sent blank. A website that IS typed on create must
+    // be an http(s) address (the server's `url:http,https`); that is said
+    // next to the field, nothing is sent and everything typed stays.
+    const websiteTyped = website.trim() !== "";
+    const sentWebsite = isEdit ? website : websiteTyped ? normalizeWebsite(website) : "";
     if (!isEdit) {
-      const missing = {
-        website: !website.trim()
-          ? t("company.errors.websiteRequired")
-          : sentWebsite === null ? t("company.errors.websiteInvalid") : undefined,
-        description: !description.trim() ? t("company.errors.descriptionRequired") : undefined,
-      };
-      setFieldErr(missing);
-      if (missing.website || missing.description) return;
+      const invalid = websiteTyped && sentWebsite === null ? t("company.errors.websiteInvalid") : undefined;
+      setFieldErr({ website: invalid });
+      if (invalid) return;
     }
     if (!isEdit && !logo) return setErr(t("company.logoRequired"));
     if (!isEdit && !country) return setErr(t("company.selectCountryFirst"));
@@ -191,8 +188,8 @@ const CompanyForm = ({ initial, onClose, onSaved }: Props) => {
       <Modal open onClose={onClose}>
         <form className="card" style={cardStyle} onSubmit={submitStep1}>
           <div className="row-between"><h2 style={{ margin: 0 }}>{t("company.titleNew")} · {t("company.step1")}</h2><span className="muted">{t("company.owner")}</span></div>
-          <Input label={t("company.ownerName")} value={ownerName} onChange={(e) => setOwnerName(e.target.value)} required maxLength={255} autoFocus />
-          <Input label={t("company.ownerEmail")} type="email" value={ownerEmail} onChange={(e) => setOwnerEmail(e.target.value)} required maxLength={255} />
+          <Input label={t("company.ownerName")} requiredMark value={ownerName} onChange={(e) => setOwnerName(e.target.value)} required maxLength={255} autoFocus />
+          <Input label={t("company.ownerEmail")} requiredMark type="email" value={ownerEmail} onChange={(e) => setOwnerEmail(e.target.value)} required maxLength={255} />
           <div className="muted" style={{ fontSize: 13 }}>{t("staff.inviteHint")}</div>
           {err && <div className="error" style={{ whiteSpace: "pre-line" }}>{err}</div>}
           <div className="row-between">
@@ -212,13 +209,13 @@ const CompanyForm = ({ initial, onClose, onSaved }: Props) => {
           {!isEdit && <span className="muted">{t("company.section")}</span>}
         </div>
 
-        <Input label={t("company.name")} value={name} onChange={(e) => setName(e.target.value)} required maxLength={255} autoFocus />
+        <Input label={t("company.name")} requiredMark value={name} onChange={(e) => setName(e.target.value)} required maxLength={255} autoFocus />
         <div className="row" style={{ gap: 10 }}>
           <div style={{ flex: 1 }}>
-            <Input label={t("label.email")} type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+            <Input label={t("label.email")} requiredMark type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
           </div>
           <div style={{ flex: 1 }}>
-            <span className="label">{t("label.phone")}</span>
+            <span className="label">{t("label.phone")}<RequiredMark /></span>
             {homeLocked ? (
               <FixedDialPhoneInput countryCode={HOME_COUNTRY_CODE} value={phone} onChange={setPhone} ariaLabel={t("label.phone")} />
             ) : (
@@ -249,10 +246,13 @@ const CompanyForm = ({ initial, onClose, onSaved }: Props) => {
         </div>
         <div className="row" style={{ gap: 10 }}>
           <div style={{ flex: 1 }}>
-            <span className="label">{t("branch.country")}</span>
+            <span className="label">{t("branch.country")}<RequiredMark /></span>
             {homeLocked ? (
-              // Fixed: shown, not offered. Saved as its English name, as before.
-              <input className="input" value={`${flagOf(HOME_COUNTRY_CODE)} ${t("country.armenia")}`} readOnly aria-readonly="true" tabIndex={-1} />
+              // Fixed: a DISABLED picker holding the one country, so it reads
+              // (and is) locked. Saved as its English name, as before.
+              <select className="input" value={HOME_COUNTRY_CODE} disabled aria-label={t("branch.country")}>
+                <option value={HOME_COUNTRY_CODE}>{flagOf(HOME_COUNTRY_CODE)} {t("country.armenia")}</option>
+              </select>
             ) : (
             <select
               className="input"
@@ -268,46 +268,34 @@ const CompanyForm = ({ initial, onClose, onSaved }: Props) => {
             )}
           </div>
           <div style={{ flex: 1 }}>
-            <Input label={t("branch.city")} value={city} onChange={(e) => setCity(e.target.value)} required />
+            <Input label={t("branch.city")} requiredMark value={city} onChange={(e) => setCity(e.target.value)} required />
           </div>
         </div>
         <Input
           label={t("company.tin")}
+          requiredMark
           value={tin}
           onChange={(e) => setTin(e.target.value)}
           placeholder={tinExample(country, tinRules)}
           required
         />
-        {/* Required on create: marked " *" (the panel's idiom) before anything
-            is sent. No native `required`: spaces would pass it, and its bubble
-            speaks the OS language, not the panel's. */}
+        {/* Optional (2026-10-12): no mark, never blocks a save. A typed
+            website must still be an address; that is said next to it. */}
         <div>
           <Input
-            label={isEdit ? t("company.website") : `${t("company.website")} *`}
+            label={t("company.website")}
             value={website}
-            onChange={(e) => { setWebsite(e.target.value); setFieldErr((f) => ({ ...f, website: undefined })); }}
+            onChange={(e) => { setWebsite(e.target.value); setFieldErr({}); }}
             maxLength={255}
             placeholder="https://"
-            aria-required={!isEdit || undefined}
             aria-invalid={fieldErr.website ? true : undefined}
             aria-describedby={fieldErr.website ? "company-website-error" : undefined}
           />
-          {fieldErr.website && <span id="company-website-error" className="field-error" style={{ fontSize: 12, color: "#ef4444" }}>{fieldErr.website}</span>}
+          {fieldErr.website && <span id="company-website-error" className="field-error" style={{ fontSize: 12, color: "var(--color-danger)" }}>{fieldErr.website}</span>}
         </div>
         {/* 255 = the backend's limit (companies.description is varchar(255)):
             typing past it could only end in a refused save. */}
-        <div>
-          <Input
-            label={isEdit ? t("label.description") : `${t("label.description")} *`}
-            value={description}
-            onChange={(e) => { setDescription(e.target.value); setFieldErr((f) => ({ ...f, description: undefined })); }}
-            maxLength={255}
-            aria-required={!isEdit || undefined}
-            aria-invalid={fieldErr.description ? true : undefined}
-            aria-describedby={fieldErr.description ? "company-description-error" : undefined}
-          />
-          {fieldErr.description && <span id="company-description-error" className="field-error" style={{ fontSize: 12, color: "#ef4444" }}>{fieldErr.description}</span>}
-        </div>
+        <Input label={t("label.description")} value={description} onChange={(e) => setDescription(e.target.value)} maxLength={255} />
 
         {isAdmin && (
           <>

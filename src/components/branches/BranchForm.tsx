@@ -342,8 +342,11 @@ const BranchForm = ({ initial, companyId, onClose, onSaved }: Props) => {
           <div style={{ flex: 1 }}>
             <span className="label">{t("branch.country")}</span>
             {homeLocked ? (
-              // Fixed: shown, not offered. Saved as its English name, as before.
-              <input className="input" value={`${flagOf(HOME_COUNTRY_CODE)} ${t("country.armenia")}`} readOnly aria-readonly="true" tabIndex={-1} />
+              // Fixed: a DISABLED picker holding the one country, so it reads
+              // (and is) locked. Saved as its English name, as before.
+              <select className="input" value={HOME_COUNTRY_CODE} disabled aria-label={t("branch.country")}>
+                <option value={HOME_COUNTRY_CODE}>{flagOf(HOME_COUNTRY_CODE)} {t("country.armenia")}</option>
+              </select>
             ) : (
             <select
               className="input"
