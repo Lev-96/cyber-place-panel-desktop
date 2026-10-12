@@ -103,3 +103,16 @@ describe("PsnSenderCard", () => {
     expect(screen.getByText("psn.notConnected")).toBeTruthy();
   });
 });
+
+describe("the sign-in link", () => {
+  test("opens Sony's account site, not playstation.com (its Armenian page is a 404)", async () => {
+    const open = vi.spyOn(window, "open").mockReturnValue(null);
+    request.mockResolvedValueOnce({ data: off });
+    await mount();
+
+    fireEvent.click(screen.getByRole("button", { name: "psn.openSignIn" }));
+
+    expect(open).toHaveBeenCalledWith("https://my.account.sony.com/", "_blank");
+    open.mockRestore();
+  });
+});

@@ -80,7 +80,7 @@ const PsnSenderCard = ({ companyId }: { companyId: number }) => {
           <ol className="col" style={{ gap: 6, margin: 0, paddingLeft: 18, fontSize: 13 }}>
             <li>
               {t("psn.step1")}{" "}
-              <Button type="button" variant="secondary" onClick={() => window.open(PSN_SIGN_IN_URL, "_blank")}>playstation.com</Button>
+              <Button type="button" variant="secondary" onClick={() => window.open(PSN_SIGN_IN_URL, "_blank")}>{t("psn.openSignIn")}</Button>
             </li>
             <li>
               {t("psn.step2")}{" "}

@@ -31,8 +31,12 @@ export const apiDisconnectPsnSender = (companyId: number) =>
 /** Where a signed-in browser reads its `npsso`. Opened in the system browser. */
 export const PSN_NPSSO_URL = "https://ca.account.sony.com/api/v1/ssocookie";
 
-/** Signs a player is told in: playstation.com, in the system browser. */
-export const PSN_SIGN_IN_URL = "https://www.playstation.com/";
+/**
+ * Where the owner signs in: Sony's own account site, in the system browser.
+ * It signs in on ca.account.sony.com, the domain {@link PSN_NPSSO_URL} reads the
+ * cookie from. (playstation.com redirected Armenia to /en-am/, which is a 404.)
+ */
+export const PSN_SIGN_IN_URL = "https://my.account.sony.com/";
 
 /** A PSN online ID: 3-16 characters, a letter first, then letters, digits, - and _. Mirrors the server. */
 export const PSN_ONLINE_ID = /^[A-Za-z][A-Za-z0-9_-]{2,15}$/;
