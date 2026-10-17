@@ -387,7 +387,7 @@ const Sidebar = ({ footerExtra }: SidebarProps = {}) => {
     <aside className="sidebar">
       {/* Brand row — logo + wordmark. The logo PNG lives in /public,
           so Vite serves it at the root path in both dev and the built
-          electron bundle. Width-limited to keep the header compact;
+          electron bundle. Height-limited to keep the header compact;
           the wordmark wraps onto its own line on a narrow sidebar. */}
       <h1
         style={{
@@ -401,9 +401,10 @@ const Sidebar = ({ footerExtra }: SidebarProps = {}) => {
           alt=""
           aria-hidden
           style={{
-            width: 28,
-            height: 28,
-            objectFit: "contain",
+            // The mark is 1.64:1, so the height is fixed and the width
+            // follows; 24px keeps it and the wordmark on one 192px row.
+            width: "auto",
+            height: 24,
             flexShrink: 0,
           }}
         />

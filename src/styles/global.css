@@ -1772,8 +1772,10 @@ input[type="time"]::-webkit-datetime-edit-field:focus {
     brandGlow 5s ease-in-out infinite;
 }
 
+/* The mark is 1.64:1 (2026-10-17); 108px wide gives it the area the old,
+   squarer 90px mark had. */
 .login-logo {
-  width: 90px;
+  width: 108px;
   height: auto;
   margin-bottom: -8px;
 }
@@ -3178,7 +3180,7 @@ button.pill:hover {
   font-size: calc(var(--ring-size) * 0.077);
 }
 .login-shell .login-logo {
-  width: calc(var(--ring-size) * 0.145);
+  width: calc(var(--ring-size) * 0.174);
 }
 .login-shell .login-title {
   font-size: calc(var(--ring-size) * 0.032);
