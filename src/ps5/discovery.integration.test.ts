@@ -1,6 +1,6 @@
 import { createSocket, type Socket } from "node:dgram";
 import { afterEach, describe, expect, test } from "vitest";
-import { discover, probe } from "../../electron/ps5/discovery";
+import { discover, probe, sweepLanes } from "../../electron/ps5/discovery";
 import { PS_DISCOVERY_PORT } from "../../electron/ps5/protocol";
 
 /**
@@ -25,6 +25,8 @@ import { PS_DISCOVERY_PORT } from "../../electron/ps5/protocol";
  */
 
 let fake: Socket | null = null;
+/** Every probe the fake consoles heard, for counting resends. */
+let heard = 0;
 
 /**
  * A responder on 127.0.0.1:9302 that replies with each console it was given.
@@ -40,6 +42,7 @@ const fakeConsoles = async (
   fake = socket;
 
   socket.on("message", (_message, remote) => {
+    heard += 1;
     for (const console_ of consoles) {
       const answer = [
         `HTTP/1.1 ${console_.status}`,
@@ -61,6 +64,7 @@ const fakeConsoles = async (
 };
 
 afterEach(() => {
+  heard = 0;
   if (fake) { try { fake.close(); } catch { /* already closed */ } fake = null; }
 });
 
@@ -181,5 +185,67 @@ describe("a discovery sweep", () => {
 
     expect(result.probed).toContain("127.0.0.1");
     expect(result.probed).toContain("255.255.255.255");
+  });
+});
+
+/**
+ * Several interfaces at once (2026-10-18): the console LAN beside a USB modem.
+ * Lanes are bound to loopback here for the reason above — never a broadcast in
+ * a test — which still exercises what is ours: one socket per lane, answers
+ * merged by host id, and a lane that cannot open not ending the others.
+ */
+describe("a sweep out of several interfaces", () => {
+  test("the same console heard on two lanes is one console", async () => {
+    await fakeConsoles([{ hostId: "LANE01", name: "PS5-01", status: "200 Ok" }]);
+
+    const result = await sweepLanes([
+      { label: "lan", bind: "127.0.0.1", targets: ["127.0.0.1"] },
+      { label: "modem", targets: ["127.0.0.1"] },
+    ], 400);
+
+    expect(result.consoles.filter((c) => c.hostId === "LANE01")).toHaveLength(1);
+  });
+
+  test("a lane whose address is gone is reported and the others still find the console", async () => {
+    await fakeConsoles([{ hostId: "LANE02", name: "PS5-02", status: "620 Server Standby" }]);
+
+    // TEST-NET-3: never an address of this machine, so the bind fails.
+    const result = await sweepLanes([
+      { label: "gone", bind: "203.0.113.77", targets: ["127.0.0.1"] },
+      { label: "lan", bind: "127.0.0.1", targets: ["127.0.0.1"] },
+    ], 400);
+
+    expect(result.consoles.find((c) => c.hostId === "LANE02")?.state).toBe("rest");
+    expect(result.warnings.some((w) => w.startsWith("gone:"))).toBe(true);
+  });
+
+  test("a broadcast sweep asks three times within its window, not more", async () => {
+    await fakeConsoles([{ hostId: "LANE03", name: "PS5-03", status: "200 Ok" }]);
+
+    await sweepLanes([{ label: "lan", bind: "127.0.0.1", targets: ["127.0.0.1"] }], 600, { resend: true });
+
+    expect(heard).toBe(3);
+  });
+
+  test("every lane failing still ends the sweep, early and with the reasons", async () => {
+    const started = Date.now();
+    const result = await sweepLanes([{ label: "gone", bind: "203.0.113.77", targets: ["127.0.0.1"] }], 2_000);
+
+    expect(Date.now() - started).toBeLessThan(1_500);
+    expect(result.consoles).toEqual([]);
+    expect(result.warnings[0]).toMatch(/^gone:/);
+  });
+
+  test("discover() with only skipped interfaces still sweeps its extra targets and says what it skipped", async () => {
+    await fakeConsoles([{ hostId: "LANE04", name: "PS5-04", status: "200 Ok" }]);
+
+    const result = await discover({
+      timeoutMs: 400,
+      extraTargets: ["127.0.0.1"],
+      interfaces: { tun0: [{ address: "100.101.7.3", netmask: "255.255.255.255", family: "IPv4", internal: false } as never] },
+    });
+
+    expect(result.consoles.find((c) => c.hostId === "LANE04")).toBeDefined();
+    expect(result.warnings).toContain("skipped tun0 100.101.7.3: point-to-point");
   });
 });

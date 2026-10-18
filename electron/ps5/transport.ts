@@ -39,7 +39,9 @@ export type Ps5ErrorCode =
   | "DEVICE_NOT_FOUND"
   | "TRANSPORT_ERROR"
   | "UNSUPPORTED_BY_TRANSPORT"
-  | "INVALID_STATE";
+  | "INVALID_STATE"
+  /** Withdrawn by the panel before it was sent: a session started meanwhile. Not a failure. */
+  | "CANCELLED";
 
 export interface CommandResult {
   /**
@@ -76,8 +78,9 @@ export interface Ps5Transport {
    * @param hostId  Which console, by its own identity. The address is where it
    *   was last seen; the host-id is what it IS, and with more than one console
    *   in a venue only the second one is safe to act on.
+   * @param cancelled  Asked before each attempt; true answers `CANCELLED`.
    */
-  requestRest(address: string, hostId?: string): Promise<CommandResult>;
+  requestRest(address: string, hostId?: string, cancelled?: () => boolean): Promise<CommandResult>;
 }
 
 /**
@@ -130,7 +133,7 @@ export class DiscoveryTransport implements Ps5Transport {
     };
   }
 
-  async requestRest(address: string, hostId?: string): Promise<CommandResult> {
+  async requestRest(address: string, hostId?: string, cancelled?: () => boolean): Promise<CommandResult> {
     if (!this.keys) {
       return {
         sent: false,
@@ -139,8 +142,9 @@ export class DiscoveryTransport implements Ps5Transport {
       };
     }
 
-    const result = await standby(address, this.keys, hostId);
+    const result = await standby(address, this.keys, hostId, cancelled);
     if (result.ok) return { sent: true };
+    if (result.code === "CANCELLED") return { sent: false, code: "CANCELLED", detail: result.detail };
 
     return {
       sent: false,

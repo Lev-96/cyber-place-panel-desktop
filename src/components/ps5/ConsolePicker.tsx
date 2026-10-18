@@ -38,7 +38,7 @@ interface Props {
  */
 const ConsolePicker = ({ branchId, onClose }: Props) => {
   const { t, lang } = useLang();
-  const { consoles, searching, error, probed, scan } = usePs5Discovery();
+  const { consoles, searching, error, probed, warnings, scan } = usePs5Discovery();
   const available = ps5DiscoveryAvailable();
   const devices = useAsync(() => pcRepository.listConsoleDevices(branchId), [branchId]);
   const [busyHostId, setBusyHostId] = useState<string | null>(null);
@@ -448,6 +448,11 @@ const ConsolePicker = ({ branchId, onClose }: Props) => {
                 <div className="muted" style={{ fontSize: 11 }}>
                   {t("ps5.discover.probed")}: <span className="mono">{probed.join(", ")}</span>
                 </div>
+                {warnings.length > 0 && (
+                  <div className="muted" style={{ fontSize: 11 }} data-testid="ps5-discover-warnings">
+                    {t("ps5.discover.warnings")}: <span className="mono">{warnings.join("; ")}</span>
+                  </div>
+                )}
               </div>
             )}
 

@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, test, vi } from "vitest";
+import { PSN_FEATURE } from "@/api/psn";
 
 /**
  * Settings has no "Newsletter" card any more (2026-10-12): it subscribed an
@@ -25,6 +26,7 @@ import Settings from "./Settings";
 afterEach(() => {
   cleanup();
   auth.role = "manager";
+  PSN_FEATURE.playerMessages = false;
   request.mockReset();
 });
 
@@ -52,7 +54,15 @@ describe("Settings", () => {
 
   // The PSN account PlayStation players are messaged from is the company's:
   // an owner's card, never a manager's (the server refuses a manager too).
+  test("deferred (the default): not even an owner is offered the PSN card", () => {
+    auth.role = "company_owner";
+    render(<Settings />);
+    expect(screen.queryByTestId("psn-sender-card")).toBeNull();
+    auth.role = "manager";
+  });
+
   test("an owner gets the PSN card, a manager does not", async () => {
+    PSN_FEATURE.playerMessages = true;
     render(<Settings />);
     expect(screen.queryByTestId("psn-sender-card")).toBeNull();
     cleanup();
@@ -63,5 +73,6 @@ describe("Settings", () => {
     expect(screen.getByTestId("psn-sender-card")).toBeTruthy();
     await screen.findByText("psn.notConnected");
     expect(request).toHaveBeenCalledWith("/companies/2/psn-sender");
+    PSN_FEATURE.playerMessages = false;
   });
 });

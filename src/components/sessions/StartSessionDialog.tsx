@@ -17,7 +17,7 @@ import { IPcApi, ITimePackage } from "@/types/sessions";
 import { isDeviceStartable, isPs } from "@/types/pc";
 import { isPlayStationSeat, packageFitsSeat } from "@/utils/platform";
 import { packageMismatchOf } from "@/api/packagePlatformMismatch";
-import { PSN_ONLINE_ID } from "@/api/psn";
+import { PSN_FEATURE, PSN_ONLINE_ID } from "@/api/psn";
 import { recentPsnNames, rememberPsnName } from "@/ps5/recentPsnNames";
 import { renderText, textKey, textLiteral, type LocalizedText } from "@/i18n/localizedText";
 import { IBranchApi } from "@/types/api";
@@ -71,10 +71,12 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
   // reaches their screen as a PSN message (the server keeps it on console
   // seats only). Empty is the ordinary start.
   const [psn, setPsn] = useState("");
-  const psnName = playStation ? psn.trim() : "";
+  // The PSN message is deferred (PSN_FEATURE): no field, nothing sent.
+  const askPsn = playStation && PSN_FEATURE.playerMessages;
+  const psnName = askPsn ? psn.trim() : "";
   const psnValid = psnName === "" || PSN_ONLINE_ID.test(psnName);
   const psnField = psnName !== "" ? { psn_online_id: psnName } : {};
-  const psnSuggestions = useMemo(() => (playStation ? recentPsnNames() : []), [playStation]);
+  const psnSuggestions = useMemo(() => (askPsn ? recentPsnNames() : []), [askPsn]);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<LocalizedText | null>(null);
   const [branch, setBranch] = useState<IBranchApi | null>(null);
@@ -377,7 +379,7 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
               </div>
             ))}
 
-            {playStation && (
+            {askPsn && (
               <div className="col" style={{ gap: 4 }}>
                 <Input
                   label={t("session.psnName")}

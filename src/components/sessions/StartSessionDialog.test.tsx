@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { IPcApi } from "@/types/sessions";
 import { PC_KIND, PC_STATUS } from "@/types/pc";
 import StartSessionDialog from "./StartSessionDialog";
+import { PSN_FEATURE } from "@/api/psn";
 
 /**
  * Which tariffs a seat can be sold.
@@ -461,7 +462,24 @@ describe("the player's PSN name", () => {
     });
   };
 
-  beforeEach(() => localStorage.clear());
+  // These pin the feature as it works when an environment turns it back on.
+  beforeEach(() => {
+    localStorage.clear();
+    PSN_FEATURE.playerMessages = true;
+  });
+  afterEach(() => {
+    PSN_FEATURE.playerMessages = false;
+  });
+
+  test("deferred (the default): not asked, and nothing PSN goes with the start", async () => {
+    PSN_FEATURE.playerMessages = false;
+    await mount(device());
+    expect(screen.queryByTestId("psn-name")).toBeNull();
+    await start();
+
+    expect(repo.start).toHaveBeenCalledTimes(1);
+    expect(repo.start.mock.calls[0][0]).not.toHaveProperty("psn_online_id");
+  });
 
   test("is sent with the start on a PlayStation, trimmed", async () => {
     await mount(device());

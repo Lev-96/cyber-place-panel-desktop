@@ -20,6 +20,15 @@ export interface IPsnSender {
   last_sent_at: string | null;
 }
 
+/**
+ * Deferred on 2026-10-18, mirroring the backend's `services.psn.player_messages`
+ * (off by default): while off the panel neither asks for the player's PSN name
+ * at start nor offers the owner to connect a sender, because the server sends
+ * no PSN message. PS5 wake, rest and pairing do not read this. A property
+ * rather than a constant so tests can switch it.
+ */
+export const PSN_FEATURE = { playerMessages: false };
+
 export const apiGetPsnSender = (companyId: number) =>
   request<{ data: IPsnSender }>(`/companies/${companyId}/psn-sender`);
 

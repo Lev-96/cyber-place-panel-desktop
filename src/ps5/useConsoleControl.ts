@@ -218,7 +218,9 @@ export const useConsoleControl = ({ devices, sessionDeviceIds, enabled = true }:
         // have to notice for themselves — least of all after answering "no" to
         // a question about it. The panel keeps trying either way; this is so
         // the person knows it has not simply happened.
-        if (!result.sent) {
+        // Withdrawn by the panel itself because a session started: nothing
+        // for anybody to be told about.
+        if (!result.sent && result.code !== "CANCELLED") {
           const last = toldAt.current[hostId] ?? 0;
           if (Date.now() - last > 60_000) {
             toldAt.current[hostId] = Date.now();
@@ -227,6 +229,9 @@ export const useConsoleControl = ({ devices, sessionDeviceIds, enabled = true }:
         }
 
         return result;
+      },
+      cancelRest: (hostId) => {
+        void ps5Bridge()?.restCancel?.(hostId).catch(() => { /* the rest runs its course */ });
       },
       reportUnexpectedWake: async ({ deviceId, eventId }) => {
         await apiReportUnexpectedWake(deviceId, eventId);
@@ -262,10 +267,26 @@ export const useConsoleControl = ({ devices, sessionDeviceIds, enabled = true }:
     refreshNow();
   }, [refreshNow]);
 
+  /** A press is a fresh intent for the console behind this device. */
+  const pressed = (deviceId: number) => {
+    const hostId = boundRef.current.find((d) => d.deviceId === deviceId)?.hostId;
+    if (hostId) controllerRef.current?.pressed(hostId);
+  };
+
   /** Call when the operator presses Start: the console may wake from now on. */
   const sessionStarting = useCallback((deviceId: number) => {
     urgentUntil.current[deviceId] = Date.now() + URGENT_WINDOW_MS;
+    pressed(deviceId);
     setStarting((s) => ({ ...s, [deviceId]: { at: Date.now() } }));
+    // The latest press wins. A Stop a moment ago must not go on asking for
+    // rest: if a list read before this start lands after it, "stopping" would
+    // turn that stale "no session" into a fresh rest under the new player.
+    setStopping((s) => {
+      if (!(deviceId in s)) return s;
+      const next = { ...s };
+      delete next[deviceId];
+      return next;
+    });
     setNudge((n) => n + 1);
     // Ask the console now, and keep asking quickly: the operator is watching
     // the tile, and the next scheduled look could be ten seconds away.
@@ -275,6 +296,7 @@ export const useConsoleControl = ({ devices, sessionDeviceIds, enabled = true }:
   /** Call when a session has actually stopped on the backend. */
   const sessionStopped = useCallback((deviceId: number) => {
     urgentUntil.current[deviceId] = Date.now() + URGENT_WINDOW_MS;
+    pressed(deviceId);
     setStopping((s) => ({ ...s, [deviceId]: { at: Date.now() } }));
     setStarting((s) => {
       const next = { ...s };

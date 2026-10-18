@@ -251,3 +251,53 @@ describe("the ten-second console check", () => {
     expect(result.current.statuses).toEqual({});
   });
 });
+
+/**
+ * A console that is really off (2026-10-18): it used to cost a network-wide
+ * sweep on every tick, all evening. Now the sweeps space out, and a press
+ * brings them back.
+ */
+describe("sweeping for a console that is not there", () => {
+  test("sweeps space out instead of running on every tick", async () => {
+    renderHook(() => useConsoleWatch([{ hostId: "OFF", address: "192.168.1.10" }], { intervalMs: 3_000 }));
+    await settle();
+
+    // Ten minutes of a console that never answers, at the watchful rhythm.
+    for (let i = 0; i < 200; i++) await act(async () => { await vi.advanceTimersByTimeAsync(3_000); });
+
+    // At every tick that would be ~199 sweeps. Spaced: 5, 10, 20, 40, then one
+    // a minute — about a dozen in ten minutes.
+    expect(sweepCalls).toBeGreaterThanOrEqual(8);
+    expect(sweepCalls).toBeLessThanOrEqual(16);
+  });
+
+  test("a press brings the next sweep back to the shortest gap", async () => {
+    const { result } = renderHook(() => useConsoleWatch([{ hostId: "OFF", address: "192.168.1.10" }], { intervalMs: 3_000 }));
+    await settle();
+    for (let i = 0; i < 100; i++) await act(async () => { await vi.advanceTimersByTimeAsync(3_000); });
+    const before = sweepCalls;
+
+    await act(async () => { result.current.refreshNow(); await Promise.resolve(); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(WATCH_INTERVAL_FAST_MS * 5); });
+
+    expect(sweepCalls).toBeGreaterThan(before);
+  });
+
+  test("a console that comes back resets the spacing", async () => {
+    let on = false;
+    answerToProbe = (addresses) => (on ? addresses.map((a) => consoleAt("OFF", a)) : []);
+    const { result } = renderHook(() => useConsoleWatch([{ hostId: "OFF", address: "192.168.1.10" }], { intervalMs: 3_000 }));
+    await settle();
+    for (let i = 0; i < 60; i++) await act(async () => { await vi.advanceTimersByTimeAsync(3_000); });
+
+    on = true;
+    await act(async () => { await vi.advanceTimersByTimeAsync(3_000); });
+    await waitFor(() => expect(result.current.statuses.OFF.state).toBe("awake"));
+
+    // Off again: the first sweep comes after two misses and the shortest gap.
+    on = false;
+    const before = sweepCalls;
+    for (let i = 0; i < 4; i++) await act(async () => { await vi.advanceTimersByTimeAsync(3_000); });
+    expect(sweepCalls).toBe(before + 1);
+  });
+});

@@ -2,6 +2,7 @@ import { useAuth } from "@/auth/AuthContext";
 import Button from "@/components/ui/Button";
 import ScreenWithBg from "@/components/ui/ScreenWithBg";
 import PsnSenderCard from "@/components/ps5/PsnSenderCard";
+import { PSN_FEATURE } from "@/api/psn";
 import { useLang } from "@/i18n/LanguageContext";
 import { AMD_UNIT, Currency } from "@/i18n/currency";
 import { LANGUAGES, Lang } from "@/i18n/translations";
@@ -46,8 +47,8 @@ const Settings = () => {
       </div></div>
 
       {/* The PSN account PlayStation players are messaged from: the owner's
-          company's, so only an owner sees it. */}
-      {user?.role === "company_owner" && typeof user.dashboard?.company_id === "number" && (
+          company's, so only an owner sees it. Deferred (PSN_FEATURE). */}
+      {PSN_FEATURE.playerMessages && user?.role === "company_owner" && typeof user.dashboard?.company_id === "number" && (
         <PsnSenderCard companyId={user.dashboard.company_id} />
       )}
 

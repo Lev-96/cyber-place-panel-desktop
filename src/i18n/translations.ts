@@ -135,6 +135,7 @@ export const TRANSLATIONS: Dict = {
     am: "Ոչ մի սարք չպատասխանեց։ Կոնսոլները պետք է լինեն այս համակարգչի հետ նույն ցանցում և լինեն միացված կամ քնի ռեժիմում։",
   },
   "ps5.discover.probed": { en: "Looked at", ru: "Опрошено", am: "Հարցվել է" },
+  "ps5.discover.warnings": { en: "Network notes", ru: "Заметки о сети", am: "Ցանցի նշումներ" },
   "ps5.discover.scanning": { en: "Searching…", ru: "Ищем…", am: "Որոնում…" },
   "ps5.discover.rescan": { en: "Search again", ru: "Искать снова", am: "Որոնել կրկին" },
   "ps5.discover.desktopOnly": {

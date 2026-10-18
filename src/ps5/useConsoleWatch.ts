@@ -66,6 +66,20 @@ export const WATCH_FAST_WINDOW_MS = 20_000;
  */
 const MISSES_BEFORE_SWEEP = 2;
 
+/**
+ * The shortest gap between two sweeps, doubled after each sweep that still did
+ * not find a missing console, up to {@link SWEEP_MAX_GAP_MS} (2026-10-18).
+ *
+ * A console that is really off used to cost a network-wide sweep on every tick
+ * — every three seconds all evening. A console that moved is found by the
+ * first sweep; one that is off gains nothing from the tenth, so they space out:
+ * 5 s, 10 s, 20 s, 40 s, then once a minute. A press (the fast window) brings
+ * the gap back to the shortest, so a console the operator is waiting for is
+ * looked for promptly.
+ */
+export const SWEEP_MIN_GAP_MS = 5_000;
+export const SWEEP_MAX_GAP_MS = 60_000;
+
 export interface WatchedConsole {
   hostId: string;
   /** Last known address, or null when nobody has ever seen it answer. */
@@ -120,6 +134,9 @@ export const useConsoleWatch = (bound: WatchedConsole[], options: Options = {}) 
   const fastUntil = useRef(0);
   /** Wakes the loop out of its wait, for when there is no reason to wait. */
   const wakeLoop = useRef<(() => void) | null>(null);
+  /** When the last sweep ran, and how many in a row found nothing it was looking for. */
+  const lastSweepAt = useRef(0);
+  const fruitless = useRef(0);
 
   const tick = useCallback(async () => {
     const api = ps5Bridge();
@@ -141,9 +158,21 @@ export const useConsoleWatch = (bound: WatchedConsole[], options: Options = {}) 
     for (const c of missing) misses.current[c.hostId] = (misses.current[c.hostId] ?? 0) + 1;
     for (const c of watched) if (answers.has(c.hostId)) misses.current[c.hostId] = 0;
 
-    const needsSweep = missing.some((c) => (misses.current[c.hostId] ?? 0) >= MISSES_BEFORE_SWEEP);
+    if (missing.length === 0) fruitless.current = 0;
+    const now = Date.now();
+    const gap = now < fastUntil.current
+      ? SWEEP_MIN_GAP_MS
+      : Math.min(SWEEP_MAX_GAP_MS, SWEEP_MIN_GAP_MS * 2 ** fruitless.current);
+    const needsSweep = missing.some((c) => (misses.current[c.hostId] ?? 0) >= MISSES_BEFORE_SWEEP)
+      && now - lastSweepAt.current >= gap;
     if (needsSweep) {
+      lastSweepAt.current = now;
       const swept = await api.discover();
+      // Found every console it was looking for, or not.
+      fruitless.current = missing.every((c) => swept.consoles.some((f) => f.hostId === c.hostId))
+        ? 0
+        : fruitless.current + 1;
+      if (swept.warnings?.length) console.info("[ps5] sweep warnings", swept.warnings);
       for (const console_ of swept.consoles) {
         if (!watched.some((c) => c.hostId === console_.hostId)) continue;
         answers.set(console_.hostId, console_);
