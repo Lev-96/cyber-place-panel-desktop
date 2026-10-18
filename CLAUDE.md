@@ -152,6 +152,14 @@ branch — so the two yml files never conflict:
   paints no error. `Ps5ControlProvider.reload()` applies a list only if no newer
   read or local change happened after it was asked. Tests:
   `src/ps5/stopStartRace.test.ts`, `src/ps5/stopStartProvider.test.tsx`.
+- **The watcher's "has a key" answer is re-asked (2026-10-19).** It was asked
+  once per binding: a place bound before its console was paired stayed "no key"
+  after pairing, sent no wake and showed "command failed" until a restart. Now
+  `useConsoleControl` re-asks the vault on `credentialsChanged()` (called by
+  ConsolePicker after pair / save key / forget key, exposed by the provider) and
+  on every Start/Stop. Tests: `src/ps5/keyFreshness.test.tsx`,
+  `src/components/ps5/ConsolePicker.pairing.test.tsx`. Verified live at the club:
+  laptop on 5 GHz, console on 2.4 GHz of the same router, rest → wake in ~9 s.
 - **PSN player message is deferred** (`PSN_FEATURE.playerMessages = false` in
   `src/api/psn.ts`, mirrors the backend flag): no PSN name field at start and no
   sender card in Settings. Pairing's `psnLoginExternal` is separate and stays.
