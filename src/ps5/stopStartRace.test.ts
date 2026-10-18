@@ -231,3 +231,20 @@ describe("the main process withdraws between attempts", () => {
     expect(attempt).toHaveBeenCalledTimes(2);
   });
 });
+
+describe("Start wakes a console that has not answered yet (2026-10-19)", () => {
+  test("inside the press window the wake goes to the last known address", async () => {
+    const c = new Ps5Controller(ports);
+    await c.tick([input({ actual: "unreachable", hasSession: true, urgent: true })]);
+    expect(wake).toHaveBeenCalledWith("AAA", "192.168.1.10");
+  });
+
+  test("after the window, silence sends nothing: no stream at a console that is really off", async () => {
+    const c = new Ps5Controller(ports);
+    for (let i = 0; i < 20; i++) {
+      await c.tick([input({ actual: "unreachable", hasSession: true })]);
+      clock += 10_000;
+    }
+    expect(wake).not.toHaveBeenCalled();
+  });
+});

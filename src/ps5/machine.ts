@@ -120,6 +120,12 @@ export interface Observation {
    * one. `null` while nobody has answered.
    */
   decision: { eventId: string; approved: boolean } | null;
+  /**
+   * An operator pressed Start or Stop moments ago (the controller's urgent
+   * window). Lets a Start wake a console that has not answered yet; see the
+   * unreachable branch of {@link step}.
+   */
+  pressed?: boolean;
   /** Milliseconds since the epoch. Passed in, never read from the clock here. */
   now: number;
 }
@@ -239,8 +245,29 @@ export const step = (prev: MachineSnapshot, obs: Observation, newEventId: string
   const desired = desiredFor(obs, approved);
   next.desired = desired;
 
+  // Start was just pressed and the console has not answered (yet). A PS5 at
+  // rest on Wi-Fi answers only now and then (measured at a club 2026-10-19:
+  // about one probe in three), so waiting for it to say "rest" before waking
+  // it is what made Start feel slow. The wake goes to the last known address,
+  // carries this console's own credential (any other console there ignores
+  // it), and only inside the press window — never a stream for a console that
+  // is really off. Nothing here claims it woke: ACTIVE still needs its answer.
+  if (
+    (obs.actual === "unreachable" || obs.actual === "unknown")
+    && desired === "active" && obs.pressed === true && obs.canWake !== false
+  ) {
+    next.state = "WAKING";
+    next.wakingSince = null;
+    next.wakeEventId = null;
+    next.wakeSeenAt = null;
+    next.approvedEventId = null;
+    commands.push({ kind: "wake" });
+    return { next, commands };
+  }
+
   // A console nobody can reach says nothing about whether it is authorised —
-  // it says the network is in the way. Never act on silence.
+  // it says the network is in the way. Never act on silence (a fresh Start,
+  // above, is the one exception, and it only ever wakes).
   if (obs.actual === "unreachable" || obs.actual === "unknown") {
     next.state = obs.actual === "unreachable" ? "OFFLINE" : "UNKNOWN";
     next.wakingSince = null;

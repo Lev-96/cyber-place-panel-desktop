@@ -567,3 +567,47 @@ describe("a console that cannot be reached", () => {
     expect(commands).toEqual([]);
   });
 });
+
+/**
+ * Start pressed while the console has not answered yet (2026-10-19, club). A
+ * PS5 at rest on Wi-Fi answers about one probe in three; waiting for its
+ * "rest" before waking it is what made Start slow. Right after the press it is
+ * woken anyway — and only then, only to wake, and only with a key.
+ */
+describe("a fresh Start does not wait for a console that has not answered", () => {
+  test("unreachable right after Start: the wake goes out", () => {
+    const { next, commands } = step(initialSnapshot(), observe({ actual: "unreachable", hasSession: true, pressed: true }), "e1");
+    expect(commands).toEqual([{ kind: "wake" }]);
+    expect(next.state).toBe("WAKING");
+  });
+
+  test("not answered yet at all (unknown) right after Start: the wake goes out", () => {
+    const { commands } = step(initialSnapshot(), observe({ actual: "unknown", starting: true, pressed: true }), "e1");
+    expect(commands).toEqual([{ kind: "wake" }]);
+  });
+
+  test("outside the press window silence is still not acted on", () => {
+    const { next, commands } = step(initialSnapshot(), observe({ actual: "unreachable", hasSession: true }), "e1");
+    expect(commands).toEqual([]);
+    expect(next.state).toBe("OFFLINE");
+  });
+
+  test("a Stop press never wakes a silent console", () => {
+    const { commands } = step(initialSnapshot(), observe({ actual: "unreachable", stopping: true, pressed: true }), "e1");
+    expect(commands).toEqual([]);
+  });
+
+  test("no key on this machine: nothing is sent, silent or not", () => {
+    const { commands } = step(initialSnapshot(), observe({ actual: "unreachable", hasSession: true, pressed: true, canWake: false }), "e1");
+    expect(commands).toEqual([]);
+  });
+
+  test("it is never called ACTIVE until the console says it is awake", () => {
+    const { steps } = run(initialSnapshot(), [
+      { actual: "unreachable", hasSession: true, pressed: true },
+      { actual: "unreachable", hasSession: true, pressed: true, now: 1_001_500 },
+      { actual: "awake", hasSession: true, now: 1_009_000 },
+    ]);
+    expect(steps.map((s) => s.next.state)).toEqual(["WAKING", "WAKING", "ACTIVE"]);
+  });
+});

@@ -196,6 +196,7 @@ export class Ps5Controller {
       canWake: input.canWake,
       commandError: this.lastError.get(input.hostId) ?? null,
       decision: input.decision,
+      pressed: input.urgent === true,
       now: this.ports.now(),
     }, this.ports.newId());
 
