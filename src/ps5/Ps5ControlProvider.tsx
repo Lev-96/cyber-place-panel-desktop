@@ -37,6 +37,8 @@ interface Ps5Control {
   statuses: ReturnType<typeof useConsoleControl>["statuses"];
   sessionStarting: (deviceId: number) => void;
   sessionStopped: (deviceId: number) => void;
+  /** The keys on this machine changed (paired, typed, forgotten): ask the vault again. */
+  credentialsChanged: () => void;
 }
 
 const noop = () => {};
@@ -46,6 +48,7 @@ const Ps5ControlContext = createContext<Ps5Control>({
   statuses: {},
   sessionStarting: noop,
   sessionStopped: noop,
+  credentialsChanged: noop,
 });
 
 /** How often the watcher re-reads which consoles exist and what is running. */
@@ -138,6 +141,7 @@ export const Ps5ControlProvider = ({ children }: { children: ReactNode }) => {
       control.sessionStopped(deviceId);
       void reload();
     },
+    credentialsChanged: control.credentialsChanged,
   }), [control, reload]);
 
   return (

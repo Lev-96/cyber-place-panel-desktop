@@ -8,6 +8,7 @@ import { tr } from "@/i18n/translated";
 import { useLang } from "@/i18n/LanguageContext";
 import { pcRepository } from "@/repositories/PcRepository";
 import { PS5_STATE_LOOK } from "@/ps5/stateLook";
+import { usePs5Control } from "@/ps5/Ps5ControlProvider";
 import { ps5Bridge, ps5DiscoveryAvailable, usePs5Discovery, type CredentialState, type Ps5Console } from "@/ps5/usePs5Discovery";
 import { IPcApi } from "@/types/sessions";
 import { useEffect, useState } from "react";
@@ -39,6 +40,8 @@ interface Props {
 const ConsolePicker = ({ branchId, onClose }: Props) => {
   const { t, lang } = useLang();
   const { consoles, searching, error, probed, warnings, scan } = usePs5Discovery();
+  // The console watcher keeps its own "has a key" answer; tell it when ours changes.
+  const { credentialsChanged } = usePs5Control();
   const available = ps5DiscoveryAvailable();
   const devices = useAsync(() => pcRepository.listConsoleDevices(branchId), [branchId]);
   const [busyHostId, setBusyHostId] = useState<string | null>(null);
@@ -91,6 +94,7 @@ const ConsolePicker = ({ branchId, onClose }: Props) => {
       // Cleared immediately: the typed value has done its job and has no reason
       // to sit in a React state tree for the rest of the shift.
       setTypedKey((k) => ({ ...k, [hostId]: "" }));
+      credentialsChanged();
       setKeys((s2) => ({
         ...s2,
         [hostId]: { has: true, available: result.persisted !== false, persisted: result.persisted !== false },
@@ -148,6 +152,7 @@ const ConsolePicker = ({ branchId, onClose }: Props) => {
       setPin((p) => ({ ...p, [console_.hostId]: "" }));
 
       if (result.ok) {
+        credentialsChanged();
         setKeys((k) => ({ ...k, [console_.hostId]: { has: true, available: true, persisted: true } }));
         setKeyError((e) => ({ ...e, [console_.hostId]: t("ps5.pair.done") }));
         return;
@@ -171,6 +176,7 @@ const ConsolePicker = ({ branchId, onClose }: Props) => {
     setBusyHostId(hostId);
     try {
       await api.forgetCredential(hostId);
+      credentialsChanged();
       setKeys((s2) => ({ ...s2, [hostId]: { has: false, available: s2[hostId]?.available ?? true } }));
     } finally {
       setBusyHostId(null);

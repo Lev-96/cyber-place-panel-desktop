@@ -93,6 +93,15 @@ export const useConsoleControl = ({ devices, sessionDeviceIds, enabled = true }:
   });
 
   const hostKey = watched.map((c) => c.hostId).sort().join(",");
+  /**
+   * Bumped whenever the keys on this machine may have changed: a console paired
+   * or a key typed in or forgotten (the picker says so), and every Start or
+   * Stop. Without it the answer was asked once per binding and kept: a place
+   * bound before its console was paired stayed "no key" after pairing, so no
+   * wake was ever sent until the panel restarted (2026-10-19, club).
+   */
+  const [keysAsked, setKeysAsked] = useState(0);
+  const credentialsChanged = useCallback(() => setKeysAsked((n) => n + 1), []);
   useEffect(() => {
     const api = ps5Bridge();
     if (!api?.hasCredential || hostKey === "") return;
@@ -109,7 +118,7 @@ export const useConsoleControl = ({ devices, sessionDeviceIds, enabled = true }:
     });
 
     return () => { alive = false; };
-  }, [hostKey]);
+  }, [hostKey, keysAsked]);
 
   /** Start pressed / stop confirmed, by device id, with the moment it happened. */
   const [starting, setStarting] = useState<Record<number, Intent>>({});
@@ -277,6 +286,7 @@ export const useConsoleControl = ({ devices, sessionDeviceIds, enabled = true }:
   const sessionStarting = useCallback((deviceId: number) => {
     urgentUntil.current[deviceId] = Date.now() + URGENT_WINDOW_MS;
     pressed(deviceId);
+    credentialsChanged();
     setStarting((s) => ({ ...s, [deviceId]: { at: Date.now() } }));
     // The latest press wins. A Stop a moment ago must not go on asking for
     // rest: if a list read before this start lands after it, "stopping" would
@@ -291,12 +301,13 @@ export const useConsoleControl = ({ devices, sessionDeviceIds, enabled = true }:
     // Ask the console now, and keep asking quickly: the operator is watching
     // the tile, and the next scheduled look could be ten seconds away.
     refreshNow();
-  }, [refreshNow]);
+  }, [refreshNow, credentialsChanged]);
 
   /** Call when a session has actually stopped on the backend. */
   const sessionStopped = useCallback((deviceId: number) => {
     urgentUntil.current[deviceId] = Date.now() + URGENT_WINDOW_MS;
     pressed(deviceId);
+    credentialsChanged();
     setStopping((s) => ({ ...s, [deviceId]: { at: Date.now() } }));
     setStarting((s) => {
       const next = { ...s };
@@ -305,7 +316,7 @@ export const useConsoleControl = ({ devices, sessionDeviceIds, enabled = true }:
     });
     setNudge((n) => n + 1);
     refreshNow();
-  }, [refreshNow]);
+  }, [refreshNow, credentialsChanged]);
 
   // One control pass per observation, plus one immediately after a press. The
   // observations arrive every ten seconds from the monitor, which is what makes
@@ -381,5 +392,5 @@ export const useConsoleControl = ({ devices, sessionDeviceIds, enabled = true }:
     });
   }, [sessionDeviceIds]);
 
-  return { views, statuses, sessionStarting, sessionStopped, wakeDecided };
+  return { views, statuses, sessionStarting, sessionStopped, wakeDecided, credentialsChanged };
 };
