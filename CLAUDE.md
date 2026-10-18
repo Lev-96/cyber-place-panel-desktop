@@ -102,8 +102,9 @@ branch — so the two yml files never conflict:
   and `cyberplacePS5` (PlayStation discovery + status). Each is its own global
   so a screen can feature-detect it: the renderer can be newer than the preload
   it loads into, and a missing bridge must produce a sentence, not a throw.
-- 13 `ipcMain.handle` channels total: `kv:get|set|remove`, `wol:send`,
-  `updates:check|install|getState`, `ps5:discover|probe|wake|rest|capabilities`,
+- 20 `ipcMain.handle` channels total: `kv:get|set|remove`, `wol:send`,
+  `updates:check|checkGated|install|getState`,
+  `ps5:discover|probe|wake|wake-once|pair|psn-login-external|rest|rest-cancel|capabilities`,
   `ps5:credential:set|has|forget`.
 - **The console wake key never crosses to the renderer.** It is encrypted by the
   OS keystore (`electron/ps5/credentials.ts`, `safeStorage`), and the bridge can
@@ -111,18 +112,49 @@ branch — so the two yml files never conflict:
   keystore, storing is refused rather than falling back to readable text.
 - **The consoles are talked to from HERE, not from the server.** The backend is
   in a datacentre and shares no broadcast domain with any club; this process
-  runs on a machine in the room. `electron/ps5/` is read-only by construction —
-  it can find a console and report what it said, and it cannot wake or rest one.
+  runs on a machine in the room. `electron/ps5/` finds, observes, pairs, wakes
+  and rests consoles; keys never leave the main process.
   `ps5:discover` sweeps the network and belongs behind a button; `ps5:probe`
   asks named addresses and is what the ten-second status check on the sessions
   board uses (`src/ps5/useConsoleWatch.ts`). A broadcast every ten seconds would
   put a packet in front of every device in the venue all shift.
 - **`electron/ps5/transport.ts` is the seam.** It declares what a transport can
-  do, and today's answers `rest: false` — the local protocol has no rest
-  command; that needs a Remote Play session (TCP 9295, a key exchange). The
-  refusal is a value (`UNSUPPORTED_BY_TRANSPORT`) that reaches the screen. It is
-  never a success nothing earned, and swapping in a rest-capable transport
-  changes no logic above it.
+  do. Rest is a request inside a Remote Play session (playactor, TCP 9295), so
+  `rest` is true only once the key vault is loaded; without it the refusal is a
+  value (`UNSUPPORTED_BY_TRANSPORT`) that reaches the screen, never a success
+  nothing earned.
+- **Several interfaces (2026-10-18).** A club PC can have the console LAN with no
+  gateway and a USB modem holding the default route; a limited broadcast from a
+  socket on 0.0.0.0 then leaves through the modem only (Windows). So:
+  - `discover()` sends out of every usable IPv4 interface, one socket BOUND to
+    that interface's address, to its directed broadcast and 255.255.255.255,
+    three times within the window (`discoveryLanes`, `sweepLanes` in
+    `electron/ps5/discovery.ts`). Skipped, by what they are and never by name:
+    loopback, 169.254/16, /31-/32 (point-to-point/VPN). Answers merged by
+    host-id; a lane that fails is a warning, not the end of the sweep. Routes
+    and gateways are only read. Skips, lanes and warnings are logged
+    (`[ps5] discovery`, no secrets) and shown under "Find PlayStation".
+  - pair and rest give playactor `discoveryConfig.deviceIp` = the known address
+    (`aimedAt`), so its SRCH is unicast down the LAN's own route; the console is
+    still matched by host-id. Wake was always unicast.
+  - `probe()` (the status check) is unicast and unchanged. The watcher sweeps a
+    missing console after 2 misses, then spaces sweeps 5/10/20/40/60 s while it
+    stays missing; a press brings the gap back to 5 s. An address found by a
+    sweep is re-bound by host-id; nothing is ever re-paired or unbound by
+    silence.
+- **The latest press wins (2026-10-18).** Start clears the Stop intent; a press
+  clears the previous intent's backoff and wake give-up clock
+  (`Ps5Controller.pressed`). A rest still being retried when the console is
+  wanted for anything else is withdrawn (`ps5:rest-cancel`, checked between
+  attempts in `standby()`); an attempt already on the wire cannot be called
+  back, so the console may sleep and is woken from its own answer. A command
+  that comes back after the wish turned (`superseded`) starts no backoff and
+  paints no error. `Ps5ControlProvider.reload()` applies a list only if no newer
+  read or local change happened after it was asked. Tests:
+  `src/ps5/stopStartRace.test.ts`, `src/ps5/stopStartProvider.test.tsx`.
+- **PSN player message is deferred** (`PSN_FEATURE.playerMessages = false` in
+  `src/api/psn.ts`, mirrors the backend flag): no PSN name field at start and no
+  sender card in Settings. Pairing's `psnLoginExternal` is separate and stays.
 
 ### The console lifecycle (`src/ps5/`)
 `machine.ts` is a pure function of (previous state, observation) → (next state,
