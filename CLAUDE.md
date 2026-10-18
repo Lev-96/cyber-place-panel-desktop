@@ -160,6 +160,12 @@ branch — so the two yml files never conflict:
   on every Start/Stop. Tests: `src/ps5/keyFreshness.test.tsx`,
   `src/components/ps5/ConsolePicker.pairing.test.tsx`. Verified live at the club:
   laptop on 5 GHz, console on 2.4 GHz of the same router, rest → wake in ~9 s.
+- **Start wakes without waiting for an answer (2026-10-19).** A PS5 at rest on
+  Wi-Fi answers about one probe in three, so waiting for its "rest" made Start
+  slow. Within the press window (`urgent` → `Observation.pressed`) a silent
+  (`unreachable`/`unknown`) console that is wanted active is sent a wake to its
+  last known address; outside it silence is never acted on, a Stop press never
+  wakes, no key = nothing sent, ACTIVE still needs the console's own answer.
 - **PSN player message is deferred** (`PSN_FEATURE.playerMessages = false` in
   `src/api/psn.ts`, mirrors the backend flag): no PSN name field at start and no
   sender card in Settings. Pairing's `psnLoginExternal` is separate and stays.
