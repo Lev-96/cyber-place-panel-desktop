@@ -2906,3 +2906,19 @@ Because the mark is wide, the sidebar sizes it by height (24px) and `.login-logo
 is 108px / `--ring-size * 0.174` wide (the area the old 90px square mark had).
 The owner web (`telegram-web-app`) serves this `public/` at its pinned
 `panel.ref`, so it shows the new mark only after `panel.ref` is bumped.
+
+## No "Sessions" label (2026-10-18)
+
+The owner retired "session" as a name: the running-seats screen was already
+"Active Places" / «Активные места» / «Ակտիվ տեղեր» (2026-09-28), and now every
+LABEL that said Sessions does too — sales-history totals (incl. free), revenue
+source and "closed" count, the notifications feed, the branch-hub tile, the home
+menu subtitles («Сеансы» is gone from Russian as well), the owner-delete and
+blocker lines, the packages and price-matrix hints, the history empty/error
+states ("sales history"). Keys are unchanged (`history.sumSessions` etc. are
+identifiers). **Kept on purpose, the owner's call:** "Start session" and the
+sentences about one running seat («к этой сессии», «В сессии», "session ends in
+15 min"). `translations.test.ts` pins both halves: no value in any language
+contains «Сессии/Сеанс/сеанс/Sessions/Սեսիաներ», the 14 renamed keys contain no
+form of the old word at all (a lowercase plural is indistinguishable from the
+singular genitive kept elsewhere, hence by key), and "Start session" stays.
