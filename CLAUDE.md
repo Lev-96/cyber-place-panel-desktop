@@ -166,6 +166,26 @@ branch — so the two yml files never conflict:
   (`unreachable`/`unknown`) console that is wanted active is sent a wake to its
   last known address; outside it silence is never acted on, a Stop press never
   wakes, no key = nothing sent, ACTIVE still needs the console's own answer.
+- **Start/Stop follow the console, not a guess (2026-10-19).**
+  - Seat free, console GOING_TO_REST → Start disabled, "Уходит в режим сна…";
+    session running, console WAKING → Stop disabled, "Включение…"
+    (`src/ps5/tileGate.ts`). Bounded by the machine (REST_SETTLE_MS /
+    WAKE_GIVE_UP_MS), so OFFLINE / ERROR / no console never lock a seat.
+  - No "unavailable" flash mid-transition: silence while WAKING or
+    GOING_TO_REST keeps that state until its bound; a console last heard at
+    rest is shown at rest through silence for `REST_HOLD_MS` (60 s) — a PS5
+    asleep on Wi-Fi answers about one probe in three (measured at the club).
+  - The press window is 45 s (was 15) and ends as soon as the console is where
+    it was asked to be; inside it the same datagram goes out at most once a
+    second. A wake no longer waits for a withdrawn rest's TCP attempt (up to
+    20 s) to finish.
+  - "Ignores the wake" (WAKE_IGNORED) is said only of a console really heard
+    at rest after the waking began (`ConsoleStatus.heardAt` →
+    `Observation.heardAt`); one silent since then is OFFLINE, not blamed on
+    its settings.
+  - Real-socket simulation of a Wi-Fi PS5 (`consoleSimulation.integration.test.tsx`):
+    tile ACTIVE → GOING_TO_REST → REST → WAKING → ACTIVE, Stop→REST 3-5 s,
+    Start→ACTIVE 9-12 s with a deliberately deaf console.
 - **PSN player message is deferred** (`PSN_FEATURE.playerMessages = false` in
   `src/api/psn.ts`, mirrors the backend flag): no PSN name field at start and no
   sender card in Settings. Pairing's `psnLoginExternal` is separate and stays.
