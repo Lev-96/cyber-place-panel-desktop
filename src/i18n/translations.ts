@@ -301,6 +301,8 @@ export const TRANSLATIONS: Dict = {
   "ps5.maintenance.until": { en: "Suspended until {t}", ru: "Приостановлено до {t}", am: "Կասեցված է մինչև {t}" },
   // Lifecycle, as the board shows it.
   "ps5.lifecycle.WAKING": { en: "Waking…", ru: "Просыпается…", am: "Արթնանում է…" },
+  "ps5.gate.waking": { en: "Turning on…", ru: "Включение…", am: "Միացում…" },
+  "ps5.gate.goingToRest": { en: "Going to sleep…", ru: "Уходит в режим сна…", am: "Անցնում է քնի…" },
   "ps5.lifecycle.GOING_TO_REST": { en: "Going to rest…", ru: "Уходит в сон…", am: "Անցնում է քնի ռեժիմի…" },
   "ps5.lifecycle.UNEXPECTED_WAKE": { en: "On without a session", ru: "Включена без сессии", am: "Միացված է առանց սեսիայի" },
   "ps5.lifecycle.ERROR": { en: "Command failed", ru: "Команда не прошла", am: "Հրամանը ձախողվեց" },

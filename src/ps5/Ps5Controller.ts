@@ -71,6 +71,8 @@ export interface ConsoleInput {
   hostId: string;
   address: string | null;
   actual: Observation["actual"];
+  /** When the console last really answered; see {@link Observation.heardAt}. */
+  heardAt?: number;
   hasSession: boolean;
   starting: boolean;
   stopping: boolean;
@@ -113,6 +115,13 @@ const RETRY_BACKOFF_MS = 30_000;
  */
 const RESEND_COOLDOWN_MS = 20_000;
 
+/**
+ * Right after a press the cooldowns are lifted, but the same datagram is still
+ * not sent more than once a second: the board re-renders several times a
+ * second and each render is a tick (measured: five wakes in one second).
+ */
+const URGENT_RESEND_MS = 1_000;
+
 export class Ps5Controller {
   private readonly snapshots = new Map<string, MachineSnapshot>();
   private readonly inFlight = new Map<string, Command["kind"]>();
@@ -132,6 +141,8 @@ export class Ps5Controller {
   private readonly desired = new Map<string, MachineSnapshot["desired"]>();
   /** Consoles whose in-flight rest has already been withdrawn, so it is asked once. */
   private readonly cancelAsked = new Set<string>();
+  /** A wake sent while a withdrawn rest still holds the in-flight slot. */
+  private readonly wakeOnTheWire = new Set<string>();
 
   constructor(private readonly ports: ControllerPorts) {}
 
@@ -153,6 +164,7 @@ export class Ps5Controller {
       this.sentAt.delete(`${hostId}:rest`);
       this.desired.delete(hostId);
       this.cancelAsked.delete(hostId);
+      this.wakeOnTheWire.delete(hostId);
     }
   }
 
@@ -197,6 +209,7 @@ export class Ps5Controller {
       commandError: this.lastError.get(input.hostId) ?? null,
       decision: input.decision,
       pressed: input.urgent === true,
+      heardAt: input.heardAt,
       now: this.ports.now(),
     }, this.ports.newId());
 
@@ -267,9 +280,22 @@ export class Ps5Controller {
     // Pressing Start three times must produce one wake, not three. This one
     // holds even for an urgent request: a command already on the wire is not
     // made faster by sending it twice.
-    if (this.inFlight.has(input.hostId)) return;
+    //
+    // One exception (2026-10-19): a rest that has been withdrawn may still be
+    // finishing an attempt for up to twenty seconds (measured), and the wake a
+    // fresh Start needs is a single UDP datagram that does not touch that TCP
+    // session. Waiting for it is what made some Starts late.
+    const overtakesWithdrawnRest = command.kind === "wake"
+      && this.inFlight.get(input.hostId) === "rest" && this.cancelAsked.has(input.hostId);
+    if (this.inFlight.has(input.hostId) && !overtakesWithdrawnRest) return;
+    if (overtakesWithdrawnRest && this.wakeOnTheWire.has(input.hostId)) return;
 
     const sentKey = `${input.hostId}:${command.kind}`;
+
+    if (input.urgent) {
+      const sentAt = this.sentAt.get(sentKey);
+      if (sentAt !== undefined && this.ports.now() - sentAt < URGENT_RESEND_MS) return;
+    }
 
     if (!input.urgent) {
       const failedAt = this.failedAt.get(input.hostId);
@@ -285,6 +311,11 @@ export class Ps5Controller {
       // Bound but never located. Nothing to aim at until a sweep finds it.
       this.snapshots.set(input.hostId, withError(this.view(input.hostId).snapshot, "DEVICE_NOT_FOUND"));
       this.ports.log("PS5_TRANSPORT_ERROR", { hostId: input.hostId, code: "DEVICE_NOT_FOUND" });
+      return;
+    }
+
+    if (overtakesWithdrawnRest) {
+      await this.sendWakeBesideRest(input, sentKey);
       return;
     }
 
@@ -341,6 +372,31 @@ export class Ps5Controller {
     } finally {
       this.inFlight.delete(input.hostId);
       this.cancelAsked.delete(input.hostId);
+    }
+  }
+
+  /**
+   * A wake sent while a withdrawn rest is still finishing. It does not take the
+   * console's in-flight slot (the rest still owns it and releases it), and its
+   * failure is recorded like any wake's.
+   */
+  private async sendWakeBesideRest(input: ConsoleInput, sentKey: string): Promise<void> {
+    if (!input.address) return;
+    this.wakeOnTheWire.add(input.hostId);
+    this.sentAt.set(sentKey, this.ports.now());
+    this.ports.log("PS5_WAKE_REQUESTED", { hostId: input.hostId, deviceId: input.deviceId, besideRest: true });
+    try {
+      const outcome = await this.ports.wake(input.hostId, input.address);
+      if (!outcome.sent && !this.superseded(input.hostId, "wake")) {
+        this.lastError.set(input.hostId, outcome.code ?? "TRANSPORT_ERROR");
+        this.ports.log("PS5_TRANSPORT_ERROR", { hostId: input.hostId, command: "wake", code: outcome.code, detail: outcome.detail });
+      }
+    } catch (error) {
+      this.ports.log("PS5_TRANSPORT_ERROR", {
+        hostId: input.hostId, command: "wake", detail: error instanceof Error ? error.message : String(error),
+      });
+    } finally {
+      this.wakeOnTheWire.delete(input.hostId);
     }
   }
 

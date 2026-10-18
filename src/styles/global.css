@@ -5030,6 +5030,9 @@ select.input option:disabled {
   width: 100%;
   height: 34px;
   font-size: 13px;
+  /* Room for "Уходит в режим сна…" (142px measured) on the narrowest card,
+     whose button is 160px wide: the text is centred either way. */
+  padding-inline: 8px;
 }
 .session-card__hint {
   font-size: 11px;

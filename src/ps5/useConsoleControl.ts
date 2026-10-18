@@ -35,9 +35,12 @@ const INTENT_TTL_MS = 60_000;
  *
  * Enough to carry the command and its confirmation past the rate limits that
  * exist for the monitor, and no longer — those limits are what keep a console
- * from being asked something forty times a minute.
+ * from being asked something forty times a minute. 45 s since 2026-10-19 (it
+ * was 15: a console still settling into rest missed the wakes of the first
+ * seconds, and the next one then waited out a 20 s cooldown). It ends as soon
+ * as the console is where it was asked to be.
  */
-const URGENT_WINDOW_MS = 15_000;
+const URGENT_WINDOW_MS = 45_000;
 
 interface Options {
   /** Console devices of this branch, as the board has them. */
@@ -340,6 +343,7 @@ export const useConsoleControl = ({ devices, sessionDeviceIds, enabled = true }:
         // since the row was written.
         address: status?.address ?? device.console_address ?? null,
         actual: status?.state ?? "unknown",
+        heardAt: status?.heardAt,
         hasSession: sessionDeviceIds.has(device.id),
         // An intent that nothing confirmed within a minute is a failed start,
         // not a licence to stay awake all evening.
@@ -356,6 +360,15 @@ export const useConsoleControl = ({ devices, sessionDeviceIds, enabled = true }:
     void controller.tick(inputs).then(() => {
       const views = Object.fromEntries(inputs.map((i) => [i.hostId, controller.view(i.hostId)]));
       setViews(views);
+
+      // Arrived: the press has done its job, and the ordinary rhythm and rate
+      // limits apply again.
+      for (const input of inputs) {
+        const { state, desired } = views[input.hostId].snapshot;
+        if ((state === "ACTIVE" && desired === "active") || (state === "REST" && desired === "rest")) {
+          delete urgentUntil.current[input.deviceId];
+        }
+      }
 
       // A console that cannot be woken because this machine holds no key for
       // it says so out loud, once. Nothing else does now: the datagram is not

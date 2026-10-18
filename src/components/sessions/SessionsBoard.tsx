@@ -30,6 +30,7 @@ import { platformGroup } from "@/utils/platform";
 import { usePs5Control } from "@/ps5/Ps5ControlProvider";
 import { useRealtimeResync } from "@/realtime/useRealtimeResync";
 import { PS5_STATE_LOOK } from "@/ps5/stateLook";
+import { startGate, stopGate } from "@/ps5/tileGate";
 import { DragEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import AddSessionItemDialog from "./AddSessionItemDialog";
@@ -710,6 +711,9 @@ const SessionsBoard = ({ branchId }: Props) => {
     const lifecycle = consoleView?.snapshot.state;
     const consoleBusy = lifecycle === "WAKING" || lifecycle === "GOING_TO_REST"
       || lifecycle === "UNEXPECTED_WAKE" || lifecycle === "ERROR";
+    // No second press while the console is on its way (see tileGate).
+    const startLock = startGate(lifecycle);
+    const stopLock = stopGate(lifecycle);
     return (
       <SessionCard
         key={pc.id}
@@ -1230,9 +1234,10 @@ const SessionsBoard = ({ branchId }: Props) => {
               {/* Destructive, so it reads as such and spans the row: the one
                   button on the card a slip must not land on by accident. */}
               <SessionCardAction
-                label={t("action.stop")}
-                fullLabel={t("action.stop")}
+                label={t(stopLock.labelKey ?? "action.stop")}
+                fullLabel={t(stopLock.labelKey ?? "action.stop")}
                 danger
+                disabled={stopLock.disabled}
                 onClick={() => setStopTarget(sess)}
               />
             </div>
@@ -1273,11 +1278,11 @@ const SessionsBoard = ({ branchId }: Props) => {
             <div className="session-card__foot">
               <Button
                 onClick={() => setStartTarget(pc)}
-                disabled={!canStart}
+                disabled={!canStart || startLock.disabled}
                 title={isOffline ? t("session.deviceOfflineHint") : undefined}
                 className="session-card__start"
               >
-                {t("action.start")}
+                {t(startLock.labelKey ?? "action.start")}
               </Button>
             </div>
           </>

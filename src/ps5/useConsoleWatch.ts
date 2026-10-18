@@ -57,7 +57,17 @@ export const WATCH_INTERVAL_FAST_MS = 1_500;
  * enough that a console which is not going to obey does not get asked forty
  * times a minute for the rest of the shift.
  */
-export const WATCH_FAST_WINDOW_MS = 20_000;
+export const WATCH_FAST_WINDOW_MS = 45_000;
+
+/**
+ * How long a console last heard at rest is still shown at rest while it is
+ * silent (2026-10-19). A PS5 asleep on Wi-Fi answers about one probe in three
+ * (measured at a club, gaps up to half a minute), and calling each gap
+ * "unreachable" made the tile flash between sleep, unavailable and back. Past
+ * this it really is unreachable. Only rest is held: an awake console answers
+ * every probe, and its silence means something.
+ */
+export const REST_HOLD_MS = 60_000;
 
 /**
  * Silent ticks before the watcher stops trusting the address it has and
@@ -90,6 +100,8 @@ export interface ConsoleStatus {
   state: Ps5State;
   address: string | null;
   name: string | null;
+  /** When it last really answered (ms); a held "rest" keeps the old moment. */
+  heardAt?: number;
 }
 
 interface Options {
@@ -125,6 +137,8 @@ export const useConsoleWatch = (bound: WatchedConsole[], options: Options = {}) 
   const misses = useRef<Record<string, number>>({});
   /** Addresses learned since mount, which are fresher than the props. */
   const learned = useRef<Record<string, string>>({});
+  /** When each console last answered "rest", for {@link REST_HOLD_MS}. */
+  const restHeardAt = useRef<Record<string, number>>({});
   /**
    * Until when to ask quickly, because something was just asked to change.
    *
@@ -188,15 +202,25 @@ export const useConsoleWatch = (bound: WatchedConsole[], options: Options = {}) 
       }
     }
 
-    setStatuses(() => {
+    const heardAt = Date.now();
+    for (const [hostId, answer] of answers) {
+      if (answer.state === "rest") restHeardAt.current[hostId] = heardAt;
+      else delete restHeardAt.current[hostId];
+    }
+
+    setStatuses((previous) => {
       const next: Record<string, ConsoleStatus> = {};
       for (const c of watched) {
         const answer = answers.get(c.hostId);
+        const restAt = restHeardAt.current[c.hostId];
         next[c.hostId] = answer
-          ? { state: answer.state, address: answer.address, name: answer.name }
-          // Off, unplugged, or on another network — indistinguishable from
-          // here, and presenting them as different states would be a guess.
-          : { state: "unreachable", address: addressOf(c), name: null };
+          ? { state: answer.state, address: answer.address, name: answer.name, heardAt }
+          : restAt !== undefined && heardAt - restAt < REST_HOLD_MS
+            // Asleep a moment ago and quiet now: a sleeping console on Wi-Fi.
+            ? { state: "rest", address: previous[c.hostId]?.address ?? addressOf(c), name: previous[c.hostId]?.name ?? null, heardAt: restAt }
+            // Off, unplugged, or on another network — indistinguishable from
+            // here, and presenting them as different states would be a guess.
+            : { state: "unreachable", address: addressOf(c), name: null };
       }
       // Rebuilt from the watched list rather than merged into the previous
       // value, so a console that was just unbound cannot linger on the board.

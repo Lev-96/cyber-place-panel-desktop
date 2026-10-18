@@ -248,3 +248,44 @@ describe("Start wakes a console that has not answered yet (2026-10-19)", () => {
     expect(wake).not.toHaveBeenCalled();
   });
 });
+
+describe("Start right after Stop, with the rest still finishing (2026-10-19)", () => {
+  test("the wake does not wait for a withdrawn rest's attempt to time out", async () => {
+    const c = new Ps5Controller(ports);
+    const answer = pendingRest();
+
+    const stopTick = c.tick([input({ stopping: true, urgent: true })]);
+    await Promise.resolve();
+    // Start: withdrawn at once; the console is already at rest.
+    await c.tick([input({ actual: "rest", hasSession: true, urgent: true })]);
+    clock += 1_500;
+    await c.tick([input({ actual: "rest", hasSession: true, urgent: true })]);
+
+    expect(cancelRest).toHaveBeenCalledTimes(1);
+    expect(wake).toHaveBeenCalled();
+    answer({ sent: false, code: "CANCELLED" });
+    await stopTick;
+  });
+
+  test("a rest still wanted is never overtaken by a wake", async () => {
+    const c = new Ps5Controller(ports);
+    const answer = pendingRest();
+    const stopTick = c.tick([input({ stopping: true, urgent: true })]);
+    await Promise.resolve();
+    await c.tick([input({ actual: "awake", stopping: true, urgent: true })]);
+    expect(wake).not.toHaveBeenCalled();
+    answer({ sent: true });
+    await stopTick;
+  });
+
+  test("after a press the same wake goes out at most once a second", async () => {
+    const c = new Ps5Controller(ports);
+    for (let i = 0; i < 10; i++) {
+      await c.tick([input({ actual: "rest", hasSession: true, urgent: true })]);
+      clock += 200;
+    }
+    // Two seconds of re-renders: two or three wakes, not ten.
+    expect(wake.mock.calls.length).toBeLessThanOrEqual(3);
+    expect(wake.mock.calls.length).toBeGreaterThanOrEqual(2);
+  });
+});

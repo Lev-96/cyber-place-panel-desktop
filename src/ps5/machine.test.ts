@@ -611,3 +611,71 @@ describe("a fresh Start does not wait for a console that has not answered", () =
     expect(steps.map((s) => s.next.state)).toEqual(["WAKING", "WAKING", "ACTIVE"]);
   });
 });
+
+/**
+ * The tile tells what the console is doing, not every dropped answer
+ * (2026-10-19, club): Stop → "going to rest" → rest; Start → "waking" → active.
+ */
+describe("no 'unavailable' flash in the middle of a transition", () => {
+  test("going to rest and quiet for a moment: still going to rest, nothing sent", () => {
+    const { steps } = run(initialSnapshot(), [
+      { actual: "awake", stopping: true, now: 1_000_000 },
+      { actual: "unreachable", stopping: true, now: 1_003_000 },
+      { actual: "rest", stopping: true, now: 1_006_000 },
+    ]);
+    expect(steps.map((s) => s.next.state)).toEqual(["GOING_TO_REST", "GOING_TO_REST", "REST"]);
+    expect(steps[1].commands).toEqual([]);
+  });
+
+  test("waking and quiet for a moment: still waking", () => {
+    const { steps } = run(initialSnapshot(), [
+      { actual: "rest", hasSession: true, now: 1_000_000 },
+      { actual: "unreachable", hasSession: true, now: 1_003_000 },
+      { actual: "awake", hasSession: true, now: 1_008_000 },
+    ]);
+    expect(steps.map((s) => s.next.state)).toEqual(["WAKING", "WAKING", "ACTIVE"]);
+  });
+
+  test("silence that outlasts the transition is called what it is", () => {
+    const { steps } = run(initialSnapshot(), [
+      { actual: "awake", stopping: true, now: 1_000_000 },
+      { actual: "unreachable", stopping: true, now: 1_000_000 + REST_SETTLE_MS + 1_000 },
+    ]);
+    expect(steps[1].next.state).toBe("OFFLINE");
+  });
+
+  test("a press keeps waking a silent console only until the give-up, then it is offline", () => {
+    const { steps } = run(initialSnapshot(), [
+      { actual: "unreachable", hasSession: true, pressed: true, now: 1_000_000 },
+      { actual: "unreachable", hasSession: true, pressed: true, now: 1_000_000 + WAKE_GIVE_UP_MS + 1 },
+    ]);
+    expect(steps[0].commands).toEqual([{ kind: "wake" }]);
+    expect(steps[1].commands).toEqual([]);
+    expect(steps[1].next.state).toBe("OFFLINE");
+  });
+});
+
+/**
+ * Who is to blame when a wake goes unanswered (2026-10-19). Only a console that
+ * was really heard asleep after the waking began is "ignoring the wake"; one
+ * that has said nothing since is simply unavailable.
+ */
+describe("a wake that never landed", () => {
+  test("heard asleep after the waking began: it is ignoring us (its settings)", () => {
+    const { steps } = run(initialSnapshot(), [
+      { actual: "rest", hasSession: true, heardAt: 1_000_000, now: 1_000_000 },
+      { actual: "rest", hasSession: true, heardAt: 1_040_000, now: 1_000_000 + WAKE_GIVE_UP_MS },
+    ]);
+    expect(steps[1].next.state).toBe("ERROR");
+    expect(steps[1].next.error).toBe("WAKE_IGNORED");
+  });
+
+  test("not heard at all since the waking began: unavailable, not its settings", () => {
+    const { steps } = run(initialSnapshot(), [
+      { actual: "rest", hasSession: true, heardAt: 999_000, now: 1_000_000 },
+      { actual: "rest", hasSession: true, heardAt: 999_000, now: 1_000_000 + WAKE_GIVE_UP_MS },
+    ]);
+    expect(steps[1].next.state).toBe("OFFLINE");
+    expect(steps[1].next.error).toBeNull();
+  });
+});
