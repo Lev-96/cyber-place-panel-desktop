@@ -1290,7 +1290,7 @@ export const TRANSLATIONS: Dict = {
   "history.yesterday": { en: "Yesterday", ru: "Вчера", am: "Երեկ" },
   "history.month": { en: "This month", ru: "Текущий месяц", am: "Ընթացիկ ամիս" },
   "history.backToBoard": { en: "Back to Active Places", ru: "К активным местам", am: "Վերադառնալ ակտիվ տեղերին" },
-  "history.sumSessions": { en: "Sessions", ru: "Сессии", am: "Սեսիաներ" },
+  "history.sumSessions": { en: "Active Places", ru: "Активные места", am: "Ակտիվ տեղեր" },
   "history.sumTotal": { en: "Total revenue", ru: "Выручка", am: "Ընդհանուր եկամուտ" },
   "history.sumTime": { en: "Time revenue", ru: "За время", am: "Ժամանակի դիմաց" },
   "history.sumItemsRevenue": { en: "Items revenue", ru: "Товары · сумма", am: "Ապրանքների գումար" },
@@ -1472,7 +1472,7 @@ export const TRANSLATIONS: Dict = {
   "history.billTime": { en: "Play time", ru: "Игровое время", am: "Խաղային ժամանակ" },
   "history.branch": { en: "Branch", ru: "Филиал", am: "Մասնաճյուղ" },
   "history.actionsEmpty": { en: "Nothing beyond the start.", ru: "Кроме старта. Ничего.", am: "Բացի սկսելուց՝ ոչինչ։" },
-  "history.sumFree": { en: "Free sessions", ru: "Бесплатные сессии", am: "Անվճար սեսիաներ" },
+  "history.sumFree": { en: "Free active places", ru: "Бесплатные активные места", am: "Անվճար ակտիվ տեղեր" },
   "history.sumWaived": { en: "Waived", ru: "Списано", am: "Դուրս գրված" },
   "history.action.started": { en: "Started the session", ru: "Начал сессию", am: "Սկսեց սեսիան" },
   "history.action.stopped": { en: "Stopped the session", ru: "Завершил сессию", am: "Ավարտեց սեսիան" },
@@ -1731,8 +1731,8 @@ export const TRANSLATIONS: Dict = {
   // sessions"; tournament entry fees are part of the takings now, so the
   // heading names the period rather than one of the sources.
   "revenue.summaryTitle": { en: "Revenue for the month", ru: "Выручка за месяц", am: "Ամսվա եկամուտը" },
-  "revenue.closedSessions": { en: "Closed sessions", ru: "Закрытых сессий", am: "Փակված սեսիաներ" },
-  "revenue.sourceSessions": { en: "Sessions", ru: "Сессии", am: "Սեսիաներ" },
+  "revenue.closedSessions": { en: "Closed active places", ru: "Закрытых активных мест", am: "Փակված ակտիվ տեղեր" },
+  "revenue.sourceSessions": { en: "Active Places", ru: "Активные места", am: "Ակտիվ տեղեր" },
   "revenue.sourcePos": { en: "POS orders", ru: "Заказы кассы", am: "Դրամարկղի վաճառք" },
   "revenue.tournamentEntries": { en: "Paid tournament entries", ru: "Оплаченных участий в турнирах", am: "Վճարված մասնակցություններ մրցաշարերում" },
   "revenue.sourceTournaments": { en: "Tournament entry fees", ru: "Взносы за участие в турнирах", am: "Մրցաշարերի մասնակցության վճարներ" },
@@ -1828,7 +1828,7 @@ export const TRANSLATIONS: Dict = {
   "notifications.markAllRead": { en: "Mark all as read", ru: "Отметить все прочитанными", am: "Նշել բոլորը որպես կարդացված" },
   "notifications.unreadDot": { en: "Unread", ru: "Не прочитано", am: "Չկարդացված" },
   "notifications.bookingFeedTitle": { en: "Bookings", ru: "Бронирования", am: "Ամրագրումներ" },
-  "notifications.sessionFeedTitle": { en: "Sessions", ru: "Сессии", am: "Սեսիաներ" },
+  "notifications.sessionFeedTitle": { en: "Active Places", ru: "Активные места", am: "Ակտիվ տեղեր" },
   "notifications.sessionEndingSoonTitle": { en: "Seat №{seat}: session ends in {minutes} min", ru: "Место №{seat}: сессия закончится через {minutes} мин", am: "Տեղ №{seat}. սեսիան կավարտվի {minutes} րոպեից" },
   "notifications.sessionEndingSoonBody": { en: "Ends at {time} · {venue}", ru: "Окончание в {time} · {venue}", am: "Ավարտը՝ {time} · {venue}" },
   "notifications.billingFeedTitle": { en: "Billing", ru: "Биллинг", am: "Հաշվարկ" },
@@ -2357,7 +2357,7 @@ export const TRANSLATIONS: Dict = {
   "owners.delete.branches": { en: "Branches: {0}", ru: "Филиалов: {0}", am: "Մասնաճյուղեր՝ {0}" },
   "owners.delete.managers": { en: "Manager accounts: {0}", ru: "Аккаунтов менеджеров: {0}", am: "Մենեջերների հաշիվներ՝ {0}" },
   "owners.delete.places": { en: "Places: {0}", ru: "Мест: {0}", am: "Տեղեր՝ {0}" },
-  "owners.delete.sessions": { en: "Sessions in history: {0}", ru: "Сессий в истории: {0}", am: "Սեսիաներ պատմության մեջ՝ {0}" },
+  "owners.delete.sessions": { en: "Active places in history: {0}", ru: "Активных мест в истории: {0}", am: "Ակտիվ տեղեր պատմության մեջ՝ {0}" },
   "owners.delete.members": {
     en: "Member cards with a balance: {0}",
     ru: "Клиентских карт с балансом: {0}",
@@ -2367,9 +2367,9 @@ export const TRANSLATIONS: Dict = {
   "owners.delete.blocked": { en: "It can't be deleted yet:", ru: "Удалить пока нельзя:", am: "Դեռ հնարավոր չէ ջնջել՝" },
   // Keyed by the backend's `TenantDeletionBlocker` code; {0} = the count.
   "owners.blocker.running_sessions": {
-    en: "Running sessions: {0}. Stop them first.",
-    ru: "Идущих сессий: {0}. Сначала остановите их.",
-    am: "Ընթացիկ սեսիաներ՝ {0}։ Նախ դադարեցրեք դրանք։",
+    en: "Active places: {0}. Stop them first.",
+    ru: "Активных мест: {0}. Сначала остановите их.",
+    am: "Ակտիվ տեղեր՝ {0}։ Նախ դադարեցրեք դրանք։",
   },
   "owners.blocker.upcoming_bookings": {
     en: "Upcoming bookings: {0}. Cancel them first (players are notified).",
@@ -2453,9 +2453,9 @@ export const TRANSLATIONS: Dict = {
   "branch.prices.standard": { en: "Standard", ru: "Стандарт", am: "Ստանդարտ" },
   "branch.prices.vip": { en: "VIP", ru: "VIP", am: "VIP" },
   "branch.prices.hint": {
-    en: "Per-hour rate (AMD). Sessions and the mobile app bill from this matrix.",
-    ru: "Ставка за час (драм). Сессии и мобильное приложение считают по этой таблице.",
-    am: "Ժամային սակագին (դրամ)։ Սեսիաներն ու բջջային հավելվածը հաշվարկում են ըստ այս աղյուսակի։",
+    en: "Per-hour rate (AMD). Active places and the mobile app bill from this matrix.",
+    ru: "Ставка за час (драм). Активные места и мобильное приложение считают по этой таблице.",
+    am: "Ժամային սակագին (դրամ)։ Ակտիվ տեղերն ու բջջային հավելվածը հաշվարկում են ըստ այս աղյուսակի։",
   },
   "branch.prices.saved": { en: "Saved", ru: "Сохранено", am: "Պահպանված է" },
   "branch.prices.packagesSubtitle": { en: "Time packages", ru: "Тарифные пакеты", am: "Ժամանակային փաթեթներ" },
@@ -2466,9 +2466,9 @@ export const TRANSLATIONS: Dict = {
   "prices.group.packages": { en: "Packages", ru: "Пакеты", am: "Փաթեթներ" },
   "prices.group.rules": { en: "Billing rules", ru: "Правила оплаты", am: "Վճարման կանոններ" },
   "prices.packagesHint": {
-    en: "Fixed-length sessions sold at one price.",
-    ru: "Сессии фиксированной длины по одной цене.",
-    am: "Ֆիքսված տևողությամբ սեսիաներ՝ մեկ գնով։",
+    en: "Fixed-length play time sold at one price.",
+    ru: "Игровое время фиксированной длины по одной цене.",
+    am: "Ֆիքսված տևողությամբ խաղաժամ՝ մեկ գնով։",
   },
   "prices.packageInactive": { en: "Inactive", ru: "Неактивен", am: "Ոչ ակտիվ" },
   "tariff.platform": { en: "Platform", ru: "Платформа", am: "Հարթակ" },
@@ -2663,7 +2663,7 @@ export const TRANSLATIONS: Dict = {
   "memberCard.adjust": { en: "Adjust", ru: "Корректировка", am: "Շտկում" },
 
   // Branch hub tiles
-  "tile.sessions": { en: "Sessions", ru: "Сессии", am: "Սեսիաներ" },
+  "tile.sessions": { en: "Active Places", ru: "Активные места", am: "Ակտիվ տեղեր" },
   "tile.members": { en: "Members", ru: "Клиенты", am: "Հաճախորդներ" },
   "tile.places": { en: "Places", ru: "Места", am: "Տեղեր" },
   "tile.pcs": { en: "PCs", ru: "ПК", am: "Համակարգիչներ" },
@@ -2731,9 +2731,9 @@ export const TRANSLATIONS: Dict = {
 
   "home.menu.branches": { en: "Branches", ru: "Филиалы", am: "Մասնաճյուղեր" },
   "home.menu.branchesSub": {
-    en: "Live, sessions, products, members",
-    ru: "Мониторинг, сеансы, товары, игроки",
-    am: "Մոնիտորինգ, սեսիաներ, ապրանքներ, հաճախորդներ",
+    en: "Live, active places, products, members",
+    ru: "Мониторинг, активные места, товары, игроки",
+    am: "Մոնիտորինգ, ակտիվ տեղեր, ապրանքներ, հաճախորդներ",
   },
   "home.menu.bookings": {
     en: "Bookings",
@@ -2761,9 +2761,9 @@ export const TRANSLATIONS: Dict = {
     am: "Իմ մասնաճյուղը",
   },
   "home.menu.myBranchSub": {
-    en: "Sessions, products, members",
-    ru: "Сеансы, товары, клиенты",
-    am: "Սեսիաներ, ապրանքներ, հաճախորդներ",
+    en: "Active Places, products, members",
+    ru: "Активные места, товары, клиенты",
+    am: "Ակտիվ տեղեր, ապրանքներ, հաճախորդներ",
   },
   "home.menu.expenses": {
     en: "Expenses",
@@ -3752,8 +3752,8 @@ export const TRANSLATIONS: Dict = {
   "session.state.noPcsDescription": { en: "Computers and consoles registered in Computers appear here as seats.", ru: "Компьютеры и консоли из раздела «Компьютеры» появятся здесь как места.", am: "«Համակարգիչներ» բաժնում գրանցված սարքերը կհայտնվեն այստեղ որպես տեղեր։" },
   "live.state.emptyTitle": { en: "No places yet", ru: "Мест пока нет", am: "Տեղեր դեռ չկան" },
   "live.state.emptyDescription": { en: "Places created in this branch appear here with their live status.", ru: "Места филиала появятся здесь вместе с их текущим статусом.", am: "Մասնաճյուղի տեղերը կհայտնվեն այստեղ՝ իրենց ընթացիկ կարգավիճակով։" },
-  "history.state.errorTitle": { en: "Could not load the session history", ru: "Не удалось загрузить историю сессий", am: "Չհաջողվեց բեռնել սեսիաների պատմությունը" },
-  "history.state.noResultsTitle": { en: "No sessions in this period", ru: "За выбранный период сессий нет", am: "Ընտրված ժամանակահատվածում սեսիաներ չկան" },
+  "history.state.errorTitle": { en: "Could not load the sales history", ru: "Не удалось загрузить историю торговли", am: "Չհաջողվեց բեռնել վաճառքների պատմությունը" },
+  "history.state.noResultsTitle": { en: "No active places in this period", ru: "За выбранный период активных мест нет", am: "Ընտրված ժամանակահատվածում ակտիվ տեղեր չկան" },
   "history.state.noResultsDescription": { en: "Try another date range or staff member.", ru: "Попробуйте изменить период или сотрудника.", am: "Փորձեք փոխել ժամանակահատվածը կամ աշխատակցին։" },
   "history.state.timelineErrorTitle": { en: "Could not load this session's activity", ru: "Не удалось загрузить действия по сессии", am: "Չհաջողվեց բեռնել սեսիայի գործողությունները" },
   "history.state.actorsFailed": { en: "Could not load the staff list. Retry", ru: "Не удалось загрузить сотрудников. Повторить", am: "Չհաջողվեց բեռնել աշխատակիցներին։ Կրկնել" },

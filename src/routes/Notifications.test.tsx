@@ -247,7 +247,7 @@ describe("Notifications states", () => {
 
     expect(await screen.findByText("Could not load notifications")).toBeTruthy();
     expect(screen.getByText(/Billing/i)).toBeTruthy();
-    // The one empty state is the owner's own (empty) Sessions feed; billing
+    // The one empty state is the owner's own (empty) Active Places feed; billing
     // shows its error, never "nothing due".
     expect(screen.getAllByText("No notifications right now")).toHaveLength(1);
     expect(screen.getByText("Seats whose session ends in 15 minutes appear here.")).toBeTruthy();
@@ -276,11 +276,11 @@ describe("the session-ending-soon card", () => {
     expect(nav.fn).toHaveBeenCalledWith("/branches/4/sessions");
   });
 
-  test("an owner sees it under Sessions", async () => {
+  test("an owner sees it under Active Places", async () => {
     auth.user = { id: 5, role: "company_owner", dashboard: { company_id: 7 } };
     render(<Notifications />);
 
-    expect(screen.getByText("Sessions")).toBeTruthy();
+    expect(screen.getByText("Active Places")).toBeTruthy();
     expect(screen.queryByText("Bookings")).toBeNull();
     expect(screen.getByText("Seat №3: session ends in 15 min")).toBeTruthy();
     await waitFor(() => expect(api.calls.length).toBeGreaterThan(0));

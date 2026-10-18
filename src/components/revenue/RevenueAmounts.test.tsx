@@ -97,7 +97,7 @@ describe("RevenueSummaryCard — amounts to the hundredth", () => {
     expect(rowValue(card, "Total revenue")).toMatch(withCents("9000", "50"));
     expect(rowValue(card, "You owe us this period")).toMatch(withCents("900", "05"));
     expect(rowValue(card, "Owner income")).toMatch(withCents("8100", "45"));
-    expect(rowValue(card, "Sessions")).toMatch(withCents("7500", "50"));
+    expect(rowValue(card, "Active Places")).toMatch(withCents("7500", "50"));
   });
 
   test("a whole amount on the same card prints without decimals", () => {
@@ -127,7 +127,7 @@ describe("RevenueSummaryCard for one branch: amounts to the hundredth", () => {
     render(<RevenueSummaryCard figures={branchFigures(TUMANYAN, SUMMARY.commission_percent)} title="Tumanyan" />);
     const card = screen.getByRole("region", { name: "Tumanyan" });
 
-    expect(rowValue(card, "Sessions")).toMatch(withCents("3500", "50"));
+    expect(rowValue(card, "Active Places")).toMatch(withCents("3500", "50"));
     expect(rowValue(card, "Tournament entry fees")).toMatch(wholeOnly("1500"));
     expect(rowValue(card, "Total revenue")).toMatch(withCents("5000", "50"));
     expect(rowValue(card, "You owe us this period")).toMatch(withCents("500", "05"));
@@ -139,7 +139,7 @@ describe("RevenueSummaryCard for one branch: amounts to the hundredth", () => {
     render(<RevenueSummaryCard figures={branchFigures(SAYAT_NOVA, SUMMARY.commission_percent)} title="Sayat-Nova" />);
     const card = screen.getByRole("region", { name: "Sayat-Nova" });
 
-    expect(rowValue(card, "Sessions")).toMatch(wholeOnly("4000"));
+    expect(rowValue(card, "Active Places")).toMatch(wholeOnly("4000"));
     expect(rowValue(card, "Tournament entry fees")).toBe("0 AMD");
     expect(rowValue(card, "Total revenue")).toMatch(wholeOnly("4000"));
     expect(rowValue(card, "You owe us this period")).toMatch(wholeOnly("400"));

@@ -168,9 +168,42 @@ describe("Section names and punctuation", () => {
     const section = { en: "Active Places", ru: "Активные места", am: "Ակտիվ տեղեր" };
     expect(TRANSLATIONS["session.boardTitle"]).toEqual(section);
     expect(TRANSLATIONS["hub.tile.sessions"]).toEqual(section);
-    // A count or a sum OF sessions is still about sessions, not the section.
-    expect(TRANSLATIONS["history.sumSessions"].en).toBe("Sessions");
-    expect(TRANSLATIONS["revenue.sourceSessions"].en).toBe("Sessions");
+    // Since 2026-10-18 the counts and sums carry the same name (the owner's
+    // decision): sales history, revenue and the notifications feed.
+    expect(TRANSLATIONS["history.sumSessions"]).toEqual(section);
+    expect(TRANSLATIONS["revenue.sourceSessions"]).toEqual(section);
+    expect(TRANSLATIONS["notifications.sessionFeedTitle"]).toEqual(section);
+  });
+
+  it("never labels anything Sessions any more (2026-10-18)", () => {
+    // The plural label is gone in every language, and the Russian «сеанс»
+    // with it. Sentences about one running seat («Старт сессии», «В сессии»)
+    // keep the singular on purpose: the owner kept "Start session".
+    const label = /Сессии|Сеанс|сеанс|Sessions|Սեսիաներ/;
+    for (const [key, dict] of Object.entries(TRANSLATIONS)) {
+      for (const { code } of LANGUAGES) {
+        expect(label.test(dict[code]), `${key}.${code}: ${dict[code]}`).toBe(false);
+      }
+    }
+    expect(TRANSLATIONS["session.start"].en).toBe("Start session");
+  });
+
+  it("the renamed labels carry no form of the old word in any language (2026-10-18)", () => {
+    // A lowercase plural («Бесплатные сессии») cannot be told from the
+    // singular genitive kept in sentences («к этой сессии»), so the labels
+    // the owner renamed are checked by key.
+    const renamed = [
+      "history.sumSessions", "history.sumFree", "history.state.noResultsTitle", "history.state.errorTitle",
+      "revenue.closedSessions", "revenue.sourceSessions", "notifications.sessionFeedTitle",
+      "owners.delete.sessions", "owners.blocker.running_sessions", "prices.packagesHint",
+      "branch.prices.hint", "tile.sessions", "home.menu.branchesSub", "home.menu.myBranchSub",
+    ];
+    const old = /сесси|сеанс|session|սեսիա/i;
+    for (const key of renamed) {
+      for (const { code } of LANGUAGES) {
+        expect(old.test(TRANSLATIONS[key][code]), `${key}.${code}: ${TRANSLATIONS[key][code]}`).toBe(false);
+      }
+    }
   });
 
   it("never renders an em dash, in any language", () => {
