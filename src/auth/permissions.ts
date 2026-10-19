@@ -110,13 +110,14 @@ export type Permission =
    */
   | "session.free"
   /**
-   * Cashier shifts — open, close, Z-report. Declared since the first version of
-   * this map and read by nothing until now; the section was open to everyone.
-   * Owner-level from 2026-08-30: the shift is the cash-accountability record
-   * the company answers for. A sale still works without an open shift
-   * (`orders.cashier_shift_id` is nullable), so a manager who cannot open one
-   * can still ring up a customer.
+   * Cash shifts — open, close, count the till, the report (back 2026-10-19).
+   * Admin, owner and the manager of the branch: the manager is the one who
+   * counts the till at night. Mirrors the backend's `shifts.manage`, which
+   * also scopes every action to the branches the account may see; this only
+   * decides whether the tile and the screen are drawn. A sale still works
+   * without an open shift (`orders.cashier_shift_id` is nullable).
    */
+  | "shift.manage"
   /**
    * Administratively block a company / a single branch: it disappears from the
    * player-facing app, takes no bookings, and its staff cannot sign in.
@@ -169,6 +170,7 @@ const PERMS: Record<Role, ReadonlySet<Permission>> = {
     "owner.view", "owner.create", "owner.edit", "owner.delete",
     "game.crud", "game.crud.branch", "expenses.crud",
     "session.start", "session.stop", "session.free",
+    "shift.manage",
   ]),
   company_owner: new Set<Permission>([
     "menu.branches", "menu.managers", "menu.tournaments", "menu.scan", "menu.map",
@@ -188,12 +190,14 @@ const PERMS: Record<Role, ReadonlySet<Permission>> = {
     "company.edit",
     "manager.create", "manager.delete",
     "session.start", "session.stop", "session.free",
+    "shift.manage",
   ]),
   manager: new Set<Permission>([
     // Manager = single-branch floor staff, and the floor is what they get: run
     // sessions, ring up sales, read the product list. No global lists, no CRUD
     // of branches/companies, and — since 2026-08-30 — no branch profile, no
-    // seats, no shifts, no member cards and no product writes. Those are the
+    // seats, no member cards and no product writes (shifts came back on
+    // 2026-10-19, below). Those are the
     // company's arrangements; a manager works inside them.
     //
     // The branch profile was already refused server-side (a manager
@@ -211,6 +215,9 @@ const PERMS: Record<Role, ReadonlySet<Permission>> = {
     // an owner who is not in the building means it does not happen. The backend
     // holds the same rule on `sessions.free`; this only draws the control.
     "session.start", "session.stop", "session.free",
+    // The branch's cash shift (2026-10-19): opened and closed by whoever runs
+    // the till that night; the backend keeps it to their own branch.
+    "shift.manage",
   ]),
 };
 

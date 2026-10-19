@@ -1,0 +1,216 @@
+import Button from "@/components/ui/Button";
+import Input from "@/components/ui/Input";
+import Modal from "@/components/ui/Modal";
+import { ListSkeleton, SkeletonText } from "@/components/ui/Skeleton";
+import { StateSwitch, deriveViewState } from "@/components/ui/state";
+import CloseShiftDialog from "@/components/shifts/CloseShiftDialog";
+import ShiftReportView from "@/components/shifts/ShiftReportView";
+import { formatApiError } from "@/api/errors";
+import { useAsync } from "@/hooks/useAsync";
+import { formatDateTime } from "@/i18n/dates";
+import { useLang } from "@/i18n/LanguageContext";
+import { shiftRepository } from "@/repositories/ShiftRepository";
+import { parseCents, shiftAmount, toAmount } from "@/shifts/cash";
+import type { DifferenceKind, IShift, IShiftWithReport } from "@/types/shifts";
+import { useRef, useState } from "react";
+import { useParams } from "react-router-dom";
+
+/**
+ * Смена — the branch's cash shift (2026-10-19).
+ *
+ * No shift open: the opening cash and "Open shift". A shift open: its live
+ * report (refreshed on demand and after every action; it is computed on the
+ * server from the records the money was written in) and "Close shift", which
+ * shows exactly what will be recorded before it is. Below, the history: every
+ * shift with who opened and closed it and how the till came out; one opens its
+ * saved report.
+ *
+ * Reading this screen never opens a shift, and a restart finds the open one
+ * where it was: the server holds it, not this window. Closing a shift does
+ * not touch Active Places — a running place stays running and is counted in
+ * the shift in which it is closed.
+ */
+const KIND_KEY: Record<DifferenceKind, string> = {
+  shortage: "shift.kind.shortage",
+  surplus: "shift.kind.surplus",
+  none: "shift.kind.none",
+};
+
+const Shift = () => {
+  const { branchId } = useParams();
+  const id = Number(branchId);
+  const { t, money } = useLang();
+
+  const current = useAsync(() => shiftRepository.current(id), [id]);
+  const history = useAsync(() => shiftRepository.list(id), [id]);
+
+  const [openingCash, setOpeningCash] = useState("");
+  const [opening, setOpening] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const [closing, setClosing] = useState(false);
+  const [viewing, setViewing] = useState<IShiftWithReport | null>(null);
+  const [loadingReport, setLoadingReport] = useState<number | null>(null);
+  /** Synchronous guard: clicks arrive before the disabled button re-renders. */
+  const openingNow = useRef(false);
+
+  if (!Number.isFinite(id) || id <= 0) return <div className="error">{t("hub.invalidId")}</div>;
+
+  const reloadAll = () => { void current.reload(); void history.reload(); };
+  const openingCents = openingCash.trim() === "" ? 0 : parseCents(openingCash);
+
+  const open = async () => {
+    if (opening || openingCents === null || openingNow.current) return;
+    openingNow.current = true;
+    setOpening(true);
+    setErr(null);
+    setNotice(null);
+    try {
+      await shiftRepository.open(id, toAmount(openingCents));
+      setOpeningCash("");
+    } catch (e) {
+      // Somebody else opened it a moment ago: show theirs, do not fail.
+      if ((e as { status?: number }).status === 409) setNotice(t("shift.alreadyOpen"));
+      else setErr(formatApiError(e));
+    } finally {
+      openingNow.current = false;
+      setOpening(false);
+      reloadAll();
+    }
+  };
+
+  const showReport = async (shift: IShift) => {
+    setLoadingReport(shift.id);
+    setErr(null);
+    try {
+      setViewing(await shiftRepository.summary(shift.id));
+    } catch (e) {
+      setErr(formatApiError(e));
+    } finally {
+      setLoadingReport(null);
+    }
+  };
+
+  const differenceText = (s: IShift) =>
+    s.cash_difference === null || s.difference_kind === null
+      ? ""
+      : `${t(KIND_KEY[s.difference_kind])}${s.difference_kind === "none" ? "" : `: ${shiftAmount(money, s.cash_difference)}`}`;
+
+  const live = current.data;
+
+  return (
+    <div className="col" style={{ gap: 18 }}>
+      <div className="row-between">
+        <h2 className="page-title" style={{ margin: 0 }}>{t("shift.title")} · №{id}</h2>
+        {live?.shift && (
+          <div className="row" style={{ gap: 8 }}>
+            <Button variant="secondary" onClick={reloadAll} disabled={current.loading}>{t("action.refresh")}</Button>
+            <Button onClick={() => setClosing(true)} disabled={!live.report} data-testid="shift-close">{t("shift.close")}</Button>
+          </div>
+        )}
+      </div>
+
+      {notice && <div className="card muted">{notice}</div>}
+      {err && <div className="error" style={{ whiteSpace: "pre-line" }}>{err}</div>}
+
+      <StateSwitch
+        view={deriveViewState({ loading: current.loading, error: current.error, data: current.data })}
+        skeleton={<SkeletonText lines={6} />}
+        onRetry={() => void current.reload()}
+        error={{ titleKey: "shift.state.errorTitle" }}
+      >
+        {live?.shift && live.report ? (
+          <ShiftReportView shift={live.shift} report={live.report} />
+        ) : (
+          <div className="card col" style={{ gap: 10, maxWidth: 520 }} data-testid="shift-none">
+            <strong>{t("shift.none")}</strong>
+            <span className="muted" style={{ fontSize: 13 }}>{t("shift.noneHint")}</span>
+            <Input
+              label={t("shift.openingCash")}
+              inputMode="decimal"
+              placeholder="0"
+              value={openingCash}
+              onChange={(e) => { setOpeningCash(e.target.value); setErr(null); }}
+              disabled={opening}
+              data-testid="shift-opening-cash"
+            />
+            {openingCents === null && <span className="error" style={{ fontSize: 12 }}>{t("shift.countedInvalid")}</span>}
+            <div>
+              <Button onClick={() => void open()} disabled={opening || openingCents === null} data-testid="shift-open">
+                {opening ? t("shift.opening") : t("shift.open")}
+              </Button>
+            </div>
+          </div>
+        )}
+      </StateSwitch>
+
+      <div className="col" style={{ gap: 8 }}>
+        <h3 style={{ margin: 0 }}>{t("shift.history")}</h3>
+        <StateSwitch
+          view={deriveViewState({ loading: history.loading, error: history.error, data: history.data })}
+          skeleton={<ListSkeleton />}
+          onRetry={() => void history.reload()}
+          error={{ titleKey: "shift.state.errorTitle" }}
+          empty={{ titleKey: "shift.historyEmpty", descriptionKey: null }}
+        >
+          <div className="list" data-testid="shift-history">
+            {(history.data ?? []).map((s) => (
+              <div key={s.id} className="list-item">
+                <div style={{ minWidth: 0 }}>
+                  <div className="name">
+                    {formatDateTime(s.opened_at)}{s.closed_at ? ` → ${formatDateTime(s.closed_at)}` : ""}
+                    {" · "}{s.status === "open" ? t("shift.statusOpen") : t("shift.statusClosed")}
+                  </div>
+                  <div className="meta">
+                    {t("shift.openedBy")}: {s.opened_by?.name ?? ""}
+                    {s.closed_by ? ` · ${t("shift.closedBy")}: ${s.closed_by.name}` : ""}
+                    {s.status === "closed" && s.expected_cash !== null
+                      ? ` · ${t("shift.cashExpected")}: ${shiftAmount(money, s.expected_cash)}` : ""}
+                    {s.counted_cash !== null ? ` · ${t("shift.cashCounted")}: ${shiftAmount(money, s.counted_cash)}` : ""}
+                    {differenceText(s) ? ` · ${differenceText(s)}` : ""}
+                  </div>
+                </div>
+                {s.status === "closed" && (
+                  <Button variant="secondary" onClick={() => void showReport(s)} disabled={loadingReport !== null}>
+                    {loadingReport === s.id ? "…" : t("shift.report")}
+                  </Button>
+                )}
+              </div>
+            ))}
+          </div>
+        </StateSwitch>
+      </div>
+
+      {closing && live?.shift && live.report && (
+        <CloseShiftDialog
+          shift={live.shift}
+          report={live.report}
+          onClose={() => setClosing(false)}
+          onClosed={(result) => {
+            setClosing(false);
+            setNotice(result.already_closed ? t("shift.alreadyClosed") : null);
+            setViewing(result);
+            reloadAll();
+          }}
+        />
+      )}
+
+      {viewing && (
+        <Modal open onClose={() => setViewing(null)}>
+          <div className="card" style={{ width: 640, maxWidth: "94vw", maxHeight: "88vh", overflowY: "auto", display: "flex", flexDirection: "column", gap: 12 }} data-testid="shift-report-modal">
+            <h2 style={{ margin: 0 }}>{viewing.shift.status === "closed" ? t("shift.closedTitle") : t("shift.report")}</h2>
+            {viewing.report
+              ? <ShiftReportView shift={viewing.shift} report={viewing.report} />
+              : <span className="muted">{t("shift.noReport")}</span>}
+            <div className="row-between">
+              <span />
+              <Button onClick={() => setViewing(null)}>{t("action.close")}</Button>
+            </div>
+          </div>
+        </Modal>
+      )}
+    </div>
+  );
+};
+
+export default Shift;
