@@ -1177,7 +1177,7 @@ button is not a permission: a manager who kept the URL could still POST.
 |---|---|---|---|
 | Клиенты (members, deposits) | ✅ | ❌ | ❌ |
 | Настройки филиала | ✅ | ✅ | ❌ |
-| Смена (open/close/Z-report) | ✅ | ✅ | ❌ |
+| Смена (open/close/report, `/branches/:id/shift`) | ✅ | ✅ | ✅ own branch (2026-10-19) |
 | Места | ✅ | ✅ | ❌ |
 | Товары — создать / изменить / удалить / скрыть | ✅ | ✅ | ❌ |
 | Товары — список + поиск | ✅ | ✅ | ✅ |
@@ -1195,10 +1195,16 @@ Two things that look like oversights and are not:
 - **Member cards are gone for the OWNER too.** They hold player identities and
   stored balances, and nothing on the cashier path reads them — the POS charges
   cash and sends `member_id: null`.
-- **A manager without shifts can still take money.** `orders.cashier_shift_id`
-  is nullable, so a sale files itself under the open shift if there is one and
-  simply does not if there is not — exactly what already happened outside shift
-  hours.
+- **A sale needs no shift.** `orders.cashier_shift_id` is nullable, so a sale
+  files itself under the open shift if there is one and simply does not if
+  there is not.
+- **The shift screen (2026-10-19)** — `src/routes/Shift.tsx`, hub tile
+  "Смена", permission `shift.manage` (admin/owner/manager). Live report of the
+  open shift, `CloseShiftDialog` (counted cash typed, difference previewed in
+  exact cents via `src/shifts/cash.ts`, reason required when non-zero, a ref
+  guard so one press sends one close), history with each saved report. Every
+  figure is the server's decimal string; the screen formats it
+  (`shiftAmount`, cents shown when present) and never computes it.
 
 Product READS stay open to everyone: the POS sells from that list, and the
 manager's screen is the list plus a search box with no write control on it.
