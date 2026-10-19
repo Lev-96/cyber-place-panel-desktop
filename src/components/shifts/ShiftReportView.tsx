@@ -4,6 +4,7 @@ import { fmt } from "@/i18n/translations";
 import type { DifferenceKind, IShift, IShiftReport } from "@/types/shifts";
 import type { CSSProperties, ReactNode } from "react";
 import { shiftAmount } from "@/shifts/cash";
+import { platformLabel } from "@/utils/platform";
 
 /**
  * One shift's report, as the server computed it (2026-10-19): the live one of
@@ -51,6 +52,10 @@ const Section = ({ title, children }: { title: string; children: ReactNode }) =>
 
 const ShiftReportView = ({ shift, report }: Props) => {
   const { t, money } = useLang();
+  const methodName = (method: string) =>
+    method === "cash" ? t("session.payCash") : method === "card" ? t("session.payCard")
+      : method === "deposit" ? t("till.payDeposit") : method === "other" ? t("session.payOther") : t("shift.methodUnrecorded");
+
   const m = (amount: string) => shiftAmount(money, amount);
   const closed = shift.status === "closed";
   const kind = report.cash.difference_kind;
@@ -85,6 +90,30 @@ const ShiftReportView = ({ shift, report }: Props) => {
         <div style={divider} />
         <Row label={t("shift.revenueTotal")} value={m(report.revenue_total)} strong testId="shift-revenue-total" />
       </Section>
+
+      {(report.places.unique_seats !== undefined || report.bookings) && (
+        <Section title={t("shift.activity")}>
+          {report.places.unique_seats !== undefined && (
+            <Row label={t("shift.seatsUsed")} value={fmt(t("shift.seatsUsedValue"), report.places.unique_seats, report.places.closed_count)} testId="shift-seats" />
+          )}
+          {(report.places.by_platform ?? []).map((p) => (
+            <Row key={p.platform} muted label={`${platformLabel(p.platform)} · ${p.count}`} value={m(p.total)} />
+          ))}
+          {report.bookings && (
+            <>
+              <div style={divider} />
+              <Row label={t("shift.bookingsCreated")} value={report.bookings.created_count} testId="shift-bookings-created" />
+              <Row label={t("shift.bookingsServed")} value={report.bookings.served_count} />
+              <Row label={t("shift.bookingsCancelled")} value={fmt(t("shift.bookingsCancelledValue"), report.bookings.cancelled_count, report.bookings.no_show_count)} />
+              <Row
+                label={t("shift.bookingsScheduled")}
+                value={fmt(t("shift.bookingsScheduledValue"), report.bookings.scheduled.count, report.bookings.scheduled.served, report.bookings.scheduled.cancelled, report.bookings.scheduled.open)}
+                testId="shift-bookings-scheduled"
+              />
+            </>
+          )}
+        </Section>
+      )}
 
       <Section title={t("shift.byMethod")}>
         <Row label={t("session.payCash")} value={m(report.by_method.cash)} testId="shift-method-cash" />
@@ -122,10 +151,33 @@ const ShiftReportView = ({ shift, report }: Props) => {
             <span className="muted">{fmt(t("shift.topups"), report.member_topups.count, m(report.member_topups.total))}</span>
           )}
           {report.places.running_count > 0 && <span className="muted">{fmt(t("shift.running"), report.places.running_count)}</span>}
+          {(report.places.paused_count ?? 0) > 0 && <span className="muted">{fmt(t("shift.paused"), report.places.paused_count ?? 0)}</span>}
           {report.warnings.map((w) => (
             <span key={w} style={{ fontSize: 13 }}>⚠ {t(`shift.warn.${w}`)}</span>
           ))}
         </div>
+      )}
+
+      {report.lines && (
+        <details className="card" data-testid="shift-lines">
+          <summary style={{ cursor: "pointer", fontWeight: 600 }}>{t("shift.lines")}</summary>
+          <div className="col" style={{ gap: 2, marginTop: 8, fontSize: 13 }}>
+            <strong style={{ marginTop: 4 }}>{t("shift.revenuePlaces")}</strong>
+            {report.lines.places.length === 0 && <span className="muted">{t("shift.linesNone")}</span>}
+            {report.lines.places.map((l) => (
+              <Row key={`p${l.id}`} label={`${l.closed_at ? formatDateTime(l.closed_at) : ""} · ${l.seat} · ${methodName(l.method)}${l.is_free ? ` · ${t("shift.free")}` : ""}`} value={m(l.amount)} />
+            ))}
+            <strong style={{ marginTop: 8 }}>{t("shift.revenueTill")}</strong>
+            {report.lines.till.length === 0 && <span className="muted">{t("shift.linesNone")}</span>}
+            {report.lines.till.map((l) => (
+              <Row key={`o${l.id}`} muted={l.status !== "paid"} label={`${l.at ? formatDateTime(l.at) : ""} · ${methodName(l.method)}${l.status !== "paid" ? ` · ${t("till.voided")}` : ""}`} value={m(l.amount)} />
+            ))}
+            {report.lines.tournaments.length > 0 && <strong style={{ marginTop: 8 }}>{t("shift.revenueTournaments")}</strong>}
+            {report.lines.tournaments.map((l) => (
+              <Row key={`t${l.id}`} label={formatDateTime(l.paid_at)} value={m(l.amount)} />
+            ))}
+          </div>
+        </details>
       )}
     </div>
   );

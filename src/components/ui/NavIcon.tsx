@@ -64,6 +64,13 @@ const SHAPES: Readonly<Record<string, ReactNode>> = {
       <path d="M16 3.13a4 4 0 0 1 0 7.75" />
     </>
   ),
+  "nav.shifts": (
+    <>
+      <rect x="8" y="2" width="8" height="4" rx="1" />
+      <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
+      <path d="m9 14 2 2 4-4" />
+    </>
+  ),
   "nav.revenue": (
     <>
       <path d="M22 7 13.5 15.5 8.5 10.5 2 17" />

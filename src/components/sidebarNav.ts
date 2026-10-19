@@ -87,6 +87,8 @@ const STAFF_MENU: Readonly<Record<string, { rank: number; labelKey?: string; man
   "nav.myBranch": { rank: 2 },
   "nav.managers": { rank: 3, labelKey: "nav.side.myManagers" },
   "nav.revenue": { rank: 4 },
+  // Right after revenue: the owner's money, then each shift's (2026-10-19).
+  "nav.shifts": { rank: 4.5 },
   "nav.map": { rank: 5, labelKey: "nav.side.branchesOnMap" },
   "nav.scan": { rank: 6, labelKey: "nav.side.scanCode" },
   "nav.bookings": { rank: 7 },

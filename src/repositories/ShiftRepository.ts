@@ -1,6 +1,6 @@
-import { apiCloseShift, apiCurrentShift, apiListShifts, apiOpenShift, apiShiftSummary } from "@/api/shifts";
+import { apiCloseShift, apiCurrentShift, apiListShifts, apiOpenShift, apiShiftStaff, apiShiftSummary } from "@/api/shifts";
 import { friendlyMutation } from "@/api/fallback";
-import { IShift, IShiftWithReport } from "@/types/shifts";
+import { IShift, IShiftStaff, IShiftWithReport, ShiftHistoryFilters } from "@/types/shifts";
 
 /**
  * The branch's cash shifts. Reads are NOT wrapped in a fallback: a money
@@ -11,8 +11,11 @@ export class ShiftRepository {
   current(branchId: number) {
     return apiCurrentShift(branchId);
   }
-  list(branchId: number): Promise<IShift[]> {
-    return apiListShifts(branchId).then((r) => r.data);
+  list(filters: ShiftHistoryFilters) {
+    return apiListShifts(filters);
+  }
+  staff(branchId: number): Promise<IShiftStaff[]> {
+    return apiShiftStaff(branchId).then((r) => r.data);
   }
   summary(shiftId: number): Promise<IShiftWithReport> {
     return apiShiftSummary(shiftId);

@@ -1,5 +1,6 @@
 import { request } from "./client";
-import { IShift, IShiftReport, IShiftWithReport } from "@/types/shifts";
+import { IShift, IShiftReport, IShiftStaff, IShiftWithReport, ShiftHistoryFilters } from "@/types/shifts";
+import type { PaginatedList } from "@/types/api";
 
 /**
  * Cash shifts (2026-10-19). Live data: never cached (see httpCache), and the
@@ -9,8 +10,13 @@ import { IShift, IShiftReport, IShiftWithReport } from "@/types/shifts";
 export const apiCurrentShift = (branchId: number) =>
   request<{ shift: IShift | null; report: IShiftReport | null }>("/shifts/current", { params: { branch_id: branchId } });
 
-export const apiListShifts = (branchId: number, limit = 30) =>
-  request<{ data: IShift[] }>("/shifts", { params: { branch_id: branchId, limit } });
+/** The history, filtered and paged on the server; a manager gets their own shifts only. */
+export const apiListShifts = (filters: ShiftHistoryFilters) =>
+  request<PaginatedList<IShift>>("/shifts", { params: filters });
+
+/** Who can be picked as the staff member for a branch's history. */
+export const apiShiftStaff = (branchId: number) =>
+  request<{ data: IShiftStaff[] }>("/shifts/staff", { params: { branch_id: branchId } });
 
 export const apiShiftSummary = (shiftId: number) =>
   request<IShiftWithReport>(`/shifts/${shiftId}/summary`);

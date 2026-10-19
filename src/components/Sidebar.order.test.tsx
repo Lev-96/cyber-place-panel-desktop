@@ -64,11 +64,11 @@ const collated = (names: string[], tag: string) =>
  */
 const STAFF_ORDER = {
   company_owner: [
-    "nav.dashboard", "nav.myCompany", "nav.side.myBranches", "nav.side.myManagers", "nav.revenue",
+    "nav.dashboard", "nav.myCompany", "nav.side.myBranches", "nav.side.myManagers", "nav.revenue", "nav.shifts",
     "nav.side.branchesOnMap", "nav.side.scanCode", "nav.bookings", "nav.side.allTournaments", "nav.notifications",
   ],
   manager: [
-    "nav.dashboard", "nav.myBranch", "nav.side.scanCode", "nav.bookings", "nav.side.myBranchTournaments", "nav.notifications",
+    "nav.dashboard", "nav.myBranch", "nav.shifts", "nav.side.scanCode", "nav.bookings", "nav.side.myBranchTournaments", "nav.notifications",
   ],
 } as const;
 
@@ -121,8 +121,8 @@ test("a manager reads their own branch's tournaments, not all branches'", () => 
 test("the owner's menu wording in Russian, as asked", () => {
   lang.current = "ru";
   mount("company_owner");
-  expect(menuNames().slice(0, 10)).toEqual([
-    "Панель", "Моя компания", "Мои филиалы", "Мои менеджеры", "Выручка",
+  expect(menuNames().slice(0, 11)).toEqual([
+    "Панель", "Моя компания", "Мои филиалы", "Мои менеджеры", "Выручка", "Смены",
     "Филиалы на карте", "Сканировать код", "Бронирования", "Турниры филиалов", "Уведомления",
   ]);
 });
@@ -130,8 +130,8 @@ test("the owner's menu wording in Russian, as asked", () => {
 test("the manager's menu wording in Russian, as asked", () => {
   lang.current = "ru";
   mount("manager");
-  expect(menuNames().slice(0, 6)).toEqual([
-    "Панель", "Мой филиал", "Сканировать код", "Бронирования", "Турниры моего филиала", "Уведомления",
+  expect(menuNames().slice(0, 7)).toEqual([
+    "Панель", "Мой филиал", "Смены", "Сканировать код", "Бронирования", "Турниры моего филиала", "Уведомления",
   ]);
 });
 
@@ -153,7 +153,7 @@ test("switching the language keeps the owner's order", () => {
       </MemoryRouter>,
     );
     const now = menuNames();
-    expect(now.slice(0, 10)).toEqual(STAFF_ORDER.company_owner.map((key) => t(key, code)));
+    expect(now.slice(0, 11)).toEqual(STAFF_ORDER.company_owner.map((key) => t(key, code)));
     expect(now).toHaveLength(en.length);
   }
 });

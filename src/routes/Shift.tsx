@@ -1,17 +1,19 @@
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import Modal from "@/components/ui/Modal";
-import { ListSkeleton, SkeletonText } from "@/components/ui/Skeleton";
+import { SkeletonText } from "@/components/ui/Skeleton";
 import { StateSwitch, deriveViewState } from "@/components/ui/state";
 import CloseShiftDialog from "@/components/shifts/CloseShiftDialog";
+import ShiftHistory, { branchLabel } from "@/components/shifts/ShiftHistory";
+import { useAuth } from "@/auth/AuthContext";
+import { branchRepository } from "@/repositories/BranchRepository";
 import ShiftReportView from "@/components/shifts/ShiftReportView";
 import { formatApiError } from "@/api/errors";
 import { useAsync } from "@/hooks/useAsync";
-import { formatDateTime } from "@/i18n/dates";
 import { useLang } from "@/i18n/LanguageContext";
 import { shiftRepository } from "@/repositories/ShiftRepository";
-import { parseCents, shiftAmount, toAmount } from "@/shifts/cash";
-import type { DifferenceKind, IShift, IShiftWithReport } from "@/types/shifts";
+import { parseCents, toAmount } from "@/shifts/cash";
+import type { IShiftWithReport } from "@/types/shifts";
 import { useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 
@@ -30,19 +32,17 @@ import { useParams } from "react-router-dom";
  * not touch Active Places — a running place stays running and is counted in
  * the shift in which it is closed.
  */
-const KIND_KEY: Record<DifferenceKind, string> = {
-  shortage: "shift.kind.shortage",
-  surplus: "shift.kind.surplus",
-  none: "shift.kind.none",
-};
 
 const Shift = () => {
   const { branchId } = useParams();
   const id = Number(branchId);
-  const { t, money } = useLang();
+  const { t } = useLang();
+  const { user } = useAuth();
 
   const current = useAsync(() => shiftRepository.current(id), [id]);
-  const history = useAsync(() => shiftRepository.list(id), [id]);
+  const branch = useAsync(() => branchRepository.byId(id), [id]);
+  // Bumped after an open or a close so the history below re-reads.
+  const [historyKey, setHistoryKey] = useState(0);
 
   const [openingCash, setOpeningCash] = useState("");
   const [opening, setOpening] = useState(false);
@@ -50,13 +50,12 @@ const Shift = () => {
   const [err, setErr] = useState<string | null>(null);
   const [closing, setClosing] = useState(false);
   const [viewing, setViewing] = useState<IShiftWithReport | null>(null);
-  const [loadingReport, setLoadingReport] = useState<number | null>(null);
   /** Synchronous guard: clicks arrive before the disabled button re-renders. */
   const openingNow = useRef(false);
 
   if (!Number.isFinite(id) || id <= 0) return <div className="error">{t("hub.invalidId")}</div>;
 
-  const reloadAll = () => { void current.reload(); void history.reload(); };
+  const reloadAll = () => { void current.reload(); setHistoryKey((k) => k + 1); };
   const openingCents = openingCash.trim() === "" ? 0 : parseCents(openingCash);
 
   const open = async () => {
@@ -79,29 +78,14 @@ const Shift = () => {
     }
   };
 
-  const showReport = async (shift: IShift) => {
-    setLoadingReport(shift.id);
-    setErr(null);
-    try {
-      setViewing(await shiftRepository.summary(shift.id));
-    } catch (e) {
-      setErr(formatApiError(e));
-    } finally {
-      setLoadingReport(null);
-    }
-  };
-
-  const differenceText = (s: IShift) =>
-    s.cash_difference === null || s.difference_kind === null
-      ? ""
-      : `${t(KIND_KEY[s.difference_kind])}${s.difference_kind === "none" ? "" : `: ${shiftAmount(money, s.cash_difference)}`}`;
-
   const live = current.data;
 
   return (
     <div className="col" style={{ gap: 18 }}>
       <div className="row-between">
-        <h2 className="page-title" style={{ margin: 0 }}>{t("shift.title")} · №{id}</h2>
+        <h2 className="page-title" style={{ margin: 0 }}>
+          {t("shift.title")} · {branch.data ? branchLabel(branch.data) : `№${id}`}
+        </h2>
         {live?.shift && (
           <div className="row" style={{ gap: 8 }}>
             <Button variant="secondary" onClick={reloadAll} disabled={current.loading}>{t("action.refresh")}</Button>
@@ -146,39 +130,7 @@ const Shift = () => {
 
       <div className="col" style={{ gap: 8 }}>
         <h3 style={{ margin: 0 }}>{t("shift.history")}</h3>
-        <StateSwitch
-          view={deriveViewState({ loading: history.loading, error: history.error, data: history.data })}
-          skeleton={<ListSkeleton />}
-          onRetry={() => void history.reload()}
-          error={{ titleKey: "shift.state.errorTitle" }}
-          empty={{ titleKey: "shift.historyEmpty", descriptionKey: null }}
-        >
-          <div className="list" data-testid="shift-history">
-            {(history.data ?? []).map((s) => (
-              <div key={s.id} className="list-item">
-                <div style={{ minWidth: 0 }}>
-                  <div className="name">
-                    {formatDateTime(s.opened_at)}{s.closed_at ? ` → ${formatDateTime(s.closed_at)}` : ""}
-                    {" · "}{s.status === "open" ? t("shift.statusOpen") : t("shift.statusClosed")}
-                  </div>
-                  <div className="meta">
-                    {t("shift.openedBy")}: {s.opened_by?.name ?? ""}
-                    {s.closed_by ? ` · ${t("shift.closedBy")}: ${s.closed_by.name}` : ""}
-                    {s.status === "closed" && s.expected_cash !== null
-                      ? ` · ${t("shift.cashExpected")}: ${shiftAmount(money, s.expected_cash)}` : ""}
-                    {s.counted_cash !== null ? ` · ${t("shift.cashCounted")}: ${shiftAmount(money, s.counted_cash)}` : ""}
-                    {differenceText(s) ? ` · ${differenceText(s)}` : ""}
-                  </div>
-                </div>
-                {s.status === "closed" && (
-                  <Button variant="secondary" onClick={() => void showReport(s)} disabled={loadingReport !== null}>
-                    {loadingReport === s.id ? "…" : t("shift.report")}
-                  </Button>
-                )}
-              </div>
-            ))}
-          </div>
-        </StateSwitch>
+        <ShiftHistory key={historyKey} fixedBranchId={id} canPickStaff={user?.role !== "manager"} />
       </div>
 
       {closing && live?.shift && live.report && (

@@ -337,6 +337,7 @@ const Sidebar = ({ footerExtra }: SidebarProps = {}) => {
       { to: "/games", labelKey: "nav.games", show: can(role, "menu.games") },
       { to: "/companies", labelKey: "nav.companies", show: can(role, "menu.companies") },
       { to: "/revenue", labelKey: "nav.revenue", show: can(role, "revenue.view") },
+      { to: "/shifts", labelKey: "nav.shifts", show: can(role, "shift.manage") },
       { to: "/expenses", labelKey: "nav.expenses", show: can(role, "menu.expenses") },
       { to: "/metrics", labelKey: "nav.metrics", show: can(role, "menu.metrics") },
       {

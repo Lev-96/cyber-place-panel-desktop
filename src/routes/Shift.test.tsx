@@ -11,9 +11,12 @@ import type { IShift, IShiftReport } from "@/types/shifts";
  */
 
 const repo = vi.hoisted(() => ({
-  current: vi.fn(), list: vi.fn(), summary: vi.fn(), open: vi.fn(), close: vi.fn(),
+  current: vi.fn(), list: vi.fn(), summary: vi.fn(), open: vi.fn(), close: vi.fn(), staff: vi.fn(),
 }));
 vi.mock("@/repositories/ShiftRepository", () => ({ shiftRepository: repo }));
+vi.mock("@/repositories/BranchRepository", () => ({
+  branchRepository: { byId: async () => ({ id: 4, address: "Abovyan 1", city: "Yerevan" }), list: async () => [] },
+}));
 vi.mock("@/auth/AuthContext", () => ({ useAuth: () => ({ user: { id: 7, name: "Anna Hakobyan", role: "manager" } }) }));
 vi.mock("@/i18n/LanguageContext", () => ({
   useLang: () => ({ t: (k: string) => k, lang: "en", money: (n: number) => n.toFixed(2) }),
@@ -25,6 +28,7 @@ const shift = (over: Partial<IShift> = {}): IShift => ({
   id: 11, branch_id: 4, status: "open", opened_at: "2026-10-19T10:00:00+04:00", closed_at: null,
   opened_by: { id: 7, name: "Anna Hakobyan" }, closed_by: null, opening_cash: "50000.00",
   expected_cash: null, counted_cash: null, cash_difference: null, difference_kind: null, notes: null, has_report: true,
+  branch: { id: 4, address: "Abovyan 1", city: "Yerevan" }, revenue_total: null,
   ...over,
 });
 
@@ -60,7 +64,8 @@ const mount = async () => {
 
 beforeEach(() => {
   for (const f of Object.values(repo)) f.mockReset();
-  repo.list.mockResolvedValue([]);
+  repo.list.mockResolvedValue({ data: [], meta: { current_page: 1, last_page: 1, per_page: 20, total: 0 } });
+  repo.staff.mockResolvedValue([]);
 });
 afterEach(() => cleanup());
 
@@ -174,14 +179,16 @@ describe("the report and the history", () => {
 
   test("history lists each shift's till result and opens its saved report", async () => {
     repo.current.mockResolvedValue({ shift: null, report: null });
-    repo.list.mockResolvedValue([
+    repo.list.mockResolvedValue({ data: [
       shift({ id: 9, status: "closed", closed_at: "2026-10-19T02:05:00+04:00", closed_by: { id: 8, name: "Aram Petrosyan" }, expected_cash: "50000.00", counted_cash: "52000.00", cash_difference: "2000.00", difference_kind: "surplus" }),
-    ]);
+    ], meta: { current_page: 1, last_page: 1, per_page: 20, total: 1 } });
     repo.summary.mockResolvedValue({ shift: shift({ id: 9, status: "closed" }), report: report() });
     await mount();
 
-    const history = screen.getByTestId("shift-history");
-    expect(history.textContent).toContain("Aram Petrosyan");
+    const history = await screen.findByTestId("shift-history");
+    await waitFor(() => expect(history.textContent).toContain("Aram Petrosyan"));
+    // The branch screen asks for its own branch only.
+    expect(repo.list).toHaveBeenCalledWith(expect.objectContaining({ branch_id: 4, page: 1 }));
     expect(history.textContent).toContain("shift.kind.surplus: 2000.00");
     await act(async () => { fireEvent.click(screen.getByText("shift.report")); });
     expect(repo.summary).toHaveBeenCalledWith(9);
