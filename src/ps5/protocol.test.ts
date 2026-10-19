@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { parseDiscoveryResponse, probePacket } from "../../electron/ps5/protocol";
-import { broadcastTargets } from "../../electron/ps5/discovery";
+import { discoveryLanes } from "../../electron/ps5/discovery";
 
 /**
  * The parser is the part of PS5 discovery that has to be right without a
@@ -98,23 +98,53 @@ describe("reading a console's answer", () => {
 });
 
 describe("where the probe is sent", () => {
-  test("broadcast addresses come from the machine's own interfaces", () => {
-    const targets = broadcastTargets({
-      lo: [{ address: "127.0.0.1", netmask: "255.0.0.0", family: "IPv4", internal: true } as never],
-      eth0: [{ address: "192.168.1.20", netmask: "255.255.255.0", family: "IPv4", internal: false } as never],
-      wlan0: [{ address: "10.4.2.7", netmask: "255.255.0.0", family: "IPv4", internal: false } as never],
+  const iface = (address: string, netmask: string, internal = false) =>
+    [{ address, netmask, family: "IPv4", internal } as never];
+
+  test("one lane per usable interface, bound to it, aimed at its own broadcast", () => {
+    const { lanes } = discoveryLanes({
+      lo: iface("127.0.0.1", "255.0.0.0", true),
+      eth0: iface("192.168.1.20", "255.255.255.0"),
+      wlan0: iface("10.4.2.7", "255.255.0.0"),
     });
 
     // Derived, not assumed: a club on 10.x is as likely as one on 192.168.x.
-    expect(targets).toContain("192.168.1.255");
-    expect(targets).toContain("10.4.255.255");
-    // Loopback would only ever probe ourselves.
-    expect(targets).not.toContain("127.255.255.255");
-    // The global fallback, for an interface with no usable broadcast of its own.
-    expect(targets).toContain("255.255.255.255");
+    expect(lanes).toEqual([
+      { label: "eth0 192.168.1.20", bind: "192.168.1.20", targets: ["192.168.1.255", "255.255.255.255"] },
+      { label: "wlan0 10.4.2.7", bind: "10.4.2.7", targets: ["10.4.255.255", "255.255.255.255"] },
+    ]);
   });
 
-  test("a machine with no usable interface still has somewhere to send", () => {
-    expect(broadcastTargets({})).toEqual(["255.255.255.255"]);
+  test("the console LAN with no gateway beside a USB modem: both are swept, each out of its own interface", () => {
+    // The field case (2026-10-18). Names are whatever Windows calls them; the
+    // choice never depends on them.
+    const { lanes } = discoveryLanes({
+      "Ethernet": iface("192.168.1.50", "255.255.255.0"),
+      "Remote NDIS based Internet Sharing Device": iface("192.168.42.129", "255.255.255.0"),
+    });
+
+    expect(lanes.map((l) => l.bind)).toEqual(["192.168.1.50", "192.168.42.129"]);
+    expect(lanes[0].targets).toContain("192.168.1.255");
+  });
+
+  test("loopback, link-local and point-to-point (VPN) links are skipped, and say why", () => {
+    const { lanes, skipped } = discoveryLanes({
+      lo: iface("127.0.0.1", "255.0.0.0", true),
+      apipa: iface("169.254.10.3", "255.255.0.0"),
+      tun0: iface("100.101.7.3", "255.255.255.255"),
+      ppp0: iface("10.8.0.6", "255.255.255.254"),
+    });
+
+    expect(lanes).toEqual([]);
+    expect(skipped.map((s) => s.reason)).toEqual(["loopback", "link-local", "point-to-point", "point-to-point"]);
+  });
+
+  test("the same address twice is one lane", () => {
+    const { lanes } = discoveryLanes({ a: iface("192.168.1.20", "255.255.255.0"), b: iface("192.168.1.20", "255.255.255.0") });
+    expect(lanes).toHaveLength(1);
+  });
+
+  test("a machine with no usable interface has no lanes; the sweep falls back to one unbound socket", () => {
+    expect(discoveryLanes({}).lanes).toEqual([]);
   });
 });

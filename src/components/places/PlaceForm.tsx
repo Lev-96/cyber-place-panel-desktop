@@ -20,21 +20,22 @@ import { can } from "@/auth/permissions";
 import { useAsync } from "@/hooks/useAsync";
 import { useLang } from "@/i18n/LanguageContext";
 import { fmt } from "@/i18n/translations";
-import { platformPriceNameOf } from "@/i18n/platformPriceName";
+import { customPlatformOptions, platformPriceNameOf } from "@/i18n/platformPriceName";
 import { gameRepository } from "@/repositories/GameRepository";
 import { placeRepository } from "@/repositories/PlaceRepository";
 import { subplatformRepository } from "@/repositories/SubplatformRepository";
 import { CHARGE_MODES, JoystickChargeMode, JoystickPricingMode, PRICING_MODES, pricingModeOf } from "@/api/joystickPrices";
 import { IBranchApi, IBranchPlace, IBranchPlatformPrice, PlaceType } from "@/types/api";
-import { isKnownPlatform, platformGroup, platformLabel, slugifyPlatform } from "@/utils/platform";
-import { FormEvent, useEffect, useState } from "react";
+import { isKnownPlatform, platformGroup, platformLabel } from "@/utils/platform";
+import { resolveTypedPlatform } from "@/utils/platformName";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 
 const EMPTY_NAMES: LangNames = { en: "", ru: "", am: "" };
 
 interface Props {
   branchId: number;
   initial?: IBranchPlace;
-  /** Existing custom-platform slugs to autocomplete in the platform picker. */
+  /** The platforms this branch's places use: with `platformPrices`, its custom-platform quick buttons. */
   platformSuggestions?: string[];
   /**
    * Existing custom-platform prices for this branch. When the chosen custom
@@ -44,7 +45,12 @@ interface Props {
    */
   platformPrices?: IBranchPlatformPrice[];
   onClose: () => void;
-  onSaved: () => void;
+  /**
+   * Saved. On create it carries the place the server returned (null if the
+   * response had none); on edit nothing — BranchPlaces opens "Register
+   * computer" for a new PC place from it.
+   */
+  onSaved: (created?: IBranchPlace | null) => void;
 }
 
 const TYPES: PlaceType[] = ["standard", "vip"];
@@ -348,14 +354,62 @@ const PlaceForm = ({ branchId, initial, platformSuggestions, platformPrices, onC
   // Multilingual наименование for that new platform's price row. The English
   // value is the identity: the platform slug is derived from it, so the same
   // platform resolves the same way regardless of the panel's language.
-  const [names, setNames] = useState<LangNames>(EMPTY_NAMES);
+  //
+  // Editing a place on a custom platform the branch has NO price row for (a
+  // legacy row, or its price was removed): the form treats it as a new
+  // platform to name, and an empty name would block Save — or, typed afresh,
+  // re-slug the place. So its English name starts as the de-slugged slug,
+  // and Save keeps the stored slug (see `finalPlatform`).
+  const [names, setNames] = useState<LangNames>(() =>
+    initial && !isKnownPlatform(initial.platform) && !(platformPrices ?? []).some((pp) => pp.platform === initial.platform)
+      ? { en: platformLabel(initial.platform), ru: "", am: "" }
+      : EMPTY_NAMES,
+  );
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
-  // Platform selection from the picker: a known slug (pc/ps4/ps5) or "" when
-  // the operator hits "Other". Switching to Other starts a fresh custom name.
+  /**
+   * A different platform is a different price. On edit both rate boxes open
+   * holding the place's stored `hourly_rate` — the rate of the OLD platform —
+   * and carried over unchanged it would be saved as the new platform's own
+   * override (or seed a new custom platform's price) without anyone typing
+   * it. So picking another platform empties them and the new platform's own
+   * price applies; anything typed AFTER the switch is the operator's and is
+   * kept. Going back to the stored platform restores the stored figure.
+   *
+   * Only DISCRETE picks come through here. Typing a new platform's name
+   * changes the slug on every keystroke (`handleNamesChange`) and must not
+   * wipe the rate typed next to it. Create and edit behave the same: on
+   * create there is no stored platform to return to.
+   */
+  const changePlatform = (next: string) => {
+    if (next !== platform) {
+      const stored = initial && next === initial.platform && initial.hourly_rate != null
+        ? String(initial.hourly_rate)
+        : "";
+      setPlaceRate(stored);
+      setHourlyRate(stored);
+    }
+    setPlatform(next);
+  };
+
+  // Platform selection from the picker: a known slug (pc/ps4/ps5), one of
+  // this branch's custom platforms (a quick button), or "" when the operator
+  // hits "Other" — which starts a fresh custom name. A custom button goes the
+  // same way as picking it from the name suggestions: its наименование in
+  // every language and its exact slug, so its existing price locks in.
   const handlePlatformPick = (v: string) => {
-    setPlatform(v);
+    namedByOperator.current = false;
+    if (v !== "" && !isKnownPlatform(v)) {
+      const priced = (platformPrices ?? []).find((pp) => pp.platform === v);
+      if (priced) { handlePickExisting(priced); return; }
+      // Used by a place but never priced: name it from its slug (the English
+      // name is what the slug derives from, so it stays the same slug).
+      changePlatform(v);
+      setNames({ en: platformLabel(v), ru: "", am: "" });
+      return;
+    }
+    changePlatform(v);
     if (!isKnownPlatform(v)) setNames(EMPTY_NAMES);
   };
 
@@ -363,16 +417,27 @@ const PlaceForm = ({ branchId, initial, platformSuggestions, platformPrices, onC
   // platform identity persisted on the place + used to match an existing price.
   // Trim before slugifying so a stray trailing space ("tennis " → "tennis-")
   // can't fork a duplicate platform past the case-insensitive match.
+  //
+  // A name that IS an existing platform ("PC", "pc", " PC ", a custom one's
+  // name in the panel language) selects that platform instead of forking a
+  // new one; the picker then shows it, not Other (`resolveTypedPlatform`).
+  // Set only by typing here and cleared by any discrete pick, so the
+  // late-data effect below never re-targets a platform the operator chose.
+  const namedByOperator = useRef(false);
+  const resolveNames = (v: LangNames) =>
+    resolveTypedPlatform(v, lang, branchCustomPlatforms.map((o) => o.slug), platformPrices);
   const handleNamesChange = (v: LangNames) => {
+    namedByOperator.current = true;
     setNames(v);
-    setPlatform(slugifyPlatform(v.en.trim()));
+    setPlatform(resolveNames(v));
   };
 
   // Adopting an existing platform from the suggestions: fill every locale and
   // snap to its exact slug so its already-defined price locks in.
   const handlePickExisting = (p: IBranchPlatformPrice) => {
+    namedByOperator.current = false;
     setNames({ en: p.name_en ?? "", ru: p.name_ru ?? "", am: p.name_am ?? "" });
-    setPlatform(p.platform);
+    changePlatform(p.platform);
   };
 
   /**
@@ -542,17 +607,28 @@ const PlaceForm = ({ branchId, initial, platformSuggestions, platformPrices, onC
 
   const filteredGames = (games.data ?? []).filter((g) => g.platform === platform);
 
-  // Existing custom platforms to autocomplete in the picker: the branch's
-  // places (passed in) plus any platform that already has games in the catalogue.
-  const platformOptions = Array.from(
-    new Set([
-      ...(platformSuggestions ?? []),
-      // Platforms that already have a branch price — offer them even if no
-      // place uses them yet, so the operator re-picks the priced platform.
-      ...(platformPrices ?? []).map((pp) => pp.platform),
-      ...(games.data ?? []).map((g) => g.platform).filter((p) => !isKnownPlatform(p)),
-    ]),
+  // This branch's custom platforms as quick buttons next to PC / PS4 / PS5:
+  // the platforms its places use plus the ones it has a price for. NOT the
+  // platforms of the shared games catalogue — those can belong to another
+  // company and must never appear as one of this branch's buttons.
+  const branchCustomPlatforms = useMemo(
+    () => customPlatformOptions(
+      [...(platformSuggestions ?? []), ...(platformPrices ?? []).map((pp) => pp.platform)],
+      platformPrices,
+      lang,
+    ),
+    [platformSuggestions, platformPrices, lang],
   );
+
+  // The branch's platforms can land after the operator started typing a name
+  // (a slow read). Resolve that name again once they do, so an existing
+  // platform is still picked rather than duplicated. Keyed on the data only:
+  // typing already resolves in `handleNamesChange`, and an untouched form —
+  // an edit above all — is never re-targeted by a list that arrived late.
+  useEffect(() => {
+    if (namedByOperator.current) setPlatform(resolveNames(names));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [branchCustomPlatforms, platformPrices]);
 
   // A place targets ONE platform, so its games must all belong to that
   // platform. When the operator switches platform (e.g. pc → ps4), drop any
@@ -585,8 +661,13 @@ const PlaceForm = ({ branchId, initial, platformSuggestions, platformPrices, onC
     // For a brand-new custom platform the English наименование is mandatory
     // (its slug is the platform identity). A rate is mandatory whenever THIS
     // tier isn't priced yet. A locked tier needs neither.
-    const finalPlatform = customNew ? slugifyPlatform(names.en.trim()) : platform;
-    if (customNew && !finalPlatform) return setErr(t("place.errors.nameRequired"));
+    // `platform` already IS the slug of the English name once anything was
+    // typed (`handleNamesChange`); untyped, it is the slug the place came with
+    // or the custom button picked. Re-deriving it from the name here would
+    // re-slug a stored platform whose slug the de-slugged name does not
+    // round-trip to ("a--b" → "A  B" → "a-b").
+    const finalPlatform = platform;
+    if (customNew && (!finalPlatform || !names.en.trim())) return setErr(t("place.errors.nameRequired"));
     // A room that prices its own pads must name the figure. Under "every
     // handout" that is the third pad's price (the fourth may be left to follow
     // it); under "one charge per session" it is the single figure for the
@@ -737,9 +818,9 @@ const PlaceForm = ({ branchId, initial, platformSuggestions, platformPrices, onC
       };
       // The place keeps a single `name` — the interface-language value — so
       // every existing consumer keeps working; the per-language values follow.
-      const placeId = initial
-        ? (await placeRepository.update(initial.id, body), initial.id)
-        : (await placeRepository.create(body))?.id ?? null;
+      const created = initial ? null : await placeRepository.create(body);
+      if (initial) await placeRepository.update(initial.id, body);
+      const placeId = initial ? initial.id : created?.id ?? null;
 
       if (placeId != null) {
         await apiSaveEntityTranslations("place", placeId, {
@@ -748,7 +829,7 @@ const PlaceForm = ({ branchId, initial, platformSuggestions, platformPrices, onC
         });
       }
 
-      onSaved();
+      onSaved(created);
     } catch (e) { setErr(formatApiError(e)); }
     finally { setBusy(false); }
   };
@@ -774,7 +855,11 @@ const PlaceForm = ({ branchId, initial, platformSuggestions, platformPrices, onC
   // Shown whenever the operator may create games — NOT only when the list is
   // empty: a platform that already has one game must still be extendable, and
   // for a brand-new custom platform this is the only way to get the first one.
-  const createGameButton = canCreateGames && !games.loading ? (
+  //
+  // Never while the platform is still empty ("Other" picked, no name typed
+  // yet): there is no platform to put the game on, and GameForm must not be
+  // opened with a platform the operator could then pick freely.
+  const createGameButton = canCreateGames && !games.loading && platform !== "" ? (
     <div className="row" style={{ justifyContent: "flex-end" }}>
       <Button type="button" variant="secondary" onClick={() => setGameCreating(true)} style={{ padding: "4px 10px", fontSize: 12 }}>
         {t("place.createGame")}
@@ -812,7 +897,12 @@ const PlaceForm = ({ branchId, initial, platformSuggestions, platformPrices, onC
           <span className="label">{t("label.platform")}</span>
           {/* The picker owns known buttons + the Other toggle; the custom slug
               comes from the наименование below, so its own text input is hidden. */}
-          <PlatformPicker value={platform} onChange={handlePlatformPick} suggestions={platformOptions} hideOtherInput />
+          <PlatformPicker
+            value={platform}
+            onChange={handlePlatformPick}
+            customOptions={branchCustomPlatforms}
+            hideOtherInput
+          />
         </div>
 
         {/* Second level: which sub-category of that platform. Only once the
@@ -1339,14 +1429,17 @@ const PlaceForm = ({ branchId, initial, platformSuggestions, platformPrices, onC
         <GameForm
           branchId={branchId}
           lockedPlatform={platform}
+          globalCatalogue={games.data}
           onClose={() => setGameCreating(false)}
           onSaved={(game) => {
             setGameCreating(false);
             void games.reload();
             // Tick the freshly created game right away — the operator opened
             // this form to attach it, so making them hunt for it in the
-            // refreshed grid would be pure friction. The prune effect keeps
-            // it: it matches the place's platform by construction.
+            // refreshed grid would be pure friction. The same holds for an
+            // EXISTING game the operator chose instead of a duplicate. The
+            // prune effect keeps it: it matches the place's platform by
+            // construction.
             if (game) setGameIds((prev) => new Set(prev).add(game.id));
           }}
         />

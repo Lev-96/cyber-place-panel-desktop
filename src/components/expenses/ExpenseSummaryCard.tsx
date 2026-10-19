@@ -24,10 +24,10 @@ const ExpenseSummaryCard = ({ active }: { active: IServiceExpense[] }) => {
       <div className="muted" style={{ fontSize: 13, marginBottom: 6 }}>
         {t("expenses.monthlyTotal")}
       </div>
-      {active.length === 0 ? (
-        <div className="muted">{t("expenses.empty")}</div>
-      ) : (
-        <>
+      {/* Only drawn beside a non-empty list (Expenses): with nothing active the
+          total is simply zero — "no services" is the screen's empty state, said
+          once, not repeated in this card. */}
+      <>
           <div className="row" style={{ gap: 16, flexWrap: "wrap" }}>
             {(Object.keys(subtotals) as Currency[]).map((c) => (
               <span key={c} style={{ fontWeight: 700, fontSize: 18 }}>
@@ -38,8 +38,7 @@ const ExpenseSummaryCard = ({ active }: { active: IServiceExpense[] }) => {
           <div className="muted" style={{ fontSize: 13, marginTop: 6 }}>
             ≈ {money(grandTotalAmd)} {t("expenses.perMonth")}
           </div>
-        </>
-      )}
+      </>
     </div>
   );
 };

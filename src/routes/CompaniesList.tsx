@@ -4,6 +4,7 @@ import CompanyForm from "@/components/companies/CompanyForm";
 import Button from "@/components/ui/Button";
 import ScreenWithBg from "@/components/ui/ScreenWithBg";
 import { ListSkeleton } from "@/components/ui/Skeleton";
+import { StateSwitch, deriveViewState } from "@/components/ui/state";
 import { useAsync } from "@/hooks/useAsync";
 import { useAccessVersion } from "@/realtime/accessVersion";
 import { useLang } from "@/i18n/LanguageContext";
@@ -28,9 +29,17 @@ const CompaniesList = () => {
         <Link to="/revenue" className="muted">{t("companiesList.revenueLink")}</Link>
         {canCreate && <Button onClick={() => setCreating(true)}>{t("companiesList.new")}</Button>}
       </div>
-      {loading && <ListSkeleton />}
-      {error && <div className="error">{error.message}</div>}
-      {!loading && !error && (
+      <StateSwitch
+        view={deriveViewState({ loading, error, data: companies })}
+        skeleton={<ListSkeleton />}
+        onRetry={() => void reload()}
+        error={{ titleKey: "companies.state.errorTitle" }}
+        empty={{
+          titleKey: "companies.state.emptyTitle",
+          descriptionKey: "companies.state.emptyDescription",
+          actions: canCreate ? <Button onClick={() => setCreating(true)}>{t("companiesList.new")}</Button> : undefined,
+        }}
+      >
         <div className="list">
           {(companies ?? []).map((c) => (
             <Link key={c.id} to={`/companies/${c.id}`} className="list-item">
@@ -50,9 +59,8 @@ const CompaniesList = () => {
               <span className="muted">{t("common.open")}</span>
             </Link>
           ))}
-          {!companies?.length && <div className="muted">{t("common.empty.companies")}</div>}
         </div>
-      )}
+      </StateSwitch>
       {creating && <CompanyForm onClose={() => setCreating(false)} onSaved={() => { setCreating(false); void reload(); }} />}
     </ScreenWithBg>
   );

@@ -22,11 +22,22 @@ describe("SettingsSection", () => {
     expect(screen.queryByText("body")).toBeNull();
   });
 
-  test("failed: the message and a retry, and NEVER the body", () => {
+  test("failed: the error state (server sentence as its detail) and a retry, and NEVER the body", () => {
     const onRetry = vi.fn();
-    render(<SettingsSection title="T" error={new Error("Network down")} onRetry={onRetry} loading><form>body</form></SettingsSection>);
-    expect(screen.getByRole("alert").textContent).toContain("Network down");
+    const failure = Object.assign(new Error("Server down"), { status: 500, body: { message: "Server down" } });
+    render(<SettingsSection title="T" error={failure} onRetry={onRetry} loading><form>body</form></SettingsSection>);
+    expect(screen.getByRole("alert").textContent).toContain("state.error.title");
+    expect(screen.getByRole("alert").textContent).toContain("Server down");
     expect(screen.queryByText("body")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "action.retry" }));
+    expect(onRetry).toHaveBeenCalledTimes(1);
+  });
+
+  test("offline: said as offline, with a retry", () => {
+    const onRetry = vi.fn();
+    render(<SettingsSection title="T" error={new TypeError("Failed to fetch")} onRetry={onRetry}><form>body</form></SettingsSection>);
+    expect(screen.getByRole("alert").textContent).toContain("state.offline.title");
+    expect(screen.queryByText("Failed to fetch")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "action.retry" }));
     expect(onRetry).toHaveBeenCalledTimes(1);
   });

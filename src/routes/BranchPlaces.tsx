@@ -2,23 +2,26 @@ import { can } from "@/auth/permissions";
 import { useAuth } from "@/auth/AuthContext";
 import ConsolePicker from "@/components/ps5/ConsolePicker";
 import PlaceForm from "@/components/places/PlaceForm";
+import RegisterPlaceComputer from "@/components/pcs/RegisterPlaceComputer";
 import Button from "@/components/ui/Button";
 import CollapsibleSection from "@/components/ui/CollapsibleSection";
 import ScreenWithBg from "@/components/ui/ScreenWithBg";
 import { GridSkeleton } from "@/components/ui/Skeleton";
 import { useAsync } from "@/hooks/useAsync";
+import { StateSwitch, deriveViewState } from "@/components/ui/state";
 import { useLocalReorder } from "@/hooks/useLocalReorder";
 import { useReservedPlaceIds } from "@/hooks/useReservedPlaceIds";
 import { useConfirm } from "@/components/ui/ConfirmProvider";
 import { useLang } from "@/i18n/LanguageContext";
 import { fmt } from "@/i18n/translations";
-import { platformPriceNameOf } from "@/i18n/platformPriceName";
+import { platformDisplayNameOf, platformPriceNameOf } from "@/i18n/platformPriceName";
 import { placeRepository } from "@/repositories/PlaceRepository";
 import { platformPriceRepository } from "@/repositories/PlatformPriceRepository";
 import { IBranchPlace } from "@/types/api";
-import { platformGroup, platformLabel } from "@/utils/platform";
+import { platformGroup } from "@/utils/platform";
 import { DragEvent, useState } from "react";
 import { useParams } from "react-router-dom";
+import { dropSideOf } from "@/utils/reorder";
 
 // Tile border / dot palette. Reserved wins over the place's own active/inactive
 // status — a manager needs to see "this seat is currently held by a booking"
@@ -48,6 +51,8 @@ const BranchPlaces = () => {
   const { user } = useAuth();
   const role = user?.role;
   const [creating, setCreating] = useState(false);
+  // The PC place just created whose computer is being registered (null = none).
+  const [registeringPlaceId, setRegisteringPlaceId] = useState<number | null>(null);
   /**
    * The console finder. Read-only in this build — it looks at the network and
    * reports; binding a console to a place comes with the next phase.
@@ -88,8 +93,11 @@ const BranchPlaces = () => {
 
   if (!Number.isFinite(id) || id <= 0) return <div className="error">{t("hub.invalidId")}</div>;
 
+  // A custom platform is named as the branch named it, in the panel language
+  // (its price row), falling back to the de-slugged slug.
+  const platformName = (slug: string): string => platformDisplayNameOf(slug, platformPrices.data ?? undefined, lang);
   const sectionLabel = (key: string): string =>
-    key === "pc" ? t("session.groupComputers") : key === "ps" ? t("session.groupPs") : platformLabel(key);
+    key === "pc" ? t("session.groupComputers") : key === "ps" ? t("session.groupPs") : platformName(key);
 
   const toggleGroup = (key: string) =>
     setCollapsed((prev) => {
@@ -150,6 +158,7 @@ const BranchPlaces = () => {
 
   const renderCell = (p: IBranchPlace) => {
     const pid = String(p.id);
+    const dropSide = dragOverId === pid ? dropSideOf(tileReorder.ordered, dragId, pid) : null;
     const isReserved = reservedPlaceIds.has(p.id);
     const isActive = p.status === "active";
     const tone = isReserved ? COLOR_RESERVED : isActive ? COLOR_ACTIVE : COLOR_IDLE;
@@ -159,9 +168,7 @@ const BranchPlaces = () => {
     return (
       <div
         key={p.id}
-        className={`place-cell${dragId === pid ? " is-dragging" : ""}${
-          dragOverId === pid && dragId != null && dragId !== pid ? " is-drop-before" : ""
-        }`}
+        className={`place-cell${dragId === pid ? " is-dragging" : ""}${dropSide ? ` is-drop-${dropSide}` : ""}`}
         style={{ borderColor: tone, minHeight: 130 }}
         onDragOver={(e) => {
           e.preventDefault();
@@ -187,7 +194,7 @@ const BranchPlaces = () => {
         >
           ⠿
         </span>
-        <span className="platform" style={{ marginLeft: 18 }}>{platformLabel(p.platform)} · {p.type}</span>
+        <span className="platform" style={{ marginLeft: 18 }}>{platformName(p.platform)} · {p.type}</span>
         <span className="id">№{p.number ?? p.id}</span>
         <span className="status" style={{ color: tone }}>{statusLabel}</span>
         <span className="until">{p.games?.length ?? 0} {t("branchPlaces.games")}</span>
@@ -227,12 +234,13 @@ const BranchPlaces = () => {
           <Button onClick={() => setCreating(true)}>{t("branchPlaces.new")}</Button>
         </div>
       </div>
-      {loading && <GridSkeleton />}
-      {error && <div className="error">{error.message}</div>}
-      {!loading && !error && (
-        orderedPlaces.length === 0 ? (
-          <div className="muted">{t("branchPlaces.empty")}</div>
-        ) : (
+      <StateSwitch
+        view={deriveViewState({ loading, error, data: data ? orderedPlaces : null })}
+        skeleton={<GridSkeleton />}
+        onRetry={() => void reload()}
+        error={{ titleKey: "branchPlaces.state.errorTitle" }}
+        empty={{ titleKey: "branchPlaces.state.emptyTitle", descriptionKey: "branchPlaces.state.emptyDescription" }}
+      >
           <div className="col" style={{ gap: 14 }}>
             {sectionKeys.map((key) => {
               const items = grouped[key];
@@ -247,7 +255,7 @@ const BranchPlaces = () => {
                   reorderable={sectionKeys.length > 1}
                   dragHint={t("session.dragSectionHint")}
                   dragging={dragSection === key}
-                  dropTarget={dropSection === key && dragSection != null && dragSection !== key}
+                  dropSide={dropSection === key ? dropSideOf(sectionReorder.ordered, dragSection, key) : null}
                   onDragStart={onSectionDragStart(key)}
                   onDragEnd={() => { setDragSection(null); setDropSection(null); }}
                   onDragOver={(e) => {
@@ -263,11 +271,20 @@ const BranchPlaces = () => {
               );
             })}
           </div>
-        )
-      )}
+      </StateSwitch>
 
       {findingConsoles && <ConsolePicker branchId={id} onClose={() => setFindingConsoles(false)} />}
-      {creating && <PlaceForm branchId={id} platformSuggestions={customPlatforms} platformPrices={platformPrices.data ?? []} onClose={() => setCreating(false)} onSaved={() => { setCreating(false); void reload(); void platformPrices.reload(); }} />}
+      {creating && <PlaceForm branchId={id} platformSuggestions={customPlatforms} platformPrices={platformPrices.data ?? []} onClose={() => setCreating(false)} onSaved={(created) => {
+        setCreating(false);
+        void reload();
+        void platformPrices.reload();
+        // A new PC place: offer to register its computer at once. Set here,
+        // from the save itself, so no re-render or realtime reload reopens it.
+        if (created && created.platform === "pc") setRegisteringPlaceId(created.id);
+      }} />}
+      {registeringPlaceId != null && (
+        <RegisterPlaceComputer branchId={id} placeId={registeringPlaceId} onClose={() => setRegisteringPlaceId(null)} />
+      )}
       {editing && <PlaceForm branchId={id} initial={editing} platformSuggestions={customPlatforms} platformPrices={platformPrices.data ?? []} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); void reload(); void platformPrices.reload(); }} />}
     </ScreenWithBg>
   );

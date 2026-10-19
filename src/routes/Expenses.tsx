@@ -1,4 +1,5 @@
 import { SkeletonTable } from "@/components/ui/Skeleton";
+import { StateSwitch, deriveViewState } from "@/components/ui/state";
 import { IServiceExpense } from "@/api/expenses";
 import { tr } from "@/i18n/translated";
 import { orFallback } from "@/api/fallback";
@@ -64,10 +65,13 @@ const Expenses = () => {
         <Button onClick={() => setCreating(true)}>{t("expenses.new")}</Button>
       </div>
 
-      {loading && <SkeletonTable rows={6} columns={4} />}
-      {error && <div className="error">{error.message}</div>}
-
-      {!loading && !error && (
+      <StateSwitch
+        view={deriveViewState({ loading, error, data })}
+        skeleton={<SkeletonTable rows={6} columns={4} />}
+        onRetry={() => void reload()}
+        error={{ titleKey: "expenses.state.errorTitle" }}
+        empty={{ titleKey: "expenses.state.emptyTitle", descriptionKey: "expenses.state.emptyDescription" }}
+      >
         <>
           <UpcomingChargesBanner items={upcoming} onMarkPaid={markPaid} busyId={payingId} />
           <ExpenseSummaryCard active={active} />
@@ -83,10 +87,9 @@ const Expenses = () => {
                 busy={payingId === e.id}
               />
             ))}
-            {all.length === 0 && <div className="muted">{t("expenses.empty")}</div>}
           </div>
         </>
-      )}
+      </StateSwitch>
 
       {creating && (
         <ExpenseForm onClose={() => setCreating(false)} onSaved={() => { setCreating(false); void reload(); }} />

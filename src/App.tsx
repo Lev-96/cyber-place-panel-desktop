@@ -21,6 +21,7 @@ import { useAppUpdates, useUpdateCatchUp } from "@/realtime/useAppUpdates";
 import { UpdatesNotificationProvider } from "@/realtime/UpdatesNotificationContext";
 import { Suspense, lazy, useEffect } from "react";
 import { HashRouter, Navigate, Route, Routes } from "react-router-dom";
+import { OfflineNotice } from "@/components/ui/state";
 
 /* Eagerly loaded — small + always needed (auth flow). */
 import Home from "@/routes/Home";
@@ -58,6 +59,8 @@ const SupportChat = lazy(() => import("@/routes/SupportChat"));
 const PcsList = lazy(() => import("@/routes/PcsList"));
 const ProductsList = lazy(() => import("@/routes/ProductsList"));
 const Till = lazy(() => import("@/routes/Till"));
+const Shift = lazy(() => import("@/routes/Shift"));
+const Shifts = lazy(() => import("@/routes/Shifts"));
 const ResetPassword = lazy(() => import("@/routes/ResetPassword"));
 const SessionsHistory = lazy(() => import("@/routes/SessionsHistory"));
 const Settings = lazy(() => import("@/routes/Settings"));
@@ -67,6 +70,7 @@ const BranchPricesPage = lazy(() => import("@/routes/BranchPricesPage"));
 const BranchSubscribersPage = lazy(() => import("@/routes/BranchSubscribersPage"));
 const TournamentDetails = lazy(() => import("@/routes/TournamentDetails"));
 const Tournaments = lazy(() => import("@/routes/Tournaments"));
+const NotFound = lazy(() => import("@/routes/NotFound"));
 
 const Authed = () => {
   // App-wide subscription to the Reverb `app-update.promoted` broadcast.
@@ -85,6 +89,7 @@ const Authed = () => {
   <Suspense fallback={<RouteSkeleton />}>
     <UpdateReadyModal />
     <UpdatesToast />
+    <OfflineNotice />
     <Routes>
       <Route element={<Layout />}>
         <Route path="/" element={<Home />} />
@@ -168,6 +173,8 @@ const Authed = () => {
           {/* Касса: selling at the counter with no session. Every staff role at
               its own branch, as the session bill — the server decides. */}
           <Route path="/branches/:branchId/pos" element={<Till />} />
+          <Route path="/branches/:branchId/shift" element={<RoleGuard perm="shift.manage"><Shift /></RoleGuard>} />
+          <Route path="/shifts" element={<RoleGuard perm="shift.manage"><Shifts /></RoleGuard>} />
           {/* Member cards and deposits are administrative. Guarding the route
               as well as the tile is the point: a bookmarked URL is the other
               way into a section, and the backend refuses these reads too. */}
@@ -357,7 +364,15 @@ const Authed = () => {
           }
         />
 
-        <Route path="*" element={<Navigate to="/" replace />} />
+        {/* An address that matches no screen says so, with a way back. It used
+            to redirect to the dashboard silently, which made a broken link look
+            like the app had ignored the click. Signed out, `*` is still Login. */}
+        {/* The signed-out screens' addresses are not "not found" for a signed-in
+            person — they simply have nothing to do there. */}
+        <Route path="/login" element={<Navigate to="/" replace />} />
+        <Route path="/forgot-password" element={<Navigate to="/" replace />} />
+        <Route path="/reset-password" element={<Navigate to="/" replace />} />
+        <Route path="*" element={<NotFound />} />
       </Route>
     </Routes>
   </Suspense>

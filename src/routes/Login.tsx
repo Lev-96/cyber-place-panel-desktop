@@ -2,14 +2,18 @@ import { blockingKeyOf } from "@/api/blockingErrors";
 import { ApiError } from "@/api/client";
 import { useAuth } from "@/auth/AuthContext";
 import { recentEmails } from "@/auth/recentEmails";
+import { useLoginCaptcha } from "@/auth/useLoginCaptcha";
+import CaptchaDialog from "@/components/login/CaptchaDialog";
 import ForgotPasswordForm from "@/components/login/ForgotPasswordForm";
 import HudBackdrop from "@/components/login/HudBackdrop";
+import LoginHold, { HoldKind } from "@/components/login/LoginHold";
 import Button from "@/components/ui/Button";
 import PasswordInput from "@/components/ui/PasswordInput";
 import SuggestInput from "@/components/ui/SuggestInput";
 import { useLang } from "@/i18n/LanguageContext";
+import { LocalizedText, renderText, textKey, textLiteral } from "@/i18n/localizedText";
 import { LANGUAGES } from "@/i18n/translations";
-import { FormEvent, lazy, Suspense, useEffect, useState } from "react";
+import { FormEvent, lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
 // three.js is heavy and only this screen needs it — keep it out of the initial
@@ -19,15 +23,18 @@ const LoginScene = lazy(() => import("@/components/login/LoginScene"));
 
 const LANG_LABEL: Record<string, string> = { en: "ENG", ru: "РУС", am: "ՀԱՅ" };
 
-type LoginErr =
-  | { kind: "invalid" }
-  | { kind: "generic" }
-  // An administrative block. Held as a TRANSLATION KEY, not as a sentence:
-  // the server's own wording follows the request's locale, and this way the
-  // message also re-renders when the operator switches language on this very
-  // screen (the language picker sits on the login card).
-  | { kind: "blocked"; key: string }
-  | { kind: "raw"; message: string };
+/**
+ * The server holding sign-in back for a while (2026-10-07): a lock after too
+ * many wrong passwords (423) or the per-minute limit (429). Counted down from
+ * its own "seconds left"; the server still decides on the next attempt.
+ */
+interface Hold { kind: HoldKind; seconds: number; startedAt: number }
+
+const codeOf = (ex: unknown): string | undefined => (ex as { body?: { code?: string } } | undefined)?.body?.code;
+const retryAfterOf = (ex: unknown): number | null => {
+  const value = Number((ex as { body?: { retry_after?: unknown } } | undefined)?.body?.retry_after);
+  return Number.isFinite(value) && value > 0 ? Math.ceil(value) : null;
+};
 
 /** Which face of the card is showing. */
 type Face = "login" | "forgot";
@@ -46,8 +53,15 @@ const Login = () => {
     navigate(next === "forgot" ? "/forgot-password" : "/login", { replace: true });
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [err, setErr] = useState<LoginErr | null>(null);
+  // Held by meaning, not as a sentence: the language picker sits on this card,
+  // and a message on screen must follow a switch made after it appeared.
+  const [err, setErr] = useState<LocalizedText | null>(null);
   const [busy, setBusy] = useState(false);
+  const [hold, setHold] = useState<Hold | null>(null);
+  const [holdOver, setHoldOver] = useState(false);
+  const emailRef = useRef<HTMLInputElement>(null);
+  const passwordRef = useRef<HTMLInputElement>(null);
+  const captcha = useLoginCaptcha(emailRef, passwordRef);
   // Addresses that already signed in on this machine — offered while typing
   // so a returning operator types one letter instead of the whole address.
   const [known, setKnown] = useState<string[]>([]);
@@ -60,30 +74,43 @@ const Login = () => {
     void recentEmails.forget(value).then(() => recentEmails.list().then(setKnown));
   };
 
-  const onSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-    setBusy(true); setErr(null);
+  const attempt = async () => {
+    setBusy(true); setErr(null); setHoldOver(false); captcha.attempting();
     try { await login(email, password); }
     catch (ex) {
       const status = (ex as ApiError | undefined)?.status;
+      const code = codeOf(ex);
+      const retryAfter = retryAfterOf(ex);
       // Asked before the status branches: a block is a 403 carrying a code,
       // and it is the one refusal the operator can act on ("call the
       // administrator") rather than retype their way out of.
       const blockedKey = blockingKeyOf(ex);
-      if (blockedKey) setErr({ kind: "blocked", key: blockedKey });
-      else if (status === 401 || status === 422) setErr({ kind: "invalid" });
-      else if (ex instanceof Error) setErr({ kind: "raw", message: ex.message });
-      else setErr({ kind: "generic" });
+      if (blockedKey) setErr(textKey(blockedKey));
+      else if ((status === 423 || status === 429) && retryAfter !== null) {
+        setHold({ kind: status === 423 ? "locked" : "throttled", seconds: retryAfter, startedAt: performance.now() });
+      } else if (code === "captcha_required") {
+        // A wrong password that now needs the mosaic (422), or an attempt held
+        // back for it (428): the mosaic, then back to the form — never a
+        // sign-in sent by the mosaic itself.
+        if (status === 422) setErr(textKey("login.invalidCredentials"));
+        captcha.ask();
+      } else if (status === 401 || status === 422) setErr(textKey("login.invalidCredentials"));
+      else if (ex instanceof Error) setErr(textLiteral(ex.message));
+      else setErr(textKey("login.failed"));
     }
     finally { setBusy(false); }
   };
 
-  const errText =
-    err === null ? null
-    : err.kind === "invalid" ? t("login.invalidCredentials")
-    : err.kind === "generic" ? t("login.failed")
-    : err.kind === "blocked" ? t(err.key)
-    : err.message;
+  const onSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (busy || hold) return;
+    await attempt();
+  };
+
+  // The time is up: the form is open again (the server decides on the next try).
+  const holdOverNow = useCallback(() => { setHold(null); setHoldOver(true); }, []);
+
+  const errText = err === null ? null : renderText(err, t);
 
   return (
     <div className="login-shell">
@@ -125,19 +152,26 @@ const Login = () => {
           <div className={`login-flip${face === "forgot" ? " is-back" : ""}`}>
             <form className="login-card" onSubmit={onSubmit} inert={face === "forgot" || undefined}>
           <SuggestInput
+            ref={emailRef}
             label={t("auth.email")}
             type="email"
             placeholder="your@email.com"
             value={email}
-            onValueChange={setEmail}
+            onValueChange={(value) => { setEmail(value); setHold(null); setHoldOver(false); }}
             options={known}
             onRemoveOption={forgetEmail}
             removeHint={t("login.forgetEmail")}
             required
             autoFocus
           />
-          <PasswordInput label={t("auth.password")} placeholder={t("login.passwordPlaceholder")} value={password} onChange={(e) => setPassword(e.target.value)} required />
-          {errText && <div className="error" style={{ textAlign: "center" }}>{errText}</div>}
+          <PasswordInput ref={passwordRef} label={t("auth.password")} placeholder={t("login.passwordPlaceholder")} value={password} onChange={(e) => setPassword(e.target.value)} required />
+          {hold ? (
+            <LoginHold kind={hold.kind} seconds={hold.seconds} startedAt={hold.startedAt} onOver={holdOverNow} />
+          ) : holdOver ? (
+            <div className="login-hold is-over" role="status">{t("login.hold.ready")}</div>
+          ) : captcha.passed ? (
+            <div className="login-hold is-over" role="status">{t("login.captchaPassed")}</div>
+          ) : errText && <div className="error" role="alert" style={{ textAlign: "center" }}>{errText}</div>}
           <button
             type="button"
             className="login-forgot login-flip-back"
@@ -145,7 +179,7 @@ const Login = () => {
           >
             {t("auth.forgot")}
           </button>
-              <Button disabled={busy}>{busy ? t("login.signingIn") : t("login.title")}</Button>
+              <Button disabled={busy || hold !== null}>{busy ? t("login.signingIn") : t("login.title")}</Button>
             </form>
 
             {/* The reverse face. `inert` keeps the hidden side out of the tab
@@ -157,6 +191,8 @@ const Login = () => {
           </div>
         </div>
       </div>
+
+      <CaptchaDialog open={captcha.open} client="desktop" onSolved={captcha.solved} onClose={captcha.close} />
     </div>
   );
 };

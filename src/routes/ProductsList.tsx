@@ -4,6 +4,7 @@ import { can } from "@/auth/permissions";
 import { tr } from "@/i18n/translated";
 import Button from "@/components/ui/Button";
 import { ListSkeleton } from "@/components/ui/Skeleton";
+import { StateSwitch, deriveViewState } from "@/components/ui/state";
 import { useAsync } from "@/hooks/useAsync";
 import { useConfirm } from "@/components/ui/ConfirmProvider";
 import { useLang } from "@/i18n/LanguageContext";
@@ -51,6 +52,10 @@ const ProductsList = () => {
 
   if (!Number.isFinite(id) || id <= 0) return <div className="error">{t("hub.invalidId")}</div>;
 
+  const searching = search.trim() !== "";
+  const view = deriveViewState({ loading, error, data: data ? visible : null, hasFilters: searching });
+  const newLabel = t(section === "additional" ? "products.newAdditional" : "products.new");
+
   const remove = async (p: IProduct) => {
     if (!(await confirm(`${t("action.delete")} ${tr(p, "name", lang)}?`, { destructive: true }))) return;
     await productRepository.remove(p.id, p.kind);
@@ -86,9 +91,18 @@ const ProductsList = () => {
         value={search}
         onChange={(e) => setSearch(e.target.value)}
       />
-      {loading && <ListSkeleton />}
-      {error && <div className="error">{error.message}</div>}
-      {!loading && !error && (
+      <StateSwitch
+        view={view}
+        skeleton={<ListSkeleton />}
+        onRetry={() => void reload()}
+        error={{ titleKey: "products.state.errorTitle" }}
+        empty={{
+          titleKey: section === "additional" ? "products.state.emptyAdditionalTitle" : "products.state.emptyTitle",
+          descriptionKey: section === "additional" ? "products.state.emptyAdditionalDescription" : "products.state.emptyDescription",
+          actions: canEdit ? <Button onClick={() => setCreating(true)}>{newLabel}</Button> : undefined,
+        }}
+        noResults={{ descriptionKey: "products.state.noResultsDescription" }}
+      >
         <div className="list">
           {visible.map((p) => (
             <div key={p.id} className="list-item" style={{ opacity: p.is_active ? 1 : 0.5 }}>
@@ -108,11 +122,8 @@ const ProductsList = () => {
               )}
             </div>
           ))}
-          {!visible.length && (
-            <div className="muted">{search.trim() ? t("products.noMatches") : t(section === "additional" ? "products.emptyAdditional" : "products.empty")}</div>
-          )}
         </div>
-      )}
+      </StateSwitch>
       {creating && <ProductForm branchId={id} kind={section} onClose={() => setCreating(false)} onSaved={() => { setCreating(false); void reload(); }} />}
       {editing && <ProductForm branchId={id} initial={editing} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); void reload(); }} />}
     </div>

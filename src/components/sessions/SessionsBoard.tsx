@@ -5,8 +5,11 @@ import { can } from "@/auth/permissions";
 import Button from "@/components/ui/Button";
 import CollapsibleSection from "@/components/ui/CollapsibleSection";
 import { GridSkeleton } from "@/components/ui/Skeleton";
+import { ErrorState, StaleNotice, StateView } from "@/components/ui/state";
+import { reconcileOrder } from "./tileOrder";
 import JoystickIcon from "@/components/ui/JoystickIcon";
 import { useAsync } from "@/hooks/useAsync";
+import { useBranchPlatformNames } from "@/hooks/useBranchPlatforms";
 import { useKeyedBusy } from "@/hooks/useKeyedBusy";
 import { useLocalReorder } from "@/hooks/useLocalReorder";
 import { useReservedPlaceIds } from "@/hooks/useReservedPlaceIds";
@@ -23,10 +26,11 @@ import {
   resolveSessionCellState,
   SESSION_CELL_COLOR,
 } from "@/domain/SessionCellState";
-import { platformGroup, platformLabel } from "@/utils/platform";
+import { platformGroup } from "@/utils/platform";
 import { usePs5Control } from "@/ps5/Ps5ControlProvider";
 import { useRealtimeResync } from "@/realtime/useRealtimeResync";
 import { PS5_STATE_LOOK } from "@/ps5/stateLook";
+import { startGate, stopGate } from "@/ps5/tileGate";
 import { DragEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import AddSessionItemDialog from "./AddSessionItemDialog";
@@ -40,6 +44,7 @@ import { BASE_JOYSTICKS, MAX_JOYSTICKS } from "@/api/joystickPrices";
 import { notify } from "@/ui/notify";
 import StopReceiptModal from "./StopReceiptModal";
 import { useExpiryNudge } from "./useExpiryNudge";
+import { dropSideOf, moveOnto } from "@/utils/reorder";
 
 const navBtn: React.CSSProperties = { padding: "6px 10px", border: "1px solid #1f2a44", borderRadius: 6 };
 
@@ -68,6 +73,10 @@ const SessionsBoard = ({ branchId }: Props) => {
   const { user } = useAuth();
   const role = user?.role;
   const pcs = useAsync(() => sessionRepository.listPcs(branchId), [branchId]);
+  // Custom platforms named as the branch named them, in the panel language.
+  // ONE cached read for the board and every dialog it opens (passed down), and
+  // best effort: until it lands, or if it fails, names fall back to the slug.
+  const { nameOf: platformName } = useBranchPlatformNames(branchId);
   const sessions = useAsync(() => sessionRepository.listActive(branchId), [branchId]);
   const [startTarget, setStartTarget] = useState<IPcApi | null>(null);
   const [stopTarget, setStopTarget] = useState<ISessionApi | null>(null);
@@ -514,19 +523,18 @@ const SessionsBoard = ({ branchId }: Props) => {
   // for devices still present, append new ones, drop removed ones.
   useEffect(() => {
     const ids = (pcs.data ?? []).map((p) => p.id);
-    setOrder((prev) => {
-      const present = new Set(ids);
-      const kept = prev.filter((id) => present.has(id));
-      const added = ids.filter((id) => !kept.includes(id));
-      return [...kept, ...added];
-    });
+    setOrder((prev) => reconcileOrder(prev, ids));
   }, [pcs.data]);
 
   const sessionByPc = new Map<number, ISessionApi>();
   for (const s of sessions.data ?? []) sessionByPc.set(s.pc_id, s);
 
   const byId = new Map((pcs.data ?? []).map((p) => [p.id, p] as const));
-  const orderedPcs = order.map((id) => byId.get(id)).filter((p): p is IPcApi => !!p);
+  // Reconciled during render too: `order` catches up only after paint, and the
+  // tiles must not wait for it (see tileOrder.ts).
+  const orderedPcs = reconcileOrder(order, (pcs.data ?? []).map((p) => p.id))
+    .map((id) => byId.get(id))
+    .filter((p): p is IPcApi => !!p);
 
   // Seats with a session running on them, counted off the SAME map the tiles
   // are drawn from — so the heading and the grid cannot disagree about how
@@ -548,7 +556,7 @@ const SessionsBoard = ({ branchId }: Props) => {
   const sectionKeys = sectionReorder.ordered;
 
   const sectionLabel = (key: string): string =>
-    key === "pc" ? t("session.groupComputers") : key === "ps" ? t("session.groupPs") : platformLabel(key);
+    key === "pc" ? t("session.groupComputers") : key === "ps" ? t("session.groupPs") : platformName(key);
 
   const toggleGroup = (key: string) =>
     setCollapsed((prev) => {
@@ -568,9 +576,7 @@ const SessionsBoard = ({ branchId }: Props) => {
     const targetPc = byId.get(targetId);
     if (!fromPc || !targetPc || sectionKeyOf(fromPc) !== sectionKeyOf(targetPc)) return;
     setOrder((prev) => {
-      const next = prev.filter((id) => id !== from);
-      const idx = next.indexOf(targetId);
-      next.splice(idx < 0 ? next.length : idx, 0, from);
+      const next = moveOnto(prev, from, targetId);
       void sessionRepository.reorderPcs(branchId, next).catch(() => {});
       return next;
     });
@@ -669,7 +675,7 @@ const SessionsBoard = ({ branchId }: Props) => {
     // ("is this the VIP one?"), and a long custom platform — "Table Tennis" —
     // would otherwise eat the ellipsis and take the tier down with it. The
     // platform shrinks; the tier never does.
-    const platformName = pc.place ? platformLabel(pc.place.platform) : "";
+    const seatPlatformName = pc.place ? platformName(pc.place.platform) : "";
     const tierName = pc.place ? pc.place.type : "";
     // ⚠️ The NUMBER leads, always, and it is the same value the player is
     // given on their phone.
@@ -705,6 +711,9 @@ const SessionsBoard = ({ branchId }: Props) => {
     const lifecycle = consoleView?.snapshot.state;
     const consoleBusy = lifecycle === "WAKING" || lifecycle === "GOING_TO_REST"
       || lifecycle === "UNEXPECTED_WAKE" || lifecycle === "ERROR";
+    // No second press while the console is on its way (see tileGate).
+    const startLock = startGate(lifecycle);
+    const stopLock = stopGate(lifecycle);
     return (
       <SessionCard
         key={pc.id}
@@ -712,7 +721,7 @@ const SessionsBoard = ({ branchId }: Props) => {
         baseColor={color}
         seatState={cellState}
         dragging={dragId === pc.id}
-        dropBefore={dragOverId === pc.id && dragId != null && dragId !== pc.id}
+        dropSide={dragOverId === pc.id ? dropSideOf(order, dragId, pc.id) : null}
         onDragOver={(e) => {
           e.preventDefault();
           if (dragId != null && dragId !== pc.id) {
@@ -754,7 +763,7 @@ const SessionsBoard = ({ branchId }: Props) => {
           {/* Nested so the platform is the only thing that can shrink, and the
               4px gap reads as the single space in "PS5 · VIP". */}
           <span style={{ display: "flex", alignItems: "baseline", gap: 4, minWidth: 0 }}>
-            <span className="cell-line" title={platformName || undefined}>{platformName || "\u00A0"}</span>
+            <span className="cell-line" title={seatPlatformName || undefined}>{seatPlatformName || "\u00A0"}</span>
             {tierName && <span style={{ flexShrink: 0 }}>· {tierName}</span>}
           </span>
         </span>
@@ -1225,9 +1234,10 @@ const SessionsBoard = ({ branchId }: Props) => {
               {/* Destructive, so it reads as such and spans the row: the one
                   button on the card a slip must not land on by accident. */}
               <SessionCardAction
-                label={t("action.stop")}
-                fullLabel={t("action.stop")}
+                label={t(stopLock.labelKey ?? "action.stop")}
+                fullLabel={t(stopLock.labelKey ?? "action.stop")}
                 danger
+                disabled={stopLock.disabled}
                 onClick={() => setStopTarget(sess)}
               />
             </div>
@@ -1268,11 +1278,11 @@ const SessionsBoard = ({ branchId }: Props) => {
             <div className="session-card__foot">
               <Button
                 onClick={() => setStartTarget(pc)}
-                disabled={!canStart}
+                disabled={!canStart || startLock.disabled}
                 title={isOffline ? t("session.deviceOfflineHint") : undefined}
                 className="session-card__start"
               >
-                {t("action.start")}
+                {t(startLock.labelKey ?? "action.start")}
               </Button>
             </div>
           </>
@@ -1281,9 +1291,15 @@ const SessionsBoard = ({ branchId }: Props) => {
     );
   };
 
-  if ((pcs.loading && !pcs.data) || (sessions.loading && !sessions.data)) return <GridSkeleton />;
-  if (pcs.error && !pcs.data) return <div className="error">{pcs.error.message}</div>;
-  if (sessions.error && !sessions.data) return <div className="error">{sessions.error.message}</div>;
+  // Both reads again; each keeps what it already had if this one fails too.
+  const retryBoard = () => { void pcs.reload(); void sessions.reload(); };
+  // A first load that failed: the error (offline / failed) with Retry. Never
+  // "No devices registered" — a board that could not be read is not empty.
+  if (pcs.error && !pcs.data) return <ErrorState error={pcs.error} onRetry={retryBoard} titleKey="session.state.errorTitle" />;
+  if (sessions.error && !sessions.data) return <ErrorState error={sessions.error} onRetry={retryBoard} titleKey="session.state.errorTitle" />;
+  if (!pcs.data || !sessions.data) return <GridSkeleton />;
+  // A later refresh that failed keeps the seats on screen, with a quiet line.
+  const staleError = pcs.error ?? sessions.error;
 
   return (
     <div className="col" style={{ gap: 18 }}>
@@ -1314,8 +1330,9 @@ const SessionsBoard = ({ branchId }: Props) => {
         </div>
       </div>
 
+      {staleError && <StaleNotice error={staleError} onRetry={retryBoard} />}
       {orderedPcs.length === 0 ? (
-        <div className="muted">{t("session.noPcs")}</div>
+        <StateView variant="empty" titleKey="session.state.noPcsTitle" descriptionKey="session.state.noPcsDescription" />
       ) : (
         <div className="col" style={{ gap: 14 }}>
           {sectionKeys.map((key) => {
@@ -1331,7 +1348,7 @@ const SessionsBoard = ({ branchId }: Props) => {
                 reorderable={sectionKeys.length > 1}
                 dragHint={t("session.dragSectionHint")}
                 dragging={dragSection === key}
-                dropTarget={dropSection === key && dragSection != null && dragSection !== key}
+                dropSide={dropSection === key ? dropSideOf(sectionReorder.ordered, dragSection, key) : null}
                 onDragStart={onSectionDragStart(key)}
                 onDragEnd={() => { setDragSection(null); setDropSection(null); }}
                 onDragOver={(e) => {
@@ -1390,6 +1407,7 @@ const SessionsBoard = ({ branchId }: Props) => {
         <SessionOptionsDialog
           session={optionsTarget}
           platform={(pcs.data ?? []).find((pc) => pc.id === optionsTarget.pc_id)?.place?.platform}
+          platformName={platformName}
           onClose={() => { setOptionsTarget(null); void sessions.reload(); }}
           // The server's answer replaces the dialog's copy AND the board's row,
           // so the tile behind the dialog is never a version behind it.
@@ -1405,6 +1423,7 @@ const SessionsBoard = ({ branchId }: Props) => {
       {relocateTarget && (
         <RelocateSessionDialog
           session={relocateTarget}
+          platformName={platformName}
           onClose={() => { setRelocateTarget(null); void sessions.reload(); }}
           onMoved={(updated, from) => {
             consolesFollowMove(from.pcId, updated.pc_id);

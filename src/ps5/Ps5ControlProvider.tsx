@@ -6,7 +6,7 @@ import { usePs5WakeDecided } from "@/realtime/usePs5Realtime";
 import { ps5DiscoveryAvailable } from "@/ps5/usePs5Discovery";
 import { IPcApi } from "@/types/sessions";
 import { platformGroup } from "@/utils/platform";
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 /**
  * Watches this venue's consoles from wherever the panel happens to be.
@@ -37,6 +37,8 @@ interface Ps5Control {
   statuses: ReturnType<typeof useConsoleControl>["statuses"];
   sessionStarting: (deviceId: number) => void;
   sessionStopped: (deviceId: number) => void;
+  /** The keys on this machine changed (paired, typed, forgotten): ask the vault again. */
+  credentialsChanged: () => void;
 }
 
 const noop = () => {};
@@ -46,6 +48,7 @@ const Ps5ControlContext = createContext<Ps5Control>({
   statuses: {},
   sessionStarting: noop,
   sessionStopped: noop,
+  credentialsChanged: noop,
 });
 
 /** How often the watcher re-reads which consoles exist and what is running. */
@@ -61,12 +64,22 @@ export const Ps5ControlProvider = ({ children }: { children: ReactNode }) => {
   const [devices, setDevices] = useState<IPcApi[]>([]);
   const [sessionDeviceIds, setSessionDeviceIds] = useState<Set<number>>(new Set());
 
+  /**
+   * Bumped by every read and every local change to the running set. A read is
+   * applied only if nothing newer happened after it was asked: a Stop's read or
+   * a poll that lands after the next Start would otherwise put back the "no
+   * session" it saw, and the console would be sent to rest under the player.
+   */
+  const generation = useRef(0);
+
   const reload = useCallback(async () => {
+    const asked = ++generation.current;
     try {
       const [pcs, sessions] = await Promise.all([
         apiListPcsEverywhere("ps").then((r) => r.data),
         apiListAllActiveSessions().then((r) => r.data),
       ]);
+      if (asked !== generation.current) return;
 
       setDevices(pcs.filter((d) => d.console_host_id && d.place && platformGroup(d.place.platform) === "ps"));
       setSessionDeviceIds(new Set(sessions.map((s) => s.pc_id)));
@@ -113,11 +126,13 @@ export const Ps5ControlProvider = ({ children }: { children: ReactNode }) => {
     views: control.views,
     statuses: control.statuses,
     sessionStarting: (deviceId: number) => {
+      generation.current++;
       setSessionDeviceIds((ids) => new Set(ids).add(deviceId));
       control.sessionStarting(deviceId);
       void reload();
     },
     sessionStopped: (deviceId: number) => {
+      generation.current++;
       setSessionDeviceIds((ids) => {
         const next = new Set(ids);
         next.delete(deviceId);
@@ -126,6 +141,7 @@ export const Ps5ControlProvider = ({ children }: { children: ReactNode }) => {
       control.sessionStopped(deviceId);
       void reload();
     },
+    credentialsChanged: control.credentialsChanged,
   }), [control, reload]);
 
   return (

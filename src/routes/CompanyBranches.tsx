@@ -6,12 +6,13 @@ import Avatar from "@/components/ui/Avatar";
 import Button from "@/components/ui/Button";
 import ScreenWithBg from "@/components/ui/ScreenWithBg";
 import { ListSkeleton } from "@/components/ui/Skeleton";
+import { StateSwitch, deriveViewState } from "@/components/ui/state";
 import { useAsync } from "@/hooks/useAsync";
 import { useLang } from "@/i18n/LanguageContext";
 import { fmt } from "@/i18n/translations";
 import { branchRepository } from "@/repositories/BranchRepository";
 import { useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 
 const CompanyBranches = () => {
   const { user } = useAuth();
@@ -28,13 +29,23 @@ const CompanyBranches = () => {
 
   return (
     <ScreenWithBg bg="./bg/branch.jpg" title={fmt(t("companyBranches.title"), id)}>
-      <div className="row-between">
-        <Link to={`/companies/${id}`} className="muted">{t("companyBranches.back")}</Link>
-        {canCreate && <Button onClick={() => setCreating(true)}>{t("companyBranches.newBranch")}</Button>}
-      </div>
-      {loading && <ListSkeleton />}
-      {error && <div className="error">{error.message}</div>}
-      {!loading && !error && (
+      {/* No "back to company" link here: the shell's Back button (Layout) is the one way back. */}
+      {canCreate && (
+        <div className="row-between" style={{ justifyContent: "flex-end" }}>
+          <Button onClick={() => setCreating(true)}>{t("companyBranches.newBranch")}</Button>
+        </div>
+      )}
+      <StateSwitch
+        view={deriveViewState({ loading, error, data: branches })}
+        skeleton={<ListSkeleton />}
+        onRetry={() => void reload()}
+        error={{ titleKey: "branchesList.state.errorTitle" }}
+        empty={{
+          titleKey: "companyBranches.state.emptyTitle",
+          descriptionKey: "companyBranches.state.emptyDescription",
+          actions: canCreate ? <Button onClick={() => setCreating(true)}>{t("companyBranches.newBranch")}</Button> : undefined,
+        }}
+      >
         <div className="list">
           {(branches ?? []).map((b) => (
             <BranchListRow
@@ -49,9 +60,8 @@ const CompanyBranches = () => {
               blockedLabel={b.is_blocked ? (b.blocked_at ? t("blocking.state.branch") : t("blocking.state.byCompany")) : null}
             />
           ))}
-          {!branches?.length && <div className="muted">{t("companyBranches.empty")}</div>}
         </div>
-      )}
+      </StateSwitch>
       {creating && (
         <BranchForm
           companyId={id}

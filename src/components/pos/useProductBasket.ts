@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { IItemChoice, IResolvedItems } from "@/api/sessions";
 import { QuickEntryChoices, choiceKey, pendingPicks, pruneChoices, removeTypedLine, toChoicePayload } from "./quickEntryChoices";
 import { productRepository } from "@/repositories/ProductRepository";
@@ -99,9 +99,17 @@ export const useProductBasket = ({ branchId, resolve, resolveKey, allow }: Optio
   const resolveRef = useRef(resolve);
   useEffect(() => { resolveRef.current = resolve; }, [resolve]);
 
-  useEffect(() => {
-    void productRepository.listByBranch(branchId).then(setProducts);
+  /**
+   * The catalogue read. A failure is kept, not swallowed: without the catch
+   * the picker waited on a skeleton for ever. Products already on screen stay
+   * when a re-read fails.
+   */
+  const [productsError, setProductsError] = useState<unknown>(null);
+  const reloadProducts = useCallback(() => {
+    setProductsError(null);
+    productRepository.listByBranch(branchId).then(setProducts).catch((e: unknown) => setProductsError(e));
   }, [branchId]);
+  useEffect(reloadProducts, [reloadProducts]);
 
   /** Add one, or raise the count of the line that is already in the basket. */
   const put = (line: Omit<CartLine, "qty">) =>
@@ -222,7 +230,8 @@ export const useProductBasket = ({ branchId, resolve, resolveKey, allow }: Optio
     choices, choose, removeLine, pendingPicks: pendingPicks(resolved),
     err, setErr,
     creating, setCreating, onProductCreated,
-    loading: products === null,
+    productsError, reloadProducts,
+    loading: products === null && productsError === null,
   };
 };
 

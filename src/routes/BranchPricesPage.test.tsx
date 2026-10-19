@@ -87,11 +87,14 @@ describe("Branch → Prices", () => {
   });
 
   test("a failed load shows the error and a retry — and NO billing form to save", async () => {
-    billing.getForEdit.mockRejectedValue(new Error("Network error"));
+    billing.getForEdit.mockRejectedValue(Object.assign(new Error("Network error"), { status: 500, body: { message: "Network error" } }));
     await mount();
 
     expect(saveButtons().length).toBe(0);
+    // One error state per billing section, each with the server's sentence as
+    // its detail and its own Retry.
     expect(screen.getAllByRole("alert").length).toBe(4);
+    expect(screen.getAllByText("state.error.title").length).toBe(4);
     expect(document.body.textContent).toContain("Network error");
 
     billing.getForEdit.mockResolvedValue(settings);

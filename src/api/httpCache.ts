@@ -218,7 +218,10 @@ export const policyFor = (path: string): { ttlMs: number } | null => {
  */
 const MUTATION_FANOUT: Readonly<Record<string, readonly string[]>> = {
   "/branches": ["/branches", "/places", "/branch-platform-prices", "/branch-subplatforms"],
-  "/places": ["/places", "/branches"],
+  // A place write creates/renames/deletes the branch's custom platform price
+  // and subplatform rows server-side (place lifecycle owns them), so the
+  // pickers that list them must not keep a 30s-old copy.
+  "/places": ["/places", "/branches", "/branch-platform-prices", "/branch-subplatforms"],
   "/pcs": ["/places", "/branches"],
   "/place-games": ["/places", "/games"],
   "/games": ["/games", "/branches"],

@@ -136,7 +136,13 @@ export const useAutoTranslate = ({
     retryTimer.current = null;
   };
 
-  useEffect(() => () => clearTimers(), []);
+  // Unmounted, the field has no say any more: a response still in flight must
+  // not write into a form that has moved on (PlaceForm hides its name box the
+  // moment a typed name resolves to an existing platform).
+  useEffect(() => () => {
+    clearTimers();
+    seq.current++;
+  }, []);
 
   /** Write a translated map into the boxes, honouring locks and the sanitiser. */
   const apply = useCallback(

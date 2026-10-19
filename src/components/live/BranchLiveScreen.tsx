@@ -1,16 +1,18 @@
 import { GridSkeleton } from "@/components/ui/Skeleton";
-import Spinner from "@/components/ui/Spinner";
+import { ErrorState, StaleNotice, StateView } from "@/components/ui/state";
 import CollapsibleSection from "@/components/ui/CollapsibleSection";
 import { formatTime } from "@/i18n/dates";
 import { useLang } from "@/i18n/LanguageContext";
+import { useBranchPlatformNames } from "@/hooks/useBranchPlatforms";
 import { useRealtimeBranch } from "@/hooks/useRealtimeBranch";
 import { useLocalReorder } from "@/hooks/useLocalReorder";
-import { platformGroup, platformLabel } from "@/utils/platform";
+import { platformGroup } from "@/utils/platform";
 import { PlaceSnapshot } from "@/services/realtime/RealtimeService";
 import { DragEvent, useState } from "react";
 import Button from "@/components/ui/Button";
 import PlaceCell from "./PlaceCell";
 import StatusLegend from "./StatusLegend";
+import { dropSideOf } from "@/utils/reorder";
 
 const LEAD_SECTIONS = ["pc", "ps"];
 
@@ -22,6 +24,8 @@ const sectionKeyOf = (platform: string): string => {
 const BranchLiveScreen = ({ branchId }: { branchId: number }) => {
   const { t } = useLang();
   const { snapshot, error, loading, refresh } = useRealtimeBranch(branchId);
+  // One cached read: custom platforms named as the branch named them.
+  const { nameOf: platformName } = useBranchPlatformNames(branchId);
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [dragSection, setDragSection] = useState<string | null>(null);
   const [dropSection, setDropSection] = useState<string | null>(null);
@@ -35,12 +39,13 @@ const BranchLiveScreen = ({ branchId }: { branchId: number }) => {
   ];
   const sectionReorder = useLocalReorder(`board:live:sections:${branchId}`, canonicalSections);
 
-  if (loading && !snapshot) return <GridSkeleton cells={8} />;
-  if (error && !snapshot) return <div className="error">{t("live.failedLoad")}</div>;
-  if (!snapshot) return null;
+  // The first snapshot failed: say why (offline / failed) and let Refresh be
+  // pressed from here. Before it arrives, the skeleton — never a blank page.
+  if (error && !snapshot) return <ErrorState error={error} onRetry={refresh} titleKey="live.failedLoad" />;
+  if (loading || !snapshot) return <GridSkeleton cells={8} />;
 
   const sectionLabel = (key: string): string =>
-    key === "pc" ? t("session.groupComputers") : key === "ps" ? t("session.groupPs") : platformLabel(key);
+    key === "pc" ? t("session.groupComputers") : key === "ps" ? t("session.groupPs") : platformName(key);
 
   const toggleGroup = (key: string) =>
     setCollapsed((prev) => {
@@ -73,9 +78,12 @@ const BranchLiveScreen = ({ branchId }: { branchId: number }) => {
           <Button variant="secondary" onClick={refresh}>{t("action.refresh")}</Button>
         </div>
       </div>
+      {error && <StaleNotice error={error} onRetry={refresh} />}
       <StatusLegend totals={snapshot.totals} />
 
-      {places.length === 0 ? null : (
+      {places.length === 0 ? (
+        <StateView variant="empty" titleKey="live.state.emptyTitle" descriptionKey="live.state.emptyDescription" />
+      ) : (
         <div className="col" style={{ gap: 14 }}>
           {sectionKeys.map((key) => {
             const items = grouped[key];
@@ -90,7 +98,7 @@ const BranchLiveScreen = ({ branchId }: { branchId: number }) => {
                 reorderable={sectionKeys.length > 1}
                 dragHint={t("session.dragSectionHint")}
                 dragging={dragSection === key}
-                dropTarget={dropSection === key && dragSection != null && dragSection !== key}
+                dropSide={dropSection === key ? dropSideOf(sectionReorder.ordered, dragSection, key) : null}
                 onDragStart={onSectionDragStart(key)}
                 onDragEnd={() => { setDragSection(null); setDropSection(null); }}
                 onDragOver={(e) => {
@@ -100,7 +108,7 @@ const BranchLiveScreen = ({ branchId }: { branchId: number }) => {
                 onDrop={() => onSectionDrop(key)}
               >
                 <div className="live-grid">
-                  {items.map((s) => <PlaceCell key={s.place.id} snapshot={s} />)}
+                  {items.map((s) => <PlaceCell key={s.place.id} snapshot={s} platformName={platformName} />)}
                 </div>
               </CollapsibleSection>
             );

@@ -77,7 +77,8 @@ describe("ProductsList — two sections", () => {
     repo.list.mockResolvedValue(PRODUCTS.filter((p) => p.kind !== "additional"));
     await mount();
     await act(async () => { fireEvent.click(tab("session.additionalTitle")); });
-    expect(screen.getByText("products.emptyAdditional")).toBeTruthy();
+    expect(screen.getByText("products.state.emptyAdditionalTitle")).toBeTruthy();
+    expect(screen.getByText("products.state.emptyAdditionalDescription")).toBeTruthy();
   });
 
   test("hiding and deleting an additional item name its kind for the toast", async () => {

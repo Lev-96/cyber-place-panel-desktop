@@ -1,5 +1,6 @@
 import { Lang } from "@/i18n/translations";
 import { IBranchPlatformPrice } from "@/types/api";
+import { KNOWN_PLATFORMS, isKnownPlatform, platformLabel, slugifyPlatform } from "@/utils/platform";
 
 /**
  * Per-language script guards for the platform-name inputs. Each field accepts
@@ -38,4 +39,42 @@ export const matchPlatforms = (
     seen.add(p.platform);
     return true;
   });
+};
+
+/**
+ * The platform a name typed under "Other" stands for (2026-10-11): an existing
+ * one when the name IS that platform, otherwise the new slug it derives.
+ *
+ *  1. The slug of the English name, when the branch already has it (pc, ps5,
+ *     a place's custom slug, a priced platform) — the slug is the platform's
+ *     identity, so this is the same platform whatever its names say.
+ *  2. Otherwise the ONE existing platform whose name, in any locale, equals
+ *     the text typed in `typedIn` — the box the operator types in. Only that
+ *     box: the others are machine translations, and a translation that happens
+ *     to equal another platform's name must not re-target a new one.
+ *     Exact after trim + lower-case: "PS" is not "PS5", and two platforms
+ *     answering to the same name are ambiguous, so neither is chosen.
+ *  3. Otherwise the derived slug: a new platform, exactly as before.
+ *
+ * `existing` is every slug the branch already has; `prices` names the custom
+ * ones. Both are the caller's branch data — nothing here is hard-coded but the
+ * known three, which the picker always offers.
+ */
+export const resolveTypedPlatform = (
+  names: Record<Lang, string>,
+  typedIn: Lang,
+  existing: readonly string[],
+  prices: readonly Pick<IBranchPlatformPrice, "platform" | "name_en" | "name_ru" | "name_am">[] | undefined,
+): string => {
+  const slug = slugifyPlatform(names.en.trim());
+  if (slug !== "" && (isKnownPlatform(slug) || existing.includes(slug))) return slug;
+
+  const typed = names[typedIn].trim().toLowerCase();
+  if (typed === "") return slug;
+  const same = (n: string | null | undefined) => (n ?? "").trim().toLowerCase() === typed;
+  const hits = new Set<string>([
+    ...KNOWN_PLATFORMS.filter((k) => same(platformLabel(k))),
+    ...(prices ?? []).filter((p) => p.platform && [p.name_en, p.name_ru, p.name_am].some(same)).map((p) => p.platform),
+  ]);
+  return hits.size === 1 ? [...hits][0] : slug;
 };

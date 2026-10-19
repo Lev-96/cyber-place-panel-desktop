@@ -1,4 +1,5 @@
 import { SkeletonForm } from "@/components/ui/Skeleton";
+import { BackAction, ErrorState } from "@/components/ui/state";
 import BranchStatusPill from "@/components/branches/BranchStatusPill";
 import BranchForm from "@/components/branches/BranchForm";
 import BranchOpenDaysForm from "@/components/branches/BranchOpenDaysForm";
@@ -23,14 +24,29 @@ const BranchEdit = () => {
   const nav = useNavigate();
   const { t } = useLang();
   const confirm = useConfirm();
-  const { data, loading, error, reload } = useAsync(() => branchRepository.byId(id), [id]);
+  const { data: loaded, error, reload } = useAsync(() => branchRepository.byId(id), [id]);
+  // Only an answer for THIS id: useAsync keeps the previous answer while a
+  // new route param is read, and another record is not this page.
+  const data = loaded && loaded.id === id ? loaded : null;
   const [edit, setEdit] = useState(false);
   const [hours, setHours] = useState(false);
 
   if (!Number.isFinite(id) || id <= 0) return <div className="error">{t("error.invalidBranchId")}</div>;
-  if (loading) return <SkeletonForm fields={6} />;
-  if (error) return <div className="error">{error.message}</div>;
-  if (!data) return null;
+  // A 404 is "not found" with a way back; any other first-load failure is the
+  // error state with Retry. A failed BACKGROUND re-read keeps the page.
+  if (error && !data) {
+    return (
+      <ErrorState
+        error={error}
+        onRetry={() => void reload()}
+        titleKey="branch.state.errorTitle"
+        notFoundTitleKey="branch.state.notFoundTitle"
+        notFoundDescriptionKey="branch.state.notFoundDescription"
+        notFoundAction={<BackAction fallback="/branches" />}
+      />
+    );
+  }
+  if (!data) return <SkeletonForm fields={6} />;
 
   const remove = async () => {
     // The app's own dialog: a native confirm() poisons the Electron renderer's

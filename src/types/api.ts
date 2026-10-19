@@ -1,6 +1,11 @@
 import { Translated } from "@/i18n/translated";
 import type { BranchStatus } from "@/types/branch";
 
+/**
+ * The three KNOWN platforms (first-class behaviour: tariff matrix, kiosk agent).
+ * NOT the type of a place's / game's / tariff's `platform`, which is any slug —
+ * a branch adds custom ones (billiards, poker, …). See `utils/platform.ts`.
+ */
 export type PlatformType = "pc" | "ps4" | "ps5";
 export type PlaceType = "standard" | "vip";
 /**
@@ -242,7 +247,8 @@ export interface IBookingApi {
   /** Human-readable seat numbers, parallel to `place_ids`. */
   place_numbers?: number[];
   company?: { id: number; name: string };
-  game?: { id: number; platform: PlatformType; name: string };
+  /** Any platform slug: pc/ps4/ps5 or a branch's custom one. */
+  game?: { id: number; platform: string; name: string };
 }
 
 export interface IBranchApi extends Translated {

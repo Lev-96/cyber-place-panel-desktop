@@ -549,3 +549,102 @@ describe("taking a line off the bill before the stop", () => {
     expect(repo.removeItem).not.toHaveBeenCalled();
   });
 });
+
+/**
+ * The change for a cash payment (2026-10-19). The banknotes are never the bill:
+ * only what was typed for CASH is sent, a shortfall blocks the stop, and a
+ * switch to card drops the amount so it cannot ride along.
+ */
+describe("received cash and change", () => {
+  const radio = (value: string) =>
+    screen.getAllByRole("radio").find((r) => (r as HTMLInputElement).value === value) as HTMLInputElement;
+  const confirm = () => screen.getByTestId("stop-confirm") as HTMLButtonElement;
+  const type = (v: string) => fireEvent.change(screen.getByTestId("cash-received"), { target: { value: v } });
+
+  afterEach(cleanup);
+  beforeEach(() => {
+    repo.preview.mockReset();
+    repo.stop.mockReset();
+    repo.preview.mockResolvedValue(bill({ total: 3400, time_cost: 3400, subtotal: 3400, gross_total: 3400 }));
+    repo.stop.mockResolvedValue({ session: session(), breakdown: bill({ total: 3400 }), cash: { received: "5000.00", change: "1600.00" } });
+  });
+
+  test("5000 for 3400: 1600 back, and the stop carries the banknotes, not a new bill", async () => {
+    await mount();
+    await act(async () => { type("5000"); });
+    expect(screen.getByTestId("cash-change-value").textContent).toContain("1600");
+
+    await act(async () => { fireEvent.click(confirm()); });
+    expect(repo.stop).toHaveBeenCalledWith(1, { payment_method: "cash", cash_received: "5000.00" });
+    // After the stop the figures are the server's.
+    expect(screen.getByTestId("cash-change-value").textContent).toContain("1600");
+    expect(screen.queryByTestId("cash-received")).toBeNull();
+  });
+
+  test("the exact amount is zero change", async () => {
+    await mount();
+    await act(async () => { type("3400"); });
+    expect(screen.getByTestId("cash-change-value").textContent).toContain("0·AMD");
+    expect(confirm().disabled).toBe(false);
+  });
+
+  test("3000 for 3400 says what is missing and cannot be confirmed", async () => {
+    await mount();
+    await act(async () => { type("3000"); });
+    expect(screen.getByTestId("cash-change-short").textContent).toContain("400");
+    expect(screen.queryByTestId("cash-change-value")).toBeNull();
+    expect(confirm().disabled).toBe(true);
+    await act(async () => { fireEvent.click(confirm()); });
+    expect(repo.stop).not.toHaveBeenCalled();
+  });
+
+  test("an amount that is not money blocks; nothing typed shows a hint and stops as before", async () => {
+    await mount();
+    expect(screen.getByTestId("cash-change-hint")).toBeTruthy();
+    expect(screen.queryByTestId("cash-change-value")).toBeNull();
+    await act(async () => { type("-5"); });
+    expect(screen.getByTestId("cash-change-invalid")).toBeTruthy();
+    expect(confirm().disabled).toBe(true);
+    await act(async () => { type(""); });
+    await act(async () => { fireEvent.click(confirm()); });
+    expect(repo.stop).toHaveBeenCalledWith(1, { payment_method: "cash" });
+  });
+
+  test("switching to card hides the field and drops the amount; back to cash starts empty", async () => {
+    await mount();
+    await act(async () => { type("5000"); });
+    await act(async () => { fireEvent.click(radio("card")); });
+    expect(screen.queryByTestId("cash-change")).toBeNull();
+    await act(async () => { fireEvent.click(radio("cash")); });
+    expect((screen.getByTestId("cash-received") as HTMLInputElement).value).toBe("");
+    await act(async () => { fireEvent.click(radio("card")); });
+    await act(async () => { fireEvent.click(confirm()); });
+    expect(repo.stop).toHaveBeenCalledWith(1, { payment_method: "card" });
+  });
+
+  test("a double click sends one stop", async () => {
+    let release!: () => void;
+    repo.stop.mockImplementation(() => new Promise((r) => { release = () => r({ session: session(), breakdown: bill({ total: 3400 }), cash: null }); }));
+    await mount();
+    await act(async () => { fireEvent.click(confirm()); fireEvent.click(confirm()); fireEvent.click(confirm()); });
+    expect(repo.stop).toHaveBeenCalledTimes(1);
+    await act(async () => { release(); });
+  });
+
+  test("the bill grew past the banknotes: told in words and the bill is re-read", async () => {
+    repo.stop.mockRejectedValue(Object.assign(new Error("422"), { status: 422 }));
+    await mount();
+    await act(async () => { type("3400"); });
+    const reads = repo.preview.mock.calls.length;
+    await act(async () => { fireEvent.click(confirm()); });
+    expect(screen.getByText("session.cashBillGrew")).toBeTruthy();
+    expect(repo.preview.mock.calls.length).toBeGreaterThan(reads);
+    expect(confirm().disabled).toBe(false);
+  });
+
+  test("a waived bill asks for no banknotes", async () => {
+    repo.preview.mockResolvedValue(bill({ is_free: true, total: 0 }));
+    await mount();
+    expect(screen.queryByTestId("cash-change")).toBeNull();
+  });
+});

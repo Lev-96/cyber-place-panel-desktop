@@ -9,6 +9,12 @@ export interface StartSessionBody {
   hourly_rate?: number;
   user_display_name?: string;
   /**
+   * The player's PSN name on a PlayStation seat (2026-10-12): the "ends in 15
+   * minutes" warning then reaches their screen as a PSN message. The server
+   * keeps it on console seats only and refuses a name PSN could not have.
+   */
+  psn_online_id?: string;
+  /**
    * WHICH joystick strategy this seat runs on.
    *
    * Sent only when the club allows both and the cashier picked one; the server
@@ -200,10 +206,21 @@ export interface StopSessionBody {
   payment_method?: PaymentMethod;
   /** Required by the server ONLY when the method is `other`. */
   payment_method_other?: string;
+  /**
+   * Cash only, optional: the banknotes handed over, for the change. Never sent
+   * for card or other (the server drops it there too). Not the bill.
+   */
+  cash_received?: string;
+}
+
+/** What was handed over and handed back, from the stored bill; null when not typed. */
+export interface ICashHandover {
+  received: string;
+  change: string;
 }
 
 export const apiStopSessionWithBreakdown = (id: number, body?: StopSessionBody) =>
-  request<{ session: ISessionApi; breakdown: IBillBreakdown }>(`/sessions/${id}/stop`, {
+  request<{ session: ISessionApi; breakdown: IBillBreakdown; cash?: ICashHandover | null }>(`/sessions/${id}/stop`, {
     method: "POST",
     body,
   });

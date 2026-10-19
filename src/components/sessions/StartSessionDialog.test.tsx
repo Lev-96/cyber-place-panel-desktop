@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { IPcApi } from "@/types/sessions";
 import { PC_KIND, PC_STATUS } from "@/types/pc";
 import StartSessionDialog from "./StartSessionDialog";
+import { PSN_FEATURE } from "@/api/psn";
 
 /**
  * Which tariffs a seat can be sold.
@@ -331,5 +332,197 @@ describe("what the start dialog deliberately does not ask", () => {
     expect(repo.start).toHaveBeenCalledWith(
       expect.not.objectContaining({ joystick_strategy: expect.anything() }),
     );
+  });
+});
+
+describe("the package list could not be read (2026-10-07)", () => {
+  test("the dialog opens anyway, says why there are no packages, and Retry reads them", async () => {
+    const { sessionRepository } = await import("@/repositories/SessionRepository");
+    const list = vi.mocked(sessionRepository.listPackages);
+    list.mockRejectedValueOnce(new TypeError("Failed to fetch"));
+    // A computer opens on the package tab.
+    await mount(device({ kind: PC_KIND.Pc, place: { id: 10, number: 1, name: "PC 1", type: "standard", platform: "pc" } }));
+
+    // Not the skeleton for ever, and not "no packages yet".
+    expect(screen.getByText("state.offline.title")).toBeTruthy();
+    expect(screen.queryByText("session.noPackages")).toBeNull();
+
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "action.retry" })); });
+    expect(screen.getByText("One hour")).toBeTruthy();
+    expect(screen.queryByText("state.offline.title")).toBeNull();
+  });
+});
+
+/**
+ * "Is this a PlayStation?" is the PLACE's platform, not the device kind.
+ *
+ * A billiards table or a poker seat is registered as a billing-only device
+ * (`kind: "ps"`, no kiosk agent) — that says nothing about it being a
+ * console. Reading the kind labelled every custom seat "(PS)". The kind is
+ * the fallback only for a device that is not linked to a place yet. The
+ * DEFAULT MODE stays on the kind: every billing-only seat (consoles and
+ * custom rooms alike) opens on count-up, as operators are used to.
+ */
+describe("which seats the dialog calls a PlayStation", () => {
+  const heading = () => screen.getByRole("heading").textContent ?? "";
+
+  test("a PS5 seat is marked (PS) and opens on count-up", async () => {
+    await mount(device());
+
+    expect(heading()).toContain("(PS)");
+    expect(screen.queryByText("One hour")).toBeNull();
+  });
+
+  test("a billiards seat on a billing-only device is not marked (PS), and still opens on count-up", async () => {
+    await mount(device({ place: { id: 11, number: 4, name: "Table 4", type: "standard", platform: "billiards" } }));
+
+    expect(heading()).not.toContain("(PS)");
+    expect(screen.queryByText("One hour")).toBeNull();
+  });
+
+  test("a console not linked to a place falls back to its kind", async () => {
+    await mount(device({ place: null, place_id: null }));
+
+    expect(heading()).toContain("(PS)");
+  });
+});
+
+describe("a tariff for another platform (422 package_platform_mismatch)", () => {
+  test("is explained in the operator's language, not the server's sentence", async () => {
+    repo.start.mockRejectedValueOnce(Object.assign(new Error("The package is for ps5."), {
+      status: 422,
+      body: { message: "The package is for ps5.", code: "package_platform_mismatch" },
+    }));
+    await mount(device({ kind: PC_KIND.Pc, place: { id: 10, number: 1, name: "PC 1", type: "standard", platform: "pc" } }));
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "action.start" })); });
+
+    expect(screen.getByText("session.errors.packagePlatformMismatch")).toBeTruthy();
+    expect(screen.queryByText("The package is for ps5.")).toBeNull();
+  });
+
+  test("any other refusal keeps the server's sentence", async () => {
+    repo.start.mockRejectedValueOnce(Object.assign(new Error("Seat is busy."), { status: 422, body: { message: "Seat is busy." } }));
+    await mount(device({ kind: PC_KIND.Pc, place: { id: 10, number: 1, name: "PC 1", type: "standard", platform: "pc" } }));
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "action.start" })); });
+
+    expect(screen.getByText("Seat is busy.")).toBeTruthy();
+  });
+});
+
+describe("the tariffs offered fit the seat's platform (2026-10-08)", () => {
+  const tariffs = [
+    { id: 1, branch_id: 7, name_en: "One hour", name_ru: "Час", name_am: "Ժամ", duration_minutes: 60, price: 1500, platform: null },
+    { id: 2, branch_id: 7, name_en: "PS5 hour", name_ru: "Час PS5", name_am: "PS5 ժամ", duration_minutes: 60, price: 2000, platform: "ps5" },
+    { id: 3, branch_id: 7, name_en: "Table hour", name_ru: "Час стола", name_am: "Սեղանի ժամ", duration_minutes: 60, price: 3000, platform: "billiards" },
+  ];
+
+  test("a billiards seat sees the all-platform tariff and its own, never a PS5 one", async () => {
+    const { sessionRepository } = await import("@/repositories/SessionRepository");
+    vi.mocked(sessionRepository.listPackages).mockResolvedValueOnce(tariffs as never);
+    await mount(device({ place: { id: 11, number: 4, name: "Table 4", type: "standard", platform: "billiards" } }));
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: /session.fixedTariff/ })); });
+
+    expect(screen.getByText("One hour")).toBeTruthy();
+    expect(screen.getByText("Table hour")).toBeTruthy();
+    expect(screen.queryByText("PS5 hour")).toBeNull();
+  });
+
+  test("a computer sees only the all-platform tariff here", async () => {
+    const { sessionRepository } = await import("@/repositories/SessionRepository");
+    vi.mocked(sessionRepository.listPackages).mockResolvedValueOnce(tariffs as never);
+    await mount(device({ kind: PC_KIND.Pc, place: { id: 10, number: 1, name: "PC 1", type: "standard", platform: "pc" } }));
+
+    expect(screen.getByText("One hour")).toBeTruthy();
+    expect(screen.queryByText("PS5 hour")).toBeNull();
+    expect(screen.queryByText("Table hour")).toBeNull();
+  });
+});
+
+/**
+ * The player's PSN name (2026-10-12): optional, on a PlayStation seat only.
+ * Given, the "ends in 15 minutes" warning reaches the player's screen as a
+ * PSN message; left empty, the body is exactly what it always was.
+ */
+describe("the player's PSN name", () => {
+  const computer = () => device({
+    kind: PC_KIND.Pc,
+    place: { id: 10, number: 1, name: "PC-1", type: "standard", platform: "pc" },
+  });
+  const billiards = () => device({
+    place: { id: 10, number: 1, name: "Table", type: "standard", platform: "billiards" },
+  });
+  const type = async (value: string) => {
+    await act(async () => {
+      fireEvent.change(screen.getByTestId("psn-name"), { target: { value } });
+    });
+  };
+  const start = async () => {
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "action.start" }));
+    });
+  };
+
+  // These pin the feature as it works when an environment turns it back on.
+  beforeEach(() => {
+    localStorage.clear();
+    PSN_FEATURE.playerMessages = true;
+  });
+  afterEach(() => {
+    PSN_FEATURE.playerMessages = false;
+  });
+
+  test("deferred (the default): not asked, and nothing PSN goes with the start", async () => {
+    PSN_FEATURE.playerMessages = false;
+    await mount(device());
+    expect(screen.queryByTestId("psn-name")).toBeNull();
+    await start();
+
+    expect(repo.start).toHaveBeenCalledTimes(1);
+    expect(repo.start.mock.calls[0][0]).not.toHaveProperty("psn_online_id");
+  });
+
+  test("is sent with the start on a PlayStation, trimmed", async () => {
+    await mount(device());
+    await type("  Player_One-7 ");
+    await start();
+
+    expect(repo.start).toHaveBeenCalledTimes(1);
+    expect(repo.start.mock.calls[0][0]).toMatchObject({ psn_online_id: "Player_One-7" });
+  });
+
+  test("left empty, the body carries no such key", async () => {
+    await mount(device());
+    await start();
+
+    expect(repo.start.mock.calls[0][0]).not.toHaveProperty("psn_online_id");
+  });
+
+  test("a name PSN could not have holds Start back and says why", async () => {
+    await mount(device());
+    await type("1 bad name");
+
+    const startButton = screen.getByRole("button", { name: "action.start" }) as HTMLButtonElement;
+    expect(startButton.disabled).toBe(true);
+    expect(screen.getByText("session.psnNameInvalid")).toBeTruthy();
+  });
+
+  test("is not asked on a computer or a billiards table", async () => {
+    await mount(computer());
+    expect(screen.queryByTestId("psn-name")).toBeNull();
+    cleanup();
+
+    await mount(billiards());
+    expect(screen.queryByTestId("psn-name")).toBeNull();
+  });
+
+  test("a name used once is offered again next time", async () => {
+    await mount(device());
+    await type("RegularGuy");
+    await start();
+    cleanup();
+
+    await mount(device());
+    const options = [...document.querySelectorAll("#psn-recent-names option")].map((o) => (o as HTMLOptionElement).value);
+    expect(options).toEqual(["RegularGuy"]);
   });
 });

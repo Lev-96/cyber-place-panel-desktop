@@ -4,12 +4,13 @@ import { useAuth } from "@/auth/AuthContext";
 import { can } from "@/auth/permissions";
 import ScreenWithBg from "@/components/ui/ScreenWithBg";
 import { ListSkeleton } from "@/components/ui/Skeleton";
+import { StateSwitch, deriveViewState } from "@/components/ui/state";
 import { IGameApi } from "@/api/games";
 import { useAsync } from "@/hooks/useAsync";
 import { useConfirm } from "@/components/ui/ConfirmProvider";
 import { useLang } from "@/i18n/LanguageContext";
 import { gameRepository } from "@/repositories/GameRepository";
-import { platformLabel } from "@/utils/platform";
+import { useBranchPlatformNames } from "@/hooks/useBranchPlatforms";
 import { useState } from "react";
 import { useParams } from "react-router-dom";
 
@@ -30,6 +31,8 @@ const BranchGames = () => {
   // services enforce. Owners and managers add games to their own library.
   const canEditCatalog = can(user?.role, "game.crud");
   const { data, loading, error, reload } = useAsync(() => gameRepository.list({ branchId: id }), [id]);
+  // Custom platforms named as the branch named them (one cached read).
+  const { nameOf: platformName } = useBranchPlatformNames(Number.isFinite(id) && id > 0 ? id : undefined);
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState<IGameApi | null>(null);
 
@@ -47,15 +50,19 @@ const BranchGames = () => {
         <span className="muted">{t("branchGames.intro")}</span>
         <Button onClick={() => setCreating(true)}>{t("games.new")}</Button>
       </div>
-      {loading && <ListSkeleton />}
-      {error && <div className="error">{error.message}</div>}
-      {!loading && !error && (
+      <StateSwitch
+        view={deriveViewState({ loading, error, data })}
+        skeleton={<ListSkeleton />}
+        onRetry={() => void reload()}
+        error={{ titleKey: "games.state.errorTitle" }}
+        empty={{ titleKey: "branchGames.state.emptyTitle", descriptionKey: "branchGames.state.emptyDescription" }}
+      >
         <div className="list">
           {(data ?? []).map((g) => (
             <div key={g.id} className="list-item">
               <div>
                 <div className="name">{g.name}</div>
-                <div className="meta">{platformLabel(g.platform)}</div>
+                <div className="meta">{platformName(g.platform)}</div>
               </div>
               {canEditCatalog && (
                 <div className="row" style={{ gap: 6 }}>
@@ -65,10 +72,9 @@ const BranchGames = () => {
               )}
             </div>
           ))}
-          {!data?.length && <div className="muted">{t("branchGames.empty")}</div>}
         </div>
-      )}
-      {creating && <GameForm branchId={id} onClose={() => setCreating(false)} onSaved={() => { setCreating(false); void reload(); }} />}
+      </StateSwitch>
+      {creating && <GameForm branchId={id} branchGames={data ?? undefined} onClose={() => setCreating(false)} onSaved={() => { setCreating(false); void reload(); }} />}
       {editing && <GameForm initial={editing} branchId={id} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); void reload(); }} />}
     </ScreenWithBg>
   );

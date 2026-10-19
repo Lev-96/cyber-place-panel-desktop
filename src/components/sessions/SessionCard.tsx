@@ -3,6 +3,7 @@ import Button from "@/components/ui/Button";
 import { ISessionApi } from "@/types/sessions";
 import type { SessionCellState } from "@/domain/SessionCellState";
 import { SessionUrgency, useSessionUrgency } from "./sessionUrgency";
+import type { DropSide } from "@/utils/reorder";
 
 interface Props {
   /** The running session on this seat, or undefined for a free one. */
@@ -18,7 +19,8 @@ interface Props {
    */
   seatState: SessionCellState;
   dragging?: boolean;
-  dropBefore?: boolean;
+  /** The drop will land on this edge of the seat (`utils/reorder.ts` `dropSideOf`). */
+  dropSide?: DropSide | null;
   onDragOver?: DragEventHandler<HTMLDivElement>;
   onDrop?: DragEventHandler<HTMLDivElement>;
   children: ReactNode;
@@ -49,7 +51,7 @@ const accentFor = (urgency: SessionUrgency | null): string | null => {
  * `.place-cell` itself is shared with the places and live boards.
  */
 const SessionCard = ({
-  session, baseColor, seatState, dragging = false, dropBefore = false, onDragOver, onDrop, children,
+  session, baseColor, seatState, dragging = false, dropSide = null, onDragOver, onDrop, children,
 }: Props) => {
   const urgency = useSessionUrgency(session);
   const accent = accentFor(urgency) ?? baseColor;
@@ -61,7 +63,7 @@ const SessionCard = ({
     urgency && urgency !== "none" && urgency !== "normal" ? `session-card--${urgency}` : "",
     `session-card--seat-${seatState}`,
     dragging ? "is-dragging" : "",
-    dropBefore ? "is-drop-before" : "",
+    dropSide ? `is-drop-${dropSide}` : "",
   ].filter(Boolean).join(" ");
 
   return (

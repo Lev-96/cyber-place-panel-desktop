@@ -38,6 +38,8 @@ let store: Store | null = null;
 // Console wake keys, encrypted by the OS. Loaded once at boot like the kv
 // store; a null here means the app has not finished starting, never "no keys".
 let wakeKeys: WakeKeys | null = null;
+/** Consoles whose in-flight rest the panel has withdrawn (see `ps5:rest-cancel`). */
+const restCancelled = new Set<string>();
 let mainWindow: BrowserWindow | null = null;
 let updateService: UpdateService | null = null;
 
@@ -378,9 +380,27 @@ app.whenReady().then(async () => {
       return { sent: false, code: "INVALID_STATE" };
     }
 
-    // The host-id goes with it: a rest aimed only at an address can land on
-    // whichever console holds that lease right now.
-    return activeTransport().requestRest(address, hostId);
+    // A fresh request starts uncancelled; `ps5:rest-cancel` may withdraw it
+    // between its attempts.
+    restCancelled.delete(hostId);
+    try {
+      // The host-id goes with it: a rest aimed only at an address can land on
+      // whichever console holds that lease right now.
+      return await activeTransport().requestRest(address, hostId, () => restCancelled.has(hostId));
+    } finally {
+      restCancelled.delete(hostId);
+    }
+  });
+
+  /**
+   * Withdraw a rest that is still being retried, because a session has just
+   * started on that console. Only the attempts not yet made are stopped; one
+   * already on the wire may still put the console to sleep, and the panel
+   * wakes it from what it then observes. Idempotent; unknown ids are ignored.
+   */
+  ipcMain.handle("ps5:rest-cancel", (_e: unknown, hostId: unknown) => {
+    // A console's host-id is a short hex string; anything else is not one.
+    if (typeof hostId === "string" && hostId !== "" && hostId.length <= 64) restCancelled.add(hostId);
   });
 
   /** What the current transport can actually do, for a screen that must not promise more. */

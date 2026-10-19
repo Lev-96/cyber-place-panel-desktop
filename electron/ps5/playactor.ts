@@ -87,9 +87,23 @@ class SuppliedPin {
 
 export interface PairResult {
   ok: boolean;
-  code?: "NO_PIN" | "NOT_AWAKE" | "REJECTED" | "UNREACHABLE" | "FAILED" | "IN_USE";
+  code?: "NO_PIN" | "NOT_AWAKE" | "REJECTED" | "UNREACHABLE" | "FAILED" | "IN_USE" | "CANCELLED";
   detail?: string;
 }
+
+/**
+ * Where playactor looks for the console before it connects (2026-10-18).
+ *
+ * Left to itself it sends its SRCH to 255.255.255.255 from a socket bound to
+ * every address, and Windows sends that out of the default-route interface
+ * only. On a club PC with the console LAN (no gateway) and a USB modem (the
+ * default route), it left through the modem and the console was "not found":
+ * pairing and rest both failed while wake, which is unicast, worked. Aimed at
+ * the address the panel already knows, the SRCH follows the LAN's own route.
+ * The console is still matched by host-id, so a lease that now belongs to a
+ * different console is not acted on.
+ */
+export const aimedAt = (address: string): { deviceIp: string } => ({ deviceIp: address });
 
 /**
  * Pair a console with an account, so that later it can be woken and rested.
@@ -120,7 +134,7 @@ export const pair = async (
       `console at ${address}`,
       (found: { address?: { address?: string } }) => found.address?.address === address,
       undefined,
-      undefined,
+      aimedAt(address),
       undefined,
       manager,
     );
@@ -294,20 +308,34 @@ export const isTheConsole = (
 ): ((found: { id?: string; address?: { address?: string } }) => boolean) =>
   (found) => (hostId ? found.id === hostId : found.address?.address === address);
 
+/** What {@link standby} answers when the caller withdrew the request before the next attempt. */
+export const STANDBY_CANCELLED: PairResult = { ok: false, code: "CANCELLED", detail: "Superseded before the next attempt" };
+
+/**
+ * @param cancelled  Asked before every attempt, the first included. A session
+ *   started on this console while the rest was still being retried has made the
+ *   rest wrong: the console must not be put to sleep under the player who was
+ *   just given it. An attempt already on the wire cannot be called back — the
+ *   console may still sleep, and the panel wakes it from what it then observes.
+ */
 export const standby = async (
   address: string,
   keys: WakeKeys,
   hostId?: string,
+  cancelled: () => boolean = () => false,
+  attemptOnce: typeof standbyOnce = standbyOnce,
 ): Promise<PairResult> => {
   const startedAt = Date.now();
   let last: PairResult = { ok: false, code: "FAILED" };
 
   for (let attempt = 1; attempt <= STANDBY_ATTEMPTS; attempt++) {
+    if (cancelled()) return STANDBY_CANCELLED;
+
     const left = STANDBY_TOTAL_TIMEOUT_MS - (Date.now() - startedAt);
     if (left <= 0) return last;
 
     last = await withCeiling(
-      standbyOnce(address, keys, hostId),
+      attemptOnce(address, keys, hostId),
       Math.min(STANDBY_ATTEMPT_TIMEOUT_MS, left),
     );
     if (last.ok || isPermanentRefusal(last.code)) return last;
@@ -341,7 +369,7 @@ const standbyOnce = async (
       hostId ? `console ${hostId}` : `console at ${address}`,
       isTheConsole(address, hostId),
       undefined,
-      undefined,
+      aimedAt(address),
       undefined,
       manager,
     );

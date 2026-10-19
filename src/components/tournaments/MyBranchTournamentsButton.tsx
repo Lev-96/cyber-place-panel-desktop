@@ -1,5 +1,6 @@
 import Button from "@/components/ui/Button";
 import Modal from "@/components/ui/Modal";
+import { ErrorState } from "@/components/ui/state";
 import { useAuth } from "@/auth/AuthContext";
 import { useLang } from "@/i18n/LanguageContext";
 import { branchRepository } from "@/repositories/BranchRepository";
@@ -25,18 +26,22 @@ const MyBranchTournamentsButton = () => {
   const role = user?.role;
   const [picking, setPicking] = useState<IBranchApi[] | null>(null);
   const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
+  /**
+   * Why the jump did not happen. "No branch" is a fact about the account, not
+   * a failure, so it is not drawn as one; a failed read is, with Retry.
+   */
+  const [outcome, setOutcome] = useState<{ kind: "noBranch" } | { kind: "error"; error: unknown } | null>(null);
 
   if (role !== "company_owner" && role !== "manager") return null;
 
   const goTo = (branchId: number) => navigate(`/branches/${branchId}/tournaments`);
 
   const onClick = async () => {
-    setErr(null);
+    setOutcome(null);
     if (role === "manager") {
       const bid = user?.dashboard?.branch_id;
       if (typeof bid === "number") goTo(bid);
-      else setErr(t("tournaments.noBranch"));
+      else setOutcome({ kind: "noBranch" });
       return;
     }
     // Owner: resolve their company's branches, then route or prompt.
@@ -44,11 +49,11 @@ const MyBranchTournamentsButton = () => {
     try {
       const companyId = user?.dashboard?.company_id;
       const branches = await branchRepository.list(companyId ? { company_id: companyId } : {});
-      if (branches.length === 0) setErr(t("tournaments.noBranch"));
+      if (branches.length === 0) setOutcome({ kind: "noBranch" });
       else if (branches.length === 1) goTo(branches[0].id);
       else setPicking(branches);
     } catch (e) {
-      setErr(e instanceof Error ? e.message : t("form.errors.failed"));
+      setOutcome({ kind: "error", error: e });
     } finally {
       setBusy(false);
     }
@@ -59,7 +64,10 @@ const MyBranchTournamentsButton = () => {
       <div className="tournaments-cta">
         <div className="col" style={{ gap: 4, alignItems: "flex-end" }}>
           <Button onClick={onClick} disabled={busy}>{busy ? "…" : t("tournaments.goToMyBranch")}</Button>
-          {err && <span className="error" style={{ fontSize: 12 }}>{err}</span>}
+          {outcome?.kind === "noBranch" && <span className="muted" role="status" style={{ fontSize: 12 }}>{t("tournaments.noBranch")}</span>}
+          {outcome?.kind === "error" && (
+            <ErrorState size="compact" error={outcome.error} onRetry={() => void onClick()} titleKey="branchesList.state.errorTitle" descriptionKey={null} />
+          )}
         </div>
       </div>
 

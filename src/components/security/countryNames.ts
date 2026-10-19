@@ -1,3 +1,4 @@
+import { bcp47 } from "@/i18n/collation";
 import type { Lang } from "@/i18n/translations";
 
 /**
@@ -5,12 +6,10 @@ import type { Lang } from "@/i18n/translations";
  *
  * The server sends codes only; naming them is the platform's job
  * (`Intl.DisplayNames`). The panel's Armenian code is `am`, which is NOT the
- * BCP-47 tag for Armenian — that is `hy` — so it is translated here and only
- * here. A runtime without `Intl.DisplayNames`, or a code it does not know,
+ * BCP-47 tag for Armenian — that is `hy` — so it goes through `bcp47`. A
+ * runtime without `Intl.DisplayNames`, or a code it does not know,
  * falls back to the code itself, never to an empty cell.
  */
-
-const bcp47 = (lang: Lang): string => (lang === "am" ? "hy" : lang);
 
 const cache = new Map<Lang, Intl.DisplayNames | null>();
 

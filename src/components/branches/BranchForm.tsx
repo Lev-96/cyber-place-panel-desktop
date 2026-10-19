@@ -12,7 +12,8 @@ import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { storageUri } from "@/infrastructure/AppConfig";
 import { branchRepository } from "@/repositories/BranchRepository";
 import { geocodeAddress, GeocodeResult } from "@/services/geocoding";
-import { COUNTRIES, countryByCode, flagOf, resolveCountryCode } from "@/data/countries";
+import FixedDialPhoneInput from "@/components/ui/FixedDialPhoneInput";
+import { COUNTRIES, HOME_COUNTRY_CODE, countryByCode, flagOf, isHomeCountryRecord, nationalPart, resolveCountryCode } from "@/data/countries";
 import { IBranchApi } from "@/types/api";
 import { BRANCH_STATUSES, BranchStatus, branchStatusOf } from "@/types/branch";
 import { parsePhoneNumberFromString, type CountryCode } from "libphonenumber-js";
@@ -50,10 +51,18 @@ const BranchForm = ({ initial, companyId, onClose, onSaved }: Props) => {
   // `country` holds an ISO alpha-2 code (drives the strict dropdown + phone
   // validation). Legacy free-text values are resolved back to a code so
   // editing pre-selects the dropdown; on submit we send the English name.
-  const [country, setCountry] = useState(resolveCountryCode(initial?.country));
-  const [phone, setPhone] = useState(
-    typeof initial?.phone === "string" ? initial.phone : "",
-  );
+  //
+  // Armenia and +374, fixed (2026-10-11): always on create, and on edit for a
+  // branch already saved that way. One saved with another country or dial
+  // code keeps its picker and its full number, so opening it rewrites nothing.
+  const homeLocked = !initial || isHomeCountryRecord(initial.country, typeof initial.phone === "string" ? initial.phone : "");
+  const [country, setCountry] = useState(homeLocked ? HOME_COUNTRY_CODE : resolveCountryCode(initial?.country));
+  // Locked: the national part only (the +374 is drawn, not typed). Otherwise
+  // the full number as stored, as before.
+  const [phone, setPhone] = useState(() => {
+    const stored = typeof initial?.phone === "string" ? initial.phone : "";
+    return homeLocked ? nationalPart(stored, HOME_COUNTRY_CODE) : stored;
+  });
   const [lat, setLat] = useState<number>(toCoord(initial?.address_lat));
   const [lng, setLng] = useState<number>(toCoord(initial?.address_lng));
   const [logo, setLogo] = useState<File | null>(null);
@@ -132,6 +141,7 @@ const BranchForm = ({ initial, companyId, onClose, onSaved }: Props) => {
   /** Apply an ISO country code to the dropdown if it's an allowed country.
    *  `onlyIfEmpty` keeps a value the user already chose. */
   const applyCountryCode = (cc: string, onlyIfEmpty = false) => {
+    if (homeLocked) return; // the country is fixed; an address abroad does not move it
     const found = COUNTRIES.find((c) => c.code === cc.toUpperCase());
     if (!found) return; // unknown or product-excluded (RU/AZ/TR) — leave as is
     setCountry((cur) => (onlyIfEmpty && cur ? cur : found.code));
@@ -331,6 +341,13 @@ const BranchForm = ({ initial, companyId, onClose, onSaved }: Props) => {
           </div>
           <div style={{ flex: 1 }}>
             <span className="label">{t("branch.country")}</span>
+            {homeLocked ? (
+              // Fixed: a DISABLED picker holding the one country, so it reads
+              // (and is) locked. Saved as its English name, as before.
+              <select className="input" value={HOME_COUNTRY_CODE} disabled aria-label={t("branch.country")}>
+                <option value={HOME_COUNTRY_CODE}>{flagOf(HOME_COUNTRY_CODE)} {t("country.armenia")}</option>
+              </select>
+            ) : (
             <select
               className="input"
               value={country}
@@ -344,9 +361,22 @@ const BranchForm = ({ initial, companyId, onClose, onSaved }: Props) => {
                 </option>
               ))}
             </select>
+            )}
           </div>
         </div>
         <div>
+          {homeLocked ? (
+            <>
+              <span className="label">{t("label.phone")}</span>
+              <FixedDialPhoneInput
+                countryCode={HOME_COUNTRY_CODE}
+                value={phone}
+                onChange={setPhone}
+                ariaLabel={t("label.phone")}
+                invalid={phone.trim() !== "" && !phoneValid}
+              />
+            </>
+          ) : (
           <Input
             label={t("label.phone")}
             type="tel"
@@ -355,6 +385,7 @@ const BranchForm = ({ initial, companyId, onClose, onSaved }: Props) => {
             required
             placeholder={country ? `+${countryByCode(country)?.dial ?? ""} …` : ""}
           />
+          )}
           {phone.trim() !== "" && !phoneValid && (
             <span className="muted" style={{ fontSize: 11, color: "#ef4444" }}>
               {t("branchForm.invalidPhone")}

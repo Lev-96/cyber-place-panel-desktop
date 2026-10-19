@@ -216,7 +216,7 @@ describe("deleting", () => {
     const text = dialogText();
     for (const line of [
       "Companies: 1", "Branches: 2", "Manager accounts: 1", "Places: 10",
-      "Sessions in history: 99", "Member cards with a balance: 3", "This cannot be undone.",
+      "Active places in history: 99", "Member cards with a balance: 3", "This cannot be undone.",
     ]) {
       expect(text).toContain(line);
     }
@@ -237,7 +237,7 @@ describe("deleting", () => {
 
     const text = dialogText();
     expect(text).toContain("It can't be deleted yet:");
-    expect(text).toContain("Running sessions: 2. Stop them first.");
+    expect(text).toContain("Active places: 2. Stop them first.");
     expect(text).toContain("Upcoming bookings: 3. Cancel them first (players are notified).");
     expect(text).not.toContain("This cannot be undone.");
     expect(dialogConfirm().disabled).toBe(true);
@@ -257,7 +257,7 @@ describe("deleting", () => {
 
     await act(async () => { fireEvent.click(dialogConfirm()); });
 
-    await waitFor(() => expect(dialogText()).toContain("Running sessions: 2. Stop them first."));
+    await waitFor(() => expect(dialogText()).toContain("Active places: 2. Stop them first."));
     expect(dialogConfirm().disabled).toBe(true);
     expect(callsTo("DELETE", "/admin/owners/1")).toHaveLength(1);
     expect(listCalls().length).toBe(before);

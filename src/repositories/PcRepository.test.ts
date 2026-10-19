@@ -39,12 +39,20 @@ describe("PcRepository.listByBranch", () => {
     expect(api.list).toHaveBeenCalledWith(7, "pc");
   });
 
-  it("returns an empty list rather than throwing when the request fails", async () => {
-    api.list.mockRejectedValueOnce(new Error("offline"));
+  it("returns an empty list when the endpoint is not deployed (404)", async () => {
+    api.list.mockRejectedValueOnce(Object.assign(new Error("Not Found"), { status: 404 }));
     const { pcRepository } = await import("./PcRepository");
 
-    // The screen renders "no computers yet" instead of an error page — the
-    // existing `orFallback` behaviour, kept while adding the kind filter.
+    // The `orFallback` behaviour for a backend without the route, kept while
+    // adding the kind filter.
     await expect(pcRepository.listByBranch(7)).resolves.toEqual([]);
+  });
+
+  it("THROWS when the request got no answer (offline) — never «no computers» (2026-10-07)", async () => {
+    api.list.mockRejectedValueOnce(new TypeError("Failed to fetch"));
+    const { pcRepository } = await import("./PcRepository");
+
+    // The screen shows the offline state with Retry instead of an empty list.
+    await expect(pcRepository.listByBranch(7)).rejects.toThrow("Failed to fetch");
   });
 });

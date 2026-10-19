@@ -50,6 +50,8 @@ contextBridge.exposeInMainWorld("cyberplacePS5", {
    * rest command — and the shape does not change when one becomes possible.
    */
   rest: (hostId: string, address: string) => ipcRenderer.invoke("ps5:rest", hostId, address),
+  /** Withdraw a rest still being retried: a session has just started on that console. */
+  restCancel: (hostId: string) => ipcRenderer.invoke("ps5:rest-cancel", hostId),
   capabilities: () => ipcRenderer.invoke("ps5:capabilities"),
   /**
    * Pair a console: opens the PlayStation sign-in, then registers with the PIN.

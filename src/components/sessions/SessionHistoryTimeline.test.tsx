@@ -176,3 +176,20 @@ describe("SessionHistoryTimeline", () => {
     expect(times[1]).toMatch(/27/);
   });
 });
+
+describe("a card whose own read of its events failed (2026-10-07)", () => {
+  test("says it failed, with Retry — it used to say «loading» for ever", () => {
+    const retry = vi.fn();
+    render(<SessionHistoryTimeline events={null} startedAt={START} error={new TypeError("Failed to fetch")} onRetry={retry} />);
+
+    expect(screen.queryByText("history.timelineLoading")).toBeNull();
+    expect(screen.getByText("state.offline.title")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "action.retry" }));
+    expect(retry).toHaveBeenCalledTimes(1);
+  });
+
+  test("still loading without an error", () => {
+    render(<SessionHistoryTimeline events={null} startedAt={START} error={null} />);
+    expect(screen.getByText("history.timelineLoading")).toBeTruthy();
+  });
+});

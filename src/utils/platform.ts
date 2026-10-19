@@ -1,4 +1,5 @@
 import { PlatformType } from "@/types/api";
+import { isPs, type PcKind } from "@/types/pc";
 
 /**
  * The three platforms with first-class behaviour: a tariff matrix cell
@@ -64,3 +65,31 @@ export const platformGroup = (platform: string): PlatformGroup => {
   if (/^ps\d*$/i.test(platform)) return "ps";
   return "other";
 };
+
+/**
+ * Is this seat a PlayStation? Asked of the PLACE's platform, not the device.
+ *
+ * `pc.kind === "ps"` only says "no kiosk agent runs here" — equally true of a
+ * billiards table or a poker seat registered as a billing-only device — so a
+ * "PS" marker drawn from it labels every custom seat a console. The device
+ * kind is the fallback only for a device not linked to a place yet, the same
+ * rule the sessions board's sections follow.
+ */
+export const isPlayStationSeat = (device: {
+  kind?: PcKind;
+  place?: { platform?: string | null } | null;
+}): boolean => {
+  const platform = device.place?.platform;
+  return platform ? platformGroup(platform) === "ps" : isPs(device.kind);
+};
+
+/**
+ * Whether a tariff may be sold on a seat (2026-10-08) — the server's own rule
+ * (`TimePackage::fitsPlatform`): a tariff for all platforms (null) fits every
+ * seat, one for a platform fits only that platform. A seat whose platform is
+ * unknown (a device not linked to a place) is not narrowed.
+ */
+export const packageFitsSeat = (
+  pkg: { platform?: string | null },
+  seatPlatform: string | null | undefined,
+): boolean => !pkg.platform || !seatPlatform || pkg.platform === seatPlatform;

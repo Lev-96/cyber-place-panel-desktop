@@ -1,4 +1,5 @@
 import Input from "@/components/ui/Input";
+import { StateView } from "@/components/ui/state";
 import { useLang } from "@/i18n/LanguageContext";
 import { storageUri } from "@/infrastructure/AppConfig";
 import type { IBranchApi } from "@/types/api";
@@ -66,11 +67,11 @@ const BranchPicker = ({ branches, selectedId, onPick, busy }: Props) => {
         />
       )}
 
-      {filtered.length === 0 ? (
-        <div className="support-branch-empty">
-          <div style={{ fontSize: 22 }}>🔍</div>
-          <div className="muted" style={{ fontSize: 13 }}>{t("support.noBranchMatches")}</div>
-        </div>
+      {branches.length === 0 ? (
+        // Nothing to choose from is not "nothing matched".
+        <StateView variant="empty" size="compact" titleKey="support.state.noBranchesTitle" descriptionKey={null} />
+      ) : filtered.length === 0 ? (
+        <StateView variant="noResults" size="compact" titleKey="support.noBranchMatches" descriptionKey="state.noResults.description" />
       ) : (
         <div className="support-branch-grid">
           {filtered.map((branch) => {

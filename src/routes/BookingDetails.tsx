@@ -1,4 +1,5 @@
 import { SkeletonCard } from "@/components/ui/Skeleton";
+import { BackAction, ErrorState } from "@/components/ui/state";
 import { apiGetBooking } from "@/api/bookings";
 import CancelReasonModal from "@/components/bookings/CancelReasonModal";
 import Button from "@/components/ui/Button";
@@ -15,15 +16,30 @@ const BookingDetails = () => {
   const { t } = useLang();
   const { bookingId } = useParams();
   const id = Number(bookingId);
-  const { data, loading, error, reload } = useAsync(
+  const { data: loaded, error, reload } = useAsync(
     () => apiGetBooking(id).then((r) => r.booking),
     [id],
   );
+  // Only an answer for THIS id: useAsync keeps the previous answer while a
+  // new route param is read, and another record is not this page.
+  const data = loaded && loaded.id === id ? loaded : null;
   const [cancel, setCancel] = useState(false);
 
-  if (loading) return <SkeletonCard lines={5} />;
-  if (error) return <div className="error">{error.message}</div>;
-  if (!data) return null;
+  // A 404 is "not found" with a way back; any other first-load failure is the
+  // error state with Retry. A failed BACKGROUND re-read keeps the page.
+  if (error && !data) {
+    return (
+      <ErrorState
+        error={error}
+        onRetry={() => void reload()}
+        titleKey="booking.state.errorTitle"
+        notFoundTitleKey="booking.state.notFoundTitle"
+        notFoundDescriptionKey="booking.state.notFoundDescription"
+        notFoundAction={<BackAction fallback="/bookings" />}
+      />
+    );
+  }
+  if (!data) return <SkeletonCard lines={5} />;
 
   const startTime = (data.start_time ?? "").slice(0, 5);
   const start = `${formatDate(data.booking_date)} ${startTime}`;

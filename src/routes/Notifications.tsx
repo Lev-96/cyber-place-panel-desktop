@@ -8,8 +8,9 @@ import { useAuth } from "@/auth/AuthContext";
 import { useConfirm } from "@/components/ui/ConfirmProvider";
 import ScreenWithBg from "@/components/ui/ScreenWithBg";
 import Spinner from "@/components/ui/Spinner";
+import { StateSwitch, deriveViewState } from "@/components/ui/state";
 import { useAsync } from "@/hooks/useAsync";
-import { formatDate } from "@/i18n/dates";
+import { formatDate, formatTime } from "@/i18n/dates";
 import { formatAmount } from "@/i18n/currency";
 import { useLang } from "@/i18n/LanguageContext";
 import { expenseRepository } from "@/repositories/ExpenseRepository";
@@ -36,7 +37,17 @@ import { useNavigate } from "react-router-dom";
  * the corner-popup gate in `GlobalBookingNotifier`.
  */
 export const shouldShowBookingsFeed = (role: string | undefined): boolean =>
-  role === "manager";
+  role === "manager" || role === "company_owner";
+
+/**
+ * The feed's heading and empty text by role (2026-10-12). An owner's rows are
+ * only "a seat ends soon" (the backend allows them nothing else), so their
+ * feed is named for sessions, not bookings.
+ */
+export const dbFeedCopy = (role: string | undefined): { titleKey: string; emptyKey: string } =>
+  role === "company_owner"
+    ? { titleKey: "notifications.sessionFeedTitle", emptyKey: "notifications.state.sessionsEmptyDescription" }
+    : { titleKey: "notifications.bookingFeedTitle", emptyKey: "notifications.state.bookingsEmptyDescription" };
 
 /**
  * Billing feed mirrors the inverse rule: admins and company owners
@@ -100,8 +111,9 @@ const Notifications = () => {
   const {
     list,
     unreadCount,
-    loading: loadingDb,
-    error: errorDb,
+    failure: errorDb,
+    settled: settledDb,
+    refresh: refreshDb,
     markRead,
     markAllRead,
     deleteOne,
@@ -138,12 +150,14 @@ const Notifications = () => {
     [isAdmin],
   );
 
-  if (loadingDb && list.length === 0 && billing.loading) return <ListSkeleton rows={5} />;
-  if (errorDb && list.length === 0) return <div className="error">{errorDb}</div>;
-  if (billing.error && (billing.data?.data ?? []).length === 0) {
-    return <div className="error">{billing.error.message}</div>;
-  }
-
+  // Each feed answers for itself: one failing must not hide the other, and
+  // neither may read as "no notifications" when it could not be read.
+  const bookingsView = deriveViewState({
+    loading: !settledDb,
+    error: errorDb,
+    data: settledDb && (list.length > 0 || !errorDb) ? list : null,
+  });
+  const billingView = deriveViewState({ loading: billing.loading, error: billing.error, data: billing.data?.data });
   const billingList = billing.data?.data ?? [];
   const expensesList = expenses.data ?? [];
 
@@ -153,7 +167,7 @@ const Notifications = () => {
         <>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, flexWrap: "wrap", gap: 8 }}>
             <h3 className="muted" style={{ margin: 0, fontSize: 14 }}>
-              {t("notifications.bookingFeedTitle") || "Bookings"}
+              {t(dbFeedCopy(user?.role).titleKey)}
             </h3>
             <div style={{ display: "flex", gap: 8 }}>
               {unreadCount > 0 && (
@@ -185,11 +199,14 @@ const Notifications = () => {
             </div>
           </div>
 
-          {list.length === 0 ? (
-            <div className="card">
-              <div className="muted">{t("common.empty.notifications")}</div>
-            </div>
-          ) : (
+          <StateSwitch
+            view={bookingsView}
+            skeleton={<ListSkeleton rows={5} />}
+            size="section"
+            onRetry={() => void refreshDb()}
+            error={{ titleKey: "notifications.state.errorTitle" }}
+            empty={{ titleKey: "notifications.state.emptyTitle", descriptionKey: dbFeedCopy(user?.role).emptyKey }}
+          >
             <div style={{ display: "grid", gap: 12, marginBottom: 24 }}>
               {list.map((n) => (
                 <DbNotificationCard
@@ -200,7 +217,7 @@ const Notifications = () => {
                 />
               ))}
             </div>
-          )}
+          </StateSwitch>
         </>
       )}
 
@@ -209,17 +226,20 @@ const Notifications = () => {
           <h3 className="muted" style={{ margin: showBookings ? "24px 0 12px" : "0 0 12px", fontSize: 14 }}>
             {t("notifications.billingFeedTitle") || "Billing"}
           </h3>
-          {billingList.length === 0 ? (
-            <div className="card">
-              <div className="muted">{t("common.empty.notifications")}</div>
-            </div>
-          ) : (
+          <StateSwitch
+            view={billingView}
+            skeleton={<ListSkeleton rows={3} />}
+            size="section"
+            onRetry={() => void billing.reload()}
+            error={{ titleKey: "notifications.state.errorTitle" }}
+            empty={{ titleKey: "notifications.state.emptyTitle", descriptionKey: "notifications.state.billingEmptyDescription" }}
+          >
             <div style={{ display: "grid", gap: 12 }}>
               {billingList.map((r) => (
                 <ReminderCard key={r.id} r={r} isAdmin={isAdmin} />
               ))}
             </div>
-          )}
+          </StateSwitch>
         </>
       )}
 
@@ -291,6 +311,7 @@ const DbNotificationCard = ({ n, onClick, onDelete }: { n: IDbNotification; onCl
   const isBookingCancelled = dataType === "booking.cancelled";
   const isBranchSubscribed = dataType === "branch.subscribed";
   const isTournamentJoined = dataType === "tournament.joined";
+  const isSessionEndingSoon = dataType === "session.ending_soon";
   const bookingDate = n.data?.booking_date as string | undefined;
   const startTime = n.data?.start_time as string | undefined;
   const extraMinutes = n.data?.extra_minutes as number | undefined;
@@ -376,6 +397,19 @@ const DbNotificationCard = ({ n, onClick, onDelete }: { n: IDbNotification; onCl
       venue,
     ].filter(Boolean);
     body = segments.join(" · ");
+  } else if (isSessionEndingSoon) {
+    // "Seat №4 · ends in 15 min" — the minutes as they were when it was said,
+    // and the planned end, so a card read later is still exact.
+    const seat = n.data?.place_number as number | undefined;
+    const endsAt = n.data?.ends_at as string | undefined;
+    const vars = {
+      seat: seat != null ? String(seat) : "-",
+      minutes: String((n.data?.minutes_left as number | undefined) ?? 15),
+      time: endsAt ? formatTime(endsAt) : "-",
+      venue: venue || "-",
+    };
+    headline = interpolate(t("notifications.sessionEndingSoonTitle"), vars);
+    body = interpolate(t("notifications.sessionEndingSoonBody"), vars);
   } else {
     headline = n.type.split("\\").pop() ?? n.type;
   }
@@ -387,7 +421,9 @@ const DbNotificationCard = ({ n, onClick, onDelete }: { n: IDbNotification; onCl
     // surface the staff can act on. Tournament has its own detail page
     // with the registrations list + verify form, so it wins over a
     // generic guest profile when both are present.
-    if (n.data?.booking_id) {
+    if (isSessionEndingSoon && n.data?.branch_id) {
+      navigate(`/branches/${n.data.branch_id}/sessions`);
+    } else if (n.data?.booking_id) {
       navigate(`/bookings/${n.data.booking_id}`);
     } else if (n.data?.tournament_id) {
       navigate(`/tournaments/${n.data.tournament_id}`);

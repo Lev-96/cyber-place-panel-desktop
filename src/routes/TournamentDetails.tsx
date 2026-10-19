@@ -1,4 +1,5 @@
 import { SkeletonCard } from "@/components/ui/Skeleton";
+import { BackAction, ErrorState } from "@/components/ui/state";
 import RegistrationsList from "@/components/tournaments/RegistrationsList";
 import ScreenWithBg from "@/components/ui/ScreenWithBg";
 import Spinner from "@/components/ui/Spinner";
@@ -11,12 +12,27 @@ const TournamentDetails = () => {
   const { tournamentId } = useParams();
   const { t } = useLang();
   const id = Number(tournamentId);
-  const { data, loading, error } = useAsync(() => tournamentRepository.byId(id), [id]);
+  const { data: loaded, error, reload } = useAsync(() => tournamentRepository.byId(id), [id]);
+  // Only an answer for THIS id: useAsync keeps the previous answer while a
+  // new route param is read, and another record is not this page.
+  const data = loaded && loaded.id === id ? loaded : null;
 
   if (!Number.isFinite(id) || id <= 0) return <div className="error">{t("error.invalidTournamentId")}</div>;
-  if (loading) return <SkeletonCard lines={5} />;
-  if (error) return <div className="error">{error.message}</div>;
-  if (!data) return null;
+  // A 404 is "not found" with a way back; any other first-load failure is the
+  // error state with Retry. A failed BACKGROUND re-read keeps the page.
+  if (error && !data) {
+    return (
+      <ErrorState
+        error={error}
+        onRetry={() => void reload()}
+        titleKey="tournament.state.errorTitle"
+        notFoundTitleKey="tournament.state.notFoundTitle"
+        notFoundDescriptionKey="tournament.state.notFoundDescription"
+        notFoundAction={<BackAction fallback="/" />}
+      />
+    );
+  }
+  if (!data) return <SkeletonCard lines={5} />;
 
   return (
     <ScreenWithBg bg="./bg/owner-home.jpg" title={data.title}>

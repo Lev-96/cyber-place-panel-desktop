@@ -1,5 +1,6 @@
 import Button from "@/components/ui/Button";
 import { ListSkeleton } from "@/components/ui/Skeleton";
+import { StateSwitch, deriveViewState } from "@/components/ui/state";
 import SellProductsDialog from "@/components/pos/SellProductsDialog";
 import { useAsync } from "@/hooks/useAsync";
 import { formatTime } from "@/i18n/dates";
@@ -87,12 +88,15 @@ const Till = () => {
         </div>
       </div>
 
-      {loading && !data && <ListSkeleton />}
-      {error && <div className="error">{error.message}</div>}
-      {!error && data && data.length === 0 && <div className="muted">{t("till.empty")}</div>}
-      {!error && data && data.length > 0 && (
+      <StateSwitch
+        view={deriveViewState({ loading, error, data })}
+        skeleton={<ListSkeleton />}
+        onRetry={() => void reload()}
+        error={{ titleKey: "till.state.errorTitle" }}
+        empty={{ titleKey: "till.state.emptyTitle", descriptionKey: "till.state.emptyDescription" }}
+      >
         <div className="list">
-          {data.map((o) => (
+          {(data ?? []).map((o) => (
             <div key={o.id} className="list-item" style={{ opacity: o.status === "paid" ? 1 : 0.5 }}>
               <div style={{ minWidth: 0 }}>
                 <div className="name">
@@ -108,7 +112,7 @@ const Till = () => {
             </div>
           ))}
         </div>
-      )}
+      </StateSwitch>
 
       {selling && (
         <SellProductsDialog

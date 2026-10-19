@@ -244,3 +244,37 @@ export const resolveCountryCode = (value: string | null | undefined): string => 
   const byName = COUNTRIES.find((c) => c.name.toLowerCase() === v.toLowerCase());
   return byName?.code ?? "";
 };
+
+/**
+ * The country companies and branches are created in (2026-10-11): Armenia,
+ * dial code +374, neither one changeable in those forms. A record already
+ * saved with another country or another dial code keeps its own fields on
+ * edit (`isHomeCountryRecord`): nothing stored is rewritten.
+ */
+export const HOME_COUNTRY_CODE = "AM";
+
+/** Strip a leading "+<dial>" so a number box shows the national part only. */
+export const nationalPart = (full: string, code: string): string => {
+  const dial = countryByCode(code)?.dial ?? "";
+  const trimmed = full.trim();
+  if (dial) {
+    const compact = trimmed.replace(/\s+/g, "");
+    if (compact.startsWith(`+${dial}`)) return compact.slice(dial.length + 1);
+  }
+  return trimmed;
+};
+
+/**
+ * Whether a saved record is (or is still blank enough to become) a home
+ * country one — its form is then locked to Armenia and +374. Another country,
+ * or a phone with another international code, is legacy data the form must
+ * show and keep as it is.
+ */
+export const isHomeCountryRecord = (country: string | null | undefined, phone: string | null | undefined): boolean => {
+  const code = resolveCountryCode(country);
+  const homeCountry = !country?.trim() || code === HOME_COUNTRY_CODE;
+  const compact = (phone ?? "").replace(/\s+/g, "");
+  const dial = countryByCode(HOME_COUNTRY_CODE)!.dial;
+  const homePhone = compact === "" || compact.startsWith(`+${dial}`) || !compact.startsWith("+");
+  return homeCountry && homePhone;
+};

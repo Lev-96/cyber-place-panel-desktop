@@ -102,8 +102,9 @@ branch — so the two yml files never conflict:
   and `cyberplacePS5` (PlayStation discovery + status). Each is its own global
   so a screen can feature-detect it: the renderer can be newer than the preload
   it loads into, and a missing bridge must produce a sentence, not a throw.
-- 13 `ipcMain.handle` channels total: `kv:get|set|remove`, `wol:send`,
-  `updates:check|install|getState`, `ps5:discover|probe|wake|rest|capabilities`,
+- 20 `ipcMain.handle` channels total: `kv:get|set|remove`, `wol:send`,
+  `updates:check|checkGated|install|getState`,
+  `ps5:discover|probe|wake|wake-once|pair|psn-login-external|rest|rest-cancel|capabilities`,
   `ps5:credential:set|has|forget`.
 - **The console wake key never crosses to the renderer.** It is encrypted by the
   OS keystore (`electron/ps5/credentials.ts`, `safeStorage`), and the bridge can
@@ -111,18 +112,83 @@ branch — so the two yml files never conflict:
   keystore, storing is refused rather than falling back to readable text.
 - **The consoles are talked to from HERE, not from the server.** The backend is
   in a datacentre and shares no broadcast domain with any club; this process
-  runs on a machine in the room. `electron/ps5/` is read-only by construction —
-  it can find a console and report what it said, and it cannot wake or rest one.
+  runs on a machine in the room. `electron/ps5/` finds, observes, pairs, wakes
+  and rests consoles; keys never leave the main process.
   `ps5:discover` sweeps the network and belongs behind a button; `ps5:probe`
   asks named addresses and is what the ten-second status check on the sessions
   board uses (`src/ps5/useConsoleWatch.ts`). A broadcast every ten seconds would
   put a packet in front of every device in the venue all shift.
 - **`electron/ps5/transport.ts` is the seam.** It declares what a transport can
-  do, and today's answers `rest: false` — the local protocol has no rest
-  command; that needs a Remote Play session (TCP 9295, a key exchange). The
-  refusal is a value (`UNSUPPORTED_BY_TRANSPORT`) that reaches the screen. It is
-  never a success nothing earned, and swapping in a rest-capable transport
-  changes no logic above it.
+  do. Rest is a request inside a Remote Play session (playactor, TCP 9295), so
+  `rest` is true only once the key vault is loaded; without it the refusal is a
+  value (`UNSUPPORTED_BY_TRANSPORT`) that reaches the screen, never a success
+  nothing earned.
+- **Several interfaces (2026-10-18).** A club PC can have the console LAN with no
+  gateway and a USB modem holding the default route; a limited broadcast from a
+  socket on 0.0.0.0 then leaves through the modem only (Windows). So:
+  - `discover()` sends out of every usable IPv4 interface, one socket BOUND to
+    that interface's address, to its directed broadcast and 255.255.255.255,
+    three times within the window (`discoveryLanes`, `sweepLanes` in
+    `electron/ps5/discovery.ts`). Skipped, by what they are and never by name:
+    loopback, 169.254/16, /31-/32 (point-to-point/VPN). Answers merged by
+    host-id; a lane that fails is a warning, not the end of the sweep. Routes
+    and gateways are only read. Skips, lanes and warnings are logged
+    (`[ps5] discovery`, no secrets) and shown under "Find PlayStation".
+  - pair and rest give playactor `discoveryConfig.deviceIp` = the known address
+    (`aimedAt`), so its SRCH is unicast down the LAN's own route; the console is
+    still matched by host-id. Wake was always unicast.
+  - `probe()` (the status check) is unicast and unchanged. The watcher sweeps a
+    missing console after 2 misses, then spaces sweeps 5/10/20/40/60 s while it
+    stays missing; a press brings the gap back to 5 s. An address found by a
+    sweep is re-bound by host-id; nothing is ever re-paired or unbound by
+    silence.
+- **The latest press wins (2026-10-18).** Start clears the Stop intent; a press
+  clears the previous intent's backoff and wake give-up clock
+  (`Ps5Controller.pressed`). A rest still being retried when the console is
+  wanted for anything else is withdrawn (`ps5:rest-cancel`, checked between
+  attempts in `standby()`); an attempt already on the wire cannot be called
+  back, so the console may sleep and is woken from its own answer. A command
+  that comes back after the wish turned (`superseded`) starts no backoff and
+  paints no error. `Ps5ControlProvider.reload()` applies a list only if no newer
+  read or local change happened after it was asked. Tests:
+  `src/ps5/stopStartRace.test.ts`, `src/ps5/stopStartProvider.test.tsx`.
+- **The watcher's "has a key" answer is re-asked (2026-10-19).** It was asked
+  once per binding: a place bound before its console was paired stayed "no key"
+  after pairing, sent no wake and showed "command failed" until a restart. Now
+  `useConsoleControl` re-asks the vault on `credentialsChanged()` (called by
+  ConsolePicker after pair / save key / forget key, exposed by the provider) and
+  on every Start/Stop. Tests: `src/ps5/keyFreshness.test.tsx`,
+  `src/components/ps5/ConsolePicker.pairing.test.tsx`. Verified live at the club:
+  laptop on 5 GHz, console on 2.4 GHz of the same router, rest → wake in ~9 s.
+- **Start wakes without waiting for an answer (2026-10-19).** A PS5 at rest on
+  Wi-Fi answers about one probe in three, so waiting for its "rest" made Start
+  slow. Within the press window (`urgent` → `Observation.pressed`) a silent
+  (`unreachable`/`unknown`) console that is wanted active is sent a wake to its
+  last known address; outside it silence is never acted on, a Stop press never
+  wakes, no key = nothing sent, ACTIVE still needs the console's own answer.
+- **Start/Stop follow the console, not a guess (2026-10-19).**
+  - Seat free, console GOING_TO_REST → Start disabled, "Уходит в режим сна…";
+    session running, console WAKING → Stop disabled, "Включение…"
+    (`src/ps5/tileGate.ts`). Bounded by the machine (REST_SETTLE_MS /
+    WAKE_GIVE_UP_MS), so OFFLINE / ERROR / no console never lock a seat.
+  - No "unavailable" flash mid-transition: silence while WAKING or
+    GOING_TO_REST keeps that state until its bound; a console last heard at
+    rest is shown at rest through silence for `REST_HOLD_MS` (60 s) — a PS5
+    asleep on Wi-Fi answers about one probe in three (measured at the club).
+  - The press window is 45 s (was 15) and ends as soon as the console is where
+    it was asked to be; inside it the same datagram goes out at most once a
+    second. A wake no longer waits for a withdrawn rest's TCP attempt (up to
+    20 s) to finish.
+  - "Ignores the wake" (WAKE_IGNORED) is said only of a console really heard
+    at rest after the waking began (`ConsoleStatus.heardAt` →
+    `Observation.heardAt`); one silent since then is OFFLINE, not blamed on
+    its settings.
+  - Real-socket simulation of a Wi-Fi PS5 (`consoleSimulation.integration.test.tsx`):
+    tile ACTIVE → GOING_TO_REST → REST → WAKING → ACTIVE, Stop→REST 3-5 s,
+    Start→ACTIVE 9-12 s with a deliberately deaf console.
+- **PSN player message is deferred** (`PSN_FEATURE.playerMessages = false` in
+  `src/api/psn.ts`, mirrors the backend flag): no PSN name field at start and no
+  sender card in Settings. Pairing's `psnLoginExternal` is separate and stays.
 
 ### The console lifecycle (`src/ps5/`)
 `machine.ts` is a pure function of (previous state, observation) → (next state,
@@ -184,8 +250,9 @@ pos · places · ps5 · sessions · tournaments · revenue · services · scanne
   (`as const satisfies Record<…>`) + `pcHasAgent()` / `isPs()`. Adding a
   case is a one-file edit; a stray literal in a new diff is a bug.
   ⚠️ Do NOT conflate overlapping-but-distinct sets: `PcKind`
-  (`"pc"|"ps"`, a *device*) is not `PlatformType` (`"pc"|"ps4"|"ps5"`, a
-  *place's platform*).
+  (`"pc"|"ps"`, a *device*) is not `PlatformType` (`"pc"|"ps4"|"ps5"`, the
+  three KNOWN platforms). A place's / game's / tariff's `platform` is any
+  slug (`string`): a branch adds custom platforms, see §9.5.11.
 - **Use in-app primitives for dialogs/toasts, never native.** Confirms
   via `useConfirm()`/`ConfirmDialog`, notifications via `notify.*` — a
   native `window.confirm()`/`alert()` poisons renderer focus (see traps).
@@ -220,6 +287,13 @@ pos · places · ps5 · sessions · tournaments · revenue · services · scanne
   Watch for duplicate translation keys. Outside a component (UI kit
   primitives, aria-labels in shared widgets) use `tActive(key)` from
   `@/i18n/translations`: never a hardcoded literal, never a second dictionary.
+  **A message kept in state** (an error, a notice) is stored as
+  `LocalizedText` (`src/i18n/localizedText.ts`: `textKey(key)` /
+  `textLiteral(serverSentence)`) and rendered with `renderText(text, t)` —
+  never as `t(...)`'s result, or it stays in the old language after a switch
+  (fixed 2026-10-07 on the sign-in card and the reset face; tests
+  `Login.language.test.tsx`). A known server `code` → our key; the server's
+  sentence only as the fallback for a code this build does not know.
 - **"Active Places" is the name of the running-seats section** (2026-09-28):
   `session.boardTitle`, `hub.tile.sessions`, `history.backToBoard`,
   `notifications.openBoard` say Active Places / Активные места / Ակտիվ տեղեր.
@@ -838,6 +912,109 @@ mechanism from this one, and both are needed.
 
 Covered by `src/api/httpCache.test.ts` and `src/api/client.cache.test.ts`.
 
+## 7.7 Screen states: empty / no results / not found / error / offline (2026-10-07)
+
+ONE system, in `src/components/ui/state/` (import from `@/components/ui/state`):
+
+| Piece | Job |
+|---|---|
+| `deriveViewState({loading, error, data, hasFilters, isEmpty?})` (`viewState.ts`) | the ORDER, pure: data with items → `ready` (also while reloading, and after a failed refresh as `staleError`); error with nothing to show → `error`; no data + in flight → `loading`; answered empty → `noResults` if a search/filter narrowed it, else `empty` |
+| `StateSwitch` | renders exactly one of skeleton / `ErrorState` / empty / noResults / children for a `ViewState`; stale data gets `StaleNotice` above it |
+| `StateView` | the layout: player + title + description + optional detail + actions. `size` = `page` / `section` (smaller player) / `compact` (text only — dialogs, dropdowns, form rows). Copy by KEY (`titleKey`, `descriptionKey`, `null` = none), rendered with `t` so it follows a language switch |
+| `ErrorState` | `classifyError`: status-less TypeError / status 0 / `navigator.onLine === false` → **offline**; **404 → notFound** (with `notFoundAction`, usually `BackAction`, no Retry); else **error** + Retry (`onRetry` = the screen's `reload`). The server's `body.message` only as the secondary `detail` (LocalizedText literal) for a non-404 answer. Never `error.stack`, never "Failed to fetch" |
+| `StaleNotice`, `OfflineNotice` (App, bottom pill), `useOnline()` (`src/hooks`) | presentation only — no new request, no realtime wiring |
+| `BackAction` | "Go back": `navigate(-1)`, or `fallback` when the page was opened directly |
+
+Rules:
+- **Loading keeps the screen's own Skeleton.** The player is never a loader.
+- **A failed read is never "empty".** A background re-read never blanks loaded
+  data. Detail pages also ignore an answer for ANOTHER id (useAsync keeps the
+  previous answer while a new route param is read).
+- **Context copy, not generic:** each screen passes its own `*.state.*` keys
+  (en/ru/am, Armenian ends with `։`, no em dash). Defaults live under `state.*`.
+- **CTA in an empty state only where the screen already had a permission
+  check for that action** (BranchesList `branch.create`+company, CompanyBranches
+  `branch.create`, CompaniesList `company.create`, Managers `manager.create`,
+  Owners `owner.create`, ProductsList `product.crud`; the prices page's package
+  empty kept its existing button).
+- Unknown route (signed in) → `routes/NotFound.tsx`, not a silent redirect;
+  `/login`, `/forgot-password`, `/reset-password` still go to `/`; signed out,
+  `*` is still Login. Pinned by `src/App.notFound.test.tsx` (real route table).
+
+**`api/fallback.ts` (the bug this fixed):** `isMissingEndpoint` used to count an
+error with no status (network down) as "endpoint missing", so `orFallback`
+resolved `[]`/defaults offline and screens replaced real data with "nothing
+here" (the sessions board: "No devices registered", running sessions gone).
+Now ONLY 404 / 501 is missing; everything else rethrows. Every non-useAsync
+caller of an `orFallback` repository got a catch (StartSessionDialog packages,
+useProductBasket catalogue, SessionOptionsDialog joystick fee,
+SupportUnreadContext keeps its count). `friendlyMutation` no longer calls a
+dropped connection "endpoint not deployed". `NotificationsContext` gained
+`failure` (raw error) and `settled` (additive).
+
+**The player** (`poses/GamerFigure.tsx` + one module per pose; redrawn
+2026-10-11 from neon line-art into a lit character). A young gamer, bust
+behind the glowing edge of a desk: shaded skin (radial gradient), side-swept
+dark-violet hair with a magenta streak and a crown tuft, hazel irises with a
+catchlight and a cyan screen reflection, lashes, brows, blush, graphite
+headset with cyan / magenta LED cups and a mic, navy hoodie with hood rim,
+strings, folds and a neon trim; cyan rim light left, magenta right, soft
+brand backlight. Per pose the FACE changes (`face={{brows, mouth, lids?,
+look?}}`) plus the props: Empty = relaxed smile, thumbing a controller
+(glowing ABXY, light bar); NoResults = curious "o", one brow up, magnifier
+with glass sheen; NotFound = puzzled wavy mouth, head tilted, scratching the
+head over a folded map, floating "?"; Error = worried brows, plug pulled from
+a socket, flickering spark; Offline = sleepy lids, nodding, crossed Wi-Fi,
+rising "zzz"; Success = big grin, smiling eyes, thumbs-up, twinkling sparkles
+and confetti.
+
+Structure: `scene` (behind) → body group (neck, hoodie, head, `arms` — the
+sleeves, drawn BEHIND the desk) → desk → `front` (hands + props). Arms must
+start at y ≤ 168 so the round sleeve cap stays under the opaque desk (the
+SVG is `overflow: visible`). Gradient / clip ids from `useId()`. Colours:
+the UI tokens for the neon, plus an illustration-only palette scoped on
+`.cp-gamer` (`--gamer-skin*`, `--gamer-hair*`, `--gamer-cloth*`,
+`--gamer-gear*`, iris, mouth, paper) — gradient stops are painted by
+`.cp-gamer__s-*` classes. Two SVG gotchas pinned by tests / comments: a
+CSS `transform` animation REPLACES the element's `transform` attribute (put
+placement on a wrapper `<g>`; the test fails otherwise), and an
+objectBoundingBox gradient does not paint a perfectly horizontal line (the
+desk edge uses `userSpaceOnUse`).
+
+Motion: CSS keyframes, transform / opacity only, origins in view-box
+coordinates (`transform-box: view-box`), loops of different lengths so they
+never line up: breathe 5.2 s (hoodie scaleY 1.5 %), head bob / micro-tilt
+6.8 s (neck + head share it), blink 4.7 s, eye glance 7.3 s, body sway 8.2 s
+(±0.5°), LED / mic glow 3.6 s; pose actions: thumbs press 1.9 / 2.3 s,
+magnifier sweep 4.4 s, head scratch 1.6 s, "?" float 3.4 s, spark flicker
+2.6 s, sleepy nod 6 s + zzz 4.5 s staggered, thumbs-up bounce 2.4 s, star
+twinkle 3 s. `@media (prefers-reduced-motion: reduce)` stops all of it (and
+the `.cp-skeleton` shimmer, and slows `.spinner`); the static frame is a
+complete drawing. No filters, no blur — gradients only. Each pose is
+`React.lazy`: nothing of the drawing is in the main chunk. Sizes (`npm run
+build:web`, gzip), before → after the redraw: GamerFigure (shared chunk)
+1.00 → 2.37 kB; poses 0.34–0.47 → 0.50–0.80 kB (NoResults 0.50, Error 0.57,
+Offline 0.58, NotFound 0.65, Empty 0.68, Success 0.80); CSS 17.28 → 18.45 kB;
+main JS unchanged (222.26 kB). A screen showing one state downloads ≈ 3 kB
+gzip of drawing. Original 2026-10-07 numbers: main JS 653.66 → 677.10 kB
+(gzip 213.55 → 220.20 kB), almost all of it the en/ru/am dictionary entries.
+No dependency added.
+
+Tests: `viewState.test.ts`, `StateView.test.tsx` (variants, roles, lazy pose,
+each variant draws its own prop and a face — head, irises, brows, mouth —
+unique gradient/clip ids for two players on one screen, no transform
+attribute on a CSS-transform-animated element, the shared idle keyframes,
+CSS reduced-motion + transform/opacity-only keyframes, ErrorState
+classification + Retry, StateSwitch), `useOnline.test.tsx`,
+`api/fallback.test.ts`, `tileOrder.test.ts`, per screen:
+`SessionsBoard.states`, `BranchLiveScreen.states`, `MembersList`,
+`Expenses.states`, `useProductBasket.load`, RegistrationsList / Notifications /
+IpActivityTab / StartSessionDialog / SessionHistoryTimeline / Till /
+OwnerDetails additions. Mutation-verified: fallback back to "no status =
+missing" and "≥400 = missing"; empty/noResults swapped; stale data turned into
+an error; the basket catch dropped; the board's first-load error branch and
+stale notice removed; `*` back to `<Navigate to="/">`.
+
 ---
 
 ## 8. AI Assistant Behaviour (for me, Claude)
@@ -1000,7 +1177,7 @@ button is not a permission: a manager who kept the URL could still POST.
 |---|---|---|---|
 | Клиенты (members, deposits) | ✅ | ❌ | ❌ |
 | Настройки филиала | ✅ | ✅ | ❌ |
-| Смена (open/close/Z-report) | ✅ | ✅ | ❌ |
+| Смена (open/close/report, `/branches/:id/shift`) | ✅ | ✅ | ✅ own branch (2026-10-19) |
 | Места | ✅ | ✅ | ❌ |
 | Товары — создать / изменить / удалить / скрыть | ✅ | ✅ | ❌ |
 | Товары — список + поиск | ✅ | ✅ | ✅ |
@@ -1018,10 +1195,36 @@ Two things that look like oversights and are not:
 - **Member cards are gone for the OWNER too.** They hold player identities and
   stored balances, and nothing on the cashier path reads them — the POS charges
   cash and sends `member_id: null`.
-- **A manager without shifts can still take money.** `orders.cashier_shift_id`
-  is nullable, so a sale files itself under the open shift if there is one and
-  simply does not if there is not — exactly what already happened outside shift
-  hours.
+- **A sale needs no shift.** `orders.cashier_shift_id` is nullable, so a sale
+  files itself under the open shift if there is one and simply does not if
+  there is not.
+- **The shift screen (2026-10-19)** — `src/routes/Shift.tsx`, hub tile
+  "Смена", permission `shift.manage` (admin/owner/manager). Live report of the
+  open shift, `CloseShiftDialog` (counted cash typed, difference previewed in
+  exact cents via `src/shifts/cash.ts`, reason required when non-zero, a ref
+  guard so one press sends one close), history with each saved report. Every
+  figure is the server's decimal string; the screen formats it
+  (`shiftAmount`, cents shown when present) and never computes it.
+- **Shift history (2026-10-19)** — `src/components/shifts/ShiftHistory.tsx`,
+  used by the company screen `/shifts` (sidebar "Смены", rank after Revenue)
+  and by the branch shift screen (branch fixed). Filters branch → staff (owner/
+  admin only; the list is `/shifts/staff` of the picked branch and a pick not
+  in the new branch is dropped) → from/to → status → difference; one server
+  request, page 1 on any change (the `{key, page}` idiom), reset with a count;
+  nothing filtered client-side. Report v2 blocks (seats, platforms, bookings,
+  "what the totals are made of") render only when present, so v1 reports open.
+- **Report layout (2026-10-19 evening).** Header facts are label-above-value
+  (`Fact`), status said in words; one large revenue figure with its parts;
+  every count sits on its own line UNDER its label, never next to an amount
+  (the till's "2" beside "3 000" read as "23 000"). An open shift reads
+  "Данные на" (figures as of the last read) and re-reads every 60 s, paused
+  while the close dialog is up. History shows active filters as removable
+  chips.
+- **Change at the stop** — `components/payments/cashChange.ts` (cents, no
+  float) + `CashChangePanel`. Cash only, optional, cleared on every method
+  switch; short/invalid blocks Confirm; a ref guards double clicks; 422 after
+  the bill grew says so and re-reads the bill. Only `cash_received` is sent;
+  after the stop the figures shown are the server's `cash`.
 
 Product READS stay open to everyone: the POS sells from that list, and the
 manager's screen is the list plus a search box with no write control on it.
@@ -1178,12 +1381,107 @@ a link, `Sidebar.tsx` does not mention `BranchForm`, `global.css` has no
 `sidebar-action`. Mutation-verified (link back to `/my-company`, `end` on the
 link, create button put back under Branches).
 
+### Sidebar in alphabetical order (2026-10-07)
+
+The nav entries are DATA (`navItems` in `Sidebar.tsx`: route, label key, who may
+see it, badge) sorted by `sortedNavItems` (`src/components/sidebarNav.ts`) in
+alphabetical order of the label in the CURRENT language, re-sorted when it
+changes. Collation is `compareText` from `src/i18n/collation.ts`, which maps the
+panel's `am` to `hy` (to `Intl`, `am` is Amharic) — the one place that mapping
+lives (`countryNames.ts` and `BlockedCountriesTab` use it too). The footer
+(Support, footerExtra, account, Sign out) is NOT sorted. The owner web uses the
+same Sidebar, so it sorts too after a `panel.ref` bump. Tests:
+`Sidebar.order.test.tsx` (every role × en/ru/am with real translations, the
+Armenian alphabet, re-sort on language change, links/badges kept).
+
+**Dashboard pinned first (2026-10-09).** Sorted by its label the Dashboard
+landed under П (ru, "Панель") and Կ (am, "Կառավարման էջ"). Its spec carries
+`pinnedFirst: true` (a stable key on the SPEC, never matched by label text or
+by `to`); `sortedNavItems` puts pinned entries first in declared order, then
+everything else locale-sorted with the declaration index as tiebreak. A pinned
+entry the role may not open (`show: false`) is still dropped. Note: a report of
+the ru menu reading "Бронирование, Выручка, Безопасность" came from an
+unsorted build (prod v1.0.50, declared order); staging sorts it as
+Безопасность → Бронирования → Выручка. Tests (`Sidebar.order.test.tsx`): every
+role × en/ru/am — Dashboard first with `href="/"`, the rest collated, no
+duplicates; the ru admin order above; role permissions unchanged by the pin;
+en → ru → am switch keeps it first. Mutation-verified (pin flag removed from
+`Sidebar.tsx`; pin ignored in the comparator).
+
+**Owner / manager menu: explicit order + menu-only wording (2026-10-11).**
+`withStaffMenu(specs, role)` (`sidebarNav.ts`, table `STAFF_MENU`, keyed by the
+entry's base label key — a stable id, never the translated text) gives an
+owner or a manager a `rank` and their menu label. `sortedNavItems` orders in
+three bands: pinned (Dashboard) → ranked by rank → the rest alphabetically
+(Settings, Agent updates, anything added later). Owner: Панель, Моя компания,
+Мои филиалы, Мои менеджеры, Выручка, Филиалы на карте, Сканировать код,
+Бронирования, Турниры филиалов, Уведомления (tournaments before
+notifications, reordered later on 2026-10-11). Manager (own branch only):
+Панель, Мой филиал (takes the branches' place), Сканировать код, Бронирования,
+Турниры моего филиала, Уведомления. Their tournaments list is filtered to their
+branch, so "all branches" would be false. `nav.side.branchesOnMap` reads
+"Филиалы на карте" / "Branches on the map" /
+"Մասնաճյուղերը քարտեզի վրա". `withStaffMenu` stores the base key in
+the spec's `id` before it swaps `labelKey`, and `NavItem.id` carries it to the
+renderer, so icons and order never key on the menu wording. Admin is NOT
+changed (sees every branch/manager: "My …" would be false; Dashboard first +
+alphabetical). Only the SIDE MENU wording changes (`nav.side.*`): page titles,
+routes, permissions untouched. Long labels wrap in the 240px column (checked
+in Chromium, ru/am/en, no overflow). Tests in `Sidebar.order.test.tsx` (per
+role × language, ru wording, language switch, manager tournaments label);
+mutation-verified (table not applied, rank ignored, manager label).
+
+**One current entry + icons (2026-10-11).** The nav renders plain `Link`s, not
+`NavLink`s. Each NavLink decided on its own, so `/bookings/confirm` lit both
+Scan and Bookings, and `/settings/updates` lit both Settings and Updates.
+`activeNavTo(items, pathname)` (`sidebarNav.ts`) picks ONE entry: the longest
+`to` that equals the path or contains it as a whole-segment prefix. `end`
+entries (the Dashboard) match only exactly. Only that entry gets `.active` and
+`aria-current="page"`. Detail pages still light their section: `/bookings/5`
+lights Bookings, `/branches/9/...` lights a manager's My branch, and
+`/companies/4/revenue` lights My company. A page outside the menu
+(`/support`) lights nothing in the nav. Every row is `<NavIcon id={item.id}/>`
++ `.nav-label` + badge. `src/components/ui/NavIcon.tsx` is the single map from
+base key to a 24×24 outline (Lucide geometry, ISC, attributed in the file; no
+npm dependency). It uses `currentColor`, stroke 1.75 and round joins, renders
+at 18px, and carries `data-nav-icon={id}`. Unknown ids render nothing; the
+test catches that. A new nav entry needs a shape here.
+
+**Rhythm (§7.5, 4px scale).** Nav rows are 4px apart with 10/12 padding, and
+the icon sits 12px from the label. The icon aligns with the label's FIRST line:
+a 20px line-height and 1px icon offset. Wrapped labels stay under the label
+start, never under the icon. The sidebar gap is 12px. The footer has a hairline
+`border-top`, 12px top padding and 8px between cards. Footer cards (Support,
+`footerExtra`, account) share padding 10/12, radius 12, the `--color-border`
+edge and full column width. The support icon tile and the avatar are both
+34px, so the titles line up. Hover changes no geometry: the old
+`padding-left` slide and `translateY` lifts are gone. Nav-row rules are scoped
+to `.sidebar-nav a`. The old `.sidebar a` rules out-specified
+`.nav-support-card` and silently gave it radius 8 and a flat hover fill.
+Verified in Chromium at 240px (owner ru/am/en, manager ru, short viewport):
+no horizontal overflow, the nav scrolls under the pinned footer without
+overlap, and Support and the account card are both 215px from x=12.
+
 ### Sidebar footer slot (2026-09-29)
 
 `<Sidebar footerExtra={…} />` draws extra entries in the pinned footer, after
-Support and before the account card. The desktop Layout passes nothing, so its
-footer is unchanged (`Sidebar.footerExtra.test.tsx`); the owner web passes its
-"Telegram" card (styled with `.nav-support-card`).
+Support and before the account card. The desktop Layout passes nothing; the
+owner web passes its "Telegram" card (styled with `.nav-support-card`).
+
+**The account card is last (2026-10-11).** Sign-out is no longer a full-width
+button under the card. It is a 40×40 icon button (`button.logout`, the
+`nav.signOut` log-out glyph, with `aria-label` and `title` set to
+`t("nav.signOut")`, still `onClick={() => void logout()}`). `Sidebar` passes it
+to `UserMenu` through its `trailing` slot. The footer is: Support →
+`footerExtra` → `.sidebar-account` (the card: `.user-card` button that opens
+the account menu, then sign-out). Nothing comes after it. The card's edge lights
+via `:has(.user-card:hover / .active)`, and sign-out has its own red hover.
+The popover, profile and account-switch flows are unchanged. Tests:
+`Sidebar.layout.test.tsx` (icons per role, one current entry, footer order,
+sign-out calls logout) and `Sidebar.footerExtra.test.tsx`. Mutation-verified:
+first match instead of longest, `end` ignored, base id dropped on the staff
+swap, notifications ranked before tournaments, back to self-matching NavLinks,
+and sign-out moved outside the card.
 
 ## 9.5.7a "+ New branch" on the Branches page (2026-09-12)
 
@@ -1226,6 +1524,14 @@ middleware; `{owner}` resolves only a `company_owner`, anything else is 404).
   person gets an email link and sets their own (backend §8.9.12). Every such
   form shows `staff.inviteHint`. Pinned by `Owners.test.tsx` ("adding"),
   `CompanyForm.test.tsx`, `ManagerForm.test.tsx`.
+- **The company edit may clear its description (2026-10-09).**
+  `buildCompanyForm` drops empty fields, so an emptied description was never
+  sent and the server kept the old text while answering "saved".
+  `apiUpdateCompany` now sends the fields in `CLEARABLE_ON_UPDATE`
+  (`description`) even when empty; every other empty field and the create
+  form are unchanged. The input is capped at 255 (`maxLength`) — the backend
+  column's limit; longer was refused with 422. Pinned by
+  `api/companies.update.test.ts`.
 
 - Transport `src/api/owners.ts` — types mirror `OwnerResource`,
   `DeletionPreviewResource`, `OwnerDeletionResource` and the 409
@@ -1339,9 +1645,102 @@ backend routes.
   - rows read as a user (name + email), a mobile player, "Anonymous", or "Telegram servers" (bot webhooks);
   - the header sentence says the address is the SERVER's view (a VPN's address behind a VPN) and the location approximate — never "exact";
   - source pills `.pill.ipa-source.is-*`;
-  - `IpActivityTab.test.tsx` (8).
+  - **Device and OS columns** (2026-10-07), right after User (`data-label`
+    for the phone cards): the resource's `device` (`iphone | ipad |
+    android_phone | android_tablet | windows_pc | mac | linux_pc |
+    chromebook | null`), `os_name` (`ios | ipados | android | windows | macos |
+    linux | chromeos | null`), `os_version` — all OPTIONAL in
+    `src/api/ipActivity.ts`: an older backend omits them and the row reads
+    "Unknown"; a value this build does not know renders as sent. OS cell = name
+    + version ("iOS 17.8", "Windows"). Icon: `security/DeviceIcon.tsx`
+    (phone / tablet / desktop / laptop, inline SVG). Server filters `device` and
+    `os` in the filter bar; any change starts on page 1. Empty ("No connections
+    recorded yet") vs no results (any filter/search/pick) vs error + Retry;
+  - **Network, Activity and the details dialog** (2026-10-07). All new
+    resource fields are OPTIONAL in `src/api/ipActivity.ts` (absent = `null` =
+    "Not determined"): `region_name`, `asn`, `as_org`, `browser`
+    (`IP_ACTIVITY_BROWSERS`, typed `string`), `browser_version` (major),
+    `location: {latitude, longitude, accuracy_radius_km} | null` (the backend
+    sends null for `telegram_bot` and unknown addresses).
+    - **"Provider / Network" column** after OS: `as_org` over `AS<asn>` (muted).
+      Never called Wi-Fi: the server sees the network, not the access point.
+      Clicking it is the third click-to-filter (`asn`, chip, page 1); the
+      search box also matches the organisation and "AS<number>" server-side.
+    - **"Activity", not "Visits"**: `visits_count` counts 10-minute windows with
+      activity, not requests; the header's tooltip says so
+      (`ipActivity.col.visitsHint`), the sort is "Most activity".
+    - **Row click / Enter on a focused row** opens `IpActivityDetailsModal`.
+      Clicks on a control inside the row (user, city, network) and a click
+      that ends a text selection do not; Enter on an inner control does not.
+    - The dialog reads `GET /admin/ip-activity/{id}` through
+      `securityRepository.ipActivityDetails` (NOT the list row): the server
+      audits each read. Hence `useAsync(..., { revalidateOnCacheChange: false })`
+      (new, additive option) so a cache announcement elsewhere cannot re-read
+      it and log an access nobody made; `/admin/*` is never cached anyway.
+      Skeleton while loading; `ErrorState` compact (404 → "This record no
+      longer exists", no Retry; else error + Retry). Shows only what the
+      resource carries, never tokens / headers / bodies.
+    - **Map**: `BranchMap` lazy-loaded inside the dialog (Leaflet stays in the
+      shared `BranchMap` chunk, out of `Security`), only when `location` is
+      non-null and the source is not `telegram_bot` (that one shows the
+      "belongs to Telegram's servers" note even if a location arrives). No
+      pin: a dashed `.cp-map-area` circle. Caption always under the map:
+      approximate location determined BY THE IP ADDRESS, ~N km, not the
+      person's exact location, VPN = the VPN server's (`captionNoRadius`
+      without a number). It never says "network": the place comes from the
+      MaxMind City database by IP, the provider from the separate ASN
+      database (2026-10-08). No location → compact StateView "IP location
+      not determined".
+    - **Fact groups** (2026-10-08, `FactGroup`): Device / **Location by IP**
+      (country, region, city) / **Provider / Network** (organisation, AS
+      number) / Activity — the place and the provider are separate groups
+      so neither reads as derived from the other. Table headers say
+      "Country (by IP)" / "City (by IP)" (`ipActivity.col.countryByIp` /
+      `cityByIp`). Test: "the place by IP and the provider are separate
+      groups".
+    - **`BranchMap` area mode**: passing `accuracyRadiusKm` (even `null`)
+      caps the map at `AREA_MAX_ZOOM` (11) so an approximate place is never
+      shown at street level; a radius draws `L.circle` (metres) and
+      `fitBounds` to it. The map re-measures (`invalidateSize`) after the
+      first frame and on container resize (ResizeObserver) — needed inside a
+      dialog. Point-mode callers (BranchForm, BranchesMap) are unchanged.
+    - Shared wording for table and dialog: `security/ipActivityText.tsx`.
+  - Tests: `IpActivityTab.test.tsx` (26), `map/BranchMap.test.tsx` (7, a
+    recording Leaflet mock), `useAsync.test.tsx` (+2). Mutation-verified:
+    map for `telegram_bot`, caption dropped, inner click opens the dialog,
+    Enter on an inner control opens it, radius in km not metres, no zoom cap
+    on the fit, the useAsync opt-out ignored, `asn` not sent.
 - Layout: tables scroll in their own frame; ≤640px rows become cards from
   `data-label`; the owner-web app renders the same screen in a browser.
+- **Refresh button (2026-10-09)** in the header row next to the tabs
+  (`.sec-head`; under the tabs, right-aligned, ≤900px). `Button` secondary +
+  `ui/RefreshIcon.tsx` (inline SVG, `currentColor`), the icon spins while a
+  round is in flight (`.sec-refresh.is-busy`, transform only, stopped under
+  `prefers-reduced-motion`), `aria-busy`. Mechanism:
+  `security/securityRefresh.ts` — `SecurityRefreshContext` (provided by
+  `Security.tsx`, default no-op), `useSecurityRefresh(reload, enabled?)`
+  registers the LATEST `useAsync` reload while mounted (BlockedIpsTab,
+  LoginLockoutsSection — not while hidden by a missing endpoint,
+  BlockedCountriesTab, IpActivityTab), `refreshAll(set)` runs them in parallel.
+  A ref guards against a second round; the button is re-enabled in `finally`.
+  All true → `notify.success("security","refreshed")` ("Refreshed" /
+  "Обновлено" / "Թարմացվեց"); any false → `toast.fail.refreshed` and the
+  list's own StaleNotice / ErrorState stays. A list unmounted mid-round (tab
+  switched) is not counted as a failure. The activity tab re-reads its current
+  search / filters / page; a shrunken result is handled by its page clamp.
+  Data is replaced (useAsync), never appended. No realtime here; `/admin/*` is
+  not cached, so a refresh is always a real request.
+  - `useAsync`'s `run`/`reload` now resolves a boolean (additive): `true` only
+    when that run's answer is the one on screen; `false` on failure, when a
+    newer run or `mutate` superseded it, or after unmount. Never rejects.
+  - Tests: `routes/Security.refresh.test.tsx` (8: one request per mounted list
+    per tab, activity keeps filters + page, double click → one round, new rows
+    replace old, failure → error toast only + button back, ErrorState kept,
+    switched-away tab not asked, ru copy), `securityRefresh.test.ts` (5),
+    `useAsync.test.tsx` (+5), `translations.test.ts` (+1). Mutation-verified:
+    ref guard removed, unregister a no-op, success toast on failure, stale
+    reload registered instead of the latest, lockouts not registered,
+    superseded run reporting true.
 
 ## 9.5.8b Address block and parity with the web (2026-10-01)
 
@@ -1352,6 +1751,14 @@ backend routes.
   - Tests: `networkBlock.test.ts`, `NetworkBlockedScreen.test.tsx`, `AuthContext.networkBlock.test.tsx`.
 - **Add owner:** first name, last name and email are all required (`CreateOwnerBody`); the server stores "First Last".
 - **Security → Blocked IPs** marks rows the system added (`reason` `auto_threat` / `auto_login`) with a pill; they unblock like any other.
+- **Security → Blocked IPs → Locked sign-ins** (2026-10-07, `LoginLockoutsSection` under the IP table): sign-ins closed after too many wrong passwords on the desktop or the owner web — account (email, name · role, or "No such account"), IP (+ "address blocked too" pill), where, attempts, locked until, Unblock (asks first, `DELETE /admin/security/login-lockouts/{id}`). Re-read after an IP unblock (lifting an `auto_login` ban lifts its locks). A backend without the endpoint hides the section. The sign-in counts down from the server's `retry_after` (see below). Tests: `LoginLockouts.test.tsx`, `Login.blocked.test.tsx`.
+- **Sign-in captcha + lock countdown** (2026-10-07, shared with the owner web, which imports these by `@/`):
+  - `src/components/login/MosaicCaptcha.tsx` — 3×3 tile-swap puzzle (click/Enter two tiles to swap, arrows move focus), "New picture" sends `replaces` so the server forgets the old one; loading/checking/solved/wrong states, instant under reduced motion; StrictMode-safe (`alive` ref re-armed in the effect). Shown in `CaptchaDialog.tsx` (a Modal — the 960×600 card has no room).
+  - API `src/api/captcha.ts` (`GET|POST /auth/captcha?client=`); the pass goes to `src/auth/loginChallenge.ts`, and `apiLogin` sends it ONCE as `captcha_token`.
+  - `src/auth/useLoginCaptcha.ts` (both sign-in screens): `captcha_required` → `ask()` opens the dialog; solved → the pass is kept, the dialog closes, the form says `login.captchaPassed` and focuses the email (if empty) or the password. **Solving NEVER sends the sign-in by itself** — the person corrects the credentials and presses Sign in (bug fixed 2026-10-07: the auto-resend of the same wrong credentials failed, spent an attempt towards the lock and opened the next mosaic at once). A new mosaic opens only when the server answers `captcha_required` again.
+  - `LoginHold.tsx` + `useDeadline` + `i18n/duration.ts`: 423 `login_locked` / 429 `too_many_attempts` with `retry_after` → live "try again in 49 min 30 s" against `performance.now()` (system clock irrelevant), then "You can try to sign in again". The server still decides. On short windows (`max-height: 700px`) the logo hides while the hold shows.
+  - The backend asks the desktop for a captcha only while `SECURITY_DESKTOP_CAPTCHA=true`.
+  - Tests: `MosaicCaptcha.test.tsx`, `LoginHold.test.tsx`, `duration.test.ts`, `auth.captcha.test.ts`, `Login.blocked.test.tsx` (incl. the no-auto-resend regression).
 - **Web and Telegram owners can now do what the desktop does:** profile name/email/password, managers, kiosk PIN, agent token. Only a LAN-only action (Wake-on-LAN, the console watcher) or a destructive global one stays desktop-only (backend `client_access.denied_routes`). The web shows the same buttons, so nothing is hidden here.
 
 ## 9.5.9 Revenue screen — tournaments, owner income, per branch (2026-09-11)
@@ -1559,8 +1966,9 @@ reusable `<SettingsSection>` (`components/ui/SettingsSection.tsx`: title,
 description, header actions, loading and error-with-retry states; it never
 renders its body on error). The billing rules load with
 `billingSettingsRepository.getForEdit()` — STRICT. `get()` falls back to
-defaults on a network failure (fine for read-only screens), which on this page
-let the next Save overwrite the real policy with defaults. The forms, their
+defaults when the endpoint is missing (404/501; until 2026-10-07 also on a
+network failure, see §7.7), which on this page would let the next Save
+overwrite the real policy with defaults. The forms, their
 whole-policy PUT and their remount `key`s are unchanged. Package delete uses
 `useConfirm` (never `window.confirm`). Pinned by `BranchPricesPage.test.tsx`
 and `BillingSettingsRepository.test.ts`.
@@ -2051,6 +2459,241 @@ they did, and TypeScript caught it as a duplicate object property.
 
 ---
 
+## 9.5.11 Custom platforms: games, tariffs, the PS marker (2026-10-08)
+
+- **A duplicate game is a question, not an error.** `POST /games` answers a
+  duplicate (same name, same platform) with 422 + `code: "game_exists"` +
+  `game: {id, name, platform}` (old `message` / `errors.name` kept).
+  `api/gameExists.ts` (`existingGameOf`) reads it; `GameForm` draws an inline
+  notice (`game.exists.notice`, buttons `game.exists.useExisting` /
+  `action.cancel`), never the field line or a red toast:
+  `GameRepository.create` suppresses its error toast for `game_exists` only.
+  "Use existing" resends the same body + `use_existing: true` (success body has
+  `existing: true`, toast `toast.game.linked`); with no `branchId` (admin
+  `GamesList`) there is nothing to link, so it hands back the row with no
+  request and the list marks it (`.list-item--focus`). The pre-Save check
+  (`findExistingGame`, `utils/gameName.ts`: trim, lower-case, collapse spaces,
+  same platform) runs over the GLOBAL catalogue + the branch list: advice
+  only, the 422 decides. Double submit is stopped by a ref (`inFlight`), not
+  by `busy`.
+- **Existing games are suggested while typing** (create only, 2026-10-08).
+  The branch list alone never knew a game another branch had added, so the
+  owner only learned of it on Save. `GameSuggestions` (in the flow under the
+  name, not a popup) lists up to 5 games on the SELECTED platform whose
+  normalised name contains the typed text (`suggestGames`: exact, then
+  prefix, then contains; ≥2 chars; 200 ms `useDebouncedValue`), the exact one
+  with the primary edge, a badge `game.suggest.inBranch` for games already in
+  the branch, and `game.exists.useExisting` → the SAME `takeExisting` path as
+  the notice. That path sends the picked game's exact `name` + `platform`
+  (not what was typed) with `use_existing: true`; linking is idempotent
+  server-side, so a game already in the branch is sent too (the list on
+  screen may be stale). No request per keystroke: `useGameFormSources` reads
+  `gameRepository.list()` ONCE per opened create form, only when the caller
+  did not pass `globalCatalogue` (GamesList and PlaceForm pass theirs;
+  `null` = still loading, no second read). BranchGames passes `branchGames`.
+  A failed read only removes the suggestions; Save works as before.
+- **The branch's custom platforms are quick buttons in GameForm AND PlaceForm.**
+  `PlatformPicker`'s opt-in `customOptions: {slug,label}[]` draws them between
+  PS5 and Other (a value equal to one starts on its button, not on Other).
+  Sources, scoped like their data: with a branch, `useBranchPlatforms` (its
+  places + price rows, since 2026-10-09) + the branch games' custom slugs,
+  named via `customPlatformOptions` (`i18n/platformPriceName.ts`, shared);
+  without one (admin), the custom slugs of the global catalogue. Never the
+  global catalogue for an owner: another company's platform must not become a
+  button. PlaceForm (2026-10-08) passes the branch's own: its places'
+  platforms (`platformSuggestions`) + its priced platforms — never the games
+  catalogue's. A custom button goes through `handlePlatformPick` →
+  `handlePickExisting` (names in 3 languages + exact slug, so the existing
+  price locks), like picking it from the name suggestions. Pinned in
+  `PlaceForm.platformChange.test.tsx` (buttons, pick, edit pressed, no
+  foreign platform).
+- **`lockedPlatform` locks even when empty.** `lockedPlatform=""` (a place on
+  "Other" with no name yet) used to fall through to the picker, so a place form
+  could create a game on any platform. Now any defined value hides the picker
+  and an empty one disables Save; `PlaceForm` does not offer "+ Create game"
+  until `platform !== ""`.
+- **Changing a place's platform drops the copied rate.** Both rate boxes open
+  with the stored `hourly_rate`, i.e. the OLD platform's figure. `changePlatform`
+  (picker or picking an existing custom platform, NOT name typing) empties them
+  so the new platform's own price applies; typing after the switch is kept;
+  going back to the stored platform restores the stored figure. Same on create.
+- **"(PS)" / the PS badge is the place's platform.** `isPlayStationSeat(pc)`
+  (`utils/platform.ts`): `platformGroup(place.platform) === "ps"`, device kind
+  only when no place is linked. `kind === "ps"` means "no kiosk agent" and is
+  true of a billiards table; it still decides MAC / Wake / pairing token in
+  `PcsList`, and the DEFAULT MODE of `StartSessionDialog` (every billing-only
+  seat — consoles and custom rooms — opens on count-up, PCs on packages; the
+  operators' flow, deliberately unchanged on 2026-10-08). Only the "(PS)"
+  heading follows the place's platform.
+- **Tariffs target any platform slug.** `ITimePackage.platform` and the
+  create/update bodies are `string | null` (null = all). `PackageForm` offers
+  All + pc/ps4/ps5 + the branch's custom platforms from
+  `platformPriceRepository.listByBranch` (passed in by `BranchPricesPage`),
+  listed and named via `branchPlatformOptions` (`i18n/platformPriceName.ts`); a
+  saved slug the branch no longer prices keeps its own option (`extra`).
+- **One platform list, one picker (2026-10-09).** Every platform choice draws
+  from `branchPlatformOptions(placeSlugs, prices, lang, extra?)`
+  (`i18n/platformPriceName.ts`) → `{slug,label,known}[]`: pc/ps4/ps5 in
+  canonical order, then the branch's custom slugs (its places + its price rows)
+  sorted by display name with `compareText` (Cyrillic before Latin in ru,
+  Armenian order in am); `extra` keeps a saved slug the branch no longer has;
+  nothing is invented. `customPlatformOptions` is its custom part over exactly
+  the given slugs. Callers that do not hold places + prices use
+  `hooks/useBranchPlatforms.ts` (`useBranchPlatforms` = both reads;
+  `useBranchPlatformNames` = the price rows only, for screens that just LABEL
+  platforms). BranchPlaces / BranchPricesPage already read both and call the
+  pure helper; do not stack the hook on them. Labels: a custom platform is
+  shown by `platformDisplayNameOf` (branch name in the panel language) where
+  prices are at hand — BranchPlaces sections + tiles, SubplatformPricesForm
+  headings, BranchGames, the live floor (`PlaceCell`), the sessions board
+  sections + tiles and its Relocate / Add-time dialogs (the board makes ONE
+  cached read and passes `platformName` down) — else `platformLabel`, never
+  `toUpperCase()` (GamesList). BY DESIGN still known-only: the HourlyRatesForm
+  matrix, `PcForm.filterPlacesForKind`, StartSessionDialog's default mode,
+  PcsList MAC/Wake, PS5 control, joysticks.
+- **The picker is adaptive (`PlatformPicker` + `hooks/useFitsInline.ts`).**
+  One ordered list (known + `customOptions` + Other). It is ONE nowrap row of
+  buttons (`aria-pressed` on every one) when that row fits the width it is
+  given, and a native `select.input` with the same options + `Other…`
+  (`platform.otherOption`) when it does not — 960×600 Electron, the owner web
+  build at 360 px, Armenian labels, 8 custom platforms. Never `flex-wrap` it
+  back: a wrapped row of 8 is the bug this replaced. Fit is MEASURED: a hidden
+  copy of the full row (aria-hidden, inert, `visibility:hidden`, zero-size
+  clipped box, rendered AFTER the real control so DOM-order queries in tests
+  find the real one) vs the container's `clientWidth`, on a ResizeObserver
+  over both boxes + option/language changes; state flips only on change; no
+  RO / zero width → buttons (jsdom). The container is `width:100%;
+  min-width:0; contain:inline-size` so its width never depends on its content
+  — that is what makes the measure loop-free. Other is DERIVED
+  (`(userChoseOther && !resolvedByParent) || value not listed`), not a
+  mount-time snapshot (that
+  snapshot left a value on Other when its custom button loaded late). A saved
+  slug nobody lists shows as Other+slug in buttons and as its own option in
+  the select, never blank. Mode switches never touch the value or remount the
+  parent. PackageForm keeps its own `select.input` (a tariff has All, never
+  Other) but sources it from `branchPlatformOptions`. Tests:
+  `PlatformPicker.test.tsx`, `useFitsInline.test.tsx`,
+  `useBranchPlatforms.test.tsx`, `platformPriceName.test.ts`.
+- **PlaceForm on an unpriced custom slug** (legacy row, price removed) opens
+  with `names.en = platformLabel(slug)` and Save sends `platform` as held (the
+  slug of the typed English name once anything is typed): it never re-slugs
+  from the name ("a--b" does not round-trip) and Save is not blocked. Its dead
+  `suggestions` pass to the picker is gone (the slug box is hidden there).
+- **A name typed under Other that IS an existing platform selects it**
+  (2026-10-11, `utils/platformName.ts` `resolveTypedPlatform`): first the slug
+  of the English name if the branch has it (known three, place slugs, priced
+  slugs — the picker's own list), else the ONE priced platform whose name in
+  any locale equals the text of the PANEL-LANGUAGE box (never a
+  machine-translated box), exact after trim + lower-case — no partials, two
+  matches = ambiguous = new slug. The picker shows that platform, not Other,
+  only under `hideOtherInput` (`resolvedByParent`: PlaceForm names it);
+  GameForm's own slug box keeps Other while typed ("pc-club" passes "pc").
+  `namedByOperator` (set by typing, cleared by any pick) gates a re-resolve
+  when the branch's platforms land late — an untouched/edit form is never
+  re-targeted. `useAutoTranslate` bumps its sequence on unmount, so a
+  translation in flight when the name box hides cannot write the name back
+  and re-target the place. Tests: `PlaceForm.typedPlatform.test.tsx`,
+  `platformName.test.ts`, `PlatformPicker.test.tsx`.
+- **A place write invalidates `/branch-platform-prices` and
+  `/branch-subplatforms`** (`httpCache.ts` `MUTATION_FANOUT['/places']`): the
+  place lifecycle creates, renames and drops those rows server-side, and the
+  pickers read them through the 60 s cache.
+- **422 `package_platform_mismatch`** on start (and extend, if a UI ever calls
+  `sessionRepository.extend`; none does today) → `api/packagePlatformMismatch.ts`
+  → `session.errors.packagePlatformMismatch` as `LocalizedText`.
+- Tests: `GameForm.test.tsx`, `PlaceForm.platformChange.test.tsx`,
+  `PlatformPicker.test.tsx`, `utils/gameName.test.ts`,
+  `StartSessionDialog.test.tsx` (PS seat / billiards seat / mismatch),
+  `PcsList.psBadge.test.tsx`, `PackageForm.platform.test.tsx`,
+  `api/gameExists.test.ts`, `utils/platform.test.ts`.
+
+## 9.5.12 Drag-to-reorder: a drop takes the target's slot (2026-10-11)
+
+- **One rule, one helper: `utils/reorder.ts`.** `moveOnto(list, from, target)`
+  puts `from` in `target`'s slot: dragged DOWN it lands just after the
+  target, dragged UP just before it (null or unknown target → end). The old
+  "always in front of the target" rule could never reach the last slot and
+  treated one step down as no move at all.
+- **The marker follows.** `dropSideOf` → `is-drop-before` / `is-drop-after`:
+  the bar is on the leading or trailing edge of a tile, and on the top or
+  bottom of a section. The hub tiles keep their ring, which has no side.
+- **Consumers:** `useLocalReorder.move` (place tiles, board sections on
+  Sessions / Places / Live, hub tiles; per-user localStorage) and the
+  SessionsBoard seat order (`POST /pcs/reorder`, the WHOLE order per user;
+  the server keeps ids of this branch only, de-duplicated). Never hand-roll a
+  splice at a call site again.
+- Tests: `utils/reorder.test.ts` (every from/target pair), the
+  `useLocalReorder.test.tsx` slot tests, `SessionsBoard.reorder.test.tsx`
+  (real drag events → shown order + payload, failed save, reload),
+  `SessionCard.test.tsx`.
+
+## 9.5.13 Six small changes (2026-10-11)
+
+- **New PC place → "Register computer".** `PlaceForm.onSaved(created)` hands up
+  the place the create returned (null on edit, never called on failure);
+  BranchPlaces opens `components/pcs/RegisterPlaceComputer` only for
+  `platform === "pc"`, from the save handler (a reload or realtime refetch never
+  reopens it). The server provisions the place's `kind = pc` device WITH the
+  place (`EnsureBillingDeviceService`), so this is `PcForm` in `registering`
+  mode on THAT device: title "Register computer", dismiss "Not now", save =
+  update (a create would be the 422 second device), then the pairing token via
+  `rotateToken` only when the device never paired (`last_seen_at` null).
+- **CompanyBranches** has no inner "← Back to company" link (the shell's
+  BackButton is the way back); `companyBranches.back` is gone.
+- **Scan code (`ConfirmByCode`)**: the box keeps digits only, the first six
+  (`digits:6` server-side), as a string (leading zeros survive); no `maxLength`
+  (it would cut a paste before the spaces are dropped); Confirm and Enter send
+  only a full code.
+- **All-branch tournaments** show `Branch: <address>` per card from the row's
+  eager-loaded `branch` (`IndexService` already loads it — no API change);
+  "Branch not specified" when absent; one clipped line; not on the
+  branch-scoped page.
+- **Armenia / +374 fixed** in CompanyForm and BranchForm
+  (`data/countries.ts` `HOME_COUNTRY_CODE`, `isHomeCountryRecord`,
+  `nationalPart`; `components/ui/FixedDialPhoneInput`): on create, and on edit
+  of a record already Armenian; a record saved with another country or another
+  +code keeps its pickers and number untouched. The geocoder cannot move a
+  locked country. Saved as before ("Armenia", `formatInternational()`).
+  MemberForm (no country picker) is unchanged.
+- **Company create: website + description required** (marked " *",
+  `aria-required`, errors next to each field, nothing sent, other fields kept).
+  `normalizeWebsite` adds https:// to a bare host and refuses non-http(s), no
+  dotted host, credentials. Backend `Companies\StoreRequest`: `required` +
+  `url:http,https` (edit/UpdateRequest unchanged).
+
+## 9.5.14 Company form, settings, session-ending warning (2026-10-12)
+
+- **Phone with a fixed code** is `components/ui/FixedDialPhoneInput`: ONE
+  `.phone-group` frame like `.input` (same height), a compact grey
+  `.phone-group__dial` segment (text, not a field: not focusable, not
+  editable, `cursor: not-allowed`) and the national number box. The locked
+  country is a DISABLED `select.input` with the one option. Company and
+  branch forms only.
+- **Required mark**: `components/ui/RequiredMark` (red `.req-mark`), opt-in via
+  `Input requiredMark` / `ImageUpload required`. CompanyForm marks what
+  `Companies\StoreRequest` requires (owner name/email, name, email, phone,
+  country, city, TIN, logo). Website and description are OPTIONAL again (a
+  typed website must still be an http(s) address; backend
+  `nullable|url:http,https`).
+- **Settings**: the "Newsletter" card is gone with `api/subscribe.ts`. The
+  backend `/subscribe` endpoints stay (the mobile app uses them).
+- **"Session ends in 15 minutes"**: the backend sends staff a
+  `session.ending_soon` row (SessionEndingSoon). `Notifications` renders it
+  (seat, minutes, end time, venue; click → `/branches/{id}/sessions`). The DB
+  feed (`NotificationsContext.dbFeedEnabled`, `shouldShowBookingsFeed`) is now
+  manager AND owner; the owner's only rows are these, so `dbFeedCopy` names
+  their feed "Sessions". Admins: unchanged (billing only).
+
+- **PSN message to the PlayStation player (2026-10-12)**: `StartSessionDialog`
+  shows an optional "player's PSN name" on a PlayStation seat
+  (`isPlayStationSeat`), validated like the server (`PSN_ONLINE_ID`), sent as
+  `psn_online_id` only when filled; recent names are a per-machine datalist
+  (`src/ps5/recentPsnNames.ts`, localStorage, try/catch). The owner connects
+  the sender in Settings (`PsnSenderCard`, owner only, `user.dashboard.
+  company_id`): open playstation.com and Sony's ssocookie page in the system
+  browser, paste the page (password field; `npssoOf` extracts the 64-char
+  code), `PUT /companies/{id}/psn-sender`. No token ever reaches the panel.
+
 ## 10. How work must be done here (MANDATORY — run it in this order)
 
 "100% guaranteed correct" is not achievable as a claim. It is achievable as a
@@ -2345,3 +2988,29 @@ console.
 
 _Last verified: 2026-07-18. When the panel's stack or conventions change,
 update the relevant section here in the same change._
+
+## Brand mark (2026-10-17)
+
+`public/logo.png` (328x200, transparent) is the new 1.64:1 "CP" mark; `build/icon.ico`
+(16–256) and `build/icon.png` (1024) are the mark on a rounded navy tile. Generated by
+`~/cyber-place-local/reports/branding-2026-10-17/brand-kit/make_brand_kit.py`.
+Because the mark is wide, the sidebar sizes it by height (24px) and `.login-logo`
+is 108px / `--ring-size * 0.174` wide (the area the old 90px square mark had).
+The owner web (`telegram-web-app`) serves this `public/` at its pinned
+`panel.ref`, so it shows the new mark only after `panel.ref` is bumped.
+
+## No "Sessions" label (2026-10-18)
+
+The owner retired "session" as a name: the running-seats screen was already
+"Active Places" / «Активные места» / «Ակտիվ տեղեր» (2026-09-28), and now every
+LABEL that said Sessions does too — sales-history totals (incl. free), revenue
+source and "closed" count, the notifications feed, the branch-hub tile, the home
+menu subtitles («Сеансы» is gone from Russian as well), the owner-delete and
+blocker lines, the packages and price-matrix hints, the history empty/error
+states ("sales history"). Keys are unchanged (`history.sumSessions` etc. are
+identifiers). **Kept on purpose, the owner's call:** "Start session" and the
+sentences about one running seat («к этой сессии», «В сессии», "session ends in
+15 min"). `translations.test.ts` pins both halves: no value in any language
+contains «Сессии/Сеанс/сеанс/Sessions/Սեսիաներ», the 14 renamed keys contain no
+form of the old word at all (a lowercase plural is indistinguishable from the
+singular genitive kept elsewhere, hence by key), and "Start session" stays.

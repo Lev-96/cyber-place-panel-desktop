@@ -3,6 +3,7 @@ import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import Spinner from "@/components/ui/Spinner";
 import { ListSkeleton, SkeletonMessages } from "@/components/ui/Skeleton";
+import { ErrorState, StaleNotice, StateView } from "@/components/ui/state";
 import { useAuth } from "@/auth/AuthContext";
 import { useLang } from "@/i18n/LanguageContext";
 import { formatDateTime } from "@/i18n/dates";
@@ -118,7 +119,12 @@ const SupportChat = () => {
   const [starting, setStarting] = useState(false);
   /** True while the branch cards are up instead of a thread. */
   const [picking, setPicking] = useState(false);
-  const [listError, setListError] = useState<string | null>(null);
+  /** The list read failed. What was already listed stays on screen. */
+  const [listError, setListError] = useState<unknown>(null);
+  /** The open thread's read failed — never shown as an empty thread. */
+  const [threadError, setThreadError] = useState<unknown>(null);
+  /** Bumped by Retry on a failed thread, to read it again. */
+  const [threadAttempt, setThreadAttempt] = useState(0);
   /** The clock the delivery lines are read against; ticked only while one waits. */
   const [now, setNow] = useState(() => Date.now());
 
@@ -151,8 +157,9 @@ const SupportChat = () => {
       // pane: the person opening Support almost always wants the last one.
       setActiveId((current) => current ?? list[0]?.id ?? null);
     } catch (e) {
-      setListError(e instanceof Error ? e.message : "Failed to load");
-      setConversations([]);
+      // Not `[]`: an unread list is not "no conversations", and an empty list
+      // would also make the one-branch shortcut below open a new thread.
+      setListError(e);
     }
   }, []);
 
@@ -160,7 +167,14 @@ const SupportChat = () => {
 
   // The branches this caller may open a thread for — the same scoped list the
   // rest of the panel reads, so nothing here decides who owns what.
-  useEffect(() => { void branchRepository.list().then(setBranches).catch(() => setBranches([])); }, []);
+  // A failed read is kept as a failure (with Retry in the thread pane), not
+  // turned into "no branches".
+  const [branchesError, setBranchesError] = useState<unknown>(null);
+  const loadBranches = useCallback(() => {
+    setBranchesError(null);
+    branchRepository.list().then(setBranches).catch((e: unknown) => setBranchesError(e));
+  }, []);
+  useEffect(loadBranches, [loadBranches]);
 
   /**
    * Tell the badge where the reader is.
@@ -179,6 +193,7 @@ const SupportChat = () => {
     if (activeId == null) { setMessages([]); return; }
     let alive = true;
     setThreadLoading(true);
+    setThreadError(null);
     void supportRepository.thread(activeId)
       .then((thread) => {
         if (!alive) return;
@@ -187,10 +202,10 @@ const SupportChat = () => {
         void supportRepository.markRead(activeId).then(() => refreshUnread());
         setConversations((prev) => prev?.map((c) => (c.id === activeId ? { ...c, unread: 0 } : c)) ?? prev);
       })
-      .catch(() => { if (alive) setMessages([]); })
+      .catch((e: unknown) => { if (alive) { setMessages([]); setThreadError(e); } })
       .finally(() => { if (alive) setThreadLoading(false); });
     return () => { alive = false; };
-  }, [activeId]);
+  }, [activeId, threadAttempt]);
 
   useEffect(() => {
     bottom.current?.scrollIntoView({ behavior: "smooth", block: "end" });
@@ -313,7 +328,7 @@ const SupportChat = () => {
     }
   };
 
-  const loading = conversations === null;
+  const loading = conversations === null && listError === null;
   const onlyBranch = branches?.length === 1 ? branches[0] : null;
   const autoStarted = useRef(false);
 
@@ -355,16 +370,18 @@ const SupportChat = () => {
 
       <p className="muted" style={{ margin: 0, fontSize: 13 }}>{t("support.intro")}</p>
 
-      {loading ? <ListSkeleton /> : (
+      {loading ? <ListSkeleton /> : conversations === null ? (
+        <ErrorState error={listError} onRetry={() => void loadConversations()} titleKey="support.state.listErrorTitle" />
+      ) : (
         <div className="support-layout">
           {/* ── Conversations ─────────────────────────────────────────── */}
           <aside className="card support-list">
             <div className="label" style={{ fontSize: 12, marginBottom: 8 }}>{t("support.conversations")}</div>
 
-            {listError && <div className="error" style={{ marginBottom: 8 }}>{listError}</div>}
+            {listError !== null && <StaleNotice error={listError} onRetry={() => void loadConversations()} />}
 
             {conversations.length === 0 && (
-              <div className="muted" style={{ fontSize: 13 }}>{t("support.noConversations")}</div>
+              <StateView variant="empty" size="compact" titleKey="support.noConversations" descriptionKey={null} />
             )}
 
             {conversations.map((c) => (
@@ -404,7 +421,9 @@ const SupportChat = () => {
           {/* ── The thread ────────────────────────────────────────────── */}
           <section className="card support-thread">
             {picking || !active ? (
-              branches && branches.length > 1 ? (
+              branchesError !== null && branches === null ? (
+                <ErrorState size="compact" error={branchesError} onRetry={loadBranches} titleKey="branchesList.state.errorTitle" descriptionKey={null} />
+              ) : branches && branches.length > 1 ? (
                 <div className="col" style={{ gap: 12 }}>
                   <BranchPicker
                     branches={branches}
@@ -456,8 +475,17 @@ const SupportChat = () => {
 
                 <div className="support-messages">
                   {threadLoading && <SkeletonMessages bubbles={4} />}
-                  {!threadLoading && messages.length === 0 && pending.length === 0 && (
-                    <div className="muted" style={{ fontSize: 13 }}>{t("support.emptyThread")}</div>
+                  {!threadLoading && threadError !== null && (
+                    <ErrorState
+                      size="compact"
+                      error={threadError}
+                      onRetry={() => setThreadAttempt((n) => n + 1)}
+                      titleKey="support.state.threadErrorTitle"
+                      descriptionKey={null}
+                    />
+                  )}
+                  {!threadLoading && threadError === null && messages.length === 0 && pending.length === 0 && (
+                    <StateView variant="empty" size="compact" titleKey="support.emptyThread" descriptionKey={null} />
                   )}
 
                   {messages.map((m) => (

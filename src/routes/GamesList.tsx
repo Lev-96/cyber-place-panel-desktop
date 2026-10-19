@@ -2,11 +2,13 @@ import GameForm from "@/components/games/GameForm";
 import Button from "@/components/ui/Button";
 import ScreenWithBg from "@/components/ui/ScreenWithBg";
 import { ListSkeleton } from "@/components/ui/Skeleton";
+import { StateSwitch, deriveViewState } from "@/components/ui/state";
 import { IGameApi } from "@/api/games";
 import { useAsync } from "@/hooks/useAsync";
 import { useConfirm } from "@/components/ui/ConfirmProvider";
 import { useLang } from "@/i18n/LanguageContext";
 import { gameRepository } from "@/repositories/GameRepository";
+import { platformLabel } from "@/utils/platform";
 import { useState } from "react";
 
 const GamesList = () => {
@@ -15,6 +17,9 @@ const GamesList = () => {
   const { data, loading, error, reload } = useAsync(() => gameRepository.list(), []);
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState<IGameApi | null>(null);
+  // The game the operator just saved — or the existing one they chose instead
+  // of a duplicate — marked and scrolled to, so it is found, not hunted for.
+  const [focusId, setFocusId] = useState<number | null>(null);
 
   const remove = async (g: IGameApi) => {
     if (!(await confirm(`${t("action.delete")} ${g.name}?`, { destructive: true }))) return;
@@ -28,15 +33,23 @@ const GamesList = () => {
         <div />
         <Button onClick={() => setCreating(true)}>{t("games.new")}</Button>
       </div>
-      {loading && <ListSkeleton />}
-      {error && <div className="error">{error.message}</div>}
-      {!loading && !error && (
+      <StateSwitch
+        view={deriveViewState({ loading, error, data })}
+        skeleton={<ListSkeleton />}
+        onRetry={() => void reload()}
+        error={{ titleKey: "games.state.errorTitle" }}
+        empty={{ titleKey: "games.state.emptyTitle", descriptionKey: "games.state.emptyDescription" }}
+      >
         <div className="list">
           {(data ?? []).map((g) => (
-            <div key={g.id} className="list-item">
+            <div
+              key={g.id}
+              className={g.id === focusId ? "list-item list-item--focus" : "list-item"}
+              ref={g.id === focusId ? (el) => el?.scrollIntoView?.({ block: "nearest" }) : undefined}
+            >
               <div>
                 <div className="name">{g.name}</div>
-                <div className="meta">{g.platform.toUpperCase()}</div>
+                <div className="meta">{platformLabel(g.platform)}</div>
               </div>
               <div className="row" style={{ gap: 6 }}>
                 <Button variant="secondary" onClick={() => setEditing(g)} style={btn}>{t("action.edit")}</Button>
@@ -44,10 +57,15 @@ const GamesList = () => {
               </div>
             </div>
           ))}
-          {!data?.length && <div className="muted">{t("common.empty.games")}</div>}
         </div>
+      </StateSwitch>
+      {creating && (
+        <GameForm
+          globalCatalogue={data}
+          onClose={() => setCreating(false)}
+          onSaved={(game) => { setCreating(false); setFocusId(game?.id ?? null); void reload(); }}
+        />
       )}
-      {creating && <GameForm onClose={() => setCreating(false)} onSaved={() => { setCreating(false); void reload(); }} />}
       {editing && <GameForm initial={editing} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); void reload(); }} />}
     </ScreenWithBg>
   );

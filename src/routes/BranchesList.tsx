@@ -7,6 +7,7 @@ import Button from "@/components/ui/Button";
 import Pagination from "@/components/ui/Pagination";
 import ScreenWithBg from "@/components/ui/ScreenWithBg";
 import { ListSkeleton } from "@/components/ui/Skeleton";
+import { StateSwitch, deriveViewState } from "@/components/ui/state";
 import { useAsync } from "@/hooks/useAsync";
 import { useLang } from "@/i18n/LanguageContext";
 import { useAccessVersion } from "@/realtime/accessVersion";
@@ -32,6 +33,7 @@ const BranchesList = () => {
   const access = useAccessVersion();
   const { data, loading, error, reload } = useAsync(() => branchRepository.listPaged(page), [page, access]);
   const branches = data?.data ?? [];
+  const view = deriveViewState({ loading, error, data: data ? branches : null });
   const lastPage = data?.meta?.last_page ?? 1;
 
   // The create request needs a company; without one the form could only fail,
@@ -47,10 +49,17 @@ const BranchesList = () => {
           <Button onClick={() => setCreating(true)}>{t("branchesList.newBranch")}</Button>
         </div>
       )}
-      {error && <div className="error">{error.message}</div>}
-      {loading ? (
-        <ListSkeleton />
-      ) : !error ? (
+      <StateSwitch
+        view={view}
+        skeleton={<ListSkeleton />}
+        onRetry={() => void reload()}
+        error={{ titleKey: "branchesList.state.errorTitle" }}
+        empty={{
+          titleKey: "branchesList.state.emptyTitle",
+          descriptionKey: "branchesList.state.emptyDescription",
+          actions: canCreate ? <Button onClick={() => setCreating(true)}>{t("branchesList.newBranch")}</Button> : undefined,
+        }}
+      >
         <div className="list">
           {branches.map((b) => (
             <BranchListRow
@@ -66,10 +75,9 @@ const BranchesList = () => {
               blockedLabel={b.is_blocked ? (b.blocked_at ? t("blocking.state.branch") : t("blocking.state.byCompany")) : null}
             />
           ))}
-          {!branches.length && <div className="muted">{t("common.empty.branches")}</div>}
         </div>
-      ) : null}
-      {!error && <Pagination page={page} lastPage={lastPage} onChange={setPage} disabled={loading} />}
+      </StateSwitch>
+      {view.kind !== "error" && <Pagination page={page} lastPage={lastPage} onChange={setPage} disabled={loading} />}
       {/* Same handling as the company's own branch list: close, then re-read
           the page on screen. The POST already dropped every cached branch
           listing, and the repository's "created" toast confirms the save even

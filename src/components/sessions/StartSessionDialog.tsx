@@ -1,9 +1,11 @@
 import { ListSkeleton } from "@/components/ui/Skeleton";
+import { ErrorState, StateView } from "@/components/ui/state";
 import Radio from "@/components/ui/Radio";
 import Button from "@/components/ui/Button";
 import Modal from "@/components/ui/Modal";
 import Checkbox from "@/components/ui/Checkbox";
 import PriceInput from "@/components/ui/PriceInput";
+import Input from "@/components/ui/Input";
 import Spinner from "@/components/ui/Spinner";
 import { useAuth } from "@/auth/AuthContext";
 import { can } from "@/auth/permissions";
@@ -13,8 +15,13 @@ import { branchRepository } from "@/repositories/BranchRepository";
 import { sessionRepository } from "@/repositories/SessionRepository";
 import { IPcApi, ITimePackage } from "@/types/sessions";
 import { isDeviceStartable, isPs } from "@/types/pc";
+import { isPlayStationSeat, packageFitsSeat } from "@/utils/platform";
+import { packageMismatchOf } from "@/api/packagePlatformMismatch";
+import { PSN_FEATURE, PSN_ONLINE_ID } from "@/api/psn";
+import { recentPsnNames, rememberPsnName } from "@/ps5/recentPsnNames";
+import { renderText, textKey, textLiteral, type LocalizedText } from "@/i18n/localizedText";
 import { IBranchApi } from "@/types/api";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 interface Props {
   branchId: number;
@@ -53,11 +60,25 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
   const mayWaive = can(user?.role, "session.free");
   const [packages, setPackages] = useState<ITimePackage[] | null>(null);
   const [pkgId, setPkgId] = useState<number | null>(null);
-  // PlayStation rows are billing-only (no kiosk agent), so the open/count-up
-  // mode is the only sensible default. PCs default to fixed packages.
+  // Billing-only rows (no kiosk agent: PlayStations AND custom rooms such as
+  // billiards or poker) default to the open/count-up mode; PCs to a fixed
+  // package. Kept on the device kind on purpose — the operators' flow.
   const [mode, setMode] = useState<Mode>(isPs(pc.kind) ? "open" : "fixed");
+  // The "(PS)" marker is about the console, so it asks the PLACE's platform:
+  // a billiards table is billing-only too, but it is no PlayStation.
+  const playStation = isPlayStationSeat(pc);
+  // The player's PSN name, optional: given, the "ends in 15 minutes" warning
+  // reaches their screen as a PSN message (the server keeps it on console
+  // seats only). Empty is the ordinary start.
+  const [psn, setPsn] = useState("");
+  // The PSN message is deferred (PSN_FEATURE): no field, nothing sent.
+  const askPsn = playStation && PSN_FEATURE.playerMessages;
+  const psnName = askPsn ? psn.trim() : "";
+  const psnValid = psnName === "" || PSN_ONLINE_ID.test(psnName);
+  const psnField = psnName !== "" ? { psn_online_id: psnName } : {};
+  const psnSuggestions = useMemo(() => (askPsn ? recentPsnNames() : []), [askPsn]);
   const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
+  const [err, setErr] = useState<LocalizedText | null>(null);
   const [branch, setBranch] = useState<IBranchApi | null>(null);
   // Optional per-session price override. Off by default → the session bills
   // at the assigned matrix/PC rate (backend resolution chain). When on, the
@@ -71,7 +92,23 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
   // and the two behave differently the moment a drink is added to it.
   const [isFree, setIsFree] = useState(false);
 
-  useEffect(() => { void sessionRepository.listPackages(branchId).then((p) => { setPackages(p); setPkgId(p[0]?.id ?? null); }); }, [branchId]);
+  // A failed read is kept as such: the dialog used to wait on it for ever (no
+  // catch), and "no packages" would be a lie. Open mode still works without it.
+  const [pkgError, setPkgError] = useState<unknown>(null);
+  const loadPackages = useCallback(() => {
+    setPkgError(null);
+    sessionRepository.listPackages(branchId)
+      .then((all) => {
+        // Only the tariffs the server would accept for this seat: "all
+        // platforms" or this seat's own (it refuses the rest with
+        // package_platform_mismatch). A device with no place is not narrowed.
+        const p = all.filter((pkg) => packageFitsSeat(pkg, pc.place?.platform));
+        setPackages(p);
+        setPkgId(p[0]?.id ?? null);
+      })
+      .catch((e: unknown) => setPkgError(e));
+  }, [branchId, pc.place?.platform]);
+  useEffect(loadPackages, [loadPackages]);
   useEffect(() => {
     let cancelled = false;
     void branchRepository.byId(branchId).then((b) => {
@@ -168,22 +205,25 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
           mode: "open",
           user_display_name: pc.label,
           is_free: true,
+          ...psnField,
         });
+        if (psnName !== "") rememberPsnName(psnName);
         onStarted();
         return;
       }
       if (mode === "fixed") {
-        if (!pkgId) { setErr(t("session.choosePackage")); setBusy(false); return; }
+        if (!pkgId) { setErr(textKey("session.choosePackage")); setBusy(false); return; }
         await sessionRepository.start({
           branch_id: branchId,
           pc_id: pc.id,
           mode: "fixed",
           time_package_id: pkgId,
           user_display_name: pc.label,
+          ...psnField,
         });
       } else {
         if (effectiveRate === null) {
-          setErr(t("session.noAssignedRate"));
+          setErr(textKey("session.noAssignedRate"));
           setBusy(false);
           return;
         }
@@ -197,11 +237,17 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
           mode: "open",
           user_display_name: pc.label,
           ...(overrideApplied ? { hourly_rate: customRateNum } : {}),
+          ...psnField,
         });
       }
+      if (psnName !== "") rememberPsnName(psnName);
       onStarted();
     } catch (e) {
-      setErr(e instanceof Error ? e.message : "Failed to start");
+      // A tariff for another platform is refused with a code: worded here, in
+      // the operator's language. Anything else keeps the server's sentence.
+      setErr(packageMismatchOf(e)
+        ? textKey("session.errors.packagePlatformMismatch")
+        : e instanceof Error ? textLiteral(e.message) : textKey("action.failed"));
     } finally { setBusy(false); }
   };
 
@@ -221,13 +267,13 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
   // exact case free is for: a demo stand, a tournament machine, a seat given
   // back after an outage. The server lifts the same refusal for the same reason.
   const startDisabled =
-    busy || deviceOffline || (!isFree && mode === "open" && (editPrice ? !overrideApplied : assignedRate === null));
+    busy || deviceOffline || !psnValid || (!isFree && mode === "open" && (editPrice ? !overrideApplied : assignedRate === null));
 
   return (
     <Modal open onClose={onClose}>
       <div className="card" style={{ width: 460, maxWidth: "90vw", display: "flex", flexDirection: "column", gap: 14 }}>
-        <h2 style={{ margin: 0 }}>{t("session.start")} · №{pc.place?.number ?? pc.label}{isPs(pc.kind) ? " (PS)" : ""}</h2>
-        {!packages ? <ListSkeleton rows={3} /> : (
+        <h2 style={{ margin: 0 }}>{t("session.start")} · №{pc.place?.number ?? pc.label}{playStation ? " (PS)" : ""}</h2>
+        {!packages && !pkgError ? <ListSkeleton rows={3} /> : (
           <>
             {/* Free sits ABOVE the tariff, and turning it on takes the tariff
                 away entirely.
@@ -277,8 +323,10 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
             {!isFree && (mode === "fixed" ? (
               <div className="col" style={{ gap: 6 }}>
                 <span className="label">{t("session.tariffField")}</span>
-                {packages.length === 0 ? (
-                  <div className="muted">{t("session.noPackages")}</div>
+                {pkgError || !packages ? (
+                  <ErrorState size="compact" error={pkgError} onRetry={loadPackages} titleKey="session.state.packagesErrorTitle" descriptionKey={null} />
+                ) : packages.length === 0 ? (
+                  <StateView variant="empty" size="compact" titleKey="session.noPackages" descriptionKey={null} />
                 ) : (
                   <div className="col" style={{ gap: 6 }}>
                     {packages.map((p) => (
@@ -331,8 +379,30 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
               </div>
             ))}
 
+            {askPsn && (
+              <div className="col" style={{ gap: 4 }}>
+                <Input
+                  label={t("session.psnName")}
+                  value={psn}
+                  onChange={(e) => setPsn(e.target.value)}
+                  placeholder={t("session.psnNamePlaceholder")}
+                  maxLength={16}
+                  list="psn-recent-names"
+                  autoComplete="off"
+                  spellCheck={false}
+                  data-testid="psn-name"
+                />
+                <datalist id="psn-recent-names">
+                  {psnSuggestions.map((n) => <option key={n} value={n} />)}
+                </datalist>
+                <span className={psnValid ? "muted" : "error"} style={{ fontSize: 11 }}>
+                  {t(psnValid ? "session.psnNameHint" : "session.psnNameInvalid")}
+                </span>
+              </div>
+            )}
+
             {deviceOffline && <div className="error">{t("session.deviceOfflineHint")}</div>}
-            {err && <div className="error">{err}</div>}
+            {err && <div className="error">{renderText(err, t)}</div>}
             <div className="row-between">
               <Button variant="secondary" onClick={onClose} disabled={busy}>{t("action.cancel")}</Button>
               <Button onClick={submit} disabled={startDisabled}>{busy ? "…" : t("action.start")}</Button>

@@ -67,6 +67,10 @@ beforeEach(() => {
     if (c.path === "/admin/ip-address" && c.method === "GET") return IPS;
     if (c.path === "/admin/ip-address" && c.method === "POST") return createIp();
     if (c.path === "/admin/security/countries" && c.method === "GET") return countries;
+    // The locked sign-ins under the IP table (their own suite: LoginLockouts).
+    // A plain thrown Error has no status, which is "offline" now, not
+    // "endpoint missing" — so answer the read like a server with none.
+    if (c.path === "/admin/security/login-lockouts" && c.method === "GET") return { data: [] };
     if (c.method === "POST" || c.method === "DELETE") return { message: "ok" };
     throw new Error(`unexpected ${c.method} ${c.path}`);
   };

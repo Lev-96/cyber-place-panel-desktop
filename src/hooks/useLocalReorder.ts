@@ -1,4 +1,5 @@
 import { useAuth } from "@/auth/AuthContext";
+import { moveOnto } from "@/utils/reorder";
 import { useEffect, useState } from "react";
 
 /**
@@ -23,8 +24,8 @@ const read = (storageKey: string): string[] => {
 export interface LocalReorder {
   /** Live keys in the user's saved order (new keys appended, removed dropped). */
   ordered: string[];
-  /** Move `fromKey` to sit just before `beforeKey` (or to the end when null). */
-  move: (fromKey: string, beforeKey: string | null) => void;
+  /** Move `fromKey` into `targetKey`'s slot, or to the end when null (`moveOnto`). */
+  move: (fromKey: string, targetKey: string | null) => void;
 }
 
 /**
@@ -79,15 +80,9 @@ export function useLocalReorder(storageKey: string, keys: string[]): LocalReorde
   for (const k of saved) if (keys.includes(k) && !seen.has(k)) { ordered.push(k); seen.add(k); }
   for (const k of keys) if (!seen.has(k)) { ordered.push(k); seen.add(k); }
 
-  const move = (fromKey: string, beforeKey: string | null) => {
-    if (fromKey === beforeKey) return;
-    const next = ordered.filter((k) => k !== fromKey);
-    if (beforeKey == null || !next.includes(beforeKey)) {
-      next.push(fromKey);
-    } else {
-      next.splice(next.indexOf(beforeKey), 0, fromKey);
-    }
-    setState({ key: scopedKey, order: next });
+  const move = (fromKey: string, targetKey: string | null) => {
+    if (fromKey === targetKey) return;
+    setState({ key: scopedKey, order: moveOnto(ordered, fromKey, targetKey) });
   };
 
   return { ordered, move };

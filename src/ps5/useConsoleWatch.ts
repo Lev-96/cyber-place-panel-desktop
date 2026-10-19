@@ -57,7 +57,17 @@ export const WATCH_INTERVAL_FAST_MS = 1_500;
  * enough that a console which is not going to obey does not get asked forty
  * times a minute for the rest of the shift.
  */
-export const WATCH_FAST_WINDOW_MS = 20_000;
+export const WATCH_FAST_WINDOW_MS = 45_000;
+
+/**
+ * How long a console last heard at rest is still shown at rest while it is
+ * silent (2026-10-19). A PS5 asleep on Wi-Fi answers about one probe in three
+ * (measured at a club, gaps up to half a minute), and calling each gap
+ * "unreachable" made the tile flash between sleep, unavailable and back. Past
+ * this it really is unreachable. Only rest is held: an awake console answers
+ * every probe, and its silence means something.
+ */
+export const REST_HOLD_MS = 60_000;
 
 /**
  * Silent ticks before the watcher stops trusting the address it has and
@@ -65,6 +75,20 @@ export const WATCH_FAST_WINDOW_MS = 20_000;
  * slower answer rather than a network-wide broadcast.
  */
 const MISSES_BEFORE_SWEEP = 2;
+
+/**
+ * The shortest gap between two sweeps, doubled after each sweep that still did
+ * not find a missing console, up to {@link SWEEP_MAX_GAP_MS} (2026-10-18).
+ *
+ * A console that is really off used to cost a network-wide sweep on every tick
+ * — every three seconds all evening. A console that moved is found by the
+ * first sweep; one that is off gains nothing from the tenth, so they space out:
+ * 5 s, 10 s, 20 s, 40 s, then once a minute. A press (the fast window) brings
+ * the gap back to the shortest, so a console the operator is waiting for is
+ * looked for promptly.
+ */
+export const SWEEP_MIN_GAP_MS = 5_000;
+export const SWEEP_MAX_GAP_MS = 60_000;
 
 export interface WatchedConsole {
   hostId: string;
@@ -76,6 +100,8 @@ export interface ConsoleStatus {
   state: Ps5State;
   address: string | null;
   name: string | null;
+  /** When it last really answered (ms); a held "rest" keeps the old moment. */
+  heardAt?: number;
 }
 
 interface Options {
@@ -111,6 +137,8 @@ export const useConsoleWatch = (bound: WatchedConsole[], options: Options = {}) 
   const misses = useRef<Record<string, number>>({});
   /** Addresses learned since mount, which are fresher than the props. */
   const learned = useRef<Record<string, string>>({});
+  /** When each console last answered "rest", for {@link REST_HOLD_MS}. */
+  const restHeardAt = useRef<Record<string, number>>({});
   /**
    * Until when to ask quickly, because something was just asked to change.
    *
@@ -120,6 +148,9 @@ export const useConsoleWatch = (bound: WatchedConsole[], options: Options = {}) 
   const fastUntil = useRef(0);
   /** Wakes the loop out of its wait, for when there is no reason to wait. */
   const wakeLoop = useRef<(() => void) | null>(null);
+  /** When the last sweep ran, and how many in a row found nothing it was looking for. */
+  const lastSweepAt = useRef(0);
+  const fruitless = useRef(0);
 
   const tick = useCallback(async () => {
     const api = ps5Bridge();
@@ -141,9 +172,21 @@ export const useConsoleWatch = (bound: WatchedConsole[], options: Options = {}) 
     for (const c of missing) misses.current[c.hostId] = (misses.current[c.hostId] ?? 0) + 1;
     for (const c of watched) if (answers.has(c.hostId)) misses.current[c.hostId] = 0;
 
-    const needsSweep = missing.some((c) => (misses.current[c.hostId] ?? 0) >= MISSES_BEFORE_SWEEP);
+    if (missing.length === 0) fruitless.current = 0;
+    const now = Date.now();
+    const gap = now < fastUntil.current
+      ? SWEEP_MIN_GAP_MS
+      : Math.min(SWEEP_MAX_GAP_MS, SWEEP_MIN_GAP_MS * 2 ** fruitless.current);
+    const needsSweep = missing.some((c) => (misses.current[c.hostId] ?? 0) >= MISSES_BEFORE_SWEEP)
+      && now - lastSweepAt.current >= gap;
     if (needsSweep) {
+      lastSweepAt.current = now;
       const swept = await api.discover();
+      // Found every console it was looking for, or not.
+      fruitless.current = missing.every((c) => swept.consoles.some((f) => f.hostId === c.hostId))
+        ? 0
+        : fruitless.current + 1;
+      if (swept.warnings?.length) console.info("[ps5] sweep warnings", swept.warnings);
       for (const console_ of swept.consoles) {
         if (!watched.some((c) => c.hostId === console_.hostId)) continue;
         answers.set(console_.hostId, console_);
@@ -159,15 +202,25 @@ export const useConsoleWatch = (bound: WatchedConsole[], options: Options = {}) 
       }
     }
 
-    setStatuses(() => {
+    const heardAt = Date.now();
+    for (const [hostId, answer] of answers) {
+      if (answer.state === "rest") restHeardAt.current[hostId] = heardAt;
+      else delete restHeardAt.current[hostId];
+    }
+
+    setStatuses((previous) => {
       const next: Record<string, ConsoleStatus> = {};
       for (const c of watched) {
         const answer = answers.get(c.hostId);
+        const restAt = restHeardAt.current[c.hostId];
         next[c.hostId] = answer
-          ? { state: answer.state, address: answer.address, name: answer.name }
-          // Off, unplugged, or on another network — indistinguishable from
-          // here, and presenting them as different states would be a guess.
-          : { state: "unreachable", address: addressOf(c), name: null };
+          ? { state: answer.state, address: answer.address, name: answer.name, heardAt }
+          : restAt !== undefined && heardAt - restAt < REST_HOLD_MS
+            // Asleep a moment ago and quiet now: a sleeping console on Wi-Fi.
+            ? { state: "rest", address: previous[c.hostId]?.address ?? addressOf(c), name: previous[c.hostId]?.name ?? null, heardAt: restAt }
+            // Off, unplugged, or on another network — indistinguishable from
+            // here, and presenting them as different states would be a guess.
+            : { state: "unreachable", address: addressOf(c), name: null };
       }
       // Rebuilt from the watched list rather than merged into the previous
       // value, so a console that was just unbound cannot linger on the board.

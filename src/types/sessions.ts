@@ -31,8 +31,12 @@ export interface ITimePackage {
    * platforms". Mobile durationSelect filters tariffs server-side via
    * the `?platform=` query parameter — NULL-platform rows always
    * match, specific-platform rows match exactly.
+   *
+   * Any platform slug — pc/ps4/ps5 or a branch's custom one (billiards,
+   * table-tennis, …). The server refuses a package of another platform on
+   * start/extend (422 `package_platform_mismatch`).
    */
-  platform?: "pc" | "ps4" | "ps5" | null;
+  platform?: string | null;
   /**
    * Optional time-windowed discount. All four columns are nullable as
    * an atomic group: when any is null, no discount applies. Backend

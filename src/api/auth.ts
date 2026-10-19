@@ -1,4 +1,5 @@
 import { AuthUser, Role } from "@/types/api";
+import { loginChallenge } from "@/auth/loginChallenge";
 import { request } from "./client";
 
 interface LoginResponseRaw {
@@ -13,9 +14,11 @@ export interface LoginResult {
 }
 
 export const apiLogin = async (email: string, password: string): Promise<LoginResult> => {
+  // A solved sign-in mosaic travels with the next attempt, once (2026-10-07).
+  const captchaToken = loginChallenge.take();
   const res = await request<LoginResponseRaw>("/session/login", {
     method: "POST",
-    body: { email, password },
+    body: captchaToken ? { email, password, captcha_token: captchaToken } : { email, password },
   });
   return {
     token: res.token,

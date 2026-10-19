@@ -2,11 +2,14 @@ import { validationMessageOf } from "@/api/security";
 import Button from "@/components/ui/Button";
 import { useConfirm } from "@/components/ui/ConfirmProvider";
 import { ListSkeleton } from "@/components/ui/Skeleton";
+import { StateSwitch, deriveViewState } from "@/components/ui/state";
 import { useAsync } from "@/hooks/useAsync";
 import { useKeyedBusy } from "@/hooks/useKeyedBusy";
 import { formatDateTime } from "@/i18n/dates";
 import { useLang } from "@/i18n/LanguageContext";
 import { fmt } from "@/i18n/translations";
+import LoginLockoutsSection from "@/components/security/LoginLockoutsSection";
+import { useSecurityRefresh } from "@/components/security/securityRefresh";
 import { securityRepository } from "@/repositories/SecurityRepository";
 import { FormEvent, useState } from "react";
 
@@ -20,17 +23,21 @@ const NOTE_MAX = 255;
  * duplicate, or a rule that would lock out the admin typing it — is the
  * server's answer (422), shown under the field in its own words; the panel
  * does not second-guess an address, it shows "your IP" so the admin can.
+ * Below it, the sign-ins closed after too many wrong passwords (2026-10-07).
  */
 const BlockedIpsTab = () => {
   const { t } = useLang();
   const confirm = useConfirm();
   const { begin, end, isBusy } = useKeyedBusy();
   const { data, loading, error, reload } = useAsync(() => securityRepository.blockedIps(), []);
+  useSecurityRefresh(reload);
 
   const [ip, setIp] = useState("");
   const [note, setNote] = useState("");
   const [saving, setSaving] = useState(false);
   const [fieldError, setFieldError] = useState<string | null>(null);
+  // Unblocking an address the sign-in guard banned lifts its sign-in locks too.
+  const [locksKey, setLocksKey] = useState(0);
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -64,6 +71,7 @@ const BlockedIpsTab = () => {
       end(id);
     }
     void reload();
+    setLocksKey((k) => k + 1);
   };
 
   const rows = data?.data ?? [];
@@ -102,12 +110,14 @@ const BlockedIpsTab = () => {
         )}
       </form>
 
-      {error && <div className="error">{error.message}</div>}
-      {loading && !data ? (
-        <ListSkeleton rows={4} />
-      ) : !error && rows.length === 0 ? (
-        <div className="muted">{t("security.ips.empty")}</div>
-      ) : !error ? (
+      <StateSwitch
+        view={deriveViewState({ loading, error, data: data ? rows : null })}
+        skeleton={<ListSkeleton rows={4} />}
+        size="section"
+        onRetry={() => void reload()}
+        error={{ titleKey: "security.state.errorTitle" }}
+        empty={{ titleKey: "security.ips.state.emptyTitle", descriptionKey: "security.ips.state.emptyDescription" }}
+      >
         <div className="sec-table-wrap">
           <table className="sec-table">
             <thead>
@@ -146,7 +156,9 @@ const BlockedIpsTab = () => {
             </tbody>
           </table>
         </div>
-      ) : null}
+      </StateSwitch>
+
+      <LoginLockoutsSection refreshKey={locksKey} />
     </div>
   );
 };

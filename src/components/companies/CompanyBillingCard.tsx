@@ -1,6 +1,7 @@
 import { SkeletonCard } from "@/components/ui/Skeleton";
 import { apiCompanyBilling, apiMarkCompanyPaid, ICompanyBilling } from "@/api/billing";
 import { isMissingEndpoint } from "@/api/fallback";
+import { ErrorState, StateView } from "@/components/ui/state";
 import { useAuth } from "@/auth/AuthContext";
 import Button from "@/components/ui/Button";
 import Spinner from "@/components/ui/Spinner";
@@ -28,13 +29,17 @@ const CompanyBillingCard = ({ companyId, companyName }: Props) => {
   const [missing, setMissing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  /** The READ failed (offline / server error) — not "not deployed", not "no info". */
+  const [loadError, setLoadError] = useState<unknown>(null);
 
   const load = async () => {
-    setErr(null); setMissing(false); setLoading(true);
+    setErr(null); setLoadError(null); setMissing(false); setLoading(true);
     try { setBilling(await apiCompanyBilling(companyId)); }
     catch (e) {
+      // Only the server's 404 / 501 means the endpoint is not deployed; a
+      // dropped connection used to land here too (see api/fallback.ts).
       if (isMissingEndpoint(e)) setMissing(true);
-      else setErr(e instanceof Error ? e.message : t("form.errors.failedSave"));
+      else setLoadError(e);
     }
     finally { setLoading(false); }
   };
@@ -61,7 +66,11 @@ const CompanyBillingCard = ({ companyId, companyName }: Props) => {
   );
   if (!billing) return (
     <div className="card">
-      {err ? <div className="error">{err}</div> : <div className="muted">{t("billing.noInfo")}</div>}
+      {loadError !== null ? (
+        <ErrorState size="compact" error={loadError} onRetry={() => void load()} titleKey="billing.state.errorTitle" descriptionKey={null} />
+      ) : (
+        <StateView variant="empty" size="compact" titleKey="billing.noInfo" descriptionKey={null} />
+      )}
     </div>
   );
 

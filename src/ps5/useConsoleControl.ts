@@ -35,9 +35,12 @@ const INTENT_TTL_MS = 60_000;
  *
  * Enough to carry the command and its confirmation past the rate limits that
  * exist for the monitor, and no longer — those limits are what keep a console
- * from being asked something forty times a minute.
+ * from being asked something forty times a minute. 45 s since 2026-10-19 (it
+ * was 15: a console still settling into rest missed the wakes of the first
+ * seconds, and the next one then waited out a 20 s cooldown). It ends as soon
+ * as the console is where it was asked to be.
  */
-const URGENT_WINDOW_MS = 15_000;
+const URGENT_WINDOW_MS = 45_000;
 
 interface Options {
   /** Console devices of this branch, as the board has them. */
@@ -93,6 +96,15 @@ export const useConsoleControl = ({ devices, sessionDeviceIds, enabled = true }:
   });
 
   const hostKey = watched.map((c) => c.hostId).sort().join(",");
+  /**
+   * Bumped whenever the keys on this machine may have changed: a console paired
+   * or a key typed in or forgotten (the picker says so), and every Start or
+   * Stop. Without it the answer was asked once per binding and kept: a place
+   * bound before its console was paired stayed "no key" after pairing, so no
+   * wake was ever sent until the panel restarted (2026-10-19, club).
+   */
+  const [keysAsked, setKeysAsked] = useState(0);
+  const credentialsChanged = useCallback(() => setKeysAsked((n) => n + 1), []);
   useEffect(() => {
     const api = ps5Bridge();
     if (!api?.hasCredential || hostKey === "") return;
@@ -109,7 +121,7 @@ export const useConsoleControl = ({ devices, sessionDeviceIds, enabled = true }:
     });
 
     return () => { alive = false; };
-  }, [hostKey]);
+  }, [hostKey, keysAsked]);
 
   /** Start pressed / stop confirmed, by device id, with the moment it happened. */
   const [starting, setStarting] = useState<Record<number, Intent>>({});
@@ -218,7 +230,9 @@ export const useConsoleControl = ({ devices, sessionDeviceIds, enabled = true }:
         // have to notice for themselves — least of all after answering "no" to
         // a question about it. The panel keeps trying either way; this is so
         // the person knows it has not simply happened.
-        if (!result.sent) {
+        // Withdrawn by the panel itself because a session started: nothing
+        // for anybody to be told about.
+        if (!result.sent && result.code !== "CANCELLED") {
           const last = toldAt.current[hostId] ?? 0;
           if (Date.now() - last > 60_000) {
             toldAt.current[hostId] = Date.now();
@@ -227,6 +241,9 @@ export const useConsoleControl = ({ devices, sessionDeviceIds, enabled = true }:
         }
 
         return result;
+      },
+      cancelRest: (hostId) => {
+        void ps5Bridge()?.restCancel?.(hostId).catch(() => { /* the rest runs its course */ });
       },
       reportUnexpectedWake: async ({ deviceId, eventId }) => {
         await apiReportUnexpectedWake(deviceId, eventId);
@@ -262,19 +279,38 @@ export const useConsoleControl = ({ devices, sessionDeviceIds, enabled = true }:
     refreshNow();
   }, [refreshNow]);
 
+  /** A press is a fresh intent for the console behind this device. */
+  const pressed = (deviceId: number) => {
+    const hostId = boundRef.current.find((d) => d.deviceId === deviceId)?.hostId;
+    if (hostId) controllerRef.current?.pressed(hostId);
+  };
+
   /** Call when the operator presses Start: the console may wake from now on. */
   const sessionStarting = useCallback((deviceId: number) => {
     urgentUntil.current[deviceId] = Date.now() + URGENT_WINDOW_MS;
+    pressed(deviceId);
+    credentialsChanged();
     setStarting((s) => ({ ...s, [deviceId]: { at: Date.now() } }));
+    // The latest press wins. A Stop a moment ago must not go on asking for
+    // rest: if a list read before this start lands after it, "stopping" would
+    // turn that stale "no session" into a fresh rest under the new player.
+    setStopping((s) => {
+      if (!(deviceId in s)) return s;
+      const next = { ...s };
+      delete next[deviceId];
+      return next;
+    });
     setNudge((n) => n + 1);
     // Ask the console now, and keep asking quickly: the operator is watching
     // the tile, and the next scheduled look could be ten seconds away.
     refreshNow();
-  }, [refreshNow]);
+  }, [refreshNow, credentialsChanged]);
 
   /** Call when a session has actually stopped on the backend. */
   const sessionStopped = useCallback((deviceId: number) => {
     urgentUntil.current[deviceId] = Date.now() + URGENT_WINDOW_MS;
+    pressed(deviceId);
+    credentialsChanged();
     setStopping((s) => ({ ...s, [deviceId]: { at: Date.now() } }));
     setStarting((s) => {
       const next = { ...s };
@@ -283,7 +319,7 @@ export const useConsoleControl = ({ devices, sessionDeviceIds, enabled = true }:
     });
     setNudge((n) => n + 1);
     refreshNow();
-  }, [refreshNow]);
+  }, [refreshNow, credentialsChanged]);
 
   // One control pass per observation, plus one immediately after a press. The
   // observations arrive every ten seconds from the monitor, which is what makes
@@ -307,6 +343,7 @@ export const useConsoleControl = ({ devices, sessionDeviceIds, enabled = true }:
         // since the row was written.
         address: status?.address ?? device.console_address ?? null,
         actual: status?.state ?? "unknown",
+        heardAt: status?.heardAt,
         hasSession: sessionDeviceIds.has(device.id),
         // An intent that nothing confirmed within a minute is a failed start,
         // not a licence to stay awake all evening.
@@ -323,6 +360,15 @@ export const useConsoleControl = ({ devices, sessionDeviceIds, enabled = true }:
     void controller.tick(inputs).then(() => {
       const views = Object.fromEntries(inputs.map((i) => [i.hostId, controller.view(i.hostId)]));
       setViews(views);
+
+      // Arrived: the press has done its job, and the ordinary rhythm and rate
+      // limits apply again.
+      for (const input of inputs) {
+        const { state, desired } = views[input.hostId].snapshot;
+        if ((state === "ACTIVE" && desired === "active") || (state === "REST" && desired === "rest")) {
+          delete urgentUntil.current[input.deviceId];
+        }
+      }
 
       // A console that cannot be woken because this machine holds no key for
       // it says so out loud, once. Nothing else does now: the datagram is not
@@ -359,5 +405,5 @@ export const useConsoleControl = ({ devices, sessionDeviceIds, enabled = true }:
     });
   }, [sessionDeviceIds]);
 
-  return { views, statuses, sessionStarting, sessionStopped, wakeDecided };
+  return { views, statuses, sessionStarting, sessionStopped, wakeDecided, credentialsChanged };
 };

@@ -6,6 +6,7 @@ import ScreenWithBg from "@/components/ui/ScreenWithBg";
 import { useConfirm } from "@/components/ui/ConfirmProvider";
 import Pagination from "@/components/ui/Pagination";
 import { ListSkeleton } from "@/components/ui/Skeleton";
+import { StateSwitch, deriveViewState } from "@/components/ui/state";
 import { ITournamentApi, SkillLevel } from "@/api/tournaments";
 import { useAsync } from "@/hooks/useAsync";
 import { useLang } from "@/i18n/LanguageContext";
@@ -68,6 +69,7 @@ const Tournaments = () => {
   );
   const tournaments = data?.data ?? [];
   const lastPage = data?.meta?.last_page ?? 1;
+  const view = deriveViewState({ loading, error, data: data ? tournaments : null });
 
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState<ITournamentApi | null>(null);
@@ -95,6 +97,12 @@ const Tournaments = () => {
     void reload();
   };
 
+  // "Branch: <address>", or a neutral word when the row carries no branch.
+  const branchLine = (row: ITournamentApi): string => {
+    const address = row.branch?.address?.trim();
+    return address ? `${tr("tournaments.branch")}: ${address}` : tr("tournaments.branchUnknown");
+  };
+
   return (
     <ScreenWithBg
       bg="./bg/owner-home.jpg"
@@ -115,10 +123,14 @@ const Tournaments = () => {
         </>
       )}
 
-      {loading && <ListSkeleton />}
-      {error && <div className="error">{error.message}</div>}
       {removeErr && <div className="error">{removeErr}</div>}
-      {!loading && !error && (
+      <StateSwitch
+        view={view}
+        skeleton={<ListSkeleton />}
+        onRetry={() => void reload()}
+        error={{ titleKey: "tournaments.state.errorTitle" }}
+        empty={{ titleKey: "tournaments.state.emptyTitle", descriptionKey: "tournaments.state.emptyDescription" }}
+      >
         <div style={{ display: "grid", gap: 12 }}>
           {tournaments.map((t) => {
             const skill = (t.skill_level ?? "any") as SkillLevel;
@@ -157,6 +169,19 @@ const Tournaments = () => {
                     {tr(`tournament.skillLevel.${skill}`)}
                   </span>
                 </div>
+
+                {/* Across branches, say which one hosts it — from the row's own
+                    eager-loaded branch, never guessed from the title. One line,
+                    clipped, the full text on hover; the branch page needs none. */}
+                {!isBranchScoped && (
+                  <div
+                    className="muted tournament-branch"
+                    style={{ fontSize: 13, marginTop: 6, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+                    title={branchLine(t)}
+                  >
+                    {branchLine(t)}
+                  </div>
+                )}
 
                 <div className="muted" style={{ fontSize: 13, marginTop: 6 }}>
                   {t.start_date}
@@ -237,10 +262,9 @@ const Tournaments = () => {
               </div>
             );
           })}
-          {!tournaments.length && <div className="muted">{tr("common.empty.tournaments")}</div>}
         </div>
-      )}
-      {!error && <Pagination page={page} lastPage={lastPage} onChange={setPage} disabled={loading} />}
+      </StateSwitch>
+      {view.kind !== "error" && <Pagination page={page} lastPage={lastPage} onChange={setPage} disabled={loading} />}
       {creating && isBranchScoped && (
         <TournamentForm
           branchId={id}

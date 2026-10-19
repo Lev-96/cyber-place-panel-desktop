@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import { useConsoleWatch, WATCH_INTERVAL_FAST_MS, WATCH_INTERVAL_MS } from "./useConsoleWatch";
+import { useConsoleWatch, REST_HOLD_MS, WATCH_FAST_WINDOW_MS, WATCH_INTERVAL_FAST_MS, WATCH_INTERVAL_MS } from "./useConsoleWatch";
 import type { Ps5Console, Ps5SweepResult } from "./usePs5Discovery";
 
 /**
@@ -100,7 +100,7 @@ describe("asking again straight away", () => {
     await settle();
 
     await act(async () => { result.current.refreshNow(); await Promise.resolve(); });
-    await act(async () => { await vi.advanceTimersByTimeAsync(30_000); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(WATCH_FAST_WINDOW_MS + 10_000); });
     const settled = probeCalls.length;
 
     // Well past the window: back to one look per ten seconds.
@@ -251,3 +251,113 @@ describe("the ten-second console check", () => {
     expect(result.current.statuses).toEqual({});
   });
 });
+
+/**
+ * A console that is really off (2026-10-18): it used to cost a network-wide
+ * sweep on every tick, all evening. Now the sweeps space out, and a press
+ * brings them back.
+ */
+describe("sweeping for a console that is not there", () => {
+  test("sweeps space out instead of running on every tick", async () => {
+    renderHook(() => useConsoleWatch([{ hostId: "OFF", address: "192.168.1.10" }], { intervalMs: 3_000 }));
+    await settle();
+
+    // Ten minutes of a console that never answers, at the watchful rhythm.
+    for (let i = 0; i < 200; i++) await act(async () => { await vi.advanceTimersByTimeAsync(3_000); });
+
+    // At every tick that would be ~199 sweeps. Spaced: 5, 10, 20, 40, then one
+    // a minute — about a dozen in ten minutes.
+    expect(sweepCalls).toBeGreaterThanOrEqual(8);
+    expect(sweepCalls).toBeLessThanOrEqual(16);
+  });
+
+  test("a press brings the next sweep back to the shortest gap", async () => {
+    const { result } = renderHook(() => useConsoleWatch([{ hostId: "OFF", address: "192.168.1.10" }], { intervalMs: 3_000 }));
+    await settle();
+    for (let i = 0; i < 100; i++) await act(async () => { await vi.advanceTimersByTimeAsync(3_000); });
+    const before = sweepCalls;
+
+    await act(async () => { result.current.refreshNow(); await Promise.resolve(); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(WATCH_INTERVAL_FAST_MS * 5); });
+
+    expect(sweepCalls).toBeGreaterThan(before);
+  });
+
+  test("a console that comes back resets the spacing", async () => {
+    let on = false;
+    answerToProbe = (addresses) => (on ? addresses.map((a) => consoleAt("OFF", a)) : []);
+    const { result } = renderHook(() => useConsoleWatch([{ hostId: "OFF", address: "192.168.1.10" }], { intervalMs: 3_000 }));
+    await settle();
+    for (let i = 0; i < 60; i++) await act(async () => { await vi.advanceTimersByTimeAsync(3_000); });
+
+    on = true;
+    await act(async () => { await vi.advanceTimersByTimeAsync(3_000); });
+    await waitFor(() => expect(result.current.statuses.OFF.state).toBe("awake"));
+
+    // Off again: the first sweep comes after two misses and the shortest gap.
+    on = false;
+    const before = sweepCalls;
+    for (let i = 0; i < 4; i++) await act(async () => { await vi.advanceTimersByTimeAsync(3_000); });
+    expect(sweepCalls).toBe(before + 1);
+  });
+});
+
+/**
+ * A console asleep on Wi-Fi answers about one probe in three (2026-10-19,
+ * club). Its silence must not turn the tile into "unavailable" between two
+ * answers; real silence still does, once it has lasted.
+ */
+describe("a sleeping console that goes quiet", () => {
+  test("is still shown at rest through the gaps between its answers", async () => {
+    let answers = true;
+    answerToProbe = (addresses) => (answers ? addresses.map((a) => consoleAt("AAA", a, "rest")) : []);
+    const { result } = renderHook(() => useConsoleWatch([{ hostId: "AAA", address: "192.168.1.10" }], { intervalMs: 3_000 }));
+    await settle();
+    await waitFor(() => expect(result.current.statuses.AAA.state).toBe("rest"));
+
+    answers = false;
+    for (let i = 0; i < 5; i++) {
+      await act(async () => { await vi.advanceTimersByTimeAsync(3_000); });
+      expect(result.current.statuses.AAA.state).toBe("rest");
+    }
+  });
+
+  test("is unreachable once the silence has outlasted the hold", async () => {
+    let answers = true;
+    answerToProbe = (addresses) => (answers ? addresses.map((a) => consoleAt("AAA", a, "rest")) : []);
+    const { result } = renderHook(() => useConsoleWatch([{ hostId: "AAA", address: "192.168.1.10" }], { intervalMs: 3_000 }));
+    await settle();
+    await waitFor(() => expect(result.current.statuses.AAA.state).toBe("rest"));
+
+    answers = false;
+    await act(async () => { await vi.advanceTimersByTimeAsync(REST_HOLD_MS + 10_000); });
+    await waitFor(() => expect(result.current.statuses.AAA.state).toBe("unreachable"));
+  });
+
+  test("an awake console's silence is not held: it is reported at once", async () => {
+    let answers = true;
+    answerToProbe = (addresses) => (answers ? addresses.map((a) => consoleAt("AAA", a, "awake")) : []);
+    const { result } = renderHook(() => useConsoleWatch([{ hostId: "AAA", address: "192.168.1.10" }], { intervalMs: 3_000 }));
+    await settle();
+    await waitFor(() => expect(result.current.statuses.AAA.state).toBe("awake"));
+
+    answers = false;
+    await act(async () => { await vi.advanceTimersByTimeAsync(3_000); });
+    await waitFor(() => expect(result.current.statuses.AAA.state).toBe("unreachable"));
+  });
+
+  test("a held rest keeps the moment it was really heard, so silence is not mistaken for an answer", async () => {
+    let answers = true;
+    answerToProbe = (addresses) => (answers ? addresses.map((a) => consoleAt("AAA", a, "rest")) : []);
+    const { result } = renderHook(() => useConsoleWatch([{ hostId: "AAA", address: "192.168.1.10" }], { intervalMs: 3_000 }));
+    await settle();
+    await waitFor(() => expect(result.current.statuses.AAA.heardAt).toBeDefined());
+    const heard = result.current.statuses.AAA.heardAt;
+
+    answers = false;
+    await act(async () => { await vi.advanceTimersByTimeAsync(9_000); });
+    expect(result.current.statuses.AAA.state).toBe("rest");
+    expect(result.current.statuses.AAA.heardAt).toBe(heard);
+  });
+});
+

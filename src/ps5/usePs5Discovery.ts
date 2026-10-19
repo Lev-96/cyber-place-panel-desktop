@@ -72,6 +72,8 @@ export interface Ps5Bridge {
    * function nobody handles.
    */
   rest?: (hostId: string, address: string) => Promise<WakeOutcome>;
+  /** Withdraw a rest still being retried (an older preload has none). */
+  restCancel?: (hostId: string) => Promise<void>;
   /**
    * Try a key once, without storing it. For checking a key that was just handed
    * over, and for machines whose OS offers no keystore at all.
@@ -110,6 +112,12 @@ export const usePs5Discovery = () => {
   const [error, setError] = useState<string | null>(null);
   /** Where the probe went — the only way to diagnose a network that answers nothing. */
   const [probed, setProbed] = useState<string[]>([]);
+  /**
+   * What the sweep could not do: an interface skipped (and why) or one that
+   * would not send. Kept so a "nothing found" report from a club carries the
+   * evidence instead of a guess. Never a key: addresses of this machine only.
+   */
+  const [warnings, setWarnings] = useState<string[]>([]);
 
   const scan = useCallback(async () => {
     const api = bridge();
@@ -124,6 +132,7 @@ export const usePs5Discovery = () => {
       const result = await api.discover(2_000);
       setConsoles(result.consoles);
       setProbed(result.probed);
+      setWarnings(result.warnings ?? []);
     } catch (e) {
       // A failed sweep leaves the previous list alone: a network hiccup should
       // not erase what the owner was just looking at.
@@ -133,5 +142,5 @@ export const usePs5Discovery = () => {
     }
   }, []);
 
-  return { consoles, searching, error, probed, scan };
+  return { consoles, searching, error, probed, warnings, scan };
 };

@@ -120,6 +120,18 @@ export interface Observation {
    * one. `null` while nobody has answered.
    */
   decision: { eventId: string; approved: boolean } | null;
+  /**
+   * An operator pressed Start or Stop moments ago (the controller's urgent
+   * window). Lets a Start wake a console that has not answered yet; see the
+   * unreachable branch of {@link step}.
+   */
+  pressed?: boolean;
+  /**
+   * When the console last really answered (ms), as opposed to a "rest" the
+   * watcher holds through a sleeping console's silence. Undefined when not
+   * known, which keeps the older reading.
+   */
+  heardAt?: number;
   /** Milliseconds since the epoch. Passed in, never read from the clock here. */
   now: number;
 }
@@ -239,8 +251,55 @@ export const step = (prev: MachineSnapshot, obs: Observation, newEventId: string
   const desired = desiredFor(obs, approved);
   next.desired = desired;
 
+  // Start was just pressed and the console has not answered (yet). A PS5 at
+  // rest on Wi-Fi answers only now and then (measured at a club 2026-10-19:
+  // about one probe in three), so waiting for it to say "rest" before waking
+  // it is what made Start feel slow. The wake goes to the last known address,
+  // carries this console's own credential (any other console there ignores
+  // it), and only inside the press window — never a stream for a console that
+  // is really off. Nothing here claims it woke: ACTIVE still needs its answer.
+  if (
+    (obs.actual === "unreachable" || obs.actual === "unknown")
+    && desired === "active" && obs.pressed === true && obs.canWake !== false
+  ) {
+    // The give-up clock runs from the press, silent or not, so a console that
+    // never answers is not called "waking" for ever.
+    next.wakingSince = prev.wakingSince ?? obs.now;
+    if (obs.now - next.wakingSince < WAKE_GIVE_UP_MS) {
+      next.state = "WAKING";
+      next.wakeEventId = null;
+      next.wakeSeenAt = null;
+      next.approvedEventId = null;
+      commands.push({ kind: "wake" });
+      return { next, commands };
+    }
+  }
+
+  // A transition already under way, and the console quiet for a moment: a PS5
+  // on Wi-Fi drops answers while it changes state (measured: several seconds
+  // of silence between "awake" and "rest"). The tile keeps saying what is
+  // happening — waking, going to rest — instead of flashing "unavailable" in
+  // the middle of it, and only for as long as that transition may take.
+  if (obs.actual === "unreachable" || obs.actual === "unknown") {
+    if (
+      desired === "active" && prev.state === "WAKING"
+      && prev.wakingSince !== null && obs.now - prev.wakingSince < WAKE_GIVE_UP_MS
+    ) {
+      next.state = "WAKING";
+      return { next, commands };
+    }
+    if (
+      desired === "rest" && prev.state === "GOING_TO_REST"
+      && prev.restingSince !== null && obs.now - prev.restingSince < REST_SETTLE_MS
+    ) {
+      next.state = "GOING_TO_REST";
+      return { next, commands };
+    }
+  }
+
   // A console nobody can reach says nothing about whether it is authorised —
-  // it says the network is in the way. Never act on silence.
+  // it says the network is in the way. Never act on silence (a fresh Start,
+  // above, is the one exception, and it only ever wakes).
   if (obs.actual === "unreachable" || obs.actual === "unknown") {
     next.state = obs.actual === "unreachable" ? "OFFLINE" : "UNKNOWN";
     next.wakingSince = null;
@@ -273,6 +332,13 @@ export const step = (prev: MachineSnapshot, obs: Observation, newEventId: string
       next.wakingSince = prev.wakingSince ?? obs.now;
 
       if (obs.now - next.wakingSince >= WAKE_GIVE_UP_MS) {
+        // Not one answer since the waking began: the "rest" is only the last
+        // thing it said, held through silence. Unplugged or gone from the
+        // network, not ignoring us — say "unavailable", not blame its settings.
+        if (obs.heardAt !== undefined && obs.heardAt < next.wakingSince) {
+          next.state = "OFFLINE";
+          return { next, commands };
+        }
         // Asked, repeatedly, and still asleep. The packet is leaving this
         // machine — the missing-key case returned above — so what is left is
         // the console's own "turn on from network" setting.

@@ -3,9 +3,10 @@ import { beforeEach, describe, expect, test, vi } from "vitest";
 /**
  * The two reads of a branch's billing policy, and why there are two.
  *
- * `get()` is lenient: a missing endpoint (and, by `isMissingEndpoint`, a
- * network failure) reads as defaults — fine for a screen that only shows the
- * joystick fee. `getForEdit()` is strict: the Prices page PUTs the whole policy
+ * `get()` is lenient about a MISSING endpoint (404 / 501) only — it reads as
+ * defaults, fine for a screen that only shows the joystick fee. Since
+ * 2026-10-07 a network failure is not "missing" (api/fallback.ts) and throws
+ * from both reads. `getForEdit()` is strict: the Prices page PUTs the whole policy
  * back, so a default read there would be saved over the real one.
  */
 
@@ -35,9 +36,16 @@ describe("BillingSettingsRepository", () => {
     expect((caught as Error | null)?.message).toBe("network down");
   });
 
-  test("get() stays lenient for read-only screens", async () => {
-    api.get.mockImplementation(async () => { throw networkDown(); });
+  test("get() stays lenient for a backend without the endpoint (404)", async () => {
+    api.get.mockImplementation(async () => { throw Object.assign(new Error("Not Found"), { status: 404 }); });
     const read = await billingSettingsRepository.get(7);
     expect(read).toMatchObject({ branch_id: 7, joystick_price: null });
+  });
+
+  test("get() THROWS on a network failure — defaults are never invented offline", async () => {
+    api.get.mockImplementation(async () => { throw networkDown(); });
+    let caught: unknown = null;
+    try { await billingSettingsRepository.get(7); } catch (e) { caught = e; }
+    expect((caught as Error | null)?.message).toBe("network down");
   });
 });

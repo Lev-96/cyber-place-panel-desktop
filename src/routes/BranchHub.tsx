@@ -1,4 +1,5 @@
 import { GridSkeleton } from "@/components/ui/Skeleton";
+import { BackAction, ErrorState, classifyError } from "@/components/ui/state";
 import { useAuth } from "@/auth/AuthContext";
 import { can } from "@/auth/permissions";
 import BlockToggle from "@/components/blocking/BlockToggle";
@@ -102,6 +103,7 @@ const BranchHub = () => {
     { key: "tariffs", to: `/branches/${id}/tariffs`, title: t("hub.tile.prices"), hint: t("hub.tile.pricesHint"), show: can(role, "branch.prices") },
     { key: "products", to: `/branches/${id}/products`, title: t("hub.tile.products"), hint: t("hub.tile.productsHint"), show: true },
     { key: "till", to: `/branches/${id}/pos`, title: t("hub.tile.till"), hint: t("hub.tile.tillHint"), show: true },
+    { key: "shift", to: `/branches/${id}/shift`, title: t("hub.tile.shift"), hint: t("hub.tile.shiftHint"), show: can(role, "shift.manage") },
     { key: "managers", to: `/branches/${id}/managers`, title: t("hub.tile.managers"), hint: t("hub.tile.managersHint"), show: can(role, "manager.create") },
     { key: "tournaments", to: `/branches/${id}/tournaments`, title: t("hub.tile.tournaments"), hint: t("hub.tile.tournamentsHint"), show: true },
     { key: "subscribers", to: `/branches/${id}/subscribers`, title: t("hub.tile.subscribers"), hint: t("hub.tile.subscribersHint"), show: true },
@@ -116,6 +118,21 @@ const BranchHub = () => {
 
   if (!Number.isFinite(id) || id <= 0) return <div className="error">{t("hub.invalidId")}</div>;
 
+  // No such branch: nothing below (its tiles, its live board) has anything to
+  // show, so the page is the not-found state alone.
+  if (error && !data && classifyError(error) === "notFound") {
+    return (
+      <ScreenWithBg bg="./bg/branch.jpg" title={`${t("hub.branchFallback")} №${id}`}>
+        <ErrorState
+          error={error}
+          notFoundTitleKey="branch.state.notFoundTitle"
+          notFoundDescriptionKey="branch.state.notFoundDescription"
+          notFoundAction={<BackAction fallback="/branches" />}
+        />
+      </ScreenWithBg>
+    );
+  }
+
   const onDrop = (key: string) => {
     const from = dragKey;
     setDragKey(null);
@@ -126,8 +143,20 @@ const BranchHub = () => {
 
   return (
     <ScreenWithBg bg="./bg/branch.jpg" title={data ? `${data.company?.name ?? t("hub.branchFallback")} · ${data.address}` : `${t("hub.branchFallback")} №${id}`}>
-      {loading && <GridSkeleton cells={6} />}
-      {error && <div className="error">{error.message}</div>}
+      {/* Skeleton only before the first answer: a background re-read (an
+          access change) must not blank the header the operator is reading. */}
+      {loading && !data && <GridSkeleton cells={6} />}
+      {error && !data && (
+        <ErrorState
+          size="section"
+          error={error}
+          onRetry={() => void reload()}
+          titleKey="branch.state.errorTitle"
+          notFoundTitleKey="branch.state.notFoundTitle"
+          notFoundDescriptionKey="branch.state.notFoundDescription"
+          notFoundAction={<BackAction fallback="/branches" />}
+        />
+      )}
 
       {data && (
         /* Wrapping header (see `.entity-header` in global.css): the address,

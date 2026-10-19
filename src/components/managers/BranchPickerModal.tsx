@@ -1,7 +1,7 @@
 import { ListSkeleton } from "@/components/ui/Skeleton";
 import Button from "@/components/ui/Button";
 import Modal from "@/components/ui/Modal";
-import Spinner from "@/components/ui/Spinner";
+import { StateSwitch, deriveViewState } from "@/components/ui/state";
 import { useAsync } from "@/hooks/useAsync";
 import { useLang } from "@/i18n/LanguageContext";
 import { branchRepository } from "@/repositories/BranchRepository";
@@ -31,7 +31,7 @@ interface Props {
  */
 const BranchPickerModal = ({ onClose, onPicked }: Props) => {
   const { t } = useLang();
-  const { data: branches, loading, error } = useAsync(() => branchRepository.list(), []);
+  const { data: branches, loading, error, reload } = useAsync(() => branchRepository.list(), []);
   const [selected, setSelected] = useState<number | null>(null);
 
   const only = branches?.length === 1 ? branches[0] : null;
@@ -53,13 +53,16 @@ const BranchPickerModal = ({ onClose, onPicked }: Props) => {
         <h2 style={{ margin: 0 }}>{t("managers.pickBranch")}</h2>
         <p className="muted" style={{ margin: 0, fontSize: 13 }}>{t("managers.pickBranchHint")}</p>
 
-        {loading && <ListSkeleton rows={4} />}
-        {error && <div className="error">{error.message}</div>}
-
-        {!loading && !error && (
-          branches?.length ? (
+        <StateSwitch
+          view={deriveViewState({ loading, error, data: branches })}
+          skeleton={<ListSkeleton rows={4} />}
+          size="compact"
+          onRetry={() => void reload()}
+          error={{ titleKey: "branchesList.state.errorTitle", descriptionKey: null }}
+          empty={{ titleKey: "managers.noBranches", descriptionKey: null }}
+        >
             <div className="list" style={{ maxHeight: 320, overflowY: "auto" }}>
-              {branches.map((b) => (
+              {(branches ?? []).map((b) => (
                 <button
                   key={b.id}
                   type="button"
@@ -78,10 +81,7 @@ const BranchPickerModal = ({ onClose, onPicked }: Props) => {
                 </button>
               ))}
             </div>
-          ) : (
-            <div className="muted">{t("managers.noBranches")}</div>
-          )
-        )}
+        </StateSwitch>
 
         <div className="row-between">
           <Button type="button" variant="secondary" onClick={onClose}>{t("action.cancel")}</Button>

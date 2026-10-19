@@ -2,14 +2,14 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import type { ICompanyBilling } from "@/api/billing";
-import Notifications, { shouldShowBookingsFeed, shouldShowBillingFeed } from "./Notifications";
+import Notifications, { dbFeedCopy, shouldShowBookingsFeed, shouldShowBillingFeed } from "./Notifications";
 
 /**
  * Regression-shield for the role gate that decides whether the
  * "Bookings" feed section renders on the Уведомления screen.
  *
- * Manager only — admin and company_owner are scoped to billing-only
- * by product (2026-05-29). Mirrors the backend
+ * Manager, and since 2026-10-12 the owner too (whose rows are only "a seat
+ * ends soon"); admin stays billing-only. Mirrors the backend
  * `StaffNotificationDispatcher` allowlist and the corner-popup gate
  * in `GlobalBookingNotifier.shouldShowBookingToasts`.
  */
@@ -20,8 +20,10 @@ describe("shouldShowBookingsFeed", () => {
   test("admin does NOT see Bookings feed", () => {
     expect(shouldShowBookingsFeed("admin")).toBe(false);
   });
-  test("company_owner does NOT see Bookings feed", () => {
-    expect(shouldShowBookingsFeed("company_owner")).toBe(false);
+  test("company_owner sees the feed, named for sessions", () => {
+    expect(shouldShowBookingsFeed("company_owner")).toBe(true);
+    expect(dbFeedCopy("company_owner").titleKey).toBe("notifications.sessionFeedTitle");
+    expect(dbFeedCopy("manager").titleKey).toBe("notifications.bookingFeedTitle");
   });
   test("undefined role does NOT see Bookings feed", () => {
     expect(shouldShowBookingsFeed(undefined)).toBe(false);
@@ -78,13 +80,16 @@ vi.mock("@/i18n/LanguageContext", async () => {
   const { t } = await import("@/i18n/translations");
   return { useLang: () => ({ t: (k: string) => t(k, "en"), lang: "en" }) };
 });
-const feed = vi.hoisted(() => ({ list: [] as unknown[], deleteAll: vi.fn() }));
+const feed = vi.hoisted(() => ({ list: [] as unknown[], deleteAll: vi.fn(), failure: null as unknown, refresh: vi.fn(async () => {}) }));
 vi.mock("@/notifications/NotificationsContext", () => ({
   useNotifications: () => ({
     list: feed.list,
     unreadCount: 0,
     loading: false,
-    error: null,
+    error: feed.failure ? "failed" : null,
+    failure: feed.failure,
+    settled: true,
+    refresh: feed.refresh,
     markRead: vi.fn(),
     markAllRead: vi.fn(),
     deleteOne: vi.fn(),
@@ -99,7 +104,8 @@ vi.mock("@/repositories/ExpenseRepository", () => ({
 vi.mock("@/components/ui/ScreenWithBg", () => ({
   default: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }));
-vi.mock("react-router-dom", () => ({ useNavigate: () => vi.fn() }));
+const nav = vi.hoisted(() => ({ fn: vi.fn() }));
+vi.mock("react-router-dom", () => ({ useNavigate: () => nav.fn }));
 
 const OWN_BILLING: ICompanyBilling = {
   company_id: 7,
@@ -199,5 +205,84 @@ describe("Notifications clear all", () => {
     render(<Notifications />);
     clearAll();
     await waitFor(() => expect(feed.deleteAll).toHaveBeenCalledTimes(1));
+  });
+});
+
+/**
+ * Each feed answers for itself (2026-10-07): one that could not be read is
+ * its error with Retry — never "No notifications right now", and never the
+ * whole screen replaced by a red line.
+ */
+describe("Notifications states", () => {
+  beforeEach(() => {
+    api.calls = [];
+    feed.list = [];
+    feed.failure = null;
+    feed.refresh.mockClear();
+  });
+  afterEach(() => { cleanup(); feed.failure = null; });
+
+  test("a manager whose feed failed sees the error with Retry, not «no notifications»", async () => {
+    auth.user = { id: 1, role: "manager" };
+    feed.failure = new TypeError("Failed to fetch");
+    render(<Notifications />);
+
+    expect(screen.getByText("No connection")).toBeTruthy();
+    expect(screen.queryByText("No notifications right now")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+    expect(feed.refresh).toHaveBeenCalledTimes(1);
+  });
+
+  test("a manager with an empty feed gets the empty state", async () => {
+    auth.user = { id: 1, role: "manager" };
+    render(<Notifications />);
+
+    expect(screen.getByText("No notifications right now")).toBeTruthy();
+  });
+
+  test("an owner whose billing read failed sees that feed's error, the title still there", async () => {
+    auth.user = { id: 5, role: "company_owner", dashboard: { company_id: 7 } };
+    api.handler = () => Promise.reject(Object.assign(new Error("Server Error"), { status: 500, body: { message: "Server Error" } }));
+    render(<Notifications />);
+
+    expect(await screen.findByText("Could not load notifications")).toBeTruthy();
+    expect(screen.getByText(/Billing/i)).toBeTruthy();
+    // The one empty state is the owner's own (empty) Active Places feed; billing
+    // shows its error, never "nothing due".
+    expect(screen.getAllByText("No notifications right now")).toHaveLength(1);
+    expect(screen.getByText("Seats whose session ends in 15 minutes appear here.")).toBeTruthy();
+  });
+});
+
+/** "A seat ends in 15 minutes" in the staff feed (2026-10-12). */
+describe("the session-ending-soon card", () => {
+  const row = {
+    id: "n1", type: "App\\Notifications\\SessionEndingSoon", read_at: null, created_at: "2026-10-12T13:45:00Z",
+    data: {
+      type: "session.ending_soon", session_id: 9, branch_id: 4, place_number: 3, minutes_left: 15,
+      ends_at: "2026-10-12T18:00:00", company_name: "Club", branch_address: "Abovyan 1",
+    },
+  };
+  beforeEach(() => { feed.list = [row]; nav.fn.mockReset(); api.handler = () => Promise.resolve({ data: [] }); });
+  afterEach(() => { cleanup(); feed.list = []; });
+
+  test("says which seat, how long, when it ends and where; opens the branch's sessions", async () => {
+    auth.user = { id: 2, role: "manager" };
+    render(<Notifications />);
+
+    expect(screen.getByText("Seat №3: session ends in 15 min")).toBeTruthy();
+    expect(screen.getByText("Ends at 18:00 · Club · Abovyan 1")).toBeTruthy();
+    fireEvent.click(screen.getByText("Seat №3: session ends in 15 min"));
+    expect(nav.fn).toHaveBeenCalledWith("/branches/4/sessions");
+  });
+
+  test("an owner sees it under Active Places", async () => {
+    auth.user = { id: 5, role: "company_owner", dashboard: { company_id: 7 } };
+    render(<Notifications />);
+
+    expect(screen.getByText("Active Places")).toBeTruthy();
+    expect(screen.queryByText("Bookings")).toBeNull();
+    expect(screen.getByText("Seat №3: session ends in 15 min")).toBeTruthy();
+    await waitFor(() => expect(api.calls.length).toBeGreaterThan(0));
   });
 });

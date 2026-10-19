@@ -5,6 +5,7 @@ import PcForm from "@/components/pcs/PcForm";
 import Button from "@/components/ui/Button";
 import { useConfirm } from "@/components/ui/ConfirmProvider";
 import { ListSkeleton } from "@/components/ui/Skeleton";
+import { StateSwitch, deriveViewState } from "@/components/ui/state";
 import { notify } from "@/ui/notify";
 import { useAsync } from "@/hooks/useAsync";
 import { formatDateTime } from "@/i18n/dates";
@@ -13,6 +14,7 @@ import { fmt } from "@/i18n/translations";
 import { pcRepository } from "@/repositories/PcRepository";
 import { IPcApi } from "@/types/sessions";
 import { effectivePcStatus, isPs, pcHasAgent, PC_STATUS, PC_STATUS_COLOR } from "@/types/pc";
+import { isPlayStationSeat } from "@/utils/platform";
 import { useState } from "react";
 import { useParams } from "react-router-dom";
 
@@ -105,13 +107,22 @@ const PcsList = () => {
         </ol>
       </div>
 
-      {loading && <ListSkeleton />}
-      {error && <div className="error">{error.message}</div>}
-      {!loading && !error && (
+      <StateSwitch
+        view={deriveViewState({ loading, error, data: pcs })}
+        skeleton={<ListSkeleton />}
+        onRetry={() => void reload()}
+        error={{ titleKey: "pcs.state.errorTitle" }}
+        empty={{ titleKey: "pcs.state.emptyTitle", descriptionKey: "pcs.state.emptyDescription" }}
+      >
         <div className="list">
           {(pcs ?? []).map((pc) => {
             const neverPaired = !pc.last_seen_at;
+            // Two different questions. `isPsDevice` (kind) is "no kiosk agent":
+            // no MAC, no Wake, no pairing token — true of a billiards table
+            // too. The PS BADGE is "this seat is a console", which only the
+            // place's platform answers.
             const isPsDevice = isPs(pc.kind);
+            const showPsBadge = isPlayStationSeat(pc);
             return (
             <div key={pc.id} className="list-item">
               <div>
@@ -120,7 +131,7 @@ const PcsList = () => {
                   {pc.place && (
                     <span className="muted" style={{ marginLeft: 6 }}>№{pc.place.number ?? pc.place.id}</span>
                   )}
-                  {isPsDevice && <span style={{ marginLeft: 8, fontSize: 11, padding: "2px 6px", borderRadius: 4, background: "#101a35", color: "#d152fa" }}>PS</span>}
+                  {showPsBadge && <span style={{ marginLeft: 8, fontSize: 11, padding: "2px 6px", borderRadius: 4, background: "#101a35", color: "#d152fa" }}>PS</span>}
                 </div>
                 <div className="meta">
                   <StatusDot status={effectivePcStatus(pc)} /> {statusLabel(effectivePcStatus(pc))}
@@ -149,9 +160,8 @@ const PcsList = () => {
             </div>
             );
           })}
-          {!pcs?.length && <div className="muted">{t("pcs.empty")}</div>}
         </div>
-      )}
+      </StateSwitch>
 
       {creating && (
         <PcForm

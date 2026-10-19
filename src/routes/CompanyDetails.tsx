@@ -1,4 +1,5 @@
 import { SkeletonCard } from "@/components/ui/Skeleton";
+import { BackAction, ErrorState } from "@/components/ui/state";
 import { useAuth } from "@/auth/AuthContext";
 import { can } from "@/auth/permissions";
 import BlockToggle from "@/components/blocking/BlockToggle";
@@ -20,14 +21,29 @@ const CompanyDetails = () => {
   const { t } = useLang();
   const { companyId } = useParams();
   const id = Number(companyId);
-  const { data: company, loading, error, reload } = useAsync(() => companyRepository.byId(id), [id]);
+  const { data: loaded, error, reload } = useAsync(() => companyRepository.byId(id), [id]);
+  // Only an answer for THIS id: useAsync keeps the previous answer while a
+  // new route param is read, and another record is not this page.
+  const company = loaded && loaded.id === id ? loaded : null;
   const [editing, setEditing] = useState(false);
   const [addingBranch, setAddingBranch] = useState(false);
 
   if (!Number.isFinite(id) || id <= 0) return <div className="error">{t("company.invalidId")}</div>;
-  if (loading) return <SkeletonCard lines={5} />;
-  if (error) return <div className="error">{error.message}</div>;
-  if (!company) return null;
+  // A 404 is "not found" with a way back; any other first-load failure is the
+  // error state with Retry. A failed BACKGROUND re-read keeps the page.
+  if (error && !company) {
+    return (
+      <ErrorState
+        error={error}
+        onRetry={() => void reload()}
+        titleKey="company.state.errorTitle"
+        notFoundTitleKey="company.state.notFoundTitle"
+        notFoundDescriptionKey="company.state.notFoundDescription"
+        notFoundAction={<BackAction fallback="/companies" />}
+      />
+    );
+  }
+  if (!company) return <SkeletonCard lines={5} />;
 
   const c = company.raw;
   const canEditCompany = can(user?.role, "company.edit");

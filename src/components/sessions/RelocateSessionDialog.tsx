@@ -1,3 +1,4 @@
+import { ErrorState, StaleNotice, StateView } from "@/components/ui/state";
 import Button from "@/components/ui/Button";
 import Checkbox from "@/components/ui/Checkbox";
 import Modal from "@/components/ui/Modal";
@@ -16,6 +17,8 @@ interface Props {
   onClose: () => void;
   /** The session the server returned after the move — same id, new seat. */
   onMoved: (session: ISessionApi, from: { pcId: number }) => void;
+  /** A platform's display name; the board passes the branch's own (one shared read). */
+  platformName?: (slug: string) => string;
 }
 
 /** 24-hour wall clock, the only format this panel shows a time in. */
@@ -41,10 +44,10 @@ const seatOf = (p: { number: number | null; place_id?: number | null; name?: str
  * another, validated again on the server. Either way only the time AFTER the
  * move runs at it — the server freezes what was already played.
  */
-const RelocateSessionDialog = ({ session, onClose, onMoved }: Props) => {
+const RelocateSessionDialog = ({ session, onClose, onMoved, platformName = platformLabel }: Props) => {
   const { t, money } = useLang();
   const [options, setOptions] = useState<IRelocationOptions | null>(null);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<unknown>(null);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [overrideOn, setOverrideOn] = useState(false);
   const [rateInput, setRateInput] = useState("");
@@ -57,7 +60,7 @@ const RelocateSessionDialog = ({ session, onClose, onMoved }: Props) => {
     try {
       setOptions(await sessionRepository.relocationOptions(session.id));
     } catch (e) {
-      setLoadError(e instanceof Error ? e.message : String(e));
+      setLoadError(e);
     }
   }, [session.id]);
 
@@ -133,7 +136,7 @@ const RelocateSessionDialog = ({ session, onClose, onMoved }: Props) => {
         <span className="col" style={{ gap: 3, minWidth: 0 }}>
           <strong>{seatOf(p)}</strong>
           <span className="muted" style={{ fontSize: 12 }}>
-            {[p.platform ? platformLabel(p.platform) : null, p.type].filter(Boolean).join(" · ")}
+            {[p.platform ? platformName(p.platform) : null, p.type].filter(Boolean).join(" · ")}
           </span>
           {p.free_until !== null ? (
             <span style={{ fontSize: 12, color: "var(--color-warning)" }}>
@@ -161,7 +164,10 @@ const RelocateSessionDialog = ({ session, onClose, onMoved }: Props) => {
           <span className="muted" style={{ fontSize: 13 }}>{session.pc_label}</span>
         </div>
 
-        {loadError !== null && <span className="error">{loadError}</span>}
+        {loadError !== null && options === null && (
+          <ErrorState size="compact" error={loadError} onRetry={() => void load()} titleKey="session.state.relocateErrorTitle" descriptionKey={null} />
+        )}
+        {loadError !== null && options !== null && <StaleNotice error={loadError} onRetry={() => void load()} />}
         {options === null && loadError === null && <Spinner />}
 
         {current && (
@@ -181,7 +187,7 @@ const RelocateSessionDialog = ({ session, onClose, onMoved }: Props) => {
         )}
 
         {options !== null && options.places.length === 0 && (
-          <span className="muted" style={{ fontSize: 13 }}>{t("session.relocateNone")}</span>
+          <StateView variant="empty" size="compact" titleKey="session.relocateNone" descriptionKey={null} />
         )}
 
         {sameRate.length > 0 && (

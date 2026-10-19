@@ -1,27 +1,30 @@
 import { IAccountSwitchTarget } from "@/api/accountSwitch";
 import { useAuth } from "@/auth/AuthContext";
 import { can } from "@/auth/permissions";
+import NavIcon from "@/components/ui/NavIcon";
 import SupportIcon from "@/components/ui/SupportIcon";
 import { useSupportUnread } from "@/support/SupportUnreadContext";
 import AccountSwitchModal from "@/components/profile/AccountSwitchModal";
 import AccountSwitchPanel from "@/components/profile/AccountSwitchPanel";
 import ProfileModal from "@/components/profile/ProfileModal";
 import { useLang } from "@/i18n/LanguageContext";
+import { activeNavTo, sortedNavItems, withStaffMenu } from "@/components/sidebarNav";
 import { useNotifications } from "@/notifications/NotificationsContext";
 import { useUpdatesNotification } from "@/realtime/UpdatesNotificationContext";
 import { ReactNode, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useAnchoredPopover } from "@/hooks/useAnchoredPopover";
-import { NavLink, useNavigate } from "react-router-dom";
+import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 
 const UnreadBadge = ({ count }: { count: number }) => {
   if (count <= 0) return null;
   return (
     <span
+      className="unread-badge"
       aria-label={`${count} unread`}
       style={{
-        marginLeft: 8,
         display: "inline-block",
+        flexShrink: 0,
         minWidth: 20,
         padding: "1px 6px",
         borderRadius: 999,
@@ -92,12 +95,14 @@ interface UserCardProps {
   email: string | undefined;
   role: string | undefined;
   roleLabel: string;
+  /** Drawn inside the account card, right of the clickable part (sign-out). */
+  trailing?: ReactNode;
 }
 
 /** Which face of the account popover is showing. */
 type MenuView = "menu" | "managers";
 
-const UserMenu = ({ name, email, role, roleLabel }: UserCardProps) => {
+const UserMenu = ({ name, email, role, roleLabel, trailing }: UserCardProps) => {
   const { t } = useLang();
   const navigate = useNavigate();
   const palette = paletteFor(role);
@@ -148,7 +153,10 @@ const UserMenu = ({ name, email, role, roleLabel }: UserCardProps) => {
   }, [open, switchTarget]);
 
   return (
-    <div ref={ref} style={{ position: "relative", margin: "0 8px 10px" }}>
+    // The account card: the same surface, edge and width as the Support card
+    // above it. The clickable part opens the account menu; the trailing slot
+    // (sign-out) sits on its right, so the card is the last row of the sidebar.
+    <div ref={ref} className="sidebar-account">
       {open && anchored && createPortal(
         <div
           ref={popRef}
@@ -192,25 +200,13 @@ const UserMenu = ({ name, email, role, roleLabel }: UserCardProps) => {
         className={`user-card${open ? " active" : ""}`}
         title={name}
         onClick={() => setOpen((o) => !o)}
-        style={{
-          width: "100%",
-          padding: "10px 12px",
-          borderRadius: 12,
-          background:
-            "linear-gradient(135deg, rgba(7, 221, 241, 0.06), rgba(209, 82, 250, 0.05))",
-          border: "1px solid #1f2a44",
-          display: "flex",
-          alignItems: "center",
-          gap: 10,
-          cursor: "pointer",
-          textAlign: "left",
-        }}
       >
         <div
           aria-hidden
           style={{
-            width: 38,
-            height: 38,
+            // Same 34px as Support's icon tile, so both cards' titles line up.
+            width: 34,
+            height: 34,
             borderRadius: "50%",
             background: palette.gradient,
             display: "flex",
@@ -274,6 +270,8 @@ const UserMenu = ({ name, email, role, roleLabel }: UserCardProps) => {
         </div>
       </button>
 
+      {trailing}
+
       {profileOpen && <ProfileModal onClose={() => setProfileOpen(false)} />}
 
       {switchTarget && (
@@ -299,7 +297,8 @@ interface SidebarProps {
 
 const Sidebar = ({ footerExtra }: SidebarProps = {}) => {
   const { user, logout } = useAuth();
-  const { t } = useLang();
+  const { t, lang } = useLang();
+  const { pathname } = useLocation();
   const { unreadCount } = useNotifications();
   const { unread: supportUnread } = useSupportUnread();
   const { panel: panelUpd, agent: agentUpd } = useUpdatesNotification();
@@ -316,18 +315,86 @@ const Sidebar = ({ footerExtra }: SidebarProps = {}) => {
   // The owner's company (single company per owner, as everywhere in the panel).
   const myCompanyId = typeof dash?.company_id === "number" ? dash.company_id : null;
 
+  // Every entry this role may open: the Dashboard pinned first (2026-10-09);
+  // for an owner or a manager their explicit order and menu labels next
+  // (withStaffMenu, 2026-10-11); the rest in alphabetical order of the label
+  // in the current language (2026-10-07) — re-sorted when the language changes.
+  const navItems = sortedNavItems(
+    withStaffMenu([
+      { to: "/", labelKey: "nav.dashboard", end: true, show: true, pinnedFirst: true },
+      // Creating a branch is an action on the Branches page (its header
+      // button), not an entry in the navigation.
+      { to: "/branches", labelKey: "nav.branches", show: can(role, "menu.branches") },
+      {
+        to: `/branches/${myBranchId}`,
+        labelKey: "nav.myBranch",
+        show: role === "manager" && myBranchId !== null,
+      },
+      { to: "/branches-map", labelKey: "nav.map", show: can(role, "menu.map") },
+      { to: "/bookings", labelKey: "nav.bookings", show: true },
+      { to: "/bookings/confirm", labelKey: "nav.scan", show: can(role, "menu.scan") },
+      { to: "/tournaments", labelKey: "nav.tournaments", show: can(role, "menu.tournaments") },
+      { to: "/games", labelKey: "nav.games", show: can(role, "menu.games") },
+      { to: "/companies", labelKey: "nav.companies", show: can(role, "menu.companies") },
+      { to: "/revenue", labelKey: "nav.revenue", show: can(role, "revenue.view") },
+      { to: "/shifts", labelKey: "nav.shifts", show: can(role, "shift.manage") },
+      { to: "/expenses", labelKey: "nav.expenses", show: can(role, "menu.expenses") },
+      { to: "/metrics", labelKey: "nav.metrics", show: can(role, "menu.metrics") },
+      {
+        // Straight to the company's own page, the way "My branch" links to the
+        // branch. `/my-company` only redirects, and a link to a route that only
+        // redirects is never the current page — so it never lit up. Prefix
+        // matching now covers the company's branches and revenue pages too.
+        // An owner with no company still goes to `/my-company`, which is where
+        // that is explained.
+        to: myCompanyId !== null ? `/companies/${myCompanyId}` : "/my-company",
+        labelKey: "nav.myCompany",
+        show: can(role, "menu.myCompany"),
+      },
+      { to: "/managers", labelKey: "nav.managers", show: can(role, "menu.managers") },
+      { to: "/owners", labelKey: "nav.owners", show: can(role, "owner.view") },
+      { to: "/security", labelKey: "nav.security", show: can(role, "menu.security") },
+      {
+        to: "/notifications",
+        labelKey: "nav.notifications",
+        show: true,
+        badge: <UnreadBadge count={unreadCount} />,
+      },
+      { to: "/settings", labelKey: "nav.settings", show: true },
+      {
+        to: "/settings/updates",
+        labelKey: "nav.updates",
+        show: can(role, "menu.updates"),
+        badge: <UnreadBadge count={adminUpdateCount} />,
+      },
+      {
+        // Admin already sees both apps under /settings/updates;
+        // owner+manager get this dedicated agent-only entry.
+        to: "/settings/agent-updates",
+        labelKey: "nav.agentUpdates",
+        show: can(role, "menu.agentUpdates") && !can(role, "menu.updates"),
+        badge: <UnreadBadge count={agentUpdateCount} />,
+      },
+    ], role),
+    t,
+    lang,
+  );
+  // Exactly one entry is current: the most specific route containing the page
+  // (`/bookings/confirm` is Scan, not Scan AND Bookings). Plain `Link`s, because
+  // a NavLink decides on its own and two of them can both claim the page.
+  const activeTo = activeNavTo(navItems, pathname);
+
   return (
     <aside className="sidebar">
       {/* Brand row — logo + wordmark. The logo PNG lives in /public,
           so Vite serves it at the root path in both dev and the built
-          electron bundle. Width-limited to keep the header compact;
+          electron bundle. Height-limited to keep the header compact;
           the wordmark wraps onto its own line on a narrow sidebar. */}
       <h1
         style={{
           display: "flex",
           alignItems: "center",
           gap: 10,
-          margin: "0 8px 16px",
         }}
       >
         <img
@@ -335,90 +402,31 @@ const Sidebar = ({ footerExtra }: SidebarProps = {}) => {
           alt=""
           aria-hidden
           style={{
-            width: 28,
-            height: 28,
-            objectFit: "contain",
+            // The mark is 1.64:1, so the height is fixed and the width
+            // follows; 24px keeps it and the wordmark on one 192px row.
+            width: "auto",
+            height: 24,
             flexShrink: 0,
           }}
         />
         <span>CYBER PLACE</span>
       </h1>
       <nav className="sidebar-nav">
-      <NavLink to="/" end>
-        {t("nav.dashboard")}
-      </NavLink>
-      {can(role, "menu.branches") && (
-        // Creating a branch is an action on the Branches page (its header
-        // button), not an entry in the navigation.
-        <NavLink to="/branches">{t("nav.branches")}</NavLink>
-      )}
-      {role === "manager" && myBranchId !== null && (
-        <NavLink to={`/branches/${myBranchId}`}>{t("nav.myBranch")}</NavLink>
-      )}
-      {can(role, "menu.map") && (
-        <NavLink to="/branches-map">{t("nav.map")}</NavLink>
-      )}
-      <NavLink to="/bookings">{t("nav.bookings")}</NavLink>
-      {can(role, "menu.scan") && (
-        <NavLink to="/bookings/confirm">{t("nav.scan")}</NavLink>
-      )}
-      {can(role, "menu.tournaments") && (
-        <NavLink to="/tournaments">{t("nav.tournaments")}</NavLink>
-      )}
-      {can(role, "menu.games") && (
-        <NavLink to="/games">{t("nav.games")}</NavLink>
-      )}
-      {can(role, "menu.companies") && (
-        <NavLink to="/companies">{t("nav.companies")}</NavLink>
-      )}
-      {can(role, "revenue.view") && (
-        <NavLink to="/revenue">{t("nav.revenue")}</NavLink>
-      )}
-      {can(role, "menu.expenses") && (
-        <NavLink to="/expenses">{t("nav.expenses")}</NavLink>
-      )}
-      {can(role, "menu.metrics") && (
-        <NavLink to="/metrics">{t("nav.metrics")}</NavLink>
-      )}
-      {can(role, "menu.myCompany") && (
-        // Straight to the company's own page, the way "My branch" links to the
-        // branch. `/my-company` only redirects, and a link to a route that only
-        // redirects is never the current page — so it never lit up. Prefix
-        // matching now covers the company's branches and revenue pages too.
-        // An owner with no company still goes to `/my-company`, which is where
-        // that is explained.
-        <NavLink to={myCompanyId !== null ? `/companies/${myCompanyId}` : "/my-company"}>
-          {t("nav.myCompany")}
-        </NavLink>
-      )}
-      {can(role, "menu.managers") && (
-        <NavLink to="/managers">{t("nav.managers")}</NavLink>
-      )}
-      {can(role, "owner.view") && (
-        <NavLink to="/owners">{t("nav.owners")}</NavLink>
-      )}
-      {can(role, "menu.security") && (
-        <NavLink to="/security">{t("nav.security")}</NavLink>
-      )}
-      <NavLink to="/notifications">
-        {t("nav.notifications")}
-        <UnreadBadge count={unreadCount} />
-      </NavLink>
-      <NavLink to="/settings">{t("nav.settings")}</NavLink>
-      {can(role, "menu.updates") && (
-        <NavLink to="/settings/updates">
-          {t("nav.updates")}
-          <UnreadBadge count={adminUpdateCount} />
-        </NavLink>
-      )}
-      {can(role, "menu.agentUpdates") && !can(role, "menu.updates") && (
-        // Admin already sees both apps under /settings/updates;
-        // owner+manager get this dedicated agent-only entry.
-        <NavLink to="/settings/agent-updates">
-          {t("nav.agentUpdates")}
-          <UnreadBadge count={agentUpdateCount} />
-        </NavLink>
-      )}
+        {navItems.map((item) => {
+          const active = item.to === activeTo;
+          return (
+            <Link
+              key={item.to}
+              to={item.to}
+              className={active ? "active" : undefined}
+              aria-current={active ? "page" : undefined}
+            >
+              <NavIcon id={item.id} />
+              <span className="nav-label">{item.label}</span>
+              {item.badge}
+            </Link>
+          );
+        })}
       </nav>
       <div className="sidebar-footer">
         {/* Support is not another section of the product — it is the way out of
@@ -445,10 +453,18 @@ const Sidebar = ({ footerExtra }: SidebarProps = {}) => {
           email={user?.email}
           role={role}
           roleLabel={role ? t(`role.${role}`) || role.replace("_", " ") : ""}
+          trailing={
+            <button
+              type="button"
+              className="logout"
+              aria-label={t("nav.signOut")}
+              title={t("nav.signOut")}
+              onClick={() => void logout()}
+            >
+              <NavIcon id="nav.signOut" />
+            </button>
+          }
         />
-        <button className="logout" onClick={() => void logout()}>
-          {t("nav.signOut")}
-        </button>
       </div>
     </aside>
   );

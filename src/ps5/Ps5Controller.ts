@@ -51,6 +51,12 @@ export interface ControllerPorts {
    * shown a sleep that did not happen.
    */
   rest(hostId: string, address: string): Promise<CommandOutcome>;
+  /**
+   * Withdraw a rest that is still in flight, because the console is wanted
+   * awake now. Optional: an older desktop build cannot, and the console is then
+   * woken once the rest has run its course.
+   */
+  cancelRest?(hostId: string): void;
   /** Tell the backend a console woke with no session, so the owner can be asked. */
   reportUnexpectedWake(input: { deviceId: number; hostId: string; eventId: string }): Promise<void>;
   /** Structured, and never carrying a key or a token. */
@@ -65,6 +71,8 @@ export interface ConsoleInput {
   hostId: string;
   address: string | null;
   actual: Observation["actual"];
+  /** When the console last really answered; see {@link Observation.heardAt}. */
+  heardAt?: number;
   hasSession: boolean;
   starting: boolean;
   stopping: boolean;
@@ -107,6 +115,13 @@ const RETRY_BACKOFF_MS = 30_000;
  */
 const RESEND_COOLDOWN_MS = 20_000;
 
+/**
+ * Right after a press the cooldowns are lifted, but the same datagram is still
+ * not sent more than once a second: the board re-renders several times a
+ * second and each render is a tick (measured: five wakes in one second).
+ */
+const URGENT_RESEND_MS = 1_000;
+
 export class Ps5Controller {
   private readonly snapshots = new Map<string, MachineSnapshot>();
   private readonly inFlight = new Map<string, Command["kind"]>();
@@ -117,6 +132,17 @@ export class Ps5Controller {
   private readonly sentAt = new Map<string, number>();
   /** Wakes the backend has accepted, so the owner is asked once per event. */
   private readonly reported = new Set<string>();
+  /**
+   * What each console's machine wanted on its latest tick. A command that comes
+   * back after the wish has turned the other way (a rest still retrying when a
+   * session started) is stale: its failure says nothing about the command that
+   * is wanted now, so it must not start a backoff or paint an error.
+   */
+  private readonly desired = new Map<string, MachineSnapshot["desired"]>();
+  /** Consoles whose in-flight rest has already been withdrawn, so it is asked once. */
+  private readonly cancelAsked = new Set<string>();
+  /** A wake sent while a withdrawn rest still holds the in-flight slot. */
+  private readonly wakeOnTheWire = new Set<string>();
 
   constructor(private readonly ports: ControllerPorts) {}
 
@@ -136,7 +162,26 @@ export class Ps5Controller {
       this.lastError.delete(hostId);
       this.sentAt.delete(`${hostId}:wake`);
       this.sentAt.delete(`${hostId}:rest`);
+      this.desired.delete(hostId);
+      this.cancelAsked.delete(hostId);
+      this.wakeOnTheWire.delete(hostId);
     }
+  }
+
+  /**
+   * An operator has just pressed Start or Stop on this console: a fresh intent.
+   *
+   * What went wrong before the press belongs to the previous intent. A rest that
+   * failed must not hold the wake back for thirty seconds, and a wake that gave
+   * up an hour ago must not stop this one being tried; the give-up clock starts
+   * again from this press. The machine still decides only from what the console
+   * is observed to be.
+   */
+  pressed(hostId: string): void {
+    this.failedAt.delete(hostId);
+    this.lastError.delete(hostId);
+    const snapshot = this.snapshots.get(hostId);
+    if (snapshot) this.snapshots.set(hostId, { ...snapshot, wakingSince: null, error: null });
   }
 
   /**
@@ -163,10 +208,26 @@ export class Ps5Controller {
       canWake: input.canWake,
       commandError: this.lastError.get(input.hostId) ?? null,
       decision: input.decision,
+      pressed: input.urgent === true,
+      heardAt: input.heardAt,
       now: this.ports.now(),
     }, this.ports.newId());
 
     this.snapshots.set(input.hostId, next);
+    this.desired.set(input.hostId, next.desired);
+
+    // The latest wish wins: a rest still being retried is withdrawn as soon as
+    // the console is wanted for anything other than rest.
+    if (this.inFlight.get(input.hostId) === "rest" && next.desired !== "rest" && !this.cancelAsked.has(input.hostId)) {
+      this.cancelAsked.add(input.hostId);
+      this.ports.log("PS5_REST_WITHDRAWN", { hostId: input.hostId, desired: next.desired });
+      try {
+        this.ports.cancelRest?.(input.hostId);
+      } catch {
+        // Best effort: the rest then runs its course and the console is woken
+        // from what it is observed to be.
+      }
+    }
 
     if (previous.state !== next.state) {
       this.ports.log("PS5_STATE_CHANGED", {
@@ -219,9 +280,22 @@ export class Ps5Controller {
     // Pressing Start three times must produce one wake, not three. This one
     // holds even for an urgent request: a command already on the wire is not
     // made faster by sending it twice.
-    if (this.inFlight.has(input.hostId)) return;
+    //
+    // One exception (2026-10-19): a rest that has been withdrawn may still be
+    // finishing an attempt for up to twenty seconds (measured), and the wake a
+    // fresh Start needs is a single UDP datagram that does not touch that TCP
+    // session. Waiting for it is what made some Starts late.
+    const overtakesWithdrawnRest = command.kind === "wake"
+      && this.inFlight.get(input.hostId) === "rest" && this.cancelAsked.has(input.hostId);
+    if (this.inFlight.has(input.hostId) && !overtakesWithdrawnRest) return;
+    if (overtakesWithdrawnRest && this.wakeOnTheWire.has(input.hostId)) return;
 
     const sentKey = `${input.hostId}:${command.kind}`;
+
+    if (input.urgent) {
+      const sentAt = this.sentAt.get(sentKey);
+      if (sentAt !== undefined && this.ports.now() - sentAt < URGENT_RESEND_MS) return;
+    }
 
     if (!input.urgent) {
       const failedAt = this.failedAt.get(input.hostId);
@@ -240,7 +314,13 @@ export class Ps5Controller {
       return;
     }
 
+    if (overtakesWithdrawnRest) {
+      await this.sendWakeBesideRest(input, sentKey);
+      return;
+    }
+
     this.inFlight.set(input.hostId, command.kind);
+    this.cancelAsked.delete(input.hostId);
     this.sentAt.set(sentKey, this.ports.now());
     this.ports.log(command.kind === "wake" ? "PS5_WAKE_REQUESTED" : "PS5_REST_REQUESTED", {
       hostId: input.hostId, deviceId: input.deviceId,
@@ -259,6 +339,13 @@ export class Ps5Controller {
         return;
       }
 
+      if (outcome.code === "CANCELLED" || this.superseded(input.hostId, command.kind)) {
+        // Withdrawn, or answered after the wish turned the other way. Not a
+        // failure of what is wanted now, so no backoff and no error on the tile.
+        this.ports.log("PS5_COMMAND_SUPERSEDED", { hostId: input.hostId, command: command.kind, code: outcome.code });
+        return;
+      }
+
       this.failedAt.set(input.hostId, this.ports.now());
       this.lastError.set(input.hostId, outcome.code ?? "TRANSPORT_ERROR");
       this.snapshots.set(
@@ -269,6 +356,10 @@ export class Ps5Controller {
         hostId: input.hostId, command: command.kind, code: outcome.code, detail: outcome.detail,
       });
     } catch (error) {
+      if (this.superseded(input.hostId, command.kind)) {
+        this.ports.log("PS5_COMMAND_SUPERSEDED", { hostId: input.hostId, command: command.kind, code: "THREW" });
+        return;
+      }
       this.failedAt.set(input.hostId, this.ports.now());
       this.snapshots.set(
         input.hostId,
@@ -280,6 +371,39 @@ export class Ps5Controller {
       });
     } finally {
       this.inFlight.delete(input.hostId);
+      this.cancelAsked.delete(input.hostId);
     }
+  }
+
+  /**
+   * A wake sent while a withdrawn rest is still finishing. It does not take the
+   * console's in-flight slot (the rest still owns it and releases it), and its
+   * failure is recorded like any wake's.
+   */
+  private async sendWakeBesideRest(input: ConsoleInput, sentKey: string): Promise<void> {
+    if (!input.address) return;
+    this.wakeOnTheWire.add(input.hostId);
+    this.sentAt.set(sentKey, this.ports.now());
+    this.ports.log("PS5_WAKE_REQUESTED", { hostId: input.hostId, deviceId: input.deviceId, besideRest: true });
+    try {
+      const outcome = await this.ports.wake(input.hostId, input.address);
+      if (!outcome.sent && !this.superseded(input.hostId, "wake")) {
+        this.lastError.set(input.hostId, outcome.code ?? "TRANSPORT_ERROR");
+        this.ports.log("PS5_TRANSPORT_ERROR", { hostId: input.hostId, command: "wake", code: outcome.code, detail: outcome.detail });
+      }
+    } catch (error) {
+      this.ports.log("PS5_TRANSPORT_ERROR", {
+        hostId: input.hostId, command: "wake", detail: error instanceof Error ? error.message : String(error),
+      });
+    } finally {
+      this.wakeOnTheWire.delete(input.hostId);
+    }
+  }
+
+  /** Whether the console is no longer wanted the way this command would leave it. */
+  private superseded(hostId: string, kind: Command["kind"]): boolean {
+    const wanted = this.desired.get(hostId);
+    if (wanted === undefined) return false;
+    return kind === "wake" ? wanted !== "active" : wanted !== "rest";
   }
 }
