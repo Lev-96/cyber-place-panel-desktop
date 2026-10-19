@@ -14,7 +14,7 @@ import { useLang } from "@/i18n/LanguageContext";
 import { shiftRepository } from "@/repositories/ShiftRepository";
 import { parseCents, toAmount } from "@/shifts/cash";
 import type { IShiftWithReport } from "@/types/shifts";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 
 /**
@@ -79,6 +79,17 @@ const Shift = () => {
   };
 
   const live = current.data;
+  const isOpen = Boolean(live?.shift);
+
+  // An open shift's figures are "as of" the last read: re-read every minute so
+  // the duration and the money stay current. Paused while closing, so the
+  // dialog's figures are the ones the cashier is looking at.
+  useEffect(() => {
+    if (!isOpen || closing) return;
+    const timer = setInterval(() => { void current.reload(); }, 60_000);
+    return () => clearInterval(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, closing]);
 
   return (
     <div className="col" style={{ gap: 18 }}>

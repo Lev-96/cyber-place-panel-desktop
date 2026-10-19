@@ -10,9 +10,13 @@ import { fmt } from "@/i18n/translations";
 import { useConfirm } from "@/components/ui/ConfirmProvider";
 import { notify } from "@/ui/notify";
 import { sharedPrecision } from "@/i18n/currency";
+import { toAmount } from "@/shifts/cash";
 import { sessionRepository } from "@/repositories/SessionRepository";
 import { ISessionApi } from "@/types/sessions";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import CashChangePanel from "@/components/payments/CashChangePanel";
+import { billCents, cashChange } from "@/components/payments/cashChange";
+import type { ICashHandover } from "@/api/sessions";
 
 interface Props {
   session: ISessionApi;
@@ -47,6 +51,12 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved }: Prop
   const [method, setMethod] = useState<PaymentMethod>("cash");
   const [other, setOther] = useState("");
   const [stopped, setStopped] = useState<IBillBreakdown | null>(null);
+  // Cash only: the banknotes handed over, for the change. Cleared on every
+  // method switch, so an amount typed for cash never rides along with card.
+  const [received, setReceived] = useState("");
+  const [handover, setHandover] = useState<ICashHandover | null>(null);
+  /** Synchronous guard: a double click arrives before `busy` re-renders. */
+  const stoppingNow = useRef(false);
 
   const reload = async () => {
     try {
@@ -87,7 +97,13 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved }: Prop
     } finally { setBusy(false); }
   };
 
+  // Nothing to pay, nothing to change: a waived bill asks for no banknotes.
+  const asksForCash = method === "cash" && bill !== null && !bill.is_free;
+  const change = asksForCash ? cashChange(billCents(bill.total), received) : null;
+  const cashBlocks = change !== null && (change.state === "short" || change.state === "invalid");
+
   const confirmStop = async () => {
+    if (stoppingNow.current || cashBlocks) return;
     // ⚠️ Checked here so the cashier is told BEFORE the request, but the server
     // enforces the same rule and is what actually decides — this is a courtesy,
     // not the guard. A stop refused for a missing note leaves the seat running.
@@ -96,20 +112,33 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved }: Prop
       return;
     }
 
+    stoppingNow.current = true;
     setBusy(true); setErr(null);
     try {
       const r = await sessionRepository.stop(session.id, {
         payment_method: method,
+        ...(change?.state === "ok" ? { cash_received: toAmount(change.receivedCents) } : {}),
         // Sent only for `other`: the server strips it for the other two, and a
         // card payment carrying a note called "Idram" is a contradiction the
         // history would then have to display.
         ...(method === "other" ? { payment_method_other: other.trim() } : {}),
       });
       setStopped(r.breakdown);
+      setHandover(r.cash ?? null);
       onConfirmed();
     } catch (e) {
-      setErr(e instanceof Error ? e.message : "Failed to stop");
+      // An open place kept billing while the guest counted: the server's bill
+      // is now above the banknotes. Re-read it so the shortfall shows.
+      if (change?.state === "ok" && (e as { status?: number }).status === 422) {
+        setErr(t("session.cashBillGrew"));
+        // Not `reload()`: it clears the error this line just set.
+        void sessionRepository.preview(session.id).then(setBill).catch(() => {});
+      } else {
+        setErr(e instanceof Error ? e.message : "Failed to stop");
+      }
       setBusy(false);
+    } finally {
+      stoppingNow.current = false;
     }
   };
 
@@ -269,10 +298,27 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved }: Prop
           <PaymentMethodPicker
             name={`pay-${session.id}`}
             method={method}
-            onMethod={(m) => { setMethod(m); setErr(null); }}
+            onMethod={(m) => { setMethod(m); setReceived(""); setErr(null); }}
             note={other}
             onNote={(v) => { setOther(v); setErr(null); }}
             disabled={busy}
+          />
+        )}
+
+        {!finished && asksForCash && bill && change && (
+          <CashChangePanel
+            dueCents={billCents(bill.total)}
+            received={received}
+            onReceived={(v) => { setReceived(v); setErr(null); }}
+            change={change}
+            disabled={busy}
+          />
+        )}
+        {finished && handover && (
+          <CashChangePanel
+            dueCents={billCents(view?.total ?? 0)}
+            received={handover.received}
+            change={{ state: "ok", receivedCents: billCents(handover.received), changeCents: billCents(handover.change) }}
           />
         )}
 
@@ -284,7 +330,7 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved }: Prop
           ) : (
             <>
               <Button variant="secondary" onClick={onClose} disabled={busy}>{t("action.cancel")}</Button>
-              <Button onClick={confirmStop} disabled={busy || !bill}>
+              <Button onClick={confirmStop} disabled={busy || !bill || cashBlocks} data-testid="stop-confirm">
                 {busy ? t("session.closing") : t("session.confirmStop")}
               </Button>
             </>

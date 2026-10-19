@@ -38,7 +38,7 @@ import {
   apiSetSessionItemQty,
   apiStartSession,
   apiStopSessionWithBreakdown,
-  IBillBreakdown,
+  IBillBreakdown, ICashHandover,
   ListSessionsParams,
   StartSessionBody,
 } from "@/api/sessions";
@@ -49,6 +49,8 @@ import { IPcApi, ISessionApi, ITimePackage } from "@/types/sessions";
 export interface StopResult {
   session: ISessionApi;
   breakdown: IBillBreakdown;
+  /** Absent from servers before 2026-10-19; null when no amount was typed. */
+  cash?: ICashHandover | null;
 }
 
 export class SessionRepository {

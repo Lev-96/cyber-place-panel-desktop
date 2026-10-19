@@ -8,7 +8,9 @@ import type { IShift, IShiftReport } from "@/types/shifts";
  * and a report frozen before them (v1) still readable without them.
  */
 vi.mock("@/i18n/LanguageContext", () => ({
-  useLang: () => ({ t: (k: string) => k, lang: "en", money: (n: number) => n.toFixed(2) }),
+  // Count keys keep their placeholder, so the counts really reach the screen
+  // and a count glued to an amount is visible to the assertions.
+  useLang: () => ({ t: (k: string) => (k.endsWith("Counts") ? `${k} {0}` : k), lang: "en", money: (n: number) => n.toFixed(2) }),
 }));
 import ShiftReportView from "./ShiftReportView";
 
@@ -59,5 +61,42 @@ describe("the report on screen", () => {
     expect(screen.queryByTestId("shift-seats")).toBeNull();
     expect(screen.queryByTestId("shift-bookings-created")).toBeNull();
     expect(screen.queryByTestId("shift-lines")).toBeNull();
+  });
+});
+
+/**
+ * The staging shift that read "Продажи на кассе 23 000" (2026-10-19): two sales
+ * worth 3 000, the count "2" printed right before the amount. The count now
+ * lives in its own element under the label; the amount element holds the
+ * amount and nothing else.
+ */
+describe("figures never run together", () => {
+  const live: IShift = { ...shift, status: "open", closed_at: null, closed_by: null, counted_cash: null, cash_difference: null, difference_kind: null };
+  const twoSales: IShiftReport = {
+    ...v1,
+    places: { ...v1.places, closed_count: 0, total: "0.00", by_method: { cash: "0.00", card: "0.00", other: "0.00", unrecorded: "0.00" } },
+    till: { ...v1.till, paid_count: 2, total: "3000.00", by_method: { cash: "600.00", card: "2400.00", deposit: "0.00", other: "0.00" } },
+    revenue_total: "3000.00",
+    by_method: { cash: "600.00", card: "2400.00", other: "0.00", deposit: "0.00", unrecorded: "0.00" },
+    cash: { opening: "50000.00", places: "0.00", till: "600.00", expected: "50600.00" },
+  };
+
+  test("the till's count and amount are separate elements", () => {
+    render(<ShiftReportView shift={live} report={twoSales} />);
+    const till = screen.getByTestId("shift-revenue-till");
+    const strong = till.querySelector("strong")!;
+    expect(strong.textContent).toBe("3000.00");
+    expect(till.textContent).toContain("shift.tillCounts 2");
+    expect(till.textContent).not.toContain("23000");
+    expect(screen.getByTestId("shift-revenue-total").querySelector("strong")!.textContent).toBe("3000.00");
+    expect(screen.getByTestId("shift-cash-expected").textContent).toContain("50600.00");
+  });
+
+  test("an open shift's header names each fact above its value and says the figures are as of the last read", () => {
+    render(<ShiftReportView shift={live} report={twoSales} />);
+    expect(screen.getByTestId("shift-status").textContent).toBe("shift.headerOpen");
+    expect(screen.getByText("shift.asOf")).toBeTruthy();
+    expect(screen.queryByText("shift.closedBy")).toBeNull();
+    expect(screen.getByTestId("shift-duration").textContent).toContain("16 time.hourShort 0 time.minShort");
   });
 });

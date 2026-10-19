@@ -14,6 +14,9 @@ import { shiftAmount } from "@/shifts/cash";
 import type { DifferenceKind, IShift, IShiftWithReport, ShiftHistoryFilters } from "@/types/shifts";
 import { useEffect, useMemo, useState } from "react";
 
+/** "2026-10-19" (the date input's value) → "19.10.2026". */
+const formatDate = (ymd: string): string => ymd.split("-").reverse().join(".");
+
 /**
  * The shift history, filtered and paged on the server (2026-10-19).
  *
@@ -102,6 +105,19 @@ const ShiftHistory = ({ fixedBranchId, canPickStaff }: Props) => {
   const active = (fixedBranchId ? 0 : Number(branchId !== undefined)) + Number(staffId !== undefined)
     + Number(from !== "") + Number(to !== "") + Number(status !== undefined) + Number(discrepancy !== undefined);
 
+  // What is on, said in words, each removable on its own.
+  const branchName = (branches.data ?? []).find((b) => b.id === branchId);
+  const staffName = (staff.data ?? []).find((u) => u.id === staffId)?.name;
+  const chips: Array<{ key: string; label: string; clear: () => void }> = [
+    ...(!fixedBranchId && branchId !== undefined
+      ? [{ key: "branch", label: `${t("shift.filter.branch")}: ${branchName ? branchLabel(branchName) : `№${branchId}`}`, clear: () => setBranchId(undefined) }] : []),
+    ...(staffId !== undefined && staffName ? [{ key: "staff", label: `${t("shift.filter.staff")}: ${staffName}`, clear: () => setStaffId(undefined) }] : []),
+    ...(from ? [{ key: "from", label: `${t("shift.filter.from")}: ${formatDate(from)}`, clear: () => setFrom("") }] : []),
+    ...(to ? [{ key: "to", label: `${t("shift.filter.to")}: ${formatDate(to)}`, clear: () => setTo("") }] : []),
+    ...(status ? [{ key: "status", label: `${t("shift.filter.status")}: ${t(status === "open" ? "shift.statusOpen" : "shift.statusClosed")}`, clear: () => setStatus(undefined) }] : []),
+    ...(discrepancy ? [{ key: "diff", label: `${t("shift.difference")}: ${t(discrepancy === "any" ? "shift.filter.anyDifference" : KIND_KEY[discrepancy])}`, clear: () => setDiscrepancy(undefined) }] : []),
+  ];
+
   const showReport = async (shift: IShift) => {
     setOpening(shift.id);
     setErr(null);
@@ -185,6 +201,16 @@ const ShiftHistory = ({ fixedBranchId, canPickStaff }: Props) => {
         )}
       </div>
 
+      {chips.length > 0 && (
+        <div className="row" style={{ gap: 6, flexWrap: "wrap" }} data-testid="shift-filter-chips">
+          {chips.map((c) => (
+            <button key={c.key} type="button" className="chip" style={chip} onClick={c.clear} aria-label={`${t("shift.filter.remove")}: ${c.label}`}>
+              {c.label} <span aria-hidden>×</span>
+            </button>
+          ))}
+        </div>
+      )}
+
       {err && <div className="error" style={{ whiteSpace: "pre-line" }}>{err}</div>}
       {list.data?.meta && (
         <span className="muted" style={{ fontSize: 12 }} data-testid="shift-history-total">
@@ -253,6 +279,11 @@ const ShiftHistory = ({ fixedBranchId, canPickStaff }: Props) => {
       )}
     </div>
   );
+};
+
+const chip: React.CSSProperties = {
+  padding: "4px 10px", borderRadius: 999, fontSize: 12, cursor: "pointer",
+  background: "var(--color-surface-alt)", color: "var(--color-text)", border: "1px solid var(--color-border)",
 };
 
 const stripEmpty = (f: ShiftHistoryFilters): ShiftHistoryFilters =>

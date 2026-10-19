@@ -109,6 +109,25 @@ describe("the owner's filters", () => {
     await waitFor(() => expect(lastCall()).toEqual(expect.objectContaining({ status: "open", page: 1 })));
   });
 
+  test("each active filter shows as a chip in words, and removing one keeps the others", async () => {
+    await mount({ canPickStaff: true });
+    await waitFor(() => expect(screen.getByText("Abovyan 1, Yerevan")).toBeTruthy());
+    expect(screen.queryByTestId("shift-filter-chips")).toBeNull();
+    await act(async () => {
+      select("shift-filter-branch", "1");
+      fireEvent.change(screen.getByTestId("shift-filter-from"), { target: { value: "2026-10-01" } });
+      select("shift-filter-discrepancy", "shortage");
+    });
+    const chips = screen.getByTestId("shift-filter-chips");
+    expect(chips.textContent).toContain("Abovyan 1, Yerevan");
+    expect(chips.textContent).toContain("01.10.2026");
+    expect(chips.textContent).toContain("shift.kind.shortage");
+
+    const fromChip = Array.from(chips.querySelectorAll("button")).find((b) => b.textContent?.includes("01.10.2026"))!;
+    await act(async () => { fireEvent.click(fromChip); });
+    await waitFor(() => expect(lastCall()).toEqual({ branch_id: 1, discrepancy: "shortage", page: 1, per_page: 20 }));
+  });
+
   test("reset clears every filter and says how many were on", async () => {
     await mount({ canPickStaff: true });
     await act(async () => {

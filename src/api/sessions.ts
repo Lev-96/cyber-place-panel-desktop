@@ -206,10 +206,21 @@ export interface StopSessionBody {
   payment_method?: PaymentMethod;
   /** Required by the server ONLY when the method is `other`. */
   payment_method_other?: string;
+  /**
+   * Cash only, optional: the banknotes handed over, for the change. Never sent
+   * for card or other (the server drops it there too). Not the bill.
+   */
+  cash_received?: string;
+}
+
+/** What was handed over and handed back, from the stored bill; null when not typed. */
+export interface ICashHandover {
+  received: string;
+  change: string;
 }
 
 export const apiStopSessionWithBreakdown = (id: number, body?: StopSessionBody) =>
-  request<{ session: ISessionApi; breakdown: IBillBreakdown }>(`/sessions/${id}/stop`, {
+  request<{ session: ISessionApi; breakdown: IBillBreakdown; cash?: ICashHandover | null }>(`/sessions/${id}/stop`, {
     method: "POST",
     body,
   });
