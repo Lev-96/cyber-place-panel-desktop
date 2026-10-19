@@ -1205,6 +1205,14 @@ Two things that look like oversights and are not:
   guard so one press sends one close), history with each saved report. Every
   figure is the server's decimal string; the screen formats it
   (`shiftAmount`, cents shown when present) and never computes it.
+- **Shift history (2026-10-19)** — `src/components/shifts/ShiftHistory.tsx`,
+  used by the company screen `/shifts` (sidebar "Смены", rank after Revenue)
+  and by the branch shift screen (branch fixed). Filters branch → staff (owner/
+  admin only; the list is `/shifts/staff` of the picked branch and a pick not
+  in the new branch is dropped) → from/to → status → difference; one server
+  request, page 1 on any change (the `{key, page}` idiom), reset with a count;
+  nothing filtered client-side. Report v2 blocks (seats, platforms, bookings,
+  "what the totals are made of") render only when present, so v1 reports open.
 
 Product READS stay open to everyone: the POS sells from that list, and the
 manager's screen is the list plus a search box with no write control on it.
