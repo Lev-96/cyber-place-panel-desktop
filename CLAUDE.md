@@ -1213,6 +1213,18 @@ Two things that look like oversights and are not:
   request, page 1 on any change (the `{key, page}` idiom), reset with a count;
   nothing filtered client-side. Report v2 blocks (seats, platforms, bookings,
   "what the totals are made of") render only when present, so v1 reports open.
+- **Report layout (2026-10-19 evening).** Header facts are label-above-value
+  (`Fact`), status said in words; one large revenue figure with its parts;
+  every count sits on its own line UNDER its label, never next to an amount
+  (the till's "2" beside "3 000" read as "23 000"). An open shift reads
+  "Данные на" (figures as of the last read) and re-reads every 60 s, paused
+  while the close dialog is up. History shows active filters as removable
+  chips.
+- **Change at the stop** — `components/payments/cashChange.ts` (cents, no
+  float) + `CashChangePanel`. Cash only, optional, cleared on every method
+  switch; short/invalid blocks Confirm; a ref guards double clicks; 422 after
+  the bill grew says so and re-reads the bill. Only `cash_received` is sent;
+  after the stop the figures shown are the server's `cash`.
 
 Product READS stay open to everyone: the POS sells from that list, and the
 manager's screen is the list plus a search box with no write control on it.
