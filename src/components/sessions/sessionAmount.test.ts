@@ -679,3 +679,46 @@ describe("a limited pause stops counting at its limit, before anyone presses Res
     expect(sessionTimeCostAt(s, AT)).toBe(750);
   });
 });
+
+/**
+ * A planned hourly start (2026-10-25): its share of the plan inside the
+ * planned time, the rate past it — the backend's `timeCostStringAt`, so a
+ * total set by hand reads on the card exactly as the receipt bills it.
+ */
+describe("a planned hourly start bills its share of the plan", () => {
+  // 2 500 for three hours, set by hand: 833.33/h, which rate × clock would
+  // turn into 2 499.99 at the end.
+  const planned = (minutesAgo: number) => session({
+    mode: "fixed", time_package_id: null, hourly_rate: 833.33,
+    started_at: ago(minutesAgo), ends_at: ahead(180 - minutesAgo),
+    committed_until: ahead(180 - minutesAgo), committed_amount: 2500,
+  });
+
+  test.each([
+    [0, 0],
+    [90, 1250],
+    [180, 2500],
+  ])("%i minutes in: %d", (minutes, amount) => {
+    const s = planned(minutes);
+    expect(sessionTimeCostAt(s, AT)).toBe(amount);
+  });
+
+  test("past its end it runs on at the rate", () => {
+    const s = session({
+      mode: "fixed", time_package_id: null, hourly_rate: 833.33,
+      started_at: ago(210), ends_at: ago(30), committed_until: ago(30), committed_amount: 2500,
+    });
+    expect(sessionTimeCostAt(s, AT)).toBe(2916.67);
+  });
+
+  test("a package seat is untouched: still its rate × the clock, never a share", () => {
+    // A committed figure that is NOT the package's price: a share of it would
+    // read 4 999.5 at half time; the package's own rate reads 1 250.
+    const s = session({
+      mode: "fixed", time_package_id: 5, hourly_rate: null,
+      time_package: { id: 5, duration_minutes: 180, price: 2500 } as ISessionApi["time_package"],
+      started_at: ago(90), ends_at: ahead(90), committed_until: ahead(90), committed_amount: 9999,
+    });
+    expect(sessionTimeCostAt(s, AT)).toBe(1250);
+  });
+});

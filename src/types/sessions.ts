@@ -241,6 +241,8 @@ export interface ISessionApi {
    * the session unlimited. {@see sessionTimeCostAt}.
    */
   time_package?: ITimePackage | null;
+  /** The package's id; null on a planned hourly start, which has none. */
+  time_package_id?: number | null;
 
   /* ---- added 2026-09-03; every field above is unchanged ---------------- */
 

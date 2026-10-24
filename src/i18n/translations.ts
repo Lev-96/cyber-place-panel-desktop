@@ -686,6 +686,15 @@ export const TRANSLATIONS: Dict = {
     ru: "Оставьте пустым: сессия без конца, как раньше",
     am: "Թողեք դատարկ՝ առանց ավարտի սեսիայի համար",
   },
+  "session.plannedEditTotal": { en: "Change the total price", ru: "Изменить итоговую цену", am: "Փոխել ընդհանուր գինը" },
+  "session.plannedTotal": { en: "Total price", ru: "Итоговая цена", am: "Ընդհանուր գին" },
+  "session.plannedTotalInvalid": {
+    en: "Enter a price above zero",
+    ru: "Введите цену больше нуля",
+    am: "Մուտքագրեք զրոյից մեծ գին",
+  },
+  "session.plannedStandard": { en: "standard", ru: "стандартно", am: "ստանդարտ" },
+  "history.priceSetByHand": { en: "price set by hand", ru: "цена изменена вручную", am: "գինը փոխվել է ձեռքով" },
   "session.planLine": { en: "plan {0}", ru: "план {0}", am: "պլան {0}" },
   "session.timeUnitHours": { en: "Hours", ru: "Часы", am: "Ժամ" },
   // Says the resolved figure back before it is granted, because the mistake

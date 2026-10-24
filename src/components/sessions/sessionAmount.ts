@@ -86,6 +86,21 @@ export const sessionTimeCostAt = (session: ISessionApi, at: number): number => {
   // figure anybody agreed to and is safer than billing the seat nothing.
   const tariff = tariffHourlyRate(session);
 
+  // A planned hourly start (2026-10-25) bills its SHARE of the plan inside the
+  // planned time and the rate past it — mirrors `Session::timeCostStringAt`,
+  // so a total set by hand reads on the card exactly as the receipt bills it.
+  if (tariff !== null && session.time_package_id == null && !session.time_package
+      && session.committed_amount !== null && session.committed_amount !== undefined
+      && session.committed_until) {
+    const planned = playedSecondsBetween(session, session.started_at, Date.parse(session.committed_until));
+    const played = playedSecondsBetween(session, session.started_at, at);
+    if (planned > 0) {
+      return played <= planned
+        ? round2((committed * played) / planned)
+        : round2(committed + perSecond(tariff, played - planned));
+    }
+  }
+
   return tariff === null
     ? round2(committed)
     : perSecond(tariff, playedSecondsBetween(session, session.started_at, at));

@@ -37,6 +37,12 @@ export interface StartSessionBody {
    * any timed seat, extendable with "+ Время". Never sent with a package.
    */
   duration_minutes?: number;
+  /**
+   * The TOTAL for that length, set by hand (2026-10-25). Kept exactly; the
+   * seat runs at the rate it implies, and the full time bills exactly this.
+   * Sent instead of `hourly_rate`, only with `duration_minutes`.
+   */
+  planned_amount?: number;
 }
 
 /** What "+ Время" would charge for N minutes now — the server's own figure. */
@@ -52,6 +58,8 @@ export interface IStartQuote {
   minutes: number;
   hourly_rate: number;
   amount: number;
+  /** What the seat's own rate would ask for these minutes; null when it has none. */
+  standard_amount: number | null;
 }
 
 export interface ExtendSessionBody {
@@ -459,10 +467,12 @@ export const apiSessionTimeQuote = (sessionId: number, minutes: number) =>
   request<ITimeQuote>(`/sessions/${sessionId}/time-quote?minutes=${minutes}`);
 
 /** ⚠️ ADVICE: `apiStartSession` is what creates the session. Writes nothing. */
-export const apiStartQuote = (pcId: number, minutes: number, hourlyRate?: number) =>
+export const apiStartQuote = (pcId: number, minutes: number, hourlyRate?: number, plannedAmount?: number) =>
   request<IStartQuote>(
     `/sessions/start-quote?pc_id=${pcId}&minutes=${minutes}`
-      + (hourlyRate !== undefined ? `&hourly_rate=${hourlyRate}` : ""),
+      + (plannedAmount !== undefined
+        ? `&planned_amount=${plannedAmount}`
+        : hourlyRate !== undefined ? `&hourly_rate=${hourlyRate}` : ""),
   );
 
 export const apiSessionExtensionOptions = (sessionId: number, minutes: number) =>

@@ -98,6 +98,9 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
   const [isFree, setIsFree] = useState(false);
   // The optional planned length (2026-10-25), hours by default, empty = none.
   const [plan, setPlan] = useState<{ unit: DurationUnit; amount: string }>({ unit: "hours", amount: "" });
+  // The plan's TOTAL set by hand (2026-10-25), in AMD as `PriceInput` keeps it.
+  const [editTotal, setEditTotal] = useState(false);
+  const [totalInput, setTotalInput] = useState("");
 
   // A failed read is kept as such: the dialog used to wait on it for ever (no
   // catch), and "no packages" would be a lie. Open mode still works without it.
@@ -178,12 +181,22 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
   const planInvalid = plan.amount.trim() !== "" && planMinutes === null;
   const planApplies = !isFree && mode === "open";
   const typedRate = overrideApplied ? customRateNum : undefined;
+  const totalNum = Number(totalInput);
+  const totalValid = Number.isFinite(totalNum) && totalNum > 0;
+  // A total set by hand is sent INSTEAD of a rate: the seat runs at the rate
+  // it implies, and the server keeps the total exactly.
+  const typedTotal = editTotal && totalValid ? totalNum : undefined;
   const planQuote = useServerQuote<IStartQuote>(
-    planApplies ? planMinutes : null,
-    (m) => sessionRepository.startQuote(pc.id, m, typedRate),
-    `${pc.id}|${typedRate ?? ""}`,
+    planApplies && (!editTotal || totalValid) ? planMinutes : null,
+    (m) => sessionRepository.startQuote(pc.id, m, typedRate, typedTotal),
+    `${pc.id}|${typedRate ?? ""}|${typedTotal ?? ""}`,
   );
-  const planPriced = quoteFor(planQuote, planMinutes) !== null;
+  const quotedPlan = quoteFor(planQuote, planMinutes);
+  // Priced for exactly what is on screen: the length AND, when set by hand,
+  // the total — a reply for an earlier figure never starts a seat.
+  const planPriced = quotedPlan !== null
+    && (typedTotal === undefined || Math.round(quotedPlan.amount * 100) === Math.round(typedTotal * 100));
+  const planByHand = planMinutes !== null && typedTotal !== undefined;
 
   const toggleEditPrice = (next: boolean) => {
     setEditPrice(next);
@@ -256,8 +269,9 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
           pc_id: pc.id,
           mode: "open",
           user_display_name: pc.label,
-          ...(overrideApplied ? { hourly_rate: customRateNum } : {}),
+          ...(overrideApplied && !planByHand ? { hourly_rate: customRateNum } : {}),
           ...(planMinutes !== null ? { duration_minutes: planMinutes } : {}),
+          ...(planByHand ? { planned_amount: typedTotal } : {}),
           ...psnField,
         });
       }
@@ -288,9 +302,12 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
   // exact case free is for: a demo stand, a tournament machine, a seat given
   // back after an outage. The server lifts the same refusal for the same reason.
   const startDisabled =
-    busy || deviceOffline || !psnValid || (!isFree && mode === "open" && (editPrice ? !overrideApplied : assignedRate === null))
+    busy || deviceOffline || !psnValid
+    // A total set by hand prices the seat itself, so no seat rate is needed.
+    || (!isFree && mode === "open" && !planByHand && (editPrice ? !overrideApplied : assignedRate === null))
     // A plan is started only on the server's own figure for it.
-    || (planApplies && (planInvalid || (planMinutes !== null && !planPriced)));
+    || (planApplies && (planInvalid || (planMinutes !== null && !planPriced)))
+    || (planApplies && planMinutes !== null && editTotal && !totalValid);
 
   return (
     <Modal open onClose={onClose}>
@@ -418,12 +435,46 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
                   {planMinutes === null && plan.amount.trim() === "" ? (
                     <span className="muted" style={{ fontSize: 11 }}>{t("session.plannedNone")}</span>
                   ) : (
-                    <QuotedPrice
-                      label={t("session.plannedPrice")}
-                      hint={t("session.plannedHint")}
-                      quote={planQuote}
-                      amountOf={(q) => q.amount}
-                    />
+                    <>
+                      <QuotedPrice
+                        label={t("session.plannedPrice")}
+                        hint={t("session.plannedHint")}
+                        quote={planQuote}
+                        amountOf={(q) => q.amount}
+                        // Set by hand: the rate it implies and what the seat
+                        // would have asked, so a deal is visibly a deal.
+                        noteOf={(q) => (typedTotal === undefined ? null : [
+                          `${money(q.hourly_rate)} / ${t("time.hourShort") || "h"}`,
+                          q.standard_amount !== null
+                            ? `${t("session.plannedStandard")}: ${money(q.standard_amount)}`
+                            : null,
+                        ].filter(Boolean).join(" · "))}
+                      />
+                      {/* The total, editable (2026-10-25): a price agreed at
+                          the counter for this length. Kept exactly by the
+                          server; the full time bills exactly this. */}
+                      <Checkbox
+                        checked={editTotal}
+                        onChange={(next) => {
+                          setEditTotal(next);
+                          setTotalInput(next && quotedPlan !== null ? String(quotedPlan.amount) : "");
+                        }}
+                        label={t("session.plannedEditTotal")}
+                        disabled={busy || planMinutes === null}
+                      />
+                      {editTotal && (
+                        <div className="col" style={{ gap: 4 }} data-testid="planned-total">
+                          <PriceInput
+                            label={t("session.plannedTotal")}
+                            value={totalInput}
+                            onChange={setTotalInput}
+                          />
+                          {totalInput.trim() !== "" && !totalValid && (
+                            <span className="error" style={{ fontSize: 11 }}>{t("session.plannedTotalInvalid")}</span>
+                          )}
+                        </div>
+                      )}
+                    </>
                   )}
                 </section>
               </div>

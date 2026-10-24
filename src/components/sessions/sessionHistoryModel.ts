@@ -211,6 +211,13 @@ export const eventDetailParts = (
         if (rate !== null) parts.push(`${money(rate)} / ${t("time.hourShort")}`);
         const end = new Date(new Date(e.created_at).getTime() + planned * 60_000);
         if (Number.isFinite(end.getTime())) parts.push(`${t("history.untilLabel")} ${formatTime(end)}`);
+        // A total agreed at the counter, beside what the seat would have asked.
+        if (meta !== null && (meta as Record<string, unknown>).price_set_by_hand === true) {
+          const standard = metaNum(meta, "standard_amount");
+          parts.push(standard !== null
+            ? `${t("history.priceSetByHand")} (${t("session.plannedStandard")} ${money(standard)})`
+            : t("history.priceSetByHand"));
+        }
       }
       break;
     }

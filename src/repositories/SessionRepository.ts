@@ -156,8 +156,8 @@ export class SessionRepository {
   }
 
   /** Read-only advice: what a planned start would cost. See `apiStartQuote`. */
-  async startQuote(pcId: number, minutes: number, hourlyRate?: number): Promise<IStartQuote> {
-    return friendlyMutation(apiStartQuote(pcId, minutes, hourlyRate));
+  async startQuote(pcId: number, minutes: number, hourlyRate?: number, plannedAmount?: number): Promise<IStartQuote> {
+    return friendlyMutation(apiStartQuote(pcId, minutes, hourlyRate, plannedAmount));
   }
 
   /** Read-only advice: see `apiSessionExtensionOptions`. */

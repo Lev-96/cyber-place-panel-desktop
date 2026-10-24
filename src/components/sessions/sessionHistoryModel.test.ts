@@ -198,6 +198,15 @@ describe("a planned start in the history (2026-10-25)", () => {
     expect(parts[2]).toContain("history.untilLabel");
   });
 
+  test("a total set by hand says so, beside the standard price", () => {
+    const parts = eventDetailParts(event({
+      action: "started",
+      created_at: "2026-10-25T10:00:00Z",
+      meta: { planned_minutes: 180, hourly_rate: 833.33, planned_amount: 2500, price_set_by_hand: true, standard_amount: 4500 },
+    }), t, money);
+    expect(parts).toContain("history.priceSetByHand (session.plannedStandard 4500 AMD)");
+  });
+
   test("a start without a plan prints nothing extra", () => {
     const parts = eventDetailParts(event({ action: "started", meta: { mode: "open", is_free: false } }), t, money);
     expect(parts).toEqual([]);
