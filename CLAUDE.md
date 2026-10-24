@@ -2406,6 +2406,21 @@ disagree about. `padChargeOf()` prints `n × fee` only when every charged period
 agrees on a price — fees are frozen per pad, so a seat that straddles a
 re-pricing holds two, and "3 × ?" would be a lie where the sum is always true.
 
+**One "+🎮" switch on every seat (2026-10-25, `PadToggle`).** The select of
+pads and the separate "−" were replaced by the floor's own GameZone control: a
+"+🎮" button that says what the NEXT pad costs — `+500` on a fixed seat,
+`+500/ч → 1 500/ч` on an hourly one (the card's own `sessionCurrentHourlyRate`
+plus that pad; nothing prices time on the client) — and, with a pad out, a lit
+"🎮 +1 ✓" that takes the last one back. A venue with a fourth controller keeps a
+second "+🎮" beside the lit switch (production uses two extras at branch 5).
+The charge-once venue's switch is drawn with the same component in its
+actions row, keeping its own names (`padAddOne`/`padRemoveOne`) and no
+"joysticks" group. Same `addPad(slot)`/`removeTopPad` calls, all buttons held
+while one is in flight. BILLING IS UNCHANGED: GameZone re-prices the whole
+session when the pad goes in; Cyber Place bills an hourly pad only for the
+time it was out (owner's decision, 2026-10-25). The history line of an hourly
+pad's add no longer prints its rate as a charge (`EventPresentation.showAmount`).
+
 `places.joystick_price_4` is the room's own fourth-pad figure (null = the pair
 shares one, 0 = the fourth is free), mirroring `branches.joystick_price_4`. The
 server refuses it unless the room charges for the fourth pad and names a base
