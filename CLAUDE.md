@@ -2230,7 +2230,11 @@ package) whose tile reads "rate / ч · план N". Its total can be changed by
 ("Изменить итоговую цену", prefilled with the server's figure): sent as
 `planned_amount` INSTEAD of `hourly_rate`, quoted back with the implied rate
 and the standard price, and Start waits for a quote of exactly that total.
-`sessionTimeCostAt` mirrors the server's share-of-plan billing for such seats.
+"+ Время" takes a typed price the same way on a seat the server marks
+`price_editable` (a package or a planned start): sent as `charge`, quoted back
+with `standard_charge`, confirm enabled only on a quote of exactly that price.
+`sessionTimeCostAt` mirrors the server's share-of-plan billing (packages
+included, re-base via `plan_rebased_at`, only resumed pauses out of the plan).
 
 **The window (2026-10-25).** Resizable with no maximum; minimum 800×560
 (`electron/windowBounds.ts` `MIN_CONTENT`) — every screen reflows there, and
