@@ -1412,7 +1412,6 @@ export const TRANSLATIONS: Dict = {
   "history.itemsTotal": { en: "Items", ru: "Товары", am: "Ապրանքներ" },
   "history.total": { en: "Total", ru: "Итог", am: "Ընդհանուր" },
   /* ── the Prices screen's two new sections ─────────────────────────────── */
-  "session.padOutCount": { en: "Out", ru: "Выдано", am: "Տրված է" },
   "session.padChoose": { en: "Choose a joystick", ru: "Выберите джойстик", am: "Ընտրեք ջոյսթիք" },
   "session.padOption": { en: "Joystick #{0}", ru: "{0}-й джойстик", am: "Ջոյսթիք №{0}" },
   "session.padSharedOption": { en: "Joystick 3/4", ru: "Джойстик 3/4", am: "Ջոյսթիք 3/4" },

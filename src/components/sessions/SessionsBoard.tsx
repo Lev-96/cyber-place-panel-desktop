@@ -7,7 +7,6 @@ import CollapsibleSection from "@/components/ui/CollapsibleSection";
 import { GridSkeleton } from "@/components/ui/Skeleton";
 import { ErrorState, StaleNotice, StateView } from "@/components/ui/state";
 import { reconcileOrder } from "./tileOrder";
-import JoystickIcon from "@/components/ui/JoystickIcon";
 import { useAsync } from "@/hooks/useAsync";
 import { useBranchPlatformNames } from "@/hooks/useBranchPlatforms";
 import { useKeyedBusy } from "@/hooks/useKeyedBusy";
@@ -910,7 +909,6 @@ const SessionsBoard = ({ branchId }: Props) => {
                       }}
                       title={`${t("session.joysticks")}: ${joystickCount} / ${padMax}`}
                     >
-                      <JoystickIcon />
                       {/* The number the seat is HOLDING, on its own.
                           It was a fraction, and the fraction was the thing an
                           operator could not read: "1 / 4" on a PlayStation with
@@ -957,34 +955,6 @@ const SessionsBoard = ({ branchId }: Props) => {
                       )}
                     </span>
                   )}
-                  {supportsJoysticks && !padSwitch && (
-                  <>
-                    {/* The extra joystick as one "+🎮" switch, as on the
-                        floor's own screen (PadToggle, 2026-10-25; it was a
-                        select plus a "−" button). It says what the next pad
-                        costs — on an hourly seat the surcharge and the seat's
-                        rate after it — a press hands it over, a press on the
-                        lit switch takes the last one back, and a venue with a
-                        fourth controller keeps a "+🎮" for it. Same calls as
-                        before; disabled while a change is in flight. */}
-                    <PadToggle
-                      next={padMenu.find((c) => c.enabled) ?? null}
-                      extrasOut={(sess.joysticks ?? []).filter(
-                        (j) => j.stopped_at === null && Number(j.slot) > BASE_JOYSTICKS,
-                      ).length}
-                      hourly={sess.joystick_rule?.hourly === true}
-                      currentRate={sess.is_free ? null : sessionCurrentHourlyRate(sess)}
-                      busy={padBusy.isBusy(sess.id)}
-                      onAdd={(slot) => void addPad(sess, slot)}
-                      onRemove={() => void removeTopPad(sess)}
-                    />
-                    {/* The round trip, said on the tile it belongs to. The
-                      select is already disabled while it is in flight; this
-                      is what tells the cashier the change landed, on a board
-                      where the number itself only moves once the server has
-                      answered. */}
-                  </>
-                  )}
                   {/* The round trip, said on the tile it belongs to — for the
                       menu and for the switch alike, since either can be in
                       flight. */}
@@ -1026,37 +996,29 @@ const SessionsBoard = ({ branchId }: Props) => {
               </span>
             )}
             <div className="session-card__actions">
-              {/* One payment, one controller: a switch rather than a menu.
-                  The label says what pressing it does AND what the seat is
-                  holding, which is the whole of the state a cashier needs.
-
-                  It sits with the tile's other ACTIONS rather than on the pad
-                  line, and that is not a style choice: the pad line is a
-                  no-wrap 160px row built for a glyph, a count and a control
-                  that can shrink to nothing. A button with a word in it cannot,
-                  and putting one there pushed it out of the tile and under the
-                  neighbouring seat — where a click landed on somebody else's
-                  card. The row below wraps, which is what makes the label safe
-                  in three languages.
-
-                  The venue that hands pads out one at a time is the only one
-                  that gets this; every other keeps its menu, untouched. */}
-              {/* Drawn as the same "+🎮" switch as every other venue
-                  (PadToggle, 2026-10-25), with this venue's own names; the
-                  behaviour is unchanged — one pad out or none, and nothing to
-                  hand out is a disabled button rather than a hidden one. */}
-              {supportsJoysticks && padSwitch && (
+              {/* The joystick switch is the FIRST cell of the action grid, the
+                  same size and style as every action beside it (2026-10-25).
+                  It used to sit on the no-wrap pad line for a per-pad venue
+                  and here for a charge-once one, so two seats side by side
+                  drew it in two places at two sizes. One place now, both
+                  venues; only the names differ: a charge-once seat hands out
+                  ONE pad ("hand out / take back the joystick") and is no menu. */}
+              {supportsJoysticks && (
                 <PadToggle
-                  next={padOut ? null : (padMenu.find((c) => c.enabled) ?? null)}
-                  extrasOut={padOut ? 1 : 0}
-                  hourly={sess.joystick_rule?.hourly === true}
-                  currentRate={sess.is_free ? null : sessionCurrentHourlyRate(sess)}
+                  next={padSwitch && padOut ? null : (padMenu.find((c) => c.enabled) ?? null)}
+                  extrasOut={padSwitch
+                    ? (padOut ? 1 : 0)
+                    : (sess.joysticks ?? []).filter(
+                      (j) => j.stopped_at === null && Number(j.slot) > BASE_JOYSTICKS,
+                    ).length}
                   busy={padBusy.isBusy(sess.id)}
                   onAdd={(slot) => void addPad(sess, slot)}
                   onRemove={() => void removeTopPad(sess)}
-                  addLabelKey="session.padAddOne"
-                  removeLabelKey="session.padRemoveOne"
-                  groupLabelKey={null}
+                  {...(padSwitch ? {
+                    addLabelKey: "session.padAddOne",
+                    removeLabelKey: "session.padRemoveOne",
+                    groupLabelKey: null,
+                  } : {})}
                 />
               )}
               <SessionCardAction

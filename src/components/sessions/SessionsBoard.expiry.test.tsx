@@ -360,8 +360,12 @@ describe("joysticks on the tile", () => {
   const padButtons = () => [...pads().querySelectorAll("button")] as HTMLButtonElement[];
   const addBtn = () => screen.queryByTestId("pad-add") as HTMLButtonElement | null;
   const onSwitch = () => screen.queryByTestId("pad-remove") as HTMLButtonElement | null;
-  /** What the buttons cost and how many are out: beside them, never inside. */
-  const caption = () => screen.queryByTestId("pad-caption");
+  /** The pad a press of the unlit button actually asks the server for. */
+  const pressedSlot = async (): Promise<number | undefined> => {
+    repo.addJoystick.mockClear();
+    await act(async () => { fireEvent.click(screen.getByTestId("pad-add")); });
+    return repo.addJoystick.mock.calls[0]?.[1] as number | undefined;
+  };
   /** Presses "+🎮", which hands over whichever pad the venue gives next. */
   const pickPad = async (_slot: number) => {
     await act(async () => {
@@ -393,11 +397,29 @@ describe("joysticks on the tile", () => {
     expect(screen.queryByText("1 / 4")).toBeNull();
     expect(screen.queryByText("2 / 3/4")).toBeNull();
 
-    // "+🎮" is pressable, priced at the venue's fee, and not the free kit pad.
+    // The joystick button is pressable and hands over the venue's third pad,
+    // not the kit's second. Nothing priced is printed on the card (2026-10-25).
     expect(addBtn()?.disabled).toBe(false);
-    expect(caption()?.textContent).toContain("500");
-    expect(caption()?.textContent).not.toContain("session.padFree");
     expect(onSwitch()).toBeNull();
+    expect(pads().textContent).toBe("");
+    expect(await pressedSlot()).toBe(3);
+  });
+
+  /**
+   * The switch is the FIRST cell of the card's action grid, an ordinary card
+   * action, and the pad line above carries no icon of its own (2026-10-25).
+   */
+  test("the joystick is the first card action and the pad line has no icon", async () => {
+    repo.listActive.mockResolvedValue([ps]);
+    await mount();
+
+    const grid = pads().parentElement;
+    expect(grid?.classList.contains("session-card__actions")).toBe(true);
+    expect(grid?.firstElementChild).toBe(pads());
+    expect(addBtn()?.className).toContain("session-card__btn");
+    const card = grid?.closest(".session-card");
+    const loose = [...(card?.querySelectorAll("svg") ?? [])].filter((x) => !x.closest("button"));
+    expect(loose).toHaveLength(0);
   });
 
   // Nothing is handed over until "+🎮" is pressed, and opening the tile
@@ -425,8 +447,7 @@ describe("joysticks on the tile", () => {
     })]);
     await mount();
 
-    expect(caption()?.textContent).toContain("500");
-    expect(caption()?.textContent).not.toContain("700");
+    expect(await pressedSlot()).toBe(3);
   });
 
   /** One shared figure is quoted ONCE. */
@@ -435,7 +456,6 @@ describe("joysticks on the tile", () => {
     await mount();
 
     expect(padButtons()).toHaveLength(1);
-    expect((caption()?.textContent ?? "").match(/500/g)?.length).toBe(1);
   });
 
   /**
@@ -459,9 +479,9 @@ describe("joysticks on the tile", () => {
     await mount();
 
     expect(onSwitch()?.getAttribute("aria-pressed")).toBe("true");
-    expect(caption()?.textContent).toContain("session.padOutCount: 1");
     expect(onSwitch()?.textContent).toBe("");
-    expect(caption()?.textContent).toContain("700");
+    expect(padButtons()).toHaveLength(2);
+    expect(await pressedSlot()).toBe(4);
   });
 
   /**
@@ -503,7 +523,7 @@ describe("joysticks on the tile", () => {
 
     expect(onSwitch()).toBeNull();
     expect(addBtn()?.disabled).toBe(false);
-    expect(caption()?.textContent).toContain("500");
+    expect(await pressedSlot()).toBe(3);
   });
 
   test("the tile shows the pads the seat is holding, not a fraction", async () => {
@@ -1041,7 +1061,7 @@ describe("a seat whose joystick fee is charged once", () => {
    * A venue that hands pads out free is a different thing, and the tile must
    * not tell a cashier that somebody has paid.
    */
-  test("a free pad is still called free, not charged", async () => {
+  test("a free pad can still be handed over, with nothing priced on the card", async () => {
     repo.listActive.mockResolvedValue([seat({
       joystick_count: 2,
       joysticks: [],
@@ -1054,9 +1074,8 @@ describe("a seat whose joystick fee is charged once", () => {
     })]);
     await mount();
 
-    const text = screen.getByTestId("pad-caption").textContent ?? "";
-    expect(text).toContain("session.padFree");
-    expect(text).not.toContain("session.padFeeTaken");
+    expect((screen.getByTestId("pad-add") as HTMLButtonElement).disabled).toBe(false);
+    expect(screen.getByTestId("pad-toggle").textContent).toBe("");
   });
 });
 
