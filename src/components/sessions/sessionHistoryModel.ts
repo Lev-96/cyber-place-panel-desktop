@@ -200,6 +200,21 @@ export const eventDetailParts = (
       break;
     }
 
+    case "started": {
+      // A planned hourly start (2026-10-25): how long it was started for and
+      // at what rate, as the server wrote it — the row's amount is the plan.
+      // A start without a plan has none of these and prints nothing extra.
+      const planned = metaNum(meta, "planned_minutes");
+      if (planned !== null) {
+        parts.push(`${t("history.plannedFor")} ${durationLabel(planned, t)}`);
+        const rate = metaNum(meta, "hourly_rate");
+        if (rate !== null) parts.push(`${money(rate)} / ${t("time.hourShort")}`);
+        const end = new Date(new Date(e.created_at).getTime() + planned * 60_000);
+        if (Number.isFinite(end.getTime())) parts.push(`${t("history.untilLabel")} ${formatTime(end)}`);
+      }
+      break;
+    }
+
     case "time_added": {
       const minutes = metaNum(meta, "minutes");
       if (minutes !== null) parts.push(`+${minutes} ${t("time.minShort")}`);

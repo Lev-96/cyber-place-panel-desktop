@@ -22,6 +22,11 @@ import { recentPsnNames, rememberPsnName } from "@/ps5/recentPsnNames";
 import { renderText, textKey, textLiteral, type LocalizedText } from "@/i18n/localizedText";
 import { IBranchApi } from "@/types/api";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import type { IStartQuote } from "@/api/sessions";
+import DurationPicker from "./DurationPicker";
+import QuotedPrice from "./QuotedPrice";
+import { minutesOf, type DurationUnit } from "./durationModel";
+import { quoteFor, useServerQuote } from "./useServerQuote";
 
 interface Props {
   branchId: number;
@@ -91,6 +96,8 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
   // session is not "a price of zero", it is a session whose bill nobody pays,
   // and the two behave differently the moment a drink is added to it.
   const [isFree, setIsFree] = useState(false);
+  // The optional planned length (2026-10-25), hours by default, empty = none.
+  const [plan, setPlan] = useState<{ unit: DurationUnit; amount: string }>({ unit: "hours", amount: "" });
 
   // A failed read is kept as such: the dialog used to wait on it for ever (no
   // catch), and "no packages" would be a lie. Open mode still works without it.
@@ -165,6 +172,19 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
 
   // Prefill the override input with the current rate the moment it's enabled,
   // so the operator edits "the current price" rather than a blank field.
+  const planMinutes = minutesOf(plan.amount, plan.unit);
+  // Typed but unreadable is not "no plan": the Start waits for a fix rather
+  // than quietly starting a seat with no end.
+  const planInvalid = plan.amount.trim() !== "" && planMinutes === null;
+  const planApplies = !isFree && mode === "open";
+  const typedRate = overrideApplied ? customRateNum : undefined;
+  const planQuote = useServerQuote<IStartQuote>(
+    planApplies ? planMinutes : null,
+    (m) => sessionRepository.startQuote(pc.id, m, typedRate),
+    `${pc.id}|${typedRate ?? ""}`,
+  );
+  const planPriced = quoteFor(planQuote, planMinutes) !== null;
+
   const toggleEditPrice = (next: boolean) => {
     setEditPrice(next);
     setRateSaved(false);
@@ -237,6 +257,7 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
           mode: "open",
           user_display_name: pc.label,
           ...(overrideApplied ? { hourly_rate: customRateNum } : {}),
+          ...(planMinutes !== null ? { duration_minutes: planMinutes } : {}),
           ...psnField,
         });
       }
@@ -267,7 +288,9 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
   // exact case free is for: a demo stand, a tournament machine, a seat given
   // back after an outage. The server lifts the same refusal for the same reason.
   const startDisabled =
-    busy || deviceOffline || !psnValid || (!isFree && mode === "open" && (editPrice ? !overrideApplied : assignedRate === null));
+    busy || deviceOffline || !psnValid || (!isFree && mode === "open" && (editPrice ? !overrideApplied : assignedRate === null))
+    // A plan is started only on the server's own figure for it.
+    || (planApplies && (planInvalid || (planMinutes !== null && !planPriced)));
 
   return (
     <Modal open onClose={onClose}>
@@ -376,6 +399,33 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
                     )}
                   </div>
                 )}
+
+                {/* A planned length, OPTIONAL (2026-10-25). Empty is the
+                    count-up start this form has always made — nothing is
+                    filled in for the cashier. Filled, the server starts the
+                    seat with an end, prices it at the rate above (its own
+                    `start-quote`, the chain the start itself runs), and the
+                    card gets "+ Время". Billed by the clock either way. */}
+                <section className="col" style={{ gap: 8 }} data-testid="planned-duration">
+                  <span className="label">{t("session.plannedDuration")}</span>
+                  <DurationPicker
+                    unit={plan.unit}
+                    amount={plan.amount}
+                    onChange={setPlan}
+                    disabled={busy}
+                    label={t("session.plannedDuration")}
+                  />
+                  {planMinutes === null && plan.amount.trim() === "" ? (
+                    <span className="muted" style={{ fontSize: 11 }}>{t("session.plannedNone")}</span>
+                  ) : (
+                    <QuotedPrice
+                      label={t("session.plannedPrice")}
+                      hint={t("session.plannedHint")}
+                      quote={planQuote}
+                      amountOf={(q) => q.amount}
+                    />
+                  )}
+                </section>
               </div>
             ))}
 

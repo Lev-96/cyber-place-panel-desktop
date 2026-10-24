@@ -30,6 +30,28 @@ export interface StartSessionBody {
    * backend from before this release keeps working.
    */
   is_free?: boolean;
+  /**
+   * A PLANNED length for an hourly start, in minutes (2026-10-25). Omitted is
+   * the count-up session the panel has always started. Given, the server
+   * starts the seat with an end — billed by the clock, ended at its end like
+   * any timed seat, extendable with "+ Время". Never sent with a package.
+   */
+  duration_minutes?: number;
+}
+
+/** What "+ Время" would charge for N minutes now — the server's own figure. */
+export interface ITimeQuote {
+  minutes: number;
+  hourly_rate: number;
+  charge: number;
+  is_free: boolean;
+}
+
+/** What a planned hourly start would cost — the server's own figure. */
+export interface IStartQuote {
+  minutes: number;
+  hourly_rate: number;
+  amount: number;
 }
 
 export interface ExtendSessionBody {
@@ -432,6 +454,17 @@ export interface IExtensionOptions {
  * those seats a second later — `apiTransferExtension` re-checks everything
  * under a row lock and may still refuse. Never treat this as a promise.
  */
+/** ⚠️ ADVICE: `apiAddSessionTime` re-checks and is what charges. Writes nothing. */
+export const apiSessionTimeQuote = (sessionId: number, minutes: number) =>
+  request<ITimeQuote>(`/sessions/${sessionId}/time-quote?minutes=${minutes}`);
+
+/** ⚠️ ADVICE: `apiStartSession` is what creates the session. Writes nothing. */
+export const apiStartQuote = (pcId: number, minutes: number, hourlyRate?: number) =>
+  request<IStartQuote>(
+    `/sessions/start-quote?pc_id=${pcId}&minutes=${minutes}`
+      + (hourlyRate !== undefined ? `&hourly_rate=${hourlyRate}` : ""),
+  );
+
 export const apiSessionExtensionOptions = (sessionId: number, minutes: number) =>
   request<IExtensionOptions>(`/sessions/${sessionId}/extension-options?minutes=${minutes}`);
 

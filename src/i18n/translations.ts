@@ -649,6 +649,44 @@ export const TRANSLATIONS: Dict = {
   },
   "session.timeAmount": { en: "Amount", ru: "Количество", am: "Քանակ" },
   "session.timeUnitMinutes": { en: "Minutes", ru: "Минуты", am: "Րոպե" },
+  "session.durationUnit": { en: "Unit", ru: "Единица", am: "Միավոր" },
+  "session.durationPresets": { en: "Quick choice", ru: "Быстрый выбор", am: "Արագ ընտրություն" },
+  "session.durationCustom": { en: "Your own value", ru: "Своё значение", am: "Ձեր արժեքը" },
+  "session.addTimePrice": { en: "Total price", ru: "Итоговая цена", am: "Ընդհանուր գին" },
+  "session.addTimePriceHint": {
+    en: "Price of the time being added, at this session's rate",
+    ru: "Стоимость добавляемого времени по тарифу этой сессии",
+    am: "Ավելացվող ժամանակի արժեքը այս սեսիայի սակագնով",
+  },
+  "session.priceFreeNote": {
+    en: "Free session: nothing will be charged",
+    ru: "Бесплатная сессия: ничего не будет списано",
+    am: "Անվճար սեսիա: ոչինչ չի գանձվի",
+  },
+  "session.priceUnavailable": {
+    en: "Price is not available: check the session's rate",
+    ru: "Цена недоступна: проверьте тариф сессии",
+    am: "Գինը հասանելի չէ: ստուգեք սակագինը",
+  },
+  "session.newEndAt": { en: "New end: {0}", ru: "Новый конец: {0}", am: "Նոր ավարտ՝ {0}" },
+  "session.timeAddConfirmPriced": { en: "Add {0} · {1}", ru: "Добавить {0} · {1}", am: "Ավելացնել {0} · {1}" },
+  "session.plannedDuration": {
+    en: "Duration (optional)",
+    ru: "Длительность (необязательно)",
+    am: "Տևողություն (ըստ ցանկության)",
+  },
+  "session.plannedPrice": { en: "Cost of the chosen time", ru: "Стоимость за выбранное время", am: "Ընտրված ժամանակի արժեքը" },
+  "session.plannedHint": {
+    en: "Billed by the time actually played. At the end the session stops on its own; add time with «+ Time».",
+    ru: "Счёт идёт по фактическому времени. По окончании сессия завершится автоматически; продлить можно через «+ Время».",
+    am: "Հաշվարկը ըստ փաստացի ժամանակի։ Ավարտին սեսիան ինքնաբերաբար կավարտվի։",
+  },
+  "session.plannedNone": {
+    en: "Leave empty for an open session with no end",
+    ru: "Оставьте пустым: сессия без конца, как раньше",
+    am: "Թողեք դատարկ՝ առանց ավարտի սեսիայի համար",
+  },
+  "session.planLine": { en: "plan {0}", ru: "план {0}", am: "պլան {0}" },
   "session.timeUnitHours": { en: "Hours", ru: "Часы", am: "Ժամ" },
   // Says the resolved figure back before it is granted, because the mistake
   // this catches is a unit mistake and only the total makes one visible.
@@ -1640,6 +1678,7 @@ export const TRANSLATIONS: Dict = {
     am: "Խաղացել է տեղափոխումից առաջ",
   },
   "history.untilLabel": { en: "until", ru: "до", am: "մինչև" },
+  "history.plannedFor": { en: "planned for", ru: "назначено на", am: "նախատեսված է" },
   // What the seat that was left had run up, as the server priced it at the
   // moment of the move. Unrecoverable afterwards: the session row describes
   // the NEW seat from then on.

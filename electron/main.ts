@@ -4,6 +4,7 @@ import { existsSync } from "node:fs";
 import { join, normalize, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { Store } from "./storage";
+import { MIN_CONTENT, WINDOW_STATE_KEY, parseSavedWindow, restoredBounds } from "./windowBounds";
 import { UpdateService, broadcastUpdateState } from "./updates/UpdateService";
 import { bundledIconPath, ensureLinuxDesktopIntegration } from "./linuxIntegration";
 import { mayNavigateTo, mayOpenExternally, navigationKeyFor } from "./urlPolicy";
@@ -109,26 +110,59 @@ const preferredWindowSize = () => {
   const { workAreaSize } = screen.getPrimaryDisplay();
 
   return {
-    width: Math.min(DEFAULT_CONTENT.width, Math.max(960, workAreaSize.width - SCREEN_MARGIN)),
-    height: Math.min(DEFAULT_CONTENT.height, Math.max(600, workAreaSize.height - SCREEN_MARGIN)),
+    width: Math.min(DEFAULT_CONTENT.width, Math.max(MIN_CONTENT.width, workAreaSize.width - SCREEN_MARGIN)),
+    height: Math.min(DEFAULT_CONTENT.height, Math.max(MIN_CONTENT.height, workAreaSize.height - SCREEN_MARGIN)),
   };
+};
+
+/**
+ * Remember the window's size, place and maximized state (2026-10-25), in the
+ * same `Store` file the app already keeps. The NORMAL bounds are saved even
+ * while maximized, so un-maximizing after a restart returns to them. Written
+ * after the cashier stops dragging, and once more on close.
+ */
+const rememberWindowState = (win: BrowserWindow) => {
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  const save = () => {
+    if (win.isDestroyed() || win.isMinimized() || win.isFullScreen()) return;
+    void store?.set(WINDOW_STATE_KEY, JSON.stringify({ ...win.getNormalBounds(), maximized: win.isMaximized() }));
+  };
+  const later = () => {
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(save, 500);
+  };
+  win.on("resize", later);
+  win.on("move", later);
+  win.on("maximize", save);
+  win.on("unmaximize", save);
+  win.on("close", () => { if (timer) clearTimeout(timer); save(); });
 };
 
 const createWindow = async () => {
   const { width, height } = preferredWindowSize();
+  // The last size and place, fitted to the displays there are now; null opens
+  // at the default, centred — exactly the first-run behaviour.
+  const restored = restoredBounds(
+    parseSavedWindow(store?.get(WINDOW_STATE_KEY) ?? null),
+    screen.getAllDisplays().map((d) => d.workArea),
+  );
 
   mainWindow = new BrowserWindow({
-    width,
-    height,
+    ...(restored
+      ? { x: restored.x, y: restored.y, width: restored.width, height: restored.height }
+      : { width, height, center: true }),
     // These numbers describe the WEB CONTENT, not the outer frame. Title bars
     // differ in height across Windows, macOS and every Linux window manager,
     // so sizing the frame would hand each platform a slightly different canvas
     // — and the login composition is laid out against the viewport. Content
     // sizing is what makes it identical everywhere.
-    useContentSize: true,
-    center: true,
-    minWidth: 960,
-    minHeight: 600,
+    // A restored window is the FRAME it was saved as (`getNormalBounds`); a
+    // first-run one is sized as content, as above.
+    useContentSize: restored === null,
+    // Every screen reflows down to this; below it the board stops being usable.
+    // No maximum: a wide or a second monitor is the cashier's to use.
+    minWidth: MIN_CONTENT.width,
+    minHeight: MIN_CONTENT.height,
     backgroundColor: "#020514",
     autoHideMenuBar: true,
     webPreferences: {
@@ -143,6 +177,9 @@ const createWindow = async () => {
   // are server-supplied (Pulse entry link, Metrika dashboard), so an
   // unrestricted openExternal would let a hostile or compromised backend
   // response launch `file://`, `smb://` or a Windows handler URI.
+  if (restored?.maximized) mainWindow.maximize();
+  rememberWindowState(mainWindow);
+
   mainWindow.webContents.setWindowOpenHandler(({ url }: { url: string }) => {
     if (mayOpenExternally(url)) {
       void shell.openExternal(url);

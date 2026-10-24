@@ -26,7 +26,7 @@ import { PSN_FEATURE } from "@/api/psn";
  * has always seen.
  */
 
-const repo = vi.hoisted(() => ({ start: vi.fn() }));
+const repo = vi.hoisted(() => ({ start: vi.fn(), startQuote: vi.fn() }));
 const auth = vi.hoisted(() => ({ role: "company_owner" as string }));
 
 vi.mock("@/repositories/SessionRepository", () => ({
@@ -35,6 +35,7 @@ vi.mock("@/repositories/SessionRepository", () => ({
       { id: 1, branch_id: 7, name_en: "One hour", name_ru: "Час", name_am: "Ժամ", duration_minutes: 60, price: 1500 },
     ]),
     start: (...a: unknown[]) => repo.start(...a),
+    startQuote: (...a: unknown[]) => repo.startQuote(...a),
   },
 }));
 vi.mock("@/auth/AuthContext", () => ({ useAuth: () => ({ user: { id: 1, role: auth.role } }) }));
@@ -63,7 +64,7 @@ vi.mock("@/repositories/BranchRepository", () => ({
   branchRepository: { byId: vi.fn().mockResolvedValue({ id: 7, price_for_branch: { "ps5-standard": 1500 } }) },
 }));
 vi.mock("@/i18n/LanguageContext", () => ({
-  useLang: () => ({ t: (k: string) => k, money: (n: number) => String(n), lang: "en" }),
+  useLang: () => ({ t: (k: string) => k, money: (n: number) => String(n), lang: "en", currency: "AMD" }),
 }));
 
 const device = (over: Partial<IPcApi> = {}): IPcApi => ({
@@ -87,6 +88,11 @@ beforeEach(() => {
   auth.role = "company_owner";
   repo.start.mockReset();
   repo.start.mockResolvedValue({ id: 1 });
+  // The server's figure for a planned start: the seat's 1 500/h, or the rate
+  // typed for this start.
+  repo.startQuote.mockReset();
+  repo.startQuote.mockImplementation((_pc: number, m: number, rate?: number) =>
+    Promise.resolve({ minutes: m, hourly_rate: rate ?? 1500, amount: ((rate ?? 1500) * m) / 60 }));
 });
 afterEach(cleanup);
 
@@ -524,5 +530,99 @@ describe("the player's PSN name", () => {
     await mount(device());
     const options = [...document.querySelectorAll("#psn-recent-names option")].map((o) => (o as HTMLOptionElement).value);
     expect(options).toEqual(["RegularGuy"]);
+  });
+});
+
+/**
+ * A planned length on an hourly start (2026-10-25). Optional: empty is the
+ * count-up start the form has always made. Filled, the server's own price for
+ * it is shown before Start, and Start waits for that price.
+ */
+describe("a planned length at start", () => {
+  const settle = async () => {
+    await act(async () => { await new Promise((r) => setTimeout(r, 320)); });
+  };
+  const typePlan = async (value: string) => {
+    await act(async () => {
+      fireEvent.change(screen.getByLabelText("session.plannedDuration"), { target: { value } });
+    });
+  };
+  const startButton = () => screen.getByRole("button", { name: "action.start" }) as HTMLButtonElement;
+  const press = async () => { await act(async () => { fireEvent.click(startButton()); }); };
+
+  test("left empty, the start is exactly what it was — no length, no quote", async () => {
+    await mount(device());
+    await settle();
+    expect(startButton().disabled).toBe(false);
+    await press();
+
+    expect(repo.start.mock.calls[0][0]).not.toHaveProperty("duration_minutes");
+    expect(repo.start.mock.calls[0][0].mode).toBe("open");
+    expect(repo.startQuote).not.toHaveBeenCalled();
+  });
+
+  test("3 hours at the seat's 1 500 is quoted 4 500 and sent as 180 minutes", async () => {
+    await mount(device());
+    await typePlan("3");
+    await settle();
+
+    expect(repo.startQuote).toHaveBeenLastCalledWith(1, 180, undefined);
+    expect(screen.getByText("4500")).toBeTruthy();
+    await press();
+    expect(repo.start.mock.calls[0][0]).toMatchObject({ mode: "open", duration_minutes: 180 });
+  });
+
+  test("the quote follows the rate typed for this start", async () => {
+    await mount(device());
+    await act(async () => { fireEvent.click(screen.getByText("session.editPrice")); });
+    await act(async () => {
+      // PriceInput's label is a caption, not a <label>: the box beside it.
+      const box = screen.getByText("session.newHourlyRate").parentElement!.querySelector("input")!;
+      fireEvent.change(box, { target: { value: "2000" } });
+    });
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "action.save" })); });
+    await typePlan("2");
+    await settle();
+
+    expect(repo.startQuote).toHaveBeenLastCalledWith(1, 120, 2000);
+    expect(screen.getByText("4000")).toBeTruthy();
+  });
+
+  test("Start waits for the server's price, and a refused price holds it", async () => {
+    let answer: (v: unknown) => void = () => {};
+    repo.startQuote.mockImplementation(() => new Promise((r) => { answer = r; }));
+    await mount(device());
+    await typePlan("1");
+    await settle();
+    expect(startButton().disabled).toBe(true);
+
+    await act(async () => { answer({ minutes: 60, hourly_rate: 1500, amount: 1500 }); });
+    expect(startButton().disabled).toBe(false);
+
+    repo.startQuote.mockRejectedValue(new Error("Hourly rate is required for open sessions"));
+    await typePlan("2");
+    await settle();
+    expect(screen.getByText("Hourly rate is required for open sessions")).toBeTruthy();
+    expect(startButton().disabled).toBe(true);
+  });
+
+  test("an unreadable length holds Start rather than starting with no end", async () => {
+    await mount(device());
+    await typePlan("abc");
+    await settle();
+
+    expect(startButton().disabled).toBe(true);
+    expect(screen.getByText("session.timeInvalid")).toBeTruthy();
+  });
+
+  test("not offered on a package start or a waived one", async () => {
+    await mount(device());
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: /session.fixedTariff/ })); });
+    expect(screen.queryByTestId("planned-duration")).toBeNull();
+    cleanup();
+
+    await mount(device());
+    await act(async () => { fireEvent.click(screen.getByText("session.freeBill")); });
+    expect(screen.queryByTestId("planned-duration")).toBeNull();
   });
 });

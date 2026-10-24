@@ -181,3 +181,25 @@ describe("feedCoversSession", () => {
     expect(feedCoversSession({ status: "expired", stopped_at: null, ends_at: null }, started, { truncated: false, to, now: 0 })).toBe(false);
   });
 });
+
+describe("a planned start in the history (2026-10-25)", () => {
+  const t = (k: string) => k;
+  const money = (n: number) => `${n} AMD`;
+
+  test("says how long, at what rate, and until when", () => {
+    const parts = eventDetailParts(event({
+      action: "started",
+      created_at: "2026-10-25T10:00:00Z",
+      meta: { mode: "fixed", is_free: false, planned_minutes: 180, hourly_rate: 1000, planned_amount: 3000 },
+    }), t, money);
+
+    expect(parts[0]).toContain("history.plannedFor");
+    expect(parts[1]).toBe("1000 AMD / time.hourShort");
+    expect(parts[2]).toContain("history.untilLabel");
+  });
+
+  test("a start without a plan prints nothing extra", () => {
+    const parts = eventDetailParts(event({ action: "started", meta: { mode: "open", is_free: false } }), t, money);
+    expect(parts).toEqual([]);
+  });
+});

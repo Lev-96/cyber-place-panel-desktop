@@ -1861,6 +1861,14 @@ button.pill:hover {
   min-height: 100%;
   padding: 24px 32px;
 }
+/* A narrow window (2026-10-25): the shell's two 32px gutters and the page's
+   two more took 128px of an 800px window — the sessions board was left one
+   stretched card wide. Below 1100px both gutters tighten; at a normal width
+   nothing changes. */
+@media (max-width: 1100px) {
+  .main { padding: 16px; }
+  .screen-bg { padding: 16px 20px; }
+}
 .screen-bg-img {
   position: absolute;
   inset: 0;
@@ -6326,4 +6334,52 @@ select.input option:disabled {
   outline: 2px solid var(--color-primary);
   outline-offset: 2px;
   border-radius: 4px;
+}
+
+/* Length of time in hours or minutes (DurationPicker, 2026-10-25): presets in
+   an even grid that wraps without changing a button's size; the chosen one is
+   lit by colour and an inset ring, so its box never moves. */
+.duration-picker__presets {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(64px, 1fr));
+  gap: 6px;
+}
+.duration-picker__preset.btn {
+  min-width: 0;
+  height: 32px;
+  padding: 0 6px;
+  font-size: 12.5px;
+  white-space: nowrap;
+}
+.duration-picker__preset.btn.is-on {
+  border-color: var(--color-primary);
+  box-shadow: inset 0 0 0 1px var(--color-primary);
+  color: var(--color-primary);
+}
+.duration-picker__preset.btn:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 1px;
+}
+
+/* The server's price for the chosen time (QuotedPrice): a read-only figure,
+   never an input, set apart so it reads as the answer to the form. */
+.quoted-price {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-surface-alt);
+  min-width: 0;
+}
+.quoted-price__value {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--color-text);
+  overflow-wrap: anywhere;
+}
+.quoted-price__hint {
+  font-size: 11.5px;
+  line-height: 1.35;
 }

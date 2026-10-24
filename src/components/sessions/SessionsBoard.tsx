@@ -818,7 +818,15 @@ const SessionsBoard = ({ branchId }: Props) => {
                   ? t("session.unlimited")
                   : sess.mode === "open"
                     ? `${money(Number(sess.hourly_rate ?? 0))} / ${t("time.hourShort") || "h"}`
-                    : sess.package_name}
+                    // A planned hourly start (2026-10-25) has no package: it
+                    // says its rate and its plan, both the server's — the plan
+                    // grows with "+ Время"; the bill is still the clock's.
+                    : sess.package_name == null && sess.hourly_rate != null
+                      ? `${money(Number(sess.hourly_rate))} / ${t("time.hourShort") || "h"}`
+                        + (sess.committed_amount != null
+                          ? ` · ${fmt(t("session.planLine"), money(Number(sess.committed_amount)))}`
+                          : "")
+                      : sess.package_name}
               {itemsCount > 0 && <span className="muted"> · {itemsCount} {t("session.posNote")}</span>}
               {sess.paused_at && (
                 <span className="pill session-card__pill">

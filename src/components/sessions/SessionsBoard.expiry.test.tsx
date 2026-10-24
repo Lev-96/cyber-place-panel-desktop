@@ -229,6 +229,33 @@ describe("adding time from the card", () => {
     expect(screen.getByRole("button", { name: "session.addTime" })).toBeTruthy();
   });
 
+  /**
+   * A planned hourly start (2026-10-25): an end and a rate, no package. It
+   * gets "+ Время" like any seat with an end, and its tariff line names the
+   * rate and the plan — the server's figures — instead of an empty package.
+   */
+  test("a planned hourly start offers it and says its rate and plan", async () => {
+    repo.listActive.mockResolvedValue([{
+      ...running, hourly_rate: 1000, committed_amount: 3000, package_name: undefined,
+      ends_at: new Date(Date.now() + 170 * 60_000).toISOString(),
+    } as ISessionApi]);
+    await mount();
+
+    expect(screen.getByRole("button", { name: "session.addTime" })).toBeTruthy();
+    const line = document.querySelector(".until")?.textContent ?? "";
+    expect(line).toContain("1000 / time.hourShort");
+    expect(line).toContain("session.planLine");
+  });
+
+  test("a count-up start (no length) offers no extra time, as before", async () => {
+    repo.listActive.mockResolvedValue([{
+      ...running, mode: "open", ends_at: null, is_unlimited: true, hourly_rate: 1000, committed_amount: null,
+    } as ISessionApi]);
+    await mount();
+
+    expect(screen.queryByRole("button", { name: "session.addTime" })).toBeNull();
+  });
+
   test("opens the management dialog", async () => {
     await mount();
 

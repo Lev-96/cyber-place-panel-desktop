@@ -2,7 +2,6 @@ import Button from "@/components/ui/Button";
 import JoystickIcon from "@/components/ui/JoystickIcon";
 import Checkbox from "@/components/ui/Checkbox";
 import Modal from "@/components/ui/Modal";
-import Radio from "@/components/ui/Radio";
 import { useConfirm } from "@/components/ui/ConfirmProvider";
 import Spinner from "@/components/ui/Spinner";
 import { notify } from "@/ui/notify";
@@ -21,7 +20,11 @@ import {
   seatUnavailableBodyOf,
   type SeatUnavailableBody,
 } from "@/api/seatUnavailable";
-import type { IExtensionAlternative, IExtensionOptions } from "@/api/sessions";
+import type { IExtensionAlternative, IExtensionOptions, ITimeQuote } from "@/api/sessions";
+import DurationPicker from "./DurationPicker";
+import QuotedPrice from "./QuotedPrice";
+import { minutesOf, type DurationUnit } from "./durationModel";
+import { quoteFor, useServerQuote } from "./useServerQuote";
 
 interface Props {
   session: ISessionApi;
@@ -34,20 +37,6 @@ interface Props {
   platformName?: (slug: string) => string;
 }
 
-/**
- * The grants offered as one tap. A list rather than a rule, because these are
- * the lengths venues actually sell — and anything not on it is reachable by
- * typing, so adding one here is a preference, never a capability.
- */
-const MINUTE_STEPS = [10, 15, 20, 30, 45, 60, 90, 120] as const;
-
-/**
- * The server's ceiling on a SINGLE grant, mirrored so the form can refuse
- * before a round trip. Past ten hours it is a new session, not an extension —
- * `SessionTimeService::MAX_MINUTES` is where that decision lives and this is
- * only an echo of it: the request is validated there whatever this says.
- */
-const MAX_GRANT_MINUTES = 600;
 
 /**
  * Everything a cashier can change about a session that is already running.
@@ -107,9 +96,9 @@ const SessionOptionsDialog = ({ session, platform, onClose, onChanged, platformN
   /** Which seat the cashier has picked. Nothing is sent until one is. */
   const [selectedPlaceId, setSelectedPlaceId] = useState<number | null>(null);
   // Manual grant: off by default, so the ordinary case stays one tap.
-  const [manual, setManual] = useState(false);
-  const [manualAmount, setManualAmount] = useState("");
-  const [manualUnit, setManualUnit] = useState<"minutes" | "hours">("minutes");
+  // One length, in hours by default (2026-10-25): a preset and a typed value
+  // write the same box, so the grant on the confirm is always what is shown.
+  const [grant, setGrant] = useState<{ unit: DurationUnit; amount: string }>({ unit: "hours", amount: "" });
   // The price the session carries on at once its end is removed. Off by
   // default: not naming one keeps the tariff's own rate, which is what every
   // switch did before a price could be named at all.
@@ -152,34 +141,15 @@ const SessionOptionsDialog = ({ session, platform, onClose, onChanged, platformN
   useEffect(loadPrices, [loadPrices]);
 
   /** Run one change, keep the server's answer, and surface its sentence. */
-  /**
-   * The typed grant, in MINUTES — the unit the API speaks.
-   *
-   * Resolved once and read everywhere, so the number the button offers to add
-   * and the number sent are the same by construction. Hours are converted here
-   * and nowhere else; `null` means the box does not currently hold a grant that
-   * could be sent, which is what disables the button.
-   *
-   * Whole minutes only. A fractional hour is a legitimate thing to type — 1.5 —
-   * and it resolves to 90; a fractional MINUTE is not, and rounding one
-   * silently would bill for time nobody granted.
-   */
-  const manualMinutes = ((): number | null => {
-    const raw = manualAmount.trim().replace(",", ".");
-    if (raw === "") return null;
-
-    // Only "is this a number at all" here. How SMALL a grant may be is the
-    // bound at the bottom of this function and lives there alone — checking it
-    // twice means neither check can be proved, because breaking one leaves the
-    // other quietly covering for it.
-    const value = Number(raw);
-    if (!Number.isFinite(value)) return null;
-
-    const minutes = manualUnit === "hours" ? value * 60 : value;
-    if (!Number.isInteger(minutes)) return null;
-
-    return minutes >= 1 && minutes <= MAX_GRANT_MINUTES ? minutes : null;
-  })();
+  const grantMinutes = minutesOf(grant.amount, grant.unit);
+  // The server's price for exactly that length, at THIS session's rate. Only
+  // asked of a session that can take time; a refusal shows its reason.
+  const timeQuote = useServerQuote<ITimeQuote>(
+    isActive && !isUnlimited && !current.paused_at ? grantMinutes : null,
+    (m) => sessionRepository.timeQuote(current.id, m),
+    `${current.id}|${current.ends_at ?? ""}`,
+  );
+  const quotedCharge = quoteFor(timeQuote, grantMinutes)?.charge ?? null;
 
   /**
    * @return true when the server accepted it. Refusals are SHOWN, not thrown —
@@ -591,107 +561,60 @@ const SessionOptionsDialog = ({ session, platform, onClose, onChanged, platformN
             untouched — only this duplicate is gone. */
         }
         {/* ── time ──────────────────────────────────────────────────────── */}
-        <section className="col" style={{ gap: 8 }}>
+        {/* Choose, see the price, confirm (2026-10-25). A preset used to grant
+            on the tap; now it fills the length, the SERVER's price for exactly
+            that length appears below it, and only the confirm — which names
+            both — writes. The grant re-checks everything under its lock, so
+            the price is advice and the history row is the record. */}
+        <section className="col" style={{ gap: 10 }}>
           <strong>{t("session.addTime")}</strong>
           {isUnlimited ? (
             <span className="muted" style={{ fontSize: 12 }}>{t("session.timeNotApplicable")}</span>
           ) : (
-            <div className="row" style={{ gap: 8, flexWrap: "wrap" }}>
-              {MINUTE_STEPS.map((m) => (
-                <Button
-                  key={m}
-                  variant="secondary"
-                  disabled={busy || !isActive}
-                  onClick={() =>
-                    void run(
-                      () => sessionRepository.addTime(current.id, m),
-                      m,
-                      timeAddedToast(m),
-                    )
-                  }
-                >
-                  {t("session.addMinutes").replace("{0}", String(m))}
-                </Button>
-              ))}
-            </div>
-          )}
-
-          {/* The grant no preset covers. Reuses the dialog's own primitives —
-              nothing here is a new control. */}
-          {!isUnlimited && (
-            <div className="col" style={{ gap: 6 }}>
-              <Checkbox
-                checked={manual}
-                onChange={(next) => { setManual(next); setManualAmount(""); }}
-                label={t("session.timeManual")}
+            <>
+              <DurationPicker
+                unit={grant.unit}
+                amount={grant.amount}
+                onChange={setGrant}
                 disabled={busy || !isActive}
+                label={t("session.timeAmount")}
               />
-              {manual && (
-                <div className="col" style={{ gap: 6 }}>
-                  <div className="row" style={{ gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                    {/* Text + `inputMode`, which is the mechanism
-                        `NumberStepper` itself uses — Electron swallows
-                        keystrokes in a raw `type="number"`, on one of the two
-                        boxes a cashier types into with a player waiting.
-                        `NumberStepper` is not used directly because it holds a
-                        NUMBER and this field is deliberately a string: empty is
-                        "not filled in yet" rather than zero, and the validation
-                        below depends on telling those apart. */}
-                    <input
-                      className="input"
-                      type="text"
-                      inputMode="decimal"
-                      value={manualAmount}
-                      onChange={(e) => setManualAmount(e.target.value)}
-                      aria-label={t("session.timeAmount")}
-                      style={{ width: 110 }}
-                      autoFocus
-                    />
-                    {/* The app's own radio, not the native control — which
-                        renders washed-out against this dark UI and was the one
-                        place it had survived. Same 18px mark as the Checkbox
-                        above, so the two line up on one baseline. */}
-                    {(["minutes", "hours"] as const).map((unit) => (
-                      <Radio
-                        key={unit}
-                        name="cp-time-unit"
-                        checked={manualUnit === unit}
-                        onChange={() => setManualUnit(unit)}
-                        disabled={busy || !isActive}
-                        label={t(unit === "hours" ? "session.timeUnitHours" : "session.timeUnitMinutes")}
-                      />
-                    ))}
-                  </div>
-                  {/* Only once something has been typed: an empty box is not a
-                      mistake yet, and shouting at one is how a form teaches an
-                      operator to ignore it. */}
-                  {manualAmount.trim() !== "" && manualMinutes === null && (
-                    <span className="error" style={{ fontSize: 12 }}>{t("session.timeInvalid")}</span>
+              <QuotedPrice
+                label={t("session.addTimePrice")}
+                hint={t("session.addTimePriceHint")}
+                quote={timeQuote}
+                amountOf={(q) => q.charge}
+                noteOf={(q) => (q.is_free ? t("session.priceFreeNote") : null)}
+              />
+              {grantMinutes !== null && current.ends_at && (
+                <span className="muted" style={{ fontSize: 12 }}>
+                  {t("session.newEndAt").replace(
+                    "{0}",
+                    clockOf(new Date(new Date(current.ends_at).getTime() + grantMinutes * 60_000)),
                   )}
-                  <div>
-                    <Button
-                      disabled={busy || !isActive || manualMinutes === null}
-                      onClick={() => {
-                        if (manualMinutes === null) return;
-                        void run(
-                          () => sessionRepository.addTime(current.id, manualMinutes),
-                          manualMinutes,
-                          timeAddedToast(manualMinutes),
-                        )
-                          // Only on success. A refused grant keeps the box as
-                          // it was, beside the sentence saying why.
-                          .then((ok) => { if (ok) { setManualAmount(""); setManual(false); } });
-                      }}
-                    >
-                      {/* The resolved TOTAL, not what was typed: "2 hours" and
-                          "Add 120 min" are the same grant, and seeing the second
-                          is what catches a wrong unit before it is sold. */}
-                      {t("session.timeAddConfirm").replace("{0}", String(manualMinutes ?? 0))}
-                    </Button>
-                  </div>
-                </div>
+                </span>
               )}
-            </div>
+              <div>
+                <Button
+                  disabled={busy || !isActive || grantMinutes === null || quotedCharge === null}
+                  onClick={() => {
+                    if (grantMinutes === null || quotedCharge === null) return;
+                    void run(
+                      () => sessionRepository.addTime(current.id, grantMinutes),
+                      grantMinutes,
+                      timeAddedToast(grantMinutes),
+                    ).then((ok) => { if (ok) setGrant((g) => ({ ...g, amount: "" })); });
+                  }}
+                >
+                  {/* The resolved minutes AND the server's price: "2 hours" and
+                      "120 min" are the same grant, and seeing both is what
+                      catches a wrong unit before it is sold. */}
+                  {t("session.timeAddConfirmPriced")
+                    .replace("{0}", `${grantMinutes ?? 0} ${t("time.minShort")}`)
+                    .replace("{1}", quotedCharge === null ? "-" : money(quotedCharge))}
+                </Button>
+              </div>
+            </>
           )}
         </section>
 
