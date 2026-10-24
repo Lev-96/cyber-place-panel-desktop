@@ -2226,7 +2226,11 @@ value the form has moved past, and the confirm / Start is enabled only when the
 quote is for exactly the minutes on screen. A refused quote shows its reason
 and no figure. A preset no longer grants on the tap. Empty length on Start is
 the count-up start as before; a filled one is a timed seat (`mode=fixed`, no
-package) whose tile reads "rate / ч · план N".
+package) whose tile reads "rate / ч · план N". Its total can be changed by hand
+("Изменить итоговую цену", prefilled with the server's figure): sent as
+`planned_amount` INSTEAD of `hourly_rate`, quoted back with the implied rate
+and the standard price, and Start waits for a quote of exactly that total.
+`sessionTimeCostAt` mirrors the server's share-of-plan billing for such seats.
 
 **The window (2026-10-25).** Resizable with no maximum; minimum 800×560
 (`electron/windowBounds.ts` `MIN_CONTENT`) — every screen reflows there, and
