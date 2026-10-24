@@ -2406,12 +2406,15 @@ disagree about. `padChargeOf()` prints `n × fee` only when every charged period
 agrees on a price — fees are frozen per pad, so a seat that straddles a
 re-pricing holds two, and "3 × ?" would be a lie where the sum is always true.
 
-**One "+🎮" switch on every seat (2026-10-25, `PadToggle`).** The select of
-pads and the separate "−" were replaced by the floor's own GameZone control: a
-"+🎮" button that says what the NEXT pad costs — `+500` on a fixed seat,
+**One joystick switch on every seat (2026-10-25, `PadToggle`).** The select of
+pads and the separate "−" were replaced by the floor's own GameZone control.
+Inside each button is the `JoystickIcon` and NOTHING else (owner's rule): fixed
+40×40 squares in a fixed-step grid, so a wrap, a lit state or a long caption
+never changes a button's box. What the next pad costs — `+500` on a fixed seat,
 `+500/ч → 1 500/ч` on an hourly one (the card's own `sessionCurrentHourlyRate`
-plus that pad; nothing prices time on the client) — and, with a pad out, a lit
-"🎮 +1 ✓" that takes the last one back. A venue with a fourth controller keeps a
+plus that pad; nothing prices time on the client) — and how many are out is
+the `pad-caption` line below. With a pad out the button is lit
+(`aria-pressed`) and a press takes the last one back. A venue with a fourth controller keeps a
 second "+🎮" beside the lit switch (production uses two extras at branch 5).
 The charge-once venue's switch is drawn with the same component in its
 actions row, keeping its own names (`padAddOne`/`padRemoveOne`) and no
