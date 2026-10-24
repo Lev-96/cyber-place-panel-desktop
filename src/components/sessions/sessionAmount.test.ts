@@ -711,14 +711,35 @@ describe("a planned hourly start bills its share of the plan", () => {
     expect(sessionTimeCostAt(s, AT)).toBe(2916.67);
   });
 
-  test("a package seat is untouched: still its rate × the clock, never a share", () => {
-    // A committed figure that is NOT the package's price: a share of it would
-    // read 4 999.5 at half time; the package's own rate reads 1 250.
-    const s = session({
+  test("a package is a plan too: its share, exactly its price at the end", () => {
+    const pkg = (minutesAgo: number) => session({
       mode: "fixed", time_package_id: 5, hourly_rate: null,
       time_package: { id: 5, duration_minutes: 180, price: 2500 } as ISessionApi["time_package"],
-      started_at: ago(90), ends_at: ahead(90), committed_until: ahead(90), committed_amount: 9999,
+      started_at: ago(minutesAgo), ends_at: ahead(180 - minutesAgo),
+      committed_until: ahead(180 - minutesAgo), committed_amount: 2500,
     });
-    expect(sessionTimeCostAt(s, AT)).toBe(1250);
+    expect(sessionTimeCostAt(pkg(90), AT)).toBe(1250);
+    expect(sessionTimeCostAt(pkg(180), AT)).toBe(2500);
+  });
+
+  test("re-based by a typed + Время: what was played stays, the rest shares the new plan", () => {
+    // 1 000/h for an hour, then at 30 min +60 min for 700: frozen 500 at the
+    // re-base, 1 200 left (500 + 700) over the 90 min to come.
+    const s = session({
+      mode: "fixed", time_package_id: null, hourly_rate: 1000,
+      started_at: ago(60), plan_rebased_at: ago(30), amount_before_plan_rebase: 500,
+      ends_at: ahead(60), committed_until: ahead(60), committed_amount: 1700,
+    });
+    expect(sessionTimeCostAt(s, AT)).toBe(900);   // 500 + 1 200 × 30/90
+  });
+
+  test("a running pause does not make a planned seat's figure grow", () => {
+    const s = session({
+      mode: "fixed", time_package_id: null, hourly_rate: 1000,
+      started_at: ago(90), ends_at: ahead(90), committed_until: ahead(90), committed_amount: 3000,
+      paused_at: ago(30), pauses: [{ paused_at: ago(30), resumed_at: null }],
+    });
+    // 60 min played of 180 planned: 1 000, however long the pause runs.
+    expect(sessionTimeCostAt(s, AT)).toBe(1000);
   });
 });

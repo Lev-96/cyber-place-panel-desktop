@@ -142,8 +142,8 @@ export class SessionRepository {
     return friendlyMutation(apiRemoveSessionJoystick(sessionId, slot).then((r) => r.session));
   }
 
-  async addTime(sessionId: number, minutes: number): Promise<ISessionApi> {
-    return friendlyMutation(apiAddSessionTime(sessionId, minutes).then((r) => r.session));
+  async addTime(sessionId: number, minutes: number, charge?: number): Promise<ISessionApi> {
+    return friendlyMutation(apiAddSessionTime(sessionId, minutes, charge).then((r) => r.session));
   }
 
   async makeUnlimited(sessionId: number, hourlyRate?: number): Promise<ISessionApi> {
@@ -151,8 +151,8 @@ export class SessionRepository {
   }
 
   /** Read-only advice: what `addTime` would charge. See `apiSessionTimeQuote`. */
-  async timeQuote(sessionId: number, minutes: number): Promise<ITimeQuote> {
-    return friendlyMutation(apiSessionTimeQuote(sessionId, minutes));
+  async timeQuote(sessionId: number, minutes: number, charge?: number): Promise<ITimeQuote> {
+    return friendlyMutation(apiSessionTimeQuote(sessionId, minutes, charge));
   }
 
   /** Read-only advice: what a planned start would cost. See `apiStartQuote`. */

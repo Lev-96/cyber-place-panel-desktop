@@ -227,6 +227,13 @@ export const eventDetailParts = (
       if (minutes !== null) parts.push(`+${minutes} ${t("time.minShort")}`);
       const newEnd = metaStr(meta, "new_ends_at");
       if (newEnd !== null) parts.push(`${t("history.untilLabel")} ${formatTime(new Date(newEnd))}`);
+      // A price agreed at the counter (2026-10-25), beside what the rate asked.
+      if (meta !== null && (meta as Record<string, unknown>).price_set_by_hand === true) {
+        const standard = metaNum(meta, "standard_charge");
+        parts.push(standard !== null
+          ? `${t("history.priceSetByHand")} (${t("session.plannedStandard")} ${money(standard)})`
+          : t("history.priceSetByHand"));
+      }
       break;
     }
 

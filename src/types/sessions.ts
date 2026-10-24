@@ -263,6 +263,13 @@ export interface ISessionApi {
   committed_until?: string | null;
   committed_amount?: number | string | null;
   /**
+   * Where the plan was last re-based (2026-10-25): "+ Время" at a typed
+   * price froze what was played there; only the time after it shares the
+   * rest of the plan.
+   */
+  plan_rebased_at?: string | null;
+  amount_before_plan_rebase?: number | string | null;
+  /**
    * A rate change mid-way — the player moved to a seat priced differently.
    * What the clock had earned at `rate_changed_at` is frozen in
    * `amount_before_rate_change`; only later time runs at `hourly_rate`.

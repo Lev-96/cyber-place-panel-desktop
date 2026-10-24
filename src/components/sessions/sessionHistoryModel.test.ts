@@ -207,6 +207,14 @@ describe("a planned start in the history (2026-10-25)", () => {
     expect(parts).toContain("history.priceSetByHand (session.plannedStandard 4500 AMD)");
   });
 
+  test("+ Время at a typed price says so, beside the standard price", () => {
+    const parts = eventDetailParts(event({
+      action: "time_added", amount: 1500,
+      meta: { minutes: 120, new_ends_at: "2026-10-25T14:00:00Z", price_set_by_hand: true, standard_charge: 2000 },
+    }), t, money);
+    expect(parts).toContain("history.priceSetByHand (session.plannedStandard 2000 AMD)");
+  });
+
   test("a start without a plan prints nothing extra", () => {
     const parts = eventDetailParts(event({ action: "started", meta: { mode: "open", is_free: false } }), t, money);
     expect(parts).toEqual([]);

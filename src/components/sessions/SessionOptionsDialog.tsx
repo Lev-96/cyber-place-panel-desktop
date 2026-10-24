@@ -1,6 +1,7 @@
 import Button from "@/components/ui/Button";
 import JoystickIcon from "@/components/ui/JoystickIcon";
 import Checkbox from "@/components/ui/Checkbox";
+import PriceInput from "@/components/ui/PriceInput";
 import Modal from "@/components/ui/Modal";
 import { useConfirm } from "@/components/ui/ConfirmProvider";
 import Spinner from "@/components/ui/Spinner";
@@ -99,6 +100,9 @@ const SessionOptionsDialog = ({ session, platform, onClose, onChanged, platformN
   // One length, in hours by default (2026-10-25): a preset and a typed value
   // write the same box, so the grant on the confirm is always what is shown.
   const [grant, setGrant] = useState<{ unit: DurationUnit; amount: string }>({ unit: "hours", amount: "" });
+  // The grant's price typed by hand (2026-10-25), in AMD as `PriceInput` keeps it.
+  const [editCharge, setEditCharge] = useState(false);
+  const [chargeInput, setChargeInput] = useState("");
   // The price the session carries on at once its end is removed. Off by
   // default: not naming one keeps the tariff's own rate, which is what every
   // switch did before a price could be named at all.
@@ -144,12 +148,28 @@ const SessionOptionsDialog = ({ session, platform, onClose, onChanged, platformN
   const grantMinutes = minutesOf(grant.amount, grant.unit);
   // The server's price for exactly that length, at THIS session's rate. Only
   // asked of a session that can take time; a refusal shows its reason.
+  const chargeNum = Number(chargeInput);
+  // 0 is a gift and a legitimate price; empty or negative is not a price.
+  const chargeValid = chargeInput.trim() !== "" && Number.isFinite(chargeNum) && chargeNum >= 0;
+  const typedCharge = editCharge && chargeValid ? chargeNum : undefined;
   const timeQuote = useServerQuote<ITimeQuote>(
-    isActive && !isUnlimited && !current.paused_at ? grantMinutes : null,
-    (m) => sessionRepository.timeQuote(current.id, m),
-    `${current.id}|${current.ends_at ?? ""}`,
+    isActive && !isUnlimited && !current.paused_at && (!editCharge || chargeValid) ? grantMinutes : null,
+    (m) => sessionRepository.timeQuote(current.id, m, typedCharge),
+    `${current.id}|${current.ends_at ?? ""}|${typedCharge ?? ""}`,
   );
-  const quotedCharge = quoteFor(timeQuote, grantMinutes)?.charge ?? null;
+  const quoted = quoteFor(timeQuote, grantMinutes);
+  // Confirmed only on a quote for exactly what is on screen — the length AND,
+  // when typed, the price.
+  const quotedCharge = quoted !== null
+    && (typedCharge === undefined || Math.round(quoted.charge * 100) === Math.round(typedCharge * 100))
+    ? quoted.charge
+    : null;
+  // Whether this seat takes a typed price is the server's answer; until it
+  // has answered once, the box is not offered.
+  const [priceEditable, setPriceEditable] = useState(false);
+  useEffect(() => {
+    if (timeQuote.status === "ok") setPriceEditable(timeQuote.value.price_editable);
+  }, [timeQuote]);
 
   /**
    * @return true when the server accepted it. Refusals are SHOWN, not thrown —
@@ -584,8 +604,37 @@ const SessionOptionsDialog = ({ session, platform, onClose, onChanged, platformN
                 hint={t("session.addTimePriceHint")}
                 quote={timeQuote}
                 amountOf={(q) => q.charge}
-                noteOf={(q) => (q.is_free ? t("session.priceFreeNote") : null)}
+                noteOf={(q) => [
+                  q.is_free ? t("session.priceFreeNote") : null,
+                  // Typed by hand: what the rate would have asked, so a deal is
+                  // visibly a deal.
+                  typedCharge !== undefined ? `${t("session.plannedStandard")}: ${money(q.standard_charge)}` : null,
+                ].filter(Boolean).join(" · ") || null}
               />
+              {/* The price, editable (2026-10-25) on a seat with a plan. What
+                  was played is not re-priced; the time still to come shares
+                  the rest of the plan plus this figure. */}
+              {(priceEditable || editCharge) && (
+                <>
+                  <Checkbox
+                    checked={editCharge}
+                    onChange={(next) => {
+                      setEditCharge(next);
+                      setChargeInput(next && quotedCharge !== null ? String(quotedCharge) : "");
+                    }}
+                    label={t("session.plannedEditTotal")}
+                    disabled={busy || !isActive || grantMinutes === null}
+                  />
+                  {editCharge && (
+                    <div className="col" style={{ gap: 4 }} data-testid="grant-charge">
+                      <PriceInput label={t("session.addTimePrice")} value={chargeInput} onChange={setChargeInput} />
+                      {chargeInput.trim() !== "" && !chargeValid && (
+                        <span className="error" style={{ fontSize: 11 }}>{t("session.grantChargeInvalid")}</span>
+                      )}
+                    </div>
+                  )}
+                </>
+              )}
               {grantMinutes !== null && current.ends_at && (
                 <span className="muted" style={{ fontSize: 12 }}>
                   {t("session.newEndAt").replace(
@@ -600,10 +649,15 @@ const SessionOptionsDialog = ({ session, platform, onClose, onChanged, platformN
                   onClick={() => {
                     if (grantMinutes === null || quotedCharge === null) return;
                     void run(
-                      () => sessionRepository.addTime(current.id, grantMinutes),
+                      () => sessionRepository.addTime(current.id, grantMinutes, typedCharge),
                       grantMinutes,
                       timeAddedToast(grantMinutes),
-                    ).then((ok) => { if (ok) setGrant((g) => ({ ...g, amount: "" })); });
+                    ).then((ok) => {
+                      if (!ok) return;
+                      setGrant((g) => ({ ...g, amount: "" }));
+                      setEditCharge(false);
+                      setChargeInput("");
+                    });
                   }}
                 >
                   {/* The resolved minutes AND the server's price: "2 hours" and

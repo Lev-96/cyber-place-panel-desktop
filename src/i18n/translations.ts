@@ -693,6 +693,11 @@ export const TRANSLATIONS: Dict = {
     ru: "Введите цену больше нуля",
     am: "Մուտքագրեք զրոյից մեծ գին",
   },
+  "session.grantChargeInvalid": {
+    en: "Enter a price of zero or more",
+    ru: "Введите цену от нуля и выше",
+    am: "Մուտքագրեք զրոյից ոչ պակաս գին",
+  },
   "session.plannedStandard": { en: "standard", ru: "стандартно", am: "ստանդարտ" },
   "history.priceSetByHand": { en: "price set by hand", ru: "цена изменена вручную", am: "գինը փոխվել է ձեռքով" },
   "session.planLine": { en: "plan {0}", ru: "план {0}", am: "պլան {0}" },

@@ -82,6 +82,7 @@ vi.mock("@/i18n/LanguageContext", () => ({
         : k,
     money: (n: number) => String(n),
     lang: "en",
+    currency: "AMD",
   }),
 }));
 
@@ -167,8 +168,11 @@ beforeEach(() => {
   prices.fee = 500;
   // The server's price for N minutes at a 1 000/h session: what the confirm
   // names and waits for.
-  repo.timeQuote.mockImplementation((_id: number, m: number) =>
-    Promise.resolve({ minutes: m, hourly_rate: 1000, charge: (m * 1000) / 60, is_free: false }));
+  repo.timeQuote.mockImplementation((_id: number, m: number, charge?: number) =>
+    Promise.resolve({
+      minutes: m, hourly_rate: 1000, charge: charge ?? (m * 1000) / 60, standard_charge: (m * 1000) / 60,
+      price_editable: true, is_free: false,
+    }));
   prices.get.mockReset();
   prices.get.mockImplementation(() => Promise.resolve({
     branch_id: 7, money_rounding_step: 0, money_rounding_mode: "up", joystick_price: prices.fee,
@@ -293,7 +297,7 @@ describe("time and the ceiling", () => {
     await settle();
     await act(async () => { fireEvent.click(confirmGrant()); });
 
-    expect(repo.addTime).toHaveBeenCalledWith(42, 60);
+    expect(repo.addTime).toHaveBeenCalledWith(42, 60, undefined);
   });
 
   test("do not offer extra time on a session that has no end", async () => {
@@ -402,7 +406,7 @@ describe("a grant typed by hand, and its price", () => {
     await settle();
     await act(async () => { fireEvent.click(confirmGrant()); });
 
-    expect(repo.addTime).toHaveBeenCalledWith(42, 120);
+    expect(repo.addTime).toHaveBeenCalledWith(42, 120, undefined);
   });
 
   test("half an hour is a legitimate thing to type", async () => {
@@ -412,7 +416,7 @@ describe("a grant typed by hand, and its price", () => {
     await settle();
     await act(async () => { fireEvent.click(confirmGrant()); });
 
-    expect(repo.addTime).toHaveBeenCalledWith(42, 90);
+    expect(repo.addTime).toHaveBeenCalledWith(42, 90, undefined);
   });
 
   test("minutes typed on the minutes tab are sent as typed", async () => {
@@ -420,7 +424,7 @@ describe("a grant typed by hand, and its price", () => {
     await mount();
     await requestGrant(45);
 
-    expect(repo.addTime).toHaveBeenCalledWith(42, 45);
+    expect(repo.addTime).toHaveBeenCalledWith(42, 45, undefined);
   });
 
   test("switching the unit keeps the length, never re-reads the number", async () => {
@@ -471,7 +475,7 @@ describe("a grant typed by hand, and its price", () => {
     await typeAmount("3");
     await settle();
 
-    expect(repo.timeQuote).toHaveBeenLastCalledWith(42, 180);
+    expect(repo.timeQuote).toHaveBeenLastCalledWith(42, 180, undefined);
     expect(within(screen.getByTestId("quoted-price")).getByText("3000")).toBeTruthy();
     expect(confirmGrant().disabled).toBe(false);
   });
@@ -533,6 +537,85 @@ describe("a grant typed by hand, and its price", () => {
     await act(async () => { done(session()); });
 
     expect(repo.addTime).toHaveBeenCalledTimes(1);
+  });
+
+  /** The price typed by hand (2026-10-25), on a seat the server says takes one. */
+  describe("the price changed by hand", () => {
+    const setCharge = async (value: string) => {
+      const box = screen.getByTestId("grant-charge").querySelector("input")!;
+      await act(async () => { fireEvent.change(box, { target: { value } }); });
+    };
+    const tick = async () => {
+      await act(async () => { fireEvent.click(screen.getByText("session.plannedEditTotal")); });
+    };
+
+    test("prefilled with the server's figure, quoted and sent as typed", async () => {
+      repo.addTime.mockResolvedValue(session());
+      await mount();
+      await typeAmount("2");
+      await settle();
+      await tick();
+      expect((screen.getByTestId("grant-charge").querySelector("input") as HTMLInputElement).value).toBe("2000");
+
+      await setCharge("1500");
+      await settle();
+      expect(repo.timeQuote).toHaveBeenLastCalledWith(42, 120, 1500);
+      expect(within(screen.getByTestId("quoted-price")).getByText("1500")).toBeTruthy();
+      expect(screen.getByText(/session\.plannedStandard: 2000/)).toBeTruthy();
+
+      await act(async () => { fireEvent.click(confirmGrant()); });
+      expect(repo.addTime).toHaveBeenCalledWith(42, 120, 1500);
+    });
+
+    test("zero is a gift and can be confirmed", async () => {
+      repo.addTime.mockResolvedValue(session());
+      await mount();
+      await typeAmount("1");
+      await settle();
+      await tick();
+      await setCharge("0");
+      await settle();
+      await act(async () => { fireEvent.click(confirmGrant()); });
+      expect(repo.addTime).toHaveBeenCalledWith(42, 60, 0);
+    });
+
+    test("an empty or negative price holds the confirm", async () => {
+      await mount();
+      await typeAmount("1");
+      await settle();
+      await tick();
+      for (const v of ["", "-5"]) {
+        await setCharge(v);
+        await settle();
+        expect(confirmGrant().disabled).toBe(true);
+      }
+    });
+
+    test("a quote for a different price does not unlock the confirm", async () => {
+      await mount();
+      await typeAmount("1");
+      await settle();
+      await tick();
+      let answer: (v: unknown) => void = () => {};
+      repo.timeQuote.mockImplementation(() => new Promise((r) => { answer = r; }));
+      await setCharge("700");
+      await settle();
+      await act(async () => {
+        answer({ minutes: 60, hourly_rate: 1000, charge: 1000, standard_charge: 1000, price_editable: true, is_free: false });
+      });
+      expect(confirmGrant().disabled).toBe(true);
+    });
+
+    test("not offered on a seat the server says cannot take one", async () => {
+      repo.timeQuote.mockImplementation((_id: number, m: number) => Promise.resolve({
+        minutes: m, hourly_rate: 1000, charge: (m * 1000) / 60, standard_charge: (m * 1000) / 60,
+        price_editable: false, is_free: false,
+      }));
+      await mount();
+      await typeAmount("1");
+      await settle();
+      expect(screen.queryByText("session.plannedEditTotal")).toBeNull();
+    });
   });
 
   test("a waived session says nothing will be charged", async () => {

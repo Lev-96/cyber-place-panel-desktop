@@ -50,6 +50,10 @@ export interface ITimeQuote {
   minutes: number;
   hourly_rate: number;
   charge: number;
+  /** What the session's rate asks for these minutes. */
+  standard_charge: number;
+  /** Whether this seat takes a price typed by hand (a seat with a plan). */
+  price_editable: boolean;
   is_free: boolean;
 }
 
@@ -395,8 +399,12 @@ export const apiRemoveSessionJoystick = (sessionId: number, slot: number) =>
   request<{ session: ISessionApi }>(`/sessions/${sessionId}/joysticks/${slot}`, { method: "DELETE" });
 
 /** +10 / +30 / +60, priced at the tariff the player is already on. */
-export const apiAddSessionTime = (sessionId: number, minutes: number) =>
-  request<{ session: ISessionApi }>(`/sessions/${sessionId}/time`, { method: "POST", body: { minutes } });
+/** `charge`: the price typed by hand for these minutes (2026-10-25); omitted = the rate's. */
+export const apiAddSessionTime = (sessionId: number, minutes: number, charge?: number) =>
+  request<{ session: ISessionApi }>(`/sessions/${sessionId}/time`, {
+    method: "POST",
+    body: charge === undefined ? { minutes } : { minutes, charge },
+  });
 
 /**
  * Lift the ceiling, optionally at a new price. Refused (422, with a sentence)
@@ -463,8 +471,10 @@ export interface IExtensionOptions {
  * under a row lock and may still refuse. Never treat this as a promise.
  */
 /** ⚠️ ADVICE: `apiAddSessionTime` re-checks and is what charges. Writes nothing. */
-export const apiSessionTimeQuote = (sessionId: number, minutes: number) =>
-  request<ITimeQuote>(`/sessions/${sessionId}/time-quote?minutes=${minutes}`);
+export const apiSessionTimeQuote = (sessionId: number, minutes: number, charge?: number) =>
+  request<ITimeQuote>(
+    `/sessions/${sessionId}/time-quote?minutes=${minutes}` + (charge !== undefined ? `&charge=${charge}` : ""),
+  );
 
 /** ⚠️ ADVICE: `apiStartSession` is what creates the session. Writes nothing. */
 export const apiStartQuote = (pcId: number, minutes: number, hourlyRate?: number, plannedAmount?: number) =>

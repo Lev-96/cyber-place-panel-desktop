@@ -51,6 +51,32 @@ import { IExtraItem, ISessionApi } from "@/types/sessions";
 export const sessionTimeCostAt = (session: ISessionApi, at: number): number => {
   const rate = toNumber(session.hourly_rate);
 
+  // A PLAN (2026-10-25) — a package or a planned hourly start — bills its
+  // share of the plan from the last re-base, the rate past its end. Mirrors
+  // `Session::timeCostStringAt`; a seat moved before re-basing existed keeps
+  // the move's rule below.
+  const plannedTariff = tariffHourlyRate(session);
+  if (session.mode === "fixed" && !session.unlimited_at && plannedTariff !== null
+      && session.committed_amount !== null && session.committed_amount !== undefined && session.committed_until
+      && (!session.rate_changed_at || (session.plan_rebased_at
+        && !(Date.parse(session.plan_rebased_at) < Date.parse(session.rate_changed_at))))) {
+    const from = session.plan_rebased_at ?? session.started_at;
+    const fromMs = Date.parse(from);
+    const frozen = session.plan_rebased_at ? toNumber(session.amount_before_plan_rebase ?? 0) : 0;
+    const plan = toNumber(session.committed_amount);
+    const untilMs = Date.parse(session.committed_until);
+    // Only pauses resumed before now come out of the plan's length: a resume
+    // moves the end; a running pause, or one closed by the stop, has not.
+    const planned = untilMs > fromMs
+      ? Math.max(0, Math.floor((untilMs - fromMs) / 1000) - pausedSecondsBetween(session, fromMs, untilMs, at))
+      : 0;
+    const played = playedSecondsBetween(session, from, at);
+    if (planned <= 0) return round2(frozen + perSecond(plannedTariff, played));
+    return played <= planned
+      ? round2(frozen + ((plan - frozen) * played) / planned)
+      : round2(plan + perSecond(plannedTariff, played - planned));
+  }
+
   // A rate change mid-way (a move): what was earned is frozen, only the time
   // after it runs at the new rate. Outranks the unlimited boundary unless that
   // one came later.
@@ -85,21 +111,6 @@ export const sessionTimeCostAt = (session: ISessionApi, at: number): number => {
   // under a running session — bills what was committed, which is the last
   // figure anybody agreed to and is safer than billing the seat nothing.
   const tariff = tariffHourlyRate(session);
-
-  // A planned hourly start (2026-10-25) bills its SHARE of the plan inside the
-  // planned time and the rate past it — mirrors `Session::timeCostStringAt`,
-  // so a total set by hand reads on the card exactly as the receipt bills it.
-  if (tariff !== null && session.time_package_id == null && !session.time_package
-      && session.committed_amount !== null && session.committed_amount !== undefined
-      && session.committed_until) {
-    const planned = playedSecondsBetween(session, session.started_at, Date.parse(session.committed_until));
-    const played = playedSecondsBetween(session, session.started_at, at);
-    if (planned > 0) {
-      return played <= planned
-        ? round2((committed * played) / planned)
-        : round2(committed + perSecond(tariff, played - planned));
-    }
-  }
 
   return tariff === null
     ? round2(committed)
@@ -413,7 +424,13 @@ const secondsBetween = (fromIso: string | null | undefined, at: number): number 
  *
  * 0 for a session never paused — nothing that existed before moves.
  */
-export const pausedSecondsBetween = (session: ISessionApi, from: number, to: number): number => {
+export const pausedSecondsBetween = (
+  session: ISessionApi,
+  from: number,
+  to: number,
+  /** Only pauses resumed before this instant (a plan's length). */
+  resumedBefore?: number,
+): number => {
   if (!(to > from)) return 0;
 
   const pauses = session.pauses
@@ -423,6 +440,8 @@ export const pausedSecondsBetween = (session: ISessionApi, from: number, to: num
   for (const pause of pauses) {
     const pausedAt = Date.parse(pause.paused_at);
     if (Number.isNaN(pausedAt)) continue;
+    if (resumedBefore !== undefined
+      && (!pause.resumed_at || !(Date.parse(pause.resumed_at) < resumedBefore))) continue;
 
     const start = Math.max(pausedAt, from);
     // An open pause ends at its limit even before anyone presses Resume:
