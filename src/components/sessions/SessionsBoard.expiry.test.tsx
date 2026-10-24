@@ -360,6 +360,8 @@ describe("joysticks on the tile", () => {
   const padButtons = () => [...pads().querySelectorAll("button")] as HTMLButtonElement[];
   const addBtn = () => screen.queryByTestId("pad-add") as HTMLButtonElement | null;
   const onSwitch = () => screen.queryByTestId("pad-remove") as HTMLButtonElement | null;
+  /** What the buttons cost and how many are out: beside them, never inside. */
+  const caption = () => screen.queryByTestId("pad-caption");
   /** Presses "+🎮", which hands over whichever pad the venue gives next. */
   const pickPad = async (_slot: number) => {
     await act(async () => {
@@ -393,8 +395,8 @@ describe("joysticks on the tile", () => {
 
     // "+🎮" is pressable, priced at the venue's fee, and not the free kit pad.
     expect(addBtn()?.disabled).toBe(false);
-    expect(addBtn()?.textContent).toContain("500");
-    expect(addBtn()?.textContent).not.toContain("session.padFree");
+    expect(caption()?.textContent).toContain("500");
+    expect(caption()?.textContent).not.toContain("session.padFree");
     expect(onSwitch()).toBeNull();
   });
 
@@ -423,8 +425,8 @@ describe("joysticks on the tile", () => {
     })]);
     await mount();
 
-    expect(addBtn()?.textContent).toContain("500");
-    expect(addBtn()?.textContent).not.toContain("700");
+    expect(caption()?.textContent).toContain("500");
+    expect(caption()?.textContent).not.toContain("700");
   });
 
   /** One shared figure is quoted ONCE. */
@@ -433,7 +435,7 @@ describe("joysticks on the tile", () => {
     await mount();
 
     expect(padButtons()).toHaveLength(1);
-    expect((addBtn()?.textContent ?? "").match(/500/g)?.length).toBe(1);
+    expect((caption()?.textContent ?? "").match(/500/g)?.length).toBe(1);
   });
 
   /**
@@ -457,8 +459,9 @@ describe("joysticks on the tile", () => {
     await mount();
 
     expect(onSwitch()?.getAttribute("aria-pressed")).toBe("true");
-    expect(onSwitch()?.textContent).toContain("+1");
-    expect(addBtn()?.textContent).toContain("700");
+    expect(caption()?.textContent).toContain("session.padOutCount: 1");
+    expect(onSwitch()?.textContent).toBe("");
+    expect(caption()?.textContent).toContain("700");
   });
 
   /**
@@ -500,7 +503,7 @@ describe("joysticks on the tile", () => {
 
     expect(onSwitch()).toBeNull();
     expect(addBtn()?.disabled).toBe(false);
-    expect(addBtn()?.textContent).toContain("500");
+    expect(caption()?.textContent).toContain("500");
   });
 
   test("the tile shows the pads the seat is holding, not a fraction", async () => {
@@ -1051,8 +1054,7 @@ describe("a seat whose joystick fee is charged once", () => {
     })]);
     await mount();
 
-    const text = [...screen.getByTestId("pad-toggle").querySelectorAll("button")]
-      .map((b) => b.textContent ?? "").join(" | ");
+    const text = screen.getByTestId("pad-caption").textContent ?? "";
     expect(text).toContain("session.padFree");
     expect(text).not.toContain("session.padFeeTaken");
   });

@@ -1,4 +1,5 @@
 import { useLang } from "@/i18n/LanguageContext";
+import JoystickIcon from "@/components/ui/JoystickIcon";
 import type { PadChoice } from "./joystickView";
 
 /**
@@ -12,12 +13,15 @@ import type { PadChoice } from "./joystickView";
  * (GameZone also re-prices the whole session when the pad goes in; Cyber Place
  * deliberately does not — an hourly pad bills only the time it was out.)
  *
- * - No extra pad out: "+🎮" with what it costs — on an hourly seat the
- *   surcharge AND the seat's rate after it ("+500/h → 1 500/h"), on a fixed
- *   seat the one-off fee ("+500"). Disabled when the venue has no pad to give.
- * - A pad out: the switch shows it is on ("🎮 ×1 ✓") and a press takes the
- *   last one back. A venue that hands out a fourth controller keeps a second
- *   "+🎮" for it beside the switch, so nothing the floor does today is lost.
+ * Inside every button is the joystick and nothing else; what it costs and
+ * how many are out is the caption beside them (owner's call, 2026-10-25).
+ * - No extra pad out: one button; the caption says what the next pad costs —
+ *   on an hourly seat the surcharge AND the seat's rate after it ("+500/h →
+ *   1 500/h"), on a fixed seat the one-off fee ("+500"). Disabled when the
+ *   venue has no pad to give.
+ * - A pad out: that button is lit (aria-pressed) and a press takes the last
+ *   one back. A venue that hands out a fourth controller keeps a second,
+ *   unlit button for it beside the lit one.
  *
  * Every button is disabled while a change is in flight, so a double press is
  * one pad.
@@ -65,42 +69,52 @@ const PadToggle = ({
   };
 
   const canAdd = next !== null && next.enabled && next.price !== null;
-  const add = (
-    <button
-      type="button"
-      className="pad-toggle__btn"
-      disabled={busy || !canAdd}
-      onClick={() => { if (!busy && canAdd && next) onAdd(next.slot); }}
-      title={t(addLabelKey)}
-      aria-label={t(addLabelKey)}
-      data-testid="pad-add"
-    >
-      <span className="pad-toggle__name">+🎮</span>
-      {next !== null && <span className="pad-toggle__price">{priceOf(next)}</span>}
-    </button>
-  );
+  const groupLabel = groupLabelKey === null ? undefined : t(groupLabelKey);
 
-  if (extrasOut === 0) {
-    return <div className="pad-toggle" role="group" aria-label={groupLabelKey === null ? undefined : t(groupLabelKey)} data-testid="pad-toggle">{add}</div>;
-  }
+  // What the buttons do, said BESIDE them: inside each button is the joystick
+  // and nothing else (owner's call, 2026-10-25). How many are out, then what
+  // the next one would cost.
+  const caption = [
+    extrasOut > 0 ? `${t("session.padOutCount")}: ${extrasOut}` : null,
+    // The next pad's cost while there is one to hand out — and, on a seat
+    // with none out, also when there is not ("no price set"), so a disabled
+    // button is never silent about why.
+    next !== null && (canAdd || extrasOut === 0) ? priceOf(next) : null,
+  ].filter((x): x is string => x !== null).join(" · ");
 
   return (
-    <div className="pad-toggle" role="group" aria-label={groupLabelKey === null ? undefined : t(groupLabelKey)} data-testid="pad-toggle">
-      <button
-        type="button"
-        className="pad-toggle__btn is-on"
-        aria-pressed="true"
-        disabled={busy}
-        onClick={() => { if (!busy) onRemove(); }}
-        title={t(removeLabelKey)}
-        aria-label={t(removeLabelKey)}
-        data-testid="pad-remove"
-      >
-        <span className="pad-toggle__name">🎮 +{extrasOut} ✓</span>
-        {/* The card's own short word; the full sentence is the tooltip. */}
-        <span className="pad-toggle__price">{t("session.card.padRemove")}</span>
-      </button>
-      {canAdd && add}
+    <div className="pad-toggle" role="group" aria-label={groupLabel} data-testid="pad-toggle">
+      <div className="pad-toggle__row">
+        {extrasOut > 0 && (
+          <button
+            type="button"
+            className="pad-toggle__btn is-on"
+            aria-pressed="true"
+            disabled={busy}
+            onClick={() => { if (!busy) onRemove(); }}
+            title={t(removeLabelKey)}
+            aria-label={t(removeLabelKey)}
+            data-testid="pad-remove"
+          >
+            <JoystickIcon size={22} />
+          </button>
+        )}
+        {(extrasOut === 0 || canAdd) && (
+          <button
+            type="button"
+            className="pad-toggle__btn"
+            aria-pressed="false"
+            disabled={busy || !canAdd}
+            onClick={() => { if (!busy && canAdd && next) onAdd(next.slot); }}
+            title={t(addLabelKey)}
+            aria-label={t(addLabelKey)}
+            data-testid="pad-add"
+          >
+            <JoystickIcon size={22} />
+          </button>
+        )}
+      </div>
+      {caption !== "" && <span className="pad-toggle__caption" data-testid="pad-caption">{caption}</span>}
     </div>
   );
 };
