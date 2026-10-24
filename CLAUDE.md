@@ -2209,11 +2209,32 @@ saying so.
 
 | Control | Where | Who |
 |---|---|---|
-| 🎮 set the pad count (select, 1–4) | the seat's tile in `SessionsBoard` | everyone who works the branch |
-| +10 / +30 / +60 minutes | `SessionOptionsDialog` | same |
+| 🎮 joystick switch (`PadToggle`, first card action) | the seat's tile in `SessionsBoard` | everyone who works the branch |
+| + Время: hours/minutes, preset or typed, priced, then confirmed | `SessionOptionsDialog` | same |
+| optional planned length at an hourly start, priced | `StartSessionDialog` | same |
 | switch to unlimited | same | same |
 | Free (start it waived) | `StartSessionDialog`, behind `session.free` | same (managers since 2026-09-06) |
 | joystick prices, rounding policy | `BranchPricesPage` | admin + owner |
+
+**Choose, see the server's price, confirm (2026-10-25).** "+ Время" and the
+optional length on an hourly start share `DurationPicker` (ONE amount + ONE
+unit, hours by default, presets write the same box, switching the unit
+rewrites it: 2 h → 120 min — `durationModel.ts`) and `QuotedPrice` (a
+read-only `<output>`). The figure is never computed here: `useServerQuote`
+asks `time-quote` / `start-quote` after a 250 ms pause, drops a reply for a
+value the form has moved past, and the confirm / Start is enabled only when the
+quote is for exactly the minutes on screen. A refused quote shows its reason
+and no figure. A preset no longer grants on the tap. Empty length on Start is
+the count-up start as before; a filled one is a timed seat (`mode=fixed`, no
+package) whose tile reads "rate / ч · план N".
+
+**The window (2026-10-25).** Resizable with no maximum; minimum 800×560
+(`electron/windowBounds.ts` `MIN_CONTENT`) — every screen reflows there, and
+below 1100 px the shell gutters tighten so the board keeps two columns. Size,
+place and maximized state are kept in the existing `Store` under
+`window.state` and restored only if the window still lands on a display
+(shrunk and moved inside it otherwise); first run opens at the default,
+centred.
 
 ⚠️ Two rows MOVED out of `SessionOptionsDialog` (2026-09-10). Pads are set on
 the tile, because a cashier looking at the board can already see how many are in
