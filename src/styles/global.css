@@ -4787,17 +4787,60 @@ select.input {
     background-color 160ms ease;
 }
 
-/* The tile's pad count: 46px on a 160px card, so it cannot afford 32px of
-   right padding or the digit would be pushed out of its own box. Keyed by a
-   class rather than by the inline width it used to match on, because that
-   match disappeared the moment anybody wrote 48 instead of 46 and the arrow
-   then sat on top of the number. */
-.pad-select,
-select.input.pad-select {
-  padding: 0 14px 0 5px;
-  background-position: right 3px center;
-  background-size: 8px 6px;
-  text-align: center;
+/* The extra joystick as one "+🎮" switch (PadToggle), as on the floor's own
+   screen: a clear button that lights when a pad is out. A second "+🎮" sits
+   beside the lit switch on a venue with a fourth controller. */
+.pad-toggle {
+  display: flex;
+  flex: 1 1 100%;
+  flex-wrap: wrap;
+  gap: 4px;
+  min-width: 0;
+}
+
+.pad-toggle__btn {
+  display: flex;
+  flex: 1 1 96px;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  min-width: 96px;
+  padding: 4px 8px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-surface-alt);
+  color: var(--color-text);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.pad-toggle__btn:hover:not(:disabled) {
+  border-color: var(--color-primary);
+}
+
+.pad-toggle__btn:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 1px;
+}
+
+.pad-toggle__btn:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
+.pad-toggle__btn.is-on {
+  border-color: var(--color-accent-purple);
+  box-shadow: 0 0 0 1px var(--color-accent-purple) inset;
+}
+
+.pad-toggle__name {
+  font-weight: 700;
+}
+
+.pad-toggle__price {
+  color: var(--color-muted);
+  font-size: 11px;
 }
 
 select:hover:not(:disabled),

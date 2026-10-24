@@ -351,14 +351,22 @@ describe("joysticks on the tile", () => {
    * the tile opens: a control that starts on a value is one mis-scroll away
    * from charging a player for a controller nobody handed over.
    */
-  const pads = () => screen.getByLabelText("session.joysticks") as HTMLSelectElement;
-  const padOptions = () => [...pads().options];
-  const pickPad = async (slot: number) => {
+  // The extra pad is ONE "+🎮" switch now (PadToggle, 2026-10-25), as on the
+  // floor's own screen. "+🎮" offers the pad the venue hands out NEXT, priced;
+  // the lit switch takes the last one back. These read it as the menu
+  // assertions used to read the select: which pad comes next, at what price,
+  // and what cannot be had.
+  const pads = () => screen.getByTestId("pad-toggle");
+  const padButtons = () => [...pads().querySelectorAll("button")] as HTMLButtonElement[];
+  const addBtn = () => screen.queryByTestId("pad-add") as HTMLButtonElement | null;
+  const onSwitch = () => screen.queryByTestId("pad-remove") as HTMLButtonElement | null;
+  /** Presses "+🎮", which hands over whichever pad the venue gives next. */
+  const pickPad = async (_slot: number) => {
     await act(async () => {
-      fireEvent.change(pads(), { target: { value: String(slot) } });
+      fireEvent.click(screen.getByTestId("pad-add"));
     });
   };
-  /** Taking the last pad back, which is its own control now and not a direction. */
+  /** Taking the last pad back: the lit switch. */
   const takeBack = async () => {
     await act(async () => {
       fireEvent.click(screen.getByLabelText("session.padRemove"));
@@ -366,14 +374,13 @@ describe("joysticks on the tile", () => {
   };
 
   /**
-   * A fresh PlayStation seat is holding TWO controllers, and the menu offers
-   * the venue's product rather than one of them.
+   * A fresh PlayStation seat is holding TWO controllers, and "+🎮" offers the
+   * venue's product rather than one of them.
    *
    * The three symptoms this pins had one cause: the second controller was
    * modelled as an addable pad. The tile read "1 / 4" because the count was
-   * "1 + rows", the menu carried "the 2nd joystick, free" because slot 2 was an
-   * option, and the venue's own "3/4" sat DISABLED behind it because the menu
-   * enables the pad that comes next, which was that free second one.
+   * "1 + rows", the control offered "the 2nd joystick, free" because slot 2 was
+   * an option, and the venue's own "3/4" sat unreachable behind it.
    */
   test("a fresh seat holds two and offers the venue's pad, not one of its own", async () => {
     repo.listActive.mockResolvedValue([ps]);
@@ -384,26 +391,28 @@ describe("joysticks on the tile", () => {
     expect(screen.queryByText("1 / 4")).toBeNull();
     expect(screen.queryByText("2 / 3/4")).toBeNull();
 
-    // The menu: no kit pad, and nothing described as free.
-    const labels = padOptions().map((o) => o.textContent ?? "");
-    expect(labels.some((l) => l.includes("session.padFree"))).toBe(false);
-    expect(padOptions().map((o) => o.value)).not.toContain("2");
-
-    // …and the venue's shared pad is the one a cashier can actually pick.
-    const shared = padOptions().find((o) => (o.textContent ?? "").includes("session.padSharedOption"));
-    expect(shared).toBeTruthy();
-    expect(shared?.disabled).toBe(false);
+    // "+🎮" is pressable, priced at the venue's fee, and not the free kit pad.
+    expect(addBtn()?.disabled).toBe(false);
+    expect(addBtn()?.textContent).toContain("500");
+    expect(addBtn()?.textContent).not.toContain("session.padFree");
+    expect(onSwitch()).toBeNull();
   });
 
-  test("nothing is selected when the tile opens", async () => {
+  // Nothing is handed over until "+🎮" is pressed, and opening the tile
+  // presses nothing.
+  test("opening the tile hands over nothing", async () => {
     repo.listActive.mockResolvedValue([ps]);
     await mount();
 
-    expect(pads().value).toBe("");
-    expect(padOptions()[0].value).toBe("");
+    expect(repo.addJoystick).not.toHaveBeenCalled();
   });
 
-  test("offers the pads the VENUE hands out, priced", async () => {
+  /**
+   * "+🎮" says the price of the pad that comes NEXT. A fourth controller with
+   * no third one is not a thing a floor does, and offering it would charge the
+   * fourth pad's fee for the third pad's use; the server refuses it too.
+   */
+  test("offers the pad the VENUE hands out next, at its own price", async () => {
     // Two priced apart: the third at 500, the fourth at 700.
     repo.listActive.mockResolvedValue([withRule(ps, {
       shared: false,
@@ -414,88 +423,25 @@ describe("joysticks on the tile", () => {
     })]);
     await mount();
 
-    const labels = padOptions().map((o) => o.textContent ?? "");
-    expect(labels.some((l) => l.includes("500"))).toBe(true);
-    expect(labels.some((l) => l.includes("700"))).toBe(true);
+    expect(addBtn()?.textContent).toContain("500");
+    expect(addBtn()?.textContent).not.toContain("700");
   });
 
-  /**
-   * A venue that hands out three controllers has no fourth entry at all.
-   *
-   * The whole reason the ceiling is a venue answer rather than a constant here:
-   * the card used to draw a fourth option at every branch.
-   */
-  test("a pad the venue does not offer is not on the menu", async () => {
-    repo.listActive.mockResolvedValue([withRule(ps, {
-      max_slot: 3,
-      shared: false,
-      options: [
-        { slot: 3, price: 500, shared: false },
-      ],
-    })]);
-    await mount();
-
-    // The kit is never on the menu, so a venue that hands out three pads has
-    // exactly one entry, and the tile reads the number it is HOLDING.
-    expect(padOptions().map((o) => o.value)).toEqual(["", "3"]);
-    expect(screen.getByText("2")).toBeTruthy();
-  });
-
-  /** One shared figure is ONE entry, not the same price listed twice. */
-  test("a venue on one figure collapses the pair into a single entry", async () => {
+  /** One shared figure is quoted ONCE. */
+  test("a venue on one figure quotes it once", async () => {
     repo.listActive.mockResolvedValue([ps]);
     await mount();
 
-    const labels = padOptions().map((o) => o.textContent ?? "");
-    // One entry for the pair, not the same price listed twice — and nothing
-    // else beside the placeholder, because the kit is not on the menu.
-    expect(labels.filter((l) => l.includes("session.padSharedOption")).length).toBe(1);
-    expect(labels.some((l) => l.includes("session.padOption"))).toBe(false);
-    expect(padOptions()).toHaveLength(2);
+    expect(padButtons()).toHaveLength(1);
+    expect((addBtn()?.textContent ?? "").match(/500/g)?.length).toBe(1);
   });
 
   /**
-   * Everything but the pad that comes next is unreachable.
-   *
-   * A fourth controller with no third one is not a thing a floor does, and
-   * letting it be picked would charge the fourth pad's price for the third
-   * pad's use. The server refuses it too; this is what stops the cashier
-   * reaching it at all.
+   * With the third pad out the switch is lit and takes it back, and "+🎮"
+   * moves on to the fourth at its own price — a venue that hands out a fourth
+   * controller keeps it.
    */
-  test("only the pad that comes next can be chosen", async () => {
-    repo.listActive.mockResolvedValue([withRule(ps, {
-      shared: false,
-      options: [
-        { slot: 3, price: 500, shared: false },
-        { slot: 4, price: 700, shared: false },
-      ],
-    })]);
-    await mount();
-
-    const byValue = Object.fromEntries(padOptions().map((o) => [o.value, o.disabled]));
-    // Nothing is out on this fixture, so the third comes next and the fourth
-    // does not: a fourth controller with no third one is not a thing a floor
-    // does, and picking it would charge the fourth pad's fee for the third
-    // pad's use.
-    expect(byValue["3"]).toBe(false);
-    expect(byValue["4"]).toBe(true);
-  });
-
-  /**
-   * The number is what the seat is HOLDING, on its own.
-   *
-   * It was a fraction, and the fraction was the thing an operator could not
-   * read: "1 / 4" on a PlayStation with two controllers on the table, and
-   * "2 / 3/4" once the ceiling carried the venue's pricing shape.
-   */
-  /**
-   * A pad already handed over says so, and stays on the menu.
-   *
-   * Hiding it would leave the cashier wondering where it went; greying it with
-   * no reason reads as a broken control. It says "already in use", and it
-   * clears itself the moment the pad comes back.
-   */
-  test("a pad already in play is shown disabled and says why", async () => {
+  test("a pad in play lights the switch and +🎮 offers the next one", async () => {
     repo.listActive.mockResolvedValue([withRule({
       ...ps,
       joystick_count: 3,
@@ -510,18 +456,34 @@ describe("joysticks on the tile", () => {
     })]);
     await mount();
 
-    const third = padOptions().find((o) => o.value === "3");
-    const fourth = padOptions().find((o) => o.value === "4");
-
-    expect(third?.disabled).toBe(true);
-    expect(third?.textContent).toContain("session.padTaken");
-    // …and the one still free is neither disabled nor labelled.
-    expect(fourth?.disabled).toBe(false);
-    expect(fourth?.textContent).not.toContain("session.padTaken");
+    expect(onSwitch()?.getAttribute("aria-pressed")).toBe("true");
+    expect(onSwitch()?.textContent).toContain("+1");
+    expect(addBtn()?.textContent).toContain("700");
   });
 
-  /** Handing it back puts it straight back on the menu. */
-  test("a pad handed back is available again and no longer says otherwise", async () => {
+  /**
+   * A venue that hands out three controllers has nothing after the third: the
+   * lit switch is the whole control, exactly the floor's on/off button.
+   */
+  test("at the venue's ceiling the switch is the only control", async () => {
+    repo.listActive.mockResolvedValue([withRule({
+      ...ps,
+      joystick_count: 3,
+      joysticks: [{ id: 6, slot: 3, price: 500, is_charged: true, is_hourly: false,
+        started_at: new Date().toISOString(), stopped_at: null }],
+    } as unknown as ISessionApi, {
+      max_slot: 3,
+      shared: false,
+      options: [{ slot: 3, price: 500, shared: false }],
+    })]);
+    await mount();
+
+    expect(onSwitch()).toBeTruthy();
+    expect(addBtn()).toBeNull();
+  });
+
+  /** Handing it back puts "+🎮" straight back on that pad. */
+  test("a pad handed back is offered again", async () => {
     repo.listActive.mockResolvedValue([withRule({
       ...ps,
       joystick_count: 2,
@@ -536,9 +498,9 @@ describe("joysticks on the tile", () => {
     })]);
     await mount();
 
-    const third = padOptions().find((o) => o.value === "3");
-    expect(third?.disabled).toBe(false);
-    expect(third?.textContent).not.toContain("session.padTaken");
+    expect(onSwitch()).toBeNull();
+    expect(addBtn()?.disabled).toBe(false);
+    expect(addBtn()?.textContent).toContain("500");
   });
 
   test("the tile shows the pads the seat is holding, not a fraction", async () => {
@@ -620,19 +582,19 @@ describe("joysticks on the tile", () => {
     expect(repo.removeJoystick).not.toHaveBeenCalled();
   });
 
-  test("the placeholder hands over nothing", async () => {
+  // A double press is one pad: the first press disables every button until
+  // the server answers, and a press on a disabled button does nothing.
+  test("a second press while the first is in flight hands over nothing", async () => {
     repo.listActive.mockResolvedValue([ps]);
+    let release!: (s: ISessionApi) => void;
+    repo.addJoystick.mockReturnValueOnce(new Promise((r) => { release = r; }));
     await mount();
-    const readsAfterMount = repo.listActive.mock.calls.length;
 
-    await act(async () => {
-      fireEvent.change(pads(), { target: { value: "" } });
-    });
+    await pickPad(3);
+    await pickPad(3);
 
-    expect(repo.addJoystick).not.toHaveBeenCalled();
-    // …and no re-read either. Without the guard the board would flick the
-    // control disabled and re-fetch the list for a change that was never made.
-    expect(repo.listActive.mock.calls.length).toBe(readsAfterMount);
+    expect(repo.addJoystick).toHaveBeenCalledTimes(1);
+    await act(async () => { release(ps); });
   });
 
   test("taking one back names the highest pad in play", async () => {
@@ -705,7 +667,7 @@ describe("joysticks on the tile", () => {
     await mount();
 
     await pickPad(3);
-    expect(pads().disabled).toBe(true);
+    expect(padButtons().every((b) => b.disabled)).toBe(true);
 
     await act(async () => { release(ps); });
   });
@@ -911,10 +873,7 @@ describe("joysticks on the tile", () => {
     await mount();
 
     await act(async () => {
-      fireEvent.change(
-        screen.getByLabelText("session.joysticks"),
-        { target: { value: "3" } },
-      );
+      fireEvent.click(screen.getByTestId("pad-add"));
     });
 
     // Word for word: "no price is set for that slot" is a sentence the cashier
@@ -1092,8 +1051,8 @@ describe("a seat whose joystick fee is charged once", () => {
     })]);
     await mount();
 
-    const menu = screen.getByLabelText("session.joysticks") as HTMLSelectElement;
-    const text = [...menu.options].map((o) => o.textContent ?? "").join(" | ");
+    const text = [...screen.getByTestId("pad-toggle").querySelectorAll("button")]
+      .map((b) => b.textContent ?? "").join(" | ");
     expect(text).toContain("session.padFree");
     expect(text).not.toContain("session.padFeeTaken");
   });

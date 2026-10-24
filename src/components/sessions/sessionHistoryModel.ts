@@ -353,6 +353,13 @@ export interface EventPresentation {
   actor: string | null;
   /** What changed, one fact per entry. */
   details: string[];
+  /**
+   * Whether the event's `amount` is money put on the bill (2026-10-25). An
+   * HOURLY pad's add event carries the pad's per-hour RATE as its amount, and
+   * printed bare it read as a 500 charge on a pad that bills by the second;
+   * that line hides it, and its details say "500/h" instead.
+   */
+  showAmount: boolean;
 }
 
 /** "some_new_action" → "Some new action": readable without a translation. */
@@ -384,6 +391,7 @@ export const eventPresentation = (
       icon: "⟳",
       actor: e.user?.name ?? t("history.endedAutomatically"),
       details,
+      showAmount: true,
     };
   }
 
@@ -397,6 +405,7 @@ export const eventPresentation = (
       icon: "•",
       actor: e.user?.name ?? null,
       details: plain,
+      showAmount: true,
     };
   }
 
@@ -406,6 +415,8 @@ export const eventPresentation = (
     icon: known.icon,
     actor: e.user?.name ?? null,
     details,
+    showAmount: !(e.action === "joystick_added"
+      && e.meta !== null && (e.meta as Record<string, unknown>).hourly === true),
   };
 };
 

@@ -43,6 +43,7 @@ import RelocateSessionDialog from "./RelocateSessionDialog";
 import { BASE_JOYSTICKS, MAX_JOYSTICKS } from "@/api/joystickPrices";
 import { notify } from "@/ui/notify";
 import StopReceiptModal from "./StopReceiptModal";
+import PadToggle from "./PadToggle";
 import { useExpiryNudge } from "./useExpiryNudge";
 import { dropSideOf, moveOnto } from "@/utils/reorder";
 
@@ -958,102 +959,25 @@ const SessionsBoard = ({ branchId }: Props) => {
                   )}
                   {supportsJoysticks && !padSwitch && (
                   <>
-                    {/* WHICH pad, not how many.
-                        It was a select of target counts and the server picked
-                        the slots. A venue may now hand out three controllers
-                        or price the fourth apart from the third, so "make it
-                        four" stopped saying what it costs. The cashier names
-                        the pad and sees its price before they choose it.
-
-                        Nothing is selected when the tile opens, deliberately:
-                        a control that starts on a value is one mis-scroll away
-                        from charging a player for a controller nobody handed
-                        over. It goes back to empty after every add. */}
-                    <select
-                      // `pad-select` is what the stylesheet sizes the chevron
-                      // and the padding by. It used to key off the inline
-                      // width, which silently stopped applying the moment
-                      // anybody changed 46 to 48 and let the arrow sit on top
-                      // of the digit.
-                      className="input pad-select"
-                      style={{
-                        height: 24,
-                        // Never narrower than a word plus its chevron. It was
-                        // 0, which on a full tile collapsed the control to the
-                        // arrow alone; the row above wraps instead now, and
-                        // this is what makes it wrap rather than shrink.
-                        //
-                        // The basis is the MINIMUM and not the content's width
-                        // on purpose: at its natural 136px the menu fills the
-                        // line by itself and pushes the take-back button onto a
-                        // third, which is a taller tile for no more information.
-                        // Asking for 96 and growing into what is left keeps the
-                        // two controls together on one line.
-                        minWidth: 96,
-                        flexBasis: 96,
-                        flexGrow: 1,
-                        flexShrink: 1,
-                        fontSize: 12,
-                      }}
-                      title={t("session.padChoose")}
-                      aria-label={t("session.joysticks")}
-                      // Disabled while a change is in flight, and when this
-                      // venue has nothing left to hand out on this seat.
-                      disabled={padBusy.isBusy(sess.id) || padMenu.every((c) => !c.enabled)}
-                      value=""
-                      onChange={(e) => {
-                        const slot = Number(e.target.value);
-                        if (Number.isFinite(slot) && slot > 0) void addPad(sess, slot);
-                      }}
-                    >
-                      <option value="">{t("session.padChoose")}</option>
-                      {padMenu.map((c) => (
-                        <option
-                          key={c.shared ? "shared" : c.slot}
-                          value={c.slot}
-                          // Everything but the pad that comes next. The server
-                          // refuses those too; this is what stops the cashier
-                          // reaching them at all.
-                          disabled={!c.enabled}
-                        >
-                          {(c.shared
-                            ? t("session.padSharedOption")
-                            : t("session.padOption").replace("{0}", String(c.slot)))
-                            + " · "
-                            + (c.price === null
-                              ? t("session.padNoPrice")
-                              // Two different zeros. "Free" is what this venue
-                              // charges for a pad; "already charged" is a
-                              // payment that happened on THIS seat and covers
-                              // every controller after it.
-                              : c.feeTaken
-                                ? t("session.padFeeTaken")
-                                : c.price === 0 ? t("session.padFree") : money(c.price))
-                            // A pad in somebody's hands says so. Greyed with no
-                            // reason reads as broken; greyed with a reason reads
-                            // as the floor's own state, and it clears itself the
-                            // moment the pad comes back.
-                            + (c.taken ? ` · ${t("session.padTaken")}` : "")}
-                        </option>
-                      ))}
-                    </select>
-                    {/* Taking one back, which the count select used to do by
-                        being set lower. It is a separate control now because
-                        the select above hands ONE named pad over and a control
-                        that both charges and refunds by direction is how a
-                        mis-click becomes money. */}
-                    {joystickCount > BASE_JOYSTICKS && (
-                      <Button
-                        variant="secondary"
-                        style={{ height: 24, padding: "0 8px", fontSize: 12, flexShrink: 0 }}
-                        title={t("session.padRemove")}
-                        aria-label={t("session.padRemove")}
-                        disabled={padBusy.isBusy(sess.id)}
-                        onClick={() => void removeTopPad(sess)}
-                      >
-                        −
-                      </Button>
-                    )}
+                    {/* The extra joystick as one "+🎮" switch, as on the
+                        floor's own screen (PadToggle, 2026-10-25; it was a
+                        select plus a "−" button). It says what the next pad
+                        costs — on an hourly seat the surcharge and the seat's
+                        rate after it — a press hands it over, a press on the
+                        lit switch takes the last one back, and a venue with a
+                        fourth controller keeps a "+🎮" for it. Same calls as
+                        before; disabled while a change is in flight. */}
+                    <PadToggle
+                      next={padMenu.find((c) => c.enabled) ?? null}
+                      extrasOut={(sess.joysticks ?? []).filter(
+                        (j) => j.stopped_at === null && Number(j.slot) > BASE_JOYSTICKS,
+                      ).length}
+                      hourly={sess.joystick_rule?.hourly === true}
+                      currentRate={sess.is_free ? null : sessionCurrentHourlyRate(sess)}
+                      busy={padBusy.isBusy(sess.id)}
+                      onAdd={(slot) => void addPad(sess, slot)}
+                      onRemove={() => void removeTopPad(sess)}
+                    />
                     {/* The round trip, said on the tile it belongs to. The
                       select is already disabled while it is in flight; this
                       is what tells the cashier the change landed, on a board
@@ -1117,18 +1041,22 @@ const SessionsBoard = ({ branchId }: Props) => {
 
                   The venue that hands pads out one at a time is the only one
                   that gets this; every other keeps its menu, untouched. */}
+              {/* Drawn as the same "+🎮" switch as every other venue
+                  (PadToggle, 2026-10-25), with this venue's own names; the
+                  behaviour is unchanged — one pad out or none, and nothing to
+                  hand out is a disabled button rather than a hidden one. */}
               {supportsJoysticks && padSwitch && (
-                <SessionCardAction
-                  label={padOut ? t("session.card.padRemove") : t("session.card.padAdd")}
-                  fullLabel={padOut ? t("session.padRemoveOne") : t("session.padAddOne")}
-                  // Nothing to hand out is a disabled button rather than a
-                  // hidden one: a venue with no price set is a thing the
-                  // cashier can see and ask about.
-                  disabled={padBusy.isBusy(sess.id) || (!padOut && padNext === null)}
-                  onClick={() => {
-                    if (padOut) { void removeTopPad(sess); return; }
-                    if (padNext !== null) void addPad(sess, padNext);
-                  }}
+                <PadToggle
+                  next={padOut ? null : (padMenu.find((c) => c.enabled) ?? null)}
+                  extrasOut={padOut ? 1 : 0}
+                  hourly={sess.joystick_rule?.hourly === true}
+                  currentRate={sess.is_free ? null : sessionCurrentHourlyRate(sess)}
+                  busy={padBusy.isBusy(sess.id)}
+                  onAdd={(slot) => void addPad(sess, slot)}
+                  onRemove={() => void removeTopPad(sess)}
+                  addLabelKey="session.padAddOne"
+                  removeLabelKey="session.padRemoveOne"
+                  groupLabelKey={null}
                 />
               )}
               <SessionCardAction
