@@ -3112,7 +3112,9 @@ singular genitive kept elsewhere, hence by key), and "Start session" stays.
 
 `Layout` renders `PageTopBar` where `BackButton` was: a sticky, click-through
 bar (only Back takes the pointer) holding Back on the left. When the screen's
-first `.page-title` (outside a dialog) scrolls above the bar, its text fades
+first `.page-title` (outside a dialog) reaches the bar — its top at the bar's
+bottom, i.e. the main's top padding + the bar's height (`barBottomInset`), so
+even a small scroll never slides it under Back — its text fades
 and rises into the bar's centre, level with Back; scrolling up fades it out.
 It finds the heading itself (IntersectionObserver rooted at `main`, re-looked
 on DOM changes), so no screen changes; it resets on every route and shows no
