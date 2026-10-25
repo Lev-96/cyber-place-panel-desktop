@@ -25,6 +25,13 @@ export const pageTitleIn = (main: Element): HTMLElement | null => {
 export const barBottomInset = (main: Element, bar: HTMLElement): number =>
   Math.round((parseFloat(getComputedStyle(main).paddingTop) || 0) + bar.offsetHeight);
 
+/**
+ * Set on the screen's own heading while the bar carries it (2026-10-26), so
+ * only ONE name is ever on screen: it fades up out of its place as the bar's
+ * copy fades in, and plays its usual entrance again when it comes back.
+ */
+export const DOCKED_CLASS = "cp-page-title--docked";
+
 const PageTopBar = () => {
   const location = useLocation();
   const barRef = useRef<HTMLDivElement>(null);
@@ -53,6 +60,7 @@ const PageTopBar = () => {
       }
       io?.disconnect();
       io = null;
+      watched?.classList.remove(DOCKED_CLASS);
       watched = el;
       setTitle(el?.textContent?.trim() || null);
       setShown(false);
@@ -62,7 +70,11 @@ const PageTopBar = () => {
         // it has gone entirely: a small scroll used to slide the real heading
         // under Back. From there the band covers it and the bar carries it.
         // Below the fold is not "reached".
-        ([entry]) => setShown(entry.intersectionRatio < 1 && entry.boundingClientRect.top < (entry.rootBounds?.top ?? 0)),
+        ([entry]) => {
+          const docked = entry.intersectionRatio < 1 && entry.boundingClientRect.top < (entry.rootBounds?.top ?? 0);
+          setShown(docked);
+          el.classList.toggle(DOCKED_CLASS, docked);
+        },
         // The bar sticks below the scroll area's top padding, so its bottom is
         // padding + its own height from the top — that is the line to reach.
         { root: main, rootMargin: `-${barBottomInset(main, bar)}px 0px 0px 0px`, threshold: [0, 1] },
@@ -85,6 +97,7 @@ const PageTopBar = () => {
       cancelAnimationFrame(frame);
       mo.disconnect();
       io?.disconnect();
+      watched?.classList.remove(DOCKED_CLASS);
     };
   }, [location.pathname]);
 

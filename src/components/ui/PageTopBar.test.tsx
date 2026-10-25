@@ -2,7 +2,7 @@
 import { act, cleanup, render, screen } from "@testing-library/react";
 import { MemoryRouter, useLocation, useNavigate } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import PageTopBar, { barBottomInset, pageTitleIn } from "./PageTopBar";
+import PageTopBar, { DOCKED_CLASS, barBottomInset, pageTitleIn } from "./PageTopBar";
 
 /**
  * The bar pinned to every screen (2026-10-25): Back, and the screen's heading
@@ -84,6 +84,29 @@ describe("the pinned top bar", () => {
       io.fire?.({ isIntersecting: true, intersectionRatio: 0.4, boundingClientRect: { top: 20 } as DOMRectReadOnly });
     });
     expect(bar().classList.contains("is-titled")).toBe(true);
+  });
+
+  test("only one name on screen: the heading leaves its place while the bar carries it, and returns", async () => {
+    await mount();
+    const heading = io.observed[0];
+    expect(heading.classList.contains(DOCKED_CLASS)).toBe(false);
+
+    await act(async () => { io.fire?.({ isIntersecting: true, intersectionRatio: 0.5, boundingClientRect: { top: 20 } as DOMRectReadOnly }); });
+    expect(heading.classList.contains(DOCKED_CLASS)).toBe(true);
+    expect(bar().classList.contains("is-titled")).toBe(true);
+
+    await act(async () => { io.fire?.({ isIntersecting: true, intersectionRatio: 1, boundingClientRect: { top: 80 } as DOMRectReadOnly }); });
+    expect(heading.classList.contains(DOCKED_CLASS)).toBe(false);
+    expect(bar().classList.contains("is-titled")).toBe(false);
+  });
+
+  test("leaving the screen gives the heading back its place", async () => {
+    await mount();
+    const heading = io.observed[0];
+    await act(async () => { io.fire?.({ isIntersecting: false, intersectionRatio: 0, boundingClientRect: { top: -40 } as DOMRectReadOnly }); });
+    expect(heading.classList.contains(DOCKED_CLASS)).toBe(true);
+    cleanup();
+    expect(heading.classList.contains(DOCKED_CLASS)).toBe(false);
   });
 
   test("fully in view under the bar: not yet", async () => {

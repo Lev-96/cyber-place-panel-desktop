@@ -994,7 +994,24 @@ body.cp-modal-open .main {
 .cp-topbar__title:empty {
   display: none;
 }
+/* The screen's own heading while the bar carries it: it leaves its place as
+   the bar's copy arrives, so the name is never on screen twice. Its usual
+   entrance (`cp-title-in`) plays again when the class goes. Its box stays, so
+   nothing below moves. */
+.page-title.cp-page-title--docked {
+  animation: cp-title-dock 180ms ease both;
+}
+@keyframes cp-title-dock {
+  to {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
 @media (prefers-reduced-motion: reduce) {
+  .page-title.cp-page-title--docked {
+    animation: none;
+    opacity: 0;
+  }
   .cp-topbar::before,
   .cp-topbar__title,
   .cp-topbar.is-titled .cp-topbar__title {
