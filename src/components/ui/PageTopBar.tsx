@@ -21,6 +21,10 @@ export const pageTitleIn = (main: Element): HTMLElement | null => {
   return null;
 };
 
+/** How far below the scroll area's top edge the pinned bar ends. */
+export const barBottomInset = (main: Element, bar: HTMLElement): number =>
+  Math.round((parseFloat(getComputedStyle(main).paddingTop) || 0) + bar.offsetHeight);
+
 const PageTopBar = () => {
   const location = useLocation();
   const barRef = useRef<HTMLDivElement>(null);
@@ -54,9 +58,14 @@ const PageTopBar = () => {
       setShown(false);
       if (!el || typeof IntersectionObserver === "undefined") return;
       io = new IntersectionObserver(
-        // Out of view ABOVE the bar — not merely below the fold.
-        ([entry]) => setShown(!entry.isIntersecting && entry.boundingClientRect.top < (entry.rootBounds?.top ?? 0)),
-        { root: main, rootMargin: `-${bar.offsetHeight}px 0px 0px 0px`, threshold: 0 },
+        // The moment the heading's top reaches the bar (2026-10-26) — not once
+        // it has gone entirely: a small scroll used to slide the real heading
+        // under Back. From there the band covers it and the bar carries it.
+        // Below the fold is not "reached".
+        ([entry]) => setShown(entry.intersectionRatio < 1 && entry.boundingClientRect.top < (entry.rootBounds?.top ?? 0)),
+        // The bar sticks below the scroll area's top padding, so its bottom is
+        // padding + its own height from the top — that is the line to reach.
+        { root: main, rootMargin: `-${barBottomInset(main, bar)}px 0px 0px 0px`, threshold: [0, 1] },
       );
       io.observe(el);
     };

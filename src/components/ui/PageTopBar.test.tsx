@@ -2,7 +2,7 @@
 import { act, cleanup, render, screen } from "@testing-library/react";
 import { MemoryRouter, useLocation, useNavigate } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import PageTopBar, { pageTitleIn } from "./PageTopBar";
+import PageTopBar, { barBottomInset, pageTitleIn } from "./PageTopBar";
 
 /**
  * The bar pinned to every screen (2026-10-25): Back, and the screen's heading
@@ -66,21 +66,37 @@ describe("the pinned top bar", () => {
 
   test("the heading scrolled away: it shows, centred in the bar", async () => {
     await mount();
-    await act(async () => { io.fire?.({ isIntersecting: false, boundingClientRect: { top: -40 } as DOMRectReadOnly }); });
+    await act(async () => { io.fire?.({ isIntersecting: false, intersectionRatio: 0, boundingClientRect: { top: -40 } as DOMRectReadOnly }); });
     expect(bar().classList.contains("is-titled")).toBe(true);
     expect(title().getAttribute("aria-hidden")).toBe("false");
   });
 
   test("scrolled back up: it hides again", async () => {
     await mount();
-    await act(async () => { io.fire?.({ isIntersecting: false, boundingClientRect: { top: -40 } as DOMRectReadOnly }); });
-    await act(async () => { io.fire?.({ isIntersecting: true, boundingClientRect: { top: 60 } as DOMRectReadOnly }); });
+    await act(async () => { io.fire?.({ isIntersecting: false, intersectionRatio: 0, boundingClientRect: { top: -40 } as DOMRectReadOnly }); });
+    await act(async () => { io.fire?.({ isIntersecting: true, intersectionRatio: 1, boundingClientRect: { top: 60 } as DOMRectReadOnly }); });
+    expect(bar().classList.contains("is-titled")).toBe(false);
+  });
+
+  test("a small scroll: the heading's top under the bar already moves it into the bar", async () => {
+    await mount();
+    await act(async () => {
+      io.fire?.({ isIntersecting: true, intersectionRatio: 0.4, boundingClientRect: { top: 20 } as DOMRectReadOnly });
+    });
+    expect(bar().classList.contains("is-titled")).toBe(true);
+  });
+
+  test("fully in view under the bar: not yet", async () => {
+    await mount();
+    await act(async () => {
+      io.fire?.({ isIntersecting: true, intersectionRatio: 1, boundingClientRect: { top: 60 } as DOMRectReadOnly });
+    });
     expect(bar().classList.contains("is-titled")).toBe(false);
   });
 
   test("below the fold is not 'scrolled away'", async () => {
     await mount();
-    await act(async () => { io.fire?.({ isIntersecting: false, boundingClientRect: { top: 2000 } as DOMRectReadOnly }); });
+    await act(async () => { io.fire?.({ isIntersecting: false, intersectionRatio: 0, boundingClientRect: { top: 2000 } as DOMRectReadOnly }); });
     expect(bar().classList.contains("is-titled")).toBe(false);
   });
 
@@ -140,5 +156,19 @@ describe("pageTitleIn", () => {
     const main = document.createElement("main");
     main.innerHTML = '<div class="cp-modal"><h2 class="page-title">A</h2></div><h2 class="page-title">B</h2><h2 class="page-title">C</h2>';
     expect(pageTitleIn(main)?.textContent).toBe("B");
+  });
+});
+
+describe("barBottomInset", () => {
+  test("the bar ends at the scroll area's top padding plus its own height", () => {
+    const main = document.createElement("main");
+    main.style.paddingTop = "24px";
+    const bar = document.createElement("div");
+    Object.defineProperty(bar, "offsetHeight", { value: 36 });
+    document.body.appendChild(main);
+    expect(barBottomInset(main, bar)).toBe(60);
+    main.style.paddingTop = "16px";
+    expect(barBottomInset(main, bar)).toBe(52);
+    main.remove();
   });
 });
