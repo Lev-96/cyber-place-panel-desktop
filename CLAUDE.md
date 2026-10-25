@@ -3122,3 +3122,6 @@ heading on `/` (the dashboard has only widget headings). A band of the page
 background (`.cp-topbar::before`, sized by `--main-pad-top`/`--main-pad-x` on
 `.main`) rises with it so nothing scrolls visibly behind the bar. Reduced
 motion: no animation.
+Only one name is ever on screen: while the bar carries the heading, the
+heading itself gets `cp-page-title--docked` (fades up out of its place, box
+kept so nothing moves) and plays its usual `cp-title-in` again when it returns.
