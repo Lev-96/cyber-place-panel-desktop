@@ -68,17 +68,16 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved }: Prop
     }
   };
 
+  // Read ONCE, when Stop was pressed (2026-10-25): the receipt is frozen at
+  // that instant — it no longer ticks — while the card's clock runs on in case
+  // the cashier cancels. Confirming closes the seat AT that instant for exactly
+  // this total (`priced_at` + `expected_total`); a receipt the server finds
+  // stale or changed is refused and read again (see confirmStop). It is read
+  // again too after a line is taken off, or when the seat is ended elsewhere.
   useEffect(() => {
     void reload();
-    // Refresh time-cost every 5s while modal open (open sessions keep ticking).
-    // A seat that is already over has a final figure, so it is read once —
-    // re-asking would return the same number every five seconds for as long as
-    // the cashier leaves the receipt on screen.
-    if (session.status !== "active") return;
-    const timer = setInterval(() => { void reload(); }, 5_000);
-    return () => clearInterval(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session.id]);
+  }, [session.id, session.status]);
 
   const remove = async (itemId: number, name: string, additional: boolean) => {
     // Asked first, as on the Add Product dialog: one misplaced click must not
@@ -122,15 +121,23 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved }: Prop
         // card payment carrying a note called "Idram" is a contradiction the
         // history would then have to display.
         ...(method === "other" ? { payment_method_other: other.trim() } : {}),
+        // The figure on screen is the figure charged (2026-10-25).
+        ...(bill?.priced_at ? { priced_at: bill.priced_at, expected_total: Number(bill.total) } : {}),
       });
       setStopped(r.breakdown);
       setHandover(r.cash ?? null);
       onConfirmed();
     } catch (e) {
-      // An open place kept billing while the guest counted: the server's bill
-      // is now above the banknotes. Re-read it so the shortfall shows.
-      if (change?.state === "ok" && (e as { status?: number }).status === 422) {
-        setErr(t("session.cashBillGrew"));
+      // Refused as stale or changed (2026-10-25) — older than ten minutes, or
+      // a product, pad, pause, waiver or move since: the server's sentence,
+      // and the receipt read again so the new figure is what is confirmed.
+      // (Cash short against it is the same 422 and the same remedy.)
+      if ((e as { status?: number }).status === 422) {
+        // The banknotes short of the bill keep their own sentence; any other
+        // refusal is the server's.
+        const body = (e as { body?: { errors?: Record<string, unknown> } }).body;
+        const cashShort = change?.state === "ok" && body?.errors?.cash_received !== undefined;
+        setErr(cashShort || !(e instanceof Error) || !e.message ? t("session.cashBillGrew") : e.message);
         // Not `reload()`: it clears the error this line just set.
         void sessionRepository.preview(session.id).then(setBill).catch(() => {});
       } else {
@@ -192,7 +199,12 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved }: Prop
         )}
         {!finished && (
           <span className="muted" style={{ fontSize: 12 }} data-testid="checkout-still-running">
-            {t("session.checkoutStillRunning")}
+            {t("session.checkoutStillRunning").replace(
+              "{0}",
+              bill?.priced_at
+                ? new Date(bill.priced_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false })
+                : "-",
+            )}
           </span>
         )}
 

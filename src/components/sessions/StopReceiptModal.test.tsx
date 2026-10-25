@@ -632,7 +632,10 @@ describe("received cash and change", () => {
   });
 
   test("the bill grew past the banknotes: told in words and the bill is re-read", async () => {
-    repo.stop.mockRejectedValue(Object.assign(new Error("422"), { status: 422 }));
+    // Laravel's validation answer for the banknotes short of the bill.
+    repo.stop.mockRejectedValue(Object.assign(new Error("The cash received field must be greater…"), {
+      status: 422, body: { message: "…", errors: { cash_received: ["…"] } },
+    }));
     await mount();
     await act(async () => { type("3400"); });
     const reads = repo.preview.mock.calls.length;
@@ -721,5 +724,57 @@ describe("the preliminary total", () => {
     expect(onClose).toHaveBeenCalled();
     expect(repo.stop).not.toHaveBeenCalled();
     expect(screen.getByTestId("stop-confirm").textContent).toBe("session.confirmStop");
+  });
+});
+
+/**
+ * Charged at the receipt (2026-10-25): frozen at the moment Stop was pressed,
+ * confirmed with that instant and that total, re-read when the server says it
+ * changed.
+ */
+describe("the receipt is the figure charged", () => {
+  beforeEach(() => { cleanup(); repo.stop.mockReset(); repo.preview.mockReset(); });
+  afterEach(() => { cleanup(); vi.useRealTimers(); });
+
+  const frozen = (total: number, at = "2026-10-25T13:00:00+00:00") => bill({ total, priced_at: at } as Partial<IBillBreakdown>);
+
+  test("read once: it does not tick while open", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    repo.preview.mockResolvedValue(frozen(137.22));
+    await mount();
+    const reads = repo.preview.mock.calls.length;
+    await act(async () => { await vi.advanceTimersByTimeAsync(60_000); });
+
+    expect(repo.preview.mock.calls.length).toBe(reads);
+  });
+
+  test("confirming sends the receipt's instant and total", async () => {
+    repo.preview.mockResolvedValue(frozen(137.22));
+    repo.stop.mockResolvedValue({ breakdown: frozen(137.22), cash: null });
+    await mount();
+    await act(async () => { fireEvent.click(screen.getByTestId("stop-confirm")); });
+
+    expect(repo.stop.mock.calls[0][1]).toMatchObject({ priced_at: "2026-10-25T13:00:00+00:00", expected_total: 137.22 });
+  });
+
+  test("says the time it is frozen at", async () => {
+    repo.preview.mockResolvedValue(frozen(137.22));
+    await mount();
+    expect(screen.getByTestId("checkout-still-running").textContent).not.toContain("{0}");
+  });
+
+  test("a changed bill: the server's sentence, the receipt read again, confirm still offered", async () => {
+    repo.preview.mockResolvedValueOnce(frozen(137.22)).mockResolvedValue(frozen(150, "2026-10-25T13:05:00+00:00"));
+    repo.stop.mockRejectedValueOnce(Object.assign(new Error("Счёт изменился"), { status: 422, body: { message: "Счёт изменился" } }));
+    await mount();
+    await act(async () => { fireEvent.click(screen.getByTestId("stop-confirm")); });
+
+    expect(screen.getByText("Счёт изменился")).toBeTruthy();
+    expect(repo.preview).toHaveBeenCalledTimes(2);
+    expect((screen.getByTestId("stop-confirm") as HTMLButtonElement).disabled).toBe(false);
+
+    repo.stop.mockResolvedValue({ breakdown: frozen(150), cash: null });
+    await act(async () => { fireEvent.click(screen.getByTestId("stop-confirm")); });
+    expect(repo.stop.mock.calls[1][1]).toMatchObject({ priced_at: "2026-10-25T13:05:00+00:00", expected_total: 150 });
   });
 });

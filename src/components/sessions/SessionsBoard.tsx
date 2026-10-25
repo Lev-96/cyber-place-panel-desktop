@@ -82,7 +82,7 @@ const SessionsBoard = ({ branchId }: Props) => {
   const [startTarget, setStartTarget] = useState<IPcApi | null>(null);
   const [stopTarget, setStopTarget] = useState<ISessionApi | null>(null);
   const [addItemTarget, setAddItemTarget] = useState<ISessionApi | null>(null);
-  // The till's sale, opened from a free seat (2026-10-25).
+  // The till's sale, opened from the board's header (2026-10-25).
   const [sellOpen, setSellOpen] = useState(false);
   /** The line a return is in flight for, so its button cannot be pressed twice. */
   const [returningItem, setReturningItem] = useState<number | null>(null);
@@ -914,7 +914,13 @@ const SessionsBoard = ({ branchId }: Props) => {
                       made it 2, so the fraction appeared on every seat — a
                       poker table announcing two joysticks it does not have.
                       The server's own answer is the only one that decides. */}
-                  {supportsJoysticks && (
+                  {/* Only when it says something (2026-10-25): a bare "2" — the
+                      kit every console ships with, nothing extra out, nothing
+                      charged — was noise under "Безлимит". An extra pad out or
+                      a pad charge still shows, with its money. */}
+                  {supportsJoysticks && (padCharge !== null
+                    || (sess.joystick_count ?? BASE_JOYSTICKS) > BASE_JOYSTICKS
+                    || (sess.joysticks ?? []).some((j) => j.stopped_at === null && Number(j.slot) > BASE_JOYSTICKS)) && (
                     <span
                       className="row"
                       style={{
@@ -1185,21 +1191,6 @@ const SessionsBoard = ({ branchId }: Props) => {
                 the bottom, so every Start in a row sits on one line whatever
                 is above it (a console chip, an offline hint). */}
             <div className="session-card__foot">
-              {/* Sell from the board (2026-10-25): the till's own sale — the
-                  same dialog, request, server prices, payment methods and
-                  double-submit guard as «Касса» — reached from a free seat
-                  without starting anything. A sale is the branch's, not the
-                  seat's (orders carry no place), so no session is created. */}
-              <Button
-                variant="secondary"
-                onClick={() => setSellOpen(true)}
-                title={t("till.sell")}
-                aria-label={t("till.sell")}
-                className="session-card__btn session-card__sell"
-                data-testid="seat-sell"
-              >
-                {t("session.card.addItem")}
-              </Button>
               <Button
                 onClick={() => setStartTarget(pc)}
                 disabled={!canStart || startLock.disabled}
@@ -1246,6 +1237,20 @@ const SessionsBoard = ({ branchId }: Props) => {
           )}
         </div>
         <div className="row" style={{ gap: 8, flexWrap: "wrap", rowGap: 8 }}>
+          {/* "+ Продукт" (2026-10-25): a guest who came only for a juice or
+              crisps. The till's own sale — the same dialog, request, server
+              prices, payment methods and double-submit guard as «Касса» —
+              without leaving the board and without touching any seat: a sale
+              is the branch's, so nothing starts a session. */}
+          <button
+            type="button"
+            className="board-sell-btn"
+            onClick={() => setSellOpen(true)}
+            title={t("till.sell")}
+            data-testid="board-sell"
+          >
+            {t("session.sellProduct")}
+          </button>
           <Link to={`/branches/${branchId}/sessions/history`} className="muted" style={navBtn}>{t("history.title")}</Link>
           <Link to={`/branches/${branchId}/pcs`} className="muted" style={navBtn}>{t("pcs.title")}</Link>
           {can(role, "branch.prices") && (

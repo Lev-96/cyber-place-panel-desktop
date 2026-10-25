@@ -1003,9 +1003,9 @@ export const TRANSLATIONS: Dict = {
   "session.confirmStop": { en: "Confirm ending", ru: "Подтвердить завершение", am: "Հաստատել ավարտը" },
   "session.checkoutPreviewTitle": { en: "Preliminary total", ru: "Предварительный итог", am: "Նախնական հաշիվ" },
   "session.checkoutStillRunning": {
-    en: "The session keeps running until you confirm the ending. The figures update as it runs.",
-    ru: "Сессия продолжается, пока вы не подтвердите завершение. Суммы обновляются по ходу игры.",
-    am: "Սեսիան շարունակվում է, մինչև հաստատեք ավարտը։ Գումարները թարմացվում են։",
+    en: "Total as of {0}, when Stop was pressed; this is what will be charged. The session keeps running on its card until you confirm.",
+    ru: "Итог на {0}, момент нажатия «Стоп»: будет списано ровно это. На карточке сессия продолжается, пока вы не подтвердите завершение.",
+    am: "Հաշիվը {0}-ի դրությամբ՝ «Ստոպ» սեղմելու պահին․ կգանձվի հենց սա։ Քարտի վրա սեսիան շարունակվում է, մինչև հաստատեք։",
   },
   "session.checkoutEndedElsewhere": {
     en: "This session has already ended. This is its final bill.",
@@ -1373,6 +1373,7 @@ export const TRANSLATIONS: Dict = {
   "hub.tile.tillHint": { en: "Sell products without a session", ru: "Продажа товаров без сессии", am: "Ապրանքների վաճառք առանց սեսիայի" },
   "till.title": { en: "Till", ru: "Касса", am: "Դրամարկղ" },
   "till.sell": { en: "Sell products", ru: "Продать товар", am: "Վաճառել ապրանք" },
+  "session.sellProduct": { en: "+ Product", ru: "+ Продукт", am: "+ Ապրանք" },
   "till.sellTitle": { en: "Product sale", ru: "Продажа товара", am: "Ապրանքի վաճառք" },
   "till.sellConfirm": { en: "Sell", ru: "Продать", am: "Վաճառել" },
   "till.selling": { en: "Selling…", ru: "Продаём…", am: "Վաճառվում է…" },

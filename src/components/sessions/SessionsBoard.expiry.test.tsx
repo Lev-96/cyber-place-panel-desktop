@@ -428,8 +428,10 @@ describe("joysticks on the tile", () => {
     repo.listActive.mockResolvedValue([ps]);
     await mount();
 
-    // The count.
-    expect(screen.getByText("2")).toBeTruthy();
+    // No bare "2" (2026-10-25): the kit every console ships with, nothing
+    // extra out and nothing charged, says nothing on the card.
+    expect([...document.querySelectorAll("span[title]")]
+      .find((el) => (el.getAttribute("title") ?? "").startsWith("session.joysticks"))).toBeUndefined();
     expect(screen.queryByText("1 / 4")).toBeNull();
     expect(screen.queryByText("2 / 3/4")).toBeNull();
 
@@ -713,10 +715,11 @@ describe("joysticks on the tile", () => {
     // Asserted on the joystick line itself, not on the document: a bare "1"
     // matches the board's own section counter, which would let this pass while
     // the tile said one controller.
+    // Holding its kit and nothing more: no pad line at all (2026-10-25) —
+    // and certainly never "1".
     const line = [...document.querySelectorAll("span[title]")]
       .find((el) => (el.getAttribute("title") ?? "").startsWith("session.joysticks"));
-    expect(line?.textContent).toContain("2");
-    expect(line?.textContent).not.toContain("1");
+    expect(line).toBeUndefined();
   });
 
   test("is held while a change is in flight", async () => {
@@ -1334,10 +1337,11 @@ describe("the joystick switch on a venue that charges once", () => {
 });
 
 /**
- * Selling from a free seat (2026-10-25): the till's own sale, opened from the
- * board, with no session started for it.
+ * "+ Продукт" in the board's header (2026-10-25): the till's own sale for a
+ * guest who came only for a drink — one button for the board, none on a
+ * seat, and no session started for it.
  */
-describe("selling a product from a free seat", () => {
+describe("selling a product from the board's header", () => {
   beforeEach(() => {
     repo.listPcs.mockResolvedValue([device]);
     repo.listActive.mockResolvedValue([]);
@@ -1345,33 +1349,42 @@ describe("selling a product from a free seat", () => {
   });
   afterEach(cleanup);
 
+  test("one button, beside the sales history, and none on any seat", async () => {
+    repo.listActive.mockResolvedValue([running]);
+    repo.listPcs.mockResolvedValue([device, { ...device, id: 2, label: "PS5-2", place_id: 11 } as IPcApi]);
+    await mount();
+
+    const buttons = screen.getAllByTestId("board-sell");
+    expect(buttons).toHaveLength(1);
+    expect(buttons[0].textContent).toBe("session.sellProduct");
+    // Its neighbour is the sales history link.
+    expect(buttons[0].nextElementSibling?.textContent).toBe("history.title");
+    expect(screen.queryByTestId("seat-sell")).toBeNull();
+    expect(document.querySelectorAll(".session-card .board-sell-btn")).toHaveLength(0);
+  });
+
   test("opens the till's sale for this branch, and starts nothing", async () => {
     await mount();
-    const button = screen.getByTestId("seat-sell");
-    expect(button.getAttribute("aria-label")).toBe("till.sell");
-
-    await act(async () => { fireEvent.click(button); });
+    await act(async () => { fireEvent.click(screen.getByTestId("board-sell")); });
 
     expect(screen.getByTestId("till-sale-dialog")).toBeTruthy();
     expect(sell.props?.branchId).toBe(7);
-    // No Start dialog, no session request: a sale is not a seat.
     expect(screen.queryByText("session.start")).toBeNull();
   });
 
-  test("closing it leaves the seat free with Start still offered", async () => {
+  test("closing it leaves the board as it was", async () => {
     await mount();
-    await act(async () => { fireEvent.click(screen.getByTestId("seat-sell")); });
+    await act(async () => { fireEvent.click(screen.getByTestId("board-sell")); });
     await act(async () => { fireEvent.click(screen.getByText("close-sale")); });
 
     expect(screen.queryByTestId("till-sale-dialog")).toBeNull();
-    expect(screen.getByTestId("seat-sell")).toBeTruthy();
     expect(document.querySelector(".session-card__start")).toBeTruthy();
   });
 
-  test("a running seat keeps its own + Товар for the session's bill, not a till sale", async () => {
-    repo.listActive.mockResolvedValue([running]);
+  test("offered on a board with no seats at all", async () => {
+    repo.listPcs.mockResolvedValue([]);
     await mount();
-    expect(screen.queryByTestId("seat-sell")).toBeNull();
+    expect(screen.getByTestId("board-sell")).toBeTruthy();
   });
 });
 

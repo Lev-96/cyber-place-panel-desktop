@@ -183,6 +183,8 @@ export interface IBillBreakdown {
   items_total: number;
   /** What is actually owed. Zero for a waived session. */
   total: number;
+  /** The instant this preview was priced at (2026-10-25); a stop can be closed at it. */
+  priced_at?: string;
 
   /* ---- added 2026-09-03; optional so an older backend still renders ---- */
 
@@ -245,6 +247,13 @@ export interface StopSessionBody {
    * for card or other (the server drops it there too). Not the bill.
    */
   cash_received?: string;
+  /**
+   * The receipt's instant and total (2026-10-25): the seat is closed AT that
+   * instant for exactly that total. Both or neither; the server refuses a
+   * stale or changed receipt (422) and the receipt re-reads.
+   */
+  priced_at?: string;
+  expected_total?: number;
 }
 
 /** What was handed over and handed back, from the stored bill; null when not typed. */
