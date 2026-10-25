@@ -3098,3 +3098,12 @@ singular genitive kept elsewhere, hence by key), and "Start session" stays.
   banknotes short of the bill keep "cashBillGrew" (`errors.cash_received`).
 - **No bare "2" on a card.** The pad line shows only with an extra pad out or a
   pad charge; the console's own kit says nothing.
+- **Till sale: cash and change, and the history.** `SellProductsDialog` (both
+  «Касса» and "+ Продукт") shows the Stop receipt's `CashChangePanel`
+  (`autoFocus={false}` there), holds the sale when short or unreadable, sends
+  `cash_received`, says the change in the toast; a 422 on `cash_received` reads
+  `till.cashShortOfTotal`. «История торговли» has a "Продажи товаров (без
+  места)" section (`TillSalesHistory`): same period and person as the page,
+  one sentence per sale — when · who sold (role) · what · how paid · received /
+  change · total; voided listed, not counted. «Касса» rows read the same
+  sentence (`tillSaleText.ts`).
