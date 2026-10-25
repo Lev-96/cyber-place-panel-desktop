@@ -3088,3 +3088,13 @@ singular genitive kept elsewhere, hence by key), and "Start session" stays.
   total stays the server's `total`. A stop made elsewhere while the receipt is
   open turns it into that final bill with no confirm. A planned hourly seat
   (no package) reads "Время игры", not an empty "Тариф · ".
+
+- **"+ Продукт" lives in the board's header** (beside "История торговли"), not
+  on seats: one till sale for a guest who only buys a drink.
+- **The receipt is the figure charged.** Read once when Stop is pressed (no
+  5-s refresh), it says "Итог на HH:MM:SS"; confirm sends `priced_at` +
+  `expected_total`, the server closes the seat at that instant for that total,
+  and a 422 (stale / changed) shows the server's sentence and re-reads it. The
+  banknotes short of the bill keep "cashBillGrew" (`errors.cash_received`).
+- **No bare "2" on a card.** The pad line shows only with an extra pad out or a
+  pad charge; the console's own kit says nothing.
