@@ -3060,3 +3060,31 @@ sentences about one running seat («к этой сессии», «В сесси�
 contains «Сессии/Сеанс/сеанс/Sessions/Սեսիաներ», the 14 renamed keys contain no
 form of the old word at all (a lowercase plural is indistinguishable from the
 singular genitive kept elsewhere, hence by key), and "Start session" stays.
+
+
+## Board sale, ending-soon warnings, preliminary total (2026-10-25)
+
+- **Sell from a free seat.** The free card's "+ Товар" opens the till's own
+  `SellProductsDialog` (same request, server prices, payment methods,
+  `client_request_id` double-submit guard). A sale is the branch's — orders
+  carry no place — so nothing starts a session. No shift is required (the
+  till's existing rule); a sale with no open shift is in revenue, not a shift.
+- **Ending-soon card = the server's notification.** `SessionEndingNotifier`
+  no longer runs its own 10-min poll: it shows unread `session.ending_soon`
+  rows from `NotificationsContext` (15 min, `SessionEndingSoonService`, owner +
+  the branch's managers), stacked, soonest first, gone once read/deleted or the
+  seat's end passed. Dismissed ids are kept per user in localStorage, so a
+  reconnect or a restart does not re-pop them; an unread, undismissed one comes
+  back after a restart.
+- **`NotificationsContext`:** a replayed `notification.created` for a row
+  already held is not counted twice; the 60-s unread poll re-reads the LIST when
+  the count drifted (a missed broadcast used to leave "1" and no row); the
+  Notifications page re-reads once on open.
+- **Stop is a preliminary total.** It always was two-step (preview, then
+  `/stop` only on confirm); the copy now says so: "Предварительный итог", "the
+  session keeps running until you confirm", buttons "Продолжить игру" /
+  "Подтвердить завершение" (it read "Подтвердить и закрыть"). Products have
+  their own section (qty × unit = line) and the server's `items_total`; the
+  total stays the server's `total`. A stop made elsewhere while the receipt is
+  open turns it into that final bill with no confirm. A planned hourly seat
+  (no package) reads "Время игры", not an empty "Тариф · ".
