@@ -848,7 +848,10 @@ a.card:hover {
 }
 
 .main {
-  padding: 24px 32px;
+  /* Named so the pinned top bar can cover exactly this gutter (PageTopBar). */
+  --main-pad-top: 24px;
+  --main-pad-x: 32px;
+  padding: var(--main-pad-top) var(--main-pad-x);
   overflow-y: auto;
   /* Reserve the scrollbar gutter so locking it (when a modal opens) doesn't
      shift the page content sideways. */
@@ -903,6 +906,101 @@ body.cp-modal-open .main {
 }
 .cp-back-btn:hover svg {
   transform: translateX(-2px);
+}
+
+/* The bar pinned to the top of every screen (PageTopBar, 2026-10-25): Back on
+   the left, and the screen's heading centred on the same line once the real
+   one has scrolled away — fading and rising into place, and back out. The bar
+   itself is click-through; only Back takes the pointer. Back keeps its own
+   look; it no longer needs its own stickiness, the bar has it. */
+.cp-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 6;
+  display: grid;
+  grid-template-columns: 1fr minmax(0, auto) 1fr;
+  align-items: center;
+  gap: 12px;
+  margin: 0 0 14px;
+  min-height: 36px;
+  pointer-events: none;
+}
+/* Once the heading has gone, a soft band of the page's own background rises
+   behind the bar, from the very top of the scroll area, so nothing scrolling
+   underneath shows through the gutter above it or around Back. */
+.cp-topbar::before {
+  content: "";
+  position: absolute;
+  top: calc(-1 * var(--main-pad-top, 24px));
+  bottom: -12px;
+  left: calc(-1 * var(--main-pad-x, 32px));
+  right: calc(-1 * var(--main-pad-x, 32px));
+  z-index: -1;
+  /* Solid where the bar's row is, fading out only in the last 12px under it,
+     and frosted so nothing behind reads through. */
+  background: linear-gradient(
+    to bottom,
+    var(--color-bg) 0%,
+    var(--color-bg) calc(100% - 12px),
+    transparent 100%
+  );
+  backdrop-filter: blur(10px);
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 12px), transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 12px), transparent 100%);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 200ms ease;
+}
+.cp-topbar.is-titled::before {
+  opacity: 1;
+}
+.cp-topbar__side {
+  display: flex;
+  min-width: 0;
+}
+.cp-topbar__side > * {
+  pointer-events: auto;
+}
+.cp-topbar .cp-back-btn {
+  position: static;
+  margin: 0;
+}
+.cp-topbar__title {
+  justify-self: center;
+  max-width: min(46vw, 560px);
+  padding: 6px 16px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: rgba(9, 14, 30, 0.82);
+  backdrop-filter: blur(8px);
+  color: var(--color-text);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  opacity: 0;
+  transform: translateY(6px);
+  visibility: hidden;
+  transition: opacity 200ms ease, transform 200ms ease, visibility 0s linear 200ms;
+}
+.cp-topbar.is-titled .cp-topbar__title {
+  opacity: 1;
+  transform: translateY(0);
+  visibility: visible;
+  transition: opacity 200ms ease, transform 200ms ease, visibility 0s;
+}
+.cp-topbar__title:empty {
+  display: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .cp-topbar::before,
+  .cp-topbar__title,
+  .cp-topbar.is-titled .cp-topbar__title {
+    transition: none;
+    transform: none;
+  }
 }
 
 /* Sticky "go to my branch tournaments" CTA — pins to the top-right of the
@@ -1866,7 +1964,7 @@ button.pill:hover {
    stretched card wide. Below 1100px both gutters tighten; at a normal width
    nothing changes. */
 @media (max-width: 1100px) {
-  .main { padding: 16px; }
+  .main { --main-pad-top: 16px; --main-pad-x: 16px; }
   .screen-bg { padding: 16px 20px; }
 }
 .screen-bg-img {

@@ -6,7 +6,7 @@ import SupportNotifier from "./notifications/SupportNotifier";
 import { Ps5ControlProvider } from "@/ps5/Ps5ControlProvider";
 import UnexpectedWakeDialog from "./ps5/UnexpectedWakeDialog";
 import Sidebar from "./Sidebar";
-import BackButton from "./ui/BackButton";
+import PageTopBar from "./ui/PageTopBar";
 
 const Layout = () => (
   /*
@@ -18,7 +18,7 @@ const Layout = () => (
   <div className="app-shell">
     <Sidebar />
     <main className="main">
-      <BackButton />
+      <PageTopBar />
       <Outlet />
     </main>
     {/*
