@@ -272,3 +272,81 @@ describe("additional items", () => {
     expect(screen.queryByRole("region", { name: "session.additionalTitle" })).toBeNull();
   });
 });
+
+/**
+ * Cash handed over, and the change (2026-10-25): the Stop receipt's own panel
+ * and arithmetic, on the till's sale — in «Касса» and on the board alike.
+ */
+describe("cash received and change", () => {
+  const typeCash = async (v: string) => {
+    await act(async () => { fireEvent.change(screen.getByTestId("cash-received"), { target: { value: v } }); });
+  };
+  const basket1700 = async () => { await mount(); await add("Tea"); await add("Tea"); await add("Coca-Cola"); };
+
+  test("asks once there is something to sell, optional, and sells without it", async () => {
+    await mount();
+    expect(screen.queryByTestId("cash-received")).toBeNull();
+    await add("Tea");
+    expect(screen.getByTestId("cash-received")).toBeTruthy();
+    expect(screen.getByTestId("cash-change-hint")).toBeTruthy();
+
+    await sell();
+    expect(repo.create.mock.calls[0][0]).not.toHaveProperty("cash_received");
+  });
+
+  test("2 000 for 1 700: 300 back, sent to the server, and said with the sale", async () => {
+    await basket1700();
+    await typeCash("2000");
+
+    expect(screen.getByTestId("cash-change-value").textContent).toContain("300");
+    await sell();
+    expect(repo.create.mock.calls[0][0].cash_received).toBe("2000.00");
+    expect(toast.message.mock.calls[0][1]).toContain("session.cashChange");
+    expect(toast.message.mock.calls[0][1]).toContain("300");
+  });
+
+  test("the exact amount is no change", async () => {
+    await basket1700();
+    await typeCash("1700");
+    expect(screen.getByTestId("cash-change-value").textContent).toContain("0");
+    expect(sellButton().disabled).toBe(false);
+  });
+
+  test("too little or not a number holds the sale", async () => {
+    await basket1700();
+    await typeCash("1000");
+    expect(screen.getByTestId("cash-change-short")).toBeTruthy();
+    expect(sellButton().disabled).toBe(true);
+    await typeCash("abc");
+    expect(sellButton().disabled).toBe(true);
+    await sell();
+    expect(repo.create).not.toHaveBeenCalled();
+  });
+
+  test("card asks for no banknotes and sends none; back to cash starts empty", async () => {
+    await basket1700();
+    await typeCash("2000");
+    await choose("session.payCard");
+    expect(screen.queryByTestId("cash-received")).toBeNull();
+    await choose("session.payCash");
+    expect((screen.getByTestId("cash-received") as HTMLInputElement).value).toBe("");
+  });
+
+  test("the server's total above the banknotes: said in words, nothing sold, basket kept", async () => {
+    repo.create.mockRejectedValue(Object.assign(new Error("The cash received field must be…"), {
+      status: 422, body: { message: "…", errors: { cash_received: ["…"] } },
+    }));
+    await basket1700();
+    await typeCash("1700");
+    await sell();
+
+    expect(screen.getByText("till.cashShortOfTotal")).toBeTruthy();
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByText("till.total").parentElement!.textContent).toContain("1700");
+  });
+
+  test("does not take the focus while lines are typed", async () => {
+    await basket1700();
+    expect(document.activeElement).not.toBe(screen.getByTestId("cash-received"));
+  });
+});

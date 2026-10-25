@@ -17,9 +17,14 @@ interface Props {
   /** Omitted after the stop: the panel then reports, it does not ask. */
   onReceived?: (value: string) => void;
   disabled?: boolean;
+  /**
+   * Focus the amount when it appears (the Stop receipt's default). Off in the
+   * till's sale, where it appears while the cashier is still typing lines.
+   */
+  autoFocus?: boolean;
 }
 
-const CashChangePanel = ({ dueCents, received, change, onReceived, disabled }: Props) => {
+const CashChangePanel = ({ dueCents, received, change, onReceived, disabled, autoFocus = true }: Props) => {
   const { t, money } = useLang();
   const m = (cents: number) => shiftAmount(money, cents / 100);
 
@@ -33,7 +38,7 @@ const CashChangePanel = ({ dueCents, received, change, onReceived, disabled }: P
           value={received}
           onChange={(e) => onReceived(e.target.value)}
           disabled={disabled}
-          autoFocus
+          autoFocus={autoFocus}
           data-testid="cash-received"
         />
       )}

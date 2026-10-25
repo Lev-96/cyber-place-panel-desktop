@@ -6,6 +6,7 @@ import { useSessionsSummary } from "@/hooks/useSessionsSummary";
 import { formatDate, formatDateTime, formatTime } from "@/i18n/dates";
 import { useLang } from "@/i18n/LanguageContext";
 import SessionHistoryBill from "@/components/sessions/SessionHistoryBill";
+import TillSalesHistory from "@/components/pos/TillSalesHistory";
 import SessionHistoryTimeline from "@/components/sessions/SessionHistoryTimeline";
 import { feedCoversSession, groupBySession, seatRoute, seatSteps } from "@/components/sessions/sessionHistoryModel";
 import { sessionRepository } from "@/repositories/SessionRepository";
@@ -64,6 +65,8 @@ const SessionsHistory = () => {
 
   // The people this branch's log may hold — the server's list, scoped to the caller.
   const actors = useAsync(() => sessionRepository.listEventActors(id), [id]);
+  // Bumped by Refresh so the till sales below re-read with everything else.
+  const [salesRefresh, setSalesRefresh] = useState(0);
 
   const { data, loading, error, reload } = useAsync(
     () => sessionRepository.list({ branch_id: id, from: fromIso, to: toIso, limit: 1000 }),
@@ -109,7 +112,10 @@ const SessionsHistory = () => {
 
   // Both: the cards read their events from the feed, so a refresh of the
   // sessions alone would show a new stop with an old story.
-  const refreshAll = () => { void reload(); void events.reload(); void acted.reload(); void actors.reload(); };
+  const refreshAll = () => {
+    void reload(); void events.reload(); void acted.reload(); void actors.reload();
+    setSalesRefresh((n) => n + 1);
+  };
 
   const setRange = (kind: "today" | "yesterday" | "month") => {
     const now = new Date();
@@ -204,6 +210,10 @@ const SessionsHistory = () => {
 
         </div>
       </div>
+
+      {/* Products sold on their own (2026-10-25): the same period and person,
+          its own loading — the sessions below never wait on it. */}
+      <TillSalesHistory branchId={id} fromIso={fromIso} toIso={toIso} actorId={actorId} refreshKey={salesRefresh} />
 
       {/* The range is always a filter: an empty answer is "no sessions in this
           period", never "nothing has ever happened here". The list's own
