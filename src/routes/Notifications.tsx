@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { ListSkeleton } from "@/components/ui/Skeleton";
 import { apiBillingReminders, apiCompanyBilling, IBillingReminder, ICompanyBilling } from "@/api/billing";
 import type { IServiceExpense } from "@/api/expenses";
@@ -119,6 +120,12 @@ const Notifications = () => {
     deleteOne,
     deleteAll,
   } = useNotifications();
+  // Opening the list reads it again (2026-10-25): it used to show whatever
+  // the panel had heard over Reverb, so a missed broadcast was a row nobody
+  // could find until a reconnect or a fresh sign-in.
+  // Once per opening, whatever identity `refreshDb` has on a given render.
+  const refreshOnOpen = useRef(refreshDb);
+  useEffect(() => { void refreshOnOpen.current(); }, []);
 
   // An owner reads their own company; only an admin may read the list of
   // everybody's. An owner account with no company on its dashboard payload

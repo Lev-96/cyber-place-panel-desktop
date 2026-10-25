@@ -33,6 +33,7 @@ import { startGate, stopGate } from "@/ps5/tileGate";
 import { DragEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import AddSessionItemDialog from "./AddSessionItemDialog";
+import SellProductsDialog from "@/components/pos/SellProductsDialog";
 import SessionTimer from "./SessionTimer";
 import { autoResumeAtOf, sessionCurrentHourlyRate, sessionJoysticksTotal } from "./sessionAmount";
 import StartSessionDialog from "./StartSessionDialog";
@@ -81,6 +82,8 @@ const SessionsBoard = ({ branchId }: Props) => {
   const [startTarget, setStartTarget] = useState<IPcApi | null>(null);
   const [stopTarget, setStopTarget] = useState<ISessionApi | null>(null);
   const [addItemTarget, setAddItemTarget] = useState<ISessionApi | null>(null);
+  // The till's sale, opened from a free seat (2026-10-25).
+  const [sellOpen, setSellOpen] = useState(false);
   /** The line a return is in flight for, so its button cannot be pressed twice. */
   const [returningItem, setReturningItem] = useState<number | null>(null);
   /**
@@ -344,6 +347,14 @@ const SessionsBoard = ({ branchId }: Props) => {
         // seat must not have it replaced by another. The second seat is still
         // ended and still on the board's history — what it loses is the popup.
         if (ended) setStopTarget((current) => current ?? { ...ended, status: "expired" });
+      }
+      // The receipt open on THIS seat, ended elsewhere (another cashier, the
+      // clock) while it was on screen (2026-10-25): it turns into that final
+      // bill, with no confirm — never a second "stopped" announced as ours.
+      if (evt.kind === "stopped") {
+        setStopTarget((current) => (current && current.id === evt.session_id && current.status === "active"
+          ? { ...current, status: (evt.status ?? "stopped") as ISessionApi["status"] }
+          : current));
       }
       void sessions.reload();
 
@@ -1174,6 +1185,21 @@ const SessionsBoard = ({ branchId }: Props) => {
                 the bottom, so every Start in a row sits on one line whatever
                 is above it (a console chip, an offline hint). */}
             <div className="session-card__foot">
+              {/* Sell from the board (2026-10-25): the till's own sale — the
+                  same dialog, request, server prices, payment methods and
+                  double-submit guard as «Касса» — reached from a free seat
+                  without starting anything. A sale is the branch's, not the
+                  seat's (orders carry no place), so no session is created. */}
+              <Button
+                variant="secondary"
+                onClick={() => setSellOpen(true)}
+                title={t("till.sell")}
+                aria-label={t("till.sell")}
+                className="session-card__btn session-card__sell"
+                data-testid="seat-sell"
+              >
+                {t("session.card.addItem")}
+              </Button>
               <Button
                 onClick={() => setStartTarget(pc)}
                 disabled={!canStart || startLock.disabled}
@@ -1330,6 +1356,9 @@ const SessionsBoard = ({ branchId }: Props) => {
             void pcs.reload();
           }}
         />
+      )}
+      {sellOpen && (
+        <SellProductsDialog branchId={branchId} onClose={() => setSellOpen(false)} onSold={() => {}} />
       )}
       {addItemTarget && (
         <AddSessionItemDialog

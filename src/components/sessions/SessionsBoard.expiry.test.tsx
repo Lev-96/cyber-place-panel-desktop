@@ -42,6 +42,15 @@ vi.mock("@/repositories/SessionRepository", () => ({
   },
 }));
 vi.mock("@/realtime/usePlaceAvailability", () => ({ usePlaceAvailability: () => {} }));
+// The till's own sale dialog, stubbed: its rules are its own suite's
+// (SellProductsDialog.test.tsx); here only WHICH dialog opens, for which branch.
+const sell = vi.hoisted(() => ({ props: null as null | { branchId: number } }));
+vi.mock("@/components/pos/SellProductsDialog", () => ({
+  default: (props: { branchId: number; onClose: () => void }) => {
+    sell.props = props;
+    return <div data-testid="till-sale-dialog"><button onClick={props.onClose}>close-sale</button></div>;
+  },
+}));
 vi.mock("@/realtime/useSessionChanged", () => ({
   useSessionChanged: (_branchId: unknown, onChange: (e: SessionChangedEvent) => void) => {
     realtime.handler = onChange;
@@ -1321,5 +1330,84 @@ describe("the joystick switch on a venue that charges once", () => {
     await mount();
 
     expect(screen.getByLabelText("session.joysticks")).toBeTruthy();
+  });
+});
+
+/**
+ * Selling from a free seat (2026-10-25): the till's own sale, opened from the
+ * board, with no session started for it.
+ */
+describe("selling a product from a free seat", () => {
+  beforeEach(() => {
+    repo.listPcs.mockResolvedValue([device]);
+    repo.listActive.mockResolvedValue([]);
+    sell.props = null;
+  });
+  afterEach(cleanup);
+
+  test("opens the till's sale for this branch, and starts nothing", async () => {
+    await mount();
+    const button = screen.getByTestId("seat-sell");
+    expect(button.getAttribute("aria-label")).toBe("till.sell");
+
+    await act(async () => { fireEvent.click(button); });
+
+    expect(screen.getByTestId("till-sale-dialog")).toBeTruthy();
+    expect(sell.props?.branchId).toBe(7);
+    // No Start dialog, no session request: a sale is not a seat.
+    expect(screen.queryByText("session.start")).toBeNull();
+  });
+
+  test("closing it leaves the seat free with Start still offered", async () => {
+    await mount();
+    await act(async () => { fireEvent.click(screen.getByTestId("seat-sell")); });
+    await act(async () => { fireEvent.click(screen.getByText("close-sale")); });
+
+    expect(screen.queryByTestId("till-sale-dialog")).toBeNull();
+    expect(screen.getByTestId("seat-sell")).toBeTruthy();
+    expect(document.querySelector(".session-card__start")).toBeTruthy();
+  });
+
+  test("a running seat keeps its own + Товар for the session's bill, not a till sale", async () => {
+    repo.listActive.mockResolvedValue([running]);
+    await mount();
+    expect(screen.queryByTestId("seat-sell")).toBeNull();
+  });
+});
+
+/**
+ * A receipt open on a seat that another cashier stops (2026-10-25): it becomes
+ * that final bill, with no confirm — never a second stop announced as ours.
+ */
+describe("a receipt open while the seat is stopped elsewhere", () => {
+  beforeEach(() => {
+    repo.listPcs.mockResolvedValue([device]);
+    repo.listActive.mockResolvedValue([{ ...running, ends_at: new Date(Date.now() + 30 * 60_000).toISOString() } as ISessionApi]);
+    repo.preview.mockResolvedValue({
+      mode: "fixed", is_free: false, is_unlimited: false, elapsed_minutes: 10, time_cost: 250,
+      hourly_rate: null, package_name: "Hour", items: [], items_total: 0, joysticks: [], joysticks_total: 0,
+      subtotal: 250, gross_total: 250, total: 250,
+    });
+  });
+  afterEach(cleanup);
+
+  test("turns into the final bill with no confirm", async () => {
+    await mount();
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "action.stop" })); });
+    expect(screen.getByTestId("stop-confirm")).toBeTruthy();
+
+    await fire(event({ kind: "stopped", status: "stopped", session_id: 42 }));
+
+    expect(screen.queryByTestId("stop-confirm")).toBeNull();
+    expect(screen.getByTestId("checkout-ended-elsewhere")).toBeTruthy();
+  });
+
+  test("an event for another seat leaves this receipt as it was", async () => {
+    await mount();
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "action.stop" })); });
+    await fire(event({ kind: "stopped", status: "stopped", session_id: 999 }));
+
+    expect(screen.getByTestId("stop-confirm")).toBeTruthy();
+    expect(screen.queryByTestId("checkout-ended-elsewhere")).toBeNull();
   });
 });

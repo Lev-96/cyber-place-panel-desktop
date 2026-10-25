@@ -271,7 +271,7 @@ describe("SessionsBoard — the toasts after stop, pause and resume", () => {
     await mount();
 
     await press("action.stop");
-    await press("action.cancel");
+    await press("session.checkoutKeepPlaying");
     expect(toasts).toEqual([]);
 
     await press("action.stop");

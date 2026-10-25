@@ -170,22 +170,43 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved }: Prop
   const finished = stopped !== null || endedWithoutUs;
 
   const deviceLabel = session.pc_label ?? `№${session.pc_id}`;
+  // Billed by the hour: count-up, or a planned start with no package.
+  const byTheHour = view !== null && (view.mode === "open" || !view.package_name);
 
   return (
     <Modal open onClose={onClose}>
       <div className="card" style={{ width: 520, maxWidth: "92vw", display: "flex", flexDirection: "column", gap: 12 }}>
         <h2 style={{ margin: 0 }}>
-          {finished ? t("session.checkoutDone") : `${t("session.checkoutTitle")} · ${deviceLabel}`}
+          {finished ? t("session.checkoutDone") : `${t("session.checkoutPreviewTitle")} · ${deviceLabel}`}
         </h2>
+        {/* Opening this ends nothing (2026-10-25): the seat plays on, the
+            figures re-read every few seconds, and only the confirm below
+            stops it — the server prices it at that instant. Said in words,
+            because "Подтвердить и закрыть" read as "close this window". */}
+        {/* Ended while this was open, by somebody or something else: the bill
+            below is theirs, final, and nothing here will stop it again. */}
+        {endedWithoutUs && stopped === null && (
+          <span className="muted" style={{ fontSize: 12 }} data-testid="checkout-ended-elsewhere">
+            {t("session.checkoutEndedElsewhere")}
+          </span>
+        )}
+        {!finished && (
+          <span className="muted" style={{ fontSize: 12 }} data-testid="checkout-still-running">
+            {t("session.checkoutStillRunning")}
+          </span>
+        )}
 
         {!view ? <SkeletonText lines={5} /> : (
           <div className="col" style={{ gap: 0 }}>
             {/* Time line */}
             <div style={row}>
               <span style={{ flex: 1 }}>
-                {view.mode === "open"
+                {/* A package names itself; a seat billed by the hour — count-up
+                    or a planned start, which has no package (2026-10-25) —
+                    says how long it was played, never "Тариф · " and nothing. */}
+                {byTheHour
                   ? `${t("session.timePlayed")}: ${fmtDuration(view.elapsed_minutes, t)}`
-                  : `${t("session.tariff")} · ${view.package_name ?? ""}`}
+                  : `${t("session.tariff")} · ${view.package_name}`}
               </span>
               {/* Both figures are hidden on a waived bill, and `is_free` is the
                   only thing that decides it — never `total === 0`, which is
@@ -199,7 +220,7 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved }: Prop
                   a charge. */}
               {!view.is_free && (
                 <>
-                  {view.mode === "open" && view.hourly_rate != null && (
+                  {byTheHour && view.hourly_rate != null && (
                     <span className="muted" style={{ marginRight: 12, fontSize: 12 }}>
                       {money(Number(view.hourly_rate), receiptPrecision)}/{t("time.hourShort") || "h"}
                     </span>
@@ -247,30 +268,43 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved }: Prop
               </div>
             ))}
 
-            {/* Items */}
-            {view.items.map((it) => (
-              <div key={it.id} style={row}>
-                <span style={{ flex: 1 }}>{it.name}{it.qty > 1 ? ` × ${it.qty}` : ""}</span>
-                {/* An HOURLY line is a rate and a duration, so it reads like a
-                    pad's line rather than like a drink's: "90 m · 700/h", and
-                    "returned" once its clock has stopped. Printing "700 × 1"
-                    beside an amount of 1 050 is three figures that do not add
-                    up, on the one screen a cashier checks with their eyes. */}
-                <span className="muted" style={{ marginRight: 12, fontSize: 12 }}>
-                  {it.is_hourly
-                    ? `${it.minutes ?? 0} ${t("time.minShort") || "m"} · ${money(Number(it.price), receiptPrecision)}${t("session.extraPerHour")}${it.qty > 1 ? ` × ${it.qty}` : ""}${it.returned_at ? ` · ${t("session.extraReturned")}` : ""}`
-                    : `${money(Number(it.price), receiptPrecision)}${it.qty > 1 ? ` × ${it.qty}` : ""}`}
-                </span>
-                <span style={{ fontWeight: 700, marginRight: 8 }}>
-                  {money(Number(it.line_total), receiptPrecision)}
-                </span>
-                {!finished && (
-                  <button type="button" onClick={() => void remove(it.id, it.name, it.is_additional === true)} disabled={busy} style={removeBtn} title={t("session.removeItemTitle")}>
-                    ×
-                  </button>
-                )}
+            {/* Products bought during the session (2026-10-25): their own
+                section — quantity × unit price = line — and their own total,
+                the server's `items_total`. The total below already includes
+                them; this is the breakdown, never added twice. */}
+            {view.items.length > 0 && (
+              <div className="receipt-items" data-testid="receipt-items">
+                <span className="label" style={{ marginTop: 8 }}>{t("session.itemsBought")}</span>
+                {view.items.map((it) => (
+                  <div key={it.id} style={row}>
+                    <span style={{ flex: 1, minWidth: 0, overflowWrap: "anywhere" }}>{it.name}</span>
+                    {/* An HOURLY line is a rate and a duration, so it reads like a
+                        pad's line rather than like a drink's: "90 m · 700/h", and
+                        "returned" once its clock has stopped. A sold one reads
+                        "2 × 500". */}
+                    <span className="muted" style={{ marginRight: 12, fontSize: 12, whiteSpace: "nowrap" }}>
+                      {it.is_hourly
+                        ? `${it.minutes ?? 0} ${t("time.minShort") || "m"} · ${money(Number(it.price), receiptPrecision)}${t("session.extraPerHour")}${it.qty > 1 ? ` × ${it.qty}` : ""}${it.returned_at ? ` · ${t("session.extraReturned")}` : ""}`
+                        : `${it.qty} × ${money(Number(it.price), receiptPrecision)}`}
+                    </span>
+                    <span style={{ fontWeight: 700, marginRight: 8 }}>
+                      {money(Number(it.line_total), receiptPrecision)}
+                    </span>
+                    {!finished && (
+                      <button type="button" onClick={() => void remove(it.id, it.name, it.is_additional === true)} disabled={busy} style={removeBtn} title={t("session.removeItemTitle")}>
+                        ×
+                      </button>
+                    )}
+                  </div>
+                ))}
+                <div style={{ ...row, borderTop: "1px dashed var(--color-border)" }} data-testid="receipt-items-total">
+                  <span style={{ flex: 1 }}>{t("session.itemsTotal")}</span>
+                  <span style={{ fontWeight: 700, marginRight: finished ? 0 : 32 }}>
+                    {money(Number(view.items_total), receiptPrecision)}
+                  </span>
+                </div>
               </div>
-            ))}
+            )}
 
             {/* Total */}
             <div style={{ ...row, borderTop: "2px solid #07ddf1", marginTop: 6, paddingTop: 12 }}>
@@ -329,7 +363,8 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved }: Prop
             <Button onClick={onClose}>{t("action.close")}</Button>
           ) : (
             <>
-              <Button variant="secondary" onClick={onClose} disabled={busy}>{t("action.cancel")}</Button>
+              {/* Back to the running seat: nothing was sent, nothing stopped. */}
+              <Button variant="secondary" onClick={onClose} disabled={busy}>{t("session.checkoutKeepPlaying")}</Button>
               <Button onClick={confirmStop} disabled={busy || !bill || cashBlocks} data-testid="stop-confirm">
                 {busy ? t("session.closing") : t("session.confirmStop")}
               </Button>

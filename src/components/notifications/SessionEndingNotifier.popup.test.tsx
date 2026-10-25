@@ -27,6 +27,18 @@ vi.mock("@/repositories/JoystickPriceRepository", () => ({
   joystickPriceRepository: { listByBranch: () => Promise.resolve([]) },
 }));
 vi.mock("@/auth/AuthContext", () => ({ useAuth: () => ({ user: { id: 1, role: "manager" } }) }));
+// The card is the SERVER's notification now (2026-10-25): the feed it reads.
+const feed = vi.hoisted(() => ({ list: [] as unknown[] }));
+vi.mock("@/notifications/NotificationsContext", () => ({ useNotifications: () => ({ list: feed.list }) }));
+/** The server's `session.ending_soon` row for session 42, `minutes` ahead. */
+const warningRow = (minutes = 14, over: Record<string, unknown> = {}) => ({
+  id: "n-42", type: "App\\Notifications\\SessionEndingSoon", read_at: null, created_at: new Date().toISOString(),
+  data: {
+    type: "session.ending_soon", session_id: 42, branch_id: 7, pc_id: 1, place_number: 8,
+    ends_at: new Date(Date.now() + minutes * 60_000).toISOString(), minutes_left: 15,
+  },
+  ...over,
+});
 vi.mock("@/i18n/LanguageContext", () => ({
   useLang: () => ({ t: (k: string) => k, money: (n: number) => String(n), lang: "en" }),
 }));
@@ -71,6 +83,8 @@ describe("the seat-running-out warning", () => {
   beforeEach(() => {
     repo.listActiveEverywhere.mockReset();
     repo.listActiveEverywhere.mockResolvedValue([ending()]);
+    feed.list = [warningRow()];
+    window.localStorage.clear();
   });
   afterEach(cleanup);
 
@@ -136,10 +150,45 @@ describe("the seat-running-out warning", () => {
     expect(screen.queryByText("session.options")).toBeNull();
   });
 
-  test("a seat with no end is never warned about", async () => {
-    repo.listActiveEverywhere.mockResolvedValue([ending({ ends_at: null, is_unlimited: true })]);
+  test("nothing is shown without the server's notification", async () => {
+    feed.list = [];
     await mount();
 
     expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  test("names the seat by its number, as the server wrote it", async () => {
+    await mount();
+    expect(screen.getByRole("alert").textContent).toContain("session.endingSoonBody");
+  });
+
+  test("a dismissed warning stays dismissed after a restart", async () => {
+    await mount();
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "session.endingSoonDismiss" }));
+    });
+    cleanup();
+    await mount();
+
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  test("an unread warning not dismissed comes back after a restart", async () => {
+    await mount();
+    cleanup();
+    await mount();
+    expect(screen.getByRole("alert")).toBeTruthy();
+  });
+
+  test("read in the list, it goes", async () => {
+    feed.list = [warningRow(14, { read_at: new Date().toISOString() })];
+    await mount();
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  test("two seats, two cards; the same row twice, one card", async () => {
+    feed.list = [warningRow(12), { ...warningRow(9), id: "n-43", data: { ...warningRow(9).data, session_id: 43, place_number: 9 } }, warningRow(12)];
+    await mount();
+    expect(screen.getAllByRole("alert")).toHaveLength(2);
   });
 });

@@ -123,7 +123,12 @@ export const NotificationsProvider = ({ children }: { children: ReactNode }) => 
     const id = setInterval(() => {
       void apiNotificationsUnreadCount()
         .then(({ unread_count }) => {
-          if (aliveRef.current) setUnreadCount(unread_count);
+          if (!aliveRef.current) return;
+          // The badge moved without this panel hearing why — a broadcast
+          // missed (socket down, a failed auth, a Reverb hiccup). Only the
+          // count used to be corrected and the LIST left behind, so a manager
+          // saw "1" and no row (2026-10-25). Read the list again instead.
+          if (unread_count !== unreadRef.current) void refreshRef.current();
         })
         .catch(() => {
           /* network blip — keep current count, next tick will retry */
@@ -153,6 +158,10 @@ export const NotificationsProvider = ({ children }: { children: ReactNode }) => 
   // gap, which is the exact failure this is here to prevent.
   const refreshRef = useRef(refresh);
   refreshRef.current = refresh;
+  const unreadRef = useRef(unreadCount);
+  unreadRef.current = unreadCount;
+  const listRef = useRef(list);
+  listRef.current = list;
 
   // Re-attaches when the Echo client is rebuilt on connection details the
   // backend handed us: a subscription on the discarded client is silent.
@@ -168,13 +177,16 @@ export const NotificationsProvider = ({ children }: { children: ReactNode }) => 
       if (!aliveRef.current) return;
       const row = payload as IDbNotification;
       if (!row?.id) return;
+      // A row this panel already holds (the same event delivered twice, a
+      // reconnect replaying it, a refresh that landed first) replaces itself
+      // and is NOT counted again — counting it twice left a badge that
+      // disagreed with the list (2026-10-25).
+      const known = listRef.current.some((n) => n.id === row.id);
       setList((cur) => {
-        // Defensive de-dup — if we already have it (e.g. polling
-        // landed first), just refresh in place.
         const without = cur.filter((n) => n.id !== row.id);
         return [row, ...without];
       });
-      setUnreadCount((c) => (row.read_at === null ? c + 1 : c));
+      if (!known && row.read_at === null) setUnreadCount((c) => c + 1);
     };
     channel.listen(".notification.created", listener);
 

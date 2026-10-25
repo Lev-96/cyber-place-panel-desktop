@@ -484,7 +484,7 @@ describe("an hourly extra on the receipt", () => {
 
     // Exactly the old shape: a price and a count, no duration and no rate.
     // (`time.minShort` on its own would match the receipt's elapsed-time line.)
-    expect(notes()).toContain("300.00\u00b7AMD \u00d7 2");
+    expect(notes()).toContain("2 \u00d7 300.00\u00b7AMD");
   });
 });
 
@@ -646,5 +646,80 @@ describe("received cash and change", () => {
     repo.preview.mockResolvedValue(bill({ is_free: true, total: 0 }));
     await mount();
     expect(screen.queryByTestId("cash-change")).toBeNull();
+  });
+});
+
+/**
+ * The preliminary total (2026-10-25): opening it ends nothing; products have
+ * their own section and total; the buttons say what they do.
+ */
+describe("the preliminary total", () => {
+  beforeEach(() => { cleanup(); repo.stop.mockReset(); });
+  afterEach(() => cleanup());
+
+  // The requirement's example: time 1 000, Cola 2 × 500, chips 1 × 700.
+  const example = () => bill({
+    time_cost: 1000,
+    items: [
+      { id: 1, name: "Coca-Cola", price: 500, qty: 2, line_total: 1000 },
+      { id: 2, name: "Чипсы", price: 700, qty: 1, line_total: 700 },
+    ] as unknown as IBillBreakdown["items"],
+    items_total: 1700, subtotal: 2700, gross_total: 2700, total: 2700,
+  });
+
+  test("says the seat plays on, and nothing is sent by opening it", async () => {
+    repo.preview.mockResolvedValue(example());
+    await mount();
+
+    expect(screen.getByText(/session\.checkoutPreviewTitle/)).toBeTruthy();
+    expect(screen.getByTestId("checkout-still-running")).toBeTruthy();
+    expect(repo.stop).not.toHaveBeenCalled();
+  });
+
+  test("lists the products bought, each qty × unit = line, then their total, then the total", async () => {
+    repo.preview.mockResolvedValue(example());
+    await mount();
+
+    const items = screen.getByTestId("receipt-items");
+    expect(items.textContent).toContain("session.itemsBought");
+    expect(items.textContent).toContain("Coca-Cola");
+    expect(items.textContent).toContain("2 \u00d7 500");
+    expect(items.textContent).toContain("1 \u00d7 700");
+    expect(screen.getByTestId("receipt-items-total").textContent).toMatch(/session\.itemsTotal.*1,?700/);
+    // The total is the server's, once: 2 700, not 2 700 + 1 700.
+    expect(document.body.textContent).toMatch(/session\.totalDue[^]*2,?700/);
+    expect(document.body.textContent).not.toMatch(/4,?400/);
+  });
+
+  test("a planned hourly seat (no package) says how long it played, not an empty tariff", async () => {
+    repo.preview.mockResolvedValue(bill({ mode: "fixed", package_name: null, hourly_rate: 1000, elapsed_minutes: 46 }));
+    await mount();
+    expect(document.body.textContent).toContain("session.timePlayed");
+    expect(document.body.textContent).not.toMatch(/session\.tariff · (?!\S)/);
+  });
+
+  test("a package still names itself", async () => {
+    repo.preview.mockResolvedValue(bill({ mode: "fixed", package_name: "Hour", hourly_rate: null }));
+    await mount();
+    expect(document.body.textContent).toContain("session.tariff · Hour");
+  });
+
+  test("no products, no products section", async () => {
+    repo.preview.mockResolvedValue(bill());
+    await mount();
+    expect(screen.queryByTestId("receipt-items")).toBeNull();
+  });
+
+  test("Keep playing closes it and stops nothing; only the confirm stops", async () => {
+    const onClose = vi.fn();
+    repo.preview.mockResolvedValue(example());
+    await act(async () => {
+      render(<StopReceiptModal session={session()} onClose={onClose} onConfirmed={() => {}} onItemRemoved={() => {}} />);
+    });
+
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "session.checkoutKeepPlaying" })); });
+    expect(onClose).toHaveBeenCalled();
+    expect(repo.stop).not.toHaveBeenCalled();
+    expect(screen.getByTestId("stop-confirm").textContent).toBe("session.confirmStop");
   });
 });

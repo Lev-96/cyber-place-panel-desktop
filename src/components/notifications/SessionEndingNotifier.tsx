@@ -1,235 +1,179 @@
 import { useAuth } from "@/auth/AuthContext";
 import { useLang } from "@/i18n/LanguageContext";
+import { useNotifications } from "@/notifications/NotificationsContext";
+import type { IDbNotification } from "@/api/notifications";
 import { sessionRepository } from "@/repositories/SessionRepository";
 import { ISessionApi } from "@/types/sessions";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import SessionOptionsDialog from "@/components/sessions/SessionOptionsDialog";
 
 /**
- * "This seat runs out in ten minutes — do you want to sell them more?"
+ * "This seat is about to run out" — a floating card for every staff member the
+ * SERVER told (2026-10-25).
  *
- * ## Why it lives in the panel and not on the server
+ * It used to run its own clock: poll the active sessions every 30 s and warn at
+ * 10 minutes, while the server warned at 15 and wrote that warning to the
+ * notifications list. Two clocks, two thresholds, and a desktop that showed the
+ * server's warning only as a badge — so a manager at the panel saw a count and
+ * had to open Notifications to find out which seat. Now the card IS the
+ * server's notification (`session.ending_soon`, `SessionEndingSoonService`):
+ * the same recipients (owner and the branch's managers, by the server's
+ * scope), the same moment, the same row the list shows. It arrives with the
+ * list — on start, over Reverb, after a reconnect — so nothing here decides
+ * when a seat is ending.
  *
- * There is no scheduler and no queue worker on this deployment
- * (`SCHEDULER_ENABLED` / `QUEUE_WORKER_ENABLED` are both off), so a backend
- * cron for "ten minutes left" would be a job that never runs. Nothing here
- * needs one: the panel already knows every session it may see and their end
- * times, and the people who have to act on the warning are the ones sitting in
- * front of it.
- *
- * ## How it stays addressed to the right people
- *
- * `GET /sessions?status=active` with no `branch_id` returns exactly the
- * caller's own venues — the branch scope is applied server-side. An admin
- * therefore sees the platform, an owner their company, a manager their branch,
- * and nobody is told about a seat that is not theirs. There is no filtering to
- * get wrong on this side because there is nothing to filter.
- *
- * ## And how it stays quiet
- *
- * One warning per session, ever, per panel session — `warned` is the whole
- * duplicate-suppression mechanism, and it is deliberately never cleared for a
- * session that is still running. Granting more time pushes `ends_at` out, the
- * session leaves the window, and the operator is NOT warned again ten minutes
- * later for a decision they already made. A session that ends and a new one
- * that starts on the same seat has a new id and warns on its own merits.
- *
- * The card does not auto-dismiss. A booking toast that fades is a missed
- * booking somebody can still find in the list; a seat that goes dark under a
- * player is not recoverable after the fact.
+ * Shown once per notification: dismissing it is remembered for this user (a
+ * per-device convenience in localStorage), so a reconnect or a restart does not
+ * bring it back; an unread warning not yet dismissed comes back after a
+ * restart, because it still stands. Marked read or deleted in the list, it
+ * goes. Gone too once the seat's end has passed. Several seats are stacked.
  */
 
-/** How close to the end the warning fires. */
-const WARN_AT_MINUTES = 10;
+const TYPE = "session.ending_soon";
+const MAX_CARDS = 3;
+const TICK_MS = 30_000;
 
-/** How often the sessions are re-read. Same cadence as the board's own poll. */
-const POLL_MS = 30_000;
-
-interface Warning {
+export interface EndingWarning {
+  id: string;
   sessionId: number;
   branchId: number;
   label: string;
   minutesLeft: number;
-  /**
-   * The row itself, so the action can OPEN the management dialog rather than
-   * send the operator somewhere to look for it. Everything that dialog needs —
-   * the tariff, the pads, the seat's platform — is already on it.
-   */
-  session: ISessionApi;
 }
 
-const minutesLeft = (endsAt: string, now: number): number =>
-  Math.ceil((new Date(endsAt).getTime() - now) / 60_000);
-
-/**
- * The sessions that just entered the window, given what has already been
- * warned about. Exported for the unit test: the rule ("about to end, has an
- * end at all, not already warned") is the whole feature, and it is worth
- * asserting without mounting React or faking a clock in a DOM.
- */
-export const sessionsToWarnAbout = (
-  sessions: ISessionApi[],
-  warned: ReadonlySet<number>,
+/** The warnings to show now: unread, still ahead, not dismissed — soonest first. */
+export const endingWarnings = (
+  list: readonly IDbNotification[],
+  dismissed: ReadonlySet<string>,
   now: number,
-): Warning[] =>
-  sessions
-    .filter((s) => s.status === "active")
-    // A session with no end cannot run out: it was started in count-up mode,
-    // or an operator has already lifted its ceiling. `is_unlimited` is checked
-    // too, so an older backend that only nulls `ends_at` behaves the same.
-    .filter((s) => s.ends_at !== null && s.is_unlimited !== true)
-    // Paused: nothing is running out. The end moves on resume, and a warning
-    // about a clock that is not moving would be a false alarm.
-    .filter((s) => !s.paused_at)
-    .filter((s) => !warned.has(s.id))
-    .map((s) => ({
-      sessionId: s.id,
-      branchId: s.branch_id,
-      label: s.pc_label || `#${s.pc_id}`,
-      minutesLeft: minutesLeft(s.ends_at as string, now),
-      session: s,
-    }))
-    // Already over is not a warning, it is news — the board turns the tile
-    // over on its own and there is nothing left to sell.
-    .filter((w) => w.minutesLeft > 0 && w.minutesLeft <= WARN_AT_MINUTES);
+): EndingWarning[] =>
+  list
+    // One card per notification, even if a replay put the row in twice.
+    .filter((n, i, all) => all.findIndex((m) => m.id === n.id) === i)
+    .filter((n) => n.data?.type === TYPE && n.read_at === null && !dismissed.has(n.id))
+    .map((n) => {
+      const endsAt = n.data.ends_at ? Date.parse(n.data.ends_at) : NaN;
+      return {
+        id: n.id,
+        sessionId: Number(n.data.session_id),
+        branchId: Number(n.data.branch_id),
+        label: n.data.place_number != null ? `№${n.data.place_number}` : `#${n.data.pc_id ?? n.data.session_id}`,
+        minutesLeft: Number.isNaN(endsAt) ? Number(n.data.minutes_left ?? 0) : Math.ceil((endsAt - now) / 60_000),
+        endsAt,
+      };
+    })
+    .filter((w) => (Number.isNaN(w.endsAt) ? w.minutesLeft > 0 : w.endsAt > now))
+    .sort((a, b) => a.minutesLeft - b.minutesLeft)
+    .map(({ endsAt: _endsAt, ...w }) => w);
+
+const storageKey = (userId: number) => `cp.endingSoon.dismissed.${userId}`;
+
+const readDismissed = (userId: number): Set<string> => {
+  try {
+    const raw = window.localStorage.getItem(storageKey(userId));
+    const ids: unknown = raw ? JSON.parse(raw) : [];
+    return new Set(Array.isArray(ids) ? ids.filter((x): x is string => typeof x === "string") : []);
+  } catch {
+    return new Set();
+  }
+};
+
+const writeDismissed = (userId: number, ids: Set<string>) => {
+  try {
+    // The last 200 are plenty: older warnings are long past their seat's end.
+    window.localStorage.setItem(storageKey(userId), JSON.stringify([...ids].slice(-200)));
+  } catch {
+    /* private window / storage blocked: dismissing still works for this run */
+  }
+};
 
 const SessionEndingNotifier = () => {
   const { t } = useLang();
   const { user } = useAuth();
-  const [warning, setWarning] = useState<Warning | null>(null);
-  // The session whose terms are being changed, if any. Deliberately separate
-  // from `warning`: the dialog outlives the card that opened it.
+  const { list } = useNotifications();
+  const [dismissed, setDismissed] = useState<Set<string>>(() => new Set());
+  const [now, setNow] = useState(() => Date.now());
   const [managing, setManaging] = useState<ISessionApi | null>(null);
-  // Never cleared while the panel is open: one warning per session, ever.
-  const warned = useRef<Set<number>>(new Set());
 
-  const check = useCallback(async () => {
-    // The endpoint is staff-only; without an account there is nothing to ask.
-    if (!user) return;
-    let sessions: ISessionApi[];
-    try {
-      sessions = await sessionRepository.listActiveEverywhere();
-    } catch {
-      // A blip must not take the shell down. The next tick tries again.
-      return;
-    }
-
-    const due = sessionsToWarnAbout(sessions, warned.current, Date.now());
-    if (due.length === 0) return;
-
-    // Soonest first, so the one with the least time left is the one shown.
-    due.sort((a, b) => a.minutesLeft - b.minutesLeft);
-    for (const w of due) warned.current.add(w.sessionId);
-    setWarning(due[0]);
-  }, [user]);
-
+  // Keyed on the id, not the object: a re-created user object (a refreshed
+  // profile) must not re-read storage and re-render in a loop.
+  const userId = user?.id ?? null;
   useEffect(() => {
-    void check();
-    const timer = setInterval(() => void check(), POLL_MS);
-    return () => clearInterval(timer);
-  }, [check]);
+    if (userId !== null) setDismissed(readDismissed(userId));
+  }, [userId]);
 
-  /**
-   * The button said "Add time" and NAVIGATED — to the sessions board of the
-   * warning's branch, then cleared itself.
-   *
-   * Which does nothing at all when the operator is already on that board, and
-   * that is exactly where they are when watching a seat run out: the route does
-   * not change, nothing new renders, and all the cashier sees is their warning
-   * vanishing. The button was not broken so much as pointed at the wrong thing.
-   *
-   * It now opens the management dialog — the SAME component a tile opens, not a
-   * copy of it — so the offer to sell more time is answerable from wherever the
-   * operator is standing.
-   */
-  const manage = () => {
-    if (warning) setManaging(warning.session);
-    setWarning(null);
+  // Only to drop a card whose seat has run out and refresh "N min" — the
+  // warning itself is the server's, never decided here.
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), TICK_MS);
+    return () => clearInterval(timer);
+  }, []);
+
+  const warnings = useMemo(
+    () => endingWarnings(list, dismissed, now).slice(0, MAX_CARDS),
+    [list, dismissed, now],
+  );
+
+  const dismiss = (id: string) => {
+    setDismissed((cur) => {
+      const next = new Set(cur).add(id);
+      if (user) writeDismissed(user.id, next);
+      return next;
+    });
   };
 
-  // The dialog can outlive the card, so this early return has to let it
-  // through: bailing out the moment the warning is gone would unmount the
-  // dialog the warning just opened.
+  const manage = async (w: EndingWarning) => {
+    dismiss(w.id);
+    try {
+      const sessions = await sessionRepository.listActiveEverywhere();
+      const found = sessions.find((s) => s.id === w.sessionId);
+      if (found) setManaging(found);
+    } catch {
+      /* the seat cannot be read now; the board still has it */
+    }
+  };
+
   const dialog = managing === null ? null : (
     <SessionOptionsDialog
       session={managing}
       platform={managing.place_platform}
       onClose={() => setManaging(null)}
-      // Keep the dialog's own copy current after each change, exactly as the
-      // board does. The board itself re-reads on its poll and on the session
-      // event, so nothing here has to tell it.
       onChanged={setManaging}
     />
   );
 
-  if (!warning) return dialog;
+  if (warnings.length === 0) return dialog;
 
   return (
     <>
-    <div
-      role="alert"
-      aria-live="assertive"
-      style={{
-        position: "fixed",
-        // Below the booking toast rather than on top of it: two notifications
-        // about different things must not hide one another.
-        top: 96,
-        right: 16,
-        zIndex: 9000,
-        maxWidth: 360,
-        borderRadius: 8,
-        background: "rgba(120, 90, 10, 0.96)",
-        borderLeft: "4px solid #facc15",
-        padding: "12px 14px",
-        boxShadow: "0 6px 22px rgba(0, 0, 0, 0.35)",
-        color: "#fef3c7",
-        fontSize: 14,
-        lineHeight: 1.4,
-      }}
-    >
-      <div className="row-between" style={{ alignItems: "flex-start", gap: 10 }}>
-        <div style={{ fontWeight: 700 }}>⚠️ {t("session.endingSoonTitle")}</div>
-        <button
-          type="button"
-          onClick={() => setWarning(null)}
-          aria-label={t("session.endingSoonDismiss")}
-          title={t("session.endingSoonDismiss")}
-          style={{
-            border: "none",
-            background: "transparent",
-            color: "#fef3c7",
-            cursor: "pointer",
-            fontSize: 16,
-            lineHeight: 1,
-            padding: 0,
-          }}
-        >
-          ×
-        </button>
+      <div className="ending-soon-stack" data-testid="ending-soon-stack">
+        {warnings.map((w) => (
+          <div key={w.id} role="alert" aria-live="assertive" className="ending-soon-card">
+            <div className="row-between" style={{ alignItems: "flex-start", gap: 10 }}>
+              <div style={{ fontWeight: 700 }}>⚠️ {t("session.endingSoonTitle")}</div>
+              <button
+                type="button"
+                onClick={() => dismiss(w.id)}
+                aria-label={t("session.endingSoonDismiss")}
+                title={t("session.endingSoonDismiss")}
+                className="ending-soon-card__close"
+              >
+                ×
+              </button>
+            </div>
+            <div style={{ fontSize: 13, marginTop: 4 }}>
+              {t("session.endingSoonBody")
+                .replace("{place}", w.label)
+                .replace("{minutes}", String(Math.max(1, w.minutesLeft)))}
+            </div>
+            <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+              <button type="button" onClick={() => void manage(w)} className="ending-soon-card__action">
+                {t("session.endingSoonAction")}
+              </button>
+            </div>
+          </div>
+        ))}
       </div>
-      <div style={{ fontSize: 13, marginTop: 4 }}>
-        {t("session.endingSoonBody")
-          .replace("{place}", warning.label)
-          .replace("{minutes}", String(warning.minutesLeft))}
-      </div>
-      <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
-        <button
-          type="button"
-          onClick={manage}
-          style={{
-            padding: "4px 10px",
-            border: "1px solid rgba(254, 243, 199, 0.35)",
-            borderRadius: 6,
-            background: "transparent",
-            color: "#fef3c7",
-            cursor: "pointer",
-            fontSize: 12,
-          }}
-        >
-          {t("session.endingSoonAction")}
-        </button>
-      </div>
-    </div>
       {dialog}
     </>
   );

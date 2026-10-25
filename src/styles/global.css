@@ -5048,6 +5048,17 @@ select.input option:disabled {
   margin-top: auto;
   padding-top: 10px;
 }
+/* A free seat's "+ Товар" (the till's sale): the running card's action size,
+   full width, above Start, so both stay one line on the narrowest card. */
+.session-card__foot {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.session-card__sell.btn {
+  width: 100%;
+  height: 32px;
+}
 .session-card__start.btn {
   width: 100%;
   height: 34px;
@@ -6382,4 +6393,46 @@ select.input option:disabled {
 .quoted-price__hint {
   font-size: 11.5px;
   line-height: 1.35;
+}
+
+/* "A seat is about to run out" (SessionEndingNotifier, 2026-10-25): the
+   server's warning as stacked cards, top-right, above the page header's own
+   buttons and clear of every card's actions. */
+.ending-soon-stack {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: 9000;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: min(340px, calc(100vw - 32px));
+}
+.ending-soon-card {
+  border-radius: 8px;
+  background: rgba(120, 90, 10, 0.96);
+  border-left: 4px solid #facc15;
+  padding: 12px 14px;
+  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.35);
+  color: #fef3c7;
+  font-size: 14px;
+  line-height: 1.4;
+}
+.ending-soon-card__close {
+  border: none;
+  background: transparent;
+  color: #fef3c7;
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  padding: 0;
+}
+.ending-soon-card__action {
+  padding: 4px 10px;
+  border: 1px solid rgba(254, 243, 199, 0.35);
+  border-radius: 6px;
+  background: transparent;
+  color: #fef3c7;
+  cursor: pointer;
+  font-size: 12px;
 }
