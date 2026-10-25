@@ -3107,3 +3107,16 @@ singular genitive kept elsewhere, hence by key), and "Start session" stays.
   one sentence per sale — when · who sold (role) · what · how paid · received /
   change · total; voided listed, not counted. «Касса» rows read the same
   sentence (`tillSaleText.ts`).
+
+## The pinned top bar (2026-10-26)
+
+`Layout` renders `PageTopBar` where `BackButton` was: a sticky, click-through
+bar (only Back takes the pointer) holding Back on the left. When the screen's
+first `.page-title` (outside a dialog) scrolls above the bar, its text fades
+and rises into the bar's centre, level with Back; scrolling up fades it out.
+It finds the heading itself (IntersectionObserver rooted at `main`, re-looked
+on DOM changes), so no screen changes; it resets on every route and shows no
+heading on `/` (the dashboard has only widget headings). A band of the page
+background (`.cp-topbar::before`, sized by `--main-pad-top`/`--main-pad-x` on
+`.main`) rises with it so nothing scrolls visibly behind the bar. Reduced
+motion: no animation.
