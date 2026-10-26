@@ -1213,6 +1213,14 @@ Two things that look like oversights and are not:
   request, page 1 on any change (the `{key, page}` idiom), reset with a count;
   nothing filtered client-side. Report v2 blocks (seats, platforms, bookings,
   "what the totals are made of") render only when present, so v1 reports open.
+- **Report v3 (2026-10-26)** — `ShiftBreakdown.tsx` (shared rows in
+  `shiftReportParts.tsx`): products per product and price (till / on places /
+  voided / on free places, units and totals from the server), staff (the
+  closer first: `report.closed.closed_by` → `shift.closed_by` → the viewer on
+  an open shift — `viewerId` from `Shift.tsx` and `CloseShiftDialog`), handover
+  of running places, sales of earlier shifts voided here, and "не учитывается"
+  for debts / cash in-out / top-up method. Every block renders only when the
+  report has it, so v1/v2 reports open unchanged. Nothing is summed here.
 - **Report layout (2026-10-19 evening).** Header facts are label-above-value
   (`Fact`), status said in words; one large revenue figure with its parts;
   every count sits on its own line UNDER its label, never next to an amount
@@ -2211,7 +2219,7 @@ saying so.
 |---|---|---|
 | 🎮 joystick switch (`PadToggle`, first card action) | the seat's tile in `SessionsBoard` | everyone who works the branch |
 | + Время: hours/minutes, preset or typed, priced, then confirmed | `SessionOptionsDialog` | same |
-| optional planned length at an hourly start, priced | `StartSessionDialog` | same |
+| optional planned length at an hourly start, priced — duration or "until HH:mm" | `StartSessionDialog` | same |
 | switch to unlimited | same | same |
 | Free (start it waived) | `StartSessionDialog`, behind `session.free` | same (managers since 2026-09-06) |
 | joystick prices, rounding policy | `BranchPricesPage` | admin + owner |
@@ -2235,6 +2243,18 @@ and the standard price, and Start waits for a quote of exactly that total.
 with `standard_charge`, confirm enabled only on a quote of exactly that price.
 `sessionTimeCostAt` mirrors the server's share-of-plan billing (packages
 included, re-base via `plan_rebased_at`, only resumed pauses out of the plan).
+
+**"До времени" (2026-10-26).** Tabs "Продолжительность" / "До времени" above
+the plan; only the chosen one is read and sent, the other keeps its value.
+`ClockTimeField` takes "00:40" (`clockOf` checks the SHAPE only, "0:40" →
+"00:40"); `until` is sent to `start-quote` and `POST /sessions` — never
+minutes worked out on this machine. The server resolves it on its clock and
+answers `minutes` + `ends_at`, shown as "50 мин · до 00:40 (завтра)"; a passed
+/ too-far time comes back as its 422 sentence and holds Start. The quote is
+keyed on the time (`useServerQuote` is generic over its input) and re-asked
+each minute (`useMinuteTick` → its `refresh` argument): the figure stays on
+screen while the same question is asked again, so Start never blinks off; a
+different time or rate blanks it as before.
 
 **The window (2026-10-25).** Resizable with no maximum; minimum 800×560
 (`electron/windowBounds.ts` `MIN_CONTENT`) — every screen reflows there, and
