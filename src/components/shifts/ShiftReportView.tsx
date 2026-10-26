@@ -5,6 +5,8 @@ import type { DifferenceKind, IShift, IShiftReport } from "@/types/shifts";
 import type { CSSProperties, ReactNode } from "react";
 import { shiftAmount } from "@/shifts/cash";
 import { platformLabel } from "@/utils/platform";
+import ShiftBreakdown from "./ShiftBreakdown";
+import { Row, Section, divider, rowStyle, valueStyle } from "./shiftReportParts";
 
 /**
  * One shift's report, as the server computed it (2026-10-19): the live one of
@@ -20,6 +22,8 @@ import { platformLabel } from "@/utils/platform";
 interface Props {
   shift: IShift;
   report: IShiftReport;
+  /** Who is looking: on an open shift, the one about to close it. */
+  viewerId?: number | null;
 }
 
 const KIND_KEY: Record<DifferenceKind, string> = {
@@ -34,27 +38,6 @@ export const durationText = (seconds: number, t: (k: string) => string): string 
   return `${h} ${t("time.hourShort")} ${m} ${t("time.minShort")}`;
 };
 
-const Row = ({ label, hint, value, strong, muted, testId }: {
-  label: ReactNode; hint?: ReactNode; value: ReactNode; strong?: boolean; muted?: boolean; testId?: string;
-}) => (
-  <div className="row-between" style={rowStyle} data-testid={testId}>
-    {/* The count sits under the label, never beside the amount: "продаж: 2"
-        printed next to "3 000" read as "23 000" (2026-10-19). */}
-    <span className={muted ? "muted" : undefined} style={{ minWidth: 0 }}>
-      {label}
-      {hint !== undefined && <span className="muted" style={hintStyle}>{hint}</span>}
-    </span>
-    {strong ? <strong style={valueStyle}>{value}</strong> : <span style={valueStyle}>{value}</span>}
-  </div>
-);
-
-const Section = ({ title, children, testId }: { title: string; children: ReactNode; testId?: string }) => (
-  <section className="card col" style={{ gap: 2, minWidth: 0 }} data-testid={testId}>
-    <h3 style={{ margin: "0 0 8px", fontSize: 15 }}>{title}</h3>
-    {children}
-  </section>
-);
-
 /** One fact of the header: its name above it, so two never run together. */
 const Fact = ({ label, children, testId }: { label: string; children: ReactNode; testId?: string }) => (
   <div className="col" style={{ gap: 2, minWidth: 0 }} data-testid={testId}>
@@ -63,7 +46,7 @@ const Fact = ({ label, children, testId }: { label: string; children: ReactNode;
   </div>
 );
 
-const ShiftReportView = ({ shift, report }: Props) => {
+const ShiftReportView = ({ shift, report, viewerId = null }: Props) => {
   const { t, money } = useLang();
   const methodName = (method: string) =>
     method === "cash" ? t("session.payCash") : method === "card" ? t("session.payCard")
@@ -179,6 +162,8 @@ const ShiftReportView = ({ shift, report }: Props) => {
         </Section>
       )}
 
+      <ShiftBreakdown report={report} closerId={report.closed?.closed_by.id ?? shift.closed_by?.id ?? viewerId} />
+
       {(report.member_topups.count > 0 || report.places.running_count > 0 || report.warnings.length > 0) && (
         <section className="card col" style={{ gap: 6, borderColor: "var(--color-warning)" }} data-testid="shift-warnings">
           {report.warnings.map((w) => (
@@ -236,10 +221,6 @@ const LinesHead = ({ title, rule, total }: { title: string; rule: string; total:
   </div>
 );
 
-const rowStyle: CSSProperties = { padding: "5px 0", gap: 16, alignItems: "baseline" };
-const hintStyle: CSSProperties = { display: "block", fontSize: 12 };
-const valueStyle: CSSProperties = { whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" };
-const divider: CSSProperties = { borderTop: "1px solid var(--color-border, rgba(255,255,255,0.12))", margin: "6px 0" };
 const factsGrid: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: 14 };
 const partsGrid: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10 };
 const twoCols: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 12, alignItems: "start" };

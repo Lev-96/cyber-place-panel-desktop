@@ -43,6 +43,12 @@ export interface StartSessionBody {
    * Sent instead of `hourly_rate`, only with `duration_minutes`.
    */
   planned_amount?: number;
+  /**
+   * Or the clock time it ends at, "HH:mm" (2026-10-26) — never with
+   * `duration_minutes`. The server resolves it on its own clock: today, or
+   * tomorrow past midnight; passed or more than 10 h away is refused.
+   */
+  until?: string;
 }
 
 /** What "+ Время" would charge for N minutes now — the server's own figure. */
@@ -64,7 +70,13 @@ export interface IStartQuote {
   amount: number;
   /** What the seat's own rate would ask for these minutes; null when it has none. */
   standard_amount: number | null;
+  /** Only for a quote "until HH:mm": the exact end it came to, and the time asked. */
+  ends_at?: string;
+  until?: string;
 }
+
+/** A planned length: so many minutes, or until a clock time. */
+export type PlannedLength = { minutes: number } | { until: string };
 
 export interface ExtendSessionBody {
   time_package_id: number;
@@ -486,9 +498,10 @@ export const apiSessionTimeQuote = (sessionId: number, minutes: number, charge?:
   );
 
 /** ⚠️ ADVICE: `apiStartSession` is what creates the session. Writes nothing. */
-export const apiStartQuote = (pcId: number, minutes: number, hourlyRate?: number, plannedAmount?: number) =>
+export const apiStartQuote = (pcId: number, length: PlannedLength, hourlyRate?: number, plannedAmount?: number) =>
   request<IStartQuote>(
-    `/sessions/start-quote?pc_id=${pcId}&minutes=${minutes}`
+    `/sessions/start-quote?pc_id=${pcId}`
+      + ("until" in length ? `&until=${encodeURIComponent(length.until)}` : `&minutes=${length.minutes}`)
       + (plannedAmount !== undefined
         ? `&planned_amount=${plannedAmount}`
         : hourlyRate !== undefined ? `&hourly_rate=${hourlyRate}` : ""),

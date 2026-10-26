@@ -13,7 +13,7 @@ import type { QuoteState } from "./useServerQuote";
 interface Props<T> {
   label: string;
   hint: string;
-  quote: QuoteState<T>;
+  quote: QuoteState<T, number | string>;
   /** The figure out of a quote, null when it carries none. */
   amountOf: (value: T) => number | null;
   /** A note shown under the figure (a waived session's "nothing is charged"). */

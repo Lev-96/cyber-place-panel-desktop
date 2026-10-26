@@ -10,39 +10,52 @@ import { useEffect, useRef, useState } from "react";
  * answer that comes back for a value the form has since moved past is
  * dropped, so a slow reply for "12" can never sit beside "120".
  *
- * `ok` carries the minutes it is FOR: a caller enables its confirm only when
- * that matches what is on screen, so nothing is confirmed on a stale figure.
+ * `ok` carries the input it is FOR — minutes, or a clock time "00:40"
+ * (2026-10-26): a caller enables its confirm only when that matches what is
+ * on screen, so nothing is confirmed on a stale figure.
  */
-export type QuoteState<T> =
+export type QuoteState<T, K extends number | string = number> =
   | { status: "idle" }
   | { status: "loading" }
-  | { status: "ok"; minutes: number; value: T }
+  | { status: "ok"; input: K; value: T }
   | { status: "error"; message: string };
 
 export const QUOTE_DEBOUNCE_MS = 250;
 
-export const useServerQuote = <T>(
-  minutes: number | null,
-  fetchQuote: (minutes: number) => Promise<T>,
+export const useServerQuote = <T, K extends number | string = number>(
+  input: K | null,
+  fetchQuote: (input: K) => Promise<T>,
   /** Anything else the price depends on (the session, the seat, a typed rate). */
   key: string,
-): QuoteState<T> => {
-  const [state, setState] = useState<QuoteState<T>>({ status: "idle" });
+  /**
+   * Bumped to ask the same question again (2026-10-26: "until 00:40" is a
+   * minute shorter every minute). The figure on screen stays while the fresh
+   * one is asked — it is still the answer for exactly this input — so a
+   * confirm never blinks off once a minute.
+   */
+  refresh: number = 0,
+): QuoteState<T, K> => {
+  const [state, setState] = useState<QuoteState<T, K>>({ status: "idle" });
   const seq = useRef(0);
+  const asked = useRef<{ input: K | null; key: string } | null>(null);
   const fetchRef = useRef(fetchQuote);
   fetchRef.current = fetchQuote;
 
   useEffect(() => {
     const mine = ++seq.current;
-    if (minutes === null) {
+    const same = asked.current !== null && asked.current.input === input && asked.current.key === key;
+    asked.current = { input, key };
+    if (input === null) {
       setState({ status: "idle" });
       return;
     }
-    setState({ status: "loading" });
+    // A refresh of the same question keeps the answer on screen; anything
+    // else the old answer is not for, so it goes.
+    if (!same) setState({ status: "loading" });
     const timer = setTimeout(() => {
-      fetchRef.current(minutes)
+      fetchRef.current(input)
         .then((value) => {
-          if (seq.current === mine) setState({ status: "ok", minutes, value });
+          if (seq.current === mine) setState({ status: "ok", input, value });
         })
         .catch((e: unknown) => {
           if (seq.current === mine) {
@@ -52,11 +65,11 @@ export const useServerQuote = <T>(
     }, QUOTE_DEBOUNCE_MS);
 
     return () => clearTimeout(timer);
-  }, [minutes, key]);
+  }, [input, key, refresh]);
 
   return state;
 };
 
-/** The quoted value, only when it is for exactly these minutes. */
-export const quoteFor = <T>(state: QuoteState<T>, minutes: number | null): T | null =>
-  state.status === "ok" && minutes !== null && state.minutes === minutes ? state.value : null;
+/** The quoted value, only when it is for exactly this input. */
+export const quoteFor = <T, K extends number | string = number>(state: QuoteState<T, K>, input: K | null): T | null =>
+  state.status === "ok" && input !== null && state.input === input ? state.value : null;

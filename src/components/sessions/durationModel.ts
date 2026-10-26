@@ -43,6 +43,23 @@ export const minutesOf = (amount: string, unit: DurationUnit): number | null => 
 };
 
 /**
+ * A clock time "until" which a seat is started (2026-10-26), as the server
+ * takes it — "HH:mm", 24-hour — or null when the box means no such time:
+ * empty, "25:80", "24:00". "0:40" and "00.40" are read as 00:40, the way they
+ * are typed at a counter. Only the shape is checked here: whether the time has
+ * passed, and how long it is from now, is the server's answer on its own
+ * clock (`start-quote`), never this machine's.
+ */
+export const clockOf = (text: string): string | null => {
+  const m = /^(\d{1,2})[:.](\d{2})$/.exec(text.trim());
+  if (!m) return null;
+  const hour = Number(m[1]);
+  const minute = Number(m[2]);
+  if (hour > 23 || minute > 59) return null;
+  return `${String(hour).padStart(2, "0")}:${m[2]}`;
+};
+
+/**
  * The same length written in the other unit, so switching hours ↔ minutes
  * keeps what was chosen instead of re-reading "2" as two minutes. A value
  * that means nothing yet is kept as typed.

@@ -19,6 +19,7 @@ import {
   type IExtensionOptions,
   type ITimeQuote,
   type IStartQuote,
+  type PlannedLength,
   apiExtendSession,
   apiListEventsForSession,
   apiListSessionEventActors,
@@ -156,8 +157,8 @@ export class SessionRepository {
   }
 
   /** Read-only advice: what a planned start would cost. See `apiStartQuote`. */
-  async startQuote(pcId: number, minutes: number, hourlyRate?: number, plannedAmount?: number): Promise<IStartQuote> {
-    return friendlyMutation(apiStartQuote(pcId, minutes, hourlyRate, plannedAmount));
+  async startQuote(pcId: number, length: PlannedLength, hourlyRate?: number, plannedAmount?: number): Promise<IStartQuote> {
+    return friendlyMutation(apiStartQuote(pcId, length, hourlyRate, plannedAmount));
   }
 
   /** Read-only advice: see `apiSessionExtensionOptions`. */

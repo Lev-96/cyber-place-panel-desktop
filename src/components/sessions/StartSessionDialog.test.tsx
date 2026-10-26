@@ -27,6 +27,8 @@ import { PSN_FEATURE } from "@/api/psn";
  */
 
 const repo = vi.hoisted(() => ({ start: vi.fn(), startQuote: vi.fn() }));
+const UNTIL_ENDS_AT = new Date(new Date().setHours(24, 40, 0, 0)).toISOString();
+const UNTIL_PASSED = "This time has already passed or is more than 10 hours away. Choose another end time.";
 const auth = vi.hoisted(() => ({ role: "company_owner" as string }));
 
 vi.mock("@/repositories/SessionRepository", () => ({
@@ -91,10 +93,16 @@ beforeEach(() => {
   // The server's figure for a planned start: the seat's 1 500/h, or the rate
   // typed for this start.
   repo.startQuote.mockReset();
-  repo.startQuote.mockImplementation((_pc: number, m: number, rate?: number, total?: number) =>
-    Promise.resolve(total !== undefined
-      ? { minutes: m, hourly_rate: Math.round((total * 60 / m) * 100) / 100, amount: total, standard_amount: (1500 * m) / 60 }
-      : { minutes: m, hourly_rate: rate ?? 1500, amount: ((rate ?? 1500) * m) / 60, standard_amount: (1500 * m) / 60 }));
+  repo.startQuote.mockImplementation((_pc: number, length: { minutes: number } | { until: string }, rate?: number, total?: number) => {
+    // "Until" is resolved by the server on its clock: here "00:40" is 50
+    // minutes away, tomorrow, and "14:00" has passed.
+    if ("until" in length && length.until === "14:00") return Promise.reject(new Error(UNTIL_PASSED));
+    const m = "until" in length ? 50 : length.minutes;
+    const end = "until" in length ? { ends_at: UNTIL_ENDS_AT, until: length.until } : {};
+    return Promise.resolve(total !== undefined
+      ? { minutes: m, hourly_rate: Math.round((total * 60 / m) * 100) / 100, amount: total, standard_amount: (1500 * m) / 60, ...end }
+      : { minutes: m, hourly_rate: rate ?? 1500, amount: ((rate ?? 1500) * m) / 60, standard_amount: (1500 * m) / 60, ...end });
+  });
 });
 afterEach(cleanup);
 
@@ -568,7 +576,7 @@ describe("a planned length at start", () => {
     await typePlan("3");
     await settle();
 
-    expect(repo.startQuote).toHaveBeenLastCalledWith(1, 180, undefined, undefined);
+    expect(repo.startQuote).toHaveBeenLastCalledWith(1, { minutes: 180 }, undefined, undefined);
     expect(screen.getByText("4500")).toBeTruthy();
     await press();
     expect(repo.start.mock.calls[0][0]).toMatchObject({ mode: "open", duration_minutes: 180 });
@@ -586,7 +594,7 @@ describe("a planned length at start", () => {
     await typePlan("2");
     await settle();
 
-    expect(repo.startQuote).toHaveBeenLastCalledWith(1, 120, 2000, undefined);
+    expect(repo.startQuote).toHaveBeenLastCalledWith(1, { minutes: 120 }, 2000, undefined);
     expect(screen.getByText("4000")).toBeTruthy();
   });
 
@@ -643,7 +651,7 @@ describe("a planned length at start", () => {
       await setTotal("2500");
       await settle();
 
-      expect(repo.startQuote).toHaveBeenLastCalledWith(1, 180, undefined, 2500);
+      expect(repo.startQuote).toHaveBeenLastCalledWith(1, { minutes: 180 }, undefined, 2500);
       expect(screen.getByText("2500")).toBeTruthy();
       expect(screen.getByText(/833\.33 \/ time\.hourShort · session\.plannedStandard: 4500/)).toBeTruthy();
 
@@ -704,5 +712,110 @@ describe("a planned length at start", () => {
     await mount(device());
     await act(async () => { fireEvent.click(screen.getByText("session.freeBill")); });
     expect(screen.queryByTestId("planned-duration")).toBeNull();
+  });
+});
+
+/**
+ * "Until" a clock time (2026-10-26): the second way to set the same plan. The
+ * server turns "00:40" into a length on its own clock; the dialog sends the
+ * time, never minutes it worked out, and starts only on the server's answer.
+ */
+describe("a plan until a clock time", () => {
+  const settle = async () => {
+    await act(async () => { await new Promise((r) => setTimeout(r, 320)); });
+  };
+  const chooseUntil = async () => {
+    await act(async () => { fireEvent.click(screen.getByRole("tab", { name: "session.planLimitUntil" })); });
+  };
+  const typeUntil = async (value: string) => {
+    await act(async () => { fireEvent.change(screen.getByLabelText("session.untilLabel"), { target: { value } }); });
+  };
+  const startButton = () => screen.getByRole("button", { name: "action.start" }) as HTMLButtonElement;
+  const press = async () => { await act(async () => { fireEvent.click(startButton()); }); };
+
+  test("00:40 is asked of the server, shown as its length and end, and sent as the time", async () => {
+    await mount(device());
+    await chooseUntil();
+    await typeUntil("0:40");
+    await settle();
+
+    expect(repo.startQuote).toHaveBeenLastCalledWith(1, { until: "00:40" }, undefined, undefined);
+    expect(screen.getByTestId("planned-until-resolved").textContent).toContain("session.untilResolvedTomorrow");
+    expect(screen.getByText("1250")).toBeTruthy(); // 50 min at 1 500/h, the server's figure
+    expect(startButton().disabled).toBe(false);
+    await press();
+
+    const body = repo.start.mock.calls[0][0];
+    expect(body).toMatchObject({ mode: "open", until: "00:40" });
+    expect(body).not.toHaveProperty("duration_minutes");
+  });
+
+  test("a malformed time holds Start and says why; empty is no plan", async () => {
+    await mount(device());
+    await chooseUntil();
+    for (const bad of ["25:80", "24:00", "abc", "9"]) {
+      await typeUntil(bad);
+      await settle();
+      expect(screen.getByText("session.untilInvalid")).toBeTruthy();
+      expect(startButton().disabled).toBe(true);
+    }
+    expect(repo.startQuote).not.toHaveBeenCalled();
+
+    await typeUntil("");
+    await settle();
+    expect(screen.queryByText("session.untilInvalid")).toBeNull();
+    expect(startButton().disabled).toBe(false);
+    await press();
+    expect(repo.start.mock.calls[0][0]).not.toHaveProperty("until");
+    expect(repo.start.mock.calls[0][0]).not.toHaveProperty("duration_minutes");
+  });
+
+  test("a time the server refuses (already passed) shows its sentence and holds Start", async () => {
+    await mount(device());
+    await chooseUntil();
+    await typeUntil("14:00");
+    await settle();
+
+    expect(screen.getByText(UNTIL_PASSED)).toBeTruthy();
+    expect(startButton().disabled).toBe(true);
+  });
+
+  test("switching keeps each way's value and only the chosen one is sent", async () => {
+    await mount(device());
+    await act(async () => {
+      fireEvent.change(screen.getByLabelText("session.plannedDuration"), { target: { value: "2" } });
+    });
+    await chooseUntil();
+    await typeUntil("00:40");
+    await settle();
+    await act(async () => { fireEvent.click(screen.getByRole("tab", { name: "session.planLimitDuration" })); });
+    await settle();
+
+    expect((screen.getByLabelText("session.plannedDuration") as HTMLInputElement).value).toBe("2");
+    expect(repo.startQuote).toHaveBeenLastCalledWith(1, { minutes: 120 }, undefined, undefined);
+    await press();
+    const body = repo.start.mock.calls[0][0];
+    expect(body).toMatchObject({ duration_minutes: 120 });
+    expect(body).not.toHaveProperty("until");
+
+    await chooseUntil();
+    expect((screen.getByLabelText("session.untilLabel") as HTMLInputElement).value).toBe("00:40");
+  });
+
+  test("a total set by hand goes with the time", async () => {
+    await mount(device());
+    await chooseUntil();
+    await typeUntil("00:40");
+    await settle();
+    await act(async () => { fireEvent.click(screen.getByText("session.plannedEditTotal")); });
+    await act(async () => {
+      const box = screen.getByTestId("planned-total").querySelector("input")!;
+      fireEvent.change(box, { target: { value: "900" } });
+    });
+    await settle();
+
+    expect(repo.startQuote).toHaveBeenLastCalledWith(1, { until: "00:40" }, undefined, 900);
+    await press();
+    expect(repo.start.mock.calls[0][0]).toMatchObject({ until: "00:40", planned_amount: 900 });
   });
 });

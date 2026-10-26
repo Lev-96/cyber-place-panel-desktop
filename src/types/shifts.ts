@@ -69,6 +69,52 @@ export type ShiftWarning =
   | "places_paused"
   | "bookings_open";
 
+/** v3 (2026-10-26): one product at one price, from the lines it was sold on. */
+export interface IShiftProductRow {
+  product_id: number | null;
+  name: string;
+  unit_price: Money;
+  quantity: number;
+  total: Money;
+}
+
+export interface IShiftProductGroup {
+  rows: IShiftProductRow[];
+  units: number;
+  total: Money;
+}
+
+/** v3: one person's own part of the shift. The parts overlap by design and are never summed. */
+export interface IShiftStaffPart {
+  id: number;
+  name: string;
+  /** Paid till sales they made. */
+  till: { count: number; units: number; total: Money };
+  /** Places they started in the shift: launches, distinct seats, how those stand now. */
+  started: { launches: number; seats: number; finished: number; running: number };
+  /** Places billed in this shift that they had started. */
+  started_billed: { count: number; total: Money };
+  /** Places billed in this shift that they stopped — the money they took. */
+  closed: { count: number; total: Money; cash: Money };
+  /** Sales they voided during the shift. */
+  voided: { count: number; total: Money };
+}
+
+export interface IShiftHandoverPlace {
+  session_id: number;
+  seat: string;
+  platform: string;
+  mode: string;
+  is_free: boolean;
+  paused: boolean;
+  started_at: string | null;
+  /** null: runs until someone stops it. */
+  ends_at: string | null;
+  started_by: IShiftPerson | null;
+}
+
+export type ShiftNotTracked = "customer_debts" | "cash_movements" | "topup_payment_method";
+
 export interface IShiftReport {
   period: { opened_at: string; to: string; duration_seconds: number };
   places: {
@@ -123,6 +169,25 @@ export interface IShiftReport {
     tournaments: Array<{ id: number; amount: Money; paid_at: string }>;
     member_topups: Array<{ id: number; amount: Money }>;
   };
+  /** v3 (2026-10-26): absent from a report frozen before. */
+  products?: {
+    till: IShiftProductGroup;
+    till_voided: IShiftProductGroup;
+    /** Catalogue lines of places billed in the shift — inside the places' money, before rounding. */
+    places: IShiftProductGroup;
+    /** Lines of free places: they earned nothing. */
+    places_free: IShiftProductGroup;
+    units: number;
+    total: Money;
+  };
+  staff?: IShiftStaffPart[];
+  handover?: { count: number; places: IShiftHandoverPlace[] };
+  voided_from_other_shifts?: {
+    count: number;
+    total: Money;
+    lines: Array<{ id: number; amount: Money; method: string; shift_id: number | null; sold_at: string | null; voided_at: string | null; voided_by_id: number | null }>;
+  };
+  not_tracked?: ShiftNotTracked[];
   version?: number;
   warnings: ShiftWarning[];
   /** Present once closed. */

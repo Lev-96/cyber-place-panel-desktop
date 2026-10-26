@@ -71,7 +71,7 @@ const CloseShiftDialog = ({ shift, report, onClose, onClosed }: Props) => {
       <div className="card" style={{ width: 640, maxWidth: "94vw", maxHeight: "88vh", overflowY: "auto", display: "flex", flexDirection: "column", gap: 12 }}>
         <h2 style={{ margin: 0 }}>{t("shift.closeTitle")}</h2>
 
-        <ShiftReportView shift={shift} report={report} />
+        <ShiftReportView shift={shift} report={report} viewerId={user?.id ?? null} />
 
         <div className="card col" style={{ gap: 10 }}>
           <Input

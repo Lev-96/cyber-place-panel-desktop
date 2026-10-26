@@ -115,7 +115,7 @@ const Shift = () => {
         error={{ titleKey: "shift.state.errorTitle" }}
       >
         {live?.shift && live.report ? (
-          <ShiftReportView shift={live.shift} report={live.report} />
+          <ShiftReportView shift={live.shift} report={live.report} viewerId={user?.id ?? null} />
         ) : (
           <div className="card col" style={{ gap: 10, maxWidth: 520 }} data-testid="shift-none">
             <strong>{t("shift.none")}</strong>

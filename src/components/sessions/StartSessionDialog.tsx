@@ -23,9 +23,12 @@ import { renderText, textKey, textLiteral, type LocalizedText } from "@/i18n/loc
 import { IBranchApi } from "@/types/api";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { IStartQuote } from "@/api/sessions";
+import SectionTabs from "@/components/ui/SectionTabs";
+import ClockTimeField from "./ClockTimeField";
 import DurationPicker from "./DurationPicker";
 import QuotedPrice from "./QuotedPrice";
-import { minutesOf, type DurationUnit } from "./durationModel";
+import { clockOf, minutesOf, type DurationUnit } from "./durationModel";
+import { useMinuteTick } from "./useMinuteTick";
 import { quoteFor, useServerQuote } from "./useServerQuote";
 
 interface Props {
@@ -36,6 +39,7 @@ interface Props {
 }
 
 type Mode = "fixed" | "open";
+type PlanLimit = "duration" | "until";
 
 /**
  * Start-a-session dialog.
@@ -98,6 +102,11 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
   const [isFree, setIsFree] = useState(false);
   // The optional planned length (2026-10-25), hours by default, empty = none.
   const [plan, setPlan] = useState<{ unit: DurationUnit; amount: string }>({ unit: "hours", amount: "" });
+  // …or "until" a clock time (2026-10-26). Two ways to set ONE plan, never
+  // both: only the way chosen is read and sent. Switching keeps what was
+  // typed in the other, so a slip of the tab loses nothing.
+  const [limit, setLimit] = useState<PlanLimit>("duration");
+  const [untilInput, setUntilInput] = useState("");
   // The plan's TOTAL set by hand (2026-10-25), in AMD as `PriceInput` keeps it.
   const [editTotal, setEditTotal] = useState(false);
   const [totalInput, setTotalInput] = useState("");
@@ -175,10 +184,17 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
 
   // Prefill the override input with the current rate the moment it's enabled,
   // so the operator edits "the current price" rather than a blank field.
-  const planMinutes = minutesOf(plan.amount, plan.unit);
+  const planMinutes = limit === "duration" ? minutesOf(plan.amount, plan.unit) : null;
+  const planUntil = limit === "until" ? clockOf(untilInput) : null;
+  // What the plan is, in the form the server takes: minutes, or "HH:mm".
+  const planInput: number | string | null = planMinutes ?? planUntil;
+  const planTyped = limit === "duration" ? plan.amount.trim() !== "" : untilInput.trim() !== "";
   // Typed but unreadable is not "no plan": the Start waits for a fix rather
   // than quietly starting a seat with no end.
-  const planInvalid = plan.amount.trim() !== "" && planMinutes === null;
+  const planInvalid = planTyped && planInput === null;
+  // "Until" is a length that shrinks as the clock runs: asked again each
+  // minute, so the minutes and the price on screen are never an old answer.
+  const minute = useMinuteTick(limit === "until");
   const planApplies = !isFree && mode === "open";
   const typedRate = overrideApplied ? customRateNum : undefined;
   const totalNum = Number(totalInput);
@@ -186,17 +202,20 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
   // A total set by hand is sent INSTEAD of a rate: the seat runs at the rate
   // it implies, and the server keeps the total exactly.
   const typedTotal = editTotal && totalValid ? totalNum : undefined;
-  const planQuote = useServerQuote<IStartQuote>(
-    planApplies && (!editTotal || totalValid) ? planMinutes : null,
-    (m) => sessionRepository.startQuote(pc.id, m, typedRate, typedTotal),
+  const planQuote = useServerQuote<IStartQuote, number | string>(
+    planApplies && (!editTotal || totalValid) ? planInput : null,
+    (input) => sessionRepository.startQuote(
+      pc.id, typeof input === "number" ? { minutes: input } : { until: input }, typedRate, typedTotal,
+    ),
     `${pc.id}|${typedRate ?? ""}|${typedTotal ?? ""}`,
+    limit === "until" ? minute : 0,
   );
-  const quotedPlan = quoteFor(planQuote, planMinutes);
+  const quotedPlan = quoteFor(planQuote, planInput);
   // Priced for exactly what is on screen: the length AND, when set by hand,
   // the total — a reply for an earlier figure never starts a seat.
   const planPriced = quotedPlan !== null
     && (typedTotal === undefined || Math.round(quotedPlan.amount * 100) === Math.round(typedTotal * 100));
-  const planByHand = planMinutes !== null && typedTotal !== undefined;
+  const planByHand = planInput !== null && typedTotal !== undefined;
 
   const toggleEditPrice = (next: boolean) => {
     setEditPrice(next);
@@ -271,6 +290,7 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
           user_display_name: pc.label,
           ...(overrideApplied && !planByHand ? { hourly_rate: customRateNum } : {}),
           ...(planMinutes !== null ? { duration_minutes: planMinutes } : {}),
+          ...(planUntil !== null ? { until: planUntil } : {}),
           ...(planByHand ? { planned_amount: typedTotal } : {}),
           ...psnField,
         });
@@ -306,8 +326,8 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
     // A total set by hand prices the seat itself, so no seat rate is needed.
     || (!isFree && mode === "open" && !planByHand && (editPrice ? !overrideApplied : assignedRate === null))
     // A plan is started only on the server's own figure for it.
-    || (planApplies && (planInvalid || (planMinutes !== null && !planPriced)))
-    || (planApplies && planMinutes !== null && editTotal && !totalValid);
+    || (planApplies && (planInvalid || (planInput !== null && !planPriced)))
+    || (planApplies && planInput !== null && editTotal && !totalValid);
 
   return (
     <Modal open onClose={onClose}>
@@ -425,14 +445,33 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
                     card gets "+ Время". Billed by the clock either way. */}
                 <section className="col" style={{ gap: 8 }} data-testid="planned-duration">
                   <span className="label">{t("session.plannedDuration")}</span>
-                  <DurationPicker
-                    unit={plan.unit}
-                    amount={plan.amount}
-                    onChange={setPlan}
+                  <SectionTabs
+                    label={t("session.planLimit")}
+                    value={limit}
                     disabled={busy}
-                    label={t("session.plannedDuration")}
+                    tabs={[
+                      { key: "duration", label: t("session.planLimitDuration") },
+                      { key: "until", label: t("session.planLimitUntil") },
+                    ]}
+                    onChange={setLimit}
                   />
-                  {planMinutes === null && plan.amount.trim() === "" ? (
+                  {limit === "duration" ? (
+                    <DurationPicker
+                      unit={plan.unit}
+                      amount={plan.amount}
+                      onChange={setPlan}
+                      disabled={busy}
+                      label={t("session.plannedDuration")}
+                    />
+                  ) : (
+                    <ClockTimeField
+                      value={untilInput}
+                      onChange={setUntilInput}
+                      disabled={busy}
+                      quote={quotedPlan}
+                    />
+                  )}
+                  {planInput === null && !planTyped ? (
                     <span className="muted" style={{ fontSize: 11 }}>{t("session.plannedNone")}</span>
                   ) : (
                     <>
@@ -460,7 +499,7 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
                           setTotalInput(next && quotedPlan !== null ? String(quotedPlan.amount) : "");
                         }}
                         label={t("session.plannedEditTotal")}
-                        disabled={busy || planMinutes === null}
+                        disabled={busy || planInput === null}
                       />
                       {editTotal && (
                         <div className="col" style={{ gap: 4 }} data-testid="planned-total">
