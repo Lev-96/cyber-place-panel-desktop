@@ -58,20 +58,20 @@ const EXPECTED_ICONS: Record<Role, Record<string, string>> = {
     "/games": "nav.games", "/companies": "nav.companies", "/revenue": "nav.revenue", "/shifts": "nav.shifts",
     "/expenses": "nav.expenses", "/metrics": "nav.metrics", "/managers": "nav.managers",
     "/owners": "nav.owners", "/security": "nav.security", "/notifications": "nav.notifications",
-    "/settings": "nav.settings", "/settings/updates": "nav.updates",
+    "/settings": "nav.settings", "/settings/updates": "nav.updates", "/appearance": "nav.appearance",
   },
   company_owner: {
     "/": "nav.dashboard", "/companies/4": "nav.myCompany", "/branches": "nav.branches",
     "/managers": "nav.managers", "/revenue": "nav.revenue", "/shifts": "nav.shifts", "/branches-map": "nav.map",
     "/bookings/confirm": "nav.scan", "/bookings": "nav.bookings", "/tournaments": "nav.tournaments",
     "/notifications": "nav.notifications", "/settings": "nav.settings",
-    "/settings/agent-updates": "nav.agentUpdates",
+    "/settings/agent-updates": "nav.agentUpdates", "/appearance": "nav.appearance",
   },
   manager: {
     "/": "nav.dashboard", "/branches/9": "nav.myBranch", "/shifts": "nav.shifts", "/bookings/confirm": "nav.scan",
     "/bookings": "nav.bookings", "/tournaments": "nav.tournaments",
     "/notifications": "nav.notifications", "/settings": "nav.settings",
-    "/settings/agent-updates": "nav.agentUpdates",
+    "/settings/agent-updates": "nav.agentUpdates", "/appearance": "nav.appearance",
   },
 } as Record<Role, Record<string, string>>;
 

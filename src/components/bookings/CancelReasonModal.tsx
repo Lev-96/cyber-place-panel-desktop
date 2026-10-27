@@ -34,7 +34,7 @@ const CancelReasonModal = ({ bookingId, onClose, onDone }: Props) => {
         {err && <div className="error">{err}</div>}
         <div className="row-between">
           <Button type="button" variant="secondary" onClick={onClose} disabled={busy}>{t("booking.keep")}</Button>
-          <Button disabled={busy} style={{ background: "#ef4444", color: "#fff" }}>{busy ? t("booking.cancelling") : t("booking.cancelDo")}</Button>
+          <Button disabled={busy} style={{ background: "var(--color-danger)", color: "var(--color-on-danger)" }}>{busy ? t("booking.cancelling") : t("booking.cancelDo")}</Button>
         </div>
       </form>
     </Modal>

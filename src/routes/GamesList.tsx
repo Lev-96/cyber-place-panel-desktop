@@ -53,7 +53,7 @@ const GamesList = () => {
               </div>
               <div className="row" style={{ gap: 6 }}>
                 <Button variant="secondary" onClick={() => setEditing(g)} style={btn}>{t("action.edit")}</Button>
-                <Button variant="secondary" onClick={() => remove(g)} style={{ ...btn, color: "#ef4444", borderColor: "#4a1a1a" }}>{t("action.delete")}</Button>
+                <Button variant="secondary" onClick={() => remove(g)} style={{ ...btn, color: "var(--color-danger)", borderColor: "var(--color-danger-border-dim)" }}>{t("action.delete")}</Button>
               </div>
             </div>
           ))}

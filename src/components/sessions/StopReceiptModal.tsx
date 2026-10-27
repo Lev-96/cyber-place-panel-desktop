@@ -327,7 +327,7 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved }: Prop
                   away is still on the row and in the audit log; this receipt
                   is what the player is being handed, and it owes them one
                   number. */}
-              <span style={{ fontWeight: 800, fontSize: 18, color: "#07ddf1" }}>
+              <span style={{ fontWeight: 800, fontSize: 18, color: "var(--color-primary)" }}>
                 {view.is_free
                   ? t("session.freeBill")
                   : money(Number(view.total), receiptPrecision)}
@@ -397,7 +397,7 @@ const row: React.CSSProperties = {
 const removeBtn: React.CSSProperties = {
   width: 22, height: 22, borderRadius: 11,
   border: "1px solid #4a1a1a", background: "transparent",
-  color: "#ef4444", cursor: "pointer", fontSize: 14, lineHeight: 1,
+  color: "var(--color-danger)", cursor: "pointer", fontSize: 14, lineHeight: 1,
 };
 
 export default StopReceiptModal;

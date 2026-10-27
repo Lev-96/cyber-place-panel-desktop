@@ -9,8 +9,8 @@ import type { Ps5State } from "@/ps5/usePs5Discovery";
  * than in each component.
  */
 export const PS5_STATE_LOOK: Record<Ps5State, { dot: string; key: string }> = {
-  awake: { dot: "#3ddc97", key: "ps5.state.awake" },
-  rest: { dot: "#8794ae", key: "ps5.state.rest" },
-  unreachable: { dot: "#ef4444", key: "ps5.state.unreachable" },
-  unknown: { dot: "#f2b544", key: "ps5.state.unknown" },
+  awake: { dot: "var(--color-success-bright)", key: "ps5.state.awake" },
+  rest: { dot: "var(--color-muted-dim)", key: "ps5.state.rest" },
+  unreachable: { dot: "var(--color-danger)", key: "ps5.state.unreachable" },
+  unknown: { dot: "var(--color-ps5-amber)", key: "ps5.state.unknown" },
 };

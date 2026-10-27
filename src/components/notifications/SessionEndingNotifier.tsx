@@ -5,6 +5,7 @@ import type { IDbNotification } from "@/api/notifications";
 import { sessionRepository } from "@/repositories/SessionRepository";
 import { ISessionApi } from "@/types/sessions";
 import { useEffect, useMemo, useState } from "react";
+import { playFor } from "@/sound/soundEngine";
 import SessionOptionsDialog from "@/components/sessions/SessionOptionsDialog";
 
 /**
@@ -113,6 +114,13 @@ const SessionEndingNotifier = () => {
     () => endingWarnings(list, dismissed, now).slice(0, MAX_CARDS),
     [list, dismissed, now],
   );
+
+  // The bell for a seat about to run out (2026-10-27): once per server
+  // notification — `playFor` keys it by the notification's id, so a replay,
+  // a reconnect or the minute tick re-rendering the card is silent.
+  useEffect(() => {
+    for (const w of warnings) playFor("session_ending", w.id);
+  }, [warnings]);
 
   const dismiss = (id: string) => {
     setDismissed((cur) => {

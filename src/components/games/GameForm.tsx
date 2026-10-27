@@ -177,7 +177,7 @@ const GameForm = ({ initial, branchId, lockedPlatform, globalCatalogue, branchGa
           {isEdit && <span className="muted" style={{ fontSize: 11 }}>{t("game.platformLocked")}</span>}
         </div>
         {conflict && (
-          <div role="alert" className="card" style={{ padding: "10px 12px", display: "flex", flexDirection: "column", gap: 10, borderColor: "#07ddf1" }}>
+          <div role="alert" className="card" style={{ padding: "10px 12px", display: "flex", flexDirection: "column", gap: 10, borderColor: "var(--color-primary)" }}>
             <span>{fmt(t("game.exists.notice"), conflict.name, platformLabel(conflict.platform))}</span>
             <div className="row" style={{ gap: 8, justifyContent: "flex-end", flexWrap: "wrap" }}>
               <Button type="button" variant="secondary" onClick={() => setConflict(null)} disabled={busy}>{t("action.cancel")}</Button>

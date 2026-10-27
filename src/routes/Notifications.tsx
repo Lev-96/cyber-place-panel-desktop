@@ -198,7 +198,7 @@ const Notifications = () => {
                     });
                     if (ok) void deleteAll();
                   }}
-                  style={{ ...feedActionBtn, color: "#ef4444", borderColor: "#7f1d1d" }}
+                  style={{ ...feedActionBtn, color: "var(--color-danger)", borderColor: "var(--color-danger-deeper)" }}
                 >
                   {t("notifications.clearAll") || "Clear all"}
                 </button>
@@ -310,7 +310,7 @@ const DbNotificationCard = ({ n, onClick, onDelete }: { n: IDbNotification; onCl
   const { t } = useLang();
   const navigate = useNavigate();
   const isUnread = n.read_at === null;
-  const tone = isUnread ? "#07ddf1" : "#1f2a44";
+  const tone = isUnread ? "var(--color-primary)" : "var(--color-border)";
   const dataType = (n.data?.type as string | undefined) ?? n.type;
 
   const isBookingCreated = dataType === "booking.created";
@@ -440,7 +440,7 @@ const DbNotificationCard = ({ n, onClick, onDelete }: { n: IDbNotification; onCl
   return (
     <div
       style={{
-        background: "rgba(7, 221, 241, 0.05)",
+        background: "rgb(var(--accent-rgb) / 0.05)",
         border: `1px solid ${tone}`,
         borderRadius: 8,
         padding: "12px 14px",
@@ -471,7 +471,7 @@ const DbNotificationCard = ({ n, onClick, onDelete }: { n: IDbNotification; onCl
               width: 8,
               height: 8,
               borderRadius: "50%",
-              background: "#ef4444",
+              background: "var(--color-danger)",
               marginRight: 8,
               verticalAlign: "middle",
             }}
@@ -479,7 +479,7 @@ const DbNotificationCard = ({ n, onClick, onDelete }: { n: IDbNotification; onCl
         )}
         <span style={{ fontWeight: 700, fontSize: 15 }}>{headline}</span>
         {body && (
-          <div style={{ fontSize: 14, marginTop: 4, color: "#e5e7eb" }}>
+          <div style={{ fontSize: 14, marginTop: 4, color: "var(--color-text-soft)" }}>
             {body}
           </div>
         )}
@@ -503,7 +503,7 @@ const DbNotificationCard = ({ n, onClick, onDelete }: { n: IDbNotification; onCl
           border: "1px solid #7f1d1d",
           borderRadius: 6,
           background: "transparent",
-          color: "#ef4444",
+          color: "var(--color-danger)",
           cursor: "pointer",
           fontSize: 16,
           lineHeight: 1,
@@ -521,7 +521,7 @@ const feedActionBtn: React.CSSProperties = {
   border: "1px solid #1f2a44",
   borderRadius: 6,
   background: "transparent",
-  color: "#e5e7eb",
+  color: "var(--color-text-soft)",
   cursor: "pointer",
   fontSize: 12,
 };
@@ -530,10 +530,10 @@ const ReminderCard = ({ r, isAdmin }: { r: IBillingReminder; isAdmin: boolean })
   const { t } = useLang();
   const days = r.days_until_due;
   const tone =
-    r.is_overdue ? "#ef4444"
-    : days != null && days <= 1 ? "#ef4444"
-    : days != null && days <= 3 ? "#f59e0b"
-    : "#22c55e";
+    r.is_overdue ? "var(--color-danger)"
+    : days != null && days <= 1 ? "var(--color-danger)"
+    : days != null && days <= 3 ? "var(--color-warning)"
+    : "var(--color-success)";
 
   const dayWord = days === 1 ? t("notifications.dayShort") : t("notifications.daysShort");
   const headline = isAdmin

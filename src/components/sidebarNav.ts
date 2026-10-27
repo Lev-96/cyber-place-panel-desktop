@@ -136,3 +136,39 @@ export const activeNavTo = (
   }
   return best;
 };
+
+/**
+ * Entries a person cannot hide from their own menu (2026-10-27): home, the
+ * notifications they must not miss, settings, and the screen that undoes a
+ * customisation — so no arrangement can lock anyone out of getting back.
+ */
+export const REQUIRED_MENU_IDS: ReadonlySet<string> = new Set([
+  "nav.dashboard", "nav.notifications", "nav.settings", "nav.appearance",
+]);
+
+/**
+ * A person's own menu arrangement (2026-10-27), applied on top of the role's
+ * menu — never instead of it: it can only reorder and hide entries the role
+ * already shows, so it can never add a screen or reach one the role may not
+ * open. The pinned home stays first; entries the person never arranged
+ * (new in a later version) keep their standard place after the arranged
+ * ones; a required entry is never hidden.
+ */
+export const applyPersonalMenu = (
+  items: NavItem[],
+  arrangement: ReadonlyArray<{ id: string; hidden: boolean }>,
+): NavItem[] => {
+  if (arrangement.length === 0) return items;
+  const position = new Map(arrangement.map((e, i) => [e.id, i]));
+  const hidden = new Set(arrangement.filter((e) => e.hidden && !REQUIRED_MENU_IDS.has(e.id)).map((e) => e.id));
+  const [home, ...rest] = items[0]?.id === "nav.dashboard" ? [items[0], ...items.slice(1)] : [undefined, ...items];
+  const arranged = rest
+    .map((item, index) => ({ item, index, at: position.get(item.id) }))
+    .filter(({ item }) => !hidden.has(item.id))
+    .sort((a, b) =>
+      (a.at === undefined ? 1 : 0) - (b.at === undefined ? 1 : 0)
+      || (a.at ?? 0) - (b.at ?? 0)
+      || a.index - b.index)
+    .map(({ item }) => item);
+  return home ? [home, ...arranged] : arranged;
+};

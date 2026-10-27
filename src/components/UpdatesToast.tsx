@@ -1,3 +1,4 @@
+import { playFor } from "@/sound/soundEngine";
 import { useAuth } from "@/auth/AuthContext";
 import { useLang } from "@/i18n/LanguageContext";
 import { useUpdatesNotification } from "@/realtime/UpdatesNotificationContext";
@@ -6,14 +7,10 @@ import { useNavigate } from "react-router-dom";
 
 /**
  * Global "new update available" toast. Sits in the top-right corner
- * regardless of which route the user is on, plays a soft two-note
- * ding via Web Audio API the first time each version is seen, and
- * goes silent forever once the user dismisses it for that version.
- *
- * Why no audio file: a synthesised sine-wave ding is ~30 lines, has
- * no playback latency (no fetch), zero filesystem footprint, and
- * does not need a copyright clearance check. The downside is no
- * branding, which is fine for a transient notification.
+ * regardless of which route the user is on, sounds the "system" kind of
+ * notification (the soft two-note ding by default; `sound/soundEngine.ts`,
+ * 2026-10-27) the first time each version is seen, and goes silent
+ * forever once the user dismisses it for that version.
  *
  * Why version-keyed dismissal: if the user closes the toast for
  * v1.0.X they don't want to see it again on the next 60s poll. But
@@ -28,42 +25,6 @@ interface ActiveToast {
   app: "panel" | "agent";
   version: string;
 }
-
-/**
- * Soft two-note "ding". Bails silently if the AudioContext API
- * isn't available (e.g. an old preload mock during tests). Wrapped
- * in try/catch so a missing user gesture on a hostile WebView
- * doesn't surface as an uncaught promise rejection.
- */
-const playDing = (): void => {
-  try {
-    const AC: typeof AudioContext | undefined =
-      window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-    if (!AC) return;
-    const ctx = new AC();
-    const now = ctx.currentTime;
-    const note = (freq: number, when: number, dur: number) => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = "sine";
-      osc.frequency.value = freq;
-      gain.gain.setValueAtTime(0, when);
-      gain.gain.linearRampToValueAtTime(0.18, when + 0.02);
-      gain.gain.linearRampToValueAtTime(0, when + dur);
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.start(when);
-      osc.stop(when + dur);
-    };
-    note(660, now,        0.18);
-    note(880, now + 0.13, 0.22);
-    // Close the context after the second tone so we don't leak it
-    // across many toasts in a long-running session.
-    setTimeout(() => { void ctx.close().catch(() => { /* ignore */ }); }, 600);
-  } catch {
-    /* sound is non-essential — toast still renders */
-  }
-};
 
 const UpdatesToast = () => {
   const { panel, agent } = useUpdatesNotification();
@@ -93,7 +54,8 @@ const UpdatesToast = () => {
 
       seenRef.current.add(key);
       setActive(c);
-      playDing();
+      // The update ding, as the person set it (2026-10-27).
+      playFor("system", `update:${key}`);
 
       // Auto-dismiss after a few seconds. The timer is scoped to
       // THIS toast — if a newer toast arrives mid-countdown, the

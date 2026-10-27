@@ -27,13 +27,15 @@ export const PC_STATUS = {
 
 /**
  * Status-dot palette (single source of truth for the sessions board + device
- * list): online = green (available), offline = red (agent not connected),
- * in_session = amber (busy). Billing-only devices are always online → green.
+ * list) — about the DEVICE's connection, not the seat: reachable (online or
+ * running a session) = green, agent not connected = red. In-session used to be
+ * amber, which on the board (2026-10-27) means "ending soon". Billing-only
+ * devices are always online → green.
  */
 export const PC_STATUS_COLOR: Record<PcStatus, string> = {
-  online: "#22c55e",
-  offline: "#ef4444",
-  in_session: "#f59e0b",
+  online: "var(--color-success)",
+  offline: "var(--color-danger)",
+  in_session: "var(--color-success)",
 };
 
 /** A PC runs the kiosk agent; a PS/console does not (billing-only). */

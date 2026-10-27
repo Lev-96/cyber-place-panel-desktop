@@ -131,7 +131,7 @@ const PcsList = () => {
                   {pc.place && (
                     <span className="muted" style={{ marginLeft: 6 }}>№{pc.place.number ?? pc.place.id}</span>
                   )}
-                  {showPsBadge && <span style={{ marginLeft: 8, fontSize: 11, padding: "2px 6px", borderRadius: 4, background: "#101a35", color: "#d152fa" }}>PS</span>}
+                  {showPsBadge && <span style={{ marginLeft: 8, fontSize: 11, padding: "2px 6px", borderRadius: 4, background: "var(--color-surface-alt)", color: "var(--color-accent-purple)" }}>PS</span>}
                 </div>
                 <div className="meta">
                   <StatusDot status={effectivePcStatus(pc)} /> {statusLabel(effectivePcStatus(pc))}
@@ -139,7 +139,7 @@ const PcsList = () => {
                   {!isPsDevice && pc.mac_address && <> · MAC: {pc.mac_address}</>}
                   {!isPsDevice && (pc.last_seen_at
                     ? <> · {t("pcs.lastSeen")} {formatDateTime(pc.last_seen_at)}</>
-                    : <> · <span style={{ color: "#f59e0b" }}>{t("pcs.notPaired")}</span></>
+                    : <> · <span style={{ color: "var(--color-warning)" }}>{t("pcs.notPaired")}</span></>
                   )}
                 </div>
               </div>
@@ -155,7 +155,7 @@ const PcsList = () => {
                     {neverPaired ? t("pcs.getToken") : t("pcs.rotateToken")}
                   </Button>
                 )}
-                <Button variant="secondary" onClick={() => remove(pc)} style={{ ...btn, color: "#ef4444", borderColor: "#4a1a1a" }}>{t("action.delete")}</Button>
+                <Button variant="secondary" onClick={() => remove(pc)} style={{ ...btn, color: "var(--color-danger)", borderColor: "var(--color-danger-border-dim)" }}>{t("action.delete")}</Button>
               </div>
             </div>
             );

@@ -187,7 +187,7 @@ const PcForm = ({ branchId, initial, takenPlaceIds = [], registering = false, on
           {!selectedPlace ? (
             <p className="muted" style={{ margin: 0 }}>{t("pcs.tierPickPlace")}</p>
           ) : noPriceForPlace ? (
-            <p className="muted" style={{ margin: 0, color: "#f59e0b" }}>{t("pcs.tierNoPrices")}</p>
+            <p className="muted" style={{ margin: 0, color: "var(--color-warning)" }}>{t("pcs.tierNoPrices")}</p>
           ) : (
             <div style={selectWrap}>
               {/* Derived, single-option select — the tariff can't drift from the
@@ -288,7 +288,7 @@ const selectCaret: React.CSSProperties = {
   top: "50%",
   transform: "translateY(-50%)",
   pointerEvents: "none",
-  color: "#07ddf1",
+  color: "var(--color-primary)",
   fontSize: 12,
 };
 

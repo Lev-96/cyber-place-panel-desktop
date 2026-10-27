@@ -138,9 +138,9 @@ const PasswordChangeCard = ({ email }: Props) => {
         fontSize: 13,
         whiteSpace: "normal",
         lineHeight: 1.2,
-        border: `1px solid ${mode === m ? "#07ddf1" : "#1f2a44"}`,
-        background: mode === m ? "#101a35" : "transparent",
-        color: mode === m ? "#07ddf1" : "#9aa8c7",
+        border: `1px solid ${mode === m ? "var(--color-primary)" : "var(--color-border)"}`,
+        background: mode === m ? "var(--color-surface-alt)" : "transparent",
+        color: mode === m ? "var(--color-primary)" : "var(--color-muted-alt)",
         transition: "border-color 160ms ease, background 160ms ease, color 160ms ease",
       }}
     >
@@ -236,7 +236,7 @@ const PasswordChangeCard = ({ email }: Props) => {
               value={confirmPw}
               onChange={(e) => setConfirmPw(e.target.value)}
               autoComplete="new-password"
-              style={{ borderColor: confirmPw.length > 0 && !matches ? "#ef4444" : undefined }}
+              style={{ borderColor: confirmPw.length > 0 && !matches ? "var(--color-danger)" : undefined }}
             />
             {confirmPw.length > 0 && !matches && (
               <span className="error" style={{ fontSize: 12 }}>{t("settings.passwordsMismatch")}</span>

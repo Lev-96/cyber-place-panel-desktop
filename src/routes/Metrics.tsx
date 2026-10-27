@@ -15,7 +15,7 @@ import { metrikaRepository } from "@/repositories/MetrikaRepository";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 /** Series colours — the panel's accent for visits, a muted violet for users. */
-const COLOR_VISITS = "#07ddf1";
+const COLOR_VISITS = "var(--color-primary)";
 const COLOR_USERS = "#9b7bff";
 
 /**
@@ -290,7 +290,7 @@ const SummaryBody = ({ summary, lang, t }: BodyProps) => {
               </span>
             </div>
             <div
-              style={{ height: 6, borderRadius: 3, background: "rgba(255,255,255,.08)", marginTop: 4 }}
+              style={{ height: 6, borderRadius: 3, background: "rgb(var(--fg-rgb) / .08)", marginTop: 4 }}
             >
               <div
                 style={{

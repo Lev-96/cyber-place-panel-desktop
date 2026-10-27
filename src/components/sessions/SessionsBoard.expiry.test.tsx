@@ -456,7 +456,9 @@ describe("joysticks on the tile", () => {
     expect(grid?.firstElementChild).toBe(pads());
     expect(addBtn()?.className).toContain("session-card__btn");
     const card = grid?.closest(".session-card");
-    const loose = [...(card?.querySelectorAll("svg") ?? [])].filter((x) => !x.closest("button"));
+    // The corner state icon (2026-10-27) is the card's, not the pad line's.
+    const loose = [...(card?.querySelectorAll("svg") ?? [])]
+      .filter((x) => !x.closest("button") && !x.closest(".session-card__state"));
     expect(loose).toHaveLength(0);
   });
 

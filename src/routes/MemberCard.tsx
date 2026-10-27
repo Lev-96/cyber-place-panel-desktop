@@ -87,7 +87,7 @@ const MemberCard = () => {
 };
 
 const signOf = (d: IMemberDeposit) => Number(d.amount) > 0 ? "+" : "";
-const signColor = (d: IMemberDeposit) => Number(d.amount) > 0 ? "#22c55e" : "#ef4444";
+const signColor = (d: IMemberDeposit) => Number(d.amount) > 0 ? "var(--color-success)" : "var(--color-danger)";
 
 const Row = ({ k, v, highlight }: { k: string; v: string; highlight?: boolean }) => (
   <div className="kv-row">

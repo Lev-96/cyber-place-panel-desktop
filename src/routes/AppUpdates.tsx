@@ -29,10 +29,10 @@ type ApiState = "idle" | "loading" | "ready" | "error";
 
 const StatusPill = ({ label, tone }: { label: string; tone: "ok" | "warn" | "bad" | "info" }) => {
   const palette: Record<typeof tone, { bg: string; fg: string; border: string }> = {
-    ok:   { bg: "rgba(34, 197, 94, 0.14)",  fg: "#22c55e", border: "rgba(34, 197, 94, 0.45)" },
-    warn: { bg: "rgba(7, 221, 241, 0.14)",  fg: "#07ddf1", border: "rgba(7, 221, 241, 0.45)" },
-    bad:  { bg: "rgba(239, 68, 68, 0.14)",  fg: "#ef4444", border: "rgba(239, 68, 68, 0.45)" },
-    info: { bg: "rgba(148, 163, 184, 0.14)", fg: "#94a3b8", border: "rgba(148, 163, 184, 0.4)" },
+    ok:   { bg: "rgb(var(--success-rgb) / 0.14)",  fg: "var(--color-success)", border: "rgb(var(--success-rgb) / 0.45)" },
+    warn: { bg: "rgb(var(--accent-rgb) / 0.14)",  fg: "var(--color-primary)", border: "rgb(var(--accent-rgb) / 0.45)" },
+    bad:  { bg: "rgb(var(--danger-rgb) / 0.14)",  fg: "var(--color-danger)", border: "rgb(var(--danger-rgb) / 0.45)" },
+    info: { bg: "rgb(var(--muted-rgb) / 0.14)", fg: "var(--color-muted)", border: "rgb(var(--muted-rgb) / 0.4)" },
   };
   const s = palette[tone];
   return (
@@ -153,7 +153,7 @@ const AppUpdates = () => {
           </div>
 
           {apiError && (
-            <p className="muted" style={{ color: "#ef4444", marginTop: 8 }}>
+            <p className="muted" style={{ color: "var(--color-danger)", marginTop: 8 }}>
               {apiError}
             </p>
           )}
@@ -174,7 +174,7 @@ const AppUpdates = () => {
         <div className="gradient-card-inner">
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead>
-              <tr style={{ textAlign: "left", color: "#94a3b8", fontSize: 12 }}>
+              <tr style={{ textAlign: "left", color: "var(--color-muted)", fontSize: 12 }}>
                 <th style={{ padding: "8px 6px" }}>{t("updates.colApp")}</th>
                 <th style={{ padding: "8px 6px" }}>{t("updates.colCurrent")}</th>
                 <th style={{ padding: "8px 6px" }}>{t("updates.colAvailable")}</th>

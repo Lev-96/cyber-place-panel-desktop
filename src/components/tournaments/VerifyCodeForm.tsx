@@ -130,7 +130,7 @@ const VerifyCodeForm = ({ tournamentId, onVerified }: Props) => {
         </Button>
       </form>
       {err && <div className="error">{err}</div>}
-      {ok && <div className="success" style={{ color: "#22c55e" }}>{ok}</div>}
+      {ok && <div className="success" style={{ color: "var(--color-success)" }}>{ok}</div>}
 
       {scannerOpen && (
         <Modal open onClose={() => setScannerOpen(false)}>

@@ -11,7 +11,7 @@ type Translate = (key: string) => string;
 
 /** Urgency tone: red overdue/≤1 day, amber within the reminder window, else green. */
 export const dueTone = (days: number): string =>
-  days <= 1 ? "#ef4444" : days <= REMIND_WITHIN_DAYS ? "#f59e0b" : "#22c55e";
+  days <= 1 ? "var(--color-danger)" : days <= REMIND_WITHIN_DAYS ? "var(--color-warning)" : "var(--color-success)";
 
 const dayUnit = (n: number, t: Translate): string =>
   n === 1 ? t("expenses.dayShort") : t("expenses.daysShort");

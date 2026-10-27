@@ -32,7 +32,7 @@ const SmartImage = ({ src, name, alt, size, shape = "square", style }: Props) =>
 
   const containerStyle: CSSProperties = {
     width: size, height: size, borderRadius: radius,
-    background: "#0b1224", border: "1px solid #1f2a44",
+    background: "var(--color-surface)", border: "1px solid #1f2a44",
     display: "flex", alignItems: "center", justifyContent: "center",
     overflow: "hidden", flexShrink: 0, position: "relative",
     ...style,
@@ -42,7 +42,7 @@ const SmartImage = ({ src, name, alt, size, shape = "square", style }: Props) =>
     return (
       <div style={containerStyle}>
         <span style={{
-          color: "#07ddf1", fontWeight: 700,
+          color: "var(--color-primary)", fontWeight: 700,
           fontSize: typeof size === "number" ? Math.round(size * 0.42) : "1.2em",
           fontFamily: "'Playstation', 'Inter', sans-serif",
           letterSpacing: 1,

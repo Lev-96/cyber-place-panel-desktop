@@ -28,13 +28,13 @@ class ErrorBoundary extends Component<Props, State> {
       <div style={{
         position: "fixed", inset: 0, display: "flex", flexDirection: "column",
         alignItems: "center", justifyContent: "center", padding: 32, gap: 16,
-        background: "#020514", color: "#fff", textAlign: "center",
+        background: "var(--color-bg)", color: "var(--color-text)", textAlign: "center",
       }}>
-        <h2 style={{ margin: 0, color: "#ef4444" }}>{tActive("errorBoundary.title")}</h2>
+        <h2 style={{ margin: 0, color: "var(--color-danger)" }}>{tActive("errorBoundary.title")}</h2>
         <pre style={{
           maxWidth: 720, maxHeight: 240, overflow: "auto",
-          background: "#0b1224", border: "1px solid #1f2a44", borderRadius: 8,
-          padding: 12, color: "#94a3b8", fontSize: 12, textAlign: "left",
+          background: "var(--color-surface)", border: "1px solid #1f2a44", borderRadius: 8,
+          padding: 12, color: "var(--color-muted)", fontSize: 12, textAlign: "left",
         }}>
           {this.state.error.message}
           {this.state.error.stack ? `\n\n${this.state.error.stack}` : ""}

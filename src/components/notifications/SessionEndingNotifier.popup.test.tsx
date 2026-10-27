@@ -39,6 +39,8 @@ const warningRow = (minutes = 14, over: Record<string, unknown> = {}) => ({
   },
   ...over,
 });
+const sound = vi.hoisted(() => ({ playFor: vi.fn() }));
+vi.mock("@/sound/soundEngine", () => ({ playFor: sound.playFor }));
 vi.mock("@/i18n/LanguageContext", () => ({
   useLang: () => ({ t: (k: string) => k, money: (n: number) => String(n), lang: "en" }),
 }));
@@ -190,5 +192,33 @@ describe("the seat-running-out warning", () => {
     feed.list = [warningRow(12), { ...warningRow(9), id: "n-43", data: { ...warningRow(9).data, session_id: 43, place_number: 9 } }, warningRow(12)];
     await mount();
     expect(screen.getAllByRole("alert")).toHaveLength(2);
+  });
+});
+
+/**
+ * The bell for a seat about to run out (2026-10-27): played for the server's
+ * notification, keyed by its id — the engine plays a key once — and not for a
+ * warning the person dismissed.
+ */
+describe("the warning's sound", () => {
+  beforeEach(() => {
+    sound.playFor.mockReset();
+    repo.listActiveEverywhere.mockResolvedValue([ending()]);
+    window.localStorage.clear();
+  });
+  afterEach(cleanup);
+
+  test("sounds the ending-soon kind, keyed by the notification", async () => {
+    feed.list = [warningRow()];
+    await mount();
+    const row = feed.list[0] as { id: string };
+    expect(sound.playFor).toHaveBeenCalledWith("session_ending", row.id);
+    expect(sound.playFor.mock.calls.every((c) => c[0] === "session_ending" && c[1] === row.id)).toBe(true);
+  });
+
+  test("no warning, no sound", async () => {
+    feed.list = [];
+    await mount();
+    expect(sound.playFor).not.toHaveBeenCalled();
   });
 });

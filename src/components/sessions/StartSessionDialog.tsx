@@ -10,6 +10,7 @@ import Spinner from "@/components/ui/Spinner";
 import { useAuth } from "@/auth/AuthContext";
 import { can } from "@/auth/permissions";
 import { useLang } from "@/i18n/LanguageContext";
+import { fmt } from "@/i18n/translations";
 import { timePackageNameOf } from "@/i18n/timePackageName";
 import { branchRepository } from "@/repositories/BranchRepository";
 import { sessionRepository } from "@/repositories/SessionRepository";
@@ -543,6 +544,32 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
 
             {deviceOffline && <div className="error">{t("session.deviceOfflineHint")}</div>}
             {err && <div className="error">{renderText(err, t)}</div>}
+            {/* What Start will do, in one line, before it is pressed
+                (2026-10-27): read off the choices above, nothing worked out
+                here — the price is the server's quote, said as preliminary. */}
+            <div className="start-summary" data-testid="start-summary" aria-live="polite">
+              <span className="muted">{t("session.summary.title")}</span>{" "}
+              <strong>
+                {[
+                  `№${pc.place?.number ?? pc.label}`,
+                  isFree
+                    ? t("session.freeBill")
+                    : mode === "fixed"
+                      ? (packages?.find((p) => p.id === pkgId) ? timePackageNameOf(packages.find((p) => p.id === pkgId)!, lang) : t("session.choosePackage"))
+                      : effectiveRate !== null && !planByHand ? `${money(effectiveRate)} / ${t("time.hourShort") || "h"}` : null,
+                  !isFree && mode === "open"
+                    ? planUntil !== null
+                      ? fmt(t("session.summary.until"), planUntil)
+                      : planMinutes !== null
+                        ? fmt(t("session.summary.minutes"), planMinutes)
+                        : t("session.summary.open")
+                    : null,
+                  !isFree && mode === "open" && quotedPlan !== null
+                    ? fmt(t("session.summary.price"), money(quotedPlan.amount))
+                    : null,
+                ].filter(Boolean).join(" · ")}
+              </strong>
+            </div>
             <div className="row-between">
               <Button variant="secondary" onClick={onClose} disabled={busy}>{t("action.cancel")}</Button>
               <Button onClick={submit} disabled={startDisabled}>{busy ? "…" : t("action.start")}</Button>
@@ -570,7 +597,7 @@ interface AssignedRateDisplayProps {
 const AssignedRateDisplay = ({ rate, hourSuffix, noRateText, rateLabel, money }: AssignedRateDisplayProps) => {
   if (rate === null) {
     return (
-      <div className="muted" style={{ fontSize: 13, padding: "10px 12px", border: "1px solid #4a3a1a", background: "#2a2210", borderRadius: 8 }}>
+      <div className="muted" style={{ fontSize: 13, padding: "10px 12px", border: "1px solid #4a3a1a", background: "var(--color-warning-surface)", borderRadius: 8 }}>
         {noRateText}
       </div>
     );
@@ -583,7 +610,7 @@ const AssignedRateDisplay = ({ rate, hourSuffix, noRateText, rateLabel, money }:
         alignItems: "center",
         padding: "10px 12px",
         border: "1px solid #1f2a44",
-        background: "#0b1224",
+        background: "var(--color-surface)",
         borderRadius: 8,
       }}
     >
@@ -597,9 +624,9 @@ const AssignedRateDisplay = ({ rate, hourSuffix, noRateText, rateLabel, money }:
 
 const pkgRow = (active: boolean): React.CSSProperties => ({
   display: "flex", gap: 10, alignItems: "center",
-  border: `1px solid ${active ? "#07ddf1" : "#1f2a44"}`,
+  border: `1px solid ${active ? "var(--color-primary)" : "var(--color-border)"}`,
   borderRadius: 8, padding: "10px 12px", cursor: "pointer",
-  background: active ? "#101a35" : "transparent",
+  background: active ? "var(--color-surface-alt)" : "transparent",
 });
 
 const tabStyle = (active: boolean): React.CSSProperties => ({
@@ -611,9 +638,9 @@ const tabStyle = (active: boolean): React.CSSProperties => ({
   // wrap to a second line on narrow widths instead of overflowing.
   minWidth: 0,
   padding: "8px 10px",
-  border: `1px solid ${active ? "#07ddf1" : "#1f2a44"}`,
-  background: active ? "#101a35" : "transparent",
-  color: active ? "#07ddf1" : "#9aa8c7",
+  border: `1px solid ${active ? "var(--color-primary)" : "var(--color-border)"}`,
+  background: active ? "var(--color-surface-alt)" : "transparent",
+  color: active ? "var(--color-primary)" : "var(--color-muted-alt)",
   borderRadius: 8,
   cursor: "pointer",
   fontWeight: 600,

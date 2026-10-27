@@ -38,7 +38,8 @@ import SessionTimer from "./SessionTimer";
 import { autoResumeAtOf, sessionCurrentHourlyRate, sessionJoysticksTotal } from "./sessionAmount";
 import StartSessionDialog from "./StartSessionDialog";
 import SessionOptionsDialog from "./SessionOptionsDialog";
-import SessionCard, { SessionCardAction } from "./SessionCard";
+import SessionCard, { CardOverflow, SessionCardAction } from "./SessionCard";
+import { useUiPreferencesOptional } from "@/preferences/UiPreferencesContext";
 import RelocateSessionDialog from "./RelocateSessionDialog";
 import { BASE_JOYSTICKS, MAX_JOYSTICKS } from "@/api/joystickPrices";
 import { notify } from "@/ui/notify";
@@ -73,6 +74,9 @@ const SessionsBoard = ({ branchId }: Props) => {
   const { money, t, lang } = useLang();
   const { user } = useAuth();
   const role = user?.role;
+  // How the person's interface lays the card's actions out (2026-10-27);
+  // outside the provider (tests, an embed) every action is shown, as before.
+  const quickActions = useUiPreferencesOptional()?.layout.quick_actions ?? "all";
   const pcs = useAsync(() => sessionRepository.listPcs(branchId), [branchId]);
   // Custom platforms named as the branch named them, in the panel language.
   // ONE cached read for the board and every dialog it opens (passed down), and
@@ -731,6 +735,7 @@ const SessionsBoard = ({ branchId }: Props) => {
         session={sess}
         baseColor={color}
         seatState={cellState}
+        stateLabel={(tone) => t(`session.tone.${tone}`)}
         dragging={dragId === pc.id}
         dropSide={dragOverId === pc.id ? dropSideOf(order, dragId, pc.id) : null}
         onDragOver={(e) => {
@@ -742,8 +747,6 @@ const SessionsBoard = ({ branchId }: Props) => {
         }}
         onDrop={() => dropOn(pc.id)}
       >
-        {/* Coloured by the card (`--card-accent`), so it follows urgency too. */}
-        <span className="dot" />
         <span
           className="cell-grip"
           draggable
@@ -823,6 +826,9 @@ const SessionsBoard = ({ branchId }: Props) => {
                   and for a waived session the answer is not the venue's rate —
                   printing it there put a price the player will never be asked
                   for directly under a clock that was counting for free. */}
+              {/* Secondary detail (2026-10-27): hidden in the Simple interface,
+                  where the stripe, the clock and the money are the card. */}
+              <span className="session-card__secondary">
               {sess.is_free
                 ? t("session.freeBill")
                 : sess.is_unlimited
@@ -839,6 +845,7 @@ const SessionsBoard = ({ branchId }: Props) => {
                           : "")
                       : sess.package_name}
               {itemsCount > 0 && <span className="muted"> · {itemsCount} {t("session.posNote")}</span>}
+              </span>
               {sess.paused_at && (
                 <span className="pill session-card__pill">
                   {(() => {
@@ -1051,6 +1058,10 @@ const SessionsBoard = ({ branchId }: Props) => {
                 fullLabel={t("session.addItem")}
                 onClick={() => setAddItemTarget(sess)}
               />
+              {/* The less frequent actions (2026-10-27): inline as always,
+                  or folded into «Ещё» in the Simple interface — the same
+                  buttons and handlers either way (CardOverflow). */}
+              <CardOverflow collapsed={quickActions === "primary"} label={t("session.card.more")}>
               {/* Only on a seat whose room hands something out, and labelled
                   with that room's own word. The server sends the object or
                   null, so a control that appears here is one the server will
@@ -1146,6 +1157,7 @@ const SessionsBoard = ({ branchId }: Props) => {
                   onClick={() => setRelocateTarget(sess)}
                 />
               )}
+              </CardOverflow>
               {/* Destructive, so it reads as such and spans the row: the one
                   button on the card a slip must not land on by accident. */}
               <SessionCardAction

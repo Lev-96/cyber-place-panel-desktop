@@ -7,6 +7,8 @@ import { Ps5ControlProvider } from "@/ps5/Ps5ControlProvider";
 import UnexpectedWakeDialog from "./ps5/UnexpectedWakeDialog";
 import Sidebar from "./Sidebar";
 import PageTopBar from "./ui/PageTopBar";
+import UnsavedInterfaceNotice from "./appearance/UnsavedInterfaceNotice";
+import NewInterfacesOffer from "./appearance/NewInterfacesOffer";
 
 const Layout = () => (
   /*
@@ -19,6 +21,9 @@ const Layout = () => (
     <Sidebar />
     <main className="main">
       <PageTopBar />
+      {/* Interface edits left unsaved, said wherever the person went (2026-10-27). */}
+      <UnsavedInterfaceNotice />
+      <NewInterfacesOffer />
       <Outlet />
     </main>
     {/*

@@ -161,7 +161,7 @@ const BranchUnlockPinCard = ({ branchId, updatedAt: initialUpdatedAt, onSaved }:
             : t("unlockPin.notSet")}
         </div>
         {error && <div className="error" style={{ marginTop: 6 }}>{error}</div>}
-        {success && <div style={{ color: "#22c55e", marginTop: 6, fontSize: 12 }}>{t("unlockPin.saved")}</div>}
+        {success && <div style={{ color: "var(--color-success)", marginTop: 6, fontSize: 12 }}>{t("unlockPin.saved")}</div>}
       </div>
     </div>
   );
@@ -169,7 +169,7 @@ const BranchUnlockPinCard = ({ branchId, updatedAt: initialUpdatedAt, onSaved }:
 
 const eyeButtonStyle: React.CSSProperties = {
   background: "transparent",
-  border: "1px solid rgba(255,255,255,0.15)",
+  border: "1px solid rgb(var(--fg-rgb) / 0.15)",
   borderRadius: 6,
   cursor: "pointer",
   fontSize: 18,

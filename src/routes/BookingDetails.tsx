@@ -92,7 +92,7 @@ const BookingDetails = () => {
           <Button
             variant="secondary"
             onClick={() => setCancel(true)}
-            style={{ color: "#ef4444", borderColor: "#4a1a1a" }}
+            style={{ color: "var(--color-danger)", borderColor: "var(--color-danger-border-dim)" }}
           >
             {t("bookingDetails.cancel")}
           </Button>

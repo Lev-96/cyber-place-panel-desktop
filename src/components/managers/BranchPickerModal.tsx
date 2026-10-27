@@ -71,7 +71,7 @@ const BranchPickerModal = ({ onClose, onPicked }: Props) => {
                   style={{
                     textAlign: "left",
                     cursor: "pointer",
-                    borderColor: selected === b.id ? "#07ddf1" : undefined,
+                    borderColor: selected === b.id ? "var(--color-primary)" : undefined,
                   }}
                 >
                   <div>

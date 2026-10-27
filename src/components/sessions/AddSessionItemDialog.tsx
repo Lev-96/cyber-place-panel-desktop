@@ -323,7 +323,7 @@ const AddSessionItemDialog = ({ branchId, session, onClose, onAdded }: Props) =>
                     variant="secondary"
                     onClick={() => void removeFromBill(item.id, item.name, item.product_id != null && additionalIds.has(item.product_id))}
                     disabled={saving || removing.includes(item.id)}
-                    style={{ ...stepBtn, color: "#ef4444", borderColor: "#4a1a1a" }}
+                    style={{ ...stepBtn, color: "var(--color-danger)", borderColor: "var(--color-danger-border-dim)" }}
                     aria-label={`${t("action.delete")}: ${item.name}`}
                     title={t("session.removeFromBill")}
                   >

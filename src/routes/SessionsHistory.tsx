@@ -370,7 +370,7 @@ const SessionRow = ({ session, feedEvents, covered, actorId }: {
     <div ref={ref} className="card hs-card">
       <div className="row-between" style={{ gap: 12, flexWrap: "wrap" }}>
         <div className="row" style={{ gap: 8, alignItems: "baseline" }}>
-          <strong style={{ fontSize: 15, color: "#07ddf1" }}>{session.pc_label || `№${session.pc_id}`}</strong>
+          <strong style={{ fontSize: 15, color: "var(--color-primary)" }}>{session.pc_label || `№${session.pc_id}`}</strong>
           <span className="pill" style={{ fontSize: 11, textTransform: "none", letterSpacing: 0 }}>{modeLabel}</span>
           <span className="pill" style={{ fontSize: 11, textTransform: "none", letterSpacing: 0, opacity: isClosed ? 1 : 0.7 }}>{statusLabel}</span>
           {session.is_free && (

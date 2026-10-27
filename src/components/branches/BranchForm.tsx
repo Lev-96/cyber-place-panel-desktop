@@ -387,7 +387,7 @@ const BranchForm = ({ initial, companyId, onClose, onSaved }: Props) => {
           />
           )}
           {phone.trim() !== "" && !phoneValid && (
-            <span className="muted" style={{ fontSize: 11, color: "#ef4444" }}>
+            <span className="muted" style={{ fontSize: 11, color: "var(--color-danger)" }}>
               {t("branchForm.invalidPhone")}
             </span>
           )}

@@ -539,7 +539,7 @@ const ConsolePicker = ({ branchId, onClose }: Props) => {
                     <div className="ps5-row__head">
                       <span
                         className="ps5-row__dot"
-                        style={{ background: seenNow.has(hostId) ? "#3ddc97" : "#8794ae" }}
+                        style={{ background: seenNow.has(hostId) ? "var(--color-success-bright)" : "var(--color-muted-dim)" }}
                         aria-hidden
                       />
                       <span className="ps5-row__name" title={placeLabel(device)}>{placeLabel(device)}</span>

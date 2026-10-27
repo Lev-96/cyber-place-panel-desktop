@@ -48,7 +48,7 @@ const ConfirmDialog = ({
             type="button"
             onClick={onConfirm}
             disabled={confirmDisabled}
-            style={destructive ? { background: "#7a1f1f", borderColor: "#4a1a1a" } : undefined}
+            style={destructive ? { background: "var(--color-danger-deep)", borderColor: "var(--color-danger-border-dim)" } : undefined}
           >
             {confirmLabel ?? t("action.confirm")}
           </Button>

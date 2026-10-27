@@ -35,7 +35,7 @@ const ExpenseListItem = ({ expense: e, onEdit, onDelete, onMarkPaid, busy }: Pro
             height: 10,
             borderRadius: "50%",
             flexShrink: 0,
-            background: e.is_active ? dueTone(e.days_until_due) : "#4b5563",
+            background: e.is_active ? dueTone(e.days_until_due) : "var(--color-grey-dim)",
           }}
         />
         <div style={{ flex: 1 }}>
@@ -65,7 +65,7 @@ const ExpenseListItem = ({ expense: e, onEdit, onDelete, onMarkPaid, busy }: Pro
         <Button
           variant="secondary"
           onClick={onDelete}
-          style={{ ...btn, color: "#ef4444", borderColor: "#4a1a1a" }}
+          style={{ ...btn, color: "var(--color-danger)", borderColor: "var(--color-danger-border-dim)" }}
         >
           {t("action.delete")}
         </Button>

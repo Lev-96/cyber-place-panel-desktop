@@ -245,7 +245,7 @@ const PriceInput = ({ value, onChange, targetCurrency, targetLocale, lang }: Pri
             right: 12,
             top: "50%",
             transform: "translateY(-50%)",
-            color: "#9aa8c7",
+            color: "var(--color-muted-alt)",
             fontSize: 12,
             pointerEvents: "none",
           }}

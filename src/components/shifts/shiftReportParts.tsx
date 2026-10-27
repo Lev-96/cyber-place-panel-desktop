@@ -25,4 +25,4 @@ export const Section = ({ title, children, testId }: { title: string; children: 
 export const rowStyle: CSSProperties = { padding: "5px 0", gap: 16, alignItems: "baseline" };
 const hintStyle: CSSProperties = { display: "block", fontSize: 12 };
 export const valueStyle: CSSProperties = { whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" };
-export const divider: CSSProperties = { borderTop: "1px solid var(--color-border, rgba(255,255,255,0.12))", margin: "6px 0" };
+export const divider: CSSProperties = { borderTop: "1px solid var(--color-border, rgb(var(--fg-rgb) / 0.12))", margin: "6px 0" };

@@ -5,7 +5,7 @@ import { formatAmount } from "@/i18n/currency";
 import { useLang } from "@/i18n/LanguageContext";
 import { expenseRepository } from "@/repositories/ExpenseRepository";
 import { showDesktopNotification } from "@/utils/desktopNotification";
-import { playNotificationChime } from "@/utils/notificationSound";
+import { playFor } from "@/sound/soundEngine";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -51,7 +51,7 @@ const ExpenseReminderNotifier = () => {
     (fresh: IServiceExpense[]) => {
       // One chime for the whole batch; an OS push per service so each is
       // individually actionable from the OS tray; one combined in-app toast.
-      playNotificationChime();
+      playFor("system", `expenses:${fresh.map((e) => e.id).sort((a, b) => a - b).join(",")}`);
       for (const e of fresh) {
         const body = `${e.name} · ${dueLabel(e.days_until_due, t)} · ${formatAmount(e.amount, e.currency, lang)}`;
         showDesktopNotification(
@@ -126,11 +126,11 @@ const ExpenseReminderNotifier = () => {
         zIndex: 9000,
         maxWidth: 360,
         borderRadius: 8,
-        background: "rgba(245, 158, 11, 0.16)",
+        background: "rgb(var(--warning-rgb) / 0.16)",
         borderLeft: "4px solid #f59e0b",
         padding: "12px 14px",
-        boxShadow: "0 6px 22px rgba(0, 0, 0, 0.35)",
-        color: "#e5e7eb",
+        boxShadow: "0 6px 22px rgb(var(--shadow-rgb) / 0.35)",
+        color: "var(--color-text-soft)",
         fontSize: 14,
         lineHeight: 1.4,
       }}
@@ -156,7 +156,7 @@ const ExpenseReminderNotifier = () => {
           type="button"
           onClick={() => setToast(null)}
           aria-label={t("action.close")}
-          style={{ ...toastBtn, marginLeft: "auto", color: "#9ca3af" }}
+          style={{ ...toastBtn, marginLeft: "auto", color: "var(--color-muted-grey)" }}
         >
           ×
         </button>
@@ -170,7 +170,7 @@ const toastBtn: React.CSSProperties = {
   border: "1px solid #1f2a44",
   borderRadius: 6,
   background: "transparent",
-  color: "#e5e7eb",
+  color: "var(--color-text-soft)",
   cursor: "pointer",
   fontSize: 12,
 };

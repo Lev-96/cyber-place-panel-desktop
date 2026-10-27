@@ -286,7 +286,9 @@ describe("starting a session free", () => {
     await mount(device({ assigned_hourly_rate: 2500 }));
 
     // The matrix in this file says 1500 for ps5-standard. The seat says 2500.
-    expect(screen.getByText(/2500/)).toBeTruthy();
+    // The rate line, and the same rate in the start summary (2026-10-27).
+    expect(screen.getAllByText(/2500/).some((el) => !el.closest('[data-testid="start-summary"]'))).toBe(true);
+    expect(screen.getByTestId("start-summary").textContent).toContain("2500");
     expect(screen.queryByText(/1500 /)).toBeNull();
   });
 
@@ -295,7 +297,9 @@ describe("starting a session free", () => {
     // what it always showed, rather than nothing.
     await mount(device({ assigned_hourly_rate: undefined }));
 
-    expect(screen.getByText(/1500/)).toBeTruthy();
+    // The rate line, and the same rate in the start summary (2026-10-27).
+    expect(screen.getAllByText(/1500/).some((el) => !el.closest('[data-testid="start-summary"]'))).toBe(true);
+    expect(screen.getByTestId("start-summary").textContent).toContain("1500");
   });
 
   test("a seat priced only through a subcategory can be started", async () => {
@@ -310,7 +314,9 @@ describe("starting a session free", () => {
 
     const start = screen.getByRole("button", { name: "action.start" }) as HTMLButtonElement;
     expect(start.disabled).toBe(false);
-    expect(screen.getByText(/3000/)).toBeTruthy();
+    // The rate line, and the same rate in the start summary (2026-10-27).
+    expect(screen.getAllByText(/3000/).some((el) => !el.closest('[data-testid="start-summary"]'))).toBe(true);
+    expect(screen.getByTestId("start-summary").textContent).toContain("3000");
   });
 });
 
@@ -817,5 +823,36 @@ describe("a plan until a clock time", () => {
     expect(repo.startQuote).toHaveBeenLastCalledWith(1, { until: "00:40" }, undefined, 900);
     await press();
     expect(repo.start.mock.calls[0][0]).toMatchObject({ until: "00:40", planned_amount: 900 });
+  });
+});
+
+/**
+ * What Start will do, said before it is pressed (2026-10-27): the seat, the
+ * tariff, the plan and the server's preliminary price, read off the choices.
+ */
+describe("the start summary", () => {
+  test("names the seat and an open start with no end", async () => {
+    await mount(device());
+    const line = screen.getByTestId("start-summary").textContent ?? "";
+    expect(line).toContain("session.summary.title");
+    expect(line).toContain("session.summary.open");
+  });
+
+  test("says until when and the preliminary price for a plan until a time", async () => {
+    await mount(device());
+    await act(async () => { fireEvent.click(screen.getByRole("tab", { name: "session.planLimitUntil" })); });
+    await act(async () => { fireEvent.change(screen.getByLabelText("session.untilLabel"), { target: { value: "00:40" } }); });
+    await act(async () => { await new Promise((r) => setTimeout(r, 320)); });
+    const line = screen.getByTestId("start-summary").textContent ?? "";
+    expect(line).toContain("session.summary.until");
+    expect(line).toContain("session.summary.price");
+  });
+
+  test("a free start says so and no price", async () => {
+    await mount(device());
+    await act(async () => { fireEvent.click(screen.getByText("session.freeBill")); });
+    const line = screen.getByTestId("start-summary").textContent ?? "";
+    expect(line).toContain("session.freeBill");
+    expect(line).not.toContain("session.summary.price");
   });
 });
