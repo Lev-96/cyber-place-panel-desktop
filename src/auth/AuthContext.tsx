@@ -60,6 +60,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       // BOTH ends of it.
       apiCache.clear();
       const res = await apiLogin(email, password);
+      // Switching accounts is a sign-in over a signed-in one (2026-10-27).
+      // The socket kept the previous person's private channels — their
+      // notifications, their support thread — open for the next one; it is
+      // dropped here, once the new credentials have worked, exactly as
+      // sign-out drops it. The previous token is NOT revoked: the server's
+      // sign-out revokes every token the person holds, which would sign an
+      // owner out of all their devices just for handing over the desk.
+      if (user !== null) disconnectEchoForSignOut();
       await keyValueStore.set(AppConfig.storageKeys.token, res.token);
       const me = await apiGetMe();
       await keyValueStore.set(AppConfig.storageKeys.user, me.user);
