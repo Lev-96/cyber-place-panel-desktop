@@ -198,11 +198,19 @@ describe("the menu and the first screen", () => {
 });
 
 describe("the preview", () => {
-  test("is a picture: inert, no clickable controls, nothing sent", async () => {
+  test("is a picture: the board's own buttons, all inert and out of the tab order, doing nothing", async () => {
     await mount();
     const preview = screen.getByTestId("appearance-preview");
-    expect(preview.querySelector("[inert]")).toBeTruthy();
-    expect(preview.querySelectorAll("button, a, input, select")).toHaveLength(0);
+    const buttons = [...preview.querySelectorAll("button")];
+    // The same buttons the board draws, so it lays out as the board does…
+    expect(buttons.length).toBeGreaterThan(0);
+    expect(buttons.every((b) => b.classList.contains("btn"))).toBe(true);
+    expect(buttons.some((b) => b.classList.contains("session-card__btn"))).toBe(true);
+    // …which cannot be reached or pressed, and do nothing if they were.
+    expect(buttons.every((b) => b.closest("[inert]") !== null && b.tabIndex === -1)).toBe(true);
+    expect(preview.querySelectorAll("a, input, select")).toHaveLength(0);
+    for (const b of buttons) fireEvent.click(b);
     expect(repo.put).not.toHaveBeenCalled();
+    expect(screen.queryByRole("menu")).toBeNull();
   });
 });

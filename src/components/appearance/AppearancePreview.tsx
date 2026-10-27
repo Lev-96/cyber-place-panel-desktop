@@ -1,3 +1,5 @@
+import { SessionCardAction } from "@/components/sessions/SessionCard";
+import Button from "@/components/ui/Button";
 import { StatusIcon } from "@/components/ui/StatusChip";
 import { useLang } from "@/i18n/LanguageContext";
 
@@ -16,8 +18,12 @@ const Card = ({ tone, number, status, rate, quick }: {
   const { t } = useLang();
   const accent = `rgb(var(--status-${tone}-rgb))`;
   const running = tone !== "free";
-  const fake = (label: string, extra = "") => (
-    <span className={`btn secondary session-card__btn ${extra}`} aria-hidden>{label}</span>
+  // The board's own button components, so the preview lays out exactly as
+  // the board does (2026-10-27: plain spans did not, and their words sat
+  // outside their frames). No onClick, out of the tab order, and the whole
+  // picture is `inert`: nothing here can be pressed.
+  const fake = (label: string, extra: { wide?: boolean; danger?: boolean } = {}) => (
+    <SessionCardAction label={label} fullLabel={label} tabIndex={-1} type="button" {...extra} />
   );
   return (
     <div
@@ -34,17 +40,19 @@ const Card = ({ tone, number, status, rate, quick }: {
         <div className="session-card__actions">
           {fake(t("session.card.addItem"))}
           {quick === "primary" ? (
-            <div className="session-card__more">{fake(`${t("session.card.more")} ▾`, "session-card__btn--wide")}</div>
+            <div className="session-card__more">{fake(`${t("session.card.more")} ▾`, { wide: true })}</div>
           ) : (
             <>
               {fake(t("session.pause"))}
-              {fake(t("session.card.relocate"), "session-card__btn--wide")}
+              {fake(t("session.card.relocate"), { wide: true })}
             </>
           )}
-          {fake(t("action.stop"), "session-card__btn--wide is-danger")}
+          {fake(t("action.stop"), { danger: true })}
         </div>
       ) : (
-        <div className="session-card__foot"><span className="btn session-card__start" aria-hidden>{t("action.start")}</span></div>
+        <div className="session-card__foot">
+          <Button type="button" className="session-card__start" tabIndex={-1}>{t("action.start")}</Button>
+        </div>
       )}
     </div>
   );
