@@ -12,7 +12,7 @@ import {
  * which, how loud, and never twice for one notification.
  */
 
-interface FakeOsc { type: string; freq: number; started: boolean; stopped: number; peak: number }
+interface FakeOsc { type: string; freq: number; started: boolean; stopped: number; peak: number; glide?: number }
 const made: FakeOsc[] = [];
 let ctxState: "running" | "suspended" = "running";
 
@@ -24,7 +24,7 @@ class FakeAudioContext {
   createOscillator() {
     const o: FakeOsc & Record<string, unknown> = {
       type: "sine", freq: 0, started: false, stopped: 0, peak: 0,
-      frequency: { setValueAtTime: (f: number) => { o.freq = f; } },
+      frequency: { setValueAtTime: (f: number) => { o.freq = f; }, exponentialRampToValueAtTime: (f: number) => { o.glide = f; } },
       connect: () => {},
       start: () => { o.started = true; },
       stop: () => { o.stopped++; },
@@ -65,6 +65,21 @@ describe("the built-in sounds", () => {
     const [a, b] = LIBRARY.soft;
     expect(b.freq).toBeLessThan(a.freq);
     expect(Math.max(...LIBRARY.soft.map((n) => n.peak))).toBeLessThan(Math.max(...LIBRARY.chime.map((n) => n.peak)));
+  });
+
+  test("the modern sounds are there, short, and the pops really slide", () => {
+    for (const id of ["pop", "bubble", "glass", "strum", "knock", "marimba"] as const) {
+      expect(LIBRARY[id].length).toBeGreaterThan(0);
+      expect(Math.max(...LIBRARY[id].map((n) => n.at + n.dur))).toBeLessThan(0.8);
+    }
+    previewSound("pop", "standard", 100);
+    expect(made[0].glide).toBe(420);
+  });
+
+  test("at the standard profile no sound is scaled down or clips", () => {
+    for (const notes of Object.values(LIBRARY)) {
+      expect(notes.reduce((t, n) => t + n.peak, 0)).toBeLessThanOrEqual(MAX_PEAK);
+    }
   });
 
   test("every sound is a different sound", () => {

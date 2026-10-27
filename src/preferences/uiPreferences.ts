@@ -27,7 +27,7 @@ export const SOUND_PROFILES = ["quiet", "standard", "loud", "custom"] as const;
  * sale event in the system, so there is no sale sound to offer.
  */
 export const SOUND_CATEGORIES = ["booking_new", "booking_changed", "session_ending", "support", "guests", "system"] as const;
-export const SOUNDS = ["chime", "soft", "ding", "bell", "pulse", "alert"] as const;
+export const SOUNDS = ["chime", "soft", "ding", "bell", "pulse", "alert", "pop", "bubble", "glass", "strum", "knock", "marimba"] as const;
 
 export type InterfaceId = (typeof INTERFACES)[number];
 export type ThemeId = (typeof THEMES)[number];
@@ -86,8 +86,10 @@ export const PRESETS: Record<Exclude<InterfaceId, "custom">, Layout> = {
     density: "standard", card_size: "m", board_view: "grid", show_secondary: true,
     quick_actions: "all", home: null, sidebar: [],
   },
+  // Compact is rows (2026-10-27): more places on one screen, every action
+  // in the row — a different board, not a smaller copy of the standard one.
   compact: {
-    density: "compact", card_size: "s", board_view: "grid", show_secondary: true,
+    density: "compact", card_size: "s", board_view: "list", show_secondary: true,
     quick_actions: "all", home: null, sidebar: [],
   },
 };

@@ -106,6 +106,9 @@ const SessionCard = ({
       <span className="session-card__stripe" aria-hidden />
       <span className="session-card__state" role="img" aria-label={label} title={label}>
         <StatusIcon tone={tone} />
+        {/* The word itself, shown where the interface asks for it (Simple,
+            list); the accessible name is already the label above. */}
+        {label && <span className="session-card__state-word" aria-hidden>{label}</span>}
       </span>
       {children}
     </div>
@@ -193,6 +196,7 @@ export const CardOverflow = ({ collapsed, label, children }: OverflowProps) => {
         aria-expanded={open}
         title={label}
         aria-label={label}
+        data-action="more"
         onClick={() => setOpen((v) => !v)}
       >
         {label} ▾

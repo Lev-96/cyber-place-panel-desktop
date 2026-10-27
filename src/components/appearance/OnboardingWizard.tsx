@@ -1,4 +1,5 @@
 import ChoiceCards from "@/components/appearance/ChoiceCards";
+import PresetPicture from "@/components/appearance/PresetPicture";
 import Button from "@/components/ui/Button";
 import Modal from "@/components/ui/Modal";
 import { useLang } from "@/i18n/LanguageContext";
@@ -101,7 +102,7 @@ const OnboardingWizard = () => {
         )}
         {step === "interface" && (
           <ChoiceCards name="onb-interface" label={t("onboarding.interface.title")} value={choice.interface}
-            choices={interfaces.map((c) => ({ ...c, picture: <span className={`choice-pic choice-pic--${c.key}`} /> }))}
+            choices={interfaces.map((c) => ({ ...c, picture: <PresetPicture id={c.key} /> }))}
             onChange={(key) => setChoice({ ...choice, interface: key, layout: { ...PRESETS[key as Exclude<InterfaceId, "custom">] } })} />
         )}
         {step === "theme" && (

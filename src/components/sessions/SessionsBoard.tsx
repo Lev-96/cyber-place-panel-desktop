@@ -39,6 +39,7 @@ import { autoResumeAtOf, sessionCurrentHourlyRate, sessionJoysticksTotal } from 
 import StartSessionDialog from "./StartSessionDialog";
 import SessionOptionsDialog from "./SessionOptionsDialog";
 import SessionCard, { CardOverflow, SessionCardAction } from "./SessionCard";
+import SimpleBoardHelp from "./SimpleBoardHelp";
 import { useUiPreferencesOptional } from "@/preferences/UiPreferencesContext";
 import RelocateSessionDialog from "./RelocateSessionDialog";
 import { BASE_JOYSTICKS, MAX_JOYSTICKS } from "@/api/joystickPrices";
@@ -76,7 +77,9 @@ const SessionsBoard = ({ branchId }: Props) => {
   const role = user?.role;
   // How the person's interface lays the card's actions out (2026-10-27);
   // outside the provider (tests, an embed) every action is shown, as before.
-  const quickActions = useUiPreferencesOptional()?.layout.quick_actions ?? "all";
+  const uiLayout = useUiPreferencesOptional()?.layout;
+  const quickActions = uiLayout?.quick_actions ?? "all";
+  const density = uiLayout?.density ?? "standard";
   const pcs = useAsync(() => sessionRepository.listPcs(branchId), [branchId]);
   // Custom platforms named as the branch named them, in the panel language.
   // ONE cached read for the board and every dialog it opens (passed down), and
@@ -1054,6 +1057,7 @@ const SessionsBoard = ({ branchId }: Props) => {
                 />
               )}
               <SessionCardAction
+                data-action="add-item"
                 label={t("session.card.addItem")}
                 fullLabel={t("session.addItem")}
                 onClick={() => setAddItemTarget(sess)}
@@ -1095,6 +1099,7 @@ const SessionsBoard = ({ branchId }: Props) => {
 
                 return (
                   <SessionCardAction
+                    data-action="extra"
                     label={shortLabel}
                     fullLabel={label}
                     onClick={() => {
@@ -1122,6 +1127,7 @@ const SessionsBoard = ({ branchId }: Props) => {
                   resume moves it by the pause. */}
               {sess.ends_at !== null && sess.is_unlimited !== true && !sess.paused_at && (
                 <SessionCardAction
+                  data-action="add-time"
                   label={t("session.card.addTime")}
                   fullLabel={t("session.addTime")}
                   onClick={() => setOptionsTarget(sess)}
@@ -1131,6 +1137,7 @@ const SessionsBoard = ({ branchId }: Props) => {
                   session stays active either way — the seat stays taken and a
                   console stays awake — only the clock and the bill hold. */}
               <SessionCardAction
+                data-action={sess.paused_at ? "resume" : "pause"}
                 label={sess.paused_at ? t("session.card.resume") : t("session.pause")}
                 fullLabel={sess.paused_at ? t("session.resume") : t("session.pause")}
                 onClick={() => { void togglePause(sess); }}
@@ -1151,6 +1158,7 @@ const SessionsBoard = ({ branchId }: Props) => {
                   belongs to the seat it began on, so resume first. */}
               {!sess.paused_at && (
                 <SessionCardAction
+                  data-action="relocate"
                   label={t("session.card.relocate")}
                   fullLabel={t("session.relocate")}
                   wide
@@ -1161,6 +1169,7 @@ const SessionsBoard = ({ branchId }: Props) => {
               {/* Destructive, so it reads as such and spans the row: the one
                   button on the card a slip must not land on by accident. */}
               <SessionCardAction
+                data-action="stop"
                 label={t(stopLock.labelKey ?? "action.stop")}
                 fullLabel={t(stopLock.labelKey ?? "action.stop")}
                 danger
@@ -1208,6 +1217,7 @@ const SessionsBoard = ({ branchId }: Props) => {
                 disabled={!canStart || startLock.disabled}
                 title={isOffline ? t("session.deviceOfflineHint") : undefined}
                 className="session-card__start"
+                data-action="start"
               >
                 {t(startLock.labelKey ?? "action.start")}
               </Button>
@@ -1272,6 +1282,8 @@ const SessionsBoard = ({ branchId }: Props) => {
       </div>
 
       {staleError && <StaleNotice error={staleError} onRetry={retryBoard} />}
+      {/* What the colours mean, for the Simple interface (2026-10-27). */}
+      {density === "simple" && orderedPcs.length > 0 && <SimpleBoardHelp />}
       {orderedPcs.length === 0 ? (
         <StateView variant="empty" titleKey="session.state.noPcsTitle" descriptionKey="session.state.noPcsDescription" />
       ) : (

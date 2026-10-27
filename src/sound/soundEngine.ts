@@ -35,6 +35,8 @@ interface Note {
   peak: number;
   /** "exp": quick attack, exponential decay; "lin": linear in and out. */
   shape: "exp" | "lin";
+  /** Slide to this pitch over the note (a "pop", a "bubble"). */
+  glideTo?: number;
 }
 
 /**
@@ -69,6 +71,42 @@ export const LIBRARY: Record<SoundId, Note[]> = {
     { freq: 880, at: 0, dur: 0.09, type: "square", peak: 0.09, shape: "exp" },
     { freq: 880, at: 0.14, dur: 0.09, type: "square", peak: 0.09, shape: "exp" },
     { freq: 880, at: 0.28, dur: 0.09, type: "square", peak: 0.09, shape: "exp" },
+  ],
+  // Modern, short, soft UI sounds (2026-10-27) — original sounds in the
+  // style of today's messengers, not copies of any app's own.
+  // A bubble pop: one quick sine falling in pitch.
+  pop: [
+    { freq: 880, at: 0, dur: 0.12, type: "sine", peak: 0.24, shape: "exp", glideTo: 420 },
+  ],
+  // Two rising bubbles: friendly "message in".
+  bubble: [
+    { freq: 520, at: 0, dur: 0.1, type: "sine", peak: 0.2, shape: "exp", glideTo: 780 },
+    { freq: 700, at: 0.11, dur: 0.12, type: "sine", peak: 0.2, shape: "exp", glideTo: 1050 },
+  ],
+  // A light glass ping with a shimmer above it.
+  glass: [
+    { freq: 1567.98, at: 0, dur: 0.5, type: "sine", peak: 0.16, shape: "exp" },
+    { freq: 2349.32, at: 0, dur: 0.32, type: "sine", peak: 0.06, shape: "exp" },
+    { freq: 1975.53, at: 0.09, dur: 0.45, type: "sine", peak: 0.1, shape: "exp" },
+  ],
+  // A soft major-seventh strum, low to high.
+  strum: [
+    { freq: 523.25, at: 0, dur: 0.6, type: "sine", peak: 0.1, shape: "exp" },
+    { freq: 659.25, at: 0.04, dur: 0.6, type: "sine", peak: 0.1, shape: "exp" },
+    { freq: 783.99, at: 0.08, dur: 0.6, type: "sine", peak: 0.1, shape: "exp" },
+    { freq: 987.77, at: 0.12, dur: 0.6, type: "sine", peak: 0.1, shape: "exp" },
+  ],
+  // Two wooden knocks: short, dry, unmistakable.
+  knock: [
+    { freq: 1100, at: 0, dur: 0.07, type: "triangle", peak: 0.26, shape: "exp", glideTo: 700 },
+    { freq: 1100, at: 0.13, dur: 0.07, type: "triangle", peak: 0.26, shape: "exp", glideTo: 700 },
+  ],
+  // A marimba-like phrase: round notes that die away fast.
+  marimba: [
+    { freq: 659.25, at: 0, dur: 0.28, type: "sine", peak: 0.2, shape: "exp" },
+    { freq: 2637.02, at: 0, dur: 0.05, type: "sine", peak: 0.04, shape: "exp" },
+    { freq: 987.77, at: 0.12, dur: 0.32, type: "sine", peak: 0.2, shape: "exp" },
+    { freq: 3951.07, at: 0.12, dur: 0.05, type: "sine", peak: 0.04, shape: "exp" },
   ],
   // Two-tone alert (B5 / F#5 twice): for what needs attention now.
   alert: [
@@ -188,6 +226,7 @@ const schedule = (id: SoundId, gain: number, repeat: number): (() => void) | nul
         const peak = n.peak * gain * scale;
         osc.type = n.type;
         osc.frequency.setValueAtTime(n.freq, offset + n.at);
+        if (n.glideTo) osc.frequency.exponentialRampToValueAtTime(n.glideTo, offset + n.at + n.dur * 0.8);
         g.gain.setValueAtTime(0, offset + n.at);
         if (n.shape === "exp") {
           g.gain.linearRampToValueAtTime(peak, offset + n.at + 0.015);

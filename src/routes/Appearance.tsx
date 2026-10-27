@@ -1,5 +1,6 @@
 import { useAuth } from "@/auth/AuthContext";
 import AppearancePreview from "@/components/appearance/AppearancePreview";
+import PresetPicture from "@/components/appearance/PresetPicture";
 import ChoiceCards from "@/components/appearance/ChoiceCards";
 import MenuEditor from "@/components/appearance/MenuEditor";
 import SoundSettings from "@/components/appearance/SoundSettings";
@@ -103,7 +104,9 @@ const Appearance = () => {
 
   return (
     <ScreenWithBg bg="./bg/settings.jpg" title={t("nav.appearance")}>
+      <div className="appearance-page">
       <p className="muted appearance-intro">{t("appearance.intro")}</p>
+      <div className="appearance-help" role="note">{t("appearance.help")}</div>
 
       <SettingsSection title={t("appearance.ui.title")} description={t("appearance.ui.hint")}>
         <ChoiceCards
@@ -111,7 +114,7 @@ const Appearance = () => {
           label={t("appearance.ui.title")}
           value={working.interface}
           onChange={setInterface}
-          choices={interfaces.map((c) => ({ ...c, picture: <span className={`choice-pic choice-pic--${c.key}`} /> }))}
+          choices={interfaces.map((c) => ({ ...c, picture: <PresetPicture id={c.key} /> }))}
         />
       </SettingsSection>
 
@@ -219,6 +222,7 @@ const Appearance = () => {
         <Button type="button" onClick={() => void onSave()} disabled={!dirty || saving}>
           {saving ? t("appearance.saving") : t("appearance.save")}
         </Button>
+      </div>
       </div>
     </ScreenWithBg>
   );
