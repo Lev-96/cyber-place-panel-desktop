@@ -274,12 +274,8 @@ pos · places · ps5 · sessions · tournaments · revenue · services · scanne
   `inputMode="decimal"`), never `type="number"`.
 - **Confirm dialogs:** never use native `window.confirm()` — it poisons
   renderer focus on Linux WMs. Use the in-app `ConfirmDialog`.
-  ⚠️ **Known debt — the rule is not yet true of the whole app.** Three native
-  `confirm()` calls are still in HEAD. They predate PA-D and are out of its
-  scope: `src/routes/BranchEdit.tsx:34` (delete branch),
-  `src/routes/Notifications.tsx:119` (clear all), and
-  `src/routes/BranchPricesPage.tsx:53` (delete tariff). Each should move to
-  `useConfirm()` in its own change.
+  No native `confirm()` is left (re-checked 2026-10-27): every confirmation
+  goes through `useConfirm()`.
 - **DevTools:** auto-detached DevTools also break renderer focus. Gate
   with `ELECTRON_DEVTOOLS=1` env var.
 - **i18n:** language codes are `en` / `ru` / `am` (NOT `hy`). Use the
@@ -394,6 +390,9 @@ booking instantly" and "the cashier finds out 30 s later via polling".
 | `app-updates.{role}` | public | release-available per role |
 | `user.{id}.notifications` | **private** (wire: `private-user.{id}.notifications`) | per-user notification feed |
 | `user.{id}.access` | **private** (wire: `private-user.{id}.access`) | admin blocked this account's company / branch — sign out, or leave the branch |
+| `support.user.{id}` | **private** | the person's own support thread (`useSupportMessages`) |
+| `user.{id}.ps5` | **private** | an owner's consoles (`usePs5Realtime`) |
+| `branch.{id}.ps5` | **private** | a branch's consoles (`usePs5Realtime`) |
 
 Role-aware routing for staff is preserved in backend
 `GlobalBookingNotifier::resolveBookingChannel`:
@@ -579,9 +578,11 @@ loud `[reverb] REJECTED …` line naming the key and host; the backend has
 
 - Modern gaming aesthetic — dark base (`#020514`), neon accents (cyan
   `#07DDF1` → blue `#32AFF7` → magenta `#D152FA`).
-- Dark theme by default; no light theme implementation yet.
+- Dark theme by default; Light and High contrast exist since 2026-10-27
+  (see "Interface, themes and sounds" below) — never hard-code a colour.
 - Smooth CSS transitions; no jarring instant state changes.
-- Responsive — must work down to ~1280×720 (cashier laptops).
+- Responsive — must work down to the 800×560 window minimum
+  (`electron/windowBounds.ts` `MIN_CONTENT`), up to 1920×1080 and beyond.
 - Playstation font for branding / headings; Inter for UI text.
 - Stable button widths across i18n (don't let translations shift layout).
 - Tariff / promo UI: server-computed `is_currently_active` is the source
@@ -3145,3 +3146,57 @@ motion: no animation.
 Only one name is ever on screen: while the bar carries the heading, the
 heading itself gets `cp-page-title--docked` (fades up out of its place, box
 kept so nothing moves) and plays its usual `cp-title-in` again when it returns.
+
+
+## Interface, themes and sounds (2026-10-27)
+
+One business layer, many looks. Nothing here branches on the interface for
+BEHAVIOUR: the same routes, components, handlers and permissions in every
+look; only CSS (via `<html>` data attributes) and the folding of card actions
+differ.
+
+- **Tokens** (`global.css :root`): L1 primitives as colour CHANNELS
+  (`--rgb-cyan: 7 221 241`), L2 semantic (`--accent-rgb`, `--fg-rgb`,
+  `--color-*`, `--status-<tone>-fg/bg/border`), L3 density (`--control-h`,
+  `--grid-min`, `--card-pad`…). Use `rgb(var(--accent-rgb) / .35)`, never a
+  literal. Every remaining literal is either a theme token with its exact old
+  value or deliberately fixed (login scene, flags, QR, illustrations, toasts).
+- **Status vocabulary** (`domain/statusTone.ts`, `ui/StatusChip.tsx`): free =
+  cyan ○, playing = green ▶, booked = violet, ending = amber clock, critical =
+  red ⚠, paused = grey ‖, offline = grey dashed. Same on Active Places, Live
+  and Places (green no longer means "free" anywhere). Always colour + icon +
+  word. The device dot is connectivity only (green reachable, red offline).
+- **Preferences** (`preferences/uiPreferences.ts`, `UiPreferencesContext`):
+  server `GET/PUT /user/preferences` (whitelist mirrored in
+  `parsePreferences` — field-by-field fallback, never throws), local cache
+  `u{id}:cp.ui.prefs` for the first frame; volume/mute device-local
+  `u{id}:cp.sound.device`. Applied as `data-theme`, `data-density`,
+  `data-card-size`, `data-board-view`, `data-secondary`, `data-quick-actions`.
+  Existing users: Standard + a one-time dashboard offer
+  (`NewInterfacesOffer`); new users: `OnboardingWizard` (server
+  `onboarding_version` < 1; offline never forces it).
+- **Presets**: Simple (density simple, large cards, details off, «Ещё» on the
+  card via `CardOverflow`), Standard (no CSS rules at all — the old panel,
+  proven pixel-identical), Compact (tighter, cards min 186 px, card buttons
+  keep 32 px). Custom = the person's own `layout`.
+- **«Интерфейс и тема»** (`/appearance`, every role; `nav.appearance`):
+  ready-made interface, theme, preview (`AppearancePreview`: the board's own
+  classes, `inert`, no handlers), own layout, side-menu order/visibility
+  (`applyPersonalMenu` over the role's menu built by the shared
+  `menuSpecsFor` — can only reorder/hide what the role shows;
+  `REQUIRED_MENU_IDS` never hidden), first screen after sign-in
+  (`ApplyHomeOnSignIn`, once, only from "/"), sounds. Edits are a draft in
+  the provider: tried on at once, kept only on Save; leaving shows
+  `UnsavedInterfaceNotice`.
+- **Sound** (`sound/soundEngine.ts`): the only sound source. Call sites ask
+  `playFor(category, key)` AFTER their existing delivery (no new
+  subscription): booking_new / booking_changed (`GlobalBookingNotifier`),
+  guests (subscribe, tournament join), session_ending
+  (`SessionEndingNotifier`, by notification id), support (`SupportNotifier`,
+  by message id), system (expense reminders, update toast). Dedup per key for
+  10 min, ≥700 ms spacing, peak capped (`MAX_PEAK`), profiles quiet ×0.45 /
+  standard ×1 / loud ×2.4 + repeat, device volume 0–100. OS notifications are
+  `silent: true` (the panel's sound is the sound). Audio refused by the
+  system → `isAudioBlocked()` + «Включить звук»; visuals never depend on it.
+- **Typecheck**: `npm run typecheck` (`tsc -p .` checks nothing — the root
+  tsconfig has `"files": []`).
