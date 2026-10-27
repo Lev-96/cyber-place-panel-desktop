@@ -16,6 +16,7 @@ vi.mock("playactor/dist/device/pending", () => ({
     constructor(_d: string, _p: unknown, _n: unknown, discoveryConfig: unknown) {
       built.configs.push(discoveryConfig);
     }
+    async discover() { return { status: "AWAKE" }; }
     async openConnection() {
       return { standby: async () => {}, close: async () => {} };
     }

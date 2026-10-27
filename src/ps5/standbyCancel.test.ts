@@ -13,11 +13,17 @@ const playactor = vi.hoisted(() => ({
   whileOpening: () => {},
   /** Holds the connection open until the test says so (a slow console). */
   opening: null as Promise<void> | null,
+  /** What the console's discovery answer says it is doing. */
+  status: "AWAKE" as "AWAKE" | "STANDBY",
+  /** Connections opened — each one starts with a wake inside playactor. */
+  opened: 0,
 }));
 
 vi.mock("playactor/dist/device/pending", () => ({
   PendingDevice: class {
+    async discover() { return { status: playactor.status }; }
     async openConnection() {
+      playactor.opened += 1;
       playactor.whileOpening();
       if (playactor.opening) await playactor.opening;
       return { standby: playactor.standby, close: playactor.close };
@@ -29,6 +35,33 @@ vi.mock("playactor/dist/credentials", () => ({ CredentialManager: class {} }));
 import { standby } from "../../electron/ps5/playactor";
 
 const keys = {} as never;
+
+describe("a console that is already asleep (2026-10-28, measured live with two panels)", () => {
+  test("is not connected to — playactor would wake it first — and the rest counts as done", async () => {
+    playactor.standby.mockClear();
+    playactor.opened = 0;
+    playactor.status = "STANDBY";
+    playactor.whileOpening = () => {};
+    try {
+      const result = await standby("192.168.1.35", keys, "AAA", () => false);
+      expect(result.ok).toBe(true);
+      expect(playactor.opened).toBe(0);
+      expect(playactor.standby).not.toHaveBeenCalled();
+    } finally {
+      playactor.status = "AWAKE";
+    }
+  });
+
+  test("an awake console is connected to and put to sleep", async () => {
+    playactor.standby.mockClear();
+    playactor.opened = 0;
+    playactor.whileOpening = () => {};
+    const result = await standby("192.168.1.35", keys, "AAA", () => false);
+    expect(result.ok).toBe(true);
+    expect(playactor.opened).toBe(1);
+    expect(playactor.standby).toHaveBeenCalledTimes(1);
+  });
+});
 
 describe("a rest that was given up on (2026-10-27, measured on a real console)", () => {
   test("an attempt that timed out and connects later sends no standby", async () => {

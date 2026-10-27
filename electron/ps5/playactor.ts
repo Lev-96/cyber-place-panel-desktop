@@ -430,6 +430,16 @@ const standbyOnce = async (
       manager,
     );
 
+    // playactor WAKES a console before it connects (ResolvedDevice.openConnection
+    // → waker.wake, unconditionally). Asked to sleep a console that is already
+    // asleep — another panel got there first, or this is a retry after it went
+    // down — it woke it to put it back to sleep: measured 2026-10-28, two
+    // panels, the console woke twice after its session had ended. Its own
+    // discovery answer says whether it sleeps; a sleeping one is left alone.
+    const found = await device.discover();
+    if (found.status === "STANDBY") return { ok: true, detail: "Already in rest mode" };
+    if (cancelled()) return STANDBY_CANCELLED;
+
     const connection = await device.openConnection();
     try {
       // Withdrawn (a session started) or abandoned (timed out) while the
