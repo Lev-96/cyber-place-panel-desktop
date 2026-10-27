@@ -53,8 +53,6 @@ const Shift = () => {
   /** Synchronous guard: clicks arrive before the disabled button re-renders. */
   const openingNow = useRef(false);
 
-  if (!Number.isFinite(id) || id <= 0) return <div className="error">{t("hub.invalidId")}</div>;
-
   const reloadAll = () => { void current.reload(); setHistoryKey((k) => k + 1); };
   const openingCents = openingCash.trim() === "" ? 0 : parseCents(openingCash);
 
@@ -90,6 +88,11 @@ const Shift = () => {
     return () => clearInterval(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, closing]);
+
+  // After every hook (2026-10-27): returned before the effect above, the
+  // screen rendered fewer hooks for a bad id than for a good one, and moving
+  // between the two tore it down.
+  if (!Number.isFinite(id) || id <= 0) return <div className="error">{t("hub.invalidId")}</div>;
 
   return (
     <div className="col" style={{ gap: 18 }}>
