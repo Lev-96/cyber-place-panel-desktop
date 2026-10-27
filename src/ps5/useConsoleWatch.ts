@@ -67,7 +67,12 @@ export const WATCH_FAST_WINDOW_MS = 45_000;
  * this it really is unreachable. Only rest is held: an awake console answers
  * every probe, and its silence means something.
  */
-export const REST_HOLD_MS = 60_000;
+export const REST_HOLD_MS = 10 * 60_000;
+// 60 s until 2026-10-28. Measured on a sleeping PS5 on Wi-Fi: 0 answers in
+// 45 s, 2 in 90 s. At 60 s a console asleep on the shelf read "unavailable"
+// most of the time. Ten minutes is still bounded (an unplugged console turns
+// "unavailable" by then) and a sleeping console is not acted on either way:
+// nothing is sent to a console that is wanted asleep and last said asleep.
 
 /**
  * How long a console last heard AWAKE is still shown awake while it is silent

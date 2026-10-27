@@ -356,6 +356,22 @@ describe("a sleeping console that goes quiet", () => {
     await waitFor(() => expect(result.current.statuses.AAA.state).toBe("unreachable"));
   });
 
+  test("a sleeping console on Wi-Fi is still shown asleep after five silent minutes, unavailable after ten", async () => {
+    // Measured 2026-10-28: asleep, it answered 0 of 45 and 2 of 90 probes.
+    let answers = true;
+    answerToProbe = (addresses) => (answers ? addresses.map((a) => consoleAt("AAA", a, "rest")) : []);
+    const { result } = renderHook(() => useConsoleWatch([{ hostId: "AAA", address: "192.168.1.10" }], { intervalMs: 3_000 }));
+    await settle();
+    await waitFor(() => expect(result.current.statuses.AAA.state).toBe("rest"));
+
+    answers = false;
+    await act(async () => { await vi.advanceTimersByTimeAsync(5 * 60_000); });
+    expect(result.current.statuses.AAA.state).toBe("rest");
+
+    await act(async () => { await vi.advanceTimersByTimeAsync(5 * 60_000 + 10_000); });
+    await waitFor(() => expect(result.current.statuses.AAA.state).toBe("unreachable"));
+  });
+
   test("a held rest keeps the moment it was really heard, so silence is not mistaken for an answer", async () => {
     let answers = true;
     answerToProbe = (addresses) => (answers ? addresses.map((a) => consoleAt("AAA", a, "rest")) : []);
