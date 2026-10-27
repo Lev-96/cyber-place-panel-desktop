@@ -180,7 +180,11 @@ export const UNEXPECTED_WAKE_GRACE_MS = 10_000;
  * registration both get nowhere against a console with that switch off, so it
  * is worth naming rather than leaving as "waking…" forever.
  */
-export const WAKE_GIVE_UP_MS = 45_000;
+export const WAKE_GIVE_UP_MS = 90_000;
+// 45 s until 2026-10-27. Measured on a real console that had gone to rest a
+// few seconds earlier: it ignored wakes for about a minute and woke ~64 s after
+// the first one. At 45 s the panel blamed its "turn on from network" setting
+// moments before it woke by itself.
 
 /**
  * How long a sleep counts as still under way.

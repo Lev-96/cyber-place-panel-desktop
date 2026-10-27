@@ -28,6 +28,7 @@ vi.mock("@/realtime/usePs5Realtime", () => ({
     subscribers.current = [onEvent];
   },
 }));
+vi.mock("@/realtime/useSessionChanged", () => ({ useSessionChanged: () => {} }));
 
 vi.mock("@/i18n/LanguageContext", () => ({
   useLang: () => ({ t: (k: string) => k, money: (n: number) => String(n), lang: "en" }),

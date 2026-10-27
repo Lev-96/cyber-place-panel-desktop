@@ -37,6 +37,8 @@ export type Ps5ErrorCode =
   | "NO_CREDENTIAL"
   | "BAD_CREDENTIAL"
   | "DEVICE_NOT_FOUND"
+  /** Found and asked, but it did not finish answering in time (slow network). */
+  | "TIMEOUT"
   | "TRANSPORT_ERROR"
   | "UNSUPPORTED_BY_TRANSPORT"
   | "INVALID_STATE"
@@ -155,7 +157,8 @@ export class DiscoveryTransport implements Ps5Transport {
       code: result.code === "IN_USE" ? "IN_USE"
         : result.code === "REJECTED" ? "NO_CREDENTIAL"
           : result.code === "UNREACHABLE" ? "DEVICE_NOT_FOUND"
-            : "TRANSPORT_ERROR",
+            : result.code === "TIMEOUT" ? "TIMEOUT"
+              : "TRANSPORT_ERROR",
       detail: result.detail,
     };
   }

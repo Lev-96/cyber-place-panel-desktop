@@ -162,7 +162,18 @@ export const discover = async (options: DiscoveryOptions = {}): Promise<Discover
  * An empty list is not an error and does not open a socket: there is simply
  * nothing bound yet.
  */
-export const probe = async (addresses: string[], timeoutMs = 1_200): Promise<DiscoveryResult> => {
+/**
+ * How long a status check waits, and why it asks three times (2026-10-27).
+ *
+ * Measured on a PS5 awake on a club's Wi-Fi: 21 answers to 60 one-second
+ * probes (35 %), replies 13–1285 ms late. One datagram with a 1.2 s wait missed
+ * most ticks and an awake console was shown as "unavailable" every few
+ * seconds. Three copies inside 1.8 s are a retry, not a flood, and the check
+ * still ends as soon as every console has answered.
+ */
+export const PROBE_TIMEOUT_MS = 1_800;
+
+export const probe = async (addresses: string[], timeoutMs = PROBE_TIMEOUT_MS): Promise<DiscoveryResult> => {
   const targets = [...new Set(addresses.map((a) => a.trim()).filter(Boolean))];
   if (targets.length === 0) {
     return { consoles: [], probed: [], warnings: [] };
@@ -172,7 +183,7 @@ export const probe = async (addresses: string[], timeoutMs = 1_200): Promise<Dis
   // moment they all have — a console on a club LAN answers in about 130ms,
   // and waiting out the full timeout would make each status check ten times
   // longer than it needs to be.
-  return sweepLanes([{ label: "any", targets }], timeoutMs, { finishWhenAllAnswer: true });
+  return sweepLanes([{ label: "any", targets }], timeoutMs, { finishWhenAllAnswer: true, resend: true });
 };
 
 /**
@@ -193,7 +204,8 @@ const RESEND_AT = [0, 0.25, 0.5];
  * @param finishWhenAllAnswer  Stop early once every target has replied. Only
  *   meaningful for a unicast list: a broadcast has no idea how many consoles
  *   are out there, so it must always wait out its timeout.
- * @param resend  Send the probe again within the window (broadcast sweeps).
+ * @param resend  Send the probe again within the window (sweeps and status
+ *   checks alike: a console on Wi-Fi drops answers).
  */
 export const sweepLanes = async (
   lanes: SweepLane[],

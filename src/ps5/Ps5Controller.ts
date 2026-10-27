@@ -141,8 +141,6 @@ export class Ps5Controller {
   private readonly desired = new Map<string, MachineSnapshot["desired"]>();
   /** Consoles whose in-flight rest has already been withdrawn, so it is asked once. */
   private readonly cancelAsked = new Set<string>();
-  /** A wake sent while a withdrawn rest still holds the in-flight slot. */
-  private readonly wakeOnTheWire = new Set<string>();
 
   constructor(private readonly ports: ControllerPorts) {}
 
@@ -164,7 +162,6 @@ export class Ps5Controller {
       this.sentAt.delete(`${hostId}:rest`);
       this.desired.delete(hostId);
       this.cancelAsked.delete(hostId);
-      this.wakeOnTheWire.delete(hostId);
     }
   }
 
@@ -277,18 +274,14 @@ export class Ps5Controller {
   }
 
   private async execute(input: ConsoleInput, command: Command): Promise<void> {
-    // Pressing Start three times must produce one wake, not three. This one
-    // holds even for an urgent request: a command already on the wire is not
-    // made faster by sending it twice.
-    //
-    // One exception (2026-10-19): a rest that has been withdrawn may still be
-    // finishing an attempt for up to twenty seconds (measured), and the wake a
-    // fresh Start needs is a single UDP datagram that does not touch that TCP
-    // session. Waiting for it is what made some Starts late.
-    const overtakesWithdrawnRest = command.kind === "wake"
-      && this.inFlight.get(input.hostId) === "rest" && this.cancelAsked.has(input.hostId);
-    if (this.inFlight.has(input.hostId) && !overtakesWithdrawnRest) return;
-    if (overtakesWithdrawnRest && this.wakeOnTheWire.has(input.hostId)) return;
+    // ONE command per console at a time, whatever it is (2026-10-27). Pressing
+    // Start three times produces one wake, and a wake never goes out while a
+    // rest for the same console is still on the wire — even a withdrawn one:
+    // until it returns, its standby may still land, and a wake beside it is
+    // exactly the "on, off, on" an operator sees. A withdrawn rest returns as
+    // soon as its connection is up (it checks the withdrawal once more before
+    // asking the console), and the next tick sends the wake.
+    if (this.inFlight.has(input.hostId)) return;
 
     const sentKey = `${input.hostId}:${command.kind}`;
 
@@ -311,11 +304,6 @@ export class Ps5Controller {
       // Bound but never located. Nothing to aim at until a sweep finds it.
       this.snapshots.set(input.hostId, withError(this.view(input.hostId).snapshot, "DEVICE_NOT_FOUND"));
       this.ports.log("PS5_TRANSPORT_ERROR", { hostId: input.hostId, code: "DEVICE_NOT_FOUND" });
-      return;
-    }
-
-    if (overtakesWithdrawnRest) {
-      await this.sendWakeBesideRest(input, sentKey);
       return;
     }
 
@@ -372,31 +360,6 @@ export class Ps5Controller {
     } finally {
       this.inFlight.delete(input.hostId);
       this.cancelAsked.delete(input.hostId);
-    }
-  }
-
-  /**
-   * A wake sent while a withdrawn rest is still finishing. It does not take the
-   * console's in-flight slot (the rest still owns it and releases it), and its
-   * failure is recorded like any wake's.
-   */
-  private async sendWakeBesideRest(input: ConsoleInput, sentKey: string): Promise<void> {
-    if (!input.address) return;
-    this.wakeOnTheWire.add(input.hostId);
-    this.sentAt.set(sentKey, this.ports.now());
-    this.ports.log("PS5_WAKE_REQUESTED", { hostId: input.hostId, deviceId: input.deviceId, besideRest: true });
-    try {
-      const outcome = await this.ports.wake(input.hostId, input.address);
-      if (!outcome.sent && !this.superseded(input.hostId, "wake")) {
-        this.lastError.set(input.hostId, outcome.code ?? "TRANSPORT_ERROR");
-        this.ports.log("PS5_TRANSPORT_ERROR", { hostId: input.hostId, command: "wake", code: outcome.code, detail: outcome.detail });
-      }
-    } catch (error) {
-      this.ports.log("PS5_TRANSPORT_ERROR", {
-        hostId: input.hostId, command: "wake", detail: error instanceof Error ? error.message : String(error),
-      });
-    } finally {
-      this.wakeOnTheWire.delete(input.hostId);
     }
   }
 

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import { useConsoleWatch, REST_HOLD_MS, WATCH_FAST_WINDOW_MS, WATCH_INTERVAL_FAST_MS, WATCH_INTERVAL_MS } from "./useConsoleWatch";
+import { useConsoleWatch, AWAKE_HOLD_MS, REST_HOLD_MS, WATCH_FAST_WINDOW_MS, WATCH_INTERVAL_FAST_MS, WATCH_INTERVAL_MS } from "./useConsoleWatch";
 import type { Ps5Console, Ps5SweepResult } from "./usePs5Discovery";
 
 /**
@@ -173,8 +173,9 @@ describe("the ten-second console check", () => {
     // Unplugged, switched off at the wall, or moved to another network — from
     // here these are the same silence, and presenting one of them as a state
     // would be a guess.
+    // Past the hold an awake console gets for Wi-Fi gaps (AWAKE_HOLD_MS).
     answerToProbe = () => [];
-    await act(async () => { await vi.advanceTimersByTimeAsync(WATCH_INTERVAL_MS); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(AWAKE_HOLD_MS + WATCH_INTERVAL_MS); });
 
     await waitFor(() => expect(result.current.statuses.AAA.state).toBe("unreachable"));
   });
@@ -334,15 +335,24 @@ describe("a sleeping console that goes quiet", () => {
     await waitFor(() => expect(result.current.statuses.AAA.state).toBe("unreachable"));
   });
 
-  test("an awake console's silence is not held: it is reported at once", async () => {
+  test("an awake console on Wi-Fi stays awake through a few silent probes, then is unavailable", async () => {
+    // Measured 2026-10-27: awake, it answered 35 % of probes with gaps up to
+    // 6 s. A gap is not "unavailable", which flickered the tile and restarted
+    // the unexpected-wake clock on every miss.
     let answers = true;
     answerToProbe = (addresses) => (answers ? addresses.map((a) => consoleAt("AAA", a, "awake")) : []);
     const { result } = renderHook(() => useConsoleWatch([{ hostId: "AAA", address: "192.168.1.10" }], { intervalMs: 3_000 }));
     await settle();
     await waitFor(() => expect(result.current.statuses.AAA.state).toBe("awake"));
+    const heard = result.current.statuses.AAA.heardAt;
 
     answers = false;
-    await act(async () => { await vi.advanceTimersByTimeAsync(3_000); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(9_000); });
+    expect(result.current.statuses.AAA.state).toBe("awake");
+    // Held, not heard: the moment it last really answered is kept.
+    expect(result.current.statuses.AAA.heardAt).toBe(heard);
+
+    await act(async () => { await vi.advanceTimersByTimeAsync(AWAKE_HOLD_MS); });
     await waitFor(() => expect(result.current.statuses.AAA.state).toBe("unreachable"));
   });
 

@@ -338,6 +338,11 @@ export const TRANSLATIONS: Dict = {
     ru: "Приставка игнорирует пробуждение. Включите на ней «Включение PS5 по сети» в настройках энергосбережения",
     am: "Կոնսոլն անտեսում է արթնացումը։ Միացրեք «Enable Turning On PS5 from Network» կարգավորումը Power Saving բաժնում",
   },
+  "ps5.error.TIMEOUT": {
+    en: "The console did not answer in time (slow network). Trying again",
+    ru: "Приставка не ответила вовремя (медленная сеть). Пробуем ещё раз",
+    am: "Կոնսոլը ժամանակին չպատասխանեց (դանդաղ ցանց)։ Կրկին փորձում ենք",
+  },
   "ps5.error.TRANSPORT_ERROR": {
     en: "Could not reach the console",
     ru: "Не удалось достучаться до приставки",

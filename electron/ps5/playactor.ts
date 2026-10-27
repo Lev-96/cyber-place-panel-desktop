@@ -87,7 +87,7 @@ class SuppliedPin {
 
 export interface PairResult {
   ok: boolean;
-  code?: "NO_PIN" | "NOT_AWAKE" | "REJECTED" | "UNREACHABLE" | "FAILED" | "IN_USE" | "CANCELLED";
+  code?: "NO_PIN" | "NOT_AWAKE" | "REJECTED" | "UNREACHABLE" | "FAILED" | "IN_USE" | "CANCELLED" | "TIMEOUT";
   detail?: string;
 }
 
@@ -103,7 +103,25 @@ export interface PairResult {
  * The console is still matched by host-id, so a lease that now belongs to a
  * different console is not acted on.
  */
-export const aimedAt = (address: string): { deviceIp: string } => ({ deviceIp: address });
+/**
+ * playactor's discovery aimed at one address, asking once a second.
+ *
+ * Its default is a ping every 5 s. A PS5 on Wi-Fi answers about a third of
+ * them (measured 2026-10-27), so finding the console before a standby could
+ * take 15 s, and one attempt missed every ping about one time in five —
+ * reported as "not on the network" while the console sat there awake.
+ */
+export const DISCOVERY_PING_MS = 1_000;
+/**
+ * How long playactor looks for the console before it gives up (its default is
+ * 30 s). A console that answers at all is found within a few seconds; a
+ * search that has not found it in 15 s ends, and the attempt is retried
+ * inside the same command instead of spending the whole budget on one search.
+ */
+export const DISCOVERY_TIMEOUT_MS = 15_000;
+
+export const aimedAt = (address: string): { deviceIp: string; pingIntervalMillis: number; timeoutMillis: number } =>
+  ({ deviceIp: address, pingIntervalMillis: DISCOVERY_PING_MS, timeoutMillis: DISCOVERY_TIMEOUT_MS });
 
 /**
  * Pair a console with an account, so that later it can be woken and rested.
@@ -197,8 +215,18 @@ const STANDBY_RETRY_MS = 4_000;
  * floor needs — a failure reported in seconds is retried by the monitor on its
  * next observation, with a fresh reading of what the console is actually doing.
  */
-const STANDBY_ATTEMPT_TIMEOUT_MS = 20_000;
-const STANDBY_TOTAL_TIMEOUT_MS = 35_000;
+/*
+ * Measured again 2026-10-27 on a console on Wi-Fi: found in 2 s, then its
+ * Remote Play session took 31.6 s to answer. A 20 s ceiling reported that as
+ * "not on the network" — and the abandoned attempt went on and put the console
+ * to sleep a dozen seconds later, after the panel had moved on. The ceilings
+ * now fit a slow console, and an attempt that is abandoned can no longer send
+ * its standby (see `standby`).
+ */
+const STANDBY_ATTEMPT_TIMEOUT_MS = 45_000;
+const STANDBY_TOTAL_TIMEOUT_MS = 60_000;
+/** How often a running attempt is checked for a withdrawal. */
+const CANCEL_POLL_MS = 250;
 
 /** Resolve to a timeout result rather than hanging on a library that will not return. */
 export const withCeiling = async (
@@ -209,7 +237,9 @@ export const withCeiling = async (
 
   const ceiling = new Promise<PairResult>((resolve) => {
     timer = setTimeout(
-      () => resolve({ ok: false, code: "UNREACHABLE", detail: `Timed out after ${ms}ms` }),
+      // The console was asked and did not finish answering in time — not the
+      // same sentence as "it is not on the network".
+      () => resolve({ ok: false, code: "TIMEOUT", detail: `Timed out after ${ms}ms` }),
       ms,
     );
   });
@@ -334,10 +364,26 @@ export const standby = async (
     const left = STANDBY_TOTAL_TIMEOUT_MS - (Date.now() - startedAt);
     if (left <= 0) return last;
 
-    last = await withCeiling(
-      attemptOnce(address, keys, hostId),
-      Math.min(STANDBY_ATTEMPT_TIMEOUT_MS, left),
-    );
+    // Once this attempt is left behind — it timed out, or the rest was
+    // withdrawn — it may still be opening its connection, and playactor cannot
+    // be called back. What it can no longer do is send the standby: it asks
+    // `gone` at the last moment, so a console never falls asleep after the
+    // panel has given up on putting it to sleep (measured: 12 s later, under
+    // whatever came next).
+    const gone = { value: false };
+    const watch = { done: false };
+    last = await Promise.race([
+      withCeiling(
+        attemptOnce(address, keys, hostId, () => gone.value || cancelled()),
+        Math.min(STANDBY_ATTEMPT_TIMEOUT_MS, left),
+      ),
+      // A withdrawal answers at once instead of after the slow connection, so
+      // the wake the panel holds back until this returns goes out promptly.
+      whenWithdrawn(cancelled, watch),
+    ]);
+    watch.done = true;
+    gone.value = true;
+    if (last.code === "CANCELLED") return last;
     if (last.ok || isPermanentRefusal(last.code)) return last;
 
     if (attempt < STANDBY_ATTEMPTS) {
@@ -348,11 +394,21 @@ export const standby = async (
   return last;
 };
 
+/** Resolves as CANCELLED once `cancelled` turns true, unless `watch.done` first. */
+const whenWithdrawn = (cancelled: () => boolean, watch: { done: boolean }): Promise<PairResult> =>
+  new Promise((resolve) => {
+    const timer = setInterval(() => {
+      if (watch.done) { clearInterval(timer); return; }
+      if (cancelled()) { clearInterval(timer); resolve(STANDBY_CANCELLED); }
+    }, CANCEL_POLL_MS);
+  });
+
 /** One attempt: open the session, ask, and close whatever happened. */
 const standbyOnce = async (
   address: string,
   keys: WakeKeys,
   hostId?: string,
+  cancelled: () => boolean = () => false,
 ): Promise<PairResult> => {
   try {
     const { PendingDevice } = await import("playactor/dist/device/pending");
@@ -376,6 +432,11 @@ const standbyOnce = async (
 
     const connection = await device.openConnection();
     try {
+      // Withdrawn (a session started) or abandoned (timed out) while the
+      // connection was being opened: the last moment the standby can still not
+      // be sent. Without it a late connection slept the console under the
+      // next player.
+      if (cancelled()) return STANDBY_CANCELLED;
       await connection.standby();
     } finally {
       // Always, even when the request above threw. A session left open is one

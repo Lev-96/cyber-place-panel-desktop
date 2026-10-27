@@ -37,12 +37,15 @@ let heard = 0;
  */
 const fakeConsoles = async (
   consoles: Array<{ hostId: string; name: string; status: string }>,
+  /** Probes to ignore before answering — a console on Wi-Fi drops some. */
+  dropFirst = 0,
 ): Promise<void> => {
   const socket = createSocket({ type: "udp4", reuseAddr: true });
   fake = socket;
 
   socket.on("message", (_message, remote) => {
     heard += 1;
+    if (heard <= dropFirst) return;
     for (const console_ of consoles) {
       const answer = [
         `HTTP/1.1 ${console_.status}`,
@@ -69,6 +72,19 @@ afterEach(() => {
 });
 
 describe("a discovery sweep", () => {
+  test("a status check still hears a console that dropped the first two asks (Wi-Fi)", async () => {
+    // Measured 2026-10-27: an awake PS5 on Wi-Fi answered 35 % of probes. The
+    // check asks three times in its window, so two dropped asks are not an
+    // "unavailable" console.
+    await fakeConsoles([{ hostId: "WIFI01", name: "PS5-WIFI", status: "200 Ok" }], 2);
+
+    const result = await probe(["127.0.0.1"]);
+
+    expect(result.consoles.find((c) => c.hostId === "WIFI01")?.state).toBe("awake");
+    expect(heard).toBe(3);
+  });
+
+
   test("finds a console, reads its identity and its state", async () => {
     await fakeConsoles([{ hostId: "AABBCC001122", name: "PS5-VIP-01", status: "200 Ok" }]);
 

@@ -70,6 +70,18 @@ export const WATCH_FAST_WINDOW_MS = 45_000;
 export const REST_HOLD_MS = 60_000;
 
 /**
+ * How long a console last heard AWAKE is still shown awake while it is silent
+ * (2026-10-27). It was not held at all — "an awake console answers every
+ * probe" — and that is not what a PS5 on Wi-Fi does: measured awake, it
+ * answered 21 of 60 one-second probes, with gaps up to six seconds. Every gap
+ * turned "on" into "unavailable" and back, and every flicker restarted the
+ * unexpected-wake clock, so a console left on after a session expired was put
+ * to sleep late or never. Twenty seconds of silence is longer than any gap
+ * measured and short enough that a console really unplugged is shown as such.
+ */
+export const AWAKE_HOLD_MS = 20_000;
+
+/**
  * Silent ticks before the watcher stops trusting the address it has and
  * sweeps. Two, so a single dropped datagram (which UDP is entitled to) costs a
  * slower answer rather than a network-wide broadcast.
@@ -137,8 +149,8 @@ export const useConsoleWatch = (bound: WatchedConsole[], options: Options = {}) 
   const misses = useRef<Record<string, number>>({});
   /** Addresses learned since mount, which are fresher than the props. */
   const learned = useRef<Record<string, string>>({});
-  /** When each console last answered "rest", for {@link REST_HOLD_MS}. */
-  const restHeardAt = useRef<Record<string, number>>({});
+  /** What each console last really answered, and when — held through silence. */
+  const lastHeard = useRef<Record<string, { state: Ps5State; at: number }>>({});
   /**
    * Until when to ask quickly, because something was just asked to change.
    *
@@ -204,20 +216,22 @@ export const useConsoleWatch = (bound: WatchedConsole[], options: Options = {}) 
 
     const heardAt = Date.now();
     for (const [hostId, answer] of answers) {
-      if (answer.state === "rest") restHeardAt.current[hostId] = heardAt;
-      else delete restHeardAt.current[hostId];
+      if (answer.state === "rest" || answer.state === "awake") lastHeard.current[hostId] = { state: answer.state, at: heardAt };
+      else delete lastHeard.current[hostId];
     }
 
     setStatuses((previous) => {
       const next: Record<string, ConsoleStatus> = {};
       for (const c of watched) {
         const answer = answers.get(c.hostId);
-        const restAt = restHeardAt.current[c.hostId];
+        const last = lastHeard.current[c.hostId];
+        const hold = last?.state === "rest" ? REST_HOLD_MS : AWAKE_HOLD_MS;
         next[c.hostId] = answer
           ? { state: answer.state, address: answer.address, name: answer.name, heardAt }
-          : restAt !== undefined && heardAt - restAt < REST_HOLD_MS
-            // Asleep a moment ago and quiet now: a sleeping console on Wi-Fi.
-            ? { state: "rest", address: previous[c.hostId]?.address ?? addressOf(c), name: previous[c.hostId]?.name ?? null, heardAt: restAt }
+          : last !== undefined && heardAt - last.at < hold
+            // Heard a moment ago and quiet now: a console on Wi-Fi between
+            // answers. It is shown as it last said, with when it said it.
+            ? { state: last.state, address: previous[c.hostId]?.address ?? addressOf(c), name: previous[c.hostId]?.name ?? null, heardAt: last.at }
             // Off, unplugged, or on another network — indistinguishable from
             // here, and presenting them as different states would be a guess.
             : { state: "unreachable", address: addressOf(c), name: null };

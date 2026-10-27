@@ -42,6 +42,7 @@ vi.mock("@/realtime/usePs5Realtime", () => ({
     if (branchId) { decided.branches.push(branchId); decided.deliver = onEvent; }
   },
 }));
+vi.mock("@/realtime/useSessionChanged", () => ({ useSessionChanged: () => {} }));
 // The key is what identifies WHICH sentence was chosen; the wording itself is
 // the translations file's business and is tested there.
 vi.mock("@/i18n/translations", () => ({ tActive: (key: string) => key }));
