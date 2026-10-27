@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import {
-  DEFAULT_PREFERENCES, NEW_PERSON_PREFERENCES, PRESETS, effectiveLayout, parsePreferences, toDocument,
+  DEFAULT_PREFERENCES, NEW_PERSON_PREFERENCES, PRESETS, SOUND_DEFAULTS, effectiveLayout, parsePreferences, toDocument,
 } from "./uiPreferences";
 
 /**
@@ -46,8 +46,12 @@ describe("parsePreferences", () => {
     expect(p.layout.sidebar).toEqual([{ id: "bookings", hidden: false }, { id: "shifts", hidden: true }]);
     expect(p).not.toHaveProperty("permissions");
     expect(p.sound.profile).toBe("standard");
-    expect(p.sound.categories.booking_new.sound).toBe("chime");
+    expect(p.sound.categories.booking_new.sound).toBe(SOUND_DEFAULTS.booking_new.sound);
     expect(Object.keys(p.sound.categories)).not.toContain("unknown");
+    // A sound this build no longer offers (the short synthesised ones of
+    // 2026-10-27 morning) falls back to the default, not to an error.
+    const old = parsePreferences({ sound: { categories: { support: { enabled: true, sound: "pop" } } } });
+    expect(old.sound.categories.support).toEqual({ enabled: true, sound: SOUND_DEFAULTS.support.sound });
   });
 
   test("a menu is capped at 60 entries", () => {

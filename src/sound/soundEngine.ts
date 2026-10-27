@@ -1,6 +1,6 @@
 import {
-  SOUND_DEFAULTS, defaultSound,
-  type SoundCategory, type SoundId, type SoundPrefs, type SoundProfile,
+  SOUND_DEFAULTS, SYNTH_SOUNDS, defaultSound,
+  type FileSoundId, type SoundCategory, type SoundId, type SoundPrefs, type SoundProfile, type SynthSoundId,
 } from "@/preferences/uiPreferences";
 
 /**
@@ -22,7 +22,13 @@ import {
  * - No pile-up: within 700 ms of the last sound nothing else starts.
  * - Never above 100 %: the gain is capped and the system volume is never
  *   touched — how loud 100 % is depends on the machine and its speakers.
- * - Synthesised (Web Audio), no files: nothing to load, nothing to fail.
+ * - Two kinds of sound (2026-10-27): the panel's own, synthesised (Web
+ *   Audio, nothing to load), and recorded melodies shipped with the panel
+ *   (`public/sounds`), loaded once and kept. A recording that cannot be
+ *   loaded plays the chime instead: a notification is never silent because
+ *   a file was missing.
+ * - Long enough to be heard (owner, 2026-10-27): a short recording is played
+ *   again until the profile's minimum length is reached.
  */
 
 interface Note {
@@ -35,15 +41,13 @@ interface Note {
   peak: number;
   /** "exp": quick attack, exponential decay; "lin": linear in and out. */
   shape: "exp" | "lin";
-  /** Slide to this pitch over the note (a "pop", a "bubble"). */
-  glideTo?: number;
 }
 
 /**
  * The built-in sounds. The first three are the panel's own, note for note,
  * so the Standard profile sounds exactly as before.
  */
-export const LIBRARY: Record<SoundId, Note[]> = {
+export const LIBRARY: Record<SynthSoundId, Note[]> = {
   // The floor arpeggio (C5 → E5 → G5), formerly `playNotificationChime`.
   chime: [
     { freq: 523.25, at: 0, dur: 0.22, type: "triangle", peak: 0.18, shape: "exp" },
@@ -72,42 +76,6 @@ export const LIBRARY: Record<SoundId, Note[]> = {
     { freq: 880, at: 0.14, dur: 0.09, type: "square", peak: 0.09, shape: "exp" },
     { freq: 880, at: 0.28, dur: 0.09, type: "square", peak: 0.09, shape: "exp" },
   ],
-  // Modern, short, soft UI sounds (2026-10-27) — original sounds in the
-  // style of today's messengers, not copies of any app's own.
-  // A bubble pop: one quick sine falling in pitch.
-  pop: [
-    { freq: 880, at: 0, dur: 0.12, type: "sine", peak: 0.24, shape: "exp", glideTo: 420 },
-  ],
-  // Two rising bubbles: friendly "message in".
-  bubble: [
-    { freq: 520, at: 0, dur: 0.1, type: "sine", peak: 0.2, shape: "exp", glideTo: 780 },
-    { freq: 700, at: 0.11, dur: 0.12, type: "sine", peak: 0.2, shape: "exp", glideTo: 1050 },
-  ],
-  // A light glass ping with a shimmer above it.
-  glass: [
-    { freq: 1567.98, at: 0, dur: 0.5, type: "sine", peak: 0.16, shape: "exp" },
-    { freq: 2349.32, at: 0, dur: 0.32, type: "sine", peak: 0.06, shape: "exp" },
-    { freq: 1975.53, at: 0.09, dur: 0.45, type: "sine", peak: 0.1, shape: "exp" },
-  ],
-  // A soft major-seventh strum, low to high.
-  strum: [
-    { freq: 523.25, at: 0, dur: 0.6, type: "sine", peak: 0.1, shape: "exp" },
-    { freq: 659.25, at: 0.04, dur: 0.6, type: "sine", peak: 0.1, shape: "exp" },
-    { freq: 783.99, at: 0.08, dur: 0.6, type: "sine", peak: 0.1, shape: "exp" },
-    { freq: 987.77, at: 0.12, dur: 0.6, type: "sine", peak: 0.1, shape: "exp" },
-  ],
-  // Two wooden knocks: short, dry, unmistakable.
-  knock: [
-    { freq: 1100, at: 0, dur: 0.07, type: "triangle", peak: 0.26, shape: "exp", glideTo: 700 },
-    { freq: 1100, at: 0.13, dur: 0.07, type: "triangle", peak: 0.26, shape: "exp", glideTo: 700 },
-  ],
-  // A marimba-like phrase: round notes that die away fast.
-  marimba: [
-    { freq: 659.25, at: 0, dur: 0.28, type: "sine", peak: 0.2, shape: "exp" },
-    { freq: 2637.02, at: 0, dur: 0.05, type: "sine", peak: 0.04, shape: "exp" },
-    { freq: 987.77, at: 0.12, dur: 0.32, type: "sine", peak: 0.2, shape: "exp" },
-    { freq: 3951.07, at: 0.12, dur: 0.05, type: "sine", peak: 0.04, shape: "exp" },
-  ],
   // Two-tone alert (B5 / F#5 twice): for what needs attention now.
   alert: [
     { freq: 987.77, at: 0, dur: 0.16, type: "sawtooth", peak: 0.07, shape: "lin" },
@@ -117,13 +85,37 @@ export const LIBRARY: Record<SoundId, Note[]> = {
   ],
 };
 
-/** What each ready-made profile does: real playback differences, not names. */
-export const PROFILES: Record<Exclude<SoundProfile, "custom">, { gain: number; repeat: number }> = {
-  quiet: { gain: 0.45, repeat: 1 },
-  standard: { gain: 1, repeat: 1 },
-  // Loud / Gaming club: louder, and the sound plays twice.
-  loud: { gain: 2.4, repeat: 2 },
+/**
+ * The recorded melodies: each file's length in seconds, as measured when it
+ * was trimmed and levelled to one loudness (−16 LUFS, peaks under −1.5 dB),
+ * so a level of 1 never clips and every melody is equally loud.
+ */
+export const RECORDINGS: Record<FileSoundId, number> = {
+  melodic: 1.34, message: 1.6, arrival: 1.67, newmsg: 0.79, sms: 2.17,
+  messenger: 1.32, chat: 0.63, note: 1.2, chord: 1.24, calm: 1.46,
+  social: 1.55, woohoo: 1.95, beep: 3.0, digital: 3.0, space: 6.46,
 };
+
+/**
+ * What each ready-made profile does: real playback differences, not names.
+ * `gain` / `repeat` shape the synthesised sounds (as before); `level` and
+ * `minSeconds` the recordings — how loud, and how long a notification rings
+ * at least (a short melody plays again until it has).
+ */
+export const PROFILES: Record<Exclude<SoundProfile, "custom">, {
+  gain: number; repeat: number; level: number; minSeconds: number;
+}> = {
+  quiet: { gain: 0.45, repeat: 1, level: 0.4, minSeconds: 0 },
+  standard: { gain: 1, repeat: 1, level: 0.75, minSeconds: 3 },
+  // Loud / Gaming club: louder, and it rings longer.
+  loud: { gain: 2.4, repeat: 2, level: 1, minSeconds: 6 },
+};
+/** A recording is played at most this many times for one notification. */
+export const MAX_PLAYS = 4;
+/** Silence between two plays of a recording, in seconds. */
+const PLAY_GAP = 0.3;
+/** A recording that took longer than this to load is not played late. */
+const LATE_MS = 3_000;
 
 /** Never louder than this, whatever the profile: a clean signal, not clipping. */
 export const MAX_PEAK = 0.9;
@@ -146,7 +138,9 @@ export interface DeviceSound {
 let prefs: SoundPrefs = defaultSound();
 let device: DeviceSound = { volume: 100, muted: false };
 let ctx: AudioContext | null = null;
-let lastAt = 0;
+/** Nothing new starts before this (ms): the sound playing now is not cut or doubled. */
+let busyUntil = 0;
+const recordings = new Map<FileSoundId, Promise<AudioBuffer | null>>();
 const heard = new Map<string, number>();
 let blocked = false;
 const blockedListeners = new Set<(b: boolean) => void>();
@@ -157,8 +151,19 @@ const setBlocked = (b: boolean) => {
   for (const l of blockedListeners) { try { l(b); } catch { /* a listener mid-unmount */ } }
 };
 
+const isSynth = (id: SoundId): id is SynthSoundId => (SYNTH_SOUNDS as readonly string[]).includes(id);
+
 /** The person's sound choices (the preferences provider keeps this current). */
-export const setSoundPreferences = (next: SoundPrefs): void => { prefs = next; };
+export const setSoundPreferences = (next: SoundPrefs): void => {
+  prefs = next;
+  // The melodies this person will hear are loaded now, not at the first
+  // notification, so it is not late.
+  const c = getCtx();
+  if (!c) return;
+  for (const choice of Object.values(next.categories)) {
+    if (choice.enabled && !isSynth(choice.sound)) void loadRecording(c, choice.sound);
+  }
+};
 /** This machine's volume and mute. */
 export const setDeviceSound = (next: DeviceSound): void => {
   device = { volume: Math.max(0, Math.min(100, Math.round(next.volume))), muted: next.muted };
@@ -192,15 +197,44 @@ export const gainFor = (profile: SoundProfile, volume: number): number => {
   return base * (Math.max(0, Math.min(100, volume)) / 100);
 };
 export const repeatFor = (profile: SoundProfile): number => (profile === "custom" ? 1 : PROFILES[profile].repeat);
+/** How loud a recording plays (0–1) for a profile at this machine's volume. */
+export const levelFor = (profile: SoundProfile, volume: number): number =>
+  PROFILES[profile === "custom" ? "standard" : profile].level * (Math.max(0, Math.min(100, volume)) / 100);
+/** How many times a recording of this length plays for one notification. */
+export const playsFor = (profile: SoundProfile, seconds: number): number => {
+  const min = PROFILES[profile === "custom" ? "standard" : profile].minSeconds;
+  return Math.max(1, Math.min(MAX_PLAYS, Math.ceil(min / (seconds + PLAY_GAP))));
+};
+/** How long a sound rings, in ms, start to finish (what `busyUntil` waits for). */
+export const soundLengthMs = (id: SoundId, profile: SoundProfile): number => {
+  if (isSynth(id)) {
+    const notes = LIBRARY[id];
+    return (Math.max(...notes.map((n) => n.at + n.dur)) + 0.12) * repeatFor(profile) * 1000;
+  }
+  const seconds = RECORDINGS[id];
+  const plays = playsFor(profile, seconds);
+  return (plays * seconds + (plays - 1) * PLAY_GAP) * 1000;
+};
 
-/**
- * Schedule a sound. Returns a stop function (for the preview), or null when
- * nothing could play. Never throws: sound is the least important part of a
- * notification.
- */
-const schedule = (id: SoundId, gain: number, repeat: number): (() => void) | null => {
-  const c = getCtx();
-  if (!c || gain <= 0) return null;
+/** Load a recording once (kept for the session); null when it cannot be had. */
+const loadRecording = (c: AudioContext, id: FileSoundId): Promise<AudioBuffer | null> => {
+  let pending = recordings.get(id);
+  if (!pending) {
+    pending = fetch(new URL(`sounds/${id}.mp3`, document.baseURI).toString())
+      .then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(new Error(`HTTP ${r.status}`))))
+      .then((data) => c.decodeAudioData(data))
+      .catch(() => {
+        // Forgotten, so the next notification tries again.
+        recordings.delete(id);
+        return null;
+      });
+    recordings.set(id, pending);
+  }
+  return pending;
+};
+
+/** Ask a suspended context to run, and say whether audio is allowed. */
+const wake = (c: AudioContext) => {
   if (c.state === "suspended") {
     void c.resume().then(() => setBlocked(c.state !== "running")).catch(() => setBlocked(true));
     // Still suspended right after asking: the system has not allowed audio
@@ -209,6 +243,14 @@ const schedule = (id: SoundId, gain: number, repeat: number): (() => void) | nul
   } else {
     setBlocked(false);
   }
+};
+
+/**
+ * Schedule a sound. Returns a stop function (for the preview), or null when
+ * nothing could play. Never throws: sound is the least important part of a
+ * notification.
+ */
+const scheduleSynth = (c: AudioContext, id: SynthSoundId, gain: number, repeat: number): (() => void) | null => {
   const notes = LIBRARY[id];
   const length = Math.max(...notes.map((n) => n.at + n.dur)) + 0.12;
   // The notes of a sound overlap, so the cap is on their SUM, not on each:
@@ -226,7 +268,6 @@ const schedule = (id: SoundId, gain: number, repeat: number): (() => void) | nul
         const peak = n.peak * gain * scale;
         osc.type = n.type;
         osc.frequency.setValueAtTime(n.freq, offset + n.at);
-        if (n.glideTo) osc.frequency.exponentialRampToValueAtTime(n.glideTo, offset + n.at + n.dur * 0.8);
         g.gain.setValueAtTime(0, offset + n.at);
         if (n.shape === "exp") {
           g.gain.linearRampToValueAtTime(peak, offset + n.at + 0.015);
@@ -251,6 +292,60 @@ const schedule = (id: SoundId, gain: number, repeat: number): (() => void) | nul
 };
 
 /**
+ * Play a recording `plays` times at `level`. It may still be loading: the
+ * stop function works either way, and a recording that cannot be loaded —
+ * or arrives too late to belong to this notification — gives way to the
+ * chime, or to nothing when it is late.
+ */
+const scheduleRecording = (c: AudioContext, id: FileSoundId, level: number, plays: number): () => void => {
+  let stopped = false;
+  let stopFallback: (() => void) | null = null;
+  const sources: AudioBufferSourceNode[] = [];
+  const asked = Date.now();
+  void loadRecording(c, id).then((buffer) => {
+    if (stopped || Date.now() - asked > LATE_MS) return;
+    if (!buffer) {
+      stopFallback = scheduleSynth(c, "chime", level, 1);
+      return;
+    }
+    try {
+      const g = c.createGain();
+      g.gain.setValueAtTime(Math.min(1, level), c.currentTime);
+      g.connect(c.destination);
+      const t0 = c.currentTime + 0.01;
+      for (let i = 0; i < plays; i++) {
+        const src = c.createBufferSource();
+        src.buffer = buffer;
+        src.connect(g);
+        src.start(t0 + i * (buffer.duration + PLAY_GAP));
+        sources.push(src);
+      }
+    } catch { /* sound is the least important part of a notification */ }
+  });
+  return () => {
+    stopped = true;
+    stopFallback?.();
+    for (const src of sources) { try { src.stop(); } catch { /* already stopped */ } }
+  };
+};
+
+/** Start a sound for a profile at a volume. Returns its stop, or null when nothing can play. */
+const schedule = (id: SoundId, profile: SoundProfile, volume: number): (() => void) | null => {
+  const c = getCtx();
+  if (!c) return null;
+  if (isSynth(id)) {
+    const gain = gainFor(profile, volume);
+    if (gain <= 0) return null;
+    wake(c);
+    return scheduleSynth(c, id, gain, repeatFor(profile));
+  }
+  const level = levelFor(profile, volume);
+  if (level <= 0) return null;
+  wake(c);
+  return scheduleRecording(c, id, level, playsFor(profile, RECORDINGS[id]));
+};
+
+/**
  * A notification of this kind has ARRIVED and is being shown: sound it, once.
  * `key` identifies the notification (its id, or the event's identity) so a
  * second arrival of the same one — replay, reconnect, re-render — is silent.
@@ -265,9 +360,9 @@ export const playFor = (category: SoundCategory, key: string, now: number = Date
 
   const choice = prefs.categories[category] ?? SOUND_DEFAULTS[category];
   if (!choice.enabled || device.muted) return false;
-  if (now - lastAt < SPACING_MS) return false;
-  lastAt = now;
-  return schedule(choice.sound, gainFor(prefs.profile, device.volume), repeatFor(prefs.profile)) !== null;
+  if (now < busyUntil) return false;
+  busyUntil = now + Math.max(SPACING_MS, soundLengthMs(choice.sound, prefs.profile));
+  return schedule(choice.sound, prefs.profile, device.volume) !== null;
 };
 
 let previewing: (() => void) | null = null;
@@ -275,7 +370,7 @@ let previewing: (() => void) | null = null;
 /** Play a sound to hear it (the settings screen). One at a time; returns its stop. */
 export const previewSound = (id: SoundId, profile: SoundProfile, volume: number): (() => void) => {
   stopPreview();
-  const stop = schedule(id, gainFor(profile, volume), repeatFor(profile));
+  const stop = schedule(id, profile, volume);
   previewing = stop;
   return () => { if (previewing === stop) stopPreview(); };
 };
@@ -297,7 +392,8 @@ export const unlockAudio = async (): Promise<boolean> => {
 /** Test-only: forget everything heard and the spacing clock. */
 export const resetSoundEngineForTests = (): void => {
   heard.clear();
-  lastAt = 0;
+  busyUntil = 0;
+  recordings.clear();
   previewing = null;
   blocked = false;
   ctx = null;

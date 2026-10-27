@@ -6,7 +6,7 @@ import { useLang } from "@/i18n/LanguageContext";
 import { LANGUAGES, type Lang } from "@/i18n/translations";
 import { useUiPreferences } from "@/preferences/UiPreferencesContext";
 import {
-  NEW_PERSON_PREFERENCES, PRESETS,
+  NEW_PERSON_PREFERENCES, PRESETS, SOUND_DEFAULTS,
   type InterfaceId, type SoundProfile, type ThemeId, type UiPreferences,
 } from "@/preferences/uiPreferences";
 import { previewSound, stopPreview, unlockAudio } from "@/sound/soundEngine";
@@ -63,7 +63,7 @@ const OnboardingWizard = () => {
   const tryVolume = async (profile: SoundProfile) => {
     // A click is also what lets the system play sound at all.
     await unlockAudio();
-    previewSound("chime", profile, deviceSound.muted ? 0 : deviceSound.volume);
+    previewSound(SOUND_DEFAULTS.booking_new.sound, profile, deviceSound.muted ? 0 : deviceSound.volume);
   };
 
   const interfaces: Array<{ key: Exclude<InterfaceId, "custom">; title: string; description: string }> = [

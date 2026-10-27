@@ -94,6 +94,27 @@ describe("trying on and saving", () => {
     expect(saved.layout.density).toBe("simple");
   });
 
+  test("after Compact, Standard and My interface really change the look again", async () => {
+    await mount();
+    await act(async () => { pick("interface", "compact"); });
+    expect(html()).toMatchObject({ density: "compact", cardSize: "s", boardView: "list" });
+    await act(async () => { pick("interface", "standard"); });
+    expect(html()).toMatchObject({ density: "standard", cardSize: "m", boardView: "grid" });
+    await act(async () => { pick("interface", "compact"); });
+    // My interface is the person's own layout (Standard until they change it),
+    // not a copy of the Compact that was just on screen.
+    await act(async () => { pick("interface", "custom"); });
+    expect(html()).toMatchObject({ density: "standard", cardSize: "m", boardView: "grid" });
+  });
+
+  test("My interface brings back the person's own saved layout", async () => {
+    repo.get.mockResolvedValue(doc({ data: { interface: "standard", layout: { density: "simple", card_size: "l", board_view: "list" } } }));
+    await mount();
+    await act(async () => { pick("interface", "compact"); });
+    await act(async () => { pick("interface", "custom"); });
+    expect(html()).toMatchObject({ density: "simple", cardSize: "l", boardView: "list" });
+  });
+
   test("Back to the standard interface is a change like any other", async () => {
     repo.get.mockResolvedValue(doc({ data: { interface: "compact" } }));
     await mount();

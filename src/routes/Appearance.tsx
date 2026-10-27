@@ -67,11 +67,10 @@ const Appearance = () => {
   }, [roleItems, myBranchId, t]);
 
   const setInterface = (id: InterfaceId) => {
-    if (id === "custom") {
-      // «Мой интерфейс» starts from what is on screen, not from a blank.
-      editDraft({ ...working, interface: "custom", layout: working.interface === "custom" ? working.layout : { ...layout } });
-      return;
-    }
+    // «Мой интерфейс» is the person's OWN layout, kept while a ready-made
+    // one is on (it starts as Standard), so choosing it shows that layout —
+    // not a copy of whatever was on screen. Editing any control below while
+    // a ready-made one is on still starts from what is on screen (setLayout).
     editDraft({ ...working, interface: id });
   };
   const setLayout = (patch: Partial<Layout>) =>

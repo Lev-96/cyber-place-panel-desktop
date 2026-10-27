@@ -31,7 +31,10 @@ const Card = ({ tone, number, status, rate, quick }: {
       style={{ borderColor: accent, "--card-accent": accent } as React.CSSProperties}
     >
       <span className="session-card__stripe" aria-hidden />
-      <span className="session-card__state" aria-hidden><StatusIcon tone={tone} /></span>
+      <span className="session-card__state" aria-hidden>
+        <StatusIcon tone={tone} />
+        <span className="session-card__state-word">{t(`session.tone.${tone}`)}</span>
+      </span>
       <span className="platform" style={{ marginLeft: 0 }}>PC · STANDARD</span>
       <span className="id cell-line">№{number}</span>
       <span className="status">{status}</span>

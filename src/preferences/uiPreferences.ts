@@ -27,7 +27,18 @@ export const SOUND_PROFILES = ["quiet", "standard", "loud", "custom"] as const;
  * sale event in the system, so there is no sale sound to offer.
  */
 export const SOUND_CATEGORIES = ["booking_new", "booking_changed", "session_ending", "support", "guests", "system"] as const;
-export const SOUNDS = ["chime", "soft", "ding", "bell", "pulse", "alert", "pop", "bubble", "glass", "strum", "knock", "marimba"] as const;
+/** The panel's own sounds, synthesised in code (the first three are the old ones, note for note). */
+export const SYNTH_SOUNDS = ["chime", "soft", "ding", "bell", "pulse", "alert"] as const;
+/**
+ * Recorded melodies shipped with the panel (`public/sounds/<id>.mp3`,
+ * 2026-10-27, chosen by the owner): trimmed and levelled to one loudness.
+ */
+export const FILE_SOUNDS = [
+  "melodic", "message", "arrival", "newmsg", "sms", "messenger", "chat", "note",
+  "chord", "calm", "social", "woohoo", "beep", "digital", "space",
+] as const;
+/** Every sound a person can choose, the recorded ones first. */
+export const SOUNDS = [...FILE_SOUNDS, ...SYNTH_SOUNDS] as const;
 
 export type InterfaceId = (typeof INTERFACES)[number];
 export type ThemeId = (typeof THEMES)[number];
@@ -37,7 +48,9 @@ export type BoardView = (typeof BOARD_VIEWS)[number];
 export type QuickActions = (typeof QUICK_ACTIONS)[number];
 export type SoundProfile = (typeof SOUND_PROFILES)[number];
 export type SoundCategory = (typeof SOUND_CATEGORIES)[number];
-export type SoundId = (typeof SOUNDS)[number];
+export type SynthSoundId = (typeof SYNTH_SOUNDS)[number];
+export type FileSoundId = (typeof FILE_SOUNDS)[number];
+export type SoundId = SynthSoundId | FileSoundId;
 
 export interface SidebarEntry {
   id: string;
@@ -94,19 +107,19 @@ export const PRESETS: Record<Exclude<InterfaceId, "custom">, Layout> = {
   },
 };
 
-/** Which sound plays for each kind of notification, per ready-made profile. */
 /**
- * The sounds a person hears before choosing any: the ones the panel already
- * played for each event (the floor arpeggio, the support "bloop", the update
- * ding), plus a bell for a seat about to run out, which had none.
+ * The sounds a person hears before choosing any (2026-10-27, owner: modern
+ * melodies, long enough to be heard at a busy counter): a different recorded
+ * melody per kind, so a bell for a seat running out is told apart from a new
+ * booking without looking. A person's own choice always wins.
  */
 export const SOUND_DEFAULTS: Record<SoundCategory, SoundCategoryPrefs> = {
-  booking_new: { enabled: true, sound: "chime" },
-  booking_changed: { enabled: true, sound: "chime" },
-  session_ending: { enabled: true, sound: "bell" },
-  support: { enabled: true, sound: "soft" },
-  guests: { enabled: true, sound: "chime" },
-  system: { enabled: true, sound: "ding" },
+  booking_new: { enabled: true, sound: "melodic" },
+  booking_changed: { enabled: true, sound: "message" },
+  session_ending: { enabled: true, sound: "digital" },
+  support: { enabled: true, sound: "chat" },
+  guests: { enabled: true, sound: "chord" },
+  system: { enabled: true, sound: "calm" },
 };
 
 export const defaultSound = (): SoundPrefs => ({

@@ -136,7 +136,6 @@
   --control-h: 40px;
   --control-h-card: 32px;
   --grid-min: 198px;
-  --card-pad: 10px;
   --gap-grid: 12px;
 
   /* App surfaces that had their own literal (2026-10-27), kept exact. */
@@ -3355,7 +3354,7 @@ button.pill:hover {
 .cp-subtab {
   flex: 1 1 0;
   min-width: 0;
-  height: 34px;
+  height: var(--subtab-h, 34px);
   /* Block, not flex: the ellipsis needs a block-level text box — a flex
      container clips the label without ever drawing the "…". Centring is done
      with line-height for the same reason. */
@@ -3363,7 +3362,7 @@ button.pill:hover {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  line-height: 34px;
+  line-height: var(--subtab-h, 34px);
   padding-top: 0;
   padding-bottom: 0;
   text-align: center;
@@ -5214,7 +5213,7 @@ select.input option:disabled {
 .live-grid.live-grid--sessions {
   /* Medium: the card's short action labels ("+ Время", "Переместить") fit a
      2-column grid on one line from 184px. */
-  grid-template-columns: repeat(auto-fill, minmax(198px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(var(--grid-min, 198px), 1fr));
   gap: 10px;
 }
 .place-cell.session-card {
@@ -6838,16 +6837,16 @@ select.input option:disabled {
 [data-density="simple"] {
   --control-h: 46px;
   --control-h-card: 40px;
-  --card-pad: 14px;
   --gap-grid: 16px;
 }
 [data-density="simple"] .sidebar-nav a { padding: 12px 14px; font-size: 15px; }
-[data-density="simple"] .btn:not(.session-card__btn) { min-height: 44px; font-size: 15px; }
+[data-density="simple"] { --subtab-h: 44px; }
+/* Fixed-height buttons (card actions, tabs) centre their words themselves:
+   only free-height buttons take the density's padding and height. */
+[data-density="simple"] .btn:not(.session-card__btn):not(.cp-subtab) { min-height: 44px; font-size: 15px; }
+[data-density="simple"] .cp-subtab { font-size: 15px; }
 [data-density="simple"] .input { min-height: 44px; font-size: 15px; }
 [data-density="simple"] .live-grid.live-grid--sessions { gap: var(--gap-grid); }
-[data-density="simple"] .place-cell.session-card { padding: var(--card-pad); }
-[data-density="simple"] .place-cell.session-card .id { font-size: 20px; }
-[data-density="simple"] .place-cell.session-card--running .status { font-size: 21px; }
 [data-density="simple"] .session-card__btn.btn,
 [data-density="simple"] .session-card__start.btn {
   height: var(--control-h-card);
@@ -6862,26 +6861,38 @@ select.input option:disabled {
    their 32 px, only the air around them goes. */
 [data-density="compact"] {
   --control-h: 34px;
-  --card-pad: 8px;
   --gap-grid: 8px;
 }
 [data-density="compact"] .main { --main-pad-top: 16px; --main-pad-x: 20px; }
 [data-density="compact"] .sidebar-nav a { padding: 7px 10px; font-size: 13px; }
 [data-density="compact"] .sidebar-nav { gap: 2px; }
-[data-density="compact"] .btn:not(.session-card__btn) { padding: 7px 12px; font-size: 13px; }
+[data-density="compact"] { --subtab-h: 30px; }
+[data-density="compact"] .btn:not(.session-card__btn):not(.cp-subtab) { padding: 7px 12px; font-size: 13px; }
+[data-density="compact"] .cp-subtab { font-size: 13px; }
 [data-density="compact"] .input { padding: 7px 10px; font-size: 13px; }
 [data-density="compact"] .live-grid.live-grid--sessions { gap: var(--gap-grid); }
-[data-density="compact"] .place-cell.session-card { padding: var(--card-pad); gap: 3px; }
-[data-density="compact"] .place-cell.session-card--running .status { font-size: 15px; }
+[data-density="compact"] .place-cell.session-card { gap: 3px; }
 
-/* Card size, on the sessions board only. */
-[data-card-size="l"] .live-grid.live-grid--sessions { grid-template-columns: repeat(auto-fill, minmax(236px, 1fr)); }
-[data-card-size="s"] .live-grid.live-grid--sessions { grid-template-columns: repeat(auto-fill, minmax(186px, 1fr)); }
+/* Card size, on the sessions board only: the column, the air inside and the
+   number and clock. Medium has no rules — it is the board as it always was. */
+[data-card-size="s"] { --grid-min: 168px; --row-py: 6px; }
+[data-card-size="l"] { --grid-min: 272px; --row-py: 14px; }
+[data-card-size="s"] .place-cell.session-card { padding: 8px 8px 10px; min-height: 118px; }
+[data-card-size="s"] .place-cell.session-card .id { font-size: 14px; }
+[data-card-size="s"] .place-cell.session-card--running .status { font-size: 15px; }
+[data-card-size="s"] .place-cell.session-card--idle .status { font-size: 13px; }
+[data-card-size="l"] .place-cell.session-card { padding: 14px 14px 18px; min-height: 176px; gap: 8px; }
+[data-card-size="l"] .place-cell.session-card .platform { font-size: 12px; }
+[data-card-size="l"] .place-cell.session-card .id { font-size: 22px; font-weight: 800; }
+[data-card-size="l"] .place-cell.session-card--running .status { font-size: 26px; }
+[data-card-size="l"] .place-cell.session-card--idle .status { font-size: 18px; font-weight: 700; }
 
 /* Secondary detail off (Simple, or a person's own choice). */
 [data-secondary="off"] .session-card__secondary { display: none; }
 
 /* === Themes (2026-10-27) ====================================================
+   Light is soft on purpose (2026-10-27, owner: pure white hurt the eyes):
+   a grey-blue page, off-white surfaces, near-black (not black) text.
    Dark is :root above — the panel as it always was. Light and High contrast
    redefine the SAME tokens, nothing else: components never know which theme
    is on. Every text colour here is ≥ 4.5:1 on its surface and every control
@@ -6894,52 +6905,52 @@ select.input option:disabled {
   --on-accent-ink-tick: #ffffff;
   --on-accent-ink-badge: #ffffff;
   --update-toast-end: rgba(224, 242, 254, 0.98);
-  --update-toast-fg: #1e293b;
-  --accent-rgb: 14 116 144;
+  --update-toast-fg: #262e3c;
+  --accent-rgb: 14 111 138;
   --accent-blue-rgb: 3 105 161;
   --accent-purple-rgb: 126 34 206;
   --danger-rgb: 185 28 28;
-  --success-rgb: 21 128 61;
+  --success-rgb: 17 108 53;
   --warning-rgb: 180 83 9;
-  --muted-rgb: 71 85 105;
-  --bg-rgb: 244 246 251;
-  --surface-rgb: 255 255 255;
-  --fg-rgb: 15 23 42;
+  --muted-rgb: 74 85 102;
+  --bg-rgb: 230 233 238;
+  --surface-rgb: 243 244 247;
+  --fg-rgb: 28 35 48;
   --shadow-rgb: 15 23 42;
-  --border-rgb: 195 205 221;
+  --border-rgb: 197 204 214;
   --rgb-steel: 100 116 139;
   --rgb-steel-light: 148 163 184;
   --rgb-yellow: 161 98 7;
 
-  --color-bg: #f4f6fb;
-  --color-surface: #ffffff;
-  --color-surface-alt: #eef2f8;
-  --color-border: #c3cddd;
-  --color-text: #0b1224;
-  --color-muted: #475569;
-  --color-primary: #0e7490;
+  --color-bg: #e6e9ee;
+  --color-surface: #f3f4f7;
+  --color-surface-alt: #eaedf1;
+  --color-border: #c5ccd6;
+  --color-text: #1c2330;
+  --color-muted: #4a5566;
+  --color-primary: #0e6f8a;
   --color-danger: #b91c1c;
-  --color-success: #15803d;
+  --color-success: #116c35;
   --color-warning: #b45309;
   --color-inactive: #556274;
   --color-accent-blue: #0369a1;
   --color-accent-purple: #7e22ce;
 
-  --status-free-rgb: 14 116 144;
-  --status-playing-rgb: 21 128 61;
+  --status-free-rgb: 14 111 138;
+  --status-playing-rgb: 17 108 53;
   --status-booked-rgb: 109 40 217;
   --status-ending-rgb: 180 83 9;
   --status-critical-rgb: 185 28 28;
   --status-offline-rgb: 85 98 116;
   --status-critical-fg: #b91c1c;
 
-  --color-text-soft: #1e293b;
+  --color-text-soft: #262e3c;
   --color-muted-alt: #475569;
   --color-muted-dim: #556274;
   --color-muted-grey: #556274;
   --color-danger-border-dim: #fca5a5;
-  --color-success-bright: #15803d;
-  --color-surface-deep: #e2e8f0;
+  --color-success-bright: #116c35;
+  --color-surface-deep: #dde1e7;
   --color-on-danger: #ffffff;
   --color-on-primary: #ffffff;
   --color-danger-deep: #fca5a5;
@@ -6948,25 +6959,25 @@ select.input option:disabled {
   --color-warning-surface: #fef3c7;
   --color-ps5-amber: #b45309;
   --color-grey-dim: #556274;
-  --color-text-bright: #0f172a;
+  --color-text-bright: #1c2330;
   --color-accent-purple-soft: #6b21a8;
   --scrollbar-thumb-hover: #94a3b8;
-  --back-btn-bg: rgba(255, 255, 255, 0.92);
-  --back-btn-fg: #0e7490;
-  --topbar-pill-bg: rgba(255, 255, 255, 0.96);
-  --stepper-hi: #f1f5f9;
+  --back-btn-bg: rgba(243, 244, 247, 0.94);
+  --back-btn-fg: #0e6f8a;
+  --topbar-pill-bg: rgba(243, 244, 247, 0.96);
+  --stepper-hi: #eef0f3;
   --stepper-lo: #e2e8f0;
   --stepper-hover: #dbe3ee;
-  --pill-fg: #0e7490;
+  --pill-fg: #0e6f8a;
   --suggest-fg: #1e293b;
   --suggest-active-bg: #e0f2fe;
-  --control-bg: #ffffff;
+  --control-bg: #f7f8fa;
   --notice-border: #b45309;
   --notice-bg: rgba(180, 83, 9, 0.08);
   --notice-fg: #92400e;
-  --toast-surface: #ffffff;
-  --select-bg: #ffffff;
-  --select-fg: #0f172a;
+  --toast-surface: #f7f8fa;
+  --select-bg: #f7f8fa;
+  --select-fg: #1c2330;
   color-scheme: light;
 }
 /* A control's own frame needs 3:1 against the page (WCAG 1.4.11). */
@@ -6974,7 +6985,7 @@ select.input option:disabled {
 [data-theme="light"] select,
 [data-theme="light"] textarea { border-color: #77849b; }
 /* The artwork behind screens is drawn for a dark room: a whisper of it here. */
-[data-theme="light"] .screen-bg-img { opacity: 0.07; filter: grayscale(1); }
+[data-theme="light"] .screen-bg-img { opacity: 0.05; filter: grayscale(1); }
 
 [data-theme="contrast"] {
   --on-success-ink: #000000;
@@ -7105,7 +7116,7 @@ select.input option:disabled {
 /* Theme swatches are drawn in the theme's own colours, whatever theme is on. */
 .theme-swatch { display: block; height: 34px; border-radius: 6px; border: 1px solid var(--color-border); }
 .theme-swatch--dark { background: linear-gradient(90deg, #020514 0 55%, #0b1224 55% 80%, #07ddf1 80%); }
-.theme-swatch--light { background: linear-gradient(90deg, #f4f6fb 0 55%, #ffffff 55% 80%, #0e7490 80%); }
+.theme-swatch--light { background: linear-gradient(90deg, #e6e9ee 0 55%, #f3f4f7 55% 80%, #0e6f8a 80%); }
 .theme-swatch--contrast { background: linear-gradient(90deg, #000000 0 55%, #ffffff 55% 62%, #000 62% 80%, #22e8ff 80%); }
 
 .appearance-preview {
@@ -7115,6 +7126,11 @@ select.input option:disabled {
   overflow: hidden;
 }
 .appearance-preview .live-grid { pointer-events: none; }
+/* Cards keep the chosen card size here instead of stretching to fill the
+   frame, so Large / Medium / Small are seen side by side. */
+[data-board-view="grid"] .appearance-preview .live-grid.live-grid--sessions {
+  grid-template-columns: repeat(auto-fill, var(--grid-min, 198px));
+}
 .appearance-preview .session-card__btn,
 .appearance-preview .session-card__start { pointer-events: none; }
 .appearance-grid {
@@ -7191,36 +7207,16 @@ select.input option:disabled {
 /* Wraps by the space it has, not by the window: on a narrow panel the sound
    and its Listen button drop under the name instead of off the edge. */
 .sound-row__name { flex: 1 1 220px; min-width: 0; }
-.sound-row > [role="cell"]:nth-child(2) { flex: 0 1 200px; min-width: 150px; }
+.sound-row > :nth-child(2) { flex: 0 1 220px; min-width: 150px; }
+.sound-row > :nth-child(2) .input { width: 100%; }
+/* The one choice for every kind: the row that matters most, so it stands out. */
+.sound-all { margin-bottom: var(--space-3); border-color: rgb(var(--accent-rgb) / 0.5); background: rgb(var(--accent-rgb) / 0.05); }
+.sound-all .sound-row__name { margin: 0; font-size: var(--fs-md); font-weight: 600; color: var(--color-text); text-transform: none; letter-spacing: 0; }
+.sound-all > :nth-child(2) { flex-basis: 260px; }
+.sound-each { margin-bottom: var(--space-2); }
+.sound-each > summary { cursor: pointer; padding: 6px 0; font-weight: 600; color: var(--color-text); }
+.sound-each[open] > summary { margin-bottom: 6px; }
 .sound-row__play .btn { min-width: 128px; }
-
-/* === Active Places as a list (2026-10-27) ===================================
-   One seat per row: who it is on the left, the clock and money in the middle,
-   the actions on the right. Same markup and handlers as the grid. */
-[data-board-view="list"] .live-grid.live-grid--sessions { grid-template-columns: 1fr; gap: 8px; }
-[data-board-view="list"] .place-cell.session-card {
-  flex-direction: row;
-  flex-wrap: wrap;
-  align-items: center;
-  column-gap: var(--space-4);
-  row-gap: var(--space-2);
-  min-height: 0;
-  padding-left: calc(var(--card-pad) + 18px);
-}
-[data-board-view="list"] .place-cell.session-card .platform { margin-left: 0 !important; min-width: 130px; }
-[data-board-view="list"] .place-cell.session-card .id { min-width: 90px; }
-[data-board-view="list"] .place-cell.session-card .session-card__actions,
-[data-board-view="list"] .place-cell.session-card .session-card__foot {
-  margin-left: auto;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 0;
-}
-[data-board-view="list"] .place-cell.session-card .session-card__btn.btn,
-[data-board-view="list"] .place-cell.session-card .session-card__start.btn { width: auto; min-width: 96px; padding: 0 12px; }
-[data-board-view="list"] .session-card__more { grid-column: auto; }
-[data-board-view="list"] .place-cell.session-card .session-card__menu { left: auto; right: 0; min-width: 200px; }
 
 /* === First-run setup (2026-10-27) =========================================== */
 .onboarding { width: 720px; max-width: 92vw; display: flex; flex-direction: column; gap: var(--space-3); }
@@ -7253,14 +7249,8 @@ select.input option:disabled {
 .session-card__state-word { display: none; }
 
 /* Simple: big, few, obvious. */
-[data-density="simple"] .live-grid.live-grid--sessions {
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 18px;
-}
-[data-density="simple"] .place-cell.session-card { padding: 16px; gap: 8px; border-width: 2px; }
-[data-density="simple"] .place-cell.session-card .id { font-size: 24px; font-weight: 800; }
-[data-density="simple"] .place-cell.session-card--running .status { font-size: 28px; }
-[data-density="simple"] .place-cell.session-card--idle .status { font-size: 18px; font-weight: 700; }
+[data-density="simple"] .live-grid.live-grid--sessions { gap: 18px; }
+[data-density="simple"] .place-cell.session-card { border-width: 2px; }
 [data-density="simple"] .place-cell.session-card .session-card__state {
   width: auto;
   height: auto;
@@ -7308,46 +7298,6 @@ select.input option:disabled {
 .simple-board-help__title { font-weight: 700; margin-right: 4px; }
 .simple-board-help .status-chip { font-size: 13px; padding: 4px 10px 4px 8px; }
 
-/* List: the state is the row's first thing, never on top of a button. */
-[data-board-view="list"] .place-cell.session-card .session-card__state {
-  position: static;
-  order: -1;
-  width: auto;
-  height: auto;
-  gap: 6px;
-  font-size: 12px;
-  font-weight: 700;
-  min-width: 120px;
-  justify-content: flex-start;
-}
-[data-board-view="list"] .session-card__state-word { display: inline; }
-[data-board-view="list"] .place-cell.session-card { padding-left: calc(var(--card-pad) + 22px); }
-
-/* Compact: dense rows, every action in reach, buttons never under 32 px. */
-[data-density="compact"][data-board-view="list"] .live-grid.live-grid--sessions { gap: 6px; }
-[data-density="compact"][data-board-view="list"] .place-cell.session-card { padding-top: 6px; padding-bottom: 6px; row-gap: 4px; }
-[data-density="compact"][data-board-view="list"] .place-cell.session-card--running .status { font-size: 15px; }
-[data-density="compact"][data-board-view="list"] .place-cell.session-card .id { font-size: 15px; min-width: 64px; }
-
-/* Compact rows: the who/what columns give up their reserve and the long
-   tariff line shortens with an ellipsis, so the actions fit on the row when
-   the window allows; when it does not they wrap to the right on a second
-   line — never past the frame. */
-[data-density="compact"][data-board-view="list"] .place-cell.session-card .session-card__state { min-width: 104px; font-size: 11.5px; }
-[data-density="compact"][data-board-view="list"] .place-cell.session-card .platform { min-width: 0; flex-shrink: 1; }
-[data-density="compact"][data-board-view="list"] .place-cell.session-card .until,
-[data-density="compact"][data-board-view="list"] .place-cell.session-card .session-card__hint {
-  min-width: 0;
-  flex: 1 1 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-[data-density="compact"][data-board-view="list"] .place-cell.session-card .session-card__btn.btn,
-[data-density="compact"][data-board-view="list"] .place-cell.session-card .session-card__start.btn { min-width: 84px; padding: 0 10px; }
-[data-board-view="list"] .place-cell.session-card .session-card__actions,
-[data-board-view="list"] .place-cell.session-card .session-card__foot { justify-content: flex-end; max-width: 100%; }
-
 /* === Miniatures of the ready-made interfaces (2026-10-27) =================
    Fixed pixel sizes on purpose: the four pictures must compare the same way
    whichever interface is on. */
@@ -7386,3 +7336,113 @@ select.input option:disabled {
 }
 .appearance-help::before { content: "💡"; line-height: 1.3; }
 .choice-card__title { font-size: var(--fs-md); }
+
+/* === Active Places as a list (2026-10-27, rebuilt) ==========================
+   One seat per row, every row cut into the SAME columns, each part pinned to
+   its own column — so a seat without a console chip or a tariff line leaves
+   its cell empty instead of pulling the rest of the row left. Same markup
+   and handlers as the cards; only the layout differs. Narrower boards fold
+   into two and then three lines (container queries on the board itself). */
+[data-board-view="list"] .live-grid.live-grid--sessions {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+  container-type: inline-size;
+}
+[data-board-view="list"] .live-grid--sessions > .place-cell.session-card {
+  display: grid;
+  /* Fixed widths, never content-sized: every row is its own grid, so only
+     fixed tracks line up from row to row. The tariff line takes what is left,
+     the buttons at most 440px (more of them wrap inside their cell). */
+  grid-template-columns: 132px 140px 112px 200px 200px minmax(0, 1fr) fit-content(440px);
+  column-gap: 16px;
+  row-gap: 6px;
+  align-items: center;
+  min-height: 0;
+  padding: var(--row-py, 10px) 12px var(--row-py, 10px) 34px;
+}
+[data-board-view="list"] .live-grid--sessions > .place-cell.session-card > * { min-width: 0; margin: 0; }
+[data-board-view="list"] .live-grid--sessions .session-card .cell-grip { top: 50%; left: 12px; transform: translateY(-50%); }
+[data-board-view="list"] .live-grid--sessions .session-card .session-card__state {
+  grid-column: 1; grid-row: 1;
+  position: static;
+  width: auto;
+  height: auto;
+  max-width: none;
+  justify-content: flex-start;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+}
+[data-board-view="list"] .session-card__state svg { flex-shrink: 0; }
+[data-board-view="list"] .session-card__state-word { display: inline; overflow: hidden; text-overflow: ellipsis; }
+[data-board-view="list"] .live-grid--sessions .session-card .platform { grid-column: 2; grid-row: 1; margin-left: 0 !important; overflow: hidden; }
+[data-board-view="list"] .live-grid--sessions .session-card .ps5-chip { grid-column: 3; grid-row: 1; justify-self: start; align-self: center; }
+[data-board-view="list"] .live-grid--sessions .session-card .id { grid-column: 4; grid-row: 1; }
+[data-board-view="list"] .live-grid--sessions .session-card .status { grid-column: 5; grid-row: 1; }
+/* The clock and the money may stack in a narrow column instead of running
+   past the frame (they share one span with no break between them). */
+[data-board-view="list"] .live-grid--sessions .session-card--running .status > span {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  row-gap: 2px;
+}
+[data-board-view="list"] .live-grid--sessions .session-card .until,
+[data-board-view="list"] .live-grid--sessions .session-card .session-card__hint {
+  grid-column: 6; grid-row: 1;
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* The pad line and refusals: a second line under the seat's own columns. */
+[data-board-view="list"] .live-grid--sessions .session-card > .row { grid-column: 4 / 7; }
+/* A row with a pad line is two lines tall: its buttons centre on both. */
+[data-board-view="list"] .live-grid--sessions .session-card:has(> .row) .session-card__actions { grid-row: 1 / span 2; }
+[data-board-view="list"] .live-grid--sessions .session-card .session-card__error { grid-column: 4 / -1; }
+[data-board-view="list"] .live-grid--sessions .session-card .session-card__actions,
+[data-board-view="list"] .live-grid--sessions .session-card .session-card__foot {
+  grid-column: 7; grid-row: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  padding: 0;
+}
+[data-board-view="list"] .live-grid--sessions .session-card .session-card__btn.btn,
+[data-board-view="list"] .live-grid--sessions .session-card .session-card__start.btn { width: auto; min-width: 92px; padding: 0 12px; }
+[data-board-view="list"] .live-grid--sessions .session-card .session-card__more { grid-column: auto; }
+[data-board-view="list"] .live-grid--sessions .session-card .session-card__menu { left: auto; right: 0; min-width: 200px; }
+@container (max-width: 1320px) {
+  [data-board-view="list"] .live-grid--sessions > .place-cell.session-card {
+    /* The clock keeps its 190px; the buttons wrap before it is squeezed. */
+    grid-template-columns: 120px 200px minmax(190px, 1fr) fit-content(440px);
+  }
+  [data-board-view="list"] .live-grid--sessions .session-card .id { grid-column: 2; grid-row: 1; }
+  [data-board-view="list"] .live-grid--sessions .session-card .status { grid-column: 3; grid-row: 1; }
+  [data-board-view="list"] .live-grid--sessions .session-card .platform { grid-column: 1; grid-row: 2; }
+  [data-board-view="list"] .live-grid--sessions .session-card .ps5-chip { grid-column: 2; grid-row: 2; }
+  [data-board-view="list"] .live-grid--sessions .session-card .until,
+  [data-board-view="list"] .live-grid--sessions .session-card .session-card__hint { grid-column: 3; grid-row: 2; }
+  [data-board-view="list"] .live-grid--sessions .session-card .session-card__actions,
+  [data-board-view="list"] .live-grid--sessions .session-card .session-card__foot { grid-column: 4; grid-row: 1 / span 2; }
+  [data-board-view="list"] .live-grid--sessions .session-card > .row { grid-column: 2 / 4; }
+  [data-board-view="list"] .live-grid--sessions .session-card:has(> .row) .session-card__actions { grid-row: 1 / span 3; }
+  [data-board-view="list"] .live-grid--sessions .session-card .session-card__error { grid-column: 1 / -1; }
+}
+@container (max-width: 760px) {
+  [data-board-view="list"] .live-grid--sessions > .place-cell.session-card {
+    grid-template-columns: 110px minmax(0, 1fr) minmax(0, 1fr);
+  }
+  [data-board-view="list"] .live-grid--sessions .session-card .status { grid-column: 3; }
+  [data-board-view="list"] .live-grid--sessions .session-card .session-card__actions,
+  [data-board-view="list"] .live-grid--sessions .session-card .session-card__foot {
+    grid-column: 1 / -1; grid-row: 3;
+    flex-wrap: wrap;
+  }
+  [data-board-view="list"] .live-grid--sessions .session-card:has(> .row) .session-card__actions { grid-row: 4; }
+  [data-board-view="list"] .live-grid--sessions .session-card > .row { grid-column: 1 / -1; }
+}
