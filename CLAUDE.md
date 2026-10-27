@@ -3158,7 +3158,7 @@ differ.
 - **Tokens** (`global.css :root`): L1 primitives as colour CHANNELS
   (`--rgb-cyan: 7 221 241`), L2 semantic (`--accent-rgb`, `--fg-rgb`,
   `--color-*`, `--status-<tone>-fg/bg/border`), L3 density (`--control-h`,
-  `--grid-min`, `--card-pad`…). Use `rgb(var(--accent-rgb) / .35)`, never a
+  `--grid-min` = the board's card column, `--row-py`, `--subtab-h`…). Use `rgb(var(--accent-rgb) / .35)`, never a
   literal. Every remaining literal is either a theme token with its exact old
   value or deliberately fixed (login scene, flags, QR, illustrations, toasts).
 - **Status vocabulary** (`domain/statusTone.ts`, `ui/StatusChip.tsx`): free =
@@ -3175,10 +3175,30 @@ differ.
   Existing users: Standard + a one-time dashboard offer
   (`NewInterfacesOffer`); new users: `OnboardingWizard` (server
   `onboarding_version` < 1; offline never forces it).
-- **Presets**: Simple (density simple, large cards, details off, «Ещё» on the
-  card via `CardOverflow`), Standard (no CSS rules at all — the old panel,
-  proven pixel-identical), Compact (tighter, cards min 186 px, card buttons
-  keep 32 px). Custom = the person's own `layout`.
+- **Presets**: Simple (density simple, card size L, details off, «Ещё» on the
+  card via `CardOverflow`, big icon+word buttons, colour legend
+  `SimpleBoardHelp`), Standard (no CSS rules at all — the old panel, proven
+  pixel-identical), Compact (density compact, card size S, LIST rows). Custom
+  = the person's own `layout`, kept while a preset is on: choosing «Мой
+  интерфейс» shows it (it starts as Standard); editing a control while a
+  preset is on copies what is on screen first.
+- **Density vs card size**: density sizes text and controls; card size
+  (S 168 / M 198 / L 272 px column via `--grid-min`, plus padding, number and
+  clock size) sizes the card. Never set card fonts/columns in density rules —
+  they overrode each other before. Fixed-height buttons (`.session-card__btn`,
+  `.cp-subtab`) are excluded from the density `.btn` padding: they centre
+  their words with their own height (`--subtab-h`), and a density padding
+  pushed the words to the bottom (Compact, 2026-10-27).
+- **List view** (`[data-board-view="list"]`): every row is the SAME grid of
+  FIXED tracks (state · platform · console chip · № · clock · tariff 1fr ·
+  buttons `fit-content(440px)`) with each part pinned to its column, so rows
+  line up whether or not a seat has a chip or a tariff. Container queries on
+  the board fold it to two lines (≤1320 px) and three (≤760 px). Never use
+  `auto`/`minmax(a,b)` tracks there: each row sizes them alone and the
+  columns drift. Measured: no button text off-centre, no part past the
+  frame, columns aligned — 5 viewports × ru/en/am.
+- **Light theme** is soft on purpose (owner: white hurt the eyes): page
+  `#e6e9ee`, surfaces `#f3f4f7`, text `#1c2330`; every text ≥ 4.5:1.
 - **«Интерфейс и тема»** (`/appearance`, every role; `nav.appearance`):
   ready-made interface, theme, preview (`AppearancePreview`: the board's own
   classes, `inert`, no handlers), own layout, side-menu order/visibility
@@ -3194,8 +3214,21 @@ differ.
   guests (subscribe, tournament join), session_ending
   (`SessionEndingNotifier`, by notification id), support (`SupportNotifier`,
   by message id), system (expense reminders, update toast). Dedup per key for
-  10 min, ≥700 ms spacing, peak capped (`MAX_PEAK`), profiles quiet ×0.45 /
-  standard ×1 / loud ×2.4 + repeat, device volume 0–100. OS notifications are
+  1 h; nothing new starts while a sound is still ringing (`busyUntil`, at
+  least 700 ms). Two kinds of sound: `SYNTH_SOUNDS` (the panel's own, Web
+  Audio, peak capped by `MAX_PEAK`, profiles ×0.45 / ×1 / ×2.4 + repeat) and
+  `FILE_SOUNDS` — 15 recorded melodies chosen by the owner in
+  `public/sounds/<id>.mp3`, trimmed and levelled to −16 LUFS / peak ≤ −1.5 dB
+  (lengths in `RECORDINGS`, keep in sync when a file changes). Recordings are
+  fetched from the app origin (`app://` supports fetch; CSP `connect-src
+  'self'`), decoded once, preloaded for the kinds a person hears; a short one
+  repeats up to the profile's `minSeconds` (quiet 0 / standard 3 / loud 6,
+  max 4 plays) at `level` ≤ 1; a missing file plays the chime; one that loads
+  > 3 s late is skipped. Defaults: a different melody per kind. UI: one
+  «Звук для всех уведомлений» choice sets every kind (keeps on/off), the
+  per-kind table is under «Отдельно для каждого уведомления». A new sound id
+  goes in BOTH whitelists (`uiPreferences.ts` and backend
+  `App\Support\UiPreferences::SOUNDS`). OS notifications are
   `silent: true` (the panel's sound is the sound). Audio refused by the
   system → `isAudioBlocked()` + «Включить звук»; visuals never depend on it.
 - **Typecheck**: `npm run typecheck` (`tsc -p .` checks nothing — the root
