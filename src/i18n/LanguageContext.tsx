@@ -1,7 +1,7 @@
 import { apiCache } from "@/api/client";
 import { AppConfig } from "@/infrastructure/AppConfig";
 import { keyValueStore } from "@/infrastructure/KeyValueStore";
-import { ReactNode, createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { ReactNode, createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { Currency, moneyDisplay, type MoneyFormatOptions } from "./currency";
 import { Lang, setActiveLang, t as translate } from "./translations";
 import { hasChosenLang, readStoredLang, rememberLang } from "@/i18n/languagePreference";
@@ -17,6 +17,11 @@ interface LangState {
   currency: Currency;
   setLang: (l: Lang) => void;
   setCurrencyOverride: (c: Currency | null) => void;
+  /**
+   * Load the signed-in account's own currency, or drop back to the default
+   * when nobody is signed in (2026-10-27). Called by `AccountLanguageGate`.
+   */
+  applyAccountCurrency: (userId: number | null) => void;
   t: (key: string) => string;
   money: (amountInBaseAmd: number, options?: MoneyFormatOptions) => string;
   /**
@@ -35,13 +40,24 @@ interface LangState {
 
 const Ctx = createContext<LangState | null>(null);
 
-const KEY_CURRENCY = "cp.currencyOverride";
+/**
+ * The display currency is the PERSON's choice, kept against the account
+ * (2026-10-27): it used to be one key per machine, so the currency an owner
+ * picked was what the next manager on that front-desk PC saw. The old device
+ * key is removed, never adopted — adopting it would hand it to whoever signs
+ * in first.
+ */
+const LEGACY_KEY_CURRENCY = "cp.currencyOverride";
+export const accountCurrencyKey = (userId: number): string => `u${userId}:cp.currencyOverride`;
+const isCurrency = (c: unknown): c is Currency => c === "AMD" || c === "USD" || c === "RUB";
 
 export const LanguageProvider = ({ children }: { children: ReactNode }) => {
   const [lang, setLangState] = useState<Lang>("en");
   const [override, setOverride] = useState<Currency | null>(null);
   const [ready, setReady] = useState(false);
   const [chosen, setChosen] = useState(false);
+  // Whose currency is on screen: writes go to that account only.
+  const currencyAccount = useRef<number | null>(null);
 
   useEffect(() => {
     void (async () => {
@@ -53,8 +69,7 @@ export const LanguageProvider = ({ children }: { children: ReactNode }) => {
         }
         setChosen(await hasChosenLang());
 
-        const ovr = await keyValueStore.get<Currency>(KEY_CURRENCY);
-        if (ovr === "AMD" || ovr === "USD" || ovr === "RUB") setOverride(ovr);
+        void keyValueStore.remove(LEGACY_KEY_CURRENCY);
       } finally {
         // Always flip `ready`, even if storage threw: a broken store must leave
         // the app usable on defaults, not stuck on a spinner forever.
@@ -77,8 +92,20 @@ export const LanguageProvider = ({ children }: { children: ReactNode }) => {
 
   const setCurrencyOverride = useCallback((c: Currency | null) => {
     setOverride(c);
-    if (c) void keyValueStore.set(KEY_CURRENCY, c);
-    else void keyValueStore.remove(KEY_CURRENCY);
+    const userId = currencyAccount.current;
+    if (userId === null) return;
+    if (c) void keyValueStore.set(accountCurrencyKey(userId), c);
+    else void keyValueStore.remove(accountCurrencyKey(userId));
+  }, []);
+
+  const applyAccountCurrency = useCallback((userId: number | null) => {
+    currencyAccount.current = userId;
+    setOverride(null);
+    if (userId === null) return;
+    void keyValueStore.get<Currency>(accountCurrencyKey(userId)).then((c) => {
+      // The account may have changed while the read was in flight.
+      if (currencyAccount.current === userId && isCurrency(c)) setOverride(c);
+    }).catch(() => { /* unreadable store: the default currency stands */ });
   }, []);
 
   const value = useMemo<LangState>(() => {
@@ -90,6 +117,7 @@ export const LanguageProvider = ({ children }: { children: ReactNode }) => {
       currency,
       setLang,
       setCurrencyOverride,
+      applyAccountCurrency,
       ready,
       chosen,
       t: (key: string) => translate(key, lang),
@@ -103,7 +131,7 @@ export const LanguageProvider = ({ children }: { children: ReactNode }) => {
     };
     // AppConfig touched to silence unused import; remove if never referenced
     void AppConfig;
-  }, [lang, override, ready, chosen, setLang, setCurrencyOverride]);
+  }, [lang, override, ready, chosen, setLang, setCurrencyOverride, applyAccountCurrency]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 };

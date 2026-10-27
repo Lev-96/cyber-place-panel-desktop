@@ -109,7 +109,7 @@ export const FirstRunLanguageGate = ({ children }: { children: ReactNode }) => {
  */
 export const AccountLanguageGate = ({ children }: { children: ReactNode }) => {
   const { user } = useAuth();
-  const { lang, setLang, ready } = useLang();
+  const { lang, setLang, ready, applyAccountCurrency } = useLang();
   const [decided, setDecided] = useState(false);
   const [prompt, setPrompt] = useState(false);
 
@@ -124,6 +124,8 @@ export const AccountLanguageGate = ({ children }: { children: ReactNode }) => {
     // is attributed to this account. Cleared on sign-out below so a write
     // can never land on the account that just left.
     setActiveAccount(userId);
+    // The same for the display currency: this account's, never the last one's.
+    applyAccountCurrency(userId);
 
     void (async () => {
       const stored = await readAccountLang(userId);
@@ -156,10 +158,11 @@ export const AccountLanguageGate = ({ children }: { children: ReactNode }) => {
     return () => {
       cancelled = true;
       setActiveAccount(null);
+      applyAccountCurrency(null);
     };
     // Re-runs on account switch, which is what re-arms the gate for the next
     // person on a shared front-desk machine.
-  }, [ready, userId, setLang]);
+  }, [ready, userId, setLang, applyAccountCurrency]);
 
   // A signed-out render must never hold the app: the gate lives inside the
   // authed tree, so this is the unmount path.
