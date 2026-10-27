@@ -199,7 +199,13 @@ export const WAKE_GIVE_UP_MS = 90_000;
  * sleep without ever asking the owner. Safe, and wrong: being asked is the
  * entire feature.
  */
-export const REST_SETTLE_MS = 30_000;
+export const REST_SETTLE_MS = 180_000;
+// 30 s until 2026-10-28. Measured live on Wi-Fi: two sleeps took 132 s and
+// 145 s; past 30 s the console was called an "unexpected wake" and the owner
+// was asked about a console the panel itself was still putting to sleep. A
+// console switched on by hand within three minutes of a stop is put back to
+// sleep without the question — the safe direction. The Start button's lock is
+// bounded separately (tileGate START_LOCK_MS).
 
 export const initialSnapshot = (): MachineSnapshot => ({
   state: "UNKNOWN",

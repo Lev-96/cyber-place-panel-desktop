@@ -730,8 +730,8 @@ const SessionsBoard = ({ branchId }: Props) => {
     const consoleBusy = lifecycle === "WAKING" || lifecycle === "GOING_TO_REST"
       || lifecycle === "UNEXPECTED_WAKE" || lifecycle === "ERROR";
     // No second press while the console is on its way (see tileGate).
-    const startLock = startGate(lifecycle);
-    const stopLock = stopGate(lifecycle);
+    const startLock = startGate(lifecycle, consoleView?.snapshot.restingSince);
+    const stopLock = stopGate(lifecycle, consoleView?.snapshot.wakingSince);
     return (
       <SessionCard
         key={pc.id}

@@ -128,6 +128,20 @@ describe("a session started or ended somewhere else (2026-10-27)", () => {
     expect(reported.calls).toBe(0);
   });
 
+  test("a slow sleep (measured 132-145 s on Wi-Fi) is still a sleep: nobody is asked, the rest keeps being sent", async () => {
+    bridge.answer = "awake";
+    await mount([96]);
+    await broadcast("stopped", "expired");
+    await act(async () => { lists.pending.shift()!([]); });
+    // Two and a half minutes of a console that will not go down yet.
+    for (let i = 0; i < 15; i++) {
+      await settle(10_000);
+      while (lists.pending.length) await act(async () => { lists.pending.shift()!([]); });
+    }
+    expect(reported.calls).toBe(0);
+    expect(bridge.rests).toBeGreaterThan(1);
+  });
+
   test("a change that keeps the seat taken (a pad, time, a pause) reads nothing", async () => {
     await mount([96]);
     for (const kind of ["joystick.added", "time.added", "paused", "resumed"]) await broadcast(kind);
