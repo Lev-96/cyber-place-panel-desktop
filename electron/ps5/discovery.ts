@@ -1,4 +1,4 @@
-import { createSocket } from "node:dgram";
+import { createSocket, type Socket } from "node:dgram";
 import { networkInterfaces } from "node:os";
 import { PS_DISCOVERY_PORT, parseDiscoveryResponse, probePacket, type PsConsole } from "./protocol";
 
@@ -166,12 +166,74 @@ export const discover = async (options: DiscoveryOptions = {}): Promise<Discover
  * How long a status check waits, and why it asks three times (2026-10-27).
  *
  * Measured on a PS5 awake on a club's Wi-Fi: 21 answers to 60 one-second
- * probes (35 %), replies 13–1285 ms late. One datagram with a 1.2 s wait missed
- * most ticks and an awake console was shown as "unavailable" every few
- * seconds. Three copies inside 1.8 s are a retry, not a flood, and the check
- * still ends as soon as every console has answered.
+ * probes (35 %), replies 13–1285 ms late. Three copies inside 1.8 s are a
+ * retry, not a flood, and the check still ends as soon as every console has
+ * answered.
  */
 export const PROBE_TIMEOUT_MS = 1_800;
+
+/**
+ * How long an answer counts as what the console is doing now (2026-10-28).
+ *
+ * A console on Wi-Fi in power-save hands its answers over in bursts, seconds
+ * late: measured live, an independent listener heard "awake" every second for
+ * 44 s while the panel's checks — each on its own socket, closed after 1.8 s —
+ * heard nothing, so the tile said "waking…" and Stop stayed locked. Answers
+ * are now heard by ONE socket that stays open, whenever they land, and a check
+ * reports the latest answer of the last few seconds.
+ */
+export const ANSWER_FRESH_MS = 6_000;
+
+interface Heard { console_: PsConsole; at: number }
+
+/**
+ * The one socket status checks are sent from and heard on. Opened on first
+ * use, never holds the process open (`unref`), reopened after an error.
+ */
+const listener = {
+  socket: null as Socket | null,
+  opening: null as Promise<Socket> | null,
+  /** Latest answer per address and console. */
+  heard: new Map<string, Heard>(),
+  /** Called on every answer, so a waiting check can end early. */
+  waiters: new Set<() => void>(),
+};
+
+const listening = (): Promise<Socket> => {
+  if (listener.socket) return Promise.resolve(listener.socket);
+  if (listener.opening) return listener.opening;
+  listener.opening = new Promise<Socket>((resolve, reject) => {
+    const socket = createSocket({ type: "udp4", reuseAddr: true });
+    socket.on("message", (message, remote) => {
+      const console_ = parseDiscoveryResponse(message.toString("utf8"), remote.address);
+      if (!console_) return;
+      listener.heard.set(`${remote.address}|${console_.hostId}`, { console_, at: Date.now() });
+      for (const wake of listener.waiters) wake();
+    });
+    socket.once("error", (error) => {
+      try { socket.close(); } catch { /* already closed */ }
+      if (listener.socket === socket) listener.socket = null;
+      listener.opening = null;
+      reject(error);
+    });
+    socket.bind({ port: 0 }, () => {
+      socket.unref();
+      listener.socket = socket;
+      listener.opening = null;
+      resolve(socket);
+    });
+  });
+  return listener.opening;
+};
+
+/** Tests only: forget every answer and close the socket. */
+export const resetStatusListenerForTests = (): void => {
+  listener.heard.clear();
+  listener.waiters.clear();
+  try { listener.socket?.close(); } catch { /* already closed */ }
+  listener.socket = null;
+  listener.opening = null;
+};
 
 export const probe = async (addresses: string[], timeoutMs = PROBE_TIMEOUT_MS): Promise<DiscoveryResult> => {
   const targets = [...new Set(addresses.map((a) => a.trim()).filter(Boolean))];
@@ -179,11 +241,59 @@ export const probe = async (addresses: string[], timeoutMs = PROBE_TIMEOUT_MS): 
     return { consoles: [], probed: [], warnings: [] };
   }
 
-  // Every named address is expected to answer, so the sweep can stop the
-  // moment they all have — a console on a club LAN answers in about 130ms,
-  // and waiting out the full timeout would make each status check ten times
-  // longer than it needs to be.
-  return sweepLanes([{ label: "any", targets }], timeoutMs, { finishWhenAllAnswer: true, resend: true });
+  const warnings: string[] = [];
+  let socket: Socket;
+  try {
+    socket = await listening();
+  } catch (error) {
+    return { consoles: [], probed: targets, warnings: [`status socket: ${(error as Error).message}`] };
+  }
+
+  const startedAt = Date.now();
+  const packet = probePacket();
+  const timers: ReturnType<typeof setTimeout>[] = [];
+  const send = () => {
+    for (const target of targets) {
+      socket.send(packet, PS_DISCOVERY_PORT, target, (error) => {
+        if (error) warnings.push(`${target}: ${error.message}`);
+      });
+    }
+  };
+
+  // Three copies within the window; done early once every address has
+  // answered since this check began (a short grace lets a burst land).
+  await new Promise<void>((resolve) => {
+    let grace: ReturnType<typeof setTimeout> | null = null;
+    const finish = () => {
+      for (const t of timers) clearTimeout(t);
+      if (grace) clearTimeout(grace);
+      listener.waiters.delete(check);
+      resolve();
+    };
+    const check = () => {
+      const all = targets.every((t) => [...listener.heard.entries()]
+        .some(([key, h]) => key.startsWith(`${t}|`) && h.at >= startedAt));
+      if (all && grace === null) grace = setTimeout(finish, ALL_ANSWERED_GRACE_MS);
+    };
+    listener.waiters.add(check);
+    for (const at of RESEND_AT) {
+      if (at === 0) send();
+      else timers.push(setTimeout(send, Math.round(timeoutMs * at)));
+    }
+    timers.push(setTimeout(finish, timeoutMs));
+  });
+
+  // The latest answer of the last few seconds from each address asked — late
+  // answers to an earlier check included.
+  const now = Date.now();
+  const consoles = new Map<string, PsConsole>();
+  for (const [key, h] of listener.heard) {
+    const address = key.slice(0, key.indexOf("|"));
+    if (!targets.includes(address) || now - h.at > ANSWER_FRESH_MS) continue;
+    const had = consoles.get(h.console_.hostId);
+    if (!had || (listener.heard.get(`${had.address}|${had.hostId}`)?.at ?? 0) < h.at) consoles.set(h.console_.hostId, h.console_);
+  }
+  return { consoles: [...consoles.values()], probed: targets, warnings };
 };
 
 /**

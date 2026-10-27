@@ -1,6 +1,6 @@
 import { createSocket, type Socket } from "node:dgram";
 import { afterEach, describe, expect, test } from "vitest";
-import { discover, probe, sweepLanes } from "../../electron/ps5/discovery";
+import { ANSWER_FRESH_MS, discover, probe, resetStatusListenerForTests, sweepLanes } from "../../electron/ps5/discovery";
 import { PS_DISCOVERY_PORT } from "../../electron/ps5/protocol";
 
 /**
@@ -39,6 +39,8 @@ const fakeConsoles = async (
   consoles: Array<{ hostId: string; name: string; status: string }>,
   /** Probes to ignore before answering — a console on Wi-Fi drops some. */
   dropFirst = 0,
+  /** Answer this late (ms) — a console in Wi-Fi power-save, its answers held back. */
+  delayMs = 0,
 ): Promise<void> => {
   const socket = createSocket({ type: "udp4", reuseAddr: true });
   fake = socket;
@@ -56,7 +58,8 @@ const fakeConsoles = async (
         "system-version:07000001",
         "",
       ].join("\n");
-      socket.send(Buffer.from(answer, "utf8"), remote.port, remote.address);
+      const reply = () => { try { socket.send(Buffer.from(answer, "utf8"), remote.port, remote.address); } catch { /* closed */ } };
+      if (delayMs > 0) setTimeout(reply, delayMs); else reply();
     }
   });
 
@@ -68,10 +71,36 @@ const fakeConsoles = async (
 
 afterEach(() => {
   heard = 0;
+  resetStatusListenerForTests();
   if (fake) { try { fake.close(); } catch { /* already closed */ } fake = null; }
 });
 
 describe("a discovery sweep", () => {
+  test("an answer that lands after a check ended is heard by the next one (Wi-Fi power-save, 2026-10-28)", async () => {
+    // Measured live: answers arrive in bursts, seconds late. A check that
+    // closed its socket after 1.8 s threw them away and the tile said
+    // "waking…" for 44 s while the console was answering every second.
+    await fakeConsoles([{ hostId: "LATE01", name: "PS5-LATE", status: "200 Ok" }], 0, 2_500);
+
+    const first = await probe(["127.0.0.1"], 1_000);
+    expect(first.consoles).toHaveLength(0);
+
+    await new Promise((r) => setTimeout(r, 2_000));
+    const next = await probe(["127.0.0.1"], 300);
+    expect(next.consoles.find((c) => c.hostId === "LATE01")?.state).toBe("awake");
+  });
+
+  test("an answer older than the fresh window is not passed off as current", async () => {
+    await fakeConsoles([{ hostId: "OLD01", name: "PS5-OLD", status: "200 Ok" }]);
+    expect((await probe(["127.0.0.1"], 800)).consoles.map((c) => c.hostId)).toContain("OLD01");
+
+    // The console goes silent.
+    if (fake) { fake.close(); fake = null; }
+    await new Promise((r) => setTimeout(r, ANSWER_FRESH_MS + 200));
+    expect((await probe(["127.0.0.1"], 300)).consoles).toHaveLength(0);
+  }, 15_000);
+
+
   test("a status check still hears a console that dropped the first two asks (Wi-Fi)", async () => {
     // Measured 2026-10-27: an awake PS5 on Wi-Fi answered 35 % of probes. The
     // check asks three times in its window, so two dropped asks are not an

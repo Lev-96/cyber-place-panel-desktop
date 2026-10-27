@@ -252,7 +252,10 @@ export const useConsoleControl = ({ devices, sessionDeviceIds, enabled = true }:
         // Structured and greppable, and carrying nothing secret: this side
         // never sees a wake key — it names a console and the main process looks
         // up what it may send.
-        console.info(`[ps5] ${event}`, fields);
+        // One line of JSON, with the moment: readable in a log file (Chromium
+        // writes an object argument as "[object Object]"), which is where the
+        // reason a console would not sleep has to be found after the fact.
+        console.info(`[ps5] ${new Date().toISOString()} ${event} ${JSON.stringify(fields)}`);
       },
       now: () => Date.now(),
       newId: () => crypto.randomUUID(),
