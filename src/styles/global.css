@@ -136,7 +136,7 @@
   --control-h: 40px;
   --control-h-card: 32px;
   --grid-min: 198px;
-  --gap-grid: 12px;
+  --gap-grid: 14px;
 
   /* App surfaces that had their own literal (2026-10-27), kept exact. */
   --color-text-bright: #e6edf7;
@@ -5214,7 +5214,9 @@ select.input option:disabled {
   /* Medium: the card's short action labels ("+ Время", "Переместить") fit a
      2-column grid on one line from 184px. */
   grid-template-columns: repeat(auto-fill, minmax(var(--grid-min, 198px), 1fr));
-  gap: 10px;
+  /* Air between seats, cards or rows alike (owner, 2026-10-27: they read
+     as one block when they nearly touched). One token, set per density. */
+  gap: var(--gap-grid);
 }
 .place-cell.session-card {
   min-height: 140px;
@@ -6837,7 +6839,7 @@ select.input option:disabled {
 [data-density="simple"] {
   --control-h: 46px;
   --control-h-card: 40px;
-  --gap-grid: 16px;
+  --gap-grid: 18px;
 }
 [data-density="simple"] .sidebar-nav a { padding: 12px 14px; font-size: 15px; }
 [data-density="simple"] { --subtab-h: 44px; }
@@ -6846,7 +6848,6 @@ select.input option:disabled {
 [data-density="simple"] .btn:not(.session-card__btn):not(.cp-subtab) { min-height: 44px; font-size: 15px; }
 [data-density="simple"] .cp-subtab { font-size: 15px; }
 [data-density="simple"] .input { min-height: 44px; font-size: 15px; }
-[data-density="simple"] .live-grid.live-grid--sessions { gap: var(--gap-grid); }
 [data-density="simple"] .session-card__btn.btn,
 [data-density="simple"] .session-card__start.btn {
   height: var(--control-h-card);
@@ -6861,7 +6862,7 @@ select.input option:disabled {
    their 32 px, only the air around them goes. */
 [data-density="compact"] {
   --control-h: 34px;
-  --gap-grid: 8px;
+  --gap-grid: 12px;
 }
 [data-density="compact"] .main { --main-pad-top: 16px; --main-pad-x: 20px; }
 [data-density="compact"] .sidebar-nav a { padding: 7px 10px; font-size: 13px; }
@@ -6870,7 +6871,6 @@ select.input option:disabled {
 [data-density="compact"] .btn:not(.session-card__btn):not(.cp-subtab) { padding: 7px 12px; font-size: 13px; }
 [data-density="compact"] .cp-subtab { font-size: 13px; }
 [data-density="compact"] .input { padding: 7px 10px; font-size: 13px; }
-[data-density="compact"] .live-grid.live-grid--sessions { gap: var(--gap-grid); }
 [data-density="compact"] .place-cell.session-card { gap: 3px; }
 
 /* Card size, on the sessions board only: the column, the air inside and the
@@ -7249,7 +7249,6 @@ select.input option:disabled {
 .session-card__state-word { display: none; }
 
 /* Simple: big, few, obvious. */
-[data-density="simple"] .live-grid.live-grid--sessions { gap: 18px; }
 [data-density="simple"] .place-cell.session-card { border-width: 2px; }
 [data-density="simple"] .place-cell.session-card .session-card__state {
   width: auto;
@@ -7345,7 +7344,6 @@ select.input option:disabled {
    into two and then three lines (container queries on the board itself). */
 [data-board-view="list"] .live-grid.live-grid--sessions {
   grid-template-columns: minmax(0, 1fr);
-  gap: 8px;
   container-type: inline-size;
 }
 [data-board-view="list"] .live-grid--sessions > .place-cell.session-card {
