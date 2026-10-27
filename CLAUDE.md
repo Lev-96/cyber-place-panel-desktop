@@ -177,8 +177,9 @@ branch — so the two yml files never conflict:
     asleep on Wi-Fi answers about one probe in three (measured at the club).
   - The press window is 45 s (was 15) and ends as soon as the console is where
     it was asked to be; inside it the same datagram goes out at most once a
-    second. A wake no longer waits for a withdrawn rest's TCP attempt (up to
-    20 s) to finish.
+    second. Superseded 2026-10-27: a wake WAITS for a withdrawn rest to return
+    (one command per console, never both on the wire); the withdrawal now
+    returns at once (see below), so this costs nothing.
   - "Ignores the wake" (WAKE_IGNORED) is said only of a console really heard
     at rest after the waking began (`ConsoleStatus.heardAt` →
     `Observation.heardAt`); one silent since then is OFFLINE, not blamed on
@@ -186,6 +187,34 @@ branch — so the two yml files never conflict:
   - Real-socket simulation of a Wi-Fi PS5 (`consoleSimulation.integration.test.tsx`):
     tile ACTIVE → GOING_TO_REST → REST → WAKING → ACTIVE, Stop→REST 3-5 s,
     Start→ACTIVE 9-12 s with a deliberately deaf console.
+- **Incident fixes, measured on a real Wi-Fi PS5 (2026-10-27).** Report:
+  `~/cyber-place-local/reports/ps5-incident-2026-10-27/`. An awake PS5 on Wi-Fi
+  answered 20-35 % of status probes, replies up to 1.3 s; its Remote Play
+  session took 31.6 s to open.
+  - Status probe = 3 copies within `PROBE_TIMEOUT_MS` (1.8 s); an awake console
+    is held through silence for `AWAKE_HOLD_MS` (20 s), rest for 60 s. Before,
+    one miss = "unavailable", which also restarted the unexpected-wake clock, so
+    a console left on after expiry was rested late or never.
+  - `Ps5ControlProvider` listens to `.session.changed` per branch
+    (`SessionSetListener`, own handler; Echo `stopListening` removes only it) and
+    re-reads at once on started/stopped/moved. A device that GAINED a session
+    in a read = `sessionStarting`, one that LOST it = `sessionStopped` — one
+    path for QR, bookings, other panels and server expiry. The first read is
+    the state of things, never a press; local presses update `known` so they
+    are not acted on twice.
+  - `Ps5Controller.execute`: one command per console, period.
+  - `standby()`: discovery ping 1 s / 15 s (`aimedAt`), attempt ≤45 s, total
+    ≤60 s; an attempt left behind (timeout or withdrawal) can never send its
+    standby (`gone` checked after `openConnection`) — measured before: a
+    "failed" rest slept the console 12 s later; a withdrawal answers within
+    250 ms (`whenWithdrawn`). Ceiling = `TIMEOUT` («не ответила вовремя»),
+    not DEVICE_NOT_FOUND.
+  - `WAKE_GIVE_UP_MS` 90 s: a console that just went to rest ignored wakes for
+    ~1 min and woke ~64 s after the first one.
+  - Hardware result: rest 0/4 → 2/2, unintended transitions 8 → 0.
+  - Limits: LAN only (same router; 2.4/5 GHz of one router is one LAN unless
+    client isolation is on); no remote close-game command exists for PS5 in
+    playactor (only standby); a panel must be running on the venue LAN.
 - **PSN player message is deferred** (`PSN_FEATURE.playerMessages = false` in
   `src/api/psn.ts`, mirrors the backend flag): no PSN name field at start and no
   sender card in Settings. Pairing's `psnLoginExternal` is separate and stays.
