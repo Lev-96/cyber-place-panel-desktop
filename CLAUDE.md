@@ -212,6 +212,25 @@ branch — so the two yml files never conflict:
   - `WAKE_GIVE_UP_MS` 90 s: a console that just went to rest ignored wakes for
     ~1 min and woke ~64 s after the first one.
   - Hardware result: rest 0/4 → 2/2, unintended transitions 8 → 0.
+  - 2026-10-28, live with TWO panels against staging (sessions started and
+    stopped via the API, expiry by the server, independent UDP listener):
+    - playactor wakes a console before every connection
+      (`ResolvedDevice.openConnection` → waker, unconditionally): a rest aimed
+      at a console already asleep woke it. `standbyOnce` reads
+      `device.discover()` first and leaves a `STANDBY` console alone.
+    - Status answers arrive in power-save bursts, seconds late: `probe()` now
+      uses ONE long-lived socket (`listener`, `unref`) and reports the latest
+      answer of the last `ANSWER_FRESH_MS` (6 s). Before, the panel showed
+      "waking" 44 s after the console answered; now within 1 s.
+    - Rest held 10 min (`REST_HOLD_MS`), awake 20 s.
+    - `[ps5]` log lines are `timestamp EVENT {json}` (Chromium prints objects
+      as "[object Object]"); run with `--enable-logging=stderr` to collect them.
+    - Result over 8 cycles: wake 7–23 s, sleep 10–31 s after the end (one
+      45 s, earlier two 132/145 s before the listener fix), billing exact
+      (2 min at 1200/h = 40.00, closed once), 0 re-wakes after the fix.
+    - Two panels still each ask the owner about one REAL manual power-on
+      (two wake events) — fixed only by a single executor (bridge plan in the
+      incident report).
   - Limits: LAN only (same router; 2.4/5 GHz of one router is one LAN unless
     client isolation is on); no remote close-game command exists for PS5 in
     playactor (only standby); a panel must be running on the venue LAN.
