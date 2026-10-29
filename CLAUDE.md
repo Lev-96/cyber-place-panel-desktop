@@ -1299,6 +1299,47 @@ owner's side of that line until 2026-09-06 and is now the manager's too: the
 person who waives a bill is whoever is at the counter when a machine crashes
 (the backend moved `sessions.free` the same day).
 
+## 9.5.3a A game's cover (2026-10-30)
+
+- `GameForm` → `components/games/GameCoverField`: `ImageUpload` for the cover
+  plus `components/ui/Switch` "No cover" (new reusable switch, `role="switch"`,
+  styles `.cp-switch` in global.css, built like `Checkbox`). A NEW game is saved
+  only once its cover is decided (`coverDecided`): a file, or the switch on —
+  otherwise Save shows `game.coverRequired` and sends nothing. The choice rides
+  along on "Use existing" too (the server keeps it only for a game with no
+  cover). Edit (admin only, `game.crud`): a game with no cover opens with the
+  switch on; a new file replaces, the switch turned on sends `remove_cover`,
+  untouched = the rename alone as before.
+- `api/games.ts`: JSON exactly as before without a file; with one, multipart
+  (`buildGameForm`, booleans "1"/"0" — Laravel's `boolean` refuses
+  "true"/"false"); an edit with a file is `POST /games/{id}?_method=PUT`. The
+  write path strips the query, so `/games` and `/branches` caches still drop.
+- GamesList / BranchGames show a 40 px cover thumb (`SmartImage`, first letter
+  when there is none).
+- Tests: `GameForm.cover.test.tsx` (9), `api/games.cover.test.ts` (5); the
+  catalogue tests in `GameForm.test.tsx` mount with "No cover" on, which sends
+  their old bodies unchanged. Mutation-checked: no cover guard, cover dropped
+  on use-existing, booleans as true/false — each caught.
+
+## 9.5.3b Platform icons (2026-10-30)
+
+- `utils/platform.ts` `platformIconKind(slug)`: pc → Windows, any PlayStation
+  → its mark, a venue's own platform by the words in its slug (poker,
+  table-tennis / ping-pong, billiards / pool / snooker, vr as a whole word /
+  virtual), else the neutral four-tile mark. Slugs come from the English name,
+  so a platform added later under one of those names is drawn right with no
+  code change. Mirrored in the mobile app. Tests `utils/platformIcon.test.ts`.
+- `components/ui/PlatformIcon` (24 px box, `tone="brand"` = theme gradient
+  tokens, `tone="current"` = text colour for use inside buttons; decorative,
+  `aria-hidden`; the billiards "8" is shapes, not SVG text, so it never joins a
+  label's `textContent`).
+- Shown on GamesList / BranchGames rows (`.game-platform`) and on every
+  PlatformPicker option. The picker's narrow mode is now
+  `components/ui/PlatformDropdown` (select-only combobox: ↑/↓ wrap, Enter/Space,
+  Escape/Tab, click outside; `aria-activedescendant`), because a native
+  `<select>` cannot draw icons. Same ordered list, legacy slug and Other as
+  before. Tests: `PlatformDropdown.test.tsx`, `PlatformPicker.test.tsx`.
+
 ## 9.5.4 Branch status: Active / Inactive (2026-09-11)
 
 `branches.status` is `active | inactive` and means **whether players can see
