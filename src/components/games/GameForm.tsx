@@ -1,6 +1,7 @@
 import Button from "@/components/ui/Button";
 import { formatApiError } from "@/api/errors";
 import { existingGameOf, type ExistingGame } from "@/api/gameExists";
+import GameCoverField, { coverDecided, type CoverChoice } from "@/components/games/GameCoverField";
 import GameSuggestions from "@/components/games/GameSuggestions";
 import { useGameFormSources } from "@/components/games/useGameFormSources";
 import Modal from "@/components/ui/Modal";
@@ -11,6 +12,7 @@ import { renderText, textLiteral, type LocalizedText } from "@/i18n/localizedTex
 import { fmt } from "@/i18n/translations";
 import { gameRepository } from "@/repositories/GameRepository";
 import { IGameApi } from "@/api/games";
+import { storageUri } from "@/infrastructure/AppConfig";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { findExistingGame, suggestGames } from "@/utils/gameName";
 import { platformLabel } from "@/utils/platform";
@@ -70,6 +72,15 @@ const GameForm = ({ initial, branchId, lockedPlatform, globalCatalogue, branchGa
   // synchronously, so the second call sees it.
   const inFlight = useRef(false);
   const isEdit = !!initial;
+  // A game being edited with no cover starts with "no cover" on: that IS its
+  // current state, and Save must not ask for a decision already made.
+  const [cover, setCover] = useState<CoverChoice>({ file: null, none: isEdit && !initial?.game_logo_path });
+  /** Set by a Save that was refused for want of a cover decision. */
+  const [askedForCover, setAskedForCover] = useState(false);
+  const currentCoverUrl = isEdit ? storageUri(initial?.game_logo_path) : null;
+  const hasCover = coverDecided(cover, !cover.none && !!currentCoverUrl);
+  /** The cover part of a create (or `use_existing`) body. */
+  const coverBody = cover.file ? { game_logo_path: cover.file } : {};
   const platformFixed = lockedPlatform !== undefined;
   const hasPlatform = platform.trim() !== "";
   const { catalogue, inBranch, customPlatforms } = useGameFormSources({
@@ -102,17 +113,22 @@ const GameForm = ({ initial, branchId, lockedPlatform, globalCatalogue, branchGa
     // While the duplicate question is on screen, Enter must not resend the
     // same create: the operator answers with one of the two buttons.
     if (conflict || (!isEdit && !hasPlatform)) return;
+    if (!hasCover) { setAskedForCover(true); return; }
     void run(async () => {
       try {
         if (isEdit) {
           // Backend's Games/UpdateRequest only accepts `name` reliably (platform validator
-          // is bugged: expects array of uppercase). So on edit we update name only.
-          onSaved(await gameRepository.update(initial!.id, { name }));
+          // is bugged: expects array of uppercase). So on edit we update name only —
+          // plus the cover: a new file replaces it, the switch turned on clears it.
+          const coverEdit = cover.file
+            ? { game_logo_path: cover.file }
+            : cover.none && initial!.game_logo_path ? { remove_cover: true } : {};
+          onSaved(await gameRepository.update(initial!.id, { name, ...coverEdit }));
           return;
         }
         const known = findExistingGame(catalogue, name, platform);
         if (known) { setConflict(known); return; }
-        onSaved(await gameRepository.create({ name, platform, branch_id: branchId }));
+        onSaved(await gameRepository.create({ name, platform, branch_id: branchId, ...coverBody }));
       } catch (ex) {
         const existing = existingGameOf(ex);
         if (existing) setConflict(existing);
@@ -134,7 +150,9 @@ const GameForm = ({ initial, branchId, lockedPlatform, globalCatalogue, branchGa
       // there is nothing to link it to — the answer is simply that row.
       if (branchId === undefined) { onSaved(game); return; }
       try {
-        const linked = await gameRepository.create({ name: game.name, platform: game.platform, branch_id: branchId, use_existing: true });
+        // The chosen cover rides along: the server keeps it only if that game
+        // has none yet, and never replaces one another venue already shows.
+        const linked = await gameRepository.create({ name: game.name, platform: game.platform, branch_id: branchId, use_existing: true, ...coverBody });
         onSaved(linked ?? game);
       } catch (ex) {
         // A second `game_exists` means a backend that does not know
@@ -176,6 +194,13 @@ const GameForm = ({ initial, branchId, lockedPlatform, globalCatalogue, branchGa
           )}
           {isEdit && <span className="muted" style={{ fontSize: 11 }}>{t("game.platformLocked")}</span>}
         </div>
+        <GameCoverField
+          value={cover}
+          onChange={(next) => { setCover(next); setAskedForCover(false); }}
+          currentUrl={currentCoverUrl}
+          name={name || "?"}
+          showRequiredHint={askedForCover && !hasCover}
+        />
         {conflict && (
           <div role="alert" className="card" style={{ padding: "10px 12px", display: "flex", flexDirection: "column", gap: 10, borderColor: "var(--color-primary)" }}>
             <span>{fmt(t("game.exists.notice"), conflict.name, platformLabel(conflict.platform))}</span>

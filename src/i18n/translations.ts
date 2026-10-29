@@ -2278,6 +2278,11 @@ export const TRANSLATIONS: Dict = {
   // Game form
   "game.titleNew": { en: "New game", ru: "Новая игра", am: "Նոր խաղ" },
   "game.titleEdit": { en: "Edit game", ru: "Редактировать игру", am: "Խմբագրել խաղը" },
+  "game.cover": { en: "Cover", ru: "Обложка", am: "Շապիկ" },
+  "game.noCover": { en: "No cover", ru: "Без обложки", am: "Առանց շապիկի" },
+  "game.coverHint": { en: "Players see it in the app's games list. A portrait image (3:4) looks best.", ru: "Игроки видят её в списке игр в приложении. Лучше всего подходит вертикальное изображение 3:4.", am: "Խաղացողները այն տեսնում են հավելվածի խաղերի ցանկում։ Լավագույնն ուղղահայաց պատկերն է (3:4)։" },
+  "game.noCoverHint": { en: "The app will show its standard “no cover” picture for this game.", ru: "В приложении у игры будет стандартная картинка «нет обложки».", am: "Հավելվածում խաղը կունենա ստանդարտ «շապիկ չկա» պատկեր։" },
+  "game.coverRequired": { en: "Add a cover or turn on “No cover”.", ru: "Добавьте обложку или включите «Без обложки».", am: "Ավելացրեք շապիկ կամ միացրեք «Առանց շապիկի»։" },
   "game.platformLocked": { en: "Platform cannot be changed after creation.", ru: "Платформу нельзя изменить после создания.", am: "Ստեղծելուց հետո հարթակը հնարավոր չէ փոխել։" },
   // A duplicate the server refused (422 `game_exists`): asked, not failed.
   "game.exists.notice": { en: "The game “{0}” already exists on {1}. Use it?", ru: "Игра «{0}» уже есть на {1}. Использовать её?", am: "«{0}» խաղն արդեն կա {1} հարթակում։ Օգտագործե՞լ այն։" },

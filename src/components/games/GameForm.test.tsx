@@ -62,10 +62,19 @@ const duplicate = (game = { id: 41, name: "Dota 2", platform: "pc" }) =>
 
 let onSaved: ReturnType<typeof vi.fn<(game?: IGameApi | null) => void>>;
 
+/**
+ * A new game may only be saved once its cover is decided. These tests are
+ * about the catalogue, not the cover, so a create form is mounted with
+ * "no cover" switched on — which sends exactly the body it always did. The
+ * cover itself is pinned in GameForm.cover.test.tsx.
+ */
 const mount = async (props: Partial<React.ComponentProps<typeof GameForm>> = {}) => {
   await act(async () => {
     render(<GameForm branchId={7} onClose={() => {}} onSaved={onSaved} {...props} />);
   });
+  if (!props.initial) {
+    await act(async () => { fireEvent.click(screen.getByRole("switch", { name: "game.noCover" })); });
+  }
 };
 /** The name box (the kit's Input renders its label as a sibling span). */
 const nameBox = () => document.querySelector<HTMLInputElement>("input.input")!;

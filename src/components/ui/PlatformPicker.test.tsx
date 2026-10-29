@@ -76,7 +76,16 @@ describe("PlatformPicker: one row when it fits, a select when it does not", () =
     size.container = container;
     await act(async () => { FakeRO.all.forEach((r) => r.fire()); });
   };
-  const select = () => document.querySelector<HTMLSelectElement>("select.platform-picker__select");
+  // Narrow mode: the icon dropdown (a native select cannot draw the icons).
+  const select = () => document.querySelector<HTMLButtonElement>(".platform-picker__select button[role=combobox]");
+  const openList = async () => { await act(async () => { fireEvent.click(select()!); }); };
+  const listed = () => screen.getAllByRole("option").map((o) => [o.getAttribute("data-value"), o.textContent]);
+  const chosen = () => screen.getAllByRole("option").find((o) => o.getAttribute("aria-selected") === "true")?.getAttribute("data-value");
+  const choose = async (value: string) => {
+    await openList();
+    const option = screen.getAllByRole("option").find((o) => o.getAttribute("data-value") === value)!;
+    await act(async () => { fireEvent.click(option); });
+  };
   const customs = [{ slug: "billiards", label: "Pool table" }, { slug: "poker", label: "Poker" }];
 
   beforeEach(() => {
@@ -93,18 +102,23 @@ describe("PlatformPicker: one row when it fits, a select when it does not", () =
     restore("scrollWidth");
   });
 
-  test("too narrow: a native select with the same ordered list and an Other… entry", async () => {
+  test("too narrow: a dropdown with the same ordered list, icons, and an Other… entry", async () => {
     render(<Harness start="poker" customOptions={customs} />);
     expect(select()).toBeNull();
 
     await resize(300);
     const box = select()!;
     expect(box.className).toContain("input");
+    expect(box.textContent).toBe("Poker");
     expect(screen.queryAllByRole("button")).toHaveLength(0);
-    expect([...box.options].map((o) => [o.value, o.textContent])).toEqual([
+    await openList();
+    expect(listed()).toEqual([
       ["pc", "PC"], ["ps4", "PS4"], ["ps5", "PS5"], ["billiards", "Pool table"], ["poker", "Poker"], ["-other", "platform.otherOption"],
     ]);
-    expect(box.value).toBe("poker");
+    expect(chosen()).toBe("poker");
+    // Every platform carries its icon; Other carries none.
+    const kinds = screen.getAllByRole("option").map((o) => o.querySelector(".platform-icon")?.getAttribute("data-kind") ?? null);
+    expect(kinds).toEqual(["pc", "ps", "ps", "billiards", "poker", null]);
   });
 
   test("the selection survives fits → compact → fits, and the select changes it", async () => {
@@ -113,10 +127,10 @@ describe("PlatformPicker: one row when it fits, a select when it does not", () =
     await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Pool table" })); });
 
     await resize(300);
-    expect(select()!.value).toBe("billiards");
+    expect(select()!.textContent).toBe("Pool table");
     expect(onChange).toHaveBeenCalledTimes(1);
 
-    await act(async () => { fireEvent.change(select()!, { target: { value: "ps4" } }); });
+    await choose("ps4");
     expect(onChange).toHaveBeenLastCalledWith("ps4");
 
     await resize(800);
@@ -128,9 +142,9 @@ describe("PlatformPicker: one row when it fits, a select when it does not", () =
     const onChange = vi.fn();
     render(<Harness start="pc" onChange={onChange} />);
     await resize(300);
-    await act(async () => { fireEvent.change(select()!, { target: { value: "-other" } }); });
+    await choose("-other");
     expect(onChange).toHaveBeenLastCalledWith("");
-    expect(select()!.value).toBe("-other");
+    expect(select()!.textContent).toBe("platform.otherOption");
     expect(slugBox()).not.toBeNull();
 
     await resize(800);
@@ -145,9 +159,9 @@ describe("PlatformPicker: one row when it fits, a select when it does not", () =
     expect((slugBox() as HTMLInputElement).value).toBe("old-room");
 
     await resize(300);
-    const box = select()!;
-    expect(box.value).toBe("old-room");
-    expect(box.selectedOptions[0].textContent).toBe("Old Room");
+    expect(select()!.textContent).toBe("Old Room");
+    await openList();
+    expect(chosen()).toBe("old-room");
   });
 });
 
