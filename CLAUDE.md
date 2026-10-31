@@ -2134,7 +2134,9 @@ are unchanged — do not add a `paused` status here either.
   in `minimum`). Sends the base policy plus the `vip_min_charge_*` keys (in
   minutes), only the switch when off. The rule rides on the
   session (`min_charge`, frozen by the server); `sessionTimeCostAt` applies it
-  so the tile ticks the same figure the server bills, `SessionTimer` shows a
+  so the tile ticks the same figure the server bills — including a minimum the
+  server SETTLED on a move after the threshold (`min_charge.settled_amount`
+  added to the clock, never repriced at the new seat), `SessionTimer` shows a
   «Минимум 1 ч» badge (`minimumLabel` prop) and the receipt a line from the
   bill's `minimum_charge`. Tests: `VipMinimumChargeForm.test.tsx`,
   `sessionAmount.minimumCharge.test.ts`, badge/receipt cases.
