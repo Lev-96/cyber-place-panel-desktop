@@ -1314,8 +1314,11 @@ person who waives a bill is whoever is at the counter when a machine crashes
   (`buildGameForm`, booleans "1"/"0" — Laravel's `boolean` refuses
   "true"/"false"); an edit with a file is `POST /games/{id}?_method=PUT`. The
   write path strips the query, so `/games` and `/branches` caches still drop.
-- GamesList / BranchGames show a 40 px cover thumb (`SmartImage`, first letter
-  when there is none).
+- GamesList / BranchGames show the cover as box art (`components/games/GameCover`,
+  42×56) — or, with none / a failed load, the mobile app's "no cover" art:
+  dark gradient, brand ring, the platform's `PlatformIcon` (`.game-cover-empty`).
+  Built on `SmartImage`'s new optional `fallback` (omitted = the first letter,
+  as every other user still gets). Tests `GameCover.test.tsx` (4).
 - Tests: `GameForm.cover.test.tsx` (9), `api/games.cover.test.ts` (5); the
   catalogue tests in `GameForm.test.tsx` mount with "No cover" on, which sends
   their old bodies unchanged. Mutation-checked: no cover guard, cover dropped
@@ -2108,6 +2111,22 @@ are unchanged — do not add a `paused` status here either.
   server sweep), `pausedSecondsBetween` caps an open pause there
   (`autoResumeAtOf()` in `sessionAmount.ts`). History: a `resumed` with
   `reason: pause_limit` reads «Автоматически, по лимиту паузы».
+- **VIP minimum charge (2026-10-31)**: Branch → Prices, `VipMinimumChargeForm`
+  written for an owner who has never seen it: the rule in plain sentences with
+  their numbers (short visit / long visit / past the minimum / a move), two
+  questions answered with `DurationPicker` in hours OR minutes (its `presets`,
+  `maxMinutes` = 1440, `invalidText` props; defaults unchanged for «+ Время»),
+  the billing choice with a worked case each, and an example table with a
+  «Почему» column plus a moved-visit line (`vipMinimumCharge.ts`
+  `exampleRow`/`moveExample`, priced by `applyMinimumCharge` at the first VIP
+  rate). The panel refuses minimum < threshold in BOTH modes (the server only
+  in `minimum`). Sends the base policy plus the `vip_min_charge_*` keys (in
+  minutes), only the switch when off. The rule rides on the
+  session (`min_charge`, frozen by the server); `sessionTimeCostAt` applies it
+  so the tile ticks the same figure the server bills, `SessionTimer` shows a
+  «Минимум 1 ч» badge (`minimumLabel` prop) and the receipt a line from the
+  bill's `minimum_charge`. Tests: `VipMinimumChargeForm.test.tsx`,
+  `sessionAmount.minimumCharge.test.ts`, badge/receipt cases.
 - **«Переместить игрока» (2026-09-25)**: a tile button (hidden while paused)
   opens `RelocateSessionDialog`: `relocation-options` lists same-price seats
   first, then others; a booking-limited seat shows «Забронировано с HH:MM,
