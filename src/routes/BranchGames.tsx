@@ -1,7 +1,6 @@
 import GameForm from "@/components/games/GameForm";
 import PlatformIcon from "@/components/ui/PlatformIcon";
-import SmartImage from "@/components/ui/SmartImage";
-import { storageUri } from "@/infrastructure/AppConfig";
+import GameCover from "@/components/games/GameCover";
 import Button from "@/components/ui/Button";
 import { useAuth } from "@/auth/AuthContext";
 import { can } from "@/auth/permissions";
@@ -64,8 +63,8 @@ const BranchGames = () => {
           {(data ?? []).map((g) => (
             <div key={g.id} className="list-item">
               <div className="row" style={{ gap: 12, alignItems: "center", minWidth: 0 }}>
-                {/* The cover players see in the app; first letter when there is none. */}
-                <SmartImage src={storageUri(g.game_logo_path)} name={g.name} alt="" size={40} />
+                {/* The cover players see in the app, or the app's "no cover" art. */}
+                <GameCover path={g.game_logo_path} platform={g.platform} name={g.name} />
                 <div style={{ minWidth: 0 }}>
                   <div className="name">{g.name}</div>
                   <div className="meta game-platform">
