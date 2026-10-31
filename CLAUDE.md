@@ -386,6 +386,14 @@ pos · places · ps5 · sessions · tournaments · revenue · services · scanne
 
 ## 5. Booking domain (staff perspective)
 
+### A booking without a game (2026-10-31)
+
+A booking for a platform that is the game itself (poker, table tennis) has
+`game_id`/`game` null and `platform` set (from its places). `Booking.platform`
+reads `raw.platform` first, then the game's (older rows);
+`bookingSubjectOf(raw)` names it — the game, else the platform's label, else
+"-" — in the bookings list and details. Tests: `domain/Booking.test.ts`.
+
 ### Verified statuses (from backend migrations)
 `pending` · `confirmed` · `cancelled` · `rescheduled` · `finished`
 
