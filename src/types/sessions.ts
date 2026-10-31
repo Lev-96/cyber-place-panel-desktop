@@ -276,6 +276,12 @@ export interface ISessionApi {
    */
   rate_changed_at?: string | null;
   amount_before_rate_change?: number | string | null;
+  /**
+   * The VIP minimum charge frozen on this session when it first sat on a VIP
+   * seat (2026-10-31); null/absent = none. The tile applies it exactly as the
+   * bill does (`applyMinimumCharge`).
+   */
+  min_charge?: IMinimumChargeRule | null;
   /** Pads in play INCLUDING the session's own. 1 is the floor, never 0. */
   joystick_count?: number;
   /**
@@ -480,4 +486,17 @@ export interface IPcApi extends Translated {
     type: "standard" | "vip";
     platform: string;
   }) | null;
+}
+
+/**
+ * A VIP minimum-charge rule (2026-10-31), as the session (frozen) and the
+ * branch's billing settings carry it. Minutes of PLAYED time.
+ *  - `minimum`: from `after_minutes`, at least `minimum_minutes` is billed.
+ *  - `round_up`: from `after_minutes`, played time rounds up to whole blocks
+ *    of `minimum_minutes`.
+ */
+export interface IMinimumChargeRule {
+  after_minutes: number;
+  minimum_minutes: number;
+  mode: "minimum" | "round_up";
 }

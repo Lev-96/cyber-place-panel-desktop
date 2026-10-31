@@ -1,4 +1,4 @@
-import { IExtraItem, ISessionApi } from "@/types/sessions";
+import { IExtraItem, IMinimumChargeRule, ISessionApi } from "@/types/sessions";
 
 /**
  * What a running session's CLOCK is worth right now.
@@ -48,7 +48,76 @@ import { IExtraItem, ISessionApi } from "@/types/sessions";
  * @param at Milliseconds since the epoch to price at; `Date.now()` in the UI,
  *           a fixed instant in tests.
  */
-export const sessionTimeCostAt = (session: ISessionApi, at: number): number => {
+export const sessionTimeCostAt = (session: ISessionApi, at: number): number =>
+  sessionMinimumChargeAt(session, at).amount;
+
+/**
+ * The clock with the session's VIP minimum charge applied — the same step
+ * `SessionPricingCalculator::bill()` takes before adding anything: ONCE, to
+ * the whole visit's clock, topped up at the current tariff rate.
+ */
+export const sessionMinimumChargeAt = (session: ISessionApi, at: number): MinimumChargeResult =>
+  applyMinimumCharge(
+    session.min_charge ?? null,
+    clockCostAt(session, at),
+    playedSecondsBetween(session, session.started_at, at),
+    tariffHourlyRate(session),
+  );
+
+/** What a minimum-charge rule did to a clock. */
+export interface MinimumChargeResult {
+  /** The clock as billed. */
+  amount: number;
+  /** True when the rule added something. */
+  applied: boolean;
+  /** The seconds billed (played time when nothing was added). */
+  billedSeconds: number;
+}
+
+/**
+ * The seconds billed for `playedSeconds` under a rule — mirrors
+ * `MinimumChargeRule::billedSeconds()`: below the threshold what was played;
+ * from it (inclusive, whole seconds) the minimum, or played time rounded up
+ * to whole blocks.
+ */
+export const minimumChargeBilledSeconds = (rule: IMinimumChargeRule, playedSeconds: number): number => {
+  const played = Math.max(0, playedSeconds);
+  if (played < rule.after_minutes * 60) return played;
+  const block = rule.minimum_minutes * 60;
+  return rule.mode === "round_up" ? Math.ceil(played / block) * block : Math.max(played, block);
+};
+
+/**
+ * A clock with a VIP minimum-charge rule applied — mirrors
+ * `MinimumChargeRule::apply()`: `clock + (rate × billed − rate × played)`, each
+ * term rounded as the clock rounds, so a single-rate visit is exactly
+ * `rate × billed`. No rule, nothing to add, or no rate → the clock unchanged.
+ * Also what the owner's settings preview prices its examples with, so the
+ * preview cannot promise what the till would not charge.
+ */
+export const applyMinimumCharge = (
+  rule: IMinimumChargeRule | null,
+  clockCost: number,
+  playedSeconds: number,
+  rate: number | null,
+): MinimumChargeResult => {
+  const played = Math.max(0, playedSeconds);
+  if (!rule || rule.after_minutes < 1 || rule.minimum_minutes < 1) {
+    return { amount: clockCost, applied: false, billedSeconds: played };
+  }
+  const billed = minimumChargeBilledSeconds(rule, played);
+  if (billed <= played || rate === null) {
+    return { amount: clockCost, applied: false, billedSeconds: played };
+  }
+  return {
+    amount: round2(clockCost + perSecond(rate, billed) - perSecond(rate, played)),
+    applied: true,
+    billedSeconds: billed,
+  };
+};
+
+/** The clock as played — `Session::timeCostStringAt()`, no minimum. */
+const clockCostAt = (session: ISessionApi, at: number): number => {
   const rate = toNumber(session.hourly_rate);
 
   // A PLAN (2026-10-25) — a package or a planned hourly start — bills its

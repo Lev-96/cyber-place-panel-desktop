@@ -214,6 +214,18 @@ export interface IBillBreakdown {
   /** 0 means the venue rounds nothing, which is the default. */
   rounding_step?: number;
   rounding_mode?: "up" | "nearest" | "down";
+  /**
+   * The VIP minimum charge and what it did (2026-10-31): `time_cost` above
+   * already includes it. Null/absent = no rule on this session.
+   */
+  minimum_charge?: {
+    mode: "minimum" | "round_up";
+    after_minutes: number;
+    minimum_minutes: number;
+    applied: boolean;
+    billed_minutes: number;
+    played_time_cost: number;
+  } | null;
 }
 
 export interface AddItemBody {

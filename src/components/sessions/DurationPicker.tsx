@@ -1,6 +1,6 @@
 import SectionTabs from "@/components/ui/SectionTabs";
 import { useLang } from "@/i18n/LanguageContext";
-import { amountIn, minutesOf, presetsOf, type DurationUnit } from "./durationModel";
+import { MAX_DURATION_MINUTES, amountIn, minutesOf, presetsOf, type DurationUnit } from "./durationModel";
 
 /**
  * Hours ↔ minutes, a preset or a typed value (2026-10-25).
@@ -21,12 +21,27 @@ interface Props {
   disabled?: boolean;
   /** The box's accessible name. */
   label: string;
+  /** Quick picks per unit; default the session ones (`presetsOf`). */
+  presets?: Record<DurationUnit, readonly number[]>;
+  /** The longest length accepted; default the session ceiling (600 min). */
+  maxMinutes?: number;
+  /** Said under a value that is not accepted; default `session.timeInvalid`. */
+  invalidText?: string;
 }
 
-const DurationPicker = ({ unit, amount, onChange, disabled = false, label }: Props) => {
+const DurationPicker = ({
+  unit,
+  amount,
+  onChange,
+  disabled = false,
+  label,
+  presets,
+  maxMinutes = MAX_DURATION_MINUTES,
+  invalidText,
+}: Props) => {
   const { t } = useLang();
   const suffix = unit === "hours" ? t("time.hourShort") : t("time.minShort");
-  const minutes = minutesOf(amount, unit);
+  const minutes = minutesOf(amount, unit, maxMinutes);
 
   return (
     <div className="col duration-picker" style={{ gap: 8 }}>
@@ -38,12 +53,12 @@ const DurationPicker = ({ unit, amount, onChange, disabled = false, label }: Pro
           { key: "hours", label: t("session.timeUnitHours") },
           { key: "minutes", label: t("session.timeUnitMinutes") },
         ]}
-        onChange={(next) => onChange({ unit: next, amount: amountIn(amount, unit, next) })}
+        onChange={(next) => onChange({ unit: next, amount: amountIn(amount, unit, next, maxMinutes) })}
       />
 
       <div className="duration-picker__presets" role="group" aria-label={t("session.durationPresets")}>
-        {presetsOf(unit).map((n) => {
-          const chosen = minutes !== null && minutesOf(String(n), unit) === minutes;
+        {(presets ? presets[unit] : presetsOf(unit)).map((n) => {
+          const chosen = minutes !== null && minutesOf(String(n), unit, maxMinutes) === minutes;
           return (
             <button
               key={n}
@@ -75,7 +90,7 @@ const DurationPicker = ({ unit, amount, onChange, disabled = false, label }: Pro
       </label>
 
       {amount.trim() !== "" && minutes === null && (
-        <span className="error" style={{ fontSize: 12 }}>{t("session.timeInvalid")}</span>
+        <span className="error" style={{ fontSize: 12 }}>{invalidText ?? t("session.timeInvalid")}</span>
       )}
     </div>
   );

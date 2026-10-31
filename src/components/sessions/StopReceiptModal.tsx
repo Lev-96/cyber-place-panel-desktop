@@ -247,6 +247,20 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved }: Prop
               )}
             </div>
 
+            {/* The VIP minimum charge, when it is in the time line above: what
+                was billed and what the time played came to, so the figure has
+                its reason on the receipt. From the server, never recomputed. */}
+            {!view.is_free && view.minimum_charge?.applied && (
+              <div style={row} className="muted" data-testid="receipt-min-charge">
+                <span style={{ flex: 1, fontSize: 12 }}>
+                  {fmt(t("vipMin.receipt"), fmtDuration(view.minimum_charge.billed_minutes, t))}
+                </span>
+                <span style={{ fontSize: 12 }}>
+                  {fmt(t("vipMin.receiptPlayed"), money(Number(view.minimum_charge.played_time_cost), receiptPrecision))}
+                </span>
+              </div>
+            )}
+
             {/* Joysticks — one line per USE, because that is what is charged.
                 A pad's fee goes on the bill when it is handed out and comes off
                 when it is handed back, so a line is either the whole fee or a

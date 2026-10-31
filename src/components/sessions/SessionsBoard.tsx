@@ -34,6 +34,7 @@ import { DragEvent, useCallback, useEffect, useMemo, useRef, useState } from "re
 import { Link } from "react-router-dom";
 import AddSessionItemDialog from "./AddSessionItemDialog";
 import SellProductsDialog from "@/components/pos/SellProductsDialog";
+import { durationLabel } from "@/components/prices/vipMinimumCharge";
 import SessionTimer from "./SessionTimer";
 import { autoResumeAtOf, sessionCurrentHourlyRate, sessionJoysticksTotal } from "./sessionAmount";
 import StartSessionDialog from "./StartSessionDialog";
@@ -822,7 +823,11 @@ const SessionsBoard = ({ branchId }: Props) => {
               {/* The row itself, not a handful of its fields. Passing an
                   hourly rate a fixed session does not have is what left the
                   countdown branch with nothing to price from. */}
-              <SessionTimer session={sess} formatMoney={money} />
+              <SessionTimer
+                session={sess}
+                formatMoney={money}
+                minimumLabel={(minutes) => fmt(t("vipMin.badge"), durationLabel(minutes, t))}
+              />
             </span>
             <span className="until">
               {/* The tariff line answers "what is this seat earning per hour",

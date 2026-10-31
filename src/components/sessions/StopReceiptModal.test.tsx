@@ -778,3 +778,32 @@ describe("the receipt is the figure charged", () => {
     expect(repo.stop.mock.calls[1][1]).toMatchObject({ priced_at: "2026-10-25T13:05:00+00:00", expected_total: 150 });
   });
 });
+
+describe("the VIP minimum charge on the receipt", () => {
+  beforeEach(() => { cleanup(); repo.preview.mockReset(); });
+  afterEach(cleanup);
+
+  const minimum = (applied: boolean) => ({
+    mode: "minimum", after_minutes: 20, minimum_minutes: 60, applied, billed_minutes: applied ? 60 : 25, played_time_cost: 1250,
+  });
+
+  test("applied: the line names the minimum and what was played", async () => {
+    repo.preview.mockResolvedValue(bill({ time_cost: 3000, subtotal: 3000, gross_total: 3000, total: 3000, minimum_charge: minimum(true) } as Partial<IBillBreakdown>));
+    await mount();
+
+    const line = screen.getByTestId("receipt-min-charge").textContent ?? "";
+    expect(line).toContain("vipMin.receipt");
+    expect(line).toContain("vipMin.receiptPlayed");
+  });
+
+  test("not applied, or waived: no line", async () => {
+    repo.preview.mockResolvedValue(bill({ minimum_charge: minimum(false) } as Partial<IBillBreakdown>));
+    await mount();
+    expect(screen.queryByTestId("receipt-min-charge")).toBeNull();
+
+    cleanup();
+    repo.preview.mockResolvedValue(bill({ is_free: true, total: 0, minimum_charge: minimum(true) } as Partial<IBillBreakdown>));
+    await mount();
+    expect(screen.queryByTestId("receipt-min-charge")).toBeNull();
+  });
+});

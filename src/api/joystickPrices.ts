@@ -54,6 +54,14 @@ export interface IBillingSettings {
    * no limit, and absent reads as exactly that.
    */
   pause_limit_minutes?: number | null;
+  /**
+   * The VIP minimum charge (2026-10-31). Optional: an older backend has none,
+   * and absent reads as off.
+   */
+  vip_min_charge_enabled?: boolean;
+  vip_min_charge_after_minutes?: number | null;
+  vip_min_charge_minutes?: number | null;
+  vip_min_charge_mode?: "minimum" | "round_up" | null;
   /** 0 = round nothing. The default every branch is on. */
   money_rounding_step: number;
   money_rounding_mode: MoneyRoundingMode;
@@ -291,6 +299,11 @@ export interface IBillingPolicy {
    * on the write side like the room's answer above: absent leaves it alone.
    */
   pause_limit_minutes?: number | null;
+  /** The VIP minimum charge; absent leaves it alone, like the fields above. */
+  vip_min_charge_enabled?: boolean;
+  vip_min_charge_after_minutes?: number | null;
+  vip_min_charge_minutes?: number | null;
+  vip_min_charge_mode?: "minimum" | "round_up" | null;
 }
 
 export const apiGetBillingSettings = (branchId: number) =>

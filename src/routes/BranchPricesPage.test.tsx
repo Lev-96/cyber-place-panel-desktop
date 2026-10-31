@@ -82,8 +82,8 @@ describe("Branch → Prices", () => {
     await mount();
     expect(billing.getForEdit).toHaveBeenCalledWith(7);
     expect(billing.get).not.toHaveBeenCalled();
-    // Four rule forms, each with its own Save.
-    expect(saveButtons().length).toBe(4);
+    // Five rule forms, each with its own Save (the VIP minimum charge is the fifth).
+    expect(saveButtons().length).toBe(5);
   });
 
   test("a failed load shows the error and a retry — and NO billing form to save", async () => {
@@ -93,13 +93,13 @@ describe("Branch → Prices", () => {
     expect(saveButtons().length).toBe(0);
     // One error state per billing section, each with the server's sentence as
     // its detail and its own Retry.
-    expect(screen.getAllByRole("alert").length).toBe(4);
-    expect(screen.getAllByText("state.error.title").length).toBe(4);
+    expect(screen.getAllByRole("alert").length).toBe(5);
+    expect(screen.getAllByText("state.error.title").length).toBe(5);
     expect(document.body.textContent).toContain("Network error");
 
     billing.getForEdit.mockResolvedValue(settings);
     await act(async () => { screen.getAllByRole("button", { name: "action.retry" })[0].click(); });
-    expect(saveButtons().length).toBe(4);
+    expect(saveButtons().length).toBe(5);
   });
 
   test("the page is grouped: rates, packages, rules", async () => {

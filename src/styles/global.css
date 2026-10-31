@@ -2740,6 +2740,104 @@ button.pill:hover {
   color: var(--color-text);
 }
 
+/* A VIP seat billed at its minimum (SessionTimer): the reason beside the figure. */
+.session-min-badge {
+  margin-left: 6px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  border: 1px solid rgb(var(--accent-rgb) / 0.4);
+  color: var(--color-primary);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* The VIP minimum charge form (components/prices/VipMinimumChargeForm). */
+.vip-min-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-surface);
+}
+.vip-min-warning {
+  font-size: 12px;
+  color: var(--color-warning);
+}
+.vip-min-preview {
+  width: 100%;
+  max-width: 420px;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.vip-min-preview th {
+  text-align: left;
+  font-weight: 600;
+  color: var(--color-muted);
+  padding: 4px 8px;
+}
+.vip-min-preview td {
+  padding: 6px 8px;
+  border-top: 1px solid var(--color-border);
+  font-variant-numeric: tabular-nums;
+}
+.vip-min-preview tr[data-applied] td:nth-child(2) {
+  color: var(--color-primary);
+  font-weight: 600;
+}
+.vip-min-preview__why {
+  font-size: 12px;
+  color: var(--color-muted);
+}
+.vip-min-preview tr[data-applied] .vip-min-preview__why {
+  color: var(--color-primary);
+}
+/* The rule in plain sentences, with the owner's own numbers. */
+.vip-min-rules {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 12px 14px 12px 30px;
+  border-left: 3px solid var(--color-primary);
+  border-radius: 10px;
+  background: var(--color-surface);
+  font-size: 13px;
+  line-height: 1.45;
+}
+.vip-min-move {
+  margin: 0;
+  max-width: 560px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--color-muted);
+}
+
+/* A game with no cover (components/games/GameCover.tsx): the mobile app's
+   "no cover" art — dark gradient, brand ring, the platform's icon. */
+.game-cover-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(135deg, var(--color-surface-alt), var(--color-bg));
+}
+.game-cover-empty__ring {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 72%;
+  aspect-ratio: 1;
+  border: 1.5px solid transparent;
+  border-radius: 50%;
+  background:
+    linear-gradient(var(--color-bg), var(--color-bg)) padding-box,
+    linear-gradient(135deg, var(--color-primary), var(--color-accent-blue) 50%, var(--color-accent-purple)) border-box;
+}
+
 /* A game's platform under its name: the platform's icon, then its name. */
 .game-platform {
   display: inline-flex;

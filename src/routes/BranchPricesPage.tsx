@@ -5,6 +5,8 @@ import BranchExtraItemForm from "@/components/prices/BranchExtraItemForm";
 import BranchJoystickForm from "@/components/prices/BranchJoystickForm";
 import MoneyRoundingForm from "@/components/prices/MoneyRoundingForm";
 import PauseLimitForm from "@/components/prices/PauseLimitForm";
+import VipMinimumChargeForm from "@/components/prices/VipMinimumChargeForm";
+import { firstVipRate } from "@/components/prices/vipMinimumCharge";
 import PlatformPricesForm from "@/components/prices/PlatformPricesForm";
 import SubplatformPricesForm from "@/components/prices/SubplatformPricesForm";
 import Button from "@/components/ui/Button";
@@ -301,6 +303,34 @@ const BranchPricesPage = () => {
                 key={String(billing.data.pause_limit_minutes ?? "")}
                 branchId={id}
                 settings={billing.data}
+                onSaved={() => void billing.reload()}
+              />
+            )}
+          </SettingsSection>
+
+          {/* The VIP minimum charge: one rule for all the branch's VIP seats. */}
+          <SettingsSection
+            title={t("vipMin.sectionTitle")}
+            description={t("vipMin.description")}
+            loading={billing.loading && !billing.data}
+            error={billing.data ? null : billing.error}
+            onRetry={() => void billing.reload()}
+          >
+            {billing.data && (
+              <VipMinimumChargeForm
+                key={[
+                  billing.data.vip_min_charge_enabled,
+                  billing.data.vip_min_charge_after_minutes,
+                  billing.data.vip_min_charge_minutes,
+                  billing.data.vip_min_charge_mode,
+                ].join(":")}
+                branchId={id}
+                settings={billing.data}
+                vipRate={
+                  firstVipRate(branch.data?.price_for_branch as Record<string, number | null> | undefined)
+                  ?? (platformPrices.data ?? []).map((p) => Number(p.price_vip)).find((v) => v > 0)
+                  ?? null
+                }
                 onSaved={() => void billing.reload()}
               />
             )}

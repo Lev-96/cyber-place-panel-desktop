@@ -23,10 +23,14 @@ export const presetsOf = (unit: DurationUnit): readonly number[] =>
 /**
  * The minutes a typed amount means, or null when it means none the server
  * would accept: empty, not a number, not a whole number of minutes, or
- * outside 1…600. "1,5" is accepted as 1.5 — a decimal comma is how half the
- * floor types it.
+ * outside 1…600 (or 1…`maxMinutes`, for a caller with another ceiling).
+ * "1,5" is accepted as 1.5 — a decimal comma is how half the floor types it.
  */
-export const minutesOf = (amount: string, unit: DurationUnit): number | null => {
+export const minutesOf = (
+  amount: string,
+  unit: DurationUnit,
+  maxMinutes: number = MAX_DURATION_MINUTES,
+): number | null => {
   const raw = amount.trim().replace(",", ".");
   if (raw === "") return null;
 
@@ -39,7 +43,7 @@ export const minutesOf = (amount: string, unit: DurationUnit): number | null => 
   const whole = Math.round(minutes);
   if (Math.abs(minutes - whole) > 1e-9) return null;
 
-  return whole >= 1 && whole <= MAX_DURATION_MINUTES ? whole : null;
+  return whole >= 1 && whole <= maxMinutes ? whole : null;
 };
 
 /**
@@ -64,9 +68,14 @@ export const clockOf = (text: string): string | null => {
  * keeps what was chosen instead of re-reading "2" as two minutes. A value
  * that means nothing yet is kept as typed.
  */
-export const amountIn = (amount: string, from: DurationUnit, to: DurationUnit): string => {
+export const amountIn = (
+  amount: string,
+  from: DurationUnit,
+  to: DurationUnit,
+  maxMinutes: number = MAX_DURATION_MINUTES,
+): string => {
   if (from === to) return amount;
-  const minutes = minutesOf(amount, from);
+  const minutes = minutesOf(amount, from, maxMinutes);
   if (minutes === null) return amount;
   if (to === "minutes") return String(minutes);
 
