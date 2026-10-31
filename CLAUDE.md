@@ -2118,8 +2118,11 @@ are unchanged — do not add a `paused` status here either.
   `maxMinutes` = 1440, `invalidText` props; defaults unchanged for «+ Время»),
   the billing choice with a worked case each, and an example table with a
   «Почему» column plus a moved-visit line (`vipMinimumCharge.ts`
-  `exampleRow`/`moveExample`, priced by `applyMinimumCharge` at the first VIP
-  rate). The panel refuses minimum < threshold in BOTH modes (the server only
+  `exampleRow`/`moveExample`, priced by `applyMinimumCharge`). The example's
+  price comes from `vipRateOptions` (matrix `<slug>-vip` + custom rows, the
+  platform with the most VIP seats first; a picker when several) — "the first
+  VIP price found" once priced it at PC VIP 12 in a branch whose VIP seats are
+  all PS5 at 1500. The panel refuses minimum < threshold in BOTH modes (the server only
   in `minimum`). Sends the base policy plus the `vip_min_charge_*` keys (in
   minutes), only the switch when off. The rule rides on the
   session (`min_charge`, frozen by the server); `sessionTimeCostAt` applies it
