@@ -1859,7 +1859,9 @@ export const TRANSLATIONS: Dict = {
     ru: "Округлять вверх до целого минимума (сыграл {0}, платит за {1})",
     am: "Կլորացնել վերև՝ մինչև ամբողջ նվազագույն (խաղացել է {0}, վճարում է {1}-ի համար)",
   },
-  "vipMin.preview.title": { en: "How it is counted at the VIP price of {0} per hour", ru: "Как это посчитается при цене VIP {0} в час", am: "Ինչպես կհաշվվի VIP-ի ժամը {0} գնով" },
+  "vipMin.preview.title": { en: "How it is counted: {0}", ru: "Как это посчитается: {0}", am: "Ինչպես կհաշվվի՝ {0}" },
+  "vipMin.preview.for": { en: "How it is counted for", ru: "Как это посчитается для", am: "Ինչպես կհաշվվի՝" },
+  "vipMin.preview.option": { en: "{0} VIP, {1} per hour", ru: "{0} VIP, {1} в час", am: "{0} VIP, ժամը {1}" },
   "vipMin.preview.noRate": {
     en: "Set a VIP hourly price above to see an example.",
     ru: "Укажите цену VIP за час выше, чтобы увидеть пример.",

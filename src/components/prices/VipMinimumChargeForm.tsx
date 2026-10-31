@@ -23,6 +23,7 @@ import {
   MINIMUM_PRESETS,
   THRESHOLD_PRESETS,
   VIP_MIN_MAX_MINUTES,
+  VipRateOption,
   durationFieldOf,
   durationLabel,
   ruleProblem,
@@ -32,8 +33,8 @@ import {
 interface Props {
   branchId: number;
   settings: IBillingSettings;
-  /** The branch's VIP hourly rate, to price the examples at; null = none set. */
-  vipRate: number | null;
+  /** The branch's VIP prices, the example's default first (`vipRateOptions`). */
+  vipRates: readonly VipRateOption[];
   onSaved: () => void;
 }
 
@@ -65,13 +66,14 @@ const Question = ({ title, hint, children }: { title: string; hint: string; chil
  * sits on a VIP seat, so a change here applies to NEW visits only — said on
  * the form, because it is the consequence an owner must know before saving.
  */
-const VipMinimumChargeForm = ({ branchId, settings, vipRate, onSaved }: Props) => {
+const VipMinimumChargeForm = ({ branchId, settings, vipRates, onSaved }: Props) => {
   const { t, money } = useLang();
   const saved = savedRule(settings);
   const [enabled, setEnabled] = useState(!!settings.vip_min_charge_enabled);
   const [after, setAfter] = useState<DurationField>(() => durationFieldOf(settings.vip_min_charge_after_minutes ?? 20));
   const [minimum, setMinimum] = useState<DurationField>(() => durationFieldOf(settings.vip_min_charge_minutes ?? 60));
   const [mode, setMode] = useState<IMinimumChargeRule["mode"]>(settings.vip_min_charge_mode ?? "minimum");
+  const [exampleSlug, setExampleSlug] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -124,6 +126,8 @@ const VipMinimumChargeForm = ({ branchId, settings, vipRate, onSaved }: Props) =
     fmt(t(key), durationLabel(pastMinimum, t), durationLabel(billedPast(m), t));
 
   const d = (minutes: number) => durationLabel(minutes, t);
+  const example = vipRates.find((o) => o.slug === exampleSlug) ?? vipRates[0] ?? null;
+  const optionText = (o: VipRateOption) => fmt(t("vipMin.preview.option"), o.label, money(o.rate));
 
   return (
     <form className="col vip-min-form" style={{ gap: 16 }} onSubmit={submit}>
@@ -186,10 +190,24 @@ const VipMinimumChargeForm = ({ branchId, settings, vipRate, onSaved }: Props) =
 
           {rule && (
             <div className="vip-min-summary">
-              {vipRate !== null ? (
+              {example ? (
                 <>
-                  <span className="label">{fmt(t("vipMin.preview.title"), money(vipRate))}</span>
-                  <VipMinimumChargePreview rule={rule} rate={vipRate} />
+                  {vipRates.length > 1 ? (
+                    <label className="row" style={{ gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                      <span className="label">{t("vipMin.preview.for")}</span>
+                      <select
+                        className="input"
+                        value={example.slug}
+                        onChange={(e) => setExampleSlug(e.target.value)}
+                        style={{ width: "auto" }}
+                      >
+                        {vipRates.map((o) => <option key={o.slug} value={o.slug}>{optionText(o)}</option>)}
+                      </select>
+                    </label>
+                  ) : (
+                    <span className="label">{fmt(t("vipMin.preview.title"), optionText(example))}</span>
+                  )}
+                  <VipMinimumChargePreview rule={rule} rate={example.rate} />
                 </>
               ) : (
                 <span className="muted" style={{ fontSize: 12 }}>{t("vipMin.preview.noRate")}</span>

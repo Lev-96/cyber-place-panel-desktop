@@ -24,6 +24,7 @@ vi.mock("@/i18n/LanguageContext", async () => {
 });
 
 import VipMinimumChargeForm from "./VipMinimumChargeForm";
+import type { VipRateOption } from "./vipMinimumCharge";
 
 const AFTER = "С какого времени действует минимум";
 const MINIMUM = "Минимальная оплата";
@@ -40,8 +41,9 @@ const on = (over: Partial<IBillingSettings> = {}) => settings({
   vip_min_charge_enabled: true, vip_min_charge_after_minutes: 20, vip_min_charge_minutes: 60, vip_min_charge_mode: "minimum", ...over,
 });
 
-const mount = async (s: IBillingSettings, vipRate: number | null = 3000) => {
-  await act(async () => { render(<VipMinimumChargeForm branchId={7} settings={s} vipRate={vipRate} onSaved={() => {}} />); });
+const PS5 = { slug: "ps5", label: "PS5", rate: 3000, vipSeats: 2 };
+const mount = async (s: IBillingSettings, vipRates: VipRateOption[] = [PS5]) => {
+  await act(async () => { render(<VipMinimumChargeForm branchId={7} settings={s} vipRates={vipRates} onSaved={() => {}} />); });
 };
 const toggle = async () => { await act(async () => { fireEvent.click(screen.getByRole("switch")); }); };
 const box = (label: string) => screen.getByLabelText(label) as HTMLInputElement;
@@ -181,7 +183,7 @@ describe("the VIP minimum charge card", () => {
   });
 
   test("with no VIP price set, says how to see an example instead of inventing one", async () => {
-    await mount(settings(), null);
+    await mount(settings(), []);
     await toggle();
 
     expect(document.querySelector(".vip-min-preview")).toBeNull();
@@ -199,5 +201,23 @@ describe("the VIP minimum charge card", () => {
     await typeInto(MINIMUM, "3");
     expect(save().disabled).toBe(false);
     expect(screen.getByText(/^Новые настройки действуют/)).toBeTruthy();
+  });
+
+  test("one VIP price: the example names it", async () => {
+    await mount(settings());
+    await toggle();
+    expect(screen.getByText("Как это посчитается: PS5 VIP, 3000·AMD в час")).toBeTruthy();
+  });
+
+  test("several VIP prices: the owner picks which one the example is worked at", async () => {
+    await mount(settings(), [PS5, { slug: "pc", label: "PC", rate: 12, vipSeats: 0 }]);
+    await toggle();
+
+    const picker = screen.getByLabelText("Как это посчитается для") as HTMLSelectElement;
+    expect(picker.value).toBe("ps5");
+    expect(previewRows()[1]).toEqual(["20 мин", "3000·AMD", "минимум 1 ч"]);
+
+    await act(async () => { fireEvent.change(picker, { target: { value: "pc" } }); });
+    expect(previewRows()[1]).toEqual(["20 мин", "12·AMD", "минимум 1 ч"]);
   });
 });

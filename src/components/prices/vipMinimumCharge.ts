@@ -51,13 +51,47 @@ export const durationLabel = (minutes: number, t: (k: string) => string): string
   return m === 0 ? `${h} ${t("time.hourShort")}` : `${h} ${t("time.hourShort")} ${m} ${t("time.minShort")}`;
 };
 
-/** The first VIP hourly rate the branch has set, to price the examples at. */
-export const firstVipRate = (prices: Record<string, number | null> | null | undefined): number | null => {
-  if (!prices) return null;
-  for (const [key, value] of Object.entries(prices)) {
-    if (key.endsWith("-vip") && typeof value === "number" && value > 0) return value;
+/** A VIP hourly price the example can be worked at: one per platform. */
+export interface VipRateOption {
+  slug: string;
+  /** "PS5", or a venue's own platform name. */
+  label: string;
+  rate: number;
+  /** How many active VIP seats the branch has on this platform. */
+  vipSeats: number;
+}
+
+/**
+ * The VIP prices this branch has set, one per platform — from the tariff
+ * matrix (`<slug>-vip`, pc/ps4/ps5) and from custom-platform price rows —
+ * the platforms that actually have VIP seats first (most seats first), so the
+ * example is worked at a price the owner's VIP seats really bill. Taking "the
+ * first VIP price found" priced it at a PC VIP rate in a branch whose VIP
+ * seats are all PS5.
+ */
+export const vipRateOptions = (
+  matrix: Record<string, number | string | null> | null | undefined,
+  customPrices: readonly { platform: string; price_vip: number | string | null }[],
+  places: readonly { platform: string; type: string; status?: string }[],
+  nameOf: (slug: string) => string,
+): VipRateOption[] => {
+  const rates = new Map<string, number>();
+  for (const [key, value] of Object.entries(matrix ?? {})) {
+    const rate = Number(value);
+    if (key.endsWith("-vip") && rate > 0) rates.set(key.slice(0, -"-vip".length), rate);
   }
-  return null;
+  for (const row of customPrices) {
+    const rate = Number(row.price_vip);
+    if (rate > 0 && !rates.has(row.platform)) rates.set(row.platform, rate);
+  }
+
+  const seats = new Map<string, number>();
+  for (const place of places) {
+    if (place.type === "vip" && place.status !== "inactive") seats.set(place.platform, (seats.get(place.platform) ?? 0) + 1);
+  }
+
+  return Array.from(rates, ([slug, rate]) => ({ slug, label: nameOf(slug), rate, vipSeats: seats.get(slug) ?? 0 }))
+    .sort((a, b) => b.vipSeats - a.vipSeats);
 };
 
 /** Why a visit pays what it pays: the words beside each example. */

@@ -33,6 +33,9 @@ vi.mock("@/repositories/TimePackageRepository", () => ({
 vi.mock("@/repositories/BranchRepository", () => ({
   branchRepository: { byId: vi.fn().mockResolvedValue({ id: 7, pricing: {} }), updatePricing: vi.fn() },
 }));
+vi.mock("@/repositories/PlaceRepository", () => ({
+  placeRepository: { listRawByBranch: vi.fn().mockResolvedValue([]) },
+}));
 vi.mock("@/repositories/PlatformPriceRepository", () => ({
   platformPriceRepository: { listByBranch: vi.fn().mockResolvedValue([]) },
 }));
