@@ -1,6 +1,7 @@
 import { SkeletonCard } from "@/components/ui/Skeleton";
 import { BackAction, ErrorState } from "@/components/ui/state";
 import { apiGetBooking } from "@/api/bookings";
+import { bookingSubjectOf } from "@/domain/Booking";
 import CancelReasonModal from "@/components/bookings/CancelReasonModal";
 import Button from "@/components/ui/Button";
 import QrCode from "@/components/ui/QrCode";
@@ -65,7 +66,7 @@ const BookingDetails = () => {
           <Row k={t("bookingDetails.branch")} v={data.branch?.address ?? "-"} />
           <Row
             k={t("bookingDetails.game")}
-            v={`${data.game?.name ?? "-"} ${data.game?.platform ? `(${data.game.platform})` : ""}`}
+            v={`${bookingSubjectOf(data)} ${data.game?.platform ? `(${data.game.platform})` : ""}`}
           />
           <Row k={t("bookingDetails.start")} v={start} />
           <Row

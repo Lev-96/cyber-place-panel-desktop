@@ -6,6 +6,7 @@ import { StateSwitch, deriveViewState } from "@/components/ui/state";
 import { useAsync } from "@/hooks/useAsync";
 import { formatDateTime } from "@/i18n/dates";
 import { useLang } from "@/i18n/LanguageContext";
+import { bookingSubjectOf } from "@/domain/Booking";
 import { bookingRepository } from "@/repositories/BookingRepository";
 import { useState } from "react";
 import { Link } from "react-router-dom";
@@ -46,7 +47,7 @@ const Bookings = () => {
                   </div>
                   <div className="meta">
                     {start} · {b.raw.duration_minutes} {t("time.minShort")} ·{" "}
-                    {b.raw.game?.name ?? ""}{" "}
+                    {bookingSubjectOf(b.raw)}{" "}
                     {b.raw.game?.platform ? `(${b.raw.game.platform})` : ""}
                   </div>
                 </div>
