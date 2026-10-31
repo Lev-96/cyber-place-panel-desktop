@@ -53,16 +53,24 @@ export const sessionTimeCostAt = (session: ISessionApi, at: number): number =>
 
 /**
  * The clock with the session's VIP minimum charge applied — the same step
- * `SessionPricingCalculator::bill()` takes before adding anything: ONCE, to
- * the whole visit's clock, topped up at the current tariff rate.
+ * `SessionPricingCalculator::bill()` takes before adding anything
+ * (`Session::minimumChargeAt`): ONCE per visit. Settled on a move after the
+ * threshold → the clock plus the server's settled top-up (that seat's hour at
+ * its rate; later seats by the minute). Otherwise → the whole clock, topped up
+ * at the current tariff rate.
  */
-export const sessionMinimumChargeAt = (session: ISessionApi, at: number): MinimumChargeResult =>
-  applyMinimumCharge(
-    session.min_charge ?? null,
-    clockCostAt(session, at),
-    playedSecondsBetween(session, session.started_at, at),
-    tariffHourlyRate(session),
-  );
+export const sessionMinimumChargeAt = (session: ISessionApi, at: number): MinimumChargeResult => {
+  const rule = session.min_charge ?? null;
+  const clock = clockCostAt(session, at);
+  if (rule && rule.settled_amount != null) {
+    return {
+      amount: round2(clock + rule.settled_amount),
+      applied: rule.settled_amount > 0,
+      billedSeconds: (rule.settled_billed_minutes ?? 0) * 60,
+    };
+  }
+  return applyMinimumCharge(rule, clock, playedSecondsBetween(session, session.started_at, at), tariffHourlyRate(session));
+};
 
 /** What a minimum-charge rule did to a clock. */
 export interface MinimumChargeResult {

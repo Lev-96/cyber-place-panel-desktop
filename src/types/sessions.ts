@@ -499,4 +499,11 @@ export interface IMinimumChargeRule {
   after_minutes: number;
   minimum_minutes: number;
   mode: "minimum" | "round_up";
+  /**
+   * Settled on a move after the threshold (2026-10-31): the top-up the seat
+   * that reached it added, at ITS rate, and the time it billed. Absent/null =
+   * not settled. Server-owned; the panel only adds it.
+   */
+  settled_amount?: number | null;
+  settled_billed_minutes?: number | null;
 }

@@ -70,6 +70,30 @@ describe("on a running session", () => {
     expect(sessionTimeCostAt(session({ min_charge: null }), AT)).toBe(1250);
   });
 
+  // The owner's case, as the backend bills it (VipMinimumChargeTest): 25 min at
+  // the dear VIP (4000/h) reached the threshold there, then a move to 3000/h.
+  // The server settled that seat's hour (+2333.33); the tile adds it to the
+  // clock and never reprices it at the cheaper seat.
+  test("moved after the threshold: the dear seat's hour stays, the next seat by the minute (backend: 4500)", () => {
+    const s = session({
+      started_at: ago(35),
+      min_charge: { ...RULE, settled_amount: 2333.33, settled_billed_minutes: 60 },
+      hourly_rate: 3000,
+      rate_changed_at: ago(10),
+      amount_before_rate_change: 1666.67,
+    });
+    expect(sessionTimeCostAt(s, AT)).toBe(4500);
+    const result = sessionMinimumChargeAt(s, AT);
+    expect(result.applied).toBe(true);
+    expect(result.billedSeconds).toBe(3600);
+  });
+
+  test("settled with nothing to add (already past the minimum): no badge, just the clock", () => {
+    const s = session({ min_charge: { ...RULE, settled_amount: 0, settled_billed_minutes: 70 } });
+    expect(sessionTimeCostAt(s, AT)).toBe(1250);
+    expect(sessionMinimumChargeAt(s, AT).applied).toBe(false);
+  });
+
   test("after a move to a 4000/h seat the top-up runs at the CURRENT rate (backend: 3800)", () => {
     const s = session({
       min_charge: RULE,
