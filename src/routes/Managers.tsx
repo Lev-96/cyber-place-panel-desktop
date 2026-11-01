@@ -80,7 +80,7 @@ const Managers = () => {
               </div>
               <div className="row" style={{ gap: 6 }}>
                 <Button variant="secondary" onClick={() => setEditing(m)} style={btn}>{t("action.edit")}</Button>
-                <Button variant="secondary" onClick={() => setPendingRemove(m)} style={{ ...btn, color: "#ef4444", borderColor: "#4a1a1a" }}>{t("action.remove")}</Button>
+                <Button variant="secondary" onClick={() => setPendingRemove(m)} style={{ ...btn, color: "var(--color-danger)", borderColor: "var(--color-danger-border-dim)" }}>{t("action.remove")}</Button>
               </div>
             </div>
           ))}

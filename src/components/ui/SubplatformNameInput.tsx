@@ -119,7 +119,7 @@ const SubplatformNameInput = ({ value, onChange, suggestions, onPickExisting, di
         {showSuggestions && (
           <div
             className="col"
-            style={{ border: "1px solid #1f2a44", borderRadius: 8, overflow: "hidden", background: "#0b1327" }}
+            style={{ border: "1px solid #1f2a44", borderRadius: 8, overflow: "hidden", background: "var(--color-surface-deep)" }}
           >
             <span className="muted" style={{ fontSize: 10, padding: "4px 8px 0" }}>
               {t("platformName.suggestions")}

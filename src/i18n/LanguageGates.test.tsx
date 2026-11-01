@@ -22,6 +22,7 @@ const lang = vi.hoisted(() => ({
   ready: true,
   chosen: true,
   setLang: vi.fn(),
+  applyAccountCurrency: vi.fn(),
 }));
 
 const auth = vi.hoisted(() => ({
@@ -43,6 +44,7 @@ vi.mock("@/i18n/LanguageContext", () => ({
     setLang: lang.setLang,
     currency: "AMD",
     setCurrencyOverride: vi.fn(),
+    applyAccountCurrency: lang.applyAccountCurrency,
     t: (k: string) => k,
     money: (n: number) => String(n),
   }),
@@ -229,6 +231,15 @@ describe("AccountLanguageGate — once per account", () => {
     cleanup();
     // Unmount = sign-out. A later write must not land on the account that left.
     expect(prefs.setActiveAccount).toHaveBeenLastCalledWith(null);
+  });
+
+  test("the display currency is the account's, loaded on sign-in and dropped on sign-out", async () => {
+    prefs.readAccountLang.mockResolvedValue("ru");
+    await signIn(5);
+    expect(lang.applyAccountCurrency).toHaveBeenLastCalledWith(5);
+
+    cleanup();
+    expect(lang.applyAccountCurrency).toHaveBeenLastCalledWith(null);
   });
 
   test("a signed-out render never blocks the app", async () => {

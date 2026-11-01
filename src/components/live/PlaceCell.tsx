@@ -1,5 +1,6 @@
 import { useLang } from "@/i18n/LanguageContext";
-import { PlaceStatusColors } from "@/domain/PlaceStatus";
+import { PLACE_STATUS_TONE, PlaceStatusColors } from "@/domain/PlaceStatus";
+import StatusChip from "@/components/ui/StatusChip";
 import { PlaceSnapshot } from "@/services/realtime/RealtimeService";
 import { formatTime } from "@/i18n/dates";
 import { platformLabel } from "@/utils/platform";
@@ -17,10 +18,11 @@ const PlaceCell = ({ snapshot, platformName = platformLabel }: Props) => {
   const top = bookings[0];
   return (
     <div className="place-cell" style={{ borderColor: color }}>
-      <span className="dot" style={{ background: color }} />
+
       <span className="platform">{platformName(place.platform)} · {place.type}</span>
       <span className="id">№{place.number ?? place.id}</span>
-      <span className="status" style={{ color }}>{t(`place.${status}`)}</span>
+      {/* Colour, icon and word together (2026-10-27). */}
+      <span className="status"><StatusChip tone={PLACE_STATUS_TONE[status]} label={t(`place.${status}`)} /></span>
       {top && (
         <span className="until">
           {status === "busy" ? t("live.till") : t("live.from")}{" "}

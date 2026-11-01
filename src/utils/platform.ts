@@ -67,6 +67,30 @@ export const platformGroup = (platform: string): PlatformGroup => {
 };
 
 /**
+ * Which picture a platform gets (components/ui/PlatformIcon). PC and every
+ * PlayStation by `platformGroup`; a venue's own platform by the words in its
+ * slug (the slug comes from the English name: "table-tennis", "poker",
+ * "billiards"), so a platform added tomorrow under one of these names is drawn
+ * right with no code change; anything else gets the neutral mark. Mirrored in
+ * the mobile app (`utils/platform.ts` → `platformIconKind`).
+ */
+export type PlatformIconKind = "pc" | "ps" | "poker" | "table-tennis" | "billiards" | "vr" | "other";
+
+const ICON_WORDS: ReadonlyArray<[PlatformIconKind, RegExp]> = [
+  ["poker", /poker|holdem|blackjack|cards?(?:-|$)/],
+  ["table-tennis", /table-tennis|ping|pong|tennis/],
+  ["billiards", /billiard|snooker|pool/],
+  ["vr", /(?:^|-)vr(?:-|$)|virtual/],
+];
+
+export const platformIconKind = (platform: string | null | undefined): PlatformIconKind => {
+  const slug = (platform ?? "").trim().toLowerCase();
+  const group = platformGroup(slug);
+  if (group !== "other") return group;
+  return ICON_WORDS.find(([, words]) => words.test(slug))?.[0] ?? "other";
+};
+
+/**
  * Is this seat a PlayStation? Asked of the PLACE's platform, not the device.
  *
  * `pc.kind === "ps"` only says "no kiosk agent runs here" — equally true of a

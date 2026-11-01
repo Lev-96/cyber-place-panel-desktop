@@ -8,7 +8,9 @@ import AccountSwitchModal from "@/components/profile/AccountSwitchModal";
 import AccountSwitchPanel from "@/components/profile/AccountSwitchPanel";
 import ProfileModal from "@/components/profile/ProfileModal";
 import { useLang } from "@/i18n/LanguageContext";
-import { activeNavTo, sortedNavItems, withStaffMenu } from "@/components/sidebarNav";
+import { activeNavTo, applyPersonalMenu, sortedNavItems, withStaffMenu, type NavItemSpec } from "@/components/sidebarNav";
+import type { Role } from "@/types/api";
+import { useUiPreferencesOptional } from "@/preferences/UiPreferencesContext";
 import { useNotifications } from "@/notifications/NotificationsContext";
 import { useUpdatesNotification } from "@/realtime/UpdatesNotificationContext";
 import { ReactNode, useEffect, useRef, useState } from "react";
@@ -28,8 +30,8 @@ const UnreadBadge = ({ count }: { count: number }) => {
         minWidth: 20,
         padding: "1px 6px",
         borderRadius: 999,
-        background: "#ef4444",
-        color: "#fff",
+        background: "var(--color-danger)",
+        color: "var(--color-on-danger)",
         fontSize: 11,
         fontWeight: 700,
         lineHeight: "16px",
@@ -49,29 +51,29 @@ const UnreadBadge = ({ count }: { count: number }) => {
 const ROLE_PALETTE: Record<string, { gradient: string; chipBg: string; chipFg: string; chipBorder: string }> = {
   admin: {
     gradient: "linear-gradient(135deg, #07ddf1, #06b6d4)",
-    chipBg: "rgba(7, 221, 241, 0.14)",
-    chipFg: "#07ddf1",
-    chipBorder: "rgba(7, 221, 241, 0.45)",
+    chipBg: "rgb(var(--accent-rgb) / 0.14)",
+    chipFg: "var(--color-primary)",
+    chipBorder: "rgb(var(--accent-rgb) / 0.45)",
   },
   company_owner: {
     gradient: "linear-gradient(135deg, #d152fa, #a855f7)",
-    chipBg: "rgba(209, 82, 250, 0.14)",
-    chipFg: "#d152fa",
-    chipBorder: "rgba(209, 82, 250, 0.45)",
+    chipBg: "rgb(var(--accent-purple-rgb) / 0.14)",
+    chipFg: "var(--color-accent-purple)",
+    chipBorder: "rgb(var(--accent-purple-rgb) / 0.45)",
   },
   manager: {
     gradient: "linear-gradient(135deg, #22c55e, #16a34a)",
-    chipBg: "rgba(34, 197, 94, 0.14)",
-    chipFg: "#22c55e",
-    chipBorder: "rgba(34, 197, 94, 0.45)",
+    chipBg: "rgb(var(--success-rgb) / 0.14)",
+    chipFg: "var(--color-success)",
+    chipBorder: "rgb(var(--success-rgb) / 0.45)",
   },
 };
 
 const NEUTRAL_PALETTE = {
   gradient: "linear-gradient(135deg, #6b7280, #4b5563)",
-  chipBg: "rgba(148, 163, 184, 0.14)",
-  chipFg: "#94a3b8",
-  chipBorder: "rgba(148, 163, 184, 0.4)",
+  chipBg: "rgb(var(--muted-rgb) / 0.14)",
+  chipFg: "var(--color-muted)",
+  chipBorder: "rgb(var(--muted-rgb) / 0.4)",
 };
 
 const paletteFor = (role: string | undefined) =>
@@ -212,12 +214,12 @@ const UserMenu = ({ name, email, role, roleLabel, trailing }: UserCardProps) => 
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            color: "#020514",
+            color: "var(--avatar-ink)",
             fontWeight: 800,
             fontSize: 13,
             letterSpacing: 0.5,
             flexShrink: 0,
-            boxShadow: "0 2px 8px rgba(0, 0, 0, 0.25)",
+            boxShadow: "0 2px 8px rgb(var(--shadow-rgb) / 0.25)",
           }}
         >
           {initialsFor(name)}
@@ -227,7 +229,7 @@ const UserMenu = ({ name, email, role, roleLabel, trailing }: UserCardProps) => 
             style={{
               fontSize: 13,
               fontWeight: 700,
-              color: "#e5e7eb",
+              color: "var(--color-text-soft)",
               whiteSpace: "nowrap",
               overflow: "hidden",
               textOverflow: "ellipsis",
@@ -240,7 +242,7 @@ const UserMenu = ({ name, email, role, roleLabel, trailing }: UserCardProps) => 
           <div
             style={{
               fontSize: 11,
-              color: "#94a3b8",
+              color: "var(--color-muted)",
               whiteSpace: "nowrap",
               overflow: "hidden",
               textOverflow: "ellipsis",
@@ -295,32 +297,17 @@ interface SidebarProps {
   footerExtra?: ReactNode;
 }
 
-const Sidebar = ({ footerExtra }: SidebarProps = {}) => {
-  const { user, logout } = useAuth();
-  const { t, lang } = useLang();
-  const { pathname } = useLocation();
-  const { unreadCount } = useNotifications();
-  const { unread: supportUnread } = useSupportUnread();
-  const { panel: panelUpd, agent: agentUpd } = useUpdatesNotification();
-  const role = user?.role;
-
-  // Badge counts: admin sees the union of panel + agent pending
-  // promotes; owner/manager only ever see the agent count. Both stay
-  // 0 when nothing is pending so the badge silently disappears.
-  const adminUpdateCount =
-    (panelUpd?.has_update ? 1 : 0) + (agentUpd?.has_update ? 1 : 0);
-  const agentUpdateCount = agentUpd?.has_update ? 1 : 0;
-  const dash = user?.dashboard;
-  const myBranchId = typeof dash?.branch_id === "number" ? dash.branch_id : null;
-  // The owner's company (single company per owner, as everywhere in the panel).
-  const myCompanyId = typeof dash?.company_id === "number" ? dash.company_id : null;
-
-  // Every entry this role may open: the Dashboard pinned first (2026-10-09);
-  // for an owner or a manager their explicit order and menu labels next
-  // (withStaffMenu, 2026-10-11); the rest in alphabetical order of the label
-  // in the current language (2026-10-07) — re-sorted when the language changes.
-  const navItems = sortedNavItems(
-    withStaffMenu([
+/**
+ * Every entry a role's side menu may show, before ordering (2026-10-27: out
+ * of the component, so the interface screen lists exactly the entries the
+ * menu shows — one rule for both, never a copy). Badges are the menu's own.
+ */
+export const menuSpecsFor = (
+  role: Role | undefined,
+  myBranchId: number | null,
+  myCompanyId: number | null,
+  badges: { notifications?: ReactNode; updates?: ReactNode; agentUpdates?: ReactNode } = {},
+): NavItemSpec[] => [
       { to: "/", labelKey: "nav.dashboard", end: true, show: true, pinnedFirst: true },
       // Creating a branch is an action on the Branches page (its header
       // button), not an entry in the navigation.
@@ -358,14 +345,16 @@ const Sidebar = ({ footerExtra }: SidebarProps = {}) => {
         to: "/notifications",
         labelKey: "nav.notifications",
         show: true,
-        badge: <UnreadBadge count={unreadCount} />,
+        badge: badges.notifications,
       },
       { to: "/settings", labelKey: "nav.settings", show: true },
+      // The person's interface, theme and sounds (2026-10-27): everyone.
+      { to: "/appearance", labelKey: "nav.appearance", show: true },
       {
         to: "/settings/updates",
         labelKey: "nav.updates",
         show: can(role, "menu.updates"),
-        badge: <UnreadBadge count={adminUpdateCount} />,
+        badge: badges.updates,
       },
       {
         // Admin already sees both apps under /settings/updates;
@@ -373,12 +362,46 @@ const Sidebar = ({ footerExtra }: SidebarProps = {}) => {
         to: "/settings/agent-updates",
         labelKey: "nav.agentUpdates",
         show: can(role, "menu.agentUpdates") && !can(role, "menu.updates"),
-        badge: <UnreadBadge count={agentUpdateCount} />,
+        badge: badges.agentUpdates,
       },
-    ], role),
+];
+
+const Sidebar = ({ footerExtra }: SidebarProps = {}) => {
+  const { user, logout } = useAuth();
+  const { t, lang } = useLang();
+  const { pathname } = useLocation();
+  const { unreadCount } = useNotifications();
+  const { unread: supportUnread } = useSupportUnread();
+  const { panel: panelUpd, agent: agentUpd } = useUpdatesNotification();
+  const role = user?.role;
+  // The person's own menu order and hidden entries (2026-10-27), on top of
+  // the role's menu; outside the provider the standard menu.
+  const menuArrangement = useUiPreferencesOptional()?.layout.sidebar ?? [];
+
+  // Badge counts: admin sees the union of panel + agent pending
+  // promotes; owner/manager only ever see the agent count. Both stay
+  // 0 when nothing is pending so the badge silently disappears.
+  const adminUpdateCount =
+    (panelUpd?.has_update ? 1 : 0) + (agentUpd?.has_update ? 1 : 0);
+  const agentUpdateCount = agentUpd?.has_update ? 1 : 0;
+  const dash = user?.dashboard;
+  const myBranchId = typeof dash?.branch_id === "number" ? dash.branch_id : null;
+  // The owner's company (single company per owner, as everywhere in the panel).
+  const myCompanyId = typeof dash?.company_id === "number" ? dash.company_id : null;
+
+  // Every entry this role may open: the Dashboard pinned first (2026-10-09);
+  // for an owner or a manager their explicit order and menu labels next
+  // (withStaffMenu, 2026-10-11); the rest in alphabetical order of the label
+  // in the current language (2026-10-07) — re-sorted when the language changes.
+  const navItems = applyPersonalMenu(sortedNavItems(
+    withStaffMenu(menuSpecsFor(role, myBranchId, myCompanyId, {
+      notifications: <UnreadBadge count={unreadCount} />,
+      updates: <UnreadBadge count={adminUpdateCount} />,
+      agentUpdates: <UnreadBadge count={agentUpdateCount} />,
+    }), role),
     t,
     lang,
-  );
+  ), menuArrangement);
   // Exactly one entry is current: the most specific route containing the page
   // (`/bookings/confirm` is Scan, not Scan AND Bookings). Plain `Link`s, because
   // a NavLink decides on its own and two of them can both claim the page.

@@ -9,12 +9,17 @@ import {
   apiAddSessionJoystick,
   apiAddSessionTime,
   apiSessionExtensionOptions,
+  apiSessionTimeQuote,
+  apiStartQuote,
   apiTransferExtension,
   apiRelocationOptions,
   apiRelocateSession,
   type IRelocationOptions,
   type RelocateSessionBody,
   type IExtensionOptions,
+  type ITimeQuote,
+  type IStartQuote,
+  type PlannedLength,
   apiExtendSession,
   apiListEventsForSession,
   apiListSessionEventActors,
@@ -138,12 +143,22 @@ export class SessionRepository {
     return friendlyMutation(apiRemoveSessionJoystick(sessionId, slot).then((r) => r.session));
   }
 
-  async addTime(sessionId: number, minutes: number): Promise<ISessionApi> {
-    return friendlyMutation(apiAddSessionTime(sessionId, minutes).then((r) => r.session));
+  async addTime(sessionId: number, minutes: number, charge?: number): Promise<ISessionApi> {
+    return friendlyMutation(apiAddSessionTime(sessionId, minutes, charge).then((r) => r.session));
   }
 
   async makeUnlimited(sessionId: number, hourlyRate?: number): Promise<ISessionApi> {
     return friendlyMutation(apiMakeSessionUnlimited(sessionId, hourlyRate).then((r) => r.session));
+  }
+
+  /** Read-only advice: what `addTime` would charge. See `apiSessionTimeQuote`. */
+  async timeQuote(sessionId: number, minutes: number, charge?: number): Promise<ITimeQuote> {
+    return friendlyMutation(apiSessionTimeQuote(sessionId, minutes, charge));
+  }
+
+  /** Read-only advice: what a planned start would cost. See `apiStartQuote`. */
+  async startQuote(pcId: number, length: PlannedLength, hourlyRate?: number, plannedAmount?: number): Promise<IStartQuote> {
+    return friendlyMutation(apiStartQuote(pcId, length, hourlyRate, plannedAmount));
   }
 
   /** Read-only advice: see `apiSessionExtensionOptions`. */

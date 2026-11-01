@@ -679,3 +679,67 @@ describe("a limited pause stops counting at its limit, before anyone presses Res
     expect(sessionTimeCostAt(s, AT)).toBe(750);
   });
 });
+
+/**
+ * A planned hourly start (2026-10-25): its share of the plan inside the
+ * planned time, the rate past it — the backend's `timeCostStringAt`, so a
+ * total set by hand reads on the card exactly as the receipt bills it.
+ */
+describe("a planned hourly start bills its share of the plan", () => {
+  // 2 500 for three hours, set by hand: 833.33/h, which rate × clock would
+  // turn into 2 499.99 at the end.
+  const planned = (minutesAgo: number) => session({
+    mode: "fixed", time_package_id: null, hourly_rate: 833.33,
+    started_at: ago(minutesAgo), ends_at: ahead(180 - minutesAgo),
+    committed_until: ahead(180 - minutesAgo), committed_amount: 2500,
+  });
+
+  test.each([
+    [0, 0],
+    [90, 1250],
+    [180, 2500],
+  ])("%i minutes in: %d", (minutes, amount) => {
+    const s = planned(minutes);
+    expect(sessionTimeCostAt(s, AT)).toBe(amount);
+  });
+
+  test("past its end it runs on at the rate", () => {
+    const s = session({
+      mode: "fixed", time_package_id: null, hourly_rate: 833.33,
+      started_at: ago(210), ends_at: ago(30), committed_until: ago(30), committed_amount: 2500,
+    });
+    expect(sessionTimeCostAt(s, AT)).toBe(2916.67);
+  });
+
+  test("a package is a plan too: its share, exactly its price at the end", () => {
+    const pkg = (minutesAgo: number) => session({
+      mode: "fixed", time_package_id: 5, hourly_rate: null,
+      time_package: { id: 5, duration_minutes: 180, price: 2500 } as ISessionApi["time_package"],
+      started_at: ago(minutesAgo), ends_at: ahead(180 - minutesAgo),
+      committed_until: ahead(180 - minutesAgo), committed_amount: 2500,
+    });
+    expect(sessionTimeCostAt(pkg(90), AT)).toBe(1250);
+    expect(sessionTimeCostAt(pkg(180), AT)).toBe(2500);
+  });
+
+  test("re-based by a typed + Время: what was played stays, the rest shares the new plan", () => {
+    // 1 000/h for an hour, then at 30 min +60 min for 700: frozen 500 at the
+    // re-base, 1 200 left (500 + 700) over the 90 min to come.
+    const s = session({
+      mode: "fixed", time_package_id: null, hourly_rate: 1000,
+      started_at: ago(60), plan_rebased_at: ago(30), amount_before_plan_rebase: 500,
+      ends_at: ahead(60), committed_until: ahead(60), committed_amount: 1700,
+    });
+    expect(sessionTimeCostAt(s, AT)).toBe(900);   // 500 + 1 200 × 30/90
+  });
+
+  test("a running pause does not make a planned seat's figure grow", () => {
+    const s = session({
+      mode: "fixed", time_package_id: null, hourly_rate: 1000,
+      started_at: ago(90), ends_at: ahead(90), committed_until: ahead(90), committed_amount: 3000,
+      paused_at: ago(30), pauses: [{ paused_at: ago(30), resumed_at: null }],
+    });
+    // 60 min played of 180 planned: 1 000, however long the pause runs.
+    expect(sessionTimeCostAt(s, AT)).toBe(1000);
+  });
+});

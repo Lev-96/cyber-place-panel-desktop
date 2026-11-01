@@ -226,7 +226,8 @@ export interface IBookingApi {
   id: number;
   company_id: number;
   branch_id: number;
-  game_id: number;
+  /** Null for a platform that is the game itself (poker, table tennis …). */
+  game_id: number | null;
   guest_id: number;
   booking_date: string;
   start_time: string;
@@ -248,7 +249,12 @@ export interface IBookingApi {
   place_numbers?: number[];
   company?: { id: number; name: string };
   /** Any platform slug: pc/ps4/ps5 or a branch's custom one. */
-  game?: { id: number; platform: string; name: string };
+  game?: { id: number; platform: string; name: string } | null;
+  /**
+   * What the booking is for, from its places (2026-10-31). Null on older
+   * rows, whose platform is their game's.
+   */
+  platform?: string | null;
 }
 
 export interface IBranchApi extends Translated {

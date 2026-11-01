@@ -60,12 +60,12 @@ const ImageUpload = ({ label, initialUrl, name, required, onChange }: Props) => 
               border: "1.5px dashed #1f2a44", borderRadius: 10,
               display: "flex", flexDirection: "column",
               alignItems: "center", justifyContent: "center",
-              color: "#94a3b8", fontSize: 11, gap: 2,
-              background: "rgba(11,18,36,0.6)",
+              color: "var(--color-muted)", fontSize: 11, gap: 2,
+              background: "rgb(var(--surface-rgb) / 0.6)",
               transition: "border-color 160ms",
               pointerEvents: "none",
             }}>
-              <span style={{ fontSize: 22, color: "#07ddf1" }}>＋</span>
+              <span style={{ fontSize: 22, color: "var(--color-primary)" }}>＋</span>
               <span>{t("image.click")}</span>
             </div>
           )}
@@ -83,7 +83,7 @@ const ImageUpload = ({ label, initialUrl, name, required, onChange }: Props) => 
               {previewUrl ? t("image.changeImage") : t("image.chooseImage")}
             </button>
             {file && (
-              <button type="button" className="btn secondary" onClick={clear} style={{ padding: "8px 14px", color: "#ef4444", borderColor: "#4a1a1a" }}>
+              <button type="button" className="btn secondary" onClick={clear} style={{ padding: "8px 14px", color: "var(--color-danger)", borderColor: "var(--color-danger-border-dim)" }}>
                 {t("image.clear")}
               </button>
             )}

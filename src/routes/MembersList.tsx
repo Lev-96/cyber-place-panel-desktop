@@ -55,7 +55,7 @@ const MembersList = () => {
                 <div className="name">{m.name}</div>
                 <div className="meta">{m.phone ?? "-"} · {m.email ?? "-"} {m.card_code && <>· {t("members.cardLabel")} {m.card_code}</>}</div>
               </div>
-              <div style={{ fontWeight: 700, color: "#07ddf1" }}>{money(Number(m.balance))}</div>
+              <div style={{ fontWeight: 700, color: "var(--color-primary)" }}>{money(Number(m.balance))}</div>
             </Link>
           ))}
         </div>

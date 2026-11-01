@@ -1,4 +1,6 @@
 import { can } from "@/auth/permissions";
+import { StatusIcon } from "@/components/ui/StatusChip";
+import type { StatusTone } from "@/domain/statusTone";
 import { useAuth } from "@/auth/AuthContext";
 import ConsolePicker from "@/components/ps5/ConsolePicker";
 import PlaceForm from "@/components/places/PlaceForm";
@@ -26,9 +28,12 @@ import { dropSideOf } from "@/utils/reorder";
 // Tile border / dot palette. Reserved wins over the place's own active/inactive
 // status — a manager needs to see "this seat is currently held by a booking"
 // even if its admin status is `active`.
-const COLOR_RESERVED = "#f59e0b";
-const COLOR_ACTIVE = "#22c55e";
-const COLOR_IDLE = "#6b7280";
+// The shared vocabulary (2026-10-27): an enabled place is available (free),
+// a booked one booked, a disabled one out of service — the same colours and
+// icons as Active Places and Live, where green means a seat in play.
+const TONE_RESERVED: StatusTone = "booked";
+const TONE_ACTIVE: StatusTone = "free";
+const TONE_IDLE: StatusTone = "offline";
 
 const LEAD_SECTIONS = ["pc", "ps"];
 
@@ -161,7 +166,8 @@ const BranchPlaces = () => {
     const dropSide = dragOverId === pid ? dropSideOf(tileReorder.ordered, dragId, pid) : null;
     const isReserved = reservedPlaceIds.has(p.id);
     const isActive = p.status === "active";
-    const tone = isReserved ? COLOR_RESERVED : isActive ? COLOR_ACTIVE : COLOR_IDLE;
+    const toneName = isReserved ? TONE_RESERVED : isActive ? TONE_ACTIVE : TONE_IDLE;
+    const tone = `rgb(var(--status-${toneName}-rgb))`;
     const statusLabel = isReserved
       ? t("session.reserved") || "Reserved"
       : t(`branchPlaces.status.${p.status}`) || p.status;
@@ -179,7 +185,7 @@ const BranchPlaces = () => {
         }}
         onDrop={() => dropOn(pid)}
       >
-        <span className="dot" style={{ background: tone }} />
+        <span className="place-cell__state" style={{ color: tone }} title={statusLabel}><StatusIcon tone={toneName} /></span>
         <span
           className="cell-grip"
           draggable
@@ -207,7 +213,7 @@ const BranchPlaces = () => {
         </span>
         <div className="row cell-actions" style={{ gap: 4, marginTop: 6 }}>
           <Button variant="secondary" onClick={() => setEditing(p)} style={{ padding: "4px 8px", fontSize: 11, flex: 1 }}>{t("action.edit")}</Button>
-          <Button variant="secondary" onClick={() => remove(p)} style={{ padding: "4px 8px", fontSize: 11, color: "#ef4444", borderColor: "#4a1a1a" }}>×</Button>
+          <Button variant="secondary" onClick={() => remove(p)} style={{ padding: "4px 8px", fontSize: 11, color: "var(--color-danger)", borderColor: "var(--color-danger-border-dim)" }}>×</Button>
         </div>
       </div>
     );

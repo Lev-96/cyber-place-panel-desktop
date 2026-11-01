@@ -158,7 +158,7 @@ export const BasketPicker = ({ basket, saving, canCreateProducts }: PickerProps)
                   variant="secondary"
                   onClick={() => basket.drop(line.key)}
                   disabled={saving}
-                  style={{ ...stepBtn, color: "#ef4444", borderColor: "#4a1a1a" }}
+                  style={{ ...stepBtn, color: "var(--color-danger)", borderColor: "var(--color-danger-border-dim)" }}
                   title={t("action.delete")}
                 >
                   {t("action.delete")}

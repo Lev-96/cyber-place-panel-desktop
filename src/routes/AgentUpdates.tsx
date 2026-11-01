@@ -100,7 +100,7 @@ const AgentUpdates = () => {
           )}
 
           {apiState === "error" && apiError && (
-            <p style={{ color: "#ef4444" }}>{apiError}</p>
+            <p style={{ color: "var(--color-danger)" }}>{apiError}</p>
           )}
 
           {apiState === "ready" && (
@@ -119,7 +119,7 @@ const AgentUpdates = () => {
                   <div style={{
                     fontSize: 22,
                     fontWeight: 600,
-                    color: approved ? "#07ddf1" : undefined,
+                    color: approved ? "var(--color-primary)" : undefined,
                   }}>
                     {approved?.version ?? "-"}
                   </div>
@@ -133,20 +133,20 @@ const AgentUpdates = () => {
               </div>
 
               {data?.error && (
-                <p className="muted" style={{ color: "#ef4444", margin: 0 }}>
+                <p className="muted" style={{ color: "var(--color-danger)", margin: 0 }}>
                   {data.error}
                 </p>
               )}
               {apiError && (
-                <p style={{ color: "#ef4444", margin: 0 }}>{apiError}</p>
+                <p style={{ color: "var(--color-danger)", margin: 0 }}>{apiError}</p>
               )}
               {appliedMsg && (
-                <p style={{ color: "#22c55e", margin: 0 }}>{appliedMsg}</p>
+                <p style={{ color: "var(--color-success)", margin: 0 }}>{appliedMsg}</p>
               )}
 
               {approved ? (
                 alreadyApplied ? (
-                  <p className="muted" style={{ margin: 0, color: "#22c55e" }}>
+                  <p className="muted" style={{ margin: 0, color: "var(--color-success)" }}>
                     {t("agentUpdates.upToDate")}
                   </p>
                 ) : venuePcCount > 0 ? (

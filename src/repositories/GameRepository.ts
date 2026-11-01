@@ -1,4 +1,4 @@
-import { apiCreateGame, apiDeleteGame, apiListGames, apiUpdateGame, CreateGameBody, GameWriteResponse, IGameApi } from "@/api/games";
+import { apiCreateGame, apiDeleteGame, apiListGames, apiUpdateGame, CreateGameBody, GameWriteResponse, IGameApi, UpdateGameBody } from "@/api/games";
 import { existingGameOf } from "@/api/gameExists";
 import { notify, withToast } from "@/ui/notify";
 
@@ -34,7 +34,7 @@ export class GameRepository {
       throw e;
     }
   }
-  update(id: number, b: Partial<CreateGameBody>) { return withToast("game", "updated", () => apiUpdateGame(id, b).then(savedGame)); }
+  update(id: number, b: UpdateGameBody) { return withToast("game", "updated", () => apiUpdateGame(id, b).then(savedGame)); }
   remove(id: number) { return withToast("game", "deleted", () => apiDeleteGame(id).then(() => undefined)); }
 }
 

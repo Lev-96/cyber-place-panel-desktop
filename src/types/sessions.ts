@@ -241,6 +241,8 @@ export interface ISessionApi {
    * the session unlimited. {@see sessionTimeCostAt}.
    */
   time_package?: ITimePackage | null;
+  /** The package's id; null on a planned hourly start, which has none. */
+  time_package_id?: number | null;
 
   /* ---- added 2026-09-03; every field above is unchanged ---------------- */
 
@@ -261,12 +263,25 @@ export interface ISessionApi {
   committed_until?: string | null;
   committed_amount?: number | string | null;
   /**
+   * Where the plan was last re-based (2026-10-25): "+ Время" at a typed
+   * price froze what was played there; only the time after it shares the
+   * rest of the plan.
+   */
+  plan_rebased_at?: string | null;
+  amount_before_plan_rebase?: number | string | null;
+  /**
    * A rate change mid-way — the player moved to a seat priced differently.
    * What the clock had earned at `rate_changed_at` is frozen in
    * `amount_before_rate_change`; only later time runs at `hourly_rate`.
    */
   rate_changed_at?: string | null;
   amount_before_rate_change?: number | string | null;
+  /**
+   * The VIP minimum charge frozen on this session when it first sat on a VIP
+   * seat (2026-10-31); null/absent = none. The tile applies it exactly as the
+   * bill does (`applyMinimumCharge`).
+   */
+  min_charge?: IMinimumChargeRule | null;
   /** Pads in play INCLUDING the session's own. 1 is the floor, never 0. */
   joystick_count?: number;
   /**
@@ -471,4 +486,24 @@ export interface IPcApi extends Translated {
     type: "standard" | "vip";
     platform: string;
   }) | null;
+}
+
+/**
+ * A VIP minimum-charge rule (2026-10-31), as the session (frozen) and the
+ * branch's billing settings carry it. Minutes of PLAYED time.
+ *  - `minimum`: from `after_minutes`, at least `minimum_minutes` is billed.
+ *  - `round_up`: from `after_minutes`, played time rounds up to whole blocks
+ *    of `minimum_minutes`.
+ */
+export interface IMinimumChargeRule {
+  after_minutes: number;
+  minimum_minutes: number;
+  mode: "minimum" | "round_up";
+  /**
+   * Settled on a move after the threshold (2026-10-31): the top-up the seat
+   * that reached it added, at ITS rate, and the time it billed. Absent/null =
+   * not settled. Server-owned; the panel only adds it.
+   */
+  settled_amount?: number | null;
+  settled_billed_minutes?: number | null;
 }

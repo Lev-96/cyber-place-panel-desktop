@@ -6,7 +6,7 @@ import { resolveBookingScopeChannel, type BookingScopeChannel } from "@/realtime
 import { useBookingChanged, type BookingChangedEvent } from "@/realtime/useBookingChanged";
 import { useBranchSubscribed, type BranchSubscribedEvent } from "@/realtime/useBranchSubscribed";
 import { useTournamentJoined, type TournamentJoinedEvent } from "@/realtime/useTournamentJoined";
-import { playNotificationChime } from "@/utils/notificationSound";
+import { playFor } from "@/sound/soundEngine";
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -136,7 +136,8 @@ const showNativeBookingNotification = (
     const title = interpolate(t(titleKey), vars);
     const body = interpolate(t(bodyKey), vars);
     try {
-      const n = new Notification(title, { body, tag: `booking-${evt.booking_id}` });
+      // Silent: the panel's own sound plays, as the person set it (2026-10-27).
+      const n = new Notification(title, { body, tag: `booking-${evt.booking_id}`, silent: true });
       n.onclick = () => {
         try { window.focus(); } catch { /* not always allowed */ }
       };
@@ -268,7 +269,12 @@ const GlobalBookingNotifier = () => {
     // when the user denied permission or the platform doesn't expose
     // Notification (some Linux WMs without notification daemon).
     showNativeBookingNotification(evt, t);
-    playNotificationChime();
+    // One sound per booking change (2026-10-27): a replay of the same event
+    // is silent; a new booking and a change are separate kinds of sound.
+    playFor(
+      evt.kind === "created" ? "booking_new" : "booking_changed",
+      `${evt.booking_id}:${evt.kind}:${evt.booking_date ?? ""}:${evt.start_time ?? ""}:${evt.duration_minutes}:${evt.rescheduled_minutes ?? 0}`,
+    );
     // Pull the freshly-written database notification row so the
     // sidebar badge and Notifications screen reflect it without
     // waiting for the 60s polling tick.
@@ -297,12 +303,13 @@ const GlobalBookingNotifier = () => {
         new Notification(title, {
           body: `${name} → ${branch}`,
           tag: `subscribe-${evt.branch_id}-${evt.guest_id}`,
+          silent: true,
         });
       } catch {
         /* WMs without a notification daemon — swallow */
       }
     });
-    playNotificationChime();
+    playFor("guests", `subscribed:${evt.branch_id}:${evt.guest_id}`);
     void refreshNotifications();
   }, [refreshNotifications, showToasts, t]);
   useBranchSubscribed(channelName, handleSubscribe, channelIsPrivate);
@@ -334,6 +341,7 @@ const GlobalBookingNotifier = () => {
         const n = new Notification(title, {
           body: `${name} → ${tournament}`,
           tag: `tournament-${evt.tournament_id}-${evt.guest_id}`,
+          silent: true,
         });
         n.onclick = () => {
           try { window.focus(); } catch { /* not always allowed */ }
@@ -343,7 +351,7 @@ const GlobalBookingNotifier = () => {
         /* WMs without a notification daemon — swallow */
       }
     });
-    playNotificationChime();
+    playFor("guests", `joined:${evt.tournament_id}:${evt.guest_id}`);
     void refreshNotifications();
   }, [navigate, refreshNotifications, showToasts, t]);
   useTournamentJoined(channelName, handleTournamentJoined, channelIsPrivate);
@@ -367,12 +375,12 @@ const GlobalBookingNotifier = () => {
   // cancelled — matches the per-kind tile overlay on SessionsBoard
   // so the cashier doesn't have to think about which colour means
   // what.
-  const accent = isCancelled ? "#ef4444" : isExtended ? "#f59e0b" : "#07ddf1";
+  const accent = isCancelled ? "var(--color-danger)" : isExtended ? "var(--color-warning)" : "var(--color-primary)";
   const accentBg = isCancelled
-    ? "rgba(239, 68, 68, 0.14)"
+    ? "rgb(var(--danger-rgb) / 0.14)"
     : isExtended
-      ? "rgba(245, 158, 11, 0.18)"
-      : "rgba(7, 221, 241, 0.14)";
+      ? "rgb(var(--warning-rgb) / 0.18)"
+      : "rgb(var(--accent-rgb) / 0.14)";
   const placeLabel =
     toast.placeIds.length === 1
       ? t("notifications.bookingPlaces") || "Place"
@@ -399,8 +407,8 @@ const GlobalBookingNotifier = () => {
         background: accentBg,
         borderLeft: `4px solid ${accent}`,
         padding: "12px 14px",
-        boxShadow: "0 6px 22px rgba(0, 0, 0, 0.35)",
-        color: "#e5e7eb",
+        boxShadow: "0 6px 22px rgb(var(--shadow-rgb) / 0.35)",
+        color: "var(--color-text-soft)",
         fontSize: 14,
         lineHeight: 1.4,
       }}
@@ -426,7 +434,7 @@ const GlobalBookingNotifier = () => {
             border: "1px solid #1f2a44",
             borderRadius: 6,
             background: "transparent",
-            color: "#e5e7eb",
+            color: "var(--color-text-soft)",
             cursor: "pointer",
             fontSize: 12,
           }}
@@ -443,7 +451,7 @@ const GlobalBookingNotifier = () => {
             border: "1px solid #1f2a44",
             borderRadius: 6,
             background: "transparent",
-            color: "#9ca3af",
+            color: "var(--color-muted-grey)",
             cursor: "pointer",
             fontSize: 12,
           }}

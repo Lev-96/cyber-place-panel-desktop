@@ -81,7 +81,7 @@ const CompanyBillingCard = ({ companyId, companyName }: Props) => {
   const dueSoon = days !== null && days >= 0 && days <= 3;
 
   // Border + tint based on urgency
-  const bandColor = overdue ? "#ef4444" : dueSoon ? "#f59e0b" : "#22c55e";
+  const bandColor = overdue ? "var(--color-danger)" : dueSoon ? "var(--color-warning)" : "var(--color-success)";
 
   return (
     <div className="gradient-card"><div className="gradient-card-inner" style={{ borderLeft: `4px solid ${bandColor}` }}>
@@ -107,12 +107,12 @@ const CompanyBillingCard = ({ companyId, companyName }: Props) => {
 
       {/* Audience-specific reminder text */}
       {dueSoon && isAdmin && !overdue && (
-        <div className="muted" style={{ fontSize: 13, color: "#f59e0b" }}>
+        <div className="muted" style={{ fontSize: 13, color: "var(--color-warning)" }}>
           {msg(t("billing.adminReminder"), companyName, days ?? 0)}
         </div>
       )}
       {dueSoon && isOwner && !overdue && (
-        <div className="muted" style={{ fontSize: 13, color: "#f59e0b" }}>
+        <div className="muted" style={{ fontSize: 13, color: "var(--color-warning)" }}>
           {msg(t("billing.ownerReminder"), days ?? 0)}
         </div>
       )}

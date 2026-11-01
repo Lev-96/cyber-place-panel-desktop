@@ -13,12 +13,16 @@ import type { MachineState } from "./machine";
  * - seat free, console going to rest → Start disabled, "Going to sleep…";
  * - session running, console waking   → Stop disabled, "Turning on…".
  *
- * Bounded by the state machine, never by a timer here: GOING_TO_REST lasts at
- * most `REST_SETTLE_MS` and WAKING at most `WAKE_GIVE_UP_MS`, after which the
- * console is REST / ACTIVE / OFFLINE / ERROR and the button is back. A console
- * that never answers therefore can never lock a seat. A seat with no console,
- * or a panel with no desktop bridge, has no lifecycle and is not gated.
+ * Bounded on its own (2026-10-28): the lock lasts at most `START_LOCK_MS` from
+ * when the sleep began and `STOP_LOCK_MS` from when the waking began — the
+ * bounds the floor was given — whatever the machine keeps waiting for after
+ * that (a console on poor Wi-Fi may take minutes to sleep; the machine keeps
+ * resting it, but the seat is not held hostage). A seat with no console, or a
+ * panel with no desktop bridge, has no lifecycle and is not gated.
  */
+export const START_LOCK_MS = 30_000;
+export const STOP_LOCK_MS = 45_000;
+
 export interface TileGate {
   disabled: boolean;
   /** The label to show instead of Start/Stop, or null to keep it. */
@@ -27,8 +31,16 @@ export interface TileGate {
 
 const OPEN: TileGate = { disabled: false, labelKey: null };
 
-export const startGate = (lifecycle: MachineState | undefined): TileGate =>
-  lifecycle === "GOING_TO_REST" ? { disabled: true, labelKey: "ps5.gate.goingToRest" } : OPEN;
+/** Whether a transition that began at `since` is still young enough to lock a button. */
+const young = (since: number | null | undefined, now: number, limit: number): boolean =>
+  since === null || since === undefined || now - since < limit;
 
-export const stopGate = (lifecycle: MachineState | undefined): TileGate =>
-  lifecycle === "WAKING" ? { disabled: true, labelKey: "ps5.gate.waking" } : OPEN;
+/** @param restingSince when the sleep began (the machine's snapshot), if known. */
+export const startGate = (lifecycle: MachineState | undefined, restingSince?: number | null, now = Date.now()): TileGate =>
+  lifecycle === "GOING_TO_REST" && young(restingSince, now, START_LOCK_MS)
+    ? { disabled: true, labelKey: "ps5.gate.goingToRest" } : OPEN;
+
+/** @param wakingSince when the waking began (the machine's snapshot), if known. */
+export const stopGate = (lifecycle: MachineState | undefined, wakingSince?: number | null, now = Date.now()): TileGate =>
+  lifecycle === "WAKING" && young(wakingSince, now, STOP_LOCK_MS)
+    ? { disabled: true, labelKey: "ps5.gate.waking" } : OPEN;

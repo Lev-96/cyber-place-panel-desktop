@@ -1,6 +1,6 @@
 import { preciseWhenSmall } from "@/i18n/currency";
 import { ISessionApi } from "@/types/sessions";
-import { autoResumeAtOf, playedSecondsBetween, sessionAmountAt } from "./sessionAmount";
+import { autoResumeAtOf, playedSecondsBetween, sessionAmountAt, sessionMinimumChargeAt } from "./sessionAmount";
 import { useEffect, useState } from "react";
 import { sessionUrgency } from "./sessionUrgency";
 
@@ -29,6 +29,11 @@ interface Props {
    * rendered in the user's display currency instead of as a raw decimal.
    */
   formatMoney?: (amountInBaseAmd: number, options?: { maximumFractionDigits?: number }) => string;
+  /**
+   * The words for an applied VIP minimum charge, e.g. "Минимум 1 ч", from the
+   * billed minutes. Absent = no badge (callers without the language context).
+   */
+  minimumLabel?: (billedMinutes: number) => string;
 }
 
 /**
@@ -48,7 +53,7 @@ interface Props {
 /** A clock that is not running: neither the live cyan nor a warning colour. */
 const PAUSED_COLOR = "var(--color-muted)";
 
-const SessionTimer = ({ session, formatMoney }: Props) => {
+const SessionTimer = ({ session, formatMoney, minimumLabel }: Props) => {
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 1000);
@@ -56,6 +61,9 @@ const SessionTimer = ({ session, formatMoney }: Props) => {
   }, []);
 
   const amount = sessionAmountAt(session, now);
+  // The VIP minimum charge, said when it is what the figure includes: a seat
+  // at 25 minutes showing a full hour's price needs its reason beside it.
+  const minimum = session.min_charge && minimumLabel ? sessionMinimumChargeAt(session, now) : null;
   // Whether to quote a figure at all, decided ONCE for both branches. A waived
   // session states its zero, because that zero is a decision somebody made; a
   // session with nothing to price from — an open one on a seat with no
@@ -68,9 +76,16 @@ const SessionTimer = ({ session, formatMoney }: Props) => {
   // Prices elsewhere are untouched: this asks for the precision, nothing else
   // does.
   const cost = showCost ? (
-    <span className="session-timer__cost" style={{ marginLeft: 8, color: "var(--color-accent-purple)" }}>
-      {formatMoney ? formatMoney(amount, preciseWhenSmall(amount)) : amount.toFixed(2)}
-    </span>
+    <>
+      <span className="session-timer__cost" style={{ marginLeft: 8, color: "var(--color-accent-purple)" }}>
+        {formatMoney ? formatMoney(amount, preciseWhenSmall(amount)) : amount.toFixed(2)}
+      </span>
+      {minimum?.applied && minimumLabel && !session.is_free && (
+        <span className="session-min-badge" data-testid="min-charge">
+          {minimumLabel(Math.round(minimum.billedSeconds / 60))}
+        </span>
+      )}
+    </>
   ) : null;
 
   const isOpen = !session.ends_at && !!session.started_at;

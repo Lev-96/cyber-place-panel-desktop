@@ -117,7 +117,7 @@ const ProductsList = () => {
                       as the one thing a manager could still change. */}
                   <Button variant="secondary" onClick={() => toggle(p)} style={btn}>{p.is_active ? t("action.hide") : t("action.show")}</Button>
                   <Button variant="secondary" onClick={() => setEditing(p)} style={btn}>{t("action.edit")}</Button>
-                  <Button variant="secondary" onClick={() => remove(p)} style={{ ...btn, color: "#ef4444", borderColor: "#4a1a1a" }}>{t("action.delete")}</Button>
+                  <Button variant="secondary" onClick={() => remove(p)} style={{ ...btn, color: "var(--color-danger)", borderColor: "var(--color-danger-border-dim)" }}>{t("action.delete")}</Button>
                 </div>
               )}
             </div>

@@ -7,7 +7,6 @@ import CollapsibleSection from "@/components/ui/CollapsibleSection";
 import { GridSkeleton } from "@/components/ui/Skeleton";
 import { ErrorState, StaleNotice, StateView } from "@/components/ui/state";
 import { reconcileOrder } from "./tileOrder";
-import JoystickIcon from "@/components/ui/JoystickIcon";
 import { useAsync } from "@/hooks/useAsync";
 import { useBranchPlatformNames } from "@/hooks/useBranchPlatforms";
 import { useKeyedBusy } from "@/hooks/useKeyedBusy";
@@ -34,15 +33,20 @@ import { startGate, stopGate } from "@/ps5/tileGate";
 import { DragEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import AddSessionItemDialog from "./AddSessionItemDialog";
+import SellProductsDialog from "@/components/pos/SellProductsDialog";
+import { durationLabel } from "@/components/prices/vipMinimumCharge";
 import SessionTimer from "./SessionTimer";
 import { autoResumeAtOf, sessionCurrentHourlyRate, sessionJoysticksTotal } from "./sessionAmount";
 import StartSessionDialog from "./StartSessionDialog";
 import SessionOptionsDialog from "./SessionOptionsDialog";
-import SessionCard, { SessionCardAction } from "./SessionCard";
+import SessionCard, { CardOverflow, SessionCardAction } from "./SessionCard";
+import SimpleBoardHelp from "./SimpleBoardHelp";
+import { useUiPreferencesOptional } from "@/preferences/UiPreferencesContext";
 import RelocateSessionDialog from "./RelocateSessionDialog";
 import { BASE_JOYSTICKS, MAX_JOYSTICKS } from "@/api/joystickPrices";
 import { notify } from "@/ui/notify";
 import StopReceiptModal from "./StopReceiptModal";
+import PadToggle from "./PadToggle";
 import { useExpiryNudge } from "./useExpiryNudge";
 import { dropSideOf, moveOnto } from "@/utils/reorder";
 
@@ -72,6 +76,11 @@ const SessionsBoard = ({ branchId }: Props) => {
   const { money, t, lang } = useLang();
   const { user } = useAuth();
   const role = user?.role;
+  // How the person's interface lays the card's actions out (2026-10-27);
+  // outside the provider (tests, an embed) every action is shown, as before.
+  const uiLayout = useUiPreferencesOptional()?.layout;
+  const quickActions = uiLayout?.quick_actions ?? "all";
+  const density = uiLayout?.density ?? "standard";
   const pcs = useAsync(() => sessionRepository.listPcs(branchId), [branchId]);
   // Custom platforms named as the branch named them, in the panel language.
   // ONE cached read for the board and every dialog it opens (passed down), and
@@ -81,6 +90,8 @@ const SessionsBoard = ({ branchId }: Props) => {
   const [startTarget, setStartTarget] = useState<IPcApi | null>(null);
   const [stopTarget, setStopTarget] = useState<ISessionApi | null>(null);
   const [addItemTarget, setAddItemTarget] = useState<ISessionApi | null>(null);
+  // The till's sale, opened from the board's header (2026-10-25).
+  const [sellOpen, setSellOpen] = useState(false);
   /** The line a return is in flight for, so its button cannot be pressed twice. */
   const [returningItem, setReturningItem] = useState<number | null>(null);
   /**
@@ -344,6 +355,14 @@ const SessionsBoard = ({ branchId }: Props) => {
         // seat must not have it replaced by another. The second seat is still
         // ended and still on the board's history — what it loses is the popup.
         if (ended) setStopTarget((current) => current ?? { ...ended, status: "expired" });
+      }
+      // The receipt open on THIS seat, ended elsewhere (another cashier, the
+      // clock) while it was on screen (2026-10-25): it turns into that final
+      // bill, with no confirm — never a second "stopped" announced as ours.
+      if (evt.kind === "stopped") {
+        setStopTarget((current) => (current && current.id === evt.session_id && current.status === "active"
+          ? { ...current, status: (evt.status ?? "stopped") as ISessionApi["status"] }
+          : current));
       }
       void sessions.reload();
 
@@ -712,14 +731,15 @@ const SessionsBoard = ({ branchId }: Props) => {
     const consoleBusy = lifecycle === "WAKING" || lifecycle === "GOING_TO_REST"
       || lifecycle === "UNEXPECTED_WAKE" || lifecycle === "ERROR";
     // No second press while the console is on its way (see tileGate).
-    const startLock = startGate(lifecycle);
-    const stopLock = stopGate(lifecycle);
+    const startLock = startGate(lifecycle, consoleView?.snapshot.restingSince);
+    const stopLock = stopGate(lifecycle, consoleView?.snapshot.wakingSince);
     return (
       <SessionCard
         key={pc.id}
         session={sess}
         baseColor={color}
         seatState={cellState}
+        stateLabel={(tone) => t(`session.tone.${tone}`)}
         dragging={dragId === pc.id}
         dropSide={dragOverId === pc.id ? dropSideOf(order, dragId, pc.id) : null}
         onDragOver={(e) => {
@@ -731,8 +751,6 @@ const SessionsBoard = ({ branchId }: Props) => {
         }}
         onDrop={() => dropOn(pc.id)}
       >
-        {/* Coloured by the card (`--card-accent`), so it follows urgency too. */}
-        <span className="dot" />
         <span
           className="cell-grip"
           draggable
@@ -805,21 +823,37 @@ const SessionsBoard = ({ branchId }: Props) => {
               {/* The row itself, not a handful of its fields. Passing an
                   hourly rate a fixed session does not have is what left the
                   countdown branch with nothing to price from. */}
-              <SessionTimer session={sess} formatMoney={money} />
+              <SessionTimer
+                session={sess}
+                formatMoney={money}
+                minimumLabel={(minutes) => fmt(t("vipMin.badge"), durationLabel(minutes, t))}
+              />
             </span>
             <span className="until">
               {/* The tariff line answers "what is this seat earning per hour",
                   and for a waived session the answer is not the venue's rate —
                   printing it there put a price the player will never be asked
                   for directly under a clock that was counting for free. */}
+              {/* Secondary detail (2026-10-27): hidden in the Simple interface,
+                  where the stripe, the clock and the money are the card. */}
+              <span className="session-card__secondary">
               {sess.is_free
                 ? t("session.freeBill")
                 : sess.is_unlimited
                   ? t("session.unlimited")
                   : sess.mode === "open"
                     ? `${money(Number(sess.hourly_rate ?? 0))} / ${t("time.hourShort") || "h"}`
-                    : sess.package_name}
+                    // A planned hourly start (2026-10-25) has no package: it
+                    // says its rate and its plan, both the server's — the plan
+                    // grows with "+ Время"; the bill is still the clock's.
+                    : sess.package_name == null && sess.hourly_rate != null
+                      ? `${money(Number(sess.hourly_rate))} / ${t("time.hourShort") || "h"}`
+                        + (sess.committed_amount != null
+                          ? ` · ${fmt(t("session.planLine"), money(Number(sess.committed_amount)))}`
+                          : "")
+                      : sess.package_name}
               {itemsCount > 0 && <span className="muted"> · {itemsCount} {t("session.posNote")}</span>}
+              </span>
               {sess.paused_at && (
                 <span className="pill session-card__pill">
                   {(() => {
@@ -895,7 +929,13 @@ const SessionsBoard = ({ branchId }: Props) => {
                       made it 2, so the fraction appeared on every seat — a
                       poker table announcing two joysticks it does not have.
                       The server's own answer is the only one that decides. */}
-                  {supportsJoysticks && (
+                  {/* Only when it says something (2026-10-25): a bare "2" — the
+                      kit every console ships with, nothing extra out, nothing
+                      charged — was noise under "Безлимит". An extra pad out or
+                      a pad charge still shows, with its money. */}
+                  {supportsJoysticks && (padCharge !== null
+                    || (sess.joystick_count ?? BASE_JOYSTICKS) > BASE_JOYSTICKS
+                    || (sess.joysticks ?? []).some((j) => j.stopped_at === null && Number(j.slot) > BASE_JOYSTICKS)) && (
                     <span
                       className="row"
                       style={{
@@ -909,7 +949,6 @@ const SessionsBoard = ({ branchId }: Props) => {
                       }}
                       title={`${t("session.joysticks")}: ${joystickCount} / ${padMax}`}
                     >
-                      <JoystickIcon />
                       {/* The number the seat is HOLDING, on its own.
                           It was a fraction, and the fraction was the thing an
                           operator could not read: "1 / 4" on a PlayStation with
@@ -956,111 +995,6 @@ const SessionsBoard = ({ branchId }: Props) => {
                       )}
                     </span>
                   )}
-                  {supportsJoysticks && !padSwitch && (
-                  <>
-                    {/* WHICH pad, not how many.
-                        It was a select of target counts and the server picked
-                        the slots. A venue may now hand out three controllers
-                        or price the fourth apart from the third, so "make it
-                        four" stopped saying what it costs. The cashier names
-                        the pad and sees its price before they choose it.
-
-                        Nothing is selected when the tile opens, deliberately:
-                        a control that starts on a value is one mis-scroll away
-                        from charging a player for a controller nobody handed
-                        over. It goes back to empty after every add. */}
-                    <select
-                      // `pad-select` is what the stylesheet sizes the chevron
-                      // and the padding by. It used to key off the inline
-                      // width, which silently stopped applying the moment
-                      // anybody changed 46 to 48 and let the arrow sit on top
-                      // of the digit.
-                      className="input pad-select"
-                      style={{
-                        height: 24,
-                        // Never narrower than a word plus its chevron. It was
-                        // 0, which on a full tile collapsed the control to the
-                        // arrow alone; the row above wraps instead now, and
-                        // this is what makes it wrap rather than shrink.
-                        //
-                        // The basis is the MINIMUM and not the content's width
-                        // on purpose: at its natural 136px the menu fills the
-                        // line by itself and pushes the take-back button onto a
-                        // third, which is a taller tile for no more information.
-                        // Asking for 96 and growing into what is left keeps the
-                        // two controls together on one line.
-                        minWidth: 96,
-                        flexBasis: 96,
-                        flexGrow: 1,
-                        flexShrink: 1,
-                        fontSize: 12,
-                      }}
-                      title={t("session.padChoose")}
-                      aria-label={t("session.joysticks")}
-                      // Disabled while a change is in flight, and when this
-                      // venue has nothing left to hand out on this seat.
-                      disabled={padBusy.isBusy(sess.id) || padMenu.every((c) => !c.enabled)}
-                      value=""
-                      onChange={(e) => {
-                        const slot = Number(e.target.value);
-                        if (Number.isFinite(slot) && slot > 0) void addPad(sess, slot);
-                      }}
-                    >
-                      <option value="">{t("session.padChoose")}</option>
-                      {padMenu.map((c) => (
-                        <option
-                          key={c.shared ? "shared" : c.slot}
-                          value={c.slot}
-                          // Everything but the pad that comes next. The server
-                          // refuses those too; this is what stops the cashier
-                          // reaching them at all.
-                          disabled={!c.enabled}
-                        >
-                          {(c.shared
-                            ? t("session.padSharedOption")
-                            : t("session.padOption").replace("{0}", String(c.slot)))
-                            + " · "
-                            + (c.price === null
-                              ? t("session.padNoPrice")
-                              // Two different zeros. "Free" is what this venue
-                              // charges for a pad; "already charged" is a
-                              // payment that happened on THIS seat and covers
-                              // every controller after it.
-                              : c.feeTaken
-                                ? t("session.padFeeTaken")
-                                : c.price === 0 ? t("session.padFree") : money(c.price))
-                            // A pad in somebody's hands says so. Greyed with no
-                            // reason reads as broken; greyed with a reason reads
-                            // as the floor's own state, and it clears itself the
-                            // moment the pad comes back.
-                            + (c.taken ? ` · ${t("session.padTaken")}` : "")}
-                        </option>
-                      ))}
-                    </select>
-                    {/* Taking one back, which the count select used to do by
-                        being set lower. It is a separate control now because
-                        the select above hands ONE named pad over and a control
-                        that both charges and refunds by direction is how a
-                        mis-click becomes money. */}
-                    {joystickCount > BASE_JOYSTICKS && (
-                      <Button
-                        variant="secondary"
-                        style={{ height: 24, padding: "0 8px", fontSize: 12, flexShrink: 0 }}
-                        title={t("session.padRemove")}
-                        aria-label={t("session.padRemove")}
-                        disabled={padBusy.isBusy(sess.id)}
-                        onClick={() => void removeTopPad(sess)}
-                      >
-                        −
-                      </Button>
-                    )}
-                    {/* The round trip, said on the tile it belongs to. The
-                      select is already disabled while it is in flight; this
-                      is what tells the cashier the change landed, on a board
-                      where the number itself only moves once the server has
-                      answered. */}
-                  </>
-                  )}
                   {/* The round trip, said on the tile it belongs to — for the
                       menu and for the switch alike, since either can be in
                       flight. */}
@@ -1102,40 +1036,41 @@ const SessionsBoard = ({ branchId }: Props) => {
               </span>
             )}
             <div className="session-card__actions">
-              {/* One payment, one controller: a switch rather than a menu.
-                  The label says what pressing it does AND what the seat is
-                  holding, which is the whole of the state a cashier needs.
-
-                  It sits with the tile's other ACTIONS rather than on the pad
-                  line, and that is not a style choice: the pad line is a
-                  no-wrap 160px row built for a glyph, a count and a control
-                  that can shrink to nothing. A button with a word in it cannot,
-                  and putting one there pushed it out of the tile and under the
-                  neighbouring seat — where a click landed on somebody else's
-                  card. The row below wraps, which is what makes the label safe
-                  in three languages.
-
-                  The venue that hands pads out one at a time is the only one
-                  that gets this; every other keeps its menu, untouched. */}
-              {supportsJoysticks && padSwitch && (
-                <SessionCardAction
-                  label={padOut ? t("session.card.padRemove") : t("session.card.padAdd")}
-                  fullLabel={padOut ? t("session.padRemoveOne") : t("session.padAddOne")}
-                  // Nothing to hand out is a disabled button rather than a
-                  // hidden one: a venue with no price set is a thing the
-                  // cashier can see and ask about.
-                  disabled={padBusy.isBusy(sess.id) || (!padOut && padNext === null)}
-                  onClick={() => {
-                    if (padOut) { void removeTopPad(sess); return; }
-                    if (padNext !== null) void addPad(sess, padNext);
-                  }}
+              {/* The joystick switch is the FIRST cell of the action grid, the
+                  same size and style as every action beside it (2026-10-25).
+                  It used to sit on the no-wrap pad line for a per-pad venue
+                  and here for a charge-once one, so two seats side by side
+                  drew it in two places at two sizes. One place now, both
+                  venues; only the names differ: a charge-once seat hands out
+                  ONE pad ("hand out / take back the joystick") and is no menu. */}
+              {supportsJoysticks && (
+                <PadToggle
+                  next={padSwitch && padOut ? null : (padMenu.find((c) => c.enabled) ?? null)}
+                  extrasOut={padSwitch
+                    ? (padOut ? 1 : 0)
+                    : (sess.joysticks ?? []).filter(
+                      (j) => j.stopped_at === null && Number(j.slot) > BASE_JOYSTICKS,
+                    ).length}
+                  busy={padBusy.isBusy(sess.id)}
+                  onAdd={(slot) => void addPad(sess, slot)}
+                  onRemove={() => void removeTopPad(sess)}
+                  {...(padSwitch ? {
+                    addLabelKey: "session.padAddOne",
+                    removeLabelKey: "session.padRemoveOne",
+                    groupLabelKey: null,
+                  } : {})}
                 />
               )}
               <SessionCardAction
+                data-action="add-item"
                 label={t("session.card.addItem")}
                 fullLabel={t("session.addItem")}
                 onClick={() => setAddItemTarget(sess)}
               />
+              {/* The less frequent actions (2026-10-27): inline as always,
+                  or folded into «Ещё» in the Simple interface — the same
+                  buttons and handlers either way (CardOverflow). */}
+              <CardOverflow collapsed={quickActions === "primary"} label={t("session.card.more")}>
               {/* Only on a seat whose room hands something out, and labelled
                   with that room's own word. The server sends the object or
                   null, so a control that appears here is one the server will
@@ -1169,6 +1104,7 @@ const SessionsBoard = ({ branchId }: Props) => {
 
                 return (
                   <SessionCardAction
+                    data-action="extra"
                     label={shortLabel}
                     fullLabel={label}
                     onClick={() => {
@@ -1196,6 +1132,7 @@ const SessionsBoard = ({ branchId }: Props) => {
                   resume moves it by the pause. */}
               {sess.ends_at !== null && sess.is_unlimited !== true && !sess.paused_at && (
                 <SessionCardAction
+                  data-action="add-time"
                   label={t("session.card.addTime")}
                   fullLabel={t("session.addTime")}
                   onClick={() => setOptionsTarget(sess)}
@@ -1205,6 +1142,7 @@ const SessionsBoard = ({ branchId }: Props) => {
                   session stays active either way — the seat stays taken and a
                   console stays awake — only the clock and the bill hold. */}
               <SessionCardAction
+                data-action={sess.paused_at ? "resume" : "pause"}
                 label={sess.paused_at ? t("session.card.resume") : t("session.pause")}
                 fullLabel={sess.paused_at ? t("session.resume") : t("session.pause")}
                 onClick={() => { void togglePause(sess); }}
@@ -1225,15 +1163,18 @@ const SessionsBoard = ({ branchId }: Props) => {
                   belongs to the seat it began on, so resume first. */}
               {!sess.paused_at && (
                 <SessionCardAction
+                  data-action="relocate"
                   label={t("session.card.relocate")}
                   fullLabel={t("session.relocate")}
                   wide
                   onClick={() => setRelocateTarget(sess)}
                 />
               )}
+              </CardOverflow>
               {/* Destructive, so it reads as such and spans the row: the one
                   button on the card a slip must not land on by accident. */}
               <SessionCardAction
+                data-action="stop"
                 label={t(stopLock.labelKey ?? "action.stop")}
                 fullLabel={t(stopLock.labelKey ?? "action.stop")}
                 danger
@@ -1281,6 +1222,7 @@ const SessionsBoard = ({ branchId }: Props) => {
                 disabled={!canStart || startLock.disabled}
                 title={isOffline ? t("session.deviceOfflineHint") : undefined}
                 className="session-card__start"
+                data-action="start"
               >
                 {t(startLock.labelKey ?? "action.start")}
               </Button>
@@ -1322,6 +1264,20 @@ const SessionsBoard = ({ branchId }: Props) => {
           )}
         </div>
         <div className="row" style={{ gap: 8, flexWrap: "wrap", rowGap: 8 }}>
+          {/* "+ Продукт" (2026-10-25): a guest who came only for a juice or
+              crisps. The till's own sale — the same dialog, request, server
+              prices, payment methods and double-submit guard as «Касса» —
+              without leaving the board and without touching any seat: a sale
+              is the branch's, so nothing starts a session. */}
+          <button
+            type="button"
+            className="board-sell-btn"
+            onClick={() => setSellOpen(true)}
+            title={t("till.sell")}
+            data-testid="board-sell"
+          >
+            {t("session.sellProduct")}
+          </button>
           <Link to={`/branches/${branchId}/sessions/history`} className="muted" style={navBtn}>{t("history.title")}</Link>
           <Link to={`/branches/${branchId}/pcs`} className="muted" style={navBtn}>{t("pcs.title")}</Link>
           {can(role, "branch.prices") && (
@@ -1331,6 +1287,8 @@ const SessionsBoard = ({ branchId }: Props) => {
       </div>
 
       {staleError && <StaleNotice error={staleError} onRetry={retryBoard} />}
+      {/* What the colours mean, for the Simple interface (2026-10-27). */}
+      {density === "simple" && orderedPcs.length > 0 && <SimpleBoardHelp />}
       {orderedPcs.length === 0 ? (
         <StateView variant="empty" titleKey="session.state.noPcsTitle" descriptionKey="session.state.noPcsDescription" />
       ) : (
@@ -1432,6 +1390,9 @@ const SessionsBoard = ({ branchId }: Props) => {
             void pcs.reload();
           }}
         />
+      )}
+      {sellOpen && (
+        <SellProductsDialog branchId={branchId} onClose={() => setSellOpen(false)} onSold={() => {}} />
       )}
       {addItemTarget && (
         <AddSessionItemDialog

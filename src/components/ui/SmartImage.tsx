@@ -1,4 +1,4 @@
-import { CSSProperties, useEffect, useState } from "react";
+import { CSSProperties, ReactNode, useEffect, useState } from "react";
 
 interface Props {
   src: string | null | undefined;
@@ -10,13 +10,18 @@ interface Props {
   shape?: "circle" | "square";
   /** Extra container style. */
   style?: CSSProperties;
+  /**
+   * Drawn instead of the first letter when there is no image or it fails to
+   * load (e.g. a game's "no cover" art). Omitted = the letter, as before.
+   */
+  fallback?: ReactNode;
 }
 
 /**
  * Image with skeleton-shimmer while loading and first-letter fallback when
  * src is missing or fails to load. Used everywhere we display logos/avatars.
  */
-const SmartImage = ({ src, name, alt, size, shape = "square", style }: Props) => {
+const SmartImage = ({ src, name, alt, size, shape = "square", style, fallback }: Props) => {
   const [loaded, setLoaded] = useState(false);
   const [errored, setErrored] = useState(false);
   const radius = shape === "circle" ? "50%" : "10px";
@@ -32,17 +37,21 @@ const SmartImage = ({ src, name, alt, size, shape = "square", style }: Props) =>
 
   const containerStyle: CSSProperties = {
     width: size, height: size, borderRadius: radius,
-    background: "#0b1224", border: "1px solid #1f2a44",
+    background: "var(--color-surface)", border: "1px solid #1f2a44",
     display: "flex", alignItems: "center", justifyContent: "center",
     overflow: "hidden", flexShrink: 0, position: "relative",
     ...style,
   };
 
+  if (showLetter && fallback !== undefined) {
+    return <div style={containerStyle}>{fallback}</div>;
+  }
+
   if (showLetter) {
     return (
       <div style={containerStyle}>
         <span style={{
-          color: "#07ddf1", fontWeight: 700,
+          color: "var(--color-primary)", fontWeight: 700,
           fontSize: typeof size === "number" ? Math.round(size * 0.42) : "1.2em",
           fontFamily: "'Playstation', 'Inter', sans-serif",
           letterSpacing: 1,

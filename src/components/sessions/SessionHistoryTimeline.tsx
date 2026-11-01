@@ -88,7 +88,7 @@ const SessionHistoryTimeline = ({ events, startedAt, error, onRetry }: Props) =>
               </div>
               <div className="hs-event__body">
                 <span className="hs-event__title">{p.title}</span>
-                {e.amount !== null && <span className="hs-event__amount">{money(e.amount)}</span>}
+                {e.amount !== null && p.showAmount && <span className="hs-event__amount">{money(e.amount)}</span>}
                 {/* The account may since have been deleted; the fact still
                     happened, so a nameless event is shown rather than hidden. */}
                 {p.actor !== null && <span className="hs-event__actor">{p.actor}</span>}

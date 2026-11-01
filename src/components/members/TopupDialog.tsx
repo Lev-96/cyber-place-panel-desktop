@@ -37,7 +37,7 @@ const TopupDialog = ({ member, onClose, onDone }: Props) => {
     <Modal open onClose={onClose}>
       <form className="card" style={{ width: 380, maxWidth: "90vw", display: "flex", flexDirection: "column", gap: 14 }} onSubmit={submit}>
         <h2 style={{ margin: 0 }}>{t("topup.title")} · {member.name}</h2>
-        <div className="muted">{t("topup.balance")}: <b style={{ color: "#fff" }}>{money(Number(member.balance))}</b></div>
+        <div className="muted">{t("topup.balance")}: <b style={{ color: "var(--color-text)" }}>{money(Number(member.balance))}</b></div>
         <PriceInput label={t("label.amount")} value={amount} onChange={setAmount} required autoFocus />
         <Input label={t("label.reference")} value={reference} onChange={(e) => setReference(e.target.value)} />
         {err && <div className="error">{err}</div>}

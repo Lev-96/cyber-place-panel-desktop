@@ -1,6 +1,7 @@
 import Button from "@/components/ui/Button";
 import { ListSkeleton } from "@/components/ui/Skeleton";
 import { StateSwitch, deriveViewState } from "@/components/ui/state";
+import { PAYMENT_LABEL_KEY, saleCashText, saleItemsText, salePaymentText, saleSellerText } from "@/components/pos/tillSaleText";
 import SellProductsDialog from "@/components/pos/SellProductsDialog";
 import { useAsync } from "@/hooks/useAsync";
 import { formatTime } from "@/i18n/dates";
@@ -17,12 +18,7 @@ const startOfToday = (): string => {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} 00:00:00`;
 };
 
-const LABEL_KEY: Record<IOrder["payment_method"], string> = {
-  cash: "session.payCash",
-  card: "session.payCard",
-  other: "session.payOther",
-  deposit: "till.payDeposit",
-};
+const LABEL_KEY = PAYMENT_LABEL_KEY;
 
 /**
  * Касса — selling at the counter with no gaming session (2026-09-24).
@@ -62,10 +58,6 @@ const Till = () => {
 
   if (!Number.isFinite(id) || id <= 0) return <div className="error">{t("hub.invalidId")}</div>;
 
-  const paymentOf = (o: IOrder) =>
-    o.payment_method === "other" && o.payment_method_other
-      ? `${t(LABEL_KEY.other)}: ${o.payment_method_other}`
-      : t(LABEL_KEY[o.payment_method]);
 
   return (
     <div className="col" style={{ gap: 18 }}>
@@ -99,12 +91,14 @@ const Till = () => {
           {(data ?? []).map((o) => (
             <div key={o.id} className="list-item" style={{ opacity: o.status === "paid" ? 1 : 0.5 }}>
               <div style={{ minWidth: 0 }}>
-                <div className="name">
-                  {(o.items ?? []).map((i) => `${i.product_name} × ${i.quantity}`).join(", ")}
-                </div>
+                <div className="name">{saleItemsText(o)}</div>
+                {/* The same sentence the sales history reads (2026-10-25):
+                    how it was paid, what was handed over and given back,
+                    and who sold it. */}
                 <div className="meta">
-                  {formatTime(o.created_at)} · {paymentOf(o)}
-                  {o.cashier ? ` · ${o.cashier.name}` : ""}
+                  {formatTime(o.created_at)} · {salePaymentText(o, t)}
+                  {saleCashText(o, t, money) ? ` · ${saleCashText(o, t, money)}` : ""}
+                  {saleSellerText(o, t) ? ` · ${saleSellerText(o, t)}` : ""}
                   {o.status !== "paid" ? ` · ${t("till.voided")}` : ""}
                 </div>
               </div>

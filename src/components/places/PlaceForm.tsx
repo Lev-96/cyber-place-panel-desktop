@@ -844,7 +844,7 @@ const PlaceForm = ({ branchId, initial, platformSuggestions, platformPrices, onC
           checked={gameIds.has(g.id)}
           onChange={() => toggleGame(g.id)}
           label={g.name}
-          style={{ padding: "4px 6px", borderRadius: 4, background: gameIds.has(g.id) ? "#101a35" : "transparent" }}
+          style={{ padding: "4px 6px", borderRadius: 4, background: gameIds.has(g.id) ? "var(--color-surface-alt)" : "transparent" }}
         />
       ))}
       {!filteredGames.length && <span className="muted">{t("place.noGamesPlatform")} {platformLabel(platform)}.</span>}
@@ -935,7 +935,7 @@ const PlaceForm = ({ branchId, initial, platformSuggestions, platformPrices, onC
               style={{ padding: "10px 12px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}
             >
               <span>{subplatform ? platformPriceNameOf(subplatform, lang) : ""}</span>
-              <strong style={{ color: "#07ddf1" }}>{money(Number(subplatformRate))}</strong>
+              <strong style={{ color: "var(--color-primary)" }}>{money(Number(subplatformRate))}</strong>
             </div>
             <span className="muted" style={{ fontSize: 11 }}>{t("subplatform.priceAppliedNote")}</span>
           </div>
@@ -963,7 +963,7 @@ const PlaceForm = ({ branchId, initial, platformSuggestions, platformPrices, onC
               style={{ padding: "10px 12px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}
             >
               <span>{t("place.branchDefaultRate")}</span>
-              <strong style={{ color: "#07ddf1" }}>{money(branchRate)}</strong>
+              <strong style={{ color: "var(--color-primary)" }}>{money(branchRate)}</strong>
             </div>
             <span className="muted" style={{ fontSize: 11 }}>{t("place.branchDefaultNote")}</span>
           </div>
@@ -976,7 +976,7 @@ const PlaceForm = ({ branchId, initial, platformSuggestions, platformPrices, onC
               style={{ padding: "10px 12px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}
             >
               <span>{existingPrice ? platformPriceNameOf(existingPrice, lang) : ""}</span>
-              <strong style={{ color: "#07ddf1" }}>{money(Number(tierPrice))}</strong>
+              <strong style={{ color: "var(--color-primary)" }}>{money(Number(tierPrice))}</strong>
             </div>
             <span className="muted" style={{ fontSize: 11 }}>{t("place.priceLockedNote")}</span>
           </div>

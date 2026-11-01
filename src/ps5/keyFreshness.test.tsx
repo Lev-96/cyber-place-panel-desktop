@@ -19,6 +19,7 @@ vi.mock("@/api/pcs", () => ({ apiListPcsEverywhere: async () => ({ data: lists.p
 vi.mock("@/api/sessions", () => ({ apiListAllActiveSessions: async () => ({ data: lists.sessions }) }));
 vi.mock("@/api/ps5", () => ({ apiReportUnexpectedWake: async () => {} }));
 vi.mock("@/realtime/usePs5Realtime", () => ({ usePs5WakeDecided: () => {} }));
+vi.mock("@/realtime/useSessionChanged", () => ({ useSessionChanged: () => {} }));
 vi.mock("@/i18n/translations", () => ({ tActive: (key: string) => key }));
 vi.mock("@/auth/AuthContext", () => ({ useAuth: () => ({ user: { id: 3, role: "company_owner" } }) }));
 vi.mock("@/ui/notify", () => ({ notify: { message: () => {} } }));

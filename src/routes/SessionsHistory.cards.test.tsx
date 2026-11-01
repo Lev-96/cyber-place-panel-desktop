@@ -37,6 +37,13 @@ vi.mock("@/repositories/SessionRepository", () => ({
   },
 }));
 
+// The till's sales section (2026-10-25): its own suite covers it; here only
+// that it is on the page, reads the page's period, and re-reads on Refresh.
+const orders = vi.hoisted(() => ({ list: vi.fn() }));
+vi.mock("@/repositories/OrderRepository", () => ({
+  orderRepository: { list: (...a: unknown[]) => orders.list(...a) },
+}));
+
 import SessionsHistory from "./SessionsHistory";
 
 const today = new Date();
@@ -427,5 +434,32 @@ describe("SessionsHistory — whose actions", () => {
     expect(lastFeedCall()).toMatchObject({ branch_id: 2 });
     expect(lastFeedCall()).not.toHaveProperty("user_id");
     expect(select().value).toBe("");
+  });
+});
+
+describe("product sales on the history page (2026-10-25)", () => {
+  beforeEach(() => {
+    repo.list.mockReset().mockResolvedValue([]);
+    repo.listEvents.mockReset().mockResolvedValue([]);
+    repo.eventsForSession.mockReset().mockResolvedValue([]);
+    repo.listEventActors.mockReset().mockResolvedValue([]);
+    orders.list.mockReset().mockResolvedValue([]);
+  });
+  afterEach(cleanup);
+
+  test("the section is on the page and reads the same day as the sessions", async () => {
+    await mount();
+    expect(screen.getByTestId("till-history")).toBeTruthy();
+    const sessionsArgs = repo.list.mock.calls[0][0];
+    expect(orders.list.mock.calls[0][0]).toMatchObject({
+      branch_id: sessionsArgs.branch_id, date_from: sessionsArgs.from, date_to: sessionsArgs.to,
+    });
+  });
+
+  test("Refresh re-reads the sales too", async () => {
+    await mount();
+    const before = orders.list.mock.calls.length;
+    await act(async () => { fireEvent.click(screen.getByText("action.refresh")); });
+    expect(orders.list.mock.calls.length).toBe(before + 1);
   });
 });

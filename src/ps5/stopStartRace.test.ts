@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test, vi, type Mock } from "vitest";
 import { Ps5Controller, type CommandOutcome, type ConsoleInput, type ControllerPorts } from "./Ps5Controller";
+import { WAKE_GIVE_UP_MS } from "./machine";
 import { standby, STANDBY_CANCELLED } from "../../electron/ps5/playactor";
 
 /**
@@ -167,7 +168,7 @@ describe("recovery after a wake that gave up", () => {
   test("a new press starts the give-up clock again, so the wake is tried", async () => {
     const c = new Ps5Controller(ports);
     await c.tick([input({ actual: "rest", hasSession: true })]);
-    clock += 50_000;
+    clock += WAKE_GIVE_UP_MS + 5_000;
     await c.tick([input({ actual: "rest", hasSession: true })]);
     expect(c.view("AAA").snapshot.error).toBe("WAKE_IGNORED");
     const before = wake.mock.calls.length;
@@ -250,21 +251,27 @@ describe("Start wakes a console that has not answered yet (2026-10-19)", () => {
 });
 
 describe("Start right after Stop, with the rest still finishing (2026-10-19)", () => {
-  test("the wake does not wait for a withdrawn rest's attempt to time out", async () => {
+  test("the wake waits for the withdrawn rest to return — never both at once — then goes on the next tick", async () => {
+    // 2026-10-27: a wake beside a rest still on the wire is two conflicting
+    // commands for one console; its standby may still land after the wake.
     const c = new Ps5Controller(ports);
     const answer = pendingRest();
 
     const stopTick = c.tick([input({ stopping: true, urgent: true })]);
     await Promise.resolve();
-    // Start: withdrawn at once; the console is already at rest.
+    // Start: the rest is withdrawn at once…
     await c.tick([input({ actual: "rest", hasSession: true, urgent: true })]);
     clock += 1_500;
     await c.tick([input({ actual: "rest", hasSession: true, urgent: true })]);
-
     expect(cancelRest).toHaveBeenCalledTimes(1);
-    expect(wake).toHaveBeenCalled();
+    // …and no wake goes out while it is still in flight.
+    expect(wake).not.toHaveBeenCalled();
+
     answer({ sent: false, code: "CANCELLED" });
     await stopTick;
+    clock += 1_500;
+    await c.tick([input({ actual: "rest", hasSession: true, urgent: true })]);
+    expect(wake).toHaveBeenCalledTimes(1);
   });
 
   test("a rest still wanted is never overtaken by a wake", async () => {

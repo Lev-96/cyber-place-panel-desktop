@@ -164,7 +164,7 @@ const PasswordResetCard = ({ email, onDone }: Props) => {
               value={confirmPw}
               onChange={(e) => setConfirmPw(e.target.value)}
               autoComplete="new-password"
-              style={{ borderColor: confirmPw.length > 0 && !matches ? "#ef4444" : undefined }}
+              style={{ borderColor: confirmPw.length > 0 && !matches ? "var(--color-danger)" : undefined }}
             />
             {confirmPw.length > 0 && !matches && (
               <span className="error" style={{ fontSize: 12 }}>{t("settings.passwordsMismatch")}</span>

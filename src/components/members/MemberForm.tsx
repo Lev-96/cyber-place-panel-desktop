@@ -54,7 +54,7 @@ const MemberForm = ({ branchId, initial, onClose, onSaved }: Props) => {
         <div>
           <Input label={t("label.phone")} type="tel" value={phone ?? ""} onChange={(e) => setPhone(e.target.value)} />
           {phone.trim() !== "" && !phoneValid && (
-            <span className="muted" style={{ fontSize: 11, color: "#ef4444" }}>{t("branchForm.invalidPhone")}</span>
+            <span className="muted" style={{ fontSize: 11, color: "var(--color-danger)" }}>{t("branchForm.invalidPhone")}</span>
           )}
         </div>
         <Input label={t("label.email")} type="email" value={email ?? ""} onChange={(e) => setEmail(e.target.value)} />

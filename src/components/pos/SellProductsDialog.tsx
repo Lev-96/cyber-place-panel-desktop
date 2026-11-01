@@ -11,6 +11,9 @@ import { notify } from "@/ui/notify";
 import { IProduct, isAdditionalProduct } from "@/types/pos";
 import { useCallback, useRef, useState } from "react";
 import { useProductBasket } from "./useProductBasket";
+import CashChangePanel from "@/components/payments/CashChangePanel";
+import { billCents, cashChange } from "@/components/payments/cashChange";
+import { shiftAmount, toAmount } from "@/shifts/cash";
 import { BasketCreateProduct, BasketModeSwitch, BasketPicker, BasketQuickEntry } from "./ProductBasketPanels";
 
 interface Props {
@@ -45,6 +48,10 @@ const SellProductsDialog = ({ branchId, onClose, onSold }: Props) => {
   const [saving, setSaving] = useState(false);
   const [method, setMethod] = useState<PaymentMethod>("cash");
   const [note, setNote] = useState("");
+  // Cash only: the banknotes handed over, for the change (2026-10-25) — the
+  // same panel and arithmetic as the Stop receipt. Cleared on every method
+  // switch, so an amount typed for cash never rides along with card.
+  const [received, setReceived] = useState("");
   const requestIdRef = useRef(newRequestId());
   const inFlightRef = useRef(false);
 
@@ -69,9 +76,13 @@ const SellProductsDialog = ({ branchId, onClose, onSold }: Props) => {
     ? cart.map((l) => `${l.name} × ${l.qty}`).join(", ")
     : (resolved?.lines ?? []).filter((l) => l.product_id !== null).map((l) => `${l.name} × ${l.qty}`).join(", ");
   const ready = items.length > 0 && (mode === "picker" || (resolved?.ok === true && !resolving));
+  const asksForCash = method === "cash" && ready && total > 0;
+  const change = asksForCash ? cashChange(billCents(total), received) : null;
+  // Too little handed over, or not a number: nothing is sold on a wrong change.
+  const cashBlocks = change !== null && (change.state === "short" || change.state === "invalid");
 
   const sell = async () => {
-    if (!ready || inFlightRef.current) return;
+    if (!ready || inFlightRef.current || cashBlocks) return;
     if (paymentNoteMissing(method, note)) {
       setErr(t("session.payOtherRequired"));
       return;
@@ -87,15 +98,24 @@ const SellProductsDialog = ({ branchId, onClose, onSold }: Props) => {
         ...(method === "other" ? { payment_method_other: note.trim() } : {}),
         items,
         client_request_id: requestIdRef.current,
+        ...(change?.state === "ok" ? { cash_received: toAmount(change.receivedCents) } : {}),
       });
-      notify.message("success", fmt(t("till.sold"), summary));
+      // The dialog closes on a sale, so the change goes with the toast too.
+      notify.message("success", change?.state === "ok"
+        ? `${fmt(t("till.sold"), summary)} · ${t("session.cashChange")}: ${shiftAmount(money, change.changeCents / 100)}`
+        : fmt(t("till.sold"), summary));
       onSold();
       onClose();
     } catch (e) {
       // The basket stays as it is: the cashier fixes what the server objected
       // to and presses again — with the SAME request id, so a sale the server
       // did make before the answer was lost is found, not made twice.
-      setErr(e instanceof Error && e.message ? e.message : t("session.failUnknown"));
+      // Fewer banknotes than the server's total (a price changed since the
+      // basket was drawn): said in the cashier's words, never as "422".
+      const body = (e as { status?: number; body?: { errors?: Record<string, unknown> } });
+      setErr(body.status === 422 && body.body?.errors?.cash_received !== undefined
+        ? t("till.cashShortOfTotal")
+        : e instanceof Error && e.message ? e.message : t("session.failUnknown"));
     } finally {
       inFlightRef.current = false;
       setSaving(false);
@@ -117,7 +137,7 @@ const SellProductsDialog = ({ branchId, onClose, onSold }: Props) => {
         <PaymentMethodPicker
           name={`till-pay-${branchId}`}
           method={method}
-          onMethod={(m) => { setMethod(m); setErr(null); }}
+          onMethod={(m) => { setMethod(m); setReceived(""); setErr(null); }}
           note={note}
           onNote={(v) => { setNote(v); setErr(null); }}
           disabled={saving}
@@ -128,13 +148,24 @@ const SellProductsDialog = ({ branchId, onClose, onSold }: Props) => {
           <strong>{money(total)}</strong>
         </div>
 
+        {asksForCash && change && (
+          <CashChangePanel
+            dueCents={billCents(total)}
+            received={received}
+            onReceived={(v) => { setReceived(v); setErr(null); }}
+            change={change}
+            disabled={saving}
+            autoFocus={false}
+          />
+        )}
+
         {err !== null && <div className="error">{err || t("session.failUnknown")}</div>}
         <div className="row-between">
           <Button variant="secondary" onClick={onClose} disabled={saving}>{t("action.cancel")}</Button>
           {/* Held down until there is something to sell and, for typed
               lines, until every one of them resolved: a sale with one bad
               line is refused whole, never saved in part. */}
-          <Button onClick={() => { void sell(); }} disabled={saving || !ready}>
+          <Button onClick={() => { void sell(); }} disabled={saving || !ready || cashBlocks}>
             {saving ? t("till.selling") : t("till.sellConfirm")}
           </Button>
         </div>

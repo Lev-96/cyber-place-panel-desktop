@@ -1,4 +1,5 @@
-import { DeviceAvailabilityLike, isDeviceStartable, PC_STATUS_COLOR } from "@/types/pc";
+import { DeviceAvailabilityLike, isDeviceStartable } from "@/types/pc";
+import type { StatusTone } from "./statusTone";
 
 /**
  * What a single tile of the sessions board is showing.
@@ -48,10 +49,22 @@ export const resolveSessionCellState = ({
 /** Start is offered for exactly one state — an available device on a free seat. */
 export const canStartSession = (state: SessionCellState): boolean => state === "free";
 
-/** Tile border / status colour per state (offline reuses the device palette). */
+/**
+ * Each state's tone in the shared vocabulary (2026-10-27): free is cyan,
+ * playing green, booked violet, offline grey — the same words and colours the
+ * places and live boards use (`domain/statusTone.ts`).
+ */
+export const SESSION_CELL_TONE: Record<SessionCellState, StatusTone> = {
+  busy: "playing",
+  offline: "offline",
+  reserved: "booked",
+  free: "free",
+};
+
+/** Tile border / status colour per state: its tone's full colour. */
 export const SESSION_CELL_COLOR: Record<SessionCellState, string> = {
-  busy: "#22c55e",
-  offline: PC_STATUS_COLOR.offline,
-  reserved: "#f59e0b",
-  free: "#6b7280",
+  busy: "rgb(var(--status-playing-rgb))",
+  offline: "rgb(var(--status-offline-rgb))",
+  reserved: "rgb(var(--status-booked-rgb))",
+  free: "rgb(var(--status-free-rgb))",
 };

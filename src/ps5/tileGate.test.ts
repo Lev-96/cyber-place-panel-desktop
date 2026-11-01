@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import type { MachineState } from "./machine";
-import { startGate, stopGate } from "./tileGate";
+import { START_LOCK_MS, STOP_LOCK_MS, startGate, stopGate } from "./tileGate";
 
 const ALL: Array<MachineState | undefined> = [
   undefined, "UNKNOWN", "OFFLINE", "REST", "WAKING", "ACTIVE", "GOING_TO_REST", "UNEXPECTED_WAKE", "ERROR",
@@ -26,5 +26,13 @@ describe("the PlayStation seat's buttons while its console changes state (2026-1
       expect(startGate(s)).toEqual({ disabled: false, labelKey: null });
       expect(stopGate(s)).toEqual({ disabled: false, labelKey: null });
     }
+  });
+
+  test("the lock is short whatever the console does (2026-10-28): Start ≤ 30 s, Stop ≤ 45 s", () => {
+    const t0 = 1_000_000;
+    expect(startGate("GOING_TO_REST", t0, t0 + START_LOCK_MS - 1).disabled).toBe(true);
+    expect(startGate("GOING_TO_REST", t0, t0 + START_LOCK_MS).disabled).toBe(false);
+    expect(stopGate("WAKING", t0, t0 + STOP_LOCK_MS - 1).disabled).toBe(true);
+    expect(stopGate("WAKING", t0, t0 + STOP_LOCK_MS).disabled).toBe(false);
   });
 });

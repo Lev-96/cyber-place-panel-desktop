@@ -62,7 +62,7 @@ const BranchSubscribersPage = () => {
     >
       {data && (
         <div className="muted" style={{ fontSize: 13 }}>
-          {totalLabel}: <strong style={{ color: "#fff" }}>{countText}</strong>
+          {totalLabel}: <strong style={{ color: "var(--color-text)" }}>{countText}</strong>
         </div>
       )}
       <Input

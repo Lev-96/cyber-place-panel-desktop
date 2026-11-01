@@ -74,6 +74,9 @@ export interface IOrder {
   created_at: string;
   items?: IOrderItem[];
   cashier?: IOrderCashier | null;
+  /** Cash handed over and the change given back (2026-10-25); null when not typed. */
+  cash_received?: number | string | null;
+  change?: number | null;
 }
 
 export interface CartLine {

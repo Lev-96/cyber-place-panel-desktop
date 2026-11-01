@@ -177,8 +177,9 @@ branch — so the two yml files never conflict:
     asleep on Wi-Fi answers about one probe in three (measured at the club).
   - The press window is 45 s (was 15) and ends as soon as the console is where
     it was asked to be; inside it the same datagram goes out at most once a
-    second. A wake no longer waits for a withdrawn rest's TCP attempt (up to
-    20 s) to finish.
+    second. Superseded 2026-10-27: a wake WAITS for a withdrawn rest to return
+    (one command per console, never both on the wire); the withdrawal now
+    returns at once (see below), so this costs nothing.
   - "Ignores the wake" (WAKE_IGNORED) is said only of a console really heard
     at rest after the waking began (`ConsoleStatus.heardAt` →
     `Observation.heardAt`); one silent since then is OFFLINE, not blamed on
@@ -186,6 +187,53 @@ branch — so the two yml files never conflict:
   - Real-socket simulation of a Wi-Fi PS5 (`consoleSimulation.integration.test.tsx`):
     tile ACTIVE → GOING_TO_REST → REST → WAKING → ACTIVE, Stop→REST 3-5 s,
     Start→ACTIVE 9-12 s with a deliberately deaf console.
+- **Incident fixes, measured on a real Wi-Fi PS5 (2026-10-27).** Report:
+  `~/cyber-place-local/reports/ps5-incident-2026-10-27/`. An awake PS5 on Wi-Fi
+  answered 20-35 % of status probes, replies up to 1.3 s; its Remote Play
+  session took 31.6 s to open.
+  - Status probe = 3 copies within `PROBE_TIMEOUT_MS` (1.8 s); an awake console
+    is held through silence for `AWAKE_HOLD_MS` (20 s), rest for 60 s. Before,
+    one miss = "unavailable", which also restarted the unexpected-wake clock, so
+    a console left on after expiry was rested late or never.
+  - `Ps5ControlProvider` listens to `.session.changed` per branch
+    (`SessionSetListener`, own handler; Echo `stopListening` removes only it) and
+    re-reads at once on started/stopped/moved. A device that GAINED a session
+    in a read = `sessionStarting`, one that LOST it = `sessionStopped` — one
+    path for QR, bookings, other panels and server expiry. The first read is
+    the state of things, never a press; local presses update `known` so they
+    are not acted on twice.
+  - `Ps5Controller.execute`: one command per console, period.
+  - `standby()`: discovery ping 1 s / 15 s (`aimedAt`), attempt ≤45 s, total
+    ≤60 s; an attempt left behind (timeout or withdrawal) can never send its
+    standby (`gone` checked after `openConnection`) — measured before: a
+    "failed" rest slept the console 12 s later; a withdrawal answers within
+    250 ms (`whenWithdrawn`). Ceiling = `TIMEOUT` («не ответила вовремя»),
+    not DEVICE_NOT_FOUND.
+  - `WAKE_GIVE_UP_MS` 90 s: a console that just went to rest ignored wakes for
+    ~1 min and woke ~64 s after the first one.
+  - Hardware result: rest 0/4 → 2/2, unintended transitions 8 → 0.
+  - 2026-10-28, live with TWO panels against staging (sessions started and
+    stopped via the API, expiry by the server, independent UDP listener):
+    - playactor wakes a console before every connection
+      (`ResolvedDevice.openConnection` → waker, unconditionally): a rest aimed
+      at a console already asleep woke it. `standbyOnce` reads
+      `device.discover()` first and leaves a `STANDBY` console alone.
+    - Status answers arrive in power-save bursts, seconds late: `probe()` now
+      uses ONE long-lived socket (`listener`, `unref`) and reports the latest
+      answer of the last `ANSWER_FRESH_MS` (6 s). Before, the panel showed
+      "waking" 44 s after the console answered; now within 1 s.
+    - Rest held 10 min (`REST_HOLD_MS`), awake 20 s.
+    - `[ps5]` log lines are `timestamp EVENT {json}` (Chromium prints objects
+      as "[object Object]"); run with `--enable-logging=stderr` to collect them.
+    - Result over 8 cycles: wake 7–23 s, sleep 10–31 s after the end (one
+      45 s, earlier two 132/145 s before the listener fix), billing exact
+      (2 min at 1200/h = 40.00, closed once), 0 re-wakes after the fix.
+    - Two panels still each ask the owner about one REAL manual power-on
+      (two wake events) — fixed only by a single executor (bridge plan in the
+      incident report).
+  - Limits: LAN only (same router; 2.4/5 GHz of one router is one LAN unless
+    client isolation is on); no remote close-game command exists for PS5 in
+    playactor (only standby); a panel must be running on the venue LAN.
 - **PSN player message is deferred** (`PSN_FEATURE.playerMessages = false` in
   `src/api/psn.ts`, mirrors the backend flag): no PSN name field at start and no
   sender card in Settings. Pairing's `psnLoginExternal` is separate and stays.
@@ -274,12 +322,8 @@ pos · places · ps5 · sessions · tournaments · revenue · services · scanne
   `inputMode="decimal"`), never `type="number"`.
 - **Confirm dialogs:** never use native `window.confirm()` — it poisons
   renderer focus on Linux WMs. Use the in-app `ConfirmDialog`.
-  ⚠️ **Known debt — the rule is not yet true of the whole app.** Three native
-  `confirm()` calls are still in HEAD. They predate PA-D and are out of its
-  scope: `src/routes/BranchEdit.tsx:34` (delete branch),
-  `src/routes/Notifications.tsx:119` (clear all), and
-  `src/routes/BranchPricesPage.tsx:53` (delete tariff). Each should move to
-  `useConfirm()` in its own change.
+  No native `confirm()` is left (re-checked 2026-10-27): every confirmation
+  goes through `useConfirm()`.
 - **DevTools:** auto-detached DevTools also break renderer focus. Gate
   with `ELECTRON_DEVTOOLS=1` env var.
 - **i18n:** language codes are `en` / `ru` / `am` (NOT `hy`). Use the
@@ -342,6 +386,14 @@ pos · places · ps5 · sessions · tournaments · revenue · services · scanne
 
 ## 5. Booking domain (staff perspective)
 
+### A booking without a game (2026-10-31)
+
+A booking for a platform that is the game itself (poker, table tennis) has
+`game_id`/`game` null and `platform` set (from its places). `Booking.platform`
+reads `raw.platform` first, then the game's (older rows);
+`bookingSubjectOf(raw)` names it — the game, else the platform's label, else
+"-" — in the bookings list and details. Tests: `domain/Booking.test.ts`.
+
 ### Verified statuses (from backend migrations)
 `pending` · `confirmed` · `cancelled` · `rescheduled` · `finished`
 
@@ -394,6 +446,9 @@ booking instantly" and "the cashier finds out 30 s later via polling".
 | `app-updates.{role}` | public | release-available per role |
 | `user.{id}.notifications` | **private** (wire: `private-user.{id}.notifications`) | per-user notification feed |
 | `user.{id}.access` | **private** (wire: `private-user.{id}.access`) | admin blocked this account's company / branch — sign out, or leave the branch |
+| `support.user.{id}` | **private** | the person's own support thread (`useSupportMessages`) |
+| `user.{id}.ps5` | **private** | an owner's consoles (`usePs5Realtime`) |
+| `branch.{id}.ps5` | **private** | a branch's consoles (`usePs5Realtime`) |
 
 Role-aware routing for staff is preserved in backend
 `GlobalBookingNotifier::resolveBookingChannel`:
@@ -579,9 +634,11 @@ loud `[reverb] REJECTED …` line naming the key and host; the backend has
 
 - Modern gaming aesthetic — dark base (`#020514`), neon accents (cyan
   `#07DDF1` → blue `#32AFF7` → magenta `#D152FA`).
-- Dark theme by default; no light theme implementation yet.
+- Dark theme by default; Light and High contrast exist since 2026-10-27
+  (see "Interface, themes and sounds" below) — never hard-code a colour.
 - Smooth CSS transitions; no jarring instant state changes.
-- Responsive — must work down to ~1280×720 (cashier laptops).
+- Responsive — must work down to the 800×560 window minimum
+  (`electron/windowBounds.ts` `MIN_CONTENT`), up to 1920×1080 and beyond.
 - Playstation font for branding / headings; Inter for UI text.
 - Stable button widths across i18n (don't let translations shift layout).
 - Tariff / promo UI: server-computed `is_currently_active` is the source
@@ -1213,6 +1270,14 @@ Two things that look like oversights and are not:
   request, page 1 on any change (the `{key, page}` idiom), reset with a count;
   nothing filtered client-side. Report v2 blocks (seats, platforms, bookings,
   "what the totals are made of") render only when present, so v1 reports open.
+- **Report v3 (2026-10-26)** — `ShiftBreakdown.tsx` (shared rows in
+  `shiftReportParts.tsx`): products per product and price (till / on places /
+  voided / on free places, units and totals from the server), staff (the
+  closer first: `report.closed.closed_by` → `shift.closed_by` → the viewer on
+  an open shift — `viewerId` from `Shift.tsx` and `CloseShiftDialog`), handover
+  of running places, sales of earlier shifts voided here, and "не учитывается"
+  for debts / cash in-out / top-up method. Every block renders only when the
+  report has it, so v1/v2 reports open unchanged. Nothing is summed here.
 - **Report layout (2026-10-19 evening).** Header facts are label-above-value
   (`Fact`), status said in words; one large revenue figure with its parts;
   every count sits on its own line UNDER its label, never next to an amount
@@ -1241,6 +1306,50 @@ decides whether the control is drawn. Waiving a bill (`session.free`) sat on the
 owner's side of that line until 2026-09-06 and is now the manager's too: the
 person who waives a bill is whoever is at the counter when a machine crashes
 (the backend moved `sessions.free` the same day).
+
+## 9.5.3a A game's cover (2026-10-30)
+
+- `GameForm` → `components/games/GameCoverField`: `ImageUpload` for the cover
+  plus `components/ui/Switch` "No cover" (new reusable switch, `role="switch"`,
+  styles `.cp-switch` in global.css, built like `Checkbox`). A NEW game is saved
+  only once its cover is decided (`coverDecided`): a file, or the switch on —
+  otherwise Save shows `game.coverRequired` and sends nothing. The choice rides
+  along on "Use existing" too (the server keeps it only for a game with no
+  cover). Edit (admin only, `game.crud`): a game with no cover opens with the
+  switch on; a new file replaces, the switch turned on sends `remove_cover`,
+  untouched = the rename alone as before.
+- `api/games.ts`: JSON exactly as before without a file; with one, multipart
+  (`buildGameForm`, booleans "1"/"0" — Laravel's `boolean` refuses
+  "true"/"false"); an edit with a file is `POST /games/{id}?_method=PUT`. The
+  write path strips the query, so `/games` and `/branches` caches still drop.
+- GamesList / BranchGames show the cover as box art (`components/games/GameCover`,
+  42×56) — or, with none / a failed load, the mobile app's "no cover" art:
+  dark gradient, brand ring, the platform's `PlatformIcon` (`.game-cover-empty`).
+  Built on `SmartImage`'s new optional `fallback` (omitted = the first letter,
+  as every other user still gets). Tests `GameCover.test.tsx` (4).
+- Tests: `GameForm.cover.test.tsx` (9), `api/games.cover.test.ts` (5); the
+  catalogue tests in `GameForm.test.tsx` mount with "No cover" on, which sends
+  their old bodies unchanged. Mutation-checked: no cover guard, cover dropped
+  on use-existing, booleans as true/false — each caught.
+
+## 9.5.3b Platform icons (2026-10-30)
+
+- `utils/platform.ts` `platformIconKind(slug)`: pc → Windows, any PlayStation
+  → its mark, a venue's own platform by the words in its slug (poker,
+  table-tennis / ping-pong, billiards / pool / snooker, vr as a whole word /
+  virtual), else the neutral four-tile mark. Slugs come from the English name,
+  so a platform added later under one of those names is drawn right with no
+  code change. Mirrored in the mobile app. Tests `utils/platformIcon.test.ts`.
+- `components/ui/PlatformIcon` (24 px box, `tone="brand"` = theme gradient
+  tokens, `tone="current"` = text colour for use inside buttons; decorative,
+  `aria-hidden`; the billiards "8" is shapes, not SVG text, so it never joins a
+  label's `textContent`).
+- Shown on GamesList / BranchGames rows (`.game-platform`) and on every
+  PlatformPicker option. The picker's narrow mode is now
+  `components/ui/PlatformDropdown` (select-only combobox: ↑/↓ wrap, Enter/Space,
+  Escape/Tab, click outside; `aria-activedescendant`), because a native
+  `<select>` cannot draw icons. Same ordered list, legacy slug and Other as
+  before. Tests: `PlatformDropdown.test.tsx`, `PlatformPicker.test.tsx`.
 
 ## 9.5.4 Branch status: Active / Inactive (2026-09-11)
 
@@ -2010,6 +2119,27 @@ are unchanged — do not add a `paused` status here either.
   server sweep), `pausedSecondsBetween` caps an open pause there
   (`autoResumeAtOf()` in `sessionAmount.ts`). History: a `resumed` with
   `reason: pause_limit` reads «Автоматически, по лимиту паузы».
+- **VIP minimum charge (2026-10-31)**: Branch → Prices, `VipMinimumChargeForm`
+  written for an owner who has never seen it: the rule in plain sentences with
+  their numbers (short visit / long visit / past the minimum / a move), two
+  questions answered with `DurationPicker` in hours OR minutes (its `presets`,
+  `maxMinutes` = 1440, `invalidText` props; defaults unchanged for «+ Время»),
+  the billing choice with a worked case each, and an example table with a
+  «Почему» column plus a moved-visit line (`vipMinimumCharge.ts`
+  `exampleRow`/`moveExample`, priced by `applyMinimumCharge`). The example's
+  price comes from `vipRateOptions` (matrix `<slug>-vip` + custom rows, the
+  platform with the most VIP seats first; a picker when several) — "the first
+  VIP price found" once priced it at PC VIP 12 in a branch whose VIP seats are
+  all PS5 at 1500. The panel refuses minimum < threshold in BOTH modes (the server only
+  in `minimum`). Sends the base policy plus the `vip_min_charge_*` keys (in
+  minutes), only the switch when off. The rule rides on the
+  session (`min_charge`, frozen by the server); `sessionTimeCostAt` applies it
+  so the tile ticks the same figure the server bills — including a minimum the
+  server SETTLED on a move after the threshold (`min_charge.settled_amount`
+  added to the clock, never repriced at the new seat), `SessionTimer` shows a
+  «Минимум 1 ч» badge (`minimumLabel` prop) and the receipt a line from the
+  bill's `minimum_charge`. Tests: `VipMinimumChargeForm.test.tsx`,
+  `sessionAmount.minimumCharge.test.ts`, badge/receipt cases.
 - **«Переместить игрока» (2026-09-25)**: a tile button (hidden while paused)
   opens `RelocateSessionDialog`: `relocation-options` lists same-price seats
   first, then others; a booking-limited seat shows «Забронировано с HH:MM,
@@ -2209,11 +2339,52 @@ saying so.
 
 | Control | Where | Who |
 |---|---|---|
-| 🎮 set the pad count (select, 1–4) | the seat's tile in `SessionsBoard` | everyone who works the branch |
-| +10 / +30 / +60 minutes | `SessionOptionsDialog` | same |
+| 🎮 joystick switch (`PadToggle`, first card action) | the seat's tile in `SessionsBoard` | everyone who works the branch |
+| + Время: hours/minutes, preset or typed, priced, then confirmed | `SessionOptionsDialog` | same |
+| optional planned length at an hourly start, priced — duration or "until HH:mm" | `StartSessionDialog` | same |
 | switch to unlimited | same | same |
 | Free (start it waived) | `StartSessionDialog`, behind `session.free` | same (managers since 2026-09-06) |
 | joystick prices, rounding policy | `BranchPricesPage` | admin + owner |
+
+**Choose, see the server's price, confirm (2026-10-25).** "+ Время" and the
+optional length on an hourly start share `DurationPicker` (ONE amount + ONE
+unit, hours by default, presets write the same box, switching the unit
+rewrites it: 2 h → 120 min — `durationModel.ts`) and `QuotedPrice` (a
+read-only `<output>`). The figure is never computed here: `useServerQuote`
+asks `time-quote` / `start-quote` after a 250 ms pause, drops a reply for a
+value the form has moved past, and the confirm / Start is enabled only when the
+quote is for exactly the minutes on screen. A refused quote shows its reason
+and no figure. A preset no longer grants on the tap. Empty length on Start is
+the count-up start as before; a filled one is a timed seat (`mode=fixed`, no
+package) whose tile reads "rate / ч · план N". Its total can be changed by hand
+("Изменить итоговую цену", prefilled with the server's figure): sent as
+`planned_amount` INSTEAD of `hourly_rate`, quoted back with the implied rate
+and the standard price, and Start waits for a quote of exactly that total.
+"+ Время" takes a typed price the same way on a seat the server marks
+`price_editable` (a package or a planned start): sent as `charge`, quoted back
+with `standard_charge`, confirm enabled only on a quote of exactly that price.
+`sessionTimeCostAt` mirrors the server's share-of-plan billing (packages
+included, re-base via `plan_rebased_at`, only resumed pauses out of the plan).
+
+**"До времени" (2026-10-26).** Tabs "Продолжительность" / "До времени" above
+the plan; only the chosen one is read and sent, the other keeps its value.
+`ClockTimeField` takes "00:40" (`clockOf` checks the SHAPE only, "0:40" →
+"00:40"); `until` is sent to `start-quote` and `POST /sessions` — never
+minutes worked out on this machine. The server resolves it on its clock and
+answers `minutes` + `ends_at`, shown as "50 мин · до 00:40 (завтра)"; a passed
+/ too-far time comes back as its 422 sentence and holds Start. The quote is
+keyed on the time (`useServerQuote` is generic over its input) and re-asked
+each minute (`useMinuteTick` → its `refresh` argument): the figure stays on
+screen while the same question is asked again, so Start never blinks off; a
+different time or rate blanks it as before.
+
+**The window (2026-10-25).** Resizable with no maximum; minimum 800×560
+(`electron/windowBounds.ts` `MIN_CONTENT`) — every screen reflows there, and
+below 1100 px the shell gutters tighten so the board keeps two columns. Size,
+place and maximized state are kept in the existing `Store` under
+`window.state` and restored only if the window still lands on a display
+(shrunk and moved inside it otherwise); first run opens at the default,
+centred.
 
 ⚠️ Two rows MOVED out of `SessionOptionsDialog` (2026-09-10). Pads are set on
 the tile, because a cashier looking at the board can already see how many are in
@@ -2405,6 +2576,23 @@ socket update or another cashier's press flips it with no local state to
 disagree about. `padChargeOf()` prints `n × fee` only when every charged period
 agrees on a price — fees are frozen per pad, so a seat that straddles a
 re-pricing holds two, and "3 × ?" would be a lie where the sum is always true.
+
+**One joystick switch on every seat (2026-10-25, `PadToggle`).** The select of
+pads and the separate "−" were replaced by the floor's own GameZone control. It
+is the FIRST cell of the card's action grid for every venue (it used to sit on
+the pad line for per-pad venues and in the actions for charge-once ones), and
+its buttons are ordinary card actions (`session-card__btn`, 32px) carrying only
+the `JoystickIcon` — no price, rate or count anywhere in or beside it (owner's
+rule); the pad line and "Тариф сейчас" carry the figures, and the pad line has
+no icon. With a pad out the button is lit (`aria-pressed`) and a press takes
+the last one back; a venue with a fourth controller splits the cell into two
+equal halves (production uses two extras at branch 5), so the grid never gains
+a cell. A charge-once seat keeps its own names (`padAddOne`/`padRemoveOne`) and
+no "joysticks" group. Same `addPad(slot)`/`removeTopPad` calls, all buttons
+held while one is in flight. BILLING: an hourly pad bills only the time it was
+out, every handout at its rate — charge-once applies to a fixed fee only
+(backend 2026-10-25). The history line of an hourly pad's add does not print
+its rate as a charge (`EventPresentation.showAmount`).
 
 `places.joystick_price_4` is the room's own fourth-pad figure (null = the pair
 shares one, 0 = the fourth is free), mirroring `branches.joystick_price_4`. The
@@ -3014,3 +3202,155 @@ sentences about one running seat («к этой сессии», «В сесси�
 contains «Сессии/Сеанс/сеанс/Sessions/Սեսիաներ», the 14 renamed keys contain no
 form of the old word at all (a lowercase plural is indistinguishable from the
 singular genitive kept elsewhere, hence by key), and "Start session" stays.
+
+
+## Board sale, ending-soon warnings, preliminary total (2026-10-25)
+
+- **Sell from a free seat.** The free card's "+ Товар" opens the till's own
+  `SellProductsDialog` (same request, server prices, payment methods,
+  `client_request_id` double-submit guard). A sale is the branch's — orders
+  carry no place — so nothing starts a session. No shift is required (the
+  till's existing rule); a sale with no open shift is in revenue, not a shift.
+- **Ending-soon card = the server's notification.** `SessionEndingNotifier`
+  no longer runs its own 10-min poll: it shows unread `session.ending_soon`
+  rows from `NotificationsContext` (15 min, `SessionEndingSoonService`, owner +
+  the branch's managers), stacked, soonest first, gone once read/deleted or the
+  seat's end passed. Dismissed ids are kept per user in localStorage, so a
+  reconnect or a restart does not re-pop them; an unread, undismissed one comes
+  back after a restart.
+- **`NotificationsContext`:** a replayed `notification.created` for a row
+  already held is not counted twice; the 60-s unread poll re-reads the LIST when
+  the count drifted (a missed broadcast used to leave "1" and no row); the
+  Notifications page re-reads once on open.
+- **Stop is a preliminary total.** It always was two-step (preview, then
+  `/stop` only on confirm); the copy now says so: "Предварительный итог", "the
+  session keeps running until you confirm", buttons "Продолжить игру" /
+  "Подтвердить завершение" (it read "Подтвердить и закрыть"). Products have
+  their own section (qty × unit = line) and the server's `items_total`; the
+  total stays the server's `total`. A stop made elsewhere while the receipt is
+  open turns it into that final bill with no confirm. A planned hourly seat
+  (no package) reads "Время игры", not an empty "Тариф · ".
+
+- **"+ Продукт" lives in the board's header** (beside "История торговли"), not
+  on seats: one till sale for a guest who only buys a drink.
+- **The receipt is the figure charged.** Read once when Stop is pressed (no
+  5-s refresh), it says "Итог на HH:MM:SS"; confirm sends `priced_at` +
+  `expected_total`, the server closes the seat at that instant for that total,
+  and a 422 (stale / changed) shows the server's sentence and re-reads it. The
+  banknotes short of the bill keep "cashBillGrew" (`errors.cash_received`).
+- **No bare "2" on a card.** The pad line shows only with an extra pad out or a
+  pad charge; the console's own kit says nothing.
+- **Till sale: cash and change, and the history.** `SellProductsDialog` (both
+  «Касса» and "+ Продукт") shows the Stop receipt's `CashChangePanel`
+  (`autoFocus={false}` there), holds the sale when short or unreadable, sends
+  `cash_received`, says the change in the toast; a 422 on `cash_received` reads
+  `till.cashShortOfTotal`. «История торговли» has a "Продажи товаров (без
+  места)" section (`TillSalesHistory`): same period and person as the page,
+  one sentence per sale — when · who sold (role) · what · how paid · received /
+  change · total; voided listed, not counted. «Касса» rows read the same
+  sentence (`tillSaleText.ts`).
+
+## The pinned top bar (2026-10-26)
+
+`Layout` renders `PageTopBar` where `BackButton` was: a sticky, click-through
+bar (only Back takes the pointer) holding Back on the left. When the screen's
+first `.page-title` (outside a dialog) reaches the bar — its top at the bar's
+bottom, i.e. the main's top padding + the bar's height (`barBottomInset`), so
+even a small scroll never slides it under Back — its text fades
+and rises into the bar's centre, level with Back; scrolling up fades it out.
+It finds the heading itself (IntersectionObserver rooted at `main`, re-looked
+on DOM changes), so no screen changes; it resets on every route and shows no
+heading on `/` (the dashboard has only widget headings). A band of the page
+background (`.cp-topbar::before`, sized by `--main-pad-top`/`--main-pad-x` on
+`.main`) rises with it so nothing scrolls visibly behind the bar. Reduced
+motion: no animation.
+Only one name is ever on screen: while the bar carries the heading, the
+heading itself gets `cp-page-title--docked` (fades up out of its place, box
+kept so nothing moves) and plays its usual `cp-title-in` again when it returns.
+
+
+## Interface, themes and sounds (2026-10-27)
+
+One business layer, many looks. Nothing here branches on the interface for
+BEHAVIOUR: the same routes, components, handlers and permissions in every
+look; only CSS (via `<html>` data attributes) and the folding of card actions
+differ.
+
+- **Tokens** (`global.css :root`): L1 primitives as colour CHANNELS
+  (`--rgb-cyan: 7 221 241`), L2 semantic (`--accent-rgb`, `--fg-rgb`,
+  `--color-*`, `--status-<tone>-fg/bg/border`), L3 density (`--control-h`,
+  `--grid-min` = the board's card column, `--row-py`, `--subtab-h`…). Use `rgb(var(--accent-rgb) / .35)`, never a
+  literal. Every remaining literal is either a theme token with its exact old
+  value or deliberately fixed (login scene, flags, QR, illustrations, toasts).
+- **Status vocabulary** (`domain/statusTone.ts`, `ui/StatusChip.tsx`): free =
+  cyan ○, playing = green ▶, booked = violet, ending = amber clock, critical =
+  red ⚠, paused = grey ‖, offline = grey dashed. Same on Active Places, Live
+  and Places (green no longer means "free" anywhere). Always colour + icon +
+  word. The device dot is connectivity only (green reachable, red offline).
+- **Preferences** (`preferences/uiPreferences.ts`, `UiPreferencesContext`):
+  server `GET/PUT /user/preferences` (whitelist mirrored in
+  `parsePreferences` — field-by-field fallback, never throws), local cache
+  `u{id}:cp.ui.prefs` for the first frame; volume/mute device-local
+  `u{id}:cp.sound.device`. Applied as `data-theme`, `data-density`,
+  `data-card-size`, `data-board-view`, `data-secondary`, `data-quick-actions`.
+  Existing users: Standard + a one-time dashboard offer
+  (`NewInterfacesOffer`); new users: `OnboardingWizard` (server
+  `onboarding_version` < 1; offline never forces it).
+- **Presets**: Simple (density simple, card size L, details off, «Ещё» on the
+  card via `CardOverflow`, big icon+word buttons, colour legend
+  `SimpleBoardHelp`), Standard (no CSS rules at all — the old panel, proven
+  pixel-identical), Compact (density compact, card size S, LIST rows). Custom
+  = the person's own `layout`, kept while a preset is on: choosing «Мой
+  интерфейс» shows it (it starts as Standard); editing a control while a
+  preset is on copies what is on screen first.
+- **Density vs card size**: density sizes text and controls; card size
+  (S 168 / M 198 / L 272 px column via `--grid-min`, plus padding, number and
+  clock size) sizes the card. Never set card fonts/columns in density rules —
+  they overrode each other before. Fixed-height buttons (`.session-card__btn`,
+  `.cp-subtab`) are excluded from the density `.btn` padding: they centre
+  their words with their own height (`--subtab-h`), and a density padding
+  pushed the words to the bottom (Compact, 2026-10-27).
+- **List view** (`[data-board-view="list"]`): every row is the SAME grid of
+  FIXED tracks (state · platform · console chip · № · clock · tariff 1fr ·
+  buttons `fit-content(440px)`) with each part pinned to its column, so rows
+  line up whether or not a seat has a chip or a tariff. Container queries on
+  the board fold it to two lines (≤1320 px) and three (≤760 px). Never use
+  `auto`/`minmax(a,b)` tracks there: each row sizes them alone and the
+  columns drift. Measured: no button text off-centre, no part past the
+  frame, columns aligned — 5 viewports × ru/en/am.
+- **Light theme** is soft on purpose (owner: white hurt the eyes): page
+  `#e6e9ee`, surfaces `#f3f4f7`, text `#1c2330`; every text ≥ 4.5:1.
+- **«Интерфейс и тема»** (`/appearance`, every role; `nav.appearance`):
+  ready-made interface, theme, preview (`AppearancePreview`: the board's own
+  classes, `inert`, no handlers), own layout, side-menu order/visibility
+  (`applyPersonalMenu` over the role's menu built by the shared
+  `menuSpecsFor` — can only reorder/hide what the role shows;
+  `REQUIRED_MENU_IDS` never hidden), first screen after sign-in
+  (`ApplyHomeOnSignIn`, once, only from "/"), sounds. Edits are a draft in
+  the provider: tried on at once, kept only on Save; leaving shows
+  `UnsavedInterfaceNotice`.
+- **Sound** (`sound/soundEngine.ts`): the only sound source. Call sites ask
+  `playFor(category, key)` AFTER their existing delivery (no new
+  subscription): booking_new / booking_changed (`GlobalBookingNotifier`),
+  guests (subscribe, tournament join), session_ending
+  (`SessionEndingNotifier`, by notification id), support (`SupportNotifier`,
+  by message id), system (expense reminders, update toast). Dedup per key for
+  1 h; nothing new starts while a sound is still ringing (`busyUntil`, at
+  least 700 ms). Two kinds of sound: `SYNTH_SOUNDS` (the panel's own, Web
+  Audio, peak capped by `MAX_PEAK`, profiles ×0.45 / ×1 / ×2.4 + repeat) and
+  `FILE_SOUNDS` — 15 recorded melodies chosen by the owner in
+  `public/sounds/<id>.mp3`, trimmed and levelled to −16 LUFS / peak ≤ −1.5 dB
+  (lengths in `RECORDINGS`, keep in sync when a file changes). Recordings are
+  fetched from the app origin (`app://` supports fetch; CSP `connect-src
+  'self'`), decoded once, preloaded for the kinds a person hears; a short one
+  repeats up to the profile's `minSeconds` (quiet 0 / standard 3 / loud 6,
+  max 4 plays) at `level` ≤ 1; a missing file plays the chime; one that loads
+  > 3 s late is skipped. Defaults: a different melody per kind. UI: one
+  «Звук для всех уведомлений» choice sets every kind (keeps on/off), the
+  per-kind table is under «Отдельно для каждого уведомления». A new sound id
+  goes in BOTH whitelists (`uiPreferences.ts` and backend
+  `App\Support\UiPreferences::SOUNDS`). OS notifications are
+  `silent: true` (the panel's sound is the sound). Audio refused by the
+  system → `isAudioBlocked()` + «Включить звук»; visuals never depend on it.
+- **Typecheck**: `npm run typecheck` (`tsc -p .` checks nothing — the root
+  tsconfig has `"files": []`).

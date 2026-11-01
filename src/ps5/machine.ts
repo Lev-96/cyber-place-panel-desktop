@@ -180,7 +180,11 @@ export const UNEXPECTED_WAKE_GRACE_MS = 10_000;
  * registration both get nowhere against a console with that switch off, so it
  * is worth naming rather than leaving as "waking…" forever.
  */
-export const WAKE_GIVE_UP_MS = 45_000;
+export const WAKE_GIVE_UP_MS = 90_000;
+// 45 s until 2026-10-27. Measured on a real console that had gone to rest a
+// few seconds earlier: it ignored wakes for about a minute and woke ~64 s after
+// the first one. At 45 s the panel blamed its "turn on from network" setting
+// moments before it woke by itself.
 
 /**
  * How long a sleep counts as still under way.
@@ -195,7 +199,13 @@ export const WAKE_GIVE_UP_MS = 45_000;
  * sleep without ever asking the owner. Safe, and wrong: being asked is the
  * entire feature.
  */
-export const REST_SETTLE_MS = 30_000;
+export const REST_SETTLE_MS = 180_000;
+// 30 s until 2026-10-28. Measured live on Wi-Fi: two sleeps took 132 s and
+// 145 s; past 30 s the console was called an "unexpected wake" and the owner
+// was asked about a console the panel itself was still putting to sleep. A
+// console switched on by hand within three minutes of a stop is put back to
+// sleep without the question — the safe direction. The Start button's lock is
+// bounded separately (tileGate START_LOCK_MS).
 
 export const initialSnapshot = (): MachineSnapshot => ({
   state: "UNKNOWN",

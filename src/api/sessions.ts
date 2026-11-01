@@ -30,7 +30,53 @@ export interface StartSessionBody {
    * backend from before this release keeps working.
    */
   is_free?: boolean;
+  /**
+   * A PLANNED length for an hourly start, in minutes (2026-10-25). Omitted is
+   * the count-up session the panel has always started. Given, the server
+   * starts the seat with an end — billed by the clock, ended at its end like
+   * any timed seat, extendable with "+ Время". Never sent with a package.
+   */
+  duration_minutes?: number;
+  /**
+   * The TOTAL for that length, set by hand (2026-10-25). Kept exactly; the
+   * seat runs at the rate it implies, and the full time bills exactly this.
+   * Sent instead of `hourly_rate`, only with `duration_minutes`.
+   */
+  planned_amount?: number;
+  /**
+   * Or the clock time it ends at, "HH:mm" (2026-10-26) — never with
+   * `duration_minutes`. The server resolves it on its own clock: today, or
+   * tomorrow past midnight; passed or more than 10 h away is refused.
+   */
+  until?: string;
 }
+
+/** What "+ Время" would charge for N minutes now — the server's own figure. */
+export interface ITimeQuote {
+  minutes: number;
+  hourly_rate: number;
+  charge: number;
+  /** What the session's rate asks for these minutes. */
+  standard_charge: number;
+  /** Whether this seat takes a price typed by hand (a seat with a plan). */
+  price_editable: boolean;
+  is_free: boolean;
+}
+
+/** What a planned hourly start would cost — the server's own figure. */
+export interface IStartQuote {
+  minutes: number;
+  hourly_rate: number;
+  amount: number;
+  /** What the seat's own rate would ask for these minutes; null when it has none. */
+  standard_amount: number | null;
+  /** Only for a quote "until HH:mm": the exact end it came to, and the time asked. */
+  ends_at?: string;
+  until?: string;
+}
+
+/** A planned length: so many minutes, or until a clock time. */
+export type PlannedLength = { minutes: number } | { until: string };
 
 export interface ExtendSessionBody {
   time_package_id: number;
@@ -149,6 +195,8 @@ export interface IBillBreakdown {
   items_total: number;
   /** What is actually owed. Zero for a waived session. */
   total: number;
+  /** The instant this preview was priced at (2026-10-25); a stop can be closed at it. */
+  priced_at?: string;
 
   /* ---- added 2026-09-03; optional so an older backend still renders ---- */
 
@@ -166,6 +214,18 @@ export interface IBillBreakdown {
   /** 0 means the venue rounds nothing, which is the default. */
   rounding_step?: number;
   rounding_mode?: "up" | "nearest" | "down";
+  /**
+   * The VIP minimum charge and what it did (2026-10-31): `time_cost` above
+   * already includes it. Null/absent = no rule on this session.
+   */
+  minimum_charge?: {
+    mode: "minimum" | "round_up";
+    after_minutes: number;
+    minimum_minutes: number;
+    applied: boolean;
+    billed_minutes: number;
+    played_time_cost: number;
+  } | null;
 }
 
 export interface AddItemBody {
@@ -211,6 +271,13 @@ export interface StopSessionBody {
    * for card or other (the server drops it there too). Not the bill.
    */
   cash_received?: string;
+  /**
+   * The receipt's instant and total (2026-10-25): the seat is closed AT that
+   * instant for exactly that total. Both or neither; the server refuses a
+   * stale or changed receipt (422) and the receipt re-reads.
+   */
+  priced_at?: string;
+  expected_total?: number;
 }
 
 /** What was handed over and handed back, from the stored bill; null when not typed. */
@@ -365,8 +432,12 @@ export const apiRemoveSessionJoystick = (sessionId: number, slot: number) =>
   request<{ session: ISessionApi }>(`/sessions/${sessionId}/joysticks/${slot}`, { method: "DELETE" });
 
 /** +10 / +30 / +60, priced at the tariff the player is already on. */
-export const apiAddSessionTime = (sessionId: number, minutes: number) =>
-  request<{ session: ISessionApi }>(`/sessions/${sessionId}/time`, { method: "POST", body: { minutes } });
+/** `charge`: the price typed by hand for these minutes (2026-10-25); omitted = the rate's. */
+export const apiAddSessionTime = (sessionId: number, minutes: number, charge?: number) =>
+  request<{ session: ISessionApi }>(`/sessions/${sessionId}/time`, {
+    method: "POST",
+    body: charge === undefined ? { minutes } : { minutes, charge },
+  });
 
 /**
  * Lift the ceiling, optionally at a new price. Refused (422, with a sentence)
@@ -432,6 +503,22 @@ export interface IExtensionOptions {
  * those seats a second later — `apiTransferExtension` re-checks everything
  * under a row lock and may still refuse. Never treat this as a promise.
  */
+/** ⚠️ ADVICE: `apiAddSessionTime` re-checks and is what charges. Writes nothing. */
+export const apiSessionTimeQuote = (sessionId: number, minutes: number, charge?: number) =>
+  request<ITimeQuote>(
+    `/sessions/${sessionId}/time-quote?minutes=${minutes}` + (charge !== undefined ? `&charge=${charge}` : ""),
+  );
+
+/** ⚠️ ADVICE: `apiStartSession` is what creates the session. Writes nothing. */
+export const apiStartQuote = (pcId: number, length: PlannedLength, hourlyRate?: number, plannedAmount?: number) =>
+  request<IStartQuote>(
+    `/sessions/start-quote?pc_id=${pcId}`
+      + ("until" in length ? `&until=${encodeURIComponent(length.until)}` : `&minutes=${length.minutes}`)
+      + (plannedAmount !== undefined
+        ? `&planned_amount=${plannedAmount}`
+        : hourlyRate !== undefined ? `&hourly_rate=${hourlyRate}` : ""),
+  );
+
 export const apiSessionExtensionOptions = (sessionId: number, minutes: number) =>
   request<IExtensionOptions>(`/sessions/${sessionId}/extension-options?minutes=${minutes}`);
 

@@ -229,8 +229,17 @@ describe("Notifications states", () => {
 
     expect(screen.getByText("No connection")).toBeTruthy();
     expect(screen.queryByText("No notifications right now")).toBeNull();
+    // Opening the list reads it once (2026-10-25); Retry reads it again.
+    const opened = feed.refresh.mock.calls.length;
     fireEvent.click(screen.getByRole("button", { name: "Retry" }));
-    expect(feed.refresh).toHaveBeenCalledTimes(1);
+    expect(feed.refresh).toHaveBeenCalledTimes(opened + 1);
+  });
+
+  test("opening the list reads it again, exactly once", async () => {
+    auth.user = { id: 1, role: "manager" };
+    const before = feed.refresh.mock.calls.length;
+    render(<Notifications />);
+    expect(feed.refresh.mock.calls.length - before).toBe(1);
   });
 
   test("a manager with an empty feed gets the empty state", async () => {

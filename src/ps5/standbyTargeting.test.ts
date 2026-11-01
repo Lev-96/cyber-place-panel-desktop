@@ -57,7 +57,7 @@ describe("how long a sleep command may take", () => {
     expect(result).toEqual({ ok: true });
   });
 
-  test("work that will not return is given up on, as unreachable", async () => {
+  test("work that will not return is given up on, as a timeout (not \"not on the network\")", async () => {
     vi.useFakeTimers();
     try {
       // A promise that never settles is exactly what the 144-second call was:
@@ -67,7 +67,7 @@ describe("how long a sleep command may take", () => {
 
       expect(await race).toEqual({
         ok: false,
-        code: "UNREACHABLE",
+        code: "TIMEOUT",
         detail: "Timed out after 20000ms",
       });
     } finally {

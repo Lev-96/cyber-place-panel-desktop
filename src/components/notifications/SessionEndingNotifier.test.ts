@@ -1,109 +1,52 @@
-import { describe, expect, it } from "vitest";
-import { ISessionApi } from "@/types/sessions";
-import { sessionsToWarnAbout } from "./SessionEndingNotifier";
+import { describe, expect, test } from "vitest";
+import type { IDbNotification } from "@/api/notifications";
+import { endingWarnings } from "./SessionEndingNotifier";
 
-const NOW = new Date("2026-09-03T14:00:00.000Z").getTime();
-const inMinutes = (m: number): string => new Date(NOW + m * 60_000).toISOString();
-
-const session = (over: Partial<ISessionApi>): ISessionApi => ({
-  id: 1,
-  branch_id: 7,
-  pc_id: 21,
-  pc_label: "№1",
-  started_at: new Date(NOW - 3_000_000).toISOString(),
-  ends_at: inMinutes(60),
-  status: "active",
-  total_paid: 0,
+/**
+ * Which "about to run out" warnings to show — the SERVER's notifications
+ * (2026-10-25). Nothing here decides when a seat is ending: an unread
+ * `session.ending_soon` row whose seat has not run out yet, not dismissed.
+ */
+const NOW = Date.parse("2026-10-25T12:00:00Z");
+const row = (id: string, minutesAhead: number, over: Partial<IDbNotification> = {}, data: Record<string, unknown> = {}): IDbNotification => ({
+  id,
+  type: "App\\Notifications\\SessionEndingSoon",
+  read_at: null,
+  created_at: new Date(NOW).toISOString(),
+  data: {
+    type: "session.ending_soon", session_id: Number(id.replace(/\D/g, "")) || 1, branch_id: 7, pc_id: 3, place_number: 4,
+    ends_at: new Date(NOW + minutesAhead * 60_000).toISOString(), minutes_left: 15, ...data,
+  },
   ...over,
 });
 
-/**
- * The rule behind the ten-minute warning, asserted without React or a fake
- * clock in a DOM. Three things have to be true of it, and each one is a way an
- * operator's evening gets worse if it is not:
- *
- *   - it fires in time to be useful and not after the fact;
- *   - it fires ONCE, so granting time does not summon it again;
- *   - it never fires for a session that cannot run out at all.
- */
-describe("which sessions are about to run out", () => {
-  it("warns inside the last ten minutes and not before", () => {
-    const due = sessionsToWarnAbout(
-      [
-        session({ id: 1, ends_at: inMinutes(10) }),
-        session({ id: 2, ends_at: inMinutes(9) }),
-        session({ id: 3, ends_at: inMinutes(11) }),
-        session({ id: 4, ends_at: inMinutes(59) }),
-      ],
-      new Set(),
-      NOW,
-    );
-
-    expect(due.map((d) => d.sessionId)).toEqual([1, 2]);
+describe("endingWarnings", () => {
+  test("an unread warning still ahead is shown, with the seat and the minutes left", () => {
+    expect(endingWarnings([row("n1", 15)], new Set(), NOW)).toEqual([
+      { id: "n1", sessionId: 1, branchId: 7, label: "№4", minutesLeft: 15 },
+    ]);
   });
 
-  it("does not warn about one that has already ended", () => {
-    // The board turns the tile over on its own, and there is nothing left to
-    // sell — a warning here is news, not a chance to act.
-    const due = sessionsToWarnAbout([session({ ends_at: inMinutes(-1) })], new Set(), NOW);
-
-    expect(due).toEqual([]);
+  test("minutes are counted from the server's end, so a restart reads the truth", () => {
+    expect(endingWarnings([row("n1", 6)], new Set(), NOW)[0].minutesLeft).toBe(6);
   });
 
-  it("says nothing about a paused session — its clock is not moving", () => {
-    const due = sessionsToWarnAbout(
-      [session({ id: 1, ends_at: inMinutes(5), paused_at: inMinutes(-10) })],
-      new Set(),
-      NOW,
-    );
-
-    expect(due).toEqual([]);
+  test("read, dismissed, past its end, or another kind: not shown", () => {
+    const list = [
+      row("n1", 10, { read_at: new Date(NOW).toISOString() }),
+      row("n2", 10),
+      row("n3", -1),
+      row("n4", 10, {}, { type: "booking.created" }),
+    ];
+    expect(endingWarnings(list, new Set(["n2"]), NOW)).toEqual([]);
   });
 
-  it("says nothing about a session that cannot run out", () => {
-    // Count-up mode, and one an operator has already lifted the ceiling on.
-    const due = sessionsToWarnAbout(
-      [
-        session({ id: 1, ends_at: null }),
-        session({ id: 2, ends_at: inMinutes(5), is_unlimited: true }),
-      ],
-      new Set(),
-      NOW,
-    );
-
-    expect(due).toEqual([]);
+  test("soonest first", () => {
+    const ids = endingWarnings([row("n1", 12), row("n2", 4), row("n3", 9)], new Set(), NOW).map((w) => w.id);
+    expect(ids).toEqual(["n2", "n3", "n1"]);
   });
 
-  it("warns once per session, so granting time does not summon it again", () => {
-    const already = new Set([1]);
-
-    const due = sessionsToWarnAbout(
-      [session({ id: 1, ends_at: inMinutes(5) }), session({ id: 2, ends_at: inMinutes(5) })],
-      already,
-      NOW,
-    );
-
-    expect(due.map((d) => d.sessionId)).toEqual([2]);
-  });
-
-  it("ignores a session that is no longer active", () => {
-    const due = sessionsToWarnAbout(
-      [session({ status: "stopped", ends_at: inMinutes(5) })],
-      new Set(),
-      NOW,
-    );
-
-    expect(due).toEqual([]);
-  });
-
-  it("carries the venue, the seat and the session the card has to act on", () => {
-    const row = session({ id: 9, branch_id: 3, pc_label: "PS5 VIP", ends_at: inMinutes(4) });
-    const [due] = sessionsToWarnAbout([row], new Set(), NOW);
-
-    expect(due).toMatchObject({ sessionId: 9, branchId: 3, label: "PS5 VIP", minutesLeft: 4 });
-    // The row itself travels with the warning: the card's action opens the
-    // management dialog, and that needs the session rather than an id it would
-    // have to go and look up.
-    expect(due.session).toBe(row);
+  test("a seat with no number is named by its device", () => {
+    expect(endingWarnings([row("n1", 5, {}, { place_number: null })], new Set(), NOW)[0].label).toBe("#3");
   });
 });

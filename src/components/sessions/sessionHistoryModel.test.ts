@@ -26,7 +26,24 @@ const event = (over: Partial<ISessionEvent>): ISessionEvent => ({
 describe("eventPresentation", () => {
   test("a known action: its label, its tone, its actor, its details", () => {
     const p = eventPresentation(event({ action: "paused", user: { id: 1, name: "Giorgi", role: "manager" } }), t, money);
-    expect(p).toEqual({ title: "history.action.paused", tone: "pause", icon: "❚❚", actor: "Giorgi", details: [] });
+    expect(p).toEqual({ title: "history.action.paused", tone: "pause", icon: "❚❚", actor: "Giorgi", details: [], showAmount: true });
+  });
+
+  // An hourly pad's add event carries its per-hour RATE as the amount; printed
+  // bare it read as a 500 charge. Its details say the rate instead.
+  test("an hourly pad's add line does not print its rate as a charge", () => {
+    const p = eventPresentation(event({
+      action: "joystick_added", amount: 500, meta: { price: 500, hourly: true, count_after: 3 },
+    }), t, money);
+    expect(p.showAmount).toBe(false);
+    expect(p.details.join(" ")).toContain("500 AMDsession.perHourShort");
+  });
+
+  test("a fixed pad's add line still shows the fee it charged", () => {
+    const p = eventPresentation(event({
+      action: "joystick_added", amount: 500, meta: { price: 500, hourly: false, count_after: 3 },
+    }), t, money);
+    expect(p.showAmount).toBe(true);
   });
 
   test("the server's resume at the pause limit is its own entry, never a cashier's press", () => {
@@ -162,5 +179,44 @@ describe("feedCoversSession", () => {
 
   test("an expired session with no end time recorded is not vouched for", () => {
     expect(feedCoversSession({ status: "expired", stopped_at: null, ends_at: null }, started, { truncated: false, to, now: 0 })).toBe(false);
+  });
+});
+
+describe("a planned start in the history (2026-10-25)", () => {
+  const t = (k: string) => k;
+  const money = (n: number) => `${n} AMD`;
+
+  test("says how long, at what rate, and until when", () => {
+    const parts = eventDetailParts(event({
+      action: "started",
+      created_at: "2026-10-25T10:00:00Z",
+      meta: { mode: "fixed", is_free: false, planned_minutes: 180, hourly_rate: 1000, planned_amount: 3000 },
+    }), t, money);
+
+    expect(parts[0]).toContain("history.plannedFor");
+    expect(parts[1]).toBe("1000 AMD / time.hourShort");
+    expect(parts[2]).toContain("history.untilLabel");
+  });
+
+  test("a total set by hand says so, beside the standard price", () => {
+    const parts = eventDetailParts(event({
+      action: "started",
+      created_at: "2026-10-25T10:00:00Z",
+      meta: { planned_minutes: 180, hourly_rate: 833.33, planned_amount: 2500, price_set_by_hand: true, standard_amount: 4500 },
+    }), t, money);
+    expect(parts).toContain("history.priceSetByHand (session.plannedStandard 4500 AMD)");
+  });
+
+  test("+ Время at a typed price says so, beside the standard price", () => {
+    const parts = eventDetailParts(event({
+      action: "time_added", amount: 1500,
+      meta: { minutes: 120, new_ends_at: "2026-10-25T14:00:00Z", price_set_by_hand: true, standard_charge: 2000 },
+    }), t, money);
+    expect(parts).toContain("history.priceSetByHand (session.plannedStandard 2000 AMD)");
+  });
+
+  test("a start without a plan prints nothing extra", () => {
+    const parts = eventDetailParts(event({ action: "started", meta: { mode: "open", is_free: false } }), t, money);
+    expect(parts).toEqual([]);
   });
 });

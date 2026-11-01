@@ -5,6 +5,8 @@ import BranchExtraItemForm from "@/components/prices/BranchExtraItemForm";
 import BranchJoystickForm from "@/components/prices/BranchJoystickForm";
 import MoneyRoundingForm from "@/components/prices/MoneyRoundingForm";
 import PauseLimitForm from "@/components/prices/PauseLimitForm";
+import VipMinimumChargeForm from "@/components/prices/VipMinimumChargeForm";
+import { vipRateOptions } from "@/components/prices/vipMinimumCharge";
 import PlatformPricesForm from "@/components/prices/PlatformPricesForm";
 import SubplatformPricesForm from "@/components/prices/SubplatformPricesForm";
 import Button from "@/components/ui/Button";
@@ -16,6 +18,7 @@ import { useLang } from "@/i18n/LanguageContext";
 import { platformDisplayNameOf } from "@/i18n/platformPriceName";
 import { timePackageNameOf } from "@/i18n/timePackageName";
 import { branchRepository } from "@/repositories/BranchRepository";
+import { placeRepository } from "@/repositories/PlaceRepository";
 import { billingSettingsRepository } from "@/repositories/BillingSettingsRepository";
 import { platformPriceRepository } from "@/repositories/PlatformPriceRepository";
 import { subplatformRepository } from "@/repositories/SubplatformRepository";
@@ -45,6 +48,8 @@ const BranchPricesPage = () => {
   const packages = useAsync(() => timePackageRepository.listByBranch(id), [id]);
   const platformPrices = useAsync(() => platformPriceRepository.listByBranch(id), [id]);
   const subplatforms = useAsync(() => subplatformRepository.listByBranch(id), [id]);
+  // Only to work the VIP minimum's example at a price its VIP seats bill.
+  const places = useAsync(() => placeRepository.listRawByBranch(id), [id]);
   // One read for every billing rule below — they are fields of the same
   // branch policy and the same endpoint. STRICT (`getForEdit`): a failed load
   // shows an error and a retry, never defaults a Save could write back.
@@ -301,6 +306,35 @@ const BranchPricesPage = () => {
                 key={String(billing.data.pause_limit_minutes ?? "")}
                 branchId={id}
                 settings={billing.data}
+                onSaved={() => void billing.reload()}
+              />
+            )}
+          </SettingsSection>
+
+          {/* The VIP minimum charge: one rule for all the branch's VIP seats. */}
+          <SettingsSection
+            title={t("vipMin.sectionTitle")}
+            description={t("vipMin.description")}
+            loading={billing.loading && !billing.data}
+            error={billing.data ? null : billing.error}
+            onRetry={() => void billing.reload()}
+          >
+            {billing.data && (
+              <VipMinimumChargeForm
+                key={[
+                  billing.data.vip_min_charge_enabled,
+                  billing.data.vip_min_charge_after_minutes,
+                  billing.data.vip_min_charge_minutes,
+                  billing.data.vip_min_charge_mode,
+                ].join(":")}
+                branchId={id}
+                settings={billing.data}
+                vipRates={vipRateOptions(
+                  branch.data?.price_for_branch as Record<string, number | string | null> | undefined,
+                  platformPrices.data ?? [],
+                  places.data ?? [],
+                  (slug) => platformDisplayNameOf(slug, platformPrices.data ?? [], lang),
+                )}
                 onSaved={() => void billing.reload()}
               />
             )}

@@ -134,3 +134,47 @@ describe("AuthContext.logout", () => {
     expect(auth.user).toBeNull();
   });
 });
+
+/**
+ * Switching accounts (2026-10-27): a sign-in over a signed-in account drops
+ * the socket the previous person's private channels lived on; a first sign-in
+ * and a failed switch do not.
+ */
+describe("AuthContext.login over a signed-in account", () => {
+  afterEach(cleanup);
+
+  test("switching drops the previous account's socket, and revokes nothing", async () => {
+    vi.clearAllMocks();
+    store.data.clear();
+    store.data.set(AppConfig.storageKeys.token, "owner-token");
+    store.data.set(AppConfig.storageKeys.user, { id: 1, name: "a", email: "a@t.test", role: "admin" });
+    await mount();
+
+    api.login.mockResolvedValueOnce({ token: "manager-token", user: { id: 2, name: "m", email: "m@t.test", role: "admin" } });
+    await act(async () => { await auth.login("m@t.test", "secret"); });
+
+    expect(echo.disconnect).toHaveBeenCalledTimes(1);
+    expect(api.logout).not.toHaveBeenCalled();
+    expect(store.data.get(AppConfig.storageKeys.token)).toBe("manager-token");
+  });
+
+  test("a first sign-in has no previous socket to drop", async () => {
+    vi.clearAllMocks();
+    store.data.clear();
+    await mount();
+    await act(async () => { await auth.login("a@t.test", "secret"); });
+    expect(echo.disconnect).not.toHaveBeenCalled();
+  });
+
+  test("a switch with wrong credentials keeps the current account connected", async () => {
+    vi.clearAllMocks();
+    store.data.clear();
+    store.data.set(AppConfig.storageKeys.token, "owner-token");
+    store.data.set(AppConfig.storageKeys.user, { id: 1, name: "a", email: "a@t.test", role: "admin" });
+    await mount();
+    api.login.mockRejectedValueOnce(new Error("bad credentials"));
+    await act(async () => { await auth.login("m@t.test", "wrong").catch(() => {}); });
+    expect(echo.disconnect).not.toHaveBeenCalled();
+    expect(store.data.get(AppConfig.storageKeys.token)).toBe("owner-token");
+  });
+});

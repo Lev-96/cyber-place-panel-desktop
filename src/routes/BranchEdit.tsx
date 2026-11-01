@@ -75,7 +75,7 @@ const BranchEdit = () => {
         <div className="row" style={{ gap: 8, flexWrap: "wrap", marginTop: 6 }}>
           <Button variant="secondary" onClick={() => setEdit(true)}>{t("branchEdit.editInfo")}</Button>
           <Button variant="secondary" onClick={() => setHours(true)}>{t("branch.editTabs.hours")}</Button>
-          <Button variant="secondary" onClick={remove} style={{ color: "#ef4444", borderColor: "#4a1a1a" }}>{t("action.delete")}</Button>
+          <Button variant="secondary" onClick={remove} style={{ color: "var(--color-danger)", borderColor: "var(--color-danger-border-dim)" }}>{t("action.delete")}</Button>
         </div>
       </div></div>
 

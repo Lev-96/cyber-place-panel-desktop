@@ -301,8 +301,8 @@ const Tile = ({ to, title, hint, disabled, disabledHint, dragHint, dragging, dro
       opacity: disabled ? 0.45 : dragging ? 0.5 : 1,
       cursor: disabled ? "not-allowed" : undefined,
       filter: disabled ? "grayscale(1)" : undefined,
-      borderColor: dropTarget ? "#07ddf1" : undefined,
-      boxShadow: dropTarget ? "0 0 0 2px rgba(7,221,241,0.5), 0 0 18px rgba(7,221,241,0.3)" : undefined,
+      borderColor: dropTarget ? "var(--color-primary)" : undefined,
+      boxShadow: dropTarget ? "0 0 0 2px rgb(var(--accent-rgb) / 0.5), 0 0 18px rgb(var(--accent-rgb) / 0.3)" : undefined,
       transition: "opacity 140ms ease, box-shadow 200ms ease, border-color 160ms ease",
     }}
   >
@@ -312,11 +312,11 @@ const Tile = ({ to, title, hint, disabled, disabledHint, dragHint, dragging, dro
       onDragEnd={onDragEnd}
       title={dragHint}
       aria-label={dragHint}
-      style={{ position: "absolute", top: 6, right: 8, cursor: "grab", userSelect: "none", color: "#9aa8c7", opacity: 0.6, fontSize: 13, lineHeight: 1 }}
+      style={{ position: "absolute", top: 6, right: 8, cursor: "grab", userSelect: "none", color: "var(--color-muted-alt)", opacity: 0.6, fontSize: 13, lineHeight: 1 }}
     >
       ⠿
     </span>
-    <div style={{ fontWeight: 700, fontSize: 16, color: disabled ? "#9aa8c7" : "#07ddf1", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", paddingRight: 18 }}>{title}</div>
+    <div style={{ fontWeight: 700, fontSize: 16, color: disabled ? "var(--color-muted-alt)" : "var(--color-primary)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", paddingRight: 18 }}>{title}</div>
     <div className="muted" style={{ fontSize: 12, lineHeight: 1.3, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>{hint}</div>
   </Link>
 );

@@ -1,6 +1,6 @@
 import { useLang } from "@/i18n/LanguageContext";
 import { useSupportUnread } from "@/support/SupportUnreadContext";
-import { playSupportChime } from "@/utils/notificationSound";
+import { playFor } from "@/sound/soundEngine";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -20,7 +20,7 @@ import { useNavigate } from "react-router-dom";
  * notification.
  *
  * ## The sound
- * `playSupportChime`, NOT the app's arpeggio: two soft notes stepping down,
+ * The support sound (`soft`, via `playFor("support")`), NOT the app's arpeggio: two soft notes stepping down,
  * the cadence a chat app uses, against the rising "something happened on the
  * floor" of a booking. If the two sounded alike the second one would be
  * ignored along with the first.
@@ -33,7 +33,7 @@ import { useNavigate } from "react-router-dom";
  * Autoplay is not a problem here for the reason it is not one for the booking
  * chime: by the time any of this can happen the user has signed in, which is
  * interaction enough for the renderer to hand back a running AudioContext. If
- * it does not, `playSupportChime` swallows it and the card still shows.
+ * it does not, the sound engine swallows it and the card still shows.
  */
 const AUTO_DISMISS_MS = 9_000;
 
@@ -46,7 +46,7 @@ const SupportNotifier = () => {
   useEffect(() => {
     if (!arrival) return;
 
-    playSupportChime();
+    playFor("support", String(arrival.id));
     // Mounted invisible, then flipped on the next frame so the transition has
     // two states to move between — set both at once and it simply appears.
     setVisible(false);

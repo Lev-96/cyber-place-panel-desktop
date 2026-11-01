@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { IBookingApi } from "@/types/api";
-import { Booking } from "./Booking";
+import { Booking, bookingSubjectOf } from "./Booking";
 
 const baseRaw = (overrides: Partial<IBookingApi> = {}): IBookingApi => ({
   id: 1,
@@ -118,5 +118,35 @@ describe("Booking", () => {
       expect(b.isReservingAt(t)).toBe(true);
       expect(b.isUpcomingAt(t)).toBe(false);
     });
+  });
+});
+
+/**
+ * A booking for a platform that is the game itself (2026-10-31): no game, and
+ * the platform stored on the booking. It must still say what it is for.
+ */
+describe("a booking without a game", () => {
+  const platformOnly = baseRaw({ game_id: null, game: null, platform: "table-tennis" });
+
+  it("takes its platform from the booking", () => {
+    expect(new Booking(platformOnly).platform).toBe("table-tennis");
+  });
+
+  it("is named by its platform", () => {
+    expect(bookingSubjectOf(platformOnly)).toBe("Table Tennis");
+  });
+
+  it("an older booking still reads its platform and name off its game", () => {
+    const old = baseRaw({ platform: undefined });
+    expect(new Booking(old).platform).toBe("pc");
+    expect(bookingSubjectOf(old)).toBe("CS");
+  });
+
+  it("a game wins over the platform for the name", () => {
+    expect(bookingSubjectOf(baseRaw({ platform: "ps5", game: { id: 2, platform: "ps5", name: "FIFA" } }))).toBe("FIFA");
+  });
+
+  it("knowing neither says so", () => {
+    expect(bookingSubjectOf({ game: null, platform: null })).toBe("-");
   });
 });

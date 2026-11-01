@@ -26,7 +26,9 @@ import { PSN_FEATURE } from "@/api/psn";
  * has always seen.
  */
 
-const repo = vi.hoisted(() => ({ start: vi.fn() }));
+const repo = vi.hoisted(() => ({ start: vi.fn(), startQuote: vi.fn() }));
+const UNTIL_ENDS_AT = new Date(new Date().setHours(24, 40, 0, 0)).toISOString();
+const UNTIL_PASSED = "This time has already passed or is more than 10 hours away. Choose another end time.";
 const auth = vi.hoisted(() => ({ role: "company_owner" as string }));
 
 vi.mock("@/repositories/SessionRepository", () => ({
@@ -35,6 +37,7 @@ vi.mock("@/repositories/SessionRepository", () => ({
       { id: 1, branch_id: 7, name_en: "One hour", name_ru: "Час", name_am: "Ժամ", duration_minutes: 60, price: 1500 },
     ]),
     start: (...a: unknown[]) => repo.start(...a),
+    startQuote: (...a: unknown[]) => repo.startQuote(...a),
   },
 }));
 vi.mock("@/auth/AuthContext", () => ({ useAuth: () => ({ user: { id: 1, role: auth.role } }) }));
@@ -63,7 +66,7 @@ vi.mock("@/repositories/BranchRepository", () => ({
   branchRepository: { byId: vi.fn().mockResolvedValue({ id: 7, price_for_branch: { "ps5-standard": 1500 } }) },
 }));
 vi.mock("@/i18n/LanguageContext", () => ({
-  useLang: () => ({ t: (k: string) => k, money: (n: number) => String(n), lang: "en" }),
+  useLang: () => ({ t: (k: string) => k, money: (n: number) => String(n), lang: "en", currency: "AMD" }),
 }));
 
 const device = (over: Partial<IPcApi> = {}): IPcApi => ({
@@ -87,6 +90,19 @@ beforeEach(() => {
   auth.role = "company_owner";
   repo.start.mockReset();
   repo.start.mockResolvedValue({ id: 1 });
+  // The server's figure for a planned start: the seat's 1 500/h, or the rate
+  // typed for this start.
+  repo.startQuote.mockReset();
+  repo.startQuote.mockImplementation((_pc: number, length: { minutes: number } | { until: string }, rate?: number, total?: number) => {
+    // "Until" is resolved by the server on its clock: here "00:40" is 50
+    // minutes away, tomorrow, and "14:00" has passed.
+    if ("until" in length && length.until === "14:00") return Promise.reject(new Error(UNTIL_PASSED));
+    const m = "until" in length ? 50 : length.minutes;
+    const end = "until" in length ? { ends_at: UNTIL_ENDS_AT, until: length.until } : {};
+    return Promise.resolve(total !== undefined
+      ? { minutes: m, hourly_rate: Math.round((total * 60 / m) * 100) / 100, amount: total, standard_amount: (1500 * m) / 60, ...end }
+      : { minutes: m, hourly_rate: rate ?? 1500, amount: ((rate ?? 1500) * m) / 60, standard_amount: (1500 * m) / 60, ...end });
+  });
 });
 afterEach(cleanup);
 
@@ -270,7 +286,9 @@ describe("starting a session free", () => {
     await mount(device({ assigned_hourly_rate: 2500 }));
 
     // The matrix in this file says 1500 for ps5-standard. The seat says 2500.
-    expect(screen.getByText(/2500/)).toBeTruthy();
+    // The rate line, and the same rate in the start summary (2026-10-27).
+    expect(screen.getAllByText(/2500/).some((el) => !el.closest('[data-testid="start-summary"]'))).toBe(true);
+    expect(screen.getByTestId("start-summary").textContent).toContain("2500");
     expect(screen.queryByText(/1500 /)).toBeNull();
   });
 
@@ -279,7 +297,9 @@ describe("starting a session free", () => {
     // what it always showed, rather than nothing.
     await mount(device({ assigned_hourly_rate: undefined }));
 
-    expect(screen.getByText(/1500/)).toBeTruthy();
+    // The rate line, and the same rate in the start summary (2026-10-27).
+    expect(screen.getAllByText(/1500/).some((el) => !el.closest('[data-testid="start-summary"]'))).toBe(true);
+    expect(screen.getByTestId("start-summary").textContent).toContain("1500");
   });
 
   test("a seat priced only through a subcategory can be started", async () => {
@@ -294,7 +314,9 @@ describe("starting a session free", () => {
 
     const start = screen.getByRole("button", { name: "action.start" }) as HTMLButtonElement;
     expect(start.disabled).toBe(false);
-    expect(screen.getByText(/3000/)).toBeTruthy();
+    // The rate line, and the same rate in the start summary (2026-10-27).
+    expect(screen.getAllByText(/3000/).some((el) => !el.closest('[data-testid="start-summary"]'))).toBe(true);
+    expect(screen.getByTestId("start-summary").textContent).toContain("3000");
   });
 });
 
@@ -524,5 +546,313 @@ describe("the player's PSN name", () => {
     await mount(device());
     const options = [...document.querySelectorAll("#psn-recent-names option")].map((o) => (o as HTMLOptionElement).value);
     expect(options).toEqual(["RegularGuy"]);
+  });
+});
+
+/**
+ * A planned length on an hourly start (2026-10-25). Optional: empty is the
+ * count-up start the form has always made. Filled, the server's own price for
+ * it is shown before Start, and Start waits for that price.
+ */
+describe("a planned length at start", () => {
+  const settle = async () => {
+    await act(async () => { await new Promise((r) => setTimeout(r, 320)); });
+  };
+  const typePlan = async (value: string) => {
+    await act(async () => {
+      fireEvent.change(screen.getByLabelText("session.plannedDuration"), { target: { value } });
+    });
+  };
+  const startButton = () => screen.getByRole("button", { name: "action.start" }) as HTMLButtonElement;
+  const press = async () => { await act(async () => { fireEvent.click(startButton()); }); };
+
+  test("left empty, the start is exactly what it was — no length, no quote", async () => {
+    await mount(device());
+    await settle();
+    expect(startButton().disabled).toBe(false);
+    await press();
+
+    expect(repo.start.mock.calls[0][0]).not.toHaveProperty("duration_minutes");
+    expect(repo.start.mock.calls[0][0].mode).toBe("open");
+    expect(repo.startQuote).not.toHaveBeenCalled();
+  });
+
+  test("3 hours at the seat's 1 500 is quoted 4 500 and sent as 180 minutes", async () => {
+    await mount(device());
+    await typePlan("3");
+    await settle();
+
+    expect(repo.startQuote).toHaveBeenLastCalledWith(1, { minutes: 180 }, undefined, undefined);
+    expect(screen.getByText("4500")).toBeTruthy();
+    await press();
+    expect(repo.start.mock.calls[0][0]).toMatchObject({ mode: "open", duration_minutes: 180 });
+  });
+
+  test("the quote follows the rate typed for this start", async () => {
+    await mount(device());
+    await act(async () => { fireEvent.click(screen.getByText("session.editPrice")); });
+    await act(async () => {
+      // PriceInput's label is a caption, not a <label>: the box beside it.
+      const box = screen.getByText("session.newHourlyRate").parentElement!.querySelector("input")!;
+      fireEvent.change(box, { target: { value: "2000" } });
+    });
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "action.save" })); });
+    await typePlan("2");
+    await settle();
+
+    expect(repo.startQuote).toHaveBeenLastCalledWith(1, { minutes: 120 }, 2000, undefined);
+    expect(screen.getByText("4000")).toBeTruthy();
+  });
+
+  test("Start waits for the server's price, and a refused price holds it", async () => {
+    let answer: (v: unknown) => void = () => {};
+    repo.startQuote.mockImplementation(() => new Promise((r) => { answer = r; }));
+    await mount(device());
+    await typePlan("1");
+    await settle();
+    expect(startButton().disabled).toBe(true);
+
+    await act(async () => { answer({ minutes: 60, hourly_rate: 1500, amount: 1500 }); });
+    expect(startButton().disabled).toBe(false);
+
+    repo.startQuote.mockRejectedValue(new Error("Hourly rate is required for open sessions"));
+    await typePlan("2");
+    await settle();
+    expect(screen.getByText("Hourly rate is required for open sessions")).toBeTruthy();
+    expect(startButton().disabled).toBe(true);
+  });
+
+  test("an unreadable length holds Start rather than starting with no end", async () => {
+    await mount(device());
+    await typePlan("abc");
+    await settle();
+
+    expect(startButton().disabled).toBe(true);
+    expect(screen.getByText("session.timeInvalid")).toBeTruthy();
+  });
+
+  /** The total, set by hand (2026-10-25): sent as typed, instead of a rate. */
+  describe("the total changed by hand", () => {
+    const setTotal = async (value: string) => {
+      const box = screen.getByTestId("planned-total").querySelector("input")!;
+      await act(async () => { fireEvent.change(box, { target: { value } }); });
+    };
+
+    test("is offered once a length is set, prefilled with the server's figure", async () => {
+      await mount(device());
+      expect((screen.queryByRole("checkbox", { name: "session.plannedEditTotal" }) as HTMLInputElement | null)).toBeNull();
+      await typePlan("2");
+      await settle();
+      await act(async () => { fireEvent.click(screen.getByText("session.plannedEditTotal")); });
+
+      const box = screen.getByTestId("planned-total").querySelector("input") as HTMLInputElement;
+      expect(box.value).toBe("3000");
+    });
+
+    test("2 500 for 3 hours is quoted, shown with its rate and the standard, and sent as typed", async () => {
+      await mount(device());
+      await typePlan("3");
+      await settle();
+      await act(async () => { fireEvent.click(screen.getByText("session.plannedEditTotal")); });
+      await setTotal("2500");
+      await settle();
+
+      expect(repo.startQuote).toHaveBeenLastCalledWith(1, { minutes: 180 }, undefined, 2500);
+      expect(screen.getByText("2500")).toBeTruthy();
+      expect(screen.getByText(/833\.33 \/ time\.hourShort · session\.plannedStandard: 4500/)).toBeTruthy();
+
+      await press();
+      const body = repo.start.mock.calls[0][0];
+      expect(body).toMatchObject({ mode: "open", duration_minutes: 180, planned_amount: 2500 });
+      expect(body).not.toHaveProperty("hourly_rate");
+    });
+
+    test("an empty or zero total holds Start", async () => {
+      await mount(device());
+      await typePlan("1");
+      await settle();
+      await act(async () => { fireEvent.click(screen.getByText("session.plannedEditTotal")); });
+      for (const v of ["", "0"]) {
+        await setTotal(v);
+        await settle();
+        expect(startButton().disabled).toBe(true);
+      }
+    });
+
+    test("Start waits for the quote of the total on screen, not an earlier one", async () => {
+      await mount(device());
+      await typePlan("1");
+      await settle();
+      await act(async () => { fireEvent.click(screen.getByText("session.plannedEditTotal")); });
+      let answer: (v: unknown) => void = () => {};
+      repo.startQuote.mockImplementation(() => new Promise((r) => { answer = r; }));
+      await setTotal("1200");
+      await settle();
+      expect(startButton().disabled).toBe(true);
+
+      // A reply for a different figure does not unlock it.
+      await act(async () => { answer({ minutes: 60, hourly_rate: 1000, amount: 1000, standard_amount: 1500 }); });
+      expect(startButton().disabled).toBe(true);
+    });
+
+    test("unticked, the start goes back to the seat's own price", async () => {
+      await mount(device());
+      await typePlan("1");
+      await settle();
+      await act(async () => { fireEvent.click(screen.getByText("session.plannedEditTotal")); });
+      await setTotal("900");
+      await act(async () => { fireEvent.click(screen.getByText("session.plannedEditTotal")); });
+      await settle();
+      await press();
+
+      expect(repo.start.mock.calls[0][0]).not.toHaveProperty("planned_amount");
+    });
+  });
+
+  test("not offered on a package start or a waived one", async () => {
+    await mount(device());
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: /session.fixedTariff/ })); });
+    expect(screen.queryByTestId("planned-duration")).toBeNull();
+    cleanup();
+
+    await mount(device());
+    await act(async () => { fireEvent.click(screen.getByText("session.freeBill")); });
+    expect(screen.queryByTestId("planned-duration")).toBeNull();
+  });
+});
+
+/**
+ * "Until" a clock time (2026-10-26): the second way to set the same plan. The
+ * server turns "00:40" into a length on its own clock; the dialog sends the
+ * time, never minutes it worked out, and starts only on the server's answer.
+ */
+describe("a plan until a clock time", () => {
+  const settle = async () => {
+    await act(async () => { await new Promise((r) => setTimeout(r, 320)); });
+  };
+  const chooseUntil = async () => {
+    await act(async () => { fireEvent.click(screen.getByRole("tab", { name: "session.planLimitUntil" })); });
+  };
+  const typeUntil = async (value: string) => {
+    await act(async () => { fireEvent.change(screen.getByLabelText("session.untilLabel"), { target: { value } }); });
+  };
+  const startButton = () => screen.getByRole("button", { name: "action.start" }) as HTMLButtonElement;
+  const press = async () => { await act(async () => { fireEvent.click(startButton()); }); };
+
+  test("00:40 is asked of the server, shown as its length and end, and sent as the time", async () => {
+    await mount(device());
+    await chooseUntil();
+    await typeUntil("0:40");
+    await settle();
+
+    expect(repo.startQuote).toHaveBeenLastCalledWith(1, { until: "00:40" }, undefined, undefined);
+    expect(screen.getByTestId("planned-until-resolved").textContent).toContain("session.untilResolvedTomorrow");
+    expect(screen.getByText("1250")).toBeTruthy(); // 50 min at 1 500/h, the server's figure
+    expect(startButton().disabled).toBe(false);
+    await press();
+
+    const body = repo.start.mock.calls[0][0];
+    expect(body).toMatchObject({ mode: "open", until: "00:40" });
+    expect(body).not.toHaveProperty("duration_minutes");
+  });
+
+  test("a malformed time holds Start and says why; empty is no plan", async () => {
+    await mount(device());
+    await chooseUntil();
+    for (const bad of ["25:80", "24:00", "abc", "9"]) {
+      await typeUntil(bad);
+      await settle();
+      expect(screen.getByText("session.untilInvalid")).toBeTruthy();
+      expect(startButton().disabled).toBe(true);
+    }
+    expect(repo.startQuote).not.toHaveBeenCalled();
+
+    await typeUntil("");
+    await settle();
+    expect(screen.queryByText("session.untilInvalid")).toBeNull();
+    expect(startButton().disabled).toBe(false);
+    await press();
+    expect(repo.start.mock.calls[0][0]).not.toHaveProperty("until");
+    expect(repo.start.mock.calls[0][0]).not.toHaveProperty("duration_minutes");
+  });
+
+  test("a time the server refuses (already passed) shows its sentence and holds Start", async () => {
+    await mount(device());
+    await chooseUntil();
+    await typeUntil("14:00");
+    await settle();
+
+    expect(screen.getByText(UNTIL_PASSED)).toBeTruthy();
+    expect(startButton().disabled).toBe(true);
+  });
+
+  test("switching keeps each way's value and only the chosen one is sent", async () => {
+    await mount(device());
+    await act(async () => {
+      fireEvent.change(screen.getByLabelText("session.plannedDuration"), { target: { value: "2" } });
+    });
+    await chooseUntil();
+    await typeUntil("00:40");
+    await settle();
+    await act(async () => { fireEvent.click(screen.getByRole("tab", { name: "session.planLimitDuration" })); });
+    await settle();
+
+    expect((screen.getByLabelText("session.plannedDuration") as HTMLInputElement).value).toBe("2");
+    expect(repo.startQuote).toHaveBeenLastCalledWith(1, { minutes: 120 }, undefined, undefined);
+    await press();
+    const body = repo.start.mock.calls[0][0];
+    expect(body).toMatchObject({ duration_minutes: 120 });
+    expect(body).not.toHaveProperty("until");
+
+    await chooseUntil();
+    expect((screen.getByLabelText("session.untilLabel") as HTMLInputElement).value).toBe("00:40");
+  });
+
+  test("a total set by hand goes with the time", async () => {
+    await mount(device());
+    await chooseUntil();
+    await typeUntil("00:40");
+    await settle();
+    await act(async () => { fireEvent.click(screen.getByText("session.plannedEditTotal")); });
+    await act(async () => {
+      const box = screen.getByTestId("planned-total").querySelector("input")!;
+      fireEvent.change(box, { target: { value: "900" } });
+    });
+    await settle();
+
+    expect(repo.startQuote).toHaveBeenLastCalledWith(1, { until: "00:40" }, undefined, 900);
+    await press();
+    expect(repo.start.mock.calls[0][0]).toMatchObject({ until: "00:40", planned_amount: 900 });
+  });
+});
+
+/**
+ * What Start will do, said before it is pressed (2026-10-27): the seat, the
+ * tariff, the plan and the server's preliminary price, read off the choices.
+ */
+describe("the start summary", () => {
+  test("names the seat and an open start with no end", async () => {
+    await mount(device());
+    const line = screen.getByTestId("start-summary").textContent ?? "";
+    expect(line).toContain("session.summary.title");
+    expect(line).toContain("session.summary.open");
+  });
+
+  test("says until when and the preliminary price for a plan until a time", async () => {
+    await mount(device());
+    await act(async () => { fireEvent.click(screen.getByRole("tab", { name: "session.planLimitUntil" })); });
+    await act(async () => { fireEvent.change(screen.getByLabelText("session.untilLabel"), { target: { value: "00:40" } }); });
+    await act(async () => { await new Promise((r) => setTimeout(r, 320)); });
+    const line = screen.getByTestId("start-summary").textContent ?? "";
+    expect(line).toContain("session.summary.until");
+    expect(line).toContain("session.summary.price");
+  });
+
+  test("a free start says so and no price", async () => {
+    await mount(device());
+    await act(async () => { fireEvent.click(screen.getByText("session.freeBill")); });
+    const line = screen.getByTestId("start-summary").textContent ?? "";
+    expect(line).toContain("session.freeBill");
+    expect(line).not.toContain("session.summary.price");
   });
 });

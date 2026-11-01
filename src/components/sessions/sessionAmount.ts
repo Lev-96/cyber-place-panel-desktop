@@ -1,4 +1,4 @@
-import { IExtraItem, ISessionApi } from "@/types/sessions";
+import { IExtraItem, IMinimumChargeRule, ISessionApi } from "@/types/sessions";
 
 /**
  * What a running session's CLOCK is worth right now.
@@ -48,8 +48,111 @@ import { IExtraItem, ISessionApi } from "@/types/sessions";
  * @param at Milliseconds since the epoch to price at; `Date.now()` in the UI,
  *           a fixed instant in tests.
  */
-export const sessionTimeCostAt = (session: ISessionApi, at: number): number => {
+export const sessionTimeCostAt = (session: ISessionApi, at: number): number =>
+  sessionMinimumChargeAt(session, at).amount;
+
+/**
+ * The clock with the session's VIP minimum charge applied — the same step
+ * `SessionPricingCalculator::bill()` takes before adding anything
+ * (`Session::minimumChargeAt`): ONCE per visit. Settled on a move after the
+ * threshold → the clock plus the server's settled top-up (that seat's hour at
+ * its rate; later seats by the minute). Otherwise → the whole clock, topped up
+ * at the current tariff rate.
+ */
+export const sessionMinimumChargeAt = (session: ISessionApi, at: number): MinimumChargeResult => {
+  const rule = session.min_charge ?? null;
+  const clock = clockCostAt(session, at);
+  if (rule && rule.settled_amount != null) {
+    return {
+      amount: round2(clock + rule.settled_amount),
+      applied: rule.settled_amount > 0,
+      billedSeconds: (rule.settled_billed_minutes ?? 0) * 60,
+    };
+  }
+  return applyMinimumCharge(rule, clock, playedSecondsBetween(session, session.started_at, at), tariffHourlyRate(session));
+};
+
+/** What a minimum-charge rule did to a clock. */
+export interface MinimumChargeResult {
+  /** The clock as billed. */
+  amount: number;
+  /** True when the rule added something. */
+  applied: boolean;
+  /** The seconds billed (played time when nothing was added). */
+  billedSeconds: number;
+}
+
+/**
+ * The seconds billed for `playedSeconds` under a rule — mirrors
+ * `MinimumChargeRule::billedSeconds()`: below the threshold what was played;
+ * from it (inclusive, whole seconds) the minimum, or played time rounded up
+ * to whole blocks.
+ */
+export const minimumChargeBilledSeconds = (rule: IMinimumChargeRule, playedSeconds: number): number => {
+  const played = Math.max(0, playedSeconds);
+  if (played < rule.after_minutes * 60) return played;
+  const block = rule.minimum_minutes * 60;
+  return rule.mode === "round_up" ? Math.ceil(played / block) * block : Math.max(played, block);
+};
+
+/**
+ * A clock with a VIP minimum-charge rule applied — mirrors
+ * `MinimumChargeRule::apply()`: `clock + (rate × billed − rate × played)`, each
+ * term rounded as the clock rounds, so a single-rate visit is exactly
+ * `rate × billed`. No rule, nothing to add, or no rate → the clock unchanged.
+ * Also what the owner's settings preview prices its examples with, so the
+ * preview cannot promise what the till would not charge.
+ */
+export const applyMinimumCharge = (
+  rule: IMinimumChargeRule | null,
+  clockCost: number,
+  playedSeconds: number,
+  rate: number | null,
+): MinimumChargeResult => {
+  const played = Math.max(0, playedSeconds);
+  if (!rule || rule.after_minutes < 1 || rule.minimum_minutes < 1) {
+    return { amount: clockCost, applied: false, billedSeconds: played };
+  }
+  const billed = minimumChargeBilledSeconds(rule, played);
+  if (billed <= played || rate === null) {
+    return { amount: clockCost, applied: false, billedSeconds: played };
+  }
+  return {
+    amount: round2(clockCost + perSecond(rate, billed) - perSecond(rate, played)),
+    applied: true,
+    billedSeconds: billed,
+  };
+};
+
+/** The clock as played — `Session::timeCostStringAt()`, no minimum. */
+const clockCostAt = (session: ISessionApi, at: number): number => {
   const rate = toNumber(session.hourly_rate);
+
+  // A PLAN (2026-10-25) — a package or a planned hourly start — bills its
+  // share of the plan from the last re-base, the rate past its end. Mirrors
+  // `Session::timeCostStringAt`; a seat moved before re-basing existed keeps
+  // the move's rule below.
+  const plannedTariff = tariffHourlyRate(session);
+  if (session.mode === "fixed" && !session.unlimited_at && plannedTariff !== null
+      && session.committed_amount !== null && session.committed_amount !== undefined && session.committed_until
+      && (!session.rate_changed_at || (session.plan_rebased_at
+        && !(Date.parse(session.plan_rebased_at) < Date.parse(session.rate_changed_at))))) {
+    const from = session.plan_rebased_at ?? session.started_at;
+    const fromMs = Date.parse(from);
+    const frozen = session.plan_rebased_at ? toNumber(session.amount_before_plan_rebase ?? 0) : 0;
+    const plan = toNumber(session.committed_amount);
+    const untilMs = Date.parse(session.committed_until);
+    // Only pauses resumed before now come out of the plan's length: a resume
+    // moves the end; a running pause, or one closed by the stop, has not.
+    const planned = untilMs > fromMs
+      ? Math.max(0, Math.floor((untilMs - fromMs) / 1000) - pausedSecondsBetween(session, fromMs, untilMs, at))
+      : 0;
+    const played = playedSecondsBetween(session, from, at);
+    if (planned <= 0) return round2(frozen + perSecond(plannedTariff, played));
+    return played <= planned
+      ? round2(frozen + ((plan - frozen) * played) / planned)
+      : round2(plan + perSecond(plannedTariff, played - planned));
+  }
 
   // A rate change mid-way (a move): what was earned is frozen, only the time
   // after it runs at the new rate. Outranks the unlimited boundary unless that
@@ -398,7 +501,13 @@ const secondsBetween = (fromIso: string | null | undefined, at: number): number 
  *
  * 0 for a session never paused — nothing that existed before moves.
  */
-export const pausedSecondsBetween = (session: ISessionApi, from: number, to: number): number => {
+export const pausedSecondsBetween = (
+  session: ISessionApi,
+  from: number,
+  to: number,
+  /** Only pauses resumed before this instant (a plan's length). */
+  resumedBefore?: number,
+): number => {
   if (!(to > from)) return 0;
 
   const pauses = session.pauses
@@ -408,6 +517,8 @@ export const pausedSecondsBetween = (session: ISessionApi, from: number, to: num
   for (const pause of pauses) {
     const pausedAt = Date.parse(pause.paused_at);
     if (Number.isNaN(pausedAt)) continue;
+    if (resumedBefore !== undefined
+      && (!pause.resumed_at || !(Date.parse(pause.resumed_at) < resumedBefore))) continue;
 
     const start = Math.max(pausedAt, from);
     // An open pause ends at its limit even before anyone presses Resume:

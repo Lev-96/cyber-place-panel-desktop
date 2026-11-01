@@ -1,4 +1,5 @@
 import { BookingStatusType, IBookingApi } from "@/types/api";
+import { platformLabel } from "@/utils/platform";
 
 /**
  * Statuses where a booking is still holding the places listed in
@@ -8,6 +9,14 @@ import { BookingStatusType, IBookingApi } from "@/types/api";
  * the Sessions board (which filters by this set) while the
  * backend still rejects overlapping submits.
  */
+/**
+ * What a booking is for, as staff read it: its game, or — for a platform that
+ * is the game itself (poker, table tennis …), booked with no game — the
+ * platform's name. "-" when neither is known.
+ */
+export const bookingSubjectOf = (raw: Pick<IBookingApi, "game" | "platform">): string =>
+  raw.game?.name ?? (raw.platform ? platformLabel(raw.platform) : "-");
+
 const BLOCKING_STATUSES: readonly BookingStatusType[] = [
   "pending",
   "confirmed",
@@ -41,7 +50,7 @@ export const RESERVATION_LEAD_MS = 2 * 60 * 60_000;
 export class Booking {
   readonly id: number;
   readonly branchId: number;
-  readonly gameId: number;
+  readonly gameId: number | null;
   readonly companyId: number;
   readonly status: BookingStatusType;
   readonly start: Date;
@@ -69,7 +78,8 @@ export class Booking {
     this.placeCount = raw.place_booking_count ?? 1;
     this.placeIds = Object.freeze([...(raw.place_ids ?? [])]);
     this.placeNumbers = Object.freeze([...(raw.place_numbers ?? [])]);
-    this.platform = raw.game?.platform ?? "";
+    // Stored on the booking since 2026-10-31; older rows only have their game's.
+    this.platform = raw.platform ?? raw.game?.platform ?? "";
     this.start = Booking.parseStart(raw);
     this.end = new Date(this.start.getTime() + (raw.duration_minutes + (raw.rescheduled_minutes ?? 0)) * 60_000);
   }

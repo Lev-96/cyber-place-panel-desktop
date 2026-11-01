@@ -16,6 +16,12 @@ export interface CreateOrderBody {
   payment_method_other?: string;
   items: Array<{ product_id: number; quantity: number }>;
   client_request_id: string;
+  /**
+   * Cash only, optional (2026-10-25): the banknotes handed over, so the
+   * server checks the change shown against the total it prices, and keeps
+   * it for the history.
+   */
+  cash_received?: string;
 }
 
 export interface ListOrdersParams {
@@ -24,6 +30,10 @@ export interface ListOrdersParams {
   date_from?: string;
   /** Inclusive upper bound, wall-clock "YYYY-MM-DD HH:mm:ss" (backend app tz). */
   date_to?: string;
+  /** One seller's sales (the history's person filter). */
+  cashier_user_id?: number;
+  /** Up to 1 000; the server's default is 200. */
+  limit?: number;
 }
 
 export const apiCreateOrder = (body: CreateOrderBody) =>

@@ -5,6 +5,9 @@ import AuthRouteReset from "@/auth/AuthRouteReset";
 import TelemetryTracker from "@/telemetry/TelemetryTracker";
 import RoleGuard from "@/auth/RoleGuard";
 import { AccountLanguageGate } from "@/i18n/LanguageGates";
+import { UiPreferencesProvider } from "@/preferences/UiPreferencesContext";
+import ApplyHomeOnSignIn from "@/components/appearance/ApplyHomeOnSignIn";
+import OnboardingWizard from "@/components/appearance/OnboardingWizard";
 import Layout from "@/components/Layout";
 import UpdateReadyModal from "@/components/UpdateReadyModal";
 import UpdatesToast from "@/components/UpdatesToast";
@@ -64,6 +67,7 @@ const Shifts = lazy(() => import("@/routes/Shifts"));
 const ResetPassword = lazy(() => import("@/routes/ResetPassword"));
 const SessionsHistory = lazy(() => import("@/routes/SessionsHistory"));
 const Settings = lazy(() => import("@/routes/Settings"));
+const Appearance = lazy(() => import("@/routes/Appearance"));
 const AppUpdates = lazy(() => import("@/routes/AppUpdates"));
 const AgentUpdates = lazy(() => import("@/routes/AgentUpdates"));
 const BranchPricesPage = lazy(() => import("@/routes/BranchPricesPage"));
@@ -245,6 +249,7 @@ const Authed = () => {
           }
         />
         <Route path="/settings" element={<Settings />} />
+        <Route path="/appearance" element={<Appearance />} />
         <Route
           path="/settings/updates"
           element={
@@ -450,7 +455,14 @@ const App = () => {
                   applies the account's stored language before the cabinet
                   renders, so nothing flashes in the previous one. */}
               <AccountLanguageGate>
-                <Authed />
+                {/* The person's interface, theme and sounds (2026-10-27):
+                    applied to <html> for every screen below; display only. */}
+                <UiPreferencesProvider>
+                  <ApplyHomeOnSignIn />
+                  {/* First-run setup over the working panel (2026-10-27). */}
+                  <OnboardingWizard />
+                  <Authed />
+                </UiPreferencesProvider>
               </AccountLanguageGate>
             </UpdatesNotificationProvider>
             </SupportUnreadProvider>

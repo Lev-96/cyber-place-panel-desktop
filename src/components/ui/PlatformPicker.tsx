@@ -1,5 +1,7 @@
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
+import PlatformDropdown, { type DropdownItem } from "@/components/ui/PlatformDropdown";
+import PlatformIcon from "@/components/ui/PlatformIcon";
 import { useFitsInline } from "@/hooks/useFitsInline";
 import { useLang } from "@/i18n/LanguageContext";
 import { KNOWN_PLATFORMS, isKnownPlatform, platformLabel, slugifyPlatform } from "@/utils/platform";
@@ -44,9 +46,11 @@ const OTHER = "-other";
  * known-vs-custom toggle per form.
  *
  * ONE ordered list: PC, PS4, PS5, the branch's custom platforms, then Other
- * (which reveals a slug box, or hands the naming to the parent). Drawn as one
- * row of buttons when that row fits on a single line, and as a native select
- * (`select.input`, the app's select idiom) when it does not — a 960 px window,
+ * (which reveals a slug box, or hands the naming to the parent). Every option
+ * carries its platform's icon (`PlatformIcon`, chosen from the slug, so a new
+ * custom platform is drawn too). Drawn as one row of buttons when that row
+ * fits on a single line, and as a dropdown (`PlatformDropdown`, a native
+ * `<select>` cannot draw icons) when it does not — a 960 px window,
  * the owner web build at 360 px, Armenian labels, eight custom platforms. The
  * switch is measured (`useFitsInline`), never guessed from a count, and it is
  * presentation only: the value, the parent and the Other state survive it.
@@ -93,6 +97,14 @@ const PlatformPicker = ({ value, onChange, disabled, suggestions, hideOtherInput
     onChange("");
   };
 
+  // The dropdown's entries: the same ordered list, a saved slug nobody offers
+  // any more as itself, then Other.
+  const dropdownItems: DropdownItem[] = [
+    ...options.map((o) => ({ value: o.slug, label: o.label, icon: <PlatformIcon platform={o.slug} size={16} /> })),
+    ...(legacy ? [{ value: legacy, label: platformLabel(legacy), icon: <PlatformIcon platform={legacy} size={16} /> }] : []),
+    { value: OTHER, label: t("platform.otherOption") },
+  ];
+
   const slugOptions = Array.from(new Set((suggestions ?? []).filter((s) => s && !isKnownPlatform(s)))).sort();
   const pressed = (slug: string) => !otherMode && value === slug;
 
@@ -111,7 +123,10 @@ const PlatformPicker = ({ value, onChange, disabled, suggestions, hideOtherInput
                 disabled={disabled}
                 title={o.label}
               >
-                {o.label}
+                <span className="platform-picker__option">
+                  <PlatformIcon platform={o.slug} size={16} tone="current" />
+                  {o.label}
+                </span>
               </Button>
             ))}
             <Button
@@ -125,20 +140,16 @@ const PlatformPicker = ({ value, onChange, disabled, suggestions, hideOtherInput
             </Button>
           </div>
         ) : (
-          <select
-            className="input platform-picker__select"
-            aria-label={t("label.platform")}
+          // A fresh form with nothing picked yet shows "-" rather than imply
+          // the first option.
+          <PlatformDropdown
+            className="platform-picker__select"
+            ariaLabel={t("label.platform")}
+            items={dropdownItems}
             value={legacy ?? (otherMode ? OTHER : value)}
-            onChange={(e) => (e.target.value === OTHER ? chooseOther() : pick(e.target.value))}
+            onChange={(v) => (v === OTHER ? chooseOther() : pick(v))}
             disabled={disabled}
-          >
-            {/* A fresh form with nothing picked yet: say so, rather than let
-                the browser show (and imply) the first option. */}
-            {value === "" && !otherMode && <option value="" disabled>-</option>}
-            {options.map((o) => <option key={o.slug} value={o.slug}>{o.label}</option>)}
-            {legacy && <option value={legacy}>{platformLabel(legacy)}</option>}
-            <option value={OTHER}>{t("platform.otherOption")}</option>
-          </select>
+          />
         )}
         {/* The full row at its natural width, always rendered so the measure
             never depends on the mode it decides. Invisible, inert, and AFTER
@@ -146,7 +157,12 @@ const PlatformPicker = ({ value, onChange, disabled, suggestions, hideOtherInput
         <div className="platform-picker__measure-clip" aria-hidden="true" inert>
           <div ref={measureRef} className="platform-picker__row platform-picker__row--measure">
             {options.map((o) => (
-              <Button key={o.slug} type="button" variant="secondary" tabIndex={-1}>{o.label}</Button>
+              <Button key={o.slug} type="button" variant="secondary" tabIndex={-1}>
+                <span className="platform-picker__option">
+                  <PlatformIcon platform={o.slug} size={16} tone="current" />
+                  {o.label}
+                </span>
+              </Button>
             ))}
             <Button type="button" variant="secondary" tabIndex={-1}>{otherLabel}</Button>
           </div>

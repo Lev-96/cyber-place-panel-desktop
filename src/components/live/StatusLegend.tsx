@@ -1,5 +1,7 @@
 import { useLang } from "@/i18n/LanguageContext";
-import { PlaceLiveStatus, PlaceStatusColors } from "@/domain/PlaceStatus";
+import { PLACE_STATUS_TONE, PlaceLiveStatus } from "@/domain/PlaceStatus";
+import { StatusIcon } from "@/components/ui/StatusChip";
+import { toneLook } from "@/domain/statusTone";
 
 interface Props {
   totals: Record<PlaceLiveStatus, number> & { total: number };
@@ -13,7 +15,8 @@ const StatusLegend = ({ totals }: Props) => {
     <div className="legend">
       {ORDER.map((s) => (
         <div className="item" key={s}>
-          <span className="dot" style={{ background: PlaceStatusColors[s] }} />
+          {/* The same icon the seats wear, in their colour (2026-10-27). */}
+          <span className="legend__icon" style={{ color: toneLook(PLACE_STATUS_TONE[s]).fg }}><StatusIcon tone={PLACE_STATUS_TONE[s]} /></span>
           <span>{t(`place.${s}`)} <span className="count">{totals[s]}</span></span>
         </div>
       ))}

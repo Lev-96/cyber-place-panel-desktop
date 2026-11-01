@@ -3,8 +3,9 @@ import {
   canStartSession,
   resolveSessionCellState,
   SESSION_CELL_COLOR,
+  SESSION_CELL_TONE,
 } from "./SessionCellState";
-import { DeviceAvailabilityLike, PC_KIND, PC_STATUS, PC_STATUS_COLOR } from "@/types/pc";
+import { DeviceAvailabilityLike, PC_KIND, PC_STATUS } from "@/types/pc";
 
 /**
  * Regression shield for the user-reported bug: places whose computer was
@@ -56,14 +57,18 @@ describe("canStartSession", () => {
   });
 });
 
-describe("SESSION_CELL_COLOR", () => {
-  it("paints an offline tile with the device palette's offline colour", () => {
-    expect(SESSION_CELL_COLOR.offline).toBe(PC_STATUS_COLOR.offline);
+describe("SESSION_CELL_TONE / SESSION_CELL_COLOR — one vocabulary on every board (2026-10-27)", () => {
+  it("maps each state onto the shared tones", () => {
+    expect(SESSION_CELL_TONE).toEqual({ busy: "playing", offline: "offline", reserved: "booked", free: "free" });
   });
 
-  it("covers every state", () => {
+  it("paints each state with its tone's colour token, so a theme changes it in one place", () => {
     for (const state of ["busy", "offline", "reserved", "free"] as const) {
-      expect(SESSION_CELL_COLOR[state]).toMatch(/^#[0-9a-f]{6}$/i);
+      expect(SESSION_CELL_COLOR[state]).toBe(`rgb(var(--status-${SESSION_CELL_TONE[state]}-rgb))`);
     }
+  });
+
+  it("never paints a free seat the colour of a playing one (the old green-means-two-things bug)", () => {
+    expect(SESSION_CELL_COLOR.free).not.toBe(SESSION_CELL_COLOR.busy);
   });
 });

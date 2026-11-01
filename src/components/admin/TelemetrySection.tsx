@@ -10,7 +10,7 @@ import { useLang } from "@/i18n/LanguageContext";
 import { telemetryRepository } from "@/repositories/TelemetryRepository";
 import { useMemo } from "react";
 
-const COLOR_EVENTS = "#07ddf1";
+const COLOR_EVENTS = "var(--color-primary)";
 const COLOR_ERRORS = "#ff6b81";
 
 /**
@@ -141,7 +141,7 @@ const Body = ({ summary, lang, t }: BodyProps) => {
             key={`${e.occurred_at}-${i}`}
             style={{
               padding: "8px 0",
-              borderTop: i === 0 ? "none" : "1px solid rgba(255,255,255,.06)",
+              borderTop: i === 0 ? "none" : "1px solid rgb(var(--fg-rgb) / .06)",
             }}
           >
             <div className="row" style={{ justifyContent: "space-between", gap: 12 }}>
@@ -174,14 +174,14 @@ const HealthBadge = ({ summary, t, lang }: { summary: ITelemetrySummary; t: (k: 
   const minutesAgo = seen ? (Date.now() - seen.getTime()) / 60000 : Infinity;
 
   const tone = !seen ? "idle" : minutesAgo <= 60 ? "good" : minutesAgo <= 60 * 24 ? "warn" : "idle";
-  const color = tone === "good" ? "#3ddc97" : tone === "warn" ? "#ffc857" : "rgba(255,255,255,.35)";
+  const color = tone === "good" ? "var(--color-success-bright)" : tone === "warn" ? "#ffc857" : "rgb(var(--fg-rgb) / .35)";
 
   return (
     <span
       className="row"
       style={{
         gap: 8, alignItems: "center", padding: "6px 12px", borderRadius: 999,
-        background: "rgba(255,255,255,.05)", fontSize: 13,
+        background: "rgb(var(--fg-rgb) / .05)", fontSize: 13,
       }}
     >
       <span style={{ width: 8, height: 8, borderRadius: "50%", background: color, flex: "0 0 auto" }} />
@@ -212,7 +212,7 @@ const BarCard = ({
             {r.value.toLocaleString(lang)} {suffix}
           </span>
         </div>
-        <div style={{ height: 6, borderRadius: 3, background: "rgba(255,255,255,.08)", marginTop: 4 }}>
+        <div style={{ height: 6, borderRadius: 3, background: "rgb(var(--fg-rgb) / .08)", marginTop: 4 }}>
           <div
             style={{
               width: `${Math.min(100, Math.max(0, r.share))}%`,

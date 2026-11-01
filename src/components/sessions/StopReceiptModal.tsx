@@ -68,17 +68,16 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved }: Prop
     }
   };
 
+  // Read ONCE, when Stop was pressed (2026-10-25): the receipt is frozen at
+  // that instant — it no longer ticks — while the card's clock runs on in case
+  // the cashier cancels. Confirming closes the seat AT that instant for exactly
+  // this total (`priced_at` + `expected_total`); a receipt the server finds
+  // stale or changed is refused and read again (see confirmStop). It is read
+  // again too after a line is taken off, or when the seat is ended elsewhere.
   useEffect(() => {
     void reload();
-    // Refresh time-cost every 5s while modal open (open sessions keep ticking).
-    // A seat that is already over has a final figure, so it is read once —
-    // re-asking would return the same number every five seconds for as long as
-    // the cashier leaves the receipt on screen.
-    if (session.status !== "active") return;
-    const timer = setInterval(() => { void reload(); }, 5_000);
-    return () => clearInterval(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session.id]);
+  }, [session.id, session.status]);
 
   const remove = async (itemId: number, name: string, additional: boolean) => {
     // Asked first, as on the Add Product dialog: one misplaced click must not
@@ -122,15 +121,23 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved }: Prop
         // card payment carrying a note called "Idram" is a contradiction the
         // history would then have to display.
         ...(method === "other" ? { payment_method_other: other.trim() } : {}),
+        // The figure on screen is the figure charged (2026-10-25).
+        ...(bill?.priced_at ? { priced_at: bill.priced_at, expected_total: Number(bill.total) } : {}),
       });
       setStopped(r.breakdown);
       setHandover(r.cash ?? null);
       onConfirmed();
     } catch (e) {
-      // An open place kept billing while the guest counted: the server's bill
-      // is now above the banknotes. Re-read it so the shortfall shows.
-      if (change?.state === "ok" && (e as { status?: number }).status === 422) {
-        setErr(t("session.cashBillGrew"));
+      // Refused as stale or changed (2026-10-25) — older than ten minutes, or
+      // a product, pad, pause, waiver or move since: the server's sentence,
+      // and the receipt read again so the new figure is what is confirmed.
+      // (Cash short against it is the same 422 and the same remedy.)
+      if ((e as { status?: number }).status === 422) {
+        // The banknotes short of the bill keep their own sentence; any other
+        // refusal is the server's.
+        const body = (e as { body?: { errors?: Record<string, unknown> } }).body;
+        const cashShort = change?.state === "ok" && body?.errors?.cash_received !== undefined;
+        setErr(cashShort || !(e instanceof Error) || !e.message ? t("session.cashBillGrew") : e.message);
         // Not `reload()`: it clears the error this line just set.
         void sessionRepository.preview(session.id).then(setBill).catch(() => {});
       } else {
@@ -170,22 +177,48 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved }: Prop
   const finished = stopped !== null || endedWithoutUs;
 
   const deviceLabel = session.pc_label ?? `№${session.pc_id}`;
+  // Billed by the hour: count-up, or a planned start with no package.
+  const byTheHour = view !== null && (view.mode === "open" || !view.package_name);
 
   return (
     <Modal open onClose={onClose}>
       <div className="card" style={{ width: 520, maxWidth: "92vw", display: "flex", flexDirection: "column", gap: 12 }}>
         <h2 style={{ margin: 0 }}>
-          {finished ? t("session.checkoutDone") : `${t("session.checkoutTitle")} · ${deviceLabel}`}
+          {finished ? t("session.checkoutDone") : `${t("session.checkoutPreviewTitle")} · ${deviceLabel}`}
         </h2>
+        {/* Opening this ends nothing (2026-10-25): the seat plays on, the
+            figures re-read every few seconds, and only the confirm below
+            stops it — the server prices it at that instant. Said in words,
+            because "Подтвердить и закрыть" read as "close this window". */}
+        {/* Ended while this was open, by somebody or something else: the bill
+            below is theirs, final, and nothing here will stop it again. */}
+        {endedWithoutUs && stopped === null && (
+          <span className="muted" style={{ fontSize: 12 }} data-testid="checkout-ended-elsewhere">
+            {t("session.checkoutEndedElsewhere")}
+          </span>
+        )}
+        {!finished && (
+          <span className="muted" style={{ fontSize: 12 }} data-testid="checkout-still-running">
+            {t("session.checkoutStillRunning").replace(
+              "{0}",
+              bill?.priced_at
+                ? new Date(bill.priced_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false })
+                : "-",
+            )}
+          </span>
+        )}
 
         {!view ? <SkeletonText lines={5} /> : (
           <div className="col" style={{ gap: 0 }}>
             {/* Time line */}
             <div style={row}>
               <span style={{ flex: 1 }}>
-                {view.mode === "open"
+                {/* A package names itself; a seat billed by the hour — count-up
+                    or a planned start, which has no package (2026-10-25) —
+                    says how long it was played, never "Тариф · " and nothing. */}
+                {byTheHour
                   ? `${t("session.timePlayed")}: ${fmtDuration(view.elapsed_minutes, t)}`
-                  : `${t("session.tariff")} · ${view.package_name ?? ""}`}
+                  : `${t("session.tariff")} · ${view.package_name}`}
               </span>
               {/* Both figures are hidden on a waived bill, and `is_free` is the
                   only thing that decides it — never `total === 0`, which is
@@ -199,7 +232,7 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved }: Prop
                   a charge. */}
               {!view.is_free && (
                 <>
-                  {view.mode === "open" && view.hourly_rate != null && (
+                  {byTheHour && view.hourly_rate != null && (
                     <span className="muted" style={{ marginRight: 12, fontSize: 12 }}>
                       {money(Number(view.hourly_rate), receiptPrecision)}/{t("time.hourShort") || "h"}
                     </span>
@@ -213,6 +246,20 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved }: Prop
                 </>
               )}
             </div>
+
+            {/* The VIP minimum charge, when it is in the time line above: what
+                was billed and what the time played came to, so the figure has
+                its reason on the receipt. From the server, never recomputed. */}
+            {!view.is_free && view.minimum_charge?.applied && (
+              <div style={row} className="muted" data-testid="receipt-min-charge">
+                <span style={{ flex: 1, fontSize: 12 }}>
+                  {fmt(t("vipMin.receipt"), fmtDuration(view.minimum_charge.billed_minutes, t))}
+                </span>
+                <span style={{ fontSize: 12 }}>
+                  {fmt(t("vipMin.receiptPlayed"), money(Number(view.minimum_charge.played_time_cost), receiptPrecision))}
+                </span>
+              </div>
+            )}
 
             {/* Joysticks — one line per USE, because that is what is charged.
                 A pad's fee goes on the bill when it is handed out and comes off
@@ -247,30 +294,43 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved }: Prop
               </div>
             ))}
 
-            {/* Items */}
-            {view.items.map((it) => (
-              <div key={it.id} style={row}>
-                <span style={{ flex: 1 }}>{it.name}{it.qty > 1 ? ` × ${it.qty}` : ""}</span>
-                {/* An HOURLY line is a rate and a duration, so it reads like a
-                    pad's line rather than like a drink's: "90 m · 700/h", and
-                    "returned" once its clock has stopped. Printing "700 × 1"
-                    beside an amount of 1 050 is three figures that do not add
-                    up, on the one screen a cashier checks with their eyes. */}
-                <span className="muted" style={{ marginRight: 12, fontSize: 12 }}>
-                  {it.is_hourly
-                    ? `${it.minutes ?? 0} ${t("time.minShort") || "m"} · ${money(Number(it.price), receiptPrecision)}${t("session.extraPerHour")}${it.qty > 1 ? ` × ${it.qty}` : ""}${it.returned_at ? ` · ${t("session.extraReturned")}` : ""}`
-                    : `${money(Number(it.price), receiptPrecision)}${it.qty > 1 ? ` × ${it.qty}` : ""}`}
-                </span>
-                <span style={{ fontWeight: 700, marginRight: 8 }}>
-                  {money(Number(it.line_total), receiptPrecision)}
-                </span>
-                {!finished && (
-                  <button type="button" onClick={() => void remove(it.id, it.name, it.is_additional === true)} disabled={busy} style={removeBtn} title={t("session.removeItemTitle")}>
-                    ×
-                  </button>
-                )}
+            {/* Products bought during the session (2026-10-25): their own
+                section — quantity × unit price = line — and their own total,
+                the server's `items_total`. The total below already includes
+                them; this is the breakdown, never added twice. */}
+            {view.items.length > 0 && (
+              <div className="receipt-items" data-testid="receipt-items">
+                <span className="label" style={{ marginTop: 8 }}>{t("session.itemsBought")}</span>
+                {view.items.map((it) => (
+                  <div key={it.id} style={row}>
+                    <span style={{ flex: 1, minWidth: 0, overflowWrap: "anywhere" }}>{it.name}</span>
+                    {/* An HOURLY line is a rate and a duration, so it reads like a
+                        pad's line rather than like a drink's: "90 m · 700/h", and
+                        "returned" once its clock has stopped. A sold one reads
+                        "2 × 500". */}
+                    <span className="muted" style={{ marginRight: 12, fontSize: 12, whiteSpace: "nowrap" }}>
+                      {it.is_hourly
+                        ? `${it.minutes ?? 0} ${t("time.minShort") || "m"} · ${money(Number(it.price), receiptPrecision)}${t("session.extraPerHour")}${it.qty > 1 ? ` × ${it.qty}` : ""}${it.returned_at ? ` · ${t("session.extraReturned")}` : ""}`
+                        : `${it.qty} × ${money(Number(it.price), receiptPrecision)}`}
+                    </span>
+                    <span style={{ fontWeight: 700, marginRight: 8 }}>
+                      {money(Number(it.line_total), receiptPrecision)}
+                    </span>
+                    {!finished && (
+                      <button type="button" onClick={() => void remove(it.id, it.name, it.is_additional === true)} disabled={busy} style={removeBtn} title={t("session.removeItemTitle")}>
+                        ×
+                      </button>
+                    )}
+                  </div>
+                ))}
+                <div style={{ ...row, borderTop: "1px dashed var(--color-border)" }} data-testid="receipt-items-total">
+                  <span style={{ flex: 1 }}>{t("session.itemsTotal")}</span>
+                  <span style={{ fontWeight: 700, marginRight: finished ? 0 : 32 }}>
+                    {money(Number(view.items_total), receiptPrecision)}
+                  </span>
+                </div>
               </div>
-            ))}
+            )}
 
             {/* Total */}
             <div style={{ ...row, borderTop: "2px solid #07ddf1", marginTop: 6, paddingTop: 12 }}>
@@ -281,7 +341,7 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved }: Prop
                   away is still on the row and in the audit log; this receipt
                   is what the player is being handed, and it owes them one
                   number. */}
-              <span style={{ fontWeight: 800, fontSize: 18, color: "#07ddf1" }}>
+              <span style={{ fontWeight: 800, fontSize: 18, color: "var(--color-primary)" }}>
                 {view.is_free
                   ? t("session.freeBill")
                   : money(Number(view.total), receiptPrecision)}
@@ -329,7 +389,8 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved }: Prop
             <Button onClick={onClose}>{t("action.close")}</Button>
           ) : (
             <>
-              <Button variant="secondary" onClick={onClose} disabled={busy}>{t("action.cancel")}</Button>
+              {/* Back to the running seat: nothing was sent, nothing stopped. */}
+              <Button variant="secondary" onClick={onClose} disabled={busy}>{t("session.checkoutKeepPlaying")}</Button>
               <Button onClick={confirmStop} disabled={busy || !bill || cashBlocks} data-testid="stop-confirm">
                 {busy ? t("session.closing") : t("session.confirmStop")}
               </Button>
@@ -350,7 +411,7 @@ const row: React.CSSProperties = {
 const removeBtn: React.CSSProperties = {
   width: 22, height: 22, borderRadius: 11,
   border: "1px solid #4a1a1a", background: "transparent",
-  color: "#ef4444", cursor: "pointer", fontSize: 14, lineHeight: 1,
+  color: "var(--color-danger)", cursor: "pointer", fontSize: 14, lineHeight: 1,
 };
 
 export default StopReceiptModal;

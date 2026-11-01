@@ -484,7 +484,7 @@ describe("an hourly extra on the receipt", () => {
 
     // Exactly the old shape: a price and a count, no duration and no rate.
     // (`time.minShort` on its own would match the receipt's elapsed-time line.)
-    expect(notes()).toContain("300.00\u00b7AMD \u00d7 2");
+    expect(notes()).toContain("2 \u00d7 300.00\u00b7AMD");
   });
 });
 
@@ -632,7 +632,10 @@ describe("received cash and change", () => {
   });
 
   test("the bill grew past the banknotes: told in words and the bill is re-read", async () => {
-    repo.stop.mockRejectedValue(Object.assign(new Error("422"), { status: 422 }));
+    // Laravel's validation answer for the banknotes short of the bill.
+    repo.stop.mockRejectedValue(Object.assign(new Error("The cash received field must be greater…"), {
+      status: 422, body: { message: "…", errors: { cash_received: ["…"] } },
+    }));
     await mount();
     await act(async () => { type("3400"); });
     const reads = repo.preview.mock.calls.length;
@@ -646,5 +649,161 @@ describe("received cash and change", () => {
     repo.preview.mockResolvedValue(bill({ is_free: true, total: 0 }));
     await mount();
     expect(screen.queryByTestId("cash-change")).toBeNull();
+  });
+});
+
+/**
+ * The preliminary total (2026-10-25): opening it ends nothing; products have
+ * their own section and total; the buttons say what they do.
+ */
+describe("the preliminary total", () => {
+  beforeEach(() => { cleanup(); repo.stop.mockReset(); });
+  afterEach(() => cleanup());
+
+  // The requirement's example: time 1 000, Cola 2 × 500, chips 1 × 700.
+  const example = () => bill({
+    time_cost: 1000,
+    items: [
+      { id: 1, name: "Coca-Cola", price: 500, qty: 2, line_total: 1000 },
+      { id: 2, name: "Чипсы", price: 700, qty: 1, line_total: 700 },
+    ] as unknown as IBillBreakdown["items"],
+    items_total: 1700, subtotal: 2700, gross_total: 2700, total: 2700,
+  });
+
+  test("says the seat plays on, and nothing is sent by opening it", async () => {
+    repo.preview.mockResolvedValue(example());
+    await mount();
+
+    expect(screen.getByText(/session\.checkoutPreviewTitle/)).toBeTruthy();
+    expect(screen.getByTestId("checkout-still-running")).toBeTruthy();
+    expect(repo.stop).not.toHaveBeenCalled();
+  });
+
+  test("lists the products bought, each qty × unit = line, then their total, then the total", async () => {
+    repo.preview.mockResolvedValue(example());
+    await mount();
+
+    const items = screen.getByTestId("receipt-items");
+    expect(items.textContent).toContain("session.itemsBought");
+    expect(items.textContent).toContain("Coca-Cola");
+    expect(items.textContent).toContain("2 \u00d7 500");
+    expect(items.textContent).toContain("1 \u00d7 700");
+    expect(screen.getByTestId("receipt-items-total").textContent).toMatch(/session\.itemsTotal.*1,?700/);
+    // The total is the server's, once: 2 700, not 2 700 + 1 700.
+    expect(document.body.textContent).toMatch(/session\.totalDue[^]*2,?700/);
+    expect(document.body.textContent).not.toMatch(/4,?400/);
+  });
+
+  test("a planned hourly seat (no package) says how long it played, not an empty tariff", async () => {
+    repo.preview.mockResolvedValue(bill({ mode: "fixed", package_name: null, hourly_rate: 1000, elapsed_minutes: 46 }));
+    await mount();
+    expect(document.body.textContent).toContain("session.timePlayed");
+    expect(document.body.textContent).not.toMatch(/session\.tariff · (?!\S)/);
+  });
+
+  test("a package still names itself", async () => {
+    repo.preview.mockResolvedValue(bill({ mode: "fixed", package_name: "Hour", hourly_rate: null }));
+    await mount();
+    expect(document.body.textContent).toContain("session.tariff · Hour");
+  });
+
+  test("no products, no products section", async () => {
+    repo.preview.mockResolvedValue(bill());
+    await mount();
+    expect(screen.queryByTestId("receipt-items")).toBeNull();
+  });
+
+  test("Keep playing closes it and stops nothing; only the confirm stops", async () => {
+    const onClose = vi.fn();
+    repo.preview.mockResolvedValue(example());
+    await act(async () => {
+      render(<StopReceiptModal session={session()} onClose={onClose} onConfirmed={() => {}} onItemRemoved={() => {}} />);
+    });
+
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "session.checkoutKeepPlaying" })); });
+    expect(onClose).toHaveBeenCalled();
+    expect(repo.stop).not.toHaveBeenCalled();
+    expect(screen.getByTestId("stop-confirm").textContent).toBe("session.confirmStop");
+  });
+});
+
+/**
+ * Charged at the receipt (2026-10-25): frozen at the moment Stop was pressed,
+ * confirmed with that instant and that total, re-read when the server says it
+ * changed.
+ */
+describe("the receipt is the figure charged", () => {
+  beforeEach(() => { cleanup(); repo.stop.mockReset(); repo.preview.mockReset(); });
+  afterEach(() => { cleanup(); vi.useRealTimers(); });
+
+  const frozen = (total: number, at = "2026-10-25T13:00:00+00:00") => bill({ total, priced_at: at } as Partial<IBillBreakdown>);
+
+  test("read once: it does not tick while open", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    repo.preview.mockResolvedValue(frozen(137.22));
+    await mount();
+    const reads = repo.preview.mock.calls.length;
+    await act(async () => { await vi.advanceTimersByTimeAsync(60_000); });
+
+    expect(repo.preview.mock.calls.length).toBe(reads);
+  });
+
+  test("confirming sends the receipt's instant and total", async () => {
+    repo.preview.mockResolvedValue(frozen(137.22));
+    repo.stop.mockResolvedValue({ breakdown: frozen(137.22), cash: null });
+    await mount();
+    await act(async () => { fireEvent.click(screen.getByTestId("stop-confirm")); });
+
+    expect(repo.stop.mock.calls[0][1]).toMatchObject({ priced_at: "2026-10-25T13:00:00+00:00", expected_total: 137.22 });
+  });
+
+  test("says the time it is frozen at", async () => {
+    repo.preview.mockResolvedValue(frozen(137.22));
+    await mount();
+    expect(screen.getByTestId("checkout-still-running").textContent).not.toContain("{0}");
+  });
+
+  test("a changed bill: the server's sentence, the receipt read again, confirm still offered", async () => {
+    repo.preview.mockResolvedValueOnce(frozen(137.22)).mockResolvedValue(frozen(150, "2026-10-25T13:05:00+00:00"));
+    repo.stop.mockRejectedValueOnce(Object.assign(new Error("Счёт изменился"), { status: 422, body: { message: "Счёт изменился" } }));
+    await mount();
+    await act(async () => { fireEvent.click(screen.getByTestId("stop-confirm")); });
+
+    expect(screen.getByText("Счёт изменился")).toBeTruthy();
+    expect(repo.preview).toHaveBeenCalledTimes(2);
+    expect((screen.getByTestId("stop-confirm") as HTMLButtonElement).disabled).toBe(false);
+
+    repo.stop.mockResolvedValue({ breakdown: frozen(150), cash: null });
+    await act(async () => { fireEvent.click(screen.getByTestId("stop-confirm")); });
+    expect(repo.stop.mock.calls[1][1]).toMatchObject({ priced_at: "2026-10-25T13:05:00+00:00", expected_total: 150 });
+  });
+});
+
+describe("the VIP minimum charge on the receipt", () => {
+  beforeEach(() => { cleanup(); repo.preview.mockReset(); });
+  afterEach(cleanup);
+
+  const minimum = (applied: boolean) => ({
+    mode: "minimum", after_minutes: 20, minimum_minutes: 60, applied, billed_minutes: applied ? 60 : 25, played_time_cost: 1250,
+  });
+
+  test("applied: the line names the minimum and what was played", async () => {
+    repo.preview.mockResolvedValue(bill({ time_cost: 3000, subtotal: 3000, gross_total: 3000, total: 3000, minimum_charge: minimum(true) } as Partial<IBillBreakdown>));
+    await mount();
+
+    const line = screen.getByTestId("receipt-min-charge").textContent ?? "";
+    expect(line).toContain("vipMin.receipt");
+    expect(line).toContain("vipMin.receiptPlayed");
+  });
+
+  test("not applied, or waived: no line", async () => {
+    repo.preview.mockResolvedValue(bill({ minimum_charge: minimum(false) } as Partial<IBillBreakdown>));
+    await mount();
+    expect(screen.queryByTestId("receipt-min-charge")).toBeNull();
+
+    cleanup();
+    repo.preview.mockResolvedValue(bill({ is_free: true, total: 0, minimum_charge: minimum(true) } as Partial<IBillBreakdown>));
+    await mount();
+    expect(screen.queryByTestId("receipt-min-charge")).toBeNull();
   });
 });

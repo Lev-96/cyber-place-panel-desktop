@@ -147,7 +147,7 @@ const OwnerRow = memo(({ owner, onEdit, onDelete }: RowProps) => {
         <div className="row" style={{ gap: 8, flexShrink: 0 }}>
           {onEdit && <Button variant="secondary" onClick={() => onEdit(owner)} style={btn}>{t("action.edit")}</Button>}
           {onDelete && (
-            <Button variant="secondary" onClick={() => onDelete(owner)} style={{ ...btn, color: "#ef4444", borderColor: "#4a1a1a" }}>
+            <Button variant="secondary" onClick={() => onDelete(owner)} style={{ ...btn, color: "var(--color-danger)", borderColor: "var(--color-danger-border-dim)" }}>
               {t("action.delete")}
             </Button>
           )}

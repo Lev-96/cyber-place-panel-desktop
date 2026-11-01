@@ -168,4 +168,41 @@ describe("SessionTimer", () => {
 
     expect(screen.getByText("750·AMD")).toBeTruthy();
   });
+
+  describe("the VIP minimum charge badge", () => {
+    // 25 minutes played on a VIP seat at 3000/h, rule "from 20 min, at least 1 h".
+    const vip = (over: Partial<ISessionApi> = {}) => open({
+      started_at: new Date(Date.now() - 25 * 60_000).toISOString(),
+      hourly_rate: 3000,
+      min_charge: { after_minutes: 20, minimum_minutes: 60, mode: "minimum" },
+      ...over,
+    });
+    const label = (m: number) => `min ${m}`;
+
+    test("past the threshold the figure is the minimum, and the badge says why", () => {
+      render(<SessionTimer session={vip()} formatMoney={money} minimumLabel={label} />);
+
+      expect(screen.getByText("3000·AMD")).toBeTruthy();
+      expect(screen.getByTestId("min-charge").textContent).toBe("min 60");
+    });
+
+    test("below the threshold: what was played, no badge", () => {
+      render(<SessionTimer session={vip({ started_at: new Date(Date.now() - 10 * 60_000).toISOString() })} formatMoney={money} minimumLabel={label} />);
+
+      expect(screen.getByText("500·AMD")).toBeTruthy();
+      expect(screen.queryByTestId("min-charge")).toBeNull();
+    });
+
+    test("a waived visit carries no badge", () => {
+      render(<SessionTimer session={vip({ is_free: true })} formatMoney={money} minimumLabel={label} />);
+      expect(screen.queryByTestId("min-charge")).toBeNull();
+    });
+
+    test("no words handed in: no badge, the figure still charged", () => {
+      render(<SessionTimer session={vip()} formatMoney={money} />);
+
+      expect(screen.getByText("3000·AMD")).toBeTruthy();
+      expect(screen.queryByTestId("min-charge")).toBeNull();
+    });
+  });
 });

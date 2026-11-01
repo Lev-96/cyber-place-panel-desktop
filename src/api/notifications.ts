@@ -28,6 +28,12 @@ export interface IDbNotification {
     tournament_id?: number;
     booking_date?: string;
     start_time?: string;
+    /** `SessionEndingSoon::toArray()` — the seat about to run out. */
+    session_id?: number;
+    pc_id?: number;
+    place_number?: number | null;
+    ends_at?: string | null;
+    minutes_left?: number;
     [key: string]: unknown;
   };
   /** ISO timestamp; null when unread. */

@@ -217,7 +217,7 @@ const PackageForm = ({ branchId, initial, platformPrices, onClose, onSaved }: Pr
             padding: "12px 14px",
             border: "1px solid #1f2a44",
             borderRadius: 8,
-            background: "rgba(7, 221, 241, 0.04)",
+            background: "rgb(var(--accent-rgb) / 0.04)",
             display: "flex",
             flexDirection: "column",
             gap: 12,

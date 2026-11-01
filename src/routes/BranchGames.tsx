@@ -1,4 +1,6 @@
 import GameForm from "@/components/games/GameForm";
+import PlatformIcon from "@/components/ui/PlatformIcon";
+import GameCover from "@/components/games/GameCover";
 import Button from "@/components/ui/Button";
 import { useAuth } from "@/auth/AuthContext";
 import { can } from "@/auth/permissions";
@@ -60,14 +62,21 @@ const BranchGames = () => {
         <div className="list">
           {(data ?? []).map((g) => (
             <div key={g.id} className="list-item">
-              <div>
-                <div className="name">{g.name}</div>
-                <div className="meta">{platformName(g.platform)}</div>
+              <div className="row" style={{ gap: 12, alignItems: "center", minWidth: 0 }}>
+                {/* The cover players see in the app, or the app's "no cover" art. */}
+                <GameCover path={g.game_logo_path} platform={g.platform} name={g.name} />
+                <div style={{ minWidth: 0 }}>
+                  <div className="name">{g.name}</div>
+                  <div className="meta game-platform">
+                    <PlatformIcon platform={g.platform} size={14} />
+                    <span>{platformName(g.platform)}</span>
+                  </div>
+                </div>
               </div>
               {canEditCatalog && (
                 <div className="row" style={{ gap: 6 }}>
                   <Button variant="secondary" onClick={() => setEditing(g)} style={btn}>{t("action.edit")}</Button>
-                  <Button variant="secondary" onClick={() => remove(g)} style={{ ...btn, color: "#ef4444", borderColor: "#4a1a1a" }}>{t("action.delete")}</Button>
+                  <Button variant="secondary" onClick={() => remove(g)} style={{ ...btn, color: "var(--color-danger)", borderColor: "var(--color-danger-border-dim)" }}>{t("action.delete")}</Button>
                 </div>
               )}
             </div>

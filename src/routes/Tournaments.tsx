@@ -20,10 +20,10 @@ import { useAuth } from "@/auth/AuthContext";
 // caution amber, professional = hot red) and lets a future bracket
 // inherit a defined fallback by simply adding a row here.
 const SKILL_TONES: Record<SkillLevel, { bg: string; fg: string; border: string }> = {
-  any:          { bg: "rgba(148, 163, 184, 0.14)", fg: "#94a3b8", border: "rgba(148, 163, 184, 0.50)" },
-  beginner:     { bg: "rgba(34, 197, 94, 0.14)",   fg: "#22c55e", border: "rgba(34, 197, 94, 0.50)" },
-  intermediate: { bg: "rgba(245, 158, 11, 0.14)",  fg: "#f59e0b", border: "rgba(245, 158, 11, 0.50)" },
-  professional: { bg: "rgba(239, 68, 68, 0.14)",   fg: "#ef4444", border: "rgba(239, 68, 68, 0.50)" },
+  any:          { bg: "rgb(var(--muted-rgb) / 0.14)", fg: "var(--color-muted)", border: "rgb(var(--muted-rgb) / 0.50)" },
+  beginner:     { bg: "rgb(var(--success-rgb) / 0.14)",   fg: "var(--color-success)", border: "rgb(var(--success-rgb) / 0.50)" },
+  intermediate: { bg: "rgb(var(--warning-rgb) / 0.14)",  fg: "var(--color-warning)", border: "rgb(var(--warning-rgb) / 0.50)" },
+  professional: { bg: "rgb(var(--danger-rgb) / 0.14)",   fg: "var(--color-danger)", border: "rgb(var(--danger-rgb) / 0.50)" },
 };
 
 const Tournaments = () => {
@@ -189,7 +189,7 @@ const Tournaments = () => {
                   {t.price != null && (
                     <>
                       {" · "}
-                      <span style={{ color: "#e5e7eb", fontWeight: 600 }}>
+                      <span style={{ color: "var(--color-text-soft)", fontWeight: 600 }}>
                         {tr("tournaments.price")}: {Number(t.price).toFixed(2)}
                       </span>
                     </>
@@ -207,7 +207,7 @@ const Tournaments = () => {
                       }}
                     >
                       <span className="muted">{tr("tournaments.players")}</span>
-                      <span style={{ color: "#e5e7eb", fontWeight: 600 }}>
+                      <span style={{ color: "var(--color-text-soft)", fontWeight: 600 }}>
                         {t.registered_participants}/{t.participants_limit}
                       </span>
                     </div>
@@ -249,8 +249,8 @@ const Tournaments = () => {
                           onClick={() => remove(t)}
                           style={{
                             ...btn,
-                            color: "#ef4444",
-                            borderColor: "#4a1a1a",
+                            color: "var(--color-danger)",
+                            borderColor: "var(--color-danger-border-dim)",
                           }}
                         >
                           {tr("action.delete")}
@@ -296,7 +296,7 @@ const btn: React.CSSProperties = { padding: "6px 10px", fontSize: 12, minWidth: 
 // `cursor: pointer` since the global view is read-only. Kept inline
 // to scope the styling to this file and avoid drift in global.css.
 const cardStyle: React.CSSProperties = {
-  background: "#0b1224",
+  background: "var(--color-surface)",
   border: "1px solid #1f2a44",
   borderRadius: 12,
   padding: "14px 16px",
@@ -317,7 +317,7 @@ const chipStyle: React.CSSProperties = {
 const progressTrackStyle: React.CSSProperties = {
   height: 6,
   borderRadius: 3,
-  background: "rgba(31, 42, 68, 0.6)",
+  background: "rgb(var(--border-rgb) / 0.6)",
   overflow: "hidden",
 };
 

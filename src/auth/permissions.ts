@@ -102,11 +102,10 @@ export type Permission =
    * Waive a running session's bill ("Free"). The clock keeps running and the
    * session still counts — what changes is that nobody pays.
    *
-   * Admin + owner, and deliberately NOT part of running the floor: a manager
-   * adds joysticks, grants time and lifts a time limit all day, because those
-   * spend prices the company already set. Writing a bill off is giving the
-   * company's takings away. The backend enforces the same on the
-   * `sessions.free` capability; this only decides whether the toggle is drawn.
+   * Admin, owner AND manager since 2026-09-06 (see the manager's set below:
+   * the manager is the one at the counter when a machine crashes). The
+   * backend enforces the same on the `sessions.free` capability; this only
+   * decides whether the toggle is drawn.
    */
   | "session.free"
   /**

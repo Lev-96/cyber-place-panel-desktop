@@ -39,7 +39,10 @@ export const showDesktopNotification = (
   void ensureNotificationPermission().then((perm) => {
     if (perm !== "granted") return;
     try {
-      const n = new Notification(title, options);
+      // Silent (2026-10-27): the panel plays its own sound for the
+      // notification, as the person set it; an OS sound on top would play
+      // twice and ignore their mute.
+      const n = new Notification(title, { ...options, silent: true });
       if (onClick) n.onclick = onClick;
     } catch {
       /* WM without a notification daemon — swallow, in-app surface stands */

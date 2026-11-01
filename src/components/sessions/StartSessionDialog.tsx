@@ -10,6 +10,7 @@ import Spinner from "@/components/ui/Spinner";
 import { useAuth } from "@/auth/AuthContext";
 import { can } from "@/auth/permissions";
 import { useLang } from "@/i18n/LanguageContext";
+import { fmt } from "@/i18n/translations";
 import { timePackageNameOf } from "@/i18n/timePackageName";
 import { branchRepository } from "@/repositories/BranchRepository";
 import { sessionRepository } from "@/repositories/SessionRepository";
@@ -22,6 +23,14 @@ import { recentPsnNames, rememberPsnName } from "@/ps5/recentPsnNames";
 import { renderText, textKey, textLiteral, type LocalizedText } from "@/i18n/localizedText";
 import { IBranchApi } from "@/types/api";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import type { IStartQuote } from "@/api/sessions";
+import SectionTabs from "@/components/ui/SectionTabs";
+import ClockTimeField from "./ClockTimeField";
+import DurationPicker from "./DurationPicker";
+import QuotedPrice from "./QuotedPrice";
+import { clockOf, minutesOf, type DurationUnit } from "./durationModel";
+import { useMinuteTick } from "./useMinuteTick";
+import { quoteFor, useServerQuote } from "./useServerQuote";
 
 interface Props {
   branchId: number;
@@ -31,6 +40,7 @@ interface Props {
 }
 
 type Mode = "fixed" | "open";
+type PlanLimit = "duration" | "until";
 
 /**
  * Start-a-session dialog.
@@ -91,6 +101,16 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
   // session is not "a price of zero", it is a session whose bill nobody pays,
   // and the two behave differently the moment a drink is added to it.
   const [isFree, setIsFree] = useState(false);
+  // The optional planned length (2026-10-25), hours by default, empty = none.
+  const [plan, setPlan] = useState<{ unit: DurationUnit; amount: string }>({ unit: "hours", amount: "" });
+  // …or "until" a clock time (2026-10-26). Two ways to set ONE plan, never
+  // both: only the way chosen is read and sent. Switching keeps what was
+  // typed in the other, so a slip of the tab loses nothing.
+  const [limit, setLimit] = useState<PlanLimit>("duration");
+  const [untilInput, setUntilInput] = useState("");
+  // The plan's TOTAL set by hand (2026-10-25), in AMD as `PriceInput` keeps it.
+  const [editTotal, setEditTotal] = useState(false);
+  const [totalInput, setTotalInput] = useState("");
 
   // A failed read is kept as such: the dialog used to wait on it for ever (no
   // catch), and "no packages" would be a lie. Open mode still works without it.
@@ -165,6 +185,39 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
 
   // Prefill the override input with the current rate the moment it's enabled,
   // so the operator edits "the current price" rather than a blank field.
+  const planMinutes = limit === "duration" ? minutesOf(plan.amount, plan.unit) : null;
+  const planUntil = limit === "until" ? clockOf(untilInput) : null;
+  // What the plan is, in the form the server takes: minutes, or "HH:mm".
+  const planInput: number | string | null = planMinutes ?? planUntil;
+  const planTyped = limit === "duration" ? plan.amount.trim() !== "" : untilInput.trim() !== "";
+  // Typed but unreadable is not "no plan": the Start waits for a fix rather
+  // than quietly starting a seat with no end.
+  const planInvalid = planTyped && planInput === null;
+  // "Until" is a length that shrinks as the clock runs: asked again each
+  // minute, so the minutes and the price on screen are never an old answer.
+  const minute = useMinuteTick(limit === "until");
+  const planApplies = !isFree && mode === "open";
+  const typedRate = overrideApplied ? customRateNum : undefined;
+  const totalNum = Number(totalInput);
+  const totalValid = Number.isFinite(totalNum) && totalNum > 0;
+  // A total set by hand is sent INSTEAD of a rate: the seat runs at the rate
+  // it implies, and the server keeps the total exactly.
+  const typedTotal = editTotal && totalValid ? totalNum : undefined;
+  const planQuote = useServerQuote<IStartQuote, number | string>(
+    planApplies && (!editTotal || totalValid) ? planInput : null,
+    (input) => sessionRepository.startQuote(
+      pc.id, typeof input === "number" ? { minutes: input } : { until: input }, typedRate, typedTotal,
+    ),
+    `${pc.id}|${typedRate ?? ""}|${typedTotal ?? ""}`,
+    limit === "until" ? minute : 0,
+  );
+  const quotedPlan = quoteFor(planQuote, planInput);
+  // Priced for exactly what is on screen: the length AND, when set by hand,
+  // the total — a reply for an earlier figure never starts a seat.
+  const planPriced = quotedPlan !== null
+    && (typedTotal === undefined || Math.round(quotedPlan.amount * 100) === Math.round(typedTotal * 100));
+  const planByHand = planInput !== null && typedTotal !== undefined;
+
   const toggleEditPrice = (next: boolean) => {
     setEditPrice(next);
     setRateSaved(false);
@@ -236,7 +289,10 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
           pc_id: pc.id,
           mode: "open",
           user_display_name: pc.label,
-          ...(overrideApplied ? { hourly_rate: customRateNum } : {}),
+          ...(overrideApplied && !planByHand ? { hourly_rate: customRateNum } : {}),
+          ...(planMinutes !== null ? { duration_minutes: planMinutes } : {}),
+          ...(planUntil !== null ? { until: planUntil } : {}),
+          ...(planByHand ? { planned_amount: typedTotal } : {}),
           ...psnField,
         });
       }
@@ -267,7 +323,12 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
   // exact case free is for: a demo stand, a tournament machine, a seat given
   // back after an outage. The server lifts the same refusal for the same reason.
   const startDisabled =
-    busy || deviceOffline || !psnValid || (!isFree && mode === "open" && (editPrice ? !overrideApplied : assignedRate === null));
+    busy || deviceOffline || !psnValid
+    // A total set by hand prices the seat itself, so no seat rate is needed.
+    || (!isFree && mode === "open" && !planByHand && (editPrice ? !overrideApplied : assignedRate === null))
+    // A plan is started only on the server's own figure for it.
+    || (planApplies && (planInvalid || (planInput !== null && !planPriced)))
+    || (planApplies && planInput !== null && editTotal && !totalValid);
 
   return (
     <Modal open onClose={onClose}>
@@ -376,6 +437,86 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
                     )}
                   </div>
                 )}
+
+                {/* A planned length, OPTIONAL (2026-10-25). Empty is the
+                    count-up start this form has always made — nothing is
+                    filled in for the cashier. Filled, the server starts the
+                    seat with an end, prices it at the rate above (its own
+                    `start-quote`, the chain the start itself runs), and the
+                    card gets "+ Время". Billed by the clock either way. */}
+                <section className="col" style={{ gap: 8 }} data-testid="planned-duration">
+                  <span className="label">{t("session.plannedDuration")}</span>
+                  <SectionTabs
+                    label={t("session.planLimit")}
+                    value={limit}
+                    disabled={busy}
+                    tabs={[
+                      { key: "duration", label: t("session.planLimitDuration") },
+                      { key: "until", label: t("session.planLimitUntil") },
+                    ]}
+                    onChange={setLimit}
+                  />
+                  {limit === "duration" ? (
+                    <DurationPicker
+                      unit={plan.unit}
+                      amount={plan.amount}
+                      onChange={setPlan}
+                      disabled={busy}
+                      label={t("session.plannedDuration")}
+                    />
+                  ) : (
+                    <ClockTimeField
+                      value={untilInput}
+                      onChange={setUntilInput}
+                      disabled={busy}
+                      quote={quotedPlan}
+                    />
+                  )}
+                  {planInput === null && !planTyped ? (
+                    <span className="muted" style={{ fontSize: 11 }}>{t("session.plannedNone")}</span>
+                  ) : (
+                    <>
+                      <QuotedPrice
+                        label={t("session.plannedPrice")}
+                        hint={t("session.plannedHint")}
+                        quote={planQuote}
+                        amountOf={(q) => q.amount}
+                        // Set by hand: the rate it implies and what the seat
+                        // would have asked, so a deal is visibly a deal.
+                        noteOf={(q) => (typedTotal === undefined ? null : [
+                          `${money(q.hourly_rate)} / ${t("time.hourShort") || "h"}`,
+                          q.standard_amount !== null
+                            ? `${t("session.plannedStandard")}: ${money(q.standard_amount)}`
+                            : null,
+                        ].filter(Boolean).join(" · "))}
+                      />
+                      {/* The total, editable (2026-10-25): a price agreed at
+                          the counter for this length. Kept exactly by the
+                          server; the full time bills exactly this. */}
+                      <Checkbox
+                        checked={editTotal}
+                        onChange={(next) => {
+                          setEditTotal(next);
+                          setTotalInput(next && quotedPlan !== null ? String(quotedPlan.amount) : "");
+                        }}
+                        label={t("session.plannedEditTotal")}
+                        disabled={busy || planInput === null}
+                      />
+                      {editTotal && (
+                        <div className="col" style={{ gap: 4 }} data-testid="planned-total">
+                          <PriceInput
+                            label={t("session.plannedTotal")}
+                            value={totalInput}
+                            onChange={setTotalInput}
+                          />
+                          {totalInput.trim() !== "" && !totalValid && (
+                            <span className="error" style={{ fontSize: 11 }}>{t("session.plannedTotalInvalid")}</span>
+                          )}
+                        </div>
+                      )}
+                    </>
+                  )}
+                </section>
               </div>
             ))}
 
@@ -403,6 +544,32 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
 
             {deviceOffline && <div className="error">{t("session.deviceOfflineHint")}</div>}
             {err && <div className="error">{renderText(err, t)}</div>}
+            {/* What Start will do, in one line, before it is pressed
+                (2026-10-27): read off the choices above, nothing worked out
+                here — the price is the server's quote, said as preliminary. */}
+            <div className="start-summary" data-testid="start-summary" aria-live="polite">
+              <span className="muted">{t("session.summary.title")}</span>{" "}
+              <strong>
+                {[
+                  `№${pc.place?.number ?? pc.label}`,
+                  isFree
+                    ? t("session.freeBill")
+                    : mode === "fixed"
+                      ? (packages?.find((p) => p.id === pkgId) ? timePackageNameOf(packages.find((p) => p.id === pkgId)!, lang) : t("session.choosePackage"))
+                      : effectiveRate !== null && !planByHand ? `${money(effectiveRate)} / ${t("time.hourShort") || "h"}` : null,
+                  !isFree && mode === "open"
+                    ? planUntil !== null
+                      ? fmt(t("session.summary.until"), planUntil)
+                      : planMinutes !== null
+                        ? fmt(t("session.summary.minutes"), planMinutes)
+                        : t("session.summary.open")
+                    : null,
+                  !isFree && mode === "open" && quotedPlan !== null
+                    ? fmt(t("session.summary.price"), money(quotedPlan.amount))
+                    : null,
+                ].filter(Boolean).join(" · ")}
+              </strong>
+            </div>
             <div className="row-between">
               <Button variant="secondary" onClick={onClose} disabled={busy}>{t("action.cancel")}</Button>
               <Button onClick={submit} disabled={startDisabled}>{busy ? "…" : t("action.start")}</Button>
@@ -430,7 +597,7 @@ interface AssignedRateDisplayProps {
 const AssignedRateDisplay = ({ rate, hourSuffix, noRateText, rateLabel, money }: AssignedRateDisplayProps) => {
   if (rate === null) {
     return (
-      <div className="muted" style={{ fontSize: 13, padding: "10px 12px", border: "1px solid #4a3a1a", background: "#2a2210", borderRadius: 8 }}>
+      <div className="muted" style={{ fontSize: 13, padding: "10px 12px", border: "1px solid #4a3a1a", background: "var(--color-warning-surface)", borderRadius: 8 }}>
         {noRateText}
       </div>
     );
@@ -443,7 +610,7 @@ const AssignedRateDisplay = ({ rate, hourSuffix, noRateText, rateLabel, money }:
         alignItems: "center",
         padding: "10px 12px",
         border: "1px solid #1f2a44",
-        background: "#0b1224",
+        background: "var(--color-surface)",
         borderRadius: 8,
       }}
     >
@@ -457,9 +624,9 @@ const AssignedRateDisplay = ({ rate, hourSuffix, noRateText, rateLabel, money }:
 
 const pkgRow = (active: boolean): React.CSSProperties => ({
   display: "flex", gap: 10, alignItems: "center",
-  border: `1px solid ${active ? "#07ddf1" : "#1f2a44"}`,
+  border: `1px solid ${active ? "var(--color-primary)" : "var(--color-border)"}`,
   borderRadius: 8, padding: "10px 12px", cursor: "pointer",
-  background: active ? "#101a35" : "transparent",
+  background: active ? "var(--color-surface-alt)" : "transparent",
 });
 
 const tabStyle = (active: boolean): React.CSSProperties => ({
@@ -471,9 +638,9 @@ const tabStyle = (active: boolean): React.CSSProperties => ({
   // wrap to a second line on narrow widths instead of overflowing.
   minWidth: 0,
   padding: "8px 10px",
-  border: `1px solid ${active ? "#07ddf1" : "#1f2a44"}`,
-  background: active ? "#101a35" : "transparent",
-  color: active ? "#07ddf1" : "#9aa8c7",
+  border: `1px solid ${active ? "var(--color-primary)" : "var(--color-border)"}`,
+  background: active ? "var(--color-surface-alt)" : "transparent",
+  color: active ? "var(--color-primary)" : "var(--color-muted-alt)",
   borderRadius: 8,
   cursor: "pointer",
   fontWeight: 600,

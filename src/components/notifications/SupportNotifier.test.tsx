@@ -12,17 +12,14 @@ import SupportNotifier from "./SupportNotifier";
  * arpeggio.
  */
 
-const sound = vi.hoisted(() => ({ support: vi.fn(), app: vi.fn() }));
+const sound = vi.hoisted(() => ({ playFor: vi.fn() }));
 const store = vi.hoisted(() => ({
   arrival: null as unknown,
   clearArrival: vi.fn(),
 }));
 const nav = vi.hoisted(() => ({ go: vi.fn() }));
 
-vi.mock("@/utils/notificationSound", () => ({
-  playSupportChime: sound.support,
-  playNotificationChime: sound.app,
-}));
+vi.mock("@/sound/soundEngine", () => ({ playFor: sound.playFor }));
 vi.mock("@/support/SupportUnreadContext", () => ({
   useSupportUnread: () => ({ arrival: store.arrival, clearArrival: store.clearArrival }),
 }));
@@ -38,8 +35,7 @@ const arrival = {
 };
 
 beforeEach(() => {
-  sound.support.mockReset();
-  sound.app.mockReset();
+  sound.playFor.mockReset();
   store.clearArrival.mockReset();
   nav.go.mockReset();
   store.arrival = null;
@@ -51,8 +47,9 @@ describe("SupportNotifier", () => {
     store.arrival = arrival;
     await act(async () => { render(<SupportNotifier />); });
 
-    expect(sound.support).toHaveBeenCalledTimes(1);
-    expect(sound.app).not.toHaveBeenCalled();
+    // The SUPPORT kind, keyed by the message, never the floor's (2026-10-27).
+    expect(sound.playFor).toHaveBeenCalledTimes(1);
+    expect(sound.playFor).toHaveBeenCalledWith("support", "11");
   });
 
   test("shows the sender and the preview", async () => {
@@ -69,7 +66,7 @@ describe("SupportNotifier", () => {
     await act(async () => { render(<SupportNotifier />); });
 
     expect(document.querySelector(".support-toast")).toBeNull();
-    expect(sound.support).not.toHaveBeenCalled();
+    expect(sound.playFor).not.toHaveBeenCalled();
   });
 
   test("Open goes to Support and takes the card with it", async () => {

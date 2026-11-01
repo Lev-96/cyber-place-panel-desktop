@@ -180,16 +180,16 @@ const RegistrationRow = ({ reg, onRemove }: RowProps) => {
                       fontSize: 11,
                       padding: "2px 6px",
                       borderRadius: 6,
-                      background: "rgba(34,197,94,0.15)",
-                      color: "#22c55e",
+                      background: "rgb(var(--success-rgb) / 0.15)",
+                      color: "var(--color-success)",
                       fontWeight: 600,
                     }
                   : {
                       fontSize: 11,
                       padding: "2px 6px",
                       borderRadius: 6,
-                      background: "rgba(250,204,21,0.12)",
-                      color: "#facc15",
+                      background: "rgb(var(--rgb-yellow) / 0.12)",
+                      color: "var(--color-yellow)",
                       fontWeight: 600,
                     }
               }
@@ -217,8 +217,8 @@ const RegistrationRow = ({ reg, onRemove }: RowProps) => {
         style={{
           padding: "6px 10px",
           fontSize: 12,
-          color: "#ef4444",
-          borderColor: "#4a1a1a",
+          color: "var(--color-danger)",
+          borderColor: "var(--color-danger-border-dim)",
         }}
       >
         {t("action.remove") || "Remove"}

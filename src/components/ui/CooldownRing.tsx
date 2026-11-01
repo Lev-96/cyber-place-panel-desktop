@@ -22,18 +22,17 @@ const CooldownRing = ({ remaining, total }: Props) => {
   return (
     <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
       <svg width="22" height="22" viewBox="0 0 24 24" style={{ transform: "rotate(-90deg)" }} aria-hidden>
-        <circle cx="12" cy="12" r={r} fill="none" stroke="#1f2a44" strokeWidth="2.5" />
+        <circle cx="12" cy="12" r={r} fill="none" style={{ stroke: "var(--color-border)" }} strokeWidth="2.5" />
         <circle
           cx="12"
           cy="12"
           r={r}
           fill="none"
-          stroke="#07ddf1"
           strokeWidth="2.5"
           strokeLinecap="round"
           strokeDasharray={circ}
           strokeDashoffset={circ * (1 - pct)}
-          style={{ transition: "stroke-dashoffset 1s linear" }}
+          style={{ stroke: "var(--color-primary)", transition: "stroke-dashoffset 1s linear" }}
         />
       </svg>
       <span style={{ fontVariantNumeric: "tabular-nums" }}>{mmss(remaining)}</span>

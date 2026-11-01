@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useNavigate } from "react-router-dom";
 import type { IShift, IShiftReport } from "@/types/shifts";
 
 /**
@@ -200,5 +200,35 @@ describe("the report and the history", () => {
     await mount();
     expect(screen.queryByTestId("shift-none")).toBeNull();
     expect(screen.queryByTestId("shift-open")).toBeNull();
+  });
+});
+
+/**
+ * Hooks run in the same order on every render (2026-10-27): the minute
+ * re-read used to be declared AFTER the "invalid id" early return, so the
+ * screen moving from a bad address to a good one (a deep link fixed by hand,
+ * back/forward) rendered more hooks than before and React tore the screen down.
+ */
+describe("the address changes under the screen", () => {
+  test("from an invalid branch id to a real one, the screen renders instead of crashing", async () => {
+    repo.current.mockResolvedValue({ shift: null, report: null });
+    const errors = vi.spyOn(console, "error").mockImplementation(() => {});
+    let go: (to: string) => void = () => {};
+    const Nav = () => { go = useNavigate(); return null; };
+    await act(async () => {
+      render(
+        <MemoryRouter initialEntries={["/branches/abc/shift"]}>
+          <Nav />
+          <Routes><Route path="/branches/:branchId/shift" element={<Shift />} /></Routes>
+        </MemoryRouter>,
+      );
+    });
+    expect(screen.getByText("hub.invalidId")).toBeTruthy();
+
+    await act(async () => { go("/branches/4/shift"); });
+    await waitFor(() => expect(repo.current).toHaveBeenCalledWith(4));
+    expect(screen.queryByText("hub.invalidId")).toBeNull();
+    expect(errors.mock.calls.some((c) => String(c[0]).includes("Rendered more hooks"))).toBe(false);
+    errors.mockRestore();
   });
 });
