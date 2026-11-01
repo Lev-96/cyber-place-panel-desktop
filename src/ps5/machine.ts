@@ -417,9 +417,20 @@ export const step = (prev: MachineSnapshot, obs: Observation, newEventId: string
   // The rest is re-issued rather than merely waited on: the previous one is
   // known not to have worked. The controller's own cooldown decides how often
   // that actually reaches the wire.
+  //
+  // `restingSince` is what marks "we asked it to sleep and it has not yet",
+  // not the state on the previous tick (2026-11-02). A rest that FAILED leaves
+  // the state ERROR, and a console unheard for a while leaves it OFFLINE —
+  // both keep `restingSince`. Requiring GOING_TO_REST here turned exactly
+  // that case into an unexpected wake: measured at a club, a manager's Stop
+  // failed twice on a console the desk PC could not hear, and when it was
+  // heard again it was treated as switched on by someone, waited out the
+  // grace and asked the owner about it. A console seen asleep, seen active or
+  // a real unexpected wake clears `restingSince`; one left over from a rest
+  // that a Start superseded can only matter after a newer Stop, when a rest is
+  // what is wanted anyway.
   if (
-    prev.state === "GOING_TO_REST"
-    && prev.restingSince !== null
+    prev.restingSince !== null
     && obs.now - prev.restingSince < REST_SETTLE_MS
   ) {
     if (!obs.canRest) {

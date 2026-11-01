@@ -387,3 +387,89 @@ describe("a sleeping console that goes quiet", () => {
   });
 });
 
+
+describe("one watching loop, however often a press asks for a fresh look", () => {
+  // A status check on venue Wi-Fi where some console stays quiet waits its
+  // full window (1.8 s) — longer than the fast rhythm's 1.5 s, so a press
+  // nearly always lands while a check is running (2026-11-02).
+  const SLOW_CHECK_MS = 1_800;
+  let checkMs = SLOW_CHECK_MS;
+  const seven = Array.from({ length: 7 }, (_, i) => ({ hostId: `H${i}`, address: `192.168.1.${10 + i}` }));
+  let inFlight = 0;
+  let mostAtOnce = 0;
+  let failNext = false;
+
+  const installSlowBridge = () => {
+    (globalThis as Record<string, unknown>).cyberplacePS5 = {
+      probe: (addresses: string[]) => new Promise<Ps5SweepResult>((resolve, reject) => {
+        probeCalls.push({ addresses });
+        inFlight += 1;
+        mostAtOnce = Math.max(mostAtOnce, inFlight);
+        const fail = failNext;
+        failNext = false;
+        setTimeout(() => {
+          inFlight -= 1;
+          if (fail) reject(new Error("bridge gone"));
+          else resolve({ ...empty, probed: addresses });
+        }, checkMs);
+      }),
+      discover: async () => empty,
+    };
+  };
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    inFlight = 0;
+    mostAtOnce = 0;
+    failNext = false;
+    checkMs = SLOW_CHECK_MS;
+    installSlowBridge();
+  });
+
+  const advance = async (ms: number) => { await act(async () => { await vi.advanceTimersByTimeAsync(ms); }); };
+
+  test("twenty presses during checks leave the rhythm and the load exactly as one loop", async () => {
+    const { result } = renderHook(() => useConsoleWatch(seven));
+    await advance(100);
+
+    for (let i = 0; i < 20; i++) {
+      await advance(900); // mid-check
+      act(() => result.current.refreshNow());
+      await advance(5_000);
+    }
+
+    // Long past the fast window: the usual ten-second rhythm.
+    await advance(120_000);
+    probeCalls = [];
+    mostAtOnce = 0;
+    await advance(60_000);
+
+    expect(probeCalls).toHaveLength(6);
+    expect(mostAtOnce).toBe(1);
+  });
+
+  test("a press during a check is not lost: a fresh check follows as soon as that one ends", async () => {
+    // A check shorter than the fast rhythm, so "as soon as it ends" and "at
+    // the next period" are different moments.
+    checkMs = 1_000;
+    const { result } = renderHook(() => useConsoleWatch(seven));
+    await advance(500);
+    const before = probeCalls.length;
+
+    act(() => result.current.refreshNow());
+    expect(probeCalls).toHaveLength(before); // not beside the running one
+
+    await advance(600); // the running check has ended (at 1 000 ms)
+    expect(probeCalls).toHaveLength(before + 1);
+  });
+
+  test("a check that fails does not end the watching", async () => {
+    failNext = true;
+    renderHook(() => useConsoleWatch(seven));
+    await advance(100);
+    expect(probeCalls).toHaveLength(1);
+
+    await advance(WATCH_INTERVAL_MS + SLOW_CHECK_MS);
+    expect(probeCalls).toHaveLength(2);
+  });
+});

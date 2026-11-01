@@ -254,29 +254,60 @@ export const useConsoleWatch = (bound: WatchedConsole[], options: Options = {}) 
     }
 
     let stopped = false;
-    let timer: ReturnType<typeof setTimeout>;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    /** A check is on the wire; a second one must not start beside it. */
+    let checking = false;
+    /** Asked for "now" while a check was running: go again as soon as it ends. */
+    let again = false;
+
+    const schedule = (wait: number) => {
+      clearTimeout(timer);
+      timer = setTimeout(() => void run(), wait);
+    };
 
     // Chained timeouts rather than an interval: a probe that takes longer than
     // the interval must delay the next tick, not stack another one on top of
     // it. The wait is measured from when the tick STARTED, so the check happens
     // on its period — not the period plus however long the network took, which
     // is how a "ten-second" check quietly becomes a twelve-second one.
+    //
+    // ONE loop, always (2026-11-02). A press used to start a second loop when
+    // it landed during a check, and the first one's timer was then lost rather
+    // than cancelled: both went on for good. In the fast rhythm a check (1.8 s)
+    // outlasts its period (1.5 s), so nearly every Start, Stop or move added a
+    // loop — measured on seven consoles, 6 checks a minute became 120 after 20
+    // presses, each one a datagram to every console three times over.
     const run = async () => {
-      const startedAt = Date.now();
-      await tick();
       if (stopped) return;
+      if (checking) { again = true; return; }
+      checking = true;
+      again = false;
+      const startedAt = Date.now();
+      try {
+        await tick();
+      } catch (error) {
+        // A failed check must not end the watching for the rest of the shift:
+        // the next one is simply tried at its time.
+        console.info("[ps5] status check failed", error instanceof Error ? error.message : String(error));
+      } finally {
+        checking = false;
+      }
+      if (stopped) return;
+
+      // Asked for "now" during that check: the answer it wants is a fresh one.
+      if (again) { schedule(0); return; }
 
       // Quickly while a change is expected, at the usual rhythm otherwise.
       const period = Date.now() < fastUntil.current ? fastIntervalMs : intervalMs;
-      const wait = Math.max(0, period - (Date.now() - startedAt));
+      schedule(Math.max(0, period - (Date.now() - startedAt)));
+    };
 
-      timer = setTimeout(() => void run(), wait);
-      // …and the wait can be cut short: pressing Start should not mean waiting
-      // out a period that began before the operator touched anything.
-      wakeLoop.current = () => {
-        clearTimeout(timer);
-        void run();
-      };
+    // …and the wait can be cut short: pressing Start should not mean waiting
+    // out a period that began before the operator touched anything.
+    wakeLoop.current = () => {
+      if (checking) { again = true; return; }
+      clearTimeout(timer);
+      void run();
     };
     void run();
 
