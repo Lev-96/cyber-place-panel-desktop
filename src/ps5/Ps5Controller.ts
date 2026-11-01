@@ -309,15 +309,21 @@ export class Ps5Controller {
 
     this.inFlight.set(input.hostId, command.kind);
     this.cancelAsked.delete(input.hostId);
-    this.sentAt.set(sentKey, this.ports.now());
+    const startedAt = this.ports.now();
+    this.sentAt.set(sentKey, startedAt);
     this.ports.log(command.kind === "wake" ? "PS5_WAKE_REQUESTED" : "PS5_REST_REQUESTED", {
       hostId: input.hostId, deviceId: input.deviceId,
     });
+    // How the command ended and how long it took, on one line (2026-11-02):
+    // the measurement a slow evening is diagnosed from. `sent` is the transport
+    // having done its part, never the console having obeyed.
+    let result: string = "threw";
 
     try {
       const outcome = command.kind === "wake"
         ? await this.ports.wake(input.hostId, input.address)
         : await this.ports.rest(input.hostId, input.address);
+      result = outcome.sent ? "sent" : (outcome.code ?? "TRANSPORT_ERROR");
 
       if (outcome.sent) {
         // Sent, NOT confirmed. Confirmation is the next observation's job, and
@@ -360,6 +366,9 @@ export class Ps5Controller {
     } finally {
       this.inFlight.delete(input.hostId);
       this.cancelAsked.delete(input.hostId);
+      this.ports.log("PS5_COMMAND_DONE", {
+        hostId: input.hostId, command: command.kind, result, ms: this.ports.now() - startedAt,
+      });
     }
   }
 
