@@ -363,3 +363,36 @@ describe("what is written to the log", () => {
     expect(JSON.stringify(logs)).not.toMatch(/credential|registKey|secret/i);
   });
 });
+
+describe("every command leaves one line saying how it ended and how long it took", () => {
+  // The record a slow evening is diagnosed from (2026-11-02): `ps5.log` keeps
+  // these lines, so "Start took ages" becomes a number per console.
+  const done = () => logs.filter((l) => l.event === "PS5_COMMAND_DONE").map((l) => l.fields);
+
+  test("a sent wake: the time it took, and 'sent' — not 'woke'", async () => {
+    wake.mockImplementation(async () => { clock += 40; return { sent: true }; });
+    const c = new Ps5Controller(ports);
+
+    await c.tick([input({ starting: true })]);
+
+    expect(done()).toEqual([{ hostId: "AAA", command: "wake", result: "sent", ms: 40 }]);
+  });
+
+  test("a rest the console refused: its code and the time spent getting there", async () => {
+    rest.mockImplementation(async () => { clock += 45_000; return { sent: false, code: "TIMEOUT" }; });
+    const c = new Ps5Controller(ports);
+
+    await c.tick([input({ actual: "awake", stopping: true })]);
+
+    expect(done()).toEqual([{ hostId: "AAA", command: "rest", result: "TIMEOUT", ms: 45_000 }]);
+  });
+
+  test("a transport that threw", async () => {
+    wake.mockImplementation(async () => { clock += 5; throw new Error("ipc gone"); });
+    const c = new Ps5Controller(ports);
+
+    await c.tick([input({ starting: true })]);
+
+    expect(done()).toEqual([{ hostId: "AAA", command: "wake", result: "threw", ms: 5 }]);
+  });
+});

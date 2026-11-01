@@ -13,6 +13,7 @@ import { activeTransport, useCredentialVault } from "./ps5/transport";
 import { WakeKeys } from "./ps5/credentials";
 import { wake as wakePlayStation, wakeWithCredential } from "./ps5/wake";
 import { openPsnLoginExternally, pairConsole, psnLoginUrl } from "./ps5/pairing";
+import { isPs5Line, writePs5Line } from "./ps5/ps5Log";
 
 // `isDev` follows how the app was BUILT, never the environment it starts in.
 // Previously a packaged panel launched with ELECTRON_DEV_URL set would load
@@ -170,6 +171,14 @@ const createWindow = async () => {
       nodeIntegration: false,
       sandbox: true,
       preload: join(__dirname, "preload.js"),
+      // The console watcher and its controller run in this page, on timers.
+      // Chromium throttles a hidden page's timer chains to ONE run a minute
+      // after five minutes (on Windows a window fully covered by another
+      // counts as hidden). Measured on this Electron, 2026-11-02: a 1.5 s
+      // check ran every 59 s while hidden — a session ending with the panel
+      // minimised left its console awake for minutes. This panel controls
+      // hardware in the room, so it keeps its rhythm whatever is in front.
+      backgroundThrottling: false,
     },
   });
 
@@ -179,6 +188,10 @@ const createWindow = async () => {
   // response launch `file://`, `smb://` or a Windows handler URI.
   if (restored?.maximized) mainWindow.maximize();
   rememberWindowState(mainWindow);
+  // The console watcher's lines, kept in ps5.log for diagnosis (see ps5Log).
+  mainWindow.webContents.on("console-message", (_event: unknown, _level: unknown, message: unknown) => {
+    if (isPs5Line(message)) writePs5Line(message);
+  });
 
   mainWindow.webContents.setWindowOpenHandler(({ url }: { url: string }) => {
     if (mayOpenExternally(url)) {

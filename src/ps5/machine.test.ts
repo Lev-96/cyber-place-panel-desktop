@@ -2,6 +2,7 @@ import { describe, expect, test } from "vitest";
 import {
   initialSnapshot,
   step,
+  withError,
   UNEXPECTED_WAKE_GRACE_MS,
   REST_SETTLE_MS,
   WAKE_GIVE_UP_MS,
@@ -436,6 +437,28 @@ describe("a console that cannot be reached", () => {
     expect(steps.flatMap((s) => s.commands).some((c) => c.kind === "report-unexpected-wake")).toBe(false);
     expect(steps[1].commands).toEqual([{ kind: "rest" }]);
     expect(snapshot.wakeEventId).toBeNull();
+  });
+
+  test("a Stop whose rest failed and whose console went quiet is still a Stop when it is heard again", () => {
+    // Measured at a club, 2026-11-02 (desk PC log, "Маленький VIP"): Stop →
+    // rest → DEVICE_NOT_FOUND → rest → TIMEOUT → the PC could not hear the
+    // console (OFFLINE) → heard awake again two minutes after the Stop, with
+    // the local "stopping" intent long lapsed. It was treated as switched on by
+    // someone: ten more seconds of grace and a question to the owner.
+    let snapshot = step(initialSnapshot(), observe({ actual: "awake", stopping: true }), "e1").next;
+    expect(snapshot.state).toBe("GOING_TO_REST");
+
+    snapshot = withError(snapshot, "DEVICE_NOT_FOUND");
+    snapshot = step(snapshot, observe({ actual: "awake", stopping: true, now: 1_015_000 }), "e2").next;
+    snapshot = withError(snapshot, "TIMEOUT");
+    snapshot = step(snapshot, observe({ actual: "unreachable", now: 1_080_000 }), "e3").next;
+    expect(snapshot.state).toBe("OFFLINE");
+
+    const heardAgain = step(snapshot, observe({ actual: "awake", now: 1_136_000 }), "e4");
+
+    expect(heardAgain.next.state).toBe("GOING_TO_REST");
+    expect(heardAgain.commands).toEqual([{ kind: "rest" }]);
+    expect(heardAgain.next.wakeEventId).toBeNull();
   });
 
   test("but a console still awake LONG after that IS asked about", () => {

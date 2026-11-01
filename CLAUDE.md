@@ -234,6 +234,30 @@ branch — so the two yml files never conflict:
   - Limits: LAN only (same router; 2.4/5 GHz of one router is one LAN unless
     client isolation is on); no remote close-game command exists for PS5 in
     playactor (only standby); a panel must be running on the venue LAN.
+- **Evening slowness with 5–7 consoles (2026-11-02).** Report:
+  `~/cyber-place-local/reports/ps5-evening-2026-11-02/`. Two proven defects, both
+  in the panel (backend, Reverb, agent are not in the command path):
+  - `useConsoleWatch` ran a SECOND loop whenever `refreshNow()` landed during a
+    check, and lost the first loop's timer, so both ran forever. A fast-rhythm
+    check (1.8 s) outlasts its period (1.5 s), so nearly every Start/Stop/move
+    added a loop: 7 consoles, 6 checks/min → 120 after 20 presses. Now one loop;
+    a press during a check re-runs right after it; a thrown check does not end
+    the loop. Tests: "one watching loop…" in `useConsoleWatch.test.ts`.
+  - Chromium throttles a hidden page's timer chains to one run a MINUTE after
+    5 min (Windows also counts a fully covered window as hidden). Measured on
+    Electron 33: the 1.5 s check ran every 59 s. `backgroundThrottling: false`
+    on the main window; side effect: the branch poller no longer slows to its
+    idle 60 s while minimised (stays 30 s).
+  - Diagnosis: every command logs `PS5_COMMAND_DONE {hostId, command, result,
+    ms}`; all `[ps5]` page-console lines are written to `logs/ps5.log` in
+    userData (`electron/ps5/ps5Log.ts`, 5 MB rolling). Ask a venue for that file.
+  - Live at the club (desk PC log): a Stop whose rest failed (DEVICE_NOT_FOUND,
+    then TIMEOUT) left the state ERROR → OFFLINE, and when the console was heard
+    again the "still going to rest" guard (it required `prev.state ===
+    GOING_TO_REST`) missed it → UNEXPECTED_WAKE, 10 s grace, owner asked. The
+    guard now keys on `restingSince` within REST_SETTLE_MS. The failures
+    themselves: the desk PC (Realtek 8188GU USB, 2.4 GHz only) could not hear
+    that console for ~80 s while a laptop in the same room heard it every second.
 - **PSN player message is deferred** (`PSN_FEATURE.playerMessages = false` in
   `src/api/psn.ts`, mirrors the backend flag): no PSN name field at start and no
   sender card in Settings. Pairing's `psnLoginExternal` is separate and stays.
