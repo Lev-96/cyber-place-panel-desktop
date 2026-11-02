@@ -3378,3 +3378,40 @@ differ.
   system → `isAudioBlocked()` + «Включить звук»; visuals never depend on it.
 - **Typecheck**: `npm run typecheck` (`tsc -p .` checks nothing — the root
   tsconfig has `"files": []`).
+
+## Hiding the side menu (2026-11-03)
+
+One toggle, `SidebarToggle`, in `PageTopBar`'s left slot before Back. It is a
+36px circle in Back's glass, the bar's own height, so `barBottomInset` does not
+change. It never moves under the pointer or focus, so focus is never lost. Its
+`aria-label` is "Side menu" (`nav.sideMenu`), its `title` is the action
+(`nav.menuHide` / `nav.menuShow`), and `aria-expanded` + `aria-controls` point at
+`#app-sidebar`.
+
+- **State**: `src/components/SidebarCollapse.tsx`. `AppShell` owns `collapsed`
+  and renders `div.app-shell.app-shell--collapsible[.is-sidebar-collapsed]`.
+  `Layout` passes its children already built, so a toggle re-renders only
+  AppShell, PageTopBar and Sidebar. The page, the notifiers and
+  `Ps5ControlProvider` are not even re-rendered, and nothing remounts. It is not
+  persisted: the menu is shown on every launch and sign-in, and stays as set
+  across screens.
+- **Motion**: the column goes `240px → 0px` (`grid-template-columns`
+  transition) while the sidebar, held at `--sidebar-w`, slides `translateX(-100%)`
+  on the same 240ms curve, so its edge rides the column edge. It gets
+  `visibility: hidden` after the slide and `inert` while hidden. Reduced motion
+  means no transition. Width-dependent widgets already follow `main`: the map
+  and `useFitsInline` use ResizeObserver, and the board uses container queries.
+  A new widget that measures only on `window.resize` would NOT see a toggle.
+- **Owner web**: it renders the same `Sidebar` in its drawer with no AppShell.
+  `useSidebarCollapse()` returns null there, so there is no toggle, no id and no
+  `inert`, and the CSS uses `> .sidebar` child selectors that cannot reach
+  `.web-drawer .sidebar`.
+- The account popover (portal) closes when the menu hides.
+
+Tests: `SidebarCollapse.test.tsx` (9, real Layout/Sidebar/PageTopBar) and
+`e2e/sidebar-collapse.spec.ts` (5, real Chromium). The e2e spec covers
+mid-slide geometry, final widths, no sideways scroll at 800×560 / 1280×800 /
+1920×1080, no Tab into the hidden menu, reduced motion and zero network
+requests. Mutation-verified: remount on toggle, re-render of the children,
+never inert, popover left open, id leaked to the web, a descendant selector,
+and the reduced-motion guard dropped.
