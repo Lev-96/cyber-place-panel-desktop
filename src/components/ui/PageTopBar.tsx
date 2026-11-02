@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
 import BackButton from "./BackButton";
+import { SidebarToggle } from "../SidebarCollapse";
 
 /**
  * The bar pinned to the top of every screen (2026-10-25): Back on the left,
@@ -104,6 +105,8 @@ const PageTopBar = () => {
   return (
     <div ref={barRef} className={`cp-topbar${shown ? " is-titled" : ""}`} data-testid="page-topbar">
       <div className="cp-topbar__side">
+        {/* Hide / show the side menu (2026-11-03); nothing outside the desktop shell. */}
+        <SidebarToggle />
         <BackButton />
       </div>
       <div className="cp-topbar__title" aria-hidden={!shown} data-testid="page-topbar-title">

@@ -166,6 +166,21 @@ const SHAPES: Readonly<Record<string, ReactNode>> = {
       <path d="M12 17.5v-11" />
     </>
   ),
+  // Not menu entries: the top bar's toggle that hides / shows the menu.
+  "nav.menuHide": (
+    <>
+      <rect x="3" y="3" width="18" height="18" rx="2" />
+      <path d="M9 3v18" />
+      <path d="m16 15-3-3 3-3" />
+    </>
+  ),
+  "nav.menuShow": (
+    <>
+      <rect x="3" y="3" width="18" height="18" rx="2" />
+      <path d="M9 3v18" />
+      <path d="m14 9 3 3-3 3" />
+    </>
+  ),
   // Not a menu entry: the sign-out button beside the account card.
   "nav.signOut": (
     <>

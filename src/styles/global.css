@@ -861,9 +861,45 @@ a.card:hover {
 }
 
 .app-shell {
+  --sidebar-w: 240px;
   display: grid;
-  grid-template-columns: 240px 1fr;
+  grid-template-columns: var(--sidebar-w) 1fr;
   height: 100vh;
+}
+
+/* Hiding the side menu (desktop shell only, 2026-11-03; AppShell sets both
+   classes). The column closes 240px → 0 while the menu, held at its own width
+   so nothing in it re-wraps, slides out by its width on the same curve and
+   duration — its edge rides the column's edge, so the page grows into the
+   space with no gap and no overlap. The column is the one thing that has to
+   change size: the page must actually gain the room, which a transform alone
+   cannot give it. Once out, the menu stops painting (visibility, after the
+   slide); `inert` takes it out of the Tab order. Child selectors on purpose:
+   the owner web's sidebar sits inside its drawer and is never reached. */
+.app-shell--collapsible {
+  transition: grid-template-columns 240ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.app-shell--collapsible > .sidebar {
+  width: var(--sidebar-w);
+  transition:
+    transform 240ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    visibility 0s;
+}
+.app-shell--collapsible.is-sidebar-collapsed {
+  grid-template-columns: 0px 1fr;
+}
+.app-shell--collapsible.is-sidebar-collapsed > .sidebar {
+  transform: translateX(-100%);
+  visibility: hidden;
+  transition:
+    transform 240ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    visibility 0s linear 240ms;
+}
+@media (prefers-reduced-motion: reduce) {
+  .app-shell--collapsible,
+  .app-shell--collapsible > .sidebar {
+    transition: none;
+  }
 }
 
 /* ── Sidebar rhythm (2026-10-11) — one 4px scale throughout:
@@ -1107,7 +1143,37 @@ body.cp-modal-open .main {
 }
 .cp-topbar__side {
   display: flex;
+  align-items: center;
+  gap: 8px;
   min-width: 0;
+}
+/* Hide / show the side menu (2026-11-03): Back's glass and edge in a 36px
+   circle — the bar's own height, so the bar and `barBottomInset` stay as they
+   were. Only the colours move on hover: it never shifts under the pointer. */
+.cp-sidebar-toggle {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  background: var(--back-btn-bg);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  color: var(--back-btn-fg);
+  cursor: pointer;
+  transition:
+    color 160ms ease,
+    border-color 160ms ease;
+}
+.cp-sidebar-toggle:hover {
+  color: var(--color-text);
+  border-color: rgb(var(--accent-rgb) / 0.55);
+}
+.cp-sidebar-toggle:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
 }
 .cp-topbar__side > * {
   pointer-events: auto;

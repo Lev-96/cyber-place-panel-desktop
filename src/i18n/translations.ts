@@ -59,6 +59,10 @@ export const TRANSLATIONS: Dict = {
   },
   "nav.settings": { en: "Settings", ru: "Настройки", am: "Կարգավորումներ" },
   "nav.signOut": { en: "Sign out", ru: "Выйти", am: "Ելք" },
+  // The top bar's toggle for the side menu: its name, then what a press does.
+  "nav.sideMenu": { en: "Side menu", ru: "Боковое меню", am: "Կողային մենյու" },
+  "nav.menuHide": { en: "Hide menu", ru: "Скрыть меню", am: "Թաքցնել մենյուն" },
+  "nav.menuShow": { en: "Show menu", ru: "Показать меню", am: "Ցույց տալ մենյուն" },
 
   // Auth
   "auth.signIn": { en: "Sign in", ru: "Войти", am: "Մուտք" },

@@ -16,6 +16,7 @@ import { useUpdatesNotification } from "@/realtime/UpdatesNotificationContext";
 import { ReactNode, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useAnchoredPopover } from "@/hooks/useAnchoredPopover";
+import { SIDEBAR_ID, useSidebarCollapse } from "@/components/SidebarCollapse";
 import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 
 const UnreadBadge = ({ count }: { count: number }) => {
@@ -153,6 +154,13 @@ const UserMenu = ({ name, email, role, roleLabel, trailing }: UserCardProps) => 
       document.removeEventListener("keydown", onKey);
     };
   }, [open, switchTarget]);
+
+  // The popover lives in <body>: hiding the side menu by keyboard (no outside
+  // mousedown) would leave it hanging off a card that is no longer on screen.
+  const menuHidden = useSidebarCollapse()?.collapsed ?? false;
+  useEffect(() => {
+    if (menuHidden) { setOpen(false); setView("menu"); }
+  }, [menuHidden]);
 
   return (
     // The account card: the same surface, edge and width as the Support card
@@ -406,9 +414,16 @@ const Sidebar = ({ footerExtra }: SidebarProps = {}) => {
   // (`/bookings/confirm` is Scan, not Scan AND Bookings). Plain `Link`s, because
   // a NavLink decides on its own and two of them can both claim the page.
   const activeTo = activeNavTo(navItems, pathname);
+  // Hidden by the desktop shell's toggle (2026-11-03): out of the Tab order and
+  // the accessibility tree while off screen. No shell, no id and never inert.
+  const collapse = useSidebarCollapse();
 
   return (
-    <aside className="sidebar">
+    <aside
+      className="sidebar"
+      id={collapse ? SIDEBAR_ID : undefined}
+      inert={collapse?.collapsed || undefined}
+    >
       {/* Brand row — logo + wordmark. The logo PNG lives in /public,
           so Vite serves it at the root path in both dev and the built
           electron bundle. Height-limited to keep the header compact;
