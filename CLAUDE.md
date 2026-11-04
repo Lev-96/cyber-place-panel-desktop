@@ -661,7 +661,7 @@ loud `[reverb] REJECTED …` line naming the key and host; the backend has
 - Dark theme by default; Light and High contrast exist since 2026-10-27
   (see "Interface, themes and sounds" below) — never hard-code a colour.
 - Smooth CSS transitions; no jarring instant state changes.
-- Responsive — must work down to the 800×560 window minimum
+- Responsive — must work down to the 520×560 window minimum
   (`electron/windowBounds.ts` `MIN_CONTENT`), up to 1920×1080 and beyond.
 - Playstation font for branding / headings; Inter for UI text.
 - Stable button widths across i18n (don't let translations shift layout).
@@ -2402,9 +2402,17 @@ each minute (`useMinuteTick` → its `refresh` argument): the figure stays on
 screen while the same question is asked again, so Start never blinks off; a
 different time or rate blanks it as before.
 
-**The window (2026-10-25).** Resizable with no maximum; minimum 800×560
-(`electron/windowBounds.ts` `MIN_CONTENT`) — every screen reflows there, and
-below 1100 px the shell gutters tighten so the board keeps two columns. Size,
+**The window (2026-10-25).** Resizable with no maximum; minimum 520×560
+(`electron/windowBounds.ts` `MIN_CONTENT`; 800 until 2026-11-04, owner: "the
+window shrinks without limits") — every screen reflows there, and below
+1100 px the shell gutters tighten so the board keeps two columns, below 640
+to their smallest. No screen holds the window wider. `e2e/narrow-window.spec.ts`
+walks 26 screens at 520px, side menu folded and open: the page never scrolls
+sideways (fixed for it: `.appearance-grid` `minmax(min(300px, 100%), 1fr)`,
+`.screen-actions__buttons` may wrap, `.sound-device__volume`
+`min-width: min(240px, 100%)`). `e2e-electron/window-resize.spec.ts`: one
+squeeze takes the window to 520 on Active Places (list and grid), the list is
+whole there in pictures with the menu folded, and there is no window bridge. Size,
 place and maximized state are kept in the existing `Store` under
 `window.state` and restored only if the window still lands on a display
 (shrunk and moved inside it otherwise); first run opens at the default,
@@ -2838,6 +2846,108 @@ they did, and TypeScript caught it as a duplicate object property.
   `useLocalReorder.test.tsx` slot tests, `SessionsBoard.reorder.test.tsx`
   (real drag events → shown order + payload, failed save, reload),
   `SessionCard.test.tsx`.
+
+## «Интерфейс и тема», 2026-11-04
+
+- **«По умолчанию»**: the `standard` card is titled «По умолчанию» (it IS the
+  default: `DEFAULT_PREFERENCES.interface`), not a fourth duplicate card. A
+  first visit has it chosen and no «Мой интерфейс»; the card appears only
+  from what was SAVED (`hasOwnInterface(prefs)`), chosen, its words from
+  `interfaceSummary(prefs)`. Simple / Default / Compact are exactly their
+  preset (`effectiveLayout`, `effectiveBoard` = `BOARD_DEFAULTS`, labels
+  "auto"); «Мой» brings back exactly what was saved. Theme and sounds stay
+  global (their own sections), not part of an interface.
+- **Removed** (owner): card size 80–130 % (`scale`), «Без прокрутки» (`fit`),
+  side spacing (`gap_x` and its switch), columns (`columns` and «Сколько
+  поместится»). `BoardGeometry` is `{ gap_y }`; `parseBoard` reads only it,
+  so values an older build kept stop applying (a setting nobody can see is
+  one nobody can change back). The row spacing slider + switch stay.
+- **Button labels** `layout.button_labels`: "auto" (Оба: words, pictures in
+  a list row too narrow — as before), "icons" (pictures always, list AND
+  grid; in a grid card only the picture replaces the word inside its cell),
+  "text" (words always; a list too narrow is zoomed instead). Server-side:
+  `App\Support\UiPreferences::BUTTON_LABELS`, request rule
+  `data.layout.button_labels` — DEPLOY THE BACKEND FIRST, an older backend
+  refuses the key with 422. Presets carry "auto"; a document without the key
+  parses to "auto" and still equals its preset.
+- **Themes**: dark, light (softened), contrast, purple, midnight, emerald,
+  amber («Тёплая ночь»). One list, `THEMES` (same on the server, also deploy
+  FIRST: an older backend 422s a new name), offered by `themeChoices` on the
+  page and in the first-run setup. Each new one redefines the page, the
+  surfaces, the frames and the accent only. Since 2026-11-05 (owner: the
+  colours hurt the eyes) the five non-dark, non-contrast themes are calm:
+  «Серая» (id `light`, the white theme is gone), «Лаванда», «Полночь»,
+  «Шалфей», «Песок»; they share one softer status block
+  (`:is([data-theme="light"], …)`, after the themes).
+  `preferences/themes.test.ts` reads the stylesheet: every theme has its
+  block and swatch, and text / muted / accent / danger ≥ 4.5:1 on page and
+  surface, a primary button's text ≥ 4.5:1; no theme has a page or surface
+  above luminance 0.05; calm themes never use pure-white text.
+- **Preview docked** (see «The interface preview is drawn from…»).
+- Tests: `boardGeometry.test.tsx`, `FitBoardToScreen.test.tsx`,
+  `Appearance.personal.test.tsx` (first visit, save → «Мой», the exact
+  switch between cards, labels, row gap), `themes.test.ts`,
+  `e2e/button-labels.spec.ts` (Both / Icons list+grid / Text in real
+  Chromium), `e2e/active-places-responsive.spec.ts` (the dock in sight while
+  scrolling, lets go after, hides). Mutation-checked: «Мой» read from the
+  draft, a preset taking «Мой»'s layout, Text still showing pictures, a
+  theme accent under 4.5:1, grid pictures off; backend: a theme or the
+  labels rule removed.
+
+## A pad press says itself beside the card, never in it (2026-11-04)
+
+Owner: after pressing the joystick, nothing must be written on the card
+("3 · 500 ֏", "3/4 · 12 ֏", "Тариф сейчас: 2,300 ֏/ч") — it made the card, and
+its row, taller. Now:
+- The pad line keeps its empty `PAD_COUNT_STYLE` span only (same shape the
+  preview draws; the list hides an empty pad line). The identity + money,
+  «оплачено» (charge-once fee taken), the hourly «Тариф сейчас» and the
+  round-trip spinner are gone from the card. `padMax` / `joystickCount`
+  went with them (no other reader). The refusal (`session-card__error`) and
+  the free pill stay as before; the corner toast stays as before.
+- `components/sessions/PadChargeNote.tsx`: an anchor laid over the card
+  (`position: absolute; inset: 0`, out of the card's grid/flex flow, only
+  while shown) and the note in a portal on `<body>`, placed by
+  `useAnchoredPopover` (above the card, below if no room, inside the window,
+  follows scroll; not clipped by any section, not shrunk by the board zoom).
+  Orange (`--color-warning` border on `--color-warning-surface`,
+  `--notice-fg` text), `pointer-events: none`, `role="status"`, z 40 (above
+  the pinned bar, under dialogs at 50), fades in and out over its last 300ms.
+- `hooks/useTransientFlags.ts` (`flash(key)` / `isOn(key)`, per-key clocks,
+  a re-flash restarts, timers cleared on unmount): `SessionsBoard` flashes
+  the seat for 5000ms only AFTER the server accepted the add/remove AND the
+  read-back landed, so the note reads the seat as the server now holds it.
+  Never on a refusal, never from a socket update (only the presser sees it).
+- Tests: the pad-line assertions in `SessionsBoard.expiry.test.tsx` moved onto
+  the note (`pressPad`), plus its 5s life, no note on refusal, none from a
+  `joystick.added` socket event; `useTransientFlags.test.tsx`;
+  `e2e/pad-note.spec.ts` (grid and list: card size and every row unchanged,
+  note outside the card, orange, not clickable, gone after 5s);
+  `e2e/session-terms.spec.ts` names the pad in the note. Mutation-checked:
+  note on refusal, text back on the card, 50s instead of 5s.
+
+## Devices without a place (2026-11-04)
+
+Owner: "Active Places shows 10 seats at khanjyan, Places shows 7". Active
+Places draws DEVICES (`GET /pcs`), Places draws PLACES (`GET /places`); three
+devices there had `place_id = null` (two running sessions), so they were on
+the board and on no tile — and Computers lists `kind = pc` only.
+- `components/places/DevicesWithoutPlace.tsx`, under the Places tiles: an
+  amber `.card.state-notice` naming them, with «Удалить устройство» for
+  `can(role, "branch.places")` (`DELETE /pcs/{id}`: the device and every
+  session recorded on it; the confirm says so).
+- Delete is refused while a session runs, by TWO signals: the branch's
+  running sessions (`sessionRepository.runningPcIds`) and the device's own
+  `in_session` status. Only on a fresh, successful read: both strict reads
+  (`pcRepository.listWithoutPlace`, `runningPcIds`) THROW instead of falling
+  back to `[]`, and a reload in flight or failed disables it — "could not
+  tell" never reads as "nothing runs".
+- The backend now requires a place on `POST /pcs` and never accepts
+  `place_id: null` on `PUT`; `CreatePcBody.place_id` is required and
+  `UpdatePcBody.place_id` is `number` (no null) to mirror it.
+- Tests: `DevicesWithoutPlace.test.tsx` (8, down to `request()`,
+  mutation-checked on each running signal), `e2e/places-orphans.spec.ts`
+  (1440 and 520px, real CSS).
 
 ## 9.5.13 Six small changes (2026-10-11)
 
@@ -3342,8 +3452,10 @@ differ.
   `auto`/`minmax(a,b)` tracks there: each row sizes them alone and the
   columns drift. Measured: no button text off-centre, no part past the
   frame, columns aligned — 5 viewports × ru/en/am.
-- **Light theme** is soft on purpose (owner: white hurt the eyes): page
-  `#e6e9ee`, surfaces `#f3f4f7`, text `#1c2330`; every text ≥ 4.5:1.
+- **No white theme** (2026-11-05, owner): the id `light` is kept (saved
+  preferences and the backend whitelist use it) but it is the grey
+  «Серая»: page `#1f2226`, surface `#282c31`, text `#d9dce1`, accent
+  `#8fb3d1`. Seven themes, see «Интерфейс и тема, 2026-11-04».
 - **«Интерфейс и тема»** (`/appearance`, every role; `nav.appearance`):
   ready-made interface, theme, preview (`AppearancePreview`: the board's own
   classes, `inert`, no handlers), own layout, side-menu order/visibility
@@ -3379,14 +3491,21 @@ differ.
 - **Typecheck**: `npm run typecheck` (`tsc -p .` checks nothing — the root
   tsconfig has `"files": []`).
 
-## Hiding the side menu (2026-11-03)
+## Folding the side menu to a rail (2026-11-03)
 
 One toggle, `SidebarToggle`, in `PageTopBar`'s left slot before Back. It is a
 36px circle in Back's glass, the bar's own height, so `barBottomInset` does not
 change. It never moves under the pointer or focus, so focus is never lost. Its
 `aria-label` is "Side menu" (`nav.sideMenu`), its `title` is the action
-(`nav.menuHide` / `nav.menuShow`), and `aria-expanded` + `aria-controls` point at
-`#app-sidebar`.
+(`nav.menuHide` / `nav.menuShow`: Collapse / Expand menu), and
+`aria-expanded` + `aria-controls` point at `#app-sidebar`.
+
+**Folded = a 64px rail, never zero** (the owner asked that the menu stay
+visibly there). The rail shows the logo, every entry's icon (its name as a
+`title` tooltip, unread as a red dot), the Support tile and the avatar, all
+centred on the rail's 32px axis. Every entry stays clickable and tabbable.
+Sign-out is the one exception: it sits past the edge, so it fades and leaves
+the Tab order (`visibility: hidden`).
 
 - **State**: `src/components/SidebarCollapse.tsx`. `AppShell` owns `collapsed`
   and renders `div.app-shell.app-shell--collapsible[.is-sidebar-collapsed]`.
@@ -3395,23 +3514,230 @@ change. It never moves under the pointer or focus, so focus is never lost. Its
   `Ps5ControlProvider` are not even re-rendered, and nothing remounts. It is not
   persisted: the menu is shown on every launch and sign-in, and stays as set
   across screens.
-- **Motion**: the column goes `240px → 0px` (`grid-template-columns`
-  transition) while the sidebar, held at `--sidebar-w`, slides `translateX(-100%)`
-  on the same 240ms curve, so its edge rides the column edge. It gets
-  `visibility: hidden` after the slide and `inert` while hidden. Reduced motion
-  means no transition. Width-dependent widgets already follow `main`: the map
-  and `useFitsInline` use ResizeObserver, and the board uses container queries.
-  A new widget that measures only on `window.resize` would NOT see a toggle.
+- **How the rail is made**: the column animates `240px → 64px`
+  (`grid-template-columns`). The sidebar's width follows the column, while its
+  nav, footer and brand row keep the OPEN widths (`--sidebar-w` minus the
+  paddings), so no label re-wraps mid-fold. The sidebar's own `overflow:
+  hidden` clips the rest, which also takes no clicks: a click right of the rail
+  lands in `main`. A row's hover/current surface narrows to a 40px tile via an
+  animated `clip-path: inset(...)`. Labels fade, because their first letters
+  would show. The footer cards lose edge and fill; the tiles and logo shift
+  `translateX(-10px / -12px)` onto the axis. When folded, focus rings go on the
+  icon, tile or avatar, because the row outline would be cut by the edge.
+- **Motion**: every transition of the fold is inside
+  `@media (prefers-reduced-motion: no-preference)`; with reduced motion it
+  folds at once. Width-dependent widgets already follow `main`: the map and
+  `useFitsInline` use ResizeObserver, and the board uses container queries. A
+  new widget that measures only on `window.resize` would NOT see a toggle.
 - **Owner web**: it renders the same `Sidebar` in its drawer with no AppShell.
   `useSidebarCollapse()` returns null there, so there is no toggle, no id and no
-  `inert`, and the CSS uses `> .sidebar` child selectors that cannot reach
+  tooltips, and the CSS uses `> .sidebar` child selectors that cannot reach
   `.web-drawer .sidebar`.
-- The account popover (portal) closes when the menu hides.
+- The account popover (portal) closes when the menu folds.
+- A role with many entries scrolls the rail with the wheel. The nav's
+  scrollbar is past the edge, so it does not show.
 
-Tests: `SidebarCollapse.test.tsx` (9, real Layout/Sidebar/PageTopBar) and
-`e2e/sidebar-collapse.spec.ts` (5, real Chromium). The e2e spec covers
-mid-slide geometry, final widths, no sideways scroll at 800×560 / 1280×800 /
-1920×1080, no Tab into the hidden menu, reduced motion and zero network
-requests. Mutation-verified: remount on toggle, re-render of the children,
-never inert, popover left open, id leaked to the web, a descendant selector,
-and the reduced-motion guard dropped.
+Tests:
+- `SidebarCollapse.test.tsx` (11, real Layout/Sidebar/PageTopBar).
+- `e2e/sidebar-collapse.spec.ts` (7, real Chromium). It covers: mid-fold
+  geometry, the final widths, icons/tiles/logo on the axis, label opacity 0,
+  sign-out hidden, a rail click navigates, keyboard reach (rail yes,
+  sign-out no), reduced motion, no sideways scroll at 800×560 / 1280×800 /
+  1920×1080, and zero requests. The zero-requests test waits for network
+  quiet first: the board's full load reopens the Reverb socket, and its
+  `/broadcasting/auth` burst (once, ~0.3 s after open) used to land in the
+  window.
+- Mutation-verified: remount on toggle, re-render of the children, popover
+  left open, id leaked to the web, a descendant selector, no tooltips when
+  folded, a zero-wide rail, a transition outside the motion query, sign-out
+  left visible, tiles off-axis, and a toggle that fires a request.
+
+## Personal interface: board, «Мой интерфейс», branch shortcuts (2026-11-03)
+
+**The server refuses unknown keys.** `UpdateUserPreferencesRequest` validates
+with `array:keys`, so any key the backend does not list gets a 422 and NOTHING
+is stored. A new field sent in `data` would break every save. That is why:
+
+- **Board geometry is local, per person**: `u{id}:cp.ui.board` =
+  `{ v: 1, gap_y }` (since 2026-11-04; `gap_x`, `columns`, `scale`, `fit` an
+  older build wrote are left unread), parsed by `parseBoard`.
+  - The row gap is 8–64 px on the 4px scale; null = the density's own.
+  - It is held as `UiPreferences.board`, but `toDocument` lists the server's
+    four keys only.
+  - Saving writes it FIRST, awaited; if it cannot be written, nothing is
+    applied and `saveFailed` is set.
+  - It applies only with «Мой интерфейс» and does not follow the person to
+    another PC.
+  - To sync it: add the keys to the backend request rules, deploy the backend
+    FIRST, then move the fields into `layout`.
+- **CSS on `<html>`**: `--board-gap-y` (the person's row spacing, unset =
+  the density's) and `data-button-labels` (auto / icons / text). The grid
+  gap is `var(--board-gap-y, --gap-grid) var(--gap-grid)`. Unset, the old
+  CSS applies exactly. Side spacing, fixed columns, the size zoom and «Без
+  прокрутки» were removed 2026-11-04 (owner): no `--board-gap-x`,
+  `--board-cols`, `--board-scale` or `--board-fit-gap` any more.
+- **The list's width fit is one CSS `zoom`** on `.live-grid--sessions`:
+  `var(--board-fit, 1)`, set by `FitBoardToScreen` on `main` (list view only).
+  - Zoom, not transform: it relays out, hit-testing follows, and
+    position: fixed is not broken. The board reads no geometry.
+  - It re-fits on `main`'s ResizeObserver and on childList mutations only (a
+    clock tick is characterData). It clears its marks on unmount.
+- **The screen-bg fix**: under the pinned top bar, `.cp-topbar ~ .screen-bg`
+  is `min-height: calc(100% - 50px)` (bar 36 + margin 14). At 100% EVERY
+  desktop screen scrolled ~50px even when its content fitted.
+- **A list row keeps its own size and look at every window size** (owner,
+  2026-11-03, after GameZone.html): texts, then the buttons on the right, on
+  one line, for a free seat and a running one alike, never shrunk or
+  rearranged for a small window.
+  - The list grid is `minmax(max-content, 1fr)`: every row is as wide as the
+    widest one needs, so the Start / Stop column lines up.
+  - The section keeps `.cp-section-inner:has(> .live-grid--sessions)`:
+    `overflow-x: auto; overflow-y: hidden` (both non-visible, so the fold
+    animation still clips) as the last resort below `MIN_WIDTH_ZOOM`. The
+    owner rejected sideways scroll as the normal case: the width fit
+    (pictures, then zoom, below) keeps the list whole.
+  - Below 1460 there is one set of row columns:
+    `110px minmax(130px, 170px) minmax(130px, 1fr) auto`. The old 1184 / 990 /
+    880 / 640 rules that moved buttons under the texts are gone.
+  - The buttons' cell has `min-width: max-content`.
+  - An EMPTY PlayStation pad line (`.row` > empty `.row`) is `display: none`
+    in a row. It made a running row taller. With content it shows as before.
+  - Tried and dropped the same day: zooming rows to the window's width, and
+    folding buttons under the texts. The owner wants the same size.
+  - Row sizes (owner, 2026-11-03, "a touch larger"): buttons 38px / 14px
+    (min-width 76, padding 0 14), number 16px, clock 17px, «Свободно» 15px,
+    platform 12px, state word 13px, `--row-py` 12px (S 8, L 16).
+- **Pictures instead of words when a row does not fit** (owner, 2026-11-03,
+  down to 520px, the same order and places, no mobile rearrangement):
+  - `SessionCardAction` takes an optional `icon` (`ActionIcon`: add-item,
+    extra, add-time, pause, resume, relocate, stop, more; Lucide geometry
+    through the shared `ui/LineIcon`, which `NavIcon` now uses too). The icon
+    is drawn hidden (`.session-card__btn-icon { display: none }`), so a card
+    or a row with room looks exactly as before. `title` / `aria-label` stay
+    the full label. Start keeps its word. The pad switch was already a picture.
+  - `installBoardFit` (list), cheapest first, all within one frame:
+    1. words, as is;
+    2. `data-board-icons` on the board's container when the words do not
+       fit: every action button 38px square with its picture, the actions'
+       gap 4px, and in the compact layout the columns
+       `96px 120px minmax(110px, max-content) auto` with a 10px column gap
+       (the clock and its money stay on one line);
+    3. only then the whole-list zoom (room / natural with pictures, floor
+       `MIN_WIDTH_ZOOM` 0.5).
+  - Below 640px (the owner web, and the desktop window since 2026-11-04) the
+    gutters are at their smallest: `.main` 8px, `.screen-bg` 12/8px, a
+    section's left indent 12px.
+  - Measured in Chromium, list, 6 seats / 3 playing, menu folded: 1920 → 520
+    every 20px, no sideways scroll at all; at 520 the list is at zoom 0.595.
+    With the side menu OPEN, 520 leaves the list 218px (the menu alone is
+    240): even pictures at the floor do not fit, so there (only) the list
+    scrolls sideways inside its section, the page never.
+- **The window is never held wider for the board** (owner, 2026-11-04,
+  "without limits"). A board-driven window minimum existed for one day
+  (2026-11-03: `KeepBoardWhole`, the `window:min-content-width` IPC channel,
+  the `cyberplaceWindow` bridge, gutter-aware measurement) and was REMOVED
+  with all of it: the window shrinks to its 520 base on every screen, and the
+  list keeps itself whole by pictures, then zoom, then (only past the floor)
+  a sideways scroll inside its section. Do not bring a window minimum back
+  without the owner asking: it is the thing that "would not let the window
+  get smaller".
+- **`FitBoardToScreen` / `installBoardFit(target)`** serve the list's width
+  only (measured by `boardMeasure.ts` `measureLists`, the rows laid out
+  `max-content` under `[data-board-measure]` within one frame): words →
+  pictures (`data-board-icons`) → zoom down to `MIN_WIDTH_ZOOM` 0.5. The
+  height fit («Без прокрутки», `fitSearch`, `MIN_FIT_ZOOM`) is gone with its
+  switch (2026-11-04). The zoom rule is unconditional; unset, it is 1.
+- **`Switch` vs the account picker**: both used the `.cp-switch` class. The
+  picker's rule (column flex) is now `div.cp-switch`. Before, it stacked EVERY
+  `Switch` primitive app-wide, including the game cover and VIP minimum
+  forms, which now render as designed (track, then label, on one line).
+  `Switch` gained `size="md"` (44×24), `ariaLabel` and `testId`.
+  `RangeSlider` (ui) is the labelled native range used for every number on
+  the page.
+- **«Мой интерфейс» is a card among the ready-made ones** (ChoiceCards). It
+  appears only when `hasOwnInterface(prefs)`: custom is on, a non-preset
+  layout, or a non-default board. Its description is `interfaceSummary(prefs)`,
+  i.e. what was SAVED. Choosing it applies it. «Сбросить «Мой интерфейс»»
+  under the row asks first. «Вернуть интерфейс по умолчанию» only switches
+  and never wipes it.
+- **Branch shortcuts**: `components/branches/branchSections.ts` is the ONE
+  list of branch sections (key, path, title/hint keys, icon, `allowed(role)`).
+  - BranchHub's tiles are built from it.
+  - A test pins every `allowed` to the route's `RoleGuard` in App.tsx, for
+    every role.
+  - Menu ids are `branch.<key>.<branchId>`, kept in `layout.sidebar`.
+    `addedMenuSpecs` draws a shortcut only for owner or manager, only for a
+    section the hub offers that role, and a manager's only for their own
+    branch, each once.
+  - Every branch sub-route is inside `BlockedBranchGuard`, and the server
+    authorises as ever.
+  - The editor lists the role's sections with switches (`BranchShortcuts`;
+    owners pick a branch from `branchRepository.list({ company_id })`). In
+    the order editor, switching a shortcut off removes it.
+- **The interface preview is drawn from the board's own parts**:
+  - `AppearancePreview` uses `SessionCard`, `seatParts.tsx` (`SeatGrip`,
+    `SeatPlatformLine`, `SeatNameLine`, `sessionTariffLine`, `PAD_LINE_STYLE`
+    / `PAD_COUNT_STYLE`), `SessionTimer`, `PadToggle`, `SessionCardAction` and
+    `CardOverflow`, inside `CollapsibleSection` and `.live-grid--sessions`.
+  - `seatParts` was moved out of `SessionsBoard.renderCell` word for word. It
+    was proven by rendering the board before and after the move: the HTML was
+    byte-identical.
+  - It is drawn at the board's OWN size, pixel for pixel (owner, 2026-11-03):
+    laid out at the screen's content width (`previewWidth`) with no zoom, and
+    fitted by `installBoardFit` with the board's own options
+    (`useBoardFitOptions`, height fit excluded: it depends on the window's
+    height). So the same columns, words or pictures and zoom as the board;
+    what the settings card cannot show scrolls sideways inside
+    `.appearance-preview__frame`.
+  - It is docked (2026-11-04, owner: at the bottom of a long page nobody saw
+    it): `.appearance-preview-dock` (`appearance-preview-block`) is the first
+    child of the «Карточки активных мест» section (2026-11-05, owner: not
+    pinned over the whole page) and sticks under the pinned top bar while
+    that section's settings, «Отступ между рядами» included, are on screen;
+    it lets go where the section ends. Its body is at most
+    `min(40vh, 380px)` and scrolls inside; «Скрыть просмотр» hides it.
+    It is `components/appearance/PreviewDock.tsx`, which publishes its height
+    as `--preview-dock-h` on the section; the section's controls carry
+    `scroll-margin-top` from it, so focus / Tab / a scroll to one stops below
+    the stuck preview, not behind it (e2e + mutation-checked).
+  - `e2e/active-places-responsive.spec.ts` compares computed styles and
+    sizes of a playing seat (card, state, platform, number, clock, Stop,
+    Pause, pad) on the board and in the preview, list and grid, 1440 and 800
+    with the menu open. The board's data includes a seat in its last minutes
+    like the preview's sample: its thicker frame makes the widest row.
+  - Its sample seats are fixed in pattern; how many it draws is two full
+    rows of the grid as laid out (`previewSeatCount(columns)` = 2 × columns,
+    4..24; 4 in a list or jsdom), re-read on resize and on a look change, so
+    row spacing always shows (e2e: exactly 2 rows at 1366/1920/2560 and
+    after a card-size change). It is `inert`, has no handlers and reads
+    nothing.
+  - `AppearancePreview.parity.test.tsx` compares the skeleton of the preview's
+    running and free seats (tag, classes, data-action, order) with the real
+    board's. A card changed in one place and not the other fails it.
+- **Not done on purpose**: a free card-padding setting (S/M/L pairs padding
+  with min-heights; free padding clips the 198px card's buttons).
+
+Tests:
+- `preferences/boardGeometry.test.tsx`
+- `preferences/FitBoardToScreen.test.tsx`
+- `components/Sidebar.addedEntries.test.tsx` (route parity)
+- `routes/Appearance.personal.test.tsx`
+- `e2e/board-personalization.spec.ts` (5)
+- `e2e/board-fit.spec.ts` (15, real Chromium)
+- `e2e/active-places-responsive.spec.ts` (8, real Chromium: the 1920 → 520
+  sweep, menu open, grid, preview parity ×4, preview position)
+- `components/sessions/SessionCardAction.icon.test.tsx`
+
+Mutation-verified:
+- the board in the server document, the board write not awaited;
+- a manager adding another branch, an admin allowed, a section's `allowed`
+  drifting from its route;
+- presets counted as own, reset without confirm, the default wiping «Мой
+  интерфейс», the summary read from the draft;
+- gaps unclamped, the fixed-columns rule removed, the gap fallback lost;
+- the fit spacing step removed, the floor ignored, re-fit on clock ticks;
+- list buttons back under the texts, the screen-bg 100% back, the
+  `.cp-switch` collision back;
+- the pictures step removed, the pictures never shown, the gutters'
+  narrow answer ignored, the preview without the board's fit, the preview
+  moved above the choices or into its own section.
