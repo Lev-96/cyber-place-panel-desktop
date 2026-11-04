@@ -7,6 +7,7 @@ import type { StatusTone } from "@/domain/statusTone";
 import { StatusIcon } from "@/components/ui/StatusChip";
 import { SessionUrgency, useSessionUrgency } from "./sessionUrgency";
 import type { DropSide } from "@/utils/reorder";
+import ActionIcon, { type ActionIconId } from "./ActionIcon";
 
 interface Props {
   /** The running session on this seat, or undefined for a free one. */
@@ -128,13 +129,19 @@ interface ActionProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, "chi
   danger?: boolean;
   /** Spans the whole row, like Stop (e.g. «Пересадить»). */
   wide?: boolean;
+  /**
+   * The picture a list row too narrow for the words shows in their place
+   * (2026-11-03). Drawn hidden; CSS shows it only then, so a card or a row
+   * with room looks exactly as without it.
+   */
+  icon?: ActionIconId;
 }
 
 /**
  * One button in a card's action grid. Every action on a session card goes
  * through this, which is what keeps them one height, one line and one style.
  */
-export const SessionCardAction = ({ label, fullLabel, danger = false, wide = false, className, ...rest }: ActionProps) => (
+export const SessionCardAction = ({ label, fullLabel, danger = false, wide = false, icon, className, ...rest }: ActionProps) => (
   <Button
     variant="secondary"
     {...rest}
@@ -147,7 +154,12 @@ export const SessionCardAction = ({ label, fullLabel, danger = false, wide = fal
       className ?? "",
     ].filter(Boolean).join(" ")}
   >
-    {label}
+    {icon ? (
+      <>
+        <ActionIcon id={icon} />
+        <span className="session-card__btn-text">{label}</span>
+      </>
+    ) : label}
   </Button>
 );
 
@@ -199,7 +211,8 @@ export const CardOverflow = ({ collapsed, label, children }: OverflowProps) => {
         data-action="more"
         onClick={() => setOpen((v) => !v)}
       >
-        {label} ▾
+        <ActionIcon id="more" />
+        <span className="session-card__btn-text">{label} ▾</span>
       </Button>
       {open && (
         // A click on any action inside closes the menu after it has run.

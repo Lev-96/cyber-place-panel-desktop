@@ -12,7 +12,8 @@ import { request } from "./client";
  */
 export interface CreatePcBody {
   branch_id: number;
-  place_id?: number | null;
+  /** Required by the backend since 2026-11-04: a device always serves a place. */
+  place_id: number;
   label: string;
   kind?: PcKind;
   hourly_rate?: number | null;
@@ -21,7 +22,8 @@ export interface CreatePcBody {
 }
 
 export interface UpdatePcBody {
-  place_id?: number | null;
+  /** Never null (backend refuses since 2026-11-04): omit it to keep the link. */
+  place_id?: number;
   label?: string;
   kind?: PcKind;
   hourly_rate?: number | null;

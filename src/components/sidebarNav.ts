@@ -1,6 +1,8 @@
 import type { ReactNode } from "react";
 import { compareText } from "@/i18n/collation";
 import type { Lang } from "@/i18n/translations";
+import type { Role } from "@/types/api";
+import { branchSectionPath, parseBranchShortcut, type BranchSection } from "@/components/branches/branchSections";
 
 /** One entry of the side menu, before the role and the language decide. */
 export interface NavItemSpec {
@@ -171,4 +173,54 @@ export const applyPersonalMenu = (
       || a.index - b.index)
     .map(({ item }) => item);
   return home ? [home, ...arranged] : arranged;
+};
+
+/**
+ * Branch shortcuts a person switches on in their own menu (2026-11-03): any
+ * section of a branch they work (`branchSections.ts`, the hub's own list),
+ * opened straight from the menu, Active Places first among them.
+ *
+ * Kept in the arrangement the server already stores (`{ id, hidden }`), the id
+ * naming section and branch: `branch.<key>.<branchId>`. Personalisation never
+ * grants anything: a shortcut is drawn only for a role that works a branch
+ * (owner, manager), only for a section that role is offered in the hub, a
+ * manager's only for their OWN branch; the route guards, `BlockedBranchGuard`
+ * and the server still decide what opens. Switching one off removes it.
+ */
+export const canHaveBranchShortcuts = (role: string | undefined): boolean =>
+  role === "company_owner" || role === "manager";
+
+/** A shortcut the person added (as opposed to an entry the role's menu always has). */
+export const isAddedEntry = (id: string): boolean => parseBranchShortcut(id) !== null;
+
+/** The icon an entry draws: a shortcut draws its section's. */
+export const iconIdOf = (id: string): string => parseBranchShortcut(id)?.section.icon ?? id;
+
+/** Whether this role may draw this shortcut at all. */
+export const shortcutAllowed = (
+  role: Role | undefined,
+  myBranchId: number | null,
+  id: string,
+): boolean => {
+  if (!canHaveBranchShortcuts(role)) return false;
+  const parsed = parseBranchShortcut(id);
+  if (!parsed || !parsed.section.allowed(role)) return false;
+  return role !== "manager" || parsed.branchId === myBranchId;
+};
+
+/** The shortcuts this role may draw, from the person's arrangement, each once. */
+export const addedMenuSpecs = (
+  role: Role | undefined,
+  myBranchId: number | null,
+  arrangement: ReadonlyArray<{ id: string; hidden: boolean }>,
+): NavItemSpec[] => {
+  const seen = new Set<string>();
+  const specs: NavItemSpec[] = [];
+  for (const e of arrangement) {
+    if (e.hidden || seen.has(e.id) || !shortcutAllowed(role, myBranchId, e.id)) continue;
+    seen.add(e.id);
+    const { section, branchId } = parseBranchShortcut(e.id) as { section: BranchSection; branchId: number };
+    specs.push({ to: branchSectionPath(section, branchId), labelKey: section.titleKey, id: e.id, show: true });
+  }
+  return specs;
 };

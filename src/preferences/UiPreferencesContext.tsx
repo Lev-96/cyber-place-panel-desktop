@@ -4,8 +4,9 @@ import { preferencesRepository } from "@/repositories/PreferencesRepository";
 import { setDeviceSound as setEngineDeviceSound, setSoundPreferences, type DeviceSound } from "@/sound/soundEngine";
 import { ReactNode, createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import {
-  DEFAULT_PREFERENCES, NEW_PERSON_PREFERENCES, ONBOARDING_VERSION, SCHEMA_VERSION,
-  effectiveLayout, parsePreferences, toDocument, type Layout, type UiPreferences,
+  BOARD_DEFAULTS, DEFAULT_PREFERENCES, NEW_PERSON_PREFERENCES, ONBOARDING_VERSION, SCHEMA_VERSION,
+  effectiveBoard, effectiveLayout, parseBoard, parsePreferences, toBoardDocument, toDocument,
+  type BoardGeometry, type Layout, type UiPreferences,
 } from "./uiPreferences";
 
 /**
@@ -61,7 +62,23 @@ export const deviceSoundKey = (userId: number) => `u${userId}:cp.sound.device`;
  * and is sent with the next save or the next sign-in.
  */
 export const onboardedKey = (userId: number) => `u${userId}:cp.ui.onboarded`;
+/** The Active Places grid's spacing and columns, on this computer (2026-11-03). */
+export const boardKey = (userId: number) => `u${userId}:cp.ui.board`;
 const DEVICE_DEFAULT: DeviceSound = { volume: 100, muted: false };
+
+const setPx = (root: HTMLElement, name: string, v: number | null) => {
+  if (v === null) root.style.removeProperty(name);
+  else root.style.setProperty(name, `${v}px`);
+};
+
+/**
+ * The board's own spacing as a CSS variable on `<html>` (2026-11-03). Unset
+ * means the stylesheet's own value, so the standard board is byte-for-byte
+ * the old one.
+ */
+const applyBoard = (b: BoardGeometry, root: HTMLElement) => {
+  setPx(root, "--board-gap-y", b.gap_y);
+};
 
 /** Put the interface on `<html>`; the stylesheet does the rest. */
 export const applyToDocument = (p: UiPreferences, root: HTMLElement = document.documentElement) => {
@@ -72,6 +89,8 @@ export const applyToDocument = (p: UiPreferences, root: HTMLElement = document.d
   root.dataset.boardView = l.board_view;
   root.dataset.secondary = l.show_secondary ? "on" : "off";
   root.dataset.quickActions = l.quick_actions;
+  root.dataset.buttonLabels = l.button_labels;
+  applyBoard(effectiveBoard(p), root);
 };
 
 export const UiPreferencesProvider = ({ children }: { children: ReactNode }) => {
@@ -115,9 +134,16 @@ export const UiPreferencesProvider = ({ children }: { children: ReactNode }) => 
           });
         }
       } catch { /* full volume, not muted */ }
+      // The board geometry lives only here; it rides along with every
+      // document read below, so the board never shows half of one look.
+      let board: BoardGeometry = { ...BOARD_DEFAULTS };
+      try {
+        board = parseBoard(await keyValueStore.get<unknown>(boardKey(userId)));
+      } catch { /* nothing kept here: the standard board */ }
       try {
         const cached = await keyValueStore.get<unknown>(cacheKey(userId));
-        if (!cancelled && cached) setPrefs(parsePreferences(cached));
+        if (!cancelled && cached) setPrefs({ ...parsePreferences(cached), board });
+        else if (!cancelled) setPrefs((p) => ({ ...p, board }));
       } catch { /* no copy on this machine: the defaults stand until the server answers */ }
       let finishedHere = 0;
       try {
@@ -139,7 +165,7 @@ export const UiPreferencesProvider = ({ children }: { children: ReactNode }) => 
         // Nobody chose anything yet: a person still to be set up starts from
         // the new-person defaults, everybody else from what they know.
         const base = doc.onboarding_version < ONBOARDING_VERSION ? NEW_PERSON_PREFERENCES : DEFAULT_PREFERENCES;
-        const next = doc.data == null ? base : parsePreferences(doc.data, base);
+        const next = { ...(doc.data == null ? base : parsePreferences(doc.data, base)), board };
         setPrefs(next);
         setOnboardingVersion(doc.onboarding_version);
         setHasSaved(doc.data != null);
@@ -163,6 +189,16 @@ export const UiPreferencesProvider = ({ children }: { children: ReactNode }) => 
   const persist = useCallback(async (next: UiPreferences, onboarding?: number) => {
     const id = owner.current;
     if (id === null) return;
+    // The board half is written first and AWAITED: if this computer cannot
+    // keep it, nothing is applied and the screen says the save failed — never
+    // a look half saved.
+    try {
+      await keyValueStore.set(boardKey(id), toBoardDocument(next.board));
+    } catch (e) {
+      if (owner.current === id) setSaveFailed(true);
+      throw e;
+    }
+    if (owner.current !== id) return;
     setPrefs(next);
     setCandidate(null);
     setDraft(null);

@@ -1,6 +1,6 @@
 import ChoiceCards from "@/components/appearance/ChoiceCards";
 import Button from "@/components/ui/Button";
-import Checkbox from "@/components/ui/Checkbox";
+import Switch from "@/components/ui/Switch";
 import SettingsSection from "@/components/ui/SettingsSection";
 import { useLang } from "@/i18n/LanguageContext";
 import { useUiPreferences } from "@/preferences/UiPreferencesContext";
@@ -111,7 +111,8 @@ const SoundSettings = ({ value, onChange }: Props) => {
             data-testid="sound-volume"
           />
         </label>
-        <Checkbox
+        <Switch
+          size="md"
           checked={deviceSound.muted}
           onChange={(muted) => { if (muted) stop(); setDeviceSound({ ...deviceSound, muted }); }}
           label={t("sound.mute")}
@@ -144,7 +145,7 @@ const SoundSettings = ({ value, onChange }: Props) => {
           return (
             <div key={c} className={`sound-row${row.enabled ? "" : " is-off"}`} role="row" data-testid={`sound-row-${c}`}>
               <span className="sound-row__name" role="cell">
-                <Checkbox checked={row.enabled} onChange={(enabled) => setCategory(c, { enabled })} label={t(`sound.category.${c}`)} />
+                <Switch size="md" checked={row.enabled} onChange={(enabled) => setCategory(c, { enabled })} label={t(`sound.category.${c}`)} />
               </span>
               <span role="cell">
                 <select

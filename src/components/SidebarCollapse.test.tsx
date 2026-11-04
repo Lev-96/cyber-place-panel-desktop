@@ -105,6 +105,7 @@ const mountShell = () =>
       <Routes>
         <Route element={<Layout />}>
           <Route path="/bookings" element={<Screen />} />
+          <Route path="/notifications" element={<Screen />} />
         </Route>
       </Routes>
     </MemoryRouter>,
@@ -113,6 +114,8 @@ const mountShell = () =>
 const shell = () => document.querySelector(".app-shell") as HTMLElement;
 const aside = () => document.querySelector("aside.sidebar") as HTMLElement;
 const toggle = () => screen.getByTestId("sidebar-toggle");
+const navLinks = () => Array.from(document.querySelectorAll<HTMLAnchorElement>("nav.sidebar-nav a"));
+const supportCard = () => document.querySelector(".nav-support-card") as HTMLElement;
 
 describe("the desktop shell: hide and show the side menu", () => {
   test("opens shown: the toggle says what it would do and points at the menu", () => {
@@ -124,26 +127,42 @@ describe("the desktop shell: hide and show the side menu", () => {
     expect(toggle().getAttribute("aria-expanded")).toBe("true");
     expect(toggle().getAttribute("aria-controls")).toBe(SIDEBAR_ID);
     expect(toggle().getAttribute("aria-label")).toBe("Side menu");
-    expect(toggle().getAttribute("title")).toBe("Hide menu");
+    expect(toggle().getAttribute("title")).toBe("Collapse menu");
     expect(aside().id).toBe(SIDEBAR_ID);
     expect(aside().hasAttribute("inert")).toBe(false);
+    expect(navLinks().every((a) => !a.hasAttribute("title"))).toBe(true);
   });
 
-  test("hides, then shows again; the menu is out of reach only while hidden", () => {
+  test("folds to a rail and back: entries stay reachable, their names move into tooltips", () => {
     mountShell();
     fireEvent.click(toggle());
     expect(shell().classList.contains("is-sidebar-collapsed")).toBe(true);
     expect(toggle().getAttribute("aria-expanded")).toBe("false");
-    expect(toggle().getAttribute("title")).toBe("Show menu");
-    expect(aside().hasAttribute("inert")).toBe(true);
-    // The way back stays on screen: it is in the top bar, not in the menu.
+    expect(toggle().getAttribute("title")).toBe("Expand menu");
+    // The rail is a working menu, not a hidden one.
+    expect(aside().hasAttribute("inert")).toBe(false);
+    expect(navLinks().length).toBeGreaterThan(3);
+    for (const a of navLinks()) {
+      expect(a.getAttribute("title")).toBe(a.querySelector(".nav-label")?.textContent);
+    }
+    expect(supportCard().getAttribute("title")).toBe("Support");
+    // The way back is in the top bar, not in the menu.
     expect(aside().contains(toggle())).toBe(false);
 
     fireEvent.click(toggle());
     expect(shell().classList.contains("is-sidebar-collapsed")).toBe(false);
     expect(toggle().getAttribute("aria-expanded")).toBe("true");
-    expect(toggle().getAttribute("title")).toBe("Hide menu");
-    expect(aside().hasAttribute("inert")).toBe(false);
+    expect(toggle().getAttribute("title")).toBe("Collapse menu");
+    expect(navLinks().every((a) => !a.hasAttribute("title"))).toBe(true);
+    expect(supportCard().hasAttribute("title")).toBe(false);
+  });
+
+  test("a rail entry still navigates, and the menu stays folded", () => {
+    mountShell();
+    fireEvent.click(toggle());
+    fireEvent.click(navLinks().find((a) => a.getAttribute("href") === "/notifications") as HTMLElement);
+    expect(screen.getByTestId("path").textContent).toBe("/notifications");
+    expect(shell().classList.contains("is-sidebar-collapsed")).toBe(true);
   });
 
   test("repeated presses only ever alternate between the two states", () => {
@@ -153,7 +172,7 @@ describe("the desktop shell: hide and show the side menu", () => {
       const hidden = i % 2 === 1;
       expect(shell().classList.contains("is-sidebar-collapsed")).toBe(hidden);
       expect(toggle().getAttribute("aria-expanded")).toBe(String(!hidden));
-      expect(aside().hasAttribute("inert")).toBe(hidden);
+      expect(navLinks()[0].hasAttribute("title")).toBe(hidden);
     }
   });
 
@@ -198,7 +217,7 @@ describe("the desktop shell: hide and show the side menu", () => {
 });
 
 describe("outside the desktop shell (the owner web renders the same Sidebar)", () => {
-  test("no toggle in the top bar, and the menu carries no id and is never inert", () => {
+  test("no toggle in the top bar, and the menu carries no id, no tooltips and is never inert", () => {
     render(
       <MemoryRouter initialEntries={["/bookings"]}>
         <Sidebar />
@@ -208,23 +227,33 @@ describe("outside the desktop shell (the owner web renders the same Sidebar)", (
     expect(screen.queryByTestId("sidebar-toggle")).toBeNull();
     expect(aside().hasAttribute("id")).toBe(false);
     expect(aside().hasAttribute("inert")).toBe(false);
+    expect(navLinks().every((a) => !a.hasAttribute("title"))).toBe(true);
   });
 });
 
 describe("the styles", () => {
   const css = readFileSync(path.resolve(__dirname, "../styles/global.css"), "utf8");
 
-  test("only the desktop shell animates, and only its own direct sidebar", () => {
-    expect(css).toMatch(/\.app-shell--collapsible\.is-sidebar-collapsed\s*\{[^}]*grid-template-columns:\s*0px 1fr/);
-    expect(css).toMatch(/\.app-shell--collapsible\.is-sidebar-collapsed > \.sidebar\s*\{[^}]*transform:\s*translateX\(-100%\)/);
-    // The web shell's sidebar sits inside .web-drawer: a descendant selector
-    // would reach it, a child selector cannot.
-    expect(css).not.toMatch(/\.app-shell--collapsible \.sidebar/);
+  test("folded, the column is a 64px rail, never zero", () => {
+    expect(css).toMatch(/\.app-shell--collapsible\s*\{[^}]*--sidebar-rail-w:\s*64px/);
+    expect(css).toMatch(/\.app-shell--collapsible\.is-sidebar-collapsed\s*\{[^}]*grid-template-columns:\s*var\(--sidebar-rail-w\) 1fr/);
+    // Nothing moves the menu off screen or stops it painting.
+    expect(css).not.toMatch(/is-sidebar-collapsed > \.sidebar\s*\{[^}]*(translateX|visibility)/);
   });
 
-  test("reduced motion turns the slide off", () => {
-    expect(css).toMatch(
-      /@media \(prefers-reduced-motion: reduce\)\s*\{\s*\.app-shell--collapsible,\s*\.app-shell--collapsible > \.sidebar\s*\{\s*transition:\s*none;/,
-    );
+  test("only the desktop shell's own sidebar is reached", () => {
+    // The web shell's sidebar sits inside .web-drawer: a descendant selector
+    // would reach it, a child selector cannot.
+    expect(css).not.toMatch(/\.app-shell--collapsible(\.is-sidebar-collapsed)? \.sidebar/);
+  });
+
+  test("every fold transition sits behind prefers-reduced-motion: no-preference", () => {
+    const start = css.indexOf("/* The side menu folds to a rail");
+    const motion = css.indexOf("@media (prefers-reduced-motion: no-preference) {\n  .app-shell--collapsible {", start);
+    expect(start).toBeGreaterThan(-1);
+    expect(motion).toBeGreaterThan(start);
+    // Between the block's start and its motion query: states only, no transition.
+    expect(css.slice(start, motion)).not.toMatch(/transition\s*:/);
+    expect(css.slice(motion, motion + 200)).toMatch(/transition: grid-template-columns var\(--sidebar-slide\)/);
   });
 });

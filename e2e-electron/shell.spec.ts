@@ -186,16 +186,22 @@ test("the changed session screens render in Electron", async () => {
 
   await page.evaluate(() => { window.location.hash = "#/branches/1/sessions"; });
 
-  // The pad line NAMES the extra rather than counting to a ceiling: `3/4`,
-  // because this venue prices the third and the fourth as one figure.
-  await expect(page.getByText("3/4").first()).toBeVisible();
-  // …and the charge line names it too, at the fee it froze.
-  // …and what they have earned, on the SAME line. The card used to carry a
-  // second one naming the controllers again ("Joystick #3 · 500 AMD = 500
-  // AMD"); on a 160px tile that was most of the card, and every number on it
-  // is either printed beside it or on the receipt.
-  await expect(page.getByText(/^3\/4 · /)).toBeVisible();
-  await expect(page.getByText(/Joystick #3/)).toHaveCount(0);
+  // Nothing about the pads is written on the tile (owner, 2026-11-04: the
+  // line made the card taller). A press says it in an orange note beside the
+  // card: the extra NAMED, not counted to a ceiling — `3/4`, because this
+  // venue prices the third and the fourth as one figure — and what it earned,
+  // on one line, never "Joystick #3" again.
+  const tile = page.locator(".place-cell.session-card--running").first();
+  await expect(page.getByTestId("pad-toggle")).toBeVisible();
+  await expect(tile).not.toContainText("3/4");
+  await page.route((url) => isBackend(url) && url.pathname.startsWith("/sessions/5/joysticks"), (route) =>
+    route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ session }) }));
+  await page.getByTestId("pad-remove").click();
+  const note = page.getByTestId("pad-note-5");
+  await expect(note).toBeVisible();
+  await expect(note).toContainText(/3\/4 · /);
+  await expect(note).not.toContainText(/Joystick #3/);
+  await expect(tile).not.toContainText("3/4");
 });
 
 /**
@@ -280,14 +286,20 @@ test("a seat whose fee was already charged says so, in Electron", async () => {
 
   await page.evaluate(() => { window.location.hash = "#/branches/1/sessions"; });
 
-  // On the pad line, without pressing anything…
-  // One word now: the figure on the same line already says how much was
-  // charged, and what this adds is that the NEXT controller costs nothing.
-  await expect(page.getByText("paid").first()).toBeVisible();
-
-  // …and the control is the SWITCH this venue gets instead of a menu: one
+  // The control is the SWITCH this venue gets instead of a menu: one
   // payment, one controller, and with it out the button offers its return.
   await expect(page.getByLabel("Joysticks")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Remove joystick" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Add joystick" })).toHaveCount(0);
+
+  // Not on the tile (it would make it taller): the press says it, in the
+  // orange note beside the card — one word, since the figure beside it
+  // already says how much was charged, and what it adds is that the NEXT
+  // controller costs nothing.
+  const tile = page.locator(".place-cell.session-card--running").first();
+  await expect(tile).not.toContainText("paid");
+  await page.route((url) => isBackend(url) && url.pathname.startsWith("/sessions/5/joysticks"), (route) =>
+    route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ session: paid }) }));
+  await page.getByRole("button", { name: "Remove joystick" }).click();
+  await expect(page.getByTestId("pad-note-5")).toContainText("paid");
 });

@@ -1,3 +1,4 @@
+import { themeChoices } from "./themeChoices";
 import ChoiceCards from "@/components/appearance/ChoiceCards";
 import PresetPicture from "@/components/appearance/PresetPicture";
 import Button from "@/components/ui/Button";
@@ -7,7 +8,7 @@ import { LANGUAGES, type Lang } from "@/i18n/translations";
 import { useUiPreferences } from "@/preferences/UiPreferencesContext";
 import {
   NEW_PERSON_PREFERENCES, PRESETS, SOUND_DEFAULTS,
-  type InterfaceId, type SoundProfile, type ThemeId, type UiPreferences,
+  type InterfaceId, type SoundProfile, type UiPreferences,
 } from "@/preferences/uiPreferences";
 import { previewSound, stopPreview, unlockAudio } from "@/sound/soundEngine";
 import { useEffect, useState } from "react";
@@ -71,11 +72,7 @@ const OnboardingWizard = () => {
     { key: "standard", title: t("appearance.ui.standard"), description: t("appearance.ui.standardDesc") },
     { key: "compact", title: t("appearance.ui.compact"), description: t("appearance.ui.compactDesc") },
   ];
-  const themes: Array<{ key: ThemeId; title: string; description: string }> = [
-    { key: "dark", title: t("appearance.theme.dark"), description: t("appearance.theme.darkDesc") },
-    { key: "light", title: t("appearance.theme.light"), description: t("appearance.theme.lightDesc") },
-    { key: "contrast", title: t("appearance.theme.contrast"), description: t("appearance.theme.contrastDesc") },
-  ];
+  const themes = themeChoices(t);
   const profiles: Array<{ key: SoundProfile; title: string; description: string }> = [
     { key: "quiet", title: t("sound.profile.quiet"), description: t("sound.profile.quietDesc") },
     { key: "standard", title: t("sound.profile.standard"), description: t("sound.profile.standardDesc") },

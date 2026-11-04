@@ -1,28 +1,40 @@
 import { useAuth } from "@/auth/AuthContext";
-import AppearancePreview from "@/components/appearance/AppearancePreview";
+import BoardSettings from "@/components/appearance/BoardSettings";
+import BranchShortcuts, { type BranchOption } from "@/components/appearance/BranchShortcuts";
+import PreviewDock from "@/components/appearance/PreviewDock";
 import PresetPicture from "@/components/appearance/PresetPicture";
 import ChoiceCards from "@/components/appearance/ChoiceCards";
-import MenuEditor from "@/components/appearance/MenuEditor";
+import { themeChoices } from "@/components/appearance/themeChoices";
+import MenuEditor, { arrangementOf } from "@/components/appearance/MenuEditor";
 import SoundSettings from "@/components/appearance/SoundSettings";
+import { interfaceSummary } from "@/components/appearance/interfaceSummary";
+import { parseBranchShortcut } from "@/components/branches/branchSections";
 import { menuSpecsFor } from "@/components/Sidebar";
-import { applyPersonalMenu, sortedNavItems, withStaffMenu } from "@/components/sidebarNav";
+import {
+  applyPersonalMenu, canHaveBranchShortcuts, isAddedEntry, sortedNavItems, withStaffMenu,
+} from "@/components/sidebarNav";
 import Button from "@/components/ui/Button";
-import Checkbox from "@/components/ui/Checkbox";
+import { useConfirm } from "@/components/ui/ConfirmProvider";
 import ScreenWithBg from "@/components/ui/ScreenWithBg";
 import SectionTabs from "@/components/ui/SectionTabs";
 import SettingsSection from "@/components/ui/SettingsSection";
+import Switch from "@/components/ui/Switch";
+import { useAsync } from "@/hooks/useAsync";
 import { useLang } from "@/i18n/LanguageContext";
+import { tr } from "@/i18n/translated";
 import { useUiPreferences } from "@/preferences/UiPreferencesContext";
 import {
-  PRESETS, effectiveLayout, toDocument,
-  type InterfaceId, type Layout, type ThemeId, type UiPreferences,
+  BOARD_DEFAULTS, BUTTON_LABELS, PRESETS, effectiveBoard, effectiveLayout, hasOwnInterface, sameLook,
+  type BoardGeometry, type InterfaceId, type Layout,
 } from "@/preferences/uiPreferences";
+import { branchRepository } from "@/repositories/BranchRepository";
 import { notify } from "@/ui/notify";
 import { useEffect, useMemo, useState } from "react";
 
 /**
- * «Интерфейс и тема» (2026-10-27): the person's ready-made interface, theme,
- * own layout and notification sounds, in plain words.
+ * «Интерфейс и тема» (2026-10-27; regrouped 2026-11-03): the ready-made
+ * interfaces and «Мой интерфейс», the theme, a preview, the Active Places
+ * cards, the workspace, the side menu and the sounds, in plain words.
  *
  * Every change is tried on at once — the whole panel shows it — and nothing
  * is kept until «Сохранить». «Отменить изменения» puts the saved look back;
@@ -30,16 +42,20 @@ import { useEffect, useMemo, useState } from "react";
  * (UnsavedInterfaceNotice), so nothing is lost without a word. Only display
  * changes here: permissions, data and every action stay as they are.
  */
-const same = (a: UiPreferences, b: UiPreferences) => JSON.stringify(toDocument(a)) === JSON.stringify(toDocument(b));
+const READY: ReadonlyArray<Exclude<InterfaceId, "custom">> = ["simple", "standard", "compact"];
 
 const Appearance = () => {
   const { t, lang } = useLang();
   const { user } = useAuth();
+  const confirm = useConfirm();
   const { prefs, draft, editDraft, discardDraft, save, preview, saveFailed } = useUiPreferences();
   const working = draft ?? prefs;
-  const dirty = draft !== null && !same(draft, prefs);
+  const dirty = draft !== null && !sameLook(draft, prefs);
   const layout = effectiveLayout(working);
+  const board = effectiveBoard(working);
   const [saving, setSaving] = useState(false);
+  // The preview above the settings, shown unless the person hid it.
+  const [previewOpen, setPreviewOpen] = useState(true);
 
   // Back on the screen with edits: show them again; leaving: the saved look.
   useEffect(() => {
@@ -48,33 +64,66 @@ const Appearance = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const role = user?.role;
   const dash = user?.dashboard;
   const myBranchId = typeof dash?.branch_id === "number" ? dash.branch_id : null;
   const myCompanyId = typeof dash?.company_id === "number" ? dash.company_id : null;
-  // The role's own menu, built by the same function the side menu uses.
+  // The role's own menu — with the shortcuts this person switched on — built
+  // by the same function the side menu uses.
   const roleItems = useMemo(
-    () => sortedNavItems(withStaffMenu(menuSpecsFor(user?.role, myBranchId, myCompanyId), user?.role), t, lang),
-    [user?.role, myBranchId, myCompanyId, t, lang],
-  );
-  const orderedItems = useMemo(
-    () => applyPersonalMenu(roleItems, layout.sidebar.map((e) => ({ id: e.id, hidden: false }))),
-    [roleItems, layout.sidebar],
+    () => sortedNavItems(withStaffMenu(menuSpecsFor(role, myBranchId, myCompanyId, {}, layout.sidebar), role), t, lang),
+    [role, myBranchId, myCompanyId, layout.sidebar, t, lang],
   );
   const homeOptions = useMemo(() => {
-    const options = roleItems.map((i) => ({ to: i.to, label: i.label }));
+    const options = roleItems.filter((i) => !isAddedEntry(i.id)).map((i) => ({ to: i.to, label: i.label }));
     if (myBranchId !== null) options.splice(1, 0, { to: `/branches/${myBranchId}/sessions`, label: t("hub.tile.sessions") });
     return options.filter((o) => /^\/[a-z0-9/_-]{0,80}$/.test(o.to));
   }, [roleItems, myBranchId, t]);
 
-  const setInterface = (id: InterfaceId) => {
-    // «Мой интерфейс» is the person's OWN layout, kept while a ready-made
-    // one is on (it starts as Standard), so choosing it shows that layout —
-    // not a copy of whatever was on screen. Editing any control below while
-    // a ready-made one is on still starts from what is on screen (setLayout).
-    editDraft({ ...working, interface: id });
+  // The branches this person may make shortcuts for: a manager's own; an
+  // owner's from the server's list for their company (read only here, only
+  // for an owner). Nobody else is offered shortcuts.
+  const ownerBranches = useAsync(
+    () => (role === "company_owner" && myCompanyId !== null
+      ? branchRepository.list({ company_id: myCompanyId })
+      : Promise.resolve([])),
+    [role, myCompanyId],
+  );
+  const branchOptions: BranchOption[] = useMemo(() => {
+    if (!canHaveBranchShortcuts(role)) return [];
+    if (role === "manager") return myBranchId !== null ? [{ id: myBranchId, label: t("nav.myBranch") }] : [];
+    return (ownerBranches.data ?? []).map((b) => ({ id: b.id, label: [tr(b, "address", lang), b.city].filter(Boolean).join(", ") }));
+  }, [role, myBranchId, ownerBranches.data, t, lang]);
+  const branchLabel = useMemo(() => new Map(branchOptions.map((b) => [b.id, b.label])), [branchOptions]);
+
+  // The editor's rows: an owner's shortcut names its branch (they may have several).
+  const orderedItems = useMemo(
+    () => applyPersonalMenu(roleItems, layout.sidebar.map((e) => ({ id: e.id, hidden: false })))
+      .map((i) => {
+        const branchId = parseBranchShortcut(i.id)?.branchId;
+        const where = branchId !== undefined && role === "company_owner" ? branchLabel.get(branchId) : undefined;
+        return where ? { ...i, label: `${i.label} · ${where}` } : i;
+      }),
+    [roleItems, layout.sidebar, role, branchLabel],
+  );
+  const activeShortcuts = useMemo(
+    () => new Set(orderedItems.filter((i) => isAddedEntry(i.id)).map((i) => i.id)),
+    [orderedItems],
+  );
+
+  // Any edit to a control switches to «Мой интерфейс», starting from what is
+  // on screen (a ready-made one's layout and the standard board).
+  const toCustom = (nextLayout: Layout, nextBoard: BoardGeometry) =>
+    editDraft({ ...working, interface: "custom", layout: nextLayout, board: nextBoard });
+  const setLayout = (patch: Partial<Layout>) => toCustom({ ...layout, ...patch }, board);
+  const setBoard = (patch: Partial<BoardGeometry>) => toCustom(layout, { ...board, ...patch });
+  const setInterface = (id: InterfaceId) => editDraft({ ...working, interface: id });
+
+  // A shortcut switched on goes last in the menu as it stands; off, it leaves.
+  const toggleShortcut = (id: string, on: boolean) => {
+    const current = arrangementOf(orderedItems.slice(1), layout.sidebar).filter((e) => e.id !== id);
+    setLayout({ sidebar: on ? [...current, { id, hidden: false }] : current });
   };
-  const setLayout = (patch: Partial<Layout>) =>
-    editDraft({ ...working, interface: "custom", layout: { ...layout, ...patch } });
 
   const onSave = async () => {
     setSaving(true);
@@ -87,19 +136,36 @@ const Appearance = () => {
       setSaving(false);
     }
   };
-  const onReset = () => editDraft({ ...working, interface: "standard", layout: { ...PRESETS.standard } });
 
-  const interfaces: Array<{ key: InterfaceId; title: string; description: string }> = [
-    { key: "simple", title: t("appearance.ui.simple"), description: t("appearance.ui.simpleDesc") },
-    { key: "standard", title: t("appearance.ui.standard"), description: t("appearance.ui.standardDesc") },
-    { key: "compact", title: t("appearance.ui.compact"), description: t("appearance.ui.compactDesc") },
-    { key: "custom", title: t("appearance.ui.custom"), description: t("appearance.ui.customDesc") },
+  // «Интерфейс по умолчанию»: the standard interface; «Мой интерфейс» stays
+  // kept aside (it is not lost by trying the default on).
+  const onDefault = () => setInterface("standard");
+  // Resetting «Мой интерфейс» DOES lose the person's own settings: asked first.
+  const onResetMine = async () => {
+    const yes = await confirm(t("appearance.my.resetConfirm"), { confirmLabel: t("appearance.my.reset") });
+    if (!yes) return;
+    editDraft({ ...working, interface: "standard", layout: { ...PRESETS.standard }, board: { ...BOARD_DEFAULTS } });
+  };
+
+  // «Мой интерфейс» is a card like the ready-made ones once the person has
+  // SAVED one; its words are what was saved (what choosing it brings back).
+  const showMine = hasOwnInterface(prefs);
+  const interfaces = [
+    ...READY.map((key) => ({
+      key: key as InterfaceId,
+      title: t(`appearance.ui.${key}`),
+      description: t(`appearance.ui.${key}Desc`),
+      picture: <PresetPicture id={key} />,
+    })),
+    ...(showMine ? [{
+      key: "custom" as InterfaceId,
+      title: t("appearance.ui.custom"),
+      description: interfaceSummary(prefs, t),
+      picture: <PresetPicture id="custom" />,
+    }] : []),
   ];
-  const themes: Array<{ key: ThemeId; title: string; description: string }> = [
-    { key: "dark", title: t("appearance.theme.dark"), description: t("appearance.theme.darkDesc") },
-    { key: "light", title: t("appearance.theme.light"), description: t("appearance.theme.lightDesc") },
-    { key: "contrast", title: t("appearance.theme.contrast"), description: t("appearance.theme.contrastDesc") },
-  ];
+  // Every theme the model knows (one list with the first-run setup).
+  const themes = themeChoices(t);
 
   return (
     <ScreenWithBg bg="./bg/settings.jpg" title={t("nav.appearance")}>
@@ -113,8 +179,15 @@ const Appearance = () => {
           label={t("appearance.ui.title")}
           value={working.interface}
           onChange={setInterface}
-          choices={interfaces.map((c) => ({ ...c, picture: <PresetPicture id={c.key} /> }))}
+          choices={interfaces}
         />
+        {showMine && (
+          <div className="appearance-mine-actions">
+            <Button type="button" variant="secondary" onClick={() => void onResetMine()} data-testid="my-interface-reset">
+              {t("appearance.my.resetMine")}
+            </Button>
+          </div>
+        )}
       </SettingsSection>
 
       <SettingsSection title={t("appearance.theme.title")} description={t("appearance.theme.hint")}>
@@ -127,22 +200,18 @@ const Appearance = () => {
         />
       </SettingsSection>
 
-      <SettingsSection title={t("appearance.preview")} description={t("appearance.previewHint")}>
-        <AppearancePreview quick={layout.quick_actions} />
-      </SettingsSection>
-
-      <SettingsSection title={t("appearance.custom.title")} description={t("appearance.custom.hint")}>
-        <div className="appearance-grid">
+      <SettingsSection title={t("appearance.cards.title")} description={t("appearance.cards.hint")}>
+        <PreviewDock open={previewOpen} onToggle={() => setPreviewOpen((v) => !v)} quick={layout.quick_actions} />
+        <div className="appearance-grid" data-testid="appearance-cards">
           <div className="col appearance-field">
-            <span className="label">{t("appearance.custom.density")}</span>
+            <span className="label">{t("appearance.custom.boardView")}</span>
             <SectionTabs
-              label={t("appearance.custom.density")}
-              value={layout.density}
-              onChange={(density) => setLayout({ density })}
+              label={t("appearance.custom.boardView")}
+              value={layout.board_view}
+              onChange={(board_view) => setLayout({ board_view })}
               tabs={[
-                { key: "simple", label: t("appearance.custom.densitySimple") },
-                { key: "standard", label: t("appearance.custom.densityStandard") },
-                { key: "compact", label: t("appearance.custom.densityCompact") },
+                { key: "grid", label: t("appearance.custom.grid") },
+                { key: "list", label: t("appearance.custom.list") },
               ]}
             />
           </div>
@@ -159,18 +228,7 @@ const Appearance = () => {
               ]}
             />
           </div>
-          <div className="col appearance-field">
-            <span className="label">{t("appearance.custom.boardView")}</span>
-            <SectionTabs
-              label={t("appearance.custom.boardView")}
-              value={layout.board_view}
-              onChange={(board_view) => setLayout({ board_view })}
-              tabs={[
-                { key: "grid", label: t("appearance.custom.grid") },
-                { key: "list", label: t("appearance.custom.list") },
-              ]}
-            />
-          </div>
+          <BoardSettings value={board} onChange={setBoard} />
           <div className="col appearance-field">
             <span className="label">{t("appearance.custom.actions")}</span>
             <SectionTabs
@@ -184,12 +242,43 @@ const Appearance = () => {
             />
           </div>
           <div className="col appearance-field">
-            <Checkbox
+            <span className="label">{t("appearance.labels.title")}</span>
+            <SectionTabs
+              label={t("appearance.labels.title")}
+              value={layout.button_labels}
+              onChange={(button_labels) => setLayout({ button_labels })}
+              tabs={BUTTON_LABELS.map((key) => ({ key, label: t(`appearance.labels.${key}`) }))}
+            />
+            <span className="muted appearance-note">{t("appearance.labels.hint")}</span>
+          </div>
+          <div className="col appearance-field">
+            <Switch
+              size="md"
               checked={layout.show_secondary}
               onChange={(show_secondary) => setLayout({ show_secondary })}
               label={t("appearance.custom.secondary")}
+              testId="appearance-secondary"
             />
             <span className="muted appearance-note">{t("appearance.custom.secondaryHint")}</span>
+          </div>
+        </div>
+        <p className="muted appearance-note">{t("appearance.cards.localNote")}</p>
+      </SettingsSection>
+
+      <SettingsSection title={t("appearance.workspace.title")} description={t("appearance.workspace.hint")}>
+        <div className="appearance-grid">
+          <div className="col appearance-field">
+            <span className="label">{t("appearance.custom.density")}</span>
+            <SectionTabs
+              label={t("appearance.custom.density")}
+              value={layout.density}
+              onChange={(density) => setLayout({ density })}
+              tabs={[
+                { key: "simple", label: t("appearance.custom.densitySimple") },
+                { key: "standard", label: t("appearance.custom.densityStandard") },
+                { key: "compact", label: t("appearance.custom.densityCompact") },
+              ]}
+            />
           </div>
           <label className="col appearance-field">
             <span className="label">{t("appearance.custom.home")}</span>
@@ -203,10 +292,28 @@ const Appearance = () => {
             </select>
           </label>
         </div>
-        <div className="col" style={{ gap: 8, marginTop: 16 }}>
-          <span className="label">{t("appearance.menu.title")}</span>
-          <span className="muted appearance-note">{t("appearance.menu.hint")}</span>
+      </SettingsSection>
+
+      <SettingsSection title={t("appearance.menu.section")} description={t("appearance.menu.hint")}>
+        <div className="col" style={{ gap: 16 }}>
           <MenuEditor items={orderedItems} arrangement={layout.sidebar} onChange={(sidebar) => setLayout({ sidebar })} />
+          {canHaveBranchShortcuts(role) && (
+            <div className="col" style={{ gap: 8 }}>
+              <span className="label">{t("appearance.menu.branchSections")}</span>
+              <span className="muted appearance-note">{t("appearance.menu.branchSectionsHint")}</span>
+              <BranchShortcuts
+                role={role}
+                branches={branchOptions}
+                active={activeShortcuts}
+                failed={ownerBranches.error !== null}
+                onToggle={toggleShortcut}
+              />
+            </div>
+          )}
+          <div>
+            <Button type="button" variant="secondary" onClick={() => setLayout({ sidebar: [] })}
+              disabled={layout.sidebar.length === 0}>{t("appearance.menu.reset")}</Button>
+          </div>
         </div>
       </SettingsSection>
 
@@ -215,7 +322,7 @@ const Appearance = () => {
       <div className="appearance-actions" data-testid="appearance-actions">
         {dirty && <span className="appearance-actions__state">{t("appearance.unsaved")}</span>}
         {saveFailed && !dirty && <span className="error">{t("appearance.saveFailed")}</span>}
-        <Button type="button" variant="secondary" onClick={onReset}
+        <Button type="button" variant="secondary" onClick={onDefault}
           disabled={working.interface === "standard"}>{t("appearance.reset")}</Button>
         <Button type="button" variant="secondary" onClick={discardDraft} disabled={!dirty}>{t("appearance.cancel")}</Button>
         <Button type="button" onClick={() => void onSave()} disabled={!dirty || saving}>

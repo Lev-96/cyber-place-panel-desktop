@@ -18,6 +18,7 @@ import { useLang } from "@/i18n/LanguageContext";
 import { fmt } from "@/i18n/translations";
 import { platformDisplayNameOf, platformPriceNameOf } from "@/i18n/platformPriceName";
 import { placeRepository } from "@/repositories/PlaceRepository";
+import DevicesWithoutPlace from "@/components/places/DevicesWithoutPlace";
 import { platformPriceRepository } from "@/repositories/PlatformPriceRepository";
 import { IBranchPlace } from "@/types/api";
 import { platformGroup } from "@/utils/platform";
@@ -278,6 +279,9 @@ const BranchPlaces = () => {
             })}
           </div>
       </StateSwitch>
+
+      {/* Devices that serve no place: on Active Places, on no tile here. */}
+      <DevicesWithoutPlace branchId={id} canRemove={can(role, "branch.places")} />
 
       {findingConsoles && <ConsolePicker branchId={id} onClose={() => setFindingConsoles(false)} />}
       {creating && <PlaceForm branchId={id} platformSuggestions={customPlatforms} platformPrices={platformPrices.data ?? []} onClose={() => setCreating(false)} onSaved={(created) => {

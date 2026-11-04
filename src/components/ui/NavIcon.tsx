@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import LineIcon from "./LineIcon";
 
 /**
  * The side menu's icons, one per entry, keyed by the entry's STABLE id (its
@@ -166,6 +167,70 @@ const SHAPES: Readonly<Record<string, ReactNode>> = {
       <path d="M12 17.5v-11" />
     </>
   ),
+  /* Branch shortcuts a person switches on (2026-11-03, branchSections.ts);
+     the rest reuse the menu's own shapes (games, shifts, managers…). */
+  // A screen with a play mark: the running seats (after Lucide `monitor-play`).
+  "branch.sessions": (
+    <>
+      <rect x="2" y="3" width="20" height="14" rx="2" />
+      <path d="M12 17v4" />
+      <path d="M8 21h8" />
+      <path d="m10 7.5 4.5 2.5-4.5 2.5z" />
+    </>
+  ),
+  // A person and a plus: the branch's customers (after Lucide `user-plus`).
+  "branch.members": (
+    <>
+      <circle cx="9" cy="7" r="4" />
+      <path d="M3 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2" />
+      <path d="M19 8v6" />
+      <path d="M22 11h-6" />
+    </>
+  ),
+  // A sofa: the seats themselves (after Lucide `sofa`).
+  "branch.places": (
+    <>
+      <path d="M20 9V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v3" />
+      <path d="M2 16a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-5a2 2 0 0 0-4 0v1.5a.5.5 0 0 1-.5.5h-11a.5.5 0 0 1-.5-.5V11a2 2 0 0 0-4 0z" />
+      <path d="M4 18v2" />
+      <path d="M20 18v2" />
+    </>
+  ),
+  // A monitor: the computers (after Lucide `monitor`).
+  "branch.pcs": (
+    <>
+      <rect x="2" y="3" width="20" height="14" rx="2" />
+      <path d="M8 21h8" />
+      <path d="M12 17v4" />
+    </>
+  ),
+  // A price tag (after Lucide `tag`).
+  "branch.tariffs": (
+    <>
+      <path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z" />
+      <circle cx="7.5" cy="7.5" r="1" />
+    </>
+  ),
+  // A box: the products on sale (after Lucide `package`).
+  "branch.products": (
+    <>
+      <path d="M21 8 12 3 3 8v8l9 5 9-5z" />
+      <path d="m3 8 9 5 9-5" />
+      <path d="M12 13v8" />
+    </>
+  ),
+  // A banknote: the till (after Lucide `banknote`).
+  "branch.till": (
+    <>
+      <rect x="2" y="6" width="20" height="12" rx="2" />
+      <circle cx="12" cy="12" r="2" />
+      <path d="M6 12h.01M18 12h.01" />
+    </>
+  ),
+  // A heart: the players who follow the branch (after Lucide `heart`).
+  "branch.subscribers": (
+    <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" />
+  ),
   // Not menu entries: the top bar's toggle that hides / shows the menu.
   "nav.menuHide": (
     <>
@@ -195,22 +260,9 @@ const NavIcon = ({ id, size = 18 }: { id: string; size?: number }) => {
   const shape = SHAPES[id];
   if (!shape) return null;
   return (
-    <svg
-      className="nav-icon"
-      data-nav-icon={id}
-      width={size}
-      height={size}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.75"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-      focusable="false"
-    >
+    <LineIcon className="nav-icon" data-nav-icon={id} size={size}>
       {shape}
-    </svg>
+    </LineIcon>
   );
 };
 

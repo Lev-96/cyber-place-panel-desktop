@@ -63,6 +63,15 @@ export class SessionRepository {
     return orFallback(apiListActiveSessions(branchId).then((r) => r.data), []);
   }
   /**
+   * The devices a session is running on right now, or a THROWN error — never
+   * an empty answer for a failed read (2026-11-04). For a decision that
+   * deletes billing data: "could not tell" must not read as "nothing runs".
+   */
+  async runningPcIds(branchId: number): Promise<Set<number>> {
+    const { data } = await apiListActiveSessions(branchId);
+    return new Set(data.map((s) => s.pc_id));
+  }
+  /**
    * Every session running right now, in every venue this account may see.
    *
    * `branch_id` is omitted deliberately: the endpoint applies the caller's

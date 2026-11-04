@@ -3,10 +3,11 @@ import { useLang } from "@/i18n/LanguageContext";
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
 
 /**
- * Hiding the side menu (2026-11-03). The desktop shell owns one flag; the menu
- * reads it (to leave the Tab order while hidden) and the top bar draws the one
- * toggle. Outside the desktop shell — the owner web renders the same Sidebar
- * in a drawer of its own — there is no provider, so nothing here applies.
+ * Folding the side menu to an icon rail (2026-11-03). The desktop shell owns
+ * one flag; the menu reads it (tooltips on its entries while folded) and the
+ * top bar draws the one toggle. Outside the desktop shell (the owner web
+ * renders the same Sidebar in a drawer of its own) there is no provider, so
+ * nothing here applies.
  *
  * Not remembered on purpose: the panel opens with the menu shown on every
  * launch and sign-in. It holds across screens, because the shell stays mounted.

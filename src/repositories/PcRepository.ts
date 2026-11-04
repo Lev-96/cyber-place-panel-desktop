@@ -28,6 +28,17 @@ export class PcRepository {
   async listByBranch(branchId: number): Promise<IPcApi[]> {
     return orFallback(apiListPcsForBranch(branchId, PC_KIND.Pc).then((r) => r.data), []);
   }
+  /**
+   * A branch's devices that serve NO place (2026-11-04): legacy rows, or rows
+   * created through the API before a place was required. They are on the
+   * sessions board (it lists devices) but on no Places tile, so the two
+   * screens disagree on how many seats there are. Every kind, read the way the
+   * board reads them; a failed read THROWS, never answers "none".
+   */
+  async listWithoutPlace(branchId: number): Promise<IPcApi[]> {
+    const { data } = await apiListPcsForBranch(branchId);
+    return data.filter((d) => d.branch_id === branchId && (d.place_id ?? null) === null);
+  }
   async create(body: CreatePcBody): Promise<IPcApi> {
     return withToast("pc", "created", () => friendlyMutation(apiCreatePc(body).then((r) => r.pc)));
   }

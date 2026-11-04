@@ -160,7 +160,7 @@ const createWindow = async () => {
     // A restored window is the FRAME it was saved as (`getNormalBounds`); a
     // first-run one is sized as content, as above.
     useContentSize: restored === null,
-    // Every screen reflows down to this; below it the board stops being usable.
+    // Every screen reflows down to this (`MIN_CONTENT`, 520 wide).
     // No maximum: a wide or a second monitor is the cashier's to use.
     minWidth: MIN_CONTENT.width,
     minHeight: MIN_CONTENT.height,

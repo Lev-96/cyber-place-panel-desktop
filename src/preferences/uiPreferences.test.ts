@@ -20,7 +20,8 @@ describe("parsePreferences", () => {
   test("a valid document round-trips", () => {
     const doc = toDocument({ ...DEFAULT_PREFERENCES, interface: "custom", theme: "contrast",
       layout: { ...PRESETS.compact, home: "/bookings", sidebar: [{ id: "bookings", hidden: true }] } });
-    expect(parsePreferences(JSON.parse(JSON.stringify(doc)))).toEqual(doc);
+    // The SERVER document round-trips (the local-only board is not part of it).
+    expect(toDocument(parsePreferences(JSON.parse(JSON.stringify(doc))))).toEqual(doc);
   });
 
   test("one bad field costs only that field", () => {
