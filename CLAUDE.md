@@ -2399,6 +2399,16 @@ a running seat's clock"); the waived amount is the server's. The card keeps
 its size (e2e); the ↺ shows only while the TIME has something to reset
 (`sessionTimeCostAt`, not goods). The tile mirrors the bill: `sessionMinimumChargeAt` charges
 `max(0, clock − time_reset_offset)` after `time_reset_at`, no VIP minimum.
+**From the stop receipt too (2026-11-05):** `StopReceiptModal` shows
+«Обнулить» on its time line (`canResetTime` from the board = `session.free`;
+only while running and the time is at least `RESET_MIN_AMOUNT` = 1 unit,
+like the card's ↺ — a few hundredths right after a reset are not offered),
+re-reads the receipt BEFORE asking (the question names the server's current
+figure, not the frozen one), asks, resets, then READS THE RECEIPT AGAIN so Confirm sends the new
+`priced_at`/`expected_total` (the old receipt would be refused as changed — the
+server's existing check, pinned in `SessionTimeResetTest`). A «Обнулено −N»
+line shows `time_waived`. Tests: `StopReceiptModal.test.tsx` («resetting the
+counter from the receipt»), e2e «the stop receipt resets the counter…».
 The dialog reads the LIVE row by id (`resetId`), so a reset/stop from another
 desk while it is open shows (0, Confirm held) or closes it; the toast counts
 this reset only (server total − the total the dialog showed at confirm).
