@@ -681,6 +681,12 @@ export const TRANSLATIONS: Dict = {
   },
   "session.reset.confirm": { en: "Reset to 0", ru: "Обнулить до 0", am: "Զրոյացնել" },
   "session.reset.toast": { en: "{0}: counter reset, {1} waived", ru: "{0}: счётчик обнулён, списано {1}", am: "{0}․ հաշվիչը զրոյացվեց, դուրս գրվեց {1}" },
+  "session.reset.short": { en: "Reset", ru: "Обнулить", am: "Զրոյացնել" },
+  "session.reset.confirmReceipt": {
+    en: "Reset the time to 0? {0} of time will not be paid. Goods and joysticks stay on the bill.",
+    ru: "Обнулить время? {0} за время не будет оплачено. Товары и джойстики останутся в счёте.",
+    am: "Զրոյացնե՞լ ժամանակը։ Ժամանակի {0}-ը չի վճարվի։ Ապրանքներն ու ջոյսթիքները մնում են հաշվում։",
+  },
   "session.reset.waived": { en: "Reset", ru: "Обнулено", am: "Զրոյացված" },
   "session.durationClear": { en: "Clear the time", ru: "Очистить время", am: "Մաքրել ժամանակը" },
   "session.customize": { en: "Customize", ru: "Настроить окно", am: "Կարգավորել" },

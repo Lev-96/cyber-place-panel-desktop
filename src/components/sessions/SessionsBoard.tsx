@@ -1237,6 +1237,8 @@ const SessionsBoard = ({ branchId }: Props) => {
             void pcs.reload();
           }}
           onItemRemoved={() => { void sessions.reload(); }}
+          canResetTime={mayReset}
+          onTimeReset={() => { void sessions.reload(); }}
         />
       )}
       {optionsTarget && (

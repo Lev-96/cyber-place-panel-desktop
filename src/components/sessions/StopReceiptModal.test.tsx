@@ -22,13 +22,14 @@ import StopReceiptModal from "./StopReceiptModal";
  * figure would waive that one on screen.
  */
 
-const repo = vi.hoisted(() => ({ preview: vi.fn(), stop: vi.fn(), removeItem: vi.fn() }));
+const repo = vi.hoisted(() => ({ preview: vi.fn(), stop: vi.fn(), removeItem: vi.fn(), resetTime: vi.fn() }));
 
 vi.mock("@/repositories/SessionRepository", () => ({
   sessionRepository: {
     preview: (...a: unknown[]) => repo.preview(...a),
     stop: (...a: unknown[]) => repo.stop(...a),
     removeItem: (...a: unknown[]) => repo.removeItem(...a),
+    resetTime: (...a: unknown[]) => repo.resetTime(...a),
   },
 }));
 vi.mock("@/i18n/LanguageContext", () => ({
@@ -805,5 +806,104 @@ describe("the VIP minimum charge on the receipt", () => {
     repo.preview.mockResolvedValue(bill({ is_free: true, total: 0, minimum_charge: minimum(true) } as Partial<IBillBreakdown>));
     await mount();
     expect(screen.queryByTestId("receipt-min-charge")).toBeNull();
+  });
+});
+
+/**
+ * Resetting the counter from the receipt (2026-11-05): offered only to a role
+ * that may and only while the time has something to reset; asked first; the
+ * receipt is read AGAIN after it, so Confirm charges the server's new bill.
+ */
+describe("resetting the counter from the receipt", () => {
+  const mountWith = async (props: { canResetTime?: boolean; onTimeReset?: () => void } = {}, s: ISessionApi = session()) => {
+    await act(async () => {
+      render(<StopReceiptModal session={s} onClose={() => {}} onConfirmed={() => {}} onItemRemoved={() => {}} {...props} />);
+    });
+  };
+  beforeEach(() => {
+    repo.preview.mockReset();
+    repo.stop.mockReset();
+    repo.resetTime.mockReset();
+    asked.fn.mockReset();
+    asked.fn.mockResolvedValue(true);
+    toasts.message.mockReset();
+  });
+  afterEach(cleanup);
+
+  test("not offered without the right, on a waived bill, at no time cost, or once stopped", async () => {
+    repo.preview.mockResolvedValue(bill({ time_cost: 400, total: 400 }));
+    await mountWith();
+    expect(screen.queryByTestId("receipt-reset")).toBeNull();
+    cleanup();
+
+    repo.preview.mockResolvedValue(bill({ is_free: true }));
+    await mountWith({ canResetTime: true });
+    expect(screen.queryByTestId("receipt-reset")).toBeNull();
+    cleanup();
+
+    repo.preview.mockResolvedValue(bill({ time_cost: 0, total: 300, items_total: 300 }));
+    await mountWith({ canResetTime: true });
+    expect(screen.queryByTestId("receipt-reset")).toBeNull();
+    cleanup();
+
+    repo.preview.mockResolvedValue(bill({ time_cost: 400, total: 400 }));
+    await mountWith({ canResetTime: true }, session({ status: "stopped" }));
+    expect(screen.queryByTestId("receipt-reset")).toBeNull();
+  });
+
+  test("asks first, resets, reads the receipt again and charges THAT bill", async () => {
+    const onTimeReset = vi.fn();
+    repo.preview.mockResolvedValueOnce(bill({ time_cost: 400, total: 700, items_total: 300, priced_at: "2026-11-05T15:16:00Z" }));
+    // Read again before asking: the time has grown since Stop.
+    repo.preview.mockResolvedValueOnce(bill({ time_cost: 425, total: 725, items_total: 300, priced_at: "2026-11-05T15:17:00Z" }));
+    repo.preview.mockResolvedValueOnce(bill({ time_cost: 0, time_waived: 425, total: 300, items_total: 300, priced_at: "2026-11-05T15:17:05Z" }));
+    repo.resetTime.mockResolvedValue({ session: session(), waived: 400 });
+    repo.stop.mockResolvedValue({ breakdown: bill({ total: 300 }), cash: null });
+    await mountWith({ canResetTime: true, onTimeReset });
+
+    await act(async () => { fireEvent.click(screen.getByTestId("receipt-reset")); });
+    expect(asked.fn).toHaveBeenCalledTimes(1);
+    expect(String(asked.fn.mock.calls[0][0])).toBe("session.reset.confirmReceipt");
+    expect(repo.resetTime).toHaveBeenCalledWith(1);
+    expect(onTimeReset).toHaveBeenCalledTimes(1);
+    expect(repo.preview).toHaveBeenCalledTimes(3);
+    expect(screen.getByTestId("receipt-time-waived").textContent).toContain("425");
+    expect(screen.queryByTestId("receipt-reset")).toBeNull();
+
+    await act(async () => { fireEvent.click(screen.getByTestId("stop-confirm")); });
+    expect(repo.stop.mock.calls[0][1]).toMatchObject({ priced_at: "2026-11-05T15:17:05Z", expected_total: 300 });
+  });
+
+  test("the question names the figure read NOW, not the frozen receipt's", async () => {
+    repo.preview.mockResolvedValueOnce(bill({ time_cost: 400, total: 400 }));
+    repo.preview.mockResolvedValueOnce(bill({ time_cost: 1200, total: 1200 }));
+    asked.fn.mockResolvedValue(false);
+    await mountWith({ canResetTime: true });
+    await act(async () => { fireEvent.click(screen.getByTestId("receipt-reset")); });
+    expect(repo.preview).toHaveBeenCalledTimes(2);
+    expect(screen.getAllByText("1200·AMD").length).toBeGreaterThan(0);
+  });
+
+  test("a few hundredths of time are not offered for reset (right after one)", async () => {
+    repo.preview.mockResolvedValue(bill({ time_cost: 0.11, time_waived: 400, total: 300.11, items_total: 300 }));
+    await mountWith({ canResetTime: true });
+    expect(screen.queryByTestId("receipt-reset")).toBeNull();
+  });
+
+  test("answered no: nothing is reset", async () => {
+    asked.fn.mockResolvedValue(false);
+    repo.preview.mockResolvedValue(bill({ time_cost: 400, total: 400 }));
+    await mountWith({ canResetTime: true });
+    await act(async () => { fireEvent.click(screen.getByTestId("receipt-reset")); });
+    expect(repo.resetTime).not.toHaveBeenCalled();
+  });
+
+  test("refused by the server: its sentence, the receipt unchanged and still confirmable", async () => {
+    repo.preview.mockResolvedValue(bill({ time_cost: 400, total: 400 }));
+    repo.resetTime.mockRejectedValue(new Error("This session is no longer running, so its clock cannot be reset."));
+    await mountWith({ canResetTime: true });
+    await act(async () => { fireEvent.click(screen.getByTestId("receipt-reset")); });
+    expect(screen.getByText("This session is no longer running, so its clock cannot be reset.")).toBeTruthy();
+    expect((screen.getByTestId("stop-confirm") as HTMLButtonElement).disabled).toBe(false);
   });
 });

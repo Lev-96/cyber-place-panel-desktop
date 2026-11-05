@@ -14,6 +14,7 @@ import { toAmount } from "@/shifts/cash";
 import { sessionRepository } from "@/repositories/SessionRepository";
 import { ISessionApi } from "@/types/sessions";
 import { useEffect, useRef, useState } from "react";
+import { RESET_MIN_AMOUNT } from "./sessionAmount";
 import CashChangePanel from "@/components/payments/CashChangePanel";
 import { billCents, cashChange } from "@/components/payments/cashChange";
 import type { ICashHandover } from "@/api/sessions";
@@ -23,6 +24,13 @@ interface Props {
   onClose: () => void;
   onConfirmed: () => void;
   onItemRemoved: () => void;
+  /**
+   * Whether this person may reset the counter from the receipt (2026-11-05,
+   * `session.free` — the server checks it again). Absent: not offered.
+   */
+  canResetTime?: boolean;
+  /** The bill changed here (the counter was reset): the board reads again. */
+  onTimeReset?: () => void;
 }
 
 const fmtDuration = (mins: number, t: (k: string) => string) => {
@@ -40,7 +48,7 @@ const fmtDuration = (mins: number, t: (k: string) => string) => {
  * source of truth — same calculator used by /stop), shows time + items, lets
  * cashier remove items, then confirms stop.
  */
-const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved }: Props) => {
+const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved, canResetTime = false, onTimeReset }: Props) => {
   const { money, t } = useLang();
   const ask = useConfirm();
   const [bill, setBill] = useState<IBillBreakdown | null>(null);
@@ -93,6 +101,39 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved }: Prop
       await reload();
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Failed to remove");
+    } finally { setBusy(false); }
+  };
+
+  /**
+   * Reset the counter from the receipt (2026-11-05, owner): the player is
+   * leaving after a few minutes. Asked first, naming what goes; the server
+   * waives its own figure (`reset-time`) and the receipt is READ AGAIN, so
+   * what Confirm then charges is the server's new bill at its new instant —
+   * the old one would be refused as changed. Goods and pads stay on it.
+   */
+  const resetTime = async () => {
+    if (bill === null) return;
+    // The receipt is frozen at Stop (up to ten minutes old): the figure asked
+    // about is read now, so the question names what the server will waive.
+    let current: IBillBreakdown;
+    try {
+      current = await sessionRepository.preview(session.id);
+      setBill(current);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+      return;
+    }
+    const question = fmt(t("session.reset.confirmReceipt"), money(Number(current.time_cost), receiptPrecision));
+    if (!(await ask(question, { destructive: true }))) return;
+    setBusy(true);
+    setErr(null);
+    try {
+      const r = await sessionRepository.resetTime(session.id);
+      notify.message("success", fmt(t("session.reset.toast"), deviceLabel, money(Math.max(0, r.waived ?? 0))));
+      onTimeReset?.();
+      await reload();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
     } finally { setBusy(false); }
   };
 
@@ -157,6 +198,7 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved }: Prop
   // so the column stopped adding up. A receipt is read as a column.
   const receiptPrecision = view === null ? undefined : sharedPrecision([
     Number(view.time_cost),
+    Number(view.time_waived ?? 0),
     Number(view.total),
     ...(view.joysticks ?? []).map((j) => Number(j.amount)),
     ...view.items.map((it) => Number(it.line_total)),
@@ -243,9 +285,33 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved }: Prop
                   <span style={{ fontWeight: 700 }}>
                     {money(Number(view.time_cost), receiptPrecision)}
                   </span>
+                  {/* Reset the counter right here (2026-11-05): only while the
+                      seat runs, for a role that may, and while the TIME has
+                      something to reset — goods alone are not reset. */}
+                  {!finished && canResetTime && Number(view.time_cost) >= RESET_MIN_AMOUNT && (
+                    <button
+                      type="button"
+                      className="receipt-reset"
+                      onClick={() => { void resetTime(); }}
+                      disabled={busy}
+                      title={t("session.reset.button")}
+                      data-testid="receipt-reset"
+                    >
+                      {t("session.reset.short")}
+                    </button>
+                  )}
                 </>
               )}
             </div>
+
+            {/* What resetting the counter waived (2026-11-05): its own line —
+                the time above is already net of it. From the server. */}
+            {!view.is_free && Number(view.time_waived ?? 0) > 0 && (
+              <div style={row} className="receipt-waived" data-testid="receipt-time-waived">
+                <span style={{ flex: 1 }}>{t("session.reset.waived")}</span>
+                <span style={{ fontWeight: 700 }}>−{money(Number(view.time_waived), receiptPrecision)}</span>
+              </div>
+            )}
 
             {/* The VIP minimum charge, when it is in the time line above: what
                 was billed and what the time played came to, so the figure has

@@ -1,7 +1,7 @@
 import LineIcon from "@/components/ui/LineIcon";
 import { preciseWhenSmall } from "@/i18n/currency";
 import { ISessionApi } from "@/types/sessions";
-import { autoResumeAtOf, playedSecondsBetween, sessionAmountAt, sessionMinimumChargeAt, sessionTimeCostAt } from "./sessionAmount";
+import { RESET_MIN_AMOUNT, autoResumeAtOf, playedSecondsBetween, sessionAmountAt, sessionMinimumChargeAt, sessionTimeCostAt } from "./sessionAmount";
 import { useEffect, useState } from "react";
 import { sessionUrgency } from "./sessionUrgency";
 
@@ -94,7 +94,7 @@ const SessionTimer = ({ session, formatMoney, minimumLabel, reset }: Props) => {
         </span>
       )}
       {/* Only while the TIME has something to reset: goods alone are not reset. */}
-      {reset && !session.is_free && sessionTimeCostAt(session, now) > 0 && (
+      {reset && !session.is_free && sessionTimeCostAt(session, now) >= RESET_MIN_AMOUNT && (
         <button
           type="button"
           className="session-timer__reset"

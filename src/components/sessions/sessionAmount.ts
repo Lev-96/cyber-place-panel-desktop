@@ -48,6 +48,14 @@ import { IExtraItem, IMinimumChargeRule, ISessionApi } from "@/types/sessions";
  * @param at Milliseconds since the epoch to price at; `Date.now()` in the UI,
  *           a fixed instant in tests.
  */
+/**
+ * The least time figure worth resetting (2026-11-05): one whole unit. Right
+ * after a reset the clock reads a few hundredths again within seconds; a
+ * reset control beside "0.11" would only waive cents. The server takes any
+ * positive figure — this decides only where the control is offered.
+ */
+export const RESET_MIN_AMOUNT = 1;
+
 export const sessionTimeCostAt = (session: ISessionApi, at: number): number =>
   sessionMinimumChargeAt(session, at).amount;
 

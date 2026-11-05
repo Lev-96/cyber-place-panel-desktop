@@ -136,6 +136,49 @@ test("the dialog follows the seat: reset elsewhere shows 0 and holds Confirm; st
   await expect(page.getByTestId("reset-dialog")).toHaveCount(0);
 });
 
+// Reset from the stop receipt (owner, 2026-11-05): Stop → receipt →
+// «Reset» → asked → the receipt read again → Confirm charges THAT bill.
+test("the stop receipt resets the counter, reads itself again and charges the new bill", async ({ page }) => {
+  await seedBoard(page);
+  const billOf = (time: number, waived: number, at: string) => ({
+    mode: "open", is_free: false, is_unlimited: true, elapsed_minutes: 16, time_cost: time, time_waived: waived,
+    hourly_rate: 1500, package_name: null, items: [{ id: 1, name: "Cola", price: 300, qty: 1, line_total: 300 }],
+    items_total: 300, joysticks: [], joysticks_total: 0, subtotal: time + 300, gross_total: time + 300, total: time + 300, priced_at: at,
+  });
+  let reset = false;
+  let stopBody: Record<string, unknown> | null = null;
+  await page.route((u) => isBackend(u) && u.pathname === "/sessions/5/preview", (r) => r.fulfill(json({
+    preview: reset ? billOf(0, 400, "2026-11-05T15:16:05Z") : billOf(400, 0, "2026-11-05T15:16:00Z"),
+  })));
+  await page.route((u) => isBackend(u) && u.pathname === "/sessions/5/reset-time", (r) => {
+    reset = true;
+    return r.fulfill(json({ session: { ...running, time_reset_at: new Date().toISOString(), time_reset_offset: "400.00", time_waived_total: "400.00" }, waived: 400 }));
+  });
+  await page.route((u) => isBackend(u) && u.pathname === "/sessions/5/stop", (r) => {
+    stopBody = r.request().postDataJSON();
+    return r.fulfill(json({ session: { ...running, status: "stopped" }, breakdown: billOf(0, 400, "2026-11-05T15:16:05Z"), cash: null }));
+  });
+  await signIn(page);
+  await page.goto("/#/branches/1/sessions");
+  await page.locator('.place-cell.session-card--running [data-action="stop"]').first().click();
+
+  const resetBtn = page.getByTestId("receipt-reset");
+  await expect(resetBtn).toBeVisible();
+  await resetBtn.click();
+  // Asked first, naming what goes.
+  await expect(page.getByText(/Reset the time to 0\? 400 AMD of time will not be paid/)).toBeVisible();
+  await page.getByRole("button", { name: "Confirm", exact: true }).click();
+
+  // The receipt read again: time 0, the waiver on its own line, the new total.
+  await expect(page.getByTestId("receipt-time-waived")).toContainText("400");
+  await expect(page.getByTestId("receipt-reset")).toHaveCount(0);
+  await expect(page.getByText(/counter reset, .*waived/)).toBeVisible();
+
+  await page.getByTestId("stop-confirm").click();
+  await expect.poll(() => stopBody).not.toBeNull();
+  expect(stopBody).toMatchObject({ priced_at: "2026-11-05T15:16:05Z", expected_total: 300 });
+});
+
 // ── the history ──────────────────────────────────────────────────────
 const T0 = Date.parse("2026-11-05T15:00:00Z");
 const iso = (m: number) => new Date(T0 + m * 60_000).toISOString();
