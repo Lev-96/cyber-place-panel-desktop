@@ -231,10 +231,13 @@ describe("the preview", () => {
     const buttons = [...preview.querySelectorAll("button")];
     // The same buttons the board draws, so it lays out as the board does…
     expect(buttons.length).toBeGreaterThan(0);
-    // Every button on a card is the board's button; the only other one is the
-    // board's own section header (2026-11-03: the preview sits in it too).
-    expect(buttons.every((b) => b.classList.contains("btn") || b.classList.contains("cp-section-toggle"))).toBe(true);
-    expect([...preview.querySelectorAll(".place-cell button")].every((b) => b.classList.contains("btn"))).toBe(true);
+    // Every button on a card is the board's button; the only others are the
+    // board's own section header (2026-11-03: the preview sits in it too) and
+    // the counter's own ↺ beside the money (2026-11-05, SessionTimer).
+    const boardOwn = (b: Element) => b.classList.contains("btn") || b.classList.contains("session-timer__reset");
+    expect(buttons.every((b) => boardOwn(b) || b.classList.contains("cp-section-toggle"))).toBe(true);
+    expect([...preview.querySelectorAll(".place-cell button")].every(boardOwn)).toBe(true);
+    expect(preview.querySelector(".place-cell .session-timer__reset")).not.toBeNull();
     expect(buttons.some((b) => b.classList.contains("session-card__btn"))).toBe(true);
     // …which cannot be reached or pressed: all of them inside `inert` (the
     // board's own section toggle and pad switch included, 2026-11-03), and

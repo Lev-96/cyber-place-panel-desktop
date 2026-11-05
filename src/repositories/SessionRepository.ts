@@ -27,6 +27,7 @@ import {
   apiMakeSessionUnlimited,
   apiRemoveSessionJoystick,
   apiSetSessionFree,
+  apiResetSessionTime,
   apiPauseSession,
   apiResumeSession,
   ISessionEvent,
@@ -188,6 +189,14 @@ export class SessionRepository {
   /** «Переместить игрока», atomically. May still be refused — the list is stale. */
   async relocate(sessionId: number, body: RelocateSessionBody): Promise<ISessionApi> {
     return friendlyMutation(apiRelocateSession(sessionId, body).then((r) => r.session));
+  }
+
+  /** Reset the clock to zero; the seat keeps running (2026-11-05). `waived` is the server's figure. */
+  async resetTime(sessionId: number): Promise<{ session: ISessionApi; waived: number | null }> {
+    return friendlyMutation(apiResetSessionTime(sessionId).then((r) => ({
+      session: r.session,
+      waived: typeof r.waived === "number" ? r.waived : null,
+    })));
   }
 
   async setFree(sessionId: number, isFree: boolean): Promise<ISessionApi> {

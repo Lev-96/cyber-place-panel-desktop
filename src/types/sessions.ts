@@ -270,6 +270,16 @@ export interface ISessionApi {
   plan_rebased_at?: string | null;
   amount_before_plan_rebase?: number | string | null;
   /**
+   * The clock reset to zero (2026-11-05): what it had earned at
+   * `time_reset_at` was waived; the time costs the clock minus
+   * `time_reset_offset` (the raw clock then), with no VIP minimum after it.
+   * `time_waived_total` is every reset's waiver added up. Absent / null on a
+   * seat never reset, or from an older backend.
+   */
+  time_reset_at?: string | null;
+  time_reset_offset?: number | string | null;
+  time_waived_total?: number | string | null;
+  /**
    * A rate change mid-way — the player moved to a seat priced differently.
    * What the clock had earned at `rate_changed_at` is frozen in
    * `amount_before_rate_change`; only later time runs at `hourly_rate`.

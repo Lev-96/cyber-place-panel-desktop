@@ -226,6 +226,8 @@ export interface IBillBreakdown {
     billed_minutes: number;
     played_time_cost: number;
   } | null;
+  /** What resetting the clock waived (2026-11-05), already out of `time_cost`; 0 when never reset. */
+  time_waived?: number;
 }
 
 export interface AddItemBody {
@@ -591,6 +593,15 @@ export interface RelocateSessionBody {
 export const apiRelocateSession = (sessionId: number, body: RelocateSessionBody) =>
   request<{ session: ISessionApi }>(`/sessions/${sessionId}/relocate`, { method: "POST", body });
 
+/**
+ * Reset the clock to zero (2026-11-05): what it has earned is waived and the
+ * seat counts on from zero; goods and pads stay on the bill. `sessions.free`,
+ * branch-scoped and audited on the server.
+ */
+export const apiResetSessionTime = (sessionId: number) =>
+  // `waived`: what THIS reset waived (the audit amount).
+  request<{ session: ISessionApi; waived?: number }>(`/sessions/${sessionId}/reset-time`, { method: "POST" });
+
 /** Waive the bill, or put it back. Owner-level; the server enforces it. */
 export const apiSetSessionFree = (sessionId: number, isFree: boolean) =>
   request<{ session: ISessionApi }>(`/sessions/${sessionId}/free`, {
@@ -623,6 +634,8 @@ export type SessionActionName =
   | "resumed"
   | "free_enabled"
   | "free_disabled"
+  // The clock reset to zero (2026-11-05); `amount` is what was waived.
+  | "time_reset"
   // ⚠️ The server has emitted this since seat migration shipped; the client
   // type never learned it, so every `moved` line arrived typed as something
   // it is not and the history could not branch on it.

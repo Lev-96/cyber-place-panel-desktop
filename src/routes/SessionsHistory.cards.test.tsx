@@ -123,7 +123,7 @@ describe("SessionsHistory — the cards", () => {
     expect(repo.listEvents.mock.calls[0][0]).toMatchObject({ branch_id: 1, limit: 1000 });
     expect(repo.eventsForSession).not.toHaveBeenCalled();
     expect(titlesIn(cardOf("№8"))).toEqual(["history.action.started", "history.action.stopped"]);
-    expect([...cardOf("№9").querySelectorAll(".hs-event__amount")].map((n) => n.textContent)).toEqual(["0 AMD", "1003 AMD"]);
+    expect([...cardOf("№9").querySelectorAll(".hs-event__amount")].map((n) => n.textContent)).toEqual(["0 AMD", "history.total: 1003 AMD"]);
   });
 
   test("the old toggle and the branch-wide list are gone", async () => {

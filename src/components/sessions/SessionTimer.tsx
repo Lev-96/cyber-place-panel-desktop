@@ -1,6 +1,7 @@
+import LineIcon from "@/components/ui/LineIcon";
 import { preciseWhenSmall } from "@/i18n/currency";
 import { ISessionApi } from "@/types/sessions";
-import { autoResumeAtOf, playedSecondsBetween, sessionAmountAt, sessionMinimumChargeAt } from "./sessionAmount";
+import { autoResumeAtOf, playedSecondsBetween, sessionAmountAt, sessionMinimumChargeAt, sessionTimeCostAt } from "./sessionAmount";
 import { useEffect, useState } from "react";
 import { sessionUrgency } from "./sessionUrgency";
 
@@ -34,6 +35,13 @@ interface Props {
    * billed minutes. Absent = no badge (callers without the language context).
    */
   minimumLabel?: (billedMinutes: number) => string;
+  /**
+   * "Reset the counter" (2026-11-05): a small ↺ right beside the money it
+   * resets, drawn only while there is money to reset on a seat that is not
+   * free. Absent = no control (a role without `session.free`, the receipt).
+   * The press only asks — the caller opens the confirmation.
+   */
+  reset?: { label: string; onReset: () => void };
 }
 
 /**
@@ -53,7 +61,7 @@ interface Props {
 /** A clock that is not running: neither the live cyan nor a warning colour. */
 const PAUSED_COLOR = "var(--color-muted)";
 
-const SessionTimer = ({ session, formatMoney, minimumLabel }: Props) => {
+const SessionTimer = ({ session, formatMoney, minimumLabel, reset }: Props) => {
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 1000);
@@ -84,6 +92,23 @@ const SessionTimer = ({ session, formatMoney, minimumLabel }: Props) => {
         <span className="session-min-badge" data-testid="min-charge">
           {minimumLabel(Math.round(minimum.billedSeconds / 60))}
         </span>
+      )}
+      {/* Only while the TIME has something to reset: goods alone are not reset. */}
+      {reset && !session.is_free && sessionTimeCostAt(session, now) > 0 && (
+        <button
+          type="button"
+          className="session-timer__reset"
+          data-action="reset-time"
+          aria-label={reset.label}
+          title={reset.label}
+          // A press on the card around it does nothing else.
+          onClick={(e) => { e.stopPropagation(); reset.onReset(); }}
+        >
+          <LineIcon size={14}>
+            <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+            <path d="M3 3v5h5" />
+          </LineIcon>
+        </button>
       )}
     </>
   ) : null;

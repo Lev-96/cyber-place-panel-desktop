@@ -138,4 +138,17 @@ describe("SessionHistoryBill", () => {
     expect(document.querySelector("caption")?.textContent).toBe("history.billTitle");
     expect(document.querySelectorAll('tbody th[scope="row"]')).toHaveLength(6);
   });
+
+  test("a counter reset says what it waived on its own line, and the total is the money taken (2026-11-05)", () => {
+    mount(session({ total_paid: 550, time_waived_total: "400.00", items: [item(1, "Cola", 1, 300)], joysticks: [] }));
+    const rows = body();
+    expect(rows).toContainEqual(["history.billTime", "-", "-", "250 AMD"]);
+    expect(rows).toContainEqual(["session.reset.waived", "−400 AMD"]);
+    expect(foot()[0]).toEqual(["history.total", "550 AMD"]);
+  });
+
+  test("never reset: no such line", () => {
+    mount(session());
+    expect(document.querySelector('[data-testid="bill-waived"]')).toBeNull();
+  });
 });

@@ -2934,6 +2934,59 @@ button.pill:hover {
   white-space: nowrap;
 }
 
+/* "Reset the counter" beside the money it resets (SessionTimer, 2026-11-05):
+   small and round so the status line keeps its height and the card its size;
+   inline-flex so it sits on the text's middle. */
+.session-timer__reset {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  margin-left: 6px;
+  padding: 0;
+  vertical-align: middle;
+  border: 1px solid color-mix(in srgb, var(--color-warning) 45%, transparent);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--color-warning);
+  line-height: 1;
+  cursor: pointer;
+}
+.session-timer__reset:hover,
+.session-timer__reset:focus-visible {
+  background: color-mix(in srgb, var(--color-warning) 18%, transparent);
+  border-color: var(--color-warning);
+}
+.session-timer__reset svg { width: 12px; height: 12px; }
+
+/* The reset's confirmation (ResetTimeDialog): the figure large, before → 0. */
+.reset-dialog {
+  width: 440px;
+  max-width: 90vw;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.reset-dialog__title { margin: 0; }
+.reset-dialog__amount {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--color-warning) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-warning) 35%, transparent);
+}
+.reset-dialog__amount .muted { flex-basis: 100%; font-size: var(--fs-sm); }
+.reset-dialog__amount strong { font-size: 26px; font-variant-numeric: tabular-nums; }
+.reset-dialog__arrow { color: var(--color-muted); font-size: 20px; }
+.reset-dialog__zero { color: var(--color-success); }
+.reset-dialog__text { margin: 0; line-height: 1.45; }
+.reset-dialog__keeps { color: var(--color-warning); }
+.reset-dialog__note { margin: 0; font-size: var(--fs-sm); }
+
 /* The VIP minimum charge form (components/prices/VipMinimumChargeForm). */
 .vip-min-summary {
   display: flex;
@@ -6241,8 +6294,8 @@ select.input option:disabled {
   min-width: 0;
 }
 .hs-event {
-  flex: 0 0 200px;
-  padding-right: 14px;
+  flex: 0 0 220px;
+  padding-right: 16px;
 }
 .hs-gap {
   flex: 0 0 56px;
@@ -6254,7 +6307,7 @@ select.input option:disabled {
   min-height: 20px;
 }
 .hs-event__time {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--color-muted);
   font-variant-numeric: tabular-nums;
 }
@@ -6263,7 +6316,7 @@ select.input option:disabled {
   position: relative;
   display: flex;
   align-items: center;
-  height: 22px;
+  height: 28px;
 }
 .hs-event__rail::after {
   content: "";
@@ -6288,10 +6341,10 @@ select.input option:disabled {
 .hs-event__marker {
   display: grid;
   place-items: center;
-  width: 22px;
-  height: 22px;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
-  font-size: 10px;
+  font-size: 13px;
   line-height: 1;
   color: var(--tone);
   border: 1px solid color-mix(in srgb, var(--tone) 55%, transparent);
@@ -6308,27 +6361,44 @@ select.input option:disabled {
 .hs-event__body {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 4px;
   min-width: 0;
 }
 .hs-event__title {
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 600;
   overflow-wrap: anywhere;
 }
+/* The amount reads by what it is (2026-11-05): large and signed, so what was
+   put on the bill, what was waived and what the bill came to never look alike. */
 .hs-event__amount {
-  font-size: 13px;
-  color: var(--color-primary);
+  align-self: flex-start;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--color-text);
   font-variant-numeric: tabular-nums;
 }
+.hs-amount--charge { color: var(--color-primary); }
+.hs-amount--waive {
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  color: var(--color-warning);
+  background: color-mix(in srgb, var(--color-warning) 14%, transparent);
+}
+.hs-amount--total {
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  color: var(--color-success);
+  background: color-mix(in srgb, var(--color-success) 12%, transparent);
+}
 .hs-event__actor {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--color-text);
   opacity: 0.8;
   overflow-wrap: anywhere;
 }
 .hs-event__detail {
-  font-size: 12px;
+  font-size: 13px;
   line-height: 1.4;
   color: var(--color-muted);
   overflow-wrap: anywhere;
@@ -6350,6 +6420,7 @@ select.input option:disabled {
 .hs-tone-charge { --tone: var(--color-text); }
 .hs-tone-neutral { --tone: var(--color-muted); }
 .hs-tone-refused { --tone: var(--color-danger); }
+.hs-tone-waive { --tone: var(--color-warning); }
 .hs-more {
   align-self: flex-start;
   padding: 4px 12px;
@@ -6389,19 +6460,19 @@ select.input option:disabled {
   width: 100%;
   table-layout: fixed;
   border-collapse: collapse;
-  font-size: 13px;
+  font-size: 15px;
 }
 .hs-bill__title {
   caption-side: top;
   text-align: left;
-  padding-bottom: 6px;
-  font-size: 12px;
+  padding-bottom: 8px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--color-muted);
 }
 .hs-bill__table th,
 .hs-bill__table td {
-  padding: 5px 8px;
+  padding: 7px 8px;
   text-align: left;
   font-weight: 400;
   vertical-align: baseline;
@@ -6428,7 +6499,7 @@ select.input option:disabled {
   text-align: center;
 }
 .hs-bill__table thead th {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--color-muted);
   border-bottom: 1px solid var(--color-border);
 }
@@ -6440,12 +6511,21 @@ select.input option:disabled {
 }
 .hs-bill__subtotal > * {
   color: var(--color-muted);
-  font-size: 12px;
+  font-size: 13px;
 }
+/* What a reset of the clock waived (2026-11-05): its own coloured line, not a
+   charge — the time above it is already net. */
+/* Specific enough to beat `.hs-bill__table tbody td:not(:last-child)`
+   (0,2,2) without !important (panel CLAUDE.md §7.5). */
+.hs-bill__table tbody tr.hs-bill__waived > * {
+  color: var(--color-warning);
+  font-weight: 600;
+}
+/* The total: the one figure the eye looks for, the largest on the card. */
 .hs-bill__total > * {
-  padding-top: 10px;
+  padding-top: 12px;
   border-top: 1px solid var(--color-border);
-  font-size: 15px;
+  font-size: 20px;
   font-weight: 700 !important;
 }
 .hs-bill__total td {
@@ -7931,6 +8011,88 @@ select.input option:disabled {
 .onboarding__summary dt { color: var(--color-muted); }
 .onboarding__summary dd { margin: 0; font-weight: 600; }
 .onboarding__actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); margin-top: var(--space-2); }
+
+/* The start dialog (2026-11-05, owner: simple, nothing crowded): room
+   between its parts, a head with «Настроить окно», the hidden-parts panel. */
+.start-dialog {
+  width: 500px;
+  max-width: 90vw;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+.start-dialog__head { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--space-2) var(--space-3); }
+.start-dialog__customize-toggle { flex-shrink: 0; }
+.start-dialog__customize {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  border: 1px dashed rgb(var(--accent-rgb) / 0.4);
+  background: var(--color-surface-alt);
+}
+.start-dialog__note { font-size: var(--fs-sm); }
+.start-dialog__open { gap: var(--space-4); }
+.start-dialog__plan { gap: var(--space-3); }
+
+/* Two boxes typed like a time field (TwoBoxField, 2026-11-05): a length
+   "[ 1 ] ч : [ 30 ] мин" and a clock time "[ 14 ] : [ 30 ]".
+   One frame like an input; two borderless boxes with large tabular digits;
+   the frame takes the focus ring and the error colour. */
+.two-box { display: flex; flex-direction: column; gap: 6px; }
+.two-box__field {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 52px;
+  padding: 6px 10px 6px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+  cursor: text;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.two-box__field:focus-within {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgb(var(--accent-rgb) / 0.2);
+}
+.two-box__field[data-invalid="true"] { border-color: var(--color-danger); }
+.two-box__field[data-disabled="true"] { opacity: 0.6; cursor: default; }
+.two-box__box {
+  width: 2.4ch;
+  min-width: 0;
+  padding: 2px 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  font-size: 24px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  outline: none;
+}
+.two-box__box:focus { background: rgb(var(--accent-rgb) / 0.12); }
+.two-box__box::placeholder { color: var(--color-muted); opacity: 0.5; }
+.two-box__unit { color: var(--color-muted); font-size: var(--fs-body); }
+.two-box__colon { color: var(--color-muted); font-size: 20px; font-weight: 600; padding: 0 4px; }
+.two-box__clear {
+  margin-left: auto;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--color-muted);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+.two-box__clear:hover, .two-box__clear:focus-visible { background: var(--color-surface-alt); color: var(--color-text); }
+.two-box__error { font-size: var(--fs-sm); }
 
 .start-summary {
   padding: var(--space-2) var(--space-3);

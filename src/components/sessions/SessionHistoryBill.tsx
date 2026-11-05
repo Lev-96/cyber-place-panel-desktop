@@ -55,8 +55,11 @@ const SessionHistoryBill = ({ session, closed }: Props) => {
   // so the two cannot drift.
   const padTotal = padCharge?.total ?? 0;
   const timeCost = Math.max(0, total - itemsTotal - padTotal);
+  // What resetting the clock waived (2026-11-05): the time line above is
+  // already net of it; said on its own line so the bill shows where it went.
+  const waived = num(session.time_waived_total);
 
-  if (!closed && items.length === 0 && padCharge === null) return null;
+  if (!closed && items.length === 0 && padCharge === null && waived <= 0) return null;
 
   const perHour = t("session.perHourShort");
 
@@ -75,6 +78,12 @@ const SessionHistoryBill = ({ session, closed }: Props) => {
         <tbody>
           {/* The clock — only once the session is over, when it is a fact. */}
           {closed && <BillRow label={t("history.billTime")} qty={null} price={null} sum={money(timeCost)} />}
+          {waived > 0 && (
+            <tr className="hs-bill__waived" data-testid="bill-waived">
+              <th scope="row" colSpan={2}>{t("session.reset.waived")}</th>
+              <td className="num" colSpan={2}>−{money(waived)}</td>
+            </tr>
+          )}
 
           {items.map((it) => (
             <BillRow

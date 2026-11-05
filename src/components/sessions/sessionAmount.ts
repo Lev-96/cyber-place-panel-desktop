@@ -62,6 +62,18 @@ export const sessionTimeCostAt = (session: ISessionApi, at: number): number =>
 export const sessionMinimumChargeAt = (session: ISessionApi, at: number): MinimumChargeResult => {
   const rule = session.min_charge ?? null;
   const clock = clockCostAt(session, at);
+  // Reset to zero (2026-11-05) — `SessionPricingCalculator::timeCharge`: the
+  // clock minus the clock at the reset, never below zero, and no VIP minimum
+  // after it. The raw clock is what every boundary above froze, so this one
+  // subtraction is exact across all of them.
+  const offset = session.time_reset_at ? session.time_reset_offset : null;
+  if (offset !== null && offset !== undefined) {
+    return {
+      amount: Math.max(0, round2(clock - toNumber(offset))),
+      applied: false,
+      billedSeconds: playedSecondsBetween(session, session.started_at, at),
+    };
+  }
   if (rule && rule.settled_amount != null) {
     return {
       amount: round2(clock + rule.settled_amount),

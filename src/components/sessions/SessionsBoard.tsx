@@ -36,6 +36,7 @@ import AddSessionItemDialog from "./AddSessionItemDialog";
 import SellProductsDialog from "@/components/pos/SellProductsDialog";
 import { durationLabel } from "@/components/prices/vipMinimumCharge";
 import SessionTimer from "./SessionTimer";
+import ResetTimeDialog from "./ResetTimeDialog";
 import { autoResumeAtOf, sessionCurrentHourlyRate, sessionJoysticksTotal } from "./sessionAmount";
 import StartSessionDialog from "./StartSessionDialog";
 import SessionOptionsDialog from "./SessionOptionsDialog";
@@ -274,6 +275,16 @@ const SessionsBoard = ({ branchId }: Props) => {
   const [optionsTarget, setOptionsTarget] = useState<ISessionApi | null>(null);
   // The session being moved to another seat («Переместить игрока»).
   const [relocateTarget, setRelocateTarget] = useState<ISessionApi | null>(null);
+  // "Reset the counter" (2026-11-05): the session being asked about, by id —
+  // the dialog always reads its LIVE row, so a reset, +time or stop from
+  // another desk while it is open is what it shows (and what the toast counts).
+  const [resetId, setResetId] = useState<number | null>(null);
+  const resetTarget = resetId === null ? null : (sessions.data ?? []).find((s) => s.id === resetId) ?? null;
+  // Gone from the board, or no longer running: nothing left to reset.
+  useEffect(() => {
+    if (resetId !== null && (resetTarget === null || resetTarget.status !== "active")) setResetId(null);
+  }, [resetId, resetTarget]);
+  const mayReset = can(role, "session.free");
   // The sessions whose pads are mid-change. Per session (useKeyedBusy), so a
   // second click on the SAME tile is refused while the first is in flight and a
   // cashier working another seat is not blocked by it — which is what the old
@@ -834,6 +845,7 @@ const SessionsBoard = ({ branchId }: Props) => {
                 session={sess}
                 formatMoney={money}
                 minimumLabel={(minutes) => fmt(t("vipMin.badge"), durationLabel(minutes, t))}
+                reset={mayReset ? { label: t("session.reset.button"), onReset: () => setResetId(sess.id) } : undefined}
               />
             </span>
             <span className="until">
@@ -1240,6 +1252,21 @@ const SessionsBoard = ({ branchId }: Props) => {
             // consoles on both sides must hear of it as a relocation does.
             consolesFollowMove(optionsTarget.pc_id, updated.pc_id);
             setOptionsTarget(updated);
+            void sessions.reload();
+          }}
+        />
+      )}
+      {resetTarget && (
+        <ResetTimeDialog
+          session={resetTarget}
+          seat={seatOf(resetTarget.pc_id)}
+          onClose={() => setResetId(null)}
+          onDone={(updated, waived) => {
+            setResetId(null);
+            // The server's whole row at once (the reset may re-base the plan
+            // too), so the card reads 0 before the reload.
+            sessions.mutate((list) => list?.map((s) => (s.id === updated.id ? { ...s, ...updated } : s)) ?? list);
+            notify.message("success", fmt(t("session.reset.toast"), seatOf(updated.pc_id), money(Math.max(0, waived))));
             void sessions.reload();
           }}
         />

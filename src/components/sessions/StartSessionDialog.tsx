@@ -4,6 +4,7 @@ import Radio from "@/components/ui/Radio";
 import Button from "@/components/ui/Button";
 import Modal from "@/components/ui/Modal";
 import Checkbox from "@/components/ui/Checkbox";
+import Switch from "@/components/ui/Switch";
 import PriceInput from "@/components/ui/PriceInput";
 import Input from "@/components/ui/Input";
 import Spinner from "@/components/ui/Spinner";
@@ -26,9 +27,10 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { IStartQuote } from "@/api/sessions";
 import SectionTabs from "@/components/ui/SectionTabs";
 import ClockTimeField from "./ClockTimeField";
-import DurationPicker from "./DurationPicker";
+import DurationInput from "./DurationInput";
 import QuotedPrice from "./QuotedPrice";
-import { clockOf, minutesOf, type DurationUnit } from "./durationModel";
+import { EMPTY_DRAFT, clockOfDraft, draftMinutes, isDraftEmpty, type ClockDraft, type DurationDraft } from "./durationModel";
+import { useHiddenParts } from "@/hooks/useHiddenParts";
 import { useMinuteTick } from "./useMinuteTick";
 import { quoteFor, useServerQuote } from "./useServerQuote";
 
@@ -41,6 +43,15 @@ interface Props {
 
 type Mode = "fixed" | "open";
 type PlanLimit = "duration" | "until";
+
+/**
+ * The optional parts a person may hide from this dialog (2026-11-05, owner),
+ * each put back to its default while hidden: a free start, a price changed
+ * for this start, a planned length, a total changed by hand.
+ */
+const OPTIONAL_PARTS = ["free", "rate", "plan", "total"] as const;
+type OptionalPart = (typeof OPTIONAL_PARTS)[number];
+export const startDialogKey = (userId: number) => `u${userId}:cp.ui.start-dialog`;
 
 /**
  * Start-a-session dialog.
@@ -101,16 +112,40 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
   // session is not "a price of zero", it is a session whose bill nobody pays,
   // and the two behave differently the moment a drink is added to it.
   const [isFree, setIsFree] = useState(false);
-  // The optional planned length (2026-10-25), hours by default, empty = none.
-  const [plan, setPlan] = useState<{ unit: DurationUnit; amount: string }>({ unit: "hours", amount: "" });
+  // The optional planned length (2026-10-25), in a time-style hours : minutes
+  // field (2026-11-05), empty = none.
+  const [planDraft, setPlanDraft] = useState<DurationDraft>(EMPTY_DRAFT);
   // …or "until" a clock time (2026-10-26). Two ways to set ONE plan, never
   // both: only the way chosen is read and sent. Switching keeps what was
   // typed in the other, so a slip of the tab loses nothing.
   const [limit, setLimit] = useState<PlanLimit>("duration");
-  const [untilInput, setUntilInput] = useState("");
+  const [untilDraft, setUntilDraft] = useState<ClockDraft>(EMPTY_DRAFT);
   // The plan's TOTAL set by hand (2026-10-25), in AMD as `PriceInput` keeps it.
   const [editTotal, setEditTotal] = useState(false);
   const [totalInput, setTotalInput] = useState("");
+
+  // What this person has hidden here, and each hidden part at its default:
+  // nothing out of sight changes what Start does.
+  const parts = useHiddenParts<OptionalPart>(user ? startDialogKey(user.id) : null, OPTIONAL_PARTS);
+  const { isShown } = parts;
+  const [customizing, setCustomizing] = useState(false);
+  useEffect(() => {
+    if (!isShown("free")) setIsFree(false);
+    if (!isShown("rate")) { setEditPrice(false); setRateSaved(false); setCustomRate(""); }
+    if (!isShown("plan")) { setPlanDraft(EMPTY_DRAFT); setUntilDraft(EMPTY_DRAFT); setLimit("duration"); }
+    if (!isShown("plan") || !isShown("total")) { setEditTotal(false); setTotalInput(""); }
+  }, [isShown]);
+  const customizable = OPTIONAL_PARTS.filter((id) => id !== "free" || mayWaive);
+  const partLabel: Record<OptionalPart, string> = {
+    free: t("session.freeBill"),
+    rate: t("session.editPrice"),
+    plan: t("session.planLimitDuration"),
+    total: t("session.plannedEditTotal"),
+  };
+  // A seat with no tariff it could be sold is started by the hour, and the
+  // choice is not drawn. A list that could not be read keeps it (its error
+  // and Retry are under the package tab).
+  const offerPackages = !(packages !== null && packages.length === 0);
 
   // A failed read is kept as such: the dialog used to wait on it for ever (no
   // catch), and "no packages" would be a lie. Open mode still works without it.
@@ -125,6 +160,9 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
         const p = all.filter((pkg) => packageFitsSeat(pkg, pc.place?.platform));
         setPackages(p);
         setPkgId(p[0]?.id ?? null);
+        // No tariff this seat could be sold (2026-11-05, owner): the package
+        // choice is not offered at all, and the start is by the hour.
+        if (p.length === 0) setMode("open");
       })
       .catch((e: unknown) => setPkgError(e));
   }, [branchId, pc.place?.platform]);
@@ -185,11 +223,11 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
 
   // Prefill the override input with the current rate the moment it's enabled,
   // so the operator edits "the current price" rather than a blank field.
-  const planMinutes = limit === "duration" ? minutesOf(plan.amount, plan.unit) : null;
-  const planUntil = limit === "until" ? clockOf(untilInput) : null;
+  const planMinutes = limit === "duration" ? draftMinutes(planDraft) : null;
+  const planUntil = limit === "until" ? clockOfDraft(untilDraft) : null;
   // What the plan is, in the form the server takes: minutes, or "HH:mm".
   const planInput: number | string | null = planMinutes ?? planUntil;
-  const planTyped = limit === "duration" ? plan.amount.trim() !== "" : untilInput.trim() !== "";
+  const planTyped = limit === "duration" ? !isDraftEmpty(planDraft) : !isDraftEmpty(untilDraft);
   // Typed but unreadable is not "no plan": the Start waits for a fix rather
   // than quietly starting a seat with no end.
   const planInvalid = planTyped && planInput === null;
@@ -332,8 +370,23 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
 
   return (
     <Modal open onClose={onClose}>
-      <div className="card" style={{ width: 460, maxWidth: "90vw", display: "flex", flexDirection: "column", gap: 14 }}>
-        <h2 style={{ margin: 0 }}>{t("session.start")} · №{pc.place?.number ?? pc.label}{playStation ? " (PS)" : ""}</h2>
+      <div className="card start-dialog">
+        <div className="start-dialog__head">
+          <h2 style={{ margin: 0 }}>{t("session.start")} · №{pc.place?.number ?? pc.label}{playStation ? " (PS)" : ""}</h2>
+          <Button type="button" variant="secondary" className="start-dialog__customize-toggle"
+            aria-expanded={customizing} onClick={() => setCustomizing((v) => !v)} data-testid="start-customize">
+            {customizing ? t("action.close") : t("session.customize")}
+          </Button>
+        </div>
+        {customizing && (
+          <div className="start-dialog__customize" data-testid="start-customize-panel">
+            <span className="muted start-dialog__note">{t("session.customizeHint")}</span>
+            {customizable.map((id) => (
+              <Switch key={id} checked={isShown(id)} onChange={(on) => parts.setShown(id, on)}
+                label={partLabel[id]} testId={`start-part-${id}`} />
+            ))}
+          </div>
+        )}
         {!packages && !pkgError ? <ListSkeleton rows={3} /> : (
           <>
             {/* Free sits ABOVE the tariff, and turning it on takes the tariff
@@ -345,7 +398,7 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
                 never going to be charged. Every control below answers "what
                 does this cost", and for a waived session that question has one
                 answer, so the honest form is the one that stops asking it. */}
-            {mayWaive && (
+            {mayWaive && isShown("free") && (
               <div className="col" style={{ gap: 4 }}>
                 <Checkbox checked={isFree} onChange={setIsFree} label={t("session.freeBill")} />
                 {isFree && (
@@ -356,8 +409,8 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
               </div>
             )}
 
-            {!isFree && (
-            <div className="row" style={{ gap: 8 }}>
+            {!isFree && offerPackages && (
+            <div className="row" style={{ gap: 8 }} data-testid="start-mode">
               {/* A PlayStation may be sold a package too.
 
                   This tab was DISABLED for PS on the grounds that count-up is
@@ -402,7 +455,7 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
                 )}
               </div>
             ) : (
-              <div className="col" style={{ gap: 10 }}>
+              <div className="col start-dialog__open">
                 <AssignedRateDisplay
                   rate={effectiveRate}
                   hourSuffix={t("time.hourShort") || "h"}
@@ -410,8 +463,10 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
                   rateLabel={t("session.hourlyRate")}
                   money={money}
                 />
+                {isShown("rate") && (
                 <Checkbox checked={editPrice} onChange={toggleEditPrice} label={t("session.editPrice")} />
-                {editPrice && (
+                )}
+                {isShown("rate") && editPrice && (
                   <div className="col" style={{ gap: 6 }}>
                     <div className="row" style={{ gap: 8, alignItems: "flex-end" }}>
                       <div style={{ flex: 1 }}>
@@ -444,7 +499,8 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
                     seat with an end, prices it at the rate above (its own
                     `start-quote`, the chain the start itself runs), and the
                     card gets "+ Время". Billed by the clock either way. */}
-                <section className="col" style={{ gap: 8 }} data-testid="planned-duration">
+                {isShown("plan") && (
+                <section className="col start-dialog__plan" data-testid="planned-duration">
                   <span className="label">{t("session.plannedDuration")}</span>
                   <SectionTabs
                     label={t("session.planLimit")}
@@ -457,23 +513,24 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
                     onChange={setLimit}
                   />
                   {limit === "duration" ? (
-                    <DurationPicker
-                      unit={plan.unit}
-                      amount={plan.amount}
-                      onChange={setPlan}
+                    <DurationInput
+                      value={planDraft}
+                      onChange={setPlanDraft}
                       disabled={busy}
                       label={t("session.plannedDuration")}
+                      testId="planned-duration-input"
                     />
                   ) : (
                     <ClockTimeField
-                      value={untilInput}
-                      onChange={setUntilInput}
+                      value={untilDraft}
+                      onChange={setUntilDraft}
                       disabled={busy}
                       quote={quotedPlan}
                     />
                   )}
                   {planInput === null && !planTyped ? (
-                    <span className="muted" style={{ fontSize: 11 }}>{t("session.plannedNone")}</span>
+                    // "Until" says how to type it in its own line; one line under a field.
+                    limit === "duration" ? <span className="muted" style={{ fontSize: 11 }}>{t("session.plannedNone")}</span> : null
                   ) : (
                     <>
                       <QuotedPrice
@@ -493,6 +550,7 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
                       {/* The total, editable (2026-10-25): a price agreed at
                           the counter for this length. Kept exactly by the
                           server; the full time bills exactly this. */}
+                      {isShown("total") && (
                       <Checkbox
                         checked={editTotal}
                         onChange={(next) => {
@@ -502,7 +560,8 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
                         label={t("session.plannedEditTotal")}
                         disabled={busy || planInput === null}
                       />
-                      {editTotal && (
+                      )}
+                      {isShown("total") && editTotal && (
                         <div className="col" style={{ gap: 4 }} data-testid="planned-total">
                           <PriceInput
                             label={t("session.plannedTotal")}
@@ -517,6 +576,7 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
                     </>
                   )}
                 </section>
+                )}
               </div>
             ))}
 

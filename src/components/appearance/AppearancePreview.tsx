@@ -177,7 +177,7 @@ const AppearancePreview = ({ quick }: { quick: "all" | "primary" }) => {
                   {sess ? (
                     <>
                       <span className="status">
-                        <SessionTimer session={sess} formatMoney={money} />
+                        <SessionTimer session={sess} formatMoney={money} reset={{ label: t("session.reset.button"), onReset: noop }} />
                       </span>
                       <span className="until">
                         <span className="session-card__secondary">{sessionTariffLine(sess, money, t)}</span>
