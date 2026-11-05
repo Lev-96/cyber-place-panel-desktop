@@ -2390,6 +2390,96 @@ with `standard_charge`, confirm enabled only on a quote of exactly that price.
 `sessionTimeCostAt` mirrors the server's share-of-plan billing (packages
 included, re-base via `plan_rebased_at`, only resumed pauses out of the plan).
 
+**Reset the counter (2026-11-05, owner).** A small ↺ beside the money on a
+running card (`SessionTimer` `reset` prop; only for `session.free`, not on a
+free seat, only while there is money) opens `ResetTimeDialog`: the time's
+figure live → 0, "the seat counts again from 0", "goods and pads stay",
+"saved in the history". `POST /sessions/{id}/reset-time` (backend §"Resetting
+a running seat's clock"); the waived amount is the server's. The card keeps
+its size (e2e); the ↺ shows only while the TIME has something to reset
+(`sessionTimeCostAt`, not goods). The tile mirrors the bill: `sessionMinimumChargeAt` charges
+`max(0, clock − time_reset_offset)` after `time_reset_at`, no VIP minimum.
+The dialog reads the LIVE row by id (`resetId`), so a reset/stop from another
+desk while it is open shows (0, Confirm held) or closes it; the toast counts
+this reset only (server total − the total the dialog showed at confirm).
+History: `time_reset` reads "Reset the counter −400" (tone `waive`); every
+amount is signed by kind (`amountKind`: charge "+", waive "−", total
+"Итог: …"), larger type; the bill has an «Обнулено −N» line
+(`time_waived_total`). Tests: `sessionAmount.reset.test.ts` (the backend's
+figures), `SessionHistoryTimeline`/`SessionHistoryBill` tests,
+`e2e/session-reset.spec.ts`. The AppearancePreview draws the ↺ too.
+
+**The start dialog, made simple (2026-11-05, owner).** Only the start
+changed; "+ Время" and the VIP minimum keep `DurationPicker`.
+- No tariff this seat could be sold (the list read, empty after
+  `packageFitsSeat`): the «Фиксированный / По часам» choice is not drawn and
+  the start is by the hour (`mode` set to `open` on load, for a computer too).
+  A list that failed to read keeps the choice (its error + Retry live there).
+- The planned length is a time-style field, `DurationInput`:
+  "[ 1 ] ч : [ 30 ] мин" — two plain text boxes, NOT `<input type="time">`
+  (Electron swallows keys in raw time inputs, and a time input is a clock).
+  The boxes are a `DurationDraft` read by `durationModel.ts`
+  (`typeIntoHours` / `typeIntoMinutes` / `draftMinutes` / `stepDraft`),
+  safe key by key: no single digit jumps on (a "3" may start "30мин"); a
+  space, ":" or "ч" after the hours goes on ("1 30" = 1 h 30 min); a number
+  past 10 h in the hours is minutes ("30", "90" → 1 h 30 min); "1ч 30мин",
+  "1:30", "1.5" are laid out in both boxes; the letters of "мин"/"час" after
+  the digits are ignored; "75" in the minutes carries (1 h 15 min); ↑/↓ step
+  1 h / 5 min; × clears. An unreadable value is said once the field is left
+  (Start is held either way). One line under it while empty
+  (`session.plannedNone`). `parseDuration` also reads "1 30". The wire is
+  unchanged (`duration_minutes`, `until`, `planned_amount`), the price is
+  still only the server's quote.
+- "Until a time" is the same kind of field, `ClockInput` "[ 14 ] : [ 30 ]",
+  24-hour, no ":" to type (`typeIntoClockHours` / `typeIntoClockMinutes` /
+  `clockOfDraft` / `settleClock` / `stepClock`): "1430" → 14:30, "0040",
+  "930" → 09:30; "3"…"9" in the hour goes on to the minutes; "25" → 02:5…;
+  "14:30", "14.30", "14 30" pasted land in both boxes; ↑/↓ round the clock.
+  A time half typed (minutes without both digits) is never quoted or
+  started; leaving the field writes it out ("9" → 09:00, "14","5" → 14:05).
+  The wire is still `until: "HH:mm"`; its length and day are the server's.
+  One line under it: the typing hint while empty, the server's answer once set.
+- **Typing over a filled box REPLACES it (review, 2026-11-05):** a box
+  entered by click, Tab or a click into the box already focused has its value
+  selected at once (no rAF: a fast first digit must not beat the selection);
+  the move on from the hours selects minutes it did NOT just write, and leaves
+  the caret after minutes it did write ("30" in the hours → "30мин"). The
+  move reports `wroteMinutes` explicitly (never inferred by comparing values:
+  "30мин" over 1:30 must stay 30 min). Backspace from empty minutes puts the
+  caret at the END of the hours (one digit per press). Minutes typed key by
+  key are never cut ("120" through the hours is 2 h). e2e «correcting a
+  filled length or time replaces it».
+- Hours never jump on by themselves ("10" then "0" is 100 min, not 10 h —
+  fourth review): a space, ":" or "ч" goes on to the minutes. Minutes keep up
+  to four digits as typed (a fourth is no longer dropped: "1500" is no length);
+  Backspace over a clock minute padded for you ("07") takes the pad with it.
+- **Nothing is rewritten while typed** (third review): digits stay as typed —
+  "90" in the minutes box is 90 min, "600" typed key by key is 10 h — and the
+  summary shows the minutes at once; `settleDuration` lays the boxes out as
+  hours and minutes when the field is left. (Laying "60" out early read the
+  next "0" as 1:00.) The clock keeps a third minute digit as NO time instead
+  of dropping one ("2400" key by key used to become 02:40).
+- Decimals: "1.30" / "1,30" is 1 h 30 min (two digits after the point, under
+  60, as "1:30" and the clock's "14.30"); "1.60" is refused, never re-read as
+  1.6 h; "1.5" is 1 h 30 min (one digit is a decimal; it stays in the hours
+  box while typed and is laid out on leaving); "1." is 1 h; "1.25ч" with a
+  unit is decimal hours. A whole length pasted into the minutes ("1 30",
+  "1.30") is read whole.
+- Both fields are thin wrappers of `components/ui/TwoBoxField.tsx` (frame,
+  two plain text boxes, ↑/↓, Backspace back to the hours, ×, invalid said
+  only once the field is left, `.two-box*` styles); the rules are the
+  caller's, so a new two-box field is a wrapper with its own rules.
+- «Настроить окно» hides optional parts — free start, price change, length,
+  total change — per person on this computer (`useHiddenParts`, key
+  `u{id}:cp.ui.start-dialog`, `{v:1, hidden}`; unknown ids ignored). A
+  hidden part is reset to its default while hidden, so nothing unseen changes
+  the start. The summary line, the rate, the mode and Start cannot be hidden.
+- Tests: `StartSessionDialog.test.tsx` («the simpler start dialog»),
+  `durationModel.test.ts` (`parseDuration`), `useHiddenParts.test.ts`,
+  `e2e/start-dialog.spec.ts` (1440/800/520: ≥ 16px between parts, nothing past
+  the edge; hidden stays hidden after a reload; nine phrasings typed key by
+  key, arrows, ×, error only after leaving). Every rule was mutation-checked.
+
 **"До времени" (2026-10-26).** Tabs "Продолжительность" / "До времени" above
 the plan; only the chosen one is read and sent, the other keeps its value.
 `ClockTimeField` takes "00:40" (`clockOf` checks the SHAPE only, "0:40" →
