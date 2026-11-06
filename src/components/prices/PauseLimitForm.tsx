@@ -1,10 +1,13 @@
 import Button from "@/components/ui/Button";
+import DurationInput from "@/components/sessions/DurationInput";
+import { draftMinutes, draftOf, isDraftEmpty, EMPTY_DRAFT, type DurationDraft } from "@/components/sessions/durationModel";
 import { IBillingSettings, chargedSlotsOf, includedJoysticks, maxJoystickSlotOf, pricingModeOf, strategyModeOf } from "@/api/joystickPrices";
 import { useLang } from "@/i18n/LanguageContext";
 import { fmt } from "@/i18n/translations";
 import { billingSettingsRepository } from "@/repositories/BillingSettingsRepository";
 import { notify } from "@/ui/notify";
 import { FormEvent, useState } from "react";
+import { durationLabel } from "./vipMinimumCharge";
 
 interface Props {
   branchId: number;
@@ -26,20 +29,22 @@ export const PAUSE_LIMIT_MAX = 240;
  * here never shortens or stretches a pause already running — only the next one.
  * At the limit the BACKEND resumes the session by itself, whether or not any
  * panel is open.
+ *
+ * Typed in the start dialog's time field (2026-11-06, owner: "[ч] : [мин]",
+ * `DurationInput`), so an hour or more reads as hours; the server stores
+ * minutes.
  */
 const PauseLimitForm = ({ branchId, settings, onSaved }: Props) => {
   const { t } = useLang();
   const saved = settings.pause_limit_minutes ?? null;
-  const [input, setInput] = useState(saved === null ? "" : String(saved));
+  const [draft, setDraft] = useState<DurationDraft>(() => (saved === null ? EMPTY_DRAFT : draftOf(saved)));
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
-  /** The minutes typed: null = no limit, NaN = not a valid limit. */
+  /** The minutes typed: null = no limit (both boxes empty), NaN = not a valid limit. */
   const typed = ((): number | null => {
-    const raw = input.trim();
-    if (raw === "") return null;
-    const n = Number(raw);
-    return Number.isInteger(n) && n >= 1 && n <= PAUSE_LIMIT_MAX ? n : NaN;
+    if (isDraftEmpty(draft)) return null;
+    return draftMinutes(draft, PAUSE_LIMIT_MAX) ?? NaN;
   })();
 
   const invalid = typed !== null && Number.isNaN(typed);
@@ -78,24 +83,20 @@ const PauseLimitForm = ({ branchId, settings, onSaved }: Props) => {
   return (
     <form className="col" style={{ gap: 12 }} onSubmit={submit}>
       <span className="muted" style={{ fontSize: 12 }}>{t("pauseLimit.hint")}</span>
-      <label className="col" style={{ gap: 4 }}>
+      <div className="col" style={{ gap: 4 }}>
         <span className="label">{t("pauseLimit.label")}</span>
-        <div className="row" style={{ gap: 6, alignItems: "center" }}>
-          <input
-            className="input"
-            type="text"
-            inputMode="numeric"
-            value={input}
-            placeholder={t("pauseLimit.none")}
-            onChange={(e) => setInput(e.target.value)}
-            disabled={busy}
-            aria-label={t("pauseLimit.label")}
-            style={{ width: 120 }}
-          />
-          <span className="muted" style={{ fontSize: 12 }}>{t("time.minShort") || "min"}</span>
-        </div>
-      </label>
-      {invalid && <span className="error" style={{ fontSize: 12 }}>{fmt(t("pauseLimit.invalid"), PAUSE_LIMIT_MAX)}</span>}
+        <DurationInput
+          value={draft}
+          onChange={setDraft}
+          disabled={busy}
+          label={t("pauseLimit.label")}
+          maxMinutes={PAUSE_LIMIT_MAX}
+          invalidText={fmt(t("pauseLimit.invalid"), durationLabel(PAUSE_LIMIT_MAX, t))}
+          testId="pause-limit"
+        />
+        {/* Empty is a choice, not an omission: say what it means. */}
+        {typed === null && <span className="muted" style={{ fontSize: 12 }} data-testid="pause-limit-none">{t("pauseLimit.none")}</span>}
+      </div>
       {err && <div className="error">{err}</div>}
       <div>
         <Button type="submit" disabled={!changed || busy}>{t("action.save")}</Button>

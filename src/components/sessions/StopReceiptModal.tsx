@@ -485,7 +485,9 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved, canRes
 
         {err && <div className="error">{err}</div>}
 
-        <div className="row-between" style={{ marginTop: 4 }}>
+        {/* Medium buttons (2026-11-06, owner): the receipt's large type made
+            three of them crowd the row; `.receipt-actions` sizes them. */}
+        <div className="row-between receipt-actions" style={{ marginTop: 4 }}>
           {finished ? (
             <Button onClick={onClose}>{t("action.close")}</Button>
           ) : (

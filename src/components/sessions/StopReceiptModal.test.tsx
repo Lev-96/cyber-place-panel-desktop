@@ -977,6 +977,15 @@ describe("cancelling the seat from the receipt", () => {
     expect((screen.getByTestId("stop-confirm") as HTMLButtonElement).disabled).toBe(false);
   });
 
+  test("the three buttons sit in the medium-sized actions row (2026-11-06)", async () => {
+    repo.preview.mockResolvedValue(bill({ time_cost: 400, total: 400 }));
+    await mountWith({ canCancel: true });
+    const row = screen.getByTestId("stop-confirm").closest(".receipt-actions");
+    expect(row).not.toBeNull();
+    expect(row!.contains(screen.getByTestId("receipt-cancel"))).toBe(true);
+    expect(screen.getByTestId("receipt-cancel").textContent).toBe("session.cancel.button");
+  });
+
   test("a plain stop still reports itself as not cancelled", async () => {
     const onConfirmed = vi.fn();
     repo.preview.mockResolvedValue(bill({ time_cost: 400, total: 400 }));

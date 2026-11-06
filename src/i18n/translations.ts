@@ -689,7 +689,7 @@ export const TRANSLATIONS: Dict = {
   },
   "session.reset.waived": { en: "Reset", ru: "Обнулено", am: "Զրոյացված" },
   // Cancel the seat from the stop receipt (2026-11-06): ends it, nothing owed.
-  "session.cancel.button": { en: "Cancel session", ru: "Отменить сессию", am: "Չեղարկել սեսիան" },
+  "session.cancel.button": { en: "Cancel the seat", ru: "Отменить место", am: "Չեղարկել տեղը" },
   "session.cancel.confirm": {
     en: "Cancel the session on {0}? It ends now and nothing is paid: time, joysticks and goods are waived. The seat becomes free.",
     ru: "Отменить сессию на {0}? Она завершится сейчас и ничего не будет оплачено: время, джойстики и товары. Место станет свободным.",
@@ -2002,9 +2002,9 @@ export const TRANSLATIONS: Dict = {
     am: "Երբ դադարը հասնում է այս տևողությանը, սեսիան ինքնաբերաբար շարունակվում է, և վճարումը վերսկսվում է։ Դատարկ՝ առանց սահմանաչափի։ Կիրառվում է պահպանելուց հետո սկսված դադարների վրա։",
   },
   "pauseLimit.invalid": {
-    en: "Enter whole minutes from 1 to {0}, or leave empty.",
-    ru: "Введите целое число минут от 1 до {0} или оставьте пустым.",
-    am: "Մուտքագրեք ամբողջ թիվ՝ 1-ից {0} րոպե, կամ թողեք դատարկ։",
+    en: "Enter a time from 1 min to {0}, or leave it empty.",
+    ru: "Укажите время от 1 мин до {0} или оставьте пустым.",
+    am: "Նշեք ժամանակ 1 րոպեից մինչև {0}, կամ թողեք դատարկ։",
   },
   "pauseLimit.saved": { en: "Pause limit saved", ru: "Лимит паузы сохранён", am: "Դադարի սահմանաչափը պահպանվեց" },
   "rounding.sectionTitle": { en: "Rounding the bill", ru: "Округление счёта", am: "Հաշվի կլորացում" },

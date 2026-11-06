@@ -2977,6 +2977,19 @@ button.pill:hover {
 .receipt-reset:hover:not(:disabled),
 .receipt-reset:focus-visible { background: color-mix(in srgb, var(--color-warning) 15%, transparent); }
 .receipt-reset:disabled { opacity: 0.5; cursor: default; }
+/* The stop receipt's buttons (2026-11-06, owner): medium — the type of a
+   control, not of the receipt above it — on one line each, wrapping as a row
+   when the window is narrow. */
+.receipt-actions {
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.receipt-actions .btn {
+  font-size: 13px;
+  line-height: 1.2;
+  padding: 8px 14px;
+  white-space: nowrap;
+}
 /* Cancel the seat from the receipt (2026-11-06): destructive, in the tokens the
    confirm dialog's destructive button uses — red, apart from the reset's amber. */
 .receipt-cancel.btn.secondary {
