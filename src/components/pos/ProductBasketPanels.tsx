@@ -36,19 +36,20 @@ export const BasketModeSwitch = ({ basket, name, disabled }: ModeSwitchProps) =>
   const { t } = useLang();
   return (
     <div className="row" role="radiogroup" aria-label={t("session.addMode")} style={{ gap: 16, flexWrap: "wrap" }}>
-      <Radio
-        name={name}
-        checked={basket.mode === "picker"}
-        onChange={() => basket.setMode("picker")}
-        disabled={disabled}
-        label={t("session.addModePicker")}
-      />
+      {/* Typing first: it is the way the dialog opens (2026-11-07). */}
       <Radio
         name={name}
         checked={basket.mode === "text"}
         onChange={() => basket.setMode("text")}
         disabled={disabled}
         label={t("session.addModeText")}
+      />
+      <Radio
+        name={name}
+        checked={basket.mode === "picker"}
+        onChange={() => basket.setMode("picker")}
+        disabled={disabled}
+        label={t("session.addModePicker")}
       />
     </div>
   );

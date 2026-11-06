@@ -55,16 +55,25 @@ const PRODUCTS = [
 const onClose = vi.fn();
 const onSold = vi.fn();
 
-const mount = async () => {
+/** Opens the till. It opens on typing (2026-11-07); `{ onList: true }` puts it on the list. */
+const mount = async ({ onList = true } = {}) => {
   await act(async () => {
     render(<SellProductsDialog branchId={7} onClose={onClose} onSold={onSold} />);
   });
+  const list = screen.queryByLabelText("session.addModePicker");
+  if (onList && list) await act(async () => { fireEvent.click(list); });
 };
 const add = async (name: string) => {
   await act(async () => { fireEvent.click(screen.getByLabelText(`action.add: ${name}`)); });
 };
 const sellButton = () => screen.getByText("till.sellConfirm").closest("button") as HTMLButtonElement;
 const sell = async () => { await act(async () => { fireEvent.click(sellButton()); }); };
+test("the till opens on typing too, the first choice (2026-11-07)", async () => {
+  await mount({ onList: false });
+  expect((screen.getByLabelText("session.addModeText") as HTMLInputElement).checked).toBe(true);
+  expect(screen.getByLabelText("session.quickEntry")).toBeTruthy();
+});
+
 const choose = async (label: string) => {
   await act(async () => { fireEvent.click(screen.getByLabelText(label)); });
 };

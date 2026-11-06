@@ -1066,14 +1066,14 @@ export const TRANSLATIONS: Dict = {
   // venue may not even sell read as a format to copy rather than as an
   // instruction, and the line below already explains the format.
   "session.quickEntryPlaceholder": {
-    en: "Enter the product name and the quantity",
-    ru: "Введите название продукта и количество",
-    am: "Մուտքագրեք ապրանքի անվանումը և քանակը",
+    en: "For example: coca cola 2",
+    ru: "Например: coca cola 2",
+    am: "Օրինակ՝ coca cola 2",
   },
   "session.quickEntryHint": {
-    en: "One product per line, with the quantity before or after the name. Nothing is added until you confirm.",
-    ru: "По одному продукту в строке, количество до или после названия. Ничего не добавится, пока вы не подтвердите.",
-    am: "Մեկ ապրանք՝ մեկ տողում, քանակը՝ անվանումից առաջ կամ հետո։ Ոչինչ չի ավելացվի, քանի դեռ չեք հաստատել։",
+    en: "One product per line, the quantity before or after the name; no quantity is one. Nothing is added until you confirm.",
+    ru: "По одному товару в строке, количество до или после названия. Без количества считается 1 шт. Ничего не добавится, пока вы не подтвердите.",
+    am: "Մեկ ապրանք՝ մեկ տողում, քանակը՝ անվանումից առաջ կամ հետո, առանց քանակի՝ 1 հատ։ Ոչինչ չի ավելացվի, քանի դեռ չեք հաստատել։",
   },
   "session.quickEntryReading": { en: "Reading…", ru: "Разбираем…", am: "Վերծանում ենք…" },
   "session.quickEntryPreview": { en: "Will be added", ru: "Будет добавлено", am: "Կավելացվի" },
