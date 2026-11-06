@@ -113,3 +113,59 @@ describe("on a running session", () => {
     expect(sessionTimeCostAt(s, AT)).toBe(950);
   });
 });
+
+/**
+ * The paid time covers the whole visit (2026-11-07) — the backend's own
+ * figures (VipMinimumChargeTest): settled at 25 min on the 4000/h seat, moved
+ * to 3000/h. The tile shows the server's total until the visit has PLAYED the
+ * paid hour, then the clock from that instant on — never 4001, 4002… early.
+ */
+describe("a settled minimum covers the whole visit", () => {
+  const SETTLED = { ...RULE, settled_amount: 2333.33, settled_billed_minutes: 60, settled_total: 4000, settled_seconds: 3600 };
+  const moved = (playedMinutes: number, over: Partial<ISessionApi> = {}) => session({
+    started_at: ago(playedMinutes),
+    min_charge: SETTLED,
+    hourly_rate: 3000,
+    rate_changed_at: ago(playedMinutes - 25),
+    amount_before_rate_change: 1666.67,
+    ...over,
+  });
+
+  test("inside the hour: the paid total, the new seat adds nothing (backend: 4000)", () => {
+    expect(sessionTimeCostAt(moved(35), AT)).toBe(4000);
+    expect(sessionTimeCostAt(moved(60), AT)).toBe(4000);
+    expect(sessionMinimumChargeAt(moved(35), AT).applied).toBe(true);
+  });
+
+  test("one second past the hour, by the second at the new seat (backend: 4000.83)", () => {
+    const s = session({
+      started_at: new Date(AT - 3601_000).toISOString(),
+      min_charge: SETTLED,
+      hourly_rate: 3000,
+      rate_changed_at: new Date(AT - 2101_000).toISOString(),
+      amount_before_rate_change: 1666.67,
+    });
+    expect(sessionTimeCostAt(s, AT)).toBe(4000.83);
+  });
+
+  test("past the hour: the paid total plus the new seat's minutes beyond it (backend: 4750)", () => {
+    expect(sessionTimeCostAt(moved(75), AT)).toBe(4750);
+  });
+
+  test("a pause inside the paid hour moves its end (backend: 3000 at 60 played, 3500 at 70)", () => {
+    const rule = { after_minutes: 10, minimum_minutes: 60, mode: "minimum" as const, settled_amount: 2250, settled_billed_minutes: 60, settled_total: 3000, settled_seconds: 3600 };
+    const paused = (total: number) => session({
+      started_at: ago(total),
+      min_charge: rule,
+      hourly_rate: 3000,
+      pauses: [{ paused_at: ago(total - 15), resumed_at: ago(total - 25) }],
+    } as Partial<ISessionApi>);
+    expect(sessionTimeCostAt(paused(70), AT)).toBe(3000);
+    expect(sessionTimeCostAt(paused(80), AT)).toBe(3500);
+  });
+
+  test("settled before 2026-11-07 (no total): read the old way, the clock plus the top-up (backend: 4500)", () => {
+    const s = moved(35, { min_charge: { ...RULE, settled_amount: 2333.33, settled_billed_minutes: 60 } });
+    expect(sessionTimeCostAt(s, AT)).toBe(4500);
+  });
+});

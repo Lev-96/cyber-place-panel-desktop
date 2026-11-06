@@ -60,12 +60,15 @@ export const sessionTimeCostAt = (session: ISessionApi, at: number): number =>
   sessionMinimumChargeAt(session, at).amount;
 
 /**
- * The clock with the session's VIP minimum charge applied — the same step
+ * The clock with the session's minimum charge applied — the same step
  * `SessionPricingCalculator::bill()` takes before adding anything
  * (`Session::minimumChargeAt`): ONCE per visit. Settled on a move after the
- * threshold → the clock plus the server's settled top-up (that seat's hour at
- * its rate; later seats by the minute). Otherwise → the whole clock, topped up
- * at the current tariff rate.
+ * threshold → the server's paid total while the visit has played no more than
+ * the paid time — the new seat's minutes inside it are already paid — then
+ * that total plus what the clock earned after the visit reached it
+ * (2026-11-07; `MinimumChargeRule::applyCovering`). A visit settled before
+ * that → the clock plus the settled top-up, as it was billed. Otherwise → the
+ * whole clock, topped up at the current tariff rate.
  */
 export const sessionMinimumChargeAt = (session: ISessionApi, at: number): MinimumChargeResult => {
   const rule = session.min_charge ?? null;
@@ -80,6 +83,18 @@ export const sessionMinimumChargeAt = (session: ISessionApi, at: number): Minimu
       amount: Math.max(0, round2(clock - toNumber(offset))),
       applied: false,
       billedSeconds: playedSecondsBetween(session, session.started_at, at),
+    };
+  }
+  if (rule && rule.settled_total != null && rule.settled_seconds != null) {
+    const covered = rule.settled_seconds;
+    const played = playedSecondsBetween(session, session.started_at, at);
+    const amount = played <= covered
+      ? rule.settled_total
+      : round2(rule.settled_total + Math.max(0, round2(clock - clockCostAt(session, instantAtPlayed(session, covered, at)))));
+    return {
+      amount,
+      applied: (rule.settled_amount ?? 0) > 0,
+      billedSeconds: Math.max(covered, played),
     };
   }
   if (rule && rule.settled_amount != null) {
@@ -566,6 +581,24 @@ export const autoResumeAtOf = (session: ISessionApi): number | null => {
   const open = (session.pauses ?? []).find((p) => p.resumed_at === null);
   const at = open?.auto_resume_at ? Date.parse(open.auto_resume_at) : NaN;
   return Number.isNaN(at) ? null : at;
+};
+
+/**
+ * The first moment (whole seconds), no later than `at`, at which the visit had
+ * PLAYED `seconds` — `Session::instantAtPlayed()` on the server, the same
+ * search: played time only grows, so the first second it reaches `seconds`.
+ */
+export const instantAtPlayed = (session: ISessionApi, seconds: number, at: number): number => {
+  const start = Math.floor(new Date(session.started_at as string).getTime() / 1000);
+  let lo = start + Math.max(0, seconds);
+  let hi = Math.floor(at / 1000);
+  if (lo >= hi) return at;
+  while (lo < hi) {
+    const mid = Math.floor((lo + hi) / 2);
+    if (playedSecondsBetween(session, session.started_at, mid * 1000) >= seconds) hi = mid;
+    else lo = mid + 1;
+  }
+  return lo * 1000;
 };
 
 /**

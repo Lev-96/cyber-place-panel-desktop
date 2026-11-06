@@ -977,13 +977,52 @@ describe("cancelling the seat from the receipt", () => {
     expect((screen.getByTestId("stop-confirm") as HTMLButtonElement).disabled).toBe(false);
   });
 
-  test("the three buttons sit in the medium-sized actions row (2026-11-06)", async () => {
+  test("the three buttons: keep playing left, cancel centre, confirm right, in one medium row (2026-11-07)", async () => {
     repo.preview.mockResolvedValue(bill({ time_cost: 400, total: 400 }));
     await mountWith({ canCancel: true });
-    const row = screen.getByTestId("stop-confirm").closest(".receipt-actions");
+    const row = screen.getByTestId("stop-confirm").closest(".receipt-actions") as HTMLElement;
     expect(row).not.toBeNull();
-    expect(row!.contains(screen.getByTestId("receipt-cancel"))).toBe(true);
+    const buttons = Array.from(row.querySelectorAll("button"));
+    expect(buttons.map((b) => b.className.match(/receipt-actions__(\w+)/)?.[1])).toEqual(["keep", "cancel", "confirm"]);
     expect(screen.getByTestId("receipt-cancel").textContent).toBe("session.cancel.button");
+  });
+
+  test("after its own stop the receipt is not read again — a manager is never told «no rights» over a stop that worked (2026-11-07)", async () => {
+    repo.preview.mockResolvedValue(bill({ time_cost: 400, total: 400 }));
+    repo.stop.mockResolvedValue({ breakdown: bill({ total: 400 }), cash: null });
+    const props = { onClose: () => {}, onConfirmed: () => {}, onItemRemoved: () => {}, canCancel: true };
+    let view: ReturnType<typeof render> | undefined;
+    await act(async () => { view = render(<StopReceiptModal session={session()} {...props} />); });
+    await act(async () => { fireEvent.click(screen.getByTestId("stop-confirm")); });
+    expect(repo.preview).toHaveBeenCalledTimes(1);
+
+    // The socket's `stopped` turns the board's copy to stopped; a manager's
+    // read of that closed receipt would be refused.
+    repo.preview.mockRejectedValue(Object.assign(new Error("У вас нет прав на это действие."), { status: 403 }));
+    await act(async () => { view!.rerender(<StopReceiptModal session={session({ status: "stopped" })} {...props} />); });
+
+    expect(repo.preview).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText("У вас нет прав на это действие.")).toBeNull();
+  });
+
+  test("ended at another desk: a refused read keeps the figures and says it ended elsewhere, no error", async () => {
+    repo.preview.mockResolvedValueOnce(bill({ time_cost: 400, total: 400 }));
+    repo.preview.mockRejectedValueOnce(Object.assign(new Error("У вас нет прав на это действие."), { status: 403 }));
+    const props = { onClose: () => {}, onConfirmed: () => {}, onItemRemoved: () => {} };
+    let view: ReturnType<typeof render> | undefined;
+    await act(async () => { view = render(<StopReceiptModal session={session()} {...props} />); });
+    await act(async () => { view!.rerender(<StopReceiptModal session={session({ status: "stopped" })} {...props} />); });
+
+    expect(repo.preview).toHaveBeenCalledTimes(2);
+    expect(screen.queryByText("У вас нет прав на это действие.")).toBeNull();
+    expect(screen.getByTestId("checkout-ended-elsewhere")).toBeTruthy();
+    expect(screen.getAllByText("400·AMD").length).toBeGreaterThan(0);
+  });
+
+  test("while the seat runs, a refused read is still shown", async () => {
+    repo.preview.mockRejectedValue(Object.assign(new Error("У вас нет прав на это действие."), { status: 403 }));
+    await mountWith({ canCancel: true });
+    expect(screen.getByText("У вас нет прав на это действие.")).toBeTruthy();
   });
 
   test("a plain stop still reports itself as not cancelled", async () => {

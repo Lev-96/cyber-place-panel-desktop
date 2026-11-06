@@ -72,12 +72,19 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved, canRes
   /** Synchronous guard: a double click arrives before `busy` re-renders. */
   const stoppingNow = useRef(false);
 
-  const reload = async () => {
+  /**
+   * `keepOnForbidden`: the seat has just ended. A manager may read a CLOSED
+   * session's receipt only if they opened it (`SessionHistoryScope::allows`),
+   * so a 403 then is not an error to show — the receipt keeps the last figures
+   * it had and says the checkout was done elsewhere.
+   */
+  const reload = async (opts: { keepOnForbidden?: boolean } = {}) => {
     try {
       const preview = await sessionRepository.preview(session.id);
       setBill(preview);
       setErr(null);
     } catch (e) {
+      if (opts.keepOnForbidden && (e as { status?: number }).status === 403) return;
       setErr(e instanceof Error ? e.message : "Failed to load");
     }
   };
@@ -89,7 +96,11 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved, canRes
   // stale or changed is refused and read again (see confirmStop). It is read
   // again too after a line is taken off, or when the seat is ended elsewhere.
   useEffect(() => {
-    void reload();
+    // Our own Stop or cancel already holds the server's final bill (2026-11-07):
+    // reading it again only asked a manager for a closed colleague's receipt and
+    // showed «нет прав» over a stop that had worked.
+    if (stopped !== null) return;
+    void reload({ keepOnForbidden: session.status !== "active" });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session.id, session.status]);
 
@@ -485,24 +496,25 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved, canRes
 
         {err && <div className="error">{err}</div>}
 
-        {/* Medium buttons (2026-11-06, owner): the receipt's large type made
-            three of them crowd the row; `.receipt-actions` sizes them. */}
-        <div className="row-between receipt-actions" style={{ marginTop: 4 }}>
+        {/* Medium buttons in three even columns (2026-11-06/07, owner): keep
+            playing on the left, cancel in the centre, confirm on the right,
+            all one height. `.receipt-actions` lays them out. */}
+        <div className="receipt-actions" style={{ marginTop: 4 }}>
           {finished ? (
             <Button onClick={onClose}>{t("action.close")}</Button>
           ) : (
             <>
               {/* Back to the running seat: nothing was sent, nothing stopped. */}
-              <Button variant="secondary" onClick={onClose} disabled={busy}>{t("session.checkoutKeepPlaying")}</Button>
+              <Button variant="secondary" className="receipt-actions__keep" onClick={onClose} disabled={busy}>{t("session.checkoutKeepPlaying")}</Button>
               {/* The player changed his mind (2026-11-06): end the seat with
                   nothing owed. Its own button, apart from the counter reset
                   above, which keeps the seat running. */}
               {canCancel && (
-                <Button variant="secondary" className="receipt-cancel" onClick={() => { void cancelSession(); }} disabled={busy || !bill} data-testid="receipt-cancel">
+                <Button variant="secondary" className="receipt-cancel receipt-actions__cancel" onClick={() => { void cancelSession(); }} disabled={busy || !bill} data-testid="receipt-cancel">
                   {t("session.cancel.button")}
                 </Button>
               )}
-              <Button onClick={confirmStop} disabled={busy || !bill || cashBlocks} data-testid="stop-confirm">
+              <Button className="receipt-actions__confirm" onClick={confirmStop} disabled={busy || !bill || cashBlocks} data-testid="stop-confirm">
                 {busy ? t("session.closing") : t("session.confirmStop")}
               </Button>
             </>

@@ -2981,7 +2981,9 @@ button.pill:hover {
    control, not of the receipt above it — on one line each, wrapping as a row
    when the window is narrow. */
 .receipt-actions {
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: stretch;
   gap: var(--space-2);
 }
 .receipt-actions .btn {
@@ -2990,11 +2992,12 @@ button.pill:hover {
   padding: 8px 14px;
   white-space: nowrap;
 }
+.receipt-actions__keep { grid-column: 1; justify-self: start; }
+.receipt-actions__cancel { grid-column: 2; justify-self: center; }
+.receipt-actions__confirm { grid-column: 3; justify-self: end; }
 /* Cancel the seat from the receipt (2026-11-06): destructive, in the tokens the
    confirm dialog's destructive button uses — red, apart from the reset's amber. */
 .receipt-cancel.btn.secondary {
-  margin-left: auto;
-  margin-right: var(--space-2);
   background: var(--color-danger-deep);
   border-color: var(--color-danger-border-dim);
   color: var(--color-on-danger);

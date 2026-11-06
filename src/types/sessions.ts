@@ -518,4 +518,12 @@ export interface IMinimumChargeRule {
    */
   settled_amount?: number | null;
   settled_billed_minutes?: number | null;
+  /**
+   * The paid time covers the whole visit (2026-11-07): the time costs
+   * `settled_total` up to `settled_seconds` PLAYED, then the clock runs on from
+   * the instant the visit reached them. Null on a visit settled before (read
+   * the old way: the clock plus `settled_amount`). Server-owned.
+   */
+  settled_total?: number | null;
+  settled_seconds?: number | null;
 }
