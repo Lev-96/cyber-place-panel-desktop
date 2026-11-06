@@ -2154,6 +2154,12 @@ are unchanged — do not add a `paused` status here either.
   the start dialog's `DurationInput` ([ч] : [мин], `maxMinutes` =
   `PAUSE_LIMIT_MAX` 240); both boxes empty = no limit (said under the field);
   the server still stores minutes. Tests: `PauseLimitForm.test.tsx`.
+- **Add products: typing first (2026-11-07, owner)**: `useProductBasket` opens
+  in `text` mode and `BasketModeSwitch` lists «Ввести списком» first — the
+  seat's dialog and the till alike (one hook, one switch). The Modal's initial
+  focus lands in the box. A line with no number is one (backend resolver);
+  the hint says so. Tests: `AddSessionItemDialog`/`SellProductsDialog` tests
+  (their `mount` puts list-focused tests on the list; two mutations caught).
 - **Minimum charge — any seats, by the minute (2026-11-06, owner)**: the card
   is «Минимальная оплата». A large switch (`Switch size="lg"`); «Для каких
   мест» as `SectionTabs` (all / VIP / standard / choose seats — a checkbox grid
