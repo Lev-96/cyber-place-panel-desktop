@@ -2143,6 +2143,17 @@ are unchanged — do not add a `paused` status here either.
   server sweep), `pausedSecondsBetween` caps an open pause there
   (`autoResumeAtOf()` in `sessionAmount.ts`). History: a `resumed` with
   `reason: pause_limit` reads «Автоматически, по лимиту паузы».
+- **Minimum charge — any seats, by the minute (2026-11-06, owner)**: the card
+  is «Минимальная оплата». A large switch (`Switch size="lg"`); «Для каких
+  мест» as `SectionTabs` (all / VIP / standard / choose seats — a checkbox grid
+  `.vip-min-seats`, at least one); both lengths are the start dialog's
+  `DurationInput` ([ч] : [мин], `maxMinutes` 1440) — no presets, no unit tabs;
+  no billing choice (always `minimum`, a branch still on `round_up` opens with
+  something to save). The example's prices come from `rateOptions(…, tiers)`
+  for the tiers in scope (`tiersOf`). Sends `vip_min_charge_scope`, and
+  `_place_ids` only with «choose seats». Server: backend §"VIP minimum charge".
+  Tests: `VipMinimumChargeForm.test.tsx`, `vipMinimumCharge.test.ts` (six
+  mutations caught). The bullet below is the 2026-10-31 design.
 - **VIP minimum charge (2026-10-31)**: Branch → Prices, `VipMinimumChargeForm`
   written for an owner who has never seen it: the rule in plain sentences with
   their numbers (short visit / long visit / past the minimum / a move), two
@@ -2433,7 +2444,8 @@ goods / pads); a closed bill reads «Отменена · 0» (`cancelled_at`). T
 mutations caught), `SessionHistoryTimeline.test.tsx`.
 
 **The start dialog, made simple (2026-11-05, owner).** Only the start
-changed; "+ Время" and the VIP minimum keep `DurationPicker`.
+changed; "+ Время" keeps `DurationPicker` (the minimum charge moved to
+`DurationInput` on 2026-11-06).
 - No tariff this seat could be sold (the list read, empty after
   `packageFitsSeat`): the «Фиксированный / По часам» choice is not drawn and
   the start is by the hour (`mode` set to `open` on load, for a computer too).
