@@ -228,6 +228,8 @@ export interface IBillBreakdown {
   } | null;
   /** What resetting the clock waived (2026-11-05), already out of `time_cost`; 0 when never reset. */
   time_waived?: number;
+  /** Ended by a cancel (2026-11-06): the whole bill waived (`is_free` with it). Absent from an older backend. */
+  is_cancelled?: boolean;
 }
 
 export interface AddItemBody {
@@ -292,6 +294,15 @@ export const apiStopSessionWithBreakdown = (id: number, body?: StopSessionBody) 
   request<{ session: ISessionApi; breakdown: IBillBreakdown; cash?: ICashHandover | null }>(`/sessions/${id}/stop`, {
     method: "POST",
     body,
+  });
+
+/**
+ * Cancel a running seat (2026-11-06): it ends as Stop ends it, with the whole
+ * bill waived. `sessions.free`, branch-scoped and audited on the server.
+ */
+export const apiCancelSession = (id: number) =>
+  request<{ session: ISessionApi; breakdown: IBillBreakdown; cash?: ICashHandover | null }>(`/sessions/${id}/cancel`, {
+    method: "POST",
   });
 
 export const apiAddSessionItem = (id: number, body: AddItemBody) =>
@@ -636,6 +647,8 @@ export type SessionActionName =
   | "free_disabled"
   // The clock reset to zero (2026-11-05); `amount` is what was waived.
   | "time_reset"
+  // The seat ended with its whole bill waived (2026-11-06); `amount` is what was waived.
+  | "cancelled"
   // ⚠️ The server has emitted this since seat migration shipped; the client
   // type never learned it, so every `moved` line arrived typed as something
   // it is not and the history could not branch on it.

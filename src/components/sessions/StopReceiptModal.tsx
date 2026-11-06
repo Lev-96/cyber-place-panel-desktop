@@ -22,7 +22,8 @@ import type { ICashHandover } from "@/api/sessions";
 interface Props {
   session: ISessionApi;
   onClose: () => void;
-  onConfirmed: () => void;
+  /** The seat is over on the server — stopped, or cancelled (2026-11-06). */
+  onConfirmed: (outcome?: { cancelled: boolean }) => void;
   onItemRemoved: () => void;
   /**
    * Whether this person may reset the counter from the receipt (2026-11-05,
@@ -31,6 +32,11 @@ interface Props {
   canResetTime?: boolean;
   /** The bill changed here (the counter was reset): the board reads again. */
   onTimeReset?: () => void;
+  /**
+   * Whether this person may cancel the seat from the receipt (2026-11-06,
+   * `session.free` — the server checks it again). Absent: not offered.
+   */
+  canCancel?: boolean;
 }
 
 const fmtDuration = (mins: number, t: (k: string) => string) => {
@@ -48,7 +54,7 @@ const fmtDuration = (mins: number, t: (k: string) => string) => {
  * source of truth — same calculator used by /stop), shows time + items, lets
  * cashier remove items, then confirms stop.
  */
-const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved, canResetTime = false, onTimeReset }: Props) => {
+const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved, canResetTime = false, onTimeReset, canCancel = false }: Props) => {
   const { money, t } = useLang();
   const ask = useConfirm();
   const [bill, setBill] = useState<IBillBreakdown | null>(null);
@@ -167,7 +173,7 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved, canRes
       });
       setStopped(r.breakdown);
       setHandover(r.cash ?? null);
-      onConfirmed();
+      onConfirmed({ cancelled: false });
     } catch (e) {
       // Refused as stale or changed (2026-10-25) — older than ten minutes, or
       // a product, pad, pause, waiver or move since: the server's sentence,
@@ -190,7 +196,32 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved, canRes
     }
   };
 
+  /**
+   * Cancel the seat (2026-11-06, owner): the player sat down and changed his
+   * mind. Unlike the counter reset the seat does NOT run on — it ends as Stop
+   * ends it, and the server waives the whole bill: time, pads and goods. Asked
+   * first, destructively; the receipt then shows the server's own result.
+   */
+  const cancelSession = async () => {
+    if (stoppingNow.current) return;
+    if (!(await ask(fmt(t("session.cancel.confirm"), deviceLabel), { destructive: true }))) return;
+    stoppingNow.current = true;
+    setBusy(true); setErr(null);
+    try {
+      const r = await sessionRepository.cancel(session.id);
+      setStopped(r.breakdown);
+      setHandover(null);
+      onConfirmed({ cancelled: true });
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+      setBusy(false);
+    } finally {
+      stoppingNow.current = false;
+    }
+  };
+
   const view = stopped ?? bill;
+  const cancelled = view?.is_cancelled === true;
 
   // ONE precision decision for the whole receipt, taken from every figure on
   // it. Deciding per figure printed "4.72", "500" and "505" on the same bill:
@@ -226,7 +257,9 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved, canRes
     <Modal open onClose={onClose}>
       <div className="card" style={{ width: 520, maxWidth: "92vw", display: "flex", flexDirection: "column", gap: 12 }}>
         <h2 style={{ margin: 0 }}>
-          {finished ? t("session.checkoutDone") : `${t("session.checkoutPreviewTitle")} · ${deviceLabel}`}
+          {cancelled
+            ? t("session.cancel.done")
+            : finished ? t("session.checkoutDone") : `${t("session.checkoutPreviewTitle")} · ${deviceLabel}`}
         </h2>
         {/* Opening this ends nothing (2026-10-25): the seat plays on, the
             figures re-read every few seconds, and only the confirm below
@@ -408,9 +441,11 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved, canRes
                   is what the player is being handed, and it owes them one
                   number. */}
               <span style={{ fontWeight: 800, fontSize: 18, color: "var(--color-primary)" }}>
-                {view.is_free
-                  ? t("session.freeBill")
-                  : money(Number(view.total), receiptPrecision)}
+                {cancelled
+                  ? t("session.cancel.bill")
+                  : view.is_free
+                    ? t("session.freeBill")
+                    : money(Number(view.total), receiptPrecision)}
               </span>
             </div>
           </div>
@@ -457,6 +492,14 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved, canRes
             <>
               {/* Back to the running seat: nothing was sent, nothing stopped. */}
               <Button variant="secondary" onClick={onClose} disabled={busy}>{t("session.checkoutKeepPlaying")}</Button>
+              {/* The player changed his mind (2026-11-06): end the seat with
+                  nothing owed. Its own button, apart from the counter reset
+                  above, which keeps the seat running. */}
+              {canCancel && (
+                <Button variant="secondary" className="receipt-cancel" onClick={() => { void cancelSession(); }} disabled={busy || !bill} data-testid="receipt-cancel">
+                  {t("session.cancel.button")}
+                </Button>
+              )}
               <Button onClick={confirmStop} disabled={busy || !bill || cashBlocks} data-testid="stop-confirm">
                 {busy ? t("session.closing") : t("session.confirmStop")}
               </Button>

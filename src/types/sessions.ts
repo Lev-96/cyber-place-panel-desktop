@@ -279,6 +279,8 @@ export interface ISessionApi {
   time_reset_at?: string | null;
   time_reset_offset?: number | string | null;
   time_waived_total?: number | string | null;
+  /** Ended by a cancel (2026-11-06): the whole bill waived, the seat freed. Null otherwise. */
+  cancelled_at?: string | null;
   /**
    * A rate change mid-way — the player moved to a seat priced differently.
    * What the clock had earned at `rate_changed_at` is frozen in

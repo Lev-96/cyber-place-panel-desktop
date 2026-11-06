@@ -44,6 +44,7 @@ import {
   apiSetSessionItemQty,
   apiStartSession,
   apiStopSessionWithBreakdown,
+  apiCancelSession,
   IBillBreakdown, ICashHandover,
   ListSessionsParams,
   StartSessionBody,
@@ -103,6 +104,10 @@ export class SessionRepository {
   }
   async stop(id: number, payment?: StopSessionBody): Promise<StopResult> {
     return friendlyMutation(apiStopSessionWithBreakdown(id, payment));
+  }
+  /** End the seat with its whole bill waived (2026-11-06); the same result shape as `stop`. */
+  async cancel(id: number): Promise<StopResult> {
+    return friendlyMutation(apiCancelSession(id));
   }
   async extend(id: number, packageId: number): Promise<ISessionApi> {
     return friendlyMutation(apiExtendSession(id, { time_package_id: packageId }).then((r) => r.session));

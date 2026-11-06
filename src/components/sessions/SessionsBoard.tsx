@@ -1223,7 +1223,7 @@ const SessionsBoard = ({ branchId }: Props) => {
         <StopReceiptModal
           session={stopTarget}
           onClose={() => { setStopTarget(null); void sessions.reload(); void pcs.reload(); }}
-          onConfirmed={() => {
+          onConfirmed={(outcome) => {
             // The session is over on the backend, so the console should be
             // asleep. Whether this build can actually ask it to is the
             // transport's business — and its refusal is shown, not swallowed.
@@ -1232,13 +1232,17 @@ const SessionsBoard = ({ branchId }: Props) => {
             // Green (2026-09-28): a stop the server confirmed is a completed
             // checkout, not a failure. Only such a stop reaches here — an
             // auto-ended seat's receipt never calls this.
-            notify.message("success", fmt(t("session.toastStopped"), seatOf(stopTarget.pc_id)));
+            // A cancel (2026-11-06) frees the seat the same way; its toast says
+            // it was cancelled, not paid.
+            notify.message("success", fmt(t(outcome?.cancelled ? "session.cancel.toast" : "session.toastStopped"), seatOf(stopTarget.pc_id)));
             void sessions.reload();
             void pcs.reload();
           }}
           onItemRemoved={() => { void sessions.reload(); }}
           canResetTime={mayReset}
           onTimeReset={() => { void sessions.reload(); }}
+          // The same right as the reset: both give money away.
+          canCancel={mayReset}
         />
       )}
       {optionsTarget && (

@@ -126,7 +126,7 @@ const SessionHistoryBill = ({ session, closed }: Props) => {
               <th scope="row" colSpan={2}>{t("history.total")}</th>
               {/* A waived bill reads as the words, not as a zero: "0" could be
                   a session nobody played. */}
-              <td className="num" colSpan={2}>{session.is_free ? t("session.freeBill") : money(total)}</td>
+              <td className="num" colSpan={2}>{session.cancelled_at ? t("session.cancel.bill") : session.is_free ? t("session.freeBill") : money(total)}</td>
             </tr>
             {/* How the money was taken — the value is the bold half. Omitted
                 when nothing was recorded: inventing one would be worse than

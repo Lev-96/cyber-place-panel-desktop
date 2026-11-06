@@ -22,7 +22,7 @@ import StopReceiptModal from "./StopReceiptModal";
  * figure would waive that one on screen.
  */
 
-const repo = vi.hoisted(() => ({ preview: vi.fn(), stop: vi.fn(), removeItem: vi.fn(), resetTime: vi.fn() }));
+const repo = vi.hoisted(() => ({ preview: vi.fn(), stop: vi.fn(), removeItem: vi.fn(), resetTime: vi.fn(), cancel: vi.fn() }));
 
 vi.mock("@/repositories/SessionRepository", () => ({
   sessionRepository: {
@@ -30,6 +30,7 @@ vi.mock("@/repositories/SessionRepository", () => ({
     stop: (...a: unknown[]) => repo.stop(...a),
     removeItem: (...a: unknown[]) => repo.removeItem(...a),
     resetTime: (...a: unknown[]) => repo.resetTime(...a),
+    cancel: (...a: unknown[]) => repo.cancel(...a),
   },
 }));
 vi.mock("@/i18n/LanguageContext", () => ({
@@ -905,5 +906,87 @@ describe("resetting the counter from the receipt", () => {
     await act(async () => { fireEvent.click(screen.getByTestId("receipt-reset")); });
     expect(screen.getByText("This session is no longer running, so its clock cannot be reset.")).toBeTruthy();
     expect((screen.getByTestId("stop-confirm") as HTMLButtonElement).disabled).toBe(false);
+  });
+});
+
+describe("cancelling the seat from the receipt", () => {
+  const mountWith = async (props: { canCancel?: boolean; onConfirmed?: (o?: { cancelled: boolean }) => void } = {}, s: ISessionApi = session()) => {
+    await act(async () => {
+      render(<StopReceiptModal session={s} onClose={() => {}} onConfirmed={() => {}} onItemRemoved={() => {}} {...props} />);
+    });
+  };
+  beforeEach(() => {
+    repo.preview.mockReset();
+    repo.stop.mockReset();
+    repo.cancel.mockReset();
+    asked.fn.mockReset();
+    asked.fn.mockResolvedValue(true);
+  });
+  afterEach(cleanup);
+
+  test("not offered without the right, nor once the seat is over", async () => {
+    repo.preview.mockResolvedValue(bill({ time_cost: 400, total: 400 }));
+    await mountWith();
+    expect(screen.queryByTestId("receipt-cancel")).toBeNull();
+    cleanup();
+
+    await mountWith({ canCancel: true }, session({ status: "stopped" }));
+    expect(screen.queryByTestId("receipt-cancel")).toBeNull();
+  });
+
+  test("asks first, cancels, and shows the server's result as a cancel — not a paid stop", async () => {
+    const onConfirmed = vi.fn();
+    repo.preview.mockResolvedValue(bill({ time_cost: 400, total: 700, items_total: 300 }));
+    repo.cancel.mockResolvedValue({ session: session({ status: "stopped" }), breakdown: bill({ time_cost: 400, total: 0, items_total: 300, is_free: true, is_cancelled: true }), cash: null });
+    await mountWith({ canCancel: true, onConfirmed });
+
+    await act(async () => { fireEvent.click(screen.getByTestId("receipt-cancel")); });
+
+    expect(asked.fn).toHaveBeenCalledTimes(1);
+    expect(String(asked.fn.mock.calls[0][0])).toBe("session.cancel.confirm");
+    expect(asked.fn.mock.calls[0][1]).toMatchObject({ destructive: true });
+    expect(repo.cancel).toHaveBeenCalledWith(1);
+    expect(repo.stop).not.toHaveBeenCalled();
+    expect(onConfirmed).toHaveBeenCalledWith({ cancelled: true });
+    expect(screen.getByText("session.cancel.done")).toBeTruthy();
+    expect(screen.getByText("session.cancel.bill")).toBeTruthy();
+    expect(screen.queryByTestId("stop-confirm")).toBeNull();
+  });
+
+  test("declined, nothing is sent and the seat stays running", async () => {
+    const onConfirmed = vi.fn();
+    repo.preview.mockResolvedValue(bill({ time_cost: 400, total: 400 }));
+    asked.fn.mockResolvedValue(false);
+    await mountWith({ canCancel: true, onConfirmed });
+
+    await act(async () => { fireEvent.click(screen.getByTestId("receipt-cancel")); });
+
+    expect(repo.cancel).not.toHaveBeenCalled();
+    expect(onConfirmed).not.toHaveBeenCalled();
+    expect(screen.getByTestId("stop-confirm")).toBeTruthy();
+  });
+
+  test("refused by the server: its sentence, and Stop still works", async () => {
+    repo.preview.mockResolvedValue(bill({ time_cost: 400, total: 400 }));
+    repo.cancel.mockRejectedValue(new Error("This session is no longer running, so it cannot be cancelled."));
+    await mountWith({ canCancel: true });
+
+    await act(async () => { fireEvent.click(screen.getByTestId("receipt-cancel")); });
+
+    expect(screen.getByText("This session is no longer running, so it cannot be cancelled.")).toBeTruthy();
+    expect((screen.getByTestId("stop-confirm") as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  test("a plain stop still reports itself as not cancelled", async () => {
+    const onConfirmed = vi.fn();
+    repo.preview.mockResolvedValue(bill({ time_cost: 400, total: 400 }));
+    repo.stop.mockResolvedValue({ breakdown: bill({ total: 400 }), cash: null });
+    await mountWith({ canCancel: true, onConfirmed });
+
+    await act(async () => { fireEvent.click(screen.getByTestId("stop-confirm")); });
+
+    expect(repo.cancel).not.toHaveBeenCalled();
+    expect(onConfirmed).toHaveBeenCalledWith({ cancelled: false });
+    expect(screen.queryByText("session.cancel.done")).toBeNull();
   });
 });

@@ -175,6 +175,16 @@ describe("SessionHistoryTimeline", () => {
     expect(Array.from(document.querySelectorAll(".hs-event__detail")).map((d) => d.textContent)).toEqual(["history.resetKeeps"]);
   });
 
+  test("a cancel reads as the seat ended with its whole bill waived, set apart from a reset (2026-11-06)", () => {
+    mount([event(1, { action: "cancelled", amount: 700, meta: { gross_total: 700, time_cost: 400, items_total: 300, joysticks_total: 0 } })]);
+    const amount = document.querySelector(".hs-event__amount") as HTMLElement;
+    expect(amount.textContent).toBe("−700 AMD");
+    expect(amount.dataset.kind).toBe("waive");
+    expect(document.querySelector(".hs-event")!.className).toContain("hs-tone-stop");
+    expect(document.querySelector(".hs-event__title")?.textContent).toBe("history.action.cancelled");
+    expect(Array.from(document.querySelectorAll(".hs-event__detail")).map((d) => d.textContent)).toEqual(["history.cancelWaived"]);
+  });
+
   test("an action the panel does not know still renders, with what its meta says", () => {
     mount([event(1, { action: "ps_woke" as ISessionEvent["action"], meta: { console: "PS5-01" } })]);
     expect(titles()).toEqual(["history.action.ps_woke"]);

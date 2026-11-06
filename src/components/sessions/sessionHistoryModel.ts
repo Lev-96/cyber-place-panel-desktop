@@ -339,6 +339,15 @@ export const eventDetailParts = (
       break;
     }
 
+    // The seat ended with nothing owed (2026-11-06): what each part came to.
+    case "cancelled": {
+      parts.push(fmt(t("history.cancelWaived"),
+        money(metaNum(meta, "time_cost") ?? 0),
+        money(metaNum(meta, "items_total") ?? 0),
+        money(metaNum(meta, "joysticks_total") ?? 0)));
+      break;
+    }
+
     case "move_failed": {
       const from = metaNum(meta, "from_place_number");
       const minutes = metaNum(meta, "minutes");
@@ -386,6 +395,7 @@ const ACTION_LOOK: Record<string, { tone: EventTone; icon: string }> = {
   free_enabled: { tone: "neutral", icon: "0" },
   free_disabled: { tone: "neutral", icon: "֏" },
   time_reset: { tone: "waive", icon: "↺" },
+  cancelled: { tone: "stop", icon: "✕" },
   time_add_refused: { tone: "refused", icon: "!" },
   move_failed: { tone: "refused", icon: "!" },
 };
@@ -414,6 +424,7 @@ const AMOUNT_KIND: Record<string, AmountKind> = {
   joystick_added: "charge",
   time_added: "charge",
   time_reset: "waive",
+  cancelled: "waive",
   free_enabled: "waive",
   stopped: "total",
 };

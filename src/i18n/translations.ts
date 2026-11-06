@@ -688,6 +688,16 @@ export const TRANSLATIONS: Dict = {
     am: "Զրոյացնե՞լ ժամանակը։ Ժամանակի {0}-ը չի վճարվի։ Ապրանքներն ու ջոյսթիքները մնում են հաշվում։",
   },
   "session.reset.waived": { en: "Reset", ru: "Обнулено", am: "Զրոյացված" },
+  // Cancel the seat from the stop receipt (2026-11-06): ends it, nothing owed.
+  "session.cancel.button": { en: "Cancel session", ru: "Отменить сессию", am: "Չեղարկել սեսիան" },
+  "session.cancel.confirm": {
+    en: "Cancel the session on {0}? It ends now and nothing is paid: time, joysticks and goods are waived. The seat becomes free.",
+    ru: "Отменить сессию на {0}? Она завершится сейчас и ничего не будет оплачено: время, джойстики и товары. Место станет свободным.",
+    am: "Չեղարկե՞լ սեսիան {0}-ում։ Այն կավարտվի հիմա և ոչինչ չի վճարվի՝ ժամանակ, ջոյսթիքներ և ապրանքներ։ Տեղը կազատվի։",
+  },
+  "session.cancel.done": { en: "Session cancelled", ru: "Сессия отменена", am: "Սեսիան չեղարկվեց" },
+  "session.cancel.bill": { en: "Cancelled · 0", ru: "Отменена · 0", am: "Չեղարկված · 0" },
+  "session.cancel.toast": { en: "Session cancelled · {0}", ru: "Сессия отменена · {0}", am: "Սեսիան չեղարկվեց · {0}" },
   "session.durationClear": { en: "Clear the time", ru: "Очистить время", am: "Մաքրել ժամանակը" },
   "session.customize": { en: "Customize", ru: "Настроить окно", am: "Կարգավորել" },
   "session.customizeHint": {
@@ -2078,6 +2088,8 @@ export const TRANSLATIONS: Dict = {
   "history.pausedFor": { en: "Paused for", ru: "Пауза длилась", am: "Դադարը տևեց" },
   "history.rateSetByHand": { en: "price set by hand", ru: "цена изменена вручную", am: "գինը փոխվել է ձեռքով" },
   "history.action.time_reset": { en: "Reset the counter", ru: "Обнулил счётчик", am: "Զրոյացրեց հաշվիչը" },
+  "history.action.cancelled": { en: "Cancelled the session", ru: "Отменил сессию", am: "Չեղարկեց սեսիան" },
+  "history.cancelWaived": { en: "Nothing paid: time {0}, goods {1}, joysticks {2}", ru: "Ничего не оплачено: время {0}, товары {1}, джойстики {2}", am: "Ոչինչ չի վճարվել՝ ժամանակ {0}, ապրանքներ {1}, ջոյսթիքներ {2}" },
   "history.resetKeeps": { en: "Goods and pads stay on the bill: {0}", ru: "Товары и джойстики остаются в счёте: {0}", am: "Ապրանքներն ու ջոյսթիքները մնում են հաշվում՝ {0}" },
   "history.action.free_enabled": { en: "Made it free", ru: "Сделал бесплатной", am: "Դարձրեց անվճար" },
   "history.action.free_disabled": { en: "Made it paid again", ru: "Вернул оплату", am: "Կրկին դարձրեց վճարովի" },
