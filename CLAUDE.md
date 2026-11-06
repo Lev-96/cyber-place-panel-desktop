@@ -2143,11 +2143,13 @@ are unchanged — do not add a `paused` status here either.
   server sweep), `pausedSecondsBetween` caps an open pause there
   (`autoResumeAtOf()` in `sessionAmount.ts`). History: a `resumed` with
   `reason: pause_limit` reads «Автоматически, по лимиту паузы».
-- **Settled minimum covers the visit (2026-11-07)**: `sessionMinimumChargeAt`
-  mirrors `applyCovering` — `settled_total` while played ≤ `settled_seconds`,
-  then + `clockCostAt(now) − clockCostAt(instantAtPlayed(...))`; rows without
+- **The minimum is the current seat's hour (2026-11-07)**: `sessionMinimumChargeAt`
+  mirrors `Session::minimumChargeAt` branch for branch — from the threshold to
+  the minimum exactly `perSecond(rate_now, minimum)`, past it + `clockCostAt(now)
+  − clockCostAt(instantAtPlayed(minimum))`; pinned rows (`settled_seconds` >
+  minimum) → their total then the clock; round-up and rows without
   `settled_total` read the old way. Tests: `sessionAmount.minimumCharge.test.ts`
-  («a settled minimum covers the whole visit», the backend's figures).
+  (the backend's figures, the owner's 1000/1500 moves; three mutations caught).
 - **Pause limit as a time field (2026-11-06, owner)**: `PauseLimitForm` uses
   the start dialog's `DurationInput` ([ч] : [мин], `maxMinutes` =
   `PAUSE_LIMIT_MAX` 240); both boxes empty = no limit (said under the field);
@@ -2440,9 +2442,9 @@ figures), `SessionHistoryTimeline`/`SessionHistoryBill` tests,
 `e2e/session-reset.spec.ts`. The AppearancePreview draws the ↺ too.
 
 **Cancel the seat from the receipt (2026-11-06, owner).** The button reads
-«Отменить место»; the receipt's buttons are medium and in three even columns
-(`.receipt-actions` grid: keep playing left, cancel centre, confirm right,
-2026-11-07). After its OWN stop/cancel the receipt is not read again — a
+«Отменить место»; the receipt's buttons are medium and in even columns
+(`.receipt-actions[data-count]` grid, each button the full column width, labels
+wrap instead of overlapping; cancel is `.btn.secondary.is-danger`, 2026-11-07). After its OWN stop/cancel the receipt is not read again — a
 manager may read a closed receipt only if they opened it
 (`SessionHistoryScope::allows`), and the re-read showed «нет прав» over a stop
 that had worked; a seat ended elsewhere keeps its last figures on a 403. Earlier wording below: «Отменить сессию»
