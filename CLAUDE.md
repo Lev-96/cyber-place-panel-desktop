@@ -2143,6 +2143,10 @@ are unchanged — do not add a `paused` status here either.
   server sweep), `pausedSecondsBetween` caps an open pause there
   (`autoResumeAtOf()` in `sessionAmount.ts`). History: a `resumed` with
   `reason: pause_limit` reads «Автоматически, по лимиту паузы».
+- **Pause limit as a time field (2026-11-06, owner)**: `PauseLimitForm` uses
+  the start dialog's `DurationInput` ([ч] : [мин], `maxMinutes` =
+  `PAUSE_LIMIT_MAX` 240); both boxes empty = no limit (said under the field);
+  the server still stores minutes. Tests: `PauseLimitForm.test.tsx`.
 - **Minimum charge — any seats, by the minute (2026-11-06, owner)**: the card
   is «Минимальная оплата». A large switch (`Switch size="lg"`); «Для каких
   мест» as `SectionTabs` (all / VIP / standard / choose seats — a checkbox grid
@@ -2430,7 +2434,9 @@ amount is signed by kind (`amountKind`: charge "+", waive "−", total
 figures), `SessionHistoryTimeline`/`SessionHistoryBill` tests,
 `e2e/session-reset.spec.ts`. The AppearancePreview draws the ↺ too.
 
-**Cancel the seat from the receipt (2026-11-06, owner).** «Отменить сессию»
+**Cancel the seat from the receipt (2026-11-06, owner).** The button reads
+«Отменить место»; the receipt's three buttons are medium (`.receipt-actions`:
+13px, one line each, the row wraps). Earlier wording below: «Отменить сессию»
 in `StopReceiptModal` (`canCancel`, the board passes `session.free` — same right
 as the reset): asked destructively, then `sessionRepository.cancel` →
 `POST /sessions/{id}/cancel` (backend §"Cancelling a running seat"). The seat
