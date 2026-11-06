@@ -6561,6 +6561,10 @@ select.input option:disabled {
 .hs-bill__total td {
   color: var(--color-primary);
 }
+/* A cancelled session's total (2026-11-06): the word in the danger red. */
+.hs-bill__total td.hs-bill__cancelled {
+  color: var(--color-danger);
+}
 .hs-bill__pay > * {
   padding-top: 2px;
   color: var(--color-muted);

@@ -2088,6 +2088,7 @@ export const TRANSLATIONS: Dict = {
   "history.pausedFor": { en: "Paused for", ru: "Пауза длилась", am: "Դադարը տևեց" },
   "history.rateSetByHand": { en: "price set by hand", ru: "цена изменена вручную", am: "գինը փոխվել է ձեռքով" },
   "history.action.time_reset": { en: "Reset the counter", ru: "Обнулил счётчик", am: "Զրոյացրեց հաշվիչը" },
+  "history.billCancelled": { en: "Cancelled", ru: "Отменено", am: "Չեղարկված" },
   "history.action.cancelled": { en: "Cancelled the session", ru: "Отменил сессию", am: "Չեղարկեց սեսիան" },
   "history.cancelWaived": { en: "Nothing paid: time {0}, goods {1}, joysticks {2}", ru: "Ничего не оплачено: время {0}, товары {1}, джойстики {2}", am: "Ոչինչ չի վճարվել՝ ժամանակ {0}, ապրանքներ {1}, ջոյսթիքներ {2}" },
   "history.resetKeeps": { en: "Goods and pads stay on the bill: {0}", ru: "Товары и джойстики остаются в счёте: {0}", am: "Ապրանքներն ու ջոյսթիքները մնում են հաշվում՝ {0}" },

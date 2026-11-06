@@ -110,6 +110,18 @@ describe("SessionHistoryBill", () => {
     expect(foot()).toEqual([["history.total", "1003 AMD"], ["session.payTitle", "session.payCard"]]);
   });
 
+  test("a cancelled session reads «Cancelled» alone, in red — no «· 0», never «free» (2026-11-06)", () => {
+    mount(session({ is_free: true, total_paid: 0, cancelled_at: "2026-11-06T15:16:00+04:00" }));
+    expect(foot()[0]).toEqual(["history.total", "history.billCancelled"]);
+    const cell = document.querySelector("tfoot tr td") as HTMLElement;
+    expect(cell.classList.contains("hs-bill__cancelled")).toBe(true);
+  });
+
+  test("a session never cancelled carries no red total", () => {
+    mount(session({ is_free: true, total_paid: 0 }));
+    expect(document.querySelector(".hs-bill__cancelled")).toBeNull();
+  });
+
   test("a waived session reads as the words, with no pad row", () => {
     mount(session({ is_free: true, total_paid: 0 }));
     expect(foot()[0]).toEqual(["history.total", "session.freeBill"]);
