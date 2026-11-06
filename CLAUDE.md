@@ -2419,6 +2419,19 @@ amount is signed by kind (`amountKind`: charge "+", waive "−", total
 figures), `SessionHistoryTimeline`/`SessionHistoryBill` tests,
 `e2e/session-reset.spec.ts`. The AppearancePreview draws the ↺ too.
 
+**Cancel the seat from the receipt (2026-11-06, owner).** «Отменить сессию»
+in `StopReceiptModal` (`canCancel`, the board passes `session.free` — same right
+as the reset): asked destructively, then `sessionRepository.cancel` →
+`POST /sessions/{id}/cancel` (backend §"Cancelling a running seat"). The seat
+ends as Stop ends it and the server waives the whole bill; the receipt shows the
+server's result («Сессия отменена», «Отменена · 0», from `is_cancelled`).
+`onConfirmed({ cancelled })` — the board does what it does after Stop (PS5
+sleep via `sessionStopped`, reload) with its own toast. History: `cancelled`
+reads «Отменил сессию −N» (tone `stop`, amount `waive`, a line with time /
+goods / pads); a closed bill reads «Отменена · 0» (`cancelled_at`). Tests:
+`StopReceiptModal.test.tsx` («cancelling the seat from the receipt», four
+mutations caught), `SessionHistoryTimeline.test.tsx`.
+
 **The start dialog, made simple (2026-11-05, owner).** Only the start
 changed; "+ Время" and the VIP minimum keep `DurationPicker`.
 - No tariff this seat could be sold (the list read, empty after
