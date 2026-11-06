@@ -62,6 +62,10 @@ export interface IBillingSettings {
   vip_min_charge_after_minutes?: number | null;
   vip_min_charge_minutes?: number | null;
   vip_min_charge_mode?: "minimum" | "round_up" | null;
+  /** Which seats it covers (2026-11-06); a branch that never chose covers VIP. */
+  vip_min_charge_scope?: "all" | "vip" | "standard" | "places" | null;
+  /** The chosen seats, for `places`. */
+  vip_min_charge_place_ids?: number[] | null;
   /** 0 = round nothing. The default every branch is on. */
   money_rounding_step: number;
   money_rounding_mode: MoneyRoundingMode;
@@ -304,6 +308,10 @@ export interface IBillingPolicy {
   vip_min_charge_after_minutes?: number | null;
   vip_min_charge_minutes?: number | null;
   vip_min_charge_mode?: "minimum" | "round_up" | null;
+  /** Which seats it covers (2026-11-06); a branch that never chose covers VIP. */
+  vip_min_charge_scope?: "all" | "vip" | "standard" | "places" | null;
+  /** The chosen seats, for `places`. */
+  vip_min_charge_place_ids?: number[] | null;
 }
 
 export const apiGetBillingSettings = (branchId: number) =>

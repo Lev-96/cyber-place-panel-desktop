@@ -3198,6 +3198,39 @@ button.pill:hover {
 .cp-switch[data-size="md"][data-checked] .cp-switch-thumb {
   transform: translateX(19px);
 }
+/* The seats a minimum charge is put on, by hand (2026-11-06): a wrapping grid
+   of checkboxes, scrolled when a branch has many. */
+.vip-min-seats {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: var(--space-2) var(--space-4);
+  max-height: 240px;
+  overflow-y: auto;
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+}
+/* The card's main switch (2026-11-06, `size="lg"`): a 56×30 track, a 24px
+   thumb, the label in the card's weight. Travel = 56 − 2×1.5 − 2×2 − 24 = 25px. */
+.cp-switch[data-size="lg"] {
+  gap: var(--space-3);
+}
+.cp-switch[data-size="lg"] .cp-switch-track {
+  width: 56px;
+  height: 30px;
+}
+.cp-switch[data-size="lg"] .cp-switch-thumb {
+  width: 24px;
+  height: 24px;
+  box-shadow: 0 2px 4px rgb(var(--shadow-rgb) / 0.35);
+}
+.cp-switch[data-size="lg"][data-checked] .cp-switch-thumb {
+  transform: translateX(25px);
+}
+.cp-switch[data-size="lg"] .cp-switch-label {
+  font-size: 16px;
+  font-weight: 600;
+}
 
 /* A labelled slider (RangeSlider, 2026-11-03): name and value on one line,
    the track under them, its filled part drawn from `--pct`. Electron renders

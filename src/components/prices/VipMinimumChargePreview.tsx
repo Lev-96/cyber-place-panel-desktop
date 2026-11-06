@@ -5,12 +5,12 @@ import { ExampleRow, durationLabel, exampleMinutes, exampleRow, moveExample } fr
 
 interface Props {
   rule: IMinimumChargeRule;
-  /** The VIP hourly rate the examples are priced at. */
+  /** The hourly rate the examples are priced at. */
   rate: number;
 }
 
 /**
- * What a VIP visit would pay under the rule being edited, recomputed as it is
+ * What a visit would pay under the rule being edited, recomputed as it is
  * edited, with the reason beside each figure ("по факту", "минимум 1 ч", …) so
  * an owner reads the rule off the table instead of decoding it. Priced with
  * the till's own function (see `exampleRow`), so the preview cannot promise
@@ -24,7 +24,6 @@ const VipMinimumChargePreview = ({ rule, rate }: Props) => {
       case "played": return t("vipMin.reason.played");
       case "perMinute": return t("vipMin.reason.perMinute");
       case "minimum": return fmt(t("vipMin.reason.minimum"), durationLabel(row.billedMinutes, t));
-      case "roundedUp": return fmt(t("vipMin.reason.roundedUp"), durationLabel(row.billedMinutes, t));
     }
   };
   const rows = exampleMinutes(rule).map((minutes) => exampleRow(rule, rate, minutes));
@@ -42,7 +41,7 @@ const VipMinimumChargePreview = ({ rule, rate }: Props) => {
         </thead>
         <tbody>
           {rows.map((row) => (
-            <tr key={row.playedMinutes} data-applied={row.reason === "minimum" || row.reason === "roundedUp" ? "1" : undefined}>
+            <tr key={row.playedMinutes} data-applied={row.reason === "minimum" ? "1" : undefined}>
               <td>{durationLabel(row.playedMinutes, t)}</td>
               <td>{money(row.amount)}</td>
               <td className="vip-min-preview__why">{reason(row)}</td>

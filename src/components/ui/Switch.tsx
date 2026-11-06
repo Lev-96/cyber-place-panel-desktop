@@ -6,8 +6,11 @@ interface Props {
   label?: ReactNode;
   disabled?: boolean;
   style?: React.CSSProperties;
-  /** "md" (2026-11-03): the larger switch of a settings page; "sm" (default) elsewhere. */
-  size?: "sm" | "md";
+  /**
+   * "md" (2026-11-03): the larger switch of a settings page; "lg" (2026-11-06):
+   * the one switch a whole card hangs on; "sm" (default) elsewhere.
+   */
+  size?: "sm" | "md" | "lg";
   /** The accessible name when the visible label is elsewhere (a list row). */
   ariaLabel?: string;
   testId?: string;
@@ -25,7 +28,7 @@ const Switch = ({ checked, onChange, label, disabled, style, size = "sm", ariaLa
     className="cp-switch"
     data-checked={checked ? "1" : undefined}
     data-disabled={disabled ? "1" : undefined}
-    data-size={size === "md" ? "md" : undefined}
+    data-size={size === "sm" ? undefined : size}
     style={style}
   >
     <input

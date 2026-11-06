@@ -6,7 +6,7 @@ import BranchJoystickForm from "@/components/prices/BranchJoystickForm";
 import MoneyRoundingForm from "@/components/prices/MoneyRoundingForm";
 import PauseLimitForm from "@/components/prices/PauseLimitForm";
 import VipMinimumChargeForm from "@/components/prices/VipMinimumChargeForm";
-import { vipRateOptions } from "@/components/prices/vipMinimumCharge";
+import { rateOptions } from "@/components/prices/vipMinimumCharge";
 import PlatformPricesForm from "@/components/prices/PlatformPricesForm";
 import SubplatformPricesForm from "@/components/prices/SubplatformPricesForm";
 import Button from "@/components/ui/Button";
@@ -326,14 +326,19 @@ const BranchPricesPage = () => {
                   billing.data.vip_min_charge_after_minutes,
                   billing.data.vip_min_charge_minutes,
                   billing.data.vip_min_charge_mode,
+                  billing.data.vip_min_charge_scope,
+                  (billing.data.vip_min_charge_place_ids ?? []).join(","),
                 ].join(":")}
                 branchId={id}
                 settings={billing.data}
-                vipRates={vipRateOptions(
+                seats={places.data ?? []}
+                platformName={(slug) => platformDisplayNameOf(slug, platformPrices.data ?? [], lang)}
+                rateOptionsFor={(tiers) => rateOptions(
                   branch.data?.price_for_branch as Record<string, number | string | null> | undefined,
                   platformPrices.data ?? [],
                   places.data ?? [],
                   (slug) => platformDisplayNameOf(slug, platformPrices.data ?? [], lang),
+                  tiers,
                 )}
                 onSaved={() => void billing.reload()}
               />
