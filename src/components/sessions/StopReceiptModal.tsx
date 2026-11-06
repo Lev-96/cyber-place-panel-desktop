@@ -496,10 +496,10 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved, canRes
 
         {err && <div className="error">{err}</div>}
 
-        {/* Medium buttons in three even columns (2026-11-06/07, owner): keep
-            playing on the left, cancel in the centre, confirm on the right,
-            all one height. `.receipt-actions` lays them out. */}
-        <div className="receipt-actions" style={{ marginTop: 4 }}>
+        {/* Even columns across the receipt (2026-11-07, owner): keep playing,
+            cancel, confirm — one width, one height, a label that does not fit
+            wraps instead of being cut. `data-count` picks the columns. */}
+        <div className="receipt-actions" data-count={finished ? 1 : canCancel ? 3 : 2} style={{ marginTop: 4 }}>
           {finished ? (
             <Button onClick={onClose}>{t("action.close")}</Button>
           ) : (
@@ -510,7 +510,7 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved, canRes
                   nothing owed. Its own button, apart from the counter reset
                   above, which keeps the seat running. */}
               {canCancel && (
-                <Button variant="secondary" className="receipt-cancel receipt-actions__cancel" onClick={() => { void cancelSession(); }} disabled={busy || !bill} data-testid="receipt-cancel">
+                <Button variant="secondary" className="is-danger receipt-actions__cancel" onClick={() => { void cancelSession(); }} disabled={busy || !bill} data-testid="receipt-cancel">
                   {t("session.cancel.button")}
                 </Button>
               )}

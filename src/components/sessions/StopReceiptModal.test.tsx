@@ -928,6 +928,7 @@ describe("cancelling the seat from the receipt", () => {
     repo.preview.mockResolvedValue(bill({ time_cost: 400, total: 400 }));
     await mountWith();
     expect(screen.queryByTestId("receipt-cancel")).toBeNull();
+    expect((screen.getByTestId("stop-confirm").closest(".receipt-actions") as HTMLElement).dataset.count).toBe("2");
     cleanup();
 
     await mountWith({ canCancel: true }, session({ status: "stopped" }));
@@ -984,6 +985,8 @@ describe("cancelling the seat from the receipt", () => {
     expect(row).not.toBeNull();
     const buttons = Array.from(row.querySelectorAll("button"));
     expect(buttons.map((b) => b.className.match(/receipt-actions__(\w+)/)?.[1])).toEqual(["keep", "cancel", "confirm"]);
+    expect(row.dataset.count).toBe("3");
+    expect(screen.getByTestId("receipt-cancel").className).toContain("is-danger");
     expect(screen.getByTestId("receipt-cancel").textContent).toBe("session.cancel.button");
   });
 
