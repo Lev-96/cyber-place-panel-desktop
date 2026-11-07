@@ -8689,16 +8689,18 @@ select.input option:disabled {
 [data-button-labels="icons"] .session-card__foot-btn .session-card__btn-text { display: none; }
 [data-button-labels="icons"] .session-card__foot-btn .session-card__btn-icon { display: block; flex-shrink: 0; }
 
-/* === Bookings calendar + reservation form (2026-11-07) =====================
-   `BookingsCalendarModal` → `BookingsCalendar` (toolbar, legend, views),
-   `CalendarTimeGrid` (Day / Week: a 24 h scale, blocks placed by minutes via
-   --cal-start / --cal-len / --cal-lane / --cal-lanes set per block),
-   `CalendarMonthGrid`, `ReservationFormDialog`, `ReservationDetailsDialog`.
-   Colours are the status tokens only: booked = yellow, active = green,
-   offline = grey hatched, so every theme recolours it. The grid scrolls
-   inside itself (both axes); the page never scrolls sideways. Absolute
-   positioning is used only where a timeline needs it: blocks and the
-   current-time line inside a column. */
+/* === Bookings calendar + reservation form (2026-11-07, simplified) =========
+   `BookingsCalendarModal` → `BookingsCalendar`: a head (title, seat filter,
+   «Создать бронь»), `DateStrip` (two weeks of day chips with counts), the
+   day line with the legend, then the body: `BookingsTimeline` (a row per
+   seat, the hours across) beside `DayBookingsList`. Blocks are placed by
+   --tl-start / --tl-len (minutes from the window's start) over --tl-span,
+   and stacked by --tl-lane / --tl-lanes, so layout stays in CSS. Colours
+   are the status tokens only (booked = yellow, playing = green, offline =
+   grey hatched), so every theme recolours it; each state also has its own
+   shape (filled, outlined, fading, hatched). The timeline scrolls inside
+   itself; the page never scrolls sideways. Absolute positioning only where
+   a timeline needs it: blocks, the now line and its pill. */
 .cal-modal {
   /* Near-fullscreen by design: the wrapper's 16px gutter on each side. */
   box-sizing: border-box;
@@ -8710,10 +8712,10 @@ select.input option:disabled {
   min-height: 0;
 }
 .cal {
-  --cal-hour-h: 48px;
-  --cal-min-h: calc(var(--cal-hour-h) / 60);
-  --cal-gutter-w: 56px;
-  --cal-col-min: 120px;
+  /* The seat column, the narrowest an hour may get, and a seat's row. */
+  --tl-label-w: 132px;
+  --tl-hour-min: 64px;
+  --tl-row-h: 56px;
   flex: 1;
   min-height: 0;
   min-width: 0;
@@ -8721,34 +8723,19 @@ select.input option:disabled {
   flex-direction: column;
   gap: var(--space-3);
 }
-.cal__toolbar {
+.cal__head {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
+  justify-content: space-between;
   gap: var(--space-3) var(--space-4);
 }
-.cal__nav {
-  flex: 1 1 320px;
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-.cal__step {
-  min-width: var(--control-h);
-  padding-inline: var(--space-2);
-  font-size: var(--fs-lg);
-  line-height: 1;
-}
 .cal__title {
-  margin: 0 0 0 var(--space-2);
-  min-width: 0;
-  font-size: var(--fs-lg);
-  font-weight: 600;
+  margin: 0;
+  font-size: var(--fs-xl);
+  font-weight: 700;
   line-height: 1.3;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  letter-spacing: 0.01em;
 }
 .cal__actions {
   display: flex;
@@ -8760,13 +8747,28 @@ select.input option:disabled {
   width: auto;
   min-width: 160px;
 }
+.cal__create { gap: var(--space-2); }
+.cal__sub {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-4);
+}
+.cal__day {
+  font-size: var(--fs-lg);
+  font-weight: 600;
+  line-height: 1.3;
+  font-variant-numeric: tabular-nums;
+}
 .cal__legend {
   margin: 0;
   padding: 0;
   list-style: none;
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-2) var(--space-4);
+  gap: var(--space-1) var(--space-4);
+  color: var(--color-muted);
   font-size: var(--fs-sm);
   line-height: 1.4;
 }
@@ -8775,216 +8777,467 @@ select.input option:disabled {
   align-items: center;
   gap: var(--space-2);
 }
+/* Each swatch is the block it explains, small. */
 .cal__swatch {
-  width: 12px;
+  box-sizing: border-box;
+  width: 20px;
   height: 12px;
   flex-shrink: 0;
   border-radius: 3px;
-  border: 1px solid var(--color-border);
 }
-.cal__swatch--free { background: var(--status-free-bg); border-color: var(--status-free-border); }
-.cal__swatch--booked { background: var(--status-booked-bg); border-color: var(--status-booked-fg); }
-.cal__swatch--active { background: var(--status-playing-bg); border-color: var(--status-playing-fg); }
-.cal__swatch--unlimited { background: var(--status-playing-bg); border: 1px dashed var(--status-playing-fg); }
+.cal__swatch--booked { background: rgb(var(--status-booked-rgb) / 0.22); border: 1px solid var(--status-booked-border); border-left: 3px solid var(--status-booked-fg); }
+.cal__swatch--guest { background: rgb(var(--status-booked-rgb) / 0.05); border: 2px solid var(--status-booked-border); }
+.cal__swatch--active { background: rgb(var(--status-playing-rgb) / 0.22); border: 1px solid var(--status-playing-border); border-left: 3px solid var(--status-playing-fg); }
+.cal__swatch--unlimited {
+  border-left: 3px solid var(--status-playing-fg);
+  background: linear-gradient(to right, rgb(var(--status-playing-rgb) / 0.4), rgb(var(--status-playing-rgb) / 0));
+}
 .cal__swatch--offline {
-  border-color: var(--status-offline-border);
+  border: 1px solid var(--status-offline-border);
   background-image: repeating-linear-gradient(45deg, var(--status-offline-bg) 0 3px, rgb(var(--status-offline-rgb) / 0.35) 3px 6px);
 }
 
-/* -- Day / Week time grid --------------------------------------------------- */
-.cal-grid {
+/* -- Date strip ------------------------------------------------------------- */
+.cal-strip {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.cal-strip__step {
+  min-width: var(--control-h);
+  padding-inline: var(--space-2);
+  font-size: var(--fs-xl);
+  line-height: 1;
+}
+.cal-strip__days {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  gap: var(--space-1);
+}
+.cal-day {
+  position: relative;
+  flex: 1 1 0;
+  min-width: 44px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: var(--space-2) var(--space-1);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease-out,
+    border-color 0.15s ease-out;
+}
+.cal-day:hover { border-color: rgb(var(--accent-rgb) / 0.6); }
+.cal-day:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.cal-day__weekday {
+  color: var(--color-muted);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  line-height: 1.3;
+}
+.cal-day.is-weekend .cal-day__weekday { color: var(--color-accent-purple); }
+.cal-day__num {
+  font-size: var(--fs-lg);
+  font-weight: 700;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+}
+/* The count: a yellow pill, the bookings' own colour. Kept in the layout
+   when empty, so every chip is the same height. */
+.cal-day__count {
+  box-sizing: border-box;
+  min-width: 20px;
+  height: 16px;
+  padding-inline: var(--space-1);
+  border-radius: var(--radius-pill);
+  background: var(--status-booked-bg);
+  border: 1px solid var(--status-booked-border);
+  color: var(--status-booked-fg);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  line-height: 14px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.cal-day__count.is-empty { visibility: hidden; }
+/* Today: an accent bar under the chip's top edge. */
+.cal-day.is-today::before {
+  content: "";
+  position: absolute;
+  top: -1px;
+  left: 30%;
+  right: 30%;
+  height: 3px;
+  border-radius: 0 0 3px 3px;
+  background: var(--color-primary);
+}
+.cal-day.is-today .cal-day__weekday { color: var(--color-primary); }
+.cal-day.is-selected {
+  border-color: var(--color-primary);
+  background: rgb(var(--accent-rgb) / 0.14);
+  box-shadow: 0 0 0 1px var(--color-primary), 0 0 16px rgb(var(--accent-rgb) / 0.25);
+}
+.cal-day.is-selected .cal-day__num { color: var(--color-primary); }
+
+/* -- Body: the timeline beside the day's list ------------------------------ */
+.cal__body {
   flex: 1;
   min-height: 0;
   min-width: 0;
+  display: flex;
+  gap: var(--space-4);
+}
+
+/* -- Timeline --------------------------------------------------------------- */
+.tl {
+  flex: 1 1 auto;
+  /* As tall as its seats, up to the body: no empty box under a short list. */
+  align-self: flex-start;
+  max-height: 100%;
+  min-width: 0;
+  min-height: 0;
   overflow: auto;
   overscroll-behavior: contain;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   background: var(--color-surface);
 }
-.cal-grid__head,
-.cal-grid__body {
+.tl__inner {
+  position: relative;
+  min-width: calc(var(--tl-label-w) + var(--tl-hours) * var(--tl-hour-min));
   display: flex;
-  min-width: max-content;
-  width: 100%;
+  flex-direction: column;
 }
-.cal-grid__head {
+.tl__scale {
   position: sticky;
   top: 0;
   z-index: 3;
+  display: flex;
   background: var(--color-surface-alt);
   border-bottom: 1px solid var(--color-border);
 }
-.cal-grid__corner,
-.cal-grid__gutter {
+.tl__corner {
   position: sticky;
   left: 0;
-  z-index: 2;
-  flex: 0 0 var(--cal-gutter-w);
+  z-index: 4;
+  flex: 0 0 var(--tl-label-w);
   background: var(--color-surface-alt);
   border-right: 1px solid var(--color-border);
 }
-.cal-grid__colhead {
-  flex: 1 0 var(--cal-col-min);
-  min-width: var(--cal-col-min);
-  padding: var(--space-2);
-  border-right: 1px solid var(--color-border);
-  font-size: var(--fs-sm);
-  font-weight: 600;
-  line-height: 1.3;
-  text-align: center;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.tl__hours {
+  position: relative;
+  flex: 1;
+  display: flex;
 }
-.cal-grid__colhead--today { color: var(--color-primary); }
-.cal-grid__colhead--offline { color: var(--status-offline-fg); }
-.cal-grid__hour {
-  box-sizing: border-box;
-  display: block;
-  height: var(--cal-hour-h);
-  padding: 2px var(--space-2) 0;
+.tl__hour {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-2);
+  border-left: 1px solid var(--color-border);
   color: var(--color-muted);
   font-size: var(--fs-xs);
+  font-weight: 600;
+  line-height: 1.3;
   font-variant-numeric: tabular-nums;
-  line-height: 1.2;
-  text-align: right;
+  white-space: nowrap;
 }
-.cal-grid__col {
-  position: relative;
-  flex: 1 0 var(--cal-col-min);
-  min-width: var(--cal-col-min);
-  height: calc(24 * var(--cal-hour-h));
-  border-right: 1px solid var(--color-border);
-  cursor: cell;
-  /* Hour lines, then the 15-minute grid, under the blocks. */
-  background-image:
-    repeating-linear-gradient(to bottom, var(--color-border) 0 1px, transparent 1px var(--cal-hour-h)),
-    repeating-linear-gradient(to bottom, rgb(var(--border-rgb) / 0.45) 0 1px, transparent 1px calc(var(--cal-hour-h) / 4));
-}
-.cal-grid__col--offline {
-  /* The hatch first, then the same hour lines. */
-  background-image:
-    repeating-linear-gradient(45deg, var(--status-offline-bg) 0 6px, rgb(var(--status-offline-rgb) / 0.22) 6px 12px),
-    repeating-linear-gradient(to bottom, var(--color-border) 0 1px, transparent 1px var(--cal-hour-h));
-}
-.cal-grid__now {
+.tl__hour:first-child { border-left-color: transparent; }
+/* Midnight: the next date under 00:00, so a night booking reads as such. */
+.tl__hour.is-midnight { color: var(--color-text); border-left-color: rgb(var(--accent-purple-rgb) / 0.7); }
+.tl__date { color: var(--color-accent-purple); font-weight: 600; }
+/* Sits on the scale's bottom edge, where the now line begins, clear of the hour labels. */
+.tl__now-pill {
   position: absolute;
-  left: 0;
-  right: 0;
-  top: calc(var(--cal-start) * var(--cal-min-h));
+  bottom: 0;
+  left: calc(var(--tl-now) / var(--tl-span) * 100%);
   z-index: 1;
-  height: 2px;
-  background: var(--color-danger);
+  transform: translate(-50%, 50%);
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-pill);
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  line-height: 1.3;
+  font-variant-numeric: tabular-nums;
+  box-shadow: 0 0 12px rgb(var(--accent-rgb) / 0.5);
+  pointer-events: none;
+}
+.tl__rows {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+.tl__row {
+  display: flex;
+  min-height: var(--tl-row-h);
+  border-bottom: 1px solid var(--color-border);
+}
+.tl__row:last-of-type { border-bottom-color: transparent; }
+.tl__seat {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  flex: 0 0 var(--tl-label-w);
+  box-sizing: border-box;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-surface);
+  border-right: 1px solid var(--color-border);
+}
+.tl__seat-name {
+  font-size: var(--fs-md);
+  font-weight: 700;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+.tl__seat-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--color-muted);
+  font-size: var(--fs-xs);
+  line-height: 1.3;
+}
+.tl__seat-meta svg { flex-shrink: 0; }
+.tl__row.is-offline .tl__seat-name,
+.tl__seat-meta--offline { color: var(--status-offline-fg); }
+.tl__track {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  cursor: cell;
+  /* Hour lines, then fainter half hours, under the blocks. */
+  background-image:
+    linear-gradient(to right, var(--color-border) 0 1px, transparent 1px),
+    linear-gradient(to right, rgb(var(--border-rgb) / 0.45) 0 1px, transparent 1px);
+  background-size:
+    calc(100% / var(--tl-hours)) 100%,
+    calc(100% / var(--tl-hours) / 2) 100%;
+  transition: background-color 0.15s ease-out;
+}
+.tl__track:hover { background-color: rgb(var(--accent-rgb) / 0.04); }
+.tl__row.is-offline .tl__track {
+  background-image:
+    repeating-linear-gradient(45deg, var(--status-offline-bg) 0 6px, rgb(var(--status-offline-rgb) / 0.16) 6px 12px),
+    linear-gradient(to right, var(--color-border) 0 1px, transparent 1px);
+  background-size: auto, calc(100% / var(--tl-hours)) 100%;
+}
+.tl__now {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc(var(--tl-label-w) + (100% - var(--tl-label-w)) * var(--tl-now) / var(--tl-span));
+  z-index: 1;
+  width: 2px;
+  transform: translateX(-1px);
+  background: var(--color-primary);
+  box-shadow: 0 0 8px rgb(var(--accent-rgb) / 0.6);
   pointer-events: none;
 }
 
-.cal-block {
+.tl-block {
   box-sizing: border-box;
   position: absolute;
-  top: calc(var(--cal-start) * var(--cal-min-h));
-  height: calc(var(--cal-len) * var(--cal-min-h));
-  left: calc(100% * var(--cal-lane) / var(--cal-lanes));
-  width: calc(100% / var(--cal-lanes) - 2px);
-  min-height: 12px;
+  left: calc(var(--tl-start) / var(--tl-span) * 100%);
+  width: calc(var(--tl-len) / var(--tl-span) * 100% - 2px);
+  top: calc(var(--space-1) + (100% - var(--space-2)) * var(--tl-lane) / var(--tl-lanes));
+  height: calc((100% - var(--space-2)) / var(--tl-lanes) - 2px);
+  min-width: 6px;
   display: flex;
   flex-direction: column;
+  justify-content: center;
   gap: 0;
-  padding: 2px var(--space-1);
+  padding: 0 var(--space-2);
   overflow: hidden;
   border-radius: var(--radius-sm);
   font: inherit;
   font-size: var(--fs-xs);
-  line-height: 1.25;
+  line-height: 1.3;
   text-align: left;
+  white-space: nowrap;
   color: var(--color-text);
 }
-.cal-block--booking {
+.tl-block__time { font-weight: 700; font-variant-numeric: tabular-nums; }
+.tl-block__who { overflow: hidden; text-overflow: ellipsis; }
+/* A booking sits above a running session's band, on its own opaque ground
+   so the two tints never mix. */
+.tl-block--booking {
+  z-index: 1;
   cursor: pointer;
+  background: linear-gradient(rgb(var(--status-booked-rgb) / 0.2), rgb(var(--status-booked-rgb) / 0.2)), var(--color-surface);
   border: 1px solid var(--status-booked-border);
   border-left: 3px solid var(--status-booked-fg);
-  background: var(--status-booked-bg);
   transition:
-    box-shadow 0.2s ease,
-    border-color 0.2s ease;
+    background-color 0.15s ease-out,
+    box-shadow 0.15s ease-out;
 }
-.cal-block--booking:hover { box-shadow: 0 0 0 1px var(--status-booked-fg); }
-.cal-block--booking:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 1px; }
-/* A booking from the app: the same yellow, a dashed outline. */
-.cal-block--guest { border-style: dashed; border-left-style: solid; }
-.cal-block--finished { opacity: 0.6; }
-.cal-block--session {
-  pointer-events: none;
+.tl-block--booking .tl-block__time { color: var(--status-booked-fg); }
+/* A short block keeps its start time whole rather than cutting "20:00–21"
+   (the tooltip has the full window). */
+.tl-block--booking { container-type: inline-size; }
+@container (max-width: 88px) {
+  .tl-block__end { display: none; }
+}
+.tl-block--booking:hover { box-shadow: 0 0 0 1px var(--status-booked-fg), 0 0 12px rgb(var(--status-booked-rgb) / 0.3); }
+.tl-block--booking:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 1px; }
+/* From the app: the same yellow, hollow. */
+.tl-block--guest {
+  background: linear-gradient(rgb(var(--status-booked-rgb) / 0.05), rgb(var(--status-booked-rgb) / 0.05)), var(--color-surface);
+  border: 2px solid var(--status-booked-border);
+}
+.tl-block--booking.is-finished { opacity: 0.5; }
+.tl-block--session {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  background: rgb(var(--status-playing-rgb) / 0.2);
   border: 1px solid var(--status-playing-border);
   border-left: 3px solid var(--status-playing-fg);
-  background: var(--status-playing-bg);
 }
-/* Open-ended (unlimited): no bottom edge, it grows with the clock. */
-.cal-block--open { border-bottom: 1px dashed var(--status-playing-fg); border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
-.cal-block--from-before { border-top-style: dashed; border-top-left-radius: 0; border-top-right-radius: 0; }
-.cal-block--into-next { border-bottom-style: dashed; border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
-.cal-block__time { font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.cal-block__seat,
-.cal-block__who { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.cal-block__seat { color: var(--status-booked-fg); font-weight: 600; }
-.cal-block__infinity { color: var(--status-playing-fg); font-size: var(--fs-md); font-weight: 700; line-height: 1; }
-
-/* -- Month grid (a 7-column calendar is what Grid is for) ------------------- */
-.cal-month {
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
-  display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
-  grid-auto-rows: minmax(104px, 1fr);
+.tl-block--session .tl-block__time {
+  display: inline-flex;
+  align-items: center;
   gap: var(--space-1);
+  color: var(--status-playing-fg);
 }
-.cal-month__weekday {
-  padding: var(--space-1) var(--space-2);
-  color: var(--color-muted);
-  font-size: var(--fs-sm);
-  font-weight: 600;
-  line-height: 1.3;
+/* Unlimited: fades out to the right edge, ∞ at its end. */
+.tl-block--open {
+  border-color: transparent;
+  border-left-color: var(--status-playing-fg);
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+  background: linear-gradient(to right, rgb(var(--status-playing-rgb) / 0.26), rgb(var(--status-playing-rgb) / 0.14) 60%, rgb(var(--status-playing-rgb) / 0));
 }
-.cal-month > .cal-month__weekday:nth-child(-n + 7) { align-self: end; }
-.cal-month__cell {
-  box-sizing: border-box;
+.tl-block__infinity { color: var(--status-playing-fg); font-size: var(--fs-xl); font-weight: 700; line-height: 1; }
+/* Cut at the club day's edge: dashed and square on that side. */
+.tl-block.is-from-before { border-left-style: dashed; border-top-left-radius: 0; border-bottom-left-radius: 0; }
+.tl-block.is-into-next { border-right-style: dashed; border-top-right-radius: 0; border-bottom-right-radius: 0; }
+
+/* -- The day's list ---------------------------------------------------------- */
+.cal-list {
+  flex: 0 0 clamp(340px, 30%, 460px);
   min-width: 0;
+  min-height: 0;
   display: flex;
   flex-direction: column;
-  align-items: stretch;
-  gap: 2px;
-  padding: var(--space-1) var(--space-2);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  background: var(--color-surface);
-  color: var(--color-text);
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-  transition:
-    border-color 0.2s ease,
-    background-color 0.2s ease;
-}
-.cal-month__cell:hover { border-color: rgb(var(--accent-rgb) / 0.6); }
-.cal-month__cell:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 1px; }
-.cal-month__cell--out { opacity: 0.5; }
-.cal-month__cell--today { border-color: var(--color-primary); }
-.cal-month__date { font-size: var(--fs-sm); font-weight: 600; line-height: 1.3; font-variant-numeric: tabular-nums; }
-.cal-month__chip {
-  min-width: 0;
-  padding: 1px var(--space-1);
-  border-radius: 4px;
-  border-left: 3px solid var(--status-booked-fg);
-  background: var(--status-booked-bg);
-  font-size: var(--fs-xs);
-  line-height: 1.3;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
 }
-.cal-month__chip--guest { outline: 1px dashed var(--status-booked-border); outline-offset: -1px; }
-.cal-month__more { color: var(--color-muted); font-size: var(--fs-xs); font-weight: 600; line-height: 1.3; }
+.cal-list__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface-alt);
+}
+.cal-list__title {
+  margin: 0;
+  min-width: 0;
+  font-size: var(--fs-md);
+  font-weight: 700;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+.cal-list__total {
+  min-width: 24px;
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-pill);
+  background: var(--status-booked-bg);
+  border: 1px solid var(--status-booked-border);
+  color: var(--status-booked-fg);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  line-height: 20px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.cal-list__items {
+  flex: 1;
+  min-height: 0;
+  margin: 0;
+  padding: var(--space-3);
+  list-style: none;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.cal-item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-left: 3px solid var(--status-booked-fg);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-alt);
+}
+.cal-item--guest { border-left-style: dashed; }
+.cal-item.is-finished { border-left-color: var(--status-offline-border); opacity: 0.7; }
+.cal-item__top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+}
+.cal-item__time {
+  font-size: var(--fs-lg);
+  font-weight: 700;
+  line-height: 1.3;
+  font-variant-numeric: tabular-nums;
+}
+.cal-item__seat { font-size: var(--fs-md); font-weight: 700; line-height: 1.3; color: var(--color-primary); }
+.cal-item__state { margin-left: auto; }
+.cal-item__who {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-1) var(--space-3);
+  line-height: 1.4;
+}
+.cal-item__source { margin-left: auto; font-size: var(--fs-xs); line-height: 1.3; }
+.cal-item__name { font-weight: 600; overflow-wrap: anywhere; }
+.cal-item__phone { color: var(--color-text-soft); font-variant-numeric: tabular-nums; text-decoration: none; }
+.cal-item__phone:hover { color: var(--color-primary); text-decoration: underline; }
+.cal-item__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.cal-item__actions .btn { padding-inline: var(--space-3); }
+.cal-list__empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  padding: var(--space-8) var(--space-6);
+  text-align: center;
+  line-height: 1.4;
+}
+.cal-list__empty p { margin: 0; }
+.cal-list__empty-title { font-size: var(--fs-md); font-weight: 600; }
 
 /* -- Reservation form + details ------------------------------------------- */
 .reservation-form,
@@ -9019,7 +9272,120 @@ select.input option:disabled {
    neighbouring header links. */
 .board-calendar-btn { background: transparent; font: inherit; cursor: pointer; }
 .board-calendar-btn:hover { color: var(--color-text); }
-/* The calendar's Day / Week / Month (2026-11-07): each tab as wide as its word
-   (the shared subtabs share a fixed width and cut «Неделя» to «W…» here). */
-.cal__toolbar .cp-subtabs { flex: 0 0 auto; }
-.cal__toolbar .cp-subtab { flex: 0 0 auto; min-width: 72px; padding-inline: 14px; }
+
+/* ChoiceCards (2026-11-07): "pick one of a few" as large rows on real radios.
+   Tokens only; the picked row is outlined in the accent. */
+.choice-cards-list { display: flex; flex-direction: column; gap: var(--space-2); }
+.choice-card-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-alt);
+  cursor: pointer;
+}
+.choice-card-row:hover:not([data-disabled]) { border-color: rgb(var(--accent-rgb) / 0.55); }
+.choice-card-row[data-checked] {
+  border-color: var(--color-primary);
+  background: rgb(var(--accent-rgb) / 0.10);
+  box-shadow: 0 0 0 1px var(--color-primary) inset;
+}
+.choice-card-row[data-disabled] { opacity: 0.5; cursor: not-allowed; }
+.choice-card-row__input { position: absolute; opacity: 0; width: 1px; height: 1px; pointer-events: none; }
+.choice-card-row__dot {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--color-muted);
+  border-radius: 50%;
+}
+.choice-card-row[data-checked] .choice-card-row__dot {
+  border-color: var(--color-primary);
+  background: radial-gradient(circle, var(--color-primary) 0 45%, transparent 50%);
+}
+.choice-card-row:has(.choice-card-row__input:focus-visible) { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.choice-card-row__body { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1 1 auto; }
+.choice-card-row__title { font-weight: 600; color: var(--color-text); overflow-wrap: anywhere; }
+.choice-card-row__detail { font-size: 13px; color: var(--color-muted); font-variant-numeric: tabular-nums; }
+.choice-card-row__badge {
+  flex: 0 0 auto;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--status-booked-bg);
+  border: 1px solid var(--status-booked-border);
+  color: var(--status-booked-fg);
+  font-size: 12px;
+  font-weight: 600;
+}
+/* Start's "free until" line (2026-11-07): the time a walk-in may play. */
+.start-free-until {
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--status-booked-border);
+  background: var(--status-booked-bg);
+  color: var(--color-text);
+  font-size: 13px;
+}
+.start-free-until strong { color: var(--status-booked-fg); }
+
+/* PaymentEditor (2026-11-07): one method or a split, for every bill. */
+.pay-editor__methods { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.btn.pay-editor__method, .pay-editor__method {
+  flex: 1 1 0;
+  min-width: 96px;
+  height: 36px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-alt);
+  color: var(--color-text);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.pay-editor__method:hover:not(:disabled) { border-color: rgb(var(--accent-rgb) / 0.6); }
+.pay-editor__method[aria-checked="true"] {
+  border-color: var(--color-primary);
+  background: rgb(var(--accent-rgb) / 0.14);
+  box-shadow: 0 0 0 1px var(--color-primary) inset;
+}
+.pay-editor__method:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.pay-editor__method:disabled { opacity: 0.5; cursor: default; }
+.pay-editor__part { display: flex; align-items: flex-end; gap: var(--space-2); }
+.pay-editor__part-name { flex: 0 0 96px; padding-bottom: 10px; font-size: 13px; font-weight: 600; }
+.pay-editor__part-box { flex: 1 1 auto; min-width: 0; }
+.pay-editor__part-box .label { display: none; }
+.btn.pay-editor__rest { flex: 0 0 auto; height: 36px; padding: 0 var(--space-3); font-size: 12px; }
+.pay-editor__remaining {
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  background: rgb(var(--warning-rgb) / 0.12);
+  color: var(--color-warning);
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.pay-editor__remaining.is-done { background: rgb(var(--success-rgb) / 0.12); color: var(--color-success); }
+.pay-editor__note { resize: vertical; min-height: 56px; }
+/* A free seat reserved later (2026-11-07): how long a walk-in may play. */
+.session-card__free-until { font-size: 12px; font-weight: 600; color: var(--status-booked-fg); font-variant-numeric: tabular-nums; }
+/* Booking history (2026-11-07): one line per step, in the sales history. */
+.booking-history__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.booking-history__row {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px var(--space-3);
+  padding: var(--space-2) var(--space-3); border: 1px solid var(--color-border); border-radius: var(--radius-sm);
+  font-size: 13px;
+}
+.booking-history__when { color: var(--color-muted); font-variant-numeric: tabular-nums; }
+.booking-history__action { font-weight: 700; color: var(--status-booked-fg); }
+.booking-history__action.is-cancelled { color: var(--status-critical-fg); }
+.booking-history__action.is-started, .booking-history__action.is-finished { color: var(--status-playing-fg); }
+.booking-history__subject { font-weight: 600; }
+.booking-history__who { margin-left: auto; }
+/* A seat that ended by itself, paid afterwards (2026-11-07). */
+.pay-mark-note { padding: var(--space-2) var(--space-3); border-radius: var(--radius-sm); background: rgb(var(--warning-rgb) / 0.12); color: var(--color-warning); font-size: 13px; font-weight: 600; }
+.pay-mark-done { padding: var(--space-2) var(--space-3); border-radius: var(--radius-sm); background: rgb(var(--success-rgb) / 0.12); color: var(--color-success); font-size: 13px; font-weight: 600; }

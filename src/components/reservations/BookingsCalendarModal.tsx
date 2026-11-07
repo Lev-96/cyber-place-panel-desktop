@@ -11,6 +11,8 @@ interface Props extends BookingsCalendarProps {
  * (2026-11-07). `data-tip-scope`: every `title` inside gets the panel's
  * tooltip, as on the board. Escape, the × and the backdrop close it
  * (`Modal`); the forms it opens stack above it and take Escape first.
+ * `onStartBooking` (optional) puts «Старт» on due bookings; the board
+ * closes the calendar and opens its Start dialog with that booking.
  */
 const BookingsCalendarModal = ({ onClose, ...calendar }: Props) => {
   const { t } = useLang();

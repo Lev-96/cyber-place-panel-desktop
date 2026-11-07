@@ -1,4 +1,5 @@
 import type { IOrder } from "@/types/pos";
+import { METHOD_LABEL_KEY, paymentText } from "@/components/payments/paymentText";
 
 /**
  * A till sale said in plain words (2026-10-25) — one wording for «Касса» and
@@ -9,22 +10,20 @@ import type { IOrder } from "@/types/pos";
 type T = (key: string) => string;
 type Money = (n: number) => string;
 
-export const PAYMENT_LABEL_KEY: Record<IOrder["payment_method"], string> = {
-  cash: "session.payCash",
-  card: "session.payCard",
-  other: "session.payOther",
-  deposit: "till.payDeposit",
-};
+/** One label per method a part can have; a split is said from its parts (`paymentText`). */
+export const PAYMENT_LABEL_KEY: Record<Exclude<IOrder["payment_method"], "split">, string> = METHOD_LABEL_KEY;
 
 /** "Чипсы × 2, Кола × 1". */
 export const saleItemsText = (o: IOrder): string =>
   (o.items ?? []).map((i) => `${i.product_name} × ${i.quantity}`).join(", ");
 
 /** "Наличные", or "Другой способ: Idram". */
-export const salePaymentText = (o: IOrder, t: T): string =>
-  o.payment_method === "other" && o.payment_method_other
-    ? `${t(PAYMENT_LABEL_KEY.other)}: ${o.payment_method_other}`
-    : t(PAYMENT_LABEL_KEY[o.payment_method]);
+export const salePaymentText = (o: IOrder, t: T, money: Money = String): string =>
+  o.payment_method === "split" || (o.payments?.length ?? 0) > 1
+    ? paymentText(o, t, money) ?? t("pay.splitSummary")
+    : o.payment_method === "other" && o.payment_method_other
+      ? `${t(PAYMENT_LABEL_KEY.other)}: ${o.payment_method_other}`
+      : t(PAYMENT_LABEL_KEY[o.payment_method as Exclude<IOrder["payment_method"], "split">]);
 
 /** "Получено 2 000 · Сдача 600", or null when nothing was typed. */
 export const saleCashText = (o: IOrder, t: T, money: Money): string | null => {

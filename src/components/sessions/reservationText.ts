@@ -17,3 +17,16 @@ export const reservationTip = (b: Booking, t: (key: string) => string): string =
     b.contactPhone ? formatArmenianPhone(b.contactPhone) : null,
     reservationWindow(b),
   ].filter(Boolean).join("\n");
+
+/**
+ * «до 16:00 · 3 ч 50 мин» side: the clock time a free seat is free until,
+ * when its next reservation is later TODAY (within 24 h) and still ahead;
+ * null otherwise (nothing ahead, or not today, or already under way).
+ */
+export const freeUntilOf = (nextBookingStart: string | null | undefined, now: Date = new Date()): string | null => {
+  if (!nextBookingStart) return null;
+  const at = new Date(nextBookingStart);
+  const ahead = at.getTime() - now.getTime();
+  if (!Number.isFinite(ahead) || ahead <= 0 || ahead > 24 * 3_600_000) return null;
+  return hm(at);
+};

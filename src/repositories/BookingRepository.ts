@@ -1,6 +1,8 @@
 import {
   apiDeleteBooking, apiGetBookings, apiReservePlace, apiStaffReservations, apiUpdateReservation,
   GetBookingsParams, ReservationPatch, ReserveBody,
+  apiBookingEvents,
+  type IBookingEvent,
 } from "@/api/bookings";
 import { friendlyMutation } from "@/api/fallback";
 import { Booking } from "@/domain/Booking";
@@ -50,6 +52,11 @@ export class BookingRepository {
   }
 
   /** Cancel a booking — a staff reservation included — by the existing path. */
+  /** The history of the branch's bookings, newest first (2026-11-07). */
+  async listEvents(params: { branch_id: number; from?: string; to?: string; booking_id?: number; limit?: number }): Promise<IBookingEvent[]> {
+    return (await apiBookingEvents(params)).data;
+  }
+
   async cancel(bookingId: number): Promise<void> {
     await friendlyMutation(apiDeleteBooking(bookingId));
   }

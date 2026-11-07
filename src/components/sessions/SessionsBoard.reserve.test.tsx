@@ -98,6 +98,23 @@ describe("reserving from the board", () => {
     expect((calendar.props?.places as { id: number; label: string }[]).map((p) => p.id)).toEqual([10]);
   });
 
+  test("«Старт» on a booking in the calendar opens Start on its seat with the booking chosen", async () => {
+    await mount();
+    await act(async () => { fireEvent.click(screen.getByTestId("board-calendar")); });
+    await act(async () => { (calendar.props?.onStartBooking as (p: number, b: number) => void)(10, 77); });
+    expect(screen.queryByTestId("calendar-modal")).toBeNull();
+    expect(screen.getByTestId("start-dialog")).toBeTruthy();
+    expect(started.props?.bookingId).toBe(77);
+  });
+
+  test("a free seat reserved later says until when it is free", async () => {
+    const at = new Date(Date.now() + 3 * 3_600_000);
+    repo.listPcs.mockResolvedValue([{ ...pc(), next_booking_start: at.toISOString() }]);
+    await mount();
+    const hm = `${String(at.getHours()).padStart(2, "0")}:${String(at.getMinutes()).padStart(2, "0")}`;
+    expect(screen.getByTestId("free-until").textContent).toBe("start.freeUntilCard".replace("{0}", hm));
+  });
+
   test("the header's «Календарь броней» opens it on every seat", async () => {
     await mount();
     await act(async () => { fireEvent.click(screen.getByTestId("board-calendar")); });
@@ -105,7 +122,7 @@ describe("reserving from the board", () => {
     expect(calendar.props?.focusPlaceId).toBeUndefined();
   });
 
-  test("a reserved seat shows its time, who is coming in the tooltip; Start carries the reservation", async () => {
+  test("a reserved seat shows its time, who is coming in the tooltip; Start asks who sits down", async () => {
     reserved.ids = new Set([10]);
     bookings.listAll.mockResolvedValue([hold()]);
     await mount();
@@ -120,7 +137,8 @@ describe("reserving from the board", () => {
 
     await act(async () => { fireEvent.click(action("start")!); });
     expect(screen.getByTestId("start-dialog")).toBeTruthy();
-    expect(started.props?.bookingId).toBe(77);
+    // Who sits down is asked in Start: the reservation is never assumed.
+    expect(started.props?.bookingId).toBeUndefined();
   });
 
   test("«Отменить бронь» asks first and cancels by the booking's id", async () => {

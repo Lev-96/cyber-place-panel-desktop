@@ -83,7 +83,7 @@ const TillSalesHistory = ({ branchId, fromIso, toIso, actorId, refreshKey }: Pro
                     </span>
                     <span className="name" style={{ overflowWrap: "anywhere" }}>{saleItemsText(o)}</span>
                     <span className="muted" style={{ fontSize: 12 }}>
-                      {salePaymentText(o, t)}
+                      {salePaymentText(o, t, money)}
                       {cash ? ` · ${cash}` : ""}
                       {o.status !== "paid" ? ` · ${t("till.voided")}` : ""}
                     </span>

@@ -2,8 +2,9 @@ import { can } from "@/auth/permissions";
 import { useAuth } from "@/auth/AuthContext";
 import Button from "@/components/ui/Button";
 import Modal from "@/components/ui/Modal";
-import PaymentMethodPicker, { paymentNoteMissing } from "@/components/payments/PaymentMethodPicker";
-import { IItemChoice, PaymentMethod } from "@/api/sessions";
+import PaymentEditor from "@/components/payments/PaymentEditor";
+import { checkPayment, emptyPaymentDraft, paymentBody, type PaymentDraft } from "@/components/payments/paymentSplit";
+import { IItemChoice } from "@/api/sessions";
 import { fmt } from "@/i18n/translations";
 import { useLang } from "@/i18n/LanguageContext";
 import { orderRepository } from "@/repositories/OrderRepository";
@@ -46,8 +47,8 @@ const SellProductsDialog = ({ branchId, onClose, onSold }: Props) => {
   const canCreateProducts = can(user?.role, "product.crud");
   const { money, t } = useLang();
   const [saving, setSaving] = useState(false);
-  const [method, setMethod] = useState<PaymentMethod>("cash");
-  const [note, setNote] = useState("");
+  // How it was paid (2026-11-07): one method or split, cash by default.
+  const [pay, setPay] = useState<PaymentDraft>(() => emptyPaymentDraft("cash"));
   // Cash only: the banknotes handed over, for the change (2026-10-25) — the
   // same panel and arithmetic as the Stop receipt. Cleared on every method
   // switch, so an amount typed for cash never rides along with card.
@@ -76,15 +77,17 @@ const SellProductsDialog = ({ branchId, onClose, onSold }: Props) => {
     ? cart.map((l) => `${l.name} × ${l.qty}`).join(", ")
     : (resolved?.lines ?? []).filter((l) => l.product_id !== null).map((l) => `${l.name} × ${l.qty}`).join(", ");
   const ready = items.length > 0 && (mode === "picker" || (resolved?.ok === true && !resolving));
-  const asksForCash = method === "cash" && ready && total > 0;
+  const asksForCash = !pay.split && pay.method === "cash" && ready && total > 0;
+  const payCheck = checkPayment(billCents(total), pay);
   const change = asksForCash ? cashChange(billCents(total), received) : null;
   // Too little handed over, or not a number: nothing is sold on a wrong change.
   const cashBlocks = change !== null && (change.state === "short" || change.state === "invalid");
 
   const sell = async () => {
     if (!ready || inFlightRef.current || cashBlocks) return;
-    if (paymentNoteMissing(method, note)) {
-      setErr(t("session.payOtherRequired"));
+    if (!payCheck.ok) {
+      setErr(t(payCheck.problem === "note" ? (pay.split ? "pay.noteRequired" : "session.payOtherRequired")
+        : payCheck.problem === "sum" ? "pay.sumMismatch" : payCheck.problem === "parts" ? "pay.needTwo" : "pay.invalid"));
       return;
     }
 
@@ -94,8 +97,8 @@ const SellProductsDialog = ({ branchId, onClose, onSold }: Props) => {
     try {
       await orderRepository.create({
         branch_id: branchId,
-        payment_method: method,
-        ...(method === "other" ? { payment_method_other: note.trim() } : {}),
+        // One method (its "other" text only for other), or the split parts.
+        ...paymentBody(pay, payCheck),
         items,
         client_request_id: requestIdRef.current,
         ...(change?.state === "ok" ? { cash_received: toAmount(change.receivedCents) } : {}),
@@ -134,12 +137,17 @@ const SellProductsDialog = ({ branchId, onClose, onSold }: Props) => {
         )}
         {mode === "text" && <BasketQuickEntry basket={basket} saving={saving} />}
 
-        <PaymentMethodPicker
+        <PaymentEditor
           name={`till-pay-${branchId}`}
-          method={method}
-          onMethod={(m) => { setMethod(m); setReceived(""); setErr(null); }}
-          note={note}
-          onNote={(v) => { setNote(v); setErr(null); }}
+          dueCents={billCents(total)}
+          value={pay}
+          onChange={(next) => {
+            if (next.split !== pay.split || next.method !== pay.method) setReceived("");
+            setPay(next);
+            setErr(null);
+          }}
+          check={payCheck}
+          money={money}
           disabled={saving}
         />
 

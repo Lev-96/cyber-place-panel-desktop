@@ -197,7 +197,10 @@ export interface ISessionApi {
    * before this was recorded and every session still running; the history
    * renders nothing for it rather than inventing a method.
    */
-  payment_method?: "cash" | "card" | "other" | null;
+  /** `split` (2026-11-07): paid in parts, see `payments`. */
+  payment_method?: "cash" | "card" | "other" | "split" | null;
+  /** The parts of the payment (2026-11-07); [] for a row from before them. */
+  payments?: { method: "cash" | "card" | "other" | "deposit"; amount: number | string; note?: string | null }[];
   /** The words the cashier typed. Only ever set when the method is `other`. */
   payment_method_other?: string | null;
   opened_by_user_id?: number | null;
@@ -436,6 +439,12 @@ export interface IExtraItem {
 export interface IPcApi extends Translated {
   id: number;
   branch_id: number;
+  /**
+   * When this seat is next reserved (2026-11-07, board listing only): the
+   * next blocking booking's start (ISO), or null. ADVICE for the card's
+   * «Свободно до»; the start re-checks under its lock.
+   */
+  next_booking_start?: string | null;
   place_id?: number | null;
   label: string;
   kind?: PcKind;

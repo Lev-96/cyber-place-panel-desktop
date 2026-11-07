@@ -44,7 +44,7 @@ import { autoResumeAtOf, sessionCurrentHourlyRate, sessionJoysticksTotal } from 
 import StartSessionDialog from "./StartSessionDialog";
 import SessionOptionsDialog from "./SessionOptionsDialog";
 import SessionCard, { CardFootAction, CardOverflow, SessionCardAction } from "./SessionCard";
-import { reservationTip, reservationWindow } from "./reservationText";
+import { freeUntilOf, reservationTip, reservationWindow } from "./reservationText";
 import { PAD_COUNT_STYLE, PAD_LINE_STYLE, SeatGrip, SeatNameLine, SeatPlatformLine, sessionTariffLine } from "./seatParts";
 import SimpleBoardHelp from "./SimpleBoardHelp";
 import { useUiPreferencesOptional } from "@/preferences/UiPreferencesContext";
@@ -1114,10 +1114,20 @@ const SessionsBoard = ({ branchId }: Props) => {
                   </span>
                 );
               }
+              // Free now, reserved later (2026-11-07, owner): how long a walk-in
+              // may play, from the server's next booking start.
+              const freeUntil = !isOffline && !isReserved ? freeUntilOf(pc.next_booking_start) : null;
               return (
-                <span className="status">
-                  {isOffline ? t("session.deviceOffline") : isReserved ? t("session.reserved") : t("session.free")}
-                </span>
+                <>
+                  <span className="status">
+                    {isOffline ? t("session.deviceOffline") : isReserved ? t("session.reserved") : t("session.free")}
+                  </span>
+                  {freeUntil && (
+                    <span className="session-card__free-until" data-testid="free-until" data-tip={t("start.freeUntilCardTip")}>
+                      {fmt(t("start.freeUntilCard"), freeUntil)}
+                    </span>
+                  )}
+                </>
               );
             })()}
             {isOffline && (
@@ -1141,7 +1151,9 @@ const SessionsBoard = ({ branchId }: Props) => {
                     <ReservationActions
                       bookingId={reservation.id}
                       seat={seatOf(pc.id)}
-                      onStart={() => { setStartBookingId(reservation.id); setStartTarget(pc); }}
+                      // Who sits down is asked in Start (2026-11-07): the
+                      // reservation is never assumed from the card.
+                      onStart={() => setStartTarget(pc)}
                       disabled={isOffline || startLock.disabled}
                       startLabel={t(startLock.labelKey ?? "action.start")}
                       startHint={isOffline ? t("session.deviceOfflineHint") : undefined}
@@ -1303,6 +1315,15 @@ const SessionsBoard = ({ branchId }: Props) => {
                 unlimited: sess.is_unlimited === true || sess.ends_at === null,
               }];
             })}
+          // «Старт» on a booking in the calendar: the calendar closes and
+          // Start opens on that seat with the booking already chosen.
+          onStartBooking={(placeId, bookingId) => {
+            const target = (pcs.data ?? []).find((pc) => pc.place_id === placeId);
+            if (!target) return;
+            setCalendar(null);
+            setStartBookingId(bookingId);
+            setStartTarget(target);
+          }}
           onClose={() => { setCalendar(null); void pcs.reload(); }}
         />
       )}

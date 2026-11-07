@@ -74,6 +74,42 @@ export interface ITimeQuote {
 }
 
 /** What a planned hourly start would cost — the server's own figure. */
+/** A booking a start may fulfil, or the next one ahead (2026-11-07, `GET /sessions/start-options`). */
+export interface IStartOptionBooking {
+  id: number;
+  starts_at: string;
+  ends_at: string;
+  status?: string;
+  source: "staff" | "guest";
+  who: string | null;
+  contact_phone?: string | null;
+}
+
+/**
+ * ⚠️ ADVICE (2026-11-07): how long a NEW session may run on this seat from
+ * now, and which reservations it may fulfil. The start re-checks all of it
+ * under its lock; this only shapes the dialog.
+ *
+ * `max_minutes` null = no cap: nothing ahead, or the next booking is 10 h or
+ * more away (`free_until`/`next_booking` are then still filled, for
+ * information); 0 = a booking holds the seat now. Whether an open start is
+ * possible is `unlimited_allowed`, never `free_until`. With `booking_id`,
+ * that booking is not counted against the start.
+ */
+export interface IStartOptions {
+  free_until: string | null;
+  max_minutes: number | null;
+  unlimited_allowed: boolean;
+  next_booking: IStartOptionBooking | null;
+  claimable_bookings: IStartOptionBooking[];
+}
+
+export const apiStartOptions = (pcId: number, bookingId?: number) =>
+  request<IStartOptions>(`/sessions/start-options`, {
+    params: { pc_id: pcId, ...(bookingId === undefined ? {} : { booking_id: bookingId }) },
+    noCache: true,
+  });
+
 export interface IStartQuote {
   minutes: number;
   hourly_rate: number;
@@ -276,7 +312,26 @@ export const apiPreviewSession = (id: number) =>
 /** How the money was taken. `other` is the only one that carries free text. */
 export type PaymentMethod = "cash" | "card" | "other";
 
-export interface StopSessionBody {
+/** One part of a bill's payment (2026-11-07): a split has 2..3, one per method. */
+export interface IPaymentLine {
+  method: PaymentMethod | "deposit";
+  amount: number;
+  note?: string | null;
+}
+
+/**
+ * How a bill was paid, as every server takes it: ONE method (the fields every
+ * server has always taken), or SPLIT — `payments` (each part, summing to the
+ * bill to the cent) and `payment_note` (how; required). Never both.
+ */
+export interface PaymentFields {
+  payment_method?: PaymentMethod;
+  payment_method_other?: string;
+  payments?: { method: PaymentMethod; amount: number }[];
+  payment_note?: string;
+}
+
+export interface StopSessionBody extends PaymentFields {
   payment_method?: PaymentMethod;
   /** Required by the server ONLY when the method is `other`. */
   payment_method_other?: string;
@@ -299,6 +354,14 @@ export interface ICashHandover {
   received: string;
   change: string;
 }
+
+/**
+ * The payment of a seat that ended WITHOUT a stop at the till (2026-11-07):
+ * it ran out, or the kiosk ended it, so nobody chose a method. Allowed once,
+ * while its shift is open; `client_request_id` makes a repeat harmless.
+ */
+export const apiRecordSessionPayment = (id: number, body: PaymentFields & { cash_received?: string; client_request_id: string }) =>
+  request<{ session: ISessionApi; cash: ICashHandover | null }>(`/sessions/${id}/payment`, { method: "POST", body });
 
 export const apiStopSessionWithBreakdown = (id: number, body?: StopSessionBody) =>
   request<{ session: ISessionApi; breakdown: IBillBreakdown; cash?: ICashHandover | null }>(`/sessions/${id}/stop`, {
@@ -678,6 +741,8 @@ export const apiResumeSession = (sessionId: number) =>
 export type SessionActionName =
   | "started"
   | "stopped"
+  // How a seat that ended by itself was paid, recorded afterwards (2026-11-07).
+  | "payment_recorded"
   | "joystick_added"
   | "joystick_removed"
   | "time_added"

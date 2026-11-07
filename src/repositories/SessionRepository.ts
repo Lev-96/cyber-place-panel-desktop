@@ -15,6 +15,8 @@ import {
   apiSessionExtensionOptions,
   apiSessionTimeQuote,
   apiStartQuote,
+  apiStartOptions,
+  type IStartOptions,
   apiTransferExtension,
   apiRelocationOptions,
   apiRelocateSession,
@@ -48,6 +50,8 @@ import {
   apiSetSessionItemQty,
   apiStartSession,
   apiStopSessionWithBreakdown,
+  apiRecordSessionPayment,
+  type PaymentFields,
   apiCancelSession,
   IBillBreakdown, ICashHandover,
   ListSessionsParams,
@@ -106,6 +110,11 @@ export class SessionRepository {
   async preview(id: number): Promise<IBillBreakdown> {
     return friendlyMutation(apiPreviewSession(id).then((r) => r.preview));
   }
+  /** Mark how a seat that ended by itself was paid (2026-11-07). */
+  async recordPayment(id: number, body: PaymentFields & { cash_received?: string; client_request_id: string }): Promise<{ session: ISessionApi; cash: ICashHandover | null }> {
+    return friendlyMutation(apiRecordSessionPayment(id, body).then((r) => ({ session: r.session, cash: r.cash ?? null })));
+  }
+
   async stop(id: number, payment?: StopSessionBody): Promise<StopResult> {
     return friendlyMutation(apiStopSessionWithBreakdown(id, payment));
   }
@@ -196,6 +205,11 @@ export class SessionRepository {
   }
 
   /** Read-only advice: what a planned start would cost. See `apiStartQuote`. */
+  /** Read-only advice: see `apiStartOptions`. */
+  async startOptions(pcId: number, bookingId?: number): Promise<IStartOptions> {
+    return apiStartOptions(pcId, bookingId);
+  }
+
   async startQuote(pcId: number, length: PlannedLength, hourlyRate?: number, plannedAmount?: number): Promise<IStartQuote> {
     return friendlyMutation(apiStartQuote(pcId, length, hourlyRate, plannedAmount));
   }

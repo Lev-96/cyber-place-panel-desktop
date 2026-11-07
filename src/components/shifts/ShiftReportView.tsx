@@ -50,7 +50,13 @@ const ShiftReportView = ({ shift, report, viewerId = null }: Props) => {
   const { t, money } = useLang();
   const methodName = (method: string) =>
     method === "cash" ? t("session.payCash") : method === "card" ? t("session.payCard")
-      : method === "deposit" ? t("till.payDeposit") : method === "other" ? t("session.payOther") : t("shift.methodUnrecorded");
+      : method === "deposit" ? t("till.payDeposit") : method === "other" ? t("session.payOther")
+        : method === "split" ? t("pay.splitSummary") : t("shift.methodUnrecorded");
+  // A line paid in parts (report v4) says each part; an older report, its one method.
+  const lineMethod = (l: { method: string; payments?: { method: string; amount: string }[] }) =>
+    l.method === "split" && (l.payments?.length ?? 0) > 1
+      ? `${methodName("split")}: ${l.payments!.map((p) => `${methodName(p.method)} ${m(p.amount)}`).join(", ")}`
+      : methodName(l.method);
 
   const m = (amount: string) => shiftAmount(money, amount);
   const closed = shift.status === "closed";
@@ -184,12 +190,12 @@ const ShiftReportView = ({ shift, report, viewerId = null }: Props) => {
             <LinesHead title={t("shift.revenuePlaces")} rule={t("shift.linesRule.places")} total={m(report.places.total)} />
             {report.lines.places.length === 0 && <span className="muted">{t("shift.linesNone")}</span>}
             {report.lines.places.map((l) => (
-              <Row key={`p${l.id}`} label={`${l.closed_at ? formatDateTime(l.closed_at) : ""} · ${l.seat} · ${methodName(l.method)}${l.is_free ? ` · ${t("shift.free")}` : ""}`} value={m(l.amount)} />
+              <Row key={`p${l.id}`} label={`${l.closed_at ? formatDateTime(l.closed_at) : ""} · ${l.seat} · ${lineMethod(l)}${l.is_free ? ` · ${t("shift.free")}` : ""}`} value={m(l.amount)} />
             ))}
             <LinesHead title={t("shift.revenueTill")} rule={t("shift.linesRule.till")} total={m(report.till.total)} />
             {report.lines.till.length === 0 && <span className="muted">{t("shift.linesNone")}</span>}
             {report.lines.till.map((l) => (
-              <Row key={`o${l.id}`} muted={l.status !== "paid"} label={`${l.at ? formatDateTime(l.at) : ""} · ${methodName(l.method)}${l.status !== "paid" ? ` · ${t("till.voided")}` : ""}`} value={m(l.amount)} />
+              <Row key={`o${l.id}`} muted={l.status !== "paid"} label={`${l.at ? formatDateTime(l.at) : ""} · ${lineMethod(l)}${l.status !== "paid" ? ` · ${t("till.voided")}` : ""}`} value={m(l.amount)} />
             ))}
             {report.lines.tournaments.length > 0 && (
               <LinesHead title={t("shift.revenueTournaments")} rule={t("shift.linesRule.tournaments")} total={m(report.tournaments.total)} />

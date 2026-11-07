@@ -18,6 +18,16 @@ import { useCallback, useEffect, useRef, useState } from "react";
  * additive complement — the conditional in the handler treats
  * any non-terminal kind as add.
  */
+/** Whether a booking event's reservation holds its seats right now (the snapshot's own rule). */
+const eventHoldsSeatNow = (evt: BookingChangedEvent): boolean => {
+  if (!evt.booking_date || !evt.start_time) return true;
+  return new Booking({
+    id: evt.booking_id, branch_id: evt.branch_id, company_id: evt.company_id, status: "pending",
+    booking_date: evt.booking_date, start_time: evt.start_time, duration_minutes: evt.duration_minutes,
+    rescheduled_minutes: evt.rescheduled_minutes, place_ids: evt.place_ids,
+  } as never).isReservingAt(new Date());
+};
+
 const TERMINAL_BOOKING_KINDS: readonly BookingChangedEvent["kind"][] = [
   "cancelled",
   "finished",
@@ -148,6 +158,12 @@ export const useReservedPlaceIds = (branchId: number): Set<number> => {
       // that tile yellow until the sweep.
       if (evt.kind === "updated") { void reload(); return; }
       const isTerminal = TERMINAL_BOOKING_KINDS.includes(evt.kind);
+      // A reservation far ahead (16:00, made at 12:00) does not hold its seat
+      // yet (2026-11-07): the event is judged by the same rule as the
+      // snapshot (`isReservingAt`), so the tile no longer turns yellow until
+      // the next sweep. An event without its time (an older backend) is
+      // applied as before.
+      if (!isTerminal && !eventHoldsSeatNow(evt)) return;
       setIds((prev) => {
         const next = new Set(prev);
         for (const id of evt.place_ids) {

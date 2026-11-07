@@ -69,3 +69,25 @@ export const apiStaffReservations = (params: { branch_id: number; from: string; 
 /** Move / edit a staff reservation; the server refuses a row that is not `editable`, or a conflict, with a sentence. */
 export const apiUpdateReservation = (bookingId: number, patch: ReservationPatch) =>
   request<{ booking: IBookingApi }>(`/places/reservations/${bookingId}`, { method: "PATCH", body: patch });
+
+/** One step in a booking's life (2026-11-07, `GET /booking-events`). */
+export type BookingEventAction =
+  | "created" | "updated" | "extended" | "confirmed" | "cancelled" | "started" | "finished" | "start_due_notified";
+
+export interface IBookingEvent {
+  id: number;
+  booking_id: number;
+  branch_id: number;
+  action: BookingEventAction;
+  /** `by`: staff | guest | system; plus what the step needs (reason, from/to, session_id …). */
+  meta: Record<string, unknown> | null;
+  created_at: string;
+  user: { id: number; name: string; role: string } | null;
+  booking: {
+    id: number; status: string; booking_date: string; start_time: string; starts_at: string; ends_at: string;
+    place_numbers: number[]; source: "staff" | "guest"; who: string | null;
+  } | null;
+}
+
+export const apiBookingEvents = (params: { branch_id: number; from?: string; to?: string; booking_id?: number; limit?: number }) =>
+  request<{ data: IBookingEvent[] }>("/booking-events", { params, noCache: true });

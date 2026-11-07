@@ -1,3 +1,4 @@
+import { paymentText, type PaidPart } from "@/components/payments/paymentText";
 import { ISessionEvent } from "@/api/sessions";
 import { formatTime } from "@/i18n/dates";
 import { fmt } from "@/i18n/translations";
@@ -23,6 +24,18 @@ const metaNum = (meta: Record<string, unknown> | null, key: string): number | nu
   if (typeof raw === "string" && raw.trim() !== "" && Number.isFinite(Number(raw))) return Number(raw);
   return null;
 };
+/** The parts of a payment as the audit line keeps them (`meta.payments`), well-formed ones only. */
+const paidPartsOf = (meta: Record<string, unknown> | null): PaidPart[] => {
+  const raw = meta?.payments;
+  if (!Array.isArray(raw)) return [];
+  return raw.flatMap((p) => {
+    const m = (p as { method?: unknown }).method;
+    const a = (p as { amount?: unknown }).amount;
+    return (m === "cash" || m === "card" || m === "other" || m === "deposit") && (typeof a === "number" || typeof a === "string")
+      ? [{ method: m, amount: a } as PaidPart] : [];
+  });
+};
+
 const metaStr = (meta: Record<string, unknown> | null, key: string): string | null => {
   const raw = meta?.[key];
   return typeof raw === "string" && raw.trim() !== "" ? raw : null;
@@ -62,10 +75,13 @@ export const eventSeat = (e: ISessionEvent): string | null => {
  * server refuses it) and is folded into the same null for the same reason.
  */
 export const paymentLabelOf = (
-  session: Pick<ISessionApi, "payment_method" | "payment_method_other">,
+  session: Pick<ISessionApi, "payment_method" | "payment_method_other" | "payments">,
   t: (k: string) => string,
+  money: (n: number) => string = String,
 ): string | null => {
   const method = session.payment_method;
+  // Paid in parts (2026-11-07): each part and how, from its lines.
+  if (method === "split" || (session.payments?.length ?? 0) > 1) return paymentText(session, t, money);
   if (!method) return null;
 
   if (method === "other") {
@@ -345,6 +361,21 @@ export const eventDetailParts = (
         money(metaNum(meta, "time_cost") ?? 0),
         money(metaNum(meta, "items_total") ?? 0),
         money(metaNum(meta, "joysticks_total") ?? 0)));
+      break;
+    }
+
+    // How it was paid (2026-11-07): at the stop, or recorded afterwards for a
+    // seat that ended by itself. A stop the sweep made says so.
+    case "stopped":
+    case "payment_recorded": {
+      if (e.action === "stopped" && metaStr(meta, "reason") === "expired") parts.push(t("history.endedAutomatically"));
+      const paid = paidPartsOf(meta);
+      const text = paymentText({
+        payment_method: metaStr(meta, "payment_method"),
+        payment_method_other: metaStr(meta, "payment_method_other"),
+        payments: paid.map((p) => ({ ...p, note: metaStr(meta, "payment_note") })),
+      }, t, money);
+      if (text !== null) parts.push(text);
       break;
     }
 

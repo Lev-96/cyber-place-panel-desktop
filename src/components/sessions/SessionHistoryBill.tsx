@@ -45,7 +45,7 @@ const SessionHistoryBill = ({ session, closed }: Props) => {
    * session" is two numbers telling one truth.
    */
   const padCharge = padChargeOf(session);
-  const paymentLabel = paymentLabelOf(session, t);
+  const paymentLabel = paymentLabelOf(session, t, money);
   const total = num(session.total_paid);
   // What the CLOCK earned: the bill less everything that is not the clock.
   //

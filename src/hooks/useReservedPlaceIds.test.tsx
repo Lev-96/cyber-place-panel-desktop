@@ -86,6 +86,22 @@ describe("seats held by a reservation", () => {
     expect(seen.has(10)).toBe(false);
   });
 
+  // The event is judged as the snapshot is (2026-11-07): a reservation far
+  // ahead does not turn the tile yellow; one starting soon does.
+  test("a booking made for much later does not take its seat yet; one starting soon does", async () => {
+    const at = (minutes: number) => {
+      const d = new Date(Date.now() + minutes * 60_000);
+      return {
+        booking_date: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`,
+        start_time: d.toTimeString().slice(0, 8), duration_minutes: 60, rescheduled_minutes: 0,
+      };
+    };
+    await fire(event({ ...at(4 * 60), place_ids: [20], at: "2026-09-10T14:03:00+04:00" }));
+    expect(seen.has(20)).toBe(false);
+    await fire(event({ ...at(30), booking_id: 101, place_ids: [21], at: "2026-09-10T14:04:00+04:00" }));
+    expect(seen.has(21)).toBe(true);
+  });
+
   test("a cancellation hands them back", async () => {
     await fire(event());
     await fire(event({ kind: "cancelled", at: "2026-09-10T14:01:00+04:00" }));
