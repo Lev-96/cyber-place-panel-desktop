@@ -22,8 +22,11 @@ import type { ICashHandover } from "@/api/sessions";
 interface Props {
   session: ISessionApi;
   onClose: () => void;
-  /** The seat is over on the server — stopped, or cancelled (2026-11-06). */
-  onConfirmed: (outcome?: { cancelled: boolean }) => void;
+  /**
+   * The seat is over on the server — stopped, or cancelled (2026-11-06) — and
+   * what it owes for extra time not paid (2026-11-07; the server's figure).
+   */
+  onConfirmed: (outcome?: { cancelled: boolean; unpaidAmount?: number | null }) => void;
   onItemRemoved: () => void;
   /**
    * Whether this person may reset the counter from the receipt (2026-11-05,
@@ -184,7 +187,7 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved, canRes
       });
       setStopped(r.breakdown);
       setHandover(r.cash ?? null);
-      onConfirmed({ cancelled: false });
+      onConfirmed({ cancelled: false, unpaidAmount: r.session?.unpaid_amount ?? null });
     } catch (e) {
       // Refused as stale or changed (2026-10-25) — older than ten minutes, or
       // a product, pad, pause, waiver or move since: the server's sentence,

@@ -1037,7 +1037,7 @@ describe("cancelling the seat from the receipt", () => {
     await act(async () => { fireEvent.click(screen.getByTestId("stop-confirm")); });
 
     expect(repo.cancel).not.toHaveBeenCalled();
-    expect(onConfirmed).toHaveBeenCalledWith({ cancelled: false });
+    expect(onConfirmed).toHaveBeenCalledWith({ cancelled: false, unpaidAmount: null });
     expect(screen.queryByText("session.cancel.done")).toBeNull();
   });
 });

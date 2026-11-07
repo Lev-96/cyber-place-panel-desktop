@@ -4,6 +4,8 @@ import { request } from "./client";
 export interface StartSessionBody {
   branch_id: number;
   pc_id: number;
+  /** The reservation this start fulfils (2026-11-07, «Пришёл»). */
+  booking_id?: number;
   mode?: "fixed" | "open";
   time_package_id?: number;
   hourly_rate?: number;
@@ -61,6 +63,8 @@ export interface ITimeQuote {
   /** Whether this seat takes a price typed by hand (a seat with a plan). */
   price_editable: boolean;
   is_free: boolean;
+  /** The money asked for, when the time was asked for by money (2026-11-07); null otherwise. */
+  amount?: number | null;
 }
 
 /** What a planned hourly start would cost — the server's own figure. */
@@ -516,6 +520,30 @@ export interface IExtensionOptions {
  * those seats a second later — `apiTransferExtension` re-checks everything
  * under a row lock and may still refuse. Never treat this as a promise.
  */
+/**
+ * Time BY MONEY (2026-11-07): the server turns `amount` into minutes at this
+ * seat's rate and grants them — at exactly that money on a seat with a plan,
+ * at the rate elsewhere (its quote says which).
+ */
+export const apiAddSessionTimeByAmount = (sessionId: number, amount: number) =>
+  request<{ session: ISessionApi }>(`/sessions/${sessionId}/time`, { method: "POST", body: { amount } });
+
+/**
+ * An unlimited seat given a fixed time from now (2026-11-07). The bill does
+ * not move; from then on it is a timed seat. Refused (422) for a seat with an
+ * end, a paused one, or one a booking is waiting for.
+ */
+export const apiLimitSession = (sessionId: number, minutes: number) =>
+  request<{ session: ISessionApi }>(`/sessions/${sessionId}/limit`, { method: "POST", body: { minutes } });
+
+/** Extra time not paid yet, on or off (2026-11-07); what is owed is worked out when the seat ends. */
+export const apiSetSessionUnpaid = (sessionId: number, on: boolean) =>
+  request<{ session: ISessionApi }>(`/sessions/${sessionId}/unpaid`, { method: "POST", body: { on } });
+
+/** ⚠️ ADVICE: what `apiAddSessionTimeByAmount` would grant — the minutes and the charge. Writes nothing. */
+export const apiSessionTimeQuoteByAmount = (sessionId: number, amount: number) =>
+  request<ITimeQuote>(`/sessions/${sessionId}/time-quote?amount=${amount}`);
+
 /** ⚠️ ADVICE: `apiAddSessionTime` re-checks and is what charges. Writes nothing. */
 export const apiSessionTimeQuote = (sessionId: number, minutes: number, charge?: number) =>
   request<ITimeQuote>(
@@ -649,6 +677,11 @@ export type SessionActionName =
   | "time_reset"
   // The seat ended with its whole bill waived (2026-11-06); `amount` is what was waived.
   | "cancelled"
+  // An unlimited seat given a fixed time from now (2026-11-07); `amount` is that time's price.
+  | "limited"
+  // Extra time not paid yet, switched on / off (2026-11-07); `amount` on `unpaid_on` is what was paid.
+  | "unpaid_on"
+  | "unpaid_off"
   // ⚠️ The server has emitted this since seat migration shipped; the client
   // type never learned it, so every `moved` line arrived typed as something
   // it is not and the history could not branch on it.

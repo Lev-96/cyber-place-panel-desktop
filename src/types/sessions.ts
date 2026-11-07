@@ -281,6 +281,10 @@ export interface ISessionApi {
   time_waived_total?: number | string | null;
   /** Ended by a cancel (2026-11-06): the whole bill waived, the seat freed. Null otherwise. */
   cancelled_at?: string | null;
+  /** Extra time not paid yet (2026-11-07): on since when; null = off. */
+  unpaid_since?: string | null;
+  /** Once ended: what the player owes for that extra time (the server's figure). */
+  unpaid_amount?: number | null;
   /**
    * A rate change mid-way — the player moved to a seat priced differently.
    * What the clock had earned at `rate_changed_at` is frozen in

@@ -2977,6 +2977,127 @@ button.pill:hover {
 .receipt-reset:hover:not(:disabled),
 .receipt-reset:focus-visible { background: color-mix(in srgb, var(--color-warning) 15%, transparent); }
 .receipt-reset:disabled { opacity: 0.5; cursor: default; }
+/* Extra time not paid yet (2026-11-07): the card's switch — a button drawn as
+   the panel's switch (UnpaidToggle), amber when on. */
+.session-card__unpaid {
+  display: inline-flex;
+  margin-top: var(--space-1);
+}
+.btn.unpaid-toggle {
+  gap: var(--space-2);
+  padding: 2px 0;
+  background: transparent;
+  color: var(--color-text);
+  font-size: 13px;
+  font-weight: 500;
+}
+.btn.unpaid-toggle:hover:not(:disabled) .cp-switch-track { border-color: var(--color-warning); }
+.btn.unpaid-toggle:focus-visible .cp-switch-track {
+  border-color: var(--color-warning);
+  box-shadow: 0 0 0 3px rgb(var(--warning-rgb) / 0.30);
+}
+.btn.unpaid-toggle.is-on .cp-switch-track {
+  background: var(--color-warning);
+  border-color: var(--color-warning);
+  box-shadow: 0 0 0 3px rgb(var(--warning-rgb) / 0.18);
+}
+.btn.unpaid-toggle.is-on .cp-switch-thumb {
+  background: #1a1203;
+  transform: translateX(14px);
+}
+.btn.unpaid-toggle.is-on .unpaid-toggle__label {
+  color: var(--color-warning);
+  font-weight: 700;
+}
+/* The warning a seat ending owing for extra time raises: amber, a slow glow,
+   the amount large enough to read across the room. */
+.unpaid-alert {
+  width: 460px;
+  max-width: 92vw;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  text-align: center;
+  border: 2px solid var(--color-warning);
+  background: color-mix(in srgb, var(--color-warning-surface) 70%, var(--color-surface));
+  animation: cp-unpaid-in 260ms ease-out both, cp-unpaid-glow 1.6s ease-in-out 260ms infinite;
+}
+.unpaid-alert__badge {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--color-warning);
+  color: #1a1203;
+  font-size: 32px;
+  font-weight: 900;
+}
+.unpaid-alert__seat {
+  margin: 0;
+  font-size: 30px;
+  font-weight: 800;
+  color: var(--color-text);
+}
+.unpaid-alert__why {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--color-warning);
+}
+.unpaid-alert__amount {
+  font-size: 48px;
+  font-weight: 900;
+  line-height: 1.1;
+  color: var(--color-warning);
+  font-variant-numeric: tabular-nums;
+}
+.unpaid-alert__hint { margin: 0; font-size: 15px; color: var(--color-text); }
+.unpaid-alert__more { font-size: 13px; color: var(--color-text-muted, var(--color-text)); }
+.unpaid-alert .btn { min-width: 160px; font-size: 16px; padding: 10px 20px; }
+@keyframes cp-unpaid-in {
+  from { opacity: 0; transform: scale(0.92) translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes cp-unpaid-glow {
+  0%, 100% { box-shadow: 0 0 0 0 rgb(var(--warning-rgb) / 0.0), 0 0 24px rgb(var(--warning-rgb) / 0.25); }
+  50% { box-shadow: 0 0 0 6px rgb(var(--warning-rgb) / 0.18), 0 0 40px rgb(var(--warning-rgb) / 0.45); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .unpaid-alert { animation: none; }
+}
+/* A seat reserved by phone (2026-11-07): who is coming, and the tile's two
+   actions side by side. */
+.session-card__reservation {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px var(--space-2);
+  font-size: 13px;
+}
+.session-card__reservation a { color: inherit; text-decoration: underline; }
+.session-card__reserve-actions {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: var(--space-2);
+  width: 100%;
+}
+.reserve-dialog { width: 440px; max-width: 92vw; }
+/* "+ Время" by money (2026-11-07): the server's answer — how long the money
+   buys — large and in the accent, the figure the cashier reads aloud. */
+.grant-money-result {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--space-2) var(--space-3);
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--color-primary) 40%, transparent);
+  background: color-mix(in srgb, var(--color-primary) 8%, transparent);
+  color: var(--color-primary);
+  font-size: 18px;
+  font-weight: 700;
+}
 /* The stop receipt's buttons (2026-11-07, owner): even columns across the
    receipt — keep playing, cancel, confirm — each filling its column, one
    height, the type of a control. A label that does not fit wraps; nothing

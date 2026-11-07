@@ -228,7 +228,12 @@ export interface IBookingApi {
   branch_id: number;
   /** Null for a platform that is the game itself (poker, table tennis …). */
   game_id: number | null;
-  guest_id: number;
+  /** Null for a seat reserved by staff from the board (2026-11-07): no app guest. */
+  guest_id: number | null;
+  /** Who is coming, as staff typed it (a staff reservation). */
+  contact_name?: string | null;
+  contact_phone?: string | null;
+  reserved_by_user_id?: number | null;
   booking_date: string;
   start_time: string;
   duration_minutes: number;

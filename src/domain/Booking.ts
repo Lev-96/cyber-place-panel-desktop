@@ -66,6 +66,9 @@ export class Booking {
   /** Human-readable seat numbers, parallel to `placeIds`. */
   readonly placeNumbers: readonly number[];
   readonly platform: string;
+  /** A staff reservation's contact (2026-11-07); null on a guest's booking. */
+  readonly contactName: string | null;
+  readonly contactPhone: string | null;
   readonly raw: IBookingApi;
 
   constructor(raw: IBookingApi) {
@@ -80,6 +83,8 @@ export class Booking {
     this.placeNumbers = Object.freeze([...(raw.place_numbers ?? [])]);
     // Stored on the booking since 2026-10-31; older rows only have their game's.
     this.platform = raw.platform ?? raw.game?.platform ?? "";
+    this.contactName = raw.contact_name?.trim() || null;
+    this.contactPhone = raw.contact_phone?.trim() || null;
     this.start = Booking.parseStart(raw);
     this.end = new Date(this.start.getTime() + (raw.duration_minutes + (raw.rescheduled_minutes ?? 0)) * 60_000);
   }

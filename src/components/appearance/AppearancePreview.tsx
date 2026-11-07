@@ -5,6 +5,7 @@ import {
   PAD_COUNT_STYLE, PAD_LINE_STYLE, SeatGrip, SeatNameLine, SeatPlatformLine, sessionTariffLine,
 } from "@/components/sessions/seatParts";
 import Button from "@/components/ui/Button";
+import UnpaidToggle from "@/components/sessions/UnpaidToggle";
 import CollapsibleSection from "@/components/ui/CollapsibleSection";
 import { useLang } from "@/i18n/LanguageContext";
 import { SESSION_CELL_COLOR } from "@/domain/SessionCellState";
@@ -181,6 +182,10 @@ const AppearancePreview = ({ quick }: { quick: "all" | "primary" }) => {
                       </span>
                       <span className="until">
                         <span className="session-card__secondary">{sessionTariffLine(sess, money, t)}</span>
+                        {/* The «not paid» switch every running seat carries (2026-11-07), off. */}
+                        <span className="session-card__unpaid">
+                          <UnpaidToggle on={false} onChange={noop} label={t("session.unpaid.switch")} fullLabel={t("session.unpaid.switchFull")} tabIndex={-1} />
+                        </span>
                       </span>
                       {/* The pad line every PlayStation seat carries, empty: no extra pad out. */}
                       <span className="row" style={PAD_LINE_STYLE}>
@@ -191,6 +196,7 @@ const AppearancePreview = ({ quick }: { quick: "all" | "primary" }) => {
                         {fake("add-item", t("session.card.addItem"), t("session.addItem"))}
                         <CardOverflow collapsed={quick === "primary"} label={t("session.card.more")}>
                           {fake("add-time", t("session.card.addTime"), t("session.addTime"))}
+                          {fake("unlimited", t("session.card.unlimited"), t("session.card.unlimitedFull"))}
                           {fake("pause", t("session.pause"), t("session.pause"))}
                           {fake("relocate", t("session.card.relocate"), t("session.relocate"), { wide: true })}
                         </CardOverflow>
@@ -201,9 +207,15 @@ const AppearancePreview = ({ quick }: { quick: "all" | "primary" }) => {
                     <>
                       <span className="status">{t("session.free")}</span>
                       <div className="session-card__foot">
-                        <Button type="button" className="session-card__start" data-action="start" tabIndex={-1}>
-                          {t("action.start")}
-                        </Button>
+                        {/* Start and «Забронировать», as a free seat on the board (2026-11-07). */}
+                        <div className="session-card__reserve-actions">
+                          <Button type="button" className="session-card__start" data-action="start" tabIndex={-1}>
+                            {t("action.start")}
+                          </Button>
+                          <Button type="button" variant="secondary" data-action="reserve" tabIndex={-1}>
+                            {t("reserve.button")}
+                          </Button>
+                        </div>
                       </div>
                     </>
                   )}

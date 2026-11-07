@@ -396,6 +396,9 @@ const ACTION_LOOK: Record<string, { tone: EventTone; icon: string }> = {
   free_disabled: { tone: "neutral", icon: "֏" },
   time_reset: { tone: "waive", icon: "↺" },
   cancelled: { tone: "stop", icon: "✕" },
+  limited: { tone: "neutral", icon: "⏱" },
+  unpaid_on: { tone: "refused", icon: "!" },
+  unpaid_off: { tone: "neutral", icon: "✓" },
   time_add_refused: { tone: "refused", icon: "!" },
   move_failed: { tone: "refused", icon: "!" },
 };

@@ -38,7 +38,7 @@ export const SOUND_PROFILES = ["quiet", "standard", "loud", "custom"] as const;
  * Only kinds of notification a real event feeds (2026-10-27): there is no
  * sale event in the system, so there is no sale sound to offer.
  */
-export const SOUND_CATEGORIES = ["booking_new", "booking_changed", "session_ending", "support", "guests", "system"] as const;
+export const SOUND_CATEGORIES = ["booking_new", "booking_changed", "session_ending", "session_unpaid", "support", "guests", "system"] as const;
 /** The panel's own sounds, synthesised in code (the first three are the old ones, note for note). */
 export const SYNTH_SOUNDS = ["chime", "soft", "ding", "bell", "pulse", "alert"] as const;
 /**
@@ -203,6 +203,8 @@ export const SOUND_DEFAULTS: Record<SoundCategory, SoundCategoryPrefs> = {
   booking_new: { enabled: true, sound: "melodic" },
   booking_changed: { enabled: true, sound: "message" },
   session_ending: { enabled: true, sound: "digital" },
+  // A seat ended owing for extra time (2026-11-07): heard across the room.
+  session_unpaid: { enabled: true, sound: "arrival" },
   support: { enabled: true, sound: "chat" },
   guests: { enabled: true, sound: "chord" },
   system: { enabled: true, sound: "calm" },

@@ -25,6 +25,9 @@ const repo = vi.hoisted(() => ({
   removeJoystick: vi.fn(),
   addTime: vi.fn(),
   timeQuote: vi.fn(),
+  addTimeByAmount: vi.fn(),
+  timeQuoteByAmount: vi.fn(),
+  limit: vi.fn(),
   makeUnlimited: vi.fn(),
   setFree: vi.fn(),
   extensionOptions: vi.fn(),
@@ -46,6 +49,9 @@ vi.mock("@/repositories/SessionRepository", () => ({
     removeJoystick: (...a: unknown[]) => repo.removeJoystick(...a),
     addTime: (...a: unknown[]) => repo.addTime(...a),
     timeQuote: (...a: unknown[]) => repo.timeQuote(...a),
+    addTimeByAmount: (...a: unknown[]) => repo.addTimeByAmount(...a),
+    limit: (...a: unknown[]) => repo.limit(...a),
+    timeQuoteByAmount: (...a: unknown[]) => repo.timeQuoteByAmount(...a),
     makeUnlimited: (...a: unknown[]) => repo.makeUnlimited(...a),
     setFree: (...a: unknown[]) => repo.setFree(...a),
     extensionOptions: (...a: unknown[]) => repo.extensionOptions(...a),
@@ -124,18 +130,18 @@ const settle = async () => {
   await act(async () => { await new Promise((r) => setTimeout(r, 320)); });
 };
 
+// The start dialog's time field (2026-11-07): an hours box and a minutes box.
+const hoursBox = () => screen.getByTestId("grant-duration-hours") as HTMLInputElement;
+const minutesBox = () => screen.getByTestId("grant-duration-minutes") as HTMLInputElement;
+
+/** Hours, typed into the field's hours box. */
 const typeAmount = async (value: string) => {
-  await act(async () => {
-    fireEvent.change(screen.getByLabelText("session.timeAmount"), { target: { value } });
-  });
+  await act(async () => { fireEvent.change(hoursBox(), { target: { value } }); });
 };
 
-const chooseUnit = async (unit: "hours" | "minutes") => {
-  await act(async () => {
-    fireEvent.click(screen.getByRole("tab", {
-      name: unit === "hours" ? "session.timeUnitHours" : "session.timeUnitMinutes",
-    }));
-  });
+/** Minutes, typed into the field's minutes box. */
+const typeMinutes = async (value: string) => {
+  await act(async () => { fireEvent.change(minutesBox(), { target: { value } }); });
 };
 
 const confirmGrant = () =>
@@ -143,21 +149,22 @@ const confirmGrant = () =>
 
 /** Choose N minutes, wait for the server's price, confirm. */
 const requestGrant = async (minutes = 10) => {
-  await chooseUnit("minutes");
-  await typeAmount(String(minutes));
+  await typeMinutes(String(minutes));
   await settle();
   await act(async () => { fireEvent.click(confirmGrant()); });
 };
 
-const mount = async (s: ISessionApi = session(), platform = "ps5") => {
+const mount = async (s: ISessionApi = session(), platform = "ps5", view: "time" | "unlimited" | "limit" = "time") => {
   await act(async () => {
     render(
       <ConfirmProvider>
-        <SessionOptionsDialog session={s} platform={platform} onClose={() => {}} onChanged={() => {}} />
+        <SessionOptionsDialog session={s} platform={platform} onClose={() => {}} onChanged={() => {}} view={view} />
       </ConfirmProvider>,
     );
   });
 };
+/** As the card's «∞ Безлимит» opens it (2026-11-07). */
+const mountUnlimited = (s: ISessionApi = session()) => mount(s, "ps5", "unlimited");
 
 beforeEach(() => {
   auth.role = "company_owner";
@@ -172,6 +179,12 @@ beforeEach(() => {
     Promise.resolve({
       minutes: m, hourly_rate: 1000, charge: charge ?? (m * 1000) / 60, standard_charge: (m * 1000) / 60,
       price_editable: true, is_free: false,
+    }));
+  // By money at 1 000/h: 700 buys 42 minutes, charged as typed (a plan).
+  repo.timeQuoteByAmount.mockImplementation((_id: number, a: number) =>
+    Promise.resolve({
+      minutes: Math.round((a * 60) / 1000), hourly_rate: 1000, charge: a, standard_charge: a,
+      price_editable: true, is_free: false, amount: a,
     }));
   prices.get.mockReset();
   prices.get.mockImplementation(() => Promise.resolve({
@@ -280,38 +293,33 @@ const switchButton = () =>
   screen.getByRole("button", { name: "session.unlimitedApply" }) as HTMLButtonElement;
 
 describe("time and the ceiling", () => {
-  test("hours by default, minutes on the other tab, and the minutes are what is sent", async () => {
+  test("the start dialog's time field, no quick picks, and the minutes are what is sent (2026-11-07)", async () => {
     repo.addTime.mockResolvedValue(session());
     await mount();
 
-    // Hours first: 1–5 h.
-    expect(screen.getByRole("tab", { name: "session.timeUnitHours" }).getAttribute("aria-selected")).toBe("true");
-    const hourPresets = screen.getAllByRole("button", { name: /time\.hourShort$/ });
-    expect(hourPresets).toHaveLength(5);
+    expect(screen.queryAllByRole("button", { name: /time\.(hourShort|minShort)$/ })).toHaveLength(0);
+    expect(screen.queryByRole("tab", { name: "session.timeUnitHours" })).toBeNull();
 
-    await chooseUnit("minutes");
-    expect(screen.getAllByRole("button", { name: /time\.minShort$/ })).toHaveLength(9);
-    await chooseUnit("hours");
-
-    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "1 time.hourShort" })); });
+    await typeAmount("1");
+    await typeMinutes("30");
     await settle();
     await act(async () => { fireEvent.click(confirmGrant()); });
 
-    expect(repo.addTime).toHaveBeenCalledWith(42, 60, undefined);
+    expect(repo.addTime).toHaveBeenCalledWith(42, 90, undefined);
   });
 
   test("do not offer extra time on a session that has no end", async () => {
     await mount(session({ is_unlimited: true, ends_at: null }));
 
     expect(screen.queryByRole("button", { name: /session.timeAddConfirmPriced/ })).toBeNull();
-    expect(screen.queryByLabelText("session.timeAmount")).toBeNull();
+    expect(screen.queryByTestId("grant-duration-hours")).toBeNull();
     expect(screen.getByText("session.timeNotApplicable")).toBeTruthy();
     expect(repo.timeQuote).not.toHaveBeenCalled();
   });
 
   test("show the booking refusal instead of silently doing nothing", async () => {
     repo.makeUnlimited.mockRejectedValue(new Error("This place is booked in the app."));
-    await mount();
+    await mountUnlimited();
     await armUnlimited();
 
     await act(async () => {
@@ -323,7 +331,7 @@ describe("time and the ceiling", () => {
   });
 
   test("ask before lifting the ceiling, and do nothing if the answer is no", async () => {
-    await mount();
+    await mountUnlimited();
     await armUnlimited();
 
     await act(async () => {
@@ -342,7 +350,7 @@ describe("time and the ceiling", () => {
    */
   test("never asks through a native confirm", async () => {
     const native = vi.spyOn(window, "confirm");
-    await mount();
+    await mountUnlimited();
     await armUnlimited();
 
     await act(async () => {
@@ -384,7 +392,7 @@ describe("a session that is over", () => {
     await mount(session({ status: "stopped" }));
 
     expect(screen.getByText("session.optionsClosedSession")).toBeTruthy();
-    expect((screen.getByRole("button", { name: "1 time.hourShort" }) as HTMLButtonElement).disabled).toBe(true);
+    expect(hoursBox().disabled).toBe(true);
     expect(confirmGrant().disabled).toBe(true);
     expect(repo.timeQuote).not.toHaveBeenCalled();
   });
@@ -412,7 +420,7 @@ describe("a grant typed by hand, and its price", () => {
   test("half an hour is a legitimate thing to type", async () => {
     repo.addTime.mockResolvedValue(session());
     await mount();
-    await typeAmount("1,5");
+    await typeAmount("1.5");
     await settle();
     await act(async () => { fireEvent.click(confirmGrant()); });
 
@@ -427,25 +435,14 @@ describe("a grant typed by hand, and its price", () => {
     expect(repo.addTime).toHaveBeenCalledWith(42, 45, undefined);
   });
 
-  test("switching the unit keeps the length, never re-reads the number", async () => {
-    await mount();
-    await typeAmount("2");
-    await chooseUnit("minutes");
-
-    expect((screen.getByLabelText("session.timeAmount") as HTMLInputElement).value).toBe("120");
-  });
-
   test.each([
     ["nothing", ""],
     ["a zero", "0"],
-    ["a negative", "-30"],
     ["words", "abc"],
-    ["a fraction of a minute", "1.5"],
     ["more than the server's ceiling", "601"],
   ])("refuses %s", async (_name, value) => {
     await mount();
-    await chooseUnit("minutes");
-    await typeAmount(value);
+    await typeMinutes(value);
     await settle();
 
     expect(confirmGrant().disabled).toBe(true);
@@ -458,6 +455,7 @@ describe("a grant typed by hand, and its price", () => {
     expect(screen.queryByText("session.timeInvalid")).toBeNull();
 
     await typeAmount("0");
+    await act(async () => { fireEvent.focusOut(hoursBox(), { relatedTarget: null }); });
     expect(screen.getByText("session.timeInvalid")).toBeTruthy();
   });
 
@@ -467,7 +465,7 @@ describe("a grant typed by hand, and its price", () => {
     await requestGrant(30);
 
     expect(screen.getByText("Seat is booked at 20:00")).toBeTruthy();
-    expect((screen.getByLabelText("session.timeAmount") as HTMLInputElement).value).toBe("30");
+    expect(minutesBox().value).toBe("30");
   });
 
   test("the price shown is the server's, for exactly the length chosen", async () => {
@@ -653,14 +651,14 @@ describe("a grant typed by hand, and its price", () => {
  */
 describe("switching a session to unlimited", () => {
   test("offers nothing until the gate is ticked", async () => {
-    await mount();
+    await mountUnlimited();
 
     expect(screen.queryByLabelText("session.unlimitedRate")).toBeNull();
     expect(switchButton().disabled).toBe(true);
   });
 
   test("ticking it reveals a required price, prefilled from the seat", async () => {
-    await mount(session({ hourly_rate: null, tariff_hourly_rate: 1500 }));
+    await mountUnlimited(session({ hourly_rate: null, tariff_hourly_rate: 1500 }));
 
     await act(async () => {
       fireEvent.click(screen.getByText("session.unlimitedGate"));
@@ -672,7 +670,7 @@ describe("switching a session to unlimited", () => {
   });
 
   test("a seat with no configured price asks for one instead of refusing", async () => {
-    await mount(session({ hourly_rate: null, tariff_hourly_rate: null }));
+    await mountUnlimited(session({ hourly_rate: null, tariff_hourly_rate: null }));
 
     await act(async () => {
       fireEvent.click(screen.getByText("session.unlimitedGate"));
@@ -695,7 +693,7 @@ describe("switching a session to unlimited", () => {
     ["a negative", "-100"],
     ["words", "abc"],
   ])("keeps the switch shut on %s", async (_name, value) => {
-    await mount(session({ hourly_rate: null, tariff_hourly_rate: null }));
+    await mountUnlimited(session({ hourly_rate: null, tariff_hourly_rate: null }));
     await armUnlimited(value);
 
     expect(switchButton().disabled).toBe(true);
@@ -703,7 +701,7 @@ describe("switching a session to unlimited", () => {
   });
 
   test("unticking the gate keeps the switch shut, price or no price", async () => {
-    await mount();
+    await mountUnlimited();
     await armUnlimited("2000");
     expect(switchButton().disabled).toBe(false);
 
@@ -718,7 +716,7 @@ describe("switching a session to unlimited", () => {
 
   test("sends the price that was typed", async () => {
     repo.makeUnlimited.mockResolvedValue(session({ is_unlimited: true, ends_at: null }));
-    await mount();
+    await mountUnlimited();
     await armUnlimited("2000");
 
     await act(async () => { fireEvent.click(switchButton()); });
@@ -728,7 +726,7 @@ describe("switching a session to unlimited", () => {
   });
 
   test("says the rule out loud once the gate is open", async () => {
-    await mount();
+    await mountUnlimited();
     await armUnlimited();
 
     // "From now on" is the question an operator asks, and the wrong answer
@@ -737,7 +735,7 @@ describe("switching a session to unlimited", () => {
   });
 
   test("a session that already has no end states the fact", async () => {
-    await mount(session({ is_unlimited: true, ends_at: null }));
+    await mountUnlimited(session({ is_unlimited: true, ends_at: null }));
 
     expect(screen.getByText("session.unlimitedAlready")).toBeTruthy();
     expect(screen.queryByLabelText("session.unlimitedRate")).toBeNull();
@@ -1039,5 +1037,157 @@ describe("moving the player to another seat", () => {
     await pressAPreset();
 
     expect(screen.getByText("session.moveNone")).toBeTruthy();
+  });
+});
+
+describe("adding time by money (2026-11-07)", () => {
+  const toMoney = async () => { await act(async () => { fireEvent.click(screen.getByRole("tab", { name: "session.addTimeByMoney" })); }); };
+  const typeMoney = async (value: string) => {
+    await act(async () => { fireEvent.change(screen.getByLabelText("session.addTimeMoney"), { target: { value } }); });
+  };
+  const moneyConfirm = () => screen.getByTestId("grant-money-confirm") as HTMLButtonElement;
+
+  test("700 is the server's 42 minutes, shown before anything is sent, and sent as money", async () => {
+    repo.addTimeByAmount.mockResolvedValue(session());
+    await mount();
+    await toMoney();
+    expect(moneyConfirm().disabled).toBe(true);
+
+    await typeMoney("700");
+    await settle();
+
+    expect(repo.timeQuoteByAmount).toHaveBeenCalledWith(42, 700);
+    expect(screen.getByTestId("grant-money-result").dataset.minutes).toBe("42");
+    expect(moneyConfirm().disabled).toBe(false);
+    await act(async () => { fireEvent.click(moneyConfirm()); });
+
+    expect(repo.addTimeByAmount).toHaveBeenCalledWith(42, 700);
+    expect(repo.addTime).not.toHaveBeenCalled();
+  });
+
+  test("a seat without a plan says what its rate will charge for those minutes", async () => {
+    repo.timeQuoteByAmount.mockResolvedValue({
+      minutes: 20, hourly_rate: 1000, charge: 333.33, standard_charge: 333.33, price_editable: false, is_free: false, amount: 333,
+    });
+    await mount();
+    await toMoney();
+    await typeMoney("333");
+    await settle();
+
+    expect(screen.getByTestId("grant-money-result").textContent).toContain("session.addTimeMoneyAtRate");
+  });
+
+  test("an empty or zero amount asks nothing and confirms nothing", async () => {
+    await mount();
+    await toMoney();
+    await typeMoney("0");
+    await settle();
+
+    expect(repo.timeQuoteByAmount).not.toHaveBeenCalled();
+    expect(moneyConfirm().disabled).toBe(true);
+  });
+
+  test("the server's refusal is shown and nothing can be confirmed", async () => {
+    repo.timeQuoteByAmount.mockRejectedValue(new Error("Too little for a minute."));
+    await mount();
+    await toMoney();
+    await typeMoney("5");
+    await settle();
+
+    expect(screen.getByText("Too little for a minute.")).toBeTruthy();
+    expect(moneyConfirm().disabled).toBe(true);
+  });
+
+  test("a changed amount is never confirmed on the answer for the old one", async () => {
+    await mount();
+    await toMoney();
+    await typeMoney("700");
+    await settle();
+    expect(moneyConfirm().disabled).toBe(false);
+
+    // The answer for 800 has not come yet.
+    repo.timeQuoteByAmount.mockImplementation(() => new Promise(() => {}));
+    await typeMoney("800");
+    await settle();
+
+    expect(moneyConfirm().disabled).toBe(true);
+    expect(screen.queryByTestId("grant-money-result")).toBeNull();
+  });
+
+  test("the title names the active seat", async () => {
+    await mount();
+    expect(screen.getByText("session.options")).toBeTruthy();
+  });
+});
+
+describe("fixed ↔ unlimited moved onto the card (2026-11-07)", () => {
+  test("«+ Время» no longer carries the unlimited switch", async () => {
+    await mount();
+    expect(screen.queryByText("session.unlimitedGate")).toBeNull();
+    expect(screen.getByText("session.options")).toBeTruthy();
+  });
+
+  test("«∞» opens only the unlimited switch, titled so", async () => {
+    await mountUnlimited();
+    expect(screen.getByText("session.unlimitedGate")).toBeTruthy();
+    expect(screen.queryByTestId("grant-duration-hours")).toBeNull();
+    expect(screen.getAllByText("session.unlimited").length).toBeGreaterThan(0);
+  });
+
+  const unlimited = () => session({ is_unlimited: true, ends_at: null });
+  const typeLimit = async (h: string, m: string) => {
+    await act(async () => { fireEvent.change(screen.getByTestId("limit-duration-hours"), { target: { value: h } }); });
+    await act(async () => { fireEvent.change(screen.getByTestId("limit-duration-minutes"), { target: { value: m } }); });
+  };
+
+  test("«⏱» gives an unlimited seat a fixed time from now: shown, then sent as minutes", async () => {
+    repo.limit.mockResolvedValue(session());
+    const onClose = vi.fn();
+    await act(async () => {
+      render(
+        <ConfirmProvider>
+          <SessionOptionsDialog session={unlimited()} platform="ps5" onClose={onClose} onChanged={() => {}} view="limit" />
+        </ConfirmProvider>,
+      );
+    });
+    const confirm = screen.getByTestId("limit-confirm") as HTMLButtonElement;
+    expect(confirm.disabled).toBe(true);
+
+    await typeLimit("1", "30");
+    expect(screen.getByTestId("limit-ends-at")).toBeTruthy();
+    expect(confirm.disabled).toBe(false);
+    await act(async () => { fireEvent.click(confirm); });
+
+    expect(repo.limit).toHaveBeenCalledWith(42, 90);
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  test("«⏱» on a seat that already has an end says so and offers nothing", async () => {
+    await mount(session(), "ps5", "limit");
+    expect(screen.getByText("session.limitNotUnlimited")).toBeTruthy();
+    expect(screen.queryByTestId("limit-confirm")).toBeNull();
+  });
+
+  test("«⏱» on a paused seat waits for the resume", async () => {
+    await mount(session({ is_unlimited: true, ends_at: null, paused_at: "2026-11-07T15:00:00Z" }), "ps5", "limit");
+    expect((screen.getByTestId("limit-confirm") as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByText("session.limitPaused")).toBeTruthy();
+  });
+
+  test("a refused limit shows the server's sentence and keeps the dialog", async () => {
+    repo.limit.mockRejectedValue(new Error("The seat is booked at 16:00."));
+    const onClose = vi.fn();
+    await act(async () => {
+      render(
+        <ConfirmProvider>
+          <SessionOptionsDialog session={unlimited()} platform="ps5" onClose={onClose} onChanged={() => {}} view="limit" />
+        </ConfirmProvider>,
+      );
+    });
+    await typeLimit("1", "00");
+    await act(async () => { fireEvent.click(screen.getByTestId("limit-confirm")); });
+
+    expect(screen.getByText("The seat is booked at 16:00.")).toBeTruthy();
+    expect(onClose).not.toHaveBeenCalled();
   });
 });

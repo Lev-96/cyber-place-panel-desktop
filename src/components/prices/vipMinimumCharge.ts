@@ -58,13 +58,7 @@ export const ruleProblem = (after: number | null, minimum: number | null): strin
   return null;
 };
 
-/** "20 мин", "1 ч", "1 ч 30 мин" — in the panel's words. */
-export const durationLabel = (minutes: number, t: (k: string) => string): string => {
-  const h = Math.floor(minutes / 60);
-  const m = minutes % 60;
-  if (h === 0) return `${m} ${t("time.minShort")}`;
-  return m === 0 ? `${h} ${t("time.hourShort")}` : `${h} ${t("time.hourShort")} ${m} ${t("time.minShort")}`;
-};
+export { durationLabel } from "@/utils/durationLabel";
 
 /** An hourly price the example can be worked at: one per platform and tier. */
 export interface RateOption {

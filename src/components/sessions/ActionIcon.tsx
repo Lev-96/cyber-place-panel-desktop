@@ -12,7 +12,8 @@ import type { ReactNode } from "react";
  * (https://lucide.dev), ISC License, Copyright (c) Lucide Contributors.
  */
 export type ActionIconId =
-  | "add-item" | "extra" | "add-time" | "pause" | "resume" | "relocate" | "stop" | "more";
+  | "add-item" | "extra" | "add-time" | "pause" | "resume" | "relocate" | "stop" | "more"
+  | "unlimited" | "limit";
 
 const play = <path d="M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z" />;
 
@@ -61,6 +62,16 @@ const SHAPES: Record<ActionIconId, ReactNode> = {
   ),
   // square
   stop: <rect x="5" y="5" width="14" height="14" rx="2" />,
+  // infinity (2026-11-07): a timed seat goes unlimited
+  unlimited: <path d="M6 16c5 0 7-8 12-8a4 4 0 0 1 0 8c-5 0-7-8-12-8a4 4 0 1 0 0 8" />,
+  // timer (2026-11-07): an unlimited seat takes a fixed time
+  limit: (
+    <>
+      <line x1="10" x2="14" y1="2" y2="2" />
+      <line x1="12" x2="15" y1="14" y2="11" />
+      <circle cx="12" cy="14" r="8" />
+    </>
+  ),
   // ellipsis
   more: (
     <>

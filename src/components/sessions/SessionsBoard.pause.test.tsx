@@ -128,6 +128,26 @@ describe("SessionsBoard — pause and resume", () => {
     expect(named("session.addTime").classList.contains("session-card__btn--wide")).toBe(false);
   });
 
+  test("fixed ↔ unlimited on the card (2026-11-07): a timed seat offers «∞», an unlimited one «⏱», a paused one neither", async () => {
+    repo.listActive.mockResolvedValue([running()]);
+    await mount();
+    expect(buttons()).toContain("session.card.unlimitedFull");
+    expect(buttons()).not.toContain("session.card.limitFull");
+    cleanup();
+
+    repo.listActive.mockResolvedValue([running({ mode: "open", ends_at: null, is_unlimited: true } as Partial<ISessionApi>)]);
+    await mount();
+    expect(buttons()).toContain("session.card.limitFull");
+    expect(buttons()).not.toContain("session.card.unlimitedFull");
+    cleanup();
+
+    const pausedAt = new Date().toISOString();
+    repo.listActive.mockResolvedValue([running({ paused_at: pausedAt, pauses: [{ paused_at: pausedAt, resumed_at: null }] })]);
+    await mount();
+    expect(buttons()).not.toContain("session.card.unlimitedFull");
+    expect(buttons()).not.toContain("session.card.limitFull");
+  });
+
   test("a running seat offers «Move player»", async () => {
     repo.listActive.mockResolvedValue([running()]);
     await mount();

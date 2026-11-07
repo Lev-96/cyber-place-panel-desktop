@@ -135,6 +135,9 @@ const PriceInput = ({
           required={required}
           disabled={disabled}
           autoFocus={autoFocus}
+          // The field's name is the label above it (2026-11-07): it was text
+          // beside the box, so nothing told a screen reader what it is.
+          aria-label={typeof label === "string" ? label : undefined}
         />
         <span
           style={{

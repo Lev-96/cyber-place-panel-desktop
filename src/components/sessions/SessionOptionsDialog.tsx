@@ -10,6 +10,8 @@ import { MAX_JOYSTICKS } from "@/api/joystickPrices";
 import { useAuth } from "@/auth/AuthContext";
 import { can } from "@/auth/permissions";
 import { useLang } from "@/i18n/LanguageContext";
+import { fmt } from "@/i18n/translations";
+import { durationLabel } from "@/utils/durationLabel";
 import { billingSettingsRepository } from "@/repositories/BillingSettingsRepository";
 import { sessionRepository } from "@/repositories/SessionRepository";
 import { ISessionApi } from "@/types/sessions";
@@ -22,9 +24,10 @@ import {
   type SeatUnavailableBody,
 } from "@/api/seatUnavailable";
 import type { IExtensionAlternative, IExtensionOptions, ITimeQuote } from "@/api/sessions";
-import DurationPicker from "./DurationPicker";
+import SectionTabs from "@/components/ui/SectionTabs";
+import DurationInput from "./DurationInput";
 import QuotedPrice from "./QuotedPrice";
-import { minutesOf, type DurationUnit } from "./durationModel";
+import { EMPTY_DRAFT, draftMinutes, type DurationDraft } from "./durationModel";
 import { quoteFor, useServerQuote } from "./useServerQuote";
 
 interface Props {
@@ -36,6 +39,13 @@ interface Props {
   onChanged: (session: ISessionApi) => void;
   /** A platform's display name; the board passes the branch's own (one shared read). */
   platformName?: (slug: string) => string;
+  /**
+   * Which part of the dialog the card opened (2026-11-07, owner: the switches
+   * under the cashier's eyes): «+ Время» (`time`, the default), «∞ Безлимит»
+   * (`unlimited`), or «⏱ Время» on an unlimited seat (`limit`). One dialog,
+   * so each part keeps its one tested implementation.
+   */
+  view?: "time" | "unlimited" | "limit";
 }
 
 
@@ -59,7 +69,7 @@ interface Props {
  * for joystick #3, the owner sets it in Branch → Prices" — sentences an
  * operator can act on, which a generic "failed" would throw away.
  */
-const SessionOptionsDialog = ({ session, platform, onClose, onChanged, platformName = platformLabel }: Props) => {
+const SessionOptionsDialog = ({ session, platform, onClose, onChanged, platformName = platformLabel, view = "time" }: Props) => {
   const { t, money } = useLang();
   const { user } = useAuth();
   const confirm = useConfirm();
@@ -96,10 +106,12 @@ const SessionOptionsDialog = ({ session, platform, onClose, onChanged, platformN
   const [moveFrom, setMoveFrom] = useState<IExtensionOptions["current"] | null>(null);
   /** Which seat the cashier has picked. Nothing is sent until one is. */
   const [selectedPlaceId, setSelectedPlaceId] = useState<number | null>(null);
-  // Manual grant: off by default, so the ordinary case stays one tap.
-  // One length, in hours by default (2026-10-25): a preset and a typed value
-  // write the same box, so the grant on the confirm is always what is shown.
-  const [grant, setGrant] = useState<{ unit: DurationUnit; amount: string }>({ unit: "hours", amount: "" });
+  // The grant, by time or by money (2026-11-07, owner): a length in the
+  // start dialog's time field ("[1] ч : [30] мин"), or the money the player
+  // hands over ("add 700"), which the SERVER turns into minutes.
+  const [grantBy, setGrantBy] = useState<"time" | "money">("time");
+  const [grant, setGrant] = useState<DurationDraft>(EMPTY_DRAFT);
+  const [amountInput, setAmountInput] = useState("");
   // The grant's price typed by hand (2026-10-25), in AMD as `PriceInput` keeps it.
   const [editCharge, setEditCharge] = useState(false);
   const [chargeInput, setChargeInput] = useState("");
@@ -112,6 +124,8 @@ const SessionOptionsDialog = ({ session, platform, onClose, onChanged, platformN
   // checkbox is the only state the section needs.
   const [goUnlimited, setGoUnlimited] = useState(false);
   const [rateInput, setRateInput] = useState("");
+  // «⏱ Время» on an unlimited seat (2026-11-07): the length from now.
+  const [limitDraft, setLimitDraft] = useState<DurationDraft>(EMPTY_DRAFT);
 
   /**
    * Joysticks are a PlayStation thing, and the BACKEND decides it.
@@ -145,7 +159,10 @@ const SessionOptionsDialog = ({ session, platform, onClose, onChanged, platformN
   useEffect(loadPrices, [loadPrices]);
 
   /** Run one change, keep the server's answer, and surface its sentence. */
-  const grantMinutes = minutesOf(grant.amount, grant.unit);
+  const grantMinutes = grantBy === "time" ? draftMinutes(grant) : null;
+  const amountNum = Number(amountInput);
+  const grantAmount = grantBy === "money" && amountInput.trim() !== "" && Number.isFinite(amountNum) && amountNum > 0 ? amountNum : null;
+  const canGrant = isActive && !isUnlimited && !current.paused_at;
   // The server's price for exactly that length, at THIS session's rate. Only
   // asked of a session that can take time; a refusal shows its reason.
   const chargeNum = Number(chargeInput);
@@ -153,10 +170,17 @@ const SessionOptionsDialog = ({ session, platform, onClose, onChanged, platformN
   const chargeValid = chargeInput.trim() !== "" && Number.isFinite(chargeNum) && chargeNum >= 0;
   const typedCharge = editCharge && chargeValid ? chargeNum : undefined;
   const timeQuote = useServerQuote<ITimeQuote>(
-    isActive && !isUnlimited && !current.paused_at && (!editCharge || chargeValid) ? grantMinutes : null,
+    canGrant && (!editCharge || chargeValid) ? grantMinutes : null,
     (m) => sessionRepository.timeQuote(current.id, m, typedCharge),
     `${current.id}|${current.ends_at ?? ""}|${typedCharge ?? ""}`,
   );
+  // By money: the server's minutes and charge for exactly the money typed.
+  const moneyQuote = useServerQuote<ITimeQuote>(
+    canGrant ? grantAmount : null,
+    (a) => sessionRepository.timeQuoteByAmount(current.id, a),
+    `${current.id}|${current.ends_at ?? ""}|money`,
+  );
+  const moneyQuoted = quoteFor(moneyQuote, grantAmount);
   const quoted = quoteFor(timeQuote, grantMinutes);
   // Confirmed only on a quote for exactly what is on screen — the length AND,
   // when typed, the price.
@@ -203,6 +227,7 @@ const SessionOptionsDialog = ({ session, platform, onClose, onChanged, platformN
    * that cannot work.
    */
   const resolvedRate = current.tariff_hourly_rate ?? null;
+  const limitMinutes = draftMinutes(limitDraft);
 
   /**
    * One sentence for every grant, whichever button produced it.
@@ -334,7 +359,9 @@ const SessionOptionsDialog = ({ session, platform, onClose, onChanged, platformN
           design system's surface, radius and border rather than inventing one. */}
       <div className="card col" style={{ gap: 18, width: 460, maxWidth: "92vw" }}>
         <div className="row-between" style={{ alignItems: "baseline" }}>
-          <h2 style={{ margin: 0 }}>{t("session.options")}</h2>
+          <h2 style={{ margin: 0 }}>
+            {t(view === "unlimited" ? "session.unlimited" : view === "limit" ? "session.limitTitle" : "session.options")}
+          </h2>
           <span className="muted" style={{ fontSize: 13 }}>{current.pc_label}</span>
         </div>
 
@@ -580,6 +607,8 @@ const SessionOptionsDialog = ({ session, platform, onClose, onChanged, platformN
             The pricing, the history and the card's own controls are
             untouched — only this duplicate is gone. */
         }
+        {view === "time" && (
+          <>
         {/* ── time ──────────────────────────────────────────────────────── */}
         {/* Choose, see the price, confirm (2026-10-25). A preset used to grant
             on the tap; now it fills the length, the SERVER's price for exactly
@@ -592,86 +621,148 @@ const SessionOptionsDialog = ({ session, platform, onClose, onChanged, platformN
             <span className="muted" style={{ fontSize: 12 }}>{t("session.timeNotApplicable")}</span>
           ) : (
             <>
-              <DurationPicker
-                unit={grant.unit}
-                amount={grant.amount}
-                onChange={setGrant}
+              {/* By time or by money (2026-11-07): the same grant either way —
+                  money is turned into minutes by the server, at this seat. */}
+              <SectionTabs
+                label={t("session.addTimeBy")}
+                value={grantBy}
                 disabled={busy || !isActive}
-                label={t("session.timeAmount")}
+                tabs={[
+                  { key: "time", label: t("session.addTimeByTime") },
+                  { key: "money", label: t("session.addTimeByMoney") },
+                ]}
+                onChange={(next) => { setGrantBy(next); setEditCharge(false); setChargeInput(""); }}
               />
-              <QuotedPrice
-                label={t("session.addTimePrice")}
-                hint={t("session.addTimePriceHint")}
-                quote={timeQuote}
-                amountOf={(q) => q.charge}
-                noteOf={(q) => [
-                  q.is_free ? t("session.priceFreeNote") : null,
-                  // Typed by hand: what the rate would have asked, so a deal is
-                  // visibly a deal.
-                  typedCharge !== undefined ? `${t("session.plannedStandard")}: ${money(q.standard_charge)}` : null,
-                ].filter(Boolean).join(" · ") || null}
-              />
-              {/* The price, editable (2026-10-25) on a seat with a plan. What
-                  was played is not re-priced; the time still to come shares
-                  the rest of the plan plus this figure. */}
-              {(priceEditable || editCharge) && (
+              {grantBy === "time" ? (
                 <>
-                  <Checkbox
-                    checked={editCharge}
-                    onChange={(next) => {
-                      setEditCharge(next);
-                      setChargeInput(next && quotedCharge !== null ? String(quotedCharge) : "");
-                    }}
-                    label={t("session.plannedEditTotal")}
-                    disabled={busy || !isActive || grantMinutes === null}
+                  <DurationInput
+                    value={grant}
+                    onChange={setGrant}
+                    disabled={busy || !isActive}
+                    label={t("session.timeAmount")}
+                    testId="grant-duration"
                   />
-                  {editCharge && (
-                    <div className="col" style={{ gap: 4 }} data-testid="grant-charge">
-                      <PriceInput label={t("session.addTimePrice")} value={chargeInput} onChange={setChargeInput} />
-                      {chargeInput.trim() !== "" && !chargeValid && (
-                        <span className="error" style={{ fontSize: 11 }}>{t("session.grantChargeInvalid")}</span>
+                  <QuotedPrice
+                    label={t("session.addTimePrice")}
+                    hint={t("session.addTimePriceHint")}
+                    quote={timeQuote}
+                    amountOf={(q) => q.charge}
+                    noteOf={(q) => [
+                      q.is_free ? t("session.priceFreeNote") : null,
+                      // Typed by hand: what the rate would have asked, so a deal is
+                      // visibly a deal.
+                      typedCharge !== undefined ? `${t("session.plannedStandard")}: ${money(q.standard_charge)}` : null,
+                    ].filter(Boolean).join(" · ") || null}
+                  />
+                  {/* The price, editable (2026-10-25) on a seat with a plan. What
+                      was played is not re-priced; the time still to come shares
+                      the rest of the plan plus this figure. */}
+                  {(priceEditable || editCharge) && (
+                    <>
+                      <Checkbox
+                        checked={editCharge}
+                        onChange={(next) => {
+                          setEditCharge(next);
+                          setChargeInput(next && quotedCharge !== null ? String(quotedCharge) : "");
+                        }}
+                        label={t("session.plannedEditTotal")}
+                        disabled={busy || !isActive || grantMinutes === null}
+                      />
+                      {editCharge && (
+                        <div className="col" style={{ gap: 4 }} data-testid="grant-charge">
+                          <PriceInput label={t("session.addTimePrice")} value={chargeInput} onChange={setChargeInput} />
+                          {chargeInput.trim() !== "" && !chargeValid && (
+                            <span className="error" style={{ fontSize: 11 }}>{t("session.grantChargeInvalid")}</span>
+                          )}
+                        </div>
+                      )}
+                    </>
+                  )}
+                </>
+              ) : (
+                <div className="col" style={{ gap: 8 }} data-testid="grant-money">
+                  <PriceInput label={t("session.addTimeMoney")} value={amountInput} onChange={setAmountInput} />
+                  {/* The server's answer for exactly this money: how long it
+                      buys, and what will be charged. */}
+                  {grantAmount !== null && moneyQuote.status === "error" && (
+                    <span className="error" style={{ fontSize: 12 }}>{moneyQuote.message}</span>
+                  )}
+                  {moneyQuoted && (
+                    <div className="grant-money-result" data-testid="grant-money-result" data-minutes={moneyQuoted.minutes}>
+                      {fmt(t("session.addTimeMoneyResult"), money(grantAmount ?? 0), durationLabel(moneyQuoted.minutes, t))}
+                      {Math.round(moneyQuoted.charge * 100) !== Math.round((grantAmount ?? 0) * 100) && (
+                        <span className="muted" style={{ fontSize: 12 }}>
+                          {fmt(t("session.addTimeMoneyAtRate"), money(moneyQuoted.charge))}
+                        </span>
                       )}
                     </div>
                   )}
-                </>
+                </div>
               )}
-              {grantMinutes !== null && current.ends_at && (
-                <span className="muted" style={{ fontSize: 12 }}>
-                  {t("session.newEndAt").replace(
-                    "{0}",
-                    clockOf(new Date(new Date(current.ends_at).getTime() + grantMinutes * 60_000)),
-                  )}
-                </span>
-              )}
+              {(() => {
+                const minutes = grantBy === "time" ? grantMinutes : moneyQuoted?.minutes ?? null;
+                return minutes !== null && current.ends_at ? (
+                  <span className="muted" style={{ fontSize: 12 }}>
+                    {t("session.newEndAt").replace(
+                      "{0}",
+                      clockOf(new Date(new Date(current.ends_at).getTime() + minutes * 60_000)),
+                    )}
+                  </span>
+                ) : null;
+              })()}
               <div>
-                <Button
-                  disabled={busy || !isActive || grantMinutes === null || quotedCharge === null}
-                  onClick={() => {
-                    if (grantMinutes === null || quotedCharge === null) return;
-                    void run(
-                      () => sessionRepository.addTime(current.id, grantMinutes, typedCharge),
-                      grantMinutes,
-                      timeAddedToast(grantMinutes),
-                    ).then((ok) => {
-                      if (!ok) return;
-                      setGrant((g) => ({ ...g, amount: "" }));
-                      setEditCharge(false);
-                      setChargeInput("");
-                    });
-                  }}
-                >
-                  {/* The resolved minutes AND the server's price: "2 hours" and
-                      "120 min" are the same grant, and seeing both is what
-                      catches a wrong unit before it is sold. */}
-                  {t("session.timeAddConfirmPriced")
-                    .replace("{0}", `${grantMinutes ?? 0} ${t("time.minShort")}`)
-                    .replace("{1}", quotedCharge === null ? "-" : money(quotedCharge))}
-                </Button>
+                {grantBy === "time" ? (
+                  <Button
+                    disabled={busy || !isActive || grantMinutes === null || quotedCharge === null}
+                    onClick={() => {
+                      if (grantMinutes === null || quotedCharge === null) return;
+                      void run(
+                        () => sessionRepository.addTime(current.id, grantMinutes, typedCharge),
+                        grantMinutes,
+                        timeAddedToast(grantMinutes),
+                      ).then((ok) => {
+                        if (!ok) return;
+                        setGrant(EMPTY_DRAFT);
+                        setEditCharge(false);
+                        setChargeInput("");
+                      });
+                    }}
+                  >
+                    {/* The resolved minutes AND the server's price: "2 hours" and
+                        "120 min" are the same grant, and seeing both is what
+                        catches a wrong unit before it is sold. */}
+                    {t("session.timeAddConfirmPriced")
+                      .replace("{0}", `${grantMinutes ?? 0} ${t("time.minShort")}`)
+                      .replace("{1}", quotedCharge === null ? "-" : money(quotedCharge))}
+                  </Button>
+                ) : (
+                  <Button
+                    disabled={busy || !isActive || grantAmount === null || moneyQuoted === null}
+                    data-testid="grant-money-confirm"
+                    onClick={() => {
+                      if (grantAmount === null || moneyQuoted === null) return;
+                      const minutes = moneyQuoted.minutes;
+                      void run(
+                        () => sessionRepository.addTimeByAmount(current.id, grantAmount),
+                        minutes,
+                        timeAddedToast(minutes),
+                      ).then((ok) => { if (ok) setAmountInput(""); });
+                    }}
+                  >
+                    {t("session.timeAddConfirmPriced")
+                      .replace("{0}", `${moneyQuoted?.minutes ?? 0} ${t("time.minShort")}`)
+                      .replace("{1}", moneyQuoted === null ? "-" : money(moneyQuoted.charge))}
+                  </Button>
+                )}
               </div>
             </>
           )}
         </section>
 
+          </>
+        )}
+        {view === "unlimited" && (
+          <>
         {/* ── unlimited ─────────────────────────────────────────────────── */}
         <section className="col" style={{ gap: 8 }}>
           <strong>{t("session.unlimited")}</strong>
@@ -773,6 +864,50 @@ const SessionOptionsDialog = ({ session, platform, onClose, onChanged, platformN
             </>
           )}
         </section>
+
+          </>
+        )}
+        {/* ── a fixed time for an unlimited seat (2026-11-07) ──────────── */}
+        {view === "limit" && (
+          <section className="col" style={{ gap: 10 }} data-testid="limit-section">
+            {!isUnlimited ? (
+              <span className="muted" style={{ fontSize: 12 }}>{t("session.limitNotUnlimited")}</span>
+            ) : (
+              <>
+                <span className="muted" style={{ fontSize: 12 }}>{t("session.limitHint")}</span>
+                <DurationInput
+                  value={limitDraft}
+                  onChange={setLimitDraft}
+                  disabled={busy || !isActive || !!current.paused_at}
+                  label={t("session.limitLength")}
+                  testId="limit-duration"
+                />
+                {limitMinutes !== null && (
+                  <span className="muted" style={{ fontSize: 12 }} data-testid="limit-ends-at">
+                    {t("session.limitEndsAt").replace("{0}", clockOf(new Date(Date.now() + limitMinutes * 60_000)))}
+                  </span>
+                )}
+                {current.paused_at && <span className="muted" style={{ fontSize: 12 }}>{t("session.limitPaused")}</span>}
+                <div>
+                  <Button
+                    data-testid="limit-confirm"
+                    disabled={busy || !isActive || !!current.paused_at || limitMinutes === null}
+                    onClick={() => {
+                      if (limitMinutes === null) return;
+                      void run(
+                        () => sessionRepository.limit(current.id, limitMinutes),
+                        null,
+                        fmt(t("session.limitDone"), durationLabel(limitMinutes, t)),
+                      ).then((ok) => { if (ok) onClose(); });
+                    }}
+                  >
+                    {fmt(t("session.limitApply"), durationLabel(limitMinutes ?? 0, t))}
+                  </Button>
+                </div>
+              </>
+            )}
+          </section>
+        )}
 
         {/* Waiving the bill lives on START SESSION, where the decision is
             actually made. Offering it again inside "add time" invited it as

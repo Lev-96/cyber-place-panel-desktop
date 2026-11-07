@@ -23,3 +23,11 @@ export const apiConfirmBookingByCode = (code: string) =>
 
 export const apiDeleteBooking = (id: number) =>
   request<{ message: string }>(`/guest-bookings/${id}`, { method: "DELETE" });
+
+/**
+ * Staff reserve a free seat for a player who phoned (2026-11-07): a name, a
+ * phone, how long to hold it (minutes, default the server's 60). The booking
+ * every client shows; cancelled by `apiDeleteBooking`.
+ */
+export const apiReservePlace = (placeId: number, body: { name: string; phone?: string; minutes?: number }) =>
+  request<{ booking: IBookingApi }>(`/places/${placeId}/reserve`, { method: "POST", body });

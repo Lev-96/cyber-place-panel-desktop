@@ -1,4 +1,5 @@
-import { apiGetBookings, GetBookingsParams } from "@/api/bookings";
+import { apiDeleteBooking, apiGetBookings, apiReservePlace, GetBookingsParams } from "@/api/bookings";
+import { friendlyMutation } from "@/api/fallback";
 import { Booking } from "@/domain/Booking";
 import { PaginatedList } from "@/types/api";
 
@@ -26,6 +27,16 @@ export class BookingRepository {
       page += 1;
     }
     return collected;
+  }
+
+  /** Staff reserve a free seat for a player who phoned (2026-11-07). */
+  async reserve(placeId: number, body: { name: string; phone?: string; minutes?: number }): Promise<Booking> {
+    return friendlyMutation(apiReservePlace(placeId, body).then((r) => new Booking(r.booking)));
+  }
+
+  /** Cancel a booking — a staff reservation included — by the existing path. */
+  async cancel(bookingId: number): Promise<void> {
+    await friendlyMutation(apiDeleteBooking(bookingId));
   }
 }
 

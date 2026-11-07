@@ -8,6 +8,10 @@ import {
   type IItemChoice,
   apiAddSessionJoystick,
   apiAddSessionTime,
+  apiAddSessionTimeByAmount,
+  apiLimitSession,
+  apiSetSessionUnpaid,
+  apiSessionTimeQuoteByAmount,
   apiSessionExtensionOptions,
   apiSessionTimeQuote,
   apiStartQuote,
@@ -160,6 +164,26 @@ export class SessionRepository {
 
   async addTime(sessionId: number, minutes: number, charge?: number): Promise<ISessionApi> {
     return friendlyMutation(apiAddSessionTime(sessionId, minutes, charge).then((r) => r.session));
+  }
+
+  /** Extra time not paid yet, on or off (2026-11-07). */
+  async setUnpaid(sessionId: number, on: boolean): Promise<ISessionApi> {
+    return friendlyMutation(apiSetSessionUnpaid(sessionId, on).then((r) => r.session));
+  }
+
+  /** An unlimited seat given a fixed time from now (2026-11-07). */
+  async limit(sessionId: number, minutes: number): Promise<ISessionApi> {
+    return friendlyMutation(apiLimitSession(sessionId, minutes).then((r) => r.session));
+  }
+
+  /** "+ Время" by money (2026-11-07): the server decides the minutes and the charge. */
+  async addTimeByAmount(sessionId: number, amount: number): Promise<ISessionApi> {
+    return friendlyMutation(apiAddSessionTimeByAmount(sessionId, amount).then((r) => r.session));
+  }
+
+  /** Read-only advice: what `addTimeByAmount` would grant. */
+  async timeQuoteByAmount(sessionId: number, amount: number): Promise<ITimeQuote> {
+    return friendlyMutation(apiSessionTimeQuoteByAmount(sessionId, amount));
   }
 
   async makeUnlimited(sessionId: number, hourlyRate?: number): Promise<ISessionApi> {

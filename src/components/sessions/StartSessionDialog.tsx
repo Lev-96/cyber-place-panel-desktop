@@ -39,6 +39,12 @@ interface Props {
   pc: IPcApi;
   onClose: () => void;
   onStarted: () => void;
+  /**
+   * «Пришёл» on a reserved seat (2026-11-07): the reservation this start
+   * fulfils. The server checks it is this seat's, confirms it and finishes it
+   * when the session ends.
+   */
+  bookingId?: number;
 }
 
 type Mode = "fixed" | "open";
@@ -71,7 +77,7 @@ export const startDialogKey = (userId: number) => `u${userId}:cp.ui.start-dialog
  * disabled with a clear message — pricing is an owner/admin task,
  * not something the cashier should be making up at the till.
  */
-const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
+const StartSessionDialog = ({ branchId, pc, onClose, onStarted, bookingId }: Props) => {
   const { t, money, lang } = useLang();
   const { user } = useAuth();
   // Waiving a bill is the company's decision, so the control is only drawn for
@@ -97,6 +103,7 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
   const psnName = askPsn ? psn.trim() : "";
   const psnValid = psnName === "" || PSN_ONLINE_ID.test(psnName);
   const psnField = psnName !== "" ? { psn_online_id: psnName } : {};
+  const bookingField = bookingId !== undefined ? { booking_id: bookingId } : {};
   const psnSuggestions = useMemo(() => (askPsn ? recentPsnNames() : []), [askPsn]);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<LocalizedText | null>(null);
@@ -297,6 +304,7 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
           user_display_name: pc.label,
           is_free: true,
           ...psnField,
+          ...bookingField,
         });
         if (psnName !== "") rememberPsnName(psnName);
         onStarted();
@@ -311,6 +319,7 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
           time_package_id: pkgId,
           user_display_name: pc.label,
           ...psnField,
+          ...bookingField,
         });
       } else {
         if (effectiveRate === null) {
@@ -332,6 +341,7 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
           ...(planUntil !== null ? { until: planUntil } : {}),
           ...(planByHand ? { planned_amount: typedTotal } : {}),
           ...psnField,
+          ...bookingField,
         });
       }
       if (psnName !== "") rememberPsnName(psnName);
