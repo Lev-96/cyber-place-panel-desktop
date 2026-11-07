@@ -2228,6 +2228,15 @@ are unchanged — do not add a `paused` status here either.
     `IPcApi.next_booking_start` (within 24 h). `useReservedPlaceIds` judges a
     realtime event by the snapshot's own 2 h rule (no yellow flash for a
     16:00 booking made at 12:00).
+  - Start dialog readability (2026-11-08, owner): title «Старт места · №N»
+    (`session.start`, en "Start seat"); «Кто садится?» is a heading
+    (`.start-choice__title`); a reservation's player row carries
+    `ChoiceCards` `tone: "booked"` (reservation yellow, `data-tone`); the
+    cap note, the summary and «Не оплачено» (scoped to `.start-dialog`, not
+    «+ Время») are larger. `.outline-btn` is the one outlined accent button:
+    «Настроить окно» and every board header action («+ Продукт», «История
+    торговли», «Календарь броней», «Компьютеры», «Тарифы») — the inline
+    `navBtn` style and `.board-calendar-btn` look are gone.
   - Payments (2026-11-07, owner): ONE control, `PaymentEditor` +
     `paymentSplit.ts` (cents, `checkPayment`, `paymentBody`), on Stop, the
     till sale and the post-hoc mark. Cash / Card / Other, or «Разделить»: a
