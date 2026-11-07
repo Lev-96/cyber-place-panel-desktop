@@ -2154,6 +2154,24 @@ are unchanged — do not add a `paused` status here either.
   the start dialog's `DurationInput` ([ч] : [мин], `maxMinutes` =
   `PAUSE_LIMIT_MAX` 240); both boxes empty = no limit (said under the field);
   the server still stores minutes. Tests: `PauseLimitForm.test.tsx`.
+- **Active seats, 2026-11-07 (owner)** — backend §"Active seats: …":
+  - «+ Время» window (`SessionOptionsDialog`, titled «Параметры активного
+    места») has tabs «По времени» (`DurationInput`, no presets) / «По сумме»
+    (`PriceInput` → `timeQuoteByAmount` → «За 700 драм: 42 мин»,
+    `addTimeByAmount`). `PriceInput` now names its box (`aria-label`).
+  - The dialog has a `view` (`time` | `unlimited` | `limit`): the card's
+    «∞ Безлимит» (timed seat) and «⏱ Время» (unlimited seat) open their part;
+    the unlimited switch is no longer inside «+ Время». Icons in `ActionIcon`.
+  - «Не оплачено» on every running card — `UnpaidToggle`, a BUTTON with
+    `role="switch"` (the preview must hold no inputs). A `stopped` with
+    `unpaid_amount > 0` (socket) or this desk's Stop answer
+    (`onConfirmed({ unpaidAmount })`) queues `UnpaidAlert` (yellow, large) and
+    rings sound category `session_unpaid` once per session.
+  - Reservation: a free tile offers «Забронировать» (`ReserveSeatDialog`); a
+    reserved one shows the contact (`useReservationsByPlace`, re-read when
+    `useReservedPlaceIds` changes) and `ReservationActions` («Пришёл» opens
+    StartSessionDialog with `bookingId`; «Отменить бронь» asks, then
+    `bookingRepository.cancel`). The appearance preview draws the new buttons.
 - **Add products: typing first (2026-11-07, owner)**: `useProductBasket` opens
   in `text` mode and `BasketModeSwitch` lists «Ввести списком» first — the
   seat's dialog and the till alike (one hook, one switch). The Modal's initial
