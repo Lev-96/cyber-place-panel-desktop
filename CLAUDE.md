@@ -2188,15 +2188,23 @@ are unchanged — do not add a `paused` status here either.
     bookings ring nobody: `BookingChanged.by_staff` → `shouldAnnounceBookingEvent`
     false (no corner toast, OS notification or sound); the desk that made it
     shows «Забронировано» on the server's answer.
-  - Bookings calendar (`src/components/reservations/`): `BookingsCalendarModal`
-    opens from the card's «Бронь» (focused on that seat, today) and from the
-    board header's «Календарь броней» (all seats). Day / Week / Month, Today
-    ‹ ›, seat filter, «Создать бронь», legend (free, booked yellow, active
-    green, unlimited, offline hatched), a current-time line; blocks from the
-    server's `starts_at`/`ends_at`, clipped at midnight (the list is asked from
-    the day before: the server filters by booking DAY). Data:
-    `GET /places/reservations` (`noCache`), refetched on any `.booking.changed`
-    of the branch (debounced 300 ms), on resync, every 30 s, after own edits.
+  - Bookings calendar (`src/components/reservations/`, simplified 2026-11-07
+    second pass): `BookingsCalendarModal` opens from the card's «Бронь»
+    (focused on that seat, today) and the board header's «Календарь броней».
+    A date strip (Сегодня ‹ 14 day chips with booking counts ›), a seat
+    select, «+ Создать бронь»; a horizontal timeline, one row per seat, the
+    day running 06:00 to 06:00 (`DAY_START_HOUR` in `calendarModel.ts`: a
+    23:00–01:00 booking is one block), window 08:00–02:00 widened so nothing
+    is cut, a now line; bookings yellow (app ones outlined), sessions a green
+    band behind them (unlimited fades out with ∞), offline rows hatched. Next
+    to it «Брони на <день>»: time, seat, who, phone, status, source, and
+    «Старт» / «Изменить» / «Отменить». «Старт» (`onStartBooking(placeId,
+    bookingId)`, the board closes the calendar and opens Start with that
+    booking chosen) only for pending/confirmed, no session, within 2 h or
+    under way, on a seat with no session. Week/Month views are gone. Data:
+    `GET /places/reservations` (`noCache`, asked from the day before),
+    refetched on any `.booking.changed` of the branch (debounced 300 ms), on
+    resync, every 30 s, after own edits.
     `ReservationFormDialog` creates and edits (`PATCH
     /places/reservations/{id}`, only `editable` staff rows; a time/seat change
     asks first); name and phone optional (name ≥ 2 letters; phone masked
@@ -2204,6 +2212,38 @@ are unchanged — do not add a `paused` status here either.
     A `updated` event re-reads `useReservedPlaceIds` (the seat it left is not
     in the event) and is never announced. `booking.start_due` (server
     scheduler, once per booking) has its own card in Notifications.
+  - Start on a seat with reservations (2026-11-07, owner): `StartSessionDialog`
+    reads `GET /sessions/start-options` (`useStartOptions`) and, when the
+    seat has reservations a start may fulfil, asks «Кто садится?»
+    (`StartBookingChoice` on the reusable `ChoiceCards`): the booking's player
+    (sends `booking_id`) or «Другой игрок». NOTHING is preselected — a
+    stranger used to finish someone's reservation — except a booking picked
+    in the calendar (`bookingId` prop). The reserved card's Start never
+    passes a booking. With a cap (`max_minutes` not null) it shows «Свободно
+    до HH:MM · N», hides the free start, requires a plan, disables packages
+    longer than the window; `unlimited_allowed` (not `free_until`) decides an
+    open start (the server allows it when the next booking is 10 h or more
+    away). The server re-checks under its lock (422 `seat_reserved*` → the
+    sentence, options re-read). A free card shows «Свободно до 16:00» from
+    `IPcApi.next_booking_start` (within 24 h). `useReservedPlaceIds` judges a
+    realtime event by the snapshot's own 2 h rule (no yellow flash for a
+    16:00 booking made at 12:00).
+  - Payments (2026-11-07, owner): ONE control, `PaymentEditor` +
+    `paymentSplit.ts` (cents, `checkPayment`, `paymentBody`), on Stop, the
+    till sale and the post-hoc mark. Cash / Card / Other, or «Разделить»: a
+    box per method, «Остаток», what is still due, a required note; parts sum
+    to the bill to the cent. One method sends the legacy fields (every server
+    takes them); a split sends `payments` + `payment_note` (never
+    `cash_received`). A seat that ended by itself with no method recorded:
+    `StopReceiptModal` asks once («Отметить оплату» → `POST
+    /sessions/{id}/payment` with a stable `client_request_id`; 409 already
+    recorded, 422 shift closed). `payment_method` may be `split` with
+    `payments[]` — `paymentText` says it everywhere (session history, till,
+    sales history, timeline `stopped` / `payment_recorded`, shift lines v4).
+    ⚠️ An older panel shows `split` wrongly: roll the panel out to every desk.
+  - Booking history (`src/components/bookings/BookingHistory.tsx`) in the
+    sales history: `GET /booking-events` — made, changed (what), cancelled
+    (why), player started, finished, start time come; who and when.
   - Foot buttons are `CardFootAction` (icon + SHORT word, full name as tooltip:
     «Бронь» / «Забронировать», «Отменить» / «Отменить бронь»): words by default; «Подписи
     кнопок» = «Иконки» shows the picture (`start`, `reserve`,
