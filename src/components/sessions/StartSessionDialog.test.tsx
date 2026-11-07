@@ -1213,6 +1213,21 @@ describe("who sits down, and how long before a reservation", () => {
     expect(startBtn().disabled).toBe(false);
   });
 
+  test("the reservation's player stands out in the reservation yellow; the walk-in does not (2026-11-08)", async () => {
+    repo.startOptions.mockResolvedValue(capped(0, { max_minutes: null, free_until: null, unlimited_allowed: true }));
+    await mount(device());
+    expect(screen.getByTestId("start-who-77").getAttribute("data-tone")).toBe("booked");
+    expect(screen.getByTestId("start-who-walkin").hasAttribute("data-tone")).toBe(false);
+    // «Кто садится?» is a heading of its own, not a field caption.
+    expect(screen.getByTestId("start-booking-choice").querySelector(".start-choice__title")?.textContent).toBe("start.choice.title");
+  });
+
+  test("«Настроить окно» is drawn as an outlined button (2026-11-08)", async () => {
+    repo.startOptions.mockResolvedValue(capped(0, { max_minutes: null, free_until: null, unlimited_allowed: true }));
+    await mount(device());
+    expect(screen.getByTestId("start-customize").classList.contains("outline-btn")).toBe(true);
+  });
+
   test("the booking's player: the start carries the reservation", async () => {
     repo.startOptions.mockImplementation((_pc: number, bookingId?: number) => Promise.resolve(
       bookingId === 77 ? capped(0, { max_minutes: null, free_until: null, unlimited_allowed: true }) : capped(90)));

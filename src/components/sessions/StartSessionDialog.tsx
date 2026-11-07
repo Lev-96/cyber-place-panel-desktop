@@ -439,7 +439,7 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted, bookingId }: Pro
       <div className="card start-dialog">
         <div className="start-dialog__head">
           <h2 style={{ margin: 0 }}>{t("session.start")} · №{pc.place?.number ?? pc.label}{playStation ? " (PS)" : ""}</h2>
-          <Button type="button" variant="secondary" className="start-dialog__customize-toggle"
+          <Button type="button" variant="secondary" className="outline-btn start-dialog__customize-toggle"
             aria-expanded={customizing} onClick={() => setCustomizing((v) => !v)} data-testid="start-customize">
             {customizing ? t("action.close") : t("session.customize")}
           </Button>

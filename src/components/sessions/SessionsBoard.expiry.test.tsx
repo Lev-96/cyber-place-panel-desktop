@@ -1431,6 +1431,16 @@ describe("selling a product from the board's header", () => {
     expect(document.querySelectorAll(".session-card .board-sell-btn")).toHaveLength(0);
   });
 
+  test("every header action is drawn as a button, like «+ Продукт» (2026-11-08)", async () => {
+    repo.listPcs.mockResolvedValue([device]);
+    await mount();
+    for (const text of ["session.sellProduct", "history.title", "calendar.title", "pcs.title"]) {
+      const el = screen.getByText(text);
+      expect(el.classList.contains("outline-btn"), text).toBe(true);
+      expect(el.classList.contains("muted"), text).toBe(false);
+    }
+  });
+
   test("opens the till's sale for this branch, and starts nothing", async () => {
     await mount();
     await act(async () => { fireEvent.click(screen.getByTestId("board-sell")); });

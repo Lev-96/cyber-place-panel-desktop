@@ -60,8 +60,6 @@ import { useTransientFlags } from "@/hooks/useTransientFlags";
 import { useExpiryNudge } from "./useExpiryNudge";
 import { dropSideOf, moveOnto } from "@/utils/reorder";
 
-const navBtn: React.CSSProperties = { padding: "6px 10px", border: "1px solid #1f2a44", borderRadius: 6 };
-
 // The two lead sections shown before any custom-platform sections.
 const LEAD_SECTIONS = ["pc", "ps"];
 
@@ -1229,26 +1227,25 @@ const SessionsBoard = ({ branchId }: Props) => {
               is the branch's, so nothing starts a session. */}
           <button
             type="button"
-            className="board-sell-btn"
+            className="outline-btn board-sell-btn"
             onClick={() => setSellOpen(true)}
             title={t("till.sell")}
             data-testid="board-sell"
           >
             {t("session.sellProduct")}
           </button>
-          <Link to={`/branches/${branchId}/sessions/history`} className="muted" style={navBtn}>{t("history.title")}</Link>
+          <Link to={`/branches/${branchId}/sessions/history`} className="outline-btn">{t("history.title")}</Link>
           <button
             type="button"
-            className="muted board-calendar-btn"
-            style={navBtn}
+            className="outline-btn board-calendar-btn"
             onClick={() => setCalendar({})}
             data-testid="board-calendar"
           >
             {t("calendar.title")}
           </button>
-          <Link to={`/branches/${branchId}/pcs`} className="muted" style={navBtn}>{t("pcs.title")}</Link>
+          <Link to={`/branches/${branchId}/pcs`} className="outline-btn">{t("pcs.title")}</Link>
           {can(role, "branch.prices") && (
-            <Link to={`/branches/${branchId}/tariffs`} className="muted" style={navBtn}>{t("hub.tile.prices")}</Link>
+            <Link to={`/branches/${branchId}/tariffs`} className="outline-btn">{t("hub.tile.prices")}</Link>
           )}
         </div>
       </div>

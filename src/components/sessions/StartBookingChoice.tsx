@@ -37,6 +37,7 @@ const StartBookingChoice = ({ bookings, value, onChange, walkInUntil, disabled =
       detail: [`${hm(b.starts_at)}–${hm(b.ends_at)}`, b.contact_phone ? formatArmenianPhone(b.contact_phone) : null]
         .filter(Boolean).join(" · "),
       badge: t(b.source === "guest" ? "start.choice.fromApp" : "start.choice.reserved"),
+      tone: "booked" as const,
     })),
     {
       key: "walkin",
@@ -45,8 +46,8 @@ const StartBookingChoice = ({ bookings, value, onChange, walkInUntil, disabled =
     },
   ];
   return (
-    <section className="col" style={{ gap: 6 }} data-testid="start-booking-choice">
-      <span className="label">{t("start.choice.title")}</span>
+    <section className="col start-choice" data-testid="start-booking-choice">
+      <span className="start-choice__title">{t("start.choice.title")}</span>
       <ChoiceCards
         label={t("start.choice.title")}
         name="start-who"

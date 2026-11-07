@@ -6161,22 +6161,33 @@ select.input option:disabled {
   margin-top: auto;
   padding-top: 10px;
 }
-/* "+ Продукт" in the board's header (2026-10-25): the same box as the links
-   beside it ("История торговли", "Компьютеры"), in the accent colour because
-   it is the one that acts rather than navigates. */
-.board-sell-btn {
-  padding: 6px 10px;
+/* An outlined accent button (2026-11-08, owner): "+ Продукт" (2026-10-25)
+   and, now, every action beside it in the board's header («История
+   торговли», «Календарь броней», «Компьютеры», «Тарифы») and the start
+   dialog's «Настроить окно» — visibly a button, in every theme. Works on a
+   <button>, a router <Link> and a .btn alike. */
+.outline-btn,
+.btn.outline-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 12px;
   border: 1px solid var(--color-primary);
   border-radius: 6px;
   background: transparent;
   color: var(--color-primary);
   font: inherit;
+  font-weight: 500;
+  line-height: 1.4;
+  text-decoration: none;
   cursor: pointer;
 }
-.board-sell-btn:hover {
+.outline-btn:hover,
+.btn.outline-btn:hover {
   background: color-mix(in srgb, var(--color-primary) 12%, transparent);
+  box-shadow: none;
 }
-.board-sell-btn:focus-visible {
+.outline-btn:focus-visible {
   outline: 2px solid var(--color-primary);
   outline-offset: 2px;
 }
@@ -8294,13 +8305,17 @@ select.input option:disabled {
 .two-box__error { font-size: var(--fs-sm); }
 
 .start-summary {
-  padding: var(--space-2) var(--space-3);
+  padding: var(--space-3) var(--space-4);
   border-radius: var(--radius-sm);
-  background: rgb(var(--accent-rgb) / 0.06);
-  border: 1px solid rgb(var(--accent-rgb) / 0.25);
-  font-size: var(--fs-body);
+  background: rgb(var(--accent-rgb) / 0.10);
+  border: 1px solid rgb(var(--accent-rgb) / 0.45);
+  font-size: var(--fs-md);
+  line-height: 1.45;
   overflow-wrap: anywhere;
 }
+/* «Будет запущено:» reads as part of the sentence, not as a faint caption
+   (2026-11-08, owner). */
+.start-summary > .muted { color: var(--color-text); font-weight: 600; }
 
 /* === Interfaces that really differ on Active Places (2026-10-27, round 2) ===
    Same markup and handlers in every interface; only layout and words-with-
@@ -9268,10 +9283,6 @@ select.input option:disabled {
 .reservation-details__row dt { flex: 0 0 120px; font-size: var(--fs-sm); }
 .reservation-details__row dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
 .reservation-details__actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--space-2); }
-/* The board header's «Календарь броней» (2026-11-07): a button drawn as its
-   neighbouring header links. */
-.board-calendar-btn { background: transparent; font: inherit; cursor: pointer; }
-.board-calendar-btn:hover { color: var(--color-text); }
 
 /* ChoiceCards (2026-11-07): "pick one of a few" as large rows on real radios.
    Tokens only; the picked row is outlined in the accent. */
@@ -9322,14 +9333,39 @@ select.input option:disabled {
 }
 /* Start's "free until" line (2026-11-07): the time a walk-in may play. */
 .start-free-until {
-  padding: var(--space-2) var(--space-3);
+  padding: var(--space-3) var(--space-4);
   border-radius: var(--radius-sm);
   border: 1px solid var(--status-booked-border);
   background: var(--status-booked-bg);
   color: var(--color-text);
-  font-size: 13px;
+  font-size: var(--fs-md);
+  font-weight: 500;
+  line-height: 1.45;
 }
-.start-free-until strong { color: var(--status-booked-fg); }
+.start-free-until strong { color: var(--status-booked-fg); font-weight: 700; }
+
+/* The start dialog, read at a busy counter (2026-11-08, owner): «Кто
+   садится?» as a heading, a reservation's player in the reservation yellow,
+   and «Не оплачено» large enough to hit and to see. */
+.start-choice { gap: var(--space-2); }
+.start-choice__title { font-size: var(--fs-lg); font-weight: 700; color: var(--color-text); }
+.choice-card-row[data-tone="booked"] {
+  background: var(--status-booked-bg);
+  border-color: var(--status-booked-border);
+}
+.choice-card-row[data-tone="booked"] .choice-card-row__title { color: var(--status-booked-fg); }
+.choice-card-row[data-tone="booked"][data-checked] {
+  border-color: var(--status-booked-fg);
+  box-shadow: 0 0 0 1px var(--status-booked-fg) inset;
+}
+.choice-card-row[data-tone="booked"][data-checked] .choice-card-row__dot {
+  border-color: var(--status-booked-fg);
+  background: radial-gradient(circle, var(--status-booked-fg) 0 45%, transparent 50%);
+}
+.start-dialog .btn.unpaid-toggle { font-size: var(--fs-md); gap: var(--space-3); padding: var(--space-1) 0; }
+.start-dialog .btn.unpaid-toggle .cp-switch-track { width: 44px; height: 24px; }
+.start-dialog .btn.unpaid-toggle .cp-switch-thumb { width: 18px; height: 18px; }
+.start-dialog .btn.unpaid-toggle.is-on .cp-switch-thumb { transform: translateX(20px); }
 
 /* PaymentEditor (2026-11-07): one method or a split, for every bill. */
 .pay-editor__methods { display: flex; flex-wrap: wrap; gap: var(--space-2); }

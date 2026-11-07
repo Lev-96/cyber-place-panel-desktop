@@ -177,15 +177,16 @@ describe("Section names and punctuation", () => {
 
   it("never labels anything Sessions any more (2026-10-18)", () => {
     // The plural label is gone in every language, and the Russian «сеанс»
-    // with it. Sentences about one running seat («Старт сессии», «В сессии»)
-    // keep the singular on purpose: the owner kept "Start session".
+    // with it. Sentences about one running seat («В сессии») keep the
+    // singular on purpose. The start dialog's title became «Старт места» /
+    // "Start seat" on 2026-11-08 (owner).
     const label = /Сессии|Сеанс|сеанс|Sessions|Սեսիաներ/;
     for (const [key, dict] of Object.entries(TRANSLATIONS)) {
       for (const { code } of LANGUAGES) {
         expect(label.test(dict[code]), `${key}.${code}: ${dict[code]}`).toBe(false);
       }
     }
-    expect(TRANSLATIONS["session.start"].en).toBe("Start session");
+    expect(TRANSLATIONS["session.start"]).toEqual({ en: "Start seat", ru: "Старт места", am: "Սկսել տեղը" });
   });
 
   it("the renamed labels carry no form of the old word in any language (2026-10-18)", () => {

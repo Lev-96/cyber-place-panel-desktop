@@ -9,6 +9,12 @@ export interface Choice<K extends string | number> {
   /** A small mark on the right ("Бронь", "Сейчас"). */
   badge?: ReactNode;
   disabled?: boolean;
+  /**
+   * The row's colour when it means something (2026-11-08): `booked` draws it
+   * in the reservation yellow, so a reserved player cannot be mistaken for
+   * anybody else at a glance. No tone = the plain row.
+   */
+  tone?: "booked";
 }
 
 interface Props<K extends string | number> {
@@ -42,6 +48,7 @@ const ChoiceCards = <K extends string | number>({ label, name, choices, value, o
           className="choice-card-row"
           data-checked={checked ? "1" : undefined}
           data-disabled={off ? "1" : undefined}
+          data-tone={c.tone}
           data-testid={testId ? `${testId}-${c.key}` : undefined}
         >
           <input

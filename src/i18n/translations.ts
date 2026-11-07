@@ -116,7 +116,7 @@ export const TRANSLATIONS: Dict = {
   "action.back": { en: "Back", ru: "Назад", am: "Հետ" },
 
   // Sessions
-  "session.start": { en: "Start session", ru: "Старт сессии", am: "Սկսել սեսիան" },
+  "session.start": { en: "Start seat", ru: "Старт места", am: "Սկսել տեղը" },
   // "Товар", not "позиция": what the cashier adds is a product off the shelf,
   // and the branch's own catalogue screen already calls them товары.
   // ── Support desk ───────────────────────────────────────────────────────
