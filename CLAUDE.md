@@ -439,9 +439,12 @@ pending ──confirm──▶ confirmed ──start──▶ (session) ──en
 - **Do NOT expose "Rate branch" CTA.** That's mobile-only — fired by the
   backend Expo push `BookingFinishedRatePrompt` to guests, deep-links into
   `mob://bookings/{id}`. Staff have no rating UI.
-- **Do NOT expose "Reschedule" on the booking-detail page.** Rescheduling is
-  initiated from the mobile player app only (`PUT /guest-bookings/{id}` with
-  `rescheduled_minutes`). Staff can only confirm / cancel / finish.
+- **Guest bookings are not rescheduled by staff.** A guest's extension is
+  the mobile app's (`PUT /guest-bookings/{id}` with `rescheduled_minutes`);
+  staff confirm / cancel / finish it. Since 2026-11-07 (owner) staff DO move
+  and edit THEIR OWN reservations (made from the board, `reserved_by_user_id`)
+  in the bookings calendar — `PATCH /places/reservations/{id}`, only rows the
+  server marks `editable`; the server re-checks conflicts under a lock.
 - **`finished` is terminal.** Once a booking flips to `finished`,
   `place_ids` are dropped and it must not be re-treated as active.
   `Booking.BLOCKING_STATUSES` excludes `finished`.
@@ -2155,23 +2158,61 @@ are unchanged — do not add a `paused` status here either.
   `PAUSE_LIMIT_MAX` 240); both boxes empty = no limit (said under the field);
   the server still stores minutes. Tests: `PauseLimitForm.test.tsx`.
 - **Active seats, 2026-11-07 (owner)** — backend §"Active seats: …":
-  - «+ Время» window (`SessionOptionsDialog`, titled «Параметры активного
-    места») has tabs «По времени» (`DurationInput`, no presets) / «По сумме»
-    (`PriceInput` → `timeQuoteByAmount` → «За 700 драм: 42 мин»,
-    `addTimeByAmount`). `PriceInput` now names its box (`aria-label`).
-  - The dialog has a `view` (`time` | `unlimited` | `limit`): the card's
-    «∞ Безлимит» (timed seat) and «⏱ Время» (unlimited seat) open their part;
-    the unlimited switch is no longer inside «+ Время». Icons in `ActionIcon`.
-  - «Не оплачено» on every running card — `UnpaidToggle`, a BUTTON with
-    `role="switch"` (the preview must hold no inputs). A `stopped` with
-    `unpaid_amount > 0` (socket) or this desk's Stop answer
+  - ONE «+ Время» card button on every running seat, whatever its mode
+    (2026-11-07, second pass; the card's «∞»/«⏱» buttons are gone).
+    `SessionOptionsDialog` (titled «+ Время», no `view` prop) shows the mode
+    and what is left, and offers what fits: a timed seat — tabs «По времени»
+    (`DurationInput`) / «По сумме» (`PriceInput` → `timeQuoteByAmount` →
+    `addTimeByAmount`) and the «Безлимит» switch; an unlimited seat — a fixed
+    time from now (`limit`); a paused seat — no time at all (a note; the end
+    moves on resume). `PriceInput` names its box (`aria-label`).
+  - «Не оплачено» is ONLY in «+ Время» and Start (owner), never on the card.
+    `UnpaidToggle` (a BUTTON with `role="switch"`). In «+ Время» a flip is the
+    server's at once (`setUnpaid`; switch on BEFORE adding unpaid time), and a
+    grant made while it is on sends `unpaid: true` too (never `false`: a stale
+    dialog must not undo another desk). In Start it is a form field: on, the
+    body carries `unpaid: true` and the server starts the seat with nothing
+    paid (whole time owed); a free start hides it and never sends it. A
+    `stopped` with `unpaid_amount > 0` (socket) or this desk's Stop answer
     (`onConfirmed({ unpaidAmount })`) queues `UnpaidAlert` (yellow, large) and
-    rings sound category `session_unpaid` once per session.
-  - Reservation: a free tile offers «Забронировать» (`ReserveSeatDialog`); a
-    reserved one shows the contact (`useReservationsByPlace`, re-read when
-    `useReservedPlaceIds` changes) and `ReservationActions` («Пришёл» opens
-    StartSessionDialog with `bookingId`; «Отменить бронь» asks, then
-    `bookingRepository.cancel`). The appearance preview draws the new buttons.
+    rings sound category `session_unpaid` once per session — that category is
+    in the server's `UiPreferences::SOUND_CATEGORIES` too (the server refuses
+    the whole preferences document for a category it does not list: 422).
+  - Reservation: a free tile offers Start and «Забронировать»; a reserved one
+    is YELLOW (`--status-booked-*`, lemon, apart from "ending" amber), shows
+    only its time («15:00–16:00»), with what it is, the name (or «Без имени»),
+    the phone (`formatArmenianPhone`, 077 777 777) and the time in its tooltip
+    (`reservationTip`, `data-tip`). Its foot is `ReservationActions`: Start
+    (opens StartSessionDialog with `bookingId`; the server checks and links
+    it) and «Отменить бронь» (asks, then `bookingRepository.cancel`). Staff
+    bookings ring nobody: `BookingChanged.by_staff` → `shouldAnnounceBookingEvent`
+    false (no corner toast, OS notification or sound); the desk that made it
+    shows «Забронировано» on the server's answer.
+  - Bookings calendar (`src/components/reservations/`): `BookingsCalendarModal`
+    opens from the card's «Бронь» (focused on that seat, today) and from the
+    board header's «Календарь броней» (all seats). Day / Week / Month, Today
+    ‹ ›, seat filter, «Создать бронь», legend (free, booked yellow, active
+    green, unlimited, offline hatched), a current-time line; blocks from the
+    server's `starts_at`/`ends_at`, clipped at midnight (the list is asked from
+    the day before: the server filters by booking DAY). Data:
+    `GET /places/reservations` (`noCache`), refetched on any `.booking.changed`
+    of the branch (debounced 300 ms), on resync, every 30 s, after own edits.
+    `ReservationFormDialog` creates and edits (`PATCH
+    /places/reservations/{id}`, only `editable` staff rows; a time/seat change
+    asks first); name and phone optional (name ≥ 2 letters; phone masked
+    `077 777 777`, sent `+374XXXXXXXX`, same rule as `App\Support\ArmenianPhone`).
+    A `updated` event re-reads `useReservedPlaceIds` (the seat it left is not
+    in the event) and is never announced. `booking.start_due` (server
+    scheduler, once per booking) has its own card in Notifications.
+  - Foot buttons are `CardFootAction` (icon + SHORT word, full name as tooltip:
+    «Бронь» / «Забронировать», «Отменить» / «Отменить бронь»): words by default; «Подписи
+    кнопок» = «Иконки» shows the picture (`start`, `reserve`,
+    `cancel-reservation` in `ActionIcon`); «Авто» keeps the words there.
+  - Tooltips: ONE `TooltipLayer` at the app root — `data-tip` anywhere, and
+    every native `title` inside a `[data-tip-scope]` (the board root). Hover
+    (220 ms) or keyboard focus; never on touch, a press, a drag or a scroll;
+    Escape hides it; edge-aware (`placeTooltip`); the native title is parked
+    while shown and put back after.
 - **Add products: typing first (2026-11-07, owner)**: `useProductBasket` opens
   in `text` mode and `BasketModeSwitch` lists «Ввести списком» first — the
   seat's dialog and the till alike (one hook, one switch). The Modal's initial
