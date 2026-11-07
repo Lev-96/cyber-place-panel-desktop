@@ -295,3 +295,25 @@ describe("the session-ending-soon card", () => {
     await waitFor(() => expect(api.calls.length).toBeGreaterThan(0));
   });
 });
+
+/** "A booking's time has come" (2026-11-07): the server says it once per booking. */
+describe("the booking-start-due card", () => {
+  const row = {
+    id: "n2", type: "App\\Notifications\\BookingStartDue", read_at: null, created_at: "2026-11-07T15:00:00Z",
+    data: {
+      type: "booking.start_due", booking_id: 77, branch_id: 4, booking_date: "2026-11-07", start_time: "15:00:00",
+      place_ids: [10], place_numbers: [4], guest_first_name: "Aram", guest_last_name: null, by_staff: true,
+      company_name: "Club", branch_address: "Abovyan 1",
+    },
+  };
+  beforeEach(() => { feed.list = [row]; nav.fn.mockReset(); api.handler = () => Promise.resolve({ data: [] }); });
+  afterEach(() => { cleanup(); feed.list = []; });
+
+  test("names the seat, the time, who and where — not the class name", () => {
+    auth.user = { id: 2, role: "manager" };
+    render(<Notifications />);
+    expect(screen.getByText("Booking time has come · seat №4")).toBeTruthy();
+    expect(screen.getByText("15:00 · Aram · Club · Abovyan 1")).toBeTruthy();
+    expect(screen.queryByText(/BookingStartDue/)).toBeNull();
+  });
+});

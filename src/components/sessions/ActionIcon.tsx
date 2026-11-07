@@ -13,7 +13,7 @@ import type { ReactNode } from "react";
  */
 export type ActionIconId =
   | "add-item" | "extra" | "add-time" | "pause" | "resume" | "relocate" | "stop" | "more"
-  | "unlimited" | "limit";
+  | "start" | "reserve" | "cancel-reservation";
 
 const play = <path d="M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z" />;
 
@@ -51,6 +51,30 @@ const SHAPES: Record<ActionIconId, ReactNode> = {
     </>
   ),
   resume: play,
+  // A free seat's Start (2026-11-07): the same triangle as resume
+  start: play,
+  // calendar-plus (2026-11-07): reserve the seat
+  reserve: (
+    <>
+      <path d="M16 19h6" />
+      <path d="M16 2v4" />
+      <path d="M19 16v6" />
+      <path d="M21 12.598V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h8.5" />
+      <path d="M3 10h18" />
+      <path d="M8 2v4" />
+    </>
+  ),
+  // calendar-x (2026-11-07): call the reservation off
+  "cancel-reservation": (
+    <>
+      <path d="M8 2v4" />
+      <path d="M16 2v4" />
+      <rect width="18" height="18" x="3" y="4" rx="2" />
+      <path d="M3 10h18" />
+      <path d="m14 14-4 4" />
+      <path d="m10 14 4 4" />
+    </>
+  ),
   // arrow-right-left
   relocate: (
     <>
@@ -62,16 +86,6 @@ const SHAPES: Record<ActionIconId, ReactNode> = {
   ),
   // square
   stop: <rect x="5" y="5" width="14" height="14" rx="2" />,
-  // infinity (2026-11-07): a timed seat goes unlimited
-  unlimited: <path d="M6 16c5 0 7-8 12-8a4 4 0 0 1 0 8c-5 0-7-8-12-8a4 4 0 1 0 0 8" />,
-  // timer (2026-11-07): an unlimited seat takes a fixed time
-  limit: (
-    <>
-      <line x1="10" x2="14" y1="2" y2="2" />
-      <line x1="12" x2="15" y1="14" y2="11" />
-      <circle cx="12" cy="14" r="8" />
-    </>
-  ),
   // ellipsis
   more: (
     <>

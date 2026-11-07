@@ -13,6 +13,7 @@ import UpdateReadyModal from "@/components/UpdateReadyModal";
 import UpdatesToast from "@/components/UpdatesToast";
 import Spinner from "@/components/ui/Spinner";
 import Toaster from "@/components/ui/Toaster";
+import TooltipLayer from "@/components/ui/TooltipLayer";
 import { ConfirmProvider } from "@/components/ui/ConfirmProvider";
 import { NotificationsProvider } from "@/notifications/NotificationsContext";
 import { SupportUnreadProvider } from "@/support/SupportUnreadContext";
@@ -421,6 +422,9 @@ const App = () => {
           BOTH the authed screens and the unauth'd flow (login / forgot
           password), and so no native confirm()/alert() poisons focus. */}
       <Toaster />
+      {/* The one hover/focus tooltip (2026-11-07): `data-tip`, and `title`
+          inside a `data-tip-scope` (the Active Places board). */}
+      <TooltipLayer />
       <HashRouter>
         {/* Signing in / out / switching account always lands on the
             dashboard — a route must never outlive the account that

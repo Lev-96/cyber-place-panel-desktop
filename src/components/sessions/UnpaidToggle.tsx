@@ -10,11 +10,10 @@ interface Props {
 }
 
 /**
- * The card's «extra time not paid» switch (2026-11-07). A BUTTON with
- * `role="switch"` drawn as the panel's switch (the `cp-switch` track and
- * thumb), not a checkbox: the card's controls are buttons — the appearance
- * preview draws them inert, with no inputs in it — and a screen reader still
- * hears a switch and its state. Amber when on: something is owed.
+ * The «extra time not paid» switch (2026-11-07), in «+ Время» and Start —
+ * never on the card (owner). A BUTTON with `role="switch"` drawn as the
+ * panel's switch (the `cp-switch` track and thumb); a screen reader hears a
+ * switch and its state. Amber when on: something is owed.
  */
 const UnpaidToggle = ({ on, onChange, label, fullLabel, disabled = false, tabIndex }: Props) => (
   <button

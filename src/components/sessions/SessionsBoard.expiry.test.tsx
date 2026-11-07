@@ -279,13 +279,16 @@ describe("adding time from the card", () => {
     expect(line).toContain("session.planLine");
   });
 
-  test("a count-up start (no length) offers no extra time, as before", async () => {
+  // One «+ Время» whatever the mode (2026-11-07, owner): on a count-up seat
+  // it opens the dialog that offers a fixed time and «Не оплачено».
+  test("a count-up start (no length) offers «+ Время» too, which offers a fixed time", async () => {
     repo.listActive.mockResolvedValue([{
       ...running, mode: "open", ends_at: null, is_unlimited: true, hourly_rate: 1000, committed_amount: null,
     } as ISessionApi]);
     await mount();
 
-    expect(screen.queryByRole("button", { name: "session.addTime" })).toBeNull();
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "session.addTime" })); });
+    expect(screen.getByTestId("limit-section")).toBeTruthy();
   });
 
   test("opens the management dialog", async () => {
@@ -297,7 +300,7 @@ describe("adding time from the card", () => {
 
     // The same dialog "Options" opens — asserted by its own heading, so a
     // second modal built for the card would fail this.
-    expect(screen.getByText("session.options")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "session.addTime" })).toBeTruthy();
   });
 
   /**
@@ -317,14 +320,14 @@ describe("adding time from the card", () => {
     });
 
     // Its own heading, so a second modal built for the tile would fail this.
-    expect(screen.getByText("session.options")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "session.addTime" })).toBeTruthy();
   });
 
-  test("is not offered on a seat with no end to extend", async () => {
+  test("an unlimited seat has «+ Время» as its one time button, and no «Options»", async () => {
     repo.listActive.mockResolvedValue([{ ...running, ends_at: null, is_unlimited: true }]);
     await mount();
 
-    expect(screen.queryByRole("button", { name: "session.addTime" })).toBeNull();
+    expect(screen.getAllByRole("button", { name: "session.addTime" })).toHaveLength(1);
     // ⚠️ And neither is "Options", on ANY tile.
     //
     // The reason this test used to give for keeping it — "a count-up session

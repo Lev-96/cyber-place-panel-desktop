@@ -121,8 +121,9 @@ describe("the seat-running-out warning", () => {
     expect(screen.queryByRole("alert")).toBeNull();
     // …and the dialog it opened is here. This is the assertion the old
     // behaviour failed: it cleared the card and opened nothing.
-    expect(screen.getByText("session.options")).toBeTruthy();
-    expect(screen.getByText("session.addTime")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "session.addTime" })).toBeTruthy();
+    // …with the grant itself in it, not only a title.
+    expect(screen.getByTestId("grant-duration-hours")).toBeTruthy();
   });
 
   test("the dialog it opened does not close on its own", async () => {
@@ -135,7 +136,7 @@ describe("the seat-running-out warning", () => {
       // Five minutes of an operator reading it. Nothing dismisses a dialog but
       // the operator — and the notifier's own poll runs in that window, which
       // is the thing most likely to have closed it.
-      expect(screen.getByText("session.options")).toBeTruthy();
+      expect(screen.getByRole("heading", { name: "session.addTime" })).toBeTruthy();
     } finally {
       vi.useRealTimers();
     }
@@ -149,7 +150,7 @@ describe("the seat-running-out warning", () => {
     });
 
     expect(screen.queryByRole("alert")).toBeNull();
-    expect(screen.queryByText("session.options")).toBeNull();
+    expect(screen.queryByRole("heading", { name: "session.addTime" })).toBeNull();
   });
 
   test("nothing is shown without the server's notification", async () => {

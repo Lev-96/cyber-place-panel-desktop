@@ -30,8 +30,9 @@ vi.mock("@/realtime/bookingScope", () => ({
 vi.mock("@/auth/AuthContext", () => ({
   useAuth: () => ({ user: { id: 1, role: "manager" } }),
 }));
+const listAll = vi.hoisted(() => ({ fn: (() => Promise.resolve([])) as () => Promise<unknown[]>, calls: 0 }));
 vi.mock("@/repositories/BookingRepository", () => ({
-  bookingRepository: { listAll: () => Promise.resolve([]) },
+  bookingRepository: { listAll: () => { listAll.calls += 1; return listAll.fn(); } },
 }));
 
 let seen: Set<number> = new Set();
@@ -71,6 +72,18 @@ describe("seats held by a reservation", () => {
   test("a created booking takes its seats", async () => {
     await fire(event());
     expect(seen.has(10)).toBe(true);
+  });
+
+  // Moved by staff (2026-11-07): the seat it left is not in the event, so
+  // the whole set is read again, and the old seat is free at once.
+  test("a reservation moved to another seat is read again, not added", async () => {
+    await fire(event());
+    expect(seen.has(10)).toBe(true);
+    const before = listAll.calls;
+    await fire(event({ kind: "updated", place_ids: [11], at: "2026-09-10T14:02:00+04:00" }));
+    expect(listAll.calls).toBe(before + 1);
+    expect(seen.has(11)).toBe(false);
+    expect(seen.has(10)).toBe(false);
   });
 
   test("a cancellation hands them back", async () => {

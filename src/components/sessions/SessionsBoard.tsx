@@ -13,7 +13,7 @@ import { useKeyedBusy } from "@/hooks/useKeyedBusy";
 import { useLocalReorder } from "@/hooks/useLocalReorder";
 import { useReservedPlaceIds } from "@/hooks/useReservedPlaceIds";
 import { useReservationsByPlace } from "@/hooks/useReservationsByPlace";
-import ReserveSeatDialog from "./ReserveSeatDialog";
+import BookingsCalendarModal from "@/components/reservations/BookingsCalendarModal";
 import ReservationActions from "./ReservationActions";
 import { useLang } from "@/i18n/LanguageContext";
 import { fmt } from "@/i18n/translations";
@@ -43,7 +43,8 @@ import ResetTimeDialog from "./ResetTimeDialog";
 import { autoResumeAtOf, sessionCurrentHourlyRate, sessionJoysticksTotal } from "./sessionAmount";
 import StartSessionDialog from "./StartSessionDialog";
 import SessionOptionsDialog from "./SessionOptionsDialog";
-import SessionCard, { CardOverflow, SessionCardAction } from "./SessionCard";
+import SessionCard, { CardFootAction, CardOverflow, SessionCardAction } from "./SessionCard";
+import { reservationTip, reservationWindow } from "./reservationText";
 import { PAD_COUNT_STYLE, PAD_LINE_STYLE, SeatGrip, SeatNameLine, SeatPlatformLine, sessionTariffLine } from "./seatParts";
 import SimpleBoardHelp from "./SimpleBoardHelp";
 import { useUiPreferencesOptional } from "@/preferences/UiPreferencesContext";
@@ -52,7 +53,6 @@ import { BASE_JOYSTICKS, MAX_JOYSTICKS } from "@/api/joystickPrices";
 import { notify } from "@/ui/notify";
 import StopReceiptModal from "./StopReceiptModal";
 import UnpaidAlert, { type UnpaidNotice } from "./UnpaidAlert";
-import UnpaidToggle from "./UnpaidToggle";
 import { playFor } from "@/sound/soundEngine";
 import PadToggle from "./PadToggle";
 import PadChargeNote from "./PadChargeNote";
@@ -101,7 +101,9 @@ const SessionsBoard = ({ branchId }: Props) => {
   // «Пришёл» (2026-11-07): the reservation the start fulfils.
   const [startBookingId, setStartBookingId] = useState<number | undefined>(undefined);
   // «Забронировать» on a free seat (2026-11-07).
-  const [reserveTarget, setReserveTarget] = useState<IPcApi | null>(null);
+  // The bookings calendar (2026-11-07, owner): the card's «Забронировать»
+  // opens it on that seat and today; the header's «Календарь броней» on all.
+  const [calendar, setCalendar] = useState<{ focusPlaceId?: number } | null>(null);
   const [stopTarget, setStopTarget] = useState<ISessionApi | null>(null);
   const [addItemTarget, setAddItemTarget] = useState<ISessionApi | null>(null);
   // The till's sale, opened from the board's header (2026-10-25).
@@ -271,23 +273,6 @@ const SessionsBoard = ({ branchId }: Props) => {
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pcs.data]);
-  const unpaidBusy = useKeyedBusy();
-  /** Extra time not paid yet, on or off — the server freezes what was paid. */
-  const toggleUnpaid = async (sess: ISessionApi, on: boolean) => {
-    if (!unpaidBusy.begin(sess.id)) return;
-    try {
-      const updated = await sessionRepository.setUnpaid(sess.id, on);
-      sessions.mutate((list) =>
-        list?.map((s) => (s.id === updated.id ? { ...s, unpaid_since: updated.unpaid_since ?? null } : s)) ?? list);
-      notify.message(on ? "warning" : "success", fmt(t(on ? "session.unpaid.toastOn" : "session.unpaid.toastOff"), seatOf(sess.pc_id)));
-    } catch (e) {
-      notify.message("error", e instanceof Error ? e.message : String(e));
-    } finally {
-      unpaidBusy.end(sess.id);
-      await sessions.reload();
-    }
-  };
-
   const togglePause = async (sess: ISessionApi) => {
     if (!pauseBusy.begin(sess.id)) return;
 
@@ -316,12 +301,6 @@ const SessionsBoard = ({ branchId }: Props) => {
     }
   };
   const [optionsTarget, setOptionsTarget] = useState<ISessionApi | null>(null);
-  // Which part of it the card opened (2026-11-07): «+ Время», «∞», «⏱».
-  const [optionsView, setOptionsView] = useState<"time" | "unlimited" | "limit">("time");
-  const openOptions = (sess: ISessionApi, view: "time" | "unlimited" | "limit") => {
-    setOptionsView(view);
-    setOptionsTarget(sess);
-  };
   // The session being moved to another seat («Переместить игрока»).
   const [relocateTarget, setRelocateTarget] = useState<ISessionApi | null>(null);
   // "Reset the counter" (2026-11-05): the session being asked about, by id —
@@ -911,20 +890,6 @@ const SessionsBoard = ({ branchId }: Props) => {
               {sessionTariffLine(sess, money, t)}
               {itemsCount > 0 && <span className="muted"> · {itemsCount} {t("session.posNote")}</span>}
               </span>
-              {/* Extra time NOT paid yet (2026-11-07, owner): switched on when
-                  the player asks for more time before paying; the seat then
-                  rings and shows the debt when it ends. */}
-              {sess.status === "active" && (
-                <span className="session-card__unpaid">
-                  <UnpaidToggle
-                    on={!!sess.unpaid_since}
-                    onChange={(on) => { void toggleUnpaid(sess, on); }}
-                    disabled={unpaidBusy.isBusy(sess.id)}
-                    label={t("session.unpaid.switch")}
-                    fullLabel={t("session.unpaid.switchFull")}
-                  />
-                </span>
-              )}
               {sess.paused_at && (
                 <span className="pill session-card__pill">
                   {(() => {
@@ -1057,48 +1022,19 @@ const SessionsBoard = ({ branchId }: Props) => {
                   />
                 );
               })()}
-              {/* Named for the thing a cashier is actually looking for on a
-                  seat that is running out. It opens the SAME dialog "Options"
-                  does — one management surface, reached by two names, because
-                  "Options" is not what somebody with eight minutes left is
-                  scanning the card for.
-
-                  Only on a seat that HAS an end: a count-up or unlimited
-                  session has nothing to extend, and the dialog says so rather
-                  than offering it. */}
-              {/* Not while PAUSED: the server refuses to move the end then —
-                  resume moves it by the pause. */}
-              {sess.ends_at !== null && sess.is_unlimited !== true && !sess.paused_at && (
+              {/* «+ Время» — ONE button whatever the seat's mode (2026-11-07,
+                  owner): the dialog shows the mode and what is left, and
+                  offers what fits it — more time (by time or by money) and
+                  «Безлимит» on a timed seat, a fixed time on an unlimited one —
+                  and «Не оплачено». The two mode buttons beside it are gone. */}
+              {sess.status === "active" && (
                 <SessionCardAction
                   data-action="add-time"
                   icon="add-time"
                   label={t("session.card.addTime")}
                   fullLabel={t("session.addTime")}
-                  onClick={() => openOptions(sess, "time")}
+                  onClick={() => setOptionsTarget(sess)}
                 />
-              )}
-              {/* Fixed ↔ unlimited, on the card (2026-11-07, owner): it was
-                  inside «+ Время», where nobody looked for it. Timed seats go
-                  unlimited; an unlimited seat takes a fixed time from now.
-                  Not while PAUSED, as every end-moving action. */}
-              {sess.status === "active" && !sess.paused_at && (
-                sess.ends_at !== null && sess.is_unlimited !== true ? (
-                  <SessionCardAction
-                    data-action="unlimited"
-                    icon="unlimited"
-                    label={t("session.card.unlimited")}
-                    fullLabel={t("session.card.unlimitedFull")}
-                    onClick={() => openOptions(sess, "unlimited")}
-                  />
-                ) : (
-                  <SessionCardAction
-                    data-action="limit"
-                    icon="limit"
-                    label={t("session.card.limit")}
-                    fullLabel={t("session.card.limitFull")}
-                    onClick={() => openOptions(sess, "limit")}
-                  />
-                )
               )}
               {/* Pause ↔ Resume, one control, on every kind of seat. The
                   session stays active either way — the seat stays taken and a
@@ -1166,22 +1102,23 @@ const SessionsBoard = ({ branchId }: Props) => {
                 the header could not be trusted to show it. It has its own line
                 now, with the tier, so the status says only what it is for: the
                 state of the seat. */}
-            <span className="status">
-              {isOffline
-                ? t("session.deviceOffline")
-                : isReserved
-                  ? t("session.reserved") || "Reserved"
-                  : t("session.free")}
-            </span>
-            {/* Who is coming, for a seat reserved by phone (2026-11-07). */}
             {(() => {
+              // A reserved seat (2026-11-07, owner): yellow, and no big word
+              // on it — its time, with who is coming and the whole booking in
+              // the tooltip. The word stays until the booking itself is known.
               const b = isReserved && pc.place_id != null ? reservations.get(pc.place_id) : undefined;
-              return b?.contactName ? (
-                <span className="session-card__reservation" data-testid="reservation-contact">
-                  <strong>{b.contactName}</strong>
-                  {b.contactPhone && <a href={`tel:${b.contactPhone.replace(/[^+0-9]/g, "")}`}>{b.contactPhone}</a>}
+              if (isReserved && b) {
+                return (
+                  <span className="status session-card__reservation" data-testid="reservation-contact" data-tip={reservationTip(b, t)}>
+                    {reservationWindow(b)}
+                  </span>
+                );
+              }
+              return (
+                <span className="status">
+                  {isOffline ? t("session.deviceOffline") : isReserved ? t("session.reserved") : t("session.free")}
                 </span>
-              ) : null;
+              );
             })()}
             {isOffline && (
               // Two lines, never an ellipsis: this is the sentence that tells
@@ -1196,34 +1133,41 @@ const SessionsBoard = ({ branchId }: Props) => {
             <div className="session-card__foot">
               {(() => {
                 const reservation = isReserved && pc.place_id != null ? reservations.get(pc.place_id) : undefined;
-                // A reserved seat (2026-11-07): the player came — an ordinary
-                // start that carries the reservation — or the reservation is
-                // called off. Only once its booking is known.
+                // A reserved seat (2026-11-07): Start is the player arriving —
+                // the ordinary start, carrying the reservation — and the
+                // reservation can be called off. Only once its booking is known.
                 if (reservation) {
                   return (
                     <ReservationActions
                       bookingId={reservation.id}
                       seat={seatOf(pc.id)}
-                      onArrived={() => { setStartBookingId(reservation.id); setStartTarget(pc); }}
+                      onStart={() => { setStartBookingId(reservation.id); setStartTarget(pc); }}
                       disabled={isOffline || startLock.disabled}
+                      startLabel={t(startLock.labelKey ?? "action.start")}
+                      startHint={isOffline ? t("session.deviceOfflineHint") : undefined}
                     />
                   );
                 }
                 return (
                   <div className="session-card__reserve-actions">
-                    <Button
+                    <CardFootAction
+                      icon="start"
+                      label={t(startLock.labelKey ?? "action.start")}
+                      hint={isOffline ? t("session.deviceOfflineHint") : undefined}
                       onClick={() => setStartTarget(pc)}
                       disabled={!canStart || startLock.disabled}
-                      title={isOffline ? t("session.deviceOfflineHint") : undefined}
                       className="session-card__start"
                       data-action="start"
-                    >
-                      {t(startLock.labelKey ?? "action.start")}
-                    </Button>
+                    />
                     {!isReserved && pc.place_id != null && (
-                      <Button variant="secondary" onClick={() => setReserveTarget(pc)} data-action="reserve">
-                        {t("reserve.button")}
-                      </Button>
+                      <CardFootAction
+                        icon="reserve"
+                        variant="secondary"
+                        label={t("reserve.buttonShort")}
+                        fullLabel={t("reserve.button")}
+                        onClick={() => setCalendar({ focusPlaceId: pc.place_id as number })}
+                        data-action="reserve"
+                      />
                     )}
                   </div>
                 );
@@ -1246,7 +1190,7 @@ const SessionsBoard = ({ branchId }: Props) => {
   const staleError = pcs.error ?? sessions.error;
 
   return (
-    <div className="col" style={{ gap: 18 }}>
+    <div className="col" style={{ gap: 18 }} data-tip-scope>
       <div className="row-between" style={{ flexWrap: "wrap", rowGap: 8 }}>
         {/* ⚠️ The heading used to read "Sessions · №{branchId}" — the BRANCH's
             surrogate id, next to a word about sessions, in a section full of
@@ -1281,6 +1225,15 @@ const SessionsBoard = ({ branchId }: Props) => {
             {t("session.sellProduct")}
           </button>
           <Link to={`/branches/${branchId}/sessions/history`} className="muted" style={navBtn}>{t("history.title")}</Link>
+          <button
+            type="button"
+            className="muted board-calendar-btn"
+            style={navBtn}
+            onClick={() => setCalendar({})}
+            data-testid="board-calendar"
+          >
+            {t("calendar.title")}
+          </button>
           <Link to={`/branches/${branchId}/pcs`} className="muted" style={navBtn}>{t("pcs.title")}</Link>
           {can(role, "branch.prices") && (
             <Link to={`/branches/${branchId}/tariffs`} className="muted" style={navBtn}>{t("hub.tile.prices")}</Link>
@@ -1326,12 +1279,31 @@ const SessionsBoard = ({ branchId }: Props) => {
         </div>
       )}
 
-      {reserveTarget && reserveTarget.place_id != null && (
-        <ReserveSeatDialog
-          placeId={reserveTarget.place_id}
-          seat={seatOf(reserveTarget.id)}
-          onClose={() => setReserveTarget(null)}
-          onReserved={() => { setReserveTarget(null); void pcs.reload(); }}
+      {calendar && (
+        <BookingsCalendarModal
+          branchId={branchId}
+          focusPlaceId={calendar.focusPlaceId}
+          places={orderedPcs
+            .filter((pc) => pc.place_id != null)
+            .map((pc) => ({
+              id: pc.place_id as number,
+              number: pc.place?.number ?? pc.place_id as number,
+              label: seatOf(pc.id),
+              platform: pc.place?.platform,
+              offline: resolveSessionCellState({ hasSession: false, isReserved: false, device: pc }) === "offline",
+            }))}
+          sessions={(sessions.data ?? [])
+            .filter((sess) => sess.status === "active")
+            .flatMap((sess) => {
+              const placeId = (pcs.data ?? []).find((pc) => pc.id === sess.pc_id)?.place_id;
+              return placeId == null ? [] : [{
+                placeId,
+                startedAt: new Date(sess.started_at),
+                endsAt: sess.ends_at ? new Date(sess.ends_at) : null,
+                unlimited: sess.is_unlimited === true || sess.ends_at === null,
+              }];
+            })}
+          onClose={() => { setCalendar(null); void pcs.reload(); }}
         />
       )}
       {startTarget && (
@@ -1383,7 +1355,6 @@ const SessionsBoard = ({ branchId }: Props) => {
       {optionsTarget && (
         <SessionOptionsDialog
           session={optionsTarget}
-          view={optionsView}
           platform={(pcs.data ?? []).find((pc) => pc.id === optionsTarget.pc_id)?.place?.platform}
           platformName={platformName}
           onClose={() => { setOptionsTarget(null); void sessions.reload(); }}

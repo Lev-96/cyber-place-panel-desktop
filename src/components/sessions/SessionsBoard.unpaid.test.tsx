@@ -79,15 +79,15 @@ beforeEach(() => {
 });
 
 describe("extra time not paid yet", () => {
-  test("the card's switch turns it on through the server", async () => {
-    repo.setUnpaid.mockResolvedValue(running({ unpaid_since: new Date().toISOString() }));
+  // The switch is in «+ Время» and Start only (2026-11-07, owner): never on
+  // the card. Its logic is the dialogs' and their tests'.
+  test("the card carries no «Не оплачено» switch, on or off", async () => {
     await mount();
-
-    const sw = screen.getByRole("switch", { name: "session.unpaid.switchFull" });
-    expect(sw.getAttribute("aria-checked")).toBe("false");
-    await act(async () => { fireEvent.click(sw); });
-
-    expect(repo.setUnpaid).toHaveBeenCalledWith(5, true);
+    expect(screen.queryByRole("switch")).toBeNull();
+    cleanup();
+    repo.listActive.mockResolvedValue([running({ unpaid_since: new Date().toISOString() })]);
+    await mount();
+    expect(screen.queryByRole("switch")).toBeNull();
   });
 
   test("a seat ending owing rings once and shows the seat and the server's amount", async () => {

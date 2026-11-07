@@ -4,8 +4,14 @@ import { request } from "./client";
 export interface StartSessionBody {
   branch_id: number;
   pc_id: number;
-  /** The reservation this start fulfils (2026-11-07, «Пришёл»). */
+  /** The reservation this start fulfils (2026-11-07): Start on a reserved seat. */
   booking_id?: number;
+  /**
+   * «Не оплачено» at the start (2026-11-07, owner): the player pays later, so
+   * nothing is paid ahead and, when the seat ends, the whole time is owed
+   * (the server sets `unpaid_since` at the start with nothing paid).
+   */
+  unpaid?: boolean;
   mode?: "fixed" | "open";
   time_package_id?: number;
   hourly_rate?: number;
@@ -449,11 +455,16 @@ export const apiRemoveSessionJoystick = (sessionId: number, slot: number) =>
   request<{ session: ISessionApi }>(`/sessions/${sessionId}/joysticks/${slot}`, { method: "DELETE" });
 
 /** +10 / +30 / +60, priced at the tariff the player is already on. */
-/** `charge`: the price typed by hand for these minutes (2026-10-25); omitted = the rate's. */
-export const apiAddSessionTime = (sessionId: number, minutes: number, charge?: number) =>
+/**
+ * `charge`: the price typed by hand for these minutes (2026-10-25); omitted =
+ * the rate's. `unpaid` (2026-11-07): «Не оплачено» as the dialog shows it,
+ * applied by the server BEFORE the time is added, so the added time is never
+ * counted as paid; omitted = left as it is.
+ */
+export const apiAddSessionTime = (sessionId: number, minutes: number, charge?: number, unpaid?: boolean) =>
   request<{ session: ISessionApi }>(`/sessions/${sessionId}/time`, {
     method: "POST",
-    body: charge === undefined ? { minutes } : { minutes, charge },
+    body: { minutes, ...(charge === undefined ? {} : { charge }), ...(unpaid === undefined ? {} : { unpaid }) },
   });
 
 /**
@@ -525,8 +536,11 @@ export interface IExtensionOptions {
  * seat's rate and grants them — at exactly that money on a seat with a plan,
  * at the rate elsewhere (its quote says which).
  */
-export const apiAddSessionTimeByAmount = (sessionId: number, amount: number) =>
-  request<{ session: ISessionApi }>(`/sessions/${sessionId}/time`, { method: "POST", body: { amount } });
+export const apiAddSessionTimeByAmount = (sessionId: number, amount: number, unpaid?: boolean) =>
+  request<{ session: ISessionApi }>(`/sessions/${sessionId}/time`, {
+    method: "POST",
+    body: { amount, ...(unpaid === undefined ? {} : { unpaid }) },
+  });
 
 /**
  * An unlimited seat given a fixed time from now (2026-11-07). The bill does

@@ -51,7 +51,7 @@ export const canStartSession = (state: SessionCellState): boolean => state === "
 
 /**
  * Each state's tone in the shared vocabulary (2026-10-27): free is cyan,
- * playing green, booked violet, offline grey — the same words and colours the
+ * playing green, booked yellow (violet until 2026-11-07), offline grey — the same words and colours the
  * places and live boards use (`domain/statusTone.ts`).
  */
 export const SESSION_CELL_TONE: Record<SessionCellState, StatusTone> = {

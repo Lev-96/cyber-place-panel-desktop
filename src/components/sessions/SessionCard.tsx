@@ -163,6 +163,37 @@ export const SessionCardAction = ({ label, fullLabel, danger = false, wide = fal
   </Button>
 );
 
+interface FootProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, "children" | "title" | "aria-label"> {
+  /** The word on the button. */
+  label: string;
+  /** Its tooltip and accessible name; the word when not given. */
+  fullLabel?: string;
+  icon: ActionIconId;
+  variant?: "primary" | "secondary";
+  /** A tooltip that says why, when it is not just the name (an offline seat's Start). */
+  hint?: string;
+}
+
+/**
+ * A button at the foot of a seat with no session — Start, «Забронировать»,
+ * «Отменить бронь» (2026-11-07). Words by default; the person's «Подписи
+ * кнопок» = «Иконки» shows the picture instead (CSS, `data-button-labels`),
+ * the name staying its tooltip and accessible name. «Авто» keeps the words
+ * here: a free seat's row is short, and Start is the word a cashier looks for.
+ */
+export const CardFootAction = ({ label, fullLabel, icon, variant = "primary", hint, className, ...rest }: FootProps) => (
+  <Button
+    variant={variant}
+    {...rest}
+    title={hint ?? fullLabel ?? label}
+    aria-label={fullLabel ?? label}
+    className={["session-card__foot-btn", className ?? ""].filter(Boolean).join(" ")}
+  >
+    <ActionIcon id={icon} />
+    <span className="session-card__btn-text">{label}</span>
+  </Button>
+);
+
 export default SessionCard;
 
 interface OverflowProps {

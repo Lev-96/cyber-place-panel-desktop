@@ -143,6 +143,10 @@ export const useReservedPlaceIds = (branchId: number): Set<number> => {
         lastEventAtRef.current.set(evt.booking_id, at);
       }
 
+      // A reservation moved or edited by staff (2026-11-07): the seat it LEFT
+      // is not in the event, so read the whole set again rather than leave
+      // that tile yellow until the sweep.
+      if (evt.kind === "updated") { void reload(); return; }
       const isTerminal = TERMINAL_BOOKING_KINDS.includes(evt.kind);
       setIds((prev) => {
         const next = new Set(prev);
@@ -151,7 +155,7 @@ export const useReservedPlaceIds = (branchId: number): Set<number> => {
         }
         return next;
       });
-    }, [branchId]),
+    }, [branchId, reload]),
     bookingScope?.isPrivate ?? false,
   );
 

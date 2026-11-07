@@ -31,6 +31,7 @@ import DurationInput from "./DurationInput";
 import QuotedPrice from "./QuotedPrice";
 import { EMPTY_DRAFT, clockOfDraft, draftMinutes, isDraftEmpty, type ClockDraft, type DurationDraft } from "./durationModel";
 import { useHiddenParts } from "@/hooks/useHiddenParts";
+import UnpaidToggle from "./UnpaidToggle";
 import { useMinuteTick } from "./useMinuteTick";
 import { quoteFor, useServerQuote } from "./useServerQuote";
 
@@ -104,6 +105,9 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted, bookingId }: Pro
   const psnValid = psnName === "" || PSN_ONLINE_ID.test(psnName);
   const psnField = psnName !== "" ? { psn_online_id: psnName } : {};
   const bookingField = bookingId !== undefined ? { booking_id: bookingId } : {};
+  // «Не оплачено» (2026-11-07, owner): here and in «+ Время», never on the
+  // card. Only on a seat that bills: a free one owes nothing.
+  const [unpaid, setUnpaid] = useState(false);
   const psnSuggestions = useMemo(() => (askPsn ? recentPsnNames() : []), [askPsn]);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<LocalizedText | null>(null);
@@ -320,6 +324,7 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted, bookingId }: Pro
           user_display_name: pc.label,
           ...psnField,
           ...bookingField,
+          ...(unpaid ? { unpaid: true } : {}),
         });
       } else {
         if (effectiveRate === null) {
@@ -342,6 +347,7 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted, bookingId }: Pro
           ...(planByHand ? { planned_amount: typedTotal } : {}),
           ...psnField,
           ...bookingField,
+          ...(unpaid ? { unpaid: true } : {}),
         });
       }
       if (psnName !== "") rememberPsnName(psnName);
@@ -416,6 +422,19 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted, bookingId }: Pro
                     {t("session.freeBillStartHint")}
                   </span>
                 )}
+              </div>
+            )}
+
+            {!isFree && (
+              <div className="col" style={{ gap: 4 }} data-testid="start-unpaid">
+                <UnpaidToggle
+                  on={unpaid}
+                  onChange={setUnpaid}
+                  disabled={busy}
+                  label={t("session.unpaid.switch")}
+                  fullLabel={t("session.unpaid.switchFull")}
+                />
+                {unpaid && <span className="muted" style={{ fontSize: 11 }}>{t("session.unpaid.startHint")}</span>}
               </div>
             )}
 

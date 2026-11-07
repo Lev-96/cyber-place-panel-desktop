@@ -28,6 +28,7 @@ const repo = vi.hoisted(() => ({
   addTimeByAmount: vi.fn(),
   timeQuoteByAmount: vi.fn(),
   limit: vi.fn(),
+  setUnpaid: vi.fn(),
   makeUnlimited: vi.fn(),
   setFree: vi.fn(),
   extensionOptions: vi.fn(),
@@ -51,6 +52,7 @@ vi.mock("@/repositories/SessionRepository", () => ({
     timeQuote: (...a: unknown[]) => repo.timeQuote(...a),
     addTimeByAmount: (...a: unknown[]) => repo.addTimeByAmount(...a),
     limit: (...a: unknown[]) => repo.limit(...a),
+    setUnpaid: (...a: unknown[]) => repo.setUnpaid(...a),
     timeQuoteByAmount: (...a: unknown[]) => repo.timeQuoteByAmount(...a),
     makeUnlimited: (...a: unknown[]) => repo.makeUnlimited(...a),
     setFree: (...a: unknown[]) => repo.setFree(...a),
@@ -154,17 +156,17 @@ const requestGrant = async (minutes = 10) => {
   await act(async () => { fireEvent.click(confirmGrant()); });
 };
 
-const mount = async (s: ISessionApi = session(), platform = "ps5", view: "time" | "unlimited" | "limit" = "time") => {
+const mount = async (s: ISessionApi = session(), platform = "ps5") => {
   await act(async () => {
     render(
       <ConfirmProvider>
-        <SessionOptionsDialog session={s} platform={platform} onClose={() => {}} onChanged={() => {}} view={view} />
+        <SessionOptionsDialog session={s} platform={platform} onClose={() => {}} onChanged={() => {}} />
       </ConfirmProvider>,
     );
   });
 };
-/** As the card's «∞ Безлимит» opens it (2026-11-07). */
-const mountUnlimited = (s: ISessionApi = session()) => mount(s, "ps5", "unlimited");
+/** «+ Время» is one dialog (2026-11-07): «Безлимит» is a part of it on a timed seat. */
+const mountUnlimited = (s: ISessionApi = session()) => mount(s, "ps5");
 
 beforeEach(() => {
   auth.role = "company_owner";
@@ -305,7 +307,7 @@ describe("time and the ceiling", () => {
     await settle();
     await act(async () => { fireEvent.click(confirmGrant()); });
 
-    expect(repo.addTime).toHaveBeenCalledWith(42, 90, undefined);
+    expect(repo.addTime).toHaveBeenCalledWith(42, 90, undefined, undefined);
   });
 
   test("do not offer extra time on a session that has no end", async () => {
@@ -313,7 +315,8 @@ describe("time and the ceiling", () => {
 
     expect(screen.queryByRole("button", { name: /session.timeAddConfirmPriced/ })).toBeNull();
     expect(screen.queryByTestId("grant-duration-hours")).toBeNull();
-    expect(screen.getByText("session.timeNotApplicable")).toBeTruthy();
+    // What it offers instead: a fixed time from now.
+    expect(screen.getByTestId("limit-section")).toBeTruthy();
     expect(repo.timeQuote).not.toHaveBeenCalled();
   });
 
@@ -414,7 +417,7 @@ describe("a grant typed by hand, and its price", () => {
     await settle();
     await act(async () => { fireEvent.click(confirmGrant()); });
 
-    expect(repo.addTime).toHaveBeenCalledWith(42, 120, undefined);
+    expect(repo.addTime).toHaveBeenCalledWith(42, 120, undefined, undefined);
   });
 
   test("half an hour is a legitimate thing to type", async () => {
@@ -424,7 +427,7 @@ describe("a grant typed by hand, and its price", () => {
     await settle();
     await act(async () => { fireEvent.click(confirmGrant()); });
 
-    expect(repo.addTime).toHaveBeenCalledWith(42, 90, undefined);
+    expect(repo.addTime).toHaveBeenCalledWith(42, 90, undefined, undefined);
   });
 
   test("minutes typed on the minutes tab are sent as typed", async () => {
@@ -432,7 +435,7 @@ describe("a grant typed by hand, and its price", () => {
     await mount();
     await requestGrant(45);
 
-    expect(repo.addTime).toHaveBeenCalledWith(42, 45, undefined);
+    expect(repo.addTime).toHaveBeenCalledWith(42, 45, undefined, undefined);
   });
 
   test.each([
@@ -562,7 +565,7 @@ describe("a grant typed by hand, and its price", () => {
       expect(screen.getByText(/session\.plannedStandard: 2000/)).toBeTruthy();
 
       await act(async () => { fireEvent.click(confirmGrant()); });
-      expect(repo.addTime).toHaveBeenCalledWith(42, 120, 1500);
+      expect(repo.addTime).toHaveBeenCalledWith(42, 120, 1500, undefined);
     });
 
     test("zero is a gift and can be confirmed", async () => {
@@ -574,7 +577,7 @@ describe("a grant typed by hand, and its price", () => {
       await setCharge("0");
       await settle();
       await act(async () => { fireEvent.click(confirmGrant()); });
-      expect(repo.addTime).toHaveBeenCalledWith(42, 60, 0);
+      expect(repo.addTime).toHaveBeenCalledWith(42, 60, 0, undefined);
     });
 
     test("an empty or negative price holds the confirm", async () => {
@@ -737,7 +740,7 @@ describe("switching a session to unlimited", () => {
   test("a session that already has no end states the fact", async () => {
     await mountUnlimited(session({ is_unlimited: true, ends_at: null }));
 
-    expect(screen.getByText("session.unlimitedAlready")).toBeTruthy();
+    expect(screen.queryByText("session.unlimitedGate")).toBeNull();
     expect(screen.queryByLabelText("session.unlimitedRate")).toBeNull();
   });
 });
@@ -790,7 +793,7 @@ describe("when the seat is reserved ahead", () => {
     });
 
     // The SERVER's figure, not a preset.
-    expect(repo.addTime).toHaveBeenLastCalledWith(42, 50);
+    expect(repo.addTime).toHaveBeenLastCalledWith(42, 50, undefined, undefined);
   });
 
   test("offers nothing when the reservation has already started", async () => {
@@ -1061,7 +1064,7 @@ describe("adding time by money (2026-11-07)", () => {
     expect(moneyConfirm().disabled).toBe(false);
     await act(async () => { fireEvent.click(moneyConfirm()); });
 
-    expect(repo.addTimeByAmount).toHaveBeenCalledWith(42, 700);
+    expect(repo.addTimeByAmount).toHaveBeenCalledWith(42, 700, undefined);
     expect(repo.addTime).not.toHaveBeenCalled();
   });
 
@@ -1114,24 +1117,34 @@ describe("adding time by money (2026-11-07)", () => {
     expect(screen.queryByTestId("grant-money-result")).toBeNull();
   });
 
-  test("the title names the active seat", async () => {
+  test("the title is «+ Время»", async () => {
     await mount();
-    expect(screen.getByText("session.options")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "session.addTime" })).toBeTruthy();
   });
 });
 
-describe("fixed ↔ unlimited moved onto the card (2026-11-07)", () => {
-  test("«+ Время» no longer carries the unlimited switch", async () => {
-    await mount();
-    expect(screen.queryByText("session.unlimitedGate")).toBeNull();
-    expect(screen.getByText("session.options")).toBeTruthy();
+/**
+ * One «+ Время» for every mode (2026-11-07, owner): the dialog says the mode
+ * and what is left, and offers what fits — more time and «Безлимит» on a
+ * timed seat, a fixed time on an unlimited one — and «Не оплачено».
+ */
+describe("one «+ Время» for every mode (2026-11-07)", () => {
+  test("a timed seat: its mode and what is left, more time, and «Безлимит»", async () => {
+    await mount(session({ ends_at: new Date(Date.now() + 25 * 60_000 + 30_000).toISOString() }));
+    expect(screen.getByTestId("options-mode").textContent).toContain("session.modeTimed");
+    expect(screen.getByTestId("options-remaining").textContent).toContain("26");
+    expect(screen.getByTestId("grant-duration-hours")).toBeTruthy();
+    expect(screen.getByText("session.unlimitedGate")).toBeTruthy();
+    expect(screen.queryByTestId("limit-section")).toBeNull();
   });
 
-  test("«∞» opens only the unlimited switch, titled so", async () => {
-    await mountUnlimited();
-    expect(screen.getByText("session.unlimitedGate")).toBeTruthy();
+  test("an unlimited seat: its mode, no time left to show, and only a fixed time", async () => {
+    await mount(session({ is_unlimited: true, ends_at: null }));
+    expect(screen.getByTestId("options-mode").textContent).toContain("session.modeUnlimited");
+    expect(screen.queryByTestId("options-remaining")).toBeNull();
     expect(screen.queryByTestId("grant-duration-hours")).toBeNull();
-    expect(screen.getAllByText("session.unlimited").length).toBeGreaterThan(0);
+    expect(screen.queryByText("session.unlimitedGate")).toBeNull();
+    expect(screen.getByTestId("limit-section")).toBeTruthy();
   });
 
   const unlimited = () => session({ is_unlimited: true, ends_at: null });
@@ -1146,7 +1159,7 @@ describe("fixed ↔ unlimited moved onto the card (2026-11-07)", () => {
     await act(async () => {
       render(
         <ConfirmProvider>
-          <SessionOptionsDialog session={unlimited()} platform="ps5" onClose={onClose} onChanged={() => {}} view="limit" />
+          <SessionOptionsDialog session={unlimited()} platform="ps5" onClose={onClose} onChanged={() => {}} />
         </ConfirmProvider>,
       );
     });
@@ -1162,16 +1175,19 @@ describe("fixed ↔ unlimited moved onto the card (2026-11-07)", () => {
     expect(onClose).toHaveBeenCalled();
   });
 
-  test("«⏱» on a seat that already has an end says so and offers nothing", async () => {
-    await mount(session(), "ps5", "limit");
-    expect(screen.getByText("session.limitNotUnlimited")).toBeTruthy();
-    expect(screen.queryByTestId("limit-confirm")).toBeNull();
-  });
-
-  test("«⏱» on a paused seat waits for the resume", async () => {
-    await mount(session({ is_unlimited: true, ends_at: null, paused_at: "2026-11-07T15:00:00Z" }), "ps5", "limit");
-    expect((screen.getByTestId("limit-confirm") as HTMLButtonElement).disabled).toBe(true);
-    expect(screen.getByText("session.limitPaused")).toBeTruthy();
+  test("a paused seat: nothing about time until it is resumed, «Не оплачено» still there", async () => {
+    for (const s of [
+      session({ is_unlimited: true, ends_at: null, paused_at: "2026-11-07T15:00:00Z" }),
+      session({ paused_at: "2026-11-07T15:00:00Z" }),
+    ]) {
+      await mount(s);
+      expect(screen.getByTestId("options-paused")).toBeTruthy();
+      expect(screen.queryByTestId("limit-section")).toBeNull();
+      expect(screen.queryByTestId("grant-duration-hours")).toBeNull();
+      expect(screen.queryByText("session.unlimitedGate")).toBeNull();
+      expect(screen.getByTestId("unpaid-switch")).toBeTruthy();
+      cleanup();
+    }
   });
 
   test("a refused limit shows the server's sentence and keeps the dialog", async () => {
@@ -1180,7 +1196,7 @@ describe("fixed ↔ unlimited moved onto the card (2026-11-07)", () => {
     await act(async () => {
       render(
         <ConfirmProvider>
-          <SessionOptionsDialog session={unlimited()} platform="ps5" onClose={onClose} onChanged={() => {}} view="limit" />
+          <SessionOptionsDialog session={unlimited()} platform="ps5" onClose={onClose} onChanged={() => {}} />
         </ConfirmProvider>,
       );
     });
@@ -1189,5 +1205,67 @@ describe("fixed ↔ unlimited moved onto the card (2026-11-07)", () => {
 
     expect(screen.getByText("The seat is booked at 16:00.")).toBeTruthy();
     expect(onClose).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * «Не оплачено» lives in this dialog and in Start, never on the card
+ * (2026-11-07, owner). Flipped, it is the server's at once; a grant made
+ * while it is on carries it, so the time it adds is never counted as paid;
+ * a grant made while it is off says nothing about it, so a stale dialog never
+ * switches off what another desk switched on.
+ */
+describe("«Не оплачено» in «+ Время» (2026-11-07)", () => {
+  const unpaidSwitch = () => screen.getByTestId("unpaid-switch") as HTMLButtonElement;
+
+  test("shows the server's state and flips it on the server", async () => {
+    repo.setUnpaid.mockResolvedValue(session({ unpaid_since: "2026-11-07T15:50:00Z" }));
+    await mount();
+    expect(unpaidSwitch().getAttribute("aria-checked")).toBe("false");
+
+    await act(async () => { fireEvent.click(unpaidSwitch()); });
+
+    expect(repo.setUnpaid).toHaveBeenCalledWith(42, true);
+    expect(unpaidSwitch().getAttribute("aria-checked")).toBe("true");
+  });
+
+  test("a grant while it is on carries it — by time and by money", async () => {
+    repo.addTime.mockResolvedValue(session({ unpaid_since: "2026-11-07T15:50:00Z" }));
+    repo.addTimeByAmount.mockResolvedValue(session({ unpaid_since: "2026-11-07T15:50:00Z" }));
+    await mount(session({ unpaid_since: "2026-11-07T15:50:00Z" }));
+    await requestGrant(30);
+    expect(repo.addTime).toHaveBeenCalledWith(42, 30, undefined, true);
+
+    cleanup();
+    await mount(session({ unpaid_since: "2026-11-07T15:50:00Z" }));
+    await act(async () => { fireEvent.click(screen.getByRole("tab", { name: "session.addTimeByMoney" })); });
+    await act(async () => { fireEvent.change(screen.getByLabelText("session.addTimeMoney"), { target: { value: "700" } }); });
+    await settle();
+    await act(async () => { fireEvent.click(screen.getByTestId("grant-money-confirm")); });
+    expect(repo.addTimeByAmount).toHaveBeenCalledWith(42, 700, true);
+  });
+
+  test("a grant while it is off says nothing about it", async () => {
+    repo.addTime.mockResolvedValue(session());
+    await mount();
+    await requestGrant(30);
+    expect(repo.addTime).toHaveBeenCalledWith(42, 30, undefined, undefined);
+    expect(repo.setUnpaid).not.toHaveBeenCalled();
+  });
+
+  test("an unlimited seat has it too; a free one cannot owe, so it is greyed", async () => {
+    await mount(session({ is_unlimited: true, ends_at: null }));
+    expect(unpaidSwitch()).toBeTruthy();
+    cleanup();
+    await mount(session({ is_free: true }));
+    expect(unpaidSwitch().disabled).toBe(true);
+  });
+
+  test("a refused flip shows the server's sentence and leaves the switch as it was", async () => {
+    repo.setUnpaid.mockRejectedValue(new Error("The session is not active."));
+    await mount();
+    await act(async () => { fireEvent.click(unpaidSwitch()); });
+    expect(screen.getByText("The session is not active.")).toBeTruthy();
+    expect(unpaidSwitch().getAttribute("aria-checked")).toBe("false");
   });
 });

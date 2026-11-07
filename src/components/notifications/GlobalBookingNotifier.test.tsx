@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { shouldShowBookingToasts } from "./GlobalBookingNotifier";
+import { shouldAnnounceBookingEvent, shouldShowBookingToasts } from "./GlobalBookingNotifier";
 import type { AuthUser } from "@/types/api";
 
 /**
@@ -32,5 +32,24 @@ describe("shouldShowBookingToasts", () => {
   });
   test("unknown role does NOT see toasts", () => {
     expect(shouldShowBookingToasts(u("guest"))).toBe(false);
+  });
+});
+
+describe("shouldAnnounceBookingEvent", () => {
+  test("a guest's new or changed booking rings", () => {
+    expect(shouldAnnounceBookingEvent({ kind: "created" })).toBe(true);
+    expect(shouldAnnounceBookingEvent({ kind: "created", by_staff: false })).toBe(true);
+    expect(shouldAnnounceBookingEvent({ kind: "cancelled" })).toBe(true);
+    expect(shouldAnnounceBookingEvent({ kind: "extended" })).toBe(true);
+  });
+  test("confirmed and finished are silent, as before", () => {
+    expect(shouldAnnounceBookingEvent({ kind: "confirmed" })).toBe(false);
+    expect(shouldAnnounceBookingEvent({ kind: "finished" })).toBe(false);
+    expect(shouldAnnounceBookingEvent({ kind: "updated" })).toBe(false);
+  });
+  test("a reservation made by staff from the board never rings (2026-11-07)", () => {
+    for (const kind of ["created", "cancelled", "extended"] as const) {
+      expect(shouldAnnounceBookingEvent({ kind, by_staff: true })).toBe(false);
+    }
   });
 });

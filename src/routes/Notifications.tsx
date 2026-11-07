@@ -319,6 +319,8 @@ const DbNotificationCard = ({ n, onClick, onDelete }: { n: IDbNotification; onCl
   const isBranchSubscribed = dataType === "branch.subscribed";
   const isTournamentJoined = dataType === "tournament.joined";
   const isSessionEndingSoon = dataType === "session.ending_soon";
+  // A booking's start time has come (2026-11-07, server scheduler, once).
+  const isBookingStartDue = dataType === "booking.start_due";
   const bookingDate = n.data?.booking_date as string | undefined;
   const startTime = n.data?.start_time as string | undefined;
   const extraMinutes = n.data?.extra_minutes as number | undefined;
@@ -404,6 +406,15 @@ const DbNotificationCard = ({ n, onClick, onDelete }: { n: IDbNotification; onCl
       venue,
     ].filter(Boolean);
     body = segments.join(" · ");
+  } else if (isBookingStartDue) {
+    const vars = {
+      places: placesLabel,
+      time: startTime ? startTime.slice(0, 5) : "-",
+      name: [guestFirstName, guestLastName].filter(Boolean).join(" ") || "-",
+      venue: venue || "-",
+    };
+    headline = interpolate(t("notifications.bookingStartDueTitle"), vars);
+    body = interpolate(t("notifications.bookingStartDueBody"), vars);
   } else if (isSessionEndingSoon) {
     // "Seat №4 · ends in 15 min" — the minutes as they were when it was said,
     // and the planned end, so a card read later is still exact.

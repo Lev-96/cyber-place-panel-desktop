@@ -26,6 +26,7 @@ import {
 import type { IExtensionAlternative, IExtensionOptions, ITimeQuote } from "@/api/sessions";
 import SectionTabs from "@/components/ui/SectionTabs";
 import DurationInput from "./DurationInput";
+import UnpaidToggle from "./UnpaidToggle";
 import QuotedPrice from "./QuotedPrice";
 import { EMPTY_DRAFT, draftMinutes, type DurationDraft } from "./durationModel";
 import { quoteFor, useServerQuote } from "./useServerQuote";
@@ -39,13 +40,6 @@ interface Props {
   onChanged: (session: ISessionApi) => void;
   /** A platform's display name; the board passes the branch's own (one shared read). */
   platformName?: (slug: string) => string;
-  /**
-   * Which part of the dialog the card opened (2026-11-07, owner: the switches
-   * under the cashier's eyes): «+ Время» (`time`, the default), «∞ Безлимит»
-   * (`unlimited`), or «⏱ Время» on an unlimited seat (`limit`). One dialog,
-   * so each part keeps its one tested implementation.
-   */
-  view?: "time" | "unlimited" | "limit";
 }
 
 
@@ -69,7 +63,7 @@ interface Props {
  * for joystick #3, the owner sets it in Branch → Prices" — sentences an
  * operator can act on, which a generic "failed" would throw away.
  */
-const SessionOptionsDialog = ({ session, platform, onClose, onChanged, platformName = platformLabel, view = "time" }: Props) => {
+const SessionOptionsDialog = ({ session, platform, onClose, onChanged, platformName = platformLabel }: Props) => {
   const { t, money } = useLang();
   const { user } = useAuth();
   const confirm = useConfirm();
@@ -143,6 +137,8 @@ const SessionOptionsDialog = ({ session, platform, onClose, onChanged, platformN
   const isUnlimited = current.is_unlimited ?? current.ends_at === null;
   const isFree = current.is_free ?? false;
   const isActive = current.status === "active";
+  // The server's state, never a local guess: each flip returns the session.
+  const unpaidOn = !!current.unpaid_since;
 
   // ONE fee for every pad, read from the venue's billing settings. It was a
   // list of per-slot prices and a lookup for "which slot comes next", which
@@ -162,7 +158,8 @@ const SessionOptionsDialog = ({ session, platform, onClose, onChanged, platformN
   const grantMinutes = grantBy === "time" ? draftMinutes(grant) : null;
   const amountNum = Number(amountInput);
   const grantAmount = grantBy === "money" && amountInput.trim() !== "" && Number.isFinite(amountNum) && amountNum > 0 ? amountNum : null;
-  const canGrant = isActive && !isUnlimited && !current.paused_at;
+  const paused = !!current.paused_at;
+  const canGrant = isActive && !isUnlimited && !paused;
   // The server's price for exactly that length, at THIS session's rate. Only
   // asked of a session that can take time; a refusal shows its reason.
   const chargeNum = Number(chargeInput);
@@ -345,6 +342,18 @@ const SessionOptionsDialog = ({ session, platform, onClose, onChanged, platformN
     0,
     Math.floor((Date.now() - new Date(current.started_at).getTime()) / 60_000),
   );
+  // What is left until the server's end; null on a seat without one.
+  const remainingLabel = current.ends_at === null || isUnlimited
+    ? null
+    : durationLabel(Math.max(0, Math.ceil((new Date(current.ends_at).getTime() - Date.now()) / 60_000)), t);
+
+  /** «Не оплачено», flipped: the server freezes what was paid at this moment. */
+  const switchUnpaid = (on: boolean) => run(
+    () => sessionRepository.setUnpaid(current.id, on),
+    null,
+    fmt(t(on ? "session.unpaid.toastOn" : "session.unpaid.toastOff"), current.pc_label ?? ""),
+  );
+
   const elapsedLabel = elapsedMinutes >= 60
     ? `${Math.floor(elapsedMinutes / 60)} ${t("time.hourShort") || "h"} ${elapsedMinutes % 60} ${t("time.minShort") || "min"}`
     : `${elapsedMinutes} ${t("time.minShort") || "min"}`;
@@ -359,9 +368,8 @@ const SessionOptionsDialog = ({ session, platform, onClose, onChanged, platformN
           design system's surface, radius and border rather than inventing one. */}
       <div className="card col" style={{ gap: 18, width: 460, maxWidth: "92vw" }}>
         <div className="row-between" style={{ alignItems: "baseline" }}>
-          <h2 style={{ margin: 0 }}>
-            {t(view === "unlimited" ? "session.unlimited" : view === "limit" ? "session.limitTitle" : "session.options")}
-          </h2>
+          {/* «+ Время», one dialog for every mode (2026-11-07, owner). */}
+          <h2 style={{ margin: 0 }}>{t("session.addTime")}</h2>
           <span className="muted" style={{ fontSize: 13 }}>{current.pc_label}</span>
         </div>
 
@@ -382,7 +390,40 @@ const SessionOptionsDialog = ({ session, platform, onClose, onChanged, platformN
             {t("session.elapsedField")}:{" "}
             <span style={{ color: "var(--color-text)" }}>{elapsedLabel}</span>
           </span>
+          {/* What is left, on a seat that has an end — the server's end, only
+              formatted here. An unlimited seat has none: its mode says so. */}
+          <span className="muted" data-testid="options-mode">
+            {t("session.modeField")}:{" "}
+            <span style={{ color: "var(--color-text)" }}>
+              {isUnlimited ? t("session.modeUnlimited") : t("session.modeTimed")}
+            </span>
+          </span>
+          {remainingLabel !== null && (
+            <span className="muted" data-testid="options-remaining">
+              {t("session.remainingField")}:{" "}
+              <span style={{ color: "var(--color-text)" }}>{remainingLabel}</span>
+            </span>
+          )}
         </div>
+
+        {/* Extra time NOT paid yet (2026-11-07, owner): here and in Start,
+            never on the card. Flipped, it is the server's at once — what was
+            paid is frozen then — so switch it on BEFORE adding the time the
+            player has not paid for; a grant made while it is on carries it as
+            well (never "off": a stale dialog must not switch off what another
+            desk switched on), so the time it adds is never counted as paid. */}
+        {isActive && (
+          <div className="col" style={{ gap: 4 }} data-testid="options-unpaid">
+            <UnpaidToggle
+              on={unpaidOn}
+              onChange={(on) => { void switchUnpaid(on); }}
+              disabled={busy || isFree}
+              label={t("session.unpaid.switch")}
+              fullLabel={t("session.unpaid.switchFull")}
+            />
+            <span className="muted" style={{ fontSize: 12 }}>{t(isFree ? "session.unpaid.freeHint" : "session.unpaid.hint")}</span>
+          </div>
+        )}
 
         {!isActive && <div className="error">{t("session.optionsClosedSession")}</div>}
         {error && <div className="error">{error}</div>}
@@ -415,7 +456,7 @@ const SessionOptionsDialog = ({ session, platform, onClose, onChanged, platformN
                 disabled={busy || !isActive}
                 onClick={() =>
                   void run(
-                    () => sessionRepository.addTime(current.id, offeredMinutes),
+                    () => sessionRepository.addTime(current.id, offeredMinutes, undefined, unpaidOn || undefined),
                     offeredMinutes,
                     timeAddedToast(offeredMinutes),
                   )
@@ -607,7 +648,12 @@ const SessionOptionsDialog = ({ session, platform, onClose, onChanged, platformN
             The pricing, the history and the card's own controls are
             untouched — only this duplicate is gone. */
         }
-        {view === "time" && (
+        {/* Paused: the end moves only on resume (the server refuses it now),
+            so nothing about time is offered — «Не оплачено» above still is. */}
+        {paused && isActive && (
+          <span className="muted" style={{ fontSize: 12 }} data-testid="options-paused">{t("session.timePaused")}</span>
+        )}
+        {!isUnlimited && !paused && (
           <>
         {/* ── time ──────────────────────────────────────────────────────── */}
         {/* Choose, see the price, confirm (2026-10-25). A preset used to grant
@@ -617,9 +663,6 @@ const SessionOptionsDialog = ({ session, platform, onClose, onChanged, platformN
             the price is advice and the history row is the record. */}
         <section className="col" style={{ gap: 10 }}>
           <strong>{t("session.addTime")}</strong>
-          {isUnlimited ? (
-            <span className="muted" style={{ fontSize: 12 }}>{t("session.timeNotApplicable")}</span>
-          ) : (
             <>
               {/* By time or by money (2026-11-07): the same grant either way —
                   money is turned into minutes by the server, at this seat. */}
@@ -717,7 +760,7 @@ const SessionOptionsDialog = ({ session, platform, onClose, onChanged, platformN
                     onClick={() => {
                       if (grantMinutes === null || quotedCharge === null) return;
                       void run(
-                        () => sessionRepository.addTime(current.id, grantMinutes, typedCharge),
+                        () => sessionRepository.addTime(current.id, grantMinutes, typedCharge, unpaidOn || undefined),
                         grantMinutes,
                         timeAddedToast(grantMinutes),
                       ).then((ok) => {
@@ -743,7 +786,7 @@ const SessionOptionsDialog = ({ session, platform, onClose, onChanged, platformN
                       if (grantAmount === null || moneyQuoted === null) return;
                       const minutes = moneyQuoted.minutes;
                       void run(
-                        () => sessionRepository.addTimeByAmount(current.id, grantAmount),
+                        () => sessionRepository.addTimeByAmount(current.id, grantAmount, unpaidOn || undefined),
                         minutes,
                         timeAddedToast(minutes),
                       ).then((ok) => { if (ok) setAmountInput(""); });
@@ -756,20 +799,16 @@ const SessionOptionsDialog = ({ session, platform, onClose, onChanged, platformN
                 )}
               </div>
             </>
-          )}
         </section>
 
           </>
         )}
-        {view === "unlimited" && (
+        {!isUnlimited && !paused && (
           <>
         {/* ── unlimited ─────────────────────────────────────────────────── */}
         <section className="col" style={{ gap: 8 }}>
           <strong>{t("session.unlimited")}</strong>
 
-          {isUnlimited ? (
-            <span className="muted" style={{ fontSize: 12 }}>{t("session.unlimitedAlready")}</span>
-          ) : (
             <>
               {/* The checkbox IS the gate. Nothing about the switch is offered
                   until it is ticked — not the price, not the button — because
@@ -862,23 +901,19 @@ const SessionOptionsDialog = ({ session, platform, onClose, onChanged, platformN
                 </Button>
               </div>
             </>
-          )}
         </section>
 
           </>
         )}
         {/* ── a fixed time for an unlimited seat (2026-11-07) ──────────── */}
-        {view === "limit" && (
+        {isUnlimited && !paused && (
           <section className="col" style={{ gap: 10 }} data-testid="limit-section">
-            {!isUnlimited ? (
-              <span className="muted" style={{ fontSize: 12 }}>{t("session.limitNotUnlimited")}</span>
-            ) : (
               <>
                 <span className="muted" style={{ fontSize: 12 }}>{t("session.limitHint")}</span>
                 <DurationInput
                   value={limitDraft}
                   onChange={setLimitDraft}
-                  disabled={busy || !isActive || !!current.paused_at}
+                  disabled={busy || !isActive}
                   label={t("session.limitLength")}
                   testId="limit-duration"
                 />
@@ -887,11 +922,10 @@ const SessionOptionsDialog = ({ session, platform, onClose, onChanged, platformN
                     {t("session.limitEndsAt").replace("{0}", clockOf(new Date(Date.now() + limitMinutes * 60_000)))}
                   </span>
                 )}
-                {current.paused_at && <span className="muted" style={{ fontSize: 12 }}>{t("session.limitPaused")}</span>}
                 <div>
                   <Button
                     data-testid="limit-confirm"
-                    disabled={busy || !isActive || !!current.paused_at || limitMinutes === null}
+                    disabled={busy || !isActive || limitMinutes === null}
                     onClick={() => {
                       if (limitMinutes === null) return;
                       void run(
@@ -905,7 +939,6 @@ const SessionOptionsDialog = ({ session, platform, onClose, onChanged, platformN
                   </Button>
                 </div>
               </>
-            )}
           </section>
         )}
 

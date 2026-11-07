@@ -162,8 +162,8 @@ export class SessionRepository {
     return friendlyMutation(apiRemoveSessionJoystick(sessionId, slot).then((r) => r.session));
   }
 
-  async addTime(sessionId: number, minutes: number, charge?: number): Promise<ISessionApi> {
-    return friendlyMutation(apiAddSessionTime(sessionId, minutes, charge).then((r) => r.session));
+  async addTime(sessionId: number, minutes: number, charge?: number, unpaid?: boolean): Promise<ISessionApi> {
+    return friendlyMutation(apiAddSessionTime(sessionId, minutes, charge, unpaid).then((r) => r.session));
   }
 
   /** Extra time not paid yet, on or off (2026-11-07). */
@@ -177,8 +177,8 @@ export class SessionRepository {
   }
 
   /** "+ Время" by money (2026-11-07): the server decides the minutes and the charge. */
-  async addTimeByAmount(sessionId: number, amount: number): Promise<ISessionApi> {
-    return friendlyMutation(apiAddSessionTimeByAmount(sessionId, amount).then((r) => r.session));
+  async addTimeByAmount(sessionId: number, amount: number, unpaid?: boolean): Promise<ISessionApi> {
+    return friendlyMutation(apiAddSessionTimeByAmount(sessionId, amount, unpaid).then((r) => r.session));
   }
 
   /** Read-only advice: what `addTimeByAmount` would grant. */

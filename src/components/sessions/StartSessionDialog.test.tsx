@@ -1115,3 +1115,59 @@ describe("the simpler start dialog (2026-11-05)", () => {
     });
   });
 });
+
+/**
+ * «Не оплачено» at the start (2026-11-07, owner): the player pays later. Off
+ * by default and then absent from the body (the start an older server has
+ * always seen); on, the server starts the seat owing its whole time.
+ */
+describe("«Не оплачено» at the start", () => {
+  const computer = () => device({ kind: PC_KIND.Pc, place: { id: 10, number: 1, name: "PC-1", type: "standard", platform: "pc" } });
+  const unpaidSwitch = () => screen.getByTestId("unpaid-switch") as HTMLButtonElement;
+  const start = async () => {
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "action.start" })); });
+  };
+
+  test("off by default, and then not in the body", async () => {
+    await mount(computer());
+    expect(unpaidSwitch().getAttribute("aria-checked")).toBe("false");
+    await start();
+    expect(repo.start.mock.calls[0][0]).not.toHaveProperty("unpaid");
+  });
+
+  test("switched on, the start carries it", async () => {
+    await mount(computer());
+    await act(async () => { fireEvent.click(unpaidSwitch()); });
+    expect(unpaidSwitch().getAttribute("aria-checked")).toBe("true");
+    expect(screen.getByText("session.unpaid.startHint")).toBeTruthy();
+    await start();
+    expect(repo.start).toHaveBeenCalledTimes(1);
+    expect(repo.start.mock.calls[0][0]).toMatchObject({ unpaid: true });
+  });
+
+  test("a console at its rate carries it too (the open start, not only a package)", async () => {
+    await mount(device());
+    await act(async () => { fireEvent.click(unpaidSwitch()); });
+    await start();
+    expect(repo.start).toHaveBeenCalledTimes(1);
+    expect(repo.start.mock.calls[0][0]).toMatchObject({ unpaid: true, mode: "open" });
+  });
+
+  test("a package start carries it", async () => {
+    await mount(computer());
+    await act(async () => { fireEvent.click(unpaidSwitch()); });
+    await start();
+    expect(repo.start.mock.calls[0][0]).toMatchObject({ unpaid: true });
+  });
+
+  test("a free start owes nothing: the switch goes, and the body never carries it", async () => {
+    await mount(computer());
+    await act(async () => { fireEvent.click(unpaidSwitch()); });
+    await act(async () => { fireEvent.click(screen.getByText("session.freeBill")); });
+    expect(screen.queryByTestId("unpaid-switch")).toBeNull();
+    await start();
+    const body = repo.start.mock.calls[0][0] as Record<string, unknown>;
+    expect(body).toMatchObject({ is_free: true });
+    expect(body).not.toHaveProperty("unpaid");
+  });
+});

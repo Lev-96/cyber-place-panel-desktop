@@ -8,14 +8,19 @@ import { Booking } from "@/domain/Booking";
 
 /**
  * A seat reserved by phone, on the board (2026-11-07): a free seat offers
- * «Забронировать»; a reserved one shows who is coming and offers «Пришёл» —
- * the ordinary start carrying the reservation — and «Отменить бронь».
+ * «Забронировать»; a reserved one shows its time — who is coming in its
+ * tooltip, never as a big word — and offers Start, the ordinary start
+ * carrying the reservation, and «Отменить бронь».
  */
 
 const repo = vi.hoisted(() => ({ listPcs: vi.fn(), listActive: vi.fn() }));
 const bookings = vi.hoisted(() => ({ listAll: vi.fn(), cancel: vi.fn(), reserve: vi.fn() }));
 const reserved = vi.hoisted(() => ({ ids: new Set<number>() }));
 const started = vi.hoisted(() => ({ props: null as null | Record<string, unknown> }));
+const calendar = vi.hoisted(() => ({ props: null as null | Record<string, unknown> }));
+vi.mock("@/components/reservations/BookingsCalendarModal", () => ({
+  default: (props: Record<string, unknown>) => { calendar.props = props; return <div data-testid="calendar-modal" />; },
+}));
 
 vi.mock("@/repositories/SessionRepository", () => ({
   sessionRepository: {
@@ -77,29 +82,43 @@ beforeEach(() => {
   bookings.cancel.mockReset().mockResolvedValue(undefined);
   reserved.ids = new Set();
   started.props = null;
+  calendar.props = null;
 });
 
 describe("reserving from the board", () => {
-  test("a free seat offers Start and «Забронировать», which opens the reserve dialog", async () => {
+  test("a free seat offers Start and «Забронировать», which opens the calendar on that seat", async () => {
     await mount();
     expect(action("start")).not.toBeNull();
-    expect(action("arrived")).toBeNull();
+    expect(action("cancel-reservation")).toBeNull();
 
     await act(async () => { fireEvent.click(action("reserve")!); });
-    expect(screen.getByTestId("reserve-dialog")).toBeTruthy();
+    expect(screen.getByTestId("calendar-modal")).toBeTruthy();
+    expect(calendar.props?.focusPlaceId).toBe(10);
+    expect(calendar.props?.branchId).toBe(7);
+    expect((calendar.props?.places as { id: number; label: string }[]).map((p) => p.id)).toEqual([10]);
   });
 
-  test("a reserved seat shows who is coming; «Пришёл» opens the start carrying the reservation", async () => {
+  test("the header's «Календарь броней» opens it on every seat", async () => {
+    await mount();
+    await act(async () => { fireEvent.click(screen.getByTestId("board-calendar")); });
+    expect(screen.getByTestId("calendar-modal")).toBeTruthy();
+    expect(calendar.props?.focusPlaceId).toBeUndefined();
+  });
+
+  test("a reserved seat shows its time, who is coming in the tooltip; Start carries the reservation", async () => {
     reserved.ids = new Set([10]);
     bookings.listAll.mockResolvedValue([hold()]);
     await mount();
 
-    expect(screen.getByTestId("reservation-contact").textContent).toContain("Aram");
-    expect(screen.getByTestId("reservation-contact").textContent).toContain("+374 91 123456");
+    const line = screen.getByTestId("reservation-contact");
+    expect(line.textContent).toMatch(/^\d{2}:\d{2}–\d{2}:\d{2}$/);
+    expect(line.textContent).not.toContain("session.reserved");
+    expect(line.getAttribute("data-tip")).toContain("Aram");
+    expect(line.getAttribute("data-tip")).toContain("091 123 456");
+    expect(line.getAttribute("data-tip")).toContain("session.reserved");
     expect(action("reserve")).toBeNull();
-    expect(action("start")).toBeNull();
 
-    await act(async () => { fireEvent.click(action("arrived")!); });
+    await act(async () => { fireEvent.click(action("start")!); });
     expect(screen.getByTestId("start-dialog")).toBeTruthy();
     expect(started.props?.bookingId).toBe(77);
   });
