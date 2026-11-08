@@ -34,6 +34,10 @@ export type ConsoleObservation = "awake" | "rest" | "unreachable" | "unknown";
 /** Why a command did not happen. Each is a different thing to do about it. */
 export type Ps5ErrorCode =
   | "IN_USE"
+  /** The console's user has a PS5 login passcode; the panel cannot log in to rest it. */
+  | "PASSCODE_REQUIRED"
+  /** The saved login passcode was refused by the console. */
+  | "PASSCODE_WRONG"
   | "NO_CREDENTIAL"
   | "BAD_CREDENTIAL"
   | "DEVICE_NOT_FOUND"
@@ -155,6 +159,8 @@ export class DiscoveryTransport implements Ps5Transport {
       // Each of the console's answers means something different to whoever is
       // standing in front of it.
       code: result.code === "IN_USE" ? "IN_USE"
+        : result.code === "PASSCODE_REQUIRED" ? "PASSCODE_REQUIRED"
+        : result.code === "PASSCODE_WRONG" ? "PASSCODE_WRONG"
         : result.code === "REJECTED" ? "NO_CREDENTIAL"
           : result.code === "UNREACHABLE" ? "DEVICE_NOT_FOUND"
             : result.code === "TIMEOUT" ? "TIMEOUT"

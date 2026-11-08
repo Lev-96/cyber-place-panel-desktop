@@ -104,7 +104,7 @@ export class WakeKeys {
     // Everything about this console goes: the typed key, the credential pairing
     // produced, and the pairing itself. A half-forgotten console is one that
     // still answers to somebody.
-    for (const slot of [hostId, `cred:${hostId}`, `creds:${hostId}`]) {
+    for (const slot of [hostId, `cred:${hostId}`, `creds:${hostId}`, `passcode:${hostId}`]) {
       delete this.vault[slot];
       this.session.delete(slot);
     }
@@ -157,6 +157,33 @@ export class WakeKeys {
 
   async forgetCredentials(deviceId: string): Promise<void> {
     await this.forget(`creds:${deviceId}`);
+  }
+
+  /**
+   * The console user's PS5 login passcode (four digits), when it has one.
+   *
+   * A console whose user has a login passcode asks for it on every Remote Play
+   * login made while nobody is signed in on it, and without it the panel cannot
+   * put the console to rest (measured 2026-11-08: PASSCODE_IS_NEEDED on Stop
+   * right after a wake). Same rules as the keys: OS-encrypted, never readable
+   * from the renderer, gone with `forget`. Read only by the rest command.
+   */
+  async setPasscode(hostId: string, passcode: string): Promise<SaveOutcome> {
+    return this.set(`passcode:${hostId}`, passcode);
+  }
+
+  readPasscode(hostId: string): string | null {
+    return this.read(`passcode:${hostId}`);
+  }
+
+  hasPasscode(hostId: string): boolean {
+    return this.holds(`passcode:${hostId}`);
+  }
+
+  async forgetPasscode(hostId: string): Promise<void> {
+    delete this.vault[`passcode:${hostId}`];
+    this.session.delete(`passcode:${hostId}`);
+    await this.flush();
   }
 
   /**

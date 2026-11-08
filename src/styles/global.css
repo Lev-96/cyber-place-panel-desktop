@@ -5090,6 +5090,15 @@ button.login-flip-back:hover {
    window — the dialog is 94vw on a small screen and this row is the widest
    thing in it. */
 .ps5-attach { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+/* The console user's login passcode (ConsolePasscodeField): a 4-digit box and
+   its button on one row that wraps, the same rhythm as the key row above. */
+.ps5-passcode { gap: 4px; }
+.ps5-passcode__hint,
+.ps5-passcode__state { font-size: 11px; line-height: 1.4; }
+.ps5-passcode__state { flex: 1 1 160px; min-width: 0; }
+.ps5-passcode__input { flex: 0 1 120px; min-width: 0; letter-spacing: 0.2em; }
+.ps5-passcode__error { color: var(--color-danger); font-size: 12px; }
 .ps5-bound {
   flex: 1 1 160px;
   min-width: 0;

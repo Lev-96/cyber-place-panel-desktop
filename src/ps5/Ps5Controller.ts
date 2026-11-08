@@ -39,6 +39,9 @@ export interface CommandOutcome {
   detail?: string;
 }
 
+/** The backend's answer to "may this panel rest the console?" See {@link ControllerPorts.claimRest}. */
+export type RestClaim = "granted" | "elsewhere" | "unknown";
+
 /** Everything the controller needs from the world outside it. */
 export interface ControllerPorts {
   wake(hostId: string, address: string): Promise<CommandOutcome>;
@@ -57,6 +60,19 @@ export interface ControllerPorts {
    * woken once the rest has run its course.
    */
   cancelRest?(hostId: string): void;
+  /**
+   * Ask the backend whether THIS panel may put the console to rest now.
+   *
+   * A rest is a Remote Play session and a PS5 takes one at a time: two panels
+   * of one venue resting it together are answered "Remote is already in use"
+   * and it stays awake (the club, 2026-11-08). `elsewhere` = another panel
+   * holds it and is resting it; `unknown` = the backend could not be asked
+   * (offline, an older backend), and the rest goes ahead as it always did.
+   * Optional: without it every rest goes ahead.
+   */
+  claimRest?(deviceId: number): Promise<RestClaim>;
+  /** Give the console back after a rest that did not go out. */
+  releaseRest?(deviceId: number): void;
   /** Tell the backend a console woke with no session, so the owner can be asked. */
   reportUnexpectedWake(input: { deviceId: number; hostId: string; eventId: string }): Promise<void>;
   /** Structured, and never carrying a key or a token. */
@@ -122,6 +138,22 @@ const RESEND_COOLDOWN_MS = 20_000;
  */
 const URGENT_RESEND_MS = 1_000;
 
+/**
+ * How long to leave a console alone after the backend said another panel is
+ * resting it — a press included. That panel's rest takes 6-12 s on Wi-Fi
+ * (measured); asking again sooner would only be refused again, and asking
+ * the CONSOLE is exactly what gets everybody "already in use".
+ */
+const REST_ELSEWHERE_RECHECK_MS = 10_000;
+
+/**
+ * How long to leave a console alone after it asked for its user's login
+ * passcode, a press included. Nothing the panel sends changes that answer; a
+ * player signing in on the console does, and that takes seconds, not one.
+ * Measured 2026-11-08: without it a press re-asked every 1.5 s for 45 s.
+ */
+const PASSCODE_RECHECK_MS = 15_000;
+
 export class Ps5Controller {
   private readonly snapshots = new Map<string, MachineSnapshot>();
   private readonly inFlight = new Map<string, Command["kind"]>();
@@ -130,6 +162,10 @@ export class Ps5Controller {
   private readonly lastError = new Map<string, string>();
   /** When each command was last put on the wire, keyed by console and kind. */
   private readonly sentAt = new Map<string, number>();
+  /** When the backend last said another panel is resting each console. */
+  private readonly restElsewhereAt = new Map<string, number>();
+  /** When each console last asked for a login passcode the panel does not have. */
+  private readonly passcodeAskedAt = new Map<string, number>();
   /** Wakes the backend has accepted, so the owner is asked once per event. */
   private readonly reported = new Set<string>();
   /**
@@ -162,6 +198,8 @@ export class Ps5Controller {
       this.sentAt.delete(`${hostId}:rest`);
       this.desired.delete(hostId);
       this.cancelAsked.delete(hostId);
+      this.restElsewhereAt.delete(hostId);
+      this.passcodeAskedAt.delete(hostId);
     }
   }
 
@@ -283,6 +321,15 @@ export class Ps5Controller {
     // asking the console), and the next tick sends the wake.
     if (this.inFlight.has(input.hostId)) return;
 
+    // Another panel of the venue is resting this console: leave it to that
+    // panel for a while, a press included (see REST_ELSEWHERE_RECHECK_MS).
+    if (command.kind === "rest") {
+      const elsewhereAt = this.restElsewhereAt.get(input.hostId);
+      if (elsewhereAt !== undefined && this.ports.now() - elsewhereAt < REST_ELSEWHERE_RECHECK_MS) return;
+      const passcodeAt = this.passcodeAskedAt.get(input.hostId);
+      if (passcodeAt !== undefined && this.ports.now() - passcodeAt < PASSCODE_RECHECK_MS) return;
+    }
+
     const sentKey = `${input.hostId}:${command.kind}`;
 
     if (input.urgent) {
@@ -318,12 +365,48 @@ export class Ps5Controller {
     // the measurement a slow evening is diagnosed from. `sent` is the transport
     // having done its part, never the console having obeyed.
     let result: string = "threw";
+    // Held by this panel for this rest. Kept after a rest that went out, so no
+    // other panel opens a session to a console on its way down (the lease
+    // ends by itself); given back when the rest did not go out.
+    let leased = false;
+    let restSent = false;
 
     try {
+      if (command.kind === "rest" && this.ports.claimRest) {
+        const claim = await this.claimRest(input.deviceId);
+        if (claim === "elsewhere") {
+          // Not a failure: no backoff, no error on the tile, nothing sent. The
+          // console is watched falling asleep like any other.
+          result = "ELSEWHERE";
+          this.restElsewhereAt.set(input.hostId, this.ports.now());
+          // Nothing went out: the resend cooldown is for a rest that did, and
+          // would hold this console back 20 s instead of the recheck's 10.
+          this.sentAt.delete(sentKey);
+          this.ports.log("PS5_REST_ELSEWHERE", { hostId: input.hostId, deviceId: input.deviceId });
+          return;
+        }
+        leased = claim === "granted";
+        this.restElsewhereAt.delete(input.hostId);
+
+        // The wish may have turned while the backend was being asked (a
+        // session started): the rest must not go out under that player.
+        if (this.superseded(input.hostId, "rest") || this.cancelAsked.has(input.hostId)) {
+          result = "CANCELLED";
+          this.ports.log("PS5_COMMAND_SUPERSEDED", { hostId: input.hostId, command: "rest", code: "BEFORE_SEND" });
+          return;
+        }
+      }
+
       const outcome = command.kind === "wake"
         ? await this.ports.wake(input.hostId, input.address)
         : await this.ports.rest(input.hostId, input.address);
       result = outcome.sent ? "sent" : (outcome.code ?? "TRANSPORT_ERROR");
+      restSent = command.kind === "rest" && outcome.sent;
+
+      if (command.kind === "rest") {
+        if (outcome.code === "PASSCODE_REQUIRED" || outcome.code === "PASSCODE_WRONG") this.passcodeAskedAt.set(input.hostId, this.ports.now());
+        else this.passcodeAskedAt.delete(input.hostId);
+      }
 
       if (outcome.sent) {
         // Sent, NOT confirmed. Confirmation is the next observation's job, and
@@ -364,11 +447,27 @@ export class Ps5Controller {
         detail: error instanceof Error ? error.message : String(error),
       });
     } finally {
+      if (leased && !restSent) {
+        try {
+          this.ports.releaseRest?.(input.deviceId);
+        } catch {
+          // Best effort: an unreleased lease ends by itself.
+        }
+      }
       this.inFlight.delete(input.hostId);
       this.cancelAsked.delete(input.hostId);
       this.ports.log("PS5_COMMAND_DONE", {
         hostId: input.hostId, command: command.kind, result, ms: this.ports.now() - startedAt,
       });
+    }
+  }
+
+  /** {@link ControllerPorts.claimRest}, where a port that throws means "could not ask". */
+  private async claimRest(deviceId: number): Promise<RestClaim> {
+    try {
+      return (await this.ports.claimRest?.(deviceId)) ?? "unknown";
+    } catch {
+      return "unknown";
     }
   }
 

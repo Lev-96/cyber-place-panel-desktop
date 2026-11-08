@@ -244,6 +244,21 @@ export const TRANSLATIONS: Dict = {
     am: "Remote Play գրանցման բանալի",
   },
   "ps5.key.save": { en: "Save key", ru: "Сохранить ключ", am: "Պահել բանալին" },
+  "ps5.passcode.label": { en: "PS5 login passcode", ru: "Код входа PS5", am: "PS5 մուտքի գաղտնաբառ" },
+  "ps5.passcode.hint": {
+    en: "If the console's user has a 4-digit login passcode, enter it: the panel needs it to put the console to sleep while nobody is signed in on it.",
+    ru: "Если у профиля на приставке есть 4-значный код входа, введите его: без него панель не усыпит приставку, пока в профиль никто не вошёл.",
+    am: "Եթե կոնսոլի օգտատերն ունի 4 նիշանոց մուտքի գաղտնաբառ, մուտքագրեք այն՝ առանց դրա վահանակը չի կարող քնեցնել կոնսոլը, քանի դեռ ոչ ոք մուտք չի գործել։",
+  },
+  "ps5.passcode.save": { en: "Save code", ru: "Сохранить код", am: "Պահել" },
+  "ps5.passcode.saved": { en: "Login passcode saved on this computer", ru: "Код входа сохранён на этом компьютере", am: "Մուտքի գաղտնաբառը պահված է այս համակարգչում" },
+  "ps5.passcode.forget": { en: "Remove code", ru: "Удалить код", am: "Ջնջել" },
+  "ps5.passcode.invalid": { en: "The code is 4 digits", ru: "Код состоит из 4 цифр", am: "Գաղտնաբառը 4 թվանշան է" },
+  "ps5.error.PASSCODE_WRONG": {
+    en: "The console refused the saved login passcode. Check it in the console settings (Set up console) and save it again",
+    ru: "Приставка не приняла сохранённый код входа. Проверьте его в настройке приставки (Настроить приставку) и сохраните заново",
+    am: "Կոնսոլը չընդունեց պահված մուտքի գաղտնաբառը։ Ստուգեք այն կոնսոլի կարգավորումներում և պահեք նորից",
+  },
   "ps5.key.forget": { en: "Remove key", ru: "Удалить ключ", am: "Ջնջել բանալին" },
   "ps5.key.noKeystore": {
     en: "No OS keystore here. The key will work until the panel is closed, and is never written to disk",
@@ -331,6 +346,11 @@ export const TRANSLATIONS: Dict = {
     en: "The console says a Remote Play session is already in use. Close it on the console or wait a moment",
     ru: "Приставка отвечает, что сессия Remote Play уже занята. Закройте её на приставке или подождите немного",
     am: "Կոնսոլի Remote Play սեսիան արդեն զբաղված է։ Փակեք այն կոնսոլի վրա կամ մի փոքր սպասեք",
+  },
+  "ps5.error.PASSCODE_REQUIRED": {
+    en: "The console asks for its user's PS5 login passcode. Enter it in the console setup (field \"PS5 login passcode\"), or sign in on the console",
+    ru: "Приставка просит код входа пользователя PS5. Введите его в настройке приставки (поле «Код входа PS5») или войдите в профиль на приставке",
+    am: "Կոնսոլը պահանջում է PS5 օգտատիրոջ մուտքի գաղտնաբառը։ Մուտքագրեք այն կոնսոլի կարգավորումներում («PS5 մուտքի գաղտնաբառ») կամ մուտք գործեք կոնսոլի վրա",
   },
   "ps5.error.UNSUPPORTED_BY_TRANSPORT": {
     en: "This build cannot put a console to rest over the network",

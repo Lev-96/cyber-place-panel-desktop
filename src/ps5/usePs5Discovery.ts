@@ -97,6 +97,10 @@ export interface Ps5Bridge {
   setCredential?: (hostId: string, registKey: string) => Promise<{ saved: boolean; persisted?: boolean; reason?: string }>;
   hasCredential?: (hostId: string) => Promise<CredentialState>;
   forgetCredential?: (hostId: string) => Promise<{ ok: boolean }>;
+  /** Optional: an older preload has no passcode store, and the row offers none. */
+  setPasscode?: (hostId: string, passcode: string) => Promise<{ saved: boolean; persisted?: boolean; reason?: string }>;
+  hasPasscode?: (hostId: string) => Promise<{ has: boolean }>;
+  forgetPasscode?: (hostId: string) => Promise<{ ok: boolean }>;
 }
 
 export const ps5Bridge = (): Ps5Bridge | null =>

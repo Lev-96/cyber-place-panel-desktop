@@ -87,7 +87,7 @@ class SuppliedPin {
 
 export interface PairResult {
   ok: boolean;
-  code?: "NO_PIN" | "NOT_AWAKE" | "REJECTED" | "UNREACHABLE" | "FAILED" | "IN_USE" | "CANCELLED" | "TIMEOUT";
+  code?: "NO_PIN" | "NOT_AWAKE" | "REJECTED" | "UNREACHABLE" | "FAILED" | "IN_USE" | "CANCELLED" | "TIMEOUT" | "PASSCODE_REQUIRED" | "PASSCODE_WRONG";
   detail?: string;
 }
 
@@ -157,6 +157,7 @@ export const pair = async (
       manager,
     );
 
+    await closeSocketOnFailedLogin();
     const connection = await device.openConnection();
     await connection.close();
 
@@ -168,10 +169,12 @@ export const pair = async (
       ok: false,
       // The library's own words, mapped to the three things an owner can
       // actually do about them.
-      code: /must be awake/i.test(message) ? "NOT_AWAKE"
+      // A console whose user has a login passcode: registered by now, but the
+      // login after it was refused. Said as such, not as a failed pairing.
+      code: passcodeCodeOf(message) ?? (/must be awake/i.test(message) ? "NOT_AWAKE"
         : /not found|no device|timed out/i.test(message) ? "UNREACHABLE"
           : /credential|regist|pin/i.test(message) ? "REJECTED"
-            : "FAILED",
+            : "FAILED"),
       detail: message.slice(0, 200),
     };
   }
@@ -275,7 +278,98 @@ export const withCeiling = async (
  * there" loses nothing and returns the console to the panel's control at once.
  */
 export const isPermanentRefusal = (code: PairResult["code"]): boolean =>
-  code === "REJECTED" || code === "UNREACHABLE";
+  // A passcode the panel does not have is not going to appear four seconds
+  // later; asking again only knocks on the console for nothing.
+  code === "REJECTED" || code === "UNREACHABLE" || code === "PASSCODE_REQUIRED" || code === "PASSCODE_WRONG";
+
+/** The console's two passcode answers, in the words the panel uses for them. */
+export const passcodeCodeOf = (message: string): "PASSCODE_REQUIRED" | "PASSCODE_WRONG" | null =>
+  /PASSCODE_IS_UNMATCHED/.test(message) ? "PASSCODE_WRONG"
+    : /PASSCODE_IS_NEEDED/.test(message) ? "PASSCODE_REQUIRED"
+      : null;
+
+/**
+ * A Remote Play login that fails must not leave its connection open.
+ *
+ * playactor opens the control socket, then logs in; when the login throws
+ * (the console asks for its user's PS5 login passcode, which the panel does not
+ * have) the socket is never closed. It is ref'd and keeps answering the
+ * console's heartbeats, so the console holds that session for as long as the
+ * panel runs and answers EVERY later request "Remote is already in use".
+ * Measured at the club 2026-11-08 (`DEBUG=playactor:*`): one PASSCODE_IS_NEEDED
+ * per console, then only 403 IN_USE for over an hour, and an ESTABLISHED
+ * connection to each console's 9295 from the panel itself; a restart freed them.
+ *
+ * So the socket's `execute` is wrapped once: a login procedure that throws
+ * closes its socket before the error goes on. Every Remote Play session is also
+ * remembered, by console address, from its login until it is closed, so a rest
+ * attempt that is ABANDONED (its ceiling ran out, or it was withdrawn) can close
+ * what it left behind: playactor waits without a timeout for a login answer and
+ * for the console to drop the connection after a standby, and either can never
+ * come. Nothing else changes: every other procedure, and every successful
+ * login, runs exactly as before. (A plain close — destroy — is enough: measured,
+ * the next attempt is answered normally, not "in use".)
+ *
+ * If the library's shape ever changes so the guard cannot be installed, the
+ * panel rests consoles exactly as it did without it, and says so in the log.
+ */
+type RpSocket = { close(): Promise<void>; device?: { id?: string; address?: { address?: string } } };
+const liveSessions = new Map<string, Set<RpSocket>>();
+/** A console by its host-id (survives a new DHCP lease), else by its address. */
+const consoleOf = (socket: RpSocket): string => socket.device?.id || socket.device?.address?.address || "";
+const forgetSession = (socket: RpSocket): void => {
+  const sockets = liveSessions.get(consoleOf(socket));
+  sockets?.delete(socket);
+  if (sockets && sockets.size === 0) liveSessions.delete(consoleOf(socket));
+};
+
+let loginFailureCloses: Promise<void> | null = null;
+export const closeSocketOnFailedLogin = (): Promise<void> =>
+  (loginFailureCloses ??= (async () => {
+    try {
+      const { TcpDeviceSocket } = await import("playactor/dist/socket/tcp");
+      const { RemotePlayLoginProc } = await import("playactor/dist/remoteplay/proc/login");
+      type Execute = (this: RpSocket, proc: unknown) => Promise<unknown>;
+      type Close = (this: RpSocket) => Promise<void>;
+      const proto = TcpDeviceSocket.prototype as unknown as { execute: Execute; close: Close };
+      const originalExecute = proto.execute;
+      const originalClose = proto.close;
+      proto.execute = async function (proc) {
+        const login = proc instanceof RemotePlayLoginProc;
+        if (login) {
+          const sockets = liveSessions.get(consoleOf(this)) ?? new Set<RpSocket>();
+          sockets.add(this);
+          liveSessions.set(consoleOf(this), sockets);
+        }
+        try {
+          return await originalExecute.call(this, proc);
+        } catch (error) {
+          if (login) await this.close().catch(() => {});
+          throw error;
+        }
+      };
+      proto.close = async function () {
+        forgetSession(this);
+        return originalClose.call(this);
+      };
+    } catch (error) {
+      console.warn("[ps5] login guard not installed; resting as before",
+        error instanceof Error ? error.message : String(error));
+    }
+  })());
+
+/**
+ * Close every Remote Play session still open to this console (its host-id, or
+ * its address for a caller with none) — the leftovers of an attempt the panel
+ * has given up on. Safe when there are none.
+ */
+export const closeSessionsTo = async (console_: string): Promise<void> => {
+  const sockets = [...(liveSessions.get(console_) ?? [])];
+  await Promise.all(sockets.map((socket) => socket.close().catch(() => {})));
+};
+
+/** For tests: how many sessions are open to this console. */
+export const openSessionCount = (console_: string): number => liveSessions.get(console_)?.size ?? 0;
 
 /**
  * Hang up on the console rather than pulling the wire out.
@@ -383,6 +477,9 @@ export const standby = async (
     ]);
     watch.done = true;
     gone.value = true;
+    // Abandoned (ceiling or withdrawal): whatever that attempt still holds open
+    // on the console is closed now, or the console stays "in use".
+    if (last.code === "TIMEOUT" || last.code === "CANCELLED") await closeSessionsTo(hostId ?? address);
     if (last.code === "CANCELLED") return last;
     if (last.ok || isPermanentRefusal(last.code)) return last;
 
@@ -440,7 +537,12 @@ const standbyOnce = async (
     if (found.status === "STANDBY") return { ok: true, detail: "Already in rest mode" };
     if (cancelled()) return STANDBY_CANCELLED;
 
-    const connection = await device.openConnection();
+    await closeSocketOnFailedLogin();
+    // The console's user's login passcode, if the owner saved one: asked for on
+    // a login made while nobody is signed in on the console.
+    // (Optional call: a vault from an older shape, or a test double, has none.)
+    const passCode = hostId ? keys.readPasscode?.(hostId) ?? null : null;
+    const connection = await device.openConnection(passCode ? { login: { passCode } } : undefined);
     try {
       // Withdrawn (a session started) or abandoned (timed out) while the
       // connection was being opened: the last moment the standby can still not
@@ -463,10 +565,13 @@ const standbyOnce = async (
       ok: false,
       // The console's own refusals, kept apart because they need different
       // things done about them. "Already in use" is not a failure to reach it.
-      code: /already in use|in use/i.test(message) ? "IN_USE"
+      // The console's user has a PS5 login passcode and the panel has none to
+      // give: said as such, never as "in use" or a generic failure.
+      code: passcodeCodeOf(message)
+        ?? (/already in use|in use/i.test(message) ? "IN_USE"
         : /NOT_PAIRED|credential/i.test(message) ? "REJECTED"
           : /not found|no device|timed out|unable to locate/i.test(message) ? "UNREACHABLE"
-            : "FAILED",
+            : "FAILED"),
       detail: message.slice(0, 200),
     };
   }

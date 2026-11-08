@@ -3,6 +3,7 @@ import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import Modal from "@/components/ui/Modal";
 import { ListSkeleton } from "@/components/ui/Skeleton";
+import ConsolePasscodeField from "@/components/ps5/ConsolePasscodeField";
 import { useAsync } from "@/hooks/useAsync";
 import { tr } from "@/i18n/translated";
 import { useLang } from "@/i18n/LanguageContext";
@@ -200,6 +201,7 @@ const ConsolePicker = ({ branchId, onClose }: Props) => {
 
     if (state?.has) {
       return (
+        <div className="col" style={{ gap: 8 }}>
         <div className="ps5-attach">
           <span className="muted" style={{ fontSize: 11, flex: "1 1 160px", minWidth: 0 }}>
             {/* Saved and held-for-the-run are different promises, and an
@@ -209,6 +211,9 @@ const ConsolePicker = ({ branchId, onClose }: Props) => {
           <Button variant="secondary" disabled={busy} onClick={() => void forgetKey(hostId)}>
             {t("ps5.key.forget")}
           </Button>
+        </div>
+        {/* Resting a console whose user has a login passcode needs it. */}
+        <ConsolePasscodeField hostId={hostId} onChanged={credentialsChanged} />
         </div>
       );
     }

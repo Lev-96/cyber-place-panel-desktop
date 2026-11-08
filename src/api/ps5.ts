@@ -50,6 +50,26 @@ export const apiReportUnexpectedWake = (deviceId: number, eventUuid: string) =>
     body: { event_uuid: eventUuid },
   });
 
+/**
+ * "May this panel put the console to rest now?"
+ *
+ * A PS5 takes one Remote Play session at a time, so one panel of the venue
+ * rests it and the others leave it alone (backend `Ps5RestLeaseController`).
+ * `holder` is this panel run's own id; the holder asking again is still the
+ * holder (and renews it), and the lease ends by itself after `lease_seconds`.
+ * Not under `/pcs`: a `/pcs` write drops the cached places and branches, and
+ * this is asked several times per Stop.
+ */
+export const apiClaimRestLease = (deviceId: number, holder: string) =>
+  request<{ granted: boolean; lease_seconds: number }>(`/ps5-rest-lease/${deviceId}`, {
+    method: "POST",
+    body: { holder },
+  });
+
+/** Give the console back. A no-op on the backend for anyone but the holder. */
+export const apiReleaseRestLease = (deviceId: number, holder: string) =>
+  request<void>(`/ps5-rest-lease/${deviceId}`, { method: "DELETE", body: { holder } });
+
 /** The owner's answer. Refused for anyone else, and for an event already decided. */
 export const apiDecideWakeEvent = (id: number, approved: boolean) =>
   request<{ wake_event: Ps5WakeEventApi }>(`/ps5-wake-events/${id}/decision`, {
