@@ -46,14 +46,14 @@ vi.mock("react-router-dom", () => ({ useNavigate: () => vi.fn() }));
 
 import Notifications from "./Notifications";
 
-/** The owner's titles, verbatim (the backend's lang/am/billing.php). */
+/** Short Armenian titles — the same words as the Telegram message (owner, 2026-11-09). */
 const OWNER_TITLES: Record<string, string> = {
-  reminder_d_minus_3: "Վճարման ժամկետը մոտենում է",
-  due_today: "Այսօր վճարման վերջնաժամկետն է",
-  overdue_d2: "Վճարումը ուշացել է",
-  restricted_d5: "Մասնաճյուղի աշխատանքը ժամանակավորապես սահմանափակվել է",
-  suspended_d7: "Մասնաճյուղը ժամանակավորապես արգելափակվել է",
-  restored: "Մասնաճյուղի հասանելիությունը վերականգնվել է",
+  reminder_d_minus_3: "Վճարմանը մնաց 3 օր",
+  due_today: "Այսօր վճարման օրն է",
+  overdue_d2: "Վճարումն ուշացել է",
+  restricted_d5: "Աշխատանքը սահմանափակված է",
+  suspended_d7: "Մասնաճյուղն արգելափակված է",
+  restored: "Հասանելիությունը վերականգնվեց",
 };
 const ALL_KINDS = [...Object.keys(OWNER_TITLES), "payment_recorded", "extended"];
 
@@ -66,6 +66,7 @@ const notice = (kind: string, i: number) => ({
     type: `platform_billing.${kind}`, invoice_id: 31, company_id: 4, company_name: "Cyber Zone",
     period_start: "2026-10-01", period_end: "2026-10-31", amount: "12500.50", balance: "12500.50", currency: "AMD",
     commission_percent: "10.00", due_on: "2026-11-10", effective_due_on: "2026-11-10", days_overdue: 2, billing_access: "active",
+    restriction_on: "2026-11-15",
   },
 });
 
@@ -97,15 +98,18 @@ describe("payment notices", () => {
     }
     expect(screen.getByText(TRANSLATIONS["platformBilling.notice.payment_recorded"].am)).toBeTruthy();
     expect(screen.getByText(TRANSLATIONS["platformBilling.notice.extended"].am)).toBeTruthy();
-    // The body is Armenian too: the period, the amount in drams (Armenian unit), the due date.
-    const body = document.querySelector('[data-notice-kind="overdue_d2"] .billing-notice__body')!.textContent!;
-    expect(body).toContain("Ժամանակահատված");
-    expect(body).toContain("01.10.2026 – 31.10.2026");
-    expect(body).toContain("10.11.2026");
-    expect(body).toContain(moneyDisplay.format(12500.5, "AMD", "am", centsWhenFractional(12500.5)));
-    expect(body).toContain("դրամ");
+    // One plain Armenian sentence: what happened, what comes next (the restriction date).
+    const overdue = document.querySelector('[data-notice-kind="overdue_d2"]')!;
+    expect(overdue.querySelector(".billing-notice__body")!.textContent).toBe("Վճարումը չի ստացվել։ 15.11.2026-ից նոր սեսիաները կսահմանափակվեն։");
+    // The figures stand on their own: owed, due date, month.
+    const facts = Array.from(overdue.querySelectorAll(".billing-notice__fact")).map((f) => f.textContent);
+    expect(facts).toEqual([
+      `Պարտք${moneyDisplay.format(12500.5, "AMD", "am", centsWhenFractional(12500.5))}`,
+      "Ժամկետ10.11.2026",
+      "Ամիս01.10.2026 – 31.10.2026",
+    ]);
     // Restriction says what is limited and that running seats carry on.
-    expect(document.querySelector('[data-notice-kind="restricted_d5"]')!.textContent).toContain(TRANSLATIONS["platformBilling.notice.bodyRestricted"].am);
+    expect(document.querySelector('[data-notice-kind="restricted_d5"] .billing-notice__body')!.textContent).toBe(TRANSLATIONS["platformBilling.noticeSay.restricted_d5"].am);
     // …and no English title leaked in.
     expect(screen.queryByText(TRANSLATIONS["platformBilling.notice.overdue_d2"].en)).toBeNull();
   });
@@ -163,12 +167,27 @@ describe("payment notices", () => {
     expect(api.calls).toContain("/platform-invoices/31");
   });
 
-  test("an admin sees the notices in Billing (Armenian) next to the cross-company list", async () => {
+  test("the whole card opens the invoice, not only the Details button", async () => {
+    feed.list = [notice("due_today", 0)];
+    api.handler = (p) => {
+      if (p === "/company/4/billing") return Promise.resolve({ ...LEGACY_BILLING, outstanding_amount: "12500.50" });
+      if (p === "/company/4/platform-invoices") return Promise.resolve({ data: [], meta: { current_page: 1, last_page: 1, per_page: 6, total: 0 } });
+      if (p === "/platform-invoices/31") return Promise.resolve({ data: { ...notice("x", 0).data, id: 31, entries: [], events: [] } });
+      return Promise.reject(new Error(p));
+    };
+    render(<Notifications />);
+    fireEvent.click(await screen.findByText(OWNER_TITLES.due_today));
+    expect(feed.markRead).toHaveBeenCalledWith("n-due_today");
+    expect(await screen.findByRole("dialog")).toBeTruthy();
+  });
+
+  test("an admin reads the notices in the panel's own language, next to the cross-company list", async () => {
     auth.user = { id: 1, role: "admin" };
     feed.list = [notice("suspended_d7", 0)];
     api.handler = (p) => (p === "/company-billing/reminders" ? Promise.resolve({ data: [] }) : Promise.reject(new Error(p)));
     render(<Notifications />);
-    expect(await screen.findByText(OWNER_TITLES.suspended_d7)).toBeTruthy();
+    expect(await screen.findByText(TRANSLATIONS["platformBilling.notice.suspended_d7"].en)).toBeTruthy();
+    expect(screen.queryByText(OWNER_TITLES.suspended_d7)).toBeNull();
     expect(screen.getByText(/Cyber Zone/)).toBeTruthy();
   });
 });

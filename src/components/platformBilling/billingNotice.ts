@@ -45,28 +45,40 @@ const str = (v: unknown): string | null => (typeof v === "string" && v.trim() !=
 /** A figure the row carries as a decimal string (the contract) or a number. */
 const num = (v: unknown): number | null => (typeof v === "number" && Number.isFinite(v) ? v : amountOf(str(v)));
 
-/** Title and body of a notice, in Armenian. */
-export const billingNoticeText = (n: Pick<IDbNotification, "type" | "data">): { title: string; body: string } => {
+export interface NoticeFact { label: string; value: string }
+
+/**
+ * What one notice says, in `lang` (Armenian for owners, the panel's own for an
+ * admin): a short title, ONE plain sentence — what happened and what comes
+ * next — and the two or three figures that matter, each on its own.
+ */
+export const billingNoticeContent = (
+  n: Pick<IDbNotification, "type" | "data">,
+  lang: Lang = NOTICE_LANG,
+): { title: string; sentence: string; facts: NoticeFact[] } => {
   const kind = noticeKindOf(n);
-  const title = t(kind ? `platformBilling.notice.${kind}` : "platformBilling.notice.generic", NOTICE_LANG);
+  const title = t(kind ? `platformBilling.notice.${kind}` : "platformBilling.notice.generic", lang);
 
   const d = n.data ?? {};
   const balance = num(d.balance) ?? num(d.amount);
   const currency = str(d.currency) ?? "AMD";
-  const amount = balance === null
+  const money = (v: number | null) => v === null
     ? "-"
-    : currency === "AMD"
-      ? moneyDisplay.format(balance, "AMD", NOTICE_LANG, centsWhenFractional(balance))
-      : `${balance} ${currency}`;
+    : currency === "AMD" ? moneyDisplay.format(v, "AMD", lang, centsWhenFractional(v)) : `${v} ${currency}`;
   const due = formatBillingDate(str(d.effective_due_on) ?? str(d.due_on));
+  const restrictionOn = formatBillingDate(str(d.restriction_on));
   const period = periodText(str(d.period_start), str(d.period_end));
 
-  const lines = [fmt(t("platformBilling.notice.body", NOTICE_LANG), period, amount, due)];
-  if (kind === "restricted_d5") lines.push(t("platformBilling.notice.bodyRestricted", NOTICE_LANG));
-  if (kind === "suspended_d7") lines.push(t("platformBilling.notice.bodySuspended", NOTICE_LANG));
-  if (kind === "restored") lines.push(t("platformBilling.notice.bodyRestored", NOTICE_LANG));
-  const company = str(d.company_name);
-  return { title, body: [company, ...lines].filter(Boolean).join(" ") };
+  const sentence = kind
+    ? fmt(t(`platformBilling.noticeSay.${kind}`, lang), kind === "overdue_d2" ? restrictionOn : due)
+    : "";
+  const settled = kind === "restored" || kind === "payment_recorded";
+  const facts: NoticeFact[] = [
+    { label: t(settled ? "platformBilling.noticeFact.left" : "platformBilling.noticeFact.owed", lang), value: money(balance) },
+    ...(settled || kind === "extended" ? [] : [{ label: t("platformBilling.noticeFact.due", lang), value: due }]),
+    { label: t("platformBilling.noticeFact.period", lang), value: period },
+  ];
+  return { title, sentence, facts };
 };
 
 /** Where "Details" leads: the invoice and its company, when the row names them. */

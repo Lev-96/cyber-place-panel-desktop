@@ -9820,21 +9820,28 @@ select.input option:disabled {
   flex-direction: column;
   font-size: var(--fs-sm);
 }
+/* A real grid (2026-11-09): flex-wrap pushed the last column ("Total") onto
+   its own line in the modal's narrow detail pane. Figures align right; the
+   table scrolls sideways rather than break its columns on a narrow window. */
+.invoice-detail__table {
+  overflow-x: auto;
+}
 .invoice-detail__row {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: minmax(110px, 1.4fr) repeat(4, minmax(72px, 1fr));
   gap: var(--space-2);
+  align-items: end;
   padding: var(--space-1) 0;
   border-bottom: 1px solid var(--color-border);
 }
 .invoice-detail__row > * {
-  flex: 1 1 88px;
   min-width: 0;
   overflow-wrap: anywhere;
   font-variant-numeric: tabular-nums;
+  text-align: right;
 }
 .invoice-detail__row > :first-child {
-  flex-basis: 140px;
+  text-align: left;
 }
 .invoice-detail__row--head {
   color: var(--color-muted);
@@ -10013,8 +10020,54 @@ select.input option:disabled {
 .billing-notice--ok {
   border-left-color: var(--color-success);
 }
+.billing-notice__open {
+  flex: 1 1 320px;
+  min-width: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.billing-notice__open:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 4px;
+  border-radius: 6px;
+}
+.billing-notice__icon {
+  flex-shrink: 0;
+  font-size: 24px;
+  line-height: 1.2;
+}
+.billing-notice__facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
+}
+.billing-notice__fact {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  font-size: var(--fs-sm);
+}
+.billing-notice__fact-label {
+  color: var(--color-text-soft);
+}
+.billing-notice__fact-value {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
 .billing-notice__text {
-  flex: 1 1 260px;
+  flex: 1 1 auto;
   min-width: 0;
   display: flex;
   flex-direction: column;
@@ -10022,6 +10075,7 @@ select.input option:disabled {
 }
 .billing-notice__title {
   margin: 0;
+  font-weight: 700;
   display: flex;
   align-items: center;
   gap: var(--space-2);
