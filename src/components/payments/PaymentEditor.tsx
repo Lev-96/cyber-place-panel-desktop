@@ -7,10 +7,22 @@ import { fmt } from "@/i18n/translations";
 import { PAYMENT_METHODS } from "./PaymentMethodPicker";
 import { SPLIT_METHODS, fillRemaining, type PaymentCheck, type PaymentDraft } from "./paymentSplit";
 
+/** A method's full name: the tooltip, the accessible name, the hidden field label. */
 const LABEL_KEY: Record<PaymentMethod, string> = {
   cash: "session.payCash",
   card: "session.payCard",
   other: "session.payOther",
+};
+
+/**
+ * What a method's button SHOWS (2026-11-08, owner): one short word, so all
+ * four buttons stay one line and one height. «Другой способ оплаты» broke
+ * onto three lines and out of its box; the full name stays on hover.
+ */
+const SHORT_KEY: Record<PaymentMethod, string> = {
+  cash: "session.payCash",
+  card: "session.payCard",
+  other: "pay.otherShort",
 };
 
 interface Props {
@@ -53,8 +65,10 @@ const PaymentEditor = ({ name, dueCents, value, onChange, check, money, disabled
             disabled={disabled}
             onClick={() => pick(m)}
             data-testid={`pay-${m}`}
+            title={t(LABEL_KEY[m])}
+            aria-label={t(LABEL_KEY[m])}
           >
-            {t(LABEL_KEY[m])}
+            {t(SHORT_KEY[m])}
           </button>
         ))}
         <button
@@ -84,7 +98,7 @@ const PaymentEditor = ({ name, dueCents, value, onChange, check, money, disabled
         <div className="col pay-editor__split" style={{ gap: 8 }}>
           {SPLIT_METHODS.map((m) => (
             <div key={m} className="pay-editor__part">
-              <span className="pay-editor__part-name">{t(LABEL_KEY[m])}</span>
+              <span className="pay-editor__part-name" title={t(LABEL_KEY[m])}>{t(SHORT_KEY[m])}</span>
               <div className="pay-editor__part-box">
                 <PriceInput
                   label={t(LABEL_KEY[m])}

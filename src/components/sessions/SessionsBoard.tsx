@@ -678,6 +678,10 @@ const SessionsBoard = ({ branchId }: Props) => {
     const cellState = resolveSessionCellState({ hasSession: !!sess, isReserved, device: pc });
     const isOffline = cellState === "offline";
     const canStart = canStartSession(cellState);
+    // Free now, reserved later (2026-11-07, owner): how long a walk-in may
+    // play, from the server's next booking start. Since 2026-11-08 it also
+    // paints the card in the reservation yellow (SessionCard `bookingAhead`).
+    const freeUntil = !sess && !isOffline && !isReserved ? freeUntilOf(pc.next_booking_start) : null;
     const deviceStatus = effectivePcStatus(pc);
     const color = SESSION_CELL_COLOR[cellState];
     const itemsCount = sess?.items?.length ?? 0;
@@ -802,6 +806,7 @@ const SessionsBoard = ({ branchId }: Props) => {
         session={sess}
         baseColor={color}
         seatState={cellState}
+        bookingAhead={freeUntil !== null}
         stateLabel={(tone) => t(`session.tone.${tone}`)}
         dragging={dragId === pc.id}
         dropSide={dragOverId === pc.id ? dropSideOf(order, dragId, pc.id) : null}
@@ -1112,20 +1117,24 @@ const SessionsBoard = ({ branchId }: Props) => {
                   </span>
                 );
               }
-              // Free now, reserved later (2026-11-07, owner): how long a walk-in
-              // may play, from the server's next booking start.
-              const freeUntil = !isOffline && !isReserved ? freeUntilOf(pc.next_booking_start) : null;
-              return (
-                <>
-                  <span className="status">
-                    {isOffline ? t("session.deviceOffline") : isReserved ? t("session.reserved") : t("session.free")}
-                  </span>
-                  {freeUntil && (
-                    <span className="session-card__free-until" data-testid="free-until" data-tip={t("start.freeUntilCardTip")}>
+              // Free now, reserved later (`freeUntil` above; 2026-11-08, owner):
+              // the word «Свободно» turns into «Свободно до 05:30» in its own
+              // place while the card is pointed at or focused, and back after.
+              // The full sentence is the one read aloud.
+              if (freeUntil) {
+                return (
+                  <span className="status session-card__status-swap" data-tip={t("start.freeUntilCardTip")}>
+                    <span className="session-card__status-word" aria-hidden>{t("session.free")}</span>
+                    <span className="session-card__free-until" data-testid="free-until">
                       {fmt(t("start.freeUntilCard"), freeUntil)}
                     </span>
-                  )}
-                </>
+                  </span>
+                );
+              }
+              return (
+                <span className="status">
+                  {isOffline ? t("session.deviceOffline") : isReserved ? t("session.reserved") : t("session.free")}
+                </span>
               );
             })()}
             {isOffline && (

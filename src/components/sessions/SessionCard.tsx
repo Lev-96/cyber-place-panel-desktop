@@ -23,6 +23,13 @@ interface Props {
    */
   seatState: SessionCellState;
   /**
+   * A reservation later today on a seat that is free now (2026-11-08,
+   * owner): the card takes the reservation yellow — frame, stripe and icon —
+   * while the seat itself stays free and startable. Ignored on a running,
+   * reserved or offline seat, which keep their own colour.
+   */
+  bookingAhead?: boolean;
+  /**
    * The word for the seat's state (2026-10-27), shown as the tooltip and the
    * accessible name of the state icon in the corner. The board passes its
    * translation; the card decides which state it is.
@@ -72,13 +79,14 @@ export const accentOf = (tone: StatusTone): string =>
  * `.place-cell` itself is shared with the places and live boards.
  */
 const SessionCard = ({
-  session, baseColor, seatState, stateLabel, dragging = false, dropSide = null, onDragOver, onDrop, children,
+  session, baseColor, seatState, bookingAhead = false, stateLabel, dragging = false, dropSide = null, onDragOver, onDrop, children,
 }: Props) => {
   const urgency = useSessionUrgency(session);
-  const tone = seatTone(Boolean(session), urgency, seatState);
+  const ahead = bookingAhead && !session && seatState === "free";
+  const tone = ahead ? "booked" : seatTone(Boolean(session), urgency, seatState);
   // An urgent seat's frame is its urgency; otherwise the seat's own colour.
   const urgent = session ? urgencyTone(urgency) : null;
-  const accent = urgent ? accentOf(urgent) : baseColor;
+  const accent = urgent ? accentOf(urgent) : ahead ? accentOf("booked") : baseColor;
   const label = stateLabel?.(tone);
 
   const className = [
@@ -87,6 +95,7 @@ const SessionCard = ({
     session ? "session-card--running" : "session-card--idle",
     urgency && urgency !== "none" && urgency !== "normal" ? `session-card--${urgency}` : "",
     `session-card--seat-${seatState}`,
+    ahead ? "session-card--booking-ahead" : "",
     dragging ? "is-dragging" : "",
     dropSide ? `is-drop-${dropSide}` : "",
   ].filter(Boolean).join(" ");

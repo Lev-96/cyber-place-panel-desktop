@@ -18,6 +18,16 @@ const Host = ({ due }: { due: number }) => {
 afterEach(cleanup);
 
 describe("PaymentEditor", () => {
+  test("each method button shows one short word; the full name is its tooltip and name (2026-11-08)", () => {
+    render(<Host due={500000} />);
+    const other = screen.getByTestId("pay-other");
+    expect(other.textContent).toBe("pay.otherShort");
+    expect(other.getAttribute("title")).toBe("session.payOther");
+    expect(other.getAttribute("aria-label")).toBe("session.payOther");
+    expect(screen.getByTestId("pay-cash").textContent).toBe("session.payCash");
+    expect(screen.getByTestId("pay-card").textContent).toBe("session.payCard");
+  });
+
   test("cash by default; a method is one click", async () => {
     render(<Host due={500000} />);
     expect(screen.getByTestId("pay-cash").getAttribute("aria-checked")).toBe("true");

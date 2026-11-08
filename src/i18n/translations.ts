@@ -1557,6 +1557,7 @@ export const TRANSLATIONS: Dict = {
   "pay.markConfirm": { en: "Record payment", ru: "Отметить оплату", am: "Նշել վճարումը" },
   "pay.recorded": { en: "Payment recorded · {0}", ru: "Оплата отмечена · {0}", am: "Վճարումը նշվեց · {0}" },
   "pay.split": { en: "Split", ru: "Разделить", am: "Բաժանել" },
+  "pay.otherShort": { en: "Other", ru: "Другое", am: "Այլ" },
   "pay.restHere": { en: "The rest", ru: "Остаток", am: "Մնացորդը" },
   "pay.remaining": { en: "Still due: {0}", ru: "Осталось внести: {0}", am: "Մնում է վճարել՝ {0}" },
   "pay.tooMuch": { en: "{0} more than the bill", ru: "Больше счёта на {0}", am: "Հաշվից ավելի է {0}-ով" },

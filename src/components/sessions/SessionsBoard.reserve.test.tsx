@@ -115,6 +115,37 @@ describe("reserving from the board", () => {
     expect(screen.getByTestId("free-until").textContent).toBe("start.freeUntilCard".replace("{0}", hm));
   });
 
+  test("a free seat reserved later is drawn yellow, and still starts (2026-11-08)", async () => {
+    const at = new Date(Date.now() + 3 * 3_600_000);
+    repo.listPcs.mockResolvedValue([{ ...pc(), next_booking_start: at.toISOString() }]);
+    await mount();
+    const cell = screen.getByTestId("free-until").closest(".place-cell") as HTMLElement;
+    expect(cell.classList.contains("session-card--booking-ahead")).toBe(true);
+    expect(cell.getAttribute("data-tone")).toBe("booked");
+    // Still a free seat: the state the Start button follows is unchanged.
+    expect(cell.classList.contains("session-card--seat-free")).toBe(true);
+  });
+
+  test("«Свободно» and «Свободно до …» share one place, swapped on hover (2026-11-08)", async () => {
+    const at = new Date(Date.now() + 3 * 3_600_000);
+    repo.listPcs.mockResolvedValue([{ ...pc(), next_booking_start: at.toISOString() }]);
+    await mount();
+    const swap = screen.getByTestId("free-until").parentElement as HTMLElement;
+    expect(swap.classList.contains("session-card__status-swap")).toBe(true);
+    const word = swap.querySelector(".session-card__status-word") as HTMLElement;
+    expect(word.textContent).toBe("session.free");
+    // Read aloud once: the full sentence, not the word as well.
+    expect(word.getAttribute("aria-hidden")).toBe("true");
+  });
+
+  test("a seat with nothing booked ahead stays the free colour", async () => {
+    repo.listPcs.mockResolvedValue([{ ...pc(), next_booking_start: null }]);
+    await mount();
+    const cell = document.querySelector(".place-cell") as HTMLElement;
+    expect(cell.classList.contains("session-card--booking-ahead")).toBe(false);
+    expect(cell.getAttribute("data-tone")).toBe("free");
+  });
+
   test("the header's «Календарь броней» opens it on every seat", async () => {
     await mount();
     await act(async () => { fireEvent.click(screen.getByTestId("board-calendar")); });

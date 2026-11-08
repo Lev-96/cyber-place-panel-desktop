@@ -9381,6 +9381,12 @@ select.input option:disabled {
   font: inherit;
   font-size: 13px;
   font-weight: 600;
+  /* One line, always (2026-11-08): the four buttons are one row of equal
+     boxes. The labels are short words; a longer translation is cut with an
+     ellipsis rather than pushed out of the box (the full name is the title). */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   cursor: pointer;
 }
 .pay-editor__method:hover:not(:disabled) { border-color: rgb(var(--accent-rgb) / 0.6); }
@@ -9392,7 +9398,7 @@ select.input option:disabled {
 .pay-editor__method:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
 .pay-editor__method:disabled { opacity: 0.5; cursor: default; }
 .pay-editor__part { display: flex; align-items: flex-end; gap: var(--space-2); }
-.pay-editor__part-name { flex: 0 0 96px; padding-bottom: 10px; font-size: 13px; font-weight: 600; }
+.pay-editor__part-name { flex: 0 0 96px; padding-bottom: 10px; font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .pay-editor__part-box { flex: 1 1 auto; min-width: 0; }
 .pay-editor__part-box .label { display: none; }
 .btn.pay-editor__rest { flex: 0 0 auto; height: 36px; padding: 0 var(--space-3); font-size: 12px; }
@@ -9409,6 +9415,33 @@ select.input option:disabled {
 .pay-editor__note { resize: vertical; min-height: 56px; }
 /* A free seat reserved later (2026-11-07): how long a walk-in may play. */
 .session-card__free-until { font-size: 12px; font-weight: 600; color: var(--status-booked-fg); font-variant-numeric: tabular-nums; }
+/* «Свободно» → «Свободно до 05:30» on a seat reserved later (2026-11-08,
+   owner): both sit in ONE grid cell, the word shown, the sentence hidden;
+   pointing at the card (or focusing it) cross-fades them. The cell is as wide
+   as the longer of the two, so nothing beside it moves. */
+.session-card__status-swap { display: inline-grid; }
+.session-card__status-swap > * {
+  grid-area: 1 / 1;
+  transition: opacity 200ms ease, transform 200ms ease;
+}
+.session-card__status-swap .session-card__free-until {
+  font-size: inherit;
+  opacity: 0;
+  transform: translateY(3px);
+}
+.place-cell.session-card:hover .session-card__status-swap .session-card__status-word,
+.place-cell.session-card:focus-within .session-card__status-swap .session-card__status-word {
+  opacity: 0;
+  transform: translateY(-3px);
+}
+.place-cell.session-card:hover .session-card__status-swap .session-card__free-until,
+.place-cell.session-card:focus-within .session-card__status-swap .session-card__free-until {
+  opacity: 1;
+  transform: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .session-card__status-swap > * { transition: none; transform: none !important; }
+}
 /* Booking history (2026-11-07): one line per step, in the sales history. */
 .booking-history__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
 .booking-history__row {
