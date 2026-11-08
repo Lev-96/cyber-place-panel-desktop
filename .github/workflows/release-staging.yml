@@ -17,7 +17,7 @@ permissions:
 
 jobs:
   guard:
-    runs-on: ubuntu-24.04 # pinned 2026-11-08: ubuntu-latest moved to Ubuntu 26 and the AppImage step failed there (v1.0.54, v1.0.55); v1.0.53 built on 24.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -40,7 +40,7 @@ jobs:
 
   build-linux:
     needs: guard
-    runs-on: ubuntu-24.04 # pinned 2026-11-08: ubuntu-latest moved to Ubuntu 26 and the AppImage step failed there (v1.0.54, v1.0.55); v1.0.53 built on 24.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -70,7 +70,12 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   build-windows:
-    needs: build-linux
+    # After the Linux job, never beside it (two jobs creating one release race),
+    # but not BLOCKED by it: the venues run Windows, and a Linux-only download
+    # failure (2026-11-08: GitHub answered 504 for the AppImage tool) must not
+    # stop the Windows installer. The version guard still has to pass.
+    needs: [guard, build-linux]
+    if: ${{ always() && needs.guard.result == 'success' }}
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
