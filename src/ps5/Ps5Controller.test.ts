@@ -396,3 +396,223 @@ describe("every command leaves one line saying how it ended and how long it took
     expect(done()).toEqual([{ hostId: "AAA", command: "wake", result: "threw", ms: 5 }]);
   });
 });
+
+describe("one panel of the venue rests a console (2026-11-08)", () => {
+  // Two panels resting one PS5 together were answered "Remote is already in
+  // use" for minutes and the console stayed awake: it takes one Remote Play
+  // session at a time. The backend names one panel; the others stand aside.
+  let claim: Mock<NonNullable<ControllerPorts["claimRest"]>>;
+  let release: Mock<NonNullable<ControllerPorts["releaseRest"]>>;
+  const stopping = (over: Partial<ConsoleInput> = {}) => input({ actual: "awake", stopping: true, ...over });
+
+  beforeEach(() => {
+    claim = vi.fn(async () => "granted" as const);
+    release = vi.fn();
+    rest.mockImplementation(async () => ({ sent: true }));
+    ports = { ...ports, claimRest: claim, releaseRest: release };
+  });
+
+  test("the panel that holds the console rests it, and keeps it while it goes down", async () => {
+    const c = new Ps5Controller(ports);
+    await c.tick([stopping()]);
+
+    expect(claim).toHaveBeenCalledWith(1);
+    expect(rest).toHaveBeenCalledTimes(1);
+    // Given back only when the rest did not go out: a console on its way down
+    // must not get a second panel's session.
+    expect(release).not.toHaveBeenCalled();
+  });
+
+  test("another panel resting it: nothing is sent, nothing is an error", async () => {
+    claim.mockImplementation(async () => "elsewhere");
+    const c = new Ps5Controller(ports);
+    await c.tick([stopping()]);
+
+    expect(rest).not.toHaveBeenCalled();
+    expect(c.view("AAA").snapshot.error).toBeNull();
+    expect(c.view("AAA").snapshot.state).not.toBe("ERROR");
+    expect(logs.some((l) => l.event === "PS5_REST_ELSEWHERE")).toBe(true);
+    expect(logs.find((l) => l.event === "PS5_COMMAND_DONE")?.fields.result).toBe("ELSEWHERE");
+  });
+
+  test("it is left to that panel for ten seconds, a press included, then asked again", async () => {
+    claim.mockImplementation(async () => "elsewhere");
+    const c = new Ps5Controller(ports);
+    await c.tick([stopping()]);
+
+    clock += 5_000;
+    c.pressed("AAA");
+    await c.tick([stopping({ urgent: true })]);
+    expect(claim).toHaveBeenCalledTimes(1);
+
+    claim.mockImplementation(async () => "granted");
+    clock += 6_000;
+    await c.tick([stopping({ urgent: true })]);
+    expect(claim).toHaveBeenCalledTimes(2);
+    expect(rest).toHaveBeenCalledTimes(1);
+  });
+
+  test("without a press too: asked again after ten seconds, not the twenty of a resend", async () => {
+    claim.mockImplementation(async () => "elsewhere");
+    const c = new Ps5Controller(ports);
+    await c.tick([stopping()]);
+
+    clock += 9_000;
+    await c.tick([stopping()]);
+    expect(claim).toHaveBeenCalledTimes(1);
+
+    claim.mockImplementation(async () => "granted");
+    clock += 2_000;
+    await c.tick([stopping()]);
+    expect(claim).toHaveBeenCalledTimes(2);
+    expect(rest).toHaveBeenCalledTimes(1);
+  });
+
+  test("an unbound and re-bound console starts without the other panel's wait", async () => {
+    claim.mockImplementation(async () => "elsewhere");
+    const c = new Ps5Controller(ports);
+    await c.tick([stopping()]);
+    c.forget(["AAA"]);
+
+    claim.mockImplementation(async () => "granted");
+    await c.tick([stopping()]);
+    expect(rest).toHaveBeenCalledTimes(1);
+  });
+
+  test("a rest that threw gives the console back", async () => {
+    rest.mockImplementation(async () => { throw new Error("ipc gone"); });
+    const c = new Ps5Controller(ports);
+    await c.tick([stopping()]);
+
+    expect(release).toHaveBeenCalledWith(1);
+  });
+
+  test("a backend that cannot be asked does not stop the rest", async () => {
+    claim.mockImplementation(async () => "unknown");
+    const c = new Ps5Controller(ports);
+    await c.tick([stopping()]);
+
+    expect(rest).toHaveBeenCalledTimes(1);
+    expect(release).not.toHaveBeenCalled();
+  });
+
+  test("a claim port that throws reads as 'could not ask'", async () => {
+    claim.mockImplementation(async () => { throw new Error("offline"); });
+    const c = new Ps5Controller(ports);
+    await c.tick([stopping()]);
+
+    expect(rest).toHaveBeenCalledTimes(1);
+  });
+
+  test("a rest that did not go out gives the console back", async () => {
+    rest.mockImplementation(async () => ({ sent: false, code: "IN_USE" }));
+    const c = new Ps5Controller(ports);
+    await c.tick([stopping()]);
+
+    expect(release).toHaveBeenCalledWith(1);
+  });
+
+  test("a session started while the backend was being asked: the rest is not sent", async () => {
+    let answer: (v: "granted") => void = () => {};
+    claim.mockImplementation(() => new Promise((resolve) => { answer = resolve; }));
+    const c = new Ps5Controller(ports);
+
+    const first = c.tick([stopping()]);
+    // The next tick sees the player: the console is wanted awake now.
+    await c.tick([input({ actual: "awake", hasSession: true, starting: true })]);
+    answer("granted");
+    await first;
+
+    expect(rest).not.toHaveBeenCalled();
+    expect(release).toHaveBeenCalledWith(1);
+  });
+
+  test("waking never asks the backend", async () => {
+    const c = new Ps5Controller(ports);
+    await c.tick([input({ starting: true })]);
+
+    expect(wake).toHaveBeenCalledTimes(1);
+    expect(claim).not.toHaveBeenCalled();
+  });
+
+  test("two consoles are claimed separately", async () => {
+    const c = new Ps5Controller(ports);
+    await c.tick([
+      stopping({ deviceId: 1, hostId: "AAA" }),
+      stopping({ deviceId: 2, hostId: "BBB", address: "192.168.1.11" }),
+    ]);
+
+    expect(claim.mock.calls.map(([id]) => id).sort()).toEqual([1, 2]);
+    expect(rest).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("a console that asks for its user's login passcode (2026-11-08)", () => {
+  // Nothing the panel sends changes that answer; a player signing in does.
+  // A press used to re-ask the console every 1.5 s for the whole 45 s window.
+  const stopping = (over: Partial<ConsoleInput> = {}) => input({ actual: "awake", stopping: true, ...over });
+
+  test("is left alone for fifteen seconds, a press included, then asked again", async () => {
+    rest.mockImplementation(async () => ({ sent: false, code: "PASSCODE_REQUIRED" }));
+    const c = new Ps5Controller(ports);
+    await c.tick([stopping()]);
+
+    for (let i = 0; i < 10; i++) {
+      clock += 1_400;
+      await c.tick([stopping({ urgent: true })]);
+    }
+    expect(rest).toHaveBeenCalledTimes(1);
+
+    clock += 1_100; // 15.1 s after the refusal
+    await c.tick([stopping({ urgent: true })]);
+    expect(rest).toHaveBeenCalledTimes(2);
+  });
+
+  test("a saved code the console refuses is held the same way", async () => {
+    rest.mockImplementation(async () => ({ sent: false, code: "PASSCODE_WRONG" }));
+    const c = new Ps5Controller(ports);
+    await c.tick([stopping()]);
+    clock += 5_000;
+    await c.tick([stopping({ urgent: true })]);
+    expect(rest).toHaveBeenCalledTimes(1);
+  });
+
+  test("the error stays on the tile meanwhile", async () => {
+    rest.mockImplementation(async () => ({ sent: false, code: "PASSCODE_REQUIRED" }));
+    const c = new Ps5Controller(ports);
+    await c.tick([stopping()]);
+
+    expect(c.view("AAA").snapshot.error).toBe("PASSCODE_REQUIRED");
+  });
+
+  test("once it sleeps, or is unbound, the wait is gone", async () => {
+    rest.mockImplementation(async () => ({ sent: false, code: "PASSCODE_REQUIRED" }));
+    const c = new Ps5Controller(ports);
+    await c.tick([stopping()]);
+    c.forget(["AAA"]);
+
+    rest.mockImplementation(async () => ({ sent: true }));
+    await c.tick([stopping()]);
+    expect(rest).toHaveBeenCalledTimes(2);
+  });
+
+  test("any other refusal keeps the old rhythm", async () => {
+    rest.mockImplementation(async () => ({ sent: false, code: "IN_USE" }));
+    const c = new Ps5Controller(ports);
+    await c.tick([stopping()]);
+
+    clock += 1_500;
+    await c.tick([stopping({ urgent: true })]);
+    expect(rest).toHaveBeenCalledTimes(2);
+  });
+
+  test("waking is never held by it", async () => {
+    rest.mockImplementation(async () => ({ sent: false, code: "PASSCODE_REQUIRED" }));
+    const c = new Ps5Controller(ports);
+    await c.tick([stopping()]);
+
+    clock += 2_000;
+    await c.tick([input({ actual: "rest", starting: true, urgent: true })]);
+    expect(wake).toHaveBeenCalledTimes(1);
+  });
+});

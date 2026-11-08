@@ -77,4 +77,8 @@ contextBridge.exposeInMainWorld("cyberplacePS5", {
     ipcRenderer.invoke("ps5:credential:set", hostId, registKey),
   hasCredential: (hostId: string) => ipcRenderer.invoke("ps5:credential:has", hostId),
   forgetCredential: (hostId: string) => ipcRenderer.invoke("ps5:credential:forget", hostId),
+  /** The console user's PS5 login passcode: writable, checkable, never readable. */
+  setPasscode: (hostId: string, passcode: string) => ipcRenderer.invoke("ps5:passcode:set", hostId, passcode),
+  hasPasscode: (hostId: string) => ipcRenderer.invoke("ps5:passcode:has", hostId),
+  forgetPasscode: (hostId: string) => ipcRenderer.invoke("ps5:passcode:forget", hostId),
 });

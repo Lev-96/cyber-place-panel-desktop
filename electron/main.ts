@@ -505,6 +505,28 @@ app.whenReady().then(async () => {
     return { ok: true };
   });
 
+  /**
+   * The console user's PS5 login passcode, used only to log in when resting it
+   * (see `WakeKeys.setPasscode`). Like the key: writable, checkable, forgettable,
+   * never readable from the renderer. Four digits, nothing else is accepted.
+   */
+  ipcMain.handle("ps5:passcode:set", async (_e: unknown, hostId: unknown, passcode: unknown) => {
+    if (typeof hostId !== "string" || hostId === "" || hostId.length > 64
+      || typeof passcode !== "string" || !/^\d{4}$/.test(passcode) || !wakeKeys) {
+      return { saved: false, reason: "bad-request" };
+    }
+    return wakeKeys.setPasscode(hostId, passcode);
+  });
+
+  ipcMain.handle("ps5:passcode:has", (_e: unknown, hostId: unknown) => ({
+    has: typeof hostId === "string" && (wakeKeys?.hasPasscode(hostId) ?? false),
+  }));
+
+  ipcMain.handle("ps5:passcode:forget", async (_e: unknown, hostId: unknown) => {
+    if (typeof hostId === "string") await wakeKeys?.forgetPasscode(hostId);
+    return { ok: true };
+  });
+
   ipcMain.handle("ps5:probe", (_e: unknown, addresses: unknown, timeoutMs?: number) =>
     probePlayStations(
       // Whatever the renderer sends is treated as untrusted shape, not just

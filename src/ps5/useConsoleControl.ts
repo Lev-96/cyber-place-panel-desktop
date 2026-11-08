@@ -1,11 +1,48 @@
-import { apiReportUnexpectedWake } from "@/api/ps5";
+import { apiClaimRestLease, apiReleaseRestLease, apiReportUnexpectedWake } from "@/api/ps5";
 import { notify } from "@/ui/notify";
 import { tActive } from "@/i18n/translations";
 import { ps5Bridge } from "@/ps5/usePs5Discovery";
 import { useConsoleWatch, WATCH_INTERVAL_MS, WATCH_INTERVAL_WATCHFUL_MS, type WatchedConsole } from "@/ps5/useConsoleWatch";
-import { Ps5Controller, type ConsoleInput, type ControllerPorts } from "@/ps5/Ps5Controller";
+import { Ps5Controller, type ConsoleInput, type ControllerPorts, type RestClaim } from "@/ps5/Ps5Controller";
 import { IPcApi } from "@/types/sessions";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+
+/**
+ * This panel run's name when it asks the backend for a console's rest lease
+ * (one panel per venue rests a console: a PS5 takes one Remote Play session
+ * at a time). New on every launch, so a lease never outlives the run that
+ * took it by more than the backend's own expiry.
+ */
+let restHolder: string | null = null;
+const restHolderId = (): string => (restHolder ??= crypto.randomUUID());
+
+/**
+ * The backend gets this long to answer before the rest goes ahead anyway: a
+ * slow or unreachable server must not cost a Stop more than a moment.
+ */
+export const REST_CLAIM_TIMEOUT_MS = 3_000;
+
+export const claimRestLease = async (deviceId: number): Promise<RestClaim> => {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const late = new Promise<RestClaim>((resolve) => {
+    timer = setTimeout(() => resolve("unknown"), REST_CLAIM_TIMEOUT_MS);
+  });
+  // An older backend (404), a network failure or an answer of another shape
+  // all read "could not ask": the rest then goes ahead as it always did.
+  const answer = apiClaimRestLease(deviceId, restHolderId()).then(
+    (res): RestClaim => (res?.granted === true ? "granted" : res?.granted === false ? "elsewhere" : "unknown"),
+    (): RestClaim => "unknown",
+  );
+  try {
+    return await Promise.race([answer, late]);
+  } finally {
+    clearTimeout(timer);
+  }
+};
+
+export const releaseRestLease = (deviceId: number): void => {
+  void apiReleaseRestLease(deviceId, restHolderId()).catch(() => { /* the lease ends by itself */ });
+};
 
 /**
  * Ties the venue's facts to the consoles in the room.
@@ -245,6 +282,8 @@ export const useConsoleControl = ({ devices, sessionDeviceIds, enabled = true }:
       cancelRest: (hostId) => {
         void ps5Bridge()?.restCancel?.(hostId).catch(() => { /* the rest runs its course */ });
       },
+      claimRest: claimRestLease,
+      releaseRest: releaseRestLease,
       reportUnexpectedWake: async ({ deviceId, eventId }) => {
         await apiReportUnexpectedWake(deviceId, eventId);
       },
