@@ -150,6 +150,15 @@ describe("the platform debt card", () => {
     expect(card.querySelector('[data-billing-access="active"]')).not.toBeNull();
   });
 
+  test("the open invoice shows ITS percent, not the company's live one", async () => {
+    // The percent changed after the invoice was issued: the bill keeps 10 %.
+    api.handler = (p) => (p === "/company/4/platform-billing" ? Promise.resolve({ ...OVERVIEW, commission_percent: "25.00" }) : notFound());
+    mount("company_owner", { company_id: 4 });
+    const card = await screen.findByTestId("platform-debt-card");
+    expect(within(card).getByText("10%")).toBeTruthy();
+    expect(within(card).queryByText("25%")).toBeNull();
+  });
+
   test("a manager gets no card and asks nothing", async () => {
     mount("manager", { branch_id: 9 });
     await waitFor(() => expect(document.querySelector(".stat-tile")).not.toBeNull());

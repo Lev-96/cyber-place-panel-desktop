@@ -76,7 +76,8 @@ const PlatformDebtCard = ({ companyId }: { companyId: number }) => {
       {inv && <Kv k={t("platformBilling.charge")} v={money(inv.amount, inv.currency)} />}
       {inv && <Kv k={t("platformBilling.paid")} v={money(inv.paid_amount, inv.currency)} />}
       <Kv k={t("platformBilling.nextDue")} v={formatBillingDate(data.next_due_on)} />
-      <Kv k={t("platformBilling.percent")} v={percentText(data.commission_percent)} />
+      {/* The open invoice's own (snapshotted) percent; the live one only when nothing is owed. */}
+      <Kv k={t("platformBilling.percent")} v={percentText(inv?.commission_percent ?? data.commission_percent)} />
       <Kv
         k={<>{t("platformBilling.currentMonth")} <span className="billing-estimate">{t("platformBilling.estimate")}</span></>}
         v={money(data.current_period.commission_amount, cur)}

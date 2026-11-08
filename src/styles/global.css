@@ -9481,8 +9481,8 @@ select.input option:disabled {
 /* === Dashboard layout, icons, Cyber Place Platform billing (2026-11-09) ======
    The dashboard is two columns: the tiles and links (`.home-main`) and, on the
    right, the platform bill (`.home-aside`, ~400px). Flex-wrap does the
-   stacking: at 1280 the content area (~976px beside the menu) fits 480 + 24 +
-   400; below 1100px the aside takes the whole row under the main column, and
+   stacking: at 1280 the content area (~900px inside the page card) fits 440 +
+   24 + 400 (480 did not: measured 2026-11-09, the card wrapped below); below 1100px the aside takes the whole row under the main column, and
    at the 520px minimum both are full width. An aside whose card rendered
    nothing (a backend without platform billing) is `:empty` and takes no room,
    so that dashboard is exactly the old one. */
@@ -9494,7 +9494,7 @@ select.input option:disabled {
   width: 100%;
 }
 .home-main {
-  flex: 1 1 480px;
+  flex: 1 1 440px;
   min-width: 0;
   display: flex;
   flex-direction: column;
