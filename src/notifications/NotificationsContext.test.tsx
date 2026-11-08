@@ -119,3 +119,64 @@ describe("the notifications feed", () => {
     expect(api.page.mock.calls.length).toBe(reads);
   });
 });
+
+/**
+ * An admin's feed (2026-11-09) carries Cyber Place Platform payment notices
+ * ONLY: whatever else their table holds is dropped from the list, the badge
+ * and the push, and the badge counts what the admin can actually see.
+ */
+describe("the admin's feed", () => {
+  const billing = (id: string, read = false) => ({
+    id, type: "App\\Notifications\\PlatformBillingNotice", read_at: read ? "2026-11-09T10:00:00Z" : null, created_at: "2026-11-09T09:00:00Z",
+    data: { type: "platform_billing.overdue_d2", invoice_id: 31, company_id: 4 },
+  });
+  const legacy = (id: string) => ({
+    id, type: "App\\Notifications\\CompanyPaymentDue", read_at: null, created_at: "2026-11-09T09:00:00Z",
+    data: { type: "company.payment_due", company_id: 4 },
+  });
+
+  beforeEach(() => {
+    api.page.mockReset();
+    api.count.mockReset();
+    socket.listener = null;
+    auth.value = { user: { id: 1, role: "admin" } };
+  });
+  afterEach(() => {
+    cleanup();
+    vi.useRealTimers();
+    auth.value = { user: { id: 9, role: "manager" } };
+  });
+
+  test("reads the feed and keeps only payment notices; the badge counts those", async () => {
+    api.page.mockResolvedValue(page([legacy("x1"), billing("b1"), billing("b2", true), legacy("x2")], 4));
+    await mount();
+    expect(probe()).toBe("2|1|b1,b2");
+  });
+
+  test("a pushed row of another kind is ignored; a payment notice is added", async () => {
+    api.page.mockResolvedValue(page([], 0));
+    await mount();
+    await act(async () => { socket.listener?.(legacy("x1")); });
+    expect(probe()).toBe("0|0|");
+    await act(async () => { socket.listener?.(billing("b1")); });
+    expect(probe()).toBe("1|1|b1");
+  });
+
+  test("the poll compares the server's count with the server's count, not the filtered one", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    // Server: 3 unread (2 hidden); the admin sees 1.
+    api.page.mockResolvedValue(page([legacy("x1"), legacy("x2"), billing("b1")], 3));
+    await mount();
+    api.count.mockResolvedValue({ unread_count: 3 });
+    const reads = api.page.mock.calls.length;
+    await act(async () => { await vi.advanceTimersByTimeAsync(60_000); });
+    expect(api.page.mock.calls.length, "nothing moved: no re-read every minute").toBe(reads);
+  });
+
+  test("a manager's feed is not filtered", async () => {
+    auth.value = { user: { id: 9, role: "manager" } };
+    api.page.mockResolvedValue(page([legacy("x1"), billing("b1")], 2));
+    await mount();
+    expect(probe()).toBe("2|2|x1,b1");
+  });
+});

@@ -1,4 +1,7 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import PlatformBillingModal from "@/components/platformBilling/PlatformBillingModal";
+import PlatformBillingNoticeCard from "@/components/platformBilling/PlatformBillingNoticeCard";
+import { isPlatformBillingNotice, noticeTarget } from "@/components/platformBilling/billingNotice";
 import { ListSkeleton } from "@/components/ui/Skeleton";
 import { apiBillingReminders, apiCompanyBilling, IBillingReminder, ICompanyBilling } from "@/api/billing";
 import type { IServiceExpense } from "@/api/expenses";
@@ -84,6 +87,12 @@ const REMINDER_WITHIN_DAYS = 7;
  * identical for both roles — a payment due inside the window, or nothing.
  */
 export const ownCompanyReminders = (billing: ICompanyBilling): IBillingReminder[] => {
+  // A backend with platform invoices (2026-11-09) says so by sending
+  // `outstanding_amount`, and it also writes the payment notices into the
+  // feed (the server's own D-3 / D / D+2 … rows, in Armenian) — those rows
+  // and the dashboard's debt card replace this client-side reminder, so the
+  // same debt is never announced twice. An older backend keeps the reminder.
+  if (billing.outstanding_amount !== undefined) return [];
   const days = billing.days_until_due;
   const due = billing.is_overdue || (days != null && days <= REMINDER_WITHIN_DAYS);
   if (!due) return [];
@@ -157,15 +166,26 @@ const Notifications = () => {
     [isAdmin],
   );
 
+  // Platform payment notices (2026-11-09) are database rows like the rest,
+  // but they belong to the Billing section: an owner's operational feed stays
+  // about seats, and an admin's feed holds nothing else.
+  const billingRows = list.filter(isPlatformBillingNotice);
+  const feedRows = billingRows.length === 0 ? list : list.filter((n) => !isPlatformBillingNotice(n));
+  const [billingDetail, setBillingDetail] = useState<{ invoiceId: number | null; companyId: number | null } | null>(null);
+
   // Each feed answers for itself: one failing must not hide the other, and
   // neither may read as "no notifications" when it could not be read.
   const bookingsView = deriveViewState({
     loading: !settledDb,
     error: errorDb,
-    data: settledDb && (list.length > 0 || !errorDb) ? list : null,
+    data: settledDb && (feedRows.length > 0 || !errorDb) ? feedRows : null,
   });
-  const billingView = deriveViewState({ loading: billing.loading, error: billing.error, data: billing.data?.data });
   const billingList = billing.data?.data ?? [];
+  const billingView = deriveViewState({
+    loading: billing.loading && billingRows.length === 0,
+    error: billing.error,
+    data: billing.data ? [...billingRows, ...billingList] : billingRows.length > 0 ? billingRows : null,
+  });
   const expensesList = expenses.data ?? [];
 
   return (
@@ -186,7 +206,7 @@ const Notifications = () => {
                   {t("notifications.markAllRead") || "Mark all as read"}
                 </button>
               )}
-              {list.length > 0 && (
+              {feedRows.length > 0 && (
                 <button
                   type="button"
                   onClick={async () => {
@@ -215,7 +235,7 @@ const Notifications = () => {
             empty={{ titleKey: "notifications.state.emptyTitle", descriptionKey: dbFeedCopy(user?.role).emptyKey }}
           >
             <div style={{ display: "grid", gap: 12, marginBottom: 24 }}>
-              {list.map((n) => (
+              {feedRows.map((n) => (
                 <DbNotificationCard
                   key={n.id}
                   n={n}
@@ -242,12 +262,28 @@ const Notifications = () => {
             empty={{ titleKey: "notifications.state.emptyTitle", descriptionKey: "notifications.state.billingEmptyDescription" }}
           >
             <div style={{ display: "grid", gap: 12 }}>
+              {billingRows.map((n) => (
+                <PlatformBillingNoticeCard
+                  key={n.id}
+                  n={n}
+                  onOpen={() => { void markRead(n.id); setBillingDetail(noticeTarget(n)); }}
+                  onDelete={() => void deleteOne(n.id)}
+                />
+              ))}
               {billingList.map((r) => (
                 <ReminderCard key={r.id} r={r} isAdmin={isAdmin} />
               ))}
             </div>
           </StateSwitch>
         </>
+      )}
+
+      {billingDetail && (
+        <PlatformBillingModal
+          companyId={billingDetail.companyId}
+          invoiceId={billingDetail.invoiceId}
+          onClose={() => setBillingDetail(null)}
+        />
       )}
 
       {isAdmin && expensesList.length > 0 && (

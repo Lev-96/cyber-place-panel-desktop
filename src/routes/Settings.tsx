@@ -2,6 +2,7 @@ import { useAuth } from "@/auth/AuthContext";
 import Button from "@/components/ui/Button";
 import ScreenWithBg from "@/components/ui/ScreenWithBg";
 import PsnSenderCard from "@/components/ps5/PsnSenderCard";
+import NotificationSettings from "@/components/settings/NotificationSettings";
 import { PSN_FEATURE } from "@/api/psn";
 import { useLang } from "@/i18n/LanguageContext";
 import { AMD_UNIT, Currency } from "@/i18n/currency";
@@ -51,6 +52,10 @@ const Settings = () => {
       {PSN_FEATURE.playerMessages && user?.role === "company_owner" && typeof user.dashboard?.company_id === "number" && (
         <PsnSenderCard companyId={user.dashboard.company_id} />
       )}
+
+      {/* Which notifications the owner receives (2026-11-09). An owner's
+          setting: the server applies it to the owner's own notices. */}
+      {user?.role === "company_owner" && <NotificationSettings />}
 
       <div className="gradient-card"><div className="gradient-card-inner">
         <h3 style={{ margin: 0 }}>{t("settings.account")}</h3>

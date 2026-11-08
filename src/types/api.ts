@@ -1,4 +1,5 @@
 import { Translated } from "@/i18n/translated";
+import type { BillingAccess } from "./platformBilling";
 import type { BranchStatus } from "@/types/branch";
 
 /**
@@ -343,6 +344,13 @@ export interface IBranchApi extends Translated {
    *  null if the branch has never set one. The PIN hash itself is
    *  shipped only to agents, never to the panel. */
   unlock_pin_updated_at?: string | null;
+  /**
+   * What an unpaid Cyber Place Platform invoice does to new work here
+   * (2026-11-09, `BranchResource`, staff responses only): `restricted` (D+5)
+   * or `suspended` (D+7). Absent on an older backend, which reads as active.
+   * Display only: the server refuses the gated writes either way.
+   */
+  billing_access?: BillingAccess;
 }
 
 export interface ICompanyApi extends Translated {

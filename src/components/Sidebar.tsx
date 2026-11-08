@@ -352,6 +352,7 @@ export const menuSpecsFor = (
       { to: "/managers", labelKey: "nav.managers", show: can(role, "menu.managers") },
       { to: "/owners", labelKey: "nav.owners", show: can(role, "owner.view") },
       { to: "/security", labelKey: "nav.security", show: can(role, "menu.security") },
+      { to: "/platform-billing", labelKey: "nav.platformBilling", show: can(role, "menu.platformBilling") },
       {
         to: "/notifications",
         labelKey: "nav.notifications",

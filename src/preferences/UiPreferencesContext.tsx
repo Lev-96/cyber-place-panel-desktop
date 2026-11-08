@@ -6,7 +6,7 @@ import { ReactNode, createContext, useCallback, useContext, useEffect, useMemo, 
 import {
   BOARD_DEFAULTS, DEFAULT_PREFERENCES, NEW_PERSON_PREFERENCES, ONBOARDING_VERSION, SCHEMA_VERSION,
   effectiveBoard, effectiveLayout, parseBoard, parsePreferences, toBoardDocument, toDocument,
-  type BoardGeometry, type Layout, type UiPreferences,
+  type BoardGeometry, type Layout, type NotificationPrefs, type UiPreferences,
 } from "./uiPreferences";
 
 /**
@@ -37,6 +37,14 @@ export interface UiPreferencesState {
   /** The last save did not reach the server (kept here and retried on the next). */
   saveFailed: boolean;
   save: (next: UiPreferences) => Promise<void>;
+  /**
+   * Save the notification settings alone (2026-11-09). Same document, same
+   * PUT; if the server refuses it — a backend that predates the setting
+   * answers 422 to the unknown key — the setting goes back to what it was,
+   * so the NEXT save of the look (which carries the block) is not refused
+   * too. Rejects with the server's error for the screen to show.
+   */
+  saveNotifications: (next: NotificationPrefs) => Promise<void>;
   finishOnboarding: (next: UiPreferences) => Promise<void>;
   preview: (candidate: UiPreferences | null) => void;
   /**
@@ -230,6 +238,29 @@ export const UiPreferencesProvider = ({ children }: { children: ReactNode }) => 
     hasSaved,
     saveFailed,
     save: (next) => persist(next),
+    saveNotifications: async (next) => {
+      const id = owner.current;
+      if (id === null) return;
+      const before = prefs.notifications;
+      const doc = toDocument({ ...prefs, notifications: next });
+      // Its own PUT rather than `persist`: saving a notification switch must
+      // not drop an unsaved look the person left on the interface screen.
+      setPrefs((p) => ({ ...p, notifications: next }));
+      try {
+        const reported = pendingOnboarding.current ?? undefined;
+        await preferencesRepository.put({
+          schema_version: SCHEMA_VERSION,
+          data: doc,
+          ...(reported !== undefined ? { onboarding_version: reported } : {}),
+        });
+        if (owner.current !== id) return;
+        setHasSaved(true);
+        void keyValueStore.set(cacheKey(id), doc).catch(() => {});
+      } catch (e) {
+        if (owner.current === id) setPrefs((p) => ({ ...p, notifications: before }));
+        throw e;
+      }
+    },
     finishOnboarding: async (next) => {
       // Finished on screen at once, whatever the network does: the wizard is
       // never shown twice in one sitting because a save was slow.

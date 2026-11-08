@@ -111,6 +111,44 @@ export interface BoardGeometry {
   gap_y: number | null;
 }
 
+/**
+ * Which notifications the owner receives (2026-11-09, «Уведомления» in
+ * Settings). Stored in the same server document, as `data.notifications`.
+ */
+export const NOTIFICATION_CATEGORIES = ["bookings", "sessions", "support", "system", "platform_billing"] as const;
+export type NotificationCategory = (typeof NOTIFICATION_CATEGORIES)[number];
+
+export interface NotificationCategoryPrefs {
+  enabled: boolean;
+}
+
+/** Platform payment notices also choose their channels (the panel row always comes with `enabled`). */
+export interface PlatformBillingPrefs extends NotificationCategoryPrefs {
+  email: boolean;
+  telegram: boolean;
+}
+
+export interface NotificationPrefs {
+  categories: Record<Exclude<NotificationCategory, "platform_billing">, NotificationCategoryPrefs> & {
+    platform_billing: PlatformBillingPrefs;
+  };
+}
+
+/**
+ * A person who never stored the block reads as LEGACY: everything on, exactly
+ * what they got before the setting existed. (A NEW owner gets an explicit
+ * block from the server instead; that is the server's decision, not this one.)
+ */
+export const LEGACY_NOTIFICATIONS: NotificationPrefs = {
+  categories: {
+    bookings: { enabled: true },
+    sessions: { enabled: true },
+    support: { enabled: true },
+    system: { enabled: true },
+    platform_billing: { enabled: true, email: true, telegram: true },
+  },
+};
+
 export interface UiPreferences {
   interface: InterfaceId;
   theme: ThemeId;
@@ -119,6 +157,13 @@ export interface UiPreferences {
   sound: SoundPrefs;
   /** The person's own board geometry; used when interface = custom. Local only. */
   board: BoardGeometry;
+  /**
+   * The stored notification settings, or null when the document has none
+   * (read as {@link LEGACY_NOTIFICATIONS}). Null is kept apart from "all on"
+   * on purpose: a document without the block is sent back without it, which
+   * is the only document a backend that predates the setting accepts.
+   */
+  notifications: NotificationPrefs | null;
 }
 
 /** The local board document's format; bumped only with a breaking change. */
@@ -222,6 +267,7 @@ export const DEFAULT_PREFERENCES: UiPreferences = {
   layout: PRESETS.standard,
   sound: defaultSound(),
   board: BOARD_DEFAULTS,
+  notifications: null,
 };
 
 /** What the first-run setup offers a NEW person (owner decision 2026-10-27). */
@@ -273,6 +319,39 @@ const parseSound = (raw: unknown): SoundPrefs => {
   return { profile: oneOf(SOUND_PROFILES, o.profile, "standard"), categories };
 };
 
+const flag = (o: Record<string, unknown>, key: string, fallback: boolean): boolean =>
+  typeof o[key] === "boolean" ? (o[key] as boolean) : fallback;
+
+/**
+ * Read a stored `notifications` block. Absent or not an object → null (legacy).
+ * Present → every category and channel it does not carry takes its legacy
+ * value (on), field by field, so a partial or newer block never loses the rest.
+ */
+export const parseNotifications = (raw: unknown): NotificationPrefs | null => {
+  if (!isObject(raw)) return null;
+  const cats = isObject(raw.categories) ? raw.categories : {};
+  const cat = (c: NotificationCategory): Record<string, unknown> => (isObject(cats[c]) ? (cats[c] as Record<string, unknown>) : {});
+  const L = LEGACY_NOTIFICATIONS.categories;
+  const pb = cat("platform_billing");
+  return {
+    categories: {
+      bookings: { enabled: flag(cat("bookings"), "enabled", L.bookings.enabled) },
+      sessions: { enabled: flag(cat("sessions"), "enabled", L.sessions.enabled) },
+      support: { enabled: flag(cat("support"), "enabled", L.support.enabled) },
+      system: { enabled: flag(cat("system"), "enabled", L.system.enabled) },
+      platform_billing: {
+        enabled: flag(pb, "enabled", L.platform_billing.enabled),
+        email: flag(pb, "email", L.platform_billing.email),
+        telegram: flag(pb, "telegram", L.platform_billing.telegram),
+      },
+    },
+  };
+};
+
+/** The settings in force: the stored ones, or legacy (all on) when none are stored. */
+export const effectiveNotifications = (p: Pick<UiPreferences, "notifications">): NotificationPrefs =>
+  p.notifications ?? LEGACY_NOTIFICATIONS;
+
 /**
  * Read a stored document into preferences this build understands. Never
  * throws: anything missing, unknown or malformed takes its default, field by
@@ -287,6 +366,7 @@ export const parsePreferences = (raw: unknown, fallback: UiPreferences = DEFAULT
     sound: isObject(raw.sound) ? parseSound(raw.sound) : structuredClone(fallback.sound),
     // Never in the server document: the provider reads it from this computer.
     board: { ...fallback.board },
+    notifications: "notifications" in raw ? parseNotifications(raw.notifications) : fallback.notifications,
   };
 };
 
@@ -304,6 +384,11 @@ export const toDocument = (p: UiPreferences) => ({
   theme: p.theme,
   layout: layoutDocument(p.layout),
   sound: p.sound,
+  // Only when the person has the block (2026-11-09): a backend that predates
+  // it refuses the WHOLE document for an unknown key (422), so a person who
+  // never touched the setting keeps sending exactly what they always did; and
+  // a stored block is always sent back, so saving the look never wipes it.
+  ...(p.notifications ? { notifications: p.notifications } : {}),
 });
 
 /**

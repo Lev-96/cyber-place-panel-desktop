@@ -278,17 +278,26 @@ describe("creating a product from the basket", () => {
     expect(repo.addItems).toHaveBeenCalledWith(42, [{ product_id: 77, qty: 1 }]);
   });
 
-  test("a manager is not offered the catalogue form at all", async () => {
-    // The backend has always refused a manager here (`products.manage` → 403).
-    // The button was drawn anyway, so the one role standing at the counter
-    // pressed it mid-sale and got a permission error. They sell from the list.
+  test("a manager is offered the catalogue form (products.write, 2026-11-09)", async () => {
+    // Until 2026-11-09 the backend refused a manager here (`products.manage`
+    // → 403) and the button was hidden. Product writes moved to
+    // `products.write`, which the branch's manager holds, so the one role
+    // standing at the counter can add what the shelf has and the list lacks.
     auth.role = "manager";
     repo.listProducts.mockResolvedValue(products);
     await mount();
 
+    expect(screen.getByText("session.createProduct")).toBeTruthy();
+    expect(screen.getByText("session.createProductHint")).toBeTruthy();
+    expect(plusFor("Lays")).toBeTruthy();
+  });
+
+  test("a role with no catalogue write right is not offered the form", async () => {
+    auth.role = "nobody";
+    repo.listProducts.mockResolvedValue(products);
+    await mount();
+
     expect(screen.queryByText("session.createProduct")).toBeNull();
-    expect(screen.queryByText("session.createProductHint")).toBeNull();
-    // The catalogue itself is untouched: selling is exactly what they may do.
     expect(plusFor("Lays")).toBeTruthy();
   });
 

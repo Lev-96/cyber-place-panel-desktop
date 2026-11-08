@@ -381,3 +381,10 @@ describe("cash received and change", () => {
     expect(document.activeElement).not.toBe(screen.getByTestId("cash-received"));
   });
 });
+
+describe("a product the branch does not stock yet (2026-11-09)", () => {
+  test("the manager at the till is offered «new product» — products.write is theirs now", async () => {
+    await mount();
+    expect(screen.getByText("session.createProduct")).toBeTruthy();
+  });
+});

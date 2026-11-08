@@ -72,8 +72,8 @@ interface Props {
  */
 const AddSessionItemDialog = ({ branchId, session, onClose, onAdded }: Props) => {
   const { user } = useAuth();
-  /** Mirrors the backend's `products.manage`; the two are pinned by tests on both sides. */
-  const canCreateProducts = can(user?.role, "product.crud");
+  /** Mirrors the backend's `products.write` (manager too since 2026-11-09). */
+  const canCreateProducts = can(user?.role, "product.write");
   const { money, t } = useLang();
   const [saving, setSaving] = useState(false);
   const confirmingRef = useRef(false);

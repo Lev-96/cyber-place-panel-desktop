@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatDate, formatDateTime, formatMonth, formatTime } from "./dates";
+import { formatDate, formatDateTime, formatMonth, formatTime, formatVenueDateTime } from "./dates";
 
 // Dates are formatted in the runner's local TZ. The tests construct dates
 // via the local-time `Date` constructor so the assertions are stable
@@ -62,5 +62,19 @@ describe("formatMonth", () => {
 
   it("returns placeholder for invalid input", () => {
     expect(formatMonth(null)).toBe("-");
+  });
+});
+
+describe("formatVenueDateTime (2026-11-09)", () => {
+  it("reads the instant on the venue's clock, Asia/Yerevan (UTC+4), 24-hour", () => {
+    // 19:55 UTC is 23:55 in Yerevan, whatever zone the runner is in.
+    expect(formatVenueDateTime("2026-11-09T19:55:00Z")).toBe("09.11.2026 23:55");
+    // Past midnight in Yerevan rolls the date: never "12:30 AM".
+    expect(formatVenueDateTime("2026-11-09T20:30:00Z")).toBe("10.11.2026 00:30");
+  });
+
+  it("returns the placeholder for nothing or garbage", () => {
+    expect(formatVenueDateTime(null)).toBe("-");
+    expect(formatVenueDateTime("not a date")).toBe("-");
   });
 });

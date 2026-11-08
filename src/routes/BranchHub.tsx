@@ -16,6 +16,8 @@ import { fmt } from "@/i18n/translations";
 import { useAccessVersion } from "@/realtime/accessVersion";
 import { branchRepository } from "@/repositories/BranchRepository";
 import { isBranchInactive } from "@/types/branch";
+import { billingAccessOf } from "@/types/platformBilling";
+import NavIcon from "@/components/ui/NavIcon";
 import { DragEvent, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 
@@ -41,8 +43,19 @@ export const isBranchReadOnly = (role: string | undefined, isBlocked: boolean | 
 export const readOnlyNoticeKey = (blockedAt: string | null | undefined): string =>
   blockedAt ? "blocking.readOnly.banner" : "blocking.readOnly.bannerByCompany";
 
+/**
+ * The banner for a branch whose company has an unpaid platform invoice, or
+ * null when it is fully open (or the backend predates the field).
+ */
+export const billingAccessNoticeKey = (access: unknown): string | null => {
+  const a = billingAccessOf(access);
+  return a === "active" ? null : `billingAccess.banner.${a}`;
+};
+
 interface TileDef {
   key: string;
+  /** The section's NavIcon id (the same shape its menu shortcut draws). */
+  icon: string;
   to: string;
   title: string;
   hint: string;
@@ -89,6 +102,11 @@ const BranchHub = () => {
         t("branch.status.active"),
       )}`
     : t("branch.inactive.notice");
+  // An unpaid Cyber Place Platform invoice limits NEW work here (2026-11-09):
+  // say what is limited and that running seats carry on. Only the sentence;
+  // the tiles stay live, because stopping, paying and adding time all still
+  // work, and the server refuses exactly the gated writes with its own message.
+  const billingNoticeKey = billingAccessNoticeKey(data?.billing_access);
   const [dragKey, setDragKey] = useState<string | null>(null);
   const [dropKey, setDropKey] = useState<string | null>(null);
 
@@ -97,6 +115,7 @@ const BranchHub = () => {
   // without any backend change.
   const tiles: TileDef[] = BRANCH_SECTIONS.map((section) => ({
     key: section.key,
+    icon: section.icon,
     to: branchSectionPath(section, id),
     title: t(section.titleKey),
     hint: t(section.hintKey),
@@ -203,6 +222,12 @@ const BranchHub = () => {
           {inactiveNotice}
         </div>
       )}
+      {billingNoticeKey && (
+        <div className="card state-notice" role="status" data-billing-access={data?.billing_access}>
+          {t(billingNoticeKey)}
+          {can(role, "revenue.view") && role !== "admin" && <> {t("billingAccess.banner.ownerAction")}</>}
+        </div>
+      )}
 
       <div
         className="row"
@@ -216,6 +241,7 @@ const BranchHub = () => {
         {ordered.map((tile) => (
           <Tile
             key={tile.key}
+            icon={tile.icon}
             to={tile.to}
             title={tile.title}
             hint={tile.hint}
@@ -244,6 +270,7 @@ const BranchHub = () => {
 };
 
 interface TileProps {
+  icon: string;
   to: string;
   title: string;
   hint: string;
@@ -269,7 +296,7 @@ interface TileProps {
  * administrator made. The reason travels with the tile (title + aria-label) so
  * a greyed-out card is never a mystery.
  */
-const Tile = ({ to, title, hint, disabled, disabledHint, dragHint, dragging, dropTarget, onDragStart, onDragEnd, onDragOver, onDrop }: TileProps) => (
+const Tile = ({ icon, to, title, hint, disabled, disabledHint, dragHint, dragging, dropTarget, onDragStart, onDragEnd, onDragOver, onDrop }: TileProps) => (
   <Link
     to={to}
     className={`card hub-tile${disabled ? " is-disabled" : ""}`}
@@ -307,7 +334,10 @@ const Tile = ({ to, title, hint, disabled, disabledHint, dragHint, dragging, dro
     >
       ⠿
     </span>
-    <div style={{ fontWeight: 700, fontSize: 16, color: disabled ? "var(--color-muted-alt)" : "var(--color-primary)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", paddingRight: 18 }}>{title}</div>
+    <div className="hub-tile__title" style={{ color: disabled ? "var(--color-muted-alt)" : "var(--color-primary)" }}>
+      <NavIcon id={icon} />
+      <span className="hub-tile__label">{title}</span>
+    </div>
     <div className="muted" style={{ fontSize: 12, lineHeight: 1.3, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>{hint}</div>
   </Link>
 );

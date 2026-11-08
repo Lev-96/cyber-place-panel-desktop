@@ -9467,3 +9467,619 @@ select.input option:disabled {
 /* A seat that ended by itself, paid afterwards (2026-11-07). */
 .pay-mark-note { padding: var(--space-2) var(--space-3); border-radius: var(--radius-sm); background: rgb(var(--warning-rgb) / 0.12); color: var(--color-warning); font-size: 13px; font-weight: 600; }
 .pay-mark-done { padding: var(--space-2) var(--space-3); border-radius: var(--radius-sm); background: rgb(var(--success-rgb) / 0.12); color: var(--color-success); font-size: 13px; font-weight: 600; }
+/* «История товаров» (2026-11-09): the product audit trail, filters + rows. */
+.product-history { gap: var(--space-3); }
+.product-history-filters { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--space-3); }
+/* 180px holds the longest label ("Ցանկացած գործողություն") without clipping; date inputs size to content. */
+.product-history-field { display: flex; flex-direction: column; gap: var(--space-1); flex: 1 1 180px; min-width: 0; max-width: 280px; }
+.product-history-field--date { flex: 0 1 auto; }
+.product-history-total { font-size: var(--fs-sm); }
+.product-history-body { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; }
+.product-history-body .name, .product-history-body .meta { overflow-wrap: anywhere; }
+.product-history-change { font-size: var(--fs-sm); font-weight: 600; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+
+/* === Dashboard layout, icons, Cyber Place Platform billing (2026-11-09) ======
+   The dashboard is two columns: the tiles and links (`.home-main`) and, on the
+   right, the platform bill (`.home-aside`, ~400px). Flex-wrap does the
+   stacking: at 1280 the content area (~976px beside the menu) fits 480 + 24 +
+   400; below 1100px the aside takes the whole row under the main column, and
+   at the 520px minimum both are full width. An aside whose card rendered
+   nothing (a backend without platform billing) is `:empty` and takes no room,
+   so that dashboard is exactly the old one. */
+.home-layout {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--space-6);
+  width: 100%;
+}
+.home-main {
+  flex: 1 1 480px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.home-aside {
+  flex: 0 1 400px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.home-aside:empty {
+  display: none;
+}
+@media (max-width: 1100px) {
+  .home-aside {
+    flex-basis: 100%;
+  }
+}
+
+/* A dashboard tile's label with its icon (the side menu's shape for the same place). */
+.stat-tile__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.stat-tile__head .nav-icon {
+  flex-shrink: 0;
+  color: var(--color-primary);
+}
+
+/* Quick links: icon + title + one line of what is behind it. Same width floor
+   (220px) the inline styles had; wraps instead of overflowing. */
+.home-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+.home-link {
+  flex: 0 1 auto;
+  min-width: min(220px, 100%);
+  max-width: 100%;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  color: inherit;
+  text-decoration: none;
+}
+.home-link .nav-icon {
+  flex-shrink: 0;
+  color: var(--color-primary);
+}
+.home-link__text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+.home-link__title {
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+.home-link__sub {
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+/* Branch hub tile: the section's icon before its title. The right padding
+   keeps the title clear of the drag handle in the tile's corner. */
+.hub-tile__title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  padding-right: var(--space-5);
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+.hub-tile__title .nav-icon {
+  flex-shrink: 0;
+}
+.hub-tile__label {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* Invoice state / access badges. */
+.billing-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px var(--space-2);
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  line-height: 1.4;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.billing-badge--ok {
+  color: var(--color-success);
+  background: rgb(var(--success-rgb) / 0.15);
+}
+.billing-badge--warn {
+  color: var(--color-warning);
+  background: rgb(var(--warning-rgb) / 0.15);
+}
+.billing-badge--danger {
+  color: var(--color-danger);
+  background: rgb(var(--danger-rgb) / 0.15);
+}
+.billing-badge--muted {
+  color: var(--color-muted);
+  border-color: var(--color-border);
+}
+.billing-danger {
+  color: var(--color-danger);
+  font-weight: 600;
+}
+/* "estimate" beside the running month: never mistaken for a billed figure. */
+.billing-estimate {
+  display: inline-block;
+  margin-left: var(--space-1);
+  padding: 0 6px;
+  border: 1px dashed currentColor;
+  border-radius: 999px;
+  color: var(--color-warning);
+  font-size: var(--fs-xs);
+  text-transform: uppercase;
+}
+
+/* The owner's debt card / the admin's fleet card. */
+.platform-debt {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+  border-left: 4px solid var(--color-success);
+}
+.platform-debt--warn {
+  border-left-color: var(--color-warning);
+}
+.platform-debt--danger {
+  border-left-color: var(--color-danger);
+}
+.platform-debt__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+.platform-debt__title {
+  margin: 0;
+  font-size: var(--fs-lg);
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+.platform-debt__total {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-2) 0;
+}
+.platform-debt__total-label {
+  color: var(--color-muted);
+  font-size: var(--fs-sm);
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+.platform-debt__total-value {
+  color: var(--color-primary);
+  font-size: clamp(22px, 2.4vw, 32px);
+  font-weight: 800;
+  line-height: 1.15;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.platform-debt__none {
+  margin: 0;
+}
+.platform-debt__more {
+  align-self: flex-start;
+  margin-top: var(--space-2);
+}
+
+/* "Details": the running month, the invoice list and one invoice. */
+.billing-modal {
+  width: 880px;
+  max-width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.billing-modal__title {
+  margin: 0;
+  padding-right: var(--space-6);
+  font-size: var(--fs-xl);
+  line-height: 1.3;
+}
+.billing-modal__estimate {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+}
+.billing-modal__hint {
+  margin: 0;
+  font-size: var(--fs-sm);
+  line-height: 1.45;
+}
+.billing-modal__body {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--space-4);
+}
+.billing-modal__history {
+  flex: 1 1 260px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.billing-modal__detail {
+  flex: 2 1 400px;
+  min-width: 0;
+}
+.billing-modal__subtitle {
+  margin: 0;
+  font-size: var(--fs-md);
+}
+.billing-history {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.billing-history__row,
+.billing-admin__row {
+  width: 100%;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.2s ease, background-color 0.2s ease;
+}
+.billing-history__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: transparent;
+}
+.billing-history__row:hover,
+.billing-history__row.is-selected,
+.billing-admin__row:hover,
+.billing-admin__row.is-selected {
+  border-color: var(--color-primary);
+  background: rgb(var(--accent-rgb) / 0.08);
+}
+.billing-history__row:focus-visible,
+.billing-admin__row:focus-visible,
+.billing-notice__delete:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+.billing-history__period {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-variant-numeric: tabular-nums;
+}
+.billing-history__amount {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.invoice-detail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.invoice-detail__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+.invoice-detail__period {
+  font-size: var(--fs-md);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.invoice-detail__section {
+  margin: var(--space-3) 0 0;
+  color: var(--color-muted);
+  font-size: var(--fs-sm);
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+.invoice-detail__note {
+  margin: 0;
+  font-size: var(--fs-sm);
+  line-height: 1.45;
+}
+.invoice-detail__table {
+  display: flex;
+  flex-direction: column;
+  font-size: var(--fs-sm);
+}
+.invoice-detail__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  padding: var(--space-1) 0;
+  border-bottom: 1px solid var(--color-border);
+}
+.invoice-detail__row > * {
+  flex: 1 1 88px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
+}
+.invoice-detail__row > :first-child {
+  flex-basis: 140px;
+}
+.invoice-detail__row--head {
+  color: var(--color-muted);
+  font-weight: 600;
+}
+.invoice-detail__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.invoice-detail__item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+}
+.invoice-detail__item-main {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--space-2);
+  font-weight: 600;
+}
+.invoice-detail__amount {
+  font-variant-numeric: tabular-nums;
+}
+.invoice-detail__item-meta {
+  font-size: var(--fs-sm);
+  overflow-wrap: anywhere;
+}
+
+/* Admin "Club payments". */
+.billing-admin__filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+.billing-admin__filter {
+  flex: 0 1 240px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.billing-admin {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--space-4);
+}
+.billing-admin__list {
+  flex: 1 1 480px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.billing-admin__detail {
+  flex: 1 1 400px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.billing-admin__rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.billing-admin__row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.billing-admin__row-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+.billing-admin__company {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: var(--fs-md);
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+.billing-admin__branches {
+  font-size: var(--fs-sm);
+  overflow-wrap: anywhere;
+}
+.billing-admin__figures {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+}
+.billing-admin__fig {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+.billing-admin__fig-k {
+  color: var(--color-muted);
+  font-size: var(--fs-xs);
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+}
+.billing-admin__fig-v {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.billing-admin__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.billing-admin__saved {
+  color: var(--color-success);
+  font-size: var(--fs-sm);
+}
+
+/* One admin write: payment / adjustment / extension. */
+.billing-action {
+  width: 440px;
+  max-width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.billing-action__title {
+  margin: 0;
+  padding-right: var(--space-6);
+  font-size: var(--fs-xl);
+}
+.billing-action__who {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.billing-action__field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.billing-action__reason {
+  min-height: 96px;
+  resize: vertical;
+}
+.billing-action__buttons {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+/* A payment notice in the feed (Armenian text, the panel's own controls). */
+.billing-notice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--space-3);
+  border-left: 4px solid var(--color-warning);
+}
+.billing-notice--danger {
+  border-left-color: var(--color-danger);
+}
+.billing-notice--ok {
+  border-left-color: var(--color-success);
+}
+.billing-notice__text {
+  flex: 1 1 260px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.billing-notice__title {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--fs-md);
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+.billing-notice__dot {
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-danger);
+}
+.billing-notice__body {
+  margin: 0;
+  color: var(--color-text-soft);
+  font-size: var(--fs-body);
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+.billing-notice__date {
+  font-size: var(--fs-sm);
+}
+.billing-notice__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.billing-notice__delete {
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--color-danger-deeper);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-danger);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+.billing-notice__delete:hover {
+  background: rgb(var(--danger-rgb) / 0.12);
+}
+
+/* Settings → Notifications (owner). */
+.notification-settings {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.notification-settings__channels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  padding-left: var(--space-8);
+}
+.notification-settings__mandatory {
+  margin: 0;
+  font-size: var(--fs-sm);
+  line-height: 1.45;
+}

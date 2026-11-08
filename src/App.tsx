@@ -53,6 +53,7 @@ const Owners = lazy(() => import("@/routes/Owners"));
 const OwnerDetails = lazy(() => import("@/routes/OwnerDetails"));
 const Revenue = lazy(() => import("@/routes/Revenue"));
 const Security = lazy(() => import("@/routes/Security"));
+const PlatformBilling = lazy(() => import("@/routes/PlatformBilling"));
 const ConfirmByCode = lazy(() => import("@/routes/ConfirmByCode"));
 const GamesList = lazy(() => import("@/routes/GamesList"));
 const Managers = lazy(() => import("@/routes/Managers"));
@@ -329,6 +330,16 @@ const Authed = () => {
           element={
             <RoleGuard perm="menu.security">
               <Security />
+            </RoleGuard>
+          }
+        />
+        {/* Admin only (2026-11-09): every club's Cyber Place Platform
+            invoices, payments, adjustments, extensions. */}
+        <Route
+          path="/platform-billing"
+          element={
+            <RoleGuard perm="menu.platformBilling">
+              <PlatformBilling />
             </RoleGuard>
           }
         />

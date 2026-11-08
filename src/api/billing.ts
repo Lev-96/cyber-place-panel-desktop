@@ -1,3 +1,4 @@
+import type { BillingAccess, MoneyString } from "@/types/platformBilling";
 import { request } from "./client";
 
 export interface ICompanyBilling {
@@ -8,6 +9,14 @@ export interface ICompanyBilling {
   days_until_due: number | null;
   is_overdue: boolean;
   status: "pending" | "active";
+  /*
+   * Appended 2026-11-09 with platform invoices (`CompanyBillingResource`).
+   * Optional: an older backend sends none of them.
+   */
+  billing_access?: BillingAccess;
+  outstanding_amount?: MoneyString;
+  open_invoice_id?: number | null;
+  days_overdue?: number;
 }
 
 export interface IBillingReminder {

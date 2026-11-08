@@ -1,11 +1,30 @@
 import { useAuth } from "@/auth/AuthContext";
+import PlatformDebtCard from "@/components/platformBilling/PlatformDebtCard";
+import PlatformFleetCard from "@/components/platformBilling/PlatformFleetCard";
 import GradientText from "@/components/ui/GradientText";
+import NavIcon from "@/components/ui/NavIcon";
 import ScreenWithBg from "@/components/ui/ScreenWithBg";
 import { useLang } from "@/i18n/LanguageContext";
 import { resolveBookingScopeChannel } from "@/realtime/bookingScope";
 import { useBookingChanged } from "@/realtime/useBookingChanged";
 import { useCallback, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
+
+interface TileSpec {
+  key: string;
+  /** NavIcon id. */
+  icon: string;
+  labelKey: string;
+  value: number | string;
+}
+
+interface LinkSpec {
+  to: string;
+  /** NavIcon id: the same shape the side menu draws for the same place. */
+  icon: string;
+  titleKey: string;
+  subKey: string;
+}
 
 const Home = () => {
   const { user, refreshUser } = useAuth();
@@ -61,6 +80,45 @@ const Home = () => {
   const isManager = user?.role === "manager";
   const dash = user?.dashboard ?? {};
   const myBranchId = typeof dash.branch_id === "number" ? dash.branch_id : null;
+  // What the dashboard shows each role. Owner "Places" was dropped on
+  // 2026-11-09 (owner): the count stays in the payload (`all_places`) for
+  // older panels, it is simply not drawn.
+  const tiles: TileSpec[] = isAdmin
+    ? [
+        { key: "companies", icon: "nav.companies", labelKey: "home.companies", value: dash.total_companies ?? 0 },
+        { key: "branches", icon: "nav.branches", labelKey: "home.branches", value: dash.total_branches ?? 0 },
+        { key: "places", icon: "branch.places", labelKey: "home.places", value: dash.total_places ?? 0 },
+        { key: "bookings", icon: "nav.bookings", labelKey: "home.bookings", value: dash.total_bookings ?? 0 },
+      ]
+    : [
+        ...(isOwner
+          ? [{ key: "activeBranches", icon: "nav.branches", labelKey: "home.activeBranches", value: dash.active_branches ?? 0 }]
+          : []),
+        { key: "today", icon: "nav.bookings", labelKey: "home.todaysBookings", value: dash.total_bookings_today ?? 0 },
+        { key: "upcoming", icon: "home.upcoming", labelKey: "home.upcoming", value: dash.upcoming_bookings ?? 0 },
+      ];
+
+  const links: LinkSpec[] = [
+    ...((isAdmin || isOwner)
+      ? [{ to: "/branches", icon: "nav.branches", titleKey: "home.menu.branches", subKey: "home.menu.branchesSub" }]
+      : []),
+    ...(isManager && myBranchId !== null
+      ? [{ to: `/branches/${myBranchId}`, icon: "nav.myBranch", titleKey: "home.menu.myBranch", subKey: "home.menu.myBranchSub" }]
+      : []),
+    { to: "/bookings", icon: "nav.bookings", titleKey: "home.menu.bookings", subKey: "home.menu.bookingsSub" },
+    ...(isAdmin
+      ? [
+          { to: "/companies", icon: "nav.companies", titleKey: "home.menu.companies", subKey: "home.menu.companiesSub" },
+          { to: "/expenses", icon: "nav.expenses", titleKey: "home.menu.expenses", subKey: "home.menu.expensesSub" },
+          // Website analytics + backend monitoring both live in "Метрики"; the
+          // Pulse entry sits inside that screen. Admin-only in the UI AND on
+          // the server, so this tile is convenience, not the access control.
+          { to: "/metrics", icon: "nav.metrics", titleKey: "home.menu.metrics", subKey: "home.menu.metricsSub" },
+        ]
+      : []),
+    { to: "/settings", icon: "nav.settings", titleKey: "home.menu.settings", subKey: "home.menu.settingsSub" },
+  ];
+
   const bg = isAdmin
     ? "./bg/admin-home.jpg"
     : isOwner
@@ -76,103 +134,48 @@ const Home = () => {
         <GradientText style={{ fontSize: 32 }}>{user?.name}</GradientText>
       </div>
 
-      <div className="stat-grid">
-        {isAdmin && (
-          <>
-            <Tile k={t("home.companies")} v={dash.total_companies ?? 0} />
-            <Tile k={t("home.branches")} v={dash.total_branches ?? 0} />
-            <Tile k={t("home.places")} v={dash.total_places ?? 0} />
-            <Tile k={t("home.bookings")} v={dash.total_bookings ?? 0} />
-          </>
-        )}
-        {isOwner && (
-          <>
-            <Tile k={t("home.activeBranches")} v={dash.active_branches ?? 0} />
-            <Tile
-              k={t("home.todaysBookings")}
-              v={dash.total_bookings_today ?? 0}
-            />
-            <Tile k={t("home.upcoming")} v={dash.upcoming_bookings ?? 0} />
-            <Tile k={t("home.allPlaces")} v={dash.all_places ?? 0} />
-          </>
-        )}
-        {!isAdmin && !isOwner && (
-          <>
-            <Tile
-              k={t("home.todaysBookings")}
-              v={dash.total_bookings_today ?? 0}
-            />
-            <Tile k={t("home.upcoming")} v={dash.upcoming_bookings ?? 0} />
-          </>
-        )}
-      </div>
+      <div className="home-layout">
+        <div className="home-main">
+          <div className="stat-grid">
+            {tiles.map((tile) => (
+              <Tile key={tile.key} icon={tile.icon} k={t(tile.labelKey)} v={tile.value} />
+            ))}
+          </div>
 
-      <div className="row" style={{ gap: 12, flexWrap: "wrap" }}>
-        {(isAdmin || isOwner) && (
-          <Link to="/branches" className="card" style={{ minWidth: 220 }}>
-            <div style={{ fontWeight: 700, fontSize: 16 }}>
-              {t("home.menu.branches")}
-            </div>
-            <div className="muted">{t("home.menu.branchesSub")}</div>
-          </Link>
+          <nav className="home-links" aria-label={t("nav.dashboard")}>
+            {links.map((link) => (
+              <Link key={link.to} to={link.to} className="card home-link">
+                <NavIcon id={link.icon} size={22} />
+                <span className="home-link__text">
+                  <span className="home-link__title">{t(link.titleKey)}</span>
+                  <span className="muted home-link__sub">{t(link.subKey)}</span>
+                </span>
+              </Link>
+            ))}
+          </nav>
+        </div>
+
+        {/* The platform's bill, on the right (2026-11-09). Each card renders
+            nothing for a backend without platform billing, and `.home-aside`
+            hides itself when empty, so the dashboard is then exactly the old
+            one. A manager never gets it (no revenue.view). */}
+        {(isOwner || isAdmin) && (
+          <aside className="home-aside">
+            {isOwner && typeof dash.company_id === "number" && <PlatformDebtCard companyId={dash.company_id} />}
+            {isAdmin && <PlatformFleetCard />}
+          </aside>
         )}
-        {isManager && myBranchId !== null && (
-          <Link to={`/branches/${myBranchId}`} className="card" style={{ minWidth: 220 }}>
-            <div style={{ fontWeight: 700, fontSize: 16 }}>
-              {t("home.menu.myBranch")}
-            </div>
-            <div className="muted">{t("home.menu.myBranchSub")}</div>
-          </Link>
-        )}
-        <Link to="/bookings" className="card" style={{ minWidth: 220 }}>
-          <div style={{ fontWeight: 700, fontSize: 16 }}>
-            {t("home.menu.bookings")}
-          </div>
-          <div className="muted">{t("home.menu.bookingsSub")}</div>
-        </Link>
-        {isAdmin && (
-          <Link to="/companies" className="card" style={{ minWidth: 220 }}>
-            <div style={{ fontWeight: 700, fontSize: 16 }}>
-              {t("home.menu.companies")}
-            </div>
-            <div className="muted">{t("home.menu.companiesSub")}</div>
-          </Link>
-        )}
-        {isAdmin && (
-          <Link to="/expenses" className="card" style={{ minWidth: 220 }}>
-            <div style={{ fontWeight: 700, fontSize: 16 }}>
-              {t("home.menu.expenses")}
-            </div>
-            <div className="muted">{t("home.menu.expensesSub")}</div>
-          </Link>
-        )}
-        {/* Website analytics + backend monitoring both live in the "Метрики"
-            section, so this is a plain link — the Pulse entry point sits
-            inside that screen rather than being duplicated here. Admin-only
-            in the UI AND on the server (the endpoints are behind the admin
-            guard), so this tile is convenience, not the access control. */}
-        {isAdmin && (
-          <Link to="/metrics" className="card" style={{ minWidth: 220 }}>
-            <div style={{ fontWeight: 700, fontSize: 16 }}>
-              {t("home.menu.metrics")}
-            </div>
-            <div className="muted">{t("home.menu.metricsSub")}</div>
-          </Link>
-        )}
-        <Link to="/settings" className="card" style={{ minWidth: 220 }}>
-          <div style={{ fontWeight: 700, fontSize: 16 }}>
-            {t("home.menu.settings")}
-          </div>
-          <div className="muted">{t("home.menu.settingsSub")}</div>
-        </Link>
       </div>
     </ScreenWithBg>
   );
 };
 
-const Tile = ({ k, v }: { k: string; v: number | string }) => (
+const Tile = ({ icon, k, v }: { icon: string; k: string; v: number | string }) => (
   <div className="stat-tile">
-    <span className="k">{k}</span>
+    <span className="stat-tile__head">
+      <NavIcon id={icon} />
+      <span className="k">{k}</span>
+    </span>
     <span className="v">{v}</span>
   </div>
 );

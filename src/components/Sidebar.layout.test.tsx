@@ -57,7 +57,8 @@ const EXPECTED_ICONS: Record<Role, Record<string, string>> = {
     "/bookings": "nav.bookings", "/bookings/confirm": "nav.scan", "/tournaments": "nav.tournaments",
     "/games": "nav.games", "/companies": "nav.companies", "/revenue": "nav.revenue", "/shifts": "nav.shifts",
     "/expenses": "nav.expenses", "/metrics": "nav.metrics", "/managers": "nav.managers",
-    "/owners": "nav.owners", "/security": "nav.security", "/notifications": "nav.notifications",
+    "/owners": "nav.owners", "/security": "nav.security", "/platform-billing": "nav.platformBilling",
+    "/notifications": "nav.notifications",
     "/settings": "nav.settings", "/settings/updates": "nav.updates", "/appearance": "nav.appearance",
   },
   company_owner: {
