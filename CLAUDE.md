@@ -102,10 +102,10 @@ branch — so the two yml files never conflict:
   and `cyberplacePS5` (PlayStation discovery + status). Each is its own global
   so a screen can feature-detect it: the renderer can be newer than the preload
   it loads into, and a missing bridge must produce a sentence, not a throw.
-- 20 `ipcMain.handle` channels total: `kv:get|set|remove`, `wol:send`,
+- 23 `ipcMain.handle` channels total: `kv:get|set|remove`, `wol:send`,
   `updates:check|checkGated|install|getState`,
   `ps5:discover|probe|wake|wake-once|pair|psn-login-external|rest|rest-cancel|capabilities`,
-  `ps5:credential:set|has|forget`.
+  `ps5:credential:set|has|forget`, `ps5:passcode:set|has|forget` (2026-11-08).
 - **The console wake key never crosses to the renderer.** It is encrypted by the
   OS keystore (`electron/ps5/credentials.ts`, `safeStorage`), and the bridge can
   be asked *whether* a console has one, never what it is. If the OS offers no
@@ -258,6 +258,66 @@ branch — so the two yml files never conflict:
     guard now keys on `restingSince` within REST_SETTLE_MS. The failures
     themselves: the desk PC (Realtek 8188GU USB, 2.4 GHz only) could not hear
     that console for ~80 s while a laptop in the same room heard it every second.
+- **One panel of the venue rests a console (2026-11-08).** Measured at the club
+  (`logs/ps5.log`, two panels, two consoles): a Stop on both consoles had every
+  panel open its own Remote Play session; a PS5 takes ONE, so the rest was
+  answered `403 Remote is already in use` for 3.5 minutes and the console stayed
+  awake. Now `Ps5Controller.execute` asks the backend before a rest
+  (`claimRest` → `POST /ps5-rest-lease/{id}`, holder = a uuid per panel run;
+  not under `/pcs`, whose writes drop the cached places and branches;
+  `useConsoleControl.claimRestLease`):
+  - `granted` → rest; the lease is KEPT after a rest that went out (no other
+    panel opens a session to a console on its way down) and given back
+    (`DELETE`) when it did not; it ends by itself after 75 s, and the holder
+    asking again renews it (a slow rest never lapses under its own resends).
+  - `elsewhere` → nothing sent, no error, no backoff; result `ELSEWHERE`,
+    `PS5_REST_ELSEWHERE`; the console is left to that panel for
+    `REST_ELSEWHERE_RECHECK_MS` (10 s, with or without a press: the resend
+    cooldown is cleared for a rest that never went out), then asked again;
+    `forget()` clears it.
+  - `unknown` (offline, older backend, no answer in `REST_CLAIM_TIMEOUT_MS` 3 s)
+    → the rest goes ahead as before. Order of rollout does not matter.
+  - The wish is re-checked after the claim: a session started meanwhile sends
+    no rest. Waking is never leased (one UDP datagram, cannot be "in use").
+  - Old panels do not ask: every desk must run this build for it to hold.
+  - Tests: "one panel of the venue rests a console" in `Ps5Controller.test.ts`,
+    `restLease.test.ts`; mutation-checked (elsewhere ignored, no re-check
+    before send, released after a sent rest, recheck window ignored, never
+    released, resend cooldown kept after `elsewhere`, `forget()` keeping the
+    wait). Reviewed independently; its lease-renewal finding is fixed.
+  - Known, accepted: a Start pressed while a claim is in flight waits for that
+    claim (a round trip; at most `REST_CLAIM_TIMEOUT_MS`).
+- **"Remote is already in use" was the panel's own leaked session (2026-11-08).**
+  Proven at the club with `DEBUG=playactor:*` and `ss -tn`: Stop right after
+  Start; the console asked for its user's PS5 login passcode
+  (`RemotePlayPasscodeRequestPacket`); playactor's login threw
+  `PASSCODE_IS_NEEDED` and never closed the control socket it had opened
+  (ref'd, answering heartbeats), so the panel itself held an ESTABLISHED
+  connection to each console's 9295 and every later rest got 403 IN_USE for
+  over an hour. Fixes in `electron/ps5/playactor.ts`:
+  - `closeSocketOnFailedLogin()` wraps `TcpDeviceSocket.prototype.execute` and
+    `close` once (CommonJS build: same module instance as playactor's own
+    `require`): a failed `RemotePlayLoginProc` closes its socket; every login's
+    session is tracked by host-id (`liveSessions`) until closed. If the guard
+    cannot be installed it logs a warning and resting goes on as before.
+  - `standby()` calls `closeSessionsTo(hostId)` after an ABANDONED attempt
+    (TIMEOUT ceiling or withdrawal): playactor has no timeout on the login
+    answer or on the console dropping the connection after a standby.
+  - `PASSCODE_IS_NEEDED` → `PASSCODE_REQUIRED`, `PASSCODE_IS_UNMATCHED` →
+    `PASSCODE_WRONG` (`passcodeCodeOf`), both permanent within one `standby()`;
+    the controller leaves the console for `PASSCODE_RECHECK_MS` (15 s, a press
+    included) instead of re-asking every 1.5 s.
+  - **The login passcode can be saved per console** (`ConsolePasscodeField` in
+    the console setup, under a saved key): 4 digits, `ps5:passcode:set|has|forget`,
+    vault slot `passcode:<hostId>` in `WakeKeys` (OS-encrypted like the keys,
+    never readable from the renderer, removed by `forget`), read only by
+    `standbyOnce` → `openConnection({ login: { passCode } })`.
+  - Verified live: after the fix `ss -tn` shows 0 connections to 9295 and the
+    log `playactor:socket:tcp close()` after each refused login; the next
+    attempt is answered PASSCODE again, never IN_USE.
+  - Tests: `loginLeak`, `passcodeRequired`, `standbyLoginGuard`,
+    `abandonedSession`, `loginGuardFallback`, `ConsolePasscodeField`, the
+    passcode block in `Ps5Controller.test.ts`; mutation-checked.
 - **PSN player message is deferred** (`PSN_FEATURE.playerMessages = false` in
   `src/api/psn.ts`, mirrors the backend flag): no PSN name field at start and no
   sender card in Settings. Pairing's `psnLoginExternal` is separate and stays.
