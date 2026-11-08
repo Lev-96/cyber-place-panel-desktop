@@ -31,16 +31,61 @@ jobs:
             *-staging*) echo "::error::Production release must not use a -staging version ($PKG_VERSION). Use release-staging.yml for staging."; exit 1 ;;
           esac
 
-  build-windows:
-    # Production ships Windows only (the venues run Windows). Linux was dropped
-    # on 2026-11-08 when GitHub answered 504 for its AppImage tool and held the
-    # whole release.
+  build-linux:
     needs: guard
+    runs-on: ubuntu-latest
+    # Electron and electron-builder's tools (AppImage, NSIS, winCodeSign) come
+    # from the npmmirror copy of their GitHub releases, so a GitHub download
+    # outage (504/503 all day on 2026-11-08) cannot stop the build. Each is
+    # checked: SHASUMS256 for Electron, the sha512 pinned in electron-builder
+    # for its tools.
+    env:
+      ELECTRON_MIRROR: https://npmmirror.com/mirrors/electron/
+      ELECTRON_BUILDER_BINARIES_MIRROR: https://npmmirror.com/mirrors/electron-builder-binaries/
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      # The mirror keeps Electron under "<version>/" (GitHub: "v<version>/").
+      # A literal value, because electron-builder does not expand "{{ version }}".
+      - name: Point the Electron download at the mirror's folder
+        shell: bash
+        run: echo "ELECTRON_CUSTOM_DIR=$(node -p "require('./package-lock.json').packages['node_modules/electron'].version")" >> "$GITHUB_ENV"
+      - run: npm ci
+      - name: Write .env.production from repo variable
+        env:
+          ENV_PRODUCTION: ${{ vars.ENV_PRODUCTION }}
+        shell: bash
+        run: |
+          if [ -z "$ENV_PRODUCTION" ]; then echo "::error::Repo variable ENV_PRODUCTION is not set — add it under Settings → Secrets and variables → Actions → Variables"; exit 1; fi
+          printf '%s\n' "$ENV_PRODUCTION" > .env.production
+      - run: npm run build
+      - name: Build Linux AppImage (no auto-publish)
+        run: npx electron-builder --linux --publish never
+      - name: Upload selected Linux assets to release
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: false
+          fail_on_unmatched_files: true
+          files: |
+            release/*.AppImage
+            release/latest-linux.yml
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build-windows:
+    # After the Linux job, never beside it (two jobs creating one release race),
+    # but not BLOCKED by it: the venues run Windows, so a Linux failure must
+    # not stop the Windows installer. The version guard still has to pass.
+    needs: [guard, build-linux]
+    if: ${{ always() && needs.guard.result == 'success' }}
     runs-on: windows-latest
-    # Electron and electron-builder's tools (NSIS, winCodeSign) come from the
-    # npmmirror copy of their GitHub releases, so a GitHub download outage
-    # (504/503 all day on 2026-11-08) cannot stop the build. electron-builder
-    # checks each tool against the sha512 pinned in its own code.
+    # Electron and electron-builder's tools (AppImage, NSIS, winCodeSign) come
+    # from the npmmirror copy of their GitHub releases, so a GitHub download
+    # outage (504/503 all day on 2026-11-08) cannot stop the build. Each is
+    # checked: SHASUMS256 for Electron, the sha512 pinned in electron-builder
+    # for its tools.
     env:
       ELECTRON_MIRROR: https://npmmirror.com/mirrors/electron/
       ELECTRON_BUILDER_BINARIES_MIRROR: https://npmmirror.com/mirrors/electron-builder-binaries/
