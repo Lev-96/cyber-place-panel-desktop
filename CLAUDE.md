@@ -2237,6 +2237,18 @@ are unchanged — do not add a `paused` status here either.
     «Настроить окно» and every board header action («+ Продукт», «История
     торговли», «Календарь броней», «Компьютеры», «Тарифы») — the inline
     `navBtn` style and `.board-calendar-btn` look are gone.
+  - Seat reserved later (2026-11-08, owner): a FREE seat with
+    `next_booking_start` within 24 h (`freeUntilOf`) is drawn in the
+    reservation yellow — `SessionCard` `bookingAhead` sets tone `booked`, the
+    accent and `session-card--booking-ahead`; `seatState` stays `free`, so
+    Start and every state rule are unchanged; running / offline / reserved
+    seats ignore it. Its status reads «Свободно» and cross-fades to
+    «Свободно до HH:MM» in the same place on hover / focus-within
+    (`.session-card__status-swap`, one grid cell; the word is aria-hidden).
+  - Payment method buttons show one short word (`PaymentEditor` `SHORT_KEY`:
+    «Другое» = `pay.otherShort`), the full name (`session.payOther`, still
+    used by history, till and shift texts) as title and aria-label; the
+    buttons and split row names never wrap (nowrap + ellipsis).
   - Payments (2026-11-07, owner): ONE control, `PaymentEditor` +
     `paymentSplit.ts` (cents, `checkPayment`, `paymentBody`), on Stop, the
     till sale and the post-hoc mark. Cash / Card / Other, or «Разделить»: a
