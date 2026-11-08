@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   guard:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04 # pinned 2026-11-08: ubuntu-latest moved to Ubuntu 26 and the AppImage step failed there (v1.0.54, v1.0.55); v1.0.53 built on 24.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -33,7 +33,7 @@ jobs:
 
   build-linux:
     needs: guard
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04 # pinned 2026-11-08: ubuntu-latest moved to Ubuntu 26 and the AppImage step failed there (v1.0.54, v1.0.55); v1.0.53 built on 24.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
