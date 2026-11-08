@@ -58,12 +58,12 @@ export const useProductBasket = ({ branchId, resolve, resolveKey, allow }: Optio
   const [search, setSearch] = useState("");
   const [cart, setCart] = useState<CartLine[]>([]);
   /**
-   * Which way the cashier is adding things. `picker` is the way the dialog
-   * opens; `text` is the shortcut for an order of five things, where finding
-   * each one in a list is the slow part. Each mode keeps its state across a
-   * switch.
+   * Which way the cashier is adding things. `text` is the way the dialog opens
+   * (2026-11-07, owner: typing the order is the common case — "coca cola" is
+   * one Coca Cola); `picker` is the list, for browsing. Each mode keeps its
+   * state across a switch.
    */
-  const [mode, setMode] = useState<"picker" | "text">("picker");
+  const [mode, setMode] = useState<"picker" | "text">("text");
   const [text, setText] = useState("");
   const [resolved, setResolved] = useState<IResolvedItems | null>(null);
   const [resolving, setResolving] = useState(false);

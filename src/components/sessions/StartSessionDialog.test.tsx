@@ -26,7 +26,7 @@ import { PSN_FEATURE } from "@/api/psn";
  * has always seen.
  */
 
-const repo = vi.hoisted(() => ({ start: vi.fn(), startQuote: vi.fn() }));
+const repo = vi.hoisted(() => ({ start: vi.fn(), startQuote: vi.fn(), startOptions: vi.fn() }));
 const UNTIL_ENDS_AT = new Date(new Date().setHours(24, 40, 0, 0)).toISOString();
 const UNTIL_PASSED = "This time has already passed or is more than 10 hours away. Choose another end time.";
 const auth = vi.hoisted(() => ({ role: "company_owner" as string }));
@@ -38,6 +38,7 @@ vi.mock("@/repositories/SessionRepository", () => ({
     ]),
     start: (...a: unknown[]) => repo.start(...a),
     startQuote: (...a: unknown[]) => repo.startQuote(...a),
+    startOptions: (...a: unknown[]) => repo.startOptions(...a),
   },
 }));
 vi.mock("@/auth/AuthContext", () => ({ useAuth: () => ({ user: { id: 1, role: auth.role } }) }));
@@ -89,6 +90,9 @@ const mount = async (pc: IPcApi) => {
 beforeEach(() => {
   auth.role = "company_owner";
   repo.start.mockReset();
+  // A seat with nothing booked ahead: no choice, no limit (2026-11-07).
+  repo.startOptions.mockReset();
+  repo.startOptions.mockResolvedValue({ free_until: null, max_minutes: null, unlimited_allowed: true, next_booking: null, claimable_bookings: [] });
   repo.start.mockResolvedValue({ id: 1 });
   // The server's figure for a planned start: the seat's 1 500/h, or the rate
   // typed for this start.
@@ -560,7 +564,7 @@ describe("a planned length at start", () => {
   };
   const typePlan = async (value: string) => {
     await act(async () => {
-      fireEvent.change(screen.getByLabelText("session.plannedDuration"), { target: { value } });
+      fireEvent.change(screen.getByTestId("planned-duration-input-hours"), { target: { value } });
     });
   };
   const startButton = () => screen.getByRole("button", { name: "action.start" }) as HTMLButtonElement;
@@ -626,7 +630,10 @@ describe("a planned length at start", () => {
     await mount(device());
     await typePlan("abc");
     await settle();
+    expect(startButton().disabled).toBe(true);
 
+    // Said once the field is left, not while it is being typed.
+    await act(async () => { fireEvent.focusOut(screen.getByTestId("planned-duration-input-hours"), { relatedTarget: null }); });
     expect(startButton().disabled).toBe(true);
     expect(screen.getByText("session.timeInvalid")).toBeTruthy();
   });
@@ -734,7 +741,10 @@ describe("a plan until a clock time", () => {
     await act(async () => { fireEvent.click(screen.getByRole("tab", { name: "session.planLimitUntil" })); });
   };
   const typeUntil = async (value: string) => {
-    await act(async () => { fireEvent.change(screen.getByLabelText("session.untilLabel"), { target: { value } }); });
+    await act(async () => { fireEvent.change(screen.getByTestId("planned-until-input-hours"), { target: { value } }); });
+  };
+  const leave = async () => {
+    await act(async () => { fireEvent.focusOut(screen.getByTestId("planned-until-input-hours"), { relatedTarget: null }); });
   };
   const startButton = () => screen.getByRole("button", { name: "action.start" }) as HTMLButtonElement;
   const press = async () => { await act(async () => { fireEvent.click(startButton()); }); };
@@ -759,15 +769,16 @@ describe("a plan until a clock time", () => {
   test("a malformed time holds Start and says why; empty is no plan", async () => {
     await mount(device());
     await chooseUntil();
-    for (const bad of ["25:80", "24:00", "abc", "9"]) {
+    for (const bad of ["25:80", "24:00", "abc"]) {
       await typeUntil(bad);
+      await leave();
       await settle();
       expect(screen.getByText("session.untilInvalid")).toBeTruthy();
       expect(startButton().disabled).toBe(true);
     }
     expect(repo.startQuote).not.toHaveBeenCalled();
 
-    await typeUntil("");
+    await act(async () => { fireEvent.click(screen.getByTestId("planned-until-input-clear")); });
     await settle();
     expect(screen.queryByText("session.untilInvalid")).toBeNull();
     expect(startButton().disabled).toBe(false);
@@ -789,7 +800,7 @@ describe("a plan until a clock time", () => {
   test("switching keeps each way's value and only the chosen one is sent", async () => {
     await mount(device());
     await act(async () => {
-      fireEvent.change(screen.getByLabelText("session.plannedDuration"), { target: { value: "2" } });
+      fireEvent.change(screen.getByTestId("planned-duration-input-hours"), { target: { value: "2" } });
     });
     await chooseUntil();
     await typeUntil("00:40");
@@ -797,7 +808,7 @@ describe("a plan until a clock time", () => {
     await act(async () => { fireEvent.click(screen.getByRole("tab", { name: "session.planLimitDuration" })); });
     await settle();
 
-    expect((screen.getByLabelText("session.plannedDuration") as HTMLInputElement).value).toBe("2");
+    expect((screen.getByTestId("planned-duration-input-hours") as HTMLInputElement).value).toBe("2");
     expect(repo.startQuote).toHaveBeenLastCalledWith(1, { minutes: 120 }, undefined, undefined);
     await press();
     const body = repo.start.mock.calls[0][0];
@@ -805,7 +816,35 @@ describe("a plan until a clock time", () => {
     expect(body).not.toHaveProperty("until");
 
     await chooseUntil();
-    expect((screen.getByLabelText("session.untilLabel") as HTMLInputElement).value).toBe("00:40");
+    expect((screen.getByTestId("planned-until-input-hours") as HTMLInputElement).value).toBe("00");
+    expect((screen.getByTestId("planned-until-input-minutes") as HTMLInputElement).value).toBe("40");
+  });
+
+  test("no colon to type: 0040 and 1430 land as times", async () => {
+    await mount(device());
+    await chooseUntil();
+    await typeUntil("0040");
+    await settle();
+    expect(repo.startQuote).toHaveBeenLastCalledWith(1, { until: "00:40" }, undefined, undefined);
+    await act(async () => { fireEvent.click(screen.getByTestId("planned-until-input-clear")); });
+    await typeUntil("1430");
+    await settle();
+    expect(repo.startQuote).toHaveBeenLastCalledWith(1, { until: "14:30" }, undefined, undefined);
+  });
+
+  test("a time half typed is not asked of the server nor started; leaving writes it out", async () => {
+    await mount(device());
+    await chooseUntil();
+    await typeUntil("9");
+    await settle();
+    expect(repo.startQuote).not.toHaveBeenCalled();
+    expect(startButton().disabled).toBe(true);
+    // An hour alone, left: on the hour.
+    await leave();
+    await settle();
+    expect((screen.getByTestId("planned-until-input-hours") as HTMLInputElement).value).toBe("09");
+    expect((screen.getByTestId("planned-until-input-minutes") as HTMLInputElement).value).toBe("00");
+    expect(repo.startQuote).toHaveBeenLastCalledWith(1, { until: "09:00" }, undefined, undefined);
   });
 
   test("a total set by hand goes with the time", async () => {
@@ -841,7 +880,7 @@ describe("the start summary", () => {
   test("says until when and the preliminary price for a plan until a time", async () => {
     await mount(device());
     await act(async () => { fireEvent.click(screen.getByRole("tab", { name: "session.planLimitUntil" })); });
-    await act(async () => { fireEvent.change(screen.getByLabelText("session.untilLabel"), { target: { value: "00:40" } }); });
+    await act(async () => { fireEvent.change(screen.getByTestId("planned-until-input-hours"), { target: { value: "00:40" } }); });
     await act(async () => { await new Promise((r) => setTimeout(r, 320)); });
     const line = screen.getByTestId("start-summary").textContent ?? "";
     expect(line).toContain("session.summary.until");
@@ -854,5 +893,399 @@ describe("the start summary", () => {
     const line = screen.getByTestId("start-summary").textContent ?? "";
     expect(line).toContain("session.freeBill");
     expect(line).not.toContain("session.summary.price");
+  });
+});
+
+/**
+ * The simpler start (2026-11-05, owner): no package choice where there is no
+ * package, one box for a length as it is said, and the optional parts a
+ * person does not use hidden — each hidden part at its default, so nothing
+ * out of sight changes the start.
+ */
+describe("the simpler start dialog (2026-11-05)", () => {
+  const computer = () => device({ kind: PC_KIND.Pc, place: { id: 10, number: 1, name: "PC 1", type: "standard", platform: "pc" } });
+  const settle = async () => { await act(async () => { await new Promise((r) => setTimeout(r, 320)); }); };
+  const press = async () => { await act(async () => { fireEvent.click(screen.getByRole("button", { name: "action.start" })); }); };
+  const typePlan = async (value: string) => {
+    await act(async () => { fireEvent.change(screen.getByTestId("planned-duration-input-hours"), { target: { value } }); });
+  };
+  const noPackages = async () => {
+    const { sessionRepository } = await import("@/repositories/SessionRepository");
+    vi.mocked(sessionRepository.listPackages).mockResolvedValueOnce([]);
+  };
+  const customize = async () => { await act(async () => { fireEvent.click(screen.getByTestId("start-customize")); }); };
+  const flip = async (id: string) => { await act(async () => { fireEvent.click(screen.getByTestId(`start-part-${id}`)); }); };
+  beforeEach(() => { window.localStorage.clear(); });
+
+  describe("a branch with no tariff for this seat", () => {
+    test("offers no package choice, and a computer is started by the hour", async () => {
+      await noPackages();
+      await mount({ ...computer(), assigned_hourly_rate: 900 } as IPcApi);
+
+      expect(screen.queryByTestId("start-mode")).toBeNull();
+      expect(screen.queryByText("session.fixedTariff")).toBeNull();
+      expect(screen.queryByText("session.noPackages")).toBeNull();
+      expect(screen.getByTestId("planned-duration")).toBeTruthy();
+      await press();
+      expect(repo.start.mock.calls[0][0]).toMatchObject({ mode: "open" });
+      expect(repo.start.mock.calls[0][0]).not.toHaveProperty("time_package_id");
+    });
+
+    test("with a tariff, both choices are offered as before", async () => {
+      await mount(computer());
+      expect(screen.getByTestId("start-mode")).toBeTruthy();
+      expect(screen.getByText("session.fixedTariff")).toBeTruthy();
+    });
+
+    test("a list that could not be read keeps the choice (its error and Retry are under it)", async () => {
+      const { sessionRepository } = await import("@/repositories/SessionRepository");
+      vi.mocked(sessionRepository.listPackages).mockRejectedValueOnce(new TypeError("Failed to fetch"));
+      await mount(computer());
+      expect(screen.getByTestId("start-mode")).toBeTruthy();
+      expect(screen.getByText("state.offline.title")).toBeTruthy();
+    });
+  });
+
+  describe("one box for the length", () => {
+    test("no hours/minutes switch and no quick picks", async () => {
+      await mount(device());
+      expect(screen.queryByText("session.timeUnitHours")).toBeNull();
+      expect(screen.queryByText("session.timeUnitMinutes")).toBeNull();
+      expect(screen.queryByRole("group", { name: "session.durationPresets" })).toBeNull();
+      // One line under the field, and only while it is empty.
+      expect(screen.getAllByText("session.plannedNone")).toHaveLength(1);
+      expect(screen.getByRole("group", { name: "session.plannedDuration" })).toBeTruthy();
+    });
+
+    test.each([["1ч 30мин", 90], ["30мин", 30], ["1h", 60], ["1:30", 90], ["1 30", 90], ["2", 120]] as const)(
+      "%j typed in the hours is quoted and sent as %i minutes", async (text, minutes) => {
+        await mount(device());
+        await typePlan(text);
+        await settle();
+
+        expect(repo.startQuote).toHaveBeenLastCalledWith(1, { minutes }, undefined, undefined);
+        expect(screen.getByText(String((1500 * minutes) / 60))).toBeTruthy();
+        await press();
+        expect(repo.start.mock.calls[0][0]).toMatchObject({ mode: "open", duration_minutes: minutes });
+      },
+    );
+
+    test("1 in the hours and 30 in the minutes is 90 minutes, laid out as typed", async () => {
+      await mount(device());
+      await typePlan("1");
+      await act(async () => { fireEvent.change(screen.getByTestId("planned-duration-input-minutes"), { target: { value: "30" } }); });
+      await settle();
+      expect((screen.getByTestId("planned-duration-input-hours") as HTMLInputElement).value).toBe("1");
+      expect((screen.getByTestId("planned-duration-input-minutes") as HTMLInputElement).value).toBe("30");
+      expect(screen.queryByText("session.plannedNone")).toBeNull();
+      await press();
+      expect(repo.start.mock.calls[0][0]).toMatchObject({ duration_minutes: 90 });
+    });
+
+    test("45 in the minutes alone is 45 minutes", async () => {
+      await mount(device());
+      await act(async () => { fireEvent.change(screen.getByTestId("planned-duration-input-minutes"), { target: { value: "45" } }); });
+      await settle();
+      await press();
+      expect(repo.start.mock.calls[0][0]).toMatchObject({ duration_minutes: 45 });
+    });
+
+    test("1ч 30мин is laid out in both boxes", async () => {
+      await mount(device());
+      await typePlan("1ч 30мин");
+      expect((screen.getByTestId("planned-duration-input-hours") as HTMLInputElement).value).toBe("1");
+      expect((screen.getByTestId("planned-duration-input-minutes") as HTMLInputElement).value).toBe("30");
+    });
+
+    test("the arrows step it, and × clears it back to an open start", async () => {
+      await mount(device());
+      const hours = screen.getByTestId("planned-duration-input-hours");
+      await act(async () => { fireEvent.keyDown(hours, { key: "ArrowUp" }); });
+      await act(async () => { fireEvent.keyDown(screen.getByTestId("planned-duration-input-minutes"), { key: "ArrowUp" }); });
+      await settle();
+      expect(repo.startQuote).toHaveBeenLastCalledWith(1, { minutes: 65 }, undefined, undefined);
+      await act(async () => { fireEvent.click(screen.getByTestId("planned-duration-input-clear")); });
+      await settle();
+      expect(screen.getAllByText("session.plannedNone")).toHaveLength(1);
+      await press();
+      expect(repo.start.mock.calls[0][0]).not.toHaveProperty("duration_minutes");
+    });
+  });
+
+  describe("hiding what is not used", () => {
+    test("each optional part can be hidden and shown again", async () => {
+      await mount(device());
+      await customize();
+      for (const id of ["free", "rate", "plan", "total"]) {
+        expect((screen.getByTestId(`start-part-${id}`) as HTMLInputElement).checked).toBe(true);
+      }
+      await flip("plan");
+      expect(screen.queryByTestId("planned-duration")).toBeNull();
+      await flip("rate");
+      // Only its switch in the panel is left, not the checkbox in the form.
+      expect(screen.getAllByText("session.editPrice")).toHaveLength(1);
+      await flip("plan");
+      expect(screen.getByTestId("planned-duration")).toBeTruthy();
+    });
+
+    test("a length typed and then hidden is not sent: the start is count-up", async () => {
+      await mount(device());
+      await typePlan("2ч");
+      await settle();
+      await customize();
+      await flip("plan");
+      await settle();
+      await press();
+      expect(repo.start.mock.calls[0][0]).not.toHaveProperty("duration_minutes");
+      expect(repo.start.mock.calls[0][0]).not.toHaveProperty("until");
+      expect(repo.start.mock.calls[0][0]).not.toHaveProperty("planned_amount");
+    });
+
+    test("a time typed until and then hidden is not sent", async () => {
+      await mount(device());
+      await act(async () => { fireEvent.click(screen.getByRole("tab", { name: "session.planLimitUntil" })); });
+      await act(async () => { fireEvent.change(screen.getByTestId("planned-until-input-hours"), { target: { value: "0040" } }); });
+      await settle();
+      await customize();
+      await flip("plan");
+      await flip("plan");
+      await settle();
+      // Back to its default: the tab, and an empty time under it.
+      await act(async () => { fireEvent.click(screen.getByRole("tab", { name: "session.planLimitUntil" })); });
+      expect((screen.getByTestId("planned-until-input-hours") as HTMLInputElement).value).toBe("");
+      expect((screen.getByTestId("planned-until-input-minutes") as HTMLInputElement).value).toBe("");
+      await press();
+      expect(repo.start.mock.calls[0][0]).not.toHaveProperty("until");
+      expect(repo.start.mock.calls[0][0]).not.toHaveProperty("duration_minutes");
+    });
+
+    test("a free start ticked and then hidden is not free", async () => {
+      await mount(device());
+      await act(async () => { fireEvent.click(screen.getByText("session.freeBill")); });
+      await customize();
+      await flip("free");
+      await press();
+      expect(repo.start.mock.calls[0][0]).not.toHaveProperty("is_free");
+    });
+
+    test("a price changed and then hidden is not sent: the seat's own rate", async () => {
+      await mount(device());
+      await act(async () => { fireEvent.click(screen.getByText("session.editPrice")); });
+      await act(async () => {
+        const box = screen.getByText("session.newHourlyRate").parentElement!.querySelector("input")!;
+        fireEvent.change(box, { target: { value: "2000" } });
+      });
+      await act(async () => { fireEvent.click(screen.getByRole("button", { name: "action.save" })); });
+      await customize();
+      await flip("rate");
+      await press();
+      expect(repo.start.mock.calls[0][0]).not.toHaveProperty("hourly_rate");
+    });
+
+    test("a total changed and then hidden is not sent", async () => {
+      await mount(device());
+      await typePlan("3");
+      await settle();
+      await act(async () => { fireEvent.click(screen.getByText("session.plannedEditTotal")); });
+      await act(async () => {
+        fireEvent.change(screen.getByTestId("planned-total").querySelector("input")!, { target: { value: "2500" } });
+      });
+      await customize();
+      await flip("total");
+      await settle();
+      await press();
+      expect(repo.start.mock.calls[0][0]).toMatchObject({ duration_minutes: 180 });
+      expect(repo.start.mock.calls[0][0]).not.toHaveProperty("planned_amount");
+    });
+
+    test("what was hidden is kept for this person and comes back hidden", async () => {
+      await mount(device());
+      await customize();
+      await flip("plan");
+      await settle();
+      expect(JSON.parse(window.localStorage.getItem("u1:cp.ui.start-dialog")!)).toEqual({ v: 1, hidden: ["plan"] });
+
+      cleanup();
+      await mount(device());
+      await settle();
+      expect(screen.queryByTestId("planned-duration")).toBeNull();
+    });
+
+    test("another person on the same computer has their own", async () => {
+      window.localStorage.setItem("u2:cp.ui.start-dialog", JSON.stringify({ v: 1, hidden: ["plan"] }));
+      await mount(device());
+      await settle();
+      expect(screen.getByTestId("planned-duration")).toBeTruthy();
+    });
+  });
+});
+
+/**
+ * «Не оплачено» at the start (2026-11-07, owner): the player pays later. Off
+ * by default and then absent from the body (the start an older server has
+ * always seen); on, the server starts the seat owing its whole time.
+ */
+describe("«Не оплачено» at the start", () => {
+  const computer = () => device({ kind: PC_KIND.Pc, place: { id: 10, number: 1, name: "PC-1", type: "standard", platform: "pc" } });
+  const unpaidSwitch = () => screen.getByTestId("unpaid-switch") as HTMLButtonElement;
+  const start = async () => {
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "action.start" })); });
+  };
+
+  test("off by default, and then not in the body", async () => {
+    await mount(computer());
+    expect(unpaidSwitch().getAttribute("aria-checked")).toBe("false");
+    await start();
+    expect(repo.start.mock.calls[0][0]).not.toHaveProperty("unpaid");
+  });
+
+  test("switched on, the start carries it", async () => {
+    await mount(computer());
+    await act(async () => { fireEvent.click(unpaidSwitch()); });
+    expect(unpaidSwitch().getAttribute("aria-checked")).toBe("true");
+    expect(screen.getByText("session.unpaid.startHint")).toBeTruthy();
+    await start();
+    expect(repo.start).toHaveBeenCalledTimes(1);
+    expect(repo.start.mock.calls[0][0]).toMatchObject({ unpaid: true });
+  });
+
+  test("a console at its rate carries it too (the open start, not only a package)", async () => {
+    await mount(device());
+    await act(async () => { fireEvent.click(unpaidSwitch()); });
+    await start();
+    expect(repo.start).toHaveBeenCalledTimes(1);
+    expect(repo.start.mock.calls[0][0]).toMatchObject({ unpaid: true, mode: "open" });
+  });
+
+  test("a package start carries it", async () => {
+    await mount(computer());
+    await act(async () => { fireEvent.click(unpaidSwitch()); });
+    await start();
+    expect(repo.start.mock.calls[0][0]).toMatchObject({ unpaid: true });
+  });
+
+  test("a free start owes nothing: the switch goes, and the body never carries it", async () => {
+    await mount(computer());
+    await act(async () => { fireEvent.click(unpaidSwitch()); });
+    await act(async () => { fireEvent.click(screen.getByText("session.freeBill")); });
+    expect(screen.queryByTestId("unpaid-switch")).toBeNull();
+    await start();
+    const body = repo.start.mock.calls[0][0] as Record<string, unknown>;
+    expect(body).toMatchObject({ is_free: true });
+    expect(body).not.toHaveProperty("unpaid");
+  });
+});
+
+/**
+ * A seat with reservations (2026-11-07, owner): the start asks who sits down,
+ * never guesses — a stranger started "as the booking" used to finish it — and
+ * somebody else may play only until the reservation, as the server says.
+ */
+describe("who sits down, and how long before a reservation", () => {
+  const soon = new Date(Date.now() + 90 * 60_000);
+  const booking = {
+    id: 77, starts_at: soon.toISOString(), ends_at: new Date(soon.getTime() + 3_600_000).toISOString(),
+    status: "pending", source: "staff", who: "Арам", contact_phone: "+37477123456",
+  };
+  const capped = (max: number, over: Record<string, unknown> = {}) => ({
+    free_until: soon.toISOString(), max_minutes: max, unlimited_allowed: false, next_booking: booking, claimable_bookings: [booking], ...over,
+  });
+  const startBtn = () => screen.getByRole("button", { name: "action.start" }) as HTMLButtonElement;
+  const pick = async (key: string) => {
+    await act(async () => { fireEvent.click(screen.getByTestId(`start-who-${key}`).querySelector("input")!); });
+  };
+  const typePlan = async (value: string) => {
+    await act(async () => { fireEvent.change(screen.getByTestId("planned-duration-input-hours"), { target: { value } }); });
+    await act(async () => { await new Promise((r) => setTimeout(r, 400)); });
+  };
+
+  test("asks, picks nothing, and waits for the answer", async () => {
+    // Nothing caps this start (the reservation's own window aside), so only
+    // the unanswered question holds it back.
+    repo.startOptions.mockResolvedValue(capped(0, { max_minutes: null, free_until: null, unlimited_allowed: true }));
+    await mount(device());
+    expect([...screen.getByTestId("start-booking-choice").querySelectorAll("input")].some((i) => (i as HTMLInputElement).checked)).toBe(false);
+    expect(screen.getByTestId("start-who-77")).toBeTruthy();
+    expect(screen.getByTestId("start-who-walkin")).toBeTruthy();
+    expect(screen.getByTestId("start-booking-choice").textContent).toContain("077 123 456");
+    expect(startBtn().disabled).toBe(true);
+    await pick("walkin");
+    expect(startBtn().disabled).toBe(false);
+  });
+
+  test("the reservation's player stands out in the reservation yellow; the walk-in does not (2026-11-08)", async () => {
+    repo.startOptions.mockResolvedValue(capped(0, { max_minutes: null, free_until: null, unlimited_allowed: true }));
+    await mount(device());
+    expect(screen.getByTestId("start-who-77").getAttribute("data-tone")).toBe("booked");
+    expect(screen.getByTestId("start-who-walkin").hasAttribute("data-tone")).toBe(false);
+    // «Кто садится?» is a heading of its own, not a field caption.
+    expect(screen.getByTestId("start-booking-choice").querySelector(".start-choice__title")?.textContent).toBe("start.choice.title");
+  });
+
+  test("«Настроить окно» is drawn as an outlined button (2026-11-08)", async () => {
+    repo.startOptions.mockResolvedValue(capped(0, { max_minutes: null, free_until: null, unlimited_allowed: true }));
+    await mount(device());
+    expect(screen.getByTestId("start-customize").classList.contains("outline-btn")).toBe(true);
+  });
+
+  test("the booking's player: the start carries the reservation", async () => {
+    repo.startOptions.mockImplementation((_pc: number, bookingId?: number) => Promise.resolve(
+      bookingId === 77 ? capped(0, { max_minutes: null, free_until: null, unlimited_allowed: true }) : capped(90)));
+    await mount(device());
+    await pick("77");
+    // Asked again with that reservation, which then does not count against the start.
+    expect(repo.startOptions).toHaveBeenLastCalledWith(1, 77);
+    await act(async () => { fireEvent.click(startBtn()); });
+    expect(repo.start.mock.calls[0][0]).toMatchObject({ booking_id: 77 });
+  });
+
+  test("another player: no reservation in the body, and only until it", async () => {
+    repo.startOptions.mockResolvedValue(capped(90));
+    await mount(device());
+    await pick("walkin");
+    expect(screen.getByTestId("start-free-until").textContent).toContain("start.freeUntil");
+    // An open start with no end would run into the reservation.
+    expect(startBtn().disabled).toBe(true);
+    await typePlan("2");
+    expect(startBtn().disabled).toBe(true);
+    await typePlan("1");
+    expect(startBtn().disabled).toBe(false);
+    await act(async () => { fireEvent.click(startBtn()); });
+    const body = repo.start.mock.calls[0][0] as Record<string, unknown>;
+    expect(body).not.toHaveProperty("booking_id");
+    expect(body).toMatchObject({ duration_minutes: 60 });
+  });
+
+  test("a free start and packages longer than the window are not offered", async () => {
+    repo.startOptions.mockResolvedValue(capped(45, { claimable_bookings: [] }));
+    await mount(device({ kind: PC_KIND.Pc, place: { id: 10, number: 1, name: "PC-1", type: "standard", platform: "pc" } }));
+    expect(screen.queryByTestId("start-booking-choice")).toBeNull();
+    expect(screen.queryByText("session.freeBill")).toBeNull();
+    expect((screen.getByTestId("pkg-1").querySelector("input") as HTMLInputElement).disabled).toBe(true);
+    expect(startBtn().disabled).toBe(true);
+  });
+
+  test("a reservation holding the seat now: another player cannot start", async () => {
+    repo.startOptions.mockResolvedValue(capped(0));
+    await mount(device());
+    await pick("walkin");
+    expect(screen.getByTestId("start-free-until").textContent).toContain("start.seatTakenNow");
+    expect(startBtn().disabled).toBe(true);
+  });
+
+  test("a reservation picked in the calendar comes preselected", async () => {
+    repo.startOptions.mockResolvedValue(capped(0, { max_minutes: null, free_until: null }));
+    await act(async () => {
+      render(<StartSessionDialog branchId={7} pc={device()} bookingId={77} onClose={() => {}} onStarted={() => {}} />);
+    });
+    expect((screen.getByTestId("start-who-77").querySelector("input") as HTMLInputElement).checked).toBe(true);
+    expect(startBtn().disabled).toBe(false);
+  });
+
+  test("a seat with nothing booked asks nothing", async () => {
+    await mount(device());
+    expect(screen.queryByTestId("start-booking-choice")).toBeNull();
+    expect(screen.queryByTestId("start-free-until")).toBeNull();
+    expect(startBtn().disabled).toBe(false);
   });
 });

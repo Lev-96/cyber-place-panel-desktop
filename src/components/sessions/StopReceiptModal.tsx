@@ -1,8 +1,8 @@
 import { SkeletonText } from "@/components/ui/Skeleton";
 import Button from "@/components/ui/Button";
-import type { PaymentMethod } from "@/api/sessions";
 import Modal from "@/components/ui/Modal";
-import PaymentMethodPicker, { paymentNoteMissing } from "@/components/payments/PaymentMethodPicker";
+import PaymentEditor from "@/components/payments/PaymentEditor";
+import { checkPayment, emptyPaymentDraft, paymentBody, type PaymentCheck, type PaymentDraft } from "@/components/payments/paymentSplit";
 import Spinner from "@/components/ui/Spinner";
 import { IBillBreakdown } from "@/api/sessions";
 import { useLang } from "@/i18n/LanguageContext";
@@ -14,6 +14,7 @@ import { toAmount } from "@/shifts/cash";
 import { sessionRepository } from "@/repositories/SessionRepository";
 import { ISessionApi } from "@/types/sessions";
 import { useEffect, useRef, useState } from "react";
+import { RESET_MIN_AMOUNT } from "./sessionAmount";
 import CashChangePanel from "@/components/payments/CashChangePanel";
 import { billCents, cashChange } from "@/components/payments/cashChange";
 import type { ICashHandover } from "@/api/sessions";
@@ -21,8 +22,24 @@ import type { ICashHandover } from "@/api/sessions";
 interface Props {
   session: ISessionApi;
   onClose: () => void;
-  onConfirmed: () => void;
+  /**
+   * The seat is over on the server — stopped, or cancelled (2026-11-06) — and
+   * what it owes for extra time not paid (2026-11-07; the server's figure).
+   */
+  onConfirmed: (outcome?: { cancelled: boolean; unpaidAmount?: number | null }) => void;
   onItemRemoved: () => void;
+  /**
+   * Whether this person may reset the counter from the receipt (2026-11-05,
+   * `session.free` — the server checks it again). Absent: not offered.
+   */
+  canResetTime?: boolean;
+  /** The bill changed here (the counter was reset): the board reads again. */
+  onTimeReset?: () => void;
+  /**
+   * Whether this person may cancel the seat from the receipt (2026-11-06,
+   * `session.free` — the server checks it again). Absent: not offered.
+   */
+  canCancel?: boolean;
 }
 
 const fmtDuration = (mins: number, t: (k: string) => string) => {
@@ -40,7 +57,7 @@ const fmtDuration = (mins: number, t: (k: string) => string) => {
  * source of truth — same calculator used by /stop), shows time + items, lets
  * cashier remove items, then confirms stop.
  */
-const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved }: Props) => {
+const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved, canResetTime = false, onTimeReset, canCancel = false }: Props) => {
   const { money, t } = useLang();
   const ask = useConfirm();
   const [bill, setBill] = useState<IBillBreakdown | null>(null);
@@ -48,8 +65,10 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved }: Prop
   const [err, setErr] = useState<string | null>(null);
   // Cash by default: it is the common case at a counter, so the ordinary stop
   // stays one click rather than two.
-  const [method, setMethod] = useState<PaymentMethod>("cash");
-  const [other, setOther] = useState("");
+  // How it was paid (2026-11-07): one method or split, cash by default.
+  const [pay, setPay] = useState<PaymentDraft>(() => emptyPaymentDraft("cash"));
+  // A seat that ended by itself, paid afterwards: the answer once it is recorded.
+  const [recorded, setRecorded] = useState(false);
   const [stopped, setStopped] = useState<IBillBreakdown | null>(null);
   // Cash only: the banknotes handed over, for the change. Cleared on every
   // method switch, so an amount typed for cash never rides along with card.
@@ -58,12 +77,19 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved }: Prop
   /** Synchronous guard: a double click arrives before `busy` re-renders. */
   const stoppingNow = useRef(false);
 
-  const reload = async () => {
+  /**
+   * `keepOnForbidden`: the seat has just ended. A manager may read a CLOSED
+   * session's receipt only if they opened it (`SessionHistoryScope::allows`),
+   * so a 403 then is not an error to show — the receipt keeps the last figures
+   * it had and says the checkout was done elsewhere.
+   */
+  const reload = async (opts: { keepOnForbidden?: boolean } = {}) => {
     try {
       const preview = await sessionRepository.preview(session.id);
       setBill(preview);
       setErr(null);
     } catch (e) {
+      if (opts.keepOnForbidden && (e as { status?: number }).status === 403) return;
       setErr(e instanceof Error ? e.message : "Failed to load");
     }
   };
@@ -75,7 +101,11 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved }: Prop
   // stale or changed is refused and read again (see confirmStop). It is read
   // again too after a line is taken off, or when the seat is ended elsewhere.
   useEffect(() => {
-    void reload();
+    // Our own Stop or cancel already holds the server's final bill (2026-11-07):
+    // reading it again only asked a manager for a closed colleague's receipt and
+    // showed «нет прав» over a stop that had worked.
+    if (stopped !== null) return;
+    void reload({ keepOnForbidden: session.status !== "active" });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session.id, session.status]);
 
@@ -96,18 +126,68 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved }: Prop
     } finally { setBusy(false); }
   };
 
+  /**
+   * Reset the counter from the receipt (2026-11-05, owner): the player is
+   * leaving after a few minutes. Asked first, naming what goes; the server
+   * waives its own figure (`reset-time`) and the receipt is READ AGAIN, so
+   * what Confirm then charges is the server's new bill at its new instant —
+   * the old one would be refused as changed. Goods and pads stay on it.
+   */
+  const resetTime = async () => {
+    if (bill === null) return;
+    // The receipt is frozen at Stop (up to ten minutes old): the figure asked
+    // about is read now, so the question names what the server will waive.
+    let current: IBillBreakdown;
+    try {
+      current = await sessionRepository.preview(session.id);
+      setBill(current);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+      return;
+    }
+    const question = fmt(t("session.reset.confirmReceipt"), money(Number(current.time_cost), receiptPrecision));
+    if (!(await ask(question, { destructive: true }))) return;
+    setBusy(true);
+    setErr(null);
+    try {
+      const r = await sessionRepository.resetTime(session.id);
+      notify.message("success", fmt(t("session.reset.toast"), deviceLabel, money(Math.max(0, r.waived ?? 0))));
+      onTimeReset?.();
+      await reload();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    } finally { setBusy(false); }
+  };
+
   // Nothing to pay, nothing to change: a waived bill asks for no banknotes.
-  const asksForCash = method === "cash" && bill !== null && !bill.is_free;
+  const asksForCash = !pay.split && pay.method === "cash" && bill !== null && !bill.is_free;
   const change = asksForCash ? cashChange(billCents(bill.total), received) : null;
   const cashBlocks = change !== null && (change.state === "short" || change.state === "invalid");
+  const payCheck: PaymentCheck = checkPayment(bill ? billCents(bill.total) : 0, pay);
+  /** Why the payment cannot be sent yet, in the cashier's words; null when it can. */
+  const paymentProblem = (): string | null => {
+    if (payCheck.ok) return null;
+    switch (payCheck.problem) {
+      case "note": return t(pay.split ? "pay.noteRequired" : "session.payOtherRequired");
+      case "sum": return t("pay.sumMismatch");
+      case "parts": return t("pay.needTwo");
+      default: return t("pay.invalid");
+    }
+  };
+  /** The payment fields of the body, and the banknotes for a single cash payment. */
+  const paymentFields = () => ({
+    ...paymentBody(pay, payCheck),
+    ...(change?.state === "ok" ? { cash_received: toAmount(change.receivedCents) } : {}),
+  });
 
   const confirmStop = async () => {
     if (stoppingNow.current || cashBlocks) return;
     // ⚠️ Checked here so the cashier is told BEFORE the request, but the server
     // enforces the same rule and is what actually decides — this is a courtesy,
     // not the guard. A stop refused for a missing note leaves the seat running.
-    if (paymentNoteMissing(method, other)) {
-      setErr(t("session.payOtherRequired"));
+    const problem = paymentProblem();
+    if (problem !== null) {
+      setErr(problem);
       return;
     }
 
@@ -115,18 +195,15 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved }: Prop
     setBusy(true); setErr(null);
     try {
       const r = await sessionRepository.stop(session.id, {
-        payment_method: method,
-        ...(change?.state === "ok" ? { cash_received: toAmount(change.receivedCents) } : {}),
-        // Sent only for `other`: the server strips it for the other two, and a
-        // card payment carrying a note called "Idram" is a contradiction the
-        // history would then have to display.
-        ...(method === "other" ? { payment_method_other: other.trim() } : {}),
+        // One method (its "other" text only for other), or the split parts
+        // and how it was paid (`paymentBody`).
+        ...paymentFields(),
         // The figure on screen is the figure charged (2026-10-25).
         ...(bill?.priced_at ? { priced_at: bill.priced_at, expected_total: Number(bill.total) } : {}),
       });
       setStopped(r.breakdown);
       setHandover(r.cash ?? null);
-      onConfirmed();
+      onConfirmed({ cancelled: false, unpaidAmount: r.session?.unpaid_amount ?? null });
     } catch (e) {
       // Refused as stale or changed (2026-10-25) — older than ten minutes, or
       // a product, pad, pause, waiver or move since: the server's sentence,
@@ -149,7 +226,32 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved }: Prop
     }
   };
 
+  /**
+   * Cancel the seat (2026-11-06, owner): the player sat down and changed his
+   * mind. Unlike the counter reset the seat does NOT run on — it ends as Stop
+   * ends it, and the server waives the whole bill: time, pads and goods. Asked
+   * first, destructively; the receipt then shows the server's own result.
+   */
+  const cancelSession = async () => {
+    if (stoppingNow.current) return;
+    if (!(await ask(fmt(t("session.cancel.confirm"), deviceLabel), { destructive: true }))) return;
+    stoppingNow.current = true;
+    setBusy(true); setErr(null);
+    try {
+      const r = await sessionRepository.cancel(session.id);
+      setStopped(r.breakdown);
+      setHandover(null);
+      onConfirmed({ cancelled: true });
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+      setBusy(false);
+    } finally {
+      stoppingNow.current = false;
+    }
+  };
+
   const view = stopped ?? bill;
+  const cancelled = view?.is_cancelled === true;
 
   // ONE precision decision for the whole receipt, taken from every figure on
   // it. Deciding per figure printed "4.72", "500" and "505" on the same bill:
@@ -157,6 +259,7 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved }: Prop
   // so the column stopped adding up. A receipt is read as a column.
   const receiptPrecision = view === null ? undefined : sharedPrecision([
     Number(view.time_cost),
+    Number(view.time_waived ?? 0),
     Number(view.total),
     ...(view.joysticks ?? []).map((j) => Number(j.amount)),
     ...view.items.map((it) => Number(it.line_total)),
@@ -177,6 +280,33 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved }: Prop
   const finished = stopped !== null || endedWithoutUs;
 
   const deviceLabel = session.pc_label ?? `№${session.pc_id}`;
+  // Ended by itself (ran out, or the kiosk ended it) with nobody at the till
+  // (2026-11-07, owner): how it was paid is asked here, once. Not for a
+  // cancelled or waived seat (nothing owed), nor once a method is on record.
+  const markable = endedWithoutUs && stopped === null && !recorded && !cancelled
+    && !session.cancelled_at && (session.payment_method ?? null) === null && (session.payments?.length ?? 0) === 0
+    && view !== null && !view.is_free && Number(view.total) > 0;
+  /** Synchronous guard and one id per attempt-series: a repeat is the same request. */
+  const markRequestId = useRef<string>(crypto.randomUUID());
+  const recordPayment = async () => {
+    if (stoppingNow.current || cashBlocks) return;
+    const problem = paymentProblem();
+    if (problem !== null) { setErr(problem); return; }
+    stoppingNow.current = true;
+    setBusy(true); setErr(null);
+    try {
+      const r = await sessionRepository.recordPayment(session.id, { ...paymentFields(), client_request_id: markRequestId.current });
+      // The change for cash, as the server worked it out.
+      setHandover(r.cash);
+      setRecorded(true);
+      notify.message("success", fmt(t("pay.recorded"), deviceLabel));
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      stoppingNow.current = false;
+      setBusy(false);
+    }
+  };
   // Billed by the hour: count-up, or a planned start with no package.
   const byTheHour = view !== null && (view.mode === "open" || !view.package_name);
 
@@ -184,7 +314,9 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved }: Prop
     <Modal open onClose={onClose}>
       <div className="card" style={{ width: 520, maxWidth: "92vw", display: "flex", flexDirection: "column", gap: 12 }}>
         <h2 style={{ margin: 0 }}>
-          {finished ? t("session.checkoutDone") : `${t("session.checkoutPreviewTitle")} · ${deviceLabel}`}
+          {cancelled
+            ? t("session.cancel.done")
+            : finished ? t("session.checkoutDone") : `${t("session.checkoutPreviewTitle")} · ${deviceLabel}`}
         </h2>
         {/* Opening this ends nothing (2026-10-25): the seat plays on, the
             figures re-read every few seconds, and only the confirm below
@@ -243,9 +375,33 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved }: Prop
                   <span style={{ fontWeight: 700 }}>
                     {money(Number(view.time_cost), receiptPrecision)}
                   </span>
+                  {/* Reset the counter right here (2026-11-05): only while the
+                      seat runs, for a role that may, and while the TIME has
+                      something to reset — goods alone are not reset. */}
+                  {!finished && canResetTime && Number(view.time_cost) >= RESET_MIN_AMOUNT && (
+                    <button
+                      type="button"
+                      className="receipt-reset"
+                      onClick={() => { void resetTime(); }}
+                      disabled={busy}
+                      title={t("session.reset.button")}
+                      data-testid="receipt-reset"
+                    >
+                      {t("session.reset.short")}
+                    </button>
+                  )}
                 </>
               )}
             </div>
+
+            {/* What resetting the counter waived (2026-11-05): its own line —
+                the time above is already net of it. From the server. */}
+            {!view.is_free && Number(view.time_waived ?? 0) > 0 && (
+              <div style={row} className="receipt-waived" data-testid="receipt-time-waived">
+                <span style={{ flex: 1 }}>{t("session.reset.waived")}</span>
+                <span style={{ fontWeight: 700 }}>−{money(Number(view.time_waived), receiptPrecision)}</span>
+              </div>
+            )}
 
             {/* The VIP minimum charge, when it is in the time line above: what
                 was billed and what the time played came to, so the figure has
@@ -342,9 +498,11 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved }: Prop
                   is what the player is being handed, and it owes them one
                   number. */}
               <span style={{ fontWeight: 800, fontSize: 18, color: "var(--color-primary)" }}>
-                {view.is_free
-                  ? t("session.freeBill")
-                  : money(Number(view.total), receiptPrecision)}
+                {cancelled
+                  ? t("session.cancel.bill")
+                  : view.is_free
+                    ? t("session.freeBill")
+                    : money(Number(view.total), receiptPrecision)}
               </span>
             </div>
           </div>
@@ -353,19 +511,29 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved }: Prop
         {/* ⚠️ Hidden once the session is finished: the choice has been made and
             the receipt above is the record of it. A live radio group under a
             closed bill invites an edit that nothing would accept. */}
-        {!finished && (
-          // The one list of methods, shared with the till (PaymentMethodPicker).
-          <PaymentMethodPicker
-            name={`pay-${session.id}`}
-            method={method}
-            onMethod={(m) => { setMethod(m); setReceived(""); setErr(null); }}
-            note={other}
-            onNote={(v) => { setOther(v); setErr(null); }}
-            disabled={busy}
-          />
+        {(!finished || markable) && bill && (
+          // The one payment control, shared with the till (PaymentEditor).
+          <>
+            {markable && <div className="pay-mark-note" data-testid="pay-mark-note">{t("pay.markAfterAuto")}</div>}
+            <PaymentEditor
+              name={`pay-${session.id}`}
+              dueCents={billCents(bill.total)}
+              value={pay}
+              onChange={(next) => {
+                // Banknotes typed for cash never ride along with another method.
+                if (next.split !== pay.split || next.method !== pay.method) setReceived("");
+                setPay(next);
+                setErr(null);
+              }}
+              check={payCheck}
+              money={money}
+              disabled={busy}
+            />
+          </>
         )}
+        {recorded && <div className="pay-mark-done" data-testid="pay-mark-done">{fmt(t("pay.recorded"), deviceLabel)}</div>}
 
-        {!finished && asksForCash && bill && change && (
+        {(!finished || markable) && asksForCash && bill && change && (
           <CashChangePanel
             dueCents={billCents(bill.total)}
             received={received}
@@ -384,14 +552,32 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved }: Prop
 
         {err && <div className="error">{err}</div>}
 
-        <div className="row-between" style={{ marginTop: 4 }}>
-          {finished ? (
+        {/* Even columns across the receipt (2026-11-07, owner): keep playing,
+            cancel, confirm — one width, one height, a label that does not fit
+            wraps instead of being cut. `data-count` picks the columns. */}
+        <div className="receipt-actions" data-count={markable ? 2 : finished ? 1 : canCancel ? 3 : 2} style={{ marginTop: 4 }}>
+          {markable ? (
+            <>
+              <Button variant="secondary" onClick={onClose} disabled={busy}>{t("action.close")}</Button>
+              <Button onClick={() => { void recordPayment(); }} disabled={busy || cashBlocks} data-testid="pay-mark-confirm">
+                {t("pay.markConfirm")}
+              </Button>
+            </>
+          ) : finished ? (
             <Button onClick={onClose}>{t("action.close")}</Button>
           ) : (
             <>
               {/* Back to the running seat: nothing was sent, nothing stopped. */}
-              <Button variant="secondary" onClick={onClose} disabled={busy}>{t("session.checkoutKeepPlaying")}</Button>
-              <Button onClick={confirmStop} disabled={busy || !bill || cashBlocks} data-testid="stop-confirm">
+              <Button variant="secondary" className="receipt-actions__keep" onClick={onClose} disabled={busy}>{t("session.checkoutKeepPlaying")}</Button>
+              {/* The player changed his mind (2026-11-06): end the seat with
+                  nothing owed. Its own button, apart from the counter reset
+                  above, which keeps the seat running. */}
+              {canCancel && (
+                <Button variant="secondary" className="is-danger receipt-actions__cancel" onClick={() => { void cancelSession(); }} disabled={busy || !bill} data-testid="receipt-cancel">
+                  {t("session.cancel.button")}
+                </Button>
+              )}
+              <Button className="receipt-actions__confirm" onClick={confirmStop} disabled={busy || !bill || cashBlocks} data-testid="stop-confirm">
                 {busy ? t("session.closing") : t("session.confirmStop")}
               </Button>
             </>

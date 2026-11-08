@@ -22,8 +22,14 @@ export interface SavedWindow extends Rect {
   maximized: boolean;
 }
 
-/** The smallest content the panel is laid out for: every screen reflows at this size. */
-export const MIN_CONTENT = { width: 800, height: 560 } as const;
+/**
+ * The smallest content the panel is laid out for (520 wide since 2026-11-04,
+ * owner: "the window shrinks without limits"; it was 800): the width the
+ * interface adapts down to, the same the owner web is used at. Active Places
+ * no longer holds the window wider — its list shows pictures for its buttons'
+ * words and then scales itself to fit.
+ */
+export const MIN_CONTENT = { width: 520, height: 560 } as const;
 
 export const WINDOW_STATE_KEY = "window.state";
 

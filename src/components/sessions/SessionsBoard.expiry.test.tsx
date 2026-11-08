@@ -163,6 +163,29 @@ const fire = async (e: SessionChangedEvent) => {
   });
 };
 
+/**
+ * What a pad press says (owner, 2026-11-04): nothing on the card, an orange
+ * note beside it for 5s. Presses the pad switch (whichever half there is) with
+ * the server answering `after`, and returns the note's text and the card's own
+ * text — the note lives in a portal on <body>, OUTSIDE the card, and the card
+ * must not carry the same words.
+ */
+/** The seat the board was last given (this test's, not an earlier test's call). */
+const lastListed = async (): Promise<ISessionApi> =>
+  ((await repo.listActive.mock.results.at(-1)!.value) as ISessionApi[])[0];
+
+const pressPad = async (after: ISessionApi) => {
+  repo.listActive.mockResolvedValue([after]);
+  repo.addJoystick.mockResolvedValue(after);
+  repo.removeJoystick.mockResolvedValue(after);
+  const add = screen.queryByTestId("pad-add") as HTMLButtonElement | null;
+  const target = add && !add.disabled ? add : screen.getByTestId("pad-remove");
+  await act(async () => { fireEvent.click(target); });
+  const note = screen.getByTestId(`pad-note-${after.id}`);
+  const card = screen.getByTestId("pad-toggle").closest(".place-cell") as HTMLElement;
+  return { note: note.textContent ?? "", lines: [...note.children].map((l) => l.textContent ?? ""), card: card.textContent ?? "", noteInCard: card.contains(note) };
+};
+
 describe("a seat that ends on its own clock", () => {
   beforeEach(() => {
     realtime.handler = null;
@@ -256,13 +279,16 @@ describe("adding time from the card", () => {
     expect(line).toContain("session.planLine");
   });
 
-  test("a count-up start (no length) offers no extra time, as before", async () => {
+  // One «+ Время» whatever the mode (2026-11-07, owner): on a count-up seat
+  // it opens the dialog that offers a fixed time and «Не оплачено».
+  test("a count-up start (no length) offers «+ Время» too, which offers a fixed time", async () => {
     repo.listActive.mockResolvedValue([{
       ...running, mode: "open", ends_at: null, is_unlimited: true, hourly_rate: 1000, committed_amount: null,
     } as ISessionApi]);
     await mount();
 
-    expect(screen.queryByRole("button", { name: "session.addTime" })).toBeNull();
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "session.addTime" })); });
+    expect(screen.getByTestId("limit-section")).toBeTruthy();
   });
 
   test("opens the management dialog", async () => {
@@ -274,7 +300,7 @@ describe("adding time from the card", () => {
 
     // The same dialog "Options" opens — asserted by its own heading, so a
     // second modal built for the card would fail this.
-    expect(screen.getByText("session.options")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "session.addTime" })).toBeTruthy();
   });
 
   /**
@@ -294,14 +320,14 @@ describe("adding time from the card", () => {
     });
 
     // Its own heading, so a second modal built for the tile would fail this.
-    expect(screen.getByText("session.options")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "session.addTime" })).toBeTruthy();
   });
 
-  test("is not offered on a seat with no end to extend", async () => {
+  test("an unlimited seat has «+ Время» as its one time button, and no «Options»", async () => {
     repo.listActive.mockResolvedValue([{ ...running, ends_at: null, is_unlimited: true }]);
     await mount();
 
-    expect(screen.queryByRole("button", { name: "session.addTime" })).toBeNull();
+    expect(screen.getAllByRole("button", { name: "session.addTime" })).toHaveLength(1);
     // ⚠️ And neither is "Options", on ANY tile.
     //
     // The reason this test used to give for keeping it — "a count-up session
@@ -566,12 +592,63 @@ describe("joysticks on the tile", () => {
     expect(await pressedSlot()).toBe(3);
   });
 
-  test("the tile shows the pads the seat is holding, not a fraction", async () => {
-    repo.listActive.mockResolvedValue([{ ...ps, joystick_count: 3 } as ISessionApi]);
+  /**
+   * The note's life (owner, 2026-11-04): it appears after the SERVER agreed,
+   * stays 5 seconds, then goes; the card is the same before, during and after.
+   */
+  test("the note is shown for 5 seconds after the server agreed, and the card does not change", async () => {
+    const after = { ...ps, joystick_count: 3 } as ISessionApi;
+    repo.listActive.mockResolvedValue([ps]);
     await mount();
+    const card = () => screen.getByTestId("pad-toggle").closest(".place-cell") as HTMLElement;
+    const padLine = () => card().querySelector(".row > .row") as HTMLElement;
+    expect(padLine().textContent).toBe("");
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      await pressPad(after);
+      expect(screen.getByTestId("pad-note-42")).toBeTruthy();
+      // Nothing written on the card: the pad line stays empty.
+      expect(padLine().textContent).toBe("");
+      await act(async () => { vi.advanceTimersByTime(4900); });
+      expect(screen.queryByTestId("pad-note-42")).not.toBeNull();
+      await act(async () => { vi.advanceTimersByTime(200); });
+      expect(screen.queryByTestId("pad-note-42")).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 
-    expect(screen.getByText("3")).toBeTruthy();
-    expect(screen.queryByText("3 / 4")).toBeNull();
+  test("a refused press brings no note (the refusal is said as before)", async () => {
+    repo.listActive.mockResolvedValue([ps]);
+    repo.addJoystick.mockRejectedValue(new Error("No price is set for joystick #3"));
+    await mount();
+    await act(async () => { fireEvent.click(screen.getByTestId("pad-add")); });
+    expect(screen.getByText("No price is set for joystick #3")).toBeTruthy();
+    expect(screen.queryByTestId("pad-note-42")).toBeNull();
+  });
+
+  test("another cashier's pad (a socket update, no press here) brings no note", async () => {
+    repo.listActive.mockResolvedValue([ps]);
+    await mount();
+    repo.listActive.mockResolvedValue([{ ...ps, joystick_count: 3 } as ISessionApi]);
+    await fire({ kind: "joystick.added", session_id: 42, branch_id: 7 } as unknown as SessionChangedEvent);
+    // The board did take the update (it re-read the seat)…
+    await act(async () => { await Promise.resolve(); });
+    expect(repo.listActive.mock.calls.length).toBeGreaterThan(1);
+    // …and still says nothing beside the card: only the presser gets a note.
+    expect(screen.queryByTestId("pad-note-42")).toBeNull();
+  });
+
+  test("the note names the pads the seat is holding, not a fraction — and the tile says nothing", async () => {
+    const after = { ...ps, joystick_count: 3 } as ISessionApi;
+    repo.listActive.mockResolvedValue([after]);
+    await mount();
+    const { lines, card, noteInCard } = await pressPad(after);
+
+    expect(lines[0]).toBe("session.joysticks: 3");
+    expect(lines.join(" ")).not.toContain("3 / 4");
+    expect(noteInCard).toBe(false);
+    expect(card).not.toContain("session.joysticks");
   });
 
   /**
@@ -791,13 +868,11 @@ describe("joysticks on the tile", () => {
       }],
     } as unknown as ISessionApi]);
     await mount();
+    const { lines } = await pressPad(await lastListed());
 
-    // 50/h for 80 seconds is about 1.11, and the line has to say so rather
-    // than rounding it to a whole unit. The pad line is the identity plus the
-    // figure, so that is what finds it.
-    const padLine = [...document.querySelectorAll("span")]
-      .find((el) => el.children.length === 0 && /^[\d/,\s]+ · /.test(el.textContent ?? ""));
-    expect(padLine?.textContent).toMatch(/1\.1/);
+    // 50/h for 80 seconds is about 1.11, and the note has to say so rather
+    // than rounding it to a whole unit.
+    expect(lines[0]).toMatch(/· .*1\.1/);
   });
 
   describe("the pad charge on the tile", () => {
@@ -822,16 +897,12 @@ describe("joysticks on the tile", () => {
     test("says which pads are out and what they have earned, on one line", async () => {
       repo.listActive.mockResolvedValue([priced(2)]);
       await mount();
+      const { lines, card } = await pressPad(priced(2));
 
-      // The line lands as two text nodes (identity, then the figure), so
-      // `getByText` cannot see it whole — the question is what the cashier
-      // reads, which is the element's own text content.
-      const padLine = [...document.querySelectorAll("span")].find((el) =>
-        el.children.length === 0 && /^[\d/,\s]+ · /.test(el.textContent ?? ""));
-      expect(padLine?.textContent).toMatch(/600/);
+      expect(lines[0]).toMatch(/^session\.joysticks: [\d/,\s]+ · .*600/);
       // No second line naming them again, and no multiplication.
-      expect(screen.queryByText(/Joystick #/)).toBeNull();
-      expect(screen.queryByText(/2 × /)).toBeNull();
+      expect(lines.join(" ")).not.toMatch(/Joystick #|2 × /);
+      expect(card).not.toMatch(/600/);
     });
 
     test("a pad handed back is still counted and still charged", async () => {
@@ -844,11 +915,11 @@ describe("joysticks on the tile", () => {
         }],
       } as ISessionApi]);
       await mount();
+      const { lines } = await pressPad(await lastListed());
 
       // One pad on the bill, no extras in play: the seat is back to the two it
-      // came with, and the charge still stands beside them — on the same line,
-      // which is the whole of what the card says about pads now.
-      expect(screen.getByText(/^2 · .*300/)).toBeTruthy();
+      // came with, and the charge still stands beside them.
+      expect(lines[0]).toMatch(/^session\.joysticks: 2 · .*300/);
     });
 
     test("a seat with no pads says nothing about them", async () => {
@@ -859,14 +930,15 @@ describe("joysticks on the tile", () => {
     });
 
     test("a waived seat quotes no fee", async () => {
-      repo.listActive.mockResolvedValue([{ ...priced(2), is_free: true } as ISessionApi]);
-      const { container } = await mount();
+      const waived = { ...priced(2), is_free: true } as ISessionApi;
+      repo.listActive.mockResolvedValue([waived]);
+      await mount();
+      const { lines } = await pressPad(waived);
 
       // The pads are still NAMED; the money is not printed under a bill
-      // nobody is paying. This venue prices the pair as one figure, so the pad
-      // in play is "3/4" rather than the position it happened to open.
-      expect(screen.getByText("3/4")).toBeTruthy();
-      expect(container.textContent).not.toContain("session.joysticksCost");
+      // nobody is paying, and no rate either. This venue prices the pair as
+      // one figure, so the pad in play is "3/4".
+      expect(lines).toEqual(["session.joysticks: 3/4"]);
     });
 
     test("periods frozen at different fees show the sum and no multiplication", async () => {
@@ -919,11 +991,12 @@ describe("joysticks on the tile", () => {
       ],
     }]);
     await mount();
+    const { lines } = await pressPad(await lastListed());
 
     // Two rows, one of them closed. The closed one is not in play, so the seat
     // is holding its kit plus the third pad — and this venue prices the pair as
     // one figure, so that pad is named "3/4".
-    expect(screen.getByText("3/4")).toBeTruthy();
+    expect(lines[0]).toMatch(/^session\.joysticks: 3\/4/);
   });
 
   /**
@@ -958,22 +1031,22 @@ describe("joysticks on the tile", () => {
       ],
     } as unknown as ISessionApi]);
     await mount();
+    const { lines, card } = await pressPad(await lastListed());
 
-    // The seat plus the pad currently out. `t()` is mocked to return the key,
-    // so the assertion is on the key rather than on translated copy.
-    expect(screen.getByText(/session\.currentRate/)).toBeTruthy();
+    // The seat plus the pad currently out, said in the note (never on the
+    // card). `t()` is mocked to return the key, so the assertion is on the key.
+    expect(lines[1]).toMatch(/^session\.currentRate: .*session\.perHourShort$/);
+    expect(card).not.toContain("session.currentRate");
     // And the pad line does NOT repeat it. The tile names the controller and
     // what it has earned so far; the rate is one line above and saying it
     // twice is most of a 160px card.
     //
     // The unit price and its per-hour suffix still exist where a unit price is
     // the point — the receipt and the history — and are pinned there.
-    const padLine = [...document.querySelectorAll("span")].find((el) =>
-      el.children.length === 0 && /^[\d/,\s]+ · /.test(el.textContent ?? ""));
-    expect(padLine, "the pad line is missing").toBeTruthy();
-    expect(padLine?.textContent).not.toContain("session.perHourShort");
+    const padLine = lines[0];
+    expect(padLine).not.toContain("session.perHourShort");
     // …and it is the EARNED figure, not the rate: an hour of a 500/h pad.
-    expect(padLine?.textContent).toMatch(/500/);
+    expect(padLine).toMatch(/500/);
   });
 
   // A session CAN hold both: the venue switched strategy while the seat ran,
@@ -994,15 +1067,12 @@ describe("joysticks on the tile", () => {
       ],
     } as unknown as ISessionApi]);
     await mount();
+    const { lines } = await pressPad(await lastListed());
 
-    // The tile quotes no unit price at all now, so it cannot call a fee a
-    // rate: what it shows is the identity and the money earned.
-    const padLine = [...document.querySelectorAll("span")].find((el) =>
-      el.children.length === 0 && /^[\d/,\s]+ · /.test(el.textContent ?? ""));
-    expect(padLine, "the pad line is missing").toBeTruthy();
-    expect(padLine?.textContent).not.toContain("session.perHourShort");
-    // The hourly pad still moves the seat's rate, so that line stays.
-    expect(screen.getByText(/session\.currentRate/)).toBeTruthy();
+    // The note quotes no unit price, so it cannot call a fee a rate: the
+    // identity and the money earned, then the rate the hourly pad moved to.
+    expect(lines[0]).not.toContain("session.perHourShort");
+    expect(lines[1]).toMatch(/^session\.currentRate/);
   });
 
   test("a flat fee shows no rate line, because the rate never moved", async () => {
@@ -1048,7 +1118,7 @@ describe("a seat whose joystick fee is charged once", () => {
   });
   afterEach(cleanup);
 
-  test("says the fee was taken on the pad line, and offers to take it back", async () => {
+  test("says the fee was taken in the note a press brings, and offers to take it back", async () => {
     repo.listActive.mockResolvedValue([seat({
       joystick_count: 3,
       joysticks: [{
@@ -1063,21 +1133,17 @@ describe("a seat whose joystick fee is charged once", () => {
     })]);
     await mount();
 
-    // On the pad line, so it is visible without pressing anything.
-    //
-    // Asserted on the LEAF that carries the words and nowhere else: every
-    // ancestor inherits the text, so a looser query passes with this line
-    // deleted — which is how the first version of this assertion proved
-    // nothing.
-    const onTheLine = [...document.querySelectorAll("span")]
-      .filter((el) => el.children.length === 0
-        && (el.textContent ?? "").includes("session.padFeeTaken"));
-    expect(onTheLine.length).toBe(1);
+    // Not on the card (it would make it taller): in the note a press brings.
+    const card = screen.getByTestId("pad-toggle").closest(".place-cell") as HTMLElement;
+    expect(card.textContent).not.toContain("session.padFeeTaken");
     // A venue that charges once gets a switch, not a menu, and with the pad
     // out the switch offers the other direction.
     expect(screen.queryByLabelText("session.joysticks")).toBeNull();
     expect(screen.getByRole("button", { name: "session.padRemoveOne" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "session.padAddOne" })).toBeNull();
+    // The press (the server answering with the same seat): the note says it.
+    const { lines } = await pressPad(await lastListed());
+    expect(lines[0]).toMatch(/· session\.padFeeTaken$/);
   });
 
   test("says nothing of the sort before the fee is taken", async () => {
@@ -1363,6 +1429,16 @@ describe("selling a product from the board's header", () => {
     expect(buttons[0].nextElementSibling?.textContent).toBe("history.title");
     expect(screen.queryByTestId("seat-sell")).toBeNull();
     expect(document.querySelectorAll(".session-card .board-sell-btn")).toHaveLength(0);
+  });
+
+  test("every header action is drawn as a button, like «+ Продукт» (2026-11-08)", async () => {
+    repo.listPcs.mockResolvedValue([device]);
+    await mount();
+    for (const text of ["session.sellProduct", "history.title", "calendar.title", "pcs.title"]) {
+      const el = screen.getByText(text);
+      expect(el.classList.contains("outline-btn"), text).toBe(true);
+      expect(el.classList.contains("muted"), text).toBe(false);
+    }
   });
 
   test("opens the till's sale for this branch, and starts nothing", async () => {

@@ -228,7 +228,12 @@ export interface IBookingApi {
   branch_id: number;
   /** Null for a platform that is the game itself (poker, table tennis …). */
   game_id: number | null;
-  guest_id: number;
+  /** Null for a seat reserved by staff from the board (2026-11-07): no app guest. */
+  guest_id: number | null;
+  /** Who is coming, as staff typed it (a staff reservation). */
+  contact_name?: string | null;
+  contact_phone?: string | null;
+  reserved_by_user_id?: number | null;
   booking_date: string;
   start_time: string;
   duration_minutes: number;
@@ -255,6 +260,36 @@ export interface IBookingApi {
    * rows, whose platform is their game's.
    */
   platform?: string | null;
+}
+
+/** Who made a reservation: staff from the panel, or a guest in the app. */
+export type ReservationSource = "staff" | "guest";
+
+/**
+ * One row of `GET /places/reservations` (backend `StaffReservationResource`,
+ * 2026-11-07): the branch's bookings calendar. No booking code, no guest
+ * contact details; `contact_*` are what staff typed.
+ */
+export interface IStaffReservationApi {
+  id: number;
+  status: BookingStatusType;
+  /** "Y-m-d", venue-local (Asia/Yerevan). */
+  booking_date: string;
+  /** "H:i", venue-local. */
+  start_time: string;
+  /** Effective length: the guest's "I'm late" extension included. */
+  duration_minutes: number;
+  /** ISO 8601 with offset. */
+  starts_at: string;
+  ends_at: string;
+  place_ids: number[];
+  contact_name: string | null;
+  contact_phone: string | null;
+  guest_name: string | null;
+  source: ReservationSource;
+  session_id: number | null;
+  /** The server's answer to "may staff move or edit it" (`StoreService::staffMayEdit`). */
+  editable: boolean;
 }
 
 export interface IBranchApi extends Translated {

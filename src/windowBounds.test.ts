@@ -45,6 +45,11 @@ describe("restoredBounds", () => {
     expect(r.y + r.height).toBeLessThanOrEqual(728);
   });
 
+  test("a compact window is restored as compact (520 wide is allowed, 2026-11-04)", () => {
+    expect(MIN_CONTENT.width).toBe(520);
+    expect(restoredBounds(saved({ width: 600, height: 700 }), [FHD])?.width).toBe(600);
+  });
+
   test("never below the panel's minimum", () => {
     const r = restoredBounds(saved({ width: 300, height: 200 }), [FHD])!;
     expect(r.width).toBe(MIN_CONTENT.width);

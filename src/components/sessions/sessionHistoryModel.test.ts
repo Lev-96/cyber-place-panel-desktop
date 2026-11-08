@@ -26,7 +26,7 @@ const event = (over: Partial<ISessionEvent>): ISessionEvent => ({
 describe("eventPresentation", () => {
   test("a known action: its label, its tone, its actor, its details", () => {
     const p = eventPresentation(event({ action: "paused", user: { id: 1, name: "Giorgi", role: "manager" } }), t, money);
-    expect(p).toEqual({ title: "history.action.paused", tone: "pause", icon: "❚❚", actor: "Giorgi", details: [], showAmount: true });
+    expect(p).toEqual({ title: "history.action.paused", tone: "pause", icon: "❚❚", actor: "Giorgi", details: [], showAmount: true, amountKind: "plain" });
   });
 
   // An hourly pad's add event carries its per-hour RATE as the amount; printed

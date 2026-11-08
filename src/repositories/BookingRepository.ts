@@ -1,5 +1,12 @@
-import { apiGetBookings, GetBookingsParams } from "@/api/bookings";
+import {
+  apiDeleteBooking, apiGetBookings, apiReservePlace, apiStaffReservations, apiUpdateReservation,
+  GetBookingsParams, ReservationPatch, ReserveBody,
+  apiBookingEvents,
+  type IBookingEvent,
+} from "@/api/bookings";
+import { friendlyMutation } from "@/api/fallback";
 import { Booking } from "@/domain/Booking";
+import { StaffReservation, toStaffReservation } from "@/domain/StaffReservation";
 import { PaginatedList } from "@/types/api";
 
 const PAGE_SIZE = 100;
@@ -26,6 +33,32 @@ export class BookingRepository {
       page += 1;
     }
     return collected;
+  }
+
+  /** Staff reserve a seat for a player who phoned (2026-11-07), now or at a given day and time. */
+  async reserve(placeId: number, body: ReserveBody): Promise<Booking> {
+    return friendlyMutation(apiReservePlace(placeId, body).then((r) => new Booking(r.booking)));
+  }
+
+  /** The branch's bookings calendar, `from`..`to` inclusive ("Y-m-d"). Cancelled rows are not asked for. */
+  async listReservations(branchId: number, from: string, to: string): Promise<StaffReservation[]> {
+    const res = await apiStaffReservations({ branch_id: branchId, from, to });
+    return res.reservations.map(toStaffReservation);
+  }
+
+  /** Move / edit a staff reservation; only what `patch` carries changes. */
+  async updateReservation(bookingId: number, patch: ReservationPatch): Promise<Booking> {
+    return friendlyMutation(apiUpdateReservation(bookingId, patch).then((r) => new Booking(r.booking)));
+  }
+
+  /** Cancel a booking — a staff reservation included — by the existing path. */
+  /** The history of the branch's bookings, newest first (2026-11-07). */
+  async listEvents(params: { branch_id: number; from?: string; to?: string; booking_id?: number; limit?: number }): Promise<IBookingEvent[]> {
+    return (await apiBookingEvents(params)).data;
+  }
+
+  async cancel(bookingId: number): Promise<void> {
+    await friendlyMutation(apiDeleteBooking(bookingId));
   }
 }
 

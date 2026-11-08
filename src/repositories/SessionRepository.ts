@@ -8,9 +8,15 @@ import {
   type IItemChoice,
   apiAddSessionJoystick,
   apiAddSessionTime,
+  apiAddSessionTimeByAmount,
+  apiLimitSession,
+  apiSetSessionUnpaid,
+  apiSessionTimeQuoteByAmount,
   apiSessionExtensionOptions,
   apiSessionTimeQuote,
   apiStartQuote,
+  apiStartOptions,
+  type IStartOptions,
   apiTransferExtension,
   apiRelocationOptions,
   apiRelocateSession,
@@ -27,6 +33,7 @@ import {
   apiMakeSessionUnlimited,
   apiRemoveSessionJoystick,
   apiSetSessionFree,
+  apiResetSessionTime,
   apiPauseSession,
   apiResumeSession,
   ISessionEvent,
@@ -43,6 +50,9 @@ import {
   apiSetSessionItemQty,
   apiStartSession,
   apiStopSessionWithBreakdown,
+  apiRecordSessionPayment,
+  type PaymentFields,
+  apiCancelSession,
   IBillBreakdown, ICashHandover,
   ListSessionsParams,
   StartSessionBody,
@@ -61,6 +71,15 @@ export interface StopResult {
 export class SessionRepository {
   async listActive(branchId: number): Promise<ISessionApi[]> {
     return orFallback(apiListActiveSessions(branchId).then((r) => r.data), []);
+  }
+  /**
+   * The devices a session is running on right now, or a THROWN error — never
+   * an empty answer for a failed read (2026-11-04). For a decision that
+   * deletes billing data: "could not tell" must not read as "nothing runs".
+   */
+  async runningPcIds(branchId: number): Promise<Set<number>> {
+    const { data } = await apiListActiveSessions(branchId);
+    return new Set(data.map((s) => s.pc_id));
   }
   /**
    * Every session running right now, in every venue this account may see.
@@ -91,8 +110,17 @@ export class SessionRepository {
   async preview(id: number): Promise<IBillBreakdown> {
     return friendlyMutation(apiPreviewSession(id).then((r) => r.preview));
   }
+  /** Mark how a seat that ended by itself was paid (2026-11-07). */
+  async recordPayment(id: number, body: PaymentFields & { cash_received?: string; client_request_id: string }): Promise<{ session: ISessionApi; cash: ICashHandover | null }> {
+    return friendlyMutation(apiRecordSessionPayment(id, body).then((r) => ({ session: r.session, cash: r.cash ?? null })));
+  }
+
   async stop(id: number, payment?: StopSessionBody): Promise<StopResult> {
     return friendlyMutation(apiStopSessionWithBreakdown(id, payment));
+  }
+  /** End the seat with its whole bill waived (2026-11-06); the same result shape as `stop`. */
+  async cancel(id: number): Promise<StopResult> {
+    return friendlyMutation(apiCancelSession(id));
   }
   async extend(id: number, packageId: number): Promise<ISessionApi> {
     return friendlyMutation(apiExtendSession(id, { time_package_id: packageId }).then((r) => r.session));
@@ -143,8 +171,28 @@ export class SessionRepository {
     return friendlyMutation(apiRemoveSessionJoystick(sessionId, slot).then((r) => r.session));
   }
 
-  async addTime(sessionId: number, minutes: number, charge?: number): Promise<ISessionApi> {
-    return friendlyMutation(apiAddSessionTime(sessionId, minutes, charge).then((r) => r.session));
+  async addTime(sessionId: number, minutes: number, charge?: number, unpaid?: boolean): Promise<ISessionApi> {
+    return friendlyMutation(apiAddSessionTime(sessionId, minutes, charge, unpaid).then((r) => r.session));
+  }
+
+  /** Extra time not paid yet, on or off (2026-11-07). */
+  async setUnpaid(sessionId: number, on: boolean): Promise<ISessionApi> {
+    return friendlyMutation(apiSetSessionUnpaid(sessionId, on).then((r) => r.session));
+  }
+
+  /** An unlimited seat given a fixed time from now (2026-11-07). */
+  async limit(sessionId: number, minutes: number): Promise<ISessionApi> {
+    return friendlyMutation(apiLimitSession(sessionId, minutes).then((r) => r.session));
+  }
+
+  /** "+ Время" by money (2026-11-07): the server decides the minutes and the charge. */
+  async addTimeByAmount(sessionId: number, amount: number, unpaid?: boolean): Promise<ISessionApi> {
+    return friendlyMutation(apiAddSessionTimeByAmount(sessionId, amount, unpaid).then((r) => r.session));
+  }
+
+  /** Read-only advice: what `addTimeByAmount` would grant. */
+  async timeQuoteByAmount(sessionId: number, amount: number): Promise<ITimeQuote> {
+    return friendlyMutation(apiSessionTimeQuoteByAmount(sessionId, amount));
   }
 
   async makeUnlimited(sessionId: number, hourlyRate?: number): Promise<ISessionApi> {
@@ -157,6 +205,11 @@ export class SessionRepository {
   }
 
   /** Read-only advice: what a planned start would cost. See `apiStartQuote`. */
+  /** Read-only advice: see `apiStartOptions`. */
+  async startOptions(pcId: number, bookingId?: number): Promise<IStartOptions> {
+    return apiStartOptions(pcId, bookingId);
+  }
+
   async startQuote(pcId: number, length: PlannedLength, hourlyRate?: number, plannedAmount?: number): Promise<IStartQuote> {
     return friendlyMutation(apiStartQuote(pcId, length, hourlyRate, plannedAmount));
   }
@@ -179,6 +232,14 @@ export class SessionRepository {
   /** «Переместить игрока», atomically. May still be refused — the list is stale. */
   async relocate(sessionId: number, body: RelocateSessionBody): Promise<ISessionApi> {
     return friendlyMutation(apiRelocateSession(sessionId, body).then((r) => r.session));
+  }
+
+  /** Reset the clock to zero; the seat keeps running (2026-11-05). `waived` is the server's figure. */
+  async resetTime(sessionId: number): Promise<{ session: ISessionApi; waived: number | null }> {
+    return friendlyMutation(apiResetSessionTime(sessionId).then((r) => ({
+      session: r.session,
+      waived: typeof r.waived === "number" ? r.waived : null,
+    })));
   }
 
   async setFree(sessionId: number, isFree: boolean): Promise<ISessionApi> {

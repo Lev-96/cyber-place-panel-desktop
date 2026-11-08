@@ -102,22 +102,29 @@ const signIn = async (page: import("@playwright/test").Page, email: string) => {
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
 };
 
-test("the tile names the extra controller in play", async ({ page }) => {
+test("the extra controller in play is named in the note a press brings, never on the tile", async ({ page }) => {
   await installBackendMocks(page, { role: "company_owner", company_id: 1, name: "Owner One" });
   await seedFloor(page);
   await signIn(page, "o@o");
   await expect(page.getByText("Owner One").first()).toBeVisible();
 
   await page.goto("/#/branches/1/sessions");
+  await expect(page.getByTestId("pad-toggle")).toBeVisible();
 
-  // The identity, not a quantity: the pair this venue prices as one figure.
-  await expect(page.getByText("3/4").first()).toBeVisible();
-  // …and what they have earned, on the SAME line. The card used to carry a
-  // second one naming the controllers again ("Joystick #3 · 500 AMD = 500
-  // AMD"); on a 160px tile that was most of the card, and every number on it
-  // is either printed beside it or on the receipt.
-  await expect(page.getByText(/^3\/4 · /)).toBeVisible();
-  await expect(page.getByText(/Joystick #3/)).toHaveCount(0);
+  // Not on the tile (owner, 2026-11-04: the line made the card taller).
+  const tile = page.locator(".place-cell.session-card--running").first();
+  await expect(tile).not.toContainText("3/4");
+
+  // Taking the pad back is the press this seat offers; the server answers
+  // with the same seat, and the note says what it holds: the identity plus
+  // its money, on one line, never "Joystick #3" again.
+  await page.route((url) => isBackend(url) && /\/sessions\/5\/joysticks/.test(url.pathname), (route) =>
+    route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ session: { id: 5 } }) }));
+  await page.getByTestId("pad-remove").click();
+  const note = page.getByTestId("pad-note-5");
+  await expect(note).toBeVisible();
+  await expect(note).toContainText(/3\/4 · /);
+  await expect(note).not.toContainText(/Joystick #3/);
 });
 
 /**

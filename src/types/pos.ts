@@ -67,7 +67,10 @@ export interface IOrder {
   subtotal: number;
   total: number;
   /** The session's three (`PAYMENT_METHODS`), plus a member's `deposit` on older rows. */
-  payment_method: "cash" | "card" | "other" | "deposit";
+  /** `split` (2026-11-07): paid in parts, see `payments`. */
+  payment_method: "cash" | "card" | "other" | "deposit" | "split";
+  /** The parts (2026-11-07); [] for a sale from before them. */
+  payments?: { method: "cash" | "card" | "other" | "deposit"; amount: number | string; note?: string | null }[];
   /** What an `other` payment was; null otherwise. */
   payment_method_other?: string | null;
   status: "paid" | "voided";

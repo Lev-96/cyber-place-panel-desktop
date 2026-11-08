@@ -180,6 +180,29 @@ const showNativeBookingNotification = (
  * backend `StaffNotificationDispatcher` enforces the same scope on
  * the database feed); this gate keeps the realtime surface aligned.
  */
+/**
+ * Whether a booking event gets the corner toast, the OS notification and the
+ * sound.
+ *
+ * `confirmed` is a silent refresh hint (used to drop the booking out of the
+ * dashboard "Upcoming/pending" tile) — Home.tsx's own `useBookingChanged`
+ * hook handles the dashboard refetch. `finished` is also silent: the cashier
+ * who hit Stop already knows the session ended; the tile flip via
+ * `useReservedPlaceIds` is the only signal needed.
+ *
+ * A reservation staff made from the board (`by_staff`, 2026-11-07, owner) is
+ * silent in every kind: the desk that made it showed «Забронировано» on the
+ * server's answer, and nobody is rung for it — not that desk again when its
+ * own event arrives, not the others. The tile still turns yellow.
+ */
+// `updated` is only ever a staff edit of a staff reservation (2026-11-07),
+// silent like every staff booking — and silent even if `by_staff` were lost.
+type AnnouncedKind = Exclude<BookingChangedEvent["kind"], "confirmed" | "finished" | "updated">;
+export const shouldAnnounceBookingEvent = <E extends Pick<BookingChangedEvent, "kind" | "by_staff">>(
+  evt: E,
+): evt is E & { kind: AnnouncedKind } =>
+  evt.kind !== "confirmed" && evt.kind !== "finished" && evt.kind !== "updated" && evt.by_staff !== true;
+
 export const shouldShowBookingToasts = (user: AuthUser | null): boolean =>
   user?.role === "manager";
 
@@ -243,17 +266,7 @@ const GlobalBookingNotifier = () => {
   const [toast, setToast] = useState<ToastModel | null>(null);
 
   const handleEvent = useCallback((evt: BookingChangedEvent) => {
-    if (!showToasts) return;
-    // `confirmed` is a silent refresh hint (used to drop the booking
-    // out of the dashboard "Upcoming/pending" tile). No toast, no OS
-    // notification, no notifications-list refresh — Home.tsx's own
-    // `useBookingChanged` hook handles the dashboard refetch.
-    //
-    // `finished` is also silent: the cashier who hit Stop already
-    // knows the session ended; the tile flip via `useReservedPlace
-    // Ids` is the only signal needed. A toast here would just nag
-    // them about their own action.
-    if (evt.kind === "confirmed" || evt.kind === "finished") return;
+    if (!showToasts || !shouldAnnounceBookingEvent(evt)) return;
     setToast({
       kind: evt.kind,
       code: evt.code,

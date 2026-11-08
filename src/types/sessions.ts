@@ -197,7 +197,10 @@ export interface ISessionApi {
    * before this was recorded and every session still running; the history
    * renders nothing for it rather than inventing a method.
    */
-  payment_method?: "cash" | "card" | "other" | null;
+  /** `split` (2026-11-07): paid in parts, see `payments`. */
+  payment_method?: "cash" | "card" | "other" | "split" | null;
+  /** The parts of the payment (2026-11-07); [] for a row from before them. */
+  payments?: { method: "cash" | "card" | "other" | "deposit"; amount: number | string; note?: string | null }[];
   /** The words the cashier typed. Only ever set when the method is `other`. */
   payment_method_other?: string | null;
   opened_by_user_id?: number | null;
@@ -269,6 +272,22 @@ export interface ISessionApi {
    */
   plan_rebased_at?: string | null;
   amount_before_plan_rebase?: number | string | null;
+  /**
+   * The clock reset to zero (2026-11-05): what it had earned at
+   * `time_reset_at` was waived; the time costs the clock minus
+   * `time_reset_offset` (the raw clock then), with no VIP minimum after it.
+   * `time_waived_total` is every reset's waiver added up. Absent / null on a
+   * seat never reset, or from an older backend.
+   */
+  time_reset_at?: string | null;
+  time_reset_offset?: number | string | null;
+  time_waived_total?: number | string | null;
+  /** Ended by a cancel (2026-11-06): the whole bill waived, the seat freed. Null otherwise. */
+  cancelled_at?: string | null;
+  /** Extra time not paid yet (2026-11-07): on since when; null = off. */
+  unpaid_since?: string | null;
+  /** Once ended: what the player owes for that extra time (the server's figure). */
+  unpaid_amount?: number | null;
   /**
    * A rate change mid-way — the player moved to a seat priced differently.
    * What the clock had earned at `rate_changed_at` is frozen in
@@ -420,6 +439,12 @@ export interface IExtraItem {
 export interface IPcApi extends Translated {
   id: number;
   branch_id: number;
+  /**
+   * When this seat is next reserved (2026-11-07, board listing only): the
+   * next blocking booking's start (ISO), or null. ADVICE for the card's
+   * «Свободно до»; the start re-checks under its lock.
+   */
+  next_booking_start?: string | null;
   place_id?: number | null;
   label: string;
   kind?: PcKind;
@@ -506,4 +531,12 @@ export interface IMinimumChargeRule {
    */
   settled_amount?: number | null;
   settled_billed_minutes?: number | null;
+  /**
+   * The paid time covers the whole visit (2026-11-07): the time costs
+   * `settled_total` up to `settled_seconds` PLAYED, then the clock runs on from
+   * the instant the visit reached them. Null on a visit settled before (read
+   * the old way: the clock plus `settled_amount`). Server-owned.
+   */
+  settled_total?: number | null;
+  settled_seconds?: number | null;
 }

@@ -12,6 +12,9 @@ import { useBranchPlatformNames } from "@/hooks/useBranchPlatforms";
 import { useKeyedBusy } from "@/hooks/useKeyedBusy";
 import { useLocalReorder } from "@/hooks/useLocalReorder";
 import { useReservedPlaceIds } from "@/hooks/useReservedPlaceIds";
+import { useReservationsByPlace } from "@/hooks/useReservationsByPlace";
+import BookingsCalendarModal from "@/components/reservations/BookingsCalendarModal";
+import ReservationActions from "./ReservationActions";
 import { useLang } from "@/i18n/LanguageContext";
 import { fmt } from "@/i18n/translations";
 import { usePlaceAvailability } from "@/realtime/usePlaceAvailability";
@@ -19,7 +22,7 @@ import { useSessionChanged } from "@/realtime/useSessionChanged";
 import { sessionRepository } from "@/repositories/SessionRepository";
 import { IPcApi, ISessionApi } from "@/types/sessions";
 import { PAD_CEILING_FALLBACK, padCeiling, padChargeOf, padChoices, padIdentity } from "./joystickView";
-import { PC_STATUS_COLOR, effectivePcStatus, isPs } from "@/types/pc";
+import { effectivePcStatus, isPs } from "@/types/pc";
 import {
   canStartSession,
   resolveSessionCellState,
@@ -36,21 +39,26 @@ import AddSessionItemDialog from "./AddSessionItemDialog";
 import SellProductsDialog from "@/components/pos/SellProductsDialog";
 import { durationLabel } from "@/components/prices/vipMinimumCharge";
 import SessionTimer from "./SessionTimer";
+import ResetTimeDialog from "./ResetTimeDialog";
 import { autoResumeAtOf, sessionCurrentHourlyRate, sessionJoysticksTotal } from "./sessionAmount";
 import StartSessionDialog from "./StartSessionDialog";
 import SessionOptionsDialog from "./SessionOptionsDialog";
-import SessionCard, { CardOverflow, SessionCardAction } from "./SessionCard";
+import SessionCard, { CardFootAction, CardOverflow, SessionCardAction } from "./SessionCard";
+import { freeUntilOf, reservationTip, reservationWindow } from "./reservationText";
+import { PAD_COUNT_STYLE, PAD_LINE_STYLE, SeatGrip, SeatNameLine, SeatPlatformLine, sessionTariffLine } from "./seatParts";
 import SimpleBoardHelp from "./SimpleBoardHelp";
 import { useUiPreferencesOptional } from "@/preferences/UiPreferencesContext";
 import RelocateSessionDialog from "./RelocateSessionDialog";
 import { BASE_JOYSTICKS, MAX_JOYSTICKS } from "@/api/joystickPrices";
 import { notify } from "@/ui/notify";
 import StopReceiptModal from "./StopReceiptModal";
+import UnpaidAlert, { type UnpaidNotice } from "./UnpaidAlert";
+import { playFor } from "@/sound/soundEngine";
 import PadToggle from "./PadToggle";
+import PadChargeNote from "./PadChargeNote";
+import { useTransientFlags } from "@/hooks/useTransientFlags";
 import { useExpiryNudge } from "./useExpiryNudge";
 import { dropSideOf, moveOnto } from "@/utils/reorder";
-
-const navBtn: React.CSSProperties = { padding: "6px 10px", border: "1px solid #1f2a44", borderRadius: 6 };
 
 // The two lead sections shown before any custom-platform sections.
 const LEAD_SECTIONS = ["pc", "ps"];
@@ -88,6 +96,12 @@ const SessionsBoard = ({ branchId }: Props) => {
   const { nameOf: platformName } = useBranchPlatformNames(branchId);
   const sessions = useAsync(() => sessionRepository.listActive(branchId), [branchId]);
   const [startTarget, setStartTarget] = useState<IPcApi | null>(null);
+  // «Пришёл» (2026-11-07): the reservation the start fulfils.
+  const [startBookingId, setStartBookingId] = useState<number | undefined>(undefined);
+  // «Забронировать» on a free seat (2026-11-07).
+  // The bookings calendar (2026-11-07, owner): the card's «Забронировать»
+  // opens it on that seat and today; the header's «Календарь броней» on all.
+  const [calendar, setCalendar] = useState<{ focusPlaceId?: number } | null>(null);
   const [stopTarget, setStopTarget] = useState<ISessionApi | null>(null);
   const [addItemTarget, setAddItemTarget] = useState<ISessionApi | null>(null);
   // The till's sale, opened from the board's header (2026-10-25).
@@ -241,6 +255,22 @@ const SessionsBoard = ({ branchId }: Props) => {
     if (to?.console_host_id) sessionStarting(to.id);
   };
 
+  /**
+   * Seats that ended owing for extra time (2026-11-07): rung once each and
+   * queued, so two seats ending together are two warnings, never one lost.
+   * Fed by the `stopped` broadcast (an auto-expiry, another desk) AND by this
+   * desk's own Stop answer — whichever lands first; the session id dedupes.
+   */
+  const [unpaidNotices, setUnpaidNotices] = useState<UnpaidNotice[]>([]);
+  const noticeUnpaid = useCallback((sessionId: number, pcId: number, amount: number | null | undefined) => {
+    if (amount === null || amount === undefined || !(amount > 0)) return;
+    setUnpaidNotices((list) => {
+      if (list.some((n) => n.sessionId === sessionId)) return list;
+      playFor("session_unpaid", `unpaid-${sessionId}`);
+      return [...list, { sessionId, seat: seatOf(pcId), amount }];
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pcs.data]);
   const togglePause = async (sess: ISessionApi) => {
     if (!pauseBusy.begin(sess.id)) return;
 
@@ -271,6 +301,16 @@ const SessionsBoard = ({ branchId }: Props) => {
   const [optionsTarget, setOptionsTarget] = useState<ISessionApi | null>(null);
   // The session being moved to another seat («Переместить игрока»).
   const [relocateTarget, setRelocateTarget] = useState<ISessionApi | null>(null);
+  // "Reset the counter" (2026-11-05): the session being asked about, by id —
+  // the dialog always reads its LIVE row, so a reset, +time or stop from
+  // another desk while it is open is what it shows (and what the toast counts).
+  const [resetId, setResetId] = useState<number | null>(null);
+  const resetTarget = resetId === null ? null : (sessions.data ?? []).find((s) => s.id === resetId) ?? null;
+  // Gone from the board, or no longer running: nothing left to reset.
+  useEffect(() => {
+    if (resetId !== null && (resetTarget === null || resetTarget.status !== "active")) setResetId(null);
+  }, [resetId, resetTarget]);
+  const mayReset = can(role, "session.free");
   // The sessions whose pads are mid-change. Per session (useKeyedBusy), so a
   // second click on the SAME tile is refused while the first is in flight and a
   // cashier working another seat is not blocked by it — which is what the old
@@ -280,6 +320,9 @@ const SessionsBoard = ({ branchId }: Props) => {
   // a removal of a pad that is already gone. This one keeps the operator from
   // sending the second request at all.
   const padBusy = useKeyedBusy();
+  // Which seats' last pad press is being said beside the card (5s, owner
+  // 2026-11-04): only for the cashier who pressed, never from a socket update.
+  const padNotes = useTransientFlags<number>(5000);
   // The last refusal, shown on the tile it belongs to. This project has no
   // global toast helper and the board shows its errors where they happened;
   // keyed by session so one seat's refusal does not appear on another's.
@@ -297,6 +340,7 @@ const SessionsBoard = ({ branchId }: Props) => {
   // Which sections are collapsed. Empty = all open (the default).
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const reservedPlaceIds = useReservedPlaceIds(branchId);
+  const reservations = useReservationsByPlace(branchId, reservedPlaceIds);
 
   // Read from the app-wide watcher rather than starting a second one: two would
   // each raise their own question about the same console, and the owner would
@@ -349,6 +393,8 @@ const SessionsBoard = ({ branchId }: Props) => {
   useSessionChanged(
     branchId,
     useCallback((evt) => {
+      // Ended owing for extra time — by itself or at any desk (2026-11-07).
+      if (evt.kind === "stopped") noticeUnpaid(evt.session_id, evt.pc_id, evt.unpaid_amount);
       if (evt.kind === "stopped" && evt.status === "expired") {
         const ended = (sessions.data ?? []).find((s) => s.id === evt.session_id);
         // Never over the top of an open receipt: a cashier mid-checkout on one
@@ -465,6 +511,7 @@ const SessionsBoard = ({ branchId }: Props) => {
     if (!padBusy.begin(sess.id)) return;
 
     setPadError(null);
+    let accepted = false;
 
     try {
       const updated = await sessionRepository.addJoystick(sess.id, slot);
@@ -472,6 +519,7 @@ const SessionsBoard = ({ branchId }: Props) => {
       // have moved this seat first, and a tile showing a number the server has
       // not agreed to is how two screens start disagreeing about one seat.
       const count = updated.joystick_count ?? (sess.joystick_count ?? 1);
+      accepted = true;
       notify.message(
         "success",
         `${t("session.joystickAdded")} · ${t("session.joysticksInSession")} `
@@ -485,8 +533,10 @@ const SessionsBoard = ({ branchId }: Props) => {
     } finally {
       padBusy.end(sess.id);
       await sessions.reload();
+      // After the read-back, so the note says what the server now holds.
+      if (accepted) padNotes.flash(sess.id);
     }
-  }, [padBusy, sessions, t]);
+  }, [padBusy, padNotes, sessions, t]);
 
   /**
    * Take the last pad handed out back.
@@ -506,10 +556,12 @@ const SessionsBoard = ({ branchId }: Props) => {
 
     if (!padBusy.begin(sess.id)) return;
     setPadError(null);
+    let accepted = false;
 
     try {
       const updated = await sessionRepository.removeJoystick(sess.id, slot);
       const count = updated.joystick_count ?? (sess.joystick_count ?? 1);
+      accepted = true;
       notify.message(
         "error",
         `${t("session.joystickRemoved")} · ${t("session.joysticksInSession")} `
@@ -520,8 +572,9 @@ const SessionsBoard = ({ branchId }: Props) => {
     } finally {
       padBusy.end(sess.id);
       await sessions.reload();
+      if (accepted) padNotes.flash(sess.id);
     }
-  }, [padBusy, sessions, t]);
+  }, [padBusy, padNotes, sessions, t]);
 
   // …and one wake-up aimed at the exact instant the soonest seat runs out.
   //
@@ -625,13 +678,13 @@ const SessionsBoard = ({ branchId }: Props) => {
     const cellState = resolveSessionCellState({ hasSession: !!sess, isReserved, device: pc });
     const isOffline = cellState === "offline";
     const canStart = canStartSession(cellState);
+    // Free now, reserved later (2026-11-07, owner): how long a walk-in may
+    // play, from the server's next booking start. Since 2026-11-08 it also
+    // paints the card in the reservation yellow (SessionCard `bookingAhead`).
+    const freeUntil = !sess && !isOffline && !isReserved ? freeUntilOf(pc.next_booking_start) : null;
     const deviceStatus = effectivePcStatus(pc);
     const color = SESSION_CELL_COLOR[cellState];
     const itemsCount = sess?.items?.length ?? 0;
-    // How many controllers this seat is holding, as the SERVER counts them.
-    // An older backend sends nothing, and the base kit is the honest floor: a
-    // PlayStation comes with two and they are in play from the first second.
-    const joystickCount = sess?.joystick_count ?? BASE_JOYSTICKS;
     // The backend's answer, resolved from the place's platform. Absent on an
     // older payload, and then the controls simply are not drawn — which is the
     // safe direction: a missing field must not offer an operation the seat
@@ -652,10 +705,7 @@ const SessionsBoard = ({ branchId }: Props) => {
     // model, and only when a pad is actually moving it: on the fee model the
     // rate never changes and a line repeating it would be noise on a 160px
     // card.
-    // What this VENUE hands out on this seat, and which pad comes next. Both
-    // from the server's rule; the fallback is what a seat can physically hold,
-    // which is the number the card drew before the rule travelled with it.
-    const padMax = (sess === undefined ? null : padCeiling(sess)) ?? MAX_JOYSTICKS;
+    // Which pad this venue hands out next, from the server's rule.
     const padMenu = padChoices(
       sess?.joystick_rule,
       (sess?.joysticks ?? []).filter((j) => j.stopped_at === null).map((j) => j.slot),
@@ -686,6 +736,23 @@ const SessionsBoard = ({ branchId }: Props) => {
       if (active.length === 0) return null;
       return sessionCurrentHourlyRate(sess);
     })();
+    // What the last pad press did, said for 5s beside the card (2026-11-04):
+    // which controllers, what they have earned, the one fee already taken,
+    // and — under the hourly model — the rate the seat moved to. All read
+    // from the server's row as it is NOW, so the note says what was agreed,
+    // never what was asked for. No money on a waived seat: `padChargeOf` and
+    // `currentRate` answer null there.
+    const padNoteLines: string[] = sess !== undefined && supportsJoysticks && padNotes.isOn(sess.id)
+      ? [
+        `${t("session.joysticks")}: ${padIdentity(sess, BASE_JOYSTICKS)}`
+          + (padCharge !== null ? ` · ${money(padCharge.total, preciseWhenSmall(padCharge.total))}` : "")
+          + (sess.joystick_rule?.charge_once === true && sess.joystick_rule?.fee_taken === true
+            ? ` · ${t("session.padFeeTaken")}` : ""),
+        ...(currentRate !== null
+          ? [`${t("session.currentRate")}: ${money(currentRate, preciseWhenSmall(currentRate))}${t("session.perHourShort")}`]
+          : []),
+      ]
+      : [];
     // The two identity lines, resolved once so the JSX below stays readable.
     // A device with no place (a legacy row) has no platform or tier to show —
     // it still renders the line, as a non-breaking space, because a tile with
@@ -739,6 +806,7 @@ const SessionsBoard = ({ branchId }: Props) => {
         session={sess}
         baseColor={color}
         seatState={cellState}
+        bookingAhead={freeUntil !== null}
         stateLabel={(tone) => t(`session.tone.${tone}`)}
         dragging={dragId === pc.id}
         dropSide={dragOverId === pc.id ? dropSideOf(order, dragId, pc.id) : null}
@@ -751,20 +819,15 @@ const SessionsBoard = ({ branchId }: Props) => {
         }}
         onDrop={() => dropOn(pc.id)}
       >
-        <span
-          className="cell-grip"
-          draggable
+        <SeatGrip
+          label={t("session.dragToReorder")}
           onDragStart={(e) => {
             const cell = (e.currentTarget as HTMLElement).closest(".place-cell");
             if (cell) e.dataTransfer.setDragImage(cell, 24, 24);
             setDragId(pc.id);
           }}
           onDragEnd={() => { setDragId(null); setDragOverId(null); }}
-          title={t("session.dragToReorder")}
-          aria-label={t("session.dragToReorder")}
-        >
-          ⠿
-        </span>
+        />
         {/* Line 1 — WHAT this seat is: platform and tier, the same
             "PS5 · STANDARD" wording the places board uses, so an operator
             reading both screens sees one vocabulary. The tier lives in
@@ -773,18 +836,7 @@ const SessionsBoard = ({ branchId }: Props) => {
 
             The agent dot keeps its place at the head of the line and is
             `flexShrink: 0`, so it cannot be squeezed out by a long label. */}
-        <span className="platform" style={{ display: "flex", alignItems: "center", gap: 6, marginLeft: 18 }}>
-          <span
-            title={deviceStatus}
-            style={{ width: 8, height: 8, borderRadius: 4, background: PC_STATUS_COLOR[deviceStatus], flexShrink: 0 }}
-          />
-          {/* Nested so the platform is the only thing that can shrink, and the
-              4px gap reads as the single space in "PS5 · VIP". */}
-          <span style={{ display: "flex", alignItems: "baseline", gap: 4, minWidth: 0 }}>
-            <span className="cell-line" title={seatPlatformName || undefined}>{seatPlatformName || "\u00A0"}</span>
-            {tierName && <span style={{ flexShrink: 0 }}>· {tierName}</span>}
-          </span>
-        </span>
+        <SeatPlatformLine deviceStatus={deviceStatus} platformName={seatPlatformName} tierName={tierName} />
         {/* The console itself, refreshed every ten seconds from this machine.
             On its OWN line, not beside the platform: a tile is 160px at its
             narrowest and "Режим покоя" next to "PS5 · STANDARD" does not fit in
@@ -816,7 +868,7 @@ const SessionsBoard = ({ branchId }: Props) => {
             the platform label is what pushed the status and the button down the
             card by a different amount on every tile. One line, ellipsis, and
             the full text on hover — the rule every other line here follows. */}
-        <span className="id cell-line" title={nameLine}>{nameLine}</span>
+        <SeatNameLine text={nameLine} />
         {sess ? (
           <>
             <span className="status">
@@ -827,6 +879,7 @@ const SessionsBoard = ({ branchId }: Props) => {
                 session={sess}
                 formatMoney={money}
                 minimumLabel={(minutes) => fmt(t("vipMin.badge"), durationLabel(minutes, t))}
+                reset={mayReset ? { label: t("session.reset.button"), onReset: () => setResetId(sess.id) } : undefined}
               />
             </span>
             <span className="until">
@@ -837,21 +890,7 @@ const SessionsBoard = ({ branchId }: Props) => {
               {/* Secondary detail (2026-10-27): hidden in the Simple interface,
                   where the stripe, the clock and the money are the card. */}
               <span className="session-card__secondary">
-              {sess.is_free
-                ? t("session.freeBill")
-                : sess.is_unlimited
-                  ? t("session.unlimited")
-                  : sess.mode === "open"
-                    ? `${money(Number(sess.hourly_rate ?? 0))} / ${t("time.hourShort") || "h"}`
-                    // A planned hourly start (2026-10-25) has no package: it
-                    // says its rate and its plan, both the server's — the plan
-                    // grows with "+ Время"; the bill is still the clock's.
-                    : sess.package_name == null && sess.hourly_rate != null
-                      ? `${money(Number(sess.hourly_rate))} / ${t("time.hourShort") || "h"}`
-                        + (sess.committed_amount != null
-                          ? ` · ${fmt(t("session.planLine"), money(Number(sess.committed_amount)))}`
-                          : "")
-                      : sess.package_name}
+              {sessionTariffLine(sess, money, t)}
               {itemsCount > 0 && <span className="muted"> · {itemsCount} {t("session.posNote")}</span>}
               </span>
               {sess.paused_at && (
@@ -873,7 +912,7 @@ const SessionsBoard = ({ branchId }: Props) => {
                 seat. The pads render only for a PlayStation, where the concept
                 exists; a computer showing "🎮 1" would be noise. */}
             {(supportsJoysticks || sess.is_free) && (
-              <span className="row" style={{ gap: 6, fontSize: 12, flexWrap: "wrap" }}>
+              <span className="row" style={PAD_LINE_STYLE}>
                 {/* Pads are a PlayStation thing, and the seat says so itself:
                     `supports_joysticks` is the backend's answer — the place's
                     platform where the seat has a place, the device's own kind
@@ -884,150 +923,15 @@ const SessionsBoard = ({ branchId }: Props) => {
                     Shown for every PlayStation seat, not only one that already
                     has a second pad: a control that appears once you have
                     already used it is a control nobody finds. */}
-                <span
-                  className="row"
-                  style={{
-                    gap: 4,
-                    alignItems: "center",
-                    // The glyph and what it says stay together — that is the
-                    // span below, which is `nowrap` and does not shrink, so the
-                    // count can never drop under the icon.
-                    //
-                    // This row wraps, and has to. Once an extra pad is out the
-                    // line carries the identity AND what it earned, and that
-                    // plus the menu plus the take-back button wants 252px on a
-                    // 160px tile. Nowrap made the menu the only thing that could
-                    // give, so it was squeezed to 21px — a control with no room
-                    // for a word, showing nothing but its own chevron hard
-                    // against the border. Measured, not guessed.
-                    flexWrap: "wrap",
-                    rowGap: 4,
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  {/* The count, with the icon and the word in front of it.
-                      Before this it appeared only from the SECOND pad onwards,
-                      so a seat that had just started showed two unlabelled 20px
-                      buttons and nothing to say what they were for — which is
-                      how a feature that was fully built read as missing.
-
-                      One glyph plus the fraction, not one glyph per pad. Four
-                      glyphs is the widest this line could get on a 160px tile,
-                      and the repeat never said what the ceiling was — "1 / 4"
-                      answers "can another player join?" without opening
-                      anything.
-
-                      `joystickCount` counts the pads IN PLAY and the session's
-                      own is one of them, so a fresh seat reads 1 / 4, not 0.
-                      That is the same number the options dialog shows for the
-                      same seat, and two screens disagreeing about one seat is
-                      worse than either wording. */}
-                  {/* Only where controllers are a thing.
-                      It used to read `supportsJoysticks || joystickCount > 1`,
-                      and the second half was a heuristic for "this seat has
-                      extras out" back when a fresh seat counted 1. The base kit
-                      made it 2, so the fraction appeared on every seat — a
-                      poker table announcing two joysticks it does not have.
-                      The server's own answer is the only one that decides. */}
-                  {/* Only when it says something (2026-10-25): a bare "2" — the
-                      kit every console ships with, nothing extra out, nothing
-                      charged — was noise under "Безлимит". An extra pad out or
-                      a pad charge still shows, with its money. */}
-                  {supportsJoysticks && (padCharge !== null
-                    || (sess.joystick_count ?? BASE_JOYSTICKS) > BASE_JOYSTICKS
-                    || (sess.joysticks ?? []).some((j) => j.stopped_at === null && Number(j.slot) > BASE_JOYSTICKS)) && (
-                    <span
-                      className="row"
-                      style={{
-                        gap: 4,
-                        alignItems: "center",
-                        flexWrap: "nowrap",
-                        whiteSpace: "nowrap",
-                        // "1 / 4" is three glyphs and a slash; letting it shrink
-                        // is what pushed it onto its own line.
-                        flexShrink: 0,
-                      }}
-                      title={`${t("session.joysticks")}: ${joystickCount} / ${padMax}`}
-                    >
-                      {/* The number the seat is HOLDING, on its own.
-                          It was a fraction, and the fraction was the thing an
-                          operator could not read: "1 / 4" on a PlayStation with
-                          two controllers on the table, and "2 / 3/4" once the
-                          ceiling started carrying a venue's pricing shape. The
-                          ceiling is still worth knowing and is in the tooltip,
-                          where it cannot be mistaken for arithmetic. */}
-                      {/* WHICH controllers, once any extra is out.
-                          The base kit is a count — two come with the console and
-                          nobody hands them over — so an untouched seat reads
-                          "2". The moment an extra is in play the useful fact
-                          stops being how many there are and becomes which ones,
-                          and a venue that prices the pair as one figure calls
-                          that "3/4" rather than naming the position it happened
-                          to open. */}
-                      {/* WHICH controllers, and what they have earned — on one
-                          line, because a 160px card cannot afford two.
-
-                          It used to be this line plus a second one reading
-                          "Joystick #3, 4 · 500 AMD = 1,000 AMD": the slot
-                          numbers were already printed here, the unit price is
-                          on the menu that hands the pad over, and under the
-                          hourly model the rate is on the line above. What was
-                          left that a cashier needs is the identity and the
-                          figure, so that is what this says.
-
-                          No money on a waived seat and none before anything is
-                          charged: `padChargeOf` answers null for both, and a
-                          fee printed under "Free session" is two numbers
-                          telling one truth. */}
-                      <span className="muted">
-                        {padIdentity(sess, BASE_JOYSTICKS)}
-                        {padCharge !== null
-                          && ` · ${money(padCharge.total, preciseWhenSmall(padCharge.total))}`}
-                      </span>
-                      {/* The seat's one fee, already taken: every controller
-                          after it is handed over for nothing. One word, because
-                          the figure beside it already says how much. */}
-                      {sess.joystick_rule?.charge_once === true
-                        && sess.joystick_rule?.fee_taken === true && (
-                        <span className="muted" style={{ fontSize: 10 }}>
-                          · {t("session.padFeeTaken")}
-                        </span>
-                      )}
-                    </span>
-                  )}
-                  {/* The round trip, said on the tile it belongs to — for the
-                      menu and for the switch alike, since either can be in
-                      flight. */}
-                  {supportsJoysticks && padBusy.isBusy(sess.id) && (
-                    // The project's own spinner class, sized down inline
-                    // rather than by widening the `Spinner` primitive: that
-                    // one is a 32px page-level element with its own margins,
-                    // and giving it a props API for one 12px use would change
-                    // a component every screen renders.
-                    <span
-                      className="spinner"
-                      style={{ width: 12, height: 12, borderWidth: 2, margin: 0 }}
-                      aria-hidden
-                    />
-                  )}
-                </span>
-                {/* What the pads have added to this seat, spelled out.
-                    Before this the fee vanished into the running total and a
-                    cashier had no way to see it was there — which is the
-                    question a player asks when the figure jumps by 300.
-
-                    Under the FEE strategy it is a count and a flat fee that
-                    does not move with the clock. Under the HOURLY one it is a
-                    count, a rate, and a figure that ticks — and the line says
-                    which by suffixing the rate. Both come from the server's own
-                    rows: the count of CHARGED periods, which is not the count
-                    of pads in play, because a pad handed back keeps its fee. */}
-                {currentRate !== null && (
-                  <span className="muted" style={{ fontSize: 11, flexBasis: "100%" }}>
-                    {t("session.currentRate")}: {money(currentRate, preciseWhenSmall(currentRate))}
-                    {t("session.perHourShort")}
-                  </span>
-                )}
+                {/* What a pad press did (identity, its money, the rate it
+                    moved to) is no longer written here: a line that appears
+                    when a pad goes out made the card taller, and every card in
+                    its row with it (owner, 2026-11-04). It is said for 5s in an
+                    orange note beside the card instead (PadChargeNote, below).
+                    The empty span keeps the line's shape — the board's CSS
+                    hides an empty pad line, and the interface preview draws
+                    the same one. */}
+                <span className="row" style={PAD_COUNT_STYLE} />
                 {sess.is_free && (
                   <span className="pill session-card__pill">
                     {t("session.freeBillShort")}
@@ -1063,6 +967,7 @@ const SessionsBoard = ({ branchId }: Props) => {
               )}
               <SessionCardAction
                 data-action="add-item"
+                icon="add-item"
                 label={t("session.card.addItem")}
                 fullLabel={t("session.addItem")}
                 onClick={() => setAddItemTarget(sess)}
@@ -1105,6 +1010,7 @@ const SessionsBoard = ({ branchId }: Props) => {
                 return (
                   <SessionCardAction
                     data-action="extra"
+                    icon="extra"
                     label={shortLabel}
                     fullLabel={label}
                     onClick={() => {
@@ -1119,20 +1025,15 @@ const SessionsBoard = ({ branchId }: Props) => {
                   />
                 );
               })()}
-              {/* Named for the thing a cashier is actually looking for on a
-                  seat that is running out. It opens the SAME dialog "Options"
-                  does — one management surface, reached by two names, because
-                  "Options" is not what somebody with eight minutes left is
-                  scanning the card for.
-
-                  Only on a seat that HAS an end: a count-up or unlimited
-                  session has nothing to extend, and the dialog says so rather
-                  than offering it. */}
-              {/* Not while PAUSED: the server refuses to move the end then —
-                  resume moves it by the pause. */}
-              {sess.ends_at !== null && sess.is_unlimited !== true && !sess.paused_at && (
+              {/* «+ Время» — ONE button whatever the seat's mode (2026-11-07,
+                  owner): the dialog shows the mode and what is left, and
+                  offers what fits it — more time (by time or by money) and
+                  «Безлимит» on a timed seat, a fixed time on an unlimited one —
+                  and «Не оплачено». The two mode buttons beside it are gone. */}
+              {sess.status === "active" && (
                 <SessionCardAction
                   data-action="add-time"
+                  icon="add-time"
                   label={t("session.card.addTime")}
                   fullLabel={t("session.addTime")}
                   onClick={() => setOptionsTarget(sess)}
@@ -1143,6 +1044,7 @@ const SessionsBoard = ({ branchId }: Props) => {
                   console stays awake — only the clock and the bill hold. */}
               <SessionCardAction
                 data-action={sess.paused_at ? "resume" : "pause"}
+                icon={sess.paused_at ? "resume" : "pause"}
                 label={sess.paused_at ? t("session.card.resume") : t("session.pause")}
                 fullLabel={sess.paused_at ? t("session.resume") : t("session.pause")}
                 onClick={() => { void togglePause(sess); }}
@@ -1164,6 +1066,7 @@ const SessionsBoard = ({ branchId }: Props) => {
               {!sess.paused_at && (
                 <SessionCardAction
                   data-action="relocate"
+                  icon="relocate"
                   label={t("session.card.relocate")}
                   fullLabel={t("session.relocate")}
                   wide
@@ -1175,6 +1078,7 @@ const SessionsBoard = ({ branchId }: Props) => {
                   button on the card a slip must not land on by accident. */}
               <SessionCardAction
                 data-action="stop"
+                icon="stop"
                 label={t(stopLock.labelKey ?? "action.stop")}
                 fullLabel={t(stopLock.labelKey ?? "action.stop")}
                 danger
@@ -1192,6 +1096,8 @@ const SessionsBoard = ({ branchId }: Props) => {
             {pauseError?.id === sess.id && (
               <span className="error session-card__error">{pauseError.message}</span>
             )}
+            {/* The last pad press, for 5s, beside the card — never in it. */}
+            <PadChargeNote lines={padNoteLines} testId={`pad-note-${sess.id}`} />
           </>
         ) : (
           <>
@@ -1199,13 +1105,38 @@ const SessionsBoard = ({ branchId }: Props) => {
                 the header could not be trusted to show it. It has its own line
                 now, with the tier, so the status says only what it is for: the
                 state of the seat. */}
-            <span className="status">
-              {isOffline
-                ? t("session.deviceOffline")
-                : isReserved
-                  ? t("session.reserved") || "Reserved"
-                  : t("session.free")}
-            </span>
+            {(() => {
+              // A reserved seat (2026-11-07, owner): yellow, and no big word
+              // on it — its time, with who is coming and the whole booking in
+              // the tooltip. The word stays until the booking itself is known.
+              const b = isReserved && pc.place_id != null ? reservations.get(pc.place_id) : undefined;
+              if (isReserved && b) {
+                return (
+                  <span className="status session-card__reservation" data-testid="reservation-contact" data-tip={reservationTip(b, t)}>
+                    {reservationWindow(b)}
+                  </span>
+                );
+              }
+              // Free now, reserved later (`freeUntil` above; 2026-11-08, owner):
+              // the word «Свободно» turns into «Свободно до 05:30» in its own
+              // place while the card is pointed at or focused, and back after.
+              // The full sentence is the one read aloud.
+              if (freeUntil) {
+                return (
+                  <span className="status session-card__status-swap" data-tip={t("start.freeUntilCardTip")}>
+                    <span className="session-card__status-word" aria-hidden>{t("session.free")}</span>
+                    <span className="session-card__free-until" data-testid="free-until">
+                      {fmt(t("start.freeUntilCard"), freeUntil)}
+                    </span>
+                  </span>
+                );
+              }
+              return (
+                <span className="status">
+                  {isOffline ? t("session.deviceOffline") : isReserved ? t("session.reserved") : t("session.free")}
+                </span>
+              );
+            })()}
             {isOffline && (
               // Two lines, never an ellipsis: this is the sentence that tells
               // the cashier WHY the seat cannot start.
@@ -1217,15 +1148,49 @@ const SessionsBoard = ({ branchId }: Props) => {
                 the bottom, so every Start in a row sits on one line whatever
                 is above it (a console chip, an offline hint). */}
             <div className="session-card__foot">
-              <Button
-                onClick={() => setStartTarget(pc)}
-                disabled={!canStart || startLock.disabled}
-                title={isOffline ? t("session.deviceOfflineHint") : undefined}
-                className="session-card__start"
-                data-action="start"
-              >
-                {t(startLock.labelKey ?? "action.start")}
-              </Button>
+              {(() => {
+                const reservation = isReserved && pc.place_id != null ? reservations.get(pc.place_id) : undefined;
+                // A reserved seat (2026-11-07): Start is the player arriving —
+                // the ordinary start, carrying the reservation — and the
+                // reservation can be called off. Only once its booking is known.
+                if (reservation) {
+                  return (
+                    <ReservationActions
+                      bookingId={reservation.id}
+                      seat={seatOf(pc.id)}
+                      // Who sits down is asked in Start (2026-11-07): the
+                      // reservation is never assumed from the card.
+                      onStart={() => setStartTarget(pc)}
+                      disabled={isOffline || startLock.disabled}
+                      startLabel={t(startLock.labelKey ?? "action.start")}
+                      startHint={isOffline ? t("session.deviceOfflineHint") : undefined}
+                    />
+                  );
+                }
+                return (
+                  <div className="session-card__reserve-actions">
+                    <CardFootAction
+                      icon="start"
+                      label={t(startLock.labelKey ?? "action.start")}
+                      hint={isOffline ? t("session.deviceOfflineHint") : undefined}
+                      onClick={() => setStartTarget(pc)}
+                      disabled={!canStart || startLock.disabled}
+                      className="session-card__start"
+                      data-action="start"
+                    />
+                    {!isReserved && pc.place_id != null && (
+                      <CardFootAction
+                        icon="reserve"
+                        variant="secondary"
+                        label={t("reserve.buttonShort")}
+                        fullLabel={t("reserve.button")}
+                        onClick={() => setCalendar({ focusPlaceId: pc.place_id as number })}
+                        data-action="reserve"
+                      />
+                    )}
+                  </div>
+                );
+              })()}
             </div>
           </>
         )}
@@ -1244,7 +1209,7 @@ const SessionsBoard = ({ branchId }: Props) => {
   const staleError = pcs.error ?? sessions.error;
 
   return (
-    <div className="col" style={{ gap: 18 }}>
+    <div className="col" style={{ gap: 18 }} data-tip-scope>
       <div className="row-between" style={{ flexWrap: "wrap", rowGap: 8 }}>
         {/* ⚠️ The heading used to read "Sessions · №{branchId}" — the BRANCH's
             surrogate id, next to a word about sessions, in a section full of
@@ -1271,17 +1236,25 @@ const SessionsBoard = ({ branchId }: Props) => {
               is the branch's, so nothing starts a session. */}
           <button
             type="button"
-            className="board-sell-btn"
+            className="outline-btn board-sell-btn"
             onClick={() => setSellOpen(true)}
             title={t("till.sell")}
             data-testid="board-sell"
           >
             {t("session.sellProduct")}
           </button>
-          <Link to={`/branches/${branchId}/sessions/history`} className="muted" style={navBtn}>{t("history.title")}</Link>
-          <Link to={`/branches/${branchId}/pcs`} className="muted" style={navBtn}>{t("pcs.title")}</Link>
+          <Link to={`/branches/${branchId}/sessions/history`} className="outline-btn">{t("history.title")}</Link>
+          <button
+            type="button"
+            className="outline-btn board-calendar-btn"
+            onClick={() => setCalendar({})}
+            data-testid="board-calendar"
+          >
+            {t("calendar.title")}
+          </button>
+          <Link to={`/branches/${branchId}/pcs`} className="outline-btn">{t("pcs.title")}</Link>
           {can(role, "branch.prices") && (
-            <Link to={`/branches/${branchId}/tariffs`} className="muted" style={navBtn}>{t("hub.tile.prices")}</Link>
+            <Link to={`/branches/${branchId}/tariffs`} className="outline-btn">{t("hub.tile.prices")}</Link>
           )}
         </div>
       </div>
@@ -1324,11 +1297,48 @@ const SessionsBoard = ({ branchId }: Props) => {
         </div>
       )}
 
+      {calendar && (
+        <BookingsCalendarModal
+          branchId={branchId}
+          focusPlaceId={calendar.focusPlaceId}
+          places={orderedPcs
+            .filter((pc) => pc.place_id != null)
+            .map((pc) => ({
+              id: pc.place_id as number,
+              number: pc.place?.number ?? pc.place_id as number,
+              label: seatOf(pc.id),
+              platform: pc.place?.platform,
+              offline: resolveSessionCellState({ hasSession: false, isReserved: false, device: pc }) === "offline",
+            }))}
+          sessions={(sessions.data ?? [])
+            .filter((sess) => sess.status === "active")
+            .flatMap((sess) => {
+              const placeId = (pcs.data ?? []).find((pc) => pc.id === sess.pc_id)?.place_id;
+              return placeId == null ? [] : [{
+                placeId,
+                startedAt: new Date(sess.started_at),
+                endsAt: sess.ends_at ? new Date(sess.ends_at) : null,
+                unlimited: sess.is_unlimited === true || sess.ends_at === null,
+              }];
+            })}
+          // «Старт» on a booking in the calendar: the calendar closes and
+          // Start opens on that seat with the booking already chosen.
+          onStartBooking={(placeId, bookingId) => {
+            const target = (pcs.data ?? []).find((pc) => pc.place_id === placeId);
+            if (!target) return;
+            setCalendar(null);
+            setStartBookingId(bookingId);
+            setStartTarget(target);
+          }}
+          onClose={() => { setCalendar(null); void pcs.reload(); }}
+        />
+      )}
       {startTarget && (
         <StartSessionDialog
+          bookingId={startBookingId}
           branchId={branchId}
           pc={startTarget}
-          onClose={() => setStartTarget(null)}
+          onClose={() => { setStartTarget(null); setStartBookingId(undefined); }}
           onStarted={() => {
             // The console may legitimately wake from now on. Said BEFORE the
             // reload, because the monitor can tick before the session row is
@@ -1336,6 +1346,7 @@ const SessionsBoard = ({ branchId }: Props) => {
             // monitor that switches the console off under the player.
             if (startTarget.console_host_id) sessionStarting(startTarget.id);
             setStartTarget(null);
+            setStartBookingId(undefined);
             void sessions.reload();
             void pcs.reload();
           }}
@@ -1345,7 +1356,7 @@ const SessionsBoard = ({ branchId }: Props) => {
         <StopReceiptModal
           session={stopTarget}
           onClose={() => { setStopTarget(null); void sessions.reload(); void pcs.reload(); }}
-          onConfirmed={() => {
+          onConfirmed={(outcome) => {
             // The session is over on the backend, so the console should be
             // asleep. Whether this build can actually ask it to is the
             // transport's business — and its refusal is shown, not swallowed.
@@ -1354,11 +1365,18 @@ const SessionsBoard = ({ branchId }: Props) => {
             // Green (2026-09-28): a stop the server confirmed is a completed
             // checkout, not a failure. Only such a stop reaches here — an
             // auto-ended seat's receipt never calls this.
-            notify.message("success", fmt(t("session.toastStopped"), seatOf(stopTarget.pc_id)));
+            // A cancel (2026-11-06) frees the seat the same way; its toast says
+            // it was cancelled, not paid.
+            notify.message("success", fmt(t(outcome?.cancelled ? "session.cancel.toast" : "session.toastStopped"), seatOf(stopTarget.pc_id)));
+            noticeUnpaid(stopTarget.id, stopTarget.pc_id, outcome?.unpaidAmount);
             void sessions.reload();
             void pcs.reload();
           }}
           onItemRemoved={() => { void sessions.reload(); }}
+          canResetTime={mayReset}
+          onTimeReset={() => { void sessions.reload(); }}
+          // The same right as the reset: both give money away.
+          canCancel={mayReset}
         />
       )}
       {optionsTarget && (
@@ -1374,6 +1392,25 @@ const SessionsBoard = ({ branchId }: Props) => {
             // consoles on both sides must hear of it as a relocation does.
             consolesFollowMove(optionsTarget.pc_id, updated.pc_id);
             setOptionsTarget(updated);
+            void sessions.reload();
+          }}
+        />
+      )}
+      <UnpaidAlert
+        notices={unpaidNotices}
+        onDismiss={(id) => setUnpaidNotices((list) => list.filter((n) => n.sessionId !== id))}
+      />
+      {resetTarget && (
+        <ResetTimeDialog
+          session={resetTarget}
+          seat={seatOf(resetTarget.pc_id)}
+          onClose={() => setResetId(null)}
+          onDone={(updated, waived) => {
+            setResetId(null);
+            // The server's whole row at once (the reset may re-base the plan
+            // too), so the card reads 0 before the reload.
+            sessions.mutate((list) => list?.map((s) => (s.id === updated.id ? { ...s, ...updated } : s)) ?? list);
+            notify.message("success", fmt(t("session.reset.toast"), seatOf(updated.pc_id), money(Math.max(0, waived))));
             void sessions.reload();
           }}
         />

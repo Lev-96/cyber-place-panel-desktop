@@ -80,7 +80,9 @@
      alone. */
   --status-free-rgb: var(--rgb-cyan);
   --status-playing-rgb: var(--rgb-green);
-  --status-booked-rgb: 167 139 250;
+  /* Reserved = yellow (2026-11-07, owner), lemon rather than amber so it
+     stays apart from "ending" (amber, only ever on a running seat). */
+  --status-booked-rgb: 245 215 50;
   --status-ending-rgb: var(--rgb-amber);
   --status-critical-rgb: var(--rgb-red);
   --status-offline-rgb: var(--rgb-slate);
@@ -861,9 +863,145 @@ a.card:hover {
 }
 
 .app-shell {
+  --sidebar-w: 240px;
   display: grid;
-  grid-template-columns: 240px 1fr;
+  grid-template-columns: var(--sidebar-w) 1fr;
   height: 100vh;
+}
+
+/* The side menu folds to a rail (desktop shell only, 2026-11-03; AppShell sets
+   both classes). Folded, the column is 64px and still shows the menu: the
+   logo, every entry's icon (its name as a tooltip, a dot for unread), the
+   Support tile and the avatar. Every entry stays clickable.
+
+   How: the column animates 240px → 64px. The menu's width follows it, while
+   its parts keep the open menu's layout, so no label re-wraps mid-fold. The
+   sidebar's own `overflow: hidden` clips what no longer fits. Only what would
+   peek into the rail is hidden: the labels' first letters (fade) and sign-out
+   (fade, then out of the Tab order). The column is the one thing that has to
+   change size, because the page must actually gain the room.
+   Child selectors on purpose: the owner web's sidebar sits inside its drawer
+   and is never reached. */
+.app-shell--collapsible {
+  --sidebar-rail-w: 64px;
+  --sidebar-slide: 240ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.app-shell--collapsible.is-sidebar-collapsed {
+  grid-template-columns: var(--sidebar-rail-w) 1fr;
+}
+.app-shell--collapsible > .sidebar {
+  min-width: 0;
+}
+/* The open menu's widths, kept while folded: the column minus the sidebar's
+   two 12px side paddings, and the brand row minus its own two 12px margins. */
+.app-shell--collapsible > .sidebar > :is(.sidebar-nav, .sidebar-footer) {
+  width: calc(var(--sidebar-w) - 24px);
+}
+.app-shell--collapsible > .sidebar > h1 {
+  width: calc(var(--sidebar-w) - 48px);
+}
+/* A row's hover / current surface narrows to a rounded tile under its icon:
+   the rail minus the same two paddings, so 12px of air on both sides. */
+.app-shell--collapsible > .sidebar .sidebar-nav a {
+  clip-path: inset(0 0 0 0 round 8px);
+}
+.app-shell--collapsible.is-sidebar-collapsed > .sidebar .sidebar-nav a {
+  clip-path: inset(0 calc(100% - (var(--sidebar-rail-w) - 24px)) 0 0 round 8px);
+}
+.app-shell--collapsible.is-sidebar-collapsed > .sidebar .nav-label {
+  opacity: 0;
+}
+.app-shell--collapsible.is-sidebar-collapsed > .sidebar :is(.nav-support-card, .sidebar-account) {
+  border-color: transparent;
+  background: transparent;
+}
+/* Centre the 34px tiles and the logo on the rail's 32px axis (the nav icons
+   already sit on it): a tile starts 25px in (12 padding + 1 edge + 12 card
+   padding), so its centre is at 42; the logo spans 24-63, centre ~43.5. */
+.app-shell--collapsible.is-sidebar-collapsed > .sidebar :is(.nav-support-card__icon, .user-card > :first-child) {
+  transform: translateX(-10px);
+}
+.app-shell--collapsible.is-sidebar-collapsed > .sidebar > h1 img {
+  transform: translateX(-12px);
+}
+.app-shell--collapsible.is-sidebar-collapsed > .sidebar .logout {
+  opacity: 0;
+  visibility: hidden;
+}
+/* Folded, the focus and "you are here" rings go on what is visible: the icon,
+   the tile, the avatar. The row's own outline would be cut by the rail edge. */
+.app-shell--collapsible.is-sidebar-collapsed > .sidebar :is(.sidebar-nav a, .nav-support-card, .user-card):focus-visible {
+  outline: none;
+}
+.app-shell--collapsible.is-sidebar-collapsed > .sidebar .sidebar-nav a:focus-visible .nav-icon {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 9px;
+  border-radius: 4px;
+}
+.app-shell--collapsible.is-sidebar-collapsed > .sidebar .nav-support-card:is(:focus-visible, .active) .nav-support-card__icon,
+.app-shell--collapsible.is-sidebar-collapsed > .sidebar .user-card:is(:focus-visible, .active) > :first-child {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+.app-shell--collapsible.is-sidebar-collapsed > .sidebar .nav-support-card:hover .nav-support-card__icon {
+  background: rgb(var(--accent-rgb) / 0.22);
+}
+/* Unread, folded: the count itself is past the rail edge, so a dot on the icon. */
+.app-shell--collapsible > .sidebar .nav-support-card__icon {
+  position: relative;
+}
+.app-shell--collapsible.is-sidebar-collapsed > .sidebar .sidebar-nav a:has(.unread-badge)::after,
+.app-shell--collapsible.is-sidebar-collapsed > .sidebar .nav-support-card:has(.unread-badge) .nav-support-card__icon::after {
+  content: "";
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-danger);
+  box-shadow: 0 0 0 2px var(--color-surface);
+}
+.app-shell--collapsible.is-sidebar-collapsed > .sidebar .sidebar-nav a:has(.unread-badge)::after {
+  top: 8px;
+  left: 26px;
+}
+.app-shell--collapsible.is-sidebar-collapsed > .sidebar .nav-support-card:has(.unread-badge) .nav-support-card__icon::after {
+  top: -2px;
+  right: -2px;
+}
+/* Motion only for those who have not asked for less: with reduced motion the
+   menu folds and unfolds at once. */
+@media (prefers-reduced-motion: no-preference) {
+  .app-shell--collapsible {
+    transition: grid-template-columns var(--sidebar-slide);
+  }
+  .app-shell--collapsible > .sidebar .sidebar-nav a {
+    transition:
+      background 150ms ease-out,
+      color 150ms ease-out,
+      clip-path var(--sidebar-slide);
+  }
+  .app-shell--collapsible > .sidebar .nav-label {
+    transition: opacity 160ms ease;
+  }
+  .app-shell--collapsible > .sidebar :is(.nav-support-card__icon, .user-card > :first-child, h1 img) {
+    transition: transform var(--sidebar-slide);
+  }
+  .app-shell--collapsible > .sidebar .logout {
+    transition:
+      color 150ms ease-out,
+      border-color 150ms ease-out,
+      background 150ms ease-out,
+      opacity 160ms ease,
+      visibility 0s;
+  }
+  .app-shell--collapsible.is-sidebar-collapsed > .sidebar .logout {
+    transition:
+      color 150ms ease-out,
+      border-color 150ms ease-out,
+      background 150ms ease-out,
+      opacity 160ms ease,
+      visibility 0s linear 160ms;
+  }
 }
 
 /* ── Sidebar rhythm (2026-10-11) — one 4px scale throughout:
@@ -1107,7 +1245,37 @@ body.cp-modal-open .main {
 }
 .cp-topbar__side {
   display: flex;
+  align-items: center;
+  gap: 8px;
   min-width: 0;
+}
+/* Hide / show the side menu (2026-11-03): Back's glass and edge in a 36px
+   circle — the bar's own height, so the bar and `barBottomInset` stay as they
+   were. Only the colours move on hover: it never shifts under the pointer. */
+.cp-sidebar-toggle {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  background: var(--back-btn-bg);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  color: var(--back-btn-fg);
+  cursor: pointer;
+  transition:
+    color 160ms ease,
+    border-color 160ms ease;
+}
+.cp-sidebar-toggle:hover {
+  color: var(--color-text);
+  border-color: rgb(var(--accent-rgb) / 0.55);
+}
+.cp-sidebar-toggle:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
 }
 .cp-topbar__side > * {
   pointer-events: auto;
@@ -2147,6 +2315,14 @@ button.pill:hover {
   min-height: 100%;
   padding: 24px 32px;
 }
+/* Under the desktop's pinned top bar (2026-11-03): the screen fills what is
+   LEFT of the window. At 100% it was the bar's row taller than the window, so
+   every screen scrolled by ~50px even when its content fitted. 50px = the
+   bar's min-height (36) + its margin (14), see `.cp-topbar`. The owner web has
+   no top bar, so this never reaches it. */
+.cp-topbar ~ .screen-bg {
+  min-height: calc(100% - 50px);
+}
 /* A narrow window (2026-10-25): the shell's two 32px gutters and the page's
    two more took 128px of an 800px window — the sessions board was left one
    stretched card wide. Below 1100px both gutters tighten; at a normal width
@@ -2154,6 +2330,14 @@ button.pill:hover {
 @media (max-width: 1100px) {
   .main { --main-pad-top: 16px; --main-pad-x: 16px; }
   .screen-bg { padding: 16px 20px; }
+}
+/* A phone-sized window (down to 520px, 2026-11-03: the owner web, and the
+   desktop window since 2026-11-04): every gutter at its smallest, so a page's
+   content gets the width. */
+@media (max-width: 640px) {
+  .main { --main-pad-x: 8px; }
+  .screen-bg { padding: 12px 8px; }
+  .cp-section-inner { padding-left: 12px; }
 }
 .screen-bg-img {
   position: absolute;
@@ -2752,6 +2936,219 @@ button.pill:hover {
   white-space: nowrap;
 }
 
+/* "Reset the counter" beside the money it resets (SessionTimer, 2026-11-05):
+   small and round so the status line keeps its height and the card its size;
+   inline-flex so it sits on the text's middle. */
+.session-timer__reset {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  margin-left: 6px;
+  padding: 0;
+  vertical-align: middle;
+  border: 1px solid color-mix(in srgb, var(--color-warning) 45%, transparent);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--color-warning);
+  line-height: 1;
+  cursor: pointer;
+}
+.session-timer__reset:hover,
+.session-timer__reset:focus-visible {
+  background: color-mix(in srgb, var(--color-warning) 18%, transparent);
+  border-color: var(--color-warning);
+}
+.session-timer__reset svg { width: 12px; height: 12px; }
+
+/* "Reset" on the stop receipt's time line (StopReceiptModal, 2026-11-05):
+   a small warning-toned button after the figure it resets. */
+.receipt-reset {
+  margin-left: 10px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--color-warning) 55%, transparent);
+  background: transparent;
+  color: var(--color-warning);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.receipt-reset:hover:not(:disabled),
+.receipt-reset:focus-visible { background: color-mix(in srgb, var(--color-warning) 15%, transparent); }
+.receipt-reset:disabled { opacity: 0.5; cursor: default; }
+/* Extra time not paid yet (2026-11-07): the switch in «+ Время» and Start —
+   a button drawn as the panel's switch (UnpaidToggle), amber when on. */
+.btn.unpaid-toggle {
+  align-self: flex-start;
+  gap: var(--space-2);
+  padding: 2px 0;
+  background: transparent;
+  color: var(--color-text);
+  font-size: 13px;
+  font-weight: 500;
+}
+.btn.unpaid-toggle:hover:not(:disabled) .cp-switch-track { border-color: var(--color-warning); }
+.btn.unpaid-toggle:focus-visible .cp-switch-track {
+  border-color: var(--color-warning);
+  box-shadow: 0 0 0 3px rgb(var(--warning-rgb) / 0.30);
+}
+.btn.unpaid-toggle.is-on .cp-switch-track {
+  background: var(--color-warning);
+  border-color: var(--color-warning);
+  box-shadow: 0 0 0 3px rgb(var(--warning-rgb) / 0.18);
+}
+.btn.unpaid-toggle.is-on .cp-switch-thumb {
+  background: #1a1203;
+  transform: translateX(14px);
+}
+.btn.unpaid-toggle.is-on .unpaid-toggle__label {
+  color: var(--color-warning);
+  font-weight: 700;
+}
+/* The warning a seat ending owing for extra time raises: amber, a slow glow,
+   the amount large enough to read across the room. */
+.unpaid-alert {
+  width: 460px;
+  max-width: 92vw;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  text-align: center;
+  border: 2px solid var(--color-warning);
+  background: color-mix(in srgb, var(--color-warning-surface) 70%, var(--color-surface));
+  animation: cp-unpaid-in 260ms ease-out both, cp-unpaid-glow 1.6s ease-in-out 260ms infinite;
+}
+.unpaid-alert__badge {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--color-warning);
+  color: #1a1203;
+  font-size: 32px;
+  font-weight: 900;
+}
+.unpaid-alert__seat {
+  margin: 0;
+  font-size: 30px;
+  font-weight: 800;
+  color: var(--color-text);
+}
+.unpaid-alert__why {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--color-warning);
+}
+.unpaid-alert__amount {
+  font-size: 48px;
+  font-weight: 900;
+  line-height: 1.1;
+  color: var(--color-warning);
+  font-variant-numeric: tabular-nums;
+}
+.unpaid-alert__hint { margin: 0; font-size: 15px; color: var(--color-text); }
+.unpaid-alert__more { font-size: 13px; color: var(--color-text-muted, var(--color-text)); }
+.unpaid-alert .btn { min-width: 160px; font-size: 16px; padding: 10px 20px; }
+@keyframes cp-unpaid-in {
+  from { opacity: 0; transform: scale(0.92) translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes cp-unpaid-glow {
+  0%, 100% { box-shadow: 0 0 0 0 rgb(var(--warning-rgb) / 0.0), 0 0 24px rgb(var(--warning-rgb) / 0.25); }
+  50% { box-shadow: 0 0 0 6px rgb(var(--warning-rgb) / 0.18), 0 0 40px rgb(var(--warning-rgb) / 0.45); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .unpaid-alert { animation: none; }
+}
+/* A reserved seat (2026-11-07): its time in the seat's yellow, the rest in
+   the tooltip; the tile's two actions side by side. */
+.session-card__reservation {
+  color: var(--status-booked-fg);
+  font-variant-numeric: tabular-nums;
+  cursor: default;
+}
+.session-card__reserve-actions {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: var(--space-2);
+  width: 100%;
+}
+.reserve-dialog { width: 440px; max-width: 92vw; }
+/* "+ Время" by money (2026-11-07): the server's answer — how long the money
+   buys — large and in the accent, the figure the cashier reads aloud. */
+.grant-money-result {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--space-2) var(--space-3);
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--color-primary) 40%, transparent);
+  background: color-mix(in srgb, var(--color-primary) 8%, transparent);
+  color: var(--color-primary);
+  font-size: 18px;
+  font-weight: 700;
+}
+/* The stop receipt's buttons (2026-11-07, owner): even columns across the
+   receipt — keep playing, cancel, confirm — each filling its column, one
+   height, the type of a control. A label that does not fit wraps; nothing
+   overlaps. Cancel takes the panel's destructive look (`.btn.secondary.is-danger`). */
+.receipt-actions {
+  display: grid;
+  gap: var(--space-2);
+  align-items: stretch;
+}
+.receipt-actions[data-count="3"] { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.receipt-actions[data-count="2"] { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.receipt-actions[data-count="1"] { grid-template-columns: auto; justify-content: start; }
+.receipt-actions[data-count="2"] .btn,
+.receipt-actions[data-count="3"] .btn {
+  width: 100%;
+}
+.receipt-actions .btn {
+  min-height: 40px;
+  padding: 8px 10px;
+  font-size: 13px;
+  line-height: 1.25;
+  white-space: normal;
+  text-align: center;
+}
+/* What a reset waived, on the receipt: the warning tone, like the history. */
+.receipt-waived > span { color: var(--color-warning); }
+
+/* The reset's confirmation (ResetTimeDialog): the figure large, before → 0. */
+.reset-dialog {
+  width: 440px;
+  max-width: 90vw;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.reset-dialog__title { margin: 0; }
+.reset-dialog__amount {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--color-warning) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-warning) 35%, transparent);
+}
+.reset-dialog__amount .muted { flex-basis: 100%; font-size: var(--fs-sm); }
+.reset-dialog__amount strong { font-size: 26px; font-variant-numeric: tabular-nums; }
+.reset-dialog__arrow { color: var(--color-muted); font-size: 20px; }
+.reset-dialog__zero { color: var(--color-success); }
+.reset-dialog__text { margin: 0; line-height: 1.45; }
+.reset-dialog__keeps { color: var(--color-warning); }
+.reset-dialog__note { margin: 0; font-size: var(--fs-sm); }
+
 /* The VIP minimum charge form (components/prices/VipMinimumChargeForm). */
 .vip-min-summary {
   display: flex;
@@ -2918,6 +3315,116 @@ button.pill:hover {
   .cp-switch-thumb {
     transition: none;
   }
+}
+/* The settings-page switch (2026-11-03, `size="md"`): a 44×24 track, a raised
+   thumb. Travel = track 44 − 2×1.5 edge − 2×2 padding − 18 thumb = 19px. */
+.cp-switch[data-size="md"] .cp-switch-track {
+  width: 44px;
+  height: 24px;
+}
+.cp-switch[data-size="md"] .cp-switch-thumb {
+  width: 18px;
+  height: 18px;
+  box-shadow: 0 1px 3px rgb(var(--shadow-rgb) / 0.35);
+}
+.cp-switch[data-size="md"][data-checked] .cp-switch-thumb {
+  transform: translateX(19px);
+}
+/* The seats a minimum charge is put on, by hand (2026-11-06): a wrapping grid
+   of checkboxes, scrolled when a branch has many. */
+.vip-min-seats {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: var(--space-2) var(--space-4);
+  max-height: 240px;
+  overflow-y: auto;
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+}
+/* The card's main switch (2026-11-06, `size="lg"`): a 56×30 track, a 24px
+   thumb, the label in the card's weight. Travel = 56 − 2×1.5 − 2×2 − 24 = 25px. */
+.cp-switch[data-size="lg"] {
+  gap: var(--space-3);
+}
+.cp-switch[data-size="lg"] .cp-switch-track {
+  width: 56px;
+  height: 30px;
+}
+.cp-switch[data-size="lg"] .cp-switch-thumb {
+  width: 24px;
+  height: 24px;
+  box-shadow: 0 2px 4px rgb(var(--shadow-rgb) / 0.35);
+}
+.cp-switch[data-size="lg"][data-checked] .cp-switch-thumb {
+  transform: translateX(25px);
+}
+.cp-switch[data-size="lg"] .cp-switch-label {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+/* A labelled slider (RangeSlider, 2026-11-03): name and value on one line,
+   the track under them, its filled part drawn from `--pct`. Electron renders
+   with Chromium, so the -webkit- parts are the ones that apply. */
+.cp-range {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.cp-range[data-disabled] { opacity: 0.5; }
+.cp-range__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+.cp-range__value {
+  flex-shrink: 0;
+  color: var(--color-primary);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.cp-range__input {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 28px;
+  margin: 0;
+  background: transparent;
+  cursor: pointer;
+}
+.cp-range__input:disabled { cursor: not-allowed; }
+.cp-range__input::-webkit-slider-runnable-track {
+  height: 6px;
+  border-radius: 999px;
+  background: linear-gradient(
+    to right,
+    var(--color-primary) 0 var(--pct, 0%),
+    rgb(var(--fg-rgb) / 0.14) var(--pct, 0%) 100%
+  );
+}
+.cp-range__input::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  margin-top: -7px; /* (6px track − 20px thumb) / 2 */
+  border-radius: 50%;
+  border: 3px solid var(--color-surface);
+  background: var(--color-primary);
+  box-shadow: 0 0 0 1px rgb(var(--accent-rgb) / 0.6), 0 2px 8px rgb(var(--shadow-rgb) / 0.35);
+  transition: transform 150ms ease, box-shadow 150ms ease;
+}
+.cp-range__input:hover:not(:disabled)::-webkit-slider-thumb { transform: scale(1.1); }
+.cp-range__input:focus-visible { outline: none; }
+.cp-range__input:focus-visible::-webkit-slider-thumb {
+  box-shadow: 0 0 0 4px rgb(var(--accent-rgb) / 0.4), 0 2px 8px rgb(var(--shadow-rgb) / 0.35);
+}
+@media (prefers-reduced-motion: reduce) {
+  .cp-range__input::-webkit-slider-thumb { transition: none; }
 }
 
 /* Radio — the checkbox's sibling, same sizes and states so a form mixing the
@@ -3112,8 +3619,11 @@ button.pill:hover {
   transform: translateX(3px);
 }
 
-/* Manager-account picker (inside the popover). */
-.cp-switch {
+/* Manager-account picker (inside the popover). Its root is a <div>; the
+   on/off `Switch` primitive shares the class name on a <label>, and this rule
+   used to reach it too, stacking every switch's track over its words
+   (2026-11-03: scoped to the picker's element). */
+div.cp-switch {
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -4110,6 +4620,48 @@ button.login-flip-back:hover {
   font-size: 13px;
   line-height: 1.4;
 }
+/* What a pad press did, said for 5s beside its card (2026-11-04,
+   PadChargeNote). The anchor lies over the card out of its flow (nothing
+   about the card's size can change); the note is a portal on <body>, placed
+   by useAnchoredPopover, orange, never clickable. z 40: above the pinned
+   top bar (20), under every dialog (50). It fades in, and out over the last
+   300ms of its 5s. */
+.pad-note-anchor {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  visibility: hidden;
+}
+.pad-note {
+  z-index: 40;
+  pointer-events: none;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--color-warning);
+  background: var(--color-warning-surface);
+  color: var(--notice-fg);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.4;
+  box-shadow: 0 6px 18px rgb(0 0 0 / 0.35), 0 0 0 1px rgb(var(--warning-rgb) / 0.25);
+  animation: pad-note-in 160ms ease-out, pad-note-out 300ms ease-in 4700ms forwards;
+}
+.pad-note__line { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+@keyframes pad-note-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+@keyframes pad-note-out { to { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .pad-note { animation: none; }
+}
+
+/* Devices without a place, under the Places tiles (2026-11-04): the notice
+   and one line per device — its name, a running mark, its delete button. */
+.devices-without-place { display: flex; flex-direction: column; gap: var(--space-2); margin-top: 14px; }
+.devices-without-place__head { display: flex; flex-direction: column; gap: 2px; }
+.devices-without-place__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.devices-without-place__row { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); }
+.devices-without-place__name { font-weight: 700; min-width: 0; overflow-wrap: anywhere; }
+.devices-without-place__running { font-size: 12px; font-weight: 600; }
+.devices-without-place__remove { margin-left: auto; }
 
 /* ── Support desk ────────────────────────────────────────────────────────
    Two columns on a desk-sized window, one on a narrow one: the conversation
@@ -4663,6 +5215,11 @@ button.login-flip-back:hover {
   flex: 0 0 auto;
   /* Pushed to the right edge on its own line once the row has wrapped. */
   margin-left: auto;
+  /* A line narrower than both buttons (a 520px window with the side menu
+     open, 2026-11-04): they stack instead of pushing past the page. Each
+     label still one line; at any other width nothing changes. */
+  max-width: 100%;
+  flex-wrap: wrap;
 }
 .screen-actions__buttons .btn {
   /* A label on one line is what makes the two buttons the same height. */
@@ -5472,8 +6029,19 @@ select.input option:disabled {
      2-column grid on one line from 184px. */
   grid-template-columns: repeat(auto-fill, minmax(var(--grid-min, 198px), 1fr));
   /* Air between seats, cards or rows alike (owner, 2026-10-27: they read
-     as one block when they nearly touched). One token, set per density. */
-  gap: var(--gap-grid);
+     as one block when they nearly touched). One token, set per density.
+     «Мой интерфейс» can set the rows apart (2026-11-03, `--board-gap-y` on
+     <html>); unset, it is the token. */
+  --board-row-gap: var(--board-gap-y, var(--gap-grid));
+  gap: var(--board-row-gap) var(--gap-grid);
+}
+/* The list's own fit (2026-11-03, FitBoardToScreen): one CSS zoom of the
+   board, only where a list row does not fit even with pictures. Zoom (not
+   transform) because it lays the board out again at that size: list rows
+   and their container queries follow, hit-testing follows, nothing is drawn
+   outside its box. Unset, it is 1: no zoom. */
+.live-grid.live-grid--sessions {
+  zoom: var(--board-fit, 1);
 }
 .place-cell.session-card {
   min-height: 140px;
@@ -5593,22 +6161,33 @@ select.input option:disabled {
   margin-top: auto;
   padding-top: 10px;
 }
-/* "+ Продукт" in the board's header (2026-10-25): the same box as the links
-   beside it ("История торговли", "Компьютеры"), in the accent colour because
-   it is the one that acts rather than navigates. */
-.board-sell-btn {
-  padding: 6px 10px;
+/* An outlined accent button (2026-11-08, owner): "+ Продукт" (2026-10-25)
+   and, now, every action beside it in the board's header («История
+   торговли», «Календарь броней», «Компьютеры», «Тарифы») and the start
+   dialog's «Настроить окно» — visibly a button, in every theme. Works on a
+   <button>, a router <Link> and a .btn alike. */
+.outline-btn,
+.btn.outline-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 12px;
   border: 1px solid var(--color-primary);
   border-radius: 6px;
   background: transparent;
   color: var(--color-primary);
   font: inherit;
+  font-weight: 500;
+  line-height: 1.4;
+  text-decoration: none;
   cursor: pointer;
 }
-.board-sell-btn:hover {
+.outline-btn:hover,
+.btn.outline-btn:hover {
   background: color-mix(in srgb, var(--color-primary) 12%, transparent);
+  box-shadow: none;
 }
-.board-sell-btn:focus-visible {
+.outline-btn:focus-visible {
   outline: 2px solid var(--color-primary);
   outline-offset: 2px;
 }
@@ -5921,8 +6500,8 @@ select.input option:disabled {
   min-width: 0;
 }
 .hs-event {
-  flex: 0 0 200px;
-  padding-right: 14px;
+  flex: 0 0 220px;
+  padding-right: 16px;
 }
 .hs-gap {
   flex: 0 0 56px;
@@ -5934,7 +6513,7 @@ select.input option:disabled {
   min-height: 20px;
 }
 .hs-event__time {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--color-muted);
   font-variant-numeric: tabular-nums;
 }
@@ -5943,7 +6522,7 @@ select.input option:disabled {
   position: relative;
   display: flex;
   align-items: center;
-  height: 22px;
+  height: 28px;
 }
 .hs-event__rail::after {
   content: "";
@@ -5968,10 +6547,10 @@ select.input option:disabled {
 .hs-event__marker {
   display: grid;
   place-items: center;
-  width: 22px;
-  height: 22px;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
-  font-size: 10px;
+  font-size: 13px;
   line-height: 1;
   color: var(--tone);
   border: 1px solid color-mix(in srgb, var(--tone) 55%, transparent);
@@ -5988,27 +6567,44 @@ select.input option:disabled {
 .hs-event__body {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 4px;
   min-width: 0;
 }
 .hs-event__title {
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 600;
   overflow-wrap: anywhere;
 }
+/* The amount reads by what it is (2026-11-05): large and signed, so what was
+   put on the bill, what was waived and what the bill came to never look alike. */
 .hs-event__amount {
-  font-size: 13px;
-  color: var(--color-primary);
+  align-self: flex-start;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--color-text);
   font-variant-numeric: tabular-nums;
 }
+.hs-amount--charge { color: var(--color-primary); }
+.hs-amount--waive {
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  color: var(--color-warning);
+  background: color-mix(in srgb, var(--color-warning) 14%, transparent);
+}
+.hs-amount--total {
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  color: var(--color-success);
+  background: color-mix(in srgb, var(--color-success) 12%, transparent);
+}
 .hs-event__actor {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--color-text);
   opacity: 0.8;
   overflow-wrap: anywhere;
 }
 .hs-event__detail {
-  font-size: 12px;
+  font-size: 13px;
   line-height: 1.4;
   color: var(--color-muted);
   overflow-wrap: anywhere;
@@ -6030,6 +6626,7 @@ select.input option:disabled {
 .hs-tone-charge { --tone: var(--color-text); }
 .hs-tone-neutral { --tone: var(--color-muted); }
 .hs-tone-refused { --tone: var(--color-danger); }
+.hs-tone-waive { --tone: var(--color-warning); }
 .hs-more {
   align-self: flex-start;
   padding: 4px 12px;
@@ -6069,19 +6666,19 @@ select.input option:disabled {
   width: 100%;
   table-layout: fixed;
   border-collapse: collapse;
-  font-size: 13px;
+  font-size: 15px;
 }
 .hs-bill__title {
   caption-side: top;
   text-align: left;
-  padding-bottom: 6px;
-  font-size: 12px;
+  padding-bottom: 8px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--color-muted);
 }
 .hs-bill__table th,
 .hs-bill__table td {
-  padding: 5px 8px;
+  padding: 7px 8px;
   text-align: left;
   font-weight: 400;
   vertical-align: baseline;
@@ -6108,7 +6705,7 @@ select.input option:disabled {
   text-align: center;
 }
 .hs-bill__table thead th {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--color-muted);
   border-bottom: 1px solid var(--color-border);
 }
@@ -6120,16 +6717,29 @@ select.input option:disabled {
 }
 .hs-bill__subtotal > * {
   color: var(--color-muted);
-  font-size: 12px;
+  font-size: 13px;
 }
+/* What a reset of the clock waived (2026-11-05): its own coloured line, not a
+   charge — the time above it is already net. */
+/* Specific enough to beat `.hs-bill__table tbody td:not(:last-child)`
+   (0,2,2) without !important (panel CLAUDE.md §7.5). */
+.hs-bill__table tbody tr.hs-bill__waived > * {
+  color: var(--color-warning);
+  font-weight: 600;
+}
+/* The total: the one figure the eye looks for, the largest on the card. */
 .hs-bill__total > * {
-  padding-top: 10px;
+  padding-top: 12px;
   border-top: 1px solid var(--color-border);
-  font-size: 15px;
+  font-size: 20px;
   font-weight: 700 !important;
 }
 .hs-bill__total td {
   color: var(--color-primary);
+}
+/* A cancelled session's total (2026-11-06): the word in the danger red. */
+.hs-bill__total td.hs-bill__cancelled {
+  color: var(--color-danger);
 }
 .hs-bill__pay > * {
   padding-top: 2px;
@@ -7132,8 +7742,8 @@ select.input option:disabled {
 
 /* Card size, on the sessions board only: the column, the air inside and the
    number and clock. Medium has no rules — it is the board as it always was. */
-[data-card-size="s"] { --grid-min: 168px; --row-py: 6px; }
-[data-card-size="l"] { --grid-min: 272px; --row-py: 14px; }
+[data-card-size="s"] { --grid-min: 168px; --row-py: 8px; }
+[data-card-size="l"] { --grid-min: 272px; --row-py: 16px; }
 [data-card-size="s"] .place-cell.session-card { padding: 8px 8px 10px; min-height: 118px; }
 [data-card-size="s"] .place-cell.session-card .id { font-size: 14px; }
 [data-card-size="s"] .place-cell.session-card--running .status { font-size: 15px; }
@@ -7148,101 +7758,47 @@ select.input option:disabled {
 [data-secondary="off"] .session-card__secondary { display: none; }
 
 /* === Themes (2026-10-27) ====================================================
-   Light is soft on purpose (2026-10-27, owner: pure white hurt the eyes):
-   a grey-blue page, off-white surfaces, near-black (not black) text.
-   Dark is :root above — the panel as it always was. Light and High contrast
-   redefine the SAME tokens, nothing else: components never know which theme
+   There is no light theme any more (2026-11-05, owner: white hurt the eyes):
+   the id `light` is «Серая», a calm graphite, so a saved choice keeps working.
+   Dark is :root above — the panel as it always was. Every other theme
+   redefines the SAME tokens, nothing else: components never know which theme
    is on. Every text colour here is ≥ 4.5:1 on its surface and every control
    boundary ≥ 3:1 (computed, see the redesign report). Status colours keep
    their meaning in every theme; only their shade changes. */
 
+/* «Серая» (2026-11-05, owner: no white theme at all — it hurt the eyes). The
+   id stays `light` so a document that saved the old light theme opens in this
+   one and the server's whitelist is unchanged; it is a calm graphite, dark
+   like the others. */
 [data-theme="light"] {
-  --on-success-ink: #ffffff;
-  --on-accent-ink-page: #ffffff;
-  --on-accent-ink-tick: #ffffff;
-  --on-accent-ink-badge: #ffffff;
-  --update-toast-end: rgba(224, 242, 254, 0.98);
-  --update-toast-fg: #262e3c;
-  --accent-rgb: 14 111 138;
-  --accent-blue-rgb: 3 105 161;
-  --accent-purple-rgb: 126 34 206;
-  --danger-rgb: 185 28 28;
-  --success-rgb: 17 108 53;
-  --warning-rgb: 180 83 9;
-  --muted-rgb: 74 85 102;
-  --bg-rgb: 230 233 238;
-  --surface-rgb: 243 244 247;
-  --fg-rgb: 28 35 48;
-  --shadow-rgb: 15 23 42;
-  --border-rgb: 197 204 214;
-  --rgb-steel: 100 116 139;
-  --rgb-steel-light: 148 163 184;
-  --rgb-yellow: 161 98 7;
-
-  --color-bg: #e6e9ee;
-  --color-surface: #f3f4f7;
-  --color-surface-alt: #eaedf1;
-  --color-border: #c5ccd6;
-  --color-text: #1c2330;
-  --color-muted: #4a5566;
-  --color-primary: #0e6f8a;
-  --color-danger: #b91c1c;
-  --color-success: #116c35;
-  --color-warning: #b45309;
-  --color-inactive: #556274;
-  --color-accent-blue: #0369a1;
-  --color-accent-purple: #7e22ce;
-
-  --status-free-rgb: 14 111 138;
-  --status-playing-rgb: 17 108 53;
-  --status-booked-rgb: 109 40 217;
-  --status-ending-rgb: 180 83 9;
-  --status-critical-rgb: 185 28 28;
-  --status-offline-rgb: 85 98 116;
-  --status-critical-fg: #b91c1c;
-
-  --color-text-soft: #262e3c;
-  --color-muted-alt: #475569;
-  --color-muted-dim: #556274;
-  --color-muted-grey: #556274;
-  --color-danger-border-dim: #fca5a5;
-  --color-success-bright: #116c35;
-  --color-surface-deep: #dde1e7;
-  --color-on-danger: #ffffff;
-  --color-on-primary: #ffffff;
-  --color-danger-deep: #fca5a5;
-  --color-danger-deeper: #fee2e2;
-  --color-yellow: #a16207;
-  --color-warning-surface: #fef3c7;
-  --color-ps5-amber: #b45309;
-  --color-grey-dim: #556274;
-  --color-text-bright: #1c2330;
-  --color-accent-purple-soft: #6b21a8;
-  --scrollbar-thumb-hover: #94a3b8;
-  --back-btn-bg: rgba(243, 244, 247, 0.94);
-  --back-btn-fg: #0e6f8a;
-  --topbar-pill-bg: rgba(243, 244, 247, 0.96);
-  --stepper-hi: #eef0f3;
-  --stepper-lo: #e2e8f0;
-  --stepper-hover: #dbe3ee;
-  --pill-fg: #0e6f8a;
-  --suggest-fg: #1e293b;
-  --suggest-active-bg: #e0f2fe;
-  --control-bg: #f7f8fa;
-  --notice-border: #b45309;
-  --notice-bg: rgba(180, 83, 9, 0.08);
-  --notice-fg: #92400e;
-  --toast-surface: #f7f8fa;
-  --select-bg: #f7f8fa;
-  --select-fg: #1c2330;
-  color-scheme: light;
+  --accent-rgb: 143 179 209;
+  --bg-rgb: 31 34 38;
+  --surface-rgb: 40 44 49;
+  --border-rgb: 58 64 71;
+  --fg-rgb: 217 220 225;
+  --color-bg: #1f2226;
+  --color-surface: #282c31;
+  --color-surface-alt: #30353b;
+  --color-surface-deep: #23272b;
+  --color-border: #3a4047;
+  --color-text: #d9dce1;
+  --color-text-bright: #d9dce1;
+  --color-text-soft: #cfd3d9;
+  --color-muted: #9ba2ac;
+  --color-primary: #8fb3d1;
+  --color-on-primary: #12171c;
+  --scrollbar-thumb-hover: #4a5058;
+  --back-btn-bg: rgba(31, 34, 38, 0.85);
+  --topbar-pill-bg: rgba(36, 40, 45, 0.94);
+  --stepper-hi: #30353b;
+  --stepper-lo: #2a2e33;
+  --stepper-hover: #383e45;
+  --suggest-active-bg: #343a41;
+  --control-bg: #23272b;
+  --toast-surface: #262a2f;
+  --select-bg: #262a2f;
+  --update-toast-end: rgba(44, 50, 58, 0.96);
 }
-/* A control's own frame needs 3:1 against the page (WCAG 1.4.11). */
-[data-theme="light"] .input,
-[data-theme="light"] select,
-[data-theme="light"] textarea { border-color: #77849b; }
-/* The artwork behind screens is drawn for a dark room: a whisper of it here. */
-[data-theme="light"] .screen-bg-img { opacity: 0.05; filter: grayscale(1); }
 
 [data-theme="contrast"] {
   --on-success-ink: #000000;
@@ -7280,7 +7836,7 @@ select.input option:disabled {
 
   --status-free-rgb: 34 232 255;
   --status-playing-rgb: 74 222 128;
-  --status-booked-rgb: 196 167 255;
+  --status-booked-rgb: 255 230 80;
   --status-ending-rgb: 251 191 36;
   --status-critical-rgb: 255 107 107;
   --status-offline-rgb: 212 217 226;
@@ -7330,6 +7886,145 @@ select.input option:disabled {
 [data-theme="contrast"] :focus-visible { outline: 3px solid var(--color-primary); outline-offset: 2px; }
 [data-theme="contrast"] .place-cell.session-card .session-card__stripe { width: 5px; }
 
+/* Calm themes (2026-11-04; recoloured 2026-11-05, owner: pleasant, quiet
+   colours, eyes hurt). Each redefines the page, the surfaces, the frames,
+   the text (never pure white) and a muted accent — nothing else. The five
+   calm themes (these four and «Серая») also share softer status colours
+   below: the same hues and meanings, without the neon glare. Text stays
+   ≥ 4.5:1 on every surface (themes.test.ts computes it). */
+[data-theme="purple"] {
+  --accent-rgb: 179 166 217;
+  --bg-rgb: 23 20 29;
+  --surface-rgb: 32 28 40;
+  --border-rgb: 58 51 72;
+  --fg-rgb: 226 222 234;
+  --color-bg: #17141d;
+  --color-surface: #201c28;
+  --color-surface-alt: #282333;
+  --color-surface-deep: #1b1823;
+  --color-border: #3a3348;
+  --color-text: #e2deea;
+  --color-text-bright: #e2deea;
+  --color-text-soft: #d8d3e2;
+  --color-muted: #a69fb5;
+  --color-primary: #b3a6d9;
+  --color-on-primary: #1a1626;
+  --scrollbar-thumb-hover: #4a4160;
+  --back-btn-bg: rgba(23, 20, 29, 0.85);
+  --topbar-pill-bg: rgba(28, 24, 36, 0.94);
+  --stepper-hi: #282333;
+  --stepper-lo: #221e2c;
+  --stepper-hover: #302a3d;
+  --suggest-active-bg: #2e283b;
+  --control-bg: #1b1823;
+  --toast-surface: #1e1a26;
+  --select-bg: #1e1a26;
+  --update-toast-end: rgba(40, 34, 54, 0.96);
+}
+[data-theme="midnight"] {
+  --accent-rgb: 134 169 207;
+  --bg-rgb: 16 22 31;
+  --surface-rgb: 23 32 48;
+  --border-rgb: 42 58 82;
+  --fg-rgb: 213 221 232;
+  --color-bg: #10161f;
+  --color-surface: #172030;
+  --color-surface-alt: #1d283a;
+  --color-surface-deep: #131b27;
+  --color-border: #2a3a52;
+  --color-text: #d5dde8;
+  --color-text-bright: #d5dde8;
+  --color-text-soft: #cbd4e0;
+  --color-muted: #94a2b5;
+  --color-primary: #86a9cf;
+  --color-on-primary: #0c1420;
+  --scrollbar-thumb-hover: #34486a;
+  --back-btn-bg: rgba(16, 22, 31, 0.85);
+  --topbar-pill-bg: rgba(20, 28, 40, 0.94);
+  --stepper-hi: #1d283a;
+  --stepper-lo: #182232;
+  --stepper-hover: #233046;
+  --suggest-active-bg: #213048;
+  --control-bg: #131b27;
+  --toast-surface: #151e2c;
+  --select-bg: #151e2c;
+  --update-toast-end: rgba(24, 36, 56, 0.96);
+}
+[data-theme="emerald"] {
+  --accent-rgb: 148 191 162;
+  --bg-rgb: 19 25 22;
+  --surface-rgb: 27 35 31;
+  --border-rgb: 51 67 58;
+  --fg-rgb: 220 228 222;
+  --color-bg: #131916;
+  --color-surface: #1b231f;
+  --color-surface-alt: #222c27;
+  --color-surface-deep: #161d19;
+  --color-border: #33433a;
+  --color-text: #dce4de;
+  --color-text-bright: #dce4de;
+  --color-text-soft: #d1dad3;
+  --color-muted: #9eada4;
+  --color-primary: #94bfa2;
+  --color-on-primary: #122019;
+  --scrollbar-thumb-hover: #3f5448;
+  --back-btn-bg: rgba(19, 25, 22, 0.85);
+  --topbar-pill-bg: rgba(23, 30, 26, 0.94);
+  --stepper-hi: #222c27;
+  --stepper-lo: #1d2621;
+  --stepper-hover: #29342e;
+  --suggest-active-bg: #27332c;
+  --control-bg: #161d19;
+  --toast-surface: #19201c;
+  --select-bg: #19201c;
+  --update-toast-end: rgba(30, 42, 36, 0.96);
+}
+[data-theme="amber"] {
+  --accent-rgb: 210 173 126;
+  --bg-rgb: 25 21 15;
+  --surface-rgb: 35 29 21;
+  --border-rgb: 64 54 42;
+  --fg-rgb: 232 221 204;
+  --color-bg: #19150f;
+  --color-surface: #231d15;
+  --color-surface-alt: #2c251b;
+  --color-surface-deep: #1d1812;
+  --color-border: #40362a;
+  --color-text: #e8ddcc;
+  --color-text-bright: #e8ddcc;
+  --color-text-soft: #ded2bf;
+  --color-muted: #b3a690;
+  --color-primary: #d2ad7e;
+  --color-on-primary: #21180c;
+  --scrollbar-thumb-hover: #5a4a36;
+  --back-btn-bg: rgba(25, 21, 15, 0.85);
+  --topbar-pill-bg: rgba(30, 25, 18, 0.94);
+  --stepper-hi: #2c251b;
+  --stepper-lo: #262017;
+  --stepper-hover: #342c20;
+  --suggest-active-bg: #33291c;
+  --control-bg: #1d1812;
+  --toast-surface: #201a13;
+  --select-bg: #201a13;
+  --update-toast-end: rgba(48, 38, 26, 0.96);
+}
+/* The calm themes' status colours: same hue, same meaning, less glare. */
+:is([data-theme="light"], [data-theme="purple"], [data-theme="midnight"], [data-theme="emerald"], [data-theme="amber"]) {
+  --status-free-rgb: 92 190 204;
+  --status-playing-rgb: 98 186 128;
+  --status-booked-rgb: 220 200 100;
+  --status-ending-rgb: 214 160 80;
+  --status-critical-rgb: 224 128 128;
+  --status-offline-rgb: 153 163 177;
+  --status-critical-fg: #e08080;
+  --danger-rgb: 224 122 122;
+  --success-rgb: 98 186 128;
+  --warning-rgb: 214 160 80;
+  --color-danger: #e07a7a;
+  --color-success: #62ba80;
+  --color-warning: #d6a050;
+}
+
 /* === «Интерфейс и тема» (2026-10-27) ======================================== */
 .appearance-intro { margin: 0 0 var(--space-4); max-width: 70ch; }
 .appearance-note { font-size: var(--fs-sm); }
@@ -7373,8 +8068,12 @@ select.input option:disabled {
 /* Theme swatches are drawn in the theme's own colours, whatever theme is on. */
 .theme-swatch { display: block; height: 34px; border-radius: 6px; border: 1px solid var(--color-border); }
 .theme-swatch--dark { background: linear-gradient(90deg, #020514 0 55%, #0b1224 55% 80%, #07ddf1 80%); }
-.theme-swatch--light { background: linear-gradient(90deg, #e6e9ee 0 55%, #f3f4f7 55% 80%, #0e6f8a 80%); }
+.theme-swatch--light { background: linear-gradient(90deg, #1f2226 0 55%, #282c31 55% 80%, #8fb3d1 80%); }
 .theme-swatch--contrast { background: linear-gradient(90deg, #000000 0 55%, #ffffff 55% 62%, #000 62% 80%, #22e8ff 80%); }
+.theme-swatch--purple { background: linear-gradient(90deg, #17141d 0 55%, #201c28 55% 80%, #b3a6d9 80%); }
+.theme-swatch--midnight { background: linear-gradient(90deg, #10161f 0 55%, #172030 55% 80%, #86a9cf 80%); }
+.theme-swatch--emerald { background: linear-gradient(90deg, #131916 0 55%, #1b231f 55% 80%, #94bfa2 80%); }
+.theme-swatch--amber { background: linear-gradient(90deg, #19150f 0 55%, #231d15 55% 80%, #d2ad7e 80%); }
 
 .appearance-preview {
   padding: var(--space-3);
@@ -7383,19 +8082,55 @@ select.input option:disabled {
   overflow: hidden;
 }
 .appearance-preview .live-grid { pointer-events: none; }
-/* Cards keep the chosen card size here instead of stretching to fill the
-   frame, so Large / Medium / Small are seen side by side. */
-[data-board-view="grid"] .appearance-preview .live-grid.live-grid--sessions {
-  grid-template-columns: repeat(auto-fill, var(--grid-min, 198px));
-}
+/* Drawn at Active Places' own size (2026-11-03): what the settings card
+   cannot show scrolls sideways here, never out of the card. */
+.appearance-preview__frame { overflow-x: auto; overflow-y: hidden; }
+/* No grid rule of its own (2026-11-03): the preview is laid out by the
+   board's rules — columns, stretch, list rows, spacing, size — so it shows
+   exactly what Active Places will. */
 .appearance-preview .session-card__btn,
 .appearance-preview .session-card__start { pointer-events: none; }
 .appearance-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  /* One column narrower than 300px when the page is (2026-11-04: a 520px
+     window with the side menu open), never wider than the page. */
+  grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr));
   gap: var(--space-4);
 }
 .appearance-field { gap: var(--space-2); min-width: 0; }
+/* The preview inside «Карточки активных мест» (2026-11-05): it sticks under
+   the pinned top bar (36px + its 14px margin) for as long as that section is
+   on screen, so a setting changed below it — a slider being dragged — shows
+   at once, and it leaves with the section. Never taller than about half the
+   window, scrolling inside itself; it can be hidden. Above the section's
+   controls (z 5), under the top bar (6) and the save bar (--z-sticky). */
+.appearance-preview-dock {
+  position: sticky;
+  top: 50px;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-4);
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  border: 1px solid rgb(var(--accent-rgb) / 0.45);
+  background: var(--color-surface);
+  box-shadow: 0 10px 28px rgb(var(--shadow-rgb, 0 0 0) / 0.35);
+  min-width: 0;
+}
+.appearance-preview-dock__head { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2) var(--space-3); }
+.appearance-preview-dock__head .appearance-note { flex: 1 1 240px; min-width: 0; }
+.appearance-preview-dock__toggle { flex-shrink: 0; }
+.appearance-preview-dock__body { max-height: min(40vh, 380px); overflow-y: auto; overflow-x: hidden; min-width: 0; }
+/* Docked, the preview's own dashed frame would be a second frame inside this one. */
+.appearance-preview-dock .appearance-preview { padding: 0; border: 0; }
+/* A control of the same section brought into view (focus, Tab, a scroll to
+   it) stops below the stuck preview, not behind it: its top offset (50px),
+   its height (`--preview-dock-h`, published by PreviewDock) and a gap. */
+.appearance-preview-dock ~ * :is(input, button, select, textarea, a, label, [tabindex]) {
+  scroll-margin-top: calc(50px + var(--preview-dock-h, 0px) + var(--space-3));
+}
 
 .menu-editor { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; max-width: 640px; }
 .menu-editor__row {
@@ -7413,7 +8148,6 @@ select.input option:disabled {
 .menu-editor__note { font-size: var(--fs-xs); }
 .menu-editor__controls { display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0; }
 .menu-editor__controls .btn { min-width: 40px; min-height: 36px; padding: 4px 10px; }
-.menu-editor__show { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-sm); }
 
 .appearance-actions {
   position: sticky;
@@ -7448,7 +8182,7 @@ select.input option:disabled {
 
 .sound-blocked { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); margin-bottom: var(--space-3); }
 .sound-device { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-4); margin: var(--space-4) 0; }
-.sound-device__volume { gap: var(--space-1); min-width: 240px; }
+.sound-device__volume { gap: var(--space-1); min-width: min(240px, 100%); }
 .sound-device__volume input[type="range"] { width: 100%; accent-color: var(--color-primary); }
 .sound-table { display: flex; flex-direction: column; gap: 6px; margin-bottom: var(--space-2); }
 .sound-row {
@@ -7488,14 +8222,100 @@ select.input option:disabled {
 .onboarding__summary dd { margin: 0; font-weight: 600; }
 .onboarding__actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); margin-top: var(--space-2); }
 
+/* The start dialog (2026-11-05, owner: simple, nothing crowded): room
+   between its parts, a head with «Настроить окно», the hidden-parts panel. */
+.start-dialog {
+  width: 500px;
+  max-width: 90vw;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+.start-dialog__head { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--space-2) var(--space-3); }
+.start-dialog__customize-toggle { flex-shrink: 0; }
+.start-dialog__customize {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  border: 1px dashed rgb(var(--accent-rgb) / 0.4);
+  background: var(--color-surface-alt);
+}
+.start-dialog__note { font-size: var(--fs-sm); }
+.start-dialog__open { gap: var(--space-4); }
+.start-dialog__plan { gap: var(--space-3); }
+
+/* Two boxes typed like a time field (TwoBoxField, 2026-11-05): a length
+   "[ 1 ] ч : [ 30 ] мин" and a clock time "[ 14 ] : [ 30 ]".
+   One frame like an input; two borderless boxes with large tabular digits;
+   the frame takes the focus ring and the error colour. */
+.two-box { display: flex; flex-direction: column; gap: 6px; }
+.two-box__field {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 52px;
+  padding: 6px 10px 6px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+  cursor: text;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.two-box__field:focus-within {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgb(var(--accent-rgb) / 0.2);
+}
+.two-box__field[data-invalid="true"] { border-color: var(--color-danger); }
+.two-box__field[data-disabled="true"] { opacity: 0.6; cursor: default; }
+.two-box__box {
+  width: 2.4ch;
+  min-width: 0;
+  padding: 2px 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  font-size: 24px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  outline: none;
+}
+.two-box__box:focus { background: rgb(var(--accent-rgb) / 0.12); }
+.two-box__box::placeholder { color: var(--color-muted); opacity: 0.5; }
+.two-box__unit { color: var(--color-muted); font-size: var(--fs-body); }
+.two-box__colon { color: var(--color-muted); font-size: 20px; font-weight: 600; padding: 0 4px; }
+.two-box__clear {
+  margin-left: auto;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--color-muted);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+.two-box__clear:hover, .two-box__clear:focus-visible { background: var(--color-surface-alt); color: var(--color-text); }
+.two-box__error { font-size: var(--fs-sm); }
+
 .start-summary {
-  padding: var(--space-2) var(--space-3);
+  padding: var(--space-3) var(--space-4);
   border-radius: var(--radius-sm);
-  background: rgb(var(--accent-rgb) / 0.06);
-  border: 1px solid rgb(var(--accent-rgb) / 0.25);
-  font-size: var(--fs-body);
+  background: rgb(var(--accent-rgb) / 0.10);
+  border: 1px solid rgb(var(--accent-rgb) / 0.45);
+  font-size: var(--fs-md);
+  line-height: 1.45;
   overflow-wrap: anywhere;
 }
+/* «Будет запущено:» reads as part of the sentence, not as a faint caption
+   (2026-11-08, owner). */
+.start-summary > .muted { color: var(--color-text); font-weight: 600; }
 
 /* === Interfaces that really differ on Active Places (2026-10-27, round 2) ===
    Same markup and handlers in every interface; only layout and words-with-
@@ -7591,6 +8411,42 @@ select.input option:disabled {
   font-size: var(--fs-md);
 }
 .appearance-help::before { content: "💡"; line-height: 1.3; }
+
+/* «Мой интерфейс» sits among the ready-made cards (2026-11-03); its reset is
+   a quiet button under the row, asked about before anything is lost. */
+.appearance-mine-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: var(--space-3);
+}
+/* Branch sections the person may put in the side menu, one switch each:
+   the menu editor's rows, with the section's one-line hint under its name. */
+.branch-shortcuts { gap: var(--space-3); max-width: 640px; }
+.branch-shortcuts__branch { gap: var(--space-1); max-width: 420px; }
+.branch-shortcuts__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.branch-shortcuts__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 8px 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  transition: border-color 150ms ease-out;
+}
+.branch-shortcuts__row.is-on { border-color: rgb(var(--accent-rgb) / 0.55); }
+.branch-shortcuts__row .nav-icon { flex-shrink: 0; color: var(--color-muted); }
+.branch-shortcuts__row.is-on .nav-icon { color: var(--color-primary); }
+.branch-shortcuts__name { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.branch-shortcuts__title { overflow-wrap: anywhere; }
+.branch-shortcuts__hint { font-size: var(--fs-xs); overflow-wrap: anywhere; }
 .choice-card__title { font-size: var(--fs-md); }
 
 /* === Active Places as a list (2026-10-27, rebuilt) ==========================
@@ -7599,9 +8455,30 @@ select.input option:disabled {
    its cell empty instead of pulling the rest of the row left. Same markup
    and handlers as the cards; only the layout differs. Narrower boards fold
    into two and then three lines (container queries on the board itself). */
+/* A list keeps its rows' own size and look at EVERY window size, like a
+   fixed panel (owner, 2026-11-03): every row is as wide as the widest one
+   needs (`minmax(max-content, 1fr)`), so texts, buttons and the Start / Stop
+   column line up and nothing is shrunk or rearranged for a small window; a
+   list wider than its section scrolls sideways inside it (below). */
 [data-board-view="list"] .live-grid.live-grid--sessions {
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-columns: minmax(max-content, 1fr);
   container-type: inline-size;
+}
+/* The section around a list scrolls sideways when the rows are wider than it.
+   Both axes stay non-visible, so the section's fold animation still clips as
+   before (it needs `overflow: hidden`), and only the places move — the page's
+   title and buttons stay put. */
+[data-board-view="list"] .cp-section-inner:has(> .live-grid--sessions) {
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+/* For one measurement only (boardMeasure.ts, set and removed in the same
+   frame, never painted): the rows at their natural width in the layout they
+   have now, so a list that does not fit can show pictures, then be scaled to
+   fit. The list's own box is untouched, so its container queries do not
+   change under the measurement. */
+[data-board-view="list"] .live-grid.live-grid--sessions[data-board-measure] {
+  grid-template-columns: max-content;
 }
 [data-board-view="list"] .live-grid--sessions > .place-cell.session-card {
   display: grid;
@@ -7609,14 +8486,25 @@ select.input option:disabled {
      fixed tracks line up from row to row. The tariff line takes what is left;
      the buttons are ONE line, always (owner, 2026-10-27: Stop dropped under
      the others and lifted the texts off the row's middle). */
-  grid-template-columns: 110px 120px 100px 170px 210px minmax(0, 1fr) max-content;
+  grid-template-columns: 110px 120px 100px 170px 210px minmax(0, 1fr) auto;
   column-gap: 14px;
   row-gap: 6px;
   align-items: center;
   min-height: 0;
-  padding: var(--row-py, 10px) 12px var(--row-py, 10px) 34px;
+  padding: var(--row-py, 12px) 12px var(--row-py, 12px) 34px;
 }
 [data-board-view="list"] .live-grid--sessions > .place-cell.session-card > * { min-width: 0; margin: 0; }
+/* The texts that end in "…" when short of room (state, platform, number and
+   name, tariff) never widen a row (2026-11-03): their columns have their own
+   limits. Only the clock with its money and the buttons, shown whole, decide
+   how wide a row needs to be, so a long name or tariff cannot push a list
+   wider than its window. */
+[data-board-view="list"] .live-grid--sessions > .place-cell.session-card > :is(.session-card__state, .platform, .id, .until, .session-card__hint) {
+  contain: inline-size;
+}
+/* …except the buttons (2026-11-03): their cell is never narrower than the
+   buttons, so they never press over the texts. */
+[data-board-view="list"] .live-grid--sessions > .place-cell.session-card > :is(.session-card__actions, .session-card__foot) { min-width: max-content; }
 [data-board-view="list"] .live-grid--sessions .session-card .cell-grip { top: 50%; left: 12px; transform: translateY(-50%); }
 [data-board-view="list"] .live-grid--sessions .session-card .session-card__state {
   grid-column: 1; grid-row: 1;
@@ -7626,7 +8514,7 @@ select.input option:disabled {
   max-width: none;
   justify-content: flex-start;
   gap: 6px;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 700;
   white-space: nowrap;
   overflow: hidden;
@@ -7657,6 +8545,12 @@ select.input option:disabled {
 [data-board-view="list"] .live-grid--sessions .session-card > .row { grid-column: 4 / 7; }
 /* A row with a pad line is two lines tall: its buttons centre on both. */
 [data-board-view="list"] .live-grid--sessions .session-card:has(> .row) .session-card__actions { grid-row: 1 / span 2; }
+/* A PlayStation seat's pad line with nothing in it (no extra pad out, nothing
+   charged, 2026-11-03) takes no line in a row: it made a running row taller
+   than a free one and lifted its buttons off the texts. With anything in it,
+   it shows as before. */
+[data-board-view="list"] .live-grid--sessions .session-card:has(> .row > .row:empty:only-child) > .row { display: none; }
+[data-board-view="list"] .live-grid--sessions .session-card:has(> .row > .row:empty:only-child) .session-card__actions { grid-row: 1; }
 [data-board-view="list"] .live-grid--sessions .session-card .session-card__error { grid-column: 4 / -1; }
 [data-board-view="list"] .live-grid--sessions .session-card .session-card__actions,
 [data-board-view="list"] .live-grid--sessions .session-card .session-card__foot {
@@ -7668,33 +8562,87 @@ select.input option:disabled {
   gap: 6px;
   padding: 0;
 }
+/* A row's sizes (owner, 2026-11-03: a touch larger, for a manager's whole
+   day at the board): 38px buttons in 14px, the number in 16px, the clock in
+   17px, the platform in 12px. */
 [data-board-view="list"] .live-grid--sessions .session-card .session-card__btn.btn,
 [data-board-view="list"] .live-grid--sessions .session-card .session-card__start.btn {
   width: auto;
-  min-width: 72px;
-  height: 34px;
-  min-height: 34px;
-  padding: 0 12px;
-  font-size: 13px;
+  min-width: 76px;
+  height: 38px;
+  min-height: 38px;
+  padding: 0 14px;
+  font-size: 14px;
   font-weight: 600;
   flex-shrink: 0;
 }
+/* Pictures instead of words on the Active Places buttons (`ActionIcon`), the
+   same buttons in the same places and order; the full name stays the tooltip
+   and the accessible name. When (2026-11-04, `data-button-labels` on <html>,
+   the person's choice in «Интерфейс и тема»):
+   - "auto": in a list row too narrow for the words (FitBoardToScreen sets
+     `data-board-icons` on the board's container) — the behaviour so far;
+   - "icons": always, list and grid;
+   - "text": never; a list too narrow is scaled as a whole instead.
+   Start keeps its word: a free row is short, and Start is the one word a
+   cashier looks for. */
+.session-card__btn-icon { display: none; }
+:is([data-board-view="list"]:not([data-button-labels="text"]) [data-board-icons] .live-grid--sessions, [data-board-view="list"][data-button-labels="icons"] .live-grid--sessions) .session-card .session-card__btn.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  min-width: 38px;
+  padding: 0;
+}
+/* A grid card keeps its buttons' cells (two per row, the wide ones across):
+   only the picture replaces the word inside them. */
+[data-board-view="grid"][data-button-labels="icons"] .live-grid--sessions .session-card .session-card__btn.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+:is([data-board-view="list"]:not([data-button-labels="text"]) [data-board-icons] .live-grid--sessions, [data-board-view="list"][data-button-labels="icons"] .live-grid--sessions, [data-board-view="grid"][data-button-labels="icons"] .live-grid--sessions) .session-card .session-card__btn-text { display: none; }
+:is([data-board-view="list"]:not([data-button-labels="text"]) [data-board-icons] .live-grid--sessions, [data-board-view="list"][data-button-labels="icons"] .live-grid--sessions, [data-board-view="grid"][data-button-labels="icons"] .live-grid--sessions) .session-card .session-card__btn-icon { display: block; flex-shrink: 0; }
+/* Simple's emoji before a word would sit beside the picture: not with pictures. */
+[data-board-view="grid"][data-button-labels="icons"] .live-grid--sessions .session-card [data-action]::before { content: none; }
+/* …and a row's air at its smallest with them: the same columns in the same
+   order, only tighter (the number and the clock with its money still whole on
+   one line; a long name or tier ends in "…" with its tooltip, as at every
+   size). */
+:is([data-board-view="list"]:not([data-button-labels="text"]) [data-board-icons] .live-grid--sessions, [data-board-view="list"][data-button-labels="icons"] .live-grid--sessions) .session-card :is(.session-card__actions, .session-card__foot) { gap: 4px; }
+@container (max-width: 1460px) {
+  :is([data-board-view="list"]:not([data-button-labels="text"]) [data-board-icons] .live-grid--sessions, [data-board-view="list"][data-button-labels="icons"] .live-grid--sessions) > .place-cell.session-card {
+    /* The clock and its money keep one line (they decide a row's width, as
+       at every size); the number and the platform have their own limits. */
+    grid-template-columns: 96px 120px minmax(110px, max-content) auto;
+    column-gap: 10px;
+  }
+}
 /* One text size in a row whatever the card size (that sizes the row's air):
    the number and the clock stay on one line, uncut, at every size. */
-[data-board-view="list"] .live-grid--sessions .place-cell.session-card .id { font-size: 15px; font-weight: 700; }
-[data-board-view="list"] .live-grid--sessions .place-cell.session-card--running .status { font-size: 16px; }
-[data-board-view="list"] .live-grid--sessions .place-cell.session-card--idle .status { font-size: 14px; font-weight: 600; }
-[data-board-view="list"] .live-grid--sessions .place-cell.session-card .platform { font-size: 11px; }
+[data-board-view="list"] .live-grid--sessions .place-cell.session-card .id { font-size: 16px; font-weight: 700; }
+[data-board-view="list"] .live-grid--sessions .place-cell.session-card--running .status { font-size: 17px; }
+[data-board-view="list"] .live-grid--sessions .place-cell.session-card--idle .status { font-size: 15px; font-weight: 600; }
+[data-board-view="list"] .live-grid--sessions .place-cell.session-card .platform { font-size: 12px; }
 /* Simple's pictures on the buttons stay on the cards; a row has no room. */
 [data-board-view="list"] .live-grid--sessions .session-card [data-action]::before { content: none; }
 [data-board-view="list"] .live-grid--sessions .session-card .session-card__more { grid-column: auto; }
 [data-board-view="list"] .live-grid--sessions .session-card .session-card__menu { left: auto; right: 0; min-width: 200px; }
-/* Breakpoints sized for the widest row: a console seat's six buttons in
-   Armenian (~605px). Below them the row folds instead of overflowing. */
+/* Below 1460px the texts take two lines (state over platform, number over
+   the console chip, clock over tariff) and the buttons sit right of them,
+   centred on both: THE row's look, a free seat's and a running one's alike, at
+   every width (owner, 2026-11-03), never rearranged for a small window; a
+   list wider than its section scrolls sideways (above). The buttons' track is
+   `auto`: never narrower than the buttons themselves. */
 @container (max-width: 1460px) {
   [data-board-view="list"] .live-grid--sessions > .place-cell.session-card {
-    /* The clock and its money keep one line (210px) beside the buttons. */
-    grid-template-columns: 110px 170px minmax(210px, 1fr) max-content;
+    /* One set of columns for every width below 1460 (2026-11-03): the
+       number 130–170px, the clock and its money from 130px (ellipsis past
+       it), the buttons their own width. No second breakpoint: the width a row
+       needs no longer jumps as the window changes, so zooming it to fit
+       always converges (it used to need MORE room on a wider board). */
+    grid-template-columns: 110px minmax(130px, 170px) minmax(130px, 1fr) auto;
   }
   [data-board-view="list"] .live-grid--sessions .session-card .id { grid-column: 2; grid-row: 1; }
   [data-board-view="list"] .live-grid--sessions .session-card .status { grid-column: 3; grid-row: 1; }
@@ -7706,39 +8654,807 @@ select.input option:disabled {
   [data-board-view="list"] .live-grid--sessions .session-card .session-card__foot { grid-column: 4; grid-row: 1 / span 2; }
   [data-board-view="list"] .live-grid--sessions .session-card > .row { grid-column: 2 / 4; }
   [data-board-view="list"] .live-grid--sessions .session-card:has(> .row) .session-card__actions { grid-row: 1 / span 3; }
+  /* An empty pad line takes no line (see below): the buttons span the two text lines. */
+  [data-board-view="list"] .live-grid--sessions .session-card:has(> .row > .row:empty:only-child) .session-card__actions { grid-row: 1 / span 2; }
   [data-board-view="list"] .live-grid--sessions .session-card .session-card__error { grid-column: 1 / -1; }
 }
-/* Too narrow for a row's buttons beside its texts: THAT row's buttons take
-   a line of their own under the texts — still one line — while rows with
-   fewer buttons keep them beside. The texts' columns do not move. Counted by
-   the buttons a row really has (`:has(> :nth-child(n))`), sized for Armenian. */
-@container (max-width: 1184px) {
-  [data-board-view="list"] .live-grid--sessions .session-card .session-card__actions:has(> :nth-child(5)) { grid-column: 1 / -1; grid-row: 3; }
-  [data-board-view="list"] .live-grid--sessions .session-card:has(> .row) .session-card__actions:has(> :nth-child(5)) { grid-row: 4; }
+
+/* The one tooltip (2026-11-07, `TooltipLayer`): theme tokens only, so every
+   theme reads it; above dialogs and toasts; never takes the pointer. */
+.cp-tooltip {
+  position: fixed;
+  z-index: 9300;
+  max-width: min(320px, calc(100vw - 16px));
+  padding: 6px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-alt);
+  color: var(--color-text);
+  box-shadow: 0 6px 20px rgb(var(--shadow-rgb) / 0.35);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.35;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(2px);
 }
-@container (max-width: 990px) {
-  [data-board-view="list"] .live-grid--sessions .session-card .session-card__actions:has(> :nth-child(3)) { grid-column: 1 / -1; grid-row: 3; }
-  [data-board-view="list"] .live-grid--sessions .session-card:has(> .row) .session-card__actions:has(> :nth-child(3)) { grid-row: 4; }
+.cp-tooltip[data-side="bottom"] { transform: translateY(-2px); }
+.cp-tooltip.is-shown { opacity: 1; transform: none; }
+@media (prefers-reduced-motion: no-preference) {
+  .cp-tooltip { transition: opacity 120ms ease-out, transform 120ms ease-out; }
 }
-@container (max-width: 880px) {
-  [data-board-view="list"] .live-grid--sessions > .place-cell.session-card {
-    grid-template-columns: 110px minmax(0, 1fr) minmax(0, 1fr);
-  }
-  [data-board-view="list"] .live-grid--sessions .session-card .status { grid-column: 3; }
-  [data-board-view="list"] .live-grid--sessions .session-card .session-card__actions,
-  [data-board-view="list"] .live-grid--sessions .session-card .session-card__foot {
-    grid-column: 1 / -1; grid-row: 3;
-  }
-  [data-board-view="list"] .live-grid--sessions .session-card:has(> .row) .session-card__actions { grid-row: 4; }
-  [data-board-view="list"] .live-grid--sessions .session-card > .row { grid-column: 1 / -1; }
+
+/* A free or reserved seat's foot buttons (2026-11-07, `CardFootAction`):
+   words by default; «Подписи кнопок» = «Иконки» shows the picture instead,
+   on the grid and in the list. «Авто» keeps the words here. */
+.session-card__foot-btn.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 0;
+  /* One size for the pair, Start's (`.session-card__start`). */
+  height: 34px;
+  padding-inline: 8px;
+  font-size: 13px;
 }
-/* The narrowest board (an 800px window): the buttons share the line evenly
-   and stay on it; a word that does not fit ends in "…", its full name in
-   the tooltip and the accessible name (SessionCardAction). */
-@container (max-width: 640px) {
-  [data-board-view="list"] .live-grid--sessions .session-card .session-card__actions > *,
-  [data-board-view="list"] .live-grid--sessions .session-card .session-card__foot > * { flex: 1 1 0; min-width: 0; }
-  [data-board-view="list"] .live-grid--sessions .session-card .session-card__btn.btn,
-  [data-board-view="list"] .live-grid--sessions .session-card .session-card__start.btn { min-width: 0; padding: 0 6px; font-size: 12px; }
-  [data-board-view="list"] .live-grid--sessions .session-card .pad-toggle .session-card__btn.btn { flex: 1 1 0; }
+.session-card__foot-btn .session-card__btn-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+[data-button-labels="icons"] .session-card__foot-btn .session-card__btn-text { display: none; }
+[data-button-labels="icons"] .session-card__foot-btn .session-card__btn-icon { display: block; flex-shrink: 0; }
+
+/* === Bookings calendar + reservation form (2026-11-07, simplified) =========
+   `BookingsCalendarModal` → `BookingsCalendar`: a head (title, seat filter,
+   «Создать бронь»), `DateStrip` (two weeks of day chips with counts), the
+   day line with the legend, then the body: `BookingsTimeline` (a row per
+   seat, the hours across) beside `DayBookingsList`. Blocks are placed by
+   --tl-start / --tl-len (minutes from the window's start) over --tl-span,
+   and stacked by --tl-lane / --tl-lanes, so layout stays in CSS. Colours
+   are the status tokens only (booked = yellow, playing = green, offline =
+   grey hatched), so every theme recolours it; each state also has its own
+   shape (filled, outlined, fading, hatched). The timeline scrolls inside
+   itself; the page never scrolls sideways. Absolute positioning only where
+   a timeline needs it: blocks, the now line and its pill. */
+.cal-modal {
+  /* Near-fullscreen by design: the wrapper's 16px gutter on each side. */
+  box-sizing: border-box;
+  width: calc(100vw - var(--space-8));
+  max-width: 2400px;
+  height: calc(100vh - var(--space-8));
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
+.cal {
+  /* The seat column, the narrowest an hour may get, and a seat's row. */
+  --tl-label-w: 132px;
+  --tl-hour-min: 64px;
+  --tl-row-h: 56px;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.cal__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3) var(--space-4);
+}
+.cal__title {
+  margin: 0;
+  font-size: var(--fs-xl);
+  font-weight: 700;
+  line-height: 1.3;
+  letter-spacing: 0.01em;
+}
+.cal__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+.cal__seat {
+  width: auto;
+  min-width: 160px;
+}
+.cal__create { gap: var(--space-2); }
+.cal__sub {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-4);
+}
+.cal__day {
+  font-size: var(--fs-lg);
+  font-weight: 600;
+  line-height: 1.3;
+  font-variant-numeric: tabular-nums;
+}
+.cal__legend {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-4);
+  color: var(--color-muted);
+  font-size: var(--fs-sm);
+  line-height: 1.4;
+}
+.cal__legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+/* Each swatch is the block it explains, small. */
+.cal__swatch {
+  box-sizing: border-box;
+  width: 20px;
+  height: 12px;
+  flex-shrink: 0;
+  border-radius: 3px;
+}
+.cal__swatch--booked { background: rgb(var(--status-booked-rgb) / 0.22); border: 1px solid var(--status-booked-border); border-left: 3px solid var(--status-booked-fg); }
+.cal__swatch--guest { background: rgb(var(--status-booked-rgb) / 0.05); border: 2px solid var(--status-booked-border); }
+.cal__swatch--active { background: rgb(var(--status-playing-rgb) / 0.22); border: 1px solid var(--status-playing-border); border-left: 3px solid var(--status-playing-fg); }
+.cal__swatch--unlimited {
+  border-left: 3px solid var(--status-playing-fg);
+  background: linear-gradient(to right, rgb(var(--status-playing-rgb) / 0.4), rgb(var(--status-playing-rgb) / 0));
+}
+.cal__swatch--offline {
+  border: 1px solid var(--status-offline-border);
+  background-image: repeating-linear-gradient(45deg, var(--status-offline-bg) 0 3px, rgb(var(--status-offline-rgb) / 0.35) 3px 6px);
+}
+
+/* -- Date strip ------------------------------------------------------------- */
+.cal-strip {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.cal-strip__step {
+  min-width: var(--control-h);
+  padding-inline: var(--space-2);
+  font-size: var(--fs-xl);
+  line-height: 1;
+}
+.cal-strip__days {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  gap: var(--space-1);
+}
+.cal-day {
+  position: relative;
+  flex: 1 1 0;
+  min-width: 44px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: var(--space-2) var(--space-1);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease-out,
+    border-color 0.15s ease-out;
+}
+.cal-day:hover { border-color: rgb(var(--accent-rgb) / 0.6); }
+.cal-day:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.cal-day__weekday {
+  color: var(--color-muted);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  line-height: 1.3;
+}
+.cal-day.is-weekend .cal-day__weekday { color: var(--color-accent-purple); }
+.cal-day__num {
+  font-size: var(--fs-lg);
+  font-weight: 700;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+}
+/* The count: a yellow pill, the bookings' own colour. Kept in the layout
+   when empty, so every chip is the same height. */
+.cal-day__count {
+  box-sizing: border-box;
+  min-width: 20px;
+  height: 16px;
+  padding-inline: var(--space-1);
+  border-radius: var(--radius-pill);
+  background: var(--status-booked-bg);
+  border: 1px solid var(--status-booked-border);
+  color: var(--status-booked-fg);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  line-height: 14px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.cal-day__count.is-empty { visibility: hidden; }
+/* Today: an accent bar under the chip's top edge. */
+.cal-day.is-today::before {
+  content: "";
+  position: absolute;
+  top: -1px;
+  left: 30%;
+  right: 30%;
+  height: 3px;
+  border-radius: 0 0 3px 3px;
+  background: var(--color-primary);
+}
+.cal-day.is-today .cal-day__weekday { color: var(--color-primary); }
+.cal-day.is-selected {
+  border-color: var(--color-primary);
+  background: rgb(var(--accent-rgb) / 0.14);
+  box-shadow: 0 0 0 1px var(--color-primary), 0 0 16px rgb(var(--accent-rgb) / 0.25);
+}
+.cal-day.is-selected .cal-day__num { color: var(--color-primary); }
+
+/* -- Body: the timeline beside the day's list ------------------------------ */
+.cal__body {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  gap: var(--space-4);
+}
+
+/* -- Timeline --------------------------------------------------------------- */
+.tl {
+  flex: 1 1 auto;
+  /* As tall as its seats, up to the body: no empty box under a short list. */
+  align-self: flex-start;
+  max-height: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+.tl__inner {
+  position: relative;
+  min-width: calc(var(--tl-label-w) + var(--tl-hours) * var(--tl-hour-min));
+  display: flex;
+  flex-direction: column;
+}
+.tl__scale {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  display: flex;
+  background: var(--color-surface-alt);
+  border-bottom: 1px solid var(--color-border);
+}
+.tl__corner {
+  position: sticky;
+  left: 0;
+  z-index: 4;
+  flex: 0 0 var(--tl-label-w);
+  background: var(--color-surface-alt);
+  border-right: 1px solid var(--color-border);
+}
+.tl__hours {
+  position: relative;
+  flex: 1;
+  display: flex;
+}
+.tl__hour {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-2);
+  border-left: 1px solid var(--color-border);
+  color: var(--color-muted);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  line-height: 1.3;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.tl__hour:first-child { border-left-color: transparent; }
+/* Midnight: the next date under 00:00, so a night booking reads as such. */
+.tl__hour.is-midnight { color: var(--color-text); border-left-color: rgb(var(--accent-purple-rgb) / 0.7); }
+.tl__date { color: var(--color-accent-purple); font-weight: 600; }
+/* Sits on the scale's bottom edge, where the now line begins, clear of the hour labels. */
+.tl__now-pill {
+  position: absolute;
+  bottom: 0;
+  left: calc(var(--tl-now) / var(--tl-span) * 100%);
+  z-index: 1;
+  transform: translate(-50%, 50%);
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-pill);
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  line-height: 1.3;
+  font-variant-numeric: tabular-nums;
+  box-shadow: 0 0 12px rgb(var(--accent-rgb) / 0.5);
+  pointer-events: none;
+}
+.tl__rows {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+.tl__row {
+  display: flex;
+  min-height: var(--tl-row-h);
+  border-bottom: 1px solid var(--color-border);
+}
+.tl__row:last-of-type { border-bottom-color: transparent; }
+.tl__seat {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  flex: 0 0 var(--tl-label-w);
+  box-sizing: border-box;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-surface);
+  border-right: 1px solid var(--color-border);
+}
+.tl__seat-name {
+  font-size: var(--fs-md);
+  font-weight: 700;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+.tl__seat-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--color-muted);
+  font-size: var(--fs-xs);
+  line-height: 1.3;
+}
+.tl__seat-meta svg { flex-shrink: 0; }
+.tl__row.is-offline .tl__seat-name,
+.tl__seat-meta--offline { color: var(--status-offline-fg); }
+.tl__track {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  cursor: cell;
+  /* Hour lines, then fainter half hours, under the blocks. */
+  background-image:
+    linear-gradient(to right, var(--color-border) 0 1px, transparent 1px),
+    linear-gradient(to right, rgb(var(--border-rgb) / 0.45) 0 1px, transparent 1px);
+  background-size:
+    calc(100% / var(--tl-hours)) 100%,
+    calc(100% / var(--tl-hours) / 2) 100%;
+  transition: background-color 0.15s ease-out;
+}
+.tl__track:hover { background-color: rgb(var(--accent-rgb) / 0.04); }
+.tl__row.is-offline .tl__track {
+  background-image:
+    repeating-linear-gradient(45deg, var(--status-offline-bg) 0 6px, rgb(var(--status-offline-rgb) / 0.16) 6px 12px),
+    linear-gradient(to right, var(--color-border) 0 1px, transparent 1px);
+  background-size: auto, calc(100% / var(--tl-hours)) 100%;
+}
+.tl__now {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc(var(--tl-label-w) + (100% - var(--tl-label-w)) * var(--tl-now) / var(--tl-span));
+  z-index: 1;
+  width: 2px;
+  transform: translateX(-1px);
+  background: var(--color-primary);
+  box-shadow: 0 0 8px rgb(var(--accent-rgb) / 0.6);
+  pointer-events: none;
+}
+
+.tl-block {
+  box-sizing: border-box;
+  position: absolute;
+  left: calc(var(--tl-start) / var(--tl-span) * 100%);
+  width: calc(var(--tl-len) / var(--tl-span) * 100% - 2px);
+  top: calc(var(--space-1) + (100% - var(--space-2)) * var(--tl-lane) / var(--tl-lanes));
+  height: calc((100% - var(--space-2)) / var(--tl-lanes) - 2px);
+  min-width: 6px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0;
+  padding: 0 var(--space-2);
+  overflow: hidden;
+  border-radius: var(--radius-sm);
+  font: inherit;
+  font-size: var(--fs-xs);
+  line-height: 1.3;
+  text-align: left;
+  white-space: nowrap;
+  color: var(--color-text);
+}
+.tl-block__time { font-weight: 700; font-variant-numeric: tabular-nums; }
+.tl-block__who { overflow: hidden; text-overflow: ellipsis; }
+/* A booking sits above a running session's band, on its own opaque ground
+   so the two tints never mix. */
+.tl-block--booking {
+  z-index: 1;
+  cursor: pointer;
+  background: linear-gradient(rgb(var(--status-booked-rgb) / 0.2), rgb(var(--status-booked-rgb) / 0.2)), var(--color-surface);
+  border: 1px solid var(--status-booked-border);
+  border-left: 3px solid var(--status-booked-fg);
+  transition:
+    background-color 0.15s ease-out,
+    box-shadow 0.15s ease-out;
+}
+.tl-block--booking .tl-block__time { color: var(--status-booked-fg); }
+/* A short block keeps its start time whole rather than cutting "20:00–21"
+   (the tooltip has the full window). */
+.tl-block--booking { container-type: inline-size; }
+@container (max-width: 88px) {
+  .tl-block__end { display: none; }
+}
+.tl-block--booking:hover { box-shadow: 0 0 0 1px var(--status-booked-fg), 0 0 12px rgb(var(--status-booked-rgb) / 0.3); }
+.tl-block--booking:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 1px; }
+/* From the app: the same yellow, hollow. */
+.tl-block--guest {
+  background: linear-gradient(rgb(var(--status-booked-rgb) / 0.05), rgb(var(--status-booked-rgb) / 0.05)), var(--color-surface);
+  border: 2px solid var(--status-booked-border);
+}
+.tl-block--booking.is-finished { opacity: 0.5; }
+.tl-block--session {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  background: rgb(var(--status-playing-rgb) / 0.2);
+  border: 1px solid var(--status-playing-border);
+  border-left: 3px solid var(--status-playing-fg);
+}
+.tl-block--session .tl-block__time {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--status-playing-fg);
+}
+/* Unlimited: fades out to the right edge, ∞ at its end. */
+.tl-block--open {
+  border-color: transparent;
+  border-left-color: var(--status-playing-fg);
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+  background: linear-gradient(to right, rgb(var(--status-playing-rgb) / 0.26), rgb(var(--status-playing-rgb) / 0.14) 60%, rgb(var(--status-playing-rgb) / 0));
+}
+.tl-block__infinity { color: var(--status-playing-fg); font-size: var(--fs-xl); font-weight: 700; line-height: 1; }
+/* Cut at the club day's edge: dashed and square on that side. */
+.tl-block.is-from-before { border-left-style: dashed; border-top-left-radius: 0; border-bottom-left-radius: 0; }
+.tl-block.is-into-next { border-right-style: dashed; border-top-right-radius: 0; border-bottom-right-radius: 0; }
+
+/* -- The day's list ---------------------------------------------------------- */
+.cal-list {
+  flex: 0 0 clamp(340px, 30%, 460px);
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+.cal-list__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface-alt);
+}
+.cal-list__title {
+  margin: 0;
+  min-width: 0;
+  font-size: var(--fs-md);
+  font-weight: 700;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+.cal-list__total {
+  min-width: 24px;
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-pill);
+  background: var(--status-booked-bg);
+  border: 1px solid var(--status-booked-border);
+  color: var(--status-booked-fg);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  line-height: 20px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.cal-list__items {
+  flex: 1;
+  min-height: 0;
+  margin: 0;
+  padding: var(--space-3);
+  list-style: none;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.cal-item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-left: 3px solid var(--status-booked-fg);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-alt);
+}
+.cal-item--guest { border-left-style: dashed; }
+.cal-item.is-finished { border-left-color: var(--status-offline-border); opacity: 0.7; }
+.cal-item__top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+}
+.cal-item__time {
+  font-size: var(--fs-lg);
+  font-weight: 700;
+  line-height: 1.3;
+  font-variant-numeric: tabular-nums;
+}
+.cal-item__seat { font-size: var(--fs-md); font-weight: 700; line-height: 1.3; color: var(--color-primary); }
+.cal-item__state { margin-left: auto; }
+.cal-item__who {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-1) var(--space-3);
+  line-height: 1.4;
+}
+.cal-item__source { margin-left: auto; font-size: var(--fs-xs); line-height: 1.3; }
+.cal-item__name { font-weight: 600; overflow-wrap: anywhere; }
+.cal-item__phone { color: var(--color-text-soft); font-variant-numeric: tabular-nums; text-decoration: none; }
+.cal-item__phone:hover { color: var(--color-primary); text-decoration: underline; }
+.cal-item__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.cal-item__actions .btn { padding-inline: var(--space-3); }
+.cal-list__empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  padding: var(--space-8) var(--space-6);
+  text-align: center;
+  line-height: 1.4;
+}
+.cal-list__empty p { margin: 0; }
+.cal-list__empty-title { font-size: var(--fs-md); font-weight: 600; }
+
+/* -- Reservation form + details ------------------------------------------- */
+.reservation-form,
+.reservation-details {
+  width: 480px;
+  max-width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.reservation-details { width: 400px; }
+.reservation-form__title { margin: 0; font-size: var(--fs-xl); line-height: 1.3; }
+.reservation-form__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+.reservation-form__row > .reservation-form__field { flex: 1 1 180px; }
+.reservation-form__field {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.reservation-form__note { font-size: var(--fs-sm); line-height: 1.4; }
+.reservation-details__list { margin: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+.reservation-details__row { display: flex; gap: var(--space-3); line-height: 1.4; }
+.reservation-details__row dt { flex: 0 0 120px; font-size: var(--fs-sm); }
+.reservation-details__row dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.reservation-details__actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--space-2); }
+
+/* ChoiceCards (2026-11-07): "pick one of a few" as large rows on real radios.
+   Tokens only; the picked row is outlined in the accent. */
+.choice-cards-list { display: flex; flex-direction: column; gap: var(--space-2); }
+.choice-card-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-alt);
+  cursor: pointer;
+}
+.choice-card-row:hover:not([data-disabled]) { border-color: rgb(var(--accent-rgb) / 0.55); }
+.choice-card-row[data-checked] {
+  border-color: var(--color-primary);
+  background: rgb(var(--accent-rgb) / 0.10);
+  box-shadow: 0 0 0 1px var(--color-primary) inset;
+}
+.choice-card-row[data-disabled] { opacity: 0.5; cursor: not-allowed; }
+.choice-card-row__input { position: absolute; opacity: 0; width: 1px; height: 1px; pointer-events: none; }
+.choice-card-row__dot {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--color-muted);
+  border-radius: 50%;
+}
+.choice-card-row[data-checked] .choice-card-row__dot {
+  border-color: var(--color-primary);
+  background: radial-gradient(circle, var(--color-primary) 0 45%, transparent 50%);
+}
+.choice-card-row:has(.choice-card-row__input:focus-visible) { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.choice-card-row__body { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1 1 auto; }
+.choice-card-row__title { font-weight: 600; color: var(--color-text); overflow-wrap: anywhere; }
+.choice-card-row__detail { font-size: 13px; color: var(--color-muted); font-variant-numeric: tabular-nums; }
+.choice-card-row__badge {
+  flex: 0 0 auto;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--status-booked-bg);
+  border: 1px solid var(--status-booked-border);
+  color: var(--status-booked-fg);
+  font-size: 12px;
+  font-weight: 600;
+}
+/* Start's "free until" line (2026-11-07): the time a walk-in may play. */
+.start-free-until {
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--status-booked-border);
+  background: var(--status-booked-bg);
+  color: var(--color-text);
+  font-size: var(--fs-md);
+  font-weight: 500;
+  line-height: 1.45;
+}
+.start-free-until strong { color: var(--status-booked-fg); font-weight: 700; }
+
+/* The start dialog, read at a busy counter (2026-11-08, owner): «Кто
+   садится?» as a heading, a reservation's player in the reservation yellow,
+   and «Не оплачено» large enough to hit and to see. */
+.start-choice { gap: var(--space-2); }
+.start-choice__title { font-size: var(--fs-lg); font-weight: 700; color: var(--color-text); }
+.choice-card-row[data-tone="booked"] {
+  background: var(--status-booked-bg);
+  border-color: var(--status-booked-border);
+}
+.choice-card-row[data-tone="booked"] .choice-card-row__title { color: var(--status-booked-fg); }
+.choice-card-row[data-tone="booked"][data-checked] {
+  border-color: var(--status-booked-fg);
+  box-shadow: 0 0 0 1px var(--status-booked-fg) inset;
+}
+.choice-card-row[data-tone="booked"][data-checked] .choice-card-row__dot {
+  border-color: var(--status-booked-fg);
+  background: radial-gradient(circle, var(--status-booked-fg) 0 45%, transparent 50%);
+}
+.start-dialog .btn.unpaid-toggle { font-size: var(--fs-md); gap: var(--space-3); padding: var(--space-1) 0; }
+.start-dialog .btn.unpaid-toggle .cp-switch-track { width: 44px; height: 24px; }
+.start-dialog .btn.unpaid-toggle .cp-switch-thumb { width: 18px; height: 18px; }
+.start-dialog .btn.unpaid-toggle.is-on .cp-switch-thumb { transform: translateX(20px); }
+
+/* PaymentEditor (2026-11-07): one method or a split, for every bill. */
+.pay-editor__methods { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.btn.pay-editor__method, .pay-editor__method {
+  flex: 1 1 0;
+  min-width: 96px;
+  height: 36px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-alt);
+  color: var(--color-text);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  /* One line, always (2026-11-08): the four buttons are one row of equal
+     boxes. The labels are short words; a longer translation is cut with an
+     ellipsis rather than pushed out of the box (the full name is the title). */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+.pay-editor__method:hover:not(:disabled) { border-color: rgb(var(--accent-rgb) / 0.6); }
+.pay-editor__method[aria-checked="true"] {
+  border-color: var(--color-primary);
+  background: rgb(var(--accent-rgb) / 0.14);
+  box-shadow: 0 0 0 1px var(--color-primary) inset;
+}
+.pay-editor__method:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.pay-editor__method:disabled { opacity: 0.5; cursor: default; }
+.pay-editor__part { display: flex; align-items: flex-end; gap: var(--space-2); }
+.pay-editor__part-name { flex: 0 0 96px; padding-bottom: 10px; font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pay-editor__part-box { flex: 1 1 auto; min-width: 0; }
+.pay-editor__part-box .label { display: none; }
+.btn.pay-editor__rest { flex: 0 0 auto; height: 36px; padding: 0 var(--space-3); font-size: 12px; }
+.pay-editor__remaining {
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  background: rgb(var(--warning-rgb) / 0.12);
+  color: var(--color-warning);
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.pay-editor__remaining.is-done { background: rgb(var(--success-rgb) / 0.12); color: var(--color-success); }
+.pay-editor__note { resize: vertical; min-height: 56px; }
+/* A free seat reserved later (2026-11-07): how long a walk-in may play. */
+.session-card__free-until { font-size: 12px; font-weight: 600; color: var(--status-booked-fg); font-variant-numeric: tabular-nums; }
+/* «Свободно» → «Свободно до 05:30» on a seat reserved later (2026-11-08,
+   owner): both sit in ONE grid cell, the word shown, the sentence hidden;
+   pointing at the card (or focusing it) cross-fades them. The cell is as wide
+   as the longer of the two, so nothing beside it moves. */
+.session-card__status-swap { display: inline-grid; }
+.session-card__status-swap > * {
+  grid-area: 1 / 1;
+  transition: opacity 200ms ease, transform 200ms ease;
+}
+.session-card__status-swap .session-card__free-until {
+  font-size: inherit;
+  opacity: 0;
+  transform: translateY(3px);
+}
+.place-cell.session-card:hover .session-card__status-swap .session-card__status-word,
+.place-cell.session-card:focus-within .session-card__status-swap .session-card__status-word {
+  opacity: 0;
+  transform: translateY(-3px);
+}
+.place-cell.session-card:hover .session-card__status-swap .session-card__free-until,
+.place-cell.session-card:focus-within .session-card__status-swap .session-card__free-until {
+  opacity: 1;
+  transform: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .session-card__status-swap > * { transition: none; transform: none !important; }
+}
+/* Booking history (2026-11-07): one line per step, in the sales history. */
+.booking-history__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.booking-history__row {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px var(--space-3);
+  padding: var(--space-2) var(--space-3); border: 1px solid var(--color-border); border-radius: var(--radius-sm);
+  font-size: 13px;
+}
+.booking-history__when { color: var(--color-muted); font-variant-numeric: tabular-nums; }
+.booking-history__action { font-weight: 700; color: var(--status-booked-fg); }
+.booking-history__action.is-cancelled { color: var(--status-critical-fg); }
+.booking-history__action.is-started, .booking-history__action.is-finished { color: var(--status-playing-fg); }
+.booking-history__subject { font-weight: 600; }
+.booking-history__who { margin-left: auto; }
+/* A seat that ended by itself, paid afterwards (2026-11-07). */
+.pay-mark-note { padding: var(--space-2) var(--space-3); border-radius: var(--radius-sm); background: rgb(var(--warning-rgb) / 0.12); color: var(--color-warning); font-size: 13px; font-weight: 600; }
+.pay-mark-done { padding: var(--space-2) var(--space-3); border-radius: var(--radius-sm); background: rgb(var(--success-rgb) / 0.12); color: var(--color-success); font-size: 13px; font-weight: 600; }

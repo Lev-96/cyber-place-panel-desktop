@@ -101,13 +101,13 @@ describe("SessionsBoard — pause and resume", () => {
     expect(document.body.textContent).not.toContain("session.pausedBadge");
   });
 
-  test("a paused seat offers Resume, says it is paused and hides Add time", async () => {
+  test("a paused seat offers Resume and says it is paused; «+ Время» stays (its dialog offers no time then)", async () => {
     const pausedAt = new Date().toISOString();
     repo.listActive.mockResolvedValue([running({ paused_at: pausedAt, pauses: [{ paused_at: pausedAt, resumed_at: null }] })]);
     await mount();
 
     expect(buttons()).toContain("session.resume");
-    expect(buttons()).not.toContain("session.addTime");
+    expect(buttons()).toContain("session.addTime");
     expect(document.body.textContent).toContain("session.pausedBadge");
     // A pause belongs to the seat it began on: no move until it is resumed.
     expect(buttons()).not.toContain("session.relocate");
@@ -126,6 +126,21 @@ describe("SessionsBoard — pause and resume", () => {
     expect(named("session.relocate").classList.contains("session-card__btn--wide")).toBe(true);
     expect(named("action.stop").classList.contains("session-card__btn--wide")).toBe(true);
     expect(named("session.addTime").classList.contains("session-card__btn--wide")).toBe(false);
+  });
+
+  test("one «+ Время» on every kind of seat (2026-11-07): no separate «∞» or «⏱» on the card", async () => {
+    const pausedAt = new Date().toISOString();
+    for (const over of [
+      {},
+      { mode: "open", ends_at: null, is_unlimited: true },
+      { paused_at: pausedAt, pauses: [{ paused_at: pausedAt, resumed_at: null }] },
+    ] as Partial<ISessionApi>[]) {
+      repo.listActive.mockResolvedValue([running(over)]);
+      await mount();
+      expect(buttons().filter((b) => b === "session.addTime")).toHaveLength(1);
+      expect(document.querySelector('[data-action="unlimited"], [data-action="limit"]')).toBeNull();
+      cleanup();
+    }
   });
 
   test("a running seat offers «Move player»", async () => {

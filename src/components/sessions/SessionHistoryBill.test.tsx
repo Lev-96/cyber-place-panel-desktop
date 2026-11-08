@@ -110,6 +110,18 @@ describe("SessionHistoryBill", () => {
     expect(foot()).toEqual([["history.total", "1003 AMD"], ["session.payTitle", "session.payCard"]]);
   });
 
+  test("a cancelled session reads «Cancelled» alone, in red — no «· 0», never «free» (2026-11-06)", () => {
+    mount(session({ is_free: true, total_paid: 0, cancelled_at: "2026-11-06T15:16:00+04:00" }));
+    expect(foot()[0]).toEqual(["history.total", "history.billCancelled"]);
+    const cell = document.querySelector("tfoot tr td") as HTMLElement;
+    expect(cell.classList.contains("hs-bill__cancelled")).toBe(true);
+  });
+
+  test("a session never cancelled carries no red total", () => {
+    mount(session({ is_free: true, total_paid: 0 }));
+    expect(document.querySelector(".hs-bill__cancelled")).toBeNull();
+  });
+
   test("a waived session reads as the words, with no pad row", () => {
     mount(session({ is_free: true, total_paid: 0 }));
     expect(foot()[0]).toEqual(["history.total", "session.freeBill"]);
@@ -137,5 +149,18 @@ describe("SessionHistoryBill", () => {
     expect(document.querySelector("section.hs-bill")?.getAttribute("aria-label")).toBe("history.billTitle");
     expect(document.querySelector("caption")?.textContent).toBe("history.billTitle");
     expect(document.querySelectorAll('tbody th[scope="row"]')).toHaveLength(6);
+  });
+
+  test("a counter reset says what it waived on its own line, and the total is the money taken (2026-11-05)", () => {
+    mount(session({ total_paid: 550, time_waived_total: "400.00", items: [item(1, "Cola", 1, 300)], joysticks: [] }));
+    const rows = body();
+    expect(rows).toContainEqual(["history.billTime", "-", "-", "250 AMD"]);
+    expect(rows).toContainEqual(["session.reset.waived", "−400 AMD"]);
+    expect(foot()[0]).toEqual(["history.total", "550 AMD"]);
+  });
+
+  test("never reset: no such line", () => {
+    mount(session());
+    expect(document.querySelector('[data-testid="bill-waived"]')).toBeNull();
   });
 });

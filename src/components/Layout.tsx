@@ -6,6 +6,7 @@ import SupportNotifier from "./notifications/SupportNotifier";
 import { Ps5ControlProvider } from "@/ps5/Ps5ControlProvider";
 import UnexpectedWakeDialog from "./ps5/UnexpectedWakeDialog";
 import Sidebar from "./Sidebar";
+import { AppShell } from "./SidebarCollapse";
 import PageTopBar from "./ui/PageTopBar";
 import UnsavedInterfaceNotice from "./appearance/UnsavedInterfaceNotice";
 import NewInterfacesOffer from "./appearance/NewInterfacesOffer";
@@ -17,7 +18,8 @@ const Layout = () => (
     that is precisely how an owner ended up never being asked.
   */
   <Ps5ControlProvider>
-  <div className="app-shell">
+  {/* The shell's grid, which can hide the side menu (2026-11-03). */}
+  <AppShell>
     <Sidebar />
     <main className="main">
       <PageTopBar />
@@ -46,7 +48,7 @@ const Layout = () => (
       first time a service enters the window. Non-admins render nothing.
     */}
     <ExpenseReminderNotifier />
-  </div>
+  </AppShell>
   </Ps5ControlProvider>
 );
 

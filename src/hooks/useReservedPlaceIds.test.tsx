@@ -30,8 +30,9 @@ vi.mock("@/realtime/bookingScope", () => ({
 vi.mock("@/auth/AuthContext", () => ({
   useAuth: () => ({ user: { id: 1, role: "manager" } }),
 }));
+const listAll = vi.hoisted(() => ({ fn: (() => Promise.resolve([])) as () => Promise<unknown[]>, calls: 0 }));
 vi.mock("@/repositories/BookingRepository", () => ({
-  bookingRepository: { listAll: () => Promise.resolve([]) },
+  bookingRepository: { listAll: () => { listAll.calls += 1; return listAll.fn(); } },
 }));
 
 let seen: Set<number> = new Set();
@@ -71,6 +72,34 @@ describe("seats held by a reservation", () => {
   test("a created booking takes its seats", async () => {
     await fire(event());
     expect(seen.has(10)).toBe(true);
+  });
+
+  // Moved by staff (2026-11-07): the seat it left is not in the event, so
+  // the whole set is read again, and the old seat is free at once.
+  test("a reservation moved to another seat is read again, not added", async () => {
+    await fire(event());
+    expect(seen.has(10)).toBe(true);
+    const before = listAll.calls;
+    await fire(event({ kind: "updated", place_ids: [11], at: "2026-09-10T14:02:00+04:00" }));
+    expect(listAll.calls).toBe(before + 1);
+    expect(seen.has(11)).toBe(false);
+    expect(seen.has(10)).toBe(false);
+  });
+
+  // The event is judged as the snapshot is (2026-11-07): a reservation far
+  // ahead does not turn the tile yellow; one starting soon does.
+  test("a booking made for much later does not take its seat yet; one starting soon does", async () => {
+    const at = (minutes: number) => {
+      const d = new Date(Date.now() + minutes * 60_000);
+      return {
+        booking_date: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`,
+        start_time: d.toTimeString().slice(0, 8), duration_minutes: 60, rescheduled_minutes: 0,
+      };
+    };
+    await fire(event({ ...at(4 * 60), place_ids: [20], at: "2026-09-10T14:03:00+04:00" }));
+    expect(seen.has(20)).toBe(false);
+    await fire(event({ ...at(30), booking_id: 101, place_ids: [21], at: "2026-09-10T14:04:00+04:00" }));
+    expect(seen.has(21)).toBe(true);
   });
 
   test("a cancellation hands them back", async () => {

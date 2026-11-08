@@ -657,3 +657,19 @@ describe("a resume", () => {
     expect(line).not.toContain("history.pauseLimitReason");
   });
 });
+
+/** How a seat was paid, on its timeline (2026-11-07). */
+describe("the payment on the timeline", () => {
+  test("a split stop lists each part and how it was paid", () => {
+    expect(eventDetail(event({ action: "stopped", meta: {
+      payment_method: "split", payments: [{ method: "cash", amount: 2000 }, { method: "card", amount: "3000.00" }], payment_note: "3000 картой",
+    } }), t, money)).toBe("pay.splitSummary: session.payCash 2000 AMD · session.payCard 3000 AMD (3000 картой)");
+  });
+  test("a seat that ran out says so; the payment recorded later says how", () => {
+    expect(eventDetail(event({ action: "stopped", meta: { reason: "expired", is_free: false } }), t, money)).toBe("history.endedAutomatically");
+    expect(eventDetail(event({ action: "payment_recorded", meta: { payment_method: "card", after: "expired" } }), t, money)).toBe("session.payCard");
+  });
+  test("a part that is not a payment is not read", () => {
+    expect(eventDetail(event({ action: "stopped", meta: { payment_method: "split", payments: [{ method: "bitcoin", amount: 1 }, "x"] } }), t, money)).toBe("pay.splitSummary");
+  });
+});

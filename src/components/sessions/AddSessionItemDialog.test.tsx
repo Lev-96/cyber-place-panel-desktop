@@ -93,7 +93,12 @@ const products = [
   { id: 15, branch_id: 1, name: "Coffee", category: "Drinks", price: 600, is_active: true },
 ];
 
-const mount = async (over: Partial<React.ComponentProps<typeof AddSessionItemDialog>> = {}) => {
+/**
+ * Opens the dialog. It opens on typing (2026-11-07); most tests here are
+ * about the list, so they are put on it — `{ onList: false }` keeps the
+ * dialog as it opens.
+ */
+const mount = async (over: Partial<React.ComponentProps<typeof AddSessionItemDialog>> = {}, { onList = true } = {}) => {
   const onAdded = vi.fn();
   const onClose = vi.fn();
   await act(async () => {
@@ -107,6 +112,8 @@ const mount = async (over: Partial<React.ComponentProps<typeof AddSessionItemDia
       />,
     );
   });
+  const list = screen.queryByLabelText("session.addModePicker");
+  if (onList && list) await act(async () => { fireEvent.click(list); });
   return { onAdded, onClose };
 };
 
@@ -448,12 +455,15 @@ describe("AddSessionItemDialog — typing the order", () => {
   beforeEach(() => { vi.useFakeTimers({ shouldAdvanceTime: true }); });
   afterEach(() => { vi.useRealTimers(); });
 
-  test("the dialog opens on the picker, not on the box", async () => {
-    await mount();
+  test("the dialog opens on the box, and typing is the first choice (2026-11-07)", async () => {
+    await mount({}, { onList: false });
 
-    expect((screen.getByLabelText("session.addModePicker") as HTMLInputElement).checked).toBe(true);
-    expect(screen.queryByLabelText("session.quickEntry")).toBeNull();
-    expect(screen.getByText("session.availableProducts")).toBeTruthy();
+    expect((screen.getByLabelText("session.addModeText") as HTMLInputElement).checked).toBe(true);
+    expect(box()).toBeTruthy();
+    expect(screen.queryByText("session.availableProducts")).toBeNull();
+    const radios = Array.from(document.querySelectorAll('input[type="radio"][name="cp-session-add-mode"]'))
+      .map((r) => (r.closest("label") as HTMLElement).textContent);
+    expect(radios).toEqual(["session.addModeText", "session.addModePicker"]);
   });
 
   test("switching puts the box in the catalogue's place, and back", async () => {

@@ -45,7 +45,7 @@ const SessionHistoryBill = ({ session, closed }: Props) => {
    * session" is two numbers telling one truth.
    */
   const padCharge = padChargeOf(session);
-  const paymentLabel = paymentLabelOf(session, t);
+  const paymentLabel = paymentLabelOf(session, t, money);
   const total = num(session.total_paid);
   // What the CLOCK earned: the bill less everything that is not the clock.
   //
@@ -55,8 +55,11 @@ const SessionHistoryBill = ({ session, closed }: Props) => {
   // so the two cannot drift.
   const padTotal = padCharge?.total ?? 0;
   const timeCost = Math.max(0, total - itemsTotal - padTotal);
+  // What resetting the clock waived (2026-11-05): the time line above is
+  // already net of it; said on its own line so the bill shows where it went.
+  const waived = num(session.time_waived_total);
 
-  if (!closed && items.length === 0 && padCharge === null) return null;
+  if (!closed && items.length === 0 && padCharge === null && waived <= 0) return null;
 
   const perHour = t("session.perHourShort");
 
@@ -75,6 +78,12 @@ const SessionHistoryBill = ({ session, closed }: Props) => {
         <tbody>
           {/* The clock — only once the session is over, when it is a fact. */}
           {closed && <BillRow label={t("history.billTime")} qty={null} price={null} sum={money(timeCost)} />}
+          {waived > 0 && (
+            <tr className="hs-bill__waived" data-testid="bill-waived">
+              <th scope="row" colSpan={2}>{t("session.reset.waived")}</th>
+              <td className="num" colSpan={2}>−{money(waived)}</td>
+            </tr>
+          )}
 
           {items.map((it) => (
             <BillRow
@@ -117,7 +126,11 @@ const SessionHistoryBill = ({ session, closed }: Props) => {
               <th scope="row" colSpan={2}>{t("history.total")}</th>
               {/* A waived bill reads as the words, not as a zero: "0" could be
                   a session nobody played. */}
-              <td className="num" colSpan={2}>{session.is_free ? t("session.freeBill") : money(total)}</td>
+              {/* A cancelled seat (2026-11-06) reads as the word, in red, so nobody
+                  takes it for a session that was paid or given away. */}
+              <td className={session.cancelled_at ? "num hs-bill__cancelled" : "num"} colSpan={2}>
+                {session.cancelled_at ? t("history.billCancelled") : session.is_free ? t("session.freeBill") : money(total)}
+              </td>
             </tr>
             {/* How the money was taken — the value is the bold half. Omitted
                 when nothing was recorded: inventing one would be worse than

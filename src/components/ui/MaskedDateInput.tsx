@@ -10,6 +10,8 @@ interface Props {
   onChangeIso: (iso: string) => void;
   required?: boolean;
   autoFocus?: boolean;
+  /** The field's accessible name when there is no visible `label` here (the caller labels it). */
+  ariaLabel?: string;
 }
 
 /**
@@ -22,7 +24,7 @@ interface Props {
  * forced), and Electron's native date/number widgets swallow keystrokes
  * on some Linux WMs — same trap NumberStepper exists to avoid.
  */
-const MaskedDateInput = ({ label, valueIso, onChangeIso, required, autoFocus }: Props) => {
+const MaskedDateInput = ({ label, valueIso, onChangeIso, required, autoFocus, ariaLabel }: Props) => {
   // Seeded once from the incoming ISO; the field then owns its own text
   // (the modal remounts per open, so there is no external-sync case).
   const [text, setText] = useState(() => isoToDmy(valueIso));
@@ -45,6 +47,7 @@ const MaskedDateInput = ({ label, valueIso, onChangeIso, required, autoFocus }: 
         required={required}
         autoFocus={autoFocus}
         maxLength={8}
+        aria-label={ariaLabel ?? label}
       />
     </div>
   );

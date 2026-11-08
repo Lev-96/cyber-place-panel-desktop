@@ -1,6 +1,7 @@
 import Button from "@/components/ui/Button";
 import NavIcon from "@/components/ui/NavIcon";
-import { REQUIRED_MENU_IDS, type NavItem } from "@/components/sidebarNav";
+import Switch from "@/components/ui/Switch";
+import { REQUIRED_MENU_IDS, iconIdOf, isAddedEntry, type NavItem } from "@/components/sidebarNav";
 import { useLang } from "@/i18n/LanguageContext";
 import type { SidebarEntry } from "@/preferences/uiPreferences";
 
@@ -39,6 +40,9 @@ const MenuEditor = ({ items, arrangement, onChange }: Props) => {
     onChange(next);
   };
   const toggle = (index: number) => onChange(rows.map((r, i) => (i === index ? { ...r, hidden: !r.hidden } : r)));
+  // An entry the person added (2026-11-03) is removed, not hidden: gone from
+  // the arrangement, so it can be added again (for another branch) later.
+  const remove = (index: number) => onChange(rows.filter((_, i) => i !== index));
 
   return (
     <ol className="menu-editor" data-testid="menu-editor">
@@ -51,22 +55,30 @@ const MenuEditor = ({ items, arrangement, onChange }: Props) => {
       )}
       {rows.map((r, i) => {
         const required = REQUIRED_MENU_IDS.has(r.id);
+        const added = isAddedEntry(r.id);
         const name = label.get(r.id) ?? r.id;
         return (
           <li key={r.id} className={`menu-editor__row${r.hidden ? " is-hidden" : ""}`} data-testid={`menu-row-${r.id}`}>
-            <NavIcon id={r.id} />
+            <NavIcon id={iconIdOf(r.id)} />
             <span className="menu-editor__name">{name}</span>
             {required && <span className="muted menu-editor__note">{t("appearance.menu.required")}</span>}
+            {added && <span className="muted menu-editor__note">{t("appearance.menu.added")}</span>}
             <span className="menu-editor__controls">
               <Button type="button" variant="secondary" disabled={i === 0} onClick={() => move(i, -1)}
                 aria-label={`${t("appearance.menu.up")}: ${name}`} title={t("appearance.menu.up")}>↑</Button>
               <Button type="button" variant="secondary" disabled={i === rows.length - 1} onClick={() => move(i, 1)}
                 aria-label={`${t("appearance.menu.down")}: ${name}`} title={t("appearance.menu.down")}>↓</Button>
-              <label className="menu-editor__show">
-                <input type="checkbox" checked={!r.hidden} disabled={required} onChange={() => toggle(i)}
-                  aria-label={`${t("appearance.menu.show")}: ${name}`} />
-                {t("appearance.menu.show")}
-              </label>
+              {/* One switch for every row (2026-11-03): an entry the role always has
+                  is hidden or shown; a shortcut the person added is removed when
+                  switched off (it is offered again under the branch's sections). */}
+              <Switch
+                size="md"
+                checked={!r.hidden}
+                disabled={required}
+                onChange={() => (added ? remove(i) : toggle(i))}
+                ariaLabel={`${t("appearance.menu.show")}: ${name}`}
+                testId={`menu-show-${r.id}`}
+              />
             </span>
           </li>
         );

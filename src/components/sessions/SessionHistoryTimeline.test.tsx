@@ -65,7 +65,8 @@ describe("SessionHistoryTimeline", () => {
     expect(sale.querySelector(".hs-event__actor")?.textContent).toBe("Giorgi Beridze");
     expect([...sale.querySelectorAll(".hs-event__detail")].map((n) => n.textContent))
       .toEqual(["history.itemsCount: 5", "Cola 0.5L × 5"]);
-    expect(sale.querySelector(".hs-event__amount")?.textContent).toBe("3000 AMD");
+    // Put on the bill: signed, so it never reads like the total (2026-11-05).
+    expect(sale.querySelector(".hs-event__amount")?.textContent).toBe("+3000 AMD");
   });
 
   test("the automatic resume says who (nobody), why and for how long — and looks different", () => {
@@ -160,7 +161,28 @@ describe("SessionHistoryTimeline", () => {
     mount([event(1, { action: "stopped", user: null, amount: 1003 })]);
     expect(document.querySelector(".hs-event__actor")).toBeNull();
     expect(document.querySelector(".hs-event__detail")).toBeNull();
-    expect(document.querySelector(".hs-event__amount")?.textContent).toBe("1003 AMD");
+    // The stop carries the bill's total, and says so.
+    expect(document.querySelector(".hs-event__amount")?.textContent).toBe("history.total: 1003 AMD");
+  });
+
+  test("a reset of the counter reads as money waived, set apart, with what stays owed (2026-11-05)", () => {
+    mount([event(1, { action: "time_reset", amount: 400, meta: { items_total: "300.00", joysticks_total: "0.00", place_number: 1 } })]);
+    const amount = document.querySelector(".hs-event__amount") as HTMLElement;
+    expect(amount.textContent).toBe("−400 AMD");
+    expect(amount.dataset.kind).toBe("waive");
+    expect(document.querySelector(".hs-event")!.className).toContain("hs-tone-waive");
+    expect(document.querySelector(".hs-event__title")?.textContent).toBe("history.action.time_reset");
+    expect(Array.from(document.querySelectorAll(".hs-event__detail")).map((d) => d.textContent)).toEqual(["history.resetKeeps"]);
+  });
+
+  test("a cancel reads as the seat ended with its whole bill waived, set apart from a reset (2026-11-06)", () => {
+    mount([event(1, { action: "cancelled", amount: 700, meta: { gross_total: 700, time_cost: 400, items_total: 300, joysticks_total: 0 } })]);
+    const amount = document.querySelector(".hs-event__amount") as HTMLElement;
+    expect(amount.textContent).toBe("−700 AMD");
+    expect(amount.dataset.kind).toBe("waive");
+    expect(document.querySelector(".hs-event")!.className).toContain("hs-tone-stop");
+    expect(document.querySelector(".hs-event__title")?.textContent).toBe("history.action.cancelled");
+    expect(Array.from(document.querySelectorAll(".hs-event__detail")).map((d) => d.textContent)).toEqual(["history.cancelWaived"]);
   });
 
   test("an action the panel does not know still renders, with what its meta says", () => {

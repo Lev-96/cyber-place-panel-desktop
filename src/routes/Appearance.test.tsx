@@ -20,6 +20,7 @@ import Appearance from "./Appearance";
 import UnsavedInterfaceNotice from "@/components/appearance/UnsavedInterfaceNotice";
 import ApplyHomeOnSignIn from "@/components/appearance/ApplyHomeOnSignIn";
 import { UiPreferencesProvider } from "@/preferences/UiPreferencesContext";
+import { ConfirmProvider } from "@/components/ui/ConfirmProvider";
 
 const doc = (over: object = {}) => ({ data: null, schema_version: 1, onboarding_version: 1, onboarded_at: null, ...over });
 let go: (to: string) => void = () => {};
@@ -29,6 +30,8 @@ const Where = () => { const n = useNavigate(); void n; return <span data-testid=
 const mount = async (path = "/appearance") => {
   await act(async () => {
     render(
+      // As in App: confirmations live at the root, above the router.
+      <ConfirmProvider>
       <MemoryRouter initialEntries={[path]}>
         <UiPreferencesProvider>
           <Nav />
@@ -41,7 +44,8 @@ const mount = async (path = "/appearance") => {
             <Route path="*" element={<Where />} />
           </Routes>
         </UiPreferencesProvider>
-      </MemoryRouter>,
+      </MemoryRouter>
+      </ConfirmProvider>,
     );
   });
   await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
@@ -94,23 +98,24 @@ describe("trying on and saving", () => {
     expect(saved.layout.density).toBe("simple");
   });
 
-  test("after Compact, Standard and My interface really change the look again", async () => {
+  test("after Compact, Standard really changes the look again; no My interface card before one is saved", async () => {
     await mount();
     await act(async () => { pick("interface", "compact"); });
     expect(html()).toMatchObject({ density: "compact", cardSize: "s", boardView: "list" });
     await act(async () => { pick("interface", "standard"); });
     expect(html()).toMatchObject({ density: "standard", cardSize: "m", boardView: "grid" });
-    await act(async () => { pick("interface", "compact"); });
-    // My interface is the person's own layout (Standard until they change it),
-    // not a copy of the Compact that was just on screen.
-    await act(async () => { pick("interface", "custom"); });
-    expect(html()).toMatchObject({ density: "standard", cardSize: "m", boardView: "grid" });
+    // 2026-11-03: «Мой интерфейс» is a card that appears once the person has
+    // saved one of their own; there is no radio for it among the ready-made.
+    expect(screen.queryByTestId("choice-interface-custom")).toBeNull();
+    expect(screen.queryByTestId("my-interface-card")).toBeNull();
   });
 
   test("My interface brings back the person's own saved layout", async () => {
     repo.get.mockResolvedValue(doc({ data: { interface: "standard", layout: { density: "simple", card_size: "l", board_view: "list" } } }));
     await mount();
     await act(async () => { pick("interface", "compact"); });
+    // Its own layout, not a copy of the Compact that was just on screen. Since
+    // 2026-11-03 it is a card among the ready-made ones once one is saved.
     await act(async () => { pick("interface", "custom"); });
     expect(html()).toMatchObject({ density: "simple", cardSize: "l", boardView: "list" });
   });
@@ -164,9 +169,10 @@ describe("the menu and the first screen", () => {
     const editor = screen.getByTestId("menu-editor");
     // A manager's menu: no owner-only entries.
     expect(within(editor).queryByText("nav.revenue")).toBeNull();
-    expect((within(screen.getByTestId("menu-row-nav.settings")).getByRole("checkbox") as HTMLInputElement).disabled).toBe(true);
+    // 2026-11-03: a switch (a native input with role="switch"), not a checkbox.
+    expect((within(screen.getByTestId("menu-row-nav.settings")).getByRole("switch") as HTMLInputElement).disabled).toBe(true);
 
-    await act(async () => { fireEvent.click(within(screen.getByTestId("menu-row-nav.bookings")).getByRole("checkbox")); });
+    await act(async () => { fireEvent.click(within(screen.getByTestId("menu-row-nav.bookings")).getByRole("switch")); });
     await act(async () => { fireEvent.click(within(screen.getByTestId("menu-row-nav.shifts")).getByRole("button", { name: /appearance.menu.up/ })); });
     await act(async () => { fireEvent.click(screen.getByRole("button", { name: "appearance.save" })); });
     const sidebar: Array<{ id: string; hidden: boolean }> = repo.put.mock.calls[0][0].data.layout.sidebar;
@@ -225,13 +231,23 @@ describe("the preview", () => {
     const buttons = [...preview.querySelectorAll("button")];
     // The same buttons the board draws, so it lays out as the board does…
     expect(buttons.length).toBeGreaterThan(0);
-    expect(buttons.every((b) => b.classList.contains("btn"))).toBe(true);
+    // Every button on a card is the board's button; the only others are the
+    // board's own section header (2026-11-03: the preview sits in it too) and
+    // the counter's own ↺ beside the money (2026-11-05, SessionTimer).
+    const boardOwn = (b: Element) => b.classList.contains("btn") || b.classList.contains("session-timer__reset");
+    expect(buttons.every((b) => boardOwn(b) || b.classList.contains("cp-section-toggle"))).toBe(true);
+    expect([...preview.querySelectorAll(".place-cell button")].every(boardOwn)).toBe(true);
+    expect(preview.querySelector(".place-cell .session-timer__reset")).not.toBeNull();
     expect(buttons.some((b) => b.classList.contains("session-card__btn"))).toBe(true);
-    // …which cannot be reached or pressed, and do nothing if they were.
-    expect(buttons.every((b) => b.closest("[inert]") !== null && b.tabIndex === -1)).toBe(true);
+    // …which cannot be reached or pressed: all of them inside `inert` (the
+    // board's own section toggle and pad switch included, 2026-11-03), and
+    // they do nothing if they were.
+    expect(buttons.every((b) => b.closest("[inert]") !== null)).toBe(true);
     expect(preview.querySelectorAll("a, input, select")).toHaveLength(0);
     for (const b of buttons) fireEvent.click(b);
     expect(repo.put).not.toHaveBeenCalled();
     expect(screen.queryByRole("menu")).toBeNull();
+    // The section stays open: its toggle is a picture too.
+    expect(preview.querySelector(".live-grid--sessions")).not.toBeNull();
   });
 });

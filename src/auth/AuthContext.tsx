@@ -24,6 +24,16 @@ interface AuthState {
 
 const AuthCtx = createContext<AuthState | null>(null);
 
+/**
+ * Whether the server looked at the saved token and refused it: an HTTP answer
+ * in the 4xx range. No answer at all (offline, DNS, a dropped connection), a
+ * timeout or rate limit, or a server error says nothing about the session.
+ */
+const sessionRefused = (error: unknown): boolean => {
+  const status = (error as { status?: unknown } | null)?.status;
+  return typeof status === "number" && status >= 400 && status < 500 && status !== 408 && status !== 429;
+};
+
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
@@ -40,10 +50,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         // A blocked ADDRESS is not a dead session: keep the sign-in, so the
         // app continues once the administrator lifts the block
         // (NetworkBlockedScreen covers everything meanwhile).
-        if (!isNetworkBlockError(error)) {
-          await keyValueStore.remove(AppConfig.storageKeys.token);
-          await keyValueStore.remove(AppConfig.storageKeys.user);
+        if (isNetworkBlockError(error)) return;
+
+        // No verdict on the session — the server was not reached, or answered
+        // that it could not decide (2026-11-02). Measured at a venue: its
+        // internet stalled in the evening, and a panel started then was signed
+        // out, which also stops it controlling the consoles until somebody
+        // signs in again. The saved account is used instead; the server still
+        // checks the token on every request, and a real 401 signs out then.
+        if (!sessionRefused(error)) {
+          const saved = await keyValueStore.get<AuthUser>(AppConfig.storageKeys.user);
+          if (saved) setUser(saved);
+          return;
         }
+
+        await keyValueStore.remove(AppConfig.storageKeys.token);
+        await keyValueStore.remove(AppConfig.storageKeys.user);
       } finally {
         setLoading(false);
       }

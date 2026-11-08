@@ -22,18 +22,24 @@ import StopReceiptModal from "./StopReceiptModal";
  * figure would waive that one on screen.
  */
 
-const repo = vi.hoisted(() => ({ preview: vi.fn(), stop: vi.fn(), removeItem: vi.fn() }));
+const repo = vi.hoisted(() => ({ preview: vi.fn(), stop: vi.fn(), removeItem: vi.fn(), resetTime: vi.fn(), cancel: vi.fn(), recordPayment: vi.fn() }));
 
 vi.mock("@/repositories/SessionRepository", () => ({
   sessionRepository: {
     preview: (...a: unknown[]) => repo.preview(...a),
     stop: (...a: unknown[]) => repo.stop(...a),
     removeItem: (...a: unknown[]) => repo.removeItem(...a),
+    resetTime: (...a: unknown[]) => repo.resetTime(...a),
+    cancel: (...a: unknown[]) => repo.cancel(...a),
+    recordPayment: (...a: unknown[]) => repo.recordPayment(...a),
   },
 }));
 vi.mock("@/i18n/LanguageContext", () => ({
   useLang: () => ({
     t: (k: string) => k,
+    // The payment boxes (`PriceInput`) take money in the display currency.
+    lang: "en",
+    currency: "AMD",
     // Distinctive enough that a match cannot come from anywhere else on
     // screen, and it HONOURS the precision options it is handed.
     //
@@ -100,12 +106,9 @@ const mount = async (s: ISessionApi = session()) => {
  * before the request, and that the payload carries what they chose.
  */
 describe("the payment method", () => {
-  // By VALUE, not by label text: the labels and the placeholder share a prefix
-  // and a text query matches more than one of them.
-  const radio = (value: string) =>
-    screen
-      .getAllByRole("radio")
-      .find((r) => (r as HTMLInputElement).value === value) as HTMLInputElement;
+  // The payment control's own buttons (role="radio", `PaymentEditor`), by id:
+  // the labels and the placeholder share a prefix.
+  const radio = (value: string) => screen.getByTestId(`pay-${value}`);
 
   const confirm = () => screen.getByRole("button", { name: "session.confirmStop" });
 
@@ -123,7 +126,7 @@ describe("the payment method", () => {
   test("cash is chosen by default, so the ordinary stop stays one click", async () => {
     await mount();
 
-    expect(radio("cash").checked).toBe(true);
+    expect(radio("cash").getAttribute("aria-checked")).toBe("true");
     await act(async () => { fireEvent.click(confirm()); });
 
     expect(repo.stop).toHaveBeenCalledWith(1, { payment_method: "cash" });
@@ -556,8 +559,7 @@ describe("taking a line off the bill before the stop", () => {
  * switch to card drops the amount so it cannot ride along.
  */
 describe("received cash and change", () => {
-  const radio = (value: string) =>
-    screen.getAllByRole("radio").find((r) => (r as HTMLInputElement).value === value) as HTMLInputElement;
+  const radio = (value: string) => screen.getByTestId(`pay-${value}`);
   const confirm = () => screen.getByTestId("stop-confirm") as HTMLButtonElement;
   const type = (v: string) => fireEvent.change(screen.getByTestId("cash-received"), { target: { value: v } });
 
@@ -805,5 +807,314 @@ describe("the VIP minimum charge on the receipt", () => {
     repo.preview.mockResolvedValue(bill({ is_free: true, total: 0, minimum_charge: minimum(true) } as Partial<IBillBreakdown>));
     await mount();
     expect(screen.queryByTestId("receipt-min-charge")).toBeNull();
+  });
+});
+
+/**
+ * Resetting the counter from the receipt (2026-11-05): offered only to a role
+ * that may and only while the time has something to reset; asked first; the
+ * receipt is read AGAIN after it, so Confirm charges the server's new bill.
+ */
+describe("resetting the counter from the receipt", () => {
+  const mountWith = async (props: { canResetTime?: boolean; onTimeReset?: () => void } = {}, s: ISessionApi = session()) => {
+    await act(async () => {
+      render(<StopReceiptModal session={s} onClose={() => {}} onConfirmed={() => {}} onItemRemoved={() => {}} {...props} />);
+    });
+  };
+  beforeEach(() => {
+    repo.preview.mockReset();
+    repo.stop.mockReset();
+    repo.resetTime.mockReset();
+    asked.fn.mockReset();
+    asked.fn.mockResolvedValue(true);
+    toasts.message.mockReset();
+  });
+  afterEach(cleanup);
+
+  test("not offered without the right, on a waived bill, at no time cost, or once stopped", async () => {
+    repo.preview.mockResolvedValue(bill({ time_cost: 400, total: 400 }));
+    await mountWith();
+    expect(screen.queryByTestId("receipt-reset")).toBeNull();
+    cleanup();
+
+    repo.preview.mockResolvedValue(bill({ is_free: true }));
+    await mountWith({ canResetTime: true });
+    expect(screen.queryByTestId("receipt-reset")).toBeNull();
+    cleanup();
+
+    repo.preview.mockResolvedValue(bill({ time_cost: 0, total: 300, items_total: 300 }));
+    await mountWith({ canResetTime: true });
+    expect(screen.queryByTestId("receipt-reset")).toBeNull();
+    cleanup();
+
+    repo.preview.mockResolvedValue(bill({ time_cost: 400, total: 400 }));
+    await mountWith({ canResetTime: true }, session({ status: "stopped" }));
+    expect(screen.queryByTestId("receipt-reset")).toBeNull();
+  });
+
+  test("asks first, resets, reads the receipt again and charges THAT bill", async () => {
+    const onTimeReset = vi.fn();
+    repo.preview.mockResolvedValueOnce(bill({ time_cost: 400, total: 700, items_total: 300, priced_at: "2026-11-05T15:16:00Z" }));
+    // Read again before asking: the time has grown since Stop.
+    repo.preview.mockResolvedValueOnce(bill({ time_cost: 425, total: 725, items_total: 300, priced_at: "2026-11-05T15:17:00Z" }));
+    repo.preview.mockResolvedValueOnce(bill({ time_cost: 0, time_waived: 425, total: 300, items_total: 300, priced_at: "2026-11-05T15:17:05Z" }));
+    repo.resetTime.mockResolvedValue({ session: session(), waived: 400 });
+    repo.stop.mockResolvedValue({ breakdown: bill({ total: 300 }), cash: null });
+    await mountWith({ canResetTime: true, onTimeReset });
+
+    await act(async () => { fireEvent.click(screen.getByTestId("receipt-reset")); });
+    expect(asked.fn).toHaveBeenCalledTimes(1);
+    expect(String(asked.fn.mock.calls[0][0])).toBe("session.reset.confirmReceipt");
+    expect(repo.resetTime).toHaveBeenCalledWith(1);
+    expect(onTimeReset).toHaveBeenCalledTimes(1);
+    expect(repo.preview).toHaveBeenCalledTimes(3);
+    expect(screen.getByTestId("receipt-time-waived").textContent).toContain("425");
+    expect(screen.queryByTestId("receipt-reset")).toBeNull();
+
+    await act(async () => { fireEvent.click(screen.getByTestId("stop-confirm")); });
+    expect(repo.stop.mock.calls[0][1]).toMatchObject({ priced_at: "2026-11-05T15:17:05Z", expected_total: 300 });
+  });
+
+  test("the question names the figure read NOW, not the frozen receipt's", async () => {
+    repo.preview.mockResolvedValueOnce(bill({ time_cost: 400, total: 400 }));
+    repo.preview.mockResolvedValueOnce(bill({ time_cost: 1200, total: 1200 }));
+    asked.fn.mockResolvedValue(false);
+    await mountWith({ canResetTime: true });
+    await act(async () => { fireEvent.click(screen.getByTestId("receipt-reset")); });
+    expect(repo.preview).toHaveBeenCalledTimes(2);
+    expect(screen.getAllByText("1200·AMD").length).toBeGreaterThan(0);
+  });
+
+  test("a few hundredths of time are not offered for reset (right after one)", async () => {
+    repo.preview.mockResolvedValue(bill({ time_cost: 0.11, time_waived: 400, total: 300.11, items_total: 300 }));
+    await mountWith({ canResetTime: true });
+    expect(screen.queryByTestId("receipt-reset")).toBeNull();
+  });
+
+  test("answered no: nothing is reset", async () => {
+    asked.fn.mockResolvedValue(false);
+    repo.preview.mockResolvedValue(bill({ time_cost: 400, total: 400 }));
+    await mountWith({ canResetTime: true });
+    await act(async () => { fireEvent.click(screen.getByTestId("receipt-reset")); });
+    expect(repo.resetTime).not.toHaveBeenCalled();
+  });
+
+  test("refused by the server: its sentence, the receipt unchanged and still confirmable", async () => {
+    repo.preview.mockResolvedValue(bill({ time_cost: 400, total: 400 }));
+    repo.resetTime.mockRejectedValue(new Error("This session is no longer running, so its clock cannot be reset."));
+    await mountWith({ canResetTime: true });
+    await act(async () => { fireEvent.click(screen.getByTestId("receipt-reset")); });
+    expect(screen.getByText("This session is no longer running, so its clock cannot be reset.")).toBeTruthy();
+    expect((screen.getByTestId("stop-confirm") as HTMLButtonElement).disabled).toBe(false);
+  });
+});
+
+describe("cancelling the seat from the receipt", () => {
+  const mountWith = async (props: { canCancel?: boolean; onConfirmed?: (o?: { cancelled: boolean }) => void } = {}, s: ISessionApi = session()) => {
+    await act(async () => {
+      render(<StopReceiptModal session={s} onClose={() => {}} onConfirmed={() => {}} onItemRemoved={() => {}} {...props} />);
+    });
+  };
+  beforeEach(() => {
+    repo.preview.mockReset();
+    repo.stop.mockReset();
+    repo.cancel.mockReset();
+    asked.fn.mockReset();
+    asked.fn.mockResolvedValue(true);
+  });
+  afterEach(cleanup);
+
+  test("not offered without the right, nor once the seat is over", async () => {
+    repo.preview.mockResolvedValue(bill({ time_cost: 400, total: 400 }));
+    await mountWith();
+    expect(screen.queryByTestId("receipt-cancel")).toBeNull();
+    expect((screen.getByTestId("stop-confirm").closest(".receipt-actions") as HTMLElement).dataset.count).toBe("2");
+    cleanup();
+
+    await mountWith({ canCancel: true }, session({ status: "stopped" }));
+    expect(screen.queryByTestId("receipt-cancel")).toBeNull();
+  });
+
+  test("asks first, cancels, and shows the server's result as a cancel — not a paid stop", async () => {
+    const onConfirmed = vi.fn();
+    repo.preview.mockResolvedValue(bill({ time_cost: 400, total: 700, items_total: 300 }));
+    repo.cancel.mockResolvedValue({ session: session({ status: "stopped" }), breakdown: bill({ time_cost: 400, total: 0, items_total: 300, is_free: true, is_cancelled: true }), cash: null });
+    await mountWith({ canCancel: true, onConfirmed });
+
+    await act(async () => { fireEvent.click(screen.getByTestId("receipt-cancel")); });
+
+    expect(asked.fn).toHaveBeenCalledTimes(1);
+    expect(String(asked.fn.mock.calls[0][0])).toBe("session.cancel.confirm");
+    expect(asked.fn.mock.calls[0][1]).toMatchObject({ destructive: true });
+    expect(repo.cancel).toHaveBeenCalledWith(1);
+    expect(repo.stop).not.toHaveBeenCalled();
+    expect(onConfirmed).toHaveBeenCalledWith({ cancelled: true });
+    expect(screen.getByText("session.cancel.done")).toBeTruthy();
+    expect(screen.getByText("session.cancel.bill")).toBeTruthy();
+    expect(screen.queryByTestId("stop-confirm")).toBeNull();
+  });
+
+  test("declined, nothing is sent and the seat stays running", async () => {
+    const onConfirmed = vi.fn();
+    repo.preview.mockResolvedValue(bill({ time_cost: 400, total: 400 }));
+    asked.fn.mockResolvedValue(false);
+    await mountWith({ canCancel: true, onConfirmed });
+
+    await act(async () => { fireEvent.click(screen.getByTestId("receipt-cancel")); });
+
+    expect(repo.cancel).not.toHaveBeenCalled();
+    expect(onConfirmed).not.toHaveBeenCalled();
+    expect(screen.getByTestId("stop-confirm")).toBeTruthy();
+  });
+
+  test("refused by the server: its sentence, and Stop still works", async () => {
+    repo.preview.mockResolvedValue(bill({ time_cost: 400, total: 400 }));
+    repo.cancel.mockRejectedValue(new Error("This session is no longer running, so it cannot be cancelled."));
+    await mountWith({ canCancel: true });
+
+    await act(async () => { fireEvent.click(screen.getByTestId("receipt-cancel")); });
+
+    expect(screen.getByText("This session is no longer running, so it cannot be cancelled.")).toBeTruthy();
+    expect((screen.getByTestId("stop-confirm") as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  test("the three buttons: keep playing left, cancel centre, confirm right, in one medium row (2026-11-07)", async () => {
+    repo.preview.mockResolvedValue(bill({ time_cost: 400, total: 400 }));
+    await mountWith({ canCancel: true });
+    const row = screen.getByTestId("stop-confirm").closest(".receipt-actions") as HTMLElement;
+    expect(row).not.toBeNull();
+    const buttons = Array.from(row.querySelectorAll("button"));
+    expect(buttons.map((b) => b.className.match(/receipt-actions__(\w+)/)?.[1])).toEqual(["keep", "cancel", "confirm"]);
+    expect(row.dataset.count).toBe("3");
+    expect(screen.getByTestId("receipt-cancel").className).toContain("is-danger");
+    expect(screen.getByTestId("receipt-cancel").textContent).toBe("session.cancel.button");
+  });
+
+  test("after its own stop the receipt is not read again — a manager is never told «no rights» over a stop that worked (2026-11-07)", async () => {
+    repo.preview.mockResolvedValue(bill({ time_cost: 400, total: 400 }));
+    repo.stop.mockResolvedValue({ breakdown: bill({ total: 400 }), cash: null });
+    const props = { onClose: () => {}, onConfirmed: () => {}, onItemRemoved: () => {}, canCancel: true };
+    let view: ReturnType<typeof render> | undefined;
+    await act(async () => { view = render(<StopReceiptModal session={session()} {...props} />); });
+    await act(async () => { fireEvent.click(screen.getByTestId("stop-confirm")); });
+    expect(repo.preview).toHaveBeenCalledTimes(1);
+
+    // The socket's `stopped` turns the board's copy to stopped; a manager's
+    // read of that closed receipt would be refused.
+    repo.preview.mockRejectedValue(Object.assign(new Error("У вас нет прав на это действие."), { status: 403 }));
+    await act(async () => { view!.rerender(<StopReceiptModal session={session({ status: "stopped" })} {...props} />); });
+
+    expect(repo.preview).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText("У вас нет прав на это действие.")).toBeNull();
+  });
+
+  test("ended at another desk: a refused read keeps the figures and says it ended elsewhere, no error", async () => {
+    repo.preview.mockResolvedValueOnce(bill({ time_cost: 400, total: 400 }));
+    repo.preview.mockRejectedValueOnce(Object.assign(new Error("У вас нет прав на это действие."), { status: 403 }));
+    const props = { onClose: () => {}, onConfirmed: () => {}, onItemRemoved: () => {} };
+    let view: ReturnType<typeof render> | undefined;
+    await act(async () => { view = render(<StopReceiptModal session={session()} {...props} />); });
+    await act(async () => { view!.rerender(<StopReceiptModal session={session({ status: "stopped" })} {...props} />); });
+
+    expect(repo.preview).toHaveBeenCalledTimes(2);
+    expect(screen.queryByText("У вас нет прав на это действие.")).toBeNull();
+    expect(screen.getByTestId("checkout-ended-elsewhere")).toBeTruthy();
+    expect(screen.getAllByText("400·AMD").length).toBeGreaterThan(0);
+  });
+
+  test("while the seat runs, a refused read is still shown", async () => {
+    repo.preview.mockRejectedValue(Object.assign(new Error("У вас нет прав на это действие."), { status: 403 }));
+    await mountWith({ canCancel: true });
+    expect(screen.getByText("У вас нет прав на это действие.")).toBeTruthy();
+  });
+
+  test("a plain stop still reports itself as not cancelled", async () => {
+    const onConfirmed = vi.fn();
+    repo.preview.mockResolvedValue(bill({ time_cost: 400, total: 400 }));
+    repo.stop.mockResolvedValue({ breakdown: bill({ total: 400 }), cash: null });
+    await mountWith({ canCancel: true, onConfirmed });
+
+    await act(async () => { fireEvent.click(screen.getByTestId("stop-confirm")); });
+
+    expect(repo.cancel).not.toHaveBeenCalled();
+    expect(onConfirmed).toHaveBeenCalledWith({ cancelled: false, unpaidAmount: null });
+    expect(screen.queryByText("session.cancel.done")).toBeNull();
+  });
+});
+
+
+/**
+ * Split payments and a seat that ended by itself (2026-11-07, owner): the
+ * parts add up to the bill with a note saying how; a seat nobody stopped at
+ * the till asks once how it was paid.
+ */
+describe("split payment and the payment of a seat that ended by itself", () => {
+  afterEach(cleanup);
+  beforeEach(() => {
+    repo.preview.mockReset().mockResolvedValue(bill({ total: 5000 }));
+    repo.stop.mockReset().mockResolvedValue({ session: session(), breakdown: bill({ total: 5000 }) });
+    repo.recordPayment.mockReset().mockResolvedValue({ session: session({ status: "expired", payment_method: "split" }), cash: null });
+  });
+  const boxes = () => screen.getAllByRole("textbox").filter((e) => e.tagName === "INPUT");
+  const splitInto = async (cash: string, card: string, note: string) => {
+    await act(async () => { fireEvent.click(screen.getByTestId("pay-split")); });
+    await act(async () => { fireEvent.change(boxes()[0], { target: { value: cash } }); });
+    await act(async () => { fireEvent.change(boxes()[1], { target: { value: card } }); });
+    await act(async () => { fireEvent.change(screen.getByTestId("pay-note"), { target: { value: note } }); });
+  };
+
+  test("a split stop sends the parts and the note, never the banknotes", async () => {
+    await mount();
+    await splitInto("2000", "3000", "3000 картой");
+    await act(async () => { fireEvent.click(screen.getByTestId("stop-confirm")); });
+    const body = repo.stop.mock.calls[0][1] as Record<string, unknown>;
+    expect(body).toMatchObject({ payments: [{ method: "cash", amount: 2000 }, { method: "card", amount: 3000 }], payment_note: "3000 картой" });
+    expect(body).not.toHaveProperty("payment_method");
+    expect(body).not.toHaveProperty("cash_received");
+  });
+
+  test("parts that do not add up never reach the server", async () => {
+    await mount();
+    await splitInto("2000", "2000", "x");
+    await act(async () => { fireEvent.click(screen.getByTestId("stop-confirm")); });
+    expect(repo.stop).not.toHaveBeenCalled();
+    expect(screen.getByText("pay.sumMismatch")).toBeTruthy();
+  });
+
+  test("an expired seat with no payment on record asks how it was paid, once", async () => {
+    await mount(session({ status: "expired", payment_method: null, payments: [] }));
+    expect(screen.getByTestId("pay-mark-note")).toBeTruthy();
+    await act(async () => { fireEvent.click(screen.getByTestId("pay-card")); });
+    await act(async () => { fireEvent.click(screen.getByTestId("pay-mark-confirm")); });
+    const [id, body] = repo.recordPayment.mock.calls[0] as [number, Record<string, unknown>];
+    expect(id).toBe(session().id);
+    expect(body).toMatchObject({ payment_method: "card" });
+    expect(typeof body.client_request_id).toBe("string");
+    expect(screen.getByTestId("pay-mark-done")).toBeTruthy();
+    expect(screen.queryByTestId("pay-mark-confirm")).toBeNull();
+  });
+
+  test("a refused mark keeps the form, and the retry is the same request", async () => {
+    repo.recordPayment.mockRejectedValueOnce(new Error("The shift is closed."));
+    await mount(session({ status: "expired", payment_method: null }));
+    await act(async () => { fireEvent.click(screen.getByTestId("pay-mark-confirm")); });
+    expect(screen.getByText("The shift is closed.")).toBeTruthy();
+    await act(async () => { fireEvent.click(screen.getByTestId("pay-mark-confirm")); });
+    const ids = repo.recordPayment.mock.calls.map((c) => (c[1] as { client_request_id: string }).client_request_id);
+    expect(ids[0]).toBe(ids[1]);
+  });
+
+  test("nothing is asked for a seat already paid, cancelled or free", async () => {
+    for (const s of [
+      session({ status: "expired", payment_method: "cash" }),
+      session({ status: "stopped", payment_method: null, cancelled_at: "2026-11-07T12:00:00Z" }),
+    ]) {
+      await mount(s);
+      expect(screen.queryByTestId("pay-mark-confirm")).toBeNull();
+      cleanup();
+    }
+    repo.preview.mockResolvedValue(bill({ total: 0, is_free: true }));
+    await mount(session({ status: "expired", payment_method: null }));
+    expect(screen.queryByTestId("pay-mark-confirm")).toBeNull();
   });
 });

@@ -176,3 +176,23 @@ describe("CardOverflow", () => {
     expect(onPause).not.toHaveBeenCalled();
   });
 });
+
+describe("a reservation later today (2026-11-08)", () => {
+  test("turns a free seat yellow: tone, frame and class", () => {
+    card({ seatState: "free", bookingAhead: true });
+    const el = document.querySelector(".place-cell") as HTMLElement;
+    expect(el.getAttribute("data-tone")).toBe("booked");
+    expect(el.classList.contains("session-card--booking-ahead")).toBe(true);
+    expect(el.style.getPropertyValue("--card-accent")).toBe("rgb(var(--status-booked-rgb))");
+  });
+
+  test("leaves a running, an offline or an already reserved seat its own colour", () => {
+    for (const [seatState, session] of [["busy", running(3_600_000)], ["offline", undefined], ["reserved", undefined]] as const) {
+      cleanup();
+      card({ seatState, session, bookingAhead: true });
+      const el = document.querySelector(".place-cell") as HTMLElement;
+      expect(el.classList.contains("session-card--booking-ahead"), seatState).toBe(false);
+    }
+  });
+});
+

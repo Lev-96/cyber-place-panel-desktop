@@ -16,6 +16,8 @@ export interface SessionChangedEvent {
     | "joystick.removed"
     | "time.added"
     | "unlimited"
+    | "limited"
+    | "unpaid.changed"
     | "free.changed"
     // The room's own extra went out and came back. Both are already broadcast
     // by `SessionChanged`; the board reloads on either, and leaving them out
@@ -42,6 +44,10 @@ export interface SessionChangedEvent {
   is_unlimited: boolean;
   joystick_count: number;
   ends_at: string | null;
+  /** Extra time not paid yet is on (2026-11-07); absent from an older backend. */
+  unpaid?: boolean;
+  /** On a `stopped`: what is owed for it (the server's figure); null when nothing was owed. */
+  unpaid_amount?: number | null;
   at: string;
 }
 

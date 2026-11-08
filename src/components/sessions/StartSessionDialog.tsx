@@ -4,6 +4,7 @@ import Radio from "@/components/ui/Radio";
 import Button from "@/components/ui/Button";
 import Modal from "@/components/ui/Modal";
 import Checkbox from "@/components/ui/Checkbox";
+import Switch from "@/components/ui/Switch";
 import PriceInput from "@/components/ui/PriceInput";
 import Input from "@/components/ui/Input";
 import Spinner from "@/components/ui/Spinner";
@@ -26,21 +27,44 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { IStartQuote } from "@/api/sessions";
 import SectionTabs from "@/components/ui/SectionTabs";
 import ClockTimeField from "./ClockTimeField";
-import DurationPicker from "./DurationPicker";
+import DurationInput from "./DurationInput";
 import QuotedPrice from "./QuotedPrice";
-import { clockOf, minutesOf, type DurationUnit } from "./durationModel";
+import { EMPTY_DRAFT, clockOfDraft, draftMinutes, isDraftEmpty, type ClockDraft, type DurationDraft } from "./durationModel";
+import { useHiddenParts } from "@/hooks/useHiddenParts";
+import UnpaidToggle from "./UnpaidToggle";
 import { useMinuteTick } from "./useMinuteTick";
 import { quoteFor, useServerQuote } from "./useServerQuote";
+import { seatUnavailableBodyOf } from "@/api/seatUnavailable";
+import { durationLabel } from "@/utils/durationLabel";
+import StartBookingChoice, { type StartChoice } from "./StartBookingChoice";
+import { useStartOptions } from "./useStartOptions";
 
 interface Props {
   branchId: number;
   pc: IPcApi;
   onClose: () => void;
   onStarted: () => void;
+  /**
+   * A reservation picked BEFORE the dialog opened (2026-11-07: «Старт» on a
+   * booking in the calendar) — preselected in «Кто садится?». Never assumed
+   * from a reserved card: the cashier says who sits down. The server checks
+   * the reservation is this seat's and near, confirms it, and finishes it
+   * when the session ends.
+   */
+  bookingId?: number;
 }
 
 type Mode = "fixed" | "open";
 type PlanLimit = "duration" | "until";
+
+/**
+ * The optional parts a person may hide from this dialog (2026-11-05, owner),
+ * each put back to its default while hidden: a free start, a price changed
+ * for this start, a planned length, a total changed by hand.
+ */
+const OPTIONAL_PARTS = ["free", "rate", "plan", "total"] as const;
+type OptionalPart = (typeof OPTIONAL_PARTS)[number];
+export const startDialogKey = (userId: number) => `u${userId}:cp.ui.start-dialog`;
 
 /**
  * Start-a-session dialog.
@@ -60,7 +84,7 @@ type PlanLimit = "duration" | "until";
  * disabled with a clear message — pricing is an owner/admin task,
  * not something the cashier should be making up at the till.
  */
-const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
+const StartSessionDialog = ({ branchId, pc, onClose, onStarted, bookingId }: Props) => {
   const { t, money, lang } = useLang();
   const { user } = useAuth();
   // Waiving a bill is the company's decision, so the control is only drawn for
@@ -86,6 +110,32 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
   const psnName = askPsn ? psn.trim() : "";
   const psnValid = psnName === "" || PSN_ONLINE_ID.test(psnName);
   const psnField = psnName !== "" ? { psn_online_id: psnName } : {};
+  // Who sits down (2026-11-07, owner): a reservation's player, or somebody
+  // else. Asked whenever the seat has reservations a start may fulfil; a
+  // stranger never finishes someone's reservation again by default.
+  const [choice, setChoice] = useState<StartChoice | null>(bookingId ?? null);
+  const chosenBooking = typeof choice === "number" ? choice : undefined;
+  const { options, loaded: optionsLoaded, reload: reloadOptions } = useStartOptions(pc.id, chosenBooking);
+  const claimable = options?.claimable_bookings ?? [];
+  // A reservation that is no longer one this start may take (cancelled,
+  // moved, too far ahead): the choice is asked again, not kept.
+  useEffect(() => {
+    if (options && typeof choice === "number" && !claimable.some((b) => b.id === choice)) setChoice(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [options]);
+  const effectiveChoice: StartChoice | null = claimable.length === 0 ? "walkin" : choice;
+  const bookingField = typeof effectiveChoice === "number" ? { booking_id: effectiveChoice } : {};
+  // How long this start may run before a reservation: the SERVER's minutes
+  // (null = nothing ahead). 0 = a reservation holds the seat now.
+  const cap = options?.max_minutes ?? null;
+  const capped = cap !== null;
+  const freeUntil = options?.free_until ? new Date(options.free_until) : null;
+  const freeUntilLabel = freeUntil
+    ? `${String(freeUntil.getHours()).padStart(2, "0")}:${String(freeUntil.getMinutes()).padStart(2, "0")}`
+    : null;
+  // «Не оплачено» (2026-11-07, owner): here and in «+ Время», never on the
+  // card. Only on a seat that bills: a free one owes nothing.
+  const [unpaid, setUnpaid] = useState(false);
   const psnSuggestions = useMemo(() => (askPsn ? recentPsnNames() : []), [askPsn]);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<LocalizedText | null>(null);
@@ -101,16 +151,44 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
   // session is not "a price of zero", it is a session whose bill nobody pays,
   // and the two behave differently the moment a drink is added to it.
   const [isFree, setIsFree] = useState(false);
-  // The optional planned length (2026-10-25), hours by default, empty = none.
-  const [plan, setPlan] = useState<{ unit: DurationUnit; amount: string }>({ unit: "hours", amount: "" });
+  // The optional planned length (2026-10-25), in a time-style hours : minutes
+  // field (2026-11-05), empty = none.
+  const [planDraft, setPlanDraft] = useState<DurationDraft>(EMPTY_DRAFT);
   // …or "until" a clock time (2026-10-26). Two ways to set ONE plan, never
   // both: only the way chosen is read and sent. Switching keeps what was
   // typed in the other, so a slip of the tab loses nothing.
   const [limit, setLimit] = useState<PlanLimit>("duration");
-  const [untilInput, setUntilInput] = useState("");
+  const [untilDraft, setUntilDraft] = useState<ClockDraft>(EMPTY_DRAFT);
   // The plan's TOTAL set by hand (2026-10-25), in AMD as `PriceInput` keeps it.
   const [editTotal, setEditTotal] = useState(false);
   const [totalInput, setTotalInput] = useState("");
+
+  // What this person has hidden here, and each hidden part at its default:
+  // nothing out of sight changes what Start does.
+  const parts = useHiddenParts<OptionalPart>(user ? startDialogKey(user.id) : null, OPTIONAL_PARTS);
+  const { isShown } = parts;
+  // A seat with a reservation ahead needs an end: the plan is shown even to
+  // someone who hid it (2026-11-07), and a free start (always open) is not.
+  const showPlan = isShown("plan") || capped;
+  const [customizing, setCustomizing] = useState(false);
+  useEffect(() => {
+    if (!isShown("free") || capped) setIsFree(false);
+    if (!isShown("rate")) { setEditPrice(false); setRateSaved(false); setCustomRate(""); }
+    if (!showPlan) { setPlanDraft(EMPTY_DRAFT); setUntilDraft(EMPTY_DRAFT); setLimit("duration"); }
+    if (!showPlan || !isShown("total")) { setEditTotal(false); setTotalInput(""); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isShown, capped]);
+  const customizable = OPTIONAL_PARTS.filter((id) => id !== "free" || mayWaive);
+  const partLabel: Record<OptionalPart, string> = {
+    free: t("session.freeBill"),
+    rate: t("session.editPrice"),
+    plan: t("session.planLimitDuration"),
+    total: t("session.plannedEditTotal"),
+  };
+  // A seat with no tariff it could be sold is started by the hour, and the
+  // choice is not drawn. A list that could not be read keeps it (its error
+  // and Retry are under the package tab).
+  const offerPackages = !(packages !== null && packages.length === 0);
 
   // A failed read is kept as such: the dialog used to wait on it for ever (no
   // catch), and "no packages" would be a lie. Open mode still works without it.
@@ -125,6 +203,9 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
         const p = all.filter((pkg) => packageFitsSeat(pkg, pc.place?.platform));
         setPackages(p);
         setPkgId(p[0]?.id ?? null);
+        // No tariff this seat could be sold (2026-11-05, owner): the package
+        // choice is not offered at all, and the start is by the hour.
+        if (p.length === 0) setMode("open");
       })
       .catch((e: unknown) => setPkgError(e));
   }, [branchId, pc.place?.platform]);
@@ -185,11 +266,11 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
 
   // Prefill the override input with the current rate the moment it's enabled,
   // so the operator edits "the current price" rather than a blank field.
-  const planMinutes = limit === "duration" ? minutesOf(plan.amount, plan.unit) : null;
-  const planUntil = limit === "until" ? clockOf(untilInput) : null;
+  const planMinutes = limit === "duration" ? draftMinutes(planDraft) : null;
+  const planUntil = limit === "until" ? clockOfDraft(untilDraft) : null;
   // What the plan is, in the form the server takes: minutes, or "HH:mm".
   const planInput: number | string | null = planMinutes ?? planUntil;
-  const planTyped = limit === "duration" ? plan.amount.trim() !== "" : untilInput.trim() !== "";
+  const planTyped = limit === "duration" ? !isDraftEmpty(planDraft) : !isDraftEmpty(untilDraft);
   // Typed but unreadable is not "no plan": the Start waits for a fix rather
   // than quietly starting a seat with no end.
   const planInvalid = planTyped && planInput === null;
@@ -259,6 +340,7 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
           user_display_name: pc.label,
           is_free: true,
           ...psnField,
+          ...bookingField,
         });
         if (psnName !== "") rememberPsnName(psnName);
         onStarted();
@@ -273,6 +355,8 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
           time_package_id: pkgId,
           user_display_name: pc.label,
           ...psnField,
+          ...bookingField,
+          ...(unpaid ? { unpaid: true } : {}),
         });
       } else {
         if (effectiveRate === null) {
@@ -294,6 +378,8 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
           ...(planUntil !== null ? { until: planUntil } : {}),
           ...(planByHand ? { planned_amount: typedTotal } : {}),
           ...psnField,
+          ...bookingField,
+          ...(unpaid ? { unpaid: true } : {}),
         });
       }
       if (psnName !== "") rememberPsnName(psnName);
@@ -304,6 +390,9 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
       setErr(packageMismatchOf(e)
         ? textKey("session.errors.packagePlatformMismatch")
         : e instanceof Error ? textLiteral(e.message) : textKey("action.failed"));
+      // A reservation in the way (2026-11-07): the server's sentence stays,
+      // and its advice is read again so the limits on screen are its own.
+      if (seatUnavailableBodyOf(e) !== null) reloadOptions();
     } finally { setBusy(false); }
   };
 
@@ -322,18 +411,66 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
   // because the venue never configured a tariff for that seat would block the
   // exact case free is for: a demo stand, a tournament machine, a seat given
   // back after an outage. The server lifts the same refusal for the same reason.
+  // A start the server would refuse for a reservation ahead (2026-11-07):
+  // the seat taken now, a free or open start with no end, a package or a
+  // plan running into it. The server is still the judge.
+  const selectedPkg = packages?.find((p) => p.id === pkgId) ?? null;
+  const startBeyondReservation = capped && (
+    cap === 0
+    || isFree
+    || (mode === "fixed" && (selectedPkg === null || selectedPkg.duration_minutes > (cap ?? 0)))
+    // The plan's length is the server's quote (a length typed, or "until"
+    // resolved on its clock); until it answers the start waits anyway.
+    || (mode === "open" && (planInput === null || (quotedPlan !== null && quotedPlan.minutes > (cap ?? 0))))
+  );
   const startDisabled =
     busy || deviceOffline || !psnValid
     // A total set by hand prices the seat itself, so no seat rate is needed.
     || (!isFree && mode === "open" && !planByHand && (editPrice ? !overrideApplied : assignedRate === null))
     // A plan is started only on the server's own figure for it.
     || (planApplies && (planInvalid || (planInput !== null && !planPriced)))
-    || (planApplies && planInput !== null && editTotal && !totalValid);
+    || (planApplies && planInput !== null && editTotal && !totalValid)
+    // Who sits down is said, not guessed, and the seat's limits are known.
+    || !optionsLoaded || effectiveChoice === null
+    || startBeyondReservation;
 
   return (
     <Modal open onClose={onClose}>
-      <div className="card" style={{ width: 460, maxWidth: "90vw", display: "flex", flexDirection: "column", gap: 14 }}>
-        <h2 style={{ margin: 0 }}>{t("session.start")} · №{pc.place?.number ?? pc.label}{playStation ? " (PS)" : ""}</h2>
+      <div className="card start-dialog">
+        <div className="start-dialog__head">
+          <h2 style={{ margin: 0 }}>{t("session.start")} · №{pc.place?.number ?? pc.label}{playStation ? " (PS)" : ""}</h2>
+          <Button type="button" variant="secondary" className="outline-btn start-dialog__customize-toggle"
+            aria-expanded={customizing} onClick={() => setCustomizing((v) => !v)} data-testid="start-customize">
+            {customizing ? t("action.close") : t("session.customize")}
+          </Button>
+        </div>
+        {customizing && (
+          <div className="start-dialog__customize" data-testid="start-customize-panel">
+            <span className="muted start-dialog__note">{t("session.customizeHint")}</span>
+            {customizable.map((id) => (
+              <Switch key={id} checked={isShown(id)} onChange={(on) => parts.setShown(id, on)}
+                label={partLabel[id]} testId={`start-part-${id}`} />
+            ))}
+          </div>
+        )}
+        {claimable.length > 0 && (
+          <StartBookingChoice
+            bookings={claimable}
+            value={choice}
+            onChange={setChoice}
+            walkInUntil={freeUntilLabel}
+            disabled={busy}
+          />
+        )}
+        {/* How long this start may run (2026-11-07): the server's answer for
+            the choice above. Shown only when a reservation is ahead. */}
+        {capped && (
+          <div className="start-free-until" data-testid="start-free-until" role="status">
+            {cap === 0
+              ? t("start.seatTakenNow")
+              : <>{fmt(t("start.freeUntil"), freeUntilLabel ?? "")} <strong>{durationLabel(cap ?? 0, t)}</strong>. {t("start.freeUntilHint")}</>}
+          </div>
+        )}
         {!packages && !pkgError ? <ListSkeleton rows={3} /> : (
           <>
             {/* Free sits ABOVE the tariff, and turning it on takes the tariff
@@ -345,7 +482,7 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
                 never going to be charged. Every control below answers "what
                 does this cost", and for a waived session that question has one
                 answer, so the honest form is the one that stops asking it. */}
-            {mayWaive && (
+            {mayWaive && isShown("free") && !capped && (
               <div className="col" style={{ gap: 4 }}>
                 <Checkbox checked={isFree} onChange={setIsFree} label={t("session.freeBill")} />
                 {isFree && (
@@ -357,7 +494,20 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
             )}
 
             {!isFree && (
-            <div className="row" style={{ gap: 8 }}>
+              <div className="col" style={{ gap: 4 }} data-testid="start-unpaid">
+                <UnpaidToggle
+                  on={unpaid}
+                  onChange={setUnpaid}
+                  disabled={busy}
+                  label={t("session.unpaid.switch")}
+                  fullLabel={t("session.unpaid.switchFull")}
+                />
+                {unpaid && <span className="muted" style={{ fontSize: 11 }}>{t("session.unpaid.startHint")}</span>}
+              </div>
+            )}
+
+            {!isFree && offerPackages && (
+            <div className="row" style={{ gap: 8 }} data-testid="start-mode">
               {/* A PlayStation may be sold a package too.
 
                   This tab was DISABLED for PS on the grounds that count-up is
@@ -390,19 +540,24 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
                   <StateView variant="empty" size="compact" titleKey="session.noPackages" descriptionKey={null} />
                 ) : (
                   <div className="col" style={{ gap: 6 }}>
-                    {packages.map((p) => (
-                      <label key={p.id} style={pkgRow(p.id === pkgId)}>
-                        <input type="radio" name="pkg" value={p.id} checked={p.id === pkgId} onChange={() => setPkgId(p.id)} />
+                    {packages.map((p) => {
+                      // Longer than the seat is free: not offered (the server would refuse it).
+                      const tooLong = cap !== null && p.duration_minutes > cap;
+                      return (
+                      <label key={p.id} style={{ ...pkgRow(p.id === pkgId), ...(tooLong ? { opacity: 0.45 } : {}) }}
+                        data-testid={`pkg-${p.id}`} title={tooLong ? t("start.packageTooLong") : undefined}>
+                        <input type="radio" name="pkg" value={p.id} checked={p.id === pkgId} disabled={tooLong} onChange={() => setPkgId(p.id)} />
                         <span style={{ flex: 1 }}>{timePackageNameOf(p, lang)}</span>
                         <span className="muted">{p.duration_minutes} {t("time.minShort") || "min"}</span>
                         <span style={{ fontWeight: 700 }}>{money(Number(p.price))}</span>
                       </label>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>
             ) : (
-              <div className="col" style={{ gap: 10 }}>
+              <div className="col start-dialog__open">
                 <AssignedRateDisplay
                   rate={effectiveRate}
                   hourSuffix={t("time.hourShort") || "h"}
@@ -410,8 +565,10 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
                   rateLabel={t("session.hourlyRate")}
                   money={money}
                 />
+                {isShown("rate") && (
                 <Checkbox checked={editPrice} onChange={toggleEditPrice} label={t("session.editPrice")} />
-                {editPrice && (
+                )}
+                {isShown("rate") && editPrice && (
                   <div className="col" style={{ gap: 6 }}>
                     <div className="row" style={{ gap: 8, alignItems: "flex-end" }}>
                       <div style={{ flex: 1 }}>
@@ -444,7 +601,8 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
                     seat with an end, prices it at the rate above (its own
                     `start-quote`, the chain the start itself runs), and the
                     card gets "+ Время". Billed by the clock either way. */}
-                <section className="col" style={{ gap: 8 }} data-testid="planned-duration">
+                {showPlan && (
+                <section className="col start-dialog__plan" data-testid="planned-duration">
                   <span className="label">{t("session.plannedDuration")}</span>
                   <SectionTabs
                     label={t("session.planLimit")}
@@ -457,23 +615,24 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
                     onChange={setLimit}
                   />
                   {limit === "duration" ? (
-                    <DurationPicker
-                      unit={plan.unit}
-                      amount={plan.amount}
-                      onChange={setPlan}
+                    <DurationInput
+                      value={planDraft}
+                      onChange={setPlanDraft}
                       disabled={busy}
                       label={t("session.plannedDuration")}
+                      testId="planned-duration-input"
                     />
                   ) : (
                     <ClockTimeField
-                      value={untilInput}
-                      onChange={setUntilInput}
+                      value={untilDraft}
+                      onChange={setUntilDraft}
                       disabled={busy}
                       quote={quotedPlan}
                     />
                   )}
                   {planInput === null && !planTyped ? (
-                    <span className="muted" style={{ fontSize: 11 }}>{t("session.plannedNone")}</span>
+                    // "Until" says how to type it in its own line; one line under a field.
+                    limit === "duration" ? <span className="muted" style={{ fontSize: 11 }}>{t("session.plannedNone")}</span> : null
                   ) : (
                     <>
                       <QuotedPrice
@@ -493,6 +652,7 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
                       {/* The total, editable (2026-10-25): a price agreed at
                           the counter for this length. Kept exactly by the
                           server; the full time bills exactly this. */}
+                      {isShown("total") && (
                       <Checkbox
                         checked={editTotal}
                         onChange={(next) => {
@@ -502,7 +662,8 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
                         label={t("session.plannedEditTotal")}
                         disabled={busy || planInput === null}
                       />
-                      {editTotal && (
+                      )}
+                      {isShown("total") && editTotal && (
                         <div className="col" style={{ gap: 4 }} data-testid="planned-total">
                           <PriceInput
                             label={t("session.plannedTotal")}
@@ -517,6 +678,7 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted }: Props) => {
                     </>
                   )}
                 </section>
+                )}
               </div>
             ))}
 

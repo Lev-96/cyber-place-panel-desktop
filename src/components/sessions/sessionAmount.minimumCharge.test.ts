@@ -94,14 +94,14 @@ describe("on a running session", () => {
     expect(sessionMinimumChargeAt(s, AT).applied).toBe(false);
   });
 
-  test("after a move to a 4000/h seat the top-up runs at the CURRENT rate (backend: 3800)", () => {
+  test("after a move to a 4000/h seat the hour is that seat's hour, exactly (backend: 4000)", () => {
     const s = session({
       min_charge: RULE,
       hourly_rate: 4000,
       rate_changed_at: ago(13),
       amount_before_rate_change: 600,
     });
-    expect(sessionTimeCostAt(s, AT)).toBe(3800);
+    expect(sessionTimeCostAt(s, AT)).toBe(4000);
   });
 
   test("paused time does not count towards the threshold (backend: 950 at 19 played)", () => {
@@ -111,5 +111,88 @@ describe("on a running session", () => {
       pauses: [{ paused_at: ago(34), resumed_at: ago(4) }],
     } as Partial<ISessionApi>);
     expect(sessionTimeCostAt(s, AT)).toBe(950);
+  });
+});
+
+/**
+ * The hour is the CURRENT seat's hour, exactly (2026-11-07, owner: "1498 must
+ * be 1500, 998 must be 1000") — the backend's own figures
+ * (VipMinimumChargeTest): 25 min on the 4000/h seat, moved to 3000/h. Inside
+ * the hour the tile shows that seat's hour; past it the clock from the instant
+ * the visit reached the hour — never 3001, 3002… early.
+ */
+describe("the hour is the current seat's, and covers the whole visit", () => {
+  const moved = (playedMinutes: number, over: Partial<ISessionApi> = {}) => session({
+    started_at: ago(playedMinutes),
+    min_charge: RULE,
+    hourly_rate: 3000,
+    rate_changed_at: ago(playedMinutes - 25),
+    amount_before_rate_change: 1666.67,
+    ...over,
+  });
+
+  test("inside the hour: exactly the new seat's hour (backend: 3000)", () => {
+    expect(sessionTimeCostAt(moved(35), AT)).toBe(3000);
+    expect(sessionTimeCostAt(moved(60), AT)).toBe(3000);
+    expect(sessionMinimumChargeAt(moved(35), AT).applied).toBe(true);
+  });
+
+  test("one second past the hour, by the second at the seat (backend: 3000.83)", () => {
+    const s = session({
+      started_at: new Date(AT - 3601_000).toISOString(),
+      min_charge: RULE,
+      hourly_rate: 3000,
+      rate_changed_at: new Date(AT - 2101_000).toISOString(),
+      amount_before_rate_change: 1666.67,
+    });
+    expect(sessionTimeCostAt(s, AT)).toBe(3000.83);
+  });
+
+  test("past the hour: the hour plus the seat's minutes beyond it (backend: 3750)", () => {
+    expect(sessionTimeCostAt(moved(75), AT)).toBe(3750);
+  });
+
+  test("the owner's prices: hall 1000 → VIP 1500 after 14 s reads 1500, VIP → hall reads 1000 (backend: exact)", () => {
+    const rule = { after_minutes: 10, minimum_minutes: 60, mode: "minimum" as const };
+    const at15 = (from: number, to: number) => session({
+      started_at: ago(30),
+      min_charge: rule,
+      hourly_rate: to,
+      rate_changed_at: new Date(AT - 30 * 60_000 + 14_000).toISOString(),
+      amount_before_rate_change: Math.round(from * 14 / 3600 * 100) / 100,
+    });
+    expect(sessionTimeCostAt(at15(1000, 1500), AT)).toBe(1500);
+    expect(sessionTimeCostAt(at15(1500, 1000), AT)).toBe(1000);
+  });
+
+  test("a pause inside the hour moves its end (backend: 3000 at 60 played, 3500 at 70)", () => {
+    const rule = { after_minutes: 10, minimum_minutes: 60, mode: "minimum" as const };
+    const paused = (total: number) => session({
+      started_at: ago(total),
+      min_charge: rule,
+      hourly_rate: 3000,
+      pauses: [{ paused_at: ago(total - 15), resumed_at: ago(total - 25) }],
+    } as Partial<ISessionApi>);
+    expect(sessionTimeCostAt(paused(70), AT)).toBe(3000);
+    expect(sessionTimeCostAt(paused(80), AT)).toBe(3500);
+  });
+
+  test("pinned past the hour by a later move: its total, then the clock on from the pin", () => {
+    // Pinned at 80 min played for 4500 (what the visit owed then), the clock
+    // frozen there at 3800; then 10 min at 4000/h → 4500 + 666.67. Without the
+    // pin the seat's hour would be read afresh: 4000 + 666.67.
+    const s = session({
+      started_at: ago(90),
+      min_charge: { ...RULE, settled_amount: 700, settled_billed_minutes: 80, settled_total: 4500, settled_seconds: 4800 },
+      hourly_rate: 4000,
+      rate_changed_at: ago(10),
+      amount_before_rate_change: 3800,
+    });
+    expect(sessionTimeCostAt(s, AT)).toBe(5166.67);
+  });
+
+  test("settled before 2026-11-07 (no total): read the old way, the clock plus the top-up (backend: 4500)", () => {
+    const s = moved(35, { min_charge: { ...RULE, settled_amount: 2333.33, settled_billed_minutes: 60 } });
+    expect(sessionTimeCostAt(s, AT)).toBe(4500);
   });
 });

@@ -100,3 +100,17 @@ describe("figures never run together", () => {
     expect(screen.getByTestId("shift-duration").textContent).toContain("16 time.hourShort 0 time.minShort");
   });
 });
+
+/** Report v4 (2026-11-07): a line paid in parts says each part. */
+describe("a split line in the shift", () => {
+  test("says each part; an older line its one method", () => {
+    const v4: IShiftReport = { ...v2, lines: { ...v2.lines!, places: [
+      { ...v2.lines!.places[0], id: 8, method: "split", payments: [{ method: "cash", amount: "400.00" }, { method: "card", amount: "600.00" }] },
+      v2.lines!.places[0],
+    ] } };
+    render(<ShiftReportView shift={shift} report={v4} />);
+    const text = screen.getByTestId("shift-lines").textContent ?? "";
+    expect(text).toContain("pay.splitSummary: session.payCash");
+    expect(text).toContain("session.payCard");
+  });
+});

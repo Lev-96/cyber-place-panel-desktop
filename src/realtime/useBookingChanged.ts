@@ -17,7 +17,8 @@ export interface BookingChangedEvent {
    * overlay). Distinct kind so historical reports and toasts can
    * tell "no-show / aborted" from "fully played out" apart.
    */
-  kind: "created" | "extended" | "cancelled" | "confirmed" | "finished";
+  /** `updated` (2026-11-07): staff moved or edited their own reservation. */
+  kind: "created" | "extended" | "cancelled" | "confirmed" | "finished" | "updated";
   booking_id: number;
   branch_id: number;
   company_id: number;
@@ -38,6 +39,12 @@ export interface BookingChangedEvent {
   guest_last_name?: string | null;
   company_name?: string | null;
   branch_address?: string | null;
+  /**
+   * Made by staff from the board (2026-11-07): a seat reserved by phone. The
+   * desk that made it already said «Забронировано»; no corner toast, no
+   * sound, no OS notification for it anywhere. Absent on an older backend.
+   */
+  by_staff?: boolean;
   at: string;
 }
 

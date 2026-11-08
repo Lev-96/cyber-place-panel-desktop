@@ -88,7 +88,16 @@ const SessionHistoryTimeline = ({ events, startedAt, error, onRetry }: Props) =>
               </div>
               <div className="hs-event__body">
                 <span className="hs-event__title">{p.title}</span>
-                {e.amount !== null && p.showAmount && <span className="hs-event__amount">{money(e.amount)}</span>}
+                {e.amount !== null && p.showAmount && (
+                  // Signed and coloured by what it is, so an action and a total
+                  // never read alike: "+300", "−400", "Итог: 550".
+                  <span className={`hs-event__amount hs-amount--${p.amountKind}`} data-kind={p.amountKind}>
+                    {p.amountKind === "charge" ? `+${money(e.amount)}`
+                      : p.amountKind === "waive" ? `−${money(e.amount)}`
+                      : p.amountKind === "total" ? `${t("history.total")}: ${money(e.amount)}`
+                      : money(e.amount)}
+                  </span>
+                )}
                 {/* The account may since have been deleted; the fact still
                     happened, so a nameless event is shown rather than hidden. */}
                 {p.actor !== null && <span className="hs-event__actor">{p.actor}</span>}

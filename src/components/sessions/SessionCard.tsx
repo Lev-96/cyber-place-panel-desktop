@@ -7,6 +7,7 @@ import type { StatusTone } from "@/domain/statusTone";
 import { StatusIcon } from "@/components/ui/StatusChip";
 import { SessionUrgency, useSessionUrgency } from "./sessionUrgency";
 import type { DropSide } from "@/utils/reorder";
+import ActionIcon, { type ActionIconId } from "./ActionIcon";
 
 interface Props {
   /** The running session on this seat, or undefined for a free one. */
@@ -21,6 +22,13 @@ interface Props {
    * it: an offline device gets a dashed frame, a free seat a readable status.
    */
   seatState: SessionCellState;
+  /**
+   * A reservation later today on a seat that is free now (2026-11-08,
+   * owner): the card takes the reservation yellow — frame, stripe and icon —
+   * while the seat itself stays free and startable. Ignored on a running,
+   * reserved or offline seat, which keep their own colour.
+   */
+  bookingAhead?: boolean;
   /**
    * The word for the seat's state (2026-10-27), shown as the tooltip and the
    * accessible name of the state icon in the corner. The board passes its
@@ -71,13 +79,14 @@ export const accentOf = (tone: StatusTone): string =>
  * `.place-cell` itself is shared with the places and live boards.
  */
 const SessionCard = ({
-  session, baseColor, seatState, stateLabel, dragging = false, dropSide = null, onDragOver, onDrop, children,
+  session, baseColor, seatState, bookingAhead = false, stateLabel, dragging = false, dropSide = null, onDragOver, onDrop, children,
 }: Props) => {
   const urgency = useSessionUrgency(session);
-  const tone = seatTone(Boolean(session), urgency, seatState);
+  const ahead = bookingAhead && !session && seatState === "free";
+  const tone = ahead ? "booked" : seatTone(Boolean(session), urgency, seatState);
   // An urgent seat's frame is its urgency; otherwise the seat's own colour.
   const urgent = session ? urgencyTone(urgency) : null;
-  const accent = urgent ? accentOf(urgent) : baseColor;
+  const accent = urgent ? accentOf(urgent) : ahead ? accentOf("booked") : baseColor;
   const label = stateLabel?.(tone);
 
   const className = [
@@ -86,6 +95,7 @@ const SessionCard = ({
     session ? "session-card--running" : "session-card--idle",
     urgency && urgency !== "none" && urgency !== "normal" ? `session-card--${urgency}` : "",
     `session-card--seat-${seatState}`,
+    ahead ? "session-card--booking-ahead" : "",
     dragging ? "is-dragging" : "",
     dropSide ? `is-drop-${dropSide}` : "",
   ].filter(Boolean).join(" ");
@@ -128,13 +138,19 @@ interface ActionProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, "chi
   danger?: boolean;
   /** Spans the whole row, like Stop (e.g. «Пересадить»). */
   wide?: boolean;
+  /**
+   * The picture a list row too narrow for the words shows in their place
+   * (2026-11-03). Drawn hidden; CSS shows it only then, so a card or a row
+   * with room looks exactly as without it.
+   */
+  icon?: ActionIconId;
 }
 
 /**
  * One button in a card's action grid. Every action on a session card goes
  * through this, which is what keeps them one height, one line and one style.
  */
-export const SessionCardAction = ({ label, fullLabel, danger = false, wide = false, className, ...rest }: ActionProps) => (
+export const SessionCardAction = ({ label, fullLabel, danger = false, wide = false, icon, className, ...rest }: ActionProps) => (
   <Button
     variant="secondary"
     {...rest}
@@ -147,7 +163,43 @@ export const SessionCardAction = ({ label, fullLabel, danger = false, wide = fal
       className ?? "",
     ].filter(Boolean).join(" ")}
   >
-    {label}
+    {icon ? (
+      <>
+        <ActionIcon id={icon} />
+        <span className="session-card__btn-text">{label}</span>
+      </>
+    ) : label}
+  </Button>
+);
+
+interface FootProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, "children" | "title" | "aria-label"> {
+  /** The word on the button. */
+  label: string;
+  /** Its tooltip and accessible name; the word when not given. */
+  fullLabel?: string;
+  icon: ActionIconId;
+  variant?: "primary" | "secondary";
+  /** A tooltip that says why, when it is not just the name (an offline seat's Start). */
+  hint?: string;
+}
+
+/**
+ * A button at the foot of a seat with no session — Start, «Забронировать»,
+ * «Отменить бронь» (2026-11-07). Words by default; the person's «Подписи
+ * кнопок» = «Иконки» shows the picture instead (CSS, `data-button-labels`),
+ * the name staying its tooltip and accessible name. «Авто» keeps the words
+ * here: a free seat's row is short, and Start is the word a cashier looks for.
+ */
+export const CardFootAction = ({ label, fullLabel, icon, variant = "primary", hint, className, ...rest }: FootProps) => (
+  <Button
+    variant={variant}
+    {...rest}
+    title={hint ?? fullLabel ?? label}
+    aria-label={fullLabel ?? label}
+    className={["session-card__foot-btn", className ?? ""].filter(Boolean).join(" ")}
+  >
+    <ActionIcon id={icon} />
+    <span className="session-card__btn-text">{label}</span>
   </Button>
 );
 
@@ -199,7 +251,8 @@ export const CardOverflow = ({ collapsed, label, children }: OverflowProps) => {
         data-action="more"
         onClick={() => setOpen((v) => !v)}
       >
-        {label} ▾
+        <ActionIcon id="more" />
+        <span className="session-card__btn-text">{label} ▾</span>
       </Button>
       {open && (
         // A click on any action inside closes the menu after it has run.

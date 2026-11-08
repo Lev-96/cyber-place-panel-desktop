@@ -37,6 +37,7 @@ vi.mock("@/repositories/ProductRepository", () => ({
 vi.mock("@/components/products/ProductForm", () => ({ default: () => null }));
 vi.mock("@/i18n/LanguageContext", () => ({
   useLang: () => ({
+    currency: "AMD",
     t: (k: string) => (k === "till.sold" ? "sold: {0}" : k),
     money: (n: number) => String(n),
     lang: "en",
@@ -55,18 +56,28 @@ const PRODUCTS = [
 const onClose = vi.fn();
 const onSold = vi.fn();
 
-const mount = async () => {
+/** Opens the till. It opens on typing (2026-11-07); `{ onList: true }` puts it on the list. */
+const mount = async ({ onList = true } = {}) => {
   await act(async () => {
     render(<SellProductsDialog branchId={7} onClose={onClose} onSold={onSold} />);
   });
+  const list = screen.queryByLabelText("session.addModePicker");
+  if (onList && list) await act(async () => { fireEvent.click(list); });
 };
 const add = async (name: string) => {
   await act(async () => { fireEvent.click(screen.getByLabelText(`action.add: ${name}`)); });
 };
 const sellButton = () => screen.getByText("till.sellConfirm").closest("button") as HTMLButtonElement;
 const sell = async () => { await act(async () => { fireEvent.click(sellButton()); }); };
+test("the till opens on typing too, the first choice (2026-11-07)", async () => {
+  await mount({ onList: false });
+  expect((screen.getByLabelText("session.addModeText") as HTMLInputElement).checked).toBe(true);
+  expect(screen.getByLabelText("session.quickEntry")).toBeTruthy();
+});
+
+// The payment control's methods are radio buttons named by their word (PaymentEditor).
 const choose = async (label: string) => {
-  await act(async () => { fireEvent.click(screen.getByLabelText(label)); });
+  await act(async () => { fireEvent.click(screen.getByRole("radio", { name: label })); });
 };
 
 afterEach(() => cleanup());
@@ -146,6 +157,26 @@ describe("paid the way a session is", () => {
     await sell();
 
     expect(repo.create.mock.calls[0][0]).toMatchObject({ payment_method: "other", payment_method_other: "Idram" });
+  });
+});
+
+describe("split at the till (2026-11-07)", () => {
+  test("cash and card adding up to the sale, with how it was paid; never deposit, never banknotes", async () => {
+    await mount();
+    await add("Tea");
+    await choose("pay.split");
+    const boxes = screen.getAllByRole("textbox").filter((e) => e.tagName === "INPUT");
+    await act(async () => { fireEvent.change(boxes[boxes.length - 3], { target: { value: "200" } }); });
+    await act(async () => { fireEvent.click(screen.getByTestId("pay-rest-card")); });
+    await sell();
+    expect(repo.create).not.toHaveBeenCalled();
+    expect(screen.getByText("pay.noteRequired")).toBeTruthy();
+    await act(async () => { fireEvent.change(screen.getByTestId("pay-note"), { target: { value: "200 наличными" } }); });
+    await sell();
+    const body = repo.create.mock.calls[0][0];
+    expect(body).toMatchObject({ payments: [{ method: "cash", amount: 200 }, { method: "card", amount: 300 }], payment_note: "200 наличными" });
+    expect(body).not.toHaveProperty("payment_method");
+    expect(body).not.toHaveProperty("cash_received");
   });
 });
 

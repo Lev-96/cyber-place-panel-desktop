@@ -20,7 +20,8 @@ describe("parsePreferences", () => {
   test("a valid document round-trips", () => {
     const doc = toDocument({ ...DEFAULT_PREFERENCES, interface: "custom", theme: "contrast",
       layout: { ...PRESETS.compact, home: "/bookings", sidebar: [{ id: "bookings", hidden: true }] } });
-    expect(parsePreferences(JSON.parse(JSON.stringify(doc)))).toEqual(doc);
+    // The SERVER document round-trips (the local-only board is not part of it).
+    expect(toDocument(parsePreferences(JSON.parse(JSON.stringify(doc))))).toEqual(doc);
   });
 
   test("one bad field costs only that field", () => {
@@ -52,6 +53,41 @@ describe("parsePreferences", () => {
     // 2026-10-27 morning) falls back to the default, not to an error.
     const old = parsePreferences({ sound: { categories: { support: { enabled: true, sound: "pop" } } } });
     expect(old.sound.categories.support).toEqual({ enabled: true, sound: SOUND_DEFAULTS.support.sound });
+  });
+
+  /**
+   * The server refuses the WHOLE save (422, "data.sound.categories должно
+   * быть массивом") for a category it does not list, so the document must
+   * name exactly the server's (`App\Support\UiPreferences::SOUND_CATEGORIES`).
+   * 2026-11-07: `session_unpaid` reached the panel first and every save,
+   * a theme alone, failed. Adding a category here means adding it there.
+   */
+  test("the document names exactly the sound categories the server accepts", () => {
+    const server = ["booking_new", "booking_changed", "session_ending", "session_unpaid", "support", "guests", "system"];
+    expect(Object.keys(toDocument(DEFAULT_PREFERENCES).sound.categories)).toEqual(server);
+    expect(Object.keys(toDocument(parsePreferences({ theme: "light" })).sound.categories)).toEqual(server);
+  });
+
+  test("a document saved before session_unpaid keeps its sounds and gains the new one's default", () => {
+    const p = parsePreferences({ theme: "amber", sound: { profile: "loud", categories: {
+      booking_new: { enabled: false, sound: "bell" }, support: { enabled: true, sound: "space" },
+    } } });
+    expect(p.theme).toBe("amber");
+    expect(p.sound.profile).toBe("loud");
+    expect(p.sound.categories.booking_new).toEqual({ enabled: false, sound: "bell" });
+    expect(p.sound.categories.support).toEqual({ enabled: true, sound: "space" });
+    expect(p.sound.categories.session_unpaid).toEqual(SOUND_DEFAULTS.session_unpaid);
+  });
+
+  test("changing the theme keeps every sound, changing a sound keeps the theme", () => {
+    const saved = parsePreferences({ theme: "emerald", sound: { profile: "custom", categories: {
+      session_unpaid: { enabled: false, sound: "beep" } } } });
+    const themed = toDocument({ ...saved, theme: "purple" });
+    expect(themed.sound).toEqual(toDocument(saved).sound);
+    const sounded = toDocument({ ...saved, sound: { ...saved.sound, categories: {
+      ...saved.sound.categories, session_unpaid: { enabled: true, sound: "beep" } } } });
+    expect(sounded.theme).toBe("emerald");
+    expect(sounded.sound.categories.session_unpaid).toEqual({ enabled: true, sound: "beep" });
   });
 
   test("a menu is capped at 60 entries", () => {

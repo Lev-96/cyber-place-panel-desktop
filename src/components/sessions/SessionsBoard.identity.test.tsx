@@ -181,7 +181,10 @@ describe("SessionsBoard — what a tile says the seat is", () => {
    * cashiers deriving it separately is how one board reads three and the other
    * four over the same seat.
    */
-  test("a PlayStation session says how many pads it has out of the maximum", async () => {
+  // The count is no longer WRITTEN on the tile (owner, 2026-11-04: a line that
+  // appears with a pad made the card taller). A press says it in a note beside
+  // the card instead — SessionsBoard.expiry.test.tsx, "joysticks on the tile".
+  test("a PlayStation session holding extra pads does not write their count on the tile", async () => {
     repo.listPcs.mockResolvedValue([pc({ current_session_id: 5 })]);
     repo.listActive.mockResolvedValue([
       {
@@ -197,7 +200,9 @@ describe("SessionsBoard — what a tile says the seat is", () => {
     ]);
     await mount();
 
-    expect(screen.getByText("3")).toBeTruthy();
+    const tile = document.querySelector(".place-cell.session-card--running") as HTMLElement;
+    expect(tile).toBeTruthy();
+    expect([...tile.querySelectorAll("span")].some((el) => el.children.length === 0 && el.textContent === "3")).toBe(false);
   });
 
   /** A seat with no extras out says nothing about pads on a non-PlayStation. */

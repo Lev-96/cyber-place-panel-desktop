@@ -1,19 +1,40 @@
 import { IBillingSettings } from "@/api/joystickPrices";
 import { applyMinimumCharge } from "@/components/sessions/sessionAmount";
-import type { DurationUnit } from "@/components/sessions/durationModel";
 import { IMinimumChargeRule } from "@/types/sessions";
 
 /** The server's ceiling (`MinimumChargeRule::MAX_MINUTES`): a day of play. */
 export const VIP_MIN_MAX_MINUTES = 1440;
 
-/** Quick picks per unit; any other length can be typed in either unit. */
-export const THRESHOLD_PRESETS: Record<DurationUnit, readonly number[]> = {
-  minutes: [10, 15, 20, 30],
-  hours: [1, 2],
-};
-export const MINIMUM_PRESETS: Record<DurationUnit, readonly number[]> = {
-  minutes: [30, 45, 60, 90],
-  hours: [1, 2, 3, 5],
+/**
+ * Which seats the rule covers (2026-11-06; the server's `MinimumChargeScope`).
+ * A branch that never chose reads as `vip`, the rule every branch had before.
+ */
+export type MinimumChargeScope = "all" | "vip" | "standard" | "places";
+export const MINIMUM_CHARGE_SCOPES: readonly MinimumChargeScope[] = ["all", "vip", "standard", "places"];
+
+export const scopeOf = (s: IBillingSettings): MinimumChargeScope =>
+  MINIMUM_CHARGE_SCOPES.includes(s.vip_min_charge_scope as MinimumChargeScope)
+    ? (s.vip_min_charge_scope as MinimumChargeScope)
+    : "vip";
+
+export const placeIdsOf = (s: IBillingSettings): number[] =>
+  Array.isArray(s.vip_min_charge_place_ids) ? s.vip_min_charge_place_ids.filter((id) => Number.isInteger(id) && id > 0) : [];
+
+/** A seat's price tier, as the tariff matrix names it. */
+export type SeatTier = "vip" | "standard";
+const tierOf = (type: string): SeatTier => (type === "vip" ? "vip" : "standard");
+
+/** The tiers the rule reaches under `scope` — the prices its example may be worked at. */
+export const tiersOf = (
+  scope: MinimumChargeScope,
+  places: readonly { id: number; type: string }[],
+  placeIds: readonly number[],
+): SeatTier[] => {
+  if (scope === "vip") return ["vip"];
+  if (scope === "standard") return ["standard"];
+  if (scope === "all") return ["vip", "standard"];
+  const chosen = new Set(placeIds);
+  return (["vip", "standard"] as const).filter((tier) => places.some((p) => chosen.has(p.id) && tierOf(p.type) === tier));
 };
 
 /** The rule saved on the branch, or null when it is off or incomplete. */
@@ -21,12 +42,6 @@ export const savedRule = (s: IBillingSettings): IMinimumChargeRule | null =>
   s.vip_min_charge_enabled && s.vip_min_charge_after_minutes && s.vip_min_charge_minutes && s.vip_min_charge_mode
     ? { after_minutes: s.vip_min_charge_after_minutes, minimum_minutes: s.vip_min_charge_minutes, mode: s.vip_min_charge_mode }
     : null;
-
-/** A length in minutes as the picker shows it: whole hours in hours, else minutes. */
-export const durationFieldOf = (minutes: number): { unit: DurationUnit; amount: string } =>
-  minutes >= 60 && minutes % 60 === 0
-    ? { unit: "hours", amount: String(minutes / 60) }
-    : { unit: "minutes", amount: String(minutes) };
 
 /**
  * What is wrong with a rule, as a translation key, or null.
@@ -43,59 +58,66 @@ export const ruleProblem = (after: number | null, minimum: number | null): strin
   return null;
 };
 
-/** "20 мин", "1 ч", "1 ч 30 мин" — in the panel's words. */
-export const durationLabel = (minutes: number, t: (k: string) => string): string => {
-  const h = Math.floor(minutes / 60);
-  const m = minutes % 60;
-  if (h === 0) return `${m} ${t("time.minShort")}`;
-  return m === 0 ? `${h} ${t("time.hourShort")}` : `${h} ${t("time.hourShort")} ${m} ${t("time.minShort")}`;
-};
+export { durationLabel } from "@/utils/durationLabel";
 
-/** A VIP hourly price the example can be worked at: one per platform. */
-export interface VipRateOption {
+/** An hourly price the example can be worked at: one per platform and tier. */
+export interface RateOption {
+  /** `<platform>-<tier>`, unique among the options. */
+  key: string;
   slug: string;
+  tier: SeatTier;
   /** "PS5", or a venue's own platform name. */
   label: string;
   rate: number;
-  /** How many active VIP seats the branch has on this platform. */
-  vipSeats: number;
+  /** How many active seats of this platform and tier the branch has. */
+  seats: number;
 }
 
 /**
- * The VIP prices this branch has set, one per platform — from the tariff
- * matrix (`<slug>-vip`, pc/ps4/ps5) and from custom-platform price rows —
- * the platforms that actually have VIP seats first (most seats first), so the
- * example is worked at a price the owner's VIP seats really bill. Taking "the
- * first VIP price found" priced it at a PC VIP rate in a branch whose VIP
- * seats are all PS5.
+ * The prices this branch has set for the tiers the rule reaches, one per
+ * platform and tier — from the tariff matrix (`<slug>-vip`, `<slug>-standard`)
+ * and from custom-platform price rows — the ones that actually have seats
+ * first (most seats first), so the example is worked at a price the owner's
+ * seats really bill. Taking "the first price found" priced it at a PC rate in
+ * a branch whose seats are all PS5.
  */
-export const vipRateOptions = (
+export const rateOptions = (
   matrix: Record<string, number | string | null> | null | undefined,
-  customPrices: readonly { platform: string; price_vip: number | string | null }[],
+  customPrices: readonly { platform: string; price_vip?: number | string | null; price_standard?: number | string | null }[],
   places: readonly { platform: string; type: string; status?: string }[],
   nameOf: (slug: string) => string,
-): VipRateOption[] => {
-  const rates = new Map<string, number>();
-  for (const [key, value] of Object.entries(matrix ?? {})) {
-    const rate = Number(value);
-    if (key.endsWith("-vip") && rate > 0) rates.set(key.slice(0, -"-vip".length), rate);
-  }
-  for (const row of customPrices) {
-    const rate = Number(row.price_vip);
-    if (rate > 0 && !rates.has(row.platform)) rates.set(row.platform, rate);
+  tiers: readonly SeatTier[] = ["vip"],
+): RateOption[] => {
+  const rates = new Map<string, { slug: string; tier: SeatTier; rate: number }>();
+  for (const tier of tiers) {
+    const suffix = `-${tier}`;
+    for (const [key, value] of Object.entries(matrix ?? {})) {
+      const rate = Number(value);
+      if (key.endsWith(suffix) && rate > 0) {
+        const slug = key.slice(0, -suffix.length);
+        rates.set(`${slug}${suffix}`, { slug, tier, rate });
+      }
+    }
+    for (const row of customPrices) {
+      const rate = Number(tier === "vip" ? row.price_vip : row.price_standard);
+      const key = `${row.platform}${suffix}`;
+      if (rate > 0 && !rates.has(key)) rates.set(key, { slug: row.platform, tier, rate });
+    }
   }
 
   const seats = new Map<string, number>();
   for (const place of places) {
-    if (place.type === "vip" && place.status !== "inactive") seats.set(place.platform, (seats.get(place.platform) ?? 0) + 1);
+    if (place.status === "inactive") continue;
+    const key = `${place.platform}-${tierOf(place.type)}`;
+    seats.set(key, (seats.get(key) ?? 0) + 1);
   }
 
-  return Array.from(rates, ([slug, rate]) => ({ slug, label: nameOf(slug), rate, vipSeats: seats.get(slug) ?? 0 }))
-    .sort((a, b) => b.vipSeats - a.vipSeats);
+  return Array.from(rates, ([key, o]) => ({ key, slug: o.slug, tier: o.tier, label: nameOf(o.slug), rate: o.rate, seats: seats.get(key) ?? 0 }))
+    .sort((a, b) => b.seats - a.seats);
 };
 
 /** Why a visit pays what it pays: the words beside each example. */
-export type ExampleReason = "played" | "minimum" | "perMinute" | "roundedUp";
+export type ExampleReason = "played" | "minimum" | "perMinute";
 
 export interface ExampleRow {
   playedMinutes: number;
@@ -105,7 +127,7 @@ export interface ExampleRow {
 }
 
 /**
- * What a visit of `playedMinutes` on VIP pays, priced the way the till prices
+ * What a visit of `playedMinutes` on a covered seat pays, priced the way the till prices
  * it: `applyMinimumCharge` (the mirror of the backend's `MinimumChargeRule`)
  * on the clock a count-up seat earns at `rate`.
  */
@@ -115,12 +137,13 @@ export const exampleRow = (rule: IMinimumChargeRule, rate: number, playedMinutes
   const result = applyMinimumCharge(rule, clock, seconds, rate);
   const billedMinutes = Math.round(result.billedSeconds / 60);
   // Up to the minimum the visit pays the minimum — exactly the minimum played
-  // included, though nothing is added there. Past it: by the minute, or rounded.
+  // included, though nothing is added there. Past it: by the minute (the one
+  // way since 2026-11-06).
   const reason: ExampleReason = playedMinutes < rule.after_minutes
     ? "played"
     : playedMinutes <= rule.minimum_minutes
       ? "minimum"
-      : rule.mode === "round_up" ? "roundedUp" : "perMinute";
+      : "perMinute";
   return { playedMinutes, billedMinutes, amount: result.amount, reason };
 };
 
@@ -133,7 +156,7 @@ export const exampleMinutes = (rule: IMinimumChargeRule): number[] => {
 };
 
 /**
- * A visit moved between two VIP seats: the two stretches and what the whole
+ * A visit moved between two covered seats: the two stretches and what the whole
  * visit pays. Chosen so neither stretch reaches the threshold alone while the
  * two together do (when the threshold allows it) — the case an owner worries
  * about: a move neither resets the threshold nor charges the minimum twice.

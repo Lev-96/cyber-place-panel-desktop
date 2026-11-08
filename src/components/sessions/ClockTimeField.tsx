@@ -2,20 +2,19 @@ import type { IStartQuote } from "@/api/sessions";
 import { formatTime } from "@/i18n/dates";
 import { useLang } from "@/i18n/LanguageContext";
 import { fmt } from "@/i18n/translations";
-import { clockOf } from "./durationModel";
+import ClockInput from "./ClockInput";
+import { clockOfDraft, isDraftEmpty, type ClockDraft } from "./durationModel";
 
 /**
- * "Until" a clock time at start (2026-10-26): one box, "00:40".
- *
- * Text with `inputMode`, like the length box — Electron swallows keystrokes in
- * raw number/time inputs. The shape is checked here; how long that is and
- * whether it is tomorrow is the server's answer (`quote`), shown as soon as it
- * comes: "50 min · until 00:40 (tomorrow)". Nothing is worked out from this
+ * "Until" a clock time at start (2026-10-26): "[ 14 ] : [ 30 ]" since
+ * 2026-11-05, no ":" to type (`ClockInput`). How long that is and whether it
+ * is tomorrow is the server's answer (`quote`), shown as soon as it comes:
+ * "50 min · until 00:40 (tomorrow)". Nothing is worked out from this
  * machine's clock.
  */
 interface Props {
-  value: string;
-  onChange: (next: string) => void;
+  value: ClockDraft;
+  onChange: (next: ClockDraft) => void;
   disabled?: boolean;
   /** The server's answer for exactly this time, or null while there is none. */
   quote: IStartQuote | null;
@@ -30,29 +29,22 @@ export const isNextDay = (iso: string, now: Date = new Date()): boolean => {
 
 const ClockTimeField = ({ value, onChange, disabled = false, quote }: Props) => {
   const { t } = useLang();
-  const invalid = value.trim() !== "" && clockOf(value) === null;
+  const settled = clockOfDraft(value) !== null;
 
   return (
-    <div className="col" style={{ gap: 6 }} data-testid="planned-until">
-      <label className="row" style={{ gap: 8, alignItems: "center" }}>
-        <span className="muted" style={{ fontSize: 12 }}>{t("session.untilLabel")}</span>
-        <input
-          className="input"
-          type="text"
-          inputMode="numeric"
-          placeholder="00:40"
-          maxLength={5}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          aria-label={t("session.untilLabel")}
-          aria-invalid={invalid}
-          disabled={disabled}
-          style={{ width: 96 }}
-        />
-      </label>
-      <span className="muted" style={{ fontSize: 11 }}>{t("session.untilHint")}</span>
-      {invalid && <span className="error" style={{ fontSize: 12 }}>{t("session.untilInvalid")}</span>}
-      {!invalid && quote?.ends_at && (
+    <div className="col" style={{ gap: 8 }} data-testid="planned-until">
+      <span className="muted" style={{ fontSize: 12 }}>{t("session.untilLabel")}</span>
+      <ClockInput
+        value={value}
+        onChange={onChange}
+        label={t("session.untilLabel")}
+        invalidText={t("session.untilInvalid")}
+        disabled={disabled}
+        testId="planned-until-input"
+      />
+      {/* One line at a time: how to type it while empty, the server's answer once set. */}
+      {isDraftEmpty(value) && <span className="muted" style={{ fontSize: 11 }}>{t("session.untilHint")}</span>}
+      {settled && quote?.ends_at && (
         <span style={{ fontSize: 13 }} data-testid="planned-until-resolved">
           {fmt(t(isNextDay(quote.ends_at) ? "session.untilResolvedTomorrow" : "session.untilResolved"), quote.minutes, formatTime(quote.ends_at))}
         </span>

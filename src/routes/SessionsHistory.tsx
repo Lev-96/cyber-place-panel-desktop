@@ -7,6 +7,7 @@ import { formatDate, formatDateTime, formatTime } from "@/i18n/dates";
 import { useLang } from "@/i18n/LanguageContext";
 import SessionHistoryBill from "@/components/sessions/SessionHistoryBill";
 import TillSalesHistory from "@/components/pos/TillSalesHistory";
+import BookingHistory from "@/components/bookings/BookingHistory";
 import SessionHistoryTimeline from "@/components/sessions/SessionHistoryTimeline";
 import { feedCoversSession, groupBySession, seatRoute, seatSteps } from "@/components/sessions/sessionHistoryModel";
 import { sessionRepository } from "@/repositories/SessionRepository";
@@ -214,6 +215,8 @@ const SessionsHistory = () => {
       {/* Products sold on their own (2026-10-25): the same period and person,
           its own loading — the sessions below never wait on it. */}
       <TillSalesHistory branchId={id} fromIso={fromIso} toIso={toIso} actorId={actorId} refreshKey={salesRefresh} />
+      {/* Every step of the bookings in the same period (2026-11-07). */}
+      <BookingHistory branchId={id} fromIso={fromIso} toIso={toIso} refreshKey={salesRefresh} />
 
       {/* The range is always a filter: an empty answer is "no sessions in this
           period", never "nothing has ever happened here". The list's own

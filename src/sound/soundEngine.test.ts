@@ -73,6 +73,7 @@ const SYNTH: SoundPrefs = {
     booking_new: { enabled: true, sound: "chime" },
     booking_changed: { enabled: true, sound: "chime" },
     session_ending: { enabled: true, sound: "bell" },
+    session_unpaid: { enabled: true, sound: "alert" },
     support: { enabled: true, sound: "soft" },
     guests: { enabled: true, sound: "chime" },
     system: { enabled: true, sound: "ding" },

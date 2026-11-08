@@ -439,9 +439,12 @@ pending ──confirm──▶ confirmed ──start──▶ (session) ──en
 - **Do NOT expose "Rate branch" CTA.** That's mobile-only — fired by the
   backend Expo push `BookingFinishedRatePrompt` to guests, deep-links into
   `mob://bookings/{id}`. Staff have no rating UI.
-- **Do NOT expose "Reschedule" on the booking-detail page.** Rescheduling is
-  initiated from the mobile player app only (`PUT /guest-bookings/{id}` with
-  `rescheduled_minutes`). Staff can only confirm / cancel / finish.
+- **Guest bookings are not rescheduled by staff.** A guest's extension is
+  the mobile app's (`PUT /guest-bookings/{id}` with `rescheduled_minutes`);
+  staff confirm / cancel / finish it. Since 2026-11-07 (owner) staff DO move
+  and edit THEIR OWN reservations (made from the board, `reserved_by_user_id`)
+  in the bookings calendar — `PATCH /places/reservations/{id}`, only rows the
+  server marks `editable`; the server re-checks conflicts under a lock.
 - **`finished` is terminal.** Once a booking flips to `finished`,
   `place_ids` are dropped and it must not be re-treated as active.
   `Booking.BLOCKING_STATUSES` excludes `finished`.
@@ -661,7 +664,7 @@ loud `[reverb] REJECTED …` line naming the key and host; the backend has
 - Dark theme by default; Light and High contrast exist since 2026-10-27
   (see "Interface, themes and sounds" below) — never hard-code a colour.
 - Smooth CSS transitions; no jarring instant state changes.
-- Responsive — must work down to the 800×560 window minimum
+- Responsive — must work down to the 520×560 window minimum
   (`electron/windowBounds.ts` `MIN_CONTENT`), up to 1920×1080 and beyond.
 - Playstation font for branding / headings; Inter for UI text.
 - Stable button widths across i18n (don't let translations shift layout).
@@ -2143,6 +2146,151 @@ are unchanged — do not add a `paused` status here either.
   server sweep), `pausedSecondsBetween` caps an open pause there
   (`autoResumeAtOf()` in `sessionAmount.ts`). History: a `resumed` with
   `reason: pause_limit` reads «Автоматически, по лимиту паузы».
+- **The minimum is the current seat's hour (2026-11-07)**: `sessionMinimumChargeAt`
+  mirrors `Session::minimumChargeAt` branch for branch — from the threshold to
+  the minimum exactly `perSecond(rate_now, minimum)`, past it + `clockCostAt(now)
+  − clockCostAt(instantAtPlayed(minimum))`; pinned rows (`settled_seconds` >
+  minimum) → their total then the clock; round-up and rows without
+  `settled_total` read the old way. Tests: `sessionAmount.minimumCharge.test.ts`
+  (the backend's figures, the owner's 1000/1500 moves; three mutations caught).
+- **Pause limit as a time field (2026-11-06, owner)**: `PauseLimitForm` uses
+  the start dialog's `DurationInput` ([ч] : [мин], `maxMinutes` =
+  `PAUSE_LIMIT_MAX` 240); both boxes empty = no limit (said under the field);
+  the server still stores minutes. Tests: `PauseLimitForm.test.tsx`.
+- **Active seats, 2026-11-07 (owner)** — backend §"Active seats: …":
+  - ONE «+ Время» card button on every running seat, whatever its mode
+    (2026-11-07, second pass; the card's «∞»/«⏱» buttons are gone).
+    `SessionOptionsDialog` (titled «+ Время», no `view` prop) shows the mode
+    and what is left, and offers what fits: a timed seat — tabs «По времени»
+    (`DurationInput`) / «По сумме» (`PriceInput` → `timeQuoteByAmount` →
+    `addTimeByAmount`) and the «Безлимит» switch; an unlimited seat — a fixed
+    time from now (`limit`); a paused seat — no time at all (a note; the end
+    moves on resume). `PriceInput` names its box (`aria-label`).
+  - «Не оплачено» is ONLY in «+ Время» and Start (owner), never on the card.
+    `UnpaidToggle` (a BUTTON with `role="switch"`). In «+ Время» a flip is the
+    server's at once (`setUnpaid`; switch on BEFORE adding unpaid time), and a
+    grant made while it is on sends `unpaid: true` too (never `false`: a stale
+    dialog must not undo another desk). In Start it is a form field: on, the
+    body carries `unpaid: true` and the server starts the seat with nothing
+    paid (whole time owed); a free start hides it and never sends it. A
+    `stopped` with `unpaid_amount > 0` (socket) or this desk's Stop answer
+    (`onConfirmed({ unpaidAmount })`) queues `UnpaidAlert` (yellow, large) and
+    rings sound category `session_unpaid` once per session — that category is
+    in the server's `UiPreferences::SOUND_CATEGORIES` too (the server refuses
+    the whole preferences document for a category it does not list: 422).
+  - Reservation: a free tile offers Start and «Забронировать»; a reserved one
+    is YELLOW (`--status-booked-*`, lemon, apart from "ending" amber), shows
+    only its time («15:00–16:00»), with what it is, the name (or «Без имени»),
+    the phone (`formatArmenianPhone`, 077 777 777) and the time in its tooltip
+    (`reservationTip`, `data-tip`). Its foot is `ReservationActions`: Start
+    (opens StartSessionDialog with `bookingId`; the server checks and links
+    it) and «Отменить бронь» (asks, then `bookingRepository.cancel`). Staff
+    bookings ring nobody: `BookingChanged.by_staff` → `shouldAnnounceBookingEvent`
+    false (no corner toast, OS notification or sound); the desk that made it
+    shows «Забронировано» on the server's answer.
+  - Bookings calendar (`src/components/reservations/`, simplified 2026-11-07
+    second pass): `BookingsCalendarModal` opens from the card's «Бронь»
+    (focused on that seat, today) and the board header's «Календарь броней».
+    A date strip (Сегодня ‹ 14 day chips with booking counts ›), a seat
+    select, «+ Создать бронь»; a horizontal timeline, one row per seat, the
+    day running 06:00 to 06:00 (`DAY_START_HOUR` in `calendarModel.ts`: a
+    23:00–01:00 booking is one block), window 08:00–02:00 widened so nothing
+    is cut, a now line; bookings yellow (app ones outlined), sessions a green
+    band behind them (unlimited fades out with ∞), offline rows hatched. Next
+    to it «Брони на <день>»: time, seat, who, phone, status, source, and
+    «Старт» / «Изменить» / «Отменить». «Старт» (`onStartBooking(placeId,
+    bookingId)`, the board closes the calendar and opens Start with that
+    booking chosen) only for pending/confirmed, no session, within 2 h or
+    under way, on a seat with no session. Week/Month views are gone. Data:
+    `GET /places/reservations` (`noCache`, asked from the day before),
+    refetched on any `.booking.changed` of the branch (debounced 300 ms), on
+    resync, every 30 s, after own edits.
+    `ReservationFormDialog` creates and edits (`PATCH
+    /places/reservations/{id}`, only `editable` staff rows; a time/seat change
+    asks first); name and phone optional (name ≥ 2 letters; phone masked
+    `077 777 777`, sent `+374XXXXXXXX`, same rule as `App\Support\ArmenianPhone`).
+    A `updated` event re-reads `useReservedPlaceIds` (the seat it left is not
+    in the event) and is never announced. `booking.start_due` (server
+    scheduler, once per booking) has its own card in Notifications.
+  - Start on a seat with reservations (2026-11-07, owner): `StartSessionDialog`
+    reads `GET /sessions/start-options` (`useStartOptions`) and, when the
+    seat has reservations a start may fulfil, asks «Кто садится?»
+    (`StartBookingChoice` on the reusable `ChoiceCards`): the booking's player
+    (sends `booking_id`) or «Другой игрок». NOTHING is preselected — a
+    stranger used to finish someone's reservation — except a booking picked
+    in the calendar (`bookingId` prop). The reserved card's Start never
+    passes a booking. With a cap (`max_minutes` not null) it shows «Свободно
+    до HH:MM · N», hides the free start, requires a plan, disables packages
+    longer than the window; `unlimited_allowed` (not `free_until`) decides an
+    open start (the server allows it when the next booking is 10 h or more
+    away). The server re-checks under its lock (422 `seat_reserved*` → the
+    sentence, options re-read). A free card shows «Свободно до 16:00» from
+    `IPcApi.next_booking_start` (within 24 h). `useReservedPlaceIds` judges a
+    realtime event by the snapshot's own 2 h rule (no yellow flash for a
+    16:00 booking made at 12:00).
+  - Start dialog readability (2026-11-08, owner): title «Старт места · №N»
+    (`session.start`, en "Start seat"); «Кто садится?» is a heading
+    (`.start-choice__title`); a reservation's player row carries
+    `ChoiceCards` `tone: "booked"` (reservation yellow, `data-tone`); the
+    cap note, the summary and «Не оплачено» (scoped to `.start-dialog`, not
+    «+ Время») are larger. `.outline-btn` is the one outlined accent button:
+    «Настроить окно» and every board header action («+ Продукт», «История
+    торговли», «Календарь броней», «Компьютеры», «Тарифы») — the inline
+    `navBtn` style and `.board-calendar-btn` look are gone.
+  - Seat reserved later (2026-11-08, owner): a FREE seat with
+    `next_booking_start` within 24 h (`freeUntilOf`) is drawn in the
+    reservation yellow — `SessionCard` `bookingAhead` sets tone `booked`, the
+    accent and `session-card--booking-ahead`; `seatState` stays `free`, so
+    Start and every state rule are unchanged; running / offline / reserved
+    seats ignore it. Its status reads «Свободно» and cross-fades to
+    «Свободно до HH:MM» in the same place on hover / focus-within
+    (`.session-card__status-swap`, one grid cell; the word is aria-hidden).
+  - Payment method buttons show one short word (`PaymentEditor` `SHORT_KEY`:
+    «Другое» = `pay.otherShort`), the full name (`session.payOther`, still
+    used by history, till and shift texts) as title and aria-label; the
+    buttons and split row names never wrap (nowrap + ellipsis).
+  - Payments (2026-11-07, owner): ONE control, `PaymentEditor` +
+    `paymentSplit.ts` (cents, `checkPayment`, `paymentBody`), on Stop, the
+    till sale and the post-hoc mark. Cash / Card / Other, or «Разделить»: a
+    box per method, «Остаток», what is still due, a required note; parts sum
+    to the bill to the cent. One method sends the legacy fields (every server
+    takes them); a split sends `payments` + `payment_note` (never
+    `cash_received`). A seat that ended by itself with no method recorded:
+    `StopReceiptModal` asks once («Отметить оплату» → `POST
+    /sessions/{id}/payment` with a stable `client_request_id`; 409 already
+    recorded, 422 shift closed). `payment_method` may be `split` with
+    `payments[]` — `paymentText` says it everywhere (session history, till,
+    sales history, timeline `stopped` / `payment_recorded`, shift lines v4).
+    ⚠️ An older panel shows `split` wrongly: roll the panel out to every desk.
+  - Booking history (`src/components/bookings/BookingHistory.tsx`) in the
+    sales history: `GET /booking-events` — made, changed (what), cancelled
+    (why), player started, finished, start time come; who and when.
+  - Foot buttons are `CardFootAction` (icon + SHORT word, full name as tooltip:
+    «Бронь» / «Забронировать», «Отменить» / «Отменить бронь»): words by default; «Подписи
+    кнопок» = «Иконки» shows the picture (`start`, `reserve`,
+    `cancel-reservation` in `ActionIcon`); «Авто» keeps the words there.
+  - Tooltips: ONE `TooltipLayer` at the app root — `data-tip` anywhere, and
+    every native `title` inside a `[data-tip-scope]` (the board root). Hover
+    (220 ms) or keyboard focus; never on touch, a press, a drag or a scroll;
+    Escape hides it; edge-aware (`placeTooltip`); the native title is parked
+    while shown and put back after.
+- **Add products: typing first (2026-11-07, owner)**: `useProductBasket` opens
+  in `text` mode and `BasketModeSwitch` lists «Ввести списком» first — the
+  seat's dialog and the till alike (one hook, one switch). The Modal's initial
+  focus lands in the box. A line with no number is one (backend resolver);
+  the hint says so. Tests: `AddSessionItemDialog`/`SellProductsDialog` tests
+  (their `mount` puts list-focused tests on the list; two mutations caught).
+- **Minimum charge — any seats, by the minute (2026-11-06, owner)**: the card
+  is «Минимальная оплата». A large switch (`Switch size="lg"`); «Для каких
+  мест» as `SectionTabs` (all / VIP / standard / choose seats — a checkbox grid
+  `.vip-min-seats`, at least one); both lengths are the start dialog's
+  `DurationInput` ([ч] : [мин], `maxMinutes` 1440) — no presets, no unit tabs;
+  no billing choice (always `minimum`, a branch still on `round_up` opens with
+  something to save). The example's prices come from `rateOptions(…, tiers)`
+  for the tiers in scope (`tiersOf`). Sends `vip_min_charge_scope`, and
+  `_place_ids` only with «choose seats». Server: backend §"VIP minimum charge".
+  Tests: `VipMinimumChargeForm.test.tsx`, `vipMinimumCharge.test.ts` (six
+  mutations caught). The bullet below is the 2026-10-31 design.
 - **VIP minimum charge (2026-10-31)**: Branch → Prices, `VipMinimumChargeForm`
   written for an owner who has never seen it: the rule in plain sentences with
   their numbers (short visit / long visit / past the minimum / a move), two
@@ -2390,6 +2538,126 @@ with `standard_charge`, confirm enabled only on a quote of exactly that price.
 `sessionTimeCostAt` mirrors the server's share-of-plan billing (packages
 included, re-base via `plan_rebased_at`, only resumed pauses out of the plan).
 
+**Reset the counter (2026-11-05, owner).** A small ↺ beside the money on a
+running card (`SessionTimer` `reset` prop; only for `session.free`, not on a
+free seat, only while there is money) opens `ResetTimeDialog`: the time's
+figure live → 0, "the seat counts again from 0", "goods and pads stay",
+"saved in the history". `POST /sessions/{id}/reset-time` (backend §"Resetting
+a running seat's clock"); the waived amount is the server's. The card keeps
+its size (e2e); the ↺ shows only while the TIME has something to reset
+(`sessionTimeCostAt`, not goods). The tile mirrors the bill: `sessionMinimumChargeAt` charges
+`max(0, clock − time_reset_offset)` after `time_reset_at`, no VIP minimum.
+**From the stop receipt too (2026-11-05):** `StopReceiptModal` shows
+«Обнулить» on its time line (`canResetTime` from the board = `session.free`;
+only while running and the time is at least `RESET_MIN_AMOUNT` = 1 unit,
+like the card's ↺ — a few hundredths right after a reset are not offered),
+re-reads the receipt BEFORE asking (the question names the server's current
+figure, not the frozen one), asks, resets, then READS THE RECEIPT AGAIN so Confirm sends the new
+`priced_at`/`expected_total` (the old receipt would be refused as changed — the
+server's existing check, pinned in `SessionTimeResetTest`). A «Обнулено −N»
+line shows `time_waived`. Tests: `StopReceiptModal.test.tsx` («resetting the
+counter from the receipt»), e2e «the stop receipt resets the counter…».
+The dialog reads the LIVE row by id (`resetId`), so a reset/stop from another
+desk while it is open shows (0, Confirm held) or closes it; the toast counts
+this reset only (server total − the total the dialog showed at confirm).
+History: `time_reset` reads "Reset the counter −400" (tone `waive`); every
+amount is signed by kind (`amountKind`: charge "+", waive "−", total
+"Итог: …"), larger type; the bill has an «Обнулено −N» line
+(`time_waived_total`). Tests: `sessionAmount.reset.test.ts` (the backend's
+figures), `SessionHistoryTimeline`/`SessionHistoryBill` tests,
+`e2e/session-reset.spec.ts`. The AppearancePreview draws the ↺ too.
+
+**Cancel the seat from the receipt (2026-11-06, owner).** The button reads
+«Отменить место»; the receipt's buttons are medium and in even columns
+(`.receipt-actions[data-count]` grid, each button the full column width, labels
+wrap instead of overlapping; cancel is `.btn.secondary.is-danger`, 2026-11-07). After its OWN stop/cancel the receipt is not read again — a
+manager may read a closed receipt only if they opened it
+(`SessionHistoryScope::allows`), and the re-read showed «нет прав» over a stop
+that had worked; a seat ended elsewhere keeps its last figures on a 403. Earlier wording below: «Отменить сессию»
+in `StopReceiptModal` (`canCancel`, the board passes `session.free` — same right
+as the reset): asked destructively, then `sessionRepository.cancel` →
+`POST /sessions/{id}/cancel` (backend §"Cancelling a running seat"). The seat
+ends as Stop ends it and the server waives the whole bill; the receipt shows the
+server's result («Сессия отменена», «Отменена · 0», from `is_cancelled`).
+`onConfirmed({ cancelled })` — the board does what it does after Stop (PS5
+sleep via `sessionStopped`, reload) with its own toast. History: `cancelled`
+reads «Отменил сессию −N» (tone `stop`, amount `waive`, a line with time /
+goods / pads); a closed bill reads «Отменена · 0» (`cancelled_at`). Tests:
+`StopReceiptModal.test.tsx` («cancelling the seat from the receipt», four
+mutations caught), `SessionHistoryTimeline.test.tsx`.
+
+**The start dialog, made simple (2026-11-05, owner).** Only the start
+changed; "+ Время" keeps `DurationPicker` (the minimum charge moved to
+`DurationInput` on 2026-11-06).
+- No tariff this seat could be sold (the list read, empty after
+  `packageFitsSeat`): the «Фиксированный / По часам» choice is not drawn and
+  the start is by the hour (`mode` set to `open` on load, for a computer too).
+  A list that failed to read keeps the choice (its error + Retry live there).
+- The planned length is a time-style field, `DurationInput`:
+  "[ 1 ] ч : [ 30 ] мин" — two plain text boxes, NOT `<input type="time">`
+  (Electron swallows keys in raw time inputs, and a time input is a clock).
+  The boxes are a `DurationDraft` read by `durationModel.ts`
+  (`typeIntoHours` / `typeIntoMinutes` / `draftMinutes` / `stepDraft`),
+  safe key by key: no single digit jumps on (a "3" may start "30мин"); a
+  space, ":" or "ч" after the hours goes on ("1 30" = 1 h 30 min); a number
+  past 10 h in the hours is minutes ("30", "90" → 1 h 30 min); "1ч 30мин",
+  "1:30", "1.5" are laid out in both boxes; the letters of "мин"/"час" after
+  the digits are ignored; "75" in the minutes carries (1 h 15 min); ↑/↓ step
+  1 h / 5 min; × clears. An unreadable value is said once the field is left
+  (Start is held either way). One line under it while empty
+  (`session.plannedNone`). `parseDuration` also reads "1 30". The wire is
+  unchanged (`duration_minutes`, `until`, `planned_amount`), the price is
+  still only the server's quote.
+- "Until a time" is the same kind of field, `ClockInput` "[ 14 ] : [ 30 ]",
+  24-hour, no ":" to type (`typeIntoClockHours` / `typeIntoClockMinutes` /
+  `clockOfDraft` / `settleClock` / `stepClock`): "1430" → 14:30, "0040",
+  "930" → 09:30; "3"…"9" in the hour goes on to the minutes; "25" → 02:5…;
+  "14:30", "14.30", "14 30" pasted land in both boxes; ↑/↓ round the clock.
+  A time half typed (minutes without both digits) is never quoted or
+  started; leaving the field writes it out ("9" → 09:00, "14","5" → 14:05).
+  The wire is still `until: "HH:mm"`; its length and day are the server's.
+  One line under it: the typing hint while empty, the server's answer once set.
+- **Typing over a filled box REPLACES it (review, 2026-11-05):** a box
+  entered by click, Tab or a click into the box already focused has its value
+  selected at once (no rAF: a fast first digit must not beat the selection);
+  the move on from the hours selects minutes it did NOT just write, and leaves
+  the caret after minutes it did write ("30" in the hours → "30мин"). The
+  move reports `wroteMinutes` explicitly (never inferred by comparing values:
+  "30мин" over 1:30 must stay 30 min). Backspace from empty minutes puts the
+  caret at the END of the hours (one digit per press). Minutes typed key by
+  key are never cut ("120" through the hours is 2 h). e2e «correcting a
+  filled length or time replaces it».
+- Hours never jump on by themselves ("10" then "0" is 100 min, not 10 h —
+  fourth review): a space, ":" or "ч" goes on to the minutes. Minutes keep up
+  to four digits as typed (a fourth is no longer dropped: "1500" is no length);
+  Backspace over a clock minute padded for you ("07") takes the pad with it.
+- **Nothing is rewritten while typed** (third review): digits stay as typed —
+  "90" in the minutes box is 90 min, "600" typed key by key is 10 h — and the
+  summary shows the minutes at once; `settleDuration` lays the boxes out as
+  hours and minutes when the field is left. (Laying "60" out early read the
+  next "0" as 1:00.) The clock keeps a third minute digit as NO time instead
+  of dropping one ("2400" key by key used to become 02:40).
+- Decimals: "1.30" / "1,30" is 1 h 30 min (two digits after the point, under
+  60, as "1:30" and the clock's "14.30"); "1.60" is refused, never re-read as
+  1.6 h; "1.5" is 1 h 30 min (one digit is a decimal; it stays in the hours
+  box while typed and is laid out on leaving); "1." is 1 h; "1.25ч" with a
+  unit is decimal hours. A whole length pasted into the minutes ("1 30",
+  "1.30") is read whole.
+- Both fields are thin wrappers of `components/ui/TwoBoxField.tsx` (frame,
+  two plain text boxes, ↑/↓, Backspace back to the hours, ×, invalid said
+  only once the field is left, `.two-box*` styles); the rules are the
+  caller's, so a new two-box field is a wrapper with its own rules.
+- «Настроить окно» hides optional parts — free start, price change, length,
+  total change — per person on this computer (`useHiddenParts`, key
+  `u{id}:cp.ui.start-dialog`, `{v:1, hidden}`; unknown ids ignored). A
+  hidden part is reset to its default while hidden, so nothing unseen changes
+  the start. The summary line, the rate, the mode and Start cannot be hidden.
+- Tests: `StartSessionDialog.test.tsx` («the simpler start dialog»),
+  `durationModel.test.ts` (`parseDuration`), `useHiddenParts.test.ts`,
+  `e2e/start-dialog.spec.ts` (1440/800/520: ≥ 16px between parts, nothing past
+  the edge; hidden stays hidden after a reload; nine phrasings typed key by
+  key, arrows, ×, error only after leaving). Every rule was mutation-checked.
+
 **"До времени" (2026-10-26).** Tabs "Продолжительность" / "До времени" above
 the plan; only the chosen one is read and sent, the other keeps its value.
 `ClockTimeField` takes "00:40" (`clockOf` checks the SHAPE only, "0:40" →
@@ -2402,9 +2670,17 @@ each minute (`useMinuteTick` → its `refresh` argument): the figure stays on
 screen while the same question is asked again, so Start never blinks off; a
 different time or rate blanks it as before.
 
-**The window (2026-10-25).** Resizable with no maximum; minimum 800×560
-(`electron/windowBounds.ts` `MIN_CONTENT`) — every screen reflows there, and
-below 1100 px the shell gutters tighten so the board keeps two columns. Size,
+**The window (2026-10-25).** Resizable with no maximum; minimum 520×560
+(`electron/windowBounds.ts` `MIN_CONTENT`; 800 until 2026-11-04, owner: "the
+window shrinks without limits") — every screen reflows there, and below
+1100 px the shell gutters tighten so the board keeps two columns, below 640
+to their smallest. No screen holds the window wider. `e2e/narrow-window.spec.ts`
+walks 26 screens at 520px, side menu folded and open: the page never scrolls
+sideways (fixed for it: `.appearance-grid` `minmax(min(300px, 100%), 1fr)`,
+`.screen-actions__buttons` may wrap, `.sound-device__volume`
+`min-width: min(240px, 100%)`). `e2e-electron/window-resize.spec.ts`: one
+squeeze takes the window to 520 on Active Places (list and grid), the list is
+whole there in pictures with the menu folded, and there is no window bridge. Size,
 place and maximized state are kept in the existing `Store` under
 `window.state` and restored only if the window still lands on a display
 (shrunk and moved inside it otherwise); first run opens at the default,
@@ -2838,6 +3114,108 @@ they did, and TypeScript caught it as a duplicate object property.
   `useLocalReorder.test.tsx` slot tests, `SessionsBoard.reorder.test.tsx`
   (real drag events → shown order + payload, failed save, reload),
   `SessionCard.test.tsx`.
+
+## «Интерфейс и тема», 2026-11-04
+
+- **«По умолчанию»**: the `standard` card is titled «По умолчанию» (it IS the
+  default: `DEFAULT_PREFERENCES.interface`), not a fourth duplicate card. A
+  first visit has it chosen and no «Мой интерфейс»; the card appears only
+  from what was SAVED (`hasOwnInterface(prefs)`), chosen, its words from
+  `interfaceSummary(prefs)`. Simple / Default / Compact are exactly their
+  preset (`effectiveLayout`, `effectiveBoard` = `BOARD_DEFAULTS`, labels
+  "auto"); «Мой» brings back exactly what was saved. Theme and sounds stay
+  global (their own sections), not part of an interface.
+- **Removed** (owner): card size 80–130 % (`scale`), «Без прокрутки» (`fit`),
+  side spacing (`gap_x` and its switch), columns (`columns` and «Сколько
+  поместится»). `BoardGeometry` is `{ gap_y }`; `parseBoard` reads only it,
+  so values an older build kept stop applying (a setting nobody can see is
+  one nobody can change back). The row spacing slider + switch stay.
+- **Button labels** `layout.button_labels`: "auto" (Оба: words, pictures in
+  a list row too narrow — as before), "icons" (pictures always, list AND
+  grid; in a grid card only the picture replaces the word inside its cell),
+  "text" (words always; a list too narrow is zoomed instead). Server-side:
+  `App\Support\UiPreferences::BUTTON_LABELS`, request rule
+  `data.layout.button_labels` — DEPLOY THE BACKEND FIRST, an older backend
+  refuses the key with 422. Presets carry "auto"; a document without the key
+  parses to "auto" and still equals its preset.
+- **Themes**: dark, light (softened), contrast, purple, midnight, emerald,
+  amber («Тёплая ночь»). One list, `THEMES` (same on the server, also deploy
+  FIRST: an older backend 422s a new name), offered by `themeChoices` on the
+  page and in the first-run setup. Each new one redefines the page, the
+  surfaces, the frames and the accent only. Since 2026-11-05 (owner: the
+  colours hurt the eyes) the five non-dark, non-contrast themes are calm:
+  «Серая» (id `light`, the white theme is gone), «Лаванда», «Полночь»,
+  «Шалфей», «Песок»; they share one softer status block
+  (`:is([data-theme="light"], …)`, after the themes).
+  `preferences/themes.test.ts` reads the stylesheet: every theme has its
+  block and swatch, and text / muted / accent / danger ≥ 4.5:1 on page and
+  surface, a primary button's text ≥ 4.5:1; no theme has a page or surface
+  above luminance 0.05; calm themes never use pure-white text.
+- **Preview docked** (see «The interface preview is drawn from…»).
+- Tests: `boardGeometry.test.tsx`, `FitBoardToScreen.test.tsx`,
+  `Appearance.personal.test.tsx` (first visit, save → «Мой», the exact
+  switch between cards, labels, row gap), `themes.test.ts`,
+  `e2e/button-labels.spec.ts` (Both / Icons list+grid / Text in real
+  Chromium), `e2e/active-places-responsive.spec.ts` (the dock in sight while
+  scrolling, lets go after, hides). Mutation-checked: «Мой» read from the
+  draft, a preset taking «Мой»'s layout, Text still showing pictures, a
+  theme accent under 4.5:1, grid pictures off; backend: a theme or the
+  labels rule removed.
+
+## A pad press says itself beside the card, never in it (2026-11-04)
+
+Owner: after pressing the joystick, nothing must be written on the card
+("3 · 500 ֏", "3/4 · 12 ֏", "Тариф сейчас: 2,300 ֏/ч") — it made the card, and
+its row, taller. Now:
+- The pad line keeps its empty `PAD_COUNT_STYLE` span only (same shape the
+  preview draws; the list hides an empty pad line). The identity + money,
+  «оплачено» (charge-once fee taken), the hourly «Тариф сейчас» and the
+  round-trip spinner are gone from the card. `padMax` / `joystickCount`
+  went with them (no other reader). The refusal (`session-card__error`) and
+  the free pill stay as before; the corner toast stays as before.
+- `components/sessions/PadChargeNote.tsx`: an anchor laid over the card
+  (`position: absolute; inset: 0`, out of the card's grid/flex flow, only
+  while shown) and the note in a portal on `<body>`, placed by
+  `useAnchoredPopover` (above the card, below if no room, inside the window,
+  follows scroll; not clipped by any section, not shrunk by the board zoom).
+  Orange (`--color-warning` border on `--color-warning-surface`,
+  `--notice-fg` text), `pointer-events: none`, `role="status"`, z 40 (above
+  the pinned bar, under dialogs at 50), fades in and out over its last 300ms.
+- `hooks/useTransientFlags.ts` (`flash(key)` / `isOn(key)`, per-key clocks,
+  a re-flash restarts, timers cleared on unmount): `SessionsBoard` flashes
+  the seat for 5000ms only AFTER the server accepted the add/remove AND the
+  read-back landed, so the note reads the seat as the server now holds it.
+  Never on a refusal, never from a socket update (only the presser sees it).
+- Tests: the pad-line assertions in `SessionsBoard.expiry.test.tsx` moved onto
+  the note (`pressPad`), plus its 5s life, no note on refusal, none from a
+  `joystick.added` socket event; `useTransientFlags.test.tsx`;
+  `e2e/pad-note.spec.ts` (grid and list: card size and every row unchanged,
+  note outside the card, orange, not clickable, gone after 5s);
+  `e2e/session-terms.spec.ts` names the pad in the note. Mutation-checked:
+  note on refusal, text back on the card, 50s instead of 5s.
+
+## Devices without a place (2026-11-04)
+
+Owner: "Active Places shows 10 seats at khanjyan, Places shows 7". Active
+Places draws DEVICES (`GET /pcs`), Places draws PLACES (`GET /places`); three
+devices there had `place_id = null` (two running sessions), so they were on
+the board and on no tile — and Computers lists `kind = pc` only.
+- `components/places/DevicesWithoutPlace.tsx`, under the Places tiles: an
+  amber `.card.state-notice` naming them, with «Удалить устройство» for
+  `can(role, "branch.places")` (`DELETE /pcs/{id}`: the device and every
+  session recorded on it; the confirm says so).
+- Delete is refused while a session runs, by TWO signals: the branch's
+  running sessions (`sessionRepository.runningPcIds`) and the device's own
+  `in_session` status. Only on a fresh, successful read: both strict reads
+  (`pcRepository.listWithoutPlace`, `runningPcIds`) THROW instead of falling
+  back to `[]`, and a reload in flight or failed disables it — "could not
+  tell" never reads as "nothing runs".
+- The backend now requires a place on `POST /pcs` and never accepts
+  `place_id: null` on `PUT`; `CreatePcBody.place_id` is required and
+  `UpdatePcBody.place_id` is `number` (no null) to mirror it.
+- Tests: `DevicesWithoutPlace.test.tsx` (8, down to `request()`,
+  mutation-checked on each running signal), `e2e/places-orphans.spec.ts`
+  (1440 and 520px, real CSS).
 
 ## 9.5.13 Six small changes (2026-10-11)
 
@@ -3342,8 +3720,10 @@ differ.
   `auto`/`minmax(a,b)` tracks there: each row sizes them alone and the
   columns drift. Measured: no button text off-centre, no part past the
   frame, columns aligned — 5 viewports × ru/en/am.
-- **Light theme** is soft on purpose (owner: white hurt the eyes): page
-  `#e6e9ee`, surfaces `#f3f4f7`, text `#1c2330`; every text ≥ 4.5:1.
+- **No white theme** (2026-11-05, owner): the id `light` is kept (saved
+  preferences and the backend whitelist use it) but it is the grey
+  «Серая»: page `#1f2226`, surface `#282c31`, text `#d9dce1`, accent
+  `#8fb3d1`. Seven themes, see «Интерфейс и тема, 2026-11-04».
 - **«Интерфейс и тема»** (`/appearance`, every role; `nav.appearance`):
   ready-made interface, theme, preview (`AppearancePreview`: the board's own
   classes, `inert`, no handlers), own layout, side-menu order/visibility
@@ -3378,3 +3758,254 @@ differ.
   system → `isAudioBlocked()` + «Включить звук»; visuals never depend on it.
 - **Typecheck**: `npm run typecheck` (`tsc -p .` checks nothing — the root
   tsconfig has `"files": []`).
+
+## Folding the side menu to a rail (2026-11-03)
+
+One toggle, `SidebarToggle`, in `PageTopBar`'s left slot before Back. It is a
+36px circle in Back's glass, the bar's own height, so `barBottomInset` does not
+change. It never moves under the pointer or focus, so focus is never lost. Its
+`aria-label` is "Side menu" (`nav.sideMenu`), its `title` is the action
+(`nav.menuHide` / `nav.menuShow`: Collapse / Expand menu), and
+`aria-expanded` + `aria-controls` point at `#app-sidebar`.
+
+**Folded = a 64px rail, never zero** (the owner asked that the menu stay
+visibly there). The rail shows the logo, every entry's icon (its name as a
+`title` tooltip, unread as a red dot), the Support tile and the avatar, all
+centred on the rail's 32px axis. Every entry stays clickable and tabbable.
+Sign-out is the one exception: it sits past the edge, so it fades and leaves
+the Tab order (`visibility: hidden`).
+
+- **State**: `src/components/SidebarCollapse.tsx`. `AppShell` owns `collapsed`
+  and renders `div.app-shell.app-shell--collapsible[.is-sidebar-collapsed]`.
+  `Layout` passes its children already built, so a toggle re-renders only
+  AppShell, PageTopBar and Sidebar. The page, the notifiers and
+  `Ps5ControlProvider` are not even re-rendered, and nothing remounts. It is not
+  persisted: the menu is shown on every launch and sign-in, and stays as set
+  across screens.
+- **How the rail is made**: the column animates `240px → 64px`
+  (`grid-template-columns`). The sidebar's width follows the column, while its
+  nav, footer and brand row keep the OPEN widths (`--sidebar-w` minus the
+  paddings), so no label re-wraps mid-fold. The sidebar's own `overflow:
+  hidden` clips the rest, which also takes no clicks: a click right of the rail
+  lands in `main`. A row's hover/current surface narrows to a 40px tile via an
+  animated `clip-path: inset(...)`. Labels fade, because their first letters
+  would show. The footer cards lose edge and fill; the tiles and logo shift
+  `translateX(-10px / -12px)` onto the axis. When folded, focus rings go on the
+  icon, tile or avatar, because the row outline would be cut by the edge.
+- **Motion**: every transition of the fold is inside
+  `@media (prefers-reduced-motion: no-preference)`; with reduced motion it
+  folds at once. Width-dependent widgets already follow `main`: the map and
+  `useFitsInline` use ResizeObserver, and the board uses container queries. A
+  new widget that measures only on `window.resize` would NOT see a toggle.
+- **Owner web**: it renders the same `Sidebar` in its drawer with no AppShell.
+  `useSidebarCollapse()` returns null there, so there is no toggle, no id and no
+  tooltips, and the CSS uses `> .sidebar` child selectors that cannot reach
+  `.web-drawer .sidebar`.
+- The account popover (portal) closes when the menu folds.
+- A role with many entries scrolls the rail with the wheel. The nav's
+  scrollbar is past the edge, so it does not show.
+
+Tests:
+- `SidebarCollapse.test.tsx` (11, real Layout/Sidebar/PageTopBar).
+- `e2e/sidebar-collapse.spec.ts` (7, real Chromium). It covers: mid-fold
+  geometry, the final widths, icons/tiles/logo on the axis, label opacity 0,
+  sign-out hidden, a rail click navigates, keyboard reach (rail yes,
+  sign-out no), reduced motion, no sideways scroll at 800×560 / 1280×800 /
+  1920×1080, and zero requests. The zero-requests test waits for network
+  quiet first: the board's full load reopens the Reverb socket, and its
+  `/broadcasting/auth` burst (once, ~0.3 s after open) used to land in the
+  window.
+- Mutation-verified: remount on toggle, re-render of the children, popover
+  left open, id leaked to the web, a descendant selector, no tooltips when
+  folded, a zero-wide rail, a transition outside the motion query, sign-out
+  left visible, tiles off-axis, and a toggle that fires a request.
+
+## Personal interface: board, «Мой интерфейс», branch shortcuts (2026-11-03)
+
+**The server refuses unknown keys.** `UpdateUserPreferencesRequest` validates
+with `array:keys`, so any key the backend does not list gets a 422 and NOTHING
+is stored. A new field sent in `data` would break every save. That is why:
+
+- **Board geometry is local, per person**: `u{id}:cp.ui.board` =
+  `{ v: 1, gap_y }` (since 2026-11-04; `gap_x`, `columns`, `scale`, `fit` an
+  older build wrote are left unread), parsed by `parseBoard`.
+  - The row gap is 8–64 px on the 4px scale; null = the density's own.
+  - It is held as `UiPreferences.board`, but `toDocument` lists the server's
+    four keys only.
+  - Saving writes it FIRST, awaited; if it cannot be written, nothing is
+    applied and `saveFailed` is set.
+  - It applies only with «Мой интерфейс» and does not follow the person to
+    another PC.
+  - To sync it: add the keys to the backend request rules, deploy the backend
+    FIRST, then move the fields into `layout`.
+- **CSS on `<html>`**: `--board-gap-y` (the person's row spacing, unset =
+  the density's) and `data-button-labels` (auto / icons / text). The grid
+  gap is `var(--board-gap-y, --gap-grid) var(--gap-grid)`. Unset, the old
+  CSS applies exactly. Side spacing, fixed columns, the size zoom and «Без
+  прокрутки» were removed 2026-11-04 (owner): no `--board-gap-x`,
+  `--board-cols`, `--board-scale` or `--board-fit-gap` any more.
+- **The list's width fit is one CSS `zoom`** on `.live-grid--sessions`:
+  `var(--board-fit, 1)`, set by `FitBoardToScreen` on `main` (list view only).
+  - Zoom, not transform: it relays out, hit-testing follows, and
+    position: fixed is not broken. The board reads no geometry.
+  - It re-fits on `main`'s ResizeObserver and on childList mutations only (a
+    clock tick is characterData). It clears its marks on unmount.
+- **The screen-bg fix**: under the pinned top bar, `.cp-topbar ~ .screen-bg`
+  is `min-height: calc(100% - 50px)` (bar 36 + margin 14). At 100% EVERY
+  desktop screen scrolled ~50px even when its content fitted.
+- **A list row keeps its own size and look at every window size** (owner,
+  2026-11-03, after GameZone.html): texts, then the buttons on the right, on
+  one line, for a free seat and a running one alike, never shrunk or
+  rearranged for a small window.
+  - The list grid is `minmax(max-content, 1fr)`: every row is as wide as the
+    widest one needs, so the Start / Stop column lines up.
+  - The section keeps `.cp-section-inner:has(> .live-grid--sessions)`:
+    `overflow-x: auto; overflow-y: hidden` (both non-visible, so the fold
+    animation still clips) as the last resort below `MIN_WIDTH_ZOOM`. The
+    owner rejected sideways scroll as the normal case: the width fit
+    (pictures, then zoom, below) keeps the list whole.
+  - Below 1460 there is one set of row columns:
+    `110px minmax(130px, 170px) minmax(130px, 1fr) auto`. The old 1184 / 990 /
+    880 / 640 rules that moved buttons under the texts are gone.
+  - The buttons' cell has `min-width: max-content`.
+  - An EMPTY PlayStation pad line (`.row` > empty `.row`) is `display: none`
+    in a row. It made a running row taller. With content it shows as before.
+  - Tried and dropped the same day: zooming rows to the window's width, and
+    folding buttons under the texts. The owner wants the same size.
+  - Row sizes (owner, 2026-11-03, "a touch larger"): buttons 38px / 14px
+    (min-width 76, padding 0 14), number 16px, clock 17px, «Свободно» 15px,
+    platform 12px, state word 13px, `--row-py` 12px (S 8, L 16).
+- **Pictures instead of words when a row does not fit** (owner, 2026-11-03,
+  down to 520px, the same order and places, no mobile rearrangement):
+  - `SessionCardAction` takes an optional `icon` (`ActionIcon`: add-item,
+    extra, add-time, pause, resume, relocate, stop, more; Lucide geometry
+    through the shared `ui/LineIcon`, which `NavIcon` now uses too). The icon
+    is drawn hidden (`.session-card__btn-icon { display: none }`), so a card
+    or a row with room looks exactly as before. `title` / `aria-label` stay
+    the full label. Start keeps its word. The pad switch was already a picture.
+  - `installBoardFit` (list), cheapest first, all within one frame:
+    1. words, as is;
+    2. `data-board-icons` on the board's container when the words do not
+       fit: every action button 38px square with its picture, the actions'
+       gap 4px, and in the compact layout the columns
+       `96px 120px minmax(110px, max-content) auto` with a 10px column gap
+       (the clock and its money stay on one line);
+    3. only then the whole-list zoom (room / natural with pictures, floor
+       `MIN_WIDTH_ZOOM` 0.5).
+  - Below 640px (the owner web, and the desktop window since 2026-11-04) the
+    gutters are at their smallest: `.main` 8px, `.screen-bg` 12/8px, a
+    section's left indent 12px.
+  - Measured in Chromium, list, 6 seats / 3 playing, menu folded: 1920 → 520
+    every 20px, no sideways scroll at all; at 520 the list is at zoom 0.595.
+    With the side menu OPEN, 520 leaves the list 218px (the menu alone is
+    240): even pictures at the floor do not fit, so there (only) the list
+    scrolls sideways inside its section, the page never.
+- **The window is never held wider for the board** (owner, 2026-11-04,
+  "without limits"). A board-driven window minimum existed for one day
+  (2026-11-03: `KeepBoardWhole`, the `window:min-content-width` IPC channel,
+  the `cyberplaceWindow` bridge, gutter-aware measurement) and was REMOVED
+  with all of it: the window shrinks to its 520 base on every screen, and the
+  list keeps itself whole by pictures, then zoom, then (only past the floor)
+  a sideways scroll inside its section. Do not bring a window minimum back
+  without the owner asking: it is the thing that "would not let the window
+  get smaller".
+- **`FitBoardToScreen` / `installBoardFit(target)`** serve the list's width
+  only (measured by `boardMeasure.ts` `measureLists`, the rows laid out
+  `max-content` under `[data-board-measure]` within one frame): words →
+  pictures (`data-board-icons`) → zoom down to `MIN_WIDTH_ZOOM` 0.5. The
+  height fit («Без прокрутки», `fitSearch`, `MIN_FIT_ZOOM`) is gone with its
+  switch (2026-11-04). The zoom rule is unconditional; unset, it is 1.
+- **`Switch` vs the account picker**: both used the `.cp-switch` class. The
+  picker's rule (column flex) is now `div.cp-switch`. Before, it stacked EVERY
+  `Switch` primitive app-wide, including the game cover and VIP minimum
+  forms, which now render as designed (track, then label, on one line).
+  `Switch` gained `size="md"` (44×24), `ariaLabel` and `testId`.
+  `RangeSlider` (ui) is the labelled native range used for every number on
+  the page.
+- **«Мой интерфейс» is a card among the ready-made ones** (ChoiceCards). It
+  appears only when `hasOwnInterface(prefs)`: custom is on, a non-preset
+  layout, or a non-default board. Its description is `interfaceSummary(prefs)`,
+  i.e. what was SAVED. Choosing it applies it. «Сбросить «Мой интерфейс»»
+  under the row asks first. «Вернуть интерфейс по умолчанию» only switches
+  and never wipes it.
+- **Branch shortcuts**: `components/branches/branchSections.ts` is the ONE
+  list of branch sections (key, path, title/hint keys, icon, `allowed(role)`).
+  - BranchHub's tiles are built from it.
+  - A test pins every `allowed` to the route's `RoleGuard` in App.tsx, for
+    every role.
+  - Menu ids are `branch.<key>.<branchId>`, kept in `layout.sidebar`.
+    `addedMenuSpecs` draws a shortcut only for owner or manager, only for a
+    section the hub offers that role, and a manager's only for their own
+    branch, each once.
+  - Every branch sub-route is inside `BlockedBranchGuard`, and the server
+    authorises as ever.
+  - The editor lists the role's sections with switches (`BranchShortcuts`;
+    owners pick a branch from `branchRepository.list({ company_id })`). In
+    the order editor, switching a shortcut off removes it.
+- **The interface preview is drawn from the board's own parts**:
+  - `AppearancePreview` uses `SessionCard`, `seatParts.tsx` (`SeatGrip`,
+    `SeatPlatformLine`, `SeatNameLine`, `sessionTariffLine`, `PAD_LINE_STYLE`
+    / `PAD_COUNT_STYLE`), `SessionTimer`, `PadToggle`, `SessionCardAction` and
+    `CardOverflow`, inside `CollapsibleSection` and `.live-grid--sessions`.
+  - `seatParts` was moved out of `SessionsBoard.renderCell` word for word. It
+    was proven by rendering the board before and after the move: the HTML was
+    byte-identical.
+  - It is drawn at the board's OWN size, pixel for pixel (owner, 2026-11-03):
+    laid out at the screen's content width (`previewWidth`) with no zoom, and
+    fitted by `installBoardFit` with the board's own options
+    (`useBoardFitOptions`, height fit excluded: it depends on the window's
+    height). So the same columns, words or pictures and zoom as the board;
+    what the settings card cannot show scrolls sideways inside
+    `.appearance-preview__frame`.
+  - It is docked (2026-11-04, owner: at the bottom of a long page nobody saw
+    it): `.appearance-preview-dock` (`appearance-preview-block`) is the first
+    child of the «Карточки активных мест» section (2026-11-05, owner: not
+    pinned over the whole page) and sticks under the pinned top bar while
+    that section's settings, «Отступ между рядами» included, are on screen;
+    it lets go where the section ends. Its body is at most
+    `min(40vh, 380px)` and scrolls inside; «Скрыть просмотр» hides it.
+    It is `components/appearance/PreviewDock.tsx`, which publishes its height
+    as `--preview-dock-h` on the section; the section's controls carry
+    `scroll-margin-top` from it, so focus / Tab / a scroll to one stops below
+    the stuck preview, not behind it (e2e + mutation-checked).
+  - `e2e/active-places-responsive.spec.ts` compares computed styles and
+    sizes of a playing seat (card, state, platform, number, clock, Stop,
+    Pause, pad) on the board and in the preview, list and grid, 1440 and 800
+    with the menu open. The board's data includes a seat in its last minutes
+    like the preview's sample: its thicker frame makes the widest row.
+  - Its sample seats are fixed in pattern; how many it draws is two full
+    rows of the grid as laid out (`previewSeatCount(columns)` = 2 × columns,
+    4..24; 4 in a list or jsdom), re-read on resize and on a look change, so
+    row spacing always shows (e2e: exactly 2 rows at 1366/1920/2560 and
+    after a card-size change). It is `inert`, has no handlers and reads
+    nothing.
+  - `AppearancePreview.parity.test.tsx` compares the skeleton of the preview's
+    running and free seats (tag, classes, data-action, order) with the real
+    board's. A card changed in one place and not the other fails it.
+- **Not done on purpose**: a free card-padding setting (S/M/L pairs padding
+  with min-heights; free padding clips the 198px card's buttons).
+
+Tests:
+- `preferences/boardGeometry.test.tsx`
+- `preferences/FitBoardToScreen.test.tsx`
+- `components/Sidebar.addedEntries.test.tsx` (route parity)
+- `routes/Appearance.personal.test.tsx`
+- `e2e/board-personalization.spec.ts` (5)
+- `e2e/board-fit.spec.ts` (15, real Chromium)
+- `e2e/active-places-responsive.spec.ts` (8, real Chromium: the 1920 → 520
+  sweep, menu open, grid, preview parity ×4, preview position)
+- `components/sessions/SessionCardAction.icon.test.tsx`
+
+Mutation-verified:
+- the board in the server document, the board write not awaited;
+- a manager adding another branch, an admin allowed, a section's `allowed`
+  drifting from its route;
+- presets counted as own, reset without confirm, the default wiping «Мой
+  интерфейс», the summary read from the draft;
+- gaps unclamped, the fixed-columns rule removed, the gap fallback lost;
+- the fit spacing step removed, the floor ignored, re-fit on clock ticks;
+- list buttons back under the texts, the screen-bg 100% back, the
+  `.cp-switch` collision back;
+- the pictures step removed, the pictures never shown, the gutters'
+  narrow answer ignored, the preview without the board's fit, the preview
+  moved above the choices or into its own section.

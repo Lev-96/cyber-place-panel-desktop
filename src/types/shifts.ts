@@ -50,11 +50,19 @@ export interface ShiftHistoryFilters {
   per_page?: number;
 }
 
+/** One part of a line's payment (report v4, 2026-11-07); absent on older reports. */
+export interface IShiftPaymentPart {
+  method: string;
+  amount: Money;
+}
+
 export interface IShiftPlaceLine {
   id: number;
   seat: string;
   platform: string;
+  /** `split` (v4): paid in parts, see `payments`. */
   method: string;
+  payments?: IShiftPaymentPart[];
   amount: Money;
   status: string;
   is_free: boolean;
@@ -165,7 +173,7 @@ export interface IShiftReport {
   /** v2: the records each total was summed from. */
   lines?: {
     places: IShiftPlaceLine[];
-    till: Array<{ id: number; method: string; amount: Money; status: string; at: string | null }>;
+    till: Array<{ id: number; method: string; amount: Money; status: string; at: string | null; payments?: IShiftPaymentPart[] }>;
     tournaments: Array<{ id: number; amount: Money; paid_at: string }>;
     member_topups: Array<{ id: number; amount: Money }>;
   };

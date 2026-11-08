@@ -50,7 +50,9 @@ const Till = () => {
     for (const o of data ?? []) {
       if (o.status !== "paid") continue;
       const v = Number(o.total) || 0;
-      by.set(o.payment_method, (by.get(o.payment_method) ?? 0) + v);
+      // A split sale (2026-11-07) counts each part under its own method.
+      const parts = (o.payments ?? []).length > 0 ? o.payments! : [{ method: o.payment_method, amount: v }];
+      for (const p of parts) by.set(p.method as IOrder["payment_method"], (by.get(p.method as IOrder["payment_method"]) ?? 0) + (Number(p.amount) || 0));
       all += v;
     }
     return { by, all };
@@ -96,7 +98,7 @@ const Till = () => {
                     how it was paid, what was handed over and given back,
                     and who sold it. */}
                 <div className="meta">
-                  {formatTime(o.created_at)} · {salePaymentText(o, t)}
+                  {formatTime(o.created_at)} · {salePaymentText(o, t, money)}
                   {saleCashText(o, t, money) ? ` · ${saleCashText(o, t, money)}` : ""}
                   {saleSellerText(o, t) ? ` · ${saleSellerText(o, t)}` : ""}
                   {o.status !== "paid" ? ` · ${t("till.voided")}` : ""}

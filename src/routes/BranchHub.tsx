@@ -4,6 +4,7 @@ import { useAuth } from "@/auth/AuthContext";
 import { can } from "@/auth/permissions";
 import BlockToggle from "@/components/blocking/BlockToggle";
 import BranchStatusPill from "@/components/branches/BranchStatusPill";
+import { BRANCH_SECTIONS, branchSectionPath } from "@/components/branches/branchSections";
 import BranchLiveScreen from "@/components/live/BranchLiveScreen";
 import Avatar from "@/components/ui/Avatar";
 import ScreenWithBg from "@/components/ui/ScreenWithBg";
@@ -94,23 +95,13 @@ const BranchHub = () => {
   // Every tile the branch offers, gated by role. Order is a per-device UI
   // preference (useLocalReorder), so staff can arrange the hub to taste
   // without any backend change.
-  const tiles: TileDef[] = [
-    { key: "sessions", to: `/branches/${id}/sessions`, title: t("hub.tile.sessions"), hint: t("hub.tile.sessionsHint"), show: true },
-    { key: "members", to: `/branches/${id}/members`, title: t("hub.tile.members"), hint: t("hub.tile.membersHint"), show: can(role, "branch.members") },
-    { key: "places", to: `/branches/${id}/places`, title: t("hub.tile.places"), hint: t("hub.tile.placesHint"), show: can(role, "branch.places") },
-    { key: "games", to: `/branches/${id}/games`, title: t("hub.tile.games"), hint: t("hub.tile.gamesHint"), show: can(role, "game.crud.branch") },
-    { key: "pcs", to: `/branches/${id}/pcs`, title: t("hub.tile.pcs"), hint: t("hub.tile.pcsHint"), show: true },
-    { key: "tariffs", to: `/branches/${id}/tariffs`, title: t("hub.tile.prices"), hint: t("hub.tile.pricesHint"), show: can(role, "branch.prices") },
-    { key: "products", to: `/branches/${id}/products`, title: t("hub.tile.products"), hint: t("hub.tile.productsHint"), show: true },
-    { key: "till", to: `/branches/${id}/pos`, title: t("hub.tile.till"), hint: t("hub.tile.tillHint"), show: true },
-    { key: "shift", to: `/branches/${id}/shift`, title: t("hub.tile.shift"), hint: t("hub.tile.shiftHint"), show: can(role, "shift.manage") },
-    { key: "managers", to: `/branches/${id}/managers`, title: t("hub.tile.managers"), hint: t("hub.tile.managersHint"), show: can(role, "manager.create") },
-    { key: "tournaments", to: `/branches/${id}/tournaments`, title: t("hub.tile.tournaments"), hint: t("hub.tile.tournamentsHint"), show: true },
-    { key: "subscribers", to: `/branches/${id}/subscribers`, title: t("hub.tile.subscribers"), hint: t("hub.tile.subscribersHint"), show: true },
-    // The route behind this has always been guarded by `branch.edit`; the tile
-    // was not, so a manager saw a Settings card that bounced them back.
-    { key: "edit", to: `/branches/${id}/edit`, title: t("hub.tile.settings"), hint: t("hub.tile.settingsHint"), show: can(role, "branch.edit") },
-  ];
+  const tiles: TileDef[] = BRANCH_SECTIONS.map((section) => ({
+    key: section.key,
+    to: branchSectionPath(section, id),
+    title: t(section.titleKey),
+    hint: t(section.hintKey),
+    show: section.allowed(role),
+  }));
   const visible = tiles.filter((x) => x.show);
   const byKey = new Map(visible.map((x) => [x.key, x] as const));
   const reorder = useLocalReorder(`hub:tiles:${id}`, visible.map((x) => x.key));

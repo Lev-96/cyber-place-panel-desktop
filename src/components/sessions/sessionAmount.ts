@@ -48,28 +48,82 @@ import { IExtraItem, IMinimumChargeRule, ISessionApi } from "@/types/sessions";
  * @param at Milliseconds since the epoch to price at; `Date.now()` in the UI,
  *           a fixed instant in tests.
  */
+/**
+ * The least time figure worth resetting (2026-11-05): one whole unit. Right
+ * after a reset the clock reads a few hundredths again within seconds; a
+ * reset control beside "0.11" would only waive cents. The server takes any
+ * positive figure — this decides only where the control is offered.
+ */
+export const RESET_MIN_AMOUNT = 1;
+
 export const sessionTimeCostAt = (session: ISessionApi, at: number): number =>
   sessionMinimumChargeAt(session, at).amount;
 
 /**
- * The clock with the session's VIP minimum charge applied — the same step
+ * The clock with the session's minimum charge applied — the same step
  * `SessionPricingCalculator::bill()` takes before adding anything
- * (`Session::minimumChargeAt`): ONCE per visit. Settled on a move after the
- * threshold → the clock plus the server's settled top-up (that seat's hour at
- * its rate; later seats by the minute). Otherwise → the whole clock, topped up
- * at the current tariff rate.
+ * (`Session::minimumChargeAt`), branch for branch: from the threshold to the
+ * minimum exactly the CURRENT seat's `rate × minimum`, past it that plus what
+ * the clock earned since the visit reached it (2026-11-07); a bill pinned past
+ * the minimum by a move / "+ Время" / unlimited → its total, then the clock on
+ * from the pin; a visit settled before 2026-11-07, or rounding up, read as
+ * they were billed.
  */
 export const sessionMinimumChargeAt = (session: ISessionApi, at: number): MinimumChargeResult => {
   const rule = session.min_charge ?? null;
   const clock = clockCostAt(session, at);
-  if (rule && rule.settled_amount != null) {
+  // Reset to zero (2026-11-05) — `SessionPricingCalculator::timeCharge`: the
+  // clock minus the clock at the reset, never below zero, and no VIP minimum
+  // after it. The raw clock is what every boundary above froze, so this one
+  // subtraction is exact across all of them.
+  const offset = session.time_reset_at ? session.time_reset_offset : null;
+  if (offset !== null && offset !== undefined) {
     return {
-      amount: round2(clock + rule.settled_amount),
-      applied: rule.settled_amount > 0,
-      billedSeconds: (rule.settled_billed_minutes ?? 0) * 60,
+      amount: Math.max(0, round2(clock - toNumber(offset))),
+      applied: false,
+      billedSeconds: playedSecondsBetween(session, session.started_at, at),
     };
   }
-  return applyMinimumCharge(rule, clock, playedSecondsBetween(session, session.started_at, at), tariffHourlyRate(session));
+  if (!rule) return { amount: clock, applied: false, billedSeconds: playedSecondsBetween(session, session.started_at, at) };
+  const played = playedSecondsBetween(session, session.started_at, at);
+  const covering = (total: number, covered: number): MinimumChargeResult => ({
+    amount: played <= covered
+      ? total
+      : round2(total + Math.max(0, round2(clock - clockCostAt(session, instantAtPlayed(session, covered, at))))),
+    applied: (rule.settled_amount ?? 0) > 0,
+    billedSeconds: Math.max(covered, played),
+  });
+  const oldTopUp = (): MinimumChargeResult => ({
+    amount: round2(clock + (rule.settled_amount ?? 0)),
+    applied: (rule.settled_amount ?? 0) > 0,
+    billedSeconds: (rule.settled_billed_minutes ?? 0) * 60,
+  });
+
+  // Rounding up — frozen before 2026-11-06 — reads as it did.
+  if (rule.mode === "round_up") {
+    if (rule.settled_total != null && rule.settled_seconds != null) return covering(rule.settled_total, rule.settled_seconds);
+    if (rule.settled_amount != null) return oldTopUp();
+    return applyMinimumCharge(rule, clock, played, tariffHourlyRate(session));
+  }
+  // Settled on a move before 2026-11-07 (no total): read as it was then.
+  if (rule.settled_amount != null && rule.settled_total == null) return oldTopUp();
+
+  // Pinned past the minimum by a re-basing (a move, "+ Время", unlimited).
+  const minimum = rule.minimum_minutes * 60;
+  if (rule.settled_total != null && rule.settled_seconds != null && rule.settled_seconds > minimum) {
+    return covering(rule.settled_total, rule.settled_seconds);
+  }
+
+  // The minimum at the seat the visit is on NOW, exactly (2026-11-07, owner:
+  // "1498 must be 1500") — `MinimumChargeRule::applyAtCurrentRate`; past it
+  // the clock from the instant the visit reached it.
+  const rate = tariffHourlyRate(session);
+  if (played < rule.after_minutes * 60 || rate === null) return { amount: clock, applied: false, billedSeconds: played };
+  const hour = perSecond(rate, minimum);
+  const amount = played <= minimum
+    ? hour
+    : round2(hour + Math.max(0, round2(clock - clockCostAt(session, instantAtPlayed(session, minimum, at)))));
+  return { amount, applied: amount > clock, billedSeconds: Math.max(minimum, played) };
 };
 
 /** What a minimum-charge rule did to a clock. */
@@ -546,6 +600,24 @@ export const autoResumeAtOf = (session: ISessionApi): number | null => {
   const open = (session.pauses ?? []).find((p) => p.resumed_at === null);
   const at = open?.auto_resume_at ? Date.parse(open.auto_resume_at) : NaN;
   return Number.isNaN(at) ? null : at;
+};
+
+/**
+ * The first moment (whole seconds), no later than `at`, at which the visit had
+ * PLAYED `seconds` — `Session::instantAtPlayed()` on the server, the same
+ * search: played time only grows, so the first second it reaches `seconds`.
+ */
+export const instantAtPlayed = (session: ISessionApi, seconds: number, at: number): number => {
+  const start = Math.floor(new Date(session.started_at as string).getTime() / 1000);
+  let lo = start + Math.max(0, seconds);
+  let hi = Math.floor(at / 1000);
+  if (lo >= hi) return at;
+  while (lo < hi) {
+    const mid = Math.floor((lo + hi) / 2);
+    if (playedSecondsBetween(session, session.started_at, mid * 1000) >= seconds) hi = mid;
+    else lo = mid + 1;
+  }
+  return lo * 1000;
 };
 
 /**

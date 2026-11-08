@@ -4,6 +4,14 @@ import { request } from "./client";
 export interface StartSessionBody {
   branch_id: number;
   pc_id: number;
+  /** The reservation this start fulfils (2026-11-07): Start on a reserved seat. */
+  booking_id?: number;
+  /**
+   * «Не оплачено» at the start (2026-11-07, owner): the player pays later, so
+   * nothing is paid ahead and, when the seat ends, the whole time is owed
+   * (the server sets `unpaid_since` at the start with nothing paid).
+   */
+  unpaid?: boolean;
   mode?: "fixed" | "open";
   time_package_id?: number;
   hourly_rate?: number;
@@ -61,9 +69,47 @@ export interface ITimeQuote {
   /** Whether this seat takes a price typed by hand (a seat with a plan). */
   price_editable: boolean;
   is_free: boolean;
+  /** The money asked for, when the time was asked for by money (2026-11-07); null otherwise. */
+  amount?: number | null;
 }
 
 /** What a planned hourly start would cost — the server's own figure. */
+/** A booking a start may fulfil, or the next one ahead (2026-11-07, `GET /sessions/start-options`). */
+export interface IStartOptionBooking {
+  id: number;
+  starts_at: string;
+  ends_at: string;
+  status?: string;
+  source: "staff" | "guest";
+  who: string | null;
+  contact_phone?: string | null;
+}
+
+/**
+ * ⚠️ ADVICE (2026-11-07): how long a NEW session may run on this seat from
+ * now, and which reservations it may fulfil. The start re-checks all of it
+ * under its lock; this only shapes the dialog.
+ *
+ * `max_minutes` null = no cap: nothing ahead, or the next booking is 10 h or
+ * more away (`free_until`/`next_booking` are then still filled, for
+ * information); 0 = a booking holds the seat now. Whether an open start is
+ * possible is `unlimited_allowed`, never `free_until`. With `booking_id`,
+ * that booking is not counted against the start.
+ */
+export interface IStartOptions {
+  free_until: string | null;
+  max_minutes: number | null;
+  unlimited_allowed: boolean;
+  next_booking: IStartOptionBooking | null;
+  claimable_bookings: IStartOptionBooking[];
+}
+
+export const apiStartOptions = (pcId: number, bookingId?: number) =>
+  request<IStartOptions>(`/sessions/start-options`, {
+    params: { pc_id: pcId, ...(bookingId === undefined ? {} : { booking_id: bookingId }) },
+    noCache: true,
+  });
+
 export interface IStartQuote {
   minutes: number;
   hourly_rate: number;
@@ -226,6 +272,10 @@ export interface IBillBreakdown {
     billed_minutes: number;
     played_time_cost: number;
   } | null;
+  /** What resetting the clock waived (2026-11-05), already out of `time_cost`; 0 when never reset. */
+  time_waived?: number;
+  /** Ended by a cancel (2026-11-06): the whole bill waived (`is_free` with it). Absent from an older backend. */
+  is_cancelled?: boolean;
 }
 
 export interface AddItemBody {
@@ -262,7 +312,26 @@ export const apiPreviewSession = (id: number) =>
 /** How the money was taken. `other` is the only one that carries free text. */
 export type PaymentMethod = "cash" | "card" | "other";
 
-export interface StopSessionBody {
+/** One part of a bill's payment (2026-11-07): a split has 2..3, one per method. */
+export interface IPaymentLine {
+  method: PaymentMethod | "deposit";
+  amount: number;
+  note?: string | null;
+}
+
+/**
+ * How a bill was paid, as every server takes it: ONE method (the fields every
+ * server has always taken), or SPLIT — `payments` (each part, summing to the
+ * bill to the cent) and `payment_note` (how; required). Never both.
+ */
+export interface PaymentFields {
+  payment_method?: PaymentMethod;
+  payment_method_other?: string;
+  payments?: { method: PaymentMethod; amount: number }[];
+  payment_note?: string;
+}
+
+export interface StopSessionBody extends PaymentFields {
   payment_method?: PaymentMethod;
   /** Required by the server ONLY when the method is `other`. */
   payment_method_other?: string;
@@ -286,10 +355,27 @@ export interface ICashHandover {
   change: string;
 }
 
+/**
+ * The payment of a seat that ended WITHOUT a stop at the till (2026-11-07):
+ * it ran out, or the kiosk ended it, so nobody chose a method. Allowed once,
+ * while its shift is open; `client_request_id` makes a repeat harmless.
+ */
+export const apiRecordSessionPayment = (id: number, body: PaymentFields & { cash_received?: string; client_request_id: string }) =>
+  request<{ session: ISessionApi; cash: ICashHandover | null }>(`/sessions/${id}/payment`, { method: "POST", body });
+
 export const apiStopSessionWithBreakdown = (id: number, body?: StopSessionBody) =>
   request<{ session: ISessionApi; breakdown: IBillBreakdown; cash?: ICashHandover | null }>(`/sessions/${id}/stop`, {
     method: "POST",
     body,
+  });
+
+/**
+ * Cancel a running seat (2026-11-06): it ends as Stop ends it, with the whole
+ * bill waived. `sessions.free`, branch-scoped and audited on the server.
+ */
+export const apiCancelSession = (id: number) =>
+  request<{ session: ISessionApi; breakdown: IBillBreakdown; cash?: ICashHandover | null }>(`/sessions/${id}/cancel`, {
+    method: "POST",
   });
 
 export const apiAddSessionItem = (id: number, body: AddItemBody) =>
@@ -432,11 +518,16 @@ export const apiRemoveSessionJoystick = (sessionId: number, slot: number) =>
   request<{ session: ISessionApi }>(`/sessions/${sessionId}/joysticks/${slot}`, { method: "DELETE" });
 
 /** +10 / +30 / +60, priced at the tariff the player is already on. */
-/** `charge`: the price typed by hand for these minutes (2026-10-25); omitted = the rate's. */
-export const apiAddSessionTime = (sessionId: number, minutes: number, charge?: number) =>
+/**
+ * `charge`: the price typed by hand for these minutes (2026-10-25); omitted =
+ * the rate's. `unpaid` (2026-11-07): «Не оплачено» as the dialog shows it,
+ * applied by the server BEFORE the time is added, so the added time is never
+ * counted as paid; omitted = left as it is.
+ */
+export const apiAddSessionTime = (sessionId: number, minutes: number, charge?: number, unpaid?: boolean) =>
   request<{ session: ISessionApi }>(`/sessions/${sessionId}/time`, {
     method: "POST",
-    body: charge === undefined ? { minutes } : { minutes, charge },
+    body: { minutes, ...(charge === undefined ? {} : { charge }), ...(unpaid === undefined ? {} : { unpaid }) },
   });
 
 /**
@@ -503,6 +594,33 @@ export interface IExtensionOptions {
  * those seats a second later — `apiTransferExtension` re-checks everything
  * under a row lock and may still refuse. Never treat this as a promise.
  */
+/**
+ * Time BY MONEY (2026-11-07): the server turns `amount` into minutes at this
+ * seat's rate and grants them — at exactly that money on a seat with a plan,
+ * at the rate elsewhere (its quote says which).
+ */
+export const apiAddSessionTimeByAmount = (sessionId: number, amount: number, unpaid?: boolean) =>
+  request<{ session: ISessionApi }>(`/sessions/${sessionId}/time`, {
+    method: "POST",
+    body: { amount, ...(unpaid === undefined ? {} : { unpaid }) },
+  });
+
+/**
+ * An unlimited seat given a fixed time from now (2026-11-07). The bill does
+ * not move; from then on it is a timed seat. Refused (422) for a seat with an
+ * end, a paused one, or one a booking is waiting for.
+ */
+export const apiLimitSession = (sessionId: number, minutes: number) =>
+  request<{ session: ISessionApi }>(`/sessions/${sessionId}/limit`, { method: "POST", body: { minutes } });
+
+/** Extra time not paid yet, on or off (2026-11-07); what is owed is worked out when the seat ends. */
+export const apiSetSessionUnpaid = (sessionId: number, on: boolean) =>
+  request<{ session: ISessionApi }>(`/sessions/${sessionId}/unpaid`, { method: "POST", body: { on } });
+
+/** ⚠️ ADVICE: what `apiAddSessionTimeByAmount` would grant — the minutes and the charge. Writes nothing. */
+export const apiSessionTimeQuoteByAmount = (sessionId: number, amount: number) =>
+  request<ITimeQuote>(`/sessions/${sessionId}/time-quote?amount=${amount}`);
+
 /** ⚠️ ADVICE: `apiAddSessionTime` re-checks and is what charges. Writes nothing. */
 export const apiSessionTimeQuote = (sessionId: number, minutes: number, charge?: number) =>
   request<ITimeQuote>(
@@ -591,6 +709,15 @@ export interface RelocateSessionBody {
 export const apiRelocateSession = (sessionId: number, body: RelocateSessionBody) =>
   request<{ session: ISessionApi }>(`/sessions/${sessionId}/relocate`, { method: "POST", body });
 
+/**
+ * Reset the clock to zero (2026-11-05): what it has earned is waived and the
+ * seat counts on from zero; goods and pads stay on the bill. `sessions.free`,
+ * branch-scoped and audited on the server.
+ */
+export const apiResetSessionTime = (sessionId: number) =>
+  // `waived`: what THIS reset waived (the audit amount).
+  request<{ session: ISessionApi; waived?: number }>(`/sessions/${sessionId}/reset-time`, { method: "POST" });
+
 /** Waive the bill, or put it back. Owner-level; the server enforces it. */
 export const apiSetSessionFree = (sessionId: number, isFree: boolean) =>
   request<{ session: ISessionApi }>(`/sessions/${sessionId}/free`, {
@@ -614,6 +741,8 @@ export const apiResumeSession = (sessionId: number) =>
 export type SessionActionName =
   | "started"
   | "stopped"
+  // How a seat that ended by itself was paid, recorded afterwards (2026-11-07).
+  | "payment_recorded"
   | "joystick_added"
   | "joystick_removed"
   | "time_added"
@@ -623,6 +752,15 @@ export type SessionActionName =
   | "resumed"
   | "free_enabled"
   | "free_disabled"
+  // The clock reset to zero (2026-11-05); `amount` is what was waived.
+  | "time_reset"
+  // The seat ended with its whole bill waived (2026-11-06); `amount` is what was waived.
+  | "cancelled"
+  // An unlimited seat given a fixed time from now (2026-11-07); `amount` is that time's price.
+  | "limited"
+  // Extra time not paid yet, switched on / off (2026-11-07); `amount` on `unpaid_on` is what was paid.
+  | "unpaid_on"
+  | "unpaid_off"
   // ⚠️ The server has emitted this since seat migration shipped; the client
   // type never learned it, so every `moved` line arrived typed as something
   // it is not and the history could not branch on it.
