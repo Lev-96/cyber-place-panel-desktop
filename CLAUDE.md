@@ -1079,7 +1079,7 @@ Rules:
 - **CTA in an empty state only where the screen already had a permission
   check for that action** (BranchesList `branch.create`+company, CompanyBranches
   `branch.create`, CompaniesList `company.create`, Managers `manager.create`,
-  Owners `owner.create`, ProductsList `product.crud`; the prices page's package
+  Owners `owner.create`, ProductsList `product.write`; the prices page's package
   empty kept its existing button).
 - Unknown route (signed in) → `routes/NotFound.tsx`, not a silent redirect;
   `/login`, `/forgot-password`, `/reset-password` still go to `/`; signed out,
@@ -1323,7 +1323,9 @@ button is not a permission: a manager who kept the URL could still POST.
 | Настройки филиала | ✅ | ✅ | ❌ |
 | Смена (open/close/report, `/branches/:id/shift`) | ✅ | ✅ | ✅ own branch (2026-10-19) |
 | Места | ✅ | ✅ | ❌ |
-| Товары — создать / изменить / удалить / скрыть | ✅ | ✅ | ❌ |
+| Товары — создать / изменить / цена / скрыть (`product.write`, 2026-11-09) | ✅ | ✅ | ✅ own branch |
+| Товары — удалить (`product.crud`) | ✅ | ✅ | ❌ (скрывает вместо удаления) |
+| История товаров (`product.history`) | ✅ | ✅ | ❌ |
 | Товары — список + поиск | ✅ | ✅ | ✅ |
 | Сессии, касса, игры, ПК, турниры, подписчики | ✅ | ✅ | ✅ |
 | Джойстики, доп. время, безлимит на живой сессии | ✅ | ✅ | ✅ |
@@ -1378,8 +1380,45 @@ Two things that look like oversights and are not:
   the bill grew says so and re-reads the bill. Only `cash_received` is sent;
   after the stop the figures shown are the server's `cash`.
 
-Product READS stay open to everyone: the POS sells from that list, and the
-manager's screen is the list plus a search box with no write control on it.
+Product READS stay open to everyone: the POS sells from that list.
+
+**Products: manager rights + the audit trail (2026-11-09).**
+- `product.write` (admin, owner, manager; backend `products.write`, the
+  manager's own branch only): create, edit name/category/kind/PRICE, show/hide
+  (= activate/deactivate). Gates ProductsList's New/Edit/Hide and the "new
+  product" form inside `SellProductsDialog` and `AddSessionItemDialog`
+  (`ProductBasketPanels` `canCreateProducts`). `product.crud` now means DELETE
+  only (admin, owner): a manager deactivates instead, the backend answers 403.
+- Hand-typed price lines on a bill stay owner-level on the backend's
+  `products.manage`. The panel has no control that sends one (every basket
+  line carries `product_id`; `{name, price}` is only built for a line without
+  one, which no UI path creates), so there was no panel gate to keep.
+- «История товаров» (`product.history`, admin + owner): a second tab on
+  ProductsList («Каталог / История товаров»), `components/products/ProductHistory`.
+  `GET /product-events` (`api/productEvents.ts`, `repositories/ProductEventRepository`,
+  `types/productEvents.ts` — `PRODUCT_ACTIONS` mirrors `App\Enums\ProductAction`).
+  Built like ShiftHistory: filters branch (opens on this branch, "all branches"
+  = all the account may see, StaffBranchScope) → employee
+  (`/product-events/actors?branch_id`) and product (the branch's catalogue),
+  both disabled with no branch and a pick not in the new branch dropped →
+  action → from/to; one request, page 1 on any change (`{key, page}`), 20 a
+  page, meta `{current_page,last_page,per_page,total}` as `/shifts`. Never
+  cached (not in httpCache `POLICIES`). Rows: `formatVenueDateTime`
+  (`i18n/dates.ts`, Asia/Yerevan on any machine, 24h), actor name + role,
+  action label, product name (snapshot), branch, and old → new from
+  `productEventChange.describeChange` (price rows read `old_price`/`new_price`
+  through `money()`; other edits diff `before`/`after`; created / deleted /
+  activated / deactivated show no line). Empty / no-match / error states.
+- The tab exists only if `productEventRepository.available(branchId)` answers:
+  a 404/501 from `/product-events/actors` hides it (backend not deployed);
+  any other failure keeps it and the history shows its error. No probe is
+  sent for a manager.
+- Tests: `ProductsList.test.tsx` (manager create/edit/hide, no delete; owner +
+  admin tab; manager no tab and no probe; 404 hides), `ProductHistory.test.tsx`
+  (10), `productEventChange.test.ts`, `ProductEventRepository.test.ts`,
+  `dates.test.ts` (venue clock), permissions + both dialog tests. Mutation-
+  checked 15 ways (each caught).
+
 So do PRICE reads, since 2026-09-03: the sessions board shows what a session
 will cost and the "+ joystick" button has to know a price exists before it
 offers to add one.
@@ -4069,3 +4108,72 @@ Mutation-verified:
 - the pictures step removed, the pictures never shown, the gutters'
   narrow answer ignored, the preview without the board's fit, the preview
   moved above the choices or into its own section.
+
+## Cyber Place Platform billing in the panel (2026-11-09)
+
+Contract: `~/cyber-place-local/reports/2026-11-09-billing-design.md` (backend
+builds it). Types `src/types/platformBilling.ts`, transport
+`src/api/platformBilling.ts`, UI `src/components/platformBilling/*`.
+
+- **Server-owned figures only.** Money arrives as decimal strings and is only
+  formatted (`useBillingMoney` → `money()` for AMD, `centsWhenFractional`);
+  balance, state, overdue days and access are printed as sent. Calendar dates
+  (`due_on`) go through `formatBillingDate` (no UTC lift: "2026-12-10" is a
+  day in Yerevan). Not cached (`httpCache` POLICIES does not list them);
+  `/platform-invoices` writes fan out to `/branches`, `/places`, `/tournaments`.
+- **Older backend = feature absent, never an error.** `…OrNull` readers turn a
+  404/501 (only those, `isMissingEndpoint`) into `null` and the card renders
+  nothing; `.home-aside:empty` then takes no room, so that dashboard is the old
+  one. Every new field on existing resources is optional.
+- **Dashboard** (`routes/Home.tsx`): data-driven tiles/links, each with a
+  `NavIcon` (new shape `home.upcoming` = Lucide calendar-clock); the owner's
+  "Places" tile is gone (payload key `all_places` kept). Right column
+  `.home-aside` (~400px, wraps under 1100px): owner `PlatformDebtCard`
+  (`GET /company/{id}/platform-billing`, re-read when a `platform_billing.*`
+  row reaches the feed), admin `PlatformFleetCard` (`GET /platform-invoices?
+  state=open` + optional `totals`), manager nothing. "Details" →
+  `PlatformBillingModal` (running month marked estimate, invoice history
+  paginated by the server, `InvoiceView` = `GET /platform-invoices/{id}`).
+- **Branch hub**: each tile draws its `BRANCH_SECTIONS[].icon`; drag and the
+  read-only attributes are untouched. `billing_access` ≠ active on the branch
+  payload → one `state-notice` banner (`billingAccessNoticeKey`): what is
+  limited, that running seats continue; owners also read "pay to restore".
+  Tiles stay live (stop/pay/add time still work; the server refuses only the
+  gated writes, and the start/reserve/tournament dialogs show its message).
+- **`billing_restricted` / `billing_suspended` are NOT network-block codes.**
+  `auth/networkBlock.ts` must never list them (they would lock the whole app
+  like `access_blocked`); pinned by `api/client.billingCodes.test.ts`.
+- **Admin "Club payments"** (`/platform-billing`, `menu.platformBilling`,
+  sidebar icon `nav.platformBilling` = Lucide wallet): server-filtered list,
+  detail with journal, and payment / adjustment / extension dialogs. Pure
+  validators in `invoiceActions.ts` (amounts stay strings; adjustment and
+  extension need a reason; new due date > today in Yerevan) → `useConfirm()` →
+  POST; the server's refusal stays in the dialog.
+- **Notifications feed**: admins now get the DB feed, filtered to
+  `platform_billing.*` rows only (`feedRowFilter`: list, badge, push; the poll
+  compares server count with server count). Payment notices render in the
+  Billing section, ALWAYS IN ARMENIAN (`billingNotice.ts`, `NOTICE_LANG =
+  "am"`; titles are the owner's, same as backend `lang/am/billing.php`;
+  `payment_recorded` / `extended` titles are the panel's wording), with
+  "Details" opening the invoice. The old client-computed owner reminder steps
+  aside when `/company/{id}/billing` carries `outstanding_amount` (new
+  backend) and still works on an older one.
+- **Settings → Notifications** (owner): `data.notifications` in the same
+  preference document. `null` = legacy (all on, platform_billing on) and is
+  NOT serialised, so an old backend (422 on unknown keys) keeps accepting
+  saves of the look; a stored block is always sent back.
+  `saveNotifications` is its own PUT (does not drop an Appearance draft) and
+  reverts the switch on refusal. Mandatory notices (overdue, restriction,
+  suspension, restore) are explained, not offered as switches.
+
+Tests: `routes/Home.test.tsx`, `routes/BranchHub.icons.test.tsx`,
+`routes/PlatformBilling.test.tsx`, `components/platformBilling/invoiceActions.test.ts`,
+`preferences/uiPreferences.notifications.test.ts`,
+`components/settings/NotificationSettings.test.tsx`,
+`routes/Notifications.billing.test.tsx`, `api/client.billingCodes.test.ts`,
+admin block in `notifications/NotificationsContext.test.tsx`. Mutation-verified
+(18): Places tile back, tile/hub icon dropped, 404 not swallowed, modal ignores
+the invoice, banner never shown, confirm skipped, reason optional, method
+dropped, extension allows today, notifications always serialised, no revert on
+refusal, notice in UI language, admin feed unfiltered / off, billing code added
+to the network block, legacy reminder kept, billing rows left in the seats feed.
