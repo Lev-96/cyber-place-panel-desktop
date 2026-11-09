@@ -6,7 +6,7 @@ import { ReactNode, createContext, useCallback, useContext, useEffect, useMemo, 
 import {
   BOARD_DEFAULTS, DEFAULT_PREFERENCES, NEW_PERSON_PREFERENCES, ONBOARDING_VERSION, SCHEMA_VERSION,
   effectiveBoard, effectiveLayout, parseBoard, parsePreferences, toBoardDocument, toDocument,
-  type BoardGeometry, type Layout, type NotificationPrefs, type UiPreferences,
+  type BoardGeometry, type Layout, type NotificationPrefs, type SoundPrefs, type UiPreferences,
 } from "./uiPreferences";
 
 /**
@@ -45,6 +45,13 @@ export interface UiPreferencesState {
    * too. Rejects with the server's error for the screen to show.
    */
   saveNotifications: (next: NotificationPrefs) => Promise<void>;
+  /**
+   * Save the notification sounds alone (2026-11-09: they moved from the
+   * interface screen to Settings). Its own PUT, like the notification
+   * switches: it never saves or drops an unsaved look left on the interface
+   * screen, and goes back if the server refuses it.
+   */
+  saveSound: (next: SoundPrefs) => Promise<void>;
   finishOnboarding: (next: UiPreferences) => Promise<void>;
   preview: (candidate: UiPreferences | null) => void;
   /**
@@ -229,6 +236,40 @@ export const UiPreferencesProvider = ({ children }: { children: ReactNode }) => 
     }
   }, []);
 
+  /**
+   * Save one part of the document (notification switches, sounds) on its own
+   * PUT: the saved document with just that part changed. An unsaved look on
+   * the interface screen is neither sent nor dropped. On a refusal the part
+   * goes back to what it was and the error reaches the caller.
+   */
+  const saveSlice = async (patch: Partial<Pick<UiPreferences, "notifications" | "sound">>) => {
+    const id = owner.current;
+    if (id === null) return;
+    const before = prefs;
+    const doc = toDocument({ ...prefs, ...patch });
+    setPrefs((p) => ({ ...p, ...patch }));
+    try {
+      const reported = pendingOnboarding.current ?? undefined;
+      await preferencesRepository.put({
+        schema_version: SCHEMA_VERSION,
+        data: doc,
+        ...(reported !== undefined ? { onboarding_version: reported } : {}),
+      });
+      if (owner.current !== id) return;
+      setHasSaved(true);
+      void keyValueStore.set(cacheKey(id), doc).catch(() => {});
+    } catch (e) {
+      if (owner.current === id) {
+        setPrefs((p) => ({
+          ...p,
+          ...("notifications" in patch ? { notifications: before.notifications } : {}),
+          ...("sound" in patch ? { sound: before.sound } : {}),
+        }));
+      }
+      throw e;
+    }
+  };
+
   const value = useMemo<UiPreferencesState>(() => ({
     prefs,
     shown,
@@ -238,29 +279,8 @@ export const UiPreferencesProvider = ({ children }: { children: ReactNode }) => 
     hasSaved,
     saveFailed,
     save: (next) => persist(next),
-    saveNotifications: async (next) => {
-      const id = owner.current;
-      if (id === null) return;
-      const before = prefs.notifications;
-      const doc = toDocument({ ...prefs, notifications: next });
-      // Its own PUT rather than `persist`: saving a notification switch must
-      // not drop an unsaved look the person left on the interface screen.
-      setPrefs((p) => ({ ...p, notifications: next }));
-      try {
-        const reported = pendingOnboarding.current ?? undefined;
-        await preferencesRepository.put({
-          schema_version: SCHEMA_VERSION,
-          data: doc,
-          ...(reported !== undefined ? { onboarding_version: reported } : {}),
-        });
-        if (owner.current !== id) return;
-        setHasSaved(true);
-        void keyValueStore.set(cacheKey(id), doc).catch(() => {});
-      } catch (e) {
-        if (owner.current === id) setPrefs((p) => ({ ...p, notifications: before }));
-        throw e;
-      }
-    },
+    saveNotifications: (next) => saveSlice({ notifications: next }),
+    saveSound: (next) => saveSlice({ sound: next }),
     finishOnboarding: async (next) => {
       // Finished on screen at once, whatever the network does: the wizard is
       // never shown twice in one sitting because a save was slow.

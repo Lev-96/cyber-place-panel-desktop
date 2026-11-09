@@ -63,28 +63,31 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe("Settings → Notifications", () => {
-  test("a person with no stored block sees everything on, and the mandatory notices explained", async () => {
+  test("an owner chooses platform payments only; the other kinds are not offered", async () => {
     await mount();
-    for (const id of ["notif-bookings", "notif-sessions", "notif-support", "notif-system", "notif-platform_billing",
-      "notif-platform_billing-email", "notif-platform_billing-telegram"]) {
+    for (const id of ["notif-platform_billing", "notif-platform_billing-email", "notif-platform_billing-telegram"]) {
       expect(sw(id).checked, id).toBe(true);
+    }
+    for (const id of ["notif-bookings", "notif-sessions", "notif-support", "notif-system"]) {
+      expect(screen.queryByTestId(id), id).toBeNull();
     }
     expect(screen.getByText("settings.notifications.mandatory")).toBeTruthy();
   });
 
-  test("a switch saves the whole document with the block", async () => {
+  test("a switch saves the whole document, the other kinds written as off", async () => {
     await mount();
-    await act(async () => { fireEvent.click(sw("notif-bookings")); });
+    await act(async () => { fireEvent.click(sw("notif-platform_billing-email")); });
     await waitFor(() => expect(repo.put).toHaveBeenCalledTimes(1));
     const sent = lastPut().data;
     expect(sent.theme).toBe("dark");
+    // Off for an owner even when nothing was stored before (a legacy "on" is never written).
     expect(sent.notifications).toEqual({
       categories: {
-        bookings: { enabled: false }, sessions: { enabled: true }, support: { enabled: true }, system: { enabled: true },
-        platform_billing: { enabled: true, email: true, telegram: true },
+        bookings: { enabled: false }, sessions: { enabled: false }, support: { enabled: false }, system: { enabled: false },
+        platform_billing: { enabled: true, email: false, telegram: true },
       },
     });
-    expect(sw("notif-bookings").checked).toBe(false);
+    expect(sw("notif-platform_billing-email").checked).toBe(false);
     expect(await screen.findByText("settings.notifications.saved")).toBeTruthy();
   });
 
@@ -99,9 +102,9 @@ describe("Settings → Notifications", () => {
   test("an older backend refuses: the switch goes back, the error shows, the look still saves", async () => {
     repo.put.mockRejectedValueOnce(Object.assign(new Error("The data field must only contain…"), { status: 422 }));
     await mount();
-    await act(async () => { fireEvent.click(sw("notif-sessions")); });
+    await act(async () => { fireEvent.click(sw("notif-platform_billing-telegram")); });
     expect(await screen.findByRole("alert")).toHaveProperty("textContent", "settings.notifications.saveFailed");
-    expect(sw("notif-sessions").checked).toBe(true);
+    expect(sw("notif-platform_billing-telegram").checked).toBe(true);
     expect(api!.prefs.notifications).toBeNull();
 
     // The next save of the look goes out exactly as before the setting existed.
@@ -111,10 +114,10 @@ describe("Settings → Notifications", () => {
   });
 
   test("a stored block survives a save of the look", async () => {
-    repo.stored = { theme: "dark", notifications: { categories: { system: { enabled: false } } } };
+    repo.stored = { theme: "dark", notifications: { categories: { platform_billing: { enabled: true, email: false, telegram: true } } } };
     await mount();
-    expect(sw("notif-system").checked).toBe(false);
+    expect(sw("notif-platform_billing-email").checked).toBe(false);
     await act(async () => { await api!.save({ ...api!.prefs, theme: "emerald" }); });
-    expect((lastPut().data.notifications as { categories: { system: { enabled: boolean } } }).categories.system.enabled).toBe(false);
+    expect((lastPut().data.notifications as { categories: { platform_billing: { email: boolean } } }).categories.platform_billing.email).toBe(false);
   });
 });

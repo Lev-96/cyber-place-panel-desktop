@@ -4,22 +4,26 @@ import { useLang } from "@/i18n/LanguageContext";
 import { useUiPreferencesOptional } from "@/preferences/UiPreferencesContext";
 import {
   effectiveNotifications,
-  type NotificationCategory,
   type NotificationPrefs,
 } from "@/preferences/uiPreferences";
 import { useState } from "react";
 
-const ROWS: ReadonlyArray<{ category: Exclude<NotificationCategory, "platform_billing">; labelKey: string }> = [
-  { category: "bookings", labelKey: "settings.notifications.bookings" },
-  { category: "sessions", labelKey: "settings.notifications.sessions" },
-  { category: "support", labelKey: "settings.notifications.support" },
-  { category: "system", labelKey: "settings.notifications.system" },
-];
+/**
+ * The kinds an owner no longer chooses here (2026-11-09): the seat and booking
+ * feed is the manager's, so for an owner they are off. Written as off with
+ * every save, so a first save never stores them "on" from a legacy default.
+ */
+const OWNER_OFF: Pick<NotificationPrefs["categories"], "bookings" | "sessions" | "support" | "system"> = {
+  bookings: { enabled: false },
+  sessions: { enabled: false },
+  support: { enabled: false },
+  system: { enabled: false },
+};
 
 /**
- * «Уведомления» in Settings (owner, 2026-11-09): which kinds of notification
- * the owner receives, and for Cyber Place Platform payment notices which
- * channels. Saved with the person's preference document (`PUT
+ * «Уведомления» in Settings (owner, 2026-11-09): Cyber Place Platform payment
+ * notices and their channels — the only kind an owner chooses (the rest are
+ * off for an owner; sounds have their own section). Saved with the person's preference document (`PUT
  * /user/preferences`, `data.notifications`) on every switch.
  *
  * The server owns the policy: overdue, restriction, suspension and restore
@@ -55,26 +59,12 @@ const NotificationSettings = () => {
     }
   };
 
-  const setCategory = (category: Exclude<NotificationCategory, "platform_billing">, enabled: boolean) =>
-    void save({ categories: { ...current.categories, [category]: { enabled } } });
-
   const setBilling = (patch: Partial<typeof pb>) =>
-    void save({ categories: { ...current.categories, platform_billing: { ...pb, ...patch } } });
+    void save({ categories: { ...OWNER_OFF, platform_billing: { ...pb, ...patch } } });
 
   return (
     <SettingsSection title={t("settings.notifications.title")} description={t("settings.notifications.description")}>
       <div className="notification-settings" data-testid="notification-settings">
-        {ROWS.map((row) => (
-          <Switch
-            key={row.category}
-            size="md"
-            checked={current.categories[row.category].enabled}
-            onChange={(on) => setCategory(row.category, on)}
-            label={t(row.labelKey)}
-            disabled={busy}
-            testId={`notif-${row.category}`}
-          />
-        ))}
         <Switch
           size="md"
           checked={pb.enabled}
