@@ -98,7 +98,9 @@ const Home = () => {
         { key: "upcoming", icon: "home.upcoming", labelKey: "home.upcoming", value: dash.upcoming_bookings ?? 0 },
       ];
 
-  const links: LinkSpec[] = [
+  // The owner's dashboard is the figures and the platform bill (2026-11-09):
+  // the Branches / Bookings / Settings shortcuts are in the side menu already.
+  const links: LinkSpec[] = isOwner ? [] : [
     ...((isAdmin || isOwner)
       ? [{ to: "/branches", icon: "nav.branches", titleKey: "home.menu.branches", subKey: "home.menu.branchesSub" }]
       : []),
@@ -136,12 +138,16 @@ const Home = () => {
 
       <div className="home-layout">
         <div className="home-main">
-          <div className="stat-grid">
+          <div className={isOwner ? "stat-grid stat-grid--fill" : "stat-grid"}>
             {tiles.map((tile) => (
               <Tile key={tile.key} icon={tile.icon} k={t(tile.labelKey)} v={tile.value} />
             ))}
           </div>
 
+          {/* The owner's platform bill: as wide as the tiles above it (2026-11-09). */}
+          {isOwner && typeof dash.company_id === "number" && <PlatformDebtCard companyId={dash.company_id} />}
+
+          {links.length > 0 && (
           <nav className="home-links" aria-label={t("nav.dashboard")}>
             {links.map((link) => (
               <Link key={link.to} to={link.to} className="card home-link">
@@ -153,16 +159,16 @@ const Home = () => {
               </Link>
             ))}
           </nav>
+          )}
         </div>
 
         {/* The platform's bill, on the right (2026-11-09). Each card renders
             nothing for a backend without platform billing, and `.home-aside`
             hides itself when empty, so the dashboard is then exactly the old
             one. A manager never gets it (no revenue.view). */}
-        {(isOwner || isAdmin) && (
+        {isAdmin && (
           <aside className="home-aside">
-            {isOwner && typeof dash.company_id === "number" && <PlatformDebtCard companyId={dash.company_id} />}
-            {isAdmin && <PlatformFleetCard />}
+            <PlatformFleetCard />
           </aside>
         )}
       </div>

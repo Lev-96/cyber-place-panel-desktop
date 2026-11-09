@@ -17,7 +17,8 @@ vi.mock("@/auth/AuthContext", () => ({
   useAuth: () => ({ user: auth.user, refreshUser: async () => {} }),
 }));
 vi.mock("@/i18n/LanguageContext", () => ({
-  useLang: () => ({ t: (k: string) => k, lang: "en", money: (n: number) => `${n} AMD` }),
+  // Keys print as themselves, except the templates whose placeholder carries a figure.
+  useLang: () => ({ t: (k: string) => ({ "platformBilling.card.rateOfRevenue": "{0} of revenue" } as Record<string, string>)[k] ?? k, lang: "en", money: (n: number) => `${n} AMD` }),
 }));
 vi.mock("@/realtime/bookingScope", () => ({ resolveBookingScopeChannel: () => null }));
 vi.mock("@/realtime/useBookingChanged", () => ({ useBookingChanged: () => {} }));
@@ -109,6 +110,11 @@ describe("icons", () => {
       expect(icon, tile.textContent ?? "").not.toBeNull();
       expect(icon!.children.length).toBeGreaterThan(0);
     }
+    // The owner's dashboard has no shortcut cards any more (2026-11-09): the bill takes their place.
+    if (role === "company_owner") {
+      expect(document.querySelector(".home-links")).toBeNull();
+      return;
+    }
     const links = within(document.querySelector(".home-links") as HTMLElement).getAllByRole("link");
     expect(links.length).toBeGreaterThan(1);
     for (const link of links) {
@@ -135,28 +141,43 @@ describe("icons", () => {
 });
 
 describe("the platform debt card", () => {
-  test("an owner sees it, with the server's figures, on the right", async () => {
+  test("an owner sees it under the tiles, as wide as they are, with the server's figures", async () => {
     api.handler = (p) => (p === "/company/4/platform-billing" ? Promise.resolve(OVERVIEW) : notFound());
     mount("company_owner", { company_id: 4 });
     const card = await screen.findByTestId("platform-debt-card");
-    expect(card.closest(".home-aside")).not.toBeNull();
+    // In the main column right after the tile grid (which fills the row), no side column.
+    expect(card.closest(".home-main")).not.toBeNull();
+    expect(card.previousElementSibling?.className).toContain("stat-grid--fill");
+    expect(document.querySelector(".home-aside")).toBeNull();
+    // Where it stands, in one sentence (due in the future → "pay by <date>").
+    expect(card.querySelector(".platform-debt__say")!.textContent).toBe("platformBilling.say.payBy");
     expect(within(card).getByText("platformBilling.debtTitle")).toBeTruthy();
     // Printed as the server sent it — 12500.50 owed, 5000 estimate this month.
     expect(card.querySelector(".platform-debt__total-value")!.textContent).toBe("12500.5 AMD");
     expect(within(card).getByText("5000 AMD")).toBeTruthy();
     expect(within(card).getByText("platformBilling.estimate")).toBeTruthy();
     expect(within(card).getByText("10.11.2026")).toBeTruthy();
-    expect(within(card).getByText("10%")).toBeTruthy();
+    expect(within(card).getByText("10% of revenue")).toBeTruthy();
     expect(card.querySelector('[data-billing-access="active"]')).not.toBeNull();
   });
 
-  test("the open invoice shows ITS percent, not the company's live one", async () => {
-    // The percent changed after the invoice was issued: the bill keeps 10 %.
-    api.handler = (p) => (p === "/company/4/platform-billing" ? Promise.resolve({ ...OVERVIEW, commission_percent: "25.00" }) : notFound());
+  test("this month's estimate names the company's current rate; the invoice keeps its own in Details", async () => {
+    // The rate changed after the invoice was issued (10 % → 25 %).
+    api.handler = (p) => {
+      if (p === "/company/4/platform-billing") return Promise.resolve({ ...OVERVIEW, commission_percent: "25.00" });
+      if (p === "/company/4/platform-invoices") return Promise.resolve({ data: [OVERVIEW.open_invoice], meta: { current_page: 1, last_page: 1, per_page: 6, total: 1 } });
+      if (p === "/platform-invoices/31") return Promise.resolve({ data: DETAIL });
+      return notFound();
+    };
     mount("company_owner", { company_id: 4 });
     const card = await screen.findByTestId("platform-debt-card");
-    expect(within(card).getByText("10%")).toBeTruthy();
-    expect(within(card).queryByText("25%")).toBeNull();
+    expect(within(card).getByText("25% of revenue")).toBeTruthy();
+    fireEvent.click(within(card).getByRole("button", { name: "platformBilling.details" }));
+    const dialog = await screen.findByRole("dialog");
+    await waitFor(() => expect(dialog.querySelector(".billing-glance__calc")).not.toBeNull());
+    // The issued invoice is calculated at ITS 10 %.
+    expect(dialog.querySelector(".billing-glance__calc")!.textContent).toBe("platformBilling.drawer.calc");
+    expect(dialog.querySelector('[data-invoice-id="31"]')).not.toBeNull();
   });
 
   test("a manager gets no card and asks nothing", async () => {
@@ -167,11 +188,11 @@ describe("the platform debt card", () => {
     expect(api.calls.filter((p) => p.includes("platform"))).toEqual([]);
   });
 
-  test("a backend without the endpoint: no card, no error, the aside is empty", async () => {
+  test("a backend without the endpoint: no card, no error", async () => {
     api.handler = () => notFound();
     mount("company_owner", { company_id: 4 });
     await waitFor(() => expect(api.calls).toContain("/company/4/platform-billing"));
-    await waitFor(() => expect(document.querySelector(".home-aside")!.children.length).toBe(0));
+    await waitFor(() => expect(document.querySelector(".skeleton, .cp-skeleton")).toBeNull());
     expect(screen.queryByTestId("platform-debt-card")).toBeNull();
     expect(screen.queryByText("platformBilling.state.errorTitle")).toBeNull();
   });
@@ -194,6 +215,33 @@ describe("the platform debt card", () => {
     expect(within(dialog).getByText("platformBilling.excluded")).toBeTruthy();
     expect(within(dialog).getByText("platformBilling.event.issued")).toBeTruthy();
     expect(within(dialog).getAllByText("01.10.2026 – 31.10.2026").length).toBeGreaterThan(0);
+  });
+});
+
+describe("the details panel", () => {
+  test("slides in on the right with the answer first; the rest is folded; Escape closes it", async () => {
+    api.handler = (p) => {
+      if (p === "/company/4/platform-billing") return Promise.resolve(OVERVIEW);
+      if (p === "/company/4/platform-invoices") return Promise.resolve({ data: [OVERVIEW.open_invoice], meta: { current_page: 1, last_page: 1, per_page: 6, total: 1 } });
+      if (p === "/platform-invoices/31") return Promise.resolve({ data: DETAIL });
+      return notFound();
+    };
+    mount("company_owner", { company_id: 4 });
+    fireEvent.click(await screen.findByRole("button", { name: "platformBilling.details" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(dialog.closest(".cp-drawer")).not.toBeNull();
+    // At a glance: where it stands, what is left, the three facts, how the figure came about.
+    await waitFor(() => expect(dialog.querySelector(".billing-glance")).not.toBeNull());
+    expect(dialog.querySelector(".billing-glance__say")!.textContent).toBe("platformBilling.say.payBy");
+    expect(dialog.querySelector(".billing-glance__amount")!.textContent).toBe("12500.5 AMD");
+    expect(dialog.querySelectorAll(".billing-glance__facts > div")).toHaveLength(3);
+    expect(dialog.querySelector(".billing-glance__calc")).not.toBeNull();
+    // The long part is there but folded: nothing to scroll past to get the answer.
+    const folds = Array.from(dialog.querySelectorAll("details.billing-drawer__fold"));
+    expect(folds.length).toBeGreaterThan(0);
+    for (const fold of folds) expect((fold as HTMLDetailsElement).open).toBe(false);
+    fireEvent.keyDown(window, { key: "Escape" });
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
   });
 });
 

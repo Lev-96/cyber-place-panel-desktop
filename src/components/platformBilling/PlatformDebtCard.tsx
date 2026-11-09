@@ -6,15 +6,19 @@ import { useAsync } from "@/hooks/useAsync";
 import { useLang } from "@/i18n/LanguageContext";
 import { useNotificationsOptional } from "@/notifications/NotificationsContext";
 import { useId, useMemo, useState } from "react";
-import { BillingAccessBadge, BillingStateBadge } from "./BillingBadges";
-import { Kv, overdueText } from "./InvoiceDetailBody";
+import { BillingAccessBadge } from "./BillingBadges";
 import PlatformBillingModal from "./PlatformBillingModal";
 import { isPlatformBillingNotice } from "./billingNotice";
-import { formatBillingDate, percentText, periodText, useBillingMoney } from "./billingFormat";
+import { formatBillingDate, percentText, useBillingMoney } from "./billingFormat";
+import { billingSay } from "./billingSay";
+import NavIcon from "@/components/ui/NavIcon";
+import { fmt } from "@/i18n/translations";
 
 /**
- * The owner's "Cyber Place Platform: total debt" card (2026-11-09), on the
- * right of the dashboard.
+ * The owner's "Cyber Place Platform: total debt" card (2026-11-09): the full
+ * width of the dashboard under the stat tiles, read left to right — what is
+ * owed and where that stands, the due date, this month so far, access — and
+ * «Details» opening the bill in a panel on the right.
  *
  * Reads `GET /company/{id}/platform-billing` on mount and again whenever a
  * payment notice reaches the feed (a stage, a recorded payment, a restore):
@@ -56,35 +60,41 @@ const PlatformDebtCard = ({ companyId }: { companyId: number }) => {
 
   const inv = data.open_invoice;
   const cur = data.currency;
-  const tone = data.days_overdue > 0 ? "danger" : data.billing_state === "due" ? "warn" : "ok";
+  const say = inv
+    ? billingSay(t, { paid: false, billingState: data.billing_state, daysOverdue: data.days_overdue, access: data.billing_access, dueOn: data.next_due_on })
+    : { text: t("platformBilling.noDebt"), tone: "ok" as const };
 
   return (
-    <section className={`card platform-debt platform-debt--${tone}`} aria-labelledby={titleId} data-testid="platform-debt-card">
-      <header className="platform-debt__head">
-        <h3 id={titleId} className="platform-debt__title">{t("platformBilling.debtTitle")}</h3>
-        {data.billing_state && <BillingStateBadge state={data.billing_state} />}
-      </header>
-
-      <div className="platform-debt__total">
-        <span className="platform-debt__total-label">{t("platformBilling.outstanding")}</span>
+    <section className={`card platform-debt platform-debt--wide platform-debt--${say.tone}`} aria-labelledby={titleId} data-testid="platform-debt-card">
+      <div className="platform-debt__main">
+        <h3 id={titleId} className="platform-debt__title">
+          <NavIcon id="nav.platformBilling" size={20} />
+          {t("platformBilling.debtTitle")}
+        </h3>
+        <span className="platform-debt__label">{t("platformBilling.outstanding")}</span>
         <span className="platform-debt__total-value">{money(data.outstanding_amount, cur)}</span>
-        {data.days_overdue > 0 && <span className="billing-danger">{overdueText(t, data.days_overdue)}</span>}
+        <span className={`platform-debt__say platform-debt__say--${say.tone}`}>{say.text}</span>
       </div>
 
-      {!inv && <p className="muted platform-debt__none">{t("platformBilling.noDebt")}</p>}
-      {inv && <Kv k={t("platformBilling.period")} v={periodText(inv.period_start, inv.period_end)} />}
-      {inv && <Kv k={t("platformBilling.charge")} v={money(inv.amount, inv.currency)} />}
-      {inv && <Kv k={t("platformBilling.paid")} v={money(inv.paid_amount, inv.currency)} />}
-      <Kv k={t("platformBilling.nextDue")} v={formatBillingDate(data.next_due_on)} />
-      {/* The open invoice's own (snapshotted) percent; the live one only when nothing is owed. */}
-      <Kv k={t("platformBilling.percent")} v={percentText(inv?.commission_percent ?? data.commission_percent)} />
-      <Kv
-        k={<>{t("platformBilling.currentMonth")} <span className="billing-estimate">{t("platformBilling.estimate")}</span></>}
-        v={money(data.current_period.commission_amount, cur)}
-      />
-      <Kv k={t("platformBilling.accessLabel")} v={<BillingAccessBadge access={data.billing_access} />} />
+      <dl className="platform-debt__facts">
+        <div className="platform-debt__fact">
+          <dt>{t("platformBilling.nextDue")}</dt>
+          <dd>{formatBillingDate(data.next_due_on)}</dd>
+        </div>
+        <div className="platform-debt__fact">
+          <dt>{t("platformBilling.card.thisMonth")} <span className="billing-estimate">{t("platformBilling.estimate")}</span></dt>
+          <dd>{money(data.current_period.commission_amount, cur)}</dd>
+          {/* The rate this month's estimate is worked out at: the company's current one.
+              An issued invoice keeps its own (snapshotted) rate, shown in «Details». */}
+          <dd className="platform-debt__fact-sub">{fmt(t("platformBilling.card.rateOfRevenue"), percentText(data.commission_percent))}</dd>
+        </div>
+        <div className="platform-debt__fact">
+          <dt>{t("platformBilling.accessLabel")}</dt>
+          <dd><BillingAccessBadge access={data.billing_access} /></dd>
+        </div>
+      </dl>
 
-      <Button type="button" variant="secondary" className="platform-debt__more" onClick={() => setOpen(true)}>
+      <Button type="button" className="platform-debt__more" onClick={() => setOpen(true)}>
         {t("platformBilling.details")}
       </Button>
 
