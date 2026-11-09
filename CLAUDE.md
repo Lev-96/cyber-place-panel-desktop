@@ -4209,3 +4209,12 @@ to the network block, legacy reminder kept, billing rows left in the seats feed.
   present at first load are not news) and raises a silent OS notification.
 - **Notifications**: «Mark all as read» sits in `.notifications-toolbar`
   above the tabs, right corner; it reads every tab.
+- **Sounds (2026-11-09)**: new category `platform_billing` (default melody
+  `note`, its own) — `BillingNoticeNotifier` plays it. An OWNER with no stored
+  sound block defaults to platform payments only (`defaultsForRole` /
+  `ownerDefaultSound` applied in `UiPreferencesContext`); stored choices kept;
+  managers unchanged. The backend must accept the category FIRST
+  (`UiPreferences::SOUND_CATEGORIES`) or every save of a new panel is refused —
+  deploy backend before releasing the panel. Browsers start audio suspended:
+  `unlockAudioOnFirstGesture()` (called once in `App`) resumes it on the first
+  click/key, so the owner web rings too.
