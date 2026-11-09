@@ -4178,6 +4178,27 @@ dropped, extension allows today, notifications always serialised, no revert on
 refusal, notice in UI language, admin feed unfiltered / off, billing code added
 to the network block, legacy reminder kept, billing rows left in the seats feed.
 
+**On a phone** (owner web and the Telegram Mini App, 360–430px; 2026-11-09),
+CSS only, all inside `max-width` queries in `global.css`, so ≥ 1100px is
+untouched:
+- Debt card, `@media (max-width: 640px)`: padding 12/16, title `--fs-body`
+  with a 16px icon, amount `clamp(22px, 7vw, 28px)`, sentence `--fs-body`
+  (amount and sentence stay on top: DOM order); the facts a 2-column grid of
+  bordered boxes, the odd last one (access) a full row with the badge on the
+  right; «Подробнее» full width. The admin's fleet card is not `--wide`.
+- «Подробнее» drawer, `@media (max-width: 480px)`: `.cp-drawer__panel` 100%
+  wide, no edge/shadow, phone padding with safe-area insets, 40px close
+  button; `.billing-glance__facts` one bordered list of rows (label left,
+  figure right). Three boxes side by side broke «1 212 500,5|0 ֏» mid-number.
+- Verified headless (Chromium, real markup from the component, real
+  translations, `global.css` + the owner web's `web.css`): 360/375/430 ×
+  ru/en/am, card 432 → 357px tall at 375 (ru), no element past the card or
+  drawer, 0px page overflow; the desktop renders at 1280/1440/1920 × 3
+  languages are byte-identical PNGs before/after. Test:
+  `components/platformBilling/PlatformDebtCard.phone.test.ts` (mutation-verified:
+  facts back to one column, drawer facts back to three boxes, desktop padding
+  changed). The owner web gets it with a `panel.ref` bump.
+
 ## Settings: notification sounds and the owner's notifications (2026-11-09)
 
 - «Звуки уведомлений» moved from «Интерфейс и тема» to **Settings** (every
