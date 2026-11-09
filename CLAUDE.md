@@ -4177,3 +4177,19 @@ the invoice, banner never shown, confirm skipped, reason optional, method
 dropped, extension allows today, notifications always serialised, no revert on
 refusal, notice in UI language, admin feed unfiltered / off, billing code added
 to the network block, legacy reminder kept, billing rows left in the seats feed.
+
+## Settings: notification sounds and the owner's notifications (2026-11-09)
+
+- «Звуки уведомлений» moved from «Интерфейс и тема» to **Settings** (every
+  role). `components/settings/SoundSettingsSection.tsx` wraps the same
+  `SoundSettings`; each choice saves at once through
+  `UiPreferencesContext.saveSound` (own PUT via `saveSlice`, like
+  `saveNotifications`): it never sends or drops an unsaved look, and a refused
+  save puts the choice back. The interface screen no longer edits sounds and
+  its save writes the SAVED sound (`{ ...working, sound: prefs.sound }`), so a
+  draft started earlier can't overwrite a newer choice. Volume / mute stay
+  per computer (`deviceSound`).
+- Owner «Уведомления» shows **Cyber Place Platform payments only** (+ email /
+  Telegram, mandatory notices explained). Every save writes bookings /
+  sessions / support / system as `false`. Backend: an owner with nothing
+  stored reads the same defaults (payments only); managers are unchanged.
