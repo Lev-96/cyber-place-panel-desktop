@@ -70,22 +70,22 @@ describe("Settings → notification sounds", () => {
     await mount();
     // An unsaved look left on the interface screen.
     await act(async () => { api!.editDraft({ ...api!.prefs, theme: "amber" }); });
-    expect(rowSwitch("support").checked).toBe(true);
-    await act(async () => { fireEvent.click(rowSwitch("support")); });
+    expect(rowSwitch("platform_billing").checked).toBe(true);
+    await act(async () => { fireEvent.click(rowSwitch("platform_billing")); });
     await waitFor(() => expect(repo.put).toHaveBeenCalledTimes(1));
     const sent = lastPut().data as { theme: string; sound: { categories: Record<string, { enabled: boolean }> } };
     expect(sent.theme).toBe("dark");
-    expect(sent.sound.categories.support.enabled).toBe(false);
-    expect(api!.prefs.sound.categories.support.enabled).toBe(false);
+    expect(sent.sound.categories.platform_billing.enabled).toBe(false);
+    expect(api!.prefs.sound.categories.platform_billing.enabled).toBe(false);
     expect(api!.draft?.theme).toBe("amber");
   });
 
   test("a refused save puts the choice back and says so", async () => {
     repo.put.mockRejectedValueOnce(Object.assign(new Error("Server Error"), { status: 500 }));
     await mount();
-    await act(async () => { fireEvent.click(rowSwitch("support")); });
+    await act(async () => { fireEvent.click(rowSwitch("platform_billing")); });
     expect(await screen.findByRole("alert")).toHaveProperty("textContent", "appearance.saveFailed");
-    expect(rowSwitch("support").checked).toBe(true);
-    expect(api!.prefs.sound.categories.support.enabled).toBe(true);
+    expect(rowSwitch("platform_billing").checked).toBe(true);
+    expect(api!.prefs.sound.categories.platform_billing.enabled).toBe(true);
   });
 });

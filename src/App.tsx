@@ -1,4 +1,5 @@
 import BillingBlockedModal from "@/components/BillingBlockedModal";
+import { unlockAudioOnFirstGesture } from "@/sound/soundEngine";
 import { RouteSkeleton } from "@/components/ui/Skeleton";
 import { useAuth } from "@/auth/AuthContext";
 import NetworkBlockedScreen, { useNetworkBlock } from "@/components/NetworkBlockedScreen";
@@ -414,6 +415,10 @@ const Unauthed = () => (
 const App = () => {
   const { user, loading } = useAuth();
   const blocked = useNetworkBlock();
+
+  // Notification sounds in a browser (the owner web): resumed by the first
+  // click or key, so a payment notice is heard (2026-11-09).
+  useEffect(() => { unlockAudioOnFirstGesture(); }, []);
 
   // Ask the backend which socket to connect to, before anything subscribes.
   // `VITE_REVERB_*` is only a fallback now: a build carrying a key the servers

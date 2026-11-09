@@ -4,7 +4,7 @@ import { preferencesRepository } from "@/repositories/PreferencesRepository";
 import { setDeviceSound as setEngineDeviceSound, setSoundPreferences, type DeviceSound } from "@/sound/soundEngine";
 import { ReactNode, createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import {
-  BOARD_DEFAULTS, DEFAULT_PREFERENCES, NEW_PERSON_PREFERENCES, ONBOARDING_VERSION, SCHEMA_VERSION,
+  BOARD_DEFAULTS, DEFAULT_PREFERENCES, NEW_PERSON_PREFERENCES, ONBOARDING_VERSION, SCHEMA_VERSION, defaultsForRole,
   effectiveBoard, effectiveLayout, parseBoard, parsePreferences, toBoardDocument, toDocument,
   type BoardGeometry, type Layout, type NotificationPrefs, type SoundPrefs, type UiPreferences,
 } from "./uiPreferences";
@@ -111,6 +111,7 @@ export const applyToDocument = (p: UiPreferences, root: HTMLElement = document.d
 export const UiPreferencesProvider = ({ children }: { children: ReactNode }) => {
   const { user } = useAuth();
   const userId = user?.id ?? null;
+  const role = user?.role ?? null;
   const [prefs, setPrefs] = useState<UiPreferences>(DEFAULT_PREFERENCES);
   const [candidate, setCandidate] = useState<UiPreferences | null>(null);
   const [draft, setDraft] = useState<UiPreferences | null>(null);
@@ -157,7 +158,7 @@ export const UiPreferencesProvider = ({ children }: { children: ReactNode }) => 
       } catch { /* nothing kept here: the standard board */ }
       try {
         const cached = await keyValueStore.get<unknown>(cacheKey(userId));
-        if (!cancelled && cached) setPrefs({ ...parsePreferences(cached), board });
+        if (!cancelled && cached) setPrefs({ ...parsePreferences(cached, defaultsForRole(DEFAULT_PREFERENCES, role)), board });
         else if (!cancelled) setPrefs((p) => ({ ...p, board }));
       } catch { /* no copy on this machine: the defaults stand until the server answers */ }
       let finishedHere = 0;
@@ -179,7 +180,8 @@ export const UiPreferencesProvider = ({ children }: { children: ReactNode }) => 
         }
         // Nobody chose anything yet: a person still to be set up starts from
         // the new-person defaults, everybody else from what they know.
-        const base = doc.onboarding_version < ONBOARDING_VERSION ? NEW_PERSON_PREFERENCES : DEFAULT_PREFERENCES;
+        // An owner's sounds default to platform payments only (2026-11-09).
+        const base = defaultsForRole(doc.onboarding_version < ONBOARDING_VERSION ? NEW_PERSON_PREFERENCES : DEFAULT_PREFERENCES, role);
         const next = { ...(doc.data == null ? base : parsePreferences(doc.data, base)), board };
         setPrefs(next);
         setOnboardingVersion(doc.onboarding_version);

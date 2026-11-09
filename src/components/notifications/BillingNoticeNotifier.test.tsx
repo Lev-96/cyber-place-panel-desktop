@@ -41,7 +41,7 @@ describe("billing notices ring when they arrive", () => {
     show([notice("new"), notice("old")]);
     rerender(<BillingNoticeNotifier />);
     expect(sound.playFor).toHaveBeenCalledTimes(1);
-    expect(sound.playFor).toHaveBeenCalledWith("system", "new");
+    expect(sound.playFor).toHaveBeenCalledWith("platform_billing", "new");
     expect(os.show).toHaveBeenCalledTimes(1);
     // The Armenian title for an owner.
     expect(os.show.mock.calls[0][0]).toBe("Վճարումն ուշացել է");

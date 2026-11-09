@@ -39,7 +39,7 @@ const BillingNoticeNotifier = () => {
       if (seen.current.has(n.id)) continue;
       seen.current.add(n.id);
       if (n.read_at !== null) continue;
-      playFor("system", n.id);
+      playFor("platform_billing", n.id);
       const { title, sentence } = billingNoticeContent(n, user?.role === "admin" ? lang : NOTICE_LANG);
       showDesktopNotification(title, { body: sentence, tag: `platform-billing-${n.id}` }, () => {
         try { window.focus(); } catch { /* a window that cannot take focus */ }

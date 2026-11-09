@@ -63,7 +63,7 @@ describe("parsePreferences", () => {
    * a theme alone, failed. Adding a category here means adding it there.
    */
   test("the document names exactly the sound categories the server accepts", () => {
-    const server = ["booking_new", "booking_changed", "session_ending", "session_unpaid", "support", "guests", "system"];
+    const server = ["booking_new", "booking_changed", "session_ending", "session_unpaid", "support", "guests", "system", "platform_billing"];
     expect(Object.keys(toDocument(DEFAULT_PREFERENCES).sound.categories)).toEqual(server);
     expect(Object.keys(toDocument(parsePreferences({ theme: "light" })).sound.categories)).toEqual(server);
   });

@@ -38,7 +38,7 @@ export const SOUND_PROFILES = ["quiet", "standard", "loud", "custom"] as const;
  * Only kinds of notification a real event feeds (2026-10-27): there is no
  * sale event in the system, so there is no sale sound to offer.
  */
-export const SOUND_CATEGORIES = ["booking_new", "booking_changed", "session_ending", "session_unpaid", "support", "guests", "system"] as const;
+export const SOUND_CATEGORIES = ["booking_new", "booking_changed", "session_ending", "session_unpaid", "support", "guests", "system", "platform_billing"] as const;
 /** The panel's own sounds, synthesised in code (the first three are the old ones, note for note). */
 export const SYNTH_SOUNDS = ["chime", "soft", "ding", "bell", "pulse", "alert"] as const;
 /**
@@ -253,7 +253,23 @@ export const SOUND_DEFAULTS: Record<SoundCategory, SoundCategoryPrefs> = {
   support: { enabled: true, sound: "chat" },
   guests: { enabled: true, sound: "chord" },
   system: { enabled: true, sound: "calm" },
+  // A Cyber Place Platform payment notice (2026-11-09): a melody, not a beep.
+  platform_billing: { enabled: true, sound: "note" },
 };
+
+/**
+ * An owner who never chose sounds hears platform payments only (owner,
+ * 2026-11-09): the seat and booking traffic is the manager's. Anything the
+ * owner stored is kept as it is.
+ */
+export const ownerDefaultSound = (): SoundPrefs => ({
+  profile: "standard",
+  categories: Object.fromEntries(SOUND_CATEGORIES.map((c) => [c, { enabled: c === "platform_billing", sound: SOUND_DEFAULTS[c].sound }])) as Record<SoundCategory, SoundCategoryPrefs>,
+});
+
+/** The defaults for this role: an owner's sounds are platform payments only. */
+export const defaultsForRole = (base: UiPreferences, role: string | null | undefined): UiPreferences =>
+  role === "company_owner" ? { ...base, sound: ownerDefaultSound() } : base;
 
 export const defaultSound = (): SoundPrefs => ({
   profile: "standard",

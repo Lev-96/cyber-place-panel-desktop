@@ -896,6 +896,7 @@ export const TRANSLATIONS: Dict = {
   "sound.category.support": { en: "Reply from support", ru: "Ответ поддержки", am: "Աջակցության պատասխան" },
   "sound.category.guests": { en: "Guest subscribed or joined a tournament", ru: "Гость подписался или записался на турнир", am: "Հյուրը բաժանորդագրվել է կամ գրանցվել մրցաշարի" },
   "sound.category.system": { en: "Updates and system reminders", ru: "Обновления и системные напоминания", am: "Թարմացումներ և համակարգային հիշեցումներ" },
+  "sound.category.platform_billing": { en: "Cyber Place Platform payments", ru: "Платежи Cyber Place Platform", am: "Cyber Place Platform-ի վճարումներ" },
   "sound.which": { en: "Sound", ru: "Звук", am: "Ձայն" },
   "sound.name.chime": { en: "Chime (rising)", ru: "Перелив (вверх)", am: "Զնգոց (վերև)" },
   "sound.name.soft": { en: "Soft (two notes)", ru: "Мягкий (две ноты)", am: "Մեղմ (երկու նոտա)" },

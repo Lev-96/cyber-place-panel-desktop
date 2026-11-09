@@ -389,6 +389,24 @@ export const unlockAudio = async (): Promise<boolean> => {
   return c.state === "running";
 };
 
+let gestureHooked = false;
+/**
+ * Browsers start web audio suspended until the person interacts with the page
+ * (the owner web, 2026-11-09: payment notices rang in silence). The first
+ * click, tap or key anywhere resumes it, once, for every sound after. The
+ * desktop app is allowed audio from the start; this changes nothing there.
+ */
+export const unlockAudioOnFirstGesture = (): void => {
+  if (gestureHooked || typeof window === "undefined") return;
+  gestureHooked = true;
+  const events = ["pointerdown", "keydown", "touchstart"] as const;
+  const once = () => {
+    for (const e of events) window.removeEventListener(e, once, true);
+    void unlockAudio();
+  };
+  for (const e of events) window.addEventListener(e, once, true);
+};
+
 /** Test-only: forget everything heard and the spacing clock. */
 export const resetSoundEngineForTests = (): void => {
   heard.clear();
@@ -396,6 +414,7 @@ export const resetSoundEngineForTests = (): void => {
   recordings.clear();
   previewing = null;
   blocked = false;
+  gestureHooked = false;
   ctx = null;
   prefs = defaultSound();
   device = { volume: 100, muted: false };
