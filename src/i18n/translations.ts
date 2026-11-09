@@ -2649,6 +2649,7 @@ export const TRANSLATIONS: Dict = {
   "notifications.openBoard": { en: "Open Active Places", ru: "К активным местам", am: "Բացել ակտիվ տեղերը" },
   "notifications.markAllRead": { en: "Mark all as read", ru: "Отметить все прочитанными", am: "Նշել բոլորը որպես կարդացված" },
   "notifications.unreadDot": { en: "Unread", ru: "Не прочитано", am: "Չկարդացված" },
+  "notifications.unreadCount": { en: "{0} unread", ru: "Новых: {0}", am: "Նոր՝ {0}" },
   "notifications.bookingFeedTitle": { en: "Bookings", ru: "Бронирования", am: "Ամրագրումներ" },
   "notifications.sessionFeedTitle": { en: "Active Places", ru: "Активные места", am: "Ակտիվ տեղեր" },
   "notifications.sessionEndingSoonTitle": { en: "Seat №{seat}: session ends in {minutes} min", ru: "Место №{seat}: сессия закончится через {minutes} мин", am: "Տեղ №{seat}. սեսիան կավարտվի {minutes} րոպեից" },

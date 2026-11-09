@@ -114,19 +114,34 @@ describe("payment notices", () => {
     expect(screen.queryByText(TRANSLATIONS["platformBilling.notice.overdue_d2"].en)).toBeNull();
   });
 
-  test("they sit in the Billing section, not in the seats feed; the seats feed keeps its own rows", async () => {
-    feed.list = [ending, notice("due_today", 0)];
+  test("two tabs: seats and Billing, each with a red count of its unread rows", async () => {
+    feed.list = [ending, notice("due_today", 0), notice("overdue_d2", 0), { ...notice("restored", 1), id: "n-read" }];
     api.handler = (p) => (p === "/company/4/billing" ? Promise.resolve({ ...LEGACY_BILLING, outstanding_amount: "0.00" }) : Promise.reject(new Error(p)));
     render(<Notifications />);
-    const title = await screen.findByText(OWNER_TITLES.due_today);
-    const billingHeading = screen.getByText(TRANSLATIONS["notifications.billingFeedTitle"].en);
-    // Document order: the seats feed, then Billing, then the notice.
-    expect(billingHeading.compareDocumentPosition(title) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    const seatsTab = await screen.findByRole("tab", { name: /Active Places/ });
+    const billingTab = screen.getByRole("tab", { name: /Billing/ });
+    // One unread seat row, two unread payment notices (the read one is not counted).
+    expect(seatsTab.querySelector(".cp-subtab__badge")!.textContent).toBe("1");
+    expect(billingTab.querySelector(".cp-subtab__badge")!.textContent).toBe("2");
+    // The seats tab shows the seat row and no payment notice…
+    expect(seatsTab.getAttribute("aria-selected")).toBe("true");
     expect(screen.getByText(/Seat №4/)).toBeTruthy();
-    // Once, and only as a payment notice: the seats feed does not repeat it
-    // under its class name.
-    expect(screen.getAllByText(OWNER_TITLES.due_today)).toHaveLength(1);
+    expect(screen.queryByText(OWNER_TITLES.due_today)).toBeNull();
+    // …Billing shows the notices and no seat row, never under a class name.
+    fireEvent.click(billingTab);
+    expect(await screen.findByText(OWNER_TITLES.due_today)).toBeTruthy();
+    expect(screen.queryByText(/Seat №4/)).toBeNull();
     expect(screen.queryByText("PlatformBillingNotice")).toBeNull();
+  });
+
+  test("a tab with nothing new shows no circle; it opens on Billing when only Billing has news", async () => {
+    feed.list = [{ ...ending, read_at: "2026-11-09T10:00:00+04:00" }, notice("due_today", 0)];
+    api.handler = (p) => (p === "/company/4/billing" ? Promise.resolve({ ...LEGACY_BILLING, outstanding_amount: "0.00" }) : Promise.reject(new Error(p)));
+    render(<Notifications />);
+    const billingTab = await screen.findByRole("tab", { name: /Billing/ });
+    await waitFor(() => expect(billingTab.getAttribute("aria-selected")).toBe("true"));
+    expect(screen.getByRole("tab", { name: /Active Places/ }).querySelector(".cp-subtab__badge")).toBeNull();
+    expect(await screen.findByText(OWNER_TITLES.due_today)).toBeTruthy();
   });
 
   test("a new backend: the client-side reminder steps aside for the server's rows", async () => {
@@ -134,6 +149,7 @@ describe("payment notices", () => {
     api.handler = (p) => (p === "/company/4/billing" ? Promise.resolve({ ...LEGACY_BILLING, outstanding_amount: "12500.50" }) : Promise.reject(new Error(p)));
     render(<Notifications />);
     await waitFor(() => expect(api.calls).toContain("/company/4/billing"));
+    fireEvent.click(screen.getByRole("tab", { name: /Billing/ }));
     await screen.findByText(TRANSLATIONS["notifications.state.billingEmptyDescription"].en);
     expect(screen.queryByText(/you must pay Cyber Place/i)).toBeNull();
   });
@@ -142,6 +158,7 @@ describe("payment notices", () => {
     feed.list = [];
     api.handler = (p) => (p === "/company/4/billing" ? Promise.resolve(LEGACY_BILLING) : Promise.reject(new Error(p)));
     render(<Notifications />);
+    fireEvent.click(await screen.findByRole("tab", { name: /Billing/ }));
     expect(await screen.findByText(/you must pay Cyber Place/i)).toBeTruthy();
   });
 

@@ -11,12 +11,14 @@ import { orFallback } from "@/api/fallback";
 import { useAuth } from "@/auth/AuthContext";
 import { useConfirm } from "@/components/ui/ConfirmProvider";
 import ScreenWithBg from "@/components/ui/ScreenWithBg";
+import SectionTabs from "@/components/ui/SectionTabs";
 import Spinner from "@/components/ui/Spinner";
 import { StateSwitch, deriveViewState } from "@/components/ui/state";
 import { useAsync } from "@/hooks/useAsync";
 import { formatDate, formatTime } from "@/i18n/dates";
 import { formatAmount } from "@/i18n/currency";
 import { useLang } from "@/i18n/LanguageContext";
+import { fmt } from "@/i18n/translations";
 import { expenseRepository } from "@/repositories/ExpenseRepository";
 import { useNotifications } from "@/notifications/NotificationsContext";
 import { useNavigate } from "react-router-dom";
@@ -173,6 +175,22 @@ const Notifications = () => {
   const feedRows = billingRows.length === 0 ? list : list.filter((n) => !isPlatformBillingNotice(n));
   const [billingDetail, setBillingDetail] = useState<{ invoiceId: number | null; companyId: number | null } | null>(null);
 
+  // Two feeds, two tabs (owner, 2026-11-09): «Active places» and «Billing»,
+  // each with a red count of what is still unread there. Shown only when the
+  // role has both; a role with one feed keeps the plain section.
+  const tabbed = showBookings && showBilling;
+  const seatsUnread = feedRows.filter((n) => n.read_at === null).length;
+  const billingUnread = billingRows.filter((n) => n.read_at === null).length;
+  const [tab, setTab] = useState<"seats" | "billing">("seats");
+  const tabChosen = useRef(false);
+  useEffect(() => {
+    // Open on the tab that has news, once, before the owner picks one.
+    if (!tabChosen.current && seatsUnread === 0 && billingUnread > 0) setTab("billing");
+  }, [seatsUnread, billingUnread]);
+  const chooseTab = (key: "seats" | "billing") => { tabChosen.current = true; setTab(key); };
+  const seatsVisible = showBookings && (!tabbed || tab === "seats");
+  const billingVisible = showBilling && (!tabbed || tab === "billing");
+
   // Each feed answers for itself: one failing must not hide the other, and
   // neither may read as "no notifications" when it could not be read.
   const bookingsView = deriveViewState({
@@ -190,11 +208,22 @@ const Notifications = () => {
 
   return (
     <ScreenWithBg bg="./bg/notifications.jpg" title={t("notifications.title")}>
-      {showBookings && (
+      {tabbed && (
+        <SectionTabs
+          label={t("notifications.title")}
+          value={tab}
+          onChange={chooseTab}
+          tabs={[
+            { key: "seats", label: t(dbFeedCopy(user?.role).titleKey), badge: seatsUnread, badgeLabel: fmt(t("notifications.unreadCount"), seatsUnread) },
+            { key: "billing", label: t("notifications.billingFeedTitle") || "Billing", badge: billingUnread, badgeLabel: fmt(t("notifications.unreadCount"), billingUnread) },
+          ]}
+        />
+      )}
+      {seatsVisible && (
         <>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, flexWrap: "wrap", gap: 8 }}>
             <h3 className="muted" style={{ margin: 0, fontSize: 14 }}>
-              {t(dbFeedCopy(user?.role).titleKey)}
+              {tabbed ? null : t(dbFeedCopy(user?.role).titleKey)}
             </h3>
             <div style={{ display: "flex", gap: 8 }}>
               {unreadCount > 0 && (
@@ -248,11 +277,13 @@ const Notifications = () => {
         </>
       )}
 
-      {showBilling && (
+      {billingVisible && (
         <>
-          <h3 className="muted" style={{ margin: showBookings ? "24px 0 12px" : "0 0 12px", fontSize: 14 }}>
-            {t("notifications.billingFeedTitle") || "Billing"}
-          </h3>
+          {!tabbed && (
+            <h3 className="muted" style={{ margin: "0 0 12px", fontSize: 14 }}>
+              {t("notifications.billingFeedTitle") || "Billing"}
+            </h3>
+          )}
           <StateSwitch
             view={billingView}
             skeleton={<ListSkeleton rows={3} />}

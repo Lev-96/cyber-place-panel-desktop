@@ -135,6 +135,8 @@ describe("Notifications billing feed, per role", () => {
 
     await waitFor(() => expect(api.calls).toContain("/company/7/billing"));
     expect(api.calls).not.toContain("/company-billing/reminders");
+    // An owner has two feeds, so two tabs: the reminder lives under «Billing».
+    fireEvent.click(screen.getByRole("tab", { name: /Billing/ }));
     expect(await screen.findByText(/you must pay Cyber Place/i)).toBeTruthy();
   });
 
@@ -254,12 +256,13 @@ describe("Notifications states", () => {
     api.handler = () => Promise.reject(Object.assign(new Error("Server Error"), { status: 500, body: { message: "Server Error" } }));
     render(<Notifications />);
 
-    expect(await screen.findByText("Could not load notifications")).toBeTruthy();
-    expect(screen.getByText(/Billing/i)).toBeTruthy();
-    // The one empty state is the owner's own (empty) Active Places feed; billing
-    // shows its error, never "nothing due".
-    expect(screen.getAllByText("No notifications right now")).toHaveLength(1);
+    // The owner's own (empty) Active Places feed is the first tab…
+    expect(await screen.findByText("No notifications right now")).toBeTruthy();
     expect(screen.getByText("Seats whose session ends in 15 minutes appear here.")).toBeTruthy();
+    // …and «Billing» shows its error, never "nothing due".
+    fireEvent.click(screen.getByRole("tab", { name: /Billing/ }));
+    expect(await screen.findByText("Could not load notifications")).toBeTruthy();
+    expect(screen.queryByText("No notifications right now")).toBeNull();
   });
 });
 
