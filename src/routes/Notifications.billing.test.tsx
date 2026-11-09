@@ -33,7 +33,7 @@ vi.mock("@/i18n/LanguageContext", async () => {
 const feed = vi.hoisted(() => ({ list: [] as unknown[], markRead: vi.fn(async () => {}) }));
 vi.mock("@/notifications/NotificationsContext", () => ({
   useNotifications: () => ({
-    list: feed.list, unreadCount: 0, loading: false, error: null, failure: null, settled: true,
+    list: feed.list, unreadCount: (feed.list as { read_at: string | null }[]).filter((n) => n.read_at === null).length, loading: false, error: null, failure: null, settled: true,
     refresh: vi.fn(async () => {}), markRead: feed.markRead, markAllRead: vi.fn(), deleteOne: vi.fn(), deleteAll: vi.fn(),
   }),
 }));
@@ -120,6 +120,10 @@ describe("payment notices", () => {
     render(<Notifications />);
     const seatsTab = await screen.findByRole("tab", { name: /Active Places/ });
     const billingTab = screen.getByRole("tab", { name: /Billing/ });
+    // «Mark all as read» sits in the bar above the tabs, in its right corner.
+    const toolbar = document.querySelector(".notifications-toolbar")!;
+    expect(toolbar.querySelector('[role="tablist"]')).not.toBeNull();
+    expect(toolbar.lastElementChild!.className).toContain("notifications-toolbar__read-all");
     // One unread seat row, two unread payment notices (the read one is not counted).
     expect(seatsTab.querySelector(".cp-subtab__badge")!.textContent).toBe("1");
     expect(billingTab.querySelector(".cp-subtab__badge")!.textContent).toBe("2");

@@ -60,3 +60,36 @@ describe("billing refusals do not lock the app", () => {
     expect(networkBlock.current()).toBe("blocked");
   });
 });
+
+/**
+ * The company closed for an unpaid bill (2026-11-09): a sign-in (or any
+ * request) refused with `company_billing_blocked` raises the plain Armenian
+ * screen — and still never the address block.
+ */
+describe("the company billing block", () => {
+  afterEach(async () => {
+    vi.unstubAllGlobals();
+    networkBlock.resetForTests();
+    (await import("@/auth/billingBlock")).billingBlock.dismiss();
+  });
+
+  it("raises the billing screen and not the network lock", async () => {
+    const { billingBlock } = await import("@/auth/billingBlock");
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ message: "…", code: "company_billing_blocked", scope: "billing", company_id: 2 }), { status: 403 }),
+    ));
+    const err = await request("/session/login", { method: "POST", body: { email: "a@b", password: "x" } }).catch((e: unknown) => e);
+    expect(billingBlock.isShown()).toBe(true);
+    expect(networkBlock.current()).toBeNull();
+    expect(err).toMatchObject({ status: 403, body: { code: "company_billing_blocked" } });
+  });
+
+  it("a per-action billing refusal (billing_suspended) does not raise it", async () => {
+    const { billingBlock } = await import("@/auth/billingBlock");
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ message: "…", code: "billing_suspended", scope: "billing" }), { status: 403 }),
+    ));
+    await request("/sessions", { method: "POST", body: {} }).catch(() => {});
+    expect(billingBlock.isShown()).toBe(false);
+  });
+});

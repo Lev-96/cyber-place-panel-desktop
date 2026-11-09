@@ -3786,6 +3786,11 @@ export const TRANSLATIONS: Dict = {
     am: "Համակարգը հայտնաբերել է կասկածելի գործողություններ։ Ձեր մուտքը Cyber Place ընդմիշտ արգելափակված է։",
   },
   "networkBlock.retry": { en: "Check again", ru: "Проверить снова", am: "Ստուգել կրկին" },
+  "blocking.reason.company_billing_blocked": {
+    en: "Access is closed for an unpaid Cyber Place Platform bill. Contact the Cyber Place administrator.",
+    ru: "Из-за задолженности перед Cyber Place Platform доступ закрыт. Обратитесь к администратору Cyber Place.",
+    am: "Cyber Place Platform-ի պարտքի պատճառով մուտքը փակված է։ Կապվեք Cyber Place-ի ադմինիստրատորի հետ։",
+  },
   "blocking.reason.company_blocked": {
     en: "Your company has been blocked. Please contact the administrator.",
     ru: "Ваша компания заблокирована. Обратитесь к администратору.",

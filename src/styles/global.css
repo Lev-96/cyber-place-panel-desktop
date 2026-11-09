@@ -10434,3 +10434,23 @@ select.input option:disabled {
   color: var(--color-text-soft);
   font-size: var(--fs-sm);
 }
+
+/* Notifications: tabs left, «Mark all as read» in the right corner (2026-11-09). */
+.notifications-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+.notifications-toolbar__read-all {
+  margin-left: auto;
+}
+
+/* The billing block over the whole window, the sign-in screen included (2026-11-09). */
+.billing-lock--screen {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+}

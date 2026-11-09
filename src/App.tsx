@@ -1,3 +1,4 @@
+import BillingBlockedModal from "@/components/BillingBlockedModal";
 import { RouteSkeleton } from "@/components/ui/Skeleton";
 import { useAuth } from "@/auth/AuthContext";
 import NetworkBlockedScreen, { useNetworkBlock } from "@/components/NetworkBlockedScreen";
@@ -436,6 +437,9 @@ const App = () => {
       {/* The one hover/focus tooltip (2026-11-07): `data-tip`, and `title`
           inside a `data-tip-scope` (the Active Places board). */}
       <TooltipLayer />
+      {/* Closed for an unpaid Cyber Place Platform bill (2026-11-09): over
+          everything, the sign-in screen included. */}
+      <BillingBlockedModal />
       <HashRouter>
         {/* Signing in / out / switching account always lands on the
             dashboard — a route must never outlive the account that

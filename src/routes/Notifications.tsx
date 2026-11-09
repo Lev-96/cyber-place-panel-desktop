@@ -208,16 +208,27 @@ const Notifications = () => {
 
   return (
     <ScreenWithBg bg="./bg/notifications.jpg" title={t("notifications.title")}>
-      {tabbed && (
-        <SectionTabs
-          label={t("notifications.title")}
-          value={tab}
-          onChange={chooseTab}
-          tabs={[
-            { key: "seats", label: t(dbFeedCopy(user?.role).titleKey), badge: seatsUnread, badgeLabel: fmt(t("notifications.unreadCount"), seatsUnread) },
-            { key: "billing", label: t("notifications.billingFeedTitle") || "Billing", badge: billingUnread, badgeLabel: fmt(t("notifications.unreadCount"), billingUnread) },
-          ]}
-        />
+      {/* One bar above the feeds (owner, 2026-11-09): the tabs on the left,
+          «Mark all as read» in the right corner — it reads every tab. */}
+      {(tabbed || unreadCount > 0) && (
+        <div className="notifications-toolbar">
+          {tabbed ? (
+            <SectionTabs
+              label={t("notifications.title")}
+              value={tab}
+              onChange={chooseTab}
+              tabs={[
+                { key: "seats", label: t(dbFeedCopy(user?.role).titleKey), badge: seatsUnread, badgeLabel: fmt(t("notifications.unreadCount"), seatsUnread) },
+                { key: "billing", label: t("notifications.billingFeedTitle") || "Billing", badge: billingUnread, badgeLabel: fmt(t("notifications.unreadCount"), billingUnread) },
+              ]}
+            />
+          ) : <span />}
+          {unreadCount > 0 && (
+            <button type="button" onClick={() => void markAllRead()} style={feedActionBtn} className="notifications-toolbar__read-all">
+              {t("notifications.markAllRead") || "Mark all as read"}
+            </button>
+          )}
+        </div>
       )}
       {seatsVisible && (
         <>
@@ -226,15 +237,6 @@ const Notifications = () => {
               {tabbed ? null : t(dbFeedCopy(user?.role).titleKey)}
             </h3>
             <div style={{ display: "flex", gap: 8 }}>
-              {unreadCount > 0 && (
-                <button
-                  type="button"
-                  onClick={() => void markAllRead()}
-                  style={feedActionBtn}
-                >
-                  {t("notifications.markAllRead") || "Mark all as read"}
-                </button>
-              )}
               {feedRows.length > 0 && (
                 <button
                   type="button"

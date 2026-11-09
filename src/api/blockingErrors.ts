@@ -28,6 +28,8 @@ const KNOWN = new Set([
   "company_blocked",
   "branch_blocked",
   "branch_operation_blocked",
+  // Closed for an unpaid Cyber Place Platform bill (2026-11-09).
+  "company_billing_blocked",
 ]);
 
 /**

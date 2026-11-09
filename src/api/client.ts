@@ -1,5 +1,6 @@
 import { AppConfig } from "@/infrastructure/AppConfig";
 import { networkBlock, networkBlockCodeOf } from "@/auth/networkBlock";
+import { billingBlock, isBillingBlockBody } from "@/auth/billingBlock";
 import { sessionExpiry } from "@/auth/sessionExpiry";
 import { keyValueStore } from "@/infrastructure/KeyValueStore";
 import { HttpCache, invalidationTargets, policyFor } from "@/api/httpCache";
@@ -133,6 +134,9 @@ export const request = async <Res>(
     // from: every request will be refused, so the whole app says so at once.
     const blocked = networkBlockCodeOf(res.status, body);
     if (blocked) networkBlock.raise(blocked);
+    // The company is closed for an unpaid Cyber Place Platform bill (2026-11-09):
+    // a sign-in or any request says so on one screen.
+    if (isBillingBlockBody(res.status, body)) billingBlock.raise();
 
     const err = new Error(extractMessage(body) ?? `HTTP ${res.status}`) as ApiError;
     err.status = res.status;
