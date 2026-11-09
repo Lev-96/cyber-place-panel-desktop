@@ -4193,3 +4193,19 @@ to the network block, legacy reminder kept, billing rows left in the seats feed.
   Telegram, mandatory notices explained). Every save writes bookings /
   sessions / support / system as `false`. Backend: an owner with nothing
   stored reads the same defaults (payments only); managers are unchanged.
+
+## Billing block, notice sound, notifications toolbar (2026-11-09)
+
+- **Company closed for an unpaid platform bill** (`code: company_billing_blocked`,
+  403): `src/auth/billingBlock.ts` (pub/sub like `networkBlock`) is raised by
+  the API client on such a refusal (sign-in included) and by `AccessGuard` on a
+  `locked_out` `access.changed` with that code (then logout). `BillingBlockedModal`
+  (mounted in `App` above the router, so it covers the sign-in screen) shows the
+  reason in Armenian with «Հասկանալի է». The code is in `blockingErrors` KNOWN
+  (login wording) and is NOT a network-block code.
+- **Platform payment notices ring**: `components/notifications/BillingNoticeNotifier`
+  (in `Layout`, mirrored in telegram-web-app's Layout override) plays the
+  «system» sound once per NEW unread notice (`playFor` keyed by id; the rows
+  present at first load are not news) and raises a silent OS notification.
+- **Notifications**: «Mark all as read» sits in `.notifications-toolbar`
+  above the tabs, right corner; it reads every tab.
