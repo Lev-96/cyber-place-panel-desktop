@@ -10278,13 +10278,66 @@ select.input option:disabled {
     justify-self: start;
   }
 }
+/* Phones (owner web, Telegram Mini App; 360–430px wide), 2026-11-09: the bill
+   reads in one glance. Tighter padding and type, the amount and its sentence
+   on top (DOM order), the facts as a two-column grid of small boxes (the odd
+   last one, access, a full row with its badge on the right), «Details» across
+   the card. Sizes and placement only; the desktop look (≥ 1100px) is not
+   touched. */
 @media (max-width: 640px) {
+  .platform-debt--wide {
+    gap: var(--space-3);
+    padding: var(--space-3) var(--space-4);
+    border-left-width: 4px;
+  }
+  .platform-debt--wide .platform-debt__title {
+    margin-bottom: var(--space-1);
+    font-size: var(--fs-body);
+  }
+  .platform-debt--wide .platform-debt__title .nav-icon {
+    flex-shrink: 0;
+    width: 16px;
+    height: 16px;
+  }
+  .platform-debt--wide .platform-debt__label {
+    font-size: var(--fs-xs);
+  }
+  /* 7vw: 26px on a 375px phone, never under 22px nor over 28px. */
+  .platform-debt--wide .platform-debt__total-value {
+    font-size: clamp(22px, 7vw, 28px);
+  }
+  .platform-debt--wide .platform-debt__say {
+    font-size: var(--fs-body);
+  }
   .platform-debt__facts {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-2);
   }
   .platform-debt__fact {
-    padding-left: 0;
-    border-left: 0;
+    gap: var(--space-1);
+    padding: var(--space-2) var(--space-3);
+    border: 1px solid var(--color-border);
+    border-radius: 10px;
+  }
+  .platform-debt__fact:last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .platform-debt__fact dt {
+    font-size: var(--fs-xs);
+  }
+  .platform-debt__fact dd {
+    font-size: var(--fs-md);
+  }
+  .platform-debt__fact dd.platform-debt__fact-sub {
+    font-size: var(--fs-xs);
+  }
+  .platform-debt--wide .platform-debt__more {
+    justify-self: stretch;
+    width: 100%;
   }
 }
 
@@ -10433,6 +10486,64 @@ select.input option:disabled {
   border-top: 1px solid var(--color-border);
   color: var(--color-text-soft);
   font-size: var(--fs-sm);
+}
+/* Phones (≤ 480px, 2026-11-09): the drawer is the whole screen with a phone's
+   spacing, and the three facts are rows (label left, figure right): three
+   boxes side by side broke a seven-figure amount mid-number. */
+@media (max-width: 480px) {
+  .cp-drawer__panel {
+    width: 100%;
+    border-left: 0;
+    box-shadow: none;
+  }
+  .billing-drawer__head {
+    padding: max(var(--space-3), env(safe-area-inset-top)) var(--space-4) var(--space-3);
+  }
+  .billing-drawer__title {
+    font-size: var(--fs-lg);
+  }
+  .billing-drawer__close {
+    width: 40px;
+    height: 40px;
+  }
+  .billing-drawer__body {
+    gap: var(--space-3);
+    padding: var(--space-4) var(--space-4) max(var(--space-4), env(safe-area-inset-bottom));
+  }
+  .billing-glance {
+    gap: var(--space-3);
+  }
+  .billing-glance__say {
+    padding: var(--space-2) var(--space-3);
+    font-size: var(--fs-body);
+  }
+  .billing-glance__amount {
+    font-size: clamp(26px, 8vw, 32px);
+  }
+  .billing-glance__facts {
+    grid-template-columns: 1fr;
+    gap: 0;
+    border: 1px solid var(--color-border);
+    border-radius: 10px;
+  }
+  .billing-glance__facts div {
+    flex-direction: row;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--space-3);
+    padding: var(--space-2) var(--space-3);
+    border: 0;
+    border-radius: 0;
+  }
+  .billing-glance__facts div + div {
+    border-top: 1px solid var(--color-border);
+  }
+  .billing-glance__facts dd {
+    text-align: right;
+  }
+  .billing-glance__calc {
+    font-size: var(--fs-sm);
+  }
 }
 
 /* Notifications: tabs left, «Mark all as read» in the right corner (2026-11-09). */
