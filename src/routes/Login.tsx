@@ -138,8 +138,9 @@ const Login = () => {
       </div>
 
       <div className="login-stage">
-        <h1 className="login-brand">Cyber Place</h1>
+        {/* The mark first, the wordmark under it (owner, 2026-11-13). */}
         <img className="login-logo" src="./logo.png" alt="Cyber Place" />
+        <h1 className="login-brand">Cyber Place</h1>
         <h2 className="login-title">
           {face === "forgot" ? t("auth.forgotTitle") : t("login.title")}
         </h2>

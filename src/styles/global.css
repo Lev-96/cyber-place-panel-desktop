@@ -4078,11 +4078,11 @@ div.cp-switch {
    fly-in, a pulsing field and a 3D card flip — on a weak club PC the form
    answered typing in ~0.9 s while the scene rendered.
 
-   Now the background is ONE still picture, public/bg/login-space*.webp: a
-   computer club at night seen from behind the players (rendered once, see
-   CLAUDE.md "Static sign-in"). It lies over a CSS gradient that paints with
-   the first frame and copies the picture's broad light (cyan rows on the
-   left, purple on the right, a dark aisle in the middle), so the screen
+   Now the background is ONE still picture, public/bg/login-space*.webp:
+   "Arcade bokeh", a soft brand blur with defocused gaming light shapes
+   (rendered once, see CLAUDE.md "Static sign-in"). It lies over a CSS
+   gradient that paints with the first frame and copies the picture's broad
+   light (cyan on the left, purple on the right, dark in the middle), so the screen
    already looks finished before the picture arrives; the picture then simply
    appears. Nothing here moves. Used by Login, ResetPassword and
    NetworkBlockedScreen. (The file names are older than the picture.) */
@@ -4095,12 +4095,12 @@ div.cp-switch {
   background-color: #070b1f;
   background-image:
     url("/bg/login-space.webp"),
-    /* the dark aisle under the form */
+    /* the dark middle under the form */
     radial-gradient(ellipse 18% 42% at 50% 52%, rgb(6 9 29 / 0.9), transparent 75%),
-    /* the rows and their screens: cyan on the left, purple on the right */
+    /* the soft glows: cyan on the left, purple on the right */
     radial-gradient(ellipse 32% 22% at 14% 64%, rgb(22 85 119 / 0.75), transparent 72%),
     radial-gradient(ellipse 32% 22% at 86% 62%, rgb(41 53 99 / 0.8), transparent 72%),
-    /* the ceiling above, the floor below */
+    /* the base, top to bottom */
     linear-gradient(180deg, #0d1729 0%, #0e1630 32%, #0b1126 52%, #091224 72%, #070e1f 100%);
   background-size: cover, auto, auto, auto, auto;
   background-position: center;
@@ -4108,8 +4108,8 @@ div.cp-switch {
 }
 
 /* A tall screen (a phone, the Telegram Mini App, a portrait tablet) gets the
-   hall re-framed for it: the landscape picture cropped to a phone would keep
-   only the aisle. */
+   picture re-framed for it: the landscape one cropped to a phone would keep
+   only the empty middle. */
 @media (max-aspect-ratio: 3/4) {
   .login-shell {
     background-image:
@@ -4163,15 +4163,21 @@ div.cp-switch {
   align-items: center;
   gap: calc(var(--ring-size) * 0.039);
   width: 100%;
-  max-width: calc(var(--ring-size) * 0.84);
+  max-width: calc(var(--ring-size) * 0.92);
 }
 
-/* Composition type and imagery, all derived from --ring-size. */
+/* Composition type and imagery, all derived from --ring-size. The mark sits
+   above the wordmark and is a size bigger than it was (owner, 2026-11-13:
+   0.174 -> 0.21 of the ring, 108 -> 130px at full size). */
 .login-shell .login-brand {
   font-size: calc(var(--ring-size) * 0.077);
+  /* tucked under the mark: one unit, not two items in a column */
+  line-height: 1.1;
+  margin-top: calc(var(--ring-size) * -0.022);
 }
 .login-shell .login-logo {
-  width: calc(var(--ring-size) * 0.174);
+  width: calc(var(--ring-size) * 0.21);
+  margin-bottom: 0;
 }
 .login-shell .login-title {
   font-size: calc(var(--ring-size) * 0.032);
@@ -4224,6 +4230,24 @@ div.cp-switch {
   border-bottom-right-radius: 10px;
 }
 
+/* The form's fields and button: a step bigger than the app's own controls
+   (owner, 2026-11-13) — 44px at the smallest composition, 48px at full size,
+   15px text. Both faces are .login-card, so "forgot password" matches. */
+.login-shell .login-card .input,
+.login-shell .login-card .btn {
+  min-height: clamp(44px, calc(var(--ring-size) * 0.077), 48px);
+  font-size: 15px;
+}
+.login-shell .login-card .input {
+  padding: 11px 14px;
+}
+.login-shell .login-card .label {
+  font-size: 13px;
+}
+.login-shell .login-card .login-forgot {
+  font-size: 14px;
+}
+
 /* The focused field: a steady neon ring (it used to pulse). */
 .login-shell .input:focus {
   border-color: var(--color-primary);
@@ -4259,7 +4283,14 @@ div.cp-switch {
      The cap lives here rather than on .login-card because these are the
      elements the grid lays out. */
   width: 100%;
-  max-width: calc(var(--ring-size) * 0.68);
+  max-width: calc(var(--ring-size) * 0.78);
+}
+
+/* The back face's form sits one level down: without this the shared
+   .login-card cap (420px) would keep "forgot password" narrower than the
+   sign-in face it replaces. */
+.login-flip-face-back > .login-card {
+  max-width: 100%;
 }
 
 .login-flip.is-back > .login-card,

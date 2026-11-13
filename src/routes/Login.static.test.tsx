@@ -97,6 +97,13 @@ describe("the sign-in screens load no 3D", () => {
     expect(container.querySelector(".login-scene, .login-hud, [class*='login-hud']")).toBeNull();
     expect(container.querySelector("h1.login-brand")?.textContent).toBe("Cyber Place");
   });
+
+  // Owner, 2026-11-13: the mark on top, the wordmark under it, then the title.
+  test("the mark comes first, the wordmark under it", () => {
+    const { container } = render(<MemoryRouter initialEntries={["/login"]}><Login /></MemoryRouter>);
+    const stage = container.querySelector(".login-stage") as HTMLElement;
+    expect([...stage.children].slice(0, 3).map((el) => el.className)).toEqual(["login-logo", "login-brand", "login-title"]);
+  });
 });
 
 /* ------------------------------------------------------------------ motion -- */
