@@ -137,21 +137,45 @@ const rulesOf = (css: string): Array<{ selector: string; body: string }> => {
   return out;
 };
 
+/**
+ * The ONE motion the owner wants on the sign-in (2026-11-13): the card turning
+ * over to «Forgot password?». Exactly these two rules may move, and only the
+ * transform / the delayed visibility; anything else that moves is a failure.
+ */
+const FLIP_RULES: Record<string, RegExp> = {
+  ".login-shell .login-flip": /^transform 760ms /,
+  ".login-shell .login-flip.is-back > .login-card,\n.login-shell .login-flip:not(.is-back) > .login-flip-face-back": /^visibility 0s linear 380ms/,
+};
+
 const MOTION_KEYFRAMES = ["cpPanelApproach", "cpBrandIgnite", "cpBackdropIn", "cpFieldGlow", "cpHudSpin", "cpNodePulse", "cp-brand-in"];
 
 describe("nothing on the sign-in screens moves", () => {
-  test("no rule for a login-* element declares an animation or a transition", () => {
+  test("no rule for a login-* element declares motion, except the card flip", () => {
     const rules = rulesOf(CSS);
     // The parser saw the sheet (not a vacuous pass).
     expect(rules.length).toBeGreaterThan(1000);
     const offenders = rules
-      .filter(({ selector }) => /\.login-/.test(selector))
+      .filter(({ selector }) => /\.login-/.test(selector) && !(selector in FLIP_RULES))
       .flatMap(({ selector, body }) =>
         [...body.matchAll(/(?:^|;|\s)(animation|transition)(-[a-z-]+)?\s*:\s*([^;]+)/g)]
           .filter(([, , , value]) => !/^\s*none\b/.test(value))
           .map(([, prop, sub = "", value]) => `${selector} { ${prop}${sub}: ${value.trim()} }`),
       );
     expect(offenders).toEqual([]);
+  });
+
+  test("the card flip is there, and still under reduced motion", () => {
+    const rules = rulesOf(CSS);
+    for (const [selector, value] of Object.entries(FLIP_RULES)) {
+      const rule = rules.find((r) => r.selector === selector && /transition/.test(r.body) && !/none/.test(r.body));
+      expect(rule, selector).toBeDefined();
+      expect(rule!.body.match(/transition\s*:\s*([^;]+)/)![1].trim()).toMatch(value);
+    }
+    expect(rules.some((r) => r.selector === ".login-flip.is-back" && /rotateY\(180deg\)/.test(r.body))).toBe(true);
+    expect(rules.some((r) => r.selector === ".login-flip-face-back" && /rotateY\(180deg\)/.test(r.body))).toBe(true);
+    // Reduced motion: an instant swap.
+    const reduced = CSS.replace(/\/\*[\s\S]*?\*\//g, "").match(/@media \(prefers-reduced-motion: reduce\)\s*\{\s*\.login-shell \.login-flip,\s*\.login-shell \.login-flip\.is-back > \.login-card,\s*\.login-shell \.login-flip:not\(\.is-back\) > \.login-flip-face-back\s*\{\s*transition:\s*none !important;/);
+    expect(reduced).not.toBeNull();
   });
 
   test("the old entrance, ignition, glow, ring and pulse keyframes are gone", () => {
@@ -178,12 +202,16 @@ describe("nothing on the sign-in screens moves", () => {
         const animation = cs.getPropertyValue("animation").trim();
         const transition = cs.getPropertyValue("transition").trim();
         if (animation && !animation.startsWith("none")) moving.push(`${el.className || el.tagName}: animation ${animation}`);
-        if (transition && !/^(none|all 0s)/.test(transition)) moving.push(`${el.className || el.tagName}: transition ${transition}`);
+        const flip =
+          (el.matches(".login-shell .login-flip") && /^transform 760ms /.test(transition)) ||
+          (el.matches(".login-shell .login-flip.is-back > .login-card, .login-shell .login-flip:not(.is-back) > .login-flip-face-back") &&
+            /^visibility 0s linear 380ms/.test(transition));
+        if (transition && !flip && !/^(none|all 0s)/.test(transition)) moving.push(`${el.className || el.tagName}: transition ${transition}`);
       }
       return moving;
     };
 
-    test.each(["/login", "/forgot-password"])("no element on %s animates or transitions", (at) => {
+    test.each(["/login", "/forgot-password"])("no element on %s animates or transitions except the card flip", (at) => {
       render(<MemoryRouter initialEntries={[at]}><Login /></MemoryRouter>);
       const shell = document.querySelector(".login-shell")!;
       // Shared controls the screen uses (inputs, buttons, the eye, pills) are in it.
@@ -193,7 +221,7 @@ describe("nothing on the sign-in screens moves", () => {
       expect(still(shell)).toEqual([]);
     });
 
-    test("the forgot face swaps in at once: the hidden face is not drawn and not reachable, focus moves with it", async () => {
+    test("the forgot face turns in: the hidden face is not drawn and not reachable, focus moves with it", async () => {
       render(<MemoryRouter initialEntries={["/login"]}><Login /></MemoryRouter>);
       const front = document.querySelector(".login-flip > form.login-card") as HTMLFormElement;
       const back = document.querySelector(".login-flip-face-back") as HTMLElement;
@@ -212,8 +240,8 @@ describe("nothing on the sign-in screens moves", () => {
       expect(getComputedStyle(back).visibility).toBe("visible");
       expect(front.hasAttribute("inert")).toBe(true);
       expect(back.hasAttribute("inert")).toBe(false);
-      // No turn: nothing is rotated or hidden by a backface any more.
-      expect(getComputedStyle(document.querySelector(".login-flip")!).transform || "none").toBe("none");
+      // The card turns over to the forgot face.
+      expect(getComputedStyle(document.querySelector(".login-flip")!).transform).toBe("rotateY(180deg)");
       expect(document.activeElement).toBe(backEmail);
 
       await act(async () => { fireEvent.click(screen.getByText("auth.backToLogin")); });

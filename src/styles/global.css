@@ -4255,23 +4255,28 @@ div.cp-switch {
 }
 
 /* === Sign-in card: two faces ================================================
-   "Forgot password?" swaps the card to its other face instead of navigating,
-   so the screen around it stays exactly where it is. Both faces share ONE
+   "Forgot password?" turns the card over to its other face instead of
+   navigating, so the screen around it stays exactly where it is. The 3D turn
+   is the ONE motion on the sign-in screens: the owner asked for it back
+   (2026-11-13) after everything else was made still. Both faces share ONE
    grid cell, so the card keeps the height of the taller face and nothing
-   above it jumps; the face not showing is `visibility: hidden` (not drawn,
-   not in the accessibility tree) and `inert` in the markup (not focusable).
-   The swap is instant — the 3D turn went with the rest of the motion. The
-   class names keep the old "flip" wording: the owner web styles them too. */
+   above it jumps. The face turned away is hidden by its backface while it
+   turns and becomes `visibility: hidden` (not drawn, not in the
+   accessibility tree) once it is edge-on; it is `inert` in the markup (not
+   focusable) at once. Reduced motion: an instant swap. */
 
 .login-flip-wrap {
   width: 100%;
   display: flex;
   justify-content: center;
+  /* Its own perspective, so the far edge of the card recedes as it turns. */
+  perspective: 1200px;
 }
 
 .login-flip {
   display: grid;
   width: 100%;
+  transform-style: preserve-3d;
   /* Centre both faces in the cell. A grid item narrower than its cell (which
      `max-width` makes it) aligns to the START by default. */
   justify-items: center;
@@ -4284,6 +4289,40 @@ div.cp-switch {
      elements the grid lays out. */
   width: 100%;
   max-width: calc(var(--ring-size) * 0.78);
+  /* The half turned away from the viewer must not show through. */
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+/* The reverse face starts pre-turned, so after the card's 180° it faces the
+   viewer the right way round. */
+.login-flip-face-back {
+  transform: rotateY(180deg);
+}
+
+.login-flip.is-back {
+  transform: rotateY(180deg);
+}
+
+/* The turn itself. It must beat the screen's "nothing moves" rule
+   (`.login-shell *`, !important), hence the extra class and !important.
+   A transition is taken from the state being entered, so: the face being
+   turned AWAY stays drawn until it is edge-on, half-way (380ms), then hides;
+   the face being turned TO is visible at once (its backface keeps it unseen
+   until half-way), so focus can move into it on the same click. */
+.login-shell .login-flip {
+  transition: transform 760ms cubic-bezier(0.22, 0.75, 0.2, 1) !important;
+}
+.login-shell .login-flip.is-back > .login-card,
+.login-shell .login-flip:not(.is-back) > .login-flip-face-back {
+  transition: visibility 0s linear 380ms !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  .login-shell .login-flip,
+  .login-shell .login-flip.is-back > .login-card,
+  .login-shell .login-flip:not(.is-back) > .login-flip-face-back {
+    transition: none !important;
+  }
 }
 
 /* The back face's form sits one level down: without this the shared
