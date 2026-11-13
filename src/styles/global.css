@@ -4078,44 +4078,48 @@ div.cp-switch {
    fly-in, a pulsing field and a 3D card flip — on a weak club PC the form
    answered typing in ~0.9 s while the scene rendered.
 
-   Now the scene is ONE frame of itself, rendered once (Chromium on a real
-   GPU, see CLAUDE.md "Static sign-in") into public/bg/login-space*.webp, laid
-   over a CSS gradient that paints with the first frame, so the screen already
-   looks finished before the picture arrives; the picture then simply appears.
-   Nothing here moves. Used by Login, ResetPassword and NetworkBlockedScreen. */
+   Now the background is ONE still picture, public/bg/login-space*.webp: a
+   computer club at night seen from behind the players (rendered once, see
+   CLAUDE.md "Static sign-in"). It lies over a CSS gradient that paints with
+   the first frame and copies the picture's broad light (cyan rows on the
+   left, purple on the right, a dark aisle in the middle), so the screen
+   already looks finished before the picture arrives; the picture then simply
+   appears. Nothing here moves. Used by Login, ResetPassword and
+   NetworkBlockedScreen. (The file names are older than the picture.) */
 
 .login-shell {
   position: relative;
   overflow: hidden;
-  /* Deliberately fixed colours, not theme tokens: they are the picture's own
-     (its sky is #020514), and the sign-in is always the default theme. */
-  background-color: #020514;
+  /* Deliberately fixed colours, not theme tokens: they are the picture's own,
+     and the sign-in is always the default theme. */
+  background-color: #070b1f;
   background-image:
     url("/bg/login-space.webp"),
-    /* the moon's halo, upper left */
-    radial-gradient(ellipse 13% 22% at 27% 23%, rgb(125 142 156 / 0.3), rgb(52 72 88 / 0.16) 50%, transparent 78%),
-    /* the cyan cloud over the centre */
-    radial-gradient(ellipse 34% 40% at 50% 16%, rgb(31 70 92 / 0.85), transparent 72%),
-    /* the violet cloud to the right of the form */
-    radial-gradient(ellipse 20% 30% at 66% 42%, rgb(56 36 86 / 0.8), transparent 72%),
-    /* sky above the horizon, the darker floor under it */
-    linear-gradient(180deg, #040a1b 0%, #0a1528 50%, #060b1d 52%, #020514 88%);
+    /* the dark aisle under the form */
+    radial-gradient(ellipse 18% 42% at 50% 52%, rgb(6 9 29 / 0.9), transparent 75%),
+    /* the rows and their screens: cyan on the left, purple on the right */
+    radial-gradient(ellipse 32% 22% at 14% 64%, rgb(22 85 119 / 0.75), transparent 72%),
+    radial-gradient(ellipse 32% 22% at 86% 62%, rgb(41 53 99 / 0.8), transparent 72%),
+    /* the ceiling above, the floor below */
+    linear-gradient(180deg, #0d1729 0%, #0e1630 32%, #0b1126 52%, #091224 72%, #070e1f 100%);
   background-size: cover, auto, auto, auto, auto;
   background-position: center;
   background-repeat: no-repeat;
 }
 
 /* A tall screen (a phone, the Telegram Mini App, a portrait tablet) gets the
-   scene re-composed for it: the landscape frame cropped to a phone would lose
-   the moon and every planet off its sides. */
+   hall re-framed for it: the landscape picture cropped to a phone would keep
+   only the aisle. */
 @media (max-aspect-ratio: 3/4) {
   .login-shell {
     background-image:
       url("/bg/login-space-portrait.webp"),
-      radial-gradient(ellipse 30% 14% at 21% 16%, rgb(125 142 156 / 0.32), rgb(52 72 88 / 0.18) 50%, transparent 78%),
-      radial-gradient(ellipse 70% 30% at 45% 20%, rgb(36 70 90 / 0.85), transparent 75%),
-      radial-gradient(ellipse 45% 20% at 85% 42%, rgb(56 40 86 / 0.8), transparent 72%),
-      linear-gradient(180deg, #1c3344 0%, #1a3043 35%, #111d31 50%, #070b1d 52%, #020514 92%);
+      radial-gradient(ellipse 30% 10% at 6% 47%, rgb(15 44 73 / 0.9), transparent 75%),
+      radial-gradient(ellipse 30% 10% at 94% 47%, rgb(25 33 69 / 0.9), transparent 75%),
+      radial-gradient(ellipse 30% 8% at 4% 86%, rgb(8 42 63 / 0.8), transparent 75%),
+      radial-gradient(ellipse 30% 8% at 96% 86%, rgb(17 14 39 / 0.8), transparent 75%),
+      linear-gradient(180deg, #04081a 0%, #080c23 25%, #0b1229 38%, #070c1f 55%, #050b1a 100%);
+    background-size: cover, auto, auto, auto, auto, auto;
     background-position: center top;
   }
 }
