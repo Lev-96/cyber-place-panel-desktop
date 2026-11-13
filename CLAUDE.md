@@ -3750,23 +3750,33 @@ faces), ResetPassword, NetworkBlockedScreen — and the owner web's overrides.
   `brandFlicker`/`brandGlow` stay for the side menu), `cpBackdropIn`,
   `cpFieldGlow`, the card's hover glow, the 3D card flip, and the
   `three` / `@react-three/fiber` / `@types/three` packages.
-- **Background** (`global.css`, "Sign-in screens: still"): ONE still frame of
-  the old scene, `public/bg/login-space.webp` (2560×1440, 70 224 B) and
-  `login-space-portrait.webp` (1080×2340, 39 812 B, used at `max-aspect-ratio:
-  3/4`: phones, the Telegram Mini App, portrait tablets), `cover`, over a
-  CSS gradient that matches the picture and paints with the first frame —
-  the image just appears on top, no fade. Fixed colours on purpose (the
-  picture's own sky `#020514`; the sign-in is always the default theme). The
-  contrast theme and `prefers-contrast: more` drop both for `--color-bg`.
-- **How the pictures were made** (re-render, never hand-edit): the old scene
-  minus the passing ships and the pointer parallax, the camera at rest,
-  planets fully faded in, seed 13 of a seeded `Math.random`, the nebula's
-  canvas faded at its edges (the raw texture left a 2/255 vertical step), and
-  for portrait the moon/planets pulled inwards and shrunk. Rendered headless
-  on the real GPU (ANGLE/Vulkan, RADV) by Playwright, WebP q92. Harness and
-  the original scene source:
-  `~/cyber-place-local/reports/login-static-2026-11-13/harness/` (`scene/`,
-  `shoot-scene.mjs`).
+- **Background** (`global.css`, "Sign-in screens: still"): ONE still picture,
+  "The Floor" (the owner's pick of three candidates, 2026-11-13): a computer
+  club at night seen from behind the players — rows of gaming stations down a
+  central aisle, screens, chair and headset silhouettes rim-lit by them, LED
+  desk rails, ceiling light bars, bracket boards on the walls, a glossy floor;
+  cyan rows on the left, purple on the right, the aisle behind the form sinks
+  into dark haze. `public/bg/login-space.webp` (2560×1440, 219 784 B) and
+  `login-space-portrait.webp` (1080×2340, 127 184 B; the hall re-framed: the
+  horizon under the title, light bars above, the floor and its guide lines
+  below the card), used at `max-aspect-ratio: 3/4` (phones, the Telegram Mini
+  App, portrait tablets), `cover`. The file names predate the picture (it
+  replaced a still of the old space scene) and are kept so no path changes —
+  the owner web reads the same paths. Under it a CSS gradient that copies
+  the picture's broad light (dark aisle in the middle, cyan glow left, purple
+  right, ceiling/floor bands) and paints with the first frame — the image
+  just appears on top, no fade. Fixed colours on purpose (the picture's own;
+  the sign-in is always the default theme). The contrast theme and
+  `prefers-contrast: more` drop both for `--color-bg`.
+- **How the pictures were made** (re-render, never hand-edit): fully
+  procedural, local — Canvas2D in float16 in headless Chromium (Playwright,
+  real GPU via ANGLE/Vulkan): a pinhole camera with a shifted lens, per-row
+  depth of field, glow and smeared floor reflections, a seeded random, then a
+  dithered 8-bit export (no banding); WebP q100 method 6 (`encode.py`: the
+  highest quality under 250 KB). Source `src/a.html`, harness (`render.mjs`,
+  `encode.py`, `shots.mjs`, `contrast.mjs`) and the two rejected candidates in
+  `~/cyber-place-local/reports/login-bg-candidates-2026-11-13/`
+  (`node harness/render.mjs a landscape|portrait out.png`).
 - **Nothing moves:** `.login-shell, .login-shell *` (and their `::before/
   ::after`, in a separate rule — a pseudo-element in a selector list makes
   jsdom's matcher drop the whole rule) set `animation`/`transition: none
@@ -3780,12 +3790,13 @@ faces), ResetPassword, NetworkBlockedScreen — and the owner web's overrides.
   because the pressed link is on the face that turns inert); a deep link
   opens with that face's field focused (`autoFocus`).
 - **The card** is an even `rgb(--bg-rgb / 0.82)` under a faint accent tint
-  plus a 4px blur (it used to fade to nearly clear at the top): on a phone a
-  planet sits behind its top edge. Measured on screenshots with the text made
-  transparent (worst pixel under each text box), 1280/1920/2560/390/360 ×
-  en/ru/am × both faces: every text on the card ≥ 4.5:1 in both apps. Below
-  4.5 only the panel's page title at 390px over a planet (4.1; the panel has
-  no phone use) and a language pill at 360×640 (4.48, one star pixel).
+  plus a 4px blur (it used to fade to nearly clear at the top): on a phone the
+  hall's rows sit behind it. Measured with "The Floor" on screenshots with the
+  text made transparent (brightest pixel under each text box;
+  `login-bg-candidates-2026-11-13/harness/contrast.mjs`), panel
+  1280/1920/2560/390/360 and owner web 390/360/1920 × en/ru/am × sign-in and
+  forgot-password, 264 texts: none below 4.5:1. Worst: card label 6.51 (owner
+  360×640), page title 12.28, language pill 14.20.
 - **The composition** no longer reserves the ring's overhang
   (`padding-top: ring*0.454`), so it is centred as seen. `--ring-size` keeps
   its name (the owner web sets it) and is just the composition's scale.
