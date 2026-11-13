@@ -4,6 +4,7 @@ import PackageForm from "@/components/packages/PackageForm";
 import BranchExtraItemForm from "@/components/prices/BranchExtraItemForm";
 import BranchJoystickForm from "@/components/prices/BranchJoystickForm";
 import MoneyRoundingForm from "@/components/prices/MoneyRoundingForm";
+import OutsideFoodFeeForm from "@/components/prices/OutsideFoodFeeForm";
 import PauseLimitForm from "@/components/prices/PauseLimitForm";
 import VipMinimumChargeForm from "@/components/prices/VipMinimumChargeForm";
 import { rateOptions } from "@/components/prices/vipMinimumCharge";
@@ -304,6 +305,24 @@ const BranchPricesPage = () => {
             {billing.data && (
               <PauseLimitForm
                 key={String(billing.data.pause_limit_minutes ?? "")}
+                branchId={id}
+                settings={billing.data}
+                onSaved={() => void billing.reload()}
+              />
+            )}
+          </SettingsSection>
+
+          {/* «Свои продукты» (2026-11-13): the fee a player who brings their
+              own food pays, per seat tier; offered in the Start dialog. */}
+          <SettingsSection
+            title={t("outsideFood.sectionTitle")}
+            loading={billing.loading && !billing.data}
+            error={billing.data ? null : billing.error}
+            onRetry={() => void billing.reload()}
+          >
+            {billing.data && (
+              <OutsideFoodFeeForm
+                key={`${billing.data.outside_food_fee_standard ?? ""}:${billing.data.outside_food_fee_vip ?? ""}`}
                 branchId={id}
                 settings={billing.data}
                 onSaved={() => void billing.reload()}

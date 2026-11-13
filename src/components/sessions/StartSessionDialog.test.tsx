@@ -1289,3 +1289,143 @@ describe("who sits down, and how long before a reservation", () => {
     expect(startBtn().disabled).toBe(false);
   });
 });
+
+/**
+ * «Свои продукты» at the start (2026-11-13, owner): the player brought their
+ * own food, and the place's bill gets the club's fixed fee. The FIGURE is the
+ * server's (`start-options.outside_food_fee`); the dialog only offers it, says
+ * it, and sends back the figure it showed so the server can refuse a stale one.
+ */
+describe("«Свои продукты» at the start", () => {
+  const computer = () => device({ kind: PC_KIND.Pc, place: { id: 10, number: 1, name: "PC-1", type: "standard", platform: "pc" } });
+  const noBooking = { free_until: null, max_minutes: null, unlimited_allowed: true, next_booking: null, claimable_bookings: [] };
+  const offered = (fee: number | null | undefined) => {
+    repo.startOptions.mockResolvedValue(fee === undefined ? noBooking : { ...noBooking, outside_food_fee: fee });
+  };
+  const foodSwitch = () => screen.queryByTestId("outside-food-switch") as HTMLButtonElement | null;
+  const start = async () => {
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "action.start" })); });
+  };
+  const switchOn = async () => { await act(async () => { fireEvent.click(foodSwitch()!); }); };
+
+  test.each([["null", null], ["absent (an older backend)", undefined]])("not offered when the fee is %s: no switch", async (_label, fee) => {
+    offered(fee as number | null | undefined);
+    await mount(computer());
+    expect(foodSwitch()).toBeNull();
+    await start();
+    expect(repo.start.mock.calls[0][0]).not.toHaveProperty("outside_food");
+    expect(repo.start.mock.calls[0][0]).not.toHaveProperty("outside_food_fee");
+  });
+
+  test("offered: in the same row as «Не оплачено», on its right, off, and its figure said once on", async () => {
+    offered(1500);
+    await mount(computer());
+    const row = screen.getByTestId("start-switches");
+    const parts = [...row.children].map((c) => c.getAttribute("data-testid"));
+    expect(parts).toEqual(["start-unpaid", "start-outside-food"]);
+    expect(row.querySelector('[data-testid="unpaid-switch"]')).toBeTruthy();
+    expect(foodSwitch()!.getAttribute("aria-checked")).toBe("false");
+    expect(foodSwitch()!.getAttribute("aria-label")).toBe("session.outsideFood.switchFull");
+    expect(screen.queryByTestId("outside-food-hint")).toBeNull();
+    await switchOn();
+    expect(foodSwitch()!.getAttribute("aria-checked")).toBe("true");
+    expect(screen.getByTestId("outside-food-hint").textContent).toContain("session.outsideFood.startHint");
+    // The money is the dialog's own formatter (this mock prints the number).
+    expect(screen.getByTestId("outside-food-hint").querySelector("strong")?.textContent).toBe("1500");
+  });
+
+  test("a package start carries the switch and the figure shown, exactly", async () => {
+    offered(1500);
+    await mount(computer());
+    await switchOn();
+    await start();
+    expect(repo.start).toHaveBeenCalledTimes(1);
+    expect(repo.start.mock.calls[0][0]).toEqual({
+      branch_id: 7, pc_id: 1, mode: "fixed", time_package_id: 1, user_display_name: "PS5 VIP",
+      outside_food: true, outside_food_fee: 1500,
+    });
+  });
+
+  test("an open start at the seat's rate carries them too", async () => {
+    offered(800);
+    await mount(device());
+    await switchOn();
+    await start();
+    expect(repo.start.mock.calls[0][0]).toEqual({
+      branch_id: 7, pc_id: 1, mode: "open", user_display_name: "PS5 VIP",
+      outside_food: true, outside_food_fee: 800,
+    });
+  });
+
+  test("switched off again, the body carries neither key", async () => {
+    offered(1500);
+    await mount(device());
+    await switchOn();
+    await switchOn();
+    await start();
+    const body = repo.start.mock.calls[0][0] as Record<string, unknown>;
+    expect(body).not.toHaveProperty("outside_food");
+    expect(body).not.toHaveProperty("outside_food_fee");
+  });
+
+  test("with «Не оплачено» both travel", async () => {
+    offered(1500);
+    await mount(device());
+    await act(async () => { fireEvent.click(screen.getByTestId("unpaid-switch")); });
+    await switchOn();
+    await start();
+    expect(repo.start.mock.calls[0][0]).toMatchObject({ unpaid: true, outside_food: true, outside_food_fee: 1500 });
+  });
+
+  test("a free start: the switch goes off and away, and stays off when free is undone", async () => {
+    offered(1500);
+    await mount(computer());
+    await switchOn();
+    await act(async () => { fireEvent.click(screen.getByText("session.freeBill")); });
+    expect(foodSwitch()).toBeNull();
+    await start();
+    const body = repo.start.mock.calls[0][0] as Record<string, unknown>;
+    expect(body).toMatchObject({ is_free: true });
+    expect(body).not.toHaveProperty("outside_food");
+    expect(body).not.toHaveProperty("outside_food_fee");
+    await act(async () => { fireEvent.click(screen.getByText("session.freeBill")); });
+    expect(foodSwitch()!.getAttribute("aria-checked")).toBe("false");
+  });
+
+  test("the summary says the fee on top, only while it is on", async () => {
+    offered(1500);
+    await mount(device());
+    const line = () => screen.getByTestId("start-summary").textContent ?? "";
+    expect(line()).not.toContain("session.outsideFood.summary");
+    await switchOn();
+    expect(line()).toContain("session.outsideFood.summary");
+  });
+
+  test("a refused start reads the options again, and the next start sends the server's new figure", async () => {
+    offered(1500);
+    await mount(device());
+    await switchOn();
+    repo.start.mockRejectedValueOnce(new Error("The own-food fee is now 2000 AMD. Check and start again."));
+    const asked = repo.startOptions.mock.calls.length;
+    offered(2000);
+    await start();
+    expect(screen.getByText("The own-food fee is now 2000 AMD. Check and start again.")).toBeTruthy();
+    expect(repo.startOptions.mock.calls.length).toBe(asked + 1);
+    expect(screen.getByTestId("outside-food-hint").querySelector("strong")?.textContent).toBe("2000");
+    await start();
+    expect(repo.start.mock.calls[1][0]).toMatchObject({ outside_food: true, outside_food_fee: 2000 });
+  });
+
+  test("withdrawn meanwhile: the reread hides the switch and the next start carries nothing", async () => {
+    offered(1500);
+    await mount(device());
+    await switchOn();
+    repo.start.mockRejectedValueOnce(new Error("Own food is not offered here."));
+    offered(null);
+    await start();
+    expect(foodSwitch()).toBeNull();
+    await start();
+    expect(repo.start.mock.calls[1][0]).not.toHaveProperty("outside_food");
+    expect(repo.start.mock.calls[1][0]).not.toHaveProperty("outside_food_fee");
+  });
+});

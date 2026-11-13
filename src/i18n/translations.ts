@@ -821,11 +821,18 @@ export const TRANSLATIONS: Dict = {
   "appearance.custom.secondary": { en: "Show details on cards", ru: "Показывать подробности на карточках", am: "Ցույց տալ մանրամասներ քարտերի վրա" },
   "appearance.custom.secondaryHint": { en: "Rate, plan and number of items under the time.", ru: "Тариф, план и число товаров под временем.", am: "Սակագին, պլան և ապրանքների քանակ ժամանակի տակ։" },
   "appearance.custom.home": { en: "First screen after sign-in", ru: "Первый экран после входа", am: "Առաջին էկրանը մուտքից հետո" },
-  "appearance.menu.hint": { en: "Order and what to show. Entries you always need cannot be hidden.", ru: "Порядок и что показывать. Пункты, которые нужны всегда, скрыть нельзя.", am: "Հերթականություն և ինչ ցույց տալ։ Միշտ անհրաժեշտ կետերը թաքցնել հնարավոր չէ։" },
+  "appearance.menu.hint": { en: "Drag an entry by its grip to change the order. Entries you always need cannot be hidden.", ru: "Перетащите пункт за значок слева, чтобы изменить порядок. Пункты, которые нужны всегда, скрыть нельзя.", am: "Քաշեք կետը ձախ կողմի նշանից՝ հերթականությունը փոխելու համար։ Միշտ անհրաժեշտ կետերը թաքցնել հնարավոր չէ։" },
   "appearance.menu.home": { en: "always first", ru: "всегда первым", am: "միշտ առաջինը" },
   "appearance.menu.required": { en: "always shown", ru: "всегда видно", am: "միշտ տեսանելի" },
-  "appearance.menu.up": { en: "Move up", ru: "Выше", am: "Վերև" },
-  "appearance.menu.down": { en: "Move down", ru: "Ниже", am: "Ներքև" },
+  // Drag and drop in the menu editor (2026-11-13): the grip's name, tooltip,
+  // keyboard instructions and what a screen reader hears while moving a row.
+  "appearance.menu.move": { en: "Move", ru: "Переместить", am: "Տեղափոխել" },
+  "appearance.menu.moveTitle": { en: "Drag to change the order", ru: "Перетащите, чтобы изменить порядок", am: "Քաշեք՝ հերթականությունը փոխելու համար" },
+  "appearance.menu.moveKeys": { en: "Space: pick up. Arrow keys: move. Space: drop. Escape: cancel.", ru: "Пробел: взять. Стрелки: переместить. Пробел: поставить. Escape: отменить.", am: "Բացատ՝ վերցնել։ Սլաքներ՝ տեղափոխել։ Բացատ՝ դնել։ Escape՝ չեղարկել։" },
+  "appearance.menu.sort.pickedUp": { en: "{0} picked up. Position {1} of {2}.", ru: "Пункт «{0}» взят. Место {1} из {2}.", am: "«{0}» կետը վերցված է։ Տեղ {1}, ընդամենը {2}։" },
+  "appearance.menu.sort.moved": { en: "{0}: position {1} of {2}.", ru: "«{0}»: место {1} из {2}.", am: "«{0}»՝ տեղ {1}, ընդամենը {2}։" },
+  "appearance.menu.sort.dropped": { en: "{0} placed. Position {1} of {2}.", ru: "Пункт «{0}» поставлен. Место {1} из {2}.", am: "«{0}» կետը տեղադրված է։ Տեղ {1}, ընդամենը {2}։" },
+  "appearance.menu.sort.cancelled": { en: "Move cancelled. {0} is back at position {1}.", ru: "Перемещение отменено. Пункт «{0}» снова на месте {1}.", am: "Տեղափոխումը չեղարկվեց։ «{0}» կետը վերադարձավ իր տեղը՝ {1}։" },
   "appearance.menu.show": { en: "Show", ru: "Показывать", am: "Ցույց տալ" },
   "appearance.unsaved": { en: "Changes are not saved yet", ru: "Изменения ещё не сохранены", am: "Փոփոխությունները դեռ պահված չեն" },
   "appearance.saveFailed": { en: "Could not save. Your choice stays on this computer; try again.", ru: "Не удалось сохранить. Выбор остаётся на этом компьютере, попробуйте ещё раз.", am: "Չհաջողվեց պահել։ Ընտրությունը մնում է այս համակարգչում, փորձեք կրկին։" },
@@ -4183,8 +4190,32 @@ export const TRANSLATIONS: Dict = {
   "companyBranches.title": { en: "Branches of company №{0}", ru: "Филиалы компании №{0}", am: "№{0} ընկերության մասնաճյուղերը" },
   "companyBranches.newBranch": { en: "+ New branch", ru: "+ Новый филиал", am: "+ Նոր մասնաճյուղ" },
 
-  // Working-hours form title
-  "openDays.title": { en: "Working hours · {0}", ru: "Часы работы · {0}", am: "Աշխատանքային ժամեր · {0}" },
+  // Working-hours form (BranchOpenDaysForm, redesigned 2026-11-13). The title
+  // is `branch.editTabs.hours`, the rows' words `branch.weekday.*`,
+  // `branch.openTime` / `branch.closeTime` and `branch.dayOff`.
+  "openDays.summary.closed": { en: "Closed every day", ru: "Все дни выходные", am: "Բոլոր օրերը հանգստյան են" },
+  "openDays.summary.always": { en: "Open 24/7", ru: "Круглосуточно, без выходных", am: "Շուրջօրյա, առանց հանգստյան օրերի" },
+  "openDays.summary.everyDay": { en: "Every day · {0}", ru: "Каждый день · {0}", am: "Ամեն օր · {0}" },
+  "openDays.summary.someDays": { en: "Open {0} days a week · {1}", ru: "Открыто {0} из 7 дней · {1}", am: "Բաց է շաբաթական {0} օր · {1}" },
+  "openDays.summary.mixed": { en: "different hours", ru: "разные часы", am: "տարբեր ժամեր" },
+  "openDays.range.allDay": { en: "24 hours", ru: "круглосуточно", am: "շուրջօրյա" },
+  "openDays.range.overnight": { en: "{0}–{1} (+1 day)", ru: "{0}–{1} (+1 день)", am: "{0}–{1} (+1 օր)" },
+  "openDays.hint.overnight": { en: "Until {0} next day", ru: "До {0} следующего дня", am: "Մինչև հաջորդ օրվա {0}-ը" },
+  "openDays.hint.fullDay": { en: "24 hours, until {0} next day", ru: "24 часа, до {0} следующего дня", am: "24 ժամ՝ մինչև հաջորդ օրվա {0}-ը" },
+  "openDays.hint.allDay": { en: "Around the clock", ru: "Круглосуточно", am: "Շուրջօրյա" },
+  "openDays.copyToAll": { en: "Apply {0} hours to every open day", ru: "Применить часы ({0}) ко всем открытым дням", am: "Կիրառել ({0}) ժամերը բոլոր բաց օրերի համար" },
+  "openDays.timeField": { en: "{0}, {1}", ru: "{0}, {1}", am: "{0}, {1}" },
+  "openDays.errorField": { en: "\"{0}\"", ru: "«{0}»", am: "«{0}»" },
+  "openDays.errors.noDays": {
+    en: "Turn on at least one day: a branch has to be open at least one day a week.",
+    ru: "Включите хотя бы один день: филиал должен работать хотя бы один день в неделю.",
+    am: "Միացրեք առնվազն մեկ օր՝ մասնաճյուղը պետք է աշխատի շաբաթական գոնե մեկ օր։",
+  },
+  "openDays.errors.time": {
+    en: "Enter the highlighted times as HH:MM, for example 09:30.",
+    ru: "Введите выделенное время в формате ЧЧ:ММ, например 09:30.",
+    am: "Մուտքագրեք նշված ժամերը HH:MM ձևաչափով, օրինակ՝ 09:30։",
+  },
 
   // TournamentDetails rows
   "tournamentDetails.end": { en: "End", ru: "Конец", am: "Ավարտ" },
@@ -4937,6 +4968,54 @@ export const TRANSLATIONS: Dict = {
     en: "Could not save. If this server is older, these settings are not available on it yet.",
     ru: "Не удалось сохранить. Если сервер старый, эти настройки на нём ещё недоступны.",
     am: "Չհաջողվեց պահպանել։ Եթե սերվերը հին է, այս կարգավորումները դեռ հասանելի չեն։",
+  },
+
+  // «Свои продукты» (2026-11-13, owner): the fee for a player who brings their
+  // own food. Start dialog switch + hint + summary, the card's note, the bill
+  // line's label (by its kind, never its stored name), the Prices page rule and
+  // the place form's override.
+  "session.outsideFood.switch": { en: "Own food", ru: "Свои продукты", am: "Սեփական սնունդ" },
+  "session.outsideFood.switchFull": { en: "The player brought their own food", ru: "Игрок принёс свои продукты", am: "Խաղացողը բերել է իր սնունդը" },
+  "session.outsideFood.startHint": { en: "{0} will be added to the place's bill", ru: "К счёту места добавится {0}", am: "Տեղի հաշվին կավելացվի {0}" },
+  "session.outsideFood.summary": { en: "+ own food {0}", ru: "+ свои продукты {0}", am: "+ սեփական սնունդ {0}" },
+  "session.outsideFood.cardNote": { en: "Own food {0}", ru: "Свои продукты {0}", am: "Սեփական սնունդ {0}" },
+  "session.outsideFood.line": { en: "Own food", ru: "Свои продукты", am: "Սեփական սնունդ" },
+  "outsideFood.sectionTitle": { en: "Own food", ru: "Свои продукты", am: "Սեփական սնունդ" },
+  "outsideFood.hint": {
+    en: "When a player brings their own food or drinks, the cashier turns on “Own food” at the start, and this amount is added to the place's bill. Leave a box empty to not charge on those places.",
+    ru: "Если игрок принёс свою еду или напитки, кассир включает «Свои продукты» при старте, и эта сумма добавляется к счёту места. Оставьте поле пустым, чтобы не брать доплату на этих местах.",
+    am: "Եթե խաղացողը բերել է իր սնունդը կամ խմիչքը, գանձապահը մեկնարկի ժամանակ միացնում է «Սեփական սնունդ», և այս գումարը ավելացվում է տեղի հաշվին։ Թողեք դաշտը դատարկ, որպեսզի այդ տեղերում հավելավճար չգանձվի։",
+  },
+  "outsideFood.standard": { en: "Standard places", ru: "Обычные места", am: "Սովորական տեղեր" },
+  "outsideFood.vip": { en: "VIP places", ru: "VIP-места", am: "VIP տեղեր" },
+  "outsideFood.notCharged": { en: "Not charged", ru: "Не взимается", am: "Չի գանձվում" },
+  "outsideFood.zeroRefused": {
+    en: "The amount must be more than 0. To not charge, leave the box empty.",
+    ru: "Сумма должна быть больше 0. Чтобы не брать доплату, оставьте поле пустым.",
+    am: "Գումարը պետք է լինի 0-ից մեծ։ Որպեսզի չգանձվի, թողեք դաշտը դատարկ։",
+  },
+  "outsideFood.placeHint": {
+    en: "A single place can have its own amount: set it in that place's form.",
+    ru: "У отдельного места может быть своя сумма: её задают в форме места.",
+    am: "Առանձին տեղը կարող է ունենալ իր գումարը՝ այն նշվում է տեղի ձևում։",
+  },
+  "outsideFood.saved": { en: "Own food fee saved", ru: "Доплата за свои продукты сохранена", am: "Սեփական սննդի հավելավճարը պահպանվեց" },
+  "place.outsideFood": { en: "Own food fee at this place", ru: "Доплата за свои продукты на этом месте", am: "Սեփական սննդի հավելավճար այս տեղում" },
+  "place.outsideFood.placeholder": { en: "Like the branch", ru: "Как в филиале", am: "Ինչպես մասնաճյուղում" },
+  "place.outsideFood.hint": {
+    en: "Empty: like the branch. 0: not charged at this place.",
+    ru: "Пусто: как в филиале. 0: на этом месте не взимается.",
+    am: "Դատարկ՝ ինչպես մասնաճյուղում։ 0՝ այս տեղում չի գանձվում։",
+  },
+  "place.outsideFood.hintBranch": {
+    en: "Empty: like the branch ({0} for this type of place). 0: not charged at this place.",
+    ru: "Пусто: как в филиале ({0} для этого типа мест). 0: на этом месте не взимается.",
+    am: "Դատարկ՝ ինչպես մասնաճյուղում ({0} այս տեսակի տեղերի համար)։ 0՝ այս տեղում չի գանձվում։",
+  },
+  "place.outsideFood.hintBranchNone": {
+    en: "Empty: like the branch (not charged for this type of place). 0: not charged at this place.",
+    ru: "Пусто: как в филиале (для этого типа мест не взимается). 0: на этом месте не взимается.",
+    am: "Դատարկ՝ ինչպես մասնաճյուղում (այս տեսակի տեղերի համար չի գանձվում)։ 0՝ այս տեղում չի գանձվում։",
   },
 };
 

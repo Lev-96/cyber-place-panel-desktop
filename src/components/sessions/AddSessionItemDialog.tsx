@@ -24,6 +24,7 @@ import {
 } from "@/components/pos/ProductBasketPanels";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { IItemChoice } from "@/api/sessions";
+import { sessionLineLabel } from "./outsideFood";
 
 interface Props {
   branchId: number;
@@ -302,10 +303,14 @@ const AddSessionItemDialog = ({ branchId, session, onClose, onAdded }: Props) =>
           <div className="col" style={{ gap: 6 }}>
             <span className="label" style={{ fontSize: 12 }}>{t("session.alreadyInSession")}</span>
             <div className="col" style={{ gap: 6, maxHeight: 150, overflowY: "auto" }}>
-              {onBill.map((item) => (
+              {onBill.map((item) => {
+                // By kind first (2026-11-13): the own-food fee's stored name
+                // is in the language of whoever started the session.
+                const label = sessionLineLabel(item, t);
+                return (
                 <div key={item.id} style={rowStyle}>
-                  <span style={ellipsis} title={item.name}>
-                    {item.name}
+                  <span style={ellipsis} title={label}>
+                    {label}
                     {item.product_id != null && additionalIds.has(item.product_id) && (
                       <span className="pill" style={{ marginLeft: 6, fontSize: 10, textTransform: "none", letterSpacing: 0 }}>
                         {t("product.kindAdditionalShort")}
@@ -321,16 +326,17 @@ const AddSessionItemDialog = ({ branchId, session, onClose, onAdded }: Props) =>
                   </span>
                   <Button
                     variant="secondary"
-                    onClick={() => void removeFromBill(item.id, item.name, item.product_id != null && additionalIds.has(item.product_id))}
+                    onClick={() => void removeFromBill(item.id, label, item.product_id != null && additionalIds.has(item.product_id))}
                     disabled={saving || removing.includes(item.id)}
                     style={{ ...stepBtn, color: "var(--color-danger)", borderColor: "var(--color-danger-border-dim)" }}
-                    aria-label={`${t("action.delete")}: ${item.name}`}
+                    aria-label={`${t("action.delete")}: ${label}`}
                     title={t("session.removeFromBill")}
                   >
                     {removing.includes(item.id) ? "…" : "🗑"}
                   </Button>
                 </div>
-              ))}
+              );
+              })}
             </div>
           </div>
         )}

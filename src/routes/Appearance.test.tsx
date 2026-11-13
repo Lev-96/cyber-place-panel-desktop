@@ -173,7 +173,9 @@ describe("the menu and the first screen", () => {
     expect((within(screen.getByTestId("menu-row-nav.settings")).getByRole("switch") as HTMLInputElement).disabled).toBe(true);
 
     await act(async () => { fireEvent.click(within(screen.getByTestId("menu-row-nav.bookings")).getByRole("switch")); });
-    await act(async () => { fireEvent.click(within(screen.getByTestId("menu-row-nav.shifts")).getByRole("button", { name: /appearance.menu.up/ })); });
+    // One slot up by keyboard on the grip (2026-11-13: drag and drop replaced ↑ / ↓).
+    const grip = within(screen.getByTestId("menu-row-nav.shifts")).getByRole("button", { name: /appearance.menu.move/ });
+    for (const key of [" ", "ArrowUp", " "]) await act(async () => { fireEvent.keyDown(grip, { key }); });
     await act(async () => { fireEvent.click(screen.getByRole("button", { name: "appearance.save" })); });
     const sidebar: Array<{ id: string; hidden: boolean }> = repo.put.mock.calls[0][0].data.layout.sidebar;
     expect(sidebar.find((e) => e.id === "nav.bookings")?.hidden).toBe(true);

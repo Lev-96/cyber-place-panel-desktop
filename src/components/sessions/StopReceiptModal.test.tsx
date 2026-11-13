@@ -1118,3 +1118,39 @@ describe("split payment and the payment of a seat that ended by itself", () => {
     expect(screen.queryByTestId("pay-mark-confirm")).toBeNull();
   });
 });
+
+/**
+ * «Свои продукты» on the receipt (2026-11-13): the fee is a bill line whose
+ * stored name is in the STARTER's language. The receipt names it by its kind,
+ * in the panel's language; its figure is the server's line.
+ */
+describe("«Свои продукты» on the receipt", () => {
+  beforeEach(() => cleanup());
+  afterEach(() => cleanup());
+  const withFee = () => bill({
+    items: [
+      { id: 5, name: "Свои продукты", price: 1500, qty: 1, line_total: 1500, kind: "outside_food" },
+      { id: 6, name: "Coca-Cola", price: 500, qty: 1, line_total: 500, kind: null },
+    ] as unknown as IBillBreakdown["items"],
+    items_total: 2000, subtotal: 2017.22, gross_total: 2017.22, total: 2017.22,
+  });
+
+  test("labelled by its kind, never by the stored name; products keep theirs", async () => {
+    repo.preview.mockResolvedValue(withFee());
+    await mount();
+    const items = screen.getByTestId("receipt-items");
+    expect(items.textContent).toContain("session.outsideFood.line");
+    expect(items.textContent).not.toContain("Свои продукты");
+    expect(items.textContent).toContain("Coca-Cola");
+    expect(items.textContent).toContain("1 × 1500");
+  });
+
+  test("it can be taken off, like any line (the server allows and audits it)", async () => {
+    repo.preview.mockResolvedValue(withFee());
+    repo.removeItem.mockResolvedValue(undefined);
+    await mount();
+    const removes = screen.getByTestId("receipt-items").querySelectorAll("button");
+    await act(async () => { fireEvent.click(removes[0]); });
+    expect(repo.removeItem).toHaveBeenCalledWith(expect.anything(), 5);
+  });
+});

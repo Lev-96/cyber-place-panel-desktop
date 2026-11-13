@@ -15,6 +15,7 @@ import { ISessionEvent } from "@/api/sessions";
 import { ISessionApi } from "@/types/sessions";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
+import { sessionLineLabel } from "@/components/sessions/outsideFood";
 
 /** Local "YYYY-MM-DD" — what `<input type="date">` reads/writes. */
 const toDateInput = (d: Date): string => {
@@ -201,8 +202,8 @@ const SessionsHistory = () => {
               <span className="muted" style={{ fontSize: 12 }}>{t("history.topItems")}</span>
               <div className="row" style={{ gap: 6, flexWrap: "wrap", marginTop: 4 }}>
                 {summary.topItems.map((it) => (
-                  <span key={it.name} className="pill" style={{ textTransform: "none", letterSpacing: 0 }}>
-                    {it.name} · {it.qty} · {money(it.total)}
+                  <span key={it.kind ?? it.name} className="pill" style={{ textTransform: "none", letterSpacing: 0 }}>
+                    {sessionLineLabel(it, t)} · {it.qty} · {money(it.total)}
                   </span>
                 ))}
               </div>

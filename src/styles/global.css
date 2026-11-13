@@ -193,9 +193,10 @@
   font-display: swap;
 }
 
-/* ===== Brand wordmark neon animation (shared: login + sidebar) ===== */
+/* ===== Brand wordmark neon animation (the side menu's wordmark) ===== */
 /* Periodic neon "flicker" once per cycle + a gentle, eye-comfortable glow
-   "breathing" pulse. Honours prefers-reduced-motion. */
+   "breathing" pulse. Honours prefers-reduced-motion. The sign-in screens'
+   wordmark is still since 2026-11-13 (see "Sign-in screens: still"). */
 @keyframes brandFlicker {
   0% {
     opacity: 0.4;
@@ -238,7 +239,6 @@
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .login-brand,
   .sidebar h1 span {
     animation: none !important;
   }
@@ -439,14 +439,6 @@ html {
   /* Live grid cells fade in (no slide — too jittery for a grid) */
   .live-grid > * {
     animation: cp-fade-in 260ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
-  }
-
-  /* Brand title shimmer once on login screen */
-  .login-brand {
-    animation: cp-brand-in 600ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
-  }
-  .login-logo {
-    animation: cp-card-in 500ms 80ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
   }
 }
 
@@ -847,18 +839,6 @@ a.card:hover {
   to {
     opacity: 1;
     transform: translateX(0);
-  }
-}
-@keyframes cp-brand-in {
-  from {
-    opacity: 0;
-    transform: translateY(-12px);
-    letter-spacing: 6px;
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-    letter-spacing: 2px;
   }
 }
 
@@ -1611,7 +1591,8 @@ body.cp-modal-open .main {
 
 /* === Native date/time pickers — dark neon calendar everywhere ===========
    Applies to every native temporal input across the app (POS history,
-   sessions history, tournament dates, branch working-hours times). The
+   sessions history, tournament dates; branch working hours moved to the
+   24-hour `TimeInput` on 2026-11-13). The
    editable field already uses `.input`; these rules theme the parts the
    browser draws itself: the pop-up calendar, the trigger glyph and the
    focused date/time segment. */
@@ -2197,19 +2178,16 @@ input[type="time"]::-webkit-datetime-edit-field:focus {
   align-items: center;
   justify-content: center;
   height: 100vh;
-  background: var(--color-bg);
   padding: 24px;
   gap: 24px;
   /* THE size of the login composition. Every dimension below is a fraction of
-     it, so the ring, the wordmark and the form always shrink together — before
-     this the ring tracked the viewport while the form stayed pinned in pixels,
-     and on a short window the form ended up nearly as wide as the circle
-     around it. Ratios are the original design sizes over 620. */
+     it, so the wordmark, the logo and the form always shrink together. Named
+     after the HUD ring it once framed (gone 2026-11-13); the owner web sets it
+     too, so the name stays. Ratios are the original design sizes over 620. */
   --ring-size: clamp(400px, 62vh, 620px);
 }
 
 .login-brand {
-  --flicker-every: 8s;
   font-family: "Audiowide", "Inter", sans-serif;
   font-size: 48px;
   font-weight: 400;
@@ -2221,9 +2199,10 @@ input[type="time"]::-webkit-datetime-edit-field:focus {
   color: transparent;
   margin: 0;
   text-align: center;
-  animation:
-    brandFlicker var(--flicker-every) ease-in-out infinite,
-    brandGlow 5s ease-in-out infinite;
+  /* A still neon: the side menu's breathing glow held at its middle. A
+     drop-shadow, not text-shadow — with the gradient clipped to the glyphs a
+     text-shadow would paint over the fill. */
+  filter: drop-shadow(0 0 3px rgb(var(--accent-rgb) / 0.6)) drop-shadow(0 0 12px rgba(49, 175, 247, 0.38));
 }
 
 /* The mark is 1.64:1 (2026-10-17); 108px wide gives it the area the old,
@@ -2294,10 +2273,6 @@ button.pill:hover {
   font-weight: 600;
   letter-spacing: 0.5px;
   cursor: pointer;
-  transition:
-    background 0.15s,
-    border-color 0.15s,
-    color 0.15s;
 }
 .login-lang-pill:hover {
   background: rgb(var(--accent-rgb) / 0.12);
@@ -4096,8 +4071,86 @@ div.cp-switch {
   margin-top: auto;
 }
 
-/* Wrapper around brand + logo + title + form, so the panel is one block with
-   its own spacing above the decorative layers. */
+/* === Sign-in screens: still (2026-11-13) ====================================
+   The owner: "no animation at all, a very beautiful background, and the page
+   must not freeze while loading". Until then this was a three.js space scene
+   (≈900 KB of JavaScript and a WebGL frame loop), a spinning HUD ring, a 2.3 s
+   fly-in, a pulsing field and a 3D card flip — on a weak club PC the form
+   answered typing in ~0.9 s while the scene rendered.
+
+   Now the scene is ONE frame of itself, rendered once (Chromium on a real
+   GPU, see CLAUDE.md "Static sign-in") into public/bg/login-space*.webp, laid
+   over a CSS gradient that paints with the first frame, so the screen already
+   looks finished before the picture arrives; the picture then simply appears.
+   Nothing here moves. Used by Login, ResetPassword and NetworkBlockedScreen. */
+
+.login-shell {
+  position: relative;
+  overflow: hidden;
+  /* Deliberately fixed colours, not theme tokens: they are the picture's own
+     (its sky is #020514), and the sign-in is always the default theme. */
+  background-color: #020514;
+  background-image:
+    url("/bg/login-space.webp"),
+    /* the moon's halo, upper left */
+    radial-gradient(ellipse 13% 22% at 27% 23%, rgb(125 142 156 / 0.3), rgb(52 72 88 / 0.16) 50%, transparent 78%),
+    /* the cyan cloud over the centre */
+    radial-gradient(ellipse 34% 40% at 50% 16%, rgb(31 70 92 / 0.85), transparent 72%),
+    /* the violet cloud to the right of the form */
+    radial-gradient(ellipse 20% 30% at 66% 42%, rgb(56 36 86 / 0.8), transparent 72%),
+    /* sky above the horizon, the darker floor under it */
+    linear-gradient(180deg, #040a1b 0%, #0a1528 50%, #060b1d 52%, #020514 88%);
+  background-size: cover, auto, auto, auto, auto;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+/* A tall screen (a phone, the Telegram Mini App, a portrait tablet) gets the
+   scene re-composed for it: the landscape frame cropped to a phone would lose
+   the moon and every planet off its sides. */
+@media (max-aspect-ratio: 3/4) {
+  .login-shell {
+    background-image:
+      url("/bg/login-space-portrait.webp"),
+      radial-gradient(ellipse 30% 14% at 21% 16%, rgb(125 142 156 / 0.32), rgb(52 72 88 / 0.18) 50%, transparent 78%),
+      radial-gradient(ellipse 70% 30% at 45% 20%, rgb(36 70 90 / 0.85), transparent 75%),
+      radial-gradient(ellipse 45% 20% at 85% 42%, rgb(56 40 86 / 0.8), transparent 72%),
+      linear-gradient(180deg, #1c3344 0%, #1a3043 35%, #111d31 50%, #070b1d 52%, #020514 92%);
+    background-position: center top;
+  }
+}
+
+/* High contrast (the theme, or the system's preference): the plain page
+   colour behind the form, nothing to read the text against. */
+[data-theme="contrast"] .login-shell {
+  background: var(--color-bg);
+}
+@media (prefers-contrast: more) {
+  .login-shell {
+    background: var(--color-bg);
+  }
+}
+
+/* Nothing on these screens moves — not even the shared controls' hover and
+   focus fades (.btn, .input, the eye, the pills). Their states still change,
+   instantly. The captcha's own shake/done feedback lives in a dialog portalled
+   to <body>, outside this, and is kept on purpose. */
+.login-shell,
+.login-shell * {
+  animation: none !important;
+  transition: none !important;
+}
+/* Its own rule: a selector list fails as a whole where a pseudo-element is
+   not understood (jsdom's matcher, older engines), and would take the
+   elements' line above down with it. */
+.login-shell *::before,
+.login-shell *::after {
+  animation: none !important;
+  transition: none !important;
+}
+
+/* Wrapper around brand + logo + title + form, so the composition is one
+   centred block above the background. */
 .login-stage {
   position: relative;
   z-index: 2;
@@ -4107,56 +4160,6 @@ div.cp-switch {
   gap: calc(var(--ring-size) * 0.039);
   width: 100%;
   max-width: calc(var(--ring-size) * 0.84);
-  /* Reserve the half of the ring that sticks out ABOVE the wordmark.
-     The ring is absolutely positioned, so it contributes nothing to layout —
-     which meant the flex centring balanced only the text and the form, and the
-     whole composition rode high with dead space underneath. Padding the stage
-     by the ring's overhang (its radius, less half the wordmark's own height)
-     puts that space back into the flow, so centring the stage now centres what
-     you actually see. Derived from --ring-size, so it stays correct at every
-     window size instead of only at one. */
-  padding-top: calc(var(--ring-size) * 0.454);
-  /* Flattening is what makes the panel arrive as one solid object. Without it
-     each child would be depth-sorted on its own and the group would visibly
-     come apart mid-flight. */
-  transform-style: preserve-3d;
-  animation: cpPanelApproach 2300ms cubic-bezier(0.14, 0.86, 0.2, 1) both;
-}
-
-.login-shell {
-  position: relative;
-  overflow: hidden;
-  /* A real perspective, so the entrance is genuine depth rather than a scale.
-     Scaling grows every edge uniformly; translating along Z foreshortens —
-     the panel reads as travelling towards you instead of merely inflating. */
-  perspective: 1400px;
-  perspective-origin: 50% 42%;
-}
-
-/* ---- Panel entrance ----
-   Arrives out of the same depth the grid recedes into: far away, dim and out
-   of focus, then settles onto its mark. The blur clearing as it lands is what
-   sells the distance — a sharp object that only changes size reads as a
-   sticker being zoomed, not as something approaching. */
-@keyframes cpPanelApproach {
-  0% {
-    opacity: 0;
-    transform: translate3d(0, 34px, -1900px);
-    filter: blur(12px);
-  }
-  45% {
-    opacity: 1;
-  }
-  /* A whisper past the mark, then back — the settle that stops a long
-     approach ending abruptly. Two pixels, not a bounce. */
-  88% {
-    transform: translate3d(0, 0, 26px);
-  }
-  100% {
-    opacity: 1;
-    transform: translate3d(0, 0, 0);
-    filter: blur(0);
-  }
 }
 
 /* Composition type and imagery, all derived from --ring-size. */
@@ -4169,154 +4172,25 @@ div.cp-switch {
 .login-shell .login-title {
   font-size: calc(var(--ring-size) * 0.032);
 }
+
+/* ---- The form: an instrument housing, not a plain card ----
+   An even 0.82 of the page colour under a faint accent tint (it used to fade
+   to nearly clear at the top), and a 4px blur: on a phone a planet sits
+   behind the card's top edge, and a grey label there must still read
+   (measured ≥ 4.5:1 for the muted label colour). */
 .login-shell .login-card {
+  position: relative;
   padding: calc(var(--ring-size) * 0.036) calc(var(--ring-size) * 0.039);
   gap: calc(var(--ring-size) * 0.023);
-}
-
-/* The wordmark lights up once the panel has almost landed, rather than riding
-   in already glowing — the beat between arrival and ignition is what makes it
-   feel deliberate. */
-.login-shell .login-brand {
-  animation:
-    cpBrandIgnite 900ms 1500ms ease-out both,
-    brandFlicker var(--flicker-every) 2400ms ease-in-out infinite,
-    brandGlow 5s 2400ms ease-in-out infinite;
-}
-
-@keyframes cpBrandIgnite {
-  from { opacity: 0.25; }
-  to { opacity: 1; }
-}
-
-/* The backdrops come up under it, so nothing snaps in when the lazy WebGL
-   chunk finally resolves. */
-.login-scene {
-  animation: cpBackdropIn 2200ms ease-out both;
-}
-
-@keyframes cpBackdropIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-/* === Login HUD backdrop =====================================================
-   A hexagon mesh floor and a slow targeting ring behind the sign-in panel —
-   the "heads-up display" look, rendered in the product's own palette rather
-   than a borrowed cyan.
-
-   Everything here is decoration: it sits behind the character and the form,
-   never takes pointer events, and animates transform/opacity only so the whole
-   layer stays on the compositor (CLAUDE.md §7.5). */
-
-/* Anchor for the ring: a zero-height box centred on the wordmark. */
-.login-brand-wrap {
-  position: relative;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-
-.login-shell .login-brand {
-  position: relative;
-  /* Above the ring that is centred behind it. */
-  z-index: 1;
-}
-
-/* The ring, centred on the wordmark's own centre. */
-.login-hud {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: var(--ring-size);
-  aspect-ratio: 1;
-  transform: translate(-50%, -50%);
-  pointer-events: none;
-  z-index: 0;
-}
-
-/* The WebGL backdrop, behind every other layer. */
-.login-scene {
-  position: absolute !important;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
-}
-
-/* ---- Targeting ring ----
-   Three concentric pieces turning at different rates: a fast thin ring, a slow
-   counter-turning one, and a tick band. Counter-rotation is what stops it
-   reading as one flat spinning disc. */
-.login-hud-ring {
-  position: absolute;
-  inset: 0;
-  opacity: 0.5;
-}
-
-.login-hud-ring span {
-  position: absolute;
-  inset: 0;
-  border-radius: 50%;
-}
-
-.login-hud-ring-outer {
-  border: 2px solid rgb(var(--accent-rgb) / 0.35);
-  box-shadow:
-    0 0 18px rgb(var(--accent-rgb) / 0.25),
-    inset 0 0 22px rgb(var(--accent-rgb) / 0.12);
-  /* Two gaps in the ring: a broken circle reads as an instrument, a closed
-     one reads as a plain border. */
-  mask-image: conic-gradient(#000 0 38%, transparent 38% 44%, #000 44% 88%, transparent 88% 94%, #000 94%);
-  animation: cpHudSpin 32s linear infinite;
-}
-
-.login-hud-ring-inner {
-  inset: 9%;
-  border: 1px solid rgb(var(--accent-purple-rgb) / 0.32);
-  mask-image: conic-gradient(transparent 0 8%, #000 8% 46%, transparent 46% 54%, #000 54% 92%, transparent 92%);
-  animation: cpHudSpin 44s linear infinite reverse;
-}
-
-.login-hud-ring-ticks {
-  inset: 17%;
-  /* Tick marks drawn as a repeating conic gradient — no extra elements. */
-  background: repeating-conic-gradient(
-    from 0deg,
-    rgb(var(--accent-blue-rgb) / 0.5) 0deg 0.7deg,
-    transparent 0.7deg 9deg
-  );
-  mask-image: radial-gradient(circle, transparent 0 82%, #000 82% 100%);
-  animation: cpHudSpin 70s linear infinite;
-}
-
-@keyframes cpHudSpin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-
-/* ---- Panel: instrument housing, not a plain card ---- */
-.login-shell .login-card {
-  position: relative;
-  padding: 22px 24px 24px;
-  border: 1px solid rgb(var(--accent-rgb) / 0.3);
+  border: 1px solid rgb(var(--accent-rgb) / 0.42);
   border-radius: 10px;
   background:
-    linear-gradient(180deg, rgb(var(--accent-rgb) / 0.05), rgb(var(--bg-rgb) / 0.72));
+    linear-gradient(180deg, rgb(var(--accent-rgb) / 0.07), rgb(var(--accent-rgb) / 0.02)),
+    rgb(var(--bg-rgb) / 0.82);
   box-shadow:
-    0 0 22px rgb(var(--accent-rgb) / 0.12),
-    inset 0 0 24px rgb(var(--accent-rgb) / 0.05);
-  backdrop-filter: blur(2px);
-  transition:
-    border-color 400ms ease,
-    box-shadow 400ms ease;
-}
-
-.login-shell .login-card:hover,
-.login-shell .login-card:focus-within {
-  border-color: rgb(var(--accent-rgb) / 0.62);
-  box-shadow:
-    0 0 34px rgb(var(--accent-rgb) / 0.22),
-    inset 0 0 28px rgb(var(--accent-rgb) / 0.08);
+    0 0 26px rgb(var(--accent-rgb) / 0.16),
+    inset 0 0 26px rgb(var(--accent-rgb) / 0.06);
+  backdrop-filter: blur(4px);
 }
 
 /* Corner brackets: four short rules pinned to the panel's corners. Drawn on
@@ -4346,156 +4220,47 @@ div.cp-switch {
   border-bottom-right-radius: 10px;
 }
 
-/* Focused fields pulse, the way an instrument acknowledges input. Kept gentle:
-   this screen is looked at every shift, and a hard strobe gets tiring fast. */
-@keyframes cpFieldGlow {
-  from {
-    box-shadow: 0 0 0 2px rgb(var(--accent-rgb) / 0.16), 0 0 8px rgb(var(--accent-rgb) / 0.16);
-  }
-  to {
-    box-shadow: 0 0 0 3px rgb(var(--accent-rgb) / 0.3), 0 0 18px rgb(var(--accent-rgb) / 0.35);
-  }
-}
+/* The focused field: a steady neon ring (it used to pulse). */
 .login-shell .input:focus {
   border-color: var(--color-primary);
-  animation: cpFieldGlow 1.6s ease-in-out infinite alternate;
+  box-shadow: 0 0 0 3px rgb(var(--accent-rgb) / 0.26), 0 0 14px rgb(var(--accent-rgb) / 0.24);
 }
 
-/* Reduced motion: keep the look, drop the movement. */
-@media (prefers-reduced-motion: reduce) {
-  .login-hud-ring span,
-  .login-shell .input:focus,
-  .login-scene {
-    animation: none !important;
-  }
-  /* No flight, no blur — straight to the resting state. */
-  .login-stage {
-    animation: none !important;
-    opacity: 1;
-    transform: none;
-    filter: none;
-  }
-  .login-shell .login-brand {
-    animation: none !important;
-    opacity: 1;
-  }
-}
-
-/* ---- Ring: extra layers ----
-   A dashed band, a scanning beam and four pulsing nodes on top of the base
-   rings. Everything is masked gradients on pseudo-free elements, so the whole
-   instrument costs no images and animates on transform/opacity only. */
-
-/* Uneven dashes read as an instrument scale; even ones read as a dotted
-   border. The gaps repeat on a different period from the ticks below, so the
-   two never lock into a moiré. */
-.login-hud-ring-dashes {
-  inset: 4%;
-  border: 1px solid rgba(127, 233, 255, 0.5);
-  mask-image: repeating-conic-gradient(
-    from 0deg,
-    #000 0deg 6deg,
-    transparent 6deg 11deg,
-    #000 11deg 13deg,
-    transparent 13deg 22deg
-  );
-  animation: cpHudSpin 26s linear infinite;
-}
-
-/* The beam: a wedge of light fading out behind itself, clipped to a band. */
-.login-hud-ring-sweep {
-  inset: 6%;
-  background: conic-gradient(
-    from 0deg,
-    rgb(var(--accent-rgb) / 0.42) 0deg,
-    rgb(var(--accent-rgb) / 0.14) 26deg,
-    transparent 60deg,
-    transparent 360deg
-  );
-  mask-image: radial-gradient(circle, transparent 0 62%, #000 66% 100%);
-  animation: cpHudSpin 7.5s linear infinite;
-  filter: blur(0.4px);
-}
-
-.login-hud-node {
-  position: absolute;
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--color-primary);
-  box-shadow: 0 0 10px rgb(var(--accent-rgb) / 0.9);
-  animation: cpNodePulse 3.2s ease-in-out infinite;
-}
-/* Offsets are half the node size, so each sits centred on the ring's edge. */
-.login-hud-node--n { top: -3.5px; left: calc(50% - 3.5px); animation-delay: 0s; }
-.login-hud-node--e { right: -3.5px; top: calc(50% - 3.5px); animation-delay: 0.8s; }
-.login-hud-node--s { bottom: -3.5px; left: calc(50% - 3.5px); animation-delay: 1.6s; }
-.login-hud-node--w { left: -3.5px; top: calc(50% - 3.5px); animation-delay: 2.4s; }
-
-@keyframes cpNodePulse {
-  0%, 100% { opacity: 0.35; transform: scale(1); }
-  50% { opacity: 1; transform: scale(1.5); }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .login-hud-node {
-    animation: none !important;
-    opacity: 0.7;
-  }
-}
-
-/* === Sign-in card flip =====================================================
-   "Forgot password" turns the card over instead of navigating away, so the
-   space backdrop, the ring and the wordmark all stay exactly where they are.
-   Leaving the screen would tear the WebGL scene down and rebuild it — the
-   backdrop would blink, and the whole composition would re-enter from depth
-   for what is a change of one field. */
+/* === Sign-in card: two faces ================================================
+   "Forgot password?" swaps the card to its other face instead of navigating,
+   so the screen around it stays exactly where it is. Both faces share ONE
+   grid cell, so the card keeps the height of the taller face and nothing
+   above it jumps; the face not showing is `visibility: hidden` (not drawn,
+   not in the accessibility tree) and `inert` in the markup (not focusable).
+   The swap is instant — the 3D turn went with the rest of the motion. The
+   class names keep the old "flip" wording: the owner web styles them too. */
 
 .login-flip-wrap {
   width: 100%;
   display: flex;
   justify-content: center;
-  /* Its own perspective, closer than the shell's, so the turn has real depth:
-     the far edge of the card recedes rather than the whole thing shearing. */
-  perspective: 1200px;
 }
 
 .login-flip {
-  /* Both faces occupy the SAME grid cell, so the wrapper takes the height of
-     the taller one and the card never changes size mid-turn. Absolutely
-     positioning the back face instead would collapse the wrapper's height and
-     make the card jump as it flips. */
   display: grid;
   width: 100%;
   /* Centre both faces in the cell. A grid item narrower than its cell (which
-     `max-width` makes it) aligns to the START by default — that is what pulled
-     the card left of the ring's centre once it became a grid child, and put its
-     top-left corner outside the circle. */
+     `max-width` makes it) aligns to the START by default. */
   justify-items: center;
-  transform-style: preserve-3d;
-  transition: transform 760ms cubic-bezier(0.22, 0.75, 0.2, 1);
 }
 
 .login-flip > * {
   grid-area: 1 / 1;
-  /* Both faces are the same box, so the card cannot change width mid-turn.
+  /* Both faces are the same box, so the card cannot change width on a swap.
      The cap lives here rather than on .login-card because these are the
      elements the grid lays out. */
   width: 100%;
   max-width: calc(var(--ring-size) * 0.68);
-  /* The half turned away from the viewer must not show through. */
-  backface-visibility: hidden;
-  -webkit-backface-visibility: hidden;
 }
 
-/* The reverse face starts pre-turned, so that after the container's 180° it
-   ends up facing the viewer the right way round. */
-.login-flip-face-back {
-  transform: rotateY(180deg);
-}
-
-.login-flip.is-back {
-  transform: rotateY(180deg);
+.login-flip.is-back > .login-card,
+.login-flip:not(.is-back) > .login-flip-face-back {
+  visibility: hidden;
 }
 
 /* The "forgot password" / "back to sign in" links are buttons — they change
@@ -4512,12 +4277,6 @@ button.login-flip-back {
 }
 button.login-flip-back:hover {
   opacity: 0.85;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .login-flip {
-    transition: none;
-  }
 }
 
 /* === Entity header ==========================================================
@@ -8141,8 +7900,10 @@ select.input option:disabled {
   scroll-margin-top: calc(50px + var(--preview-dock-h, 0px) + var(--space-3));
 }
 
-.menu-editor { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; max-width: 640px; }
+/* The relative list is the frame of the drop slot (`::before`) below. */
+.menu-editor { position: relative; list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; max-width: 640px; }
 .menu-editor__row {
+  position: relative;
   display: flex;
   align-items: center;
   gap: var(--space-3);
@@ -8155,8 +7916,101 @@ select.input option:disabled {
 .menu-editor__row.is-fixed { opacity: 0.85; }
 .menu-editor__name { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .menu-editor__note { font-size: var(--fs-xs); }
-.menu-editor__controls { display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0; }
-.menu-editor__controls .btn { min-width: 40px; min-height: 36px; padding: 4px 10px; }
+.menu-editor__controls { display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0; margin-left: auto; }
+/* A phone-wide list (owner web, 360–430px): a note beside the name squeezed
+   the name to a letter per line, so the note goes under the name, lined up
+   with it (grip 40 + gap + icon 18 + gap), the gaps are the 8px step, and the
+   switch stays on line one. */
+.menu-editor { container-type: inline-size; }
+@container (max-width: 400px) {
+  /* The grip keeps its full 40px: it is what a finger has to hit. */
+  .menu-editor__row { flex-wrap: wrap; column-gap: var(--space-2); row-gap: 0; }
+  .menu-editor__note { order: 1; flex-basis: 100%; padding-left: calc(40px + 18px + 2 * var(--space-2)); }
+}
+
+/* Drag and drop (2026-11-13, `useSortableList`). The grip is 40×36, the size
+   of the ↑ / ↓ buttons it replaced, so a row keeps its height; the fixed Home
+   row keeps the same column empty so every icon stays aligned. Only the grip
+   has `touch-action: none`: a swipe anywhere else on a row scrolls the page. */
+.menu-editor__grip,
+.menu-editor__grip-space { flex-shrink: 0; width: 40px; height: 36px; }
+.menu-editor__grip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-muted);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.menu-editor__grip:hover { color: var(--color-text); background: rgb(var(--accent-rgb) / 0.08); }
+.menu-editor__grip:focus-visible { outline: 2px solid rgb(var(--accent-rgb) / 0.8); outline-offset: 1px; }
+.menu-editor__grip[aria-pressed="true"] { cursor: grabbing; color: var(--color-primary); }
+.menu-editor[data-sorting] { user-select: none; -webkit-user-select: none; }
+.menu-editor[data-sorting="pointer"] { cursor: grabbing; }
+
+/* The lifted row: above the others, slightly raised, a neon edge. It follows
+   the pointer through `translate`, written by the hook on the element. The
+   glow is a layer of its own that only fades (opacity), never repaints a shadow. */
+.menu-editor__row[data-sort-state="lifted"] {
+  z-index: 2;
+  scale: 1.02;
+  background: var(--color-surface-alt);
+  border-color: rgb(var(--accent-rgb) / 0.7);
+}
+.menu-editor__row::after {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  box-shadow:
+    0 12px 28px rgb(var(--shadow-rgb) / 0.5),
+    0 0 0 1px rgb(var(--accent-rgb) / 0.55),
+    0 0 22px rgb(var(--accent-rgb) / 0.28);
+  opacity: 0;
+  pointer-events: none;
+}
+.menu-editor__row[data-sort-state="lifted"]::after { opacity: 1; }
+/* Dropped, it glides into its slot over the others, not under them. */
+.menu-editor__row[data-sort-settling] { z-index: 1; }
+/* The others make room: one row's height plus the gap, up or down. */
+.menu-editor__row[data-sort-state="shift-up"] { translate: 0 calc(-1 * var(--sort-shift, 0px)); }
+.menu-editor__row[data-sort-state="shift-down"] { translate: 0 var(--sort-shift, 0px); }
+/* The drop slot: where the row lands when it is let go. */
+.menu-editor[data-sorting]::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--sort-slot-h, 0px);
+  translate: 0 var(--sort-slot-y, 0px);
+  border: 1px dashed rgb(var(--accent-rgb) / 0.75);
+  border-radius: var(--radius-sm);
+  background: rgb(var(--accent-rgb) / 0.06);
+  pointer-events: none;
+}
+/* Sliding only with motion allowed; with reduced motion every step snaps. */
+@media (prefers-reduced-motion: no-preference) {
+  .menu-editor:is([data-sorting], [data-sort-returning]) > .menu-editor__row:not([data-sort-state="lifted"], [data-sort-settling]) {
+    transition: translate 200ms ease;
+  }
+  .menu-editor__row[data-sort-state="lifted"] { transition: scale 150ms ease; }
+  /* By keyboard the row jumps a slot per key press: let it glide there. */
+  .menu-editor[data-sorting="keyboard"] > .menu-editor__row[data-sort-state="lifted"] {
+    transition: translate 200ms ease, scale 150ms ease;
+  }
+  .menu-editor__row[data-sort-settling] { transition: translate 200ms ease, scale 200ms ease; }
+  .menu-editor__row::after { transition: opacity 150ms ease; }
+  .menu-editor[data-sorting]::before { transition: translate 200ms ease; }
+}
 
 .appearance-actions {
   position: sticky;
@@ -10565,3 +10419,343 @@ select.input option:disabled {
   inset: 0;
   z-index: 2000;
 }
+
+/* === Branch → Working hours (BranchOpenDaysForm, 2026-11-13) ==============
+   One row per weekday: switch, open/close times, a hint when the close is on
+   the next day, «apply to all», and the day drawn on a 24-hour track (00:00
+   at the left). Open rows are framed solid, closed ones dashed and muted, so
+   the state never rests on colour alone. Flex throughout; the day column has
+   one width so the times line up from Monday to Sunday. */
+.open-days {
+  --open-day-col: 104px;  /* md switch 44 + gap 10 + the longest short day name («Ուրբ») */
+  --open-day-time: 76px;  /* "00:00" in Inter 14, tabular, plus the field's padding */
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  width: 640px;
+  padding: var(--space-6);
+}
+.open-days__head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  /* Clear of the dialog's × on the card's corner. */
+  padding-right: var(--space-6);
+}
+.open-days__title {
+  margin: 0;
+  font-size: var(--fs-xl);
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: 0.01em;
+}
+.open-days__address {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: var(--fs-body);
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+.open-days__bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+.open-days__summary {
+  flex: 1 1 260px;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid rgb(var(--accent-rgb) / 0.35);
+  border-radius: var(--radius-md);
+  background: rgb(var(--accent-rgb) / 0.08);
+  color: var(--color-text);
+  font-size: var(--fs-md);
+  font-weight: 600;
+  line-height: 1.35;
+  font-variant-numeric: tabular-nums;
+}
+.open-days__summary > svg {
+  flex-shrink: 0;
+  color: var(--color-primary);
+}
+.open-days__summary[data-state="closed"] {
+  border-color: rgb(var(--warning-rgb) / 0.55);
+  background: rgb(var(--warning-rgb) / 0.08);
+}
+.open-days__summary[data-state="closed"] > svg {
+  color: var(--color-warning);
+}
+.open-days__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.open-day {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: var(--space-3);
+  row-gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-md);
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+.open-day[data-open] {
+  padding-bottom: var(--space-3);
+  border-style: solid;
+  background: rgb(var(--fg-rgb) / 0.03);
+}
+.open-day__day {
+  flex: 0 0 var(--open-day-col);
+  display: flex;
+  min-height: var(--control-h);
+}
+/* The whole day cell is the switch's label: a 40px target, not just the track. */
+.open-day__day .cp-switch {
+  flex: 1 1 auto;
+}
+.open-day__day .cp-switch-label {
+  font-weight: 600;
+}
+.open-day:not([data-open]) .cp-switch-label {
+  color: var(--color-muted);
+}
+.open-day__hours {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.open-day__time {
+  flex: 0 0 var(--open-day-time);
+}
+.open-day__time .input {
+  min-height: var(--control-h);
+  padding-inline: var(--space-2);
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  transition: border-color 0.2s ease;
+}
+.open-day__time .input[aria-invalid="true"] {
+  border-color: var(--color-danger);
+}
+.open-day__dash {
+  color: var(--color-muted);
+}
+.open-day__off {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  min-height: var(--control-h);
+  color: var(--color-muted);
+}
+.open-day__hint {
+  order: 1;
+  flex: 1 1 140px;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--color-accent-purple-soft);
+  font-size: var(--fs-sm);
+  line-height: 1.35;
+}
+.open-day__hint[data-span="allDay"] {
+  color: var(--color-text-soft);
+}
+.open-day__hint > svg {
+  flex-shrink: 0;
+  color: var(--color-accent-purple);
+}
+.open-day__copy {
+  order: 2;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--control-h);
+  height: var(--control-h);
+  margin-left: auto;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-muted);
+  cursor: pointer;
+  transition: border-color 0.2s ease, color 0.2s ease;
+}
+.open-day__copy:hover:not(:disabled) {
+  border-color: var(--color-border);
+  color: var(--color-primary);
+}
+.open-day__copy:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+.open-day__copy:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+/* The 24-hour track sits under the times, from the same left edge. */
+.open-day__track {
+  order: 3;
+  flex: 0 0 calc(100% - var(--open-day-col) - var(--space-3));
+  display: flex;
+  height: 4px;
+  margin-left: calc(var(--open-day-col) + var(--space-3));
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+  background: rgb(var(--fg-rgb) / 0.07);
+}
+.open-day__gap,
+.open-day__band {
+  flex-basis: 0;
+  flex-shrink: 1;
+  min-width: 0;
+}
+.open-day__band {
+  border-radius: var(--radius-pill);
+  background: var(--color-primary);
+}
+/* Past midnight: the band runs into the night end of the brand gradient. */
+.open-day__band.is-overnight {
+  background: linear-gradient(90deg, var(--color-primary) 40%, var(--color-accent-purple));
+}
+.open-days__error {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid rgb(var(--danger-rgb) / 0.5);
+  border-radius: var(--radius-md);
+  background: rgb(var(--danger-rgb) / 0.08);
+  color: var(--status-critical-fg);
+  line-height: 1.45;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+.open-days__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+.open-days__actions .btn {
+  min-height: var(--control-h);
+  min-width: 120px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .open-day,
+  .open-day__copy,
+  .open-day__time .input {
+    transition: none;
+  }
+}
+/* Phones (owner web, 360–430px): 44px targets, and an open day in two
+   lines: the day and its times (stretched) first, then the 24-hour track
+   with «apply to all» at its end; the next-day hint, when there is one,
+   under them. A closed day stays one line. */
+@media (max-width: 480px) {
+  .open-days {
+    --control-h: 44px;
+    --open-day-col: 96px;
+    padding: var(--space-4);
+    gap: var(--space-3);
+  }
+  .open-days__summary {
+    flex-basis: 100%;
+  }
+  /* The rest of the first line, so the track and the button start the second. */
+  .open-day__hours {
+    flex: 1 1 calc(100% - var(--open-day-col) - var(--space-3));
+    min-width: 0;
+  }
+  .open-day__time {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+  .open-day__track {
+    order: 1;
+    flex: 1 1 0;
+    margin-left: 0;
+  }
+  .open-day__copy {
+    order: 2;
+    margin-left: 0;
+  }
+  .open-day__hint {
+    order: 3;
+    flex-basis: 100%;
+  }
+  .open-days__actions .btn {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+}
+
+/* === «Свои продукты» (2026-11-13, owner) ================================== */
+/* Start: «Не оплачено» and «Свои продукты» in one row, each over its own hint.
+   Two equal halves on a desktop dialog; below 2 × 180px of room (a phone) the
+   second wraps under the first, left-aligned like it. */
+.start-dialog__switches {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--space-3) var(--space-5);
+}
+.start-dialog__switch {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  flex: 1 1 180px;
+  min-width: 0;
+}
+.start-dialog__switch-hint {
+  font-size: var(--fs-sm);
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+/* The figure never splits from its currency across two lines. */
+.start-dialog__switch-hint strong { color: var(--color-text); font-weight: 700; white-space: nowrap; }
+/* The own-food switch: UnpaidToggle's size and construction, in the accent
+   (a line added to the bill) rather than amber (something owed). Same
+   specificity as the amber rules above, declared after them. */
+.btn.unpaid-toggle--accent:hover:not(:disabled) .cp-switch-track { border-color: var(--color-primary); }
+.btn.unpaid-toggle--accent:focus-visible .cp-switch-track {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgb(var(--accent-rgb) / 0.30);
+}
+.btn.unpaid-toggle--accent.is-on .cp-switch-track {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgb(var(--accent-rgb) / 0.18);
+}
+.btn.unpaid-toggle--accent.is-on .cp-switch-thumb { background: var(--on-accent-ink-tick); }
+.btn.unpaid-toggle--accent.is-on .unpaid-toggle__label { color: var(--color-primary); }
+/* The card's note: one line under the tariff, cut with an ellipsis like every
+   card line; the figure in the accent so it reads as money on the bill. */
+.session-card__food {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.session-card__food strong { color: var(--color-primary); font-weight: 700; white-space: nowrap; }
+/* Prices → «Свои продукты»: the two tiers side by side, wrapping when narrow. */
+.outside-food-form { gap: var(--space-3); }
+.outside-food-form__hint { font-size: var(--fs-sm); line-height: 1.4; }
+.outside-food-form__tiers { display: flex; flex-wrap: wrap; gap: var(--space-3) var(--space-4); }
+.outside-food-form__tier { display: flex; flex-direction: column; gap: var(--space-1); flex: 1 1 180px; min-width: 0; max-width: 260px; }
+.outside-food-form__note { font-size: var(--fs-sm); }
+/* The place form's own figure: the box no wider than the other price boxes. */
+.place-outside-food { gap: var(--space-1); max-width: 320px; }
+.place-outside-food__hint { font-size: 11px; line-height: 1.4; }

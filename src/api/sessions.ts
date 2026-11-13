@@ -1,4 +1,4 @@
-import { IPcApi, ISessionApi, ITimePackage } from "@/types/sessions";
+import { IPcApi, ISessionApi, ITimePackage, SessionItemKind } from "@/types/sessions";
 import { request } from "./client";
 
 export interface StartSessionBody {
@@ -57,6 +57,16 @@ export interface StartSessionBody {
    * tomorrow past midnight; passed or more than 10 h away is refused.
    */
   until?: string;
+  /**
+   * «Свои продукты» (2026-11-13): the player brought their own food, and the
+   * place's bill gets the fixed fee as a line. Sent ONLY with the switch on,
+   * never on a free start, and always with `outside_food_fee`: the figure the
+   * dialog showed (`IStartOptions.outside_food_fee`). The server resolves the
+   * fee itself and refuses a figure that has changed (422, the new figure in
+   * its sentence).
+   */
+  outside_food?: true;
+  outside_food_fee?: number;
 }
 
 /** What "+ Время" would charge for N minutes now — the server's own figure. */
@@ -102,6 +112,13 @@ export interface IStartOptions {
   unlimited_allowed: boolean;
   next_booking: IStartOptionBooking | null;
   claimable_bookings: IStartOptionBooking[];
+  /**
+   * The «Свои продукты» fee a start with `outside_food` would add (2026-11-13),
+   * resolved by the server: the place's own figure, else the branch's for the
+   * place's tier. Null = not offered here, and the switch is not drawn.
+   * Optional: an older backend sends nothing, which reads as null.
+   */
+  outside_food_fee?: number | null;
 }
 
 export const apiStartOptions = (pcId: number, bookingId?: number) =>
@@ -237,6 +254,8 @@ export interface IBillBreakdown {
     returned_at?: string | null;
     /** An additional item (chips, a cue — once per session). Absent on an older backend. */
     is_additional?: boolean;
+    /** What the line is when it is not a sale (2026-11-13); label it by this, not by `name`. */
+    kind?: SessionItemKind | null;
   }>;
   items_total: number;
   /** What is actually owed. Zero for a waived session. */

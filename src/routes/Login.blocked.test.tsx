@@ -21,12 +21,7 @@ vi.mock("@/i18n/LanguageContext", () => ({
 vi.mock("@/auth/recentEmails", () => ({
   recentEmails: { list: async () => [], forget: async () => {}, remember: async () => {} },
 }));
-vi.mock("@/components/login/HudBackdrop", () => ({ default: () => null }));
 vi.mock("@/components/login/ForgotPasswordForm", () => ({ default: () => null }));
-// The WebGL backdrop is decorative and pulls in three.js, which needs a
-// ResizeObserver jsdom does not have. Nothing about a refusal message depends
-// on it.
-vi.mock("@/components/login/LoginScene", () => ({ default: () => null }));
 // The mosaic itself has its own tests; here it is a dialog with a "solved" button.
 vi.mock("@/components/login/CaptchaDialog", () => ({
   default: ({ open, onSolved }: { open: boolean; onSolved: (t: string) => void }) =>

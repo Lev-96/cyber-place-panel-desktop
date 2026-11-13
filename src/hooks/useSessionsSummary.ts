@@ -1,11 +1,18 @@
 import { sessionItemLineTotal, sessionJoysticksTotal } from "@/components/sessions/sessionAmount";
-import { ISessionApi } from "@/types/sessions";
+import { ISessionApi, type SessionItemKind } from "@/types/sessions";
+import { OUTSIDE_FOOD_KIND, isOutsideFoodLine } from "@/components/sessions/outsideFood";
 import { useMemo } from "react";
 
 export interface ItemAggregate {
   name: string;
   qty: number;
   total: number;
+  /**
+   * The line's kind when it is not a sale (the own-food fee, 2026-11-13). Its
+   * stored names differ by the starter's language, so its lines gather under
+   * the kind and the screen labels the entry by it.
+   */
+  kind?: SessionItemKind;
 }
 
 export interface SessionsSummary {
@@ -84,8 +91,9 @@ export const aggregateSessionsSummary = (sessions: ISessionApi[]): SessionsSumma
       const line = sessionItemLineTotal(it);
       sItems += line;
       sQty += num(it.qty);
-      const key = it.name ?? "-";
-      const prev = itemMap.get(key) ?? { name: key, qty: 0, total: 0 };
+      const kind = isOutsideFoodLine(it) ? OUTSIDE_FOOD_KIND : undefined;
+      const key = kind !== undefined ? `kind:${kind}` : (it.name ?? "-");
+      const prev = itemMap.get(key) ?? { name: it.name ?? "-", qty: 0, total: 0, ...(kind !== undefined ? { kind } : {}) };
       prev.qty += num(it.qty);
       prev.total += line;
       itemMap.set(key, prev);

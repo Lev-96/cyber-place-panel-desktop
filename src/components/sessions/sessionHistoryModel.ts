@@ -3,6 +3,7 @@ import { ISessionEvent } from "@/api/sessions";
 import { formatTime } from "@/i18n/dates";
 import { fmt } from "@/i18n/translations";
 import { ISessionApi } from "@/types/sessions";
+import { isOutsideFoodLine, sessionLineLabel } from "./outsideFood";
 
 /**
  * How the Sessions → History screen reads a session's audit log
@@ -317,7 +318,10 @@ export const eventDetailParts = (
       const lines = Array.isArray(meta?.lines) ? meta.lines : [];
       for (const l of lines) {
         if (l === null || typeof l !== "object") continue;
-        const { name, qty } = l as { name?: unknown; qty?: unknown };
+        const { name: stored, qty } = l as { name?: unknown; qty?: unknown };
+        // A line with a kind (the own-food fee, 2026-11-13) is named by it:
+        // its stored name is in the language of whoever started the session.
+        const name = isOutsideFoodLine(l) ? sessionLineLabel(l, t) : stored;
         if (typeof name !== "string" || name.trim() === "") continue;
         parts.push(typeof qty === "number" && qty > 0 ? `${name} × ${qty}` : name);
       }

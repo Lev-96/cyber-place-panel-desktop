@@ -161,6 +161,12 @@ export interface IBranchPlace extends Translated {
   extra_item_charged_units?: string | null;
   /** What each CHARGED unit after the first costs. NULL = priced like it. */
   extra_item_price_next?: number | string | null;
+  /**
+   * This room's own «Свои продукты» fee (2026-11-13). Null = the branch's
+   * figure for this place's tier; 0 = not charged in this room. Optional: an
+   * older backend does not send it.
+   */
+  outside_food_fee?: number | null;
   games: IGame[];
 }
 

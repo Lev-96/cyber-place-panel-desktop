@@ -56,6 +56,8 @@ import UnpaidAlert, { type UnpaidNotice } from "./UnpaidAlert";
 import { playFor } from "@/sound/soundEngine";
 import PadToggle from "./PadToggle";
 import PadChargeNote from "./PadChargeNote";
+import FeeSentence from "./FeeSentence";
+import { outsideFoodFeeOf, productLineCount } from "./outsideFood";
 import { useTransientFlags } from "@/hooks/useTransientFlags";
 import { useExpiryNudge } from "./useExpiryNudge";
 import { dropSideOf, moveOnto } from "@/utils/reorder";
@@ -684,7 +686,10 @@ const SessionsBoard = ({ branchId }: Props) => {
     const freeUntil = !sess && !isOffline && !isReserved ? freeUntilOf(pc.next_booking_start) : null;
     const deviceStatus = effectivePcStatus(pc);
     const color = SESSION_CELL_COLOR[cellState];
-    const itemsCount = sess?.items?.length ?? 0;
+    // Products only: the own-food fee (2026-11-13) is a line too, but it is
+    // not something sold, and the card names it on its own line below.
+    const itemsCount = productLineCount(sess?.items);
+    const foodFee = outsideFoodFeeOf(sess?.items);
     // The backend's answer, resolved from the place's platform. Absent on an
     // older payload, and then the controls simply are not drawn — which is the
     // safe direction: a missing field must not offer an operation the seat
@@ -902,6 +907,13 @@ const SessionsBoard = ({ branchId }: Props) => {
                       ? t("session.pausedBadge")
                       : fmt(t("session.pausedUntil"), new Date(until).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false }));
                   })()}
+                </span>
+              )}
+              {/* «Свои продукты» (2026-11-13): the fee Start put on this bill,
+                  the line's own figure. Already in the card's total. */}
+              {foodFee !== null && (
+                <span className="session-card__food" data-testid={`outside-food-note-${pc.id}`}>
+                  <FeeSentence template={t("session.outsideFood.cardNote")} amount={`+${money(foodFee)}`} />
                 </span>
               )}
             </span>

@@ -304,3 +304,14 @@ describe("the room's hourly extra in the summary", () => {
     expect(s.itemsTotal).toBe(600);
   });
 });
+
+describe("the own-food fee in the top lines (2026-11-13)", () => {
+  it("is one entry whatever language each start stored its name in, and keeps its kind for the label", () => {
+    const fee = (id: number, name: string) => ({ id, name, price: 1500, qty: 1, product_id: null, kind: "outside_food" as const });
+    const s = summarize([
+      make({ id: 1, total_paid: 3000, items: [fee(1, "Свои продукты")] }),
+      make({ id: 2, total_paid: 3000, items: [fee(2, "Own food")] }),
+    ]);
+    expect(s.topItems).toEqual([{ name: "Свои продукты", qty: 2, total: 3000, kind: "outside_food" }]);
+  });
+});

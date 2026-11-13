@@ -13,6 +13,7 @@ import PlatformNameInput, { LangNames } from "@/components/ui/PlatformNameInput"
 import SubplatformTabs from "@/components/ui/SubplatformTabs";
 import Spinner from "@/components/ui/Spinner";
 import GameForm from "@/components/games/GameForm";
+import PlaceOutsideFoodFeeField from "./PlaceOutsideFoodFeeField";
 import { billingSettingsRepository } from "@/repositories/BillingSettingsRepository";
 import { branchRepository } from "@/repositories/BranchRepository";
 import { useAuth } from "@/auth/AuthContext";
@@ -249,6 +250,12 @@ const PlaceForm = ({ branchId, initial, platformSuggestions, platformPrices, onC
   const [joystickPrice, setJoystickPrice] = useState(
     initial?.joystick_price != null ? String(initial.joystick_price) : "",
   );
+  /**
+   * This room's own «Свои продукты» fee (2026-11-13). Opens holding what the
+   * place carries, so an untouched form sends it back as it was. Empty = the
+   * branch's figure for this tier; 0 = not charged here.
+   */
+  const [foodFee, setFoodFee] = useState(initial?.outside_food_fee != null ? String(initial.outside_food_fee) : "");
   /**
    * Does this room sell a FOURTH pad, and at what price?
    *
@@ -810,6 +817,8 @@ const PlaceForm = ({ branchId, initial, platformSuggestions, platformPrices, onC
         extra_item_included: isCustomPlatform && extraName.trim() !== "" && extraIncluded.trim() !== ""
           ? Number(extraIncluded)
           : null,
+        // Any platform: food is not a device. Empty = null = the branch's.
+        outside_food_fee: foodFee.trim() === "" ? null : Number(foodFee),
         platform_name_en: customNew ? (names.en.trim() || undefined) : undefined,
         platform_name_ru: customNew ? (names.ru.trim() || undefined) : undefined,
         platform_name_am: customNew ? (names.am.trim() || undefined) : undefined,
@@ -1036,6 +1045,13 @@ const PlaceForm = ({ branchId, initial, platformSuggestions, platformPrices, onC
             )}
           </div>
         )}
+
+        <PlaceOutsideFoodFeeField
+          value={foodFee}
+          onChange={setFoodFee}
+          branchFee={type === "vip" ? branchJoysticks.data?.outside_food_fee_vip : branchJoysticks.data?.outside_food_fee_standard}
+          disabled={busy}
+        />
 
         {/* The room's joystick policy, for PlayStation seats only.
             "As in the branch" is the normal case and the one every seat starts

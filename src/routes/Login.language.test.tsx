@@ -30,8 +30,6 @@ vi.mock("@/i18n/LanguageContext", async () => {
 vi.mock("@/auth/recentEmails", () => ({
   recentEmails: { list: async () => [], forget: async () => {}, remember: async () => {} },
 }));
-vi.mock("@/components/login/HudBackdrop", () => ({ default: () => null }));
-vi.mock("@/components/login/LoginScene", () => ({ default: () => null }));
 vi.mock("@/ui/notify", () => ({ notify: { message: vi.fn() } }));
 
 import { LanguageProvider } from "@/i18n/LanguageContext";

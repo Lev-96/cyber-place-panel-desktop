@@ -220,3 +220,21 @@ describe("a planned start in the history (2026-10-25)", () => {
     expect(parts).toEqual([]);
   });
 });
+
+describe("eventDetailParts — the own-food fee (2026-11-13)", () => {
+  test("an audit line with the kind reads in the panel's language, not the starter's", () => {
+    const parts = eventDetailParts(event({
+      action: "item_added",
+      meta: { count: 1, lines: [{ name: "Свои продукты", price: 1500, qty: 1, kind: "outside_food" }] },
+    }), t, money);
+    expect(parts).toEqual(["history.itemsCount: 1", "session.outsideFood.line × 1"]);
+  });
+
+  test("removed: the same label, and no refund", () => {
+    const parts = eventDetailParts(event({
+      action: "item_removed",
+      meta: { count: 1, lines: [{ name: "Own food", price: 1500, qty: 1, kind: "outside_food" }] },
+    }), t, money);
+    expect(parts).toEqual(["history.itemsCount: 1", "session.outsideFood.line × 1", "history.noRefundShort"]);
+  });
+});

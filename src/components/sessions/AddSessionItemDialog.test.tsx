@@ -1211,3 +1211,16 @@ describe("additional items — chips, a cue — handed out once per session", ()
     expect(screen.queryByRole("region", { name: "session.additionalTitle" })).toBeNull();
   });
 });
+
+describe("«Свои продукты» among what the session already holds (2026-11-13)", () => {
+  test("named by its kind in the panel's language, and its delete names it the same way", async () => {
+    const s = { ...session, items: [
+      { id: 5, name: "Свои продукты", price: 1500, qty: 1, product_id: null, kind: "outside_food" },
+    ] } as unknown as ISessionApi;
+    repo.listProducts.mockResolvedValue(products);
+    await mount({ session: s });
+    expect(screen.getByText("session.outsideFood.line")).toBeTruthy();
+    expect(screen.queryByText("Свои продукты")).toBeNull();
+    expect(screen.getByLabelText("action.delete: session.outsideFood.line")).toBeTruthy();
+  });
+});

@@ -4,6 +4,9 @@ import Modal from "@/components/ui/Modal";
 import Input from "@/components/ui/Input";
 import PriceInput from "@/components/ui/PriceInput";
 import TimeInput from "@/components/ui/TimeInput";
+// Backend validates with date_format:H:i: stored "HH:MM:SS" is trimmed for the
+// TimeInput, and input is checked against the same shape before submit.
+import { HHMM_RE, toHHMM } from "@/utils/clockTime";
 import { useLang } from "@/i18n/LanguageContext";
 import { branchPlatformOptions } from "@/i18n/platformPriceName";
 import { timePackageRepository } from "@/repositories/TimePackageRepository";
@@ -37,11 +40,6 @@ const WEEKDAYS: { iso: number; key: string }[] = [
 ];
 
 
-// Backend validates with date_format:H:i. Trim incoming "HH:MM:SS" to
-// "HH:MM" for the TimeInput control, and validate user input against
-// the same shape before submit.
-const toHHMM = (s: string | null | undefined): string => (s ? s.slice(0, 5) : "");
-const HHMM_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 const PackageForm = ({ branchId, initial, platformPrices, onClose, onSaved }: Props) => {
   const { t, lang } = useLang();
@@ -80,10 +78,10 @@ const PackageForm = ({ branchId, initial, platformPrices, onClose, onSaved }: Pr
     hasInitialDiscount ? String(initial?.discount_price ?? "") : "",
   );
   const [discountStart, setDiscountStart] = useState(
-    hasInitialDiscount ? toHHMM(initial?.discount_start_time) : "10:00",
+    hasInitialDiscount ? (toHHMM(initial?.discount_start_time) ?? "") : "10:00",
   );
   const [discountEnd, setDiscountEnd] = useState(
-    hasInitialDiscount ? toHHMM(initial?.discount_end_time) : "22:00",
+    hasInitialDiscount ? (toHHMM(initial?.discount_end_time) ?? "") : "22:00",
   );
   const [discountDays, setDiscountDays] = useState<number[]>(
     hasInitialDiscount && Array.isArray(initial?.discount_days_of_week)

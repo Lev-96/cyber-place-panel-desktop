@@ -5,7 +5,6 @@ import { recentEmails } from "@/auth/recentEmails";
 import { useLoginCaptcha } from "@/auth/useLoginCaptcha";
 import CaptchaDialog from "@/components/login/CaptchaDialog";
 import ForgotPasswordForm from "@/components/login/ForgotPasswordForm";
-import HudBackdrop from "@/components/login/HudBackdrop";
 import LoginHold, { HoldKind } from "@/components/login/LoginHold";
 import Button from "@/components/ui/Button";
 import PasswordInput from "@/components/ui/PasswordInput";
@@ -13,13 +12,8 @@ import SuggestInput from "@/components/ui/SuggestInput";
 import { useLang } from "@/i18n/LanguageContext";
 import { LocalizedText, renderText, textKey, textLiteral } from "@/i18n/localizedText";
 import { LANGUAGES } from "@/i18n/translations";
-import { FormEvent, lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-
-// three.js is heavy and only this screen needs it — keep it out of the initial
-// chunk so the panel still starts fast. Until it arrives the CSS backdrop
-// alone carries the screen, which already looks finished.
-const LoginScene = lazy(() => import("@/components/login/LoginScene"));
 
 const LANG_LABEL: Record<string, string> = { en: "ENG", ru: "РУС", am: "ՀԱՅ" };
 
@@ -46,8 +40,8 @@ const Login = () => {
   const { pathname } = useLocation();
 
   // The URL is the source of truth for which face is up, so a deep link to
-  // /forgot-password opens the same screen already turned — rather than a
-  // second, plainer page that loses the backdrop entirely.
+  // /forgot-password opens the same screen on the forgot face — rather than a
+  // second, plainer page.
   const face: Face = pathname === "/forgot-password" ? "forgot" : "login";
   const flipTo = (next: Face) =>
     navigate(next === "forgot" ? "/forgot-password" : "/login", { replace: true });
@@ -69,6 +63,18 @@ const Login = () => {
   useEffect(() => {
     void recentEmails.list().then(setKnown);
   }, []);
+
+  // A swap moves focus onto the first field of the face now showing: the
+  // link that was pressed sits on the face just hidden (inert), and focus
+  // left there falls to the page. Not on the first render: the fields'
+  // `autoFocus` covers that (a deep link opens on either face).
+  const backFace = useRef<HTMLDivElement>(null);
+  const firstFace = useRef(true);
+  useEffect(() => {
+    if (firstFace.current) { firstFace.current = false; return; }
+    if (face === "login") emailRef.current?.focus();
+    else backFace.current?.querySelector<HTMLInputElement>("input")?.focus();
+  }, [face]);
 
   const forgetEmail = (value: string) => {
     void recentEmails.forget(value).then(() => recentEmails.list().then(setKnown));
@@ -114,13 +120,9 @@ const Login = () => {
 
   return (
     <div className="login-shell">
-      {/* Two decorative layers, both inert: the WebGL depth behind, the HUD
-          instrument dressing over it. Neither takes a pointer event, so the
-          form in front stays ordinary, fully keyboard-operable DOM. */}
-      <Suspense fallback={null}>
-        <LoginScene />
-      </Suspense>
-
+      {/* The background is the shell's own CSS (a still frame over a
+          gradient, global.css "Sign-in screens: still"): nothing to mount,
+          nothing that runs. */}
       <div className="login-lang">
         {LANGUAGES.map((l) => (
           <button
@@ -136,14 +138,7 @@ const Login = () => {
       </div>
 
       <div className="login-stage">
-        {/* The ring lives INSIDE this wrapper so it is centred on the wordmark
-            itself, not on the page. Anchoring it to the element it should
-            frame is what keeps the two aligned at every window size — a fixed
-            offset would only ever be right at one height. */}
-        <div className="login-brand-wrap">
-          <HudBackdrop />
-          <h1 className="login-brand">Cyber Place</h1>
-        </div>
+        <h1 className="login-brand">Cyber Place</h1>
         <img className="login-logo" src="./logo.png" alt="Cyber Place" />
         <h2 className="login-title">
           {face === "forgot" ? t("auth.forgotTitle") : t("login.title")}
@@ -182,10 +177,11 @@ const Login = () => {
               <Button disabled={busy || hold !== null}>{busy ? t("login.signingIn") : t("login.title")}</Button>
             </form>
 
-            {/* The reverse face. `inert` keeps the hidden side out of the tab
-                order — `backface-visibility` only hides it from the eye, and a
-                form you cannot see but can still Tab into is a trap. */}
-            <div className="login-flip-face-back" inert={face === "login" || undefined}>
+            {/* The other face. `inert` keeps the hidden side out of the tab
+                order — `visibility: hidden` only hides it from the eye and the
+                accessibility tree, and a form you cannot see but can still Tab
+                into is a trap. */}
+            <div ref={backFace} className="login-flip-face-back" inert={face === "login" || undefined}>
               <ForgotPasswordForm onBack={() => flipTo("login")} autoFocus={face === "forgot"} />
             </div>
           </div>
