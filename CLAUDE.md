@@ -3214,6 +3214,55 @@ they did, and TypeScript caught it as a duplicate object property.
   (real drag events → shown order + payload, failed save, reload),
   `SessionCard.test.tsx`.
 
+## 9.5.12a Side-menu order by drag and drop (2026-11-13)
+
+«Интерфейс и тема» → «Боковое меню: порядок и видимость разделов»
+(`components/appearance/MenuEditor.tsx`). The ↑ / ↓ buttons are gone (owner):
+a row is grabbed by its grip (⠿, left) and dropped anywhere.
+
+- **`hooks/useSortableList.ts`** is the reusable part: Pointer Events (mouse,
+  pen AND finger; HTML5 drag events, which SessionsBoard / hub tiles use, never
+  fire for a finger, so they cannot serve the owner web on phones). Pointer
+  capture on the grip; `translate` written straight on the lifted element (no
+  React render per frame; React re-renders only when the target slot changes);
+  the others get `data-sort-state="shift-up|shift-down"` and slide by
+  `--sort-shift`; the slot is `--sort-slot-y/-h` on the list; auto-scroll of
+  the nearest scroll container within 80px of its edges; Escape,
+  `pointercancel`, lost capture, window blur, or the list changing mid-drag
+  cancel with no `onMove`; after a drop/cancel the row glides into place
+  (FLIP, `data-sort-settling`), the others slide back on a cancel
+  (`data-sort-returning`). Vertical lists only; items must be distinct ids.
+  `moveIndex(list, from, to)` is its pure helper and delegates to `moveOnto`
+  (the one reorder rule, §9.5.12).
+- **Only the grip has `touch-action: none`**: a swipe on the rest of a row
+  scrolls the page on a phone. Never move `touch-action: none` to the row.
+- **Keyboard = the grip itself** (a real `<button>`): Space / Enter picks up,
+  ↑ / ↓ / Home / End move, Space / Enter drops, Escape or leaving the grip puts
+  it back; `aria-pressed` while lifted; instructions via `aria-describedby`
+  (`appearance.menu.moveKeys`); every step is said in an `aria-live` region
+  (`appearance.menu.sort.*`); focus stays on the grip after a drop. Chosen over
+  keeping ↑ / ↓ as a second control: one control and one mental model, and
+  ~90px more for the name on a 360px phone.
+- **Semantics unchanged**: Home is fixed (no grip, not in the sortable ids);
+  required rows move but their switch stays disabled; added shortcuts are
+  removed by their switch; `onChange` gets the same `SidebarEntry[]` (Home
+  excluded). Persistence and `AppearancePreview` untouched.
+- **CSS** (`.menu-editor*`): grip 40×36 (the old buttons' size, rows keep their
+  height); lifted row `scale: 1.02`, accent edge, a glow layer that only fades;
+  every slide is inside `prefers-reduced-motion: no-preference`. A list
+  narrower than 400px (container query) puts the note under the name.
+- Tests: `hooks/useSortableList.test.tsx` (18; jsdom layout + PointerEvent from
+  `useSortableList.testkit.ts`), `components/appearance/MenuEditor.test.tsx`
+  (8), `routes/Appearance.test.tsx` (keyboard on the grip),
+  `e2e/menu-drag.spec.ts` (6, real Chromium: mouse at 1280, real touch via CDP
+  at 390, the swipe-on-a-row-scrolls proof, auto-scroll, Escape, keyboard;
+  `CP_SHOTS=<dir>` saves screenshots). Mutation-checked: pointer delta sign,
+  `onMove` arguments swapped, Escape ignored, the commit flag ignored.
+- The shared e2e mocks do not answer `/company/{id}/platform-billing`; the
+  shell's debt card throws on the catch-all body, so an owner spec that stays
+  on a page long enough hits «Something went wrong». `menu-drag.spec.ts`
+  answers it 404.
+
 ## «Интерфейс и тема», 2026-11-04
 
 - **«По умолчанию»**: the `standard` card is titled «По умолчанию» (it IS the
@@ -3688,6 +3737,76 @@ is 108px / `--ring-size * 0.174` wide (the area the old 90px square mark had).
 The owner web (`telegram-web-app`) serves this `public/` at its pinned
 `panel.ref`, so it shows the new mark only after `panel.ref` is bumped.
 
+## Static sign-in (2026-11-13, owner)
+
+"No animation at all, a very beautiful background, and the page must not
+freeze while loading." Applies to every `.login-shell` screen: Login (both
+faces), ResetPassword, NetworkBlockedScreen — and the owner web's overrides.
+
+- **Gone:** the three.js scene (`LoginScene.tsx`, `spaceTextures.ts`, a
+  ≈900 KB lazy chunk and a WebGL frame loop), the HUD ring (`HudBackdrop.tsx`,
+  `cpHudSpin`/`cpNodePulse`), the 2.3 s fly-in (`cpPanelApproach`), the
+  wordmark ignite/flicker/glow on the sign-in (`cpBrandIgnite`, `cp-brand-in`;
+  `brandFlicker`/`brandGlow` stay for the side menu), `cpBackdropIn`,
+  `cpFieldGlow`, the card's hover glow, the 3D card flip, and the
+  `three` / `@react-three/fiber` / `@types/three` packages.
+- **Background** (`global.css`, "Sign-in screens: still"): ONE still frame of
+  the old scene, `public/bg/login-space.webp` (2560×1440, 70 224 B) and
+  `login-space-portrait.webp` (1080×2340, 39 812 B, used at `max-aspect-ratio:
+  3/4`: phones, the Telegram Mini App, portrait tablets), `cover`, over a
+  CSS gradient that matches the picture and paints with the first frame —
+  the image just appears on top, no fade. Fixed colours on purpose (the
+  picture's own sky `#020514`; the sign-in is always the default theme). The
+  contrast theme and `prefers-contrast: more` drop both for `--color-bg`.
+- **How the pictures were made** (re-render, never hand-edit): the old scene
+  minus the passing ships and the pointer parallax, the camera at rest,
+  planets fully faded in, seed 13 of a seeded `Math.random`, the nebula's
+  canvas faded at its edges (the raw texture left a 2/255 vertical step), and
+  for portrait the moon/planets pulled inwards and shrunk. Rendered headless
+  on the real GPU (ANGLE/Vulkan, RADV) by Playwright, WebP q92. Harness and
+  the original scene source:
+  `~/cyber-place-local/reports/login-static-2026-11-13/harness/` (`scene/`,
+  `shoot-scene.mjs`).
+- **Nothing moves:** `.login-shell, .login-shell *` (and their `::before/
+  ::after`, in a separate rule — a pseudo-element in a selector list makes
+  jsdom's matcher drop the whole rule) set `animation`/`transition: none
+  !important`, so even the shared `.btn`/`.input`/`.pw-eye` fades are off
+  here; states still change, instantly. The captcha's shake/done feedback is
+  in a Modal portalled to `<body>`, outside, and is kept.
+- **The two faces** keep their markup and class names (`.login-flip`,
+  `.is-back`, `.login-flip-face-back`; the owner web styles them): one grid
+  cell, the hidden face `visibility: hidden` + `inert`. A swap moves focus to
+  the first field of the face now showing (it used to fall to the page,
+  because the pressed link is on the face that turns inert); a deep link
+  opens with that face's field focused (`autoFocus`).
+- **The card** is an even `rgb(--bg-rgb / 0.82)` under a faint accent tint
+  plus a 4px blur (it used to fade to nearly clear at the top): on a phone a
+  planet sits behind its top edge. Measured on screenshots with the text made
+  transparent (worst pixel under each text box), 1280/1920/2560/390/360 ×
+  en/ru/am × both faces: every text on the card ≥ 4.5:1 in both apps. Below
+  4.5 only the panel's page title at 390px over a planet (4.1; the panel has
+  no phone use) and a language pill at 360×640 (4.48, one star pixel).
+- **The composition** no longer reserves the ring's overhang
+  (`padding-top: ring*0.454`), so it is centred as seen. `--ring-size` keeps
+  its name (the owner web sets it) and is just the composition's scale.
+- **Measured** (Playwright on the built `dist/web`, 1920×1080, SwiftShader,
+  5 runs, medians, CPU held at a steady clock — this laptop otherwise flips
+  between two speed modes and fakes 2× differences; CPU 4× throttled /
+  unthrottled): JS on the route 1859 → 978 KB, the scene chunk and the canvas
+  gone; typing echo 709 → 135–143 ms (4×) / 94 → 43–61 ms; long tasks in the first
+  8 s 6 → 2 (4×) / 3 → 0; blocking time 658 → 168 ms / 310 → 0 ms; longest
+  frame gap after the form 767 → 17 ms, 7 → 60 fps. Time to the form is
+  unchanged (403 → 386 ms at 4×): it is the ~1 MB main chunk, the same in both;
+  that chunk (every eagerly imported provider, Home, Layout, the dictionary)
+  is what is left between a cold start and the form. Harness:
+  `~/cyber-place-local/reports/login-static-2026-11-13/harness/measure.mjs`.
+- Tests: `src/routes/Login.static.test.tsx` — the import graph of Login,
+  ResetPassword and NetworkBlockedScreen (lazy imports included) reaches no
+  `three`/`@react-three/*`; no `.login-*` rule declares motion and the old
+  keyframes are gone; with `global.css` applied in jsdom no element on either
+  face animates or transitions; the instant swap (visibility, inert, focus
+  both ways); the background rules and asset sizes (≤ 250 KB).
+
 ## No "Sessions" label (2026-10-18)
 
 The owner retired "session" as a name: the running-seats screen was already
@@ -3782,7 +3901,7 @@ differ.
   `--color-*`, `--status-<tone>-fg/bg/border`), L3 density (`--control-h`,
   `--grid-min` = the board's card column, `--row-py`, `--subtab-h`…). Use `rgb(var(--accent-rgb) / .35)`, never a
   literal. Every remaining literal is either a theme token with its exact old
-  value or deliberately fixed (login scene, flags, QR, illustrations, toasts).
+  value or deliberately fixed (the sign-in background, flags, QR, illustrations, toasts).
 - **Status vocabulary** (`domain/statusTone.ts`, `ui/StatusChip.tsx`): free =
   cyan ○, playing = green ▶, booked = violet, ending = amber clock, critical =
   red ⚠, paused = grey ‖, offline = grey dashed. Same on Active Places, Live
@@ -4239,3 +4358,60 @@ untouched:
   deploy backend before releasing the panel. Browsers start audio suspended:
   `unlockAudioOnFirstGesture()` (called once in `App`) resumes it on the first
   click/key, so the owner web rings too.
+
+## «Свои продукты»: the own-food fee (2026-11-13, owner)
+
+A player who brings their own food pays the club a FIXED fee, switched on at
+Start. Backend contract: `cyber-place` CLAUDE.md §8.9.6 "Own food". The fee is
+an ordinary bill line (`kind = "outside_food"`), so every total the panel
+already reads (the card's `sessionAmount`, the receipt's `items_total` /
+`total`, history `total_paid`) includes it with no arithmetic here.
+
+- **Types**: `SESSION_ITEM_KIND` / `SessionItemKind` (`types/sessions.ts`);
+  `kind` on `ISessionApi.items[]` and `IBillBreakdown.items[]`;
+  `IStartOptions.outside_food_fee` (null/absent = not offered);
+  `StartSessionBody.outside_food` + `outside_food_fee`; billing settings
+  `outside_food_fee_standard` / `_vip`; `IBranchPlace` / `CreatePlaceBody`
+  `outside_food_fee`.
+- **One module**: `components/sessions/outsideFood.ts` — `OUTSIDE_FOOD_KIND`,
+  `isOutsideFoodLine`, `sessionLineLabel` (a line with a kind is LABELLED by it:
+  the stored `name` is in the starter's language), `outsideFoodFeeOf` (the line's
+  own figure via `sessionItemLineTotal`), `productLineCount`.
+- **Start dialog**: `.start-dialog__switches` holds «Не оплачено» (left) and
+  «Свои продукты» (right, `UnpaidToggle` with `testId="outside-food-switch"`,
+  `tone="accent"`), each over its hint; wraps under 2 × 180px. Drawn only when
+  `start-options.outside_food_fee` is a number and the start is not free;
+  ticking Free switches it OFF (undoing Free does not bring it back on). On:
+  hint «К счёту места добавится {fee}», summary «+ свои продукты {fee}», body
+  `outside_food: true, outside_food_fee: <figure shown>` in fixed and open
+  modes; off or free: neither key. **Any start error reloads start-options**
+  (it used to be only a seat-unavailable refusal), so a changed or withdrawn
+  fee (422) shows the server's new figure, and the next Start sends it.
+- **Card**: «· N товаров» counts products only (`productLineCount`); a fee
+  line adds the note «Свои продукты +1 500 ֏» (`.session-card__food`, inside
+  `.until`, one line with ellipsis, visible in Simple too).
+- **Labels by kind**: `StopReceiptModal` (row + remove confirm/toast),
+  `AddSessionItemDialog` (row, title, delete aria-label), `SessionHistoryBill`,
+  `sessionHistoryModel.eventDetailParts` (audit `meta.lines[].kind`),
+  `useSessionsSummary` (fee lines gather under `kind:outside_food`, entry
+  carries `kind`, `SessionsHistory` labels it). The fee can be removed like any
+  line (DELETE, audited); the panel never PATCHes it (no qty control on it).
+- **Prices page**: rules group → «Свои продукты»,
+  `components/prices/OutsideFoodFeeForm.tsx` (PauseLimitForm idiom: whole
+  required policy + the two keys). Empty box = null (not charged on that
+  tier); 0 refused client-side (`outsideFood.zeroRefused`), as the server
+  refuses it. Role: the page's own guard (`branch.prices`).
+- **Place form**: `PlaceOutsideFoodFeeField` under the own-rate box, any
+  platform. State opens with the stored value, so an untouched save sends it
+  back; empty = null (the branch's), 0 = not charged here. The hint names the
+  branch figure for the place's CURRENT tier from the policy the form already
+  reads (`billingSettingsRepository.get`), «не взимается» for a null tier, a
+  general hint when unknown.
+- Tests: `StartSessionDialog.test.tsx` («Свои продукты» block, 11),
+  `SessionsBoard.outsideFood.test.tsx` (4), `OutsideFoodFeeForm.test.tsx` (5),
+  `PlaceForm.outsideFood.test.tsx` (10), receipt/dialog/history bill/history
+  model/summary blocks, `BranchPricesPage.test.tsx` (6 rule forms now). Layout:
+  `e2e/outside-food.spec.ts` (ru/en/am × 1280/390; `OUTSIDE_FOOD_SHOTS=<dir>`
+  writes screenshots).
+- Owner web: bump `panel.ref` after this lands (not done in the panel change).
+  Mobile and the kiosk agent: no change. PS5: untouched.
