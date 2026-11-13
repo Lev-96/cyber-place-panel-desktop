@@ -3782,10 +3782,19 @@ faces), ResetPassword, NetworkBlockedScreen — and the owner web's overrides.
   in a Modal portalled to `<body>`, outside, and is kept.
 - **The two faces** keep their markup and class names (`.login-flip`,
   `.is-back`, `.login-flip-face-back`; the owner web styles them): one grid
-  cell, the hidden face `visibility: hidden` + `inert`. A swap moves focus to
-  the first field of the face now showing (it used to fall to the page,
-  because the pressed link is on the face that turns inert); a deep link
-  opens with that face's field focused (`autoFocus`).
+  cell. «Forgot password?» TURNS the card over in 3D (rotateY 180°, 760 ms,
+  perspective 1200px) — the one motion on the sign-in, restored at the
+  owner's request on 2026-11-13; reduced motion swaps instantly. The face
+  turned away hides by its backface, then `visibility: hidden` half-way
+  (a delayed visibility transition on the hiding face only); the face turned
+  to is visible at once, so focus can move into it on the same click (a
+  delay there left focus on the page — caught by the e2e spec
+  "forgot password turns the card over and focuses its field", which jsdom
+  cannot see). `inert` keeps the turned-away face out of reach. A swap moves
+  focus to the first field of the face now showing; a deep link opens with
+  that face's field focused (`autoFocus`). The exemption beats the screen's
+  "nothing moves" `!important` rule with `.login-shell .login-flip…`;
+  Login.static.test allows exactly those two rules and nothing else.
 - **The card** is an even `rgb(--bg-rgb / 0.82)` under a faint accent tint
   plus a 4px blur (it used to fade to nearly clear at the top): on a phone the
   background's light shapes sit behind it. Measured with "Arcade bokeh" on screenshots with the
