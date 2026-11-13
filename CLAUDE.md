@@ -3751,20 +3751,17 @@ faces), ResetPassword, NetworkBlockedScreen — and the owner web's overrides.
   `cpFieldGlow`, the card's hover glow, the 3D card flip, and the
   `three` / `@react-three/fiber` / `@types/three` packages.
 - **Background** (`global.css`, "Sign-in screens: still"): ONE still picture,
-  "The Floor" (the owner's pick of three candidates, 2026-11-13): a computer
-  club at night seen from behind the players — rows of gaming stations down a
-  central aisle, screens, chair and headset silhouettes rim-lit by them, LED
-  desk rails, ceiling light bars, bracket boards on the walls, a glossy floor;
-  cyan rows on the left, purple on the right, the aisle behind the form sinks
-  into dark haze. `public/bg/login-space.webp` (2560×1440, 219 784 B) and
-  `login-space-portrait.webp` (1080×2340, 127 184 B; the hall re-framed: the
-  horizon under the title, light bars above, the floor and its guide lines
-  below the card), used at `max-aspect-ratio: 3/4` (phones, the Telegram Mini
+  "Arcade bokeh" (candidate E, the owner's pick in round 2, 2026-11-13; he
+  rejected the computer-hall still "The Floor" as "programmers sitting"): a
+  soft brand-coloured blur on near-black with out-of-focus light shapes that
+  read as gaming — ○ △ ✕ □, a four-light diamond like a pad's face buttons,
+  a defocused neon gamepad outline; no people. `public/bg/login-space.webp`
+  (2560×1440, 176 160 B) and `login-space-portrait.webp` (1080×2340,
+  132 110 B), used at `max-aspect-ratio: 3/4` (phones, the Telegram Mini
   App, portrait tablets), `cover`. The file names predate the picture (it
   replaced a still of the old space scene) and are kept so no path changes —
   the owner web reads the same paths. Under it a CSS gradient that copies
-  the picture's broad light (dark aisle in the middle, cyan glow left, purple
-  right, ceiling/floor bands) and paints with the first frame — the image
+  the picture's broad light (dark middle, cyan glow left, purple right) and paints with the first frame — the image
   just appears on top, no fade. Fixed colours on purpose (the picture's own;
   the sign-in is always the default theme). The contrast theme and
   `prefers-contrast: more` drop both for `--color-bg`.
@@ -3773,10 +3770,10 @@ faces), ResetPassword, NetworkBlockedScreen — and the owner web's overrides.
   real GPU via ANGLE/Vulkan): a pinhole camera with a shifted lens, per-row
   depth of field, glow and smeared floor reflections, a seeded random, then a
   dithered 8-bit export (no banding); WebP q100 method 6 (`encode.py`: the
-  highest quality under 250 KB). Source `src/a.html`, harness (`render.mjs`,
+  highest quality under 250 KB). Source `src/e.html` + `src/gl-runner.js` (round 2), harness (`render.mjs`,
   `encode.py`, `shots.mjs`, `contrast.mjs`) and the two rejected candidates in
   `~/cyber-place-local/reports/login-bg-candidates-2026-11-13/`
-  (`node harness/render.mjs a landscape|portrait out.png`).
+  (`node harness/render.mjs e landscape|portrait out.png`).
 - **Nothing moves:** `.login-shell, .login-shell *` (and their `::before/
   ::after`, in a separate rule — a pseudo-element in a selector list makes
   jsdom's matcher drop the whole rule) set `animation`/`transition: none
@@ -3791,15 +3788,29 @@ faces), ResetPassword, NetworkBlockedScreen — and the owner web's overrides.
   opens with that face's field focused (`autoFocus`).
 - **The card** is an even `rgb(--bg-rgb / 0.82)` under a faint accent tint
   plus a 4px blur (it used to fade to nearly clear at the top): on a phone the
-  hall's rows sit behind it. Measured with "The Floor" on screenshots with the
+  background's light shapes sit behind it. Measured with "Arcade bokeh" on screenshots with the
   text made transparent (brightest pixel under each text box;
   `login-bg-candidates-2026-11-13/harness/contrast.mjs`), panel
   1280/1920/2560/390/360 and owner web 390/360/1920 × en/ru/am × sign-in and
   forgot-password, 264 texts: none below 4.5:1. Worst: card label 6.51 (owner
-  360×640), page title 12.28, language pill 14.20.
+  360×640), page title 12.28; worst overall 6.09 (a language pill over the
+  four-light diamond at 360×640).
 - **The composition** no longer reserves the ring's overhang
   (`padding-top: ring*0.454`), so it is centred as seen. `--ring-size` keeps
   its name (the owner web sets it) and is just the composition's scale.
+- **Order and sizes** (owner, 2026-11-13, round 2): the mark FIRST, the
+  «CYBER PLACE» wordmark under it (tucked up by `ring*-0.022`), then the
+  title, then the card — in Login; NetworkBlockedScreen already had it; the
+  owner web's Login/ResetPassword overrides mirror it. Fractions of the ring:
+  logo 0.174 → 0.21 (130px at full size), stage 0.84 → 0.92, card (both
+  faces) 0.68 → 0.78 (484px). Fields and the button `clamp(44px,
+  ring*0.077, 48px)` tall with 15px text, labels 13px, the link 14px. The
+  back face's form sits one level below `.login-flip > *`, so
+  `.login-flip-face-back > .login-card` lifts the shared 420px card cap —
+  else "forgot password" would be narrower than the face it replaces.
+  Measured on the built bundle at 1920/1280/960×600/390/360 × ru/am × both
+  faces: no scroll, no horizontal overflow, the button on screen. Test:
+  `Login.static.test.tsx` "the mark comes first, the wordmark under it".
 - **Measured** (Playwright on the built `dist/web`, 1920×1080, SwiftShader,
   5 runs, medians, CPU held at a steady clock — this laptop otherwise flips
   between two speed modes and fakes 2× differences; CPU 4× throttled /
