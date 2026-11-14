@@ -3258,10 +3258,10 @@ a row is grabbed by its grip (⠿, left) and dropped anywhere.
   at 390, the swipe-on-a-row-scrolls proof, auto-scroll, Escape, keyboard;
   `CP_SHOTS=<dir>` saves screenshots). Mutation-checked: pointer delta sign,
   `onMove` arguments swapped, Escape ignored, the commit flag ignored.
-- The shared e2e mocks do not answer `/company/{id}/platform-billing`; the
-  shell's debt card throws on the catch-all body, so an owner spec that stays
-  on a page long enough hits «Something went wrong». `menu-drag.spec.ts`
-  answers it 404.
+- The shared e2e mocks answer `/company/{id}/platform-billing` (2026-11-14,
+  a company with no invoices and no debt); before that the shell's debt card
+  threw on the catch-all body and every owner spec hit «Something went
+  wrong». `menu-drag.spec.ts` still answers it 404 itself.
 
 ## «Интерфейс и тема», 2026-11-04
 
@@ -4446,3 +4446,58 @@ already reads (the card's `sessionAmount`, the receipt's `items_total` /
   writes screenshots).
 - Owner web: bump `panel.ref` after this lands (not done in the panel change).
   Mobile and the kiosk agent: no change. PS5: untouched.
+
+## Working hours: «saved» toast and a compact dialog; the app version under the brand (2026-11-14, owner)
+
+- **Toast.** `BranchOpenDaysForm` raises `notify.success("openDays", "saved")`
+  right after `updateOpenDays` resolves and before `onSaved()` closes the
+  dialog (the HourlyRatesForm idiom; the repository's `updateOpenDays` is NOT
+  wrapped in `withToast`, the form already says a refusal in words).
+  `toast.openDays.saved` = Working hours saved / Часы работы сохранены /
+  Աշխատանքային ժամերը պահպանվեցին. Never for the all-closed guard, the
+  incomplete-time guard, a 422 or a network failure.
+- **No scroll at 520×560** (the window minimum, `electron/windowBounds.ts`
+  `MIN_CONTENT`; also 1280×720 and the owner web's 390×844). One line per day
+  on a desktop: switch + day (88px column), times (56px fields), a
+  `.open-day__meta` column holding the 24-hour track with the next-day hint
+  under it, «apply to all». The rows' control height is `--open-day-h`
+  (`clamp(30px, --control-h − 8px, 38px)`: 32 by default, follows density).
+  Title and address share one line; card padding 16/20 (16 under 640px);
+  gaps 8 / rows 4 apart. Phones (≤480px): two lines per open day, 40px
+  targets, the meta column under the times. Measured (Playwright, built
+  bundle): card 469/474/495px of 560 (en/ru/am, mixed week), worst case seven
+  rows of the longest Armenian hint ≈517 of the 528 the modal's gutters leave;
+  390×844: 652/667/688px, no scroll. Not covered: a server error sentence at
+  520×560 adds a line and may bring the modal's own scroll back there; the
+  «Simple» density (38px rows) is not measured at 560.
+- **Version line.** `src/infrastructure/desktopApp.ts`: `isDesktopApp()` is
+  `window.desktopAPI` present (the preload bridge, the same test
+  `KeyValueStore` picks its store by); `buildVersion()` is vite's
+  `__APP_VERSION__` (package.json, the file electron-builder stamps into
+  `app.getVersion()`); `desktopAppVersion()` = the version only in the desktop
+  app. The owner web has no bridge and injects its own 0.1.0, so it shows
+  nothing. `app.version` = Version {0} / Версия {0} / Տարբերակ {0}.
+  - Sidebar: `p.sidebar-version` (testid `app-version`) is a SIBLING after
+    the brand `h1` (a span inside would pick up `.sidebar h1 span`'s gradient
+    and flicker, and the heading's name must stay «CYBER PLACE»); 11px muted,
+    tucked 4px under the row, from the mark's left edge on one line (starting
+    under the wordmark broke «…1.0.61-» / «staging.10»). Folded to the
+    rail: it fades (`opacity: 0`, keeps its row so the menu does not jump,
+    `aria-hidden`) and the brand `h1` gets `title` = the version.
+  - Login: `p.login-version` between `.login-brand` and `.login-title`
+    (12px muted, pulled up into the stage gap). Order on the desktop: mark,
+    wordmark, version, title, card; on the web unchanged.
+- **e2e mock gap fixed.** `e2e/helpers/mockBackend.ts` answers
+  `GET /company/{id}/platform-billing` with `PlatformBillingOverviewResource`'s
+  shape (never invoiced, nothing owed; `platformBillingOverview()`, typed by
+  `IPlatformBillingOverview`); before, the catch-all body crashed the owner's
+  Home and every owner sign-in spec failed at "Owner One". `menu-drag` and
+  `outside-food` still register their own 404, which wins. The Electron shell
+  spec answers it too.
+- Tests: `BranchOpenDaysForm.test.tsx` («saved» toast, 7), `desktopApp.test.ts`
+  (8), `Sidebar.version.test.tsx` (5), `Login.version.test.tsx` (4),
+  `translations.test.ts` (2). e2e: `e2e/hours-and-version.spec.ts` (19;
+  `CP_SHOTS_DIR=<dir>` writes screenshots) and the version test in
+  `e2e-electron/shell.spec.ts` (package.json = `app.getVersion()` = the line,
+  on the sign-in incl. 520×560 with no scroll, and in the side menu, folded too).
+- Owner web: bump `panel.ref` after this lands (not done in the panel change).
