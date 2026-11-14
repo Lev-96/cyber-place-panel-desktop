@@ -4432,6 +4432,34 @@ already reads (the card's `sessionAmount`, the receipt's `items_total` /
   required policy + the two keys). Empty box = null (not charged on that
   tier); 0 refused client-side (`outsideFood.zeroRefused`), as the server
   refuses it. Role: the page's own guard (`branch.prices`).
+- **Per-place figures on the Prices page (2026-11-14, owner)**: below the
+  tiers, «Своя сумма для отдельных мест» (`OutsideFoodPlacesField.tsx`, pure
+  logic in `outsideFoodPlaces.ts`). Places are the page's own
+  `placeRepository.listRawByBranch` read (PlaceResource's `outside_food_fee`);
+  ONE source of truth, `places.outside_food_fee` (PlaceForm unchanged, writes
+  the same column). SectionTabs Все / VIP / Обычные / Со своей суммой with
+  counts (default «own» when any place has a figure or 0, else «all»; a row
+  stays in «own» while its box is cleared); search (number prefix, «№» ok, or
+  name) from 13 places; groups by platform (`platformDisplayNameOf`), sorted
+  by number, `.outside-food-places__list` max 320px with its own scroll. Row:
+  «№N · name», VIP / «неактивно» chips, `PriceInput` (`ariaLabel` prop added,
+  additive) with placeholder «Как в филиале ({tier figure as typed NOW})» or
+  «… (не взимается)», «Здесь не взимается» checkbox (= 0, disables the box, a
+  typed 0 ticks it, unticking returns to the stored figure or empty), a state
+  chip in a fixed 10rem slot so the boxes align; non-branch rows carry a left
+  edge (accent = own, muted = 0), a changed row an amber dot. Summary over ALL
+  places + «Несохранённых изменений: N» + «Действует для новых стартов…».
+  **One Save**: the whole policy + tiers as before + `outside_food_place_fees:
+  [{place_id, fee}]` with ONLY the changed rows (number / 0 / null); no row
+  changed, or places failed to load (compact `ErrorState` + Retry; the tiers
+  still save) = the key is left OUT. Save off while any box is invalid (a
+  place above 99 999 999, a tier at 0). On success the page reloads billing
+  AND places; the form `key` includes `placeFeesFingerprint(places.data)`.
+  Backend contract: the billing-settings PUT (`UpdateBillingSettingsRequest`,
+  `SetOutsideFoodFeesService`); deploy the backend FIRST (an older one drops
+  the key silently). Known limit: at the 520px window (form ≈220px) and in
+  Armenian at 390px the placeholder is cut at its end by the box; the state
+  chip says «Как в филиале» in full there.
 - **Place form**: `PlaceOutsideFoodFeeField` under the own-rate box, any
   platform. State opens with the stored value, so an untouched save sends it
   back; empty = null (the branch's), 0 = not charged here. The hint names the
@@ -4440,10 +4468,13 @@ already reads (the card's `sessionAmount`, the receipt's `items_total` /
   general hint when unknown.
 - Tests: `StartSessionDialog.test.tsx` («Свои продукты» block, 11),
   `SessionsBoard.outsideFood.test.tsx` (4), `OutsideFoodFeeForm.test.tsx` (5),
+  `OutsideFoodFeeForm.places.test.tsx` (11), `outsideFoodPlaces.test.ts` (14),
   `PlaceForm.outsideFood.test.tsx` (10), receipt/dialog/history bill/history
   model/summary blocks, `BranchPricesPage.test.tsx` (6 rule forms now). Layout:
-  `e2e/outside-food.spec.ts` (ru/en/am × 1280/390; `OUTSIDE_FOOD_SHOTS=<dir>`
-  writes screenshots).
+  `e2e/outside-food.spec.ts` (ru/en/am × 1280/390; per-place: the PUT body,
+  the reload, layout ru/en/am × 1280/520/390 — at 390 the panel's side menu is
+  hidden to stand for the owner web's closed drawer; 25 tests;
+  `OUTSIDE_FOOD_SHOTS=<dir>` writes screenshots).
 - Owner web: bump `panel.ref` after this lands (not done in the panel change).
   Mobile and the kiosk agent: no change. PS5: untouched.
 
@@ -4476,17 +4507,20 @@ already reads (the card's `sessionAmount`, the receipt's `items_total` /
   `__APP_VERSION__` (package.json, the file electron-builder stamps into
   `app.getVersion()`); `desktopAppVersion()` = the version only in the desktop
   app. The owner web has no bridge and injects its own 0.1.0, so it shows
-  nothing. `app.version` = Version {0} / Версия {0} / Տարբերակ {0}.
+  nothing. `appVersionLabel(v)` = «Version {v}», ALWAYS English in every UI
+  language (owner, 2026-11-14: a build identifier, not copy); there is no
+  `app.version` i18n key any more.
   - Sidebar: `p.sidebar-version` (testid `app-version`) is a SIBLING after
     the brand `h1` (a span inside would pick up `.sidebar h1 span`'s gradient
     and flicker, and the heading's name must stay «CYBER PLACE»); 11px muted,
-    tucked 4px under the row, from the mark's left edge on one line (starting
+    its own line 8px under the brand row (`margin: -8px 12px 4px` against the
+    column's 12px gap and the h1's 4px; it used to be pulled up against the
+    logo), from the mark's left edge on one line (starting
     under the wordmark broke «…1.0.61-» / «staging.10»). Folded to the
     rail: it fades (`opacity: 0`, keeps its row so the menu does not jump,
     `aria-hidden`) and the brand `h1` gets `title` = the version.
-  - Login: `p.login-version` between `.login-brand` and `.login-title`
-    (12px muted, pulled up into the stage gap). Order on the desktop: mark,
-    wordmark, version, title, card; on the web unchanged.
+  - Login: NO version (owner's second call, 2026-11-14; `.login-version` and
+    its CSS removed). Order everywhere: mark, wordmark, title, card.
 - **e2e mock gap fixed.** `e2e/helpers/mockBackend.ts` answers
   `GET /company/{id}/platform-billing` with `PlatformBillingOverviewResource`'s
   shape (never invoiced, nothing owed; `platformBillingOverview()`, typed by
@@ -4495,9 +4529,12 @@ already reads (the card's `sessionAmount`, the receipt's `items_total` /
   `outside-food` still register their own 404, which wins. The Electron shell
   spec answers it too.
 - Tests: `BranchOpenDaysForm.test.tsx` («saved» toast, 7), `desktopApp.test.ts`
-  (8), `Sidebar.version.test.tsx` (5), `Login.version.test.tsx` (4),
-  `translations.test.ts` (2). e2e: `e2e/hours-and-version.spec.ts` (19;
+  (9, incl. `appVersionLabel`), `Sidebar.version.test.tsx` (5; «Version …» in
+  ru and am too), `Login.version.test.tsx` (4; NO version on the sign-in, in
+  the desktop app in en/ru/am and on the web), `translations.test.ts` (2; no
+  `app.version` key). e2e: `e2e/hours-and-version.spec.ts` (19;
   `CP_SHOTS_DIR=<dir>` writes screenshots) and the version test in
-  `e2e-electron/shell.spec.ts` (package.json = `app.getVersion()` = the line,
-  on the sign-in incl. 520×560 with no scroll, and in the side menu, folded too).
+  `e2e-electron/shell.spec.ts` (no version on the sign-in, which still fits
+  520×560 with no scroll; in the side menu package.json = `app.getVersion()`
+  = the line, 6–12px under the brand row, folded too).
 - Owner web: bump `panel.ref` after this lands (not done in the panel change).
