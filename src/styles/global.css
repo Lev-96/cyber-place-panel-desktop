@@ -877,7 +877,7 @@ a.card:hover {
 .app-shell--collapsible > .sidebar > :is(.sidebar-nav, .sidebar-footer) {
   width: calc(var(--sidebar-w) - 24px);
 }
-.app-shell--collapsible > .sidebar > h1 {
+.app-shell--collapsible > .sidebar > :is(h1, .sidebar-version) {
   width: calc(var(--sidebar-w) - 48px);
 }
 /* A row's hover / current surface narrows to a rounded tile under its icon:
@@ -900,6 +900,12 @@ a.card:hover {
    padding), so its centre is at 42; the logo spans 24-63, centre ~43.5. */
 .app-shell--collapsible.is-sidebar-collapsed > .sidebar :is(.nav-support-card__icon, .user-card > :first-child) {
   transform: translateX(-10px);
+}
+/* Folded, the version line fades like the labels (its first characters would
+   show on the rail) and its row stays, so the menu below never jumps; the
+   brand row's tooltip carries the version meanwhile (Sidebar.tsx). */
+.app-shell--collapsible.is-sidebar-collapsed > .sidebar > .sidebar-version {
+  opacity: 0;
 }
 .app-shell--collapsible.is-sidebar-collapsed > .sidebar > h1 img {
   transform: translateX(-12px);
@@ -960,7 +966,7 @@ a.card:hover {
       color 150ms ease-out,
       clip-path var(--sidebar-slide);
   }
-  .app-shell--collapsible > .sidebar .nav-label {
+  .app-shell--collapsible > .sidebar :is(.nav-label, .sidebar-version) {
     transition: opacity 160ms ease;
   }
   .app-shell--collapsible > .sidebar :is(.nav-support-card__icon, .user-card > :first-child, h1 img) {
@@ -1045,6 +1051,23 @@ a.card:hover {
   animation:
     brandFlicker var(--flicker-every) ease-in-out infinite,
     brandGlow 5s ease-in-out infinite;
+}
+
+/* The desktop app's version under the brand (2026-11-14): one quiet line,
+   tucked 4px under the brand row (pulled up by the sidebar's 12px gap, the
+   brand's 4px bottom margin stays), from the mark's left edge: the row's full
+   192px keeps «Տարբերակ 1.0.61-staging.10» on one line, where starting under
+   the wordmark broke it at the hyphen. Never on the web. */
+.sidebar-version {
+  flex-shrink: 0;
+  margin: -12px 12px 0;
+  color: var(--color-muted);
+  font-size: var(--fs-xs);
+  font-weight: 500;
+  line-height: 1.35;
+  letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
 }
 
 /* A nav row: icon, label, badge. The icon sits on the label's first line and
@@ -4181,6 +4204,19 @@ div.cp-switch {
 }
 .login-shell .login-title {
   font-size: calc(var(--ring-size) * 0.032);
+}
+/* The desktop app's version (2026-11-14): one quiet line under the wordmark,
+   pulled up into the stage's gap so wordmark and version read as one unit
+   and the title keeps its distance. Never on the web. */
+.login-version {
+  margin: calc(var(--ring-size) * -0.03) 0 0;
+  color: var(--color-muted);
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  line-height: 1.35;
+  letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
 }
 
 /* ---- The form: an instrument housing, not a plain card ----
@@ -10494,40 +10530,61 @@ select.input option:disabled {
   z-index: 2000;
 }
 
-/* === Branch → Working hours (BranchOpenDaysForm, 2026-11-13) ==============
-   One row per weekday: switch, open/close times, a hint when the close is on
-   the next day, «apply to all», and the day drawn on a 24-hour track (00:00
-   at the left). Open rows are framed solid, closed ones dashed and muted, so
-   the state never rests on colour alone. Flex throughout; the day column has
-   one width so the times line up from Monday to Sunday. */
+/* === Branch → Working hours (BranchOpenDaysForm, 2026-11-13; compact 2026-11-14)
+   The whole dialog fits the smallest window (520×560, `electron/windowBounds.ts`)
+   with no scroll inside or around it (owner, 2026-11-14). One LINE per weekday:
+   switch and day, open–close times, the day on a 24-hour track (00:00 at the
+   left) with the next-day hint under it, and «apply to all». Open rows are
+   framed solid, closed ones dashed and muted, so the state never rests on
+   colour alone. Flex throughout; the day column and the time fields have one
+   width, so times and tracks line up from Monday to Sunday.
+   Budget at 560 high: 16 + 16 of modal gutter, then 20 + 20 card padding, a
+   21px title line, a 30px summary, 7 rows of 42 with 4 between, 40px buttons
+   and three 12px gaps = 486px of the 528 there are; what is left holds a
+   one-line error. */
 .open-days {
-  --open-day-col: 104px;  /* md switch 44 + gap 10 + the longest short day name («Ուրբ») */
-  --open-day-time: 76px;  /* "00:00" in Inter 14, tabular, plus the field's padding */
+  /* The rows' control height: 32px at the default density, following the
+     person's density choice (compact 30, simple 38) within that range. */
+  --open-day-h: clamp(30px, calc(var(--control-h) - 8px), 38px);
+  --open-day-col: 88px;   /* md switch 44 + its 10px gap + the longest short day name («Ուրբ», 34) */
+  --open-day-time: 56px;  /* "00:00" in Inter 14, tabular (~40), plus 2 × 4 padding and the edges */
+  --open-day-gap: var(--space-2);
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
-  width: 640px;
-  padding: var(--space-6);
+  gap: var(--space-2);
+  width: 600px;
+  padding: var(--space-4) var(--space-5);
 }
+/* The smallest window (520 wide): the card's sides give their air to the hints. */
+@media (max-width: 640px) {
+  .open-days {
+    padding-inline: var(--space-4);
+  }
+}
+/* The title and the branch's address share one line; a long address wraps
+   under the title rather than being cut. */
 .open-days__head {
   display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: var(--space-3);
+  row-gap: 2px; /* the address's line just under the title's, when it wraps */
   /* Clear of the dialog's × on the card's corner. */
   padding-right: var(--space-6);
 }
 .open-days__title {
   margin: 0;
-  font-size: var(--fs-xl);
+  font-size: var(--fs-lg);
   font-weight: 700;
   line-height: 1.25;
   letter-spacing: 0.01em;
 }
 .open-days__address {
+  min-width: 0;
   margin: 0;
   color: var(--color-muted);
   font-size: var(--fs-body);
-  line-height: 1.4;
+  line-height: 1.35;
   overflow-wrap: anywhere;
 }
 .open-days__bar {
@@ -10543,14 +10600,14 @@ select.input option:disabled {
   align-items: center;
   gap: var(--space-2);
   margin: 0;
-  padding: var(--space-2) var(--space-3);
+  padding: var(--space-1) var(--space-3);
   border: 1px solid rgb(var(--accent-rgb) / 0.35);
   border-radius: var(--radius-md);
   background: rgb(var(--accent-rgb) / 0.08);
   color: var(--color-text);
-  font-size: var(--fs-md);
+  font-size: var(--fs-body);
   font-weight: 600;
-  line-height: 1.35;
+  line-height: 1.5;
   font-variant-numeric: tabular-nums;
 }
 .open-days__summary > svg {
@@ -10567,7 +10624,7 @@ select.input option:disabled {
 .open-days__list {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: var(--space-1);
   margin: 0;
   padding: 0;
   list-style: none;
@@ -10575,26 +10632,23 @@ select.input option:disabled {
 
 .open-day {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
-  column-gap: var(--space-3);
-  row-gap: var(--space-2);
-  padding: var(--space-2) var(--space-3);
+  gap: var(--open-day-gap);
+  padding: var(--space-1) var(--space-2);
   border: 1px dashed var(--color-border);
   border-radius: var(--radius-md);
   transition: background-color 0.2s ease, border-color 0.2s ease;
 }
 .open-day[data-open] {
-  padding-bottom: var(--space-3);
   border-style: solid;
   background: rgb(var(--fg-rgb) / 0.03);
 }
 .open-day__day {
   flex: 0 0 var(--open-day-col);
   display: flex;
-  min-height: var(--control-h);
+  min-height: var(--open-day-h);
 }
-/* The whole day cell is the switch's label: a 40px target, not just the track. */
+/* The whole day cell is the switch's label: the full row height, not just the track. */
 .open-day__day .cp-switch {
   flex: 1 1 auto;
 }
@@ -10608,14 +10662,15 @@ select.input option:disabled {
   flex: 0 0 auto;
   display: flex;
   align-items: center;
-  gap: var(--space-2);
+  gap: var(--space-1);
 }
 .open-day__time {
   flex: 0 0 var(--open-day-time);
 }
 .open-day__time .input {
-  min-height: var(--control-h);
-  padding-inline: var(--space-2);
+  height: var(--open-day-h);
+  padding-block: 0;
+  padding-inline: var(--space-1);
   text-align: center;
   font-variant-numeric: tabular-nums;
   transition: border-color 0.2s ease;
@@ -10630,19 +10685,48 @@ select.input option:disabled {
   flex: 1 1 auto;
   display: flex;
   align-items: center;
-  min-height: var(--control-h);
+  min-height: var(--open-day-h);
   color: var(--color-muted);
 }
+/* The track over the hint, in the room the times leave. */
+.open-day__meta {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--space-1);
+}
+.open-day__track {
+  flex: 0 0 auto;
+  display: flex;
+  height: 4px;
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+  background: rgb(var(--fg-rgb) / 0.07);
+}
+.open-day__gap,
+.open-day__band {
+  flex-basis: 0;
+  flex-shrink: 1;
+  min-width: 0;
+}
+.open-day__band {
+  border-radius: var(--radius-pill);
+  background: var(--color-primary);
+}
+/* Past midnight: the band runs into the night end of the brand gradient. */
+.open-day__band.is-overnight {
+  background: linear-gradient(90deg, var(--color-primary) 40%, var(--color-accent-purple));
+}
 .open-day__hint {
-  order: 1;
-  flex: 1 1 140px;
   min-width: 0;
   display: flex;
   align-items: center;
   gap: var(--space-1);
   color: var(--color-accent-purple-soft);
   font-size: var(--fs-sm);
-  line-height: 1.35;
+  line-height: 1.2;
 }
 .open-day__hint[data-span="allDay"] {
   color: var(--color-text-soft);
@@ -10652,14 +10736,12 @@ select.input option:disabled {
   color: var(--color-accent-purple);
 }
 .open-day__copy {
-  order: 2;
   flex: 0 0 auto;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: var(--control-h);
-  height: var(--control-h);
-  margin-left: auto;
+  width: var(--open-day-h);
+  height: var(--open-day-h);
   padding: 0;
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
@@ -10680,34 +10762,9 @@ select.input option:disabled {
   cursor: not-allowed;
   opacity: 0.5;
 }
-/* The 24-hour track sits under the times, from the same left edge. */
-.open-day__track {
-  order: 3;
-  flex: 0 0 calc(100% - var(--open-day-col) - var(--space-3));
-  display: flex;
-  height: 4px;
-  margin-left: calc(var(--open-day-col) + var(--space-3));
-  overflow: hidden;
-  border-radius: var(--radius-pill);
-  background: rgb(var(--fg-rgb) / 0.07);
-}
-.open-day__gap,
-.open-day__band {
-  flex-basis: 0;
-  flex-shrink: 1;
-  min-width: 0;
-}
-.open-day__band {
-  border-radius: var(--radius-pill);
-  background: var(--color-primary);
-}
-/* Past midnight: the band runs into the night end of the brand gradient. */
-.open-day__band.is-overnight {
-  background: linear-gradient(90deg, var(--color-primary) 40%, var(--color-accent-purple));
-}
 .open-days__error {
   margin: 0;
-  padding: var(--space-2) var(--space-3);
+  padding: var(--space-1) var(--space-3);
   border: 1px solid rgb(var(--danger-rgb) / 0.5);
   border-radius: var(--radius-md);
   background: rgb(var(--danger-rgb) / 0.08);
@@ -10723,8 +10780,9 @@ select.input option:disabled {
   gap: var(--space-3);
 }
 .open-days__actions .btn {
-  min-height: var(--control-h);
+  min-height: calc(var(--open-day-h) + var(--space-1));
   min-width: 120px;
+  padding-block: 0;
 }
 @media (prefers-reduced-motion: reduce) {
   .open-day,
@@ -10733,41 +10791,38 @@ select.input option:disabled {
     transition: none;
   }
 }
-/* Phones (owner web, 360–430px): 44px targets, and an open day in two
-   lines: the day and its times (stretched) first, then the 24-hour track
-   with «apply to all» at its end; the next-day hint, when there is one,
-   under them. A closed day stays one line. */
+/* Phones (owner web, 360–430px): 40px targets, and an open day in two
+   lines: the day, its times (stretched) and «apply to all» first, then the
+   24-hour track with the next-day hint under it, from the times' left edge.
+   A closed day stays one line. */
 @media (max-width: 480px) {
   .open-days {
-    --control-h: 44px;
-    --open-day-col: 96px;
+    --open-day-h: 40px;
+    --open-day-col: 92px;
     padding: var(--space-4);
-    gap: var(--space-3);
   }
   .open-days__summary {
     flex-basis: 100%;
   }
-  /* The rest of the first line, so the track and the button start the second. */
+  .open-day {
+    flex-wrap: wrap;
+    row-gap: var(--space-1);
+  }
   .open-day__hours {
-    flex: 1 1 calc(100% - var(--open-day-col) - var(--space-3));
+    flex: 1 1 0;
     min-width: 0;
   }
   .open-day__time {
     flex: 1 1 0;
     min-width: 0;
   }
-  .open-day__track {
-    order: 1;
-    flex: 1 1 0;
-    margin-left: 0;
-  }
   .open-day__copy {
-    order: 2;
-    margin-left: 0;
+    order: 1;
   }
-  .open-day__hint {
-    order: 3;
-    flex-basis: 100%;
+  .open-day__meta {
+    order: 2;
+    flex: 0 0 calc(100% - var(--open-day-col) - var(--open-day-gap));
+    margin-left: calc(var(--open-day-col) + var(--open-day-gap));
   }
   .open-days__actions .btn {
     flex: 1 1 0;

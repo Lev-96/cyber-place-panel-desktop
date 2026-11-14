@@ -3,6 +3,7 @@ import { act, cleanup, fireEvent, render, screen, within } from "@testing-librar
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { t as translate } from "@/i18n/translations";
 import type { IBranchApi } from "@/types/api";
+import { notify, type ToastEvent } from "@/ui/notify";
 
 /**
  * Branch → Working hours (2026-11-13).
@@ -26,6 +27,7 @@ vi.mock("@/components/ui/Modal", () => ({
   default: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }));
 
+import Toaster from "@/components/ui/Toaster";
 import BranchOpenDaysForm from "./BranchOpenDaysForm";
 
 type Day = { day_of_week: number; start_time: string; end_time: string };
@@ -67,10 +69,20 @@ const type = (day: string, which: "Open" | "Close", value: string) =>
 const toggle = (day: string) => fireEvent.click(screen.getByRole("switch", { name: day }));
 const sent = () => repo.updateOpenDays.mock.calls[0][1] as Day[];
 
+/** Every toast raised while a test runs, through the real pub/sub. */
+let toasts: ToastEvent[] = [];
+let unsubscribe: () => void = () => {};
+const successes = () => toasts.filter((e) => e.kind === "success");
+
 beforeEach(() => {
   repo.updateOpenDays.mockReset().mockResolvedValue({ message: "ok" });
+  toasts = [];
+  unsubscribe = notify.subscribe((e) => { toasts.push(e); });
 });
-afterEach(cleanup);
+afterEach(() => {
+  unsubscribe();
+  cleanup();
+});
 
 describe("BranchOpenDaysForm", () => {
   test("a stored 10:00:00 is shown and saved as 10:00 (the reported bug)", async () => {
@@ -215,5 +227,76 @@ describe("BranchOpenDaysForm", () => {
     mount(storedWeek());
     await save();
     expect(screen.getByRole("alert").textContent).toBe(translate("form.errors.failedSave", "en"));
+  });
+
+  /**
+   * The owner, 2026-11-14: a save closed the dialog with no word that it had
+   * worked. The panel's standard green toast says it, once per save that the
+   * server accepted, and never for a save that did not happen.
+   */
+  describe("the «saved» toast", () => {
+    test("a successful save raises exactly one success toast, after the server answered", async () => {
+      let answer: (v: unknown) => void = () => {};
+      repo.updateOpenDays.mockReturnValueOnce(new Promise((r) => { answer = r; }));
+      mount(storedWeek());
+      await save();
+      // Still waiting for the server: nothing said yet.
+      expect(successes()).toHaveLength(0);
+      await act(async () => { answer({ message: "ok" }); });
+
+      expect(successes()).toHaveLength(1);
+      expect(successes()[0]).toMatchObject({ entity: "openDays", action: "saved" });
+      expect(toasts).toHaveLength(1);
+      expect(onSaved).toHaveBeenCalledTimes(1);
+    });
+
+    test("the toast reads «Working hours saved» on the app's toaster", async () => {
+      render(<Toaster />);
+      mount(storedWeek());
+      await save();
+      expect(screen.getAllByRole("status").filter((el) => el.classList.contains("cp-toast"))).toHaveLength(1);
+      expect(screen.getByText("Working hours saved")).toBeTruthy();
+    });
+
+    test("a refused save raises no success toast", async () => {
+      repo.updateOpenDays.mockRejectedValueOnce(Object.assign(new Error("The given data was invalid."), {
+        status: 422, body: { message: "The given data was invalid.", errors: {} },
+      }));
+      mount(storedWeek());
+      await save();
+      expect(screen.getByRole("alert")).toBeTruthy();
+      expect(successes()).toHaveLength(0);
+    });
+
+    test("a network failure raises no success toast", async () => {
+      repo.updateOpenDays.mockRejectedValueOnce(new TypeError("Failed to fetch"));
+      mount(storedWeek());
+      await save();
+      expect(successes()).toHaveLength(0);
+    });
+
+    test("the all-closed guard raises no toast and sends nothing", async () => {
+      mount(storedWeek());
+      for (const day of ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]) toggle(day);
+      await save();
+      expect(repo.updateOpenDays).not.toHaveBeenCalled();
+      expect(toasts).toHaveLength(0);
+    });
+
+    test("the incomplete-time guard raises no toast and sends nothing", async () => {
+      mount(storedWeek());
+      type("Fri", "Open", "1");
+      await save();
+      expect(repo.updateOpenDays).not.toHaveBeenCalled();
+      expect(toasts).toHaveLength(0);
+    });
+
+    test("two saves in a row raise one toast each, never more", async () => {
+      mount(storedWeek());
+      await save();
+      await save();
+      expect(repo.updateOpenDays).toHaveBeenCalledTimes(2);
+      expect(successes()).toHaveLength(2);
+    });
   });
 });

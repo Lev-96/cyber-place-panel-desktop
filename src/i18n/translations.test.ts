@@ -227,3 +227,18 @@ describe("Security → Refresh (2026-10-09)", () => {
     });
   });
 });
+
+describe("Working hours saved, and the app version (2026-11-14)", () => {
+  // Resolved by key at render time (`toast.{entity}.{action}` in Toaster), so
+  // the literal-key scan cannot see it either.
+  it("says the working hours were saved, in every language", () => {
+    expect(TRANSLATIONS["toast.openDays.saved"]).toEqual({
+      en: "Working hours saved", ru: "Часы работы сохранены", am: "Աշխատանքային ժամերը պահպանվեցին",
+    });
+  });
+
+  it("labels the version line under the brand, the full version string in its place", () => {
+    expect(TRANSLATIONS["app.version"]).toEqual({ en: "Version {0}", ru: "Версия {0}", am: "Տարբերակ {0}" });
+    expect(t("app.version", "ru").replace("{0}", "1.0.61-staging.10")).toBe("Версия 1.0.61-staging.10");
+  });
+});

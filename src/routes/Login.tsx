@@ -11,7 +11,8 @@ import PasswordInput from "@/components/ui/PasswordInput";
 import SuggestInput from "@/components/ui/SuggestInput";
 import { useLang } from "@/i18n/LanguageContext";
 import { LocalizedText, renderText, textKey, textLiteral } from "@/i18n/localizedText";
-import { LANGUAGES } from "@/i18n/translations";
+import { fmt, LANGUAGES } from "@/i18n/translations";
+import { desktopAppVersion } from "@/infrastructure/desktopApp";
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
@@ -36,6 +37,8 @@ type Face = "login" | "forgot";
 const Login = () => {
   const { login } = useAuth();
   const { t, lang, setLang } = useLang();
+  // Read once: the preload bridge is there from the first script or never.
+  const [version] = useState(desktopAppVersion);
   const navigate = useNavigate();
   const { pathname } = useLocation();
 
@@ -141,6 +144,9 @@ const Login = () => {
         {/* The mark first, the wordmark under it (owner, 2026-11-13). */}
         <img className="login-logo" src="./logo.png" alt="Cyber Place" />
         <h1 className="login-brand">Cyber Place</h1>
+        {/* The desktop app's version, quiet, under the wordmark (2026-11-14);
+            none on the web, whose build carries its own package version. */}
+        {version && <p className="login-version">{fmt(t("app.version"), version)}</p>}
         <h2 className="login-title">
           {face === "forgot" ? t("auth.forgotTitle") : t("login.title")}
         </h2>

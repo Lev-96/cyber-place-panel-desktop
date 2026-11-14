@@ -4078,6 +4078,9 @@ export const TRANSLATIONS: Dict = {
   "toast.branch.created": { en: "Branch created", ru: "Филиал создан", am: "Մասնաճյուղը ստեղծվեց" },
   "toast.branch.updated": { en: "Branch updated", ru: "Филиал обновлён", am: "Մասնաճյուղը թարմացվեց" },
   "toast.branch.deleted": { en: "Branch deleted", ru: "Филиал удалён", am: "Մասնաճյուղը ջնջվեց" },
+  // The desktop app's version, under the brand in the side menu and on the sign-in (2026-11-14).
+  "app.version": { en: "Version {0}", ru: "Версия {0}", am: "Տարբերակ {0}" },
+  "toast.openDays.saved": { en: "Working hours saved", ru: "Часы работы сохранены", am: "Աշխատանքային ժամերը պահպանվեցին" },
 
   "toast.game.created": { en: "Game added", ru: "Игра добавлена", am: "Խաղն ավելացվեց" },
   "toast.game.updated": { en: "Game updated", ru: "Игра обновлена", am: "Խաղը թարմացվեց" },

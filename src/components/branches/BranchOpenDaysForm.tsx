@@ -5,6 +5,7 @@ import { useLang } from "@/i18n/LanguageContext";
 import { LocalizedText, renderText, textKey, textLiteral } from "@/i18n/localizedText";
 import { branchRepository } from "@/repositories/BranchRepository";
 import { IBranchApi } from "@/types/api";
+import { notify } from "@/ui/notify";
 import { HHMM_RE } from "@/utils/clockTime";
 import { FormEvent, useRef, useState } from "react";
 import OpenDayRow from "./OpenDayRow";
@@ -85,6 +86,9 @@ const BranchOpenDaysForm = ({ branch, onClose, onSaved }: Props) => {
     setMarked(new Set());
     try {
       await branchRepository.updateOpenDays(branch.id, payload);
+      // The dialog closes on save; the toast is what says it worked (owner,
+      // 2026-11-14). Only here: a guard above or a refusal below says its own.
+      notify.success("openDays", "saved");
       onSaved();
     } catch (failure) {
       const sentence = readableSaveError(failure, payload, t);

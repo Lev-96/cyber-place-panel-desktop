@@ -19,11 +19,13 @@ interface Props {
 
 /**
  * One weekday of the working-hours form: open/closed switch, open and close
- * times, what a close after midnight means, and the day on a 24-hour track.
+ * times, the day on a 24-hour track with what a close after midnight means
+ * under it, and «apply to all».
  *
- * DOM order is the focus order (switch → open → close → apply to all); the
- * hint and the track are not focusable, so CSS may move them around the
- * button (beside the times on a desktop, under them on a phone).
+ * One line per day on a desktop (compact, 2026-11-14: the dialog fits the
+ * smallest window with no scroll). DOM order is the focus order (switch →
+ * open → close → apply to all); the track and hint are not focusable, so on a
+ * phone CSS moves them to a second line under the times.
  */
 const OpenDayRow = ({ row, invalidStart, invalidEnd, disabled, onChange, onApplyToAll }: Props) => {
   const { t } = useLang();
@@ -71,6 +73,38 @@ const OpenDayRow = ({ row, invalidStart, invalidEnd, disabled, onChange, onApply
         <span className="open-day__off">{t("branch.dayOff")}</span>
       )}
 
+      {/* The day on a 24-hour track, 00:00 at the left, with the hint under
+          it when the close is on the next day. The part of an overnight
+          window after midnight belongs to tomorrow, so the band runs to the
+          right edge and turns to the night end of the brand gradient there;
+          the hint says it in words. Not focusable, so CSS may place it. */}
+      {row.open && (
+        <span className="open-day__meta">
+          <span className="open-day__track" aria-hidden>
+            {band && (
+              <>
+                <span className="open-day__gap" style={{ flexGrow: band.from }} />
+                <span
+                  className={`open-day__band${runsPastMidnight(kind) ? " is-overnight" : ""}`}
+                  style={{ flexGrow: band.to - band.from }}
+                />
+                <span className="open-day__gap" style={{ flexGrow: DAY_MINUTES - band.to }} />
+              </>
+            )}
+          </span>
+          {hint && (
+            <span className="open-day__hint" data-testid="open-day-hint" data-span={kind}>
+              {runsPastMidnight(kind) && (
+                <LineIcon size={12}>
+                  <path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5Z" />
+                </LineIcon>
+              )}
+              {hint}
+            </span>
+          )}
+        </span>
+      )}
+
       {row.open && (
         <button
           type="button"
@@ -80,41 +114,11 @@ const OpenDayRow = ({ row, invalidStart, invalidEnd, disabled, onChange, onApply
           aria-label={fmt(t("openDays.copyToAll"), day)}
           title={fmt(t("openDays.copyToAll"), day)}
         >
-          <LineIcon size={18}>
+          <LineIcon size={16}>
             <rect x="9" y="9" width="11" height="11" rx="2" />
             <path d="M5 15V6a2 2 0 0 1 2-2h9" />
           </LineIcon>
         </button>
-      )}
-
-      {hint && (
-        <span className="open-day__hint" data-testid="open-day-hint" data-span={kind}>
-          {runsPastMidnight(kind) && (
-            <LineIcon size={14}>
-              <path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5Z" />
-            </LineIcon>
-          )}
-          {hint}
-        </span>
-      )}
-
-      {/* The day on a 24-hour track, 00:00 at the left. The part of an
-          overnight window after midnight belongs to tomorrow, so the band
-          runs to the right edge and turns to the night end of the brand
-          gradient there; the hint above says it in words. */}
-      {row.open && (
-        <span className="open-day__track" aria-hidden>
-          {band && (
-            <>
-              <span className="open-day__gap" style={{ flexGrow: band.from }} />
-              <span
-                className={`open-day__band${runsPastMidnight(kind) ? " is-overnight" : ""}`}
-                style={{ flexGrow: band.to - band.from }}
-              />
-              <span className="open-day__gap" style={{ flexGrow: DAY_MINUTES - band.to }} />
-            </>
-          )}
-        </span>
       )}
     </li>
   );
