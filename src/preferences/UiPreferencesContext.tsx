@@ -4,9 +4,9 @@ import { preferencesRepository } from "@/repositories/PreferencesRepository";
 import { setDeviceSound as setEngineDeviceSound, setSoundPreferences, type DeviceSound } from "@/sound/soundEngine";
 import { ReactNode, createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import {
-  BOARD_DEFAULTS, DEFAULT_PREFERENCES, NEW_PERSON_PREFERENCES, ONBOARDING_VERSION, SCHEMA_VERSION,
+  BOARD_DEFAULTS, DEFAULT_PREFERENCES, NEW_PERSON_PREFERENCES, ONBOARDING_VERSION, SCHEMA_VERSION, defaultsForRole,
   effectiveBoard, effectiveLayout, parseBoard, parsePreferences, toBoardDocument, toDocument,
-  type BoardGeometry, type Layout, type UiPreferences,
+  type BoardGeometry, type Layout, type NotificationPrefs, type SoundPrefs, type UiPreferences,
 } from "./uiPreferences";
 
 /**
@@ -37,6 +37,21 @@ export interface UiPreferencesState {
   /** The last save did not reach the server (kept here and retried on the next). */
   saveFailed: boolean;
   save: (next: UiPreferences) => Promise<void>;
+  /**
+   * Save the notification settings alone (2026-11-09). Same document, same
+   * PUT; if the server refuses it — a backend that predates the setting
+   * answers 422 to the unknown key — the setting goes back to what it was,
+   * so the NEXT save of the look (which carries the block) is not refused
+   * too. Rejects with the server's error for the screen to show.
+   */
+  saveNotifications: (next: NotificationPrefs) => Promise<void>;
+  /**
+   * Save the notification sounds alone (2026-11-09: they moved from the
+   * interface screen to Settings). Its own PUT, like the notification
+   * switches: it never saves or drops an unsaved look left on the interface
+   * screen, and goes back if the server refuses it.
+   */
+  saveSound: (next: SoundPrefs) => Promise<void>;
   finishOnboarding: (next: UiPreferences) => Promise<void>;
   preview: (candidate: UiPreferences | null) => void;
   /**
@@ -96,6 +111,7 @@ export const applyToDocument = (p: UiPreferences, root: HTMLElement = document.d
 export const UiPreferencesProvider = ({ children }: { children: ReactNode }) => {
   const { user } = useAuth();
   const userId = user?.id ?? null;
+  const role = user?.role ?? null;
   const [prefs, setPrefs] = useState<UiPreferences>(DEFAULT_PREFERENCES);
   const [candidate, setCandidate] = useState<UiPreferences | null>(null);
   const [draft, setDraft] = useState<UiPreferences | null>(null);
@@ -142,7 +158,7 @@ export const UiPreferencesProvider = ({ children }: { children: ReactNode }) => 
       } catch { /* nothing kept here: the standard board */ }
       try {
         const cached = await keyValueStore.get<unknown>(cacheKey(userId));
-        if (!cancelled && cached) setPrefs({ ...parsePreferences(cached), board });
+        if (!cancelled && cached) setPrefs({ ...parsePreferences(cached, defaultsForRole(DEFAULT_PREFERENCES, role)), board });
         else if (!cancelled) setPrefs((p) => ({ ...p, board }));
       } catch { /* no copy on this machine: the defaults stand until the server answers */ }
       let finishedHere = 0;
@@ -164,7 +180,8 @@ export const UiPreferencesProvider = ({ children }: { children: ReactNode }) => 
         }
         // Nobody chose anything yet: a person still to be set up starts from
         // the new-person defaults, everybody else from what they know.
-        const base = doc.onboarding_version < ONBOARDING_VERSION ? NEW_PERSON_PREFERENCES : DEFAULT_PREFERENCES;
+        // An owner's sounds default to platform payments only (2026-11-09).
+        const base = defaultsForRole(doc.onboarding_version < ONBOARDING_VERSION ? NEW_PERSON_PREFERENCES : DEFAULT_PREFERENCES, role);
         const next = { ...(doc.data == null ? base : parsePreferences(doc.data, base)), board };
         setPrefs(next);
         setOnboardingVersion(doc.onboarding_version);
@@ -221,6 +238,40 @@ export const UiPreferencesProvider = ({ children }: { children: ReactNode }) => 
     }
   }, []);
 
+  /**
+   * Save one part of the document (notification switches, sounds) on its own
+   * PUT: the saved document with just that part changed. An unsaved look on
+   * the interface screen is neither sent nor dropped. On a refusal the part
+   * goes back to what it was and the error reaches the caller.
+   */
+  const saveSlice = async (patch: Partial<Pick<UiPreferences, "notifications" | "sound">>) => {
+    const id = owner.current;
+    if (id === null) return;
+    const before = prefs;
+    const doc = toDocument({ ...prefs, ...patch });
+    setPrefs((p) => ({ ...p, ...patch }));
+    try {
+      const reported = pendingOnboarding.current ?? undefined;
+      await preferencesRepository.put({
+        schema_version: SCHEMA_VERSION,
+        data: doc,
+        ...(reported !== undefined ? { onboarding_version: reported } : {}),
+      });
+      if (owner.current !== id) return;
+      setHasSaved(true);
+      void keyValueStore.set(cacheKey(id), doc).catch(() => {});
+    } catch (e) {
+      if (owner.current === id) {
+        setPrefs((p) => ({
+          ...p,
+          ...("notifications" in patch ? { notifications: before.notifications } : {}),
+          ...("sound" in patch ? { sound: before.sound } : {}),
+        }));
+      }
+      throw e;
+    }
+  };
+
   const value = useMemo<UiPreferencesState>(() => ({
     prefs,
     shown,
@@ -230,6 +281,8 @@ export const UiPreferencesProvider = ({ children }: { children: ReactNode }) => 
     hasSaved,
     saveFailed,
     save: (next) => persist(next),
+    saveNotifications: (next) => saveSlice({ notifications: next }),
+    saveSound: (next) => saveSlice({ sound: next }),
     finishOnboarding: async (next) => {
       // Finished on screen at once, whatever the network does: the wizard is
       // never shown twice in one sitting because a save was slow.

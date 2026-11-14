@@ -14,6 +14,11 @@ import { useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import { isAdditionalProduct, ProductKind } from "@/types/pos";
 import SectionTabs from "@/components/ui/SectionTabs";
+import ProductHistory from "@/components/products/ProductHistory";
+import { productEventRepository } from "@/repositories/ProductEventRepository";
+
+/** The screen's two views: the catalogue itself, and the trail of changes to it. */
+type Pane = "catalogue" | "history";
 
 const ProductsList = () => {
   const { branchId } = useParams();
@@ -21,10 +26,22 @@ const ProductsList = () => {
   const { t, money, lang } = useLang();
   const { user } = useAuth();
   // Reading the catalogue needs no permission — every role sells from it at the
-  // POS. Changing it is the company's call, so a manager gets the list and the
-  // search box and no write control at all. The backend refuses the same
-  // writes, so this is the button half of one rule, not the whole of it.
-  const canEdit = can(user?.role, "product.crud");
+  // POS. Since 2026-11-09 the manager writes it too (create, edit, price,
+  // deactivate: `product.write`); DELETE stays the owner's (`product.crud`),
+  // so a manager takes a product off the till by deactivating it. The backend
+  // refuses the same writes, so this is the button half of one rule.
+  const canEdit = can(user?.role, "product.write");
+  const canDelete = can(user?.role, "product.crud");
+  // The trail is the owner's and the admin's. A backend from before it answers
+  // 404, and then there is no tab to open; the probe is never sent for anyone
+  // without the permission.
+  const mayReadHistory = can(user?.role, "product.history");
+  const historyProbe = useAsync(
+    () => (mayReadHistory && Number.isFinite(id) && id > 0 ? productEventRepository.available(id) : Promise.resolve(false)),
+    [mayReadHistory, id],
+  );
+  const canHistory = mayReadHistory && historyProbe.data === true;
+  const [pane, setPane] = useState<Pane>("catalogue");
   const confirm = useConfirm();
   const { data, loading, error, reload } = useAsync(() => productRepository.listByBranch(id), [id]);
   const [creating, setCreating] = useState(false);
@@ -66,64 +83,84 @@ const ProductsList = () => {
     void reload();
   };
 
+  const showHistory = canHistory && pane === "history";
+
   return (
     <div className="col" style={{ gap: 18 }}>
       <div className="row-between">
         <h2 className="page-title" style={{ margin: 0 }}>{t("products.title")} · №{id}</h2>
-        {canEdit && (
+        {canEdit && !showHistory && (
           <Button onClick={() => setCreating(true)}>
             {t(section === "additional" ? "products.newAdditional" : "products.new")}
           </Button>
         )}
       </div>
-      <SectionTabs
-        label={t("session.addSections")}
-        value={section}
-        onChange={(k) => { setSection(k); setSearch(""); }}
-        tabs={[
-          { key: "regular", label: t("session.sectionProducts") },
-          { key: "additional", label: t("session.additionalTitle") },
-        ]}
-      />
-      <input
-        className="input"
-        placeholder={t("products.search")}
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-      />
-      <StateSwitch
-        view={view}
-        skeleton={<ListSkeleton />}
-        onRetry={() => void reload()}
-        error={{ titleKey: "products.state.errorTitle" }}
-        empty={{
-          titleKey: section === "additional" ? "products.state.emptyAdditionalTitle" : "products.state.emptyTitle",
-          descriptionKey: section === "additional" ? "products.state.emptyAdditionalDescription" : "products.state.emptyDescription",
-          actions: canEdit ? <Button onClick={() => setCreating(true)}>{newLabel}</Button> : undefined,
-        }}
-        noResults={{ descriptionKey: "products.state.noResultsDescription" }}
-      >
-        <div className="list">
-          {visible.map((p) => (
-            <div key={p.id} className="list-item" style={{ opacity: p.is_active ? 1 : 0.5 }}>
-              <div>
-                <div className="name">{tr(p, "name", lang)}</div>
-                <div className="meta">{tr(p, "category", lang) || "-"} · {money(Number(p.price))}</div>
-              </div>
-              {canEdit && (
-                <div className="row" style={{ gap: 6 }}>
-                  {/* Show/hide is a write too — it takes a product off the POS —
-                      so it goes with Edit and Delete rather than staying behind
-                      as the one thing a manager could still change. */}
-                  <Button variant="secondary" onClick={() => toggle(p)} style={btn}>{p.is_active ? t("action.hide") : t("action.show")}</Button>
-                  <Button variant="secondary" onClick={() => setEditing(p)} style={btn}>{t("action.edit")}</Button>
-                  <Button variant="secondary" onClick={() => remove(p)} style={{ ...btn, color: "var(--color-danger)", borderColor: "var(--color-danger-border-dim)" }}>{t("action.delete")}</Button>
+      {canHistory && (
+        <SectionTabs
+          label={t("products.views")}
+          value={pane}
+          onChange={setPane}
+          tabs={[
+            { key: "catalogue", label: t("products.viewCatalogue") },
+            { key: "history", label: t("products.viewHistory") },
+          ]}
+        />
+      )}
+      {showHistory && <ProductHistory initialBranchId={id} />}
+      {!showHistory && (
+        <>
+          <SectionTabs
+            label={t("session.addSections")}
+            value={section}
+            onChange={(k) => { setSection(k); setSearch(""); }}
+            tabs={[
+              { key: "regular", label: t("session.sectionProducts") },
+              { key: "additional", label: t("session.additionalTitle") },
+            ]}
+          />
+          <input
+            className="input"
+            placeholder={t("products.search")}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+          <StateSwitch
+            view={view}
+            skeleton={<ListSkeleton />}
+            onRetry={() => void reload()}
+            error={{ titleKey: "products.state.errorTitle" }}
+            empty={{
+              titleKey: section === "additional" ? "products.state.emptyAdditionalTitle" : "products.state.emptyTitle",
+              descriptionKey: section === "additional" ? "products.state.emptyAdditionalDescription" : "products.state.emptyDescription",
+              actions: canEdit ? <Button onClick={() => setCreating(true)}>{newLabel}</Button> : undefined,
+            }}
+            noResults={{ descriptionKey: "products.state.noResultsDescription" }}
+          >
+            <div className="list">
+              {visible.map((p) => (
+                <div key={p.id} className="list-item" style={{ opacity: p.is_active ? 1 : 0.5 }}>
+                  <div>
+                    <div className="name">{tr(p, "name", lang)}</div>
+                    <div className="meta">{tr(p, "category", lang) || "-"} · {money(Number(p.price))}</div>
+                  </div>
+                  {canEdit && (
+                    <div className="row" style={{ gap: 6 }}>
+                      {/* Show/hide is the deactivate: it takes a product off the
+                          POS and keeps it, which is what a manager has instead of
+                          Delete. */}
+                      <Button variant="secondary" onClick={() => toggle(p)} style={btn}>{p.is_active ? t("action.hide") : t("action.show")}</Button>
+                      <Button variant="secondary" onClick={() => setEditing(p)} style={btn}>{t("action.edit")}</Button>
+                      {canDelete && (
+                        <Button variant="secondary" onClick={() => remove(p)} style={{ ...btn, color: "var(--color-danger)", borderColor: "var(--color-danger-border-dim)" }}>{t("action.delete")}</Button>
+                      )}
+                    </div>
+                  )}
                 </div>
-              )}
+              ))}
             </div>
-          ))}
-        </div>
-      </StateSwitch>
+          </StateSwitch>
+        </>
+      )}
       {creating && <ProductForm branchId={id} kind={section} onClose={() => setCreating(false)} onSaved={() => { setCreating(false); void reload(); }} />}
       {editing && <ProductForm branchId={id} initial={editing} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); void reload(); }} />}
     </div>

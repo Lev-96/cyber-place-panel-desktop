@@ -193,9 +193,10 @@
   font-display: swap;
 }
 
-/* ===== Brand wordmark neon animation (shared: login + sidebar) ===== */
+/* ===== Brand wordmark neon animation (the side menu's wordmark) ===== */
 /* Periodic neon "flicker" once per cycle + a gentle, eye-comfortable glow
-   "breathing" pulse. Honours prefers-reduced-motion. */
+   "breathing" pulse. Honours prefers-reduced-motion. The sign-in screens'
+   wordmark is still since 2026-11-13 (see "Sign-in screens: still"). */
 @keyframes brandFlicker {
   0% {
     opacity: 0.4;
@@ -238,7 +239,6 @@
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .login-brand,
   .sidebar h1 span {
     animation: none !important;
   }
@@ -439,14 +439,6 @@ html {
   /* Live grid cells fade in (no slide — too jittery for a grid) */
   .live-grid > * {
     animation: cp-fade-in 260ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
-  }
-
-  /* Brand title shimmer once on login screen */
-  .login-brand {
-    animation: cp-brand-in 600ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
-  }
-  .login-logo {
-    animation: cp-card-in 500ms 80ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
   }
 }
 
@@ -849,18 +841,6 @@ a.card:hover {
     transform: translateX(0);
   }
 }
-@keyframes cp-brand-in {
-  from {
-    opacity: 0;
-    transform: translateY(-12px);
-    letter-spacing: 6px;
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-    letter-spacing: 2px;
-  }
-}
 
 .app-shell {
   --sidebar-w: 240px;
@@ -897,7 +877,7 @@ a.card:hover {
 .app-shell--collapsible > .sidebar > :is(.sidebar-nav, .sidebar-footer) {
   width: calc(var(--sidebar-w) - 24px);
 }
-.app-shell--collapsible > .sidebar > h1 {
+.app-shell--collapsible > .sidebar > :is(h1, .sidebar-version) {
   width: calc(var(--sidebar-w) - 48px);
 }
 /* A row's hover / current surface narrows to a rounded tile under its icon:
@@ -920,6 +900,12 @@ a.card:hover {
    padding), so its centre is at 42; the logo spans 24-63, centre ~43.5. */
 .app-shell--collapsible.is-sidebar-collapsed > .sidebar :is(.nav-support-card__icon, .user-card > :first-child) {
   transform: translateX(-10px);
+}
+/* Folded, the version line fades like the labels (its first characters would
+   show on the rail) and its row stays, so the menu below never jumps; the
+   brand row's tooltip carries the version meanwhile (Sidebar.tsx). */
+.app-shell--collapsible.is-sidebar-collapsed > .sidebar > .sidebar-version {
+  opacity: 0;
 }
 .app-shell--collapsible.is-sidebar-collapsed > .sidebar > h1 img {
   transform: translateX(-12px);
@@ -980,7 +966,7 @@ a.card:hover {
       color 150ms ease-out,
       clip-path var(--sidebar-slide);
   }
-  .app-shell--collapsible > .sidebar .nav-label {
+  .app-shell--collapsible > .sidebar :is(.nav-label, .sidebar-version) {
     transition: opacity 160ms ease;
   }
   .app-shell--collapsible > .sidebar :is(.nav-support-card__icon, .user-card > :first-child, h1 img) {
@@ -1065,6 +1051,26 @@ a.card:hover {
   animation:
     brandFlicker var(--flicker-every) ease-in-out infinite,
     brandGlow 5s ease-in-out infinite;
+}
+
+/* The desktop app's version under the brand (2026-11-14): one quiet line,
+   tucked 4px under the brand row (pulled up by the sidebar's 12px gap, the
+   brand's 4px bottom margin stays), from the mark's left edge: the row's full
+   192px keeps «Տարբերակ 1.0.61-staging.10» on one line, where starting under
+   the wordmark broke it at the hyphen. Never on the web. */
+.sidebar-version {
+  flex-shrink: 0;
+  /* Its own line, 8px under the brand row (h1's 4px bottom margin + the
+     column's 12px gap − 8px), never pressed against the logo (owner,
+     2026-11-14); 4px more under it before the menu. */
+  margin: -8px 12px 4px;
+  color: var(--color-muted);
+  font-size: var(--fs-xs);
+  font-weight: 500;
+  line-height: 1.35;
+  letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
 }
 
 /* A nav row: icon, label, badge. The icon sits on the label's first line and
@@ -1611,7 +1617,8 @@ body.cp-modal-open .main {
 
 /* === Native date/time pickers — dark neon calendar everywhere ===========
    Applies to every native temporal input across the app (POS history,
-   sessions history, tournament dates, branch working-hours times). The
+   sessions history, tournament dates; branch working hours moved to the
+   24-hour `TimeInput` on 2026-11-13). The
    editable field already uses `.input`; these rules theme the parts the
    browser draws itself: the pop-up calendar, the trigger glyph and the
    focused date/time segment. */
@@ -2197,19 +2204,16 @@ input[type="time"]::-webkit-datetime-edit-field:focus {
   align-items: center;
   justify-content: center;
   height: 100vh;
-  background: var(--color-bg);
   padding: 24px;
   gap: 24px;
   /* THE size of the login composition. Every dimension below is a fraction of
-     it, so the ring, the wordmark and the form always shrink together — before
-     this the ring tracked the viewport while the form stayed pinned in pixels,
-     and on a short window the form ended up nearly as wide as the circle
-     around it. Ratios are the original design sizes over 620. */
+     it, so the wordmark, the logo and the form always shrink together. Named
+     after the HUD ring it once framed (gone 2026-11-13); the owner web sets it
+     too, so the name stays. Ratios are the original design sizes over 620. */
   --ring-size: clamp(400px, 62vh, 620px);
 }
 
 .login-brand {
-  --flicker-every: 8s;
   font-family: "Audiowide", "Inter", sans-serif;
   font-size: 48px;
   font-weight: 400;
@@ -2221,9 +2225,10 @@ input[type="time"]::-webkit-datetime-edit-field:focus {
   color: transparent;
   margin: 0;
   text-align: center;
-  animation:
-    brandFlicker var(--flicker-every) ease-in-out infinite,
-    brandGlow 5s ease-in-out infinite;
+  /* A still neon: the side menu's breathing glow held at its middle. A
+     drop-shadow, not text-shadow — with the gradient clipped to the glyphs a
+     text-shadow would paint over the fill. */
+  filter: drop-shadow(0 0 3px rgb(var(--accent-rgb) / 0.6)) drop-shadow(0 0 12px rgba(49, 175, 247, 0.38));
 }
 
 /* The mark is 1.64:1 (2026-10-17); 108px wide gives it the area the old,
@@ -2294,10 +2299,6 @@ button.pill:hover {
   font-weight: 600;
   letter-spacing: 0.5px;
   cursor: pointer;
-  transition:
-    background 0.15s,
-    border-color 0.15s,
-    color 0.15s;
 }
 .login-lang-pill:hover {
   background: rgb(var(--accent-rgb) / 0.12);
@@ -4096,8 +4097,90 @@ div.cp-switch {
   margin-top: auto;
 }
 
-/* Wrapper around brand + logo + title + form, so the panel is one block with
-   its own spacing above the decorative layers. */
+/* === Sign-in screens: still (2026-11-13) ====================================
+   The owner: "no animation at all, a very beautiful background, and the page
+   must not freeze while loading". Until then this was a three.js space scene
+   (≈900 KB of JavaScript and a WebGL frame loop), a spinning HUD ring, a 2.3 s
+   fly-in, a pulsing field and a 3D card flip — on a weak club PC the form
+   answered typing in ~0.9 s while the scene rendered.
+
+   Now the background is ONE still picture, public/bg/login-space*.webp:
+   "Arcade bokeh", a soft brand blur with defocused gaming light shapes
+   (rendered once, see CLAUDE.md "Static sign-in"). It lies over a CSS
+   gradient that paints with the first frame and copies the picture's broad
+   light (cyan on the left, purple on the right, dark in the middle), so the screen
+   already looks finished before the picture arrives; the picture then simply
+   appears. Nothing here moves. Used by Login, ResetPassword and
+   NetworkBlockedScreen. (The file names are older than the picture.) */
+
+.login-shell {
+  position: relative;
+  overflow: hidden;
+  /* Deliberately fixed colours, not theme tokens: they are the picture's own,
+     and the sign-in is always the default theme. */
+  background-color: #070b1f;
+  background-image:
+    url("/bg/login-space.webp"),
+    /* the dark middle under the form */
+    radial-gradient(ellipse 18% 42% at 50% 52%, rgb(6 9 29 / 0.9), transparent 75%),
+    /* the soft glows: cyan on the left, purple on the right */
+    radial-gradient(ellipse 32% 22% at 14% 64%, rgb(22 85 119 / 0.75), transparent 72%),
+    radial-gradient(ellipse 32% 22% at 86% 62%, rgb(41 53 99 / 0.8), transparent 72%),
+    /* the base, top to bottom */
+    linear-gradient(180deg, #0d1729 0%, #0e1630 32%, #0b1126 52%, #091224 72%, #070e1f 100%);
+  background-size: cover, auto, auto, auto, auto;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+/* A tall screen (a phone, the Telegram Mini App, a portrait tablet) gets the
+   picture re-framed for it: the landscape one cropped to a phone would keep
+   only the empty middle. */
+@media (max-aspect-ratio: 3/4) {
+  .login-shell {
+    background-image:
+      url("/bg/login-space-portrait.webp"),
+      radial-gradient(ellipse 30% 10% at 6% 47%, rgb(15 44 73 / 0.9), transparent 75%),
+      radial-gradient(ellipse 30% 10% at 94% 47%, rgb(25 33 69 / 0.9), transparent 75%),
+      radial-gradient(ellipse 30% 8% at 4% 86%, rgb(8 42 63 / 0.8), transparent 75%),
+      radial-gradient(ellipse 30% 8% at 96% 86%, rgb(17 14 39 / 0.8), transparent 75%),
+      linear-gradient(180deg, #04081a 0%, #080c23 25%, #0b1229 38%, #070c1f 55%, #050b1a 100%);
+    background-size: cover, auto, auto, auto, auto, auto;
+    background-position: center top;
+  }
+}
+
+/* High contrast (the theme, or the system's preference): the plain page
+   colour behind the form, nothing to read the text against. */
+[data-theme="contrast"] .login-shell {
+  background: var(--color-bg);
+}
+@media (prefers-contrast: more) {
+  .login-shell {
+    background: var(--color-bg);
+  }
+}
+
+/* Nothing on these screens moves — not even the shared controls' hover and
+   focus fades (.btn, .input, the eye, the pills). Their states still change,
+   instantly. The captcha's own shake/done feedback lives in a dialog portalled
+   to <body>, outside this, and is kept on purpose. */
+.login-shell,
+.login-shell * {
+  animation: none !important;
+  transition: none !important;
+}
+/* Its own rule: a selector list fails as a whole where a pseudo-element is
+   not understood (jsdom's matcher, older engines), and would take the
+   elements' line above down with it. */
+.login-shell *::before,
+.login-shell *::after {
+  animation: none !important;
+  transition: none !important;
+}
+
+/* Wrapper around brand + logo + title + form, so the composition is one
+   centred block above the background. */
 .login-stage {
   position: relative;
   z-index: 2;
@@ -4106,217 +4189,43 @@ div.cp-switch {
   align-items: center;
   gap: calc(var(--ring-size) * 0.039);
   width: 100%;
-  max-width: calc(var(--ring-size) * 0.84);
-  /* Reserve the half of the ring that sticks out ABOVE the wordmark.
-     The ring is absolutely positioned, so it contributes nothing to layout —
-     which meant the flex centring balanced only the text and the form, and the
-     whole composition rode high with dead space underneath. Padding the stage
-     by the ring's overhang (its radius, less half the wordmark's own height)
-     puts that space back into the flow, so centring the stage now centres what
-     you actually see. Derived from --ring-size, so it stays correct at every
-     window size instead of only at one. */
-  padding-top: calc(var(--ring-size) * 0.454);
-  /* Flattening is what makes the panel arrive as one solid object. Without it
-     each child would be depth-sorted on its own and the group would visibly
-     come apart mid-flight. */
-  transform-style: preserve-3d;
-  animation: cpPanelApproach 2300ms cubic-bezier(0.14, 0.86, 0.2, 1) both;
+  max-width: calc(var(--ring-size) * 0.92);
 }
 
-.login-shell {
-  position: relative;
-  overflow: hidden;
-  /* A real perspective, so the entrance is genuine depth rather than a scale.
-     Scaling grows every edge uniformly; translating along Z foreshortens —
-     the panel reads as travelling towards you instead of merely inflating. */
-  perspective: 1400px;
-  perspective-origin: 50% 42%;
-}
-
-/* ---- Panel entrance ----
-   Arrives out of the same depth the grid recedes into: far away, dim and out
-   of focus, then settles onto its mark. The blur clearing as it lands is what
-   sells the distance — a sharp object that only changes size reads as a
-   sticker being zoomed, not as something approaching. */
-@keyframes cpPanelApproach {
-  0% {
-    opacity: 0;
-    transform: translate3d(0, 34px, -1900px);
-    filter: blur(12px);
-  }
-  45% {
-    opacity: 1;
-  }
-  /* A whisper past the mark, then back — the settle that stops a long
-     approach ending abruptly. Two pixels, not a bounce. */
-  88% {
-    transform: translate3d(0, 0, 26px);
-  }
-  100% {
-    opacity: 1;
-    transform: translate3d(0, 0, 0);
-    filter: blur(0);
-  }
-}
-
-/* Composition type and imagery, all derived from --ring-size. */
+/* Composition type and imagery, all derived from --ring-size. The mark sits
+   above the wordmark and is a size bigger than it was (owner, 2026-11-13:
+   0.174 -> 0.21 of the ring, 108 -> 130px at full size). */
 .login-shell .login-brand {
   font-size: calc(var(--ring-size) * 0.077);
+  /* tucked under the mark: one unit, not two items in a column */
+  line-height: 1.1;
+  margin-top: calc(var(--ring-size) * -0.022);
 }
 .login-shell .login-logo {
-  width: calc(var(--ring-size) * 0.174);
+  width: calc(var(--ring-size) * 0.21);
+  margin-bottom: 0;
 }
 .login-shell .login-title {
   font-size: calc(var(--ring-size) * 0.032);
 }
+/* ---- The form: an instrument housing, not a plain card ----
+   An even 0.82 of the page colour under a faint accent tint (it used to fade
+   to nearly clear at the top), and a 4px blur: on a phone a planet sits
+   behind the card's top edge, and a grey label there must still read
+   (measured ≥ 4.5:1 for the muted label colour). */
 .login-shell .login-card {
+  position: relative;
   padding: calc(var(--ring-size) * 0.036) calc(var(--ring-size) * 0.039);
   gap: calc(var(--ring-size) * 0.023);
-}
-
-/* The wordmark lights up once the panel has almost landed, rather than riding
-   in already glowing — the beat between arrival and ignition is what makes it
-   feel deliberate. */
-.login-shell .login-brand {
-  animation:
-    cpBrandIgnite 900ms 1500ms ease-out both,
-    brandFlicker var(--flicker-every) 2400ms ease-in-out infinite,
-    brandGlow 5s 2400ms ease-in-out infinite;
-}
-
-@keyframes cpBrandIgnite {
-  from { opacity: 0.25; }
-  to { opacity: 1; }
-}
-
-/* The backdrops come up under it, so nothing snaps in when the lazy WebGL
-   chunk finally resolves. */
-.login-scene {
-  animation: cpBackdropIn 2200ms ease-out both;
-}
-
-@keyframes cpBackdropIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-/* === Login HUD backdrop =====================================================
-   A hexagon mesh floor and a slow targeting ring behind the sign-in panel —
-   the "heads-up display" look, rendered in the product's own palette rather
-   than a borrowed cyan.
-
-   Everything here is decoration: it sits behind the character and the form,
-   never takes pointer events, and animates transform/opacity only so the whole
-   layer stays on the compositor (CLAUDE.md §7.5). */
-
-/* Anchor for the ring: a zero-height box centred on the wordmark. */
-.login-brand-wrap {
-  position: relative;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-
-.login-shell .login-brand {
-  position: relative;
-  /* Above the ring that is centred behind it. */
-  z-index: 1;
-}
-
-/* The ring, centred on the wordmark's own centre. */
-.login-hud {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: var(--ring-size);
-  aspect-ratio: 1;
-  transform: translate(-50%, -50%);
-  pointer-events: none;
-  z-index: 0;
-}
-
-/* The WebGL backdrop, behind every other layer. */
-.login-scene {
-  position: absolute !important;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
-}
-
-/* ---- Targeting ring ----
-   Three concentric pieces turning at different rates: a fast thin ring, a slow
-   counter-turning one, and a tick band. Counter-rotation is what stops it
-   reading as one flat spinning disc. */
-.login-hud-ring {
-  position: absolute;
-  inset: 0;
-  opacity: 0.5;
-}
-
-.login-hud-ring span {
-  position: absolute;
-  inset: 0;
-  border-radius: 50%;
-}
-
-.login-hud-ring-outer {
-  border: 2px solid rgb(var(--accent-rgb) / 0.35);
-  box-shadow:
-    0 0 18px rgb(var(--accent-rgb) / 0.25),
-    inset 0 0 22px rgb(var(--accent-rgb) / 0.12);
-  /* Two gaps in the ring: a broken circle reads as an instrument, a closed
-     one reads as a plain border. */
-  mask-image: conic-gradient(#000 0 38%, transparent 38% 44%, #000 44% 88%, transparent 88% 94%, #000 94%);
-  animation: cpHudSpin 32s linear infinite;
-}
-
-.login-hud-ring-inner {
-  inset: 9%;
-  border: 1px solid rgb(var(--accent-purple-rgb) / 0.32);
-  mask-image: conic-gradient(transparent 0 8%, #000 8% 46%, transparent 46% 54%, #000 54% 92%, transparent 92%);
-  animation: cpHudSpin 44s linear infinite reverse;
-}
-
-.login-hud-ring-ticks {
-  inset: 17%;
-  /* Tick marks drawn as a repeating conic gradient — no extra elements. */
-  background: repeating-conic-gradient(
-    from 0deg,
-    rgb(var(--accent-blue-rgb) / 0.5) 0deg 0.7deg,
-    transparent 0.7deg 9deg
-  );
-  mask-image: radial-gradient(circle, transparent 0 82%, #000 82% 100%);
-  animation: cpHudSpin 70s linear infinite;
-}
-
-@keyframes cpHudSpin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-
-/* ---- Panel: instrument housing, not a plain card ---- */
-.login-shell .login-card {
-  position: relative;
-  padding: 22px 24px 24px;
-  border: 1px solid rgb(var(--accent-rgb) / 0.3);
+  border: 1px solid rgb(var(--accent-rgb) / 0.42);
   border-radius: 10px;
   background:
-    linear-gradient(180deg, rgb(var(--accent-rgb) / 0.05), rgb(var(--bg-rgb) / 0.72));
+    linear-gradient(180deg, rgb(var(--accent-rgb) / 0.07), rgb(var(--accent-rgb) / 0.02)),
+    rgb(var(--bg-rgb) / 0.82);
   box-shadow:
-    0 0 22px rgb(var(--accent-rgb) / 0.12),
-    inset 0 0 24px rgb(var(--accent-rgb) / 0.05);
-  backdrop-filter: blur(2px);
-  transition:
-    border-color 400ms ease,
-    box-shadow 400ms ease;
-}
-
-.login-shell .login-card:hover,
-.login-shell .login-card:focus-within {
-  border-color: rgb(var(--accent-rgb) / 0.62);
-  box-shadow:
-    0 0 34px rgb(var(--accent-rgb) / 0.22),
-    inset 0 0 28px rgb(var(--accent-rgb) / 0.08);
+    0 0 26px rgb(var(--accent-rgb) / 0.16),
+    inset 0 0 26px rgb(var(--accent-rgb) / 0.06);
+  backdrop-filter: blur(4px);
 }
 
 /* Corner brackets: four short rules pinned to the panel's corners. Drawn on
@@ -4346,156 +4255,111 @@ div.cp-switch {
   border-bottom-right-radius: 10px;
 }
 
-/* Focused fields pulse, the way an instrument acknowledges input. Kept gentle:
-   this screen is looked at every shift, and a hard strobe gets tiring fast. */
-@keyframes cpFieldGlow {
-  from {
-    box-shadow: 0 0 0 2px rgb(var(--accent-rgb) / 0.16), 0 0 8px rgb(var(--accent-rgb) / 0.16);
-  }
-  to {
-    box-shadow: 0 0 0 3px rgb(var(--accent-rgb) / 0.3), 0 0 18px rgb(var(--accent-rgb) / 0.35);
-  }
+/* The form's fields and button: a step bigger than the app's own controls
+   (owner, 2026-11-13) — 44px at the smallest composition, 48px at full size,
+   15px text. Both faces are .login-card, so "forgot password" matches. */
+.login-shell .login-card .input,
+.login-shell .login-card .btn {
+  min-height: clamp(44px, calc(var(--ring-size) * 0.077), 48px);
+  font-size: 15px;
 }
+.login-shell .login-card .input {
+  padding: 11px 14px;
+}
+.login-shell .login-card .label {
+  font-size: 13px;
+}
+.login-shell .login-card .login-forgot {
+  font-size: 14px;
+}
+
+/* The focused field: a steady neon ring (it used to pulse). */
 .login-shell .input:focus {
   border-color: var(--color-primary);
-  animation: cpFieldGlow 1.6s ease-in-out infinite alternate;
+  box-shadow: 0 0 0 3px rgb(var(--accent-rgb) / 0.26), 0 0 14px rgb(var(--accent-rgb) / 0.24);
 }
 
-/* Reduced motion: keep the look, drop the movement. */
-@media (prefers-reduced-motion: reduce) {
-  .login-hud-ring span,
-  .login-shell .input:focus,
-  .login-scene {
-    animation: none !important;
-  }
-  /* No flight, no blur — straight to the resting state. */
-  .login-stage {
-    animation: none !important;
-    opacity: 1;
-    transform: none;
-    filter: none;
-  }
-  .login-shell .login-brand {
-    animation: none !important;
-    opacity: 1;
-  }
-}
-
-/* ---- Ring: extra layers ----
-   A dashed band, a scanning beam and four pulsing nodes on top of the base
-   rings. Everything is masked gradients on pseudo-free elements, so the whole
-   instrument costs no images and animates on transform/opacity only. */
-
-/* Uneven dashes read as an instrument scale; even ones read as a dotted
-   border. The gaps repeat on a different period from the ticks below, so the
-   two never lock into a moiré. */
-.login-hud-ring-dashes {
-  inset: 4%;
-  border: 1px solid rgba(127, 233, 255, 0.5);
-  mask-image: repeating-conic-gradient(
-    from 0deg,
-    #000 0deg 6deg,
-    transparent 6deg 11deg,
-    #000 11deg 13deg,
-    transparent 13deg 22deg
-  );
-  animation: cpHudSpin 26s linear infinite;
-}
-
-/* The beam: a wedge of light fading out behind itself, clipped to a band. */
-.login-hud-ring-sweep {
-  inset: 6%;
-  background: conic-gradient(
-    from 0deg,
-    rgb(var(--accent-rgb) / 0.42) 0deg,
-    rgb(var(--accent-rgb) / 0.14) 26deg,
-    transparent 60deg,
-    transparent 360deg
-  );
-  mask-image: radial-gradient(circle, transparent 0 62%, #000 66% 100%);
-  animation: cpHudSpin 7.5s linear infinite;
-  filter: blur(0.4px);
-}
-
-.login-hud-node {
-  position: absolute;
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--color-primary);
-  box-shadow: 0 0 10px rgb(var(--accent-rgb) / 0.9);
-  animation: cpNodePulse 3.2s ease-in-out infinite;
-}
-/* Offsets are half the node size, so each sits centred on the ring's edge. */
-.login-hud-node--n { top: -3.5px; left: calc(50% - 3.5px); animation-delay: 0s; }
-.login-hud-node--e { right: -3.5px; top: calc(50% - 3.5px); animation-delay: 0.8s; }
-.login-hud-node--s { bottom: -3.5px; left: calc(50% - 3.5px); animation-delay: 1.6s; }
-.login-hud-node--w { left: -3.5px; top: calc(50% - 3.5px); animation-delay: 2.4s; }
-
-@keyframes cpNodePulse {
-  0%, 100% { opacity: 0.35; transform: scale(1); }
-  50% { opacity: 1; transform: scale(1.5); }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .login-hud-node {
-    animation: none !important;
-    opacity: 0.7;
-  }
-}
-
-/* === Sign-in card flip =====================================================
-   "Forgot password" turns the card over instead of navigating away, so the
-   space backdrop, the ring and the wordmark all stay exactly where they are.
-   Leaving the screen would tear the WebGL scene down and rebuild it — the
-   backdrop would blink, and the whole composition would re-enter from depth
-   for what is a change of one field. */
+/* === Sign-in card: two faces ================================================
+   "Forgot password?" turns the card over to its other face instead of
+   navigating, so the screen around it stays exactly where it is. The 3D turn
+   is the ONE motion on the sign-in screens: the owner asked for it back
+   (2026-11-13) after everything else was made still. Both faces share ONE
+   grid cell, so the card keeps the height of the taller face and nothing
+   above it jumps. The face turned away is hidden by its backface while it
+   turns and becomes `visibility: hidden` (not drawn, not in the
+   accessibility tree) once it is edge-on; it is `inert` in the markup (not
+   focusable) at once. Reduced motion: an instant swap. */
 
 .login-flip-wrap {
   width: 100%;
   display: flex;
   justify-content: center;
-  /* Its own perspective, closer than the shell's, so the turn has real depth:
-     the far edge of the card recedes rather than the whole thing shearing. */
+  /* Its own perspective, so the far edge of the card recedes as it turns. */
   perspective: 1200px;
 }
 
 .login-flip {
-  /* Both faces occupy the SAME grid cell, so the wrapper takes the height of
-     the taller one and the card never changes size mid-turn. Absolutely
-     positioning the back face instead would collapse the wrapper's height and
-     make the card jump as it flips. */
   display: grid;
   width: 100%;
-  /* Centre both faces in the cell. A grid item narrower than its cell (which
-     `max-width` makes it) aligns to the START by default — that is what pulled
-     the card left of the ring's centre once it became a grid child, and put its
-     top-left corner outside the circle. */
-  justify-items: center;
   transform-style: preserve-3d;
-  transition: transform 760ms cubic-bezier(0.22, 0.75, 0.2, 1);
+  /* Centre both faces in the cell. A grid item narrower than its cell (which
+     `max-width` makes it) aligns to the START by default. */
+  justify-items: center;
 }
 
 .login-flip > * {
   grid-area: 1 / 1;
-  /* Both faces are the same box, so the card cannot change width mid-turn.
+  /* Both faces are the same box, so the card cannot change width on a swap.
      The cap lives here rather than on .login-card because these are the
      elements the grid lays out. */
   width: 100%;
-  max-width: calc(var(--ring-size) * 0.68);
+  max-width: calc(var(--ring-size) * 0.78);
   /* The half turned away from the viewer must not show through. */
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
 }
 
-/* The reverse face starts pre-turned, so that after the container's 180° it
-   ends up facing the viewer the right way round. */
+/* The reverse face starts pre-turned, so after the card's 180° it faces the
+   viewer the right way round. */
 .login-flip-face-back {
   transform: rotateY(180deg);
 }
 
 .login-flip.is-back {
   transform: rotateY(180deg);
+}
+
+/* The turn itself. It must beat the screen's "nothing moves" rule
+   (`.login-shell *`, !important), hence the extra class and !important.
+   A transition is taken from the state being entered, so: the face being
+   turned AWAY stays drawn until it is edge-on, half-way (380ms), then hides;
+   the face being turned TO is visible at once (its backface keeps it unseen
+   until half-way), so focus can move into it on the same click. */
+.login-shell .login-flip {
+  transition: transform 760ms cubic-bezier(0.22, 0.75, 0.2, 1) !important;
+}
+.login-shell .login-flip.is-back > .login-card,
+.login-shell .login-flip:not(.is-back) > .login-flip-face-back {
+  transition: visibility 0s linear 380ms !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  .login-shell .login-flip,
+  .login-shell .login-flip.is-back > .login-card,
+  .login-shell .login-flip:not(.is-back) > .login-flip-face-back {
+    transition: none !important;
+  }
+}
+
+/* The back face's form sits one level down: without this the shared
+   .login-card cap (420px) would keep "forgot password" narrower than the
+   sign-in face it replaces. */
+.login-flip-face-back > .login-card {
+  max-width: 100%;
+}
+
+.login-flip.is-back > .login-card,
+.login-flip:not(.is-back) > .login-flip-face-back {
+  visibility: hidden;
 }
 
 /* The "forgot password" / "back to sign in" links are buttons — they change
@@ -4512,12 +4376,6 @@ button.login-flip-back {
 }
 button.login-flip-back:hover {
   opacity: 0.85;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .login-flip {
-    transition: none;
-  }
 }
 
 /* === Entity header ==========================================================
@@ -4826,6 +4684,40 @@ button.login-flip-back:hover {
   cursor: pointer;
   font: inherit;
 }
+
+/* The composer: the text on a row of its own across the whole thread, the
+   buttons under it. The field grows with what is typed (SupportComposer sets
+   its height to the content) up to a cap that leaves the thread readable even
+   at the 520×560 minimum window, then scrolls inside itself. */
+.support-composer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border-top: 1px solid var(--color-border);
+  padding-top: 12px;
+}
+.support-composer__field {
+  display: block;
+  min-width: 0;
+  resize: none;
+  line-height: 1.5;
+  /* Up to about eight lines on a desk-sized window, a third of a short one. */
+  max-height: min(30vh, 220px);
+  overflow-y: auto;
+}
+.support-composer__actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.support-composer__count {
+  font-size: 12px;
+  color: var(--color-muted);
+  font-variant-numeric: tabular-nums;
+}
+/* Send stays on the right edge whatever sits beside Attach. */
+.support-composer__send { margin-left: auto; }
 
 /* ── Branch cards inside Support ─────────────────────────────────────────
    A support thread belongs to a venue, so the first question the screen asks
@@ -8141,8 +8033,10 @@ select.input option:disabled {
   scroll-margin-top: calc(50px + var(--preview-dock-h, 0px) + var(--space-3));
 }
 
-.menu-editor { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; max-width: 640px; }
+/* The relative list is the frame of the drop slot (`::before`) below. */
+.menu-editor { position: relative; list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; max-width: 640px; }
 .menu-editor__row {
+  position: relative;
   display: flex;
   align-items: center;
   gap: var(--space-3);
@@ -8155,8 +8049,101 @@ select.input option:disabled {
 .menu-editor__row.is-fixed { opacity: 0.85; }
 .menu-editor__name { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .menu-editor__note { font-size: var(--fs-xs); }
-.menu-editor__controls { display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0; }
-.menu-editor__controls .btn { min-width: 40px; min-height: 36px; padding: 4px 10px; }
+.menu-editor__controls { display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0; margin-left: auto; }
+/* A phone-wide list (owner web, 360–430px): a note beside the name squeezed
+   the name to a letter per line, so the note goes under the name, lined up
+   with it (grip 40 + gap + icon 18 + gap), the gaps are the 8px step, and the
+   switch stays on line one. */
+.menu-editor { container-type: inline-size; }
+@container (max-width: 400px) {
+  /* The grip keeps its full 40px: it is what a finger has to hit. */
+  .menu-editor__row { flex-wrap: wrap; column-gap: var(--space-2); row-gap: 0; }
+  .menu-editor__note { order: 1; flex-basis: 100%; padding-left: calc(40px + 18px + 2 * var(--space-2)); }
+}
+
+/* Drag and drop (2026-11-13, `useSortableList`). The grip is 40×36, the size
+   of the ↑ / ↓ buttons it replaced, so a row keeps its height; the fixed Home
+   row keeps the same column empty so every icon stays aligned. Only the grip
+   has `touch-action: none`: a swipe anywhere else on a row scrolls the page. */
+.menu-editor__grip,
+.menu-editor__grip-space { flex-shrink: 0; width: 40px; height: 36px; }
+.menu-editor__grip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-muted);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.menu-editor__grip:hover { color: var(--color-text); background: rgb(var(--accent-rgb) / 0.08); }
+.menu-editor__grip:focus-visible { outline: 2px solid rgb(var(--accent-rgb) / 0.8); outline-offset: 1px; }
+.menu-editor__grip[aria-pressed="true"] { cursor: grabbing; color: var(--color-primary); }
+.menu-editor[data-sorting] { user-select: none; -webkit-user-select: none; }
+.menu-editor[data-sorting="pointer"] { cursor: grabbing; }
+
+/* The lifted row: above the others, slightly raised, a neon edge. It follows
+   the pointer through `translate`, written by the hook on the element. The
+   glow is a layer of its own that only fades (opacity), never repaints a shadow. */
+.menu-editor__row[data-sort-state="lifted"] {
+  z-index: 2;
+  scale: 1.02;
+  background: var(--color-surface-alt);
+  border-color: rgb(var(--accent-rgb) / 0.7);
+}
+.menu-editor__row::after {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  box-shadow:
+    0 12px 28px rgb(var(--shadow-rgb) / 0.5),
+    0 0 0 1px rgb(var(--accent-rgb) / 0.55),
+    0 0 22px rgb(var(--accent-rgb) / 0.28);
+  opacity: 0;
+  pointer-events: none;
+}
+.menu-editor__row[data-sort-state="lifted"]::after { opacity: 1; }
+/* Dropped, it glides into its slot over the others, not under them. */
+.menu-editor__row[data-sort-settling] { z-index: 1; }
+/* The others make room: one row's height plus the gap, up or down. */
+.menu-editor__row[data-sort-state="shift-up"] { translate: 0 calc(-1 * var(--sort-shift, 0px)); }
+.menu-editor__row[data-sort-state="shift-down"] { translate: 0 var(--sort-shift, 0px); }
+/* The drop slot: where the row lands when it is let go. */
+.menu-editor[data-sorting]::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--sort-slot-h, 0px);
+  translate: 0 var(--sort-slot-y, 0px);
+  border: 1px dashed rgb(var(--accent-rgb) / 0.75);
+  border-radius: var(--radius-sm);
+  background: rgb(var(--accent-rgb) / 0.06);
+  pointer-events: none;
+}
+/* Sliding only with motion allowed; with reduced motion every step snaps. */
+@media (prefers-reduced-motion: no-preference) {
+  .menu-editor:is([data-sorting], [data-sort-returning]) > .menu-editor__row:not([data-sort-state="lifted"], [data-sort-settling]) {
+    transition: translate 200ms ease;
+  }
+  .menu-editor__row[data-sort-state="lifted"] { transition: scale 150ms ease; }
+  /* By keyboard the row jumps a slot per key press: let it glide there. */
+  .menu-editor[data-sorting="keyboard"] > .menu-editor__row[data-sort-state="lifted"] {
+    transition: translate 200ms ease, scale 150ms ease;
+  }
+  .menu-editor__row[data-sort-settling] { transition: translate 200ms ease, scale 200ms ease; }
+  .menu-editor__row::after { transition: opacity 150ms ease; }
+  .menu-editor[data-sorting]::before { transition: translate 200ms ease; }
+}
 
 .appearance-actions {
   position: sticky;
@@ -9467,3 +9454,1589 @@ select.input option:disabled {
 /* A seat that ended by itself, paid afterwards (2026-11-07). */
 .pay-mark-note { padding: var(--space-2) var(--space-3); border-radius: var(--radius-sm); background: rgb(var(--warning-rgb) / 0.12); color: var(--color-warning); font-size: 13px; font-weight: 600; }
 .pay-mark-done { padding: var(--space-2) var(--space-3); border-radius: var(--radius-sm); background: rgb(var(--success-rgb) / 0.12); color: var(--color-success); font-size: 13px; font-weight: 600; }
+/* «История товаров» (2026-11-09): the product audit trail, filters + rows. */
+.product-history { gap: var(--space-3); }
+.product-history-filters { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--space-3); }
+/* 180px holds the longest label ("Ցանկացած գործողություն") without clipping; date inputs size to content. */
+.product-history-field { display: flex; flex-direction: column; gap: var(--space-1); flex: 1 1 180px; min-width: 0; max-width: 280px; }
+.product-history-field--date { flex: 0 1 auto; }
+.product-history-total { font-size: var(--fs-sm); }
+.product-history-body { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; }
+.product-history-body .name, .product-history-body .meta { overflow-wrap: anywhere; }
+.product-history-change { font-size: var(--fs-sm); font-weight: 600; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+
+/* === Dashboard layout, icons, Cyber Place Platform billing (2026-11-09) ======
+   The dashboard is two columns: the tiles and links (`.home-main`) and, on the
+   right, the platform bill (`.home-aside`, ~400px). Flex-wrap does the
+   stacking: at 1280 the content area (~900px inside the page card) fits 440 +
+   24 + 400 (480 did not: measured 2026-11-09, the card wrapped below); below 1100px the aside takes the whole row under the main column, and
+   at the 520px minimum both are full width. An aside whose card rendered
+   nothing (a backend without platform billing) is `:empty` and takes no room,
+   so that dashboard is exactly the old one. */
+.home-layout {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--space-6);
+  width: 100%;
+}
+.home-main {
+  flex: 1 1 440px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.home-aside {
+  flex: 0 1 400px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.home-aside:empty {
+  display: none;
+}
+@media (max-width: 1100px) {
+  .home-aside {
+    flex-basis: 100%;
+  }
+}
+
+/* A dashboard tile's label with its icon (the side menu's shape for the same place). */
+.stat-tile__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.stat-tile__head .nav-icon {
+  flex-shrink: 0;
+  color: var(--color-primary);
+}
+
+/* Quick links: icon + title + one line of what is behind it. Same width floor
+   (220px) the inline styles had; wraps instead of overflowing. */
+.home-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+.home-link {
+  flex: 0 1 auto;
+  min-width: min(220px, 100%);
+  max-width: 100%;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  color: inherit;
+  text-decoration: none;
+}
+.home-link .nav-icon {
+  flex-shrink: 0;
+  color: var(--color-primary);
+}
+.home-link__text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+.home-link__title {
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+.home-link__sub {
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+/* Branch hub tile: the section's icon before its title. The right padding
+   keeps the title clear of the drag handle in the tile's corner. */
+.hub-tile__title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  padding-right: var(--space-5);
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+.hub-tile__title .nav-icon {
+  flex-shrink: 0;
+}
+.hub-tile__label {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* Invoice state / access badges. */
+.billing-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px var(--space-2);
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  line-height: 1.4;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.billing-badge--ok {
+  color: var(--color-success);
+  background: rgb(var(--success-rgb) / 0.15);
+}
+.billing-badge--warn {
+  color: var(--color-warning);
+  background: rgb(var(--warning-rgb) / 0.15);
+}
+.billing-badge--danger {
+  color: var(--color-danger);
+  background: rgb(var(--danger-rgb) / 0.15);
+}
+.billing-badge--muted {
+  color: var(--color-muted);
+  border-color: var(--color-border);
+}
+.billing-danger {
+  color: var(--color-danger);
+  font-weight: 600;
+}
+/* "estimate" beside the running month: never mistaken for a billed figure. */
+.billing-estimate {
+  display: inline-block;
+  margin-left: var(--space-1);
+  padding: 0 6px;
+  border: 1px dashed currentColor;
+  border-radius: 999px;
+  color: var(--color-warning);
+  font-size: var(--fs-xs);
+  text-transform: uppercase;
+}
+
+/* The owner's debt card / the admin's fleet card. */
+.platform-debt {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+  border-left: 4px solid var(--color-success);
+}
+.platform-debt--warn {
+  border-left-color: var(--color-warning);
+}
+.platform-debt--danger {
+  border-left-color: var(--color-danger);
+}
+.platform-debt__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+.platform-debt__title {
+  margin: 0;
+  font-size: var(--fs-lg);
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+.platform-debt__total {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-2) 0;
+}
+.platform-debt__total-label {
+  color: var(--color-muted);
+  font-size: var(--fs-sm);
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+.platform-debt__total-value {
+  color: var(--color-primary);
+  font-size: clamp(22px, 2.4vw, 32px);
+  font-weight: 800;
+  line-height: 1.15;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.platform-debt__none {
+  margin: 0;
+}
+.platform-debt__more {
+  align-self: flex-start;
+  margin-top: var(--space-2);
+}
+
+.billing-history {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.billing-history__row,
+.billing-admin__row {
+  width: 100%;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.2s ease, background-color 0.2s ease;
+}
+.billing-history__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: transparent;
+}
+.billing-history__row:hover,
+.billing-history__row.is-selected,
+.billing-admin__row:hover,
+.billing-admin__row.is-selected {
+  border-color: var(--color-primary);
+  background: rgb(var(--accent-rgb) / 0.08);
+}
+.billing-history__row:focus-visible,
+.billing-admin__row:focus-visible,
+.billing-notice__delete:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+.billing-history__period {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-variant-numeric: tabular-nums;
+}
+.billing-history__amount {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.invoice-detail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.invoice-detail__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+.invoice-detail__period {
+  font-size: var(--fs-md);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.invoice-detail__section {
+  margin: var(--space-3) 0 0;
+  color: var(--color-muted);
+  font-size: var(--fs-sm);
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+.invoice-detail__note {
+  margin: 0;
+  font-size: var(--fs-sm);
+  line-height: 1.45;
+}
+.invoice-detail__table {
+  display: flex;
+  flex-direction: column;
+  font-size: var(--fs-sm);
+}
+/* A real grid (2026-11-09): flex-wrap pushed the last column ("Total") onto
+   its own line in the modal's narrow detail pane. Figures align right; the
+   table scrolls sideways rather than break its columns on a narrow window. */
+.invoice-detail__table {
+  overflow-x: auto;
+}
+.invoice-detail__row {
+  display: grid;
+  grid-template-columns: minmax(110px, 1.4fr) repeat(4, minmax(72px, 1fr));
+  gap: var(--space-2);
+  align-items: end;
+  padding: var(--space-1) 0;
+  border-bottom: 1px solid var(--color-border);
+}
+.invoice-detail__row > * {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.invoice-detail__row > :first-child {
+  text-align: left;
+}
+.invoice-detail__row--head {
+  color: var(--color-muted);
+  font-weight: 600;
+}
+.invoice-detail__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.invoice-detail__item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+}
+.invoice-detail__item-main {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--space-2);
+  font-weight: 600;
+}
+.invoice-detail__amount {
+  font-variant-numeric: tabular-nums;
+}
+.invoice-detail__item-meta {
+  font-size: var(--fs-sm);
+  overflow-wrap: anywhere;
+}
+
+/* Admin "Club payments". */
+.billing-admin__filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+.billing-admin__filter {
+  flex: 0 1 240px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.billing-admin {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--space-4);
+}
+.billing-admin__list {
+  flex: 1 1 480px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.billing-admin__detail {
+  flex: 1 1 400px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.billing-admin__rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.billing-admin__row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.billing-admin__row-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+.billing-admin__company {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: var(--fs-md);
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+.billing-admin__branches {
+  font-size: var(--fs-sm);
+  overflow-wrap: anywhere;
+}
+.billing-admin__figures {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+}
+.billing-admin__fig {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+.billing-admin__fig-k {
+  color: var(--color-muted);
+  font-size: var(--fs-xs);
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+}
+.billing-admin__fig-v {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.billing-admin__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.billing-admin__saved {
+  color: var(--color-success);
+  font-size: var(--fs-sm);
+}
+
+/* One admin write: payment / adjustment / extension. */
+.billing-action {
+  width: 440px;
+  max-width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.billing-action__title {
+  margin: 0;
+  padding-right: var(--space-6);
+  font-size: var(--fs-xl);
+}
+.billing-action__who {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.billing-action__field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.billing-action__reason {
+  min-height: 96px;
+  resize: vertical;
+}
+.billing-action__buttons {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+/* A payment notice in the feed (Armenian text, the panel's own controls). */
+.billing-notice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--space-3);
+  border-left: 4px solid var(--color-warning);
+}
+.billing-notice--danger {
+  border-left-color: var(--color-danger);
+}
+.billing-notice--ok {
+  border-left-color: var(--color-success);
+}
+.billing-notice__open {
+  flex: 1 1 320px;
+  min-width: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.billing-notice__open:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 4px;
+  border-radius: 6px;
+}
+.billing-notice__icon {
+  flex-shrink: 0;
+  font-size: 24px;
+  line-height: 1.2;
+}
+.billing-notice__facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
+}
+.billing-notice__fact {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  font-size: var(--fs-sm);
+}
+.billing-notice__fact-label {
+  color: var(--color-text-soft);
+}
+.billing-notice__fact-value {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.billing-notice__text {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.billing-notice__title {
+  margin: 0;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--fs-md);
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+.billing-notice__dot {
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-danger);
+}
+.billing-notice__body {
+  margin: 0;
+  color: var(--color-text-soft);
+  font-size: var(--fs-body);
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+.billing-notice__date {
+  font-size: var(--fs-sm);
+}
+.billing-notice__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.billing-notice__delete {
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--color-danger-deeper);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-danger);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+.billing-notice__delete:hover {
+  background: rgb(var(--danger-rgb) / 0.12);
+}
+
+/* Settings → Notifications (owner). */
+.notification-settings {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.notification-settings__channels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  padding-left: var(--space-8);
+}
+.notification-settings__mandatory {
+  margin: 0;
+  font-size: var(--fs-sm);
+  line-height: 1.45;
+}
+
+/* === Unpaid Cyber Place Platform invoice: the screen's cover (2026-11-09) ===
+   Over the screen's content only (the menu stays usable), blurred, with the
+   reason in the middle in Armenian. The card sticks near the top of the
+   visible area however long the board below is. Fonts with real Armenian
+   glyphs first: Inter has none and would fall back glyph by glyph. */
+.billing-lock {
+  position: absolute;
+  inset: -24px -32px;
+  z-index: 40;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 12vh var(--space-4) var(--space-8);
+  background: rgb(var(--bg-rgb) / 0.55);
+  backdrop-filter: blur(10px) saturate(0.9);
+  -webkit-backdrop-filter: blur(10px) saturate(0.9);
+}
+.billing-lock__card {
+  position: sticky;
+  top: 12vh;
+  width: min(640px, 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-8) var(--space-6);
+  border: 1px solid rgb(var(--accent-rgb) / 0.35);
+  border-radius: 20px;
+  background: rgb(var(--surface-rgb) / 0.92);
+  box-shadow: 0 24px 64px rgb(0 0 0 / 0.45);
+  text-align: center;
+  font-family: "Noto Sans Armenian", "Segoe UI", "Arian AMU", "Mardoto", system-ui, sans-serif;
+}
+.billing-lock--suspended .billing-lock__card {
+  border-color: rgb(239 68 68 / 0.55);
+}
+.billing-lock__icon {
+  font-size: 48px;
+  line-height: 1;
+}
+.billing-lock__title {
+  margin: 0;
+  font-size: clamp(22px, 2.4vw, 30px);
+  font-weight: 700;
+  line-height: 1.3;
+  background: linear-gradient(90deg, var(--color-primary), #a855f7);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.billing-lock__line {
+  margin: 0;
+  font-size: 17px;
+  line-height: 1.6;
+  color: var(--color-text);
+}
+.billing-lock__line:last-of-type {
+  color: var(--color-text-soft);
+}
+.billing-lock__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+}
+@media (max-width: 640px) {
+  .billing-lock {
+    inset: -16px;
+    padding-top: var(--space-8);
+  }
+  .billing-lock__card {
+    padding: var(--space-6) var(--space-4);
+  }
+}
+
+/* A tab's red count of NEW items (2026-11-09: Notifications «Active places» /
+   «Billing»). Sits after the label; never shifts the tab's height. */
+.cp-subtab__badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  margin-left: var(--space-2);
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--color-danger);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+/* === Owner dashboard: the platform bill as a wide card (2026-11-09) =========
+   Under the stat tiles and exactly as wide: what is owed and where that
+   stands on the left, three facts in the middle, «Details» on the right. It
+   folds to one column on a narrow window. */
+.stat-grid--fill {
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+.platform-debt--wide {
+  display: grid;
+  grid-template-columns: minmax(240px, 1.2fr) minmax(0, 2fr) auto;
+  align-items: center;
+  gap: var(--space-6);
+  padding: var(--space-6);
+  border-left-width: 6px;
+  background:
+    linear-gradient(120deg, rgb(var(--accent-rgb) / 0.10), transparent 55%),
+    rgb(var(--surface-rgb) / 0.72);
+}
+.platform-debt--wide .platform-debt__main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+.platform-debt--wide .platform-debt__title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-2);
+  font-size: var(--fs-md);
+  color: var(--color-text-soft);
+}
+.platform-debt__label {
+  color: var(--color-muted);
+  font-size: var(--fs-sm);
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+.platform-debt--wide .platform-debt__total-value {
+  font-size: clamp(28px, 3vw, 40px);
+}
+.platform-debt__say {
+  font-size: var(--fs-md);
+  font-weight: 600;
+  line-height: 1.35;
+}
+.platform-debt__say--ok { color: var(--color-success); }
+.platform-debt__say--warn { color: var(--color-warning); }
+.platform-debt__say--danger { color: var(--color-danger); }
+.platform-debt__facts {
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-4);
+}
+.platform-debt__fact {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+  padding-left: var(--space-4);
+  border-left: 1px solid var(--color-border);
+}
+.platform-debt__fact dt {
+  color: var(--color-muted);
+  font-size: var(--fs-sm);
+}
+.platform-debt__fact dd {
+  margin: 0;
+  font-size: var(--fs-lg);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.platform-debt__fact dd.platform-debt__fact-sub {
+  font-size: var(--fs-sm);
+  font-weight: 400;
+  color: var(--color-text-soft);
+}
+.platform-debt--wide .platform-debt__more {
+  align-self: center;
+  margin: 0;
+  white-space: nowrap;
+}
+@media (max-width: 1100px) {
+  .platform-debt--wide {
+    grid-template-columns: 1fr;
+    gap: var(--space-4);
+  }
+  .platform-debt--wide .platform-debt__more {
+    justify-self: start;
+  }
+}
+/* Phones (owner web, Telegram Mini App; 360–430px wide), 2026-11-09: the bill
+   reads in one glance. Tighter padding and type, the amount and its sentence
+   on top (DOM order), the facts as a two-column grid of small boxes (the odd
+   last one, access, a full row with its badge on the right), «Details» across
+   the card. Sizes and placement only; the desktop look (≥ 1100px) is not
+   touched. */
+@media (max-width: 640px) {
+  .platform-debt--wide {
+    gap: var(--space-3);
+    padding: var(--space-3) var(--space-4);
+    border-left-width: 4px;
+  }
+  .platform-debt--wide .platform-debt__title {
+    margin-bottom: var(--space-1);
+    font-size: var(--fs-body);
+  }
+  .platform-debt--wide .platform-debt__title .nav-icon {
+    flex-shrink: 0;
+    width: 16px;
+    height: 16px;
+  }
+  .platform-debt--wide .platform-debt__label {
+    font-size: var(--fs-xs);
+  }
+  /* 7vw: 26px on a 375px phone, never under 22px nor over 28px. */
+  .platform-debt--wide .platform-debt__total-value {
+    font-size: clamp(22px, 7vw, 28px);
+  }
+  .platform-debt--wide .platform-debt__say {
+    font-size: var(--fs-body);
+  }
+  .platform-debt__facts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-2);
+  }
+  .platform-debt__fact {
+    gap: var(--space-1);
+    padding: var(--space-2) var(--space-3);
+    border: 1px solid var(--color-border);
+    border-radius: 10px;
+  }
+  .platform-debt__fact:last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .platform-debt__fact dt {
+    font-size: var(--fs-xs);
+  }
+  .platform-debt__fact dd {
+    font-size: var(--fs-md);
+  }
+  .platform-debt__fact dd.platform-debt__fact-sub {
+    font-size: var(--fs-xs);
+  }
+  .platform-debt--wide .platform-debt__more {
+    justify-self: stretch;
+    width: 100%;
+  }
+}
+
+/* === A panel that slides in from the right (Drawer, 2026-11-09) ========== */
+.cp-drawer {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+}
+.cp-drawer__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgb(0 0 0 / 0.45);
+  opacity: 0;
+  transition: opacity 220ms ease;
+}
+.cp-drawer__panel {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(460px, 100vw);
+  display: flex;
+  flex-direction: column;
+  background: var(--color-bg);
+  border-left: 1px solid rgb(var(--accent-rgb) / 0.35);
+  box-shadow: -24px 0 64px rgb(0 0 0 / 0.45);
+  transform: translateX(100%);
+  transition: transform 280ms cubic-bezier(0.22, 1, 0.36, 1);
+  outline: none;
+}
+.cp-drawer.is-open .cp-drawer__backdrop { opacity: 1; }
+.cp-drawer.is-open .cp-drawer__panel { transform: translateX(0); }
+@media (prefers-reduced-motion: reduce) {
+  .cp-drawer__backdrop,
+  .cp-drawer__panel { transition: none; }
+}
+
+/* The platform bill in the drawer: the answer first, the rest folded. */
+.billing-drawer__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-6);
+  border-bottom: 1px solid var(--color-border);
+}
+.billing-drawer__title {
+  margin: 0;
+  font-size: var(--fs-xl);
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+.billing-drawer__close {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--color-border);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--color-text);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+.billing-drawer__close:hover { border-color: var(--color-primary); }
+.billing-drawer__close:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.billing-drawer__body {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-6);
+}
+.billing-glance {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.billing-glance__say {
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  border-radius: 12px;
+  font-size: var(--fs-md);
+  font-weight: 600;
+  line-height: 1.4;
+}
+.billing-glance__say--ok { background: rgb(34 197 94 / 0.12); color: var(--color-success); }
+.billing-glance__say--warn { background: rgb(234 179 8 / 0.12); color: var(--color-warning); }
+.billing-glance__say--danger { background: rgb(239 68 68 / 0.12); color: var(--color-danger); }
+.billing-glance__left {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.billing-glance__label {
+  color: var(--color-muted);
+  font-size: var(--fs-sm);
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+.billing-glance__amount {
+  color: var(--color-primary);
+  font-size: clamp(30px, 3.4vw, 42px);
+  font-weight: 800;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+.billing-glance__facts {
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+.billing-glance__facts div {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+}
+.billing-glance__facts dt { color: var(--color-muted); font-size: var(--fs-sm); }
+.billing-glance__facts dd { margin: 0; font-weight: 700; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.billing-glance__calc {
+  margin: 0;
+  color: var(--color-text-soft);
+  font-size: var(--fs-body);
+  font-variant-numeric: tabular-nums;
+}
+.billing-drawer__fold {
+  border-top: 1px solid var(--color-border);
+  padding-top: var(--space-3);
+}
+.billing-drawer__fold > summary {
+  cursor: pointer;
+  color: var(--color-primary);
+  font-weight: 600;
+  list-style-position: inside;
+}
+.billing-drawer__fold[open] > summary { margin-bottom: var(--space-3); }
+.billing-drawer__month {
+  margin: 0;
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-border);
+  color: var(--color-text-soft);
+  font-size: var(--fs-sm);
+}
+/* Phones (≤ 480px, 2026-11-09): the drawer is the whole screen with a phone's
+   spacing, and the three facts are rows (label left, figure right): three
+   boxes side by side broke a seven-figure amount mid-number. */
+@media (max-width: 480px) {
+  .cp-drawer__panel {
+    width: 100%;
+    border-left: 0;
+    box-shadow: none;
+  }
+  .billing-drawer__head {
+    padding: max(var(--space-3), env(safe-area-inset-top)) var(--space-4) var(--space-3);
+  }
+  .billing-drawer__title {
+    font-size: var(--fs-lg);
+  }
+  .billing-drawer__close {
+    width: 40px;
+    height: 40px;
+  }
+  .billing-drawer__body {
+    gap: var(--space-3);
+    padding: var(--space-4) var(--space-4) max(var(--space-4), env(safe-area-inset-bottom));
+  }
+  .billing-glance {
+    gap: var(--space-3);
+  }
+  .billing-glance__say {
+    padding: var(--space-2) var(--space-3);
+    font-size: var(--fs-body);
+  }
+  .billing-glance__amount {
+    font-size: clamp(26px, 8vw, 32px);
+  }
+  .billing-glance__facts {
+    grid-template-columns: 1fr;
+    gap: 0;
+    border: 1px solid var(--color-border);
+    border-radius: 10px;
+  }
+  .billing-glance__facts div {
+    flex-direction: row;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--space-3);
+    padding: var(--space-2) var(--space-3);
+    border: 0;
+    border-radius: 0;
+  }
+  .billing-glance__facts div + div {
+    border-top: 1px solid var(--color-border);
+  }
+  .billing-glance__facts dd {
+    text-align: right;
+  }
+  .billing-glance__calc {
+    font-size: var(--fs-sm);
+  }
+}
+
+/* Notifications: tabs left, «Mark all as read» in the right corner (2026-11-09). */
+.notifications-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+.notifications-toolbar__read-all {
+  margin-left: auto;
+}
+
+/* The billing block over the whole window, the sign-in screen included (2026-11-09). */
+.billing-lock--screen {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+}
+
+/* === Branch → Working hours (BranchOpenDaysForm, 2026-11-13; compact 2026-11-14)
+   The whole dialog fits the smallest window (520×560, `electron/windowBounds.ts`)
+   with no scroll inside or around it (owner, 2026-11-14). One LINE per weekday:
+   switch and day, open–close times, the day on a 24-hour track (00:00 at the
+   left) with the next-day hint under it, and «apply to all». Open rows are
+   framed solid, closed ones dashed and muted, so the state never rests on
+   colour alone. Flex throughout; the day column and the time fields have one
+   width, so times and tracks line up from Monday to Sunday.
+   Budget at 560 high: 16 + 16 of modal gutter, then 20 + 20 card padding, a
+   21px title line, a 30px summary, 7 rows of 42 with 4 between, 40px buttons
+   and three 12px gaps = 486px of the 528 there are; what is left holds a
+   one-line error. */
+.open-days {
+  /* The rows' control height: 32px at the default density, following the
+     person's density choice (compact 30, simple 38) within that range. */
+  --open-day-h: clamp(30px, calc(var(--control-h) - 8px), 38px);
+  --open-day-col: 88px;   /* md switch 44 + its 10px gap + the longest short day name («Ուրբ», 34) */
+  --open-day-time: 56px;  /* "00:00" in Inter 14, tabular (~40), plus 2 × 4 padding and the edges */
+  --open-day-gap: var(--space-2);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  width: 600px;
+  padding: var(--space-4) var(--space-5);
+}
+/* The smallest window (520 wide): the card's sides give their air to the hints. */
+@media (max-width: 640px) {
+  .open-days {
+    padding-inline: var(--space-4);
+  }
+}
+/* The title and the branch's address share one line; a long address wraps
+   under the title rather than being cut. */
+.open-days__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: var(--space-3);
+  row-gap: 2px; /* the address's line just under the title's, when it wraps */
+  /* Clear of the dialog's × on the card's corner. */
+  padding-right: var(--space-6);
+}
+.open-days__title {
+  margin: 0;
+  font-size: var(--fs-lg);
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: 0.01em;
+}
+.open-days__address {
+  min-width: 0;
+  margin: 0;
+  color: var(--color-muted);
+  font-size: var(--fs-body);
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+.open-days__bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+.open-days__summary {
+  flex: 1 1 260px;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid rgb(var(--accent-rgb) / 0.35);
+  border-radius: var(--radius-md);
+  background: rgb(var(--accent-rgb) / 0.08);
+  color: var(--color-text);
+  font-size: var(--fs-body);
+  font-weight: 600;
+  line-height: 1.5;
+  font-variant-numeric: tabular-nums;
+}
+.open-days__summary > svg {
+  flex-shrink: 0;
+  color: var(--color-primary);
+}
+.open-days__summary[data-state="closed"] {
+  border-color: rgb(var(--warning-rgb) / 0.55);
+  background: rgb(var(--warning-rgb) / 0.08);
+}
+.open-days__summary[data-state="closed"] > svg {
+  color: var(--color-warning);
+}
+.open-days__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.open-day {
+  display: flex;
+  align-items: center;
+  gap: var(--open-day-gap);
+  padding: var(--space-1) var(--space-2);
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-md);
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+.open-day[data-open] {
+  border-style: solid;
+  background: rgb(var(--fg-rgb) / 0.03);
+}
+.open-day__day {
+  flex: 0 0 var(--open-day-col);
+  display: flex;
+  min-height: var(--open-day-h);
+}
+/* The whole day cell is the switch's label: the full row height, not just the track. */
+.open-day__day .cp-switch {
+  flex: 1 1 auto;
+}
+.open-day__day .cp-switch-label {
+  font-weight: 600;
+}
+.open-day:not([data-open]) .cp-switch-label {
+  color: var(--color-muted);
+}
+.open-day__hours {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+.open-day__time {
+  flex: 0 0 var(--open-day-time);
+}
+.open-day__time .input {
+  height: var(--open-day-h);
+  padding-block: 0;
+  padding-inline: var(--space-1);
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  transition: border-color 0.2s ease;
+}
+.open-day__time .input[aria-invalid="true"] {
+  border-color: var(--color-danger);
+}
+.open-day__dash {
+  color: var(--color-muted);
+}
+.open-day__off {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  min-height: var(--open-day-h);
+  color: var(--color-muted);
+}
+/* The track over the hint, in the room the times leave. */
+.open-day__meta {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--space-1);
+}
+.open-day__track {
+  flex: 0 0 auto;
+  display: flex;
+  height: 4px;
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+  background: rgb(var(--fg-rgb) / 0.07);
+}
+.open-day__gap,
+.open-day__band {
+  flex-basis: 0;
+  flex-shrink: 1;
+  min-width: 0;
+}
+.open-day__band {
+  border-radius: var(--radius-pill);
+  background: var(--color-primary);
+}
+/* Past midnight: the band runs into the night end of the brand gradient. */
+.open-day__band.is-overnight {
+  background: linear-gradient(90deg, var(--color-primary) 40%, var(--color-accent-purple));
+}
+.open-day__hint {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--color-accent-purple-soft);
+  font-size: var(--fs-sm);
+  line-height: 1.2;
+}
+.open-day__hint[data-span="allDay"] {
+  color: var(--color-text-soft);
+}
+.open-day__hint > svg {
+  flex-shrink: 0;
+  color: var(--color-accent-purple);
+}
+.open-day__copy {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--open-day-h);
+  height: var(--open-day-h);
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-muted);
+  cursor: pointer;
+  transition: border-color 0.2s ease, color 0.2s ease;
+}
+.open-day__copy:hover:not(:disabled) {
+  border-color: var(--color-border);
+  color: var(--color-primary);
+}
+.open-day__copy:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+.open-day__copy:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+.open-days__error {
+  margin: 0;
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid rgb(var(--danger-rgb) / 0.5);
+  border-radius: var(--radius-md);
+  background: rgb(var(--danger-rgb) / 0.08);
+  color: var(--status-critical-fg);
+  line-height: 1.45;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+.open-days__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+.open-days__actions .btn {
+  min-height: calc(var(--open-day-h) + var(--space-1));
+  min-width: 120px;
+  padding-block: 0;
+}
+@media (prefers-reduced-motion: reduce) {
+  .open-day,
+  .open-day__copy,
+  .open-day__time .input {
+    transition: none;
+  }
+}
+/* Phones (owner web, 360–430px): 40px targets, and an open day in two
+   lines: the day, its times (stretched) and «apply to all» first, then the
+   24-hour track with the next-day hint under it, from the times' left edge.
+   A closed day stays one line. */
+@media (max-width: 480px) {
+  .open-days {
+    --open-day-h: 40px;
+    --open-day-col: 92px;
+    padding: var(--space-4);
+  }
+  .open-days__summary {
+    flex-basis: 100%;
+  }
+  .open-day {
+    flex-wrap: wrap;
+    row-gap: var(--space-1);
+  }
+  .open-day__hours {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+  .open-day__time {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+  .open-day__copy {
+    order: 1;
+  }
+  .open-day__meta {
+    order: 2;
+    flex: 0 0 calc(100% - var(--open-day-col) - var(--open-day-gap));
+    margin-left: calc(var(--open-day-col) + var(--open-day-gap));
+  }
+  .open-days__actions .btn {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+}
+
+/* === «Свои продукты» (2026-11-13, owner) ================================== */
+/* Start: «Не оплачено» and «Свои продукты» in one row, each over its own hint.
+   Two equal halves on a desktop dialog; below 2 × 180px of room (a phone) the
+   second wraps under the first, left-aligned like it. */
+.start-dialog__switches {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--space-3) var(--space-5);
+}
+.start-dialog__switch {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  flex: 1 1 180px;
+  min-width: 0;
+}
+.start-dialog__switch-hint {
+  font-size: var(--fs-sm);
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+/* The figure never splits from its currency across two lines. */
+.start-dialog__switch-hint strong { color: var(--color-text); font-weight: 700; white-space: nowrap; }
+/* The own-food switch: UnpaidToggle's size and construction, in the accent
+   (a line added to the bill) rather than amber (something owed). Same
+   specificity as the amber rules above, declared after them. */
+.btn.unpaid-toggle--accent:hover:not(:disabled) .cp-switch-track { border-color: var(--color-primary); }
+.btn.unpaid-toggle--accent:focus-visible .cp-switch-track {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgb(var(--accent-rgb) / 0.30);
+}
+.btn.unpaid-toggle--accent.is-on .cp-switch-track {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgb(var(--accent-rgb) / 0.18);
+}
+.btn.unpaid-toggle--accent.is-on .cp-switch-thumb { background: var(--on-accent-ink-tick); }
+.btn.unpaid-toggle--accent.is-on .unpaid-toggle__label { color: var(--color-primary); }
+/* The card's note: one line under the tariff, cut with an ellipsis like every
+   card line; the figure in the accent so it reads as money on the bill. */
+.session-card__food {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.session-card__food strong { color: var(--color-primary); font-weight: 700; white-space: nowrap; }
+/* Prices → «Свои продукты»: the two tiers side by side, wrapping when narrow. */
+.outside-food-form { gap: var(--space-3); }
+.outside-food-form__hint { font-size: var(--fs-sm); line-height: 1.4; }
+.outside-food-form__tiers { display: flex; flex-wrap: wrap; gap: var(--space-3) var(--space-4); }
+.outside-food-form__tier { display: flex; flex-direction: column; gap: var(--space-1); flex: 1 1 180px; min-width: 0; max-width: 260px; }
+.outside-food-form__note { font-size: var(--fs-sm); }
+/* Prices → «Свои продукты» → own amounts per place (2026-11-14). One scroll
+   box (≤320px) grouped by platform; a row is the place on the left and its
+   controls on the right, wrapping under it when narrow. Labels wrap, never
+   clip. The one visual signal: a place that does NOT follow the branch carries
+   an edge on its left (accent = own figure, muted = not charged), so the
+   exceptions read at a glance down the list. */
+.outside-food-places { gap: var(--space-2); min-width: 0; padding-top: var(--space-2); border-top: 1px solid var(--color-border); }
+.outside-food-places__head { gap: 2px; }
+.outside-food-places__filters { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); min-width: 0; }
+.outside-food-places__filters .cp-subtabs { flex-wrap: wrap; min-width: 0; }
+/* Tabs sized to their words (the shared rule makes them equal and cuts the
+   longest, «Со своей суммой · 4»); they wrap onto a second line instead. */
+.outside-food-places__filters .cp-subtab {
+  flex: 0 1 auto;
+  min-width: auto;
+  max-width: 100%;
+  /* A label longer than the line (Armenian on a phone) wraps, never cut. */
+  height: auto;
+  min-height: var(--subtab-h, 34px);
+  white-space: normal;
+  line-height: 1.25;
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
+.outside-food-places__search { flex: 1 1 200px; max-width: 280px; min-width: 0; }
+.outside-food-places__list {
+  max-height: 320px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  min-width: 0;
+}
+.outside-food-places__empty { display: block; padding: var(--space-3); }
+.outside-food-places__group + .outside-food-places__group { border-top: 1px solid var(--color-border); }
+.outside-food-places__platform {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  margin: 0;
+  padding: 6px var(--space-3);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  color: var(--color-muted);
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+}
+.outside-food-places__rows { list-style: none; margin: 0; padding: 0; }
+.outside-food-place {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  padding: 6px var(--space-3);
+  box-shadow: inset 3px 0 0 transparent;
+}
+.outside-food-place + .outside-food-place { border-top: 1px solid color-mix(in srgb, var(--color-border) 60%, transparent); }
+.outside-food-place[data-state="own"] { box-shadow: inset 3px 0 0 var(--color-primary); }
+.outside-food-place[data-state="notCharged"] { box-shadow: inset 3px 0 0 var(--color-muted); }
+.outside-food-place[data-state="invalid"] { box-shadow: inset 3px 0 0 var(--color-danger); }
+.outside-food-place__who { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; flex: 1 1 120px; min-width: 0; }
+.outside-food-place__label { font-weight: 600; overflow-wrap: anywhere; }
+.outside-food-place[data-changed] .outside-food-place__label::after {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-left: 6px;
+  vertical-align: middle;
+  border-radius: 50%;
+  background: var(--color-warning);
+}
+.price-badge.outside-food-place__chip { margin-left: 0; }
+/* One line on a desktop: place | box | «not charged here» | state. Narrow,
+   the controls drop under the place and the box takes the row's width. */
+.outside-food-place__controls { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); flex: 0 1 auto; min-width: 0; }
+/* Wide enough on a desktop for the longest placeholder, Armenian
+   «Ինչպես մասնաճյուղում (1,000 դրամ)». */
+.outside-food-place__box { flex: 0 0 360px; max-width: 100%; min-width: 0; }
+.outside-food-place .cp-checkbox-label { white-space: normal; }
+.outside-food-place__state-slot { flex: 0 0 10rem; display: flex; justify-content: flex-end; min-width: 0; }
+.outside-food-place__state {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+  white-space: nowrap;
+  border: 1px solid transparent;
+}
+.outside-food-place__state--own { background: color-mix(in srgb, var(--color-primary) 18%, transparent); color: var(--color-primary); }
+.outside-food-place__state--notCharged { border-color: var(--color-border); color: var(--color-text, inherit); }
+.outside-food-place__state--branch { color: var(--color-muted); }
+.outside-food-place__state--invalid { background: color-mix(in srgb, var(--color-danger) 18%, transparent); color: var(--color-danger); }
+.outside-food-places__summary { display: flex; flex-wrap: wrap; gap: 2px var(--space-3); font-size: var(--fs-sm); color: var(--color-muted); }
+.outside-food-places__pending { color: var(--color-warning); font-weight: 600; }
+/* The place form's own figure: the box no wider than the other price boxes. */
+.place-outside-food { gap: var(--space-1); max-width: 320px; }
+.place-outside-food__hint { font-size: 11px; line-height: 1.4; }
+
+/* The root's last-resort crash screen (ErrorBoundary without a fallback): the
+   whole window, centred. No stack trace here; «Copy for support» carries it. */
+.cp-crash-root {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 32px;
+  background: var(--color-bg);
+  color: var(--color-text);
+  text-align: center;
+}
+.cp-crash-root__title { margin: 0; color: var(--color-danger); }
+.cp-crash-root__text { margin: 0; max-width: 480px; color: var(--color-muted); line-height: 1.5; }
+.cp-crash-root__actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+
+/* Prices → the venue's extra item: the two choices size to their longest
+   option (the charge sentences run long in ru/am) and never past the row on a
+   narrow window, where the select truncates rather than overflows (B5). */
+.branch-extra-item__choice {
+  gap: 4px;
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 100%;
+}
+.branch-extra-item__select {
+  width: auto;
+  min-width: 180px;
+  max-width: 100%;
+}

@@ -6,6 +6,7 @@ import { FILE_SOUNDS, SOUND_DEFAULTS, defaultSound, type SoundPrefs } from "@/pr
 import {
   LIBRARY, MAX_PEAK, MAX_PLAYS, PROFILES, RECORDINGS, gainFor, isAudioBlocked, levelFor, playFor, playsFor,
   previewSound, resetSoundEngineForTests, setDeviceSound, setSoundPreferences, stopPreview, unlockAudio,
+  unlockAudioOnFirstGesture,
 } from "./soundEngine";
 
 /**
@@ -77,6 +78,7 @@ const SYNTH: SoundPrefs = {
     support: { enabled: true, sound: "soft" },
     guests: { enabled: true, sound: "chime" },
     system: { enabled: true, sound: "ding" },
+    platform_billing: { enabled: true, sound: "chime" },
   },
 };
 const synth = (profile: SoundPrefs["profile"] = "standard"): SoundPrefs => ({ ...structuredClone(SYNTH), profile });
@@ -322,5 +324,33 @@ describe("preview and the system's permission", () => {
     ctxState = "running";
     expect(await unlockAudio()).toBe(true);
     expect(isAudioBlocked()).toBe(false);
+  });
+});
+
+/** A browser starts audio suspended until the person interacts (the owner web, 2026-11-09). */
+describe("the first click resumes audio", () => {
+  test("one resume on the first gesture, none before it, none after", async () => {
+    const resume = vi.spyOn(FakeAudioContext.prototype, "resume");
+    ctxState = "suspended";
+    playFor("platform_billing", "warm-up"); // creates the (suspended) context
+    unlockAudioOnFirstGesture();
+    unlockAudioOnFirstGesture(); // idempotent: one listener set
+    const before = resume.mock.calls.length;
+
+    ctxState = "running";
+    window.dispatchEvent(new Event("pointerdown"));
+    await flush();
+    expect(resume.mock.calls.length).toBe(before + 1);
+    expect(isAudioBlocked()).toBe(false);
+
+    window.dispatchEvent(new Event("keydown"));
+    await flush();
+    expect(resume.mock.calls.length).toBe(before + 1);
+  });
+
+  test("a platform payment notice has its own melody, on by default", () => {
+    expect(SOUND_DEFAULTS.platform_billing).toEqual({ enabled: true, sound: "note" });
+    expect(playFor("platform_billing", "n-1")).toBe(true);
+    expect(playFor("platform_billing", "n-1")).toBe(false);
   });
 });

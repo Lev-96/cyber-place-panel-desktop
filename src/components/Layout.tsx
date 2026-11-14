@@ -1,15 +1,26 @@
-import { Outlet } from "react-router-dom";
+import type { ReactNode } from "react";
+import { Outlet, useMatch } from "react-router-dom";
+import { BranchScopeContext } from "@/components/ui/state";
 import ExpenseReminderNotifier from "./notifications/ExpenseReminderNotifier";
 import GlobalBookingNotifier from "./notifications/GlobalBookingNotifier";
 import SessionEndingNotifier from "./notifications/SessionEndingNotifier";
+import BillingNoticeNotifier from "./notifications/BillingNoticeNotifier";
 import SupportNotifier from "./notifications/SupportNotifier";
 import { Ps5ControlProvider } from "@/ps5/Ps5ControlProvider";
 import UnexpectedWakeDialog from "./ps5/UnexpectedWakeDialog";
 import Sidebar from "./Sidebar";
+import RouteErrorBoundary from "./errors/RouteErrorBoundary";
 import { AppShell } from "./SidebarCollapse";
 import PageTopBar from "./ui/PageTopBar";
 import UnsavedInterfaceNotice from "./appearance/UnsavedInterfaceNotice";
 import NewInterfacesOffer from "./appearance/NewInterfacesOffer";
+
+/** The screen on display is one branch's (`/branches/:id/…`): a 403 there is "not your branch". */
+const BranchScope = ({ children }: { children: ReactNode }) => (
+  <BranchScopeContext.Provider value={useMatch("/branches/:branchId/*") !== null}>
+    {children}
+  </BranchScopeContext.Provider>
+);
 
 const Layout = () => (
   /*
@@ -26,7 +37,12 @@ const Layout = () => (
       {/* Interface edits left unsaved, said wherever the person went (2026-10-27). */}
       <UnsavedInterfaceNotice />
       <NewInterfacesOffer />
-      <Outlet />
+      {/* A screen that throws is caught here: the menu stays usable (B2). */}
+      <RouteErrorBoundary>
+        <BranchScope>
+          <Outlet />
+        </BranchScope>
+      </RouteErrorBoundary>
     </main>
     {/*
       App-shell-level toast for booking lifecycle events. Lives outside
@@ -37,6 +53,8 @@ const Layout = () => (
     <GlobalBookingNotifier />
     <SupportNotifier />
     <SessionEndingNotifier />
+    {/* A platform payment notice arriving rings and raises an OS notification (2026-11-09). */}
+    <BillingNoticeNotifier />
     {/* Owner-only, and silent for everyone else: it renders nothing unless the
         signed-in role holds `branch.places` AND a console in their own venue
         has woken with no session on it. Mounted here so the question reaches

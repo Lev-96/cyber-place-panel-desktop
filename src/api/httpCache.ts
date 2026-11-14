@@ -234,6 +234,10 @@ const MUTATION_FANOUT: Readonly<Record<string, readonly string[]>> = {
   "/sessions": ["/places", "/branches"],
   "/bookings": ["/places", "/branches"],
   "/translations": ["/products", "/places", "/time-packages", "/games", "/branches"],
+  // A payment, adjustment or extension can lift a billing restriction
+  // (2026-11-09): `billing_access` rides on every branch payload, and a
+  // restricted company's branches leave the public lists.
+  "/platform-invoices": ["/branches", "/places", "/tournaments"],
   // Administrative writes reach whole tenants: deleting an owner removes their
   // companies with every branch, seat, tariff, product and tournament under
   // them, and a block changes `is_blocked` on every branch payload. They are

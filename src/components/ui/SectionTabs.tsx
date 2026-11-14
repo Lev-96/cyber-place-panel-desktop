@@ -6,6 +6,10 @@ export interface SectionTab<K extends string> {
   label: string;
   /** Shown after the label when above zero — how many are chosen there. */
   count?: number;
+  /** A red circle with this number when above zero — how many are NEW there. */
+  badge?: number;
+  /** The badge's accessible wording ("3 unread"). */
+  badgeLabel?: string;
 }
 
 interface Props<K extends string> {
@@ -54,6 +58,11 @@ const SectionTabs = <K extends string>({ tabs, value, onChange, label, disabled 
             title={tab.label}
           >
             {tab.label}{tab.count ? ` · ${tab.count}` : ""}
+            {tab.badge ? (
+              <span className="cp-subtab__badge" aria-label={tab.badgeLabel ?? String(tab.badge)}>
+                {tab.badge > 99 ? "99+" : tab.badge}
+              </span>
+            ) : null}
           </Button>
         );
       })}

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { DELIVERY_STUCK_AFTER_MS, isStuckInDelivery, mergeMessage } from "./SupportChat";
+import { DELIVERY_STUCK_AFTER_MS, arrivalNeedsRefetch, isStuckInDelivery, mergeMessage, reconcileThread } from "./SupportChat";
 import type { ISupportMessage } from "@/api/support";
 
 /**
@@ -99,5 +99,37 @@ describe("a delivery that has stopped moving", () => {
 
   test("a row with no timestamp is not accused of anything", () => {
     expect(isStuckInDelivery(at({ created_at: null }), T + 3_600_000)).toBe(false);
+  });
+});
+
+
+/**
+ * A message too big for one Reverb frame (2026-11-14, backend): the event
+ * arrives with `body: null` and `body_truncated: true`. Rendering it would put
+ * an empty bubble in the thread; the thread is read again instead and the
+ * message comes from that answer. Normal events carry no flag and are folded
+ * in as before.
+ */
+describe("a truncated arrival", () => {
+  test("only an event flagged body_truncated asks for the thread again", () => {
+    expect(arrivalNeedsRefetch(msg(1, { body: null, body_truncated: true }))).toBe(true);
+    expect(arrivalNeedsRefetch(msg(1))).toBe(false);
+    expect(arrivalNeedsRefetch(msg(1, { body: null }))).toBe(false); // an attachment-only line
+    expect(arrivalNeedsRefetch(msg(1, { body_truncated: false }))).toBe(false);
+  });
+
+  test("the thread's answer replaces what is on screen, the full body included", () => {
+    const onScreen = [msg(1), msg(2, { delivery: "queued" })];
+    const snapshot = [msg(1), msg(2, { delivery: "sent" }), msg(3, { sender: "support", body: "я".repeat(3000) })];
+    const out = reconcileThread(onScreen, snapshot);
+    expect(out.map((m) => m.id)).toEqual([1, 2, 3]);
+    expect(out[1].delivery).toBe("sent");
+    expect(out[2].body).toHaveLength(3000);
+  });
+
+  test("a line that arrived while the thread was being read is kept", () => {
+    const onScreen = [msg(1), msg(4, { body: "just now" })];
+    const snapshot = [msg(1), msg(3)];
+    expect(reconcileThread(onScreen, snapshot).map((m) => m.id)).toEqual([1, 3, 4]);
   });
 });

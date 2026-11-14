@@ -227,3 +227,39 @@ describe("Security → Refresh (2026-10-09)", () => {
     });
   });
 });
+
+describe("Working hours saved (2026-11-14)", () => {
+  // Resolved by key at render time (`toast.{entity}.{action}` in Toaster), so
+  // the literal-key scan cannot see it either.
+  it("says the working hours were saved, in every language", () => {
+    expect(TRANSLATIONS["toast.openDays.saved"]).toEqual({
+      en: "Working hours saved", ru: "Часы работы сохранены", am: "Աշխատանքային ժամերը պահպանվեցին",
+    });
+  });
+
+  it("has no key for the version line: it is always English («Version …», `appVersionLabel`)", () => {
+    expect(TRANSLATIONS["app.version"]).toBeUndefined();
+  });
+});
+
+/**
+ * B9 (audit 2026-11-13): Russian copy. One word for the product button on the
+ * board («+ Товар», as on the session card), the till's history is a history
+ * of SALES, and the empty timeline line reads as Russian.
+ */
+describe("Russian copy (B9, 2026-11-14)", () => {
+  it("the empty actions line reads «Ничего, кроме старта.»", () => {
+    expect(t("history.actionsEmpty", "ru")).toBe("Ничего, кроме старта.");
+  });
+
+  it("the sales history is «История продаж»", () => {
+    expect(t("history.title", "ru")).toBe("История продаж");
+    expect(Object.values(TRANSLATIONS).some((v) => v.ru.includes("История торговли"))).toBe(false);
+  });
+
+  it("one word for the product button: «+ Товар» everywhere", () => {
+    expect(t("session.sellProduct", "ru")).toBe("+ Товар");
+    expect(t("session.card.addItem", "ru")).toBe("+ Товар");
+    expect(Object.values(TRANSLATIONS).some((v) => v.ru.includes("+ Продукт"))).toBe(false);
+  });
+});

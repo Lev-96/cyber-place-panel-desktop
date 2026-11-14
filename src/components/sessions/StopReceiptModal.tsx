@@ -18,6 +18,7 @@ import { RESET_MIN_AMOUNT } from "./sessionAmount";
 import CashChangePanel from "@/components/payments/CashChangePanel";
 import { billCents, cashChange } from "@/components/payments/cashChange";
 import type { ICashHandover } from "@/api/sessions";
+import { isOutsideFoodLine, sessionLineLabel } from "./outsideFood";
 
 interface Props {
   session: ISessionApi;
@@ -456,10 +457,16 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved, canRes
                 them; this is the breakdown, never added twice. */}
             {view.items.length > 0 && (
               <div className="receipt-items" data-testid="receipt-items">
-                <span className="label" style={{ marginTop: 8 }}>{t("session.itemsBought")}</span>
+                {/* The own-food fee is a line here but not a product
+                    (2026-11-14): with it on the bill the section says so. */}
+                <span className="label" style={{ marginTop: 8 }}>
+                  {t(view.items.some(isOutsideFoodLine) ? "session.itemsAndFees" : "session.itemsBought")}
+                </span>
                 {view.items.map((it) => (
                   <div key={it.id} style={row}>
-                    <span style={{ flex: 1, minWidth: 0, overflowWrap: "anywhere" }}>{it.name}</span>
+                    {/* By kind first (2026-11-13): the own-food fee's stored
+                        name is in the starter's language. */}
+                    <span style={{ flex: 1, minWidth: 0, overflowWrap: "anywhere" }}>{sessionLineLabel(it, t)}</span>
                     {/* An HOURLY line is a rate and a duration, so it reads like a
                         pad's line rather than like a drink's: "90 m · 700/h", and
                         "returned" once its clock has stopped. A sold one reads
@@ -473,7 +480,7 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved, canRes
                       {money(Number(it.line_total), receiptPrecision)}
                     </span>
                     {!finished && (
-                      <button type="button" onClick={() => void remove(it.id, it.name, it.is_additional === true)} disabled={busy} style={removeBtn} title={t("session.removeItemTitle")}>
+                      <button type="button" onClick={() => void remove(it.id, sessionLineLabel(it, t), it.is_additional === true)} disabled={busy} style={removeBtn} title={t("session.removeItemTitle")}>
                         ×
                       </button>
                     )}

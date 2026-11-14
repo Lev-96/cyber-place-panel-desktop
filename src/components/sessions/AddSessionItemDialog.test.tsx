@@ -278,17 +278,26 @@ describe("creating a product from the basket", () => {
     expect(repo.addItems).toHaveBeenCalledWith(42, [{ product_id: 77, qty: 1 }]);
   });
 
-  test("a manager is not offered the catalogue form at all", async () => {
-    // The backend has always refused a manager here (`products.manage` → 403).
-    // The button was drawn anyway, so the one role standing at the counter
-    // pressed it mid-sale and got a permission error. They sell from the list.
+  test("a manager is offered the catalogue form (products.write, 2026-11-09)", async () => {
+    // Until 2026-11-09 the backend refused a manager here (`products.manage`
+    // → 403) and the button was hidden. Product writes moved to
+    // `products.write`, which the branch's manager holds, so the one role
+    // standing at the counter can add what the shelf has and the list lacks.
     auth.role = "manager";
     repo.listProducts.mockResolvedValue(products);
     await mount();
 
+    expect(screen.getByText("session.createProduct")).toBeTruthy();
+    expect(screen.getByText("session.createProductHint")).toBeTruthy();
+    expect(plusFor("Lays")).toBeTruthy();
+  });
+
+  test("a role with no catalogue write right is not offered the form", async () => {
+    auth.role = "nobody";
+    repo.listProducts.mockResolvedValue(products);
+    await mount();
+
     expect(screen.queryByText("session.createProduct")).toBeNull();
-    expect(screen.queryByText("session.createProductHint")).toBeNull();
-    // The catalogue itself is untouched: selling is exactly what they may do.
     expect(plusFor("Lays")).toBeTruthy();
   });
 
@@ -1200,5 +1209,18 @@ describe("additional items — chips, a cue — handed out once per session", ()
     await mount();
     expect(screen.queryByRole("tablist")).toBeNull();
     expect(screen.queryByRole("region", { name: "session.additionalTitle" })).toBeNull();
+  });
+});
+
+describe("«Свои продукты» among what the session already holds (2026-11-13)", () => {
+  test("named by its kind in the panel's language, and its delete names it the same way", async () => {
+    const s = { ...session, items: [
+      { id: 5, name: "Свои продукты", price: 1500, qty: 1, product_id: null, kind: "outside_food" },
+    ] } as unknown as ISessionApi;
+    repo.listProducts.mockResolvedValue(products);
+    await mount({ session: s });
+    expect(screen.getByText("session.outsideFood.line")).toBeTruthy();
+    expect(screen.queryByText("Свои продукты")).toBeNull();
+    expect(screen.getByLabelText("action.delete: session.outsideFood.line")).toBeTruthy();
   });
 });

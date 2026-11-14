@@ -164,3 +164,19 @@ describe("SessionHistoryBill", () => {
     expect(document.querySelector('[data-testid="bill-waived"]')).toBeNull();
   });
 });
+
+describe("«Свои продукты» in the history bill (2026-11-13)", () => {
+  test("its row is named by its kind, not by the starter's language; its sum is the line", () => {
+    mount(session({
+      total_paid: 2100,
+      joysticks: [],
+      items: [item(1, "Սեփական սնունդ", 1, 1500, { product_id: null, kind: "outside_food" }), item(2, "Cola 0.5L", 1, 600)],
+    }));
+    expect(body()).toEqual([
+      ["history.billTime", "-", "-", "0 AMD"],
+      ["session.outsideFood.line", "1", "1500 AMD", "1500 AMD"],
+      ["Cola 0.5L", "1", "600 AMD", "600 AMD"],
+      ["history.itemsTotal", "2100 AMD"],
+    ]);
+  });
+});

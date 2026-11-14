@@ -9,6 +9,22 @@
 import { PcKind, PcStatus } from "@/types/pc";
 import { Translated } from "@/i18n/translated";
 
+/**
+ * What a bill line is when it is not a sale (`session_items.kind`,
+ * `SessionItem::KIND_*` on the server). Null on every ordinary line.
+ *
+ *   outside_food  «Свои продукты» (2026-11-13): the fixed fee for a player who
+ *                 brings their own food, written once at Start, price frozen.
+ *
+ * Its stored `name` is in the language of whoever started the session, so a
+ * line with a kind is LABELLED by its kind (`components/sessions/outsideFood`),
+ * never by its name.
+ */
+export const SESSION_ITEM_KIND = {
+  OutsideFood: "outside_food",
+} as const satisfies Record<string, string>;
+export type SessionItemKind = (typeof SESSION_ITEM_KIND)[keyof typeof SESSION_ITEM_KIND];
+
 export interface ITimePackage {
   id: number;
   branch_id?: number;
@@ -233,6 +249,8 @@ export interface ISessionApi {
     created_at?: string | null;
     /** What the server says this line costs right now. */
     line_total?: number | string;
+    /** What the line is when it is not a sale (2026-11-13); null on a sale. */
+    kind?: SessionItemKind | null;
   }>;
 
   /**

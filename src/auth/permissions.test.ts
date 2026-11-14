@@ -181,10 +181,19 @@ describe("can(role, perm)", () => {
     // running the floor did not. The backend refuses the same four sections
     // (`App\Services\Access\StaffCapability`), so this is the button half of
     // one rule — see tests/Feature/StaffSectionAccessTest.php.
-    it("does not arrange the branch: no seats, member cards or product writes", () => {
+    it("does not arrange the branch: no seats, member cards or product deletes", () => {
       expect(can("manager", "branch.places")).toBe(false);
       expect(can("manager", "branch.members")).toBe(false);
       expect(can("manager", "product.crud")).toBe(false);
+    });
+
+    // 2026-11-09: the catalogue came back to the floor — create, edit, price,
+    // deactivate (backend `products.write`, own branch). The delete and the
+    // audit trail of it stay above the manager.
+    it("writes the product catalogue but neither deletes nor reads its history", () => {
+      expect(can("manager", "product.write")).toBe(true);
+      expect(can("manager", "product.crud")).toBe(false);
+      expect(can("manager", "product.history")).toBe(false);
     });
 
     it("still runs the floor", () => {
@@ -207,6 +216,13 @@ describe("can(role, perm)", () => {
     it("arranges seats and products", () => {
       expect(can("company_owner", "branch.places")).toBe(true);
       expect(can("company_owner", "product.crud")).toBe(true);
+      expect(can("company_owner", "product.write")).toBe(true);
+    });
+
+    it("reads the product history, as the admin does", () => {
+      expect(can("company_owner", "product.history")).toBe(true);
+      expect(can("admin", "product.history")).toBe(true);
+      expect(can("admin", "product.write")).toBe(true);
     });
 
     it("creates managers", () => {

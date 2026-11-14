@@ -58,7 +58,7 @@ export const BasketModeSwitch = ({ basket, name, disabled }: ModeSwitchProps) =>
 interface PickerProps {
   basket: ProductBasket;
   saving: boolean;
-  /** Mirrors the backend's `products.manage`: owner-level, never a manager. */
+  /** Mirrors the backend's `products.write`: admin, owner and the branch's manager. */
   canCreateProducts: boolean;
 }
 
@@ -172,9 +172,10 @@ export const BasketPicker = ({ basket, saving, canCreateProducts }: PickerProps)
       )}
 
       {/* ── Something the branch does not stock yet ──────────────────────
-          Owner-level, and only shown to one. A manager sells from the
-          catalogue; writing it is the company's, which is what the backend
-          has always answered (`products.manage` → 403). */}
+          Whoever may write the catalogue (`products.write`: admin, owner,
+          the branch's manager since 2026-11-09) creates a REAL product here.
+          A hand-typed price line on the bill is a different right
+          (`products.manage`, owner-level) and is never sent from here. */}
       {canCreateProducts && (
         <div className="col" style={{ gap: 8, borderTop: "1px solid #1f2a44", paddingTop: 12 }}>
           <div className="row-between" style={{ gap: 8 }}>

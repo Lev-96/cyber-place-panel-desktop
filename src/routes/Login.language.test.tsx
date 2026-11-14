@@ -30,8 +30,6 @@ vi.mock("@/i18n/LanguageContext", async () => {
 vi.mock("@/auth/recentEmails", () => ({
   recentEmails: { list: async () => [], forget: async () => {}, remember: async () => {} },
 }));
-vi.mock("@/components/login/HudBackdrop", () => ({ default: () => null }));
-vi.mock("@/components/login/LoginScene", () => ({ default: () => null }));
 vi.mock("@/ui/notify", () => ({ notify: { message: vi.fn() } }));
 
 import { LanguageProvider } from "@/i18n/LanguageContext";
@@ -117,5 +115,49 @@ describe("a sign-in message follows the language switch", () => {
 
     switchTo("Русский");
     expect(screen.getByText(t("login.hold.throttled", "ru"))).toBeTruthy();
+  });
+});
+
+/**
+ * B8 (audit 2026-11-13, panel part): a network failure showed the browser's
+ * own English «Failed to fetch» on the sign-in card and on the reset face. It
+ * is said in our words now, stored as a key so a language switch re-says it.
+ */
+describe("no connection is said in our words", () => {
+  const offline = () => new TypeError("Failed to fetch");
+
+  test("sign-in", async () => {
+    auth.login.mockRejectedValueOnce(offline());
+    renderAt();
+    signIn();
+    await screen.findByText(t("auth.noConnection", "en"));
+    expect(document.body.textContent).not.toContain("Failed to fetch");
+
+    switchTo("Русский");
+    expect(screen.getByRole("alert").textContent).toBe("Нет связи с сервером. Проверьте интернет и попробуйте ещё раз.");
+    switchTo("Հայերեն");
+    expect(screen.getByRole("alert").textContent).toBe("Սերվերի հետ կապ չկա։ Ստուգեք ինտերնետը և նորից փորձեք։");
+  });
+
+  test("the reset face", async () => {
+    forgot.fn.mockRejectedValueOnce(offline());
+    renderAt("/forgot-password");
+    const back = document.querySelector(".login-flip-face-back form") as HTMLFormElement;
+    fireEvent.change(back.querySelector('input[type="email"]') as HTMLInputElement, { target: { value: "op@club.am" } });
+    fireEvent.submit(back);
+    await screen.findByText(t("auth.noConnection", "en"));
+    expect(document.body.textContent).not.toContain("Failed to fetch");
+
+    switchTo("Русский");
+    expect(screen.getByText("Нет связи с сервером. Проверьте интернет и попробуйте ещё раз.")).toBeTruthy();
+  });
+
+  test("a server sentence on the reset face is still the server's", async () => {
+    forgot.fn.mockRejectedValueOnce(apiError(422, { message: "We can't find a user with that email address." }, "We can't find a user with that email address."));
+    renderAt("/forgot-password");
+    const back = document.querySelector(".login-flip-face-back form") as HTMLFormElement;
+    fireEvent.change(back.querySelector('input[type="email"]') as HTMLInputElement, { target: { value: "op@club.am" } });
+    fireEvent.submit(back);
+    await screen.findByText("We can't find a user with that email address.");
   });
 });

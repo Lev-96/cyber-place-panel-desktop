@@ -37,6 +37,13 @@ export interface ISupportMessage {
   read_at: string | null;
   created_at: string | null;
   attachments: ISupportAttachment[];
+  /**
+   * Only on a `support.message.created` broadcast, only when the message was
+   * too big for one Reverb frame (2026-11-14): the backend sends `body: null`
+   * and this flag, and the thread is read again for the text. Absent on every
+   * normal event and on REST answers.
+   */
+  body_truncated?: boolean;
 }
 
 export interface ISupportConversation {

@@ -6,7 +6,6 @@ import PresetPicture from "@/components/appearance/PresetPicture";
 import ChoiceCards from "@/components/appearance/ChoiceCards";
 import { themeChoices } from "@/components/appearance/themeChoices";
 import MenuEditor, { arrangementOf } from "@/components/appearance/MenuEditor";
-import SoundSettings from "@/components/appearance/SoundSettings";
 import { interfaceSummary } from "@/components/appearance/interfaceSummary";
 import { parseBranchShortcut } from "@/components/branches/branchSections";
 import { menuSpecsFor } from "@/components/Sidebar";
@@ -34,7 +33,8 @@ import { useEffect, useMemo, useState } from "react";
 /**
  * «Интерфейс и тема» (2026-10-27; regrouped 2026-11-03): the ready-made
  * interfaces and «Мой интерфейс», the theme, a preview, the Active Places
- * cards, the workspace, the side menu and the sounds, in plain words.
+ * cards, the workspace and the side menu, in plain words. (The notification
+ * sounds moved to Settings on 2026-11-09 and save on their own.)
  *
  * Every change is tried on at once — the whole panel shows it — and nothing
  * is kept until «Сохранить». «Отменить изменения» puts the saved look back;
@@ -128,7 +128,9 @@ const Appearance = () => {
   const onSave = async () => {
     setSaving(true);
     try {
-      await save(working);
+      // The sounds are saved from Settings now (2026-11-09): never overwrite
+      // them with a draft that was started before they changed.
+      await save({ ...working, sound: prefs.sound });
       notify.message("success", t("appearance.saved"));
     } catch {
       notify.message("error", t("appearance.saveFailed"));
@@ -316,8 +318,6 @@ const Appearance = () => {
           </div>
         </div>
       </SettingsSection>
-
-      <SoundSettings value={working.sound} onChange={(sound) => editDraft({ ...working, sound })} />
 
       <div className="appearance-actions" data-testid="appearance-actions">
         {dirty && <span className="appearance-actions__state">{t("appearance.unsaved")}</span>}

@@ -1,4 +1,5 @@
 import { Page, Route } from "@playwright/test";
+import type { IPlatformBillingOverview } from "../../src/types/platformBilling";
 
 /**
  * Intercept all backend traffic produced by the renderer so each E2E test
@@ -78,6 +79,34 @@ export const seedLanguageChosen = async (
   }, [lang, String(userId)] as const);
 };
 
+/**
+ * `GET /company/{id}/platform-billing` as `PlatformBillingOverviewResource`
+ * answers it for a company that was never invoiced: nothing owed, no open
+ * invoice, access active, this month's estimate at zero.
+ */
+export const platformBillingOverview = (companyId: number): IPlatformBillingOverview => {
+  const now = new Date();
+  const ymd = (d: Date) => d.toISOString().slice(0, 10);
+  return {
+    company_id: companyId,
+    currency: "AMD",
+    commission_percent: "5.00",
+    current_period: {
+      start: ymd(new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1))),
+      end: ymd(new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0))),
+      gross_amount: "0.00",
+      commission_amount: "0.00",
+      is_estimate: true,
+    },
+    outstanding_amount: "0.00",
+    open_invoice: null,
+    next_due_on: null,
+    billing_state: null,
+    billing_access: "active",
+    days_overdue: 0,
+  };
+};
+
 /** Routes login + /user/me + a baseline empty list for everything else. */
 export const installBackendMocks = async (
   page: Page,
@@ -113,6 +142,21 @@ export const installBackendMocks = async (
       status: 200,
       contentType: "application/json",
       body: JSON.stringify({ data: [], meta: { total: 0 } }),
+    });
+  });
+
+  // The owner's dashboard reads `GET /company/{id}/platform-billing`
+  // (PlatformDebtCard). The catch-all's `{data: []}` has no `current_period`,
+  // so the card threw and the owner's Home came up blank: every owner sign-in
+  // spec failed at "Owner One" visible. Answered here with the backend's
+  // `PlatformBillingOverviewResource` shape for a company never invoiced and
+  // owing nothing (2026-11-14). A spec that wants "no platform billing"
+  // registers its own 404 after this and wins.
+  await page.route((url) => isBackend(url) && /^\/company\/\d+\/platform-billing$/.test(url.pathname), async (route: Route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(platformBillingOverview(dashboard.company_id)),
     });
   });
 

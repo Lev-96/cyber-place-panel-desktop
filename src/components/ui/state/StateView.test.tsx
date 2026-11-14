@@ -10,6 +10,7 @@ vi.mock("@/i18n/LanguageContext", async () => {
 });
 
 import ErrorState from "./ErrorState";
+import { BranchScopeContext } from "./branchScope";
 import StateSwitch from "./StateSwitch";
 import StateView from "./StateView";
 import { STATE_VARIANTS, StateVariant } from "./variants";
@@ -179,6 +180,28 @@ describe("ErrorState", () => {
     expect(screen.queryByText("No query results for model")).toBeNull();
     expect(screen.queryByRole("button", { name: "Retry" })).toBeNull();
     expect(screen.getByRole("button", { name: "Back to list" })).toBeTruthy();
+  });
+
+  test("403 → «no access to this branch», no Retry, never the server's English (B11)", () => {
+    const e = Object.assign(new Error("This action is unauthorized."), { status: 403, body: { message: "This action is unauthorized." } });
+    render(
+      <BranchScopeContext.Provider value>
+        <ErrorState error={e} onRetry={() => {}} titleKey="branchesList.state.errorTitle" />
+      </BranchScopeContext.Provider>,
+    );
+    // The "wrong place" pose (the map), with its own copy.
+    expect(document.querySelector('[data-state="notFound"].cp-state--forbidden')).toBeTruthy();
+    expect(screen.getByText("No access to this branch")).toBeTruthy();
+    expect(screen.queryByText("This action is unauthorized.")).toBeNull();
+    expect(screen.queryByText("Could not load branches")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Retry" })).toBeNull();
+  });
+
+  test("a 403 outside a branch's screen keeps the generic failure and its Retry", () => {
+    const e = Object.assign(new Error("Forbidden"), { status: 403, body: { message: "Forbidden" } });
+    render(<ErrorState error={e} onRetry={() => {}} />);
+    expect(document.querySelector(".cp-state--forbidden")).toBeNull();
+    expect(screen.getByRole("button", { name: "Retry" })).toBeTruthy();
   });
 
   test("never renders a stack", () => {

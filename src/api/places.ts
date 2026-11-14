@@ -61,6 +61,12 @@ export interface CreatePlaceBody {
   /** What each CHARGED unit after the first costs. NULL = priced like it. */
   extra_item_price_next?: number | string | null;
   /**
+   * This room's own «Свои продукты» fee (2026-11-13), any platform. Null = the
+   * branch's figure for the place's tier; 0 = not charged in this room. The
+   * form always sends it, holding the stored value until it is changed.
+   */
+  outside_food_fee?: number | null;
+  /**
    * Display наименование for a brand-new custom platform's branch price. Only
    * meaningful when the platform is custom AND not yet priced; ignored
    * otherwise. Not a Place column — the backend forwards it to the price row.

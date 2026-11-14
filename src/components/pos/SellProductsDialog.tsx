@@ -44,7 +44,8 @@ const newRequestId = (): string =>
  */
 const SellProductsDialog = ({ branchId, onClose, onSold }: Props) => {
   const { user } = useAuth();
-  const canCreateProducts = can(user?.role, "product.crud");
+  /** Mirrors the backend's `products.write` (manager too since 2026-11-09). */
+  const canCreateProducts = can(user?.role, "product.write");
   const { money, t } = useLang();
   const [saving, setSaving] = useState(false);
   // How it was paid (2026-11-07): one method or split, cash by default.

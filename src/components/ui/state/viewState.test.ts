@@ -63,9 +63,16 @@ describe("classifyError", () => {
     expect(classifyError(apiError(404), false)).toBe("notFound");
   });
 
+  test("403 → forbidden, even offline (the server DID answer); a block keeps its own path", () => {
+    expect(classifyError(apiError(403, { message: "This action is unauthorized." }), true)).toBe("forbidden");
+    expect(classifyError(apiError(403), false)).toBe("forbidden");
+    // A block is a 403 with a code: the guards say it in their own words.
+    expect(classifyError(apiError(403, { code: "company_blocked", message: "Company blocked" }), true)).toBe("error");
+    expect(classifyError(apiError(403, { code: "network_blocked", message: "Blocked" }), true)).toBe("error");
+  });
+
   test("any other answer, or a bug of our own → error", () => {
     expect(classifyError(apiError(500), true)).toBe("error");
-    expect(classifyError(apiError(403), true)).toBe("error");
     expect(classifyError(new Error("Invalid id"), true)).toBe("error");
     expect(classifyError("boom", true)).toBe("error");
   });

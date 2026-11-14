@@ -4,6 +4,7 @@ import StatusChip from "@/components/ui/StatusChip";
 import { PlaceSnapshot } from "@/services/realtime/RealtimeService";
 import { formatTime } from "@/i18n/dates";
 import { platformLabel } from "@/utils/platform";
+import { placeTypeLabelKey } from "@/utils/placeType";
 
 interface Props {
   snapshot: PlaceSnapshot;
@@ -19,7 +20,7 @@ const PlaceCell = ({ snapshot, platformName = platformLabel }: Props) => {
   return (
     <div className="place-cell" style={{ borderColor: color }}>
 
-      <span className="platform">{platformName(place.platform)} · {place.type}</span>
+      <span className="platform">{platformName(place.platform)} · {t(placeTypeLabelKey(place.type))}</span>
       <span className="id">№{place.number ?? place.id}</span>
       {/* Colour, icon and word together (2026-10-27). */}
       <span className="status"><StatusChip tone={PLACE_STATUS_TONE[status]} label={t(`place.${status}`)} /></span>

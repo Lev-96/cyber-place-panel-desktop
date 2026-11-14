@@ -184,6 +184,24 @@ describe("AccessGuard", () => {
     ]);
   });
 
+  test("closed for an unpaid platform bill: signed out AND the plain Armenian screen raised", async () => {
+    const { billingBlock } = await import("@/auth/billingBlock");
+    billingBlock.dismiss();
+    mountAt("/");
+    await emit({
+      scope: "company",
+      locked_out: true,
+      message: "…",
+      code: "company_billing_blocked",
+      reason: "company",
+      branch_ids: [5],
+    });
+    expect(billingBlock.isShown()).toBe(true);
+    expect(auth.logout).toHaveBeenCalled();
+    expect(toasts.messages).toEqual([{ kind: "error", text: "blocking.reason.company_billing_blocked" }]);
+    billingBlock.dismiss();
+  });
+
   test("an unknown code falls back to the sentence the server sent", async () => {
     mountAt("/");
 

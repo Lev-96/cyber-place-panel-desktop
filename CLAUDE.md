@@ -556,6 +556,13 @@ manager → `branch.{id}`, orphan → null (no subscription).
 | `BranchVisibilityChanged` | `branch.visibility.changed` | `branches` + branch.{id} |
 | `AppReleaseAvailable` | `app-release.available` | app-updates.{role} |
 | `AppUpdatePromoted` | `app-update.promoted` | app-updates |
+| `SupportMessageCreated` | `support.message.created` | support.user.{id} (**private**) |
+
+Payloads trimmed to fit Reverb's frame limit (backend, 2026-11-14): a support
+message too big for one frame arrives with `body: null` + `body_truncated: true`
+(the key is absent otherwise); `app-release.available` / `app-update.promoted`
+may carry `notes: null` + `notes_truncated: true`. The panel never renders notes
+from an event; a truncated support message is read back over REST (rule 10).
 
 ### The socket's identity comes from the BACKEND, not from this build
 
@@ -666,6 +673,13 @@ loud `[reverb] REJECTED …` line naming the key and host; the backend has
     does NOT carry the account's new scope (which branches it may still
     reach) — there is nothing to patch optimistically from. Do not read this
     as licence to fetch from booking/place handlers.
+    *Second exception (2026-11-14):* a `support.message.created` flagged
+    `body_truncated` re-reads the open thread (`GET /support/conversations/{id}`,
+    `SupportChat` → `arrivalNeedsRefetch` / `reconcileThread`) instead of
+    rendering an empty bubble: a slim broadcast means refetch. Only that
+    flag, only for the open thread, and only a message over ~1000 Cyrillic
+    characters triggers it, so it cannot storm. Normal events are merged from
+    the payload as before.
 11. **Polling fallback is mandatory** on every realtime-critical screen
     (`useReservedPlaceIds`, `NotificationsContext` etc.) — 30–60 s. Reverb
     dropouts are silent; polling is the safety net.
@@ -1079,7 +1093,7 @@ Rules:
 - **CTA in an empty state only where the screen already had a permission
   check for that action** (BranchesList `branch.create`+company, CompanyBranches
   `branch.create`, CompaniesList `company.create`, Managers `manager.create`,
-  Owners `owner.create`, ProductsList `product.crud`; the prices page's package
+  Owners `owner.create`, ProductsList `product.write`; the prices page's package
   empty kept its existing button).
 - Unknown route (signed in) → `routes/NotFound.tsx`, not a silent redirect;
   `/login`, `/forgot-password`, `/reset-password` still go to `/`; signed out,
@@ -1323,7 +1337,9 @@ button is not a permission: a manager who kept the URL could still POST.
 | Настройки филиала | ✅ | ✅ | ❌ |
 | Смена (open/close/report, `/branches/:id/shift`) | ✅ | ✅ | ✅ own branch (2026-10-19) |
 | Места | ✅ | ✅ | ❌ |
-| Товары — создать / изменить / удалить / скрыть | ✅ | ✅ | ❌ |
+| Товары — создать / изменить / цена / скрыть (`product.write`, 2026-11-09) | ✅ | ✅ | ✅ own branch |
+| Товары — удалить (`product.crud`) | ✅ | ✅ | ❌ (скрывает вместо удаления) |
+| История товаров (`product.history`) | ✅ | ✅ | ❌ |
 | Товары — список + поиск | ✅ | ✅ | ✅ |
 | Сессии, касса, игры, ПК, турниры, подписчики | ✅ | ✅ | ✅ |
 | Джойстики, доп. время, безлимит на живой сессии | ✅ | ✅ | ✅ |
@@ -1378,8 +1394,45 @@ Two things that look like oversights and are not:
   the bill grew says so and re-reads the bill. Only `cash_received` is sent;
   after the stop the figures shown are the server's `cash`.
 
-Product READS stay open to everyone: the POS sells from that list, and the
-manager's screen is the list plus a search box with no write control on it.
+Product READS stay open to everyone: the POS sells from that list.
+
+**Products: manager rights + the audit trail (2026-11-09).**
+- `product.write` (admin, owner, manager; backend `products.write`, the
+  manager's own branch only): create, edit name/category/kind/PRICE, show/hide
+  (= activate/deactivate). Gates ProductsList's New/Edit/Hide and the "new
+  product" form inside `SellProductsDialog` and `AddSessionItemDialog`
+  (`ProductBasketPanels` `canCreateProducts`). `product.crud` now means DELETE
+  only (admin, owner): a manager deactivates instead, the backend answers 403.
+- Hand-typed price lines on a bill stay owner-level on the backend's
+  `products.manage`. The panel has no control that sends one (every basket
+  line carries `product_id`; `{name, price}` is only built for a line without
+  one, which no UI path creates), so there was no panel gate to keep.
+- «История товаров» (`product.history`, admin + owner): a second tab on
+  ProductsList («Каталог / История товаров»), `components/products/ProductHistory`.
+  `GET /product-events` (`api/productEvents.ts`, `repositories/ProductEventRepository`,
+  `types/productEvents.ts` — `PRODUCT_ACTIONS` mirrors `App\Enums\ProductAction`).
+  Built like ShiftHistory: filters branch (opens on this branch, "all branches"
+  = all the account may see, StaffBranchScope) → employee
+  (`/product-events/actors?branch_id`) and product (the branch's catalogue),
+  both disabled with no branch and a pick not in the new branch dropped →
+  action → from/to; one request, page 1 on any change (`{key, page}`), 20 a
+  page, meta `{current_page,last_page,per_page,total}` as `/shifts`. Never
+  cached (not in httpCache `POLICIES`). Rows: `formatVenueDateTime`
+  (`i18n/dates.ts`, Asia/Yerevan on any machine, 24h), actor name + role,
+  action label, product name (snapshot), branch, and old → new from
+  `productEventChange.describeChange` (price rows read `old_price`/`new_price`
+  through `money()`; other edits diff `before`/`after`; created / deleted /
+  activated / deactivated show no line). Empty / no-match / error states.
+- The tab exists only if `productEventRepository.available(branchId)` answers:
+  a 404/501 from `/product-events/actors` hides it (backend not deployed);
+  any other failure keeps it and the history shows its error. No probe is
+  sent for a manager.
+- Tests: `ProductsList.test.tsx` (manager create/edit/hide, no delete; owner +
+  admin tab; manager no tab and no probe; 404 hides), `ProductHistory.test.tsx`
+  (10), `productEventChange.test.ts`, `ProductEventRepository.test.ts`,
+  `dates.test.ts` (venue clock), permissions + both dialog tests. Mutation-
+  checked 15 ways (each caught).
+
 So do PRICE reads, since 2026-09-03: the sessions board shows what a session
 will cost and the "+ joystick" button has to know a price exists before it
 offers to add one.
@@ -3175,6 +3228,55 @@ they did, and TypeScript caught it as a duplicate object property.
   (real drag events → shown order + payload, failed save, reload),
   `SessionCard.test.tsx`.
 
+## 9.5.12a Side-menu order by drag and drop (2026-11-13)
+
+«Интерфейс и тема» → «Боковое меню: порядок и видимость разделов»
+(`components/appearance/MenuEditor.tsx`). The ↑ / ↓ buttons are gone (owner):
+a row is grabbed by its grip (⠿, left) and dropped anywhere.
+
+- **`hooks/useSortableList.ts`** is the reusable part: Pointer Events (mouse,
+  pen AND finger; HTML5 drag events, which SessionsBoard / hub tiles use, never
+  fire for a finger, so they cannot serve the owner web on phones). Pointer
+  capture on the grip; `translate` written straight on the lifted element (no
+  React render per frame; React re-renders only when the target slot changes);
+  the others get `data-sort-state="shift-up|shift-down"` and slide by
+  `--sort-shift`; the slot is `--sort-slot-y/-h` on the list; auto-scroll of
+  the nearest scroll container within 80px of its edges; Escape,
+  `pointercancel`, lost capture, window blur, or the list changing mid-drag
+  cancel with no `onMove`; after a drop/cancel the row glides into place
+  (FLIP, `data-sort-settling`), the others slide back on a cancel
+  (`data-sort-returning`). Vertical lists only; items must be distinct ids.
+  `moveIndex(list, from, to)` is its pure helper and delegates to `moveOnto`
+  (the one reorder rule, §9.5.12).
+- **Only the grip has `touch-action: none`**: a swipe on the rest of a row
+  scrolls the page on a phone. Never move `touch-action: none` to the row.
+- **Keyboard = the grip itself** (a real `<button>`): Space / Enter picks up,
+  ↑ / ↓ / Home / End move, Space / Enter drops, Escape or leaving the grip puts
+  it back; `aria-pressed` while lifted; instructions via `aria-describedby`
+  (`appearance.menu.moveKeys`); every step is said in an `aria-live` region
+  (`appearance.menu.sort.*`); focus stays on the grip after a drop. Chosen over
+  keeping ↑ / ↓ as a second control: one control and one mental model, and
+  ~90px more for the name on a 360px phone.
+- **Semantics unchanged**: Home is fixed (no grip, not in the sortable ids);
+  required rows move but their switch stays disabled; added shortcuts are
+  removed by their switch; `onChange` gets the same `SidebarEntry[]` (Home
+  excluded). Persistence and `AppearancePreview` untouched.
+- **CSS** (`.menu-editor*`): grip 40×36 (the old buttons' size, rows keep their
+  height); lifted row `scale: 1.02`, accent edge, a glow layer that only fades;
+  every slide is inside `prefers-reduced-motion: no-preference`. A list
+  narrower than 400px (container query) puts the note under the name.
+- Tests: `hooks/useSortableList.test.tsx` (18; jsdom layout + PointerEvent from
+  `useSortableList.testkit.ts`), `components/appearance/MenuEditor.test.tsx`
+  (8), `routes/Appearance.test.tsx` (keyboard on the grip),
+  `e2e/menu-drag.spec.ts` (6, real Chromium: mouse at 1280, real touch via CDP
+  at 390, the swipe-on-a-row-scrolls proof, auto-scroll, Escape, keyboard;
+  `CP_SHOTS=<dir>` saves screenshots). Mutation-checked: pointer delta sign,
+  `onMove` arguments swapped, Escape ignored, the commit flag ignored.
+- The shared e2e mocks answer `/company/{id}/platform-billing` (2026-11-14,
+  a company with no invoices and no debt); before that the shell's debt card
+  threw on the catch-all body and every owner spec hit «Something went
+  wrong». `menu-drag.spec.ts` still answers it 404 itself.
+
 ## «Интерфейс и тема», 2026-11-04
 
 - **«По умолчанию»**: the `standard` card is titled «По умолчанию» (it IS the
@@ -3649,6 +3751,107 @@ is 108px / `--ring-size * 0.174` wide (the area the old 90px square mark had).
 The owner web (`telegram-web-app`) serves this `public/` at its pinned
 `panel.ref`, so it shows the new mark only after `panel.ref` is bumped.
 
+## Static sign-in (2026-11-13, owner)
+
+"No animation at all, a very beautiful background, and the page must not
+freeze while loading." Applies to every `.login-shell` screen: Login (both
+faces), ResetPassword, NetworkBlockedScreen — and the owner web's overrides.
+
+- **Gone:** the three.js scene (`LoginScene.tsx`, `spaceTextures.ts`, a
+  ≈900 KB lazy chunk and a WebGL frame loop), the HUD ring (`HudBackdrop.tsx`,
+  `cpHudSpin`/`cpNodePulse`), the 2.3 s fly-in (`cpPanelApproach`), the
+  wordmark ignite/flicker/glow on the sign-in (`cpBrandIgnite`, `cp-brand-in`;
+  `brandFlicker`/`brandGlow` stay for the side menu), `cpBackdropIn`,
+  `cpFieldGlow`, the card's hover glow, the 3D card flip, and the
+  `three` / `@react-three/fiber` / `@types/three` packages.
+- **Background** (`global.css`, "Sign-in screens: still"): ONE still picture,
+  "Arcade bokeh" (candidate E, the owner's pick in round 2, 2026-11-13; he
+  rejected the computer-hall still "The Floor" as "programmers sitting"): a
+  soft brand-coloured blur on near-black with out-of-focus light shapes that
+  read as gaming — ○ △ ✕ □, a four-light diamond like a pad's face buttons,
+  a defocused neon gamepad outline; no people. `public/bg/login-space.webp`
+  (2560×1440, 176 160 B) and `login-space-portrait.webp` (1080×2340,
+  132 110 B), used at `max-aspect-ratio: 3/4` (phones, the Telegram Mini
+  App, portrait tablets), `cover`. The file names predate the picture (it
+  replaced a still of the old space scene) and are kept so no path changes —
+  the owner web reads the same paths. Under it a CSS gradient that copies
+  the picture's broad light (dark middle, cyan glow left, purple right) and paints with the first frame — the image
+  just appears on top, no fade. Fixed colours on purpose (the picture's own;
+  the sign-in is always the default theme). The contrast theme and
+  `prefers-contrast: more` drop both for `--color-bg`.
+- **How the pictures were made** (re-render, never hand-edit): fully
+  procedural, local — Canvas2D in float16 in headless Chromium (Playwright,
+  real GPU via ANGLE/Vulkan): a pinhole camera with a shifted lens, per-row
+  depth of field, glow and smeared floor reflections, a seeded random, then a
+  dithered 8-bit export (no banding); WebP q100 method 6 (`encode.py`: the
+  highest quality under 250 KB). Source `src/e.html` + `src/gl-runner.js` (round 2), harness (`render.mjs`,
+  `encode.py`, `shots.mjs`, `contrast.mjs`) and the two rejected candidates in
+  `~/cyber-place-local/reports/login-bg-candidates-2026-11-13/`
+  (`node harness/render.mjs e landscape|portrait out.png`).
+- **Nothing moves:** `.login-shell, .login-shell *` (and their `::before/
+  ::after`, in a separate rule — a pseudo-element in a selector list makes
+  jsdom's matcher drop the whole rule) set `animation`/`transition: none
+  !important`, so even the shared `.btn`/`.input`/`.pw-eye` fades are off
+  here; states still change, instantly. The captcha's shake/done feedback is
+  in a Modal portalled to `<body>`, outside, and is kept.
+- **The two faces** keep their markup and class names (`.login-flip`,
+  `.is-back`, `.login-flip-face-back`; the owner web styles them): one grid
+  cell. «Forgot password?» TURNS the card over in 3D (rotateY 180°, 760 ms,
+  perspective 1200px) — the one motion on the sign-in, restored at the
+  owner's request on 2026-11-13; reduced motion swaps instantly. The face
+  turned away hides by its backface, then `visibility: hidden` half-way
+  (a delayed visibility transition on the hiding face only); the face turned
+  to is visible at once, so focus can move into it on the same click (a
+  delay there left focus on the page — caught by the e2e spec
+  "forgot password turns the card over and focuses its field", which jsdom
+  cannot see). `inert` keeps the turned-away face out of reach. A swap moves
+  focus to the first field of the face now showing; a deep link opens with
+  that face's field focused (`autoFocus`). The exemption beats the screen's
+  "nothing moves" `!important` rule with `.login-shell .login-flip…`;
+  Login.static.test allows exactly those two rules and nothing else.
+- **The card** is an even `rgb(--bg-rgb / 0.82)` under a faint accent tint
+  plus a 4px blur (it used to fade to nearly clear at the top): on a phone the
+  background's light shapes sit behind it. Measured with "Arcade bokeh" on screenshots with the
+  text made transparent (brightest pixel under each text box;
+  `login-bg-candidates-2026-11-13/harness/contrast.mjs`), panel
+  1280/1920/2560/390/360 and owner web 390/360/1920 × en/ru/am × sign-in and
+  forgot-password, 264 texts: none below 4.5:1. Worst: card label 6.51 (owner
+  360×640), page title 12.28; worst overall 6.09 (a language pill over the
+  four-light diamond at 360×640).
+- **The composition** no longer reserves the ring's overhang
+  (`padding-top: ring*0.454`), so it is centred as seen. `--ring-size` keeps
+  its name (the owner web sets it) and is just the composition's scale.
+- **Order and sizes** (owner, 2026-11-13, round 2): the mark FIRST, the
+  «CYBER PLACE» wordmark under it (tucked up by `ring*-0.022`), then the
+  title, then the card — in Login; NetworkBlockedScreen already had it; the
+  owner web's Login/ResetPassword overrides mirror it. Fractions of the ring:
+  logo 0.174 → 0.21 (130px at full size), stage 0.84 → 0.92, card (both
+  faces) 0.68 → 0.78 (484px). Fields and the button `clamp(44px,
+  ring*0.077, 48px)` tall with 15px text, labels 13px, the link 14px. The
+  back face's form sits one level below `.login-flip > *`, so
+  `.login-flip-face-back > .login-card` lifts the shared 420px card cap —
+  else "forgot password" would be narrower than the face it replaces.
+  Measured on the built bundle at 1920/1280/960×600/390/360 × ru/am × both
+  faces: no scroll, no horizontal overflow, the button on screen. Test:
+  `Login.static.test.tsx` "the mark comes first, the wordmark under it".
+- **Measured** (Playwright on the built `dist/web`, 1920×1080, SwiftShader,
+  5 runs, medians, CPU held at a steady clock — this laptop otherwise flips
+  between two speed modes and fakes 2× differences; CPU 4× throttled /
+  unthrottled): JS on the route 1859 → 978 KB, the scene chunk and the canvas
+  gone; typing echo 709 → 135–143 ms (4×) / 94 → 43–61 ms; long tasks in the first
+  8 s 6 → 2 (4×) / 3 → 0; blocking time 658 → 168 ms / 310 → 0 ms; longest
+  frame gap after the form 767 → 17 ms, 7 → 60 fps. Time to the form is
+  unchanged (403 → 386 ms at 4×): it is the ~1 MB main chunk, the same in both;
+  that chunk (every eagerly imported provider, Home, Layout, the dictionary)
+  is what is left between a cold start and the form. Harness:
+  `~/cyber-place-local/reports/login-static-2026-11-13/harness/measure.mjs`.
+- Tests: `src/routes/Login.static.test.tsx` — the import graph of Login,
+  ResetPassword and NetworkBlockedScreen (lazy imports included) reaches no
+  `three`/`@react-three/*`; no `.login-*` rule declares motion and the old
+  keyframes are gone; with `global.css` applied in jsdom no element on either
+  face animates or transitions; the instant swap (visibility, inert, focus
+  both ways); the background rules and asset sizes (≤ 250 KB).
+
 ## No "Sessions" label (2026-10-18)
 
 The owner retired "session" as a name: the running-seats screen was already
@@ -3743,7 +3946,7 @@ differ.
   `--color-*`, `--status-<tone>-fg/bg/border`), L3 density (`--control-h`,
   `--grid-min` = the board's card column, `--row-py`, `--subtab-h`…). Use `rgb(var(--accent-rgb) / .35)`, never a
   literal. Every remaining literal is either a theme token with its exact old
-  value or deliberately fixed (login scene, flags, QR, illustrations, toasts).
+  value or deliberately fixed (the sign-in background, flags, QR, illustrations, toasts).
 - **Status vocabulary** (`domain/statusTone.ts`, `ui/StatusChip.tsx`): free =
   cyan ○, playing = green ▶, booked = violet, ending = amber clock, critical =
   red ⚠, paused = grey ‖, offline = grey dashed. Same on Active Places, Live
@@ -4069,3 +4272,351 @@ Mutation-verified:
 - the pictures step removed, the pictures never shown, the gutters'
   narrow answer ignored, the preview without the board's fit, the preview
   moved above the choices or into its own section.
+
+## Cyber Place Platform billing in the panel (2026-11-09)
+
+Contract: `~/cyber-place-local/reports/2026-11-09-billing-design.md` (backend
+builds it). Types `src/types/platformBilling.ts`, transport
+`src/api/platformBilling.ts`, UI `src/components/platformBilling/*`.
+
+- **Server-owned figures only.** Money arrives as decimal strings and is only
+  formatted (`useBillingMoney` → `money()` for AMD, `centsWhenFractional`);
+  balance, state, overdue days and access are printed as sent. Calendar dates
+  (`due_on`) go through `formatBillingDate` (no UTC lift: "2026-12-10" is a
+  day in Yerevan). Not cached (`httpCache` POLICIES does not list them);
+  `/platform-invoices` writes fan out to `/branches`, `/places`, `/tournaments`.
+- **Older backend = feature absent, never an error.** `…OrNull` readers turn a
+  404/501 (only those, `isMissingEndpoint`) into `null` and the card renders
+  nothing; `.home-aside:empty` then takes no room, so that dashboard is the old
+  one. Every new field on existing resources is optional.
+- **Dashboard** (`routes/Home.tsx`): data-driven tiles/links, each with a
+  `NavIcon` (new shape `home.upcoming` = Lucide calendar-clock); the owner's
+  "Places" tile is gone (payload key `all_places` kept). Right column
+  `.home-aside` (~400px, wraps under 1100px): owner `PlatformDebtCard`
+  (`GET /company/{id}/platform-billing`, re-read when a `platform_billing.*`
+  row reaches the feed), admin `PlatformFleetCard` (`GET /platform-invoices?
+  state=open` + optional `totals`), manager nothing. "Details" →
+  `PlatformBillingModal` (running month marked estimate, invoice history
+  paginated by the server, `InvoiceView` = `GET /platform-invoices/{id}`).
+- **Branch hub**: each tile draws its `BRANCH_SECTIONS[].icon`; drag and the
+  read-only attributes are untouched. `billing_access` ≠ active on the branch
+  payload → one `state-notice` banner (`billingAccessNoticeKey`): what is
+  limited, that running seats continue; owners also read "pay to restore".
+  Tiles stay live (stop/pay/add time still work; the server refuses only the
+  gated writes, and the start/reserve/tournament dialogs show its message).
+- **`billing_restricted` / `billing_suspended` are NOT network-block codes.**
+  `auth/networkBlock.ts` must never list them (they would lock the whole app
+  like `access_blocked`); pinned by `api/client.billingCodes.test.ts`.
+- **Admin "Club payments"** (`/platform-billing`, `menu.platformBilling`,
+  sidebar icon `nav.platformBilling` = Lucide wallet): server-filtered list,
+  detail with journal, and payment / adjustment / extension dialogs. Pure
+  validators in `invoiceActions.ts` (amounts stay strings; adjustment and
+  extension need a reason; new due date > today in Yerevan) → `useConfirm()` →
+  POST; the server's refusal stays in the dialog.
+- **Notifications feed**: admins now get the DB feed, filtered to
+  `platform_billing.*` rows only (`feedRowFilter`: list, badge, push; the poll
+  compares server count with server count). Payment notices render in the
+  Billing section, ALWAYS IN ARMENIAN (`billingNotice.ts`, `NOTICE_LANG =
+  "am"`; titles are the owner's, same as backend `lang/am/billing.php`;
+  `payment_recorded` / `extended` titles are the panel's wording), with
+  "Details" opening the invoice. The old client-computed owner reminder steps
+  aside when `/company/{id}/billing` carries `outstanding_amount` (new
+  backend) and still works on an older one.
+- **Settings → Notifications** (owner): `data.notifications` in the same
+  preference document. `null` = legacy (all on, platform_billing on) and is
+  NOT serialised, so an old backend (422 on unknown keys) keeps accepting
+  saves of the look; a stored block is always sent back.
+  `saveNotifications` is its own PUT (does not drop an Appearance draft) and
+  reverts the switch on refusal. Mandatory notices (overdue, restriction,
+  suspension, restore) are explained, not offered as switches.
+
+Tests: `routes/Home.test.tsx`, `routes/BranchHub.icons.test.tsx`,
+`routes/PlatformBilling.test.tsx`, `components/platformBilling/invoiceActions.test.ts`,
+`preferences/uiPreferences.notifications.test.ts`,
+`components/settings/NotificationSettings.test.tsx`,
+`routes/Notifications.billing.test.tsx`, `api/client.billingCodes.test.ts`,
+admin block in `notifications/NotificationsContext.test.tsx`. Mutation-verified
+(18): Places tile back, tile/hub icon dropped, 404 not swallowed, modal ignores
+the invoice, banner never shown, confirm skipped, reason optional, method
+dropped, extension allows today, notifications always serialised, no revert on
+refusal, notice in UI language, admin feed unfiltered / off, billing code added
+to the network block, legacy reminder kept, billing rows left in the seats feed.
+
+**On a phone** (owner web and the Telegram Mini App, 360–430px; 2026-11-09),
+CSS only, all inside `max-width` queries in `global.css`, so ≥ 1100px is
+untouched:
+- Debt card, `@media (max-width: 640px)`: padding 12/16, title `--fs-body`
+  with a 16px icon, amount `clamp(22px, 7vw, 28px)`, sentence `--fs-body`
+  (amount and sentence stay on top: DOM order); the facts a 2-column grid of
+  bordered boxes, the odd last one (access) a full row with the badge on the
+  right; «Подробнее» full width. The admin's fleet card is not `--wide`.
+- «Подробнее» drawer, `@media (max-width: 480px)`: `.cp-drawer__panel` 100%
+  wide, no edge/shadow, phone padding with safe-area insets, 40px close
+  button; `.billing-glance__facts` one bordered list of rows (label left,
+  figure right). Three boxes side by side broke «1 212 500,5|0 ֏» mid-number.
+- Verified headless (Chromium, real markup from the component, real
+  translations, `global.css` + the owner web's `web.css`): 360/375/430 ×
+  ru/en/am, card 432 → 357px tall at 375 (ru), no element past the card or
+  drawer, 0px page overflow; the desktop renders at 1280/1440/1920 × 3
+  languages are byte-identical PNGs before/after. Test:
+  `components/platformBilling/PlatformDebtCard.phone.test.ts` (mutation-verified:
+  facts back to one column, drawer facts back to three boxes, desktop padding
+  changed). The owner web gets it with a `panel.ref` bump.
+
+## Settings: notification sounds and the owner's notifications (2026-11-09)
+
+- «Звуки уведомлений» moved from «Интерфейс и тема» to **Settings** (every
+  role). `components/settings/SoundSettingsSection.tsx` wraps the same
+  `SoundSettings`; each choice saves at once through
+  `UiPreferencesContext.saveSound` (own PUT via `saveSlice`, like
+  `saveNotifications`): it never sends or drops an unsaved look, and a refused
+  save puts the choice back. The interface screen no longer edits sounds and
+  its save writes the SAVED sound (`{ ...working, sound: prefs.sound }`), so a
+  draft started earlier can't overwrite a newer choice. Volume / mute stay
+  per computer (`deviceSound`).
+- Owner «Уведомления» shows **Cyber Place Platform payments only** (+ email /
+  Telegram, mandatory notices explained). Every save writes bookings /
+  sessions / support / system as `false`. Backend: an owner with nothing
+  stored reads the same defaults (payments only); managers are unchanged.
+
+## Billing block, notice sound, notifications toolbar (2026-11-09)
+
+- **Company closed for an unpaid platform bill** (`code: company_billing_blocked`,
+  403): `src/auth/billingBlock.ts` (pub/sub like `networkBlock`) is raised by
+  the API client on such a refusal (sign-in included) and by `AccessGuard` on a
+  `locked_out` `access.changed` with that code (then logout). `BillingBlockedModal`
+  (mounted in `App` above the router, so it covers the sign-in screen) shows the
+  reason in Armenian with «Հասկանալի է». The code is in `blockingErrors` KNOWN
+  (login wording) and is NOT a network-block code.
+- **Platform payment notices ring**: `components/notifications/BillingNoticeNotifier`
+  (in `Layout`, mirrored in telegram-web-app's Layout override) plays the
+  «system» sound once per NEW unread notice (`playFor` keyed by id; the rows
+  present at first load are not news) and raises a silent OS notification.
+- **Notifications**: «Mark all as read» sits in `.notifications-toolbar`
+  above the tabs, right corner; it reads every tab.
+- **Sounds (2026-11-09)**: new category `platform_billing` (default melody
+  `note`, its own) — `BillingNoticeNotifier` plays it. An OWNER with no stored
+  sound block defaults to platform payments only (`defaultsForRole` /
+  `ownerDefaultSound` applied in `UiPreferencesContext`); stored choices kept;
+  managers unchanged. The backend must accept the category FIRST
+  (`UiPreferences::SOUND_CATEGORIES`) or every save of a new panel is refused —
+  deploy backend before releasing the panel. Browsers start audio suspended:
+  `unlockAudioOnFirstGesture()` (called once in `App`) resumes it on the first
+  click/key, so the owner web rings too.
+
+## «Свои продукты»: the own-food fee (2026-11-13, owner)
+
+A player who brings their own food pays the club a FIXED fee, switched on at
+Start. Backend contract: `cyber-place` CLAUDE.md §8.9.6 "Own food". The fee is
+an ordinary bill line (`kind = "outside_food"`), so every total the panel
+already reads (the card's `sessionAmount`, the receipt's `items_total` /
+`total`, history `total_paid`) includes it with no arithmetic here.
+
+- **Types**: `SESSION_ITEM_KIND` / `SessionItemKind` (`types/sessions.ts`);
+  `kind` on `ISessionApi.items[]` and `IBillBreakdown.items[]`;
+  `IStartOptions.outside_food_fee` (null/absent = not offered);
+  `StartSessionBody.outside_food` + `outside_food_fee`; billing settings
+  `outside_food_fee_standard` / `_vip`; `IBranchPlace` / `CreatePlaceBody`
+  `outside_food_fee`.
+- **One module**: `components/sessions/outsideFood.ts` — `OUTSIDE_FOOD_KIND`,
+  `isOutsideFoodLine`, `sessionLineLabel` (a line with a kind is LABELLED by it:
+  the stored `name` is in the starter's language), `outsideFoodFeeOf` (the line's
+  own figure via `sessionItemLineTotal`), `productLineCount`.
+- **Start dialog**: `.start-dialog__switches` holds «Не оплачено» (left) and
+  «Свои продукты» (right, `UnpaidToggle` with `testId="outside-food-switch"`,
+  `tone="accent"`), each over its hint; wraps under 2 × 180px. Drawn only when
+  `start-options.outside_food_fee` is a number and the start is not free;
+  ticking Free switches it OFF (undoing Free does not bring it back on). On:
+  hint «К счёту места добавится {fee}», summary «+ свои продукты {fee}», body
+  `outside_food: true, outside_food_fee: <figure shown>` in fixed and open
+  modes; off or free: neither key. **Any start error reloads start-options**
+  (it used to be only a seat-unavailable refusal), so a changed or withdrawn
+  fee (422) shows the server's new figure, and the next Start sends it.
+- **Card**: «· N товаров» counts products only (`productLineCount`); a fee
+  line adds the note «Свои продукты +1 500 ֏» (`.session-card__food`, inside
+  `.until`, one line with ellipsis, visible in Simple too).
+- **Labels by kind**: `StopReceiptModal` (row + remove confirm/toast),
+  `AddSessionItemDialog` (row, title, delete aria-label), `SessionHistoryBill`,
+  `sessionHistoryModel.eventDetailParts` (audit `meta.lines[].kind`),
+  `useSessionsSummary` (fee lines gather under `kind:outside_food`, entry
+  carries `kind`, `SessionsHistory` labels it). The fee can be removed like any
+  line (DELETE, audited); the panel never PATCHes it (no qty control on it).
+- **Prices page**: rules group → «Свои продукты»,
+  `components/prices/OutsideFoodFeeForm.tsx` (PauseLimitForm idiom: whole
+  required policy + the two keys). Empty box = null (not charged on that
+  tier); 0 refused client-side (`outsideFood.zeroRefused`), as the server
+  refuses it. Role: the page's own guard (`branch.prices`).
+- **Per-place figures on the Prices page (2026-11-14, owner)**: below the
+  tiers, «Своя сумма для отдельных мест» (`OutsideFoodPlacesField.tsx`, pure
+  logic in `outsideFoodPlaces.ts`). Places are the page's own
+  `placeRepository.listRawByBranch` read (PlaceResource's `outside_food_fee`);
+  ONE source of truth, `places.outside_food_fee` (PlaceForm unchanged, writes
+  the same column). SectionTabs Все / VIP / Обычные / Со своей суммой with
+  counts (default «own» when any place has a figure or 0, else «all»; a row
+  stays in «own» while its box is cleared); search (number prefix, «№» ok, or
+  name) from 13 places; groups by platform (`platformDisplayNameOf`), sorted
+  by number, `.outside-food-places__list` max 320px with its own scroll. Row:
+  «№N · name», VIP / «неактивно» chips, `PriceInput` (`ariaLabel` prop added,
+  additive) with placeholder «Как в филиале ({tier figure as typed NOW})» or
+  «… (не взимается)», «Здесь не взимается» checkbox (= 0, disables the box, a
+  typed 0 ticks it, unticking returns to the stored figure or empty), a state
+  chip in a fixed 10rem slot so the boxes align; non-branch rows carry a left
+  edge (accent = own, muted = 0), a changed row an amber dot. Summary over ALL
+  places + «Несохранённых изменений: N» + «Действует для новых стартов…».
+  **One Save**: the whole policy + tiers as before + `outside_food_place_fees:
+  [{place_id, fee}]` with ONLY the changed rows (number / 0 / null); no row
+  changed, or places failed to load (compact `ErrorState` + Retry; the tiers
+  still save) = the key is left OUT. Save off while any box is invalid (a
+  place above 99 999 999, a tier at 0). On success the page reloads billing
+  AND places; the form `key` includes `placeFeesFingerprint(places.data)`.
+  Backend contract: the billing-settings PUT (`UpdateBillingSettingsRequest`,
+  `SetOutsideFoodFeesService`); deploy the backend FIRST (an older one drops
+  the key silently). Known limit: at the 520px window (form ≈220px) and in
+  Armenian at 390px the placeholder is cut at its end by the box; the state
+  chip says «Как в филиале» in full there.
+- **Place form**: `PlaceOutsideFoodFeeField` under the own-rate box, any
+  platform. State opens with the stored value, so an untouched save sends it
+  back; empty = null (the branch's), 0 = not charged here. The hint names the
+  branch figure for the place's CURRENT tier from the policy the form already
+  reads (`billingSettingsRepository.get`), «не взимается» for a null tier, a
+  general hint when unknown.
+- Tests: `StartSessionDialog.test.tsx` («Свои продукты» block, 11),
+  `SessionsBoard.outsideFood.test.tsx` (4), `OutsideFoodFeeForm.test.tsx` (5),
+  `OutsideFoodFeeForm.places.test.tsx` (11), `outsideFoodPlaces.test.ts` (14),
+  `PlaceForm.outsideFood.test.tsx` (10), receipt/dialog/history bill/history
+  model/summary blocks, `BranchPricesPage.test.tsx` (6 rule forms now). Layout:
+  `e2e/outside-food.spec.ts` (ru/en/am × 1280/390; per-place: the PUT body,
+  the reload, layout ru/en/am × 1280/520/390 — at 390 the panel's side menu is
+  hidden to stand for the owner web's closed drawer; 25 tests;
+  `OUTSIDE_FOOD_SHOTS=<dir>` writes screenshots).
+- Owner web: bump `panel.ref` after this lands (not done in the panel change).
+  Mobile and the kiosk agent: no change. PS5: untouched.
+
+## Working hours: «saved» toast and a compact dialog; the app version under the brand (2026-11-14, owner)
+
+- **Toast.** `BranchOpenDaysForm` raises `notify.success("openDays", "saved")`
+  right after `updateOpenDays` resolves and before `onSaved()` closes the
+  dialog (the HourlyRatesForm idiom; the repository's `updateOpenDays` is NOT
+  wrapped in `withToast`, the form already says a refusal in words).
+  `toast.openDays.saved` = Working hours saved / Часы работы сохранены /
+  Աշխատանքային ժամերը պահպանվեցին. Never for the all-closed guard, the
+  incomplete-time guard, a 422 or a network failure.
+- **No scroll at 520×560** (the window minimum, `electron/windowBounds.ts`
+  `MIN_CONTENT`; also 1280×720 and the owner web's 390×844). One line per day
+  on a desktop: switch + day (88px column), times (56px fields), a
+  `.open-day__meta` column holding the 24-hour track with the next-day hint
+  under it, «apply to all». The rows' control height is `--open-day-h`
+  (`clamp(30px, --control-h − 8px, 38px)`: 32 by default, follows density).
+  Title and address share one line; card padding 16/20 (16 under 640px);
+  gaps 8 / rows 4 apart. Phones (≤480px): two lines per open day, 40px
+  targets, the meta column under the times. Measured (Playwright, built
+  bundle): card 469/474/495px of 560 (en/ru/am, mixed week), worst case seven
+  rows of the longest Armenian hint ≈517 of the 528 the modal's gutters leave;
+  390×844: 652/667/688px, no scroll. Not covered: a server error sentence at
+  520×560 adds a line and may bring the modal's own scroll back there; the
+  «Simple» density (38px rows) is not measured at 560.
+- **Version line.** `src/infrastructure/desktopApp.ts`: `isDesktopApp()` is
+  `window.desktopAPI` present (the preload bridge, the same test
+  `KeyValueStore` picks its store by); `buildVersion()` is vite's
+  `__APP_VERSION__` (package.json, the file electron-builder stamps into
+  `app.getVersion()`); `desktopAppVersion()` = the version only in the desktop
+  app. The owner web has no bridge and injects its own 0.1.0, so it shows
+  nothing. `appVersionLabel(v)` = «Version {v}», ALWAYS English in every UI
+  language (owner, 2026-11-14: a build identifier, not copy); there is no
+  `app.version` i18n key any more.
+  - Sidebar: `p.sidebar-version` (testid `app-version`) is a SIBLING after
+    the brand `h1` (a span inside would pick up `.sidebar h1 span`'s gradient
+    and flicker, and the heading's name must stay «CYBER PLACE»); 11px muted,
+    its own line 8px under the brand row (`margin: -8px 12px 4px` against the
+    column's 12px gap and the h1's 4px; it used to be pulled up against the
+    logo), from the mark's left edge on one line (starting
+    under the wordmark broke «…1.0.61-» / «staging.10»). Folded to the
+    rail: it fades (`opacity: 0`, keeps its row so the menu does not jump,
+    `aria-hidden`) and the brand `h1` gets `title` = the version.
+  - Login: NO version (owner's second call, 2026-11-14; `.login-version` and
+    its CSS removed). Order everywhere: mark, wordmark, title, card.
+- **e2e mock gap fixed.** `e2e/helpers/mockBackend.ts` answers
+  `GET /company/{id}/platform-billing` with `PlatformBillingOverviewResource`'s
+  shape (never invoiced, nothing owed; `platformBillingOverview()`, typed by
+  `IPlatformBillingOverview`); before, the catch-all body crashed the owner's
+  Home and every owner sign-in spec failed at "Owner One". `menu-drag` and
+  `outside-food` still register their own 404, which wins. The Electron shell
+  spec answers it too.
+- Tests: `BranchOpenDaysForm.test.tsx` («saved» toast, 7), `desktopApp.test.ts`
+  (9, incl. `appVersionLabel`), `Sidebar.version.test.tsx` (5; «Version …» in
+  ru and am too), `Login.version.test.tsx` (4; NO version on the sign-in, in
+  the desktop app in en/ru/am and on the web), `translations.test.ts` (2; no
+  `app.version` key). e2e: `e2e/hours-and-version.spec.ts` (19;
+  `CP_SHOTS_DIR=<dir>` writes screenshots) and the version test in
+  `e2e-electron/shell.spec.ts` (no version on the sign-in, which still fits
+  520×560 with no scroll; in the side menu package.json = `app.getVersion()`
+  = the line, 6–12px under the brand row, folded too).
+- Owner web: bump `panel.ref` after this lands (not done in the panel change).
+
+## Audit fixes (2026-11-14)
+
+From `~/cyber-place-local/reports/qa-audit-2026-11-13/` and
+`regression-2026-11-14/part2/`. Each fix: failing test first, two mutations,
+Playwright. Screenshots: `~/cyber-place-local/reports/audit-fixes-2026-11-14/panel/`.
+
+- **Support composer** (`components/support/SupportComposer.tsx`, owner): the
+  one-line input is a textarea on its own row across the thread, buttons
+  under it. `growToContent` sizes it to the text on every change (before
+  paint); CSS caps it at `min(30vh, 220px)`, then it scrolls inside; while
+  typing the page follows it so Send stays on screen at 520×560. Enter sends,
+  Shift+Enter is a new line, an IME composing owns its Enter. `maxLength` =
+  `SUPPORT_BODY_MAX` 4000 (mirrors `SupportController` `max:4000`); a counter
+  from 90 %. Tests: `SupportComposer.test.tsx`, `e2e/support-composer.spec.ts`
+  (520×560, 960×600, 1280×720: ≥ 90 % of the thread, no overflow, grows then
+  scrolls; Enter sends multi-line).
+- **A crashing screen no longer locks the panel (B2).**
+  `components/errors/RouteErrorBoundary.tsx` wraps the layout's `<Outlet />`:
+  «Этот экран не открылся» / «Остальное работает.» + «На главную» +
+  «Скопировать для поддержки» (`crashReport.ts`: time, route, version, error,
+  stack, component stack — only in the clipboard, never on screen). Keyed on
+  the pathname, so any menu entry leaves the crash; «На главную» on `/`
+  retries in place. `ErrorBoundary.tsx` (one class, used twice) is still the
+  root's last resort: no stack on screen, «Copy for support», and «Reload»
+  is `reloadAtHome()` (address rewritten to `#/` via `history.replaceState`,
+  then reload; a hash-only `location.replace` would not reload). Tests:
+  `components/errors/ErrorBoundary.test.tsx`, `e2e/screen-crash.spec.ts`
+  (a real crash: the owner's Home with a malformed billing answer).
+- **Prices → extra item (B5):** the charge options go through `fmt()` with the
+  item's name, `branchExtraItem.itemFallback` («предмет») until it has one;
+  the two selects size to their content (`.branch-extra-item__select`,
+  min 180px, max the row). Tests: `BranchExtraItemForm.copy.test.tsx`,
+  `e2e/extra-item-copy.spec.ts`.
+- **Place tier through the dictionary (B6):** `utils/placeType.ts`
+  (`PLACE_TYPE_LABEL_KEY`, `placeTypeLabelKey`) on the board, the live map
+  (`PlaceCell`), the `/appearance` preview and `PlaceForm`. Never print
+  `place.type`. Tests: `placeType.test.ts`, `SessionsBoard.identity.test.tsx`,
+  `e2e/tier-label.spec.ts`.
+- **403 on a branch's screen (B11):** `classifyError` → `forbidden` for a
+  code-less 403 (a block or network-guard 403 carries a `code` and keeps its
+  own path). `ErrorState` shows «Нет доступа к этому филиалу», no Retry, no
+  server sentence — but only inside `BranchScopeContext` (provided by `Layout`
+  from `useMatch("/branches/:branchId/*")`); elsewhere a 403 is the generic
+  failure as before (the account switcher's test pins it). `BranchHub` shows
+  that state alone, without the tiles. Tests: `viewState.test.ts`,
+  `StateView.test.tsx`, `e2e/foreign-branch.spec.ts`.
+- **Russian copy (B9):** «Ничего, кроме старта.», «История продаж», «+ Товар»
+  on the board header too (and in the till's hint). `translations.test.ts`,
+  `e2e/ru-copy.spec.ts`.
+- **Receipt heading:** with the own-food line on the bill the section is
+  `session.itemsAndFees` («Товары и доплаты»), else `session.itemsBought`.
+  Totals untouched (server figures). `StopReceiptModal.test.tsx`,
+  `e2e/outside-food.spec.ts`.
+- **«Failed to fetch» on sign-in and the reset face (B8, panel part):**
+  `classifyError(ex) === "offline"` → `textKey("auth.noConnection")` in
+  `routes/Login.tsx` and `components/login/ForgotPasswordForm.tsx` (shared
+  with the owner web); a server sentence is kept. `Login.language.test.tsx`,
+  `e2e/login-offline.spec.ts`.
+- **Emergency PIN card:** `GET /branches/{id}` carries `unlock_pin_updated_at`
+  now; with no date but a PIN from `/unlock-pin` the card says «PIN
+  установлен» (`unlockPin.isSet`), never «not set».
+  `BranchUnlockPinCard.test.tsx`, `e2e/unlock-pin.spec.ts`.
+- **Truncated payloads:** see the event table and rule 10 above.
+  `SupportChat.merge.test.ts`, `useAppUpdates.test.tsx`,
+  `e2e/support-truncated.spec.ts` (a mocked Reverb socket via
+  `page.routeWebSocket`, speaking enough Pusher for one private channel:
+  reuse it for any realtime e2e).

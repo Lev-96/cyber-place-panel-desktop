@@ -2,6 +2,7 @@ import { _electron as electron, expect, test, type ElectronApplication, type Pag
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { platformBillingOverview } from "../e2e/helpers/mockBackend";
 
 /**
  * The desktop window shrinks freely (owner, 2026-11-04: "without limits"),
@@ -39,6 +40,8 @@ const launch = async (view: "list" | "grid") => {
     const json = (body: unknown) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(body) });
     if (p === "/user/me") return json({ user: { ...user, dashboard: { branch_id: null, company_id: 1 } } });
     if (p === "/session/login") return json({ login: user, token: "t", messages: "ok" });
+    // The owner's dashboard debt card; the catch-all's `{data: []}` made it throw.
+    if (/^\/company\/\d+\/platform-billing$/.test(p)) return json(platformBillingOverview(1));
     if (p === "/user/preferences") {
       return json({ preferences: {
         data: { interface: "custom", theme: "dark", layout: { board_view: view } },

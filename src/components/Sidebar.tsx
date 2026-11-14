@@ -8,6 +8,7 @@ import AccountSwitchModal from "@/components/profile/AccountSwitchModal";
 import AccountSwitchPanel from "@/components/profile/AccountSwitchPanel";
 import ProfileModal from "@/components/profile/ProfileModal";
 import { useLang } from "@/i18n/LanguageContext";
+import { appVersionLabel, desktopAppVersion } from "@/infrastructure/desktopApp";
 import { activeNavTo, addedMenuSpecs, applyPersonalMenu, iconIdOf, sortedNavItems, withStaffMenu, type NavItemSpec } from "@/components/sidebarNav";
 import type { Role } from "@/types/api";
 import { useUiPreferencesOptional } from "@/preferences/UiPreferencesContext";
@@ -352,6 +353,7 @@ export const menuSpecsFor = (
       { to: "/managers", labelKey: "nav.managers", show: can(role, "menu.managers") },
       { to: "/owners", labelKey: "nav.owners", show: can(role, "owner.view") },
       { to: "/security", labelKey: "nav.security", show: can(role, "menu.security") },
+      { to: "/platform-billing", labelKey: "nav.platformBilling", show: can(role, "menu.platformBilling") },
       {
         to: "/notifications",
         labelKey: "nav.notifications",
@@ -422,6 +424,12 @@ const Sidebar = ({ footerExtra }: SidebarProps = {}) => {
   // no id, never folded.
   const collapse = useSidebarCollapse();
   const folded = collapse?.collapsed ?? false;
+  // The desktop app's version under the brand (2026-11-14); none on the web,
+  // whose build carries its own package version. Always English («Version …»,
+  // owner). Folded, the line steps aside and the brand row's tooltip says it,
+  // like the entries' names.
+  const version = desktopAppVersion();
+  const versionText = version ? appVersionLabel(version) : null;
 
   return (
     <aside className="sidebar" id={collapse ? SIDEBAR_ID : undefined}>
@@ -435,6 +443,7 @@ const Sidebar = ({ footerExtra }: SidebarProps = {}) => {
           alignItems: "center",
           gap: 10,
         }}
+        title={folded && versionText ? versionText : undefined}
       >
         <img
           src="./logo.png"
@@ -450,6 +459,11 @@ const Sidebar = ({ footerExtra }: SidebarProps = {}) => {
         />
         <span>CYBER PLACE</span>
       </h1>
+      {versionText && (
+        <p className="sidebar-version" data-testid="app-version" aria-hidden={folded || undefined}>
+          {versionText}
+        </p>
+      )}
       <nav className="sidebar-nav">
         {navItems.map((item) => {
           const active = item.to === activeTo;

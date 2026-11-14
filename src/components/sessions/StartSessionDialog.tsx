@@ -32,9 +32,9 @@ import QuotedPrice from "./QuotedPrice";
 import { EMPTY_DRAFT, clockOfDraft, draftMinutes, isDraftEmpty, type ClockDraft, type DurationDraft } from "./durationModel";
 import { useHiddenParts } from "@/hooks/useHiddenParts";
 import UnpaidToggle from "./UnpaidToggle";
+import FeeSentence from "./FeeSentence";
 import { useMinuteTick } from "./useMinuteTick";
 import { quoteFor, useServerQuote } from "./useServerQuote";
-import { seatUnavailableBodyOf } from "@/api/seatUnavailable";
 import { durationLabel } from "@/utils/durationLabel";
 import StartBookingChoice, { type StartChoice } from "./StartBookingChoice";
 import { useStartOptions } from "./useStartOptions";
@@ -136,6 +136,15 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted, bookingId }: Pro
   // «Не оплачено» (2026-11-07, owner): here and in «+ Время», never on the
   // card. Only on a seat that bills: a free one owes nothing.
   const [unpaid, setUnpaid] = useState(false);
+  // «Свои продукты» (2026-11-13, owner): the player brought their own food and
+  // the place's bill gets the club's fixed fee. The FIGURE is the server's
+  // advice for this seat (null = not offered here: no switch); a free start
+  // pays nothing, so it neither shows nor sends it. Sent back as shown, so the
+  // server refuses a figure that changed meanwhile.
+  const [outsideFood, setOutsideFood] = useState(false);
+  const outsideFoodFee = typeof options?.outside_food_fee === "number" && options.outside_food_fee > 0
+    ? options.outside_food_fee
+    : null;
   const psnSuggestions = useMemo(() => (askPsn ? recentPsnNames() : []), [askPsn]);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<LocalizedText | null>(null);
@@ -151,6 +160,14 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted, bookingId }: Pro
   // session is not "a price of zero", it is a session whose bill nobody pays,
   // and the two behave differently the moment a drink is added to it.
   const [isFree, setIsFree] = useState(false);
+  // A free start takes the own-food switch away AND off: undoing free brings
+  // it back off, never quietly on.
+  const changeFree = (next: boolean) => {
+    setIsFree(next);
+    if (next) setOutsideFood(false);
+  };
+  const outsideFoodOn = outsideFood && !isFree && outsideFoodFee !== null;
+  const outsideFoodField = outsideFoodOn ? { outside_food: true as const, outside_food_fee: outsideFoodFee } : {};
   // The optional planned length (2026-10-25), in a time-style hours : minutes
   // field (2026-11-05), empty = none.
   const [planDraft, setPlanDraft] = useState<DurationDraft>(EMPTY_DRAFT);
@@ -357,6 +374,7 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted, bookingId }: Pro
           ...psnField,
           ...bookingField,
           ...(unpaid ? { unpaid: true } : {}),
+          ...outsideFoodField,
         });
       } else {
         if (effectiveRate === null) {
@@ -380,6 +398,7 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted, bookingId }: Pro
           ...psnField,
           ...bookingField,
           ...(unpaid ? { unpaid: true } : {}),
+          ...outsideFoodField,
         });
       }
       if (psnName !== "") rememberPsnName(psnName);
@@ -390,9 +409,11 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted, bookingId }: Pro
       setErr(packageMismatchOf(e)
         ? textKey("session.errors.packagePlatformMismatch")
         : e instanceof Error ? textLiteral(e.message) : textKey("action.failed"));
-      // A reservation in the way (2026-11-07): the server's sentence stays,
-      // and its advice is read again so the limits on screen are its own.
-      if (seatUnavailableBodyOf(e) !== null) reloadOptions();
+      // Any refusal: the server's sentence stays, and its advice is read again
+      // so what is on screen is its own — the limits before a reservation
+      // (2026-11-07), and the own-food figure (2026-11-13), which a 422 says
+      // has changed or been withdrawn. Start then sends the figure shown.
+      reloadOptions();
     } finally { setBusy(false); }
   };
 
@@ -484,7 +505,7 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted, bookingId }: Pro
                 answer, so the honest form is the one that stops asking it. */}
             {mayWaive && isShown("free") && !capped && (
               <div className="col" style={{ gap: 4 }}>
-                <Checkbox checked={isFree} onChange={setIsFree} label={t("session.freeBill")} />
+                <Checkbox checked={isFree} onChange={changeFree} label={t("session.freeBill")} />
                 {isFree && (
                   <span className="muted" style={{ fontSize: 11 }}>
                     {t("session.freeBillStartHint")}
@@ -493,16 +514,39 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted, bookingId }: Pro
               </div>
             )}
 
+            {/* Two switches, one row (2026-11-13, owner): «Не оплачено» on the
+                left, «Свои продукты» on its right when the club charges for it
+                here. A narrow window wraps the second under the first. */}
             {!isFree && (
-              <div className="col" style={{ gap: 4 }} data-testid="start-unpaid">
-                <UnpaidToggle
-                  on={unpaid}
-                  onChange={setUnpaid}
-                  disabled={busy}
-                  label={t("session.unpaid.switch")}
-                  fullLabel={t("session.unpaid.switchFull")}
-                />
-                {unpaid && <span className="muted" style={{ fontSize: 11 }}>{t("session.unpaid.startHint")}</span>}
+              <div className="start-dialog__switches" data-testid="start-switches">
+                <div className="start-dialog__switch" data-testid="start-unpaid">
+                  <UnpaidToggle
+                    on={unpaid}
+                    onChange={setUnpaid}
+                    disabled={busy}
+                    label={t("session.unpaid.switch")}
+                    fullLabel={t("session.unpaid.switchFull")}
+                  />
+                  {unpaid && <span className="muted start-dialog__switch-hint">{t("session.unpaid.startHint")}</span>}
+                </div>
+                {outsideFoodFee !== null && (
+                  <div className="start-dialog__switch" data-testid="start-outside-food">
+                    <UnpaidToggle
+                      on={outsideFood}
+                      onChange={setOutsideFood}
+                      disabled={busy}
+                      label={t("session.outsideFood.switch")}
+                      fullLabel={t("session.outsideFood.switchFull")}
+                      testId="outside-food-switch"
+                      tone="accent"
+                    />
+                    {outsideFood && (
+                      <span className="muted start-dialog__switch-hint" data-testid="outside-food-hint">
+                        <FeeSentence template={t("session.outsideFood.startHint")} amount={money(outsideFoodFee)} />
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
             )}
 
@@ -729,6 +773,8 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted, bookingId }: Pro
                   !isFree && mode === "open" && quotedPlan !== null
                     ? fmt(t("session.summary.price"), money(quotedPlan.amount))
                     : null,
+                  // On top of the time (2026-11-13): a plan's price is time only.
+                  outsideFoodOn ? fmt(t("session.outsideFood.summary"), money(outsideFoodFee)) : null,
                 ].filter(Boolean).join(" · ")}
               </strong>
             </div>

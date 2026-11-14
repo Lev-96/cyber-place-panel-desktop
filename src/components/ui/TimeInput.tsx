@@ -4,6 +4,10 @@ interface Props {
   onChange: (value: string) => void;
   required?: boolean;
   disabled?: boolean;
+  /** The accessible name when there is no visible `label` (a table-like row). */
+  ariaLabel?: string;
+  /** Marks the field as refused (`aria-invalid`, red frame). */
+  invalid?: boolean;
 }
 
 /**
@@ -25,7 +29,7 @@ interface Props {
  * partial value the user is typing, so the parent's submit-time
  * regex catches malformed entries).
  */
-const TimeInput = ({ label, value, onChange, required, disabled }: Props) => {
+const TimeInput = ({ label, value, onChange, required, disabled, ariaLabel, invalid }: Props) => {
   const handleChange = (raw: string) => {
     // Strip everything that isn't a digit or a colon. Then auto-
     // insert a colon between hours and minutes so the field reads
@@ -60,6 +64,8 @@ const TimeInput = ({ label, value, onChange, required, disabled }: Props) => {
         maxLength={5}
         required={required}
         disabled={disabled}
+        aria-label={ariaLabel}
+        aria-invalid={invalid || undefined}
         pattern="([01]\d|2[0-3]):[0-5]\d"
       />
     </div>

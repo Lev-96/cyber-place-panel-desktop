@@ -66,6 +66,14 @@ export interface IBillingSettings {
   vip_min_charge_scope?: "all" | "vip" | "standard" | "places" | null;
   /** The chosen seats, for `places`. */
   vip_min_charge_place_ids?: number[] | null;
+  /**
+   * «Свои продукты» (2026-11-13): the fixed fee for a player who brings their
+   * own food, per seat tier. Null = not offered on that tier (the Start switch
+   * is hidden there). Optional: an older backend has neither, read as null.
+   * A place may carry its own figure (`IBranchPlace.outside_food_fee`).
+   */
+  outside_food_fee_standard?: number | null;
+  outside_food_fee_vip?: number | null;
   /** 0 = round nothing. The default every branch is on. */
   money_rounding_step: number;
   money_rounding_mode: MoneyRoundingMode;
@@ -312,6 +320,25 @@ export interface IBillingPolicy {
   vip_min_charge_scope?: "all" | "vip" | "standard" | "places" | null;
   /** The chosen seats, for `places`. */
   vip_min_charge_place_ids?: number[] | null;
+  /**
+   * The own-food fee per tier (2026-11-13). Absent leaves it alone; null
+   * withdraws the offer on that tier; the server refuses 0 (`gt:0`).
+   */
+  outside_food_fee_standard?: number | null;
+  outside_food_fee_vip?: number | null;
+  /**
+   * Per-place own-food figures (2026-11-14), written to `places.outside_food_fee`
+   * in the same transaction as the tiers. ONLY the rows that changed; absent
+   * leaves every place alone. `fee`: null = like the branch's tier, 0 = not
+   * charged at this place, above 0 = the place's own figure.
+   */
+  outside_food_place_fees?: IOutsideFoodPlaceFee[];
+}
+
+/** One row of `IBillingPolicy.outside_food_place_fees`. */
+export interface IOutsideFoodPlaceFee {
+  place_id: number;
+  fee: number | null;
 }
 
 export const apiGetBillingSettings = (branchId: number) =>

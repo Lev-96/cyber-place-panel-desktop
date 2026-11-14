@@ -7,6 +7,15 @@ interface Props {
   fullLabel: string;
   disabled?: boolean;
   tabIndex?: number;
+  /** Defaults to "unpaid-switch"; a second switch drawn the same way names its own. */
+  testId?: string;
+  /**
+   * The colour it takes when on. "warning" (the default) is amber, something
+   * owed; "accent" (2026-11-13, «Свои продукты» in Start) is the panel's accent,
+   * a line added to the bill. Same size and construction either way, so two
+   * of them side by side read as a pair.
+   */
+  tone?: "warning" | "accent";
 }
 
 /**
@@ -15,18 +24,21 @@ interface Props {
  * panel's switch (the `cp-switch` track and thumb); a screen reader hears a
  * switch and its state. Amber when on: something is owed.
  */
-const UnpaidToggle = ({ on, onChange, label, fullLabel, disabled = false, tabIndex }: Props) => (
+const UnpaidToggle = ({
+  on, onChange, label, fullLabel, disabled = false, tabIndex, testId = "unpaid-switch", tone = "warning",
+}: Props) => (
   <button
     type="button"
     role="switch"
     aria-checked={on}
     aria-label={fullLabel}
     title={fullLabel}
-    className={on ? "btn unpaid-toggle is-on" : "btn unpaid-toggle"}
+    className={["btn unpaid-toggle", tone === "accent" ? "unpaid-toggle--accent" : null, on ? "is-on" : null]
+      .filter(Boolean).join(" ")}
     onClick={() => onChange(!on)}
     disabled={disabled}
     tabIndex={tabIndex}
-    data-testid="unpaid-switch"
+    data-testid={testId}
   >
     <span className="cp-switch-track" aria-hidden>
       <span className="cp-switch-thumb" />

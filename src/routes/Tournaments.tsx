@@ -3,6 +3,8 @@ import { tr as trField } from "@/i18n/translated";
 import MyBranchTournamentsButton from "@/components/tournaments/MyBranchTournamentsButton";
 import Button from "@/components/ui/Button";
 import ScreenWithBg from "@/components/ui/ScreenWithBg";
+import BillingLockOverlay from "@/components/platformBilling/BillingLockOverlay";
+import { useBillingAccess } from "@/components/platformBilling/useBillingAccess";
 import { useConfirm } from "@/components/ui/ConfirmProvider";
 import Pagination from "@/components/ui/Pagination";
 import { ListSkeleton } from "@/components/ui/Skeleton";
@@ -34,6 +36,8 @@ const Tournaments = () => {
   const { branchId } = useParams();
   const id = Number(branchId);
   const isBranchScoped = Number.isFinite(id) && id > 0;
+  // An unpaid Cyber Place Platform invoice: say so before «New» is pressed (2026-11-09).
+  const billingAccess = useBillingAccess(isBranchScoped ? id : null);
 
   let filterParams: {
     branch_id?: number;
@@ -286,6 +290,7 @@ const Tournaments = () => {
           }}
         />
       )}
+      <BillingLockOverlay access={billingAccess} area="tournaments" />
     </ScreenWithBg>
   );
 };

@@ -29,6 +29,13 @@ export type Permission =
    * backend holds the same line with its `admin` middleware.
    */
   | "menu.security"
+  /**
+   * Admin-only "Club payments" (`/platform-billing`, 2026-11-09): every
+   * company's Cyber Place Platform invoices, and recording payments,
+   * adjustments and due-date extensions on them. The backend refuses every
+   * write behind it to anyone but an admin.
+   */
+  | "menu.platformBilling"
   | "menu.tournaments"     // see Tournaments in sidebar
   | "menu.scan"            // see Scan/Confirm in sidebar
   | "menu.map"             // see Branches map in sidebar
@@ -64,11 +71,26 @@ export type Permission =
    */
   | "branch.members"
   /**
-   * The branch's product catalogue — create, edit, delete, show/hide. Reading
-   * it needs no permission: every role sells from it at the POS, and a manager
-   * gets the list plus search, without a write control anywhere.
+   * DELETE a product from the branch catalogue. Owner-level: a delete takes
+   * the row away for good, so a manager deactivates instead (2026-11-09).
+   * Reading the catalogue needs no permission: every role sells from it.
    */
   | "product.crud"
+  /**
+   * Write the branch catalogue (2026-11-09): create a product, edit its name,
+   * category, kind and price, and activate / deactivate it. Admin, owner AND
+   * the branch's manager — the manager is the one who finds the shelf changed.
+   * Mirrors the backend's `products.write` (own branch only). Hand-typed price
+   * lines on a bill stay owner-level on `products.manage`; nothing in the
+   * panel sends one.
+   */
+  | "product.write"
+  /**
+   * «История товаров»: the audit trail of every product change, with who made
+   * it. Admin and owner (backend `products.history`, branch-scoped) — the
+   * manager is one of the people it is about.
+   */
+  | "product.history"
   // company CRUD
   | "company.create"
   | "company.edit"
@@ -160,9 +182,10 @@ const PERMS: Record<Role, ReadonlySet<Permission>> = {
     "menu.branches", "menu.companies", "menu.managers", "menu.games",
     "menu.tournaments", "menu.scan", "menu.map",
     "menu.updates", "menu.expenses", "menu.metrics", "menu.security", "menu.support",
+    "menu.platformBilling",
     "revenue.view",
     "branch.create", "branch.edit", "branch.delete", "branch.prices",
-    "branch.places", "branch.members", "product.crud",
+    "branch.places", "branch.members", "product.crud", "product.write", "product.history",
     "company.create", "company.edit", "company.delete",
     "company.block", "branch.block", "branch.status",
     "manager.create", "manager.delete",
@@ -181,7 +204,7 @@ const PERMS: Record<Role, ReadonlySet<Permission>> = {
     // Seats, shifts and the product catalogue are the company's to arrange;
     // "branch.members" is deliberately NOT here — member cards and deposits are
     // administrative, and the section is gone from an owner's branch.
-    "branch.places", "product.crud",
+    "branch.places", "product.crud", "product.write", "product.history",
     // Owners manage their branches' game libraries (branch-scoped games):
     // hub tile + place-modal inline create. The shared catalogue itself
     // ("game.crud") stays admin-only — that is what the backend enforces.
@@ -195,8 +218,8 @@ const PERMS: Record<Role, ReadonlySet<Permission>> = {
     // Manager = single-branch floor staff, and the floor is what they get: run
     // sessions, ring up sales, read the product list. No global lists, no CRUD
     // of branches/companies, and — since 2026-08-30 — no branch profile, no
-    // seats, no member cards and no product writes (shifts came back on
-    // 2026-10-19, below). Those are the
+    // seats and no member cards (shifts came back on 2026-10-19 and product
+    // writes on 2026-11-09, below). Those are the
     // company's arrangements; a manager works inside them.
     //
     // The branch profile was already refused server-side (a manager
@@ -217,6 +240,9 @@ const PERMS: Record<Role, ReadonlySet<Permission>> = {
     // The branch's cash shift (2026-10-19): opened and closed by whoever runs
     // the till that night; the backend keeps it to their own branch.
     "shift.manage",
+    // The product catalogue came back on 2026-11-09: create, edit, price and
+    // deactivate — never delete, and never the audit trail of it.
+    "product.write",
   ]),
 };
 

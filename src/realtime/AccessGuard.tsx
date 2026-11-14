@@ -1,3 +1,4 @@
+import { BILLING_BLOCK_CODE, billingBlock } from "@/auth/billingBlock";
 import { lockoutKeyFor } from "@/api/blockingErrors";
 import { useRealtimeVersion } from "@/realtime/useRealtimeVersion";
 import { apiCache } from "@/api/client";
@@ -115,6 +116,8 @@ const AccessGuard = () => {
         // The panel's own wording, keyed off the code, so the person reads the
         // reason in the language they are working in. `message` is the server's
         // sentence and is only reached for a code this build does not know.
+        // Closed for an unpaid platform bill: the plain Armenian screen too (2026-11-09).
+        if (payload.code === BILLING_BLOCK_CODE) billingBlock.raise();
         const key = lockoutKeyFor(payload.code);
         notify.message(
           "error",

@@ -13,6 +13,7 @@ import PlatformNameInput, { LangNames } from "@/components/ui/PlatformNameInput"
 import SubplatformTabs from "@/components/ui/SubplatformTabs";
 import Spinner from "@/components/ui/Spinner";
 import GameForm from "@/components/games/GameForm";
+import PlaceOutsideFoodFeeField from "./PlaceOutsideFoodFeeField";
 import { billingSettingsRepository } from "@/repositories/BillingSettingsRepository";
 import { branchRepository } from "@/repositories/BranchRepository";
 import { useAuth } from "@/auth/AuthContext";
@@ -29,6 +30,7 @@ import { IBranchApi, IBranchPlace, IBranchPlatformPrice, PlaceType } from "@/typ
 import { isKnownPlatform, platformGroup, platformLabel } from "@/utils/platform";
 import { resolveTypedPlatform } from "@/utils/platformName";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { placeTypeLabelKey } from "@/utils/placeType";
 
 const EMPTY_NAMES: LangNames = { en: "", ru: "", am: "" };
 
@@ -250,6 +252,12 @@ const PlaceForm = ({ branchId, initial, platformSuggestions, platformPrices, onC
     initial?.joystick_price != null ? String(initial.joystick_price) : "",
   );
   /**
+   * This room's own «Свои продукты» fee (2026-11-13). Opens holding what the
+   * place carries, so an untouched form sends it back as it was. Empty = the
+   * branch's figure for this tier; 0 = not charged here.
+   */
+  const [foodFee, setFoodFee] = useState(initial?.outside_food_fee != null ? String(initial.outside_food_fee) : "");
+  /**
    * Does this room sell a FOURTH pad, and at what price?
    *
    * Asked only under "the third", because that is the only answer where the
@@ -350,7 +358,7 @@ const PlaceForm = ({ branchId, initial, platformSuggestions, platformPrices, onC
     ? (type === "vip" ? existingPrice.price_vip : existingPrice.price_standard)
     : null;
   const tierLocked = tierPrice != null; // this platform+type already priced
-  const typeLabel = type === "vip" ? t("branch.prices.vip") : t("branch.prices.standard");
+  const typeLabel = t(placeTypeLabelKey(type));
   // Multilingual наименование for that new platform's price row. The English
   // value is the identity: the platform slug is derived from it, so the same
   // platform resolves the same way regardless of the panel's language.
@@ -810,6 +818,8 @@ const PlaceForm = ({ branchId, initial, platformSuggestions, platformPrices, onC
         extra_item_included: isCustomPlatform && extraName.trim() !== "" && extraIncluded.trim() !== ""
           ? Number(extraIncluded)
           : null,
+        // Any platform: food is not a device. Empty = null = the branch's.
+        outside_food_fee: foodFee.trim() === "" ? null : Number(foodFee),
         platform_name_en: customNew ? (names.en.trim() || undefined) : undefined,
         platform_name_ru: customNew ? (names.ru.trim() || undefined) : undefined,
         platform_name_am: customNew ? (names.am.trim() || undefined) : undefined,
@@ -1036,6 +1046,13 @@ const PlaceForm = ({ branchId, initial, platformSuggestions, platformPrices, onC
             )}
           </div>
         )}
+
+        <PlaceOutsideFoodFeeField
+          value={foodFee}
+          onChange={setFoodFee}
+          branchFee={type === "vip" ? branchJoysticks.data?.outside_food_fee_vip : branchJoysticks.data?.outside_food_fee_standard}
+          disabled={busy}
+        />
 
         {/* The room's joystick policy, for PlayStation seats only.
             "As in the branch" is the normal case and the one every seat starts

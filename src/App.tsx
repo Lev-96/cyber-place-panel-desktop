@@ -1,3 +1,5 @@
+import BillingBlockedModal from "@/components/BillingBlockedModal";
+import { unlockAudioOnFirstGesture } from "@/sound/soundEngine";
 import { RouteSkeleton } from "@/components/ui/Skeleton";
 import { useAuth } from "@/auth/AuthContext";
 import NetworkBlockedScreen, { useNetworkBlock } from "@/components/NetworkBlockedScreen";
@@ -53,6 +55,7 @@ const Owners = lazy(() => import("@/routes/Owners"));
 const OwnerDetails = lazy(() => import("@/routes/OwnerDetails"));
 const Revenue = lazy(() => import("@/routes/Revenue"));
 const Security = lazy(() => import("@/routes/Security"));
+const PlatformBilling = lazy(() => import("@/routes/PlatformBilling"));
 const ConfirmByCode = lazy(() => import("@/routes/ConfirmByCode"));
 const GamesList = lazy(() => import("@/routes/GamesList"));
 const Managers = lazy(() => import("@/routes/Managers"));
@@ -332,6 +335,16 @@ const Authed = () => {
             </RoleGuard>
           }
         />
+        {/* Admin only (2026-11-09): every club's Cyber Place Platform
+            invoices, payments, adjustments, extensions. */}
+        <Route
+          path="/platform-billing"
+          element={
+            <RoleGuard perm="menu.platformBilling">
+              <PlatformBilling />
+            </RoleGuard>
+          }
+        />
         <Route
           path="/companies"
           element={
@@ -403,6 +416,10 @@ const App = () => {
   const { user, loading } = useAuth();
   const blocked = useNetworkBlock();
 
+  // Notification sounds in a browser (the owner web): resumed by the first
+  // click or key, so a payment notice is heard (2026-11-09).
+  useEffect(() => { unlockAudioOnFirstGesture(); }, []);
+
   // Ask the backend which socket to connect to, before anything subscribes.
   // `VITE_REVERB_*` is only a fallback now: a build carrying a key the servers
   // no longer run was refused with Pusher 4001 for its whole life while every
@@ -425,6 +442,9 @@ const App = () => {
       {/* The one hover/focus tooltip (2026-11-07): `data-tip`, and `title`
           inside a `data-tip-scope` (the Active Places board). */}
       <TooltipLayer />
+      {/* Closed for an unpaid Cyber Place Platform bill (2026-11-09): over
+          everything, the sign-in screen included. */}
+      <BillingBlockedModal />
       <HashRouter>
         {/* Signing in / out / switching account always lands on the
             dashboard — a route must never outlive the account that

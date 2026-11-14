@@ -1,4 +1,5 @@
 import { Translated } from "@/i18n/translated";
+import type { BillingAccess } from "./platformBilling";
 import type { BranchStatus } from "@/types/branch";
 
 /**
@@ -160,6 +161,12 @@ export interface IBranchPlace extends Translated {
   extra_item_charged_units?: string | null;
   /** What each CHARGED unit after the first costs. NULL = priced like it. */
   extra_item_price_next?: number | string | null;
+  /**
+   * This room's own «Свои продукты» fee (2026-11-13). Null = the branch's
+   * figure for this place's tier; 0 = not charged in this room. Optional: an
+   * older backend does not send it.
+   */
+  outside_food_fee?: number | null;
   games: IGame[];
 }
 
@@ -343,6 +350,13 @@ export interface IBranchApi extends Translated {
    *  null if the branch has never set one. The PIN hash itself is
    *  shipped only to agents, never to the panel. */
   unlock_pin_updated_at?: string | null;
+  /**
+   * What an unpaid Cyber Place Platform invoice does to new work here
+   * (2026-11-09, `BranchResource`, staff responses only): `restricted` (D+5)
+   * or `suspended` (D+7). Absent on an older backend, which reads as active.
+   * Display only: the server refuses the gated writes either way.
+   */
+  billing_access?: BillingAccess;
 }
 
 export interface ICompanyApi extends Translated {

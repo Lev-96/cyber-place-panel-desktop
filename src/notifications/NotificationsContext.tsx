@@ -11,6 +11,7 @@ import {
   type IDbNotification,
 } from "@/api/notifications";
 import { getEcho } from "@/realtime/echo";
+import { isPlatformBillingNotice } from "@/components/platformBilling/billingNotice";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 /**
@@ -49,6 +50,13 @@ interface NotificationsContextShape {
 
 const Ctx = createContext<NotificationsContextShape | null>(null);
 
+/**
+ * Which rows a role's feed shows, or null for all of them. An admin's feed is
+ * platform payment notices only (2026-11-09).
+ */
+export const feedRowFilter = (role: string | undefined): ((n: IDbNotification) => boolean) | null =>
+  role === "admin" ? isPlatformBillingNotice : null;
+
 const POLL_MS = 60_000;
 
 export const NotificationsProvider = ({ children }: { children: ReactNode }) => {
@@ -59,6 +67,8 @@ export const NotificationsProvider = ({ children }: { children: ReactNode }) => 
   const [error, setError] = useState<string | null>(null);
   const [failure, setFailure] = useState<unknown>(null);
   const [settled, setSettled] = useState(false);
+  // The server's unread figure as last read (it counts rows a filtered feed hides).
+  const serverUnreadRef = useRef<number | null>(null);
 
   // Tracks whether the screen is mounted — we don't write state on a
   // late response that returned after unmount.
@@ -83,7 +93,13 @@ export const NotificationsProvider = ({ children }: { children: ReactNode }) => 
   // 2026-10-12: owners too. The backend sends an owner exactly one kind of
   // row — "a seat ends in 15 minutes" (`StaffNotificationDispatcher`'s owner
   // allowlist) — so their feed and badge carry that and nothing operational.
-  const dbFeedEnabled = user?.role === "manager" || user?.role === "company_owner";
+  //
+  // 2026-11-09: admins too, for ONE kind of row only — Cyber Place Platform
+  // payment notices (`platform_billing.*`). Anything else an admin's table
+  // may hold is filtered out here, list, badge and push alike, so the admin
+  // is not flooded with rows the panel never showed them.
+  const dbFeedEnabled = user?.role === "manager" || user?.role === "company_owner" || user?.role === "admin";
+  const rowFilter = feedRowFilter(user?.role);
 
   const refresh = useCallback(async () => {
     if (!user || !dbFeedEnabled) {
@@ -98,8 +114,17 @@ export const NotificationsProvider = ({ children }: { children: ReactNode }) => 
     try {
       const page = await apiNotifications(1, 50);
       if (!aliveRef.current) return;
-      setList(page.data);
-      setUnreadCount(page.meta.unread_count);
+      serverUnreadRef.current = page.meta.unread_count;
+      if (rowFilter) {
+        // The server's count includes rows this role does not see: count the
+        // ones it does.
+        const rows = page.data.filter(rowFilter);
+        setList(rows);
+        setUnreadCount(rows.filter((n) => n.read_at === null).length);
+      } else {
+        setList(page.data);
+        setUnreadCount(page.meta.unread_count);
+      }
     } catch (e) {
       if (!aliveRef.current) return;
       const msg = e instanceof Error ? e.message : "Failed to load notifications";
@@ -108,7 +133,7 @@ export const NotificationsProvider = ({ children }: { children: ReactNode }) => 
     } finally {
       if (aliveRef.current) { setLoading(false); setSettled(true); }
     }
-  }, [user, dbFeedEnabled]);
+  }, [user, dbFeedEnabled, rowFilter]);
 
   // Initial load + on user change.
   useEffect(() => {
@@ -128,7 +153,10 @@ export const NotificationsProvider = ({ children }: { children: ReactNode }) => 
           // missed (socket down, a failed auth, a Reverb hiccup). Only the
           // count used to be corrected and the LIST left behind, so a manager
           // saw "1" and no row (2026-10-25). Read the list again instead.
-          if (unread_count !== unreadRef.current) void refreshRef.current();
+          // A filtered feed's own count is not the server's: compare the
+          // server's figure with the server's figure it last reported.
+          const known = rowFilterRef.current ? serverUnreadRef.current : unreadRef.current;
+          if (unread_count !== known) void refreshRef.current();
         })
         .catch(() => {
           /* network blip — keep current count, next tick will retry */
@@ -158,6 +186,8 @@ export const NotificationsProvider = ({ children }: { children: ReactNode }) => 
   // gap, which is the exact failure this is here to prevent.
   const refreshRef = useRef(refresh);
   refreshRef.current = refresh;
+  const rowFilterRef = useRef(rowFilter);
+  rowFilterRef.current = rowFilter;
   const unreadRef = useRef(unreadCount);
   unreadRef.current = unreadCount;
   const listRef = useRef(list);
@@ -177,6 +207,7 @@ export const NotificationsProvider = ({ children }: { children: ReactNode }) => 
       if (!aliveRef.current) return;
       const row = payload as IDbNotification;
       if (!row?.id) return;
+      if (rowFilterRef.current && !rowFilterRef.current(row)) return;
       // A row this panel already holds (the same event delivered twice, a
       // reconnect replaying it, a refresh that landed first) replaces itself
       // and is NOT counted again — counting it twice left a badge that
@@ -284,6 +315,9 @@ export const NotificationsProvider = ({ children }: { children: ReactNode }) => 
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 };
+
+/** For components that may render outside the provider (tests, a card on a screen that does not need the feed). */
+export const useNotificationsOptional = (): NotificationsContextShape | null => useContext(Ctx);
 
 export const useNotifications = (): NotificationsContextShape => {
   const ctx = useContext(Ctx);

@@ -4,6 +4,7 @@ import { ISessionApi } from "@/types/sessions";
 import { padChargeOf } from "./joystickView";
 import { sessionItemLineTotal } from "./sessionAmount";
 import { paymentLabelOf } from "./sessionHistoryModel";
+import { sessionLineLabel } from "./outsideFood";
 
 /** A number off the wire: JSON may send "6" for 6. */
 const num = (v: unknown): number => {
@@ -88,7 +89,7 @@ const SessionHistoryBill = ({ session, closed }: Props) => {
           {items.map((it) => (
             <BillRow
               key={it.id}
-              label={it.name}
+              label={sessionLineLabel(it, t)}
               qty={num(it.qty)}
               // A rented extra's price is a RATE; its sum is the server's figure.
               price={`${money(num(it.price))}${it.is_hourly ? perHour : ""}`}

@@ -14,7 +14,15 @@ export interface AppUpdatePromotedEvent {
   version: string;
   channel: string;
   mandatory: boolean;
+  /** The GitHub release body; null when it did not fit one Reverb frame. */
   notes: string | null;
+  /**
+   * Present (true) only when `notes` was dropped to fit Reverb's limit
+   * (backend, 2026-11-14). Nothing here renders notes from the event; the
+   * version alone drives the updater, and the update screens read notes over
+   * REST.
+   */
+  notes_truncated?: boolean;
   github_tag: string | null;
   published_at: string | null;
   at: string;
