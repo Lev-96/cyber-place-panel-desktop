@@ -158,3 +158,183 @@ for (const lang of ["ru", "en", "am"] as const) {
     });
   }
 }
+
+/* ── Own amounts for single places (2026-11-14, owner) ─────────────────────
+   ~30 places (pc standard / pc VIP / PS5, one inactive) on the Prices page:
+   the tabs and the search, one own figure and one «not charged here», the PUT
+   body captured, a mocked reload, and the layout in every language at the
+   desktop, the window's minimum and a phone. */
+type MockPlace = {
+  id: number; branch_id: number; number: number; name: string | null; type: "standard" | "vip";
+  status: "active" | "inactive"; platform: string; outside_food_fee: number | null; games: never[];
+};
+const mockPlaces = (): MockPlace[] => Array.from({ length: 30 }, (_, i) => {
+  const n = i + 1;
+  const platform = n <= 20 ? "pc" : "ps5";
+  const type = (n >= 13 && n <= 18) || n >= 28 ? "vip" : "standard";
+  return {
+    id: 500 + n, branch_id: 1, number: n,
+    name: n === 9 ? "Угловое место у окна" : n === 25 ? "Lounge sofa" : null,
+    type, status: n === 11 ? "inactive" : "active", platform,
+    outside_food_fee: n === 13 ? 2000 : n === 22 ? 0 : null, games: [],
+  };
+});
+
+const placesRoutes = async (page: Page) => {
+  const state = { places: mockPlaces(), puts: [] as Record<string, unknown>[] };
+  await page.route((u) => isBackend(u) && u.pathname === "/places", (r) => r.fulfill(json({
+    data: state.places, meta: { total: state.places.length, current_page: 1, last_page: 1, per_page: 1000 },
+  })));
+  await page.route((u) => isBackend(u) && u.pathname === "/branches/1/billing-settings", async (r) => {
+    if (r.request().method() === "PUT") {
+      const body = r.request().postDataJSON() as Record<string, unknown>;
+      state.puts.push(body);
+      // The backend writes the rows; the next read reflects them.
+      for (const row of (body.outside_food_place_fees ?? []) as { place_id: number; fee: number | null }[]) {
+        const p = state.places.find((x) => x.id === row.place_id);
+        if (p) p.outside_food_fee = row.fee;
+      }
+    }
+    await r.fulfill(json({ settings: policy }));
+  });
+  return state;
+};
+
+const placesWords = {
+  ru: { all: "Все", own: "Со своей суммой", notHere: "Здесь не взимается", search: "Номер или название места",
+    save: "Сохранить", summaryAfter: "Своя сумма: 2 · не взимается: 2 · как в филиале: 26" },
+  en: { all: "All", own: "With own amount", notHere: "Not charged here", search: "Place number or name",
+    save: "Save", summaryAfter: "Own amount: 2 · not charged: 2 · like the branch: 26" },
+  am: { all: "Բոլորը", own: "Սեփական գումարով", notHere: "Այստեղ չի գանձվում", search: "Տեղի համարը կամ անունը",
+    save: "Պահպանել", summaryAfter: "Սեփական գումար՝ 2 · չի գանձվում՝ 2 · ինչպես մասնաճյուղում՝ 26" },
+} as const;
+
+test("ru: tabs, search, one own figure and one «not charged», the PUT body, the summary after the reload", async ({ page }) => {
+  await signIn(page, "ru", 1280);
+  const state = await placesRoutes(page);
+  await page.goto("/#/branches/1/tariffs");
+  const field = page.getByTestId("outside-food-places");
+  await expect(field).toBeVisible();
+  await field.scrollIntoViewIfNeeded();
+  const w = placesWords.ru;
+
+  // «With own amount» is the default: two places have one.
+  const ownTab = field.getByRole("tab", { name: new RegExp(`^${w.own}`) });
+  await expect(ownTab).toHaveAttribute("aria-selected", "true");
+  await expect(ownTab).toContainText("2");
+  await expect(field.getByTestId(/^outside-food-place-/)).toHaveCount(2);
+  await expect(field.getByRole("tab", { name: new RegExp(`^${w.all}`) })).toContainText("30");
+  await expect(field.getByRole("tab", { name: /^VIP/ })).toContainText("9");
+  await expect(field.getByRole("tab", { name: /^Обычные/ })).toContainText("21");
+
+  // All, grouped by platform, sorted by number; the inactive one says so.
+  await field.getByRole("tab", { name: new RegExp(`^${w.all}`) }).click();
+  await expect(field.getByTestId(/^outside-food-place-/)).toHaveCount(30);
+  await expect(field.getByTestId("outside-food-group")).toHaveCount(2);
+  await expect(field.getByTestId("outside-food-place-511")).toContainText("неактивно");
+  // The placeholder follows the tier figure.
+  await expect(field.getByTestId("outside-food-place-503").locator("input.input")).toHaveAttribute("placeholder", /Как в филиале \(1[\s  ,.]?000/);
+  await expect(field.getByTestId("outside-food-place-514").locator("input.input")).toHaveAttribute("placeholder", /Как в филиале \(1[\s  ,.]?500/);
+
+  // Search: by name, then by number.
+  const search = field.getByRole("searchbox", { name: w.search });
+  await search.fill("углов");
+  await expect(field.getByTestId(/^outside-food-place-/)).toHaveCount(1);
+  await expect(field.getByTestId("outside-food-place-509")).toContainText("№9 · Угловое место у окна");
+  await search.fill("3");
+  await expect(field.getByTestId(/^outside-food-place-/)).toHaveCount(2); // №3, №30
+  await field.getByTestId("outside-food-place-503").locator("input.input").fill("1800");
+  await search.fill("");
+
+  // «Not charged here» on №7.
+  await field.getByTestId("outside-food-place-507").getByText(w.notHere).click();
+  await expect(field.getByTestId("outside-food-place-507").locator("input.input")).toBeDisabled();
+  await expect(field).toContainText("Несохранённых изменений: 2");
+  await expect(page.locator(".outside-food-form")).toContainText("Действует для новых стартов");
+  await shot(page, "places-editing-ru-1280", ".outside-food-form");
+
+  await page.locator(".outside-food-form").getByRole("button", { name: w.save, exact: true }).click();
+  await expect.poll(() => state.puts.length).toBe(1);
+  expect(state.puts[0]).toMatchObject({ outside_food_fee_standard: 1000, outside_food_fee_vip: 1500 });
+  expect(state.puts[0].outside_food_place_fees).toEqual([
+    { place_id: 503, fee: 1800 },
+    { place_id: 507, fee: 0 },
+  ]);
+
+  // The reload re-opens the form on the server's figures.
+  await expect(page.getByTestId("outside-food-summary")).toHaveText(w.summaryAfter);
+  await expect(field).not.toContainText("Несохранённых изменений");
+  await expect(page.getByTestId("outside-food-places").getByRole("tab", { name: new RegExp(`^${w.own}`) })).toContainText("4");
+});
+
+const placesLayout = (page: Page) => page.evaluate(() => {
+  const form = document.querySelector(".outside-food-form") as HTMLElement;
+  const r = form.getBoundingClientRect();
+  const list = document.querySelector('[data-testid="outside-food-places-list"]') as HTMLElement;
+  const clipped = Array.from(form.querySelectorAll<HTMLElement>(
+    ".outside-food-place__label, .outside-food-place__chip, .outside-food-place__state, .cp-checkbox-label, .cp-subtab, .outside-food-places__summary span, .outside-food-places__platform",
+  )).filter((el) => el.scrollWidth > el.clientWidth + 1).map((el) => `${el.className}:${el.textContent}`);
+  // A placeholder wider than its box is cut by the browser: measure it.
+  const ctx = document.createElement("canvas").getContext("2d")!;
+  const cutPlaceholders = Array.from(form.querySelectorAll<HTMLInputElement>(".outside-food-place input.input")).filter((i) => {
+    if (!i.placeholder || i.value) return false;
+    const cs = getComputedStyle(i);
+    ctx.font = `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+    const room = i.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+    return ctx.measureText(i.placeholder).width > room + 1;
+  }).map((i) => {
+    const cs = getComputedStyle(i);
+    ctx.font = `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+    return `${i.placeholder} (${Math.ceil(ctx.measureText(i.placeholder).width)}px in ${Math.floor(i.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight))}px)`;
+  }).slice(0, 3);
+  return {
+    formWidth: Math.round(r.width),
+    listHeight: list.getBoundingClientRect().height,
+    listScrolls: list.scrollHeight > list.clientHeight,
+    inWindow: r.left >= 0 && r.right <= window.innerWidth + 0.5,
+    overflow: form.scrollWidth - form.clientWidth,
+    pastEdge: Array.from(form.querySelectorAll<HTMLElement>("*")).filter((el) => {
+      const b = el.getBoundingClientRect();
+      return b.width > 0 && (b.right > r.right + 1 || b.left < r.left - 1);
+    }).map((el) => el.className || el.tagName).slice(0, 5),
+    clipped: clipped.slice(0, 5),
+    cutPlaceholders,
+  };
+});
+
+for (const lang of ["ru", "en", "am"] as const) {
+  for (const width of [1280, 520, 390]) {
+    test(`${lang} ${width}px: the places list fits — ≤320px with its own scroll, nothing past the form, no clipped label`, async ({ page }) => {
+      await signIn(page, lang, width);
+      await placesRoutes(page);
+      await page.goto("/#/branches/1/tariffs");
+      // A phone is the owner web, whose side menu lives in a closed drawer; in
+      // this harness the panel's own side menu stays and leaves the page ~90px,
+      // which is the shell's layout and not this form's. Hidden here so 390px
+      // measures what a phone shows.
+      if (width < 520) await page.addStyleTag({ content: "aside.sidebar { display: none !important; } .app-shell { grid-template-columns: 1fr !important; }" });
+      const field = page.getByTestId("outside-food-places");
+      await expect(field).toBeVisible();
+      await field.getByRole("tab", { name: new RegExp(`^${placesWords[lang].all}`) }).click();
+      await expect(field.getByTestId(/^outside-food-place-/)).toHaveCount(30);
+      // A typed figure and a «not charged» row, so every chip state is drawn.
+      await field.getByTestId("outside-food-place-501").locator("input.input").fill("1800");
+      await field.getByTestId("outside-food-place-502").getByText(placesWords[lang].notHere).click();
+      await page.locator(".outside-food-form").scrollIntoViewIfNeeded();
+
+      const l = await placesLayout(page);
+      expect(l.listHeight, JSON.stringify(l)).toBeLessThanOrEqual(320.5);
+      expect(l.listScrolls, JSON.stringify(l)).toBe(true);
+      expect(l.inWindow, JSON.stringify(l)).toBe(true);
+      expect(l.overflow, JSON.stringify(l)).toBeLessThanOrEqual(0);
+      expect(l.pastEdge, JSON.stringify(l)).toEqual([]);
+      expect(l.clipped, JSON.stringify(l)).toEqual([]);
+      // The placeholder «Like the branch (1,000 AMD)» fits whole on a desktop
+      // row; on a narrow one the box is the row's width and the browser may
+      // cut its end; the row's state chip says «Like the branch» in full there.
+      if (width >= 1280) expect(l.cutPlaceholders, JSON.stringify(l)).toEqual([]);
+      else console.log(`${lang} ${width}: form ${l.formWidth}px, cut placeholders: ${l.cutPlaceholders.length ? l.cutPlaceholders[0] : "none"}`);
+      await shot(page, `places-${lang}-${width}`, ".outside-food-form");
+    });
+  }
+}

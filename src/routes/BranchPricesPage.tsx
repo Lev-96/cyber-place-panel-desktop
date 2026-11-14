@@ -8,6 +8,7 @@ import OutsideFoodFeeForm from "@/components/prices/OutsideFoodFeeForm";
 import PauseLimitForm from "@/components/prices/PauseLimitForm";
 import VipMinimumChargeForm from "@/components/prices/VipMinimumChargeForm";
 import { rateOptions } from "@/components/prices/vipMinimumCharge";
+import { placeFeesFingerprint } from "@/components/prices/outsideFoodPlaces";
 import PlatformPricesForm from "@/components/prices/PlatformPricesForm";
 import SubplatformPricesForm from "@/components/prices/SubplatformPricesForm";
 import Button from "@/components/ui/Button";
@@ -49,7 +50,8 @@ const BranchPricesPage = () => {
   const packages = useAsync(() => timePackageRepository.listByBranch(id), [id]);
   const platformPrices = useAsync(() => platformPriceRepository.listByBranch(id), [id]);
   const subplatforms = useAsync(() => subplatformRepository.listByBranch(id), [id]);
-  // Only to work the VIP minimum's example at a price its VIP seats bill.
+  // The VIP minimum's seats and example prices, and the per-place own-food
+  // figures (`places.outside_food_fee`, edited in the «Свои продукты» form).
   const places = useAsync(() => placeRepository.listRawByBranch(id), [id]);
   // One read for every billing rule below — they are fields of the same
   // branch policy and the same endpoint. STRICT (`getForEdit`): a failed load
@@ -322,10 +324,16 @@ const BranchPricesPage = () => {
           >
             {billing.data && (
               <OutsideFoodFeeForm
-                key={`${billing.data.outside_food_fee_standard ?? ""}:${billing.data.outside_food_fee_vip ?? ""}`}
+                // The places' fees are in the key: a Save (or the cache's
+                // refresh) that changes any of them re-opens the form on them.
+                key={`${billing.data.outside_food_fee_standard ?? ""}:${billing.data.outside_food_fee_vip ?? ""}:${placeFeesFingerprint(places.data)}`}
                 branchId={id}
                 settings={billing.data}
-                onSaved={() => void billing.reload()}
+                places={places.data}
+                placesError={places.data ? null : places.error}
+                onRetryPlaces={() => void places.reload()}
+                platformName={(slug) => platformDisplayNameOf(slug, platformPrices.data ?? [], lang)}
+                onSaved={() => { void billing.reload(); void places.reload(); }}
               />
             )}
           </SettingsSection>

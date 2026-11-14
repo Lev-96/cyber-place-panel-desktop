@@ -327,37 +327,34 @@ test("a seat whose fee was already charged says so, in Electron", async () => {
  * The app version under the brand (owner, 2026-11-14), in the runtime that
  * shows it: the version string the bundle was built with (package.json via
  * vite's `__APP_VERSION__`) must be the one Electron itself reports
- * (`app.getVersion()`, which electron-builder stamps from the same file), on
- * the sign-in under the wordmark and in the side menu under the brand row.
+ * (`app.getVersion()`, which electron-builder stamps from the same file). ONLY
+ * in the side menu, under the brand row with a visible gap, always English
+ * («Version …»); the sign-in shows none (owner's second call, same day).
  */
-test("the version shows under the brand on the sign-in and in the side menu, and is the app's own", async () => {
+test("the version shows in the side menu only, under the brand with a gap, and is the app's own", async () => {
   const pkg = (JSON.parse(fs.readFileSync(path.join(__dirname, "..", "package.json"), "utf8")) as { version: string }).version;
   const electronVersion = await app.evaluate(({ app: a }) => a.getVersion());
   expect(electronVersion).toBe(pkg);
   const shots = process.env.CP_SHOTS_DIR;
 
-  // Sign-in: mark, wordmark, the version, title, card.
-  const login = page.locator(".login-version");
-  await expect(login).toHaveText(`Version ${pkg}`);
+  // Sign-in: mark, wordmark, title, card, and no version anywhere on it.
+  await expect(page.locator(".login-stage")).toBeVisible();
+  await expect(page.locator(".login-version")).toHaveCount(0);
+  await expect(page.locator(".login-stage")).not.toContainText(/Version|\d+\.\d+\.\d+/);
   expect(await page.$$eval(".login-stage > *", (els) => els.map((e) => e.className.split(" ")[0]))).toEqual(
-    ["login-logo", "login-brand", "login-version", "login-title", "login-flip-wrap"],
+    ["login-logo", "login-brand", "login-title", "login-flip-wrap"],
   );
-  const [brandBox, versionBox, titleBox] = await Promise.all(
-    [".login-brand", ".login-version", ".login-title"].map((s) => page.locator(s).boundingBox()),
-  );
-  expect(versionBox!.y).toBeGreaterThanOrEqual(brandBox!.y + brandBox!.height - 1);
-  expect(titleBox!.y).toBeGreaterThanOrEqual(versionBox!.y + versionBox!.height - 1);
-  if (shots) await page.screenshot({ path: path.join(shots, "electron-login-version.png") });
+  if (shots) await page.screenshot({ path: path.join(shots, "electron-login-no-version.png") });
 
   // At the window's minimum (520×560 content) the sign-in still does not scroll.
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setContentSize(520, 560));
   await expect.poll(() => page.evaluate(() => window.innerHeight)).toBe(560);
-  await expect(page.locator(".login-version")).toBeInViewport({ ratio: 1 });
+  await expect(page.locator(".login-title")).toBeInViewport({ ratio: 1 });
   expect(await page.evaluate(() => {
     const el = document.scrollingElement!;
     return el.scrollHeight - el.clientHeight;
   })).toBe(0);
-  if (shots) await page.screenshot({ path: path.join(shots, "electron-login-version-520x560.png") });
+  if (shots) await page.screenshot({ path: path.join(shots, "electron-login-no-version-520x560.png") });
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setContentSize(1280, 720));
   await expect.poll(() => page.evaluate(() => window.innerWidth)).toBe(1280);
 
@@ -372,7 +369,10 @@ test("the version shows under the brand on the sign-in and in the side menu, and
   const [h1, line, nav] = await Promise.all(
     ["aside.sidebar > h1", "aside.sidebar > .sidebar-version", "aside.sidebar > .sidebar-nav"].map((s) => page.locator(s).boundingBox()),
   );
-  expect(line!.y).toBeGreaterThanOrEqual(h1!.y + h1!.height - 1);
+  // Its own line: a visible gap under the brand row (8px by the CSS; never
+  // pulled up against the logo again).
+  expect(line!.y - (h1!.y + h1!.height)).toBeGreaterThanOrEqual(6);
+  expect(line!.y - (h1!.y + h1!.height)).toBeLessThanOrEqual(12);
   expect(nav!.y).toBeGreaterThanOrEqual(line!.y + line!.height - 1);
   // From the mark's left edge, on ONE line (a break at the hyphen of
   // "-staging" was the first draft's flaw).

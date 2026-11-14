@@ -32,7 +32,9 @@ const settings = (over: Partial<IBillingSettings> = {}): IBillingSettings => ({
 });
 
 const mount = async (s: IBillingSettings) => {
-  await act(async () => { render(<OutsideFoodFeeForm branchId={7} settings={s} onSaved={() => {}} />); });
+  await act(async () => { render(
+    <OutsideFoodFeeForm branchId={7} settings={s} places={[]} placesError={null} onRetryPlaces={() => {}} platformName={(p) => p} onSaved={() => {}} />,
+  ); });
 };
 const box = (label: string) => screen.getByLabelText(label) as HTMLInputElement;
 const standard = () => box("outsideFood.standard");

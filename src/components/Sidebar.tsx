@@ -8,8 +8,7 @@ import AccountSwitchModal from "@/components/profile/AccountSwitchModal";
 import AccountSwitchPanel from "@/components/profile/AccountSwitchPanel";
 import ProfileModal from "@/components/profile/ProfileModal";
 import { useLang } from "@/i18n/LanguageContext";
-import { fmt } from "@/i18n/translations";
-import { desktopAppVersion } from "@/infrastructure/desktopApp";
+import { appVersionLabel, desktopAppVersion } from "@/infrastructure/desktopApp";
 import { activeNavTo, addedMenuSpecs, applyPersonalMenu, iconIdOf, sortedNavItems, withStaffMenu, type NavItemSpec } from "@/components/sidebarNav";
 import type { Role } from "@/types/api";
 import { useUiPreferencesOptional } from "@/preferences/UiPreferencesContext";
@@ -426,10 +425,11 @@ const Sidebar = ({ footerExtra }: SidebarProps = {}) => {
   const collapse = useSidebarCollapse();
   const folded = collapse?.collapsed ?? false;
   // The desktop app's version under the brand (2026-11-14); none on the web,
-  // whose build carries its own package version. Folded, the line steps aside
-  // and the brand row's tooltip says it, like the entries' names.
+  // whose build carries its own package version. Always English («Version …»,
+  // owner). Folded, the line steps aside and the brand row's tooltip says it,
+  // like the entries' names.
   const version = desktopAppVersion();
-  const versionText = version ? fmt(t("app.version"), version) : null;
+  const versionText = version ? appVersionLabel(version) : null;
 
   return (
     <aside className="sidebar" id={collapse ? SIDEBAR_ID : undefined}>

@@ -14,6 +14,11 @@ interface Props {
   required?: boolean;
   disabled?: boolean;
   autoFocus?: boolean;
+  /**
+   * The field's accessible name when it has no visible label (a row of a
+   * list, 2026-11-14). A visible `label` is the name otherwise.
+   */
+  ariaLabel?: string;
 }
 
 /**
@@ -80,6 +85,7 @@ const PriceInput = ({
   required,
   disabled,
   autoFocus,
+  ariaLabel,
 }: Props) => {
   const { lang, currency } = useLang();
   const target = currency;
@@ -137,7 +143,7 @@ const PriceInput = ({
           autoFocus={autoFocus}
           // The field's name is the label above it (2026-11-07): it was text
           // beside the box, so nothing told a screen reader what it is.
-          aria-label={typeof label === "string" ? label : undefined}
+          aria-label={ariaLabel ?? (typeof label === "string" ? label : undefined)}
         />
         <span
           style={{

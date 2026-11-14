@@ -25,3 +25,10 @@ export const buildVersion = (): string | null =>
 
 /** The desktop app's version, or null anywhere else (the owner web, a browser tab). */
 export const desktopAppVersion = (): string | null => (isDesktopApp() ? buildVersion() : null);
+
+/**
+ * The version line's words: ALWAYS English, «Version 1.0.61-staging.11», in
+ * every UI language (owner, 2026-11-14) — it is a build identifier read out
+ * to support, not interface copy, so it is not translated.
+ */
+export const appVersionLabel = (version: string): string => `Version ${version}`;

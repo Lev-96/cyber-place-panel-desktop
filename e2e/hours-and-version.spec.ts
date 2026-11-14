@@ -9,8 +9,9 @@ import { installBackendMocks, seedLanguageChosen } from "./helpers/mockBackend";
  *  2. The dialog fits with no scroll, inside or around it, at 1280×720 and at
  *     the desktop's smallest window (520×560, `electron/windowBounds.ts`), in
  *     every language, with every hint showing.
- *  3. The app version is the DESKTOP app's: a browser shows none, on the
- *     sign-in or in the side menu (the Electron half is in
+ *  3. The app version is the DESKTOP app's, in its side menu only (never on
+ *     the sign-in, owner's second call the same day): a browser shows none,
+ *     on the sign-in or in the side menu (the Electron half is in
  *     `e2e-electron/shell.spec.ts`).
  *
  * `CP_SHOTS_DIR` set: screenshots of each case are written there.

@@ -326,6 +326,19 @@ export interface IBillingPolicy {
    */
   outside_food_fee_standard?: number | null;
   outside_food_fee_vip?: number | null;
+  /**
+   * Per-place own-food figures (2026-11-14), written to `places.outside_food_fee`
+   * in the same transaction as the tiers. ONLY the rows that changed; absent
+   * leaves every place alone. `fee`: null = like the branch's tier, 0 = not
+   * charged at this place, above 0 = the place's own figure.
+   */
+  outside_food_place_fees?: IOutsideFoodPlaceFee[];
+}
+
+/** One row of `IBillingPolicy.outside_food_place_fees`. */
+export interface IOutsideFoodPlaceFee {
+  place_id: number;
+  fee: number | null;
 }
 
 export const apiGetBillingSettings = (branchId: number) =>

@@ -8,7 +8,8 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 /**
  * The app version under the brand (owner, 2026-11-14): a quiet line under the
- * logo and «CYBER PLACE», the full version string, in the desktop app only.
+ * logo and «CYBER PLACE», the full version string, in the desktop app only,
+ * ALWAYS in English («Version …») whatever the UI language.
  * The owner web renders this same Sidebar in its drawer; its build carries its
  * own package version (0.1.0), which must never be shown as the panel's.
  */
@@ -78,13 +79,13 @@ describe("in the desktop app", () => {
     expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("CYBER PLACE");
   });
 
-  test.each([
-    ["ru", `Версия ${PKG_VERSION}`],
-    ["am", `Տարբերակ ${PKG_VERSION}`],
-  ] as const)("in %s", (code, text) => {
+  test.each(["ru", "am"] as const)("in %s it is still English: «Version …»", (code) => {
     lang.code = code;
-    mount();
-    expect(versionLine()?.textContent).toBe(text);
+    mount(true);
+    expect(versionLine()?.textContent).toBe(`Version ${PKG_VERSION}`);
+    // Folded, the tooltip says the same words.
+    fireEvent.click(screen.getByTestId("sidebar-toggle"));
+    expect(screen.getByRole("heading", { level: 1 }).getAttribute("title")).toBe(`Version ${PKG_VERSION}`);
   });
 
   test("folded to the rail: the line steps aside and the brand's tooltip carries it", async () => {

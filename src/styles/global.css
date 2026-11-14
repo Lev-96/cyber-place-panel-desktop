@@ -1060,7 +1060,10 @@ a.card:hover {
    the wordmark broke it at the hyphen. Never on the web. */
 .sidebar-version {
   flex-shrink: 0;
-  margin: -12px 12px 0;
+  /* Its own line, 8px under the brand row (h1's 4px bottom margin + the
+     column's 12px gap − 8px), never pressed against the logo (owner,
+     2026-11-14); 4px more under it before the menu. */
+  margin: -8px 12px 4px;
   color: var(--color-muted);
   font-size: var(--fs-xs);
   font-weight: 500;
@@ -4205,20 +4208,6 @@ div.cp-switch {
 .login-shell .login-title {
   font-size: calc(var(--ring-size) * 0.032);
 }
-/* The desktop app's version (2026-11-14): one quiet line under the wordmark,
-   pulled up into the stage's gap so wordmark and version read as one unit
-   and the title keeps its distance. Never on the web. */
-.login-version {
-  margin: calc(var(--ring-size) * -0.03) 0 0;
-  color: var(--color-muted);
-  font-size: var(--fs-sm);
-  font-weight: 500;
-  line-height: 1.35;
-  letter-spacing: 0.02em;
-  font-variant-numeric: tabular-nums;
-  text-align: center;
-}
-
 /* ---- The form: an instrument housing, not a plain card ----
    An even 0.82 of the page colour under a faint accent tint (it used to fade
    to nearly clear at the top), and a 4px blur: on a phone a planet sits
@@ -10885,6 +10874,101 @@ select.input option:disabled {
 .outside-food-form__tiers { display: flex; flex-wrap: wrap; gap: var(--space-3) var(--space-4); }
 .outside-food-form__tier { display: flex; flex-direction: column; gap: var(--space-1); flex: 1 1 180px; min-width: 0; max-width: 260px; }
 .outside-food-form__note { font-size: var(--fs-sm); }
+/* Prices → «Свои продукты» → own amounts per place (2026-11-14). One scroll
+   box (≤320px) grouped by platform; a row is the place on the left and its
+   controls on the right, wrapping under it when narrow. Labels wrap, never
+   clip. The one visual signal: a place that does NOT follow the branch carries
+   an edge on its left (accent = own figure, muted = not charged), so the
+   exceptions read at a glance down the list. */
+.outside-food-places { gap: var(--space-2); min-width: 0; padding-top: var(--space-2); border-top: 1px solid var(--color-border); }
+.outside-food-places__head { gap: 2px; }
+.outside-food-places__filters { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); min-width: 0; }
+.outside-food-places__filters .cp-subtabs { flex-wrap: wrap; min-width: 0; }
+/* Tabs sized to their words (the shared rule makes them equal and cuts the
+   longest, «Со своей суммой · 4»); they wrap onto a second line instead. */
+.outside-food-places__filters .cp-subtab {
+  flex: 0 1 auto;
+  min-width: auto;
+  max-width: 100%;
+  /* A label longer than the line (Armenian on a phone) wraps, never cut. */
+  height: auto;
+  min-height: var(--subtab-h, 34px);
+  white-space: normal;
+  line-height: 1.25;
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
+.outside-food-places__search { flex: 1 1 200px; max-width: 280px; min-width: 0; }
+.outside-food-places__list {
+  max-height: 320px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  min-width: 0;
+}
+.outside-food-places__empty { display: block; padding: var(--space-3); }
+.outside-food-places__group + .outside-food-places__group { border-top: 1px solid var(--color-border); }
+.outside-food-places__platform {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  margin: 0;
+  padding: 6px var(--space-3);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  color: var(--color-muted);
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+}
+.outside-food-places__rows { list-style: none; margin: 0; padding: 0; }
+.outside-food-place {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  padding: 6px var(--space-3);
+  box-shadow: inset 3px 0 0 transparent;
+}
+.outside-food-place + .outside-food-place { border-top: 1px solid color-mix(in srgb, var(--color-border) 60%, transparent); }
+.outside-food-place[data-state="own"] { box-shadow: inset 3px 0 0 var(--color-primary); }
+.outside-food-place[data-state="notCharged"] { box-shadow: inset 3px 0 0 var(--color-muted); }
+.outside-food-place[data-state="invalid"] { box-shadow: inset 3px 0 0 var(--color-danger); }
+.outside-food-place__who { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; flex: 1 1 120px; min-width: 0; }
+.outside-food-place__label { font-weight: 600; overflow-wrap: anywhere; }
+.outside-food-place[data-changed] .outside-food-place__label::after {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-left: 6px;
+  vertical-align: middle;
+  border-radius: 50%;
+  background: var(--color-warning);
+}
+.price-badge.outside-food-place__chip { margin-left: 0; }
+/* One line on a desktop: place | box | «not charged here» | state. Narrow,
+   the controls drop under the place and the box takes the row's width. */
+.outside-food-place__controls { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); flex: 0 1 auto; min-width: 0; }
+/* Wide enough on a desktop for the longest placeholder, Armenian
+   «Ինչպես մասնաճյուղում (1,000 դրամ)». */
+.outside-food-place__box { flex: 0 0 360px; max-width: 100%; min-width: 0; }
+.outside-food-place .cp-checkbox-label { white-space: normal; }
+.outside-food-place__state-slot { flex: 0 0 10rem; display: flex; justify-content: flex-end; min-width: 0; }
+.outside-food-place__state {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+  white-space: nowrap;
+  border: 1px solid transparent;
+}
+.outside-food-place__state--own { background: color-mix(in srgb, var(--color-primary) 18%, transparent); color: var(--color-primary); }
+.outside-food-place__state--notCharged { border-color: var(--color-border); color: var(--color-text, inherit); }
+.outside-food-place__state--branch { color: var(--color-muted); }
+.outside-food-place__state--invalid { background: color-mix(in srgb, var(--color-danger) 18%, transparent); color: var(--color-danger); }
+.outside-food-places__summary { display: flex; flex-wrap: wrap; gap: 2px var(--space-3); font-size: var(--fs-sm); color: var(--color-muted); }
+.outside-food-places__pending { color: var(--color-warning); font-weight: 600; }
 /* The place form's own figure: the box no wider than the other price boxes. */
 .place-outside-food { gap: var(--space-1); max-width: 320px; }
 .place-outside-food__hint { font-size: 11px; line-height: 1.4; }

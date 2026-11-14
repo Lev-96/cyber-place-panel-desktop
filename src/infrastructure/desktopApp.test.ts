@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { buildVersion, desktopAppVersion, isDesktopApp } from "./desktopApp";
+import { appVersionLabel, buildVersion, desktopAppVersion, isDesktopApp } from "./desktopApp";
 
 /**
  * Where the panel runs (2026-11-14). The desktop app is the bundle inside the
@@ -66,4 +66,11 @@ test("vite injects package.json's version, the one electron-builder stamps into 
   const config = readFileSync(path.resolve(__dirname, "../../vite.config.ts"), "utf8");
   expect(config).toMatch(/__APP_VERSION__:\s*JSON\.stringify\(pkg\.version\)/);
   expect(config).toMatch(/resolve\(__dirname,\s*"package\.json"\)/);
+});
+
+describe("appVersionLabel", () => {
+  test("always English, the full version string (owner, 2026-11-14: not translated)", () => {
+    expect(appVersionLabel("1.0.61-staging.11")).toBe("Version 1.0.61-staging.11");
+    expect(appVersionLabel(PKG_VERSION)).toBe(`Version ${PKG_VERSION}`);
+  });
 });
