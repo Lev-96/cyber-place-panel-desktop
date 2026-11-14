@@ -2,6 +2,7 @@ import { _electron as electron, expect, test, type ElectronApplication, type Pag
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { platformBillingOverview } from "../e2e/helpers/mockBackend";
 
 /**
  * The panel, running in the runtime it actually ships in.
@@ -114,6 +115,13 @@ test.beforeEach(async () => {
       return route.fulfill({
         status: 200, contentType: "application/json",
         body: JSON.stringify({ login: user, token: "t", messages: "ok" }),
+      });
+    }
+    // The owner's dashboard debt card; the catch-all's `{data: []}` made it throw.
+    if (/^\/company\/\d+\/platform-billing$/.test(p)) {
+      return route.fulfill({
+        status: 200, contentType: "application/json",
+        body: JSON.stringify(platformBillingOverview(1)),
       });
     }
     if (p === "/pcs") {
@@ -239,13 +247,24 @@ test("the unlimited confirmation is an in-app dialog, and the renderer keeps typ
   // it is dismissed, and the symptom appears here rather than on the dialog
   // that caused it — which is why this types into a DIFFERENT dialog opened
   // afterwards, and asserts the characters landed.
-  await page.getByRole("button", { name: "Close" }).click();
+  //
+  // Cancel starts the confirmation's 160 ms exit (MODAL_LEAVE_MS) and its ×
+  // stays in the DOM until it ends, so wait for it to be GONE first. Then the
+  // «Add time» dialog's own footer «Close» (the form's explicit answer; its ×,
+  // also named "Close", would ask «leave?» because a price was typed).
+  await expect(page.getByRole("dialog").filter({ hasText: "Switch this session to unlimited?" })).toHaveCount(0);
+  const addTime = page.getByRole("dialog").filter({ has: page.getByRole("heading", { name: "Add time", level: 2 }) });
+  await addTime.getByRole("button", { name: "Close", exact: true }).filter({ hasText: "Close" }).click();
+  await expect(addTime).toHaveCount(0);
   await page.getByRole("button", { name: "Add a product" }).first().click();
 
-  const search = page.getByPlaceholder("Search by name…");
-  await expect(search).toBeVisible();
-  await search.fill("cola");
-  await expect(search).toHaveValue("cola");
+  // The dialog opens on typing the order since c0c9c6b (2026-11-07, owner),
+  // not on the catalogue's search box: type into that field.
+  const product = page.getByRole("dialog").filter({ has: page.getByRole("heading", { name: "Add a product", level: 2 }) });
+  const entry = product.getByRole("textbox", { name: "Quick entry" });
+  await expect(entry).toBeVisible();
+  await entry.fill("cola");
+  await expect(entry).toHaveValue("cola");
 });
 
 /**
@@ -302,4 +321,74 @@ test("a seat whose fee was already charged says so, in Electron", async () => {
     route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ session: paid }) }));
   await page.getByRole("button", { name: "Remove joystick" }).click();
   await expect(page.getByTestId("pad-note-5")).toContainText("paid");
+});
+
+/**
+ * The app version under the brand (owner, 2026-11-14), in the runtime that
+ * shows it: the version string the bundle was built with (package.json via
+ * vite's `__APP_VERSION__`) must be the one Electron itself reports
+ * (`app.getVersion()`, which electron-builder stamps from the same file), on
+ * the sign-in under the wordmark and in the side menu under the brand row.
+ */
+test("the version shows under the brand on the sign-in and in the side menu, and is the app's own", async () => {
+  const pkg = (JSON.parse(fs.readFileSync(path.join(__dirname, "..", "package.json"), "utf8")) as { version: string }).version;
+  const electronVersion = await app.evaluate(({ app: a }) => a.getVersion());
+  expect(electronVersion).toBe(pkg);
+  const shots = process.env.CP_SHOTS_DIR;
+
+  // Sign-in: mark, wordmark, the version, title, card.
+  const login = page.locator(".login-version");
+  await expect(login).toHaveText(`Version ${pkg}`);
+  expect(await page.$$eval(".login-stage > *", (els) => els.map((e) => e.className.split(" ")[0]))).toEqual(
+    ["login-logo", "login-brand", "login-version", "login-title", "login-flip-wrap"],
+  );
+  const [brandBox, versionBox, titleBox] = await Promise.all(
+    [".login-brand", ".login-version", ".login-title"].map((s) => page.locator(s).boundingBox()),
+  );
+  expect(versionBox!.y).toBeGreaterThanOrEqual(brandBox!.y + brandBox!.height - 1);
+  expect(titleBox!.y).toBeGreaterThanOrEqual(versionBox!.y + versionBox!.height - 1);
+  if (shots) await page.screenshot({ path: path.join(shots, "electron-login-version.png") });
+
+  // At the window's minimum (520×560 content) the sign-in still does not scroll.
+  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setContentSize(520, 560));
+  await expect.poll(() => page.evaluate(() => window.innerHeight)).toBe(560);
+  await expect(page.locator(".login-version")).toBeInViewport({ ratio: 1 });
+  expect(await page.evaluate(() => {
+    const el = document.scrollingElement!;
+    return el.scrollHeight - el.clientHeight;
+  })).toBe(0);
+  if (shots) await page.screenshot({ path: path.join(shots, "electron-login-version-520x560.png") });
+  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setContentSize(1280, 720));
+  await expect.poll(() => page.evaluate(() => window.innerWidth)).toBe(1280);
+
+  // The side menu: under the brand row, above the menu, the full string.
+  await page.getByPlaceholder("your@email.com").fill("o@o");
+  await page.getByPlaceholder(/•/).fill("ok");
+  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await expect(page.getByText("Owner One").first()).toBeVisible();
+  const side = page.getByTestId("app-version");
+  await expect(side).toHaveText(`Version ${pkg}`);
+  await expect(side).toBeInViewport({ ratio: 1 });
+  const [h1, line, nav] = await Promise.all(
+    ["aside.sidebar > h1", "aside.sidebar > .sidebar-version", "aside.sidebar > .sidebar-nav"].map((s) => page.locator(s).boundingBox()),
+  );
+  expect(line!.y).toBeGreaterThanOrEqual(h1!.y + h1!.height - 1);
+  expect(nav!.y).toBeGreaterThanOrEqual(line!.y + line!.height - 1);
+  // From the mark's left edge, on ONE line (a break at the hyphen of
+  // "-staging" was the first draft's flaw).
+  const mark = await page.locator("aside.sidebar > h1 > img").boundingBox();
+  const text = await side.evaluate((el) => {
+    const r = document.createRange();
+    r.selectNodeContents(el);
+    return { left: r.getBoundingClientRect().left, lines: r.getClientRects().length };
+  });
+  expect(Math.abs(text.left - mark!.x)).toBeLessThanOrEqual(2);
+  expect(text.lines).toBe(1);
+  if (shots) await page.screenshot({ path: path.join(shots, "electron-sidebar-version.png") });
+
+  // Folded to the rail: the line steps aside, the brand row's tooltip carries it.
+  await page.getByTestId("sidebar-toggle").click();
+  await expect(side).toHaveCSS("opacity", "0");
+  await expect(page.locator("aside.sidebar > h1")).toHaveAttribute("title", `Version ${pkg}`);
+  if (shots) await page.screenshot({ path: path.join(shots, "electron-sidebar-folded.png") });
 });

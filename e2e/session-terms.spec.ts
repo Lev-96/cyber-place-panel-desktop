@@ -155,22 +155,40 @@ test("the extra controller in play is named in the note a press brings, never on
  * The row wraps now. The assertion is on the WIDTH rather than on a screenshot
  * because that is the thing that went wrong, and it fails the moment anybody
  * makes the line beside it longer again.
+ *
+ * Since 22eaea8 (2026-10-25) the select is the «+🎮» switch (`PadToggle`): ONE
+ * cell of the action grid. With a pad out and a fourth one on offer the cell
+ * splits into two equal halves, lit «take back» and unlit «hand out». The claim
+ * is the same: with a controller out, both presses are on the tile, neither is
+ * squeezed, and the cell is as wide as the action beside it.
  */
-test("the pad menu keeps its width when a controller is out", async ({ page }) => {
+test("the pad switch keeps its width when a controller is out", async ({ page }) => {
   await installBackendMocks(page, { role: "company_owner", company_id: 1, name: "Owner One" });
   await seedFloor(page);
   await signIn(page, "o@o");
   await expect(page.getByText("Owner One").first()).toBeVisible();
   await page.evaluate(() => { window.location.hash = "#/branches/1/sessions"; });
 
-  const menu = page.locator("select.pad-select").first();
-  await expect(menu).toBeVisible();
+  const pads = page.getByTestId("pad-toggle").first();
+  // Pad 3 is out (seedFloor): the lit «take back», and pad 4 still offered.
+  await expect(pads.getByTestId("pad-remove")).toHaveAttribute("aria-pressed", "true");
+  await expect(pads.getByTestId("pad-add")).toBeEnabled();
 
-  const box = await menu.boundingBox();
-  expect(box, "the pad menu is on the tile").not.toBeNull();
-  // Its own chevron is 8px and sits 3px from the right edge. Anything near
-  // that number is the arrow alone; 90 is a word plus the arrow.
-  expect(box!.width).toBeGreaterThanOrEqual(90);
+  const sizes = await pads.evaluate((cell) => {
+    const w = (el: Element | null) => Math.round(el!.getBoundingClientRect().width);
+    return {
+      cell: w(cell),
+      remove: w(cell.querySelector('[data-testid="pad-remove"]')),
+      add: w(cell.querySelector('[data-testid="pad-add"]')),
+      // The action that shares its row: «+ Product».
+      neighbour: w(cell.nextElementSibling),
+    };
+  });
+  // Two equal halves; a half wide enough to be pressed (the icon is 18px).
+  expect(Math.abs(sizes.remove - sizes.add)).toBeLessThanOrEqual(1);
+  expect(sizes.remove).toBeGreaterThanOrEqual(40);
+  // The switch never takes less room than the action beside it.
+  expect(Math.abs(sizes.cell - sizes.neighbour)).toBeLessThanOrEqual(1);
 
   // …and the tile it sits on does not scroll sideways to hold it.
   const overflows = await page.locator(".place-cell").first()
@@ -187,8 +205,10 @@ test("the running-session dialog does not carry the waiver", async ({ page }) =>
   await page.goto("/#/branches/1/sessions");
   await page.getByRole("button", { name: "Add time" }).first().click();
 
-  // The dialog IS open — this is one of the things it does own.
-  await expect(page.getByText("Session options")).toBeVisible();
+  // The dialog IS open — this is one of the things it does own. Since
+  // 362862a (2026-11-07) it is the one «Add time» dialog for every mode.
+  const dialog = page.getByRole("dialog");
+  await expect(dialog.getByRole("heading", { level: 2 })).toHaveText("Add time");
   await expect(page.getByText("Free session", { exact: true })).toHaveCount(0);
 });
 
@@ -231,6 +251,10 @@ test("and so can a manager", async ({ page }) => {
  * and «Пересадить» (Move) spans the row like Stop. An odd count of half-width
  * actions must not leave a hole — the last one takes the row (a `:has()` rule
  * jsdom cannot evaluate, which is why this lives here).
+ *
+ * A grid CELL is a direct child of the grid: since 22eaea8 the «+🎮» switch is
+ * one cell that may hold two half-buttons, so rows are measured by cell, and
+ * the switch's halves are checked to be equal on their own.
  */
 test("the session card's actions are even rows with nothing clipped", async ({ page }) => {
   await installBackendMocks(page, { role: "company_owner", company_id: 1, name: "Owner One" });
@@ -244,15 +268,19 @@ test("the session card's actions are even rows with nothing clipped", async ({ p
     const grid = card.querySelector(".session-card__actions") as HTMLElement;
     const gridWidth = grid.getBoundingClientRect().width;
     const buttons = [...grid.querySelectorAll(".btn")] as HTMLElement[];
+    const cells = [...grid.children] as HTMLElement[];
     const rows: Record<number, number[]> = {};
-    for (const b of buttons) {
-      const r = b.getBoundingClientRect();
+    for (const c of cells) {
+      const r = c.getBoundingClientRect();
       (rows[Math.round(r.top)] ??= []).push(Math.round(r.width));
     }
     const named = (n: string) => buttons.find((b) => b.getAttribute("aria-label") === n)!;
+    const halves = [...grid.querySelectorAll(".pad-toggle > .btn")]
+      .map((b) => Math.round(b.getBoundingClientRect().width));
     return {
       gridWidth: Math.round(gridWidth),
       rows: Object.values(rows),
+      halves,
       heights: [...new Set(buttons.map((b) => Math.round(b.getBoundingClientRect().height)))],
       clipped: buttons.filter((b) => b.scrollWidth > b.clientWidth).map((b) => b.textContent),
       move: Math.round(named("Move player").getBoundingClientRect().width),
@@ -266,6 +294,9 @@ test("the session card's actions are even rows with nothing clipped", async ({ p
     if (row.length === 2) expect(Math.abs(row[0] - row[1])).toBeLessThanOrEqual(1);
     else expect(row).toEqual([layout.gridWidth]);
   }
+  // seedFloor has pad 3 out and pad 4 on offer: the switch is two equal halves.
+  expect(layout.halves).toHaveLength(2);
+  expect(Math.abs(layout.halves[0] - layout.halves[1])).toBeLessThanOrEqual(1);
   expect(layout.move).toBe(layout.gridWidth);
   expect(layout.stop).toBe(layout.gridWidth);
 });
