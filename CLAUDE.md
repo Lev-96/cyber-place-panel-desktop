@@ -556,6 +556,13 @@ manager → `branch.{id}`, orphan → null (no subscription).
 | `BranchVisibilityChanged` | `branch.visibility.changed` | `branches` + branch.{id} |
 | `AppReleaseAvailable` | `app-release.available` | app-updates.{role} |
 | `AppUpdatePromoted` | `app-update.promoted` | app-updates |
+| `SupportMessageCreated` | `support.message.created` | support.user.{id} (**private**) |
+
+Payloads trimmed to fit Reverb's frame limit (backend, 2026-11-14): a support
+message too big for one frame arrives with `body: null` + `body_truncated: true`
+(the key is absent otherwise); `app-release.available` / `app-update.promoted`
+may carry `notes: null` + `notes_truncated: true`. The panel never renders notes
+from an event; a truncated support message is read back over REST (rule 10).
 
 ### The socket's identity comes from the BACKEND, not from this build
 
@@ -666,6 +673,13 @@ loud `[reverb] REJECTED …` line naming the key and host; the backend has
     does NOT carry the account's new scope (which branches it may still
     reach) — there is nothing to patch optimistically from. Do not read this
     as licence to fetch from booking/place handlers.
+    *Second exception (2026-11-14):* a `support.message.created` flagged
+    `body_truncated` re-reads the open thread (`GET /support/conversations/{id}`,
+    `SupportChat` → `arrivalNeedsRefetch` / `reconcileThread`) instead of
+    rendering an empty bubble: a slim broadcast means refetch. Only that
+    flag, only for the open thread, and only a message over ~1000 Cyrillic
+    characters triggers it, so it cannot storm. Normal events are merged from
+    the payload as before.
 11. **Polling fallback is mandatory** on every realtime-critical screen
     (`useReservedPlaceIds`, `NotificationsContext` etc.) — 30–60 s. Reverb
     dropouts are silent; polling is the safety net.
@@ -4538,3 +4552,71 @@ already reads (the card's `sessionAmount`, the receipt's `items_total` /
   520×560 with no scroll; in the side menu package.json = `app.getVersion()`
   = the line, 6–12px under the brand row, folded too).
 - Owner web: bump `panel.ref` after this lands (not done in the panel change).
+
+## Audit fixes (2026-11-14)
+
+From `~/cyber-place-local/reports/qa-audit-2026-11-13/` and
+`regression-2026-11-14/part2/`. Each fix: failing test first, two mutations,
+Playwright. Screenshots: `~/cyber-place-local/reports/audit-fixes-2026-11-14/panel/`.
+
+- **Support composer** (`components/support/SupportComposer.tsx`, owner): the
+  one-line input is a textarea on its own row across the thread, buttons
+  under it. `growToContent` sizes it to the text on every change (before
+  paint); CSS caps it at `min(30vh, 220px)`, then it scrolls inside; while
+  typing the page follows it so Send stays on screen at 520×560. Enter sends,
+  Shift+Enter is a new line, an IME composing owns its Enter. `maxLength` =
+  `SUPPORT_BODY_MAX` 4000 (mirrors `SupportController` `max:4000`); a counter
+  from 90 %. Tests: `SupportComposer.test.tsx`, `e2e/support-composer.spec.ts`
+  (520×560, 960×600, 1280×720: ≥ 90 % of the thread, no overflow, grows then
+  scrolls; Enter sends multi-line).
+- **A crashing screen no longer locks the panel (B2).**
+  `components/errors/RouteErrorBoundary.tsx` wraps the layout's `<Outlet />`:
+  «Этот экран не открылся» / «Остальное работает.» + «На главную» +
+  «Скопировать для поддержки» (`crashReport.ts`: time, route, version, error,
+  stack, component stack — only in the clipboard, never on screen). Keyed on
+  the pathname, so any menu entry leaves the crash; «На главную» on `/`
+  retries in place. `ErrorBoundary.tsx` (one class, used twice) is still the
+  root's last resort: no stack on screen, «Copy for support», and «Reload»
+  is `reloadAtHome()` (address rewritten to `#/` via `history.replaceState`,
+  then reload; a hash-only `location.replace` would not reload). Tests:
+  `components/errors/ErrorBoundary.test.tsx`, `e2e/screen-crash.spec.ts`
+  (a real crash: the owner's Home with a malformed billing answer).
+- **Prices → extra item (B5):** the charge options go through `fmt()` with the
+  item's name, `branchExtraItem.itemFallback` («предмет») until it has one;
+  the two selects size to their content (`.branch-extra-item__select`,
+  min 180px, max the row). Tests: `BranchExtraItemForm.copy.test.tsx`,
+  `e2e/extra-item-copy.spec.ts`.
+- **Place tier through the dictionary (B6):** `utils/placeType.ts`
+  (`PLACE_TYPE_LABEL_KEY`, `placeTypeLabelKey`) on the board, the live map
+  (`PlaceCell`), the `/appearance` preview and `PlaceForm`. Never print
+  `place.type`. Tests: `placeType.test.ts`, `SessionsBoard.identity.test.tsx`,
+  `e2e/tier-label.spec.ts`.
+- **403 on a branch's screen (B11):** `classifyError` → `forbidden` for a
+  code-less 403 (a block or network-guard 403 carries a `code` and keeps its
+  own path). `ErrorState` shows «Нет доступа к этому филиалу», no Retry, no
+  server sentence — but only inside `BranchScopeContext` (provided by `Layout`
+  from `useMatch("/branches/:branchId/*")`); elsewhere a 403 is the generic
+  failure as before (the account switcher's test pins it). `BranchHub` shows
+  that state alone, without the tiles. Tests: `viewState.test.ts`,
+  `StateView.test.tsx`, `e2e/foreign-branch.spec.ts`.
+- **Russian copy (B9):** «Ничего, кроме старта.», «История продаж», «+ Товар»
+  on the board header too (and in the till's hint). `translations.test.ts`,
+  `e2e/ru-copy.spec.ts`.
+- **Receipt heading:** with the own-food line on the bill the section is
+  `session.itemsAndFees` («Товары и доплаты»), else `session.itemsBought`.
+  Totals untouched (server figures). `StopReceiptModal.test.tsx`,
+  `e2e/outside-food.spec.ts`.
+- **«Failed to fetch» on sign-in and the reset face (B8, panel part):**
+  `classifyError(ex) === "offline"` → `textKey("auth.noConnection")` in
+  `routes/Login.tsx` and `components/login/ForgotPasswordForm.tsx` (shared
+  with the owner web); a server sentence is kept. `Login.language.test.tsx`,
+  `e2e/login-offline.spec.ts`.
+- **Emergency PIN card:** `GET /branches/{id}` carries `unlock_pin_updated_at`
+  now; with no date but a PIN from `/unlock-pin` the card says «PIN
+  установлен» (`unlockPin.isSet`), never «not set».
+  `BranchUnlockPinCard.test.tsx`, `e2e/unlock-pin.spec.ts`.
+- **Truncated payloads:** see the event table and rule 10 above.
+  `SupportChat.merge.test.ts`, `useAppUpdates.test.tsx`,
+  `e2e/support-truncated.spec.ts` (a mocked Reverb socket via
+  `page.routeWebSocket`, speaking enough Pusher for one private channel:
+  reuse it for any realtime e2e).
