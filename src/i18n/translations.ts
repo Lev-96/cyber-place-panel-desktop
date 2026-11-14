@@ -1448,6 +1448,8 @@ export const TRANSLATIONS: Dict = {
   },
   "session.checkoutKeepPlaying": { en: "Keep playing", ru: "Продолжить игру", am: "Շարունակել խաղը" },
   "session.itemsBought": { en: "Products bought", ru: "Приобретённые товары", am: "Գնված ապրանքներ" },
+  // The receipt's section when the own-food fee is among its lines (2026-11-14).
+  "session.itemsAndFees": { en: "Products and fees", ru: "Товары и доплаты", am: "Ապրանքներ և հավելավճարներ" },
   "session.closing": { en: "Closing…", ru: "Закрываем…", am: "Փակվում է…" },
   "session.fixedTariff": { en: "Fixed tariff", ru: "Фиксированный тариф", am: "Ֆիքսված սակագին" },
   "session.openByHour": { en: "By hour (open)", ru: "По часам (открытая)", am: "Ժամով (բաց)" },
@@ -1861,7 +1863,7 @@ export const TRANSLATIONS: Dict = {
   "hub.tile.tillHint": { en: "Sell products without a session", ru: "Продажа товаров без сессии", am: "Ապրանքների վաճառք առանց սեսիայի" },
   "till.title": { en: "Till", ru: "Касса", am: "Դրամարկղ" },
   "till.sell": { en: "Sell products", ru: "Продать товар", am: "Վաճառել ապրանք" },
-  "session.sellProduct": { en: "+ Product", ru: "+ Продукт", am: "+ Ապրանք" },
+  "session.sellProduct": { en: "+ Product", ru: "+ Товар", am: "+ Ապրանք" },
   "till.sellTitle": { en: "Product sale", ru: "Продажа товара", am: "Ապրանքի վաճառք" },
   "till.sellConfirm": { en: "Sell", ru: "Продать", am: "Վաճառել" },
   "till.selling": { en: "Selling…", ru: "Продаём…", am: "Վաճառվում է…" },
@@ -1880,7 +1882,7 @@ export const TRANSLATIONS: Dict = {
   "till.history.title": { en: "Product sales (no seat)", ru: "Продажи товаров (без места)", am: "Ապրանքների վաճառք (առանց տեղի)" },
   "till.history.hint": {
     en: "Sold through «+ Product» or the Till: who sold, what, for how much.",
-    ru: "Продано через «+ Продукт» или «Кассу»: кто продал, что и за сколько.",
+    ru: "Продано через «+ Товар» или «Кассу»: кто продал, что и за сколько.",
     am: "Վաճառված «+ Ապրանք»-ով կամ Դրամարկղով՝ ով, ինչ և որքանով։",
   },
   "till.history.empty": {
@@ -1969,7 +1971,7 @@ export const TRANSLATIONS: Dict = {
   // branch TOOK over a period — sessions closed, items sold, money — rather
   // than listing sessions as events. The old name sent people looking for a
   // log and made the revenue tiles beneath it read as a surprise.
-  "history.title": { en: "Sales history", ru: "История торговли", am: "Վաճառքների պատմություն" },
+  "history.title": { en: "Sales history", ru: "История продаж", am: "Վաճառքների պատմություն" },
   "history.from": { en: "From", ru: "С", am: "Սկսած" },
   "history.to": { en: "To", ru: "По", am: "Մինչև" },
   "history.today": { en: "Today", ru: "Сегодня", am: "Այսօր" },
@@ -2268,7 +2270,7 @@ export const TRANSLATIONS: Dict = {
   "history.billSum": { en: "Amount", ru: "Сумма", am: "Գումար" },
   "history.billTime": { en: "Play time", ru: "Игровое время", am: "Խաղային ժամանակ" },
   "history.branch": { en: "Branch", ru: "Филиал", am: "Մասնաճյուղ" },
-  "history.actionsEmpty": { en: "Nothing beyond the start.", ru: "Кроме старта. Ничего.", am: "Բացի սկսելուց՝ ոչինչ։" },
+  "history.actionsEmpty": { en: "Nothing beyond the start.", ru: "Ничего, кроме старта.", am: "Բացի սկսելուց՝ ոչինչ։" },
   "history.sumFree": { en: "Free active places", ru: "Бесплатные активные места", am: "Անվճար ակտիվ տեղեր" },
   "history.sumWaived": { en: "Waived", ru: "Списано", am: "Դուրս գրված" },
   "history.action.started": { en: "Started the session", ru: "Начал сессию", am: "Սկսեց սեսիան" },
@@ -2921,6 +2923,8 @@ export const TRANSLATIONS: Dict = {
   "place.extraItemPriceNext": { en: "Each one after", ru: "\u041a\u0430\u0436\u0434\u044b\u0439 \u0441\u043b\u0435\u0434\u0443\u044e\u0449\u0438\u0439", am: "Յուրաքանչյուր հաջորդը" },
   "branchExtraItem.sectionTitle": { en: "The room's own extra", ru: "\u0414\u043e\u043f. \u043f\u0440\u0435\u0434\u043c\u0435\u0442 \u043a\u043e\u043c\u043d\u0430\u0442\u044b", am: "Սենյակի լրացուցիչ իրը" },
   "branchExtraItem.name": { en: "What the venue hands out", ru: "\u0427\u0442\u043e \u0432\u044b\u0434\u0430\u0451\u0442 \u0437\u0430\u0432\u0435\u0434\u0435\u043d\u0438\u0435", am: "Ինչ է տրամադրում ակումբը" },
+  // Stands in for the extra's name in the charge options until the venue names it (B5).
+  "branchExtraItem.itemFallback": { en: "item", ru: "предмет", am: "առարկա" },
   "branchExtraItem.pricingMode": { en: "Tariff", ru: "\u0422\u0430\u0440\u0438\u0444", am: "\u054d\u0561\u056f\u0561\u0563\u056b\u0576" },
   "branchExtraItem.chargeMode": { en: "Charged", ru: "\u041e\u043f\u043b\u0430\u0442\u0430", am: "\u054e\u0573\u0561\u0580\u0578\u0582\u0574" },
   "branchExtraItem.saved": { en: "Saved", ru: "\u0421\u043e\u0445\u0440\u0430\u043d\u0435\u043d\u043e", am: "Պահպանվեց" },
@@ -4224,9 +4228,28 @@ export const TRANSLATIONS: Dict = {
   "tournamentDetails.players": { en: "Players", ru: "Игроки", am: "Խաղացողներ" },
 
   // ErrorBoundary
+  // Sign-in / reset when the server never answered (B8): instead of «Failed to fetch».
+  "auth.noConnection": {
+    en: "No connection to the server. Check your internet and try again.",
+    ru: "Нет связи с сервером. Проверьте интернет и попробуйте ещё раз.",
+    am: "Սերվերի հետ կապ չկա։ Ստուգեք ինտերնետը և նորից փորձեք։",
+  },
   "errorBoundary.title": { en: "Something went wrong", ru: "Что-то пошло не так", am: "Ինչ-որ բան սխալ գնաց" },
   "errorBoundary.tryAgain": { en: "Try again", ru: "Повторить", am: "Կրկնել" },
   "errorBoundary.reload": { en: "Reload app", ru: "Перезапустить приложение", am: "Վերաբեռնել հավելվածը" },
+  "errorBoundary.description": {
+    en: "The panel hit an error. Reload it to go back to the home screen.",
+    ru: "В панели произошла ошибка. Перезапустите её, чтобы вернуться на главную.",
+    am: "Վահանակում սխալ է տեղի ունեցել։ Վերաբեռնեք այն՝ գլխավոր էջ վերադառնալու համար։",
+  },
+  "errorBoundary.copy": { en: "Copy for support", ru: "Скопировать для поддержки", am: "Պատճենել աջակցության համար" },
+  "errorBoundary.copied": { en: "Copied", ru: "Скопировано", am: "Պատճենված է" },
+  // One screen failed inside the layout (RouteErrorBoundary); the menu still works.
+  "crash.screen.title": { en: "This screen did not open", ru: "Этот экран не открылся", am: "Այս էկրանը չբացվեց" },
+  "crash.screen.description": { en: "Everything else works.", ru: "Остальное работает.", am: "Մնացածն աշխատում է։" },
+  "crash.screen.home": { en: "Go to Home", ru: "На главную", am: "Գլխավոր էջ" },
+  "crash.screen.copy": { en: "Copy for support", ru: "Скопировать для поддержки", am: "Պատճենել աջակցության համար" },
+  "crash.screen.copied": { en: "Copied", ru: "Скопировано", am: "Պատճենված է" },
 
   // CommissionInput
   "commission.label": { en: "Commission percent", ru: "Процент комиссии", am: "Միջնորդավճարի տոկոս" },
@@ -4248,6 +4271,7 @@ export const TRANSLATIONS: Dict = {
   "unlockPin.newPlaceholder": { en: "New PIN", ru: "Новый PIN", am: "Նոր PIN" },
   "unlockPin.invalid": { en: "PIN must be 4–6 digits", ru: "PIN должен содержать 4–6 цифр", am: "PIN-ը պետք է լինի 4–6 թվանշան" },
   "unlockPin.saveFailed": { en: "Failed to save PIN", ru: "Не удалось сохранить PIN", am: "Չհաջողվեց պահպանել PIN-ը" },
+  "unlockPin.isSet": { en: "PIN is set", ru: "PIN установлен", am: "PIN-ը սահմանված է" },
   "unlockPin.setAt": { en: "Set · {0}", ru: "Установлен · {0}", am: "Սահմանված է · {0}" },
   "unlockPin.saved": { en: "Saved.", ru: "Сохранено.", am: "Պահպանված է։" },
 
@@ -4554,6 +4578,12 @@ export const TRANSLATIONS: Dict = {
   "state.notFound.back": { en: "Go back", ru: "Вернуться назад", am: "Վերադառնալ" },
   "state.error.title": { en: "Could not load the data", ru: "Не удалось загрузить данные", am: "Չհաջողվեց բեռնել տվյալները" },
   "state.error.description": { en: "Something went wrong. Try again in a moment.", ru: "Что-то пошло не так. Попробуйте ещё раз чуть позже.", am: "Ինչ-որ բան այն չգնաց։ Փորձեք կրկին մի փոքր ուշ։" },
+  "state.forbidden.title": { en: "No access to this branch", ru: "Нет доступа к этому филиалу", am: "Այս մասնաճյուղի հասանելիություն չունեք" },
+  "state.forbidden.description": {
+    en: "Your account cannot open this branch. Choose a section in the menu.",
+    ru: "Ваша учётная запись не может открыть этот филиал. Выберите раздел в меню.",
+    am: "Ձեր հաշիվը չի կարող բացել այս մասնաճյուղը։ Ընտրեք բաժին ընտրացանկում։",
+  },
   "state.offline.title": { en: "No connection", ru: "Нет соединения", am: "Կապ չկա" },
   "state.offline.description": { en: "Check the internet connection and try again.", ru: "Проверьте подключение к интернету и попробуйте снова.", am: "Ստուգեք ինտերնետ կապը և փորձեք կրկին։" },
   "state.offline.notice": { en: "No connection. The last loaded data is shown.", ru: "Нет соединения. Показаны последние загруженные данные.", am: "Կապ չկա։ Ցուցադրված են վերջին բեռնված տվյալները։" },

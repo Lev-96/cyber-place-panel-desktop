@@ -1145,6 +1145,25 @@ describe("«Свои продукты» on the receipt", () => {
     expect(items.textContent).toContain("1 × 1500");
   });
 
+  test("with the fee on it the section is «products and fees»; the totals are the server's, unchanged", async () => {
+    repo.preview.mockResolvedValue(withFee());
+    await mount();
+    const items = screen.getByTestId("receipt-items");
+    expect(items.querySelector(".label")?.textContent).toBe("session.itemsAndFees");
+    expect(items.textContent).not.toContain("session.itemsBought");
+    expect(screen.getByTestId("receipt-items-total").textContent).toMatch(/session\.itemsTotal.*2,?000/);
+    expect(document.body.textContent).toMatch(/session\.totalDue[^]*2,?017\.22/);
+  });
+
+  test("products only: the heading stays «products bought»", async () => {
+    repo.preview.mockResolvedValue(bill({
+      items: [{ id: 6, name: "Coca-Cola", price: 500, qty: 1, line_total: 500, kind: null }] as unknown as IBillBreakdown["items"],
+      items_total: 500, subtotal: 517.22, gross_total: 517.22, total: 517.22,
+    }));
+    await mount();
+    expect(screen.getByTestId("receipt-items").querySelector(".label")?.textContent).toBe("session.itemsBought");
+  });
+
   test("it can be taken off, like any line (the server allows and audits it)", async () => {
     repo.preview.mockResolvedValue(withFee());
     repo.removeItem.mockResolvedValue(undefined);

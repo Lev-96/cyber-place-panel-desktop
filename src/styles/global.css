@@ -4685,6 +4685,40 @@ button.login-flip-back:hover {
   font: inherit;
 }
 
+/* The composer: the text on a row of its own across the whole thread, the
+   buttons under it. The field grows with what is typed (SupportComposer sets
+   its height to the content) up to a cap that leaves the thread readable even
+   at the 520×560 minimum window, then scrolls inside itself. */
+.support-composer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border-top: 1px solid var(--color-border);
+  padding-top: 12px;
+}
+.support-composer__field {
+  display: block;
+  min-width: 0;
+  resize: none;
+  line-height: 1.5;
+  /* Up to about eight lines on a desk-sized window, a third of a short one. */
+  max-height: min(30vh, 220px);
+  overflow-y: auto;
+}
+.support-composer__actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.support-composer__count {
+  font-size: 12px;
+  color: var(--color-muted);
+  font-variant-numeric: tabular-nums;
+}
+/* Send stays on the right edge whatever sits beside Attach. */
+.support-composer__send { margin-left: auto; }
+
 /* ── Branch cards inside Support ─────────────────────────────────────────
    A support thread belongs to a venue, so the first question the screen asks
    is which one. It is asked with the same things an operator uses to tell
@@ -10972,3 +11006,37 @@ select.input option:disabled {
 /* The place form's own figure: the box no wider than the other price boxes. */
 .place-outside-food { gap: var(--space-1); max-width: 320px; }
 .place-outside-food__hint { font-size: 11px; line-height: 1.4; }
+
+/* The root's last-resort crash screen (ErrorBoundary without a fallback): the
+   whole window, centred. No stack trace here; «Copy for support» carries it. */
+.cp-crash-root {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 32px;
+  background: var(--color-bg);
+  color: var(--color-text);
+  text-align: center;
+}
+.cp-crash-root__title { margin: 0; color: var(--color-danger); }
+.cp-crash-root__text { margin: 0; max-width: 480px; color: var(--color-muted); line-height: 1.5; }
+.cp-crash-root__actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+
+/* Prices → the venue's extra item: the two choices size to their longest
+   option (the charge sentences run long in ru/am) and never past the row on a
+   narrow window, where the select truncates rather than overflows (B5). */
+.branch-extra-item__choice {
+  gap: 4px;
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 100%;
+}
+.branch-extra-item__select {
+  width: auto;
+  min-width: 180px;
+  max-width: 100%;
+}

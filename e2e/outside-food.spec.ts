@@ -130,6 +130,44 @@ for (const lang of ["ru", "en", "am"] as const) {
   });
 }
 
+// The stop receipt (2026-11-14): with the own-food fee among its lines the
+// section is «Товары и доплаты», and every figure is the server's, unchanged.
+const RECEIPT_HEADING = {
+  ru: { fees: "Товары и доплаты", bought: "Приобретённые товары" },
+  en: { fees: "Products and fees", bought: "Products bought" },
+  am: { fees: "Ապրանքներ և հավելավճարներ", bought: "Գնված ապրանքներ" },
+} as const;
+for (const lang of ["ru", "en", "am"] as const) {
+  test(`${lang}: the stop receipt calls its section «products and fees» when the fee is on it`, async ({ page }) => {
+    const started = new Date(Date.now() - 20 * 60_000).toISOString();
+    await signIn(page, lang, 1280, [{
+      id: 42, branch_id: 1, pc_id: 1, pc_label: "PC 1", mode: "open", status: "active", started_at: started, ends_at: null,
+      hourly_rate: 1200, total_paid: 0, is_free: false, paused_at: null,
+      items: [
+        { id: 7, name: "Свои продукты", price: "1500.00", qty: 1, product_id: null, kind: "outside_food" },
+        { id: 8, name: "Cola", price: "500.00", qty: 1, product_id: 3, kind: null },
+      ],
+    }]);
+    await page.route((u) => isBackend(u) && u.pathname === "/sessions/42/preview", (r) => r.fulfill(json({ preview: {
+      mode: "open", is_free: false, is_unlimited: true, elapsed_minutes: 20, time_cost: 400, hourly_rate: 1200, package_name: null,
+      items: [
+        { id: 7, name: "Свои продукты", price: 1500, qty: 1, line_total: 1500, kind: "outside_food" },
+        { id: 8, name: "Cola", price: 500, qty: 1, line_total: 500, kind: null },
+      ],
+      items_total: 2000, joysticks: [], joysticks_total: 0, subtotal: 2400, gross_total: 2400, total: 2400,
+      priced_at: new Date().toISOString(),
+    } })));
+    await page.goto("/#/branches/1/sessions");
+    await page.locator('.place-cell.session-card--running [data-action="stop"]').first().click();
+    const items = page.getByTestId("receipt-items");
+    await expect(items).toBeVisible();
+    await expect(items.locator(".label").first()).toHaveText(RECEIPT_HEADING[lang].fees);
+    await expect(items).not.toContainText(RECEIPT_HEADING[lang].bought);
+    await expect(page.getByTestId("receipt-items-total")).toContainText(/2[\s,.  ]?000/);
+    await shot(page, `receipt-${lang}`, '[data-testid="receipt-items"]');
+  });
+}
+
 // The Prices page at the desktop and at the window's minimum (520px,
 // `electron/windowBounds.ts`): below that the shell's own side menu leaves the
 // page ~120px, which is the shell's layout, not this form's.

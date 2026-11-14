@@ -1,4 +1,5 @@
 import { blockingKeyOf } from "@/api/blockingErrors";
+import { classifyError } from "@/components/ui/state/viewState";
 import { ApiError } from "@/api/client";
 import { useAuth } from "@/auth/AuthContext";
 import { recentEmails } from "@/auth/recentEmails";
@@ -102,6 +103,8 @@ const Login = () => {
         if (status === 422) setErr(textKey("login.invalidCredentials"));
         captcha.ask();
       } else if (status === 401 || status === 422) setErr(textKey("login.invalidCredentials"));
+      // No answer at all: our sentence, never the browser's «Failed to fetch».
+      else if (classifyError(ex) === "offline") setErr(textKey("auth.noConnection"));
       else if (ex instanceof Error) setErr(textLiteral(ex.message));
       else setErr(textKey("login.failed"));
     }

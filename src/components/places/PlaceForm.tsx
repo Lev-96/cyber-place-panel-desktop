@@ -30,6 +30,7 @@ import { IBranchApi, IBranchPlace, IBranchPlatformPrice, PlaceType } from "@/typ
 import { isKnownPlatform, platformGroup, platformLabel } from "@/utils/platform";
 import { resolveTypedPlatform } from "@/utils/platformName";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { placeTypeLabelKey } from "@/utils/placeType";
 
 const EMPTY_NAMES: LangNames = { en: "", ru: "", am: "" };
 
@@ -357,7 +358,7 @@ const PlaceForm = ({ branchId, initial, platformSuggestions, platformPrices, onC
     ? (type === "vip" ? existingPrice.price_vip : existingPrice.price_standard)
     : null;
   const tierLocked = tierPrice != null; // this platform+type already priced
-  const typeLabel = type === "vip" ? t("branch.prices.vip") : t("branch.prices.standard");
+  const typeLabel = t(placeTypeLabelKey(type));
   // Multilingual наименование for that new platform's price row. The English
   // value is the identity: the platform slug is derived from it, so the same
   // platform resolves the same way regardless of the panel's language.

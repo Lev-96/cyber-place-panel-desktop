@@ -1,6 +1,7 @@
 import { apiForgotPassword } from "@/api/auth";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
+import { classifyError } from "@/components/ui/state/viewState";
 import { useLang } from "@/i18n/LanguageContext";
 import { LocalizedText, renderText, textKey, textLiteral } from "@/i18n/localizedText";
 import { notify } from "@/ui/notify";
@@ -41,6 +42,8 @@ const ForgotPasswordForm = ({ onBack, autoFocus }: Props) => {
       // anything else is the server's sentence (or ours when there is none).
       const code = (ex as { body?: { code?: unknown } } | undefined)?.body?.code;
       const m = code === "too_many_attempts" ? textKey("login.hold.throttled")
+        // No answer at all: our sentence, never the browser's «Failed to fetch».
+        : classifyError(ex) === "offline" ? textKey("auth.noConnection")
         : ex instanceof Error ? textLiteral(ex.message)
         : textKey("form.errors.failed");
       setMsg(m); setSuccess(false);

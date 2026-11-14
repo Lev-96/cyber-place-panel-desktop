@@ -11,3 +11,4 @@ export { default as StateSwitch } from "./StateSwitch";
 export type { StateSwitchProps } from "./StateSwitch";
 export { default as StaleNotice } from "./StaleNotice";
 export { default as BackAction } from "./BackAction";
+export { BranchScopeContext } from "./branchScope";

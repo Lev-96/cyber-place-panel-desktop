@@ -87,7 +87,8 @@ describe("SessionsBoard — what a tile says the seat is", () => {
     await mount();
 
     expect(typeLine()?.textContent).toContain("PS5");
-    expect(typeLine()?.textContent).toContain("vip");
+    // Through the dictionary (B6): the raw `type` printed «STANDARD» in ru/am.
+    expect(typeLine()?.textContent).toContain("branch.prices.vip");
   });
 
   test("a custom platform keeps its tier even when the platform name is long", async () => {
@@ -101,7 +102,7 @@ describe("SessionsBoard — what a tile says the seat is", () => {
     // The platform is the half allowed to ellipse; the tier never is, so it is
     // still in the DOM whatever the width.
     expect(typeLine()?.textContent).toContain("Table Tennis");
-    expect(typeLine()?.textContent).toContain("standard");
+    expect(typeLine()?.textContent).toContain("branch.prices.standard");
   });
 
   test("the number leads and the name follows it", async () => {

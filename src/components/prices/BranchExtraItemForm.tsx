@@ -6,6 +6,7 @@ import {
   chargedSlotsOf,
 } from "@/api/joystickPrices";
 import { useLang } from "@/i18n/LanguageContext";
+import { fmt } from "@/i18n/translations";
 import { billingSettingsRepository } from "@/repositories/BillingSettingsRepository";
 import { notify } from "@/ui/notify";
 import { FormEvent, useState } from "react";
@@ -58,6 +59,8 @@ const BranchExtraItemForm = ({ branchId, settings, onSaved }: Props) => {
   const [priceNext, setPriceNext] = useState(String(storedPriceNext));
   const [pricing, setPricing] = useState<"fixed" | "hourly">(storedPricing);
   const [charge, setCharge] = useState<"each" | "once">(storedCharge);
+  /** The thing's own name in the charge options; a generic word until it has one. */
+  const itemWord = name.trim() || t("branchExtraItem.itemFallback");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -195,31 +198,29 @@ const BranchExtraItemForm = ({ branchId, settings, onSaved }: Props) => {
       </div>
 
       <div className="row" style={{ gap: 16, flexWrap: "wrap", alignItems: "flex-end" }}>
-        <label className="col" style={{ gap: 4 }}>
+        <label className="col branch-extra-item__choice">
           <span className="label">{t("branchExtraItem.pricingMode")}</span>
           <select
-            className="input"
+            className="input branch-extra-item__select"
             value={pricing}
             disabled={busy}
             onChange={(e) => setPricing(e.target.value as "fixed" | "hourly")}
-            style={{ width: 180 }}
           >
             <option value="fixed">{t("place.extraItemModeFixed")}</option>
             <option value="hourly">{t("place.extraItemModeHourly")}</option>
           </select>
         </label>
 
-        <label className="col" style={{ gap: 4 }}>
+        <label className="col branch-extra-item__choice">
           <span className="label">{t("branchExtraItem.chargeMode")}</span>
           <select
-            className="input"
+            className="input branch-extra-item__select"
             value={charge}
             disabled={busy}
             onChange={(e) => setCharge(e.target.value as "each" | "once")}
-            style={{ width: 180 }}
           >
-            <option value="each">{t("place.extraItemEach")}</option>
-            <option value="once">{t("place.extraItemOnce")}</option>
+            <option value="each">{fmt(t("place.extraItemEach"), itemWord)}</option>
+            <option value="once">{fmt(t("place.extraItemOnce"), itemWord)}</option>
           </select>
         </label>
       </div>

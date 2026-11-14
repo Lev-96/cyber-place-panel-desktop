@@ -61,6 +61,7 @@ import { outsideFoodFeeOf, productLineCount } from "./outsideFood";
 import { useTransientFlags } from "@/hooks/useTransientFlags";
 import { useExpiryNudge } from "./useExpiryNudge";
 import { dropSideOf, moveOnto } from "@/utils/reorder";
+import { placeTypeLabelKey } from "@/utils/placeType";
 
 // The two lead sections shown before any custom-platform sections.
 const LEAD_SECTIONS = ["pc", "ps"];
@@ -767,7 +768,7 @@ const SessionsBoard = ({ branchId }: Props) => {
     // would otherwise eat the ellipsis and take the tier down with it. The
     // platform shrinks; the tier never does.
     const seatPlatformName = pc.place ? platformName(pc.place.platform) : "";
-    const tierName = pc.place ? pc.place.type : "";
+    const tierName = pc.place ? t(placeTypeLabelKey(pc.place.type)) : "";
     // ⚠️ The NUMBER leads, always, and it is the same value the player is
     // given on their phone.
     //

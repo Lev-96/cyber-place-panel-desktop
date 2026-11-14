@@ -6,12 +6,14 @@ import {
 } from "@/components/sessions/seatParts";
 import CollapsibleSection from "@/components/ui/CollapsibleSection";
 import { useLang } from "@/i18n/LanguageContext";
+import type { PlaceType } from "@/types/api";
 import { SESSION_CELL_COLOR } from "@/domain/SessionCellState";
 import { PC_STATUS } from "@/types/pc";
 import type { ISessionApi } from "@/types/sessions";
 import type { ActionIconId } from "@/components/sessions/ActionIcon";
 import { installBoardFit, useBoardFitOptions } from "@/preferences/FitBoardToScreen";
 import { useEffect, useRef, useState } from "react";
+import { placeTypeLabelKey } from "@/utils/placeType";
 
 /**
  * A picture of Active Places in the look being chosen (2026-10-27; rebuilt
@@ -35,7 +37,7 @@ const noop = () => {};
 interface Sample {
   no: number;
   name: string;
-  tier: string;
+  tier: PlaceType;
   /** Minutes left on a running seat; undefined = a free seat. */
   minutesLeft?: number;
 }
@@ -44,12 +46,12 @@ interface Sample {
  * The seats repeat this pattern (running, about to end, free…), numbered on.
  */
 const PATTERN: ReadonlyArray<Omit<Sample, "no" | "name">> = [
-  { tier: "STANDARD", minutesLeft: 40 },
-  { tier: "VIP", minutesLeft: 4 },
-  { tier: "STANDARD" },
-  { tier: "STANDARD" },
-  { tier: "STANDARD", minutesLeft: 25 },
-  { tier: "VIP", minutesLeft: 55 },
+  { tier: "standard", minutesLeft: 40 },
+  { tier: "vip", minutesLeft: 4 },
+  { tier: "standard" },
+  { tier: "standard" },
+  { tier: "standard", minutesLeft: 25 },
+  { tier: "vip", minutesLeft: 55 },
 ];
 /** The most seats a preview ever draws: two rows of the widest grid. */
 const MAX_SEATS = 24;
@@ -171,7 +173,7 @@ const AppearancePreview = ({ quick }: { quick: "all" | "primary" }) => {
                   stateLabel={(tone) => t(`session.tone.${tone}`)}
                 >
                   <SeatGrip label={t("session.dragToReorder")} />
-                  <SeatPlatformLine deviceStatus={PC_STATUS.Online} platformName="PS5" tierName={s.tier} />
+                  <SeatPlatformLine deviceStatus={PC_STATUS.Online} platformName="PS5" tierName={t(placeTypeLabelKey(s.tier))} />
                   <SeatNameLine text={`№${s.no} · ${s.name}`} />
                   {sess ? (
                     <>

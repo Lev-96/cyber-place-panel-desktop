@@ -47,12 +47,20 @@ export const deriveViewState = <T,>({ loading, error, data, hasFilters = false, 
 };
 
 /** Which error state a failure is. */
-export type ErrorKind = "offline" | "notFound" | "error";
+export type ErrorKind = "offline" | "notFound" | "forbidden" | "error";
 
 const statusOf = (e: unknown): number | undefined => {
   if (!e || typeof e !== "object") return undefined;
   const s = (e as Partial<ApiError>).status;
   return typeof s === "number" ? s : undefined;
+};
+
+/** The machine-readable `code` of a refusal's body, if it has one. */
+const refusalCodeOf = (e: unknown): string | null => {
+  const body = (e as Partial<ApiError>).body;
+  if (!body || typeof body !== "object") return null;
+  const code = (body as { code?: unknown }).code;
+  return typeof code === "string" && code !== "" ? code : null;
 };
 
 /**
@@ -67,6 +75,10 @@ export const classifyError = (
 ): ErrorKind => {
   const status = statusOf(e);
   if (status === 404) return "notFound";
+  // Refused by scope (a manager on another branch's link): Laravel's plain
+  // authorization 403, a message and no code. A 403 WITH a code (a company /
+  // branch block, the network guard) has its own screens and words.
+  if (status === 403 && !refusalCodeOf(e)) return "forbidden";
   if (!online) return "offline";
   if (status === 0 || (status === undefined && e instanceof TypeError)) return "offline";
   return "error";

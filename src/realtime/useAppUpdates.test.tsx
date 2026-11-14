@@ -102,3 +102,30 @@ describe("several screens sharing the app-updates channel", () => {
     expect(stillMounted).toHaveBeenCalledTimes(1);
   });
 });
+
+/**
+ * Release notes too big for one Reverb frame (backend, 2026-11-14): the event
+ * carries `notes: null` and `notes_truncated: true`. The panel never renders
+ * notes from the event, so the version it carries must still drive the gated
+ * updater exactly as before.
+ */
+describe("a promoted release whose notes did not fit", () => {
+  beforeEach(() => { channel.reset(); });
+  afterEach(() => { cleanup(); vi.clearAllMocks(); });
+
+  test("still drives the gated check with its version; the callback gets the event as sent", () => {
+    const checkGated = vi.fn(() => Promise.resolve(null));
+    (window as unknown as { cyberplaceUpdates?: unknown }).cyberplaceUpdates = { checkGated };
+    const seen = vi.fn();
+    render(<Probe onEvent={seen} />);
+
+    const event = {
+      app: "panel", version: "1.0.62", channel: "latest", mandatory: false,
+      notes: null, notes_truncated: true, github_tag: "v1.0.62", published_at: null, at: "2026-11-14T10:00:00Z",
+    };
+    for (const h of channel.listeners.get(".app-update.promoted") ?? []) h(event);
+
+    expect(checkGated).toHaveBeenCalledWith("1.0.62");
+    expect(seen).toHaveBeenCalledWith(expect.objectContaining({ notes: null, notes_truncated: true }));
+  });
+});

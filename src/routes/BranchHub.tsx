@@ -128,9 +128,9 @@ const BranchHub = () => {
 
   if (!Number.isFinite(id) || id <= 0) return <div className="error">{t("hub.invalidId")}</div>;
 
-  // No such branch: nothing below (its tiles, its live board) has anything to
-  // show, so the page is the not-found state alone.
-  if (error && !data && classifyError(error) === "notFound") {
+  // No such branch, or not this account's (403, B11): nothing below (its
+  // tiles, its live board) has anything to show, so the page is that state alone.
+  if (error && !data && ["notFound", "forbidden"].includes(classifyError(error))) {
     return (
       <ScreenWithBg bg="./bg/branch.jpg" title={`${t("hub.branchFallback")} №${id}`}>
         <ErrorState

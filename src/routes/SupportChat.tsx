@@ -1,6 +1,6 @@
 import BranchPicker from "@/components/support/BranchPicker";
+import SupportComposer from "@/components/support/SupportComposer";
 import Button from "@/components/ui/Button";
-import Input from "@/components/ui/Input";
 import Spinner from "@/components/ui/Spinner";
 import { ListSkeleton, SkeletonMessages } from "@/components/ui/Skeleton";
 import { ErrorState, StaleNotice, StateView } from "@/components/ui/state";
@@ -16,7 +16,6 @@ import { fmt } from "@/i18n/translations";
 import { useSupportUnread } from "@/support/SupportUnreadContext";
 import {
   checkAttachments,
-  formatSize,
   hasProblem,
   type AttachmentProblem,
   type CheckedFile,
@@ -64,6 +63,28 @@ export const mergeMessage = (prev: ISupportMessage[], incoming: ISupportMessage)
   const next = [...prev];
   next[at] = incoming;
   return next;
+};
+
+/**
+ * Whether an arriving message came without its text because it was too big
+ * for one Reverb frame (`body_truncated`, 2026-11-14). Such a line is never
+ * rendered from the event — it would be an empty bubble — the thread is read
+ * again instead. A line with no body and no flag is an attachment-only one and
+ * is folded in as always.
+ */
+export const arrivalNeedsRefetch = (message: ISupportMessage): boolean => message.body_truncated === true;
+
+/**
+ * The thread as the server just answered it, plus any line that arrived over
+ * the socket while that read was in flight (newer than everything in it).
+ * The answer is the truth for everything it contains: a re-read fixes a line
+ * a missed frame left stale as well as the truncated one that asked for it.
+ */
+export const reconcileThread = (onScreen: ISupportMessage[], snapshot: ISupportMessage[]): ISupportMessage[] => {
+  const newest = snapshot.reduce((max, m) => Math.max(max, m.id), 0);
+  const known = new Set(snapshot.map((m) => m.id));
+  const later = onScreen.filter((m) => !known.has(m.id) && m.id > newest);
+  return [...snapshot, ...later];
 };
 
 /**
@@ -142,6 +163,10 @@ const SupportChat = () => {
   const [pending, setPending] = useState<PendingMessage[]>([]);
   const fileInput = useRef<HTMLInputElement>(null);
   const bottom = useRef<HTMLDivElement>(null);
+
+  /** The open thread, for answers that land after the reader may have moved on. */
+  const activeIdRef = useRef(activeId);
+  useEffect(() => { activeIdRef.current = activeId; }, [activeId]);
 
   const active = useMemo(
     () => conversations?.find((c) => c.id === activeId) ?? null,
@@ -241,7 +266,20 @@ const SupportChat = () => {
     user?.id ?? null,
     useCallback((event) => {
       if (event.conversation_id === activeId) {
-        setMessages((prev) => mergeMessage(prev, event.message));
+        if (arrivalNeedsRefetch(event.message)) {
+          // Too big for the socket: the text comes from the thread itself.
+          // Applied only if the reader is still on this thread.
+          const conversationId = event.conversation_id;
+          void supportRepository.thread(conversationId)
+            .then((thread) => {
+              if (activeIdRef.current !== conversationId) return;
+              setMessages((prev) => reconcileThread(prev, thread.messages));
+            })
+            // The next open or arrival reads it again; nothing to show here.
+            .catch(() => {});
+        } else {
+          setMessages((prev) => mergeMessage(prev, event.message));
+        }
         void supportRepository.markRead(event.conversation_id).then(() => refreshUnread());
       }
       void loadConversations();
@@ -547,74 +585,17 @@ const SupportChat = () => {
                 </div>
 
                 {/* ── Composer ────────────────────────────────────────── */}
-                <div className="col" style={{ gap: 8, borderTop: "1px solid #1f2a44", paddingTop: 10 }}>
-                  {checked.length > 0 && (
-                    <div className="col" style={{ gap: 6 }}>
-                      {checked.map(({ file, problem }) => (
-                        <div
-                          key={`${file.name}:${file.size}:${file.lastModified}`}
-                          className={`support-chip${problem ? " is-bad" : ""}`}
-                        >
-                          <span className="support-chip__icon" aria-hidden>{problem ? "✕" : "📎"}</span>
-                          <span className="support-chip__name" title={file.name}>{file.name}</span>
-                          <span className="support-chip__size">{formatSize(file.size)}</span>
-                          {problem && (
-                            <span className="support-chip__why">{problemText(problem)}</span>
-                          )}
-                          <button
-                            type="button"
-                            aria-label={`${t("support.file.remove")}: ${file.name}`}
-                            onClick={() => setFiles((prev) => prev.filter((x) => x !== file))}
-                          >
-                            ✕
-                          </button>
-                        </div>
-                      ))}
-                      {attachmentsInvalid && (
-                        <span className="cp-mli-failed" style={{ fontSize: 12 }}>
-                          {t("support.file.fixBeforeSending")}
-                        </span>
-                      )}
-                    </div>
-                  )}
-                  <div className="row" style={{ gap: 8, alignItems: "flex-end" }}>
-                    <Button
-                      variant="secondary"
-                      onClick={() => fileInput.current?.click()}
-                      style={{ minWidth: 120 }}
-                    >
-                      {t("support.attach")}
-                    </Button>
-                    <input
-                      ref={fileInput}
-                      type="file"
-                      multiple
-                      style={{ display: "none" }}
-                      onChange={(e) => setFiles((prev) => [...prev, ...Array.from(e.target.files ?? [])])}
-                    />
-                    <div style={{ flex: 1 }}>
-                      <Input
-                        placeholder={t("support.placeholder")}
-                        value={draft}
-                        onChange={(e) => setDraft(e.target.value)}
-                        onKeyDown={(e) => {
-                          // Enter sends, Shift+Enter would be a newline — but a
-                          // single-line input has none, so only the send half
-                          // is wired.
-                          if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void submit(); }
-                        }}
-                      />
-                    </div>
-                    <Button
-                      onClick={() => void submit()}
-                      // Nothing to send, or something that must not be sent.
-                      disabled={(!draft.trim() && files.length === 0) || attachmentsInvalid}
-                      title={attachmentsInvalid ? t("support.file.fixBeforeSending") : undefined}
-                    >
-                      {t("support.send")}
-                    </Button>
-                  </div>
-                </div>
+                <SupportComposer
+                  value={draft}
+                  onChange={setDraft}
+                  onSubmit={() => void submit()}
+                  checked={checked}
+                  attachmentsInvalid={attachmentsInvalid}
+                  onAddFiles={(added) => setFiles((prev) => [...prev, ...added])}
+                  onRemoveFile={(file) => setFiles((prev) => prev.filter((x) => x !== file))}
+                  problemText={problemText}
+                  fileInputRef={fileInput}
+                />
               </>
             )}
           </section>

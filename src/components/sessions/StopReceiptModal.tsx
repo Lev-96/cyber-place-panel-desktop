@@ -18,7 +18,7 @@ import { RESET_MIN_AMOUNT } from "./sessionAmount";
 import CashChangePanel from "@/components/payments/CashChangePanel";
 import { billCents, cashChange } from "@/components/payments/cashChange";
 import type { ICashHandover } from "@/api/sessions";
-import { sessionLineLabel } from "./outsideFood";
+import { isOutsideFoodLine, sessionLineLabel } from "./outsideFood";
 
 interface Props {
   session: ISessionApi;
@@ -457,7 +457,11 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved, canRes
                 them; this is the breakdown, never added twice. */}
             {view.items.length > 0 && (
               <div className="receipt-items" data-testid="receipt-items">
-                <span className="label" style={{ marginTop: 8 }}>{t("session.itemsBought")}</span>
+                {/* The own-food fee is a line here but not a product
+                    (2026-11-14): with it on the bill the section says so. */}
+                <span className="label" style={{ marginTop: 8 }}>
+                  {t(view.items.some(isOutsideFoodLine) ? "session.itemsAndFees" : "session.itemsBought")}
+                </span>
                 {view.items.map((it) => (
                   <div key={it.id} style={row}>
                     {/* By kind first (2026-11-13): the own-food fee's stored

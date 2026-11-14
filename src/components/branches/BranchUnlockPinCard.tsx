@@ -40,6 +40,8 @@ const BranchUnlockPinCard = ({ branchId, updatedAt: initialUpdatedAt, onSaved }:
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [updatedAt, setUpdatedAt] = useState<string | null>(initialUpdatedAt);
+  // A later read of the branch can bring the date (the screen re-reads it).
+  useEffect(() => { if (initialUpdatedAt) setUpdatedAt(initialUpdatedAt); }, [initialUpdatedAt]);
 
   // Fetch the current PIN on mount. Server decrypts under APP_KEY;
   // null means "never set" OR "legacy hash-only row that predates
@@ -158,6 +160,10 @@ const BranchUnlockPinCard = ({ branchId, updatedAt: initialUpdatedAt, onSaved }:
         <div className="muted" style={{ marginTop: 8, fontSize: 12 }}>
           {updatedAt
             ? fmt(t("unlockPin.setAt"), new Date(updatedAt).toLocaleString(undefined, { hour12: false }))
+            // No date but the PIN itself came back: it IS set (a backend that
+            // does not send the date yet must not make the card say otherwise).
+            : loadingCurrent ? null
+            : currentPin !== null ? t("unlockPin.isSet")
             : t("unlockPin.notSet")}
         </div>
         {error && <div className="error" style={{ marginTop: 6 }}>{error}</div>}

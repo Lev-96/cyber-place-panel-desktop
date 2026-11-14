@@ -1,8 +1,9 @@
-import { ReactNode } from "react";
+import { ReactNode, useContext } from "react";
 import Button from "@/components/ui/Button";
 import { useLang } from "@/i18n/LanguageContext";
 import { useOnline } from "@/hooks/useOnline";
 import StateView, { StateViewSize } from "./StateView";
+import { BranchScopeContext } from "./branchScope";
 import { classifyError, serverDetailOf } from "./viewState";
 
 export interface ErrorStateProps {
@@ -16,7 +17,7 @@ export interface ErrorStateProps {
   /** Context-specific copy for a 404 ("Booking not found"). */
   notFoundTitleKey?: string;
   notFoundDescriptionKey?: string | null;
-  /** What a 404 offers instead of Retry — usually a way back. */
+  /** What a 404 (or a 403 «no access») offers instead of Retry — usually a way back. */
   notFoundAction?: ReactNode;
 }
 
@@ -32,7 +33,10 @@ const ErrorState = ({
 }: ErrorStateProps) => {
   const { t } = useLang();
   const online = useOnline();
-  const kind = classifyError(error, online);
+  const inBranch = useContext(BranchScopeContext);
+  // «No access to this branch» only where the screen IS one branch's.
+  const classified = classifyError(error, online);
+  const kind = classified === "forbidden" && !inBranch ? "error" : classified;
   const retry = onRetry ? (
     <Button type="button" variant="secondary" onClick={onRetry}>{t("action.retry")}</Button>
   ) : null;
@@ -44,6 +48,21 @@ const ErrorState = ({
         size={size}
         titleKey={notFoundTitleKey}
         descriptionKey={notFoundDescriptionKey}
+        actions={notFoundAction}
+      />
+    );
+  }
+  if (kind === "forbidden") {
+    // The server answered "not yours": retrying asks the same question, and
+    // its English sentence is not for the cashier (B11). The screen's own
+    // "could not load" title would be wrong too: nothing failed.
+    return (
+      <StateView
+        variant="notFound"
+        size={size}
+        className="cp-state--forbidden"
+        titleKey="state.forbidden.title"
+        descriptionKey="state.forbidden.description"
         actions={notFoundAction}
       />
     );
