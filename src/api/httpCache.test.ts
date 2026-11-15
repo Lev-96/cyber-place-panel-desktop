@@ -152,6 +152,13 @@ describe("policyFor", () => {
 });
 
 describe("invalidationTargets", () => {
+  it("a sale at the till or on a seat retires the cached catalogue: its counts moved (2026-11-16)", () => {
+    expect(invalidationTargets("/orders")).toEqual(["/orders", "/products"]);
+    expect(invalidationTargets("/orders/12/void")).toContain("/products");
+    expect(invalidationTargets("/sessions/5/items")).toContain("/products");
+    expect(invalidationTargets("/products/7/stock")).toEqual(["/products"]);
+  });
+
   it("expands a write to everything that embeds it", () => {
     expect(invalidationTargets("/branch-platform-prices/3")).toContain("/places");
     expect(invalidationTargets("/sessions")).toContain("/places");

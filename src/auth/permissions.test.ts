@@ -219,6 +219,13 @@ describe("can(role, perm)", () => {
       expect(can("company_owner", "product.write")).toBe(true);
     });
 
+    it("recounts and switches stock off, as the admin does; a manager only receives (2026-11-16)", () => {
+      expect(can("company_owner", "product.stockCorrect")).toBe(true);
+      expect(can("admin", "product.stockCorrect")).toBe(true);
+      expect(can("manager", "product.stockCorrect")).toBe(false);
+      expect(can("manager", "product.write")).toBe(true);
+    });
+
     it("reads the product history, as the admin does", () => {
       expect(can("company_owner", "product.history")).toBe(true);
       expect(can("admin", "product.history")).toBe(true);

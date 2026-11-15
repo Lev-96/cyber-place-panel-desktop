@@ -36,11 +36,47 @@ export interface IProduct extends Translated {
   price: number;
   is_active: boolean;
   kind?: ProductKind;
+  /**
+   * Units on the shelf (2026-11-16) — the server's figure, never worked out
+   * here. `null` (or absent, from an older backend) = not counted. May be
+   * below zero: a sale is never refused for want of stock.
+   */
+  stock?: number | null;
 }
 
 /** Handed out with the seat, once per session (an older backend sends no kind: regular). */
 export const isAdditionalProduct = (product: { kind?: string | null }): boolean =>
   product.kind === "additional";
+
+/** Does this product count its stock? Absent (an older backend) reads as "not counted". */
+export const countsStock = (product: { stock?: number | null }): boolean =>
+  typeof product.stock === "number";
+
+/**
+ * A counted product a sale left below zero (2026-11-16): the sale went
+ * through — this only says the count needs a look. `name` is the catalogue
+ * name as stored; a screen shows the translated one when it has the product.
+ */
+export interface IStockWarning {
+  product_id: number;
+  name: string;
+  stock: number;
+}
+
+/** `GET /products` → `meta.stock`: what the listed products hold, the server's sums. */
+export interface IProductStockMeta {
+  units: number;
+  tracked: number;
+  untracked: number;
+  negative: number;
+}
+
+/** What one stock action did: the count before and after (null = not counted). */
+export interface IStockChange {
+  before: number | null;
+  after: number | null;
+  delta: number;
+}
 
 export interface IOrderItem {
   id: number;

@@ -104,6 +104,47 @@ export interface IShiftProductRow {
   total: Money;
 }
 
+/**
+ * v6 (2026-11-16): one counted product's shelf over the shift, in PIECES (never
+ * money). `start` / `remaining` null = not counted then. The server keeps
+ * start + received − sold + returned + corrected = remaining; nothing is
+ * summed here.
+ */
+export interface IShiftStockRow {
+  product_id: number | null;
+  name: string;
+  start: number | null;
+  received: number;
+  sold: number;
+  returned: number;
+  sold_net: number;
+  corrected: number;
+  remaining: number | null;
+}
+
+export interface IShiftStock {
+  rows: IShiftStockRow[];
+  totals: { start: number; received: number; sold: number; returned: number; sold_net: number; corrected: number; remaining: number };
+  count: number;
+  negative_count: number;
+}
+
+/** v6: one movement of the shelf in the shift — what the stock totals were summed from. */
+export interface IShiftStockLine {
+  id: number;
+  product_id: number | null;
+  name: string;
+  kind: "received" | "corrected" | "untracked" | "till_sale" | "till_void" | "seat_sale" | "seat_return" | string;
+  via: string | null;
+  delta: number;
+  stock_before: number | null;
+  stock_after: number | null;
+  order_id: number | null;
+  session_id: number | null;
+  user_id: number | null;
+  at: string | null;
+}
+
 export interface IShiftProductGroup {
   rows: IShiftProductRow[];
   units: number;
@@ -207,6 +248,8 @@ export interface IShiftReport {
     member_topups: Array<{ id: number; amount: Money }>;
     /** v5 (2026-11-15). */
     prepaid?: IShiftPrepaymentLine[];
+    /** v6 (2026-11-16). */
+    stock?: IShiftStockLine[];
   };
   /** v3 (2026-10-26): absent from a report frozen before. */
   products?: {
@@ -219,6 +262,8 @@ export interface IShiftReport {
     units: number;
     total: Money;
   };
+  /** v6 (2026-11-16): the shelf per counted product; absent from a report frozen before. */
+  stock?: IShiftStock;
   staff?: IShiftStaffPart[];
   handover?: { count: number; places: IShiftHandoverPlace[] };
   voided_from_other_shifts?: {

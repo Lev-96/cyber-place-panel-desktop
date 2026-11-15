@@ -110,6 +110,9 @@ const ProductHistory = ({ initialBranchId }: Props) => {
   const format = useMemo(() => ({
     price: (amount: string) => money(Number(amount)),
     kind: (kind: string) => t(kind === "additional" ? "product.kindAdditionalShort" : "productHistory.kindRegular"),
+    // Stock lines (2026-11-16): «Без учёта», and how a receipt came in.
+    notCounted: t("stock.notCounted"),
+    via: (via: string) => (via === "create" ? t("productHistory.stockViaCreate") : via === "merge" ? t("productHistory.stockViaMerge") : null),
   }), [money, t]);
 
   const actor = (e: IProductEvent) =>
@@ -217,7 +220,7 @@ const ProductHistory = ({ initialBranchId }: Props) => {
                   </div>
                   {changes.map((c, i) => (
                     <div key={c.field ?? i} className="product-history-change" data-testid="product-history-change">
-                      {c.field ? `${c.field}: ` : ""}{c.from} → {c.to}
+                      {c.field ? `${c.field}: ` : ""}{c.from} → {c.to}{c.note ? ` ${c.note}` : ""}
                     </div>
                   ))}
                 </div>

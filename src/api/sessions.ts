@@ -1,4 +1,5 @@
 import { IPcApi, ISessionApi, ISessionHourlyNow, ITimePackage, SessionItemKind } from "@/types/sessions";
+import type { IStockWarning } from "@/types/pos";
 import { request } from "./client";
 
 export interface StartSessionBody {
@@ -449,11 +450,12 @@ export const apiCancelSession = (id: number) =>
     method: "POST",
   });
 
+// `stock_warnings` (2026-11-16): only when the sale took a counted product below zero.
 export const apiAddSessionItem = (id: number, body: AddItemBody) =>
-  request<{ item: ISessionItem; session: ISessionApi }>(`/sessions/${id}/items`, { method: "POST", body });
+  request<{ item: ISessionItem; session: ISessionApi; stock_warnings?: IStockWarning[] }>(`/sessions/${id}/items`, { method: "POST", body });
 
 export const apiAddSessionItems = (id: number, body: AddItemsBody) =>
-  request<{ session: ISessionApi }>(`/sessions/${id}/items`, { method: "POST", body });
+  request<{ session: ISessionApi; stock_warnings?: IStockWarning[] }>(`/sessions/${id}/items`, { method: "POST", body });
 
 /**
  * What the server made of a line (2026-09-25). Absent on a backend from before
@@ -534,7 +536,7 @@ export const apiResolveSessionItemsText = (id: number, text: string, choices?: I
  * not a thing that should exist, so the server deletes the row.
  */
 export const apiSetSessionItemQty = (sessionId: number, itemId: number, qty: number) =>
-  request<{ session: ISessionApi }>(`/sessions/${sessionId}/items/${itemId}`, {
+  request<{ session: ISessionApi; stock_warnings?: IStockWarning[] }>(`/sessions/${sessionId}/items/${itemId}`, {
     method: "PATCH",
     body: { qty },
   });

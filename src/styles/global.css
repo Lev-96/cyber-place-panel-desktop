@@ -11419,3 +11419,140 @@ select.input option:disabled {
   border-color: color-mix(in srgb, var(--color-text) 30%, transparent);
   font-weight: 600;
 }
+
+/* ── Stock on the shelf (2026-11-16) ────────────────────────────────────
+   Every figure is the server's; these only draw it. Below zero is red, and
+   said in words beside the colour (never by colour alone). */
+/* A product's count on its catalogue row. */
+.product-stock {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.product-stock.is-negative,
+.shift-stock .is-negative {
+  color: var(--color-danger);
+  font-weight: 700;
+}
+/* The server's total above the catalogue; the "below zero" count beside it. */
+.product-stock-total {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 16px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.product-stock-total__negative {
+  color: var(--color-danger);
+}
+/* «ост. 15» beside a basket row or a typed line: a hint, never a limit. */
+.stock-chip {
+  display: inline-block;
+  flex-shrink: 0;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  border: 1px solid var(--color-border);
+  color: var(--color-muted);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.4;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.stock-chip.is-empty {
+  color: var(--color-warning);
+  border-color: color-mix(in srgb, var(--color-warning) 55%, transparent);
+}
+.stock-chip.is-negative {
+  color: var(--color-danger);
+  border-color: color-mix(in srgb, var(--color-danger) 55%, transparent);
+}
+/* «Такой товар уже есть»: the 409 question inside the product form. */
+.product-merge {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--color-warning) 55%, transparent);
+  background: var(--color-surface-alt);
+}
+.product-merge__title {
+  font-size: 15px;
+}
+.product-merge__hint {
+  font-size: 12px;
+}
+.product-merge__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+/* A product's stock: received, recounted, switched off. */
+.product-stock-dialog {
+  width: 480px;
+  max-width: 92vw;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.product-stock-dialog__now {
+  font-size: 15px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+/* The shift report's «Остатки»: scrolls in its own viewport (.hs-scroll). */
+.shift-stock {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+.shift-stock th,
+.shift-stock td {
+  padding: 6px 8px;
+  text-align: right;
+  white-space: nowrap;
+}
+.shift-stock thead th {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-muted);
+  border-bottom: 1px solid var(--color-border);
+}
+.shift-stock thead th:first-child,
+.shift-stock th[scope="row"] {
+  text-align: left;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.shift-stock tbody th[scope="row"] {
+  font-weight: 500;
+}
+.shift-stock tfoot th,
+.shift-stock tfoot td {
+  border-top: 1px solid var(--color-border);
+  font-weight: 700;
+}
+.shift-stock__negative {
+  margin-top: 6px;
+  font-size: 13px;
+  color: var(--color-danger);
+}
+/* A catalogue row (2026-11-16): the product, then its buttons. On a narrow
+   window the buttons wrap under the product instead of pushing past the page
+   (four of them — «Остаток» joined Hide / Edit / Delete — do not fit 520px). */
+.list-item.product-row {
+  flex-wrap: wrap;
+}
+.product-row__main {
+  flex: 1 1 200px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.product-row__actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}

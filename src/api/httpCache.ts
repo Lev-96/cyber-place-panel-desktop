@@ -229,9 +229,12 @@ const MUTATION_FANOUT: Readonly<Record<string, readonly string[]>> = {
   "/branch-subplatforms": ["/branch-subplatforms", "/places", "/branches"],
   "/time-packages": ["/time-packages"],
   "/products": ["/products"],
+  // A sale takes a counted product off the shelf (2026-11-16): the list's
+  // «Остаток» must not read a minute-old figure after this machine sold one.
+  "/orders": ["/orders", "/products"],
   "/tournaments": ["/tournaments"],
   "/tournament-registration": ["/tournaments"],
-  "/sessions": ["/places", "/branches"],
+  "/sessions": ["/places", "/branches", "/products"],
   "/bookings": ["/places", "/branches"],
   "/translations": ["/products", "/places", "/time-packages", "/games", "/branches"],
   // A payment, adjustment or extension can lift a billing restriction

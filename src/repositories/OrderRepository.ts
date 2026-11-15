@@ -5,6 +5,7 @@ import {
 import { friendlyMutation } from "@/api/fallback";
 import { IItemChoice, IResolvedItems } from "@/api/sessions";
 import { IOrder } from "@/types/pos";
+import { announceStockWarnings } from "@/ui/stockWarnings";
 
 /**
  * The till's sales. The list is NOT wrapped in a fallback: a history of money
@@ -13,7 +14,9 @@ import { IOrder } from "@/types/pos";
  */
 export class OrderRepository {
   async create(body: CreateOrderBody): Promise<IOrder> {
-    return friendlyMutation(apiCreateOrder(body).then((r) => r.order));
+    // A sale that took a counted product below zero says so (2026-11-16);
+    // the sale itself is the server's, unchanged.
+    return friendlyMutation(apiCreateOrder(body).then((r) => { announceStockWarnings(r); return r.order; }));
   }
   async list(params: ListOrdersParams): Promise<IOrder[]> {
     return apiListOrders(params).then((r) => r.data);

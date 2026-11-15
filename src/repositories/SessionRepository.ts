@@ -65,6 +65,7 @@ import {
 import { apiReorderPcs } from "@/api/pcs";
 import { friendlyMutation, orFallback } from "@/api/fallback";
 import { IPcApi, ISessionApi, ISessionHourlyNow, ITimePackage } from "@/types/sessions";
+import { announceStockWarnings } from "@/ui/stockWarnings";
 
 export interface StopResult {
   session: ISessionApi;
@@ -145,11 +146,12 @@ export class SessionRepository {
     return friendlyMutation(apiExtendSession(id, { time_package_id: packageId }).then((r) => r.session));
   }
   async addItem(sessionId: number, body: AddItemBody): Promise<ISessionApi> {
-    return friendlyMutation(apiAddSessionItem(sessionId, body).then((r) => r.session));
+    return friendlyMutation(apiAddSessionItem(sessionId, body).then((r) => { announceStockWarnings(r); return r.session; }));
   }
   /** The dialog's basket, confirmed. One request, all or nothing. */
   async addItems(sessionId: number, items: AddItemBody[]): Promise<ISessionApi> {
-    return friendlyMutation(apiAddSessionItems(sessionId, { items }).then((r) => r.session));
+    // A sale that took a counted product below zero says so (2026-11-16).
+    return friendlyMutation(apiAddSessionItems(sessionId, { items }).then((r) => { announceStockWarnings(r); return r.session; }));
   }
   /**
    * What the typed lines would put on the bill. Reads only — the confirm still
@@ -159,7 +161,7 @@ export class SessionRepository {
     return friendlyMutation(apiResolveSessionItemsText(sessionId, text, choices).then((r) => r.resolved));
   }
   async setItemQty(sessionId: number, itemId: number, qty: number): Promise<ISessionApi> {
-    return friendlyMutation(apiSetSessionItemQty(sessionId, itemId, qty).then((r) => r.session));
+    return friendlyMutation(apiSetSessionItemQty(sessionId, itemId, qty).then((r) => { announceStockWarnings(r); return r.session; }));
   }
   /** The room's hourly extra came back: stop its clock, keep its charge. */
   async returnItem(sessionId: number, itemId: number): Promise<ISessionApi> {

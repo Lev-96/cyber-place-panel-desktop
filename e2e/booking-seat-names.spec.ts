@@ -42,11 +42,17 @@ const label = (lang: Lang, i: number) => {
 };
 
 const pad = (n: number) => String(n).padStart(2, "0");
-/** A staff booking on seat №3 starting in an hour, so it is on today's timeline and list. */
+/**
+ * The spec's "now": today at noon, on the page's clock AND here. Pinned
+ * (2026-11-16) because "in an hour" was read off the real clock: run after
+ * 23:00 it fell on tomorrow, off today's timeline, and every case failed at
+ * `cal-item` with nothing wrong in the app.
+ */
+const NOON = (() => { const d = new Date(); d.setHours(12, 0, 0, 0); return d; })();
+/** A staff booking on seat №3 starting in an hour (13:00), so it is on today's timeline and list. */
 const booking = () => {
-  const start = new Date(Date.now() + 60 * 60_000);
+  const start = new Date(NOON.getTime() + 60 * 60_000);
   start.setMinutes(0, 0, 0);
-  if (start.getHours() < 8) start.setHours(10); // inside the club day's frame
   const end = new Date(start.getTime() + 60 * 60_000);
   return {
     id: 501, status: "pending",
@@ -58,6 +64,8 @@ const booking = () => {
 };
 
 const open = async (page: Page, lang: Lang, size: { width: number; height: number }) => {
+  // The page's Date reads noon whatever the hour the suite runs; its timers run as ever.
+  await page.clock.setFixedTime(NOON);
   await seedLanguageChosen(page, lang);
   await installBackendMocks(page, { role: "company_owner", company_id: 1, name: "Owner One" });
   await page.route((u) => isBackend(u) && u.pathname === "/pcs", (r) => r.fulfill({

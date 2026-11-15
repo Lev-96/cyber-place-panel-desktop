@@ -13,6 +13,9 @@ const repo = vi.hoisted(() => ({ list: vi.fn(), update: vi.fn(), remove: vi.fn()
 vi.mock("@/repositories/ProductRepository", () => ({
   productRepository: {
     listByBranch: (...a: unknown[]) => repo.list(...a),
+    // The screen reads the catalogue with its stock total (2026-11-16); these
+    // cases predate stock and see none (an older backend's answer).
+    listWithStock: (...a: unknown[]) => (repo.list(...a) as Promise<unknown[]>).then((products) => ({ products, stock: null })),
     update: (...a: unknown[]) => repo.update(...a),
     remove: (...a: unknown[]) => repo.remove(...a),
   },

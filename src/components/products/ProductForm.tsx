@@ -1,4 +1,5 @@
 import Button from "@/components/ui/Button";
+import Input from "@/components/ui/Input";
 import Modal from "@/components/ui/Modal";
 import MultiLangInput, {
   LangValues,
@@ -8,10 +9,17 @@ import MultiLangInput, {
 } from "@/components/ui/MultiLangInput";
 import PriceInput from "@/components/ui/PriceInput";
 import { apiSaveEntityTranslations } from "@/api/translations";
+import { IProductExistsBody, productExistsBody, StockChoice } from "@/api/products";
+import { tr } from "@/i18n/translated";
+import { fmt } from "@/i18n/translations";
 import { useLang } from "@/i18n/LanguageContext";
 import { productRepository } from "@/repositories/ProductRepository";
 import { IProduct, isAdditionalProduct, ProductKind } from "@/types/pos";
-import { FormEvent, useState } from "react";
+import { notify } from "@/ui/notify";
+import { newRequestId } from "@/utils/requestId";
+import { FormEvent, useRef, useState } from "react";
+import ProductMergePanel from "./ProductMergePanel";
+import { parseQuantity, stockChangeText, stockNumber } from "./stock";
 
 interface Props {
   branchId: number;
@@ -40,6 +48,15 @@ interface Props {
  * product still exists with a valid name, and the background pipeline fills the
  * other languages — the same translations the form already primed into the
  * translation memory, so it costs nothing.
+ *
+ * ## «Количество» (2026-11-16)
+ * A NEW product sold by the unit may come with how many are on the shelf.
+ * Empty = not counted, and the create is the one it always was. With a number
+ * the server matches the name: a product of that name at the same price gets
+ * the quantity added («Кола» 5 + 10 = 15, no second «Кола»), and its own names
+ * are left as they are (nothing is translated over them); another price, or
+ * several of that name, comes back as a question ({@see ProductMergePanel}).
+ * One press is one receipt: the request id lives as long as the form.
  */
 const ProductForm = ({ branchId, initial, onClose, onSaved, kind: kindProp = "regular" }: Props) => {
   const { t, lang } = useLang();
@@ -51,14 +68,62 @@ const ProductForm = ({ branchId, initial, onClose, onSaved, kind: kindProp = "re
   );
   const [price, setPrice] = useState(String(initial?.price ?? ""));
   const kind: ProductKind = initial ? (isAdditionalProduct(initial) ? "additional" : "regular") : kindProp;
+  /** Only a new product sold by the unit may arrive with a quantity. */
+  const asksQuantity = !initial && kind === "regular";
+  const [quantity, setQuantity] = useState("");
+  const [exists, setExists] = useState<IProductExistsBody | null>(null);
+  const requestId = useRef(newRequestId());
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const locked = busy || exists !== null;
+
+  const saveTranslations = (id: number) =>
+    apiSaveEntityTranslations("product", id, { primary_locale: lang, fields: { name, category } });
+
+  /** A new product WITH a quantity: created counted, added to the one of that name, or asked. */
+  const createCounted = async (qty: number, answer?: { choice: StockChoice; id: number }) => {
+    setBusy(true); setErr(null);
+    try {
+      const r = await productRepository.createCounted({
+        branch_id: branchId,
+        name: primaryValue(name, lang),
+        category: primaryValue(category, lang) || null,
+        price: Number(price),
+        is_active: true,
+        kind,
+        source_locale: lang,
+        stock: qty,
+        client_request_id: requestId.current,
+        ...(answer ? { on_existing: answer.choice, existing_id: answer.id } : {}),
+      });
+      if (r.merged && r.stock_change) {
+        notify.message("success", fmt(t("product.mergedToast"), tr(r.product, "name", lang), stockChangeText(r.stock_change, t("stock.notCounted"))));
+      } else {
+        await saveTranslations(r.product.id);
+        notify.message("success", typeof r.product.stock === "number"
+          ? fmt(t("product.createdCounted"), stockNumber(r.product.stock))
+          : t("toast.product.created"));
+      }
+      onSaved(r.product);
+    } catch (e) {
+      const asked = productExistsBody(e);
+      if (asked !== null) {
+        setExists(asked);
+      } else {
+        setErr(e instanceof Error ? e.message : t("form.errors.failedSave"));
+      }
+    } finally { setBusy(false); }
+  };
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
+    if (locked) return;
     const pr = Number(price);
     if (!Number.isFinite(pr) || pr < 0) return setErr(t("product.errors.price"));
     if (!hasAnyValue(name)) return setErr(t("product.errors.name"));
+    const qty = asksQuantity ? parseQuantity(quantity) : ({ kind: "empty" } as const);
+    if (qty.kind === "invalid") return setErr(t("product.errors.quantity"));
+    if (qty.kind === "ok") return createCounted(qty.value);
 
     setBusy(true); setErr(null);
     try {
@@ -82,15 +147,22 @@ const ProductForm = ({ branchId, initial, onClose, onSaved, kind: kindProp = "re
             source_locale: lang,
           });
 
-      await apiSaveEntityTranslations("product", p.id, {
-        primary_locale: lang,
-        fields: { name, category },
-      });
+      await saveTranslations(p.id);
 
       onSaved(p);
     } catch (e) {
       setErr(e instanceof Error ? e.message : t("form.errors.failedSave"));
     } finally { setBusy(false); }
+  };
+
+  /**
+   * The cashier's answer to the question. Saved, the parent closes the form;
+   * asked again (the catalogue moved meanwhile), the panel shows the new
+   * matches; refused, the panel stays with the reason under it.
+   */
+  const answer = (choice: StockChoice, id: number) => {
+    const qty = parseQuantity(quantity);
+    if (qty.kind === "ok") void createCounted(qty.value, { choice, id });
   };
 
   return (
@@ -110,7 +182,7 @@ const ProductForm = ({ branchId, initial, onClose, onSaved, kind: kindProp = "re
           maxChars={60}
           required
           autoFocus
-          disabled={busy}
+          disabled={locked}
         />
 
         <MultiLangInput
@@ -119,16 +191,38 @@ const ProductForm = ({ branchId, initial, onClose, onSaved, kind: kindProp = "re
           onChange={setCategory}
           fieldClass="product_category"
           maxChars={40}
-          disabled={busy}
+          disabled={locked}
         />
 
-        <PriceInput label={t("label.price")} value={price} onChange={setPrice} required />
+        <PriceInput label={t("label.price")} value={price} onChange={setPrice} required disabled={locked} />
+
+        {asksQuantity && (
+          <div className="col" style={{ gap: 4 }}>
+            <Input
+              label={t("product.quantity")}
+              type="text"
+              inputMode="numeric"
+              value={quantity}
+              onChange={(ev) => { setQuantity(ev.target.value); setErr(null); }}
+              placeholder={t("stock.notCounted")}
+              disabled={locked}
+              data-testid="product-quantity"
+            />
+            <span className="muted" style={{ fontSize: 12 }}>{t("product.quantityHint")}</span>
+          </div>
+        )}
+
+        {exists !== null && (
+          <ProductMergePanel exists={exists} typedPrice={Number(price)} busy={busy} onChoose={answer} onBack={() => setExists(null)} />
+        )}
 
         {err && <div className="error">{err}</div>}
-        <div className="row-between">
-          <Button type="button" variant="secondary" onClick={onClose} disabled={busy}>{t("action.cancel")}</Button>
-          <Button disabled={busy}>{busy ? "…" : t("action.save")}</Button>
-        </div>
+        {exists === null && (
+          <div className="row-between">
+            <Button type="button" variant="secondary" onClick={onClose} disabled={busy}>{t("action.cancel")}</Button>
+            <Button disabled={busy}>{busy ? "…" : t("action.save")}</Button>
+          </div>
+        )}
       </form>
     </Modal>
   );

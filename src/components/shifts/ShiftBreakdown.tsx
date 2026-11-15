@@ -6,6 +6,7 @@ import type { IShiftProductGroup, IShiftReport, IShiftStaffPart } from "@/types/
 import { platformLabel } from "@/utils/platform";
 import type { CSSProperties } from "react";
 import { Row, Section, divider } from "./shiftReportParts";
+import ShiftStockTable from "./ShiftStockTable";
 
 /**
  * The v3 blocks of a shift report (2026-10-26): what was sold per product,
@@ -53,6 +54,9 @@ const ShiftBreakdown = ({ report, closerId }: Props) => {
           )}
         </Section>
       )}
+
+      {/* v6 (2026-11-16): the shelf, in pieces. */}
+      {report.stock && <ShiftStockTable stock={report.stock} />}
 
       {report.staff && (
         <Section title={t("shift.staff")} testId="shift-staff">
