@@ -33,6 +33,8 @@ const repo = vi.hoisted(() => ({
   setFree: vi.fn(),
   extensionOptions: vi.fn(),
   transferExtension: vi.fn(),
+  setReminder: vi.fn(),
+  clearReminder: vi.fn(),
 }));
 const auth = vi.hoisted(() => ({ role: "company_owner" as string }));
 // The app-wide toaster, captured so a test can read what a grant announced.
@@ -58,6 +60,8 @@ vi.mock("@/repositories/SessionRepository", () => ({
     setFree: (...a: unknown[]) => repo.setFree(...a),
     extensionOptions: (...a: unknown[]) => repo.extensionOptions(...a),
     transferExtension: (...a: unknown[]) => repo.transferExtension(...a),
+    setReminder: (...a: unknown[]) => repo.setReminder(...a),
+    clearReminder: (...a: unknown[]) => repo.clearReminder(...a),
   },
 }));
 const prices = vi.hoisted(() => ({
@@ -87,6 +91,8 @@ vi.mock("@/i18n/LanguageContext", () => ({
       k === "session.movedToast" ||
       k === "session.moveTakenToast"
         ? `${k} {0}`
+        // The keep-the-rate toasts (2026-11-15) name the SERVER's figure.
+        : k === "session.unlimitedDoneKept" || k === "session.limitDoneRate" ? `${k} {0} {1}`
         : k,
     money: (n: number) => String(n),
     lang: "en",
@@ -277,17 +283,14 @@ describe("what this dialog deliberately does NOT offer", () => {
 });
 
 /**
- * Arm the unlimited switch the way the form now asks for it: tick the gate,
- * then price it. Nothing about the switch is offered until both are done —
- * removing a seat's end cannot be undone, so it reads as a deliberate act
- * rather than a button sitting there waiting to be clicked.
+ * Arm the unlimited switch the way the form asks for it: tick the gate.
+ * Nothing about the switch is offered until it is ticked — removing a seat's
+ * end cannot be undone, so it reads as a deliberate act. No price is typed
+ * (2026-11-15): it carries on at the rate it bills at now.
  */
-const armUnlimited = async (price = "1500") => {
+const armUnlimited = async () => {
   await act(async () => {
     fireEvent.click(screen.getByText("session.unlimitedGate"));
-  });
-  await act(async () => {
-    fireEvent.change(screen.getByLabelText("session.unlimitedRate"), { target: { value: price } });
   });
 };
 
@@ -640,108 +643,66 @@ describe("a grant typed by hand, and its price", () => {
  * could be named.
  */
 /**
- * The unlimited switch is a gated form, not a button.
- *
- * The checkbox is the gate: until it is ticked nothing about the switch is
- * offered — not the price, not the button. Removing a seat's end cannot be
- * undone, and the form should read as a deliberate act.
- *
- * The price is then REQUIRED and typed. It used to be shown up front from the
- * seat's configuration, with a "check the tariff settings" error when there was
- * none — which tells an operator holding a player to go and edit a settings
- * screen. It is prefilled from the seat when there is a price and typed when
- * there is not; the server validates it either way.
+ * The unlimited switch is a gated form, not a button, and asks for NO price
+ * (2026-11-15, owner): the seat carries on at the rate it is billing at now
+ * (`keep_rate`), pads and rentals keep counting on their own rows. The figure
+ * is the SERVER's (`hourly_now`), said in the toast once it has answered —
+ * nothing here works out a rate.
  */
 describe("switching a session to unlimited", () => {
+  const unlimitedNow = { seat: 1000, pads: 500, extras: 0, total: 1500 };
+
   test("offers nothing until the gate is ticked", async () => {
     await mountUnlimited();
 
-    expect(screen.queryByLabelText("session.unlimitedRate")).toBeNull();
+    expect(screen.queryByTestId("unlimited-keep-rate")).toBeNull();
     expect(switchButton().disabled).toBe(true);
   });
 
-  test("ticking it reveals a required price, prefilled from the seat", async () => {
-    await mountUnlimited(session({ hourly_rate: null, tariff_hourly_rate: 1500 }));
-
-    await act(async () => {
-      fireEvent.click(screen.getByText("session.unlimitedGate"));
-    });
-
-    const input = screen.getByLabelText("session.unlimitedRate") as HTMLInputElement;
-    expect(input.value).toBe("1500");
-    expect(switchButton().disabled).toBe(false);
-  });
-
-  test("a seat with no configured price asks for one instead of refusing", async () => {
+  test("ticking it says it carries on at today's price: no price box at all", async () => {
     await mountUnlimited(session({ hourly_rate: null, tariff_hourly_rate: null }));
+    await armUnlimited();
 
-    await act(async () => {
-      fireEvent.click(screen.getByText("session.unlimitedGate"));
-    });
-
-    // An empty box to fill, not a sentence about settings.
-    const input = screen.getByLabelText("session.unlimitedRate") as HTMLInputElement;
-    expect(input.value).toBe("");
-    expect(switchButton().disabled).toBe(true);
-
-    await act(async () => {
-      fireEvent.change(input, { target: { value: "1800" } });
-    });
+    expect(screen.getByTestId("unlimited-keep-rate").textContent).toContain("session.unlimitedKeepRate");
+    expect(screen.queryByRole("textbox", { name: /unlimitedRate/ })).toBeNull();
+    expect(document.querySelectorAll("[data-testid=unlimited-section] input[inputmode=decimal]")).toHaveLength(0);
     expect(switchButton().disabled).toBe(false);
   });
 
-  test.each([
-    ["empty", ""],
-    ["a zero", "0"],
-    ["a negative", "-100"],
-    ["words", "abc"],
-  ])("keeps the switch shut on %s", async (_name, value) => {
-    await mountUnlimited(session({ hourly_rate: null, tariff_hourly_rate: null }));
-    await armUnlimited(value);
-
-    expect(switchButton().disabled).toBe(true);
-    expect(repo.makeUnlimited).not.toHaveBeenCalled();
-  });
-
-  test("unticking the gate keeps the switch shut, price or no price", async () => {
+  test("unticking the gate keeps the switch shut", async () => {
     await mountUnlimited();
-    await armUnlimited("2000");
+    await armUnlimited();
     expect(switchButton().disabled).toBe(false);
-
-    await act(async () => {
-      fireEvent.click(screen.getByText("session.unlimitedGate"));
-    });
-
-    // The price is still in state — the form does not throw away what was
-    // typed — and the gate alone is what keeps the switch shut.
+    await armUnlimited();
     expect(switchButton().disabled).toBe(true);
   });
 
-  test("sends the price that was typed", async () => {
-    repo.makeUnlimited.mockResolvedValue(session({ is_unlimited: true, ends_at: null }));
+  test("sends keep-the-rate (no price) and toasts the SERVER's hourly figure", async () => {
+    repo.makeUnlimited.mockResolvedValue({ session: session({ is_unlimited: true, ends_at: null }), hourlyNow: unlimitedNow });
     await mountUnlimited();
-    await armUnlimited("2000");
+    await armUnlimited();
 
     await act(async () => { fireEvent.click(switchButton()); });
     await answerConfirm(true);
 
-    expect(repo.makeUnlimited).toHaveBeenCalledWith(42, 2000);
+    expect(repo.makeUnlimited).toHaveBeenCalledWith(42);
+    expect(toast.message).toHaveBeenCalledWith("success", "session.unlimitedDoneKept 1500session.perHourShort {1}");
   });
 
-  test("says the rule out loud once the gate is open", async () => {
+  test("an older backend that sends no hourly figure: a plain toast, no invented price", async () => {
+    repo.makeUnlimited.mockResolvedValue({ session: session({ is_unlimited: true, ends_at: null }), hourlyNow: null });
     await mountUnlimited();
     await armUnlimited();
-
-    // "From now on" is the question an operator asks, and the wrong answer
-    // would be somebody's receipt.
-    expect(screen.getByText("session.unlimitedRateHint")).toBeTruthy();
+    await act(async () => { fireEvent.click(switchButton()); });
+    await answerConfirm(true);
+    expect(toast.message).toHaveBeenCalledWith("success", "session.unlimitedDone");
   });
 
   test("a session that already has no end states the fact", async () => {
     await mountUnlimited(session({ is_unlimited: true, ends_at: null }));
 
     expect(screen.queryByText("session.unlimitedGate")).toBeNull();
-    expect(screen.queryByLabelText("session.unlimitedRate")).toBeNull();
+    expect(screen.queryByTestId("unlimited-keep-rate")).toBeNull();
   });
 });
 
@@ -1154,7 +1115,7 @@ describe("one «+ Время» for every mode (2026-11-07)", () => {
   };
 
   test("«⏱» gives an unlimited seat a fixed time from now: shown, then sent as minutes", async () => {
-    repo.limit.mockResolvedValue(session());
+    repo.limit.mockResolvedValue({ session: session({ ends_at: "2026-11-15T17:10:00Z" }), hourlyNow: { seat: 1000, pads: 500, extras: 0, total: 1500 } });
     const onClose = vi.fn();
     await act(async () => {
       render(
@@ -1173,6 +1134,9 @@ describe("one «+ Время» for every mode (2026-11-07)", () => {
 
     expect(repo.limit).toHaveBeenCalledWith(42, 90);
     expect(onClose).toHaveBeenCalled();
+    // The server's end and its per-hour figure (2026-11-15): "until 21:10, at 1500/h".
+    const end = new Date("2026-11-15T17:10:00Z").toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
+    expect(toast.message).toHaveBeenCalledWith("success", `session.limitDoneRate ${end} 1500session.perHourShort`);
   });
 
   test("a paused seat: nothing about time until it is resumed, «Не оплачено» still there", async () => {
@@ -1267,5 +1231,92 @@ describe("«Не оплачено» in «+ Время» (2026-11-07)", () => {
     await act(async () => { fireEvent.click(unpaidSwitch()); });
     expect(screen.getByText("The session is not active.")).toBeTruthy();
     expect(unpaidSwitch().getAttribute("aria-checked")).toBe("false");
+  });
+});
+
+/**
+ * «+ Время» on a seat paid AHEAD (2026-11-15): «Оплачено сейчас» records the
+ * grant's charge as more cash paid ahead, so the change at Stop counts it.
+ * Offered only on such a seat, never with «Не оплачено», off by default.
+ */
+describe("«Оплачено сейчас» in «+ Время»", () => {
+  const paidNow = () => screen.queryByTestId("time-prepaid-switch") as HTMLButtonElement | null;
+
+  test("not offered on a seat paid nothing ahead", async () => {
+    await mount(session());
+    expect(paidNow()).toBeNull();
+  });
+
+  test("not offered while «Не оплачено» is on", async () => {
+    await mount(session({ prepaid_amount: 2000, unpaid_since: "2026-11-15T14:00:00Z" }));
+    expect(paidNow()).toBeNull();
+  });
+
+  test("on a prepaid seat: off by default, the grant as before", async () => {
+    repo.addTime.mockResolvedValue(session({ prepaid_amount: 2000 }));
+    await mount(session({ prepaid_amount: 2000 }));
+    expect(paidNow()!.getAttribute("aria-checked")).toBe("false");
+    await requestGrant(30);
+    expect(repo.addTime).toHaveBeenCalledWith(42, 30, undefined, undefined);
+  });
+
+  test("on: the grant is sent paid ahead", async () => {
+    repo.addTime.mockResolvedValue(session({ prepaid_amount: 2500 }));
+    await mount(session({ prepaid_amount: 2000 }));
+    await act(async () => { fireEvent.click(paidNow()!); });
+    await requestGrant(30);
+    expect(repo.addTime).toHaveBeenCalledWith(42, 30, undefined, undefined, true);
+  });
+});
+
+/**
+ * «Напоминание» (2026-11-15, owner): the player asks to be reminded in 2 h.
+ * The same h:mm field as everywhere, an optional name, one button that says
+ * what it does; once set, when it rings and how to change or cancel it.
+ */
+describe("the reminder section", () => {
+  const typeReminder = async (h: string, m: string) => {
+    await act(async () => { fireEvent.change(screen.getByTestId("reminder-duration-hours"), { target: { value: h } }); });
+    await act(async () => { fireEvent.change(screen.getByTestId("reminder-duration-minutes"), { target: { value: m } }); });
+  };
+  const setButton = () => screen.getByTestId("reminder-set") as HTMLButtonElement;
+
+  test("set: in 2 h with a name, sent as minutes and the note", async () => {
+    repo.setReminder.mockResolvedValue(session({ reminder: { at: "2026-11-15T16:40:00Z", set_at: "2026-11-15T14:40:00Z", minutes: 120, note: "Арам", set_by_user_id: 1, fired_at: null } }));
+    await mount(session({ is_unlimited: true, ends_at: null }));
+    expect(setButton().disabled).toBe(true);
+    await typeReminder("2", "00");
+    await act(async () => { fireEvent.change(screen.getByTestId("reminder-note"), { target: { value: "Арам" } }); });
+    expect(setButton().textContent).toBe("session.reminder.set");
+    await act(async () => { fireEvent.click(setButton()); });
+    expect(repo.setReminder).toHaveBeenCalledWith(42, 120, "Арам");
+    // Now pending: when, and change / cancel.
+    expect(screen.getByTestId("reminder-pending").textContent).toContain("Арам");
+    expect(screen.getByTestId("reminder-cancel")).toBeTruthy();
+  });
+
+  test("more than 10 h is not offered (the server takes 1..600)", async () => {
+    await mount(session());
+    await typeReminder("10", "01");
+    expect(setButton().disabled).toBe(true);
+    expect(screen.getByTestId("reminder-too-long")).toBeTruthy();
+  });
+
+  test("a pending reminder: cancel clears it on the server", async () => {
+    const pending = { at: "2026-11-15T16:40:00Z", set_at: "2026-11-15T14:40:00Z", minutes: 120, note: null, set_by_user_id: 1, fired_at: null };
+    repo.clearReminder.mockResolvedValue(session({ reminder: null }));
+    await mount(session({ reminder: pending }));
+    expect(screen.queryByTestId("reminder-duration-hours")).toBeNull();
+    await act(async () => { fireEvent.click(screen.getByTestId("reminder-cancel")); });
+    expect(repo.clearReminder).toHaveBeenCalledWith(42);
+    expect(screen.getByTestId("reminder-duration-hours")).toBeTruthy();
+  });
+
+  test("«Изменить» opens the field again over the pending one", async () => {
+    const pending = { at: "2026-11-15T16:40:00Z", set_at: "2026-11-15T14:40:00Z", minutes: 120, note: "Арам", set_by_user_id: 1, fired_at: null };
+    await mount(session({ reminder: pending }));
+    await act(async () => { fireEvent.click(screen.getByTestId("reminder-change")); });
+    expect(screen.getByTestId("reminder-duration-hours")).toBeTruthy();
+    expect((screen.getByTestId("reminder-note") as HTMLInputElement).value).toBe("Арам");
   });
 });

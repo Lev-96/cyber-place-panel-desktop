@@ -61,6 +61,8 @@ vi.mock("./notifications/GlobalBookingNotifier", async () => {
 });
 vi.mock("./notifications/SupportNotifier", () => ({ default: () => null }));
 vi.mock("./notifications/SessionEndingNotifier", () => ({ default: () => null }));
+// A marker, so the shell is seen to mount it (2026-11-15).
+vi.mock("./notifications/SessionReminderNotifier", () => ({ default: () => <span data-testid="reminder-notifier" /> }));
 vi.mock("./notifications/BillingNoticeNotifier", () => ({ default: () => null }));
 vi.mock("./notifications/ExpenseReminderNotifier", () => ({ default: () => null }));
 vi.mock("./ps5/UnexpectedWakeDialog", () => ({ default: () => null }));
@@ -119,6 +121,11 @@ const navLinks = () => Array.from(document.querySelectorAll<HTMLAnchorElement>("
 const supportCard = () => document.querySelector(".nav-support-card") as HTMLElement;
 
 describe("the desktop shell: hide and show the side menu", () => {
+  test("mounts the reminder notifier beside the ending-soon one", () => {
+    mountShell();
+    expect(screen.getByTestId("reminder-notifier")).toBeTruthy();
+  });
+
   test("opens shown: the toggle says what it would do and points at the menu", () => {
     mountShell();
     expect(shell().classList.contains("app-shell--collapsible")).toBe(true);

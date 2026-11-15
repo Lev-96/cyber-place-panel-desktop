@@ -53,6 +53,7 @@ import { BASE_JOYSTICKS, MAX_JOYSTICKS } from "@/api/joystickPrices";
 import { notify } from "@/ui/notify";
 import StopReceiptModal from "./StopReceiptModal";
 import UnpaidAlert, { type UnpaidNotice } from "./UnpaidAlert";
+import SessionCardChips from "./SessionCardChips";
 import { playFor } from "@/sound/soundEngine";
 import PadToggle from "./PadToggle";
 import PadChargeNote from "./PadChargeNote";
@@ -901,6 +902,10 @@ const SessionsBoard = ({ branchId }: Props) => {
                   for directly under a clock that was counting for free. */}
               {/* Secondary detail (2026-10-27): hidden in the Simple interface,
                   where the stripe, the clock and the money are the card. */}
+              {/* Unpaid products, paid ahead, a reminder (2026-11-15): the
+                  server's figures, FIRST on the line so a one-line card (every
+                  card is one height) never cuts them off; the tariff after. */}
+              <SessionCardChips session={sess} t={t} money={money} />
               <span className="session-card__secondary">
               {sessionTariffLine(sess, money, t)}
               {itemsCount > 0 && <span className="muted"> · {itemsCount} {t("session.posNote")}</span>}

@@ -6649,6 +6649,12 @@ select.input option:disabled {
 .hs-bill__pay strong {
   color: var(--color-text);
 }
+/* Left owing at the hand-over (2026-11-15): amber, like the board's chip. */
+.hs-bill__unpaid > * {
+  padding-top: 2px;
+  color: var(--color-warning);
+  font-weight: 600;
+}
 
 /* ── Add Product: additional items (chips, a cue, a racket) ───────────────
    Their own tab in the dialog. Chosen or not — no count — so a chosen row is
@@ -11140,4 +11146,266 @@ select.input option:disabled {
   width: auto;
   min-width: 180px;
   max-width: 100%;
+}
+
+/* ── Paid ahead, unpaid lines, keep the rate, reminders (2026-11-15) ───────
+   One loud thing only: the CHANGE figure on the receipt. Everything else is
+   quiet and reuses the board's tokens — amber = something still owed, green =
+   money to hand back, the accent = the server's answer read aloud. */
+
+/* «Безлимит» without a price: the rule said plainly, beside the gate. */
+.options-keep-rate {
+  display: block;
+  padding: var(--space-2) var(--space-3);
+  border-left: 3px solid var(--color-primary);
+  border-radius: 0 8px 8px 0;
+  background: color-mix(in srgb, var(--color-primary) 7%, transparent);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+/* The card's chips (SessionCardChips): pills like the pause pill, coloured by
+   what they mean. Amber: products handed over not paid yet. */
+.session-chip {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+/* First on the tariff line: the gap goes after it, not before. */
+.session-card__pill.pill.session-chip {
+  margin: 0 6px 0 0;
+}
+.session-chip--unpaid {
+  color: var(--color-warning);
+  border-color: color-mix(in srgb, var(--color-warning) 55%, transparent);
+  background: color-mix(in srgb, var(--color-warning) 10%, transparent);
+}
+
+/* «не оплачено» on a bill line, and its «Оплачено» button (AddSessionItemDialog). */
+.unpaid-tag {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--color-warning) 55%, transparent);
+  color: var(--color-warning);
+  font-size: 10px;
+  font-weight: 700;
+  vertical-align: 1px;
+}
+.btn.secondary.unpaid-pay-btn {
+  padding: 4px 10px;
+  min-height: 0;
+  font-size: 12px;
+  color: var(--color-success);
+  border-color: color-mix(in srgb, var(--color-success) 55%, transparent);
+  white-space: nowrap;
+}
+/* The receipt's "of these, not paid" line: amber, inside the products' total. */
+.receipt-unpaid {
+  color: var(--color-warning);
+}
+
+/* Paid ahead on the Stop receipt (PrepaidSettlement). The CHANGE is the one
+   loud thing in this feature: money that must physically go back across the
+   counter. A figure of 44px in the success green, on a tinted panel with a
+   solid rail, announced as a status. "Still to pay" is amber and calm; "paid
+   in full" is muted. */
+.prepaid-settlement {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+.prepaid-settlement__row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--space-3);
+  font-size: 14px;
+}
+.prepaid-settlement__row strong { font-variant-numeric: tabular-nums; }
+.prepaid-change {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: var(--space-3);
+  row-gap: 2px;
+  padding: var(--space-3) var(--space-4, 16px);
+  border-left: 6px solid var(--color-success);
+  border-radius: 0 12px 12px 0;
+  background: color-mix(in srgb, var(--color-success) 14%, transparent);
+  color: var(--color-success);
+  animation: prepaid-change-in 260ms ease-out both;
+}
+.prepaid-change__label {
+  font-size: 18px;
+  font-weight: 700;
+}
+.prepaid-change__figure {
+  font-size: 44px;
+  line-height: 1.05;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+.prepaid-change__hint {
+  flex-basis: 100%;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text);
+}
+@keyframes prepaid-change-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .prepaid-change { animation: none; }
+}
+.prepaid-due {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid color-mix(in srgb, var(--color-warning) 55%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--color-warning) 10%, transparent);
+  color: var(--color-warning);
+  font-size: 16px;
+  font-weight: 700;
+}
+.prepaid-due strong { font-size: 22px; font-variant-numeric: tabular-nums; }
+.prepaid-full {
+  font-size: 13px;
+  text-align: right;
+}
+.session-chip--prepaid {
+  color: var(--color-success);
+  border-color: color-mix(in srgb, var(--color-success) 55%, transparent);
+  background: color-mix(in srgb, var(--color-success) 10%, transparent);
+}
+/* «Оплачено вперёд»: UnpaidToggle in the success green (money already in the
+   drawer). Same specificity as the amber rules, declared after them. */
+.btn.unpaid-toggle--success:hover:not(:disabled) .cp-switch-track { border-color: var(--color-success); }
+.btn.unpaid-toggle--success:focus-visible .cp-switch-track {
+  border-color: var(--color-success);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-success) 30%, transparent);
+}
+.btn.unpaid-toggle--success.is-on .cp-switch-track {
+  background: var(--color-success);
+  border-color: var(--color-success);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-success) 18%, transparent);
+}
+.btn.unpaid-toggle--success.is-on .cp-switch-thumb { background: #04140b; }
+.btn.unpaid-toggle--success.is-on .unpaid-toggle__label { color: var(--color-success); }
+
+/* «На сумму» in Start: the server's answer read aloud as one big line. */
+.start-amount {
+  gap: var(--space-2);
+}
+.start-amount__answer {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--space-3);
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--color-primary) 40%, transparent);
+  background: color-mix(in srgb, var(--color-primary) 8%, transparent);
+}
+.start-amount__result {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: var(--space-2);
+  color: var(--color-primary);
+  font-size: 28px;
+  line-height: 1.15;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.start-amount__arrow { color: var(--color-muted); font-weight: 400; }
+.start-amount__rate { font-size: 13px; color: var(--color-text); }
+.start-amount__hint, .start-amount__note { font-size: 12px; }
+/* The reminder chip: calm in the accent while pending; once rung, amber with
+   a soft pulse (opacity only) until somebody clears it. */
+.session-chip--reminder {
+  color: var(--color-primary);
+  border-color: color-mix(in srgb, var(--color-primary) 50%, transparent);
+}
+.session-chip--reminder.is-fired {
+  color: var(--color-warning);
+  border-color: var(--color-warning);
+  background: color-mix(in srgb, var(--color-warning) 14%, transparent);
+  animation: reminder-chip-pulse 1.6s ease-in-out infinite;
+}
+@keyframes reminder-chip-pulse {
+  50% { opacity: 0.55; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .session-chip--reminder.is-fired { animation: none; }
+}
+
+/* «Напоминание» in «+ Время». */
+.reminder-section { gap: var(--space-2); }
+.reminder-section__hint { font-size: 12px; }
+.reminder-pending {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: var(--space-2) var(--space-3);
+  border-left: 3px solid var(--color-primary);
+  border-radius: 0 8px 8px 0;
+  background: color-mix(in srgb, var(--color-primary) 7%, transparent);
+}
+.reminder-pending.is-fired {
+  border-left-color: var(--color-warning);
+  background: color-mix(in srgb, var(--color-warning) 10%, transparent);
+}
+.reminder-pending__when { font-weight: 700; font-variant-numeric: tabular-nums; }
+.reminder-pending__note { font-size: 13px; overflow-wrap: anywhere; }
+.reminder-pending__actions { gap: var(--space-2); flex-wrap: wrap; margin-top: 4px; }
+
+/* "The player asked to be reminded" (SessionReminderNotifier): the ending-soon
+   card's shape, in the accent rather than amber (a request kept, not a seat
+   running out), and bottom-right so the two stacks never cover each other. */
+.ending-soon-stack.reminder-stack {
+  top: auto;
+  bottom: 16px;
+}
+.ending-soon-card.reminder-card {
+  background: color-mix(in srgb, var(--color-surface, #0b1328) 92%, var(--color-primary));
+  border: 1px solid color-mix(in srgb, var(--color-primary) 45%, transparent);
+  border-left: 4px solid var(--color-primary);
+  color: var(--color-text);
+  animation: reminder-card-in 220ms ease-out both;
+}
+@keyframes reminder-card-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ending-soon-card.reminder-card { animation: none; }
+}
+.reminder-card__title { font-weight: 800; font-size: 15px; }
+.reminder-card__body { margin-top: 4px; font-size: 14px; }
+.reminder-card__note { margin-top: 2px; font-size: 13px; color: var(--color-muted); overflow-wrap: anywhere; }
+.reminder-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: 10px;
+}
+.reminder-card .ending-soon-card__action {
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--on-accent-ink-page);
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+}
+.reminder-card .ending-soon-card__action.is-secondary {
+  color: var(--color-text);
+  background: transparent;
+  border-color: color-mix(in srgb, var(--color-text) 30%, transparent);
+  font-weight: 600;
 }

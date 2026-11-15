@@ -1,4 +1,4 @@
-import { IPcApi, ISessionApi, ITimePackage, SessionItemKind } from "@/types/sessions";
+import { IPcApi, ISessionApi, ISessionHourlyNow, ITimePackage, SessionItemKind } from "@/types/sessions";
 import { request } from "./client";
 
 export interface StartSessionBody {
@@ -67,6 +67,19 @@ export interface StartSessionBody {
    */
   outside_food?: true;
   outside_food_fee?: number;
+  /**
+   * «Оплачено вперёд» (2026-11-15): a package or a planned length paid in cash
+   * at the counter; the change comes back at Stop. Sent ONLY with the switch
+   * on; never with `unpaid`, free, or `paid_amount` (the server refuses).
+   */
+  prepaid?: true;
+  /**
+   * «На сумму» (2026-11-15): the sum handed over and the WHOLE seconds the
+   * server's quote said it buys; a figure that moved is refused (422).
+   * Never with a package, a plan, a typed total, free or unpaid.
+   */
+  paid_amount?: number;
+  paid_seconds?: number;
 }
 
 /** What "+ Время" would charge for N minutes now — the server's own figure. */
@@ -136,6 +149,23 @@ export interface IStartQuote {
   /** Only for a quote "until HH:mm": the exact end it came to, and the time asked. */
   ends_at?: string;
   until?: string;
+}
+
+/**
+ * What a SUM buys on a seat (2026-11-15, «На сумму», `GET /sessions/start-quote
+ * ?amount=`): the rate, the own-food fee taken out of it first, the money left
+ * for time, the WHOLE seconds it buys (`paid_seconds` echoes these), minutes
+ * rounded up, the end, and what the seat's own rate asks for that time.
+ */
+export interface IStartAmountQuote {
+  amount: number;
+  hourly_rate: number;
+  outside_food_fee: number;
+  time_amount: number;
+  seconds: number;
+  minutes: number;
+  ends_at: string;
+  standard_amount: number | null;
 }
 
 /** A planned length: so many minutes, or until a clock time. */
@@ -256,6 +286,8 @@ export interface IBillBreakdown {
     is_additional?: boolean;
     /** What the line is when it is not a sale (2026-11-13); label it by this, not by `name`. */
     kind?: SessionItemKind | null;
+    /** Handed over NOT paid yet (2026-11-15): a reminder, priced as any line. */
+    unpaid?: boolean;
   }>;
   items_total: number;
   /** What is actually owed. Zero for a waived session. */
@@ -295,6 +327,14 @@ export interface IBillBreakdown {
   time_waived?: number;
   /** Ended by a cancel (2026-11-06): the whole bill waived (`is_free` with it). Absent from an older backend. */
   is_cancelled?: boolean;
+  /** Lines handed over unpaid (2026-11-15), already inside `items_total`. */
+  unpaid_items_total?: number;
+  /**
+   * Paid AHEAD against this total (2026-11-15), the server's three figures:
+   * the cash handed over before playing, the change to give back, and what is
+   * still due. Null/absent when nothing was paid ahead.
+   */
+  prepaid?: { amount: number; change: number; due: number } | null;
 }
 
 export interface AddItemBody {
@@ -311,6 +351,12 @@ export interface AddItemBody {
    * without the right to type prices onto a bill.
    */
   extra?: true;
+  /**
+   * Handed over NOT paid yet (2026-11-15): a reminder, never money — the line
+   * is priced exactly as a paid one. Refused by the server beside `extra`.
+   * Absent = paid, the request as it always was.
+   */
+  unpaid?: true;
 }
 
 /**
@@ -500,6 +546,17 @@ export const apiReturnSessionItem = (sessionId: number, itemId: number) =>
     body: { returned: true },
   });
 
+/**
+ * A line handed over unpaid is paid now (2026-11-15, «Оплачено»): it merges
+ * into its paid twin or simply stops being unpaid. Only `false` is an
+ * operation; a paid line is never made unpaid after the fact.
+ */
+export const apiMarkSessionItemPaid = (sessionId: number, itemId: number) =>
+  request<{ session: ISessionApi }>(`/sessions/${sessionId}/items/${itemId}`, {
+    method: "PATCH",
+    body: { unpaid: false },
+  });
+
 export const apiRemoveSessionItem = (sessionId: number, itemId: number) =>
   request<{ session: ISessionApi }>(`/sessions/${sessionId}/items/${itemId}`, { method: "DELETE" });
 
@@ -543,25 +600,38 @@ export const apiRemoveSessionJoystick = (sessionId: number, slot: number) =>
  * applied by the server BEFORE the time is added, so the added time is never
  * counted as paid; omitted = left as it is.
  */
-export const apiAddSessionTime = (sessionId: number, minutes: number, charge?: number, unpaid?: boolean) =>
+export const apiAddSessionTime = (sessionId: number, minutes: number, charge?: number, unpaid?: boolean, prepaid?: true) =>
   request<{ session: ISessionApi }>(`/sessions/${sessionId}/time`, {
     method: "POST",
-    body: { minutes, ...(charge === undefined ? {} : { charge }), ...(unpaid === undefined ? {} : { unpaid }) },
+    body: {
+      minutes,
+      ...(charge === undefined ? {} : { charge }),
+      ...(unpaid === undefined ? {} : { unpaid }),
+      // «Оплачено сейчас» on a seat paid ahead (2026-11-15); absent otherwise.
+      ...(prepaid ? { prepaid } : {}),
+    },
   });
 
 /**
- * Lift the ceiling, optionally at a new price. Refused (422, with a sentence)
- * when the seat is booked.
- *
- * The rate is omitted unless the operator actually named one: the server then
- * keeps the tariff's own, which is what every switch did before a price could
- * be sent. When it IS sent it means "from now on" — the server freezes what the
- * clock had earned first, so nothing already played is repriced.
+ * What `/unlimited` and `/limit` answer (2026-11-15): the session, and what an
+ * hour of it costs now by part (`SessionTimeService::rateNow`). `hourly_now` is
+ * absent from an older backend.
  */
-export const apiMakeSessionUnlimited = (sessionId: number, hourlyRate?: number) =>
-  request<{ session: ISessionApi }>(`/sessions/${sessionId}/unlimited`, {
+export interface IRateChangeResponse {
+  session: ISessionApi;
+  hourly_now?: ISessionHourlyNow | null;
+}
+
+/**
+ * Lift the ceiling and carry on at the rate the seat bills at NOW
+ * (`keep_rate`, 2026-11-15, owner: no price to type). Pads and hourly rentals
+ * keep billing on their own rows. Refused (422, with a sentence) when the seat
+ * is booked or no rate can be established.
+ */
+export const apiMakeSessionUnlimited = (sessionId: number) =>
+  request<IRateChangeResponse>(`/sessions/${sessionId}/unlimited`, {
     method: "POST",
-    body: hourlyRate === undefined ? {} : { hourly_rate: hourlyRate },
+    body: { keep_rate: true },
   });
 
 /**
@@ -618,10 +688,10 @@ export interface IExtensionOptions {
  * seat's rate and grants them — at exactly that money on a seat with a plan,
  * at the rate elsewhere (its quote says which).
  */
-export const apiAddSessionTimeByAmount = (sessionId: number, amount: number, unpaid?: boolean) =>
+export const apiAddSessionTimeByAmount = (sessionId: number, amount: number, unpaid?: boolean, prepaid?: true) =>
   request<{ session: ISessionApi }>(`/sessions/${sessionId}/time`, {
     method: "POST",
-    body: { amount, ...(unpaid === undefined ? {} : { unpaid }) },
+    body: { amount, ...(unpaid === undefined ? {} : { unpaid }), ...(prepaid ? { prepaid } : {}) },
   });
 
 /**
@@ -630,7 +700,7 @@ export const apiAddSessionTimeByAmount = (sessionId: number, amount: number, unp
  * end, a paused one, or one a booking is waiting for.
  */
 export const apiLimitSession = (sessionId: number, minutes: number) =>
-  request<{ session: ISessionApi }>(`/sessions/${sessionId}/limit`, { method: "POST", body: { minutes } });
+  request<IRateChangeResponse>(`/sessions/${sessionId}/limit`, { method: "POST", body: { minutes } });
 
 /** Extra time not paid yet, on or off (2026-11-07); what is owed is worked out when the seat ends. */
 export const apiSetSessionUnpaid = (sessionId: number, on: boolean) =>
@@ -655,6 +725,27 @@ export const apiStartQuote = (pcId: number, length: PlannedLength, hourlyRate?: 
         ? `&planned_amount=${plannedAmount}`
         : hourlyRate !== undefined ? `&hourly_rate=${hourlyRate}` : ""),
   );
+
+/** ⚠️ ADVICE: what a sum buys here (2026-11-15). The start re-checks it and refuses a moved figure. */
+export const apiStartQuoteByAmount = (pcId: number, amount: number, outsideFood: boolean) =>
+  request<IStartAmountQuote>(
+    `/sessions/start-quote?pc_id=${pcId}&amount=${amount}${outsideFood ? "&outside_food=1" : ""}`,
+  );
+
+/**
+ * The reminder a player asked for (2026-11-15): ring in `minutes` (1..600,
+ * wall clock), with an optional note (≤ 120). Setting again replaces it and
+ * re-arms one that already rang. Branch-scoped; answers the session.
+ */
+export const apiSetSessionReminder = (sessionId: number, minutes: number, note?: string) =>
+  request<{ session: ISessionApi }>(`/sessions/${sessionId}/reminder`, {
+    method: "PUT",
+    body: { minutes, ...(note !== undefined && note.trim() !== "" ? { note: note.trim() } : {}) },
+  });
+
+/** Clear it: «Понятно» after it rang, or the player changed their mind. */
+export const apiClearSessionReminder = (sessionId: number) =>
+  request<{ session: ISessionApi }>(`/sessions/${sessionId}/reminder`, { method: "DELETE" });
 
 export const apiSessionExtensionOptions = (sessionId: number, minutes: number) =>
   request<IExtensionOptions>(`/sessions/${sessionId}/extension-options?minutes=${minutes}`);
@@ -792,7 +883,12 @@ export type SessionActionName =
   // An hourly extra handed back: the clock stopped, the charge stayed.
   | "item_returned"
   | "time_add_refused"
-  | "move_failed";
+  | "move_failed"
+  // The reminder a player asked for (2026-11-15): set or changed (meta has the
+  // previous_*), cleared (meta.fired), rung by the system (no user; meta.notified).
+  | "reminder_set"
+  | "reminder_cleared"
+  | "reminder_fired";
 
 export interface ISessionEvent {
   id: number;

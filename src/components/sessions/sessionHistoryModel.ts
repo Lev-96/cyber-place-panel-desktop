@@ -1,7 +1,8 @@
 import { paymentText, type PaidPart } from "@/components/payments/paymentText";
 import { ISessionEvent } from "@/api/sessions";
 import { formatTime } from "@/i18n/dates";
-import { fmt } from "@/i18n/translations";
+import { fmt, hasTranslation } from "@/i18n/translations";
+import { durationLabel as sharedDurationLabel } from "@/utils/durationLabel";
 import { ISessionApi } from "@/types/sessions";
 import { isOutsideFoodLine, sessionLineLabel } from "./outsideFood";
 
@@ -18,6 +19,10 @@ const durationLabel = (minutes: number, t: (k: string) => string): string => {
   const m = whole % 60;
   return h > 0 ? `${h} ${t("time.hourShort")} ${m} ${t("time.minShort")}` : `${m} ${t("time.minShort")}`;
 };
+
+/** "2 h", "30 min", "1 h 15 min": the panel's shared reading of a length. */
+const shortDuration = (minutes: number, t: (k: string) => string): string =>
+  sharedDurationLabel(Math.max(0, Math.round(minutes)), t);
 
 const metaNum = (meta: Record<string, unknown> | null, key: string): number | null => {
   const raw = meta?.[key];
@@ -40,6 +45,52 @@ const paidPartsOf = (meta: Record<string, unknown> | null): PaidPart[] => {
 const metaStr = (meta: Record<string, unknown> | null, key: string): string | null => {
   const raw = meta?.[key];
   return typeof raw === "string" && raw.trim() !== "" ? raw : null;
+};
+
+const metaTrue = (meta: Record<string, unknown> | null, key: string): boolean => meta?.[key] === true;
+
+/** A positive figure from the meta, or null (absent, zero, unreadable). */
+const metaPositive = (meta: Record<string, unknown> | null, key: string): number | null => {
+  const n = metaNum(meta, key);
+  return n !== null && n > 0 ? n : null;
+};
+
+/**
+ * What an hour of the seat costs, as the server wrote it (`rate_now`,
+ * 2026-11-15): "1500 AMD/h (seat 1000 AMD + joysticks 500 AMD)". The parts
+ * only when something besides the seat bills by the hour. Null without it.
+ */
+const rateNowText = (meta: Record<string, unknown> | null, t: (k: string) => string, money: (n: number) => string): string | null => {
+  const raw = meta?.rate_now;
+  if (raw === null || typeof raw !== "object") return null;
+  const r = raw as Record<string, unknown>;
+  const total = metaNum(r, "total");
+  if (total === null) return null;
+  const seat = metaNum(r, "seat");
+  const pads = metaPositive(r, "pads");
+  const extras = metaPositive(r, "extras");
+  const head = `${money(total)}${t("session.perHourShort")}`;
+  if (pads === null && extras === null) return head;
+  const parts = [
+    seat !== null ? fmt(t("history.rateSeat"), money(seat)) : null,
+    pads !== null ? fmt(t("history.ratePads"), money(pads)) : null,
+    extras !== null ? fmt(t("history.rateExtras"), money(extras)) : null,
+  ].filter((p): p is string => p !== null);
+  return `${head} (${parts.join(" + ")})`;
+};
+
+/**
+ * Paid ahead against the bill at the end (2026-11-15): "Paid ahead 2000 ·
+ * Change 500", "· Due 500" or "· No change" — the server's three figures.
+ */
+const prepaidSettledText = (meta: Record<string, unknown> | null, t: (k: string) => string, money: (n: number) => string): string | null => {
+  const prepaid = metaPositive(meta, "prepaid_amount");
+  if (prepaid === null) return null;
+  const change = metaPositive(meta, "change");
+  if (change !== null) return fmt(t("history.prepaidChange"), money(prepaid), money(change));
+  const due = metaPositive(meta, "due");
+  if (due !== null) return fmt(t("history.prepaidDue"), money(prepaid), money(due));
+  return fmt(t("history.prepaidExact"), money(prepaid));
 };
 
 /**
@@ -219,12 +270,24 @@ export const eventDetailParts = (
     }
 
     case "started": {
+      // «На сумму» (2026-11-15): the sum and what it bought, first — it says
+      // the length, so the plan's own "planned for" is not repeated under it.
+      const byAmount = metaTrue(meta, "by_amount");
+      if (byAmount) {
+        const paid = metaNum(meta, "paid_amount");
+        const seconds = metaNum(meta, "seconds");
+        if (paid !== null && seconds !== null) {
+          parts.push(fmt(t("history.byAmount"), money(paid), shortDuration(Math.ceil(seconds / 60), t)));
+        }
+        const fee = metaPositive(meta, "outside_food_fee");
+        if (fee !== null) parts.push(fmt(t("history.byAmountFood"), money(fee)));
+      }
       // A planned hourly start (2026-10-25): how long it was started for and
       // at what rate, as the server wrote it — the row's amount is the plan.
       // A start without a plan has none of these and prints nothing extra.
       const planned = metaNum(meta, "planned_minutes");
       if (planned !== null) {
-        parts.push(`${t("history.plannedFor")} ${durationLabel(planned, t)}`);
+        if (!byAmount) parts.push(`${t("history.plannedFor")} ${durationLabel(planned, t)}`);
         const rate = metaNum(meta, "hourly_rate");
         if (rate !== null) parts.push(`${money(rate)} / ${t("time.hourShort")}`);
         const end = new Date(new Date(e.created_at).getTime() + planned * 60_000);
@@ -237,6 +300,9 @@ export const eventDetailParts = (
             : t("history.priceSetByHand"));
         }
       }
+      // Paid ahead with the «Оплачено вперёд» switch (by amount: the sum above IS it).
+      const prepaid = metaPositive(meta, "prepaid_amount");
+      if (prepaid !== null && !byAmount) parts.push(fmt(t("history.prepaidAhead"), money(prepaid)));
       break;
     }
 
@@ -252,6 +318,9 @@ export const eventDetailParts = (
           ? `${t("history.priceSetByHand")} (${t("session.plannedStandard")} ${money(standard)})`
           : t("history.priceSetByHand"));
       }
+      // Paid at the counter with the grant, on a seat paid ahead (2026-11-15).
+      const prepaidNow = metaTrue(meta, "prepaid") ? metaNum(meta, "prepaid_amount") : null;
+      if (prepaidNow !== null) parts.push(fmt(t("history.prepaidWithTime"), money(prepaidNow)));
       break;
     }
 
@@ -274,8 +343,74 @@ export const eventDetailParts = (
       // which is a second line saying nothing.
       const oldMode = metaStr(meta, "old_mode");
       if (oldMode !== null) parts.push(`${oldMode} -> ${t("session.unlimited")}`);
+      // «Цена прежняя» (2026-11-15): the price it carries on at, pads and
+      // extras included, in place of the bare seat rate.
+      const nowText = rateNowText(meta, t, money);
+      if (metaStr(meta, "rate_source") === "kept" && nowText !== null) {
+        parts.push(fmt(t("history.rateKept"), nowText));
+        break;
+      }
       const rate = metaNum(meta, "hourly_rate");
       if (rate !== null && rate > 0) parts.push(`${money(rate)} / ${t("time.hourShort")}`);
+      // What an hour costs in all, when more than the seat bills by the hour.
+      const rateNow = meta?.rate_now as Record<string, unknown> | undefined;
+      if (nowText !== null && rateNow && (metaPositive(rateNow, "pads") !== null || metaPositive(rateNow, "extras") !== null)) {
+        parts.push(fmt(t("history.rateNow"), nowText));
+      }
+      break;
+    }
+
+    // A fixed time from now on an unlimited seat: what an hour costs (2026-11-15).
+    case "limited": {
+      const nowText = rateNowText(meta, t, money);
+      if (nowText !== null) parts.push(fmt(t("history.rateNow"), nowText));
+      break;
+    }
+
+    // An unpaid line paid now (2026-11-15, `scope: "item"`); the extra-time
+    // switch's own line carries no meta and prints nothing, as before.
+    case "unpaid_off": {
+      if (metaStr(meta, "scope") !== "item") break;
+      const item = meta?.item;
+      if (item !== null && typeof item === "object") {
+        const i = item as Record<string, unknown>;
+        const name = metaStr(i, "name");
+        const qty = metaNum(i, "qty");
+        const total = metaNum(i, "line_total");
+        if (name !== null) {
+          parts.push(`${name}${qty !== null && qty > 0 ? ` × ${qty}` : ""}${total !== null ? ` · ${money(total)}` : ""}`);
+        }
+      }
+      const left = metaPositive(meta, "unpaid_items_left");
+      if (left !== null) parts.push(fmt(t("history.unpaidLeft"), left));
+      break;
+    }
+
+    // The reminder a player asked for (2026-11-15).
+    case "reminder_set": {
+      const minutes = metaNum(meta, "minutes");
+      if (minutes !== null) parts.push(fmt(t("history.reminderIn"), shortDuration(minutes, t)));
+      const remindAt = metaStr(meta, "remind_at");
+      if (remindAt !== null) parts.push(fmt(t("history.reminderAt"), formatTime(new Date(remindAt))));
+      const note = metaStr(meta, "note");
+      if (note !== null) parts.push(`«${note}»`);
+      const previous = metaStr(meta, "previous_remind_at");
+      if (previous !== null) parts.push(fmt(t("history.reminderWas"), formatTime(new Date(previous))));
+      break;
+    }
+    case "reminder_cleared": {
+      const remindAt = metaStr(meta, "remind_at");
+      if (remindAt !== null) parts.push(fmt(t("history.reminderWas"), formatTime(new Date(remindAt))));
+      if (meta !== null && typeof meta.fired === "boolean") {
+        parts.push(t(meta.fired ? "history.reminderAfterRing" : "history.reminderBeforeRing"));
+      }
+      break;
+    }
+    case "reminder_fired": {
+      const note = metaStr(meta, "note");
+      if (note !== null) parts.push(`«${note}»`);
+      const notified = metaNum(meta, "notified");
+      if (notified !== null) parts.push(fmt(t("history.reminderNotified"), notified));
       break;
     }
 
@@ -323,7 +458,13 @@ export const eventDetailParts = (
         // its stored name is in the language of whoever started the session.
         const name = isOutsideFoodLine(l) ? sessionLineLabel(l, t) : stored;
         if (typeof name !== "string" || name.trim() === "") continue;
-        parts.push(typeof qty === "number" && qty > 0 ? `${name} × ${qty}` : name);
+        const text = typeof qty === "number" && qty > 0 ? `${name} × ${qty}` : name;
+        // Handed over NOT paid (2026-11-15): said on the line itself.
+        parts.push((l as { unpaid?: unknown }).unpaid === true ? `${text} · ${t("history.notPaidTag")}` : text);
+      }
+      if (e.action === "item_added") {
+        const unpaidTotal = metaPositive(meta, "unpaid_total");
+        if (unpaidTotal !== null) parts.push(fmt(t("history.unpaidTotal"), money(unpaidTotal)));
       }
       // ⚠️ Taking a product off the bill returns nothing, the same rule the
       // pads follow. The amount on the line is already 0; saying so is what
@@ -365,6 +506,11 @@ export const eventDetailParts = (
         money(metaNum(meta, "time_cost") ?? 0),
         money(metaNum(meta, "items_total") ?? 0),
         money(metaNum(meta, "joysticks_total") ?? 0)));
+      // Paid ahead (2026-11-15): a cancel hands all of it back.
+      const refund = metaPositive(meta, "change") ?? metaPositive(meta, "prepaid_amount");
+      if (metaPositive(meta, "prepaid_amount") !== null && refund !== null) {
+        parts.push(fmt(t("history.prepaidRefund"), money(refund)));
+      }
       break;
     }
 
@@ -380,6 +526,15 @@ export const eventDetailParts = (
         payments: paid.map((p) => ({ ...p, note: metaStr(meta, "payment_note") })),
       }, t, money);
       if (text !== null) parts.push(text);
+      // Paid ahead, the cash handed over, and what was left owing (2026-11-15).
+      const ahead = prepaidSettledText(meta, t, money);
+      if (ahead !== null) parts.push(ahead);
+      const received = metaPositive(meta, "cash_received");
+      if (received !== null && received !== metaNum(meta, "prepaid_amount")) {
+        parts.push(fmt(t("history.cashReceived"), money(received)));
+      }
+      const owed = metaPositive(meta, "unpaid_amount");
+      if (owed !== null) parts.push(fmt(t("history.unpaidAtEnd"), money(owed)));
       break;
     }
 
@@ -434,9 +589,18 @@ const ACTION_LOOK: Record<string, { tone: EventTone; icon: string }> = {
   limited: { tone: "neutral", icon: "⏱" },
   unpaid_on: { tone: "refused", icon: "!" },
   unpaid_off: { tone: "neutral", icon: "✓" },
+  // Had no entry until 2026-11-15, so its line printed its raw meta ("After:
+  // expired") instead of how it was paid; the details below were never reached.
+  payment_recorded: { tone: "neutral", icon: "֏" },
   time_add_refused: { tone: "refused", icon: "!" },
   move_failed: { tone: "refused", icon: "!" },
+  reminder_set: { tone: "neutral", icon: "🔔" },
+  reminder_cleared: { tone: "neutral", icon: "🔕" },
+  reminder_fired: { tone: "auto", icon: "🔔" },
 };
+
+/** Written by the server with no person behind it: «Automatically», never a blank. */
+const BY_SYSTEM = new Set(["reminder_fired"]);
 
 export interface EventPresentation {
   title: string;
@@ -475,6 +639,27 @@ const humanize = (action: string): string => {
 };
 
 /**
+ * An action's title. ⚠️ The real `t` returns the KEY for a key it does not
+ * have (never ""), so an action newer than this build used to print
+ * "history.action.x" (fixed 2026-11-15). Asked of the dictionary itself, not
+ * of what `t` answered, so an action with no entry reads as words whatever
+ * `t` does with a missing key.
+ */
+const actionTitle = (action: string, t: (k: string) => string): string => {
+  const key = `history.action.${action}`;
+  if (!hasTranslation(key)) return humanize(action);
+  const label = t(key);
+  return label === "" ? humanize(action) : label;
+};
+
+/** A title that depends on the meta, not only on the action (2026-11-15). */
+const titleOf = (e: ISessionEvent, t: (k: string) => string): string => {
+  if (e.action === "unpaid_off" && metaStr(e.meta, "scope") === "item") return t("history.itemPaid");
+  if (e.action === "reminder_set" && metaStr(e.meta, "previous_remind_at") !== null) return t("history.reminderChanged");
+  return actionTitle(e.action, t);
+};
+
+/**
  * How one event reads on the timeline.
  *
  * ⚠️ A resume the SERVER made at the pause limit is its own entry — its own
@@ -507,7 +692,7 @@ export const eventPresentation = (
       .filter(([, v]) => typeof v === "string" || typeof v === "number" || typeof v === "boolean")
       .map(([k, v]) => `${humanize(k)}: ${String(v)}`);
     return {
-      title: t(`history.action.${e.action}`) || humanize(e.action),
+      title: actionTitle(e.action, t),
       tone: "neutral",
       icon: "•",
       actor: e.user?.name ?? null,
@@ -518,10 +703,10 @@ export const eventPresentation = (
   }
 
   return {
-    title: t(`history.action.${e.action}`) || humanize(e.action),
+    title: titleOf(e, t),
     tone: known.tone,
     icon: known.icon,
-    actor: e.user?.name ?? null,
+    actor: e.user?.name ?? (BY_SYSTEM.has(e.action) ? t("history.endedAutomatically") : null),
     details,
     showAmount: !(e.action === "joystick_added"
       && e.meta !== null && (e.meta as Record<string, unknown>).hourly === true),

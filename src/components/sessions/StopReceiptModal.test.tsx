@@ -1173,3 +1173,118 @@ describe("«Свои продукты» on the receipt", () => {
     expect(repo.removeItem).toHaveBeenCalledWith(expect.anything(), 5);
   });
 });
+
+/** Products handed over not paid yet (2026-11-15): tagged on the receipt; the bill is unchanged. */
+describe("unpaid lines on the receipt", () => {
+  afterEach(() => cleanup());
+  test("the unpaid line is tagged and what of it is not paid is said; the totals are the server's", async () => {
+    repo.preview.mockResolvedValue(bill({
+      items: [
+        { id: 6, name: "Cola", price: 600, qty: 1, line_total: 600, unpaid: false },
+        { id: 7, name: "Cola", price: 600, qty: 2, line_total: 1200, unpaid: true },
+      ] as unknown as IBillBreakdown["items"],
+      items_total: 1800, unpaid_items_total: 1200, subtotal: 1817.22, gross_total: 1817.22, total: 1817.22,
+    }));
+    await mount();
+    expect(screen.getAllByTestId("receipt-line-unpaid")).toHaveLength(1);
+    expect(screen.getByTestId("receipt-unpaid-total").textContent).toMatch(/session\.receiptUnpaidItems.*1,?200/);
+    expect(document.body.textContent).toMatch(/session\.totalDue[^]*1,?817\.22/);
+  });
+
+  test("no unpaid lines: no tag, no line", async () => {
+    repo.preview.mockResolvedValue(bill({
+      items: [{ id: 6, name: "Cola", price: 600, qty: 1, line_total: 600 }] as unknown as IBillBreakdown["items"],
+      items_total: 600, unpaid_items_total: 0,
+    }));
+    await mount();
+    expect(screen.queryByTestId("receipt-line-unpaid")).toBeNull();
+    expect(screen.queryByTestId("receipt-unpaid-total")).toBeNull();
+  });
+});
+
+/**
+ * Paid ahead (2026-11-15): the server's `prepaid {amount, change, due}` meets
+ * the bill (SessionPrepaidChangeTest: 2000 paid, 1500 played, 500 back). The
+ * receipt says the change in BIG green, asks for nothing when nothing is due,
+ * and asks only for the DUE when the player stayed longer.
+ */
+describe("paid ahead at the start", () => {
+  const confirm = () => screen.getByTestId("stop-confirm") as HTMLButtonElement;
+  const prepaidBill = (total: number, change: number, due: number) => bill({
+    mode: "fixed", is_unlimited: false, package_name: null, time_cost: total, subtotal: total, gross_total: total, total,
+    prepaid: { amount: 2000, change, due }, priced_at: "2026-11-15T15:30:00+00:00",
+  });
+  afterEach(cleanup);
+  beforeEach(() => {
+    repo.preview.mockReset();
+    repo.stop.mockReset();
+  });
+
+  test("left early: the prepayment, and the change BIG and green, nothing else to take", async () => {
+    repo.preview.mockResolvedValue(prepaidBill(1500, 500, 0));
+    await mount();
+    expect(screen.getByTestId("receipt-prepaid-amount").textContent).toMatch(/session\.prepaid\.atStart.*2,?000/);
+    const change = screen.getByTestId("receipt-prepaid-change");
+    expect(change.getAttribute("role")).toBe("status");
+    expect(change.querySelector(".prepaid-change__figure")!.textContent).toMatch(/^500/);
+    expect(change.textContent).toContain("session.prepaid.giveBack");
+    // Nothing due: no payment choice and no banknotes box.
+    expect(screen.queryByTestId("pay-cash")).toBeNull();
+    expect(screen.queryByTestId("cash-received")).toBeNull();
+    expect(screen.queryByTestId("receipt-prepaid-due")).toBeNull();
+  });
+
+  test("…and the stop sends cash, no banknotes, the figure on screen", async () => {
+    repo.preview.mockResolvedValue(prepaidBill(1500, 500, 0));
+    repo.stop.mockResolvedValue({ session: session({ cash_change: 500 }), breakdown: prepaidBill(1500, 500, 0), cash: { received: "2000.00", change: "500.00" } });
+    await mount();
+    await act(async () => { fireEvent.click(confirm()); });
+    expect(repo.stop.mock.calls[0][1]).toEqual({ payment_method: "cash", priced_at: "2026-11-15T15:30:00+00:00", expected_total: 1500 });
+    // After the stop: the SERVER's change.
+    expect(screen.getByTestId("receipt-prepaid-change").querySelector(".prepaid-change__figure")!.textContent).toMatch(/^500/);
+  });
+
+  test("paid exactly: «paid in full», muted, no change box", async () => {
+    repo.preview.mockResolvedValue(prepaidBill(2000, 0, 0));
+    await mount();
+    expect(screen.getByTestId("receipt-prepaid-full").textContent).toContain("session.prepaid.paidInFull");
+    expect(screen.queryByTestId("receipt-prepaid-change")).toBeNull();
+  });
+
+  test("stayed longer: amber «Доплатить 500», and the payment is for the DUE only", async () => {
+    repo.preview.mockResolvedValue(prepaidBill(2500, 0, 500));
+    repo.stop.mockResolvedValue({ session: session(), breakdown: prepaidBill(2500, 0, 500), cash: { received: "3000.00", change: "500.00" } });
+    await mount();
+    expect(screen.getByTestId("receipt-prepaid-due").textContent).toMatch(/session\.prepaid\.due.*500/);
+    expect(screen.queryByTestId("receipt-prepaid-change")).toBeNull();
+    // The banknotes are asked against the due: 1000 for 500 → 500 back.
+    fireEvent.change(screen.getByTestId("cash-received"), { target: { value: "1000" } });
+    expect(screen.getByTestId("cash-change-value").textContent).toContain("500");
+    await act(async () => { fireEvent.click(confirm()); });
+    expect(repo.stop.mock.calls[0][1]).toMatchObject({ payment_method: "cash", cash_received: "1000.00", expected_total: 2500 });
+    // Closed: the change is the SERVER's (`cash.change`, 500 from the banknotes),
+    // not the preview's prepaid.change (0).
+    expect(screen.getByTestId("receipt-prepaid-change").querySelector(".prepaid-change__figure")!.textContent).toMatch(/^500/);
+    expect(screen.queryByTestId("receipt-prepaid-due")).toBeNull();
+  });
+
+  test("stayed longer, split: the parts must add up to the DUE, not the bill", async () => {
+    repo.preview.mockResolvedValue(prepaidBill(2500, 0, 500));
+    await mount();
+    await act(async () => { fireEvent.click(screen.getByTestId("pay-split")); });
+    fireEvent.change(screen.getByLabelText("session.payCash", { selector: "input" }), { target: { value: "200" } });
+    // «the rest here» fills what is still due: 500 − 200, never 2500 − 200.
+    await act(async () => { fireEvent.click(screen.getByTestId("pay-rest-card")); });
+    fireEvent.change(screen.getByTestId("pay-note"), { target: { value: "Idram" } });
+    repo.stop.mockResolvedValue({ session: session(), breakdown: prepaidBill(2500, 0, 500), cash: null });
+    await act(async () => { fireEvent.click(confirm()); });
+    expect(repo.stop.mock.calls[0][1]).toMatchObject({ payments: [{ method: "cash", amount: 200 }, { method: "card", amount: 300 }] });
+  });
+
+  test("a seat paid nothing ahead shows none of it", async () => {
+    repo.preview.mockResolvedValue(bill({ prepaid: null }));
+    await mount();
+    expect(screen.queryByTestId("receipt-prepaid")).toBeNull();
+    expect(screen.getByTestId("pay-cash")).toBeTruthy();
+  });
+});

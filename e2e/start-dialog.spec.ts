@@ -74,7 +74,8 @@ const layout = (page: Page) => page.evaluate(() => {
 for (const width of [1440, 800, 520]) {
   test(`${width}px: no package choice without packages, one box for the length, room between parts`, async ({ page }) => {
     await openDialog(page, width);
-    await expect(page.getByTestId("start-mode")).toHaveCount(0);
+    // No package tab; by the hour and «На сумму» (2026-11-15) stay.
+    await expect(page.getByTestId("start-mode-fixed")).toHaveCount(0);
     await expect(page.getByText("Hours", { exact: true })).toHaveCount(0);
     await expect(page.getByRole("group", { name: "Quick choice" })).toHaveCount(0);
 
@@ -103,6 +104,7 @@ for (const width of [1440, 800, 520]) {
 test("with a package, both choices are offered", async ({ page }) => {
   await openDialog(page, 1440, [{ id: 1, branch_id: 1, name_en: "One hour", name_ru: "Час", name_am: "Ժամ", duration_minutes: 60, price: 1500 }]);
   await expect(page.getByTestId("start-mode")).toBeVisible();
+  await expect(page.getByTestId("start-mode-fixed")).toBeVisible();
 });
 
 test("a part hidden is gone, stays hidden after a reload, and can be shown again", async ({ page }) => {

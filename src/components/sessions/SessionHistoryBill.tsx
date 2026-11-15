@@ -60,6 +60,10 @@ const SessionHistoryBill = ({ session, closed }: Props) => {
   // already net of it; said on its own line so the bill shows where it went.
   const waived = num(session.time_waived_total);
 
+  const prepaid = num(session.prepaid_amount);
+  const change = num(session.cash_change);
+  const owed = num(session.unpaid_amount);
+
   if (!closed && items.length === 0 && padCharge === null && waived <= 0) return null;
 
   const perHour = t("session.perHourShort");
@@ -142,12 +146,26 @@ const SessionHistoryBill = ({ session, closed }: Props) => {
                 <td className="num" colSpan={2}><strong>{paymentLabel}</strong></td>
               </tr>
             )}
+            {/* Paid ahead, the change handed back and what was left owing
+                (2026-11-15): the server's own figures — `cash_change` is
+                worked out by the server, never received minus total here. */}
+            {prepaid > 0 && <SummaryRow testId="bill-prepaid" label={t("history.billPrepaid")} value={money(prepaid)} />}
+            {change > 0 && <SummaryRow testId="bill-change" label={t("history.billChange")} value={money(change)} />}
+            {owed > 0 && <SummaryRow testId="bill-unpaid" className="hs-bill__unpaid" label={t("history.billUnpaid")} value={money(owed)} />}
           </tfoot>
         )}
       </table>
     </section>
   );
 };
+
+/** A figure under the total: its name over two columns, its value over two. */
+const SummaryRow = ({ label, value, testId, className }: { label: string; value: string; testId: string; className?: string }) => (
+  <tr className={className ?? "hs-bill__pay"} data-testid={testId}>
+    <th scope="row" colSpan={2}>{label}</th>
+    <td className="num" colSpan={2}>{value}</td>
+  </tr>
+);
 
 /** One line of the bill. A column with nothing to say shows a dash, never a guess. */
 const BillRow = ({ label, qty, price, sum }: { label: string; qty: number | null; price: string | null; sum: string }) => (

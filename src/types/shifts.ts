@@ -67,6 +67,24 @@ export interface IShiftPlaceLine {
   status: string;
   is_free: boolean;
   closed_at: string | null;
+  /** v5 (2026-11-15): paid ahead on this place, the change given back, still owed at the hand-over; null: none. */
+  prepaid?: Money | null;
+  change?: Money | null;
+  unpaid?: Money | null;
+}
+
+/** v5 (2026-11-15): one prepayment taken into this shift's drawer — never revenue. */
+export interface IShiftPrepaymentLine {
+  id: number;
+  session_id: number;
+  seat: string;
+  amount: Money;
+  /** Always `cash` today. */
+  method: string;
+  /** `start` (at the start / «На сумму») or `time` («+ Время» paid ahead). */
+  kind: "start" | "time" | string;
+  user_id: number | null;
+  at: string | null;
 }
 
 export type ShiftWarning =
@@ -99,7 +117,7 @@ export interface IShiftStaffPart {
   /** Paid till sales they made. */
   till: { count: number; units: number; total: Money };
   /** Places they started in the shift: launches, distinct seats, how those stand now. */
-  started: { launches: number; seats: number; finished: number; running: number };
+  started: { launches: number; seats: number; finished: number; running: number; /** v5: cash they took ahead. */ prepaid?: Money };
   /** Places billed in this shift that they had started. */
   started_billed: { count: number; total: Money };
   /** Places billed in this shift that they stopped — the money they took. */
@@ -138,6 +156,9 @@ export interface IShiftReport {
     unique_seats?: number;
     by_platform?: Array<{ platform: string; count: number; total: Money }>;
     paused_count?: number;
+    /** v5 (2026-11-15): places paid ahead, and places that ended owing something. */
+    prepaid?: { count: number; amount: Money; settled: Money; change: Money; due: Money };
+    unpaid?: { count: number; amount: Money };
   };
   till: {
     paid_count: number;
@@ -155,6 +176,14 @@ export interface IShiftReport {
     opening: Money;
     places: Money;
     till: Money;
+    /**
+     * v5 (2026-11-15): cash paid ahead into this shift, the prepayments of the
+     * places settled in it, and the change given back from those. expected =
+     * opening + places + till + prepaid_in − prepaid_settled (the server's sum).
+     */
+    prepaid_in?: Money;
+    prepaid_settled?: Money;
+    change?: Money;
     expected: Money;
     /** Present once closed. */
     counted?: Money;
@@ -176,6 +205,8 @@ export interface IShiftReport {
     till: Array<{ id: number; method: string; amount: Money; status: string; at: string | null; payments?: IShiftPaymentPart[] }>;
     tournaments: Array<{ id: number; amount: Money; paid_at: string }>;
     member_topups: Array<{ id: number; amount: Money }>;
+    /** v5 (2026-11-15). */
+    prepaid?: IShiftPrepaymentLine[];
   };
   /** v3 (2026-10-26): absent from a report frozen before. */
   products?: {

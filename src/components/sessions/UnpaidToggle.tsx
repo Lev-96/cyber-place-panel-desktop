@@ -13,9 +13,10 @@ interface Props {
    * The colour it takes when on. "warning" (the default) is amber, something
    * owed; "accent" (2026-11-13, «Свои продукты» in Start) is the panel's accent,
    * a line added to the bill. Same size and construction either way, so two
-   * of them side by side read as a pair.
+   * of them side by side read as a pair. "success" (2026-11-15, «Оплачено
+   * вперёд»): green, money already in the drawer.
    */
-  tone?: "warning" | "accent";
+  tone?: "warning" | "accent" | "success";
 }
 
 /**
@@ -33,7 +34,7 @@ const UnpaidToggle = ({
     aria-checked={on}
     aria-label={fullLabel}
     title={fullLabel}
-    className={["btn unpaid-toggle", tone === "accent" ? "unpaid-toggle--accent" : null, on ? "is-on" : null]
+    className={["btn unpaid-toggle", tone === "accent" ? "unpaid-toggle--accent" : tone === "success" ? "unpaid-toggle--success" : null, on ? "is-on" : null]
       .filter(Boolean).join(" ")}
     onClick={() => onChange(!on)}
     disabled={disabled}

@@ -21,6 +21,7 @@ const repo = vi.hoisted(() => ({
   listProducts: vi.fn(),
   removeItem: vi.fn(),
   resolveItemsText: vi.fn(),
+  markItemPaid: vi.fn(),
 }));
 /** Stands in for the Products screen's own form. */
 const form = vi.hoisted(() => ({ saved: null as ((p: unknown) => void) | null }));
@@ -33,6 +34,7 @@ vi.mock("@/repositories/SessionRepository", () => ({
     setItemQty: vi.fn(),
     removeItem: (...a: unknown[]) => repo.removeItem(...a),
     resolveItemsText: (...a: unknown[]) => repo.resolveItemsText(...a),
+    markItemPaid: (...a: unknown[]) => repo.markItemPaid(...a),
   },
 }));
 vi.mock("@/components/products/ProductForm", () => ({
@@ -1222,5 +1224,54 @@ describe("«Свои продукты» among what the session already holds (20
     expect(screen.getByText("session.outsideFood.line")).toBeTruthy();
     expect(screen.queryByText("Свои продукты")).toBeNull();
     expect(screen.getByLabelText("action.delete: session.outsideFood.line")).toBeTruthy();
+  });
+});
+
+/**
+ * «Не оплачено» (2026-11-15, owner): products handed over before the player
+ * paid. A REMINDER only: the line is priced exactly as a paid one. Off by
+ * default, and then the request is byte-identical to before.
+ */
+describe("handed over not paid yet", () => {
+  const unpaidSwitch = () => screen.getByTestId("items-unpaid-switch") as HTMLButtonElement;
+
+  test("off by default: the basket is sent exactly as before", async () => {
+    await mount();
+    expect(unpaidSwitch().getAttribute("aria-checked")).toBe("false");
+    fireEvent.click(plusFor("Lays"));
+    await act(async () => { fireEvent.click(confirmButton()); });
+    expect(repo.addItems).toHaveBeenCalledWith(42, [{ product_id: 10, qty: 1 }]);
+  });
+
+  test("on: every product line is sent as unpaid", async () => {
+    await mount();
+    fireEvent.click(plusFor("Lays"));
+    fireEvent.click(plusFor("Coffee"));
+    await act(async () => { fireEvent.click(unpaidSwitch()); });
+    expect(unpaidSwitch().getAttribute("aria-checked")).toBe("true");
+    await act(async () => { fireEvent.click(confirmButton()); });
+    expect(repo.addItems).toHaveBeenCalledWith(42, [
+      { product_id: 10, qty: 1, unpaid: true },
+      { product_id: 15, qty: 1, unpaid: true },
+    ]);
+  });
+
+  test("a line on the bill handed over unpaid says so, and «Оплачено» marks it paid on the server", async () => {
+    const onBill = { ...session, items: [
+      { id: 7, name: "Cola", price: 600, qty: 2, product_id: 3, unpaid_at: "2026-11-15T14:00:00Z" },
+      { id: 8, name: "Water", price: 300, qty: 1, product_id: 4, unpaid_at: null },
+    ] } as unknown as ISessionApi;
+    repo.markItemPaid.mockResolvedValue({ ...onBill, items: [{ id: 8, name: "Water", price: 300, qty: 1, product_id: 4, unpaid_at: null }, { id: 9, name: "Cola", price: 600, qty: 2, product_id: 3, unpaid_at: null }] });
+    const { onAdded } = await mount({ session: onBill });
+
+    const tags = screen.getAllByTestId("bill-line-unpaid");
+    expect(tags).toHaveLength(1);
+    expect(tags[0].textContent).toContain("session.itemUnpaidTag");
+    expect(screen.getAllByTestId("bill-line-mark-paid")).toHaveLength(1);
+
+    await act(async () => { fireEvent.click(screen.getByTestId("bill-line-mark-paid")); });
+    expect(repo.markItemPaid).toHaveBeenCalledWith(42, 7);
+    expect(screen.queryByTestId("bill-line-unpaid")).toBeNull();
+    expect(onAdded).toHaveBeenCalled();
   });
 });

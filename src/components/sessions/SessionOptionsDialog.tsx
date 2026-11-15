@@ -13,8 +13,8 @@ import { useLang } from "@/i18n/LanguageContext";
 import { fmt } from "@/i18n/translations";
 import { durationLabel } from "@/utils/durationLabel";
 import { billingSettingsRepository } from "@/repositories/BillingSettingsRepository";
-import { sessionRepository } from "@/repositories/SessionRepository";
-import { ISessionApi } from "@/types/sessions";
+import { sessionRepository, type ISessionRateChange } from "@/repositories/SessionRepository";
+import { ISessionApi, ISessionHourlyNow } from "@/types/sessions";
 import { platformGroup, platformLabel } from "@/utils/platform";
 import { useCallback, useEffect, useState } from "react";
 import {
@@ -27,6 +27,7 @@ import type { IExtensionAlternative, IExtensionOptions, ITimeQuote } from "@/api
 import SectionTabs from "@/components/ui/SectionTabs";
 import DurationInput from "./DurationInput";
 import UnpaidToggle from "./UnpaidToggle";
+import ReminderSection from "./ReminderSection";
 import QuotedPrice from "./QuotedPrice";
 import { EMPTY_DRAFT, draftMinutes, type DurationDraft } from "./durationModel";
 import { quoteFor, useServerQuote } from "./useServerQuote";
@@ -109,15 +110,10 @@ const SessionOptionsDialog = ({ session, platform, onClose, onChanged, platformN
   // The grant's price typed by hand (2026-10-25), in AMD as `PriceInput` keeps it.
   const [editCharge, setEditCharge] = useState(false);
   const [chargeInput, setChargeInput] = useState("");
-  // The price the session carries on at once its end is removed. Off by
-  // default: not naming one keeps the tariff's own rate, which is what every
-  // switch did before a price could be named at all.
-  // The gate for the whole unlimited operation, and the price it will carry on
-  // at. `editRate` used to mean "the operator wants to change a price we are
-  // already showing"; the price is now always entered deliberately, so the
-  // checkbox is the only state the section needs.
+  // The gate for the whole unlimited operation. No price is asked (2026-11-15,
+  // owner): the seat carries on at the rate it bills at now (`keep_rate`), and
+  // the server says the figure once it has switched.
   const [goUnlimited, setGoUnlimited] = useState(false);
-  const [rateInput, setRateInput] = useState("");
   // «⏱ Время» on an unlimited seat (2026-11-07): the length from now.
   const [limitDraft, setLimitDraft] = useState<DurationDraft>(EMPTY_DRAFT);
 
@@ -139,6 +135,12 @@ const SessionOptionsDialog = ({ session, platform, onClose, onChanged, platformN
   const isActive = current.status === "active";
   // The server's state, never a local guess: each flip returns the session.
   const unpaidOn = !!current.unpaid_since;
+  // «Оплачено сейчас» (2026-11-15): on a seat paid AHEAD, the grant's charge
+  // is paid in cash now and joins the prepayment, so the change at Stop counts
+  // it. Off by default: money is recorded in the drawer only when said.
+  const prepaidSeat = Number(current.prepaid_amount ?? 0) > 0;
+  const [paidNow, setPaidNow] = useState(false);
+  const paidNowOn = paidNow && prepaidSeat && !unpaidOn && !(current.is_free ?? false);
 
   // ONE fee for every pad, read from the venue's billing settings. It was a
   // list of per-slot prices and a lookup for "which slot comes next", which
@@ -198,32 +200,8 @@ const SessionOptionsDialog = ({ session, platform, onClose, onChanged, platformN
    * grant additionally needs to know, so it can keep what the cashier typed
    * instead of clearing the box under a red sentence explaining why it failed.
    */
-  /**
-   * The rate to send, or null when the box does not hold a usable one.
-   *
-   * `undefined` from the caller's point of view — "no rate named" — is the
-   * unedited case and is handled at the call site; this only answers whether
-   * what was TYPED is a price. Zero is refused here as it is on the server:
-   * a free session is a different decision with its own capability.
-   */
-  const typedRate = ((): number | null => {
-    const raw = rateInput.trim().replace(",", ".");
-    if (raw === "") return null;
-
-    const value = Number(raw);
-    return Number.isFinite(value) && value > 0 ? value : null;
-  })();
-
-  /**
-   * What the session would carry on at, as the SERVER resolves it.
-   *
-   * Never `hourly_rate ?? 0`: a fixed session's column is null by design, and
-   * that fallback is exactly how a 1500/hour tariff came to be offered as
-   * "0 драм/ч". `null` here means the server could derive no rate either — it
-   * will refuse the switch, so the dialog says so rather than inviting a click
-   * that cannot work.
-   */
-  const resolvedRate = current.tariff_hourly_rate ?? null;
+  /** "1500 ֏/ч": the SERVER's per-hour figure (`hourly_now.total`), never one worked out here. */
+  const perHour = (now: ISessionHourlyNow): string => `${money(now.total)}${t("session.perHourShort")}`;
   const limitMinutes = draftMinutes(limitDraft);
 
   /**
@@ -742,6 +720,17 @@ const SessionOptionsDialog = ({ session, platform, onClose, onChanged, platformN
                   )}
                 </div>
               )}
+              {prepaidSeat && !unpaidOn && !isFree && (
+                <UnpaidToggle
+                  on={paidNow}
+                  onChange={setPaidNow}
+                  disabled={busy || !isActive}
+                  label={t("session.prepaid.timeSwitch")}
+                  fullLabel={t("session.prepaid.timeSwitchFull")}
+                  testId="time-prepaid-switch"
+                  tone="success"
+                />
+              )}
               {(() => {
                 const minutes = grantBy === "time" ? grantMinutes : moneyQuoted?.minutes ?? null;
                 return minutes !== null && current.ends_at ? (
@@ -760,7 +749,9 @@ const SessionOptionsDialog = ({ session, platform, onClose, onChanged, platformN
                     onClick={() => {
                       if (grantMinutes === null || quotedCharge === null) return;
                       void run(
-                        () => sessionRepository.addTime(current.id, grantMinutes, typedCharge, unpaidOn || undefined),
+                        () => (paidNowOn
+                          ? sessionRepository.addTime(current.id, grantMinutes, typedCharge, unpaidOn || undefined, true)
+                          : sessionRepository.addTime(current.id, grantMinutes, typedCharge, unpaidOn || undefined)),
                         grantMinutes,
                         timeAddedToast(grantMinutes),
                       ).then((ok) => {
@@ -786,7 +777,9 @@ const SessionOptionsDialog = ({ session, platform, onClose, onChanged, platformN
                       if (grantAmount === null || moneyQuoted === null) return;
                       const minutes = moneyQuoted.minutes;
                       void run(
-                        () => sessionRepository.addTimeByAmount(current.id, grantAmount, unpaidOn || undefined),
+                        () => (paidNowOn
+                          ? sessionRepository.addTimeByAmount(current.id, grantAmount, unpaidOn || undefined, true)
+                          : sessionRepository.addTimeByAmount(current.id, grantAmount, unpaidOn || undefined)),
                         minutes,
                         timeAddedToast(minutes),
                       ).then((ok) => { if (ok) setAmountInput(""); });
@@ -806,80 +799,30 @@ const SessionOptionsDialog = ({ session, platform, onClose, onChanged, platformN
         {!isUnlimited && !paused && (
           <>
         {/* ── unlimited ─────────────────────────────────────────────────── */}
-        <section className="col" style={{ gap: 8 }}>
+        <section className="col" style={{ gap: 8 }} data-testid="unlimited-section">
           <strong>{t("session.unlimited")}</strong>
-
-            <>
               {/* The checkbox IS the gate. Nothing about the switch is offered
-                  until it is ticked — not the price, not the button — because
-                  removing a seat's end cannot be undone and the form should
-                  read as a deliberate act rather than a control sitting there
-                  waiting to be clicked. */}
+                  until it is ticked, because removing a seat's end cannot be
+                  undone and the form should read as a deliberate act rather
+                  than a control sitting there waiting to be clicked. */}
               <Checkbox
                 checked={goUnlimited}
-                onChange={(next) => {
-                  setGoUnlimited(next);
-                  // Prefilled from the seat when opening an EMPTY box, and left
-                  // alone otherwise: unticking must not throw away a price the
-                  // operator typed, and re-ticking should give it back rather
-                  // than make them type it twice.
-                  //
-                  // Which also makes the gate a rule of its own rather than one
-                  // that only holds because the box happens to be empty — with
-                  // a price still in state, an unticked gate must STILL keep
-                  // the switch shut, and that is now observable.
-                  if (next && rateInput.trim() === "" && resolvedRate) setRateInput(String(resolvedRate));
-                }}
+                onChange={setGoUnlimited}
                 label={t("session.unlimitedGate")}
                 disabled={busy || !isActive}
               />
 
+              {/* No price to type (2026-11-15, owner): it carries on at the
+                  rate it bills at now, pads and rentals on their own rows as
+                  before. The figure is the server's, said once it switched. */}
               {goUnlimited && (
-                <div className="col" style={{ gap: 6, paddingLeft: 26 }}>
-                  <span className="muted" style={{ fontSize: 12 }}>{t("session.unlimitedHint")}</span>
-
-                  {/* Required, and asked for rather than assumed. A seat with
-                      no configured price used to be answered with "check the
-                      tariff settings", which tells an operator holding a player
-                      to go and edit a settings screen. The price the session
-                      carries on at is a decision they can make here — it is
-                      prefilled from the seat when there is one, and typed when
-                      there is not. The server validates it either way. */}
-                  <label className="col" style={{ gap: 4 }}>
-                    <span className="label">{t("session.unlimitedRate")} *</span>
-                    <div className="row" style={{ gap: 6, alignItems: "center" }}>
-                      {/* Same reason as the amount box above. */}
-                      <input
-                        className="input"
-                        type="text"
-                        inputMode="decimal"
-                        value={rateInput}
-                        onChange={(e) => setRateInput(e.target.value)}
-                        aria-label={t("session.unlimitedRate")}
-                        style={{ width: 140 }}
-                        autoFocus
-                      />
-                      <span className="muted" style={{ fontSize: 12 }}>/ {t("time.hourShort") || "h"}</span>
-                    </div>
-                  </label>
-
-                  {/* Only once something has been typed: an empty box is not a
-                      mistake yet, and shouting at one teaches an operator to
-                      ignore the message that matters. */}
-                  {rateInput.trim() !== "" && typedRate === null && (
-                    <span className="error" style={{ fontSize: 12 }}>{t("session.unlimitedRateInvalid")}</span>
-                  )}
-                  <span className="muted" style={{ fontSize: 12 }}>{t("session.unlimitedRateHint")}</span>
-                </div>
+                <span className="options-keep-rate" data-testid="unlimited-keep-rate">{t("session.unlimitedKeepRate")}</span>
               )}
 
               <div>
                 <Button
                   variant="secondary"
-                  // Ticked AND priced, or nothing. The server refuses a
-                  // non-price too; this only keeps the operator from earning
-                  // a 422 they would have to read.
-                  disabled={busy || !isActive || !goUnlimited || typedRate === null}
+                  disabled={busy || !isActive || !goUnlimited}
                   onClick={() => {
                     // Irreversible, so it is confirmed — through the in-app
                     // dialog, never `window.confirm`. A native one poisons the
@@ -887,20 +830,27 @@ const SessionOptionsDialog = ({ session, platform, onClose, onChanged, platformN
                     // modal's inputs silently stop accepting keystrokes, and
                     // the cashier's next action is the one that appears broken.
                     //
-                    // The refusal path stays the server's: a booked seat is
-                    // answered with a sentence, not a disabled button, because
-                    // only the server knows.
+                    // The refusal path stays the server's: a booked seat or a
+                    // seat with no rate is answered with a sentence.
                     void (async () => {
-                      if (typedRate === null) return;
                       if (!(await confirm(t("session.unlimitedConfirm")))) return;
-                      await run(() => sessionRepository.makeUnlimited(current.id, typedRate));
+                      let now: ISessionHourlyNow | null = null;
+                      const ok = await run(async () => {
+                        const r = await sessionRepository.makeUnlimited(current.id);
+                        now = r.hourlyNow;
+                        return r.session;
+                      });
+                      if (!ok) return;
+                      const kept: ISessionHourlyNow | null = now;
+                      notify.message("success", kept !== null
+                        ? fmt(t("session.unlimitedDoneKept"), perHour(kept))
+                        : t("session.unlimitedDone"));
                     })();
                   }}
                 >
                   {t("session.unlimitedApply")}
                 </Button>
               </div>
-            </>
         </section>
 
           </>
@@ -928,11 +878,21 @@ const SessionOptionsDialog = ({ session, platform, onClose, onChanged, platformN
                     disabled={busy || !isActive || limitMinutes === null}
                     onClick={() => {
                       if (limitMinutes === null) return;
-                      void run(
-                        () => sessionRepository.limit(current.id, limitMinutes),
-                        null,
-                        fmt(t("session.limitDone"), durationLabel(limitMinutes, t)),
-                      ).then((ok) => { if (ok) onClose(); });
+                      let answer: ISessionRateChange | null = null;
+                      void run(async () => {
+                        answer = await sessionRepository.limit(current.id, limitMinutes);
+                        return answer.session;
+                      }).then((ok) => {
+                        if (!ok) return;
+                        // The server's end and per-hour figure (2026-11-15):
+                        // "until 21:10, at 1500/h"; an older backend: the length.
+                        const done: ISessionRateChange | null = answer;
+                        const end = done?.session.ends_at ?? null;
+                        notify.message("success", done?.hourlyNow && end
+                          ? fmt(t("session.limitDoneRate"), clockOf(new Date(end)), perHour(done.hourlyNow))
+                          : fmt(t("session.limitDone"), durationLabel(limitMinutes, t)));
+                        onClose();
+                      });
                     }}
                   >
                     {fmt(t("session.limitApply"), durationLabel(limitMinutes ?? 0, t))}
@@ -941,6 +901,10 @@ const SessionOptionsDialog = ({ session, platform, onClose, onChanged, platformN
               </>
           </section>
         )}
+
+        {/* The reminder a player asked for (2026-11-15): a running seat,
+            paused or not, timed or unlimited. */}
+        {isActive && <ReminderSection session={current} disabled={busy} run={run} t={t} />}
 
         {/* Waiving the bill lives on START SESSION, where the decision is
             actually made. Offering it again inside "add time" invited it as

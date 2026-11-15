@@ -12,6 +12,7 @@ import { useAuth } from "@/auth/AuthContext";
 import { useConfirm } from "@/components/ui/ConfirmProvider";
 import ScreenWithBg from "@/components/ui/ScreenWithBg";
 import SectionTabs from "@/components/ui/SectionTabs";
+import { reminderSentence } from "@/components/notifications/SessionReminderNotifier";
 import Spinner from "@/components/ui/Spinner";
 import { StateSwitch, deriveViewState } from "@/components/ui/state";
 import { useAsync } from "@/hooks/useAsync";
@@ -388,6 +389,8 @@ const DbNotificationCard = ({ n, onClick, onDelete }: { n: IDbNotification; onCl
   const isBranchSubscribed = dataType === "branch.subscribed";
   const isTournamentJoined = dataType === "tournament.joined";
   const isSessionEndingSoon = dataType === "session.ending_soon";
+  // A reminder the player asked for has rung (2026-11-15, `SessionReminderDue`).
+  const isSessionReminder = dataType === "session.reminder";
   // A booking's start time has come (2026-11-07, server scheduler, once).
   const isBookingStartDue = dataType === "booking.start_due";
   const bookingDate = n.data?.booking_date as string | undefined;
@@ -497,6 +500,18 @@ const DbNotificationCard = ({ n, onClick, onDelete }: { n: IDbNotification; onCl
     };
     headline = interpolate(t("notifications.sessionEndingSoonTitle"), vars);
     body = interpolate(t("notifications.sessionEndingSoonBody"), vars);
+  } else if (isSessionReminder) {
+    // The card's own sentence (SessionReminderNotifier), and under it the
+    // player's words, who set it and where.
+    const seat = n.data?.place_number ?? n.data?.pc_id ?? n.data?.session_id;
+    headline = reminderSentence({
+      seat: String(seat ?? "-"),
+      player: (n.data?.player_name as string | undefined)?.trim() || null,
+      minutes: typeof n.data?.minutes === "number" ? n.data.minutes : null,
+    }, t);
+    const note = (n.data?.note as string | undefined)?.trim();
+    const setBy = (n.data?.set_by_name as string | undefined)?.trim();
+    body = [note ? `«${note}»` : null, setBy || null, venue || null].filter(Boolean).join(" · ") || null;
   } else {
     headline = n.type.split("\\").pop() ?? n.type;
   }
@@ -508,7 +523,7 @@ const DbNotificationCard = ({ n, onClick, onDelete }: { n: IDbNotification; onCl
     // surface the staff can act on. Tournament has its own detail page
     // with the registrations list + verify form, so it wins over a
     // generic guest profile when both are present.
-    if (isSessionEndingSoon && n.data?.branch_id) {
+    if ((isSessionEndingSoon || isSessionReminder) && n.data?.branch_id) {
       navigate(`/branches/${n.data.branch_id}/sessions`);
     } else if (n.data?.booking_id) {
       navigate(`/bookings/${n.data.booking_id}`);

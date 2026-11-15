@@ -180,3 +180,31 @@ describe("«Свои продукты» in the history bill (2026-11-13)", () =>
     ]);
   });
 });
+
+/** Paid ahead, the change and what was left owing (2026-11-15): the server's figures, under the total. */
+describe("SessionHistoryBill — paid ahead, change, unpaid", () => {
+  test("a prepaid seat: the prepayment and the server's change under the payment", () => {
+    mount(session({ total_paid: 1500, prepaid_amount: 2000, cash_received: 2000, cash_change: 500 }));
+    expect(foot().slice(2)).toEqual([
+      ["history.billPrepaid", "2000 AMD"],
+      ["history.billChange", "500 AMD"],
+    ]);
+  });
+
+  test("change is the SERVER's cash_change, never received minus total", () => {
+    mount(session({ total_paid: 5318, cash_received: 6000, cash_change: 700 }));
+    expect(foot()).toContainEqual(["history.billChange", "700 AMD"]);
+  });
+
+  test("no change row at zero; what was left owing has its own row", () => {
+    mount(session({ prepaid_amount: 2000, cash_change: 0, unpaid_amount: 1200 }));
+    const rows = foot();
+    expect(rows.some((r) => r[0] === "history.billChange")).toBe(false);
+    expect(rows).toContainEqual(["history.billUnpaid", "1200 AMD"]);
+  });
+
+  test("a running seat shows none of them", () => {
+    mount(session({ status: "active", prepaid_amount: 2000 }), false);
+    expect(document.querySelector("tfoot")).toBeNull();
+  });
+});

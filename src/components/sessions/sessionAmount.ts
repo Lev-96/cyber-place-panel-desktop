@@ -69,7 +69,8 @@ export const sessionTimeCostAt = (session: ISessionApi, at: number): number =>
  * from the pin; a visit settled before 2026-11-07, or rounding up, read as
  * they were billed.
  */
-export const sessionMinimumChargeAt = (session: ISessionApi, at: number): MinimumChargeResult => {
+export const sessionMinimumChargeAt = (session: ISessionApi, atRaw: number): MinimumChargeResult => {
+  const at = billableAt(session, atRaw);
   const rule = session.min_charge ?? null;
   const clock = clockCostAt(session, at);
   // Reset to zero (2026-11-05) — `SessionPricingCalculator::timeCharge`: the
@@ -330,7 +331,8 @@ export const sessionItemLineTotal = (line: SessionItemLine): number =>
  *
  * Every other line is a price and a count and takes no part in any of this.
  */
-export const sessionItemsTotalAt = (session: ISessionApi, at: number): number => {
+export const sessionItemsTotalAt = (session: ISessionApi, atRaw: number): number => {
+  const at = billableAt(session, atRaw);
   const lines = session.items ?? [];
   if (lines.length === 0) return 0;
 
@@ -390,7 +392,8 @@ export const sessionItemsTotal = (session: ISessionApi): number => {
  * A payload without the flags (an older backend) contributes nothing rather
  * than guessing, which keeps the tile under the receipt instead of over it.
  */
-export const sessionJoysticksTotalAt = (session: ISessionApi, at: number): number => {
+export const sessionJoysticksTotalAt = (session: ISessionApi, atRaw: number): number => {
+  const at = billableAt(session, atRaw);
   const pads = session.joysticks ?? [];
   if (pads.length === 0) return 0;
 
@@ -482,16 +485,17 @@ export const sessionCurrentHourlyRate = (session: ISessionApi): number => {
  *
  * See CLAUDE.md §9.6.
  */
-export const sessionAmountAt = (session: ISessionApi, at: number): number =>
-  session.is_free
-    ? 0
-    : applyRounding(
+export const sessionAmountAt = (session: ISessionApi, atRaw: number): number => {
+  if (session.is_free) return 0;
+  const at = billableAt(session, atRaw);
+  return applyRounding(
       round2(
         sessionTimeCostAt(session, at) + sessionJoysticksTotalAt(session, at) + sessionItemsTotalAt(session, at),
       ),
       session.rounding_step ?? 0,
       session.rounding_mode ?? "up",
     );
+};
 
 /**
  * The venue's rounding policy, applied ONCE to a composed subtotal.
@@ -585,6 +589,34 @@ export const pausedSecondsBetween = (
   }
 
   return paused;
+};
+
+/**
+ * The instant a RUNNING seat's time runs out, or null when nothing ends it by
+ * itself — `Session::billableUntil()` on the server (2026-11-15), the same
+ * three answers. No running seat is billed later than this
+ * (`SessionPricingCalculator::clampToEnd`): an hour at 1000 on a branch
+ * rounding up to 100 read 1100 for the seconds between its end and the sweep.
+ *
+ *  - running, not paused: `ends_at`;
+ *  - paused with a limit: `ends_at` moved by the whole pause (the server
+ *    resumes it AT the limit, the same arithmetic);
+ *  - paused with no limit, no end (count-up, unlimited), or closed: null.
+ */
+export const billableUntilOf = (session: ISessionApi): number | null => {
+  if (session.status !== "active" || !session.ends_at) return null;
+  const endsAt = Date.parse(session.ends_at);
+  if (Number.isNaN(endsAt)) return null;
+  if (!session.paused_at) return endsAt;
+  const pausedAt = Date.parse(session.paused_at);
+  const limit = autoResumeAtOf(session);
+  return limit !== null && limit > pausedAt ? endsAt + Math.floor((limit - pausedAt) / 1000) * 1000 : null;
+};
+
+/** `at`, never past the seat's billable end (`clampToEnd`). */
+const billableAt = (session: ISessionApi, at: number): number => {
+  const end = billableUntilOf(session);
+  return end !== null && end < at ? end : at;
 };
 
 /**

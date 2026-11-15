@@ -64,6 +64,13 @@ export const useExpiryNudge = (
     // …but a LIMITED pause is due at its limit: the board read that follows
     // is what lets the server resume it on the spot (`sweepDuePauses`).
     ...active.map(autoResumeAtOf).filter((t): t is number => t !== null),
+    // …and a REMINDER the player asked for (2026-11-15), on the wall clock —
+    // paused or not, with an end or none. The read that follows is what lets
+    // the server ring it (`SessionReminderService::sweep`); one already rung
+    // is not asked about again.
+    ...active
+      .filter((s) => s.reminder && !s.reminder.fired_at)
+      .map((s) => Date.parse((s.reminder as { at: string }).at)),
   ]
     .filter((t) => Number.isFinite(t))
     .sort((a, b) => a - b)[0];
