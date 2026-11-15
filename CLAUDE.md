@@ -4948,11 +4948,21 @@ whole rounding step.
   opened it) — reports «Сессию уже закрыли в другом месте. Счёт сохранён.»
   (`session.checkoutClosedElsewhere`, en/ru/am), shows no stale figure and
   offers only Close. Tests: two cases in `StopReceiptModal.test.tsx`.
-- **Receipt lines vs total.** Each receipt line is the server's own part to
-  the cent; the total is the exact sum's. With several fractional parts (a seat
-  and hourly pads) on a step-0 branch the lines can differ from the total by a
-  cent (625.83 + 312.08 + 312.08 printed, 1 250.00 charged). The history card
-  derives its time line from the stored total, so it always adds up.
+- **Receipt lines add up (2026-11-16, backend `BillLines`).** The server
+  prints each line (`time_cost`, each pad's `amount`, each `line_total`, and
+  `joysticks_total` / `items_total` / `unpaid_items_total` as their sums)
+  allocated by largest remainder so they add up to `subtotal` exactly: two
+  pads at 37:33 print 625.84 + 312.08 + 312.08 = 1 250.00 (ties go to the
+  earlier line: time, pads by slot, items). The receipt renders them as given
+  and never recomputes a line. The money (`subtotal`, `total`, `total_paid`,
+  `unpaid_amount`) is unchanged by it. The history card derives its time line
+  from the stored total, so it adds up by construction (its pad line is the
+  pads' exact sum to the cent, so on such a bill it can sit a cent from the
+  receipt's split between time and pads; the total is the same). The tile
+  prints no line breakdown, only the total (and the pad note's sum), so it
+  mirrors nothing here. Known residual: the receipt's reset question names
+  the printed `time_cost`, which can be a cent above the figure the server
+  waives (`reset-time` waives the bill's own time; the toast names that).
 - Mutations (13 caught): each pad or the clock cut to the cent first, the
   package rate cut to the cent, the exact pair ignored, the cent truncated,
   the old float path (rate × seconds in drams, `Math.round(x * 100)`), periods
