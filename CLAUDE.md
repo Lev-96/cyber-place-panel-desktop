@@ -4683,8 +4683,10 @@ Playwright. Screenshots: `~/cyber-place-local/reports/audit-fixes-2026-11-14/pan
 
 ## Seat names in the bookings calendar; the debt card never covers its text (2026-11-15, owner)
 
-- **The calendar names a seat as its card does.** `SessionsBoard.seatLineOf(pc)`
-  is the one source of the card's name line («№4 · Hall VIP», «№4» with no
+- **The calendar names a seat as its card does.** `seatLineOf(pc, lang)` in
+  `src/components/sessions/seatLine.ts` (moved out of SessionsBoard on
+  2026-11-15, byte-identical; `placeLineOf(place, lang)` is the same line for a
+  bare place row) is the one source of the card's name line («№4 · Hall VIP», «№4» with no
   name, the device label with no place; number = `place.number ?? place.id`,
   name through `tr(place, "name", lang)`). The card's `SeatNameLine` and the
   calendar's `CalendarPlace.label` both take it, so the timeline's seat
@@ -4722,6 +4724,37 @@ Playwright. Screenshots: `~/cyber-place-local/reports/audit-fixes-2026-11-14/pan
   label back to `seatOf`, name dropped from `seatLineOf`, the grid restored
   (27 of 90 fail), a fact allowed under its badge (`min-width: 0`, 3 fail). Screenshots:
   `~/cyber-place-local/reports/ui-fixes-2026-11-15/`.
+
+## History: filter by place (2026-11-15, owner)
+
+Backend contract: `cyber-place/CLAUDE.md` § "Which place" (`SessionPlaceFilter`).
+- **«Место» / Seat / Տեղ** after the staff picker on Sessions → History
+  (`SessionsHistory`): «Все места» + every place of the branch as its card
+  names it (`placeLineOf`, «№N · name», in number order), from
+  `placeRepository.listRawByBranch`. State is `{branch, id}` like the staff
+  picker, so another branch starts from «all». The select (`.hs-place`) is
+  capped at `max-width: 260px` with an ellipsis (a fixed cap, not a
+  percentage — see `.cal__seat`); its `title` and each option's `title` carry
+  the whole line. A failed list shows `history.state.placesFailed` as the
+  retry (only «all» is left).
+- `place_id` goes on all three history reads: the sessions list (stat tiles
+  included), the person's list (`acted_by`) and the events feed. The SERVER
+  narrows (current place, or moved off it); nothing is filtered or recomputed
+  here. Without a place the requests carry no `place_id` key at all.
+  `eventsForSession` takes no place.
+- While a place is picked, `TillSalesHistory` and `BookingHistory` (which
+  belong to no seat) are not rendered; one muted line
+  `history.placeHidesTill` says why.
+- Tests: `seatLine.test.ts` (7), `SessionsHistory.placeFilter.test.tsx` (7),
+  the board's `SessionsBoard.reserve.test.tsx` pins the extracted line;
+  `e2e/history-place-filter.spec.ts` (6: en/ru/am × 1280/520 — the select fits
+  and is capped, no overflow, both reads carry `place_id`, till/bookings hidden
+  and back). Mutation-checked: place dropped from the feed, till never hidden,
+  name dropped from the line. Screenshots:
+  `~/cyber-place-local/reports/history-filter-split-stock-2026-11-15/history/`.
+- ⚠️ `e2e/booking-seat-names.spec.ts` is clock-dependent: after 23:00 local its
+  "booking in an hour" lands on tomorrow and all 9 cases fail at `cal-item`.
+  Not a regression; with a fixed noon clock all 9 pass.
 
 ## Paid ahead, unpaid lines, keep the rate, reminders (2026-11-15, owner)
 
