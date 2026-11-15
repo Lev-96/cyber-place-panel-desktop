@@ -2365,10 +2365,21 @@ are unchanged — do not add a `paused` status here either.
   - Payments (2026-11-07, owner): ONE control, `PaymentEditor` +
     `paymentSplit.ts` (cents, `checkPayment`, `paymentBody`), on Stop, the
     till sale and the post-hoc mark. Cash / Card / Other, or «Разделить»: a
-    box per method, «Остаток», what is still due, a required note; parts sum
-    to the bill to the cent. One method sends the legacy fields (every server
-    takes them); a split sends `payments` + `payment_note` (never
-    `cash_received`). A seat that ended by itself with no method recorded:
+    box per method, «Остаток», what is still due, an OPTIONAL note («Как
+    оплатили (необязательно)», `pay.note`); parts sum to the bill (or the
+    prepaid DUE) to the cent. **No words are ever required (2026-11-15,
+    owner):** `checkPayment` has no note problem (only `invalid`, `parts` = no
+    amount typed → `pay.needAmount`, `sum`); «Другое» with no text is sent as
+    `{payment_method: "other"}`. One method — or a split with exactly ONE part
+    above zero — sends the legacy fields (every server takes them;
+    `payment_method_other` only when typed, cut to 120); two or more parts
+    send `payments` + `payment_note` only when written (never
+    `cash_received`). A text-less «Другое» reads «Другое» (`pay.otherShort`)
+    in `paymentText`, the session history (`paymentLabelOf`) and the till
+    (`salePaymentText` = `paymentText`). e2e `payment-optional-split.spec.ts`.
+    ⚠️ Deploy the backend FIRST: an older backend refuses a note-less split
+    and a text-less «Другое» with 422 (the seat keeps running, nothing is
+    written — safe, but the cashier is stuck until it is deployed). A seat that ended by itself with no method recorded:
     `StopReceiptModal` asks once («Отметить оплату» → `POST
     /sessions/{id}/payment` with a stable `client_request_id`; 409 already
     recorded, 422 shift closed). `payment_method` may be `split` with
