@@ -1061,6 +1061,11 @@ Hard rules:
     removes whole tenants and a block changes `is_blocked` on every branch
     payload. Admin writes are rare, so over-invalidating is the cheap side.
     Pinned in `httpCache.test.ts`.
+- **A sale moves the catalogue (2026-11-16).** `/orders` and `/sessions`
+  writes fan out to `/products` too: a counted product's «Остаток» changes
+  with every sale, and this machine must not read a minute-old count after it
+  sold one. Other machines still see it within the 60 s TTL. Pinned in
+  `httpCache.test.ts`.
 - Pass `noCache: true` to `request()` for a forced refresh; it also
   sends `Cache-Control: no-cache`, which makes the backend recompute.
 
@@ -1340,6 +1345,8 @@ button is not a permission: a manager who kept the URL could still POST.
 | Товары — создать / изменить / цена / скрыть (`product.write`, 2026-11-09) | ✅ | ✅ | ✅ own branch |
 | Товары — удалить (`product.crud`) | ✅ | ✅ | ❌ (скрывает вместо удаления) |
 | История товаров (`product.history`) | ✅ | ✅ | ❌ |
+| Остаток: приход, первый учёт (`product.write`, 2026-11-16) | ✅ | ✅ | ✅ own branch |
+| Остаток: пересчёт учтённого, «Не учитывать» (`product.stockCorrect`, 2026-11-16) | ✅ | ✅ | ❌ |
 | Товары — список + поиск | ✅ | ✅ | ✅ |
 | Сессии, касса, игры, ПК, турниры, подписчики | ✅ | ✅ | ✅ |
 | Джойстики, доп. время, безлимит на живой сессии | ✅ | ✅ | ✅ |
@@ -4752,9 +4759,14 @@ Backend contract: `cyber-place/CLAUDE.md` § "Which place" (`SessionPlaceFilter`
   and back). Mutation-checked: place dropped from the feed, till never hidden,
   name dropped from the line. Screenshots:
   `~/cyber-place-local/reports/history-filter-split-stock-2026-11-15/history/`.
-- ⚠️ `e2e/booking-seat-names.spec.ts` is clock-dependent: after 23:00 local its
-  "booking in an hour" lands on tomorrow and all 9 cases fail at `cal-item`.
-  Not a regression; with a fixed noon clock all 9 pass.
+- `e2e/booking-seat-names.spec.ts` was clock-dependent: after 23:00 local its
+  "booking in an hour" (with its «before 08:00 → 10:00» shift) landed on
+  tomorrow and all 9 cases failed at `cal-item`. Fixed 2026-11-16, test-only:
+  the spec's "now" is today at NOON (`NOON`; the booking is 13:00 today) and
+  the page's Date is pinned to it (`page.clock.setFixedTime`). Mutation-checked:
+  the old rule evaluated at 23:30 fails all 9 at `cal-item`; the seat name
+  dropped from `seatLineOf` fails all 9. The page-clock pin alone is defensive
+  (a 13:00 booking with the page at 23:30 still passes).
 
 ## Paid ahead, unpaid lines, keep the rate, reminders (2026-11-15, owner)
 
@@ -4895,3 +4907,75 @@ from the press, and the hour banked 1100.
   mutations caught (six in the dialog, one API body, two history lines, the
   exact-cents display — caught only by the e2e — and three in the tile's
   mirror).
+
+## Product stock per shift (2026-11-16, owner)
+
+Backend contract: `cyber-place/CLAUDE.md` § "Product stock per shift". Stock is
+bookkeeping: nothing here adds or subtracts a count, prices anything or refuses
+a sale. Every figure on screen is the server's.
+
+- **Types / API** — `IProduct.stock?: number | null` (absent from an older
+  backend = not counted; `countsStock()`), `IStockWarning`, `IProductStockMeta`,
+  `IStockChange` (`types/pos.ts`); `api/products.ts`: `CreateProductBody` gains
+  `stock` / `on_existing` / `existing_id` / `client_request_id` (sent only when
+  a quantity is typed), `apiProductStock` (`POST /products/{id}/stock`),
+  `productExistsBody(e)` reads the 409. `ProductRepository.listWithStock`
+  (rows + `meta.stock`), `createCounted` (no generic toast: the form says what
+  happened), `stock`. Pure helpers in `components/products/stock.ts`
+  (`parseQuantity`, `stockNumber`/`signedDelta` with a real minus sign,
+  `stockChangeText` «5 → 15 (+10)», «Без учёта → 10», warnings).
+  `utils/requestId.ts` is the one press-id minter (the till's moved there).
+- **Products list** (`routes/ProductsList.tsx`): each product sold by the unit
+  says «Остаток: 15» (red below zero, `.product-stock.is-negative`) or «Без
+  учёта»; above the list «Остаток всего: N шт.» + «В минусе: N» from
+  `meta.stock` (never added up here; hidden when nothing counts or the server
+  sends no meta). «Остаток» button per row (`product.write`) →
+  `ProductStockDialog`. Rows wrap their buttons under the product on a narrow
+  window (`.list-item.product-row`; four buttons did not fit 520px).
+- **ProductForm** «Количество» (new products sold by the unit only; plain text
+  + `inputMode="numeric"`, empty = not counted = the old create, byte for
+  byte). With a number: `createCounted`; merged → toast «Добавлено к остатку
+  «Кола»: 5 → 15 (+10)» and the existing product's names are NOT translated
+  over; created → names saved as before. 409 → `ProductMergePanel` («Такой
+  товар уже есть»: `ChoiceCards` of the matches with price · count · «скрыт»,
+  «Добавить к остатку», «Добавить и сменить цену на N» only when the price
+  differs, «Назад»), scrolled into view; the answer re-sends with the SAME
+  `client_request_id`. Also inside both sale dialogs' «new product».
+- **ProductStockDialog**: not counted → one action «Начать учёт» (`set`,
+  `product.write`); counted → «Приход» (+N, `product.write`), and for
+  `product.stockCorrect` (owner, admin) «Пересчёт» and «Не учитывать»; a
+  manager sees «Пересчитать или отключить учёт может только владелец.». One
+  press id per dialog; toast «Кола: 15 → 12 (−3)» / «остаток уже N».
+- **Basket**: `StockChip` «ост. N» beside a counted product in the picker and
+  on a typed line (amber at 0, red below; a hint, never a limit).
+  **Warnings**: `ui/stockWarnings.ts` `announceStockWarnings` — the till's and
+  the bill's repositories (`OrderRepository.create`, `SessionRepository.addItem /
+  addItems / setItemQty`) raise ONE amber `notify.warning` «Остаток ниже нуля:
+  Кола −2. Продажа прошла, проверьте остаток.» and return exactly what they
+  returned before.
+- **History**: `PRODUCT_ACTIONS` + `stock_received` / `stock_corrected` /
+  `stock_untracked`; `describeChange` reads `old_stock`/`new_stock`/
+  `stock_delta` («5 → 15 (+10)», «· при добавлении товара» from `after.via`).
+- **Shift report v6**: `IShiftStock`, `IShiftStockLine`, `report.stock`,
+  `lines.stock`; `ShiftStockTable` («Остатки»: Товар · На начало · Пришло ·
+  Продано · Вернули · Пересчёт · Осталось, then «Итого»; below zero red and
+  named under the table) in `ShiftBreakdown` after the products. Scrolls in
+  its own `.hs-scroll` viewport on a narrow window; nothing for a report
+  without `stock` (v5 and older) or with no counted product.
+- **Permission**: `product.stockCorrect` (admin, owner) mirrors the backend's
+  `products.manage` for stock; the server asks it again under its row lock.
+- **Tests**: vitest `stock.test.ts`, `ProductForm.stock.test.tsx` (9),
+  `ProductStockDialog.test.tsx` (6), `ProductsList.stock.test.tsx` (5: the
+  printed total is the server's 113, not the rows' 13), `ShiftStockTable.test.tsx`
+  (4), `SellProductsDialog.stock.test.tsx` (3), `saleStockWarnings.test.ts`,
+  `ui/stockWarnings.test.ts`, + cases in `productEventChange`, `httpCache`,
+  `permissions`; 13 panel mutations caught. e2e `product-stock.spec.ts` (7)
+  and `shift-stock.spec.ts` (7: the fixture `e2e/fixtures/shift-stock-v6-summary.json`
+  is the backend's own `/shifts/{id}/summary` answer for the
+  `ShiftStockScenario` evening), en/ru/am × 1280/520. Screenshots:
+  `~/cyber-place-local/reports/history-filter-split-stock-2026-11-15/stock/`.
+- **Pre-existing, not fixed (outside the ask)**: at the 520px window the shift
+  report's header buttons and its «По способам оплаты» card stick out of the
+  window, identically with and without «Остатки» (measured 2026-11-16).
+- ⚠️ **Owner web**: bump `panel.ref` with this change. Deploy the backend first
+  (an older backend ignores `stock` on create and answers 404 for `/stock`).
