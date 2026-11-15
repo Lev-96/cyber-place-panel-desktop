@@ -224,7 +224,7 @@ const Notifications = () => {
             />
           ) : <span />}
           {unreadCount > 0 && (
-            <button type="button" onClick={() => void markAllRead()} style={feedActionBtn} className="notifications-toolbar__read-all">
+            <button type="button" onClick={() => void markAllRead()} className="notifications-toolbar__read-all">
               {t("notifications.markAllRead") || "Mark all as read"}
             </button>
           )}
