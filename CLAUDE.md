@@ -4394,6 +4394,23 @@ untouched:
   present at first load are not news) and raises a silent OS notification.
 - **Notifications**: «Mark all as read» sits in `.notifications-toolbar`
   above the tabs, right corner; it reads every tab.
+  A1 (release 1.0.61, 2026-11-15): the shared `.cp-subtab` rule (equal
+  shares, `min-width: 0`, ellipsis) cut «Active Plac…» / «Активные мес…»
+  and hid its red count, because this tab list does not grow. Overridden
+  ONLY under `.notifications-toolbar`: the list wraps, each tab is
+  `flex: 0 0 auto` / `min-width: auto` (never below its longest word), an
+  inline-flex label + badge with no clipping, 34px (`--subtab-h`) wherever
+  the label fits one line; in a column narrower than the label (390px
+  window, 108px beside the side menu) the label wraps inside the tab and
+  the count goes under it. Every other SectionTabs keeps the equal shares.
+  The read-all button's look moved from the inline `feedActionBtn` to the
+  class (same values) so ≤ 420px can take 4px off its sides — it was 1px
+  wider than that column in ru. `e2e/notifications-tabs.spec.ts` (14:
+  en/ru/am × 1920/1280/520/390 — label whole, badge inside its tab, read-all
+  in the right corner, no overflow; ← → still move; Products tabs keep
+  `flex: 1 1 0` + ellipsis; `NOTIFICATION_TABS_SHOTS=<dir>` writes shots).
+  Owner web: its phone rule `.web-shell .cp-subtab` (display flex, wrap)
+  agrees with this one; bump `panel.ref` after it lands.
 - **Sounds (2026-11-09)**: new category `platform_billing` (default melody
   `note`, its own) — `BillingNoticeNotifier` plays it. An OWNER with no stored
   sound block defaults to platform payments only (`defaultsForRole` /

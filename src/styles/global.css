@@ -10542,8 +10542,55 @@ select.input option:disabled {
   gap: var(--space-3);
   margin-bottom: var(--space-3);
 }
+/* The look of the feed's small buttons (`feedActionBtn` in Notifications.tsx),
+   as a class so a 390px window (a 108px column beside the side menu) can take
+   4px off its sides: «Отметить все прочитанными» was 1px wider than that. */
 .notifications-toolbar__read-all {
   margin-left: auto;
+  max-width: 100%;
+  padding: 4px 10px;
+  border: 1px solid #1f2a44;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-text-soft);
+  cursor: pointer;
+  font-size: 12px;
+}
+@media (max-width: 420px) {
+  .notifications-toolbar__read-all { padding: 4px 6px; }
+}
+/* A1 (2026-11-15): here the tabs are sized to their words and never cut. The
+   shared `.cp-subtab` rule (equal shares, `min-width: 0`, ellipsis) cut «Active
+   Plac…» and hid its red count, because this tab list does not grow. Scoped to
+   this toolbar only — every other SectionTabs keeps the equal shares. The
+   list wraps; a tab never shrinks below its longest word (`min-width: auto`);
+   in a column too narrow for the whole label the label wraps inside the tab
+   and the count moves under it, the tab growing from its usual height. */
+.notifications-toolbar .cp-subtabs {
+  flex: 0 1 auto;
+  flex-wrap: wrap;
+  min-width: 0;
+  max-width: 100%;
+}
+.notifications-toolbar .cp-subtab {
+  flex: 0 0 auto;
+  min-width: auto;
+  max-width: 100%;
+  height: auto;
+  min-height: var(--subtab-h, 34px);
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 2px var(--space-2);
+  overflow: visible;
+  white-space: normal;
+  line-height: 1.25;
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
+.notifications-toolbar .cp-subtab__badge {
+  margin-left: 0;
 }
 
 /* The billing block over the whole window, the sign-in screen included (2026-11-09). */

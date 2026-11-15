@@ -81,10 +81,17 @@ const device = (over: Partial<IPcApi> = {}): IPcApi => ({
   ...over,
 });
 
+// Opened as a cashier sees it: the Modal's opening focus pass (once at once,
+// once on the next frame) is over before the first key. Without the frame the
+// pass could land mid-test, in whichever field was first by then — the "until"
+// box once a test had chosen it — and a field with the focus rightly holds its
+// "invalid" line back, so an assertion on that line passed or failed with the
+// worker's speed (2026-11-15).
 const mount = async (pc: IPcApi) => {
   await act(async () => {
     render(<StartSessionDialog branchId={7} pc={pc} onClose={() => {}} onStarted={() => {}} />);
   });
+  await act(async () => { await new Promise((r) => requestAnimationFrame(() => r(null))); });
 };
 
 beforeEach(() => {
