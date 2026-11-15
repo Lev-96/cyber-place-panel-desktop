@@ -19,7 +19,7 @@ import { useStaffReservations } from "./useStaffReservations";
 export interface CalendarPlace {
   id: number;
   number: number;
-  /** How the board names it: "№4". */
+  /** How the board's card names it: "№4 · Hall VIP", "№4" without a name. */
   label: string;
   platform?: string;
   offline: boolean;
@@ -123,6 +123,7 @@ const BookingsCalendar = ({ branchId, places, sessions, focusPlaceId, onStartBoo
               value={seat ?? ""}
               onChange={(e) => setSeat(e.target.value === "" ? null : Number(e.target.value))}
               aria-label={t("reserve.seat")}
+              title={seat === null ? t("calendar.allSeats") : seats.labelOf(seat)}
               data-testid="cal-seat-filter"
             >
               <option value="">{t("calendar.allSeats")}</option>

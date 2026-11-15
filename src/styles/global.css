@@ -8757,6 +8757,12 @@ select.input option:disabled {
 .cal__seat {
   width: auto;
   min-width: 160px;
+  /* A seat is «№N · name» (2026-11-15): a long name is cut, never the bar;
+     the chosen seat's whole line is the select's tooltip. */
+  /* A fixed cap, not a percentage: a percentage is ignored when the bar
+     measures its content, and the select would ask for its longest name. */
+  max-width: 320px;
+  text-overflow: ellipsis;
 }
 .cal__create { gap: var(--space-2); }
 .cal__sub {
@@ -9010,11 +9016,19 @@ select.input option:disabled {
   background: var(--color-surface);
   border-right: 1px solid var(--color-border);
 }
+/* «№N · name» (2026-11-15): two lines at most in the 132px column, then an
+   ellipsis; the number leads, so only the name is ever cut, and the whole
+   line is the title. */
 .tl__seat-name {
   font-size: var(--fs-md);
   font-weight: 700;
   line-height: 1.3;
   overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
 }
 .tl__seat-meta {
   display: inline-flex;
@@ -9217,7 +9231,19 @@ select.input option:disabled {
   line-height: 1.3;
   font-variant-numeric: tabular-nums;
 }
-.cal-item__seat { font-size: var(--fs-md); font-weight: 700; line-height: 1.3; color: var(--color-primary); }
+/* One line, an ellipsis on a long name (the whole line is the title); on its
+   own row under the time when the two do not fit side by side. */
+.cal-item__seat {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--fs-md);
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--color-primary);
+}
 .cal-item__state { margin-left: auto; }
 .cal-item__who {
   display: flex;
@@ -9273,6 +9299,8 @@ select.input option:disabled {
   flex-direction: column;
   gap: var(--space-1);
 }
+/* The seat picker: «№N · name» cut with an ellipsis, the whole line its title. */
+.reservation-form__seat { min-width: 0; text-overflow: ellipsis; }
 .reservation-form__note { font-size: var(--fs-sm); line-height: 1.4; }
 .reservation-details__list { margin: 0; display: flex; flex-direction: column; gap: var(--space-2); }
 .reservation-details__row { display: flex; gap: var(--space-3); line-height: 1.4; }
@@ -10174,16 +10202,27 @@ select.input option:disabled {
 
 /* === Owner dashboard: the platform bill as a wide card (2026-11-09) =========
    Under the stat tiles and exactly as wide: what is owed and where that
-   stands on the left, three facts in the middle, «Details» on the right. It
-   folds to one column on a narrow window. */
+   stands on the left, three facts in the middle, «Details» on the right.
+
+   Flex-wrap, not a fixed grid (2026-11-15, owner: «Подробнее» lay on the text
+   on a narrower window). The grid kept three columns down to a 1100px WINDOW
+   whatever the card's own width, and the access badge (one line, never cut)
+   spilled out of its third of the facts under the button; Armenian broke it
+   even at 1280/1440. Now each part wraps to the next line the moment its own
+   content no longer fits beside the others: the button first goes under or
+   beside the amount, the facts under it, a fact under its neighbours. Nothing
+   can overlap at any width or language, because a flex line never holds more
+   than fits. The bases keep the grid's 1.2 : 2 split (240 : 400), so a wide
+   card reads as it did. */
 .stat-grid--fill {
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
 }
 .platform-debt--wide {
-  display: grid;
-  grid-template-columns: minmax(240px, 1.2fr) minmax(0, 2fr) auto;
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
   align-items: center;
-  gap: var(--space-6);
+  gap: var(--space-4) var(--space-6);
   padding: var(--space-6);
   border-left-width: 6px;
   background:
@@ -10191,10 +10230,16 @@ select.input option:disabled {
     rgb(var(--surface-rgb) / 0.72);
 }
 .platform-debt--wide .platform-debt__main {
+  flex: 1.2 1 240px;
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
   min-width: 0;
+}
+/* No `min-width: 0`: the facts never get narrower than their widest fact,
+   so a fact that does not fit wraps the facts under the amount instead. */
+.platform-debt--wide .platform-debt__facts {
+  flex: 2 1 400px;
 }
 .platform-debt--wide .platform-debt__title {
   display: flex;
@@ -10252,25 +10297,29 @@ select.input option:disabled {
   color: var(--color-text-soft);
 }
 .platform-debt--wide .platform-debt__more {
+  flex: 0 0 auto;
   align-self: center;
   margin: 0;
   white-space: nowrap;
 }
-@media (max-width: 1100px) {
-  .platform-debt--wide {
-    grid-template-columns: 1fr;
-    gap: var(--space-4);
+/* Above a phone the facts are a wrapping row too: each at least as wide as
+   its own words and badge (`min-width: auto`), so the access badge, which is
+   one line, moves under its neighbours rather than out of its box. */
+@media (min-width: 641px) {
+  .platform-debt--wide .platform-debt__facts {
+    display: flex;
+    flex-wrap: wrap;
   }
-  .platform-debt--wide .platform-debt__more {
-    justify-self: start;
+  .platform-debt--wide .platform-debt__fact {
+    flex: 1 1 9rem;
+    min-width: auto;
   }
 }
 /* Phones (owner web, Telegram Mini App; 360–430px wide), 2026-11-09: the bill
    reads in one glance. Tighter padding and type, the amount and its sentence
    on top (DOM order), the facts as a two-column grid of small boxes (the odd
    last one, access, a full row with its badge on the right), «Details» across
-   the card. Sizes and placement only; the desktop look (≥ 1100px) is not
-   touched. */
+   the card. Sizes and placement only; above 640px this block does not apply. */
 @media (max-width: 640px) {
   .platform-debt--wide {
     gap: var(--space-3);
@@ -10325,6 +10374,11 @@ select.input option:disabled {
   .platform-debt--wide .platform-debt__more {
     justify-self: stretch;
     width: 100%;
+  }
+  /* One part per line, full width, in DOM order (a flex line of one). */
+  .platform-debt--wide .platform-debt__main,
+  .platform-debt--wide .platform-debt__facts {
+    flex-basis: 100%;
   }
 }
 

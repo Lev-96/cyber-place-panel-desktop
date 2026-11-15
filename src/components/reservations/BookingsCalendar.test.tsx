@@ -303,6 +303,40 @@ describe("a booking's details", () => {
   });
 });
 
+describe("a seat's name (2026-11-15)", () => {
+  const LONG = "№4 · Tournament stage, left of the bar, by the window";
+  const named: CalendarPlace[] = [{ ...places[0], label: LONG }, places[1]];
+
+  test("every surface names the seat «№N · name» and carries the whole label where the screen may cut it", async () => {
+    await mount({ places: named });
+    // The timeline's seat column: the label, its full text in the tooltip.
+    const seat = rowOf(10).querySelector(".tl__seat-name") as HTMLElement;
+    expect(seat.textContent).toBe(LONG);
+    expect(seat.getAttribute("title")).toBe(LONG);
+    // The day's list: the seat on the booking card, its full text in the tooltip.
+    const listed = item(1).querySelector(".cal-item__seat") as HTMLElement;
+    expect(listed.textContent).toBe(LONG);
+    expect(listed.getAttribute("title")).toBe(LONG);
+    // The block's tooltip and accessible name lead with it.
+    expect(bookingsIn(rowOf(10))[0].getAttribute("data-tip")?.startsWith(LONG)).toBe(true);
+    // The seat filter offers it, and says the chosen one in its tooltip.
+    const filter = screen.getByTestId("cal-seat-filter") as HTMLSelectElement;
+    expect(Array.from(filter.options).map((o) => o.textContent)).toContain(LONG);
+    await act(async () => { fireEvent.change(filter, { target: { value: "10" } }); });
+    expect(filter.getAttribute("title")).toBe(LONG);
+  });
+
+  test("the details and the form's seat picker say it too", async () => {
+    await mount({ places: named });
+    await click(bookingsIn(rowOf(10))[0]);
+    expect(within(screen.getByTestId("reservation-details")).getByText(LONG)).toBeTruthy();
+    await click(screen.getByTestId("reservation-edit"));
+    const picker = within(screen.getByTestId("reserve-dialog")).getByLabelText("reserve.seat") as HTMLSelectElement;
+    expect(picker.selectedOptions[0].textContent).toBe(LONG);
+    expect(picker.getAttribute("title")).toBe(LONG);
+  });
+});
+
 describe("keeping up with the server", () => {
   test("listens on the private branch channel; an event of this branch re-reads (a burst once), another branch's does not", async () => {
     await mount();

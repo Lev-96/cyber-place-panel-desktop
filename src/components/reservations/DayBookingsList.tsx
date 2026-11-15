@@ -78,7 +78,7 @@ const DayBookingsList = ({ dayLabel, bookings, seats, startSeatOf, onStart, onEd
               <li key={r.id} className={`cal-item cal-item--${r.source}${r.status === "finished" ? " is-finished" : ""}`} data-testid="cal-item" data-booking-id={r.id}>
                 <div className="cal-item__top">
                   <span className="cal-item__time">{windowOf(r)}</span>
-                  <span className="cal-item__seat">{seats.labelsOf(r.place_ids)}</span>
+                  <span className="cal-item__seat" title={seats.labelsOf(r.place_ids)}>{seats.labelsOf(r.place_ids)}</span>
                   <StatusChip tone={state.tone} label={t(state.key)} className="cal-item__state" />
                 </div>
                 <div className="cal-item__who">

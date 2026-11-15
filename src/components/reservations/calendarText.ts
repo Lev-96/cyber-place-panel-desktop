@@ -3,7 +3,7 @@ import { reservationWho } from "@/domain/StaffReservation";
 import { formatArmenianPhone } from "@/utils/armenianPhone";
 import { hm } from "./calendarModel";
 
-/** How the calendar names seats: by the board's label ("№4"), an unknown id as "#id". */
+/** How the calendar names seats: by the board's card line ("№4 · Hall VIP"), an unknown id as "#id". */
 export interface SeatNames {
   labelOf: (placeId: number) => string;
   labelsOf: (placeIds: readonly number[]) => string;
