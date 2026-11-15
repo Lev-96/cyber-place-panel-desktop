@@ -17,13 +17,9 @@ export const PAYMENT_LABEL_KEY: Record<Exclude<IOrder["payment_method"], "split"
 export const saleItemsText = (o: IOrder): string =>
   (o.items ?? []).map((i) => `${i.product_name} × ${i.quantity}`).join(", ");
 
-/** "Наличные", or "Другой способ: Idram". */
+/** "Наличные", "Другой способ: Idram", "Другое" (no words) or the split — `paymentText`'s one wording. */
 export const salePaymentText = (o: IOrder, t: T, money: Money = String): string =>
-  o.payment_method === "split" || (o.payments?.length ?? 0) > 1
-    ? paymentText(o, t, money) ?? t("pay.splitSummary")
-    : o.payment_method === "other" && o.payment_method_other
-      ? `${t(PAYMENT_LABEL_KEY.other)}: ${o.payment_method_other}`
-      : t(PAYMENT_LABEL_KEY[o.payment_method as Exclude<IOrder["payment_method"], "split">]);
+  paymentText(o, t, money) ?? t("pay.splitSummary");
 
 /** "Получено 2 000 · Сдача 600", or null when nothing was typed. */
 export const saleCashText = (o: IOrder, t: T, money: Money): string | null => {

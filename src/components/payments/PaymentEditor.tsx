@@ -42,9 +42,10 @@ interface Props {
  * How the bill was paid (2026-11-07, owner) — the one control for every
  * screen that closes a bill. Cash / Card / Other, as it always was, or
  * «Разделить»: a box per method, what is still due live under them, a «the
- * rest here» button per box, and a note saying how it was paid (required —
- * "3000 картой, 2000 наличными"). The parts must add up to the bill to the
- * cent; the confirm waits for it.
+ * rest here» button per box, and a note saying how it was paid (optional
+ * since 2026-11-15, owner — "3000 картой, 2000 наличными"; so is the
+ * «Другое» text). The parts must add up to the bill to the cent; the confirm
+ * waits for it. One part above zero is sent as that single method.
  */
 const PaymentEditor = ({ name, dueCents, value, onChange, check, money, disabled = false }: Props) => {
   const { t } = useLang();
@@ -133,7 +134,7 @@ const PaymentEditor = ({ name, dueCents, value, onChange, check, money, disabled
                   : fmt(t("pay.tooMuch"), money(-check.remainingCents / 100))}
           </div>
           <label className="col" style={{ gap: 4 }}>
-            <span className="label">{t("pay.note")} *</span>
+            <span className="label">{t("pay.note")}</span>
             <textarea
               className="input pay-editor__note"
               rows={2}
@@ -146,7 +147,6 @@ const PaymentEditor = ({ name, dueCents, value, onChange, check, money, disabled
               data-testid="pay-note"
             />
           </label>
-          {check.problem === "parts" && <span className="muted" style={{ fontSize: 12 }}>{t("pay.needTwo")}</span>}
         </div>
       )}
     </div>

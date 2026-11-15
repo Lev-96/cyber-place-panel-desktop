@@ -36,7 +36,7 @@ describe("PaymentEditor", () => {
     expect(screen.queryByTestId("pay-remaining")).toBeNull();
   });
 
-  test("split: boxes per method, what is still due, the rest in one click, and a note", async () => {
+  test("split: boxes per method, what is still due, the rest in one click, and an optional note", async () => {
     render(<Host due={500000} />);
     await act(async () => { fireEvent.click(screen.getByTestId("pay-split")); });
     const boxes = screen.getAllByRole("textbox").filter((e) => e.tagName === "INPUT");
@@ -45,9 +45,19 @@ describe("PaymentEditor", () => {
     await act(async () => { fireEvent.click(screen.getByTestId("pay-rest-cash")); });
     expect(last.amounts).toMatchObject({ card: "3000", cash: "2000.00" });
     expect(screen.getByTestId("pay-remaining").textContent).toBe("pay.allPaid");
-    expect(checkPayment(500000, last).problem).toBe("note");
+    // No note needed (2026-11-15, owner): the parts adding up is enough.
+    expect(checkPayment(500000, last)).toMatchObject({ ok: true, problem: null });
+    expect(screen.getByText("pay.note").textContent).toBe("pay.note");
+    expect(screen.queryByText(/\*/)).toBeNull();
     await act(async () => { fireEvent.change(screen.getByTestId("pay-note"), { target: { value: "3000 картой" } }); });
     expect(checkPayment(500000, last).ok).toBe(true);
+  });
+
+  test("nothing typed in a split: one line says what is still due, no second hint", async () => {
+    render(<Host due={500000} />);
+    await act(async () => { fireEvent.click(screen.getByTestId("pay-split")); });
+    expect(screen.getByTestId("pay-remaining").textContent).toBe("pay.remaining 5000");
+    expect(screen.queryByText("pay.needAmount")).toBeNull();
   });
 
   test("too much is said as such", async () => {

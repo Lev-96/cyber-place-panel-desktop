@@ -1643,7 +1643,6 @@ export const TRANSLATIONS: Dict = {
   // ── how the money was taken ─────────────────────────────────────────────
   // One answer, so radio buttons. Cash leads: it is the common case at a
   // counter and the default keeps an ordinary stop to one click.
-  "pay.noteRequired": { en: "Write how it was paid, for example: 3000 by card, 2000 in cash", ru: "Напишите, как оплатили, например: 3000 картой, 2000 наличными", am: "Գրեք, թե ինչպես վճարեցին, օրինակ՝ 3000 քարտով, 2000 կանխիկ" },
   "pay.sumMismatch": { en: "The parts must add up to the bill exactly", ru: "Сумма частей должна точно равняться счёту", am: "Մասերի գումարը պետք է ճիշտ հավասար լինի հաշվին" },
   "pay.markAfterAuto": { en: "This seat ended by itself and nobody recorded the payment. Mark how it was paid.", ru: "Место завершилось само, и оплату никто не отметил. Отметьте, как оплатили.", am: "Տեղն ավարտվեց ինքնուրույն, և վճարումը ոչ ոք չնշեց։ Նշեք, թե ինչպես վճարեցին։" },
   "pay.markConfirm": { en: "Record payment", ru: "Отметить оплату", am: "Նշել վճարումը" },
@@ -1655,8 +1654,8 @@ export const TRANSLATIONS: Dict = {
   "pay.tooMuch": { en: "{0} more than the bill", ru: "Больше счёта на {0}", am: "Հաշվից ավելի է {0}-ով" },
   "pay.allPaid": { en: "The parts add up to the bill", ru: "Сумма частей равна счёту", am: "Մասերի գումարը հավասար է հաշվին" },
   "pay.invalid": { en: "One of the amounts is not a number", ru: "Одна из сумм введена неверно", am: "Գումարներից մեկը սխալ է" },
-  "pay.needTwo": { en: "A split needs at least two methods", ru: "Для разделения нужны минимум два способа", am: "Բաժանման համար անհրաժեշտ է առնվազն երկու եղանակ" },
-  "pay.note": { en: "How it was paid", ru: "Как оплатили", am: "Ինչպես վճարեցին" },
+  "pay.note": { en: "How it was paid (optional)", ru: "Как оплатили (необязательно)", am: "Ինչպես վճարեցին (ըստ ցանկության)" },
+  "pay.needAmount": { en: "Enter an amount", ru: "Введите сумму", am: "Մուտքագրեք գումարը" },
   "pay.notePlaceholder": { en: "For example: 3000 by card, 2000 in cash", ru: "Например: 3000 картой, 2000 наличными", am: "Օրինակ՝ 3000 քարտով, 2000 կանխիկ" },
   "pay.splitSummary": { en: "Split", ru: "Раздельно", am: "Բաժանված" },
   "session.payTitle": { en: "Payment method", ru: "Способ оплаты", am: "Վճարման եղանակ" },
@@ -1672,11 +1671,7 @@ export const TRANSLATIONS: Dict = {
   "session.payCard": { en: "Card", ru: "Карта", am: "Քարտ" },
   "session.payOther": { en: "Another method", ru: "Другой способ оплаты", am: "Այլ եղանակ" },
   "session.payOtherPlaceholder": { en: "For example, Idram", ru: "Например, Idram", am: "Օրինակ՝ Idram" },
-  "session.payOtherRequired": {
-    en: "Say which method it was.",
-    ru: "Укажите, каким способом.",
-    am: "Նշեք վճարման եղանակը։",
-  },
+
   "session.boardTitle": { en: "Active Places", ru: "Активные места", am: "Ակտիվ տեղեր" },
   // How much of the room is in use. Counted off the tiles on screen, so the
   // line and the grid can never disagree.

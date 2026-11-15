@@ -123,8 +123,8 @@ export const eventSeat = (e: ISessionEvent): string | null => {
  * Null means "not recorded", which is every session stopped before this was
  * kept and every session still running. The row is omitted entirely for it: a
  * bold empty gap under "Payment method" reads as a fault rather than as
- * silence. A method of `other` with nothing typed cannot be created (the
- * server refuses it) and is folded into the same null for the same reason.
+ * silence. A method of `other` with nothing typed (allowed since 2026-11-15,
+ * owner: the words are optional) reads «Другое» — a method WAS recorded.
  */
 export const paymentLabelOf = (
   session: Pick<ISessionApi, "payment_method" | "payment_method_other" | "payments">,
@@ -138,7 +138,7 @@ export const paymentLabelOf = (
 
   if (method === "other") {
     const typed = (session.payment_method_other ?? "").trim();
-    return typed === "" ? null : typed;
+    return typed === "" ? t("pay.otherShort") : typed;
   }
 
   return t(method === "cash" ? "session.payCash" : "session.payCard");

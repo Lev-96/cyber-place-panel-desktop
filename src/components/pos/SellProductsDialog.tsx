@@ -87,8 +87,7 @@ const SellProductsDialog = ({ branchId, onClose, onSold }: Props) => {
   const sell = async () => {
     if (!ready || inFlightRef.current || cashBlocks) return;
     if (!payCheck.ok) {
-      setErr(t(payCheck.problem === "note" ? (pay.split ? "pay.noteRequired" : "session.payOtherRequired")
-        : payCheck.problem === "sum" ? "pay.sumMismatch" : payCheck.problem === "parts" ? "pay.needTwo" : "pay.invalid"));
+      setErr(t(payCheck.problem === "sum" ? "pay.sumMismatch" : payCheck.problem === "parts" ? "pay.needAmount" : "pay.invalid"));
       return;
     }
 

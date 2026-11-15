@@ -176,9 +176,8 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved, canRes
   const paymentProblem = (): string | null => {
     if (payCheck.ok) return null;
     switch (payCheck.problem) {
-      case "note": return t(pay.split ? "pay.noteRequired" : "session.payOtherRequired");
       case "sum": return t("pay.sumMismatch");
-      case "parts": return t("pay.needTwo");
+      case "parts": return t("pay.needAmount");
       default: return t("pay.invalid");
     }
   };
@@ -195,7 +194,7 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved, canRes
     if (stoppingNow.current || cashBlocks) return;
     // ⚠️ Checked here so the cashier is told BEFORE the request, but the server
     // enforces the same rule and is what actually decides — this is a courtesy,
-    // not the guard. A stop refused for a missing note leaves the seat running.
+    // not the guard. A stop refused (parts not adding up) leaves the seat running.
     const problem = paymentProblem();
     if (problem !== null) {
       setErr(problem);

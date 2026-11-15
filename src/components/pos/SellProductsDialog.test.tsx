@@ -142,15 +142,20 @@ describe("paid the way a session is", () => {
     expect(repo.create.mock.calls[0][0].payment_method).toBe("card");
   });
 
-  test("other needs its note, and the note is sent trimmed", async () => {
+  test("other needs no words (2026-11-15, owner); typed words are sent trimmed", async () => {
     await mount();
     await add("Tea");
     await choose("session.payOther");
 
     await sell();
-    expect(repo.create).not.toHaveBeenCalled();
-    expect(screen.getByText("session.payOtherRequired")).toBeTruthy();
+    expect(repo.create.mock.calls[0][0]).toMatchObject({ payment_method: "other" });
+    expect(repo.create.mock.calls[0][0]).not.toHaveProperty("payment_method_other");
+  });
 
+  test("other with words sends them trimmed", async () => {
+    await mount();
+    await add("Tea");
+    await choose("session.payOther");
     await act(async () => {
       fireEvent.change(screen.getByPlaceholderText("session.payOtherPlaceholder"), { target: { value: "  Idram " } });
     });
@@ -168,15 +173,25 @@ describe("split at the till (2026-11-07)", () => {
     const boxes = screen.getAllByRole("textbox").filter((e) => e.tagName === "INPUT");
     await act(async () => { fireEvent.change(boxes[boxes.length - 3], { target: { value: "200" } }); });
     await act(async () => { fireEvent.click(screen.getByTestId("pay-rest-card")); });
-    await sell();
-    expect(repo.create).not.toHaveBeenCalled();
-    expect(screen.getByText("pay.noteRequired")).toBeTruthy();
     await act(async () => { fireEvent.change(screen.getByTestId("pay-note"), { target: { value: "200 наличными" } }); });
     await sell();
     const body = repo.create.mock.calls[0][0];
     expect(body).toMatchObject({ payments: [{ method: "cash", amount: 200 }, { method: "card", amount: 300 }], payment_note: "200 наличными" });
     expect(body).not.toHaveProperty("payment_method");
     expect(body).not.toHaveProperty("cash_received");
+  });
+
+  test("a split with no note sells in one press (2026-11-15, owner) and sends no note", async () => {
+    await mount();
+    await add("Tea");
+    await choose("pay.split");
+    const boxes = screen.getAllByRole("textbox").filter((e) => e.tagName === "INPUT");
+    await act(async () => { fireEvent.change(boxes[boxes.length - 3], { target: { value: "200" } }); });
+    await act(async () => { fireEvent.click(screen.getByTestId("pay-rest-card")); });
+    await sell();
+    const body = repo.create.mock.calls[0][0];
+    expect(body).toMatchObject({ payments: [{ method: "cash", amount: 200 }, { method: "card", amount: 300 }] });
+    expect(body).not.toHaveProperty("payment_note");
   });
 });
 

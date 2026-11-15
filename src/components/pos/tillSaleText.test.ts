@@ -4,7 +4,7 @@ import { saleCashText, saleItemsText, salePaymentText, saleSellerText } from "./
 
 /** One plain sentence per till sale, the same in «Касса» and the history. */
 const t = (k: string) => ({
-  "session.payCash": "Наличные", "session.payOther": "Другой способ", "till.receivedShort": "Получено",
+  "session.payCash": "Наличные", "session.payOther": "Другой способ", "pay.otherShort": "Другое", "till.receivedShort": "Получено",
   "till.changeShort": "Сдача", "till.soldBy": "Продал", "role.manager": "Менеджер",
 } as Record<string, string>)[k] ?? k;
 const money = (n: number) => `${n} драм`;
@@ -26,6 +26,8 @@ describe("a till sale in words", () => {
   test("how it was paid, an other method with its note", () => {
     expect(salePaymentText(order(), t)).toBe("Наличные");
     expect(salePaymentText(order({ payment_method: "other", payment_method_other: "Idram" }), t)).toBe("Другой способ: Idram");
+    // No words (2026-11-15, owner): «Другое», the same as the session history.
+    expect(salePaymentText(order({ payment_method: "other", payment_method_other: null }), t)).toBe("Другое");
   });
 
   test("handed over and given back, from the server", () => {

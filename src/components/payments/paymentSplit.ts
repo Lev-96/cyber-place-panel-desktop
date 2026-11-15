@@ -3,7 +3,9 @@ import { toAmount } from "@/shifts/cash";
 
 /**
  * How a bill was paid (2026-11-07, owner): one method, or SPLIT across
- * several — part card, part cash, part other — with a note saying how. One
+ * several — part card, part cash, part other — with an optional note saying
+ * how (2026-11-15, owner: no words are ever required, a split's note and an
+ * «Другое»'s text alike). One
  * model for every screen that closes a bill (a seat's stop, a seat that ended
  * by itself, a sale at the till), so they can never disagree. Money in whole
  * cents: no float ever touches a sum. The server checks every rule again and
@@ -23,7 +25,7 @@ export interface PaymentDraft {
   split: boolean;
   /** The one method when not split. */
   method: PaymentMethod;
-  /** Not split: what "other" was. Split: how it was paid ("3000 картой, 2000 наличными"). */
+  /** Optional. Not split: what "other" was. Split: how it was paid ("3000 картой, 2000 наличными"). */
   note: string;
   /** Split: what was typed per method (empty = not this method). */
   amounts: Record<PaymentMethod, string>;
@@ -36,12 +38,10 @@ export const emptyPaymentDraft = (method: PaymentMethod = "cash"): PaymentDraft 
 export type PaymentProblem =
   /** A part is not an amount (letters, three decimals, a minus). */
   | "invalid"
-  /** Split, but fewer than two parts above zero. */
+  /** Split, but no part above zero typed yet. */
   | "parts"
   /** The parts do not add up to the bill. */
-  | "sum"
-  /** The note is required (split, or the single "other"). */
-  | "note";
+  | "sum";
 
 export interface PaymentCheck {
   ok: boolean;
@@ -53,6 +53,8 @@ export interface PaymentCheck {
 }
 
 const NOTE_MAX = 255;
+/** The row's `payment_method_other` column: the text of a single «Другое». */
+const OTHER_TEXT_MAX = 120;
 
 /**
  * A part as cents. `PriceInput` hands over AMD, and from another display
@@ -67,10 +69,7 @@ const partCents = (raw: string): number | null => {
 
 /** The draft read against the bill: what it would send, or why it cannot. */
 export const checkPayment = (dueCents: number, d: PaymentDraft): PaymentCheck => {
-  if (!d.split) {
-    const noteMissing = d.method === "other" && d.note.trim() === "";
-    return { ok: !noteMissing, problem: noteMissing ? "note" : null, lines: [], remainingCents: 0 };
-  }
+  if (!d.split) return { ok: true, problem: null, lines: [], remainingCents: 0 };
   const lines: PaymentLine[] = [];
   let sum = 0;
   for (const method of SPLIT_METHODS) {
@@ -84,21 +83,30 @@ export const checkPayment = (dueCents: number, d: PaymentDraft): PaymentCheck =>
   }
   const remainingCents = dueCents - sum;
   const problem: PaymentProblem | null =
-    lines.length < 2 ? "parts" : remainingCents !== 0 ? "sum" : d.note.trim() === "" ? "note" : null;
+    lines.length === 0 ? "parts" : remainingCents !== 0 ? "sum" : null;
   return { ok: problem === null, problem, lines, remainingCents };
 };
 
+/** One method, as every server has always taken it; the «Другое» text only when typed. */
+const singleBody = (method: PaymentMethod, text: string): { payment_method: PaymentMethod; payment_method_other?: string } => {
+  const typed = method === "other" ? text.trim().slice(0, OTHER_TEXT_MAX) : "";
+  return typed === "" ? { payment_method: method } : { payment_method: method, payment_method_other: typed };
+};
+
 /**
- * The body the server takes. Not split: the fields every server has always
- * taken (`payment_method`, `payment_method_other`), so nothing changes for a
- * one-method payment. Split: `payments` (each part) and `payment_note`.
+ * The body the server takes. One method — or a split with exactly ONE part
+ * above zero (2026-11-15, owner) — sends the fields every server has always
+ * taken (`payment_method`, `payment_method_other` only when words were
+ * typed). Two or more parts: `payments`, and `payment_note` only when written.
  */
 export const paymentBody = (d: PaymentDraft, check: PaymentCheck):
   | { payment_method: PaymentMethod; payment_method_other?: string }
-  | { payments: PaymentLine[]; payment_note: string } =>
-  d.split
-    ? { payments: check.lines, payment_note: d.note.trim().slice(0, NOTE_MAX) }
-    : { payment_method: d.method, ...(d.method === "other" ? { payment_method_other: d.note.trim() } : {}) };
+  | { payments: PaymentLine[]; payment_note?: string } => {
+  if (!d.split) return singleBody(d.method, d.note);
+  if (check.lines.length === 1) return singleBody(check.lines[0].method, d.note);
+  const note = d.note.trim().slice(0, NOTE_MAX);
+  return note === "" ? { payments: check.lines } : { payments: check.lines, payment_note: note };
+};
 
 /** "Остаток сюда": the method's box filled with what is still due (never below 0). */
 export const fillRemaining = (dueCents: number, d: PaymentDraft, method: PaymentMethod): PaymentDraft => {

@@ -1,6 +1,7 @@
 /**
  * A paid bill's method in plain words (2026-11-07) — one wording for a seat's
- * history, a till sale and the shift: «Наличные», «Другой способ: Idram», or
+ * history, a till sale and the shift: «Наличные», «Другой способ: Idram»,
+ * «Другое» for an other with no words (2026-11-15, owner), or
  * for a split «Раздельно: Наличные 2 000 · Карта 3 000 (3000 картой…)».
  */
 type T = (key: string) => string;
@@ -44,7 +45,7 @@ export const paymentText = (
   if (!method) return null;
   if (method === "other") {
     const typed = (row.payment_method_other ?? "").trim();
-    return typed === "" ? null : `${t(METHOD_LABEL_KEY.other)}: ${typed}`;
+    return typed === "" ? t("pay.otherShort") : `${t(METHOD_LABEL_KEY.other)}: ${typed}`;
   }
   return t(METHOD_LABEL_KEY[method] ?? method);
 };

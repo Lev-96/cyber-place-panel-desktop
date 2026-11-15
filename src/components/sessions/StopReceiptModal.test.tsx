@@ -154,17 +154,18 @@ describe("the payment method", () => {
     expect(screen.queryByPlaceholderText("session.payOtherPlaceholder")).toBeNull();
   });
 
-  test("another method with nothing typed does not reach the server", async () => {
+  test("another method with nothing typed is sent as «other» with no words (2026-11-15, owner)", async () => {
     await mount();
 
     await act(async () => { fireEvent.click(radio("other")); });
     await act(async () => { fireEvent.click(confirm()); });
 
-    expect(repo.stop).not.toHaveBeenCalled();
-    expect(screen.getByText("session.payOtherRequired")).toBeTruthy();
+    const body = repo.stop.mock.calls[0][1] as Record<string, unknown>;
+    expect(body).toMatchObject({ payment_method: "other" });
+    expect(body).not.toHaveProperty("payment_method_other");
   });
 
-  test("whitespace is not a method name", async () => {
+  test("whitespace is no words: «other» is sent without them", async () => {
     await mount();
 
     await act(async () => { fireEvent.click(radio("other")); });
@@ -175,7 +176,7 @@ describe("the payment method", () => {
     });
     await act(async () => { fireEvent.click(confirm()); });
 
-    expect(repo.stop).not.toHaveBeenCalled();
+    expect(repo.stop.mock.calls[0][1]).not.toHaveProperty("payment_method_other");
   });
 
   test("what the cashier typed is what is sent, trimmed", async () => {
@@ -1081,6 +1082,41 @@ describe("split payment and the payment of a seat that ended by itself", () => {
     expect(screen.getByText("pay.sumMismatch")).toBeTruthy();
   });
 
+  test("a split stop with no note is sent without one (2026-11-15, owner)", async () => {
+    await mount();
+    await splitInto("2000", "3000", "");
+    await act(async () => { fireEvent.click(screen.getByTestId("stop-confirm")); });
+    const body = repo.stop.mock.calls[0][1] as Record<string, unknown>;
+    expect(body).toMatchObject({ payments: [{ method: "cash", amount: 2000 }, { method: "card", amount: 3000 }] });
+    expect(body).not.toHaveProperty("payment_note");
+  });
+
+  test("a split with nothing typed is not sent, and says to enter an amount", async () => {
+    await mount();
+    await act(async () => { fireEvent.click(screen.getByTestId("pay-split")); });
+    await act(async () => { fireEvent.click(screen.getByTestId("stop-confirm")); });
+    expect(repo.stop).not.toHaveBeenCalled();
+    expect(screen.getByText("pay.needAmount")).toBeTruthy();
+  });
+
+  test("a split with one part above zero is sent as that one method", async () => {
+    await mount();
+    await splitInto("0", "5000", "");
+    await act(async () => { fireEvent.click(screen.getByTestId("stop-confirm")); });
+    const body = repo.stop.mock.calls[0][1] as Record<string, unknown>;
+    expect(body).toMatchObject({ payment_method: "card" });
+    expect(body).not.toHaveProperty("payments");
+  });
+
+  test("an expired seat can be marked as «other» with no words", async () => {
+    await mount(session({ status: "expired", payment_method: null, payments: [] }));
+    await act(async () => { fireEvent.click(screen.getByTestId("pay-other")); });
+    await act(async () => { fireEvent.click(screen.getByTestId("pay-mark-confirm")); });
+    const body = repo.recordPayment.mock.calls[0][1] as Record<string, unknown>;
+    expect(body).toMatchObject({ payment_method: "other" });
+    expect(body).not.toHaveProperty("payment_method_other");
+  });
+
   test("an expired seat with no payment on record asks how it was paid, once", async () => {
     await mount(session({ status: "expired", payment_method: null, payments: [] }));
     expect(screen.getByTestId("pay-mark-note")).toBeTruthy();
@@ -1279,6 +1315,18 @@ describe("paid ahead at the start", () => {
     repo.stop.mockResolvedValue({ session: session(), breakdown: prepaidBill(2500, 0, 500), cash: null });
     await act(async () => { fireEvent.click(confirm()); });
     expect(repo.stop.mock.calls[0][1]).toMatchObject({ payments: [{ method: "cash", amount: 200 }, { method: "card", amount: 300 }] });
+  });
+
+  test("stayed longer, card for the 500 due in one click: sent as card (the server adds the 2 000 cash)", async () => {
+    repo.preview.mockResolvedValue(prepaidBill(2500, 0, 500));
+    await mount();
+    await act(async () => { fireEvent.click(screen.getByTestId("pay-card")); });
+    repo.stop.mockResolvedValue({ session: session(), breakdown: prepaidBill(2500, 0, 500), cash: null });
+    await act(async () => { fireEvent.click(confirm()); });
+    const body = repo.stop.mock.calls[0][1] as Record<string, unknown>;
+    expect(body).toMatchObject({ payment_method: "card", expected_total: 2500 });
+    expect(body).not.toHaveProperty("payments");
+    expect(body).not.toHaveProperty("cash_received");
   });
 
   test("a seat paid nothing ahead shows none of it", async () => {
