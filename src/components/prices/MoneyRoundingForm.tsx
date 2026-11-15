@@ -11,8 +11,12 @@ interface Props {
   onSaved: () => void;
 }
 
-/** Steps an operator actually asks for. 0 is "leave the amount alone". */
-const STEPS = [0, 10, 50, 100, 500, 1000] as const;
+/**
+ * Steps an operator actually asks for. 0 is "leave the amount alone" (the
+ * figure keeps its cents); 1 is "to the whole dram" (owner, 2026-11-15: a bill
+ * must never grow by a step at close — 1 h at 1000 stays 1000, 1258.33 → 1258).
+ */
+const STEPS = [0, 1, 10, 50, 100, 500, 1000] as const;
 const MODES: MoneyRoundingMode[] = ["up", "nearest", "down"];
 
 /**
@@ -109,7 +113,7 @@ const MoneyRoundingForm = ({ branchId, settings, onSaved }: Props) => {
             onChange={(e) => setStep(Number(e.target.value))}
           >
             {STEPS.map((s) => (
-              <option key={s} value={s}>{s === 0 ? t("rounding.stepNone") : money(s)}</option>
+              <option key={s} value={s}>{s === 0 ? t("rounding.stepNone") : s === 1 ? t("rounding.stepWhole") : money(s)}</option>
             ))}
           </select>
         </label>

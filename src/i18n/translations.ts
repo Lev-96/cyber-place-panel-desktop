@@ -2273,6 +2273,7 @@ export const TRANSLATIONS: Dict = {
   },
   "rounding.step": { en: "Round to", ru: "Округлять до", am: "Կլորացնել մինչև" },
   "rounding.stepNone": { en: "Do not round", ru: "Не округлять", am: "Չկլորացնել" },
+  "rounding.stepWhole": { en: "The whole dram", ru: "До целого драма", am: "Մինչև ամբողջ դրամ" },
   "rounding.mode": { en: "Direction", ru: "Направление", am: "Ուղղություն" },
   "rounding.mode.up": { en: "Up", ru: "Вверх", am: "Վերև" },
   "rounding.mode.nearest": { en: "Nearest", ru: "К ближайшему", am: "Դեպի մոտակա" },
