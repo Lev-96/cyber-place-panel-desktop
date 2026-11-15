@@ -24,6 +24,15 @@ import log from "electron-log";
  * No-op on non-Linux and when not running as an AppImage.
  */
 
+/**
+ * File name (without `.desktop`) of the entry written below. package.json
+ * `desktopName` must be `${LINUX_DESKTOP_ID}.desktop` (pinned by
+ * src/linuxIntegration.test.ts): Electron reads it at startup
+ * (`app.setDesktopName`, else `${app.name}.desktop`, a file that does not
+ * exist) and Wayland compositors take the window's app_id from it.
+ */
+export const LINUX_DESKTOP_ID = "cyberplace-panel";
+
 interface IntegrationConfig {
   /** App's stable kebab-case identifier — used in file names. */
   appId: string;
@@ -33,7 +42,46 @@ interface IntegrationConfig {
   comment: string;
   /** Path to the icon source PNG (typically the bundled icon.png). */
   iconSourcePath: string;
+  /**
+   * The X11 WM_CLASS of our windows — pass `app.getName()`. Electron sets
+   * WM_CLASS to (lowercase(name), name) from the app name, i.e. package.json
+   * `productName ?? name` = "cyber-place-panel-desktop". The desktop
+   * environment matches a running window to its menu entry by
+   * `StartupWMClass`; until 2026-11-15 this was the display name
+   * ("Cyberplace Panel"), so KDE/GNOME never matched and the taskbar showed
+   * a generic icon.
+   */
+  wmClass: string;
 }
+
+/** The `.desktop` file body. Pure, so the contract is unit-tested. */
+export const desktopEntryBody = (config: IntegrationConfig, appImagePath: string): string =>
+  [
+    "[Desktop Entry]",
+    "Type=Application",
+    `Name=${config.displayName}`,
+    `Comment=${config.comment}`,
+    `Exec="${appImagePath}" %U`,
+    `Icon=${config.appId}`,
+    "Terminal=false",
+    "Categories=Utility;Office;",
+    "StartupNotify=true",
+    `StartupWMClass=${config.wmClass}`,
+    "",
+  ].join("\n");
+
+/**
+ * The `icon` option for a BrowserWindow. Linux only: there the window's own
+ * `_NET_WM_ICON` is what the taskbar and title bar draw, and Electron sets it
+ * only from this option. Windows takes the icon from the exe's resources, so
+ * nothing changes there. A missing file (an unpackaged run) yields no option
+ * rather than an error.
+ */
+export const windowIconOptions = (
+  platform: NodeJS.Platform,
+  iconPath: string,
+  fileExists: (path: string) => boolean = existsSync,
+): { icon?: string } => (platform === "linux" && fileExists(iconPath) ? { icon: iconPath } : {});
 
 const isAppImage = (): boolean => !!process.env.APPIMAGE;
 
@@ -75,20 +123,7 @@ export const ensureLinuxDesktopIntegration = (config: IntegrationConfig): void =
     // .desktop file — written every launch so Exec= follows the
     // AppImage if the user moved it. Spec: https://specifications.freedesktop.org/desktop-entry-spec/
     const desktopPath = join(appsDir, `${config.appId}.desktop`);
-    const desktopBody = [
-      "[Desktop Entry]",
-      "Type=Application",
-      `Name=${config.displayName}`,
-      `Comment=${config.comment}`,
-      `Exec="${appImagePath}" %U`,
-      `Icon=${config.appId}`,
-      "Terminal=false",
-      "Categories=Utility;Office;",
-      "StartupNotify=true",
-      `StartupWMClass=${config.displayName}`,
-      "",
-    ].join("\n");
-    writeFileSync(desktopPath, desktopBody, { mode: 0o644 });
+    writeFileSync(desktopPath, desktopEntryBody(config, appImagePath), { mode: 0o644 });
 
     log.info("[linux-integration] registered", { desktopPath, iconTarget, appImagePath });
   } catch (e) {

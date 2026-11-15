@@ -6,7 +6,7 @@ import { pathToFileURL } from "node:url";
 import { Store } from "./storage";
 import { MIN_CONTENT, WINDOW_STATE_KEY, parseSavedWindow, restoredBounds } from "./windowBounds";
 import { UpdateService, broadcastUpdateState } from "./updates/UpdateService";
-import { bundledIconPath, ensureLinuxDesktopIntegration } from "./linuxIntegration";
+import { LINUX_DESKTOP_ID, bundledIconPath, ensureLinuxDesktopIntegration, windowIconOptions } from "./linuxIntegration";
 import { mayNavigateTo, mayOpenExternally, navigationKeyFor } from "./urlPolicy";
 import { discover as discoverPlayStations, probe as probePlayStations } from "./ps5/discovery";
 import { activeTransport, useCredentialVault } from "./ps5/transport";
@@ -166,6 +166,8 @@ const createWindow = async () => {
     minHeight: MIN_CONTENT.height,
     backgroundColor: "#020514",
     autoHideMenuBar: true,
+    // Linux taskbar/title-bar icon (_NET_WM_ICON); empty elsewhere.
+    ...windowIconOptions(process.platform, bundledIconPath()),
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
@@ -304,10 +306,12 @@ app.whenReady().then(async () => {
   // with the brand icon (no AppImageLauncher dependency). No-op on
   // Windows/macOS — those have their own installer-driven shortcuts.
   ensureLinuxDesktopIntegration({
-    appId: "cyberplace-panel",
+    appId: LINUX_DESKTOP_ID,
     displayName: "Cyberplace Panel",
     comment: "Cyber Place staff panel: bookings, sessions, billing",
     iconSourcePath: bundledIconPath(),
+    // The same name Electron derives the window's WM_CLASS from.
+    wmClass: app.getName(),
   });
 
   // Auto-clear non-essential caches on every startup. Keeps the userData

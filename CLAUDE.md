@@ -3751,6 +3751,38 @@ is 108px / `--ring-size * 0.174` wide (the area the old 90px square mark had).
 The owner web (`telegram-web-app`) serves this `public/` at its pinned
 `panel.ref`, so it shows the new mark only after `panel.ref` is bumped.
 
+## Linux window/taskbar icon (2026-11-15)
+
+The AppImage showed a generic icon in the KDE taskbar and title bar (X11). Two
+causes, both fixed in `electron/linuxIntegration.ts` + `electron/main.ts`:
+
+- **No `_NET_WM_ICON`.** On Linux Electron sets the window icon only from the
+  BrowserWindow `icon` option. The main window now gets
+  `windowIconOptions(process.platform, bundledIconPath())` = `{ icon }` on Linux
+  when `resources/build/icon.png` exists, `{}` everywhere else (Windows takes its
+  icon from the exe resources; unchanged). The PS5 sign-in window in
+  `ps5/pairing.ts` has no icon on purpose: PS5 code is frozen.
+- **`StartupWMClass` did not match.** Electron sets WM_CLASS from the app name,
+  `productName ?? name` of the PACKAGED package.json, which has no
+  `productName`: `"cyber-place-panel-desktop", "cyber-place-panel-desktop"`. The
+  generated `~/.local/share/applications/cyberplace-panel.desktop` said
+  `StartupWMClass=Cyberplace Panel`. It now gets `wmClass: app.getName()`.
+  Do not add `productName` to package.json or rename `name`: that changes
+  WM_CLASS AND the `userData` folder (token, PS5 keys).
+- package.json `desktopName` = `cyberplace-panel.desktop` (= `LINUX_DESKTOP_ID`,
+  pinned by a test). Electron's startup calls `app.setDesktopName` from it
+  (default `${app.name}.desktop`, a file that does not exist). Used for the
+  Wayland app_id and the notification `desktop-entry` hint.
+- Known, not fixed: prod and staging both write `cyberplace-panel.desktop` and
+  share WM_CLASS, so the last one launched owns the menu entry. electron-builder's
+  own embedded `.desktop` also says `StartupWMClass=<productName>` (its bug; it
+  is only used by AppImageLauncher-style integrators). The file-manager icon of
+  an `.AppImage` FILE is the thumbnailer's business, not the app's.
+
+Verify on a real build: `xprop -id <win> WM_CLASS` must equal the entry's
+`StartupWMClass`, and `xprop -id <win> -notype -f _NET_WM_ICON 32c '=$0,$1' _NET_WM_ICON`
+prints `1024,1024`. Tests: `src/linuxIntegration.test.ts`.
+
 ## Static sign-in (2026-11-13, owner)
 
 "No animation at all, a very beautiful background, and the page must not
