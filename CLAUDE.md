@@ -2842,12 +2842,10 @@ adds `sessionItemsTotal` on top, with the waiver applied to the composed figure
 Items are READ from `items[]`, never accumulated, so a Reverb refresh cannot
 charge the same drink twice.
 
-Two terms of the server's subtotal are still missing and both make the tile
-read LOW rather than high: extra joysticks — a decision, since the periods do
-travel on the payload and mirroring a second ticking charge is a bigger change
-than the one that was needed — and the branch rounding step, which does not
-travel at all. A seat with pads, or a branch with a rounding step, will differ
-from its receipt. The receipt is right; it comes from the server.
+Two terms of the server's subtotal were once missing here (extra pads and the
+branch's rounding step); both have been mirrored since, and since 2026-11-16
+the tile is EXACT and rounded once like the bill (see "The tile is the
+receipt, to the cent" below): pinned against 350 server instants.
 
 **A fixed tariff is an HOURLY RATE with an auto-stop (settled 2026-09-06).**
 `time_packages` states the rate by stating a price for a duration — 1500 for 60
@@ -2862,11 +2860,12 @@ what has been committed to, and only the unlimited branch and the
 deleted-package fallback still bill from it.
 
 **The rate lives in two places and they must move together.**
-`Session::tariffHourlyRate()` and the `tariffHourlyRate` in `sessionAmount.ts`
-are the same two-step ladder: `hourly_rate` when set, else the package's
-`price × 60 / duration_minutes`, else null — and null bills the committed
-figure rather than nothing. `time_package` is on `ISessionApi` for this, and
-the sessions listing eager-loads it.
+`Session::tariffRate()` and `tariffRateOf` in `sessionAmount.ts` are the same
+ladder, EXACT (2026-11-16): the pair `rate_price` / `rate_seconds` when the
+seat carries one, else `hourly_rate` per hour, else the package's price for
+its length (2500 for 10800 s — never 833.33 an hour) — and null bills the
+committed figure rather than nothing. `time_package` is on `ISessionApi` for
+this, and the sessions listing eager-loads it.
 
 **Unlimited went pro-rata with it, later the same day.** Removing a session's
 end is a decision about the AUTO-STOP and not about the bill: a session
@@ -4907,6 +4906,68 @@ from the press, and the hour banked 1100.
   mutations caught (six in the dialog, one API body, two history lines, the
   exact-cents display — caught only by the e2e — and three in the tile's
   mirror).
+
+## The tile is the receipt, to the cent (2026-11-16, billing audit)
+
+Backend contract: `cyber-place/CLAUDE.md` § "An exact bill, rounded once; each
+period at its own price". Owner: «расчет должен быть 100% гарантировано
+правильным». The audit found 15 of 210 tile instants off the server, five by a
+whole rounding step.
+
+- **`sessionAmount.ts` is exact.** Every part is an `Exact` (`n / d` cents,
+  BigInt) — the server's `ExactAmount`; rates are `Rate` (`priceCents` for
+  `seconds`), the server's `Rate`. The clock (`clockExactAt`, the branches of
+  `Session::timeCostExactAt` in order), the plan's share period by period
+  (`plan_period_ends`), the minimum (`minimumChargeExactAt`), each pad and each
+  hourly line are summed and rounded half-up to the cent ONCE
+  (`toMoney`), then the step (`applyRounding`, in whole cents). No float
+  touches a figure: `Math.round(n * 100) / 100` read 1249.995 (833.33/h for
+  90 min) as 1249.99 → 1200 under "nearest 100" against a receipt of 1300.
+  Amounts are read through the panel's cents helper (`billCents`). Every
+  exported function keeps its signature and returns the cent figure.
+- **The parity test is fed the server's own payloads.**
+  `sessionAmount.serverParity.test.ts` + `__fixtures__/server-parity-2026-11-16.json`:
+  65 board rows × 350 instants, total AND subtotal, equality to the cent (no
+  tolerance), including the audit's five whole-step instants by hand. Captured
+  by the backend: `BILL_TILE_FIXTURES=<dir> php artisan test --filter
+  'SessionBillHandFiguresTest::test_t_tile_fixtures'` (dedupe the rows per
+  case as the fixture does). Re-capture after a payload change; never edit a
+  figure. Against the old mirror 109 of the 706 checks fail.
+- **New payload keys** (additive, `ISessionApi`): `plan_period_ends`,
+  `rate_price`, `rate_seconds`. A backend that does not send them reads as
+  before (one period; `hourly_rate` / the package).
+- **The card prints the cents the server stores** (`SessionTimer`:
+  `centsWhenFractional`, was `preciseWhenSmall`): 1 249.99 on a step-0 branch
+  is printed 1 249.99, a whole figure is printed whole, a step branch shows
+  whole steps. Test: `SessionTimer.cents.test.tsx`.
+- **A Stop refused because the seat was closed meanwhile (F7).** The server
+  answers the receipt's Stop with the changed-receipt 422 when the sweep (or
+  another desk) already banked another figure. `StopReceiptModal` reads the
+  receipt again and shows the banked bill (confirm then sends it), or — when
+  the re-read is refused 403 (a manager may read a closed seat only if they
+  opened it) — reports «Сессию уже закрыли в другом месте. Счёт сохранён.»
+  (`session.checkoutClosedElsewhere`, en/ru/am), shows no stale figure and
+  offers only Close. Tests: two cases in `StopReceiptModal.test.tsx`.
+- **Receipt lines vs total.** Each receipt line is the server's own part to
+  the cent; the total is the exact sum's. With several fractional parts (a seat
+  and hourly pads) on a step-0 branch the lines can differ from the total by a
+  cent (625.83 + 312.08 + 312.08 printed, 1 250.00 charged). The history card
+  derives its time line from the stored total, so it always adds up.
+- Mutations (13 caught): each pad or the clock cut to the cent first, the
+  package rate cut to the cent, the exact pair ignored, the cent truncated,
+  the old float path (rate × seconds in drams, `Math.round(x * 100)`), periods
+  ignored, the last period read from the anchor, the step decided off by a
+  cent, whole drams on the card (twice), the 403 not reported, the stale
+  figure kept. One survivor, recorded honestly: rounding the final exact
+  ratio through a float cannot fail (a half cent of a whole-cents ratio is
+  representable) — the fix is the ratio, and the float path above is caught.
+- e2e `bill-exact.spec.ts` (24: the card's cents on a step-0 branch, the step
+  on a 100 branch, the receipt re-read after the sweep, «closed elsewhere» for a
+  manager; en/ru/am × 1280/520, no raw keys, no overflow). Screenshots:
+  `~/cyber-place-local/reports/billing-fixes-2026-11-16/panel/`.
+- ⚠️ **Owner web**: bump `panel.ref` with this change. Deploy the backend first
+  (an older backend sends none of the new keys: the tile reads one period and
+  the cent rate, as before).
 
 ## Product stock per shift (2026-11-16, owner)
 
