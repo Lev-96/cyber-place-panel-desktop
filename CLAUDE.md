@@ -4711,3 +4711,95 @@ Playwright. Screenshots: `~/cyber-place-local/reports/audit-fixes-2026-11-14/pan
   label back to `seatOf`, name dropped from `seatLineOf`, the grid restored
   (27 of 90 fail), a fact allowed under its badge (`min-width: 0`, 3 fail). Screenshots:
   `~/cyber-place-local/reports/ui-fixes-2026-11-15/`.
+
+## Paid ahead, unpaid lines, keep the rate, reminders (2026-11-15, owner)
+
+Backend contract: `cyber-place/CLAUDE.md` § "Paid ahead, unpaid lines, keep the
+rate, reminders" (commit 1c8d6d7) and § billing to the paid end (c591590). The
+panel shows the server's figures only; nothing below adds or subtracts money.
+
+- **History renderer first (`sessionHistoryModel.ts`).** An action with no
+  dictionary entry used to print `history.action.x` (the real `t` returns the
+  KEY, never ""): `actionTitle` now asks `hasTranslation(key)` (new in
+  `translations.ts`) and humanizes otherwise. The model's test mock is the
+  identity, like the real `t`. New renders: `started` by amount («На сумму
+  5 000 → 5 ч», own food first) and paid ahead; `time_added` paid now;
+  `item_added` lines tagged «не оплачено» + `unpaid_total`; `unpaid_off` with
+  `scope: "item"` titled «Отметил оплату товара» (the line, lines left);
+  `stopped` / `payment_recorded` prepaid · change / due / no change, cash
+  received, not paid at the end; `cancelled` prepayment returned;
+  `made_unlimited` kept («Цена прежняя: 1 500/ч (место 1 000 + джойстики 500)»,
+  `rate_now`); `limited` per hour now; `reminder_set` (changed when
+  `previous_remind_at`), `reminder_cleared`, `reminder_fired` (actor
+  «Automatically»). ⚠️ `payment_recorded` had NO entry in `ACTION_LOOK`, so it
+  fell to the unknown dump ("After: expired", "Payment method: card", English
+  in every language); it now reads its payment like a stop — the one deliberate
+  change to an old row. Old rows are pinned by snapshots through the real
+  dictionary (`sessionHistoryModel.oldRows.test.ts`, en/ru/am;
+  `SessionHistoryBill.oldRows`, `ShiftReportView.oldRows`: a v5 report with
+  nothing paid ahead reads exactly as v4). History bill: «Оплачено вперёд»,
+  «Сдача выдана» (the server's `cash_change`, never received − total) and «Не
+  оплачено при уходе» (`unpaid_amount`). Shift report v5: `+ Предоплаты в эту
+  смену` / `− Предоплаты закрытых мест` / change given (only when > 0),
+  `lines.prepaid[]`, a place line's prepaid/change/unpaid, a person's «Принял
+  предоплат».
+- **D, unlimited without a price.** `SessionOptionsDialog` has no rate box: the
+  gate, a line «Продолжит по той же цене, что сейчас…», the in-app confirm,
+  `POST /unlimited {keep_rate: true}`. The figure exists only in the answer
+  (`hourly_now`, NOT on `SessionResource`), so it is said in the toast
+  («Безлимит. Цена прежняя: 1 500 ֏/ч»); `/limit`'s toast «До 21:10, по 1 500
+  ֏/ч». `sessionRepository.makeUnlimited / limit` return `{session, hourlyNow}`.
+  Removed keys `session.unlimitedRate/RateHint/Hint` (no other caller).
+- **B, unpaid lines.** «Не оплачено» switch in `AddSessionItemDialog` (off by
+  default = the request exactly as before; on = `unpaid: true` on product
+  lines, never on additional items / the room's extra). Bill lines with
+  `unpaid_at` carry a tag and «Оплачено» (`PATCH {unpaid:false}`,
+  `markItemPaid`). Receipt: tag + «Из них выдано без оплаты» (server's
+  `unpaid_items_total`). `UnpaidAlert` copy now says time OR products (the
+  server's `unpaid_amount` includes lines).
+- **The card's chips (`SessionCardChips`)** — 🔔 HH:MM (amber pulse once rung),
+  «Не оплачено: 1 200», «Предоплата: 2 000» — sit FIRST on the one-line tariff
+  line: every card is one height, so they never add a line and are never cut.
+- **C, paid ahead.** Start: «Оплачено вперёд» (green `UnpaidToggle tone="success"`)
+  on a package or a planned length only, mutually exclusive with «Не оплачено»,
+  `prepaid: true`. «+ Время» on a prepaid seat: «Оплачено сейчас» (off by
+  default) → `prepaid: true`. Stop receipt with `preview.prepaid`:
+  `PrepaidSettlement` — «Оплачено при старте», then a 44px green «Сдача 500 ֏ ·
+  верните игроку» (`role="status"`) when change > 0, amber «Доплатить 500» when
+  due, muted «Оплачено полностью». The payment control is asked for the DUE
+  (`dueCents`; split must add up to it; cash change against it); nothing due →
+  no payment control, `{payment_method: "cash"}`. After the stop the change is
+  the server's `cash.change`.
+- **A, «На сумму».** A third Start tab (`start-mode-amount`; the package tab is
+  `start-mode-fixed`, shown only with packages). `StartByAmount`: autofocused
+  sum, `GET /sessions/start-quote?amount=` (+`outside_food=1`), a 28px line
+  «5 000 ֏ → 5 ч», «по 1 000 ֏/ч · до 23:40», own food first, «Джойстики и
+  товары оплачиваются отдельно». Start only on a quote for exactly the sum on
+  screen; sends `paid_amount` + the quote's `paid_seconds`; refusals are the
+  server's sentences. No «Не оплачено» there.
+- **E, reminders.** `ReminderSection` in «+ Время» (DurationInput h:mm +
+  optional note ≤ 120, «Напомнить через 2 ч»; pending: when, change, cancel;
+  rung: «Убрать»). `PUT/DELETE /sessions/{id}/reminder`. `useExpiryNudge` also
+  wakes at a pending `reminder.at` (wall clock, paused too). `SessionReminderNotifier`
+  (mounted in `Layout`, the SessionEndingNotifier idiom, bottom-right; dismissed
+  ids per user in `cp.reminder.dismissed.{id}`, a NEW key): «Понятно» = read +
+  DELETE, «Ещё 30 мин» = PUT 30 with the note, «Открыть место». Bell =
+  `playFor("session_ending", id)`. Notifications page renders `session.reminder`.
+  `SessionChangedEvent.kind` gains `reminder.changed` (the board re-reads, as
+  for any kind; PS5 control ignores it).
+- **The tile never bills past a running seat's end** (`billableUntilOf`,
+  mirror of `Session::billableUntil`): `ends_at`, or `ends_at` + the whole
+  pause for a pause with a limit; null for no end, a pause with none, a
+  closed row. Capped in `sessionAmountAt`, `sessionMinimumChargeAt`,
+  `sessionJoysticksTotalAt`, `sessionItemsTotalAt` (an hour at 1000 rounding up
+  to 100 read 1100 between its end and the sweep). Two old fixtures with a
+  resumed pause but an unmoved `ends_at` were corrected to what the server
+  writes.
+- ⚠️ **Owner web:** its `src/overrides/Layout.tsx` must mount
+  `SessionReminderNotifier` beside `SessionEndingNotifier` (and
+  `tests/layout.test.tsx` mock it) when it next bumps `panel.ref`.
+- Tests: vitest per feature (`sessions.moneyFeatures.test.ts` pins every body
+  sent); e2e `session-history-new-actions`, `unlimited-keep-rate`,
+  `item-unpaid`, `stop-change`, `start-by-amount`, `session-reminder`
+  (`e2e/helpers/moneySession.ts`, en/ru/am × 1280/520; screenshots to
+  `~/cyber-place-local/reports/money-session-features-2026-11-15/panel/`).
