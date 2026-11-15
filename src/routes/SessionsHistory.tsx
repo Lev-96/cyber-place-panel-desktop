@@ -11,6 +11,8 @@ import BookingHistory from "@/components/bookings/BookingHistory";
 import SessionHistoryTimeline from "@/components/sessions/SessionHistoryTimeline";
 import { feedCoversSession, groupBySession, seatRoute, seatSteps } from "@/components/sessions/sessionHistoryModel";
 import { sessionRepository } from "@/repositories/SessionRepository";
+import { placeRepository } from "@/repositories/PlaceRepository";
+import { placeLineOf } from "@/components/sessions/seatLine";
 import { ISessionEvent } from "@/api/sessions";
 import { ISessionApi } from "@/types/sessions";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -48,7 +50,7 @@ const FEED_LIMIT = 1000;
 const SessionsHistory = () => {
   const { branchId } = useParams();
   const id = Number(branchId);
-  const { t, money } = useLang();
+  const { t, money, lang } = useLang();
 
   const today = useMemo(() => toDateInput(new Date()), []);
   const [from, setFrom] = useState<string>(today);
@@ -67,12 +69,32 @@ const SessionsHistory = () => {
 
   // The people this branch's log may hold — the server's list, scoped to the caller.
   const actors = useAsync(() => sessionRepository.listEventActors(id), [id]);
+
+  /**
+   * Which seat (2026-11-15) — null for every place. Kept with its branch, like
+   * the person: a place of one venue means nothing in the next. The server
+   * narrows by it (sessions on the place now, or moved off it), after the same
+   * scopes as always.
+   */
+  const [place, setPlace] = useState<{ branch: number; id: number } | null>(null);
+  const placeId = place !== null && place.branch === id ? place.id : null;
+  const places = useAsync(() => placeRepository.listRawByBranch(id), [id]);
+  // Each seat as its card names it, in number order.
+  const placeOptions = useMemo(
+    () => [...(places.data ?? [])]
+      .sort((a, b) => (a.number ?? a.id) - (b.number ?? b.id))
+      .map((p) => ({ id: p.id, line: placeLineOf(p, lang) })),
+    [places.data, lang],
+  );
+  const placeLine = placeOptions.find((p) => p.id === placeId)?.line ?? t("history.placeAll");
+  /** The place as every read sends it; nothing at all without one. */
+  const byPlace = placeId !== null ? { place_id: placeId } : {};
   // Bumped by Refresh so the till sales below re-read with everything else.
   const [salesRefresh, setSalesRefresh] = useState(0);
 
   const { data, loading, error, reload } = useAsync(
-    () => sessionRepository.list({ branch_id: id, from: fromIso, to: toIso, limit: 1000 }),
-    [id, fromIso, toIso],
+    () => sessionRepository.list({ branch_id: id, from: fromIso, to: toIso, limit: 1000, ...byPlace }),
+    [id, fromIso, toIso, placeId],
   );
 
   const summary = useSessionsSummary(data);
@@ -86,8 +108,8 @@ const SessionsHistory = () => {
   const acted = useAsync(
     () => (actorId === null
       ? Promise.resolve(null)
-      : sessionRepository.list({ branch_id: id, from: fromIso, to: toIso, limit: 1000, acted_by: actorId })),
-    [id, fromIso, toIso, actorId],
+      : sessionRepository.list({ branch_id: id, from: fromIso, to: toIso, limit: 1000, acted_by: actorId, ...byPlace })),
+    [id, fromIso, toIso, actorId, placeId],
   );
 
   // Who did what, for every card at once: ONE request for the whole range,
@@ -99,8 +121,9 @@ const SessionsHistory = () => {
     () => sessionRepository.listEvents({
       branch_id: id, from: fromIso, to: toIso, limit: FEED_LIMIT,
       ...(actorId !== null ? { user_id: actorId } : {}),
+      ...byPlace,
     }),
-    [id, fromIso, toIso, actorId],
+    [id, fromIso, toIso, actorId, placeId],
   );
   // A feed that could not be read vouches for nothing: marked "cut", so every
   // card asks for its own events instead of claiming "nothing beyond the start".
@@ -115,7 +138,7 @@ const SessionsHistory = () => {
   // Both: the cards read their events from the feed, so a refresh of the
   // sessions alone would show a new stop with an old story.
   const refreshAll = () => {
-    void reload(); void events.reload(); void acted.reload(); void actors.reload();
+    void reload(); void events.reload(); void acted.reload(); void actors.reload(); void places.reload();
     setSalesRefresh((n) => n + 1);
   };
 
@@ -171,6 +194,29 @@ const SessionsHistory = () => {
                 </button>
               )}
             </label>
+            {/* Which seat. «All» is the screen as it always was. A long name is
+                cut by the select; the whole line is its tooltip. */}
+            <label className="col" style={{ gap: 4, minWidth: 0 }}>
+              <span className="label">{t("history.placeLabel")}</span>
+              <select
+                className="input hs-place"
+                value={placeId ?? ""}
+                title={placeLine}
+                data-testid="history-place"
+                onChange={(e) => setPlace(e.target.value === "" ? null : { branch: id, id: Number(e.target.value) })}
+              >
+                <option value="" title={t("history.placeAll")}>{t("history.placeAll")}</option>
+                {placeOptions.map((p) => (
+                  <option key={p.id} value={p.id} title={p.line}>{p.line}</option>
+                ))}
+              </select>
+              {/* A failed list leaves only «All» — say so, and offer the retry. */}
+              {places.error && (
+                <button type="button" className="cp-stale__retry" onClick={() => void places.reload()}>
+                  {t("history.state.placesFailed")}
+                </button>
+              )}
+            </label>
             <div className="row" style={{ gap: 6, flexWrap: "wrap" }}>
               <button type="button" className="pill" onClick={() => setRange("today")}>{t("history.today")}</button>
               <button type="button" className="pill" onClick={() => setRange("yesterday")}>{t("history.yesterday")}</button>
@@ -213,11 +259,20 @@ const SessionsHistory = () => {
         </div>
       </div>
 
-      {/* Products sold on their own (2026-10-25): the same period and person,
-          its own loading — the sessions below never wait on it. */}
-      <TillSalesHistory branchId={id} fromIso={fromIso} toIso={toIso} actorId={actorId} refreshKey={salesRefresh} />
-      {/* Every step of the bookings in the same period (2026-11-07). */}
-      <BookingHistory branchId={id} fromIso={fromIso} toIso={toIso} refreshKey={salesRefresh} />
+      {placeId !== null ? (
+        // Till sales and bookings belong to no seat's sessions: with a place
+        // picked they step aside rather than show figures the place filter
+        // does not narrow.
+        <p className="muted" style={{ fontSize: 13, margin: "4px 0" }}>{t("history.placeHidesTill")}</p>
+      ) : (
+        <>
+          {/* Products sold on their own (2026-10-25): the same period and person,
+              its own loading — the sessions below never wait on it. */}
+          <TillSalesHistory branchId={id} fromIso={fromIso} toIso={toIso} actorId={actorId} refreshKey={salesRefresh} />
+          {/* Every step of the bookings in the same period (2026-11-07). */}
+          <BookingHistory branchId={id} fromIso={fromIso} toIso={toIso} refreshKey={salesRefresh} />
+        </>
+      )}
 
       {/* The range is always a filter: an empty answer is "no sessions in this
           period", never "nothing has ever happened here". The list's own

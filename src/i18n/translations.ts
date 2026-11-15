@@ -2304,6 +2304,14 @@ export const TRANSLATIONS: Dict = {
   // The staff filter (2026-09-26): whose actions the page shows.
   "history.actorLabel": { en: "Staff member", ru: "Сотрудник", am: "Աշխատակից" },
   "history.actorAll": { en: "All staff", ru: "Все сотрудники", am: "Բոլոր աշխատակիցները" },
+  // The place filter (2026-11-15). «Место» as the bookings calendar says it.
+  "history.placeLabel": { en: "Seat", ru: "Место", am: "Տեղ" },
+  "history.placeAll": { en: "All seats", ru: "Все места", am: "Բոլոր տեղերը" },
+  "history.placeHidesTill": {
+    en: "Sales without a seat and bookings are hidden while a seat is picked.",
+    ru: "Продажи без места и брони скрыты, пока выбрано место.",
+    am: "Առանց տեղի վաճառքներն ու ամրագրումները թաքցված են, քանի դեռ տեղ է ընտրված։",
+  },
   "history.noActions": {
     en: "No actions in the selected period.",
     ru: "Нет действий за выбранный период.",
@@ -4794,6 +4802,7 @@ export const TRANSLATIONS: Dict = {
   "history.state.noResultsDescription": { en: "Try another date range or staff member.", ru: "Попробуйте изменить период или сотрудника.", am: "Փորձեք փոխել ժամանակահատվածը կամ աշխատակցին։" },
   "history.state.timelineErrorTitle": { en: "Could not load this session's activity", ru: "Не удалось загрузить действия по сессии", am: "Չհաջողվեց բեռնել սեսիայի գործողությունները" },
   "history.state.actorsFailed": { en: "Could not load the staff list. Retry", ru: "Не удалось загрузить сотрудников. Повторить", am: "Չհաջողվեց բեռնել աշխատակիցներին։ Կրկնել" },
+  "history.state.placesFailed": { en: "Could not load the seats. Retry", ru: "Не удалось загрузить места. Повторить", am: "Չհաջողվեց բեռնել տեղերը։ Կրկնել" },
   "session.state.packagesErrorTitle": { en: "Could not load time packages", ru: "Не удалось загрузить пакеты времени", am: "Չհաջողվեց բեռնել ժամային փաթեթները" },
   "session.state.relocateErrorTitle": { en: "Could not load free seats", ru: "Не удалось загрузить свободные места", am: "Չհաջողվեց բեռնել ազատ տեղերը" },
   "till.state.emptyTitle": { en: "No sales today yet", ru: "Сегодня продаж ещё не было", am: "Այսօր դեռ վաճառք չի եղել" },

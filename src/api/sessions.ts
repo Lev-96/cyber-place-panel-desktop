@@ -206,6 +206,12 @@ export interface ListSessionsParams {
    * History staff filter): the server reads past the "own shift" rule for them.
    */
   acted_by?: number;
+  /**
+   * Only the sessions that ran on this place — on it now, or moved off it
+   * (the History place filter, 2026-11-15). Applied by the server after the
+   * branch and history scopes, so it only narrows.
+   */
+  place_id?: number;
 }
 
 export const apiListSessions = (params: ListSessionsParams) =>
@@ -951,6 +957,8 @@ export interface ListSessionEventsParams {
   session_id?: number;
   /** Only this person's actions (the History staff filter). Lines the system wrote have no author. */
   user_id?: number;
+  /** Every line of the sessions that ran on this place (the History place filter). */
+  place_id?: number;
   action?: SessionActionName;
   from?: string;
   to?: string;

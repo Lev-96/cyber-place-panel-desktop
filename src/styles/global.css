@@ -6329,6 +6329,16 @@ select.input option:disabled {
 .hs-list {
   gap: 20px;
 }
+/* The History place filter (2026-11-15): a seat is «№N · name», and a long
+   name is cut, never the filter bar; the chosen line is the select's tooltip.
+   A fixed cap, not a percentage (see .cal__seat): the bar measures its
+   content, and a percentage would let the select ask for its longest name. */
+.hs-place {
+  width: auto;
+  min-width: 160px;
+  max-width: 260px;
+  text-overflow: ellipsis;
+}
 .hs-card {
   display: flex;
   flex-direction: column;
