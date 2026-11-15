@@ -4748,7 +4748,8 @@ panel shows the server's figures only; nothing below adds or subtracts money.
   `POST /unlimited {keep_rate: true}`. The figure exists only in the answer
   (`hourly_now`, NOT on `SessionResource`), so it is said in the toast
   («Безлимит. Цена прежняя: 1 500 ֏/ч»); `/limit`'s toast «До 21:10, по 1 500
-  ֏/ч». `sessionRepository.makeUnlimited / limit` return `{session, hourlyNow}`.
+  ֏/ч» only for an answer without `limit` (see «Задать время» below).
+  `sessionRepository.makeUnlimited / limit` return `{session, hourlyNow, limit}`.
   Removed keys `session.unlimitedRate/RateHint/Hint` (no other caller).
 - **B, unpaid lines.** «Не оплачено» switch in `AddSessionItemDialog` (off by
   default = the request exactly as before; on = `unpaid: true` on product
@@ -4803,3 +4804,50 @@ panel shows the server's figures only; nothing below adds or subtracts money.
   `item-unpaid`, `stop-change`, `start-by-amount`, `session-reminder`
   (`e2e/helpers/moneySession.ts`, en/ru/am × 1280/520; screenshots to
   `~/cyber-place-local/reports/money-session-features-2026-11-15/panel/`).
+
+## «Задать время»: in all from the start, or more from now (2026-11-15, owner)
+
+Backend contract: `cyber-place/CLAUDE.md` § "A fixed time counted from the
+start". Production seat #258: "1 hour" set ten seconds after a 1000/h start ran
+from the press, and the hour banked 1100.
+
+- `SessionOptionsDialog`'s limit section (an unlimited seat): `DurationInput`,
+  then the SERVER's two answers from `GET /sessions/{id}/limit-quote?minutes=`
+  (`sessionRepository.limitQuote`, `useServerQuote` + `useMinuteTick`, so the
+  end of «from now» follows the clock) as `ChoiceCards` (testId `limit-from`):
+  «Всего с начала места · до 19:15» (the DEFAULT) and «Ещё 1 ч от сейчас · до
+  19:25», each with «За время места всего: …» = the server's `time_total`,
+  printed to the hundredth (`centsWhenFractional`: 1 000 beside 1 002.78 — whole
+  drams would read 1 003 and hide the difference). «Уже сыграно» is the
+  server's `played_seconds`. A choice the server cannot make (the player
+  already sat longer than the length in all) shows its 422 sentence, is
+  disabled and is never drawn as chosen; nothing looks picked until the
+  cashier picks «from now». A refused quote shows its reason and no choice.
+- The confirm («Задать 1 ч») is enabled only on an available choice of a
+  quote for exactly the length on screen; it sends `{minutes, from}`
+  (`apiLimitSession(id, minutes, from)` — `from` is required in the client).
+  Toast: the answer's `limit` plan — «До 19:15: за всё время места 1 000» /
+  «До 19:25: ещё 1 ч, за всё время места 1 002.78»; an answer without it (an
+  older backend) falls back to «До …, по … ֏/ч» / «Задано время: …».
+- History: `limited` with `from` adds «Всего с начала места, до 19:15» or
+  «Ещё 1 ч от сейчас, до 19:15» and «Время места всего: …» (`time_total`); a
+  row without `from` reads exactly as before (old-rows snapshot unchanged).
+- The tile needs nothing new: the server writes a plan share (one rate) or a
+  rate change (another rate earlier), both already mirrored by
+  `sessionTimeCostAt`, and `billableUntilOf` caps it at the end — pinned with
+  the server's own columns and figures in `sessionAmount.limitFromStart.test.ts`
+  (seat #258: 2.78 / 999.72 / 1000, «up to 100» still 1000 after the end; the
+  reset case; 500 + 666.67 after a move).
+- Removed key: `session.limitEndsAt` (the end is the server's now).
+  `session.limitHint` / `session.limitLength` reworded (no "from now").
+- Deploy: the backend first (an older one answers `limit-quote` 404 and the
+  confirm stays held). ⚠️ Owner web: bump `panel.ref` with this change.
+- Tests: `SessionOptionsDialog.test.tsx` («Задать время», 6 + the two updated
+  limit cases), `sessionHistoryModel.newActions.test.ts` (3),
+  `sessions.moneyFeatures.test.ts` (2); e2e `limit-from-start.spec.ts` (18: three
+  flows × en/ru/am × 1280/520, no overflow, no raw keys; screenshots in
+  `~/cyber-place-local/reports/limit-from-start-2026-11-15/panel/`) and
+  `unlimited-keep-rate.spec.ts` (its limit case now answers the quote). 13
+  mutations caught (six in the dialog, one API body, two history lines, the
+  exact-cents display — caught only by the e2e — and three in the tile's
+  mirror).
