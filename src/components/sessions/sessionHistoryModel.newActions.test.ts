@@ -48,6 +48,12 @@ export const NEW_ROWS: ISessionEvent[] = [
   row("reminder_set", null, { minutes: 30, remind_at: "2026-11-15T14:30:00Z", note: null, previous_remind_at: "2026-11-15T16:00:00Z", previous_minutes: 120, previous_note: "Арам", previous_fired_at: null }),
   row("reminder_cleared", null, { fired: true, remind_at: "2026-11-15T16:00:00Z", minutes: 120, note: "Арам" }),
   row("reminder_fired", null, { notified: 3, remind_at: "2026-11-15T16:00:00Z", minutes: 120, note: "Арам", set_by_user_id: 3 }, { user: null }),
+  // «Задать время» counted in all from the start / more from now (2026-11-15,
+  // SessionLimitTest): seat #258's shape, ten seconds played at 1000/h.
+  row("limited", 997.22, { minutes: 60, hourly_rate: 1000, from: "start", played_seconds: 10, time_total: 1000,
+    new_ends_at: "2026-11-15T15:15:37Z", rate_source: "current", rate_now: { seat: 1000, pads: 500, extras: 0, total: 1500 } }),
+  row("limited", 1000, { minutes: 60, hourly_rate: 1000, from: "now", played_seconds: 10, time_total: 1002.78,
+    new_ends_at: "2026-11-15T15:15:47Z", rate_source: "current", rate_now: { seat: 1000, pads: 0, extras: 0, total: 1000 } }),
 ];
 
 const pres = (i: number, t = en) => eventPresentation(NEW_ROWS[i], t, money);
@@ -130,6 +136,22 @@ describe("unlimited / limited with the rate now", () => {
   });
   test("limited: what an hour costs now", () => {
     expect(pres(13).details).toContain("Per hour now: 1800 AMD/h (seat 1000 AMD + joysticks 500 AMD + rentals 300 AMD)");
+  });
+  test("limited before `from` existed: no anchor, no total, exactly as before", () => {
+    expect(pres(13).details.join(" | ")).not.toMatch(/In all|more from now|Seat time/);
+  });
+  test("limited in all from the start: the end and the seat's time in all", () => {
+    const d = pres(18).details;
+    expect(d[0]).toBe("In all from the start, until 19:15");
+    expect(d[1]).toBe("Seat time in all: 1000 AMD");
+    expect(d).toContain("Per hour now: 1500 AMD/h (seat 1000 AMD + joysticks 500 AMD)");
+    expect(pres(18, ru).details.slice(0, 2)).toEqual(["Всего с начала места, до 19:15", "Время места всего: 1000 AMD"]);
+  });
+  test("limited more from now: the length added, the end and the seat's time in all", () => {
+    const d = pres(19).details;
+    expect(d[0]).toBe("1 h more from now, until 19:15");
+    expect(d[1]).toBe("Seat time in all: 1002.78 AMD");
+    expect(pres(19, ru).details[0]).toBe("Ещё 1 ч от сейчас, до 19:15");
   });
 });
 

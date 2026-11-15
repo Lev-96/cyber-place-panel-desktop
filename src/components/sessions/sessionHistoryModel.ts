@@ -360,8 +360,20 @@ export const eventDetailParts = (
       break;
     }
 
-    // A fixed time from now on an unlimited seat: what an hour costs (2026-11-15).
+    // A fixed time on an unlimited seat: in all from the start or more from
+    // now, to what end, and what the seat's time costs in all (2026-11-15,
+    // `from`); then what an hour costs. A row from before `from` reads as it did.
     case "limited": {
+      const from = metaStr(meta, "from");
+      const until = metaStr(meta, "new_ends_at");
+      const minutes = metaNum(meta, "minutes");
+      if (from === "start" && until !== null) {
+        parts.push(fmt(t("history.limitFromStart"), formatTime(new Date(until))));
+      } else if (from === "now" && until !== null && minutes !== null) {
+        parts.push(fmt(t("history.limitFromNow"), shortDuration(minutes, t), formatTime(new Date(until))));
+      }
+      const timeTotal = from !== null ? metaNum(meta, "time_total") : null;
+      if (timeTotal !== null) parts.push(fmt(t("history.limitTimeTotal"), money(timeTotal)));
       const nowText = rateNowText(meta, t, money);
       if (nowText !== null) parts.push(fmt(t("history.rateNow"), nowText));
       break;

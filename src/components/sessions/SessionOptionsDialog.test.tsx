@@ -28,6 +28,7 @@ const repo = vi.hoisted(() => ({
   addTimeByAmount: vi.fn(),
   timeQuoteByAmount: vi.fn(),
   limit: vi.fn(),
+  limitQuote: vi.fn(),
   setUnpaid: vi.fn(),
   makeUnlimited: vi.fn(),
   setFree: vi.fn(),
@@ -54,6 +55,7 @@ vi.mock("@/repositories/SessionRepository", () => ({
     timeQuote: (...a: unknown[]) => repo.timeQuote(...a),
     addTimeByAmount: (...a: unknown[]) => repo.addTimeByAmount(...a),
     limit: (...a: unknown[]) => repo.limit(...a),
+    limitQuote: (...a: unknown[]) => repo.limitQuote(...a),
     setUnpaid: (...a: unknown[]) => repo.setUnpaid(...a),
     timeQuoteByAmount: (...a: unknown[]) => repo.timeQuoteByAmount(...a),
     makeUnlimited: (...a: unknown[]) => repo.makeUnlimited(...a),
@@ -92,7 +94,11 @@ vi.mock("@/i18n/LanguageContext", () => ({
       k === "session.moveTakenToast"
         ? `${k} {0}`
         // The keep-the-rate toasts (2026-11-15) name the SERVER's figure.
-        : k === "session.unlimitedDoneKept" || k === "session.limitDoneRate" ? `${k} {0} {1}`
+        : k === "session.unlimitedDoneKept" || k === "session.limitDoneRate" || k === "session.limitDoneStart" ? `${k} {0} {1}`
+        // «Задать время» (2026-11-15): the server's end, length and figures.
+        : k === "session.limitUntil" || k === "session.limitTimeTotal"
+          || k === "session.limitFromNow" || k === "session.limitPlayed" ? `${k} {0}`
+        : k === "session.limitDoneNow" ? `${k} {0} {1} {2}`
         : k,
     money: (n: number) => String(n),
     lang: "en",
@@ -137,6 +143,26 @@ const answerConfirm = async (yes: boolean) => {
 const settle = async () => {
   await act(async () => { await new Promise((r) => setTimeout(r, 320)); });
 };
+
+/** A wall-clock time the way the dialog prints one: 24-hour, the machine's zone. */
+const clock = (iso: string) =>
+  new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
+
+/**
+ * The server's two answers for `m` minutes on seat #258's shape: ten seconds
+ * played at 1000/h. In all: until 15:15:37 for 1000. From now: until 15:15:47,
+ * 1002.78 for the seat's time in all.
+ */
+const limitQuoteOf = (m: number, over: Record<string, unknown> = {}) => ({
+  minutes: m, hourly_rate: 1000, played_seconds: 10,
+  start: { available: true, from: "start", minutes: m, played_seconds: 10, hourly_rate: 1000,
+    ends_at: new Date(Date.parse("2026-11-15T14:15:37Z") + m * 60_000).toISOString(),
+    time_total: Math.round(m * 1000 / 60 * 100) / 100, charge: Math.round((m * 1000 / 60 - 2.78) * 100) / 100 },
+  now: { available: true, from: "now", minutes: m, played_seconds: 10, hourly_rate: 1000,
+    ends_at: new Date(Date.parse("2026-11-15T14:15:47Z") + m * 60_000).toISOString(),
+    time_total: Math.round((m * 1000 / 60 + 2.78) * 100) / 100, charge: Math.round(m * 1000 / 60 * 100) / 100 },
+  ...over,
+});
 
 // The start dialog's time field (2026-11-07): an hours box and a minutes box.
 const hoursBox = () => screen.getByTestId("grant-duration-hours") as HTMLInputElement;
@@ -1114,8 +1140,9 @@ describe("one «+ Время» for every mode (2026-11-07)", () => {
     await act(async () => { fireEvent.change(screen.getByTestId("limit-duration-minutes"), { target: { value: m } }); });
   };
 
-  test("«⏱» gives an unlimited seat a fixed time from now: shown, then sent as minutes", async () => {
-    repo.limit.mockResolvedValue({ session: session({ ends_at: "2026-11-15T17:10:00Z" }), hourlyNow: { seat: 1000, pads: 500, extras: 0, total: 1500 } });
+  test("«⏱» on an older backend's answer (no plan in it): the length is sent and the old toast says the rate", async () => {
+    repo.limitQuote.mockImplementation((_id: number, m: number) => Promise.resolve(limitQuoteOf(m)));
+    repo.limit.mockResolvedValue({ session: session({ ends_at: "2026-11-15T17:10:00Z" }), hourlyNow: { seat: 1000, pads: 500, extras: 0, total: 1500 }, limit: null });
     const onClose = vi.fn();
     await act(async () => {
       render(
@@ -1128,15 +1155,14 @@ describe("one «+ Время» for every mode (2026-11-07)", () => {
     expect(confirm.disabled).toBe(true);
 
     await typeLimit("1", "30");
-    expect(screen.getByTestId("limit-ends-at")).toBeTruthy();
+    await settle();
     expect(confirm.disabled).toBe(false);
     await act(async () => { fireEvent.click(confirm); });
 
-    expect(repo.limit).toHaveBeenCalledWith(42, 90);
+    expect(repo.limit).toHaveBeenCalledWith(42, 90, "start");
     expect(onClose).toHaveBeenCalled();
-    // The server's end and its per-hour figure (2026-11-15): "until 21:10, at 1500/h".
-    const end = new Date("2026-11-15T17:10:00Z").toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
-    expect(toast.message).toHaveBeenCalledWith("success", `session.limitDoneRate ${end} 1500session.perHourShort`);
+    // The server's end and its per-hour figure: "until 21:10, at 1500/h".
+    expect(toast.message).toHaveBeenCalledWith("success", `session.limitDoneRate ${clock("2026-11-15T17:10:00Z")} 1500session.perHourShort`);
   });
 
   test("a paused seat: nothing about time until it is resumed, «Не оплачено» still there", async () => {
@@ -1155,6 +1181,7 @@ describe("one «+ Время» for every mode (2026-11-07)", () => {
   });
 
   test("a refused limit shows the server's sentence and keeps the dialog", async () => {
+    repo.limitQuote.mockImplementation((_id: number, m: number) => Promise.resolve(limitQuoteOf(m)));
     repo.limit.mockRejectedValue(new Error("The seat is booked at 16:00."));
     const onClose = vi.fn();
     await act(async () => {
@@ -1165,10 +1192,141 @@ describe("one «+ Время» for every mode (2026-11-07)", () => {
       );
     });
     await typeLimit("1", "00");
+    await settle();
     await act(async () => { fireEvent.click(screen.getByTestId("limit-confirm")); });
 
     expect(screen.getByText("The seat is booked at 16:00.")).toBeTruthy();
     expect(onClose).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * «Задать время» on an unlimited seat (2026-11-15, owner — production seat
+ * #258: "1 hour" set ten seconds after the start ran from the press and an
+ * hour at 1000 banked 1100). Two choices, both the SERVER's: «Всего с начала
+ * места · до 19:15» — the default — and «Ещё 1 ч от сейчас · до 19:25». Each
+ * shows the end and what the seat's time costs in all; nothing is worked out
+ * here, and the confirm waits for a quote of exactly the length on screen.
+ */
+describe("«Задать время»: in all from the start, or more from now (2026-11-15)", () => {
+  const unlimited = () => session({ is_unlimited: true, ends_at: null, started_at: "2026-11-15T14:15:37Z" });
+  const typeLimit = async (h: string, m: string) => {
+    await act(async () => { fireEvent.change(screen.getByTestId("limit-duration-hours"), { target: { value: h } }); });
+    await act(async () => { fireEvent.change(screen.getByTestId("limit-duration-minutes"), { target: { value: m } }); });
+  };
+  const card = (key: "start" | "now") => screen.getByTestId(`limit-from-${key}`);
+  const radio = (key: "start" | "now") => within(card(key)).getByRole("radio") as HTMLInputElement;
+  const confirmButton = () => screen.getByTestId("limit-confirm") as HTMLButtonElement;
+  const mountLimit = async (onClose = vi.fn()) => {
+    await act(async () => {
+      render(
+        <ConfirmProvider>
+          <SessionOptionsDialog session={unlimited()} platform="ps5" onClose={onClose} onChanged={() => {}} />
+        </ConfirmProvider>,
+      );
+    });
+    return onClose;
+  };
+
+  beforeEach(() => {
+    repo.limitQuote.mockImplementation((_id: number, m: number) => Promise.resolve(limitQuoteOf(m)));
+  });
+
+  test("both choices carry the server's end and figure, and «in all» is chosen", async () => {
+    await mountLimit();
+    await typeLimit("1", "00");
+    await settle();
+
+    expect(repo.limitQuote).toHaveBeenLastCalledWith(42, 60);
+    expect(radio("start").checked).toBe(true);
+    expect(radio("now").checked).toBe(false);
+    expect(card("start").textContent).toContain("session.limitFromStart");
+    expect(card("start").textContent).toContain(`session.limitUntil ${clock("2026-11-15T15:15:37Z")}`);
+    expect(card("start").textContent).toContain("session.limitTimeTotal 1000");
+    expect(card("now").textContent).toContain("session.limitFromNow 1 time.hourShort");
+    expect(card("now").textContent).toContain(`session.limitUntil ${clock("2026-11-15T15:15:47Z")}`);
+    expect(card("now").textContent).toContain("session.limitTimeTotal 1002.78");
+    // What was played so far, as the server counted it.
+    expect(screen.getByTestId("limit-played").textContent).toContain("session.limitPlayed 0 time.minShort");
+  });
+
+  test("the confirm sends «start» and the toast says the server's end and figure", async () => {
+    repo.limit.mockResolvedValue({
+      session: session({ ends_at: "2026-11-15T15:15:37Z" }), hourlyNow: { seat: 1000, pads: 0, extras: 0, total: 1000 },
+      limit: { from: "start", minutes: 60, played_seconds: 10, hourly_rate: 1000, ends_at: "2026-11-15T15:15:37Z", time_total: 1000, charge: 997.22 },
+    });
+    const onClose = await mountLimit();
+    await typeLimit("1", "00");
+    await settle();
+    await act(async () => { fireEvent.click(confirmButton()); });
+
+    expect(repo.limit).toHaveBeenCalledWith(42, 60, "start");
+    expect(toast.message).toHaveBeenCalledWith("success", `session.limitDoneStart ${clock("2026-11-15T15:15:37Z")} 1000`);
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  test("«from now» picked: the confirm sends «now», the toast names the length added", async () => {
+    repo.limit.mockResolvedValue({
+      session: session({ ends_at: "2026-11-15T15:15:47Z" }), hourlyNow: null,
+      limit: { from: "now", minutes: 60, played_seconds: 10, hourly_rate: 1000, ends_at: "2026-11-15T15:15:47Z", time_total: 1002.78, charge: 1000 },
+    });
+    await mountLimit();
+    await typeLimit("1", "00");
+    await settle();
+    await act(async () => { fireEvent.click(radio("now")); });
+    expect(radio("now").checked).toBe(true);
+    await act(async () => { fireEvent.click(confirmButton()); });
+
+    expect(repo.limit).toHaveBeenCalledWith(42, 60, "now");
+    expect(toast.message).toHaveBeenCalledWith("success", `session.limitDoneNow ${clock("2026-11-15T15:15:47Z")} 1 time.hourShort 1002.78`);
+  });
+
+  test("played longer than «in all»: the server's sentence on that choice, nothing sent until «from now» is chosen", async () => {
+    const longer = "The player has already played longer: 1 h 10 min. Choose a longer time, or count it from now.";
+    repo.limitQuote.mockImplementation((_id: number, m: number) => Promise.resolve(limitQuoteOf(m, {
+      played_seconds: 4200, start: { available: false, from: "start", message: longer },
+    })));
+    repo.limit.mockResolvedValue({ session: session({ ends_at: "2026-11-15T16:25:37Z" }), hourlyNow: null, limit: null });
+    await mountLimit();
+    await typeLimit("1", "00");
+    await settle();
+
+    expect(card("start").textContent).toContain(longer);
+    expect(radio("start").disabled).toBe(true);
+    // Not drawn as chosen while it cannot be: nothing looks picked yet.
+    expect(radio("start").checked).toBe(false);
+    expect(radio("now").checked).toBe(false);
+    expect(confirmButton().disabled).toBe(true);
+
+    await act(async () => { fireEvent.click(radio("now")); });
+    expect(confirmButton().disabled).toBe(false);
+    await act(async () => { fireEvent.click(confirmButton()); });
+    expect(repo.limit).toHaveBeenCalledWith(42, 60, "now");
+  });
+
+  test("nothing is confirmed on a stale figure: the confirm waits for the quote of exactly this length", async () => {
+    await mountLimit();
+    await typeLimit("1", "00");
+    await settle();
+    expect(confirmButton().disabled).toBe(false);
+
+    // A new length: the quote for 60 is not one for 90.
+    await act(async () => { fireEvent.change(screen.getByTestId("limit-duration-minutes"), { target: { value: "30" } }); });
+    expect(confirmButton().disabled).toBe(true);
+    await settle();
+    expect(repo.limitQuote).toHaveBeenLastCalledWith(42, 90);
+    expect(confirmButton().disabled).toBe(false);
+  });
+
+  test("a refused quote shows its reason and no choice", async () => {
+    repo.limitQuote.mockRejectedValue(new Error("No price is set for this seat."));
+    await mountLimit();
+    await typeLimit("1", "00");
+    await settle();
+
+    expect(screen.getByText("No price is set for this seat.")).toBeTruthy();
+    expect(screen.queryByTestId("limit-from-start")).toBeNull();
+    expect(confirmButton().disabled).toBe(true);
   });
 });
 

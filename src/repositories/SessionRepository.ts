@@ -1,4 +1,4 @@
-import type { IRateChangeResponse, IStartAmountQuote, StopSessionBody } from "@/api/sessions";
+import type { ILimitPlan, ILimitQuote, IRateChangeResponse, IStartAmountQuote, SessionLimitFrom, StopSessionBody } from "@/api/sessions";
 import {
   AddItemBody,
   apiAddSessionItem,
@@ -10,6 +10,7 @@ import {
   apiAddSessionTime,
   apiAddSessionTimeByAmount,
   apiLimitSession,
+  apiSessionLimitQuote,
   apiSetSessionUnpaid,
   apiSessionTimeQuoteByAmount,
   apiSessionExtensionOptions,
@@ -77,8 +78,14 @@ export interface ISessionRateChange {
   session: ISessionApi;
   /** The server's `hourly_now`; null from a backend that does not send it. */
   hourlyNow: ISessionHourlyNow | null;
+  /** `/limit` (2026-11-15): the plan the server wrote; null elsewhere and from an older backend. */
+  limit: ILimitPlan | null;
 }
-const rateChangeOf = (r: IRateChangeResponse): ISessionRateChange => ({ session: r.session, hourlyNow: r.hourly_now ?? null });
+const rateChangeOf = (r: IRateChangeResponse): ISessionRateChange => ({
+  session: r.session,
+  hourlyNow: r.hourly_now ?? null,
+  limit: r.limit ?? null,
+});
 
 export class SessionRepository {
   async listActive(branchId: number): Promise<ISessionApi[]> {
@@ -198,11 +205,17 @@ export class SessionRepository {
   }
 
   /**
-   * An unlimited seat given a fixed time from now (2026-11-07), with what an
-   * hour costs from then on as the server says (2026-11-15; null: older backend).
+   * An unlimited seat given a fixed time (2026-11-07), counted from `from`
+   * (2026-11-15), with the plan the server wrote and what an hour costs from
+   * then on (each null from an older backend).
    */
-  async limit(sessionId: number, minutes: number): Promise<ISessionRateChange> {
-    return friendlyMutation(apiLimitSession(sessionId, minutes).then(rateChangeOf));
+  async limit(sessionId: number, minutes: number, from: SessionLimitFrom): Promise<ISessionRateChange> {
+    return friendlyMutation(apiLimitSession(sessionId, minutes, from).then(rateChangeOf));
+  }
+
+  /** Read-only advice: both choices a limit of `minutes` offers. See `apiSessionLimitQuote`. */
+  async limitQuote(sessionId: number, minutes: number): Promise<ILimitQuote> {
+    return friendlyMutation(apiSessionLimitQuote(sessionId, minutes));
   }
 
   /** "+ Время" by money (2026-11-07): the server decides the minutes and the charge. */

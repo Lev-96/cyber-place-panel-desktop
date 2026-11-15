@@ -12,6 +12,7 @@ import { can } from "@/auth/permissions";
 import { useLang } from "@/i18n/LanguageContext";
 import { fmt } from "@/i18n/translations";
 import { durationLabel } from "@/utils/durationLabel";
+import { centsWhenFractional } from "@/i18n/currency";
 import { billingSettingsRepository } from "@/repositories/BillingSettingsRepository";
 import { sessionRepository, type ISessionRateChange } from "@/repositories/SessionRepository";
 import { ISessionApi, ISessionHourlyNow } from "@/types/sessions";
@@ -23,14 +24,16 @@ import {
   seatUnavailableBodyOf,
   type SeatUnavailableBody,
 } from "@/api/seatUnavailable";
-import type { IExtensionAlternative, IExtensionOptions, ITimeQuote } from "@/api/sessions";
+import type { IExtensionAlternative, IExtensionOptions, ILimitChoice, ILimitQuote, ITimeQuote, SessionLimitFrom } from "@/api/sessions";
 import SectionTabs from "@/components/ui/SectionTabs";
+import ChoiceCards from "@/components/ui/ChoiceCards";
 import DurationInput from "./DurationInput";
 import UnpaidToggle from "./UnpaidToggle";
 import ReminderSection from "./ReminderSection";
 import QuotedPrice from "./QuotedPrice";
 import { EMPTY_DRAFT, draftMinutes, type DurationDraft } from "./durationModel";
 import { quoteFor, useServerQuote } from "./useServerQuote";
+import { useMinuteTick } from "./useMinuteTick";
 
 interface Props {
   session: ISessionApi;
@@ -202,7 +205,32 @@ const SessionOptionsDialog = ({ session, platform, onClose, onChanged, platformN
    */
   /** "1500 ֏/ч": the SERVER's per-hour figure (`hourly_now.total`), never one worked out here. */
   const perHour = (now: ISessionHourlyNow): string => `${money(now.total)}${t("session.perHourShort")}`;
+  /**
+   * A figure read AGAINST another, to the hundredth (2026-11-15): "1 000" for
+   * the hour in all beside "1 002.78" for the hour from now — rounded to whole
+   * drams the two would read 1 000 and 1 003, and the difference that decides
+   * the choice would be a guess. The revenue screen's rule.
+   */
+  const exact = (amount: number): string => money(amount, centsWhenFractional(amount));
   const limitMinutes = draftMinutes(limitDraft);
+  // «Задать время» (2026-11-15, owner — seat #258: "1 hour" set ten seconds
+  // in meant the player sits ONE hour, and an hour at 1000 banked 1100 when it
+  // ran from the press). «Всего с начала места» is the default; «Ещё … от
+  // сейчас» stays a choice. Both are the SERVER's — end and figure — re-asked
+  // each minute, because the end of «from now» moves with the clock.
+  const [limitFrom, setLimitFrom] = useState<SessionLimitFrom>("start");
+  const limitAsked = isActive && isUnlimited && !paused ? limitMinutes : null;
+  const limitTick = useMinuteTick(limitAsked !== null);
+  const limitQuote = useServerQuote<ILimitQuote>(
+    limitAsked,
+    (m) => sessionRepository.limitQuote(current.id, m),
+    `${current.id}|limit`,
+    limitTick,
+  );
+  const limitQuoted = quoteFor(limitQuote, limitMinutes);
+  const limitChoice: ILimitChoice | null = limitQuoted !== null ? limitQuoted[limitFrom] : null;
+  // Confirmed only on an available choice of a quote for exactly this length.
+  const limitReady = limitChoice !== null && limitChoice.available;
 
   /**
    * One sentence for every grant, whichever button produced it.
@@ -224,6 +252,25 @@ const SessionOptionsDialog = ({ session, platform, onClose, onChanged, platformN
    */
   const clockOf = (at: Date): string =>
     at.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
+
+  /**
+   * What a limit says once the server has written it (2026-11-15): its end
+   * and what the seat's time costs in all — «До 19:15: за всё время места
+   * 1 000 ֏». An answer without the plan (an older backend) says the end and
+   * the per-hour figure, else the length, as before.
+   */
+  const limitDoneToast = (done: ISessionRateChange | null, minutes: number): string => {
+    const plan = done?.limit ?? null;
+    const end = plan?.ends_at ?? done?.session.ends_at ?? null;
+    if (plan !== null && end !== null) {
+      return plan.from === "start"
+        ? fmt(t("session.limitDoneStart"), clockOf(new Date(end)), exact(plan.time_total))
+        : fmt(t("session.limitDoneNow"), clockOf(new Date(end)), durationLabel(minutes, t), exact(plan.time_total));
+    }
+    return done?.hourlyNow && end
+      ? fmt(t("session.limitDoneRate"), clockOf(new Date(end)), perHour(done.hourlyNow))
+      : fmt(t("session.limitDone"), durationLabel(minutes, t));
+  };
 
   const offeredMinutes = offeredMinutesOf(seatRefusal);
   const claimedFrom = claimedFromOf(seatRefusal);
@@ -855,7 +902,8 @@ const SessionOptionsDialog = ({ session, platform, onClose, onChanged, platformN
 
           </>
         )}
-        {/* ── a fixed time for an unlimited seat (2026-11-07) ──────────── */}
+        {/* ── a fixed time for an unlimited seat (2026-11-07): in all from
+            the start, or more from now (2026-11-15) ─────────────────────── */}
         {isUnlimited && !paused && (
           <section className="col" style={{ gap: 10 }} data-testid="limit-section">
               <>
@@ -867,30 +915,57 @@ const SessionOptionsDialog = ({ session, platform, onClose, onChanged, platformN
                   label={t("session.limitLength")}
                   testId="limit-duration"
                 />
-                {limitMinutes !== null && (
-                  <span className="muted" style={{ fontSize: 12 }} data-testid="limit-ends-at">
-                    {t("session.limitEndsAt").replace("{0}", clockOf(new Date(Date.now() + limitMinutes * 60_000)))}
-                  </span>
+                {limitAsked !== null && limitQuote.status === "error" && (
+                  <span className="error" style={{ fontSize: 12 }}>{limitQuote.message}</span>
+                )}
+                {limitQuoted !== null && (
+                  <>
+                    <span className="muted" style={{ fontSize: 12 }} data-testid="limit-played">
+                      {fmt(t("session.limitPlayed"), durationLabel(Math.floor(limitQuoted.played_seconds / 60), t))}
+                    </span>
+                    <ChoiceCards<SessionLimitFrom>
+                      label={t("session.limitFromLabel")}
+                      name={`limit-from-${current.id}`}
+                      testId="limit-from"
+                      // A choice the server cannot make is never drawn as
+                      // chosen: nothing looks picked until the cashier picks.
+                      value={limitReady ? limitFrom : null}
+                      onChange={setLimitFrom}
+                      disabled={busy || !isActive}
+                      choices={(["start", "now"] as const).map((key) => {
+                        const choice = limitQuoted[key];
+                        const title = key === "start"
+                          ? t("session.limitFromStart")
+                          : fmt(t("session.limitFromNow"), durationLabel(limitMinutes ?? 0, t));
+                        return {
+                          key,
+                          title: choice.available
+                            ? `${title} · ${fmt(t("session.limitUntil"), clockOf(new Date(choice.ends_at)))}`
+                            : title,
+                          // The seat's time in all at that end, or why this
+                          // choice cannot be made — both the server's words.
+                          detail: choice.available ? fmt(t("session.limitTimeTotal"), exact(choice.time_total)) : choice.message,
+                          disabled: !choice.available,
+                        };
+                      })}
+                    />
+                  </>
                 )}
                 <div>
                   <Button
                     data-testid="limit-confirm"
-                    disabled={busy || !isActive || limitMinutes === null}
+                    disabled={busy || !isActive || limitMinutes === null || !limitReady}
                     onClick={() => {
-                      if (limitMinutes === null) return;
+                      if (limitMinutes === null || !limitReady) return;
+                      const from = limitFrom;
                       let answer: ISessionRateChange | null = null;
                       void run(async () => {
-                        answer = await sessionRepository.limit(current.id, limitMinutes);
+                        answer = await sessionRepository.limit(current.id, limitMinutes, from);
                         return answer.session;
                       }).then((ok) => {
                         if (!ok) return;
-                        // The server's end and per-hour figure (2026-11-15):
-                        // "until 21:10, at 1500/h"; an older backend: the length.
                         const done: ISessionRateChange | null = answer;
-                        const end = done?.session.ends_at ?? null;
-                        notify.message("success", done?.hourlyNow && end
-                          ? fmt(t("session.limitDoneRate"), clockOf(new Date(end)), perHour(done.hourlyNow))
-                          : fmt(t("session.limitDone"), durationLabel(limitMinutes, t)));
+                        notify.message("success", limitDoneToast(done, limitMinutes));
                         onClose();
                       });
                     }}

@@ -60,9 +60,16 @@ for (const lang of LANGS) {
     });
 
     test(`limit: the server's end and per-hour figure in the toast (${lang}, ${width})`, async ({ page }) => {
+      const end = new Date(Date.now() + 60 * 60_000).toISOString();
+      const choice = (from: "start" | "now") => ({ available: true, from, minutes: 60, played_seconds: 1800, hourly_rate: 1000, ends_at: end, time_total: 1500, charge: 1000 });
       await open(page, lang, width, () => runningSession(), async () => {
+        // The dialog confirms only on the server's quote (2026-11-15).
+        await page.route(at("/sessions/5/limit-quote"), (r) => r.fulfill(json({
+          minutes: 60, hourly_rate: 1000, played_seconds: 1800, start: choice("start"), now: choice("now"),
+        })));
+        // An answer without `limit` (as before 2026-11-15): the toast says the end and the rate.
         await page.route(at("/sessions/5/limit"), (r) => r.fulfill(json({
-          session: runningSession({ is_unlimited: false, ends_at: new Date(Date.now() + 60 * 60_000).toISOString() }), hourly_now: hourlyNow,
+          session: runningSession({ is_unlimited: false, ends_at: end }), hourly_now: hourlyNow,
         })));
       });
       await page.getByTestId("limit-duration-hours").fill("1");

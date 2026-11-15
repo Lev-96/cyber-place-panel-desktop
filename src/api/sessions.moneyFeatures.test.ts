@@ -25,6 +25,19 @@ describe("D: unlimited at the rate it bills now", () => {
   });
 });
 
+describe("«Задать время»: in all from the start, or more from now (2026-11-15)", () => {
+  test("the limit sends the minutes and where they count from", async () => {
+    await api.apiLimitSession(5, 60, "start");
+    expect(last()).toEqual({ path: "/sessions/5/limit", opts: { method: "POST", body: { minutes: 60, from: "start" } } });
+    await api.apiLimitSession(5, 30, "now");
+    expect(last().opts.body).toEqual({ minutes: 30, from: "now" });
+  });
+  test("the quote is a read of both choices for those minutes", async () => {
+    await api.apiSessionLimitQuote(5, 60);
+    expect(last()).toEqual({ path: "/sessions/5/limit-quote?minutes=60", opts: {} });
+  });
+});
+
 describe("B: unpaid lines", () => {
   test("«Оплачено» sends unpaid:false on the line", async () => {
     await api.apiMarkSessionItemPaid(5, 9);

@@ -620,6 +620,44 @@ export const apiAddSessionTime = (sessionId: number, minutes: number, charge?: n
 export interface IRateChangeResponse {
   session: ISessionApi;
   hourly_now?: ISessionHourlyNow | null;
+  /** `/limit` only (2026-11-15): where the length counted from, the end, the seat's time at it. */
+  limit?: ILimitPlan | null;
+}
+
+/**
+ * Where a fixed time for an unlimited seat is counted from (2026-11-15,
+ * owner): `start` — the seat lasts that long IN ALL, the time already played
+ * inside it ("an hour at 1000" is 1000); `now` — that long more from the
+ * press (what the panel sent before, and what a request without it means).
+ */
+export type SessionLimitFrom = "start" | "now";
+
+/** What a limit does (or did): the SERVER's end and figures, never worked out here. */
+export interface ILimitPlan {
+  from: SessionLimitFrom;
+  minutes: number;
+  /** Played before the press — since the start, or since the counter's reset. */
+  played_seconds: number;
+  hourly_rate: number;
+  ends_at: string;
+  /** What the seat's TIME costs when it runs to that end — the bill's own reading. */
+  time_total: number;
+  /** What the time still to come adds. */
+  charge: number;
+}
+
+/** One choice of the quote: its plan, or why it cannot be made (the player already sat longer). */
+export type ILimitChoice =
+  | ({ available: true } & ILimitPlan)
+  | { available: false; from: SessionLimitFrom; message: string };
+
+/** `GET /sessions/{id}/limit-quote?minutes=` — both choices, read-only. */
+export interface ILimitQuote {
+  minutes: number;
+  hourly_rate: number;
+  played_seconds: number;
+  start: ILimitChoice;
+  now: ILimitChoice;
 }
 
 /**
@@ -695,12 +733,17 @@ export const apiAddSessionTimeByAmount = (sessionId: number, amount: number, unp
   });
 
 /**
- * An unlimited seat given a fixed time from now (2026-11-07). The bill does
- * not move; from then on it is a timed seat. Refused (422) for a seat with an
- * end, a paused one, or one a booking is waiting for.
+ * An unlimited seat given a fixed time (2026-11-07), counted from where `from`
+ * says (2026-11-15). Nothing played changes price; from then on it is a timed
+ * seat. Refused (422) for a seat with an end, a paused one, one a booking is
+ * waiting for, and "in all" shorter than what was already played.
  */
-export const apiLimitSession = (sessionId: number, minutes: number) =>
-  request<IRateChangeResponse>(`/sessions/${sessionId}/limit`, { method: "POST", body: { minutes } });
+export const apiLimitSession = (sessionId: number, minutes: number, from: SessionLimitFrom) =>
+  request<IRateChangeResponse>(`/sessions/${sessionId}/limit`, { method: "POST", body: { minutes, from } });
+
+/** ⚠️ ADVICE: both choices for `apiLimitSession`, as the server would write them. Writes nothing. */
+export const apiSessionLimitQuote = (sessionId: number, minutes: number) =>
+  request<ILimitQuote>(`/sessions/${sessionId}/limit-quote?minutes=${minutes}`);
 
 /** Extra time not paid yet, on or off (2026-11-07); what is owed is worked out when the seat ends. */
 export const apiSetSessionUnpaid = (sessionId: number, on: boolean) =>
