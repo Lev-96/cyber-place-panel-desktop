@@ -4669,3 +4669,45 @@ Playwright. Screenshots: `~/cyber-place-local/reports/audit-fixes-2026-11-14/pan
   `e2e/support-truncated.spec.ts` (a mocked Reverb socket via
   `page.routeWebSocket`, speaking enough Pusher for one private channel:
   reuse it for any realtime e2e).
+
+## Seat names in the bookings calendar; the debt card never covers its text (2026-11-15, owner)
+
+- **The calendar names a seat as its card does.** `SessionsBoard.seatLineOf(pc)`
+  is the one source of the card's name line («№4 · Hall VIP», «№4» with no
+  name, the device label with no place; number = `place.number ?? place.id`,
+  name through `tr(place, "name", lang)`). The card's `SeatNameLine` and the
+  calendar's `CalendarPlace.label` both take it, so the timeline's seat
+  column, the seat filter, the day's booking cards, a block's tooltip /
+  accessible name (`bookingTip`), the details and the form's seat picker
+  (all through `seatNames`), and the cancel/«Забронировано» toasts inside the
+  calendar, say the card's line. `seatOf` (board toasts, «№N» only) is
+  unchanged. Long names: the timeline column clamps to 2 lines (`.tl__seat-name`),
+  the list card and both selects cut with an ellipsis; each carries the whole
+  line in `title`. `.cal__seat` is capped at `max-width: 320px`, NOT a
+  percentage: a percentage is ignored while the header measures its content,
+  so the select asked for its longest option and pushed the bar past the
+  520px window (caught by the e2e). Other inline «№N · name» builders
+  (`RelocateSessionDialog`, `OutsideFoodPlacesField`, `ConsolePicker`,
+  `AppearancePreview`) print the same shape and were left as they are.
+- **Pre-existing, not fixed (outside the ask):** at the 520px window the
+  calendar's two-week date strip is wider than the calendar (668px of chips
+  in a 454px `.cal`, measured on the build before this change).
+- **Debt card (`.platform-debt--wide`) is a wrapping flex row, not a fixed
+  grid.** The grid kept three columns down to a 1100px WINDOW whatever the
+  card's width; the access badge (one line) spilled out of its third under
+  «Подробнее» (Armenian at 768/900/1280/1440). Now: main `flex: 1.2 1 240px`,
+  facts `flex: 2 1 400px` (the grid's 1.2 : 2 split), button `flex: 0 0 auto`;
+  above 640px the facts wrap too (`flex: 1 1 9rem; min-width: auto`: a fact
+  is never narrower than its badge). ≤ 640px: one part per line
+  (`flex-basis: 100%`), the 2026-11-09 phone look otherwise unchanged.
+- Tests: `SessionsBoard.reserve.test.tsx` (calendar labels = card lines),
+  `BookingsCalendar.test.tsx` («a seat's name», 2), `PlatformDebtCard.phone.test.ts`
+  (desktop assertions now flex); `e2e/booking-seat-names.spec.ts` (9: en/ru/am ×
+  1280×800, 1920×1080, 520×560), `e2e/debt-card-layout.spec.ts` (90: overdue,
+  nothing owed and an eight-digit debt × en/ru/am × 520…2560; per-line text
+  rects vs the button, everything inside the card, no page overflow). The owner web's phones
+  (360–430) and 520–1920 were measured with its own shell from a scratch copy
+  pointing at this checkout (36 cases, all clear). Mutation-checked: calendar
+  label back to `seatOf`, name dropped from `seatLineOf`, the grid restored
+  (27 of 90 fail), a fact allowed under its badge (`min-width: 0`, 3 fail). Screenshots:
+  `~/cyber-place-local/reports/ui-fixes-2026-11-15/`.
