@@ -780,6 +780,48 @@ describe("the receipt is the figure charged", () => {
     await act(async () => { fireEvent.click(screen.getByTestId("stop-confirm")); });
     expect(repo.stop.mock.calls[1][1]).toMatchObject({ priced_at: "2026-10-25T13:05:00+00:00", expected_total: 150 });
   });
+
+  /**
+   * The sweep closed the seat at its end while the receipt was open
+   * (2026-11-16, audit F7): the receipt's Stop is refused as changed, the
+   * receipt read again shows the BANKED bill (1000, not 997.22), and that is
+   * what a second confirm sends.
+   */
+  test("a seat the sweep closed meanwhile: the banked bill is read and confirmed", async () => {
+    repo.preview.mockResolvedValueOnce(frozen(997.22)).mockResolvedValue(frozen(1000, "2026-10-25T13:00:05+00:00"));
+    repo.stop.mockRejectedValueOnce(Object.assign(new Error("Счёт изменился"), { status: 422, body: { message: "Счёт изменился" } }));
+    await mount();
+    expect(screen.getByText("997.22·AMD")).toBeTruthy();
+    await act(async () => { fireEvent.click(screen.getByTestId("stop-confirm")); });
+
+    expect(screen.getByText("Счёт изменился")).toBeTruthy();
+    expect(screen.queryByText("997.22·AMD")).toBeNull();
+    // One precision for the whole receipt: the fixture's time line has cents.
+    expect(screen.getAllByText("1000.00·AMD").length).toBeGreaterThan(0);
+
+    repo.stop.mockResolvedValue({ breakdown: frozen(1000), cash: null });
+    await act(async () => { fireEvent.click(screen.getByTestId("stop-confirm")); });
+    expect(repo.stop.mock.calls[1][1]).toMatchObject({ expected_total: 1000 });
+  });
+
+  /**
+   * …and when this person may not read the closed seat (a manager who did not
+   * open it): reported as closed elsewhere — no stale figure, no confirm to
+   * press again, only Close.
+   */
+  test("a seat closed elsewhere and not ours to read is reported as closed", async () => {
+    repo.preview.mockResolvedValueOnce(frozen(997.22)).mockRejectedValue(Object.assign(new Error("нет прав"), { status: 403 }));
+    repo.stop.mockRejectedValueOnce(Object.assign(new Error("Счёт изменился"), { status: 422, body: { message: "Счёт изменился" } }));
+    await mount();
+    await act(async () => { fireEvent.click(screen.getByTestId("stop-confirm")); });
+
+    expect(screen.getByTestId("checkout-ended-elsewhere").textContent).toBe("session.checkoutClosedElsewhere");
+    expect(screen.queryByText("997.22·AMD")).toBeNull();
+    expect(screen.queryByText("Счёт изменился")).toBeNull();
+    expect(screen.queryByTestId("stop-confirm")).toBeNull();
+    expect(screen.getByRole("button", { name: "action.close" })).toBeTruthy();
+    expect(repo.stop).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe("the VIP minimum charge on the receipt", () => {

@@ -76,6 +76,14 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved, canRes
   // method switch, so an amount typed for cash never rides along with card.
   const [received, setReceived] = useState("");
   const [handover, setHandover] = useState<ICashHandover | null>(null);
+  /**
+   * Closed elsewhere while this receipt was open (2026-11-16, billing audit
+   * F7): its Stop was refused as a changed receipt, and the bill can no longer
+   * be read here — a manager reads a closed seat's bill only if they opened
+   * it. Reported as ended, never asked again: the banked bill is the
+   * server's, in the history.
+   */
+  const [endedElsewhere, setEndedElsewhere] = useState(false);
   /** Synchronous guard: a double click arrives before `busy` re-renders. */
   const stoppingNow = useRef(false);
 
@@ -225,8 +233,16 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved, canRes
         const body = (e as { body?: { errors?: Record<string, unknown> } }).body;
         const cashShort = change?.state === "ok" && body?.errors?.cash_received !== undefined;
         setErr(cashShort || !(e instanceof Error) || !e.message ? t("session.cashBillGrew") : e.message);
-        // Not `reload()`: it clears the error this line just set.
-        void sessionRepository.preview(session.id).then(setBill).catch(() => {});
+        // Not `reload()`: it clears the error this line just set. A seat the
+        // sweep or another desk closed meanwhile is refused the same way
+        // (2026-11-16): read again, it shows the banked bill; refused (a
+        // manager who did not open it), it is reported as ended.
+        void sessionRepository.preview(session.id).then(setBill).catch((reread) => {
+          if ((reread as { status?: number }).status === 403) {
+            setEndedElsewhere(true);
+            setErr(null);
+          }
+        });
       } else {
         setErr(e instanceof Error ? e.message : "Failed to stop");
       }
@@ -287,7 +303,7 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved, canRes
    * shows what was banked and not two hours of extra clock.
    */
   const endedWithoutUs = session.status !== "active";
-  const finished = stopped !== null || endedWithoutUs;
+  const finished = stopped !== null || endedWithoutUs || endedElsewhere;
 
   const deviceLabel = session.pc_label ?? `№${session.pc_id}`;
   // Ended by itself (ran out, or the kiosk ended it) with nobody at the till
@@ -334,9 +350,9 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved, canRes
             because "Подтвердить и закрыть" read as "close this window". */}
         {/* Ended while this was open, by somebody or something else: the bill
             below is theirs, final, and nothing here will stop it again. */}
-        {endedWithoutUs && stopped === null && (
+        {(endedWithoutUs || endedElsewhere) && stopped === null && (
           <span className="muted" style={{ fontSize: 12 }} data-testid="checkout-ended-elsewhere">
-            {t("session.checkoutEndedElsewhere")}
+            {t(endedElsewhere && !endedWithoutUs ? "session.checkoutClosedElsewhere" : "session.checkoutEndedElsewhere")}
           </span>
         )}
         {!finished && (
@@ -350,7 +366,9 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved, canRes
           </span>
         )}
 
-        {!view ? <SkeletonText lines={5} /> : (
+        {/* Ended elsewhere and not ours to read: no stale figure is shown as
+            the bill — the sentence above says where it went. */}
+        {endedElsewhere ? null : !view ? <SkeletonText lines={5} /> : (
           <div className="col" style={{ gap: 0 }}>
             {/* Time line */}
             <div style={row}>

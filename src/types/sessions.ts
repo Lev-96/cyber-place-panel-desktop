@@ -318,6 +318,21 @@ export interface ISessionApi {
   plan_rebased_at?: string | null;
   amount_before_plan_rebase?: number | string | null;
   /**
+   * The ends of the plan's EARLIER periods (2026-11-16): PLAYED seconds from
+   * the plan's anchor (`plan_rebased_at`, else the start) and what the time
+   * costs there. Time sold later ("+ Время", a package extension) is a period
+   * of its own at its own price; null/absent = one period.
+   */
+  plan_period_ends?: { seconds: number; amount: number | string }[] | null;
+  /**
+   * The seat's rate as it was SOLD (2026-11-16): `rate_price` for
+   * `rate_seconds` of play — a 2500 / 180 min deal kept through "unlimited",
+   * a total typed for a length — when `hourly_rate` is only its hour rounded
+   * to the cent. Null/absent: `hourly_rate` (or the package) is exact.
+   */
+  rate_price?: number | string | null;
+  rate_seconds?: number | null;
+  /**
    * The clock reset to zero (2026-11-05): what it had earned at
    * `time_reset_at` was waived; the time costs the clock minus
    * `time_reset_offset` (the raw clock then), with no VIP minimum after it.

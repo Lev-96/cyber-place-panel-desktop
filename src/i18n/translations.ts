@@ -1508,6 +1508,12 @@ export const TRANSLATIONS: Dict = {
     ru: "Сессия уже завершена. Это её окончательный счёт.",
     am: "Սեսիան արդեն ավարտված է։ Սա դրա վերջնական հաշիվն է։",
   },
+  // Closed elsewhere while the receipt was open, and not this person's to read (2026-11-16).
+  "session.checkoutClosedElsewhere": {
+    en: "The session was already closed elsewhere. Its bill is saved.",
+    ru: "Сессию уже закрыли в другом месте. Счёт сохранён.",
+    am: "Սեսիան արդեն փակվել է այլ տեղում։ Հաշիվը պահպանված է։",
+  },
   "session.checkoutKeepPlaying": { en: "Keep playing", ru: "Продолжить игру", am: "Շարունակել խաղը" },
   "session.itemsBought": { en: "Products bought", ru: "Приобретённые товары", am: "Գնված ապրանքներ" },
   // The receipt's section when the own-food fee is among its lines (2026-11-14).
