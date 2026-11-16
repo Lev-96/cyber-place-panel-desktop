@@ -1,11 +1,12 @@
-import { IExtraItem, IMinimumChargeRule, ISessionApi } from "@/types/sessions";
+import { IMinimumChargeRule, ISessionApi } from "@/types/sessions";
+import { billCents } from "@/components/payments/cashChange";
 
 /**
  * What a running session's CLOCK is worth right now.
  *
  * ## This mirrors one backend function, deliberately and exactly
  *
- * `App\Models\Sessions\Session::timeCostStringAt()` is the source of truth —
+ * `App\Models\Sessions\Session::timeCostExactAt()` is the source of truth —
  * `preview` and `stop` both go through it, which is what keeps the receipt on
  * screen and the money in the books the same figure. A ticking counter cannot
  * ask the server every second, so the panel has always extrapolated locally
@@ -15,6 +16,21 @@ import { IExtraItem, IMinimumChargeRule, ISessionApi } from "@/types/sessions";
  * `SessionResource` already ships. Change one and change the other, or the
  * tile and the receipt start telling a cashier different stories.
  *
+ * ## Exact, and rounded ONCE (2026-11-16, owner: «расчет должен быть 100%
+ * гарантировано правильным»)
+ *
+ * Every part — the clock, each pad, each hourly line — is held EXACTLY, as a
+ * ratio of whole numbers of cents ({@link Exact}, the server's `ExactAmount`),
+ * the parts are summed, and the sum is rounded half-up to the cent once, then
+ * the branch's step. A float cannot do this: 833.33 × 5400 / 3600 is 1249.995,
+ * which a double holds as 1249.9949999… and rounds DOWN, while the server
+ * rounds it up — the tile read 1200 against a receipt of 1300 under "nearest
+ * 100". With integers both sides reach the same cent, at every instant.
+ *
+ * A package's rate is its price for its length (2500 for 10800 s), never
+ * 833.33 an hour; a plan sold in periods ("+ Время", an extension) reads each
+ * period at its own price (`plan_period_ends`).
+ *
  * ## What "fixed tariff" means here, since it is the case this exists for
  *
  * An HOURLY RATE with an auto-stop attached. `time_packages` states the rate
@@ -22,28 +38,16 @@ import { IExtraItem, IMinimumChargeRule, ISessionApi } from "@/types/sessions";
  * the kiosk agent locks the seat when the duration is up. A player who leaves
  * at 00:30 owes 750, and the figure ticks all the way there.
  *
- * This REVERSED on 2026-09-06. Until then a package was a block bought up
- * front, owed in full from its first second, and `committed_amount` was what
- * the clock cost. It is now only what has been committed to, and the one thing
- * still billed from it is a session whose package row was deleted underneath
- * it.
- *
- * Going UNLIMITED reversed with it: removing a session's end is a decision
- * about the auto-stop, not about the bill. What the switch DOES keep is a
- * rate boundary: the backend freezes what the clock had earned at that instant
- * into `committed_amount` (with `committed_until` = the switch) and prices only
- * the time after it at `hourly_rate` — so a new price named at the switch is
- * "from now on". Invisible when the rate does not change.
+ * Going UNLIMITED: removing a session's end is a decision about the
+ * auto-stop, not about the bill. What the switch DOES keep is a rate
+ * boundary: the backend freezes what the clock had earned at that instant
+ * into `committed_amount` (with `committed_until` = the switch) and prices
+ * only the time after it at the seat's rate — so a new price named at the
+ * switch is "from now on". Invisible when the rate does not change.
  *
  * A MOVE to a seat priced differently (2026-09-25) sets the same kind of
  * boundary in its own pair, `rate_changed_at` + `amount_before_rate_change`;
  * when both exist the LATER one decides, exactly as on the server.
- *
- * ## Not the whole bill
- *
- * The clock plus the items on the seat. Extra joysticks and the branch's
- * rounding step are not in it, so a seat with pads under-reads. The full bill
- * is the stop receipt, which comes from the server.
  *
  * @param at Milliseconds since the epoch to price at; `Date.now()` in the UI,
  *           a fixed instant in tests.
@@ -63,38 +67,41 @@ export const sessionTimeCostAt = (session: ISessionApi, at: number): number =>
  * The clock with the session's minimum charge applied — the same step
  * `SessionPricingCalculator::bill()` takes before adding anything
  * (`Session::minimumChargeAt`), branch for branch: from the threshold to the
- * minimum exactly the CURRENT seat's `rate × minimum`, past it that plus what
- * the clock earned since the visit reached it (2026-11-07); a bill pinned past
- * the minimum by a move / "+ Время" / unlimited → its total, then the clock on
- * from the pin; a visit settled before 2026-11-07, or rounding up, read as
- * they were billed.
+ * minimum exactly the CURRENT seat's price for the minimum, past it that plus
+ * what the clock earned since the visit reached it (2026-11-07); a bill pinned
+ * past the minimum by a move / "+ Время" / unlimited → its total, then the
+ * clock on from the pin; a visit settled before 2026-11-07, or rounding up,
+ * read as they were billed. `amount` is to the cent; the bill adds the exact
+ * figure.
  */
-export const sessionMinimumChargeAt = (session: ISessionApi, at: number): MinimumChargeResult => {
+export const sessionMinimumChargeAt = (session: ISessionApi, atRaw: number): MinimumChargeResult => {
+  const result = minimumChargeExactAt(session, billableAt(session, atRaw));
+  return { amount: toMoney(result.exact), applied: result.applied, billedSeconds: result.billedSeconds };
+};
+
+/** {@link sessionMinimumChargeAt}, exactly. */
+const minimumChargeExactAt = (session: ISessionApi, at: number): ExactMinimumCharge => {
   const rule = session.min_charge ?? null;
-  const clock = clockCostAt(session, at);
+  const clock = clockExactAt(session, at);
+  const played = playedSecondsBetween(session, session.started_at, at);
   // Reset to zero (2026-11-05) — `SessionPricingCalculator::timeCharge`: the
   // clock minus the clock at the reset, never below zero, and no VIP minimum
   // after it. The raw clock is what every boundary above froze, so this one
   // subtraction is exact across all of them.
   const offset = session.time_reset_at ? session.time_reset_offset : null;
   if (offset !== null && offset !== undefined) {
-    return {
-      amount: Math.max(0, round2(clock - toNumber(offset))),
-      applied: false,
-      billedSeconds: playedSecondsBetween(session, session.started_at, at),
-    };
+    return { exact: nonNegative(minus(clock, exactOf(offset))), applied: false, billedSeconds: played };
   }
-  if (!rule) return { amount: clock, applied: false, billedSeconds: playedSecondsBetween(session, session.started_at, at) };
-  const played = playedSecondsBetween(session, session.started_at, at);
-  const covering = (total: number, covered: number): MinimumChargeResult => ({
-    amount: played <= covered
-      ? total
-      : round2(total + Math.max(0, round2(clock - clockCostAt(session, instantAtPlayed(session, covered, at))))),
+  if (!rule) return { exact: clock, applied: false, billedSeconds: played };
+  const covering = (total: number, covered: number): ExactMinimumCharge => ({
+    exact: played <= covered
+      ? exactOf(total)
+      : plus(exactOf(total), nonNegative(minus(clock, clockExactAt(session, instantAtPlayed(session, covered, at))))),
     applied: (rule.settled_amount ?? 0) > 0,
     billedSeconds: Math.max(covered, played),
   });
-  const oldTopUp = (): MinimumChargeResult => ({
-    amount: round2(clock + (rule.settled_amount ?? 0)),
+  const oldTopUp = (): ExactMinimumCharge => ({
+    exact: plus(clock, exactOf(rule.settled_amount ?? 0)),
     applied: (rule.settled_amount ?? 0) > 0,
     billedSeconds: (rule.settled_billed_minutes ?? 0) * 60,
   });
@@ -103,7 +110,7 @@ export const sessionMinimumChargeAt = (session: ISessionApi, at: number): Minimu
   if (rule.mode === "round_up") {
     if (rule.settled_total != null && rule.settled_seconds != null) return covering(rule.settled_total, rule.settled_seconds);
     if (rule.settled_amount != null) return oldTopUp();
-    return applyMinimumCharge(rule, clock, played, tariffHourlyRate(session));
+    return applyMinimumChargeExact(rule, clock, played, tariffRateOf(session));
   }
   // Settled on a move before 2026-11-07 (no total): read as it was then.
   if (rule.settled_amount != null && rule.settled_total == null) return oldTopUp();
@@ -115,24 +122,30 @@ export const sessionMinimumChargeAt = (session: ISessionApi, at: number): Minimu
   }
 
   // The minimum at the seat the visit is on NOW, exactly (2026-11-07, owner:
-  // "1498 must be 1500") — `MinimumChargeRule::applyAtCurrentRate`; past it
-  // the clock from the instant the visit reached it.
-  const rate = tariffHourlyRate(session);
-  if (played < rule.after_minutes * 60 || rate === null) return { amount: clock, applied: false, billedSeconds: played };
-  const hour = perSecond(rate, minimum);
-  const amount = played <= minimum
+  // "1498 must be 1500") — `MinimumChargeRule::applyAtCurrentRateExact`; past
+  // it the clock from the instant the visit reached it.
+  const rate = tariffRateOf(session);
+  if (played < rule.after_minutes * 60 || rate === null) return { exact: clock, applied: false, billedSeconds: played };
+  const hour = rateFor(rate, minimum);
+  const exact = played <= minimum
     ? hour
-    : round2(hour + Math.max(0, round2(clock - clockCostAt(session, instantAtPlayed(session, minimum, at)))));
-  return { amount, applied: amount > clock, billedSeconds: Math.max(minimum, played) };
+    : plus(hour, nonNegative(minus(clock, clockExactAt(session, instantAtPlayed(session, minimum, at)))));
+  return { exact, applied: compare(exact, clock) > 0, billedSeconds: Math.max(minimum, played) };
 };
 
 /** What a minimum-charge rule did to a clock. */
 export interface MinimumChargeResult {
-  /** The clock as billed. */
+  /** The clock as billed, to the cent. */
   amount: number;
   /** True when the rule added something. */
   applied: boolean;
   /** The seconds billed (played time when nothing was added). */
+  billedSeconds: number;
+}
+
+interface ExactMinimumCharge {
+  exact: Exact;
+  applied: boolean;
   billedSeconds: number;
 }
 
@@ -151,11 +164,11 @@ export const minimumChargeBilledSeconds = (rule: IMinimumChargeRule, playedSecon
 
 /**
  * A clock with a VIP minimum-charge rule applied — mirrors
- * `MinimumChargeRule::apply()`: `clock + (rate × billed − rate × played)`, each
- * term rounded as the clock rounds, so a single-rate visit is exactly
- * `rate × billed`. No rule, nothing to add, or no rate → the clock unchanged.
- * Also what the owner's settings preview prices its examples with, so the
- * preview cannot promise what the till would not charge.
+ * `MinimumChargeRule::applyExact()`: `clock + (rate × billed − rate × played)`,
+ * exact and rounded once, so a single-rate visit is exactly `rate × billed`.
+ * No rule, nothing to add, or no rate → the clock unchanged. Also what the
+ * owner's settings preview prices its examples with, so the preview cannot
+ * promise what the till would not charge.
  */
 export const applyMinimumCharge = (
   rule: IMinimumChargeRule | null,
@@ -167,109 +180,134 @@ export const applyMinimumCharge = (
   if (!rule || rule.after_minutes < 1 || rule.minimum_minutes < 1) {
     return { amount: clockCost, applied: false, billedSeconds: played };
   }
-  const billed = minimumChargeBilledSeconds(rule, played);
-  if (billed <= played || rate === null) {
-    return { amount: clockCost, applied: false, billedSeconds: played };
-  }
-  return {
-    amount: round2(clockCost + perSecond(rate, billed) - perSecond(rate, played)),
-    applied: true,
-    billedSeconds: billed,
-  };
+  const result = applyMinimumChargeExact(rule, exactOf(clockCost), played, rate === null ? null : perHour(rate));
+  return { amount: toMoney(result.exact), applied: result.applied, billedSeconds: result.billedSeconds };
 };
 
-/** The clock as played — `Session::timeCostStringAt()`, no minimum. */
-const clockCostAt = (session: ISessionApi, at: number): number => {
-  const rate = toNumber(session.hourly_rate);
+const applyMinimumChargeExact = (
+  rule: IMinimumChargeRule,
+  clock: Exact,
+  playedSeconds: number,
+  rate: Rate | null,
+): ExactMinimumCharge => {
+  const played = Math.max(0, playedSeconds);
+  const billed = minimumChargeBilledSeconds(rule, played);
+  if (billed <= played || rate === null) return { exact: clock, applied: false, billedSeconds: played };
+  return { exact: plus(clock, minus(rateFor(rate, billed), rateFor(rate, played))), applied: true, billedSeconds: billed };
+};
+
+/** The clock as played — `Session::timeCostExactAt()`, no minimum — exactly. */
+const clockExactAt = (session: ISessionApi, at: number): Exact => {
+  const rate = tariffRateOf(session);
 
   // A PLAN (2026-10-25) — a package or a planned hourly start — bills its
-  // share of the plan from the last re-base, the rate past its end. Mirrors
-  // `Session::timeCostStringAt`; a seat moved before re-basing existed keeps
-  // the move's rule below.
-  const plannedTariff = tariffHourlyRate(session);
-  if (session.mode === "fixed" && !session.unlimited_at && plannedTariff !== null
+  // share of the plan from the last re-base, each period at its own price
+  // (2026-11-16), the rate past its end. A seat moved before re-basing
+  // existed keeps the move's rule below.
+  if (session.mode === "fixed" && !session.unlimited_at && rate !== null
       && session.committed_amount !== null && session.committed_amount !== undefined && session.committed_until
       && (!session.rate_changed_at || (session.plan_rebased_at
         && !(Date.parse(session.plan_rebased_at) < Date.parse(session.rate_changed_at))))) {
-    const from = session.plan_rebased_at ?? session.started_at;
-    const fromMs = Date.parse(from);
-    const frozen = session.plan_rebased_at ? toNumber(session.amount_before_plan_rebase ?? 0) : 0;
-    const plan = toNumber(session.committed_amount);
-    const untilMs = Date.parse(session.committed_until);
-    // Only pauses resumed before now come out of the plan's length: a resume
-    // moves the end; a running pause, or one closed by the stop, has not.
-    const planned = untilMs > fromMs
-      ? Math.max(0, Math.floor((untilMs - fromMs) / 1000) - pausedSecondsBetween(session, fromMs, untilMs, at))
-      : 0;
-    const played = playedSecondsBetween(session, from, at);
-    if (planned <= 0) return round2(frozen + perSecond(plannedTariff, played));
-    return played <= planned
-      ? round2(frozen + ((plan - frozen) * played) / planned)
-      : round2(plan + perSecond(plannedTariff, played - planned));
+    return planShareExactAt(session, rate, at);
   }
 
   // A rate change mid-way (a move): what was earned is frozen, only the time
-  // after it runs at the new rate. Outranks the unlimited boundary unless that
+  // after it runs at the rate. Outranks the unlimited boundary unless that
   // one came later.
   if (session.rate_changed_at && session.amount_before_rate_change !== null
       && session.amount_before_rate_change !== undefined
       && (!session.unlimited_at || !session.committed_until
         || !(Date.parse(session.rate_changed_at) < Date.parse(session.committed_until)))) {
-    return round2(toNumber(session.amount_before_rate_change)
-      + perSecond(rate, playedSecondsBetween(session, session.rate_changed_at, at)));
+    return plus(exactOf(session.amount_before_rate_change),
+      runningOn(rate, playedSecondsBetween(session, session.rate_changed_at, at)));
   }
 
   // The unlimited switch's boundary: frozen at the switch, the rest at the rate.
   if (session.unlimited_at && session.committed_until
       && session.committed_amount !== null && session.committed_amount !== undefined) {
-    return round2(toNumber(session.committed_amount)
-      + perSecond(rate, playedSecondsBetween(session, session.committed_until, at)));
+    return plus(exactOf(session.committed_amount),
+      runningOn(rate, playedSecondsBetween(session, session.committed_until, at)));
   }
 
-  // Open / count-up: per second at the assigned rate, from the first second.
+  // Open / count-up: per second at the seat's rate, from the first second.
   if (session.mode === "open") {
-    return perSecond(rate, playedSecondsBetween(session, session.started_at, at));
+    return runningOn(rate, playedSecondsBetween(session, session.started_at, at));
   }
 
-  // `total_paid` is the fallback for a session that closed before
-  // `committed_amount` existed — the same fallback the backend uses, for the
-  // same rows.
-  const committed = toNumber(session.committed_amount ?? session.total_paid);
+  // Fixed: per second at the tariff's rate, from the first second. A tariff
+  // whose rate cannot be established at all — a package row deleted under a
+  // running session — bills what was committed (`total_paid` for a session
+  // that closed before `committed_amount` existed), the backend's fallback.
+  return rate === null
+    ? exactOf(session.committed_amount ?? session.total_paid)
+    : rateFor(rate, playedSecondsBetween(session, session.started_at, at));
+};
 
-  // Fixed: per second at the tariff's implied rate, from the first second.
-  //
-  // A tariff whose rate cannot be established at all — a package row deleted
-  // under a running session — bills what was committed, which is the last
-  // figure anybody agreed to and is safer than billing the seat nothing.
-  const tariff = tariffHourlyRate(session);
+/** `seconds` at the rate the seat runs on — nothing when it has none (a free start with no price). */
+const runningOn = (rate: Rate | null, seconds: number): Exact => (rate === null ? ZERO : rateFor(rate, seconds));
 
-  return tariff === null
-    ? round2(committed)
-    : perSecond(tariff, playedSecondsBetween(session, session.started_at, at));
+/**
+ * The plan's share, exactly — `Session::planShareAt`: from the last re-base
+ * (or the start) through the end of each earlier period to the plan, each
+ * stretch in proportion to the PLAYED seconds it holds; past the plan's end,
+ * the rate per second. Only pauses resumed before `at` come out of the plan's
+ * length: a resume moves the end; a running pause, or one closed by the stop,
+ * has not.
+ */
+const planShareExactAt = (session: ISessionApi, rate: Rate, at: number): Exact => {
+  const from = session.plan_rebased_at ?? session.started_at;
+  const fromMs = Date.parse(from as string);
+  const frozen = session.plan_rebased_at ? exactOf(session.amount_before_plan_rebase ?? 0) : ZERO;
+  const plan = exactOf(session.committed_amount);
+  const untilMs = Date.parse(session.committed_until as string);
+  const planned = untilMs > fromMs
+    ? Math.max(0, Math.floor((untilMs - fromMs) / 1000) - pausedSecondsBetween(session, fromMs, untilMs, at))
+    : 0;
+  const played = playedSecondsBetween(session, from, at);
+  if (planned <= 0) return plus(frozen, rateFor(rate, played));
+  if (played > planned) return plus(plan, rateFor(rate, played - planned));
+
+  let fromSeconds = 0;
+  let fromAmount = frozen;
+  for (const end of planPeriodEnds(session)) {
+    if (end.seconds >= planned) break;
+    if (played <= end.seconds) {
+      return plus(fromAmount, scaled(minus(end.amount, fromAmount), played - fromSeconds, end.seconds - fromSeconds));
+    }
+    fromSeconds = end.seconds;
+    fromAmount = end.amount;
+  }
+  return plus(fromAmount, scaled(minus(plan, fromAmount), played - fromSeconds, planned - fromSeconds));
+};
+
+/** `Session::planPeriodEnds`: only rising, positive seconds count. */
+const planPeriodEnds = (session: ISessionApi): { seconds: number; amount: Exact }[] => {
+  const ends: { seconds: number; amount: Exact }[] = [];
+  let last = 0;
+  for (const end of session.plan_period_ends ?? []) {
+    const seconds = Math.trunc(Number(end?.seconds ?? 0));
+    if (!(seconds > last) || end?.amount === undefined || end.amount === null) continue;
+    ends.push({ seconds, amount: exactOf(end.amount) });
+    last = seconds;
+  }
+  return ends;
 };
 
 /**
- * The tariff's hourly rate, whatever shape the tariff was chosen in.
- *
- * Mirrors `Session::tariffHourlyRate()`. A package states a rate by stating a
- * price for a duration: 1500 for 60 minutes IS 1500/hour, and 1000 for 30
- * minutes is 2000/hour. `hourly_rate` wins when it is set — the count-up mode
- * and any session made unlimited, both of which carry a resolved one.
- *
- * `null` means no rate can be established: a fixed session whose package the
- * backend did not load, or whose package row is gone. The caller decides, and
- * must not read that as a zero.
+ * The tariff's rate EXACTLY, as it was sold — `Session::tariffRate()`: the
+ * pair the seat carries (`rate_price` for `rate_seconds`), else `hourly_rate`
+ * per hour, else the package's price for its length. Null: no rate.
  */
-const tariffHourlyRate = (session: ISessionApi): number | null => {
-  if (session.hourly_rate !== null && session.hourly_rate !== undefined) {
-    return toNumber(session.hourly_rate);
+const tariffRateOf = (session: ISessionApi): Rate | null => {
+  const pairSeconds = Math.trunc(Number(session.rate_seconds ?? 0));
+  if (session.rate_price !== null && session.rate_price !== undefined && pairSeconds > 0) {
+    return { priceCents: centsOfAmount(session.rate_price), seconds: pairSeconds };
   }
-
+  if (session.hourly_rate !== null && session.hourly_rate !== undefined) return perHour(toNumber(session.hourly_rate));
   const pkg = session.time_package;
-  const minutes = toNumber(pkg?.duration_minutes);
+  const minutes = Math.trunc(toNumber(pkg?.duration_minutes));
   if (!pkg || minutes <= 0) return null;
-
-  return (toNumber(pkg.price) * 60) / minutes;
+  return { priceCents: centsOfAmount(pkg.price), seconds: minutes * 60 };
 };
 
 /**
@@ -303,8 +341,8 @@ export type SessionItemLine = NonNullable<ISessionApi["items"]>[number];
  */
 export const sessionItemLineTotal = (line: SessionItemLine): number =>
   line.is_hourly
-    ? round2(toNumber(line.line_total ?? 0))
-    : round2(toNumber(line.price) * toNumber(line.qty));
+    ? toMoney(exactOf(line.line_total ?? 0))
+    : toMoney(times(exactOf(line.price), Math.trunc(toNumber(line.qty))));
 
 /**
  * What the bill's lines are worth AT a given instant.
@@ -330,42 +368,41 @@ export const sessionItemLineTotal = (line: SessionItemLine): number =>
  *
  * Every other line is a price and a count and takes no part in any of this.
  */
-export const sessionItemsTotalAt = (session: ISessionApi, at: number): number => {
-  const lines = session.items ?? [];
-  if (lines.length === 0) return 0;
+export const sessionItemsTotalAt = (session: ISessionApi, atRaw: number): number =>
+  toMoney(itemsExactAt(session, billableAt(session, atRaw)));
 
+/** {@link sessionItemsTotalAt}, exactly: each line's own worth, never cut to the cent. */
+const itemsExactAt = (session: ISessionApi, at: number): Exact => {
   const startedAt = session.started_at ? Date.parse(session.started_at) : NaN;
 
-  return round2(
-    lines.reduce((sum, line) => {
-      if (!line.is_hourly) {
-        return sum + toNumber(line.price) * toNumber(line.qty);
-      }
+  return (session.items ?? []).reduce((sum: Exact, line) => {
+    const qty = Math.trunc(toNumber(line.qty));
+    if (!line.is_hourly) return plus(sum, times(exactOf(line.price), qty));
 
-      const created = line.created_at ? Date.parse(line.created_at) : NaN;
-      if (Number.isNaN(created)) {
-        // No instant to measure from: fall back to the server's own figure
-        // rather than to zero, which would read as "this is free".
-        return sum + toNumber(line.line_total ?? 0);
-      }
+    const created = line.created_at ? Date.parse(line.created_at) : NaN;
+    if (Number.isNaN(created)) {
+      // No instant to measure from: fall back to the server's own figure
+      // rather than to zero, which would read as "this is free".
+      return plus(sum, exactOf(line.line_total ?? 0));
+    }
 
-      const from = !Number.isNaN(startedAt) && created < startedAt ? startedAt : created;
-      const returned = line.returned_at ? Date.parse(line.returned_at) : NaN;
-      const to = Number.isNaN(returned) ? at : Math.min(returned, at);
-      // A pause stops this meter with the seat's, as the calculator does.
-      const seconds = Math.max(0, Math.floor((to - from) / 1000) - pausedSecondsBetween(session, from, to));
+    const from = !Number.isNaN(startedAt) && created < startedAt ? startedAt : created;
+    const returned = line.returned_at ? Date.parse(line.returned_at) : NaN;
+    const to = Number.isNaN(returned) ? at : Math.min(returned, at);
+    // A pause stops this meter with the seat's, as the calculator does.
+    const seconds = Math.max(0, Math.floor((to - from) / 1000) - pausedSecondsBetween(session, from, to));
 
-      return sum + (toNumber(line.price) * toNumber(line.qty) * seconds) / 3600;
-    }, 0),
-  );
+    return plus(sum, times(rateFor(perHourOf(line.price), seconds), qty));
+  }, ZERO);
 };
 
-export const sessionItemsTotal = (session: ISessionApi): number => {
-  const lines = session.items ?? [];
-  if (lines.length === 0) return 0;
-
-  return round2(lines.reduce((sum, line) => sum + sessionItemLineTotal(line), 0));
-};
+export const sessionItemsTotal = (session: ISessionApi): number =>
+  toMoney((session.items ?? []).reduce(
+    (sum: Exact, line) => plus(sum, line.is_hourly
+      ? exactOf(line.line_total ?? 0)
+      : times(exactOf(line.price), Math.trunc(toNumber(line.qty)))),
+    ZERO,
+  ));
 
 
 
@@ -390,33 +427,31 @@ export const sessionItemsTotal = (session: ISessionApi): number => {
  * A payload without the flags (an older backend) contributes nothing rather
  * than guessing, which keeps the tile under the receipt instead of over it.
  */
-export const sessionJoysticksTotalAt = (session: ISessionApi, at: number): number => {
-  const pads = session.joysticks ?? [];
-  if (pads.length === 0) return 0;
+export const sessionJoysticksTotalAt = (session: ISessionApi, atRaw: number): number =>
+  toMoney(padsExactAt(session, billableAt(session, atRaw)));
 
-  return round2(
-    pads.reduce((sum, pad) => {
-      // An HOURLY pad is priced like the seat: for the time it was actually
-      // out. The row is the interval, so this mirrors
-      // `SessionPricingCalculator` exactly — the end is clamped to the instant
-      // being shown, so a pad still in play ticks and one handed back stopped
-      // ticking when it was handed back. `Money::forSeconds` is
-      // rate × seconds / 3600, and rounding is deliberately NOT applied per
-      // term on either side: a bill is rounded once, on its total.
-      if (pad.is_hourly) {
-        const from = Date.parse(pad.started_at);
-        if (Number.isNaN(from)) return sum;
-        const stopped = pad.stopped_at ? Date.parse(pad.stopped_at) : NaN;
-        const to = Number.isNaN(stopped) ? at : Math.min(stopped, at);
-        // A pause stops this meter with the seat's, as the calculator does.
-        const seconds = Math.max(0, Math.floor((to - from) / 1000) - pausedSecondsBetween(session, from, to));
-        return sum + (toNumber(pad.price) * seconds) / 3600;
-      }
+/** {@link sessionJoysticksTotalAt}, exactly. */
+const padsExactAt = (session: ISessionApi, at: number): Exact =>
+  (session.joysticks ?? []).reduce((sum: Exact, pad) => {
+    // An HOURLY pad is priced like the seat: for the time it was actually
+    // out. The row is the interval, so this mirrors
+    // `SessionPricingCalculator` exactly — the end is clamped to the instant
+    // being shown, so a pad still in play ticks and one handed back stopped
+    // ticking when it was handed back. Exactly rate × seconds / 3600, and
+    // rounding is deliberately NOT applied per term on either side: a bill
+    // is rounded once, on its total.
+    if (pad.is_hourly) {
+      const from = Date.parse(pad.started_at);
+      if (Number.isNaN(from)) return sum;
+      const stopped = pad.stopped_at ? Date.parse(pad.stopped_at) : NaN;
+      const to = Number.isNaN(stopped) ? at : Math.min(stopped, at);
+      // A pause stops this meter with the seat's, as the calculator does.
+      const seconds = Math.max(0, Math.floor((to - from) / 1000) - pausedSecondsBetween(session, from, to));
+      return plus(sum, rateFor(perHourOf(pad.price), seconds));
+    }
 
-      return sum + (pad.is_charged ? toNumber(pad.price) : 0);
-    }, 0),
-  );
-};
+    return pad.is_charged ? plus(sum, exactOf(pad.price)) : sum;
+  }, ZERO);
 
 /**
  * The pads as of now.
@@ -456,9 +491,10 @@ export const sessionCurrentHourlyRate = (session: ISessionApi): number => {
    */
   const rented = (session.items ?? [])
     .filter((line) => line.is_hourly && !line.returned_at)
-    .reduce((sum, line) => sum + toNumber(line.price) * toNumber(line.qty), 0);
+    .reduce((sum, line) => sum + billCents(toNumber(line.price)) * Math.trunc(toNumber(line.qty)), 0);
 
-  return round2(base + pads + rented);
+  // Rates to the cent, added as whole cents: no float drift.
+  return (billCents(base) + billCents(pads) + rented) / 100;
 };
 
 /**
@@ -482,16 +518,14 @@ export const sessionCurrentHourlyRate = (session: ISessionApi): number => {
  *
  * See CLAUDE.md §9.6.
  */
-export const sessionAmountAt = (session: ISessionApi, at: number): number =>
-  session.is_free
-    ? 0
-    : applyRounding(
-      round2(
-        sessionTimeCostAt(session, at) + sessionJoysticksTotalAt(session, at) + sessionItemsTotalAt(session, at),
-      ),
-      session.rounding_step ?? 0,
-      session.rounding_mode ?? "up",
-    );
+export const sessionAmountAt = (session: ISessionApi, atRaw: number): number => {
+  if (session.is_free) return 0;
+  const at = billableAt(session, atRaw);
+  // Every part exact, summed, rounded to the cent ONCE, then the step —
+  // `SessionPricingCalculator::bill()` exactly.
+  const subtotal = toMoney(plus(plus(minimumChargeExactAt(session, at).exact, padsExactAt(session, at)), itemsExactAt(session, at)));
+  return applyRounding(subtotal, session.rounding_step ?? 0, session.rounding_mode ?? "up");
+};
 
 /**
  * The venue's rounding policy, applied ONCE to a composed subtotal.
@@ -513,18 +547,20 @@ export const applyRounding = (
   step: number,
   mode: "up" | "nearest" | "down",
 ): number => {
-  if (step <= 0 || amount === 0) return round2(amount);
+  // In whole cents, so no float ever decides which side of a step a bill falls.
+  const cents = billCents(amount);
+  if (step <= 0 || cents === 0) return cents / 100;
 
-  const floorUnits = Math.floor(round2(amount) / step);
-  const floor = round2(floorUnits * step);
-  const remainder = round2(round2(amount) - floor);
+  const stepCents = Math.round(step * 100);
+  const floor = Math.floor(cents / stepCents) * stepCents;
+  const remainder = cents - floor;
 
-  if (remainder === 0) return floor;
+  if (remainder === 0) return floor / 100;
 
-  if (mode === "down") return floor;
-  if (mode === "up") return round2(floor + step);
+  if (mode === "down") return floor / 100;
+  if (mode === "up") return (floor + stepCents) / 100;
 
-  return remainder * 2 >= step ? round2(floor + step) : floor;
+  return remainder * 2 >= stepCents ? (floor + stepCents) / 100 : floor / 100;
 };
 
 /**
@@ -588,6 +624,34 @@ export const pausedSecondsBetween = (
 };
 
 /**
+ * The instant a RUNNING seat's time runs out, or null when nothing ends it by
+ * itself — `Session::billableUntil()` on the server (2026-11-15), the same
+ * three answers. No running seat is billed later than this
+ * (`SessionPricingCalculator::clampToEnd`): an hour at 1000 on a branch
+ * rounding up to 100 read 1100 for the seconds between its end and the sweep.
+ *
+ *  - running, not paused: `ends_at`;
+ *  - paused with a limit: `ends_at` moved by the whole pause (the server
+ *    resumes it AT the limit, the same arithmetic);
+ *  - paused with no limit, no end (count-up, unlimited), or closed: null.
+ */
+export const billableUntilOf = (session: ISessionApi): number | null => {
+  if (session.status !== "active" || !session.ends_at) return null;
+  const endsAt = Date.parse(session.ends_at);
+  if (Number.isNaN(endsAt)) return null;
+  if (!session.paused_at) return endsAt;
+  const pausedAt = Date.parse(session.paused_at);
+  const limit = autoResumeAtOf(session);
+  return limit !== null && limit > pausedAt ? endsAt + Math.floor((limit - pausedAt) / 1000) * 1000 : null;
+};
+
+/** `at`, never past the seat's billable end (`clampToEnd`). */
+const billableAt = (session: ISessionApi, at: number): number => {
+  const end = billableUntilOf(session);
+  return end !== null && end < at ? end : at;
+};
+
+/**
  * When the SERVER will resume this paused session by itself, or null.
  *
  * The open pause's `auto_resume_at`, fixed when the pause began from the
@@ -636,24 +700,80 @@ export const playedSecondsBetween = (
 };
 
 /**
- * `rate × seconds ÷ 3600`, rounded to cents once.
- *
- * One expression rather than a per-minute rate multiplied up: dividing first
- * gives 25.000000000000004 for 1 500/h and compounds from there. Rounding at
- * the end is what keeps 1 500 over 1 800 seconds reading as 750 and not as
- * 749.9999999999999.
+ * An amount held EXACTLY — `ExactAmount` on the server: `n / d` CENTS, whole
+ * numbers, `d > 0`. Never a float: a float cannot hold 1/3 of a cent, and
+ * cannot hold 1249.995 either (it reads 1249.9949999…).
  */
-const perSecond = (rate: number, seconds: number): number => {
-  // Only the rate is guarded here. "An interval is never negative" is
-  // `secondsBetween`'s rule and lives there alone — asserting it in both places
-  // means neither can be proved, because breaking one leaves the other
-  // silently covering for it.
-  if (rate <= 0) return 0;
+interface Exact {
+  n: bigint;
+  d: bigint;
+}
 
-  return round2((rate * seconds) / 3600);
+const ZERO: Exact = { n: 0n, d: 1n };
+
+/**
+ * A rate as it was sold — `Rate` on the server: `priceCents` for `seconds` of
+ * play. 1000 an hour is 100000 for 3600; a 2500 / 180 min deal 250000 for
+ * 10800, never 833.33 an hour.
+ */
+interface Rate {
+  priceCents: bigint;
+  seconds: number;
+}
+
+/** A stored amount (`decimal(10,2)`, string or number) in whole cents — the panel's one cents helper. */
+const centsOfAmount = (v: number | string | null | undefined): bigint => BigInt(billCents(toNumber(v)));
+
+const exactOf = (v: number | string | null | undefined): Exact => ({ n: centsOfAmount(v), d: 1n });
+
+const perHour = (rate: number): Rate => ({ priceCents: BigInt(billCents(rate)), seconds: 3600 });
+
+const perHourOf = (v: number | string | null | undefined): Rate => ({ priceCents: centsOfAmount(v), seconds: 3600 });
+
+/** What `seconds` of play cost at `rate`, exactly; nothing for none. */
+const rateFor = (rate: Rate, seconds: number): Exact =>
+  seconds > 0 && rate.seconds > 0 ? reduce(rate.priceCents * BigInt(seconds), BigInt(rate.seconds)) : ZERO;
+
+const gcd = (a: bigint, b: bigint): bigint => {
+  let x = a < 0n ? -a : a;
+  let y = b;
+  while (y !== 0n) [x, y] = [y, x % y];
+  return x;
 };
 
-const round2 = (n: number): number => Math.round(n * 100) / 100;
+const reduce = (n: bigint, d: bigint): Exact => {
+  if (n === 0n) return ZERO;
+  const g = gcd(n, d);
+  return { n: n / g, d: d / g };
+};
+
+const plus = (a: Exact, b: Exact): Exact => reduce(a.n * b.d + b.n * a.d, a.d * b.d);
+
+const minus = (a: Exact, b: Exact): Exact => reduce(a.n * b.d - b.n * a.d, a.d * b.d);
+
+const times = (a: Exact, k: number): Exact => reduce(a.n * BigInt(k), a.d);
+
+/** `× part ÷ whole`; nothing when `whole` is not positive. */
+const scaled = (a: Exact, part: number, whole: number): Exact =>
+  whole > 0 ? reduce(a.n * BigInt(part), a.d * BigInt(whole)) : ZERO;
+
+const nonNegative = (a: Exact): Exact => (a.n < 0n ? ZERO : a);
+
+const compare = (a: Exact, b: Exact): number => {
+  const diff = a.n * b.d - b.n * a.d;
+  return diff > 0n ? 1 : diff < 0n ? -1 : 0;
+};
+
+/**
+ * To the cent, halves away from zero — `Money::round` / `ExactAmount::toMoney`
+ * — as a number of drams with two decimals (whole cents ÷ 100).
+ */
+const toMoney = (a: Exact): number => {
+  const negative = a.n < 0n;
+  const abs = negative ? -a.n : a.n;
+  const cents = (abs * 2n + a.d) / (2n * a.d);
+  return Number(negative ? -cents : cents) / 100;
+};
 
 /** `decimal(10,2)` arrives as a string on some payloads and a number on others. */
 const toNumber = (v: number | string | null | undefined): number => {

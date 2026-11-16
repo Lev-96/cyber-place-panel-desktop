@@ -5,8 +5,7 @@ import { describe, expect, test } from "vitest";
 /**
  * The platform bill on a phone (2026-11-09, owner web and the Telegram Mini
  * App, 360–430px): a compact card and a full-screen «Details» drawer whose
- * three facts are rows. CSS only, and only inside max-width queries, so the
- * desktop look (≥ 1100px) is untouched. Measured in Chromium at 360/375/430
+ * three facts are rows. CSS only, and only inside max-width queries. Measured in Chromium at 360/375/430
  * and pixel-compared at 1280/1440/1920 (see CLAUDE.md); this keeps the rules.
  */
 const css = readFileSync(path.resolve(__dirname, "../../styles/global.css"), "utf8");
@@ -54,9 +53,15 @@ describe("the debt card on a phone", () => {
     expect(phone).toMatch(/\.platform-debt--wide \.platform-debt__more \{\s*justify-self: stretch;\s*width: 100%;/);
   });
 
-  test("leaves the desktop card as it was", () => {
+  test("keeps one part per line, in DOM order", () => {
+    expect(phone).toMatch(/\.platform-debt--wide \.platform-debt__main,\s*\.platform-debt--wide \.platform-debt__facts \{\s*flex-basis: 100%;/);
+  });
+
+  // 2026-11-15: the wide card wraps (flex) instead of a fixed three-column
+  // grid, so «Details» can never lie on the text; its padding and edge stay.
+  test("leaves the desktop card's size and edge as they were", () => {
     const wide = rule(".platform-debt--wide");
-    expect(wide).toContain("grid-template-columns: minmax(240px, 1.2fr) minmax(0, 2fr) auto;");
+    expect(wide).toContain("flex-wrap: wrap;");
     expect(wide).toContain("padding: var(--space-6);");
     expect(wide).toContain("border-left-width: 6px;");
     expect(rule(".platform-debt__facts")).toContain("grid-template-columns: repeat(3, minmax(0, 1fr));");

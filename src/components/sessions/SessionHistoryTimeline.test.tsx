@@ -187,7 +187,9 @@ describe("SessionHistoryTimeline", () => {
 
   test("an action the panel does not know still renders, with what its meta says", () => {
     mount([event(1, { action: "ps_woke" as ISessionEvent["action"], meta: { console: "PS5-01" } })]);
-    expect(titles()).toEqual(["history.action.ps_woke"]);
+    // Words, never the raw "history.action.ps_woke" (2026-11-15): the real
+    // translate answers a missing key with the key, as this mock does.
+    expect(titles()).toEqual(["Ps woke"]);
     expect(document.querySelector(".hs-event__detail")?.textContent).toBe("Console: PS5-01");
   });
 

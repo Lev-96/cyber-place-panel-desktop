@@ -6,6 +6,7 @@ import type { IShiftProductGroup, IShiftReport, IShiftStaffPart } from "@/types/
 import { platformLabel } from "@/utils/platform";
 import type { CSSProperties } from "react";
 import { Row, Section, divider } from "./shiftReportParts";
+import ShiftStockTable from "./ShiftStockTable";
 
 /**
  * The v3 blocks of a shift report (2026-10-26): what was sold per product,
@@ -54,6 +55,9 @@ const ShiftBreakdown = ({ report, closerId }: Props) => {
         </Section>
       )}
 
+      {/* v6 (2026-11-16): the shelf, in pieces. */}
+      {report.stock && <ShiftStockTable stock={report.stock} />}
+
       {report.staff && (
         <Section title={t("shift.staff")} testId="shift-staff">
           <span className="muted" style={{ fontSize: 12, marginBottom: 6 }}>{t("shift.staffRule")}</span>
@@ -71,6 +75,10 @@ const ShiftBreakdown = ({ report, closerId }: Props) => {
                 value={fmt(t("shift.staffStartedValue"), p.started.launches, p.started.seats)}
                 testId="shift-staff-started"
               />
+              {/* v5 (2026-11-15): cash they took AHEAD into this drawer; absent at zero. */}
+              {Number(p.started.prepaid ?? 0) > 0 && (
+                <Row label={t("shift.staffPrepaid")} value={m(p.started.prepaid!)} testId="shift-staff-prepaid" />
+              )}
               <Row label={t("shift.staffStartedBilled")} hint={fmt(t("shift.countOnly"), p.started_billed.count)} value={m(p.started_billed.total)} />
               <Row label={t("shift.staffClosed")} hint={fmt(t("shift.staffClosedHint"), p.closed.count, m(p.closed.cash))} value={m(p.closed.total)} />
               {p.voided.count > 0 && (

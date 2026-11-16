@@ -10,7 +10,8 @@ import { useLang } from "@/i18n/LanguageContext";
 import { ProductBasket } from "./useProductBasket";
 import { choiceKey } from "./quickEntryChoices";
 import { KeyboardEvent, useId, useRef, useState } from "react";
-import { isAdditionalProduct } from "@/types/pos";
+import { countsStock, IProduct, isAdditionalProduct } from "@/types/pos";
+import { stockNumber } from "@/components/products/stock";
 
 /**
  * The parts of a sale dialog that do not care what the sale is for — the
@@ -90,6 +91,7 @@ export const BasketPicker = ({ basket, saving, canCreateProducts }: PickerProps)
           {filtered.map((p) => (
             <div key={p.id} style={rowStyle}>
               <span style={ellipsis} title={p.name}>{p.name}</span>
+              <StockChip product={p} />
               <span className="muted" style={{ fontSize: 11 }}>{p.category || t("session.products")}</span>
               <span style={{ fontWeight: 700, minWidth: 80, textAlign: "right" }}>{money(Number(p.price))}</span>
               <Button
@@ -422,7 +424,10 @@ export const BasketQuickEntry = ({ basket, saving }: QuickEntryProps) => {
                   </div>
                 ) : line.error === null ? (
                   <div className="row-between" style={{ gap: 8 }}>
-                    <span>{line.name} × {line.qty}</span>
+                    <span>
+                      {line.name} × {line.qty}
+                      <StockChip product={(basket.products ?? []).find((p) => p.id === line.product_id)} />
+                    </span>
                     <span className="muted" style={{ fontSize: 12 }}>
                       {money(line.price ?? 0)} · {money(line.line_total ?? 0)}
                     </span>
@@ -456,6 +461,22 @@ export const BasketQuickEntry = ({ basket, saving }: QuickEntryProps) => {
         </div>
       )}
     </div>
+  );
+};
+
+/**
+ * «ост. 15» beside a counted product (2026-11-16): the shelf as the catalogue
+ * read last said it — a hint, never a limit (a sale below zero goes through).
+ * Red below zero; nothing for a product nobody counts.
+ */
+export const StockChip = ({ product }: { product?: IProduct | null }) => {
+  const { t } = useLang();
+  if (!product || !countsStock(product)) return null;
+  const n = product.stock as number;
+  return (
+    <span className={`stock-chip${n < 0 ? " is-negative" : n === 0 ? " is-empty" : ""}`} data-testid="stock-chip">
+      {fmt(t("stock.chip"), stockNumber(n))}
+    </span>
   );
 };
 

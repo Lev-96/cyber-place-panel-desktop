@@ -320,3 +320,27 @@ describe("the booking-start-due card", () => {
     expect(screen.queryByText(/BookingStartDue/)).toBeNull();
   });
 });
+
+/** "The player asked to be reminded" (2026-11-15): `SessionReminderDue::toArray()`. */
+describe("the session reminder card", () => {
+  const row = {
+    id: "r1", type: "Место №3 (Арам): игрок просил напомнить", read_at: null, created_at: "2026-11-15T12:40:00Z",
+    data: {
+      type: "session.reminder", session_id: 5, branch_id: 4, company_id: 1, pc_id: 3, place_id: 13, place_number: 3,
+      player_name: "Арам", note: "позвонить маме", minutes: 120, set_at: "2026-11-15T10:40:00Z", remind_at: "2026-11-15T12:40:00Z",
+      set_by_user_id: 2, set_by_name: "Ani", company_name: "Club", branch_address: "Abovyan 1",
+    },
+  };
+  beforeEach(() => { feed.list = [row]; nav.fn.mockReset(); api.handler = () => Promise.resolve({ data: [] }); });
+  afterEach(() => { cleanup(); feed.list = []; });
+
+  test("seat, player, how long ago it was asked, the note and who set it; opens the branch's board", async () => {
+    auth.user = { id: 2, role: "manager" };
+    render(<Notifications />);
+    const head = screen.getByText("Seat №3 (Арам): the player asked to be reminded, 2 h have passed");
+    expect(screen.getByText("«позвонить маме» · Ani · Club · Abovyan 1")).toBeTruthy();
+    expect(document.body.textContent).not.toContain("session.reminder");
+    fireEvent.click(head);
+    expect(nav.fn).toHaveBeenCalledWith("/branches/4/sessions");
+  });
+});

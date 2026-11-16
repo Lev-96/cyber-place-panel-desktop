@@ -654,7 +654,6 @@ export const TRANSLATIONS: Dict = {
   // The price a session carries on at once its end is removed. Shown before the
   // switch rather than after, because it is the number the operator is agreeing
   // to and the moment to correct it is now.
-  "session.unlimitedRate": { en: "Price per hour", ru: "Цена за час", am: "Գինը ժամում" },
   // The section reads differently once a session already has no end: there is
   // nothing left to decide, so it states the fact instead of offering a form.
   // Shown INSTEAD of a figure when the server could derive none. A zero there
@@ -667,11 +666,6 @@ export const TRANSLATIONS: Dict = {
   },
   // Says the rule out loud, because it is the question an operator asks and
   // getting it wrong the other way would be somebody's receipt.
-  "session.unlimitedRateHint": {
-    en: "Applies from now on. What has already been played keeps its own price.",
-    ru: "Действует с этого момента. Уже сыгранное сохраняет свою цену.",
-    am: "Գործում է այս պահից։ Արդեն խաղացածը պահպանում է իր գինը։",
-  },
   "session.unlimitedRateInvalid": {
     en: "Enter a price greater than zero.",
     ru: "Введите цену больше нуля.",
@@ -1020,11 +1014,14 @@ export const TRANSLATIONS: Dict = {
     ru: "Изменить фиксированный тариф на безлимитный",
     am: "Փոխել ֆիքսված սակագինն անսահմանափակով",
   },
-  "session.unlimitedHint": {
-    en: "The paid block stays; time past it is charged by the hour. Cannot be undone.",
-    ru: "Оплаченный пакет остаётся, время сверх него считается по часам. Отменить нельзя.",
-    am: "Վճարված փաթեթը մնում է, դրանից ավելի ժամանակը հաշվարկվում է ժամով։ Հետարկել հնարավոր չէ։",
+  // No price to type (2026-11-15, owner): the seat carries on at the rate it bills at now.
+  "session.unlimitedKeepRate": {
+    en: "It carries on at the price it has now. Joysticks and rentals keep counting as before.",
+    ru: "Продолжит по той же цене, что сейчас. Джойстики и прокат считаются, как и раньше.",
+    am: "Կշարունակի նույն գնով, ինչ հիմա։ Ջոյսթիքներն ու վարձույթը հաշվվում են ինչպես նախկինում։",
   },
+  "session.unlimitedDoneKept": { en: "Unlimited. Price kept: {0}", ru: "Безлимит. Цена прежняя: {0}", am: "Անսահմանափակ։ Գինը նույնն է՝ {0}" },
+  "session.unlimitedDone": { en: "Switched to unlimited", ru: "Переведено на безлимит", am: "Անցավ անսահմանափակի" },
   "session.unlimitedConfirm": {
     en: "Switch this session to unlimited?",
     ru: "Перевести сессию на безлимит?",
@@ -1272,27 +1269,92 @@ export const TRANSLATIONS: Dict = {
     ru: "Игрок заплатит позже: всё время будет к оплате, когда место закончится.",
     am: "Խաղացողը կվճարի ավելի ուշ. ամբողջ ժամանակը վճարման ենթակա կլինի, երբ տեղն ավարտվի։",
   },
+  // Products handed over not paid yet (2026-11-15): a reminder, never money.
+  "session.itemsUnpaid.switch": { en: "Not paid yet", ru: "Не оплачено", am: "Չվճարված" },
+  "session.itemsUnpaid.switchFull": { en: "The player has not paid for these products yet", ru: "Игрок ещё не оплатил эти товары", am: "Խաղացողը դեռ չի վճարել այս ապրանքների համար" },
+  "session.itemsUnpaid.hint": { en: "Kept as a reminder on the card. The bill stays the same.", ru: "Останется напоминанием на карточке. Счёт не меняется.", am: "Կմնա որպես հիշեցում քարտի վրա։ Հաշիվը չի փոխվում։" },
+  "session.itemUnpaidTag": { en: "not paid", ru: "не оплачено", am: "չվճարված" },
+  "session.itemMarkPaid": { en: "Paid", ru: "Оплачено", am: "Վճարված է" },
+  "session.itemMarkPaidFull": { en: "Mark as paid: {0}", ru: "Отметить оплаченным: {0}", am: "Նշել վճարված՝ {0}" },
+  "session.itemPaidToast": { en: "Paid: {0}", ru: "Оплачено: {0}", am: "Վճարված է՝ {0}" },
+  "session.receiptUnpaidItems": { en: "Of these, handed over not paid: take it now", ru: "Из них выдано без оплаты: возьмите сейчас", am: "Դրանցից տրված է առանց վճարման՝ վերցրեք հիմա" },
+  // Paid ahead (2026-11-15): cash before playing; the change comes back at Stop.
+  "session.prepaid.atStart": { en: "Paid at the start", ru: "Оплачено при старте", am: "Վճարված է մեկնարկին" },
+  "session.prepaid.change": { en: "Change", ru: "Сдача", am: "Մանր" },
+  "session.prepaid.giveBack": { en: "give it back to the player", ru: "верните игроку", am: "վերադարձրեք խաղացողին" },
+  "session.prepaid.due": { en: "To pay now", ru: "Доплатить", am: "Հավելավճար" },
+  "session.prepaid.paidInFull": { en: "Paid in full", ru: "Оплачено полностью", am: "Վճարված է ամբողջությամբ" },
+  "session.prepaid.switch": { en: "Paid ahead", ru: "Оплачено вперёд", am: "Վճարված է նախապես" },
+  "session.prepaid.switchFull": { en: "The player paid in cash now, before playing", ru: "Игрок заплатил наличными сейчас, до игры", am: "Խաղացողը վճարեց կանխիկ հիմա՝ խաղից առաջ" },
+  "session.prepaid.startHint": { en: "Leaves early: the change is shown at Stop.", ru: "Уйдёт раньше: при Стоп будет показана сдача.", am: "Եթե շուտ գնա՝ «Ավարտել»-ի ժամանակ ցույց կտրվի մանրը։" },
+  "session.prepaid.timeSwitch": { en: "Paid now", ru: "Оплачено сейчас", am: "Վճարված է հիմա" },
+  "session.prepaid.timeSwitchFull": { en: "The player paid for this time in cash now", ru: "Игрок оплатил это время наличными сейчас", am: "Խաղացողը վճարեց այս ժամանակի համար կանխիկ հիմա" },
+  "session.prepaidChip": { en: "Paid ahead: {0}", ru: "Предоплата: {0}", am: "Կանխավճար՝ {0}" },
+  // «На сумму» (2026-11-15): the player names the money, the server the time.
+  "session.byAmountTab": { en: "By amount", ru: "На сумму", am: "Գումարով" },
+  "session.byAmount.label": { en: "Amount from the player", ru: "Сумма от игрока", am: "Գումար խաղացողից" },
+  "session.byAmount.hint": { en: "Type the sum: the time it buys at this seat's price appears here.", ru: "Введите сумму: здесь появится, сколько времени она даёт по цене места.", am: "Մուտքագրեք գումարը՝ այստեղ կերևա, թե որքան ժամանակ է այն տալիս տեղի գնով։" },
+  "session.byAmount.rate": { en: "at {0} · until {1}", ru: "по {0} · до {1}", am: "{0} · մինչև {1}" },
+  "session.byAmount.food": { en: "Own food {0} first, {1} for time", ru: "Сначала свои продукты {0}, на время {1}", am: "Նախ՝ սեփական սնունդ {0}, ժամանակի համար՝ {1}" },
+  "session.byAmount.separate": { en: "Joysticks and products are paid separately.", ru: "Джойстики и товары оплачиваются отдельно.", am: "Ջոյսթիքներն ու ապրանքները վճարվում են առանձին։" },
+  "session.summary.byAmount": { en: "by amount {0} → {1}", ru: "на сумму {0} → {1}", am: "գումարով {0} → {1}" },
+  // The reminder a player asked for (2026-11-15).
+  "session.reminder.title": { en: "Reminder", ru: "Напоминание", am: "Հիշեցում" },
+  "session.reminder.hint": { en: "The player asked to be reminded: the panel rings for the staff of this branch.", ru: "Игрок просит напомнить: панель позвонит сотрудникам филиала.", am: "Խաղացողը խնդրում է հիշեցնել՝ վահանակը կզանգի մասնաճյուղի աշխատակիցներին։" },
+  "session.reminder.length": { en: "Remind in", ru: "Напомнить через", am: "Հիշեցնել" },
+  "session.reminder.note": { en: "Name or note (optional)", ru: "Имя или заметка (необязательно)", am: "Անուն կամ նշում (ոչ պարտադիր)" },
+  "session.reminder.notePlaceholder": { en: "Aram, call his mother", ru: "Арам, позвонить маме", am: "Արամ, զանգել մայրիկին" },
+  "session.reminder.set": { en: "Remind in {0}", ru: "Напомнить через {0}", am: "Հիշեցնել {0} հետո" },
+  "session.reminder.tooLong": { en: "From 1 min to 10 h.", ru: "От 1 мин до 10 ч.", am: "1 ր-ից մինչև 10 ժ։" },
+  "session.reminder.pending": { en: "Rings at {0}", ru: "Напомню в {0}", am: "Կհիշեցնի ժամը {0}" },
+  "session.reminder.fired": { en: "Rang at {0}", ru: "Сработало в {0}", am: "Աշխատեց ժամը {0}" },
+  "session.reminder.change": { en: "Change", ru: "Изменить", am: "Փոխել" },
+  "session.reminder.cancel": { en: "Cancel the reminder", ru: "Отменить напоминание", am: "Չեղարկել հիշեցումը" },
+  "session.reminder.dismiss": { en: "Remove", ru: "Убрать", am: "Հեռացնել" },
+  "session.reminder.setToast": { en: "Reminder in {0}", ru: "Напомню через {0}", am: "Կհիշեցնեմ {0} հետո" },
+  "session.reminder.clearedToast": { en: "Reminder removed", ru: "Напоминание убрано", am: "Հիշեցումը հեռացվեց" },
+  "session.reminder.chipFired": { en: "Now", ru: "Пора", am: "Ժամանակն է" },
+  "session.reminder.cardTitle": { en: "Reminder", ru: "Напоминание", am: "Հիշեցում" },
+  "session.reminder.cardBody": { en: "Seat №{seat}{player}: the player asked to be reminded, {elapsed} have passed", ru: "Место №{seat}{player}: игрок просил напомнить, прошло {elapsed}", am: "Տեղ №{seat}{player}՝ խաղացողը խնդրել էր հիշեցնել, անցել է {elapsed}" },
+  "session.reminder.ok": { en: "Got it", ru: "Понятно", am: "Հասկանալի է" },
+  "session.reminder.snooze": { en: "30 more min", ru: "Ещё 30 мин", am: "Եվս 30 ր" },
+  "session.reminder.open": { en: "Open the seat", ru: "Открыть место", am: "Բացել տեղը" },
+  "session.reminder.snoozedToast": { en: "Reminder again in 30 min", ru: "Напомню ещё через 30 мин", am: "Կհիշեցնեմ ևս 30 ր հետո" },
+  "session.unpaidChip": { en: "Not paid: {0}", ru: "Не оплачено: {0}", am: "Չվճարված՝ {0}" },
   "session.unpaid.switch": { en: "Not paid", ru: "Не оплачено", am: "Չվճարված" },
   "session.unpaid.switchFull": { en: "Extra time not paid yet", ru: "Доп. время ещё не оплачено", am: "Լրացուցիչ ժամանակը դեռ չի վճարվել" },
   "session.unpaid.toastOn": { en: "Extra time marked unpaid · {0}", ru: "Доп. время отмечено как неоплаченное · {0}", am: "Լրացուցիչ ժամանակը նշվեց որպես չվճարված · {0}" },
   "session.unpaid.toastOff": { en: "Marked paid · {0}", ru: "Отметка снята · {0}", am: "Նշումը հանվեց · {0}" },
-  "session.unpaid.alertWhy": { en: "Extra time not paid", ru: "Не оплачено за доп. время", am: "Լրացուցիչ ժամանակը չի վճարվել" },
+  // Since 2026-11-15 the server's figure is extra time AND products handed over unpaid.
+  "session.unpaid.alertWhy": { en: "Not everything is paid: extra time or products", ru: "Не всё оплачено: доп. время или товары", am: "Ամեն ինչ չէ վճարված՝ լրացուցիչ ժամանակ կամ ապրանքներ" },
   "session.unpaid.alertHint": { en: "Take the payment from the player.", ru: "Возьмите оплату у игрока.", am: "Վերցրեք վճարը խաղացողից։" },
   "session.unpaid.alertMore": { en: "{0} more waiting", ru: "Ещё ждут: {0}", am: "Եվս սպասում են՝ {0}" },
   "session.unpaid.alertOk": { en: "Got it", ru: "Понятно", am: "Հասկանալի է" },
   "history.action.unpaid_on": { en: "Marked extra time unpaid", ru: "Отметил доп. время как неоплаченное", am: "Նշեց լրացուցիչ ժամանակը որպես չվճարված" },
   "history.action.unpaid_off": { en: "Cleared the unpaid mark", ru: "Снял отметку «не оплачено»", am: "Հանեց «չվճարված» նշումը" },
   "session.limitHint": {
-    en: "From now on the seat plays for this long and ends by itself. Nothing already played changes price.",
-    ru: "С этой минуты место играет столько и завершится само. Цена уже сыгранного не меняется.",
-    am: "Այս պահից տեղը խաղում է այսքան և ինքնաբերաբար կավարտվի։ Արդեն խաղացածի գինը չի փոխվում։",
+    en: "The seat ends by itself at the chosen time. Nothing already played changes price.",
+    ru: "Место завершится само в выбранное время. Цена уже сыгранного не меняется.",
+    am: "Տեղը ինքնաբերաբար կավարտվի ընտրված ժամին։ Արդեն խաղացածի գինը չի փոխվում։",
   },
-  "session.limitLength": { en: "How long from now", ru: "Сколько от текущей минуты", am: "Որքան այս պահից" },
-  "session.limitEndsAt": { en: "Ends at {0}", ru: "Закончится в {0}", am: "Կավարտվի {0}-ին" },
+  "session.limitLength": { en: "How long", ru: "Сколько времени", am: "Որքան ժամանակ" },
+  // In all from the start, or more from now (2026-11-15, owner); the end and the figure are the server's.
+  "session.limitFromLabel": { en: "How to count the time", ru: "Как считать время", am: "Ինչպես հաշվել ժամանակը" },
+  "session.limitFromStart": { en: "In all from the seat's start", ru: "Всего с начала места", am: "Ընդամենը տեղի սկզբից" },
+  "session.limitFromNow": { en: "{0} more from now", ru: "Ещё {0} от сейчас", am: "Եվս {0} այս պահից" },
+  "session.limitUntil": { en: "until {0}", ru: "до {0}", am: "մինչև {0}" },
+  "session.limitTimeTotal": { en: "Seat time in all: {0}", ru: "За время места всего: {0}", am: "Տեղի ժամանակի համար ընդամենը՝ {0}" },
+  "session.limitPlayed": { en: "Already played: {0}", ru: "Уже сыграно: {0}", am: "Արդեն խաղացել է՝ {0}" },
   "session.limitApply": { en: "Set {0}", ru: "Задать {0}", am: "Սահմանել {0}" },
+  "session.limitDoneStart": { en: "Until {0}: seat time in all {1}", ru: "До {0}: за всё время места {1}", am: "Մինչև {0}՝ տեղի ամբողջ ժամանակի համար {1}" },
+  "session.limitDoneNow": { en: "Until {0}: {1} more, seat time in all {2}", ru: "До {0}: ещё {1}, за всё время места {2}", am: "Մինչև {0}՝ եվս {1}, տեղի ամբողջ ժամանակի համար {2}" },
+  "session.limitDoneRate": { en: "Until {0}, at {1}", ru: "До {0}, по {1}", am: "Մինչև {0}, {1} գնով" },
   "session.limitDone": { en: "Fixed time set: {0}", ru: "Задано время: {0}", am: "Ժամանակը սահմանվեց՝ {0}" },
   "session.timePaused": { en: "Paused: time can be changed once the seat is resumed.", ru: "Пауза: время можно изменить после продолжения.", am: "Դադար. ժամանակը կարելի է փոխել շարունակելուց հետո։" },
   "history.action.limited": { en: "Set a fixed time", ru: "Задал фиксированное время", am: "Սահմանեց ֆիքսված ժամանակ" },
+  "history.limitFromStart": { en: "In all from the start, until {0}", ru: "Всего с начала места, до {0}", am: "Ընդամենը սկզբից, մինչև {0}" },
+  "history.limitFromNow": { en: "{0} more from now, until {1}", ru: "Ещё {0} от сейчас, до {1}", am: "Եվս {0} այս պահից, մինչև {1}" },
+  "history.limitTimeTotal": { en: "Seat time in all: {0}", ru: "Время места всего: {0}", am: "Տեղի ժամանակը ընդամենը՝ {0}" },
   "session.card.relocate": { en: "Move", ru: "Пересадить", am: "Տեղափոխել" },
   "session.card.resume": { en: "Resume", ru: "Продолжить", am: "Վերսկսել" },
   "session.card.padAdd": { en: "+ Joystick", ru: "+ Джойстик", am: "+Ջոյսթիք" },
@@ -1446,6 +1508,12 @@ export const TRANSLATIONS: Dict = {
     ru: "Сессия уже завершена. Это её окончательный счёт.",
     am: "Սեսիան արդեն ավարտված է։ Սա դրա վերջնական հաշիվն է։",
   },
+  // Closed elsewhere while the receipt was open, and not this person's to read (2026-11-16).
+  "session.checkoutClosedElsewhere": {
+    en: "The session was already closed elsewhere. Its bill is saved.",
+    ru: "Сессию уже закрыли в другом месте. Счёт сохранён.",
+    am: "Սեսիան արդեն փակվել է այլ տեղում։ Հաշիվը պահպանված է։",
+  },
   "session.checkoutKeepPlaying": { en: "Keep playing", ru: "Продолжить игру", am: "Շարունակել խաղը" },
   "session.itemsBought": { en: "Products bought", ru: "Приобретённые товары", am: "Գնված ապրանքներ" },
   // The receipt's section when the own-food fee is among its lines (2026-11-14).
@@ -1581,7 +1649,6 @@ export const TRANSLATIONS: Dict = {
   // ── how the money was taken ─────────────────────────────────────────────
   // One answer, so radio buttons. Cash leads: it is the common case at a
   // counter and the default keeps an ordinary stop to one click.
-  "pay.noteRequired": { en: "Write how it was paid, for example: 3000 by card, 2000 in cash", ru: "Напишите, как оплатили, например: 3000 картой, 2000 наличными", am: "Գրեք, թե ինչպես վճարեցին, օրինակ՝ 3000 քարտով, 2000 կանխիկ" },
   "pay.sumMismatch": { en: "The parts must add up to the bill exactly", ru: "Сумма частей должна точно равняться счёту", am: "Մասերի գումարը պետք է ճիշտ հավասար լինի հաշվին" },
   "pay.markAfterAuto": { en: "This seat ended by itself and nobody recorded the payment. Mark how it was paid.", ru: "Место завершилось само, и оплату никто не отметил. Отметьте, как оплатили.", am: "Տեղն ավարտվեց ինքնուրույն, և վճարումը ոչ ոք չնշեց։ Նշեք, թե ինչպես վճարեցին։" },
   "pay.markConfirm": { en: "Record payment", ru: "Отметить оплату", am: "Նշել վճարումը" },
@@ -1593,8 +1660,8 @@ export const TRANSLATIONS: Dict = {
   "pay.tooMuch": { en: "{0} more than the bill", ru: "Больше счёта на {0}", am: "Հաշվից ավելի է {0}-ով" },
   "pay.allPaid": { en: "The parts add up to the bill", ru: "Сумма частей равна счёту", am: "Մասերի գումարը հավասար է հաշվին" },
   "pay.invalid": { en: "One of the amounts is not a number", ru: "Одна из сумм введена неверно", am: "Գումարներից մեկը սխալ է" },
-  "pay.needTwo": { en: "A split needs at least two methods", ru: "Для разделения нужны минимум два способа", am: "Բաժանման համար անհրաժեշտ է առնվազն երկու եղանակ" },
-  "pay.note": { en: "How it was paid", ru: "Как оплатили", am: "Ինչպես վճարեցին" },
+  "pay.note": { en: "How it was paid (optional)", ru: "Как оплатили (необязательно)", am: "Ինչպես վճարեցին (ըստ ցանկության)" },
+  "pay.needAmount": { en: "Enter an amount", ru: "Введите сумму", am: "Մուտքագրեք գումարը" },
   "pay.notePlaceholder": { en: "For example: 3000 by card, 2000 in cash", ru: "Например: 3000 картой, 2000 наличными", am: "Օրինակ՝ 3000 քարտով, 2000 կանխիկ" },
   "pay.splitSummary": { en: "Split", ru: "Раздельно", am: "Բաժանված" },
   "session.payTitle": { en: "Payment method", ru: "Способ оплаты", am: "Վճարման եղանակ" },
@@ -1610,11 +1677,7 @@ export const TRANSLATIONS: Dict = {
   "session.payCard": { en: "Card", ru: "Карта", am: "Քարտ" },
   "session.payOther": { en: "Another method", ru: "Другой способ оплаты", am: "Այլ եղանակ" },
   "session.payOtherPlaceholder": { en: "For example, Idram", ru: "Например, Idram", am: "Օրինակ՝ Idram" },
-  "session.payOtherRequired": {
-    en: "Say which method it was.",
-    ru: "Укажите, каким способом.",
-    am: "Նշեք վճարման եղանակը։",
-  },
+
   "session.boardTitle": { en: "Active Places", ru: "Активные места", am: "Ակտիվ տեղեր" },
   // How much of the room is in use. Counted off the tiles on screen, so the
   // line and the grid can never disagree.
@@ -1761,6 +1824,18 @@ export const TRANSLATIONS: Dict = {
   "shift.cash": { en: "Cash in the till", ru: "Наличные в кассе", am: "Կանխիկ դրամարկղում" },
   "shift.cashOpening": { en: "At opening", ru: "При открытии", am: "Բացման պահին" },
   "shift.cashPlaces": { en: "Cash for Active Places", ru: "Наличные за активные места", am: "Կանխիկ ակտիվ տեղերի համար" },
+  // Report v5 (2026-11-15): cash paid ahead. Never revenue; in the drawer from the moment it is handed over.
+  "shift.cashPrepaidIn": { en: "Paid ahead in this shift", ru: "Предоплаты в эту смену", am: "Կանխավճարներ այս հերթափոխում" },
+  "shift.cashPrepaidInHint": { en: "Cash handed over before playing, not revenue", ru: "Наличные до игры, это не выручка", am: "Կանխիկ՝ խաղից առաջ, հասույթ չէ" },
+  "shift.cashPrepaidSettled": { en: "Prepayments of places settled", ru: "Предоплаты закрытых мест", am: "Փակված տեղերի կանխավճարներ" },
+  "shift.cashPrepaidSettledHint": { en: "Already in the places' cash above, change included", ru: "Уже в наличных за места выше, со сдачей", am: "Արդեն ներառված է վերևի տեղերի կանխիկում՝ մանրով" },
+  "shift.cashChangeGiven": { en: "Change given back from prepayments", ru: "Сдача с предоплат выдана", am: "Կանխավճարներից վերադարձված մանր" },
+  "shift.linesPrepaid": { en: "Paid ahead (cash, not revenue)", ru: "Предоплаты (наличные, не выручка)", am: "Կանխավճարներ (կանխիկ, հասույթ չէ)" },
+  "shift.linesRule.prepaid": { en: "Cash taken before playing in this shift; it settles when the place is paid.", ru: "Наличные до игры в эту смену; закрываются при оплате места.", am: "Այս հերթափոխում խաղից առաջ ստացված կանխիկ, այն փակվում է տեղի վճարման ժամանակ։" },
+  "shift.prepaidKindStart": { en: "At the start", ru: "При старте", am: "Մեկնարկին" },
+  "shift.prepaidKindTime": { en: "+ Time", ru: "+ Время", am: "+ Ժամանակ" },
+  "shift.linePrepaid": { en: "Paid ahead {0}", ru: "Предоплата {0}", am: "Կանխավճար {0}" },
+  "shift.staffPrepaid": { en: "Cash taken ahead", ru: "Принял предоплат", am: "Ընդունել է կանխավճար" },
   "shift.cashTill": { en: "Cash till sales", ru: "Наличные продажи на кассе", am: "Կանխիկ վաճառք դրամարկղում" },
   "shift.cashExpected": { en: "Expected in the till", ru: "Ожидается в кассе", am: "Սպասվող գումար դրամարկղում" },
   "shift.cashCounted": { en: "Counted", ru: "Фактически", am: "Փաստացի" },
@@ -1833,6 +1908,19 @@ export const TRANSLATIONS: Dict = {
   "shift.productsVoidedRule": { en: "Not sold: listed apart, not in any total.", ru: "Не проданы: показаны отдельно и не входят в итоги.", am: "Չեն վաճառվել․ ցուցադրված են առանձին և չեն մտնում արդյունքների մեջ։" },
   "shift.productsFree": { en: "On free places", ru: "В бесплатных сессиях", am: "Անվճար սեսիաներում" },
   "shift.productsFreeRule": { en: "Given with a free place: no money taken.", ru: "Выданы в бесплатной сессии: денег не получено.", am: "Տրվել են անվճար սեսիայում․ գումար չի ստացվել։" },
+  // Report v6 (2026-11-16): the shelf, in units.
+  "shift.stock": { en: "Stock", ru: "Остатки", am: "Մնացորդներ" },
+  "shift.stockRule": { en: "Products whose stock is counted, in pieces. No money here.", ru: "Товары с учётом остатка, в штуках. Деньги здесь не считаются.", am: "Հաշվառվող ապրանքներ՝ հատերով։ Գումար այստեղ չկա։" },
+  "shift.stock.product": { en: "Product", ru: "Товар", am: "Ապրանք" },
+  "shift.stock.start": { en: "At start", ru: "На начало", am: "Սկզբում" },
+  "shift.stock.received": { en: "Received", ru: "Пришло", am: "Եկել է" },
+  "shift.stock.sold": { en: "Sold", ru: "Продано", am: "Վաճառվել է" },
+  "shift.stock.returned": { en: "Returned", ru: "Вернули", am: "Վերադարձվել է" },
+  "shift.stock.corrected": { en: "Recount", ru: "Пересчёт", am: "Վերահաշվարկ" },
+  "shift.stock.remaining": { en: "Left", ru: "Осталось", am: "Մնացել է" },
+  "shift.stock.total": { en: "In all", ru: "Итого", am: "Ընդամենը" },
+  "shift.stock.negative": { en: "Below zero: {0}. Recount these products.", ru: "Ниже нуля: {0}. Пересчитайте эти товары.", am: "Զրոյից ցածր՝ {0}։ Վերահաշվարկեք այս ապրանքները։" },
+  "shift.stock.notCounted": { en: "not counted", ru: "без учёта", am: "առանց հաշվառման" },
   "shift.staff": { en: "By employee", ru: "По сотрудникам", am: "Ըստ աշխատակիցների" },
   "shift.staffRule": { en: "Each figure is what the record names this person for. A place one started and another closed is in both, so the figures are not added together.", ru: "Каждая цифра считается по тому, кто указан в записи. Место, которое один запустил, а другой закрыл, есть у обоих, поэтому цифры между собой не складываются.", am: "Յուրաքանչյուր թիվ ըստ գրառման մեջ նշված անձի։ Տեղը, որը մեկը գործարկել է, իսկ մյուսը փակել, երկուսի մոտ էլ կա, ուստի թվերը չեն գումարվում։" },
   "shift.staffCloser": { en: "closes the shift", ru: "закрывает смену", am: "փակում է հերթափոխը" },
@@ -2204,6 +2292,7 @@ export const TRANSLATIONS: Dict = {
   },
   "rounding.step": { en: "Round to", ru: "Округлять до", am: "Կլորացնել մինչև" },
   "rounding.stepNone": { en: "Do not round", ru: "Не округлять", am: "Չկլորացնել" },
+  "rounding.stepWhole": { en: "The whole dram", ru: "До целого драма", am: "Մինչև ամբողջ դրամ" },
   "rounding.mode": { en: "Direction", ru: "Направление", am: "Ուղղություն" },
   "rounding.mode.up": { en: "Up", ru: "Вверх", am: "Վերև" },
   "rounding.mode.nearest": { en: "Nearest", ru: "К ближайшему", am: "Դեպի մոտակա" },
@@ -2234,6 +2323,14 @@ export const TRANSLATIONS: Dict = {
   // The staff filter (2026-09-26): whose actions the page shows.
   "history.actorLabel": { en: "Staff member", ru: "Сотрудник", am: "Աշխատակից" },
   "history.actorAll": { en: "All staff", ru: "Все сотрудники", am: "Բոլոր աշխատակիցները" },
+  // The place filter (2026-11-15). «Место» as the bookings calendar says it.
+  "history.placeLabel": { en: "Seat", ru: "Место", am: "Տեղ" },
+  "history.placeAll": { en: "All seats", ru: "Все места", am: "Բոլոր տեղերը" },
+  "history.placeHidesTill": {
+    en: "Sales without a seat and bookings are hidden while a seat is picked.",
+    ru: "Продажи без места и брони скрыты, пока выбрано место.",
+    am: "Առանց տեղի վաճառքներն ու ամրագրումները թաքցված են, քանի դեռ տեղ է ընտրված։",
+  },
   "history.noActions": {
     en: "No actions in the selected period.",
     ru: "Нет действий за выбранный период.",
@@ -2324,6 +2421,42 @@ export const TRANSLATIONS: Dict = {
   "history.itemsCount": { en: "Lines", ru: "Позиций", am: "Ապրանքներ" },
   "history.seatUnknown": { en: "Seat not recorded", ru: "Место не записано", am: "Տեղը գրանցված չէ" },
   "history.noRefundShort": { en: "no refund", ru: "без возврата", am: "առանց վերադարձի" },
+
+  // ── paid ahead, unpaid lines, keep the rate, reminders (2026-11-15) ───────
+  // Audit meta the server writes since then; reused actions keep their old
+  // titles, so an older panel still reads them correctly.
+  "history.action.reminder_set": { en: "Set a reminder", ru: "Поставил напоминание", am: "Դրեց հիշեցում" },
+  "history.action.reminder_cleared": { en: "Removed the reminder", ru: "Убрал напоминание", am: "Հանեց հիշեցումը" },
+  "history.action.reminder_fired": { en: "The reminder rang", ru: "Сработало напоминание", am: "Հիշեցումը աշխատեց" },
+  "history.reminderChanged": { en: "Changed the reminder", ru: "Изменил напоминание", am: "Փոխեց հիշեցումը" },
+  "history.reminderIn": { en: "in {0}", ru: "через {0}", am: "{0} հետո" },
+  "history.reminderAt": { en: "at {0}", ru: "в {0}", am: "ժամը {0}" },
+  "history.reminderWas": { en: "was {0}", ru: "было {0}", am: "նախկինում՝ {0}" },
+  "history.reminderAfterRing": { en: "after it rang", ru: "после сигнала", am: "ազդանշանից հետո" },
+  "history.reminderBeforeRing": { en: "before it rang", ru: "до сигнала", am: "մինչև ազդանշանը" },
+  "history.reminderNotified": { en: "Told: {0}", ru: "Оповещено: {0}", am: "Տեղեկացվել է՝ {0}" },
+  "history.itemPaid": { en: "Marked as paid", ru: "Отметил оплату товара", am: "Նշեց ապրանքի վճարումը" },
+  "history.byAmount": { en: "By amount {0} → {1}", ru: "На сумму {0} → {1}", am: "Գումարով {0} → {1}" },
+  "history.byAmountFood": { en: "Own food first: {0}", ru: "Сначала свои продукты: {0}", am: "Նախ՝ սեփական սնունդ {0}" },
+  "history.prepaidAhead": { en: "Paid ahead in cash: {0}", ru: "Оплачено вперёд наличными: {0}", am: "Նախապես վճարված կանխիկ՝ {0}" },
+  "history.prepaidWithTime": { en: "Paid now in cash: {0}", ru: "Оплачено сразу наличными: {0}", am: "Վճարվեց միանգամից կանխիկ՝ {0}" },
+  "history.notPaidTag": { en: "not paid", ru: "не оплачено", am: "չվճարված" },
+  "history.unpaidTotal": { en: "Not paid yet: {0}", ru: "Пока не оплачено: {0}", am: "Դեռ չվճարված՝ {0}" },
+  "history.unpaidLeft": { en: "Lines still unpaid: {0}", ru: "Ещё не оплачено позиций: {0}", am: "Դեռ չվճարված ապրանքներ՝ {0}" },
+  "history.prepaidChange": { en: "Paid ahead {0} · Change {1}", ru: "Предоплата {0} · Сдача {1}", am: "Կանխավճար {0} · Մանր {1}" },
+  "history.prepaidDue": { en: "Paid ahead {0} · Due {1}", ru: "Предоплата {0} · Доплата {1}", am: "Կանխավճար {0} · Հավելավճար {1}" },
+  "history.prepaidExact": { en: "Paid ahead {0} · No change", ru: "Предоплата {0} · Без сдачи", am: "Կանխավճար {0} · Առանց մանրի" },
+  "history.cashReceived": { en: "Cash received: {0}", ru: "Получено наличными: {0}", am: "Ստացվել է կանխիկ՝ {0}" },
+  "history.unpaidAtEnd": { en: "Not paid at the end: {0}", ru: "Не оплачено при уходе: {0}", am: "Չվճարված ավարտին՝ {0}" },
+  "history.prepaidRefund": { en: "Paid ahead returned in full: {0}", ru: "Предоплата возвращена полностью: {0}", am: "Կանխավճարը վերադարձվեց ամբողջությամբ՝ {0}" },
+  "history.rateKept": { en: "Price kept: {0}", ru: "Цена прежняя: {0}", am: "Գինը նույնն է՝ {0}" },
+  "history.rateNow": { en: "Per hour now: {0}", ru: "Сейчас в час: {0}", am: "Հիմա ժամը՝ {0}" },
+  "history.rateSeat": { en: "seat {0}", ru: "место {0}", am: "տեղ {0}" },
+  "history.ratePads": { en: "joysticks {0}", ru: "джойстики {0}", am: "ջոյսթիքներ {0}" },
+  "history.billPrepaid": { en: "Paid ahead", ru: "Оплачено вперёд", am: "Նախապես վճարված" },
+  "history.billChange": { en: "Change given back", ru: "Сдача выдана", am: "Վերադարձված մանր" },
+  "history.billUnpaid": { en: "Not paid at the end", ru: "Не оплачено при уходе", am: "Չվճարված ավարտին" },
+  "history.rateExtras": { en: "rentals {0}", ru: "прокат {0}", am: "վարձույթ {0}" },
 
   // ── what each line actually changed ──────────────────────────────────────
   // Written by the server into the event's `meta` and, until now, not read.
@@ -2732,6 +2865,19 @@ export const TRANSLATIONS: Dict = {
   "product.titleEditAdditional": { en: "Edit additional item", ru: "Редактировать дополнительный предмет", am: "Խմբագրել լրացուցիչ իրը" },
   "product.titleEdit": { en: "Edit product", ru: "Редактировать товар", am: "Խմբագրել ապրանքը" },
   "product.errors.price": { en: "Price must be a non-negative number", ru: "Цена должна быть неотрицательной", am: "Գինը չպետք է լինի բացասական" },
+  // A product added with a quantity (2026-11-16).
+  "product.quantity": { en: "Quantity", ru: "Количество", am: "Քանակ" },
+  "product.quantityHint": { en: "Leave it empty if the stock is not counted. If this product is already in the list, the quantity is added to it.", ru: "Оставьте пустым, если остаток не считаете. Если такой товар уже есть, количество добавится к нему.", am: "Թողեք դատարկ, եթե մնացորդը չեք հաշվում։ Եթե այս ապրանքն արդեն կա, քանակը կավելանա դրան։" },
+  "product.errors.quantity": { en: "Quantity: a whole number from 0 to 999 999, or empty.", ru: "Количество: целое число от 0 до 999 999 или пусто.", am: "Քանակ՝ ամբողջ թիվ 0-ից 999 999 կամ դատարկ։" },
+  "product.createdCounted": { en: "Product added. Stock: {0}", ru: "Товар добавлен. Остаток: {0}", am: "Ապրանքն ավելացված է։ Մնացորդ՝ {0}" },
+  "product.mergedToast": { en: "Added to the stock of {0}: {1}", ru: "Добавлено к остатку «{0}»: {1}", am: "Ավելացվել է «{0}»-ի մնացորդին՝ {1}" },
+  "product.exists.title": { en: "This product is already in the list", ru: "Такой товар уже есть", am: "Այս ապրանքն արդեն կա" },
+  "product.exists.hint": { en: "The quantity is added to its stock. No second product is created.", ru: "Количество добавится к его остатку. Второй товар не создаётся.", am: "Քանակը կավելանա դրա մնացորդին։ Երկրորդ ապրանք չի ստեղծվում։" },
+  "product.exists.pick": { en: "Which product gets the quantity", ru: "К какому товару добавить", am: "Որ ապրանքին ավելացնել" },
+  "product.exists.price": { en: "Price {0}", ru: "Цена {0}", am: "Գին՝ {0}" },
+  "product.exists.hidden": { en: "hidden", ru: "скрыт", am: "թաքցված" },
+  "product.exists.add": { en: "Add to stock", ru: "Добавить к остатку", am: "Ավելացնել մնացորդին" },
+  "product.exists.addReprice": { en: "Add and change the price to {0}", ru: "Добавить и сменить цену на {0}", am: "Ավելացնել և փոխել գինը՝ {0}" },
 
   // Manager form
   "manager.titleNew": { en: "New manager", ru: "Новый менеджер", am: "Նոր մենեջեր" },
@@ -4657,6 +4803,38 @@ export const TRANSLATIONS: Dict = {
   "productHistory.action.deactivated": { en: "Deactivated", ru: "Выключен", am: "Ապաակտիվացվել է" },
   "productHistory.action.deleted": { en: "Deleted", ru: "Удалён", am: "Ջնջվել է" },
   "productHistory.action.translation_changed": { en: "Translation changed", ru: "Изменён перевод", am: "Թարգմանությունը փոխվել է" },
+  // Stock (2026-11-16): what staff did to a product's count.
+  "productHistory.action.stock_received": { en: "Stock received", ru: "Приход товара", am: "Ապրանքի մուտք" },
+  "productHistory.action.stock_corrected": { en: "Stock recounted", ru: "Пересчёт остатка", am: "Մնացորդի վերահաշվարկ" },
+  "productHistory.action.stock_untracked": { en: "Stock counting off", ru: "Учёт остатка выключен", am: "Մնացորդի հաշվառումն անջատված է" },
+  "productHistory.stockViaCreate": { en: "when the product was added", ru: "при добавлении товара", am: "ապրանքն ավելացնելիս" },
+  "productHistory.stockViaMerge": { en: "added under the same name", ru: "добавлен с тем же названием", am: "ավելացվել է նույն անունով" },
+  // ── Stock on the shelf (2026-11-16) ──────────────────────────────────
+  "stock.left": { en: "Stock: {0}", ru: "Остаток: {0}", am: "Մնացորդ՝ {0}" },
+  "stock.notCounted": { en: "Not counted", ru: "Без учёта", am: "Առանց հաշվառման" },
+  "stock.chip": { en: "left {0}", ru: "ост. {0}", am: "մն. {0}" },
+  "stock.total": { en: "In stock in all: {0} pcs", ru: "Остаток всего: {0} шт.", am: "Ընդամենը մնացորդ՝ {0} հատ" },
+  "stock.negative": { en: "Below zero: {0}", ru: "В минусе: {0}", am: "Զրոյից ցածր՝ {0}" },
+  "stock.button": { en: "Stock", ru: "Остаток", am: "Մնացորդ" },
+  "stock.buttonFull": { en: "Stock of {0}", ru: "Остаток: {0}", am: "{0}՝ մնացորդ" },
+  "stock.title": { en: "Stock: {0}", ru: "Остаток: {0}", am: "Մնացորդ՝ {0}" },
+  "stock.now": { en: "Now: {0}", ru: "Сейчас: {0}", am: "Հիմա՝ {0}" },
+  "stock.actions": { en: "What to do", ru: "Что сделать", am: "Ինչ անել" },
+  "stock.action.add": { en: "Goods received", ru: "Приход", am: "Մուտք" },
+  "stock.action.addHint": { en: "How many came in. They are added to the stock.", ru: "Сколько пришло. Добавится к остатку.", am: "Քանի հատ է եկել։ Կավելանա մնացորդին։" },
+  "stock.action.set": { en: "Recount", ru: "Пересчёт", am: "Վերահաշվարկ" },
+  "stock.action.setHint": { en: "How many are on the shelf now. The stock becomes this number.", ru: "Сколько сейчас на полке. Остаток станет этим числом.", am: "Քանի հատ կա հիմա դարակում։ Մնացորդը կդառնա այս թիվը։" },
+  "stock.action.start": { en: "Start counting", ru: "Начать учёт", am: "Սկսել հաշվառումը" },
+  "stock.action.startHint": { en: "How many are on the shelf now. From now on every sale takes from it.", ru: "Сколько сейчас на полке. Дальше каждая продажа будет списывать с остатка.", am: "Քանի հատ կա հիմա դարակում։ Այսուհետ յուրաքանչյուր վաճառք կնվազեցնի մնացորդը։" },
+  "stock.action.untrack": { en: "Stop counting", ru: "Не учитывать", am: "Չհաշվել" },
+  "stock.action.untrackHint": { en: "The product sells as before, with no stock.", ru: "Товар продаётся как раньше, без остатка.", am: "Ապրանքը վաճառվում է ինչպես առաջ՝ առանց մնացորդի։" },
+  "stock.qty": { en: "Quantity", ru: "Количество", am: "Քանակ" },
+  "stock.ownerOnly": { en: "Only the owner can recount or stop counting.", ru: "Пересчитать или отключить учёт может только владелец.", am: "Վերահաշվարկել կամ անջատել հաշվառումը կարող է միայն սեփականատերը։" },
+  "stock.done": { en: "{0}: {1}", ru: "{0}: {1}", am: "{0}՝ {1}" },
+  "stock.unchanged": { en: "{0}: the stock is already {1}", ru: "{0}: остаток уже {1}", am: "{0}՝ մնացորդն արդեն {1} է" },
+  "stock.errors.qty": { en: "Type a whole number from 1 to 999 999.", ru: "Введите целое число от 1 до 999 999.", am: "Մուտքագրեք ամբողջ թիվ 1-ից 999 999։" },
+  "stock.errors.count": { en: "Type a whole number from 0 to 999 999.", ru: "Введите целое число от 0 до 999 999.", am: "Մուտքագրեք ամբողջ թիվ 0-ից 999 999։" },
+  "stock.warnBelowZero": { en: "Stock below zero: {0}. The sale went through; check the count.", ru: "Остаток ниже нуля: {0}. Продажа прошла, проверьте остаток.", am: "Մնացորդը զրոյից ցածր է՝ {0}։ Վաճառքը կատարվել է, ստուգեք մնացորդը։" },
   "productHistory.state.emptyTitle": { en: "No product changes yet", ru: "Изменений товаров пока нет", am: "Ապրանքների փոփոխություններ դեռ չկան" },
   "productHistory.state.emptyDescription": { en: "Every change to a product appears here: what changed, when and by whom.", ru: "Здесь появится каждое изменение товара: что изменили, когда и кто.", am: "Այստեղ կհայտնվի ապրանքի յուրաքանչյուր փոփոխություն՝ ինչ է փոխվել, երբ և ով է փոխել։" },
   "productHistory.state.noMatchTitle": { en: "Nothing matches these filters", ru: "По этим фильтрам ничего нет", am: "Այս ֆիլտրերով ոչինչ չկա" },
@@ -4688,6 +4866,7 @@ export const TRANSLATIONS: Dict = {
   "history.state.noResultsDescription": { en: "Try another date range or staff member.", ru: "Попробуйте изменить период или сотрудника.", am: "Փորձեք փոխել ժամանակահատվածը կամ աշխատակցին։" },
   "history.state.timelineErrorTitle": { en: "Could not load this session's activity", ru: "Не удалось загрузить действия по сессии", am: "Չհաջողվեց բեռնել սեսիայի գործողությունները" },
   "history.state.actorsFailed": { en: "Could not load the staff list. Retry", ru: "Не удалось загрузить сотрудников. Повторить", am: "Չհաջողվեց բեռնել աշխատակիցներին։ Կրկնել" },
+  "history.state.placesFailed": { en: "Could not load the seats. Retry", ru: "Не удалось загрузить места. Повторить", am: "Չհաջողվեց բեռնել տեղերը։ Կրկնել" },
   "session.state.packagesErrorTitle": { en: "Could not load time packages", ru: "Не удалось загрузить пакеты времени", am: "Չհաջողվեց բեռնել ժամային փաթեթները" },
   "session.state.relocateErrorTitle": { en: "Could not load free seats", ru: "Не удалось загрузить свободные места", am: "Չհաջողվեց բեռնել ազատ տեղերը" },
   "till.state.emptyTitle": { en: "No sales today yet", ru: "Сегодня продаж ещё не было", am: "Այսօր դեռ վաճառք չի եղել" },
@@ -5090,6 +5269,9 @@ export const TRANSLATIONS: Dict = {
     am: "Դատարկ՝ ինչպես մասնաճյուղում (այս տեսակի տեղերի համար չի գանձվում)։ 0՝ այս տեղում չի գանձվում։",
   },
 };
+
+/** Whether the dictionary has this key at all (the real `t` answers a missing key with the key). */
+export const hasTranslation = (key: string): boolean => Object.prototype.hasOwnProperty.call(TRANSLATIONS, key);
 
 export const t = (key: string, lang: Lang): string => {
   const entry = TRANSLATIONS[key];

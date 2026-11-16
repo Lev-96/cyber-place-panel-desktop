@@ -59,6 +59,17 @@ const ShiftReportView = ({ shift, report, viewerId = null }: Props) => {
       : methodName(l.method);
 
   const m = (amount: string) => shiftAmount(money, amount);
+  // v5 (2026-11-15): a place's prepayment, change and what it was left owing — the server's figures.
+  const placeExtras = (l: { prepaid?: string | null; change?: string | null; unpaid?: string | null }): string => {
+    const out: string[] = [];
+    if (Number(l.prepaid ?? 0) > 0) {
+      out.push(Number(l.change ?? 0) > 0
+        ? fmt(t("history.prepaidChange"), m(l.prepaid!), m(l.change!))
+        : fmt(t("shift.linePrepaid"), m(l.prepaid!)));
+    }
+    if (Number(l.unpaid ?? 0) > 0) out.push(`${t("history.billUnpaid")} ${m(l.unpaid!)}`);
+    return out.map((x) => ` · ${x}`).join("");
+  };
   const closed = shift.status === "closed";
   const kind = report.cash.difference_kind;
   const branch = shift.branch ? [shift.branch.address, shift.branch.city].filter(Boolean).join(", ") : "";
@@ -124,6 +135,14 @@ const ShiftReportView = ({ shift, report, viewerId = null }: Props) => {
           <Row label={t("shift.cashOpening")} value={m(report.cash.opening)} />
           <Row label={`+ ${t("shift.cashPlaces")}`} value={m(report.cash.places)} />
           <Row label={`+ ${t("shift.cashTill")}`} value={m(report.cash.till)} />
+          {/* v5 (2026-11-15): cash paid AHEAD. Shown only when there was some,
+              so a shift with none reads exactly as v4 did. */}
+          {Number(report.cash.prepaid_in ?? 0) > 0 && (
+            <Row label={`+ ${t("shift.cashPrepaidIn")}`} hint={t("shift.cashPrepaidInHint")} value={m(report.cash.prepaid_in!)} testId="shift-cash-prepaid-in" />
+          )}
+          {Number(report.cash.prepaid_settled ?? 0) > 0 && (
+            <Row label={`− ${t("shift.cashPrepaidSettled")}`} hint={t("shift.cashPrepaidSettledHint")} value={m(report.cash.prepaid_settled!)} testId="shift-cash-prepaid-settled" />
+          )}
           <div style={divider} />
           <Row label={t("shift.cashExpected")} value={m(report.cash.expected)} strong testId="shift-cash-expected" />
           {report.cash.counted !== undefined && (
@@ -139,6 +158,9 @@ const ShiftReportView = ({ shift, report, viewerId = null }: Props) => {
               </div>
               {report.closed?.notes && <div className="muted" style={{ fontSize: 13 }}>{report.closed.notes}</div>}
             </>
+          )}
+          {Number(report.cash.change ?? 0) > 0 && (
+            <Row muted label={t("shift.cashChangeGiven")} value={m(report.cash.change!)} testId="shift-cash-change" />
           )}
           <span className="muted" style={{ fontSize: 12, marginTop: 6 }}>{t("shift.cashRule")}</span>
         </Section>
@@ -190,12 +212,18 @@ const ShiftReportView = ({ shift, report, viewerId = null }: Props) => {
             <LinesHead title={t("shift.revenuePlaces")} rule={t("shift.linesRule.places")} total={m(report.places.total)} />
             {report.lines.places.length === 0 && <span className="muted">{t("shift.linesNone")}</span>}
             {report.lines.places.map((l) => (
-              <Row key={`p${l.id}`} label={`${l.closed_at ? formatDateTime(l.closed_at) : ""} · ${l.seat} · ${lineMethod(l)}${l.is_free ? ` · ${t("shift.free")}` : ""}`} value={m(l.amount)} />
+              <Row key={`p${l.id}`} label={`${l.closed_at ? formatDateTime(l.closed_at) : ""} · ${l.seat} · ${lineMethod(l)}${l.is_free ? ` · ${t("shift.free")}` : ""}${placeExtras(l)}`} value={m(l.amount)} />
             ))}
             <LinesHead title={t("shift.revenueTill")} rule={t("shift.linesRule.till")} total={m(report.till.total)} />
             {report.lines.till.length === 0 && <span className="muted">{t("shift.linesNone")}</span>}
             {report.lines.till.map((l) => (
               <Row key={`o${l.id}`} muted={l.status !== "paid"} label={`${l.at ? formatDateTime(l.at) : ""} · ${lineMethod(l)}${l.status !== "paid" ? ` · ${t("till.voided")}` : ""}`} value={m(l.amount)} />
+            ))}
+            {(report.lines.prepaid?.length ?? 0) > 0 && (
+              <LinesHead title={t("shift.linesPrepaid")} rule={t("shift.linesRule.prepaid")} total={m(report.cash.prepaid_in ?? "0.00")} />
+            )}
+            {(report.lines.prepaid ?? []).map((l) => (
+              <Row key={`a${l.id}`} label={`${l.at ? formatDateTime(l.at) : ""} · ${l.seat} · ${l.kind === "time" ? t("shift.prepaidKindTime") : t("shift.prepaidKindStart")}`} value={m(l.amount)} testId="shift-line-prepaid" />
             ))}
             {report.lines.tournaments.length > 0 && (
               <LinesHead title={t("shift.revenueTournaments")} rule={t("shift.linesRule.tournaments")} total={m(report.tournaments.total)} />

@@ -230,12 +230,12 @@ test("the unlimited confirmation is an in-app dialog, and the renderer keeps typ
   // cashier actually scans for on a seat that is running out.
   await page.getByRole("button", { name: "Add time" }).first().click();
 
-  // Ticked AND priced, or the apply button stays disabled: the price a seat
-  // carries on at is now always entered deliberately.
+  // Ticked, or the apply button stays disabled. No price is typed since
+  // 2026-11-15: the seat carries on at the rate it bills now (`keep_rate`).
   // Clicked the way a cashier clicks it — on the label. The input itself sits
   // behind the styled box, so targeting it directly is a click no human makes.
   await page.getByText("Switch to unlimited", { exact: true }).click();
-  await page.getByLabel("Price per hour").fill("1200");
+  await expect(page.getByTestId("unlimited-keep-rate")).toBeVisible();
   await page.getByRole("button", { name: "Change fixed tariff to unlimited" }).click();
 
   // A React dialog, in the DOM — not an OS window.

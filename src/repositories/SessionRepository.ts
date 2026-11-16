@@ -1,4 +1,4 @@
-import type { StopSessionBody } from "@/api/sessions";
+import type { ILimitPlan, ILimitQuote, IRateChangeResponse, IStartAmountQuote, SessionLimitFrom, StopSessionBody } from "@/api/sessions";
 import {
   AddItemBody,
   apiAddSessionItem,
@@ -10,6 +10,7 @@ import {
   apiAddSessionTime,
   apiAddSessionTimeByAmount,
   apiLimitSession,
+  apiSessionLimitQuote,
   apiSetSessionUnpaid,
   apiSessionTimeQuoteByAmount,
   apiSessionExtensionOptions,
@@ -46,6 +47,10 @@ import {
   apiListSessions,
   apiPreviewSession,
   apiRemoveSessionItem,
+  apiMarkSessionItemPaid,
+  apiStartQuoteByAmount,
+  apiSetSessionReminder,
+  apiClearSessionReminder,
   apiReturnSessionItem,
   apiSetSessionItemQty,
   apiStartSession,
@@ -59,7 +64,8 @@ import {
 } from "@/api/sessions";
 import { apiReorderPcs } from "@/api/pcs";
 import { friendlyMutation, orFallback } from "@/api/fallback";
-import { IPcApi, ISessionApi, ITimePackage } from "@/types/sessions";
+import { IPcApi, ISessionApi, ISessionHourlyNow, ITimePackage } from "@/types/sessions";
+import { announceStockWarnings } from "@/ui/stockWarnings";
 
 export interface StopResult {
   session: ISessionApi;
@@ -67,6 +73,20 @@ export interface StopResult {
   /** Absent from servers before 2026-10-19; null when no amount was typed. */
   cash?: ICashHandover | null;
 }
+
+/** A change of the seat's clock that answers what an hour costs now (2026-11-15). */
+export interface ISessionRateChange {
+  session: ISessionApi;
+  /** The server's `hourly_now`; null from a backend that does not send it. */
+  hourlyNow: ISessionHourlyNow | null;
+  /** `/limit` (2026-11-15): the plan the server wrote; null elsewhere and from an older backend. */
+  limit: ILimitPlan | null;
+}
+const rateChangeOf = (r: IRateChangeResponse): ISessionRateChange => ({
+  session: r.session,
+  hourlyNow: r.hourly_now ?? null,
+  limit: r.limit ?? null,
+});
 
 export class SessionRepository {
   async listActive(branchId: number): Promise<ISessionApi[]> {
@@ -126,11 +146,12 @@ export class SessionRepository {
     return friendlyMutation(apiExtendSession(id, { time_package_id: packageId }).then((r) => r.session));
   }
   async addItem(sessionId: number, body: AddItemBody): Promise<ISessionApi> {
-    return friendlyMutation(apiAddSessionItem(sessionId, body).then((r) => r.session));
+    return friendlyMutation(apiAddSessionItem(sessionId, body).then((r) => { announceStockWarnings(r); return r.session; }));
   }
   /** The dialog's basket, confirmed. One request, all or nothing. */
   async addItems(sessionId: number, items: AddItemBody[]): Promise<ISessionApi> {
-    return friendlyMutation(apiAddSessionItems(sessionId, { items }).then((r) => r.session));
+    // A sale that took a counted product below zero says so (2026-11-16).
+    return friendlyMutation(apiAddSessionItems(sessionId, { items }).then((r) => { announceStockWarnings(r); return r.session; }));
   }
   /**
    * What the typed lines would put on the bill. Reads only — the confirm still
@@ -140,11 +161,15 @@ export class SessionRepository {
     return friendlyMutation(apiResolveSessionItemsText(sessionId, text, choices).then((r) => r.resolved));
   }
   async setItemQty(sessionId: number, itemId: number, qty: number): Promise<ISessionApi> {
-    return friendlyMutation(apiSetSessionItemQty(sessionId, itemId, qty).then((r) => r.session));
+    return friendlyMutation(apiSetSessionItemQty(sessionId, itemId, qty).then((r) => { announceStockWarnings(r); return r.session; }));
   }
   /** The room's hourly extra came back: stop its clock, keep its charge. */
   async returnItem(sessionId: number, itemId: number): Promise<ISessionApi> {
     return friendlyMutation(apiReturnSessionItem(sessionId, itemId).then((r) => r.session));
+  }
+  /** «Оплачено»: a line handed over unpaid is paid now (2026-11-15). */
+  async markItemPaid(sessionId: number, itemId: number): Promise<ISessionApi> {
+    return friendlyMutation(apiMarkSessionItemPaid(sessionId, itemId).then((r) => r.session));
   }
   async removeItem(sessionId: number, itemId: number): Promise<ISessionApi> {
     return friendlyMutation(apiRemoveSessionItem(sessionId, itemId).then((r) => r.session));
@@ -171,8 +196,9 @@ export class SessionRepository {
     return friendlyMutation(apiRemoveSessionJoystick(sessionId, slot).then((r) => r.session));
   }
 
-  async addTime(sessionId: number, minutes: number, charge?: number, unpaid?: boolean): Promise<ISessionApi> {
-    return friendlyMutation(apiAddSessionTime(sessionId, minutes, charge, unpaid).then((r) => r.session));
+  /** `prepaid` (2026-11-15): «Оплачено сейчас» on a seat paid ahead. */
+  async addTime(sessionId: number, minutes: number, charge?: number, unpaid?: boolean, prepaid?: true): Promise<ISessionApi> {
+    return friendlyMutation(apiAddSessionTime(sessionId, minutes, charge, unpaid, prepaid).then((r) => r.session));
   }
 
   /** Extra time not paid yet, on or off (2026-11-07). */
@@ -180,14 +206,23 @@ export class SessionRepository {
     return friendlyMutation(apiSetSessionUnpaid(sessionId, on).then((r) => r.session));
   }
 
-  /** An unlimited seat given a fixed time from now (2026-11-07). */
-  async limit(sessionId: number, minutes: number): Promise<ISessionApi> {
-    return friendlyMutation(apiLimitSession(sessionId, minutes).then((r) => r.session));
+  /**
+   * An unlimited seat given a fixed time (2026-11-07), counted from `from`
+   * (2026-11-15), with the plan the server wrote and what an hour costs from
+   * then on (each null from an older backend).
+   */
+  async limit(sessionId: number, minutes: number, from: SessionLimitFrom): Promise<ISessionRateChange> {
+    return friendlyMutation(apiLimitSession(sessionId, minutes, from).then(rateChangeOf));
+  }
+
+  /** Read-only advice: both choices a limit of `minutes` offers. See `apiSessionLimitQuote`. */
+  async limitQuote(sessionId: number, minutes: number): Promise<ILimitQuote> {
+    return friendlyMutation(apiSessionLimitQuote(sessionId, minutes));
   }
 
   /** "+ Время" by money (2026-11-07): the server decides the minutes and the charge. */
-  async addTimeByAmount(sessionId: number, amount: number, unpaid?: boolean): Promise<ISessionApi> {
-    return friendlyMutation(apiAddSessionTimeByAmount(sessionId, amount, unpaid).then((r) => r.session));
+  async addTimeByAmount(sessionId: number, amount: number, unpaid?: boolean, prepaid?: true): Promise<ISessionApi> {
+    return friendlyMutation(apiAddSessionTimeByAmount(sessionId, amount, unpaid, prepaid).then((r) => r.session));
   }
 
   /** Read-only advice: what `addTimeByAmount` would grant. */
@@ -195,8 +230,9 @@ export class SessionRepository {
     return friendlyMutation(apiSessionTimeQuoteByAmount(sessionId, amount));
   }
 
-  async makeUnlimited(sessionId: number, hourlyRate?: number): Promise<ISessionApi> {
-    return friendlyMutation(apiMakeSessionUnlimited(sessionId, hourlyRate).then((r) => r.session));
+  /** Unlimited at the rate the seat bills at now (2026-11-15, `keep_rate`); see `apiMakeSessionUnlimited`. */
+  async makeUnlimited(sessionId: number): Promise<ISessionRateChange> {
+    return friendlyMutation(apiMakeSessionUnlimited(sessionId).then(rateChangeOf));
   }
 
   /** Read-only advice: what `addTime` would charge. See `apiSessionTimeQuote`. */
@@ -212,6 +248,21 @@ export class SessionRepository {
 
   async startQuote(pcId: number, length: PlannedLength, hourlyRate?: number, plannedAmount?: number): Promise<IStartQuote> {
     return friendlyMutation(apiStartQuote(pcId, length, hourlyRate, plannedAmount));
+  }
+
+  /** Set or change the player's reminder (2026-11-15). */
+  async setReminder(sessionId: number, minutes: number, note?: string): Promise<ISessionApi> {
+    return friendlyMutation(apiSetSessionReminder(sessionId, minutes, note).then((r) => r.session));
+  }
+
+  /** Clear it. */
+  async clearReminder(sessionId: number): Promise<ISessionApi> {
+    return friendlyMutation(apiClearSessionReminder(sessionId).then((r) => r.session));
+  }
+
+  /** Read-only advice: what a sum buys on this seat («На сумму», 2026-11-15). */
+  async startQuoteByAmount(pcId: number, amount: number, outsideFood: boolean): Promise<IStartAmountQuote> {
+    return friendlyMutation(apiStartQuoteByAmount(pcId, amount, outsideFood));
   }
 
   /** Read-only advice: see `apiSessionExtensionOptions`. */

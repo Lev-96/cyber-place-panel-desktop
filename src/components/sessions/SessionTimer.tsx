@@ -1,5 +1,5 @@
 import LineIcon from "@/components/ui/LineIcon";
-import { preciseWhenSmall } from "@/i18n/currency";
+import { centsWhenFractional, type MoneyFormatOptions } from "@/i18n/currency";
 import { ISessionApi } from "@/types/sessions";
 import { RESET_MIN_AMOUNT, autoResumeAtOf, playedSecondsBetween, sessionAmountAt, sessionMinimumChargeAt, sessionTimeCostAt } from "./sessionAmount";
 import { useEffect, useState } from "react";
@@ -29,7 +29,7 @@ interface Props {
    * Money formatter from LanguageContext. When provided, the running cost is
    * rendered in the user's display currency instead of as a raw decimal.
    */
-  formatMoney?: (amountInBaseAmd: number, options?: { maximumFractionDigits?: number }) => string;
+  formatMoney?: (amountInBaseAmd: number, options?: MoneyFormatOptions) => string;
   /**
    * The words for an applied VIP minimum charge, e.g. "Минимум 1 ч", from the
    * billed minutes. Absent = no badge (callers without the language context).
@@ -77,16 +77,16 @@ const SessionTimer = ({ session, formatMoney, minimumLabel, reset }: Props) => {
   // session with nothing to price from — an open one on a seat with no
   // configured rate — quotes nothing, because there is nothing to quote.
   const showCost = session.is_free || amount > 0;
-  // A running total is the one place whole units are wrong. A venue charging
-  // twelve an hour earns two hundredths of a unit in the first minute, so a
-  // counter rounded to whole units reads "0" for five minutes while the clock
-  // moves beside it — which looks like the money is not being counted at all.
-  // Prices elsewhere are untouched: this asks for the precision, nothing else
-  // does.
+  // The figure the server stores, to the cent (2026-11-16): a branch that
+  // rounds to a step shows whole steps already, and one that does not round
+  // (step 0) bills 1 249.99 — printed as "1 250" the card disagreed with the
+  // receipt by a cent. Cents exactly when there are cents, as every money
+  // figure on a statement is printed (`centsWhenFractional`); a venue charging
+  // twelve an hour still sees the hundredths move in the first minute.
   const cost = showCost ? (
     <>
       <span className="session-timer__cost" style={{ marginLeft: 8, color: "var(--color-accent-purple)" }}>
-        {formatMoney ? formatMoney(amount, preciseWhenSmall(amount)) : amount.toFixed(2)}
+        {formatMoney ? formatMoney(amount, centsWhenFractional(amount)) : amount.toFixed(2)}
       </span>
       {minimum?.applied && minimumLabel && !session.is_free && (
         <span className="session-min-badge" data-testid="min-charge">

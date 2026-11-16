@@ -140,7 +140,7 @@ const BookingsTimeline = ({ places, day, frame, reservations, sessions, now, sea
           {places.map((p, i) => (
             <div key={p.id} className={`tl__row${p.offline ? " is-offline" : ""}`} data-testid="cal-row" data-place-id={p.id}>
               <div className="tl__seat">
-                <span className="tl__seat-name">{p.label}</span>
+                <span className="tl__seat-name" title={p.label}>{p.label}</span>
                 {p.offline ? (
                   <span className="tl__seat-meta tl__seat-meta--offline"><StatusIcon tone="offline" />{t("calendar.legend.offline")}</span>
                 ) : p.platform ? (

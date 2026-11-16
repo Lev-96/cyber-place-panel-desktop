@@ -91,6 +91,13 @@ export type Permission =
    * manager is one of the people it is about.
    */
   | "product.history"
+  /**
+   * Recount a COUNTED product's stock, or switch counting off (2026-11-16).
+   * Admin and owner (backend `products.manage`, asked again under the row
+   * lock). Receiving goods and a product's FIRST count are `product.write`:
+   * the manager takes the delivery in, the owner corrects the books.
+   */
+  | "product.stockCorrect"
   // company CRUD
   | "company.create"
   | "company.edit"
@@ -185,7 +192,7 @@ const PERMS: Record<Role, ReadonlySet<Permission>> = {
     "menu.platformBilling",
     "revenue.view",
     "branch.create", "branch.edit", "branch.delete", "branch.prices",
-    "branch.places", "branch.members", "product.crud", "product.write", "product.history",
+    "branch.places", "branch.members", "product.crud", "product.write", "product.history", "product.stockCorrect",
     "company.create", "company.edit", "company.delete",
     "company.block", "branch.block", "branch.status",
     "manager.create", "manager.delete",
@@ -204,7 +211,7 @@ const PERMS: Record<Role, ReadonlySet<Permission>> = {
     // Seats, shifts and the product catalogue are the company's to arrange;
     // "branch.members" is deliberately NOT here — member cards and deposits are
     // administrative, and the section is gone from an owner's branch.
-    "branch.places", "product.crud", "product.write", "product.history",
+    "branch.places", "product.crud", "product.write", "product.history", "product.stockCorrect",
     // Owners manage their branches' game libraries (branch-scoped games):
     // hub tile + place-modal inline create. The shared catalogue itself
     // ("game.crud") stays admin-only — that is what the backend enforces.

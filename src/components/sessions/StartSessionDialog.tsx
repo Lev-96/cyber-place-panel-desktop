@@ -24,7 +24,7 @@ import { recentPsnNames, rememberPsnName } from "@/ps5/recentPsnNames";
 import { renderText, textKey, textLiteral, type LocalizedText } from "@/i18n/localizedText";
 import { IBranchApi } from "@/types/api";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { IStartQuote } from "@/api/sessions";
+import type { IStartAmountQuote, IStartQuote } from "@/api/sessions";
 import SectionTabs from "@/components/ui/SectionTabs";
 import ClockTimeField from "./ClockTimeField";
 import DurationInput from "./DurationInput";
@@ -38,6 +38,7 @@ import { quoteFor, useServerQuote } from "./useServerQuote";
 import { durationLabel } from "@/utils/durationLabel";
 import StartBookingChoice, { type StartChoice } from "./StartBookingChoice";
 import { useStartOptions } from "./useStartOptions";
+import StartByAmount from "./StartByAmount";
 
 interface Props {
   branchId: number;
@@ -54,7 +55,8 @@ interface Props {
   bookingId?: number;
 }
 
-type Mode = "fixed" | "open";
+/** A package; by the hour (count-up or planned); or «На сумму» (2026-11-15). */
+type Mode = "fixed" | "open" | "amount";
 type PlanLimit = "duration" | "until";
 
 /**
@@ -135,7 +137,13 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted, bookingId }: Pro
     : null;
   // «Не оплачено» (2026-11-07, owner): here and in «+ Время», never on the
   // card. Only on a seat that bills: a free one owes nothing.
-  const [unpaid, setUnpaid] = useState(false);
+  const [unpaid, setUnpaidRaw] = useState(false);
+  // «Оплачено вперёд» (2026-11-15, owner): a package or a planned length paid
+  // in cash now, so a player who leaves early gets the change at Stop. The two
+  // switches contradict each other: turning one on turns the other off.
+  const [prepaid, setPrepaidRaw] = useState(false);
+  const setUnpaid = (on: boolean) => { setUnpaidRaw(on); if (on) setPrepaidRaw(false); };
+  const setPrepaid = (on: boolean) => { setPrepaidRaw(on); if (on) setUnpaidRaw(false); };
   // «Свои продукты» (2026-11-13, owner): the player brought their own food and
   // the place's bill gets the club's fixed fee. The FIGURE is the server's
   // advice for this seat (null = not offered here: no switch); a free start
@@ -315,6 +323,22 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted, bookingId }: Pro
   const planPriced = quotedPlan !== null
     && (typedTotal === undefined || Math.round(quotedPlan.amount * 100) === Math.round(typedTotal * 100));
   const planByHand = planInput !== null && typedTotal !== undefined;
+  // «На сумму» (2026-11-15, owner): the sum the player hands over; the SERVER
+  // says what it buys (own food first, whole seconds at the seat's rate), and
+  // Start goes only on its answer for exactly this sum.
+  const [amountInput, setAmountInput] = useState("");
+  const amountParsed = Number(amountInput.replace(",", "."));
+  const amountValue = mode === "amount" && !isFree && amountInput.trim() !== "" && Number.isFinite(amountParsed) && amountParsed > 0
+    ? amountParsed : null;
+  const amountQuote = useServerQuote<IStartAmountQuote>(
+    amountValue,
+    (a) => sessionRepository.startQuoteByAmount(pc.id, a, outsideFoodOn),
+    `${pc.id}|${outsideFoodOn ? 1 : 0}`,
+  );
+  const quotedAmount = quoteFor(amountQuote, amountValue);
+  // Paid ahead only where there is a plan to pay: a package, or a length set.
+  const prepaidApplies = !isFree && (mode === "fixed" || (mode === "open" && planInput !== null));
+  const prepaidField = prepaid && prepaidApplies ? { prepaid: true as const } : {};
 
   const toggleEditPrice = (next: boolean) => {
     setEditPrice(next);
@@ -363,7 +387,22 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted, bookingId }: Pro
         onStarted();
         return;
       }
-      if (mode === "fixed") {
+      if (mode === "amount") {
+        if (quotedAmount === null || amountValue === null) { setBusy(false); return; }
+        // The sum and the WHOLE seconds the server said it buys: a figure that
+        // moved meanwhile is refused (422 amount-changed) and asked again.
+        // Cash paid ahead; never with a package, a plan, unpaid or free.
+        await sessionRepository.start({
+          branch_id: branchId,
+          pc_id: pc.id,
+          user_display_name: pc.label,
+          paid_amount: amountValue,
+          paid_seconds: quotedAmount.seconds,
+          ...psnField,
+          ...bookingField,
+          ...outsideFoodField,
+        });
+      } else if (mode === "fixed") {
         if (!pkgId) { setErr(textKey("session.choosePackage")); setBusy(false); return; }
         await sessionRepository.start({
           branch_id: branchId,
@@ -374,6 +413,7 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted, bookingId }: Pro
           ...psnField,
           ...bookingField,
           ...(unpaid ? { unpaid: true } : {}),
+          ...prepaidField,
           ...outsideFoodField,
         });
       } else {
@@ -398,6 +438,7 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted, bookingId }: Pro
           ...psnField,
           ...bookingField,
           ...(unpaid ? { unpaid: true } : {}),
+          ...prepaidField,
           ...outsideFoodField,
         });
       }
@@ -443,6 +484,7 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted, bookingId }: Pro
     // The plan's length is the server's quote (a length typed, or "until"
     // resolved on its clock); until it answers the start waits anyway.
     || (mode === "open" && (planInput === null || (quotedPlan !== null && quotedPlan.minutes > (cap ?? 0))))
+    || (mode === "amount" && quotedAmount !== null && quotedAmount.minutes > (cap ?? 0))
   );
   const startDisabled =
     busy || deviceOffline || !psnValid
@@ -452,6 +494,8 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted, bookingId }: Pro
     || (planApplies && (planInvalid || (planInput !== null && !planPriced)))
     || (planApplies && planInput !== null && editTotal && !totalValid)
     // Who sits down is said, not guessed, and the seat's limits are known.
+    // By amount: only on the server's quote for exactly the sum on screen.
+    || (!isFree && mode === "amount" && quotedAmount === null)
     || !optionsLoaded || effectiveChoice === null
     || startBeyondReservation;
 
@@ -517,8 +561,10 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted, bookingId }: Pro
             {/* Two switches, one row (2026-11-13, owner): «Не оплачено» on the
                 left, «Свои продукты» on its right when the club charges for it
                 here. A narrow window wraps the second under the first. */}
-            {!isFree && (
+            {/* By amount the row may be empty (no «Не оплачено» there): not drawn then. */}
+            {!isFree && (mode !== "amount" || outsideFoodFee !== null) && (
               <div className="start-dialog__switches" data-testid="start-switches">
+                {mode !== "amount" && (
                 <div className="start-dialog__switch" data-testid="start-unpaid">
                   <UnpaidToggle
                     on={unpaid}
@@ -529,6 +575,7 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted, bookingId }: Pro
                   />
                   {unpaid && <span className="muted start-dialog__switch-hint">{t("session.unpaid.startHint")}</span>}
                 </div>
+                )}
                 {outsideFoodFee !== null && (
                   <div className="start-dialog__switch" data-testid="start-outside-food">
                     <UnpaidToggle
@@ -547,10 +594,24 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted, bookingId }: Pro
                     )}
                   </div>
                 )}
+                {prepaidApplies && (
+                  <div className="start-dialog__switch" data-testid="start-prepaid">
+                    <UnpaidToggle
+                      on={prepaid}
+                      onChange={setPrepaid}
+                      disabled={busy}
+                      label={t("session.prepaid.switch")}
+                      fullLabel={t("session.prepaid.switchFull")}
+                      testId="prepaid-switch"
+                      tone="success"
+                    />
+                    {prepaid && <span className="muted start-dialog__switch-hint">{t("session.prepaid.startHint")}</span>}
+                  </div>
+                )}
               </div>
             )}
 
-            {!isFree && offerPackages && (
+            {!isFree && (
             <div className="row" style={{ gap: 8 }} data-testid="start-mode">
               {/* A PlayStation may be sold a package too.
 
@@ -566,16 +627,33 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted, bookingId }: Pro
                   The backend has always accepted a package on any device — a
                   console simply has no kiosk agent to notify, which the start
                   path already handles. */}
-              <button type="button" onClick={() => setMode("fixed")} style={tabStyle(mode === "fixed")}>
+              {offerPackages && (
+              <button type="button" onClick={() => setMode("fixed")} style={tabStyle(mode === "fixed")} data-testid="start-mode-fixed">
                 {t("session.fixedTariff")}
               </button>
-              <button type="button" onClick={() => setMode("open")} style={tabStyle(mode === "open")}>
+              )}
+              <button type="button" onClick={() => setMode("open")} style={tabStyle(mode === "open")} data-testid="start-mode-open">
                 {t("session.openByHour")}
+              </button>
+              {/* «На сумму» (2026-11-15): the player names the money, the server the time. */}
+              <button type="button" onClick={() => setMode("amount")} style={tabStyle(mode === "amount")} data-testid="start-mode-amount">
+                {t("session.byAmountTab")}
               </button>
             </div>
             )}
 
-            {!isFree && (mode === "fixed" ? (
+            {!isFree && mode === "amount" && (
+              <StartByAmount
+                value={amountInput}
+                onChange={setAmountInput}
+                quote={amountQuote}
+                quoted={quotedAmount}
+                money={money}
+                t={t}
+              />
+            )}
+
+            {!isFree && mode !== "amount" && (mode === "fixed" ? (
               <div className="col" style={{ gap: 6 }}>
                 <span className="label">{t("session.tariffField")}</span>
                 {pkgError || !packages ? (
@@ -760,6 +838,8 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted, bookingId }: Pro
                   `№${pc.place?.number ?? pc.label}`,
                   isFree
                     ? t("session.freeBill")
+                    : mode === "amount"
+                      ? (quotedAmount !== null ? fmt(t("session.summary.byAmount"), money(quotedAmount.amount), durationLabel(quotedAmount.minutes, t)) : t("session.byAmountTab"))
                     : mode === "fixed"
                       ? (packages?.find((p) => p.id === pkgId) ? timePackageNameOf(packages.find((p) => p.id === pkgId)!, lang) : t("session.choosePackage"))
                       : effectiveRate !== null && !planByHand ? `${money(effectiveRate)} / ${t("time.hourShort") || "h"}` : null,

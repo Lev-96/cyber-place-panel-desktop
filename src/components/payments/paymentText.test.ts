@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 import { paymentText } from "./paymentText";
 
-const t = (k: string) => ({ "session.payCash": "Наличные", "session.payCard": "Карта", "session.payOther": "Другой", "pay.splitSummary": "Раздельно" } as Record<string, string>)[k] ?? k;
+const t = (k: string) => ({ "session.payCash": "Наличные", "session.payCard": "Карта", "session.payOther": "Другой", "pay.splitSummary": "Раздельно", "pay.otherShort": "Другое" } as Record<string, string>)[k] ?? k;
 const money = (n: number) => `${n}֏`;
 
 describe("a paid bill in words", () => {
@@ -15,5 +15,14 @@ describe("a paid bill in words", () => {
     expect(paymentText({ payment_method: "other", payment_method_other: "Idram" }, t, money)).toBe("Другой: Idram");
     expect(paymentText({ payment_method: null }, t, money)).toBeNull();
     expect(paymentText({ payment_method: "split", payments: [] }, t, money)).toBe("Раздельно");
+  });
+  test("«Другое» with no words reads «Другое» (2026-11-15, owner), never nothing", () => {
+    expect(paymentText({ payment_method: "other", payment_method_other: null }, t, money)).toBe("Другое");
+    expect(paymentText({ payment_method: "other", payment_method_other: "  " }, t, money)).toBe("Другое");
+  });
+  test("a split with no note: just the parts", () => {
+    expect(paymentText({ payment_method: "split", payments: [
+      { method: "card", amount: "600.00", note: null }, { method: "cash", amount: "400.00", note: null },
+    ] }, t, money)).toBe("Раздельно: Карта 600֏ · Наличные 400֏");
   });
 });

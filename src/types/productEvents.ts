@@ -16,6 +16,10 @@ export const PRODUCT_ACTIONS = [
   "deactivated",
   "deleted",
   "translation_changed",
+  // Stock (2026-11-16): what staff did to a product's count.
+  "stock_received",
+  "stock_corrected",
+  "stock_untracked",
 ] as const;
 
 export type ProductAction = (typeof PRODUCT_ACTIONS)[number];
@@ -32,10 +36,17 @@ export const PRODUCT_ACTION_KEY = {
   deactivated: "productHistory.action.deactivated",
   deleted: "productHistory.action.deleted",
   translation_changed: "productHistory.action.translation_changed",
+  stock_received: "productHistory.action.stock_received",
+  stock_corrected: "productHistory.action.stock_corrected",
+  stock_untracked: "productHistory.action.stock_untracked",
 } as const satisfies Record<ProductAction, string>;
 
 /** The price actions carry `old_price` / `new_price`; the rest carry `before` / `after`. */
 export const isPriceAction = (a: ProductAction): boolean => a === "price_set" || a === "price_changed";
+
+/** The stock actions carry `old_stock` / `new_stock` / `stock_delta` (null stock = not counted). */
+export const isStockAction = (a: ProductAction): boolean =>
+  a === "stock_received" || a === "stock_corrected" || a === "stock_untracked";
 
 /** A field snapshot as the server stored it (json column) — `{ name: "Tea" }`, `{ category: null }`. */
 export type ProductEventValues = Record<string, string | number | boolean | null>;
@@ -61,6 +72,10 @@ export interface IProductEvent {
   after: ProductEventValues | null;
   old_price: string | null;
   new_price: string | null;
+  /** Stock actions only (absent on every other line): the count before / after, and the change. */
+  old_stock?: number | null;
+  new_stock?: number | null;
+  stock_delta?: number | null;
   created_at: string;
 }
 

@@ -47,7 +47,11 @@ describe("a paused session's figures", () => {
   });
 
   test("leave every one of several pauses out once", () => {
+    // Each resume moved the end by its pause, as the server does: 15:00 + 30.
+    // (Left at 15:00 the seat would be over at 15:00, and since 2026-11-15
+    // nothing is billed past a running seat's end.)
     const session = fixed({
+      ends_at: iso("15:30"),
       pauses: [
         { paused_at: iso("14:10"), resumed_at: iso("14:15") },
         { paused_at: iso("14:25"), resumed_at: iso("14:40") },
@@ -79,6 +83,8 @@ describe("a paused session's figures", () => {
 
   test("hourly pads and extras leave out only the pause they lived through", () => {
     const session = fixed({
+      // The resume moved the end by the pause: 15:00 + 20 (see above).
+      ends_at: iso("15:20"),
       pauses: [{ paused_at: iso("14:30"), resumed_at: iso("14:50") }],
       joysticks: [
         // Out across the pause: 60 − 20 = 40 min at 600 = 400.

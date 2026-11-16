@@ -55,3 +55,30 @@ describe("describeChange", () => {
     }
   });
 });
+
+/** Stock lines (2026-11-16): the server's counts, «5 → 15 (+10)». */
+describe("describeChange — stock", () => {
+  const fs = { ...f, notCounted: "Без учёта", via: (v: string) => (v === "merge" ? "same name" : v === "create" ? "on create" : null) };
+
+  test("a receipt reads before → after with the change", () => {
+    expect(describeChange(ev({ action: "stock_received", before: { stock: 5 }, after: { stock: 15, delta: 10, via: "add" }, old_stock: 5, new_stock: 15, stock_delta: 10 }), fs))
+      .toEqual([{ from: "5", to: "15", note: "(+10)" }]);
+  });
+
+  test("a create that landed on the product of that name says so", () => {
+    expect(describeChange(ev({ action: "stock_received", after: { stock: 15, delta: 10, via: "merge" }, old_stock: 5, new_stock: 15, stock_delta: 10 }), fs))
+      .toEqual([{ from: "5", to: "15", note: "(+10) · same name" }]);
+  });
+
+  test("a first count and counting off read «Без учёта», without a change in brackets", () => {
+    expect(describeChange(ev({ action: "stock_received", after: { stock: 10, delta: 10, via: "create" }, old_stock: null, new_stock: 10, stock_delta: 10 }), fs))
+      .toEqual([{ from: "Без учёта", to: "10", note: "on create" }]);
+    expect(describeChange(ev({ action: "stock_untracked", old_stock: 6, new_stock: null, stock_delta: -6 }), fs))
+      .toEqual([{ from: "6", to: "Без учёта" }]);
+  });
+
+  test("a recount below zero uses a real minus sign", () => {
+    expect(describeChange(ev({ action: "stock_corrected", old_stock: 2, new_stock: -1, stock_delta: -3 }), fs))
+      .toEqual([{ from: "2", to: "−1", note: "(−3)" }]);
+  });
+});

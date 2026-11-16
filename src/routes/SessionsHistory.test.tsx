@@ -360,8 +360,11 @@ describe("how the money was taken", () => {
     // A bold empty gap under "Payment method" reads as a fault.
     expect(paid({})).toBeNull();
     expect(paid({ payment_method: null })).toBeNull();
-    expect(paid({ payment_method: "other", payment_method_other: null })).toBeNull();
-    expect(paid({ payment_method: "other", payment_method_other: "   " })).toBeNull();
+  });
+
+  test("«Другое» with nothing typed reads «Другое» (2026-11-15, owner: the words are optional)", () => {
+    expect(paid({ payment_method: "other", payment_method_other: null })).toBe("pay.otherShort");
+    expect(paid({ payment_method: "other", payment_method_other: "   " })).toBe("pay.otherShort");
   });
 });
 

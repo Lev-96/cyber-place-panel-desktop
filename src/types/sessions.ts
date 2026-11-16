@@ -146,6 +146,28 @@ export interface ISessionJoystick {
   stopped_at: string | null;
 }
 
+/** `SessionResource.reminder` (2026-11-15): wall clock, rings once. */
+export interface ISessionReminder {
+  /** When it is due (ISO). */
+  at: string;
+  set_at: string | null;
+  /** The length it was set for, in minutes (1..600). */
+  minutes: number | null;
+  /** The player's words, up to 120 characters; null: none. */
+  note: string | null;
+  set_by_user_id: number | null;
+  /** When it rang; null: not yet. */
+  fired_at: string | null;
+}
+
+/** `rate_now` / `hourly_now` (2026-11-15): what an hour of the seat costs now, by part. */
+export interface ISessionHourlyNow {
+  seat: number | null;
+  pads: number;
+  extras: number;
+  total: number;
+}
+
 export interface ISessionApi {
   id: number;
   branch_id: number;
@@ -251,6 +273,11 @@ export interface ISessionApi {
     line_total?: number | string;
     /** What the line is when it is not a sale (2026-11-13); null on a sale. */
     kind?: SessionItemKind | null;
+    /**
+     * Handed over NOT paid yet (2026-11-15): when; null/absent = paid. A
+     * reminder only: the line is priced and billed exactly as a paid one.
+     */
+    unpaid_at?: string | null;
   }>;
 
   /**
@@ -291,6 +318,21 @@ export interface ISessionApi {
   plan_rebased_at?: string | null;
   amount_before_plan_rebase?: number | string | null;
   /**
+   * The ends of the plan's EARLIER periods (2026-11-16): PLAYED seconds from
+   * the plan's anchor (`plan_rebased_at`, else the start) and what the time
+   * costs there. Time sold later ("+ Время", a package extension) is a period
+   * of its own at its own price; null/absent = one period.
+   */
+  plan_period_ends?: { seconds: number; amount: number | string }[] | null;
+  /**
+   * The seat's rate as it was SOLD (2026-11-16): `rate_price` for
+   * `rate_seconds` of play — a 2500 / 180 min deal kept through "unlimited",
+   * a total typed for a length — when `hourly_rate` is only its hour rounded
+   * to the cent. Null/absent: `hourly_rate` (or the package) is exact.
+   */
+  rate_price?: number | string | null;
+  rate_seconds?: number | null;
+  /**
    * The clock reset to zero (2026-11-05): what it had earned at
    * `time_reset_at` was waived; the time costs the clock minus
    * `time_reset_offset` (the raw clock then), with no VIP minimum after it.
@@ -304,8 +346,25 @@ export interface ISessionApi {
   cancelled_at?: string | null;
   /** Extra time not paid yet (2026-11-07): on since when; null = off. */
   unpaid_since?: string | null;
-  /** Once ended: what the player owes for that extra time (the server's figure). */
+  /**
+   * Once ended: what the player still owes (the server's figure) — the extra
+   * time not paid and, since 2026-11-15, the lines handed over unpaid.
+   */
   unpaid_amount?: number | null;
+  /**
+   * The lines handed over NOT paid yet, at their line totals (2026-11-15):
+   * the card's «Не оплачено» chip. Null/absent when items were not loaded or
+   * from an older backend.
+   */
+  unpaid_items_total?: number | null;
+  /** Cash handed over AHEAD (2026-11-15, «На сумму» / «Оплачено вперёд»); null: none. Never revenue. */
+  prepaid_amount?: number | null;
+  /** Once ended: the cash the guest handed over in all; null: not on record. */
+  cash_received?: number | null;
+  /** Once ended: the change given back, worked out by the SERVER; null: no cash on record. */
+  cash_change?: number | null;
+  /** The reminder a player asked for (2026-11-15); null/absent: none. */
+  reminder?: ISessionReminder | null;
   /**
    * A rate change mid-way — the player moved to a seat priced differently.
    * What the clock had earned at `rate_changed_at` is frozen in

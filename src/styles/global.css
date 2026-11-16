@@ -6329,6 +6329,16 @@ select.input option:disabled {
 .hs-list {
   gap: 20px;
 }
+/* The History place filter (2026-11-15): a seat is «№N · name», and a long
+   name is cut, never the filter bar; the chosen line is the select's tooltip.
+   A fixed cap, not a percentage (see .cal__seat): the bar measures its
+   content, and a percentage would let the select ask for its longest name. */
+.hs-place {
+  width: auto;
+  min-width: 160px;
+  max-width: 260px;
+  text-overflow: ellipsis;
+}
 .hs-card {
   display: flex;
   flex-direction: column;
@@ -6648,6 +6658,12 @@ select.input option:disabled {
 }
 .hs-bill__pay strong {
   color: var(--color-text);
+}
+/* Left owing at the hand-over (2026-11-15): amber, like the board's chip. */
+.hs-bill__unpaid > * {
+  padding-top: 2px;
+  color: var(--color-warning);
+  font-weight: 600;
 }
 
 /* ── Add Product: additional items (chips, a cue, a racket) ───────────────
@@ -8757,6 +8773,12 @@ select.input option:disabled {
 .cal__seat {
   width: auto;
   min-width: 160px;
+  /* A seat is «№N · name» (2026-11-15): a long name is cut, never the bar;
+     the chosen seat's whole line is the select's tooltip. */
+  /* A fixed cap, not a percentage: a percentage is ignored when the bar
+     measures its content, and the select would ask for its longest name. */
+  max-width: 320px;
+  text-overflow: ellipsis;
 }
 .cal__create { gap: var(--space-2); }
 .cal__sub {
@@ -9010,11 +9032,19 @@ select.input option:disabled {
   background: var(--color-surface);
   border-right: 1px solid var(--color-border);
 }
+/* «№N · name» (2026-11-15): two lines at most in the 132px column, then an
+   ellipsis; the number leads, so only the name is ever cut, and the whole
+   line is the title. */
 .tl__seat-name {
   font-size: var(--fs-md);
   font-weight: 700;
   line-height: 1.3;
   overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
 }
 .tl__seat-meta {
   display: inline-flex;
@@ -9217,7 +9247,19 @@ select.input option:disabled {
   line-height: 1.3;
   font-variant-numeric: tabular-nums;
 }
-.cal-item__seat { font-size: var(--fs-md); font-weight: 700; line-height: 1.3; color: var(--color-primary); }
+/* One line, an ellipsis on a long name (the whole line is the title); on its
+   own row under the time when the two do not fit side by side. */
+.cal-item__seat {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--fs-md);
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--color-primary);
+}
 .cal-item__state { margin-left: auto; }
 .cal-item__who {
   display: flex;
@@ -9273,6 +9315,8 @@ select.input option:disabled {
   flex-direction: column;
   gap: var(--space-1);
 }
+/* The seat picker: «№N · name» cut with an ellipsis, the whole line its title. */
+.reservation-form__seat { min-width: 0; text-overflow: ellipsis; }
 .reservation-form__note { font-size: var(--fs-sm); line-height: 1.4; }
 .reservation-details__list { margin: 0; display: flex; flex-direction: column; gap: var(--space-2); }
 .reservation-details__row { display: flex; gap: var(--space-3); line-height: 1.4; }
@@ -10174,16 +10218,27 @@ select.input option:disabled {
 
 /* === Owner dashboard: the platform bill as a wide card (2026-11-09) =========
    Under the stat tiles and exactly as wide: what is owed and where that
-   stands on the left, three facts in the middle, «Details» on the right. It
-   folds to one column on a narrow window. */
+   stands on the left, three facts in the middle, «Details» on the right.
+
+   Flex-wrap, not a fixed grid (2026-11-15, owner: «Подробнее» lay on the text
+   on a narrower window). The grid kept three columns down to a 1100px WINDOW
+   whatever the card's own width, and the access badge (one line, never cut)
+   spilled out of its third of the facts under the button; Armenian broke it
+   even at 1280/1440. Now each part wraps to the next line the moment its own
+   content no longer fits beside the others: the button first goes under or
+   beside the amount, the facts under it, a fact under its neighbours. Nothing
+   can overlap at any width or language, because a flex line never holds more
+   than fits. The bases keep the grid's 1.2 : 2 split (240 : 400), so a wide
+   card reads as it did. */
 .stat-grid--fill {
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
 }
 .platform-debt--wide {
-  display: grid;
-  grid-template-columns: minmax(240px, 1.2fr) minmax(0, 2fr) auto;
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
   align-items: center;
-  gap: var(--space-6);
+  gap: var(--space-4) var(--space-6);
   padding: var(--space-6);
   border-left-width: 6px;
   background:
@@ -10191,10 +10246,16 @@ select.input option:disabled {
     rgb(var(--surface-rgb) / 0.72);
 }
 .platform-debt--wide .platform-debt__main {
+  flex: 1.2 1 240px;
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
   min-width: 0;
+}
+/* No `min-width: 0`: the facts never get narrower than their widest fact,
+   so a fact that does not fit wraps the facts under the amount instead. */
+.platform-debt--wide .platform-debt__facts {
+  flex: 2 1 400px;
 }
 .platform-debt--wide .platform-debt__title {
   display: flex;
@@ -10252,25 +10313,29 @@ select.input option:disabled {
   color: var(--color-text-soft);
 }
 .platform-debt--wide .platform-debt__more {
+  flex: 0 0 auto;
   align-self: center;
   margin: 0;
   white-space: nowrap;
 }
-@media (max-width: 1100px) {
-  .platform-debt--wide {
-    grid-template-columns: 1fr;
-    gap: var(--space-4);
+/* Above a phone the facts are a wrapping row too: each at least as wide as
+   its own words and badge (`min-width: auto`), so the access badge, which is
+   one line, moves under its neighbours rather than out of its box. */
+@media (min-width: 641px) {
+  .platform-debt--wide .platform-debt__facts {
+    display: flex;
+    flex-wrap: wrap;
   }
-  .platform-debt--wide .platform-debt__more {
-    justify-self: start;
+  .platform-debt--wide .platform-debt__fact {
+    flex: 1 1 9rem;
+    min-width: auto;
   }
 }
 /* Phones (owner web, Telegram Mini App; 360–430px wide), 2026-11-09: the bill
    reads in one glance. Tighter padding and type, the amount and its sentence
    on top (DOM order), the facts as a two-column grid of small boxes (the odd
    last one, access, a full row with its badge on the right), «Details» across
-   the card. Sizes and placement only; the desktop look (≥ 1100px) is not
-   touched. */
+   the card. Sizes and placement only; above 640px this block does not apply. */
 @media (max-width: 640px) {
   .platform-debt--wide {
     gap: var(--space-3);
@@ -10325,6 +10390,11 @@ select.input option:disabled {
   .platform-debt--wide .platform-debt__more {
     justify-self: stretch;
     width: 100%;
+  }
+  /* One part per line, full width, in DOM order (a flex line of one). */
+  .platform-debt--wide .platform-debt__main,
+  .platform-debt--wide .platform-debt__facts {
+    flex-basis: 100%;
   }
 }
 
@@ -11086,4 +11156,403 @@ select.input option:disabled {
   width: auto;
   min-width: 180px;
   max-width: 100%;
+}
+
+/* ── Paid ahead, unpaid lines, keep the rate, reminders (2026-11-15) ───────
+   One loud thing only: the CHANGE figure on the receipt. Everything else is
+   quiet and reuses the board's tokens — amber = something still owed, green =
+   money to hand back, the accent = the server's answer read aloud. */
+
+/* «Безлимит» without a price: the rule said plainly, beside the gate. */
+.options-keep-rate {
+  display: block;
+  padding: var(--space-2) var(--space-3);
+  border-left: 3px solid var(--color-primary);
+  border-radius: 0 8px 8px 0;
+  background: color-mix(in srgb, var(--color-primary) 7%, transparent);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+/* The card's chips (SessionCardChips): pills like the pause pill, coloured by
+   what they mean. Amber: products handed over not paid yet. */
+.session-chip {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+/* First on the tariff line: the gap goes after it, not before. */
+.session-card__pill.pill.session-chip {
+  margin: 0 6px 0 0;
+}
+.session-chip--unpaid {
+  color: var(--color-warning);
+  border-color: color-mix(in srgb, var(--color-warning) 55%, transparent);
+  background: color-mix(in srgb, var(--color-warning) 10%, transparent);
+}
+
+/* «не оплачено» on a bill line, and its «Оплачено» button (AddSessionItemDialog). */
+.unpaid-tag {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--color-warning) 55%, transparent);
+  color: var(--color-warning);
+  font-size: 10px;
+  font-weight: 700;
+  vertical-align: 1px;
+}
+.btn.secondary.unpaid-pay-btn {
+  padding: 4px 10px;
+  min-height: 0;
+  font-size: 12px;
+  color: var(--color-success);
+  border-color: color-mix(in srgb, var(--color-success) 55%, transparent);
+  white-space: nowrap;
+}
+/* The receipt's "of these, not paid" line: amber, inside the products' total. */
+.receipt-unpaid {
+  color: var(--color-warning);
+}
+
+/* Paid ahead on the Stop receipt (PrepaidSettlement). The CHANGE is the one
+   loud thing in this feature: money that must physically go back across the
+   counter. A figure of 44px in the success green, on a tinted panel with a
+   solid rail, announced as a status. "Still to pay" is amber and calm; "paid
+   in full" is muted. */
+.prepaid-settlement {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+.prepaid-settlement__row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--space-3);
+  font-size: 14px;
+}
+.prepaid-settlement__row strong { font-variant-numeric: tabular-nums; }
+.prepaid-change {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: var(--space-3);
+  row-gap: 2px;
+  padding: var(--space-3) var(--space-4, 16px);
+  border-left: 6px solid var(--color-success);
+  border-radius: 0 12px 12px 0;
+  background: color-mix(in srgb, var(--color-success) 14%, transparent);
+  color: var(--color-success);
+  animation: prepaid-change-in 260ms ease-out both;
+}
+.prepaid-change__label {
+  font-size: 18px;
+  font-weight: 700;
+}
+.prepaid-change__figure {
+  font-size: 44px;
+  line-height: 1.05;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+.prepaid-change__hint {
+  flex-basis: 100%;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text);
+}
+@keyframes prepaid-change-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .prepaid-change { animation: none; }
+}
+.prepaid-due {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid color-mix(in srgb, var(--color-warning) 55%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--color-warning) 10%, transparent);
+  color: var(--color-warning);
+  font-size: 16px;
+  font-weight: 700;
+}
+.prepaid-due strong { font-size: 22px; font-variant-numeric: tabular-nums; }
+.prepaid-full {
+  font-size: 13px;
+  text-align: right;
+}
+.session-chip--prepaid {
+  color: var(--color-success);
+  border-color: color-mix(in srgb, var(--color-success) 55%, transparent);
+  background: color-mix(in srgb, var(--color-success) 10%, transparent);
+}
+/* «Оплачено вперёд»: UnpaidToggle in the success green (money already in the
+   drawer). Same specificity as the amber rules, declared after them. */
+.btn.unpaid-toggle--success:hover:not(:disabled) .cp-switch-track { border-color: var(--color-success); }
+.btn.unpaid-toggle--success:focus-visible .cp-switch-track {
+  border-color: var(--color-success);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-success) 30%, transparent);
+}
+.btn.unpaid-toggle--success.is-on .cp-switch-track {
+  background: var(--color-success);
+  border-color: var(--color-success);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-success) 18%, transparent);
+}
+.btn.unpaid-toggle--success.is-on .cp-switch-thumb { background: #04140b; }
+.btn.unpaid-toggle--success.is-on .unpaid-toggle__label { color: var(--color-success); }
+
+/* «На сумму» in Start: the server's answer read aloud as one big line. */
+.start-amount {
+  gap: var(--space-2);
+}
+.start-amount__answer {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--space-3);
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--color-primary) 40%, transparent);
+  background: color-mix(in srgb, var(--color-primary) 8%, transparent);
+}
+.start-amount__result {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: var(--space-2);
+  color: var(--color-primary);
+  font-size: 28px;
+  line-height: 1.15;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.start-amount__arrow { color: var(--color-muted); font-weight: 400; }
+.start-amount__rate { font-size: 13px; color: var(--color-text); }
+.start-amount__hint, .start-amount__note { font-size: 12px; }
+/* The reminder chip: calm in the accent while pending; once rung, amber with
+   a soft pulse (opacity only) until somebody clears it. */
+.session-chip--reminder {
+  color: var(--color-primary);
+  border-color: color-mix(in srgb, var(--color-primary) 50%, transparent);
+}
+.session-chip--reminder.is-fired {
+  color: var(--color-warning);
+  border-color: var(--color-warning);
+  background: color-mix(in srgb, var(--color-warning) 14%, transparent);
+  animation: reminder-chip-pulse 1.6s ease-in-out infinite;
+}
+@keyframes reminder-chip-pulse {
+  50% { opacity: 0.55; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .session-chip--reminder.is-fired { animation: none; }
+}
+
+/* «Напоминание» in «+ Время». */
+.reminder-section { gap: var(--space-2); }
+.reminder-section__hint { font-size: 12px; }
+.reminder-pending {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: var(--space-2) var(--space-3);
+  border-left: 3px solid var(--color-primary);
+  border-radius: 0 8px 8px 0;
+  background: color-mix(in srgb, var(--color-primary) 7%, transparent);
+}
+.reminder-pending.is-fired {
+  border-left-color: var(--color-warning);
+  background: color-mix(in srgb, var(--color-warning) 10%, transparent);
+}
+.reminder-pending__when { font-weight: 700; font-variant-numeric: tabular-nums; }
+.reminder-pending__note { font-size: 13px; overflow-wrap: anywhere; }
+.reminder-pending__actions { gap: var(--space-2); flex-wrap: wrap; margin-top: 4px; }
+
+/* "The player asked to be reminded" (SessionReminderNotifier): the ending-soon
+   card's shape, in the accent rather than amber (a request kept, not a seat
+   running out), and bottom-right so the two stacks never cover each other. */
+.ending-soon-stack.reminder-stack {
+  top: auto;
+  bottom: 16px;
+}
+.ending-soon-card.reminder-card {
+  background: color-mix(in srgb, var(--color-surface, #0b1328) 92%, var(--color-primary));
+  border: 1px solid color-mix(in srgb, var(--color-primary) 45%, transparent);
+  border-left: 4px solid var(--color-primary);
+  color: var(--color-text);
+  animation: reminder-card-in 220ms ease-out both;
+}
+@keyframes reminder-card-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ending-soon-card.reminder-card { animation: none; }
+}
+.reminder-card__title { font-weight: 800; font-size: 15px; }
+.reminder-card__body { margin-top: 4px; font-size: 14px; }
+.reminder-card__note { margin-top: 2px; font-size: 13px; color: var(--color-muted); overflow-wrap: anywhere; }
+.reminder-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: 10px;
+}
+.reminder-card .ending-soon-card__action {
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--on-accent-ink-page);
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+}
+.reminder-card .ending-soon-card__action.is-secondary {
+  color: var(--color-text);
+  background: transparent;
+  border-color: color-mix(in srgb, var(--color-text) 30%, transparent);
+  font-weight: 600;
+}
+
+/* ── Stock on the shelf (2026-11-16) ────────────────────────────────────
+   Every figure is the server's; these only draw it. Below zero is red, and
+   said in words beside the colour (never by colour alone). */
+/* A product's count on its catalogue row. */
+.product-stock {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.product-stock.is-negative,
+.shift-stock .is-negative {
+  color: var(--color-danger);
+  font-weight: 700;
+}
+/* The server's total above the catalogue; the "below zero" count beside it. */
+.product-stock-total {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 16px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.product-stock-total__negative {
+  color: var(--color-danger);
+}
+/* «ост. 15» beside a basket row or a typed line: a hint, never a limit. */
+.stock-chip {
+  display: inline-block;
+  flex-shrink: 0;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  border: 1px solid var(--color-border);
+  color: var(--color-muted);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.4;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.stock-chip.is-empty {
+  color: var(--color-warning);
+  border-color: color-mix(in srgb, var(--color-warning) 55%, transparent);
+}
+.stock-chip.is-negative {
+  color: var(--color-danger);
+  border-color: color-mix(in srgb, var(--color-danger) 55%, transparent);
+}
+/* «Такой товар уже есть»: the 409 question inside the product form. */
+.product-merge {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--color-warning) 55%, transparent);
+  background: var(--color-surface-alt);
+}
+.product-merge__title {
+  font-size: 15px;
+}
+.product-merge__hint {
+  font-size: 12px;
+}
+.product-merge__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+/* A product's stock: received, recounted, switched off. */
+.product-stock-dialog {
+  width: 480px;
+  max-width: 92vw;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.product-stock-dialog__now {
+  font-size: 15px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+/* The shift report's «Остатки»: scrolls in its own viewport (.hs-scroll). */
+.shift-stock {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+.shift-stock th,
+.shift-stock td {
+  padding: 6px 8px;
+  text-align: right;
+  white-space: nowrap;
+}
+.shift-stock thead th {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-muted);
+  border-bottom: 1px solid var(--color-border);
+}
+.shift-stock thead th:first-child,
+.shift-stock th[scope="row"] {
+  text-align: left;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.shift-stock tbody th[scope="row"] {
+  font-weight: 500;
+}
+.shift-stock tfoot th,
+.shift-stock tfoot td {
+  border-top: 1px solid var(--color-border);
+  font-weight: 700;
+}
+.shift-stock__negative {
+  margin-top: 6px;
+  font-size: 13px;
+  color: var(--color-danger);
+}
+/* A catalogue row (2026-11-16): the product, then its buttons. On a narrow
+   window the buttons wrap under the product instead of pushing past the page
+   (four of them — «Остаток» joined Hide / Edit / Delete — do not fit 520px). */
+.list-item.product-row {
+  flex-wrap: wrap;
+}
+.product-row__main {
+  flex: 1 1 200px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.product-row__actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }

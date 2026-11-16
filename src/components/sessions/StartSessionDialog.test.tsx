@@ -26,7 +26,7 @@ import { PSN_FEATURE } from "@/api/psn";
  * has always seen.
  */
 
-const repo = vi.hoisted(() => ({ start: vi.fn(), startQuote: vi.fn(), startOptions: vi.fn() }));
+const repo = vi.hoisted(() => ({ start: vi.fn(), startQuote: vi.fn(), startOptions: vi.fn(), startQuoteByAmount: vi.fn() }));
 const UNTIL_ENDS_AT = new Date(new Date().setHours(24, 40, 0, 0)).toISOString();
 const UNTIL_PASSED = "This time has already passed or is more than 10 hours away. Choose another end time.";
 const auth = vi.hoisted(() => ({ role: "company_owner" as string }));
@@ -39,6 +39,7 @@ vi.mock("@/repositories/SessionRepository", () => ({
     start: (...a: unknown[]) => repo.start(...a),
     startQuote: (...a: unknown[]) => repo.startQuote(...a),
     startOptions: (...a: unknown[]) => repo.startOptions(...a),
+    startQuoteByAmount: (...a: unknown[]) => repo.startQuoteByAmount(...a),
   },
 }));
 vi.mock("@/auth/AuthContext", () => ({ useAuth: () => ({ user: { id: 1, role: auth.role } }) }));
@@ -67,7 +68,8 @@ vi.mock("@/repositories/BranchRepository", () => ({
   branchRepository: { byId: vi.fn().mockResolvedValue({ id: 7, price_for_branch: { "ps5-standard": 1500 } }) },
 }));
 vi.mock("@/i18n/LanguageContext", () => ({
-  useLang: () => ({ t: (k: string) => k, money: (n: number) => String(n), lang: "en", currency: "AMD" }),
+  // «На сумму»'s rate line keeps its placeholders, so the server's figures are visible.
+  useLang: () => ({ t: (k: string) => (k === "session.byAmount.rate" || k === "session.byAmount.food" ? `${k} {0} {1}` : k), money: (n: number) => String(n), lang: "en", currency: "AMD" }),
 }));
 
 const device = (over: Partial<IPcApi> = {}): IPcApi => ({
@@ -929,7 +931,8 @@ describe("the simpler start dialog (2026-11-05)", () => {
       await noPackages();
       await mount({ ...computer(), assigned_hourly_rate: 900 } as IPcApi);
 
-      expect(screen.queryByTestId("start-mode")).toBeNull();
+      // No package tab; by the hour and «На сумму» (2026-11-15) remain.
+      expect(screen.queryByTestId("start-mode-fixed")).toBeNull();
       expect(screen.queryByText("session.fixedTariff")).toBeNull();
       expect(screen.queryByText("session.noPackages")).toBeNull();
       expect(screen.getByTestId("planned-duration")).toBeTruthy();
@@ -1329,7 +1332,8 @@ describe("«Свои продукты» at the start", () => {
     await mount(computer());
     const row = screen.getByTestId("start-switches");
     const parts = [...row.children].map((c) => c.getAttribute("data-testid"));
-    expect(parts).toEqual(["start-unpaid", "start-outside-food"]);
+    // «Оплачено вперёд» (2026-11-15) joins the row after them on a package start.
+    expect(parts).toEqual(["start-unpaid", "start-outside-food", "start-prepaid"]);
     expect(row.querySelector('[data-testid="unpaid-switch"]')).toBeTruthy();
     expect(foodSwitch()!.getAttribute("aria-checked")).toBe("false");
     expect(foodSwitch()!.getAttribute("aria-label")).toBe("session.outsideFood.switchFull");
@@ -1434,5 +1438,159 @@ describe("«Свои продукты» at the start", () => {
     await start();
     expect(repo.start.mock.calls[1][0]).not.toHaveProperty("outside_food");
     expect(repo.start.mock.calls[1][0]).not.toHaveProperty("outside_food_fee");
+  });
+});
+
+/**
+ * «Оплачено вперёд» (2026-11-15, owner): a package or a planned length paid in
+ * cash at the counter, so a player who leaves early gets the change at Stop.
+ * Only where there is a plan to pay; never with «Не оплачено» (the two flip
+ * each other off); off by default, and then the request is exactly as before.
+ */
+describe("paid ahead at the start", () => {
+  const settle = async () => { await act(async () => { await new Promise((r) => setTimeout(r, 320)); }); };
+  const startButton = () => screen.getByRole("button", { name: "action.start" }) as HTMLButtonElement;
+  const prepaidSwitch = () => screen.queryByTestId("prepaid-switch") as HTMLButtonElement | null;
+  const unpaidSwitch = () => screen.getByTestId("unpaid-switch") as HTMLButtonElement;
+  const typePlan = async (value: string) => {
+    await act(async () => { fireEvent.change(screen.getByTestId("planned-duration-input-hours"), { target: { value } }); });
+  };
+
+  test("by the hour with no plan: not offered (nothing to pay ahead)", async () => {
+    await mount(device());
+    await settle();
+    expect(prepaidSwitch()).toBeNull();
+  });
+
+  test("a planned length: offered, and sent as prepaid:true", async () => {
+    await mount(device());
+    await typePlan("2");
+    await settle();
+    await act(async () => { fireEvent.click(prepaidSwitch()!); });
+    expect(prepaidSwitch()!.getAttribute("aria-checked")).toBe("true");
+    await act(async () => { fireEvent.click(startButton()); });
+    expect(repo.start.mock.calls[0][0]).toMatchObject({ mode: "open", duration_minutes: 120, prepaid: true });
+    expect(repo.start.mock.calls[0][0]).not.toHaveProperty("unpaid");
+  });
+
+  test("a package: offered and sent", async () => {
+    await mount(device({ kind: PC_KIND.Pc }));
+    await settle();
+    await act(async () => { fireEvent.click(prepaidSwitch()!); });
+    await act(async () => { fireEvent.click(startButton()); });
+    expect(repo.start.mock.calls[0][0]).toMatchObject({ mode: "fixed", time_package_id: 1, prepaid: true });
+  });
+
+  test("«Не оплачено» and «Оплачено вперёд» switch each other off", async () => {
+    await mount(device({ kind: PC_KIND.Pc }));
+    await settle();
+    await act(async () => { fireEvent.click(unpaidSwitch()); });
+    await act(async () => { fireEvent.click(prepaidSwitch()!); });
+    expect(unpaidSwitch().getAttribute("aria-checked")).toBe("false");
+    await act(async () => { fireEvent.click(unpaidSwitch()); });
+    expect(prepaidSwitch()!.getAttribute("aria-checked")).toBe("false");
+    await act(async () => { fireEvent.click(startButton()); });
+    expect(repo.start.mock.calls[0][0]).toMatchObject({ unpaid: true });
+    expect(repo.start.mock.calls[0][0]).not.toHaveProperty("prepaid");
+  });
+
+  test("off: the start request is exactly as before", async () => {
+    await mount(device({ kind: PC_KIND.Pc }));
+    await settle();
+    await act(async () => { fireEvent.click(startButton()); });
+    expect(repo.start.mock.calls[0][0]).not.toHaveProperty("prepaid");
+  });
+});
+
+/**
+ * «На сумму» (2026-11-15, owner): the player hands over a sum and plays for
+ * what it buys. Everything is the SERVER's (SessionStartByAmountTest: 5000 at
+ * 1000/h = 18000 s, ends 20:00): the dialog shows its quote and starts only on
+ * a quote for exactly the sum on screen, sending the sum and the seconds it
+ * showed; a refusal is the server's sentence, as is.
+ */
+describe("start by amount", () => {
+  const settle = async () => { await act(async () => { await new Promise((r) => setTimeout(r, 320)); }); };
+  const startButton = () => screen.getByRole("button", { name: "action.start" }) as HTMLButtonElement;
+  const amountTab = () => screen.getByTestId("start-mode-amount");
+  const amountBox = () => screen.getByTestId("start-amount").querySelector("input") as HTMLInputElement;
+  const quote = (amount: number, over: Record<string, unknown> = {}) => ({
+    amount, hourly_rate: 1000, outside_food_fee: 0, time_amount: amount, seconds: amount * 3.6, minutes: Math.ceil(amount * 3.6 / 60),
+    ends_at: "2026-11-15T20:00:00+04:00", standard_amount: amount, ...over,
+  });
+  beforeEach(() => {
+    repo.startQuoteByAmount.mockReset();
+    repo.startQuoteByAmount.mockImplementation((_pc: number, amount: number) => Promise.resolve(quote(amount)));
+  });
+
+  test("a tab of its own: the sum box gets the focus", async () => {
+    await mount(device());
+    await act(async () => { fireEvent.click(amountTab()); });
+    expect(document.activeElement).toBe(amountBox());
+    expect(startButton().disabled).toBe(true);
+  });
+
+  test("5000 → the server's 5 h at 1000/h, until 20:00, and Start sends the sum and its seconds", async () => {
+    await mount(device());
+    await act(async () => { fireEvent.click(amountTab()); });
+    await act(async () => { fireEvent.change(amountBox(), { target: { value: "5000" } }); });
+    await settle();
+    expect(repo.startQuoteByAmount).toHaveBeenLastCalledWith(1, 5000, false);
+    const result = screen.getByTestId("start-amount-result");
+    expect(result.textContent).toContain("5000");
+    expect(result.textContent).toContain("5 time.hourShort");
+    expect(screen.getByTestId("start-amount-rate").textContent).toContain("1000");
+    expect(screen.getByTestId("start-amount-note").textContent).toBe("session.byAmount.separate");
+    expect(startButton().disabled).toBe(false);
+    await act(async () => { fireEvent.click(startButton()); });
+    expect(repo.start.mock.calls[0][0]).toEqual({ branch_id: 7, pc_id: 1, user_display_name: "PS5 VIP", paid_amount: 5000, paid_seconds: 18000 });
+  });
+
+  test("own food first: the sum is sent whole, the seconds are what is left for time", async () => {
+    repo.startOptions.mockResolvedValue({ free_until: null, max_minutes: null, unlimited_allowed: true, next_booking: null, claimable_bookings: [], outside_food_fee: 500 });
+    repo.startQuoteByAmount.mockImplementation((_pc: number, amount: number, food: boolean) => Promise.resolve(food
+      ? quote(amount, { outside_food_fee: 500, time_amount: amount - 500, seconds: (amount - 500) * 3.6, minutes: Math.ceil((amount - 500) * 3.6 / 60) })
+      : quote(amount)));
+    await mount(device());
+    await act(async () => { fireEvent.click(amountTab()); });
+    await act(async () => { fireEvent.click(screen.getByTestId("outside-food-switch")); });
+    await act(async () => { fireEvent.change(amountBox(), { target: { value: "5000" } }); });
+    await settle();
+    expect(repo.startQuoteByAmount).toHaveBeenLastCalledWith(1, 5000, true);
+    expect(screen.getByTestId("start-amount-food").textContent).toContain("500 4500");
+    await act(async () => { fireEvent.click(startButton()); });
+    expect(repo.start.mock.calls[0][0]).toMatchObject({ paid_amount: 5000, paid_seconds: 16200, outside_food: true, outside_food_fee: 500 });
+  });
+
+  test("a refused sum: the server's sentence as is, and no Start", async () => {
+    repo.startQuoteByAmount.mockRejectedValue(new Error("Сумма должна быть кратна 100 (шаг округления филиала)."));
+    await mount(device());
+    await act(async () => { fireEvent.click(amountTab()); });
+    await act(async () => { fireEvent.change(amountBox(), { target: { value: "5050" } }); });
+    await settle();
+    expect(screen.getByText("Сумма должна быть кратна 100 (шаг округления филиала).")).toBeTruthy();
+    expect(startButton().disabled).toBe(true);
+  });
+
+  test("Start waits for the quote of exactly the sum on screen", async () => {
+    let answer: (v: unknown) => void = () => {};
+    repo.startQuoteByAmount.mockImplementation(() => new Promise((r) => { answer = r; }));
+    await mount(device());
+    await act(async () => { fireEvent.click(amountTab()); });
+    await act(async () => { fireEvent.change(amountBox(), { target: { value: "5000" } }); });
+    await settle();
+    expect(startButton().disabled).toBe(true);
+    await act(async () => { answer(quote(5000)); });
+    expect(startButton().disabled).toBe(false);
+    // A new sum: the answer for 5000 does not start a seat for 6000.
+    await act(async () => { fireEvent.change(amountBox(), { target: { value: "6000" } }); });
+    expect(startButton().disabled).toBe(true);
+  });
+
+  test("«Не оплачено» and «Оплачено вперёд» are not offered by amount (it IS paid ahead)", async () => {
+    await mount(device());
+    await act(async () => { fireEvent.click(amountTab()); });
+    expect(screen.queryByTestId("unpaid-switch")).toBeNull();
+    expect(screen.queryByTestId("prepaid-switch")).toBeNull();
   });
 });

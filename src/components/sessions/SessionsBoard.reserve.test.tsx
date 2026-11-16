@@ -98,6 +98,22 @@ describe("reserving from the board", () => {
     expect((calendar.props?.places as { id: number; label: string }[]).map((p) => p.id)).toEqual([10]);
   });
 
+  // 2026-11-15 (owner): the calendar names a seat as the board's card does,
+  // «№N · name», not the bare number; the board's own name line is the one source.
+  test("the calendar names each seat as its card does: «№N · name», «№N» when it has no name", async () => {
+    repo.listPcs.mockResolvedValue([
+      { ...pc(), place: { ...pc().place, name: "Hall VIP" } },
+      { ...pc(), id: 2, place_id: 11, label: "PS 5", place: { id: 11, number: 5, platform: "ps5", type: "standard", status: "active" } },
+    ]);
+    await mount();
+    await act(async () => { fireEvent.click(screen.getByTestId("board-calendar")); });
+    const seats = calendar.props?.places as { id: number; label: string }[];
+    expect(seats.map((p) => p.label)).toEqual(["№4 · Hall VIP", "№5"]);
+    // The card says the very same thing.
+    const lines = Array.from(document.querySelectorAll(".place-cell .id")).map((el) => el.textContent);
+    expect(lines).toEqual(["№4 · Hall VIP", "№5"]);
+  });
+
   test("«Старт» on a booking in the calendar opens Start on its seat with the booking chosen", async () => {
     await mount();
     await act(async () => { fireEvent.click(screen.getByTestId("board-calendar")); });

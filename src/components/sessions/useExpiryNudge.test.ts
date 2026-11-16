@@ -124,3 +124,39 @@ describe("waking at a seat's deadline", () => {
     expect(onDue).toHaveBeenCalledTimes(1);
   });
 });
+
+/** A reminder the player asked for (2026-11-15) is due on the WALL clock: the board asks the server then, and it rings. */
+describe("waking at a reminder", () => {
+  const NOW = Date.parse("2026-11-15T14:00:00.000Z");
+  const seat = (over: Partial<ISessionApi> = {}): ISessionApi => ({
+    id: 1, status: "active", ends_at: null, is_unlimited: true, ...over,
+  } as ISessionApi);
+  const reminder = (inMin: number, fired: string | null = null) => ({
+    at: new Date(NOW + inMin * 60_000).toISOString(), set_at: null, minutes: inMin, note: null, set_by_user_id: 1, fired_at: fired,
+  });
+  beforeEach(() => { vi.useFakeTimers(); vi.setSystemTime(NOW); });
+  afterEach(() => vi.useRealTimers());
+
+  test("an unlimited seat with a reminder in 5 min is asked about then", async () => {
+    const onDue = vi.fn();
+    renderHook(() => useExpiryNudge([seat({ reminder: reminder(5) })], onDue));
+    await act(async () => { await vi.advanceTimersByTimeAsync(4 * 60_000 + 59_000); });
+    expect(onDue).not.toHaveBeenCalled();
+    await act(async () => { await vi.advanceTimersByTimeAsync(2_000); });
+    expect(onDue).toHaveBeenCalledTimes(1);
+  });
+
+  test("it rings while the seat is paused too (wall clock)", async () => {
+    const onDue = vi.fn();
+    renderHook(() => useExpiryNudge([seat({ paused_at: new Date(NOW).toISOString(), reminder: reminder(5) })], onDue));
+    await act(async () => { await vi.advanceTimersByTimeAsync(5 * 60_000 + 500); });
+    expect(onDue).toHaveBeenCalledTimes(1);
+  });
+
+  test("a reminder that already rang is not asked about again", async () => {
+    const onDue = vi.fn();
+    renderHook(() => useExpiryNudge([seat({ reminder: reminder(-5, new Date(NOW).toISOString()) })], onDue));
+    await act(async () => { await vi.advanceTimersByTimeAsync(60 * 60_000); });
+    expect(onDue).not.toHaveBeenCalled();
+  });
+});

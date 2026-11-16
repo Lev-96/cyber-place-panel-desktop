@@ -74,6 +74,15 @@ describe("saving a rounding policy", () => {
     expect(sent().money_rounding_mode).toBe("up");
   });
 
+  test("offers «to the whole dram» (step 1) and sends it", async () => {
+    await mount(settings());
+    const option = screen.getByRole("option", { name: "rounding.stepWhole" }) as HTMLOptionElement;
+    expect(option.value).toBe("1");
+    await saveWithStep("1");
+
+    expect(sent().money_rounding_step).toBe(1);
+  });
+
   test("and carries every joystick answer back untouched", async () => {
     await mount(settings());
     await saveWithStep("100");

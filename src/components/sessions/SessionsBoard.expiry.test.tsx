@@ -861,6 +861,9 @@ describe("joysticks on the tile", () => {
     repo.listActive.mockResolvedValue([{
       ...ps,
       hourly_rate: 1000,
+      // A seat still running: since 2026-11-15 nothing bills past a running
+      // seat's end, and `running` ends at the moment this file loaded.
+      ends_at: new Date(Date.now() + 30 * 60_000).toISOString(),
       joystick_count: 3,
       joysticks: [{
         id: 2, slot: 3, price: 50, is_charged: true, is_hourly: true,
@@ -1024,6 +1027,9 @@ describe("joysticks on the tile", () => {
     repo.listActive.mockResolvedValue([{
       ...ps,
       hourly_rate: 1000,
+      // A seat still running: since 2026-11-15 nothing bills past a running
+      // seat's end, and `running` ends at the moment this file loaded.
+      ends_at: new Date(Date.now() + 30 * 60_000).toISOString(),
       joystick_count: 3,
       joysticks: [
         { id: 2, slot: 3, price: 500, is_charged: true, is_hourly: true,

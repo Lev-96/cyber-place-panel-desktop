@@ -15,7 +15,10 @@ import {
  * wording is pinned in routes/SessionsHistory.test.tsx.
  */
 
-const t = (k: string) => (k.startsWith("history.action.") && k.endsWith("brand_new") ? "" : k);
+// Like the real `t`: a key it does not have comes back as the key (2026-11-15;
+// this mock used to answer "" for the unknown action, which the real one never
+// does, and so hid the raw "history.action.x" an installed panel printed).
+const t = (k: string) => k;
 const money = (n: number) => `${n} AMD`;
 
 const event = (over: Partial<ISessionEvent>): ISessionEvent => ({

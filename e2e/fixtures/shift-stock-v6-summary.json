@@ -1,0 +1,604 @@
+{
+    "shift": {
+        "id": 1,
+        "branch_id": 1,
+        "status": "open",
+        "opened_at": "2026-11-16T10:00:00+04:00",
+        "closed_at": null,
+        "opened_by": {
+            "id": 2,
+            "name": "Anna Manager"
+        },
+        "closed_by": null,
+        "opening_cash": "1000.00",
+        "expected_cash": null,
+        "counted_cash": null,
+        "cash_difference": null,
+        "difference_kind": null,
+        "notes": null,
+        "has_report": false,
+        "branch": {
+            "id": 1,
+            "address": "Abovyan 1",
+            "city": null
+        },
+        "revenue_total": null
+    },
+    "report": {
+        "version": 6,
+        "period": {
+            "opened_at": "2026-11-16T10:00:00+04:00",
+            "to": "2026-11-16T12:00:00+04:00",
+            "duration_seconds": 7200
+        },
+        "places": {
+            "closed_count": 1,
+            "unique_seats": 1,
+            "by_platform": [
+                {
+                    "platform": "ps5",
+                    "count": 1,
+                    "total": "2800.00"
+                }
+            ],
+            "free_count": 0,
+            "expired_count": 0,
+            "started_count": 2,
+            "running_count": 1,
+            "paused_count": 0,
+            "by_method": {
+                "cash": "2800.00",
+                "card": "0.00",
+                "other": "0.00",
+                "unrecorded": "0.00"
+            },
+            "count_by_method": {
+                "cash": 1,
+                "card": 0,
+                "other": 0,
+                "unrecorded": 0
+            },
+            "split_count": 0,
+            "total": "2800.00",
+            "prepaid": {
+                "count": 0,
+                "amount": "0.00",
+                "settled": "0.00",
+                "change": "0.00",
+                "due": "0.00"
+            },
+            "unpaid": {
+                "count": 0,
+                "amount": "0.00"
+            }
+        },
+        "till": {
+            "paid_count": 2,
+            "by_method": {
+                "cash": "600.00",
+                "card": "1800.00",
+                "deposit": "0.00",
+                "other": "0.00"
+            },
+            "count_by_method": {
+                "cash": 1,
+                "card": 1,
+                "deposit": 0,
+                "other": 0
+            },
+            "split_count": 0,
+            "total": "2400.00",
+            "voided_count": 1,
+            "voided_total": "2100.00"
+        },
+        "tournaments": {
+            "count": 0,
+            "total": "0.00"
+        },
+        "revenue_total": "5200.00",
+        "by_method": {
+            "cash": "3400.00",
+            "card": "1800.00",
+            "other": "0.00",
+            "deposit": "0.00",
+            "unrecorded": "0.00"
+        },
+        "cash": {
+            "opening": "1000.00",
+            "places": "2800.00",
+            "till": "600.00",
+            "prepaid_in": "0.00",
+            "prepaid_settled": "0.00",
+            "change": "0.00",
+            "expected": "4400.00"
+        },
+        "member_topups": {
+            "count": 0,
+            "total": "0.00"
+        },
+        "bookings": {
+            "created_count": 0,
+            "cancelled_count": 0,
+            "no_show_count": 0,
+            "served_count": 0,
+            "scheduled": {
+                "count": 0,
+                "served": 0,
+                "cancelled": 0,
+                "open": 0
+            }
+        },
+        "products": {
+            "till": {
+                "rows": [
+                    {
+                        "product_id": 2,
+                        "name": "Chips",
+                        "unit_price": "300.00",
+                        "quantity": 6,
+                        "total": "1800.00"
+                    },
+                    {
+                        "product_id": 5,
+                        "name": "Lemonade",
+                        "unit_price": "400.00",
+                        "quantity": 1,
+                        "total": "400.00"
+                    },
+                    {
+                        "product_id": 4,
+                        "name": "Water",
+                        "unit_price": "200.00",
+                        "quantity": 1,
+                        "total": "200.00"
+                    }
+                ],
+                "units": 8,
+                "total": "2400.00"
+            },
+            "till_voided": {
+                "rows": [
+                    {
+                        "product_id": 1,
+                        "name": "Cola",
+                        "unit_price": "500.00",
+                        "quantity": 3,
+                        "total": "1500.00"
+                    },
+                    {
+                        "product_id": 2,
+                        "name": "Chips",
+                        "unit_price": "300.00",
+                        "quantity": 2,
+                        "total": "600.00"
+                    }
+                ],
+                "units": 5,
+                "total": "2100.00"
+            },
+            "places": {
+                "rows": [
+                    {
+                        "product_id": 1,
+                        "name": "Cola",
+                        "unit_price": "500.00",
+                        "quantity": 3,
+                        "total": "1500.00"
+                    },
+                    {
+                        "product_id": 2,
+                        "name": "Chips",
+                        "unit_price": "300.00",
+                        "quantity": 1,
+                        "total": "300.00"
+                    }
+                ],
+                "units": 4,
+                "total": "1800.00"
+            },
+            "places_free": {
+                "rows": [],
+                "units": 0,
+                "total": "0.00"
+            },
+            "units": 12,
+            "total": "4200.00"
+        },
+        "stock": {
+            "rows": [
+                {
+                    "product_id": 2,
+                    "name": "Chips",
+                    "start": 5,
+                    "received": 0,
+                    "sold": 9,
+                    "returned": 2,
+                    "sold_net": 7,
+                    "corrected": -1,
+                    "remaining": -3
+                },
+                {
+                    "product_id": 1,
+                    "name": "Cola",
+                    "start": 20,
+                    "received": 12,
+                    "sold": 8,
+                    "returned": 4,
+                    "sold_net": 4,
+                    "corrected": 0,
+                    "remaining": 28
+                },
+                {
+                    "product_id": 3,
+                    "name": "Juice",
+                    "start": 7,
+                    "received": 0,
+                    "sold": 0,
+                    "returned": 0,
+                    "sold_net": 0,
+                    "corrected": 0,
+                    "remaining": 7
+                },
+                {
+                    "product_id": 5,
+                    "name": "Lemonade",
+                    "start": null,
+                    "received": 10,
+                    "sold": 1,
+                    "returned": 0,
+                    "sold_net": 1,
+                    "corrected": 0,
+                    "remaining": 9
+                }
+            ],
+            "totals": {
+                "start": 32,
+                "received": 22,
+                "sold": 18,
+                "returned": 6,
+                "sold_net": 12,
+                "corrected": -1,
+                "remaining": 41
+            },
+            "count": 4,
+            "negative_count": 1
+        },
+        "staff": [
+            {
+                "name": "Anna Manager",
+                "id": 2,
+                "till": {
+                    "count": 2,
+                    "units": 8,
+                    "total": "2400.00"
+                },
+                "started": {
+                    "launches": 2,
+                    "seats": 2,
+                    "finished": 1,
+                    "running": 1,
+                    "prepaid": "0.00"
+                },
+                "started_billed": {
+                    "count": 1,
+                    "total": "2800.00"
+                },
+                "closed": {
+                    "count": 1,
+                    "total": "2800.00",
+                    "cash": "2800.00"
+                },
+                "voided": {
+                    "count": 1,
+                    "total": "2100.00"
+                }
+            }
+        ],
+        "handover": {
+            "count": 1,
+            "places": [
+                {
+                    "session_id": 2,
+                    "seat": "№5",
+                    "platform": "ps5",
+                    "mode": "open",
+                    "is_free": false,
+                    "paused": false,
+                    "started_at": "2026-11-16T10:30:00+04:00",
+                    "ends_at": null,
+                    "started_by": {
+                        "id": 2,
+                        "name": "Anna Manager"
+                    }
+                }
+            ]
+        },
+        "voided_from_other_shifts": {
+            "count": 0,
+            "total": "0.00",
+            "lines": []
+        },
+        "not_tracked": [
+            "customer_debts",
+            "cash_movements",
+            "topup_payment_method"
+        ],
+        "warnings": [
+            "places_running"
+        ],
+        "lines": {
+            "places": [
+                {
+                    "id": 1,
+                    "seat": "№4",
+                    "platform": "ps5",
+                    "method": "cash",
+                    "amount": "2800.00",
+                    "payments": [
+                        {
+                            "method": "cash",
+                            "amount": "2800.00"
+                        }
+                    ],
+                    "status": "stopped",
+                    "is_free": false,
+                    "closed_at": "2026-11-16T11:00:00+04:00",
+                    "prepaid": null,
+                    "change": null,
+                    "unpaid": null
+                }
+            ],
+            "till": [
+                {
+                    "id": 1,
+                    "method": "cash",
+                    "amount": "2100.00",
+                    "payments": [
+                        {
+                            "method": "cash",
+                            "amount": "2100.00"
+                        }
+                    ],
+                    "status": "voided",
+                    "at": "2026-11-16T10:05:00+04:00",
+                    "seller_id": 2,
+                    "voided_at": "2026-11-16T11:05:00+04:00",
+                    "voided_by_id": 2
+                },
+                {
+                    "id": 2,
+                    "method": "card",
+                    "amount": "1800.00",
+                    "payments": [
+                        {
+                            "method": "card",
+                            "amount": "1800.00"
+                        }
+                    ],
+                    "status": "paid",
+                    "at": "2026-11-16T11:15:00+04:00",
+                    "seller_id": 2,
+                    "voided_at": null,
+                    "voided_by_id": null
+                },
+                {
+                    "id": 3,
+                    "method": "cash",
+                    "amount": "600.00",
+                    "payments": [
+                        {
+                            "method": "cash",
+                            "amount": "600.00"
+                        }
+                    ],
+                    "status": "paid",
+                    "at": "2026-11-16T11:25:00+04:00",
+                    "seller_id": 2,
+                    "voided_at": null,
+                    "voided_by_id": null
+                }
+            ],
+            "tournaments": [],
+            "member_topups": [],
+            "prepaid": [],
+            "stock": [
+                {
+                    "id": 1,
+                    "product_id": 1,
+                    "name": "Cola",
+                    "kind": "till_sale",
+                    "via": null,
+                    "delta": -3,
+                    "stock_before": 20,
+                    "stock_after": 17,
+                    "order_id": 1,
+                    "session_id": null,
+                    "user_id": 2,
+                    "at": "2026-11-16T10:05:00+04:00"
+                },
+                {
+                    "id": 2,
+                    "product_id": 2,
+                    "name": "Chips",
+                    "kind": "till_sale",
+                    "via": null,
+                    "delta": -2,
+                    "stock_before": 5,
+                    "stock_after": 3,
+                    "order_id": 1,
+                    "session_id": null,
+                    "user_id": 2,
+                    "at": "2026-11-16T10:05:00+04:00"
+                },
+                {
+                    "id": 3,
+                    "product_id": 1,
+                    "name": "Cola",
+                    "kind": "seat_sale",
+                    "via": null,
+                    "delta": -2,
+                    "stock_before": 17,
+                    "stock_after": 15,
+                    "order_id": null,
+                    "session_id": 1,
+                    "user_id": 2,
+                    "at": "2026-11-16T10:10:00+04:00"
+                },
+                {
+                    "id": 4,
+                    "product_id": 1,
+                    "name": "Cola",
+                    "kind": "seat_sale",
+                    "via": null,
+                    "delta": -2,
+                    "stock_before": 15,
+                    "stock_after": 13,
+                    "order_id": null,
+                    "session_id": 1,
+                    "user_id": 2,
+                    "at": "2026-11-16T10:15:00+04:00"
+                },
+                {
+                    "id": 5,
+                    "product_id": 1,
+                    "name": "Cola",
+                    "kind": "seat_return",
+                    "via": null,
+                    "delta": 1,
+                    "stock_before": 13,
+                    "stock_after": 14,
+                    "order_id": null,
+                    "session_id": 1,
+                    "user_id": 2,
+                    "at": "2026-11-16T10:20:00+04:00"
+                },
+                {
+                    "id": 6,
+                    "product_id": 2,
+                    "name": "Chips",
+                    "kind": "seat_sale",
+                    "via": null,
+                    "delta": -1,
+                    "stock_before": 3,
+                    "stock_after": 2,
+                    "order_id": null,
+                    "session_id": 1,
+                    "user_id": 2,
+                    "at": "2026-11-16T10:25:00+04:00"
+                },
+                {
+                    "id": 7,
+                    "product_id": 1,
+                    "name": "Cola",
+                    "kind": "seat_sale",
+                    "via": null,
+                    "delta": -1,
+                    "stock_before": 14,
+                    "stock_after": 13,
+                    "order_id": null,
+                    "session_id": 2,
+                    "user_id": 2,
+                    "at": "2026-11-16T10:35:00+04:00"
+                },
+                {
+                    "id": 8,
+                    "product_id": 1,
+                    "name": "Cola",
+                    "kind": "received",
+                    "via": "add",
+                    "delta": 12,
+                    "stock_before": 13,
+                    "stock_after": 25,
+                    "order_id": null,
+                    "session_id": null,
+                    "user_id": 2,
+                    "at": "2026-11-16T10:40:00+04:00"
+                },
+                {
+                    "id": 9,
+                    "product_id": 1,
+                    "name": "Cola",
+                    "kind": "till_void",
+                    "via": null,
+                    "delta": 3,
+                    "stock_before": 25,
+                    "stock_after": 28,
+                    "order_id": 1,
+                    "session_id": null,
+                    "user_id": 2,
+                    "at": "2026-11-16T11:05:00+04:00"
+                },
+                {
+                    "id": 10,
+                    "product_id": 2,
+                    "name": "Chips",
+                    "kind": "till_void",
+                    "via": null,
+                    "delta": 2,
+                    "stock_before": 2,
+                    "stock_after": 4,
+                    "order_id": 1,
+                    "session_id": null,
+                    "user_id": 2,
+                    "at": "2026-11-16T11:05:00+04:00"
+                },
+                {
+                    "id": 11,
+                    "product_id": 2,
+                    "name": "Chips",
+                    "kind": "corrected",
+                    "via": null,
+                    "delta": -1,
+                    "stock_before": 4,
+                    "stock_after": 3,
+                    "order_id": null,
+                    "session_id": null,
+                    "user_id": 1,
+                    "at": "2026-11-16T11:10:00+04:00"
+                },
+                {
+                    "id": 12,
+                    "product_id": 2,
+                    "name": "Chips",
+                    "kind": "till_sale",
+                    "via": null,
+                    "delta": -6,
+                    "stock_before": 3,
+                    "stock_after": -3,
+                    "order_id": 2,
+                    "session_id": null,
+                    "user_id": 2,
+                    "at": "2026-11-16T11:15:00+04:00"
+                },
+                {
+                    "id": 13,
+                    "product_id": 5,
+                    "name": "Lemonade",
+                    "kind": "received",
+                    "via": "create",
+                    "delta": 10,
+                    "stock_before": null,
+                    "stock_after": 10,
+                    "order_id": null,
+                    "session_id": null,
+                    "user_id": 2,
+                    "at": "2026-11-16T11:20:00+04:00"
+                },
+                {
+                    "id": 14,
+                    "product_id": 5,
+                    "name": "Lemonade",
+                    "kind": "till_sale",
+                    "via": null,
+                    "delta": -1,
+                    "stock_before": 10,
+                    "stock_after": 9,
+                    "order_id": 3,
+                    "session_id": null,
+                    "user_id": 2,
+                    "at": "2026-11-16T11:25:00+04:00"
+                }
+            ]
+        }
+    }
+}

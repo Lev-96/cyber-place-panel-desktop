@@ -21,7 +21,7 @@ import {
   DEFAULT_MINUTES, MAX_MINUTES, MIN_MINUTES, createBody, editPatch, isNameValid, isPhoneValid, type ReservationDraft,
 } from "./reservationForm";
 
-/** A seat as the form offers it: its id and how the board names it ("№4"). */
+/** A seat as the form offers it: its id and how the board's card names it ("№4 · Hall VIP"). */
 export interface ReservationSeat {
   id: number;
   label: string;
@@ -128,7 +128,7 @@ const ReservationFormDialog = ({ places, mode, onClose, onSaved }: Props) => {
         <div className="reservation-form__row">
           <label className="reservation-form__field">
             <span className="label">{t("reserve.seat")}</span>
-            <select className="input" value={placeId} onChange={(e) => setPlaceId(Number(e.target.value))} aria-label={t("reserve.seat")} disabled={busy}>
+            <select className="input reservation-form__seat" value={placeId} onChange={(e) => setPlaceId(Number(e.target.value))} aria-label={t("reserve.seat")} title={seatLabel(placeId)} disabled={busy}>
               {places.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
             </select>
           </label>

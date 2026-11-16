@@ -1,4 +1,4 @@
-import { IOrder } from "@/types/pos";
+import { IOrder, IStockWarning } from "@/types/pos";
 import { IItemChoice, IResolvedItems, PaymentMethod } from "./sessions";
 import { request } from "./client";
 
@@ -41,7 +41,8 @@ export interface ListOrdersParams {
 }
 
 export const apiCreateOrder = (body: CreateOrderBody) =>
-  request<{ order: IOrder }>("/orders", { method: "POST", body });
+  // `stock_warnings` (2026-11-16): only when the sale took a counted product below zero.
+  request<{ order: IOrder; stock_warnings?: IStockWarning[] }>("/orders", { method: "POST", body });
 
 export const apiListOrders = (params: ListOrdersParams) =>
   request<{ data: IOrder[] }>("/orders", { params });

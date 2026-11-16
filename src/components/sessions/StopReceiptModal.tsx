@@ -19,6 +19,7 @@ import CashChangePanel from "@/components/payments/CashChangePanel";
 import { billCents, cashChange } from "@/components/payments/cashChange";
 import type { ICashHandover } from "@/api/sessions";
 import { isOutsideFoodLine, sessionLineLabel } from "./outsideFood";
+import PrepaidSettlement from "./PrepaidSettlement";
 
 interface Props {
   session: ISessionApi;
@@ -75,6 +76,14 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved, canRes
   // method switch, so an amount typed for cash never rides along with card.
   const [received, setReceived] = useState("");
   const [handover, setHandover] = useState<ICashHandover | null>(null);
+  /**
+   * Closed elsewhere while this receipt was open (2026-11-16, billing audit
+   * F7): its Stop was refused as a changed receipt, and the bill can no longer
+   * be read here — a manager reads a closed seat's bill only if they opened
+   * it. Reported as ended, never asked again: the banked bill is the
+   * server's, in the history.
+   */
+  const [endedElsewhere, setEndedElsewhere] = useState(false);
   /** Synchronous guard: a double click arrives before `busy` re-renders. */
   const stoppingNow = useRef(false);
 
@@ -160,32 +169,40 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved, canRes
     } finally { setBusy(false); }
   };
 
+  // Paid AHEAD (2026-11-15): what is still to take is the server's `due`,
+  // not the bill — the prepayment's cash already covers the rest. Nothing
+  // due: no payment is asked at all (the server records it as that cash).
+  const prepaidNow = bill?.prepaid ?? null;
+  const dueCents = bill === null ? 0 : prepaidNow ? billCents(prepaidNow.due) : billCents(bill.total);
+  const nothingDue = prepaidNow !== null && dueCents === 0;
   // Nothing to pay, nothing to change: a waived bill asks for no banknotes.
-  const asksForCash = !pay.split && pay.method === "cash" && bill !== null && !bill.is_free;
-  const change = asksForCash ? cashChange(billCents(bill.total), received) : null;
+  const asksForCash = !pay.split && pay.method === "cash" && bill !== null && !bill.is_free && !nothingDue;
+  const change = asksForCash ? cashChange(dueCents, received) : null;
   const cashBlocks = change !== null && (change.state === "short" || change.state === "invalid");
-  const payCheck: PaymentCheck = checkPayment(bill ? billCents(bill.total) : 0, pay);
+  const payCheck: PaymentCheck = checkPayment(dueCents, pay);
   /** Why the payment cannot be sent yet, in the cashier's words; null when it can. */
   const paymentProblem = (): string | null => {
     if (payCheck.ok) return null;
     switch (payCheck.problem) {
-      case "note": return t(pay.split ? "pay.noteRequired" : "session.payOtherRequired");
       case "sum": return t("pay.sumMismatch");
-      case "parts": return t("pay.needTwo");
+      case "parts": return t("pay.needAmount");
       default: return t("pay.invalid");
     }
   };
   /** The payment fields of the body, and the banknotes for a single cash payment. */
-  const paymentFields = () => ({
-    ...paymentBody(pay, payCheck),
-    ...(change?.state === "ok" ? { cash_received: toAmount(change.receivedCents) } : {}),
-  });
+  const paymentFields = () => (nothingDue
+    // Covered by the prepayment: cash, whatever else; nothing handed over.
+    ? { payment_method: "cash" as const }
+    : {
+      ...paymentBody(pay, payCheck),
+      ...(change?.state === "ok" ? { cash_received: toAmount(change.receivedCents) } : {}),
+    });
 
   const confirmStop = async () => {
     if (stoppingNow.current || cashBlocks) return;
     // ⚠️ Checked here so the cashier is told BEFORE the request, but the server
     // enforces the same rule and is what actually decides — this is a courtesy,
-    // not the guard. A stop refused for a missing note leaves the seat running.
+    // not the guard. A stop refused (parts not adding up) leaves the seat running.
     const problem = paymentProblem();
     if (problem !== null) {
       setErr(problem);
@@ -216,8 +233,16 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved, canRes
         const body = (e as { body?: { errors?: Record<string, unknown> } }).body;
         const cashShort = change?.state === "ok" && body?.errors?.cash_received !== undefined;
         setErr(cashShort || !(e instanceof Error) || !e.message ? t("session.cashBillGrew") : e.message);
-        // Not `reload()`: it clears the error this line just set.
-        void sessionRepository.preview(session.id).then(setBill).catch(() => {});
+        // Not `reload()`: it clears the error this line just set. A seat the
+        // sweep or another desk closed meanwhile is refused the same way
+        // (2026-11-16): read again, it shows the banked bill; refused (a
+        // manager who did not open it), it is reported as ended.
+        void sessionRepository.preview(session.id).then(setBill).catch((reread) => {
+          if ((reread as { status?: number }).status === 403) {
+            setEndedElsewhere(true);
+            setErr(null);
+          }
+        });
       } else {
         setErr(e instanceof Error ? e.message : "Failed to stop");
       }
@@ -278,7 +303,7 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved, canRes
    * shows what was banked and not two hours of extra clock.
    */
   const endedWithoutUs = session.status !== "active";
-  const finished = stopped !== null || endedWithoutUs;
+  const finished = stopped !== null || endedWithoutUs || endedElsewhere;
 
   const deviceLabel = session.pc_label ?? `№${session.pc_id}`;
   // Ended by itself (ran out, or the kiosk ended it) with nobody at the till
@@ -325,9 +350,9 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved, canRes
             because "Подтвердить и закрыть" read as "close this window". */}
         {/* Ended while this was open, by somebody or something else: the bill
             below is theirs, final, and nothing here will stop it again. */}
-        {endedWithoutUs && stopped === null && (
+        {(endedWithoutUs || endedElsewhere) && stopped === null && (
           <span className="muted" style={{ fontSize: 12 }} data-testid="checkout-ended-elsewhere">
-            {t("session.checkoutEndedElsewhere")}
+            {t(endedElsewhere && !endedWithoutUs ? "session.checkoutClosedElsewhere" : "session.checkoutEndedElsewhere")}
           </span>
         )}
         {!finished && (
@@ -341,7 +366,9 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved, canRes
           </span>
         )}
 
-        {!view ? <SkeletonText lines={5} /> : (
+        {/* Ended elsewhere and not ours to read: no stale figure is shown as
+            the bill — the sentence above says where it went. */}
+        {endedElsewhere ? null : !view ? <SkeletonText lines={5} /> : (
           <div className="col" style={{ gap: 0 }}>
             {/* Time line */}
             <div style={row}>
@@ -466,7 +493,11 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved, canRes
                   <div key={it.id} style={row}>
                     {/* By kind first (2026-11-13): the own-food fee's stored
                         name is in the starter's language. */}
-                    <span style={{ flex: 1, minWidth: 0, overflowWrap: "anywhere" }}>{sessionLineLabel(it, t)}</span>
+                    <span style={{ flex: 1, minWidth: 0, overflowWrap: "anywhere" }}>
+                      {sessionLineLabel(it, t)}
+                      {/* Handed over not paid yet (2026-11-15): a reminder, the line is priced as any. */}
+                      {it.unpaid === true && <span className="unpaid-tag" data-testid="receipt-line-unpaid">{t("session.itemUnpaidTag")}</span>}
+                    </span>
                     {/* An HOURLY line is a rate and a duration, so it reads like a
                         pad's line rather than like a drink's: "90 m · 700/h", and
                         "returned" once its clock has stopped. A sold one reads
@@ -492,6 +523,16 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved, canRes
                     {money(Number(view.items_total), receiptPrecision)}
                   </span>
                 </div>
+                {/* What of it was handed over unpaid: already inside the total
+                    above, the server's figure — said so it is collected now. */}
+                {Number(view.unpaid_items_total ?? 0) > 0 && (
+                  <div style={row} className="receipt-unpaid" data-testid="receipt-unpaid-total">
+                    <span style={{ flex: 1 }}>{t("session.receiptUnpaidItems")}</span>
+                    <span style={{ fontWeight: 700, marginRight: finished ? 0 : 32 }}>
+                      {money(Number(view.unpaid_items_total), receiptPrecision)}
+                    </span>
+                  </div>
+                )}
               </div>
             )}
 
@@ -512,19 +553,30 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved, canRes
                     : money(Number(view.total), receiptPrecision)}
               </span>
             </div>
+            {/* Paid ahead (2026-11-15): the change to hand back, or what is
+                still due, or nothing — the server's figures. A cancel hands
+                the whole prepayment back and says so the same way. */}
+            {view.prepaid && (
+              <PrepaidSettlement
+                prepaid={view.prepaid}
+                changeAfterStop={stopped !== null ? Number(handover?.change ?? view.prepaid.change) : undefined}
+                t={t}
+                money={(n) => money(n, receiptPrecision)}
+              />
+            )}
           </div>
         )}
 
         {/* ⚠️ Hidden once the session is finished: the choice has been made and
             the receipt above is the record of it. A live radio group under a
             closed bill invites an edit that nothing would accept. */}
-        {(!finished || markable) && bill && (
+        {(!finished || markable) && bill && !nothingDue && (
           // The one payment control, shared with the till (PaymentEditor).
           <>
             {markable && <div className="pay-mark-note" data-testid="pay-mark-note">{t("pay.markAfterAuto")}</div>}
             <PaymentEditor
               name={`pay-${session.id}`}
-              dueCents={billCents(bill.total)}
+              dueCents={dueCents}
               value={pay}
               onChange={(next) => {
                 // Banknotes typed for cash never ride along with another method.
@@ -542,14 +594,14 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved, canRes
 
         {(!finished || markable) && asksForCash && bill && change && (
           <CashChangePanel
-            dueCents={billCents(bill.total)}
+            dueCents={dueCents}
             received={received}
             onReceived={(v) => { setReceived(v); setErr(null); }}
             change={change}
             disabled={busy}
           />
         )}
-        {finished && handover && (
+        {finished && handover && !view?.prepaid && (
           <CashChangePanel
             dueCents={billCents(view?.total ?? 0)}
             received={handover.received}

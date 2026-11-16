@@ -25,6 +25,7 @@ import {
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { IItemChoice } from "@/api/sessions";
 import { sessionLineLabel } from "./outsideFood";
+import UnpaidToggle from "./UnpaidToggle";
 
 interface Props {
   branchId: number;
@@ -128,6 +129,14 @@ const AddSessionItemDialog = ({ branchId, session, onClose, onAdded }: Props) =>
   const [bill, setBill] = useState(session.items ?? []);
   /** Items being taken off the bill, so their row can say so. */
   const [removing, setRemoving] = useState<number[]>([]);
+  /**
+   * «Не оплачено» (2026-11-15, owner): the products of this basket are handed
+   * over before the player paid. A reminder on the line, never money. Off by
+   * default, and then the request is exactly what it always was.
+   */
+  const [unpaid, setUnpaid] = useState(false);
+  /** Lines being marked paid («Оплачено»), so their button can say so. */
+  const [paying, setPaying] = useState<number[]>([]);
   const ask = useConfirm();
   // The catalogue's additional items, by id — to label them on the bill.
   const additionalIds = new Set((basket.products ?? []).filter(isAdditionalProduct).map((p) => p.id));
@@ -165,6 +174,30 @@ const AddSessionItemDialog = ({ branchId, session, onClose, onAdded }: Props) =>
       notify.message("success", fmt(t("session.addedMany"), products.map((l) => `${l.name} × ${l.qty}`).join(", ")));
     }
     if (items.length > 0) notify.message("success", fmt(t("session.additionalGiven"), items.join(", ")));
+  };
+
+  /**
+   * A product line (not an additional item, never the room's extra) marked
+   * unpaid when the switch is on; untouched otherwise.
+   */
+  const withUnpaid = <L extends { product_id?: number | null; extra?: true }>(line: L): L | (L & { unpaid: true }) =>
+    unpaid && !line.extra && !(line.product_id != null && additionalIds.has(line.product_id)) ? { ...line, unpaid: true as const } : line;
+
+  /** «Оплачено»: a line handed over unpaid is paid now — the server merges it, the bill does not move. */
+  const markPaid = async (itemId: number, name: string) => {
+    if (paying.includes(itemId)) return;
+    setPaying((prev) => [...prev, itemId]);
+    try {
+      const updated = await sessionRepository.markItemPaid(session.id, itemId);
+      setBill(updated?.items ?? bill);
+      notify.message("success", fmt(t("session.itemPaidToast"), name));
+      onAdded();
+    } catch (e) {
+      const reason = e instanceof Error && e.message ? e.message : t("session.failUnknown");
+      notify.message("error", fmt(t("session.failReason"), reason));
+    } finally {
+      setPaying((prev) => prev.filter((id) => id !== itemId));
+    }
   };
 
   const removeFromBill = async (itemId: number, name: string, additional: boolean) => {
@@ -208,7 +241,7 @@ const AddSessionItemDialog = ({ branchId, session, onClose, onAdded }: Props) =>
       // one request: an item picked there must not be dropped because the
       // products were typed rather than picked.
       const typed = resolved?.ok ? resolved.items : [];
-      await sessionRepository.addItems(session.id, [...typed, ...itemPayload]);
+      await sessionRepository.addItems(session.id, [...typed.map(withUnpaid), ...itemPayload]);
 
       announceAdded(
         (resolved?.ok ? resolved.lines : [])
@@ -242,7 +275,7 @@ const AddSessionItemDialog = ({ branchId, session, onClose, onAdded }: Props) =>
     try {
       await sessionRepository.addItems(
         session.id,
-        cart.map((l) => (l.product_id
+        cart.map((l) => withUnpaid(l.product_id
           ? { product_id: l.product_id, qty: l.qty }
           : { name: l.name, price: l.price, qty: l.qty })),
       );
@@ -311,6 +344,10 @@ const AddSessionItemDialog = ({ branchId, session, onClose, onAdded }: Props) =>
                 <div key={item.id} style={rowStyle}>
                   <span style={ellipsis} title={label}>
                     {label}
+                    {/* Handed over not paid yet (2026-11-15): said on the line. */}
+                    {item.unpaid_at && (
+                      <span className="unpaid-tag" data-testid="bill-line-unpaid">{t("session.itemUnpaidTag")}</span>
+                    )}
                     {item.product_id != null && additionalIds.has(item.product_id) && (
                       <span className="pill" style={{ marginLeft: 6, fontSize: 10, textTransform: "none", letterSpacing: 0 }}>
                         {t("product.kindAdditionalShort")}
@@ -324,6 +361,19 @@ const AddSessionItemDialog = ({ branchId, session, onClose, onAdded }: Props) =>
                   <span className="muted" style={{ fontSize: 11, minWidth: 74, textAlign: "right" }}>
                     {money(sessionItemLineTotal(item))}
                   </span>
+                  {item.unpaid_at && (
+                    <Button
+                      variant="secondary"
+                      className="unpaid-pay-btn"
+                      onClick={() => void markPaid(item.id, label)}
+                      disabled={saving || paying.includes(item.id)}
+                      aria-label={fmt(t("session.itemMarkPaidFull"), label)}
+                      title={fmt(t("session.itemMarkPaidFull"), label)}
+                      data-testid="bill-line-mark-paid"
+                    >
+                      {paying.includes(item.id) ? "…" : t("session.itemMarkPaid")}
+                    </Button>
+                  )}
                   <Button
                     variant="secondary"
                     onClick={() => void removeFromBill(item.id, label, item.product_id != null && additionalIds.has(item.product_id))}
@@ -351,13 +401,28 @@ const AddSessionItemDialog = ({ branchId, session, onClose, onAdded }: Props) =>
 
         {shown === "additional" && <BasketAdditionalItems basket={basket} saving={saving} onBill={onBillIds} />}
 
+        {/* «Не оплачено» for what this basket hands over (2026-11-15). */}
+        {shown === "products" && (
+          <div className="col" style={{ gap: 4 }}>
+            <UnpaidToggle
+              on={unpaid}
+              onChange={setUnpaid}
+              label={t("session.itemsUnpaid.switch")}
+              fullLabel={t("session.itemsUnpaid.switchFull")}
+              disabled={saving}
+              testId="items-unpaid-switch"
+            />
+            {unpaid && <span className="muted" style={{ fontSize: 12 }}>{t("session.itemsUnpaid.hint")}</span>}
+          </div>
+        )}
+
         {err !== null && <div className="error">{err || t("session.failUnknown")}</div>}
         <div className="row-between">
           <Button variant="secondary" onClick={onClose} disabled={saving}>{t("action.cancel")}</Button>
           {/* Disabled while the request is in flight, so a second press cannot
               send the same basket twice. */}
           {mode === "picker" ? (
-            <Button onClick={confirm} disabled={saving || cart.length === 0}>
+            <Button onClick={confirm} disabled={saving || cart.length === 0} data-testid="items-confirm">
               {saving
                 ? t("session.adding")
                 : cart.length === 1

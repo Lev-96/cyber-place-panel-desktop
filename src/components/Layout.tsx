@@ -4,6 +4,7 @@ import { BranchScopeContext } from "@/components/ui/state";
 import ExpenseReminderNotifier from "./notifications/ExpenseReminderNotifier";
 import GlobalBookingNotifier from "./notifications/GlobalBookingNotifier";
 import SessionEndingNotifier from "./notifications/SessionEndingNotifier";
+import SessionReminderNotifier from "./notifications/SessionReminderNotifier";
 import BillingNoticeNotifier from "./notifications/BillingNoticeNotifier";
 import SupportNotifier from "./notifications/SupportNotifier";
 import { Ps5ControlProvider } from "@/ps5/Ps5ControlProvider";
@@ -53,6 +54,8 @@ const Layout = () => (
     <GlobalBookingNotifier />
     <SupportNotifier />
     <SessionEndingNotifier />
+    {/* A reminder a player asked for has rung (2026-11-15, the server's notification). */}
+    <SessionReminderNotifier />
     {/* A platform payment notice arriving rings and raises an OS notification (2026-11-09). */}
     <BillingNoticeNotifier />
     {/* Owner-only, and silent for everyone else: it renders nothing unless the

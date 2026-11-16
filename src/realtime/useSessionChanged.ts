@@ -33,7 +33,11 @@ export interface SessionChangedEvent {
     // An additional item (chips, a cue, a racket) went onto the bill / came off
     // it (2026-09-27). The board reloads on any kind.
     | "additional.added"
-    | "additional.removed";
+    | "additional.removed"
+    // A reminder on the seat was set, changed, cleared or rang (2026-11-15).
+    // Not a freeing kind; PS5 control ignores it; the board re-reads, as for
+    // any kind, and the card's 🔔 follows.
+    | "reminder.changed";
   session_id: number;
   branch_id: number;
   pc_id: number;

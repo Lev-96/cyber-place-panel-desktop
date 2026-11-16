@@ -7,6 +7,7 @@ import CollapsibleSection from "@/components/ui/CollapsibleSection";
 import { GridSkeleton } from "@/components/ui/Skeleton";
 import { ErrorState, StaleNotice, StateView } from "@/components/ui/state";
 import { reconcileOrder } from "./tileOrder";
+import { seatLineOf } from "./seatLine";
 import { useAsync } from "@/hooks/useAsync";
 import { useBranchPlatformNames } from "@/hooks/useBranchPlatforms";
 import { useKeyedBusy } from "@/hooks/useKeyedBusy";
@@ -53,6 +54,7 @@ import { BASE_JOYSTICKS, MAX_JOYSTICKS } from "@/api/joystickPrices";
 import { notify } from "@/ui/notify";
 import StopReceiptModal from "./StopReceiptModal";
 import UnpaidAlert, { type UnpaidNotice } from "./UnpaidAlert";
+import SessionCardChips from "./SessionCardChips";
 import { playFor } from "@/sound/soundEngine";
 import PadToggle from "./PadToggle";
 import PadChargeNote from "./PadChargeNote";
@@ -769,28 +771,7 @@ const SessionsBoard = ({ branchId }: Props) => {
     // platform shrinks; the tier never does.
     const seatPlatformName = pc.place ? platformName(pc.place.platform) : "";
     const tierName = pc.place ? t(placeTypeLabelKey(pc.place.type)) : "";
-    // ⚠️ The NUMBER leads, always, and it is the same value the player is
-    // given on their phone.
-    //
-    // This used to print the place's name when it had one and fall back to the
-    // device's LABEL when the number was missing. Both halves broke the one
-    // guarantee that matters here: a cashier and a player looking at the same
-    // seat must say the same thing about it. A named seat showed the operator
-    // no number at all, and an un-numbered one showed them "PS4-08" while
-    // `placesSelect` showed the player `place.id`.
-    //
-    // `place.number ?? place.id` is exactly what the mobile screen renders, so
-    // the two cannot diverge. The name follows as detail: the line is one row
-    // with an ellipsis and the full text on hover, so it is the NAME that gets
-    // cut on a narrow tile, never the number.
-    const placeNo = pc.place ? (pc.place.number ?? pc.place.id) : null;
-    const placeName = tr(pc.place, "name", lang).trim();
-    const nameLine =
-      placeNo === null
-        ? tr(pc, "label", lang)
-        : placeName
-          ? `№${placeNo} · ${placeName}`
-          : `№${placeNo}`;
+    const nameLine = seatLineOf(pc, lang);
     // Live state of the physical console behind this place, when one is bound.
     // Undefined covers both "this is a computer" and "the first probe has not
     // come back yet" — neither is something to show a colour for.
@@ -895,6 +876,10 @@ const SessionsBoard = ({ branchId }: Props) => {
                   for directly under a clock that was counting for free. */}
               {/* Secondary detail (2026-10-27): hidden in the Simple interface,
                   where the stripe, the clock and the money are the card. */}
+              {/* Unpaid products, paid ahead, a reminder (2026-11-15): the
+                  server's figures, FIRST on the line so a one-line card (every
+                  card is one height) never cuts them off; the tariff after. */}
+              <SessionCardChips session={sess} t={t} money={money} />
               <span className="session-card__secondary">
               {sessionTariffLine(sess, money, t)}
               {itemsCount > 0 && <span className="muted"> · {itemsCount} {t("session.posNote")}</span>}
@@ -1319,7 +1304,7 @@ const SessionsBoard = ({ branchId }: Props) => {
             .map((pc) => ({
               id: pc.place_id as number,
               number: pc.place?.number ?? pc.place_id as number,
-              label: seatOf(pc.id),
+              label: seatLineOf(pc, lang),
               platform: pc.place?.platform,
               offline: resolveSessionCellState({ hasSession: false, isReserved: false, device: pc }) === "offline",
             }))}

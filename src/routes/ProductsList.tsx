@@ -1,4 +1,7 @@
 import ProductForm from "@/components/products/ProductForm";
+import ProductStockDialog from "@/components/products/ProductStockDialog";
+import { stockNumber } from "@/components/products/stock";
+import { fmt } from "@/i18n/translations";
 import { useAuth } from "@/auth/AuthContext";
 import { can } from "@/auth/permissions";
 import { tr } from "@/i18n/translated";
@@ -12,7 +15,7 @@ import { productRepository } from "@/repositories/ProductRepository";
 import { IProduct } from "@/types/pos";
 import { useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
-import { isAdditionalProduct, ProductKind } from "@/types/pos";
+import { countsStock, isAdditionalProduct, ProductKind } from "@/types/pos";
 import SectionTabs from "@/components/ui/SectionTabs";
 import ProductHistory from "@/components/products/ProductHistory";
 import { productEventRepository } from "@/repositories/ProductEventRepository";
@@ -32,6 +35,9 @@ const ProductsList = () => {
   // refuses the same writes, so this is the button half of one rule.
   const canEdit = can(user?.role, "product.write");
   const canDelete = can(user?.role, "product.crud");
+  // Stock (2026-11-16): receiving goods and a first count are `product.write`;
+  // a recount of a counted product and switching it off are the owner's.
+  const canCorrectStock = can(user?.role, "product.stockCorrect");
   // The trail is the owner's and the admin's. A backend from before it answers
   // 404, and then there is no tab to open; the probe is never sent for anyone
   // without the permission.
@@ -43,8 +49,12 @@ const ProductsList = () => {
   const canHistory = mayReadHistory && historyProbe.data === true;
   const [pane, setPane] = useState<Pane>("catalogue");
   const confirm = useConfirm();
-  const { data, loading, error, reload } = useAsync(() => productRepository.listByBranch(id), [id]);
+  // The catalogue and the server's stock total, in one read.
+  const { data: listed, loading, error, reload } = useAsync(() => productRepository.listWithStock(id), [id]);
+  const data = listed?.products ?? null;
+  const stockMeta = listed?.stock ?? null;
   const [creating, setCreating] = useState(false);
+  const [stocking, setStocking] = useState<IProduct | null>(null);
   /**
    * Which catalogue is open (2026-09-27): what is SOLD, or what is HANDED OUT
    * with the seat. A new entry is created as the kind of the open section.
@@ -107,6 +117,15 @@ const ProductsList = () => {
         />
       )}
       {showHistory && <ProductHistory initialBranchId={id} />}
+      {/* The server's total of what the counted products hold (2026-11-16). */}
+      {!showHistory && section === "regular" && stockMeta !== null && stockMeta.tracked > 0 && (
+        <div className="product-stock-total" data-testid="product-stock-total">
+          <span>{fmt(t("stock.total"), stockNumber(stockMeta.units))}</span>
+          {stockMeta.negative > 0 && (
+            <span className="product-stock-total__negative" data-testid="product-stock-negative">{fmt(t("stock.negative"), stockMeta.negative)}</span>
+          )}
+        </div>
+      )}
       {!showHistory && (
         <>
           <SectionTabs
@@ -138,16 +157,32 @@ const ProductsList = () => {
           >
             <div className="list">
               {visible.map((p) => (
-                <div key={p.id} className="list-item" style={{ opacity: p.is_active ? 1 : 0.5 }}>
-                  <div>
+                <div key={p.id} className="list-item product-row" style={{ opacity: p.is_active ? 1 : 0.5 }}>
+                  <div className="product-row__main">
                     <div className="name">{tr(p, "name", lang)}</div>
-                    <div className="meta">{tr(p, "category", lang) || "-"} · {money(Number(p.price))}</div>
+                    <div className="meta">
+                      {tr(p, "category", lang) || "-"} · {money(Number(p.price))}
+                      {/* A product sold by the unit says its count (2026-11-16). */}
+                      {section === "regular" && (
+                        <>
+                          {" · "}
+                          <span className={`product-stock${countsStock(p) && (p.stock as number) < 0 ? " is-negative" : ""}`} data-testid="product-stock">
+                            {countsStock(p) ? fmt(t("stock.left"), stockNumber(p.stock as number)) : t("stock.notCounted")}
+                          </span>
+                        </>
+                      )}
+                    </div>
                   </div>
                   {canEdit && (
-                    <div className="row" style={{ gap: 6 }}>
+                    <div className="row product-row__actions" style={{ gap: 6 }}>
                       {/* Show/hide is the deactivate: it takes a product off the
                           POS and keeps it, which is what a manager has instead of
                           Delete. */}
+                      {section === "regular" && (
+                        <Button variant="secondary" onClick={() => setStocking(p)} style={btn} aria-label={fmt(t("stock.buttonFull"), tr(p, "name", lang))} data-testid="product-stock-button">
+                          {t("stock.button")}
+                        </Button>
+                      )}
                       <Button variant="secondary" onClick={() => toggle(p)} style={btn}>{p.is_active ? t("action.hide") : t("action.show")}</Button>
                       <Button variant="secondary" onClick={() => setEditing(p)} style={btn}>{t("action.edit")}</Button>
                       {canDelete && (
@@ -163,6 +198,14 @@ const ProductsList = () => {
       )}
       {creating && <ProductForm branchId={id} kind={section} onClose={() => setCreating(false)} onSaved={() => { setCreating(false); void reload(); }} />}
       {editing && <ProductForm branchId={id} initial={editing} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); void reload(); }} />}
+      {stocking && (
+        <ProductStockDialog
+          product={stocking}
+          canCorrect={canCorrectStock}
+          onClose={() => setStocking(null)}
+          onDone={() => { setStocking(null); void reload(); }}
+        />
+      )}
     </div>
   );
 };

@@ -1061,6 +1061,11 @@ Hard rules:
     removes whole tenants and a block changes `is_blocked` on every branch
     payload. Admin writes are rare, so over-invalidating is the cheap side.
     Pinned in `httpCache.test.ts`.
+- **A sale moves the catalogue (2026-11-16).** `/orders` and `/sessions`
+  writes fan out to `/products` too: a counted product's «Остаток» changes
+  with every sale, and this machine must not read a minute-old count after it
+  sold one. Other machines still see it within the 60 s TTL. Pinned in
+  `httpCache.test.ts`.
 - Pass `noCache: true` to `request()` for a forced refresh; it also
   sends `Cache-Control: no-cache`, which makes the backend recompute.
 
@@ -1340,6 +1345,8 @@ button is not a permission: a manager who kept the URL could still POST.
 | Товары — создать / изменить / цена / скрыть (`product.write`, 2026-11-09) | ✅ | ✅ | ✅ own branch |
 | Товары — удалить (`product.crud`) | ✅ | ✅ | ❌ (скрывает вместо удаления) |
 | История товаров (`product.history`) | ✅ | ✅ | ❌ |
+| Остаток: приход, первый учёт (`product.write`, 2026-11-16) | ✅ | ✅ | ✅ own branch |
+| Остаток: пересчёт учтённого, «Не учитывать» (`product.stockCorrect`, 2026-11-16) | ✅ | ✅ | ❌ |
 | Товары — список + поиск | ✅ | ✅ | ✅ |
 | Сессии, касса, игры, ПК, турниры, подписчики | ✅ | ✅ | ✅ |
 | Джойстики, доп. время, безлимит на живой сессии | ✅ | ✅ | ✅ |
@@ -2365,10 +2372,21 @@ are unchanged — do not add a `paused` status here either.
   - Payments (2026-11-07, owner): ONE control, `PaymentEditor` +
     `paymentSplit.ts` (cents, `checkPayment`, `paymentBody`), on Stop, the
     till sale and the post-hoc mark. Cash / Card / Other, or «Разделить»: a
-    box per method, «Остаток», what is still due, a required note; parts sum
-    to the bill to the cent. One method sends the legacy fields (every server
-    takes them); a split sends `payments` + `payment_note` (never
-    `cash_received`). A seat that ended by itself with no method recorded:
+    box per method, «Остаток», what is still due, an OPTIONAL note («Как
+    оплатили (необязательно)», `pay.note`); parts sum to the bill (or the
+    prepaid DUE) to the cent. **No words are ever required (2026-11-15,
+    owner):** `checkPayment` has no note problem (only `invalid`, `parts` = no
+    amount typed → `pay.needAmount`, `sum`); «Другое» with no text is sent as
+    `{payment_method: "other"}`. One method — or a split with exactly ONE part
+    above zero — sends the legacy fields (every server takes them;
+    `payment_method_other` only when typed, cut to 120); two or more parts
+    send `payments` + `payment_note` only when written (never
+    `cash_received`). A text-less «Другое» reads «Другое» (`pay.otherShort`)
+    in `paymentText`, the session history (`paymentLabelOf`) and the till
+    (`salePaymentText` = `paymentText`). e2e `payment-optional-split.spec.ts`.
+    ⚠️ Deploy the backend FIRST: an older backend refuses a note-less split
+    and a text-less «Другое» with 422 (the seat keeps running, nothing is
+    written — safe, but the cashier is stuck until it is deployed). A seat that ended by itself with no method recorded:
     `StopReceiptModal` asks once («Отметить оплату» → `POST
     /sessions/{id}/payment` with a stable `client_request_id`; 409 already
     recorded, 422 shift closed). `payment_method` may be `split` with
@@ -2824,12 +2842,10 @@ adds `sessionItemsTotal` on top, with the waiver applied to the composed figure
 Items are READ from `items[]`, never accumulated, so a Reverb refresh cannot
 charge the same drink twice.
 
-Two terms of the server's subtotal are still missing and both make the tile
-read LOW rather than high: extra joysticks — a decision, since the periods do
-travel on the payload and mirroring a second ticking charge is a bigger change
-than the one that was needed — and the branch rounding step, which does not
-travel at all. A seat with pads, or a branch with a rounding step, will differ
-from its receipt. The receipt is right; it comes from the server.
+Two terms of the server's subtotal were once missing here (extra pads and the
+branch's rounding step); both have been mirrored since, and since 2026-11-16
+the tile is EXACT and rounded once like the bill (see "The tile is the
+receipt, to the cent" below): pinned against 350 server instants.
 
 **A fixed tariff is an HOURLY RATE with an auto-stop (settled 2026-09-06).**
 `time_packages` states the rate by stating a price for a duration — 1500 for 60
@@ -2844,11 +2860,12 @@ what has been committed to, and only the unlimited branch and the
 deleted-package fallback still bill from it.
 
 **The rate lives in two places and they must move together.**
-`Session::tariffHourlyRate()` and the `tariffHourlyRate` in `sessionAmount.ts`
-are the same two-step ladder: `hourly_rate` when set, else the package's
-`price × 60 / duration_minutes`, else null — and null bills the committed
-figure rather than nothing. `time_package` is on `ISessionApi` for this, and
-the sessions listing eager-loads it.
+`Session::tariffRate()` and `tariffRateOf` in `sessionAmount.ts` are the same
+ladder, EXACT (2026-11-16): the pair `rate_price` / `rate_seconds` when the
+seat carries one, else `hourly_rate` per hour, else the package's price for
+its length (2500 for 10800 s — never 833.33 an hour) — and null bills the
+committed figure rather than nothing. `time_package` is on `ISessionApi` for
+this, and the sessions listing eager-loads it.
 
 **Unlimited went pro-rata with it, later the same day.** Removing a session's
 end is a decision about the AUTO-STOP and not about the bill: a session
@@ -4669,3 +4686,367 @@ Playwright. Screenshots: `~/cyber-place-local/reports/audit-fixes-2026-11-14/pan
   `e2e/support-truncated.spec.ts` (a mocked Reverb socket via
   `page.routeWebSocket`, speaking enough Pusher for one private channel:
   reuse it for any realtime e2e).
+
+## Seat names in the bookings calendar; the debt card never covers its text (2026-11-15, owner)
+
+- **The calendar names a seat as its card does.** `seatLineOf(pc, lang)` in
+  `src/components/sessions/seatLine.ts` (moved out of SessionsBoard on
+  2026-11-15, byte-identical; `placeLineOf(place, lang)` is the same line for a
+  bare place row) is the one source of the card's name line («№4 · Hall VIP», «№4» with no
+  name, the device label with no place; number = `place.number ?? place.id`,
+  name through `tr(place, "name", lang)`). The card's `SeatNameLine` and the
+  calendar's `CalendarPlace.label` both take it, so the timeline's seat
+  column, the seat filter, the day's booking cards, a block's tooltip /
+  accessible name (`bookingTip`), the details and the form's seat picker
+  (all through `seatNames`), and the cancel/«Забронировано» toasts inside the
+  calendar, say the card's line. `seatOf` (board toasts, «№N» only) is
+  unchanged. Long names: the timeline column clamps to 2 lines (`.tl__seat-name`),
+  the list card and both selects cut with an ellipsis; each carries the whole
+  line in `title`. `.cal__seat` is capped at `max-width: 320px`, NOT a
+  percentage: a percentage is ignored while the header measures its content,
+  so the select asked for its longest option and pushed the bar past the
+  520px window (caught by the e2e). Other inline «№N · name» builders
+  (`RelocateSessionDialog`, `OutsideFoodPlacesField`, `ConsolePicker`,
+  `AppearancePreview`) print the same shape and were left as they are.
+- **Pre-existing, not fixed (outside the ask):** at the 520px window the
+  calendar's two-week date strip is wider than the calendar (668px of chips
+  in a 454px `.cal`, measured on the build before this change).
+- **Debt card (`.platform-debt--wide`) is a wrapping flex row, not a fixed
+  grid.** The grid kept three columns down to a 1100px WINDOW whatever the
+  card's width; the access badge (one line) spilled out of its third under
+  «Подробнее» (Armenian at 768/900/1280/1440). Now: main `flex: 1.2 1 240px`,
+  facts `flex: 2 1 400px` (the grid's 1.2 : 2 split), button `flex: 0 0 auto`;
+  above 640px the facts wrap too (`flex: 1 1 9rem; min-width: auto`: a fact
+  is never narrower than its badge). ≤ 640px: one part per line
+  (`flex-basis: 100%`), the 2026-11-09 phone look otherwise unchanged.
+- Tests: `SessionsBoard.reserve.test.tsx` (calendar labels = card lines),
+  `BookingsCalendar.test.tsx` («a seat's name», 2), `PlatformDebtCard.phone.test.ts`
+  (desktop assertions now flex); `e2e/booking-seat-names.spec.ts` (9: en/ru/am ×
+  1280×800, 1920×1080, 520×560), `e2e/debt-card-layout.spec.ts` (90: overdue,
+  nothing owed and an eight-digit debt × en/ru/am × 520…2560; per-line text
+  rects vs the button, everything inside the card, no page overflow). The owner web's phones
+  (360–430) and 520–1920 were measured with its own shell from a scratch copy
+  pointing at this checkout (36 cases, all clear). Mutation-checked: calendar
+  label back to `seatOf`, name dropped from `seatLineOf`, the grid restored
+  (27 of 90 fail), a fact allowed under its badge (`min-width: 0`, 3 fail). Screenshots:
+  `~/cyber-place-local/reports/ui-fixes-2026-11-15/`.
+
+## History: filter by place (2026-11-15, owner)
+
+Backend contract: `cyber-place/CLAUDE.md` § "Which place" (`SessionPlaceFilter`).
+- **«Место» / Seat / Տեղ** after the staff picker on Sessions → History
+  (`SessionsHistory`): «Все места» + every place of the branch as its card
+  names it (`placeLineOf`, «№N · name», in number order), from
+  `placeRepository.listRawByBranch`. State is `{branch, id}` like the staff
+  picker, so another branch starts from «all». The select (`.hs-place`) is
+  capped at `max-width: 260px` with an ellipsis (a fixed cap, not a
+  percentage — see `.cal__seat`); its `title` and each option's `title` carry
+  the whole line. A failed list shows `history.state.placesFailed` as the
+  retry (only «all» is left).
+- `place_id` goes on all three history reads: the sessions list (stat tiles
+  included), the person's list (`acted_by`) and the events feed. The SERVER
+  narrows (current place, or moved off it); nothing is filtered or recomputed
+  here. Without a place the requests carry no `place_id` key at all.
+  `eventsForSession` takes no place.
+- While a place is picked, `TillSalesHistory` and `BookingHistory` (which
+  belong to no seat) are not rendered; one muted line
+  `history.placeHidesTill` says why.
+- Tests: `seatLine.test.ts` (7), `SessionsHistory.placeFilter.test.tsx` (7),
+  the board's `SessionsBoard.reserve.test.tsx` pins the extracted line;
+  `e2e/history-place-filter.spec.ts` (6: en/ru/am × 1280/520 — the select fits
+  and is capped, no overflow, both reads carry `place_id`, till/bookings hidden
+  and back). Mutation-checked: place dropped from the feed, till never hidden,
+  name dropped from the line. Screenshots:
+  `~/cyber-place-local/reports/history-filter-split-stock-2026-11-15/history/`.
+- `e2e/booking-seat-names.spec.ts` was clock-dependent: after 23:00 local its
+  "booking in an hour" (with its «before 08:00 → 10:00» shift) landed on
+  tomorrow and all 9 cases failed at `cal-item`. Fixed 2026-11-16, test-only:
+  the spec's "now" is today at NOON (`NOON`; the booking is 13:00 today) and
+  the page's Date is pinned to it (`page.clock.setFixedTime`). Mutation-checked:
+  the old rule evaluated at 23:30 fails all 9 at `cal-item`; the seat name
+  dropped from `seatLineOf` fails all 9. The page-clock pin alone is defensive
+  (a 13:00 booking with the page at 23:30 still passes).
+
+## Paid ahead, unpaid lines, keep the rate, reminders (2026-11-15, owner)
+
+Backend contract: `cyber-place/CLAUDE.md` § "Paid ahead, unpaid lines, keep the
+rate, reminders" (commit 1c8d6d7) and § billing to the paid end (c591590). The
+panel shows the server's figures only; nothing below adds or subtracts money.
+
+- **History renderer first (`sessionHistoryModel.ts`).** An action with no
+  dictionary entry used to print `history.action.x` (the real `t` returns the
+  KEY, never ""): `actionTitle` now asks `hasTranslation(key)` (new in
+  `translations.ts`) and humanizes otherwise. The model's test mock is the
+  identity, like the real `t`. New renders: `started` by amount («На сумму
+  5 000 → 5 ч», own food first) and paid ahead; `time_added` paid now;
+  `item_added` lines tagged «не оплачено» + `unpaid_total`; `unpaid_off` with
+  `scope: "item"` titled «Отметил оплату товара» (the line, lines left);
+  `stopped` / `payment_recorded` prepaid · change / due / no change, cash
+  received, not paid at the end; `cancelled` prepayment returned;
+  `made_unlimited` kept («Цена прежняя: 1 500/ч (место 1 000 + джойстики 500)»,
+  `rate_now`); `limited` per hour now; `reminder_set` (changed when
+  `previous_remind_at`), `reminder_cleared`, `reminder_fired` (actor
+  «Automatically»). ⚠️ `payment_recorded` had NO entry in `ACTION_LOOK`, so it
+  fell to the unknown dump ("After: expired", "Payment method: card", English
+  in every language); it now reads its payment like a stop — the one deliberate
+  change to an old row. Old rows are pinned by snapshots through the real
+  dictionary (`sessionHistoryModel.oldRows.test.ts`, en/ru/am;
+  `SessionHistoryBill.oldRows`, `ShiftReportView.oldRows`: a v5 report with
+  nothing paid ahead reads exactly as v4). History bill: «Оплачено вперёд»,
+  «Сдача выдана» (the server's `cash_change`, never received − total) and «Не
+  оплачено при уходе» (`unpaid_amount`). Shift report v5: `+ Предоплаты в эту
+  смену` / `− Предоплаты закрытых мест` / change given (only when > 0),
+  `lines.prepaid[]`, a place line's prepaid/change/unpaid, a person's «Принял
+  предоплат».
+- **D, unlimited without a price.** `SessionOptionsDialog` has no rate box: the
+  gate, a line «Продолжит по той же цене, что сейчас…», the in-app confirm,
+  `POST /unlimited {keep_rate: true}`. The figure exists only in the answer
+  (`hourly_now`, NOT on `SessionResource`), so it is said in the toast
+  («Безлимит. Цена прежняя: 1 500 ֏/ч»); `/limit`'s toast «До 21:10, по 1 500
+  ֏/ч» only for an answer without `limit` (see «Задать время» below).
+  `sessionRepository.makeUnlimited / limit` return `{session, hourlyNow, limit}`.
+  Removed keys `session.unlimitedRate/RateHint/Hint` (no other caller).
+- **B, unpaid lines.** «Не оплачено» switch in `AddSessionItemDialog` (off by
+  default = the request exactly as before; on = `unpaid: true` on product
+  lines, never on additional items / the room's extra). Bill lines with
+  `unpaid_at` carry a tag and «Оплачено» (`PATCH {unpaid:false}`,
+  `markItemPaid`). Receipt: tag + «Из них выдано без оплаты» (server's
+  `unpaid_items_total`). `UnpaidAlert` copy now says time OR products (the
+  server's `unpaid_amount` includes lines).
+- **The card's chips (`SessionCardChips`)** — 🔔 HH:MM (amber pulse once rung),
+  «Не оплачено: 1 200», «Предоплата: 2 000» — sit FIRST on the one-line tariff
+  line: every card is one height, so they never add a line and are never cut.
+- **C, paid ahead.** Start: «Оплачено вперёд» (green `UnpaidToggle tone="success"`)
+  on a package or a planned length only, mutually exclusive with «Не оплачено»,
+  `prepaid: true`. «+ Время» on a prepaid seat: «Оплачено сейчас» (off by
+  default) → `prepaid: true`. Stop receipt with `preview.prepaid`:
+  `PrepaidSettlement` — «Оплачено при старте», then a 44px green «Сдача 500 ֏ ·
+  верните игроку» (`role="status"`) when change > 0, amber «Доплатить 500» when
+  due, muted «Оплачено полностью». The payment control is asked for the DUE
+  (`dueCents`; split must add up to it; cash change against it); nothing due →
+  no payment control, `{payment_method: "cash"}`. After the stop the change is
+  the server's `cash.change`.
+- **A, «На сумму».** A third Start tab (`start-mode-amount`; the package tab is
+  `start-mode-fixed`, shown only with packages). `StartByAmount`: autofocused
+  sum, `GET /sessions/start-quote?amount=` (+`outside_food=1`), a 28px line
+  «5 000 ֏ → 5 ч», «по 1 000 ֏/ч · до 23:40», own food first, «Джойстики и
+  товары оплачиваются отдельно». Start only on a quote for exactly the sum on
+  screen; sends `paid_amount` + the quote's `paid_seconds`; refusals are the
+  server's sentences. No «Не оплачено» there.
+- **E, reminders.** `ReminderSection` in «+ Время» (DurationInput h:mm +
+  optional note ≤ 120, «Напомнить через 2 ч»; pending: when, change, cancel;
+  rung: «Убрать»). `PUT/DELETE /sessions/{id}/reminder`. `useExpiryNudge` also
+  wakes at a pending `reminder.at` (wall clock, paused too). `SessionReminderNotifier`
+  (mounted in `Layout`, the SessionEndingNotifier idiom, bottom-right; dismissed
+  ids per user in `cp.reminder.dismissed.{id}`, a NEW key): «Понятно» = read +
+  DELETE, «Ещё 30 мин» = PUT 30 with the note, «Открыть место». Bell =
+  `playFor("session_ending", id)`. Notifications page renders `session.reminder`.
+  `SessionChangedEvent.kind` gains `reminder.changed` (the board re-reads, as
+  for any kind; PS5 control ignores it).
+- **The tile never bills past a running seat's end** (`billableUntilOf`,
+  mirror of `Session::billableUntil`): `ends_at`, or `ends_at` + the whole
+  pause for a pause with a limit; null for no end, a pause with none, a
+  closed row. Capped in `sessionAmountAt`, `sessionMinimumChargeAt`,
+  `sessionJoysticksTotalAt`, `sessionItemsTotalAt` (an hour at 1000 rounding up
+  to 100 read 1100 between its end and the sweep). Two old fixtures with a
+  resumed pause but an unmoved `ends_at` were corrected to what the server
+  writes.
+- ⚠️ **Owner web:** its `src/overrides/Layout.tsx` must mount
+  `SessionReminderNotifier` beside `SessionEndingNotifier` (and
+  `tests/layout.test.tsx` mock it) when it next bumps `panel.ref`.
+- Tests: vitest per feature (`sessions.moneyFeatures.test.ts` pins every body
+  sent); e2e `session-history-new-actions`, `unlimited-keep-rate`,
+  `item-unpaid`, `stop-change`, `start-by-amount`, `session-reminder`
+  (`e2e/helpers/moneySession.ts`, en/ru/am × 1280/520; screenshots to
+  `~/cyber-place-local/reports/money-session-features-2026-11-15/panel/`).
+
+## «Задать время»: in all from the start, or more from now (2026-11-15, owner)
+
+Backend contract: `cyber-place/CLAUDE.md` § "A fixed time counted from the
+start". Production seat #258: "1 hour" set ten seconds after a 1000/h start ran
+from the press, and the hour banked 1100.
+
+- `SessionOptionsDialog`'s limit section (an unlimited seat): `DurationInput`,
+  then the SERVER's two answers from `GET /sessions/{id}/limit-quote?minutes=`
+  (`sessionRepository.limitQuote`, `useServerQuote` + `useMinuteTick`, so the
+  end of «from now» follows the clock) as `ChoiceCards` (testId `limit-from`):
+  «Всего с начала места · до 19:15» (the DEFAULT) and «Ещё 1 ч от сейчас · до
+  19:25», each with «За время места всего: …» = the server's `time_total`,
+  printed to the hundredth (`centsWhenFractional`: 1 000 beside 1 002.78 — whole
+  drams would read 1 003 and hide the difference). «Уже сыграно» is the
+  server's `played_seconds`. A choice the server cannot make (the player
+  already sat longer than the length in all) shows its 422 sentence, is
+  disabled and is never drawn as chosen; nothing looks picked until the
+  cashier picks «from now». A refused quote shows its reason and no choice.
+- The confirm («Задать 1 ч») is enabled only on an available choice of a
+  quote for exactly the length on screen; it sends `{minutes, from}`
+  (`apiLimitSession(id, minutes, from)` — `from` is required in the client).
+  Toast: the answer's `limit` plan — «До 19:15: за всё время места 1 000» /
+  «До 19:25: ещё 1 ч, за всё время места 1 002.78»; an answer without it (an
+  older backend) falls back to «До …, по … ֏/ч» / «Задано время: …».
+- History: `limited` with `from` adds «Всего с начала места, до 19:15» or
+  «Ещё 1 ч от сейчас, до 19:15» and «Время места всего: …» (`time_total`); a
+  row without `from` reads exactly as before (old-rows snapshot unchanged).
+- The tile needs nothing new: the server writes a plan share (one rate) or a
+  rate change (another rate earlier), both already mirrored by
+  `sessionTimeCostAt`, and `billableUntilOf` caps it at the end — pinned with
+  the server's own columns and figures in `sessionAmount.limitFromStart.test.ts`
+  (seat #258: 2.78 / 999.72 / 1000, «up to 100» still 1000 after the end; the
+  reset case; 500 + 666.67 after a move).
+- Removed key: `session.limitEndsAt` (the end is the server's now).
+  `session.limitHint` / `session.limitLength` reworded (no "from now").
+- Deploy: the backend first (an older one answers `limit-quote` 404 and the
+  confirm stays held). ⚠️ Owner web: bump `panel.ref` with this change.
+- Tests: `SessionOptionsDialog.test.tsx` («Задать время», 6 + the two updated
+  limit cases), `sessionHistoryModel.newActions.test.ts` (3),
+  `sessions.moneyFeatures.test.ts` (2); e2e `limit-from-start.spec.ts` (18: three
+  flows × en/ru/am × 1280/520, no overflow, no raw keys; screenshots in
+  `~/cyber-place-local/reports/limit-from-start-2026-11-15/panel/`) and
+  `unlimited-keep-rate.spec.ts` (its limit case now answers the quote). 13
+  mutations caught (six in the dialog, one API body, two history lines, the
+  exact-cents display — caught only by the e2e — and three in the tile's
+  mirror).
+
+## The tile is the receipt, to the cent (2026-11-16, billing audit)
+
+Backend contract: `cyber-place/CLAUDE.md` § "An exact bill, rounded once; each
+period at its own price". Owner: «расчет должен быть 100% гарантировано
+правильным». The audit found 15 of 210 tile instants off the server, five by a
+whole rounding step.
+
+- **`sessionAmount.ts` is exact.** Every part is an `Exact` (`n / d` cents,
+  BigInt) — the server's `ExactAmount`; rates are `Rate` (`priceCents` for
+  `seconds`), the server's `Rate`. The clock (`clockExactAt`, the branches of
+  `Session::timeCostExactAt` in order), the plan's share period by period
+  (`plan_period_ends`), the minimum (`minimumChargeExactAt`), each pad and each
+  hourly line are summed and rounded half-up to the cent ONCE
+  (`toMoney`), then the step (`applyRounding`, in whole cents). No float
+  touches a figure: `Math.round(n * 100) / 100` read 1249.995 (833.33/h for
+  90 min) as 1249.99 → 1200 under "nearest 100" against a receipt of 1300.
+  Amounts are read through the panel's cents helper (`billCents`). Every
+  exported function keeps its signature and returns the cent figure.
+- **The parity test is fed the server's own payloads.**
+  `sessionAmount.serverParity.test.ts` + `__fixtures__/server-parity-2026-11-16.json`:
+  65 board rows × 350 instants, total AND subtotal, equality to the cent (no
+  tolerance), including the audit's five whole-step instants by hand. Captured
+  by the backend: `BILL_TILE_FIXTURES=<dir> php artisan test --filter
+  'SessionBillHandFiguresTest::test_t_tile_fixtures'` (dedupe the rows per
+  case as the fixture does). Re-capture after a payload change; never edit a
+  figure. Against the old mirror 109 of the 706 checks fail.
+- **New payload keys** (additive, `ISessionApi`): `plan_period_ends`,
+  `rate_price`, `rate_seconds`. A backend that does not send them reads as
+  before (one period; `hourly_rate` / the package).
+- **The card prints the cents the server stores** (`SessionTimer`:
+  `centsWhenFractional`, was `preciseWhenSmall`): 1 249.99 on a step-0 branch
+  is printed 1 249.99, a whole figure is printed whole, a step branch shows
+  whole steps. Test: `SessionTimer.cents.test.tsx`.
+- **A Stop refused because the seat was closed meanwhile (F7).** The server
+  answers the receipt's Stop with the changed-receipt 422 when the sweep (or
+  another desk) already banked another figure. `StopReceiptModal` reads the
+  receipt again and shows the banked bill (confirm then sends it), or — when
+  the re-read is refused 403 (a manager may read a closed seat only if they
+  opened it) — reports «Сессию уже закрыли в другом месте. Счёт сохранён.»
+  (`session.checkoutClosedElsewhere`, en/ru/am), shows no stale figure and
+  offers only Close. Tests: two cases in `StopReceiptModal.test.tsx`.
+- **Receipt lines add up (2026-11-16, backend `BillLines`).** The server
+  prints each line (`time_cost`, each pad's `amount`, each `line_total`, and
+  `joysticks_total` / `items_total` / `unpaid_items_total` as their sums)
+  allocated by largest remainder so they add up to `subtotal` exactly: two
+  pads at 37:33 print 625.84 + 312.08 + 312.08 = 1 250.00 (ties go to the
+  earlier line: time, pads by slot, items). The receipt renders them as given
+  and never recomputes a line. The money (`subtotal`, `total`, `total_paid`,
+  `unpaid_amount`) is unchanged by it. The history card derives its time line
+  from the stored total, so it adds up by construction (its pad line is the
+  pads' exact sum to the cent, so on such a bill it can sit a cent from the
+  receipt's split between time and pads; the total is the same). The tile
+  prints no line breakdown, only the total (and the pad note's sum), so it
+  mirrors nothing here. Known residual: the receipt's reset question names
+  the printed `time_cost`, which can be a cent above the figure the server
+  waives (`reset-time` waives the bill's own time; the toast names that).
+- Mutations (13 caught): each pad or the clock cut to the cent first, the
+  package rate cut to the cent, the exact pair ignored, the cent truncated,
+  the old float path (rate × seconds in drams, `Math.round(x * 100)`), periods
+  ignored, the last period read from the anchor, the step decided off by a
+  cent, whole drams on the card (twice), the 403 not reported, the stale
+  figure kept. One survivor, recorded honestly: rounding the final exact
+  ratio through a float cannot fail (a half cent of a whole-cents ratio is
+  representable) — the fix is the ratio, and the float path above is caught.
+- e2e `bill-exact.spec.ts` (24: the card's cents on a step-0 branch, the step
+  on a 100 branch, the receipt re-read after the sweep, «closed elsewhere» for a
+  manager; en/ru/am × 1280/520, no raw keys, no overflow). Screenshots:
+  `~/cyber-place-local/reports/billing-fixes-2026-11-16/panel/`.
+- ⚠️ **Owner web**: bump `panel.ref` with this change. Deploy the backend first
+  (an older backend sends none of the new keys: the tile reads one period and
+  the cent rate, as before).
+
+## Product stock per shift (2026-11-16, owner)
+
+Backend contract: `cyber-place/CLAUDE.md` § "Product stock per shift". Stock is
+bookkeeping: nothing here adds or subtracts a count, prices anything or refuses
+a sale. Every figure on screen is the server's.
+
+- **Types / API** — `IProduct.stock?: number | null` (absent from an older
+  backend = not counted; `countsStock()`), `IStockWarning`, `IProductStockMeta`,
+  `IStockChange` (`types/pos.ts`); `api/products.ts`: `CreateProductBody` gains
+  `stock` / `on_existing` / `existing_id` / `client_request_id` (sent only when
+  a quantity is typed), `apiProductStock` (`POST /products/{id}/stock`),
+  `productExistsBody(e)` reads the 409. `ProductRepository.listWithStock`
+  (rows + `meta.stock`), `createCounted` (no generic toast: the form says what
+  happened), `stock`. Pure helpers in `components/products/stock.ts`
+  (`parseQuantity`, `stockNumber`/`signedDelta` with a real minus sign,
+  `stockChangeText` «5 → 15 (+10)», «Без учёта → 10», warnings).
+  `utils/requestId.ts` is the one press-id minter (the till's moved there).
+- **Products list** (`routes/ProductsList.tsx`): each product sold by the unit
+  says «Остаток: 15» (red below zero, `.product-stock.is-negative`) or «Без
+  учёта»; above the list «Остаток всего: N шт.» + «В минусе: N» from
+  `meta.stock` (never added up here; hidden when nothing counts or the server
+  sends no meta). «Остаток» button per row (`product.write`) →
+  `ProductStockDialog`. Rows wrap their buttons under the product on a narrow
+  window (`.list-item.product-row`; four buttons did not fit 520px).
+- **ProductForm** «Количество» (new products sold by the unit only; plain text
+  + `inputMode="numeric"`, empty = not counted = the old create, byte for
+  byte). With a number: `createCounted`; merged → toast «Добавлено к остатку
+  «Кола»: 5 → 15 (+10)» and the existing product's names are NOT translated
+  over; created → names saved as before. 409 → `ProductMergePanel` («Такой
+  товар уже есть»: `ChoiceCards` of the matches with price · count · «скрыт»,
+  «Добавить к остатку», «Добавить и сменить цену на N» only when the price
+  differs, «Назад»), scrolled into view; the answer re-sends with the SAME
+  `client_request_id`. Also inside both sale dialogs' «new product».
+- **ProductStockDialog**: not counted → one action «Начать учёт» (`set`,
+  `product.write`); counted → «Приход» (+N, `product.write`), and for
+  `product.stockCorrect` (owner, admin) «Пересчёт» and «Не учитывать»; a
+  manager sees «Пересчитать или отключить учёт может только владелец.». One
+  press id per dialog; toast «Кола: 15 → 12 (−3)» / «остаток уже N».
+- **Basket**: `StockChip` «ост. N» beside a counted product in the picker and
+  on a typed line (amber at 0, red below; a hint, never a limit).
+  **Warnings**: `ui/stockWarnings.ts` `announceStockWarnings` — the till's and
+  the bill's repositories (`OrderRepository.create`, `SessionRepository.addItem /
+  addItems / setItemQty`) raise ONE amber `notify.warning` «Остаток ниже нуля:
+  Кола −2. Продажа прошла, проверьте остаток.» and return exactly what they
+  returned before.
+- **History**: `PRODUCT_ACTIONS` + `stock_received` / `stock_corrected` /
+  `stock_untracked`; `describeChange` reads `old_stock`/`new_stock`/
+  `stock_delta` («5 → 15 (+10)», «· при добавлении товара» from `after.via`).
+- **Shift report v6**: `IShiftStock`, `IShiftStockLine`, `report.stock`,
+  `lines.stock`; `ShiftStockTable` («Остатки»: Товар · На начало · Пришло ·
+  Продано · Вернули · Пересчёт · Осталось, then «Итого»; below zero red and
+  named under the table) in `ShiftBreakdown` after the products. Scrolls in
+  its own `.hs-scroll` viewport on a narrow window; nothing for a report
+  without `stock` (v5 and older) or with no counted product.
+- **Permission**: `product.stockCorrect` (admin, owner) mirrors the backend's
+  `products.manage` for stock; the server asks it again under its row lock.
+- **Tests**: vitest `stock.test.ts`, `ProductForm.stock.test.tsx` (9),
+  `ProductStockDialog.test.tsx` (6), `ProductsList.stock.test.tsx` (5: the
+  printed total is the server's 113, not the rows' 13), `ShiftStockTable.test.tsx`
+  (4), `SellProductsDialog.stock.test.tsx` (3), `saleStockWarnings.test.ts`,
+  `ui/stockWarnings.test.ts`, + cases in `productEventChange`, `httpCache`,
+  `permissions`; 13 panel mutations caught. e2e `product-stock.spec.ts` (7)
+  and `shift-stock.spec.ts` (7: the fixture `e2e/fixtures/shift-stock-v6-summary.json`
+  is the backend's own `/shifts/{id}/summary` answer for the
+  `ShiftStockScenario` evening), en/ru/am × 1280/520. Screenshots:
+  `~/cyber-place-local/reports/history-filter-split-stock-2026-11-15/stock/`.
+- **Pre-existing, not fixed (outside the ask)**: at the 520px window the shift
+  report's header buttons and its «По способам оплаты» card stick out of the
+  window, identically with and without «Остатки» (measured 2026-11-16).
+- ⚠️ **Owner web**: bump `panel.ref` with this change. Deploy the backend first
+  (an older backend ignores `stock` on create and answers 404 for `/stock`).

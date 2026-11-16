@@ -16,6 +16,7 @@ import CashChangePanel from "@/components/payments/CashChangePanel";
 import { billCents, cashChange } from "@/components/payments/cashChange";
 import { shiftAmount, toAmount } from "@/shifts/cash";
 import { BasketCreateProduct, BasketModeSwitch, BasketPicker, BasketQuickEntry } from "./ProductBasketPanels";
+import { newRequestId } from "@/utils/requestId";
 
 interface Props {
   branchId: number;
@@ -23,11 +24,6 @@ interface Props {
   onSold: () => void;
 }
 
-/** A fresh id for one press of "Sell" (see `client_request_id`). */
-const newRequestId = (): string =>
-  typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
-    ? crypto.randomUUID()
-    : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
 /**
  * Selling at the till, with no gaming session (2026-09-24).
@@ -87,8 +83,7 @@ const SellProductsDialog = ({ branchId, onClose, onSold }: Props) => {
   const sell = async () => {
     if (!ready || inFlightRef.current || cashBlocks) return;
     if (!payCheck.ok) {
-      setErr(t(payCheck.problem === "note" ? (pay.split ? "pay.noteRequired" : "session.payOtherRequired")
-        : payCheck.problem === "sum" ? "pay.sumMismatch" : payCheck.problem === "parts" ? "pay.needTwo" : "pay.invalid"));
+      setErr(t(payCheck.problem === "sum" ? "pay.sumMismatch" : payCheck.problem === "parts" ? "pay.needAmount" : "pay.invalid"));
       return;
     }
 

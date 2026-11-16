@@ -130,3 +130,31 @@ describe("extra time not paid yet", () => {
     expect(sound.playFor).toHaveBeenCalledTimes(2);
   });
 });
+
+/**
+ * 2026-11-15: the card's chips come from the server's row, and the new
+ * `reminder.changed` kind re-reads the board like every other kind (it is not
+ * a freeing kind: no receipt, no unpaid alarm).
+ */
+describe("the card's chips and reminder.changed", () => {
+  test("unpaid products and a prepayment read on the card", async () => {
+    repo.listActive.mockResolvedValue([running({ unpaid_items_total: 1200, prepaid_amount: 2000 })]);
+    await mount();
+    expect(screen.getByTestId("card-unpaid-chip").textContent).toBe("session.unpaidChip".replace("{0}", "1200·AMD"));
+    expect(screen.getByTestId("card-prepaid-chip")).toBeTruthy();
+  });
+
+  test("reminder.changed: the board reads again and the 🔔 appears; nothing else happens", async () => {
+    await mount();
+    expect(screen.queryByTestId("card-reminder-chip")).toBeNull();
+    const reads = repo.listActive.mock.calls.length;
+    repo.listActive.mockResolvedValue([running({
+      reminder: { at: new Date(Date.now() + 3600_000).toISOString(), set_at: null, minutes: 60, note: null, set_by_user_id: 1, fired_at: null },
+    })]);
+    await emit({ ...stopped(), kind: "reminder.changed", status: "active" });
+    expect(repo.listActive.mock.calls.length).toBeGreaterThan(reads);
+    expect(screen.getByTestId("card-reminder-chip")).toBeTruthy();
+    expect(screen.queryByTestId("unpaid-alert")).toBeNull();
+    expect(sound.playFor).not.toHaveBeenCalled();
+  });
+});
