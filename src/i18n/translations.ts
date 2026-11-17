@@ -1283,12 +1283,16 @@ export const TRANSLATIONS: Dict = {
   "session.prepaid.change": { en: "Change", ru: "Сдача", am: "Մանր" },
   "session.prepaid.giveBack": { en: "give it back to the player", ru: "верните игроку", am: "վերադարձրեք խաղացողին" },
   "session.prepaid.due": { en: "To pay now", ru: "Доплатить", am: "Հավելավճար" },
+  // Paid ahead by card / «Другое», not all used (2026-11-17): back the way it came.
+  "session.prepaid.cardRefund": { en: "Back to the card", ru: "Вернуть на карту", am: "Վերադարձնել քարտին" },
+  "session.prepaid.cardRefundHint": { en: "refund on the terminal, not from the cash drawer", ru: "возврат через терминал, не из кассы", am: "վերադարձ տերմինալով, ոչ դրամարկղից" },
+  "session.prepaid.otherRefund": { en: "Back («Other»)", ru: "Вернуть («Другое»)", am: "Վերադարձնել («Այլ»)" },
   "session.prepaid.paidInFull": { en: "Paid in full", ru: "Оплачено полностью", am: "Վճարված է ամբողջությամբ" },
   "session.prepaid.switch": { en: "Paid ahead", ru: "Оплачено вперёд", am: "Վճարված է նախապես" },
-  "session.prepaid.switchFull": { en: "The player paid in cash now, before playing", ru: "Игрок заплатил наличными сейчас, до игры", am: "Խաղացողը վճարեց կանխիկ հիմա՝ խաղից առաջ" },
-  "session.prepaid.startHint": { en: "Leaves early: the change is shown at Stop.", ru: "Уйдёт раньше: при Стоп будет показана сдача.", am: "Եթե շուտ գնա՝ «Ավարտել»-ի ժամանակ ցույց կտրվի մանրը։" },
+  "session.prepaid.switchFull": { en: "The player paid now, before playing", ru: "Игрок заплатил сейчас, до игры", am: "Խաղացողը վճարեց հիմա՝ խաղից առաջ" },
+  "session.prepaid.startHint": { en: "Leaves early: Stop shows what to give back.", ru: "Уйдёт раньше: при Стоп будет показано, что вернуть.", am: "Եթե շուտ գնա՝ «Ավարտել»-ի ժամանակ ցույց կտրվի, ինչ վերադարձնել։" },
   "session.prepaid.timeSwitch": { en: "Paid now", ru: "Оплачено сейчас", am: "Վճարված է հիմա" },
-  "session.prepaid.timeSwitchFull": { en: "The player paid for this time in cash now", ru: "Игрок оплатил это время наличными сейчас", am: "Խաղացողը վճարեց այս ժամանակի համար կանխիկ հիմա" },
+  "session.prepaid.timeSwitchFull": { en: "The player paid for this time now", ru: "Игрок оплатил это время сейчас", am: "Խաղացողը վճարեց այս ժամանակի համար հիմա" },
   "session.prepaidChip": { en: "Paid ahead: {0}", ru: "Предоплата: {0}", am: "Կանխավճար՝ {0}" },
   // «На сумму» (2026-11-15): the player names the money, the server the time.
   "session.byAmountTab": { en: "By amount", ru: "На сумму", am: "Գումարով" },
@@ -1830,8 +1834,8 @@ export const TRANSLATIONS: Dict = {
   "shift.cashPrepaidSettled": { en: "Prepayments of places settled", ru: "Предоплаты закрытых мест", am: "Փակված տեղերի կանխավճարներ" },
   "shift.cashPrepaidSettledHint": { en: "Already in the places' cash above, change included", ru: "Уже в наличных за места выше, со сдачей", am: "Արդեն ներառված է վերևի տեղերի կանխիկում՝ մանրով" },
   "shift.cashChangeGiven": { en: "Change given back from prepayments", ru: "Сдача с предоплат выдана", am: "Կանխավճարներից վերադարձված մանր" },
-  "shift.linesPrepaid": { en: "Paid ahead (cash, not revenue)", ru: "Предоплаты (наличные, не выручка)", am: "Կանխավճարներ (կանխիկ, հասույթ չէ)" },
-  "shift.linesRule.prepaid": { en: "Cash taken before playing in this shift; it settles when the place is paid.", ru: "Наличные до игры в эту смену; закрываются при оплате места.", am: "Այս հերթափոխում խաղից առաջ ստացված կանխիկ, այն փակվում է տեղի վճարման ժամանակ։" },
+  "shift.linesPrepaid": { en: "Paid ahead (not revenue)", ru: "Предоплаты (не выручка)", am: "Կանխավճարներ (հասույթ չէ)" },
+  "shift.linesRule.prepaid": { en: "Taken before playing in this shift, by any method (only cash is in the drawer); it settles when the place is paid.", ru: "Получено до игры в эту смену любым способом (в кассе только наличные); закрывается при оплате места.", am: "Այս հերթափոխում խաղից առաջ ստացված՝ ցանկացած եղանակով (դրամարկղում միայն կանխիկն է), այն փակվում է տեղի վճարման ժամանակ։" },
   "shift.prepaidKindStart": { en: "At the start", ru: "При старте", am: "Մեկնարկին" },
   "shift.prepaidKindTime": { en: "+ Time", ru: "+ Время", am: "+ Ժամանակ" },
   "shift.linePrepaid": { en: "Paid ahead {0}", ru: "Предоплата {0}", am: "Կանխավճար {0}" },
@@ -2359,6 +2363,9 @@ export const TRANSLATIONS: Dict = {
     am: "Հեռացնե՞լ «{0}»-ը հաշվից։",
   },
   "product.kindAdditionalShort": { en: "Additional item", ru: "Доп. предмет", am: "Լրացուցիչ իր" },
+  // An additional item's price: once, or a change of the hourly rate (2026-11-17).
+  "session.itemReturn": { en: "Return", ru: "Вернуть", am: "Վերադարձնել" },
+  "product.pricingMode": { en: "How the price is charged", ru: "Как берётся цена", am: "Ինչպես է գանձվում գինը" },
   "history.billTitle": { en: "Bill", ru: "Счёт", am: "Հաշիվ" },
   // Its columns, and the play-time row.
   "history.billItem": { en: "Item", ru: "Позиция", am: "Ապրանք" },
@@ -2428,6 +2435,9 @@ export const TRANSLATIONS: Dict = {
   "history.action.reminder_set": { en: "Set a reminder", ru: "Поставил напоминание", am: "Դրեց հիշեցում" },
   "history.action.reminder_cleared": { en: "Removed the reminder", ru: "Убрал напоминание", am: "Հանեց հիշեցումը" },
   "history.action.reminder_fired": { en: "The reminder rang", ru: "Сработало напоминание", am: "Հիշեցումը աշխատեց" },
+  "history.action.rate_changed": { en: "Price per hour changed", ru: "Изменена цена за час", am: "Ժամավճարը փոխվեց" },
+  "history.foodRateOn": { en: "Own food", ru: "Свои продукты", am: "Սեփական սնունդ" },
+  "history.foodRateOff": { en: "Own food off", ru: "Свои продукты выключены", am: "Սեփական սնունդն անջատված է" },
   "history.reminderChanged": { en: "Changed the reminder", ru: "Изменил напоминание", am: "Փոխեց հիշեցումը" },
   "history.reminderIn": { en: "in {0}", ru: "через {0}", am: "{0} հետո" },
   "history.reminderAt": { en: "at {0}", ru: "в {0}", am: "ժամը {0}" },
@@ -2440,6 +2450,9 @@ export const TRANSLATIONS: Dict = {
   "history.byAmountFood": { en: "Own food first: {0}", ru: "Сначала свои продукты: {0}", am: "Նախ՝ սեփական սնունդ {0}" },
   "history.prepaidAhead": { en: "Paid ahead in cash: {0}", ru: "Оплачено вперёд наличными: {0}", am: "Նախապես վճարված կանխիկ՝ {0}" },
   "history.prepaidWithTime": { en: "Paid now in cash: {0}", ru: "Оплачено сразу наличными: {0}", am: "Վճարվեց միանգամից կանխիկ՝ {0}" },
+  // Paid ahead by anything but cash alone (2026-11-17): the sum and how.
+  "history.prepaidAheadBy": { en: "Paid ahead: {0} ({1})", ru: "Оплачено вперёд: {0} ({1})", am: "Նախապես վճարված՝ {0} ({1})" },
+  "history.prepaidWithTimeBy": { en: "Paid now: {0} ({1})", ru: "Оплачено сразу: {0} ({1})", am: "Վճարվեց միանգամից՝ {0} ({1})" },
   "history.notPaidTag": { en: "not paid", ru: "не оплачено", am: "չվճարված" },
   "history.unpaidTotal": { en: "Not paid yet: {0}", ru: "Пока не оплачено: {0}", am: "Դեռ չվճարված՝ {0}" },
   "history.unpaidLeft": { en: "Lines still unpaid: {0}", ru: "Ещё не оплачено позиций: {0}", am: "Դեռ չվճարված ապրանքներ՝ {0}" },
@@ -4101,49 +4114,14 @@ export const TRANSLATIONS: Dict = {
     am: "Կիոսկի Agent-ի թարմացումներ",
   },
   "agentUpdates.subtitle": {
-    en: "Roll out a new version of the kiosk agent to every gaming PC in your branches. Updates download in the background and prompt the cashier on the lock screen.",
-    ru: "Обновите версию агента на всех игровых ПК ваших филиалов. Обновление скачается фоном и предложит кассиру перезапустить на экране блокировки.",
-    am: "Թարմացրեք Agent-ը ձեր մասնաճյուղերի բոլոր խաղային համակարգիչներում։ Թարմացումը ներբեռնվում է ֆոնում, և գանձապահը հուշում է ստանում կողպման էկրանին։",
-  },
-  "agentUpdates.loading": {
-    en: "Loading agent status…",
-    ru: "Загрузка состояния агента…",
-    am: "Բեռնվում է Agent-ի վիճակը…",
-  },
-  "agentUpdates.currentVersion": {
-    en: "Current version",
-    ru: "Текущая версия",
-    am: "Ընթացիկ տարբերակը",
-  },
-  "agentUpdates.latestVersion": {
-    en: "Latest version",
-    ru: "Новая версия",
-    am: "Վերջին տարբերակը",
-  },
-  "agentUpdates.upToDate": {
-    en: "Every agent is up to date.",
-    ru: "Все агенты обновлены.",
-    am: "Բոլոր Agent-ները թարմացված են։",
-  },
-  "agentUpdates.hasUpdate": {
-    en: "A newer version is available. Install it for every agent in your branches.",
-    ru: "Доступна новая версия. Установите её на всех агентах ваших филиалов.",
-    am: "Հասանելի է նոր տարբերակ։ Տեղադրեք այն ձեր մասնաճյուղերի բոլոր Agent-ներում։",
-  },
-  "agentUpdates.promoteBtn": {
-    en: "Install new version on all agents and restart",
-    ru: "Установить новую версию на всех агентах и перезапустить",
-    am: "Տեղադրել նոր տարբերակը բոլոր Agent-ներում և վերագործարկել",
+    en: "Apply a new version of the kiosk Agent in each of your branches. It downloads in the background and prompts the cashier on the lock screen.",
+    ru: "Применяйте новую версию агента в каждом своём филиале. Обновление скачается фоном и предложит кассиру перезапуск на экране блокировки.",
+    am: "Կիրառեք Agent-ի նոր տարբերակը ձեր յուրաքանչյուր մասնաճյուղում։ Թարմացումը ներբեռնվում է ֆոնում, և գանձապահը հուշում է ստանում կողպման էկրանին։",
   },
   "agentUpdates.promoting": {
     en: "Applying…",
     ru: "Применяем…",
     am: "Կիրառվում է…",
-  },
-  "agentUpdates.cannotPromote": {
-    en: "Cannot apply. Backend could not fetch the latest release from GitHub.",
-    ru: "Не удалось применить. Backend не смог получить релиз с GitHub.",
-    am: "Չհաջողվեց կիրառել։ Սերվերը չկարողացավ ստանալ վերջին թողարկումը GitHub-ից։",
   },
   "agentUpdates.approvedVersion": {
     en: "Approved by administrator",
@@ -4155,25 +4133,47 @@ export const TRANSLATIONS: Dict = {
     ru: "Администратор ещё не одобрил обновление. Как только он его одобрит, вы сможете применить его в своих филиалах.",
     am: "Ադմինիստրատորը դեռ չի հաստատել թարմացումը։ Հաստատվելուց հետո կկարողանաք կիրառել այն ձեր մասնաճյուղերում։",
   },
-  "agentUpdates.venuePcs": {
-    en: "PCs in your branches",
-    ru: "ПК в ваших филиалах",
-    am: "Համակարգիչներ ձեր մասնաճյուղերում",
+  // One branch's card (2026-11-17). The counts are the server's; a label form
+  // («…: 2 из 3») so the noun never has to agree with the number.
+  "agentUpdates.branch.pending": {
+    en: "Computers to update: {0} of {1}",
+    ru: "Нужно обновить компьютеров: {0} из {1}",
+    am: "Պետք է թարմացնել {0} համակարգիչ՝ {1}-ից",
   },
-  "agentUpdates.applyBtn": {
-    en: "Apply approved version to my branches",
-    ru: "Применить одобренную версию в моих филиалах",
-    am: "Կիրառել հաստատված տարբերակը իմ մասնաճյուղերում",
+  "agentUpdates.branch.allReceived": {
+    en: "All computers have received the update.",
+    ru: "Все компьютеры получили обновление.",
+    am: "Բոլոր համակարգիչները ստացել են թարմացումը։",
+  },
+  "agentUpdates.branch.applyBtn": {
+    en: "Apply in this branch",
+    ru: "Применить в этом филиале",
+    am: "Կիրառել այս մասնաճյուղում",
   },
   "agentUpdates.applied": {
-    en: "Sent to your PCs. Each agent downloads in the background and prompts the cashier to restart.",
-    ru: "Отправлено на ваши ПК. Каждый агент скачает обновление фоном и предложит кассиру перезапуск.",
-    am: "Ուղարկվեց ձեր համակարգիչներին։ Յուրաքանչյուր Agent ֆոնում կներբեռնի թարմացումը և կառաջարկի գանձապահին վերագործարկել։",
+    en: "Sent to this branch's computers. Each Agent downloads the update in the background and prompts the cashier to restart.",
+    ru: "Отправлено на компьютеры филиала. Каждый агент скачает обновление фоном и предложит кассиру перезапуск.",
+    am: "Ուղարկվեց մասնաճյուղի համակարգիչներին։ Յուրաքանչյուր Agent ֆոնում կներբեռնի թարմացումը և կառաջարկի գանձապահին վերագործարկել։",
   },
-  "agentUpdates.noVenuePcs": {
-    en: "No PCs are registered in your branches yet.",
-    ru: "В ваших филиалах пока нет зарегистрированных ПК.",
-    am: "Ձեր մասնաճյուղերում դեռ գրանցված համակարգիչներ չկան։",
+  "agentUpdates.applyFailed": {
+    en: "Could not apply. Try again.",
+    ru: "Не удалось применить. Попробуйте ещё раз.",
+    am: "Չհաջողվեց կիրառել։ Փորձեք կրկին։",
+  },
+  "agentUpdates.state.emptyTitle": {
+    en: "No connected computers",
+    ru: "Нет подключённых компьютеров",
+    am: "Միացված համակարգիչներ չկան",
+  },
+  "agentUpdates.state.emptyDescription": {
+    en: "A branch appears here once a computer in it runs the Agent and has connected recently.",
+    ru: "Филиал появится здесь, когда на его компьютере заработает агент и выйдет на связь.",
+    am: "Մասնաճյուղը կհայտնվի այստեղ, երբ նրա համակարգչում աշխատի Agent-ը և կապ հաստատի։",
+  },
+  "agentUpdates.state.errorTitle": {
+    en: "Could not load the Agent updates",
+    ru: "Не удалось загрузить обновления агента",
+    am: "Չհաջողվեց բեռնել Agent-ի թարմացումները",
   },
   // ── CRUD toast messages (top-right notifications) ──────────────────────
   "toast.generic.created": { en: "Created successfully", ru: "Успешно создано", am: "Հաջողությամբ ստեղծվեց" },
@@ -4300,6 +4300,12 @@ export const TRANSLATIONS: Dict = {
     en: "You have a new update for your kiosk locker.",
     ru: "У вас есть новое обновление для вашего блокировщика.",
     am: "Կիոսկի Agent-ի համար նոր թարմացում կա։",
+  },
+  // Owner / manager (2026-11-17): the branches still to apply, by address.
+  "updates.toastAgentBranches": {
+    en: "The kiosk Agent update is waiting in: {0}",
+    ru: "Обновление агента ждёт применения: {0}",
+    am: "Agent-ի թարմացումը սպասում է կիրառման՝ {0}",
   },
   "updates.toastCta": {
     en: "Click to open the updates section",
@@ -4799,6 +4805,7 @@ export const TRANSLATIONS: Dict = {
   "productHistory.action.price_set": { en: "Price set", ru: "Задана цена", am: "Գինը սահմանվել է" },
   "productHistory.action.price_changed": { en: "Price changed", ru: "Изменена цена", am: "Գինը փոխվել է" },
   "productHistory.action.kind_changed": { en: "Type changed", ru: "Изменён тип", am: "Տեսակը փոխվել է" },
+  "productHistory.action.pricing_mode_changed": { en: "Pricing changed", ru: "Изменён способ оплаты", am: "Վճարման եղանակը փոխվել է" },
   "productHistory.action.activated": { en: "Activated", ru: "Включён", am: "Ակտիվացվել է" },
   "productHistory.action.deactivated": { en: "Deactivated", ru: "Выключен", am: "Ապաակտիվացվել է" },
   "productHistory.action.deleted": { en: "Deleted", ru: "Удалён", am: "Ջնջվել է" },
@@ -5189,9 +5196,33 @@ export const TRANSLATIONS: Dict = {
   "session.outsideFood.switchFull": { en: "The player brought their own food", ru: "Игрок принёс свои продукты", am: "Խաղացողը բերել է իր սնունդը" },
   "session.outsideFood.startHint": { en: "{0} will be added to the place's bill", ru: "К счёту места добавится {0}", am: "Տեղի հաշվին կավելացվի {0}" },
   "session.outsideFood.summary": { en: "+ own food {0}", ru: "+ свои продукты {0}", am: "+ սեփական սնունդ {0}" },
+  // Own food as the seat's rate (2026-11-17).
+  "session.outsideFood.rateHint": { en: "The seat plays at {0} while own food is on", ru: "Пока включены «Свои продукты», место играет по {0}", am: "Քանի դեռ «Սեփական սնունդ»-ը միացված է, տեղը խաղում է {0}" },
+  "session.foodRate.fromNow": { en: "The seat plays at this price per hour from now; the time before keeps its price.", ru: "С этого момента место играет по этой цене за час; прошедшее время остаётся по прежней цене.", am: "Այս պահից տեղը խաղում է այս ժամավճարով․ անցած ժամանակը՝ նախկին գնով։" },
+  "session.foodRate.isOn": { en: "On: {0} (the seat: {1})", ru: "Включено: {0} (место: {1})", am: "Միացված է՝ {0} (տեղը՝ {1})" },
+  "session.foodRate.price": { en: "Price per hour", ru: "Цена за час", am: "Ժամավճար" },
+  "session.foodRate.turnOn": { en: "Switch on", ru: "Включить", am: "Միացնել" },
+  "session.foodRate.change": { en: "Change price", ru: "Изменить цену", am: "Փոխել գինը" },
+  "session.foodRate.turnOff": { en: "Switch off", ru: "Выключить", am: "Անջատել" },
+  "session.foodRate.onToast": { en: "Own food on: {0}", ru: "Свои продукты включены: {0}", am: "Սեփական սնունդը միացված է՝ {0}" },
+  "session.foodRate.changedToast": { en: "Price per hour now {0}", ru: "Цена за час теперь {0}", am: "Ժամավճարն այժմ {0}" },
+  "session.foodRate.offToast": { en: "Own food off: the seat's own rate again", ru: "Свои продукты выключены: снова цена места", am: "Սեփական սնունդն անջատված է․ կրկին տեղի գինը" },
+  "session.outsideFood.rateSummary": { en: "own food", ru: "свои продукты", am: "սեփական սնունդ" },
   "session.outsideFood.cardNote": { en: "Own food {0}", ru: "Свои продукты {0}", am: "Սեփական սնունդ {0}" },
   "session.outsideFood.line": { en: "Own food", ru: "Свои продукты", am: "Սեփական սնունդ" },
   "outsideFood.sectionTitle": { en: "Own food", ru: "Свои продукты", am: "Սեփական սնունդ" },
+  // How own food is charged (2026-11-17): a fixed line, or the seat's hourly rate.
+  "outsideFood.mode": { en: "How it is charged", ru: "Как берётся плата", am: "Ինչպես է գանձվում" },
+  "outsideFood.modeFixedNote": {
+    en: "The figure is added to the bill once, at the start.",
+    ru: "Сумма один раз добавляется к счёту при старте.",
+    am: "Գումարը մեկ անգամ ավելացվում է հաշվին՝ մեկնարկին։",
+  },
+  "outsideFood.modeTariffNote": {
+    en: "The figure becomes the seat's price per hour while own food is on: a 2,500/h seat with 4,000 here plays at 4,000/h. Switch it on at the start or in «+ Time».",
+    ru: "Сумма становится ценой места за час, пока включены «Свои продукты»: место 2 500/ч при 4 000 здесь играет по 4 000/ч. Включается при старте или в «+ Время».",
+    am: "Գումարը դառնում է տեղի ժամավճարը, քանի դեռ «Սեփական սնունդ»-ը միացված է․ 2 500/ժ տեղը 4 000-ի դեպքում խաղում է 4 000/ժ։ Միացվում է մեկնարկին կամ «+ Ժամանակ»-ում։",
+  },
   "outsideFood.hint": {
     en: "When a player brings their own food or drinks, the cashier turns on “Own food” at the start, and this amount is added to the place's bill. Leave a box empty to not charge on those places.",
     ru: "Если игрок принёс свою еду или напитки, кассир включает «Свои продукты» при старте, и эта сумма добавляется к счёту места. Оставьте поле пустым, чтобы не брать доплату на этих местах.",

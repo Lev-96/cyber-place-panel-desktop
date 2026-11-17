@@ -14,6 +14,7 @@ import type { Role } from "@/types/api";
 import { useUiPreferencesOptional } from "@/preferences/UiPreferencesContext";
 import { useNotifications } from "@/notifications/NotificationsContext";
 import { useUpdatesNotification } from "@/realtime/UpdatesNotificationContext";
+import { updateBadgeCounts } from "@/realtime/updateBadges";
 import { ReactNode, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useAnchoredPopover } from "@/hooks/useAnchoredPopover";
@@ -385,18 +386,16 @@ const Sidebar = ({ footerExtra }: SidebarProps = {}) => {
   const { pathname } = useLocation();
   const { unreadCount } = useNotifications();
   const { unread: supportUnread } = useSupportUnread();
-  const { panel: panelUpd, agent: agentUpd } = useUpdatesNotification();
   const role = user?.role;
   // The person's own menu order and hidden entries (2026-10-27), on top of
   // the role's menu; outside the provider the standard menu.
   const menuArrangement = useUiPreferencesOptional()?.layout.sidebar ?? [];
 
-  // Badge counts: admin sees the union of panel + agent pending
-  // promotes; owner/manager only ever see the agent count. Both stay
-  // 0 when nothing is pending so the badge silently disappears.
-  const adminUpdateCount =
-    (panelUpd?.has_update ? 1 : 0) + (agentUpd?.has_update ? 1 : 0);
-  const agentUpdateCount = agentUpd?.has_update ? 1 : 0;
+  // Badge counts (`updateBadges.ts`, the owner web's bottom bar reads the same
+  // function): admin, one per app with a release to promote; owner/manager,
+  // the branches the SERVER counts as pending (2026-11-17). Both stay 0 when
+  // nothing is pending so the badge silently disappears.
+  const updateBadges = updateBadgeCounts(useUpdatesNotification());
   const dash = user?.dashboard;
   const myBranchId = typeof dash?.branch_id === "number" ? dash.branch_id : null;
   // The owner's company (single company per owner, as everywhere in the panel).
@@ -409,8 +408,8 @@ const Sidebar = ({ footerExtra }: SidebarProps = {}) => {
   const navItems = applyPersonalMenu(sortedNavItems(
     withStaffMenu(menuSpecsFor(role, myBranchId, myCompanyId, {
       notifications: <UnreadBadge count={unreadCount} />,
-      updates: <UnreadBadge count={adminUpdateCount} />,
-      agentUpdates: <UnreadBadge count={agentUpdateCount} />,
+      updates: <UnreadBadge count={updateBadges.updates} />,
+      agentUpdates: <UnreadBadge count={updateBadges.agentUpdates} />,
     }, menuArrangement), role),
     t,
     lang,

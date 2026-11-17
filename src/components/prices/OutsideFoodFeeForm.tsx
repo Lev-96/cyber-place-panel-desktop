@@ -1,6 +1,7 @@
 import Button from "@/components/ui/Button";
 import PriceInput from "@/components/ui/PriceInput";
-import { IBillingSettings, chargedSlotsOf, includedJoysticks, maxJoystickSlotOf, pricingModeOf, strategyModeOf } from "@/api/joystickPrices";
+import Radio from "@/components/ui/Radio";
+import { IBillingSettings, OutsideFoodMode, chargedSlotsOf, includedJoysticks, maxJoystickSlotOf, pricingModeOf, strategyModeOf } from "@/api/joystickPrices";
 import { useLang } from "@/i18n/LanguageContext";
 import { billingSettingsRepository } from "@/repositories/BillingSettingsRepository";
 import { notify } from "@/ui/notify";
@@ -58,6 +59,14 @@ const OutsideFoodFeeForm = ({ branchId, settings, places, placesError, onRetryPl
   const savedVip = settings.outside_food_fee_vip ?? null;
   const [standard, setStandard] = useState(() => boxOf(savedStandard));
   const [vip, setVip] = useState(() => boxOf(savedVip));
+  /**
+   * How the figure is charged (2026-11-17, owner): one fixed line, as it has
+   * always been, or — «Изменение тарифа», the pads' word — the seat's hourly
+   * rate while own food is on (a 2 500/h VIP seat with own food at 4 000 is a
+   * 4 000/h seat), switched on at the start or during the game.
+   */
+  const savedMode: OutsideFoodMode = settings.outside_food_mode === "tariff" ? "tariff" : "fixed";
+  const [mode, setMode] = useState<OutsideFoodMode>(savedMode);
   const [drafts, setDrafts] = useState<PlaceDrafts>({});
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -67,7 +76,7 @@ const OutsideFoodFeeForm = ({ branchId, settings, places, placesError, onRetryPl
   const placeRows = places ? changedPlaceFees(places, drafts) : [];
   const placesInvalid = places ? placesSummary(places, drafts).invalid > 0 : false;
   const invalid = Number.isNaN(standardFee) || Number.isNaN(vipFee) || placesInvalid;
-  const changed = !invalid && (standardFee !== savedStandard || vipFee !== savedVip || placeRows.length > 0);
+  const changed = !invalid && (standardFee !== savedStandard || vipFee !== savedVip || placeRows.length > 0 || mode !== savedMode);
 
   const setPlaceBox = useCallback((placeId: number, box: string) => {
     setDrafts((cur) => ({ ...cur, [placeId]: box }));
@@ -98,6 +107,9 @@ const OutsideFoodFeeForm = ({ branchId, settings, places, placesError, onRetryPl
         joystick_strategy_mode: strategyModeOf(settings),
         outside_food_fee_standard: standardFee,
         outside_food_fee_vip: vipFee,
+        // Only when it changed: a Save of the figures alone sends the body it
+        // always sent, and the server leaves an absent field as it is.
+        ...(mode !== savedMode ? { outside_food_mode: mode } : {}),
         ...(placeRows.length > 0 ? { outside_food_place_fees: placeRows } : {}),
       });
       notify.message("success", t("outsideFood.saved"));
@@ -120,6 +132,25 @@ const OutsideFoodFeeForm = ({ branchId, settings, places, placesError, onRetryPl
   return (
     <form className="col outside-food-form" onSubmit={submit}>
       <span className="muted outside-food-form__hint">{t("outsideFood.hint")}</span>
+      <div className="col" style={{ gap: 6 }}>
+        <span className="label">{t("outsideFood.mode")}</span>
+        <div className="cp-choice-row" role="radiogroup" aria-label={t("outsideFood.mode")}>
+          {(["fixed", "tariff"] as const).map((m) => (
+            <div key={m} className={`cp-choice${mode === m ? " is-active" : ""}`}>
+              <Radio
+                name={`outside-food-mode-${branchId}`}
+                checked={mode === m}
+                onChange={() => setMode(m)}
+                disabled={busy}
+                label={t(m === "tariff" ? "joystickPrice.strategy.hourly" : "joystickPrice.strategy.fixed")}
+              />
+            </div>
+          ))}
+        </div>
+        <span className="muted outside-food-form__note" data-testid="outside-food-mode-note">
+          {t(mode === "tariff" ? "outsideFood.modeTariffNote" : "outsideFood.modeFixedNote")}
+        </span>
+      </div>
       <div className="outside-food-form__tiers">
         {tier(t("outsideFood.standard"), standard, setStandard, standardFee)}
         {tier(t("outsideFood.vip"), vip, setVip, vipFee)}

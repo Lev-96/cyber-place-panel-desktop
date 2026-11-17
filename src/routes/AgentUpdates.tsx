@@ -1,58 +1,49 @@
-import { apiAgentUpdateApply, apiAgentUpdateStatus, type AgentUpdateStatus } from "@/api/agent-updates";
-import Button from "@/components/ui/Button";
+import { apiAgentUpdateStatus } from "@/api/agent-updates";
+import AgentBranchCard, { type AgentRelevantBranch } from "@/components/agentUpdates/AgentBranchCard";
 import ScreenWithBg from "@/components/ui/ScreenWithBg";
+import { ListSkeleton } from "@/components/ui/Skeleton";
+import { StateSwitch, deriveViewState } from "@/components/ui/state";
+import { useAsync } from "@/hooks/useAsync";
 import { useLang } from "@/i18n/LanguageContext";
 import { useAppUpdates } from "@/realtime/useAppUpdates";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useUpdatesNotification } from "@/realtime/UpdatesNotificationContext";
+import { useEffect, useRef } from "react";
 
 /**
  * Owner / manager-only screen — STAGE TWO of the two-stage agent rollout.
- * An admin first APPROVES a version; here the partner APPLIES that
- * approved version to the kiosk agents of their OWN branches, on their
- * own timing. There is no "promote to GitHub latest" here — a partner
- * can only roll out what an admin has already approved.
+ * An admin first APPROVES a version; here the partner APPLIES that approved
+ * version, branch by branch (2026-11-17), on their own timing. There is no
+ * "promote to GitHub latest" here — a partner can only roll out what an admin
+ * has already approved.
+ *
+ * One card per branch the server marks `agent_relevant` (a computer there ran
+ * the Agent recently). A branch with consoles only, or with a computer that
+ * never connected, says nothing about the Agent; with no such branch at all
+ * the screen shows its empty state and no Agent block.
  *
  * Three sources of freshness, in order of immediacy:
  *   1. Reverb `.app-update.promoted` (app:agent) — fires the instant an
  *      admin approves a new agent version.
  *   2. 60-second polling of `/agent-updates/status`.
  *   3. Initial fetch on mount — no manual "Check" button.
+ * After an apply both this screen and the shared updates context read again,
+ * so the side menu's badge clears with the card instead of a minute later.
  */
-
-type ApiState = "loading" | "ready" | "error";
 
 const POLL_INTERVAL_MS = 60_000;
 
 const AgentUpdates = () => {
   const { t } = useLang();
-  const [data, setData] = useState<AgentUpdateStatus | null>(null);
-  const [apiState, setApiState] = useState<ApiState>("loading");
-  const [apiError, setApiError] = useState<string | null>(null);
-  const [appliedMsg, setAppliedMsg] = useState<string | null>(null);
-  const [applying, setApplying] = useState(false);
+  const { reload: reloadUpdatesBadge } = useUpdatesNotification();
+  const { data, loading, error, reload } = useAsync(() => apiAgentUpdateStatus(), []);
 
-  // Stable reload fn so the polling effect doesn't reset on every render.
-  // The periodic refresh never flips apiState to "loading" — only the
-  // initial mount shows the spinner.
-  const reload = useCallback(async (initial: boolean) => {
-    if (initial) setApiState("loading");
-    setApiError(null);
-    try {
-      const next = await apiAgentUpdateStatus();
-      setData(next);
-      setApiState("ready");
-    } catch (e) {
-      setApiState("error");
-      setApiError(e instanceof Error ? e.message : String(e));
-    }
-  }, []);
-
+  // Armed once, through a ref (realtime rule 11): `useAsync` hands out a new
+  // object every render, and an interval keyed on it is never reached.
   const reloadRef = useRef(reload);
   reloadRef.current = reload;
 
   useEffect(() => {
-    void reloadRef.current(true);
-    const id = setInterval(() => { void reloadRef.current(false); }, POLL_INTERVAL_MS);
+    const id = setInterval(() => { void reloadRef.current(); }, POLL_INTERVAL_MS);
     return () => clearInterval(id);
   }, []);
 
@@ -61,114 +52,47 @@ const AgentUpdates = () => {
   // gated updater should only fire for panel events. Our callback
   // receives both and re-fetches only on agent broadcasts.
   useAppUpdates("panel", (event) => {
-    if (event.app === "agent") void reloadRef.current(false);
+    if (event.app === "agent") void reloadRef.current();
   });
 
-  const runApply = async () => {
-    setApplying(true);
-    setApiError(null);
-    setAppliedMsg(null);
-    try {
-      await apiAgentUpdateApply();
-      setAppliedMsg(t("agentUpdates.applied"));
-      void reloadRef.current(false);
-    } catch (e) {
-      setApiError(e instanceof Error ? e.message : t("agentUpdates.cannotPromote"));
-    } finally {
-      setApplying(false);
-    }
-  };
+  // The server's own flag decides which branches get a card; nothing is
+  // counted or compared here. A backend older than this screen sends no
+  // `branches`: that reads as "no branch to show", never as a crash.
+  const branches = data
+    ? (data.branches ?? []).filter((b): b is AgentRelevantBranch => b.agent_relevant && b.agent !== null)
+    : null;
+  const view = deriveViewState({ loading, error, data: branches });
 
-  const current = data?.current?.version ?? "-";
-  const approved = data?.approved ?? null;
-  const venuePcCount = data?.venue_pc_count ?? 0;
-  // The button is only for work that's left: an approved version this operator
-  // hasn't applied yet. Once applied (or after a fresh approval resets it), the
-  // button disappears and a "you're up to date" line takes its place.
-  const alreadyApplied = approved != null && data?.applied_version === approved.version;
+  const afterApply = () => {
+    void reloadRef.current();
+    void reloadUpdatesBadge();
+  };
 
   return (
     <ScreenWithBg bg="./bg/admin-home.jpg" title={t("agentUpdates.title")}>
       <div className="gradient-card">
         <div className="gradient-card-inner">
-          <p className="muted" style={{ margin: "0 0 12px" }}>
-            {t("agentUpdates.subtitle")}
-          </p>
-
-          {apiState === "loading" && (
-            <p className="muted">{t("agentUpdates.loading")}</p>
-          )}
-
-          {apiState === "error" && apiError && (
-            <p style={{ color: "var(--color-danger)" }}>{apiError}</p>
-          )}
-
-          {apiState === "ready" && (
-            <div className="col" style={{ gap: 16 }}>
-              <div className="row" style={{ gap: 24, flexWrap: "wrap" }}>
-                <div>
-                  <div className="muted" style={{ fontSize: 12 }}>
-                    {t("agentUpdates.currentVersion")}
-                  </div>
-                  <div style={{ fontSize: 22, fontWeight: 600 }}>{current}</div>
-                </div>
-                <div>
-                  <div className="muted" style={{ fontSize: 12 }}>
-                    {t("agentUpdates.approvedVersion")}
-                  </div>
-                  <div style={{
-                    fontSize: 22,
-                    fontWeight: 600,
-                    color: approved ? "var(--color-primary)" : undefined,
-                  }}>
-                    {approved?.version ?? "-"}
-                  </div>
-                </div>
-                <div>
-                  <div className="muted" style={{ fontSize: 12 }}>
-                    {t("agentUpdates.venuePcs")}
-                  </div>
-                  <div style={{ fontSize: 22, fontWeight: 600 }}>{venuePcCount}</div>
-                </div>
-              </div>
-
-              {data?.error && (
-                <p className="muted" style={{ color: "var(--color-danger)", margin: 0 }}>
-                  {data.error}
-                </p>
-              )}
-              {apiError && (
-                <p style={{ color: "var(--color-danger)", margin: 0 }}>{apiError}</p>
-              )}
-              {appliedMsg && (
-                <p style={{ color: "var(--color-success)", margin: 0 }}>{appliedMsg}</p>
-              )}
-
-              {approved ? (
-                alreadyApplied ? (
-                  <p className="muted" style={{ margin: 0, color: "var(--color-success)" }}>
-                    {t("agentUpdates.upToDate")}
-                  </p>
-                ) : venuePcCount > 0 ? (
-                  <div>
-                    <Button type="button" onClick={runApply} disabled={applying}>
-                      {applying
-                        ? t("agentUpdates.promoting")
-                        : t("agentUpdates.applyBtn")}
-                    </Button>
-                  </div>
-                ) : (
-                  <p className="muted" style={{ margin: 0 }}>
-                    {t("agentUpdates.noVenuePcs")}
-                  </p>
-                )
-              ) : (
-                <p className="muted" style={{ margin: 0 }}>
-                  {t("agentUpdates.notApprovedYet")}
-                </p>
-              )}
+          <p className="muted agent-updates__subtitle">{t("agentUpdates.subtitle")}</p>
+          <StateSwitch
+            view={view}
+            size="section"
+            skeleton={<ListSkeleton rows={2} />}
+            onRetry={() => void reload()}
+            error={{ titleKey: "agentUpdates.state.errorTitle" }}
+            empty={{ titleKey: "agentUpdates.state.emptyTitle", descriptionKey: "agentUpdates.state.emptyDescription" }}
+          >
+            {!data?.approved && <p className="muted agent-updates__note">{t("agentUpdates.notApprovedYet")}</p>}
+            <div className="agent-branches">
+              {(branches ?? []).map((branch) => (
+                <AgentBranchCard
+                  key={branch.branch_id}
+                  branch={branch}
+                  approved={data?.approved ?? null}
+                  onApplied={afterApply}
+                />
+              ))}
             </div>
-          )}
+          </StateSwitch>
         </div>
       </div>
     </ScreenWithBg>

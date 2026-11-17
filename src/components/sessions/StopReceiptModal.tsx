@@ -19,7 +19,7 @@ import CashChangePanel from "@/components/payments/CashChangePanel";
 import { billCents, cashChange } from "@/components/payments/cashChange";
 import type { ICashHandover } from "@/api/sessions";
 import { isOutsideFoodLine, sessionLineLabel } from "./outsideFood";
-import PrepaidSettlement from "./PrepaidSettlement";
+import PrepaidSettlement, { prepaidCashChange } from "./PrepaidSettlement";
 
 interface Props {
   session: ISessionApi;
@@ -559,7 +559,7 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved, canRes
             {view.prepaid && (
               <PrepaidSettlement
                 prepaid={view.prepaid}
-                changeAfterStop={stopped !== null ? Number(handover?.change ?? view.prepaid.change) : undefined}
+                changeAfterStop={stopped !== null ? Number(handover?.change ?? prepaidCashChange(view.prepaid)) : undefined}
                 t={t}
                 money={(n) => money(n, receiptPrecision)}
               />

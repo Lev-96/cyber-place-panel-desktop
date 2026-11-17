@@ -88,6 +88,16 @@ describe("ProductsList — two sections", () => {
     expect(form.props?.kind).toBe("additional");
   });
 
+  test("an item on «Изменение тарифа» says it is a rate; a fixed one does not (2026-11-17)", async () => {
+    repo.list.mockResolvedValue([...PRODUCTS, { id: 9, branch_id: 3, name: "Chips", category: "Rentals", price: 500, is_active: true, kind: "additional", pricing_mode: "hourly" }]);
+    await mount();
+    await act(async () => { fireEvent.click(tab("session.additionalTitle")); });
+    const marks = screen.getAllByTestId("product-hourly");
+    expect(marks).toHaveLength(1);
+    expect(marks[0].closest(".product-row")?.textContent).toContain("Chips");
+    expect(marks[0].textContent).toBe("session.perHourShort · joystickPrice.strategy.hourly");
+  });
+
   test("an empty section says what belongs there", async () => {
     repo.list.mockResolvedValue(PRODUCTS.filter((p) => p.kind !== "additional"));
     await mount();

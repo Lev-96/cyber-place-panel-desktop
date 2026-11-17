@@ -1425,6 +1425,20 @@ describe("«Оплачено сейчас» in «+ Время»", () => {
     await requestGrant(30);
     expect(repo.addTime).toHaveBeenCalledWith(42, 30, undefined, undefined, true);
   });
+
+  test("paid now by card (2026-11-17): the method rides with it; no control while off", async () => {
+    repo.addTime.mockResolvedValue(session({ prepaid_amount: 2500 }));
+    await mount(session({ prepaid_amount: 2000 }));
+    expect(screen.queryByTestId("payment-editor")).toBeNull();
+    await act(async () => { fireEvent.click(paidNow()!); });
+    // Shown once the server has priced the grant — a split must add up to it.
+    await typeMinutes("30");
+    await settle();
+    expect(screen.getByTestId("payment-editor")).toBeTruthy();
+    await act(async () => { fireEvent.click(screen.getByTestId("pay-card")); });
+    await act(async () => { fireEvent.click(confirmGrant()); });
+    expect(repo.addTime).toHaveBeenCalledWith(42, 30, undefined, undefined, true, { payment_method: "card" });
+  });
 });
 
 /**

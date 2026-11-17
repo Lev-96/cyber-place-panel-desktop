@@ -42,11 +42,24 @@ export interface IProduct extends Translated {
    * below zero: a sale is never refused for want of stock.
    */
   stock?: number | null;
+  /**
+   * How an ADDITIONAL item is priced (2026-11-17), the joysticks' two answers:
+   * `fixed` adds its price once, `hourly` («Изменение тарифа») adds it to every
+   * hour it is out. `null` / absent (every item before it, an older backend)
+   * is fixed. A regular product never carries one.
+   */
+  pricing_mode?: AdditionalPricingMode | null;
 }
+
+export type AdditionalPricingMode = "fixed" | "hourly";
 
 /** Handed out with the seat, once per session (an older backend sends no kind: regular). */
 export const isAdditionalProduct = (product: { kind?: string | null }): boolean =>
   product.kind === "additional";
+
+/** An additional item that changes the seat's hourly rate while it is out. */
+export const isHourlyAdditional = (product: { kind?: string | null; pricing_mode?: string | null }): boolean =>
+  isAdditionalProduct(product) && product.pricing_mode === "hourly";
 
 /** Does this product count its stock? Absent (an older backend) reads as "not counted". */
 export const countsStock = (product: { stock?: number | null }): boolean =>

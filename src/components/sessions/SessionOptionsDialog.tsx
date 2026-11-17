@@ -1,4 +1,6 @@
 import Button from "@/components/ui/Button";
+import PaymentEditor from "@/components/payments/PaymentEditor";
+import { checkPayment, emptyPaymentDraft, prepaidPaymentFields, type PaymentDraft } from "@/components/payments/paymentSplit";
 import JoystickIcon from "@/components/ui/JoystickIcon";
 import Checkbox from "@/components/ui/Checkbox";
 import PriceInput from "@/components/ui/PriceInput";
@@ -30,6 +32,7 @@ import ChoiceCards from "@/components/ui/ChoiceCards";
 import DurationInput from "./DurationInput";
 import UnpaidToggle from "./UnpaidToggle";
 import ReminderSection from "./ReminderSection";
+import OutsideFoodRateSection from "./OutsideFoodRateSection";
 import QuotedPrice from "./QuotedPrice";
 import { EMPTY_DRAFT, draftMinutes, type DurationDraft } from "./durationModel";
 import { quoteFor, useServerQuote } from "./useServerQuote";
@@ -144,6 +147,8 @@ const SessionOptionsDialog = ({ session, platform, onClose, onChanged, platformN
   const prepaidSeat = Number(current.prepaid_amount ?? 0) > 0;
   const [paidNow, setPaidNow] = useState(false);
   const paidNowOn = paidNow && prepaidSeat && !unpaidOn && !(current.is_free ?? false);
+  /** …and HOW (2026-11-17): the Stop control; cash preselected and sends nothing. */
+  const [paidNowPay, setPaidNowPay] = useState<PaymentDraft>(() => emptyPaymentDraft("cash"));
 
   // ONE fee for every pad, read from the venue's billing settings. It was a
   // list of per-slot prices and a lookup for "which slot comes next", which
@@ -190,6 +195,14 @@ const SessionOptionsDialog = ({ session, platform, onClose, onChanged, platformN
     && (typedCharge === undefined || Math.round(quoted.charge * 100) === Math.round(typedCharge * 100))
     ? quoted.charge
     : null;
+  // What «Оплачено сейчас» pays (2026-11-17): the server's charge for exactly
+  // the grant on screen — a split must add up to it.
+  const grantCharge = grantBy === "time" ? quotedCharge : moneyQuoted?.charge ?? null;
+  const grantChargeCents = grantCharge === null ? null : Math.round(grantCharge * 100);
+  const paidNowCheck = checkPayment(grantChargeCents ?? 0, paidNowPay);
+  const paidNowPayField = prepaidPaymentFields(paidNowPay, paidNowCheck);
+  // Cash adds nothing to the call — the request every «Оплачено сейчас» sent before.
+  const paidNowPayArgs: [] | [typeof paidNowPayField] = Object.keys(paidNowPayField).length === 0 ? [] : [paidNowPayField];
   // Whether this seat takes a typed price is the server's answer; until it
   // has answered once, the box is not offered.
   const [priceEditable, setPriceEditable] = useState(false);
@@ -778,6 +791,17 @@ const SessionOptionsDialog = ({ session, platform, onClose, onChanged, platformN
                   tone="success"
                 />
               )}
+              {paidNowOn && grantChargeCents !== null && (
+                <PaymentEditor
+                  name={`time-prepaid-pay-${current.id}`}
+                  dueCents={grantChargeCents}
+                  value={paidNowPay}
+                  onChange={setPaidNowPay}
+                  check={paidNowCheck}
+                  money={money}
+                  disabled={busy || !isActive}
+                />
+              )}
               {(() => {
                 const minutes = grantBy === "time" ? grantMinutes : moneyQuoted?.minutes ?? null;
                 return minutes !== null && current.ends_at ? (
@@ -792,12 +816,12 @@ const SessionOptionsDialog = ({ session, platform, onClose, onChanged, platformN
               <div>
                 {grantBy === "time" ? (
                   <Button
-                    disabled={busy || !isActive || grantMinutes === null || quotedCharge === null}
+                    disabled={busy || !isActive || grantMinutes === null || quotedCharge === null || (paidNowOn && !paidNowCheck.ok)}
                     onClick={() => {
                       if (grantMinutes === null || quotedCharge === null) return;
                       void run(
                         () => (paidNowOn
-                          ? sessionRepository.addTime(current.id, grantMinutes, typedCharge, unpaidOn || undefined, true)
+                          ? sessionRepository.addTime(current.id, grantMinutes, typedCharge, unpaidOn || undefined, true, ...paidNowPayArgs)
                           : sessionRepository.addTime(current.id, grantMinutes, typedCharge, unpaidOn || undefined)),
                         grantMinutes,
                         timeAddedToast(grantMinutes),
@@ -818,14 +842,14 @@ const SessionOptionsDialog = ({ session, platform, onClose, onChanged, platformN
                   </Button>
                 ) : (
                   <Button
-                    disabled={busy || !isActive || grantAmount === null || moneyQuoted === null}
+                    disabled={busy || !isActive || grantAmount === null || moneyQuoted === null || (paidNowOn && !paidNowCheck.ok)}
                     data-testid="grant-money-confirm"
                     onClick={() => {
                       if (grantAmount === null || moneyQuoted === null) return;
                       const minutes = moneyQuoted.minutes;
                       void run(
                         () => (paidNowOn
-                          ? sessionRepository.addTimeByAmount(current.id, grantAmount, unpaidOn || undefined, true)
+                          ? sessionRepository.addTimeByAmount(current.id, grantAmount, unpaidOn || undefined, true, ...paidNowPayArgs)
                           : sessionRepository.addTimeByAmount(current.id, grantAmount, unpaidOn || undefined)),
                         minutes,
                         timeAddedToast(minutes),
@@ -979,6 +1003,7 @@ const SessionOptionsDialog = ({ session, platform, onClose, onChanged, platformN
 
         {/* The reminder a player asked for (2026-11-15): a running seat,
             paused or not, timed or unlimited. */}
+        {isActive && <OutsideFoodRateSection session={current} disabled={busy} run={run} t={t} money={money} />}
         {isActive && <ReminderSection session={current} disabled={busy} run={run} t={t} />}
 
         {/* Waiving the bill lives on START SESSION, where the decision is

@@ -192,3 +192,34 @@ describe("no raw key and no em dash anywhere, in every language", () => {
     });
   }
 });
+
+describe("paid ahead by card / split / other (2026-11-17)", () => {
+  test("by card: the sum and the method, never «in cash»", () => {
+    const p = eventPresentation(row("started", null, { mode: "fixed", is_free: false, planned_minutes: 120, hourly_rate: 1000, planned_amount: 2000, prepaid_amount: "2000.00", prepaid_method: "card", prepaid_payments: [{ method: "card", amount: "2000.00" }] }), en, money);
+    expect(p.details).toContain("Paid ahead: 2000 AMD (Card)");
+    expect(p.details.join(" | ")).not.toContain("in cash");
+  });
+  test("split: each part", () => {
+    const p = eventPresentation(row("started", null, { mode: "fixed", is_free: false, prepaid_amount: "2000.00", prepaid_method: "split", prepaid_payments: [{ method: "cash", amount: "1200.00" }, { method: "card", amount: "800.00" }] }), en, money);
+    expect(p.details.join(" | ")).toContain("Paid ahead: 2000 AMD (Cash 1200 AMD, Card 800 AMD)");
+  });
+  test("cash (and every line before it) reads as before", () => {
+    const p = eventPresentation(row("started", null, { mode: "fixed", is_free: false, prepaid_amount: "2000.00", prepaid_method: "cash" }), en, money);
+    expect(p.details).toContain("Paid ahead in cash: 2000 AMD");
+  });
+  test("+ Время paid now by card", () => {
+    const p = eventPresentation(row("time_added", 500, { minutes: 30, prepaid: true, prepaid_amount: "500.00", prepaid_method: "card", prepaid_payments: [{ method: "card", amount: "500.00" }] }), en, money);
+    expect(p.details).toContain("Paid now: 500 AMD (Card)");
+  });
+});
+
+describe("the price per hour changed in place (2026-11-17)", () => {
+  test("own food on: the old and the new price per hour", () => {
+    const p = eventPresentation(row("rate_changed", null, { reason: "outside_food", on: true, old_rate: "2500.00", new_rate: "4000.00" }), en, money);
+    expect(p.title).toBe("Price per hour changed");
+    expect(p.details).toContain("Own food");
+    expect(p.details).toContain("2500 AMD -> 4000 AMD / h");
+    expect(eventPresentation(row("rate_changed", null, { reason: "outside_food", on: false, old_rate: "4000.00", new_rate: "2500.00" }), ru, money).details)
+      .toContain("Свои продукты выключены");
+  });
+});

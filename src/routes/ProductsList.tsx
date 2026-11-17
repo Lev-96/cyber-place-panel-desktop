@@ -15,7 +15,7 @@ import { productRepository } from "@/repositories/ProductRepository";
 import { IProduct } from "@/types/pos";
 import { useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
-import { countsStock, isAdditionalProduct, ProductKind } from "@/types/pos";
+import { countsStock, isAdditionalProduct, isHourlyAdditional, ProductKind } from "@/types/pos";
 import SectionTabs from "@/components/ui/SectionTabs";
 import ProductHistory from "@/components/products/ProductHistory";
 import { productEventRepository } from "@/repositories/ProductEventRepository";
@@ -162,6 +162,10 @@ const ProductsList = () => {
                     <div className="name">{tr(p, "name", lang)}</div>
                     <div className="meta">
                       {tr(p, "category", lang) || "-"} · {money(Number(p.price))}
+                      {/* An item that changes the seat's rate says so (2026-11-17). */}
+                      {isHourlyAdditional(p) && (
+                        <span data-testid="product-hourly">{t("session.perHourShort")} · {t("joystickPrice.strategy.hourly")}</span>
+                      )}
                       {/* A product sold by the unit says its count (2026-11-16). */}
                       {section === "regular" && (
                         <>

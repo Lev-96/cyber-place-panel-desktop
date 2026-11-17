@@ -95,10 +95,27 @@ describe("report v5", () => {
   test("the lines: each prepayment, and a place's prepayment, change and unpaid", () => {
     render(<ShiftReportView shift={shift} report={paidAhead} />);
     const text = screen.getByTestId("shift-lines").textContent ?? "";
-    expect(text).toContain("Paid ahead (cash, not revenue)");
+    expect(text).toContain("Paid ahead (not revenue)");
     expect(text).toContain("№3 · + Time");
     expect(text).toContain("Paid ahead 2000.00 · Change 500.00");
     expect(text).toContain("Not paid at the end 1200.00");
+  });
+
+  test("paid ahead by card (2026-11-17): the line says so, the drawer counts only the cash, the heading all of it", () => {
+    const byCard: IShiftReport = {
+      ...paidAhead,
+      cash: { ...paidAhead.cash, prepaid_in: "2000.00", prepaid_in_by_method: { cash: "2000.00", card: "3000.00", other: "0.00" } },
+      lines: { ...paidAhead.lines!, prepaid: [
+        paidAhead.lines!.prepaid![0],
+        { ...paidAhead.lines!.prepaid![1], method: "card" },
+      ] },
+    };
+    render(<ShiftReportView shift={shift} report={byCard} />);
+    expect(screen.getByTestId("shift-cash-prepaid-in").textContent).toContain("2000.00");
+    const lines = screen.getAllByTestId("shift-line-prepaid").map((l) => l.textContent ?? "");
+    expect(lines[0]).not.toContain("Card");
+    expect(lines[1]).toContain("№3 · + Time · Card");
+    expect(screen.getByTestId("shift-lines").textContent).toContain("5000.00");
   });
 
   test("a person's cash taken ahead", () => {

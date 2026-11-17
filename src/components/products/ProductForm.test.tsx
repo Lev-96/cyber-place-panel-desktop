@@ -83,3 +83,54 @@ describe("ProductForm — the section decides the kind", () => {
     expect(repo.update).toHaveBeenCalledWith(6, expect.anything(), "regular");
   });
 });
+
+/**
+ * An additional item's price: added once, or a change of the hourly rate
+ * (2026-11-17) — the joysticks' «Фиксированная цена» / «Изменение тарифа».
+ */
+describe("ProductForm — how an additional item is charged", () => {
+  const radio = (label: string) => screen.getByLabelText(label) as HTMLInputElement;
+
+  test("a new additional item opens on fixed, and is sent as fixed", async () => {
+    await mount(undefined, "additional");
+    expect(radio("joystickPrice.strategy.fixed").checked).toBe(true);
+    expect(screen.getByTestId("product-pricing-note").textContent).toBe("place.extraItemFixedNote");
+    await fill("Chips", "500");
+    await save();
+    expect(repo.create).toHaveBeenCalledWith(expect.objectContaining({ kind: "additional", pricing_mode: "fixed" }));
+  });
+
+  test("«Изменение тарифа» is sent as hourly, and the note says the price becomes a rate", async () => {
+    await mount(undefined, "additional");
+    await act(async () => { fireEvent.click(radio("joystickPrice.strategy.hourly")); });
+    expect(screen.getByTestId("product-pricing-note").textContent).toBe("place.extraItemHourlyNote");
+    await fill("Chips", "500");
+    await save();
+    expect(repo.create).toHaveBeenCalledWith(expect.objectContaining({ kind: "additional", pricing_mode: "hourly" }));
+  });
+
+  test("editing opens on the item's own answer and sends it back", async () => {
+    await mount({ id: 5, branch_id: 3, name: "Chips", category: null, price: 500, is_active: true, kind: "additional", pricing_mode: "hourly" });
+    expect(radio("joystickPrice.strategy.hourly").checked).toBe(true);
+    await save();
+    expect(repo.update).toHaveBeenCalledWith(5, expect.objectContaining({ pricing_mode: "hourly" }), "additional");
+  });
+
+  test("an item from before the choice (no mode) opens on fixed", async () => {
+    await mount({ id: 5, branch_id: 3, name: "Chips", category: null, price: 500, is_active: true, kind: "additional" });
+    expect(radio("joystickPrice.strategy.fixed").checked).toBe(true);
+  });
+
+  test("a regular product has no such choice and sends none", async () => {
+    await mount();
+    expect(screen.queryByLabelText("joystickPrice.strategy.hourly")).toBeNull();
+    await fill("Tea", "300");
+    await save();
+    expect(repo.create.mock.calls[0][0]).not.toHaveProperty("pricing_mode");
+
+    cleanup();
+    await mount({ id: 6, branch_id: 3, name: "Tea", category: null, price: 300, is_active: true, kind: "regular" });
+    await save();
+    expect(repo.update.mock.calls[0][1]).not.toHaveProperty("pricing_mode");
+  });
+});

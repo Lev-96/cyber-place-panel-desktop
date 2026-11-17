@@ -1,4 +1,4 @@
-import type { ILimitPlan, ILimitQuote, IRateChangeResponse, IStartAmountQuote, SessionLimitFrom, StopSessionBody } from "@/api/sessions";
+import type { ILimitPlan, ILimitQuote, IRateChangeResponse, IStartAmountQuote, PrepaidPayment, SessionLimitFrom, StopSessionBody } from "@/api/sessions";
 import {
   AddItemBody,
   apiAddSessionItem,
@@ -61,6 +61,7 @@ import {
   IBillBreakdown, ICashHandover,
   ListSessionsParams,
   StartSessionBody,
+  apiSetOutsideFoodRate,
 } from "@/api/sessions";
 import { apiReorderPcs } from "@/api/pcs";
 import { friendlyMutation, orFallback } from "@/api/fallback";
@@ -197,8 +198,8 @@ export class SessionRepository {
   }
 
   /** `prepaid` (2026-11-15): «Оплачено сейчас» on a seat paid ahead. */
-  async addTime(sessionId: number, minutes: number, charge?: number, unpaid?: boolean, prepaid?: true): Promise<ISessionApi> {
-    return friendlyMutation(apiAddSessionTime(sessionId, minutes, charge, unpaid, prepaid).then((r) => r.session));
+  async addTime(sessionId: number, minutes: number, charge?: number, unpaid?: boolean, prepaid?: true, pay?: PrepaidPayment): Promise<ISessionApi> {
+    return friendlyMutation(apiAddSessionTime(sessionId, minutes, charge, unpaid, prepaid, pay).then((r) => r.session));
   }
 
   /** Extra time not paid yet, on or off (2026-11-07). */
@@ -221,8 +222,8 @@ export class SessionRepository {
   }
 
   /** "+ Время" by money (2026-11-07): the server decides the minutes and the charge. */
-  async addTimeByAmount(sessionId: number, amount: number, unpaid?: boolean, prepaid?: true): Promise<ISessionApi> {
-    return friendlyMutation(apiAddSessionTimeByAmount(sessionId, amount, unpaid, prepaid).then((r) => r.session));
+  async addTimeByAmount(sessionId: number, amount: number, unpaid?: boolean, prepaid?: true, pay?: PrepaidPayment): Promise<ISessionApi> {
+    return friendlyMutation(apiAddSessionTimeByAmount(sessionId, amount, unpaid, prepaid, pay).then((r) => r.session));
   }
 
   /** Read-only advice: what `addTimeByAmount` would grant. */
@@ -242,12 +243,16 @@ export class SessionRepository {
 
   /** Read-only advice: what a planned start would cost. See `apiStartQuote`. */
   /** Read-only advice: see `apiStartOptions`. */
+  /** «Свои продукты» as the seat's rate, on / re-priced / off, during the game (2026-11-17). */
+  async setOutsideFoodRate(sessionId: number, on: boolean, rate?: number): Promise<ISessionApi> {
+    return friendlyMutation(apiSetOutsideFoodRate(sessionId, on, rate).then((r) => r.session));
+  }
   async startOptions(pcId: number, bookingId?: number): Promise<IStartOptions> {
     return apiStartOptions(pcId, bookingId);
   }
 
-  async startQuote(pcId: number, length: PlannedLength, hourlyRate?: number, plannedAmount?: number): Promise<IStartQuote> {
-    return friendlyMutation(apiStartQuote(pcId, length, hourlyRate, plannedAmount));
+  async startQuote(pcId: number, length: PlannedLength, hourlyRate?: number, plannedAmount?: number, outsideFoodRate?: boolean): Promise<IStartQuote> {
+    return friendlyMutation(apiStartQuote(pcId, length, hourlyRate, plannedAmount, outsideFoodRate));
   }
 
   /** Set or change the player's reminder (2026-11-15). */

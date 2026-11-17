@@ -5,10 +5,10 @@ import Modal from "@/components/ui/Modal";
 import { fmt } from "@/i18n/translations";
 import { useLang } from "@/i18n/LanguageContext";
 import { sessionRepository } from "@/repositories/SessionRepository";
-import { sessionItemLineTotal } from "@/components/sessions/sessionAmount";
+import { sessionCurrentHourlyRate, sessionItemLineTotal } from "@/components/sessions/sessionAmount";
 import { notify } from "@/ui/notify";
 import { ISessionApi } from "@/types/sessions";
-import { IProduct, isAdditionalProduct, isChipsProduct } from "@/types/pos";
+import { IProduct, isAdditionalProduct, isChipsProduct, isHourlyAdditional } from "@/types/pos";
 import { useConfirm } from "@/components/ui/ConfirmProvider";
 import { useProductBasket } from "@/components/pos/useProductBasket";
 import SectionTabs from "@/components/ui/SectionTabs";
@@ -26,6 +26,14 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { IItemChoice } from "@/api/sessions";
 import { sessionLineLabel } from "./outsideFood";
 import UnpaidToggle from "./UnpaidToggle";
+
+/**
+ * An additional item on its own clock — handed BACK rather than removed. The
+ * server's `AdditionalItemRule::onAClock`, read from the line itself: hourly,
+ * not the room's extra (that one is returned from the card), not a fee line.
+ */
+const onItsOwnClock = (item: { is_hourly?: boolean; is_extra?: boolean; kind?: string | null }): boolean =>
+  item.is_hourly === true && item.is_extra !== true && (item.kind ?? null) === null;
 
 interface Props {
   branchId: number;
@@ -137,6 +145,8 @@ const AddSessionItemDialog = ({ branchId, session, onClose, onAdded }: Props) =>
   const [unpaid, setUnpaid] = useState(false);
   /** Lines being marked paid («Оплачено»), so their button can say so. */
   const [paying, setPaying] = useState<number[]>([]);
+  /** Lines being handed back right now (an additional item on a rate). */
+  const [returning, setReturning] = useState<number[]>([]);
   const ask = useConfirm();
   // The catalogue's additional items, by id — to label them on the bill.
   const additionalIds = new Set((basket.products ?? []).filter(isAdditionalProduct).map((p) => p.id));
@@ -148,7 +158,10 @@ const AddSessionItemDialog = ({ branchId, session, onClose, onAdded }: Props) =>
   // part), or the box is empty and only additional items are being added.
   const textEmpty = basket.text.trim() === "";
   const textReady = !resolving && (textEmpty ? itemPayload.length > 0 : resolved?.ok === true && resolved.items.length > 0);
-  const onBillIds = new Set(bill.map((i) => i.product_id).filter((id): id is number => id !== null && id !== undefined));
+  // What the seat holds NOW: a line handed back (an item on «Изменение
+  // тарифа», 2026-11-17) stays on the bill with what it earned, and the item is
+  // free to go out again — the server's own rule (`AdditionalItemRule::isOnBill`).
+  const onBillIds = new Set(bill.filter((i) => !i.returned_at).map((i) => i.product_id).filter((id): id is number => id !== null && id !== undefined));
 
   // A fresh session from the parent (after a confirm, or a realtime update)
   // replaces what we hold, so the two never drift.
@@ -174,6 +187,45 @@ const AddSessionItemDialog = ({ branchId, session, onClose, onAdded }: Props) =>
       notify.message("success", fmt(t("session.addedMany"), products.map((l) => `${l.name} × ${l.qty}`).join(", ")));
     }
     if (items.length > 0) notify.message("success", fmt(t("session.additionalGiven"), items.join(", ")));
+  };
+
+  /**
+   * «Тариф сейчас» after an item on «Изменение тарифа» went out (2026-11-17),
+   * said the way a pad says it. The server's own lines and rates, read through
+   * the card's existing mirror of `rateNow`: the items from the answer, the
+   * seat and its pads from the card (the answer carries no pads).
+   */
+  const announceRate = (updated: ISessionApi, handedHourly: boolean) => {
+    if (!handedHourly || session.is_free) return;
+    const rate = sessionCurrentHourlyRate({ ...session, items: updated.items ?? [] });
+    notify.message("success", `${t("session.currentRate")}: ${money(rate)}${t("session.perHourShort")}`);
+  };
+  /** Does this basket hand out an item that changes the rate? */
+  const handsOutHourly = basket.itemLines.some((l) => {
+    const p = (basket.products ?? []).find((x) => x.id === l.product_id);
+    return p !== undefined && isHourlyAdditional(p);
+  });
+
+  /**
+   * Hand an item on «Изменение тарифа» back: its clock stops, what it earned
+   * stays, and the seat's rate falls back — the pads' own rule, through the
+   * same endpoint the room's extra uses. Not asked first: nothing leaves the
+   * bill, and the line can go out again.
+   */
+  const returnLine = async (itemId: number, name: string) => {
+    if (returning.includes(itemId)) return;
+    setReturning((prev) => [...prev, itemId]);
+    try {
+      const updated = await sessionRepository.returnItem(session.id, itemId);
+      setBill(updated?.items ?? bill);
+      notify.message("success", fmt(t("session.extraReturnedToast"), name));
+      onAdded();
+    } catch (e) {
+      const reason = e instanceof Error && e.message ? e.message : t("session.failUnknown");
+      notify.message("error", fmt(t("session.failReason"), reason));
+    } finally {
+      setReturning((prev) => prev.filter((id) => id !== itemId));
+    }
   };
 
   /**
@@ -241,7 +293,7 @@ const AddSessionItemDialog = ({ branchId, session, onClose, onAdded }: Props) =>
       // one request: an item picked there must not be dropped because the
       // products were typed rather than picked.
       const typed = resolved?.ok ? resolved.items : [];
-      await sessionRepository.addItems(session.id, [...typed.map(withUnpaid), ...itemPayload]);
+      const updated = await sessionRepository.addItems(session.id, [...typed.map(withUnpaid), ...itemPayload]);
 
       announceAdded(
         (resolved?.ok ? resolved.lines : [])
@@ -249,6 +301,7 @@ const AddSessionItemDialog = ({ branchId, session, onClose, onAdded }: Props) =>
           .map((l) => ({ name: l.name ?? "", qty: l.qty ?? 0 })),
         basket.itemLines.map((l) => l.name),
       );
+      announceRate(updated, handsOutHourly);
 
       setText("");
       setResolved(null);
@@ -273,7 +326,7 @@ const AddSessionItemDialog = ({ branchId, session, onClose, onAdded }: Props) =>
     setSaving(true);
     setErr(null);
     try {
-      await sessionRepository.addItems(
+      const updated = await sessionRepository.addItems(
         session.id,
         cart.map((l) => withUnpaid(l.product_id
           ? { product_id: l.product_id, qty: l.qty }
@@ -281,6 +334,7 @@ const AddSessionItemDialog = ({ branchId, session, onClose, onAdded }: Props) =>
       );
 
       announceAdded(basket.productLines, basket.itemLines.map((l) => l.name));
+      announceRate(updated, handsOutHourly);
 
       setCart([]);
       onAdded();
@@ -353,6 +407,12 @@ const AddSessionItemDialog = ({ branchId, session, onClose, onAdded }: Props) =>
                         {t("product.kindAdditionalShort")}
                       </span>
                     )}
+                    {/* An item on a rate that came back (2026-11-17): its clock stopped, its charge stays. */}
+                    {onItsOwnClock(item) && item.returned_at && (
+                      <span className="muted" style={{ marginLeft: 6, fontSize: 11 }} data-testid="bill-line-returned">
+                        {t("session.extraReturned")}
+                      </span>
+                    )}
                   </span>
                   {/* An additional item has no count: it was handed out or not. */}
                   <span style={{ minWidth: 40, textAlign: "center", fontWeight: 700 }}>
@@ -372,6 +432,21 @@ const AddSessionItemDialog = ({ branchId, session, onClose, onAdded }: Props) =>
                       data-testid="bill-line-mark-paid"
                     >
                       {paying.includes(item.id) ? "…" : t("session.itemMarkPaid")}
+                    </Button>
+                  )}
+                  {/* «Вернуть» (2026-11-17): an additional item on «Изменение
+                      тарифа» still out — stops its clock, the rate falls back. */}
+                  {onItsOwnClock(item) && !item.returned_at && (
+                    <Button
+                      variant="secondary"
+                      onClick={() => void returnLine(item.id, label)}
+                      disabled={saving || returning.includes(item.id)}
+                      style={{ ...stepBtn, minWidth: 88 }}
+                      aria-label={fmt(t("session.extraReturn"), label)}
+                      title={fmt(t("session.extraReturn"), label)}
+                      data-testid="bill-line-return"
+                    >
+                      {returning.includes(item.id) ? "…" : t("session.itemReturn")}
                     </Button>
                   )}
                   <Button
