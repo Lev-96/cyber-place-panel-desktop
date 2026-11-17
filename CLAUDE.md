@@ -4839,6 +4839,21 @@ panel shows the server's figures only; nothing below adds or subtracts money.
   (`dueCents`; split must add up to it; cash change against it); nothing due →
   no payment control, `{payment_method: "cash"}`. After the stop the change is
   the server's `cash.change`.
+- **C+, how it was paid ahead (2026-11-17).** The Stop control
+  (`PaymentEditor`) under «Оплачено вперёд» and in «На сумму» (Start) and under
+  «Оплачено сейчас» («+ Время»), cash preselected; `prepaidPaymentFields()`
+  sends NOTHING for plain cash (the request byte for byte as before), else
+  Stop's keys. A split is checked against the sum: Start uses the package price
+  / the server's plan quote (+ own-food fee) / the sum by amount; «+ Время» the
+  server's charge; Start / Add wait until it adds up. Receipt:
+  `prepaidCashChange()` = `refund.cash` when the server says by method, else
+  `change`; «Вернуть на карту 500 · возврат через терминал, не из кассы» and
+  «Вернуть («Другое»)» are their own lines, never the cash change (also after
+  the stop, when `cash` is null). Shift report: prepayment lines say a non-cash
+  method; their heading totals every line (`prepaid_in_by_method`), the drawer
+  row stays the cash. Copy no longer says «наличными». Tests: StartSessionDialog
+  (+6), PrepaidSettlement (5), SessionOptionsDialog (+1), ShiftReportView (+1);
+  e2e `start-payment-method.spec.ts`.
 - **A, «На сумму».** A third Start tab (`start-mode-amount`; the package tab is
   `start-mode-fixed`, shown only with packages). `StartByAmount`: autofocused
   sum, `GET /sessions/start-quote?amount=` (+`outside_food=1`), a 28px line
