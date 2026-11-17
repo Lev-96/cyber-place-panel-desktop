@@ -2488,6 +2488,19 @@ are unchanged — do not add a `paused` status here either.
   which reads the bill line's server flag `is_additional`.
 - Realtime: `SessionChangedEvent.kind` gains `additional.added` /
   `additional.removed`; the board reloads on any kind.
+- «Изменение тарифа» (2026-11-17): `IProduct.pricing_mode` (`fixed` | `hourly`,
+  null = fixed), `isHourlyAdditional()`. `ProductForm` shows the joysticks' two
+  radios (`joystickPrice.strategy.*`) for an additional item only, with the
+  room-extra notes, and sends `pricing_mode` only then. The list says «/ч ·
+  Изменение тарифа»; the basket prices it «500/ч». After a hand-out of one,
+  `AddSessionItemDialog` toasts «Тариф сейчас: N/ч» via
+  `sessionCurrentHourlyRate` (the card's pads + the answer's items; nothing on a
+  free seat). On the bill a running hourly item line (not `is_extra`, no
+  `kind`) gets «Вернуть» (`returnItem`, PATCH `returned:true`, not asked); back,
+  it reads «возвращено» and may be added again (`onBillIds` skips returned
+  lines). Product history labels `pricing_mode_changed`, null read as fixed.
+  Tests: dialog (+8), ProductForm (+5), ProductsList (+1), productEventChange
+  (+1); e2e `additional-item-tariff.spec.ts` (en/ru/am × 1280/520).
 
 ## 9.5.1 Sessions → History: the card and its timeline (2026-09-26)
 
