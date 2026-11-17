@@ -4854,6 +4854,20 @@ panel shows the server's figures only; nothing below adds or subtracts money.
   row stays the cash. Copy no longer says «наличными». Tests: StartSessionDialog
   (+6), PrepaidSettlement (5), SessionOptionsDialog (+1), ShiftReportView (+1);
   e2e `start-payment-method.spec.ts`.
+- **«Свои продукты» as the seat's rate (2026-11-17).** Prices → «Свои
+  продукты»: «Как берётся плата» Фиксированная цена / Изменение тарифа
+  (`outside_food_mode`, sent only when changed). Start (`start-options`
+  `outside_food_mode: "tariff"`): switched on, the hint says «место играет по
+  4 000/ч», the plan is quoted with `outside_food=1` (5th `startQuote` arg, only
+  when on), no hand rate / total offered or sent, no switch on a package, the
+  prepaid sum adds no fee. «+ Время»: `OutsideFoodRateSection` (only where the
+  venue charges a rate, or it is already on): price per hour prefilled with the
+  fee, «Включить» / «Изменить цену» / «Выключить» → `POST
+  /sessions/{id}/outside-food`. History: `rate_changed` «Изменена цена за час»
+  (own food, old → new per hour); a prepayment names its method instead of «наличными». ⚠️ Typecheck with `npm run typecheck` (tsconfig.app.json): the
+  root `tsc -p .` checks nothing (`files: []`). Tests: OutsideFoodFeeForm (+3),
+  StartSessionDialog (+4), OutsideFoodRateSection (5), history (+5); e2e
+  `outside-food-rate.spec.ts`.
 - **A, «На сумму».** A third Start tab (`start-mode-amount`; the package tab is
   `start-mode-fixed`, shown only with packages). `StartByAmount`: autofocused
   sum, `GET /sessions/start-quote?amount=` (+`outside_food=1`), a 28px line
