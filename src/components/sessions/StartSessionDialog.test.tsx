@@ -1594,3 +1594,82 @@ describe("start by amount", () => {
     expect(screen.queryByTestId("prepaid-switch")).toBeNull();
   });
 });
+
+/**
+ * HOW the sum paid ahead was paid (2026-11-17, owner: the Stop methods at
+ * Start too). The Stop control under «Оплачено вперёд» and «На сумму»; cash is
+ * preselected and sends NOTHING, so a cash start is the request it always was.
+ */
+describe("paid ahead by card, cash, split or other", () => {
+  const settle = async () => { await act(async () => { await new Promise((r) => setTimeout(r, 320)); }); };
+  const startButton = () => screen.getByRole("button", { name: "action.start" }) as HTMLButtonElement;
+  const prepaidOn = async () => { await act(async () => { fireEvent.click(screen.getByTestId("prepaid-switch")); }); };
+  const parts = () => [...document.querySelectorAll(".pay-editor__part input")] as HTMLInputElement[];
+  const body = () => repo.start.mock.calls[0][0] as Record<string, unknown>;
+
+  test("no prepayment: no payment control at all", async () => {
+    await mount(device({ kind: PC_KIND.Pc }));
+    await settle();
+    expect(screen.queryByTestId("payment-editor")).toBeNull();
+  });
+
+  test("on: the control appears, cash chosen, and the request carries no method", async () => {
+    await mount(device({ kind: PC_KIND.Pc }));
+    await settle();
+    await prepaidOn();
+    expect(screen.getByTestId("payment-editor")).toBeTruthy();
+    expect(screen.getByTestId("pay-cash").getAttribute("aria-checked")).toBe("true");
+    await act(async () => { fireEvent.click(startButton()); });
+    expect(body()).toMatchObject({ mode: "fixed", time_package_id: 1, prepaid: true });
+    for (const k of ["payment_method", "payments", "payment_method_other", "payment_note"]) expect(body()).not.toHaveProperty(k);
+  });
+
+  test("card: sent as payment_method card", async () => {
+    await mount(device({ kind: PC_KIND.Pc }));
+    await settle();
+    await prepaidOn();
+    await act(async () => { fireEvent.click(screen.getByTestId("pay-card")); });
+    await act(async () => { fireEvent.click(startButton()); });
+    expect(body()).toMatchObject({ prepaid: true, payment_method: "card" });
+  });
+
+  test("split of the package's 1 500: Start waits until the parts add up, then sends them", async () => {
+    await mount(device({ kind: PC_KIND.Pc }));
+    await settle();
+    await prepaidOn();
+    await act(async () => { fireEvent.click(screen.getByTestId("pay-split")); });
+    await act(async () => { fireEvent.change(parts()[0], { target: { value: "1000" } }); });
+    expect(startButton().disabled).toBe(true);
+    await act(async () => { fireEvent.change(parts()[1], { target: { value: "500" } }); });
+    expect(startButton().disabled).toBe(false);
+    await act(async () => { fireEvent.click(startButton()); });
+    expect(body()).toMatchObject({ prepaid: true, payments: [{ method: "cash", amount: 1000 }, { method: "card", amount: 500 }] });
+  });
+
+  test("a planned 2 h at the server's 3 000: the split is checked against 3 000", async () => {
+    await mount(device());
+    await act(async () => { fireEvent.change(screen.getByTestId("planned-duration-input-hours"), { target: { value: "2" } }); });
+    await settle();
+    await prepaidOn();
+    await act(async () => { fireEvent.click(screen.getByTestId("pay-split")); });
+    await act(async () => { fireEvent.click(screen.getByTestId("pay-rest-card")); });
+    expect(parts()[1].value).toBe("3000");
+    await act(async () => { fireEvent.click(startButton()); });
+    // One part above zero is sent as that single method.
+    expect(body()).toMatchObject({ prepaid: true, duration_minutes: 120, payment_method: "card" });
+  });
+
+  test("«На сумму» by card: the sum and the method", async () => {
+    repo.startQuoteByAmount.mockImplementation((_pc: number, amount: number) => Promise.resolve({
+      amount, hourly_rate: 1000, outside_food_fee: 0, time_amount: amount, seconds: amount * 3.6, minutes: Math.ceil(amount * 3.6 / 60),
+      ends_at: "2026-11-15T20:00:00+04:00", standard_amount: amount,
+    }));
+    await mount(device());
+    await act(async () => { fireEvent.click(screen.getByTestId("start-mode-amount")); });
+    await act(async () => { fireEvent.change(screen.getByTestId("start-amount").querySelector("input") as HTMLInputElement, { target: { value: "5000" } }); });
+    await settle();
+    await act(async () => { fireEvent.click(screen.getByTestId("pay-card")); });
+    await act(async () => { fireEvent.click(startButton()); });
+    expect(body()).toEqual({ branch_id: 7, pc_id: 1, user_display_name: "PS5 VIP", paid_amount: 5000, paid_seconds: 18000, payment_method: "card" });
+  });
+});

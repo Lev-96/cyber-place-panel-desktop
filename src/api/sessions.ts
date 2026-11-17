@@ -81,6 +81,14 @@ export interface StartSessionBody {
    */
   paid_amount?: number;
   paid_seconds?: number;
+  /**
+   * HOW it was paid ahead (2026-11-17), with `prepaid` or `paid_amount` only:
+   * Stop's own keys. Absent = cash, as every start before it.
+   */
+  payment_method?: PaymentMethod;
+  payment_method_other?: string;
+  payments?: { method: PaymentMethod; amount: number }[];
+  payment_note?: string;
 }
 
 /** What "+ Время" would charge for N minutes now — the server's own figure. */
@@ -341,7 +349,21 @@ export interface IBillBreakdown {
    * the cash handed over before playing, the change to give back, and what is
    * still due. Null/absent when nothing was paid ahead.
    */
-  prepaid?: { amount: number; change: number; due: number } | null;
+  prepaid?: IPrepaidSummary | null;
+}
+
+/**
+ * Paid ahead against a bill (2026-11-15): the server's figures. `by_method` /
+ * `refund` (2026-11-17) only when something was paid ahead by other than cash:
+ * what each method paid, and what of each goes back — a card refund on the
+ * terminal is not the cash change.
+ */
+export interface IPrepaidSummary {
+  amount: number;
+  change: number;
+  due: number;
+  by_method?: Partial<Record<PaymentMethod, number>>;
+  refund?: Partial<Record<PaymentMethod, number>>;
 }
 
 export interface AddItemBody {
@@ -608,7 +630,7 @@ export const apiRemoveSessionJoystick = (sessionId: number, slot: number) =>
  * applied by the server BEFORE the time is added, so the added time is never
  * counted as paid; omitted = left as it is.
  */
-export const apiAddSessionTime = (sessionId: number, minutes: number, charge?: number, unpaid?: boolean, prepaid?: true) =>
+export const apiAddSessionTime = (sessionId: number, minutes: number, charge?: number, unpaid?: boolean, prepaid?: true, pay?: PrepaidPayment) =>
   request<{ session: ISessionApi }>(`/sessions/${sessionId}/time`, {
     method: "POST",
     body: {
@@ -616,9 +638,21 @@ export const apiAddSessionTime = (sessionId: number, minutes: number, charge?: n
       ...(charge === undefined ? {} : { charge }),
       ...(unpaid === undefined ? {} : { unpaid }),
       // «Оплачено сейчас» on a seat paid ahead (2026-11-15); absent otherwise.
-      ...(prepaid ? { prepaid } : {}),
+      // How (2026-11-17), only with it; cash sends nothing.
+      ...(prepaid ? { prepaid, ...(pay ?? {}) } : {}),
     },
   });
+
+/**
+ * How a sum paid ahead was paid (2026-11-17): Stop's keys, or nothing for
+ * cash ({@link prepaidPaymentFields}).
+ */
+export type PrepaidPayment = {
+  payment_method?: PaymentMethod;
+  payment_method_other?: string;
+  payments?: { method: PaymentMethod; amount: number }[];
+  payment_note?: string;
+};
 
 /**
  * What `/unlimited` and `/limit` answer (2026-11-15): the session, and what an
@@ -734,10 +768,10 @@ export interface IExtensionOptions {
  * seat's rate and grants them — at exactly that money on a seat with a plan,
  * at the rate elsewhere (its quote says which).
  */
-export const apiAddSessionTimeByAmount = (sessionId: number, amount: number, unpaid?: boolean, prepaid?: true) =>
+export const apiAddSessionTimeByAmount = (sessionId: number, amount: number, unpaid?: boolean, prepaid?: true, pay?: PrepaidPayment) =>
   request<{ session: ISessionApi }>(`/sessions/${sessionId}/time`, {
     method: "POST",
-    body: { amount, ...(unpaid === undefined ? {} : { unpaid }), ...(prepaid ? { prepaid } : {}) },
+    body: { amount, ...(unpaid === undefined ? {} : { unpaid }), ...(prepaid ? { prepaid, ...(pay ?? {}) } : {}) },
   });
 
 /**

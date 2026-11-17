@@ -108,6 +108,19 @@ export const paymentBody = (d: PaymentDraft, check: PaymentCheck):
   return note === "" ? { payments: check.lines } : { payments: check.lines, payment_note: note };
 };
 
+/**
+ * How a sum paid AHEAD was paid (2026-11-17, owner: the Stop methods at Start
+ * and in «+ Время» too) — the body {@link paymentBody} sends, except that plain
+ * cash sends NOTHING: every server has always read no method as cash, so a
+ * cash prepayment leaves the request byte for byte as it was.
+ */
+export const prepaidPaymentFields = (d: PaymentDraft, check: PaymentCheck):
+  | Record<string, never>
+  | ReturnType<typeof paymentBody> => {
+  const body = paymentBody(d, check);
+  return "payment_method" in body && body.payment_method === "cash" && body.payment_method_other === undefined ? {} : body;
+};
+
 /** "Остаток сюда": the method's box filled with what is still due (never below 0). */
 export const fillRemaining = (dueCents: number, d: PaymentDraft, method: PaymentMethod): PaymentDraft => {
   const others = SPLIT_METHODS.filter((m) => m !== method).reduce((sum, m) => sum + (partCents(d.amounts[m]) ?? 0), 0);

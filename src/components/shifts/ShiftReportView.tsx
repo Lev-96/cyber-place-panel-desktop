@@ -59,6 +59,12 @@ const ShiftReportView = ({ shift, report, viewerId = null }: Props) => {
       : methodName(l.method);
 
   const m = (amount: string) => shiftAmount(money, amount);
+  // The prepayment lines' heading (2026-11-17): every line listed — card and
+  // «Другое» included — which the drawer's `prepaid_in` (cash only) is not.
+  // A report from before reads `prepaid_in`, which was all of them then.
+  const prepaidLinesTotal = report.cash.prepaid_in_by_method
+    ? Object.values(report.cash.prepaid_in_by_method).reduce((sum, v) => (Math.round(sum * 100) + Math.round(Number(v ?? 0) * 100)) / 100, 0).toFixed(2)
+    : report.cash.prepaid_in ?? "0.00";
   // v5 (2026-11-15): a place's prepayment, change and what it was left owing — the server's figures.
   const placeExtras = (l: { prepaid?: string | null; change?: string | null; unpaid?: string | null }): string => {
     const out: string[] = [];
@@ -220,10 +226,10 @@ const ShiftReportView = ({ shift, report, viewerId = null }: Props) => {
               <Row key={`o${l.id}`} muted={l.status !== "paid"} label={`${l.at ? formatDateTime(l.at) : ""} · ${lineMethod(l)}${l.status !== "paid" ? ` · ${t("till.voided")}` : ""}`} value={m(l.amount)} />
             ))}
             {(report.lines.prepaid?.length ?? 0) > 0 && (
-              <LinesHead title={t("shift.linesPrepaid")} rule={t("shift.linesRule.prepaid")} total={m(report.cash.prepaid_in ?? "0.00")} />
+              <LinesHead title={t("shift.linesPrepaid")} rule={t("shift.linesRule.prepaid")} total={m(prepaidLinesTotal)} />
             )}
             {(report.lines.prepaid ?? []).map((l) => (
-              <Row key={`a${l.id}`} label={`${l.at ? formatDateTime(l.at) : ""} · ${l.seat} · ${l.kind === "time" ? t("shift.prepaidKindTime") : t("shift.prepaidKindStart")}`} value={m(l.amount)} testId="shift-line-prepaid" />
+              <Row key={`a${l.id}`} label={`${l.at ? formatDateTime(l.at) : ""} · ${l.seat} · ${l.kind === "time" ? t("shift.prepaidKindTime") : t("shift.prepaidKindStart")}${l.method && l.method !== "cash" ? ` · ${methodName(l.method)}` : ""}`} value={m(l.amount)} testId="shift-line-prepaid" />
             ))}
             {report.lines.tournaments.length > 0 && (
               <LinesHead title={t("shift.revenueTournaments")} rule={t("shift.linesRule.tournaments")} total={m(report.tournaments.total)} />

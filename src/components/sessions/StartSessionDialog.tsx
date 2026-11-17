@@ -32,6 +32,8 @@ import QuotedPrice from "./QuotedPrice";
 import { EMPTY_DRAFT, clockOfDraft, draftMinutes, isDraftEmpty, type ClockDraft, type DurationDraft } from "./durationModel";
 import { useHiddenParts } from "@/hooks/useHiddenParts";
 import UnpaidToggle from "./UnpaidToggle";
+import PaymentEditor from "@/components/payments/PaymentEditor";
+import { checkPayment, emptyPaymentDraft, prepaidPaymentFields, type PaymentDraft } from "@/components/payments/paymentSplit";
 import FeeSentence from "./FeeSentence";
 import { useMinuteTick } from "./useMinuteTick";
 import { quoteFor, useServerQuote } from "./useServerQuote";
@@ -339,6 +341,25 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted, bookingId }: Pro
   // Paid ahead only where there is a plan to pay: a package, or a length set.
   const prepaidApplies = !isFree && (mode === "fixed" || (mode === "open" && planInput !== null));
   const prepaidField = prepaid && prepaidApplies ? { prepaid: true as const } : {};
+  /**
+   * HOW the sum paid ahead was paid (2026-11-17, owner: the Stop methods at
+   * Start too): the Stop control, under «Оплачено вперёд» or «На сумму».
+   * Cash is preselected and sends nothing — the request is the one every
+   * start before it sent. A split must add up to the sum to the cent; the
+   * server checks it again and starts nothing if it does not.
+   */
+  const [prepaidPay, setPrepaidPay] = useState<PaymentDraft>(() => emptyPaymentDraft("cash"));
+  // The package's own price — what a package start commits (the server's
+  // `committed_amount`).
+  const selectedPackagePrice = packages?.find((p) => p.id === pkgId)?.price ?? null;
+  const paysAhead = !isFree && ((mode === "amount" && amountValue !== null) || (prepaid && prepaidApplies));
+  const prepaidSum: number | null = !paysAhead ? null
+    : mode === "amount" ? amountValue
+    : mode === "fixed" ? (selectedPackagePrice !== null ? selectedPackagePrice + (outsideFoodOn ? outsideFoodFee ?? 0 : 0) : null)
+    : quotedPlan !== null ? quotedPlan.amount + (outsideFoodOn ? outsideFoodFee ?? 0 : 0) : null;
+  const prepaidCents = prepaidSum === null ? 0 : Math.round(prepaidSum * 100);
+  const prepaidCheck = checkPayment(prepaidCents, prepaidPay);
+  const prepaidPayField = paysAhead ? prepaidPaymentFields(prepaidPay, prepaidCheck) : {};
 
   const toggleEditPrice = (next: boolean) => {
     setEditPrice(next);
@@ -398,6 +419,7 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted, bookingId }: Pro
           user_display_name: pc.label,
           paid_amount: amountValue,
           paid_seconds: quotedAmount.seconds,
+          ...prepaidPayField,
           ...psnField,
           ...bookingField,
           ...outsideFoodField,
@@ -414,6 +436,7 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted, bookingId }: Pro
           ...bookingField,
           ...(unpaid ? { unpaid: true } : {}),
           ...prepaidField,
+          ...prepaidPayField,
           ...outsideFoodField,
         });
       } else {
@@ -439,6 +462,7 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted, bookingId }: Pro
           ...bookingField,
           ...(unpaid ? { unpaid: true } : {}),
           ...prepaidField,
+          ...prepaidPayField,
           ...outsideFoodField,
         });
       }
@@ -497,6 +521,8 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted, bookingId }: Pro
     // By amount: only on the server's quote for exactly the sum on screen.
     || (!isFree && mode === "amount" && quotedAmount === null)
     || !optionsLoaded || effectiveChoice === null
+    // Paid ahead: a split waits until it adds up to the sum.
+    || (paysAhead && (prepaidSum === null || !prepaidCheck.ok))
     || startBeyondReservation;
 
   return (
@@ -824,6 +850,18 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted, bookingId }: Pro
                   {t(psnValid ? "session.psnNameHint" : "session.psnNameInvalid")}
                 </span>
               </div>
+            )}
+
+            {paysAhead && prepaidSum !== null && (
+              <PaymentEditor
+                name={`start-prepaid-pay-${pc.id}`}
+                dueCents={prepaidCents}
+                value={prepaidPay}
+                onChange={setPrepaidPay}
+                check={prepaidCheck}
+                money={money}
+                disabled={busy}
+              />
             )}
 
             {deviceOffline && <div className="error">{t("session.deviceOfflineHint")}</div>}

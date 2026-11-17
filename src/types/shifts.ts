@@ -79,7 +79,7 @@ export interface IShiftPrepaymentLine {
   session_id: number;
   seat: string;
   amount: Money;
-  /** Always `cash` today. */
+  /** `cash`, and since 2026-11-17 also `card` / `other` (a split is one line per part). */
   method: string;
   /** `start` (at the start / «На сумму») or `time` («+ Время» paid ahead). */
   kind: "start" | "time" | string;
@@ -223,6 +223,8 @@ export interface IShiftReport {
      * opening + places + till + prepaid_in − prepaid_settled (the server's sum).
      */
     prepaid_in?: Money;
+    /** 2026-11-17: everything paid ahead in the shift, by method (`prepaid_in` is its cash). */
+    prepaid_in_by_method?: Partial<Record<"cash" | "card" | "other", Money>>;
     prepaid_settled?: Money;
     change?: Money;
     expected: Money;
