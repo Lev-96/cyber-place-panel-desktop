@@ -7,10 +7,15 @@ import type { UpdateCheckEntry } from "./updates";
  * cyber-place/app/Http/Controllers/Owner/Updates/AgentUpdateController.
  *
  * An admin first APPROVES a version (stage one). Only then can an owner /
- * manager APPLY that approved version to the Pcs of their OWN venue.
+ * manager APPLY that approved version to the computers of their OWN branches.
  *
- *  /agent-updates/status    — agent state + the admin-approved version
- *  /agent-updates/promote   — apply the approved version to my venue
+ *  /agent-updates/status    — the approved version and, per branch, how many
+ *                             connected computers still have to get it
+ *  /agent-updates/promote   — apply the approved version to one branch
+ *
+ * Every figure here is the SERVER's (2026-11-17): which branch has a connected
+ * computer, how many are left, whether a branch is pending and how many are.
+ * The panel prints them and never works them out itself.
  */
 
 export interface AgentApprovedRelease {
@@ -19,23 +24,47 @@ export interface AgentApprovedRelease {
   mandatory: boolean;
 }
 
+/** One branch's computers and the approved version, as the server counts them. */
+export interface AgentBranchRollout {
+  /** Computers whose Agent connected within the server's window. */
+  pc_count: number;
+  /** Of those, how many have not been sent the approved version. */
+  pending_pc_count: number;
+  /** Something to apply here: approved, a computer left, the branch open. */
+  pending: boolean;
+}
+
+export interface AgentBranchStatus {
+  branch_id: number;
+  address: string;
+  /** The branch has a computer whose Agent connected recently. */
+  agent_relevant: boolean;
+  /** Null when the branch has no such computer: nothing about the Agent there. */
+  agent: AgentBranchRollout | null;
+}
+
 export interface AgentUpdateStatus extends UpdateCheckEntry {
   /** The version an admin has approved for rollout, or null if none yet. */
   approved: AgentApprovedRelease | null;
-  /** How many of the caller's own Pcs an apply would target. */
-  venue_pc_count: number;
   /**
-   * The version THIS caller last applied to their venue, or null. When it
-   * equals `approved.version` the "apply" button + "update available"
-   * notification are suppressed (nothing left to do until a newer approval).
+   * Kept for panels 1.0.62/1.0.63, which read these two; this build does not.
+   * `venue_pc_count`: connected computers in scope. `applied_version`: the
+   * approved version once nothing is pending, null while something is.
    */
+  venue_pc_count: number;
   applied_version: string | null;
+  /** Every branch in the caller's scope, in id order. */
+  branches: AgentBranchStatus[];
+  /** How many branches are pending: the side menu's badge, as sent. */
+  pending_branch_count: number;
 }
 
 export interface AgentApplyResult {
   data: UpdateCheckEntry | null;
   applied_pc_count: number;
   version: string;
+  /** The branches whose computers were sent the version. */
+  applied_branch_ids: number[];
 }
 
 export const apiAgentUpdateStatus = async (): Promise<AgentUpdateStatus> => {
@@ -44,11 +73,11 @@ export const apiAgentUpdateStatus = async (): Promise<AgentUpdateStatus> => {
 };
 
 /**
- * Apply the admin-approved agent version to the caller's own venue. The
- * backend replies 409 (ApiError.status === 409) when nothing has been
- * approved yet — callers should surface that as "waiting for admin
- * approval", not a hard failure.
+ * Apply the admin-approved agent version to ONE branch's computers. The
+ * backend answers 409 (ApiError.status === 409) while nothing is approved, and
+ * 403 for a branch outside the caller's scope or one an administrator blocked
+ * (that one with the block's `code`). This build never sends the request
+ * without a branch: that form is kept for panels 1.0.62/1.0.63.
  */
-export const apiAgentUpdateApply = async (): Promise<AgentApplyResult> => {
-  return request<AgentApplyResult>("/agent-updates/promote", { method: "POST" });
-};
+export const apiAgentUpdateApply = async (branchId: number): Promise<AgentApplyResult> =>
+  request<AgentApplyResult>("/agent-updates/promote", { method: "POST", body: { branch_id: branchId } });

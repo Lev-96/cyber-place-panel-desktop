@@ -4101,49 +4101,14 @@ export const TRANSLATIONS: Dict = {
     am: "Կիոսկի Agent-ի թարմացումներ",
   },
   "agentUpdates.subtitle": {
-    en: "Roll out a new version of the kiosk agent to every gaming PC in your branches. Updates download in the background and prompt the cashier on the lock screen.",
-    ru: "Обновите версию агента на всех игровых ПК ваших филиалов. Обновление скачается фоном и предложит кассиру перезапустить на экране блокировки.",
-    am: "Թարմացրեք Agent-ը ձեր մասնաճյուղերի բոլոր խաղային համակարգիչներում։ Թարմացումը ներբեռնվում է ֆոնում, և գանձապահը հուշում է ստանում կողպման էկրանին։",
-  },
-  "agentUpdates.loading": {
-    en: "Loading agent status…",
-    ru: "Загрузка состояния агента…",
-    am: "Բեռնվում է Agent-ի վիճակը…",
-  },
-  "agentUpdates.currentVersion": {
-    en: "Current version",
-    ru: "Текущая версия",
-    am: "Ընթացիկ տարբերակը",
-  },
-  "agentUpdates.latestVersion": {
-    en: "Latest version",
-    ru: "Новая версия",
-    am: "Վերջին տարբերակը",
-  },
-  "agentUpdates.upToDate": {
-    en: "Every agent is up to date.",
-    ru: "Все агенты обновлены.",
-    am: "Բոլոր Agent-ները թարմացված են։",
-  },
-  "agentUpdates.hasUpdate": {
-    en: "A newer version is available. Install it for every agent in your branches.",
-    ru: "Доступна новая версия. Установите её на всех агентах ваших филиалов.",
-    am: "Հասանելի է նոր տարբերակ։ Տեղադրեք այն ձեր մասնաճյուղերի բոլոր Agent-ներում։",
-  },
-  "agentUpdates.promoteBtn": {
-    en: "Install new version on all agents and restart",
-    ru: "Установить новую версию на всех агентах и перезапустить",
-    am: "Տեղադրել նոր տարբերակը բոլոր Agent-ներում և վերագործարկել",
+    en: "Apply a new version of the kiosk Agent in each of your branches. It downloads in the background and prompts the cashier on the lock screen.",
+    ru: "Применяйте новую версию агента в каждом своём филиале. Обновление скачается фоном и предложит кассиру перезапуск на экране блокировки.",
+    am: "Կիրառեք Agent-ի նոր տարբերակը ձեր յուրաքանչյուր մասնաճյուղում։ Թարմացումը ներբեռնվում է ֆոնում, և գանձապահը հուշում է ստանում կողպման էկրանին։",
   },
   "agentUpdates.promoting": {
     en: "Applying…",
     ru: "Применяем…",
     am: "Կիրառվում է…",
-  },
-  "agentUpdates.cannotPromote": {
-    en: "Cannot apply. Backend could not fetch the latest release from GitHub.",
-    ru: "Не удалось применить. Backend не смог получить релиз с GitHub.",
-    am: "Չհաջողվեց կիրառել։ Սերվերը չկարողացավ ստանալ վերջին թողարկումը GitHub-ից։",
   },
   "agentUpdates.approvedVersion": {
     en: "Approved by administrator",
@@ -4155,25 +4120,47 @@ export const TRANSLATIONS: Dict = {
     ru: "Администратор ещё не одобрил обновление. Как только он его одобрит, вы сможете применить его в своих филиалах.",
     am: "Ադմինիստրատորը դեռ չի հաստատել թարմացումը։ Հաստատվելուց հետո կկարողանաք կիրառել այն ձեր մասնաճյուղերում։",
   },
-  "agentUpdates.venuePcs": {
-    en: "PCs in your branches",
-    ru: "ПК в ваших филиалах",
-    am: "Համակարգիչներ ձեր մասնաճյուղերում",
+  // One branch's card (2026-11-17). The counts are the server's; a label form
+  // («…: 2 из 3») so the noun never has to agree with the number.
+  "agentUpdates.branch.pending": {
+    en: "Computers to update: {0} of {1}",
+    ru: "Нужно обновить компьютеров: {0} из {1}",
+    am: "Պետք է թարմացնել {0} համակարգիչ՝ {1}-ից",
   },
-  "agentUpdates.applyBtn": {
-    en: "Apply approved version to my branches",
-    ru: "Применить одобренную версию в моих филиалах",
-    am: "Կիրառել հաստատված տարբերակը իմ մասնաճյուղերում",
+  "agentUpdates.branch.allReceived": {
+    en: "All computers have received the update.",
+    ru: "Все компьютеры получили обновление.",
+    am: "Բոլոր համակարգիչները ստացել են թարմացումը։",
+  },
+  "agentUpdates.branch.applyBtn": {
+    en: "Apply in this branch",
+    ru: "Применить в этом филиале",
+    am: "Կիրառել այս մասնաճյուղում",
   },
   "agentUpdates.applied": {
-    en: "Sent to your PCs. Each agent downloads in the background and prompts the cashier to restart.",
-    ru: "Отправлено на ваши ПК. Каждый агент скачает обновление фоном и предложит кассиру перезапуск.",
-    am: "Ուղարկվեց ձեր համակարգիչներին։ Յուրաքանչյուր Agent ֆոնում կներբեռնի թարմացումը և կառաջարկի գանձապահին վերագործարկել։",
+    en: "Sent to this branch's computers. Each Agent downloads the update in the background and prompts the cashier to restart.",
+    ru: "Отправлено на компьютеры филиала. Каждый агент скачает обновление фоном и предложит кассиру перезапуск.",
+    am: "Ուղարկվեց մասնաճյուղի համակարգիչներին։ Յուրաքանչյուր Agent ֆոնում կներբեռնի թարմացումը և կառաջարկի գանձապահին վերագործարկել։",
   },
-  "agentUpdates.noVenuePcs": {
-    en: "No PCs are registered in your branches yet.",
-    ru: "В ваших филиалах пока нет зарегистрированных ПК.",
-    am: "Ձեր մասնաճյուղերում դեռ գրանցված համակարգիչներ չկան։",
+  "agentUpdates.applyFailed": {
+    en: "Could not apply. Try again.",
+    ru: "Не удалось применить. Попробуйте ещё раз.",
+    am: "Չհաջողվեց կիրառել։ Փորձեք կրկին։",
+  },
+  "agentUpdates.state.emptyTitle": {
+    en: "No connected computers",
+    ru: "Нет подключённых компьютеров",
+    am: "Միացված համակարգիչներ չկան",
+  },
+  "agentUpdates.state.emptyDescription": {
+    en: "A branch appears here once a computer in it runs the Agent and has connected recently.",
+    ru: "Филиал появится здесь, когда на его компьютере заработает агент и выйдет на связь.",
+    am: "Մասնաճյուղը կհայտնվի այստեղ, երբ նրա համակարգչում աշխատի Agent-ը և կապ հաստատի։",
+  },
+  "agentUpdates.state.errorTitle": {
+    en: "Could not load the Agent updates",
+    ru: "Не удалось загрузить обновления агента",
+    am: "Չհաջողվեց բեռնել Agent-ի թարմացումները",
   },
   // ── CRUD toast messages (top-right notifications) ──────────────────────
   "toast.generic.created": { en: "Created successfully", ru: "Успешно создано", am: "Հաջողությամբ ստեղծվեց" },
@@ -4300,6 +4287,12 @@ export const TRANSLATIONS: Dict = {
     en: "You have a new update for your kiosk locker.",
     ru: "У вас есть новое обновление для вашего блокировщика.",
     am: "Կիոսկի Agent-ի համար նոր թարմացում կա։",
+  },
+  // Owner / manager (2026-11-17): the branches still to apply, by address.
+  "updates.toastAgentBranches": {
+    en: "The kiosk Agent update is waiting in: {0}",
+    ru: "Обновление агента ждёт применения: {0}",
+    am: "Agent-ի թարմացումը սպասում է կիրառման՝ {0}",
   },
   "updates.toastCta": {
     en: "Click to open the updates section",
