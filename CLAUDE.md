@@ -5190,3 +5190,18 @@ in `src/api/agent-updates.ts`.
   state; panels 1.0.62/1.0.63 keep working on the new backend through its
   legacy fields. **Owner web**: bump `panel.ref` with this change
   (`sideMenu.ts` there imports `@/realtime/updateBadges`).
+- **«История продаж» in figures + «Свой вариант» (2026-11-18, owner).** With no
+  place picked, the history's figures are `components/sales/SalesSummaryPanel`
+  over `GET /branches/{id}/sales-summary` (backend counts with the shift
+  report's code, over the branch's working day): «Итог общей продажи», «Общий
+  счёт активных мест», «Продажа товаров без места», «Общая сумма товаров», and
+  per way of paying the sum and «Платежей: N» (a named «Свой вариант» is its
+  own card). Every card opens its records (day, time, where, who, how paid),
+  filtered by the server. Header: «Сегодня, 18.11.2026 · Расчёт с 13:00 до
+  07:00». Dates read 18.11.2026 (`components/ui/DateField`). A picked place
+  keeps the old per-seat tiles (renamed). In «Разделить» the «Другое» row is
+  gone; «+ Свой вариант» adds a [name][amount] row (`PaymentDraft.own`, one per
+  bill). Revenue screen: plain names, period «с 01.11.2026 по 30.11.2026»,
+  menu «Доход и оплата Cyber Place»; no figure or formula changed.
+  Tests: SalesSummaryPanel (5), DateField (3), paymentSplit (+4),
+  PaymentEditor (+1); e2e `sales-history-figures.spec.ts` (en/ru/am × 1280/520).
