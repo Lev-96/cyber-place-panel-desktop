@@ -61,6 +61,7 @@ import {
   IBillBreakdown, ICashHandover,
   ListSessionsParams,
   StartSessionBody,
+  apiSetOutsideFoodRate,
 } from "@/api/sessions";
 import { apiReorderPcs } from "@/api/pcs";
 import { friendlyMutation, orFallback } from "@/api/fallback";
@@ -242,12 +243,16 @@ export class SessionRepository {
 
   /** Read-only advice: what a planned start would cost. See `apiStartQuote`. */
   /** Read-only advice: see `apiStartOptions`. */
+  /** «Свои продукты» as the seat's rate, on / re-priced / off, during the game (2026-11-17). */
+  async setOutsideFoodRate(sessionId: number, on: boolean, rate?: number): Promise<ISessionApi> {
+    return friendlyMutation(apiSetOutsideFoodRate(sessionId, on, rate).then((r) => r.session));
+  }
   async startOptions(pcId: number, bookingId?: number): Promise<IStartOptions> {
     return apiStartOptions(pcId, bookingId);
   }
 
-  async startQuote(pcId: number, length: PlannedLength, hourlyRate?: number, plannedAmount?: number): Promise<IStartQuote> {
-    return friendlyMutation(apiStartQuote(pcId, length, hourlyRate, plannedAmount));
+  async startQuote(pcId: number, length: PlannedLength, hourlyRate?: number, plannedAmount?: number, outsideFoodRate?: boolean): Promise<IStartQuote> {
+    return friendlyMutation(apiStartQuote(pcId, length, hourlyRate, plannedAmount, outsideFoodRate));
   }
 
   /** Set or change the player's reminder (2026-11-15). */

@@ -359,6 +359,12 @@ export interface ISessionApi {
   unpaid_items_total?: number | null;
   /** Cash handed over AHEAD (2026-11-15, «На сумму» / «Оплачено вперёд»); null: none. Never revenue. */
   prepaid_amount?: number | null;
+  /**
+   * «Свои продукты» as the seat's rate (2026-11-17): the hourly rate it runs at
+   * while on, and the rate it goes back to. Null/absent = not on as a rate.
+   */
+  outside_food_rate?: number | null;
+  rate_before_outside_food?: number | null;
   /** Once ended: the cash the guest handed over in all; null: not on record. */
   cash_received?: number | null;
   /** Once ended: the change given back, worked out by the SERVER; null: no cash on record. */

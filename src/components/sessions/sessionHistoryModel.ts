@@ -144,6 +144,24 @@ export const paymentLabelOf = (
   return t(method === "cash" ? "session.payCash" : "session.payCard");
 };
 
+/**
+ * How a sum paid ahead was paid (2026-11-17), from the line's own
+ * `prepaid_payments` / `prepaid_method`: null for cash (every line before it,
+ * whose wording already says «наличными»), else "Карта", "Другое", or
+ * "Наличные 1 200, Карта 800" for a split.
+ */
+const prepaidMethodText = (meta: Record<string, unknown> | null, t: (k: string) => string, money: (n: number) => string): string | null => {
+  const method = metaStr(meta, "prepaid_method");
+  if (method === null || method === "cash") return null;
+  const name = (m: string) => t(m === "cash" ? "session.payCash" : m === "card" ? "session.payCard" : "pay.otherShort");
+  const parts = Array.isArray(meta?.prepaid_payments) ? (meta!.prepaid_payments as Array<{ method?: unknown; amount?: unknown; note?: unknown }>) : [];
+  if (method === "split" && parts.length > 1) {
+    return parts.map((p) => `${name(String(p.method))} ${money(Number(p.amount))}`).join(", ");
+  }
+  const note = parts[0] && typeof parts[0].note === "string" ? parts[0].note.trim() : "";
+  return method === "other" && note !== "" ? note : name(method);
+};
+
 /** One event on the timeline, with the seat it happened on. */
 export interface SeatStep {
   event: ISessionEvent;
@@ -302,7 +320,14 @@ export const eventDetailParts = (
       }
       // Paid ahead with the «Оплачено вперёд» switch (by amount: the sum above IS it).
       const prepaid = metaPositive(meta, "prepaid_amount");
-      if (prepaid !== null && !byAmount) parts.push(fmt(t("history.prepaidAhead"), money(prepaid)));
+      if (prepaid !== null && !byAmount) {
+        const how = prepaidMethodText(meta, t, money);
+        parts.push(how === null ? fmt(t("history.prepaidAhead"), money(prepaid)) : fmt(t("history.prepaidAheadBy"), money(prepaid), how));
+      } else if (prepaid !== null && byAmount) {
+        // «На сумму» by card etc. (2026-11-17): the sum above IS it; say how.
+        const how = prepaidMethodText(meta, t, money);
+        if (how !== null) parts.push(how);
+      }
       break;
     }
 
@@ -320,7 +345,10 @@ export const eventDetailParts = (
       }
       // Paid at the counter with the grant, on a seat paid ahead (2026-11-15).
       const prepaidNow = metaTrue(meta, "prepaid") ? metaNum(meta, "prepaid_amount") : null;
-      if (prepaidNow !== null) parts.push(fmt(t("history.prepaidWithTime"), money(prepaidNow)));
+      if (prepaidNow !== null) {
+        const how = prepaidMethodText(meta, t, money);
+        parts.push(how === null ? fmt(t("history.prepaidWithTime"), money(prepaidNow)) : fmt(t("history.prepaidWithTimeBy"), money(prepaidNow), how));
+      }
       break;
     }
 
@@ -415,6 +443,18 @@ export const eventDetailParts = (
       if (remindAt !== null) parts.push(fmt(t("history.reminderWas"), formatTime(new Date(remindAt))));
       if (meta !== null && typeof meta.fired === "boolean") {
         parts.push(t(meta.fired ? "history.reminderAfterRing" : "history.reminderBeforeRing"));
+      }
+      break;
+    }
+    case "rate_changed": {
+      // «Свои продукты» as a rate (2026-11-17): the price per hour before → after.
+      const oldRate = metaNum(meta, "old_rate");
+      const newRate = metaNum(meta, "new_rate");
+      if (metaStr(meta, "reason") === "outside_food") {
+        parts.push(t(meta?.on === false ? "history.foodRateOff" : "history.foodRateOn"));
+      }
+      if (oldRate !== null && newRate !== null) {
+        parts.push(`${money(oldRate)} -> ${money(newRate)} / ${t("time.hourShort")}`);
       }
       break;
     }
@@ -609,6 +649,7 @@ const ACTION_LOOK: Record<string, { tone: EventTone; icon: string }> = {
   reminder_set: { tone: "neutral", icon: "🔔" },
   reminder_cleared: { tone: "neutral", icon: "🔕" },
   reminder_fired: { tone: "auto", icon: "🔔" },
+  rate_changed: { tone: "neutral", icon: "֏" },
 };
 
 /** Written by the server with no person behind it: «Automatically», never a blank. */

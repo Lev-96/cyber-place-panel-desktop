@@ -74,6 +74,8 @@ export interface IBillingSettings {
    */
   outside_food_fee_standard?: number | null;
   outside_food_fee_vip?: number | null;
+  /** How own food is charged (2026-11-17): a fixed line, or the seat's hourly rate while on. Absent = fixed. */
+  outside_food_mode?: OutsideFoodMode;
   /** 0 = round nothing. The default every branch is on. */
   money_rounding_step: number;
   money_rounding_mode: MoneyRoundingMode;
@@ -326,6 +328,8 @@ export interface IBillingPolicy {
    */
   outside_food_fee_standard?: number | null;
   outside_food_fee_vip?: number | null;
+  /** How own food is charged (2026-11-17): a fixed line, or the seat's hourly rate while on. Absent = fixed. */
+  outside_food_mode?: OutsideFoodMode;
   /**
    * Per-place own-food figures (2026-11-14), written to `places.outside_food_fee`
    * in the same transaction as the tiers. ONLY the rows that changed; absent
@@ -351,3 +355,6 @@ export const apiUpdateBillingSettings = (branchId: number, policy: IBillingPolic
     // policy, so a form that sends only its own half would blank the other's.
     body: { ...policy },
   });
+
+/** «Свои продукты»: one fixed line (`fixed`, the default) or the seat's hourly rate while on (`tariff`). */
+export type OutsideFoodMode = "fixed" | "tariff";

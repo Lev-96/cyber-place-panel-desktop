@@ -1673,3 +1673,63 @@ describe("paid ahead by card, cash, split or other", () => {
     expect(body()).toEqual({ branch_id: 7, pc_id: 1, user_display_name: "PS5 VIP", paid_amount: 5000, paid_seconds: 18000, payment_method: "card" });
   });
 });
+
+/**
+ * «Свои продукты» as the seat's rate at the start (2026-11-17): the figure is
+ * the price per hour while on — the plan is quoted at it, no line, and no
+ * package, rate or total typed beside it.
+ */
+describe("own food as the seat's rate", () => {
+  const settle = async () => { await act(async () => { await new Promise((r) => setTimeout(r, 320)); }); };
+  const startButton = () => screen.getByRole("button", { name: "action.start" }) as HTMLButtonElement;
+  beforeEach(() => {
+    repo.startOptions.mockResolvedValue({ free_until: null, max_minutes: null, unlimited_allowed: true, next_booking: null, claimable_bookings: [], outside_food_fee: 4000, outside_food_mode: "tariff" });
+  });
+
+  test("on: the hint says the price per hour, the plan is quoted at it, no hand price is offered or sent", async () => {
+    await mount(device());
+    await settle();
+    await act(async () => { fireEvent.click(screen.getByTestId("outside-food-switch")); });
+    expect(screen.getByTestId("outside-food-hint").textContent).toContain("4000");
+    expect(screen.queryByText("session.editPrice")).toBeNull();
+    await act(async () => { fireEvent.change(screen.getByTestId("planned-duration-input-hours"), { target: { value: "2" } }); });
+    await settle();
+    expect(repo.startQuote).toHaveBeenLastCalledWith(1, { minutes: 120 }, undefined, undefined, true);
+    await act(async () => { fireEvent.click(startButton()); });
+    expect(repo.start.mock.calls[0][0]).toMatchObject({ duration_minutes: 120, outside_food: true, outside_food_fee: 4000 });
+    expect(repo.start.mock.calls[0][0]).not.toHaveProperty("hourly_rate");
+    expect(repo.start.mock.calls[0][0]).not.toHaveProperty("planned_amount");
+  });
+
+  test("a hand price set before own food is switched on is not sent: the own-food rate prices the seat", async () => {
+    await mount(device());
+    await settle();
+    await act(async () => { fireEvent.click(screen.getByText("session.editPrice")); });
+    await act(async () => {
+      const box = screen.getByText("session.newHourlyRate").parentElement!.querySelector("input")!;
+      fireEvent.change(box, { target: { value: "2000" } });
+    });
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "action.save" })); });
+    await act(async () => { fireEvent.click(screen.getByTestId("outside-food-switch")); });
+    // The hint says it is a price PER HOUR.
+    expect(screen.getByTestId("outside-food-hint").textContent).toContain("session.perHourShort");
+    expect(screen.getByTestId("outside-food-hint").textContent).toContain("session.outsideFood.rateHint");
+    await act(async () => { fireEvent.click(startButton()); });
+    expect(repo.start.mock.calls[0][0]).toMatchObject({ mode: "open", outside_food: true, outside_food_fee: 4000 });
+    expect(repo.start.mock.calls[0][0]).not.toHaveProperty("hourly_rate");
+  });
+
+  test("off: the quote is the call it always was", async () => {
+    await mount(device());
+    await settle();
+    await act(async () => { fireEvent.change(screen.getByTestId("planned-duration-input-hours"), { target: { value: "2" } }); });
+    await settle();
+    expect(repo.startQuote).toHaveBeenLastCalledWith(1, { minutes: 120 }, undefined, undefined);
+  });
+
+  test("a package: the switch is not offered (the rate cannot price a package)", async () => {
+    await mount(device({ kind: PC_KIND.Pc }));
+    await settle();
+    expect(screen.queryByTestId("outside-food-switch")).toBeNull();
+  });
+});

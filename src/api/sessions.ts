@@ -141,6 +141,11 @@ export interface IStartOptions {
    * Optional: an older backend sends nothing, which reads as null.
    */
   outside_food_fee?: number | null;
+  /**
+   * How that fee is charged (2026-11-17): `tariff` — switched on, it IS the
+   * seat's hourly rate; `fixed` (or absent, an older backend) — one line.
+   */
+  outside_food_mode?: "fixed" | "tariff";
 }
 
 export const apiStartOptions = (pcId: number, bookingId?: number) =>
@@ -802,13 +807,15 @@ export const apiSessionTimeQuote = (sessionId: number, minutes: number, charge?:
   );
 
 /** ⚠️ ADVICE: `apiStartSession` is what creates the session. Writes nothing. */
-export const apiStartQuote = (pcId: number, length: PlannedLength, hourlyRate?: number, plannedAmount?: number) =>
+export const apiStartQuote = (pcId: number, length: PlannedLength, hourlyRate?: number, plannedAmount?: number, outsideFoodRate?: boolean) =>
   request<IStartQuote>(
     `/sessions/start-quote?pc_id=${pcId}`
       + ("until" in length ? `&until=${encodeURIComponent(length.until)}` : `&minutes=${length.minutes}`)
       + (plannedAmount !== undefined
         ? `&planned_amount=${plannedAmount}`
-        : hourlyRate !== undefined ? `&hourly_rate=${hourlyRate}` : ""),
+        : hourlyRate !== undefined ? `&hourly_rate=${hourlyRate}` : "")
+      // Own food as the seat's rate (2026-11-17): the plan is priced at it.
+      + (outsideFoodRate ? "&outside_food=1" : ""),
   );
 
 /** ⚠️ ADVICE: what a sum buys here (2026-11-15). The start re-checks it and refuses a moved figure. */
@@ -973,7 +980,10 @@ export type SessionActionName =
   // previous_*), cleared (meta.fired), rung by the system (no user; meta.notified).
   | "reminder_set"
   | "reminder_cleared"
-  | "reminder_fired";
+  | "reminder_fired"
+  // The seat's hourly rate changed in place (2026-11-17): «Свои продукты» as a
+  // rate on / re-priced / off (meta: reason, on, old_rate, new_rate).
+  | "rate_changed";
 
 export interface ISessionEvent {
   id: number;
@@ -1027,3 +1037,13 @@ export const apiListPcs = (branchId: number) =>
 
 export const apiListPackages = (branchId: number) =>
   request<{ data: ITimePackage[] }>("/time-packages", { params: { branch_id: branchId } });
+
+/**
+ * «Свои продукты» as the seat's hourly rate during the game (2026-11-17): on
+ * (the venue's fee, or `rate`), or off back to the seat's own rate. From now.
+ */
+export const apiSetOutsideFoodRate = (sessionId: number, on: boolean, rate?: number) =>
+  request<{ session: ISessionApi }>(`/sessions/${sessionId}/outside-food`, {
+    method: "POST",
+    body: on && rate !== undefined ? { on, rate } : { on },
+  });

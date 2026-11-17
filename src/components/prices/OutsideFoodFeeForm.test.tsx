@@ -101,3 +101,37 @@ describe("the own-food fee", () => {
     expect(screen.getAllByText("outsideFood.notCharged")).toHaveLength(2);
   });
 });
+
+/**
+ * How own food is charged (2026-11-17, owner): a fixed line (every venue
+ * today) or «Изменение тарифа» — the seat's price per hour while it is on.
+ */
+describe("how own food is charged", () => {
+  const radio = (label: string) => screen.getByLabelText(label) as HTMLInputElement;
+
+  test("a venue that never chose opens on the fixed price, and a Save of the figures sends no mode", async () => {
+    await mount(settings());
+    expect(radio("joystickPrice.strategy.fixed").checked).toBe(true);
+    expect(screen.getByTestId("outside-food-mode-note").textContent).toBe("outsideFood.modeFixedNote");
+    await type(standard(), "1500");
+    await act(async () => { save().click(); });
+    expect(sent()).not.toHaveProperty("outside_food_mode");
+  });
+
+  test("«Изменение тарифа» chosen: saved as tariff, the note says the figure is the price per hour", async () => {
+    await mount(settings({ outside_food_fee_standard: 1500 }));
+    await act(async () => { fireEvent.click(radio("joystickPrice.strategy.hourly")); });
+    expect(screen.getByTestId("outside-food-mode-note").textContent).toBe("outsideFood.modeTariffNote");
+    expect(save().disabled).toBe(false);
+    await act(async () => { save().click(); });
+    expect(sent()).toMatchObject({ outside_food_mode: "tariff", outside_food_fee_standard: 1500 });
+  });
+
+  test("a venue on the rate opens on it, and can go back to the fixed price", async () => {
+    await mount(settings({ outside_food_mode: "tariff" }));
+    expect(radio("joystickPrice.strategy.hourly").checked).toBe(true);
+    await act(async () => { fireEvent.click(radio("joystickPrice.strategy.fixed")); });
+    await act(async () => { save().click(); });
+    expect(sent()).toMatchObject({ outside_food_mode: "fixed" });
+  });
+});

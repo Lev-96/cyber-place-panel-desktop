@@ -32,6 +32,7 @@ import ChoiceCards from "@/components/ui/ChoiceCards";
 import DurationInput from "./DurationInput";
 import UnpaidToggle from "./UnpaidToggle";
 import ReminderSection from "./ReminderSection";
+import OutsideFoodRateSection from "./OutsideFoodRateSection";
 import QuotedPrice from "./QuotedPrice";
 import { EMPTY_DRAFT, draftMinutes, type DurationDraft } from "./durationModel";
 import { quoteFor, useServerQuote } from "./useServerQuote";
@@ -1002,6 +1003,7 @@ const SessionOptionsDialog = ({ session, platform, onClose, onChanged, platformN
 
         {/* The reminder a player asked for (2026-11-15): a running seat,
             paused or not, timed or unlimited. */}
+        {isActive && <OutsideFoodRateSection session={current} disabled={busy} run={run} t={t} money={money} />}
         {isActive && <ReminderSection session={current} disabled={busy} run={run} t={t} />}
 
         {/* Waiving the bill lives on START SESSION, where the decision is

@@ -176,7 +176,13 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted, bookingId }: Pro
     setIsFree(next);
     if (next) setOutsideFood(false);
   };
-  const outsideFoodOn = outsideFood && !isFree && outsideFoodFee !== null;
+  // «Изменение тарифа» (2026-11-17, owner): on a venue that charges own food
+  // AS A RATE the figure is the seat's price per hour while it is on (4 000/h
+  // on a 2 500/h VIP seat) — no line, and no package, rate or total typed by
+  // hand beside it: the server refuses those, so they are not offered.
+  const foodAsRate = options?.outside_food_mode === "tariff";
+  const outsideFoodOn = outsideFood && !isFree && outsideFoodFee !== null && !(foodAsRate && mode === "fixed");
+  const foodRateOn = outsideFoodOn && foodAsRate;
   const outsideFoodField = outsideFoodOn ? { outside_food: true as const, outside_food_fee: outsideFoodFee } : {};
   // The optional planned length (2026-10-25), in a time-style hours : minutes
   // field (2026-11-05), empty = none.
@@ -289,7 +295,7 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted, bookingId }: Pro
   const customRateNum = Number(customRate);
   const customRateValid = editPrice && Number.isFinite(customRateNum) && customRateNum > 0;
   const overrideApplied = customRateValid && rateSaved;
-  const effectiveRate = overrideApplied ? customRateNum : assignedRate;
+  const effectiveRate = foodRateOn ? outsideFoodFee : overrideApplied ? customRateNum : assignedRate;
 
   // Prefill the override input with the current rate the moment it's enabled,
   // so the operator edits "the current price" rather than a blank field.
@@ -305,18 +311,20 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted, bookingId }: Pro
   // minute, so the minutes and the price on screen are never an old answer.
   const minute = useMinuteTick(limit === "until");
   const planApplies = !isFree && mode === "open";
-  const typedRate = overrideApplied ? customRateNum : undefined;
+  const typedRate = overrideApplied && !foodRateOn ? customRateNum : undefined;
   const totalNum = Number(totalInput);
   const totalValid = Number.isFinite(totalNum) && totalNum > 0;
   // A total set by hand is sent INSTEAD of a rate: the seat runs at the rate
   // it implies, and the server keeps the total exactly.
-  const typedTotal = editTotal && totalValid ? totalNum : undefined;
+  const typedTotal = editTotal && totalValid && !foodRateOn ? totalNum : undefined;
   const planQuote = useServerQuote<IStartQuote, number | string>(
     planApplies && (!editTotal || totalValid) ? planInput : null,
     (input) => sessionRepository.startQuote(
       pc.id, typeof input === "number" ? { minutes: input } : { until: input }, typedRate, typedTotal,
+      // Own food as the rate (2026-11-17) only when on: every other quote is the call it always was.
+      ...(foodRateOn ? [true] as const : []),
     ),
-    `${pc.id}|${typedRate ?? ""}|${typedTotal ?? ""}`,
+    `${pc.id}|${typedRate ?? ""}|${typedTotal ?? ""}|${foodRateOn ? "food" : ""}`,
     limit === "until" ? minute : 0,
   );
   const quotedPlan = quoteFor(planQuote, planInput);
@@ -355,8 +363,9 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted, bookingId }: Pro
   const paysAhead = !isFree && ((mode === "amount" && amountValue !== null) || (prepaid && prepaidApplies));
   const prepaidSum: number | null = !paysAhead ? null
     : mode === "amount" ? amountValue
-    : mode === "fixed" ? (selectedPackagePrice !== null ? selectedPackagePrice + (outsideFoodOn ? outsideFoodFee ?? 0 : 0) : null)
-    : quotedPlan !== null ? quotedPlan.amount + (outsideFoodOn ? outsideFoodFee ?? 0 : 0) : null;
+    : mode === "fixed" ? (selectedPackagePrice !== null ? selectedPackagePrice + (outsideFoodOn && !foodRateOn ? outsideFoodFee ?? 0 : 0) : null)
+    // As a rate the fee IS the plan's price per hour — nothing added on top.
+    : quotedPlan !== null ? quotedPlan.amount + (outsideFoodOn && !foodRateOn ? outsideFoodFee ?? 0 : 0) : null;
   const prepaidCents = prepaidSum === null ? 0 : Math.round(prepaidSum * 100);
   const prepaidCheck = checkPayment(prepaidCents, prepaidPay);
   const prepaidPayField = paysAhead ? prepaidPaymentFields(prepaidPay, prepaidCheck) : {};
@@ -454,7 +463,7 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted, bookingId }: Pro
           pc_id: pc.id,
           mode: "open",
           user_display_name: pc.label,
-          ...(overrideApplied && !planByHand ? { hourly_rate: customRateNum } : {}),
+          ...(overrideApplied && !planByHand && !foodRateOn ? { hourly_rate: customRateNum } : {}),
           ...(planMinutes !== null ? { duration_minutes: planMinutes } : {}),
           ...(planUntil !== null ? { until: planUntil } : {}),
           ...(planByHand ? { planned_amount: typedTotal } : {}),
@@ -513,7 +522,7 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted, bookingId }: Pro
   const startDisabled =
     busy || deviceOffline || !psnValid
     // A total set by hand prices the seat itself, so no seat rate is needed.
-    || (!isFree && mode === "open" && !planByHand && (editPrice ? !overrideApplied : assignedRate === null))
+    || (!isFree && mode === "open" && !planByHand && !foodRateOn && (editPrice ? !overrideApplied : assignedRate === null))
     // A plan is started only on the server's own figure for it.
     || (planApplies && (planInvalid || (planInput !== null && !planPriced)))
     || (planApplies && planInput !== null && editTotal && !totalValid)
@@ -602,7 +611,7 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted, bookingId }: Pro
                   {unpaid && <span className="muted start-dialog__switch-hint">{t("session.unpaid.startHint")}</span>}
                 </div>
                 )}
-                {outsideFoodFee !== null && (
+                {outsideFoodFee !== null && !(foodAsRate && mode === "fixed") && (
                   <div className="start-dialog__switch" data-testid="start-outside-food">
                     <UnpaidToggle
                       on={outsideFood}
@@ -615,7 +624,7 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted, bookingId }: Pro
                     />
                     {outsideFood && (
                       <span className="muted start-dialog__switch-hint" data-testid="outside-food-hint">
-                        <FeeSentence template={t("session.outsideFood.startHint")} amount={money(outsideFoodFee)} />
+                        <FeeSentence template={t(foodAsRate ? "session.outsideFood.rateHint" : "session.outsideFood.startHint")} amount={`${money(outsideFoodFee)}${foodAsRate ? t("session.perHourShort") : ""}`} />
                       </span>
                     )}
                   </div>
@@ -713,10 +722,10 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted, bookingId }: Pro
                   rateLabel={t("session.hourlyRate")}
                   money={money}
                 />
-                {isShown("rate") && (
+                {isShown("rate") && !foodRateOn && (
                 <Checkbox checked={editPrice} onChange={toggleEditPrice} label={t("session.editPrice")} />
                 )}
-                {isShown("rate") && editPrice && (
+                {isShown("rate") && editPrice && !foodRateOn && (
                   <div className="col" style={{ gap: 6 }}>
                     <div className="row" style={{ gap: 8, alignItems: "flex-end" }}>
                       <div style={{ flex: 1 }}>
@@ -800,7 +809,7 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted, bookingId }: Pro
                       {/* The total, editable (2026-10-25): a price agreed at
                           the counter for this length. Kept exactly by the
                           server; the full time bills exactly this. */}
-                      {isShown("total") && (
+                      {isShown("total") && !foodRateOn && (
                       <Checkbox
                         checked={editTotal}
                         onChange={(next) => {
@@ -892,7 +901,8 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted, bookingId }: Pro
                     ? fmt(t("session.summary.price"), money(quotedPlan.amount))
                     : null,
                   // On top of the time (2026-11-13): a plan's price is time only.
-                  outsideFoodOn ? fmt(t("session.outsideFood.summary"), money(outsideFoodFee)) : null,
+                  outsideFoodOn && !foodRateOn ? fmt(t("session.outsideFood.summary"), money(outsideFoodFee)) : null,
+                  foodRateOn ? t("session.outsideFood.rateSummary") : null,
                 ].filter(Boolean).join(" · ")}
               </strong>
             </div>
