@@ -5050,3 +5050,76 @@ a sale. Every figure on screen is the server's.
   window, identically with and without «Остатки» (measured 2026-11-16).
 - ⚠️ **Owner web**: bump `panel.ref` with this change. Deploy the backend first
   (an older backend ignores `stock` on create and answers 404 for `/stock`).
+
+## Agent updates per branch (2026-11-17, owner)
+
+Backend contract: `GET /agent-updates/status` and `POST /agent-updates/promote`
+(backend `CLAUDE.md` §7, "Agent updates per branch and per computer"). Types
+in `src/api/agent-updates.ts`.
+
+- **The server owns every figure.** Per branch: `agent_relevant` (a computer
+  whose Agent connected recently), `agent: {pc_count, pending_pc_count,
+  pending}` or null, and `pending_branch_count` overall. Nothing here counts,
+  compares versions or decides "pending": the old context worked out
+  `has_update` from `applied_version`, a per-PERSON record, so a manager who
+  joined after the owner applied was told to apply again.
+- **`UpdatesNotificationContext`**: owner / manager keep the answer as sent in
+  `agentRollout` (`agent` is now admin-only, like `panel`). `reload()` is
+  exposed for the screen. Fixed on the way: the `visibilitychange` listener was
+  an anonymous arrow nothing removed (one more per role change / remount), and
+  the role channel's cleanup called `stopListening` without the handler and
+  then `leaveChannel` (realtime rule 9): both named and removed now; the channel
+  is never left. **Identity**: an account switch keeps this provider mounted
+  and the answer names branches by address, so the state is cleared when
+  `user.id` changes, the status is asked again at once (the poll effect keys on
+  `userId` too), and an answer the previous account asked for that lands later
+  is dropped (`identityRef`). Before, a switch between two accounts of the same
+  role kept the previous answer up to 60 s.
+- **Badges, one function**: `src/realtime/updateBadges.ts` `updateBadgeCounts()`
+  — admin `updates` = one per app with a release to promote (unchanged),
+  owner/manager `agentUpdates` = `pending_branch_count` as sent (0 when absent,
+  an older backend). The Sidebar and the owner web's bottom bar
+  (`src/web/appShell/sideMenu.ts` there) both call it. The nav id stays
+  `nav.agentUpdates`.
+- **«Обновления агента»** (`routes/AgentUpdates.tsx`,
+  `components/agentUpdates/AgentBranchCard.tsx`): `useAsync` + the screen-state
+  system (§7.7). One card per branch the server marks `agent_relevant`:
+  address, «Одобрено администратором» + version, «Нужно обновить компьютеров:
+  N из M» (label form, so the noun never agrees with a number; Armenian
+  «Պետք է թարմացնել N համակարգիչ՝ M-ից») or «Все компьютеры получили
+  обновление.», and «Применить в этом филиале» only while the server says
+  `pending` (a blocked branch shows its count, no button). The apply sends
+  `{branch_id}`; this build never applies without one. After a successful
+  apply the card re-reads AND calls the context's `reload()`, so the badge
+  clears at once instead of on the next 60 s tick. A branch without a
+  connected computer shows nothing about the Agent; with none at all the
+  screen shows its empty state («Нет подключённых компьютеров») and no Agent
+  block. A refusal stays on that card: a block by its code
+  (`blockingKeyOf`), no connection as such, else the server's sentence.
+  Styles `.agent-branches` / `.agent-branch-card*` (320px cards, the column's
+  width at 520px).
+- **`UpdatesToast`**: owner / manager are told WHERE («Обновление агента ждёт
+  применения: Abovyan 1, …», the branches the server marks pending). Closing is
+  remembered per PERSON, per version and per branch:
+  `u{id}:cp.update-toast-dismissed-{app}-{version}[-b{branchId}]`
+  (`updateToastDismissKey`). The device-wide key of older builds
+  (`cp.update-toast-dismissed-{app}-{version}`) is still READ, never written:
+  a version closed before the update stays closed. A branch that becomes
+  pending later is announced on its own.
+- **Tests**: `UpdatesNotificationContext.test.tsx` (8), `Sidebar.updatesBadge.test.tsx`
+  (4), `AgentUpdates.test.tsx` (7), `UpdatesToast.test.tsx` (8); e2e
+  `updates-agent-branches.spec.ts` (12: en/ru/am × 1280/520 — badge, toast and
+  its per-person key, the card, B absent, apply body, badge gone well inside the
+  poll, the empty state, no sideways scroll). Screenshots:
+  `~/cyber-place-local/reports/updates-private-repos-2026-11-17/panel/`.
+  Mutation-checked: badge recomputed (from `branches[]`, from `has_update`),
+  no context reload after apply, a card for a non-relevant branch, the
+  visibility listener leaking, `stopListening` without handler + `leaveChannel`,
+  toast keys without the user, toast naming non-pending branches, the state not
+  cleared on an account switch, a late answer of the previous account kept,
+  no immediate re-read after a switch.
+- ⚠️ **Deploy order**: backend first. Against an older backend (no `branches`,
+  no `pending_branch_count`) this build shows no agent badge and the empty
+  state; panels 1.0.62/1.0.63 keep working on the new backend through its
+  legacy fields. **Owner web**: bump `panel.ref` with this change
+  (`sideMenu.ts` there imports `@/realtime/updateBadges`).
