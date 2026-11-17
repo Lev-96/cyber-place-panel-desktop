@@ -97,5 +97,5 @@ test("owner can navigate to revenue page (regression: was redirected to /)", asy
 
   // Direct nav to /revenue — owner must NOT be redirected away.
   await page.goto("/#/revenue");
-  await expect(page.getByRole("heading", { name: /Revenue & commission/i })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Income & Cyber Place fee/i })).toBeVisible();
 });

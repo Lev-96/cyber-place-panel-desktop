@@ -122,7 +122,7 @@ test("the owner's menu wording in Russian, as asked", () => {
   lang.current = "ru";
   mount("company_owner");
   expect(menuNames().slice(0, 11)).toEqual([
-    "Панель", "Моя компания", "Мои филиалы", "Мои менеджеры", "Выручка", "Смены",
+    "Панель", "Моя компания", "Мои филиалы", "Мои менеджеры", "Доход и оплата Cyber Place", "Смены",
     "Филиалы на карте", "Сканировать код", "Бронирования", "Турниры филиалов", "Уведомления",
   ]);
 });
@@ -158,7 +158,7 @@ test("switching the language keeps the owner's order", () => {
   }
 });
 
-test("Russian admin menu: Безопасность, then Бронирования, then Выручка, under the pinned Панель", () => {
+test("Russian admin menu: Безопасность, then Бронирования, then Доход и оплата Cyber Place, under the pinned Панель", () => {
   lang.current = "ru";
   mount("admin");
   const names = menuNames();
@@ -166,7 +166,7 @@ test("Russian admin menu: Безопасность, then Бронировани�
   const at = (name: string) => names.indexOf(name);
   expect(at("Безопасность")).toBeGreaterThan(0);
   expect(at("Безопасность")).toBeLessThan(at("Бронирования"));
-  expect(at("Бронирования")).toBeLessThan(at("Выручка"));
+  expect(at("Бронирования")).toBeLessThan(at("Доход и оплата Cyber Place"));
 });
 
 test("the role decides the entries, the pin does not: same set as the role's permissions", () => {

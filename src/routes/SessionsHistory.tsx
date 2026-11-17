@@ -1,4 +1,6 @@
 import ScreenWithBg from "@/components/ui/ScreenWithBg";
+import DateField from "@/components/ui/DateField";
+import SalesSummaryPanel from "@/components/sales/SalesSummaryPanel";
 import { ListSkeleton } from "@/components/ui/Skeleton";
 import { ErrorState, StaleNotice, StateSwitch, StateView, deriveViewState } from "@/components/ui/state";
 import { useAsync } from "@/hooks/useAsync";
@@ -166,11 +168,11 @@ const SessionsHistory = () => {
           <div className="row" style={{ gap: 12, alignItems: "flex-end", flexWrap: "wrap" }}>
             <div className="col" style={{ gap: 4 }}>
               <span className="label">{t("history.from")}</span>
-              <input type="date" value={from} max={to} onChange={(e) => setFrom(e.target.value)} className="input" />
+              <DateField value={from} max={to} onChange={setFrom} ariaLabel={t("history.from")} testId="history-from" />
             </div>
             <div className="col" style={{ gap: 4 }}>
               <span className="label">{t("history.to")}</span>
-              <input type="date" value={to} min={from} onChange={(e) => setTo(e.target.value)} className="input" />
+              <DateField value={to} min={from} onChange={setTo} ariaLabel={t("history.to")} testId="history-to" />
             </div>
             {/* Whose actions. A native select: keyboard, screen reader and
                 Escape behave as everywhere else in the panel. «All» is the
@@ -228,10 +230,17 @@ const SessionsHistory = () => {
               </button>
             </div>
             <div style={{ marginLeft: "auto" }}>
-              <Link to={`/branches/${id}/sessions`} className="muted">{t("history.backToBoard")}</Link>
+              <Link to={`/branches/${id}/sessions`} className="btn secondary" data-testid="history-back-to-board">{t("history.backToBoard")}</Link>
             </div>
           </div>
 
+          {placeId === null ? (
+            // The branch's figures, from the server (2026-11-18): the same
+            // code as the cash drawer, over the working day.
+            <div style={{ marginTop: 12 }}>
+              <SalesSummaryPanel branchId={id} from={from} to={to} refreshKey={salesRefresh} />
+            </div>
+          ) : (
           <div className="stat-grid" style={{ marginTop: 12 }}>
             <Tile k={t("history.sumSessions")} v={`${summary.stopped}${summary.active > 0 ? ` (+${summary.active})` : ""}`} />
             <Tile k={t("history.sumTotal")} v={money(summary.total)} />
@@ -242,6 +251,8 @@ const SessionsHistory = () => {
                 beside the takings rather than folded into them. */}
             {summary.free > 0 && <Tile k={t("history.sumFree")} v={String(summary.free)} />}
           </div>
+
+          )}
 
           {summary.topItems.length > 0 && (
             <div style={{ marginTop: 10 }}>

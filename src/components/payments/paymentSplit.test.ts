@@ -1,8 +1,11 @@
 import { describe, expect, test } from "vitest";
 import { checkPayment, emptyPaymentDraft, fillRemaining, paymentBody } from "./paymentSplit";
 
-const split = (amounts: Partial<Record<"cash" | "card" | "other", string>>, note = "картой и наличными") => ({
+// An `other` part is typed only after «+ Свой вариант» (2026-11-18): the
+// helper presses it whenever one is given.
+const split = (amounts: Partial<Record<"cash" | "card" | "other", string>>, note = "картой и наличными", label = "") => ({
   ...emptyPaymentDraft(), split: true, note, amounts: { cash: "", card: "", other: "", ...amounts },
+  own: { shown: amounts.other !== undefined, label },
 });
 
 describe("how a bill was paid", () => {
@@ -73,5 +76,31 @@ describe("how a bill was paid", () => {
   test("«the rest here» fills what is still due, never below zero", () => {
     expect(fillRemaining(500000, split({ card: "3000" }), "cash").amounts.cash).toBe("2000.00");
     expect(fillRemaining(500000, split({ card: "6000" }), "cash").amounts.cash).toBe("");
+  });
+});
+
+describe("«Свой вариант» in a split (2026-11-18, owner)", () => {
+  test("hidden until pressed: an amount left in the hidden row is never sent", () => {
+    const d = { ...split({ cash: "5000" }), amounts: { cash: "5000", card: "", other: "999" }, own: { shown: false, label: "" } };
+    expect(checkPayment(500000, d)).toMatchObject({ ok: true, lines: [{ method: "cash", amount: 5000 }] });
+  });
+
+  test("named: cash 2000 + «Hovo Card» 3000 sends the name on that part only", () => {
+    const d = split({ cash: "2000", other: "3000" }, "", "  Hovo Card ");
+    const c = checkPayment(500000, d);
+    expect(c.ok).toBe(true);
+    expect(paymentBody(d, c)).toEqual({ payments: [{ method: "cash", amount: 2000 }, { method: "other", amount: 3000, label: "Hovo Card" }] });
+  });
+
+  test("alone, the name goes as the «Другое» text; a name is cut to 64", () => {
+    const d = split({ other: "5000" }, "", "Idram");
+    expect(paymentBody(d, checkPayment(500000, d))).toEqual({ payment_method: "other", payment_method_other: "Idram" });
+    const long = split({ cash: "1", other: "4999" }, "", "x".repeat(80));
+    expect(checkPayment(500000, long).lines[1].label).toBe("x".repeat(64));
+  });
+
+  test("«Остаток сюда» ignores the hidden row", () => {
+    const d = { ...split({ cash: "" }), amounts: { cash: "", card: "", other: "4000" }, own: { shown: false, label: "" } };
+    expect(fillRemaining(500000, d, "cash").amounts.cash).toBe("5000.00");
   });
 });

@@ -68,4 +68,25 @@ describe("PaymentEditor", () => {
     await act(async () => { fireEvent.change(boxes[1], { target: { value: "500" } }); });
     expect(screen.getByTestId("pay-remaining").textContent).toBe("pay.tooMuch 300");
   });
+
+  test("«Другое» is not a split row; «+ Свой вариант» adds a named one, × takes it away (2026-11-18)", async () => {
+    render(<Host due={500000} />);
+    await act(async () => { fireEvent.click(screen.getByTestId("pay-split")); });
+    expect(screen.queryByTestId("pay-own-row")).toBeNull();
+    expect(screen.queryByTestId("pay-rest-other")).toBeNull();
+
+    await act(async () => { fireEvent.click(screen.getByTestId("pay-own-add")); });
+    expect(screen.getByTestId("pay-own-row")).toBeTruthy();
+    expect(screen.queryByTestId("pay-own-add")).toBeNull();
+    await act(async () => { fireEvent.change(screen.getByTestId("pay-own-name"), { target: { value: "Hovo Card" } }); });
+    await act(async () => { fireEvent.click(screen.getByTestId("pay-rest-other")); });
+    expect(last.own).toEqual({ shown: true, label: "Hovo Card" });
+    expect(checkPayment(500000, last).lines).toEqual([{ method: "other", amount: 5000, label: "Hovo Card" }]);
+
+    await act(async () => { fireEvent.click(screen.getByTestId("pay-own-remove")); });
+    expect(screen.queryByTestId("pay-own-row")).toBeNull();
+    expect(last.amounts.other).toBe("");
+    expect(last.own).toEqual({ shown: false, label: "" });
+  });
 });
+

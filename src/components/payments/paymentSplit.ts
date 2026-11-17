@@ -19,7 +19,12 @@ export interface PaymentLine {
   method: PaymentMethod;
   /** Money, 2 decimals, as the server takes it. */
   amount: number;
+  /** «Свой вариант» (2026-11-18): the name of the `other` part, when given. */
+  label?: string;
 }
+
+/** The longest name of a «Свой вариант» (the server's `PaymentMethod::LABEL_MAX`). */
+export const OWN_LABEL_MAX = 64;
 
 export interface PaymentDraft {
   split: boolean;
@@ -29,10 +34,15 @@ export interface PaymentDraft {
   note: string;
   /** Split: what was typed per method (empty = not this method). */
   amounts: Record<PaymentMethod, string>;
+  /**
+   * Split: «+ Свой вариант» pressed (2026-11-18, owner) — the `other` part is
+   * offered only then, under the name typed on its left (Idram, «Hovo Card»).
+   */
+  own?: { shown: boolean; label: string };
 }
 
 export const emptyPaymentDraft = (method: PaymentMethod = "cash"): PaymentDraft => ({
-  split: false, method, note: "", amounts: { cash: "", card: "", other: "" },
+  split: false, method, note: "", amounts: { cash: "", card: "", other: "" }, own: { shown: false, label: "" },
 });
 
 export type PaymentProblem =
@@ -73,19 +83,25 @@ export const checkPayment = (dueCents: number, d: PaymentDraft): PaymentCheck =>
   const lines: PaymentLine[] = [];
   let sum = 0;
   for (const method of SPLIT_METHODS) {
+    // The `other` part exists only once «+ Свой вариант» is pressed.
+    if (method === "other" && d.own !== undefined && !d.own.shown) continue;
     const raw = d.amounts[method].trim();
     if (raw === "") continue;
     const cents = partCents(raw);
     if (cents === null) return { ok: false, problem: "invalid", lines: [], remainingCents: dueCents - sum };
     if (cents === 0) continue;
     sum += cents;
-    lines.push({ method, amount: cents / 100 });
+    const label = method === "other" ? ownLabel(d) : "";
+    lines.push(label === "" ? { method, amount: cents / 100 } : { method, amount: cents / 100, label });
   }
   const remainingCents = dueCents - sum;
   const problem: PaymentProblem | null =
     lines.length === 0 ? "parts" : remainingCents !== 0 ? "sum" : null;
   return { ok: problem === null, problem, lines, remainingCents };
 };
+
+/** The «Свой вариант» name as sent: trimmed, at most {@link OWN_LABEL_MAX}. */
+const ownLabel = (d: PaymentDraft): string => (d.own?.shown ? d.own.label.trim().slice(0, OWN_LABEL_MAX) : "");
 
 /** One method, as every server has always taken it; the «Другое» text only when typed. */
 const singleBody = (method: PaymentMethod, text: string): { payment_method: PaymentMethod; payment_method_other?: string } => {
@@ -103,7 +119,9 @@ export const paymentBody = (d: PaymentDraft, check: PaymentCheck):
   | { payment_method: PaymentMethod; payment_method_other?: string }
   | { payments: PaymentLine[]; payment_note?: string } => {
   if (!d.split) return singleBody(d.method, d.note);
-  if (check.lines.length === 1) return singleBody(check.lines[0].method, d.note);
+  // One part left: as a single method; a lone «Свой вариант» sends its name
+  // as the «Другое» text, which the server keeps as the name.
+  if (check.lines.length === 1) return singleBody(check.lines[0].method, check.lines[0].label ?? d.note);
   const note = d.note.trim().slice(0, NOTE_MAX);
   return note === "" ? { payments: check.lines } : { payments: check.lines, payment_note: note };
 };
@@ -123,7 +141,8 @@ export const prepaidPaymentFields = (d: PaymentDraft, check: PaymentCheck):
 
 /** "Остаток сюда": the method's box filled with what is still due (never below 0). */
 export const fillRemaining = (dueCents: number, d: PaymentDraft, method: PaymentMethod): PaymentDraft => {
-  const others = SPLIT_METHODS.filter((m) => m !== method).reduce((sum, m) => sum + (partCents(d.amounts[m]) ?? 0), 0);
+  const others = SPLIT_METHODS.filter((m) => m !== method && !(m === "other" && d.own !== undefined && !d.own.shown))
+    .reduce((sum, m) => sum + (partCents(d.amounts[m]) ?? 0), 0);
   const rest = Math.max(0, dueCents - others);
   return { ...d, amounts: { ...d.amounts, [method]: rest === 0 ? "" : toAmount(rest) } };
 };

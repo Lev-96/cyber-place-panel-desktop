@@ -170,8 +170,10 @@ describe("Section names and punctuation", () => {
     expect(TRANSLATIONS["hub.tile.sessions"]).toEqual(section);
     // Since 2026-10-18 the counts and sums carry the same name (the owner's
     // decision): sales history, revenue and the notifications feed.
-    expect(TRANSLATIONS["history.sumSessions"]).toEqual(section);
-    expect(TRANSLATIONS["revenue.sourceSessions"]).toEqual(section);
+    // 2026-11-18 (owner): the history counts closed places in plain words.
+    expect(TRANSLATIONS["history.sumSessions"].ru).toBe("Закрытых мест");
+    // 2026-11-18 (owner): the revenue screen names the sum plainly instead.
+    expect(TRANSLATIONS["revenue.sourceSessions"].ru).toBe("Общая сумма активных мест");
     expect(TRANSLATIONS["notifications.sessionFeedTitle"]).toEqual(section);
   });
 

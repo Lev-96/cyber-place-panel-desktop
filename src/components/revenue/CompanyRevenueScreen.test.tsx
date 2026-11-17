@@ -84,7 +84,7 @@ beforeEach(() => {
 
 const renderScreen = async () => {
   render(<CompanyRevenueScreen companyId={1} companyName="Arena" initialPercent={7.5} />);
-  return screen.findByRole("region", { name: "Revenue for the month" });
+  return screen.findByRole("region", { name: "The month in figures" });
 };
 
 /** The value printed on the summary row labelled `label`. */
@@ -99,21 +99,21 @@ describe("CompanyRevenueScreen — the month's summary", () => {
     const card = await renderScreen();
 
     expect(api.summary).toHaveBeenCalledWith(1, expect.objectContaining({ from: expect.any(String), to: expect.any(String) }));
-    expect(rowValue(card, "Closed active places")).toBe("5");
-    expect(rowValue(card, "Active Places")).toBe("3768.24 AMD");
-    expect(rowValue(card, "POS orders")).toBe("350.55 AMD");
+    expect(rowValue(card, "Number of closed places")).toBe("5");
+    expect(rowValue(card, "Total of all places")).toBe("3768.24 AMD");
+    expect(rowValue(card, "Products sold without a place")).toBe("350.55 AMD");
     expect(rowValue(card, "Paid tournament entries")).toBe("3");
     expect(rowValue(card, "Tournament entry fees")).toBe("3500 AMD");
-    expect(rowValue(card, "Total revenue")).toBe("7618.79 AMD");
-    expect(rowValue(card, "Cyber Place commission")).toBe("7.5%");
-    expect(rowValue(card, "Owner income")).toBe("7000 AMD");
+    expect(rowValue(card, "All the club took this month")).toBe("7618.79 AMD");
+    expect(rowValue(card, "Cyber Place percent")).toBe("7.5%");
+    expect(rowValue(card, "Your income (after the Cyber Place fee)")).toBe("7000 AMD");
   });
 
   test("the amount owed is the commission on everything, tournaments included", async () => {
     api.summary.mockResolvedValue(CURRENT);
     const card = await renderScreen();
 
-    expect(rowValue(card, "You owe us this period")).toBe("571.41 AMD");
+    expect(rowValue(card, "Cyber Place fee for the month")).toBe("571.41 AMD");
     expect(highlight(card)).toBe("571.41 AMD");
   });
 
@@ -122,11 +122,11 @@ describe("CompanyRevenueScreen — the month's summary", () => {
     const card = await renderScreen();
 
     expect(highlight(card)).toBe("308.91 AMD");
-    expect(rowValue(card, "Total revenue")).toBe("4118.79 AMD");
+    expect(rowValue(card, "All the club took this month")).toBe("4118.79 AMD");
     expect(within(card).queryByText("Paid tournament entries")).toBeNull();
     expect(within(card).queryByText("Tournament entry fees")).toBeNull();
     // No owner income on a backend that does not send it — never derived here.
-    expect(within(card).queryByText("Owner income")).toBeNull();
+    expect(within(card).queryByText("Your income (after the Cyber Place fee)")).toBeNull();
     expect(screen.queryByRole("combobox")).toBeNull();
     expect(document.body.textContent).not.toMatch(/undefined|NaN/);
   });
@@ -156,8 +156,8 @@ const BRANCH_KOMITAS: IBranchRevenueSummary = {
 
 const TWO: ICompanyRevenueSummary = { ...CURRENT, branches: [BRANCH_ABOVYAN, BRANCH_EMPTY] };
 
-const COMPANY_TITLE = "Revenue for the month";
-const branchTitle = (label: string) => `Revenue for the month: ${label}`;
+const COMPANY_TITLE = "The month in figures";
+const branchTitle = (label: string) => `The month in figures: ${label}`;
 
 const picker = () => screen.getByRole("combobox", { name: "Branch" }) as HTMLSelectElement;
 const pick = async (value: string) => {
@@ -194,8 +194,8 @@ describe("CompanyRevenueScreen: the branch selector", () => {
     expect(optionLabels()).toEqual(["All branches", "Abovyan 1", "№2"]);
     // The company's card, exactly as without a selector.
     expect(highlight(card)).toBe("571.41 AMD");
-    expect(rowValue(card, "Total revenue")).toBe("7618.79 AMD");
-    expect(rowValue(card, "Owner income")).toBe("7000 AMD");
+    expect(rowValue(card, "All the club took this month")).toBe("7618.79 AMD");
+    expect(rowValue(card, "Your income (after the Cyber Place fee)")).toBe("7000 AMD");
   });
 
   test("picking a branch prints that branch's row as sent, in the same card, without a request", async () => {
@@ -206,18 +206,18 @@ describe("CompanyRevenueScreen: the branch selector", () => {
 
     expect(screen.queryByRole("region", { name: COMPANY_TITLE })).toBeNull();
     const card = screen.getByRole("region", { name: branchTitle("Abovyan 1") });
-    expect(rowValue(card, "Closed active places")).toBe("3");
-    expect(rowValue(card, "Active Places")).toBe("2734.81 AMD");
-    expect(rowValue(card, "POS orders")).toBe("250.5 AMD");
+    expect(rowValue(card, "Number of closed places")).toBe("3");
+    expect(rowValue(card, "Total of all places")).toBe("2734.81 AMD");
+    expect(rowValue(card, "Products sold without a place")).toBe("250.5 AMD");
     expect(rowValue(card, "Paid tournament entries")).toBe("2");
     expect(rowValue(card, "Tournament entry fees")).toBe("2000 AMD");
-    expect(rowValue(card, "Total revenue")).toBe("4985.31 AMD");
+    expect(rowValue(card, "All the club took this month")).toBe("4985.31 AMD");
     // The company's rate: a branch has none of its own.
-    expect(rowValue(card, "Cyber Place commission")).toBe("7.5%");
+    expect(rowValue(card, "Cyber Place percent")).toBe("7.5%");
     // The branch's own commission, highlighted where the company's owed amount was.
     expect(highlight(card)).toBe("373.9 AMD");
     // 4600, not total_gross − commission_amount (4611.41): never derived here.
-    expect(rowValue(card, "Owner income")).toBe("4600 AMD");
+    expect(rowValue(card, "Your income (after the Cyber Place fee)")).toBe("4600 AMD");
     expect(shownOption()).toBe("Abovyan 1");
     // A filter over the answer on screen, never a second request.
     expect(api.summary).toHaveBeenCalledTimes(1);
@@ -230,14 +230,14 @@ describe("CompanyRevenueScreen: the branch selector", () => {
     await pick("2");
 
     const card = screen.getByRole("region", { name: branchTitle("№2") });
-    expect(rowValue(card, "Closed active places")).toBe("0");
-    expect(rowValue(card, "Active Places")).toBe("0 AMD");
-    expect(within(card).queryByText("POS orders")).toBeNull();
+    expect(rowValue(card, "Number of closed places")).toBe("0");
+    expect(rowValue(card, "Total of all places")).toBe("0 AMD");
+    expect(within(card).queryByText("Products sold without a place")).toBeNull();
     expect(rowValue(card, "Paid tournament entries")).toBe("0");
     expect(rowValue(card, "Tournament entry fees")).toBe("0 AMD");
-    expect(rowValue(card, "Total revenue")).toBe("0 AMD");
+    expect(rowValue(card, "All the club took this month")).toBe("0 AMD");
     expect(highlight(card)).toBe("0 AMD");
-    expect(rowValue(card, "Owner income")).toBe("0 AMD");
+    expect(rowValue(card, "Your income (after the Cyber Place fee)")).toBe("0 AMD");
     expect(document.body.textContent).not.toMatch(/undefined|NaN/);
   });
 
@@ -250,7 +250,7 @@ describe("CompanyRevenueScreen: the branch selector", () => {
 
     const card = screen.getByRole("region", { name: COMPANY_TITLE });
     expect(highlight(card)).toBe("571.41 AMD");
-    expect(rowValue(card, "Closed active places")).toBe("5");
+    expect(rowValue(card, "Number of closed places")).toBe("5");
     expect(api.summary).toHaveBeenCalledTimes(1);
   });
 });
@@ -275,9 +275,9 @@ describe("CompanyRevenueScreen: the selection across months", () => {
     await act(async () => { answer({ ...TWO, branches: [october, BRANCH_EMPTY] }); });
 
     const card = screen.getByRole("region", { name: branchTitle("Abovyan 1") });
-    expect(rowValue(card, "Active Places")).toBe("111.11 AMD");
+    expect(rowValue(card, "Total of all places")).toBe("111.11 AMD");
     expect(highlight(card)).toBe("16.67 AMD");
-    expect(rowValue(card, "Owner income")).toBe("205 AMD");
+    expect(rowValue(card, "Your income (after the Cyber Place fee)")).toBe("205 AMD");
     expect(picker().disabled).toBe(false);
     expect(shownOption()).toBe("Abovyan 1");
   });
@@ -327,12 +327,12 @@ describe("CompanyRevenueScreen — loading the month", () => {
     await nextMonth();
 
     expect(screen.getByRole("alert").textContent).toContain("Server unavailable");
-    expect(screen.queryByRole("region", { name: "Revenue for the month" })).toBeNull();
+    expect(screen.queryByRole("region", { name: "The month in figures" })).toBeNull();
 
     api.summary.mockResolvedValueOnce(LEGACY);
     await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Retry" })); });
 
-    const card = await screen.findByRole("region", { name: "Revenue for the month" });
+    const card = await screen.findByRole("region", { name: "The month in figures" });
     expect(highlight(card)).toBe("308.91 AMD");
     expect(api.summary).toHaveBeenCalledTimes(3);
   });
@@ -345,11 +345,11 @@ describe("CompanyRevenueScreen — loading the month", () => {
     render(<CompanyRevenueScreen companyId={1} companyName="Arena" initialPercent={7.5} />);
 
     await nextMonth();
-    const card = await screen.findByRole("region", { name: "Revenue for the month" });
+    const card = await screen.findByRole("region", { name: "The month in figures" });
     expect(highlight(card)).toBe("308.91 AMD");
 
     await act(async () => { answerFirst(CURRENT); });
 
-    expect(highlight(screen.getByRole("region", { name: "Revenue for the month" }))).toBe("308.91 AMD");
+    expect(highlight(screen.getByRole("region", { name: "The month in figures" }))).toBe("308.91 AMD");
   });
 });

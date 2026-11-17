@@ -11637,3 +11637,33 @@ select.input option:disabled {
   border-color: var(--color-success);
 }
 
+
+/* A date that reads dd.mm.yyyy and opens the system calendar (2026-11-18). */
+.date-field { position: relative; display: inline-flex; }
+.date-field__text { text-align: left; cursor: pointer; min-width: 140px; font-variant-numeric: tabular-nums; }
+.date-field__native { position: absolute; left: 0; bottom: 0; width: 100%; height: 0; opacity: 0; pointer-events: none; border: 0; padding: 0; }
+
+/* «Свой вариант» row (2026-11-18): name on the left, then amount, rest, remove. */
+.pay-editor__own-name { flex: 0 0 120px; min-width: 0; height: 36px; }
+.pay-editor__own-add { align-self: flex-start; }
+.pay-editor__own-remove {
+  background: transparent; border: 1px solid var(--color-border); color: var(--color-text-muted, inherit);
+  border-radius: 8px; width: 32px; height: 32px; cursor: pointer; font-size: 18px; line-height: 1;
+}
+
+/* «История продаж» in figures (2026-11-18). */
+.sales-summary { gap: 12px; }
+.sales-summary__period { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; font-size: 15px; }
+.sales-summary__subtitle { margin: 4px 0 0; font-size: 14px; }
+.sales-summary__drawer { margin: 0; font-size: 13px; }
+.sales-card { text-align: left; font: inherit; color: inherit; cursor: pointer; }
+div.sales-card { cursor: default; }
+button.sales-card:hover { border-color: var(--color-primary); }
+button.sales-card:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.sales-card--big { border-color: var(--color-primary); }
+.sales-card__sub { font-size: 12px; }
+.sales-lines { gap: 10px; width: min(560px, 92vw); }
+.sales-lines__list { display: flex; flex-direction: column; gap: 8px; max-height: 60vh; overflow-y: auto; }
+.sales-line { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; border: 1px solid var(--color-border); border-radius: 10px; }
+.sales-line__head { display: flex; justify-content: space-between; gap: 12px; }
+.sales-line__parts { font-size: 13px; }

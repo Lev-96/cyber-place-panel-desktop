@@ -171,7 +171,7 @@ describe("split at the till (2026-11-07)", () => {
     await add("Tea");
     await choose("pay.split");
     const boxes = screen.getAllByRole("textbox").filter((e) => e.tagName === "INPUT");
-    await act(async () => { fireEvent.change(boxes[boxes.length - 3], { target: { value: "200" } }); });
+    await act(async () => { fireEvent.change(boxes[boxes.length - 2], { target: { value: "200" } }); });
     await act(async () => { fireEvent.click(screen.getByTestId("pay-rest-card")); });
     await act(async () => { fireEvent.change(screen.getByTestId("pay-note"), { target: { value: "200 наличными" } }); });
     await sell();
@@ -186,7 +186,7 @@ describe("split at the till (2026-11-07)", () => {
     await add("Tea");
     await choose("pay.split");
     const boxes = screen.getAllByRole("textbox").filter((e) => e.tagName === "INPUT");
-    await act(async () => { fireEvent.change(boxes[boxes.length - 3], { target: { value: "200" } }); });
+    await act(async () => { fireEvent.change(boxes[boxes.length - 2], { target: { value: "200" } }); });
     await act(async () => { fireEvent.click(screen.getByTestId("pay-rest-card")); });
     await sell();
     const body = repo.create.mock.calls[0][0];

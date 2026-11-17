@@ -8,7 +8,7 @@ import {
   selectableBranches,
 } from "@/components/revenue/revenueFigures";
 import Button from "@/components/ui/Button";
-import { formatMonth } from "@/i18n/dates";
+import { formatDate } from "@/i18n/dates";
 import { useLang } from "@/i18n/LanguageContext";
 import { fmt } from "@/i18n/translations";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
@@ -94,7 +94,14 @@ const CompanyRevenueScreen = ({ companyId, companyName, initialPercent }: Props)
 
   useEffect(() => { void reload(); }, [reload, percent]);
 
-  const monthLabel = formatMonth(new Date(sel.year, sel.month - 1, 1));
+  // The whole period, day by day (2026-11-18, owner: «11.2026» did not say
+  // which days): the month's first to its last day — the same calendar month
+  // the server sums.
+  const monthLabel = fmt(
+    t("revenue.periodRange"),
+    formatDate(new Date(sel.year, sel.month - 1, 1)),
+    formatDate(new Date(sel.year, sel.month, 0)),
+  );
   const shift = (delta: number) => {
     const d = new Date(sel.year, sel.month - 1 + delta, 1);
     setSel({ year: d.getFullYear(), month: d.getMonth() + 1 });
