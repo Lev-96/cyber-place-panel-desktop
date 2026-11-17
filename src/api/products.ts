@@ -1,4 +1,4 @@
-import { IProduct, IProductStockMeta, IStockChange, ProductKind } from "@/types/pos";
+import { AdditionalPricingMode, IProduct, IProductStockMeta, IStockChange, ProductKind } from "@/types/pos";
 import { Lang } from "@/i18n/translations";
 import { request } from "./client";
 
@@ -10,6 +10,12 @@ export interface CreateProductBody {
   is_active?: boolean;
   /** Sold by the unit, or handed out with a seat. Omitted: the server keeps/defaults `regular`. */
   kind?: ProductKind;
+  /**
+   * An additional item's price: added once, or a rate per hour it is out
+   * (2026-11-17). Sent only for an additional item; omitted, the server keeps
+   * what it has (null = fixed).
+   */
+  pricing_mode?: AdditionalPricingMode | null;
   /**
    * Language `name` / `category` were typed in. The backend treats that locale
    * as the source of truth and machine-translates the others — it never writes

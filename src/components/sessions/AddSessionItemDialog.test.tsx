@@ -22,6 +22,7 @@ const repo = vi.hoisted(() => ({
   removeItem: vi.fn(),
   resolveItemsText: vi.fn(),
   markItemPaid: vi.fn(),
+  returnItem: vi.fn(),
 }));
 /** Stands in for the Products screen's own form. */
 const form = vi.hoisted(() => ({ saved: null as ((p: unknown) => void) | null }));
@@ -35,6 +36,7 @@ vi.mock("@/repositories/SessionRepository", () => ({
     removeItem: (...a: unknown[]) => repo.removeItem(...a),
     resolveItemsText: (...a: unknown[]) => repo.resolveItemsText(...a),
     markItemPaid: (...a: unknown[]) => repo.markItemPaid(...a),
+    returnItem: (...a: unknown[]) => repo.returnItem(...a),
   },
 }));
 vi.mock("@/components/products/ProductForm", () => ({
@@ -59,6 +61,8 @@ const PLACEHOLDER_KEYS = new Set([
   "session.additionalGiven",
   "session.additionalRemoved",
   "session.additionalRemoveConfirm",
+  "session.extraReturnedToast",
+  "session.extraReturn",
 ]);
 
 vi.mock("@/i18n/LanguageContext", () => ({
@@ -1273,5 +1277,115 @@ describe("handed over not paid yet", () => {
     expect(repo.markItemPaid).toHaveBeenCalledWith(42, 7);
     expect(screen.queryByTestId("bill-line-unpaid")).toBeNull();
     expect(onAdded).toHaveBeenCalled();
+  });
+});
+
+/**
+ * An additional item on «Изменение тарифа» (2026-11-17): the joysticks'
+ * principle. Handed out, the seat's rate rises and the cashier is told the
+ * rate now; on the bill it is handed BACK (its clock stops, its charge stays)
+ * and can then go out again.
+ */
+describe("an additional item that changes the hourly rate", () => {
+  const chipsHourly = { id: 40, branch_id: 1, name: "Poker Chips", category: "chips", price: 500, is_active: true, kind: "additional", pricing_mode: "hourly" };
+  const cue = { id: 41, branch_id: 1, name: "Billiard Cue", category: "rentals", price: 500, is_active: true, kind: "additional" };
+  const tab = (name: string) => screen.getAllByRole("tab").find((b) => (b.textContent ?? "").startsWith(name)) as HTMLButtonElement;
+  const openItems = async () => { await act(async () => { fireEvent.click(tab("session.additionalTitle")); }); };
+  const addButton = (name: string) => screen.getByLabelText(`action.add: ${name}`) as HTMLButtonElement;
+  const row = (name: string) => [...document.querySelectorAll(".basket-extras__row")]
+    .find((r) => r.querySelector(".basket-extras__name")?.textContent === name) as HTMLElement;
+  const toastTexts = () => toasts.message.mock.calls.map((c) => `${c[0]}|${c[1]}`);
+  /** A PlayStation at 2 500/h with one hourly pad out at 500 — the owner's example. */
+  const seat = { ...session, hourly_rate: 2500, is_free: false, joysticks: [
+    { slot: 3, price: 500, is_hourly: true, is_charged: true, started_at: "2026-11-17T12:00:00Z", stopped_at: null },
+  ] } as unknown as ISessionApi;
+  const outLine = { id: 9, name: "Poker Chips", qty: 1, price: 500, product_id: 40, is_hourly: true, is_extra: false, kind: null, returned_at: null, line_total: 120, created_at: "2026-11-17T12:00:00Z" };
+
+  beforeEach(() => {
+    repo.listProducts.mockReset();
+    repo.listProducts.mockResolvedValue([...products, chipsHourly, cue]);
+    repo.addItems.mockReset();
+    repo.returnItem.mockReset();
+    repo.removeItem.mockReset();
+  });
+
+  test("the item says it is a rate: «500/h»", async () => {
+    await mount({ session: seat });
+    await openItems();
+    expect(row("Poker Chips").querySelector(".basket-extras__price")?.textContent).toBe("500session.perHourShort");
+    expect(row("Billiard Cue").querySelector(".basket-extras__price")?.textContent).toBe("500");
+  });
+
+  test("handed out, the cashier is told the rate now: 2 500 + pad 500 + item 500 = 3 500", async () => {
+    repo.addItems.mockResolvedValue({ ...session, items: [outLine] });
+    await mount({ session: seat });
+    await openItems();
+    await act(async () => { fireEvent.click(addButton("Poker Chips")); });
+    await act(async () => { fireEvent.click(screen.getByText("session.cartConfirmOne")); });
+
+    expect(repo.addItems).toHaveBeenCalledWith(42, [{ product_id: 40, qty: 1 }]);
+    expect(toastTexts()).toContain("success|session.currentRate: 3500session.perHourShort");
+  });
+
+  test("a fixed item says no rate — the price is simply added", async () => {
+    repo.addItems.mockResolvedValue({ ...session, items: [{ id: 9, name: "Billiard Cue", qty: 1, price: 500, product_id: 41 }] });
+    await mount({ session: seat });
+    await openItems();
+    await act(async () => { fireEvent.click(addButton("Billiard Cue")); });
+    await act(async () => { fireEvent.click(screen.getByText("session.cartConfirmOne")); });
+    expect(toastTexts().some((x) => x.includes("session.currentRate"))).toBe(false);
+  });
+
+  test("a waived seat says no rate", async () => {
+    repo.addItems.mockResolvedValue({ ...session, items: [outLine] });
+    await mount({ session: { ...seat, is_free: true } as unknown as ISessionApi });
+    await openItems();
+    await act(async () => { fireEvent.click(addButton("Poker Chips")); });
+    await act(async () => { fireEvent.click(screen.getByText("session.cartConfirmOne")); });
+    expect(toastTexts().some((x) => x.includes("session.currentRate"))).toBe(false);
+  });
+
+  test("out, it is handed back — not removed — and nothing is asked", async () => {
+    const returned = { ...outLine, returned_at: "2026-11-17T12:20:00Z" };
+    repo.returnItem.mockResolvedValue({ ...session, items: [returned] });
+    await mount({ session: { ...seat, items: [outLine] } as unknown as ISessionApi });
+
+    await act(async () => { fireEvent.click(screen.getByTestId("bill-line-return")); });
+
+    expect(repo.returnItem).toHaveBeenCalledWith(42, 9);
+    expect(repo.removeItem).not.toHaveBeenCalled();
+    expect(asked.fn).not.toHaveBeenCalled();
+    expect(toastTexts()).toContain("success|session.extraReturnedToast: Poker Chips");
+    // Back: the line stays, says so, and offers no second return.
+    expect(screen.getByTestId("bill-line-returned")).toBeTruthy();
+    expect(screen.queryByTestId("bill-line-return")).toBeNull();
+  });
+
+  test("once back, it can go out again; while out, it cannot", async () => {
+    await mount({ session: { ...seat, items: [outLine] } as unknown as ISessionApi });
+    await openItems();
+    expect(row("Poker Chips").classList.contains("is-given")).toBe(true);
+    cleanup();
+
+    await mount({ session: { ...seat, items: [{ ...outLine, returned_at: "2026-11-17T12:20:00Z" }] } as unknown as ISessionApi });
+    await openItems();
+    expect(row("Poker Chips").classList.contains("is-given")).toBe(false);
+    expect(addButton("Poker Chips").disabled).toBe(false);
+  });
+
+  test("a fixed item and the room's own hourly extra offer no «Return» here", async () => {
+    await mount({ session: { ...seat, items: [
+      { id: 7, name: "Billiard Cue", qty: 1, price: 500, product_id: 41 },
+      { id: 8, name: "Фишки", qty: 1, price: 500, product_id: null, is_extra: true, is_hourly: true, returned_at: null, line_total: 0 },
+    ] } as unknown as ISessionApi });
+    expect(screen.queryByTestId("bill-line-return")).toBeNull();
+  });
+
+  test("a refused return says why and claims nothing", async () => {
+    repo.returnItem.mockRejectedValue(new Error("already back"));
+    await mount({ session: { ...seat, items: [outLine] } as unknown as ISessionApi });
+    await act(async () => { fireEvent.click(screen.getByTestId("bill-line-return")); });
+    expect(toastTexts()).toContain("error|session.failReason: already back");
+    expect(toastTexts().some((x) => x.includes("extraReturnedToast"))).toBe(false);
   });
 });

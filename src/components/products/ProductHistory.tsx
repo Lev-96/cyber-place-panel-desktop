@@ -110,6 +110,7 @@ const ProductHistory = ({ initialBranchId }: Props) => {
   const format = useMemo(() => ({
     price: (amount: string) => money(Number(amount)),
     kind: (kind: string) => t(kind === "additional" ? "product.kindAdditionalShort" : "productHistory.kindRegular"),
+    pricingMode: (mode: string | null) => t(mode === "hourly" ? "joystickPrice.strategy.hourly" : "joystickPrice.strategy.fixed"),
     // Stock lines (2026-11-16): «Без учёта», and how a receipt came in.
     notCounted: t("stock.notCounted"),
     via: (via: string) => (via === "create" ? t("productHistory.stockViaCreate") : via === "merge" ? t("productHistory.stockViaMerge") : null),

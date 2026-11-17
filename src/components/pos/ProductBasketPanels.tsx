@@ -10,7 +10,7 @@ import { useLang } from "@/i18n/LanguageContext";
 import { ProductBasket } from "./useProductBasket";
 import { choiceKey } from "./quickEntryChoices";
 import { KeyboardEvent, useId, useRef, useState } from "react";
-import { countsStock, IProduct, isAdditionalProduct } from "@/types/pos";
+import { countsStock, IProduct, isAdditionalProduct, isHourlyAdditional } from "@/types/pos";
 import { stockNumber } from "@/components/products/stock";
 
 /**
@@ -226,7 +226,8 @@ export const BasketAdditionalItems = ({ basket, saving, onBill }: AdditionalProp
             <li key={p.id} className={`basket-extras__row${chosen ? " is-chosen" : ""}${given ? " is-given" : ""}`}>
               <span className="basket-extras__mark" aria-hidden="true">{chosen || given ? "✓" : ""}</span>
               <span className="basket-extras__name" title={p.name}>{p.name}</span>
-              <span className="basket-extras__price">{money(Number(p.price))}</span>
+              {/* A rate says it is one: «500 ֏/ч» (2026-11-17). */}
+              <span className="basket-extras__price">{money(Number(p.price))}{isHourlyAdditional(p) ? t("session.perHourShort") : ""}</span>
               {given ? (
                 <span className="basket-extras__state">{t("session.additionalOnBill")}</span>
               ) : chosen ? (

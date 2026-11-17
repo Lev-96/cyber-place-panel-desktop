@@ -8,13 +8,14 @@ import MultiLangInput, {
   primaryValue,
 } from "@/components/ui/MultiLangInput";
 import PriceInput from "@/components/ui/PriceInput";
+import Radio from "@/components/ui/Radio";
 import { apiSaveEntityTranslations } from "@/api/translations";
 import { IProductExistsBody, productExistsBody, StockChoice } from "@/api/products";
 import { tr } from "@/i18n/translated";
 import { fmt } from "@/i18n/translations";
 import { useLang } from "@/i18n/LanguageContext";
 import { productRepository } from "@/repositories/ProductRepository";
-import { IProduct, isAdditionalProduct, ProductKind } from "@/types/pos";
+import { AdditionalPricingMode, IProduct, isAdditionalProduct, ProductKind } from "@/types/pos";
 import { notify } from "@/ui/notify";
 import { newRequestId } from "@/utils/requestId";
 import { FormEvent, useRef, useState } from "react";
@@ -71,6 +72,17 @@ const ProductForm = ({ branchId, initial, onClose, onSaved, kind: kindProp = "re
   /** Only a new product sold by the unit may arrive with a quantity. */
   const asksQuantity = !initial && kind === "regular";
   const [quantity, setQuantity] = useState("");
+  /**
+   * An additional item's price: added once, or a rate added to every hour it
+   * is out — the joysticks' «Фиксированная цена» / «Изменение тарифа»
+   * (2026-11-17). Opens on what the item carries; null (every item before the
+   * choice) is fixed.
+   */
+  const [pricingMode, setPricingMode] = useState<AdditionalPricingMode>(
+    initial?.pricing_mode === "hourly" ? "hourly" : "fixed",
+  );
+  /** Sent for an additional item only: a regular product has no rate to change. */
+  const pricingBody = kind === "additional" ? { pricing_mode: pricingMode } : {};
   const [exists, setExists] = useState<IProductExistsBody | null>(null);
   const requestId = useRef(newRequestId());
   const [busy, setBusy] = useState(false);
@@ -136,6 +148,7 @@ const ProductForm = ({ branchId, initial, onClose, onSaved, kind: kindProp = "re
             category: categoryValue || null,
             price: pr,
             source_locale: lang,
+            ...pricingBody,
           }, kind)
         : await productRepository.create({
             branch_id: branchId,
@@ -145,6 +158,7 @@ const ProductForm = ({ branchId, initial, onClose, onSaved, kind: kindProp = "re
             is_active: true,
             kind,
             source_locale: lang,
+            ...pricingBody,
           });
 
       await saveTranslations(p.id);
@@ -195,6 +209,34 @@ const ProductForm = ({ branchId, initial, onClose, onSaved, kind: kindProp = "re
         />
 
         <PriceInput label={t("label.price")} value={price} onChange={setPrice} required disabled={locked} />
+
+        {/* The joysticks' two answers, in their words (2026-11-17): the price
+            is added once, or it changes the seat's hourly rate while the item
+            is out. The sentence under it says which, with the item's name. */}
+        {kind === "additional" && (
+          <div className="col" style={{ gap: 6 }}>
+            <span className="label">{t("product.pricingMode")}</span>
+            <div className="cp-choice-row" role="radiogroup" aria-label={t("product.pricingMode")}>
+              {(["fixed", "hourly"] as const).map((m) => (
+                <div key={m} className={`cp-choice${pricingMode === m ? " is-active" : ""}`}>
+                  <Radio
+                    name="cp-product-pricing-mode"
+                    checked={pricingMode === m}
+                    onChange={() => setPricingMode(m)}
+                    disabled={locked}
+                    label={t(`joystickPrice.strategy.${m}`)}
+                  />
+                </div>
+              ))}
+            </div>
+            <span className="muted" style={{ fontSize: 12 }} data-testid="product-pricing-note">
+              {fmt(
+                t(pricingMode === "hourly" ? "place.extraItemHourlyNote" : "place.extraItemFixedNote"),
+                primaryValue(name, lang) || t("branchExtraItem.itemFallback"),
+              )}
+            </span>
+          </div>
+        )}
 
         {asksQuantity && (
           <div className="col" style={{ gap: 4 }}>

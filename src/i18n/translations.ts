@@ -2359,6 +2359,9 @@ export const TRANSLATIONS: Dict = {
     am: "Հեռացնե՞լ «{0}»-ը հաշվից։",
   },
   "product.kindAdditionalShort": { en: "Additional item", ru: "Доп. предмет", am: "Լրացուցիչ իր" },
+  // An additional item's price: once, or a change of the hourly rate (2026-11-17).
+  "session.itemReturn": { en: "Return", ru: "Вернуть", am: "Վերադարձնել" },
+  "product.pricingMode": { en: "How the price is charged", ru: "Как берётся цена", am: "Ինչպես է գանձվում գինը" },
   "history.billTitle": { en: "Bill", ru: "Счёт", am: "Հաշիվ" },
   // Its columns, and the play-time row.
   "history.billItem": { en: "Item", ru: "Позиция", am: "Ապրանք" },
@@ -4792,6 +4795,7 @@ export const TRANSLATIONS: Dict = {
   "productHistory.action.price_set": { en: "Price set", ru: "Задана цена", am: "Գինը սահմանվել է" },
   "productHistory.action.price_changed": { en: "Price changed", ru: "Изменена цена", am: "Գինը փոխվել է" },
   "productHistory.action.kind_changed": { en: "Type changed", ru: "Изменён тип", am: "Տեսակը փոխվել է" },
+  "productHistory.action.pricing_mode_changed": { en: "Pricing changed", ru: "Изменён способ оплаты", am: "Վճարման եղանակը փոխվել է" },
   "productHistory.action.activated": { en: "Activated", ru: "Включён", am: "Ակտիվացվել է" },
   "productHistory.action.deactivated": { en: "Deactivated", ru: "Выключен", am: "Ապաակտիվացվել է" },
   "productHistory.action.deleted": { en: "Deleted", ru: "Удалён", am: "Ջնջվել է" },

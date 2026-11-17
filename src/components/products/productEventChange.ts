@@ -15,6 +15,11 @@ type Formatters = {
   price: (amount: string) => string;
   /** A product kind ("regular" / "additional") in words. */
   kind: (kind: string) => string;
+  /**
+   * An additional item's pricing ("fixed" / "hourly", 2026-11-17) in words.
+   * Null is fixed — every item before the choice — so it is said, not dashed.
+   */
+  pricingMode?: (mode: string | null) => string;
   /** The viewer's word for a stock that is not counted (2026-11-16). */
   notCounted?: string;
   /** How a receipt came in (`via`: create | merge | add) in words, or null to say nothing. */
@@ -27,6 +32,7 @@ const EMPTY = "-";
 const SELF_EXPLAINED = new Set<IProductEvent["action"]>(["created", "deleted", "activated", "deactivated"]);
 
 const scalar = (v: ProductEventValues[string] | undefined, key: string, f: Formatters): string => {
+  if (key === "pricing_mode" && f.pricingMode) return f.pricingMode(v === null || v === undefined || v === "" ? null : String(v));
   if (v === null || v === undefined || v === "") return EMPTY;
   if (key === "kind") return f.kind(String(v));
   if (key === "price") return f.price(String(v));

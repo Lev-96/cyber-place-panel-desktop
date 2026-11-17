@@ -31,6 +31,14 @@ describe("describeChange", () => {
       .toEqual([{ from: "Tea", to: "Green tea" }]);
   });
 
+  test("a pricing change says both answers in words — no mode (null) is fixed, never «-» (2026-11-17)", () => {
+    const withMode = { ...f, pricingMode: (m: string | null) => (m === "hourly" ? "Изменение тарифа" : "Фиксированная цена") };
+    expect(describeChange(ev({ action: "pricing_mode_changed", before: { pricing_mode: null }, after: { pricing_mode: "hourly" } }), withMode))
+      .toEqual([{ from: "Фиксированная цена", to: "Изменение тарифа" }]);
+    expect(describeChange(ev({ action: "pricing_mode_changed", before: { pricing_mode: "hourly" }, after: { pricing_mode: "fixed" } }), withMode))
+      .toEqual([{ from: "Изменение тарифа", to: "Фиксированная цена" }]);
+  });
+
   test("a kind change says the kind in words; an empty category is «-»", () => {
     expect(describeChange(ev({ action: "kind_changed", before: { kind: "regular" }, after: { kind: "additional" } }), f))
       .toEqual([{ from: "kind:regular", to: "kind:additional" }]);
