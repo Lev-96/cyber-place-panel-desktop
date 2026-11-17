@@ -4879,6 +4879,20 @@ panel shows the server's figures only; nothing below adds or subtracts money.
   `consolesFollowMove` (it would rest a console under its new player). Tests:
   RelocateSessionDialog (+3), SessionsBoard.relocate (+1), StartSessionDialog
   (rewritten 3, +1); e2e `swap-and-unlimited-prepay.spec.ts`.
+- **«Обновление» for owner / manager (2026-11-17).** The menu entry
+  (`nav.agentUpdates`, now «Обновление», route `/settings/agent-updates`) is
+  always there; the screen opens with `components/updates/DesktopUpdateCard`:
+  installed version, «Проверить обновления» (the server's approved version via
+  `/updates/panel/manifest` → `checkGated`, then a toast: latest / found and
+  downloading / ready / failed), and once downloaded a big green «Установить и
+  перезапустить» (asks first, then `install()`; seats, settings and sign-in
+  survive). In a browser (owner web) the card says the web version is always
+  the newest. The Agent block renders only where a branch has a connected
+  computer — no empty state otherwise. `UpdateReadyModal` gained «Позже» (this
+  version, this run). The bell reads `app_update.available` as «Доступна новая
+  версия Cyber Place X» and opens «Обновление». Tests: DesktopUpdateCard (8),
+  UpdateReadyModal (2), AgentUpdates (+1, rewritten 1), Notifications (+1);
+  Electron `shell.spec.ts` (+1); e2e updates-agent-branches updated.
 - **A, «На сумму».** A third Start tab (`start-mode-amount`; the package tab is
   `start-mode-fixed`, shown only with packages). `StartByAmount`: autofocused
   sum, `GET /sessions/start-quote?amount=` (+`outside_food=1`), a 28px line
