@@ -31,8 +31,11 @@ vi.mock("@/ps5/Ps5ControlProvider", () => ({
 // The dialog's own behaviour is proven in its own file; here it only reports
 // a move the server accepted.
 vi.mock("./RelocateSessionDialog", () => ({
-  default: ({ session, onMoved }: { session: ISessionApi; onMoved: (s: ISessionApi, from: { pcId: number }) => void }) => (
-    <button onClick={() => onMoved({ ...session, pc_id: moveTo.pcId }, { pcId: session.pc_id })}>fake-move</button>
+  default: ({ session, onMoved, onSwapped }: { session: ISessionApi; onMoved: (s: ISessionApi, from: { pcId: number }) => void; onSwapped?: (s: ISessionApi, o: ISessionApi) => void }) => (
+    <>
+      <button onClick={() => onMoved({ ...session, pc_id: moveTo.pcId }, { pcId: session.pc_id })}>fake-move</button>
+      <button onClick={() => onSwapped?.({ ...session, pc_id: moveTo.pcId }, { ...session, id: 99, pc_id: session.pc_id })}>fake-swap</button>
+    </>
   ),
 }));
 vi.mock("@/realtime/usePlaceAvailability", () => ({ usePlaceAvailability: () => {} }));
@@ -104,6 +107,24 @@ describe("SessionsBoard — consoles follow a move", () => {
     await click("fake-move");
 
     expect(ps5.sessionStopped).toHaveBeenCalledWith(1);
+    expect(ps5.sessionStarting).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * A SWAP (2026-11-17) leaves no seat empty: no console may be told its session
+ * ended — `sessionStopped` would put it to rest under its new player.
+ */
+describe("SessionsBoard — a swap tells no console anything", () => {
+  test("console ⇄ console: neither stops nor starts", async () => {
+    repo.listPcs.mockReset().mockResolvedValue([device(1, true), device(2, true)]);
+    moveTo.pcId = 2;
+    await act(async () => { render(<MemoryRouter><SessionsBoard branchId={7} /></MemoryRouter>); });
+
+    await click("session.relocate");
+    await click("fake-swap");
+
+    expect(ps5.sessionStopped).not.toHaveBeenCalled();
     expect(ps5.sessionStarting).not.toHaveBeenCalled();
   });
 });

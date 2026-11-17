@@ -295,7 +295,8 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted, bookingId }: Pro
   const customRateNum = Number(customRate);
   const customRateValid = editPrice && Number.isFinite(customRateNum) && customRateNum > 0;
   const overrideApplied = customRateValid && rateSaved;
-  const effectiveRate = foodRateOn ? outsideFoodFee : overrideApplied ? customRateNum : assignedRate;
+  // Own food as the rate: the venue's fee, unless the price was changed here.
+  const effectiveRate = overrideApplied ? customRateNum : foodRateOn ? outsideFoodFee : assignedRate;
 
   // Prefill the override input with the current rate the moment it's enabled,
   // so the operator edits "the current price" rather than a blank field.
@@ -311,7 +312,7 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted, bookingId }: Pro
   // minute, so the minutes and the price on screen are never an old answer.
   const minute = useMinuteTick(limit === "until");
   const planApplies = !isFree && mode === "open";
-  const typedRate = overrideApplied && !foodRateOn ? customRateNum : undefined;
+  const typedRate = overrideApplied ? customRateNum : undefined;
   const totalNum = Number(totalInput);
   const totalValid = Number.isFinite(totalNum) && totalNum > 0;
   // A total set by hand is sent INSTEAD of a rate: the seat runs at the rate
@@ -346,9 +347,18 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted, bookingId }: Pro
     `${pc.id}|${outsideFoodOn ? 1 : 0}`,
   );
   const quotedAmount = quoteFor(amountQuote, amountValue);
-  // Paid ahead only where there is a plan to pay: a package, or a length set.
-  const prepaidApplies = !isFree && (mode === "fixed" || (mode === "open" && planInput !== null));
-  const prepaidField = prepaid && prepaidApplies ? { prepaid: true as const } : {};
+  // Paid ahead on every start (2026-11-17, owner), never required: a package
+  // or a length is paid at its own figure (`prepaid`); a seat with no limit
+  // has no figure, so the cashier names what was handed over (`prepaid_sum`).
+  const unlimitedStart = !isFree && mode === "open" && planInput === null;
+  const prepaidApplies = !isFree && (mode === "fixed" || mode === "open");
+  const [prepaidSumInput, setPrepaidSumInput] = useState("");
+  const prepaidSumNum = Number(prepaidSumInput.replace(",", "."));
+  const prepaidSumValue = prepaidSumInput.trim() !== "" && Number.isFinite(prepaidSumNum) && prepaidSumNum > 0
+    ? Math.round(prepaidSumNum * 100) / 100 : null;
+  const prepaidField = !(prepaid && prepaidApplies) ? {}
+    : unlimitedStart ? (prepaidSumValue !== null ? { prepaid_sum: prepaidSumValue } : {})
+    : { prepaid: true as const };
   /**
    * HOW the sum paid ahead was paid (2026-11-17, owner: the Stop methods at
    * Start too): the Stop control, under «Оплачено вперёд» or «На сумму».
@@ -363,6 +373,7 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted, bookingId }: Pro
   const paysAhead = !isFree && ((mode === "amount" && amountValue !== null) || (prepaid && prepaidApplies));
   const prepaidSum: number | null = !paysAhead ? null
     : mode === "amount" ? amountValue
+    : unlimitedStart ? prepaidSumValue
     : mode === "fixed" ? (selectedPackagePrice !== null ? selectedPackagePrice + (outsideFoodOn && !foodRateOn ? outsideFoodFee ?? 0 : 0) : null)
     // As a rate the fee IS the plan's price per hour — nothing added on top.
     : quotedPlan !== null ? quotedPlan.amount + (outsideFoodOn && !foodRateOn ? outsideFoodFee ?? 0 : 0) : null;
@@ -373,7 +384,9 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted, bookingId }: Pro
   const toggleEditPrice = (next: boolean) => {
     setEditPrice(next);
     setRateSaved(false);
-    setCustomRate(next && assignedRate != null ? String(assignedRate) : "");
+    // Opens on the price the seat would run at: own food's when it is the rate.
+    const base = foodRateOn ? outsideFoodFee : assignedRate;
+    setCustomRate(next && base != null ? String(base) : "");
   };
 
   // Editing the value invalidates a previous save — the cashier must press
@@ -463,7 +476,7 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted, bookingId }: Pro
           pc_id: pc.id,
           mode: "open",
           user_display_name: pc.label,
-          ...(overrideApplied && !planByHand && !foodRateOn ? { hourly_rate: customRateNum } : {}),
+          ...(overrideApplied && !planByHand ? { hourly_rate: customRateNum } : {}),
           ...(planMinutes !== null ? { duration_minutes: planMinutes } : {}),
           ...(planUntil !== null ? { until: planUntil } : {}),
           ...(planByHand ? { planned_amount: typedTotal } : {}),
@@ -522,7 +535,7 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted, bookingId }: Pro
   const startDisabled =
     busy || deviceOffline || !psnValid
     // A total set by hand prices the seat itself, so no seat rate is needed.
-    || (!isFree && mode === "open" && !planByHand && !foodRateOn && (editPrice ? !overrideApplied : assignedRate === null))
+    || (!isFree && mode === "open" && !planByHand && (editPrice ? !overrideApplied : !foodRateOn && assignedRate === null))
     // A plan is started only on the server's own figure for it.
     || (planApplies && (planInvalid || (planInput !== null && !planPriced)))
     || (planApplies && planInput !== null && editTotal && !totalValid)
@@ -640,7 +653,12 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted, bookingId }: Pro
                       testId="prepaid-switch"
                       tone="success"
                     />
-                    {prepaid && <span className="muted start-dialog__switch-hint">{t("session.prepaid.startHint")}</span>}
+                    {prepaid && <span className="muted start-dialog__switch-hint">{t(unlimitedStart ? "session.prepaid.unlimitedHint" : "session.prepaid.startHint")}</span>}
+                    {prepaid && unlimitedStart && (
+                      <div data-testid="start-prepaid-sum">
+                        <PriceInput label={t("session.prepaid.sum")} value={prepaidSumInput} onChange={setPrepaidSumInput} disabled={busy} />
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -722,10 +740,10 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted, bookingId }: Pro
                   rateLabel={t("session.hourlyRate")}
                   money={money}
                 />
-                {isShown("rate") && !foodRateOn && (
+                {isShown("rate") && (
                 <Checkbox checked={editPrice} onChange={toggleEditPrice} label={t("session.editPrice")} />
                 )}
-                {isShown("rate") && editPrice && !foodRateOn && (
+                {isShown("rate") && editPrice && (
                   <div className="col" style={{ gap: 6 }}>
                     <div className="row" style={{ gap: 8, alignItems: "flex-end" }}>
                       <div style={{ flex: 1 }}>

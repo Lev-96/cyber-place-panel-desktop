@@ -99,7 +99,8 @@ test("Start: «Оплачено вперёд» on a planned length sends prepaid
   });
   await openBoard(page);
   await page.locator('.place-cell [data-action="start"]').first().click();
-  await expect(page.getByTestId("prepaid-switch")).toHaveCount(0);
+  // Offered on every start since 2026-11-17 (no limit: a named sum); with a length it pays the plan.
+  await expect(page.getByTestId("prepaid-switch")).toHaveCount(1);
   await page.getByTestId("planned-duration-input-hours").fill("2");
   const sw = page.getByTestId("prepaid-switch");
   await expect(sw).toBeVisible();

@@ -1424,6 +1424,14 @@ const SessionsBoard = ({ branchId }: Props) => {
             void sessions.reload();
             void pcs.reload();
           }}
+          // A swap leaves no seat empty: no console is told a session ended
+          // (consolesFollowMove would rest one under its new player). The
+          // board re-reads; PS5 control sees a session on both throughout.
+          onSwapped={() => {
+            setRelocateTarget(null);
+            void sessions.reload();
+            void pcs.reload();
+          }}
         />
       )}
       {sellOpen && (

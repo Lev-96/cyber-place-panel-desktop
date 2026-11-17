@@ -62,6 +62,7 @@ import {
   ListSessionsParams,
   StartSessionBody,
   apiSetOutsideFoodRate,
+  apiSwapSessions,
 } from "@/api/sessions";
 import { apiReorderPcs } from "@/api/pcs";
 import { friendlyMutation, orFallback } from "@/api/fallback";
@@ -286,6 +287,10 @@ export class SessionRepository {
   }
 
   /** «Переместить игрока», atomically. May still be refused — the list is stale. */
+  /** Swap two running seats (2026-11-17): each keeps its own bill. */
+  async swap(sessionId: number, withSessionId: number): Promise<{ session: ISessionApi; other: ISessionApi }> {
+    return friendlyMutation(apiSwapSessions(sessionId, withSessionId));
+  }
   async relocate(sessionId: number, body: RelocateSessionBody): Promise<ISessionApi> {
     return friendlyMutation(apiRelocateSession(sessionId, body).then((r) => r.session));
   }

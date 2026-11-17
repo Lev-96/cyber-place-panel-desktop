@@ -81,6 +81,8 @@ export interface StartSessionBody {
    */
   paid_amount?: number;
   paid_seconds?: number;
+  /** A seat with no limit paid ahead (2026-11-17): the sum handed over. Never with a plan. */
+  prepaid_sum?: number;
   /**
    * HOW it was paid ahead (2026-11-17), with `prepaid` or `paid_amount` only:
    * Stop's own keys. Absent = cash, as every start before it.
@@ -888,7 +890,24 @@ export interface IRelocationOptions {
   };
   /** Same-rate seats first, then the rest; unlimited before limited in each. */
   places: IRelocationPlace[];
+  /** Running seats of the same platform to SWAP with (2026-11-17). Absent from an older backend. */
+  swap?: IRelocationSwap[];
 }
+
+/** A running seat this session may swap with: each player keeps their own bill. */
+export interface IRelocationSwap {
+  session_id: number;
+  place_id: number;
+  number: number | null;
+  name: string | null;
+  type: string | null;
+  player: string | null;
+  hourly_rate: number;
+}
+
+/** Swap two running seats (2026-11-17): both sessions come back, each on its new seat. */
+export const apiSwapSessions = (sessionId: number, withSessionId: number) =>
+  request<{ session: ISessionApi; other: ISessionApi }>(`/sessions/${sessionId}/swap`, { method: "POST", body: { with_session_id: withSessionId } });
 
 /** ⚠️ ADVICE, like `apiSessionExtensionOptions`: `apiRelocateSession` re-checks. */
 export const apiRelocationOptions = (sessionId: number) =>

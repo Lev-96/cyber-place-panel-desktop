@@ -1291,6 +1291,9 @@ export const TRANSLATIONS: Dict = {
   "session.prepaid.switch": { en: "Paid ahead", ru: "Оплачено вперёд", am: "Վճարված է նախապես" },
   "session.prepaid.switchFull": { en: "The player paid now, before playing", ru: "Игрок заплатил сейчас, до игры", am: "Խաղացողը վճարեց հիմա՝ խաղից առաջ" },
   "session.prepaid.startHint": { en: "Leaves early: Stop shows what to give back.", ru: "Уйдёт раньше: при Стоп будет показано, что вернуть.", am: "Եթե շուտ գնա՝ «Ավարտել»-ի ժամանակ ցույց կտրվի, ինչ վերադարձնել։" },
+  // A seat with no limit paid ahead (2026-11-17): the sum handed over.
+  "session.prepaid.sum": { en: "Paid now", ru: "Сколько заплатил", am: "Որքան վճարեց" },
+  "session.prepaid.unlimitedHint": { en: "Stop shows what to give back or what is still to pay.", ru: "При Стоп будет показано, что вернуть или сколько доплатить.", am: "«Ավարտել»-ի ժամանակ ցույց կտրվի, ինչ վերադարձնել կամ որքան հավելավճարել։" },
   "session.prepaid.timeSwitch": { en: "Paid now", ru: "Оплачено сейчас", am: "Վճարված է հիմա" },
   "session.prepaid.timeSwitchFull": { en: "The player paid for this time now", ru: "Игрок оплатил это время сейчас", am: "Խաղացողը վճարեց այս ժամանակի համար հիմա" },
   "session.prepaidChip": { en: "Paid ahead: {0}", ru: "Предоплата: {0}", am: "Կանխավճար՝ {0}" },
@@ -1395,6 +1398,11 @@ export const TRANSLATIONS: Dict = {
     ru: "Уже сыгранное время сохраняет свою цену; товары и джойстики переходят вместе с игроком.",
     am: "Արդեն խաղացած ժամանակը պահպանում է իր գինը․ ապրանքներն ու ջոյսթիքները տեղափոխվում են խաղացողի հետ։",
   },
+  // Swap two running seats (2026-11-17).
+  "session.swapTitle": { en: "Swap with a running seat", ru: "Поменять местами с занятым местом", am: "Փոխանակել զբաղված տեղի հետ" },
+  "session.swapSummary": { en: "Each player keeps their own bill; from now each plays at the new seat's price.", ru: "Счёт каждого игрока остаётся при нём; с этого момента каждый играет по цене нового места.", am: "Յուրաքանչյուր խաղացողի հաշիվը մնում է իր մոտ․ այս պահից յուրաքանչյուրը խաղում է նոր տեղի գնով։" },
+  "session.swapConfirm": { en: "Swap places", ru: "Поменять местами", am: "Փոխանակել տեղերը" },
+  "session.swappedToast": { en: "Swapped: {0} and {1}", ru: "Поменяли местами: {0} и {1}", am: "Փոխանակվեցին՝ {0} և {1}" },
   "session.relocateConfirm": { en: "Move", ru: "Переместить", am: "Տեղափոխել" },
   "session.relocatedToast": { en: "Player moved to {0}", ru: "Игрок перемещён на {0}", am: "Խաղացողը տեղափոխվեց՝ {0}" },
   // The green toast after a hand-out, in the room's own word — the pads say

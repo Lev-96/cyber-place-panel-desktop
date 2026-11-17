@@ -7,7 +7,7 @@ import { notify } from "@/ui/notify";
 import { useLang } from "@/i18n/LanguageContext";
 import { fmt } from "@/i18n/translations";
 import { sessionRepository } from "@/repositories/SessionRepository";
-import type { IRelocationOptions, IRelocationPlace } from "@/api/sessions";
+import type { IRelocationOptions, IRelocationPlace, IRelocationSwap } from "@/api/sessions";
 import { ISessionApi } from "@/types/sessions";
 import { platformLabel } from "@/utils/platform";
 import { useCallback, useEffect, useState } from "react";
@@ -17,6 +17,12 @@ interface Props {
   onClose: () => void;
   /** The session the server returned after the move — same id, new seat. */
   onMoved: (session: ISessionApi, from: { pcId: number }) => void;
+  /**
+   * Two seats swapped (2026-11-17). NOT `onMoved`: neither seat was left
+   * empty, so nothing may tell a console its session ended — the board only
+   * re-reads, and PS5 control sees a session on both consoles throughout.
+   */
+  onSwapped?: (session: ISessionApi, other: ISessionApi) => void;
   /** A platform's display name; the board passes the branch's own (one shared read). */
   platformName?: (slug: string) => string;
 }
@@ -44,11 +50,13 @@ const seatOf = (p: { number: number | null; place_id?: number | null; name?: str
  * another, validated again on the server. Either way only the time AFTER the
  * move runs at it — the server freezes what was already played.
  */
-const RelocateSessionDialog = ({ session, onClose, onMoved, platformName = platformLabel }: Props) => {
+const RelocateSessionDialog = ({ session, onClose, onMoved, onSwapped, platformName = platformLabel }: Props) => {
   const { t, money } = useLang();
   const [options, setOptions] = useState<IRelocationOptions | null>(null);
   const [loadError, setLoadError] = useState<unknown>(null);
   const [selectedId, setSelectedId] = useState<number | null>(null);
+  /** The running session chosen to SWAP with (2026-11-17); exclusive with a free seat. */
+  const [swapId, setSwapId] = useState<number | null>(null);
   const [overrideOn, setOverrideOn] = useState(false);
   const [rateInput, setRateInput] = useState("");
   const [limitAccepted, setLimitAccepted] = useState(false);
@@ -69,7 +77,39 @@ const RelocateSessionDialog = ({ session, onClose, onMoved, platformName = platf
   const selected: IRelocationPlace | null =
     options?.places.find((p) => p.place_id === selectedId) ?? null;
 
+  const swapWith: IRelocationSwap | null = options?.swap?.find((s) => s.session_id === swapId) ?? null;
+
+  const chooseSwap = (sessionId: number) => {
+    setSwapId(sessionId);
+    setSelectedId(null);
+    setError(null);
+  };
+
+  /**
+   * Swap: each player keeps their own bill; each runs at the new seat's
+   * price from now (the server's rule, as a move). The server re-checks all.
+   */
+  const confirmSwap = async () => {
+    if (!swapWith || busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const { session: moved, other } = await sessionRepository.swap(session.id, swapWith.session_id);
+      notify.message("success", fmt(t("session.swappedToast"), current ? seatOf(current) : session.pc_label, seatOf(swapWith)));
+      onSwapped?.(moved, other);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+      if ((e as { status?: number }).status === 409) {
+        setSwapId(null);
+        void load();
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const choose = (placeId: number) => {
+    setSwapId(null);
     setSelectedId(placeId);
     setLimitAccepted(false);
     setError(null);
@@ -157,7 +197,7 @@ const RelocateSessionDialog = ({ session, onClose, onMoved, platformName = platf
   const current = options?.current;
 
   return (
-    <Modal open onClose={onClose} dirty={selectedId !== null}>
+    <Modal open onClose={onClose} dirty={selectedId !== null || swapId !== null}>
       <div className="card col" style={{ gap: 16, width: 480, maxWidth: "92vw" }}>
         <div className="row-between" style={{ alignItems: "baseline" }}>
           <h2 style={{ margin: 0 }}>{t("session.relocate")}</h2>
@@ -186,7 +226,7 @@ const RelocateSessionDialog = ({ session, onClose, onMoved, platformName = platf
           </div>
         )}
 
-        {options !== null && options.places.length === 0 && (
+        {options !== null && options.places.length === 0 && (options.swap?.length ?? 0) === 0 && (
           <StateView variant="empty" size="compact" titleKey="session.relocateNone" descriptionKey={null} />
         )}
 
@@ -200,6 +240,52 @@ const RelocateSessionDialog = ({ session, onClose, onMoved, platformName = platf
           <section className="col" style={{ gap: 8 }}>
             <strong style={{ fontSize: 13 }}>{t("session.relocateOtherRate")}</strong>
             {others.map(card)}
+          </section>
+        )}
+
+        {/* Swap with a running seat (2026-11-17): each bill goes with its player. */}
+        {(options?.swap?.length ?? 0) > 0 && (
+          <section className="col" style={{ gap: 8 }} data-testid="relocate-swap">
+            <strong style={{ fontSize: 13 }}>{t("session.swapTitle")}</strong>
+            {options!.swap!.map((o) => {
+              const chosen = swapId === o.session_id;
+              return (
+                <button
+                  key={o.session_id}
+                  type="button"
+                  className="card"
+                  aria-pressed={chosen}
+                  disabled={busy}
+                  onClick={() => chooseSwap(o.session_id)}
+                  data-testid={`swap-${o.session_id}`}
+                  style={{
+                    textAlign: "left", cursor: "pointer", padding: 12, display: "flex",
+                    alignItems: "center", justifyContent: "space-between", gap: 12,
+                    borderColor: chosen ? "var(--color-primary)" : "var(--color-border)",
+                    borderWidth: chosen ? 2 : 1,
+                  }}
+                >
+                  <span className="col" style={{ gap: 3, minWidth: 0 }}>
+                    <strong>{seatOf(o)}</strong>
+                    <span className="muted" style={{ fontSize: 12 }}>{[o.player, o.type].filter(Boolean).join(" · ")}</span>
+                  </span>
+                  <span className="col" style={{ gap: 3, alignItems: "flex-end", flexShrink: 0 }}>
+                    <span className="muted">{money(o.hourly_rate)} / {t("time.hourShort") || "h"}</span>
+                    {chosen && <span style={{ color: "var(--color-primary)", fontSize: 12 }}>✓ {t("session.moveChosen")}</span>}
+                  </span>
+                </button>
+              );
+            })}
+          </section>
+        )}
+
+        {swapWith && (
+          <section className="col" style={{ gap: 4, paddingTop: 4, borderTop: "1px solid var(--color-border)", fontSize: 13 }} data-testid="swap-summary">
+            <span>
+              {current ? seatOf(current) : session.pc_label} <span aria-hidden style={{ color: "var(--color-primary)" }}>⇄</span>{" "}
+              <strong>{seatOf(swapWith)}</strong>
+            </span>
+            <span className="muted" style={{ fontSize: 12 }}>{t("session.swapSummary")}</span>
           </section>
         )}
 
@@ -261,9 +347,15 @@ const RelocateSessionDialog = ({ session, onClose, onMoved, platformName = platf
 
         <div className="row" style={{ justifyContent: "flex-end", gap: 8 }}>
           <Button variant="secondary" onClick={onClose} disabled={busy}>{t("action.cancel")}</Button>
-          <Button variant="primary" onClick={() => { void confirm(); }} disabled={!canConfirm}>
-            {t("session.relocateConfirm")}
-          </Button>
+          {swapWith ? (
+            <Button variant="primary" onClick={() => { void confirmSwap(); }} disabled={busy} data-testid="swap-confirm">
+              {t("session.swapConfirm")}
+            </Button>
+          ) : (
+            <Button variant="primary" onClick={() => { void confirm(); }} disabled={!canConfirm}>
+              {t("session.relocateConfirm")}
+            </Button>
+          )}
         </div>
       </div>
     </Modal>
