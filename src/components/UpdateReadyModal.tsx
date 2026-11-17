@@ -26,6 +26,12 @@ const UpdateReadyModal = () => {
   const { t } = useLang();
   const [state, setState] = useState<DesktopUpdateState | null>(null);
   const [restarting, setRestarting] = useState(false);
+  /**
+   * «Позже» (2026-11-17): the version the cashier put off for this run of the
+   * app — a seat being served is not interrupted. «Обновление» keeps the big
+   * «Установить и перезапустить», and the next start asks again.
+   */
+  const [laterFor, setLaterFor] = useState<string | null>(null);
 
   // Owner + manager only. Admin uses /settings/updates instead.
   const shouldWatch =
@@ -53,6 +59,7 @@ const UpdateReadyModal = () => {
   if (state?.status !== "downloaded") return null;
 
   const version = state.availableVersion ?? "?";
+  if (laterFor === version) return null;
 
   const onRestart = () => {
     if (restarting) return;
@@ -98,6 +105,11 @@ const UpdateReadyModal = () => {
           >
             {t("updates.readyModalRestart")}
           </Button>
+          <div style={{ marginTop: 10 }}>
+            <Button type="button" variant="secondary" onClick={() => setLaterFor(version)} disabled={restarting} data-testid="update-ready-later">
+              {t("ownUpdates.later")}
+            </Button>
+          </div>
         </div>
       </div>
     </Modal>

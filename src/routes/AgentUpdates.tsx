@@ -1,5 +1,6 @@
 import { apiAgentUpdateStatus } from "@/api/agent-updates";
 import AgentBranchCard, { type AgentRelevantBranch } from "@/components/agentUpdates/AgentBranchCard";
+import DesktopUpdateCard from "@/components/updates/DesktopUpdateCard";
 import ScreenWithBg from "@/components/ui/ScreenWithBg";
 import { ListSkeleton } from "@/components/ui/Skeleton";
 import { StateSwitch, deriveViewState } from "@/components/ui/state";
@@ -68,10 +69,23 @@ const AgentUpdates = () => {
     void reloadUpdatesBadge();
   };
 
+  // The Agent block only where a branch has a computer that runs it
+  // (2026-11-17, owner): no such branch — nothing about the Agent at all.
+  const agentShown = view.kind !== "empty";
+
   return (
-    <ScreenWithBg bg="./bg/admin-home.jpg" title={t("agentUpdates.title")}>
+    <ScreenWithBg bg="./bg/admin-home.jpg" title={t("ownUpdates.title")}>
+      {/* The desktop itself, for every role (2026-11-17): version, «Проверить
+          обновления», «Установить и перезапустить». */}
       <div className="gradient-card">
         <div className="gradient-card-inner">
+          <DesktopUpdateCard />
+        </div>
+      </div>
+      {agentShown && (
+      <div className="gradient-card" data-testid="agent-updates-block">
+        <div className="gradient-card-inner">
+          <strong className="desktop-update__title">{t("agentUpdates.title")}</strong>
           <p className="muted agent-updates__subtitle">{t("agentUpdates.subtitle")}</p>
           <StateSwitch
             view={view}
@@ -95,6 +109,7 @@ const AgentUpdates = () => {
           </StateSwitch>
         </div>
       </div>
+      )}
     </ScreenWithBg>
   );
 };

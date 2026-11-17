@@ -11621,3 +11621,19 @@ select.input option:disabled {
   flex-wrap: wrap;
   justify-content: flex-end;
 }
+
+/* «Обновление приложения» (2026-11-17): the app's own update, for every role. */
+.desktop-update { gap: 10px; }
+.desktop-update__title { font-size: 15px; }
+.desktop-update__ready { color: var(--color-success); font-weight: 600; }
+.desktop-update__actions { gap: 10px; flex-wrap: wrap; align-items: center; }
+.desktop-update__install {
+  min-height: 48px;
+  padding: 0 28px;
+  font-size: 16px;
+  font-weight: 700;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-success) 35%, transparent);
+  background: var(--color-success);
+  border-color: var(--color-success);
+}
+
