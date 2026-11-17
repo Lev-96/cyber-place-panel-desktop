@@ -4868,6 +4868,17 @@ panel shows the server's figures only; nothing below adds or subtracts money.
   root `tsc -p .` checks nothing (`files: []`). Tests: OutsideFoodFeeForm (+3),
   StartSessionDialog (+4), OutsideFoodRateSection (5), history (+5); e2e
   `outside-food-rate.spec.ts`.
+- **2026-11-17 follow-up.** Start: «Оплачено вперёд» on every start; on «без
+  ограничения» it asks «Сколько заплатил» (`prepaid_sum`) + the payment
+  control, never required (off sends nothing). Own food as a rate: «Изменить
+  текущую цену» stays offered and opens on the fee; the typed price is sent as
+  `hourly_rate` (the server makes it the own-food rate). Relocate dialog: «Поменять
+  местами с занятым местом» (`relocation-options.swap`), summary «№3 ⇄ №4 —
+  счёт каждого остаётся при нём», «Поменять местами» → `POST /sessions/{id}/swap`;
+  reported through `onSwapped`, NEVER `onMoved` — the board must not call
+  `consolesFollowMove` (it would rest a console under its new player). Tests:
+  RelocateSessionDialog (+3), SessionsBoard.relocate (+1), StartSessionDialog
+  (rewritten 3, +1); e2e `swap-and-unlimited-prepay.spec.ts`.
 - **A, «На сумму».** A third Start tab (`start-mode-amount`; the package tab is
   `start-mode-fixed`, shown only with packages). `StartByAmount`: autofocused
   sum, `GET /sessions/start-quote?amount=` (+`outside_food=1`), a 28px line
