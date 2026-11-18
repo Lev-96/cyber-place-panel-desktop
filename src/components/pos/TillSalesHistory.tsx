@@ -1,7 +1,7 @@
 import { ListSkeleton } from "@/components/ui/Skeleton";
 import { ErrorState } from "@/components/ui/state";
 import { useAsync } from "@/hooks/useAsync";
-import { formatDateTime } from "@/i18n/dates";
+import { formatVenueDateTime } from "@/i18n/dates";
 import { useLang } from "@/i18n/LanguageContext";
 import { orderRepository } from "@/repositories/OrderRepository";
 import { useMemo } from "react";
@@ -78,7 +78,7 @@ const TillSalesHistory = ({ branchId, fromIso, toIso, actorId, refreshKey }: Pro
                 >
                   <div className="col" style={{ gap: 2, minWidth: 0 }}>
                     <span className="muted" style={{ fontSize: 12 }}>
-                      {formatDateTime(o.created_at)}
+                      {formatVenueDateTime(o.created_at)}
                       {seller ? ` · ${seller}` : ""}
                     </span>
                     <span className="name" style={{ overflowWrap: "anywhere" }}>{saleItemsText(o)}</span>

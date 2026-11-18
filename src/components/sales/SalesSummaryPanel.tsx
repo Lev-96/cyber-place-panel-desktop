@@ -1,4 +1,4 @@
-import { apiSalesSummary, type ISalesLine, type ISalesMethodRow, type ISalesProductRow, type SalesQuery } from "@/api/salesSummary";
+import { apiSalesSummary, type ISalesLine, type ISalesMethodRow, type ISalesProductRow, type ISalesSummary, type SalesQuery } from "@/api/salesSummary";
 import Button from "@/components/ui/Button";
 import Modal from "@/components/ui/Modal";
 import { ListSkeleton } from "@/components/ui/Skeleton";
@@ -21,6 +21,11 @@ interface Props {
    * Null / absent: the whole branch, the request it always was.
    */
   placeId?: number | null;
+  /**
+   * The exact moments the server counted (2026-11-18): the screen's lists
+   * below read the same hours, so the cards and the records never disagree.
+   */
+  onWindow?: (w: ISalesSummary["window"]) => void;
   refreshKey?: number;
 }
 
@@ -36,7 +41,7 @@ type ProductsView = { title: string; fastFoodOnly: boolean };
  * (13:00 → 07:00); the panel adds nothing up itself. Each card opens the
  * records behind it: day and time, where, who, how it was paid.
  */
-const SalesSummaryPanel = ({ branchId, from, to, placeId = null, refreshKey = 0 }: Props) => {
+const SalesSummaryPanel = ({ branchId, from, to, placeId = null, refreshKey = 0, onWindow }: Props) => {
   const { t, money } = useLang();
   const [drill, setDrill] = useState<Drill | null>(null);
   const [productsView, setProductsView] = useState<ProductsView | null>(null);
@@ -48,6 +53,11 @@ const SalesSummaryPanel = ({ branchId, from, to, placeId = null, refreshKey = 0 
   );
   // Only a real answer is shown; anything else is an error, never zeros.
   const s = data?.data && typeof data.data === "object" && "totals" in data.data ? data.data : null;
+  const win = s?.window ?? null;
+  useEffect(() => {
+    if (win && onWindow) onWindow(win);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [win?.from, win?.to, win?.date_from, win?.date_to]);
   const m = (v: string) => money(Number(v));
 
   if (loading && !s) return <ListSkeleton />;

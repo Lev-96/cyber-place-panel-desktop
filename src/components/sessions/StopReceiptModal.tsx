@@ -576,6 +576,7 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved, canRes
             {markable && <div className="pay-mark-note" data-testid="pay-mark-note">{t("pay.markAfterAuto")}</div>}
             <PaymentEditor
               name={`pay-${session.id}`}
+              branchId={session.branch_id}
               dueCents={dueCents}
               value={pay}
               onChange={(next) => {

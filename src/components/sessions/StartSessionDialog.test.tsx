@@ -1456,6 +1456,22 @@ describe("paid ahead at the start", () => {
     await act(async () => { fireEvent.change(screen.getByTestId("planned-duration-input-hours"), { target: { value } }); });
   };
 
+  test("«Когда платит игрок?» is asked in plain words: «При Стоп» by default, «Сейчас» opens the ways of paying (2026-11-18)", async () => {
+    await mount(device());
+    await settle();
+    expect(screen.getByText("session.prepaid.when")).toBeTruthy();
+    expect(screen.getByTestId("prepaid-later").getAttribute("aria-checked")).toBe("true");
+    expect(prepaidSwitch()!.getAttribute("aria-checked")).toBe("false");
+    expect(screen.queryByTestId("pay-card")).toBeNull();
+    await act(async () => { fireEvent.click(prepaidSwitch()!); });
+    expect(prepaidSwitch()!.getAttribute("aria-checked")).toBe("true");
+    expect(screen.getByTestId("prepaid-later").getAttribute("aria-checked")).toBe("false");
+    // Back to «При Стоп»: nothing to pay now, no methods.
+    await act(async () => { fireEvent.click(screen.getByTestId("prepaid-later")); });
+    expect(prepaidSwitch()!.getAttribute("aria-checked")).toBe("false");
+    expect(screen.queryByTestId("start-prepaid-sum")).toBeNull();
+  });
+
   test("by the hour with no limit (2026-11-17): offered, the sum is named, never required", async () => {
     await mount(device());
     await settle();

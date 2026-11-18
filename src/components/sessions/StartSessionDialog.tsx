@@ -643,16 +643,36 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted, bookingId }: Pro
                   </div>
                 )}
                 {prepaidApplies && (
-                  <div className="start-dialog__switch" data-testid="start-prepaid">
-                    <UnpaidToggle
-                      on={prepaid}
-                      onChange={setPrepaid}
-                      disabled={busy}
-                      label={t("session.prepaid.switch")}
-                      fullLabel={t("session.prepaid.switchFull")}
-                      testId="prepaid-switch"
-                      tone="success"
-                    />
+                  <div className="start-dialog__switch start-dialog__when-pays" data-testid="start-prepaid">
+                    {/* «Когда платит игрок» (2026-11-18, owner: the switch alone
+                        was missed): two plain answers, «при Стоп» the default.
+                        «Сейчас» opens the sum and the ways of paying below. */}
+                    <span className="label">{t("session.prepaid.when")}</span>
+                    <div className="start-dialog__when-pays-choices" role="radiogroup" aria-label={t("session.prepaid.when")}>
+                      <button
+                        type="button"
+                        role="radio"
+                        aria-checked={!prepaid}
+                        className={`start-dialog__when-pays-btn${!prepaid ? " is-on" : ""}`}
+                        onClick={() => setPrepaid(false)}
+                        disabled={busy}
+                        data-testid="prepaid-later"
+                      >
+                        {t("session.prepaid.later")}
+                      </button>
+                      <button
+                        type="button"
+                        role="radio"
+                        aria-checked={prepaid}
+                        className={`start-dialog__when-pays-btn${prepaid ? " is-on" : ""}`}
+                        onClick={() => setPrepaid(!prepaid)}
+                        disabled={busy}
+                        title={t("session.prepaid.switchFull")}
+                        data-testid="prepaid-switch"
+                      >
+                        {t("session.prepaid.now")}
+                      </button>
+                    </div>
                     {prepaid && <span className="muted start-dialog__switch-hint">{t(unlimitedStart ? "session.prepaid.unlimitedHint" : "session.prepaid.startHint")}</span>}
                     {prepaid && unlimitedStart && (
                       <div data-testid="start-prepaid-sum">
@@ -882,6 +902,7 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted, bookingId }: Pro
             {paysAhead && prepaidSum !== null && (
               <PaymentEditor
                 name={`start-prepaid-pay-${pc.id}`}
+                branchId={branchId}
                 dueCents={prepaidCents}
                 value={prepaidPay}
                 onChange={setPrepaidPay}

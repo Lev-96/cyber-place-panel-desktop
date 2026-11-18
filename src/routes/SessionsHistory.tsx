@@ -1,10 +1,12 @@
 import ScreenWithBg from "@/components/ui/ScreenWithBg";
 import DateField from "@/components/ui/DateField";
+import RefreshIcon from "@/components/ui/RefreshIcon";
 import SalesSummaryPanel from "@/components/sales/SalesSummaryPanel";
+import { apiSalesSummary, type ISalesSummary } from "@/api/salesSummary";
 import { ListSkeleton } from "@/components/ui/Skeleton";
 import { ErrorState, StaleNotice, StateSwitch, StateView, deriveViewState } from "@/components/ui/state";
 import { useAsync } from "@/hooks/useAsync";
-import { formatDate, formatDateTime, formatTime } from "@/i18n/dates";
+import { formatDate, formatDateTime, formatTime, formatVenueDate, formatVenueDateTime, formatVenueTime, venueDateInput } from "@/i18n/dates";
 import { useLang } from "@/i18n/LanguageContext";
 import SessionHistoryBill from "@/components/sessions/SessionHistoryBill";
 import TillSalesHistory from "@/components/pos/TillSalesHistory";
@@ -16,7 +18,7 @@ import { placeRepository } from "@/repositories/PlaceRepository";
 import { placeLineOf } from "@/components/sessions/seatLine";
 import { ISessionEvent } from "@/api/sessions";
 import { ISessionApi } from "@/types/sessions";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 
 /** Local "YYYY-MM-DD" — what `<input type="date">` reads/writes. */
@@ -52,12 +54,45 @@ const SessionsHistory = () => {
   const id = Number(branchId);
   const { t, lang } = useLang();
 
-  const today = useMemo(() => toDateInput(new Date()), []);
-  const [from, setFrom] = useState<string>(today);
-  const [to, setTo] = useState<string>(today);
+  /**
+   * The WORKING day, not the calendar one (2026-11-18, owner: a club open
+   * 13:00 → 07:00; at 05:00 «today» is still yesterday's evening). The server
+   * says which working day is running now; until it has, nothing is shown
+   * under a date that may be wrong. Offline, the calendar day stands in.
+   */
+  const [from, setFrom] = useState<string>("");
+  const [to, setTo] = useState<string>("");
+  const [workingToday, setWorkingToday] = useState<string>("");
+  const readWorkingToday = useCallback(async (): Promise<string> => {
+    try {
+      const { data } = await apiSalesSummary(id, { per_page: 1 });
+      return data.window.date_from;
+    } catch {
+      return venueDateInput();
+    }
+  }, [id]);
+  useEffect(() => {
+    let alive = true;
+    void readWorkingToday().then((d) => {
+      if (!alive) return;
+      setWorkingToday(d);
+      setFrom(d);
+      setTo(d);
+    });
+    return () => { alive = false; };
+  }, [readWorkingToday]);
 
-  const fromIso = useMemo(() => toLocalBoundary(from, "start"), [from]);
-  const toIso = useMemo(() => toLocalBoundary(to, "end"), [to]);
+  /**
+   * The exact hours the cards were counted over (the server's window): every
+   * list below reads the SAME hours, so the figures and the records agree.
+   * Null until the cards have answered for the dates on screen.
+   */
+  const [counted, setCounted] = useState<ISalesSummary["window"] | null>(null);
+  const windowReady = counted !== null && counted.date_from === from && counted.date_to === to;
+  const fromIso = windowReady ? counted.from : null;
+  const toIso = windowReady ? counted.to : null;
+  /** Nothing is read before the hours are known: a list is never shown for other hours than its cards. */
+  const waitForWindow = <T,>(): Promise<T> => new Promise<T>(() => {});
 
   /**
    * Whose actions to show — null for everyone. Remembered WITH its branch, so
@@ -93,7 +128,7 @@ const SessionsHistory = () => {
   const [salesRefresh, setSalesRefresh] = useState(0);
 
   const { data, loading, error, reload } = useAsync(
-    () => sessionRepository.list({ branch_id: id, from: fromIso, to: toIso, limit: 1000, ...byPlace }),
+    () => (fromIso === null || toIso === null ? waitForWindow<ISessionApi[]>() : sessionRepository.list({ branch_id: id, from: fromIso, to: toIso, limit: 1000, ...byPlace })),
     [id, fromIso, toIso, placeId],
   );
 
@@ -106,6 +141,7 @@ const SessionsHistory = () => {
   const acted = useAsync(
     () => (actorId === null
       ? Promise.resolve(null)
+      : fromIso === null || toIso === null ? waitForWindow<ISessionApi[]>()
       : sessionRepository.list({ branch_id: id, from: fromIso, to: toIso, limit: 1000, acted_by: actorId, ...byPlace })),
     [id, fromIso, toIso, actorId, placeId],
   );
@@ -116,7 +152,7 @@ const SessionsHistory = () => {
   // picked the SERVER narrows it — the filter never pulls the whole log to
   // sift it here.
   const events = useAsync(
-    () => sessionRepository.listEvents({
+    () => fromIso === null || toIso === null ? waitForWindow<Awaited<ReturnType<typeof sessionRepository.listEvents>>>() : sessionRepository.listEvents({
       branch_id: id, from: fromIso, to: toIso, limit: FEED_LIMIT,
       ...(actorId !== null ? { user_id: actorId } : {}),
       ...byPlace,
@@ -140,20 +176,33 @@ const SessionsHistory = () => {
     setSalesRefresh((n) => n + 1);
   };
 
-  const setRange = (kind: "today" | "yesterday" | "month") => {
-    const now = new Date();
+  /** Which preset the dates on screen are, if any (lit blue). */
+  const activeRange = useMemo((): "today" | "yesterday" | "month" | null => {
+    if (workingToday === "" || from === "") return null;
+    const [y, m, d] = workingToday.split("-").map(Number);
+    const yesterday = toDateInput(new Date(y, m - 1, d - 1, 12));
+    const monthStart = toDateInput(new Date(y, m - 1, 1, 12));
+    if (from === workingToday && to === workingToday) return "today";
+    if (from === yesterday && to === yesterday) return "yesterday";
+    if (from === monthStart && to === workingToday) return "month";
+    return null;
+  }, [workingToday, from, to]);
+
+  /** «Сегодня» / «Вчера» / «Текущий месяц» by the WORKING day running now. */
+  const setRange = async (kind: "today" | "yesterday" | "month") => {
+    const today = await readWorkingToday();
+    setWorkingToday(today);
+    const [y, m, d] = today.split("-").map(Number);
     if (kind === "today") {
-      setFrom(toDateInput(now));
-      setTo(toDateInput(now));
+      setFrom(today);
+      setTo(today);
     } else if (kind === "yesterday") {
-      const y = new Date(now);
-      y.setDate(now.getDate() - 1);
-      setFrom(toDateInput(y));
-      setTo(toDateInput(y));
+      const prev = toDateInput(new Date(y, m - 1, d - 1, 12));
+      setFrom(prev);
+      setTo(prev);
     } else {
-      const start = new Date(now.getFullYear(), now.getMonth(), 1);
-      setFrom(toDateInput(start));
-      setTo(toDateInput(now));
+      setFrom(toDateInput(new Date(y, m - 1, 1, 12)));
+      setTo(today);
     }
   };
 
@@ -216,13 +265,31 @@ const SessionsHistory = () => {
               )}
             </label>
             <div className="row" style={{ gap: 6, flexWrap: "wrap" }}>
-              <button type="button" className="pill" onClick={() => setRange("today")}>{t("history.today")}</button>
-              <button type="button" className="pill" onClick={() => setRange("yesterday")}>{t("history.yesterday")}</button>
-              <button type="button" className="pill" onClick={() => setRange("month")}>{t("history.month")}</button>
+              {/* The range on screen is the one lit (2026-11-18, owner): blue
+                  says which days are shown; none lit for picked dates. */}
+              {(["today", "yesterday", "month"] as const).map((k) => (
+                <button
+                  key={k}
+                  type="button"
+                  className={`pill history-range${activeRange === k ? " is-active" : ""}`}
+                  aria-pressed={activeRange === k}
+                  onClick={() => void setRange(k)}
+                  data-testid={`history-range-${k}`}
+                >
+                  {t(`history.${k}`)}
+                </button>
+              ))}
               {/* Both: the cards read their events from the feed, so a refresh
                   of the sessions alone would show a new stop with an old story. */}
-              <button type="button" className="pill" onClick={refreshAll}>
-                {t("action.refresh")}
+              <button
+                type="button"
+                className="history-refresh"
+                onClick={refreshAll}
+                aria-label={t("action.refresh")}
+                title={t("action.refresh")}
+                data-testid="history-refresh"
+              >
+                <RefreshIcon size={18} />
               </button>
             </div>
             <div style={{ marginLeft: "auto" }}>
@@ -234,7 +301,7 @@ const SessionsHistory = () => {
               cash drawer, over the working day; with a place picked, that
               place's bills only (`place_id`). Nothing is added up here. */}
           <div style={{ marginTop: 12 }}>
-            <SalesSummaryPanel branchId={id} from={from} to={to} placeId={placeId} refreshKey={salesRefresh} />
+            {from !== "" && <SalesSummaryPanel branchId={id} from={from} to={to} placeId={placeId} refreshKey={salesRefresh} onWindow={setCounted} />}
           </div>
 
         </div>
@@ -249,9 +316,9 @@ const SessionsHistory = () => {
         <>
           {/* Products sold on their own (2026-10-25): the same period and person,
               its own loading — the sessions below never wait on it. */}
-          <TillSalesHistory branchId={id} fromIso={fromIso} toIso={toIso} actorId={actorId} refreshKey={salesRefresh} />
+          {fromIso !== null && toIso !== null && <TillSalesHistory branchId={id} fromIso={fromIso} toIso={toIso} actorId={actorId} refreshKey={salesRefresh} />}
           {/* Every step of the bookings in the same period (2026-11-07). */}
-          <BookingHistory branchId={id} fromIso={fromIso} toIso={toIso} refreshKey={salesRefresh} />
+          {fromIso !== null && toIso !== null && <BookingHistory branchId={id} fromIso={fromIso} toIso={toIso} refreshKey={salesRefresh} />}
         </>
       )}
 
@@ -279,7 +346,7 @@ const SessionsHistory = () => {
             {feedFailed && actorId === null && <StaleNotice error={events.error} onRetry={() => void events.reload()} />}
             <SessionsList
               sessions={actorId === null ? data ?? [] : acted.data ?? []}
-              feed={events.loading && !feedFailed ? null : { ...feed, to: toIso }}
+              feed={events.loading && !feedFailed ? null : { ...feed, to: toIso ?? "" }}
               actorId={actorId}
             />
           </>
@@ -447,8 +514,8 @@ const SessionRow = ({ session, feedEvents, covered, actorId }: {
         <div>
           <dt>{t("history.timeLabel")}</dt>
           <dd>
-            {formatDate(session.started_at)}, {formatTime(session.started_at)}
-            {endAt && ` – ${formatDate(endAt) === formatDate(session.started_at) ? formatTime(endAt) : formatDateTime(endAt)}`}
+            {formatVenueDate(session.started_at)}, {formatVenueTime(session.started_at)}
+            {endAt && ` – ${formatVenueDate(endAt) === formatVenueDate(session.started_at) ? formatVenueTime(endAt) : formatVenueDateTime(endAt)}`}
           </dd>
         </div>
         {seats.length > 1 && (

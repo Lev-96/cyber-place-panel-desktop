@@ -67,3 +67,47 @@ export const formatVenueDateTime = (input: DateLike): string => {
   const part = (type: Intl.DateTimeFormatPartTypes) => parts.find((p) => p.type === type)?.value ?? "";
   return `${part("day")}.${part("month")}.${part("year")} ${part("hour")}:${part("minute")}`;
 };
+
+/**
+ * The venue's calendar (Asia/Yerevan) for the money screens (2026-11-18,
+ * owner): a day or a month counted there must not move with the machine's
+ * own zone. Armenia keeps +04:00 all year (no daylight saving).
+ */
+export const VENUE_UTC_OFFSET = "+04:00";
+
+const venueDayFormat = new Intl.DateTimeFormat("en-GB", { timeZone: VENUE_TIME_ZONE, year: "numeric", month: "2-digit", day: "2-digit" });
+const venueTimeFormat = new Intl.DateTimeFormat("en-GB", { timeZone: VENUE_TIME_ZONE, hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+
+/** The venue's date of an instant, "YYYY-MM-DD". */
+export const venueDateInput = (input: DateLike = new Date()): string => {
+  const d = toDate(input) ?? new Date();
+  const parts = venueDayFormat.formatToParts(d);
+  const get = (type: Intl.DateTimeFormatPartTypes) => parts.find((p) => p.type === type)?.value ?? "";
+  return `${get("year")}-${get("month")}-${get("day")}`;
+};
+
+/** "01.05.2026" on the venue's clock. */
+export const formatVenueDate = (input: DateLike): string => {
+  const d = toDate(input);
+  if (!d) return PLACEHOLDER;
+  const [y, m, day] = venueDateInput(d).split("-");
+  return `${day}.${m}.${y}`;
+};
+
+/** "23:55" on the venue's clock. */
+export const formatVenueTime = (input: DateLike): string => {
+  const d = toDate(input);
+  if (!d) return PLACEHOLDER;
+  return venueTimeFormat.format(d);
+};
+
+/** A venue calendar month as instants: its first 00:00 to its last 23:59:59.999, Yerevan. */
+export const venueMonthBoundsIso = (year: number, month: number): { from: string; to: string } => {
+  const mm = String(month).padStart(2, "0");
+  const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  return {
+    from: new Date(`${year}-${mm}-01T00:00:00.000${VENUE_UTC_OFFSET}`).toISOString(),
+    to: new Date(`${year}-${mm}-${String(lastDay).padStart(2, "0")}T23:59:59.999${VENUE_UTC_OFFSET}`).toISOString(),
+  };
+};
+

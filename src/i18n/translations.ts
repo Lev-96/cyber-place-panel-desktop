@@ -1289,6 +1289,10 @@ export const TRANSLATIONS: Dict = {
   "session.prepaid.otherRefund": { en: "Back («Other»)", ru: "Вернуть («Другое»)", am: "Վերադարձնել («Այլ»)" },
   "session.prepaid.paidInFull": { en: "Paid in full", ru: "Оплачено полностью", am: "Վճարված է ամբողջությամբ" },
   "session.prepaid.switch": { en: "Paid ahead", ru: "Оплачено вперёд", am: "Վճարված է նախապես" },
+  // «Когда платит игрок» at Start (2026-11-18, owner).
+  "session.prepaid.when": { en: "When does the player pay?", ru: "Когда платит игрок?", am: "Ե՞րբ է վճարում խաղացողը" },
+  "session.prepaid.later": { en: "At Stop", ru: "При Стоп", am: "Ստոպի ժամանակ" },
+  "session.prepaid.now": { en: "Now, before playing", ru: "Сейчас, до игры", am: "Հիմա՝ խաղից առաջ" },
   "session.prepaid.switchFull": { en: "The player paid now, before playing", ru: "Игрок заплатил сейчас, до игры", am: "Խաղացողը վճարեց հիմա՝ խաղից առաջ" },
   "session.prepaid.startHint": { en: "Leaves early: Stop shows what to give back.", ru: "Уйдёт раньше: при Стоп будет показано, что вернуть.", am: "Եթե շուտ գնա՝ «Ավարտել»-ի ժամանակ ցույց կտրվի, ինչ վերադարձնել։" },
   // A seat with no limit paid ahead (2026-11-17): the sum handed over.
@@ -4143,7 +4147,7 @@ export const TRANSLATIONS: Dict = {
   // «Свой вариант» in «Разделить» (2026-11-18, owner).
   "pay.ownAdd": { en: "+ Own option", ru: "+ Свой вариант", am: "+ Իմ տարբերակը" },
   "pay.ownName": { en: "Name of the option", ru: "Название варианта", am: "Տարբերակի անունը" },
-  "pay.ownNamePlaceholder": { en: "Idram, Telcell…", ru: "Idram, Telcell…", am: "Idram, Telcell…" },
+  "pay.ownNamePlaceholder": { en: "Name", ru: "Название", am: "Անվանում" },
   "pay.ownRemove": { en: "Remove this option", ru: "Убрать этот вариант", am: "Հեռացնել այս տարբերակը" },
   "ownUpdates.title": { en: "Updates", ru: "Обновление", am: "Թարմացում" },
   "ownUpdates.appTitle": { en: "Cyber Place app", ru: "Приложение Cyber Place", am: "Cyber Place հավելված" },

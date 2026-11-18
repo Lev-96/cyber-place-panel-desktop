@@ -85,8 +85,9 @@ export interface ISalesSummary {
 }
 
 export interface SalesQuery {
-  date_from: string;
-  date_to: string;
+  /** Leave both out: the working day running now. */
+  date_from?: string;
+  date_to?: string;
   page?: number;
   per_page?: number;
   kind?: "place" | "till";

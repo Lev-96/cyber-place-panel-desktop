@@ -2,6 +2,8 @@
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { useState } from "react";
+const labels = vi.hoisted(() => ({ fn: vi.fn(async (_b: number) => ({ data: [] as { label: string; uses: number }[] })) }));
+vi.mock("@/api/paymentLabels", () => ({ apiPaymentLabels: (b: number) => labels.fn(b) }));
 import PaymentEditor from "./PaymentEditor";
 import { checkPayment, emptyPaymentDraft, type PaymentDraft } from "./paymentSplit";
 
@@ -10,10 +12,10 @@ vi.mock("@/i18n/LanguageContext", () => ({
 }));
 
 let last: PaymentDraft = emptyPaymentDraft();
-const Host = ({ due }: { due: number }) => {
+const Host = ({ due, branchId }: { due: number; branchId?: number }) => {
   const [d, setD] = useState<PaymentDraft>(emptyPaymentDraft());
   last = d;
-  return <PaymentEditor name="p" dueCents={due} value={d} onChange={setD} check={checkPayment(due, d)} money={String} />;
+  return <PaymentEditor name="p" dueCents={due} value={d} onChange={setD} check={checkPayment(due, d)} money={String} branchId={branchId} />;
 };
 afterEach(cleanup);
 
@@ -122,6 +124,32 @@ describe("PaymentEditor", () => {
     expect(checkPayment(500000, last)).toMatchObject({ ok: false, problem: "sum", remainingCents: 300000 });
     await act(async () => { fireEvent.click(screen.getByTestId("pay-rest-card")); });
     expect(body()).toEqual({ payments: [{ method: "cash", amount: 2000 }, { method: "card", amount: 3000 }] });
+  });
+
+  test("a name the branch already used is one press: it opens the row with that name (2026-11-18)", async () => {
+    labels.fn.mockResolvedValueOnce({ data: [{ label: "Telcell", uses: 4 }, { label: "Hovo Card", uses: 1 }] });
+    render(<Host due={500000} branchId={7} />);
+    await act(async () => { fireEvent.click(screen.getByTestId("pay-split")); });
+    await act(async () => { await Promise.resolve(); });
+    expect(labels.fn).toHaveBeenCalledWith(7);
+    expect(screen.getByTestId("pay-own-saved-Telcell").textContent).toBe("+ Telcell");
+    expect(screen.getByTestId("pay-own-add")).toBeTruthy();
+    await act(async () => { fireEvent.click(screen.getByTestId("pay-own-saved-Telcell")); });
+    expect(last.own).toEqual({ shown: true, label: "Telcell" });
+    expect((screen.getByTestId("pay-own-name") as HTMLInputElement).value).toBe("Telcell");
+    // A new name: the empty row, as before.
+    await act(async () => { fireEvent.click(screen.getByTestId("pay-own-remove")); });
+    await act(async () => { fireEvent.click(screen.getByTestId("pay-own-add")); });
+    expect(last.own).toEqual({ shown: true, label: "" });
+  });
+
+  test("no branch, or a failed read: just «+ Свой вариант»", async () => {
+    labels.fn.mockRejectedValueOnce(new Error("offline"));
+    render(<Host due={500000} branchId={7} />);
+    await act(async () => { fireEvent.click(screen.getByTestId("pay-split")); });
+    await act(async () => { await Promise.resolve(); });
+    expect(screen.queryByText(/^\+ (?!pay)/)).toBeNull();
+    expect(screen.getByTestId("pay-own-add")).toBeTruthy();
   });
 });
 

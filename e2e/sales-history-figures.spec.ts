@@ -21,6 +21,10 @@ for (const lang of LANGS) {
       await noRawKeys(page);
       expect(await page.locator("body").innerText()).not.toMatch(/\bsales\.[a-z][A-Za-z_.]+/);
       await fitsWidth(page, "[data-testid=sales-summary]");
+      // The range shown is lit; refresh is the yellow icon (2026-11-18).
+      await expect(page.getByTestId("history-range-today")).toHaveAttribute("aria-pressed", "true");
+      await expect(page.getByTestId("history-refresh")).toBeVisible();
+      if (process.env.CP_SHOTS_DIR) await page.locator(".gradient-card").first().screenshot({ path: `${process.env.CP_SHOTS_DIR}/history-filters-${lang}-${width}.png` });
       if (process.env.CP_SHOTS_DIR) await page.getByTestId("sales-summary").screenshot({ path: `${process.env.CP_SHOTS_DIR}/sales-cards-${lang}-${width}.png` });
       await page.getByTestId("sales-method-other-Hovo Card").click();
       await expect(page.getByTestId("sales-line-place-5")).toContainText("Hovo Card");

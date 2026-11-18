@@ -12,6 +12,12 @@ import type { ISessionApi } from "@/types/sessions";
  * «what happened» list are gone — each event lives in its own session's card.
  */
 
+// The working day and its hours, as the server answers them (2026-11-18).
+const salesApi = vi.hoisted(() => ({ fn: null as null | ((...a: unknown[]) => unknown) }));
+vi.mock("@/api/salesSummary", async () => {
+  const { salesSummaryStub } = await import("@/test/salesSummaryStub");
+  return { apiSalesSummary: (...a: unknown[]) => (salesApi.fn ?? (salesSummaryStub as (...x: unknown[]) => unknown))(...a) };
+});
 vi.mock("@/i18n/LanguageContext", () => ({
   useLang: () => ({
     t: (k: string) => (k === "history.showMore" ? "more {0}" : k),
@@ -402,6 +408,53 @@ describe("SessionsHistory — whose actions", () => {
     expect(repo.list.mock.calls.filter((c) => (c[0] as Record<string, unknown>).acted_by === 12).length).toBe(before + 1);
   });
 
+  /**
+   * 2026-11-18 (owner's screenshot): at 05:18 a club open 10:00 → 07:16 is
+   * still in the 17th's working day. The screen opens on THAT day, and the
+   * lists read exactly the hours the cards were counted over.
+   */
+  test("opens on the working day the server says is running, and the lists read its hours", async () => {
+    const { salesSummaryStub } = await import("@/test/salesSummaryStub");
+    salesApi.fn = (branch: unknown, q: unknown) => {
+      const query = (q ?? {}) as { date_from?: string };
+      const date = query.date_from ?? "2026-11-17";
+      return salesSummaryStub(branch as number, { ...(q as object), date_from: date, date_to: date }).then((r) => ({
+        data: { ...r.data, window: { ...r.data.window, from: `${date}T07:16:00+04:00`, to: "2026-11-18T07:16:00+04:00", business_day: { start: "10:00", end: "07:16" } } },
+      }));
+    };
+    try {
+      repo.list.mockResolvedValue([]);
+      repo.listEvents.mockResolvedValue([]);
+      await mount();
+      for (let i = 0; i < 6; i++) await act(async () => { await Promise.resolve(); });
+      expect(screen.getByTestId("history-from").textContent).toContain("17.11.2026");
+      expect(repo.list).toHaveBeenLastCalledWith(expect.objectContaining({ from: "2026-11-17T07:16:00+04:00", to: "2026-11-18T07:16:00+04:00" }));
+      expect(lastFeedCall()).toMatchObject({ from: "2026-11-17T07:16:00+04:00", to: "2026-11-18T07:16:00+04:00" });
+    } finally {
+      salesApi.fn = null;
+    }
+  });
+
+  /** 2026-11-18 (owner): the range shown is lit blue; refresh is a yellow icon. */
+  test("«Сегодня» is lit by default, the picked preset follows, and refresh is an icon", async () => {
+    repo.list.mockResolvedValue([]);
+    repo.listEvents.mockResolvedValue([]);
+    await mount();
+    for (let i = 0; i < 6; i++) await act(async () => { await Promise.resolve(); });
+    const lit = () => ["today", "yesterday", "month"].filter((k) => screen.getByTestId(`history-range-${k}`).getAttribute("aria-pressed") === "true");
+    expect(lit()).toEqual(["today"]);
+    await act(async () => { fireEvent.click(screen.getByTestId("history-range-yesterday")); });
+    for (let i = 0; i < 6; i++) await act(async () => { await Promise.resolve(); });
+    expect(lit()).toEqual(["yesterday"]);
+    await act(async () => { fireEvent.click(screen.getByTestId("history-range-month")); });
+    for (let i = 0; i < 6; i++) await act(async () => { await Promise.resolve(); });
+    expect(lit()).toEqual(["month"]);
+    const refresh = screen.getByTestId("history-refresh");
+    expect(refresh.textContent).toBe("");
+    expect(refresh.getAttribute("aria-label")).toBe("action.refresh");
+    expect(refresh.querySelector("svg")).not.toBeNull();
+  });
+
   test("the person and the dates narrow together", async () => {
     repo.listEventActors.mockResolvedValue([anna]);
     repo.list.mockResolvedValue([]);
@@ -413,10 +466,10 @@ describe("SessionsHistory — whose actions", () => {
 
     const call = lastFeedCall();
     expect(call.user_id).toBe(11);
-    const yesterdayStart = new Date(today);
-    yesterdayStart.setDate(yesterdayStart.getDate() - 1);
-    yesterdayStart.setHours(0, 0, 0, 0);
-    expect(call.from).toBe(yesterdayStart.toISOString());
+    // «Вчера» is the WORKING day before the one running (2026-11-18), read
+    // over the hours the server counted it by.
+    expect(call.from).toBe("2026-11-17T00:00:00+04:00");
+    expect(call.to).toBe("2026-11-17T23:59:59+04:00");
   });
 
   test("another branch starts from «all staff» and its own list of people", async () => {
@@ -459,7 +512,7 @@ describe("product sales on the history page (2026-10-25)", () => {
   test("Refresh re-reads the sales too", async () => {
     await mount();
     const before = orders.list.mock.calls.length;
-    await act(async () => { fireEvent.click(screen.getByText("action.refresh")); });
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "action.refresh" })); });
     expect(orders.list.mock.calls.length).toBe(before + 1);
   });
 });

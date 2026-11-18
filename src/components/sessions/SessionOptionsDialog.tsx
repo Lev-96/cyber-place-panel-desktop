@@ -794,6 +794,7 @@ const SessionOptionsDialog = ({ session, platform, onClose, onChanged, platformN
               {paidNowOn && grantChargeCents !== null && (
                 <PaymentEditor
                   name={`time-prepaid-pay-${current.id}`}
+                  branchId={current.branch_id}
                   dueCents={grantChargeCents}
                   value={paidNowPay}
                   onChange={setPaidNowPay}
