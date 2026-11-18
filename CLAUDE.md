@@ -5336,3 +5336,43 @@ and flow is the server's, only formatted.
   and opens as before, but a NEW backend refuses an OLD panel's open at a
   branch that counts products (422, its `message` is shown). **Owner web**:
   bump `panel.ref`.
+
+## Every payment carries its way of paying (2026-11-18, owner)
+
+- **Stop receipt** (`StopReceiptModal`, running seat): no method preselected
+  (`emptyPaymentDraft(null)`). «Подтвердить и завершить» (`stop-confirm`) is
+  disabled while something is due and no way of paying is settled
+  (`payPending`: no method, or a split that does not add up); the editor says
+  «Выберите способ оплаты» (`pay.chooseMethod`, `pay-choose-method`). Nothing to
+  take (`nothingToTake`: covered by the prepayment, `is_free`, or a zero bill):
+  no editor, the body is `{ payment_method: "cash" }`, byte for byte the old
+  default. Keep playing / cancel / the board callbacks and PS5 signals are
+  unchanged; only when the button enables changed.
+- **Ended by itself** (`markable`): nothing preselected, `pay-mark-confirm`
+  enabled only once a method is chosen, and the receipt can NOT be closed until
+  the payment is recorded: no «Закрыть», and `Modal` gets `onClose={undefined}`
+  + `closeOnBackdrop={false}` (a Modal without `onClose` already refuses ×,
+  backdrop and Escape; Modal itself was not changed). Recorded: finished, closes
+  as before. A refusal no retry can fix (409 already recorded, 403, a 422
+  WITHOUT field errors such as «shift closed») makes it closable
+  (`pay.cannotRecord`). A receipt opened on a RUNNING seat that a person then
+  stopped elsewhere (`status: "stopped"`) is not asked: that desk took the
+  payment.
+- **Seats that ended while no board was open**: `useUnpaidEndedSeats`
+  (`src/components/sessions/useUnpaidEndedSeats.ts`) reads
+  `GET /sessions?branch_id&from=now-24h&limit=200` on the board's mount and then
+  once a minute (its own timer, one GET a minute), keeps `isUnpaidEndedSeat`
+  (expired/stopped, no `payment_method`, no `payments`, not free, not
+  cancelled, `total_paid > 0`) and opens each as the same mandatory receipt, one
+  at a time, never over an open one (`current ?? next`). A seat settled here
+  (`onPaymentSettled`) is never re-queued while the board is mounted. The
+  history scope applies: a manager is only asked about seats they opened.
+- **Payment model**: `PaymentDraft.method` is `PaymentMethod | null`;
+  `checkPayment` reports `"method"` for null; `paymentBody` /
+  `prepaidPaymentFields` throw rather than send no method. The till, Start and
+  «+ Время» keep `emptyPaymentDraft()` = cash.
+- Tests: `StopReceiptModal.test.tsx` («every payment carries its way of
+  paying»), `SessionsBoard.unpaidEnded.test.tsx`, `useUnpaidEndedSeats.test.ts`,
+  `paymentSplit.test.ts`, `PaymentEditor.test.tsx`; e2e
+  `e2e/mandatory-payment-method.spec.ts` (en/ru/am × 1280/520). Every e2e that
+  confirms a stop now presses a method first.

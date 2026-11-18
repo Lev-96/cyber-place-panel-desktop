@@ -12,8 +12,8 @@ vi.mock("@/i18n/LanguageContext", () => ({
 }));
 
 let last: PaymentDraft = emptyPaymentDraft();
-const Host = ({ due, branchId }: { due: number; branchId?: number }) => {
-  const [d, setD] = useState<PaymentDraft>(emptyPaymentDraft());
+const Host = ({ due, branchId, start }: { due: number; branchId?: number; start?: PaymentDraft }) => {
+  const [d, setD] = useState<PaymentDraft>(start ?? emptyPaymentDraft());
   last = d;
   return <PaymentEditor name="p" dueCents={due} value={d} onChange={setD} check={checkPayment(due, d)} money={String} branchId={branchId} />;
 };
@@ -151,5 +151,21 @@ describe("PaymentEditor", () => {
     expect(screen.queryByText(/^\+ (?!pay)/)).toBeNull();
     expect(screen.getByTestId("pay-own-add")).toBeTruthy();
   });
-});
 
+  test("nothing chosen (a seat's receipt, 2026-11-18): no button checked, the hint shown until one is pressed", async () => {
+    render(<Host due={500000} start={emptyPaymentDraft(null)} />);
+    for (const m of ["cash", "card", "other", "split"]) {
+      expect(screen.getByTestId(`pay-${m}`).getAttribute("aria-checked")).toBe("false");
+    }
+    expect(screen.getByTestId("pay-choose-method").textContent).toBe("pay.chooseMethod");
+    await act(async () => { fireEvent.click(screen.getByTestId("pay-card")); });
+    expect(last).toMatchObject({ split: false, method: "card" });
+    expect(screen.queryByTestId("pay-choose-method")).toBeNull();
+  });
+
+  test("the default draft (till, start, «+ Время») still starts on cash, with no hint", () => {
+    render(<Host due={500000} />);
+    expect(screen.getByTestId("pay-cash").getAttribute("aria-checked")).toBe("true");
+    expect(screen.queryByTestId("pay-choose-method")).toBeNull();
+  });
+});

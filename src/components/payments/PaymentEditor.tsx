@@ -105,6 +105,13 @@ const PaymentEditor = ({ name, dueCents, value, onChange, check, money, disabled
           {t("pay.split")}
         </button>
       </div>
+      {/* Nothing preselected on a seat's receipt (2026-11-18, owner): said in
+          plain words beside the buttons until one is pressed. */}
+      {check.problem === "method" && (
+        <div className="pay-editor__choose" data-testid="pay-choose-method" aria-live="polite">
+          {t("pay.chooseMethod")}
+        </div>
+      )}
 
       {!value.split && value.method === "other" && (
         <Input

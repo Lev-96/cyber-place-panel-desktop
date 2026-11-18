@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { checkPayment, emptyPaymentDraft, fillRemaining, paymentBody } from "./paymentSplit";
+import { checkPayment, emptyPaymentDraft, fillRemaining, paymentBody, prepaidPaymentFields } from "./paymentSplit";
 
 // An `other` part is typed only after «+ Свой вариант» (2026-11-18): the
 // helper presses it whenever one is given.
@@ -103,4 +103,22 @@ describe("«Свой вариант» in a split (2026-11-18, owner)", () => {
     const d = { ...split({ cash: "" }), amounts: { cash: "", card: "", other: "4000" }, own: { shown: false, label: "" } };
     expect(fillRemaining(500000, d, "cash").amounts.cash).toBe("5000.00");
   });
+
+  test("nothing chosen yet (2026-11-18): not ok, problem «method», and never a body without a method", () => {
+    const d = emptyPaymentDraft(null);
+    const c = checkPayment(340000, d);
+    expect(c).toMatchObject({ ok: false, problem: "method", lines: [] });
+    expect(() => paymentBody(d, c)).toThrow();
+    expect(() => prepaidPaymentFields(d, c)).toThrow();
+    // A split needs no single method: its parts are the answer.
+    const parts = { ...split({ cash: "1000", card: "2400" }, ""), method: null };
+    expect(checkPayment(340000, parts)).toMatchObject({ ok: true, problem: null });
+    expect(paymentBody(parts, checkPayment(340000, parts))).toEqual({ payments: [{ method: "cash", amount: 1000 }, { method: "card", amount: 2400 }] });
+  });
+
+  test("the default draft is still cash (the till, Start, «+ Время» keep it)", () => {
+    expect(emptyPaymentDraft().method).toBe("cash");
+    expect(checkPayment(100, emptyPaymentDraft())).toMatchObject({ ok: true, problem: null });
+  });
 });
+

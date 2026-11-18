@@ -174,6 +174,8 @@ test("the stop receipt resets the counter, reads itself again and charges the ne
   await expect(page.getByTestId("receipt-reset")).toHaveCount(0);
   await expect(page.getByText(/counter reset, .*waived/)).toBeVisible();
 
+  // No method is preselected (2026-11-18, owner): cash is pressed first.
+  await page.getByTestId("pay-cash").click();
   await page.getByTestId("stop-confirm").click();
   await expect.poll(() => stopBody).not.toBeNull();
   expect(stopBody).toMatchObject({ priced_at: "2026-11-05T15:16:05Z", expected_total: 300 });

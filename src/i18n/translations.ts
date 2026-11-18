@@ -1668,6 +1668,8 @@ export const TRANSLATIONS: Dict = {
   "pay.sumMismatch": { en: "The parts must add up to the bill exactly", ru: "Сумма частей должна точно равняться счёту", am: "Մասերի գումարը պետք է ճիշտ հավասար լինի հաշվին" },
   "pay.markAfterAuto": { en: "This seat ended by itself and nobody recorded the payment. Mark how it was paid.", ru: "Место завершилось само, и оплату никто не отметил. Отметьте, как оплатили.", am: "Տեղն ավարտվեց ինքնուրույն, և վճարումը ոչ ոք չնշեց։ Նշեք, թե ինչպես վճարեցին։" },
   "pay.markConfirm": { en: "Record payment", ru: "Отметить оплату", am: "Նշել վճարումը" },
+  "pay.chooseMethod": { en: "Choose how it was paid", ru: "Выберите способ оплаты", am: "Ընտրեք վճարման եղանակը" },
+  "pay.cannotRecord": { en: "This payment cannot be recorded here. The receipt can be closed.", ru: "Эту оплату здесь отметить нельзя. Чек можно закрыть.", am: "Այս վճարումն այստեղ հնարավոր չէ նշել։ Կտրոնը կարելի է փակել։" },
   "pay.recorded": { en: "Payment recorded · {0}", ru: "Оплата отмечена · {0}", am: "Վճարումը նշվեց · {0}" },
   "pay.split": { en: "Split", ru: "Разделить", am: "Բաժանել" },
   "pay.otherShort": { en: "Other", ru: "Другое", am: "Այլ" },

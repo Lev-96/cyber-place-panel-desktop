@@ -62,6 +62,7 @@ import FeeSentence from "./FeeSentence";
 import { outsideFoodFeeOf, productLineCount } from "./outsideFood";
 import { useTransientFlags } from "@/hooks/useTransientFlags";
 import { useExpiryNudge } from "./useExpiryNudge";
+import { useUnpaidEndedSeats } from "./useUnpaidEndedSeats";
 import { dropSideOf, moveOnto } from "@/utils/reorder";
 import { placeTypeLabelKey } from "@/utils/placeType";
 
@@ -108,6 +109,10 @@ const SessionsBoard = ({ branchId }: Props) => {
   // opens it on that seat and today; the header's «Календарь броней» on all.
   const [calendar, setCalendar] = useState<{ focusPlaceId?: number } | null>(null);
   const [stopTarget, setStopTarget] = useState<ISessionApi | null>(null);
+  // Seats that ended unpaid while no board was open (2026-11-18, owner): found
+  // on mount and then once a minute, each opened in turn as the same
+  // mandatory receipt, never over an open one.
+  const unpaidEnded = useUnpaidEndedSeats(branchId, stopTarget, setStopTarget);
   const [addItemTarget, setAddItemTarget] = useState<ISessionApi | null>(null);
   // The till's sale, opened from the board's header (2026-10-25).
   const [sellOpen, setSellOpen] = useState(false);
@@ -1383,6 +1388,7 @@ const SessionsBoard = ({ branchId }: Props) => {
           onTimeReset={() => { void sessions.reload(); }}
           // The same right as the reset: both give money away.
           canCancel={mayReset}
+          onPaymentSettled={unpaidEnded.settle}
         />
       )}
       {optionsTarget && (

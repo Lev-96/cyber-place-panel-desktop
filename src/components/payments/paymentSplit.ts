@@ -28,8 +28,12 @@ export const OWN_LABEL_MAX = 64;
 
 export interface PaymentDraft {
   split: boolean;
-  /** The one method when not split. */
-  method: PaymentMethod;
+  /**
+   * The one method when not split. `null`: nothing chosen yet (2026-11-18,
+   * owner: a seat's receipt preselects no method, the cashier must pick one).
+   * Only the receipt starts there; the till, Start and «+ Время» start on cash.
+   */
+  method: PaymentMethod | null;
   /** Optional. Not split: what "other" was. Split: how it was paid ("3000 картой, 2000 наличными"). */
   note: string;
   /** Split: what was typed per method (empty = not this method). */
@@ -41,11 +45,13 @@ export interface PaymentDraft {
   own?: { shown: boolean; label: string };
 }
 
-export const emptyPaymentDraft = (method: PaymentMethod = "cash"): PaymentDraft => ({
+export const emptyPaymentDraft = (method: PaymentMethod | null = "cash"): PaymentDraft => ({
   split: false, method, note: "", amounts: { cash: "", card: "", other: "" }, own: { shown: false, label: "" },
 });
 
 export type PaymentProblem =
+  /** Not split, and no method chosen yet (2026-11-18). */
+  | "method"
   /** A part is not an amount (letters, three decimals, a minus). */
   | "invalid"
   /** Split, but no part above zero typed yet. */
@@ -79,7 +85,11 @@ const partCents = (raw: string): number | null => {
 
 /** The draft read against the bill: what it would send, or why it cannot. */
 export const checkPayment = (dueCents: number, d: PaymentDraft): PaymentCheck => {
-  if (!d.split) return { ok: true, problem: null, lines: [], remainingCents: 0 };
+  if (!d.split) {
+    return d.method === null
+      ? { ok: false, problem: "method", lines: [], remainingCents: dueCents }
+      : { ok: true, problem: null, lines: [], remainingCents: 0 };
+  }
   const lines: PaymentLine[] = [];
   let sum = 0;
   for (const method of SPLIT_METHODS) {
@@ -118,7 +128,12 @@ const singleBody = (method: PaymentMethod, text: string): { payment_method: Paym
 export const paymentBody = (d: PaymentDraft, check: PaymentCheck):
   | { payment_method: PaymentMethod; payment_method_other?: string }
   | { payments: PaymentLine[]; payment_note?: string } => {
-  if (!d.split) return singleBody(d.method, d.note);
+  if (!d.split) {
+    // Never a request without a method (2026-11-18): every caller gates on
+    // `check.ok` first, so this only fires on a caller that forgot to.
+    if (d.method === null) throw new Error("paymentBody: no payment method chosen");
+    return singleBody(d.method, d.note);
+  }
   // One part left: as a single method; a lone «Свой вариант» sends its name
   // as the «Другое» text, which the server keeps as the name.
   if (check.lines.length === 1) return singleBody(check.lines[0].method, check.lines[0].label ?? d.note);

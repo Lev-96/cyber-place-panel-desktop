@@ -9516,6 +9516,15 @@ select.input option:disabled {
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
+/* «Выберите способ оплаты» (2026-11-18): the same amber note as «осталось». */
+.pay-editor__choose {
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  background: rgb(var(--warning-rgb) / 0.12);
+  color: var(--color-warning);
+  font-size: 13px;
+  font-weight: 600;
+}
 .pay-editor__remaining.is-done { background: rgb(var(--success-rgb) / 0.12); color: var(--color-success); }
 .pay-editor__note { resize: vertical; min-height: 56px; }
 /* A free seat reserved later (2026-11-07): how long a walk-in may play. */
