@@ -74,26 +74,19 @@ afterEach(() => cleanup());
 describe("no shift open", () => {
   beforeEach(() => repo.current.mockResolvedValue({ shift: null, report: null }));
 
-  test("opens one with the counted opening cash, sent as an exact amount, once", async () => {
+  test("opens one at once, with no opening cash asked (2026-11-18, owner), once", async () => {
     repo.open.mockResolvedValue({ shift: shift() });
     await mount();
-    fireEvent.change(screen.getByTestId("shift-opening-cash"), { target: { value: "20 000,5" } });
+    expect(screen.queryByTestId("shift-opening-cash")).toBeNull();
     const button = screen.getByTestId("shift-open");
     await act(async () => { fireEvent.click(button); fireEvent.click(button); });
 
     expect(repo.open).toHaveBeenCalledTimes(1);
     // 2026-11-18: one body, always with a press id and the (here empty) count.
     expect(repo.open).toHaveBeenCalledWith({
-      branch_id: 4, opening_cash: "20000.50", client_request_id: expect.any(String), stock_counts: [],
+      branch_id: 4, opening_cash: "0.00", client_request_id: expect.any(String), stock_counts: [],
     });
     expect(repo.current).toHaveBeenCalledTimes(2); // re-read after opening
-  });
-
-  test("an amount that is not one cannot be sent", async () => {
-    await mount();
-    fireEvent.change(screen.getByTestId("shift-opening-cash"), { target: { value: "12.345" } });
-    expect((screen.getByTestId("shift-open") as HTMLButtonElement).disabled).toBe(true);
-    expect(screen.getByText("shift.countedInvalid")).toBeTruthy();
   });
 
   test("somebody else opened it a moment ago: shown, not an error", async () => {

@@ -1,5 +1,4 @@
 import Button from "@/components/ui/Button";
-import Input from "@/components/ui/Input";
 import Modal from "@/components/ui/Modal";
 import { SkeletonText } from "@/components/ui/Skeleton";
 import { StateSwitch, deriveViewState } from "@/components/ui/state";
@@ -14,7 +13,7 @@ import { renderText } from "@/i18n/localizedText";
 import { useAsync } from "@/hooks/useAsync";
 import { useLang } from "@/i18n/LanguageContext";
 import { shiftRepository } from "@/repositories/ShiftRepository";
-import { parseCents, toAmount } from "@/shifts/cash";
+import { toAmount } from "@/shifts/cash";
 import type { IShiftWithReport } from "@/types/shifts";
 import { useCallback, useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
@@ -46,14 +45,12 @@ const Shift = () => {
   // Bumped after an open or a close so the history below re-reads.
   const [historyKey, setHistoryKey] = useState(0);
 
-  const [openingCash, setOpeningCash] = useState("");
   const [notice, setNotice] = useState<string | null>(null);
   const [closing, setClosing] = useState(false);
   const [viewing, setViewing] = useState<IShiftWithReport | null>(null);
 
   const reload = current.reload;
   const reloadAll = useCallback(() => { void reload(); setHistoryKey((k) => k + 1); }, [reload]);
-  const openingCents = openingCash.trim() === "" ? 0 : parseCents(openingCash);
 
   const live = current.data;
   const isOpen = Boolean(live?.shift);
@@ -62,13 +59,12 @@ const Shift = () => {
   // opens at once (nothing to count) or shows the count step.
   const alreadyOpen = useCallback(() => setNotice(t("shift.alreadyOpen")), [t]);
   const opening = useShiftOpening(id, { isOpen, onSettled: reloadAll, onAlreadyOpen: alreadyOpen });
-  // The typed cash is cleared once the shift it opened is there.
-  useEffect(() => { if (isOpen) setOpeningCash(""); }, [isOpen]);
-
+  // No opening cash is asked any more (2026-11-18, owner): a shift opens
+  // with 0 in the drawer's opening float, as an empty field always sent.
   const open = () => {
-    if (opening.busy || openingCents === null) return;
+    if (opening.busy) return;
     setNotice(null);
-    void opening.start(toAmount(openingCents));
+    void opening.start(toAmount(0));
   };
 
   // An open shift's figures are "as of" the last read: re-read every minute so
@@ -115,18 +111,8 @@ const Shift = () => {
           <div className="card col" style={{ gap: 10, maxWidth: 520 }} data-testid="shift-none">
             <strong>{t("shift.none")}</strong>
             <span className="muted" style={{ fontSize: 13 }}>{t("shift.noneHint")}</span>
-            <Input
-              label={t("shift.openingCash")}
-              inputMode="decimal"
-              placeholder="0"
-              value={openingCash}
-              onChange={(e) => setOpeningCash(e.target.value)}
-              disabled={opening.busy}
-              data-testid="shift-opening-cash"
-            />
-            {openingCents === null && <span className="error" style={{ fontSize: 12 }}>{t("shift.countedInvalid")}</span>}
             <div>
-              <Button onClick={open} disabled={opening.busy || openingCents === null} data-testid="shift-open">
+              <Button onClick={open} disabled={opening.busy} data-testid="shift-open">
                 {opening.busy && !opening.step ? t("shift.opening") : t("shift.open")}
               </Button>
             </div>

@@ -105,7 +105,6 @@ describe("the count step", () => {
   test("sends the exact body once, then toasts «Смена открыта, товары приняты»", async () => {
     repo.open.mockResolvedValue({ shift: opened, acceptance_count: { blind: true, rows: [], count: 2 } });
     await mount();
-    fireEvent.change(screen.getByTestId("shift-opening-cash"), { target: { value: "15000" } });
     await pressOpen();
     type("Cola", "4");
     type("Chips", "0");
@@ -114,7 +113,7 @@ describe("the count step", () => {
     expect(repo.open).toHaveBeenCalledTimes(1);
     expect(repo.open).toHaveBeenCalledWith({
       branch_id: 4,
-      opening_cash: "15000.00",
+      opening_cash: "0.00",
       client_request_id: expect.any(String),
       stock_counts: [{ product_id: 1, counted: 4 }, { product_id: 2, counted: 0 }],
     });

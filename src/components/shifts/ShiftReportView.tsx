@@ -142,7 +142,9 @@ const ShiftReportView = ({ shift, report, viewerId = null }: Props) => {
         </Section>
 
         <Section title={t("shift.cash")}>
-          <Row label={t("shift.cashOpening")} value={m(report.cash.opening)} />
+          {/* Opening cash is no longer asked (2026-11-18, owner): the row stays
+              only for a shift that was opened with some. */}
+          {Number(report.cash.opening) !== 0 && <Row label={t("shift.cashOpening")} value={m(report.cash.opening)} />}
           <Row label={`+ ${t("shift.cashPlaces")}`} value={m(report.cash.places)} />
           <Row label={`+ ${t("shift.cashTill")}`} value={m(report.cash.till)} />
           {/* v5 (2026-11-15): cash paid AHEAD. Shown only when there was some,

@@ -82,7 +82,6 @@ for (const lang of LANGS) {
       });
 
       await page.goto("/#/branches/1/shift");
-      await page.getByTestId("shift-opening-cash").fill("1000");
       await page.getByTestId("shift-open").click();
 
       const step = page.getByTestId("shift-accept");
@@ -119,7 +118,7 @@ for (const lang of LANGS) {
 
       expect(bodies).toHaveLength(2);
       expect(bodies[0]).toEqual({
-        branch_id: 1, opening_cash: "1000.00", client_request_id: expect.any(String),
+        branch_id: 1, opening_cash: "0.00", client_request_id: expect.any(String),
         stock_counts: [{ product_id: 1, counted: 7 }, { product_id: 2, counted: 0 }],
       });
       expect(bodies[1].stock_counts).toEqual([{ product_id: 1, counted: 7 }, { product_id: 2, counted: 0 }, { product_id: 3, counted: 4 }]);
