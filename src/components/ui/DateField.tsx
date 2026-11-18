@@ -1,4 +1,3 @@
-import { useRef } from "react";
 
 interface Props {
   /** ISO `YYYY-MM-DD`. */
@@ -24,31 +23,35 @@ export const isoToDisplay = (iso: string): string => {
  * max are its own, unchanged.
  */
 const DateField = ({ value, onChange, min, max, ariaLabel, testId }: Props) => {
-  const input = useRef<HTMLInputElement>(null);
-  const open = () => {
-    const el = input.current;
-    if (!el) return;
+  /**
+   * The real date input lies OVER the text, transparent and full size
+   * (2026-11-18, owner: on a phone the calendar did not open): a tap lands on
+   * the input itself, so every phone opens its own picker natively — no
+   * script call needed, which mobile browsers refuse for a hidden input. On a
+   * computer a click on the field's body does not open the calendar by
+   * itself, so the click also asks for it (ignored where not supported).
+   */
+  const open = (el: HTMLInputElement) => {
     try {
       el.showPicker();
     } catch {
-      el.focus();
+      /* the platform opens it on its own (phones), or offers its own button */
     }
   };
 
   return (
     <span className="date-field" data-testid={testId}>
-      <button type="button" className="input date-field__text" onClick={open} aria-label={`${ariaLabel}: ${isoToDisplay(value)}`}>
+      <span className="input date-field__text" aria-hidden="true">
         {isoToDisplay(value)}
-      </button>
+      </span>
       <input
-        ref={input}
         type="date"
         className="date-field__native"
         value={value}
         min={min}
         max={max}
-        tabIndex={-1}
-        aria-hidden="true"
+        aria-label={`${ariaLabel}: ${isoToDisplay(value)}`}
+        onClick={(e) => open(e.currentTarget)}
         onChange={(e) => { if (e.target.value) onChange(e.target.value); }}
       />
     </span>
