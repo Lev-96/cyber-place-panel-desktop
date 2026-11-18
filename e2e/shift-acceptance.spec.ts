@@ -177,7 +177,8 @@ for (const lang of LANGS) {
       });
       await page.route(at("/shifts"), (r: Route) => r.fulfill(json({ data: [], meta: { current_page: 1, last_page: 1, per_page: 20, total: 0 } })));
       await page.goto("/#/notifications");
-      const title = page.getByText(`⚠ ${t("notifications.stockShortageTitle", lang).replace("{amount}", "")}`, { exact: false });
+      // The shortage row is Armenian whatever the screen's language (2026-11-18, owner).
+      const title = page.getByText(`⚠ ${t("notifications.stockShortageTitle", "am").replace("{amount}", "")}`, { exact: false });
       await expect(title).toBeVisible();
       await expect(page.getByTestId("notification-body")).toContainText("Abovyan 1");
       await expect(page.getByTestId("notification-body")).toContainText("17.11 10:00–12:00");

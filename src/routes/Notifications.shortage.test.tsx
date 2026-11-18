@@ -46,18 +46,19 @@ describe("shift.stock_shortage", () => {
   test("reads as a sentence with the server's sum, the branch, whose shift and when", async () => {
     feed.list = [row({})];
     await act(async () => { render(<Notifications />); });
-    expect(screen.getByText("⚠ Недостача при приёме смены: 500 драм")).toBeTruthy();
+    expect(screen.getByText("⚠ Պակասորդ՝ 500 դրամ")).toBeTruthy();
     const body = screen.getByTestId("notification-body").textContent!;
-    expect(body).toContain("Abovyan 1 · смена Anna 17.11 10:00–12:00");
-    expect(body).toContain("Cola −1 (500 драм)");
-    expect(body).toContain("Смены не было с 17.11 12:00 до 18.11 12:30");
+    // Always Armenian, in a few words (2026-11-18, owner).
+    expect(body).toContain("Abovyan 1 · հերթափոխ՝ Anna, 17.11 10:00–12:00");
+    expect(body).toContain("Cola՝ 1 հատ");
+    expect(body).toContain("Բաց հերթափոխ չի եղել 17.11 12:00 – 18.11 12:30");
     expect(body).not.toContain("—");
   });
 
   test("a press marks it read and opens that shift's report", async () => {
     feed.list = [row({})];
     await act(async () => { render(<Notifications />); });
-    await act(async () => { fireEvent.click(screen.getByText("⚠ Недостача при приёме смены: 500 драм")); });
+    await act(async () => { fireEvent.click(screen.getByText("⚠ Պակասորդ՝ 500 դրամ")); });
     expect(feed.markRead).toHaveBeenCalledWith("x-1");
     expect(nav.navigate).toHaveBeenCalledWith("/shifts?shift_id=42");
   });
@@ -69,7 +70,7 @@ describe("shift.stock_shortage", () => {
     })];
     await act(async () => { render(<Notifications />); });
     const body = screen.getByTestId("notification-body").textContent!;
-    expect(body).not.toContain("Смены не было");
-    expect(body).toContain("P1 −1 (100 драм), P2 −2 (100 драм), P3 −3 (100 драм), и ещё 3");
+    expect(body).not.toContain("Բաց հերթափոխ");
+    expect(body).toContain("P1՝ 1 հատ, P2՝ 2 հատ, P3՝ 3 հատ, և ևս 3 ապրանք");
   });
 });
