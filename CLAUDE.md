@@ -5205,3 +5205,70 @@ in `src/api/agent-updates.ts`.
   menu «Доход и оплата Cyber Place»; no figure or formula changed.
   Tests: SalesSummaryPanel (5), DateField (3), paymentSplit (+4),
   PaymentEditor (+1); e2e `sales-history-figures.spec.ts` (en/ru/am × 1280/520).
+
+## «Быстрая Еда» and «Мои партнёры» (2026-11-18, owner)
+
+Backend contract: `cyber-place/CLAUDE.md` § "«Быстрая Еда» and «Мои партнёры»".
+The panel computes no money here: every sum, share and «должен» is the server's
+string, only formatted (`owedAmount` strips the sign of `partner_share`, a
+string edit; `percentText` drops trailing zeros of "10.00").
+
+- **Types / API** — `IProduct.is_fast_food` / `partner_id` (`types/pos.ts`,
+  `isFastFoodProduct`); `CreateProductBody` gains both. `api/partners.ts`
+  (`IPartner`, `PartnerBody` = the figure of the chosen terms only,
+  `ISettlement`), `repositories/PartnerRepository.ts` (reads surface errors,
+  writes toast `toast.partner.*`). `ISalesSummary` gains
+  `totals.fast_food_total/_units`, `products_rows`, `window.place_id /
+  till_included`, line `note`, query `place_id` (all optional: an older backend).
+- **Permissions** — `menu.partners` + `partners.manage`: admin, company_owner;
+  never a manager (mirrors backend `partners.manage`).
+- **Products** (`routes/ProductsList.tsx`) — three tabs «Товары» (regular, not
+  fast food) / «Быстрая Еда» / «Дополнительные предметы»; the two sold-by-unit
+  tabs keep stock. Owner/admin: the partners of the branch's company
+  (`branchRepository.byId` → `partnerRepository.list(company, true)`), each
+  fast-food row says «Партнёр: X» / «Свой товар клуба». A manager never asks.
+  New from the fast-food tab = `fastFood` preset. Below 700px the products'
+  three tabs and the partners' two wrap whole instead of «Ապր…»
+  (`.cp-subtabs-wrap`); a wide window keeps equal shares + ellipsis, as
+  `e2e/notifications-tabs.spec.ts` pins (its count went 2 → 3).
+- **ProductForm** — «Быстрая Еда» switch on regular products; «Чей товар» select
+  only when `partners` is passed (owner/admin): «Свой товар клуба» + active,
+  not archived partners (+ the product's own if archived, `partnerChoices`).
+  Body: `is_fast_food` only when it differs from what is STORED (a create:
+  only when on), `partner_id` only from someone with the list and only when it
+  changes; switching fast food off sends `partner_id: null` in the same save
+  (the server refuses the reverse). A manager editing a partner's product sees
+  the switch locked on (`product.fastFoodLocked`).
+- **History labels** — `fast_food_changed`, `partner_changed`; partner ids read
+  as names from the company's partners, else «Партнёр №N».
+- **«Мои партнёры»** (`/partners`, `routes/Partners.tsx`, sidebar rank 4.6 after
+  «Смены», icon `nav.partners`): `components/partners/` — `PartnerList`
+  (terms in words «10% остаётся клубу» / «50 000 драм в месяц платит клубу»,
+  products count, archive via `useConfirm`, archive shown on request,
+  read-only), `PartnerDialog`, `PartnerSettlementView` (month ‹ › with «с
+  01.11.2026 по 30.11.2026», branch select when the company has several, one
+  card per partner: «Продано на», «Штук», rows, «Клубу», «Партнёру», «Партнёр
+  должен клубу X» on `partner_owes`; then the club's own fast food; the note is
+  the panel's `partners.termsNote`, not the server's `terms_note`).
+- **«История продаж»** — `SalesSummaryPanel` now always renders (with or
+  without a place): «Быстрая Еда» card (fast_food_total, «Штук: N», «уже входит
+  в итог») and «Общая сумма товаров» open `products_rows` (fast food filtered by
+  `is_fast_food`) with no extra request; records show «Комментарий: …». A picked
+  place sends `place_id` on the figures and on every drill-down; with
+  `till_included: false` the till card is replaced by «Без продаж товаров без
+  места». The old client tiles (`hooks/useSessionsSummary.ts`, summing
+  `total_paid` of `/sessions` here) and their `history.sum*` / `history.topItems`
+  keys are deleted.
+- **Tests**: `ProductForm.fastFood.test.tsx` (12), `ProductsList.fastFood.test.tsx`
+  (6), `partners/partnerTerms.test.ts` (5), `partners/Partners.test.tsx` (12),
+  `routes/Partners.test.tsx` (3), `SalesSummaryPanel` (+7), place filter (+1),
+  `productEventChange` (+2), permissions (+1); sidebar order/icons updated for
+  the new entry. 10 mutations caught. e2e `fast-food-partners.spec.ts` (21:
+  en/ru/am × 1280/520 for partners, products tab, history; manager × 3).
+  Screenshots: `~/cyber-place-local/reports/sales-history-2026-11-18/shots/`.
+- ⚠️ Deploy the backend first (an older backend: no fast-food card, products
+  card not clickable, `/partners` 404s). **Owner web**: bump `panel.ref`; its
+  `sideMenu.ts` reads `menuSpecsFor` generically, so the entry arrives with it,
+  but `tests/appShell.test.tsx` «a menu that fits…» must add `"nav.partners"`
+  to its `hideable` list in the same bump (checked against this panel: 1 red
+  without it, 199/199 with it).
