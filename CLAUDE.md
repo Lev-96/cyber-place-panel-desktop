@@ -5272,3 +5272,13 @@ string edit; `percentText` drops trailing zeros of "10.00").
   but `tests/appShell.test.tsx` «a menu that fits…» must add `"nav.partners"`
   to its `hideable` list in the same bump (checked against this panel: 1 red
   without it, 199/199 with it).
+- **Working day, venue calendar, «Когда платит игрок?», saved own options (2026-11-18).**
+  «История продаж» opens on the working day the SERVER says is running
+  (`/sales-summary` without dates), presets by it (active one `.is-active`, blue),
+  refresh is a yellow `RefreshIcon` button; every list on the screen waits for the
+  summary's `window` and reads exactly its `from`/`to`. Money screens use the venue
+  calendar helpers in `i18n/dates.ts` (`venueDateInput`, `formatVenueDate/Time`,
+  `venueMonthBoundsIso`, Asia/Yerevan +04:00); the old formatters are unchanged
+  (PS5's PSN card untouched). Start dialog: «При Стоп» / «Сейчас, до игры»
+  (`prepaid-later` / `prepaid-switch`, radios). `PaymentEditor` takes `branchId`
+  and offers `GET /branches/{id}/payment-labels` as «+ name» buttons.
