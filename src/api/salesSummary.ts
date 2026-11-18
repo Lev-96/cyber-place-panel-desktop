@@ -92,8 +92,10 @@ export interface SalesQuery {
   per_page?: number;
   kind?: "place" | "till";
   method?: string;
-  /** "" = an unnamed «Другое». */
+  /** A «Свой вариант» name. */
   label?: string;
+  /** Only «Другое» parts with no name (an empty `label` would not reach the server). */
+  unnamed?: 1;
   /** One place's bills only (2026-11-18): no sale without a place, no tournament. */
   place_id?: number;
 }

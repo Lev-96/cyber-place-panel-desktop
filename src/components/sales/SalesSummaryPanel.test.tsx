@@ -206,5 +206,14 @@ describe("SalesSummaryPanel — «Быстрая Еда», products, comments, o
     expect(screen.getByTestId("sales-grand")).toBeTruthy();
     expect(screen.queryByText("Быстрая Еда")).toBeNull();
   });
+
+  test("«Другое (без названия)» asks for the nameless parts only (2026-11-18)", async () => {
+    const base = summary().data;
+    api.fn.mockResolvedValue({ data: { ...base, by_method: [...base.by_method.filter((r) => r.label !== null || r.method !== "other"), { method: "other", label: null, amount: "50.00", count: 1 }] } });
+    await mount();
+    await act(async () => { fireEvent.click(screen.getByTestId("sales-method-other")); });
+    expect(api.fn).toHaveBeenLastCalledWith(1, expect.objectContaining({ method: "other", unnamed: 1 }));
+    expect(api.fn.mock.lastCall?.[1]).not.toHaveProperty("label");
+  });
 });
 

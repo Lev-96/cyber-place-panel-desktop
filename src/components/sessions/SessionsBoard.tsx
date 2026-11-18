@@ -1337,7 +1337,7 @@ const SessionsBoard = ({ branchId }: Props) => {
           branchId={branchId}
           pc={startTarget}
           onClose={() => { setStartTarget(null); setStartBookingId(undefined); }}
-          onStarted={() => {
+          onStarted={(started) => {
             // The console may legitimately wake from now on. Said BEFORE the
             // reload, because the monitor can tick before the session row is
             // visible — and a monitor that sees "awake, no session" is a
@@ -1345,6 +1345,11 @@ const SessionsBoard = ({ branchId }: Props) => {
             if (startTarget.console_host_id) sessionStarting(startTarget.id);
             setStartTarget(null);
             setStartBookingId(undefined);
+            // The tile turns busy AT ONCE with the seat the server started
+            // (2026-11-18, owner: no delay after Start); the reads below then
+            // bring the board as the server has it. The board's own list only:
+            // the PlayStation layer reads its own (Ps5ControlProvider).
+            if (started) sessions.mutate((list) => [...(list ?? []).filter((s) => s.id !== started.id && s.pc_id !== started.pc_id), started]);
             void sessions.reload();
             void pcs.reload();
           }}
@@ -1367,6 +1372,9 @@ const SessionsBoard = ({ branchId }: Props) => {
             // it was cancelled, not paid.
             notify.message("success", fmt(t(outcome?.cancelled ? "session.cancel.toast" : "session.toastStopped"), seatOf(stopTarget.pc_id)));
             noticeUnpaid(stopTarget.id, stopTarget.pc_id, outcome?.unpaidAmount);
+            // The tile is free AT ONCE (2026-11-18, owner: no delay after
+            // Stop); the reads below bring the board as the server has it.
+            sessions.mutate((list) => (list ?? []).filter((s) => s.id !== stopTarget.id));
             void sessions.reload();
             void pcs.reload();
           }}

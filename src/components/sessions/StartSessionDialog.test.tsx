@@ -1769,3 +1769,21 @@ describe("own food as the seat's rate", () => {
     expect(screen.queryByTestId("outside-food-switch")).toBeNull();
   });
 });
+
+/** 2026-11-18 (owner): the board shows the new seat at once — the dialog hands it the server's answer. */
+describe("the started seat goes to the board", () => {
+  test("onStarted gets the session exactly as the server started it", async () => {
+    const created = { id: 91, pc_id: 3, status: "active" };
+    repo.start.mockResolvedValue(created);
+    const onStarted = vi.fn();
+    await act(async () => {
+      render(<StartSessionDialog branchId={7} pc={device()} onClose={() => {}} onStarted={onStarted} />);
+    });
+    await act(async () => { await new Promise((r) => requestAnimationFrame(() => r(null))); });
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "action.start" })); });
+    for (let i = 0; i < 4; i++) await act(async () => { await Promise.resolve(); });
+    expect(onStarted).toHaveBeenCalledTimes(1);
+    expect(onStarted.mock.calls[0][0]).toBe(created);
+  });
+});
+

@@ -15,7 +15,7 @@ import { fmt } from "@/i18n/translations";
 import { timePackageNameOf } from "@/i18n/timePackageName";
 import { branchRepository } from "@/repositories/BranchRepository";
 import { sessionRepository } from "@/repositories/SessionRepository";
-import { IPcApi, ITimePackage } from "@/types/sessions";
+import { IPcApi, ISessionApi, ITimePackage } from "@/types/sessions";
 import { isDeviceStartable, isPs } from "@/types/pc";
 import { isPlayStationSeat, packageFitsSeat } from "@/utils/platform";
 import { packageMismatchOf } from "@/api/packagePlatformMismatch";
@@ -46,7 +46,8 @@ interface Props {
   branchId: number;
   pc: IPcApi;
   onClose: () => void;
-  onStarted: () => void;
+  /** The seat as started — the board shows it at once (2026-11-18). */
+  onStarted: (session?: ISessionApi) => void;
   /**
    * A reservation picked BEFORE the dialog opened (2026-11-07: «Старт» on a
    * booking in the calendar) — preselected in «Кто садится?». Never assumed
@@ -403,6 +404,9 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted, bookingId }: Pro
   const submit = async () => {
     setBusy(true); setErr(null);
     try {
+      // The seat as the server started it (2026-11-18): the board shows it at
+      // once instead of waiting for its next read of the whole list.
+      let started: ISessionApi | undefined;
       if (isFree) {
         // A waived session is started count-up and nothing else.
         //
@@ -417,7 +421,7 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted, bookingId }: Pro
         // venue's own rate for the seat, which is what lets the receipt say what
         // was given away — a number typed here would only overwrite that with a
         // guess.
-        await sessionRepository.start({
+        started = await sessionRepository.start({
           branch_id: branchId,
           pc_id: pc.id,
           mode: "open",
@@ -427,7 +431,7 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted, bookingId }: Pro
           ...bookingField,
         });
         if (psnName !== "") rememberPsnName(psnName);
-        onStarted();
+        onStarted(started);
         return;
       }
       if (mode === "amount") {
@@ -435,7 +439,7 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted, bookingId }: Pro
         // The sum and the WHOLE seconds the server said it buys: a figure that
         // moved meanwhile is refused (422 amount-changed) and asked again.
         // Cash paid ahead; never with a package, a plan, unpaid or free.
-        await sessionRepository.start({
+        started = await sessionRepository.start({
           branch_id: branchId,
           pc_id: pc.id,
           user_display_name: pc.label,
@@ -448,7 +452,7 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted, bookingId }: Pro
         });
       } else if (mode === "fixed") {
         if (!pkgId) { setErr(textKey("session.choosePackage")); setBusy(false); return; }
-        await sessionRepository.start({
+        started = await sessionRepository.start({
           branch_id: branchId,
           pc_id: pc.id,
           mode: "fixed",
@@ -471,7 +475,7 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted, bookingId }: Pro
         // "change current price". Otherwise omit it so the backend resolves
         // the assigned rate from its own chain (request → matrix →
         // pc.hourly_rate) — the single source of truth stays server-side.
-        await sessionRepository.start({
+        started = await sessionRepository.start({
           branch_id: branchId,
           pc_id: pc.id,
           mode: "open",
@@ -489,7 +493,7 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted, bookingId }: Pro
         });
       }
       if (psnName !== "") rememberPsnName(psnName);
-      onStarted();
+      onStarted(started);
     } catch (e) {
       // A tariff for another platform is refused with a code: worded here, in
       // the operator's language. Anything else keeps the server's sentence.

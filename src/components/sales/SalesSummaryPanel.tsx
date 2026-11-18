@@ -71,7 +71,7 @@ const SalesSummaryPanel = ({ branchId, from, to, placeId = null, refreshKey = 0,
       v={m(row.amount)}
       sub={fmt(t("sales.times"), row.count)}
       testId={`sales-method-${row.method}${row.label ? `-${row.label}` : ""}`}
-      onOpen={() => setDrill({ title: methodName(row, t), filter: { method: row.method, ...(row.method === "other" ? { label: row.label ?? "" } : {}) } })}
+      onOpen={() => setDrill({ title: methodName(row, t), filter: { method: row.method, ...(row.method === "other" ? (row.label ? { label: row.label } : { unnamed: 1 as const }) : {}) } })}
     />
   );
   // Cash and card always (a zero says "none today"); every other row only when it took money.
