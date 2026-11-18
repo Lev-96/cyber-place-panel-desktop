@@ -22,9 +22,23 @@ export const periodLine = (w: ISalesSummary["window"], t: T): string => {
   return fmt(t("sales.range"), dmy(w.date_from), dmy(w.date_to));
 };
 
-/** «Расчёт с 13:00 до 07:00» — or the calendar day when the branch has no hours. */
-export const hoursLine = (w: ISalesSummary["window"], t: T): string =>
-  w.business_day ? fmt(t("sales.hours"), w.business_day.start, w.business_day.end) : t("sales.calendarDay");
+/** `2026-11-18` + n days, as a date string (no clock, no zone). */
+const plusDays = (iso: string, n: number): string => {
+  const [y, m, d] = iso.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d + n)).toISOString().slice(0, 10);
+};
+
+/**
+ * «Расчёт: с 13:00 18.11.2026 до 07:00 19.11.2026» (2026-11-18, owner: the
+ * days themselves, not only the hours) — the last day closes the NEXT morning
+ * when its hours run past midnight. Without published hours: the calendar day.
+ */
+export const hoursLine = (w: ISalesSummary["window"], t: T): string => {
+  if (!w.business_day) return t("sales.calendarDay");
+  const { start, end } = w.business_day;
+  const endDay = end <= start ? plusDays(w.date_to, 1) : w.date_to;
+  return fmt(t("sales.hours"), start, dmy(w.date_from), end, dmy(endDay));
+};
 
 /** A method row's name: its own for a «Свой вариант», else the method's. */
 export const methodName = (row: Pick<ISalesMethodRow, "method" | "label">, t: T): string => {

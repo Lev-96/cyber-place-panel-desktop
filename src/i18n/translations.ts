@@ -4119,7 +4119,7 @@ export const TRANSLATIONS: Dict = {
   // «История продаж» in figures (2026-11-18, owner): plain words, server totals.
   "sales.todayDate": { en: "Today, {0}", ru: "Сегодня, {0}", am: "Այսօր, {0}" },
   "sales.range": { en: "From {0} to {1}", ru: "С {0} по {1}", am: "{0}-ից {1}" },
-  "sales.hours": { en: "Counted from {0} to {1} (working hours)", ru: "Расчёт с {0} до {1} (время работы)", am: "Հաշվարկը՝ {0}-ից {1} (աշխատանքային ժամեր)" },
+  "sales.hours": { en: "Counted from {0} {1} to {2} {3} (working hours)", ru: "Расчёт: с {0} {1} до {2} {3} (время работы)", am: "Հաշվարկը՝ {1} {0}-ից մինչև {3} {2} (աշխատանքային ժամեր)" },
   "sales.calendarDay": { en: "Counted by calendar day, 00:00 to 24:00", ru: "Расчёт по календарному дню, с 00:00 до 24:00", am: "Հաշվարկը՝ օրացուցային օրով, 00:00-ից 24:00" },
   "sales.grand": { en: "Total of all sales", ru: "Итог общей продажи", am: "Ընդհանուր վաճառքի արդյունքը" },
   "sales.grandHint": { en: "All places + products without a place", ru: "Все места + товары без места", am: "Բոլոր տեղերը + առանց տեղի ապրանքները" },

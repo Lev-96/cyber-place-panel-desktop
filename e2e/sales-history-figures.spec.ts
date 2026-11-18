@@ -7,7 +7,7 @@ import { LANGS, WIDTHS, fitsWidth, noRawKeys, signIn } from "./helpers/moneySess
  * totals, each way of paying with how many times, and a card's records.
  */
 const GRAND = { en: "Total of all sales", ru: "Итог общей продажи", am: "Ընդհանուր վաճառքի արդյունքը" };
-const HOURS = { en: "Counted from 13:00 to 07:00", ru: "Расчёт с 13:00 до 07:00", am: "Հաշվարկը՝ 13:00-ից 07:00" };
+const HOURS = { en: "Counted from 13:00 18.11.2026 to 07:00 19.11.2026", ru: "Расчёт: с 13:00 18.11.2026 до 07:00 19.11.2026", am: "Հաշվարկը՝ 18.11.2026 13:00-ից մինչև 19.11.2026 07:00" };
 
 for (const lang of LANGS) {
   for (const width of WIDTHS) {

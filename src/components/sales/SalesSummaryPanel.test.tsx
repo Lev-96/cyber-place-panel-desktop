@@ -65,7 +65,8 @@ describe("SalesSummaryPanel", () => {
     await mount();
     expect(api.fn).toHaveBeenCalledWith(1, { date_from: "2026-11-18", date_to: "2026-11-18", per_page: 1 });
     expect(screen.getByTestId("sales-period").textContent).toBe("Сегодня, 18.11.2026");
-    expect(screen.getByTestId("sales-hours").textContent).toBe("Расчёт с 13:00 до 07:00 (время работы)");
+    // The days themselves (2026-11-18): opens the 18th, closes the 19th's morning.
+    expect(screen.getByTestId("sales-hours").textContent).toBe("Расчёт: с 13:00 18.11.2026 до 07:00 19.11.2026 (время работы)");
     expect(screen.getByTestId("sales-grand").textContent).toContain("Итог общей продажи");
     expect(screen.getByTestId("sales-grand").textContent).toContain("12000 ֏");
     expect(screen.getByTestId("sales-places").textContent).toContain("9000 ֏");
