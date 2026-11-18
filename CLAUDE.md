@@ -5282,3 +5282,57 @@ string edit; `percentText` drops trailing zeros of "10.00").
   (PS5's PSN card untouched). Start dialog: «При Стоп» / «Сейчас, до игры»
   (`prepaid-later` / `prepaid-switch`, radios). `PaymentEditor` takes `branchId`
   and offers `GET /branches/{id}/payment-labels` as «+ name» buttons.
+
+## «Приём смены»: the blind count at opening (2026-11-18, owner)
+
+Backend contract: `cyber-place/CLAUDE.md` § "Shift acceptance count". The panel
+counts nothing and computes no money: every expected figure, difference, sum
+and flow is the server's, only formatted.
+
+- **Open** (`routes/Shift.tsx` → `components/shifts/acceptance/useShiftOpening.ts`):
+  the press reads `GET /shifts/acceptance-products` fresh (`shiftRepository.
+  acceptanceProducts`; a 404 from an older backend = nothing to count). Empty →
+  opens at once. Else `ShiftAcceptanceDialog`: names (+ category, «скрыт») and
+  one text box «Сколько есть сейчас» per product (`inputMode="numeric"`,
+  `parseQuantity`; empty = not counted, 0 is a count), search from 8 products,
+  «Посчитано: N из M», Open disabled until all are counted. NEVER a figure of
+  the books: the list carries none and the form renders only name/category.
+  `POST /shifts/open` ALWAYS sends `{branch_id, opening_cash, client_request_id,
+  stock_counts}` (`[]` when nothing is counted). One `client_request_id` per
+  attempt (`utils/requestId`), reused on every retry (5xx, lost answer, 422),
+  dropped once a shift is open (the server replays a known id even for a
+  closed shift). 422 `stock_count_required` (`stockCountRequiredBody`) →
+  missed products outlined red, unknown ones added (`withMissing`); 409 → the
+  old «already open» notice. Success with counts → toast `toast.shift.accepted`.
+- **Report** (`ShiftAcceptanceBlock`, right under the header of
+  `ShiftReportView`, only when `report.acceptance_count` is present):
+  owner/admin = who counted, previous shift (who, `venueSpan`), «Смены не было
+  с … до …» when `gap.notable`, whose shortage, then Товар | Принято | Получено
+  | Продано в программе | Возвращено | (Исправлено only when some row has one)
+  | Должно быть | Посчитано | Разница | Сумма from `rows[].flow` + the row;
+  `accepted: null` → «нет прошлого пересчёта»; shortage red + «Недостача» +
+  «последняя продажа: 03:12»; surplus «Излишек»; baseline «Первый пересчёт,
+  сравнивать не с чем» with no difference claimed; totals «Недостача всего» /
+  «Излишек всего». Manager (`blind: true`): Товар | Посчитано only. Below a
+  760px box (container query; the report also sits in a 680px dialog) every
+  product becomes a card of labelled figures.
+- **Bell** (`components/notifications/shiftStockShortage.ts`, Notifications.tsx):
+  `data.type = "shift.stock_shortage"` → «⚠ Недостача при приёме смены: 1 000
+  драм», «Abovyan 1 · смена Anna 17.11 10:00–12:00», up to 3 products + «и ещё
+  N», the gap line; a press opens `/shifts?shift_id=N`. `Shifts.tsx` passes
+  `?shift_id` to `ShiftHistory` (`openShiftId`), which opens that report;
+  closing it drops the parameter.
+- **Not built**: the `GET /shifts/{id}/stock-count` movements drill-down (no
+  screen asked for it yet).
+- **Tests**: `acceptanceCount.test.ts` (6), `Shift.acceptance.test.tsx` (9),
+  `ShiftAcceptanceBlock.test.tsx` (7), `Notifications.shortage.test.tsx` (3),
+  `Shifts.link.test.tsx` (2); `Shift.test.tsx` expectation of `open` updated
+  (one body object now). 11 mutations caught. e2e `shift-acceptance.spec.ts`
+  (19: en/ru/am × 1280/520 for the step, the owner's block and the bell row;
+  the empty branch). `installBackendMocks` answers `/shifts/acceptance-products`
+  with `{data: []}`. Screenshots:
+  `~/cyber-place-local/reports/shift-acceptance-2026-11-18/shots/`.
+- ⚠️ Deploy the backend (migrate) FIRST: an older backend ignores the new keys
+  and opens as before, but a NEW backend refuses an OLD panel's open at a
+  branch that counts products (422, its `message` is shown). **Owner web**:
+  bump `panel.ref`.
