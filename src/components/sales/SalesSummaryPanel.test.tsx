@@ -216,5 +216,14 @@ describe("SalesSummaryPanel — «Быстрая Еда», products, comments, o
     expect(api.fn).toHaveBeenLastCalledWith(1, expect.objectContaining({ method: "other", unnamed: 1 }));
     expect(api.fn.mock.lastCall?.[1]).not.toHaveProperty("label");
   });
+
+  test("no «Способ оплаты не отмечен» card, whatever it holds (2026-11-18, owner)", async () => {
+    const base = summary().data;
+    api.fn.mockResolvedValue({ data: { ...base, by_method: [...base.by_method, { method: "unrecorded", label: null, amount: "0.00", count: 10 }] } });
+    await mount();
+    expect(screen.queryByTestId("sales-method-unrecorded")).toBeNull();
+    expect(screen.queryByText("Способ оплаты не отмечен")).toBeNull();
+    expect(screen.getByTestId("sales-method-cash")).toBeTruthy();
+  });
 });
 
