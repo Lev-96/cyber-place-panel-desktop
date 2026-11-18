@@ -188,6 +188,27 @@ const SessionsHistory = () => {
     return null;
   }, [workingToday, from, to]);
 
+  /**
+   * A working day that ends while «Сегодня» is on screen (2026-11-18, owner:
+   * at 07:01 after a 13:00 → 07:00 night the history starts from zero) moves
+   * the screen to the new working day by itself, at the moment the day
+   * closes. Picked dates and other presets are left alone.
+   */
+  useEffect(() => {
+    if (activeRange !== "today" || counted === null || !windowReady) return;
+    const ends = Date.parse(counted.to);
+    if (!Number.isFinite(ends)) return;
+    const wait = Math.min(Math.max(ends - Date.now() + 1000, 1000), 24 * 60 * 60 * 1000);
+    const timer = window.setTimeout(() => {
+      void readWorkingToday().then((d) => {
+        setWorkingToday(d);
+        setFrom(d);
+        setTo(d);
+      });
+    }, wait);
+    return () => window.clearTimeout(timer);
+  }, [activeRange, counted, windowReady, readWorkingToday]);
+
   /** «Сегодня» / «Вчера» / «Текущий месяц» by the WORKING day running now. */
   const setRange = async (kind: "today" | "yesterday" | "month") => {
     const today = await readWorkingToday();

@@ -455,6 +455,43 @@ describe("SessionsHistory — whose actions", () => {
     expect(refresh.querySelector("svg")).not.toBeNull();
   });
 
+  /**
+   * 2026-11-18 (owner): a 13:00 → 07:00 club. «Сегодня» on screen at 06:59
+   * shows last night; at 07:00 the screen moves to the new working day by
+   * itself and reads from zero.
+   */
+  test("«Сегодня» moves to the new working day by itself when the club closes", async () => {
+    const { salesSummaryStub } = await import("@/test/salesSummaryStub");
+    let running = "2026-11-17";
+    salesApi.fn = (branch: unknown, q: unknown) => {
+      const query = (q ?? {}) as { date_from?: string };
+      const date = query.date_from ?? running;
+      const next = new Date(Date.UTC(Number(date.slice(0, 4)), Number(date.slice(5, 7)) - 1, Number(date.slice(8, 10)) + 1)).toISOString().slice(0, 10);
+      return salesSummaryStub(branch as number, { ...(q as object), date_from: date, date_to: date }).then((r) => ({
+        data: { ...r.data, window: { ...r.data.window, from: `${date}T07:00:00+04:00`, to: `${next}T07:00:00+04:00`, business_day: { start: "13:00", end: "07:00" } } },
+      }));
+    };
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(new Date("2026-11-18T06:59:00+04:00"));
+    try {
+      repo.list.mockResolvedValue([]);
+      repo.listEvents.mockResolvedValue([]);
+      await mount();
+      for (let i = 0; i < 6; i++) await act(async () => { await Promise.resolve(); });
+      expect(screen.getByTestId("history-from").textContent).toContain("17.11.2026");
+
+      // 07:00: the club closed; the next working day is running.
+      running = "2026-11-18";
+      await act(async () => { vi.advanceTimersByTime(62_000); });
+      for (let i = 0; i < 8; i++) await act(async () => { await Promise.resolve(); });
+      expect(screen.getByTestId("history-from").textContent).toContain("18.11.2026");
+      expect(screen.getByTestId("history-range-today").getAttribute("aria-pressed")).toBe("true");
+    } finally {
+      vi.useRealTimers();
+      salesApi.fn = null;
+    }
+  });
+
   test("the person and the dates narrow together", async () => {
     repo.listEventActors.mockResolvedValue([anna]);
     repo.list.mockResolvedValue([]);
