@@ -15,13 +15,25 @@ import { productRepository } from "@/repositories/ProductRepository";
 import { IProduct } from "@/types/pos";
 import { useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
-import { countsStock, isAdditionalProduct, isHourlyAdditional, ProductKind } from "@/types/pos";
+import { countsStock, isAdditionalProduct, isFastFoodProduct, isHourlyAdditional } from "@/types/pos";
+import { branchRepository } from "@/repositories/BranchRepository";
+import { partnerRepository } from "@/repositories/PartnerRepository";
 import SectionTabs from "@/components/ui/SectionTabs";
 import ProductHistory from "@/components/products/ProductHistory";
 import { productEventRepository } from "@/repositories/ProductEventRepository";
 
 /** The screen's two views: the catalogue itself, and the trail of changes to it. */
 type Pane = "catalogue" | "history";
+
+/**
+ * The catalogue's sections: what is SOLD, the fast food (2026-11-18, owner:
+ * «Быстрая Еда», a regular product with the flag), and what is HANDED OUT
+ * with the seat.
+ */
+type Section = "regular" | "fastFood" | "additional";
+
+const sectionOf = (p: IProduct): Section =>
+  isAdditionalProduct(p) ? "additional" : isFastFoodProduct(p) ? "fastFood" : "regular";
 
 const ProductsList = () => {
   const { branchId } = useParams();
@@ -47,6 +59,22 @@ const ProductsList = () => {
     [mayReadHistory, id],
   );
   const canHistory = mayReadHistory && historyProbe.data === true;
+  /**
+   * Whose fast food it is (2026-11-18): the company's partners, read only for
+   * someone who may manage them. A manager never asks (the server answers
+   * 403) and never sees a partner on this screen.
+   */
+  const managesPartners = can(user?.role, "partners.manage");
+  const partners = useAsync(
+    async () => {
+      if (!managesPartners || !Number.isFinite(id) || id <= 0) return null;
+      const branch = await branchRepository.byId(id);
+      return partnerRepository.list(branch.company_id, true);
+    },
+    [managesPartners, id],
+  );
+  const partnerName = (partnerId: number | null | undefined): string | null =>
+    partnerId == null ? null : partners.data?.find((p) => p.id === partnerId)?.name ?? null;
   const [pane, setPane] = useState<Pane>("catalogue");
   const confirm = useConfirm();
   // The catalogue and the server's stock total, in one read.
@@ -59,7 +87,7 @@ const ProductsList = () => {
    * Which catalogue is open (2026-09-27): what is SOLD, or what is HANDED OUT
    * with the seat. A new entry is created as the kind of the open section.
    */
-  const [section, setSection] = useState<ProductKind>("regular");
+  const [section, setSection] = useState<Section>("regular");
   const [editing, setEditing] = useState<IProduct | null>(null);
   const [search, setSearch] = useState("");
 
@@ -70,7 +98,7 @@ const ProductsList = () => {
   // cashier narrows a long list.
   const visible = useMemo(() => {
     const needle = search.trim().toLowerCase();
-    const inSection = (data ?? []).filter((p) => (isAdditionalProduct(p) ? "additional" : "regular") === section);
+    const inSection = (data ?? []).filter((p) => sectionOf(p) === section);
     if (!needle) return inSection;
     return inSection.filter((p) =>
       `${tr(p, "name", lang)} ${tr(p, "category", lang)}`.toLowerCase().includes(needle),
@@ -81,7 +109,14 @@ const ProductsList = () => {
 
   const searching = search.trim() !== "";
   const view = deriveViewState({ loading, error, data: data ? visible : null, hasFilters: searching });
-  const newLabel = t(section === "additional" ? "products.newAdditional" : "products.new");
+  const newLabel = t(section === "additional" ? "products.newAdditional" : section === "fastFood" ? "products.newFastFood" : "products.new");
+  const emptyKeys = section === "additional"
+    ? { titleKey: "products.state.emptyAdditionalTitle", descriptionKey: "products.state.emptyAdditionalDescription" }
+    : section === "fastFood"
+      ? { titleKey: "products.state.emptyFastFoodTitle", descriptionKey: "products.state.emptyFastFoodDescription" }
+      : { titleKey: "products.state.emptyTitle", descriptionKey: "products.state.emptyDescription" };
+  /** Sold by the unit (products and fast food): the stock line and button belong there. */
+  const soldByUnit = section !== "additional";
 
   const remove = async (p: IProduct) => {
     if (!(await confirm(`${t("action.delete")} ${tr(p, "name", lang)}?`, { destructive: true }))) return;
@@ -100,9 +135,7 @@ const ProductsList = () => {
       <div className="row-between">
         <h2 className="page-title" style={{ margin: 0 }}>{t("products.title")} · №{id}</h2>
         {canEdit && !showHistory && (
-          <Button onClick={() => setCreating(true)}>
-            {t(section === "additional" ? "products.newAdditional" : "products.new")}
-          </Button>
+          <Button onClick={() => setCreating(true)} data-testid="product-new">{newLabel}</Button>
         )}
       </div>
       {canHistory && (
@@ -128,15 +161,20 @@ const ProductsList = () => {
       )}
       {!showHistory && (
         <>
+          {/* Three sections since «Быстрая Еда» (2026-11-18): on a narrow
+              window they wrap whole instead of cutting each name to «Ապր…». */}
+          <div className="cp-subtabs-wrap">
           <SectionTabs
             label={t("session.addSections")}
             value={section}
             onChange={(k) => { setSection(k); setSearch(""); }}
             tabs={[
               { key: "regular", label: t("session.sectionProducts") },
+              { key: "fastFood", label: t("products.tabFastFood") },
               { key: "additional", label: t("session.additionalTitle") },
             ]}
           />
+          </div>
           <input
             className="input"
             placeholder={t("products.search")}
@@ -149,15 +187,14 @@ const ProductsList = () => {
             onRetry={() => void reload()}
             error={{ titleKey: "products.state.errorTitle" }}
             empty={{
-              titleKey: section === "additional" ? "products.state.emptyAdditionalTitle" : "products.state.emptyTitle",
-              descriptionKey: section === "additional" ? "products.state.emptyAdditionalDescription" : "products.state.emptyDescription",
+              ...emptyKeys,
               actions: canEdit ? <Button onClick={() => setCreating(true)}>{newLabel}</Button> : undefined,
             }}
             noResults={{ descriptionKey: "products.state.noResultsDescription" }}
           >
             <div className="list">
               {visible.map((p) => (
-                <div key={p.id} className="list-item product-row" style={{ opacity: p.is_active ? 1 : 0.5 }}>
+                <div key={p.id} className="list-item product-row" style={{ opacity: p.is_active ? 1 : 0.5 }} data-testid="product-row">
                   <div className="product-row__main">
                     <div className="name">{tr(p, "name", lang)}</div>
                     <div className="meta">
@@ -167,7 +204,7 @@ const ProductsList = () => {
                         <span data-testid="product-hourly">{t("session.perHourShort")} · {t("joystickPrice.strategy.hourly")}</span>
                       )}
                       {/* A product sold by the unit says its count (2026-11-16). */}
-                      {section === "regular" && (
+                      {soldByUnit && (
                         <>
                           {" · "}
                           <span className={`product-stock${countsStock(p) && (p.stock as number) < 0 ? " is-negative" : ""}`} data-testid="product-stock">
@@ -176,13 +213,22 @@ const ProductsList = () => {
                         </>
                       )}
                     </div>
+                    {/* Whose fast food it is (2026-11-18): only for someone who
+                        manages partners; the club's own says so. */}
+                    {section === "fastFood" && managesPartners && partners.data && (
+                      <div className="meta" data-testid="product-partner-name">
+                        {partnerName(p.partner_id) !== null
+                          ? fmt(t("products.partnerOf"), partnerName(p.partner_id) as string)
+                          : t("product.partnerOwn")}
+                      </div>
+                    )}
                   </div>
                   {canEdit && (
                     <div className="row product-row__actions" style={{ gap: 6 }}>
                       {/* Show/hide is the deactivate: it takes a product off the
                           POS and keeps it, which is what a manager has instead of
                           Delete. */}
-                      {section === "regular" && (
+                      {soldByUnit && (
                         <Button variant="secondary" onClick={() => setStocking(p)} style={btn} aria-label={fmt(t("stock.buttonFull"), tr(p, "name", lang))} data-testid="product-stock-button">
                           {t("stock.button")}
                         </Button>
@@ -200,8 +246,25 @@ const ProductsList = () => {
           </StateSwitch>
         </>
       )}
-      {creating && <ProductForm branchId={id} kind={section} onClose={() => setCreating(false)} onSaved={() => { setCreating(false); void reload(); }} />}
-      {editing && <ProductForm branchId={id} initial={editing} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); void reload(); }} />}
+      {creating && (
+        <ProductForm
+          branchId={id}
+          kind={section === "additional" ? "additional" : "regular"}
+          fastFood={section === "fastFood"}
+          partners={managesPartners ? partners.data : undefined}
+          onClose={() => setCreating(false)}
+          onSaved={() => { setCreating(false); void reload(); }}
+        />
+      )}
+      {editing && (
+        <ProductForm
+          branchId={id}
+          initial={editing}
+          partners={managesPartners ? partners.data : undefined}
+          onClose={() => setEditing(null)}
+          onSaved={() => { setEditing(null); void reload(); }}
+        />
+      )}
       {stocking && (
         <ProductStockDialog
           product={stocking}

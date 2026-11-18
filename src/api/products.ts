@@ -37,6 +37,17 @@ export interface CreateProductBody {
   existing_id?: number;
   /** One press of «Сохранить»: sent again, the server answers what it did. */
   client_request_id?: string;
+  /**
+   * «Быстрая Еда» (2026-11-18), a regular product only. Sent only when it is
+   * on (create) or changed (edit); absent, the server keeps what it has.
+   */
+  is_fast_food?: boolean;
+  /**
+   * The partner whose fast food it is; null = the club's own. Sent only by
+   * someone with `partners.manage`, and only when it changes (a manager's
+   * save never carries it: the server answers a partner change with 403).
+   */
+  partner_id?: number | null;
 }
 
 export type UpdateProductBody = Partial<Omit<CreateProductBody, "branch_id" | "stock" | "on_existing" | "existing_id" | "client_request_id">>;

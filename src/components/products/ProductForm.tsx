@@ -10,7 +10,9 @@ import MultiLangInput, {
 import PriceInput from "@/components/ui/PriceInput";
 import Radio from "@/components/ui/Radio";
 import { apiSaveEntityTranslations } from "@/api/translations";
-import { IProductExistsBody, productExistsBody, StockChoice } from "@/api/products";
+import { CreateProductBody, IProductExistsBody, productExistsBody, StockChoice } from "@/api/products";
+import type { IPartner } from "@/api/partners";
+import Switch from "@/components/ui/Switch";
 import { tr } from "@/i18n/translated";
 import { fmt } from "@/i18n/translations";
 import { useLang } from "@/i18n/LanguageContext";
@@ -21,6 +23,7 @@ import { newRequestId } from "@/utils/requestId";
 import { FormEvent, useRef, useState } from "react";
 import ProductMergePanel from "./ProductMergePanel";
 import { parseQuantity, stockChangeText, stockNumber } from "./stock";
+import { partnerChoices } from "@/components/partners/partnerTerms";
 
 interface Props {
   branchId: number;
@@ -30,6 +33,14 @@ interface Props {
    * Additional items). An edit keeps the entry's own kind.
    */
   kind?: ProductKind;
+  /** A NEW product starts as fast food (created from the «Быстрая Еда» tab). */
+  fastFood?: boolean;
+  /**
+   * The company's partners, for whoever may choose whose fast food a product
+   * is (`partners.manage`, 2026-11-18). Absent: no partner field at all and
+   * `partner_id` is never sent (a manager, or a dialog that has no list).
+   */
+  partners?: readonly IPartner[] | null;
   onClose: () => void;
   onSaved: (p: IProduct) => void;
 }
@@ -59,7 +70,7 @@ interface Props {
  * several of that name, comes back as a question ({@see ProductMergePanel}).
  * One press is one receipt: the request id lives as long as the form.
  */
-const ProductForm = ({ branchId, initial, onClose, onSaved, kind: kindProp = "regular" }: Props) => {
+const ProductForm = ({ branchId, initial, onClose, onSaved, kind: kindProp = "regular", fastFood: fastFoodProp = false, partners }: Props) => {
   const { t, lang } = useLang();
   const [name, setName] = useState<LangValues>(
     () => langValuesFromField(initial?.i18n, "name", initial?.name, lang),
@@ -83,6 +94,31 @@ const ProductForm = ({ branchId, initial, onClose, onSaved, kind: kindProp = "re
   );
   /** Sent for an additional item only: a regular product has no rate to change. */
   const pricingBody = kind === "additional" ? { pricing_mode: pricingMode } : {};
+  /**
+   * «Быстрая Еда» (2026-11-18): a regular product only. A partner's product
+   * stays fast food until its partner is removed, which only someone with
+   * the partner list may do: for anyone else the switch is locked on.
+   */
+  /** What the server holds now: a new product is not fast food until the save says so. */
+  const storedFastFood = initial?.is_fast_food === true;
+  const initialPartner = initial?.partner_id ?? null;
+  const [fastFood, setFastFood] = useState(initial ? storedFastFood : fastFoodProp);
+  const [partnerId, setPartnerId] = useState<number | null>(initialPartner);
+  const managesPartners = partners !== undefined && partners !== null;
+  const fastFoodLocked = !managesPartners && initialPartner !== null;
+  /** Whose it is once saved: no partner without fast food. */
+  const effectivePartner = fastFood ? partnerId : null;
+  /** The pickable partners, plus the product's own one if it was archived meanwhile. */
+  const choices = managesPartners ? partnerChoices(partners, initialPartner) : [];
+  /**
+   * The fast-food keys of a save: only what changed (a create: only when on),
+   * so a product saved without touching them is the request it always was.
+   * `partner_id` only for someone who manages partners.
+   */
+  const fastFoodBody: Pick<CreateProductBody, "is_fast_food" | "partner_id"> = kind !== "regular" ? {} : {
+    ...(fastFood !== storedFastFood ? { is_fast_food: fastFood } : {}),
+    ...(managesPartners && effectivePartner !== initialPartner ? { partner_id: effectivePartner } : {}),
+  };
   const [exists, setExists] = useState<IProductExistsBody | null>(null);
   const requestId = useRef(newRequestId());
   const [busy, setBusy] = useState(false);
@@ -106,6 +142,7 @@ const ProductForm = ({ branchId, initial, onClose, onSaved, kind: kindProp = "re
         source_locale: lang,
         stock: qty,
         client_request_id: requestId.current,
+        ...fastFoodBody,
         ...(answer ? { on_existing: answer.choice, existing_id: answer.id } : {}),
       });
       if (r.merged && r.stock_change) {
@@ -149,6 +186,7 @@ const ProductForm = ({ branchId, initial, onClose, onSaved, kind: kindProp = "re
             price: pr,
             source_locale: lang,
             ...pricingBody,
+            ...fastFoodBody,
           }, kind)
         : await productRepository.create({
             branch_id: branchId,
@@ -159,6 +197,7 @@ const ProductForm = ({ branchId, initial, onClose, onSaved, kind: kindProp = "re
             kind,
             source_locale: lang,
             ...pricingBody,
+            ...fastFoodBody,
           });
 
       await saveTranslations(p.id);
@@ -235,6 +274,40 @@ const ProductForm = ({ branchId, initial, onClose, onSaved, kind: kindProp = "re
                 primaryValue(name, lang) || t("branchExtraItem.itemFallback"),
               )}
             </span>
+          </div>
+        )}
+
+        {kind === "regular" && (
+          <div className="col" style={{ gap: 6 }} data-testid="product-fast-food">
+            <Switch
+              checked={fastFood}
+              onChange={setFastFood}
+              disabled={locked || fastFoodLocked}
+              label={t("product.fastFood")}
+              testId="product-fast-food-switch"
+            />
+            <span className="muted" style={{ fontSize: 12 }}>
+              {t(fastFoodLocked ? "product.fastFoodLocked" : "product.fastFoodHint")}
+            </span>
+            {fastFood && managesPartners && (
+              <label className="col" style={{ gap: 4 }}>
+                <span className="label">{t("product.partner")}</span>
+                <select
+                  className="input"
+                  value={partnerId ?? ""}
+                  onChange={(e) => setPartnerId(e.target.value === "" ? null : Number(e.target.value))}
+                  disabled={locked}
+                  data-testid="product-partner"
+                >
+                  <option value="">{t("product.partnerOwn")}</option>
+                  {choices.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.archived ? fmt(t("product.partnerArchived"), p.name) : p.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
           </div>
         )}
 

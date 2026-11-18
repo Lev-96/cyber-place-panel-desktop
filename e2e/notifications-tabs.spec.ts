@@ -176,7 +176,8 @@ test("other SectionTabs screens are unchanged: Products tabs keep equal shares a
   })));
   await page.goto("/#/branches/1/products");
   const tablist = page.getByRole("tablist").last();
-  await expect(tablist.getByRole("tab")).toHaveCount(2);
+  // Three since 2026-11-18 (owner): «Товары», «Быстрая Еда», «Дополнительные предметы».
+  await expect(tablist.getByRole("tab")).toHaveCount(3);
   const styles = await tablist.evaluate((list) => Array.from(list.querySelectorAll<HTMLElement>('[role="tab"]')).map((tab) => {
     const cs = getComputedStyle(tab);
     return {
@@ -194,5 +195,8 @@ test("other SectionTabs screens are unchanged: Products tabs keep equal shares a
   }
   // Equal shares of the line (the inactive tab's 1px border each side is the
   // only difference: 479 / 481 at 1280 before and after A1).
-  expect(Math.abs(styles[0].width - styles[1].width)).toBeLessThanOrEqual(2);
+  // Three tabs (2026-11-18) split the line into fractional pixels: the same
+  // 2px border difference measures 2.02, so the bound allows half a pixel more.
+  expect(Math.abs(styles[0].width - styles[1].width)).toBeLessThanOrEqual(2.5);
+  expect(Math.abs(styles[1].width - styles[2].width)).toBeLessThanOrEqual(2.5);
 });

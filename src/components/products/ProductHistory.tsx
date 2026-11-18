@@ -11,6 +11,8 @@ import { tr } from "@/i18n/translated";
 import { branchRepository } from "@/repositories/BranchRepository";
 import { productEventRepository } from "@/repositories/ProductEventRepository";
 import { productRepository } from "@/repositories/ProductRepository";
+import { partnerRepository } from "@/repositories/PartnerRepository";
+import { fmt } from "@/i18n/translations";
 import type { Role } from "@/types/api";
 import {
   PRODUCT_ACTIONS, PRODUCT_ACTION_KEY,
@@ -64,6 +66,17 @@ const ProductHistory = ({ initialBranchId }: Props) => {
     () => (branchId ? productRepository.listByBranch(branchId) : Promise.resolve([])),
     [branchId],
   );
+  /**
+   * Partner names for «Изменён партнёр» (2026-11-18): the partners of the
+   * picked branch's company, archived ones too. The trail is the owner's and
+   * the admin's, who both manage partners. Unknown (another company, a list
+   * that failed) reads «Партнёр №N», never a bare id.
+   */
+  const companyId = (branches.data ?? []).find((b) => b.id === branchId)?.company_id ?? null;
+  const partners = useAsync(
+    () => (companyId !== null ? partnerRepository.list(companyId, true).catch(() => []) : Promise.resolve([])),
+    [companyId],
+  );
 
   // A pick that is not part of the newly chosen branch is dropped.
   useEffect(() => {
@@ -114,7 +127,11 @@ const ProductHistory = ({ initialBranchId }: Props) => {
     // Stock lines (2026-11-16): «Без учёта», and how a receipt came in.
     notCounted: t("stock.notCounted"),
     via: (via: string) => (via === "create" ? t("productHistory.stockViaCreate") : via === "merge" ? t("productHistory.stockViaMerge") : null),
-  }), [money, t]);
+    fastFood: (on: boolean) => t(on ? "product.fastFood" : "productHistory.notFastFood"),
+    partner: (pid: number | null) => (pid === null
+      ? t("product.partnerOwn")
+      : (partners.data ?? []).find((p) => p.id === pid)?.name ?? fmt(t("productHistory.partnerUnknown"), pid)),
+  }), [money, t, partners.data]);
 
   const actor = (e: IProductEvent) =>
     `${e.actor.name}${e.actor.role ? ` (${t(ROLE_KEY[e.actor.role])})` : ""}`;

@@ -14,6 +14,9 @@ export const PRODUCT_ACTIONS = [
   "kind_changed",
   // An additional item moved between a fixed price and a rate (2026-11-17).
   "pricing_mode_changed",
+  // «Быстрая Еда» switched, and whose fast food it is (2026-11-18).
+  "fast_food_changed",
+  "partner_changed",
   "activated",
   "deactivated",
   "deleted",
@@ -35,6 +38,8 @@ export const PRODUCT_ACTION_KEY = {
   price_changed: "productHistory.action.price_changed",
   kind_changed: "productHistory.action.kind_changed",
   pricing_mode_changed: "productHistory.action.pricing_mode_changed",
+  fast_food_changed: "productHistory.action.fast_food_changed",
+  partner_changed: "productHistory.action.partner_changed",
   activated: "productHistory.action.activated",
   deactivated: "productHistory.action.deactivated",
   deleted: "productHistory.action.deleted",

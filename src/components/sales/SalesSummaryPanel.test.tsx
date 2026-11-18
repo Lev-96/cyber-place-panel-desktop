@@ -35,10 +35,26 @@ const summary = (over: Partial<ISalesSummary> = {}): { data: ISalesSummary } => 
   },
 });
 
-const mount = async () => {
-  await act(async () => { render(<SalesSummaryPanel branchId={1} from="2026-11-18" to="2026-11-18" />); });
+const mount = async (placeId?: number | null) => {
+  await act(async () => { render(<SalesSummaryPanel branchId={1} from="2026-11-18" to="2026-11-18" placeId={placeId} />); });
   await act(async () => { await Promise.resolve(); });
 };
+
+/** The 2026-11-18 additions: fast food inside the totals, what the products are, the place echo. */
+const withFastFood = (over: Partial<ISalesSummary> = {}) => {
+  const base = summary().data;
+  return summary({
+    totals: { ...base.totals, fast_food_total: "3500.00", fast_food_units: 3 },
+    products_rows: [
+      { product_id: 2, name: "Burger", unit_price: "1500.00", quantity: 2, total: "3000.00", is_fast_food: true, partner_id: 7 },
+      { product_id: 1, name: "Cola", unit_price: "500.00", quantity: 1, total: "500.00", is_fast_food: false, partner_id: null },
+      { product_id: 3, name: "Hot dog", unit_price: "500.00", quantity: 1, total: "500.00", is_fast_food: true, partner_id: null },
+    ],
+    ...over,
+  });
+};
+const rowsIn = (dialog: HTMLElement) =>
+  [...dialog.querySelectorAll("[data-testid=sales-product-row]")].map((r) => [...r.children].map((c) => c.textContent));
 
 beforeEach(() => api.fn.mockReset());
 afterEach(cleanup);
@@ -105,3 +121,90 @@ describe("SalesSummaryPanel", () => {
     expect(api.fn).toHaveBeenLastCalledWith(1, expect.objectContaining({ kind: "place", page: 1 }));
   });
 });
+
+describe("SalesSummaryPanel — «Быстрая Еда», products, comments, one place (2026-11-18)", () => {
+  test("the fast-food card: the server's sum, «Штук: N», already in the total", async () => {
+    api.fn.mockResolvedValue(withFastFood());
+    await mount();
+    const card = screen.getByTestId("sales-fast-food");
+    expect(card.textContent).toBe("Быстрая Еда3500 ֏Штук: 3уже входит в итог");
+    // A part of the totals, never added to them: the grand total is as sent.
+    expect(screen.getByTestId("sales-grand").textContent).toContain("12000 ֏");
+  });
+
+  test("an older backend without the keys: no fast-food card, and the products card opens nothing", async () => {
+    api.fn.mockResolvedValue(summary());
+    await mount();
+    expect(screen.queryByTestId("sales-fast-food")).toBeNull();
+    expect(screen.getByTestId("sales-products").tagName).toBe("DIV");
+  });
+
+  test("«Общая сумма товаров» opens every product row as sent: name, price, quantity, sum", async () => {
+    api.fn.mockResolvedValue(withFastFood());
+    await mount();
+    const calls = api.fn.mock.calls.length;
+    await act(async () => { fireEvent.click(screen.getByTestId("sales-products")); });
+    const dialog = screen.getByTestId("sales-products-dialog");
+    expect(rowsIn(dialog)).toEqual([
+      ["Burger", "1500 ֏", "× 2", "3000 ֏"],
+      ["Cola", "500 ֏", "× 1", "500 ֏"],
+      ["Hot dog", "500 ֏", "× 1", "500 ֏"],
+    ]);
+    // Already in the summary: nothing more is asked.
+    expect(api.fn.mock.calls.length).toBe(calls);
+  });
+
+  test("the fast-food card opens the fast-food rows only", async () => {
+    api.fn.mockResolvedValue(withFastFood());
+    await mount();
+    await act(async () => { fireEvent.click(screen.getByTestId("sales-fast-food")); });
+    const dialog = screen.getByTestId("sales-products-dialog");
+    expect(dialog.textContent).toContain("Быстрая Еда");
+    expect(rowsIn(dialog).map((r) => r[0])).toEqual(["Burger", "Hot dog"]);
+  });
+
+  test("a record with a comment says «Комментарий: …»; one without says nothing", async () => {
+    api.fn.mockResolvedValueOnce(withFastFood());
+    await mount();
+    api.fn.mockResolvedValueOnce(summary({
+      lines: [
+        { kind: "till", id: 4, at: "2026-11-18T14:05:00+04:00", seat: null, staff: null, is_free: false, method: "cash", payments: [{ method: "cash", amount: "500.00" }], amount: "500.00", note: "за Арама" },
+        { kind: "till", id: 5, at: "2026-11-18T14:06:00+04:00", seat: null, staff: null, is_free: false, method: "cash", payments: [{ method: "cash", amount: "500.00" }], amount: "500.00", note: null },
+      ],
+      lines_meta: { current_page: 1, last_page: 1, per_page: 100, total: 2 },
+    }));
+    await act(async () => { fireEvent.click(screen.getByTestId("sales-till")); });
+    await act(async () => { await Promise.resolve(); });
+    expect(screen.getByTestId("sales-line-till-4").textContent).toContain("Комментарий: за Арама");
+    expect(screen.getByTestId("sales-line-till-5").querySelector("[data-testid=sales-line-note]")).toBeNull();
+  });
+
+  test("a picked place: place_id on the figures and on a card's records; sales without a place are said to be left out", async () => {
+    const base = withFastFood().data;
+    api.fn.mockResolvedValue(withFastFood({ window: { ...base.window, place_id: 30, till_included: false } }));
+    await mount(30);
+    expect(api.fn).toHaveBeenCalledWith(1, { date_from: "2026-11-18", date_to: "2026-11-18", per_page: 1, place_id: 30 });
+    expect(screen.queryByTestId("sales-till")).toBeNull();
+    expect(screen.getByTestId("sales-no-till").textContent).toBe("Без продаж товаров без места");
+    expect(screen.getByTestId("sales-grand").textContent).toContain("Только это место");
+    await act(async () => { fireEvent.click(screen.getByTestId("sales-places")); });
+    expect(api.fn).toHaveBeenLastCalledWith(1, expect.objectContaining({ kind: "place", place_id: 30, page: 1 }));
+  });
+
+  test("without a place, no request carries a place_id key", async () => {
+    api.fn.mockResolvedValue(withFastFood());
+    await mount(null);
+    await act(async () => { fireEvent.click(screen.getByTestId("sales-grand")); });
+    for (const call of api.fn.mock.calls) expect(call[1]).not.toHaveProperty("place_id");
+    expect(screen.queryByTestId("sales-no-till")).toBeNull();
+  });
+
+  test("a club that sold no fast food gets no «Быстрая Еда» card (2026-11-18)", async () => {
+    const base = summary().data;
+    api.fn.mockResolvedValue({ data: { ...base, totals: { ...base.totals, fast_food_total: "0.00", fast_food_units: 0 } } });
+    await mount();
+    expect(screen.getByTestId("sales-grand")).toBeTruthy();
+    expect(screen.queryByText("Быстрая Еда")).toBeNull();
+  });
+});
+

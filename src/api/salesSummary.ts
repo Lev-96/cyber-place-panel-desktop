@@ -29,6 +29,23 @@ export interface ISalesLine {
   method: string | null;
   payments: ISalesPart[];
   amount: string;
+  /** The cashier's comment on the payment (2026-11-18), or null. Absent from an older backend. */
+  note?: string | null;
+}
+
+/**
+ * What `products_total` is made of (2026-11-18): one row per product and
+ * price, the rows add up to it ON THE SERVER. `is_fast_food` / `partner_id`
+ * are the catalogue's now.
+ */
+export interface ISalesProductRow {
+  product_id: number | null;
+  name: string;
+  unit_price: string;
+  quantity: number;
+  total: string;
+  is_fast_food: boolean;
+  partner_id: number | null;
 }
 
 export interface ISalesSummary {
@@ -41,6 +58,10 @@ export interface ISalesSummary {
     /** The branch's hours the day is counted by ("13:00" → "07:00"); null: the calendar day. */
     business_day: { start: string; end: string } | null;
     is_today: boolean;
+    /** The place asked for (2026-11-18), else null. */
+    place_id?: number | null;
+    /** False with a place: sales without a place (and tournaments) are not in it. */
+    till_included?: boolean;
   };
   totals: {
     grand_total: string;
@@ -51,9 +72,14 @@ export interface ISalesSummary {
     till_count: number;
     products_total: string;
     products_units: number;
+    /** Fast food, a part of the figures above (never added to them). Absent from an older backend. */
+    fast_food_total?: string;
+    fast_food_units?: number;
   };
   by_method: ISalesMethodRow[];
   drawer: { net_cash: string };
+  /** Absent from an older backend. */
+  products_rows?: ISalesProductRow[];
   lines: ISalesLine[];
   lines_meta: { current_page: number; last_page: number; per_page: number; total: number };
 }
@@ -67,6 +93,8 @@ export interface SalesQuery {
   method?: string;
   /** "" = an unnamed «Другое». */
   label?: string;
+  /** One place's bills only (2026-11-18): no sale without a place, no tournament. */
+  place_id?: number;
 }
 
 /** The figures are the server's, counted by the cash drawer's own code; the panel only shows them. */

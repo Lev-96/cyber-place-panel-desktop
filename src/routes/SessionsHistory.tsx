@@ -4,7 +4,6 @@ import SalesSummaryPanel from "@/components/sales/SalesSummaryPanel";
 import { ListSkeleton } from "@/components/ui/Skeleton";
 import { ErrorState, StaleNotice, StateSwitch, StateView, deriveViewState } from "@/components/ui/state";
 import { useAsync } from "@/hooks/useAsync";
-import { useSessionsSummary } from "@/hooks/useSessionsSummary";
 import { formatDate, formatDateTime, formatTime } from "@/i18n/dates";
 import { useLang } from "@/i18n/LanguageContext";
 import SessionHistoryBill from "@/components/sessions/SessionHistoryBill";
@@ -19,7 +18,6 @@ import { ISessionEvent } from "@/api/sessions";
 import { ISessionApi } from "@/types/sessions";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { sessionLineLabel } from "@/components/sessions/outsideFood";
 
 /** Local "YYYY-MM-DD" — what `<input type="date">` reads/writes. */
 const toDateInput = (d: Date): string => {
@@ -52,7 +50,7 @@ const FEED_LIMIT = 1000;
 const SessionsHistory = () => {
   const { branchId } = useParams();
   const id = Number(branchId);
-  const { t, money, lang } = useLang();
+  const { t, lang } = useLang();
 
   const today = useMemo(() => toDateInput(new Date()), []);
   const [from, setFrom] = useState<string>(today);
@@ -98,8 +96,6 @@ const SessionsHistory = () => {
     () => sessionRepository.list({ branch_id: id, from: fromIso, to: toIso, limit: 1000, ...byPlace }),
     [id, fromIso, toIso, placeId],
   );
-
-  const summary = useSessionsSummary(data);
 
   /**
    * With a person picked, the cards are the sessions THEY acted in — asked of
@@ -234,38 +230,12 @@ const SessionsHistory = () => {
             </div>
           </div>
 
-          {placeId === null ? (
-            // The branch's figures, from the server (2026-11-18): the same
-            // code as the cash drawer, over the working day.
-            <div style={{ marginTop: 12 }}>
-              <SalesSummaryPanel branchId={id} from={from} to={to} refreshKey={salesRefresh} />
-            </div>
-          ) : (
-          <div className="stat-grid" style={{ marginTop: 12 }}>
-            <Tile k={t("history.sumSessions")} v={`${summary.stopped}${summary.active > 0 ? ` (+${summary.active})` : ""}`} />
-            <Tile k={t("history.sumTotal")} v={money(summary.total)} />
-            <Tile k={t("history.sumTime")} v={money(summary.timeTotal)} />
-            <Tile k={t("history.sumItemsRevenue")} v={money(summary.itemsTotal)} />
-            <Tile k={t("history.sumItemsQty")} v={String(summary.itemsQty)} />
-            {/* Counted, and worth nothing — which is the point of showing it
-                beside the takings rather than folded into them. */}
-            {summary.free > 0 && <Tile k={t("history.sumFree")} v={String(summary.free)} />}
+          {/* The figures, from the server (2026-11-18): the same code as the
+              cash drawer, over the working day; with a place picked, that
+              place's bills only (`place_id`). Nothing is added up here. */}
+          <div style={{ marginTop: 12 }}>
+            <SalesSummaryPanel branchId={id} from={from} to={to} placeId={placeId} refreshKey={salesRefresh} />
           </div>
-
-          )}
-
-          {summary.topItems.length > 0 && (
-            <div style={{ marginTop: 10 }}>
-              <span className="muted" style={{ fontSize: 12 }}>{t("history.topItems")}</span>
-              <div className="row" style={{ gap: 6, flexWrap: "wrap", marginTop: 4 }}>
-                {summary.topItems.map((it) => (
-                  <span key={it.kind ?? it.name} className="pill" style={{ textTransform: "none", letterSpacing: 0 }}>
-                    {sessionLineLabel(it, t)} · {it.qty} · {money(it.total)}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
 
         </div>
       </div>
@@ -522,12 +492,5 @@ const SessionRow = ({ session, feedEvents, covered, actorId }: {
     </div>
   );
 };
-
-const Tile = ({ k, v }: { k: string; v: string | number }) => (
-  <div className="stat-tile">
-    <span className="k">{k}</span>
-    <span className="v">{v}</span>
-  </div>
-);
 
 export default SessionsHistory;

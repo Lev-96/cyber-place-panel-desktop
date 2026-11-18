@@ -48,6 +48,10 @@ vi.mock("@/repositories/BookingRepository", () => ({
   bookingRepository: { listEvents: (...a: unknown[]) => bookings.listEvents(...a) },
 }));
 
+/** The figures (2026-11-18): the server's `/sales-summary`, with the place when one is picked. */
+const sales = vi.hoisted(() => ({ fn: vi.fn() }));
+vi.mock("@/api/salesSummary", () => ({ apiSalesSummary: (...a: unknown[]) => sales.fn(...a) }));
+
 import SessionsHistory from "./SessionsHistory";
 
 const place = (id: number, number: number, name: string | null): IBranchPlace => ({
@@ -105,6 +109,8 @@ beforeEach(() => {
   ]);
   orders.list.mockResolvedValue([]);
   bookings.listEvents.mockResolvedValue([]);
+  sales.fn.mockReset();
+  sales.fn.mockRejectedValue(new Error("not under test"));
 });
 afterEach(() => cleanup());
 
@@ -199,5 +205,15 @@ describe("SessionsHistory — the place filter", () => {
     expect(places.listRawByBranch).toHaveBeenCalledTimes(2);
     expect(screen.queryByText("history.state.placesFailed")).toBeNull();
     expect(placeSelect().options).toHaveLength(4);
+  });
+
+  test("the figures are the server's for the picked place (place_id), never added up from the sessions here", async () => {
+    await mount();
+    expect(sales.fn).toHaveBeenLastCalledWith(1, expect.not.objectContaining({ place_id: expect.anything() }));
+
+    await pick("30");
+    expect(sales.fn).toHaveBeenLastCalledWith(1, expect.objectContaining({ place_id: 30, per_page: 1 }));
+    // The old client tiles (sessions' total_paid summed here) are gone.
+    expect(document.body.textContent).not.toMatch(/history\.sum|history\.topItems/);
   });
 });

@@ -49,6 +49,20 @@ export type Permission =
    */
   | "menu.support"
   | "revenue.view"         // see /revenue and /companies/:id/revenue (admin + owner)
+  /**
+   * «Мои партнёры» in the side menu (2026-11-18, owner): the company's
+   * partners whose fast food the club sells, and the month's settlement with
+   * them. Admin and owner only, never a manager: a partner's terms are the
+   * company's commercial business.
+   */
+  | "menu.partners"
+  /**
+   * Partners themselves (2026-11-18): add, edit, archive, read the
+   * settlement, and choose WHOSE fast food a product is. Mirrors the
+   * backend's `partners.manage` (admin, company_owner). A manager's product
+   * form shows no partner field and never sends `partner_id`.
+   */
+  | "partners.manage"
   // branch CRUD
   | "branch.create"
   | "branch.edit"
@@ -191,6 +205,7 @@ const PERMS: Record<Role, ReadonlySet<Permission>> = {
     "menu.updates", "menu.expenses", "menu.metrics", "menu.security", "menu.support",
     "menu.platformBilling",
     "revenue.view",
+    "menu.partners", "partners.manage",
     "branch.create", "branch.edit", "branch.delete", "branch.prices",
     "branch.places", "branch.members", "product.crud", "product.write", "product.history", "product.stockCorrect",
     "company.create", "company.edit", "company.delete",
@@ -204,6 +219,8 @@ const PERMS: Record<Role, ReadonlySet<Permission>> = {
   company_owner: new Set<Permission>([
     "menu.branches", "menu.managers", "menu.tournaments", "menu.scan", "menu.map",
     "menu.myCompany", "menu.agentUpdates", "menu.support", "revenue.view",
+    // The company's fast-food partners and their month (2026-11-18).
+    "menu.partners", "partners.manage",
     "branch.create", "branch.edit", "branch.delete", "branch.prices",
     // Whether players can see the venue is the owner's call; the admin
     // approval gate this replaced is gone on both sides.

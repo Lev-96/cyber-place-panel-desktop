@@ -88,5 +88,40 @@ describe("PaymentEditor", () => {
     expect(last.amounts.other).toBe("");
     expect(last.own).toEqual({ shown: false, label: "" });
   });
+
+  /**
+   * 2026-11-18 (owner): whatever was typed and switched on the way, what is
+   * sent is exactly the LAST choice — never a leftover of an earlier one.
+   */
+  test("after any switching, exactly the last choice is sent", async () => {
+    const { paymentBody } = await import("./paymentSplit");
+    const body = () => paymentBody(last, checkPayment(500000, last));
+    render(<Host due={500000} />);
+
+    // Split typed in full (cash 2000 + «Idram» 3000)…
+    await act(async () => { fireEvent.click(screen.getByTestId("pay-split")); });
+    const boxes = () => screen.getAllByRole("textbox").filter((e) => e.tagName === "INPUT" && !e.getAttribute("data-testid"));
+    await act(async () => { fireEvent.change(boxes()[0], { target: { value: "2000" } }); });
+    await act(async () => { fireEvent.click(screen.getByTestId("pay-own-add")); });
+    await act(async () => { fireEvent.change(screen.getByTestId("pay-own-name"), { target: { value: "Idram" } }); });
+    await act(async () => { fireEvent.click(screen.getByTestId("pay-rest-other")); });
+    expect(body()).toEqual({ payments: [{ method: "cash", amount: 2000 }, { method: "other", amount: 3000, label: "Idram" }] });
+
+    // …then card: card for the whole bill, no parts, no name.
+    await act(async () => { fireEvent.click(screen.getByTestId("pay-card")); });
+    expect(body()).toEqual({ payment_method: "card" });
+
+    // …then cash: cash.
+    await act(async () => { fireEvent.click(screen.getByTestId("pay-cash")); });
+    expect(body()).toEqual({ payment_method: "cash" });
+
+    // …back to split, the own option removed: only what is still shown, and
+    // it must add up again before anything can be sent.
+    await act(async () => { fireEvent.click(screen.getByTestId("pay-split")); });
+    await act(async () => { fireEvent.click(screen.getByTestId("pay-own-remove")); });
+    expect(checkPayment(500000, last)).toMatchObject({ ok: false, problem: "sum", remainingCents: 300000 });
+    await act(async () => { fireEvent.click(screen.getByTestId("pay-rest-card")); });
+    expect(body()).toEqual({ payments: [{ method: "cash", amount: 2000 }, { method: "card", amount: 3000 }] });
+  });
 });
 

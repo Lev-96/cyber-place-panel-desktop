@@ -11667,3 +11667,55 @@ button.sales-card:focus-visible { outline: 2px solid var(--color-primary); outli
 .sales-line { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; border: 1px solid var(--color-border); border-radius: 10px; }
 .sales-line__head { display: flex; justify-content: space-between; gap: 12px; }
 .sales-line__parts { font-size: 13px; }
+
+/* «Быстрая Еда» in the history (2026-11-18): the records' comment, the products table. */
+.sales-line__note { font-size: 13px; overflow-wrap: anywhere; }
+.sales-summary__no-till { margin: 0; font-size: 13px; }
+.sales-products { display: flex; flex-direction: column; gap: 4px; max-height: 60vh; overflow-y: auto; }
+.sales-product {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
+  gap: 4px 12px;
+  align-items: baseline;
+  padding: 8px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  font-variant-numeric: tabular-nums;
+}
+.sales-product--head { border: 0; padding-top: 0; padding-bottom: 0; font-size: 12px; }
+.sales-product__name { min-width: 0; overflow-wrap: anywhere; }
+@media (max-width: 600px) {
+  .sales-product { grid-template-columns: minmax(0, 1fr) auto; }
+  .sales-product--head { display: none; }
+}
+
+/* «Мои партнёры» (2026-11-18, owner). */
+.partner-dialog { width: 560px; max-width: 92vw; display: flex; flex-direction: column; gap: 14px; }
+.partner-dialog__terms { flex-wrap: wrap; }
+.partner-list__head { flex-wrap: wrap; gap: 8px; }
+.list-item.partner-row { flex-wrap: wrap; gap: 8px; }
+.partner-row__main { flex: 1 1 220px; min-width: 0; overflow-wrap: anywhere; }
+.partner-row__actions { flex-wrap: wrap; justify-content: flex-end; }
+.partner-row__badge { margin-left: 8px; font-size: 11px; text-transform: none; letter-spacing: 0; }
+.partner-row__note { white-space: pre-line; }
+.settlement-cards { display: flex; flex-wrap: wrap; gap: 12px; }
+.settlement-card { flex: 1 1 300px; min-width: 0; max-width: 100%; display: flex; flex-direction: column; gap: 8px; }
+.settlement-card.is-owes { border-color: var(--color-danger); }
+.settlement-card__title { margin: 0; font-size: 16px; overflow-wrap: anywhere; }
+.settlement-card__split { display: flex; flex-wrap: wrap; gap: 8px 24px; }
+.settlement-card__owes { color: var(--color-danger); font-weight: 700; }
+.settlement-figure { display: flex; flex-direction: column; gap: 2px; }
+.settlement-figure .k { font-size: 12px; color: var(--color-text-muted, inherit); }
+.settlement-figure .v { font-size: 18px; font-variant-numeric: tabular-nums; }
+.settlement-rows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.settlement-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 10px; font-size: 13px; font-variant-numeric: tabular-nums; }
+.settlement-row__name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Tabs that wrap whole on a NARROW window only (2026-11-18): the products'
+   three sections and the partners' two views. A wide window keeps the equal
+   shares and the ellipsis (pinned by e2e/notifications-tabs.spec.ts); below
+   700px each tab is as wide as its name and moves to the next line instead of
+   being cut to «Ապր…». */
+@media (max-width: 700px) {
+  .cp-subtabs-wrap .cp-subtabs { flex-wrap: wrap; }
+  .cp-subtabs-wrap .cp-subtab { flex: 1 1 auto; max-width: 100%; }
+}
