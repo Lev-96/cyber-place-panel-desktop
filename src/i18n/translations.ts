@@ -1871,6 +1871,7 @@ export const TRANSLATIONS: Dict = {
   "shift.countedCash": { en: "Cash counted in the till", ru: "Фактическая сумма в кассе", am: "Փաստացի գումարը դրամարկղում" },
   "shift.countedInvalid": { en: "Enter an amount, for example 47000 or 47000.50", ru: "Введите сумму, например 47000 или 47000.50", am: "Մուտքագրեք գումարը, օրինակ՝ 47000 կամ 47000.50" },
   "shift.reason": { en: "Reason for the difference", ru: "Причина расхождения", am: "Տարբերության պատճառը" },
+  "shift.reasonOptional": { en: "Reason for the difference (optional)", ru: "Причина расхождения (необязательно)", am: "Տարբերության պատճառը (ըստ ցանկության)" },
   "shift.reasonRequired": { en: "Explain the difference to close the shift", ru: "Укажите причину расхождения, чтобы закрыть смену", am: "Նշեք տարբերության պատճառը՝ հերթափոխը փակելու համար" },
   "shift.notes": { en: "Comment", ru: "Комментарий", am: "Մեկնաբանություն" },
   "shift.closingAs": { en: "Closing as {0}", ru: "Закрывает: {0}", am: "Փակում է՝ {0}" },

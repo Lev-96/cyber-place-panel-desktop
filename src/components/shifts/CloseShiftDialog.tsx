@@ -18,9 +18,9 @@ import { useRef, useState } from "react";
  * The report on top is the live one the screen already holds; the counted
  * cash is typed; the difference against the expected cash is shown as it is
  * typed — in exact cents, and only as a preview. The server computes the
- * figure that is recorded, from the same two amounts, and refuses a
- * non-zero difference with no reason; the reason box turns required here for
- * the same rule, so the refusal is never a surprise.
+ * figure that is recorded, from the same two amounts. A reason for a
+ * difference is optional (2026-11-18, owner): the difference itself is always
+ * recorded.
  *
  * One press, one request: the button is disabled while it is on the wire. The
  * server is the real guard — a second close returns the first's result.
@@ -49,8 +49,8 @@ const CloseShiftDialog = ({ shift, report, onClose, onClosed }: Props) => {
   const countedCents = parseCents(counted);
   const differenceCents = countedCents === null ? null : countedCents - centsOf(report.cash.expected);
   const kind = differenceCents === null ? null : kindOf(differenceCents);
-  const needsReason = kind !== null && kind !== "none";
-  const canConfirm = !busy && countedCents !== null && (!needsReason || notes.trim() !== "");
+  const hasDifference = kind !== null && kind !== "none";
+  const canConfirm = !busy && countedCents !== null;
 
   const confirm = async () => {
     if (!canConfirm || countedCents === null || sending.current) return;
@@ -98,15 +98,13 @@ const CloseShiftDialog = ({ shift, report, onClose, onClosed }: Props) => {
           )}
 
           <Input
-            label={needsReason ? t("shift.reason") : t("shift.notes")}
-            requiredMark={needsReason}
+            label={hasDifference ? t("shift.reasonOptional") : t("shift.notes")}
             value={notes}
             maxLength={2000}
             onChange={(e) => { setNotes(e.target.value); setErr(null); }}
             disabled={busy}
             data-testid="shift-notes"
           />
-          {needsReason && notes.trim() === "" && <span className="muted" style={{ fontSize: 12 }}>{t("shift.reasonRequired")}</span>}
 
           {user?.name && <span className="muted" style={{ fontSize: 13 }}>{fmt(t("shift.closingAs"), user.name)}</span>}
           <span className="muted" style={{ fontSize: 12 }}>{t("shift.finalNote")}</span>

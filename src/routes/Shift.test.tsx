@@ -111,7 +111,7 @@ describe("closing", () => {
     await act(async () => { fireEvent.click(screen.getByTestId("shift-close")); });
   };
 
-  test("a shortage is named, needs a reason, and is then sent once", async () => {
+  test("a shortage is named; a reason is optional (2026-11-18) and, when written, sent once", async () => {
     let finish!: (v: unknown) => void;
     repo.close.mockImplementation(() => new Promise((r) => { finish = r; }));
     await openDialog();
@@ -122,7 +122,8 @@ describe("closing", () => {
     expect(preview.textContent).toContain("shift.kind.shortage");
     expect(preview.textContent).toContain("-3000.00");
     const confirm = screen.getByTestId("shift-confirm-close") as HTMLButtonElement;
-    expect(confirm.disabled).toBe(true); // no reason yet
+    expect(confirm.disabled).toBe(false); // no reason needed
+    expect(screen.getByText("shift.reasonOptional")).toBeTruthy();
 
     fireEvent.change(screen.getByTestId("shift-notes"), { target: { value: "Change given twice" } });
     expect(confirm.disabled).toBe(false);
