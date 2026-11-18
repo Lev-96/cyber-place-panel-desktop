@@ -75,10 +75,7 @@ const SalesSummaryPanel = ({ branchId, from, to, placeId = null, refreshKey = 0,
     />
   );
   // Cash and card always (a zero says "none today"); every other row only when it took money.
-  // No «Способ оплаты не отмечен» card at all (2026-11-18, owner): free
-  // seats (0 dram) filled it and confused the till count. Its money, if any,
-  // stays in «Итог общей продажи» and the shift report as before.
-  const methods = s.by_method.filter((r) => r.method !== "unrecorded" && (r.method === "cash" || r.method === "card" || r.count > 0));
+  const methods = s.by_method.filter((r) => r.method === "cash" || r.method === "card" || r.count > 0);
   const cashRow = s.by_method.find((r) => r.method === "cash" && r.label === null);
   // With a place the server leaves sales without a place out, and says so.
   const tillIncluded = s.window.till_included !== false;
