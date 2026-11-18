@@ -182,6 +182,13 @@ export const installBackendMocks = async (
     });
   });
 
+  // «Приём смены» (2026-11-18): a branch that counts no product, in the
+  // backend's `{data: [...]}` shape, so opening a shift opens at once (still
+  // sending `stock_counts: []`). A spec that counts registers its own list.
+  await page.route((url) => isBackend(url) && url.pathname === "/shifts/acceptance-products", async (route: Route) => {
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ data: [] }) });
+  });
+
   await page.route(backendPath("/user/me"), async (route: Route) => {
     await route.fulfill({
       status: 200,

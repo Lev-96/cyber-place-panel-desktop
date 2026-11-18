@@ -1,6 +1,10 @@
-import { apiCloseShift, apiCurrentShift, apiListShifts, apiOpenShift, apiShiftStaff, apiShiftSummary } from "@/api/shifts";
-import { friendlyMutation } from "@/api/fallback";
-import { IShift, IShiftStaff, IShiftWithReport, ShiftHistoryFilters } from "@/types/shifts";
+import {
+  apiAcceptanceProducts, apiCloseShift, apiCurrentShift, apiListShifts, apiOpenShift, apiShiftStaff, apiShiftSummary,
+} from "@/api/shifts";
+import { friendlyMutation, orFallback } from "@/api/fallback";
+import type {
+  IAcceptanceProduct, IOpenShiftResult, IShiftStaff, IShiftWithReport, OpenShiftBody, ShiftHistoryFilters,
+} from "@/types/shifts";
 
 /**
  * The branch's cash shifts. Reads are NOT wrapped in a fallback: a money
@@ -20,8 +24,15 @@ export class ShiftRepository {
   summary(shiftId: number): Promise<IShiftWithReport> {
     return apiShiftSummary(shiftId);
   }
-  open(branchId: number, openingCash: string): Promise<IShift> {
-    return friendlyMutation(apiOpenShift(branchId, openingCash).then((r) => r.shift));
+  /**
+   * What must be counted to open a shift. A backend from before the count
+   * (404) has nothing to count: the shift opens as it always did there.
+   */
+  acceptanceProducts(branchId: number): Promise<IAcceptanceProduct[]> {
+    return orFallback(apiAcceptanceProducts(branchId).then((r) => r.data), []);
+  }
+  open(body: OpenShiftBody): Promise<IOpenShiftResult> {
+    return friendlyMutation(apiOpenShift(body));
   }
   close(shiftId: number, countedCash: string, notes: string) {
     return friendlyMutation(apiCloseShift(shiftId, countedCash, notes));

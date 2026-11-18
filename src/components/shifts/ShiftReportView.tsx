@@ -6,6 +6,7 @@ import type { CSSProperties, ReactNode } from "react";
 import { shiftAmount } from "@/shifts/cash";
 import { platformLabel } from "@/utils/platform";
 import ShiftBreakdown from "./ShiftBreakdown";
+import ShiftAcceptanceBlock from "./acceptance/ShiftAcceptanceBlock";
 import { Row, Section, divider, rowStyle, valueStyle } from "./shiftReportParts";
 
 /**
@@ -97,6 +98,9 @@ const ShiftReportView = ({ shift, report, viewerId = null }: Props) => {
           {closed && <Fact label={t("shift.closedBy")}>{report.closed?.closed_by.name ?? shift.closed_by?.name ?? ""}</Fact>}
         </div>
       </section>
+
+      {/* 2026-11-18: «Приём смены», what the shift began with; blind for a manager (the server's shape). */}
+      {report.acceptance_count && <ShiftAcceptanceBlock count={report.acceptance_count} />}
 
       <section className="card col" style={{ gap: 12 }}>
         <div className="col" style={{ gap: 2 }} data-testid="shift-revenue-total">

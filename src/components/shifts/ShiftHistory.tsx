@@ -34,6 +34,14 @@ interface Props {
   fixedBranchId?: number;
   /** Owners and admins pick a staff member; a manager's history is already theirs. */
   canPickStaff: boolean;
+  /**
+   * A shift to open the report of at once (2026-11-18: the shortage
+   * notification links `/shifts?shift_id=…`). The server decides whether
+   * this account may read it; a refusal is shown as any other.
+   */
+  openShiftId?: number;
+  /** The report opened for `openShiftId` was closed (the link is spent). */
+  onReportClosed?: () => void;
 }
 
 const PER_PAGE = 20;
@@ -47,7 +55,7 @@ const KIND_KEY: Record<DifferenceKind, string> = {
 export const branchLabel = (b: { address?: string | null; city?: string | null } | null | undefined): string =>
   b ? [b.address, b.city].filter(Boolean).join(", ") : "";
 
-const ShiftHistory = ({ fixedBranchId, canPickStaff }: Props) => {
+const ShiftHistory = ({ fixedBranchId, canPickStaff, openShiftId, onReportClosed }: Props) => {
   const { t, money } = useLang();
   const [branchId, setBranchId] = useState<number | undefined>(fixedBranchId);
   const [staffId, setStaffId] = useState<number | undefined>(undefined);
@@ -118,16 +126,27 @@ const ShiftHistory = ({ fixedBranchId, canPickStaff }: Props) => {
     ...(discrepancy ? [{ key: "diff", label: `${t("shift.difference")}: ${t(discrepancy === "any" ? "shift.filter.anyDifference" : KIND_KEY[discrepancy])}`, clear: () => setDiscrepancy(undefined) }] : []),
   ];
 
-  const showReport = async (shift: IShift) => {
-    setOpening(shift.id);
+  const showReport = async (shiftId: number) => {
+    setOpening(shiftId);
     setErr(null);
     try {
-      setViewing(await shiftRepository.summary(shift.id));
+      setViewing(await shiftRepository.summary(shiftId));
     } catch (e) {
       setErr(formatApiError(e));
     } finally {
       setOpening(null);
     }
+  };
+
+  // A linked shift opens once per id; the effect re-runs only when the link changes.
+  useEffect(() => {
+    if (openShiftId !== undefined && openShiftId > 0) void showReport(openShiftId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openShiftId]);
+
+  const closeReport = () => {
+    setViewing(null);
+    if (openShiftId !== undefined) onReportClosed?.();
   };
 
   const difference = (s: IShift) =>
@@ -250,7 +269,7 @@ const ShiftHistory = ({ fixedBranchId, canPickStaff }: Props) => {
                   </div>
                 )}
               </div>
-              <Button variant="secondary" onClick={() => void showReport(s)} disabled={opening !== null}>
+              <Button variant="secondary" onClick={() => void showReport(s.id)} disabled={opening !== null}>
                 {opening === s.id ? "…" : t("shift.report")}
               </Button>
             </div>
@@ -261,7 +280,7 @@ const ShiftHistory = ({ fixedBranchId, canPickStaff }: Props) => {
       <Pagination page={page} lastPage={lastPage} onChange={(p) => setPaging({ key, page: p })} disabled={list.loading} />
 
       {viewing && (
-        <Modal open onClose={() => setViewing(null)}>
+        <Modal open onClose={closeReport}>
           <div className="card" style={{ width: 680, maxWidth: "94vw", maxHeight: "88vh", overflowY: "auto", display: "flex", flexDirection: "column", gap: 12 }} data-testid="shift-report-modal">
             <h2 style={{ margin: 0 }}>
               {viewing.shift.status === "closed" ? t("shift.closedTitle") : t("shift.report")}
@@ -272,7 +291,7 @@ const ShiftHistory = ({ fixedBranchId, canPickStaff }: Props) => {
               : <span className="muted">{t("shift.noReport")}</span>}
             <div className="row-between">
               <span />
-              <Button onClick={() => setViewing(null)}>{t("action.close")}</Button>
+              <Button onClick={closeReport}>{t("action.close")}</Button>
             </div>
           </div>
         </Modal>

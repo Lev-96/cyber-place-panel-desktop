@@ -11,7 +11,7 @@ import type { IShift, IShiftReport } from "@/types/shifts";
  */
 
 const repo = vi.hoisted(() => ({
-  current: vi.fn(), list: vi.fn(), summary: vi.fn(), open: vi.fn(), close: vi.fn(), staff: vi.fn(),
+  current: vi.fn(), list: vi.fn(), summary: vi.fn(), open: vi.fn(), close: vi.fn(), staff: vi.fn(), acceptanceProducts: vi.fn(),
 }));
 vi.mock("@/repositories/ShiftRepository", () => ({ shiftRepository: repo }));
 vi.mock("@/repositories/BranchRepository", () => ({
@@ -66,6 +66,8 @@ beforeEach(() => {
   for (const f of Object.values(repo)) f.mockReset();
   repo.list.mockResolvedValue({ data: [], meta: { current_page: 1, last_page: 1, per_page: 20, total: 0 } });
   repo.staff.mockResolvedValue([]);
+  // A branch that counts nothing: the shift opens at once (2026-11-18).
+  repo.acceptanceProducts.mockResolvedValue([]);
 });
 afterEach(() => cleanup());
 
@@ -73,14 +75,17 @@ describe("no shift open", () => {
   beforeEach(() => repo.current.mockResolvedValue({ shift: null, report: null }));
 
   test("opens one with the counted opening cash, sent as an exact amount, once", async () => {
-    repo.open.mockResolvedValue(shift());
+    repo.open.mockResolvedValue({ shift: shift() });
     await mount();
     fireEvent.change(screen.getByTestId("shift-opening-cash"), { target: { value: "20 000,5" } });
     const button = screen.getByTestId("shift-open");
     await act(async () => { fireEvent.click(button); fireEvent.click(button); });
 
     expect(repo.open).toHaveBeenCalledTimes(1);
-    expect(repo.open).toHaveBeenCalledWith(4, "20000.50");
+    // 2026-11-18: one body, always with a press id and the (here empty) count.
+    expect(repo.open).toHaveBeenCalledWith({
+      branch_id: 4, opening_cash: "20000.50", client_request_id: expect.any(String), stock_counts: [],
+    });
     expect(repo.current).toHaveBeenCalledTimes(2); // re-read after opening
   });
 
