@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import type { ICompanyBilling } from "@/api/billing";
 import Notifications, { dbFeedCopy, shouldShowBookingsFeed, shouldShowBillingFeed } from "./Notifications";
@@ -342,5 +342,24 @@ describe("the session reminder card", () => {
     expect(document.body.textContent).not.toContain("session.reminder");
     fireEvent.click(head);
     expect(nav.fn).toHaveBeenCalledWith("/branches/4/sessions");
+  });
+});
+
+/** A new desktop version in the bell (2026-11-17): said in words, opens «Обновление». */
+describe("a new desktop version notice", () => {
+  afterEach(cleanup);
+  test("reads as the version and opens the updates screen", async () => {
+    auth.user = { id: 5, role: "manager" };
+    api.handler = () => Promise.resolve({ data: [] });
+    feed.list = [{
+      id: "n1", type: "Cyber Place 1.0.65", read_at: null, created_at: "2026-11-17T12:00:00Z",
+      data: { type: "app_update.available", app: "panel", version: "1.0.65", mandatory: false },
+    }];
+    nav.fn.mockReset();
+    await act(async () => { render(<Notifications />); });
+    const line = await screen.findByText(/New Cyber Place version 1\.0\.65/);
+    await act(async () => { fireEvent.click(line); });
+    expect(nav.fn).toHaveBeenCalledWith("/settings/agent-updates");
+    feed.list = [];
   });
 });

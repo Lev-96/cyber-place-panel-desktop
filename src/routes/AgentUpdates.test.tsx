@@ -11,7 +11,7 @@ import { updateBadgeCounts } from "@/realtime/updateBadges";
  *  - One card per branch whose computers run the Agent and connected recently
  *    (`agent_relevant`, the server's word). A branch with consoles only, or with
  *    a computer that never connected, shows nothing about the Agent.
- *  - No such branch: no Agent block at all, only the screen's empty state.
+ *  - No such branch: no Agent block at all — only the app's own update card.
  *  - «Применить в этом филиале» sends THAT branch, and the side menu's badge
  *    clears at once: the screen asks the shared updates context to read again
  *    instead of leaving the badge to the next 60-second tick.
@@ -29,6 +29,7 @@ vi.mock("@/i18n/LanguageContext", async () => {
 vi.mock("@/realtime/useRealtimeVersion", () => ({ useRealtimeVersion: () => 0 }));
 vi.mock("@/realtime/echo", () => ({ getEcho: () => null }));
 
+import { ConfirmProvider } from "@/components/ui/ConfirmProvider";
 import AgentUpdates from "./AgentUpdates";
 
 const branchA: AgentBranchStatus = {
@@ -54,10 +55,12 @@ const BadgeProbe = () => (
 const mount = async () => {
   await act(async () => {
     render(
-      <UpdatesNotificationProvider>
-        <BadgeProbe />
-        <AgentUpdates />
-      </UpdatesNotificationProvider>,
+      <ConfirmProvider>
+        <UpdatesNotificationProvider>
+          <BadgeProbe />
+          <AgentUpdates />
+        </UpdatesNotificationProvider>
+      </ConfirmProvider>,
     );
   });
 };
@@ -128,7 +131,18 @@ describe("no branch the Agent concerns", () => {
     expect(card(12)).toBeNull();
     expect(screen.queryByText("1.0.27")).toBeNull();
     expect(screen.queryByRole("button", { name: "Apply in this branch" })).toBeNull();
-    expect(screen.getByText("No connected computers")).toBeTruthy();
+    // Nothing about the Agent at all (2026-11-17, owner) — not even an empty
+    // state; the app's own update card is what the screen shows.
+    expect(screen.queryByTestId("agent-updates-block")).toBeNull();
+    expect(screen.queryByText("No connected computers")).toBeNull();
+    expect(screen.getByTestId("desktop-update-card")).toBeTruthy();
+  });
+
+  test("a branch with a computer: the Agent block is there, below the app's card", async () => {
+    api.status.mockResolvedValue(status());
+    await mount();
+    expect(screen.getByTestId("desktop-update-card")).toBeTruthy();
+    expect(screen.getByTestId("agent-updates-block")).toBeTruthy();
   });
 });
 

@@ -1,5 +1,8 @@
 import { request } from "./client";
-import { IShift, IShiftReport, IShiftStaff, IShiftWithReport, ShiftHistoryFilters } from "@/types/shifts";
+import type {
+  IAcceptanceProduct, IOpenShiftResult, IShift, IShiftReport, IShiftStaff, IShiftWithReport, IStockCountRequiredBody,
+  OpenShiftBody, ShiftHistoryFilters,
+} from "@/types/shifts";
 import type { PaginatedList } from "@/types/api";
 
 /**
@@ -21,8 +24,29 @@ export const apiShiftStaff = (branchId: number) =>
 export const apiShiftSummary = (shiftId: number) =>
   request<IShiftWithReport>(`/shifts/${shiftId}/summary`);
 
-export const apiOpenShift = (branchId: number, openingCash: string) =>
-  request<{ shift: IShift }>("/shifts/open", { method: "POST", body: { branch_id: branchId, opening_cash: openingCash } });
+/**
+ * «Приём смены» (2026-11-18): every product the branch counts, names only —
+ * never a figure. Empty = the branch opens without a count.
+ */
+export const apiAcceptanceProducts = (branchId: number) =>
+  request<{ data: IAcceptanceProduct[] }>("/shifts/acceptance-products", { params: { branch_id: branchId } });
+
+/**
+ * Open a shift. This build always sends `stock_counts` (empty when the branch
+ * counts nothing) and the attempt's `client_request_id`: the same id again is
+ * answered 200 + `replayed` with the shift it already opened.
+ */
+export const apiOpenShift = (body: OpenShiftBody) =>
+  request<IOpenShiftResult>("/shifts/open", { method: "POST", body });
+
+/** The 422 that names the products the count missed, or null for any other failure. */
+export const stockCountRequiredBody = (e: unknown): IStockCountRequiredBody | null => {
+  const err = e as { status?: number; body?: unknown } | null;
+  const body = err?.body as Partial<IStockCountRequiredBody> | undefined;
+  return err?.status === 422 && body?.code === "stock_count_required" && Array.isArray(body.missing)
+    ? (body as IStockCountRequiredBody)
+    : null;
+};
 
 export const apiCloseShift = (shiftId: number, countedCash: string, notes: string) =>
   request<IShiftWithReport & { already_closed: boolean }>(`/shifts/${shiftId}/close`, {

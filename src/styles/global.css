@@ -11621,3 +11621,271 @@ select.input option:disabled {
   flex-wrap: wrap;
   justify-content: flex-end;
 }
+
+/* «Обновление приложения» (2026-11-17): the app's own update, for every role. */
+.desktop-update { gap: 10px; }
+.desktop-update__title { font-size: 15px; }
+.desktop-update__ready { color: var(--color-success); font-weight: 600; }
+.desktop-update__actions { gap: 10px; flex-wrap: wrap; align-items: center; }
+.desktop-update__install {
+  min-height: 48px;
+  padding: 0 28px;
+  font-size: 16px;
+  font-weight: 700;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-success) 35%, transparent);
+  background: var(--color-success);
+  border-color: var(--color-success);
+}
+
+
+/* A date that reads dd.mm.yyyy and opens the system calendar (2026-11-18). */
+.date-field { position: relative; display: inline-flex; }
+.date-field__text { text-align: left; cursor: pointer; min-width: 140px; font-variant-numeric: tabular-nums; }
+.date-field__native { position: absolute; left: 0; bottom: 0; width: 100%; height: 0; opacity: 0; pointer-events: none; border: 0; padding: 0; }
+
+/* «Свой вариант» row (2026-11-18): name on the left, then amount, rest, remove. */
+.pay-editor__own-name { flex: 0 0 120px; min-width: 0; height: 36px; }
+.pay-editor__own-add { align-self: flex-start; }
+.pay-editor__own-remove {
+  background: transparent; border: 1px solid var(--color-border); color: var(--color-text-muted, inherit);
+  border-radius: 8px; width: 32px; height: 32px; cursor: pointer; font-size: 18px; line-height: 1;
+}
+
+/* «История продаж» in figures (2026-11-18). */
+.sales-summary { gap: 12px; }
+.sales-summary__period { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; font-size: 15px; }
+.sales-summary__subtitle { margin: 4px 0 0; font-size: 14px; }
+.sales-summary__drawer { margin: 0; font-size: 13px; }
+.sales-card { text-align: left; font: inherit; color: inherit; cursor: pointer; }
+div.sales-card { cursor: default; }
+button.sales-card:hover { border-color: var(--color-primary); }
+button.sales-card:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.sales-card--big { border-color: var(--color-primary); }
+.sales-card__sub { font-size: 12px; }
+.sales-lines { gap: 10px; width: min(560px, 92vw); }
+.sales-lines__list { display: flex; flex-direction: column; gap: 8px; max-height: 60vh; overflow-y: auto; }
+.sales-line { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; border: 1px solid var(--color-border); border-radius: 10px; }
+.sales-line__head { display: flex; justify-content: space-between; gap: 12px; }
+.sales-line__parts { font-size: 13px; }
+
+/* «Быстрая Еда» in the history (2026-11-18): the records' comment, the products table. */
+.sales-line__note { font-size: 13px; overflow-wrap: anywhere; }
+.sales-summary__no-till { margin: 0; font-size: 13px; }
+.sales-products { display: flex; flex-direction: column; gap: 4px; max-height: 60vh; overflow-y: auto; }
+.sales-product {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
+  gap: 4px 12px;
+  align-items: baseline;
+  padding: 8px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  font-variant-numeric: tabular-nums;
+}
+.sales-product--head { border: 0; padding-top: 0; padding-bottom: 0; font-size: 12px; }
+.sales-product__name { min-width: 0; overflow-wrap: anywhere; }
+@media (max-width: 600px) {
+  .sales-product { grid-template-columns: minmax(0, 1fr) auto; }
+  .sales-product--head { display: none; }
+}
+
+/* «Мои партнёры» (2026-11-18, owner). */
+.partner-dialog { width: 560px; max-width: 92vw; display: flex; flex-direction: column; gap: 14px; }
+.partner-dialog__terms { flex-wrap: wrap; }
+.partner-list__head { flex-wrap: wrap; gap: 8px; }
+.list-item.partner-row { flex-wrap: wrap; gap: 8px; }
+.partner-row__main { flex: 1 1 220px; min-width: 0; overflow-wrap: anywhere; }
+.partner-row__actions { flex-wrap: wrap; justify-content: flex-end; }
+.partner-row__badge { margin-left: 8px; font-size: 11px; text-transform: none; letter-spacing: 0; }
+.partner-row__note { white-space: pre-line; }
+.settlement-cards { display: flex; flex-wrap: wrap; gap: 12px; }
+.settlement-card { flex: 1 1 300px; min-width: 0; max-width: 100%; display: flex; flex-direction: column; gap: 8px; }
+.settlement-card.is-owes { border-color: var(--color-danger); }
+.settlement-card__title { margin: 0; font-size: 16px; overflow-wrap: anywhere; }
+.settlement-card__split { display: flex; flex-wrap: wrap; gap: 8px 24px; }
+.settlement-card__owes { color: var(--color-danger); font-weight: 700; }
+.settlement-figure { display: flex; flex-direction: column; gap: 2px; }
+.settlement-figure .k { font-size: 12px; color: var(--color-text-muted, inherit); }
+.settlement-figure .v { font-size: 18px; font-variant-numeric: tabular-nums; }
+.settlement-rows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.settlement-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 10px; font-size: 13px; font-variant-numeric: tabular-nums; }
+.settlement-row__name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Tabs that wrap whole on a NARROW window only (2026-11-18): the products'
+   three sections and the partners' two views. A wide window keeps the equal
+   shares and the ellipsis (pinned by e2e/notifications-tabs.spec.ts); below
+   700px each tab is as wide as its name and moves to the next line instead of
+   being cut to «Ապր…». */
+@media (max-width: 700px) {
+  .cp-subtabs-wrap .cp-subtabs { flex-wrap: wrap; }
+  .cp-subtabs-wrap .cp-subtab { flex: 1 1 auto; max-width: 100%; }
+}
+
+/* «Когда платит игрок» at Start (2026-11-18): two plain answers, full width. */
+.start-dialog__when-pays { flex-basis: 100%; gap: 6px; }
+.start-dialog__when-pays-choices { display: flex; gap: 8px; flex-wrap: wrap; }
+.start-dialog__when-pays-btn {
+  flex: 1 1 140px; min-height: 40px; padding: 0 14px; border-radius: 10px; cursor: pointer; font: inherit; font-weight: 600;
+  border: 1px solid var(--color-border); background: transparent; color: inherit;
+}
+.start-dialog__when-pays-btn.is-on { border-color: var(--color-success); background: color-mix(in srgb, var(--color-success) 18%, transparent); color: var(--color-success); }
+.start-dialog__when-pays-btn:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.pay-editor__own-choices { gap: 8px; flex-wrap: wrap; }
+
+/* «История продаж» range presets and refresh (2026-11-18, owner). */
+.pill.history-range.is-active { background: var(--color-primary); border-color: var(--color-primary); color: #04121a; }
+.history-refresh {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 36px; height: 32px; border-radius: 999px; cursor: pointer;
+  background: #f5c518; border: 1px solid #f5c518; color: #1a1400;
+}
+.history-refresh:hover { filter: brightness(1.08); }
+.history-refresh:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+
+/* «Приём смены» (2026-11-18): the blind count at opening. One row per product:
+   the name (and its category / «скрыт») beside its count box; the box wraps
+   under the name on a narrow window. */
+.shift-accept {
+  width: 640px;
+  max-width: 94vw;
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow: hidden;
+}
+.shift-accept__title { margin: 0; }
+.shift-accept__hint { margin: 0; font-size: 14px; color: var(--color-text-soft); }
+.shift-accept__progress { font-size: 13px; font-weight: 600; }
+.shift-accept__error { white-space: pre-line; }
+.shift-accept__list {
+  list-style: none;
+  margin: 0;
+  padding: 0 4px 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow-y: auto;
+  min-height: 0;
+  flex: 1 1 auto;
+}
+.shift-accept__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 8px 16px;
+  padding: 8px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-surface-alt);
+}
+.shift-accept__row.is-missing { border-color: var(--color-danger); }
+.shift-accept__name {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1 1 200px;
+  min-width: 0;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.shift-accept__meta { font-size: 12px; font-weight: 400; }
+.shift-accept__field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 0 1 200px;
+  min-width: 0;
+}
+.shift-accept__field .input { width: 100%; }
+.shift-accept__field .input.is-invalid { border-color: var(--color-danger); }
+.shift-accept__invalid { font-size: 12px; }
+.shift-accept__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+}
+.shift-accept__buttons { display: flex; flex-wrap: wrap; gap: 8px; margin-left: auto; }
+
+/* The report's «Приём смены»: a table on a wide box, one card per product
+   on a narrow one (the report also sits in a 680px dialog: a container query,
+   not a media query). */
+[data-testid="shift-acceptance"] { container-type: inline-size; }
+.shift-acceptance__facts {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 14px;
+  margin-bottom: 8px;
+}
+.shift-acceptance__gap { color: var(--color-warning); font-weight: 600; }
+.shift-acceptance__rule { font-size: 12px; }
+.shift-acceptance__box { overflow-x: auto; }
+.shift-acceptance__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+.shift-acceptance__table th,
+.shift-acceptance__table td {
+  padding: 6px 8px;
+  text-align: right;
+  vertical-align: top;
+}
+.shift-acceptance__table thead th {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-muted);
+  border-bottom: 1px solid var(--color-border);
+}
+.shift-acceptance__table thead th:first-child,
+.shift-acceptance__table tbody th[scope="row"] {
+  text-align: left;
+}
+.shift-acceptance__table tbody tr + tr { border-top: 1px solid var(--color-border); }
+.shift-acceptance__table tbody th[scope="row"] {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-weight: 600;
+  min-width: 140px;
+}
+.shift-acceptance__outcome { font-size: 12px; font-weight: 500; color: var(--color-muted); }
+.shift-acceptance__outcome.is-shortage,
+.shift-acceptance__table .is-shortage td.is-shortage,
+.shift-acceptance__totals .is-shortage { color: var(--color-danger); font-weight: 700; }
+.shift-acceptance__sale { font-size: 12px; font-weight: 400; }
+.shift-acceptance__totals {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  margin-top: 8px;
+}
+@container (max-width: 760px) {
+  .shift-acceptance__table.is-full thead { display: none; }
+  .shift-acceptance__table.is-full,
+  .shift-acceptance__table.is-full tbody { display: block; }
+  .shift-acceptance__table.is-full tbody tr {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+    gap: 4px 12px;
+    padding: 8px 0;
+  }
+  .shift-acceptance__table.is-full tbody th[scope="row"] { grid-column: 1 / -1; padding: 0; min-width: 0; }
+  .shift-acceptance__table.is-full tbody td {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    padding: 0;
+    text-align: left;
+    min-width: 0;
+  }
+  .shift-acceptance__table.is-full tbody td::before {
+    content: attr(data-label);
+    font-size: 11px;
+    color: var(--color-muted);
+    overflow-wrap: anywhere;
+  }
+}

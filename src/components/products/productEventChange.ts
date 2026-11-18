@@ -24,6 +24,10 @@ type Formatters = {
   notCounted?: string;
   /** How a receipt came in (`via`: create | merge | add) in words, or null to say nothing. */
   via?: (via: string) => string | null;
+  /** «Быстрая Еда» on / off in words (2026-11-18). */
+  fastFood?: (on: boolean) => string;
+  /** A partner id in words; null = the club's own (2026-11-18). */
+  partner?: (id: number | null) => string;
 };
 
 const EMPTY = "-";
@@ -33,6 +37,8 @@ const SELF_EXPLAINED = new Set<IProductEvent["action"]>(["created", "deleted", "
 
 const scalar = (v: ProductEventValues[string] | undefined, key: string, f: Formatters): string => {
   if (key === "pricing_mode" && f.pricingMode) return f.pricingMode(v === null || v === undefined || v === "" ? null : String(v));
+  if (key === "is_fast_food" && f.fastFood) return f.fastFood(v === true || v === 1 || v === "1");
+  if (key === "partner_id" && f.partner) return f.partner(v === null || v === undefined || v === "" ? null : Number(v));
   if (v === null || v === undefined || v === "") return EMPTY;
   if (key === "kind") return f.kind(String(v));
   if (key === "price") return f.price(String(v));

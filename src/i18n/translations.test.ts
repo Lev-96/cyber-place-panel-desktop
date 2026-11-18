@@ -170,8 +170,12 @@ describe("Section names and punctuation", () => {
     expect(TRANSLATIONS["hub.tile.sessions"]).toEqual(section);
     // Since 2026-10-18 the counts and sums carry the same name (the owner's
     // decision): sales history, revenue and the notifications feed.
-    expect(TRANSLATIONS["history.sumSessions"]).toEqual(section);
-    expect(TRANSLATIONS["revenue.sourceSessions"]).toEqual(section);
+    // 2026-11-18 (owner): the history counts closed places in plain words
+    // (the server's figures since the same day; the old client tiles and
+    // their keys are gone).
+    expect(TRANSLATIONS["sales.placesCount"].ru).toBe("Закрытых мест: {0}");
+    // 2026-11-18 (owner): the revenue screen names the sum plainly instead.
+    expect(TRANSLATIONS["revenue.sourceSessions"].ru).toBe("Общая сумма активных мест");
     expect(TRANSLATIONS["notifications.sessionFeedTitle"]).toEqual(section);
   });
 
@@ -194,7 +198,7 @@ describe("Section names and punctuation", () => {
     // singular genitive kept in sentences («к этой сессии»), so the labels
     // the owner renamed are checked by key.
     const renamed = [
-      "history.sumSessions", "history.sumFree", "history.state.noResultsTitle", "history.state.errorTitle",
+      "sales.placesCount", "history.state.noResultsTitle", "history.state.errorTitle",
       "revenue.closedSessions", "revenue.sourceSessions", "notifications.sessionFeedTitle",
       "owners.delete.sessions", "owners.blocker.running_sessions", "prices.packagesHint",
       "branch.prices.hint", "tile.sessions", "home.menu.branchesSub", "home.menu.myBranchSub",

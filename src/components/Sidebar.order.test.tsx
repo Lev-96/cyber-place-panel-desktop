@@ -65,6 +65,8 @@ const collated = (names: string[], tag: string) =>
 const STAFF_ORDER = {
   company_owner: [
     "nav.dashboard", "nav.myCompany", "nav.side.myBranches", "nav.side.myManagers", "nav.revenue", "nav.shifts",
+    // «Мои партнёры» (2026-11-18): right after the shifts, with the money.
+    "nav.partners",
     "nav.side.branchesOnMap", "nav.side.scanCode", "nav.bookings", "nav.side.allTournaments", "nav.notifications",
   ],
   manager: [
@@ -113,7 +115,8 @@ test("a manager reads their own branch's tournaments, not all branches'", () => 
   expect(names).toContain("Турниры моего филиала");
   expect(names).not.toContain("Турниры филиалов");
   // A manager has no branches list, managers, revenue or map.
-  for (const key of ["nav.side.myBranches", "nav.side.myManagers", "nav.revenue", "nav.side.branchesOnMap"]) {
+  // Nor «Мои партнёры» (2026-11-18): a partner's terms are the owner's business.
+  for (const key of ["nav.side.myBranches", "nav.side.myManagers", "nav.revenue", "nav.side.branchesOnMap", "nav.partners"]) {
     expect(names).not.toContain(t(key, "ru"));
   }
 });
@@ -121,8 +124,8 @@ test("a manager reads their own branch's tournaments, not all branches'", () => 
 test("the owner's menu wording in Russian, as asked", () => {
   lang.current = "ru";
   mount("company_owner");
-  expect(menuNames().slice(0, 11)).toEqual([
-    "Панель", "Моя компания", "Мои филиалы", "Мои менеджеры", "Выручка", "Смены",
+  expect(menuNames().slice(0, 12)).toEqual([
+    "Панель", "Моя компания", "Мои филиалы", "Мои менеджеры", "Доход и оплата Cyber Place", "Смены", "Мои партнёры",
     "Филиалы на карте", "Сканировать код", "Бронирования", "Турниры филиалов", "Уведомления",
   ]);
 });
@@ -153,12 +156,12 @@ test("switching the language keeps the owner's order", () => {
       </MemoryRouter>,
     );
     const now = menuNames();
-    expect(now.slice(0, 11)).toEqual(STAFF_ORDER.company_owner.map((key) => t(key, code)));
+    expect(now.slice(0, STAFF_ORDER.company_owner.length)).toEqual(STAFF_ORDER.company_owner.map((key) => t(key, code)));
     expect(now).toHaveLength(en.length);
   }
 });
 
-test("Russian admin menu: Безопасность, then Бронирования, then Выручка, under the pinned Панель", () => {
+test("Russian admin menu: Безопасность, then Бронирования, then Доход и оплата Cyber Place, under the pinned Панель", () => {
   lang.current = "ru";
   mount("admin");
   const names = menuNames();
@@ -166,7 +169,7 @@ test("Russian admin menu: Безопасность, then Бронировани�
   const at = (name: string) => names.indexOf(name);
   expect(at("Безопасность")).toBeGreaterThan(0);
   expect(at("Безопасность")).toBeLessThan(at("Бронирования"));
-  expect(at("Бронирования")).toBeLessThan(at("Выручка"));
+  expect(at("Бронирования")).toBeLessThan(at("Доход и оплата Cyber Place"));
 });
 
 test("the role decides the entries, the pin does not: same set as the role's permissions", () => {

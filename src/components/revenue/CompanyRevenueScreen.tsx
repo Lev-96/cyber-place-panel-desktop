@@ -8,7 +8,7 @@ import {
   selectableBranches,
 } from "@/components/revenue/revenueFigures";
 import Button from "@/components/ui/Button";
-import { formatMonth } from "@/i18n/dates";
+import { formatDate, venueDateInput, venueMonthBoundsIso } from "@/i18n/dates";
 import { useLang } from "@/i18n/LanguageContext";
 import { fmt } from "@/i18n/translations";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
@@ -19,16 +19,16 @@ interface Props {
   initialPercent?: number;
 }
 
+/** The month running now on the venue's calendar (Asia/Yerevan, 2026-11-18). */
 const currentMonth = () => {
-  const d = new Date();
-  return { year: d.getFullYear(), month: d.getMonth() + 1 };
+  const [y, m] = venueDateInput().split("-").map(Number);
+  return { year: y, month: m };
 };
-/** Local-time month boundaries → UTC ISO so backend uses cashier's calendar month. */
-const monthBoundsIso = (sel: { year: number; month: number }) => {
-  const start = new Date(sel.year, sel.month - 1, 1, 0, 0, 0, 0);
-  const end = new Date(sel.year, sel.month, 0, 23, 59, 59, 999);
-  return { from: start.toISOString(), to: end.toISOString() };
-};
+/**
+ * The month's boundaries on the VENUE's calendar (Asia/Yerevan), never the
+ * machine's: a PC set to another zone must not shift the month's money.
+ */
+const monthBoundsIso = (sel: { year: number; month: number }) => venueMonthBoundsIso(sel.year, sel.month);
 
 /**
  * A company's takings for one calendar month and what it owes Cyber Place,
@@ -94,7 +94,14 @@ const CompanyRevenueScreen = ({ companyId, companyName, initialPercent }: Props)
 
   useEffect(() => { void reload(); }, [reload, percent]);
 
-  const monthLabel = formatMonth(new Date(sel.year, sel.month - 1, 1));
+  // The whole period, day by day (2026-11-18, owner: «11.2026» did not say
+  // which days): the month's first to its last day — the same calendar month
+  // the server sums.
+  const monthLabel = fmt(
+    t("revenue.periodRange"),
+    formatDate(new Date(sel.year, sel.month - 1, 1)),
+    formatDate(new Date(sel.year, sel.month, 0)),
+  );
   const shift = (delta: number) => {
     const d = new Date(sel.year, sel.month - 1 + delta, 1);
     setSel({ year: d.getFullYear(), month: d.getMonth() + 1 });

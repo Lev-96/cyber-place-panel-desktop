@@ -1,7 +1,7 @@
 import { ListSkeleton } from "@/components/ui/Skeleton";
 import { ErrorState } from "@/components/ui/state";
 import { useAsync } from "@/hooks/useAsync";
-import { formatDateTime } from "@/i18n/dates";
+import { formatVenueDateTime } from "@/i18n/dates";
 import { useLang } from "@/i18n/LanguageContext";
 import { bookingRepository } from "@/repositories/BookingRepository";
 import { bookingEventActionKey, bookingEventActor, bookingEventDetail, bookingEventSubject } from "./bookingEventText";
@@ -45,7 +45,7 @@ const BookingHistory = ({ branchId, fromIso, toIso, refreshKey }: Props) => {
               const detail = bookingEventDetail(e, t);
               return (
                 <li key={e.id} className="booking-history__row" data-action={e.action} data-testid="booking-history-row">
-                  <span className="booking-history__when">{formatDateTime(new Date(e.created_at))}</span>
+                  <span className="booking-history__when">{formatVenueDateTime(e.created_at)}</span>
                   <span className={`booking-history__action is-${e.action}`}>{t(bookingEventActionKey(e))}</span>
                   <span className="booking-history__subject">{bookingEventSubject(e, t)}</span>
                   {detail && <span className="booking-history__detail muted">{detail}</span>}

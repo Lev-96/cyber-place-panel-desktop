@@ -11,7 +11,7 @@ import type { IShift, IShiftReport } from "@/types/shifts";
  */
 
 const repo = vi.hoisted(() => ({
-  current: vi.fn(), list: vi.fn(), summary: vi.fn(), open: vi.fn(), close: vi.fn(), staff: vi.fn(),
+  current: vi.fn(), list: vi.fn(), summary: vi.fn(), open: vi.fn(), close: vi.fn(), staff: vi.fn(), acceptanceProducts: vi.fn(),
 }));
 vi.mock("@/repositories/ShiftRepository", () => ({ shiftRepository: repo }));
 vi.mock("@/repositories/BranchRepository", () => ({
@@ -66,29 +66,27 @@ beforeEach(() => {
   for (const f of Object.values(repo)) f.mockReset();
   repo.list.mockResolvedValue({ data: [], meta: { current_page: 1, last_page: 1, per_page: 20, total: 0 } });
   repo.staff.mockResolvedValue([]);
+  // A branch that counts nothing: the shift opens at once (2026-11-18).
+  repo.acceptanceProducts.mockResolvedValue([]);
 });
 afterEach(() => cleanup());
 
 describe("no shift open", () => {
   beforeEach(() => repo.current.mockResolvedValue({ shift: null, report: null }));
 
-  test("opens one with the counted opening cash, sent as an exact amount, once", async () => {
-    repo.open.mockResolvedValue(shift());
+  test("opens one at once, with no opening cash asked (2026-11-18, owner), once", async () => {
+    repo.open.mockResolvedValue({ shift: shift() });
     await mount();
-    fireEvent.change(screen.getByTestId("shift-opening-cash"), { target: { value: "20 000,5" } });
+    expect(screen.queryByTestId("shift-opening-cash")).toBeNull();
     const button = screen.getByTestId("shift-open");
     await act(async () => { fireEvent.click(button); fireEvent.click(button); });
 
     expect(repo.open).toHaveBeenCalledTimes(1);
-    expect(repo.open).toHaveBeenCalledWith(4, "20000.50");
+    // 2026-11-18: one body, always with a press id and the (here empty) count.
+    expect(repo.open).toHaveBeenCalledWith({
+      branch_id: 4, opening_cash: "0.00", client_request_id: expect.any(String), stock_counts: [],
+    });
     expect(repo.current).toHaveBeenCalledTimes(2); // re-read after opening
-  });
-
-  test("an amount that is not one cannot be sent", async () => {
-    await mount();
-    fireEvent.change(screen.getByTestId("shift-opening-cash"), { target: { value: "12.345" } });
-    expect((screen.getByTestId("shift-open") as HTMLButtonElement).disabled).toBe(true);
-    expect(screen.getByText("shift.countedInvalid")).toBeTruthy();
   });
 
   test("somebody else opened it a moment ago: shown, not an error", async () => {
@@ -113,7 +111,7 @@ describe("closing", () => {
     await act(async () => { fireEvent.click(screen.getByTestId("shift-close")); });
   };
 
-  test("a shortage is named, needs a reason, and is then sent once", async () => {
+  test("a shortage is named; a reason is optional (2026-11-18) and, when written, sent once", async () => {
     let finish!: (v: unknown) => void;
     repo.close.mockImplementation(() => new Promise((r) => { finish = r; }));
     await openDialog();
@@ -124,7 +122,8 @@ describe("closing", () => {
     expect(preview.textContent).toContain("shift.kind.shortage");
     expect(preview.textContent).toContain("-3000.00");
     const confirm = screen.getByTestId("shift-confirm-close") as HTMLButtonElement;
-    expect(confirm.disabled).toBe(true); // no reason yet
+    expect(confirm.disabled).toBe(false); // no reason needed
+    expect(screen.getByText("shift.reasonOptional")).toBeTruthy();
 
     fireEvent.change(screen.getByTestId("shift-notes"), { target: { value: "Change given twice" } });
     expect(confirm.disabled).toBe(false);

@@ -1456,10 +1456,44 @@ describe("paid ahead at the start", () => {
     await act(async () => { fireEvent.change(screen.getByTestId("planned-duration-input-hours"), { target: { value } }); });
   };
 
-  test("by the hour with no plan: not offered (nothing to pay ahead)", async () => {
+  test("«Когда платит игрок?» is asked in plain words: «При Стоп» by default, «Сейчас» opens the ways of paying (2026-11-18)", async () => {
     await mount(device());
     await settle();
-    expect(prepaidSwitch()).toBeNull();
+    expect(screen.getByText("session.prepaid.when")).toBeTruthy();
+    expect(screen.getByTestId("prepaid-later").getAttribute("aria-checked")).toBe("true");
+    expect(prepaidSwitch()!.getAttribute("aria-checked")).toBe("false");
+    expect(screen.queryByTestId("pay-card")).toBeNull();
+    await act(async () => { fireEvent.click(prepaidSwitch()!); });
+    expect(prepaidSwitch()!.getAttribute("aria-checked")).toBe("true");
+    expect(screen.getByTestId("prepaid-later").getAttribute("aria-checked")).toBe("false");
+    // Back to «При Стоп»: nothing to pay now, no methods.
+    await act(async () => { fireEvent.click(screen.getByTestId("prepaid-later")); });
+    expect(prepaidSwitch()!.getAttribute("aria-checked")).toBe("false");
+    expect(screen.queryByTestId("start-prepaid-sum")).toBeNull();
+  });
+
+  test("by the hour with no limit (2026-11-17): offered, the sum is named, never required", async () => {
+    await mount(device());
+    await settle();
+    // Off: the start it always was.
+    expect(prepaidSwitch()).not.toBeNull();
+    await act(async () => { fireEvent.click(prepaidSwitch()!); });
+    // On: a sum to name, and Start waits for it.
+    const sumBox = () => screen.getByTestId("start-prepaid-sum").querySelector("input") as HTMLInputElement;
+    expect(startButton().disabled).toBe(true);
+    await act(async () => { fireEvent.change(sumBox(), { target: { value: "5000" } }); });
+    await act(async () => { fireEvent.click(screen.getByTestId("pay-card")); });
+    expect(startButton().disabled).toBe(false);
+    await act(async () => { fireEvent.click(startButton()); });
+    expect(repo.start.mock.calls[0][0]).toMatchObject({ mode: "open", prepaid_sum: 5000, payment_method: "card" });
+    expect(repo.start.mock.calls[0][0]).not.toHaveProperty("prepaid");
+  });
+
+  test("no limit, switch left off: nothing paid ahead is sent", async () => {
+    await mount(device());
+    await settle();
+    await act(async () => { fireEvent.click(startButton()); });
+    for (const k of ["prepaid", "prepaid_sum", "payment_method", "payments"]) expect(repo.start.mock.calls[0][0]).not.toHaveProperty(k);
   });
 
   test("a planned length: offered, and sent as prepaid:true", async () => {
@@ -1686,12 +1720,15 @@ describe("own food as the seat's rate", () => {
     repo.startOptions.mockResolvedValue({ free_until: null, max_minutes: null, unlimited_allowed: true, next_booking: null, claimable_bookings: [], outside_food_fee: 4000, outside_food_mode: "tariff" });
   });
 
-  test("on: the hint says the price per hour, the plan is quoted at it, no hand price is offered or sent", async () => {
+  test("on: the hint says the price per hour, the plan is quoted at it, nothing typed is sent", async () => {
     await mount(device());
     await settle();
     await act(async () => { fireEvent.click(screen.getByTestId("outside-food-switch")); });
     expect(screen.getByTestId("outside-food-hint").textContent).toContain("4000");
-    expect(screen.queryByText("session.editPrice")).toBeNull();
+    // The price may still be changed (2026-11-17): the box opens on 4 000.
+    await act(async () => { fireEvent.click(screen.getByText("session.editPrice")); });
+    expect((screen.getByText("session.newHourlyRate").parentElement!.querySelector("input") as HTMLInputElement).value).toBe("4000");
+    await act(async () => { fireEvent.click(screen.getByText("session.editPrice")); });
     await act(async () => { fireEvent.change(screen.getByTestId("planned-duration-input-hours"), { target: { value: "2" } }); });
     await settle();
     expect(repo.startQuote).toHaveBeenLastCalledWith(1, { minutes: 120 }, undefined, undefined, true);
@@ -1701,7 +1738,7 @@ describe("own food as the seat's rate", () => {
     expect(repo.start.mock.calls[0][0]).not.toHaveProperty("planned_amount");
   });
 
-  test("a hand price set before own food is switched on is not sent: the own-food rate prices the seat", async () => {
+  test("a price changed with own food on is sent: it becomes the own-food rate (2026-11-17)", async () => {
     await mount(device());
     await settle();
     await act(async () => { fireEvent.click(screen.getByText("session.editPrice")); });
@@ -1715,8 +1752,7 @@ describe("own food as the seat's rate", () => {
     expect(screen.getByTestId("outside-food-hint").textContent).toContain("session.perHourShort");
     expect(screen.getByTestId("outside-food-hint").textContent).toContain("session.outsideFood.rateHint");
     await act(async () => { fireEvent.click(startButton()); });
-    expect(repo.start.mock.calls[0][0]).toMatchObject({ mode: "open", outside_food: true, outside_food_fee: 4000 });
-    expect(repo.start.mock.calls[0][0]).not.toHaveProperty("hourly_rate");
+    expect(repo.start.mock.calls[0][0]).toMatchObject({ mode: "open", outside_food: true, outside_food_fee: 4000, hourly_rate: 2000 });
   });
 
   test("off: the quote is the call it always was", async () => {
@@ -1733,3 +1769,21 @@ describe("own food as the seat's rate", () => {
     expect(screen.queryByTestId("outside-food-switch")).toBeNull();
   });
 });
+
+/** 2026-11-18 (owner): the board shows the new seat at once — the dialog hands it the server's answer. */
+describe("the started seat goes to the board", () => {
+  test("onStarted gets the session exactly as the server started it", async () => {
+    const created = { id: 91, pc_id: 3, status: "active" };
+    repo.start.mockResolvedValue(created);
+    const onStarted = vi.fn();
+    await act(async () => {
+      render(<StartSessionDialog branchId={7} pc={device()} onClose={() => {}} onStarted={onStarted} />);
+    });
+    await act(async () => { await new Promise((r) => requestAnimationFrame(() => r(null))); });
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "action.start" })); });
+    for (let i = 0; i < 4; i++) await act(async () => { await Promise.resolve(); });
+    expect(onStarted).toHaveBeenCalledTimes(1);
+    expect(onStarted.mock.calls[0][0]).toBe(created);
+  });
+});
+

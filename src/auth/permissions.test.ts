@@ -235,5 +235,14 @@ describe("can(role, perm)", () => {
     it("creates managers", () => {
       expect(can("company_owner", "manager.create")).toBe(true);
     });
+
+    it("runs «Мои партнёры» and picks a product's partner, as the admin does; never a manager (2026-11-18)", () => {
+      for (const perm of ["menu.partners", "partners.manage"] as const) {
+        expect(can("company_owner", perm)).toBe(true);
+        expect(can("admin", perm)).toBe(true);
+        expect(can("manager", perm)).toBe(false);
+        expect(can(undefined, perm)).toBe(false);
+      }
+    });
   });
 });

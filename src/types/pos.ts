@@ -49,7 +49,22 @@ export interface IProduct extends Translated {
    * is fixed. A regular product never carries one.
    */
   pricing_mode?: AdditionalPricingMode | null;
+  /**
+   * «Быстрая Еда» (2026-11-18): a REGULAR product the club cooks or sells as
+   * fast food. Sold exactly like any product; the flag only sorts it into its
+   * own tab and into the sales figures. Absent (an older backend) = false.
+   */
+  is_fast_food?: boolean;
+  /**
+   * Whose fast food it is: a partner's id, or null for the club's own. The
+   * owner's business (backend `partners.manage`); never sent by a manager.
+   */
+  partner_id?: number | null;
 }
+
+/** Fast food is a regular product with the flag on. */
+export const isFastFoodProduct = (product: { kind?: string | null; is_fast_food?: boolean | null }): boolean =>
+  !isAdditionalProduct(product) && product.is_fast_food === true;
 
 export type AdditionalPricingMode = "fixed" | "hourly";
 

@@ -135,6 +135,7 @@ const SellProductsDialog = ({ branchId, onClose, onSold }: Props) => {
 
         <PaymentEditor
           name={`till-pay-${branchId}`}
+          branchId={branchId}
           dueCents={billCents(total)}
           value={pay}
           onChange={(next) => {

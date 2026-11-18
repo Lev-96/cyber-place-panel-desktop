@@ -1,5 +1,4 @@
 import Button from "@/components/ui/Button";
-import Input from "@/components/ui/Input";
 import Modal from "@/components/ui/Modal";
 import { SkeletonText } from "@/components/ui/Skeleton";
 import { StateSwitch, deriveViewState } from "@/components/ui/state";
@@ -8,13 +7,15 @@ import ShiftHistory, { branchLabel } from "@/components/shifts/ShiftHistory";
 import { useAuth } from "@/auth/AuthContext";
 import { branchRepository } from "@/repositories/BranchRepository";
 import ShiftReportView from "@/components/shifts/ShiftReportView";
-import { formatApiError } from "@/api/errors";
+import ShiftAcceptanceDialog from "@/components/shifts/acceptance/ShiftAcceptanceDialog";
+import { useShiftOpening } from "@/components/shifts/acceptance/useShiftOpening";
+import { renderText } from "@/i18n/localizedText";
 import { useAsync } from "@/hooks/useAsync";
 import { useLang } from "@/i18n/LanguageContext";
 import { shiftRepository } from "@/repositories/ShiftRepository";
-import { parseCents, toAmount } from "@/shifts/cash";
+import { toAmount } from "@/shifts/cash";
 import type { IShiftWithReport } from "@/types/shifts";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 
 /**
@@ -44,40 +45,27 @@ const Shift = () => {
   // Bumped after an open or a close so the history below re-reads.
   const [historyKey, setHistoryKey] = useState(0);
 
-  const [openingCash, setOpeningCash] = useState("");
-  const [opening, setOpening] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
-  const [err, setErr] = useState<string | null>(null);
   const [closing, setClosing] = useState(false);
   const [viewing, setViewing] = useState<IShiftWithReport | null>(null);
-  /** Synchronous guard: clicks arrive before the disabled button re-renders. */
-  const openingNow = useRef(false);
 
-  const reloadAll = () => { void current.reload(); setHistoryKey((k) => k + 1); };
-  const openingCents = openingCash.trim() === "" ? 0 : parseCents(openingCash);
-
-  const open = async () => {
-    if (opening || openingCents === null || openingNow.current) return;
-    openingNow.current = true;
-    setOpening(true);
-    setErr(null);
-    setNotice(null);
-    try {
-      await shiftRepository.open(id, toAmount(openingCents));
-      setOpeningCash("");
-    } catch (e) {
-      // Somebody else opened it a moment ago: show theirs, do not fail.
-      if ((e as { status?: number }).status === 409) setNotice(t("shift.alreadyOpen"));
-      else setErr(formatApiError(e));
-    } finally {
-      openingNow.current = false;
-      setOpening(false);
-      reloadAll();
-    }
-  };
+  const reload = current.reload;
+  const reloadAll = useCallback(() => { void reload(); setHistoryKey((k) => k + 1); }, [reload]);
 
   const live = current.data;
   const isOpen = Boolean(live?.shift);
+
+  // «Приём смены» (2026-11-18): the press reads what must be counted, then
+  // opens at once (nothing to count) or shows the count step.
+  const alreadyOpen = useCallback(() => setNotice(t("shift.alreadyOpen")), [t]);
+  const opening = useShiftOpening(id, { isOpen, onSettled: reloadAll, onAlreadyOpen: alreadyOpen });
+  // No opening cash is asked any more (2026-11-18, owner): a shift opens
+  // with 0 in the drawer's opening float, as an empty field always sent.
+  const open = () => {
+    if (opening.busy) return;
+    setNotice(null);
+    void opening.start(toAmount(0));
+  };
 
   // An open shift's figures are "as of" the last read: re-read every minute so
   // the duration and the money stay current. Paused while closing, so the
@@ -109,7 +97,7 @@ const Shift = () => {
       </div>
 
       {notice && <div className="card muted">{notice}</div>}
-      {err && <div className="error" style={{ whiteSpace: "pre-line" }}>{err}</div>}
+      {opening.error && <div className="error" style={{ whiteSpace: "pre-line" }}>{renderText(opening.error, t)}</div>}
 
       <StateSwitch
         view={deriveViewState({ loading: current.loading, error: current.error, data: current.data })}
@@ -123,19 +111,9 @@ const Shift = () => {
           <div className="card col" style={{ gap: 10, maxWidth: 520 }} data-testid="shift-none">
             <strong>{t("shift.none")}</strong>
             <span className="muted" style={{ fontSize: 13 }}>{t("shift.noneHint")}</span>
-            <Input
-              label={t("shift.openingCash")}
-              inputMode="decimal"
-              placeholder="0"
-              value={openingCash}
-              onChange={(e) => { setOpeningCash(e.target.value); setErr(null); }}
-              disabled={opening}
-              data-testid="shift-opening-cash"
-            />
-            {openingCents === null && <span className="error" style={{ fontSize: 12 }}>{t("shift.countedInvalid")}</span>}
             <div>
-              <Button onClick={() => void open()} disabled={opening || openingCents === null} data-testid="shift-open">
-                {opening ? t("shift.opening") : t("shift.open")}
+              <Button onClick={open} disabled={opening.busy} data-testid="shift-open">
+                {opening.busy && !opening.step ? t("shift.opening") : t("shift.open")}
               </Button>
             </div>
           </div>
@@ -146,6 +124,17 @@ const Shift = () => {
         <h3 style={{ margin: 0 }}>{t("shift.history")}</h3>
         <ShiftHistory key={historyKey} fixedBranchId={id} canPickStaff={user?.role !== "manager"} />
       </div>
+
+      {opening.step && (
+        <ShiftAcceptanceDialog
+          step={opening.step}
+          values={opening.values}
+          busy={opening.busy}
+          onChange={opening.setValue}
+          onConfirm={() => void opening.confirm()}
+          onCancel={opening.cancel}
+        />
+      )}
 
       {closing && live?.shift && live.report && (
         <CloseShiftDialog

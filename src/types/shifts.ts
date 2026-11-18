@@ -266,6 +266,8 @@ export interface IShiftReport {
   };
   /** v6 (2026-11-16): the shelf per counted product; absent from a report frozen before. */
   stock?: IShiftStock;
+  /** 2026-11-18: the count the shift was accepted with; absent when none was taken. Blind for a manager. */
+  acceptance_count?: IAcceptanceCount;
   staff?: IShiftStaffPart[];
   handover?: { count: number; places: IShiftHandoverPlace[] };
   voided_from_other_shifts?: {
@@ -284,4 +286,130 @@ export interface IShiftWithReport {
   shift: IShift;
   /** null only for a shift closed before reports were kept. */
   report: IShiftReport | null;
+}
+
+/**
+ * «Приём смены» (2026-11-18): one product the manager coming on must count.
+ * Names only: the count is BLIND, so the server never sends what it expects.
+ */
+export interface IAcceptanceProduct {
+  product_id: number;
+  name: string;
+  category: string | null;
+  /** false = hidden from sale, still on the shelf, still counted. */
+  is_active: boolean;
+}
+
+/** One counted product as `POST /shifts/open` takes it. */
+export interface IStockCountEntry {
+  product_id: number;
+  counted: number;
+}
+
+/** What a shift is opened with: every field the new panel always sends. */
+export interface OpenShiftBody {
+  branch_id: number;
+  opening_cash: string;
+  client_request_id: string;
+  /** Empty when the branch counts nothing; never omitted by this build. */
+  stock_counts: IStockCountEntry[];
+}
+
+/** 422 `stock_count_required`: the open was refused, these were not counted. */
+export interface IStockCountRequiredBody {
+  code: "stock_count_required";
+  message: string;
+  missing: Array<{ product_id: number; name: string }>;
+}
+
+/** What one product's count came to (backend `App\Enums\StockCountOutcome`). */
+export type StockCountOutcome = "shortage" | "surplus" | "none" | "baseline";
+
+export const STOCK_COUNT_OUTCOME = {
+  shortage: "shortage",
+  surplus: "surplus",
+  none: "none",
+  baseline: "baseline",
+} as const satisfies Record<StockCountOutcome, StockCountOutcome>;
+
+/** The manager's view of a count, and the open's answer: what was counted, nothing else. */
+export interface IAcceptanceCountBlind {
+  blind: true;
+  counted_at: string | null;
+  counted_by: IShiftPerson | null;
+  rows: Array<{ product_id: number | null; name: string; counted: number }>;
+  count: number;
+}
+
+/** One product of the owner's view: the books, the count and what the difference is worth. */
+export interface IAcceptanceCountRow {
+  product_id: number | null;
+  name: string;
+  unit_price: Money;
+  expected: number;
+  counted: number;
+  diff: number;
+  value: Money;
+  outcome: StockCountOutcome;
+  is_baseline: boolean;
+  last_movement_at: string | null;
+  last_sale_at: string | null;
+  /**
+   * How the books got to `expected` (owner/admin only): what the previous
+   * shift counted, then what the program recorded since. When `accepted` is
+   * not null the server keeps accepted + received − sold + returned +
+   * corrected = expected; nothing is added up here. null/absent: not known.
+   */
+  flow?: IAcceptanceFlow | null;
+}
+
+export interface IAcceptanceFlow {
+  /** null: this product was not counted at the previous acceptance. */
+  accepted: number | null;
+  received: number;
+  sold: number;
+  returned: number;
+  corrected: number;
+}
+
+/** The owner's / admin's view (`report.acceptance_count`, no `blind` key). */
+export interface IAcceptanceCountFull {
+  blind?: false;
+  counted_at: string | null;
+  counted_by: IShiftPerson | null;
+  previous_shift: {
+    id: number;
+    opened_at: string | null;
+    closed_at: string | null;
+    opened_by: IShiftPerson | null;
+    closed_by: IShiftPerson | null;
+  } | null;
+  /** Whose shelf it was: the previous shift's opener. */
+  blamed_user: IShiftPerson | null;
+  window: { from: string | null; to: string | null } | null;
+  /** The time between the previous close and this count; `notable` = over 30 min. */
+  gap: { from: string; to: string; seconds: number; notable: boolean } | null;
+  rows: IAcceptanceCountRow[];
+  totals: {
+    products: number;
+    baseline_products: number;
+    shortage_products: number;
+    shortage_units: number;
+    shortage_value: Money;
+    surplus_products: number;
+    surplus_units: number;
+    surplus_value: Money;
+  };
+}
+
+export type IAcceptanceCount = IAcceptanceCountBlind | IAcceptanceCountFull;
+
+export const isBlindCount = (c: IAcceptanceCount): c is IAcceptanceCountBlind => c.blind === true;
+
+/** The open's answer: the shift, and the blind count when one was taken. */
+export interface IOpenShiftResult {
+  shift: IShift;
+  acceptance_count?: IAcceptanceCountBlind;
+  /** The same press again: the server answered with the shift it already opened. */
+  replayed?: boolean;
 }

@@ -149,7 +149,11 @@ for (const lang of LANGS) {
       await expect(page.locator(".cp-update-toast")).toHaveCount(0);
 
       await page.goto("/#/settings/agent-updates");
-      await expect(page.getByText(TEXT[lang].empty)).toBeVisible();
+      // Nothing about the Agent at all (2026-11-17): no block, no empty state —
+      // the app's own update card is what the screen shows.
+      await expect(page.getByTestId("desktop-update-card")).toBeVisible();
+      await expect(page.getByTestId("agent-updates-block")).toHaveCount(0);
+      await expect(page.getByText(TEXT[lang].empty)).toHaveCount(0);
       await expect(page.locator("[data-testid^=agent-branch-]")).toHaveCount(0);
       await expect(page.getByText("1.0.27")).toHaveCount(0);
       await expect(page.getByRole("button", { name: TEXT[lang].apply })).toHaveCount(0);

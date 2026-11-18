@@ -4868,6 +4868,31 @@ panel shows the server's figures only; nothing below adds or subtracts money.
   root `tsc -p .` checks nothing (`files: []`). Tests: OutsideFoodFeeForm (+3),
   StartSessionDialog (+4), OutsideFoodRateSection (5), history (+5); e2e
   `outside-food-rate.spec.ts`.
+- **2026-11-17 follow-up.** Start: «Оплачено вперёд» on every start; on «без
+  ограничения» it asks «Сколько заплатил» (`prepaid_sum`) + the payment
+  control, never required (off sends nothing). Own food as a rate: «Изменить
+  текущую цену» stays offered and opens on the fee; the typed price is sent as
+  `hourly_rate` (the server makes it the own-food rate). Relocate dialog: «Поменять
+  местами с занятым местом» (`relocation-options.swap`), summary «№3 ⇄ №4 —
+  счёт каждого остаётся при нём», «Поменять местами» → `POST /sessions/{id}/swap`;
+  reported through `onSwapped`, NEVER `onMoved` — the board must not call
+  `consolesFollowMove` (it would rest a console under its new player). Tests:
+  RelocateSessionDialog (+3), SessionsBoard.relocate (+1), StartSessionDialog
+  (rewritten 3, +1); e2e `swap-and-unlimited-prepay.spec.ts`.
+- **«Обновление» for owner / manager (2026-11-17).** The menu entry
+  (`nav.agentUpdates`, now «Обновление», route `/settings/agent-updates`) is
+  always there; the screen opens with `components/updates/DesktopUpdateCard`:
+  installed version, «Проверить обновления» (the server's approved version via
+  `/updates/panel/manifest` → `checkGated`, then a toast: latest / found and
+  downloading / ready / failed), and once downloaded a big green «Установить и
+  перезапустить» (asks first, then `install()`; seats, settings and sign-in
+  survive). In a browser (owner web) the card says the web version is always
+  the newest. The Agent block renders only where a branch has a connected
+  computer — no empty state otherwise. `UpdateReadyModal` gained «Позже» (this
+  version, this run). The bell reads `app_update.available` as «Доступна новая
+  версия Cyber Place X» and opens «Обновление». Tests: DesktopUpdateCard (8),
+  UpdateReadyModal (2), AgentUpdates (+1, rewritten 1), Notifications (+1);
+  Electron `shell.spec.ts` (+1); e2e updates-agent-branches updated.
 - **A, «На сумму».** A third Start tab (`start-mode-amount`; the package tab is
   `start-mode-fixed`, shown only with packages). `StartByAmount`: autofocused
   sum, `GET /sessions/start-quote?amount=` (+`outside_food=1`), a 28px line
@@ -5165,3 +5190,149 @@ in `src/api/agent-updates.ts`.
   state; panels 1.0.62/1.0.63 keep working on the new backend through its
   legacy fields. **Owner web**: bump `panel.ref` with this change
   (`sideMenu.ts` there imports `@/realtime/updateBadges`).
+- **«История продаж» in figures + «Свой вариант» (2026-11-18, owner).** With no
+  place picked, the history's figures are `components/sales/SalesSummaryPanel`
+  over `GET /branches/{id}/sales-summary` (backend counts with the shift
+  report's code, over the branch's working day): «Итог общей продажи», «Общий
+  счёт активных мест», «Продажа товаров без места», «Общая сумма товаров», and
+  per way of paying the sum and «Платежей: N» (a named «Свой вариант» is its
+  own card). Every card opens its records (day, time, where, who, how paid),
+  filtered by the server. Header: «Сегодня, 18.11.2026 · Расчёт с 13:00 до
+  07:00». Dates read 18.11.2026 (`components/ui/DateField`). A picked place
+  keeps the old per-seat tiles (renamed). In «Разделить» the «Другое» row is
+  gone; «+ Свой вариант» adds a [name][amount] row (`PaymentDraft.own`, one per
+  bill). Revenue screen: plain names, period «с 01.11.2026 по 30.11.2026»,
+  menu «Доход и оплата Cyber Place»; no figure or formula changed.
+  Tests: SalesSummaryPanel (5), DateField (3), paymentSplit (+4),
+  PaymentEditor (+1); e2e `sales-history-figures.spec.ts` (en/ru/am × 1280/520).
+
+## «Быстрая Еда» and «Мои партнёры» (2026-11-18, owner)
+
+Backend contract: `cyber-place/CLAUDE.md` § "«Быстрая Еда» and «Мои партнёры»".
+The panel computes no money here: every sum, share and «должен» is the server's
+string, only formatted (`owedAmount` strips the sign of `partner_share`, a
+string edit; `percentText` drops trailing zeros of "10.00").
+
+- **Types / API** — `IProduct.is_fast_food` / `partner_id` (`types/pos.ts`,
+  `isFastFoodProduct`); `CreateProductBody` gains both. `api/partners.ts`
+  (`IPartner`, `PartnerBody` = the figure of the chosen terms only,
+  `ISettlement`), `repositories/PartnerRepository.ts` (reads surface errors,
+  writes toast `toast.partner.*`). `ISalesSummary` gains
+  `totals.fast_food_total/_units`, `products_rows`, `window.place_id /
+  till_included`, line `note`, query `place_id` (all optional: an older backend).
+- **Permissions** — `menu.partners` + `partners.manage`: admin, company_owner;
+  never a manager (mirrors backend `partners.manage`).
+- **Products** (`routes/ProductsList.tsx`) — three tabs «Товары» (regular, not
+  fast food) / «Быстрая Еда» / «Дополнительные предметы»; the two sold-by-unit
+  tabs keep stock. Owner/admin: the partners of the branch's company
+  (`branchRepository.byId` → `partnerRepository.list(company, true)`), each
+  fast-food row says «Партнёр: X» / «Свой товар клуба». A manager never asks.
+  New from the fast-food tab = `fastFood` preset. Below 700px the products'
+  three tabs and the partners' two wrap whole instead of «Ապր…»
+  (`.cp-subtabs-wrap`); a wide window keeps equal shares + ellipsis, as
+  `e2e/notifications-tabs.spec.ts` pins (its count went 2 → 3).
+- **ProductForm** — «Быстрая Еда» switch on regular products; «Чей товар» select
+  only when `partners` is passed (owner/admin): «Свой товар клуба» + active,
+  not archived partners (+ the product's own if archived, `partnerChoices`).
+  Body: `is_fast_food` only when it differs from what is STORED (a create:
+  only when on), `partner_id` only from someone with the list and only when it
+  changes; switching fast food off sends `partner_id: null` in the same save
+  (the server refuses the reverse). A manager editing a partner's product sees
+  the switch locked on (`product.fastFoodLocked`).
+- **History labels** — `fast_food_changed`, `partner_changed`; partner ids read
+  as names from the company's partners, else «Партнёр №N».
+- **«Мои партнёры»** (`/partners`, `routes/Partners.tsx`, sidebar rank 4.6 after
+  «Смены», icon `nav.partners`): `components/partners/` — `PartnerList`
+  (terms in words «10% остаётся клубу» / «50 000 драм в месяц платит клубу»,
+  products count, archive via `useConfirm`, archive shown on request,
+  read-only), `PartnerDialog`, `PartnerSettlementView` (month ‹ › with «с
+  01.11.2026 по 30.11.2026», branch select when the company has several, one
+  card per partner: «Продано на», «Штук», rows, «Клубу», «Партнёру», «Партнёр
+  должен клубу X» on `partner_owes`; then the club's own fast food; the note is
+  the panel's `partners.termsNote`, not the server's `terms_note`).
+- **«История продаж»** — `SalesSummaryPanel` now always renders (with or
+  without a place): «Быстрая Еда» card (fast_food_total, «Штук: N», «уже входит
+  в итог») and «Общая сумма товаров» open `products_rows` (fast food filtered by
+  `is_fast_food`) with no extra request; records show «Комментарий: …». A picked
+  place sends `place_id` on the figures and on every drill-down; with
+  `till_included: false` the till card is replaced by «Без продаж товаров без
+  места». The old client tiles (`hooks/useSessionsSummary.ts`, summing
+  `total_paid` of `/sessions` here) and their `history.sum*` / `history.topItems`
+  keys are deleted.
+- **Tests**: `ProductForm.fastFood.test.tsx` (12), `ProductsList.fastFood.test.tsx`
+  (6), `partners/partnerTerms.test.ts` (5), `partners/Partners.test.tsx` (12),
+  `routes/Partners.test.tsx` (3), `SalesSummaryPanel` (+7), place filter (+1),
+  `productEventChange` (+2), permissions (+1); sidebar order/icons updated for
+  the new entry. 10 mutations caught. e2e `fast-food-partners.spec.ts` (21:
+  en/ru/am × 1280/520 for partners, products tab, history; manager × 3).
+  Screenshots: `~/cyber-place-local/reports/sales-history-2026-11-18/shots/`.
+- ⚠️ Deploy the backend first (an older backend: no fast-food card, products
+  card not clickable, `/partners` 404s). **Owner web**: bump `panel.ref`; its
+  `sideMenu.ts` reads `menuSpecsFor` generically, so the entry arrives with it,
+  but `tests/appShell.test.tsx` «a menu that fits…» must add `"nav.partners"`
+  to its `hideable` list in the same bump (checked against this panel: 1 red
+  without it, 199/199 with it).
+- **Working day, venue calendar, «Когда платит игрок?», saved own options (2026-11-18).**
+  «История продаж» opens on the working day the SERVER says is running
+  (`/sales-summary` without dates), presets by it (active one `.is-active`, blue),
+  refresh is a yellow `RefreshIcon` button; every list on the screen waits for the
+  summary's `window` and reads exactly its `from`/`to`. Money screens use the venue
+  calendar helpers in `i18n/dates.ts` (`venueDateInput`, `formatVenueDate/Time`,
+  `venueMonthBoundsIso`, Asia/Yerevan +04:00); the old formatters are unchanged
+  (PS5's PSN card untouched). Start dialog: «При Стоп» / «Сейчас, до игры»
+  (`prepaid-later` / `prepaid-switch`, radios). `PaymentEditor` takes `branchId`
+  and offers `GET /branches/{id}/payment-labels` as «+ name» buttons.
+
+## «Приём смены»: the blind count at opening (2026-11-18, owner)
+
+Backend contract: `cyber-place/CLAUDE.md` § "Shift acceptance count". The panel
+counts nothing and computes no money: every expected figure, difference, sum
+and flow is the server's, only formatted.
+
+- **Open** (`routes/Shift.tsx` → `components/shifts/acceptance/useShiftOpening.ts`):
+  the press reads `GET /shifts/acceptance-products` fresh (`shiftRepository.
+  acceptanceProducts`; a 404 from an older backend = nothing to count). Empty →
+  opens at once. Else `ShiftAcceptanceDialog`: names (+ category, «скрыт») and
+  one text box «Сколько есть сейчас» per product (`inputMode="numeric"`,
+  `parseQuantity`; empty = not counted, 0 is a count), search from 8 products,
+  «Посчитано: N из M», Open disabled until all are counted. NEVER a figure of
+  the books: the list carries none and the form renders only name/category.
+  `POST /shifts/open` ALWAYS sends `{branch_id, opening_cash, client_request_id,
+  stock_counts}` (`[]` when nothing is counted). One `client_request_id` per
+  attempt (`utils/requestId`), reused on every retry (5xx, lost answer, 422),
+  dropped once a shift is open (the server replays a known id even for a
+  closed shift). 422 `stock_count_required` (`stockCountRequiredBody`) →
+  missed products outlined red, unknown ones added (`withMissing`); 409 → the
+  old «already open» notice. Success with counts → toast `toast.shift.accepted`.
+- **Report** (`ShiftAcceptanceBlock`, right under the header of
+  `ShiftReportView`, only when `report.acceptance_count` is present):
+  owner/admin = who counted, previous shift (who, `venueSpan`), «Смены не было
+  с … до …» when `gap.notable`, whose shortage, then Товар | Принято | Получено
+  | Продано в программе | Возвращено | (Исправлено only when some row has one)
+  | Должно быть | Посчитано | Разница | Сумма from `rows[].flow` + the row;
+  `accepted: null` → «нет прошлого пересчёта»; shortage red + «Недостача» +
+  «последняя продажа: 03:12»; surplus «Излишек»; baseline «Первый пересчёт,
+  сравнивать не с чем» with no difference claimed; totals «Недостача всего» /
+  «Излишек всего». Manager (`blind: true`): Товар | Посчитано only. Below a
+  760px box (container query; the report also sits in a 680px dialog) every
+  product becomes a card of labelled figures.
+- **Bell** (`components/notifications/shiftStockShortage.ts`, Notifications.tsx):
+  `data.type = "shift.stock_shortage"` → «⚠ Недостача при приёме смены: 1 000
+  драм», «Abovyan 1 · смена Anna 17.11 10:00–12:00», up to 3 products + «и ещё
+  N», the gap line; a press opens `/shifts?shift_id=N`. `Shifts.tsx` passes
+  `?shift_id` to `ShiftHistory` (`openShiftId`), which opens that report;
+  closing it drops the parameter.
+- **Not built**: the `GET /shifts/{id}/stock-count` movements drill-down (no
+  screen asked for it yet).
+- **Tests**: `acceptanceCount.test.ts` (6), `Shift.acceptance.test.tsx` (9),
+  `ShiftAcceptanceBlock.test.tsx` (7), `Notifications.shortage.test.tsx` (3),
+  `Shifts.link.test.tsx` (2); `Shift.test.tsx` expectation of `open` updated
+  (one body object now). 11 mutations caught. e2e `shift-acceptance.spec.ts`
+  (19: en/ru/am × 1280/520 for the step, the owner's block and the bell row;
+  the empty branch). `installBackendMocks` answers `/shifts/acceptance-products`
+  with `{data: []}`. Screenshots:
+  `~/cyber-place-local/reports/shift-acceptance-2026-11-18/shots/`.
+- ⚠️ Deploy the backend (migrate) FIRST: an older backend ignores the new keys
+  and opens as before, but a NEW backend refuses an OLD panel's open at a
+  branch that counts products (422, its `message` is shown). **Owner web**:
+  bump `panel.ref`.

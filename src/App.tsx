@@ -54,6 +54,7 @@ const MyCompany = lazy(() => import("@/routes/MyCompany"));
 const Owners = lazy(() => import("@/routes/Owners"));
 const OwnerDetails = lazy(() => import("@/routes/OwnerDetails"));
 const Revenue = lazy(() => import("@/routes/Revenue"));
+const Partners = lazy(() => import("@/routes/Partners"));
 const Security = lazy(() => import("@/routes/Security"));
 const PlatformBilling = lazy(() => import("@/routes/PlatformBilling"));
 const ConfirmByCode = lazy(() => import("@/routes/ConfirmByCode"));
@@ -183,6 +184,8 @@ const Authed = () => {
           <Route path="/branches/:branchId/pos" element={<Till />} />
           <Route path="/branches/:branchId/shift" element={<RoleGuard perm="shift.manage"><Shift /></RoleGuard>} />
           <Route path="/shifts" element={<RoleGuard perm="shift.manage"><Shifts /></RoleGuard>} />
+          {/* «Мои партнёры» (2026-11-18): owner and admin only. */}
+          <Route path="/partners" element={<RoleGuard perm="menu.partners"><Partners /></RoleGuard>} />
           {/* Member cards and deposits are administrative. Guarding the route
               as well as the tile is the point: a bookmarked URL is the other
               way into a section, and the backend refuses these reads too. */}

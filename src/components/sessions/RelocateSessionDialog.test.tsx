@@ -19,7 +19,7 @@ import { ConfirmProvider } from "@/components/ui/ConfirmProvider";
  *  - a refusal redraws the list instead of leaving a stale choice armed.
  */
 
-const repo = vi.hoisted(() => ({ relocationOptions: vi.fn(), relocate: vi.fn() }));
+const repo = vi.hoisted(() => ({ relocationOptions: vi.fn(), relocate: vi.fn(), swap: vi.fn() }));
 const toast = vi.hoisted(() => ({ message: vi.fn(), warning: vi.fn() }));
 vi.mock("@/ui/notify", () => ({
   notify: {
@@ -31,6 +31,7 @@ vi.mock("@/repositories/SessionRepository", () => ({
   sessionRepository: {
     relocationOptions: (...a: unknown[]) => repo.relocationOptions(...a),
     relocate: (...a: unknown[]) => repo.relocate(...a),
+    swap: (...a: unknown[]) => repo.swap(...a),
   },
 }));
 vi.mock("@/i18n/LanguageContext", () => ({
@@ -149,5 +150,58 @@ describe("the move", () => {
     expect(repo.relocationOptions).toHaveBeenCalledTimes(2);
     expect(screen.getByText("That place is no longer free.")).toBeTruthy();
     expect(moveButton().disabled).toBe(true);
+  });
+});
+
+/**
+ * Swap with a running seat (2026-11-17): offered under its own heading; chosen,
+ * it says each bill stays with its player and sends ONLY the other session.
+ * It reports through `onSwapped`, never `onMoved` (the board must not tell a
+ * console its session ended).
+ */
+describe("the swap", () => {
+  const withSwap = (): IRelocationOptions => ({
+    ...options(),
+    swap: [{ session_id: 77, place_id: 3, number: 3, name: null, type: "vip", player: "Давид", hourly_rate: 2000 }],
+  });
+
+  test("offered, chosen, confirmed: the other session is sent, onSwapped not onMoved", async () => {
+    repo.relocationOptions.mockResolvedValue(withSwap());
+    repo.swap.mockResolvedValue({ session: session({ pc_id: 23 }), other: session({ id: 77, pc_id: 21 }) });
+    const onSwapped = vi.fn();
+    await act(async () => {
+      render(
+        <ConfirmProvider>
+          <RelocateSessionDialog session={session()} onClose={() => {}} onMoved={onMoved} onSwapped={onSwapped} />
+        </ConfirmProvider>,
+      );
+    });
+    expect(screen.getByTestId("relocate-swap").textContent).toContain("Давид");
+    await press(screen.getByTestId("swap-77"));
+    expect(screen.getByTestId("swap-summary").textContent).toContain("session.swapSummary");
+    await press(screen.getByTestId("swap-confirm"));
+
+    expect(repo.swap).toHaveBeenCalledWith(42, 77);
+    expect(repo.relocate).not.toHaveBeenCalled();
+    expect(onSwapped).toHaveBeenCalledTimes(1);
+    expect(onMoved).not.toHaveBeenCalled();
+  });
+
+  test("choosing a free seat after a swap target goes back to a plain move", async () => {
+    repo.relocationOptions.mockResolvedValue(withSwap());
+    await mount();
+    await press(screen.getByTestId("swap-77"));
+    await press(seat(2));
+    expect(screen.queryByTestId("swap-summary")).toBeNull();
+    await press(moveButton());
+    expect(repo.relocate).toHaveBeenCalledWith(42, { place_id: 2 });
+    expect(repo.swap).not.toHaveBeenCalled();
+  });
+
+  test("no running seat to swap with, and no free one: «nothing to move to»", async () => {
+    repo.relocationOptions.mockResolvedValue({ ...options(), places: [], swap: [] });
+    await mount();
+    expect(screen.queryByTestId("relocate-swap")).toBeNull();
+    expect(screen.getByText("session.relocateNone")).toBeTruthy();
   });
 });

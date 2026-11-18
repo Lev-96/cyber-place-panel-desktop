@@ -4,8 +4,10 @@ import Input from "@/components/ui/Input";
 import PriceInput from "@/components/ui/PriceInput";
 import { useLang } from "@/i18n/LanguageContext";
 import { fmt } from "@/i18n/translations";
+import { apiPaymentLabels } from "@/api/paymentLabels";
+import { useEffect, useState } from "react";
 import { PAYMENT_METHODS } from "./PaymentMethodPicker";
-import { SPLIT_METHODS, fillRemaining, type PaymentCheck, type PaymentDraft } from "./paymentSplit";
+import { OWN_LABEL_MAX, SPLIT_METHODS, fillRemaining, type PaymentCheck, type PaymentDraft } from "./paymentSplit";
 
 /** A method's full name: the tooltip, the accessible name, the hidden field label. */
 const LABEL_KEY: Record<PaymentMethod, string> = {
@@ -26,6 +28,8 @@ const SHORT_KEY: Record<PaymentMethod, string> = {
 };
 
 interface Props {
+  /** The branch the bill is in: its saved «Свой вариант» names are offered (2026-11-18). */
+  branchId?: number;
   /** The radio group's name: unique per open form. */
   name: string;
   /** The bill, in cents (the server's total). */
@@ -47,9 +51,26 @@ interface Props {
  * «Другое» text). The parts must add up to the bill to the cent; the confirm
  * waits for it. One part above zero is sent as that single method.
  */
-const PaymentEditor = ({ name, dueCents, value, onChange, check, money, disabled = false }: Props) => {
+const PaymentEditor = ({ name, dueCents, value, onChange, check, money, disabled = false, branchId }: Props) => {
   const { t } = useLang();
   const pick = (method: PaymentMethod) => onChange({ ...value, split: false, method });
+  // A draft from before «Свой вариант» (no `own`) keeps the «Другое» row.
+  const ownShown = value.own === undefined || value.own.shown;
+  /**
+   * The names this branch has already paid with (2026-11-18, owner: a
+   * created option is kept, nobody types it again): one press each. Read when
+   * a split is opened; a failed read just offers none.
+   */
+  const [saved, setSaved] = useState<string[]>([]);
+  useEffect(() => {
+    if (!value.split || branchId === undefined) return;
+    let alive = true;
+    apiPaymentLabels(branchId)
+      .then(({ data }) => { if (alive) setSaved(data.map((l) => l.label)); })
+      .catch(() => { if (alive) setSaved([]); });
+    return () => { alive = false; };
+  }, [value.split, branchId]);
+  const useSaved = (label: string) => onChange({ ...value, own: { shown: true, label } });
 
   return (
     <div className="col pay-editor" style={{ gap: 8 }} data-testid="payment-editor">
@@ -97,9 +118,24 @@ const PaymentEditor = ({ name, dueCents, value, onChange, check, money, disabled
 
       {value.split && (
         <div className="col pay-editor__split" style={{ gap: 8 }}>
-          {SPLIT_METHODS.map((m) => (
-            <div key={m} className="pay-editor__part">
-              <span className="pay-editor__part-name" title={t(LABEL_KEY[m])}>{t(SHORT_KEY[m])}</span>
+          {SPLIT_METHODS.filter((m) => m !== "other" || ownShown).map((m) => (
+            <div key={m} className="pay-editor__part" data-testid={m === "other" ? "pay-own-row" : undefined}>
+              {m === "other" ? (
+                // «Свой вариант» (2026-11-18, owner): its name on the left —
+                // Idram, Telcell, «Hovo Card»; the sales history totals by it.
+                <input
+                  className="input pay-editor__own-name"
+                  value={value.own?.label ?? ""}
+                  maxLength={OWN_LABEL_MAX}
+                  placeholder={t("pay.ownNamePlaceholder")}
+                  aria-label={t("pay.ownName")}
+                  onChange={(e) => onChange({ ...value, own: { shown: true, label: e.target.value } })}
+                  disabled={disabled}
+                  data-testid="pay-own-name"
+                />
+              ) : (
+                <span className="pay-editor__part-name" title={t(LABEL_KEY[m])}>{t(SHORT_KEY[m])}</span>
+              )}
               <div className="pay-editor__part-box">
                 <PriceInput
                   label={t(LABEL_KEY[m])}
@@ -118,8 +154,48 @@ const PaymentEditor = ({ name, dueCents, value, onChange, check, money, disabled
               >
                 {t("pay.restHere")}
               </Button>
+              {m === "other" && (
+                <button
+                  type="button"
+                  className="pay-editor__own-remove"
+                  aria-label={t("pay.ownRemove")}
+                  title={t("pay.ownRemove")}
+                  disabled={disabled}
+                  onClick={() => onChange({ ...value, own: { shown: false, label: "" }, amounts: { ...value.amounts, other: "" } })}
+                  data-testid="pay-own-remove"
+                >
+                  ×
+                </button>
+              )}
             </div>
           ))}
+          {!ownShown && (
+            <div className="row pay-editor__own-choices">
+              {saved.map((label) => (
+                <Button
+                  key={label}
+                  type="button"
+                  variant="secondary"
+                  className="pay-editor__own-saved"
+                  disabled={disabled}
+                  onClick={() => useSaved(label)}
+                  data-testid={`pay-own-saved-${label}`}
+                >
+                  {`+ ${label}`}
+                </Button>
+              ))}
+              <Button
+                type="button"
+                variant="secondary"
+                className="pay-editor__own-add"
+                disabled={disabled}
+                onClick={() => onChange({ ...value, own: { shown: true, label: "" } })}
+                data-testid="pay-own-add"
+              >
+                {t("pay.ownAdd")}
+              </Button>
+            </div>
+          )}
           <div
             className={`pay-editor__remaining${check.remainingCents === 0 ? " is-done" : ""}`}
             data-testid="pay-remaining"

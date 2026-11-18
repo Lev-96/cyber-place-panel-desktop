@@ -13,6 +13,8 @@ import { useConfirm } from "@/components/ui/ConfirmProvider";
 import ScreenWithBg from "@/components/ui/ScreenWithBg";
 import SectionTabs from "@/components/ui/SectionTabs";
 import { reminderSentence } from "@/components/notifications/SessionReminderNotifier";
+import { SHIFT_STOCK_SHORTAGE, shiftShortageTarget, shiftShortageText } from "@/components/notifications/shiftStockShortage";
+import { shiftAmount } from "@/shifts/cash";
 import Spinner from "@/components/ui/Spinner";
 import { StateSwitch, deriveViewState } from "@/components/ui/state";
 import { useAsync } from "@/hooks/useAsync";
@@ -377,7 +379,7 @@ const ExpenseReminderCard = ({ e }: { e: IServiceExpense }) => {
  * show up rather than disappearing silently.
  */
 const DbNotificationCard = ({ n, onClick, onDelete }: { n: IDbNotification; onClick: () => void; onDelete: () => void }) => {
-  const { t } = useLang();
+  const { t, money } = useLang();
   const navigate = useNavigate();
   const isUnread = n.read_at === null;
   const tone = isUnread ? "var(--color-primary)" : "var(--color-border)";
@@ -393,6 +395,10 @@ const DbNotificationCard = ({ n, onClick, onDelete }: { n: IDbNotification; onCl
   const isSessionReminder = dataType === "session.reminder";
   // A booking's start time has come (2026-11-07, server scheduler, once).
   const isBookingStartDue = dataType === "booking.start_due";
+  // A new desktop version is out (2026-11-17, `PanelUpdateAvailable`).
+  const isAppUpdate = dataType === "app_update.available";
+  // Goods missing when a shift was accepted (2026-11-18, `ShiftStockShortage`, owners only).
+  const isStockShortage = dataType === SHIFT_STOCK_SHORTAGE;
   const bookingDate = n.data?.booking_date as string | undefined;
   const startTime = n.data?.start_time as string | undefined;
   const extraMinutes = n.data?.extra_minutes as number | undefined;
@@ -512,6 +518,12 @@ const DbNotificationCard = ({ n, onClick, onDelete }: { n: IDbNotification; onCl
     const note = (n.data?.note as string | undefined)?.trim();
     const setBy = (n.data?.set_by_name as string | undefined)?.trim();
     body = [note ? `«${note}»` : null, setBy || null, venue || null].filter(Boolean).join(" · ") || null;
+  } else if (isAppUpdate) {
+    headline = fmt(t("ownUpdates.notice"), String(n.data?.version ?? ""));
+  } else if (isStockShortage) {
+    const text = shiftShortageText(n.data, t, (v) => shiftAmount(money, v));
+    headline = `⚠ ${text.headline}`;
+    body = [text.body, text.items, text.gap].filter(Boolean).join("\n");
   } else {
     headline = n.type.split("\\").pop() ?? n.type;
   }
@@ -523,7 +535,14 @@ const DbNotificationCard = ({ n, onClick, onDelete }: { n: IDbNotification; onCl
     // surface the staff can act on. Tournament has its own detail page
     // with the registrations list + verify form, so it wins over a
     // generic guest profile when both are present.
-    if ((isSessionEndingSoon || isSessionReminder) && n.data?.branch_id) {
+    if (isAppUpdate) {
+      // Owner / manager open their «Обновление»; an admin, the release screen.
+      navigate("/settings/agent-updates");
+    } else if (isStockShortage) {
+      // The shift whose acceptance found it: its report, with the count.
+      const target = shiftShortageTarget(n.data);
+      if (target) navigate(target);
+    } else if ((isSessionEndingSoon || isSessionReminder) && n.data?.branch_id) {
       navigate(`/branches/${n.data.branch_id}/sessions`);
     } else if (n.data?.booking_id) {
       navigate(`/bookings/${n.data.booking_id}`);
@@ -574,7 +593,7 @@ const DbNotificationCard = ({ n, onClick, onDelete }: { n: IDbNotification; onCl
         )}
         <span style={{ fontWeight: 700, fontSize: 15 }}>{headline}</span>
         {body && (
-          <div style={{ fontSize: 14, marginTop: 4, color: "var(--color-text-soft)" }}>
+          <div style={{ fontSize: 14, marginTop: 4, color: "var(--color-text-soft)", whiteSpace: "pre-line" }} data-testid="notification-body">
             {body}
           </div>
         )}

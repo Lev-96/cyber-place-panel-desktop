@@ -338,6 +338,9 @@ export const menuSpecsFor = (
       { to: "/companies", labelKey: "nav.companies", show: can(role, "menu.companies") },
       { to: "/revenue", labelKey: "nav.revenue", show: can(role, "revenue.view") },
       { to: "/shifts", labelKey: "nav.shifts", show: can(role, "shift.manage") },
+      // The company's fast-food partners and their month (2026-11-18): owner
+      // and admin, never a manager.
+      { to: "/partners", labelKey: "nav.partners", show: can(role, "menu.partners") },
       { to: "/expenses", labelKey: "nav.expenses", show: can(role, "menu.expenses") },
       { to: "/metrics", labelKey: "nav.metrics", show: can(role, "menu.metrics") },
       {

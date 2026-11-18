@@ -90,3 +90,27 @@ describe("describeChange — stock", () => {
       .toEqual([{ from: "2", to: "−1", note: "(−3)" }]);
   });
 });
+
+describe("describeChange — «Быстрая Еда» and the partner (2026-11-18)", () => {
+  const ff = {
+    ...f,
+    fastFood: (on: boolean) => (on ? "Быстрая Еда" : "Не быстрая еда"),
+    partner: (id: number | null) => (id === null ? "Свой товар клуба" : id === 7 ? "Pizza House" : `Партнёр №${id}`),
+  };
+
+  test("fast food switched on / off reads in words, never true → false", () => {
+    expect(describeChange(ev({ action: "fast_food_changed", before: { is_fast_food: false }, after: { is_fast_food: true } }), ff))
+      .toEqual([{ from: "Не быстрая еда", to: "Быстрая Еда" }]);
+    // A create that set it has no before.
+    expect(describeChange(ev({ action: "fast_food_changed", before: null, after: { is_fast_food: true } }), ff))
+      .toEqual([{ from: "Не быстрая еда", to: "Быстрая Еда" }]);
+  });
+
+  test("the partner reads by name, the club's own by its words, an unknown one by number", () => {
+    expect(describeChange(ev({ action: "partner_changed", before: { partner_id: null }, after: { partner_id: 7 } }), ff))
+      .toEqual([{ from: "Свой товар клуба", to: "Pizza House" }]);
+    expect(describeChange(ev({ action: "partner_changed", before: { partner_id: 7 }, after: { partner_id: 12 } }), ff))
+      .toEqual([{ from: "Pizza House", to: "Партнёр №12" }]);
+  });
+});
+

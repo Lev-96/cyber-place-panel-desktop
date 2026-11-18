@@ -79,7 +79,7 @@ const SAYAT_NOVA: IBranchRevenueSummary = {
   owner_income: 3600,
 };
 
-const TITLE = "Revenue for the month";
+const TITLE = "The month in figures";
 
 const rowValue = (card: HTMLElement, label: string) =>
   within(card).getByText(label).closest(".kv-row")?.querySelector(".v")?.textContent;
@@ -92,17 +92,17 @@ const wholeOnly = (whole: string) => new RegExp(`^${grouped(whole)} AMD$`);
 describe("RevenueSummaryCard — amounts to the hundredth", () => {
   test("the three figures that must add up print their cents", () => {
     render(<RevenueSummaryCard figures={companyFigures(SUMMARY)} title={TITLE} />);
-    const card = screen.getByRole("region", { name: "Revenue for the month" });
+    const card = screen.getByRole("region", { name: "The month in figures" });
 
-    expect(rowValue(card, "Total revenue")).toMatch(withCents("9000", "50"));
-    expect(rowValue(card, "You owe us this period")).toMatch(withCents("900", "05"));
-    expect(rowValue(card, "Owner income")).toMatch(withCents("8100", "45"));
-    expect(rowValue(card, "Active Places")).toMatch(withCents("7500", "50"));
+    expect(rowValue(card, "All the club took this month")).toMatch(withCents("9000", "50"));
+    expect(rowValue(card, "Cyber Place fee for the month")).toMatch(withCents("900", "05"));
+    expect(rowValue(card, "Your income (after the Cyber Place fee)")).toMatch(withCents("8100", "45"));
+    expect(rowValue(card, "Total of all places")).toMatch(withCents("7500", "50"));
   });
 
   test("a whole amount on the same card prints without decimals", () => {
     render(<RevenueSummaryCard figures={companyFigures(SUMMARY)} title={TITLE} />);
-    const card = screen.getByRole("region", { name: "Revenue for the month" });
+    const card = screen.getByRole("region", { name: "The month in figures" });
 
     expect(rowValue(card, "Tournament entry fees")).toMatch(wholeOnly("1500"));
   });
@@ -114,11 +114,11 @@ describe("RevenueSummaryCard — amounts to the hundredth", () => {
         title={TITLE}
       />,
     );
-    const card = screen.getByRole("region", { name: "Revenue for the month" });
+    const card = screen.getByRole("region", { name: "The month in figures" });
 
-    expect(rowValue(card, "Total revenue")).toMatch(wholeOnly("9000"));
-    expect(rowValue(card, "You owe us this period")).toMatch(wholeOnly("900"));
-    expect(rowValue(card, "Owner income")).toMatch(wholeOnly("8100"));
+    expect(rowValue(card, "All the club took this month")).toMatch(wholeOnly("9000"));
+    expect(rowValue(card, "Cyber Place fee for the month")).toMatch(wholeOnly("900"));
+    expect(rowValue(card, "Your income (after the Cyber Place fee)")).toMatch(wholeOnly("8100"));
   });
 });
 
@@ -127,22 +127,22 @@ describe("RevenueSummaryCard for one branch: amounts to the hundredth", () => {
     render(<RevenueSummaryCard figures={branchFigures(TUMANYAN, SUMMARY.commission_percent)} title="Tumanyan" />);
     const card = screen.getByRole("region", { name: "Tumanyan" });
 
-    expect(rowValue(card, "Active Places")).toMatch(withCents("3500", "50"));
+    expect(rowValue(card, "Total of all places")).toMatch(withCents("3500", "50"));
     expect(rowValue(card, "Tournament entry fees")).toMatch(wholeOnly("1500"));
-    expect(rowValue(card, "Total revenue")).toMatch(withCents("5000", "50"));
-    expect(rowValue(card, "You owe us this period")).toMatch(withCents("500", "05"));
-    expect(rowValue(card, "Owner income")).toMatch(withCents("4500", "45"));
-    expect(rowValue(card, "Cyber Place commission")).toBe("10%");
+    expect(rowValue(card, "All the club took this month")).toMatch(withCents("5000", "50"));
+    expect(rowValue(card, "Cyber Place fee for the month")).toMatch(withCents("500", "05"));
+    expect(rowValue(card, "Your income (after the Cyber Place fee)")).toMatch(withCents("4500", "45"));
+    expect(rowValue(card, "Cyber Place percent")).toBe("10%");
   });
 
   test("a branch of whole figures prints no decimals, and its zeros as zeros", () => {
     render(<RevenueSummaryCard figures={branchFigures(SAYAT_NOVA, SUMMARY.commission_percent)} title="Sayat-Nova" />);
     const card = screen.getByRole("region", { name: "Sayat-Nova" });
 
-    expect(rowValue(card, "Active Places")).toMatch(wholeOnly("4000"));
+    expect(rowValue(card, "Total of all places")).toMatch(wholeOnly("4000"));
     expect(rowValue(card, "Tournament entry fees")).toBe("0 AMD");
-    expect(rowValue(card, "Total revenue")).toMatch(wholeOnly("4000"));
-    expect(rowValue(card, "You owe us this period")).toMatch(wholeOnly("400"));
-    expect(rowValue(card, "Owner income")).toMatch(wholeOnly("3600"));
+    expect(rowValue(card, "All the club took this month")).toMatch(wholeOnly("4000"));
+    expect(rowValue(card, "Cyber Place fee for the month")).toMatch(wholeOnly("400"));
+    expect(rowValue(card, "Your income (after the Cyber Place fee)")).toMatch(wholeOnly("3600"));
   });
 });

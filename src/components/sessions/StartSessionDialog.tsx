@@ -15,7 +15,7 @@ import { fmt } from "@/i18n/translations";
 import { timePackageNameOf } from "@/i18n/timePackageName";
 import { branchRepository } from "@/repositories/BranchRepository";
 import { sessionRepository } from "@/repositories/SessionRepository";
-import { IPcApi, ITimePackage } from "@/types/sessions";
+import { IPcApi, ISessionApi, ITimePackage } from "@/types/sessions";
 import { isDeviceStartable, isPs } from "@/types/pc";
 import { isPlayStationSeat, packageFitsSeat } from "@/utils/platform";
 import { packageMismatchOf } from "@/api/packagePlatformMismatch";
@@ -46,7 +46,8 @@ interface Props {
   branchId: number;
   pc: IPcApi;
   onClose: () => void;
-  onStarted: () => void;
+  /** The seat as started — the board shows it at once (2026-11-18). */
+  onStarted: (session?: ISessionApi) => void;
   /**
    * A reservation picked BEFORE the dialog opened (2026-11-07: «Старт» on a
    * booking in the calendar) — preselected in «Кто садится?». Never assumed
@@ -295,7 +296,8 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted, bookingId }: Pro
   const customRateNum = Number(customRate);
   const customRateValid = editPrice && Number.isFinite(customRateNum) && customRateNum > 0;
   const overrideApplied = customRateValid && rateSaved;
-  const effectiveRate = foodRateOn ? outsideFoodFee : overrideApplied ? customRateNum : assignedRate;
+  // Own food as the rate: the venue's fee, unless the price was changed here.
+  const effectiveRate = overrideApplied ? customRateNum : foodRateOn ? outsideFoodFee : assignedRate;
 
   // Prefill the override input with the current rate the moment it's enabled,
   // so the operator edits "the current price" rather than a blank field.
@@ -311,7 +313,7 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted, bookingId }: Pro
   // minute, so the minutes and the price on screen are never an old answer.
   const minute = useMinuteTick(limit === "until");
   const planApplies = !isFree && mode === "open";
-  const typedRate = overrideApplied && !foodRateOn ? customRateNum : undefined;
+  const typedRate = overrideApplied ? customRateNum : undefined;
   const totalNum = Number(totalInput);
   const totalValid = Number.isFinite(totalNum) && totalNum > 0;
   // A total set by hand is sent INSTEAD of a rate: the seat runs at the rate
@@ -346,9 +348,18 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted, bookingId }: Pro
     `${pc.id}|${outsideFoodOn ? 1 : 0}`,
   );
   const quotedAmount = quoteFor(amountQuote, amountValue);
-  // Paid ahead only where there is a plan to pay: a package, or a length set.
-  const prepaidApplies = !isFree && (mode === "fixed" || (mode === "open" && planInput !== null));
-  const prepaidField = prepaid && prepaidApplies ? { prepaid: true as const } : {};
+  // Paid ahead on every start (2026-11-17, owner), never required: a package
+  // or a length is paid at its own figure (`prepaid`); a seat with no limit
+  // has no figure, so the cashier names what was handed over (`prepaid_sum`).
+  const unlimitedStart = !isFree && mode === "open" && planInput === null;
+  const prepaidApplies = !isFree && (mode === "fixed" || mode === "open");
+  const [prepaidSumInput, setPrepaidSumInput] = useState("");
+  const prepaidSumNum = Number(prepaidSumInput.replace(",", "."));
+  const prepaidSumValue = prepaidSumInput.trim() !== "" && Number.isFinite(prepaidSumNum) && prepaidSumNum > 0
+    ? Math.round(prepaidSumNum * 100) / 100 : null;
+  const prepaidField = !(prepaid && prepaidApplies) ? {}
+    : unlimitedStart ? (prepaidSumValue !== null ? { prepaid_sum: prepaidSumValue } : {})
+    : { prepaid: true as const };
   /**
    * HOW the sum paid ahead was paid (2026-11-17, owner: the Stop methods at
    * Start too): the Stop control, under «Оплачено вперёд» or «На сумму».
@@ -363,6 +374,7 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted, bookingId }: Pro
   const paysAhead = !isFree && ((mode === "amount" && amountValue !== null) || (prepaid && prepaidApplies));
   const prepaidSum: number | null = !paysAhead ? null
     : mode === "amount" ? amountValue
+    : unlimitedStart ? prepaidSumValue
     : mode === "fixed" ? (selectedPackagePrice !== null ? selectedPackagePrice + (outsideFoodOn && !foodRateOn ? outsideFoodFee ?? 0 : 0) : null)
     // As a rate the fee IS the plan's price per hour — nothing added on top.
     : quotedPlan !== null ? quotedPlan.amount + (outsideFoodOn && !foodRateOn ? outsideFoodFee ?? 0 : 0) : null;
@@ -373,7 +385,9 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted, bookingId }: Pro
   const toggleEditPrice = (next: boolean) => {
     setEditPrice(next);
     setRateSaved(false);
-    setCustomRate(next && assignedRate != null ? String(assignedRate) : "");
+    // Opens on the price the seat would run at: own food's when it is the rate.
+    const base = foodRateOn ? outsideFoodFee : assignedRate;
+    setCustomRate(next && base != null ? String(base) : "");
   };
 
   // Editing the value invalidates a previous save — the cashier must press
@@ -390,6 +404,9 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted, bookingId }: Pro
   const submit = async () => {
     setBusy(true); setErr(null);
     try {
+      // The seat as the server started it (2026-11-18): the board shows it at
+      // once instead of waiting for its next read of the whole list.
+      let started: ISessionApi | undefined;
       if (isFree) {
         // A waived session is started count-up and nothing else.
         //
@@ -404,7 +421,7 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted, bookingId }: Pro
         // venue's own rate for the seat, which is what lets the receipt say what
         // was given away — a number typed here would only overwrite that with a
         // guess.
-        await sessionRepository.start({
+        started = await sessionRepository.start({
           branch_id: branchId,
           pc_id: pc.id,
           mode: "open",
@@ -414,7 +431,7 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted, bookingId }: Pro
           ...bookingField,
         });
         if (psnName !== "") rememberPsnName(psnName);
-        onStarted();
+        onStarted(started);
         return;
       }
       if (mode === "amount") {
@@ -422,7 +439,7 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted, bookingId }: Pro
         // The sum and the WHOLE seconds the server said it buys: a figure that
         // moved meanwhile is refused (422 amount-changed) and asked again.
         // Cash paid ahead; never with a package, a plan, unpaid or free.
-        await sessionRepository.start({
+        started = await sessionRepository.start({
           branch_id: branchId,
           pc_id: pc.id,
           user_display_name: pc.label,
@@ -435,7 +452,7 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted, bookingId }: Pro
         });
       } else if (mode === "fixed") {
         if (!pkgId) { setErr(textKey("session.choosePackage")); setBusy(false); return; }
-        await sessionRepository.start({
+        started = await sessionRepository.start({
           branch_id: branchId,
           pc_id: pc.id,
           mode: "fixed",
@@ -458,12 +475,12 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted, bookingId }: Pro
         // "change current price". Otherwise omit it so the backend resolves
         // the assigned rate from its own chain (request → matrix →
         // pc.hourly_rate) — the single source of truth stays server-side.
-        await sessionRepository.start({
+        started = await sessionRepository.start({
           branch_id: branchId,
           pc_id: pc.id,
           mode: "open",
           user_display_name: pc.label,
-          ...(overrideApplied && !planByHand && !foodRateOn ? { hourly_rate: customRateNum } : {}),
+          ...(overrideApplied && !planByHand ? { hourly_rate: customRateNum } : {}),
           ...(planMinutes !== null ? { duration_minutes: planMinutes } : {}),
           ...(planUntil !== null ? { until: planUntil } : {}),
           ...(planByHand ? { planned_amount: typedTotal } : {}),
@@ -476,7 +493,7 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted, bookingId }: Pro
         });
       }
       if (psnName !== "") rememberPsnName(psnName);
-      onStarted();
+      onStarted(started);
     } catch (e) {
       // A tariff for another platform is refused with a code: worded here, in
       // the operator's language. Anything else keeps the server's sentence.
@@ -522,7 +539,7 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted, bookingId }: Pro
   const startDisabled =
     busy || deviceOffline || !psnValid
     // A total set by hand prices the seat itself, so no seat rate is needed.
-    || (!isFree && mode === "open" && !planByHand && !foodRateOn && (editPrice ? !overrideApplied : assignedRate === null))
+    || (!isFree && mode === "open" && !planByHand && (editPrice ? !overrideApplied : !foodRateOn && assignedRate === null))
     // A plan is started only on the server's own figure for it.
     || (planApplies && (planInvalid || (planInput !== null && !planPriced)))
     || (planApplies && planInput !== null && editTotal && !totalValid)
@@ -630,17 +647,42 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted, bookingId }: Pro
                   </div>
                 )}
                 {prepaidApplies && (
-                  <div className="start-dialog__switch" data-testid="start-prepaid">
-                    <UnpaidToggle
-                      on={prepaid}
-                      onChange={setPrepaid}
-                      disabled={busy}
-                      label={t("session.prepaid.switch")}
-                      fullLabel={t("session.prepaid.switchFull")}
-                      testId="prepaid-switch"
-                      tone="success"
-                    />
-                    {prepaid && <span className="muted start-dialog__switch-hint">{t("session.prepaid.startHint")}</span>}
+                  <div className="start-dialog__switch start-dialog__when-pays" data-testid="start-prepaid">
+                    {/* «Когда платит игрок» (2026-11-18, owner: the switch alone
+                        was missed): two plain answers, «при Стоп» the default.
+                        «Сейчас» opens the sum and the ways of paying below. */}
+                    <span className="label">{t("session.prepaid.when")}</span>
+                    <div className="start-dialog__when-pays-choices" role="radiogroup" aria-label={t("session.prepaid.when")}>
+                      <button
+                        type="button"
+                        role="radio"
+                        aria-checked={!prepaid}
+                        className={`start-dialog__when-pays-btn${!prepaid ? " is-on" : ""}`}
+                        onClick={() => setPrepaid(false)}
+                        disabled={busy}
+                        data-testid="prepaid-later"
+                      >
+                        {t("session.prepaid.later")}
+                      </button>
+                      <button
+                        type="button"
+                        role="radio"
+                        aria-checked={prepaid}
+                        className={`start-dialog__when-pays-btn${prepaid ? " is-on" : ""}`}
+                        onClick={() => setPrepaid(!prepaid)}
+                        disabled={busy}
+                        title={t("session.prepaid.switchFull")}
+                        data-testid="prepaid-switch"
+                      >
+                        {t("session.prepaid.now")}
+                      </button>
+                    </div>
+                    {prepaid && <span className="muted start-dialog__switch-hint">{t(unlimitedStart ? "session.prepaid.unlimitedHint" : "session.prepaid.startHint")}</span>}
+                    {prepaid && unlimitedStart && (
+                      <div data-testid="start-prepaid-sum">
+                        <PriceInput label={t("session.prepaid.sum")} value={prepaidSumInput} onChange={setPrepaidSumInput} disabled={busy} />
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -722,10 +764,10 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted, bookingId }: Pro
                   rateLabel={t("session.hourlyRate")}
                   money={money}
                 />
-                {isShown("rate") && !foodRateOn && (
+                {isShown("rate") && (
                 <Checkbox checked={editPrice} onChange={toggleEditPrice} label={t("session.editPrice")} />
                 )}
-                {isShown("rate") && editPrice && !foodRateOn && (
+                {isShown("rate") && editPrice && (
                   <div className="col" style={{ gap: 6 }}>
                     <div className="row" style={{ gap: 8, alignItems: "flex-end" }}>
                       <div style={{ flex: 1 }}>
@@ -864,6 +906,7 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted, bookingId }: Pro
             {paysAhead && prepaidSum !== null && (
               <PaymentEditor
                 name={`start-prepaid-pay-${pc.id}`}
+                branchId={branchId}
                 dueCents={prepaidCents}
                 value={prepaidPay}
                 onChange={setPrepaidPay}

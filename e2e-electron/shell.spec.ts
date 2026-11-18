@@ -392,3 +392,29 @@ test("the version shows in the side menu only, under the brand with a gap, and i
   await expect(page.locator("aside.sidebar > h1")).toHaveAttribute("title", `Version ${pkg}`);
   if (shots) await page.screenshot({ path: path.join(shots, "electron-sidebar-folded.png") });
 });
+
+/**
+ * «Обновление» in the Windows app itself (2026-11-17): the installed version,
+ * «Check for updates» answered in a popup — the real preload bridge and
+ * updater, the server saying the approved version is this one.
+ */
+test("the owner's «Updates» shows the app's version and «Check for updates» answers in a popup", async () => {
+  const pkg = (JSON.parse(fs.readFileSync(path.join(__dirname, "..", "package.json"), "utf8")) as { version: string }).version;
+  await page.route((url) => isBackend(url) && new URL(url).pathname === "/updates/panel/manifest", (route) => route.fulfill({
+    status: 200, contentType: "application/json",
+    body: JSON.stringify({ data: { app: "panel", version: pkg, channel: "stable", mandatory: false, notes: null, published_at: null } }),
+  }));
+  await page.getByPlaceholder("your@email.com").fill("o@o");
+  await page.getByPlaceholder(/•/).fill("ok");
+  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await expect(page.getByText("Owner One").first()).toBeVisible();
+
+  await page.evaluate(() => { window.location.hash = "#/settings/agent-updates"; });
+  await expect(page.getByTestId("desktop-update-version")).toContainText(pkg);
+  const check = page.getByTestId("desktop-update-check");
+  await expect(check).toBeVisible();
+  await check.click();
+  await expect(page.getByText(`You have the latest version: ${pkg}`)).toBeVisible();
+  if (process.env.CP_SHOTS_DIR) await page.screenshot({ path: path.join(process.env.CP_SHOTS_DIR, "electron-updates-screen.png") });
+});
+

@@ -91,6 +91,8 @@ const STAFF_MENU: Readonly<Record<string, { rank: number; labelKey?: string; man
   "nav.revenue": { rank: 4 },
   // Right after revenue: the owner's money, then each shift's (2026-10-19).
   "nav.shifts": { rank: 4.5 },
+  // Then the fast-food partners' month (2026-11-18): money the owner splits.
+  "nav.partners": { rank: 4.6 },
   "nav.map": { rank: 5, labelKey: "nav.side.branchesOnMap" },
   "nav.scan": { rank: 6, labelKey: "nav.side.scanCode" },
   "nav.bookings": { rank: 7 },

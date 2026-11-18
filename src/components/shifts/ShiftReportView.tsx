@@ -6,6 +6,7 @@ import type { CSSProperties, ReactNode } from "react";
 import { shiftAmount } from "@/shifts/cash";
 import { platformLabel } from "@/utils/platform";
 import ShiftBreakdown from "./ShiftBreakdown";
+import ShiftAcceptanceBlock from "./acceptance/ShiftAcceptanceBlock";
 import { Row, Section, divider, rowStyle, valueStyle } from "./shiftReportParts";
 
 /**
@@ -98,6 +99,9 @@ const ShiftReportView = ({ shift, report, viewerId = null }: Props) => {
         </div>
       </section>
 
+      {/* 2026-11-18: «Приём смены», what the shift began with; blind for a manager (the server's shape). */}
+      {report.acceptance_count && <ShiftAcceptanceBlock count={report.acceptance_count} />}
+
       <section className="card col" style={{ gap: 12 }}>
         <div className="col" style={{ gap: 2 }} data-testid="shift-revenue-total">
           <span className="muted" style={{ fontSize: 13 }}>{t("shift.revenueTotal")}</span>
@@ -138,7 +142,9 @@ const ShiftReportView = ({ shift, report, viewerId = null }: Props) => {
         </Section>
 
         <Section title={t("shift.cash")}>
-          <Row label={t("shift.cashOpening")} value={m(report.cash.opening)} />
+          {/* Opening cash is no longer asked (2026-11-18, owner): the row stays
+              only for a shift that was opened with some. */}
+          {Number(report.cash.opening) !== 0 && <Row label={t("shift.cashOpening")} value={m(report.cash.opening)} />}
           <Row label={`+ ${t("shift.cashPlaces")}`} value={m(report.cash.places)} />
           <Row label={`+ ${t("shift.cashTill")}`} value={m(report.cash.till)} />
           {/* v5 (2026-11-15): cash paid AHEAD. Shown only when there was some,
