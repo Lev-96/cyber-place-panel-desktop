@@ -5402,3 +5402,15 @@ notification at 5 min carries `place_name`.
 now and refuses (paused, no hourly price) with its own sentence. Hidden on a
 free seat and with own food as the rate. Tests: `HourlyRateSection.test.tsx`,
 `e2e/session-hourly-rate.spec.ts`.
+
+### Free session on a reserved seat (2026-11-19)
+
+Prices page → `FreeOverBookingsForm` (the owner's switch, saved on flip as a
+PUT of the whole policy, `free_session_over_bookings`). Start dialog:
+«Бесплатно» is a switch (`UnpaidToggle` tone `free`, violet, larger, in the
+`.start-dialog__free` tile, testId `free-switch`) instead of a checkbox. On a
+reserved seat it is offered only when `start-options.free_over_bookings` is
+true; then the start is open (no end), never "beyond the reservation", and
+the hint `session.freeOverBookingHint` says to stop it when the reserving
+player comes. Tests: `StartSessionDialog.test.tsx`, `BranchPricesPage.test.tsx`,
+`e2e/free-over-booking.spec.ts`.
