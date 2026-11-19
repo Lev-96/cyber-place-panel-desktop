@@ -5414,3 +5414,12 @@ true; then the start is open (no end), never "beyond the reservation", and
 the hint `session.freeOverBookingHint` says to stop it when the reserving
 player comes. Tests: `StartSessionDialog.test.tsx`, `BranchPricesPage.test.tsx`,
 `e2e/free-over-booking.spec.ts`.
+
+### «Изменить способ оплаты» in «История продаж» (2026-11-19)
+
+A place's record in a card's list (`SalesLinesDialog`) has the button when
+`canChangePayment` (a place, money, not free, not paid ahead); it opens
+`ChangePaymentDialog` — `PaymentEditor` on the same total, starting on card —
+and Save sends `sessionRepository.changePayment` → `PUT /sessions/{id}/payment`
+once; the list and the cards are read again. The server's refusal is shown in
+the dialog. Tests: `ChangePaymentDialog.test.tsx`, `e2e/sales-change-payment.spec.ts`.
