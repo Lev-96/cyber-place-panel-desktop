@@ -3,7 +3,7 @@ import { useAuth } from "@/auth/AuthContext";
 import Button from "@/components/ui/Button";
 import Modal from "@/components/ui/Modal";
 import PaymentEditor from "@/components/payments/PaymentEditor";
-import { checkPayment, emptyPaymentDraft, paymentBody, type PaymentDraft } from "@/components/payments/paymentSplit";
+import { PAYMENT_PROBLEM_KEY, checkPayment, emptyPaymentDraft, paymentBody, type PaymentDraft } from "@/components/payments/paymentSplit";
 import { IItemChoice } from "@/api/sessions";
 import { fmt } from "@/i18n/translations";
 import { useLang } from "@/i18n/LanguageContext";
@@ -83,7 +83,7 @@ const SellProductsDialog = ({ branchId, onClose, onSold }: Props) => {
   const sell = async () => {
     if (!ready || inFlightRef.current || cashBlocks) return;
     if (!payCheck.ok) {
-      setErr(t(payCheck.problem === "sum" ? "pay.sumMismatch" : payCheck.problem === "parts" ? "pay.needAmount" : "pay.invalid"));
+      setErr(t(PAYMENT_PROBLEM_KEY[payCheck.problem ?? "invalid"]));
       return;
     }
 

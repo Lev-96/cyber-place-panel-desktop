@@ -1,7 +1,15 @@
 import type { SalesQuery } from "@/api/salesSummary";
 
-/** The working day the stubbed server says is running (tests only). */
-export const STUB_TODAY = "2026-11-18";
+/**
+ * The working day the stubbed server says is running (tests only): the
+ * machine's own today, the same day the tests' fixtures are built on — a fixed
+ * date made every history test fail once the clock passed midnight.
+ */
+const pad = (n: number) => String(n).padStart(2, "0");
+const localDate = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+export const STUB_TODAY = localDate(new Date());
+/** The day before {@link STUB_TODAY}. */
+export const STUB_YESTERDAY = (() => { const d = new Date(); d.setDate(d.getDate() - 1); return localDate(d); })();
 
 /**
  * `/sales-summary` as a test's stub server answers it: the dates asked for

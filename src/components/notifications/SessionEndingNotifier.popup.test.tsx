@@ -162,7 +162,23 @@ describe("the seat-running-out warning", () => {
 
   test("names the seat by its number, as the server wrote it", async () => {
     await mount();
-    expect(screen.getByRole("alert").textContent).toContain("session.endingSoonBody");
+    expect(screen.getByTestId("ending-soon-seat").textContent).toBe("№8");
+    expect(screen.getByRole("alert").textContent).toContain("session.endingSoonLeft");
+  });
+
+  test("names the seat by number AND name when the server sends the name (2026-11-19)", async () => {
+    feed.list = [{ ...warningRow(), data: { ...warningRow().data, place_name: "VIP 1" } }];
+    await mount();
+    expect(screen.getByTestId("ending-soon-seat").textContent).toBe("№8 · VIP 1");
+    // Said once, on its own line: the sentence under it is only the minutes.
+    expect(screen.getByRole("alert").textContent?.split("№8 · VIP 1").length).toBe(2);
+    // Still a toast: nothing modal, the page under it stays usable.
+    expect(document.querySelector("[aria-modal=true]")).toBeNull();
+  });
+
+  test("an older server without the name: the number alone, as before", async () => {
+    await mount();
+    expect(screen.getByTestId("ending-soon-seat").textContent).toBe("№8");
   });
 
   test("a dismissed warning stays dismissed after a restart", async () => {

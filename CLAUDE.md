@@ -3944,7 +3944,8 @@ singular genitive kept elsewhere, hence by key), and "Start session" stays.
   the branch's managers), stacked, soonest first, gone once read/deleted or the
   seat's end passed. Dismissed ids are kept per user in localStorage, so a
   reconnect or a restart does not re-pop them; an unread, undismissed one comes
-  back after a restart.
+  back after a restart. Since 2026-11-19 the card names the seat by number AND
+  name on its own large line (`seatLabel`, see the section of that day).
 - **`NotificationsContext`:** a replayed `notification.created` for a row
   already held is not counted twice; the 60-s unread poll re-reads the LIST when
   the count drifted (a missed broadcast used to leave "1" and no row); the
@@ -5200,8 +5201,8 @@ in `src/api/agent-updates.ts`.
   filtered by the server. Header: «Сегодня, 18.11.2026 · Расчёт с 13:00 до
   07:00». Dates read 18.11.2026 (`components/ui/DateField`). A picked place
   keeps the old per-seat tiles (renamed). In «Разделить» the «Другое» row is
-  gone; «+ Свой вариант» adds a [name][amount] row (`PaymentDraft.own`, one per
-  bill). Revenue screen: plain names, period «с 01.11.2026 по 30.11.2026»,
+  gone; «+ Свой вариант» adds a [name][amount] row (`PaymentDraft.own`; a list
+  since 2026-11-19, see «Nothing chosen is cash; several own options»). Revenue screen: plain names, period «с 01.11.2026 по 30.11.2026»,
   menu «Доход и оплата Cyber Place»; no figure or formula changed.
   Tests: SalesSummaryPanel (5), DateField (3), paymentSplit (+4),
   PaymentEditor (+1); e2e `sales-history-figures.spec.ts` (en/ru/am × 1280/520).
@@ -5337,42 +5338,57 @@ and flow is the server's, only formatted.
   branch that counts products (422, its `message` is shown). **Owner web**:
   bump `panel.ref`.
 
-## Every payment carries its way of paying (2026-11-18, owner)
+## Nothing chosen is cash; several own options; the ending-soon card; a manager's open shift (2026-11-19, owner)
 
-- **Stop receipt** (`StopReceiptModal`, running seat): no method preselected
-  (`emptyPaymentDraft(null)`). «Подтвердить и завершить» (`stop-confirm`) is
-  disabled while something is due and no way of paying is settled
-  (`payPending`: no method, or a split that does not add up); the editor says
-  «Выберите способ оплаты» (`pay.chooseMethod`, `pay-choose-method`). Nothing to
-  take (`nothingToTake`: covered by the prepayment, `is_free`, or a zero bill):
-  no editor, the body is `{ payment_method: "cash" }`, byte for byte the old
-  default. Keep playing / cancel / the board callbacks and PS5 signals are
-  unchanged; only when the button enables changed.
-- **Ended by itself** (`markable`): nothing preselected, `pay-mark-confirm`
-  enabled only once a method is chosen, and the receipt can NOT be closed until
-  the payment is recorded: no «Закрыть», and `Modal` gets `onClose={undefined}`
-  + `closeOnBackdrop={false}` (a Modal without `onClose` already refuses ×,
-  backdrop and Escape; Modal itself was not changed). Recorded: finished, closes
-  as before. A refusal no retry can fix (409 already recorded, 403, a 422
-  WITHOUT field errors such as «shift closed») makes it closable
-  (`pay.cannotRecord`). A receipt opened on a RUNNING seat that a person then
-  stopped elsewhere (`status: "stopped"`) is not asked: that desk took the
-  payment.
-- **Seats that ended while no board was open**: `useUnpaidEndedSeats`
-  (`src/components/sessions/useUnpaidEndedSeats.ts`) reads
-  `GET /sessions?branch_id&from=now-24h&limit=200` on the board's mount and then
-  once a minute (its own timer, one GET a minute), keeps `isUnpaidEndedSeat`
-  (expired/stopped, no `payment_method`, no `payments`, not free, not
-  cancelled, `total_paid > 0`) and opens each as the same mandatory receipt, one
-  at a time, never over an open one (`current ?? next`). A seat settled here
-  (`onPaymentSettled`) is never re-queued while the board is mounted. The
-  history scope applies: a manager is only asked about seats they opened.
-- **Payment model**: `PaymentDraft.method` is `PaymentMethod | null`;
-  `checkPayment` reports `"method"` for null; `paymentBody` /
-  `prepaidPaymentFields` throw rather than send no method. The till, Start and
-  «+ Время» keep `emptyPaymentDraft()` = cash.
-- Tests: `StopReceiptModal.test.tsx` («every payment carries its way of
-  paying»), `SessionsBoard.unpaidEnded.test.tsx`, `useUnpaidEndedSeats.test.ts`,
-  `paymentSplit.test.ts`, `PaymentEditor.test.tsx`; e2e
-  `e2e/mandatory-payment-method.spec.ts` (en/ru/am × 1280/520). Every e2e that
-  confirms a stop now presses a method first.
+Backend changed in parallel (same day): no way of paying = cash at expiry and
+for a Stop without payment fields; a split may hold several `other` parts,
+each `{method: "other", amount, label}`, labels distinct; the ending-soon
+notification at 5 min carries `place_name`.
+
+- **472b111 («every payment carries its way of paying») was reverted**, except
+  ONE rule. The Stop receipt starts on cash again (v1.0.66); the receipt of a
+  seat that ended by itself is closable again (Close, ×, Escape, backdrop) and
+  starts on cash; `useUnpaidEndedSeats` (the board's look for unpaid ended
+  seats) is gone, the server records such seats as cash. Kept: `nothingToTake`
+  in `StopReceiptModal` (covered by the prepayment, `is_free`, or a bill of
+  zero) hides the editor; a prepaid bill with nothing due sends
+  `{payment_method: "cash"}` as ever, a free seat or a zero bill sends NO
+  payment fields at all (stays «Способ оплаты не отмечен · 0»). ⚠️ Relies on
+  the backend NOT stamping cash on a zero bill.
+- **Several «Свой вариант» in «Разделить»** (`components/payments/paymentSplit.ts`,
+  `PaymentEditor.tsx`). `PaymentDraft.amounts` is `{cash, card}`;
+  `PaymentDraft.own: OwnPart[]` (`{id, label, amount}`, `id` screen-only).
+  «+ Свой вариант» adds an unnamed row each press (`addOwnPart`); a saved name
+  (`GET /branches/{id}/payment-labels`) adds a row under that name and is not
+  offered while a row has it (`hasOwnLabel`). Each row: [name][amount]
+  [Остаток][×]; «Остаток» on a row fills only it (`fillRemaining(due, d,
+  {own: id})`). Names distinct case-insensitively, an unnamed row at most
+  once: `duplicateOwnIds` marks every LATER repeat, the row says
+  `pay.ownDuplicate` / `pay.ownUnnamedTwice`, `checkPayment` reports problem
+  `"duplicate"` and nothing is sent. Lines are cash, card, then the own rows
+  in order; ONE part alone still goes as the legacy single method (an own
+  one's name as `payment_method_other`). `PAYMENT_PROBLEM_KEY` is the one
+  wording of every problem (Stop, till). Used unchanged by Stop, the expired
+  receipt, the till, Start prepaid and «+ Время».
+- **Ending-soon card** (`SessionEndingNotifier`): `seatLabel(data)` = «№8 ·
+  VIP 1» from `place_number` + `place_name` (absent/empty/repeating the number
+  → «№8»; no number → «#pc»), shown as its own 26px line; the sentence under
+  it is `session.endingSoonLeft` (minutes only; `session.endingSoonBody` was
+  removed). Larger look scoped by `.ending-soon-stack--ending` /
+  `.ending-soon-card--ending` (the reminder card shares the base classes and
+  is unchanged); 420px wide max, `calc(100vw - 32px)` at 520. Still a toast.
+- **A manager's OPEN shift** (`routes/Shift.tsx` → `ShiftReportView
+  acceptanceOnly`): header + «Приём смены» only (or `shift.acceptCount.none`
+  when nothing was counted). Revenue, payments, cash, activity, products,
+  stock, staff, handover, warnings, not-tracked and the lines are not
+  rendered. Owner/admin unchanged. Closed reports (history, the report after
+  closing) unchanged for everybody; `CloseShiftDialog` unchanged. A UI choice,
+  not a security boundary: the server still sends the manager the figures.
+- Tests: `StopReceiptModal.test.tsx` («nothing chosen is cash…», 5),
+  `paymentSplit.test.ts` (several own options, 8), `PaymentEditor.test.tsx`
+  (+2, 2 expectations changed), `SessionEndingNotifier.test.ts` (+3),
+  `SessionEndingNotifier.popup.test.tsx` (+2), `Shift.test.tsx` (a manager's
+  open shift, 5; the old figures test now runs as owner). e2e
+  `batch-2026-11-19.spec.ts` (en/ru/am × 1280/520 + till ru 520). Screenshots:
+  `~/cyber-place-local/reports/batch-2026-11-19/shots/`.
+

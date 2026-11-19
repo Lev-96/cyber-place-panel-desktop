@@ -2,7 +2,7 @@ import { SkeletonText } from "@/components/ui/Skeleton";
 import Button from "@/components/ui/Button";
 import Modal from "@/components/ui/Modal";
 import PaymentEditor from "@/components/payments/PaymentEditor";
-import { checkPayment, emptyPaymentDraft, paymentBody, type PaymentCheck, type PaymentDraft } from "@/components/payments/paymentSplit";
+import { PAYMENT_PROBLEM_KEY, checkPayment, emptyPaymentDraft, paymentBody, type PaymentCheck, type PaymentDraft } from "@/components/payments/paymentSplit";
 import Spinner from "@/components/ui/Spinner";
 import { IBillBreakdown } from "@/api/sessions";
 import { useLang } from "@/i18n/LanguageContext";
@@ -38,12 +38,6 @@ interface Props {
   /** The bill changed here (the counter was reset): the board reads again. */
   onTimeReset?: () => void;
   /**
-   * A seat that ended by itself is settled here (2026-11-18): its payment was
-   * recorded, or the server refused it for good (already recorded, its shift
-   * closed). The board then never asks about it again.
-   */
-  onPaymentSettled?: (sessionId: number) => void;
-  /**
    * Whether this person may cancel the seat from the receipt (2026-11-06,
    * `session.free` — the server checks it again). Absent: not offered.
    */
@@ -65,25 +59,18 @@ const fmtDuration = (mins: number, t: (k: string) => string) => {
  * source of truth — same calculator used by /stop), shows time + items, lets
  * cashier remove items, then confirms stop.
  */
-const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved, canResetTime = false, onTimeReset, canCancel = false, onPaymentSettled }: Props) => {
+const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved, canResetTime = false, onTimeReset, canCancel = false }: Props) => {
   const { money, t } = useLang();
   const ask = useConfirm();
   const [bill, setBill] = useState<IBillBreakdown | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  // How it was paid (2026-11-07): one method or split. NOTHING preselected
-  // (2026-11-18, owner): every payment carries the way it was paid, so the
-  // cashier picks one; the confirm waits for it whenever something is due.
-  const [pay, setPay] = useState<PaymentDraft>(() => emptyPaymentDraft(null));
+  // Cash by default: it is the common case at a counter, so the ordinary stop
+  // stays one click rather than two.
+  // How it was paid (2026-11-07): one method or split, cash by default.
+  const [pay, setPay] = useState<PaymentDraft>(() => emptyPaymentDraft("cash"));
   // A seat that ended by itself, paid afterwards: the answer once it is recorded.
   const [recorded, setRecorded] = useState(false);
-  /**
-   * The server refused the mark for good (2026-11-18): already recorded at
-   * another desk (409), or a refusal that is not about the form (a 422 with no
-   * field errors: its shift is closed, nothing to pay; a 403). Retrying cannot
-   * succeed, so the receipt may be closed.
-   */
-  const [unrecordable, setUnrecordable] = useState(false);
   const [stopped, setStopped] = useState<IBillBreakdown | null>(null);
   // Cash only: the banknotes handed over, for the change. Cleared on every
   // method switch, so an amount typed for cash never rides along with card.
@@ -189,9 +176,9 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved, canRes
   const dueCents = bill === null ? 0 : prepaidNow ? billCents(prepaidNow.due) : billCents(bill.total);
   const nothingDue = prepaidNow !== null && dueCents === 0;
   /**
-   * Nothing to take at all (2026-11-18): covered by the prepayment, a waived
-   * seat, or a bill of zero. No method is asked; the body says cash, as these
-   * stops always did (the old cash default, byte for byte).
+   * Nothing to take at all (2026-11-18, owner; kept 2026-11-19): covered by
+   * the prepayment, a waived seat, or a bill of zero. No way of paying is
+   * asked; see {@link paymentFields} for what each sends.
    */
   const nothingToTake = bill !== null && (nothingDue || bill.is_free || dueCents <= 0);
   // Nothing to pay, nothing to change: a waived bill asks for no banknotes.
@@ -199,30 +186,18 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved, canRes
   const change = asksForCash ? cashChange(dueCents, received) : null;
   const cashBlocks = change !== null && (change.state === "short" || change.state === "invalid");
   const payCheck: PaymentCheck = checkPayment(dueCents, pay);
-  /**
-   * Something is due and no way of paying is settled yet — no method picked,
-   * or a split that does not add up (2026-11-18, owner): the confirm waits.
-   */
-  const payPending = bill !== null && !nothingToTake && !payCheck.ok;
   /** Why the payment cannot be sent yet, in the cashier's words; null when it can. */
   const paymentProblem = (): string | null => {
-    if (!payPending) return null;
-    switch (payCheck.problem) {
-      case "method": return t("pay.chooseMethod");
-      case "sum": return t("pay.sumMismatch");
-      case "parts": return t("pay.needAmount");
-      default: return t("pay.invalid");
-    }
+    if (nothingToTake || payCheck.ok || payCheck.problem === null) return null;
+    return t(PAYMENT_PROBLEM_KEY[payCheck.problem]);
   };
   /** The payment fields of the body, and the banknotes for a single cash payment. */
   const paymentFields = () => (nothingDue
-    // Covered by the prepayment: cash, whatever else; nothing handed over
-    // (the prepayment's own method is on record).
+    // Covered by the prepayment: cash, whatever else; nothing handed over.
     ? { payment_method: "cash" as const }
     : nothingToTake
-    // A free seat or a zero bill (2026-11-18, owner): NO way of paying — it
-    // stays «Способ оплаты не отмечен · 0 драм», never a cash payment that
-    // would raise the cash count.
+    // A free seat or a zero bill (2026-11-18, owner): NO way of paying. It
+    // stays «Способ оплаты не отмечен · 0», never a cash payment of 0.
     ? {}
     : {
       ...paymentBody(pay, payCheck),
@@ -230,7 +205,7 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved, canRes
     });
 
   const confirmStop = async () => {
-    if (stoppingNow.current || cashBlocks || bill === null) return;
+    if (stoppingNow.current || cashBlocks) return;
     // ⚠️ Checked here so the cashier is told BEFORE the request, but the server
     // enforces the same rule and is what actually decides — this is a courtesy,
     // not the guard. A stop refused (parts not adding up) leaves the seat running.
@@ -337,21 +312,10 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved, canRes
   const finished = stopped !== null || endedWithoutUs || endedElsewhere;
 
   const deviceLabel = session.pc_label ?? `№${session.pc_id}`;
-  /**
-   * Opened on a RUNNING seat that a person then stopped at another desk
-   * (2026-11-18): that desk took the payment; the board's copy of the row
-   * just has not heard how. Not asked here — and so never a receipt that
-   * cannot be closed over somebody else's checkout. A seat the clock ended
-   * (`expired`) is still asked; one truly left unpaid is found by the
-   * board's look for unpaid ended seats.
-   */
-  const openedRunning = useRef(session.status === "active");
-  const stoppedElsewhereWhileOpen = openedRunning.current && session.status === "stopped";
   // Ended by itself (ran out, or the kiosk ended it) with nobody at the till
   // (2026-11-07, owner): how it was paid is asked here, once. Not for a
   // cancelled or waived seat (nothing owed), nor once a method is on record.
-  const markable = endedWithoutUs && stopped === null && !recorded && !unrecordable && !cancelled
-    && !stoppedElsewhereWhileOpen
+  const markable = endedWithoutUs && stopped === null && !recorded && !cancelled
     && !session.cancelled_at && (session.payment_method ?? null) === null && (session.payments?.length ?? 0) === 0
     && view !== null && !view.is_free && Number(view.total) > 0;
   /** Synchronous guard and one id per attempt-series: a repeat is the same request. */
@@ -367,14 +331,9 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved, canRes
       // The change for cash, as the server worked it out.
       setHandover(r.cash);
       setRecorded(true);
-      onPaymentSettled?.(session.id);
       notify.message("success", fmt(t("pay.recorded"), deviceLabel));
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
-      if (isFinalRefusal(e)) {
-        setUnrecordable(true);
-        onPaymentSettled?.(session.id);
-      }
     } finally {
       stoppingNow.current = false;
       setBusy(false);
@@ -384,10 +343,7 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved, canRes
   const byTheHour = view !== null && (view.mode === "open" || !view.package_name);
 
   return (
-    // Ended by itself and not paid yet (2026-11-18, owner): it can NOT be
-    // closed until the payment is recorded — no ×, no backdrop, no Escape (a
-    // Modal without `onClose` refuses all three). Recorded, it closes as ever.
-    <Modal open onClose={markable ? undefined : onClose} closeOnBackdrop={!markable}>
+    <Modal open onClose={onClose}>
       <div className="card" style={{ width: 520, maxWidth: "92vw", display: "flex", flexDirection: "column", gap: 12 }}>
         <h2 style={{ margin: 0 }}>
           {cancelled
@@ -642,9 +598,6 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved, canRes
           </>
         )}
         {recorded && <div className="pay-mark-done" data-testid="pay-mark-done">{fmt(t("pay.recorded"), deviceLabel)}</div>}
-        {/* Refused for good (2026-11-18): the server's sentence is above; this
-            says the receipt may now be closed. */}
-        {unrecordable && <div className="muted" style={{ fontSize: 12 }} data-testid="pay-mark-refused">{t("pay.cannotRecord")}</div>}
 
         {(!finished || markable) && asksForCash && bill && change && (
           <CashChangePanel
@@ -668,12 +621,14 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved, canRes
         {/* Even columns across the receipt (2026-11-07, owner): keep playing,
             cancel, confirm — one width, one height, a label that does not fit
             wraps instead of being cut. `data-count` picks the columns. */}
-        <div className="receipt-actions" data-count={markable ? 1 : finished ? 1 : canCancel ? 3 : 2} style={{ marginTop: 4 }}>
+        <div className="receipt-actions" data-count={markable ? 2 : finished ? 1 : canCancel ? 3 : 2} style={{ marginTop: 4 }}>
           {markable ? (
-            // No «Закрыть» (2026-11-18, owner): recording the payment is the way out.
-            <Button onClick={() => { void recordPayment(); }} disabled={busy || cashBlocks || payPending} data-testid="pay-mark-confirm">
-              {t("pay.markConfirm")}
-            </Button>
+            <>
+              <Button variant="secondary" onClick={onClose} disabled={busy}>{t("action.close")}</Button>
+              <Button onClick={() => { void recordPayment(); }} disabled={busy || cashBlocks} data-testid="pay-mark-confirm">
+                {t("pay.markConfirm")}
+              </Button>
+            </>
           ) : finished ? (
             <Button onClick={onClose}>{t("action.close")}</Button>
           ) : (
@@ -688,7 +643,7 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved, canRes
                   {t("session.cancel.button")}
                 </Button>
               )}
-              <Button className="receipt-actions__confirm" onClick={confirmStop} disabled={busy || !bill || cashBlocks || payPending} data-testid="stop-confirm">
+              <Button className="receipt-actions__confirm" onClick={confirmStop} disabled={busy || !bill || cashBlocks} data-testid="stop-confirm">
                 {busy ? t("session.closing") : t("session.confirmStop")}
               </Button>
             </>
@@ -697,20 +652,6 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved, canRes
       </div>
     </Modal>
   );
-};
-
-/**
- * A refusal of the mark that no retry can turn around (2026-11-18): 409
- * already recorded, 403 not this person's to write, or a 422 that is NOT a
- * form error (`errors` absent: the shift is closed, nothing to pay). A 422
- * with field errors (the banknotes, the parts) is the form's to fix.
- */
-const isFinalRefusal = (e: unknown): boolean => {
-  const status = (e as { status?: number }).status;
-  if (status === 409 || status === 403) return true;
-  if (status !== 422) return false;
-  const body = (e as { body?: { errors?: Record<string, unknown> } }).body;
-  return body?.errors === undefined;
 };
 
 const row: React.CSSProperties = {

@@ -7,7 +7,10 @@ import { fmt } from "@/i18n/translations";
 import { apiPaymentLabels } from "@/api/paymentLabels";
 import { useEffect, useState } from "react";
 import { PAYMENT_METHODS } from "./PaymentMethodPicker";
-import { OWN_LABEL_MAX, SPLIT_METHODS, fillRemaining, type PaymentCheck, type PaymentDraft } from "./paymentSplit";
+import {
+  OWN_LABEL_MAX, SPLIT_METHODS, addOwnPart, duplicateOwnIds, fillRemaining, hasOwnLabel, ownLabel,
+  OWN_PARTS_MAX, type OwnPart, type PaymentCheck, type PaymentDraft,
+} from "./paymentSplit";
 
 /** A method's full name: the tooltip, the accessible name, the hidden field label. */
 const LABEL_KEY: Record<PaymentMethod, string> = {
@@ -54,8 +57,6 @@ interface Props {
 const PaymentEditor = ({ name, dueCents, value, onChange, check, money, disabled = false, branchId }: Props) => {
   const { t } = useLang();
   const pick = (method: PaymentMethod) => onChange({ ...value, split: false, method });
-  // A draft from before «Свой вариант» (no `own`) keeps the «Другое» row.
-  const ownShown = value.own === undefined || value.own.shown;
   /**
    * The names this branch has already paid with (2026-11-18, owner: a
    * created option is kept, nobody types it again): one press each. Read when
@@ -70,7 +71,14 @@ const PaymentEditor = ({ name, dueCents, value, onChange, check, money, disabled
       .catch(() => { if (alive) setSaved([]); });
     return () => { alive = false; };
   }, [value.split, branchId]);
-  const useSaved = (label: string) => onChange({ ...value, own: { shown: true, label } });
+  // A saved name already in a row is not offered again: names are distinct.
+  const offered = saved.filter((label) => !hasOwnLabel(value, label));
+  // Several «Свой вариант» rows (2026-11-19, owner): a repeated name, or a
+  // second row without one, is refused on that row in plain words.
+  const duplicates = duplicateOwnIds(value.own);
+  const setOwn = (id: number, patch: Partial<Omit<OwnPart, "id">>) =>
+    onChange({ ...value, own: value.own.map((p) => (p.id === id ? { ...p, ...patch } : p)) });
+  const removeOwn = (id: number) => onChange({ ...value, own: value.own.filter((p) => p.id !== id) });
 
   return (
     <div className="col pay-editor" style={{ gap: 8 }} data-testid="payment-editor">
@@ -105,13 +113,6 @@ const PaymentEditor = ({ name, dueCents, value, onChange, check, money, disabled
           {t("pay.split")}
         </button>
       </div>
-      {/* Nothing preselected on a seat's receipt (2026-11-18, owner): said in
-          plain words beside the buttons until one is pressed. */}
-      {check.problem === "method" && (
-        <div className="pay-editor__choose" data-testid="pay-choose-method" aria-live="polite">
-          {t("pay.chooseMethod")}
-        </div>
-      )}
 
       {!value.split && value.method === "other" && (
         <Input
@@ -125,24 +126,9 @@ const PaymentEditor = ({ name, dueCents, value, onChange, check, money, disabled
 
       {value.split && (
         <div className="col pay-editor__split" style={{ gap: 8 }}>
-          {SPLIT_METHODS.filter((m) => m !== "other" || ownShown).map((m) => (
-            <div key={m} className="pay-editor__part" data-testid={m === "other" ? "pay-own-row" : undefined}>
-              {m === "other" ? (
-                // «Свой вариант» (2026-11-18, owner): its name on the left —
-                // Idram, Telcell, «Hovo Card»; the sales history totals by it.
-                <input
-                  className="input pay-editor__own-name"
-                  value={value.own?.label ?? ""}
-                  maxLength={OWN_LABEL_MAX}
-                  placeholder={t("pay.ownNamePlaceholder")}
-                  aria-label={t("pay.ownName")}
-                  onChange={(e) => onChange({ ...value, own: { shown: true, label: e.target.value } })}
-                  disabled={disabled}
-                  data-testid="pay-own-name"
-                />
-              ) : (
-                <span className="pay-editor__part-name" title={t(LABEL_KEY[m])}>{t(SHORT_KEY[m])}</span>
-              )}
+          {SPLIT_METHODS.map((m) => (
+            <div key={m} className="pay-editor__part">
+              <span className="pay-editor__part-name" title={t(LABEL_KEY[m])}>{t(SHORT_KEY[m])}</span>
               <div className="pay-editor__part-box">
                 <PriceInput
                   label={t(LABEL_KEY[m])}
@@ -161,47 +147,90 @@ const PaymentEditor = ({ name, dueCents, value, onChange, check, money, disabled
               >
                 {t("pay.restHere")}
               </Button>
-              {m === "other" && (
-                <button
-                  type="button"
-                  className="pay-editor__own-remove"
-                  aria-label={t("pay.ownRemove")}
-                  title={t("pay.ownRemove")}
-                  disabled={disabled}
-                  onClick={() => onChange({ ...value, own: { shown: false, label: "" }, amounts: { ...value.amounts, other: "" } })}
-                  data-testid="pay-own-remove"
-                >
-                  ×
-                </button>
-              )}
             </div>
           ))}
-          {!ownShown && (
-            <div className="row pay-editor__own-choices">
-              {saved.map((label) => (
-                <Button
-                  key={label}
-                  type="button"
-                  variant="secondary"
-                  className="pay-editor__own-saved"
-                  disabled={disabled}
-                  onClick={() => useSaved(label)}
-                  data-testid={`pay-own-saved-${label}`}
-                >
-                  {`+ ${label}`}
-                </Button>
-              ))}
+          {value.own.map((part) => {
+            const duplicate = duplicates.has(part.id);
+            return (
+              <div key={part.id} className="col pay-editor__own" data-testid="pay-own-row">
+                <div className="pay-editor__part">
+                  {/* «Свой вариант» (2026-11-18, owner): its name on the left —
+                      Idram, Telcell, «Hovo Card»; the sales history totals by it. */}
+                  <input
+                    className={`input pay-editor__own-name${duplicate ? " is-invalid" : ""}`}
+                    value={part.label}
+                    maxLength={OWN_LABEL_MAX}
+                    placeholder={t("pay.ownNamePlaceholder")}
+                    aria-label={t("pay.ownName")}
+                    aria-invalid={duplicate || undefined}
+                    onChange={(e) => setOwn(part.id, { label: e.target.value })}
+                    disabled={disabled}
+                    data-testid="pay-own-name"
+                  />
+                  <div className="pay-editor__part-box">
+                    <PriceInput
+                      label={ownLabel(part) || t("session.payOther")}
+                      value={part.amount}
+                      onChange={(v) => setOwn(part.id, { amount: v })}
+                      disabled={disabled}
+                    />
+                  </div>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    className="pay-editor__rest"
+                    disabled={disabled || check.remainingCents <= 0}
+                    onClick={() => onChange(fillRemaining(dueCents, value, { own: part.id }))}
+                    data-testid="pay-rest-other"
+                  >
+                    {t("pay.restHere")}
+                  </Button>
+                  <button
+                    type="button"
+                    className="pay-editor__own-remove"
+                    aria-label={t("pay.ownRemove")}
+                    title={t("pay.ownRemove")}
+                    disabled={disabled}
+                    onClick={() => removeOwn(part.id)}
+                    data-testid="pay-own-remove"
+                  >
+                    ×
+                  </button>
+                </div>
+                {duplicate && (
+                  <div className="pay-editor__own-error" role="alert" data-testid="pay-own-duplicate">
+                    {ownLabel(part) === "" ? t("pay.ownUnnamedTwice") : t("pay.ownDuplicate")}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+          {value.own.length < OWN_PARTS_MAX && (
+          <div className="row pay-editor__own-choices">
+            {offered.map((label) => (
               <Button
+                key={label}
                 type="button"
                 variant="secondary"
-                className="pay-editor__own-add"
+                className="pay-editor__own-saved"
                 disabled={disabled}
-                onClick={() => onChange({ ...value, own: { shown: true, label: "" } })}
-                data-testid="pay-own-add"
+                onClick={() => onChange(addOwnPart(value, label))}
+                data-testid={`pay-own-saved-${label}`}
               >
-                {t("pay.ownAdd")}
+                {`+ ${label}`}
               </Button>
-            </div>
+            ))}
+            <Button
+              type="button"
+              variant="secondary"
+              className="pay-editor__own-add"
+              disabled={disabled}
+              onClick={() => onChange(addOwnPart(value))}
+              data-testid="pay-own-add"
+            >
+              {t("pay.ownAdd")}
+            </Button>
+          </div>
           )}
           <div
             className={`pay-editor__remaining${check.remainingCents === 0 ? " is-done" : ""}`}

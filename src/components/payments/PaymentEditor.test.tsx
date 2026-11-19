@@ -12,8 +12,8 @@ vi.mock("@/i18n/LanguageContext", () => ({
 }));
 
 let last: PaymentDraft = emptyPaymentDraft();
-const Host = ({ due, branchId, start }: { due: number; branchId?: number; start?: PaymentDraft }) => {
-  const [d, setD] = useState<PaymentDraft>(start ?? emptyPaymentDraft());
+const Host = ({ due, branchId }: { due: number; branchId?: number }) => {
+  const [d, setD] = useState<PaymentDraft>(emptyPaymentDraft());
   last = d;
   return <PaymentEditor name="p" dueCents={due} value={d} onChange={setD} check={checkPayment(due, d)} money={String} branchId={branchId} />;
 };
@@ -79,16 +79,16 @@ describe("PaymentEditor", () => {
 
     await act(async () => { fireEvent.click(screen.getByTestId("pay-own-add")); });
     expect(screen.getByTestId("pay-own-row")).toBeTruthy();
-    expect(screen.queryByTestId("pay-own-add")).toBeNull();
+    // Changed 2026-11-19 (owner): «+ Свой вариант» stays, it adds another row.
+    expect(screen.getByTestId("pay-own-add")).toBeTruthy();
     await act(async () => { fireEvent.change(screen.getByTestId("pay-own-name"), { target: { value: "Hovo Card" } }); });
     await act(async () => { fireEvent.click(screen.getByTestId("pay-rest-other")); });
-    expect(last.own).toEqual({ shown: true, label: "Hovo Card" });
+    expect(last.own).toEqual([{ id: 1, label: "Hovo Card", amount: "5000.00" }]);
     expect(checkPayment(500000, last).lines).toEqual([{ method: "other", amount: 5000, label: "Hovo Card" }]);
 
     await act(async () => { fireEvent.click(screen.getByTestId("pay-own-remove")); });
     expect(screen.queryByTestId("pay-own-row")).toBeNull();
-    expect(last.amounts.other).toBe("");
-    expect(last.own).toEqual({ shown: false, label: "" });
+    expect(last.own).toEqual([]);
   });
 
   /**
@@ -135,12 +135,16 @@ describe("PaymentEditor", () => {
     expect(screen.getByTestId("pay-own-saved-Telcell").textContent).toBe("+ Telcell");
     expect(screen.getByTestId("pay-own-add")).toBeTruthy();
     await act(async () => { fireEvent.click(screen.getByTestId("pay-own-saved-Telcell")); });
-    expect(last.own).toEqual({ shown: true, label: "Telcell" });
+    expect(last.own).toEqual([{ id: 1, label: "Telcell", amount: "" }]);
     expect((screen.getByTestId("pay-own-name") as HTMLInputElement).value).toBe("Telcell");
+    // A name already in a row is not offered again (2026-11-19).
+    expect(screen.queryByTestId("pay-own-saved-Telcell")).toBeNull();
+    expect(screen.getByTestId("pay-own-saved-Hovo Card")).toBeTruthy();
     // A new name: the empty row, as before.
     await act(async () => { fireEvent.click(screen.getByTestId("pay-own-remove")); });
+    expect(screen.getByTestId("pay-own-saved-Telcell")).toBeTruthy();
     await act(async () => { fireEvent.click(screen.getByTestId("pay-own-add")); });
-    expect(last.own).toEqual({ shown: true, label: "" });
+    expect(last.own).toEqual([{ id: 1, label: "", amount: "" }]);
   });
 
   test("no branch, or a failed read: just «+ Свой вариант»", async () => {
@@ -152,20 +156,62 @@ describe("PaymentEditor", () => {
     expect(screen.getByTestId("pay-own-add")).toBeTruthy();
   });
 
-  test("nothing chosen (a seat's receipt, 2026-11-18): no button checked, the hint shown until one is pressed", async () => {
-    render(<Host due={500000} start={emptyPaymentDraft(null)} />);
-    for (const m of ["cash", "card", "other", "split"]) {
-      expect(screen.getByTestId(`pay-${m}`).getAttribute("aria-checked")).toBe("false");
-    }
-    expect(screen.getByTestId("pay-choose-method").textContent).toBe("pay.chooseMethod");
-    await act(async () => { fireEvent.click(screen.getByTestId("pay-card")); });
-    expect(last).toMatchObject({ split: false, method: "card" });
-    expect(screen.queryByTestId("pay-choose-method")).toBeNull();
+  test("several own options (2026-11-19): each press adds a row; cash + Idram + Telcell adds up and is sent as three parts", async () => {
+    const { paymentBody } = await import("./paymentSplit");
+    labels.fn.mockResolvedValueOnce({ data: [{ label: "Telcell", uses: 2 }] });
+    render(<Host due={500000} branchId={7} />);
+    await act(async () => { fireEvent.click(screen.getByTestId("pay-split")); });
+    await act(async () => { await Promise.resolve(); });
+    const cash = screen.getAllByRole("textbox").filter((e) => e.tagName === "INPUT")[0];
+    await act(async () => { fireEvent.change(cash, { target: { value: "1000" } }); });
+    await act(async () => { fireEvent.click(screen.getByTestId("pay-own-add")); });
+    await act(async () => { fireEvent.change(screen.getByTestId("pay-own-name"), { target: { value: "Idram" } }); });
+    const idramBox = screen.getAllByTestId("pay-own-row")[0].querySelectorAll("input")[1];
+    await act(async () => { fireEvent.change(idramBox, { target: { value: "1500" } }); });
+    await act(async () => { fireEvent.click(screen.getByTestId("pay-own-saved-Telcell")); });
+    expect(screen.getAllByTestId("pay-own-row")).toHaveLength(2);
+    await act(async () => { fireEvent.click(screen.getAllByTestId("pay-rest-other")[1]); });
+    expect(last.own).toEqual([{ id: 1, label: "Idram", amount: "1500" }, { id: 2, label: "Telcell", amount: "2500.00" }]);
+    expect(screen.getByTestId("pay-remaining").textContent).toBe("pay.allPaid");
+    expect(paymentBody(last, checkPayment(500000, last))).toEqual({
+      payments: [
+        { method: "cash", amount: 1000 },
+        { method: "other", amount: 1500, label: "Idram" },
+        { method: "other", amount: 2500, label: "Telcell" },
+      ],
+    });
+    // × on the first row takes only that one away.
+    await act(async () => { fireEvent.click(screen.getAllByTestId("pay-own-remove")[0]); });
+    expect(last.own).toEqual([{ id: 2, label: "Telcell", amount: "2500.00" }]);
   });
 
-  test("the default draft (till, start, «+ Время») still starts on cash, with no hint", () => {
+  test("a repeated name is refused on its row in plain words, and the payment cannot go", async () => {
     render(<Host due={500000} />);
-    expect(screen.getByTestId("pay-cash").getAttribute("aria-checked")).toBe("true");
-    expect(screen.queryByTestId("pay-choose-method")).toBeNull();
+    await act(async () => { fireEvent.click(screen.getByTestId("pay-split")); });
+    await act(async () => { fireEvent.click(screen.getByTestId("pay-own-add")); });
+    await act(async () => { fireEvent.click(screen.getByTestId("pay-own-add")); });
+    // Two without a name: the second is told to take one.
+    expect(screen.getAllByTestId("pay-own-duplicate").map((e) => e.textContent)).toEqual(["pay.ownUnnamedTwice"]);
+    expect(checkPayment(500000, last).problem).toBe("duplicate");
+    const names = () => screen.getAllByTestId("pay-own-name") as HTMLInputElement[];
+    await act(async () => { fireEvent.change(names()[0], { target: { value: "Idram" } }); });
+    expect(screen.queryByTestId("pay-own-duplicate")).toBeNull();
+    await act(async () => { fireEvent.change(names()[1], { target: { value: "IDRAM" } }); });
+    expect(screen.getAllByTestId("pay-own-duplicate").map((e) => e.textContent)).toEqual(["pay.ownDuplicate"]);
+    expect(names()[1].getAttribute("aria-invalid")).toBe("true");
+    expect(names()[0].getAttribute("aria-invalid")).toBeNull();
+    await act(async () => { fireEvent.change(names()[1], { target: { value: "Telcell" } }); });
+    expect(screen.queryByTestId("pay-own-duplicate")).toBeNull();
+  });
+
+  test("at most six own options: the server takes 8 parts in all (2026-11-19)", async () => {
+    render(<Host due={500000} />);
+    await act(async () => { fireEvent.click(screen.getByTestId("pay-split")); });
+    for (let i = 0; i < 6; i++) {
+      await act(async () => { fireEvent.click(screen.getByTestId("pay-own-add")); });
+    }
+    expect(last.own).toHaveLength(6);
+    expect(screen.queryByTestId("pay-own-add")).toBeNull();
   });
 });
+

@@ -77,9 +77,6 @@ for (const lang of LANGS) {
       await expect(due).toContainText("500");
       await expect(page.getByTestId("receipt-prepaid-change")).toHaveCount(0);
       await expect(page.getByTestId("payment-editor")).toBeVisible();
-      // Nothing preselected (2026-11-18, owner): the banknotes box is cash's.
-      await expect(page.getByTestId("cash-received")).toHaveCount(0);
-      await page.getByTestId("pay-cash").click();
       await expect(page.getByTestId("cash-received")).toHaveAttribute("placeholder", /500/);
       await shot(page, `stop-due-${lang}-${width}`);
     });

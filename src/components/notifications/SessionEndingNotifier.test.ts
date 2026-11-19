@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import type { IDbNotification } from "@/api/notifications";
-import { endingWarnings } from "./SessionEndingNotifier";
+import { endingWarnings, seatLabel } from "./SessionEndingNotifier";
 
 /**
  * Which "about to run out" warnings to show — the SERVER's notifications
@@ -48,5 +48,24 @@ describe("endingWarnings", () => {
 
   test("a seat with no number is named by its device", () => {
     expect(endingWarnings([row("n1", 5, {}, { place_number: null })], new Set(), NOW)[0].label).toBe("#3");
+  });
+
+  test("the seat's name rides with its number (2026-11-19, owner)", () => {
+    expect(endingWarnings([row("n1", 5, {}, { place_name: "VIP 1" })], new Set(), NOW)[0].label).toBe("№4 · VIP 1");
+  });
+});
+
+describe("seatLabel", () => {
+  test("number and name; the number alone when the name is missing, empty or only repeats it", () => {
+    expect(seatLabel({ place_number: 8, place_name: "  Sofa ", pc_id: 3 })).toBe("№8 · Sofa");
+    expect(seatLabel({ place_number: 8, pc_id: 3 })).toBe("№8");
+    expect(seatLabel({ place_number: 8, place_name: null, pc_id: 3 })).toBe("№8");
+    expect(seatLabel({ place_number: 8, place_name: "  ", pc_id: 3 })).toBe("№8");
+    expect(seatLabel({ place_number: 8, place_name: "8", pc_id: 3 })).toBe("№8");
+    expect(seatLabel({ place_number: 8, place_name: "№8", pc_id: 3 })).toBe("№8");
+  });
+
+  test("no number: the device, even with a name", () => {
+    expect(seatLabel({ place_number: null, place_name: "Sofa", pc_id: 3 })).toBe("#3");
   });
 });

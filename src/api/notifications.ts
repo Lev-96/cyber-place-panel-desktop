@@ -32,6 +32,8 @@ export interface IDbNotification {
     session_id?: number;
     pc_id?: number;
     place_number?: number | null;
+    /** The seat's name (2026-11-19); absent from an older backend, null when it has none. */
+    place_name?: string | null;
     ends_at?: string | null;
     minutes_left?: number;
     [key: string]: unknown;

@@ -505,8 +505,9 @@ describe("SessionsHistory — whose actions", () => {
     expect(call.user_id).toBe(11);
     // «Вчера» is the WORKING day before the one running (2026-11-18), read
     // over the hours the server counted it by.
-    expect(call.from).toBe("2026-11-17T00:00:00+04:00");
-    expect(call.to).toBe("2026-11-17T23:59:59+04:00");
+    const { STUB_YESTERDAY } = await import("@/test/salesSummaryStub");
+    expect(call.from).toBe(`${STUB_YESTERDAY}T00:00:00+04:00`);
+    expect(call.to).toBe(`${STUB_YESTERDAY}T23:59:59+04:00`);
   });
 
   test("another branch starts from «all staff» and its own list of people", async () => {

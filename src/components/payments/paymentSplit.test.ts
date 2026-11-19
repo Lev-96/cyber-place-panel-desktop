@@ -1,11 +1,18 @@
 import { describe, expect, test } from "vitest";
-import { checkPayment, emptyPaymentDraft, fillRemaining, paymentBody, prepaidPaymentFields } from "./paymentSplit";
+import {
+  addOwnPart, checkPayment, duplicateOwnIds, emptyPaymentDraft, fillRemaining, hasOwnLabel, paymentBody, prepaidPaymentFields,
+  type PaymentDraft,
+} from "./paymentSplit";
 
-// An `other` part is typed only after «+ Свой вариант» (2026-11-18): the
-// helper presses it whenever one is given.
-const split = (amounts: Partial<Record<"cash" | "card" | "other", string>>, note = "картой и наличными", label = "") => ({
-  ...emptyPaymentDraft(), split: true, note, amounts: { cash: "", card: "", other: "", ...amounts },
-  own: { shown: amounts.other !== undefined, label },
+// An `other` part is a «+ Свой вариант» row (2026-11-18): the helper adds one
+// whenever an `other` amount is given.
+const split = (amounts: Partial<Record<"cash" | "card" | "other", string>>, note = "картой и наличными", label = ""): PaymentDraft => ({
+  ...emptyPaymentDraft(), split: true, note, amounts: { cash: amounts.cash ?? "", card: amounts.card ?? "" },
+  own: amounts.other === undefined ? [] : [{ id: 1, label, amount: amounts.other }],
+});
+/** A split of cash/card plus several own rows, each [name, amount]. */
+const withOwn = (cash: string, rows: [string, string][], note = ""): PaymentDraft => ({
+  ...split({ cash }, note), own: rows.map(([label, amount], i) => ({ id: i + 1, label, amount })),
 });
 
 describe("how a bill was paid", () => {
@@ -80,8 +87,8 @@ describe("how a bill was paid", () => {
 });
 
 describe("«Свой вариант» in a split (2026-11-18, owner)", () => {
-  test("hidden until pressed: an amount left in the hidden row is never sent", () => {
-    const d = { ...split({ cash: "5000" }), amounts: { cash: "5000", card: "", other: "999" }, own: { shown: false, label: "" } };
+  test("a removed row is gone with its amount: nothing of it is sent", () => {
+    const d = { ...split({ cash: "5000" }), own: [] };
     expect(checkPayment(500000, d)).toMatchObject({ ok: true, lines: [{ method: "cash", amount: 5000 }] });
   });
 
@@ -99,26 +106,72 @@ describe("«Свой вариант» in a split (2026-11-18, owner)", () => {
     expect(checkPayment(500000, long).lines[1].label).toBe("x".repeat(64));
   });
 
-  test("«Остаток сюда» ignores the hidden row", () => {
-    const d = { ...split({ cash: "" }), amounts: { cash: "", card: "", other: "4000" }, own: { shown: false, label: "" } };
-    expect(fillRemaining(500000, d, "cash").amounts.cash).toBe("5000.00");
-  });
-
-  test("nothing chosen yet (2026-11-18): not ok, problem «method», and never a body without a method", () => {
-    const d = emptyPaymentDraft(null);
-    const c = checkPayment(340000, d);
-    expect(c).toMatchObject({ ok: false, problem: "method", lines: [] });
-    expect(() => paymentBody(d, c)).toThrow();
-    expect(() => prepaidPaymentFields(d, c)).toThrow();
-    // A split needs no single method: its parts are the answer.
-    const parts = { ...split({ cash: "1000", card: "2400" }, ""), method: null };
-    expect(checkPayment(340000, parts)).toMatchObject({ ok: true, problem: null });
-    expect(paymentBody(parts, checkPayment(340000, parts))).toEqual({ payments: [{ method: "cash", amount: 1000 }, { method: "card", amount: 2400 }] });
-  });
-
-  test("the default draft is still cash (the till, Start, «+ Время» keep it)", () => {
-    expect(emptyPaymentDraft().method).toBe("cash");
-    expect(checkPayment(100, emptyPaymentDraft())).toMatchObject({ ok: true, problem: null });
+  test("«Остаток сюда» on cash counts every own row", () => {
+    const d = withOwn("", [["Idram", "1000"], ["Telcell", "1500"]]);
+    expect(fillRemaining(500000, d, "cash").amounts.cash).toBe("2500.00");
   });
 });
 
+describe("several «Свой вариант» in one split (2026-11-19, owner)", () => {
+  test("cash + Idram + Telcell: every part sent, each own one as {method: other, amount, label}", () => {
+    const d = withOwn("1000", [["Idram", "1500"], ["Telcell", "2500"]]);
+    const c = checkPayment(500000, d);
+    expect(c).toMatchObject({ ok: true, problem: null, remainingCents: 0 });
+    expect(paymentBody(d, c)).toEqual({
+      payments: [
+        { method: "cash", amount: 1000 },
+        { method: "other", amount: 1500, label: "Idram" },
+        { method: "other", amount: 2500, label: "Telcell" },
+      ],
+    });
+    // The same body at Start / «+ Время» (only plain cash is left out there).
+    expect(prepaidPaymentFields(d, c)).toEqual(paymentBody(d, c));
+  });
+
+  test("two own parts and nothing else: still a split, never one method", () => {
+    const d = withOwn("", [["Idram", "2000"], ["Telcell", "3000"]]);
+    expect(paymentBody(d, checkPayment(500000, d))).toEqual({
+      payments: [{ method: "other", amount: 2000, label: "Idram" }, { method: "other", amount: 3000, label: "Telcell" }],
+    });
+  });
+
+  test("all parts are summed: short, too much, exact", () => {
+    expect(checkPayment(500000, withOwn("1000", [["Idram", "1500"], ["Telcell", "1500"]]))).toMatchObject({ ok: false, problem: "sum", remainingCents: 100000 });
+    expect(checkPayment(500000, withOwn("1000", [["Idram", "1500"], ["Telcell", "3500"]]))).toMatchObject({ ok: false, problem: "sum", remainingCents: -100000 });
+    expect(checkPayment(500000, withOwn("", [["Idram", "2500"], ["Telcell", "2500"]]))).toMatchObject({ ok: true, remainingCents: 0 });
+  });
+
+  test("an unreadable own amount is «invalid»", () => {
+    expect(checkPayment(500000, withOwn("1000", [["Idram", "4x"]]))).toMatchObject({ ok: false, problem: "invalid" });
+  });
+
+  test("a repeated name (any case, spaces) is refused; the first keeps it", () => {
+    const d = withOwn("", [["Idram", "2500"], [" idram ", "2500"]]);
+    expect([...duplicateOwnIds(d.own)]).toEqual([2]);
+    expect(checkPayment(500000, d)).toMatchObject({ ok: false, problem: "duplicate" });
+  });
+
+  test("an unnamed option at most once", () => {
+    const d = withOwn("", [["", "2500"], ["  ", "2500"]]);
+    expect([...duplicateOwnIds(d.own)]).toEqual([2]);
+    expect(checkPayment(500000, d)).toMatchObject({ ok: false, problem: "duplicate" });
+    // One unnamed and one named: fine.
+    expect(checkPayment(500000, withOwn("", [["", "2500"], ["Idram", "2500"]]))).toMatchObject({ ok: true });
+  });
+
+  test("«Остаток сюда» on an own row fills that row only", () => {
+    const d = withOwn("1000", [["Idram", "1500"], ["Telcell", ""]]);
+    const next = fillRemaining(500000, d, { own: 2 });
+    expect(next.own.map((p) => p.amount)).toEqual(["1500", "2500.00"]);
+    expect(next.amounts.cash).toBe("1000");
+  });
+
+  test("adding rows: each gets its own id and the name given; a name is looked up case-insensitively", () => {
+    let d = addOwnPart({ ...emptyPaymentDraft(), split: true });
+    d = addOwnPart(d, "Telcell");
+    d = addOwnPart(d);
+    expect(d.own).toEqual([{ id: 1, label: "", amount: "" }, { id: 2, label: "Telcell", amount: "" }, { id: 3, label: "", amount: "" }]);
+    expect(hasOwnLabel(d, "telcell ")).toBe(true);
+    expect(hasOwnLabel(d, "Idram")).toBe(false);
+  });
+});

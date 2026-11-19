@@ -93,8 +93,6 @@ for (const lang of LANGS) {
       await openBoard(page);
       await page.locator('[data-action="stop"]').first().click();
       await expect(page.getByRole("dialog")).toContainText(/997[.,]22/);
-      // No method is preselected (2026-11-18, owner): cash is pressed first.
-      await page.getByTestId("pay-cash").click();
       await page.getByTestId("stop-confirm").click();
       await expect(page.getByRole("dialog")).toContainText(CHANGED);
       await expect(page.getByRole("dialog")).not.toContainText(/997[.,]22/);
@@ -115,8 +113,6 @@ for (const lang of LANGS) {
       await page.route(at("/sessions/5/stop"), (r) => r.fulfill(json({ message: CHANGED }, 422)));
       await openBoard(page);
       await page.locator('[data-action="stop"]').first().click();
-      // No method is preselected (2026-11-18, owner): cash is pressed first.
-      await page.getByTestId("pay-cash").click();
       await page.getByTestId("stop-confirm").click();
       await expect(page.getByTestId("checkout-ended-elsewhere")).toHaveText(CLOSED[lang]);
       await expect(page.getByRole("dialog")).not.toContainText(/997[.,]22/);

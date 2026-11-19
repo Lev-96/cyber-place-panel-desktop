@@ -2,7 +2,7 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { MemoryRouter, Route, Routes, useNavigate } from "react-router-dom";
-import type { IShift, IShiftReport } from "@/types/shifts";
+import type { IAcceptanceCountBlind, IShift, IShiftReport } from "@/types/shifts";
 
 /**
  * The shift screen (2026-10-19): what the person at the till sees and can do.
@@ -17,7 +17,8 @@ vi.mock("@/repositories/ShiftRepository", () => ({ shiftRepository: repo }));
 vi.mock("@/repositories/BranchRepository", () => ({
   branchRepository: { byId: async () => ({ id: 4, address: "Abovyan 1", city: "Yerevan" }), list: async () => [] },
 }));
-vi.mock("@/auth/AuthContext", () => ({ useAuth: () => ({ user: { id: 7, name: "Anna Hakobyan", role: "manager" } }) }));
+const auth = vi.hoisted(() => ({ role: "manager" }));
+vi.mock("@/auth/AuthContext", () => ({ useAuth: () => ({ user: { id: 7, name: "Anna Hakobyan", role: auth.role } }) }));
 vi.mock("@/i18n/LanguageContext", () => ({
   useLang: () => ({ t: (k: string) => k, lang: "en", money: (n: number) => n.toFixed(2) }),
 }));
@@ -68,6 +69,7 @@ beforeEach(() => {
   repo.staff.mockResolvedValue([]);
   // A branch that counts nothing: the shift opens at once (2026-11-18).
   repo.acceptanceProducts.mockResolvedValue([]);
+  auth.role = "manager";
 });
 afterEach(() => cleanup());
 
@@ -165,7 +167,10 @@ describe("closing", () => {
 });
 
 describe("the report and the history", () => {
-  test("the live report shows the server's figures and warnings in words", async () => {
+  // Changed 2026-11-19 (owner): the figures are the OWNER's view of an open
+  // shift; a manager's open shift shows only «Приём смены» (see below).
+  test("the live report shows the server's figures and warnings in words (owner)", async () => {
+    auth.role = "company_owner";
     repo.current.mockResolvedValue({
       shift: shift(),
       report: report({ revenue_total: "12500.00", by_method: { cash: "8000.00", card: "4500.00", other: "0.00", deposit: "0.00", unrecorded: "0.00" }, warnings: ["places_running"], places: { ...report().places, running_count: 2 } }),
@@ -229,5 +234,75 @@ describe("the address changes under the screen", () => {
     expect(screen.queryByText("hub.invalidId")).toBeNull();
     expect(errors.mock.calls.some((c) => String(c[0]).includes("Rendered more hooks"))).toBe(false);
     errors.mockRestore();
+  });
+});
+
+/**
+ * A manager's OPEN shift (2026-11-19, owner): only «Приём смены», what was
+ * counted. Revenue, payments, cash, places, products, stock, staff, handover
+ * and the not-tracked list are not shown; the owner and admin see it all.
+ */
+describe("a manager's open shift", () => {
+  const blindCount: IAcceptanceCountBlind = {
+    blind: true, counted_at: "2026-10-19T10:05:00+04:00", counted_by: { id: 7, name: "Anna Hakobyan" },
+    rows: [{ product_id: 1, name: "Cola", counted: 12 }], count: 1,
+  };
+  const full = () => report({
+    revenue_total: "12500.00",
+    by_method: { cash: "8000.00", card: "4500.00", other: "0.00", deposit: "0.00", unrecorded: "0.00" },
+    warnings: ["places_running"], places: { ...report().places, running_count: 2, unique_seats: 2 },
+    lines: { places: [], till: [], tournaments: [], member_topups: [] },
+    staff: [], handover: { count: 0, places: [] }, not_tracked: ["cash_movements"],
+    acceptance_count: blindCount,
+  });
+  const HIDDEN = [
+    "shift-revenue-total", "shift-method-cash", "shift-cash-expected", "shift-warnings", "shift-lines", "shift-seats",
+    "shift-staff", "shift-handover", "shift-not-tracked",
+  ];
+
+  test("shows the header and what was counted, nothing else", async () => {
+    repo.current.mockResolvedValue({ shift: shift(), report: full() });
+    await mount();
+    expect(screen.getByTestId("shift-header")).toBeTruthy();
+    expect(screen.getByTestId("shift-report").textContent).toContain("Cola");
+    for (const id of HIDDEN) expect(screen.queryByTestId(id), id).toBeNull();
+    const text = screen.getByTestId("shift-report").textContent ?? "";
+    expect(text).not.toContain("12500.00");
+    expect(text).not.toContain("8000.00");
+    expect(text).not.toContain("shift.byMethod");
+    expect(text).not.toContain("shift.cash");
+    // Closing stays where it was.
+    expect(screen.getByTestId("shift-close")).toBeTruthy();
+  });
+
+  test("nothing was counted: says so in words", async () => {
+    repo.current.mockResolvedValue({ shift: shift(), report: report({ revenue_total: "12500.00" }) });
+    await mount();
+    expect(screen.getByTestId("shift-acceptance-none").textContent).toBe("shift.acceptCount.none");
+    expect(screen.queryByTestId("shift-revenue-total")).toBeNull();
+  });
+
+  test.each(["company_owner", "admin"])("%s still sees the whole report", async (role) => {
+    auth.role = role;
+    repo.current.mockResolvedValue({ shift: shift(), report: full() });
+    await mount();
+    expect(screen.getByTestId("shift-revenue-total").textContent).toContain("12500.00");
+    expect(screen.getByTestId("shift-method-cash").textContent).toContain("8000.00");
+    expect(screen.getByTestId("shift-cash-expected")).toBeTruthy();
+    for (const id of ["shift-staff", "shift-handover", "shift-not-tracked", "shift-lines"]) expect(screen.getByTestId(id), id).toBeTruthy();
+    expect(screen.queryByTestId("shift-acceptance-none")).toBeNull();
+  });
+
+  test("a manager opening a CLOSED shift from the history still gets its report as before", async () => {
+    repo.current.mockResolvedValue({ shift: null, report: null });
+    repo.list.mockResolvedValue({ data: [
+      shift({ id: 9, status: "closed", closed_at: "2026-10-19T02:05:00+04:00", closed_by: { id: 8, name: "Aram Petrosyan" } }),
+    ], meta: { current_page: 1, last_page: 1, per_page: 20, total: 1 } });
+    repo.summary.mockResolvedValue({ shift: shift({ id: 9, status: "closed" }), report: full() });
+    await mount();
+    const history = await screen.findByTestId("shift-history");
+    await waitFor(() => expect(history.textContent).toContain("Aram Petrosyan"));
+    await act(async () => { fireEvent.click(screen.getByText("shift.report")); });
+    await waitFor(() => expect(screen.getByTestId("shift-revenue-total").textContent).toContain("12500.00"));
   });
 });

@@ -1049,10 +1049,12 @@ export const TRANSLATIONS: Dict = {
   },
   /* ── the ten-minute warning ───────────────────────────────────────────── */
   "session.endingSoonTitle": { en: "Session ending soon", ru: "Сессия скоро закончится", am: "Սեսիան շուտով կավարտվի" },
-  "session.endingSoonBody": {
-    en: "{place}. {minutes} min left. Add more time?",
-    ru: "{place}. Осталось {minutes} мин. Добавить время?",
-    am: "{place}։ Մնացել է {minutes} րոպե։ Ավելացնե՞լ ժամանակ։",
+  // The seat is its own large line above (2026-11-19, owner), so the sentence
+  // says only the minutes; the old `session.endingSoonBody` with {place} went.
+  "session.endingSoonLeft": {
+    en: "{minutes} min left. Add more time?",
+    ru: "Осталось {minutes} мин. Добавить время?",
+    am: "Մնացել է {minutes} րոպե։ Ավելացնե՞լ ժամանակ։",
   },
   "session.endingSoonAction": { en: "Add time", ru: "Добавить время", am: "Ավելացնել ժամանակ" },
   "session.endingSoonDismiss": { en: "Dismiss", ru: "Закрыть", am: "Փակել" },
@@ -1668,8 +1670,6 @@ export const TRANSLATIONS: Dict = {
   "pay.sumMismatch": { en: "The parts must add up to the bill exactly", ru: "Сумма частей должна точно равняться счёту", am: "Մասերի գումարը պետք է ճիշտ հավասար լինի հաշվին" },
   "pay.markAfterAuto": { en: "This seat ended by itself and nobody recorded the payment. Mark how it was paid.", ru: "Место завершилось само, и оплату никто не отметил. Отметьте, как оплатили.", am: "Տեղն ավարտվեց ինքնուրույն, և վճարումը ոչ ոք չնշեց։ Նշեք, թե ինչպես վճարեցին։" },
   "pay.markConfirm": { en: "Record payment", ru: "Отметить оплату", am: "Նշել վճարումը" },
-  "pay.chooseMethod": { en: "Choose how it was paid", ru: "Выберите способ оплаты", am: "Ընտրեք վճարման եղանակը" },
-  "pay.cannotRecord": { en: "This payment cannot be recorded here. The receipt can be closed.", ru: "Эту оплату здесь отметить нельзя. Чек можно закрыть.", am: "Այս վճարումն այստեղ հնարավոր չէ նշել։ Կտրոնը կարելի է փակել։" },
   "pay.recorded": { en: "Payment recorded · {0}", ru: "Оплата отмечена · {0}", am: "Վճարումը նշվեց · {0}" },
   "pay.split": { en: "Split", ru: "Разделить", am: "Բաժանել" },
   "pay.otherShort": { en: "Other", ru: "Другое", am: "Այլ" },
@@ -1956,6 +1956,7 @@ export const TRANSLATIONS: Dict = {
   "shift.acceptCount.gap": { en: "No shift was open from {0} to {1}", ru: "Смены не было с {0} до {1}", am: "{0}-ից մինչև {1} հերթափոխ բացված չէր" },
   "shift.acceptCount.blamed": { en: "Shortage of the shift of: {0}", ru: "Недостача на смене: {0}", am: "Պակասորդը հերթափոխում՝ {0}" },
   "shift.acceptCount.flowRule": { en: "Accepted: what the previous shift counted. Received, sold, returned: what the program recorded after that. Should be: what that comes to.", ru: "Принято: сколько посчитала прошлая смена. Получено, продано, возвращено: что записано в программе после этого. Должно быть: что из этого получается.", am: "Ընդունված՝ որքան է հաշվել նախորդ հերթափոխը։ Ստացված, վաճառված, վերադարձված՝ ինչ է գրանցվել ծրագրում դրանից հետո։ Պետք է լինի՝ ինչ է ստացվում դրանից։" },
+  "shift.acceptCount.none": { en: "Nothing was counted when this shift was opened.", ru: "При открытии этой смены ничего не считали.", am: "Այս հերթափոխը բացելիս ոչինչ չի հաշվվել։" },
   "shift.acceptCount.blindRule": { en: "Only what was counted is shown here.", ru: "Здесь только то, что посчитали.", am: "Այստեղ միայն հաշվածն է։" },
   "shift.acceptCount.product": { en: "Product", ru: "Товар", am: "Ապրանք" },
   "shift.acceptCount.accepted": { en: "Accepted", ru: "Принято", am: "Ընդունված" },
@@ -4193,6 +4194,8 @@ export const TRANSLATIONS: Dict = {
   "pay.ownName": { en: "Name of the option", ru: "Название варианта", am: "Տարբերակի անունը" },
   "pay.ownNamePlaceholder": { en: "Name", ru: "Название", am: "Անվանում" },
   "pay.ownRemove": { en: "Remove this option", ru: "Убрать этот вариант", am: "Հեռացնել այս տարբերակը" },
+  "pay.ownDuplicate": { en: "This name is already in the list. Write another name or remove this row.", ru: "Такое название уже есть. Впишите другое или уберите эту строку.", am: "Այս անունն արդեն կա։ Գրեք այլ անուն կամ հեռացրեք այս տողը։" },
+  "pay.ownUnnamedTwice": { en: "An option without a name is already there. Give this one a name.", ru: "Вариант без названия уже есть. Дайте этому название.", am: "Առանց անվան տարբերակ արդեն կա։ Անուն տվեք այս մեկին։" },
   "ownUpdates.title": { en: "Updates", ru: "Обновление", am: "Թարմացում" },
   "ownUpdates.appTitle": { en: "Cyber Place app", ru: "Приложение Cyber Place", am: "Cyber Place հավելված" },
   "ownUpdates.current": { en: "Installed version: {0}", ru: "Установленная версия: {0}", am: "Տեղադրված տարբերակ՝ {0}" },

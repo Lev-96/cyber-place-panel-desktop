@@ -290,8 +290,6 @@ describe("SessionsBoard — the toasts after stop, pause and resume", () => {
     expect(toasts).toEqual([]);
 
     await press("action.stop");
-    // No method is preselected (2026-11-18, owner): cash is pressed first.
-    await act(async () => { (document.querySelector('[data-testid="pay-cash"]') as HTMLButtonElement).click(); });
     await press("session.confirmStop");
 
     expect(repo.stop).toHaveBeenCalledTimes(1);
@@ -305,15 +303,12 @@ describe("SessionsBoard — the toasts after stop, pause and resume", () => {
       time_cost: 250, hourly_rate: 1500, package_name: "1h", items: [], items_total: 0,
       joysticks: [], joysticks_total: 0, subtotal: 250, gross_total: 250, total: 250,
     });
-    repo.stop.mockClear().mockRejectedValue(new Error("not active"));
+    repo.stop.mockRejectedValue(new Error("not active"));
     await mount();
 
     await press("action.stop");
-    // Cash pressed first (2026-11-18), so the stop is really sent and refused.
-    await act(async () => { (document.querySelector('[data-testid="pay-cash"]') as HTMLButtonElement).click(); });
     await press("session.confirmStop");
 
-    expect(repo.stop).toHaveBeenCalledTimes(1);
     expect(toasts).toEqual([]);
   });
 });

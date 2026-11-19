@@ -42,6 +42,20 @@ export interface EndingWarning {
   minutesLeft: number;
 }
 
+/**
+ * Which seat, in the words the board uses (2026-11-19, owner): its number AND
+ * its name — «№8 · VIP 1». The name is the server's `place_name`; a server
+ * that does not send it yet, an empty name, or a name that only repeats the
+ * number leaves the number alone. No number: the device, as before.
+ */
+export const seatLabel = (data: IDbNotification["data"]): string => {
+  if (data.place_number == null) return `#${data.pc_id ?? data.session_id}`;
+  const number = `№${data.place_number}`;
+  const name = data.place_name?.trim() ?? "";
+  const repeatsNumber = name === "" || name === String(data.place_number) || name === number;
+  return repeatsNumber ? number : `${number} · ${name}`;
+};
+
 /** The warnings to show now: unread, still ahead, not dismissed — soonest first. */
 export const endingWarnings = (
   list: readonly IDbNotification[],
@@ -58,7 +72,7 @@ export const endingWarnings = (
         id: n.id,
         sessionId: Number(n.data.session_id),
         branchId: Number(n.data.branch_id),
-        label: n.data.place_number != null ? `№${n.data.place_number}` : `#${n.data.pc_id ?? n.data.session_id}`,
+        label: seatLabel(n.data),
         minutesLeft: Number.isNaN(endsAt) ? Number(n.data.minutes_left ?? 0) : Math.ceil((endsAt - now) / 60_000),
         endsAt,
       };
@@ -154,11 +168,11 @@ const SessionEndingNotifier = () => {
 
   return (
     <>
-      <div className="ending-soon-stack" data-testid="ending-soon-stack">
+      <div className="ending-soon-stack ending-soon-stack--ending" data-testid="ending-soon-stack">
         {warnings.map((w) => (
-          <div key={w.id} role="alert" aria-live="assertive" className="ending-soon-card">
+          <div key={w.id} role="alert" aria-live="assertive" className="ending-soon-card ending-soon-card--ending" data-testid="ending-soon-card">
             <div className="row-between" style={{ alignItems: "flex-start", gap: 10 }}>
-              <div style={{ fontWeight: 700 }}>⚠️ {t("session.endingSoonTitle")}</div>
+              <div className="ending-soon-card__title">⚠️ {t("session.endingSoonTitle")}</div>
               <button
                 type="button"
                 onClick={() => dismiss(w.id)}
@@ -169,12 +183,13 @@ const SessionEndingNotifier = () => {
                 ×
               </button>
             </div>
-            <div style={{ fontSize: 13, marginTop: 4 }}>
-              {t("session.endingSoonBody")
-                .replace("{place}", w.label)
-                .replace("{minutes}", String(Math.max(1, w.minutesLeft)))}
+            {/* The seat on a line of its own, large (2026-11-19, owner): the
+                first thing read from across the counter. */}
+            <div className="ending-soon-card__seat" data-testid="ending-soon-seat">{w.label}</div>
+            <div className="ending-soon-card__body">
+              {t("session.endingSoonLeft").replace("{minutes}", String(Math.max(1, w.minutesLeft)))}
             </div>
-            <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+            <div className="ending-soon-card__actions">
               <button type="button" onClick={() => void manage(w)} className="ending-soon-card__action">
                 {t("session.endingSoonAction")}
               </button>

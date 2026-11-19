@@ -106,7 +106,8 @@ const Shift = () => {
         error={{ titleKey: "shift.state.errorTitle" }}
       >
         {live?.shift && live.report ? (
-          <ShiftReportView shift={live.shift} report={live.report} viewerId={user?.id ?? null} />
+          // A manager's open shift (2026-11-19, owner): only «Приём смены».
+          <ShiftReportView shift={live.shift} report={live.report} viewerId={user?.id ?? null} acceptanceOnly={user?.role === "manager"} />
         ) : (
           <div className="card col" style={{ gap: 10, maxWidth: 520 }} data-testid="shift-none">
             <strong>{t("shift.none")}</strong>
