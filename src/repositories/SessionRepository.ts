@@ -55,6 +55,7 @@ import {
   apiSetSessionItemQty,
   apiStartSession,
   apiStopSessionWithBreakdown,
+  apiChangeSessionPayment,
   apiRecordSessionPayment,
   type PaymentFields,
   apiCancelSession,
@@ -136,6 +137,11 @@ export class SessionRepository {
   /** Mark how a seat that ended by itself was paid (2026-11-07). */
   async recordPayment(id: number, body: PaymentFields & { cash_received?: string; client_request_id: string }): Promise<{ session: ISessionApi; cash: ICashHandover | null }> {
     return friendlyMutation(apiRecordSessionPayment(id, body).then((r) => ({ session: r.session, cash: r.cash ?? null })));
+  }
+
+  /** Change how an ended seat was paid, the same total (2026-11-19). */
+  async changePayment(id: number, body: PaymentFields): Promise<ISessionApi> {
+    return friendlyMutation(apiChangeSessionPayment(id, body).then((r) => r.session));
   }
 
   async stop(id: number, payment?: StopSessionBody): Promise<StopResult> {

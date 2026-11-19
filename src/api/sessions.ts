@@ -466,6 +466,10 @@ export interface ICashHandover {
 export const apiRecordSessionPayment = (id: number, body: PaymentFields & { cash_received?: string; client_request_id: string }) =>
   request<{ session: ISessionApi; cash: ICashHandover | null }>(`/sessions/${id}/payment`, { method: "POST", body });
 
+/** «Изменить способ оплаты» of an ended seat (2026-11-19): how it was paid, the same total. */
+export const apiChangeSessionPayment = (id: number, body: PaymentFields) =>
+  request<{ session: ISessionApi }>(`/sessions/${id}/payment`, { method: "PUT", body });
+
 export const apiStopSessionWithBreakdown = (id: number, body?: StopSessionBody) =>
   request<{ session: ISessionApi; breakdown: IBillBreakdown; cash?: ICashHandover | null }>(`/sessions/${id}/stop`, {
     method: "POST",

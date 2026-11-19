@@ -5537,6 +5537,14 @@ export const TRANSLATIONS: Dict = {
   "sales.col.qty": { en: "Qty", ru: "Кол-во", am: "Քանակ" },
   "sales.col.total": { en: "Total", ru: "Сумма", am: "Գումար" },
   "sales.noProducts": { en: "No products sold in this period.", ru: "За этот период товары не продавались.", am: "Այս ժամանակահատվածում ապրանքներ չեն վաճառվել։" },
+  "sales.changePayment": { en: "Change the way of paying", ru: "Изменить способ оплаты", am: "Փոխել վճարման եղանակը" },
+  "sales.changePayment.what": {
+    en: "{0} · {1}. How was it really paid? The sum does not change.",
+    ru: "{0} · {1}. Как оплатили на самом деле? Сумма не меняется.",
+    am: "{0} · {1}։ Ինչպե՞ս են իրականում վճարել։ Գումարը չի փոխվում։",
+  },
+  "sales.changePayment.save": { en: "Save", ru: "Сохранить", am: "Պահպանել" },
+  "sales.changePayment.done": { en: "The way of paying is changed", ru: "Способ оплаты изменён", am: "Վճարման եղանակը փոխված է" },
   "sales.note": { en: "Comment: {0}", ru: "Комментарий: {0}", am: "Մեկնաբանություն՝ {0}" },
 };
 

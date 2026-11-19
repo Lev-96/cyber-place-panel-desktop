@@ -9,6 +9,7 @@ import { useLang } from "@/i18n/LanguageContext";
 import { fmt } from "@/i18n/translations";
 import { useEffect, useState } from "react";
 import { hoursLine, methodName, partsLine, periodLine, whereLine } from "./salesSummaryModel";
+import ChangePaymentDialog, { canChangePayment } from "./ChangePaymentDialog";
 
 interface Props {
   branchId: number;
@@ -116,7 +117,7 @@ const SalesSummaryPanel = ({ branchId, from, to, placeId = null, refreshKey = 0,
         <p className="muted sales-summary__drawer" data-testid="sales-drawer">{fmt(t("sales.drawer"), m(s.drawer.net_cash))}</p>
       )}
 
-      {drill && <SalesLinesDialog branchId={branchId} from={from} to={to} placeId={placeId} drill={drill} onClose={() => setDrill(null)} />}
+      {drill && <SalesLinesDialog branchId={branchId} from={from} to={to} placeId={placeId} drill={drill} onClose={() => setDrill(null)} onChanged={() => void reload()} />}
       {productsView && rows !== null && (
         <SalesProductsDialog
           title={productsView.title}
@@ -147,8 +148,12 @@ const Card = ({ k, v, sub, hint, big, testId, onOpen }: { k: string; v: string; 
 const PAGE = 100;
 
 /** The records behind one card, oldest first, a page at a time. */
-const SalesLinesDialog = ({ branchId, from, to, placeId, drill, onClose }: { branchId: number; from: string; to: string; placeId: number | null; drill: Drill; onClose: () => void }) => {
+const SalesLinesDialog = ({ branchId, from, to, placeId, drill, onClose, onChanged }: { branchId: number; from: string; to: string; placeId: number | null; drill: Drill; onClose: () => void; onChanged: () => void }) => {
   const { t, money } = useLang();
+  // «Изменить способ оплаты» (2026-11-19): the line being changed, and a
+  // counter that reads the list again from the first page once it is.
+  const [changing, setChanging] = useState<ISalesLine | null>(null);
+  const [version, setVersion] = useState(0);
   const [lines, setLines] = useState<ISalesLine[]>([]);
   const [page, setPage] = useState(1);
   const [lastPage, setLastPage] = useState(1);
@@ -170,7 +175,7 @@ const SalesLinesDialog = ({ branchId, from, to, placeId, drill, onClose }: { bra
       .catch((e) => { if (alive) setFailed(e); })
       .finally(() => { if (alive) setLoading(false); });
     return () => { alive = false; };
-  }, [branchId, from, to, placeId, drill, page]);
+  }, [branchId, from, to, placeId, drill, page, version]);
 
   return (
     <Modal open onClose={onClose}>
@@ -195,6 +200,13 @@ const SalesLinesDialog = ({ branchId, from, to, placeId, drill, onClose }: { bra
                 </span>
                 <span className="sales-line__parts">{l.is_free ? t("sales.free") : partsLine(l, (n) => money(n), t)}</span>
                 {l.note && <span className="muted sales-line__note" data-testid="sales-line-note">{fmt(t("sales.note"), l.note)}</span>}
+                {canChangePayment(l) && (
+                  <div>
+                    <Button variant="secondary" onClick={() => setChanging(l)} data-testid={`sales-line-change-${l.id}`}>
+                      {t("sales.changePayment")}
+                    </Button>
+                  </div>
+                )}
               </div>
             ))}
             {loading && <ListSkeleton />}
@@ -207,6 +219,14 @@ const SalesLinesDialog = ({ branchId, from, to, placeId, drill, onClose }: { bra
           <Button onClick={onClose}>{t("action.close")}</Button>
         </div>
       </div>
+      {changing && (
+        <ChangePaymentDialog
+          branchId={branchId}
+          line={changing}
+          onClose={() => setChanging(null)}
+          onChanged={() => { setPage(1); setVersion((v) => v + 1); onChanged(); }}
+        />
+      )}
     </Modal>
   );
 };

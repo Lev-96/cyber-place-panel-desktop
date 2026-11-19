@@ -31,6 +31,8 @@ export interface ISalesLine {
   amount: string;
   /** The cashier's comment on the payment (2026-11-18), or null. Absent from an older backend. */
   note?: string | null;
+  /** Paid ahead at the start (a place), or null. */
+  prepaid?: string | null;
 }
 
 /**
