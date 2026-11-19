@@ -6,6 +6,8 @@ import GlobalBookingNotifier from "./notifications/GlobalBookingNotifier";
 import SessionEndingNotifier from "./notifications/SessionEndingNotifier";
 import SessionReminderNotifier from "./notifications/SessionReminderNotifier";
 import BillingNoticeNotifier from "./notifications/BillingNoticeNotifier";
+import PanelUpdateNotifier from "./notifications/PanelUpdateNotifier";
+import DueConfirmNotifier from "./notifications/DueConfirmNotifier";
 import SupportNotifier from "./notifications/SupportNotifier";
 import { Ps5ControlProvider } from "@/ps5/Ps5ControlProvider";
 import UnexpectedWakeDialog from "./ps5/UnexpectedWakeDialog";
@@ -54,10 +56,14 @@ const Layout = () => (
     <GlobalBookingNotifier />
     <SupportNotifier />
     <SessionEndingNotifier />
+    {/* A seat paid ahead ended owing more: how was it paid? (2026-11-20) */}
+    <DueConfirmNotifier />
     {/* A reminder a player asked for has rung (2026-11-15, the server's notification). */}
     <SessionReminderNotifier />
     {/* A platform payment notice arriving rings and raises an OS notification (2026-11-09). */}
     <BillingNoticeNotifier />
+    {/* A new desktop version, said where it is seen, with a way to it (2026-11-20). */}
+    <PanelUpdateNotifier />
     {/* Owner-only, and silent for everyone else: it renders nothing unless the
         signed-in role holds `branch.places` AND a console in their own venue
         has woken with no session on it. Mounted here so the question reaches

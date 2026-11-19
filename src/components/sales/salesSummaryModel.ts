@@ -52,12 +52,27 @@ export const methodName = (row: Pick<ISalesMethodRow, "method" | "label">, t: T)
   }
 };
 
-/** «Наличные 1 000 · Idram 500» — how one record was paid. */
-export const partsLine = (l: ISalesLine, money: (n: number) => string, t: T): string =>
-  l.payments.length === 0
-    ? t("sales.method.unrecorded")
-    : l.payments.map((p) => `${methodName({ method: p.method, label: p.label ?? null }, t)} ${money(Number(p.amount))}`).join(" · ");
+/**
+ * «Наличные 1 000 · Idram 500» — how one record was paid. Since 2026-11-20 a
+ * place paid ahead shows what changed hands at its close: «Доплата» parts, or
+ * «Сдача / возврат» (a negative part), or «Оплачено заранее, без доплаты».
+ */
+export const partsLine = (l: ISalesLine, money: (n: number) => string, t: T): string => {
+  const paidAhead = l.kind === "place" && Number(l.prepaid ?? 0) > 0;
+  if (l.payments.length === 0) return paidAhead ? t("sales.aheadSettled") : t("sales.method.unrecorded");
+  return l.payments.map((p) => {
+    const amount = Number(p.amount);
+    const name = methodName({ method: p.method, label: p.label ?? null }, t);
+    return amount < 0 ? fmt(t("sales.refund"), name, money(-amount)) : `${name} ${money(amount)}`;
+  }).join(" · ");
+};
 
-/** Where a record happened: the seat, or «Товары без места». */
-export const whereLine = (l: ISalesLine, t: T): string =>
-  l.kind === "till" ? t("sales.tillWhere") : (l.seat ?? (l.place?.number != null ? `№${l.place.number}` : "-"));
+/** What a record is worth on screen: a place's whole bill, else what was taken. */
+export const lineAmount = (l: ISalesLine): number => Number(l.kind === "place" && l.bill != null ? l.bill : l.amount);
+
+/** Where a record happened: the seat, or «Товары без места»; a sum paid ahead says so. */
+export const whereLine = (l: ISalesLine, t: T): string => {
+  if (l.kind === "till") return t("sales.tillWhere");
+  const seat = l.seat ?? (l.place?.number != null ? `№${l.place.number}` : "-");
+  return l.kind === "prepaid" ? fmt(t("sales.aheadWhere"), seat) : seat;
+};

@@ -86,6 +86,22 @@ describe("saved sign-in when the server gives no verdict", () => {
     expect(signedInAs).toEqual(manager);
   });
 
+  // 2026-11-20 (a manager signed out after an update): only 401 / 403 are the
+  // server judging the token. A 404 or 405 at start-up is a proxy or a
+  // half-deployed backend answering for a route every backend has.
+  test("a 4xx that is not about the token (404, 400, 405, 409, 410, 419) is no verdict either", async () => {
+    for (const status of [404, 400, 405, 409, 410, 419]) {
+      cleanup();
+      store.removed = [];
+      store.meError = Object.assign(new Error("Not Found"), { status, body: null });
+      store.savedUser = manager;
+      signedInAs = null;
+      await boot();
+      expect(store.removed, `HTTP ${status}`).toEqual([]);
+      expect(signedInAs, `HTTP ${status}`).toEqual(manager);
+    }
+  });
+
   test("a timeout or rate limit is no verdict either", async () => {
     for (const status of [408, 429]) {
       cleanup();

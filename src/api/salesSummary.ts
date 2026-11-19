@@ -17,9 +17,15 @@ export interface ISalesPart {
   label?: string;
 }
 
-/** One money record behind the totals: a closed place or a paid sale without a place. */
+/**
+ * One money record behind the totals: a closed place, a paid sale without a
+ * place, or (2026-11-20) a sum paid AHEAD for a seat — counted when taken.
+ * A place's `payments` / `amount` are what changed hands at its close (its
+ * bill less what was paid ahead: the due, or negative — change / a refund);
+ * `bill` is the seat's whole bill.
+ */
 export interface ISalesLine {
-  kind: "place" | "till";
+  kind: "place" | "till" | "prepaid";
   id: number;
   at: string | null;
   seat: string | null;
@@ -33,6 +39,10 @@ export interface ISalesLine {
   note?: string | null;
   /** Paid ahead at the start (a place), or null. */
   prepaid?: string | null;
+  /** A place's whole bill (2026-11-20); null on a sale or a sum paid ahead. Absent from an older backend. */
+  bill?: string | null;
+  /** The seat a sum paid ahead was paid for. */
+  session_id?: number | null;
 }
 
 /**
@@ -64,6 +74,8 @@ export interface ISalesSummary {
     place_id?: number | null;
     /** False with a place: sales without a place (and tournaments) are not in it. */
     till_included?: boolean;
+    /** The person asked for (2026-11-20), else null. Absent from an older backend. */
+    staff_user_id?: number | null;
   };
   totals: {
     grand_total: string;
@@ -100,6 +112,11 @@ export interface SalesQuery {
   unnamed?: 1;
   /** One place's bills only (2026-11-18): no sale without a place, no tournament. */
   place_id?: number;
+  /**
+   * One person's records only (2026-11-20): the places they stopped, the
+   * sales they made, what they took ahead — exactly the lines that name them.
+   */
+  staff_user_id?: number;
 }
 
 /** The figures are the server's, counted by the cash drawer's own code; the panel only shows them. */

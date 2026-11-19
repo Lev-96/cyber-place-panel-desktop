@@ -2,6 +2,7 @@ import type { AgentUpdateStatus } from "@/api/agent-updates";
 import type { AppKind, UpdateCheckEntry } from "@/api/updates";
 import { playFor } from "@/sound/soundEngine";
 import { useAuth } from "@/auth/AuthContext";
+import { updatesRouteFor } from "@/components/updates/panelUpdate";
 import { useLang } from "@/i18n/LanguageContext";
 import { fmt } from "@/i18n/translations";
 import { useUpdatesNotification } from "@/realtime/UpdatesNotificationContext";
@@ -135,9 +136,7 @@ const UpdatesToast = () => {
     // visibility into the panel app. Routing per role prevents the
     // RoleGuard from bouncing admin away from a forbidden agent-only
     // path when they click a toast about an agent release.
-    const target =
-      user?.role === "admin" ? "/settings/updates" : "/settings/agent-updates";
-    navigate(target);
+    navigate(updatesRouteFor(user?.role));
   };
 
   const message = active.branches.length > 0

@@ -94,6 +94,24 @@ export const tr = <T extends Translated>(
   return typeof raw === "string" ? raw : "";
 };
 
+/**
+ * Every value `field` holds on an auto-translated entity: what the staff member
+ * typed and each locale's translation, non-empty and without repeats.
+ *
+ * For a search that must not depend on the panel's language: an operator
+ * looking for «кола» on an English panel means the product shown as "Cola".
+ */
+export const trAll = <T extends Translated>(
+  entity: T | null | undefined,
+  field: keyof T & string,
+): string[] => {
+  if (!entity) return [];
+
+  const raw = entity[field];
+  const values = [typeof raw === "string" ? raw : undefined, ...Object.values(entity.i18n?.[field] ?? {})];
+  return [...new Set(values.filter(isFilled))];
+};
+
 /** Translation state of a field, for the status badge. `undefined` = backend doesn't report it. */
 export const trStatus = <T extends Translated>(
   entity: T | null | undefined,

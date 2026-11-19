@@ -283,6 +283,29 @@ describe("SessionsHistory — whose actions", () => {
     expect(titlesIn(cardOf("№8"))).toEqual(["history.action.stopped"]);
   });
 
+  /** 2026-11-20 (owner): the figures follow the person too, and «all» lets go of them. */
+  test("picking someone narrows the sales figures to them; «all staff» asks for everyone again", async () => {
+    const { salesSummaryStub } = await import("@/test/salesSummaryStub");
+    const sales = vi.fn((...a: unknown[]) => (salesSummaryStub as (...x: unknown[]) => unknown)(...a));
+    salesApi.fn = sales;
+    try {
+      repo.listEventActors.mockResolvedValue([anna, zed]);
+      repo.list.mockResolvedValue([]);
+      repo.listEvents.mockResolvedValue([]);
+      await mount();
+      expect(sales.mock.calls.length).toBeGreaterThan(0);
+      for (const call of sales.mock.calls) expect(call[1]).not.toHaveProperty("staff_user_id");
+
+      await pick("11");
+      expect(sales).toHaveBeenLastCalledWith(1, expect.objectContaining({ staff_user_id: 11 }));
+
+      await pick("");
+      expect(sales.mock.lastCall?.[1]).not.toHaveProperty("staff_user_id");
+    } finally {
+      salesApi.fn = null;
+    }
+  });
+
   test("«all staff» brings the whole screen back, with no author in the request", async () => {
     repo.listEventActors.mockResolvedValue([anna]);
     repo.list.mockResolvedValue([session(8), session(9)]);

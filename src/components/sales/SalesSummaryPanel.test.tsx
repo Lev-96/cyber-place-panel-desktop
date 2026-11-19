@@ -200,6 +200,38 @@ describe("SalesSummaryPanel — «Быстрая Еда», products, comments, o
     expect(screen.queryByTestId("sales-no-till")).toBeNull();
   });
 
+  /**
+   * 2026-11-20 (owner): a person picked in «Все сотрудники» narrows the
+   * figures AND every card's records to them — the server answers; nothing
+   * is sifted here. With a place too, both go.
+   */
+  test("a picked person: staff_user_id on the figures and on a card's records", async () => {
+    const base = summary().data;
+    api.fn.mockResolvedValue(summary({ window: { ...base.window, place_id: 30, till_included: false, staff_user_id: 11 } }));
+    await act(async () => { render(<SalesSummaryPanel branchId={1} from="2026-11-18" to="2026-11-18" placeId={30} staffId={11} />); });
+    await act(async () => { await Promise.resolve(); });
+    expect(api.fn).toHaveBeenCalledWith(1, { date_from: "2026-11-18", date_to: "2026-11-18", per_page: 1, place_id: 30, staff_user_id: 11 });
+    await act(async () => { fireEvent.click(screen.getByTestId("sales-method-card")); });
+    expect(api.fn).toHaveBeenLastCalledWith(1, expect.objectContaining({ method: "card", place_id: 30, staff_user_id: 11, page: 1 }));
+  });
+
+  test("a server that did not narrow to the person shows no figures under their name", async () => {
+    api.fn.mockResolvedValue(summary());   // no `staff_user_id` echoed: an older backend
+    await act(async () => { render(<SalesSummaryPanel branchId={1} from="2026-11-18" to="2026-11-18" staffId={11} />); });
+    await act(async () => { await Promise.resolve(); });
+    expect(screen.getByTestId("sales-staff-not-applied").textContent).toBe("Суммы по одному сотруднику пока недоступны. Выберите «Все сотрудники», чтобы увидеть итоги.");
+    expect(screen.queryByTestId("sales-grand")).toBeNull();
+    expect(document.body.textContent).not.toContain("12000");
+  });
+
+  test("without a person, no request carries a staff_user_id key", async () => {
+    api.fn.mockResolvedValue(summary());
+    await mount(null);
+    await act(async () => { fireEvent.click(screen.getByTestId("sales-grand")); });
+    expect(api.fn.mock.calls.length).toBeGreaterThan(1);
+    for (const call of api.fn.mock.calls) expect(call[1]).not.toHaveProperty("staff_user_id");
+  });
+
   test("a club that sold no fast food gets no «Быстрая Еда» card (2026-11-18)", async () => {
     const base = summary().data;
     api.fn.mockResolvedValue({ data: { ...base, totals: { ...base.totals, fast_food_total: "0.00", fast_food_units: 0 } } });

@@ -25,6 +25,7 @@ export const salesSummaryStub = (_branchId: number, q: SalesQuery = {}) => {
       window: {
         date_from: from, date_to: to, from: `${from}T00:00:00+04:00`, to: `${to}T23:59:59+04:00`,
         business_day: null, is_today: from === STUB_TODAY && to === STUB_TODAY, place_id: q.place_id ?? null, till_included: q.place_id == null,
+        staff_user_id: q.staff_user_id ?? null,
       },
       totals: {
         grand_total: "0.00", places_total: "0.00", places_count: 0, places_free_count: 0, till_total: "0.00", till_count: 0,

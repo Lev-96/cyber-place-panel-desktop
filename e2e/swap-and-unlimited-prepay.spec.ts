@@ -45,11 +45,16 @@ for (const lang of LANGS) {
       await expect.poll(() => calls).toEqual([{ with_session_id: 9 }]);
     });
 
-    test(`no limit, paid ahead 5 000 by card (${lang}, ${width})`, async ({ page }) => {
+    // 2026-11-20 (owner): the sum paid now BUYS time — sent as «На сумму» on the server's answer.
+    test(`no limit, paid ahead 5 000 by card: the sum buys 5 h (${lang}, ${width})`, async ({ page }) => {
       let body: Record<string, unknown> | null = null;
       await signIn(page, lang, width);
       await seedBoard(page, { pcs: [pc(3, null)], sessions: () => [] });
       await page.route(at("/time-packages"), (r) => r.fulfill(json({ data: [] })));
+      await page.route(at("/sessions/start-quote"), (r) => r.fulfill(json({
+        amount: 5000, hourly_rate: 1000, outside_food_fee: 0, time_amount: 5000, seconds: 18000, minutes: 300,
+        ends_at: new Date(Date.now() + 18000_000).toISOString(), standard_amount: null,
+      })));
       await page.route(at("/sessions"), (r) => {
         if (r.request().method() !== "POST") return r.fallback();
         body = r.request().postDataJSON();
@@ -59,11 +64,13 @@ for (const lang of LANGS) {
       await page.locator('.place-cell [data-action="start"]').first().click();
       await page.getByTestId("prepaid-switch").click();
       await page.getByTestId("start-prepaid-sum").locator("input").fill("5000");
+      await expect(page.getByTestId("start-prepaid-buys")).toContainText("5");
       await page.getByTestId("pay-card").click();
       await noRawKeys(page, "[role=dialog]");
       await shot(page, `unlimited-prepay-${lang}-${width}`);
       await page.locator(".start-dialog").getByRole("button", { name: START[lang], exact: true }).click();
-      await expect.poll(() => body).toMatchObject({ mode: "open", prepaid_sum: 5000, payment_method: "card" });
+      await expect.poll(() => body).toMatchObject({ mode: "open", paid_amount: 5000, paid_seconds: 18000, payment_method: "card" });
+      expect(body).not.toHaveProperty("prepaid_sum");
     });
   }
 }

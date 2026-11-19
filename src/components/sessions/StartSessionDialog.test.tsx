@@ -42,6 +42,17 @@ vi.mock("@/repositories/SessionRepository", () => ({
     startQuoteByAmount: (...a: unknown[]) => repo.startQuoteByAmount(...a),
   },
 }));
+// «+ Товар» in Start (2026-11-20): the basket itself is the till's (tested
+// there); here a stub hands back two Colas at 500.
+vi.mock("./StartProductsDialog", async (importOriginal) => {
+  const real = await importOriginal<typeof import("./StartProductsDialog")>();
+  return {
+    ...real,
+    default: ({ onConfirm, onClose }: { onConfirm: (l: unknown[]) => void; onClose: () => void }) => (
+      <button type="button" data-testid="stub-pick-cola" onClick={() => { onConfirm([{ product_id: 21, qty: 2, name: "Cola", price: 500 }]); onClose(); }}>pick</button>
+    ),
+  };
+});
 vi.mock("@/auth/AuthContext", () => ({ useAuth: () => ({ user: { id: 1, role: auth.role } }) }));
 // The dialog reads the club's billing policy to decide whether to ask which
 // joystick strategy this seat runs on. Without this stub that read left the
@@ -1504,7 +1515,11 @@ describe("paid ahead at the start", () => {
     expect(screen.queryByTestId("start-prepaid-sum")).toBeNull();
   });
 
-  test("by the hour with no limit (2026-11-17): offered, the sum is named, never required", async () => {
+  test("by the hour with no limit, paid now (2026-11-20): the sum BUYS time — sent as «На сумму», on the server's answer", async () => {
+    repo.startQuoteByAmount.mockImplementation((_pc: number, amount: number) => Promise.resolve({
+      amount, hourly_rate: 1000, outside_food_fee: 0, time_amount: amount, seconds: amount * 3.6, minutes: Math.floor(amount * 3.6 / 60),
+      ends_at: "2026-11-20T20:00:00+04:00", standard_amount: null,
+    }));
     await mount(device());
     await settle();
     // Off: the start it always was.
@@ -1514,11 +1529,15 @@ describe("paid ahead at the start", () => {
     const sumBox = () => screen.getByTestId("start-prepaid-sum").querySelector("input") as HTMLInputElement;
     expect(startButton().disabled).toBe(true);
     await act(async () => { fireEvent.change(sumBox(), { target: { value: "5000" } }); });
+    await settle();
+    expect(repo.startQuoteByAmount).toHaveBeenLastCalledWith(1, 5000, false, []);
+    expect(screen.getByTestId("start-prepaid-buys").textContent).toContain("session.prepaid.buysTime");
     await act(async () => { fireEvent.click(screen.getByTestId("pay-card")); });
     expect(startButton().disabled).toBe(false);
     await act(async () => { fireEvent.click(startButton()); });
-    expect(repo.start.mock.calls[0][0]).toMatchObject({ mode: "open", prepaid_sum: 5000, payment_method: "card" });
+    expect(repo.start.mock.calls[0][0]).toMatchObject({ mode: "open", paid_amount: 5000, paid_seconds: 18000, payment_method: "card" });
     expect(repo.start.mock.calls[0][0]).not.toHaveProperty("prepaid");
+    expect(repo.start.mock.calls[0][0]).not.toHaveProperty("prepaid_sum");
   });
 
   test("no limit, switch left off: nothing paid ahead is sent", async () => {
@@ -1601,7 +1620,7 @@ describe("start by amount", () => {
     await act(async () => { fireEvent.click(amountTab()); });
     await act(async () => { fireEvent.change(amountBox(), { target: { value: "5000" } }); });
     await settle();
-    expect(repo.startQuoteByAmount).toHaveBeenLastCalledWith(1, 5000, false);
+    expect(repo.startQuoteByAmount).toHaveBeenLastCalledWith(1, 5000, false, []);
     const result = screen.getByTestId("start-amount-result");
     expect(result.textContent).toContain("5000");
     expect(result.textContent).toContain("5 time.hourShort");
@@ -1622,7 +1641,7 @@ describe("start by amount", () => {
     await act(async () => { fireEvent.click(screen.getByTestId("outside-food-switch")); });
     await act(async () => { fireEvent.change(amountBox(), { target: { value: "5000" } }); });
     await settle();
-    expect(repo.startQuoteByAmount).toHaveBeenLastCalledWith(1, 5000, true);
+    expect(repo.startQuoteByAmount).toHaveBeenLastCalledWith(1, 5000, true, []);
     expect(screen.getByTestId("start-amount-food").textContent).toContain("500 4500");
     await act(async () => { fireEvent.click(startButton()); });
     expect(repo.start.mock.calls[0][0]).toMatchObject({ paid_amount: 5000, paid_seconds: 16200, outside_food: true, outside_food_fee: 500 });
@@ -1819,3 +1838,53 @@ describe("the started seat goes to the board", () => {
   });
 });
 
+
+describe("products with the start (2026-11-20)", () => {
+  const settle = async () => { await act(async () => { await new Promise((r) => setTimeout(r, 320)); }); };
+  const startButton = () => screen.getByRole("button", { name: "action.start" }) as HTMLButtonElement;
+  const body = () => repo.start.mock.calls[0][0] as Record<string, unknown>;
+  const pickCola = async () => {
+    await act(async () => { fireEvent.click(screen.getByTestId("start-products-add")); });
+    await act(async () => { fireEvent.click(screen.getByTestId("stub-pick-cola")); });
+  };
+
+  test("paid at Stop: the products ride with the start as items; nothing paid ahead", async () => {
+    await mount(device({ kind: PC_KIND.Pc }));
+    await settle();
+    await pickCola();
+    expect(screen.getByTestId("start-product-21").textContent).toContain("Cola × 2");
+    expect(screen.getByTestId("start-products-total").textContent).toBe("session.startProducts.totalStop");
+    await act(async () => { fireEvent.click(startButton()); });
+    expect(body()).toMatchObject({ items: [{ product_id: 21, qty: 2 }] });
+    expect(body()).not.toHaveProperty("prepaid");
+  });
+
+  test("paid now with a package: the products are in the sum taken now", async () => {
+    await mount(device({ kind: PC_KIND.Pc }));
+    await settle();
+    await pickCola();
+    await act(async () => { fireEvent.click(screen.getByTestId("prepaid-switch")); });
+    expect(screen.getByTestId("start-products-total").textContent).toBe("session.startProducts.totalNow");
+    // The hour (1 500) + 2 Colas (1 000) = 2 500 to split: 1 500 is not enough.
+    const parts = () => [...document.querySelectorAll(".pay-editor__part input")] as HTMLInputElement[];
+    await act(async () => { fireEvent.click(screen.getByTestId("pay-split")); });
+    await act(async () => { fireEvent.change(parts()[0], { target: { value: "1500" } }); });
+    expect(startButton().disabled).toBe(true);
+    await act(async () => { fireEvent.change(parts()[1], { target: { value: "1000" } }); });
+    expect(startButton().disabled).toBe(false);
+    await act(async () => { fireEvent.click(startButton()); });
+    expect(body()).toMatchObject({ prepaid: true, items: [{ product_id: 21, qty: 2 }], payments: [{ method: "cash", amount: 1500 }, { method: "card", amount: 1000 }] });
+  });
+
+  test("picked twice: one line, the counts added; removed: gone and not sent", async () => {
+    await mount(device({ kind: PC_KIND.Pc }));
+    await settle();
+    await pickCola();
+    await pickCola();
+    expect(screen.getByTestId("start-product-21").textContent).toContain("Cola × 4");
+    await act(async () => { fireEvent.click(screen.getByTestId("start-product-remove-21")); });
+    expect(screen.queryByTestId("start-product-21")).toBeNull();
+    await act(async () => { fireEvent.click(startButton()); });
+    expect(body()).not.toHaveProperty("items");
+  });
+});

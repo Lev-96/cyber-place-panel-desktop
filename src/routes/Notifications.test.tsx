@@ -358,6 +358,8 @@ describe("a new desktop version notice", () => {
     nav.fn.mockReset();
     await act(async () => { render(<Notifications />); });
     const line = await screen.findByText(/New Cyber Place version 1\.0\.65/);
+    // 2026-11-20: where to go and what to press, never the stored English sentence.
+    expect(screen.getByText("Open the «Updates» section and press «Check for updates».")).toBeTruthy();
     await act(async () => { fireEvent.click(line); });
     expect(nav.fn).toHaveBeenCalledWith("/settings/agent-updates");
     feed.list = [];

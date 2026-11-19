@@ -6036,6 +6036,17 @@ select.input option:disabled {
   line-height: 1.2;
   white-space: normal;
 }
+/* The clock, the money, the VIP minimum's chip and the reset button share
+   SessionTimer's one span with no break between them: as an inline run they
+   ran past the frame (the chip, on a grid card, 2026-11-20). As a wrapping
+   row each one moves whole to the next line when the row is full, in the
+   grid and in the list's narrow column alike. */
+.place-cell.session-card--running .status > span {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  row-gap: 2px;
+}
 .place-cell.session-card--running .session-timer__cost {
   font-size: 13px;
   /* The amount wraps as a whole onto the next line, never mid-figure. */
@@ -8625,14 +8636,6 @@ select.input option:disabled {
 [data-board-view="list"] .live-grid--sessions .session-card .ps5-chip { grid-column: 3; grid-row: 1; justify-self: start; align-self: center; }
 [data-board-view="list"] .live-grid--sessions .session-card .id { grid-column: 4; grid-row: 1; }
 [data-board-view="list"] .live-grid--sessions .session-card .status { grid-column: 5; grid-row: 1; }
-/* The clock and the money may stack in a narrow column instead of running
-   past the frame (they share one span with no break between them). */
-[data-board-view="list"] .live-grid--sessions .session-card--running .status > span {
-  display: inline-flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  row-gap: 2px;
-}
 [data-board-view="list"] .live-grid--sessions .session-card .until,
 [data-board-view="list"] .live-grid--sessions .session-card .session-card__hint {
   grid-column: 6; grid-row: 1;
@@ -11470,6 +11473,12 @@ select.input option:disabled {
   top: auto;
   bottom: 16px;
 }
+/* "A new desktop version" (PanelUpdateNotifier, 2026-11-20): the reminder
+   card's shape and corner, one step below it — a player's reminder, when both
+   are up, is the one drawn on top. */
+.ending-soon-stack.reminder-stack.panel-update-stack {
+  z-index: 8990;
+}
 .ending-soon-card.reminder-card {
   background: color-mix(in srgb, var(--color-surface, #0b1328) 92%, var(--color-primary));
   border: 1px solid color-mix(in srgb, var(--color-primary) 45%, transparent);
@@ -11959,3 +11968,29 @@ button.sales-card:focus-visible { outline: 2px solid var(--color-primary); outli
 .btn.unpaid-toggle--free.is-on .unpaid-toggle__label { color: rgb(167 139 250); }
 :root[data-theme="light"] .btn.unpaid-toggle--free.is-on .unpaid-toggle__label { color: rgb(109 40 217); }
 .start-dialog__free-hint { font-size: 12px; line-height: 1.4; overflow-wrap: anywhere; }
+
+/* «Подтверждение оплаты» (2026-11-20, owner: large, easy to read). */
+.due-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: 560px;
+  max-width: 92vw;
+  padding: 24px;
+}
+.due-confirm__title { margin: 0; font-size: 22px; line-height: 1.3; overflow-wrap: anywhere; }
+.due-confirm__items { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; font-size: 16px; }
+.due-confirm__items li { display: flex; justify-content: space-between; gap: 12px; padding: 8px 12px; border: 1px solid var(--color-border); border-radius: 10px; }
+.due-confirm__items li span { overflow-wrap: anywhere; }
+.due-confirm__items li strong { white-space: nowrap; }
+.due-confirm__due {
+  display: flex; justify-content: space-between; align-items: baseline; gap: 12px;
+  padding: 12px 14px; border-radius: 12px;
+  background: rgb(var(--accent-rgb) / 0.10); border: 1px solid rgb(var(--accent-rgb) / 0.45);
+  font-size: 18px;
+}
+.due-confirm__due strong { font-size: 24px; color: var(--color-primary); white-space: nowrap; }
+.due-confirm__question { margin: 4px 0 0; font-size: 18px; font-weight: 700; }
+.due-confirm__answers { display: flex; gap: 10px; flex-wrap: wrap; }
+.due-confirm__answers > .btn { flex: 1 1 180px; min-height: 48px; font-size: 16px; }
+.due-confirm__later { align-self: center; }

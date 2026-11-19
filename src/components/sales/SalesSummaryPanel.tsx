@@ -8,7 +8,7 @@ import { formatVenueDateTime } from "@/i18n/dates";
 import { useLang } from "@/i18n/LanguageContext";
 import { fmt } from "@/i18n/translations";
 import { useEffect, useState } from "react";
-import { hoursLine, methodName, partsLine, periodLine, whereLine } from "./salesSummaryModel";
+import { hoursLine, lineAmount, methodName, partsLine, periodLine, whereLine } from "./salesSummaryModel";
 import ChangePaymentDialog, { canChangePayment } from "./ChangePaymentDialog";
 
 interface Props {
@@ -23,6 +23,12 @@ interface Props {
    */
   placeId?: number | null;
   /**
+   * One person (2026-11-20, the screen's staff filter): the server's figures
+   * for the records that name them (`staff_user_id`) — the places they
+   * stopped, the sales they made. Null / absent: everyone.
+   */
+  staffId?: number | null;
+  /**
    * The exact moments the server counted (2026-11-18): the screen's lists
    * below read the same hours, so the cards and the records never disagree.
    */
@@ -30,7 +36,13 @@ interface Props {
   refreshKey?: number;
 }
 
-type Drill = { title: string; filter: Omit<SalesQuery, "date_from" | "date_to" | "place_id"> };
+type Drill = { title: string; filter: Omit<SalesQuery, "date_from" | "date_to" | "place_id" | "staff_user_id"> };
+
+/** The place and the person as every request sends them; no key at all for «all». */
+const narrowing = (placeId: number | null, staffId: number | null): Pick<SalesQuery, "place_id" | "staff_user_id"> => ({
+  ...(placeId !== null ? { place_id: placeId } : {}),
+  ...(staffId !== null ? { staff_user_id: staffId } : {}),
+});
 
 /** The products behind a card: all of them, or the fast food. Rows as sent. */
 type ProductsView = { title: string; fastFoodOnly: boolean };
@@ -42,15 +54,13 @@ type ProductsView = { title: string; fastFoodOnly: boolean };
  * (13:00 → 07:00); the panel adds nothing up itself. Each card opens the
  * records behind it: day and time, where, who, how it was paid.
  */
-const SalesSummaryPanel = ({ branchId, from, to, placeId = null, refreshKey = 0, onWindow }: Props) => {
+const SalesSummaryPanel = ({ branchId, from, to, placeId = null, staffId = null, refreshKey = 0, onWindow }: Props) => {
   const { t, money } = useLang();
   const [drill, setDrill] = useState<Drill | null>(null);
   const [productsView, setProductsView] = useState<ProductsView | null>(null);
-  /** Sent only with a place: without one, every request is the one it always was. */
-  const byPlace = placeId !== null ? { place_id: placeId } : {};
   const { data, loading, error, reload } = useAsync(
-    () => apiSalesSummary(branchId, { date_from: from, date_to: to, per_page: 1, ...byPlace }),
-    [branchId, from, to, placeId, refreshKey],
+    () => apiSalesSummary(branchId, { date_from: from, date_to: to, per_page: 1, ...narrowing(placeId, staffId) }),
+    [branchId, from, to, placeId, staffId, refreshKey],
   );
   // Only a real answer is shown; anything else is an error, never zeros.
   const s = data?.data && typeof data.data === "object" && "totals" in data.data ? data.data : null;
@@ -64,6 +74,16 @@ const SalesSummaryPanel = ({ branchId, from, to, placeId = null, refreshKey = 0,
   if (loading && !s) return <ListSkeleton />;
   if (error && !s) return <ErrorState error={error} onRetry={() => void reload()} titleKey="sales.loadFailed" />;
   if (!s) return <ErrorState error={error ?? new Error("bad answer")} onRetry={() => void reload()} titleKey="sales.loadFailed" />;
+  // Fail closed (2026-11-20): a person's figures are shown only when the
+  // server says they ARE that person's. A backend that ignored
+  // `staff_user_id` would answer the whole day — never under their name.
+  if (staffId !== null && s.window.staff_user_id !== staffId) {
+    return (
+      <section className="col sales-summary" data-testid="sales-summary">
+        <p className="muted" data-testid="sales-staff-not-applied">{t("sales.staffNotApplied")}</p>
+      </section>
+    );
+  }
 
   const methodCard = (row: ISalesMethodRow) => (
     <Card
@@ -117,7 +137,7 @@ const SalesSummaryPanel = ({ branchId, from, to, placeId = null, refreshKey = 0,
         <p className="muted sales-summary__drawer" data-testid="sales-drawer">{fmt(t("sales.drawer"), m(s.drawer.net_cash))}</p>
       )}
 
-      {drill && <SalesLinesDialog branchId={branchId} from={from} to={to} placeId={placeId} drill={drill} onClose={() => setDrill(null)} onChanged={() => void reload()} />}
+      {drill && <SalesLinesDialog branchId={branchId} from={from} to={to} placeId={placeId} staffId={staffId} drill={drill} onClose={() => setDrill(null)} onChanged={() => void reload()} />}
       {productsView && rows !== null && (
         <SalesProductsDialog
           title={productsView.title}
@@ -148,7 +168,7 @@ const Card = ({ k, v, sub, hint, big, testId, onOpen }: { k: string; v: string; 
 const PAGE = 100;
 
 /** The records behind one card, oldest first, a page at a time. */
-const SalesLinesDialog = ({ branchId, from, to, placeId, drill, onClose, onChanged }: { branchId: number; from: string; to: string; placeId: number | null; drill: Drill; onClose: () => void; onChanged: () => void }) => {
+const SalesLinesDialog = ({ branchId, from, to, placeId, staffId, drill, onClose, onChanged }: { branchId: number; from: string; to: string; placeId: number | null; staffId: number | null; drill: Drill; onClose: () => void; onChanged: () => void }) => {
   const { t, money } = useLang();
   // «Изменить способ оплаты» (2026-11-19): the line being changed, and a
   // counter that reads the list again from the first page once it is.
@@ -164,7 +184,7 @@ const SalesLinesDialog = ({ branchId, from, to, placeId, drill, onClose, onChang
   useEffect(() => {
     let alive = true;
     setLoading(true);
-    apiSalesSummary(branchId, { date_from: from, date_to: to, per_page: PAGE, page, ...drill.filter, ...(placeId !== null ? { place_id: placeId } : {}) })
+    apiSalesSummary(branchId, { date_from: from, date_to: to, per_page: PAGE, page, ...drill.filter, ...narrowing(placeId, staffId) })
       .then(({ data }) => {
         if (!alive) return;
         setLines((prev) => (page === 1 ? data.lines : [...prev, ...data.lines]));
@@ -175,7 +195,7 @@ const SalesLinesDialog = ({ branchId, from, to, placeId, drill, onClose, onChang
       .catch((e) => { if (alive) setFailed(e); })
       .finally(() => { if (alive) setLoading(false); });
     return () => { alive = false; };
-  }, [branchId, from, to, placeId, drill, page, version]);
+  }, [branchId, from, to, placeId, staffId, drill, page, version]);
 
   return (
     <Modal open onClose={onClose}>
@@ -191,7 +211,7 @@ const SalesLinesDialog = ({ branchId, from, to, placeId, drill, onClose, onChang
               <div key={`${l.kind}-${l.id}`} className="sales-line" data-testid={`sales-line-${l.kind}-${l.id}`}>
                 <div className="sales-line__head">
                   <strong>{whereLine(l, t)}</strong>
-                  <strong>{money(Number(l.amount))}</strong>
+                  <strong>{money(lineAmount(l))}</strong>
                 </div>
                 <span className="muted">
                   {l.at ? formatVenueDateTime(l.at) : "-"}
@@ -199,6 +219,9 @@ const SalesLinesDialog = ({ branchId, from, to, placeId, drill, onClose, onChang
                   {l.staff?.name ?? t("sales.byNobody")}
                 </span>
                 <span className="sales-line__parts">{l.is_free ? t("sales.free") : partsLine(l, (n) => money(n), t)}</span>
+                {l.kind === "place" && Number(l.prepaid ?? 0) > 0 && (
+                  <span className="muted" data-testid="sales-line-ahead">{fmt(t("sales.aheadNote"), money(Number(l.prepaid)))}</span>
+                )}
                 {l.note && <span className="muted sales-line__note" data-testid="sales-line-note">{fmt(t("sales.note"), l.note)}</span>}
                 {canChangePayment(l) && (
                   <div>

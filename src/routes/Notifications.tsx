@@ -9,6 +9,7 @@ import { dueLabel, dueTone } from "@/components/expenses/expenseFormat";
 import type { IDbNotification } from "@/api/notifications";
 import { orFallback } from "@/api/fallback";
 import { useAuth } from "@/auth/AuthContext";
+import { PANEL_UPDATE_TYPE, panelUpdateText, updatesRouteFor } from "@/components/updates/panelUpdate";
 import { useConfirm } from "@/components/ui/ConfirmProvider";
 import ScreenWithBg from "@/components/ui/ScreenWithBg";
 import SectionTabs from "@/components/ui/SectionTabs";
@@ -380,6 +381,7 @@ const ExpenseReminderCard = ({ e }: { e: IServiceExpense }) => {
  */
 const DbNotificationCard = ({ n, onClick, onDelete }: { n: IDbNotification; onClick: () => void; onDelete: () => void }) => {
   const { t, money } = useLang();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const isUnread = n.read_at === null;
   const tone = isUnread ? "var(--color-primary)" : "var(--color-border)";
@@ -396,7 +398,7 @@ const DbNotificationCard = ({ n, onClick, onDelete }: { n: IDbNotification; onCl
   // A booking's start time has come (2026-11-07, server scheduler, once).
   const isBookingStartDue = dataType === "booking.start_due";
   // A new desktop version is out (2026-11-17, `PanelUpdateAvailable`).
-  const isAppUpdate = dataType === "app_update.available";
+  const isAppUpdate = dataType === PANEL_UPDATE_TYPE;
   // Goods missing when a shift was accepted (2026-11-18, `ShiftStockShortage`, owners only).
   const isStockShortage = dataType === SHIFT_STOCK_SHORTAGE;
   const bookingDate = n.data?.booking_date as string | undefined;
@@ -519,7 +521,11 @@ const DbNotificationCard = ({ n, onClick, onDelete }: { n: IDbNotification; onCl
     const setBy = (n.data?.set_by_name as string | undefined)?.trim();
     body = [note ? `«${note}»` : null, setBy || null, venue || null].filter(Boolean).join(" · ") || null;
   } else if (isAppUpdate) {
-    headline = fmt(t("ownUpdates.notice"), String(n.data?.version ?? ""));
+    // Where to go and what to press, in the panel's language (2026-11-20);
+    // the row's `type` is an English sentence kept for older panels.
+    const text = panelUpdateText(String(n.data?.version ?? ""), t);
+    headline = text.title;
+    body = text.body;
   } else if (isStockShortage) {
     const text = shiftShortageText(n.data, t, (v) => shiftAmount(money, v));
     headline = `⚠ ${text.headline}`;
@@ -537,7 +543,7 @@ const DbNotificationCard = ({ n, onClick, onDelete }: { n: IDbNotification; onCl
     // generic guest profile when both are present.
     if (isAppUpdate) {
       // Owner / manager open their «Обновление»; an admin, the release screen.
-      navigate("/settings/agent-updates");
+      navigate(updatesRouteFor(user?.role));
     } else if (isStockShortage) {
       // The shift whose acceptance found it: its report, with the count.
       const target = shiftShortageTarget(n.data);

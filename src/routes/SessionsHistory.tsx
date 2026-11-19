@@ -320,9 +320,11 @@ const SessionsHistory = () => {
 
           {/* The figures, from the server (2026-11-18): the same code as the
               cash drawer, over the working day; with a place picked, that
-              place's bills only (`place_id`). Nothing is added up here. */}
+              place's bills only (`place_id`); with a person picked (2026-11-20),
+              only the records that name them (`staff_user_id`). Nothing is
+              added up here. */}
           <div style={{ marginTop: 12 }}>
-            {from !== "" && <SalesSummaryPanel branchId={id} from={from} to={to} placeId={placeId} refreshKey={salesRefresh} onWindow={setCounted} />}
+            {from !== "" && <SalesSummaryPanel branchId={id} from={from} to={to} placeId={placeId} staffId={actorId} refreshKey={salesRefresh} onWindow={setCounted} />}
           </div>
 
         </div>

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Translated, needsAttention, pickLocale, tr, trStatus } from "@/i18n/translated";
+import { Translated, needsAttention, pickLocale, tr, trAll, trStatus } from "@/i18n/translated";
 import { timePackageNameOf } from "@/i18n/timePackageName";
 import { platformPriceNameOf } from "@/i18n/platformPriceName";
 
@@ -82,6 +82,26 @@ describe("tr", () => {
     expect(tr<Fixture>(null, "name", "en")).toBe("");
     expect(tr<Fixture>(undefined, "name", "en")).toBe("");
     expect(tr<Fixture>({ id: 4, i18n: null }, "name", "en")).toBe("");
+  });
+});
+
+describe("trAll", () => {
+  type Fixture = Translated & { id: number; name?: string; category?: string };
+
+  it("gives what was typed and every translation, each once", () => {
+    const product: Fixture = { id: 1, name: "Кола", i18n: { name: { en: "Cola", ru: "Кола", am: "Կոլա" } } };
+    expect(trAll(product, "name")).toEqual(["Кола", "Cola", "Կոլա"]);
+  });
+
+  it("skips a locale still being translated and a blank one", () => {
+    const product: Fixture = { id: 2, name: "Սուրճ", i18n: { name: { en: "Coffee", ru: null, am: "  " } } };
+    expect(trAll(product, "name")).toEqual(["Սուրճ", "Coffee"]);
+  });
+
+  it("is the raw column alone with no bag, and nothing for nothing", () => {
+    expect(trAll<Fixture>({ id: 3, name: "Snickers", i18n: null }, "name")).toEqual(["Snickers"]);
+    expect(trAll<Fixture>({ id: 4, category: undefined }, "category")).toEqual([]);
+    expect(trAll<Fixture>(null, "name")).toEqual([]);
   });
 });
 

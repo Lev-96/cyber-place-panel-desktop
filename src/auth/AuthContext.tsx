@@ -25,13 +25,20 @@ interface AuthState {
 const AuthCtx = createContext<AuthState | null>(null);
 
 /**
- * Whether the server looked at the saved token and refused it: an HTTP answer
- * in the 4xx range. No answer at all (offline, DNS, a dropped connection), a
- * timeout or rate limit, or a server error says nothing about the session.
+ * Whether the server looked at the saved token and refused it: 401 (the token
+ * is gone: signed out elsewhere, revoked, the account blocked or deleted) or
+ * 403 (the account may not work). Anything else says nothing about the
+ * session: no answer at all (offline, DNS, a dropped connection), a timeout or
+ * rate limit, a server error — and, since 2026-11-20, any other 4xx. A 404 or
+ * 405 for `/user/me`, a route every backend has, comes from a proxy or a
+ * backend mid-deploy, not from a judgement on the token; dropping the token on
+ * it would sign a desk out at the start that follows an update's restart. A
+ * genuinely dead token still answers 401 on the next request and signs out
+ * there (`sessionExpiry` → `AccessGuard`).
  */
 const sessionRefused = (error: unknown): boolean => {
   const status = (error as { status?: unknown } | null)?.status;
-  return typeof status === "number" && status >= 400 && status < 500 && status !== 408 && status !== 429;
+  return status === 401 || status === 403;
 };
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {

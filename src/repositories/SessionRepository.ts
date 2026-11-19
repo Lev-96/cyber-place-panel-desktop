@@ -56,6 +56,9 @@ import {
   apiStartSession,
   apiStopSessionWithBreakdown,
   apiChangeSessionPayment,
+  apiConfirmDue,
+  apiDuesToConfirm,
+  type IDueToConfirm,
   apiRecordSessionPayment,
   type PaymentFields,
   apiCancelSession,
@@ -64,7 +67,7 @@ import {
   StartSessionBody,
   apiSetHourlyRate,
   apiSetOutsideFoodRate,
-  apiSwapSessions,
+  apiSwapSessions, type StartItem,
 } from "@/api/sessions";
 import { apiReorderPcs } from "@/api/pcs";
 import { friendlyMutation, orFallback } from "@/api/fallback";
@@ -137,6 +140,16 @@ export class SessionRepository {
   /** Mark how a seat that ended by itself was paid (2026-11-07). */
   async recordPayment(id: number, body: PaymentFields & { cash_received?: string; client_request_id: string }): Promise<{ session: ISessionApi; cash: ICashHandover | null }> {
     return friendlyMutation(apiRecordSessionPayment(id, body).then((r) => ({ session: r.session, cash: r.cash ?? null })));
+  }
+
+  /** Ended seats paid ahead whose due waits to be confirmed (2026-11-20), every branch the caller works in. */
+  async duesToConfirm(): Promise<IDueToConfirm[]> {
+    return apiDuesToConfirm().then((r) => r.data ?? []);
+  }
+
+  /** How that due was paid (or taken now) — the same total (2026-11-20). */
+  async confirmDue(id: number, body: PaymentFields & { cash_received?: string }): Promise<{ session: ISessionApi; cash: ICashHandover | null }> {
+    return friendlyMutation(apiConfirmDue(id, body).then((r) => ({ session: r.session, cash: r.cash ?? null })));
   }
 
   /** Change how an ended seat was paid, the same total (2026-11-19). */
@@ -278,8 +291,8 @@ export class SessionRepository {
   }
 
   /** Read-only advice: what a sum buys on this seat («На сумму», 2026-11-15). */
-  async startQuoteByAmount(pcId: number, amount: number, outsideFood: boolean): Promise<IStartAmountQuote> {
-    return friendlyMutation(apiStartQuoteByAmount(pcId, amount, outsideFood));
+  async startQuoteByAmount(pcId: number, amount: number, outsideFood: boolean, items: readonly StartItem[] = []): Promise<IStartAmountQuote> {
+    return friendlyMutation(apiStartQuoteByAmount(pcId, amount, outsideFood, items));
   }
 
   /** Read-only advice: see `apiSessionExtensionOptions`. */

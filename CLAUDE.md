@@ -5423,3 +5423,24 @@ A place's record in a card's list (`SalesLinesDialog`) has the button when
 and Save sends `sessionRepository.changePayment` → `PUT /sessions/{id}/payment`
 once; the list and the cards are read again. The server's refusal is shown in
 the dialog. Tests: `ChangePaymentDialog.test.tsx`, `e2e/sales-change-payment.spec.ts`.
+
+## Products search in any language; the minimum chip on a grid card (2026-11-20, owner)
+
+- **Products search** (`routes/ProductsList.tsx`): a product is typed once and
+  the backend fills the other locales into its `i18n` bag. The search used to
+  match only the panel language's resolved name/category (`tr(p, f, lang)`),
+  so «кола» found nothing on an English panel that shows "Cola". It now
+  matches what was typed and every translation of the name and category
+  (`trAll` in `i18n/translated.ts`), case-insensitively, whatever the panel's
+  language. The POS basket (`useProductBasket`) shows and matches the raw
+  name only and was not changed. Tests: `ProductsList.search.test.tsx` (6),
+  `translated.test.ts` `trAll` (3), `e2e/products-search.spec.ts` (en/ru/am ×
+  1280/520).
+- **«Минимум 1 ч 30 мин» on a grid card**: SessionTimer's clock, money, VIP
+  minimum chip and reset button share one span with no break between them, so
+  as an inline run they went past a grid card's right edge. That span is now a
+  wrapping inline-flex row in both views (`.place-cell.session-card--running
+  .status > span`, the rule the list view already had): a piece that does not
+  fit moves whole to the next line. Test: `e2e/active-places-responsive.spec.ts`
+  «the minimum-charge chip stays inside its card» (en/ru/am × card size s/m/l ×
+  1920…390px).

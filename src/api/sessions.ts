@@ -2,9 +2,18 @@ import { IPcApi, ISessionApi, ISessionHourlyNow, ITimePackage, SessionItemKind }
 import type { IStockWarning } from "@/types/pos";
 import { request } from "./client";
 
+/** A product handed over WITH the start (2026-11-20): the catalogue's, a count. */
+export interface StartItem { product_id: number; qty: number }
+
+/** `items[0][product_id]=…&items[0][qty]=…` for a GET quote. */
+const startItemsQuery = (items: readonly StartItem[]): string =>
+  items.map((i, n) => `&items[${n}][product_id]=${i.product_id}&items[${n}][qty]=${i.qty}`).join("");
+
 export interface StartSessionBody {
   branch_id: number;
   pc_id: number;
+  /** Products on the seat's bill from the start (2026-11-20); paid ahead with the time when paid now. */
+  items?: StartItem[];
   /** The reservation this start fulfils (2026-11-07): Start on a reserved seat. */
   booking_id?: number;
   /**
@@ -467,6 +476,28 @@ export const apiRecordSessionPayment = (id: number, body: PaymentFields & { cash
   request<{ session: ISessionApi; cash: ICashHandover | null }>(`/sessions/${id}/payment`, { method: "POST", body });
 
 /** «Изменить способ оплаты» of an ended seat (2026-11-19): how it was paid, the same total. */
+/**
+ * «Подтверждение оплаты» (2026-11-20): an ended seat paid ahead that owed
+ * more at its end (products put on it while it played). The server banked the
+ * due in cash and asks how it was really paid.
+ */
+export interface IDueToConfirm {
+  session_id: number;
+  branch_id: number;
+  place: { id: number; number: number | null; name: string | null } | null;
+  ended_at: string | null;
+  total: string;
+  prepaid: string;
+  due: string;
+  prepaid_by_method: Record<string, string>;
+  items: Array<{ name: string; qty: number; price: string }>;
+}
+
+export const apiDuesToConfirm = () => request<{ data: IDueToConfirm[] }>("/sessions/dues-to-confirm");
+
+export const apiConfirmDue = (id: number, body: PaymentFields & { cash_received?: string }) =>
+  request<{ session: ISessionApi; cash: ICashHandover | null }>(`/sessions/${id}/confirm-due`, { method: "POST", body });
+
 export const apiChangeSessionPayment = (id: number, body: PaymentFields) =>
   request<{ session: ISessionApi }>(`/sessions/${id}/payment`, { method: "PUT", body });
 
@@ -827,9 +858,9 @@ export const apiStartQuote = (pcId: number, length: PlannedLength, hourlyRate?: 
   );
 
 /** ⚠️ ADVICE: what a sum buys here (2026-11-15). The start re-checks it and refuses a moved figure. */
-export const apiStartQuoteByAmount = (pcId: number, amount: number, outsideFood: boolean) =>
+export const apiStartQuoteByAmount = (pcId: number, amount: number, outsideFood: boolean, items: readonly StartItem[] = []) =>
   request<IStartAmountQuote>(
-    `/sessions/start-quote?pc_id=${pcId}&amount=${amount}${outsideFood ? "&outside_food=1" : ""}`,
+    `/sessions/start-quote?pc_id=${pcId}&amount=${amount}${outsideFood ? "&outside_food=1" : ""}${startItemsQuery(items)}`,
   );
 
 /**

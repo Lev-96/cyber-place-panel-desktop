@@ -4,7 +4,7 @@ import { stockNumber } from "@/components/products/stock";
 import { fmt } from "@/i18n/translations";
 import { useAuth } from "@/auth/AuthContext";
 import { can } from "@/auth/permissions";
-import { tr } from "@/i18n/translated";
+import { tr, trAll } from "@/i18n/translated";
 import Button from "@/components/ui/Button";
 import { ListSkeleton } from "@/components/ui/Skeleton";
 import { StateSwitch, deriveViewState } from "@/components/ui/state";
@@ -92,18 +92,20 @@ const ProductsList = () => {
   const [search, setSearch] = useState("");
 
   // Filtered here rather than through the API: the branch's catalogue arrives
-  // whole and is small, the operator types against the name they can SEE (which
-  // is the translated one), and a round trip per keystroke would answer slower
+  // whole and is small, and a round trip per keystroke would answer slower
   // than the list re-renders. Category is matched too — "напитки" is how a
-  // cashier narrows a long list.
+  // cashier narrows a long list. Every language of a name and category is
+  // matched, not only the panel's (2026-11-20, owner): «кола» finds the
+  // product an English panel shows as "Cola", so the same word gives the same
+  // rows in en, ru and am.
   const visible = useMemo(() => {
     const needle = search.trim().toLowerCase();
     const inSection = (data ?? []).filter((p) => sectionOf(p) === section);
     if (!needle) return inSection;
     return inSection.filter((p) =>
-      `${tr(p, "name", lang)} ${tr(p, "category", lang)}`.toLowerCase().includes(needle),
+      [...trAll(p, "name"), ...trAll(p, "category")].some((word) => word.toLowerCase().includes(needle)),
     );
-  }, [data, search, lang, section]);
+  }, [data, search, section]);
 
   if (!Number.isFinite(id) || id <= 0) return <div className="error">{t("hub.invalidId")}</div>;
 

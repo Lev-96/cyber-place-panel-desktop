@@ -242,6 +242,8 @@ export const salesSummary = (url: URL) => {
   const from = url.searchParams.get("date_from") ?? "2026-11-18";
   const to = url.searchParams.get("date_to") ?? from;
   const placeId = url.searchParams.get("place_id") === null ? null : Number(url.searchParams.get("place_id"));
+  // One person (2026-11-20): echoed, as the server does; their lines only.
+  const staffId = url.searchParams.get("staff_user_id") === null ? null : Number(url.searchParams.get("staff_user_id"));
   const all = [
     { kind: "place", id: 5, at: "2026-11-18T15:10:00+04:00", seat: "№3", place: { id: 3, number: 3, name: null }, staff: { id: 2, name: "Anna" }, is_free: false, method: "split",
       payments: [{ method: "cash", amount: "2000.00" }, { method: "other", amount: "3000.00", label: "Hovo Card" }], amount: "5000.00", note: null },
@@ -250,7 +252,8 @@ export const salesSummary = (url: URL) => {
     { kind: "till", id: 9, at: "2026-11-18T18:30:00+04:00", seat: null, place: null, staff: { id: 2, name: "Anna" }, is_free: false, method: "cash",
       payments: [{ method: "cash", amount: "1500.00" }], amount: "1500.00", note: null },
   ];
-  const lines = placeId === null ? all : all.filter((l) => l.place?.id === placeId);
+  const lines = (placeId === null ? all : all.filter((l) => l.place?.id === placeId))
+    .filter((l) => staffId === null || l.staff?.id === staffId);
   const kind = url.searchParams.get("kind");
   const method = url.searchParams.get("method");
   const label = url.searchParams.get("label");
@@ -261,7 +264,7 @@ export const salesSummary = (url: URL) => {
     return {
       data: {
         branch_id: 1,
-        window: { date_from: from, date_to: to, from: `${from}T07:00:00+04:00`, to: `${to}T07:00:00+04:00`, business_day: { start: "13:00", end: "07:00" }, is_today: from === to, place_id: placeId, till_included: false },
+        window: { date_from: from, date_to: to, from: `${from}T07:00:00+04:00`, to: `${to}T07:00:00+04:00`, business_day: { start: "13:00", end: "07:00" }, is_today: from === to, place_id: placeId, till_included: false, staff_user_id: staffId },
         totals: { grand_total: "4000.00", places_total: "4000.00", places_count: 1, places_free_count: 0, till_total: "0.00", till_count: 0, products_total: "1500.00", products_units: 1, fast_food_total: "1500.00", fast_food_units: 1 },
         by_method: [
           { method: "cash", label: null, amount: "0.00", count: 0 },
@@ -277,7 +280,7 @@ export const salesSummary = (url: URL) => {
   return {
     data: {
       branch_id: 1,
-      window: { date_from: from, date_to: to, from: `${from}T07:00:00+04:00`, to: `${to}T07:00:00+04:00`, business_day: { start: "13:00", end: "07:00" }, is_today: from === to, place_id: null, till_included: true },
+      window: { date_from: from, date_to: to, from: `${from}T07:00:00+04:00`, to: `${to}T07:00:00+04:00`, business_day: { start: "13:00", end: "07:00" }, is_today: from === to, place_id: null, till_included: true, staff_user_id: staffId },
       totals: { grand_total: "10500.00", places_total: "9000.00", places_count: 2, places_free_count: 0, till_total: "1500.00", till_count: 1, products_total: "4000.00", products_units: 4, fast_food_total: "3000.00", fast_food_units: 2 },
       by_method: [
         { method: "cash", label: null, amount: "3500.00", count: 2 },

@@ -1,5 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
-import { installBackendMocks } from "./helpers/mockBackend";
+import { installBackendMocks, seedLanguageChosen } from "./helpers/mockBackend";
+import { fmt, t, type Lang } from "../src/i18n/translations";
+import { durationLabel } from "../src/utils/durationLabel";
 
 /**
  * Active Places from 1920 down to 520px wide (owner, 2026-11-03), on the real
@@ -15,12 +17,20 @@ import { installBackendMocks } from "./helpers/mockBackend";
  */
 const isBackend = (url: URL): boolean => url.hostname !== "localhost" && url.hostname !== "127.0.0.1";
 
-const seed = async (page: Page, view: "list" | "grid", running = 3, seats = 6) => {
+/** A board other than the default one: its language, card size, and what each running seat is. */
+interface SeedOpts {
+  lang?: Lang;
+  cardSize?: "s" | "m" | "l";
+  session?: (i: number) => Record<string, unknown>;
+}
+
+const seed = async (page: Page, view: "list" | "grid", running = 3, seats = 6, opts: SeedOpts = {}) => {
+  if (opts.lang) await seedLanguageChosen(page, opts.lang);
   await installBackendMocks(page, { role: "company_owner", company_id: 1, name: "Owner One" });
   await page.route((u) => isBackend(u) && u.pathname === "/user/preferences", (r) => r.fulfill({
     status: 200, contentType: "application/json",
     body: JSON.stringify({ preferences: {
-      data: { interface: "custom", theme: "dark", layout: { board_view: view, density: "standard", card_size: "m" } },
+      data: { interface: "custom", theme: "dark", layout: { board_view: view, density: "standard", card_size: opts.cardSize ?? "m" } },
       schema_version: 1, onboarding_version: 1, onboarded_at: null,
     } }),
   }));
@@ -42,17 +52,18 @@ const seed = async (page: Page, view: "list" | "grid", running = 3, seats = 6) =
       ends_at: new Date(Date.now() + (i === 1 ? 4 : 40) * 60_000).toISOString(),
       status: "active", hourly_rate: 800, total_paid: 0, joystick_count: 2, joysticks: [], is_free: false, is_unlimited: false,
       supports_joysticks: true, place_platform: "ps5",
+      ...opts.session?.(i),
     })) }),
   }));
 };
 
-const open = async (page: Page, view: "list" | "grid", width = 1920) => {
+const open = async (page: Page, view: "list" | "grid", width = 1920, opts: SeedOpts = {}) => {
   await page.setViewportSize({ width, height: 1000 });
-  await seed(page, view);
+  await seed(page, view, 3, 6, opts);
   await page.goto("/");
   await page.getByPlaceholder("your@email.com").fill("o@o");
   await page.getByPlaceholder(/•/).fill("ok");
-  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await page.getByRole("button", { name: t("login.title", opts.lang ?? "en"), exact: true }).click();
   await expect(page.getByText("Owner One").first()).toBeVisible();
   await page.goto("/#/branches/1/sessions");
   await expect(page.locator(".live-grid--sessions .place-cell")).toHaveCount(6);
@@ -194,6 +205,49 @@ test("grid: 1920 -> 520 at each named width: cards wrap, the page never scrolls 
     expect(f.narrowest, `${width}px`).toBeGreaterThanOrEqual(197);
   }
 });
+
+/**
+ * The VIP minimum's chip («Минимум 1 ч 30 мин», 2026-11-20, owner): on a grid
+ * card it sat on one unbreakable line with the clock, the money and the reset
+ * button and ran past the card's right edge. It now goes to its own line
+ * when the row is full: always inside its card, its words whole, in every
+ * language (Armenian is the longest), card size and width the grid uses,
+ * down to a phone's.
+ */
+const VIP_MINIMUM = () => ({
+  mode: "open", ends_at: null, hourly_rate: 3000,
+  started_at: new Date(Date.now() - 25 * 60_000).toISOString(),
+  // 1 h 30 min: the longest duration the chip spells.
+  min_charge: { after_minutes: 20, minimum_minutes: 90, mode: "minimum" },
+});
+
+for (const lang of ["en", "ru", "am"] as const) {
+  for (const cardSize of ["s", "m", "l"] as const) {
+    test(`grid: the minimum-charge chip stays inside its card at every width (${lang}, card size ${cardSize})`, async ({ page }) => {
+      await open(page, "grid", 1920, { lang, cardSize, session: VIP_MINIMUM });
+      await setMenu(page, true);
+      for (const width of [...WIDTHS, 390]) {
+        await page.setViewportSize({ width, height: 1000 });
+        await page.waitForTimeout(150);
+        const chips = await page.evaluate(() => Array.from(
+          document.querySelectorAll<HTMLElement>(".live-grid--sessions > .place-cell [data-testid=min-charge]"),
+        ).map((chip) => {
+          const card = (chip.closest(".place-cell") as HTMLElement).getBoundingClientRect();
+          const b = chip.getBoundingClientRect();
+          return {
+            text: chip.textContent,
+            inside: b.width > 0 && b.left >= card.left - 1 && b.right <= card.right + 1,
+            whole: chip.scrollWidth <= chip.clientWidth + 1,
+          };
+        }));
+        const at = `${lang} ${cardSize} ${width}px`;
+        expect(chips.map((c) => c.text), at).toEqual(Array(3).fill(fmt(t("vipMin.badge", lang), durationLabel(90, (k) => t(k, lang)))));
+        expect(chips.filter((c) => !c.inside), `${at}: past the card`).toEqual([]);
+        expect(chips.filter((c) => !c.whole), `${at}: words cut`).toEqual([]);
+      }
+    });
+  }
+}
 
 /** A seat's look, part by part, as computed styles and sizes. */
 const look = (page: Page, root: string) => page.evaluate((sel) => {
