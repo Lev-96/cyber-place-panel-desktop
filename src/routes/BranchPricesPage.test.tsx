@@ -100,13 +100,29 @@ describe("Branch → Prices", () => {
     expect(saveButtons().length).toBe(0);
     // One error state per billing section, each with the server's sentence as
     // its detail and its own Retry.
-    expect(screen.getAllByRole("alert").length).toBe(6);
-    expect(screen.getAllByText("state.error.title").length).toBe(6);
+    // Seven since 2026-11-19 (the owner's free-over-reservations switch, saved on flip).
+    expect(screen.getAllByRole("alert").length).toBe(7);
+    expect(screen.getAllByText("state.error.title").length).toBe(7);
     expect(document.body.textContent).toContain("Network error");
 
     billing.getForEdit.mockResolvedValue(settings);
     await act(async () => { screen.getAllByRole("button", { name: "action.retry" })[0].click(); });
     expect(saveButtons().length).toBe(6);
+  });
+
+  test("the owner's switch (2026-11-19): off by default, a flip saves it with the policy unchanged", async () => {
+    billing.update.mockResolvedValue({ ...settings, free_session_over_bookings: true });
+    await mount();
+    const sw = screen.getByTestId("free-over-bookings-switch");
+    expect(sw.getAttribute("aria-checked")).toBe("false");
+    await act(async () => { sw.click(); });
+    expect(billing.update).toHaveBeenCalledTimes(1);
+    const [branchId, body] = billing.update.mock.calls[0] as [number, Record<string, unknown>];
+    expect(branchId).toBe(7);
+    expect(body.free_session_over_bookings).toBe(true);
+    expect(body.money_rounding_step).toBe(settings.money_rounding_step);
+    expect(body.money_rounding_mode).toBe(settings.money_rounding_mode);
+    expect(body).not.toHaveProperty("pause_limit_minutes");
   });
 
   test("«Свои продукты» is one of the billing rules (2026-11-13)", async () => {

@@ -1275,6 +1275,38 @@ describe("who sits down, and how long before a reservation", () => {
     expect(startBtn().disabled).toBe(true);
   });
 
+  test("the owner's switch on (2026-11-19): free over a reservation ahead, open, with what to do", async () => {
+    repo.startOptions.mockResolvedValue(capped(45, { claimable_bookings: [], free_over_bookings: true }));
+    await mount(device());
+    expect(screen.getByTestId("free-switch").getAttribute("role")).toBe("switch");
+    await act(async () => { fireEvent.click(screen.getByTestId("free-switch")); });
+    expect(screen.getByTestId("free-switch").getAttribute("aria-checked")).toBe("true");
+    expect(screen.getByTestId("free-start-hint").textContent).toBe("session.freeOverBookingHint");
+    expect(screen.queryByTestId("start-free-until")).toBeNull();
+    expect(startBtn().disabled).toBe(false);
+    await act(async () => { fireEvent.click(startBtn()); });
+    const body = repo.start.mock.calls[0][0] as Record<string, unknown>;
+    expect(body).toMatchObject({ mode: "open", is_free: true });
+    expect(body).not.toHaveProperty("duration_minutes");
+    expect(body).not.toHaveProperty("booking_id");
+  });
+
+  test("the owner's switch on: free even while the reservation is under way; a paid start still cannot", async () => {
+    repo.startOptions.mockResolvedValue(capped(0, { claimable_bookings: [], free_over_bookings: true }));
+    await mount(device());
+    expect(startBtn().disabled).toBe(true);
+    await act(async () => { fireEvent.click(screen.getByTestId("free-switch")); });
+    expect(startBtn().disabled).toBe(false);
+    await act(async () => { fireEvent.click(screen.getByTestId("free-switch")); });
+    expect(startBtn().disabled).toBe(true);
+  });
+
+  test("the owner's switch off: no free on a reserved seat", async () => {
+    repo.startOptions.mockResolvedValue(capped(45, { claimable_bookings: [], free_over_bookings: false }));
+    await mount(device());
+    expect(screen.queryByTestId("free-switch")).toBeNull();
+  });
+
   test("a reservation holding the seat now: another player cannot start", async () => {
     repo.startOptions.mockResolvedValue(capped(0));
     await mount(device());

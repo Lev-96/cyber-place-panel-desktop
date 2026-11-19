@@ -14,9 +14,10 @@ interface Props {
    * owed; "accent" (2026-11-13, «Свои продукты» in Start) is the panel's accent,
    * a line added to the bill. Same size and construction either way, so two
    * of them side by side read as a pair. "success" (2026-11-15, «Оплачено
-   * вперёд»): green, money already in the drawer.
+   * вперёд»): green, money already in the drawer. "free" (2026-11-19, a free
+   * session in Start): violet, larger, in its own tile.
    */
-  tone?: "warning" | "accent" | "success";
+  tone?: "warning" | "accent" | "success" | "free";
 }
 
 /**
@@ -34,7 +35,7 @@ const UnpaidToggle = ({
     aria-checked={on}
     aria-label={fullLabel}
     title={fullLabel}
-    className={["btn unpaid-toggle", tone === "accent" ? "unpaid-toggle--accent" : tone === "success" ? "unpaid-toggle--success" : null, on ? "is-on" : null]
+    className={["btn unpaid-toggle", tone === "accent" ? "unpaid-toggle--accent" : tone === "success" ? "unpaid-toggle--success" : tone === "free" ? "unpaid-toggle--free" : null, on ? "is-on" : null]
       .filter(Boolean).join(" ")}
     onClick={() => onChange(!on)}
     disabled={disabled}

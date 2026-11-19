@@ -54,6 +54,8 @@ export interface IBillingSettings {
    * no limit, and absent reads as exactly that.
    */
   pause_limit_minutes?: number | null;
+  /** The owner's switch (2026-11-19): a free session may start on a reserved seat. Absent = off / leave alone. */
+  free_session_over_bookings?: boolean;
   /**
    * The VIP minimum charge (2026-10-31). Optional: an older backend has none,
    * and absent reads as off.
@@ -313,6 +315,8 @@ export interface IBillingPolicy {
    * on the write side like the room's answer above: absent leaves it alone.
    */
   pause_limit_minutes?: number | null;
+  /** The owner's switch (2026-11-19): a free session may start on a reserved seat. Absent = off / leave alone. */
+  free_session_over_bookings?: boolean;
   /** The VIP minimum charge; absent leaves it alone, like the fields above. */
   vip_min_charge_enabled?: boolean;
   vip_min_charge_after_minutes?: number | null;

@@ -1037,6 +1037,21 @@ export const TRANSLATIONS: Dict = {
     am: "Ժամանակը շարունակում է հաշվվել, սեսիան մնում է վիճակագրության մեջ։ Պարզապես ոչ ոք չի վճարում։",
   },
   "session.freeBillWaived": { en: "Waived: {0}", ru: "Списано: {0}", am: "Դուրս գրված՝ {0}" },
+  "session.freeOverBookingHint": {
+    en: "This seat is reserved. It plays free until you stop it: when the player with the reservation comes, stop this session and start theirs.",
+    ru: "На этом месте есть бронь. Сессия бесплатная, пока её не остановят: когда придёт игрок с бронью, остановите её и запустите его место.",
+    am: "Այս տեղն ամրագրված է։ Սեսիան անվճար է, մինչև այն կանգնեցնեք․ երբ ամրագրած խաղացողը գա, կանգնեցրեք այն և սկսեք նրա տեղը։",
+  },
+  "freeOverBookings.sectionTitle": { en: "Free session on a reserved seat", ru: "Бесплатная сессия при бронировании", am: "Անվճար սեսիա ամրագրված տեղում" },
+  "freeOverBookings.switch": { en: "Allow", ru: "Разрешить", am: "Թույլատրել" },
+  "freeOverBookings.switchFull": { en: "Allow a free session on a reserved seat", ru: "Разрешить бесплатную сессию на забронированном месте", am: "Թույլատրել անվճար սեսիա ամրագրված տեղում" },
+  "freeOverBookings.hint": {
+    en: "On: a manager may start a FREE session on a seat that is reserved, while its player has not come yet. When that player comes, the manager stops the free session and starts theirs. Paid starts still respect reservations.",
+    ru: "Включено: менеджер может запустить БЕСПЛАТНУЮ сессию на забронированном месте, пока игрок с бронью не пришёл. Когда он придёт, менеджер останавливает бесплатную сессию и запускает его место. Платные запуски по-прежнему учитывают бронь.",
+    am: "Միացված՝ մենեջերը կարող է սկսել ԱՆՎՃԱՐ սեսիա ամրագրված տեղում, քանի դեռ ամրագրած խաղացողը չի եկել։ Երբ նա գա, մենեջերը կանգնեցնում է անվճար սեսիան և սկսում նրա տեղը։ Վճարովի մեկնարկները շարունակում են հաշվի առնել ամրագրումը։",
+  },
+  "freeOverBookings.on": { en: "Free sessions on reserved seats are allowed", ru: "Бесплатная сессия при бронировании разрешена", am: "Ամրագրված տեղում անվճար սեսիան թույլատրված է" },
+  "freeOverBookings.off": { en: "Free sessions on reserved seats are not allowed", ru: "Бесплатная сессия при бронировании запрещена", am: "Ամրագրված տեղում անվճար սեսիան արգելված է" },
   "session.freeBillStartHint": {
     en: "This session will be started free. The timer runs, nothing is charged.",
     ru: "Сессия запустится бесплатной. Таймер идёт, счёт не начисляется.",

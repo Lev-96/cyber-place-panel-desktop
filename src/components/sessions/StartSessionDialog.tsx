@@ -134,6 +134,8 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted, bookingId }: Pro
   // (null = nothing ahead). 0 = a reservation holds the seat now.
   const cap = options?.max_minutes ?? null;
   const capped = cap !== null;
+  // The owner's switch (2026-11-19): free may start over a reservation here.
+  const freeOver = options?.free_over_bookings === true;
   const freeUntil = options?.free_until ? new Date(options.free_until) : null;
   const freeUntilLabel = freeUntil
     ? `${String(freeUntil.getHours()).padStart(2, "0")}:${String(freeUntil.getMinutes()).padStart(2, "0")}`
@@ -202,16 +204,17 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted, bookingId }: Pro
   const parts = useHiddenParts<OptionalPart>(user ? startDialogKey(user.id) : null, OPTIONAL_PARTS);
   const { isShown } = parts;
   // A seat with a reservation ahead needs an end: the plan is shown even to
-  // someone who hid it (2026-11-07), and a free start (always open) is not.
+  // someone who hid it (2026-11-07), and a free start (always open) is not —
+  // unless the owner allows free over a reservation (2026-11-19).
   const showPlan = isShown("plan") || capped;
   const [customizing, setCustomizing] = useState(false);
   useEffect(() => {
-    if (!isShown("free") || capped) setIsFree(false);
+    if (!isShown("free") || (capped && !freeOver)) setIsFree(false);
     if (!isShown("rate")) { setEditPrice(false); setRateSaved(false); setCustomRate(""); }
     if (!showPlan) { setPlanDraft(EMPTY_DRAFT); setUntilDraft(EMPTY_DRAFT); setLimit("duration"); }
     if (!showPlan || !isShown("total")) { setEditTotal(false); setTotalInput(""); }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isShown, capped]);
+  }, [isShown, capped, freeOver]);
   const customizable = OPTIONAL_PARTS.filter((id) => id !== "free" || mayWaive);
   const partLabel: Record<OptionalPart, string> = {
     free: t("session.freeBill"),
@@ -527,7 +530,8 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted, bookingId }: Pro
   // the seat taken now, a free or open start with no end, a package or a
   // plan running into it. The server is still the judge.
   const selectedPkg = packages?.find((p) => p.id === pkgId) ?? null;
-  const startBeyondReservation = capped && (
+  // Free with the owner's switch on (2026-11-19) is never beyond it.
+  const startBeyondReservation = capped && !(isFree && freeOver) && (
     cap === 0
     || isFree
     || (mode === "fixed" && (selectedPkg === null || selectedPkg.duration_minutes > (cap ?? 0)))
@@ -581,7 +585,7 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted, bookingId }: Pro
         )}
         {/* How long this start may run (2026-11-07): the server's answer for
             the choice above. Shown only when a reservation is ahead. */}
-        {capped && (
+        {capped && !(isFree && freeOver) && (
           <div className="start-free-until" data-testid="start-free-until" role="status">
             {cap === 0
               ? t("start.seatTakenNow")
@@ -599,12 +603,24 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted, bookingId }: Pro
                 never going to be charged. Every control below answers "what
                 does this cost", and for a waived session that question has one
                 answer, so the honest form is the one that stops asking it. */}
-            {mayWaive && isShown("free") && !capped && (
-              <div className="col" style={{ gap: 4 }}>
-                <Checkbox checked={isFree} onChange={changeFree} label={t("session.freeBill")} />
+            {/* A switch, larger than the rest and in its own tile (2026-11-19,
+                owner: easy to see and to press). On a reserved seat only with
+                the owner's switch, and then it says what to do when the
+                reserving player comes. */}
+            {mayWaive && isShown("free") && (!capped || freeOver) && (
+              <div className={["start-dialog__free", isFree ? "is-on" : null].filter(Boolean).join(" ")} data-testid="start-free">
+                <UnpaidToggle
+                  on={isFree}
+                  onChange={changeFree}
+                  disabled={busy}
+                  label={t("session.freeBill")}
+                  fullLabel={t("session.freeBill")}
+                  testId="free-switch"
+                  tone="free"
+                />
                 {isFree && (
-                  <span className="muted" style={{ fontSize: 11 }}>
-                    {t("session.freeBillStartHint")}
+                  <span className="muted start-dialog__free-hint" data-testid="free-start-hint">
+                    {t(capped ? "session.freeOverBookingHint" : "session.freeBillStartHint")}
                   </span>
                 )}
               </div>

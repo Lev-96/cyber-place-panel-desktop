@@ -133,6 +133,8 @@ export interface IStartOptionBooking {
 export interface IStartOptions {
   free_until: string | null;
   max_minutes: number | null;
+  /** The owner's switch (2026-11-19): a free start is not refused for a reservation here. Absent on an older server = off. */
+  free_over_bookings?: boolean;
   unlimited_allowed: boolean;
   next_booking: IStartOptionBooking | null;
   claimable_bookings: IStartOptionBooking[];

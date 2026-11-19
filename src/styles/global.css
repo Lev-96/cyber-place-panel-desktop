@@ -11923,3 +11923,39 @@ button.sales-card:focus-visible { outline: 2px solid var(--color-primary); outli
     overflow-wrap: anywhere;
   }
 }
+
+/* «Бесплатно» in Start (2026-11-19, owner: larger, easy to see, a switch):
+   its own tile, a larger switch and label, violet when on — nothing else in
+   the dialog is violet, so a waived bill is never mistaken for a paid one. */
+.start-dialog__free {
+  --free-rgb: 139 92 246;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: rgb(var(--free-rgb) / 0.06);
+  transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+}
+.start-dialog__free.is-on {
+  border-color: rgb(var(--free-rgb) / 0.75);
+  background: rgb(var(--free-rgb) / 0.14);
+  box-shadow: 0 0 0 3px rgb(var(--free-rgb) / 0.15);
+}
+.btn.unpaid-toggle--free { gap: 12px; min-height: 40px; }
+.btn.unpaid-toggle--free .cp-switch-track { transform: scale(1.2); transform-origin: left center; margin-right: 6px; }
+.btn.unpaid-toggle--free .unpaid-toggle__label { font-size: 15px; font-weight: 700; }
+.btn.unpaid-toggle--free:hover:not(:disabled) .cp-switch-track { border-color: rgb(139 92 246); }
+.btn.unpaid-toggle--free:focus-visible .cp-switch-track {
+  border-color: rgb(139 92 246);
+  box-shadow: 0 0 0 3px rgb(139 92 246 / 0.30);
+}
+.btn.unpaid-toggle--free.is-on .cp-switch-track {
+  background: rgb(139 92 246);
+  border-color: rgb(139 92 246);
+}
+.btn.unpaid-toggle--free.is-on .cp-switch-thumb { background: #fff; }
+.btn.unpaid-toggle--free.is-on .unpaid-toggle__label { color: rgb(167 139 250); }
+:root[data-theme="light"] .btn.unpaid-toggle--free.is-on .unpaid-toggle__label { color: rgb(109 40 217); }
+.start-dialog__free-hint { font-size: 12px; line-height: 1.4; overflow-wrap: anywhere; }
