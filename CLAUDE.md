@@ -5392,3 +5392,13 @@ notification at 5 min carries `place_name`.
   `batch-2026-11-19.spec.ts` (en/ru/am × 1280/520 + till ru 520). Screenshots:
   `~/cyber-place-local/reports/batch-2026-11-19/shots/`.
 
+
+### Price per hour during the game (2026-11-19)
+
+`HourlyRateSection` in «+ Время» (`SessionOptionsDialog`, above «Свои
+продукты»): shows the price now (`tariff_hourly_rate ?? hourly_rate`), a
+`PriceInput` and «Сохранить цену» → `sessionRepository.setHourlyRate` →
+`POST /sessions/{id}/rate {rate}`. Nothing computed here; the server bills from
+now and refuses (paused, no hourly price) with its own sentence. Hidden on a
+free seat and with own food as the rate. Tests: `HourlyRateSection.test.tsx`,
+`e2e/session-hourly-rate.spec.ts`.
