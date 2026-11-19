@@ -32,6 +32,7 @@ import ChoiceCards from "@/components/ui/ChoiceCards";
 import DurationInput from "./DurationInput";
 import UnpaidToggle from "./UnpaidToggle";
 import ReminderSection from "./ReminderSection";
+import HourlyRateSection from "./HourlyRateSection";
 import OutsideFoodRateSection from "./OutsideFoodRateSection";
 import QuotedPrice from "./QuotedPrice";
 import { EMPTY_DRAFT, draftMinutes, type DurationDraft } from "./durationModel";
@@ -1004,6 +1005,8 @@ const SessionOptionsDialog = ({ session, platform, onClose, onChanged, platformN
 
         {/* The reminder a player asked for (2026-11-15): a running seat,
             paused or not, timed or unlimited. */}
+        {/* The price per hour, from now (2026-11-19). */}
+        {isActive && <HourlyRateSection session={current} disabled={busy} run={run} t={t} money={money} />}
         {isActive && <OutsideFoodRateSection session={current} disabled={busy} run={run} t={t} money={money} />}
         {isActive && <ReminderSection session={current} disabled={busy} run={run} t={t} />}
 

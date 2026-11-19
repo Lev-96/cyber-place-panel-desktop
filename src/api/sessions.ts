@@ -1061,6 +1061,10 @@ export const apiListPackages = (branchId: number) =>
  * «Свои продукты» as the seat's hourly rate during the game (2026-11-17): on
  * (the venue's fee, or `rate`), or off back to the seat's own rate. From now.
  */
+/** The seat's price per hour, changed during the game, from now (2026-11-19). */
+export const apiSetHourlyRate = (sessionId: number, rate: number) =>
+  request<{ session: ISessionApi }>(`/sessions/${sessionId}/rate`, { method: "POST", body: { rate } });
+
 export const apiSetOutsideFoodRate = (sessionId: number, on: boolean, rate?: number) =>
   request<{ session: ISessionApi }>(`/sessions/${sessionId}/outside-food`, {
     method: "POST",

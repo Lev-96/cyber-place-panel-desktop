@@ -61,6 +61,7 @@ import {
   IBillBreakdown, ICashHandover,
   ListSessionsParams,
   StartSessionBody,
+  apiSetHourlyRate,
   apiSetOutsideFoodRate,
   apiSwapSessions,
 } from "@/api/sessions";
@@ -245,6 +246,10 @@ export class SessionRepository {
   /** Read-only advice: what a planned start would cost. See `apiStartQuote`. */
   /** Read-only advice: see `apiStartOptions`. */
   /** «Свои продукты» as the seat's rate, on / re-priced / off, during the game (2026-11-17). */
+  /** The seat's price per hour from now; the time before keeps its price (2026-11-19). */
+  async setHourlyRate(sessionId: number, rate: number): Promise<ISessionApi> {
+    return friendlyMutation(apiSetHourlyRate(sessionId, rate).then((r) => r.session));
+  }
   async setOutsideFoodRate(sessionId: number, on: boolean, rate?: number): Promise<ISessionApi> {
     return friendlyMutation(apiSetOutsideFoodRate(sessionId, on, rate).then((r) => r.session));
   }

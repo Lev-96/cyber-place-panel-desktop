@@ -5302,6 +5302,10 @@ export const TRANSLATIONS: Dict = {
   "session.outsideFood.summary": { en: "+ own food {0}", ru: "+ свои продукты {0}", am: "+ սեփական սնունդ {0}" },
   // Own food as the seat's rate (2026-11-17).
   "session.outsideFood.rateHint": { en: "The seat plays at {0} while own food is on", ru: "Пока включены «Свои продукты», место играет по {0}", am: "Քանի դեռ «Սեփական սնունդ»-ը միացված է, տեղը խաղում է {0}" },
+  "session.rate.title": { en: "Price per hour", ru: "Цена за час", am: "Ժամավճար" },
+  "session.rate.now": { en: "Now: {0}. A new price counts from now; the time already played keeps its price.", ru: "Сейчас: {0}. Новая цена считается с этого момента; уже сыгранное время остаётся по прежней цене.", am: "Հիմա՝ {0}։ Նոր գինը հաշվվում է այս պահից․ արդեն խաղացած ժամանակը մնում է նախկին գնով։" },
+  "session.rate.save": { en: "Save price", ru: "Сохранить цену", am: "Պահպանել գինը" },
+  "session.rate.savedToast": { en: "Price per hour now {0}", ru: "Цена за час теперь {0}", am: "Ժամավճարն այժմ {0}" },
   "session.foodRate.fromNow": { en: "The seat plays at this price per hour from now; the time before keeps its price.", ru: "С этого момента место играет по этой цене за час; прошедшее время остаётся по прежней цене.", am: "Այս պահից տեղը խաղում է այս ժամավճարով․ անցած ժամանակը՝ նախկին գնով։" },
   "session.foodRate.isOn": { en: "On: {0} (the seat: {1})", ru: "Включено: {0} (место: {1})", am: "Միացված է՝ {0} (տեղը՝ {1})" },
   "session.foodRate.price": { en: "Price per hour", ru: "Цена за час", am: "Ժամավճար" },
