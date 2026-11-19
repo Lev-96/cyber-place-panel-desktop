@@ -10,6 +10,7 @@ import { fmt } from "@/i18n/translations";
 import { useEffect, useState } from "react";
 import { hoursLine, lineAmount, methodName, partsLine, periodLine, whereLine } from "./salesSummaryModel";
 import ChangePaymentDialog, { canChangePayment } from "./ChangePaymentDialog";
+import { centsWhenFractional } from "@/i18n/currency";
 
 interface Props {
   branchId: number;
@@ -69,7 +70,9 @@ const SalesSummaryPanel = ({ branchId, from, to, placeId = null, staffId = null,
     if (win && onWindow) onWindow(win);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [win?.from, win?.to, win?.date_from, win?.date_to]);
-  const m = (v: string) => money(Number(v));
+  // To the cent when the server's figure has cents (2026-11-20): the shift
+  // report prints them, so the two screens read the same figures.
+  const m = (v: string) => money(Number(v), centsWhenFractional(Number(v)));
 
   if (loading && !s) return <ListSkeleton />;
   if (error && !s) return <ErrorState error={error} onRetry={() => void reload()} titleKey="sales.loadFailed" />;
@@ -211,16 +214,16 @@ const SalesLinesDialog = ({ branchId, from, to, placeId, staffId, drill, onClose
               <div key={`${l.kind}-${l.id}`} className="sales-line" data-testid={`sales-line-${l.kind}-${l.id}`}>
                 <div className="sales-line__head">
                   <strong>{whereLine(l, t)}</strong>
-                  <strong>{money(lineAmount(l))}</strong>
+                  <strong>{money(lineAmount(l), centsWhenFractional(lineAmount(l)))}</strong>
                 </div>
                 <span className="muted">
                   {l.at ? formatVenueDateTime(l.at) : "-"}
                   {" · "}
                   {l.staff?.name ?? t("sales.byNobody")}
                 </span>
-                <span className="sales-line__parts">{l.is_free ? t("sales.free") : partsLine(l, (n) => money(n), t)}</span>
+                <span className="sales-line__parts">{l.is_free ? t("sales.free") : partsLine(l, (n) => money(n, centsWhenFractional(n)), t)}</span>
                 {l.kind === "place" && Number(l.prepaid ?? 0) > 0 && (
-                  <span className="muted" data-testid="sales-line-ahead">{fmt(t("sales.aheadNote"), money(Number(l.prepaid)))}</span>
+                  <span className="muted" data-testid="sales-line-ahead">{fmt(t("sales.aheadNote"), money(Number(l.prepaid), centsWhenFractional(Number(l.prepaid))))}</span>
                 )}
                 {l.note && <span className="muted sales-line__note" data-testid="sales-line-note">{fmt(t("sales.note"), l.note)}</span>}
                 {canChangePayment(l) && (
@@ -278,9 +281,9 @@ const SalesProductsDialog = ({ title, rows, onClose }: { title: string; rows: IS
             {rows.map((r) => (
               <div key={`${r.product_id ?? r.name}@${r.unit_price}`} className="sales-product" role="row" data-testid="sales-product-row">
                 <span className="sales-product__name" role="cell">{r.name}</span>
-                <span className="muted" role="cell">{money(Number(r.unit_price))}</span>
+                <span className="muted" role="cell">{money(Number(r.unit_price), centsWhenFractional(Number(r.unit_price)))}</span>
                 <span role="cell">× {r.quantity}</span>
-                <strong role="cell">{money(Number(r.total))}</strong>
+                <strong role="cell">{money(Number(r.total), centsWhenFractional(Number(r.total)))}</strong>
               </div>
             ))}
           </div>

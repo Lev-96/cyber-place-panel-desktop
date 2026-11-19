@@ -11,7 +11,7 @@ const api = vi.hoisted(() => ({ fn: vi.fn() }));
 vi.mock("@/api/salesSummary", () => ({ apiSalesSummary: (...a: unknown[]) => api.fn(...a) }));
 vi.mock("@/i18n/LanguageContext", async () => {
   const { t } = await import("@/i18n/translations");
-  return { useLang: () => ({ t: (k: string) => t(k, "ru"), money: (n: number) => `${n} ֏`, lang: "ru" }) };
+  return { useLang: () => ({ t: (k: string) => t(k, "ru"), money: (n: number, o?: { minimumFractionDigits?: number }) => (o?.minimumFractionDigits === 2 ? `${n.toFixed(2)} ֏` : `${Math.round(n)} ֏`), lang: "ru" }) };
 });
 vi.mock("@/components/ui/Modal", () => ({ default: ({ children }: { children: React.ReactNode }) => <div role="dialog">{children}</div> }));
 
@@ -250,3 +250,21 @@ describe("SalesSummaryPanel — «Быстрая Еда», products, comments, o
   });
 });
 
+
+/** To the cent like the shift report (2026-11-20, QA): 11 165.83 never reads 11 166. */
+describe("cents", () => {
+  test("a figure with cents is printed to the cent; a whole one stays whole", async () => {
+    api.fn.mockResolvedValue(summary({
+      totals: { grand_total: "11165.83", places_total: "9665.83", places_count: 3, places_free_count: 0, till_total: "1500.00", till_count: 1, products_total: "804.44", products_units: 2 } as never,
+      by_method: [{ method: "cash", label: null, amount: "4057.78", count: 3 }, { method: "card", label: null, amount: "7108.05", count: 4 }],
+      drawer: { net_cash: "4057.78" } as never,
+    }));
+    await mount();
+    const text = document.body.textContent ?? "";
+    expect(text).toContain("11165.83 ֏");
+    expect(text).toContain("4057.78 ֏");
+    expect(text).toContain("7108.05 ֏");
+    expect(text).toContain("1500 ֏");
+    expect(text).not.toContain("11166");
+  });
+});

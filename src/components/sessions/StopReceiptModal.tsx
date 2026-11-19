@@ -317,7 +317,9 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved, canRes
   // cancelled or waived seat (nothing owed), nor once a method is on record.
   const markable = endedWithoutUs && stopped === null && !recorded && !cancelled
     && !session.cancelled_at && (session.payment_method ?? null) === null && (session.payments?.length ?? 0) === 0
-    && view !== null && !view.is_free && Number(view.total) > 0;
+    // The board's copy of a seat that just ended is older than its end: the
+    // server's own word that a way of paying is on record wins (2026-11-20).
+    && view !== null && view.payment_recorded !== true && !view.is_free && Number(view.total) > 0;
   /** Synchronous guard and one id per attempt-series: a repeat is the same request. */
   const markRequestId = useRef<string>(crypto.randomUUID());
   const recordPayment = async () => {

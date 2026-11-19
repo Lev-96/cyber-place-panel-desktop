@@ -9,6 +9,7 @@ import { sessionRepository } from "@/repositories/SessionRepository";
 import { notify } from "@/ui/notify";
 import { useState } from "react";
 import { whereLine } from "./salesSummaryModel";
+import { centsWhenFractional } from "@/i18n/currency";
 
 interface Props {
   branchId: number;
@@ -59,7 +60,7 @@ const ChangePaymentDialog = ({ branchId, line, onClose, onChanged }: Props) => {
       <div className="card col" role="dialog" aria-modal="true" style={{ gap: 12, maxWidth: 520 }} data-testid="change-payment-dialog">
         <h3 style={{ margin: 0 }}>{t("sales.changePayment")}</h3>
         <span className="muted" data-testid="change-payment-what">
-          {fmt(t("sales.changePayment.what"), whereLine(line, t), money(Number(line.amount)))}
+          {fmt(t("sales.changePayment.what"), whereLine(line, t), money(Number(line.amount), centsWhenFractional(Number(line.amount))))}
         </span>
         <PaymentEditor
           name={`change-pay-${line.id}`}

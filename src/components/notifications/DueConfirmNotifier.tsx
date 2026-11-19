@@ -12,6 +12,7 @@ import { playFor } from "@/sound/soundEngine";
 import { notify } from "@/ui/notify";
 import type { PaymentMethod } from "@/api/sessions";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { centsWhenFractional } from "@/i18n/currency";
 
 /** How often the list is read again while the panel is open. */
 export const DUE_POLL_MS = 30_000;
@@ -86,7 +87,7 @@ const DueConfirmNotifier = () => {
   const seat = current.place ? `№${current.place.number ?? "?"}${current.place.name ? ` · ${current.place.name}` : ""}` : `#${current.session_id}`;
   const aheadWays = Object.entries(current.prepaid_by_method ?? {})
     .filter(([, a]) => Number(a) > 0)
-    .map(([m, a]) => `${methodName({ method: m, label: null }, t)} ${money(Number(a))}`).join(" · ");
+    .map(([m, a]) => `${methodName({ method: m, label: null }, t)} ${money(Number(a), centsWhenFractional(Number(a)))}`).join(" · ");
 
   const answer = (kind: "paid" | "take") => {
     setPay(emptyPaymentDraft(kind === "paid" ? paidAheadMethod(current) : "cash"));
@@ -123,14 +124,14 @@ const DueConfirmNotifier = () => {
             {current.items.map((i, n) => (
               <li key={`${i.name}-${n}`}>
                 <span>{i.name} × {i.qty}</span>
-                <strong>{money(Number(i.price) * i.qty)}</strong>
+                <strong>{money(Number(i.price) * i.qty, centsWhenFractional(Number(i.price) * i.qty))}</strong>
               </li>
             ))}
           </ul>
         )}
         <div className="due-confirm__due" data-testid="due-confirm-due">
           <span>{t("dueConfirm.due")}</span>
-          <strong>{money(Number(current.due))}</strong>
+          <strong>{money(Number(current.due), centsWhenFractional(Number(current.due)))}</strong>
         </div>
         {aheadWays !== "" && <span className="muted" data-testid="due-confirm-ahead">{fmt(t("dueConfirm.ahead"), aheadWays)}</span>}
 

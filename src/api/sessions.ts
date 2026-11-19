@@ -327,6 +327,12 @@ export interface IBillBreakdown {
   total: number;
   /** The instant this preview was priced at (2026-10-25); a stop can be closed at it. */
   priced_at?: string;
+  /**
+   * Its way of paying is already on record (2026-11-20): a seat that ended by
+   * itself records one (no answer = cash), so its receipt reports instead of
+   * asking. Absent from an older backend.
+   */
+  payment_recorded?: boolean;
 
   /* ---- added 2026-09-03; optional so an older backend still renders ---- */
 

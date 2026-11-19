@@ -1150,6 +1150,13 @@ describe("split payment and the payment of a seat that ended by itself", () => {
     expect(body).not.toHaveProperty("payments");
   });
 
+  test("an expired seat whose way of paying the server already recorded reports, never asks (2026-11-20)", async () => {
+    repo.preview.mockResolvedValue({ ...bill(), payment_recorded: true });
+    await mount(session({ status: "expired", payment_method: null, payments: [] }));
+    expect(screen.queryByTestId("pay-mark-confirm")).toBeNull();
+    expect(screen.queryByTestId("pay-mark-note")).toBeNull();
+  });
+
   test("an expired seat can be marked as «other» with no words", async () => {
     await mount(session({ status: "expired", payment_method: null, payments: [] }));
     await act(async () => { fireEvent.click(screen.getByTestId("pay-other")); });
