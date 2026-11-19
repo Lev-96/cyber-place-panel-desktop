@@ -2525,7 +2525,17 @@ are unchanged — do not add a `paused` status here either.
   Pure-CSS edge shadows hint "more". Cards sit 20px apart (`.hs-list`), 14px
   between their parts.
 - **Staff filter** (native `<select class="input">`, «Все сотрудники» + «Name ·
-  role»): choices from `GET /session-events/actors?branch_id` (server-scoped);
+  role»): choices from `GET /session-events/actors?branch_id` (server-scoped;
+  since 2026-11-20 only the branch's owners and assigned managers — never a
+  platform admin, a former manager or a one-off seller; the panel shows the
+  list as sent). A pick also narrows the sales figures and every card's
+  records: `SalesSummaryPanel` gets `staffId` and sends `staff_user_id` on the
+  figures AND the drill-down request (no key at all for «all»; with a place,
+  both). The server answers what that person's lines are (places they
+  stopped, sales they made, what they took ahead; an expiry is nobody's).
+  Fail closed: unless the answer's `window.staff_user_id` equals the picked
+  id (a backend without the filter ignores it), no figures are shown, only
+  «Суммы по одному сотруднику пока недоступны…» (`sales.staffNotApplied`);
   a pick adds `user_id` to the ONE feed request (the server narrows, the panel
   never sifts the whole log) and fetches the cards from `GET /sessions?acted_by=`
   — the sessions that person acted in, BRANCH-WIDE for every role (the owner's
@@ -5444,3 +5454,80 @@ the dialog. Tests: `ChangePaymentDialog.test.tsx`, `e2e/sales-change-payment.spe
   fit moves whole to the next line. Test: `e2e/active-places-responsive.spec.ts`
   «the minimum-charge chip stays inside its card» (en/ru/am × card size s/m/l ×
   1920…390px).
+
+
+## New-version notice + sign-in across an update (2026-11-20, owner)
+
+**A. The manager never noticed a release.** The backend writes
+`PanelUpdateAvailable` (`data: {type: "app_update.available", app, version,
+mandatory}`; the row's `type` column is an English sentence kept for panels
+older than 1.0.66) for every admin / owner / manager and broadcasts it as
+`notification.created`. Until now the panel showed it as a bell row only.
+- `components/notifications/PanelUpdateNotifier` (mounted in `Layout`): the
+  SessionReminderNotifier idiom — the card IS the server's notification, read
+  from `NotificationsContext` (start, Reverb, reconnect, 60 s poll). «Новая
+  версия Cyber Place 1.0.68 · Откройте раздел «Обновление» и нажмите
+  «Проверить обновления».» with «Открыть Обновление» (marks every waiting
+  update notice read, opens `updatesRouteFor(role)`) and «Позже» (hidden for
+  this run; the next start / sign-in shows it again while unread). An arrival
+  while open rings «System» and raises a silent OS notification. Desktop only
+  (`window.cyberplaceUpdates`; the owner web is always the newest); nothing for
+  a version this desktop already runs; hidden on «Обновление» itself.
+- `components/updates/panelUpdate.ts`: `pendingPanelUpdate` (newest unread,
+  newer than installed), `panelUpdateText` (title + body; the section and button
+  names come from `nav.agentUpdates` / `ownUpdates.check`, so the sentence always
+  matches the screen), `compareVersions` (moved from `DesktopUpdateCard`),
+  `updatesRouteFor` (also used by `UpdatesToast` and the bell). The bell row
+  (`routes/Notifications.tsx`) says the same title + body.
+- Tests: `panelUpdate.test.ts`, `PanelUpdateNotifier.test.tsx`,
+  `Notifications.test.tsx`, `SidebarCollapse.test.tsx` (mounted);
+  e2e `panel-update-notice.spec.ts` (en/ru/am × 1280/520, the bridge stubbed).
+  ⚠️ Owner web: bump `panel.ref` (shared `Notifications.tsx`/translations).
+
+**B. Signed out after an update.** Two defects that can do it, both fixed:
+- `electron/storage.ts` (the `cyberplace.kv.json` store: token, user, language,
+  window, every per-person setting). A set made during a running write was given
+  that write's promise and never written until some later set; and every write
+  truncated the file in place, so a quit / forced kill / power cut in between
+  left an empty or half file that the next start read as "nothing saved".
+  Now: writes are serialized and the last state always lands; each write goes
+  to `….tmp`, is fsync'd and renamed over the file (in-place only if the rename
+  keeps failing); a busy read is retried; an unparsable file is kept as
+  `….corrupt-<time>`. File name, format and keys are unchanged (no migration).
+  Tests: `electron/storage.test.ts` (vitest now includes `electron/**/*.test.ts`).
+- `AuthContext` start-up: only 401 / 403 from `/user/me` drop the saved token;
+  any other 4xx (a 404 from an edge or a half-deployed backend) is "no verdict",
+  like offline. Tests: `AuthContext.networkBlock.test.tsx`; real Electron:
+  `e2e-electron/signin-survives-restart.spec.ts` (quit like `quitAndInstall`,
+  file whole, relaunch against a 404 stays signed in).
+- ⚠️ Known, not changed: the staging build shares `userData` with production
+  (packaged `package.json` `name` is the same; `productName`/`appId` do not
+  decide the folder), so running the staging app on a machine overwrites the
+  production sign-in (`cp.token` for the other backend → 401 → signed out) and
+  mixes `u{id}:` keys across two databases. Evidence: production's
+  `logs/main.log` carries the staging updater's lines. Fixing it moves staging
+  to its own folder (owner's call).
+
+### Start: products and «Сейчас, до игры» that buys time (2026-11-20)
+
+`StartSessionDialog`: «+ Товар» → `StartProductsDialog` (the till's basket,
+regular products) → `items` with the start; their price is added to a
+package's / plan's prepaid sum and sent with the «На сумму» quote. «Сейчас,
+до игры» with a sum and no length is sent as `paid_amount` + `paid_seconds`
+on the server's quote (the seat ends by itself); `prepaid_sum` is no longer
+sent. Tests: `StartSessionDialog.test.tsx`, `e2e/start-products.spec.ts`,
+`e2e/swap-and-unlimited-prepay.spec.ts`.
+
+### «История продаж»: paid-ahead lines, change and the bill (2026-11-20)
+
+`kind: prepaid` lines («№4 · оплачено заранее»); a place's line shows its
+`bill`, its parts net of the prepayment («Сдача / возврат» for a negative
+part, «Оплачено заранее, без доплаты» for none). `salesSummaryModel`.
+
+### «Подтверждение оплаты» (2026-11-20)
+
+`DueConfirmNotifier` (Layout; owners and managers): polls
+`/sessions/dues-to-confirm` (30 s + focus), one large window per seat —
+products, «Доплата», what was paid ahead — «Да, оплатили» (starts on the way
+paid ahead) / «Нет, принять оплату» (cash) → `PaymentEditor` → `confirm-due`;
+«Позже» = 10 min. Tests: `DueConfirmNotifier.test.tsx`, `e2e/due-confirm.spec.ts`.
