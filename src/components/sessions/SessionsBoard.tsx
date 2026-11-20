@@ -53,6 +53,7 @@ import RelocateSessionDialog from "./RelocateSessionDialog";
 import { BASE_JOYSTICKS, MAX_JOYSTICKS } from "@/api/joystickPrices";
 import { notify } from "@/ui/notify";
 import StopReceiptModal from "./StopReceiptModal";
+import { afterDueConfirmed } from "@/components/notifications/dueConfirmGate";
 import UnpaidAlert, { type UnpaidNotice } from "./UnpaidAlert";
 import SessionCardChips from "./SessionCardChips";
 import { playFor } from "@/sound/soundEngine";
@@ -405,7 +406,9 @@ const SessionsBoard = ({ branchId }: Props) => {
         // Never over the top of an open receipt: a cashier mid-checkout on one
         // seat must not have it replaced by another. The second seat is still
         // ended and still on the board's history — what it loses is the popup.
-        if (ended) setStopTarget((current) => current ?? { ...ended, status: "expired" });
+        // «Эти товары оплатили?» first (2026-11-20, owner): the bill opens
+        // once that is answered — at once when there is nothing to confirm.
+        if (ended) afterDueConfirmed(evt.session_id, () => setStopTarget((current) => current ?? { ...ended, status: "expired" }));
       }
       // The receipt open on THIS seat, ended elsewhere (another cashier, the
       // clock) while it was on screen (2026-10-25): it turns into that final

@@ -7,6 +7,7 @@ import { IJoystickRule, IPcApi, ISessionApi } from "@/types/sessions";
 import { PC_KIND, PC_STATUS } from "@/types/pc";
 import { SessionChangedEvent } from "@/realtime/useSessionChanged";
 import SessionsBoard from "./SessionsBoard";
+import { registerDueAsker } from "@/components/notifications/dueConfirmGate";
 
 /**
  * A seat whose paid period runs out ends on the server, and the cashier has to
@@ -211,6 +212,24 @@ describe("a seat that ends on its own clock", () => {
     expect(screen.getByText("session.checkoutDone")).toBeTruthy();
     expect(screen.getByText("session.totalDue")).toBeTruthy();
     expect(screen.queryByText("session.confirmStop")).toBeNull();
+  });
+
+  // «Эти товары оплатили?» first (2026-11-20, owner): the bill of a seat
+  // that ended by itself waits for that answer, then opens.
+  test("the receipt waits for «оплатили?» to be answered, then opens", async () => {
+    let answer: () => void = () => {};
+    const asked: number[] = [];
+    const off = registerDueAsker((id) => { asked.push(id); return new Promise<void>((r) => { answer = r; }); });
+    try {
+      await mount();
+      await fire(event());
+      expect(asked).toEqual([42]);
+      expect(screen.queryByText("session.checkoutDone")).toBeNull();
+      await act(async () => { answer(); await Promise.resolve(); });
+      expect(screen.getByText("session.checkoutDone")).toBeTruthy();
+    } finally {
+      off();
+    }
   });
 
   test("a colleague pressing Stop opens nothing", async () => {

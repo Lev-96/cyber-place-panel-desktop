@@ -13,6 +13,7 @@ import { notify } from "@/ui/notify";
 import type { PaymentMethod } from "@/api/sessions";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { centsWhenFractional } from "@/i18n/currency";
+import { registerDueAsker } from "./dueConfirmGate";
 
 /** How often the list is read again while the panel is open. */
 export const DUE_POLL_MS = 30_000;
@@ -38,6 +39,11 @@ export const paidAheadMethod = (d: IDueToConfirm): PaymentMethod => {
  * both send the way of paying to `POST /sessions/{id}/confirm-due`, which
  * moves the due to its card in «История продаж». «Позже» asks again in ten
  * minutes. Owners and managers only; nothing is computed here.
+ *
+ * Asked AT ONCE when the board sees a seat end by itself (`dueConfirmGate`),
+ * and the board's final bill waits for the answer (2026-11-20, owner): first
+ * «оплатили?», then the bill. The poll stays the safety net for a desk that
+ * was not on the board when the seat ended.
  */
 const DueConfirmNotifier = () => {
   const { user } = useAuth();
@@ -49,14 +55,60 @@ const DueConfirmNotifier = () => {
   const [err, setErr] = useState<string | null>(null);
   const later = useRef(new Map<number, number>());
   const rang = useRef(new Set<number>());
+  // Ended seats whose final bill waits for this window: resolved once the
+  // seat is no longer being asked about (answered, «Позже», or gone).
+  const waiting = useRef(new Map<number, Array<() => void>>());
+  // Only the newest read is applied: a poll sent before a seat ended must
+  // not land after the board's own read and drop that seat again.
+  const reads = useRef(0);
   const asks = user?.role !== undefined && STAFF.has(user.role);
 
   const load = useCallback(() => {
     if (!asks) return;
+    const mine = ++reads.current;
     sessionRepository.duesToConfirm()
-      .then((list) => setDues(Array.isArray(list) ? list : []))
+      .then((list) => { if (mine === reads.current) setDues(Array.isArray(list) ? list : []); })
       .catch(() => { /* offline: asked again on the next read */ });
   }, [asks]);
+
+  useEffect(() => {
+    if (!asks) return undefined;
+    const pending = waiting.current;
+    const unregister = registerDueAsker((sessionId) => new Promise<void>((resolve) => {
+      ++reads.current;
+      sessionRepository.duesToConfirm()
+        .then((list) => {
+          const fresh = Array.isArray(list) ? list : [];
+          if (fresh.some((d) => d.session_id === sessionId)) {
+            later.current.delete(sessionId);
+            pending.set(sessionId, [...(pending.get(sessionId) ?? []), resolve]);
+          } else {
+            resolve();
+          }
+          // Always applied: read after the seat ended, it is never the stale one.
+          setDues(fresh);
+        })
+        // Not readable now: the bill opens; the poll asks later.
+        .catch(() => resolve());
+    }));
+    return () => {
+      unregister();
+      for (const fns of pending.values()) fns.forEach((f) => f());
+      pending.clear();
+    };
+  }, [asks]);
+
+  // A seat no longer asked about lets its bill open.
+  useEffect(() => {
+    const at = Date.now();
+    for (const [id, fns] of [...waiting.current]) {
+      const asked = dues.some((d) => d.session_id === id) && (later.current.get(id) ?? 0) <= at;
+      if (!asked) {
+        waiting.current.delete(id);
+        fns.forEach((f) => f());
+      }
+    }
+  }, [dues]);
 
   useEffect(() => {
     if (!asks) return undefined;
