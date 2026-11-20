@@ -5555,3 +5555,12 @@ The asker resolves with the ANSWER (`DueAnswer`: `paid` «Да» / `taken` «Н�
 (`dueAnswer`) → `PrepaidSettlement` `duePaidDuringPlay`: after «Да» the bill
 says «Оплачено полностью», never «Доплатить»; after «Нет», «Позже» or no
 question, «Доплатить» as before. Display only — the figures are the server's.
+
+## A seat that ends by itself is marked by the staff (2026-11-20, owner)
+
+The backend no longer banks an expiry as cash: the receipt of a seat that ended
+by itself gets `payment_recorded: false` until somebody marks it, so
+«Отметить оплату» (cash preselected) is offered and records exactly what is
+chosen — card or cash, however long the receipt stayed open (it used to answer
+409 «уже записана»). No panel code changed for this; `payment_recorded` already
+drives `StopReceiptModal`'s `markable`.
