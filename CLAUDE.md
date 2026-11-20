@@ -2329,6 +2329,14 @@ are unchanged — do not add a `paused` status here either.
     /places/reservations/{id}`, only `editable` staff rows; a time/seat change
     asks first); name and phone optional (name ≥ 2 letters; phone masked
     `077 777 777`, sent `+374XXXXXXXX`, same rule as `App\Support\ArmenianPhone`).
+    Length (2026-11-20, owner): from 15 min with no ceiling of its own
+    (`MAX_MINUTES` 1440, the server refuses past closing), or the switch
+    «Без лимита (до закрытия)» — the length box becomes «До закрытия» and
+    `until_close: true` is sent instead of `minutes` (`reservationForm`
+    `createBody` / `editPatch`: kept on → nothing sent, the server re-reads the
+    closing for a moved start; switched off → the shown `minutes`). The details
+    say «(До закрытия)». Tests: `ReservationFormDialog.test.tsx`,
+    `e2e/reserve-until-close.spec.ts`.
     A `updated` event re-reads `useReservedPlaceIds` (the seat it left is not
     in the event) and is never announced. `booking.start_due` (server
     scheduler, once per booking) has its own card in Notifications.
