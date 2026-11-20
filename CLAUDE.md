@@ -5550,3 +5550,8 @@ registered (admin / not mounted) → the bill synchronously, as before. Only the
 newest poll read is applied (a stale empty poll cannot drop the question).
 Tests: `dueConfirmGate.test.ts`, `DueConfirmNotifier.test.tsx`,
 `SessionsBoard.expiry.test.tsx`, `e2e/due-before-receipt.spec.ts` (fake Reverb).
+The asker resolves with the ANSWER (`DueAnswer`: `paid` «Да» / `taken` «Нет» /
+`null`); the board keeps it per seat and hands it to `StopReceiptModal`
+(`dueAnswer`) → `PrepaidSettlement` `duePaidDuringPlay`: after «Да» the bill
+says «Оплачено полностью», never «Доплатить»; after «Нет», «Позже» or no
+question, «Доплатить» as before. Display only — the figures are the server's.
