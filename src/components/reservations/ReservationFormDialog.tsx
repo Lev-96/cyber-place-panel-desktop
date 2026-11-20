@@ -3,6 +3,7 @@ import { useConfirm } from "@/components/ui/ConfirmProvider";
 import Input from "@/components/ui/Input";
 import MaskedDateInput from "@/components/ui/MaskedDateInput";
 import Modal from "@/components/ui/Modal";
+import Switch from "@/components/ui/Switch";
 import ClockInput from "@/components/sessions/ClockInput";
 import DurationInput from "@/components/sessions/DurationInput";
 import { clockOfDraft, draftMinutes, draftOf, type ClockDraft, type DurationDraft } from "@/components/sessions/durationModel";
@@ -52,12 +53,13 @@ const initialOf = (mode: ReservationFormMode) => {
       date: r.booking_date,
       start: clockDraftOf(r.start_time),
       hold: draftOf(r.duration_minutes),
+      untilClose: r.until_close === true,
       name: r.contact_name ?? "",
       phone: formatArmenianPhone(r.contact_phone),
     };
   }
   const start = mode.start ?? roundUpToStep(new Date());
-  return { placeId: mode.placeId, date: ymd(start), start: clockDraftOf(hm(start)), hold: draftOf(DEFAULT_MINUTES), name: "", phone: "" };
+  return { placeId: mode.placeId, date: ymd(start), start: clockDraftOf(hm(start)), hold: draftOf(DEFAULT_MINUTES), untilClose: false, name: "", phone: "" };
 };
 
 /**
@@ -80,6 +82,7 @@ const ReservationFormDialog = ({ places, mode, onClose, onSaved }: Props) => {
   const [date, setDate] = useState(initial.date);
   const [start, setStart] = useState<ClockDraft>(initial.start);
   const [hold, setHold] = useState<DurationDraft>(initial.hold);
+  const [untilClose, setUntilClose] = useState(initial.untilClose);
   const [name, setName] = useState(initial.name);
   const [phone, setPhone] = useState(initial.phone);
   const [phoneLeft, setPhoneLeft] = useState(false);
@@ -93,8 +96,8 @@ const ReservationFormDialog = ({ places, mode, onClose, onSaved }: Props) => {
   const seatLabel = (id: number) => places.find((p) => p.id === id)?.label ?? `#${id}`;
 
   const draft: ReservationDraft | null =
-    minutes !== null && minutes >= MIN_MINUTES && startTime !== null && parseYmd(date) !== null && nameValid && phoneValid
-      ? { placeId, date, startTime, minutes, name, phone }
+    (untilClose || (minutes !== null && minutes >= MIN_MINUTES)) && startTime !== null && parseYmd(date) !== null && nameValid && phoneValid
+      ? { placeId, date, startTime, minutes: minutes ?? 0, untilClose, name, phone }
       : null;
   const edit = mode.kind === "edit" && draft ? editPatch(mode.reservation, draft) : null;
   const ready = draft !== null && !busy && (edit === null || Object.keys(edit.patch).length > 0);
@@ -146,10 +149,20 @@ const ReservationFormDialog = ({ places, mode, onClose, onSaved }: Props) => {
           </div>
           <div className="reservation-form__field">
             <span className="label">{t("reserve.hold")}</span>
-            <DurationInput value={hold} onChange={setHold} label={t("reserve.hold")} maxMinutes={MAX_MINUTES} invalidText={t("reserve.holdInvalid")} disabled={busy} testId="reserve-hold" />
+            {untilClose
+              ? <span className="reservation-form__until-close" data-testid="reserve-until-close-note">{t("reserve.untilCloseNote")}</span>
+              : <DurationInput value={hold} onChange={setHold} label={t("reserve.hold")} maxMinutes={MAX_MINUTES} invalidText={t("reserve.holdInvalid")} disabled={busy} testId="reserve-hold" />}
           </div>
         </div>
-        <span className="muted reservation-form__note">{t("reserve.holdHint")}</span>
+        <Switch
+          checked={untilClose}
+          onChange={setUntilClose}
+          label={t("reserve.untilClose")}
+          size="md"
+          disabled={busy}
+          testId="reserve-until-close"
+        />
+        <span className="muted reservation-form__note">{t(untilClose ? "reserve.untilCloseHint" : "reserve.holdHint")}</span>
 
         <label className="reservation-form__field">
           <span className="label">{t("reserve.name")} <span className="muted">({t("reserve.optional")})</span></span>

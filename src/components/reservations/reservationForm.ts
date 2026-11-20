@@ -9,9 +9,13 @@ import type { ReservationPatch } from "@/api/bookings";
 import type { StaffReservation } from "@/domain/StaffReservation";
 import { formatArmenianPhone, normalizeArmenianPhone } from "@/utils/armenianPhone";
 
-/** The server's bounds for a reservation's length (`ReservationFormRequest`). */
+/**
+ * The server's bounds for a reservation's length (`ReservationFormRequest`).
+ * Since 2026-11-20 (owner) there is no ceiling of its own: the branch's
+ * closing is the limit, and the server says so; 24 h is only a sanity bound.
+ */
 export const MIN_MINUTES = 15;
-export const MAX_MINUTES = 300;
+export const MAX_MINUTES = 1440;
 export const DEFAULT_MINUTES = 60;
 
 const NAME_MIN = 2;
@@ -43,7 +47,10 @@ export interface ReservationDraft {
   date: string;
   /** "H:i" */
   startTime: string;
+  /** Ignored when `untilClose`: the server works the length out. */
   minutes: number;
+  /** «Без лимита»: held until the branch closes. */
+  untilClose: boolean;
   /** As typed; normalised here. */
   name: string;
   /** As masked; normalised here. */
@@ -55,7 +62,7 @@ export const createBody = (d: ReservationDraft) => {
   const name = normalizeName(d.name);
   const phone = normalizeArmenianPhone(d.phone);
   return {
-    minutes: d.minutes,
+    ...(d.untilClose ? { until_close: true } : { minutes: d.minutes }),
     date: d.date,
     start_time: d.startTime,
     ...(name !== null ? { name } : {}),
@@ -73,7 +80,15 @@ export const editPatch = (r: StaffReservation, d: ReservationDraft): { patch: Re
   if (!r.place_ids.includes(d.placeId) || r.place_ids.length !== 1) patch.place_id = d.placeId;
   if (d.date !== r.booking_date) patch.date = d.date;
   if (d.startTime !== r.start_time) patch.start_time = d.startTime;
-  if (d.minutes !== r.duration_minutes) patch.minutes = d.minutes;
+  const wasUntilClose = r.until_close === true;
+  if (d.untilClose) {
+    // Switched on: the server re-reads the closing. Kept on: a moved start
+    // re-reads it by itself, so nothing more is sent.
+    if (!wasUntilClose) patch.until_close = true;
+  } else if (wasUntilClose || d.minutes !== r.duration_minutes) {
+    // A length typed (or «Без лимита» switched off): a fixed one.
+    patch.minutes = d.minutes;
+  }
   const moves = Object.keys(patch).length > 0;
 
   const name = normalizeName(d.name);

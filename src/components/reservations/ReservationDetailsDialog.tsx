@@ -36,7 +36,7 @@ const ReservationDetailsDialog = ({ reservation: r, seats, onClose, onEdit, onCa
 
   const rows: [string, React.ReactNode][] = [
     [t("reserve.seat"), seats.labelsOf(r.place_ids)],
-    [t("calendar.details.time"), `${formatDate(r.start)} ${windowOf(r)}`],
+    [t("calendar.details.time"), `${formatDate(r.start)} ${windowOf(r)}${r.until_close === true ? ` (${t("reserve.untilCloseNote")})` : ""}`],
     [t("reserve.name"), reservationWho(r) ?? t("reserve.noName")],
     [t("reserve.phone"), r.contact_phone ? <a href={telHref(r.contact_phone)}>{phone}</a> : "-"],
     [t("calendar.details.status"), t(`bookingDetails.status.${r.status}`)],

@@ -9409,6 +9409,16 @@ select.input option:disabled {
 /* The seat picker: «№N · name» cut with an ellipsis, the whole line its title. */
 .reservation-form__seat { min-width: 0; text-overflow: ellipsis; }
 .reservation-form__note { font-size: var(--fs-sm); line-height: 1.4; }
+/* «Без лимита» (2026-11-20): in place of the length box, the same height. */
+.reservation-form__until-close {
+  display: flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 0 12px;
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-md, 8px);
+  font-weight: 600;
+}
 .reservation-details__list { margin: 0; display: flex; flex-direction: column; gap: var(--space-2); }
 .reservation-details__row { display: flex; gap: var(--space-3); line-height: 1.4; }
 .reservation-details__row dt { flex: 0 0 120px; font-size: var(--fs-sm); }

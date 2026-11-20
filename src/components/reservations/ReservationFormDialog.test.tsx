@@ -107,11 +107,28 @@ describe("a new reservation", () => {
     }
   });
 
-  test("15 minutes to 5 hours: 5 h 30 is refused before sending", async () => {
+  // 2026-11-20 (owner): no 5-hour ceiling; the branch's closing is the
+  // limit, and the server judges it. Under 15 minutes is still refused here.
+  test("any length from 15 minutes: 7 h 30 is sent; 10 minutes is refused before sending", async () => {
     await mount();
-    await type(screen.getByTestId("reserve-hold-hours"), "5");
-    await type(screen.getByTestId("reserve-hold-minutes"), "30");
+    await type(screen.getByTestId("reserve-hold-hours"), "0");
+    await type(screen.getByTestId("reserve-hold-minutes"), "10");
     expect(confirmBtn().disabled).toBe(true);
+    await type(screen.getByTestId("reserve-hold-hours"), "7");
+    await type(screen.getByTestId("reserve-hold-minutes"), "30");
+    expect(confirmBtn().disabled).toBe(false);
+    await submit();
+    expect(repo.reserve).toHaveBeenCalledWith(10, { minutes: 450, date: "2026-11-07", start_time: "15:05" });
+  });
+
+  test("«Без лимита»: no length box, `until_close` sent instead of minutes", async () => {
+    await mount();
+    await act(async () => { fireEvent.click(screen.getByTestId("reserve-until-close")); });
+    expect(screen.queryByTestId("reserve-hold-hours")).toBeNull();
+    expect(screen.getByTestId("reserve-until-close-note").textContent).toBe("reserve.untilCloseNote");
+    expect(screen.getByText("reserve.untilCloseHint")).toBeTruthy();
+    await submit();
+    expect(repo.reserve).toHaveBeenCalledWith(10, { until_close: true, date: "2026-11-07", start_time: "15:05" });
   });
 
   test("the server's refusal is shown in the form, which stays", async () => {
@@ -126,6 +143,28 @@ describe("a new reservation", () => {
 });
 
 describe("editing a reservation", () => {
+  test("«Без лимита» kept, start moved: only the start is sent (the server re-reads the closing)", async () => {
+    await mount({ kind: "edit", reservation: staffRow({ until_close: true, duration_minutes: 300 }) });
+    expect(screen.getByTestId("reserve-until-close").getAttribute("aria-checked")).toBe("true");
+    await type(screen.getByTestId("reserve-start-hours"), "19");
+    await submit();
+    expect(repo.updateReservation).toHaveBeenCalledWith(77, { start_time: "19:00" });
+  });
+
+  test("«Без лимита» switched off: the shown length is sent as a fixed one", async () => {
+    await mount({ kind: "edit", reservation: staffRow({ until_close: true, duration_minutes: 300 }) });
+    await act(async () => { fireEvent.click(screen.getByTestId("reserve-until-close")); });
+    await submit();
+    expect(repo.updateReservation).toHaveBeenCalledWith(77, { minutes: 300 });
+  });
+
+  test("a fixed one switched to «Без лимита»: `until_close` alone", async () => {
+    await mount({ kind: "edit", reservation: staffRow() });
+    await act(async () => { fireEvent.click(screen.getByTestId("reserve-until-close")); });
+    await submit();
+    expect(repo.updateReservation).toHaveBeenCalledWith(77, { until_close: true });
+  });
+
   test("prefilled from the row; nothing changed means nothing to save", async () => {
     await mount({ kind: "edit", reservation: staffRow() });
     expect(field("reserve.name").value).toBe("Aram");

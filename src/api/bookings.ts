@@ -38,6 +38,8 @@ export interface ReserveBody {
   date?: string;
   /** "H:i", 24-hour */
   start_time?: string;
+  /** «Без лимита» (2026-11-20): held until the branch closes; `minutes` is not sent with it. */
+  until_close?: boolean;
 }
 
 /**

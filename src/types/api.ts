@@ -297,6 +297,11 @@ export interface IStaffReservationApi {
   session_id: number | null;
   /** The server's answer to "may staff move or edit it" (`StoreService::staffMayEdit`). */
   editable: boolean;
+  /**
+   * «Без лимита» (2026-11-20): staff held the seat until the branch closes;
+   * the server worked out the length. Absent from an older backend = false.
+   */
+  until_close?: boolean;
 }
 
 export interface IBranchApi extends Translated {
