@@ -42,6 +42,12 @@ interface Props {
    * `session.free` — the server checks it again). Absent: not offered.
    */
   canCancel?: boolean;
+  /**
+   * A seat that ended by itself owing more (2026-11-20, owner): what
+   * «Эти товары оплатили?» answered. `paid` («Да») — the player had paid it:
+   * no «Доплатить» on this bill. Display only; the figures stay the server's.
+   */
+  dueAnswer?: "paid" | "taken" | null;
 }
 
 const fmtDuration = (mins: number, t: (k: string) => string) => {
@@ -59,7 +65,7 @@ const fmtDuration = (mins: number, t: (k: string) => string) => {
  * source of truth — same calculator used by /stop), shows time + items, lets
  * cashier remove items, then confirms stop.
  */
-const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved, canResetTime = false, onTimeReset, canCancel = false }: Props) => {
+const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved, canResetTime = false, onTimeReset, canCancel = false, dueAnswer = null }: Props) => {
   const { money, t } = useLang();
   const ask = useConfirm();
   const [bill, setBill] = useState<IBillBreakdown | null>(null);
@@ -568,6 +574,7 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved, canRes
               <PrepaidSettlement
                 prepaid={view.prepaid}
                 changeAfterStop={stopped !== null ? Number(handover?.change ?? prepaidCashChange(view.prepaid)) : undefined}
+                duePaidDuringPlay={dueAnswer === "paid"}
                 t={t}
                 money={(n) => money(n, receiptPrecision)}
               />

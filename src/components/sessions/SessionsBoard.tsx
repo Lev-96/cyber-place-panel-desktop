@@ -53,7 +53,7 @@ import RelocateSessionDialog from "./RelocateSessionDialog";
 import { BASE_JOYSTICKS, MAX_JOYSTICKS } from "@/api/joystickPrices";
 import { notify } from "@/ui/notify";
 import StopReceiptModal from "./StopReceiptModal";
-import { afterDueConfirmed } from "@/components/notifications/dueConfirmGate";
+import { afterDueConfirmed, type DueAnswer } from "@/components/notifications/dueConfirmGate";
 import UnpaidAlert, { type UnpaidNotice } from "./UnpaidAlert";
 import SessionCardChips from "./SessionCardChips";
 import { playFor } from "@/sound/soundEngine";
@@ -109,6 +109,9 @@ const SessionsBoard = ({ branchId }: Props) => {
   // opens it on that seat and today; the header's «Календарь броней» on all.
   const [calendar, setCalendar] = useState<{ focusPlaceId?: number } | null>(null);
   const [stopTarget, setStopTarget] = useState<ISessionApi | null>(null);
+  // «Эти товары оплатили?» answered per ended seat (2026-11-20): «Да» → its
+  // bill says paid in full instead of «Доплатить». Display only.
+  const dueAnswers = useRef(new Map<number, DueAnswer>());
   const [addItemTarget, setAddItemTarget] = useState<ISessionApi | null>(null);
   // The till's sale, opened from the board's header (2026-10-25).
   const [sellOpen, setSellOpen] = useState(false);
@@ -408,7 +411,13 @@ const SessionsBoard = ({ branchId }: Props) => {
         // ended and still on the board's history — what it loses is the popup.
         // «Эти товары оплатили?» first (2026-11-20, owner): the bill opens
         // once that is answered — at once when there is nothing to confirm.
-        if (ended) afterDueConfirmed(evt.session_id, () => setStopTarget((current) => current ?? { ...ended, status: "expired" }));
+        if (ended) {
+          afterDueConfirmed(evt.session_id, (answer) => {
+            // What «оплатили?» answered, for this seat's bill (2026-11-20).
+            dueAnswers.current.set(evt.session_id, answer);
+            setStopTarget((current) => current ?? { ...ended, status: "expired" });
+          });
+        }
       }
       // The receipt open on THIS seat, ended elsewhere (another cashier, the
       // clock) while it was on screen (2026-10-25): it turns into that final
@@ -1361,7 +1370,8 @@ const SessionsBoard = ({ branchId }: Props) => {
       {stopTarget && (
         <StopReceiptModal
           session={stopTarget}
-          onClose={() => { setStopTarget(null); void sessions.reload(); void pcs.reload(); }}
+          dueAnswer={dueAnswers.current.get(stopTarget.id) ?? null}
+          onClose={() => { dueAnswers.current.delete(stopTarget.id); setStopTarget(null); void sessions.reload(); void pcs.reload(); }}
           onConfirmed={(outcome) => {
             // The session is over on the backend, so the console should be
             // asleep. Whether this build can actually ask it to is the

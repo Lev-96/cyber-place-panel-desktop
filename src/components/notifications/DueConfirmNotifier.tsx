@@ -13,7 +13,7 @@ import { notify } from "@/ui/notify";
 import type { PaymentMethod } from "@/api/sessions";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { centsWhenFractional } from "@/i18n/currency";
-import { registerDueAsker } from "./dueConfirmGate";
+import { registerDueAsker, type DueAnswer } from "./dueConfirmGate";
 
 /** How often the list is read again while the panel is open. */
 export const DUE_POLL_MS = 30_000;
@@ -57,7 +57,9 @@ const DueConfirmNotifier = () => {
   const rang = useRef(new Set<number>());
   // Ended seats whose final bill waits for this window: resolved once the
   // seat is no longer being asked about (answered, «Позже», or gone).
-  const waiting = useRef(new Map<number, Array<() => void>>());
+  const waiting = useRef(new Map<number, Array<(answer: DueAnswer) => void>>());
+  // What was answered for a seat, handed to its bill (2026-11-20).
+  const answered = useRef(new Map<number, DueAnswer>());
   // Only the newest read is applied: a poll sent before a seat ended must
   // not land after the board's own read and drop that seat again.
   const reads = useRef(0);
@@ -74,7 +76,7 @@ const DueConfirmNotifier = () => {
   useEffect(() => {
     if (!asks) return undefined;
     const pending = waiting.current;
-    const unregister = registerDueAsker((sessionId) => new Promise<void>((resolve) => {
+    const unregister = registerDueAsker((sessionId) => new Promise<DueAnswer>((resolve) => {
       ++reads.current;
       sessionRepository.duesToConfirm()
         .then((list) => {
@@ -83,17 +85,17 @@ const DueConfirmNotifier = () => {
             later.current.delete(sessionId);
             pending.set(sessionId, [...(pending.get(sessionId) ?? []), resolve]);
           } else {
-            resolve();
+            resolve(null);
           }
           // Always applied: read after the seat ended, it is never the stale one.
           setDues(fresh);
         })
         // Not readable now: the bill opens; the poll asks later.
-        .catch(() => resolve());
+        .catch(() => resolve(null));
     }));
     return () => {
       unregister();
-      for (const fns of pending.values()) fns.forEach((f) => f());
+      for (const fns of pending.values()) fns.forEach((f) => f(null));
       pending.clear();
     };
   }, [asks]);
@@ -104,8 +106,10 @@ const DueConfirmNotifier = () => {
     for (const [id, fns] of [...waiting.current]) {
       const asked = dues.some((d) => d.session_id === id) && (later.current.get(id) ?? 0) <= at;
       if (!asked) {
+        const answer = answered.current.get(id) ?? null;
         waiting.current.delete(id);
-        fns.forEach((f) => f());
+        answered.current.delete(id);
+        fns.forEach((f) => f(answer));
       }
     }
   }, [dues]);
@@ -156,6 +160,7 @@ const DueConfirmNotifier = () => {
     setErr(null);
     try {
       await sessionRepository.confirmDue(current.session_id, paymentBody(pay, check));
+      answered.current.set(current.session_id, step === "paid" ? "paid" : "taken");
       notify.message("success", fmt(t("dueConfirm.done"), seat));
       setDues((list) => list.filter((d) => d.session_id !== current.session_id));
       load();

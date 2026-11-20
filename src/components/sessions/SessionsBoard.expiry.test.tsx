@@ -217,20 +217,47 @@ describe("a seat that ends on its own clock", () => {
   // «Эти товары оплатили?» first (2026-11-20, owner): the bill of a seat
   // that ended by itself waits for that answer, then opens.
   test("the receipt waits for «оплатили?» to be answered, then opens", async () => {
-    let answer: () => void = () => {};
+    let answer: (a: "paid" | "taken" | null) => void = () => {};
     const asked: number[] = [];
-    const off = registerDueAsker((id) => { asked.push(id); return new Promise<void>((r) => { answer = r; }); });
+    const off = registerDueAsker((id) => { asked.push(id); return new Promise((r) => { answer = r; }); });
     try {
       await mount();
       await fire(event());
       expect(asked).toEqual([42]);
       expect(screen.queryByText("session.checkoutDone")).toBeNull();
-      await act(async () => { answer(); await Promise.resolve(); });
+      await act(async () => { answer(null); await Promise.resolve(); });
       expect(screen.getByText("session.checkoutDone")).toBeTruthy();
     } finally {
       off();
     }
   });
+
+  // «Да» → the player had paid it during play: the bill never says
+  // «Доплатить»; «Нет» (taken now) keeps it (2026-11-20, owner).
+  for (const [answered, shown] of [["paid", "receipt-prepaid-full"], ["taken", "receipt-prepaid-due"]] as const) {
+    test(`answered «${answered}»: the bill shows ${shown}`, async () => {
+      repo.preview.mockResolvedValue({
+        mode: "fixed", is_free: false, is_unlimited: false, elapsed_minutes: 60,
+        time_cost: 170, hourly_rate: 170, package_name: null, items: [], items_total: 700,
+        joysticks: [], joysticks_total: 0, subtotal: 870, gross_total: 870, total: 870,
+        prepaid: { amount: 170, change: 0, due: 700, by_method: { card: 170 }, refund: {} },
+        payment_recorded: true,
+      });
+      let answer: (a: "paid" | "taken" | null) => void = () => {};
+      const off = registerDueAsker(() => new Promise((r) => { answer = r; }));
+      try {
+        await mount();
+        await fire(event());
+        await act(async () => { answer(answered); await Promise.resolve(); });
+        await act(async () => { await Promise.resolve(); });
+        expect(screen.getByTestId(shown)).toBeTruthy();
+        if (answered === "paid") expect(screen.queryByTestId("receipt-prepaid-due")).toBeNull();
+        else expect(screen.getByTestId("receipt-prepaid-due").textContent).toContain("700");
+      } finally {
+        off();
+      }
+    });
+  }
 
   test("a colleague pressing Stop opens nothing", async () => {
     await mount();

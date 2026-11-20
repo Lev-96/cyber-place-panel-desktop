@@ -131,6 +131,8 @@ describe("DueConfirmNotifier — first the question, then the bill", () => {
     expect(repo.confirmDue).toHaveBeenCalledWith(7, { payment_method: "card" });
     expect(screen.queryByTestId("due-confirm")).toBeNull();
     expect(bill).toHaveBeenCalledTimes(1);
+    // «Да»: the bill is told it was paid during play.
+    expect(bill).toHaveBeenCalledWith("paid");
   });
 
   test("«Нет» → taken now: the bill opens only after it is saved", async () => {
@@ -143,6 +145,7 @@ describe("DueConfirmNotifier — first the question, then the bill", () => {
     await act(async () => { fireEvent.click(screen.getByTestId("due-confirm-save")); });
     expect(repo.confirmDue).toHaveBeenCalledWith(7, { payment_method: "cash" });
     expect(bill).toHaveBeenCalledTimes(1);
+    expect(bill).toHaveBeenCalledWith("taken");
   });
 
   test("«Позже»: the bill opens; the seat is asked about again later", async () => {
@@ -152,6 +155,7 @@ describe("DueConfirmNotifier — first the question, then the bill", () => {
     expect(bill).not.toHaveBeenCalled();
     await act(async () => { fireEvent.click(screen.getByTestId("due-confirm-later")); });
     expect(bill).toHaveBeenCalledTimes(1);
+    expect(bill).toHaveBeenCalledWith(null);
     expect(screen.queryByTestId("due-confirm")).toBeNull();
   });
 

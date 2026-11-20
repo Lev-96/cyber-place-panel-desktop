@@ -12,7 +12,15 @@
  * With nobody registered (not an owner or manager, or not mounted) the bill
  * opens at once, synchronously — exactly as before this seam existed.
  */
-export type DueAsker = (sessionId: number) => Promise<void>;
+/**
+ * How that seat's question ended (2026-11-20, owner): «Да, оплатили»
+ * (`paid` — the player had paid it during play), «Нет, принять оплату»
+ * (`taken` — taken now), or not answered (`null`: nothing to confirm, «Позже»,
+ * not readable). The bill shows «Доплатить» unless it was `paid`.
+ */
+export type DueAnswer = "paid" | "taken" | null;
+
+export type DueAsker = (sessionId: number) => Promise<DueAnswer>;
 
 let asker: DueAsker | null = null;
 
@@ -28,20 +36,20 @@ export const registerDueAsker = (fn: DueAsker): (() => void) => {
  * Run `then` once this ended seat's due (if any) is answered. Never throws
  * and never swallows `then`: a failed read still opens the bill.
  */
-export const afterDueConfirmed = (sessionId: number, then: () => void): void => {
+export const afterDueConfirmed = (sessionId: number, then: (answer: DueAnswer) => void): void => {
   if (asker === null) {
-    then();
+    then(null);
     return;
   }
   let done = false;
-  const once = () => {
+  const once = (answer: DueAnswer) => {
     if (done) return;
     done = true;
-    then();
+    then(answer);
   };
   try {
-    asker(sessionId).then(once, once);
+    asker(sessionId).then((answer) => once(answer ?? null), () => once(null));
   } catch {
-    once();
+    once(null);
   }
 };

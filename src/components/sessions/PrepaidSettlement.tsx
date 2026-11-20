@@ -19,6 +19,12 @@ interface Props {
    * Undefined while the receipt is still a preview.
    */
   changeAfterStop?: number;
+  /**
+   * «Эти товары оплатили?» answered «Да» (2026-11-20, owner): what was owed
+   * had been paid during play, so the bill says «Оплачено полностью», never
+   * «Доплатить». Only after «Нет» (taken now) is «Доплатить» shown.
+   */
+  duePaidDuringPlay?: boolean;
   t: (k: string) => string;
   money: (n: number) => string;
 }
@@ -34,7 +40,7 @@ interface Props {
  *
  * Nothing is subtracted here.
  */
-const PrepaidSettlement = ({ prepaid, changeAfterStop, t, money }: Props) => {
+const PrepaidSettlement = ({ prepaid, changeAfterStop, duePaidDuringPlay = false, t, money }: Props) => {
   const change = changeAfterStop ?? prepaidCashChange(prepaid);
   // Paid ahead by card / «Другое» and not all of it used (2026-11-17): it goes
   // back the way it came — said apart from the cash change, so nobody takes
@@ -42,7 +48,7 @@ const PrepaidSettlement = ({ prepaid, changeAfterStop, t, money }: Props) => {
   const cardBack = Number(prepaid.refund?.card ?? 0);
   const otherBack = Number(prepaid.refund?.other ?? 0);
   const anyBack = change > 0 || cardBack > 0 || otherBack > 0;
-  const due = changeAfterStop !== undefined ? 0 : Number(prepaid.due);
+  const due = changeAfterStop !== undefined || duePaidDuringPlay ? 0 : Number(prepaid.due);
   return (
     <div className="prepaid-settlement" data-testid="receipt-prepaid">
       <div className="prepaid-settlement__row" data-testid="receipt-prepaid-amount">

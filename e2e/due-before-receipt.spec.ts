@@ -56,7 +56,8 @@ const bill = {
   mode: "fixed", is_free: false, is_unlimited: false, elapsed_minutes: 60, time_cost: 1000, hourly_rate: 1000, package_name: null,
   items: [{ id: 1, name: "Coca-Cola", qty: 3, price: 500, line_total: 1500 }, { id: 2, name: "Chips", qty: 1, price: 300, line_total: 300 }],
   items_total: 1800, unpaid_items_total: 0, joysticks: [], joysticks_total: 0, subtotal: 2800, gross_total: 2800, total: 2800,
-  priced_at: new Date().toISOString(), prepaid: null, payment_recorded: true,
+  priced_at: new Date().toISOString(), payment_recorded: true,
+  prepaid: { amount: 1500, change: 0, due: 1300, by_method: { card: 1500 }, refund: {} },
 };
 
 const setUp = async (page: Page, lang: (typeof LANGS)[number], width: number, owes: boolean) => {
@@ -116,6 +117,13 @@ for (const lang of LANGS) {
 
         await expect(ask).toHaveCount(0);
         await expect(page.getByTestId("checkout-ended-elsewhere")).toBeVisible();
+        // «Да»: paid during play — no «Доплатить»; «Нет»: taken now — shown (2026-11-20, owner).
+        if (answer === "yes") {
+          await expect(page.getByTestId("receipt-prepaid-full")).toBeVisible();
+          await expect(page.getByTestId("receipt-prepaid-due")).toHaveCount(0);
+        } else {
+          await expect(page.getByTestId("receipt-prepaid-due")).toContainText("1");
+        }
         await page.waitForTimeout(300);
         await page.screenshot({ path: `${SHOTS}/2-bill-${answer}-${lang}-${width}.png` });
       });
