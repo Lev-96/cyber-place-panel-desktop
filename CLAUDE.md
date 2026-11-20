@@ -5531,3 +5531,14 @@ part, «Оплачено заранее, без доплаты» for none). `sal
 products, «Доплата», what was paid ahead — «Да, оплатили» (starts on the way
 paid ahead) / «Нет, принять оплату» (cash) → `PaymentEditor` → `confirm-due`;
 «Позже» = 10 min. Tests: `DueConfirmNotifier.test.tsx`, `e2e/due-confirm.spec.ts`.
+
+**Order after a seat ends by itself** (2026-11-20, owner): the question FIRST,
+then the final bill. `SessionsBoard`'s `expired` handler calls
+`afterDueConfirmed(sessionId, openBill)` (`notifications/dueConfirmGate.ts`);
+the notifier registers the asker: it reads the list at once — the seat owing →
+the window now, the bill after «Да»/«Нет» + the way of paying is saved (or
+«Позже»); nothing to confirm or the read fails → the bill at once. Nobody
+registered (admin / not mounted) → the bill synchronously, as before. Only the
+newest poll read is applied (a stale empty poll cannot drop the question).
+Tests: `dueConfirmGate.test.ts`, `DueConfirmNotifier.test.tsx`,
+`SessionsBoard.expiry.test.tsx`, `e2e/due-before-receipt.spec.ts` (fake Reverb).
