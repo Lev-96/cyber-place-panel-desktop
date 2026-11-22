@@ -5668,6 +5668,16 @@ drives `StopReceiptModal`'s `markable`.
   so the money paid buys time at the new seat's rate; the relocate dialog says
   so (`relocate-paid-ahead`, `session.relocatePaidAhead`) when the seat is paid
   ahead and the chosen seat's rate differs. Nothing computed here.
+- **QA fixes (2026-11-22)** — the «не оплачено» notice of a seat that ended
+  by itself is raised only when «оплатили?» was NOT answered (answer `null`,
+  or nothing to confirm); a notice whose bill was seen among the open bills
+  and then left them (a colleague took the payment) goes. The receipt's
+  «Из них выдано без оплаты: возьмите сейчас» line shows only while the
+  payment is not on record (`payment_recorded`, our own Stop, a mark here).
+- **«Не оплачено» notice once per person** — `UnpaidOnNotice` `kind`
+  (`start` / `goods`): shown the first time only, remembered per person
+  (`u{id}:cp.unpaidOnNotice.{kind}` in `keyValueStore`); the switch stays ON
+  by default. Unreadable store or no user: shown.
 - **Board counts as chips** — «Всего / Занято / Забронировано / Свободно»
   (`board-counts`, `session.countTotal|countBusy|countBooked|countFree`) on a
   tint of the theme's primary / danger (red) / warning (orange) / success;
