@@ -5664,6 +5664,10 @@ drives `StopReceiptModal`'s `markable`.
   `StopReceiptModal`, the same payment. The banner shows each seat's sum and
   «Закрыть счёт», and pulses 3× when a new open bill appears (reduced motion:
   none). Nothing read or computed outside the notifier.
+- **Moving a seat paid ahead** (2026-11-22, owner) — the server moves the end
+  so the money paid buys time at the new seat's rate; the relocate dialog says
+  so (`relocate-paid-ahead`, `session.relocatePaidAhead`) when the seat is paid
+  ahead and the chosen seat's rate differs. Nothing computed here.
 - **Board counts as chips** — «Всего / Занято / Забронировано / Свободно»
   (`board-counts`, `session.countTotal|countBusy|countBooked|countFree`) on a
   tint of the theme's primary / danger (red) / warning (orange) / success;
