@@ -118,4 +118,60 @@ describe("TvScreensDialog", () => {
     await flush();
     expect(api.unpair).toHaveBeenCalledWith(3);
   });
+
+  describe("on the desktop, TVs found on the club network", () => {
+    const g = globalThis as { cyberplaceTV?: unknown };
+    afterEach(() => { delete g.cyberplaceTV; });
+
+    test("are listed and paired by choosing a place, with no code to type", async () => {
+      g.cyberplaceTV = { discover: vi.fn().mockResolvedValue([
+        { address: "192.168.1.45", code: "654321", env: "staging", maker: "Sony", model: "BRAVIA 4K" },
+      ]) };
+      api.pair.mockResolvedValue(tv());
+      await mount();
+      await flush();
+      const row = screen.getByTestId("tv-found");
+      expect(row.textContent).toContain("Sony BRAVIA 4K");
+      expect(row.textContent).toContain("192.168.1.45");
+      const button = row.querySelector("button") as HTMLButtonElement;
+      expect(button.disabled).toBe(true);
+
+      fireEvent.change(row.querySelector("select") as HTMLSelectElement, { target: { value: "8" } });
+      expect(button.disabled).toBe(false);
+      await act(async () => { fireEvent.click(button); });
+      await flush();
+
+      expect(api.pair).toHaveBeenCalledWith(1, { code: "654321", place_id: 8, name: "Sony BRAVIA 4K" });
+      expect(screen.queryByTestId("tv-found")).toBeNull();
+    });
+
+    test("a refused pairing is said and the TV stays to try again", async () => {
+      g.cyberplaceTV = { discover: vi.fn().mockResolvedValue([
+        { address: "192.168.1.45", code: "654321", env: "staging", maker: "Sony", model: "BRAVIA 4K" },
+      ]) };
+      api.pair.mockRejectedValue(Object.assign(new Error("x"), { body: { code: "tv_code_unknown" } }));
+      await mount();
+      await flush();
+      const row = screen.getByTestId("tv-found");
+      fireEvent.change(row.querySelector("select") as HTMLSelectElement, { target: { value: "7" } });
+      await act(async () => { fireEvent.click(row.querySelector("button") as HTMLButtonElement); });
+      await flush();
+      expect(screen.getByRole("alert").textContent).toContain("Ни один телевизор не показывает этот код");
+      expect(screen.getByTestId("tv-found")).toBeTruthy();
+    });
+
+    test("nothing found says what to check", async () => {
+      g.cyberplaceTV = { discover: vi.fn().mockResolvedValue([]) };
+      await mount();
+      await flush();
+      expect(screen.getByTestId("tv-network-empty").textContent).toContain("в той же сети");
+    });
+  });
+
+  test("in the owner web (no bridge) only the code form is offered", async () => {
+    await mount();
+    expect(screen.queryByTestId("tv-network")).toBeNull();
+    expect(screen.getByTestId("tv-pair-form")).toBeTruthy();
+  });
 });
+

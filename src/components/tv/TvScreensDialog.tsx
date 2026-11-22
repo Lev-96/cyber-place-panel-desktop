@@ -14,7 +14,9 @@ import { ListSkeleton } from "@/components/ui/Skeleton";
 import { useConfirm } from "@/components/ui/ConfirmProvider";
 import { useAsync } from "@/hooks/useAsync";
 import { useLang } from "@/i18n/LanguageContext";
+import { tvDiscoveryAvailable } from "@/tv/tvDiscovery";
 import { IBranchPlace } from "@/types/api";
+import TvNetworkFinder from "./TvNetworkFinder";
 import { FormEvent, useState } from "react";
 
 interface Props {
@@ -33,8 +35,10 @@ const placeLabel = (p: { number?: number | null; name?: string | null; id: numbe
  * The branch's TVs (2026-11-23): pair one by the code on its screen, move it
  * to another place, unpair it.
  *
- * Only server calls — no LAN, no bridge — so it works the same on the desktop
- * and in the owner web. It never touches consoles, computers or sessions.
+ * On the desktop the TVs waiting on the club network are listed first
+ * (TvNetworkFinder, its own bridge); typing the code stays for the owner web
+ * and as a fallback. Both pair through the same server call. It never touches
+ * consoles, computers or sessions.
  */
 const TvScreensDialog = ({ branchId, places, onClose }: Props) => {
   const { t } = useLang();
@@ -46,6 +50,8 @@ const TvScreensDialog = ({ branchId, places, onClose }: Props) => {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Read once: the desktop's bridge either exists or it does not.
+  const [networkSearch] = useState(tvDiscoveryAvailable);
   const cleanCode = normalizeTvCode(code);
   const canPair = isTvCode(cleanCode) && placeId !== "" && !busy;
 
@@ -54,19 +60,29 @@ const TvScreensDialog = ({ branchId, places, onClose }: Props) => {
     return body?.code === "tv_code_unknown" ? t("tv.error.code") : t("tv.error.generic");
   };
 
+  /** The one pairing call, for the code form and the network list alike. */
+  const pairCode = async (pairingCode: string, place: number, pairName: string | null): Promise<void> => {
+    setError(null);
+    try {
+      await apiPairTvScreen(branchId, { code: pairingCode, place_id: place, name: pairName });
+      await screens.reload();
+    } catch (err) {
+      setError(failure(err));
+      throw err;
+    }
+  };
+
   const pair = async (e: FormEvent) => {
     e.preventDefault();
     if (!canPair) return;
     setBusy(true);
-    setError(null);
     try {
-      await apiPairTvScreen(branchId, { code: cleanCode, place_id: Number(placeId), name: name.trim() || null });
+      await pairCode(cleanCode, Number(placeId), name.trim() || null);
       setCode("");
       setName("");
       setPlaceId("");
-      await screens.reload();
-    } catch (err) {
-      setError(failure(err));
+    } catch {
+      // pairCode showed the reason.
     } finally {
       setBusy(false);
     }
@@ -100,6 +116,9 @@ const TvScreensDialog = ({ branchId, places, onClose }: Props) => {
       <div className="card tv-dialog" style={{ width: 600, maxWidth: "92vw", display: "flex", flexDirection: "column", gap: 16 }}>
         <h2 style={{ margin: 0 }}>{t("tv.title")}</h2>
         <div className="muted">{t("tv.intro")}</div>
+
+        {networkSearch && <TvNetworkFinder places={places} placeLabel={placeLabel} onPair={pairCode} />}
+        {networkSearch && <div className="muted">{t("tv.code.orType")}</div>}
 
         <form onSubmit={pair} className="col" style={{ gap: 10 }} data-testid="tv-pair-form">
           <div className="row" style={{ gap: 10, flexWrap: "wrap", alignItems: "flex-end" }}>

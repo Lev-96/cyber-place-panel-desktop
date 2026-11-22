@@ -82,3 +82,12 @@ contextBridge.exposeInMainWorld("cyberplacePS5", {
   hasPasscode: (hostId: string) => ipcRenderer.invoke("ps5:passcode:has", hostId),
   forgetPasscode: (hostId: string) => ipcRenderer.invoke("ps5:passcode:forget", hostId),
 });
+
+/**
+ * Club TVs on the local network (2026-11-23) — its own global, like
+ * `cyberplacePS5`, so a screen can tell the desktop (where it exists) from the
+ * owner web (where it does not) and offer the code instead.
+ */
+contextBridge.exposeInMainWorld("cyberplaceTV", {
+  discover: (timeoutMs?: number) => ipcRenderer.invoke("tv:discover", timeoutMs),
+});
