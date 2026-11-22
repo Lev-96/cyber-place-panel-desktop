@@ -743,3 +743,37 @@ describe("a planned hourly start bills its share of the plan", () => {
     expect(sessionTimeCostAt(s, AT)).toBe(1000);
   });
 });
+
+/**
+ * A seat moved while paid ahead (2026-11-22, QA) — the server's
+ * `SessionRelocatePrepaidTest` figures: 3 000 for 2 h at 1 500/h, moved 2 min
+ * 15 s in to a 1 000/h seat: 56.25 frozen, 2 943.75 carried = 10 598 s. The
+ * tile and the receipt agree with the server at every second.
+ */
+describe("a seat moved while paid ahead", () => {
+  const MOVE = AT;
+  const at = (seconds: number) => MOVE + seconds * 1000;
+  const moved = session({
+    mode: "open",
+    started_at: new Date(MOVE - 135_000).toISOString(),
+    hourly_rate: 1000,
+    rate_changed_at: new Date(MOVE).toISOString(),
+    amount_before_rate_change: "56.25",
+    paid_ahead_amount: "2943.75",
+  } as Partial<ISessionApi>);
+
+  test("by the second until the last one, which completes exactly what was paid", () => {
+    expect(sessionTimeCostAt(moved, at(3600))).toBe(1056.25);
+    expect(sessionTimeCostAt(moved, at(10_597))).toBe(2999.86);
+    expect(sessionTimeCostAt(moved, at(10_598))).toBe(3000);
+  });
+
+  test("time past it is the rate by the second again, on top", () => {
+    expect(sessionTimeCostAt(moved, at(10_598 + 3600))).toBe(4000);
+  });
+
+  test("no carried money: the rate by the second, as before", () => {
+    const plain = { ...moved, paid_ahead_amount: null };
+    expect(sessionTimeCostAt(plain, at(10_598))).toBe(3000.14);
+  });
+});

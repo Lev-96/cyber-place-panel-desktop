@@ -20,11 +20,18 @@ interface Props {
    */
   changeAfterStop?: number;
   /**
-   * «Эти товары оплатили?» answered «Да» (2026-11-20, owner): what was owed
-   * had been paid during play, so the bill says «Оплачено полностью», never
-   * «Доплатить». Only after «Нет» (taken now) is «Доплатить» shown.
+   * What was owed is already on record (2026-11-22, QA): «Эти товары
+   * оплатили?» answered either way — «Да» and «Нет, принять оплату» both
+   * record the payment there — or the bill's payment was recorded. The bill
+   * then says «Оплачено полностью», never «Доплатить» a second time.
    */
-  duePaidDuringPlay?: boolean;
+  dueSettled?: boolean;
+  /**
+   * «Нет, принять оплату» (2026-11-20, owner): the extra was taken at the
+   * question — the bill names it, as done («Доплачено 600»), above
+   * «Оплачено полностью».
+   */
+  takenNow?: boolean;
   t: (k: string) => string;
   money: (n: number) => string;
 }
@@ -40,7 +47,7 @@ interface Props {
  *
  * Nothing is subtracted here.
  */
-const PrepaidSettlement = ({ prepaid, changeAfterStop, duePaidDuringPlay = false, t, money }: Props) => {
+const PrepaidSettlement = ({ prepaid, changeAfterStop, dueSettled = false, takenNow = false, t, money }: Props) => {
   const change = changeAfterStop ?? prepaidCashChange(prepaid);
   // Paid ahead by card / «Другое» and not all of it used (2026-11-17): it goes
   // back the way it came — said apart from the cash change, so nobody takes
@@ -48,7 +55,7 @@ const PrepaidSettlement = ({ prepaid, changeAfterStop, duePaidDuringPlay = false
   const cardBack = Number(prepaid.refund?.card ?? 0);
   const otherBack = Number(prepaid.refund?.other ?? 0);
   const anyBack = change > 0 || cardBack > 0 || otherBack > 0;
-  const due = changeAfterStop !== undefined || duePaidDuringPlay ? 0 : Number(prepaid.due);
+  const due = changeAfterStop !== undefined || dueSettled ? 0 : Number(prepaid.due);
   return (
     <div className="prepaid-settlement" data-testid="receipt-prepaid">
       <div className="prepaid-settlement__row" data-testid="receipt-prepaid-amount">
@@ -84,7 +91,15 @@ const PrepaidSettlement = ({ prepaid, changeAfterStop, duePaidDuringPlay = false
           <strong>{money(due)}</strong>
         </div>
       ) : (
-        <div className="prepaid-full muted" data-testid="receipt-prepaid-full">{t("session.prepaid.paidInFull")}</div>
+        <>
+          {takenNow && Number(prepaid.due) > 0 && (
+            <div className="prepaid-settlement__row" data-testid="receipt-prepaid-taken">
+              <span>{t("session.prepaid.dueTaken")}</span>
+              <strong>{money(Number(prepaid.due))}</strong>
+            </div>
+          )}
+          <div className="prepaid-full muted" data-testid="receipt-prepaid-full">{t("session.prepaid.paidInFull")}</div>
+        </>
       )}
     </div>
   );

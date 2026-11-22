@@ -386,6 +386,12 @@ export interface ISessionApi {
   rate_changed_at?: string | null;
   amount_before_rate_change?: number | string | null;
   /**
+   * A seat moved while paid ahead (2026-11-22): the money the move carried
+   * over. It buys whole seconds at the new rate and the last one completes it
+   * exactly (`Session::paidAheadRunning()`). Null on every other seat.
+   */
+  paid_ahead_amount?: number | string | null;
+  /**
    * The VIP minimum charge frozen on this session when it first sat on a VIP
    * seat (2026-10-31); null/absent = none. The tile applies it exactly as the
    * bill does (`applyMinimumCharge`).

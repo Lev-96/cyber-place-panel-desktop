@@ -287,28 +287,6 @@ export const TRANSLATIONS: Dict = {
   },
   // The question the owner is asked when a console is on with no session.
   // Shown above the place, and only for an owner with more than one venue.
-  "ps5.wake.branch": {
-    en: "Branch",
-    ru: "Филиал",
-    am: "Մասնաճյուղ",
-  },
-  "ps5.wake.dialogTitle": {
-    en: "A PlayStation is switched on",
-    ru: "PlayStation включена",
-    am: "PlayStation-ը միացված է",
-  },
-  "ps5.wake.dialogBody": {
-    en: "There is no session on it. Did you switch it on yourself?",
-    ru: "Активной сессии на ней нет. Вы включили её сами?",
-    am: "Դրա վրա ակտիվ սեսիա չկա։ Ինքնե՞րդ եք միացրել։",
-  },
-  "ps5.wake.dialogCountdown": {
-    en: "Goes back to rest in {s} s",
-    ru: "Уйдёт в режим сна через {s} с",
-    am: "{s} վրկ հետո կանցնի քնի ռեժիմի",
-  },
-  "ps5.wake.yes": { en: "Yes, that was me", ru: "Да, это я", am: "Այո, ես էի" },
-  "ps5.wake.no": { en: "No", ru: "Нет", am: "Ոչ" },
   // Suspending the protection while somebody works on a console.
   "ps5.maintenance.title": { en: "Maintenance", ru: "Обслуживание", am: "Սպասարկում" },
   "ps5.maintenance.hint": {
@@ -1326,6 +1304,8 @@ export const TRANSLATIONS: Dict = {
   "session.prepaid.change": { en: "Change", ru: "Сдача", am: "Մանր" },
   "session.prepaid.giveBack": { en: "give it back to the player", ru: "верните игроку", am: "վերադարձրեք խաղացողին" },
   "session.prepaid.due": { en: "To pay now", ru: "Доплатить", am: "Հավելավճար" },
+  // «Нет, принять оплату» answered (2026-11-22, QA): the extra was taken there — said as done.
+  "session.prepaid.dueTaken": { en: "Paid on top", ru: "Доплачено", am: "Հավելավճարը վճարված է" },
   // Paid ahead by card / «Другое», not all used (2026-11-17): back the way it came.
   "session.prepaid.cardRefund": { en: "Back to the card", ru: "Вернуть на карту", am: "Վերադարձնել քարտին" },
   "session.prepaid.cardRefundHint": { en: "refund on the terminal, not from the cash drawer", ru: "возврат через терминал, не из кассы", am: "վերադարձ տերմինալով, ոչ դրամարկղից" },

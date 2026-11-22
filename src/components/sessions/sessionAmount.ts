@@ -219,7 +219,7 @@ const clockExactAt = (session: ISessionApi, at: number): Exact => {
       && (!session.unlimited_at || !session.committed_until
         || !(Date.parse(session.rate_changed_at) < Date.parse(session.committed_until)))) {
     return plus(exactOf(session.amount_before_rate_change),
-      runningOn(rate, playedSecondsBetween(session, session.rate_changed_at, at)));
+      paidAheadRunning(session, rate, playedSecondsBetween(session, session.rate_changed_at, at)));
   }
 
   // The unlimited switch's boundary: frozen at the switch, the rest at the rate.
@@ -245,6 +245,33 @@ const clockExactAt = (session: ISessionApi, at: number): Exact => {
 
 /** `seconds` at the rate the seat runs on — nothing when it has none (a free start with no price). */
 const runningOn = (rate: Rate | null, seconds: number): Exact => (rate === null ? ZERO : rateFor(rate, seconds));
+
+/**
+ * The fewest whole seconds whose price at `rate` reaches `cents` —
+ * `Rate::secondsToReach()`.
+ */
+const secondsToReach = (rate: Rate, cents: bigint): number => {
+  if (cents <= 0n || rate.priceCents <= 0n) return 0;
+  const num = cents * BigInt(rate.seconds);
+  const whole = num / rate.priceCents;
+  return Number(whole + (whole * rate.priceCents < num ? 1n : 0n));
+};
+
+/**
+ * After a move made while paid ahead (2026-11-22) — `Session::paidAheadRunning()`:
+ * the carried money buys whole seconds at the new rate and the last of them
+ * completes it exactly (3 000 paid → 3 000 at the end); before then, after
+ * it, and on any other seat, the rate by the second.
+ */
+const paidAheadRunning = (session: ISessionApi, rate: Rate | null, seconds: number): Exact => {
+  const carried = session.paid_ahead_amount;
+  if (carried === null || carried === undefined || rate === null) return runningOn(rate, seconds);
+  const cents = centsOfAmount(carried);
+  if (cents <= 0n) return runningOn(rate, seconds);
+  const bought = secondsToReach(rate, cents);
+  if (seconds < bought) return runningOn(rate, seconds);
+  return plus({ n: cents, d: 1n }, runningOn(rate, seconds - bought));
+};
 
 /**
  * The plan's share, exactly — `Session::planShareAt`: from the last re-base

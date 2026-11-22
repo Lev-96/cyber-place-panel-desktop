@@ -117,12 +117,15 @@ for (const lang of LANGS) {
 
         await expect(ask).toHaveCount(0);
         await expect(page.getByTestId("checkout-ended-elsewhere")).toBeVisible();
-        // «Да»: paid during play — no «Доплатить»; «Нет»: taken now — shown (2026-11-20, owner).
+        // Either answer records the payment: never «Доплатить» again
+        // (2026-11-22, QA). «Нет»: the extra taken is named, as done —
+        // «Доплачено 1 300» (2026-11-20, owner).
+        await expect(page.getByTestId("receipt-prepaid-full")).toBeVisible();
+        await expect(page.getByTestId("receipt-prepaid-due")).toHaveCount(0);
         if (answer === "yes") {
-          await expect(page.getByTestId("receipt-prepaid-full")).toBeVisible();
-          await expect(page.getByTestId("receipt-prepaid-due")).toHaveCount(0);
+          await expect(page.getByTestId("receipt-prepaid-taken")).toHaveCount(0);
         } else {
-          await expect(page.getByTestId("receipt-prepaid-due")).toContainText("1");
+          await expect(page.getByTestId("receipt-prepaid-taken")).toContainText("1");
         }
         await page.waitForTimeout(300);
         await page.screenshot({ path: `${SHOTS}/2-bill-${answer}-${lang}-${width}.png` });

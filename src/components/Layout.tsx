@@ -11,7 +11,6 @@ import DueConfirmNotifier from "./notifications/DueConfirmNotifier";
 import OpenBillsNotifier from "./notifications/OpenBillsNotifier";
 import SupportNotifier from "./notifications/SupportNotifier";
 import { Ps5ControlProvider } from "@/ps5/Ps5ControlProvider";
-import UnexpectedWakeDialog from "./ps5/UnexpectedWakeDialog";
 import Sidebar from "./Sidebar";
 import RouteErrorBoundary from "./errors/RouteErrorBoundary";
 import { AppShell } from "./SidebarCollapse";
@@ -67,11 +66,6 @@ const Layout = () => (
     <BillingNoticeNotifier />
     {/* A new desktop version, said where it is seen, with a way to it (2026-11-20). */}
     <PanelUpdateNotifier />
-    {/* Owner-only, and silent for everyone else: it renders nothing unless the
-        signed-in role holds `branch.places` AND a console in their own venue
-        has woken with no session on it. Mounted here so the question reaches
-        them whatever screen they are on. */}
-    <UnexpectedWakeDialog />
     {/*
       Admin-only recurring-service payment reminder. Polls the "due
       within 3 days" feed and rings (chime + OS push + corner toast) the

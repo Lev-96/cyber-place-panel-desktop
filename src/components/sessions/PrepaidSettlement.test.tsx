@@ -47,14 +47,14 @@ describe("PrepaidSettlement", () => {
   // «Эти товары оплатили?» answered «Да» (2026-11-20, owner): paid during
   // play, so no «Доплатить»; after «Нет» (or no answer) the due as before.
   test("the due answered «Да»: paid in full, never «Доплатить»", () => {
-    render(<PrepaidSettlement prepaid={{ amount: 170, change: 0, due: 700, by_method: { card: 170 }, refund: {} }} duePaidDuringPlay t={t} money={money} />);
+    render(<PrepaidSettlement prepaid={{ amount: 170, change: 0, due: 700, by_method: { card: 170 }, refund: {} }} dueSettled t={t} money={money} />);
     expect(screen.queryByTestId("receipt-prepaid-due")).toBeNull();
     expect(screen.getByTestId("receipt-prepaid-full")).toBeTruthy();
     expect(screen.getByTestId("receipt-prepaid-amount").textContent).toContain("170");
   });
 
   test("the due answered «Нет» (not «Да»): «Доплатить» 700", () => {
-    render(<PrepaidSettlement prepaid={{ amount: 170, change: 0, due: 700, by_method: { card: 170 }, refund: {} }} duePaidDuringPlay={false} t={t} money={money} />);
+    render(<PrepaidSettlement prepaid={{ amount: 170, change: 0, due: 700, by_method: { card: 170 }, refund: {} }} dueSettled={false} t={t} money={money} />);
     expect(screen.getByTestId("receipt-prepaid-due").textContent).toContain("700");
   });
 

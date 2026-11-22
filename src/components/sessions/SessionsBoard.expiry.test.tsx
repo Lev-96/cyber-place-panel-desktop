@@ -238,9 +238,10 @@ describe("a seat that ends on its own clock", () => {
     }
   });
 
-  // «Да» → the player had paid it during play: the bill never says
-  // «Доплатить»; «Нет» (taken now) keeps it (2026-11-20, owner).
-  for (const [answered, shown] of [["paid", "receipt-prepaid-full"], ["taken", "receipt-prepaid-due"]] as const) {
+  // Either answer records the payment (2026-11-22, QA): the bill never says
+  // «Доплатить» after it; «Нет» names the extra as taken — «Доплачено 700»
+  // (2026-11-20, owner).
+  for (const [answered, shown] of [["paid", "receipt-prepaid-full"], ["taken", "receipt-prepaid-taken"]] as const) {
     test(`answered «${answered}»: the bill shows ${shown}`, async () => {
       repo.preview.mockResolvedValue({
         mode: "fixed", is_free: false, is_unlimited: false, elapsed_minutes: 60,
@@ -257,8 +258,10 @@ describe("a seat that ends on its own clock", () => {
         await act(async () => { answer(answered); await Promise.resolve(); });
         await act(async () => { await Promise.resolve(); });
         expect(screen.getByTestId(shown)).toBeTruthy();
-        if (answered === "paid") expect(screen.queryByTestId("receipt-prepaid-due")).toBeNull();
-        else expect(screen.getByTestId("receipt-prepaid-due").textContent).toContain("700");
+        expect(screen.queryByTestId("receipt-prepaid-due")).toBeNull();
+        expect(screen.getByTestId("receipt-prepaid-full")).toBeTruthy();
+        if (answered === "paid") expect(screen.queryByTestId("receipt-prepaid-taken")).toBeNull();
+        else expect(screen.getByTestId("receipt-prepaid-taken").textContent).toContain("700");
       } finally {
         off();
       }

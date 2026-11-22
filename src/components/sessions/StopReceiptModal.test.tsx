@@ -364,6 +364,31 @@ describe("the preliminary total at the till", () => {
 // with the payment on record it is never asked for again.
 describe("the unpaid lines once paid", () => {
   afterEach(cleanup);
+  // QA P1 (2026-11-22, re-check): «Нет, принять оплату» → card records the
+  // payment; the bill then says paid in full, never «Доплатить 600» again.
+  test.each([
+    ["answered «Нет, принять оплату»", "taken" as const, false],
+    ["answered «Да»", "paid" as const, false],
+    ["not answered, the payment on record", null, true],
+  ])("paid ahead, %s: «Оплачено полностью», no «Доплатить»", async (_name, answer, recordedOnServer) => {
+    repo.preview.mockResolvedValue(bill({ total: 650, payment_recorded: recordedOnServer, prepaid: { amount: 50, change: 0, due: 600 } } as Partial<IBillBreakdown>));
+    await act(async () => {
+      render(<StopReceiptModal session={session({ status: "expired" })} dueAnswer={answer} onClose={() => {}} onConfirmed={() => {}} onItemRemoved={() => {}} />);
+    });
+    await act(async () => { await Promise.resolve(); });
+    expect(screen.queryByTestId("receipt-prepaid-due")).toBeNull();
+    expect(screen.getByTestId("receipt-prepaid-full")).toBeTruthy();
+  });
+
+  test("paid ahead, not answered and nothing recorded: «Доплатить» still says the debt", async () => {
+    repo.preview.mockResolvedValue(bill({ total: 650, payment_recorded: false, prepaid: { amount: 50, change: 0, due: 600 } } as Partial<IBillBreakdown>));
+    await act(async () => {
+      render(<StopReceiptModal session={session({ status: "expired" })} onClose={() => {}} onConfirmed={() => {}} onItemRemoved={() => {}} />);
+    });
+    await act(async () => { await Promise.resolve(); });
+    expect(screen.getByTestId("receipt-prepaid-due").textContent).toContain("600");
+  });
+
   test("on record: no «take it now» line; not yet: the line", async () => {
     repo.preview.mockResolvedValue(bill({ unpaid_items_total: 600, payment_recorded: true, items: [{ id: 1, name: "Cola", qty: 1, price: 600, line_total: 600, unpaid: true }], items_total: 600 } as Partial<IBillBreakdown>));
     await act(async () => {

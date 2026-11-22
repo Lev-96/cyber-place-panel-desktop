@@ -723,7 +723,8 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved, canRes
               <PrepaidSettlement
                 prepaid={view.prepaid}
                 changeAfterStop={stopped !== null ? Number(handover?.change ?? prepaidCashChange(view.prepaid)) : undefined}
-                duePaidDuringPlay={dueAnswer === "paid"}
+                dueSettled={dueAnswer !== null || view.payment_recorded === true || recorded}
+                takenNow={dueAnswer === "taken"}
                 t={t}
                 money={(n) => money(n, receiptPrecision)}
               />
