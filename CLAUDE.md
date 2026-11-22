@@ -5564,3 +5564,115 @@ by itself gets `payment_recorded: false` until somebody marks it, so
 chosen — card or cash, however long the receipt stayed open (it used to answer
 409 «уже записана»). No panel code changed for this; `payment_recorded` already
 drives `StopReceiptModal`'s `markable`.
+
+## Active Places, 2026-11-22 (owner)
+
+- **Final bills one after another** — `SessionsBoard` keeps a FIFO of bills
+  (`sessions/billQueue.ts`: `enqueueBill` / `openBillNow` / `closeBill` /
+  `markBillEnded`), the head is the open `StopReceiptModal` (keyed by session
+  id). A seat that ends by itself joins the end (after «Эти товары оплатили?»,
+  `dueConfirmGate`); a Stop pressed here goes first without dropping the
+  waiting ones; closing or hiding a bill opens the next. Before: one slot,
+  `current ?? next` dropped the second seat.
+- **Hide and close later** — the receipt's «Скрыть, закрыть позже» (and ×,
+  Escape, backdrop) sends nothing; the bill stays open on the server.
+  `OpenBillsNotifier` (Layout, owners/managers; owner web mounts it too) reads
+  `GET /sessions/open-bills` (on mount, every 30 s, focus, `session.changed` of a
+  branch with an open bill, `openBillsSignal` from the board/receipt) and shows
+  «Незакрытые счета: N» with each seat; a seat reopens the same
+  `StopReceiptModal` → `POST /sessions/{id}/payment`. Nothing computed here.
+- **Time holds at once** — `SessionTimer` `frozenAt` holds the tile's clock and
+  money at the Stop press while its preliminary total is open (display only; the
+  server prices at `priced_at`); a countdown at 0 says `session.timeUp` before
+  the sweep.
+- **«Не оплачено» ON by default** — `StartSessionDialog` (every start: board,
+  reservation, booking) and `AddSessionItemDialog`; sent only where its switch is
+  shown (not free, not «На сумму»; «Сейчас, до игры» turns it off and back).
+  `UnpaidOnNotice` blurs the dialog once with a large «Не оплачено включено»;
+  any click or key dismisses it (the key is not swallowed). Start products
+  inherit the seat's unpaid (backend). The owed figure is the backend's
+  (`Session::unpaidOwedFor`: started unpaid → the whole bill incl. rounding less
+  lines handed over paid).
+- **Seat number + name** — `seatLineOf` / `sessionSeatLine` («№4 · Hall VIP»)
+  in toasts, `UnpaidAlert`, the start / receipt / goods / options / relocate
+  titles (`.dialog-title__seat`, a size up), reminders and notifiers.
+- **Dialog tones** — `ui/dialogTone.ts` `dialogToneClass(start|bill|unpaid|goods)`:
+  a `color-mix` of the theme accent with `--color-surface` (every theme keeps
+  its contrast).
+- **«Не оплачено» notice after QA (2026-11-22)** — `UnpaidAlert` only for a seat
+  that ended BY ITSELF owing (`status: expired`): a Stop pressed at any desk
+  took the payment in its own receipt, so it is never announced as money still
+  to take (it was, and with «Не оплачено» on by default that invited taking
+  the money twice). One window at a time: the board renders the bill only when
+  no notice is up, so it is «№4 · VIP: не оплачено 50.83» → «Понятно» → the
+  bill. The amount to the cent (`centsWhenFractional`).
+- **The banner never hides a seat** — `OpenBillsNotifier` writes its height to
+  `--open-bills-h` on `<html>` while it shows; `.main` gets that much bottom
+  padding, so the last row's «Старт» can be scrolled clear.
+- **At the till: «−» on the preliminary total** — opening a running seat's
+  receipt calls `POST /sessions/{id}/checkout` first (the server holds the bill
+  at the Stop press, `checkout_at`; a repeat keeps the first instant), then
+  reads the preview at that instant. Only «−» beside the × (`receipt-minimize`)
+  puts it away (`onMinimize`); the × and Escape mean «Продолжить игру» (the
+  Stop is taken back, the next Stop shows what the counter reached) — the
+  dialog closes AT ONCE and `releaseCheckout` runs behind it (no flicker; a
+  refusal is a toast and the seat stays at the till), the board re-reads on
+  `onOpenBillsChanged` — and a
+  click on the empty space around it does nothing (`closeOnBackdrop` off on a
+  running seat). Put away, nothing is sent, nothing ends — no console to rest,
+  no PC locked — and the seat waits in
+  «Незакрытые счета» («На кассе», its `held_total`) and on its tile; the bill
+  never grows, however long. «Продолжить игру» → `DELETE …/checkout` (the time
+  counts again). «Подтвердить завершение» closes it at `checkout_at`. The
+  tile's clock holds from `session.checkout_at` on every desk. A seat at the
+  till of this branch reopens ON THE BOARD (`onBoardOpenBillRequested`), so its
+  confirm is the board's Stop path (console to rest); with no board on screen
+  the notifier opens it and the PS5 layer sees the stop as one made elsewhere.
+  Putting a bill away is visible (2026-11-22, owner): the card shrinks down
+  toward the banner (`.is-putting-away`, `PUT_AWAY_MS` 320 ms; none with
+  reduced motion or where the platform cannot say), and where it went is lit
+  for `JUST_PUT_AWAY_MS` (4 s): its seat in the banner and its tile's chip pulse
+  (`markPutAway` / `useJustPutAway` in `openBillsStore`).
+  While a seat's bill waits its whole tile is ringed amber
+  (`SessionCard billWaiting` → `.is-bill-waiting`). «Свёрнутый счёт ждёт»: a
+  seat at the till is recalled `TILL_REMIND_MS` (3 min) after its Stop (the
+  server's `checkout_at`, the same on every desk) and every 3 min after —
+  sound `session_unpaid`, a top-centre card (`till-reminder`) with the seat,
+  its `held_total` and «Открыть счёт» (`requestOpenBill`) / «Напомнить через
+  3 мин» — never while that bill is on screen (`setBillShown` /
+  `isBillShown`, set by the board and the notifier), never for an ended bill.
+  Confirmed, it lands in «История продаж» like any Stop (backend
+  `SessionCheckoutTest`).
+- **Branch rounding said on the receipt** — «Округление до 100, вверх → 100»
+  (`receipt-rounding`) from the server's `rounding_step` / `rounding_mode` /
+  `gross_total`, only when it changed the `subtotal`; never on a free or
+  cancelled seat. Nothing computed.
+- **Where open bills show** (2026-11-22, owner: compact) — on the sessions
+  board, a chip «Незакрытые счета · N» (danger tint) in the counts row
+  (`board-open-bills`, this branch only) opens a list beneath it: each seat
+  («№2 · PS5 · Standard» for a seat with no name of its own —
+  `seatLineWithKind`), «На кассе» / «Счёт не закрыт», the sum; a press opens
+  that bill; a click away or Escape folds it. Off the board, the notifier is a
+  small chip in the bottom-right corner (`open-bills-toggle`) that unfolds the
+  same list; it steps aside while a board is on screen (`boardOnScreen` /
+  `useBoardOnScreen`).
+- **An open bill is never missed** — `notifications/openBillsStore.ts` shares
+  the notifier's server list (`publishOpenBills` / `useOpenBills`); the board
+  puts «Счёт не закрыт · 500» (`tile-open-bill-{pcId}`, amber) on each seat
+  that has one, even with a new player on it, and a press asks the notifier to
+  open it (`requestOpenBill` → `onOpenBillRequested`) — the same
+  `StopReceiptModal`, the same payment. The banner shows each seat's sum and
+  «Закрыть счёт», and pulses 3× when a new open bill appears (reduced motion:
+  none). Nothing read or computed outside the notifier.
+- **Board counts as chips** — «Всего / Занято / Забронировано / Свободно»
+  (`board-counts`, `session.countTotal|countBusy|countBooked|countFree`) on a
+  tint of the theme's primary / danger (red) / warning (orange) / success;
+  reserved = the tile's own reserved rule (reserved now, not taken), and free
+  excludes it, so the four add up. «Календарь броней» carries an orange dot
+  (`board-calendar-dot`) with the seats reserved now or ahead
+  (`reservedPlaceIds` / `next_booking_start`, the board's own data).
+- PS5 control, the kiosk agent, sockets (event names/payloads/channels) untouched.
+- Tests: `billQueue.test.ts`, `SessionsBoard.expiry.test.tsx` (two/three at
+  once, a Stop between), `OpenBillsNotifier.test.tsx`, `SessionTimer.stop.test.tsx`,
+  `StartSessionDialog.test.tsx` / `AddSessionItemDialog.test.tsx` (default ON,
+  notice), `seatLine.test.ts`; e2e helper `e2e/helpers/unpaidNotice.ts`.
