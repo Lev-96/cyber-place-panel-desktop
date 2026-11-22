@@ -128,6 +128,37 @@ export const TRANSLATIONS: Dict = {
   // PlayStation discovery — phase one of the console integration. The wording
   // promises exactly what it does: it looks, it does not control.
   "ps5.discover.open": { en: "Find PlayStations", ru: "Найти PlayStation", am: "Գտնել PlayStation-ներ" },
+  // A club's TVs (2026-11-23): pairing a TV to a place by the code on its screen.
+  "tv.open": { en: "TVs", ru: "Телевизоры", am: "Հեռուստացույցներ" },
+  "tv.title": { en: "TVs", ru: "Телевизоры", am: "Հեռուստացույցներ" },
+  "tv.intro": {
+    en: "Open the Cyber Place TV app on the TV, enter the code from its screen and choose the place.",
+    ru: "Откройте на телевизоре приложение Cyber Place TV, введите код с экрана и выберите место.",
+    am: "Հեռուստացույցում բացեք Cyber Place TV հավելվածը, մուտքագրեք էկրանի կոդը և ընտրեք տեղը։",
+  },
+  "tv.code": { en: "Code", ru: "Код", am: "Կոդ" },
+  "tv.place": { en: "Place", ru: "Место", am: "Տեղ" },
+  "tv.place.choose": { en: "Choose a place", ru: "Выберите место", am: "Ընտրեք տեղը" },
+  "tv.place.none": { en: "No place", ru: "Без места", am: "Առանց տեղի" },
+  "tv.name": { en: "Name (optional)", ru: "Название (необязательно)", am: "Անվանում (ըստ ցանկության)" },
+  "tv.pair": { en: "Pair", ru: "Привязать", am: "Կապել" },
+  "tv.unpair": { en: "Unpair", ru: "Отвязать", am: "Ապակապել" },
+  "tv.unpair.confirm": {
+    en: "Unpair this TV? It will stop showing messages and will show a new code.",
+    ru: "Отвязать этот телевизор? Он перестанет показывать сообщения и покажет новый код.",
+    am: "Ապակապե՞լ այս հեռուստացույցը։ Այն այլևս հաղորդագրություններ չի ցուցադրի և կցուցադրի նոր կոդ։",
+  },
+  "tv.online": { en: "Online", ru: "В сети", am: "Առցանց" },
+  "tv.offline": { en: "Offline", ru: "Не в сети", am: "Անցանց" },
+  "tv.unnamed": { en: "TV", ru: "Телевизор", am: "Հեռուստացույց" },
+  "tv.empty": { en: "No TVs yet.", ru: "Телевизоров пока нет.", am: "Հեռուստացույցներ դեռ չկան։" },
+  "tv.error.code": {
+    en: "No TV shows this code. Check the code on the TV screen: it is valid for 10 minutes.",
+    ru: "Ни один телевизор не показывает этот код. Проверьте код на экране: он действует 10 минут.",
+    am: "Ոչ մի հեռուստացույց այս կոդը չի ցուցադրում։ Ստուգեք էկրանի կոդը՝ այն գործում է 10 րոպե։",
+  },
+  "tv.error.generic": { en: "Could not save. Try again.", ru: "Не удалось сохранить. Попробуйте ещё раз.", am: "Չհաջողվեց պահպանել։ Փորձեք կրկին։" },
+  "tv.error.load": { en: "Could not load the TVs.", ru: "Не удалось загрузить телевизоры.", am: "Չհաջողվեց բեռնել հեռուստացույցները։" },
   "ps5.discover.title": { en: "PlayStations on this network", ru: "PlayStation в этой сети", am: "PlayStation-ներն այս ցանցում" },
   "ps5.discover.hint": {
     en: "Scanned from this computer, not from the server.",
