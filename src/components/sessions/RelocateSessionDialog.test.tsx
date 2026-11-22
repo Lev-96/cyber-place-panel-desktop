@@ -159,6 +159,36 @@ describe("the move", () => {
  * It reports through `onSwapped`, never `onMoved` (the board must not tell a
  * console its session ended).
  */
+// Paid ahead at another price (2026-11-22, owner): the dialog says the money
+// left buys time at the new rate (the server moves the end).
+describe("a seat paid ahead", () => {
+  const mountWith = async (over: Partial<ISessionApi>) => {
+    await act(async () => {
+      render(
+        <ConfirmProvider>
+          <RelocateSessionDialog session={session(over)} onClose={() => {}} onMoved={onMoved} />
+        </ConfirmProvider>,
+      );
+    });
+  };
+
+  test("to a dearer seat: it says the money left buys time at the new price", async () => {
+    await mountWith({ prepaid_amount: 3000 } as Partial<ISessionApi>);
+    await press(seat(3));
+    expect(screen.getByTestId("relocate-paid-ahead").textContent).toBe("session.relocatePaidAhead");
+  });
+
+  test("to a seat at the same price, or a seat not paid ahead: nothing to say", async () => {
+    await mountWith({ prepaid_amount: 3000 } as Partial<ISessionApi>);
+    await press(seat(2));
+    expect(screen.queryByTestId("relocate-paid-ahead")).toBeNull();
+    cleanup();
+    await mountWith({});
+    await press(seat(3));
+    expect(screen.queryByTestId("relocate-paid-ahead")).toBeNull();
+  });
+});
+
 describe("the swap", () => {
   const withSwap = (): IRelocationOptions => ({
     ...options(),

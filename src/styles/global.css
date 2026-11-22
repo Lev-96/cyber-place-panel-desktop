@@ -1591,6 +1591,7 @@ body.cp-modal-open .main {
 
 /* «Календарь броней» with reservations ahead (2026-11-22, owner): an orange
    dot with how many seats have one. */
+.relocate-paid-ahead { color: var(--color-warning); font-weight: 600; }
 .board-calendar-btn { position: relative; }
 
 /* «Незакрытые счета · N» beside the board's counts (2026-11-22, owner): a

@@ -345,6 +345,15 @@ const RelocateSessionDialog = ({ session, onClose, onMoved, onSwapped, platformN
                 </span>
               )}
               <span className="muted" style={{ fontSize: 12 }}>{t("session.relocateSummaryKept")}</span>
+              {/* Paid ahead, at another price (2026-11-22, owner): the money
+                  left buys time at the new rate — the server moves the end. */}
+              {Number(session.prepaid_amount ?? 0) > 0 && session.ends_at && effectiveRate !== null
+                && current?.hourly_rate !== null && current?.hourly_rate !== undefined
+                && Math.round(Number(effectiveRate) * 100) !== Math.round(Number(current.hourly_rate) * 100) && (
+                <span className="relocate-paid-ahead" style={{ fontSize: 12 }} data-testid="relocate-paid-ahead">
+                  {t("session.relocatePaidAhead")}
+                </span>
+              )}
             </div>
           </section>
         )}
