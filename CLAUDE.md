@@ -5668,6 +5668,20 @@ drives `StopReceiptModal`'s `markable`.
   so the money paid buys time at the new seat's rate; the relocate dialog says
   so (`relocate-paid-ahead`, `session.relocatePaidAhead`) when the seat is paid
   ahead and the chosen seat's rate differs. Nothing computed here.
+- **The PS5 «Вы включили её сами?» dialog is gone (2026-11-22, owner)** —
+  `UnexpectedWakeDialog` deleted and unmounted here and in the owner web: the
+  owner is never asked. `src/ps5` is untouched, so a console awake with no
+  session goes to rest after its ten seconds, as when nobody answered. The
+  socket hook (`usePs5UnexpectedWake`) and `api/ps5.ts` wake calls stay as
+  they are (socket contract and PS5 files unchanged), unused.
+- **Paid-ahead move, the clock** — `sessionAmount.ts` mirrors the server's
+  `paid_ahead_amount`: the carried money buys whole seconds (rounded up) and
+  the last completes it exactly (`paidAheadRunning`).
+- **«Доплатить» once paid** — `PrepaidSettlement` `dueSettled`: «оплатили?»
+  answered either way (both record the payment), `payment_recorded`, or a mark
+  here → «Оплачено полностью», never «Доплатить» again. After «Нет, принять
+  оплату» (`takenNow`) the extra is named as done: «Доплачено 600»
+  (`session.prepaid.dueTaken`) — the 2026-11-20 rule kept, without asking twice.
 - **QA fixes (2026-11-22)** — the «не оплачено» notice of a seat that ended
   by itself is raised only when «оплатили?» was NOT answered (answer `null`,
   or nothing to confirm); a notice whose bill was seen among the open bills
