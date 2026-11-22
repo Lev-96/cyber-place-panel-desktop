@@ -5704,3 +5704,21 @@ drives `StopReceiptModal`'s `markable`.
   once, a Stop between), `OpenBillsNotifier.test.tsx`, `SessionTimer.stop.test.tsx`,
   `StartSessionDialog.test.tsx` / `AddSessionItemDialog.test.tsx` (default ON,
   notice), `seatLine.test.ts`; e2e helper `e2e/helpers/unpaidNotice.ts`.
+
+## Club TVs — pairing a TV to a place (2026-11-23, owner)
+
+- Places screen (`routes/BranchPlaces.tsx`), owner only (`branch.places`):
+  «Телевизоры» (`data-testid=tv-open`) beside «Найти PlayStation» opens
+  `components/tv/TvScreensDialog.tsx`: type the 6-digit code shown by the
+  Cyber Place TV app, choose the place, optional name → `POST
+  /branches/{id}/tv-screens`; each paired TV can be moved to another place
+  (`PATCH /tv-screens/{id}`) or unpaired after a confirm (`DELETE`). API in
+  `api/tvScreens.ts` (`noCache` list). `tv_code_unknown` → «Ни один телевизор
+  не показывает этот код…».
+- Server calls only: no Electron IPC, no bridge, no LAN — so it works the same
+  in the owner web (needs a `panel.ref` bump there). The TV reads its place's
+  state from the backend itself; the panel never talks to a TV.
+- PS5 control (`electron/ps5`, `src/ps5`, `ConsolePicker`), the kiosk agent,
+  sessions, money and sockets untouched.
+- Tests: `components/tv/TvScreensDialog.test.tsx`, `e2e/tv-screens.spec.ts`
+  (1440 / 520 px, manager has no button).
