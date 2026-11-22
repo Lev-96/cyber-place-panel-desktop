@@ -1208,10 +1208,12 @@ describe("«Не оплачено» at the start", () => {
  */
 describe("the «Не оплачено» notice", () => {
   const computer = () => device({ kind: PC_KIND.Pc, place: { id: 10, number: 1, name: "PC-1", type: "standard", platform: "pc" } });
+  // Shown to a person once, the first time (2026-11-22, owner): a clean slate each test.
+  beforeEach(() => { window.localStorage.clear(); });
 
   test("shown at open, announced, blurring the form; a click takes it away and it does not come back", async () => {
     await mount(computer());
-    const notice = screen.getByTestId("unpaid-on-notice");
+    const notice = await screen.findByTestId("unpaid-on-notice");
     expect(notice.getAttribute("role")).toBe("alert");
     expect(notice.closest(".dialog-tone--start")).not.toBeNull();
     expect(notice.textContent).toContain("unpaidOn.title");
@@ -1226,7 +1228,7 @@ describe("the «Не оплачено» notice", () => {
 
   test("any key takes it away, and the key is not swallowed", async () => {
     await mount(computer());
-    expect(screen.getByTestId("unpaid-on-notice")).toBeTruthy();
+    expect(await screen.findByTestId("unpaid-on-notice")).toBeTruthy();
     const event = new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true });
     await act(async () => { window.dispatchEvent(event); });
     expect(screen.queryByTestId("unpaid-on-notice")).toBeNull();
@@ -1235,7 +1237,7 @@ describe("the «Не оплачено» notice", () => {
 
   test("a free seat has no switch, so no notice", async () => {
     await mount(computer());
-    await act(async () => { fireEvent.click(screen.getByTestId("unpaid-on-notice")); });
+    await act(async () => { fireEvent.click(await screen.findByTestId("unpaid-on-notice")); });
     await act(async () => { fireEvent.click(screen.getByText("session.freeBill")); });
     expect(screen.queryByTestId("unpaid-on-notice")).toBeNull();
   });
@@ -1243,6 +1245,21 @@ describe("the «Не оплачено» notice", () => {
   test("the title names the seat by number and name", async () => {
     await mount(computer());
     expect(screen.getByTestId("start-seat").textContent).toBe("№1 · PC-1");
+  });
+
+  // Once per person (2026-11-22, owner): the first Start shows it; every
+  // Start after that does not; «+ Товар» keeps its own first time.
+  test("shown the first time only: the next Start says nothing", async () => {
+    await mount(computer());
+    expect(await screen.findByTestId("unpaid-on-notice")).toBeTruthy();
+    expect(JSON.parse(window.localStorage.getItem("u1:cp.unpaidOnNotice.start") ?? "null")).toBe(true);
+    cleanup();
+    await mount(computer());
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+    expect(screen.queryByTestId("unpaid-on-notice")).toBeNull();
+    // The switch itself is still ON by default.
+    expect(screen.getByTestId("unpaid-switch").getAttribute("aria-checked")).toBe("true");
+    expect(window.localStorage.getItem("u1:cp.unpaidOnNotice.goods")).toBeNull();
   });
 });
 

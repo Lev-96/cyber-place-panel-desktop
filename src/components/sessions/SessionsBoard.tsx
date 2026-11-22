@@ -132,6 +132,18 @@ const SessionsBoard = ({ branchId }: Props) => {
   }, [shownBillId]);
   const openBillsRef = useRef(openBills);
   openBillsRef.current = openBills;
+  // A «не оплачено» notice whose bill was closed elsewhere (a colleague took
+  // the payment) goes: once seen among the open bills and then gone from them,
+  // it is paid (2026-11-22, QA).
+  const seenOpen = useRef(new Set<number>());
+  useEffect(() => {
+    const now = new Set(openBills.map((b) => b.id));
+    for (const id of now) seenOpen.current.add(id);
+    setUnpaidNotices((list) => {
+      const left = list.filter((n) => !(seenOpen.current.has(n.sessionId) && !now.has(n.sessionId)));
+      return left.length === list.length ? list : left;
+    });
+  }, [openBills]);
   // Anything that changes a bill (taken off the till, put away, paid) reads
   // the board again at once (2026-11-22): a tile never shows a stale clock.
   // This board shows «Незакрытые счета» in its own header (2026-11-22).
@@ -461,7 +473,6 @@ const SessionsBoard = ({ branchId }: Props) => {
       // Stop pressed at any desk took the payment in its own receipt, so it
       // is never announced as money still to take. The final bill waits until
       // this notice is acknowledged (see the receipt below).
-      if (evt.kind === "stopped" && evt.status === "expired") noticeUnpaid(evt.session_id, evt.pc_id, evt.unpaid_amount);
       if (evt.kind === "stopped" && evt.status === "expired") {
         const ended = (sessions.data ?? []).find((s) => s.id === evt.session_id);
         // Never over the top of an open receipt: a cashier mid-checkout on one
@@ -475,8 +486,15 @@ const SessionsBoard = ({ branchId }: Props) => {
           afterDueConfirmed(evt.session_id, (answer) => {
             // What «оплатили?» answered, for this seat's bill (2026-11-20).
             dueAnswers.current.set(evt.session_id, answer);
+            // «не оплачено» only while it still is (2026-11-22, QA): once
+            // «оплатили?» was answered the payment is on record — never
+            // announced as money still to take.
+            if (answer === null) noticeUnpaid(evt.session_id, evt.pc_id, evt.unpaid_amount);
             setBills((list) => enqueueBill(list, { ...ended, status: "expired" }));
           });
+        } else {
+          // No bill opens on this board for it: the notice is all it gets.
+          noticeUnpaid(evt.session_id, evt.pc_id, evt.unpaid_amount);
         }
       }
       // A bill open or queued for THIS seat, ended elsewhere (another

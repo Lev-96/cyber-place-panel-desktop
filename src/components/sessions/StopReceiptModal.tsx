@@ -671,7 +671,10 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved, canRes
                 </div>
                 {/* What of it was handed over unpaid: already inside the total
                     above, the server's figure — said so it is collected now. */}
-                {Number(view.unpaid_items_total ?? 0) > 0 && (
+                {/* …only while it is: once the payment is on record (a Stop
+                    that took it, «оплатили?» answered, a colleague's mark) it
+                    is never «take it now» again (2026-11-22, QA). */}
+                {Number(view.unpaid_items_total ?? 0) > 0 && stopped === null && view.payment_recorded !== true && !recorded && (
                   <div style={row} className="receipt-unpaid" data-testid="receipt-unpaid-total">
                     <span style={{ flex: 1 }}>{t("session.receiptUnpaidItems")}</span>
                     <span style={{ fontWeight: 700, marginRight: finished ? 0 : 32 }}>

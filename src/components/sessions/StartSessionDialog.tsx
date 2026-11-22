@@ -599,7 +599,7 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted, bookingId }: Pro
   return (
     <Modal open onClose={onClose}>
       <div className={`card ${dialogToneClass("start")} start-dialog`}>
-        <UnpaidOnNotice active={unpaidSwitchShown && unpaid} hint={t("unpaidOn.startHint")} />
+        <UnpaidOnNotice kind="start" active={unpaidSwitchShown && unpaid} hint={t("unpaidOn.startHint")} />
         <div className="start-dialog__head">
           {/* WHICH seat, number and name a size up (2026-11-22, owner). */}
           <h2 className="dialog-title" style={{ margin: 0 }}>

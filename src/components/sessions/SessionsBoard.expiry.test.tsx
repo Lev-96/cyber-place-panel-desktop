@@ -279,6 +279,32 @@ describe("a seat that ends on its own clock", () => {
     expect(screen.getByText("session.checkoutDone")).toBeTruthy();
   });
 
+  // QA P1 (2026-11-22): once «оплатили?» is answered the payment is on
+  // record — never «не оплачено» after it; the bill opens at once.
+  test("answered «оплатили?»: no «не оплачено» notice, the bill at once", async () => {
+    let answer: (a: "paid" | "taken" | null) => void = () => {};
+    const off = registerDueAsker(() => new Promise((r) => { answer = r; }));
+    try {
+      await mount();
+      await fire(event({ unpaid_amount: 600 } as Partial<SessionChangedEvent>));
+      expect(screen.queryByTestId("unpaid-alert")).toBeNull();
+      await act(async () => { answer("taken"); await Promise.resolve(); });
+      expect(screen.queryByTestId("unpaid-alert")).toBeNull();
+      expect(screen.getByText("session.checkoutDone")).toBeTruthy();
+    } finally { off(); }
+  });
+
+  test("a notice whose bill a colleague closed goes away", async () => {
+    await mount();
+    await fire(event({ unpaid_amount: 25 } as Partial<SessionChangedEvent>));
+    expect(screen.getByTestId("unpaid-alert")).toBeTruthy();
+    // Seen among the open bills, then gone from them: paid elsewhere.
+    await act(async () => { publishOpenBills([{ ...running, id: 42, status: "expired", total_paid: 25 } as ISessionApi]); });
+    expect(screen.getByTestId("unpaid-alert")).toBeTruthy();
+    await act(async () => { publishOpenBills([]); });
+    expect(screen.queryByTestId("unpaid-alert")).toBeNull();
+  });
+
   test("a Stop at another desk owing nothing more to take here: no notice", async () => {
     await mount();
     await fire(event({ status: "stopped", unpaid_amount: 700 } as Partial<SessionChangedEvent>));

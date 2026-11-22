@@ -360,6 +360,27 @@ describe("the preliminary total at the till", () => {
   });
 });
 
+// «Выдано без оплаты: возьмите сейчас» only while it is (2026-11-22, QA):
+// with the payment on record it is never asked for again.
+describe("the unpaid lines once paid", () => {
+  afterEach(cleanup);
+  test("on record: no «take it now» line; not yet: the line", async () => {
+    repo.preview.mockResolvedValue(bill({ unpaid_items_total: 600, payment_recorded: true, items: [{ id: 1, name: "Cola", qty: 1, price: 600, line_total: 600, unpaid: true }], items_total: 600 } as Partial<IBillBreakdown>));
+    await act(async () => {
+      render(<StopReceiptModal session={session({ status: "expired" })} onClose={() => {}} onConfirmed={() => {}} onItemRemoved={() => {}} />);
+    });
+    await act(async () => { await Promise.resolve(); });
+    expect(screen.queryByTestId("receipt-unpaid-total")).toBeNull();
+    cleanup();
+    repo.preview.mockResolvedValue(bill({ unpaid_items_total: 600, payment_recorded: false, items: [{ id: 1, name: "Cola", qty: 1, price: 600, line_total: 600, unpaid: true }], items_total: 600 } as Partial<IBillBreakdown>));
+    await act(async () => {
+      render(<StopReceiptModal session={session({ status: "expired" })} onClose={() => {}} onConfirmed={() => {}} onItemRemoved={() => {}} />);
+    });
+    await act(async () => { await Promise.resolve(); });
+    expect(screen.getByTestId("receipt-unpaid-total")).toBeTruthy();
+  });
+});
+
 // The branch's rounding said in words (2026-11-22, owner): «Время 2.92»
 // over «Итого 100» read as a mistake.
 describe("the branch rounding line", () => {

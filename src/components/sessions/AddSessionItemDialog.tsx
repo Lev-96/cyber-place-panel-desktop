@@ -366,7 +366,7 @@ const AddSessionItemDialog = ({ branchId, session, onClose, onAdded, seat }: Pro
   return (
     <Modal open onClose={saving ? () => {} : onClose}>
       <div className={`card ${dialogToneClass("goods")}`} style={{ width: 560, maxWidth: "92vw", display: "flex", flexDirection: "column", gap: 12 }}>
-        <UnpaidOnNotice active={shown === "products" && unpaid} hint={t("unpaidOn.itemsHint")} testId="items-unpaid-notice" />
+        <UnpaidOnNotice kind="goods" active={shown === "products" && unpaid} hint={t("unpaidOn.itemsHint")} testId="items-unpaid-notice" />
         <h2 className="dialog-title" style={{ margin: 0 }}>
           <span>{t("session.addItem")}</span>
           <span className="dialog-title__seat" data-testid="add-item-seat" title={deviceLabel}>{deviceLabel}</span>

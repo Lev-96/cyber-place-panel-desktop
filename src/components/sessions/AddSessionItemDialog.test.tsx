@@ -1252,8 +1252,9 @@ describe("handed over not paid yet", () => {
   });
 
   test("said large at open (blurred form, announced); a click takes it away and the basket works on", async () => {
+    window.localStorage.clear();
     await mount();
-    const notice = screen.getByTestId("items-unpaid-notice");
+    const notice = await screen.findByTestId("items-unpaid-notice");
     expect(notice.getAttribute("role")).toBe("alert");
     expect(notice.closest(".dialog-tone--goods")).not.toBeNull();
     expect(notice.textContent).toContain("unpaidOn.itemsHint");

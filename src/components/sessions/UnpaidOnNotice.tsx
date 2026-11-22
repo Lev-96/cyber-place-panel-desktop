@@ -1,5 +1,7 @@
+import { useAuth } from "@/auth/AuthContext";
 import { useLang } from "@/i18n/LanguageContext";
-import { useEffect, useState } from "react";
+import { keyValueStore } from "@/infrastructure/KeyValueStore";
+import { useEffect, useRef, useState } from "react";
 
 interface Props {
   /**
@@ -11,7 +13,16 @@ interface Props {
   /** What «on» means here, one short sentence. */
   hint: string;
   testId?: string;
+  /**
+   * Which notice this is («start», «goods»): each is shown to a person ONCE —
+   * the first time — and never again (2026-11-22, owner), remembered per
+   * person (`u{id}:cp.unpaidOnNotice.{kind}`), like their language.
+   */
+  kind: "start" | "goods";
 }
+
+/** The per-person key that says this notice was already seen. */
+export const unpaidNoticeSeenKey = (userId: number, kind: "start" | "goods"): string => `u${userId}:cp.unpaidOnNotice.${kind}`;
 
 /**
  * «Не оплачено» is ON by default (2026-11-22, owner) — so it is SAID, large,
@@ -24,13 +35,44 @@ interface Props {
  * Not a Modal: it is part of the dialog, sits in the card (`position:
  * relative` from `.dialog-tone`), and is announced (`role="alert"`).
  */
-const UnpaidOnNotice = ({ active, hint, testId = "unpaid-on-notice" }: Props) => {
+const UnpaidOnNotice = ({ active, hint, testId = "unpaid-on-notice", kind }: Props) => {
   const { t } = useLang();
-  const [phase, setPhase] = useState<"waiting" | "shown" | "done">("waiting");
+  const { user } = useAuth();
+  const [phase, setPhase] = useState<"waiting" | "checking" | "shown" | "done">("waiting");
 
+  // Asked once per dialog: the store's answer decides, and a later render
+  // (the phase moving on) never asks again or drops that answer.
+  const asked = useRef(false);
+  const mounted = useRef(true);
   useEffect(() => {
-    if (active && phase === "waiting") setPhase("shown");
-  }, [active, phase]);
+    mounted.current = true;
+    return () => { mounted.current = false; };
+  }, []);
+  useEffect(() => {
+    if (!active || asked.current) return;
+    asked.current = true;
+    const userId = user?.id;
+    // Nobody to remember it for: say it, as before.
+    if (userId === undefined || userId === null) {
+      setPhase("shown");
+      return;
+    }
+    setPhase("checking");
+    const key = unpaidNoticeSeenKey(userId, kind);
+    keyValueStore.get<boolean>(key)
+      .then((seen) => {
+        if (!mounted.current) return;
+        if (seen === true) {
+          setPhase("done");
+          return;
+        }
+        setPhase("shown");
+        // Remembered as soon as it is shown: never again for this person.
+        void keyValueStore.set(key, true).catch(() => undefined);
+      })
+      // The store unreadable: say it rather than stay silent.
+      .catch(() => { if (mounted.current) setPhase("shown"); });
+  }, [active, user?.id, kind]);
 
   useEffect(() => {
     if (phase !== "shown") return undefined;
