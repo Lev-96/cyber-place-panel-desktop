@@ -206,6 +206,13 @@ export interface ISessionApi {
    * carry a column they are not asserting on.
    */
   stopped_at?: string | null;
+  /**
+   * At the till since this instant (2026-11-22): Stop pressed, the bill held
+   * here until «Подтвердить» / «Отменить». Absent from an older backend.
+   */
+  checkout_at?: string | null;
+  /** «Незакрытые счета» only, for a seat at the till: its bill held at `checkout_at`. */
+  held_total?: string | number | null;
   status: "active" | "stopped" | "expired";
   /**
    * Paused since this instant; null while the clock runs. The session stays
@@ -471,6 +478,17 @@ export interface ISessionApi {
   extra_item?: IExtraItem | null;
   /** The seat's platform slug, so a refusal can name it rather than just say no. */
   place_platform?: string | null;
+  /**
+   * The device row, when the server loaded it (`SessionResource` `pc`). Its
+   * `place` carries `number` / `name` only where the endpoint selected them —
+   * the open-bills list does (2026-11-22); the board's listing selects the
+   * pricing columns only, so `number` is absent there (`sessionSeatLine`).
+   */
+  pc?: {
+    id: number;
+    label?: string | null;
+    place?: (Translated & { id: number; number?: number | null; name?: string | null }) | null;
+  } | null;
 }
 
 /** The room's own extra, as the server resolves it for one session. */

@@ -139,8 +139,10 @@ test("a card still does what it did: Start opens its dialog for that seat", asyn
   const dialog = page.getByRole("dialog");
   await expect(dialog).toBeVisible();
   // The dialog is for THIS seat: the third card opens №3. The title is
-  // «Start seat» since 4aece84 (2026-11-08, `session.start`).
-  await expect(dialog.getByRole("heading", { level: 2 })).toHaveText("Start seat · №3");
+  // «Start seat» since 4aece84 (2026-11-08, `session.start`); the seat's
+  // number AND name follow on their own line since 2026-11-22 (owner).
+  await expect(dialog.getByRole("heading", { level: 2 })).toContainText("Start seat");
+  await expect(dialog.getByTestId("start-seat")).toHaveText("№3 · PC-3");
 });
 
 test("after a reload the board comes back as it was saved", async ({ page }) => {

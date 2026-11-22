@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { installBackendMocks, seedLanguageChosen } from "./helpers/mockBackend";
+import { dismissUnpaidNotice } from "./helpers/unpaidNotice";
 
 /**
  * Start, 2026-11-20 (owner): «+ Товар» puts products on the seat from the
@@ -63,6 +64,7 @@ for (const lang of ["ru", "en", "am"] as const) {
       await signIn(page, lang, width, starts, quotes);
       await page.goto("/#/branches/1/sessions");
       await page.locator('.place-cell [data-action="start"]').first().click();
+      await dismissUnpaidNotice(page);
       await expect(page.locator(".start-dialog")).toBeVisible();
 
       await page.getByTestId("start-products-add").click();

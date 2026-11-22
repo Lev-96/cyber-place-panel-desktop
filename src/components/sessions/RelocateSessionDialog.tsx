@@ -11,6 +11,7 @@ import type { IRelocationOptions, IRelocationPlace, IRelocationSwap } from "@/ap
 import { ISessionApi } from "@/types/sessions";
 import { platformLabel } from "@/utils/platform";
 import { useCallback, useEffect, useState } from "react";
+import { numberNameLine, sessionSeatLine } from "./seatLine";
 
 interface Props {
   session: ISessionApi;
@@ -25,14 +26,17 @@ interface Props {
   onSwapped?: (session: ISessionApi, other: ISessionApi) => void;
   /** A platform's display name; the board passes the branch's own (one shared read). */
   platformName?: (slug: string) => string;
+  /** The seat as its card names it, «№4 · Hall VIP» (2026-11-22); absent: the server's / the row's. */
+  seat?: string;
 }
 
 /** 24-hour wall clock, the only format this panel shows a time in. */
 const clockOf = (at: string): string =>
   new Date(at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
 
+/** The seat line every surface prints (`numberNameLine`). */
 const seatOf = (p: { number: number | null; place_id?: number | null; name?: string | null }): string =>
-  `№${p.number ?? p.place_id ?? "-"}${p.name ? ` · ${p.name}` : ""}`;
+  numberNameLine(p.number ?? p.place_id ?? "-", p.name);
 
 /**
  * «Переместить игрока» — move a running session to another seat.
@@ -50,8 +54,8 @@ const seatOf = (p: { number: number | null; place_id?: number | null; name?: str
  * another, validated again on the server. Either way only the time AFTER the
  * move runs at it — the server freezes what was already played.
  */
-const RelocateSessionDialog = ({ session, onClose, onMoved, onSwapped, platformName = platformLabel }: Props) => {
-  const { t, money } = useLang();
+const RelocateSessionDialog = ({ session, onClose, onMoved, onSwapped, platformName = platformLabel, seat }: Props) => {
+  const { t, money, lang } = useLang();
   const [options, setOptions] = useState<IRelocationOptions | null>(null);
   const [loadError, setLoadError] = useState<unknown>(null);
   const [selectedId, setSelectedId] = useState<number | null>(null);
@@ -95,7 +99,7 @@ const RelocateSessionDialog = ({ session, onClose, onMoved, onSwapped, platformN
     setError(null);
     try {
       const { session: moved, other } = await sessionRepository.swap(session.id, swapWith.session_id);
-      notify.message("success", fmt(t("session.swappedToast"), current ? seatOf(current) : session.pc_label, seatOf(swapWith)));
+      notify.message("success", fmt(t("session.swappedToast"), ownSeat, seatOf(swapWith)));
       onSwapped?.(moved, other);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -195,14 +199,16 @@ const RelocateSessionDialog = ({ session, onClose, onMoved, onSwapped, platformN
   };
 
   const current = options?.current;
+  // WHICH seat the player is on: the card's line, else the server's answer.
+  const ownSeat = seat ?? (current ? seatOf(current) : sessionSeatLine(session, lang));
 
   return (
     <Modal open onClose={onClose} dirty={selectedId !== null || swapId !== null}>
       <div className="card col" style={{ gap: 16, width: 480, maxWidth: "92vw" }}>
-        <div className="row-between" style={{ alignItems: "baseline" }}>
-          <h2 style={{ margin: 0 }}>{t("session.relocate")}</h2>
-          <span className="muted" style={{ fontSize: 13 }}>{session.pc_label}</span>
-        </div>
+        <h2 className="dialog-title" style={{ margin: 0 }}>
+          <span>{t("session.relocate")}</span>
+          <span className="dialog-title__seat" data-testid="relocate-seat" title={ownSeat}>{ownSeat}</span>
+        </h2>
 
         {loadError !== null && options === null && (
           <ErrorState size="compact" error={loadError} onRetry={() => void load()} titleKey="session.state.relocateErrorTitle" descriptionKey={null} />
@@ -282,7 +288,7 @@ const RelocateSessionDialog = ({ session, onClose, onMoved, onSwapped, platformN
         {swapWith && (
           <section className="col" style={{ gap: 4, paddingTop: 4, borderTop: "1px solid var(--color-border)", fontSize: 13 }} data-testid="swap-summary">
             <span>
-              {current ? seatOf(current) : session.pc_label} <span aria-hidden style={{ color: "var(--color-primary)" }}>⇄</span>{" "}
+              {ownSeat} <span aria-hidden style={{ color: "var(--color-primary)" }}>⇄</span>{" "}
               <strong>{seatOf(swapWith)}</strong>
             </span>
             <span className="muted" style={{ fontSize: 12 }}>{t("session.swapSummary")}</span>
@@ -330,7 +336,7 @@ const RelocateSessionDialog = ({ session, onClose, onMoved, onSwapped, platformN
             {/* The summary: where, at what price, and that the past keeps its own. */}
             <div className="col" style={{ gap: 4, fontSize: 13 }}>
               <span>
-                {current ? seatOf(current) : session.pc_label} <span aria-hidden style={{ color: "var(--color-primary)" }}>-&gt;</span>{" "}
+                {ownSeat} <span aria-hidden style={{ color: "var(--color-primary)" }}>-&gt;</span>{" "}
                 <strong>{seatOf(selected)}</strong>
               </span>
               {effectiveRate !== null && (

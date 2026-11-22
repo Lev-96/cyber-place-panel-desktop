@@ -25,7 +25,7 @@ vi.mock("@/sound/soundEngine", () => ({ playFor: sound.playFor }));
 const toast = vi.hoisted(() => ({ message: vi.fn() }));
 vi.mock("@/ui/notify", () => ({ notify: { message: toast.message } }));
 vi.mock("@/i18n/LanguageContext", () => ({
-  useLang: () => ({ t: (k: string) => (k === "session.reminder.cardBody" ? "#{seat}{player} {elapsed}" : k), money: String, lang: "en" }),
+  useLang: () => ({ t: (k: string) => (k === "session.reminder.cardBody" ? "{seat}{player} {elapsed}" : k), money: String, lang: "en" }),
 }));
 
 /** `SessionReminderDue::toArray()` for seat №3, Арам, set 2 h ago with a note. */
@@ -76,15 +76,21 @@ describe("the card", () => {
     feed.list = [row()];
     await mount();
     const card = screen.getByRole("alert");
-    expect(card.textContent).toContain("#3 (Арам) 2 time.hourShort");
+    expect(card.textContent).toContain("№3 (Арам) 2 time.hourShort");
     expect(card.textContent).toContain("позвонить маме");
     expect(sound.playFor).toHaveBeenCalledWith("session_ending", "r-5");
+  });
+
+  test("the seat by number and name, as its card says it (2026-11-22)", async () => {
+    feed.list = [row({}, { place_name: "Hall VIP" })];
+    await mount();
+    expect(screen.getByRole("alert").textContent).toContain("№3 · Hall VIP (Арам)");
   });
 
   test("no player name: no empty brackets", async () => {
     feed.list = [row({}, { player_name: null, note: null })];
     await mount();
-    expect(screen.getByRole("alert").textContent).toContain("#3 2 time.hourShort");
+    expect(screen.getByRole("alert").textContent).toContain("№3 2 time.hourShort");
     expect(screen.getByRole("alert").textContent).not.toContain("()");
   });
 

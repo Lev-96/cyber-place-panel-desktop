@@ -55,9 +55,12 @@ import {
   apiSetSessionItemQty,
   apiStartSession,
   apiStopSessionWithBreakdown,
+  apiCheckout,
+  apiReleaseCheckout,
   apiChangeSessionPayment,
   apiConfirmDue,
   apiDuesToConfirm,
+  apiOpenBills,
   type IDueToConfirm,
   apiRecordSessionPayment,
   type PaymentFields,
@@ -147,6 +150,11 @@ export class SessionRepository {
     return apiDuesToConfirm().then((r) => r.data ?? []);
   }
 
+  /** Ended seats whose bill is not closed yet (2026-11-22), every branch the caller works in. */
+  async openBills(branchId?: number): Promise<ISessionApi[]> {
+    return apiOpenBills(branchId).then((r) => (Array.isArray(r.data) ? r.data : []));
+  }
+
   /** How that due was paid (or taken now) — the same total (2026-11-20). */
   async confirmDue(id: number, body: PaymentFields & { cash_received?: string }): Promise<{ session: ISessionApi; cash: ICashHandover | null }> {
     return friendlyMutation(apiConfirmDue(id, body).then((r) => ({ session: r.session, cash: r.cash ?? null })));
@@ -155,6 +163,15 @@ export class SessionRepository {
   /** Change how an ended seat was paid, the same total (2026-11-19). */
   async changePayment(id: number, body: PaymentFields): Promise<ISessionApi> {
     return friendlyMutation(apiChangeSessionPayment(id, body).then((r) => r.session));
+  }
+
+  /** Stop pressed: the seat waits at the till, its bill held (2026-11-22). */
+  async checkout(id: number): Promise<ISessionApi> {
+    return friendlyMutation(apiCheckout(id).then((r) => r.session));
+  }
+  /** «Продолжить игру»: the bill runs again (2026-11-22). */
+  async releaseCheckout(id: number): Promise<ISessionApi> {
+    return friendlyMutation(apiReleaseCheckout(id).then((r) => r.session));
   }
 
   async stop(id: number, payment?: StopSessionBody): Promise<StopResult> {

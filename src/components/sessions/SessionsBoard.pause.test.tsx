@@ -19,6 +19,9 @@ const repo = vi.hoisted(() => ({
 
 vi.mock("@/repositories/SessionRepository", () => ({
   sessionRepository: {
+    // At the till (2026-11-22): Stop holds the bill; «Продолжить игру» lets it run.
+    checkout: vi.fn().mockResolvedValue({}),
+    releaseCheckout: vi.fn().mockResolvedValue({}),
     listPcs: (...a: unknown[]) => repo.listPcs(...a),
     listActive: (...a: unknown[]) => repo.listActive(...a),
     pause: (...a: unknown[]) => repo.pause(...a),
@@ -244,7 +247,7 @@ describe("SessionsBoard — the toasts after stop, pause and resume", () => {
 
     await press("session.pause");
 
-    expect(toasts).toEqual([expect.objectContaining({ kind: "warning", text: "session.toastPaused №1" })]);
+    expect(toasts).toEqual([expect.objectContaining({ kind: "warning", text: "session.toastPaused №1 · PC 1" })]);
   });
 
   test("a resume raises a green one", async () => {
@@ -255,7 +258,7 @@ describe("SessionsBoard — the toasts after stop, pause and resume", () => {
 
     await press("session.resume");
 
-    expect(toasts).toEqual([expect.objectContaining({ kind: "success", text: "session.toastResumed №1" })]);
+    expect(toasts).toEqual([expect.objectContaining({ kind: "success", text: "session.toastResumed №1 · PC 1" })]);
   });
 
   test("a refused pause raises nothing", async () => {
@@ -293,7 +296,7 @@ describe("SessionsBoard — the toasts after stop, pause and resume", () => {
     await press("session.confirmStop");
 
     expect(repo.stop).toHaveBeenCalledTimes(1);
-    expect(toasts).toEqual([expect.objectContaining({ kind: "success", text: "session.toastStopped №1" })]);
+    expect(toasts).toEqual([expect.objectContaining({ kind: "success", text: "session.toastStopped №1 · PC 1" })]);
   });
 
   test("a refused stop raises nothing", async () => {

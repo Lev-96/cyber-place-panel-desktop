@@ -24,6 +24,9 @@ vi.mock("@/components/reservations/BookingsCalendarModal", () => ({
 
 vi.mock("@/repositories/SessionRepository", () => ({
   sessionRepository: {
+    // At the till (2026-11-22): Stop holds the bill; «Продолжить игру» lets it run.
+    checkout: vi.fn().mockResolvedValue({}),
+    releaseCheckout: vi.fn().mockResolvedValue({}),
     listPcs: (...a: unknown[]) => repo.listPcs(...a),
     listActive: (...a: unknown[]) => repo.listActive(...a),
     reorderPcs: vi.fn().mockResolvedValue(undefined),
@@ -160,6 +163,34 @@ describe("reserving from the board", () => {
     const cell = document.querySelector(".place-cell") as HTMLElement;
     expect(cell.classList.contains("session-card--booking-ahead")).toBe(false);
     expect(cell.getAttribute("data-tone")).toBe("free");
+  });
+
+  // «Забронировано» in the board's counts (2026-11-22, owner): a seat reserved
+  // now and not taken counts there, not as free — the tile's own rule.
+  test("a seat reserved now counts as reserved, not free", async () => {
+    reserved.ids = new Set([pc().place_id as number]);
+    await mount();
+    expect(screen.getByTestId("board-count-total").textContent).toBe("session.countTotal1");
+    expect(screen.getByTestId("board-count-busy").textContent).toBe("session.countBusy0");
+    expect(screen.getByTestId("board-count-booked").textContent).toBe("session.countBooked1");
+    expect(screen.getByTestId("board-count-free").textContent).toBe("session.countFree0");
+  });
+
+  // The dot on «Календарь броней» (2026-11-22, owner): seats with a
+  // reservation now or ahead; none, no dot.
+  test("the calendar button carries a dot with the seats reserved now or ahead", async () => {
+    repo.listPcs.mockResolvedValue([{ ...pc(), next_booking_start: null }]);
+    await mount();
+    expect(screen.queryByTestId("board-calendar-dot")).toBeNull();
+    cleanup();
+    reserved.ids = new Set([pc().place_id as number]);
+    await mount();
+    expect(screen.getByTestId("board-calendar-dot").textContent).toBe("1");
+    cleanup();
+    reserved.ids = new Set();
+    repo.listPcs.mockResolvedValue([{ ...pc(), next_booking_start: new Date(Date.now() + 3600_000).toISOString() }]);
+    await mount();
+    expect(screen.getByTestId("board-calendar-dot").textContent).toBe("1");
   });
 
   test("the header's «Календарь броней» opens it on every seat", async () => {

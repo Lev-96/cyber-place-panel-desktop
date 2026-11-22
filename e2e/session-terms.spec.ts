@@ -208,7 +208,9 @@ test("the running-session dialog does not carry the waiver", async ({ page }) =>
   // The dialog IS open — this is one of the things it does own. Since
   // 362862a (2026-11-07) it is the one «Add time» dialog for every mode.
   const dialog = page.getByRole("dialog");
-  await expect(dialog.getByRole("heading", { level: 2 })).toHaveText("Add time");
+  await expect(dialog.getByRole("heading", { level: 2 })).toContainText("Add time");
+  // Which seat, number and name, on its own line (2026-11-22, owner).
+  await expect(dialog.getByTestId("options-seat")).toHaveText("№1 · PS5 VIP");
   await expect(page.getByText("Free session", { exact: true })).toHaveCount(0);
 });
 

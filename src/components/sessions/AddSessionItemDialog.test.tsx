@@ -173,8 +173,8 @@ describe("AddSessionItemDialog — the basket", () => {
 
     expect(repo.addItems).toHaveBeenCalledTimes(1);
     expect(repo.addItems).toHaveBeenCalledWith(42, [
-      { product_id: 10, qty: 2 },
-      { product_id: 15, qty: 1 },
+      { product_id: 10, qty: 2, unpaid: true },
+      { product_id: 15, qty: 1, unpaid: true },
     ]);
     // Success: the session is refreshed and the dialog is done.
     expect(onAdded).toHaveBeenCalled();
@@ -281,7 +281,7 @@ describe("creating a product from the basket", () => {
     });
     await act(async () => { fireEvent.click(confirmButton()!); });
 
-    expect(repo.addItems).toHaveBeenCalledWith(42, [{ product_id: 77, qty: 1 }]);
+    expect(repo.addItems).toHaveBeenCalledWith(42, [{ product_id: 77, qty: 1, unpaid: true }]);
   });
 
   test("a manager is offered the catalogue form (products.write, 2026-11-09)", async () => {
@@ -559,7 +559,7 @@ describe("AddSessionItemDialog — typing the order", () => {
     await act(async () => { fireEvent.click(textConfirm()); });
 
     expect(repo.addItems).toHaveBeenCalledTimes(1);
-    expect(repo.addItems).toHaveBeenCalledWith(42, [{ product_id: 10, qty: 20 }, { product_id: 15, qty: 2 }]);
+    expect(repo.addItems).toHaveBeenCalledWith(42, [{ product_id: 10, qty: 20, unpaid: true }, { product_id: 15, qty: 2, unpaid: true }]);
     expect(onAdded).toHaveBeenCalled();
     expect(onClose).toHaveBeenCalled();
   });
@@ -914,7 +914,7 @@ describe("AddSessionItemDialog — a typed name that fits several products", () 
     expect(lists()).toHaveLength(0);
 
     await act(async () => { fireEvent.click(confirm()); });
-    expect(repo.addItems).toHaveBeenCalledWith(42, [{ product_id: 21, qty: 5 }, { product_id: 10, qty: 20 }, { product_id: 20, qty: 3 }]);
+    expect(repo.addItems).toHaveBeenCalledWith(42, [{ product_id: 21, qty: 5, unpaid: true }, { product_id: 10, qty: 20, unpaid: true }, { product_id: 20, qty: 3, unpaid: true }]);
   });
 
   test("× takes a wrong pick out of the draft — its product id with it — and leaves the other lines alone", async () => {
@@ -951,7 +951,7 @@ describe("AddSessionItemDialog — a typed name that fits several products", () 
     await settle();
     expect(lastRead()).toEqual([42, "20 lays\ncola 5", [{ line: 1, raw: "cola 5", product_id: 20 }]]);
     await act(async () => { fireEvent.click(confirm()); });
-    expect(repo.addItems).toHaveBeenCalledWith(42, [{ product_id: 10, qty: 20 }, { product_id: 20, qty: 5 }]);
+    expect(repo.addItems).toHaveBeenCalledWith(42, [{ product_id: 10, qty: 20, unpaid: true }, { product_id: 20, qty: 5, unpaid: true }]);
   });
 
   test("removing one picked line keeps the other line's pick, moved up with it", async () => {
@@ -992,7 +992,7 @@ describe("AddSessionItemDialog — a typed name that fits several products", () 
     await settle();
     await act(async () => { fireEvent.click(confirm()); fireEvent.click(confirm()); });
     expect(repo.addItems).toHaveBeenCalledTimes(1);
-    expect(repo.addItems).toHaveBeenCalledWith(42, [{ product_id: 21, qty: 5 }, { product_id: 10, qty: 20 }]);
+    expect(repo.addItems).toHaveBeenCalledWith(42, [{ product_id: 21, qty: 5, unpaid: true }, { product_id: 10, qty: 20, unpaid: true }]);
   });
 
   test("editing the text drops a pick made for the old text", async () => {
@@ -1105,7 +1105,7 @@ describe("additional items — chips, a cue — handed out once per session", ()
 
     expect(repo.addItems).toHaveBeenCalledTimes(1);
     expect(repo.addItems).toHaveBeenCalledWith(42, [
-      { product_id: 10, qty: 2 }, { product_id: 40, qty: 1 }, { product_id: 41, qty: 1 },
+      { product_id: 10, qty: 2, unpaid: true }, { product_id: 40, qty: 1 }, { product_id: 41, qty: 1 },
     ]);
     // The product as always; the items as handed out — never "Cue × 1".
     expect(toastTexts()).toContain("success|session.addedOne");
@@ -1150,7 +1150,7 @@ describe("additional items — chips, a cue — handed out once per session", ()
       await openItems();
       await act(async () => { fireEvent.click(addButton("Billiard Cue")); });
       await act(async () => { fireEvent.click(screen.getByText("session.quickEntryConfirm")); });
-      expect(repo.addItems).toHaveBeenCalledWith(42, [{ product_id: 10, qty: 2 }, { product_id: 41, qty: 1 }]);
+      expect(repo.addItems).toHaveBeenCalledWith(42, [{ product_id: 10, qty: 2, unpaid: true }, { product_id: 41, qty: 1 }]);
       expect(toastTexts()).toContain("success|session.additionalGiven: Billiard Cue");
     } finally {
       vi.useRealTimers();
@@ -1239,19 +1239,43 @@ describe("«Свои продукты» among what the session already holds (20
 describe("handed over not paid yet", () => {
   const unpaidSwitch = () => screen.getByTestId("items-unpaid-switch") as HTMLButtonElement;
 
-  test("off by default: the basket is sent exactly as before", async () => {
+  // ON by default since 2026-11-22 (owner); off, the basket is sent exactly
+  // as it always was.
+  test("switched off: the basket is sent exactly as before", async () => {
     await mount();
+    expect(unpaidSwitch().getAttribute("aria-checked")).toBe("true");
+    await act(async () => { fireEvent.click(unpaidSwitch()); });
     expect(unpaidSwitch().getAttribute("aria-checked")).toBe("false");
     fireEvent.click(plusFor("Lays"));
     await act(async () => { fireEvent.click(confirmButton()); });
     expect(repo.addItems).toHaveBeenCalledWith(42, [{ product_id: 10, qty: 1 }]);
   });
 
-  test("on: every product line is sent as unpaid", async () => {
+  test("said large at open (blurred form, announced); a click takes it away and the basket works on", async () => {
+    await mount();
+    const notice = screen.getByTestId("items-unpaid-notice");
+    expect(notice.getAttribute("role")).toBe("alert");
+    expect(notice.closest(".dialog-tone--goods")).not.toBeNull();
+    expect(notice.textContent).toContain("unpaidOn.itemsHint");
+    await act(async () => { fireEvent.click(notice); });
+    expect(screen.queryByTestId("items-unpaid-notice")).toBeNull();
+    fireEvent.click(plusFor("Lays"));
+    await act(async () => { fireEvent.click(confirmButton()); });
+    expect(repo.addItems).toHaveBeenCalledWith(42, [{ product_id: 10, qty: 1, unpaid: true }]);
+  });
+
+  test("the title names the seat: the board's line, else the row's own", async () => {
+    await mount({ seat: "№4 · Hall VIP" });
+    expect(screen.getByTestId("add-item-seat").textContent).toBe("№4 · Hall VIP");
+    cleanup();
+    await mount();
+    expect(screen.getByTestId("add-item-seat").textContent).toBe("№1");
+  });
+
+  test("on by default: every product line is sent as unpaid", async () => {
     await mount();
     fireEvent.click(plusFor("Lays"));
     fireEvent.click(plusFor("Coffee"));
-    await act(async () => { fireEvent.click(unpaidSwitch()); });
     expect(unpaidSwitch().getAttribute("aria-checked")).toBe("true");
     await act(async () => { fireEvent.click(confirmButton()); });
     expect(repo.addItems).toHaveBeenCalledWith(42, [

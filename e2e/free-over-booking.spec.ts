@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { installBackendMocks, seedLanguageChosen } from "./helpers/mockBackend";
+import { dismissUnpaidNotice } from "./helpers/unpaidNotice";
 
 /**
  * A free session on a reserved seat (2026-11-19, owner): the owner's switch on
@@ -109,6 +110,7 @@ for (const lang of ["ru", "en", "am"] as const) {
       await signIn(page, lang, width);
       await page.goto("/#/branches/1/sessions");
       await page.locator('.place-cell [data-action="start"]').first().click();
+      await dismissUnpaidNotice(page);
       await expect(page.locator(".start-dialog")).toBeVisible();
       const sw = page.getByTestId("free-switch");
       await expect(sw).toHaveAttribute("role", "switch");
@@ -140,6 +142,7 @@ test("the owner's switch off: no free on a reserved seat", async ({ page }) => {
   await signIn(page, "ru", 1280);
   await page.goto("/#/branches/1/sessions");
   await page.locator('.place-cell [data-action="start"]').first().click();
+  await dismissUnpaidNotice(page);
   await expect(page.locator(".start-dialog")).toBeVisible();
   await expect(page.getByTestId("free-switch")).toHaveCount(0);
 });

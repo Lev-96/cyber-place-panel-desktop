@@ -7,6 +7,7 @@ import { ISessionApi } from "@/types/sessions";
 import { useEffect, useMemo, useState } from "react";
 import { playFor } from "@/sound/soundEngine";
 import SessionOptionsDialog from "@/components/sessions/SessionOptionsDialog";
+import { numberNameLine } from "@/components/sessions/seatLine";
 
 /**
  * "This seat is about to run out" — a floating card for every staff member the
@@ -48,13 +49,8 @@ export interface EndingWarning {
  * that does not send it yet, an empty name, or a name that only repeats the
  * number leaves the number alone. No number: the device, as before.
  */
-export const seatLabel = (data: IDbNotification["data"]): string => {
-  if (data.place_number == null) return `#${data.pc_id ?? data.session_id}`;
-  const number = `№${data.place_number}`;
-  const name = data.place_name?.trim() ?? "";
-  const repeatsNumber = name === "" || name === String(data.place_number) || name === number;
-  return repeatsNumber ? number : `${number} · ${name}`;
-};
+export const seatLabel = (data: IDbNotification["data"]): string =>
+  data.place_number == null ? `#${data.pc_id ?? data.session_id}` : numberNameLine(data.place_number, data.place_name);
 
 /** The warnings to show now: unread, still ahead, not dismissed — soonest first. */
 export const endingWarnings = (
@@ -109,6 +105,8 @@ const SessionEndingNotifier = () => {
   const [dismissed, setDismissed] = useState<Set<string>>(() => new Set());
   const [now, setNow] = useState(() => Date.now());
   const [managing, setManaging] = useState<ISessionApi | null>(null);
+  // The warning's own seat line, for the dialog it opens (2026-11-22).
+  const [managingSeat, setManagingSeat] = useState<string | undefined>(undefined);
 
   // Keyed on the id, not the object: a re-created user object (a refreshed
   // profile) must not re-read storage and re-render in a loop.
@@ -149,7 +147,7 @@ const SessionEndingNotifier = () => {
     try {
       const sessions = await sessionRepository.listActiveEverywhere();
       const found = sessions.find((s) => s.id === w.sessionId);
-      if (found) setManaging(found);
+      if (found) { setManagingSeat(w.label); setManaging(found); }
     } catch {
       /* the seat cannot be read now; the board still has it */
     }
@@ -158,6 +156,7 @@ const SessionEndingNotifier = () => {
   const dialog = managing === null ? null : (
     <SessionOptionsDialog
       session={managing}
+      seat={managingSeat}
       platform={managing.place_platform}
       onClose={() => setManaging(null)}
       onChanged={setManaging}

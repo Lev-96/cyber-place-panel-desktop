@@ -501,11 +501,31 @@ export interface IDueToConfirm {
 
 export const apiDuesToConfirm = () => request<{ data: IDueToConfirm[] }>("/sessions/dues-to-confirm");
 
+/**
+ * «Незакрытые счета» (2026-11-22): ended seats with no way of paying recorded
+ * yet — the final bills a cashier hid to close later. Branch-scoped on the
+ * server; without `branch_id`, every branch the caller works in. Each row is
+ * a `SessionResource` with `pc.place` loaded. Closed with the same
+ * `POST /sessions/{id}/payment` «Отметить оплату» sends.
+ */
+export const apiOpenBills = (branchId?: number) =>
+  request<{ data: ISessionApi[] }>("/sessions/open-bills", { params: { branch_id: branchId } });
+
 export const apiConfirmDue = (id: number, body: PaymentFields & { cash_received?: string }) =>
   request<{ session: ISessionApi; cash: ICashHandover | null }>(`/sessions/${id}/confirm-due`, { method: "POST", body });
 
 export const apiChangeSessionPayment = (id: number, body: PaymentFields) =>
   request<{ session: ISessionApi }>(`/sessions/${id}/payment`, { method: "PUT", body });
+
+/**
+ * Stop pressed (2026-11-22, owner): the seat waits at the till and its bill
+ * holds at this instant until «Подтвердить» / «Отменить»; repeated, the first
+ * instant stands. `apiReleaseCheckout` («Продолжить игру») lets it run again.
+ */
+export const apiCheckout = (id: number) =>
+  request<{ session: ISessionApi }>(`/sessions/${id}/checkout`, { method: "POST" });
+export const apiReleaseCheckout = (id: number) =>
+  request<{ session: ISessionApi }>(`/sessions/${id}/checkout`, { method: "DELETE" });
 
 export const apiStopSessionWithBreakdown = (id: number, body?: StopSessionBody) =>
   request<{ session: ISessionApi; breakdown: IBillBreakdown; cash?: ICashHandover | null }>(`/sessions/${id}/stop`, {

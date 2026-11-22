@@ -14,6 +14,7 @@ import { useConfirm } from "@/components/ui/ConfirmProvider";
 import ScreenWithBg from "@/components/ui/ScreenWithBg";
 import SectionTabs from "@/components/ui/SectionTabs";
 import { reminderSentence } from "@/components/notifications/SessionReminderNotifier";
+import { seatLabel } from "@/components/notifications/SessionEndingNotifier";
 import { SHIFT_STOCK_SHORTAGE, shiftShortageTarget, shiftShortageText } from "@/components/notifications/shiftStockShortage";
 import { shiftAmount } from "@/shifts/cash";
 import Spinner from "@/components/ui/Spinner";
@@ -511,9 +512,9 @@ const DbNotificationCard = ({ n, onClick, onDelete }: { n: IDbNotification; onCl
   } else if (isSessionReminder) {
     // The card's own sentence (SessionReminderNotifier), and under it the
     // player's words, who set it and where.
-    const seat = n.data?.place_number ?? n.data?.pc_id ?? n.data?.session_id;
     headline = reminderSentence({
-      seat: String(seat ?? "-"),
+      // «№3 · Hall VIP», the seat line every surface prints (2026-11-22).
+      seat: seatLabel(n.data ?? {}),
       player: (n.data?.player_name as string | undefined)?.trim() || null,
       minutes: typeof n.data?.minutes === "number" ? n.data.minutes : null,
     }, t);

@@ -5,6 +5,7 @@ import { PlaceSnapshot } from "@/services/realtime/RealtimeService";
 import { formatTime } from "@/i18n/dates";
 import { platformLabel } from "@/utils/platform";
 import { placeTypeLabelKey } from "@/utils/placeType";
+import { placeLineOf } from "@/components/sessions/seatLine";
 
 interface Props {
   snapshot: PlaceSnapshot;
@@ -13,15 +14,17 @@ interface Props {
 }
 
 const PlaceCell = ({ snapshot, platformName = platformLabel }: Props) => {
-  const { t } = useLang();
+  const { t, lang } = useLang();
   const { place, status, bookings } = snapshot;
+  // «№4 · Hall VIP», the seat card's own line (2026-11-22, owner).
+  const line = placeLineOf(place.raw, lang);
   const color = PlaceStatusColors[status];
   const top = bookings[0];
   return (
     <div className="place-cell" style={{ borderColor: color }}>
 
       <span className="platform">{platformName(place.platform)} · {t(placeTypeLabelKey(place.type))}</span>
-      <span className="id">№{place.number ?? place.id}</span>
+      <span className="id cell-line" title={line}>{line}</span>
       {/* Colour, icon and word together (2026-10-27). */}
       <span className="status"><StatusChip tone={PLACE_STATUS_TONE[status]} label={t(`place.${status}`)} /></span>
       {top && (

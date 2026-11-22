@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { installBackendMocks, seedLanguageChosen } from "./helpers/mockBackend";
+import { dismissUnpaidNotice } from "./helpers/unpaidNotice";
 
 /**
  * «Свои продукты» (2026-11-13, owner) on the real bundle and CSS: the Start
@@ -86,6 +87,7 @@ for (const lang of ["ru", "en", "am"] as const) {
       await signIn(page, lang, width);
       await page.goto("/#/branches/1/sessions");
       await page.locator('.place-cell [data-action="start"]').first().click();
+      await dismissUnpaidNotice(page);
       await expect(page.locator(".start-dialog")).toBeVisible();
       await page.getByTestId("outside-food-switch").click();
       await expect(page.getByTestId("outside-food-switch")).toHaveAttribute("aria-checked", "true");

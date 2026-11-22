@@ -20,6 +20,9 @@ const availability = vi.hoisted(() => ({ handler: null as null | ((e: { reason: 
 
 vi.mock("@/repositories/SessionRepository", () => ({
   sessionRepository: {
+    // At the till (2026-11-22): Stop holds the bill; «Продолжить игру» lets it run.
+    checkout: vi.fn().mockResolvedValue({}),
+    releaseCheckout: vi.fn().mockResolvedValue({}),
     listPcs: (...a: unknown[]) => repo.listPcs(...a),
     listActive: (...a: unknown[]) => repo.listActive(...a),
     reorderPcs: vi.fn().mockResolvedValue(undefined),

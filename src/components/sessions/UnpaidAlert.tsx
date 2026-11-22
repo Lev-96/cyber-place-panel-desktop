@@ -1,11 +1,13 @@
 import Button from "@/components/ui/Button";
 import Modal from "@/components/ui/Modal";
 import { useLang } from "@/i18n/LanguageContext";
+import { dialogToneClass } from "@/components/ui/dialogTone";
+import { centsWhenFractional } from "@/i18n/currency";
 
 /** One seat that ended owing for extra time — the server's figure. */
 export interface UnpaidNotice {
   sessionId: number;
-  /** "№4 · Playstation 5", or the seat's own name. */
+  /** «№4 · Hall VIP» — the card's own seat line (`seatLineOf`). */
   seat: string;
   amount: number;
 }
@@ -29,11 +31,11 @@ const UnpaidAlert = ({ notices, onDismiss }: Props) => {
 
   return (
     <Modal open onClose={() => onDismiss(current.sessionId)}>
-      <div className="card unpaid-alert" role="alertdialog" aria-labelledby="unpaid-alert-title" data-testid="unpaid-alert">
+      <div className={`card ${dialogToneClass("unpaid")} unpaid-alert`} role="alertdialog" aria-labelledby="unpaid-alert-title" data-testid="unpaid-alert">
         <div className="unpaid-alert__badge" aria-hidden>!</div>
         <h2 id="unpaid-alert-title" className="unpaid-alert__seat">{current.seat}</h2>
         <p className="unpaid-alert__why">{t("session.unpaid.alertWhy")}</p>
-        <div className="unpaid-alert__amount" data-testid="unpaid-alert-amount">{money(current.amount)}</div>
+        <div className="unpaid-alert__amount" data-testid="unpaid-alert-amount">{money(current.amount, centsWhenFractional(current.amount))}</div>
         <p className="unpaid-alert__hint">{t("session.unpaid.alertHint")}</p>
         {notices.length > 1 && (
           <span className="unpaid-alert__more">{t("session.unpaid.alertMore").replace("{0}", String(notices.length - 1))}</span>

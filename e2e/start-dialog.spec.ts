@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { installBackendMocks } from "./helpers/mockBackend";
+import { dismissUnpaidNotice } from "./helpers/unpaidNotice";
 
 /**
  * The start dialog made simple (owner, 2026-11-05), on the real bundle and
@@ -41,6 +42,7 @@ const openDialog = async (page: Page, width: number, packages: unknown[] = []) =
   await expect(page.getByText("Owner One").first()).toBeVisible();
   await page.goto("/#/branches/1/sessions");
   await page.locator('.place-cell [data-action="start"]').first().click();
+  await dismissUnpaidNotice(page);
   await expect(page.locator(".start-dialog")).toBeVisible();
 };
 
@@ -118,6 +120,7 @@ test("a part hidden is gone, stays hidden after a reload, and can be shown again
 
   await page.reload();
   await page.locator('.place-cell [data-action="start"]').first().click();
+  await dismissUnpaidNotice(page);
   await expect(page.locator(".start-dialog")).toBeVisible();
   await expect(page.getByTestId("planned-duration")).toHaveCount(0);
 

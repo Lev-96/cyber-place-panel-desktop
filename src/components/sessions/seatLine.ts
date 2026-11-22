@@ -30,12 +30,51 @@ export type SeatLinePlace = Translated & {
  * the line keeps it to its room with an ellipsis and the full text on hover,
  * so it is the NAME that gets cut, never the number.
  */
-export const placeLineOf = (place: SeatLinePlace, lang: Lang): string => {
-  const placeNo = place.number ?? place.id;
-  const placeName = tr(place, "name", lang).trim();
-  return placeName ? `№${placeNo} · ${placeName}` : `№${placeNo}`;
+export const placeLineOf = (place: SeatLinePlace, lang: Lang): string =>
+  numberNameLine(place.number ?? place.id, tr(place, "name", lang));
+
+/**
+ * The line itself, from a number and a name already in the reader's language
+ * (2026-11-22): «№4 · Hall VIP», «№4» when there is no name or the name only
+ * repeats the number («4», «№4»). Every surface that names a seat — the card,
+ * the dialogs, the toasts, the notifiers — prints it through here, so a seat
+ * reads the same everywhere.
+ */
+export const numberNameLine = (number: number | string, name: string | null | undefined): string => {
+  const head = `№${number}`;
+  const trimmed = (name ?? "").trim();
+  const repeatsNumber = trimmed === "" || trimmed === String(number) || trimmed === head;
+  return repeatsNumber ? head : `${head} · ${trimmed}`;
+};
+
+/**
+ * The seat of a session, when the row carries its place (`pc.place` — the
+ * open-bills list loads it): {@link placeLineOf}; otherwise the device's
+ * label, as the receipt printed it before.
+ */
+export const sessionSeatLine = (
+  session: { pc_id: number; pc_label?: string | null; pc?: { id?: number; place?: SeatLinePlace | null } | null },
+  lang: Lang,
+): string => {
+  const place = session.pc?.place;
+  // Only a place read WITH its number: the board's listing selects the
+  // place's pricing columns and not `number`, and its id is not the number.
+  if (place && place.number !== undefined) return placeLineOf(place, lang);
+  return session.pc_label || `#${session.pc_id}`;
 };
 
 /** {@link placeLineOf} for a device: its place's line, or its own label when it has no place. */
 export const seatLineOf = (pc: IPcApi, lang: Lang): string =>
   pc.place ? placeLineOf(pc.place, lang) : tr(pc, "label", lang);
+
+/**
+ * A seat line that always says WHAT the seat is (2026-11-22, owner: number
+ * and name in «Незакрытые счета»): a seat with no name of its own reads «№2 ·
+ * PS5 · Standard» — the words its tile shows — instead of a bare «№2». A
+ * named seat is its line unchanged.
+ */
+export const seatLineWithKind = (line: string, kind: readonly (string | null | undefined)[]): string => {
+  if (line.includes(" · ")) return line;
+  const words = kind.map((k) => (k ?? "").trim()).filter((k) => k !== "");
+  return words.length > 0 ? `${line} · ${words.join(" · ")}` : line;
+};

@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { LANGS, WIDTHS, at, fitsWidth, json, noRawKeys, openBoard, pc, runningSession, seedBoard, shot, signIn, type Lang } from "./helpers/moneySession";
+import { dismissUnpaidNotice } from "./helpers/unpaidNotice";
 
 /**
  * C (2026-11-15): paid ahead, change at Stop. Shapes as in
@@ -99,6 +100,7 @@ test("Start: «Оплачено вперёд» on a planned length sends prepaid
   });
   await openBoard(page);
   await page.locator('.place-cell [data-action="start"]').first().click();
+  await dismissUnpaidNotice(page);
   // Offered on every start since 2026-11-17 (no limit: a named sum); with a length it pays the plan.
   await expect(page.getByTestId("prepaid-switch")).toHaveCount(1);
   await page.getByTestId("planned-duration-input-hours").fill("2");

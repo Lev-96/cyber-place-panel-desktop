@@ -1142,9 +1142,10 @@ describe("the simpler start dialog (2026-11-05)", () => {
 });
 
 /**
- * «Не оплачено» at the start (2026-11-07, owner): the player pays later. Off
- * by default and then absent from the body (the start an older server has
- * always seen); on, the server starts the seat owing its whole time.
+ * «Не оплачено» at the start (2026-11-07, owner): the player pays later. ON
+ * by default since 2026-11-22 (owner) — the start carries `unpaid: true`
+ * unless the cashier turns it off (then the body is the one an older server
+ * has always seen) or chooses «Сейчас» / a free start / «На сумму».
  */
 describe("«Не оплачено» at the start", () => {
   const computer = () => device({ kind: PC_KIND.Pc, place: { id: 10, number: 1, name: "PC-1", type: "standard", platform: "pc" } });
@@ -1153,16 +1154,8 @@ describe("«Не оплачено» at the start", () => {
     await act(async () => { fireEvent.click(screen.getByRole("button", { name: "action.start" })); });
   };
 
-  test("off by default, and then not in the body", async () => {
+  test("on by default, and then the start carries it", async () => {
     await mount(computer());
-    expect(unpaidSwitch().getAttribute("aria-checked")).toBe("false");
-    await start();
-    expect(repo.start.mock.calls[0][0]).not.toHaveProperty("unpaid");
-  });
-
-  test("switched on, the start carries it", async () => {
-    await mount(computer());
-    await act(async () => { fireEvent.click(unpaidSwitch()); });
     expect(unpaidSwitch().getAttribute("aria-checked")).toBe("true");
     expect(screen.getByText("session.unpaid.startHint")).toBeTruthy();
     await start();
@@ -1170,9 +1163,16 @@ describe("«Не оплачено» at the start", () => {
     expect(repo.start.mock.calls[0][0]).toMatchObject({ unpaid: true });
   });
 
+  test("switched off, it is not in the body", async () => {
+    await mount(computer());
+    await act(async () => { fireEvent.click(unpaidSwitch()); });
+    expect(unpaidSwitch().getAttribute("aria-checked")).toBe("false");
+    await start();
+    expect(repo.start.mock.calls[0][0]).not.toHaveProperty("unpaid");
+  });
+
   test("a console at its rate carries it too (the open start, not only a package)", async () => {
     await mount(device());
-    await act(async () => { fireEvent.click(unpaidSwitch()); });
     await start();
     expect(repo.start).toHaveBeenCalledTimes(1);
     expect(repo.start.mock.calls[0][0]).toMatchObject({ unpaid: true, mode: "open" });
@@ -1180,20 +1180,69 @@ describe("«Не оплачено» at the start", () => {
 
   test("a package start carries it", async () => {
     await mount(computer());
-    await act(async () => { fireEvent.click(unpaidSwitch()); });
     await start();
     expect(repo.start.mock.calls[0][0]).toMatchObject({ unpaid: true });
   });
 
   test("a free start owes nothing: the switch goes, and the body never carries it", async () => {
     await mount(computer());
-    await act(async () => { fireEvent.click(unpaidSwitch()); });
+    expect(unpaidSwitch().getAttribute("aria-checked")).toBe("true");
     await act(async () => { fireEvent.click(screen.getByText("session.freeBill")); });
     expect(screen.queryByTestId("unpaid-switch")).toBeNull();
     await start();
     const body = repo.start.mock.calls[0][0] as Record<string, unknown>;
     expect(body).toMatchObject({ is_free: true });
     expect(body).not.toHaveProperty("unpaid");
+  });
+
+  test("«Сейчас, до игры» turns it off (the two never travel together)", async () => {
+    await mount(computer());
+    await act(async () => { fireEvent.click(screen.getByTestId("prepaid-switch")); });
+    expect(unpaidSwitch().getAttribute("aria-checked")).toBe("false");
+  });
+});
+
+/**
+ * «Не оплачено» ON is said large when Start opens (2026-11-22, owner): an
+ * overlay in the card, gone on any click or key, once per open.
+ */
+describe("the «Не оплачено» notice", () => {
+  const computer = () => device({ kind: PC_KIND.Pc, place: { id: 10, number: 1, name: "PC-1", type: "standard", platform: "pc" } });
+
+  test("shown at open, announced, blurring the form; a click takes it away and it does not come back", async () => {
+    await mount(computer());
+    const notice = screen.getByTestId("unpaid-on-notice");
+    expect(notice.getAttribute("role")).toBe("alert");
+    expect(notice.closest(".dialog-tone--start")).not.toBeNull();
+    expect(notice.textContent).toContain("unpaidOn.title");
+    expect(notice.textContent).toContain("unpaidOn.startHint");
+    await act(async () => { fireEvent.click(notice); });
+    expect(screen.queryByTestId("unpaid-on-notice")).toBeNull();
+    // Off and on again: once per open, never a second time.
+    await act(async () => { fireEvent.click(screen.getByTestId("unpaid-switch")); });
+    await act(async () => { fireEvent.click(screen.getByTestId("unpaid-switch")); });
+    expect(screen.queryByTestId("unpaid-on-notice")).toBeNull();
+  });
+
+  test("any key takes it away, and the key is not swallowed", async () => {
+    await mount(computer());
+    expect(screen.getByTestId("unpaid-on-notice")).toBeTruthy();
+    const event = new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true });
+    await act(async () => { window.dispatchEvent(event); });
+    expect(screen.queryByTestId("unpaid-on-notice")).toBeNull();
+    expect(event.defaultPrevented).toBe(false);
+  });
+
+  test("a free seat has no switch, so no notice", async () => {
+    await mount(computer());
+    await act(async () => { fireEvent.click(screen.getByTestId("unpaid-on-notice")); });
+    await act(async () => { fireEvent.click(screen.getByText("session.freeBill")); });
+    expect(screen.queryByTestId("unpaid-on-notice")).toBeNull();
+  });
+
+  test("the title names the seat by number and name", async () => {
+    await mount(computer());
+    expect(screen.getByTestId("start-seat").textContent).toBe("№1 · PC-1");
   });
 });
 
@@ -1396,7 +1445,8 @@ describe("«Свои продукты» at the start", () => {
     expect(repo.start).toHaveBeenCalledTimes(1);
     expect(repo.start.mock.calls[0][0]).toEqual({
       branch_id: 7, pc_id: 1, mode: "fixed", time_package_id: 1, user_display_name: "PS5 VIP",
-      outside_food: true, outside_food_fee: 1500,
+      // «Не оплачено» is on by default (2026-11-22, owner).
+      unpaid: true, outside_food: true, outside_food_fee: 1500,
     });
   });
 
@@ -1407,7 +1457,7 @@ describe("«Свои продукты» at the start", () => {
     await start();
     expect(repo.start.mock.calls[0][0]).toEqual({
       branch_id: 7, pc_id: 1, mode: "open", user_display_name: "PS5 VIP",
-      outside_food: true, outside_food_fee: 800,
+      unpaid: true, outside_food: true, outside_food_fee: 800,
     });
   });
 
@@ -1425,7 +1475,8 @@ describe("«Свои продукты» at the start", () => {
   test("with «Не оплачено» both travel", async () => {
     offered(1500);
     await mount(device());
-    await act(async () => { fireEvent.click(screen.getByTestId("unpaid-switch")); });
+    // On by default (2026-11-22, owner): no press needed.
+    expect(screen.getByTestId("unpaid-switch").getAttribute("aria-checked")).toBe("true");
     await switchOn();
     await start();
     expect(repo.start.mock.calls[0][0]).toMatchObject({ unpaid: true, outside_food: true, outside_food_fee: 1500 });

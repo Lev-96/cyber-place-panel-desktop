@@ -35,6 +35,11 @@ interface Props {
    * translation; the card decides which state it is.
    */
   stateLabel?: (tone: StatusTone) => string;
+  /**
+   * A bill of this seat is put away and waits (2026-11-22, owner): the whole
+   * card is ringed so the cashier sees where it went.
+   */
+  billWaiting?: boolean;
   dragging?: boolean;
   /** The drop will land on this edge of the seat (`utils/reorder.ts` `dropSideOf`). */
   dropSide?: DropSide | null;
@@ -79,7 +84,7 @@ export const accentOf = (tone: StatusTone): string =>
  * `.place-cell` itself is shared with the places and live boards.
  */
 const SessionCard = ({
-  session, baseColor, seatState, bookingAhead = false, stateLabel, dragging = false, dropSide = null, onDragOver, onDrop, children,
+  session, baseColor, seatState, bookingAhead = false, stateLabel, dragging = false, dropSide = null, onDragOver, onDrop, children, billWaiting = false,
 }: Props) => {
   const urgency = useSessionUrgency(session);
   const ahead = bookingAhead && !session && seatState === "free";
@@ -97,6 +102,7 @@ const SessionCard = ({
     `session-card--seat-${seatState}`,
     ahead ? "session-card--booking-ahead" : "",
     dragging ? "is-dragging" : "",
+    billWaiting ? "is-bill-waiting" : "",
     dropSide ? `is-drop-${dropSide}` : "",
   ].filter(Boolean).join(" ");
 

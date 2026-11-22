@@ -1106,7 +1106,7 @@ describe("adding time by money (2026-11-07)", () => {
 
   test("the title is «+ Время»", async () => {
     await mount();
-    expect(screen.getByRole("heading", { name: "session.addTime" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: /^session\.addTime/ })).toBeTruthy();
   });
 });
 

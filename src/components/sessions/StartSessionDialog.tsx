@@ -43,6 +43,9 @@ import { useStartOptions } from "./useStartOptions";
 import StartByAmount from "./StartByAmount";
 import { formatVenueTime } from "@/i18n/dates";
 import StartProductsDialog, { mergeStartLines, startLinesTotal, type StartProductLine } from "./StartProductsDialog";
+import UnpaidOnNotice from "./UnpaidOnNotice";
+import { seatLineOf } from "./seatLine";
+import { dialogToneClass } from "@/components/ui/dialogTone";
 
 interface Props {
   branchId: number;
@@ -108,6 +111,8 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted, bookingId }: Pro
   // The "(PS)" marker is about the console, so it asks the PLACE's platform:
   // a billiards table is billing-only too, but it is no PlayStation.
   const playStation = isPlayStationSeat(pc);
+  // «№4 · Hall VIP», the card's own line (2026-11-22, owner).
+  const seatLine = seatLineOf(pc, lang);
   // The player's PSN name, optional: given, the "ends in 15 minutes" warning
   // reaches their screen as a PSN message (the server keeps it on console
   // seats only). Empty is the ordinary start.
@@ -143,8 +148,11 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted, bookingId }: Pro
     ? `${String(freeUntil.getHours()).padStart(2, "0")}:${String(freeUntil.getMinutes()).padStart(2, "0")}`
     : null;
   // «Не оплачено» (2026-11-07, owner): here and in «+ Время», never on the
-  // card. Only on a seat that bills: a free one owes nothing.
-  const [unpaid, setUnpaidRaw] = useState(false);
+  // card. Only on a seat that bills: a free one owes nothing. ON by default
+  // (2026-11-22, owner) — the player pays at the end unless the cashier
+  // turns it off or chooses «Сейчас»; said large when the dialog opens
+  // (UnpaidOnNotice). Still sent only where the switch is shown.
+  const [unpaid, setUnpaidRaw] = useState(true);
   // «Оплачено вперёд» (2026-11-15, owner): a package or a planned length paid
   // in cash now, so a player who leaves early gets the change at Stop. The two
   // switches contradict each other: turning one on turns the other off.
@@ -584,11 +592,20 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted, bookingId }: Pro
     || (aheadBuysTime && quotedAhead === null)
     || startBeyondReservation;
 
+  // Where «Не оплачено» is drawn (and so sent): the form is loaded, the seat
+  // bills, and it is not «На сумму». The same conditions as its switch below.
+  const unpaidSwitchShown = (packages !== null || pkgError !== null) && !isFree && mode !== "amount";
+
   return (
     <Modal open onClose={onClose}>
-      <div className="card start-dialog">
+      <div className={`card ${dialogToneClass("start")} start-dialog`}>
+        <UnpaidOnNotice active={unpaidSwitchShown && unpaid} hint={t("unpaidOn.startHint")} />
         <div className="start-dialog__head">
-          <h2 style={{ margin: 0 }}>{t("session.start")} · №{pc.place?.number ?? pc.label}{playStation ? " (PS)" : ""}</h2>
+          {/* WHICH seat, number and name a size up (2026-11-22, owner). */}
+          <h2 className="dialog-title" style={{ margin: 0 }}>
+            <span>{t("session.start")}</span>
+            <span className="dialog-title__seat" data-testid="start-seat" title={seatLine}>{seatLine}{playStation ? " (PS)" : ""}</span>
+          </h2>
           <Button type="button" variant="secondary" className="outline-btn start-dialog__customize-toggle"
             aria-expanded={customizing} onClick={() => setCustomizing((v) => !v)} data-testid="start-customize">
             {customizing ? t("action.close") : t("session.customize")}
@@ -1008,7 +1025,7 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted, bookingId }: Pro
               <span className="muted">{t("session.summary.title")}</span>{" "}
               <strong>
                 {[
-                  `№${pc.place?.number ?? pc.label}`,
+                  seatLine,
                   isFree
                     ? t("session.freeBill")
                     : mode === "amount"

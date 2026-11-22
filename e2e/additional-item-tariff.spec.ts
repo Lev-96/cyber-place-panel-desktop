@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { LANGS, WIDTHS, at, json, noRawKeys, openBoard, runningSession, seedBoard, shot, signIn, type Lang } from "./helpers/moneySession";
+import { dismissUnpaidNotice } from "./helpers/unpaidNotice";
 
 /**
  * An additional item on «Изменение тарифа» (2026-11-17, owner: the joysticks'
@@ -55,6 +56,7 @@ for (const lang of LANGS) {
     test(`an item on «Изменение тарифа»: «500/h», handed out, the rate now 3 500 (${lang}, ${width})`, async ({ page }) => {
       const calls = await open(page, lang, width);
       await page.locator('[data-action="add-item"]').first().click();
+      await dismissUnpaidNotice(page);
       await page.getByText(PICKER[lang], { exact: true }).click();
       await page.getByRole("tab", { name: new RegExp(`^${TAB[lang]}`) }).click();
 
@@ -75,6 +77,7 @@ for (const lang of LANGS) {
     test(`out, it is handed back — not removed (${lang}, ${width})`, async ({ page }) => {
       const calls = await open(page, lang, width, [outLine]);
       await page.locator('[data-action="add-item"]').first().click();
+      await dismissUnpaidNotice(page);
       const back = page.getByTestId("bill-line-return");
       await expect(back).toHaveText(RETURN[lang]);
       await noRawKeys(page, "[role=dialog]");

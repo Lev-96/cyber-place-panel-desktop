@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { LANGS, WIDTHS, at, fitsWidth, json, noRawKeys, openBoard, pc, runningSession, seedBoard, shot, signIn, type Lang } from "./helpers/moneySession";
+import { dismissUnpaidNotice } from "./helpers/unpaidNotice";
 
 /**
  * «Свои продукты» as the seat's rate (2026-11-17, owner): a VIP seat at
@@ -33,6 +34,7 @@ const openStart = async (page: Page, lang: Lang, width: number) => {
   });
   await openBoard(page);
   await page.locator('.place-cell [data-action="start"]').first().click();
+  await dismissUnpaidNotice(page);
   return { body: () => body, quotes };
 };
 

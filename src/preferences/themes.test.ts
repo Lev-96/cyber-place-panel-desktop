@@ -90,3 +90,29 @@ describe("colour themes", () => {
     expect(css.slice(shared, css.indexOf("}", shared))).toContain("--status-playing-rgb:");
   });
 });
+
+/**
+ * Dialog tones (2026-11-22, owner; dialogTone.ts): the card's background is
+ * `color-mix(in srgb, <tone> 9%, --color-surface)`. In every theme the text
+ * stays readable on it (≥ 4.5:1), computed from the tokens themselves.
+ */
+describe("dialog tones", () => {
+  const TONES = { start: "--color-primary", bill: "--color-success", unpaid: "--color-warning", goods: "--color-accent-purple" } as const;
+  const mix = (a: string, b: string, share: number): string => {
+    const ch = (hex: string, i: number) => parseInt(hex.slice(i, i + 2), 16);
+    return "#" + [1, 3, 5].map((i) => Math.round(ch(a, i) * share + ch(b, i) * (1 - share)).toString(16).padStart(2, "0")).join("");
+  };
+
+  test.each(Object.entries(TONES))("the %s tone is drawn from its theme token", (tone, token) => {
+    expect(blockOf(`.dialog-tone--${tone}`)).toContain(`--dialog-tone: var(${token})`);
+    expect(blockOf(".dialog-tone")).toContain("color-mix(in srgb, var(--dialog-tone) 9%, var(--color-surface))");
+  });
+
+  test.each(THEMES.flatMap((theme) => Object.entries(TONES).map(([tone, token]) => [theme, tone, token] as const)))(
+    "%s · %s: text on the tinted card reads at 4.5:1 or more",
+    (theme, _tone, token) => {
+      const bg = mix(colour(theme, token), colour(theme, "--color-surface"), 0.09);
+      expect(contrast(colour(theme, "--color-text"), bg)).toBeGreaterThanOrEqual(4.5);
+    },
+  );
+});

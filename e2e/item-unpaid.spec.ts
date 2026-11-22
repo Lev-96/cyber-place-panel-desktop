@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { LANGS, WIDTHS, at, fitsWidth, json, noRawKeys, openBoard, runningSession, seedBoard, shot, signIn, type Lang } from "./helpers/moneySession";
+import { dismissUnpaidNotice } from "./helpers/unpaidNotice";
 
 /**
  * B (2026-11-15): products handed over NOT paid yet. Shapes as in
@@ -67,6 +68,7 @@ for (const lang of LANGS) {
 
       // The add-item dialog: the line is tagged, «Оплачено» marks it paid.
       await page.locator('[data-action="add-item"]').first().click();
+      await dismissUnpaidNotice(page);
       const tag = page.getByTestId("bill-line-unpaid");
       await expect(tag).toHaveCount(1);
       await noRawKeys(page, "[role=dialog]");
@@ -75,11 +77,11 @@ for (const lang of LANGS) {
       await expect.poll(() => calls.patch).toEqual([{ unpaid: false }]);
       await expect(tag).toHaveCount(0);
 
-      // The switch: what this basket hands over goes on the bill unpaid.
+      // The switch, ON by default (2026-11-22, owner): what this basket hands
+      // over goes on the bill unpaid unless the cashier turns it off.
       await page.getByText(PICKER[lang], { exact: true }).click();
       await page.getByLabel(`${ADD[lang]}: Cola`).click();
       const sw = page.getByTestId("items-unpaid-switch");
-      await sw.click();
       await expect(sw).toHaveAttribute("aria-checked", "true");
       await shot(page, `item-unpaid-switch-${lang}-${width}`);
       await page.getByTestId("items-confirm").click();

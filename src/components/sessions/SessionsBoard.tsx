@@ -1,13 +1,12 @@
 import { preciseWhenSmall } from "@/i18n/currency";
 import { useAuth } from "@/auth/AuthContext";
-import { tr } from "@/i18n/translated";
 import { can } from "@/auth/permissions";
 import Button from "@/components/ui/Button";
 import CollapsibleSection from "@/components/ui/CollapsibleSection";
 import { GridSkeleton } from "@/components/ui/Skeleton";
 import { ErrorState, StaleNotice, StateView } from "@/components/ui/state";
 import { reconcileOrder } from "./tileOrder";
-import { seatLineOf } from "./seatLine";
+import { seatLineOf, seatLineWithKind, sessionSeatLine } from "./seatLine";
 import { useAsync } from "@/hooks/useAsync";
 import { useBranchPlatformNames } from "@/hooks/useBranchPlatforms";
 import { useKeyedBusy } from "@/hooks/useKeyedBusy";
@@ -54,6 +53,10 @@ import { BASE_JOYSTICKS, MAX_JOYSTICKS } from "@/api/joystickPrices";
 import { notify } from "@/ui/notify";
 import StopReceiptModal from "./StopReceiptModal";
 import { afterDueConfirmed, type DueAnswer } from "@/components/notifications/dueConfirmGate";
+import { onOpenBillsChanged, openBillsChanged } from "@/components/notifications/openBillsSignal";
+import { boardOnScreen, onBoardOpenBillRequested, requestOpenBill, setBillShown, useJustPutAway, useOpenBills } from "@/components/notifications/openBillsStore";
+import { centsWhenFractional } from "@/i18n/currency";
+import { closeBill, enqueueBill, markBillEnded, openBillNow, type BillEntry } from "./billQueue";
 import UnpaidAlert, { type UnpaidNotice } from "./UnpaidAlert";
 import SessionCardChips from "./SessionCardChips";
 import { playFor } from "@/sound/soundEngine";
@@ -108,7 +111,59 @@ const SessionsBoard = ({ branchId }: Props) => {
   // The bookings calendar (2026-11-07, owner): the card's «Забронировать»
   // opens it on that seat and today; the header's «Календарь броней» on all.
   const [calendar, setCalendar] = useState<{ focusPlaceId?: number } | null>(null);
-  const [stopTarget, setStopTarget] = useState<ISessionApi | null>(null);
+  /**
+   * The bills to show, in order (2026-11-22, owner): the first is open, the
+   * rest wait their turn. Two seats ending together are two bills, one after
+   * the other — never one dropped. A Stop pressed here goes FIRST (and holds
+   * that tile's clock at the press while its preliminary total is open).
+   * See `billQueue.ts`.
+   */
+  const [bills, setBills] = useState<BillEntry[]>([]);
+  // The server's open bills (read by «Незакрытые счета»): each seat that has
+  // one says so on its tile, and a press opens that bill (2026-11-22, owner).
+  const openBills = useOpenBills();
+  const justPutAway = useJustPutAway();
+  // The bill open on this board is never reminded about meanwhile.
+  const shownBillId = bills[0]?.session.id ?? null;
+  useEffect(() => {
+    if (shownBillId === null) return undefined;
+    setBillShown(shownBillId, true);
+    return () => setBillShown(shownBillId, false);
+  }, [shownBillId]);
+  const openBillsRef = useRef(openBills);
+  openBillsRef.current = openBills;
+  // Anything that changes a bill (taken off the till, put away, paid) reads
+  // the board again at once (2026-11-22): a tile never shows a stale clock.
+  // This board shows «Незакрытые счета» in its own header (2026-11-22).
+  useEffect(() => boardOnScreen(), []);
+  const [billsListOpen, setBillsListOpen] = useState(false);
+  const billsListRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (!billsListOpen) return undefined;
+    const away = (e: MouseEvent) => {
+      if (billsListRef.current && !billsListRef.current.contains(e.target as Node)) setBillsListOpen(false);
+    };
+    const esc = (e: KeyboardEvent) => { if (e.key === "Escape") setBillsListOpen(false); };
+    document.addEventListener("mousedown", away);
+    document.addEventListener("keydown", esc);
+    return () => { document.removeEventListener("mousedown", away); document.removeEventListener("keydown", esc); };
+  }, [billsListOpen]);
+  // Through a ref: `sessions` is a new object every render.
+  const reloadOnBillChange = useRef(() => {});
+  reloadOnBillChange.current = () => { void sessions.reload(); };
+  useEffect(() => onOpenBillsChanged(() => reloadOnBillChange.current()), []);
+  // A seat of THIS branch waiting at the till opens here (2026-11-22): its
+  // confirm then runs the board's own Stop path (console to rest, tile freed).
+  useEffect(() => onBoardOpenBillRequested((id) => {
+    const held = openBillsRef.current.find((b) => b.id === id);
+    if (!held || held.status !== "active" || held.branch_id !== branchId) return false;
+    setBills((list) => openBillNow(list, held, Date.now()));
+    return true;
+  }), [branchId]);
+  const stopTarget = bills[0]?.session ?? null;
+  /** When Stop was pressed on this running seat, while its total is open. */
+  const frozenAtOf = (sessionId: number): number | null =>
+    bills.find((b) => b.session.id === sessionId && b.session.status === "active")?.frozenAt ?? null;
   // «Эти товары оплатили?» answered per ended seat (2026-11-20): «Да» → its
   // bill says paid in full instead of «Доплатить». Display only.
   const dueAnswers = useRef(new Map<number, DueAnswer>());
@@ -227,8 +282,8 @@ const SessionsBoard = ({ branchId }: Props) => {
    */
   const seatOf = (pcId: number): string => {
     const pc = (pcs.data ?? []).find((p) => p.id === pcId);
-    if (!pc) return "";
-    return pc.place ? `№${pc.place.number ?? pc.place.id}` : tr(pc, "label", lang);
+    // Number AND name, the card's own line (2026-11-22, owner).
+    return pc ? seatLineOf(pc, lang) : "";
   };
 
   /**
@@ -402,8 +457,11 @@ const SessionsBoard = ({ branchId }: Props) => {
   useSessionChanged(
     branchId,
     useCallback((evt) => {
-      // Ended owing for extra time — by itself or at any desk (2026-11-07).
-      if (evt.kind === "stopped") noticeUnpaid(evt.session_id, evt.pc_id, evt.unpaid_amount);
+      // Ended BY ITSELF owing (2026-11-07; 2026-11-22: only by itself). A
+      // Stop pressed at any desk took the payment in its own receipt, so it
+      // is never announced as money still to take. The final bill waits until
+      // this notice is acknowledged (see the receipt below).
+      if (evt.kind === "stopped" && evt.status === "expired") noticeUnpaid(evt.session_id, evt.pc_id, evt.unpaid_amount);
       if (evt.kind === "stopped" && evt.status === "expired") {
         const ended = (sessions.data ?? []).find((s) => s.id === evt.session_id);
         // Never over the top of an open receipt: a cashier mid-checkout on one
@@ -411,21 +469,24 @@ const SessionsBoard = ({ branchId }: Props) => {
         // ended and still on the board's history — what it loses is the popup.
         // «Эти товары оплатили?» first (2026-11-20, owner): the bill opens
         // once that is answered — at once when there is nothing to confirm.
+        // Queued behind an open one (2026-11-22, owner): each ended seat
+        // gets its bill in turn, none is dropped.
         if (ended) {
           afterDueConfirmed(evt.session_id, (answer) => {
             // What «оплатили?» answered, for this seat's bill (2026-11-20).
             dueAnswers.current.set(evt.session_id, answer);
-            setStopTarget((current) => current ?? { ...ended, status: "expired" });
+            setBills((list) => enqueueBill(list, { ...ended, status: "expired" }));
           });
         }
       }
-      // The receipt open on THIS seat, ended elsewhere (another cashier, the
-      // clock) while it was on screen (2026-10-25): it turns into that final
+      // A bill open or queued for THIS seat, ended elsewhere (another
+      // cashier, the clock) meanwhile (2026-10-25): it turns into that final
       // bill, with no confirm — never a second "stopped" announced as ours.
       if (evt.kind === "stopped") {
-        setStopTarget((current) => (current && current.id === evt.session_id && current.status === "active"
-          ? { ...current, status: (evt.status ?? "stopped") as ISessionApi["status"] }
-          : current));
+        setBills((list) => markBillEnded(list, evt.session_id, (evt.status ?? "stopped") as ISessionApi["status"]));
+        // A seat ended: «Незакрытые счета» reads its list now — a seat not on
+        // this board's list (no bill opened here) is caught there.
+        openBillsChanged();
       }
       void sessions.reload();
 
@@ -630,6 +691,12 @@ const SessionsBoard = ({ branchId }: Props) => {
   // many are in use. Not `sessions.data.length`: a session whose device is not
   // on this board would inflate it.
   const occupiedCount = orderedPcs.reduce((n, pc) => n + (sessionByPc.has(pc.id) ? 1 : 0), 0);
+  // Reserved now and not taken (2026-11-22, owner): the very rule the tile's
+  // «reserved» colour uses, so the chip and the tiles never disagree.
+  // Seats with a reservation now or ahead (2026-11-22, owner): the dot on
+  // «Календарь броней». The board's own data — no extra read.
+  const seatsWithBookings = orderedPcs.reduce((n, pc) => n + ((pc.place_id != null && reservedPlaceIds.has(pc.place_id)) || !!pc.next_booking_start ? 1 : 0), 0);
+  const reservedCount = orderedPcs.reduce((n, pc) => n + (!sessionByPc.has(pc.id) && pc.place_id != null && reservedPlaceIds.has(pc.place_id) ? 1 : 0), 0);
 
   // Bucket devices into sections, preserving tile order within each.
   const grouped: Record<string, IPcApi[]> = {};
@@ -806,6 +873,7 @@ const SessionsBoard = ({ branchId }: Props) => {
         baseColor={color}
         seatState={cellState}
         bookingAhead={freeUntil !== null}
+        billWaiting={openBills.some((b) => b.pc_id === pc.id)}
         stateLabel={(tone) => t(`session.tone.${tone}`)}
         dragging={dragId === pc.id}
         dropSide={dragOverId === pc.id ? dropSideOf(order, dragId, pc.id) : null}
@@ -836,6 +904,28 @@ const SessionsBoard = ({ branchId }: Props) => {
             The agent dot keeps its place at the head of the line and is
             `flexShrink: 0`, so it cannot be squeezed out by a long label. */}
         <SeatPlatformLine deviceStatus={deviceStatus} platformName={seatPlatformName} tierName={tierName} />
+        {/* A bill on this seat nobody closed yet (2026-11-22, owner): said on
+            the tile itself — even with a new player on it — and one press
+            opens it to record how it was paid. The server's figure. */}
+        {(() => {
+          const waiting = openBills.filter((b) => b.pc_id === pc.id);
+          if (waiting.length === 0) return null;
+          const atTill = waiting[0].status === "active";
+          const sum = Number((atTill ? waiting[0].held_total : waiting[0].total_paid) ?? 0);
+          return (
+            <button
+              type="button"
+              className={`open-bill-chip${waiting.some((b) => b.id === justPutAway) ? " is-just-put-away" : ""}`}
+              title={t("openBills.tileTitle")}
+              data-testid={`tile-open-bill-${pc.id}`}
+              onClick={(e) => { e.stopPropagation(); requestOpenBill(waiting[0].id); }}
+            >
+              <span className="open-bill-chip__label">{t(atTill ? "openBills.atTill" : "openBills.tile")}</span>
+              <strong>{money(sum, centsWhenFractional(sum))}</strong>
+              {waiting.length > 1 && <span className="open-bill-chip__more">+{waiting.length - 1}</span>}
+            </button>
+          );
+        })()}
         {/* The console itself, refreshed every ten seconds from this machine.
             On its OWN line, not beside the platform: a tile is 160px at its
             narrowest and "Режим покоя" next to "PS5 · STANDARD" does not fit in
@@ -876,6 +966,10 @@ const SessionsBoard = ({ branchId }: Props) => {
                   countdown branch with nothing to price from. */}
               <SessionTimer
                 session={sess}
+                // At checkout: held at the Stop press, display only (2026-11-22).
+                frozenAt={frozenAtOf(sess.id) ?? (sess.checkout_at ? Date.parse(sess.checkout_at) : null)}
+                checkoutLabel={t("session.atCheckout")}
+                timeUpLabel={t("session.timeUp")}
                 formatMoney={money}
                 minimumLabel={(minutes) => fmt(t("vipMin.badge"), durationLabel(minutes, t))}
                 reset={mayReset ? { label: t("session.reset.button"), onReset: () => setResetId(sess.id) } : undefined}
@@ -1093,7 +1187,7 @@ const SessionsBoard = ({ branchId }: Props) => {
                 fullLabel={t(stopLock.labelKey ?? "action.stop")}
                 danger
                 disabled={stopLock.disabled}
-                onClick={() => setStopTarget(sess)}
+                onClick={() => setBills((list) => openBillNow(list, sess, Date.now()))}
               />
             </div>
             {/* Refusals, on the seat they belong to — for EVERY kind of seat.
@@ -1229,13 +1323,80 @@ const SessionsBoard = ({ branchId }: Props) => {
             the room is in use, so that is what it says now. */}
         <div className="col" style={{ gap: 2 }}>
           <h2 className="page-title" style={{ margin: 0 }}>{t("session.boardTitle")}</h2>
+          {/* How much of the room is in use (2026-11-22, owner: easy on the
+              eyes): three chips on their own tint — all, in use, free —
+              counted off the tiles on screen, so they never disagree. */}
           {orderedPcs.length > 0 && (
-            <span className="muted" style={{ fontSize: 12 }}>
-              {t("session.boardCounts")
-                .replace("{0}", String(orderedPcs.length))
-                .replace("{1}", String(occupiedCount))
-                .replace("{2}", String(orderedPcs.length - occupiedCount))}
-            </span>
+            <div className="board-counts" data-testid="board-counts">
+              <span className="board-count board-count--total" data-testid="board-count-total">
+                <span className="board-count__label">{t("session.countTotal")}</span>
+                <strong>{orderedPcs.length}</strong>
+              </span>
+              <span className="board-count board-count--busy" data-testid="board-count-busy">
+                <span className="board-count__label">{t("session.countBusy")}</span>
+                <strong>{occupiedCount}</strong>
+              </span>
+              <span className="board-count board-count--booked" data-testid="board-count-booked">
+                <span className="board-count__label">{t("session.countBooked")}</span>
+                <strong>{reservedCount}</strong>
+              </span>
+              <span className="board-count board-count--free" data-testid="board-count-free">
+                <span className="board-count__label">{t("session.countFree")}</span>
+                <strong>{orderedPcs.length - occupiedCount - reservedCount}</strong>
+              </span>
+              {/* «Незакрытые счета» beside the counts (2026-11-22, owner):
+                  compact, with the seats a press away. */}
+              {(() => {
+                const here = openBills.filter((b) => b.branch_id === branchId);
+                if (here.length === 0) return null;
+                const lit = here.some((b) => b.id === justPutAway);
+                return (
+                  <div className="board-bills" ref={billsListRef}>
+                    <button
+                      type="button"
+                      className={`board-count board-count--bills${lit ? " is-just-put-away" : ""}`}
+                      aria-expanded={billsListOpen}
+                      onClick={() => setBillsListOpen((v) => !v)}
+                      data-testid="board-open-bills"
+                    >
+                      <span className="board-count__label">{t("openBills.title")}</span>
+                      <strong>{here.length}</strong>
+                      <span aria-hidden className="board-bills__caret">▾</span>
+                    </button>
+                    {billsListOpen && (
+                      <div className="board-bills__list" role="menu" data-testid="board-open-bills-list">
+                        <span className="board-bills__hint">{t("openBills.hint")}</span>
+                        {here.map((b) => {
+                          const device = (pcs.data ?? []).find((p) => p.id === b.pc_id);
+                          const seat = device
+                            ? seatLineWithKind(seatLineOf(device, lang), [
+                              device.place ? platformName(device.place.platform) : null,
+                              device.place ? t(placeTypeLabelKey(device.place.type)) : null,
+                            ])
+                            : sessionSeatLine(b, lang);
+                          const atTill = b.status === "active";
+                          const sum = Number((atTill ? b.held_total : b.total_paid) ?? 0);
+                          return (
+                            <button
+                              key={b.id}
+                              type="button"
+                              role="menuitem"
+                              className={`board-bills__row${b.id === justPutAway ? " is-just-put-away" : ""}`}
+                              onClick={() => { setBillsListOpen(false); requestOpenBill(b.id); }}
+                              data-testid={`board-open-bill-${b.id}`}
+                            >
+                              <span className="board-bills__seat" title={seat}>{seat}</span>
+                              <span className="board-bills__state">{t(atTill ? "openBills.atTill" : "openBills.tile")}</span>
+                              <strong className="board-bills__sum">{money(sum, centsWhenFractional(sum))}</strong>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+            </div>
           )}
         </div>
         <div className="row" style={{ gap: 8, flexWrap: "wrap", rowGap: 8 }}>
@@ -1259,8 +1420,14 @@ const SessionsBoard = ({ branchId }: Props) => {
             className="outline-btn board-calendar-btn"
             onClick={() => setCalendar({})}
             data-testid="board-calendar"
+            title={seatsWithBookings > 0 ? fmt(t("calendar.hasBookings"), String(seatsWithBookings)) : undefined}
           >
             {t("calendar.title")}
+            {seatsWithBookings > 0 && (
+              <span className="board-calendar-dot" data-testid="board-calendar-dot" aria-label={fmt(t("calendar.hasBookings"), String(seatsWithBookings))}>
+                {seatsWithBookings}
+              </span>
+            )}
           </button>
           <Link to={`/branches/${branchId}/pcs`} className="outline-btn">{t("pcs.title")}</Link>
           {can(role, "branch.prices") && (
@@ -1367,11 +1534,20 @@ const SessionsBoard = ({ branchId }: Props) => {
           }}
         />
       )}
-      {stopTarget && (
+      {/* One window at a time (2026-11-22): a seat's «не оплачено» notice
+          first, then the bill where the payment is taken. */}
+      {stopTarget && unpaidNotices.length === 0 && (
         <StopReceiptModal
+          // One receipt per seat: the next bill in line mounts fresh.
+          key={stopTarget.id}
           session={stopTarget}
+          seat={seatOf(stopTarget.pc_id) || undefined}
           dueAnswer={dueAnswers.current.get(stopTarget.id) ?? null}
-          onClose={() => { dueAnswers.current.delete(stopTarget.id); setStopTarget(null); void sessions.reload(); void pcs.reload(); }}
+          // Closing (or hiding) this bill opens the next one in line.
+          onClose={() => { dueAnswers.current.delete(stopTarget.id); setBills((list) => closeBill(list, stopTarget.id)); void sessions.reload(); void pcs.reload(); }}
+          // «−» on a running seat (2026-11-22): put away, NOT ended — it waits
+          // at the till, its bill held, in «Незакрытые счета» and on its tile.
+          onMinimize={() => { setBills((list) => closeBill(list, stopTarget.id)); void sessions.reload(); }}
           onConfirmed={(outcome) => {
             // The session is over on the backend, so the console should be
             // asleep. Whether this build can actually ask it to is the
@@ -1384,7 +1560,8 @@ const SessionsBoard = ({ branchId }: Props) => {
             // A cancel (2026-11-06) frees the seat the same way; its toast says
             // it was cancelled, not paid.
             notify.message("success", fmt(t(outcome?.cancelled ? "session.cancel.toast" : "session.toastStopped"), seatOf(stopTarget.pc_id)));
-            noticeUnpaid(stopTarget.id, stopTarget.pc_id, outcome?.unpaidAmount);
+            // No «не оплачено» notice here (2026-11-22, QA): the payment was
+            // just taken in this very receipt, which showed what was unpaid.
             // The tile is free AT ONCE (2026-11-18, owner: no delay after
             // Stop); the reads below bring the board as the server has it.
             sessions.mutate((list) => (list ?? []).filter((s) => s.id !== stopTarget.id));
@@ -1401,6 +1578,7 @@ const SessionsBoard = ({ branchId }: Props) => {
       {optionsTarget && (
         <SessionOptionsDialog
           session={optionsTarget}
+          seat={seatOf(optionsTarget.pc_id) || undefined}
           platform={(pcs.data ?? []).find((pc) => pc.id === optionsTarget.pc_id)?.place?.platform}
           platformName={platformName}
           onClose={() => { setOptionsTarget(null); void sessions.reload(); }}
@@ -1437,6 +1615,7 @@ const SessionsBoard = ({ branchId }: Props) => {
       {relocateTarget && (
         <RelocateSessionDialog
           session={relocateTarget}
+          seat={seatOf(relocateTarget.pc_id) || undefined}
           platformName={platformName}
           onClose={() => { setRelocateTarget(null); void sessions.reload(); }}
           onMoved={(updated, from) => {
@@ -1462,6 +1641,7 @@ const SessionsBoard = ({ branchId }: Props) => {
         <AddSessionItemDialog
           branchId={branchId}
           session={addItemTarget}
+          seat={seatOf(addItemTarget.pc_id) || undefined}
           onClose={() => { setAddItemTarget(null); void sessions.reload(); }}
           onAdded={() => { void sessions.reload(); }}
         />

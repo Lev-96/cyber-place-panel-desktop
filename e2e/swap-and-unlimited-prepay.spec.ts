@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { LANGS, WIDTHS, at, fitsWidth, json, noRawKeys, openBoard, pc, runningSession, seedBoard, shot, signIn, type Lang } from "./helpers/moneySession";
+import { dismissUnpaidNotice } from "./helpers/unpaidNotice";
 
 /**
  * 2026-11-17 (owner): two running seats swap places, each with its own bill;
@@ -62,6 +63,7 @@ for (const lang of LANGS) {
       });
       await openBoard(page);
       await page.locator('.place-cell [data-action="start"]').first().click();
+      await dismissUnpaidNotice(page);
       await page.getByTestId("prepaid-switch").click();
       await page.getByTestId("start-prepaid-sum").locator("input").fill("5000");
       await expect(page.getByTestId("start-prepaid-buys")).toContainText("5");

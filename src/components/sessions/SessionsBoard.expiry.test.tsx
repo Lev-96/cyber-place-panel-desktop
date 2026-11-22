@@ -8,6 +8,8 @@ import { PC_KIND, PC_STATUS } from "@/types/pc";
 import { SessionChangedEvent } from "@/realtime/useSessionChanged";
 import SessionsBoard from "./SessionsBoard";
 import { registerDueAsker } from "@/components/notifications/dueConfirmGate";
+import { JUST_PUT_AWAY_MS, markPutAway, onOpenBillRequested, publishOpenBills } from "@/components/notifications/openBillsStore";
+import { onOpenBillsChanged } from "@/components/notifications/openBillsSignal";
 
 /**
  * A seat whose paid period runs out ends on the server, and the cashier has to
@@ -21,6 +23,7 @@ import { registerDueAsker } from "@/components/notifications/dueConfirmGate";
  */
 
 const repo = vi.hoisted(() => ({
+  checkout: vi.fn().mockResolvedValue({}), releaseCheckout: vi.fn().mockResolvedValue({}),
   listPcs: vi.fn(), listActive: vi.fn(), preview: vi.fn(),
   addJoystick: vi.fn(), removeJoystick: vi.fn(),
 }));
@@ -34,6 +37,9 @@ const realtime = vi.hoisted(() => ({ handler: null as null | ((e: SessionChanged
 
 vi.mock("@/repositories/SessionRepository", () => ({
   sessionRepository: {
+    // At the till (2026-11-22): Stop holds the bill; «Продолжить игру» lets it run.
+    checkout: (...a: unknown[]) => repo.checkout(...a),
+    releaseCheckout: (...a: unknown[]) => repo.releaseCheckout(...a),
     listPcs: (...a: unknown[]) => repo.listPcs(...a),
     listActive: (...a: unknown[]) => repo.listActive(...a),
     preview: (...a: unknown[]) => repo.preview(...a),
@@ -259,6 +265,121 @@ describe("a seat that ends on its own clock", () => {
     });
   }
 
+  // QA P1 (2026-11-22): «Не оплачено» is on by default, so a seat ending
+  // owing is the usual case. One window at a time: the notice with the
+  // server's amount (to the cent), then the bill where the payment is taken.
+  test("ended by itself owing: the «не оплачено» notice first, then the bill", async () => {
+    await mount();
+    await fire(event({ unpaid_amount: 50.83 } as Partial<SessionChangedEvent>));
+    expect(screen.getByTestId("unpaid-alert")).toBeTruthy();
+    expect(screen.getByTestId("unpaid-alert-amount").textContent).toBe("50.83");
+    expect(screen.queryByText("session.checkoutDone")).toBeNull();
+    await act(async () => { fireEvent.click(screen.getByTestId("unpaid-alert-ok")); });
+    expect(screen.queryByTestId("unpaid-alert")).toBeNull();
+    expect(screen.getByText("session.checkoutDone")).toBeTruthy();
+  });
+
+  test("a Stop at another desk owing nothing more to take here: no notice", async () => {
+    await mount();
+    await fire(event({ status: "stopped", unpaid_amount: 700 } as Partial<SessionChangedEvent>));
+    expect(screen.queryByTestId("unpaid-alert")).toBeNull();
+  });
+
+  // «Всего · Занято · Свободно» as three tinted chips (2026-11-22, owner),
+  // counted off the tiles: one seat, running.
+  // «Счёт не закрыт» on the seat's tile (2026-11-22, owner): the server's
+  // sum, only on that seat, and a press opens that very bill.
+  test("a seat with a bill nobody closed says so on its tile, and opens it", async () => {
+    const asked: number[] = [];
+    const off = onOpenBillRequested((id) => asked.push(id));
+    try {
+      // Another seat's bill FIRST, so a chip that ignored its seat would show it.
+      publishOpenBills([
+        { ...running, id: 78, pc_id: 99, status: "expired", total_paid: 300 } as ISessionApi,
+        { ...running, id: 77, status: "stopped", total_paid: 50.83 } as ISessionApi,
+      ]);
+      await mount();
+      const chip = screen.getByTestId("tile-open-bill-1");
+      // The whole tile is ringed: where the bill went is plain (2026-11-22).
+      expect(chip.closest(".place-cell")?.classList.contains("is-bill-waiting")).toBe(true);
+      expect(chip.textContent).toContain("openBills.tile");
+      expect(chip.textContent).toContain("50.83");
+      expect(screen.queryByTestId("tile-open-bill-99")).toBeNull();
+      await act(async () => { fireEvent.click(chip); });
+      expect(asked).toEqual([77]);
+    } finally {
+      off();
+      publishOpenBills([]);
+    }
+  });
+
+  test("the tile's chip of a bill just put away is lit for a moment", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout"] });
+    try {
+      markPutAway(0);
+      vi.advanceTimersByTime(JUST_PUT_AWAY_MS);
+      publishOpenBills([{ ...running, id: 77, status: "active", checkout_at: new Date().toISOString(), held_total: "250.00" } as ISessionApi]);
+      await mount();
+      expect(screen.getByTestId("tile-open-bill-1").className).not.toContain("is-just-put-away");
+      await act(async () => { markPutAway(77); });
+      expect(screen.getByTestId("tile-open-bill-1").className).toContain("is-just-put-away");
+      await act(async () => { vi.advanceTimersByTime(JUST_PUT_AWAY_MS); });
+      expect(screen.getByTestId("tile-open-bill-1").className).not.toContain("is-just-put-away");
+    } finally {
+      vi.useRealTimers();
+      publishOpenBills([]);
+    }
+  });
+
+  // «Незакрытые счета · N» beside the counts (2026-11-22, owner): compact,
+  // this branch only; the list names the seat (number and what it is), its
+  // state and sum; a press opens that bill; a click away folds the list.
+  test("the header chip lists this branch's open bills and opens one", async () => {
+    const asked: number[] = [];
+    const off = onOpenBillRequested((id) => asked.push(id));
+    try {
+      publishOpenBills([
+        { ...running, id: 77, status: "stopped", total_paid: 500 } as ISessionApi,
+        { ...running, id: 88, branch_id: 99, pc_id: 5, status: "stopped", total_paid: 900 } as ISessionApi,
+      ]);
+      await mount();
+      const chip = screen.getByTestId("board-open-bills");
+      expect(chip.textContent).toContain("openBills.title");
+      expect(chip.textContent).toContain("1");
+      expect(screen.queryByTestId("board-open-bills-list")).toBeNull();
+      await act(async () => { fireEvent.click(chip); });
+      const row = screen.getByTestId("board-open-bill-77");
+      expect(row.textContent).toContain("№8");
+      expect(row.textContent).toContain("openBills.tile");
+      expect(row.textContent).toContain("500");
+      expect(screen.queryByTestId("board-open-bill-88")).toBeNull();
+      await act(async () => { fireEvent.mouseDown(document.body); });
+      expect(screen.queryByTestId("board-open-bills-list")).toBeNull();
+      await act(async () => { fireEvent.click(chip); });
+      await act(async () => { fireEvent.click(screen.getByTestId("board-open-bill-77")); });
+      expect(asked).toEqual([77]);
+      expect(screen.queryByTestId("board-open-bills-list")).toBeNull();
+    } finally {
+      off();
+      publishOpenBills([]);
+    }
+  });
+
+  test("no open bill: no chip on the tile", async () => {
+    publishOpenBills([]);
+    await mount();
+    expect(screen.queryByTestId("tile-open-bill-1")).toBeNull();
+    expect(document.querySelector(".place-cell.is-bill-waiting")).toBeNull();
+  });
+
+  test("the board's counts: all, in use, free", async () => {
+    await mount();
+    expect(screen.getByTestId("board-count-total").textContent).toBe("session.countTotal1");
+    expect(screen.getByTestId("board-count-busy").textContent).toBe("session.countBusy1");
+    expect(screen.getByTestId("board-count-booked").textContent).toBe("session.countBooked0");
+    expect(screen.getByTestId("board-count-free").textContent).toBe("session.countFree0");
+  });
+
   test("a colleague pressing Stop opens nothing", async () => {
     await mount();
 
@@ -285,6 +406,24 @@ describe("a seat that ends on its own clock", () => {
 
     expect(screen.queryByText("session.checkoutDone")).toBeNull();
   });
+
+  // …but it is not lost either (2026-11-22): «Незакрытые счета» is told to
+  // read the server's list at once, and lists it there.
+  test("a seat that ended is announced to the open-bills reminder, known or not", async () => {
+    const heard = vi.fn();
+    const off = onOpenBillsChanged(heard);
+    try {
+      await mount();
+      await fire(event({ session_id: 999 }));
+      expect(heard).toHaveBeenCalledTimes(1);
+      await fire(event());
+      expect(heard).toHaveBeenCalledTimes(2);
+      await fire(event({ kind: "time.added", status: "active" }));
+      expect(heard).toHaveBeenCalledTimes(2);
+    } finally {
+      off();
+    }
+  });
 });
 
 /**
@@ -304,7 +443,7 @@ describe("adding time from the card", () => {
   test("is offered on a seat that has an end", async () => {
     await mount();
 
-    expect(screen.getByRole("button", { name: "session.addTime" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /^session\.addTime/ })).toBeTruthy();
   });
 
   /**
@@ -319,7 +458,7 @@ describe("adding time from the card", () => {
     } as ISessionApi]);
     await mount();
 
-    expect(screen.getByRole("button", { name: "session.addTime" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /^session\.addTime/ })).toBeTruthy();
     const line = document.querySelector(".until")?.textContent ?? "";
     expect(line).toContain("1000 / time.hourShort");
     expect(line).toContain("session.planLine");
@@ -333,7 +472,7 @@ describe("adding time from the card", () => {
     } as ISessionApi]);
     await mount();
 
-    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "session.addTime" })); });
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: /^session\.addTime/ })); });
     expect(screen.getByTestId("limit-section")).toBeTruthy();
   });
 
@@ -341,12 +480,12 @@ describe("adding time from the card", () => {
     await mount();
 
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "session.addTime" }));
+      fireEvent.click(screen.getByRole("button", { name: /^session\.addTime/ }));
     });
 
     // The same dialog "Options" opens — asserted by its own heading, so a
     // second modal built for the card would fail this.
-    expect(screen.getByRole("heading", { name: "session.addTime" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: /^session\.addTime/ })).toBeTruthy();
   });
 
   /**
@@ -362,18 +501,18 @@ describe("adding time from the card", () => {
     await mount();
 
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "session.addTime" }));
+      fireEvent.click(screen.getByRole("button", { name: /^session\.addTime/ }));
     });
 
     // Its own heading, so a second modal built for the tile would fail this.
-    expect(screen.getByRole("heading", { name: "session.addTime" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: /^session\.addTime/ })).toBeTruthy();
   });
 
   test("an unlimited seat has «+ Время» as its one time button, and no «Options»", async () => {
     repo.listActive.mockResolvedValue([{ ...running, ends_at: null, is_unlimited: true }]);
     await mount();
 
-    expect(screen.getAllByRole("button", { name: "session.addTime" })).toHaveLength(1);
+    expect(screen.getAllByRole("button", { name: /^session\.addTime/ })).toHaveLength(1);
     // ⚠️ And neither is "Options", on ANY tile.
     //
     // The reason this test used to give for keeping it — "a count-up session
@@ -991,19 +1130,25 @@ describe("joysticks on the tile", () => {
     });
 
     test("periods frozen at different fees show the sum and no multiplication", async () => {
-      repo.listActive.mockResolvedValue([{
+      // ⚠️ (2026-11-22) This used to read the whole board's text, and passed
+      // only because the seat «PS4-08» ran into the clock «00:00» — "800".
+      // The pad charge is said in the note beside the card after a press, so
+      // that is where the sum is read now.
+      const twoFees = {
         ...ps,
         joystick_count: 3,
         joysticks: [
           { id: 1, slot: 2, price: 300, is_charged: true, started_at: "2026-09-10T14:00:00Z", stopped_at: null },
           { id: 2, slot: 3, price: 500, is_charged: true, started_at: "2026-09-10T15:00:00Z", stopped_at: null },
         ],
-      } as ISessionApi]);
-      const { container } = await mount();
+      } as ISessionApi;
+      repo.listActive.mockResolvedValue([twoFees]);
+      await mount();
+      const { note } = await pressPad(twoFees);
 
       // "2 × ?" would be a lie across a re-pricing; the sum is always true.
-      expect(container.textContent).toContain("800");
-      expect(container.textContent).not.toContain("×");
+      expect(note).toContain("800");
+      expect(note).not.toContain("×");
     });
   });
 
@@ -1552,5 +1697,142 @@ describe("a receipt open while the seat is stopped elsewhere", () => {
 
     expect(screen.getByTestId("stop-confirm")).toBeTruthy();
     expect(screen.queryByTestId("checkout-ended-elsewhere")).toBeNull();
+  });
+});
+
+/**
+ * Final bills in turn (2026-11-22, owner). The board held ONE receipt and a
+ * second seat running out while it was open was dropped (`current ?? next`):
+ * its bill never came back. Now every ended seat gets its bill, one after the
+ * other; a Stop pressed here opens at once and holds its tile's clock.
+ */
+describe("final bills in turn", () => {
+  const seat = (n: number): IPcApi => ({
+    ...device, id: n, place_id: 10 + n, label: `PS-${n}`,
+    place: { id: 10 + n, number: n, name: `Sofa ${n}`, type: "standard", platform: "ps5" },
+  });
+  const run = (n: number, over: Partial<ISessionApi> = {}) => ({
+    ...running, id: 40 + n, pc_id: n, pc_label: `PS-${n}`, ...over,
+  } as ISessionApi);
+  const ended = (n: number) => event({ session_id: 40 + n, pc_id: n, place_id: 10 + n });
+  const openSeat = () => screen.queryByTestId("receipt-seat")?.textContent ?? null;
+  const hide = async () => {
+    await act(async () => { fireEvent.click(screen.getByTestId("pay-mark-later")); });
+    await act(async () => { await Promise.resolve(); });
+  };
+
+  beforeEach(() => {
+    realtime.handler = null;
+    repo.listPcs.mockResolvedValue([seat(1), seat(2), seat(3)]);
+    repo.listActive.mockResolvedValue([run(1), run(2), run(3)]);
+    repo.preview.mockResolvedValue({
+      mode: "fixed", is_free: false, is_unlimited: false, elapsed_minutes: 10,
+      time_cost: 250, hourly_rate: 1500, package_name: "10m", items: [], items_total: 0,
+      joysticks: [], joysticks_total: 0, subtotal: 250, gross_total: 250, total: 250,
+    });
+  });
+  afterEach(cleanup);
+
+  test("two seats end together: two bills, the second after the first is hidden", async () => {
+    await mount();
+    await fire(ended(1));
+    await fire(ended(2));
+    expect(openSeat()).toBe("№1 · Sofa 1");
+    expect(screen.getAllByTestId("receipt-seat")).toHaveLength(1);
+
+    await hide();
+    expect(openSeat()).toBe("№2 · Sofa 2");
+    await hide();
+    expect(openSeat()).toBeNull();
+  });
+
+  test("three seats, in the order they ended; a repeated event is one bill", async () => {
+    await mount();
+    await fire(ended(3));
+    await fire(ended(1));
+    await fire(ended(3));
+    await fire(ended(2));
+    const seen: Array<string | null> = [];
+    for (let i = 0; i < 4; i++) {
+      seen.push(openSeat());
+      if (openSeat() !== null) await hide();
+    }
+    expect(seen).toEqual(["№3 · Sofa 3", "№1 · Sofa 1", "№2 · Sofa 2", null]);
+  });
+
+  test("a Stop pressed here opens at once, holds its tile's clock, and the seat that ended meanwhile follows", async () => {
+    await mount();
+    const stops = screen.getAllByRole("button").filter((b) => b.getAttribute("data-action") === "stop");
+    await act(async () => { fireEvent.click(stops[0]); });
+    expect(openSeat()).toBe("№1 · Sofa 1");
+    expect(screen.getByText("session.checkoutPreviewTitle")).toBeTruthy();
+    // The tile's clock holds at the press while the preliminary total is open.
+    expect(document.querySelectorAll("[data-frozen]").length).toBe(1);
+
+    await fire(ended(2));
+    expect(openSeat()).toBe("№1 · Sofa 1");
+
+    // «Продолжить игру»: nothing stopped; the clock reads the real time again
+    // and the ended seat's bill opens.
+    await act(async () => { fireEvent.click(screen.getByText("session.checkoutKeepPlaying")); });
+    await act(async () => { await Promise.resolve(); });
+    expect(document.querySelectorAll("[data-frozen]").length).toBe(0);
+    expect(openSeat()).toBe("№2 · Sofa 2");
+    expect(screen.getByText("session.checkoutDone")).toBeTruthy();
+  });
+
+  // At the till (2026-11-22, owner): «−» puts a running seat's preliminary
+  // total away — the seat is NOT ended, the next bill in line opens; the
+  // server holds the bill, and a press on the reminder opens it here again.
+  test("«−» puts the preliminary total away, the next bill opens, and it comes back from the reminder", async () => {
+    repo.checkout.mockClear();
+    repo.releaseCheckout.mockClear();
+    await mount();
+    const stops = screen.getAllByRole("button").filter((b) => b.getAttribute("data-action") === "stop");
+    await act(async () => { fireEvent.click(stops[0]); });
+    expect(repo.checkout).toHaveBeenCalledWith(41);
+    await fire(ended(2));
+    expect(openSeat()).toBe("№1 · Sofa 1");
+
+    await act(async () => { fireEvent.click(screen.getByTestId("receipt-minimize")); });
+    await act(async () => { await Promise.resolve(); });
+    expect(repo.releaseCheckout).not.toHaveBeenCalled();
+    expect(openSeat()).toBe("№2 · Sofa 2");
+
+    // The reminder lists seat 1 at the till; a press opens it on THIS board.
+    await act(async () => { fireEvent.click(screen.getByTestId("receipt-minimize")); });
+    publishOpenBills([run(1, { checkout_at: new Date().toISOString(), held_total: "250.00" })]);
+    await act(async () => { await Promise.resolve(); });
+    const chip = screen.getByTestId("tile-open-bill-1");
+    expect(chip.textContent).toContain("openBills.atTill");
+    expect(chip.textContent).toContain("250");
+    await act(async () => { fireEvent.click(chip); });
+    expect(openSeat()).toBe("№1 · Sofa 1");
+    expect(screen.getByText("session.checkoutPreviewTitle")).toBeTruthy();
+    publishOpenBills([]);
+  });
+
+  test("a seat at the till holds its tile's clock from the server's instant", async () => {
+    repo.listActive.mockResolvedValue([run(1, { checkout_at: new Date(Date.now() - 60_000).toISOString() }), run(2), run(3)]);
+    await mount();
+    expect(document.querySelectorAll("[data-frozen]").length).toBe(1);
+  });
+
+  test("a bill waiting for «оплатили?» joins the line once answered, even after the open one was hidden", async () => {
+    let answer: (a: "paid" | "taken" | null) => void = () => {};
+    await mount();
+    await fire(ended(1));
+    const off = registerDueAsker(() => new Promise((r) => { answer = r; }));
+    try {
+      await fire(ended(2));
+      // Seat 2's bill waits for «оплатили?»; seat 1's is open.
+      expect(openSeat()).toBe("№1 · Sofa 1");
+      await hide();
+      expect(openSeat()).toBeNull();
+      await act(async () => { answer(null); await Promise.resolve(); });
+      expect(openSeat()).toBe("№2 · Sofa 2");
+    } finally {
+      off();
+    }
   });
 });

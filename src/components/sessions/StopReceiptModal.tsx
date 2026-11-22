@@ -20,6 +20,10 @@ import { billCents, cashChange } from "@/components/payments/cashChange";
 import type { ICashHandover } from "@/api/sessions";
 import { isOutsideFoodLine, sessionLineLabel } from "./outsideFood";
 import PrepaidSettlement, { prepaidCashChange } from "./PrepaidSettlement";
+import { sessionSeatLine } from "./seatLine";
+import { dialogToneClass } from "@/components/ui/dialogTone";
+import { openBillsChanged } from "@/components/notifications/openBillsSignal";
+import { markPutAway } from "@/components/notifications/openBillsStore";
 
 interface Props {
   session: ISessionApi;
@@ -48,6 +52,19 @@ interface Props {
    * no «Доплатить» on this bill. Display only; the figures stay the server's.
    */
   dueAnswer?: "paid" | "taken" | null;
+  /**
+   * The seat as the card names it — «№4 · Hall VIP» (2026-11-22, owner). The
+   * board passes its own line (its listing's place has no number); absent,
+   * the row's `pc.place` or the device label.
+   */
+  seat?: string;
+  /**
+   * «−» on a running seat's preliminary total (2026-11-22, owner): the window
+   * is put away like a minimised folder — the seat is NOT ended, its bill holds
+   * at the Stop press on the server (`checkout_at`), and «Незакрытые счета» /
+   * the seat's tile bring it back. Absent: it closes like ×.
+   */
+  onMinimize?: () => void;
 }
 
 const fmtDuration = (mins: number, t: (k: string) => string) => {
@@ -65,8 +82,11 @@ const fmtDuration = (mins: number, t: (k: string) => string) => {
  * source of truth — same calculator used by /stop), shows time + items, lets
  * cashier remove items, then confirms stop.
  */
-const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved, canResetTime = false, onTimeReset, canCancel = false, dueAnswer = null }: Props) => {
-  const { money, t } = useLang();
+/** How long the «−» shrinking takes (matches `.is-putting-away` in global.css). */
+export const PUT_AWAY_MS = 320;
+
+const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved, canResetTime = false, onTimeReset, canCancel = false, dueAnswer = null, seat, onMinimize }: Props) => {
+  const { money, t, lang } = useLang();
   const ask = useConfirm();
   const [bill, setBill] = useState<IBillBreakdown | null>(null);
   const [busy, setBusy] = useState(false);
@@ -121,7 +141,17 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved, canRes
     // reading it again only asked a manager for a closed colleague's receipt and
     // showed «нет прав» over a stop that had worked.
     if (stopped !== null) return;
-    void reload({ keepOnForbidden: session.status !== "active" });
+    if (session.status === "active") {
+      // Stop pressed (2026-11-22, owner): the seat waits at the till — the
+      // server holds its bill at this instant (a repeat keeps the first), and
+      // the receipt is then read at it. Refused (it ended meanwhile, an older
+      // backend): read as it stands.
+      void sessionRepository.checkout(session.id)
+        .catch(() => undefined)
+        .then(() => reload({ keepOnForbidden: false }));
+      return;
+    }
+    void reload({ keepOnForbidden: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session.id, session.status]);
 
@@ -317,7 +347,7 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved, canRes
   const endedWithoutUs = session.status !== "active";
   const finished = stopped !== null || endedWithoutUs || endedElsewhere;
 
-  const deviceLabel = session.pc_label ?? `№${session.pc_id}`;
+  const deviceLabel = seat ?? sessionSeatLine(session, lang);
   // Ended by itself (ran out, or the kiosk ended it) with nobody at the till
   // (2026-11-07, owner): how it was paid is asked here, once. Not for a
   // cancelled or waived seat (nothing owed), nor once a method is on record.
@@ -340,6 +370,8 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved, canRes
       setHandover(r.cash);
       setRecorded(true);
       notify.message("success", fmt(t("pay.recorded"), deviceLabel));
+      // Closed: the «Незакрытые счета» reminder drops it at once.
+      openBillsChanged();
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
     } finally {
@@ -350,13 +382,113 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved, canRes
   // Billed by the hour: count-up, or a planned start with no package.
   const byTheHour = view !== null && (view.mode === "open" || !view.package_name);
 
+  /**
+   * Leaving a final bill nobody closed (2026-11-22, owner): «Скрыть, закрыть
+   * позже», the ×, Escape and the backdrop all HIDE it — nothing is sent, the
+   * bill stays open on the server, and the «Незакрытые счета» reminder lists
+   * it at once so it is closed later from there.
+   */
+  // A running seat at the till (2026-11-22): its bill is held on the server.
+  const atTill = session.status === "active" && !finished && !endedElsewhere && stopped === null;
+  /**
+   * «−» puts the bill away (2026-11-22, owner): nothing is sent, nothing
+   * ends — an ended seat's bill stays open, a running seat stays at the till
+   * with its bill HELD at the Stop press — and «Незакрытые счета» and the
+   * seat's tile bring it back at once. (The ×, Escape and the backdrop of an
+   * ended seat's bill hide it the same way; on a running seat see `dismiss`.)
+   */
+  const [puttingAway, setPuttingAway] = useState(false);
+  const putAway = () => {
+    if (puttingAway) return;
+    const finish = () => {
+      if (markable || atTill) openBillsChanged();
+      if (atTill && onMinimize) onMinimize();
+      else onClose();
+    };
+    if (!markable && !atTill) {
+      finish();
+      return;
+    }
+    // Put away like a minimised window (2026-11-22, owner): it shrinks down
+    // toward «Незакрытые счета», and where it went is lit for a moment.
+    markPutAway(session.id);
+    // No motion where the system asks for none, or cannot say.
+    const still = typeof window.matchMedia !== "function" || window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (still) {
+      finish();
+      return;
+    }
+    setPuttingAway(true);
+    window.setTimeout(finish, PUT_AWAY_MS);
+  };
+  /**
+   * The × and Escape (2026-11-22, owner): on a RUNNING seat's preliminary total
+   * they mean «Продолжить игру» — the Stop is taken back and the time counts
+   * again, so the next Stop shows what the counter reached. Anywhere else, the
+   * receipt's own close (an ended bill is put away, a closed one just closes).
+   * A click on the empty space around a running seat's total does nothing.
+   */
+  const dismiss = () => {
+    if (!atTill) {
+      putAway();
+      return;
+    }
+    // Closed AT ONCE (2026-11-22, owner: one click, no flicker): the Stop is
+    // taken back behind it, and the board and the reminder read again when
+    // the server has. Refused: said, and the seat stays at the till — on its
+    // tile and in «Незакрытые счета» — so nothing is lost.
+    const id = session.id;
+    onClose();
+    void sessionRepository.releaseCheckout(id)
+      .then(() => openBillsChanged())
+      .catch((e) => {
+        notify.message("error", e instanceof Error && e.message ? e.message : t("session.failUnknown"));
+        openBillsChanged();
+      });
+  };
+  /** «Продолжить игру»: off the till, the time counts again. */
+  const keepPlaying = async () => {
+    if (stoppingNow.current) return;
+    setBusy(true);
+    setErr(null);
+    try {
+      await sessionRepository.releaseCheckout(session.id);
+      openBillsChanged();
+      onClose();
+    } catch (e) {
+      setErr(e instanceof Error && e.message ? e.message : t("session.failUnknown"));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
-    <Modal open onClose={onClose}>
-      <div className="card" style={{ width: 520, maxWidth: "92vw", display: "flex", flexDirection: "column", gap: 12 }}>
-        <h2 style={{ margin: 0 }}>
-          {cancelled
-            ? t("session.cancel.done")
-            : finished ? t("session.checkoutDone") : `${t("session.checkoutPreviewTitle")} · ${deviceLabel}`}
+    <Modal open onClose={dismiss} closeOnBackdrop={!atTill}>
+      <div className={`card ${dialogToneClass("bill")}${puttingAway ? " is-putting-away" : ""}`} style={{ width: 520, maxWidth: "92vw", display: "flex", flexDirection: "column", gap: 12 }}>
+        {/* What the receipt is, then WHICH seat — number and name, a size up
+            (2026-11-22, owner), on every state of it. */}
+        {/* «−» beside the × (2026-11-22, owner): put the bill away like a
+            minimised folder; it waits in «Незакрытые счета» and on its tile. */}
+        {(atTill || markable) && (
+          <button
+            type="button"
+            className="receipt-minimize"
+            onClick={putAway}
+            disabled={busy}
+            aria-label={t("receipt.minimize")}
+            title={t("receipt.minimize")}
+            data-testid="receipt-minimize"
+          >
+            −
+          </button>
+        )}
+        <h2 className="dialog-title" style={{ margin: 0 }}>
+          <span>
+            {cancelled
+              ? t("session.cancel.done")
+              : finished ? t("session.checkoutDone") : t("session.checkoutPreviewTitle")}
+          </span>
+          <span className="dialog-title__seat" data-testid="receipt-seat" title={deviceLabel}>{deviceLabel}</span>
         </h2>
         {/* Opening this ends nothing (2026-10-25): the seat plays on, the
             figures re-read every few seconds, and only the confirm below
@@ -550,6 +682,20 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved, canRes
               </div>
             )}
 
+            {/* The branch's rounding (2026-11-22, owner): «Время 2.92» over
+                «Итого 100» read as a mistake. Said in words, with the server's
+                own rounded figure; only when the rounding changed the sum. */}
+            {!cancelled && !view.is_free && Number(view.rounding_step ?? 0) > 0
+              && view.subtotal !== undefined && view.gross_total !== undefined
+              && Math.round(Number(view.subtotal) * 100) !== Math.round(Number(view.gross_total) * 100) && (
+              <div style={row} className="muted" data-testid="receipt-rounding">
+                <span style={{ flex: 1 }}>
+                  {fmt(t("session.receiptRounding"), money(Number(view.rounding_step)), t(`rounding.mode.${view.rounding_mode ?? "up"}`).toLowerCase())}
+                </span>
+                <span style={{ fontWeight: 700 }}>{money(Number(view.gross_total), receiptPrecision)}</span>
+              </div>
+            )}
+
             {/* Total */}
             <div style={{ ...row, borderTop: "2px solid #07ddf1", marginTop: 6, paddingTop: 12 }}>
               <span style={{ flex: 1, fontWeight: 700, fontSize: 16 }}>{t("session.totalDue")}</span>
@@ -633,7 +779,9 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved, canRes
         <div className="receipt-actions" data-count={markable ? 2 : finished ? 1 : canCancel ? 3 : 2} style={{ marginTop: 4 }}>
           {markable ? (
             <>
-              <Button variant="secondary" onClick={onClose} disabled={busy}>{t("action.close")}</Button>
+              {/* Hide it and close it later (2026-11-22, owner): the bill stays
+                  open on the server; «Незакрытые счета» brings it back. */}
+              <Button variant="secondary" onClick={putAway} disabled={busy} data-testid="pay-mark-later">{t("pay.closeLater")}</Button>
               <Button onClick={() => { void recordPayment(); }} disabled={busy || cashBlocks} data-testid="pay-mark-confirm">
                 {t("pay.markConfirm")}
               </Button>
@@ -643,7 +791,7 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved, canRes
           ) : (
             <>
               {/* Back to the running seat: nothing was sent, nothing stopped. */}
-              <Button variant="secondary" className="receipt-actions__keep" onClick={onClose} disabled={busy}>{t("session.checkoutKeepPlaying")}</Button>
+              <Button variant="secondary" className="receipt-actions__keep" onClick={() => { void keepPlaying(); }} disabled={busy} data-testid="receipt-keep-playing">{t("session.checkoutKeepPlaying")}</Button>
               {/* The player changed his mind (2026-11-06): end the seat with
                   nothing owed. Its own button, apart from the counter reset
                   above, which keeps the seat running. */}

@@ -1248,6 +1248,7 @@ export const TRANSLATIONS: Dict = {
   },
   // The bookings calendar (2026-11-07): day / week / month of a branch's reservations.
   "calendar.title": { en: "Bookings calendar", ru: "Календарь броней", am: "Ամրագրումների օրացույց" },
+  "calendar.hasBookings": { en: "Reservations on {0} seats", ru: "Есть бронирования: мест {0}", am: "Կան ամրագրումներ՝ {0} տեղ" },
   "calendar.today": { en: "Today", ru: "Сегодня", am: "Այսօր" },
   "calendar.prev": { en: "Previous two weeks", ru: "Предыдущие две недели", am: "Նախորդ երկու շաբաթը" },
   "calendar.next": { en: "Next two weeks", ru: "Следующие две недели", am: "Հաջորդ երկու շաբաթը" },
@@ -1298,6 +1299,24 @@ export const TRANSLATIONS: Dict = {
   "session.itemsUnpaid.switchFull": { en: "The player has not paid for these products yet", ru: "Игрок ещё не оплатил эти товары", am: "Խաղացողը դեռ չի վճարել այս ապրանքների համար" },
   "session.itemsUnpaid.hint": { en: "Kept as a reminder on the card. The bill stays the same.", ru: "Останется напоминанием на карточке. Счёт не меняется.", am: "Կմնա որպես հիշեցում քարտի վրա։ Հաշիվը չի փոխվում։" },
   "session.itemUnpaidTag": { en: "not paid", ru: "не оплачено", am: "չվճարված" },
+  // «Не оплачено» is ON by default (2026-11-22, owner): said large over the
+  // dialog when it opens, gone on any click or key.
+  "unpaidOn.title": { en: "«Not paid» is ON", ru: "«Не оплачено» включено", am: "«Չվճարված»-ը միացված է" },
+  "unpaidOn.startHint": {
+    en: "The player pays when the seat ends. Turn it off if they pay now.",
+    ru: "Игрок заплатит, когда место закончится. Выключите, если платит сейчас.",
+    am: "Խաղացողը կվճարի, երբ տեղն ավարտվի։ Անջատեք, եթե վճարում է հիմա։",
+  },
+  "unpaidOn.itemsHint": {
+    en: "These products are handed over unpaid and collected at the end. Turn it off if they are paid now.",
+    ru: "Товары выдаются без оплаты, деньги заберите в конце. Выключите, если оплатили сейчас.",
+    am: "Ապրանքները տրվում են առանց վճարման, գումարը՝ վերջում։ Անջատեք, եթե վճարվել է հիմա։",
+  },
+  "unpaidOn.dismiss": { en: "Click or press any key to continue", ru: "Нажмите любую клавишу или кликните, чтобы продолжить", am: "Սեղմեք ցանկացած ստեղն կամ կտտացրեք՝ շարունակելու համար" },
+  // The tile the moment its time runs out / while its Stop is being settled
+  // (2026-11-22, owner): the clock holds at once, display only.
+  "session.timeUp": { en: "Time's up", ru: "Время вышло", am: "Ժամանակն ավարտվեց" },
+  "session.atCheckout": { en: "At checkout", ru: "На расчёте", am: "Հաշվարկի մեջ" },
   "session.itemMarkPaid": { en: "Paid", ru: "Оплачено", am: "Վճարված է" },
   "session.itemMarkPaidFull": { en: "Mark as paid: {0}", ru: "Отметить оплаченным: {0}", am: "Նշել վճարված՝ {0}" },
   "session.itemPaidToast": { en: "Paid: {0}", ru: "Оплачено: {0}", am: "Վճարված է՝ {0}" },
@@ -1372,7 +1391,7 @@ export const TRANSLATIONS: Dict = {
   "session.reminder.clearedToast": { en: "Reminder removed", ru: "Напоминание убрано", am: "Հիշեցումը հեռացվեց" },
   "session.reminder.chipFired": { en: "Now", ru: "Пора", am: "Ժամանակն է" },
   "session.reminder.cardTitle": { en: "Reminder", ru: "Напоминание", am: "Հիշեցում" },
-  "session.reminder.cardBody": { en: "Seat №{seat}{player}: the player asked to be reminded, {elapsed} have passed", ru: "Место №{seat}{player}: игрок просил напомнить, прошло {elapsed}", am: "Տեղ №{seat}{player}՝ խաղացողը խնդրել էր հիշեցնել, անցել է {elapsed}" },
+  "session.reminder.cardBody": { en: "Seat {seat}{player}: the player asked to be reminded, {elapsed} have passed", ru: "Место {seat}{player}: игрок просил напомнить, прошло {elapsed}", am: "Տեղ {seat}{player}՝ խաղացողը խնդրել էր հիշեցնել, անցել է {elapsed}" },
   "session.reminder.ok": { en: "Got it", ru: "Понятно", am: "Հասկանալի է" },
   "session.reminder.snooze": { en: "30 more min", ru: "Ещё 30 мин", am: "Եվս 30 ր" },
   "session.reminder.open": { en: "Open the seat", ru: "Открыть место", am: "Բացել տեղը" },
@@ -1383,8 +1402,8 @@ export const TRANSLATIONS: Dict = {
   "session.unpaid.toastOn": { en: "Extra time marked unpaid · {0}", ru: "Доп. время отмечено как неоплаченное · {0}", am: "Լրացուցիչ ժամանակը նշվեց որպես չվճարված · {0}" },
   "session.unpaid.toastOff": { en: "Marked paid · {0}", ru: "Отметка снята · {0}", am: "Նշումը հանվեց · {0}" },
   // Since 2026-11-15 the server's figure is extra time AND products handed over unpaid.
-  "session.unpaid.alertWhy": { en: "Not everything is paid: extra time or products", ru: "Не всё оплачено: доп. время или товары", am: "Ամեն ինչ չէ վճարված՝ լրացուցիչ ժամանակ կամ ապրանքներ" },
-  "session.unpaid.alertHint": { en: "Take the payment from the player.", ru: "Возьмите оплату у игрока.", am: "Վերցրեք վճարը խաղացողից։" },
+  "session.unpaid.alertWhy": { en: "The seat ended, and this is not paid yet", ru: "Место закончилось, это ещё не оплачено", am: "Տեղն ավարտվեց, սա դեռ վճարված չէ" },
+  "session.unpaid.alertHint": { en: "Its bill opens next: take the payment there.", ru: "Следом откроется его счёт: примите оплату там.", am: "Հաջորդը կբացվի նրա հաշիվը՝ վճարն ընդունեք այնտեղ։" },
   "session.unpaid.alertMore": { en: "{0} more waiting", ru: "Ещё ждут: {0}", am: "Եվս սպասում են՝ {0}" },
   "session.unpaid.alertOk": { en: "Got it", ru: "Понятно", am: "Հասկանալի է" },
   "history.action.unpaid_on": { en: "Marked extra time unpaid", ru: "Отметил доп. время как неоплаченное", am: "Նշեց լրացուցիչ ժամանակը որպես չվճարված" },
@@ -1715,6 +1734,23 @@ export const TRANSLATIONS: Dict = {
   "pay.markAfterAuto": { en: "This seat ended by itself and nobody recorded the payment. Mark how it was paid.", ru: "Место завершилось само, и оплату никто не отметил. Отметьте, как оплатили.", am: "Տեղն ավարտվեց ինքնուրույն, և վճարումը ոչ ոք չնշեց։ Նշեք, թե ինչպես վճարեցին։" },
   "pay.markConfirm": { en: "Record payment", ru: "Отметить оплату", am: "Նշել վճարումը" },
   "pay.recorded": { en: "Payment recorded · {0}", ru: "Оплата отмечена · {0}", am: "Վճարումը նշվեց · {0}" },
+  // «Незакрытые счета» (2026-11-22, owner): a final bill hidden to close later.
+  "pay.closeLater": { en: "Hide, close later", ru: "Скрыть, закрыть позже", am: "Թաքցնել, փակել ավելի ուշ" },
+  "openBills.chip": { en: "Open bills: {0}", ru: "Незакрытые счета: {0}", am: "Չփակված հաշիվներ՝ {0}" },
+  "receipt.minimize": { en: "Put away, it waits in «Open bills»", ru: "Свернуть, счёт будет в «Незакрытых счетах»", am: "Ծալել, հաշիվը կլինի «Չփակված հաշիվներում»" },
+  "openBills.atTill": { en: "At the till", ru: "На кассе", am: "Դրամարկղում" },
+  "openBills.remindTitle": { en: "A put-away bill is waiting", ru: "Свёрнутый счёт ждёт", am: "Ծալված հաշիվը սպասում է" },
+  "openBills.remindSince": { en: "Stop pressed at {0}", ru: "«Стоп» нажат в {0}", am: "«Կանգ» սեղմվել է {0}-ին" },
+  "openBills.remindOpen": { en: "Open the bill", ru: "Открыть счёт", am: "Բացել հաշիվը" },
+  "openBills.remindLater": { en: "Remind in 3 min", ru: "Напомнить через 3 мин", am: "Հիշեցնել 3 րոպեից" },
+  "openBills.tile": { en: "Bill not closed", ru: "Счёт не закрыт", am: "Հաշիվը փակված չէ" },
+  "openBills.tileTitle": { en: "Open this seat's bill and record how it was paid", ru: "Открыть счёт этого места и отметить оплату", am: "Բացել այս տեղի հաշիվը և նշել վճարումը" },
+  "openBills.title": { en: "Open bills", ru: "Незакрытые счета", am: "Չփակված հաշիվներ" },
+  "openBills.hint": {
+    en: "The player has not paid yet. Press a seat to close its bill.",
+    ru: "Игрок ещё не заплатил. Нажмите на место, чтобы закрыть счёт.",
+    am: "Խաղացողը դեռ չի վճարել։ Սեղմեք տեղի վրա՝ հաշիվը փակելու համար։",
+  },
   "pay.split": { en: "Split", ru: "Разделить", am: "Բաժանել" },
   "pay.otherShort": { en: "Other", ru: "Другое", am: "Այլ" },
   "pay.restHere": { en: "The rest", ru: "Остаток", am: "Մնացորդը" },
@@ -1741,13 +1777,12 @@ export const TRANSLATIONS: Dict = {
   "session.payOtherPlaceholder": { en: "For example, Idram", ru: "Например, Idram", am: "Օրինակ՝ Idram" },
 
   "session.boardTitle": { en: "Active Places", ru: "Активные места", am: "Ակտիվ տեղեր" },
-  // How much of the room is in use. Counted off the tiles on screen, so the
-  // line and the grid can never disagree.
-  "session.boardCounts": {
-    en: "{0} seats · {1} in use · {2} free",
-    ru: "Всего {0} · Занято {1} · Свободно {2}",
-    am: "Ընդամենը {0} · Զբաղված {1} · Ազատ {2}",
-  },
+  // How much of the room is in use (2026-11-22: three chips). Counted off
+  // the tiles on screen, so they and the grid can never disagree.
+  "session.countTotal": { en: "Seats", ru: "Всего", am: "Ընդամենը" },
+  "session.countBusy": { en: "In use", ru: "Занято", am: "Զբաղված" },
+  "session.countBooked": { en: "Reserved", ru: "Забронировано", am: "Ամրագրված" },
+  "session.countFree": { en: "Free", ru: "Свободно", am: "Ազատ" },
   "session.dragToReorder": { en: "Drag to reorder", ru: "Перетащите, чтобы изменить порядок", am: "Քաշեք՝ դասավորությունը փոխելու համար" },
   "session.dragSectionHint": { en: "Drag to reorder sections", ru: "Перетащите, чтобы изменить порядок разделов", am: "Քաշեք՝ բաժինների դասավորությունը փոխելու համար" },
   "session.posNote": { en: "items", ru: "поз.", am: "միավոր" },
@@ -2389,6 +2424,7 @@ export const TRANSLATIONS: Dict = {
   "rounding.stepWhole": { en: "The whole dram", ru: "До целого драма", am: "Մինչև ամբողջ դրամ" },
   "rounding.mode": { en: "Direction", ru: "Направление", am: "Ուղղություն" },
   "rounding.mode.up": { en: "Up", ru: "Вверх", am: "Վերև" },
+  "session.receiptRounding": { en: "Rounded to {0}, {1}", ru: "Округление до {0}, {1}", am: "Կլորացում մինչև {0}, {1}" },
   "rounding.mode.nearest": { en: "Nearest", ru: "К ближайшему", am: "Դեպի մոտակա" },
   "rounding.mode.down": { en: "Down", ru: "Вниз", am: "Ներքև" },
   "rounding.example": { en: "Example: {0} → {1}", ru: "Пример: {0} → {1}", am: "Օրինակ՝ {0} → {1}" },

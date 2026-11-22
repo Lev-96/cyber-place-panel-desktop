@@ -38,6 +38,7 @@ import QuotedPrice from "./QuotedPrice";
 import { EMPTY_DRAFT, draftMinutes, type DurationDraft } from "./durationModel";
 import { quoteFor, useServerQuote } from "./useServerQuote";
 import { useMinuteTick } from "./useMinuteTick";
+import { sessionSeatLine } from "./seatLine";
 
 interface Props {
   session: ISessionApi;
@@ -48,6 +49,8 @@ interface Props {
   onChanged: (session: ISessionApi) => void;
   /** A platform's display name; the board passes the branch's own (one shared read). */
   platformName?: (slug: string) => string;
+  /** The seat as its card names it, «№4 · Hall VIP» (2026-11-22); absent: the row's own. */
+  seat?: string;
 }
 
 
@@ -71,11 +74,13 @@ interface Props {
  * for joystick #3, the owner sets it in Branch → Prices" — sentences an
  * operator can act on, which a generic "failed" would throw away.
  */
-const SessionOptionsDialog = ({ session, platform, onClose, onChanged, platformName = platformLabel }: Props) => {
-  const { t, money } = useLang();
+const SessionOptionsDialog = ({ session, platform, onClose, onChanged, platformName = platformLabel, seat }: Props) => {
+  const { t, money, lang } = useLang();
   const { user } = useAuth();
   const confirm = useConfirm();
   const [current, setCurrent] = useState<ISessionApi>(session);
+  // WHICH seat this is, as its card says it — the caller's line, else the row's.
+  const seatLine = seat ?? sessionSeatLine(current, lang);
   // The venue's one joystick fee, or null when it does not offer extra pads.
   const [fee, setFee] = useState<number | null>(null);
 
@@ -256,7 +261,7 @@ const SessionOptionsDialog = ({ session, platform, onClose, onChanged, platformN
   const timeAddedToast = (minutes: number): string =>
     t("session.timeAddedToast")
       .replace("{0}", String(minutes))
-      .replace("{1}", current.pc_label ?? "");
+      .replace("{1}", seatLine);
 
   /**
    * 24-hour wall clock, which is the only format this panel shows a time in.
@@ -390,7 +395,7 @@ const SessionOptionsDialog = ({ session, platform, onClose, onChanged, platformN
   const switchUnpaid = (on: boolean) => run(
     () => sessionRepository.setUnpaid(current.id, on),
     null,
-    fmt(t(on ? "session.unpaid.toastOn" : "session.unpaid.toastOff"), current.pc_label ?? ""),
+    fmt(t(on ? "session.unpaid.toastOn" : "session.unpaid.toastOff"), seatLine),
   );
 
   const elapsedLabel = elapsedMinutes >= 60
@@ -406,11 +411,12 @@ const SessionOptionsDialog = ({ session, platform, onClose, onChanged, platformN
           class as AddSessionItemDialog and StopReceiptModal, so it inherits the
           design system's surface, radius and border rather than inventing one. */}
       <div className="card col" style={{ gap: 18, width: 460, maxWidth: "92vw" }}>
-        <div className="row-between" style={{ alignItems: "baseline" }}>
-          {/* «+ Время», one dialog for every mode (2026-11-07, owner). */}
-          <h2 style={{ margin: 0 }}>{t("session.addTime")}</h2>
-          <span className="muted" style={{ fontSize: 13 }}>{current.pc_label}</span>
-        </div>
+        {/* «+ Время», one dialog for every mode (2026-11-07, owner); then
+            WHICH seat, number and name a size up (2026-11-22, owner). */}
+        <h2 className="dialog-title" style={{ margin: 0 }}>
+          <span>{t("session.addTime")}</span>
+          <span className="dialog-title__seat" data-testid="options-seat" title={seatLine}>{seatLine}</span>
+        </h2>
 
         {/* The two facts an operator needs before deciding anything here: what
             this session is being billed as, and how long it has run. Without
@@ -535,9 +541,9 @@ const SessionOptionsDialog = ({ session, platform, onClose, onChanged, platformN
               <span className="muted" style={{ fontSize: 12 }}>
                 {claimedFrom
                   ? t("session.moveWhyFrom")
-                      .replace("{0}", current.pc_label ?? "")
+                      .replace("{0}", seatLine)
                       .replace("{1}", clockOf(claimedFrom))
-                  : t("session.moveWhy").replace("{0}", current.pc_label ?? "")}
+                  : t("session.moveWhy").replace("{0}", seatLine)}
               </span>
             </div>
 

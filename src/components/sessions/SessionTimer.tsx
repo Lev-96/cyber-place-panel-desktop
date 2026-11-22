@@ -42,6 +42,20 @@ interface Props {
    * The press only asks — the caller opens the confirmation.
    */
   reset?: { label: string; onReset: () => void };
+  /**
+   * Stop was pressed and its preliminary total is open (2026-11-22, owner):
+   * the clock and the money hold at that instant, on screen only. The server
+   * still prices the stop at the receipt's own `priced_at`; «Продолжить игру»
+   * drops this and the clock reads the real time again.
+   */
+  frozenAt?: number | null;
+  /** The words for a seat at checkout (the frozen clock's tooltip). */
+  checkoutLabel?: string;
+  /**
+   * The words for a countdown that reached 0 (2026-11-22, owner): said at once
+   * in place of 00:00, before the server's sweep frees the seat. Absent: 00:00.
+   */
+  timeUpLabel?: string;
 }
 
 /**
@@ -61,12 +75,16 @@ interface Props {
 /** A clock that is not running: neither the live cyan nor a warning colour. */
 const PAUSED_COLOR = "var(--color-muted)";
 
-const SessionTimer = ({ session, formatMoney, minimumLabel, reset }: Props) => {
-  const [now, setNow] = useState(Date.now());
+const SessionTimer = ({ session, formatMoney, minimumLabel, reset, frozenAt = null, checkoutLabel, timeUpLabel }: Props) => {
+  const [tick, setNow] = useState(Date.now());
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(t);
   }, []);
+  // At checkout every figure holds at the press (display only, see `frozenAt`).
+  const frozen = frozenAt !== null && Number.isFinite(frozenAt);
+  const now = frozen ? Math.min(tick, frozenAt as number) : tick;
+  const frozenMark = frozen ? <span aria-hidden="true">⏹ </span> : null;
 
   const amount = sessionAmountAt(session, now);
   // The VIP minimum charge, said when it is what the figure includes: a seat
@@ -136,8 +154,12 @@ const SessionTimer = ({ session, formatMoney, minimumLabel, reset }: Props) => {
     // Time PLAYED, which is what the bill charges for — not wall time.
     const elapsedMs = playedSecondsBetween(session, session.started_at, now) * 1000;
     return (
-      <span style={{ fontWeight: 700, fontVariantNumeric: "tabular-nums", color: paused ? PAUSED_COLOR : "var(--color-primary)" }}>
-        {pausedMark}▲ {fmt(elapsedMs)}
+      <span
+        style={{ fontWeight: 700, fontVariantNumeric: "tabular-nums", color: paused || frozen ? PAUSED_COLOR : "var(--color-primary)" }}
+        title={frozen ? checkoutLabel : undefined}
+        data-frozen={frozen || undefined}
+      >
+        {frozenMark}{pausedMark}▲ {fmt(elapsedMs)}
         {autoResume}
         {cost}
       </span>
@@ -146,16 +168,26 @@ const SessionTimer = ({ session, formatMoney, minimumLabel, reset }: Props) => {
 
   if (!session.ends_at) return null;
   const remaining = new Date(session.ends_at).getTime() - (paused ? pausedAt : now);
+  // Ran out (2026-11-22, owner): said at once, before the server's sweep frees
+  // the seat. The money already holds at the end (`billableUntilOf`).
+  const timeUp = !paused && !frozen && remaining <= 0 && session.status === "active";
   // The one urgency rule the card's frame reads too (sessionUrgency.ts).
   const urgency = sessionUrgency(session, now);
-  const color = paused
+  const color = paused || frozen
     ? PAUSED_COLOR
     : urgency === "crit" ? "var(--color-danger)"
     : urgency === "warn" ? "var(--color-warning)"
     : "var(--color-primary)";
   return (
     <span style={{ fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>
-      <span style={{ color }}>{pausedMark}{fmt(remaining)}</span>
+      <span
+        style={{ color }}
+        title={frozen ? checkoutLabel : undefined}
+        data-frozen={frozen || undefined}
+        data-testid={timeUp ? "time-up" : undefined}
+      >
+        {timeUp && timeUpLabel ? timeUpLabel : <>{frozenMark}{pausedMark}{fmt(remaining)}</>}
+      </span>
       {autoResume}
       {cost}
     </span>

@@ -26,6 +26,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { IItemChoice } from "@/api/sessions";
 import { sessionLineLabel } from "./outsideFood";
 import UnpaidToggle from "./UnpaidToggle";
+import UnpaidOnNotice from "./UnpaidOnNotice";
+import { sessionSeatLine } from "./seatLine";
+import { dialogToneClass } from "@/components/ui/dialogTone";
 
 /**
  * An additional item on its own clock — handed BACK rather than removed. The
@@ -40,6 +43,8 @@ interface Props {
   session: ISessionApi;
   onClose: () => void;
   onAdded: () => void;
+  /** The seat as its card names it, «№4 · Hall VIP» (2026-11-22); absent: the row's own. */
+  seat?: string;
 }
 
 /**
@@ -80,11 +85,11 @@ interface Props {
  * That one IS immediate — it is a correction to a bill that exists, not a
  * decision in progress — and it says so with its own toast.
  */
-const AddSessionItemDialog = ({ branchId, session, onClose, onAdded }: Props) => {
+const AddSessionItemDialog = ({ branchId, session, onClose, onAdded, seat }: Props) => {
   const { user } = useAuth();
   /** Mirrors the backend's `products.write` (manager too since 2026-11-09). */
   const canCreateProducts = can(user?.role, "product.write");
-  const { money, t } = useLang();
+  const { money, t, lang } = useLang();
   const [saving, setSaving] = useState(false);
   const confirmingRef = useRef(false);
   /** Which part of the dialog is open: the products, or the additional items. */
@@ -139,10 +144,11 @@ const AddSessionItemDialog = ({ branchId, session, onClose, onAdded }: Props) =>
   const [removing, setRemoving] = useState<number[]>([]);
   /**
    * «Не оплачено» (2026-11-15, owner): the products of this basket are handed
-   * over before the player paid. A reminder on the line, never money. Off by
-   * default, and then the request is exactly what it always was.
+   * over before the player paid. A reminder on the line, never money. ON by
+   * default (2026-11-22, owner), said large when the dialog opens
+   * (UnpaidOnNotice); off, the request is exactly what it always was.
    */
-  const [unpaid, setUnpaid] = useState(false);
+  const [unpaid, setUnpaid] = useState(true);
   /** Lines being marked paid («Оплачено»), so their button can say so. */
   const [paying, setPaying] = useState<number[]>([]);
   /** Lines being handed back right now (an additional item on a rate). */
@@ -354,13 +360,17 @@ const AddSessionItemDialog = ({ branchId, session, onClose, onAdded }: Props) =>
   };
 
   const onBill = bill;
-  const deviceLabel = session.pc_label ?? `№${session.pc_id}`;
+  // WHICH seat (2026-11-22, owner): the card's line, in the title.
+  const deviceLabel = seat ?? sessionSeatLine(session, lang);
 
   return (
     <Modal open onClose={saving ? () => {} : onClose}>
-      <div className="card" style={{ width: 560, maxWidth: "92vw", display: "flex", flexDirection: "column", gap: 12 }}>
-        <h2 style={{ margin: 0 }}>{t("session.addItem")}</h2>
-        <span className="muted" style={{ fontSize: 12 }}>{deviceLabel}</span>
+      <div className={`card ${dialogToneClass("goods")}`} style={{ width: 560, maxWidth: "92vw", display: "flex", flexDirection: "column", gap: 12 }}>
+        <UnpaidOnNotice active={shown === "products" && unpaid} hint={t("unpaidOn.itemsHint")} testId="items-unpaid-notice" />
+        <h2 className="dialog-title" style={{ margin: 0 }}>
+          <span>{t("session.addItem")}</span>
+          <span className="dialog-title__seat" data-testid="add-item-seat" title={deviceLabel}>{deviceLabel}</span>
+        </h2>
 
         {/* Two sections when the branch hands things out with the seat:
             what is SOLD (products) and what is HANDED OUT (additional items).

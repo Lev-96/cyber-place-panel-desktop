@@ -8,6 +8,7 @@ import { notify } from "@/ui/notify";
 import { durationLabel } from "@/utils/durationLabel";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { numberNameLine } from "@/components/sessions/seatLine";
 
 /**
  * "The player asked to be reminded" (2026-11-15, owner) — a floating card for
@@ -52,7 +53,8 @@ export const reminderCards = (list: readonly IDbNotification[], dismissed: Reado
       id: n.id,
       sessionId: Number(n.data.session_id),
       branchId: Number(n.data.branch_id),
-      seat: n.data.place_number != null ? String(n.data.place_number) : String(n.data.pc_id ?? n.data.session_id),
+      // «№3 · Hall VIP», the card's own line (2026-11-22, owner).
+      seat: n.data.place_number != null ? numberNameLine(n.data.place_number, n.data.place_name) : `#${n.data.pc_id ?? n.data.session_id}`,
       player: text(n.data.player_name),
       note: text(n.data.note),
       minutes: typeof n.data.minutes === "number" ? n.data.minutes : null,
@@ -78,7 +80,7 @@ const writeDismissed = (userId: number, ids: Set<string>) => {
   }
 };
 
-/** "Seat №3 (Арам): the player asked to be reminded, 2 h have passed" — named tokens, any order per language. */
+/** "Seat №3 · Hall (Арам): the player asked to be reminded, 2 h have passed" — named tokens, any order per language. */
 export const reminderSentence = (c: Pick<ReminderCard, "seat" | "player" | "minutes">, t: (k: string) => string): string =>
   t("session.reminder.cardBody").replace(/\{(\w+)\}/g, (m, k: string) => ({
     seat: c.seat,

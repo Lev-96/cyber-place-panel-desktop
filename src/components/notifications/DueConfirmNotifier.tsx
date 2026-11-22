@@ -14,6 +14,7 @@ import type { PaymentMethod } from "@/api/sessions";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { centsWhenFractional } from "@/i18n/currency";
 import { registerDueAsker, type DueAnswer } from "./dueConfirmGate";
+import { numberNameLine } from "@/components/sessions/seatLine";
 
 /** How often the list is read again while the panel is open. */
 export const DUE_POLL_MS = 30_000;
@@ -140,7 +141,8 @@ const DueConfirmNotifier = () => {
 
   if (!asks || !current) return null;
 
-  const seat = current.place ? `№${current.place.number ?? "?"}${current.place.name ? ` · ${current.place.name}` : ""}` : `#${current.session_id}`;
+  // The seat line every surface prints (2026-11-22): «№4 · Hall VIP».
+  const seat = current.place ? numberNameLine(current.place.number ?? current.place.id, current.place.name) : `#${current.session_id}`;
   const aheadWays = Object.entries(current.prepaid_by_method ?? {})
     .filter(([, a]) => Number(a) > 0)
     .map(([m, a]) => `${methodName({ method: m, label: null }, t)} ${money(Number(a), centsWhenFractional(Number(a)))}`).join(" · ");

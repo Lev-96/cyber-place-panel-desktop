@@ -3,7 +3,10 @@ import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { IBillBreakdown } from "@/api/sessions";
 import { ISessionApi } from "@/types/sessions";
-import StopReceiptModal from "./StopReceiptModal";
+import { useJustPutAway } from "@/components/notifications/openBillsStore";
+import StopReceiptModal, { PUT_AWAY_MS } from "./StopReceiptModal";
+import { onOpenBillsChanged } from "@/components/notifications/openBillsSignal";
+import { MODAL_LEAVE_MS } from "@/components/ui/Modal";
 
 /**
  * What the closing receipt is allowed to say about money.
@@ -22,10 +25,14 @@ import StopReceiptModal from "./StopReceiptModal";
  * figure would waive that one on screen.
  */
 
-const repo = vi.hoisted(() => ({ preview: vi.fn(), stop: vi.fn(), removeItem: vi.fn(), resetTime: vi.fn(), cancel: vi.fn(), recordPayment: vi.fn() }));
+const repo = vi.hoisted(() => ({ preview: vi.fn(), stop: vi.fn(), removeItem: vi.fn(), resetTime: vi.fn(), cancel: vi.fn(), recordPayment: vi.fn(),
+  checkout: vi.fn().mockResolvedValue({}), releaseCheckout: vi.fn().mockResolvedValue({}) }));
 
 vi.mock("@/repositories/SessionRepository", () => ({
   sessionRepository: {
+    // At the till (2026-11-22): Stop holds the bill; «Продолжить игру» lets it run.
+    checkout: (...a: unknown[]) => repo.checkout(...a),
+    releaseCheckout: (...a: unknown[]) => repo.releaseCheckout(...a),
     preview: (...a: unknown[]) => repo.preview(...a),
     stop: (...a: unknown[]) => repo.stop(...a),
     removeItem: (...a: unknown[]) => repo.removeItem(...a),
@@ -214,6 +221,168 @@ describe("the payment method", () => {
   });
 });
 
+// At the till (2026-11-22, owner): Stop pressed holds the bill on the server;
+// «−» (and ×, Escape, the backdrop) puts it away — nothing ends; «Продолжить
+// игру» lets the time count again.
+describe("the preliminary total at the till", () => {
+  afterEach(cleanup);
+  beforeEach(() => {
+    repo.preview.mockReset().mockResolvedValue(bill({ total: 500, priced_at: "2026-11-22T11:30:00Z" } as Partial<IBillBreakdown>));
+    repo.stop.mockReset();
+    repo.checkout.mockReset().mockResolvedValue({});
+    repo.releaseCheckout.mockReset().mockResolvedValue({});
+  });
+
+  const open = async (props: { onClose?: () => void; onMinimize?: () => void } = {}) => {
+    await act(async () => {
+      render(<StopReceiptModal session={session()} onClose={props.onClose ?? (() => {})} onMinimize={props.onMinimize} onConfirmed={() => {}} onItemRemoved={() => {}} />);
+    });
+    await act(async () => { await Promise.resolve(); });
+  };
+
+  test("opening it holds the bill on the server first, then reads it", async () => {
+    await open();
+    expect(repo.checkout).toHaveBeenCalledWith(1);
+    expect(repo.checkout.mock.invocationCallOrder[0]).toBeLessThan(repo.preview.mock.invocationCallOrder[0]);
+  });
+
+  test("«−» puts it away: nothing stopped, nothing released; the reminder hears it", async () => {
+    const onMinimize = vi.fn();
+    const onClose = vi.fn();
+    const heard = vi.fn();
+    const off = onOpenBillsChanged(heard);
+    try {
+      await open({ onMinimize, onClose });
+      await act(async () => { fireEvent.click(screen.getByTestId("receipt-minimize")); });
+      expect(onMinimize).toHaveBeenCalledTimes(1);
+      expect(onClose).not.toHaveBeenCalled();
+      expect(repo.stop).not.toHaveBeenCalled();
+      expect(repo.releaseCheckout).not.toHaveBeenCalled();
+      expect(heard).toHaveBeenCalled();
+    } finally { off(); }
+  });
+
+  // Like a minimised window (2026-11-22, owner): it shrinks away, then goes;
+  // where it went is marked. With reduced motion it goes at once.
+  test("«−» shrinks it away first, then puts it away, and marks where it went", async () => {
+    const mm = vi.fn().mockReturnValue({ matches: false });
+    const had = window.matchMedia;
+    (window as unknown as { matchMedia: unknown }).matchMedia = mm;
+    vi.useFakeTimers({ toFake: ["setTimeout"] });
+    try {
+      const onMinimize = vi.fn();
+      let marked: number | null = null;
+      const Reader = () => { marked = useJustPutAway(); return null; };
+      await act(async () => { render(<Reader />); });
+      await open({ onMinimize });
+      await act(async () => { fireEvent.click(screen.getByTestId("receipt-minimize")); });
+      expect(document.querySelector(".card.is-putting-away")).not.toBeNull();
+      expect(onMinimize).not.toHaveBeenCalled();
+      expect(marked).toBe(1);
+      await act(async () => { vi.advanceTimersByTime(PUT_AWAY_MS); });
+      expect(onMinimize).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+      (window as unknown as { matchMedia: unknown }).matchMedia = had;
+    }
+  });
+
+  test("with reduced motion it goes at once", async () => {
+    const had = window.matchMedia;
+    (window as unknown as { matchMedia: unknown }).matchMedia = vi.fn().mockReturnValue({ matches: true });
+    try {
+      const onMinimize = vi.fn();
+      await open({ onMinimize });
+      await act(async () => { fireEvent.click(screen.getByTestId("receipt-minimize")); });
+      expect(onMinimize).toHaveBeenCalledTimes(1);
+      expect(document.querySelector(".card.is-putting-away")).toBeNull();
+    } finally {
+      (window as unknown as { matchMedia: unknown }).matchMedia = had;
+    }
+  });
+
+  // 2026-11-22 (owner): a click on the empty space never closes a running
+  // seat's preliminary total; the × means «Продолжить игру».
+  test("a click on the empty space around it does nothing", async () => {
+    const onClose = vi.fn();
+    const onMinimize = vi.fn();
+    await open({ onClose, onMinimize });
+    const backdrop = document.querySelector(".cp-modal") as HTMLElement;
+    await act(async () => { fireEvent.mouseDown(backdrop); fireEvent.mouseUp(backdrop); });
+    // Longer than the dialog's leaving animation: nothing came of it.
+    await act(async () => { await new Promise((r) => setTimeout(r, 500)); });
+    expect(onClose).not.toHaveBeenCalled();
+    expect(onMinimize).not.toHaveBeenCalled();
+    expect(repo.releaseCheckout).not.toHaveBeenCalled();
+    expect(screen.getByTestId("receipt-minimize")).toBeTruthy();
+  });
+
+  test("the × takes the Stop back («Продолжить игру»): released, then closed", async () => {
+    const onClose = vi.fn();
+    const onMinimize = vi.fn();
+    await open({ onClose, onMinimize });
+    await act(async () => { fireEvent.click(document.querySelector(".cp-modal-close") as HTMLElement); });
+    // The dialog's own leaving animation first.
+    await act(async () => { await new Promise((r) => setTimeout(r, 500)); });
+    expect(repo.releaseCheckout).toHaveBeenCalledWith(1);
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(onMinimize).not.toHaveBeenCalled();
+  });
+
+  test("the × closes at once, while the server is still answering (no flicker)", async () => {
+    let answer: () => void = () => {};
+    repo.releaseCheckout.mockReturnValueOnce(new Promise<void>((r) => { answer = r; }));
+    const onClose = vi.fn();
+    await open({ onClose });
+    await act(async () => { fireEvent.click(document.querySelector(".cp-modal-close") as HTMLElement); });
+    await act(async () => { await new Promise((r) => setTimeout(r, 500)); });
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(repo.releaseCheckout).toHaveBeenCalledWith(1);
+    await act(async () => { answer(); });
+  });
+
+  test("«Продолжить игру» releases the till, then closes", async () => {
+    const onClose = vi.fn();
+    await open({ onClose });
+    await act(async () => { fireEvent.click(screen.getByTestId("receipt-keep-playing")); });
+    expect(repo.releaseCheckout).toHaveBeenCalledWith(1);
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(repo.stop).not.toHaveBeenCalled();
+  });
+
+  test("«Продолжить игру» refused: the receipt stays with the sentence", async () => {
+    repo.releaseCheckout.mockRejectedValueOnce(new Error("Already ended."));
+    const onClose = vi.fn();
+    await open({ onClose });
+    await act(async () => { fireEvent.click(screen.getByTestId("receipt-keep-playing")); });
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByText("Already ended.")).toBeTruthy();
+  });
+});
+
+// The branch's rounding said in words (2026-11-22, owner): «Время 2.92»
+// over «Итого 100» read as a mistake.
+describe("the branch rounding line", () => {
+  afterEach(cleanup);
+  test("2.92 rounded up to 100: the line names the step and shows the server's 100", async () => {
+    repo.preview.mockResolvedValue(bill({ time_cost: 2.92, subtotal: 2.92, gross_total: 100, total: 100, rounding_step: 100, rounding_mode: "up" }));
+    await mount();
+    const line = screen.getByTestId("receipt-rounding");
+    expect(line.textContent).toContain("session.receiptRounding");
+    expect(line.textContent).toContain("100");
+  });
+
+  test.each([
+    ["nothing rounded", { rounding_step: 100, rounding_mode: "up", subtotal: 100, gross_total: 100, total: 100 }],
+    ["no step", { rounding_step: 0, subtotal: 2.92, gross_total: 2.92, total: 2.92 }],
+    ["a free seat", { is_free: true, rounding_step: 100, subtotal: 2.92, gross_total: 100, total: 0 }],
+  ] as const)("%s: no line", async (_name, over) => {
+    repo.preview.mockResolvedValue(bill(over as Partial<IBillBreakdown>));
+    await mount();
+    expect(screen.queryByTestId("receipt-rounding")).toBeNull();
+  });
+});
+
 describe("StopReceiptModal", () => {
   beforeEach(() => {
     repo.preview.mockReset();
@@ -327,7 +496,7 @@ describe("StopReceiptModal", () => {
       await mount(session({ status: "expired" }));
 
       expect(screen.getByText("session.checkoutDone")).toBeTruthy();
-      expect(screen.getByText("action.close")).toBeTruthy();
+      expect(screen.getByText("pay.closeLater")).toBeTruthy();
       expect(screen.queryByText("session.confirmStop")).toBeNull();
       expect(screen.getByText("250.00·AMD")).toBeTruthy();
     });
@@ -726,6 +895,8 @@ describe("the preliminary total", () => {
     await act(async () => { fireEvent.click(screen.getByRole("button", { name: "session.checkoutKeepPlaying" })); });
     expect(onClose).toHaveBeenCalled();
     expect(repo.stop).not.toHaveBeenCalled();
+    // …and lets the time count again (2026-11-22).
+    expect(repo.releaseCheckout).toHaveBeenCalledWith(1);
     expect(screen.getByTestId("stop-confirm").textContent).toBe("session.confirmStop");
   });
 });
@@ -1439,7 +1610,7 @@ describe("nothing chosen is cash; a free or zero bill sends no way of paying", (
     expect(repo.stop.mock.calls[0][1]).toMatchObject({ payment_method: "cash" });
   });
 
-  test("a seat that ended by itself: cash preselected, and the receipt closes without recording", async () => {
+  test("a seat that ended by itself: cash preselected, and «Скрыть, закрыть позже» closes without recording", async () => {
     const onClose = vi.fn();
     await act(async () => {
       render(<StopReceiptModal session={session({ status: "expired", payment_method: null, payments: [] })} onClose={onClose} onConfirmed={() => {}} onItemRemoved={() => {}} />);
@@ -1448,8 +1619,89 @@ describe("nothing chosen is cash; a free or zero bill sends no way of paying", (
     expect(screen.getByTestId("pay-cash").getAttribute("aria-checked")).toBe("true");
     expect((screen.getByTestId("pay-mark-confirm") as HTMLButtonElement).disabled).toBe(false);
     expect(document.querySelector(".cp-modal-close")).not.toBeNull();
-    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "action.close" })); });
+    await act(async () => { fireEvent.click(screen.getByTestId("pay-mark-later")); });
     expect(onClose).toHaveBeenCalledTimes(1);
     expect(repo.recordPayment).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * «Скрыть, закрыть позже» (2026-11-22, owner): a final bill nobody closed is
+ * HIDDEN — by its button, the ×, Escape — nothing is sent, and the open-bills
+ * reminder is told at once; recording the payment tells it too. The title
+ * names the seat by number and name; the card wears the bill tone.
+ */
+describe("hide a final bill and close it later", () => {
+  afterEach(cleanup);
+  beforeEach(() => {
+    repo.preview.mockReset().mockResolvedValue(bill({ total: 5000 }));
+    repo.recordPayment.mockReset().mockResolvedValue({ session: session({ status: "expired", payment_method: "cash" }), cash: null });
+  });
+  const ended = () => session({ status: "expired", payment_method: null, payments: [] });
+  const mountWith = async (s: ISessionApi, onClose = vi.fn(), seat?: string) => {
+    await act(async () => {
+      render(<StopReceiptModal session={s} seat={seat} onClose={onClose} onConfirmed={() => {}} onItemRemoved={() => {}} />);
+    });
+    return onClose;
+  };
+
+  test("«Скрыть» closes without sending anything and tells the reminder", async () => {
+    const heard = vi.fn();
+    const off = onOpenBillsChanged(heard);
+    try {
+      const onClose = await mountWith(ended());
+      await act(async () => { fireEvent.click(screen.getByTestId("pay-mark-later")); });
+      expect(onClose).toHaveBeenCalledTimes(1);
+      expect(heard).toHaveBeenCalledTimes(1);
+      expect(repo.recordPayment).not.toHaveBeenCalled();
+    } finally { off(); }
+  });
+
+  test("Escape on the final bill hides it the same way", async () => {
+    const heard = vi.fn();
+    const off = onOpenBillsChanged(heard);
+    try {
+      const onClose = await mountWith(ended());
+      await act(async () => { fireEvent.keyDown(document, { key: "Escape" }); });
+      await act(async () => { await new Promise((r) => setTimeout(r, MODAL_LEAVE_MS + 20)); });
+      expect(onClose).toHaveBeenCalledTimes(1);
+      expect(heard).toHaveBeenCalledTimes(1);
+      expect(repo.recordPayment).not.toHaveBeenCalled();
+    } finally { off(); }
+  });
+
+  test("a running seat's preliminary total: «Продолжить игру» releases the till and the reminder hears it", async () => {
+    repo.preview.mockResolvedValue(bill());
+    const heard = vi.fn();
+    const off = onOpenBillsChanged(heard);
+    try {
+      const onClose = await mountWith(session());
+      await act(async () => { fireEvent.click(screen.getByText("session.checkoutKeepPlaying")); });
+      expect(onClose).toHaveBeenCalledTimes(1);
+      expect(repo.releaseCheckout).toHaveBeenCalled();
+      expect(heard).toHaveBeenCalled();
+    } finally { off(); }
+  });
+
+  test("recording the payment tells the reminder; closing afterwards does not again", async () => {
+    const heard = vi.fn();
+    const off = onOpenBillsChanged(heard);
+    try {
+      await mountWith(ended());
+      await act(async () => { fireEvent.click(screen.getByTestId("pay-mark-confirm")); });
+      expect(repo.recordPayment).toHaveBeenCalledTimes(1);
+      expect(heard).toHaveBeenCalledTimes(1);
+      await act(async () => { fireEvent.click(screen.getByRole("button", { name: "action.close" })); });
+      expect(heard).toHaveBeenCalledTimes(1);
+    } finally { off(); }
+  });
+
+  test("the title names the seat: the caller's line, else the row's place, never its label", async () => {
+    await mountWith(ended(), vi.fn(), "№4 · Hall VIP");
+    expect(screen.getByTestId("receipt-seat").textContent).toBe("№4 · Hall VIP");
+    expect(screen.getByTestId("receipt-seat").closest(".dialog-tone--bill")).not.toBeNull();
+    cleanup();
+    await mountWith({ ...ended(), pc: { id: 8, place: { id: 30, number: 3, name: "Sofa" } } } as ISessionApi);
+    expect(screen.getByTestId("receipt-seat").textContent).toBe("№3 · Sofa");
   });
 });
