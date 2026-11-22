@@ -98,11 +98,13 @@ branch — so the two yml files never conflict:
 - `nodeIntegration: false`
 - `sandbox: true`
 - Preload (`electron/preload.ts`) exposes exactly the contracted APIs via
-  `contextBridge`: `desktopAPI` (kv-store + Wake-on-LAN), `cyberplaceUpdates`
-  and `cyberplacePS5` (PlayStation discovery + status). Each is its own global
+  `contextBridge`: `desktopAPI` (kv-store + Wake-on-LAN), `cyberplaceUpdates`,
+  `cyberplacePS5` (PlayStation discovery + status) and `cyberplaceTV` (club
+  TVs on the network, 2026-11-23). Each is its own global
   so a screen can feature-detect it: the renderer can be newer than the preload
   it loads into, and a missing bridge must produce a sentence, not a throw.
-- 23 `ipcMain.handle` channels total: `kv:get|set|remove`, `wol:send`,
+- 24 `ipcMain.handle` channels total: `kv:get|set|remove`, `wol:send`,
+  `tv:discover` (2026-11-23),
   `updates:check|checkGated|install|getState`,
   `ps5:discover|probe|wake|wake-once|pair|psn-login-external|rest|rest-cancel|capabilities`,
   `ps5:credential:set|has|forget`, `ps5:passcode:set|has|forget` (2026-11-08).
@@ -5715,10 +5717,24 @@ drives `StopReceiptModal`'s `markable`.
   (`PATCH /tv-screens/{id}`) or unpaired after a confirm (`DELETE`). API in
   `api/tvScreens.ts` (`noCache` list). `tv_code_unknown` → «Ни один телевизор
   не показывает этот код…».
-- Server calls only: no Electron IPC, no bridge, no LAN — so it works the same
-  in the owner web (needs a `panel.ref` bump there). The TV reads its place's
-  state from the backend itself; the panel never talks to a TV.
+- **Find on the network (desktop, 2026-11-23):** `TvNetworkFinder` (rendered
+  when `window.cyberplaceTV` exists) asks `tv:discover` → `electron/tv/discovery.ts`:
+  UDP broadcast `CPTV-DISCOVER 1` padded to 256 bytes on port **47231** (its own
+  port and socket; nothing shared with `electron/ps5`) to every interface's
+  directed broadcast + 255.255.255.255, listens 2 s. A TV still WAITING answers
+  `{"app":"cyberplace-tv","v":1,"env","code","maker","model"}` (never larger
+  than the request; only to private addresses). `parseReply` checks every field
+  and the private source address. `src/tv/tvDiscovery.ts` keeps TVs of this
+  build's backend (`import.meta.env.MODE` staging/production; development = all)
+  and counts the others («другая версия»). The owner picks a place →
+  «Привязать» → the SAME `POST /branches/{id}/tv-screens` with the TV's code;
+  the default name is "maker model". Read-only on the LAN: the TV's code is
+  what its screen already shows.
+- Owner web: no bridge, so only the code form (needs a `panel.ref` bump there).
+  The TV reads its place's state from the backend itself.
 - PS5 control (`electron/ps5`, `src/ps5`, `ConsolePicker`), the kiosk agent,
   sessions, money and sockets untouched.
 - Tests: `components/tv/TvScreensDialog.test.tsx`, `e2e/tv-screens.spec.ts`
-  (1440 / 520 px, manager has no button).
+  (1440 / 520 px, manager has no button), `electron/tv/discovery.test.ts`
+  (real loopback socket), `src/tv/tvDiscovery.test.ts`,
+  `e2e-electron/tv-discovery.spec.ts` (real Electron + a fake TV on UDP 47231).
