@@ -98,13 +98,11 @@ branch — so the two yml files never conflict:
 - `nodeIntegration: false`
 - `sandbox: true`
 - Preload (`electron/preload.ts`) exposes exactly the contracted APIs via
-  `contextBridge`: `desktopAPI` (kv-store + Wake-on-LAN), `cyberplaceUpdates`,
-  `cyberplacePS5` (PlayStation discovery + status) and `cyberplaceTV` (club
-  TVs on the network, 2026-11-23). Each is its own global
+  `contextBridge`: `desktopAPI` (kv-store + Wake-on-LAN), `cyberplaceUpdates`
+  and `cyberplacePS5` (PlayStation discovery + status). Each is its own global
   so a screen can feature-detect it: the renderer can be newer than the preload
   it loads into, and a missing bridge must produce a sentence, not a throw.
-- 24 `ipcMain.handle` channels total: `kv:get|set|remove`, `wol:send`,
-  `tv:discover` (2026-11-23),
+- 23 `ipcMain.handle` channels total: `kv:get|set|remove`, `wol:send`,
   `updates:check|checkGated|install|getState`,
   `ps5:discover|probe|wake|wake-once|pair|psn-login-external|rest|rest-cancel|capabilities`,
   `ps5:credential:set|has|forget`, `ps5:passcode:set|has|forget` (2026-11-08).
@@ -5706,57 +5704,3 @@ drives `StopReceiptModal`'s `markable`.
   once, a Stop between), `OpenBillsNotifier.test.tsx`, `SessionTimer.stop.test.tsx`,
   `StartSessionDialog.test.tsx` / `AddSessionItemDialog.test.tsx` (default ON,
   notice), `seatLine.test.ts`; e2e helper `e2e/helpers/unpaidNotice.ts`.
-
-## Club TVs — pairing a TV to a place (2026-11-23, owner)
-
-> **In use: only PSN (2026-11-23, owner — one way for every TV).**
-> `TV_SCREENS.enabled = false` (`api/tvScreens.ts`): the Places button is
-> «Сообщения игрокам» and the dialog shows only `TvPsnPlaces` (standalone:
-> «выключены на сервере» when the backend's `PSN_PLACE_MESSAGES` is off). No TV
-> list is fetched and the network is never searched. `PsnSenderCard` takes
-> `descriptionKey` (here `psn.description.places`: the sender's profile picture
-> and name are what the PS5 shows). Everything below about TVs stays in the code
-> for the day `TV_SCREENS.enabled` is turned back on.
-
-- Places screen (`routes/BranchPlaces.tsx`), owner only (`branch.places`):
-  «Телевизоры» (`data-testid=tv-open`) beside «Найти PlayStation» opens
-  `components/tv/TvScreensDialog.tsx`: type the 6-digit code shown by the
-  Cyber Place TV app, choose the place, optional name → `POST
-  /branches/{id}/tv-screens`; each paired TV can be moved to another place
-  (`PATCH /tv-screens/{id}`) or unpaired after a confirm (`DELETE`). API in
-  `api/tvScreens.ts` (`noCache` list). `tv_code_unknown` → «Ни один телевизор
-  не показывает этот код…».
-- **Find on the network (desktop, 2026-11-23):** `TvNetworkFinder` (rendered
-  when `window.cyberplaceTV` exists) asks `tv:discover` → `electron/tv/discovery.ts`:
-  UDP broadcast `CPTV-DISCOVER 1` padded to 256 bytes on port **47231** (its own
-  port and socket; nothing shared with `electron/ps5`) to every interface's
-  directed broadcast + 255.255.255.255, listens 2 s. A TV still WAITING answers
-  `{"app":"cyberplace-tv","v":1,"env","code","maker","model"}` (never larger
-  than the request; only to private addresses). `parseReply` checks every field
-  and the private source address. `src/tv/tvDiscovery.ts` keeps TVs of this
-  build's backend (`import.meta.env.MODE` staging/production; development = all)
-  and counts the others («другая версия»). The owner picks a place →
-  «Привязать» → the SAME `POST /branches/{id}/tv-screens` with the TV's code;
-  the default name is "maker model". Read-only on the LAN: the TV's code is
-  what its screen already shows.
-- Owner web: no bridge, so only the code form (needs a `panel.ref` bump there).
-- **PlayStation without an Android TV (2026-11-23):** `TvPsnPlaces` at the end
-  of the dialog, rendered only while `GET /branches/{id}/psn-places` says
-  `enabled` (backend `PSN_PLACE_MESSAGES`): the existing `PsnSenderCard`
-  (company sender, reused unchanged) and one «PSN-аккаунт консоли» field per
-  PlayStation place. Since 2026-11-24 the field takes SEVERAL names
-  (commas/spaces, ≤ 8, each by `PSN_ONLINE_ID`; `parseOnlineIds`) → `PUT
-  /places/{id}/psn-accounts {online_ids}` (empty = clear). Sony's answers in
-  words: `psn_unknown_online_ids` («нет такого аккаунта: …»),
-  `psn_sender_is_console` («… отправляет сообщения и не может их же
-  получать»), `checked: false` («проверятся при первом сообщении»). The backend
-  binds each session to the account online when the player sits down and
-  messages only that player.
-  The TV reads its place's state from the backend itself.
-- PS5 control (`electron/ps5`, `src/ps5`, `ConsolePicker`), the kiosk agent,
-  sessions, money and sockets untouched.
-- Tests: `components/tv/TvScreensDialog.test.tsx`, `e2e/tv-screens.spec.ts`
-  (1440 / 520 px, manager has no button), `electron/tv/discovery.test.ts`
-  (real loopback socket), `src/tv/tvDiscovery.test.ts`,
-  `e2e-electron/tv-discovery.spec.ts` (real Electron + a fake TV on UDP 47231).
-  `components/tv/TvPsnPlaces.test.tsx`.

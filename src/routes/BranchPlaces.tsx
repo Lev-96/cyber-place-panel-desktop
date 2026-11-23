@@ -3,7 +3,6 @@ import { StatusIcon } from "@/components/ui/StatusChip";
 import type { StatusTone } from "@/domain/statusTone";
 import { useAuth } from "@/auth/AuthContext";
 import ConsolePicker from "@/components/ps5/ConsolePicker";
-import TvScreensDialog from "@/components/tv/TvScreensDialog";
 import PlaceForm from "@/components/places/PlaceForm";
 import RegisterPlaceComputer from "@/components/pcs/RegisterPlaceComputer";
 import Button from "@/components/ui/Button";
@@ -65,8 +64,6 @@ const BranchPlaces = () => {
    * reports; binding a console to a place comes with the next phase.
    */
   const [findingConsoles, setFindingConsoles] = useState(false);
-  // The TVs dialog (2026-11-23): pairing a TV to a place by its code.
-  const [pairingTvs, setPairingTvs] = useState(false);
   const [editing, setEditing] = useState<IBranchPlace | null>(null);
   const [dragId, setDragId] = useState<string | null>(null);
   const [dragOverId, setDragOverId] = useState<string | null>(null);
@@ -241,13 +238,6 @@ const BranchPlaces = () => {
               {t("ps5.discover.open")}
             </Button>
           )}
-          {/* Owner only, like the consoles: a TV is paired to a place by the
-              code on its screen; server calls only, no LAN (2026-11-23). */}
-          {can(role, "branch.places") && (
-            <Button variant="secondary" onClick={() => setPairingTvs(true)} data-testid="tv-open">
-              {t("tv.open")}
-            </Button>
-          )}
           <Button onClick={() => setCreating(true)}>{t("branchPlaces.new")}</Button>
         </div>
       </div>
@@ -294,7 +284,6 @@ const BranchPlaces = () => {
       <DevicesWithoutPlace branchId={id} canRemove={can(role, "branch.places")} />
 
       {findingConsoles && <ConsolePicker branchId={id} onClose={() => setFindingConsoles(false)} />}
-      {pairingTvs && <TvScreensDialog branchId={id} places={orderedPlaces} onClose={() => setPairingTvs(false)} />}
       {creating && <PlaceForm branchId={id} platformSuggestions={customPlatforms} platformPrices={platformPrices.data ?? []} onClose={() => setCreating(false)} onSaved={(created) => {
         setCreating(false);
         void reload();

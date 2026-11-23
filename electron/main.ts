@@ -8,7 +8,6 @@ import { MIN_CONTENT, WINDOW_STATE_KEY, parseSavedWindow, restoredBounds } from 
 import { UpdateService, broadcastUpdateState } from "./updates/UpdateService";
 import { LINUX_DESKTOP_ID, bundledIconPath, ensureLinuxDesktopIntegration, windowIconOptions } from "./linuxIntegration";
 import { mayNavigateTo, mayOpenExternally, navigationKeyFor } from "./urlPolicy";
-import { discoverTvs } from "./tv/discovery";
 import { discover as discoverPlayStations, probe as probePlayStations } from "./ps5/discovery";
 import { activeTransport, useCredentialVault } from "./ps5/transport";
 import { WakeKeys } from "./ps5/credentials";
@@ -342,15 +341,6 @@ app.whenReady().then(async () => {
   ipcMain.handle("kv:remove", (_e: unknown, key: string) => store?.remove(key));
 
   ipcMain.handle("wol:send", (_e: unknown, mac: string) => sendMagicPacket(mac));
-
-  /**
-   * Find the club's Cyber Place TVs that are waiting for a place (2026-11-23).
-   * Its own module, socket and UDP port (`electron/tv`); nothing shared with
-   * the PlayStation code. Read-only: it returns the code a TV already shows,
-   * and the owner then pairs it through the server.
-   */
-  ipcMain.handle("tv:discover", (_e: unknown, timeoutMs?: unknown) =>
-    discoverTvs(typeof timeoutMs === "number" && Number.isFinite(timeoutMs) ? { timeoutMs } : {}));
 
   /**
    * Find PlayStations on the club's own network.
