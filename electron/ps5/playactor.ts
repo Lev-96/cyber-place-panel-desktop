@@ -323,6 +323,45 @@ const forgetSession = (socket: RpSocket): void => {
   if (sockets && sockets.size === 0) liveSessions.delete(consoleOf(socket));
 };
 
+/**
+ * A console with every user seat taken refuses the panel's login, and a rest
+ * that needs the login then never goes out (2026-11-24, owner: four pads on a
+ * console, Stop or the automatic stop, and it does not sleep; two pads fine).
+ *
+ * Measured on the owner's console with four pads in use: every attempt was
+ * refused at the login with `Error[4] UNKNOWN_ERROR` (8.7 s each, retried for
+ * minutes); the same console, the same keys, the session opened WITHOUT the
+ * login step and the standby sent on it — asleep 8 s later.
+ *
+ * So the login stays first, exactly as before: a console that accepts it (one
+ * or two pads, every rest until now) is rested on the very same path. Only when
+ * the CONSOLE refuses the login — an error thrown by the login step itself, and
+ * not its passcode answers, which keep their own meaning for the owner — is the
+ * session opened once more without it and the standby sent there.
+ */
+const loginRefusals = new WeakSet<object>();
+
+/** The console refused the login itself, for a reason other than its passcode. */
+export const isLoginRefusal = (error: unknown): boolean =>
+  typeof error === "object" && error !== null && loginRefusals.has(error)
+  && passcodeCodeOf(error instanceof Error ? error.message : String(error)) === null;
+
+/** For tests: mark an error as the login step's own refusal. */
+export const markLoginRefusal = (error: object): void => { loginRefusals.add(error); };
+
+/** Open the session for a rest: with the login, and without it only after a login refusal. */
+export const openForStandby = async <C>(
+  open: (config?: { login?: { passCode: string }; skipLogin?: true }) => Promise<C>,
+  login: { login: { passCode: string } } | undefined,
+): Promise<C> => {
+  try {
+    return await open(login);
+  } catch (error) {
+    if (!isLoginRefusal(error)) throw error;
+    return open({ ...login, skipLogin: true });
+  }
+};
+
 let loginFailureCloses: Promise<void> | null = null;
 export const closeSocketOnFailedLogin = (): Promise<void> =>
   (loginFailureCloses ??= (async () => {
@@ -340,11 +379,17 @@ export const closeSocketOnFailedLogin = (): Promise<void> =>
           const sockets = liveSessions.get(consoleOf(this)) ?? new Set<RpSocket>();
           sockets.add(this);
           liveSessions.set(consoleOf(this), sockets);
+          // A rest asked for without the login (see `openForStandby`): the
+          // session is open and remembered above, the login is not sent.
+          if ((proc as { config?: { skipLogin?: unknown } }).config?.skipLogin === true) return undefined;
         }
         try {
           return await originalExecute.call(this, proc);
         } catch (error) {
-          if (login) await this.close().catch(() => {});
+          if (login) {
+            if (typeof error === "object" && error !== null) loginRefusals.add(error);
+            await this.close().catch(() => {});
+          }
           throw error;
         }
       };
@@ -542,7 +587,10 @@ const standbyOnce = async (
     // a login made while nobody is signed in on the console.
     // (Optional call: a vault from an older shape, or a test double, has none.)
     const passCode = hostId ? keys.readPasscode?.(hostId) ?? null : null;
-    const connection = await device.openConnection(passCode ? { login: { passCode } } : undefined);
+    const connection = await openForStandby(
+      (config) => device.openConnection(config as never),
+      passCode ? { login: { passCode } } : undefined,
+    );
     try {
       // Withdrawn (a session started) or abandoned (timed out) while the
       // connection was being opened: the last moment the standby can still not
