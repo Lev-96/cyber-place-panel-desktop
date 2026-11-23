@@ -5744,9 +5744,14 @@ drives `StopReceiptModal`'s `markable`.
   of the dialog, rendered only while `GET /branches/{id}/psn-places` says
   `enabled` (backend `PSN_PLACE_MESSAGES`): the existing `PsnSenderCard`
   (company sender, reused unchanged) and one «PSN-аккаунт консоли» field per
-  PlayStation place (`PUT|DELETE /places/{id}/psn-account`, validated by
-  `PSN_ONLINE_ID`; empty = remove). The backend then sends the TV's sentences
-  to that console over PSN when no Android TV of the place is online.
+  PlayStation place. Since 2026-11-24 the field takes SEVERAL names
+  (commas/spaces, ≤ 8, each by `PSN_ONLINE_ID`; `parseOnlineIds`) → `PUT
+  /places/{id}/psn-accounts {online_ids}` (empty = clear). Sony's answers in
+  words: `psn_unknown_online_ids` («нет такого аккаунта: …»),
+  `psn_sender_is_console` («… отправляет сообщения и не может их же
+  получать»), `checked: false` («проверятся при первом сообщении»). The backend
+  binds each session to the account online when the player sits down and
+  messages only that player.
   The TV reads its place's state from the backend itself.
 - PS5 control (`electron/ps5`, `src/ps5`, `ConsolePicker`), the kiosk agent,
   sessions, money and sockets untouched.
