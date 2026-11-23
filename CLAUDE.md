@@ -5704,3 +5704,38 @@ drives `StopReceiptModal`'s `markable`.
   once, a Stop between), `OpenBillsNotifier.test.tsx`, `SessionTimer.stop.test.tsx`,
   `StartSessionDialog.test.tsx` / `AddSessionItemDialog.test.tsx` (default ON,
   notice), `seatLine.test.ts`; e2e helper `e2e/helpers/unpaidNotice.ts`.
+
+## Display font: Russo One (2026-11-24, owner)
+
+The former "Playstation" display face ("Made by Westral. 2017. All Rights
+Reserved", no commercial licence) is gone. `public/fonts/RussoOne.ttf` (SIL OFL
+1.1, licence next to it) is declared in `src/styles/global.css` as "Russo One"
+with `unicode-range` Latin only (the old face had no Cyrillic/Armenian, so
+those fall back exactly as before) and `size-adjust: 82%` (Russo One is about
+1.22x wider; headings keep their width). Used by `SmartImage`'s letter
+placeholder. Same change on the website, the mobile app (`FONTS.RussoOne`) and
+the agent (which only declared the old face and never used it: removed).
+
+## Licence agreement in the Windows installer (2026-11-24, owner)
+
+`build/eula.txt` (UTF-8 with BOM, CRLF; Armenian, Russian, English, version
+2026-11-24) is `nsis.license` in both `electron-builder.json` and
+`electron-builder.staging.json`. electron-builder's one-click template shows it
+before installing and wraps the page in `skipPageIfUpdated`, so auto-updates
+(and an install over an existing one) never show it: only a NEW install asks
+«Принимаю». Linux AppImage has no installer and shows nothing. The text is a
+draft pending legal review (`~/cyberplace-legal/`); changing it is editing that
+one file.
+
+## Products at their price; the step rounds the seat (2026-11-24, owner)
+
+The backend's current bill rule rounds the SEAT only (time, pads, lines billed
+by the hour) and adds each fixed-price line (a cola) at its price. The session
+payload and the bill breakdown carry `rounding_covers_products` (false = seat
+only). `sessionAmountAt` mirrors it: false → `applyRounding(seat + hourly
+lines) + fixed lines`; true or absent (a bill banked before, an older backend)
+→ the step on the whole sum, as before. `StopReceiptModal` prints
+`session.receiptRoundingSeat` («Округление времени до …, … (товары по цене)»)
+when false. Tests: `sessionAmount.productsAtPrice.test.ts` (950 / 870 / 1350 /
+866.67 / 0 / 900 / 900, 3 mutations), `StopReceiptModal.test.tsx`.
+
