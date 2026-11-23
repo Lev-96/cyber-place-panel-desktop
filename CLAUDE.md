@@ -5709,6 +5709,15 @@ drives `StopReceiptModal`'s `markable`.
 
 ## Club TVs — pairing a TV to a place (2026-11-23, owner)
 
+> **In use: only PSN (2026-11-23, owner — one way for every TV).**
+> `TV_SCREENS.enabled = false` (`api/tvScreens.ts`): the Places button is
+> «Сообщения игрокам» and the dialog shows only `TvPsnPlaces` (standalone:
+> «выключены на сервере» when the backend's `PSN_PLACE_MESSAGES` is off). No TV
+> list is fetched and the network is never searched. `PsnSenderCard` takes
+> `descriptionKey` (here `psn.description.places`: the sender's profile picture
+> and name are what the PS5 shows). Everything below about TVs stays in the code
+> for the day `TV_SCREENS.enabled` is turned back on.
+
 - Places screen (`routes/BranchPlaces.tsx`), owner only (`branch.places`):
   «Телевизоры» (`data-testid=tv-open`) beside «Найти PlayStation» opens
   `components/tv/TvScreensDialog.tsx`: type the 6-digit code shown by the
@@ -5731,6 +5740,13 @@ drives `StopReceiptModal`'s `markable`.
   the default name is "maker model". Read-only on the LAN: the TV's code is
   what its screen already shows.
 - Owner web: no bridge, so only the code form (needs a `panel.ref` bump there).
+- **PlayStation without an Android TV (2026-11-23):** `TvPsnPlaces` at the end
+  of the dialog, rendered only while `GET /branches/{id}/psn-places` says
+  `enabled` (backend `PSN_PLACE_MESSAGES`): the existing `PsnSenderCard`
+  (company sender, reused unchanged) and one «PSN-аккаунт консоли» field per
+  PlayStation place (`PUT|DELETE /places/{id}/psn-account`, validated by
+  `PSN_ONLINE_ID`; empty = remove). The backend then sends the TV's sentences
+  to that console over PSN when no Android TV of the place is online.
   The TV reads its place's state from the backend itself.
 - PS5 control (`electron/ps5`, `src/ps5`, `ConsolePicker`), the kiosk agent,
   sessions, money and sockets untouched.
@@ -5738,3 +5754,4 @@ drives `StopReceiptModal`'s `markable`.
   (1440 / 520 px, manager has no button), `electron/tv/discovery.test.ts`
   (real loopback socket), `src/tv/tvDiscovery.test.ts`,
   `e2e-electron/tv-discovery.spec.ts` (real Electron + a fake TV on UDP 47231).
+  `components/tv/TvPsnPlaces.test.tsx`.
