@@ -423,6 +423,13 @@ export interface ISessionApi {
    */
   rounding_step?: number;
   rounding_mode?: "up" | "nearest" | "down";
+  /**
+   * Whether the step also rounds the fixed-price lines (2026-11-24). false on
+   * the current rule — the seat (time, pads, hourly lines) is rounded and a
+   * product is added at its price; true on a bill banked before it. Absent
+   * (an older backend): treated as true, which is how that backend counts.
+   */
+  rounding_covers_products?: boolean;
   /** Every period, closed ones included. Present when the relation is loaded. */
   joysticks?: ISessionJoystick[];
   /** Who opened it — the owner's "which of my managers ran this?". */

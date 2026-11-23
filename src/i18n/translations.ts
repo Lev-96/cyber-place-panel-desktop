@@ -2406,6 +2406,7 @@ export const TRANSLATIONS: Dict = {
   "rounding.mode": { en: "Direction", ru: "Направление", am: "Ուղղություն" },
   "rounding.mode.up": { en: "Up", ru: "Вверх", am: "Վերև" },
   "session.receiptRounding": { en: "Rounded to {0}, {1}", ru: "Округление до {0}, {1}", am: "Կլորացում մինչև {0}, {1}" },
+  "session.receiptRoundingSeat": { en: "Time rounded to {0}, {1} (products at their price)", ru: "Округление времени до {0}, {1} (товары по цене)", am: "Ժամանակի կլորացում մինչև {0}, {1} (ապրանքները՝ իրենց գնով)" },
   "rounding.mode.nearest": { en: "Nearest", ru: "К ближайшему", am: "Դեպի մոտակա" },
   "rounding.mode.down": { en: "Down", ru: "Вниз", am: "Ներքև" },
   "rounding.example": { en: "Example: {0} → {1}", ru: "Пример: {0} → {1}", am: "Օրինակ՝ {0} → {1}" },

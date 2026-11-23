@@ -693,7 +693,10 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved, canRes
               && Math.round(Number(view.subtotal) * 100) !== Math.round(Number(view.gross_total) * 100) && (
               <div style={row} className="muted" data-testid="receipt-rounding">
                 <span style={{ flex: 1 }}>
-                  {fmt(t("session.receiptRounding"), money(Number(view.rounding_step)), t(`rounding.mode.${view.rounding_mode ?? "up"}`).toLowerCase())}
+                  {/* Since 2026-11-24 the step rounds the seat only and a product is
+                      added at its price: the line says so, or «Округление до 100 →
+                      950» would read as a sum that was never rounded. */}
+                  {fmt(t(view.rounding_covers_products === false ? "session.receiptRoundingSeat" : "session.receiptRounding"), money(Number(view.rounding_step)), t(`rounding.mode.${view.rounding_mode ?? "up"}`).toLowerCase())}
                 </span>
                 <span style={{ fontWeight: 700 }}>{money(Number(view.gross_total), receiptPrecision)}</span>
               </div>

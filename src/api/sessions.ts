@@ -350,6 +350,8 @@ export interface IBillBreakdown {
   /** 0 means the venue rounds nothing, which is the default. */
   rounding_step?: number;
   rounding_mode?: "up" | "nearest" | "down";
+  /** false: the step rounded the seat only and each product was added at its price (2026-11-24). Absent on an older backend. */
+  rounding_covers_products?: boolean;
   /**
    * The VIP minimum charge and what it did (2026-10-31): `time_cost` above
    * already includes it. Null/absent = no rule on this session.

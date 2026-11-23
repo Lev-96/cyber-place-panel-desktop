@@ -418,6 +418,18 @@ describe("the branch rounding line", () => {
     expect(line.textContent).toContain("100");
   });
 
+  // 2026-11-24 (owner): the step rounds the seat only, a cola is added at 250.
+  test("seat 616.67 → 700 plus a 250 cola: the line says the time was rounded, products at their price, 950", async () => {
+    repo.preview.mockResolvedValue(bill({
+      time_cost: 616.67, items_total: 250, subtotal: 866.67, gross_total: 950, total: 950,
+      rounding_step: 100, rounding_mode: "up", rounding_covers_products: false,
+    } as Partial<IBillBreakdown>));
+    await mount();
+    const line = screen.getByTestId("receipt-rounding");
+    expect(line.textContent).toContain("session.receiptRoundingSeat");
+    expect(line.textContent).toContain("950");
+  });
+
   test.each([
     ["nothing rounded", { rounding_step: 100, rounding_mode: "up", subtotal: 100, gross_total: 100, total: 100 }],
     ["no step", { rounding_step: 0, subtotal: 2.92, gross_total: 2.92, total: 2.92 }],

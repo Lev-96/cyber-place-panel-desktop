@@ -399,10 +399,15 @@ export const sessionItemsTotalAt = (session: ISessionApi, atRaw: number): number
   toMoney(itemsExactAt(session, billableAt(session, atRaw)));
 
 /** {@link sessionItemsTotalAt}, exactly: each line's own worth, never cut to the cent. */
-const itemsExactAt = (session: ISessionApi, at: number): Exact => {
+/** Which lines to sum: all of them, only those billed by the hour, or only those at a fixed price. */
+type LineKind = "all" | "hourly" | "fixed";
+
+const itemsExactAt = (session: ISessionApi, at: number, kind: LineKind = "all"): Exact => {
   const startedAt = session.started_at ? Date.parse(session.started_at) : NaN;
 
   return (session.items ?? []).reduce((sum: Exact, line) => {
+    if (kind === "hourly" && !line.is_hourly) return sum;
+    if (kind === "fixed" && line.is_hourly) return sum;
     const qty = Math.trunc(toNumber(line.qty));
     if (!line.is_hourly) return plus(sum, times(exactOf(line.price), qty));
 
@@ -548,10 +553,24 @@ export const sessionCurrentHourlyRate = (session: ISessionApi): number => {
 export const sessionAmountAt = (session: ISessionApi, atRaw: number): number => {
   if (session.is_free) return 0;
   const at = billableAt(session, atRaw);
-  // Every part exact, summed, rounded to the cent ONCE, then the step —
-  // `SessionPricingCalculator::bill()` exactly.
-  const subtotal = toMoney(plus(plus(minimumChargeExactAt(session, at).exact, padsExactAt(session, at)), itemsExactAt(session, at)));
-  return applyRounding(subtotal, session.rounding_step ?? 0, session.rounding_mode ?? "up");
+  const step = session.rounding_step ?? 0;
+  const mode = session.rounding_mode ?? "up";
+  const seatExact = plus(minimumChargeExactAt(session, at).exact, padsExactAt(session, at));
+
+  // The current rule (2026-11-24, owner): the step rounds the SEAT — time,
+  // pads and lines billed by the hour — and each fixed-price line (a cola)
+  // is added at exactly its price. `SessionPricingCalculator::seatRoundedTotal`.
+  if (session.rounding_covers_products === false) {
+    const seat = applyRounding(toMoney(plus(seatExact, itemsExactAt(session, at, "hourly"))), step, mode);
+    const fixed = toMoney(itemsExactAt(session, at, "fixed"));
+    return (billCents(seat) + billCents(fixed)) / 100;
+  }
+
+  // A bill banked before it (and an older backend): every part exact,
+  // summed, rounded to the cent ONCE, then the step on the whole sum —
+  // `SessionPricingCalculator::bill()` under the `exact` rule.
+  const subtotal = toMoney(plus(seatExact, itemsExactAt(session, at)));
+  return applyRounding(subtotal, step, mode);
 };
 
 /**
