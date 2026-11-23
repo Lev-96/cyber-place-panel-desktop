@@ -7,9 +7,9 @@ import { platformBillingOverview } from "../e2e/helpers/mockBackend";
 
 /**
  * Club TVs found on the network, in the real Electron app (2026-11-23): the
- * main process's `tv:discover`, the `cyberplaceTV` bridge and the dialog,
- * against a fake waiting TV on UDP 47231 on this machine. The pairing call is
- * the existing `POST /branches/{id}/tv-screens`, answered by a route mock.
+ * main process's `tv:discover` and the `cyberplaceTV` bridge against a fake
+ * waiting TV on UDP 47231 on this machine. The TV app is not offered in the
+ * panel (TV_SCREENS off, owner: only PSN), so the dialog must not search.
  */
 const isBackend = (url: URL): boolean => url.protocol.startsWith("http");
 
@@ -90,33 +90,15 @@ test("the TV bridge exists next to the others and answers with what it found", a
   expect(found.result).toEqual([expect.objectContaining({ code: "654321", maker: "Sony", model: "BRAVIA 4K", env: "production" })]);
 });
 
-test("the owner pairs a TV found on the network by choosing a place", async () => {
+test("with TVs off (owner: only PSN) the dialog never searches the network", async () => {
   await page.getByPlaceholder("your@email.com").fill("o@o");
   await page.getByPlaceholder(/•/).fill("ok");
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
   await expect(page.getByText("Owner One").first()).toBeVisible();
   await page.evaluate(() => { window.location.hash = "#/branches/1/places"; });
   await page.getByTestId("tv-open").click();
-
-  const row = page.getByTestId("tv-found");
-  await expect(row).toContainText("Sony BRAVIA 4K");
-  expect(asked).toBeGreaterThan(0);
-  await row.locator("select").selectOption("7");
-  await row.getByRole("button", { name: "Pair" }).click();
-
-  await expect(page.getByTestId("tv-row")).toHaveCount(1);
-  expect(posted).toEqual([{ code: "654321", place_id: 7, name: "Sony BRAVIA 4K" }]);
-});
-
-test("a TV running the other build of the app is named but not offered", async () => {
-  tvEnv = "staging";
-  await page.getByPlaceholder("your@email.com").fill("o@o");
-  await page.getByPlaceholder(/•/).fill("ok");
-  await page.getByRole("button", { name: "Sign in", exact: true }).click();
-  await expect(page.getByText("Owner One").first()).toBeVisible();
-  await page.evaluate(() => { window.location.hash = "#/branches/1/places"; });
-  await page.getByTestId("tv-open").click();
-
-  await expect(page.getByTestId("tv-network-other")).toContainText("other version of the app found: 1");
-  await expect(page.getByTestId("tv-found")).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Player messages", exact: true })).toBeVisible();
+  await page.waitForTimeout(800);
+  await expect(page.getByTestId("tv-network")).toHaveCount(0);
+  expect(asked).toBe(0);
 });

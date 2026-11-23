@@ -22,6 +22,14 @@ export interface ITvScreen {
   online: boolean;
 }
 
+/**
+ * Whether the panel offers the TV app at all (2026-11-23, owner: "only PSN,
+ * one way for every TV"). Off: the dialog shows the PSN console messages only;
+ * the TV code, the backend and the TV app stay for the day it is turned back
+ * on. A property rather than a constant so tests can switch it.
+ */
+export const TV_SCREENS = { enabled: false };
+
 export const apiListTvScreens = (branchId: number) =>
   request<{ data: ITvScreen[] }>(`/branches/${branchId}/tv-screens`, { noCache: true }).then((r) => r.data);
 

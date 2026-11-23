@@ -6,6 +6,7 @@ import {
   isTvCode,
   ITvScreen,
   normalizeTvCode,
+  TV_SCREENS,
 } from "@/api/tvScreens";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
@@ -17,6 +18,7 @@ import { useLang } from "@/i18n/LanguageContext";
 import { tvDiscoveryAvailable } from "@/tv/tvDiscovery";
 import { IBranchPlace } from "@/types/api";
 import TvNetworkFinder from "./TvNetworkFinder";
+import TvPsnPlaces from "./TvPsnPlaces";
 import { FormEvent, useState } from "react";
 
 interface Props {
@@ -43,7 +45,9 @@ const placeLabel = (p: { number?: number | null; name?: string | null; id: numbe
 const TvScreensDialog = ({ branchId, places, onClose }: Props) => {
   const { t } = useLang();
   const confirm = useConfirm();
-  const screens = useAsync(() => apiListTvScreens(branchId), [branchId]);
+  // Read once: the TV app is offered or it is not (TV_SCREENS).
+  const [tvs] = useState(() => TV_SCREENS.enabled);
+  const screens = useAsync(() => (tvs ? apiListTvScreens(branchId) : Promise.resolve([] as ITvScreen[])), [branchId, tvs]);
   const [code, setCode] = useState("");
   const [placeId, setPlaceId] = useState<number | "">("");
   const [name, setName] = useState("");
@@ -114,7 +118,8 @@ const TvScreensDialog = ({ branchId, places, onClose }: Props) => {
   return (
     <Modal open onClose={onClose}>
       <div className="card tv-dialog" style={{ width: 600, maxWidth: "92vw", display: "flex", flexDirection: "column", gap: 16 }}>
-        <h2 style={{ margin: 0 }}>{t("tv.title")}</h2>
+        <h2 style={{ margin: 0 }}>{tvs ? t("tv.title") : t("tv.messages.title")}</h2>
+        {tvs && (<>
         <div className="muted">{t("tv.intro")}</div>
 
         {networkSearch && <TvNetworkFinder places={places} placeLabel={placeLabel} onPair={pairCode} />}
@@ -194,6 +199,10 @@ const TvScreensDialog = ({ branchId, places, onClose }: Props) => {
             ))
           )}
         </div>
+        </>)}
+
+        {/* The console gets the messages (with TVs off, the only way). */}
+        <TvPsnPlaces branchId={branchId} places={places} placeLabel={placeLabel} standalone={!tvs} />
 
         <div className="row" style={{ justifyContent: "flex-end" }}>
           <Button type="button" variant="secondary" onClick={onClose}>{t("action.close")}</Button>

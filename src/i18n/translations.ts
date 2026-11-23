@@ -129,7 +129,13 @@ export const TRANSLATIONS: Dict = {
   // promises exactly what it does: it looks, it does not control.
   "ps5.discover.open": { en: "Find PlayStations", ru: "Найти PlayStation", am: "Գտնել PlayStation-ներ" },
   // A club's TVs (2026-11-23): pairing a TV to a place by the code on its screen.
-  "tv.open": { en: "TVs", ru: "Телевизоры", am: "Հեռուստացույցներ" },
+  "tv.open": { en: "Player messages", ru: "Сообщения игрокам", am: "Հաղորդագրություններ խաղացողներին" },
+  "tv.messages.title": { en: "Player messages", ru: "Сообщения игрокам", am: "Հաղորդագրություններ խաղացողներին" },
+  "tv.psn.off": {
+    en: "Player messages are switched off on this server.",
+    ru: "Сообщения игрокам на этом сервере выключены.",
+    am: "Այս սերվերում խաղացողներին հաղորդագրություններն անջատված են։",
+  },
   "tv.title": { en: "TVs", ru: "Телевизоры", am: "Հեռուստացույցներ" },
   "tv.intro": {
     en: "Open the Cyber Place TV app on the TV, enter the code from its screen and choose the place.",
@@ -137,6 +143,14 @@ export const TRANSLATIONS: Dict = {
     am: "Հեռուստացույցում բացեք Cyber Place TV հավելվածը, մուտքագրեք էկրանի կոդը և ընտրեք տեղը։",
   },
   "tv.code": { en: "Code", ru: "Код", am: "Կոդ" },
+  "tv.psn.title": { en: "PlayStation without an Android TV", ru: "PlayStation без Android-телевизора", am: "PlayStation առանց Android հեռուստացույցի" },
+  "tv.psn.intro": {
+    en: "The welcome, \"5 minutes left\", \"1 minute left\" and goodbye pop up on the PlayStation over the game, on any TV, with your club account's picture and name. Connect the club's PSN account once, then enter the account each console is signed in with.",
+    ru: "Приветствие, «осталось 5 минут», «осталась 1 минута» и прощание всплывают на PlayStation поверх игры, на любом телевизоре, с картинкой и именем аккаунта клуба. Один раз подключите PSN-аккаунт клуба, затем укажите аккаунт, под которым работает каждая консоль.",
+    am: "Ողջույնը, «մնացել է 5 րոպե», «մնացել է 1 րոպե» և հրաժեշտը հայտնվում են PlayStation-ում խաղի վրա, ցանկացած հեռուստացույցով, ակումբի հաշվի նկարով և անունով։ Մեկ անգամ միացրեք ակումբի PSN հաշիվը, ապա նշեք այն հաշիվը, որով աշխատում է յուրաքանչյուր կոնսոլ։",
+  },
+  "tv.psn.account": { en: "Console PSN account", ru: "PSN-аккаунт консоли", am: "Կոնսոլի PSN հաշիվ" },
+  "tv.psn.noConsoles": { en: "This branch has no PlayStation places.", ru: "В этом филиале нет мест PlayStation.", am: "Այս մասնաճյուղում PlayStation տեղեր չկան։" },
   "tv.code.orType": { en: "Or enter the code shown on the TV:", ru: "Или введите код с экрана телевизора:", am: "Կամ մուտքագրեք հեռուստացույցի էկրանի կոդը՝" },
   "tv.network.title": { en: "TVs on the club network", ru: "Телевизоры в сети клуба", am: "Հեռուստացույցներ ակումբի ցանցում" },
   "tv.network.scan": { en: "Search again", ru: "Искать снова", am: "Կրկին որոնել" },
@@ -1726,6 +1740,11 @@ export const TRANSLATIONS: Dict = {
   "session.psnNameInvalid": { en: "A PSN name is 3 to 16 characters: a letter first, then letters, digits, - or _.", ru: "PSN-ник: от 3 до 16 символов, первая буква, дальше буквы, цифры, - или _.", am: "PSN անունը 3-ից 16 նիշ է՝ սկզբում տառ, հետո տառեր, թվեր, - կամ _։" },
   "psn.title": { en: "PS5 player messages", ru: "Сообщения игрокам PS5", am: "Հաղորդագրություններ PS5 խաղացողներին" },
   "psn.description": { en: "15 minutes before a session ends, the PlayStation player gets a PSN message from this account. Give the player's PSN name when starting the session.", ru: "За 15 минут до конца сессии игрок на PlayStation получит сообщение PSN от этого аккаунта. При старте сессии укажите PSN-ник игрока.", am: "Սեսիայի ավարտից 15 րոպե առաջ PlayStation-ի խաղացողը այս հաշվից կստանա PSN հաղորդագրություն։ Սեսիան սկսելիս նշեք խաղացողի PSN անունը։" },
+  "psn.description.places": {
+    en: "Player messages reach the PlayStation from this account. Give it a profile picture with your club's logo and your club's name: the PS5 shows both in every message.",
+    ru: "Сообщения игрокам приходят на PlayStation от этого аккаунта. Поставьте ему картинку профиля с логотипом клуба и имя клуба: PS5 показывает их в каждом сообщении.",
+    am: "Խաղացողներին հաղորդագրությունները PlayStation-ին հասնում են այս հաշվից։ Տվեք նրան ակումբի լոգոյով պրոֆիլի նկար և ակումբի անունը՝ PS5-ը դրանք ցույց է տալիս յուրաքանչյուր հաղորդագրության մեջ։",
+  },
   "psn.loadFailed": { en: "Could not load the PSN account", ru: "Не удалось загрузить PSN-аккаунт", am: "Չհաջողվեց բեռնել PSN հաշիվը" },
   "psn.account": { en: "Account", ru: "Аккаунт", am: "Հաշիվ" },
   "psn.connected": { en: "Connected", ru: "Подключён", am: "Միացված է" },

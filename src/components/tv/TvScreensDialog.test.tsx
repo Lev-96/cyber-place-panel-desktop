@@ -26,8 +26,11 @@ vi.mock("@/i18n/LanguageContext", async () => {
 });
 vi.mock("@/components/ui/Modal", () => ({ default: ({ children }: { children: React.ReactNode }) => <div role="dialog">{children}</div> }));
 vi.mock("@/components/ui/ConfirmProvider", () => ({ useConfirm: () => api.confirm }));
+// The PSN section has its own test (TvPsnPlaces.test.tsx).
+vi.mock("./TvPsnPlaces", () => ({ default: ({ standalone }: { standalone?: boolean }) => <div data-testid="psn-section">{standalone ? "standalone" : "below TVs"}</div> }));
 
 import TvScreensDialog from "./TvScreensDialog";
+import { TV_SCREENS } from "@/api/tvScreens";
 
 const places = [
   { id: 7, branch_id: 1, number: 7, name: null, platform: "ps5", type: "standard", status: "active" },
@@ -46,7 +49,8 @@ const mount = async () => {
 
 const flush = () => act(async () => { await Promise.resolve(); await Promise.resolve(); });
 
-beforeEach(() => { Object.values(api).forEach((f) => f.mockReset()); api.list.mockResolvedValue([]); });
+beforeEach(() => { Object.values(api).forEach((f) => f.mockReset()); api.list.mockResolvedValue([]); TV_SCREENS.enabled = true; });
+afterEach(() => { TV_SCREENS.enabled = false; });
 afterEach(cleanup);
 
 describe("TvScreensDialog", () => {
@@ -173,5 +177,15 @@ describe("TvScreensDialog", () => {
     expect(screen.queryByTestId("tv-network")).toBeNull();
     expect(screen.getByTestId("tv-pair-form")).toBeTruthy();
   });
-});
 
+  test("by default (owner: only PSN) the dialog is the console messages alone, no TV parts", async () => {
+    TV_SCREENS.enabled = false;
+    await mount();
+    expect(screen.getByRole("heading").textContent).toBe("Сообщения игрокам");
+    expect(screen.queryByTestId("tv-pair-form")).toBeNull();
+    expect(screen.queryByTestId("tv-list")).toBeNull();
+    expect(screen.queryByTestId("tv-network")).toBeNull();
+    expect(api.list).not.toHaveBeenCalled();
+    expect(screen.getByTestId("psn-section").textContent).toBe("standalone");
+  });
+});

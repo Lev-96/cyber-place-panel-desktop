@@ -24,7 +24,12 @@ import { useState } from "react";
  * about two months. The pasted value is a password in all but name: a
  * password field, sent once, never kept here.
  */
-const PsnSenderCard = ({ companyId }: { companyId: number }) => {
+/**
+ * `descriptionKey`: what the card says the account is for. The default is the
+ * (deferred) per-player message; the console messages (2026-11-23,
+ * TvPsnPlaces) pass their own.
+ */
+const PsnSenderCard = ({ companyId, descriptionKey = "psn.description" }: { companyId: number; descriptionKey?: string }) => {
   const { t } = useLang();
   const sender = useAsync(() => apiGetPsnSender(companyId).then((r) => r.data), [companyId]);
   const [pasted, setPasted] = useState("");
@@ -51,7 +56,7 @@ const PsnSenderCard = ({ companyId }: { companyId: number }) => {
   return (
     <div className="gradient-card" data-testid="psn-sender-card"><div className="gradient-card-inner">
       <h3 style={{ margin: 0 }}>{t("psn.title")}</h3>
-      <span className="muted" style={{ fontSize: 12 }}>{t("psn.description")}</span>
+      <span className="muted" style={{ fontSize: 12 }}>{t(descriptionKey)}</span>
 
       {sender.loading && !data ? <ListSkeleton rows={2} /> : sender.error && !data ? (
         <ErrorState size="compact" error={sender.error} onRetry={() => void sender.reload()} titleKey="psn.loadFailed" descriptionKey={null} />
