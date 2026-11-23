@@ -1,10 +1,11 @@
 import { PSN_ONLINE_ID } from "@/api/psn";
-import { apiListPsnPlaces, apiRemovePlacePsnAccount, apiSetPlacePsnAccount } from "@/api/psnPlaces";
+import { apiListPsnPlaces, apiSetPlacePsnAccounts, MAX_PSN_ACCOUNTS_PER_PLACE, parseOnlineIds } from "@/api/psnPlaces";
 import { useAuth } from "@/auth/AuthContext";
 import PsnSenderCard from "@/components/ps5/PsnSenderCard";
 import Button from "@/components/ui/Button";
 import { useAsync } from "@/hooks/useAsync";
 import { useLang } from "@/i18n/LanguageContext";
+import { fmt } from "@/i18n/translations";
 import { IBranchPlace } from "@/types/api";
 import { platformGroup } from "@/utils/platform";
 import { useEffect, useState } from "react";
@@ -31,12 +32,13 @@ const TvPsnPlaces = ({ branchId, places, placeLabel, standalone = false }: Props
   const [drafts, setDrafts] = useState<Record<number, string>>({});
   const [busy, setBusy] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const saved: Record<number, string> = {};
-  for (const row of list.data?.data ?? []) saved[row.place_id] = row.online_id;
+  for (const row of list.data?.data ?? []) saved[row.place_id] = row.online_ids.join(", ");
 
   useEffect(() => {
-    if (list.data) setDrafts(Object.fromEntries(list.data.data.map((r) => [r.place_id, r.online_id])));
+    if (list.data) setDrafts(Object.fromEntries(list.data.data.map((r) => [r.place_id, r.online_ids.join(", ")])));
   }, [list.data]);
 
   if (!list.data?.enabled) {
@@ -46,15 +48,19 @@ const TvPsnPlaces = ({ branchId, places, placeLabel, standalone = false }: Props
   const consoles = places.filter((p) => platformGroup(p.platform) === "ps");
 
   const save = async (placeId: number) => {
-    const value = (drafts[placeId] ?? "").trim();
+    const ids = parseOnlineIds(drafts[placeId] ?? "");
     setError(null);
+    setNotice(null);
     setBusy(placeId);
     try {
-      if (value === "") await apiRemovePlacePsnAccount(placeId);
-      else await apiSetPlacePsnAccount(placeId, value);
+      const r = await apiSetPlacePsnAccounts(placeId, ids);
+      if (!r.data.checked && ids.length > 0) setNotice(t("tv.psn.unchecked"));
       await list.reload();
-    } catch {
-      setError(t("tv.error.generic"));
+    } catch (err) {
+      const body = (err as { body?: { code?: string; unknown?: string[]; online_id?: string } } | null)?.body;
+      if (body?.code === "psn_unknown_online_ids") setError(fmt(t("tv.psn.unknown"), (body.unknown ?? []).join(", ")));
+      else if (body?.code === "psn_sender_is_console") setError(fmt(t("tv.psn.senderIsConsole"), body.online_id ?? ""));
+      else setError(t("tv.error.generic"));
     } finally {
       setBusy(null);
     }
@@ -65,14 +71,17 @@ const TvPsnPlaces = ({ branchId, places, placeLabel, standalone = false }: Props
       {!standalone && <strong>{t("tv.psn.title")}</strong>}
       <div className="muted">{t("tv.psn.intro")}</div>
       {typeof companyId === "number" && <PsnSenderCard companyId={companyId} descriptionKey="psn.description.places" />}
+      <div className="muted">{t("tv.psn.howMany")}</div>
       {error && <div className="error" role="alert">{error}</div>}
+      {notice && <div className="muted" data-testid="tv-psn-notice">{notice}</div>}
       {consoles.length === 0 ? (
         <div className="muted">{t("tv.psn.noConsoles")}</div>
       ) : (
         consoles.map((p) => {
           const draft = drafts[p.id] ?? "";
-          const valid = draft.trim() === "" || PSN_ONLINE_ID.test(draft.trim());
-          const changed = draft.trim() !== (saved[p.id] ?? "");
+          const ids = parseOnlineIds(draft);
+          const valid = ids.length <= MAX_PSN_ACCOUNTS_PER_PLACE && ids.every((id) => PSN_ONLINE_ID.test(id));
+          const changed = ids.join(", ") !== (saved[p.id] ?? "");
           return (
             <div key={p.id} className="row-between" style={{ gap: 10, flexWrap: "wrap" }} data-testid="tv-psn-row">
               <span>{placeLabel(p)}</span>
@@ -81,7 +90,7 @@ const TvPsnPlaces = ({ branchId, places, placeLabel, standalone = false }: Props
                   className="input"
                   aria-label={t("tv.psn.account")}
                   placeholder={t("tv.psn.account")}
-                  maxLength={16}
+                  maxLength={160}
                   value={draft}
                   onChange={(e) => setDrafts((d) => ({ ...d, [p.id]: e.target.value }))}
                 />

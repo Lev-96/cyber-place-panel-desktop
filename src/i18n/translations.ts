@@ -149,7 +149,27 @@ export const TRANSLATIONS: Dict = {
     ru: "Приветствие, «осталось 5 минут», «осталась 1 минута» и прощание всплывают на PlayStation поверх игры, на любом телевизоре, с картинкой и именем аккаунта клуба. Один раз подключите PSN-аккаунт клуба, затем укажите аккаунт, под которым работает каждая консоль.",
     am: "Ողջույնը, «մնացել է 5 րոպե», «մնացել է 1 րոպե» և հրաժեշտը հայտնվում են PlayStation-ում խաղի վրա, ցանկացած հեռուստացույցով, ակումբի հաշվի նկարով և անունով։ Մեկ անգամ միացրեք ակումբի PSN հաշիվը, ապա նշեք այն հաշիվը, որով աշխատում է յուրաքանչյուր կոնսոլ։",
   },
-  "tv.psn.account": { en: "Console PSN account", ru: "PSN-аккаунт консоли", am: "Կոնսոլի PSN հաշիվ" },
+  "tv.psn.account": { en: "Console PSN accounts", ru: "PSN-аккаунты консоли", am: "Կոնսոլի PSN հաշիվներ" },
+  "tv.psn.howMany": {
+    en: "Enter, separated by commas, every PSN account that plays on this console (up to 8). Each session's messages go only to the one online when the player sits down. Add them as friends of the club account.",
+    ru: "Впишите через запятую все PSN-аккаунты, под которыми играют на этой консоли (до 8). Сообщения каждой сессии получит только тот, кто был в сети, когда игрок сел играть. Добавьте их в друзья к аккаунту клуба.",
+    am: "Ստորակետով նշեք բոլոր PSN հաշիվները, որոնցով խաղում են այս կոնսոլում (մինչև 8)։ Յուրաքանչյուր սեսիայի հաղորդագրությունները կստանա միայն նա, ով առցանց էր, երբ խաղացողը նստեց խաղալու։ Ավելացրեք նրանց ակումբի հաշվի ընկերների մեջ։",
+  },
+  "tv.psn.unknown": {
+    en: "PlayStation Network has no such account: {0}. Check the online ID on the console: Settings → Users and Accounts → Account → Profile.",
+    ru: "В PlayStation Network нет такого аккаунта: {0}. Проверьте сетевой идентификатор на консоли: Настройки → Пользователи и учётные записи → Учётная запись → Профиль.",
+    am: "PlayStation Network-ում նման հաշիվ չկա՝ {0}։ Ստուգեք ցանցային նույնացուցիչը կոնսոլում՝ Կարգավորումներ → Օգտատերեր և հաշիվներ → Հաշիվ → Պրոֆիլ։",
+  },
+  "tv.psn.senderIsConsole": {
+    en: "{0} sends the messages and cannot also receive them. Connect a separate PSN account as the sender, or remove {0} from this console.",
+    ru: "{0} отправляет сообщения и не может их же получать. Подключите отдельный PSN-аккаунт как отправителя или уберите {0} с этой консоли.",
+    am: "{0}-ը ուղարկում է հաղորդագրությունները և չի կարող նաև ստանալ դրանք։ Միացրեք առանձին PSN հաշիվ որպես ուղարկող կամ հեռացրեք {0}-ը այս կոնսոլից։",
+  },
+  "tv.psn.unchecked": {
+    en: "Saved. PlayStation Network could not be asked now: the names will be checked when the first message is due.",
+    ru: "Сохранено. Сейчас не удалось спросить PlayStation Network: ники проверятся при первом сообщении.",
+    am: "Պահպանված է։ Այժմ հնարավոր չեղավ հարցնել PlayStation Network-ին։ Անունները կստուգվեն առաջին հաղորդագրության ժամանակ։",
+  },
   "tv.psn.noConsoles": { en: "This branch has no PlayStation places.", ru: "В этом филиале нет мест PlayStation.", am: "Այս մասնաճյուղում PlayStation տեղեր չկան։" },
   "tv.code.orType": { en: "Or enter the code shown on the TV:", ru: "Или введите код с экрана телевизора:", am: "Կամ մուտքագրեք հեռուստացույցի էկրանի կոդը՝" },
   "tv.network.title": { en: "TVs on the club network", ru: "Телевизоры в сети клуба", am: "Հեռուստացույցներ ակումբի ցանցում" },
