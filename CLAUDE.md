@@ -300,6 +300,19 @@ branch — so the two yml files never conflict:
     `require`): a failed `RemotePlayLoginProc` closes its socket; every login's
     session is tracked by host-id (`liveSessions`) until closed. If the guard
     cannot be installed it logs a warning and resting goes on as before.
+  - **A console that refuses the LOGIN is rested without it (2026-11-24).**
+    Four pads in use: every rest was refused at the Remote Play login with
+    `Error[4] UNKNOWN_ERROR` (8.7 s each, for minutes) and the console never
+    slept. Measured on the owner's console: the same session opened without the
+    login step and the standby sent on it → asleep in ~8 s. `openForStandby`
+    keeps the login FIRST (1–2 pads: the unchanged path, one open); only an
+    error thrown by the login step itself (`loginRefusals`, marked in the
+    execute wrapper) and not a passcode answer (`isLoginRefusal`) opens once
+    more with `skipLogin: true`, which the wrapper honours by not running the
+    login (the session is still tracked in `liveSessions`). The `cancelled`
+    check after the open still guards the send. Owner-verified on hardware:
+    4 pads Stop/auto-stop sleep, 2 pads unchanged, no sleep during a session.
+    Tests: `standbyWithoutLogin.test.ts` (10, 4 mutations caught).
   - `standby()` calls `closeSessionsTo(hostId)` after an ABANDONED attempt
     (TIMEOUT ceiling or withdrawal): playactor has no timeout on the login
     answer or on the console dropping the connection after a standby.
