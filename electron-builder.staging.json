@@ -14,7 +14,7 @@
   "extraMetadata": { "main": "electron/dist/main.js" },
   "electronLanguages": ["en-US", "ru-RU"],
   "win": {
-    "target": [{ "target": "nsis", "arch": ["x64"] }],
+    "target": [{ "target": "nsis", "arch": ["x64", "ia32"] }],
     "publisherName": "Cyber Place",
     "legalTrademarks": "Cyber Place",
     "verifyUpdateCodeSignature": false,
