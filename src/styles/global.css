@@ -173,11 +173,18 @@
   --avatar-ink: #020514;
 }
 
+/* The display face (2026-11-24): Russo One, SIL OFL 1.1
+   (public/fonts/RussoOne-OFL.txt), replacing a former display font that had
+   no commercial licence. Latin only, as the old face had nothing else, so
+   Cyrillic and Armenian fall back exactly as before; size-adjust 82% keeps
+   the old width (Russo One is about 1.22x wider). */
 @font-face {
-  font-family: "Playstation";
-  src: url("/fonts/Playstation.ttf") format("truetype");
+  font-family: "Russo One";
+  src: url("/fonts/RussoOne.ttf") format("truetype");
   font-weight: 400 900;
   font-display: swap;
+  size-adjust: 82%;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 @font-face {
   font-family: "Inter";

@@ -32,6 +32,7 @@
   },
   "nsis": {
     "oneClick": true,
+    "license": "build/eula.txt",
     "perMachine": true,
     "runAfterFinish": true,
     "differentialPackage": true,

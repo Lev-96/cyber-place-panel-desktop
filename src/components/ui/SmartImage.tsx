@@ -53,7 +53,7 @@ const SmartImage = ({ src, name, alt, size, shape = "square", style, fallback }:
         <span style={{
           color: "var(--color-primary)", fontWeight: 700,
           fontSize: typeof size === "number" ? Math.round(size * 0.42) : "1.2em",
-          fontFamily: "'Playstation', 'Inter', sans-serif",
+          fontFamily: "'Russo One', 'Inter', sans-serif",
           letterSpacing: 1,
         }}>
           {letter}
