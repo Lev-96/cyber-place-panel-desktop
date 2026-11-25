@@ -122,7 +122,7 @@ describe("creating a company: the country and the dial code are fixed", () => {
     render(<CompanyForm onClose={() => {}} onSaved={onSaved} />);
     await toStep2();
     await fillCompany({ phone: "+374 91 234567" });
-    expect((document.querySelector('input[type="tel"]') as HTMLInputElement).value).toBe("91234567");
+    expect((document.querySelector('input[type="tel"]') as HTMLInputElement).value).toBe("91 234 567");
     await submit();
 
     await waitFor(() => expect(onSaved).toHaveBeenCalled());
@@ -206,7 +206,7 @@ describe("editing a company", () => {
   test("an Armenian company stays fixed to Armenia and +374, the number shown without the code", () => {
     render(<CompanyForm initial={company({})} onClose={() => {}} onSaved={() => {}} />);
     expect(screen.getByTestId("fixed-dial").textContent).toContain("+374");
-    expect((document.querySelector('input[type="tel"]') as HTMLInputElement).value).toBe("91234567");
+    expect((document.querySelector('input[type="tel"]') as HTMLInputElement).value).toBe("91 234 567");
   });
 
   test("a company saved in another country keeps its pickers and its number", () => {

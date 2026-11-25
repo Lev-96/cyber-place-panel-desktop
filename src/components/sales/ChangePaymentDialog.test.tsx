@@ -12,13 +12,18 @@ vi.mock("@/repositories/SessionRepository", () => ({
   sessionRepository: { changePayment: (...a: unknown[]) => repo.changePayment(...a) },
 }));
 vi.mock("@/ui/notify", () => ({ notify: { message: vi.fn() } }));
+// The seat's Club Card (2026-11-25): read by the seat's id.
+const card = vi.hoisted(() => ({ read: vi.fn() }));
+vi.mock("@/repositories/BonusRepository", () => ({ bonusRepository: { sessionCard: (...a: unknown[]) => card.read(...a) } }));
 vi.mock("@/components/ui/Modal", () => ({ default: ({ children }: { children: React.ReactNode }) => <div>{children}</div> }));
 vi.mock("@/i18n/LanguageContext", () => ({ useLang: () => ({ t: (k: string) => k, money: (n: number) => String(n) }) }));
 vi.mock("@/components/payments/PaymentEditor", () => ({
-  default: ({ value, onChange }: { value: { method: string }; onChange: (v: unknown) => void }) => (
+  default: ({ value, onChange, bonus }: { value: { method: string }; onChange: (v: unknown) => void; bonus?: { balanceCents: number } }) => (
     <div>
       <span data-testid="method">{value.method}</span>
+      <span data-testid="bonus-offered">{bonus ? String(bonus.balanceCents) : "none"}</span>
       <button type="button" onClick={() => onChange({ ...value, method: "cash" })}>to-cash</button>
+      <button type="button" onClick={() => onChange({ ...value, method: "bonus" })}>to-bonus</button>
     </div>
   ),
 }));
@@ -30,7 +35,7 @@ const line = (over: Partial<ISalesLine> = {}): ISalesLine => ({
   staff: null, is_free: false, method: "cash", payments: [{ method: "cash", amount: "2000.00" }] as never, amount: "2000.00", prepaid: null, ...over,
 });
 
-beforeEach(() => { repo.changePayment.mockReset(); repo.changePayment.mockResolvedValue({ id: 385 }); });
+beforeEach(() => { repo.changePayment.mockReset(); repo.changePayment.mockResolvedValue({ id: 385 }); card.read.mockReset(); card.read.mockResolvedValue(null); });
 afterEach(cleanup);
 
 describe("canChangePayment", () => {
@@ -72,5 +77,20 @@ describe("ChangePaymentDialog", () => {
     fireEvent.click(screen.getByText("to-cash"));
     await act(async () => { fireEvent.click(screen.getByTestId("change-payment-save")); });
     expect(repo.changePayment).toHaveBeenCalledWith(385, { payment_method: "cash" });
+  });
+
+  test("the seat has a Club Card (2026-11-25): «Бонусы» offered with its balance, and sent", async () => {
+    card.read.mockResolvedValue({ id: 9, branch_id: 5, name: "Arman", phone: "+37491123456", balance: "2500.00", opened_at: null });
+    await act(async () => { render(<ChangePaymentDialog branchId={5} line={line()} onClose={() => {}} onChanged={() => {}} />); });
+    expect(card.read).toHaveBeenCalledWith(385);
+    expect(screen.getByTestId("bonus-offered").textContent).toBe("250000");
+    await act(async () => { fireEvent.click(screen.getByText("to-bonus")); });
+    await act(async () => { fireEvent.click(screen.getByTestId("change-payment-save")); });
+    expect(repo.changePayment).toHaveBeenCalledWith(385, { payment_method: "bonus" });
+  });
+
+  test("no card on the seat: no bonuses offered", async () => {
+    await act(async () => { render(<ChangePaymentDialog branchId={5} line={line()} onClose={() => {}} onChanged={() => {}} />); });
+    expect(screen.getByTestId("bonus-offered").textContent).toBe("none");
   });
 });

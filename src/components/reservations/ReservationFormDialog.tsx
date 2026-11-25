@@ -16,6 +16,7 @@ import { fmt } from "@/i18n/translations";
 import { bookingRepository } from "@/repositories/BookingRepository";
 import { notify } from "@/ui/notify";
 import { formatArmenianPhone, maskArmenianPhone } from "@/utils/armenianPhone";
+import FixedDialPhoneInput from "@/components/ui/FixedDialPhoneInput";
 import { FormEvent, useMemo, useState } from "react";
 import { hm, parseYmd, roundUpToStep, ymd } from "./calendarModel";
 import {
@@ -171,15 +172,19 @@ const ReservationFormDialog = ({ places, mode, onClose, onSaved }: Props) => {
         </label>
         <label className="reservation-form__field">
           <span className="label">{t("reserve.phone")} <span className="muted">({t("reserve.optional")})</span></span>
-          <Input
-            value={phone}
-            onChange={(e) => setPhone(maskArmenianPhone(e.target.value))}
+          {/* The Club Card's phone box (2026-11-25, owner: the same everywhere):
+              🇦🇲 +374 fixed, the digits grouped. The form keeps «077 777 777»
+              exactly as before, so what is sent never changes. */}
+          <FixedDialPhoneInput
+            countryCode="AM"
+            value={phone.replace(/\D/g, "").replace(/^0/, "")}
+            onChange={(digits) => setPhone(maskArmenianPhone(digits))}
             onBlur={() => setPhoneLeft(true)}
-            inputMode="tel"
-            maxLength={16}
-            placeholder="077 777 777"
-            aria-label={t("reserve.phone")}
+            placeholder="77 777 777"
+            ariaLabel={t("reserve.phone")}
+            invalid={!phoneValid && phoneLeft}
             disabled={busy}
+            testId="reserve-phone"
           />
           {!phoneValid && phoneLeft && <span className="error reservation-form__note">{t("reserve.phoneInvalid")}</span>}
         </label>

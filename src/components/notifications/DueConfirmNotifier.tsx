@@ -1,6 +1,7 @@
 import type { IDueToConfirm } from "@/api/sessions";
 import PaymentEditor from "@/components/payments/PaymentEditor";
-import { PAYMENT_PROBLEM_KEY, checkPayment, emptyPaymentDraft, paymentBody, type PaymentDraft } from "@/components/payments/paymentSplit";
+import { PAYMENT_PROBLEM_KEY, billPaymentBody, checkPayment, emptyPaymentDraft, type PaymentDraft } from "@/components/payments/paymentSplit";
+import { useBoundBonusCard } from "@/components/bonus/useBoundBonusCard";
 import { methodName } from "@/components/sales/salesSummaryModel";
 import Button from "@/components/ui/Button";
 import Modal from "@/components/ui/Modal";
@@ -126,6 +127,8 @@ const DueConfirmNotifier = () => {
 
   const now = Date.now();
   const current = dues.find((d) => (later.current.get(d.session_id) ?? 0) <= now) ?? null;
+  // The seat's Club Card (2026-11-25, owner): the due may be paid with it.
+  const [bonusCard] = useBoundBonusCard(current?.branch_id ?? 0, current?.bonus_account_id ?? null);
   const dueCents = current ? Math.round(Number(current.due) * 100) : 0;
   const check = checkPayment(dueCents, pay);
 
@@ -161,7 +164,7 @@ const DueConfirmNotifier = () => {
     setBusy(true);
     setErr(null);
     try {
-      await sessionRepository.confirmDue(current.session_id, paymentBody(pay, check));
+      await sessionRepository.confirmDue(current.session_id, billPaymentBody(pay, check));
       answered.current.set(current.session_id, step === "paid" ? "paid" : "taken");
       notify.message("success", fmt(t("dueConfirm.done"), seat));
       setDues((list) => list.filter((d) => d.session_id !== current.session_id));
@@ -215,6 +218,7 @@ const DueConfirmNotifier = () => {
               check={check}
               money={money}
               disabled={busy}
+              bonus={bonusCard ? { balanceCents: Math.round(Number(bonusCard.balance) * 100) } : undefined}
             />
             {!check.ok && check.problem !== null && <span className="muted">{t(PAYMENT_PROBLEM_KEY[check.problem])}</span>}
             {err && <div className="error" role="alert" data-testid="due-confirm-error">{err}</div>}

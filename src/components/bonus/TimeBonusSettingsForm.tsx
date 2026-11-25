@@ -1,7 +1,7 @@
 import Button from "@/components/ui/Button";
 import NumberStepper from "@/components/ui/NumberStepper";
 import Switch from "@/components/ui/Switch";
-import TimeInput from "@/components/ui/TimeInput";
+import HoursRange from "./HoursRange";
 import SeatChoice from "./SeatChoice";
 import { useLang } from "@/i18n/LanguageContext";
 import { bonusRepository } from "@/repositories/BonusRepository";
@@ -65,9 +65,10 @@ const TimeBonusSettingsForm = ({ branchId, settings, onSaved }: Props) => {
   return (
     <form className="col" style={{ gap: 12 }} onSubmit={submit} data-testid="time-bonus-settings">
       <Switch checked={enabled} onChange={setEnabled} disabled={busy} label={t("timeBonus.settings.enabled")} />
+      <span className="label">{t("timeBonus.settings.hours")}</span>
+      <HoursRange from={from} to={to} onChange={(f, tt) => { setFrom(f); setTo(tt); }} disabled={busy} testId="time-bonus-hours" />
+      {from !== "" && from === to && <span className="error" style={{ fontSize: 13 }} data-testid="time-bonus-same-hours">{t("timeBonus.settings.sameHours")}</span>}
       <div className="row" style={{ gap: 16, flexWrap: "wrap", alignItems: "flex-end" }}>
-        <div style={{ width: 110 }}><TimeInput label={t("timeBonus.settings.from")} value={from} onChange={setFrom} disabled={busy} invalid={!CLOCK.test(from)} /></div>
-        <div style={{ width: 110 }}><TimeInput label={t("timeBonus.settings.to")} value={to} onChange={setTo} disabled={busy} invalid={!CLOCK.test(to) || from === to} /></div>
         <div style={{ width: 150 }}><NumberStepper label={t("timeBonus.settings.minutes")} value={minutes} onChange={(v) => setMinutes(Math.round(v))} min={1} max={MAX_MINUTES} step={5} precision={0} disabled={busy} suffix={t("time.minShort")} /></div>
         <div style={{ width: 150 }}><NumberStepper label={t("timeBonus.settings.perWindow")} value={perWindow} onChange={(v) => setPerWindow(Math.round(v))} min={1} max={MAX_PER_WINDOW} step={1} precision={0} disabled={busy} suffix="" /></div>
       </div>

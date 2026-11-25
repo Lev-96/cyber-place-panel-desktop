@@ -69,5 +69,6 @@ describe("TimeBonusSettingsForm", () => {
     await act(async () => { fireEvent.change(from, { target: { value: "18:00" } }); });
     await act(async () => { fireEvent.click(screen.getAllByRole("switch")[0]); });
     expect((screen.getByTestId("time-bonus-save") as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByTestId("time-bonus-same-hours")).toBeTruthy();
   });
 });

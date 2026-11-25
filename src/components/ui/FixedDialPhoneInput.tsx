@@ -10,7 +10,33 @@ interface Props {
   invalid?: boolean;
   describedBy?: string;
   disabled?: boolean;
+  /** A grey example inside the box (Armenia: «91 123 456»). */
+  placeholder?: string;
+  autoFocus?: boolean;
+  testId?: string;
+  /** Keys in the box (Enter to search, …). */
+  onKeyDown?: (e: React.KeyboardEvent<HTMLInputElement>) => void;
+  onBlur?: () => void;
 }
+
+/**
+ * The national digits as a person reads them (2026-11-25, owner: as clear as
+ * the Club Card's): Armenia «91 123 456» (a leading 0: «091 123 456»); other
+ * countries as typed. Display only — `value` / `onChange` stay the digits.
+ */
+export const groupNational = (digits: string, countryCode: string): string => {
+  if (countryCode !== "AM") return digits;
+  const sizes = digits.startsWith("0") ? [3, 3, 3] : [2, 3, 3];
+  const out: string[] = [];
+  let i = 0;
+  for (const n of sizes) {
+    if (i >= digits.length) break;
+    out.push(digits.slice(i, i + n));
+    i += n;
+  }
+  if (i < digits.length) out.push(digits.slice(i));
+  return out.join(" ");
+};
 
 /**
  * What the number box keeps of anything typed or pasted: its digits, with a
@@ -33,7 +59,7 @@ export const toNationalDigits = (raw: string, dial: string): string => {
  * changed nor typed twice. Used where the country is fixed too (company and
  * branch forms, Armenia); everywhere else keeps its own phone field.
  */
-const FixedDialPhoneInput = ({ countryCode, value, onChange, ariaLabel, invalid, describedBy, disabled }: Props) => {
+const FixedDialPhoneInput = ({ countryCode, value, onChange, ariaLabel, invalid, describedBy, disabled, placeholder, autoFocus, testId, onKeyDown, onBlur }: Props) => {
   const dial = countryByCode(countryCode)?.dial ?? "";
   // ONE control, drawn like any `.input`: a compact grey prefix that is
   // plainly not editable, then the number box inside the same frame. The
@@ -48,8 +74,25 @@ const FixedDialPhoneInput = ({ countryCode, value, onChange, ariaLabel, invalid,
         type="tel"
         inputMode="tel"
         autoComplete="tel-national"
-        value={value}
-        onChange={(e) => onChange(toNationalDigits(e.target.value, dial))}
+        value={groupNational(value, countryCode)}
+        onChange={(e) => {
+          // The caret stays after the same digit once the groups are redrawn.
+          const el = e.target;
+          const before = toNationalDigits(el.value.slice(0, el.selectionStart ?? el.value.length), dial).length;
+          const next = toNationalDigits(el.value, dial);
+          onChange(next);
+          requestAnimationFrame(() => {
+            const shown = el.value;
+            let seen = 0, pos = 0;
+            while (pos < shown.length && seen < before) { if (/\d/.test(shown[pos])) seen++; pos++; }
+            try { el.setSelectionRange(pos, pos); } catch { /* not focused */ }
+          });
+        }}
+        placeholder={placeholder}
+        autoFocus={autoFocus}
+        onKeyDown={onKeyDown}
+        onBlur={onBlur}
+        data-testid={testId}
         aria-label={ariaLabel ? `${ariaLabel} (+${dial})` : `+${dial}`}
         aria-invalid={invalid ? true : undefined}
         aria-describedby={describedBy}

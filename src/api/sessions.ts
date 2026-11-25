@@ -451,9 +451,10 @@ export interface IPaymentLine {
  * bill to the cent) and `payment_note` (how; required). Never both.
  */
 export interface PaymentFields {
-  payment_method?: PaymentMethod;
+  /** `bonus` (2026-11-25): a Club Card on the seat pays — the server checks the card. */
+  payment_method?: PrepaidMethod;
   payment_method_other?: string;
-  payments?: { method: PaymentMethod; amount: number }[];
+  payments?: { method: PrepaidMethod; amount: number }[];
   payment_note?: string;
 }
 
@@ -505,6 +506,8 @@ export interface IDueToConfirm {
   due: string;
   prepaid_by_method: Record<string, string>;
   items: Array<{ name: string; qty: number; price: string }>;
+  /** The seat's Club Card (2026-11-25): «Бонусы» are offered for the due. Absent from an older server. */
+  bonus_account_id?: number | null;
 }
 
 export const apiDuesToConfirm = () => request<{ data: IDueToConfirm[] }>("/sessions/dues-to-confirm");

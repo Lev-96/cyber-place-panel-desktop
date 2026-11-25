@@ -1,4 +1,5 @@
 import UnpaidToggle from "@/components/sessions/UnpaidToggle";
+import { bonusAmountText } from "@/components/bonus/bonusAmount";
 import Button from "@/components/ui/Button";
 import { useAsync } from "@/hooks/useAsync";
 import { useLang } from "@/i18n/LanguageContext";
@@ -34,14 +35,17 @@ const BonusCardStartSwitch = ({ branchId, disabled, value, onChange }: Props) =>
   };
 
   return (
-    <div className="start-dialog__switch" data-testid="start-bonus-card">
+    // Its own tile, as large as «Бесплатная сессия» (2026-11-25, owner), in
+    // the Club Card's colour; the line under it says what it does.
+    <div className={["start-dialog__free start-dialog__bonus", on ? "is-on" : null].filter(Boolean).join(" ")} data-testid="start-bonus-card">
       <UnpaidToggle on={on} onChange={toggle} disabled={disabled}
-        label={t("bonus.start.switch")} fullLabel={t("bonus.start.switchFull")} testId="bonus-card-switch" tone="accent" />
+        label={t("bonus.start.switch")} fullLabel={t("bonus.start.switchFull")} testId="bonus-card-switch" tone="bonus" />
+      {!on && <span className="muted start-dialog__free-hint" data-testid="bonus-card-hint">{t("bonus.start.hint")}</span>}
       {on && (
         <div className="row" style={{ gap: 8, alignItems: "center", flexWrap: "wrap" }}>
           {value && (
             <span className="muted start-dialog__switch-hint" data-testid="bonus-card-chosen">
-              {(value.name || t("bonus.noName")) + ", " + value.phone + ", " + t("bonus.balance").replace("{0}", money(Number(value.balance)))}
+              {(value.name || t("bonus.noName")) + ", " + value.phone + ", " + t("bonus.balance").replace("{0}", bonusAmountText(money, value.balance))}
             </span>
           )}
           <Button type="button" variant="secondary" disabled={disabled} onClick={() => setPicking(true)} data-testid="bonus-card-pick">

@@ -1,4 +1,5 @@
 import {
+  apiListBranchNews, apiPostBranchNews, apiRemoveBranchNews, type BranchNewsBody,
   apiBindBonusAccount,
   apiBonusSettings,
   apiGetBonusAccount,
@@ -9,6 +10,8 @@ import {
   apiDeclineTimeBonus,
   apiGrantTimeBonus,
   apiPendingTimeBonus,
+  apiRemoveBonusAccount,
+  apiSessionBonusCard,
   apiUpdateTimeBonusSettings,
   apiUpdateRankSettings,
   RegisterBonusBody,
@@ -28,12 +31,18 @@ export class BonusRepository {
   updateSettings(branchId: number, b: UpdateBonusSettingsBody) { return friendlyMutation(apiUpdateBonusSettings(branchId, b).then((r) => r.settings)); }
   list(branchId: number, phone?: string) { return apiListBonusAccounts(branchId, phone).then((r) => r.data); }
   account(branchId: number, id: number) { return apiGetBonusAccount(branchId, id).then((r) => r.account); }
+  sessionCard(sessionId: number) { return apiSessionBonusCard(sessionId).then((r) => r.account); }
+  remove(branchId: number, id: number) { return friendlyMutation(apiRemoveBonusAccount(branchId, id)); }
   lookup(branchId: number, code: string) { return friendlyMutation(apiLookupBonusCode(branchId, code)); }
   register(branchId: number, b: RegisterBonusBody) { return friendlyMutation(apiRegisterBonusAccount(branchId, b).then((r) => r.account)); }
   bind(sessionId: number, accountId: number | null) { return friendlyMutation(apiBindBonusAccount(sessionId, accountId)); }
   updateRanks(branchId: number, b: UpdateRankSettingsBody) { return friendlyMutation(apiUpdateRankSettings(branchId, b).then((r) => r.settings)); }
   updateTimeBonus(branchId: number, b: UpdateTimeBonusBody) { return friendlyMutation(apiUpdateTimeBonusSettings(branchId, b).then((r) => r.time_bonus)); }
   pendingTimeBonus() { return apiPendingTimeBonus().then((r) => r.data); }
+  /** The branch's news (2026-11-25): posting it tells every card holder. */
+  news(branchId: number) { return apiListBranchNews(branchId).then((r) => r.data); }
+  postNews(branchId: number, b: BranchNewsBody) { return friendlyMutation(apiPostBranchNews(branchId, b).then((r) => r.news)); }
+  removeNews(branchId: number, id: number) { return friendlyMutation(apiRemoveBranchNews(branchId, id)); }
   grantTimeBonus(winId: number) { return friendlyMutation(apiGrantTimeBonus(winId).then((r) => r.session)); }
   declineTimeBonus(winId: number) { return friendlyMutation(apiDeclineTimeBonus(winId)); }
 }

@@ -12461,5 +12461,55 @@ button.sales-card:focus-visible { outline: 2px solid var(--color-primary); outli
 .rank-badge--elite { background: linear-gradient(135deg, #9d4dff, #6a1fd6); }
 .rank-badge--veteran { background: linear-gradient(135deg, #ff8a3d, #d14b12); }
 .rank-badge--legend { background: linear-gradient(135deg, #ffd36e, #e0a21a); color: #2b1d00; }
-.seat-choice__group { border: 1px solid var(--color-border); border-radius: 10px; padding: 8px 12px 12px; margin: 0; }
+.seat-choice__group { border: 1px solid var(--color-border); border-radius: 12px; padding: 10px 14px 14px; margin: 0; }
 .seat-choice__group legend { padding: 0 6px; }
+/* Seat ticks (2026-11-25, owner: big and easy on the eyes): a 22px box in
+   the accent, the whole label clickable, a chip per seat. */
+.seat-choice__tick { display: inline-flex; align-items: center; gap: 10px; cursor: pointer; font-size: 15px; min-height: 36px; }
+.seat-choice__tick input[type="checkbox"] {
+  appearance: none; -webkit-appearance: none; flex: none; width: 22px; height: 22px; margin: 0;
+  border: 2px solid var(--color-muted); border-radius: 6px;
+  background: var(--color-surface); display: grid; place-content: center; cursor: pointer;
+  transition: background-color .15s ease, border-color .15s ease;
+}
+.seat-choice__tick input[type="checkbox"]::before {
+  content: ""; width: 7px; height: 13px; border: solid #fff; border-width: 0 3px 3px 0;
+  transform: translateY(-1px) rotate(45deg) scale(0); transition: transform .15s ease;
+}
+.seat-choice__tick input[type="checkbox"]:checked { background: rgb(6 182 212); border-color: rgb(6 182 212); }
+.seat-choice__tick input[type="checkbox"]:checked::before { transform: translateY(-1px) rotate(45deg) scale(1); }
+.seat-choice__tick input[type="checkbox"]:focus-visible { outline: 2px solid rgb(6 182 212); outline-offset: 2px; }
+.seat-choice__tick input[type="checkbox"]:disabled { opacity: .5; cursor: default; }
+.seat-choice__seats { display: flex; flex-wrap: wrap; gap: 8px; }
+.seat-choice__seat { padding: 4px 12px 4px 8px; border: 1px solid var(--color-border); border-radius: 10px; }
+.seat-choice__seat:has(input:checked) { border-color: rgb(6 182 212); }
+@media (prefers-reduced-motion: reduce) { .seat-choice__tick input[type="checkbox"], .seat-choice__tick input[type="checkbox"]::before { transition: none; } }
+/* «На карте» and «Сколько бонусами» (2026-11-25, owner): bigger, in the bonus colour. */
+.pay-editor__bonus-balance { font-size: 16px; font-weight: 700; color: rgb(34 211 238); }
+.pay-editor__bonus-part-label { font-size: 15px; font-weight: 600; }
+/* The phone search over the card lists: a phone's width, not the page's. */
+.bonus-phone-search { max-width: 340px; }
+.pay-editor__bonus-part-input { width: 160px; height: 44px; font-size: 18px; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+/* Club Card hours (2026-11-25): «С [13]:[00] — до [18]:[00]», Start's clock field. */
+.hours-range { display: flex; align-items: flex-end; gap: 14px; flex-wrap: wrap; }
+.hours-range__end { display: flex; flex-direction: column; gap: 6px; }
+.hours-range__label { font-size: 13px; font-weight: 600; color: var(--color-muted, inherit); }
+.hours-range__dash { padding-bottom: 14px; font-size: 18px; opacity: 0.6; }
+
+/* «Бонусная карта» in Start (2026-11-25, owner): the free session's tile and
+   switch size, in the Club Card's cyan. */
+.start-dialog__free.start-dialog__bonus { --free-rgb: 6 182 212; }
+.btn.unpaid-toggle--bonus:hover:not(:disabled) .cp-switch-track { border-color: rgb(6 182 212); }
+.btn.unpaid-toggle--bonus:focus-visible .cp-switch-track { border-color: rgb(6 182 212); box-shadow: 0 0 0 3px rgb(6 182 212 / 0.30); }
+.btn.unpaid-toggle--bonus.is-on .cp-switch-track { background: rgb(6 182 212); border-color: rgb(6 182 212); }
+.btn.unpaid-toggle--bonus.is-on .unpaid-toggle__label { color: rgb(34 211 238); }
+:root[data-theme="light"] .btn.unpaid-toggle--bonus.is-on .unpaid-toggle__label { color: rgb(14 116 144); }
+
+/* «Новости клуба» (2026-11-25): a calm form and the posted news. */
+.news-form__text { min-height: 120px; resize: vertical; font: inherit; line-height: 1.5; }
+.news-form__count { align-self: flex-end; font-size: 12px; font-variant-numeric: tabular-nums; }
+.news-item__when { font-size: 12px; }
+.news-item__title { font-size: 16px; overflow-wrap: anywhere; }
+.news-item__body { margin: 0; white-space: pre-line; line-height: 1.5; overflow-wrap: anywhere; }
+.news-item__img { display: block; max-width: 360px; width: 100%; max-height: 240px; object-fit: cover; border-radius: 10px; margin-top: 6px; }

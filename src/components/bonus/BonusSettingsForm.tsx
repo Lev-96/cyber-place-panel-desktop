@@ -1,6 +1,6 @@
 import Button from "@/components/ui/Button";
 import Switch from "@/components/ui/Switch";
-import TimeInput from "@/components/ui/TimeInput";
+import HoursRange from "./HoursRange";
 import { useLang } from "@/i18n/LanguageContext";
 import { bonusRepository } from "@/repositories/BonusRepository";
 import type { IBonusSettings } from "@/types/bonus";
@@ -88,10 +88,7 @@ const BonusSettingsForm = ({ branchId, settings, onSaved }: Props) => {
         <div className="col" style={{ gap: 8 }}>
           <Switch checked={hoursOn} onChange={setHoursOn} disabled={busy} label={t("bonus.settings.earnHours")} />
           {hoursOn && (
-            <div className="row" style={{ gap: 12, alignItems: "flex-end", flexWrap: "wrap" }}>
-              <div style={{ width: 110 }}><TimeInput label={t("timeBonus.settings.from")} value={earnFrom} onChange={setEarnFrom} disabled={busy} invalid={!clock.test(earnFrom)} /></div>
-              <div style={{ width: 110 }}><TimeInput label={t("timeBonus.settings.to")} value={earnTo} onChange={setEarnTo} disabled={busy} invalid={!clock.test(earnTo) || earnFrom === earnTo} /></div>
-            </div>
+            <HoursRange from={earnFrom} to={earnTo} onChange={(f, tt) => { setEarnFrom(f); setEarnTo(tt); }} disabled={busy} testId="bonus-earn-hours" />
           )}
           <span className="muted" style={{ fontSize: 12 }} data-testid="bonus-earn-hours-rule">
             {hoursOn ? t("bonus.settings.earnHoursRule").replace("{0}", earnFrom).replace("{1}", earnTo) : t("bonus.settings.earnAlways")}

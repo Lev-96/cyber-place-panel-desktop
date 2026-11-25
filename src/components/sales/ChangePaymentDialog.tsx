@@ -1,6 +1,7 @@
 import type { ISalesLine } from "@/api/salesSummary";
 import PaymentEditor from "@/components/payments/PaymentEditor";
-import { PAYMENT_PROBLEM_KEY, checkPayment, emptyPaymentDraft, paymentBody, type PaymentDraft } from "@/components/payments/paymentSplit";
+import { PAYMENT_PROBLEM_KEY, billPaymentBody, checkPayment, emptyPaymentDraft, type PaymentDraft } from "@/components/payments/paymentSplit";
+import { useSessionBonusCard } from "@/components/bonus/useBoundBonusCard";
 import Button from "@/components/ui/Button";
 import Modal from "@/components/ui/Modal";
 import { useLang } from "@/i18n/LanguageContext";
@@ -37,6 +38,9 @@ const ChangePaymentDialog = ({ branchId, line, onClose, onChanged }: Props) => {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const check = checkPayment(dueCents, pay);
+  // The seat's Club Card (2026-11-25, owner): the new way may use bonuses;
+  // what the old way spent goes back to the card on the server.
+  const bonusCard = useSessionBonusCard(line.kind === "place" ? line.id : null);
   const problem = check.ok || check.problem === null ? null : t(PAYMENT_PROBLEM_KEY[check.problem]);
 
   const save = async () => {
@@ -44,7 +48,7 @@ const ChangePaymentDialog = ({ branchId, line, onClose, onChanged }: Props) => {
     setBusy(true);
     setErr(null);
     try {
-      await sessionRepository.changePayment(line.id, paymentBody(pay, check));
+      await sessionRepository.changePayment(line.id, billPaymentBody(pay, check));
       notify.message("success", t("sales.changePayment.done"));
       onChanged();
       onClose();
@@ -71,6 +75,7 @@ const ChangePaymentDialog = ({ branchId, line, onClose, onChanged }: Props) => {
           check={check}
           money={money}
           disabled={busy}
+          bonus={bonusCard ? { balanceCents: Math.round(Number(bonusCard.balance) * 100) } : undefined}
         />
         {problem && <span className="muted" data-testid="change-payment-problem">{problem}</span>}
         {err && <div className="error" role="alert" data-testid="change-payment-error">{err}</div>}

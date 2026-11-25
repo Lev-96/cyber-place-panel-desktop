@@ -55,3 +55,33 @@ export const apiGrantTimeBonus = (winId: number) =>
 
 export const apiDeclineTimeBonus = (winId: number) =>
   request<{ declined: true }>(`/time-bonus/${winId}/decline`, { method: "POST" });
+
+/** The Club Card on a seat, or null (2026-11-25): a changed way of paying offers «Бонусы». */
+export const apiSessionBonusCard = (sessionId: number) =>
+  request<{ account: IBonusAccount | null }>(`/sessions/${sessionId}/bonus-account`);
+
+/** Owner / manager remove a card (2026-11-25): the money records stay. */
+export const apiRemoveBonusAccount = (branchId: number, accountId: number) =>
+  request<{ deleted: true }>(`/branches/${branchId}/bonus-accounts/${accountId}`, { method: "DELETE" });
+
+/** A branch's news for its Club Card players (2026-11-25). */
+export interface IBranchNews { id: number; title: string; body: string | null; image_path?: string | null; at: string | null }
+/** `image`: an optional picture (2026-11-25); with one, the post goes as a form. */
+export interface BranchNewsBody { title: string; body?: string | null; image?: File | null }
+
+export const apiListBranchNews = (branchId: number) =>
+  request<{ data: IBranchNews[] }>(`/branches/${branchId}/news`);
+
+export const apiPostBranchNews = (branchId: number, body: BranchNewsBody) => {
+  if (!body.image) {
+    return request<{ news: IBranchNews }>(`/branches/${branchId}/news`, { method: "POST", body: { title: body.title, body: body.body ?? null } });
+  }
+  const fd = new FormData();
+  fd.append("title", body.title);
+  if (body.body) fd.append("body", body.body);
+  fd.append("image", body.image);
+  return request<{ news: IBranchNews }>(`/branches/${branchId}/news`, { method: "POST", body: fd });
+};
+
+export const apiRemoveBranchNews = (branchId: number, newsId: number) =>
+  request<{ deleted: boolean }>(`/branches/${branchId}/news/${newsId}`, { method: "DELETE" });

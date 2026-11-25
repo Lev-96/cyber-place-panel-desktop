@@ -20,3 +20,18 @@ export const useBoundBonusCard = (branchId: number, accountId: number | null | u
   }, [branchId, accountId]);
   return [card, setCard] as const;
 };
+
+/** The Club Card on a seat known only by its id (a changed way of paying, 2026-11-25). */
+export const useSessionBonusCard = (sessionId: number | null) => {
+  const [card, setCard] = useState<IBonusAccount | null>(null);
+  useEffect(() => {
+    let alive = true;
+    if (sessionId) {
+      void bonusRepository.sessionCard(sessionId).then((a) => { if (alive) setCard(a); }).catch(() => undefined);
+    } else {
+      setCard(null);
+    }
+    return () => { alive = false; };
+  }, [sessionId]);
+  return card;
+};

@@ -64,6 +64,7 @@ const MemberCard = lazy(() => import("@/routes/MemberCard"));
 const MembersList = lazy(() => import("@/routes/MembersList"));
 const BonusCards = lazy(() => import("@/routes/BonusCards"));
 const BonusSettings = lazy(() => import("@/routes/BonusSettings"));
+const BranchNews = lazy(() => import("@/routes/BranchNews"));
 const Notifications = lazy(() => import("@/routes/Notifications"));
 const SupportChat = lazy(() => import("@/routes/SupportChat"));
 const PcsList = lazy(() => import("@/routes/PcsList"));
@@ -194,6 +195,7 @@ const Authed = () => {
           {/* Cyber Place Club Card (2026-11-25). */}
           <Route path="/branches/:branchId/bonus" element={<RoleGuard perm="branch.bonus"><BonusCards /></RoleGuard>} />
           <Route path="/branches/:branchId/bonus/settings" element={<RoleGuard perm="branch.bonusSettings"><BonusSettings /></RoleGuard>} />
+          <Route path="/branches/:branchId/bonus/news" element={<RoleGuard perm="branch.bonus"><BranchNews /></RoleGuard>} />
           <Route
             path="/branches/:branchId/members"
             element={

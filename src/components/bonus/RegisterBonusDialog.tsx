@@ -1,6 +1,7 @@
 import QrScanner from "@/components/scanner/QrScanner";
 import Button from "@/components/ui/Button";
 import Modal from "@/components/ui/Modal";
+import FixedDialPhoneInput from "@/components/ui/FixedDialPhoneInput";
 import { useLang } from "@/i18n/LanguageContext";
 import { bonusRepository } from "@/repositories/BonusRepository";
 import { bonusCodeFromScan, normaliseBonusCode, type IBonusAccount } from "@/types/bonus";
@@ -30,7 +31,8 @@ const RegisterBonusDialog = ({ branchId, onClose, onSaved, initialCode }: Props)
   const details = checked !== null || byPhone;
   const [scanning, setScanning] = useState(false);
   const [name, setName] = useState("");
-  const [phone, setPhone] = useState("+374");
+  // The national digits (2026-11-25): the box shows +374 fixed, like the Club Card's.
+  const [phone, setPhone] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -43,7 +45,7 @@ const RegisterBonusDialog = ({ branchId, onClose, onSaved, initialCode }: Props)
       if (r.registered) { setErr(t("bonus.register.already")); return; }
       // The player's own name and phone, so they are not typed twice.
       if (r.player?.name) setName(r.player.name);
-      if (r.player?.phone) setPhone(r.player.phone);
+      if (r.player?.phone) setPhone(r.player.phone.replace(/\D/g, "").replace(/^374/, ""));
       setCode(c); setChecked(c);
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
@@ -52,7 +54,7 @@ const RegisterBonusDialog = ({ branchId, onClose, onSaved, initialCode }: Props)
     }
   };
 
-  const parsed = parsePhoneNumberFromString(phone, "AM");
+  const parsed = parsePhoneNumberFromString("+374" + phone, "AM");
   const phoneOk = !!parsed && parsed.isValid();
 
   const submit = async (e: FormEvent) => {
@@ -76,7 +78,7 @@ const RegisterBonusDialog = ({ branchId, onClose, onSaved, initialCode }: Props)
   return (
     // Asks before closing only when something was typed or a code was checked:
     // «по номеру телефона» opened and closed empty leaves at once.
-    <Modal open onClose={onClose} dirty={checked !== null || code !== "" || name.trim() !== "" || phone.replace(/\D/g, "") !== "374"}>
+    <Modal open onClose={onClose} dirty={checked !== null || code !== "" || name.trim() !== "" || phone !== ""}>
       <form className="col" style={{ gap: 14, minWidth: 340 }} onSubmit={submit} data-testid="bonus-register">
         <h3 style={{ margin: 0 }}>{t("bonus.register.title")}</h3>
         {!details ? (
@@ -105,8 +107,8 @@ const RegisterBonusDialog = ({ branchId, onClose, onSaved, initialCode }: Props)
             </label>
             <label className="col" style={{ gap: 4 }}>
               <span className="label">{t("bonus.register.phone")}</span>
-              <input className="input" value={phone} inputMode="tel" maxLength={24} disabled={busy} aria-invalid={!phoneOk}
-                onChange={(e) => setPhone(e.target.value)} data-testid="bonus-phone" />
+              <FixedDialPhoneInput countryCode="AM" value={phone} onChange={setPhone} disabled={busy}
+                invalid={phone !== "" && !phoneOk} ariaLabel={t("bonus.register.phone")} placeholder="91 123 456" testId="bonus-phone" />
             </label>
           </>
         )}

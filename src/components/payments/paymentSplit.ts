@@ -112,7 +112,7 @@ const OTHER_TEXT_MAX = 120;
  * currency that can carry more than two decimals: a number is rounded to the
  * cent, anything else is not an amount.
  */
-const partCents = (raw: string): number | null => {
+export const partCents = (raw: string): number | null => {
   const s = raw.replace(/[\s ]/g, "").replace(",", ".");
   if (!/^\d{1,8}(\.\d+)?$/.test(s)) return null;
   return Math.round(Number(s) * 100);
@@ -273,6 +273,17 @@ export const useAllBonuses = (dueCents: number, d: PaymentDraft, balanceCents: n
     draft: { ...d, split: true, bonus: spend === 0 ? "" : toAmount(spend), amounts: { cash: toAmount(short), card: "" }, own: [] },
     shortCents: short,
   };
+};
+
+/**
+ * «Сколько бонусами» (2026-11-25, owner): the cashier names the bonus part;
+ * the rest goes on cash, to be moved to a card or «Другое» as any split. The
+ * part is capped by the bill and the card; all of it is a single «Бонусы».
+ */
+export const useSomeBonuses = (dueCents: number, d: PaymentDraft, balanceCents: number, wantCents: number): PaymentDraft => {
+  const spend = Math.max(0, Math.min(wantCents, balanceCents, dueCents));
+  if (spend >= dueCents) return { ...d, split: false, method: "bonus", bonus: "", amounts: { cash: "", card: "" }, own: [] };
+  return { ...d, split: true, bonus: spend === 0 ? "" : toAmount(spend), amounts: { cash: toAmount(dueCents - spend), card: "" }, own: [] };
 };
 
 /** The draft with no bonuses in it (2026-11-25): the card was taken off the screen. */

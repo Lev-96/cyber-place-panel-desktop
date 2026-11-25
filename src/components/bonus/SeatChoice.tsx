@@ -57,14 +57,14 @@ const SeatChoice = ({ branchId, value, onChange, disabled = false }: Props) => {
             return (
               <fieldset key={g.key} className="seat-choice__group" data-testid="seat-group">
                 <legend>
-                  <label className="row" style={{ gap: 6, alignItems: "center" }}>
+                  <label className="seat-choice__tick">
                     <input type="checkbox" checked={every} disabled={disabled} onChange={(e) => set(ids, e.target.checked)} data-testid={`seat-group-${g.key}`} />
                     <strong>{g.label}</strong>
                   </label>
                 </legend>
-                <div className="row" style={{ gap: 12, flexWrap: "wrap" }}>
+                <div className="seat-choice__seats">
                   {g.places.map((p) => (
-                    <label key={p.id} className="row" style={{ gap: 6, alignItems: "center" }}>
+                    <label key={p.id} className="seat-choice__tick seat-choice__seat">
                       <input type="checkbox" checked={chosen.has(p.id)} disabled={disabled} onChange={(e) => set([p.id], e.target.checked)} data-testid={`seat-${p.id}`} />
                       <span>{"№" + (p.number ?? p.id) + (p.name ? " · " + p.name : "")}</span>
                     </label>

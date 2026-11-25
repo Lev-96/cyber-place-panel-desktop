@@ -1,5 +1,7 @@
-import Button from "@/components/ui/Button";
 import Modal from "@/components/ui/Modal";
+import { bonusAmountText } from "@/components/bonus/bonusAmount";
+import FixedDialPhoneInput from "@/components/ui/FixedDialPhoneInput";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import RankBadge from "./RankBadge";
 import { ListSkeleton } from "@/components/ui/Skeleton";
 import { StateSwitch, deriveViewState } from "@/components/ui/state";
@@ -20,10 +22,10 @@ interface Props {
 /** «Выбрать игрока»: this branch's cards only, filtered by phone. */
 const BonusCardPicker = ({ branchId, onClose, onPick, rankNames }: Props) => {
   const { t, money } = useLang();
-  const [phone, setPhone] = useState("");
-  const [applied, setApplied] = useState("");
+  // Found as the number is typed (2026-11-25, owner): no «Найти».
+  const [digits, setDigits] = useState("");
+  const applied = useDebouncedValue(digits, 300);
   const list = useAsync(() => bonusRepository.list(branchId, applied || undefined), [branchId, applied]);
-  const run = () => { if (phone === applied) void list.reload(); else setApplied(phone); };
   const view = deriveViewState({ loading: list.loading, error: list.error, data: list.data, hasFilters: applied.trim() !== "" });
 
   return (
@@ -32,11 +34,8 @@ const BonusCardPicker = ({ branchId, onClose, onPick, rankNames }: Props) => {
           frame and background, centred over the dimmed Start. */}
       <div className="card col" style={{ gap: 12, width: 440, maxWidth: "92vw", padding: 20 }} data-testid="bonus-picker">
         <h3 style={{ margin: 0 }}>{t("bonus.pick.title")}</h3>
-        <div className="row" style={{ gap: 6 }}>
-          <input className="input" inputMode="tel" autoFocus placeholder={t("bonus.searchPhone")} value={phone}
-            onChange={(e) => setPhone(e.target.value)} onKeyDown={(e) => e.key === "Enter" && run()} data-testid="bonus-picker-search" />
-          <Button type="button" variant="secondary" onClick={run}>{t("action.search")}</Button>
-        </div>
+        <FixedDialPhoneInput countryCode="AM" value={digits} onChange={setDigits} autoFocus
+          ariaLabel={t("bonus.searchPhone")} placeholder="91 123 456" testId="bonus-picker-search" />
         <StateSwitch
           view={view}
           skeleton={<ListSkeleton />}
@@ -53,7 +52,7 @@ const BonusCardPicker = ({ branchId, onClose, onPick, rankNames }: Props) => {
                   <div className="name row" style={{ gap: 8, alignItems: "center" }}>{a.name || t("bonus.noName")} <RankBadge rank={a.rank} label={rankNames?.[a.rank ?? "gamer"]} /></div>
                   <div className="meta">{a.phone}</div>
                 </div>
-                <div style={{ fontWeight: 700 }}>{t("bonus.balance").replace("{0}", money(Number(a.balance)))}</div>
+                <div style={{ fontWeight: 700 }}>{t("bonus.balance").replace("{0}", bonusAmountText(money, a.balance))}</div>
               </button>
             ))}
           </div>
