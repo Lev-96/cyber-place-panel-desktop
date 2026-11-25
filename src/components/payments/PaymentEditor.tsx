@@ -123,7 +123,7 @@ const PaymentEditor = ({ name, dueCents, value, onChange, check, money, disabled
         </button>
       </div>
 
-      {bonus && <BonusUseAll balanceCents={bonus.balanceCents} dueCents={dueCents} value={value} onChange={onChange} money={money} disabled={disabled} />}
+      {bonus && <BonusUseAll balanceCents={bonus.balanceCents} dueCents={dueCents} value={value} onChange={onChange} disabled={disabled} />}
 
       {!value.split && value.method === "other" && (
         <Input

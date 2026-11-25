@@ -2,6 +2,9 @@ import type { IBillBreakdown } from "@/api/sessions";
 
 type Prepaid = NonNullable<IBillBreakdown["prepaid"]>;
 
+/** How a part was paid ahead, in the receipt's words. */
+const WAY_KEY = { cash: "session.payCash", card: "session.payCard", other: "pay.otherShort", bonus: "pay.bonus" } as const;
+
 /**
  * The CASH change of a prepaid bill (2026-11-17): the server's `refund.cash`
  * when it says by method — a card refund goes back on the terminal, never out
@@ -65,6 +68,15 @@ const PrepaidSettlement = ({ prepaid, changeAfterStop, dueSettled = false, taken
         <span>{t("session.prepaid.atStart")}</span>
         <strong>{money(Number(prepaid.amount))}</strong>
       </div>
+      {/* How it was paid ahead (QA 2026-11-25): «наличными 698 · бонусами 302»,
+          so the change below is plainly the cash part's. Server figures. */}
+      {prepaid.by_method && Object.keys(prepaid.by_method).length > 0 && (
+        <div className="muted" style={{ fontSize: 13 }} data-testid="receipt-prepaid-ways">
+          {(["cash", "card", "other", "bonus"] as const)
+            .filter((m) => Number(prepaid.by_method?.[m] ?? 0) > 0)
+            .map((m) => `${t(WAY_KEY[m])} ${money(Number(prepaid.by_method![m]))}`).join(" · ")}
+        </div>
+      )}
       {anyBack ? (
         <>
           {change > 0 && (

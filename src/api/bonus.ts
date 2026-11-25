@@ -1,10 +1,22 @@
-import type { IBonusAccount, IBonusLookup, IBonusSettings, ITimeBonusSettings, ITimeBonusWin } from "@/types/bonus";
+import type { IBonusAccount, IBonusLookup, IBonusSettings, ITimeBonusSettings, ITimeBonusWin, RankStrategy, RankThresholds } from "@/types/bonus";
 import type { ISessionApi } from "@/types/sessions";
 import { request } from "./client";
 
 /** No `code`: a player without a smartphone, opened by phone (2026-11-25). */
 export interface RegisterBonusBody { code?: string; name?: string | null; phone: string }
-export interface UpdateBonusSettingsBody { enabled: boolean; percent: number; welcome: number }
+export interface UpdateBonusSettingsBody {
+  enabled: boolean; percent: number; welcome: number;
+  /** The earning hours (2026-11-25): both or neither (null = every hour). */
+  earn_from?: string | null; earn_to?: string | null;
+}
+export interface UpdateRankSettingsBody {
+  strategy: RankStrategy; thresholds?: RankThresholds;
+  /** The owner's names; an empty one = the standard name (2026-11-25). */
+  names?: Partial<Record<"gamer" | "pro" | "elite" | "veteran" | "legend", string>>;
+}
+
+export const apiUpdateRankSettings = (branchId: number, body: UpdateRankSettingsBody) =>
+  request<{ settings: IBonusSettings }>(`/branches/${branchId}/bonus-rank-settings`, { method: "PUT", body });
 
 export const apiBonusSettings = (branchId: number) =>
   request<{ settings: IBonusSettings }>(`/branches/${branchId}/bonus-settings`);
@@ -31,7 +43,7 @@ export const apiBindBonusAccount = (sessionId: number, bonusAccountId: number | 
   });
 
 /** The time bonus (2026-11-25). */
-export interface UpdateTimeBonusBody { enabled: boolean; from: string; to: string; minutes: number; per_window: number }
+export interface UpdateTimeBonusBody { enabled: boolean; from: string; to: string; minutes: number; per_window: number; place_ids?: number[] | null }
 
 export const apiUpdateTimeBonusSettings = (branchId: number, body: UpdateTimeBonusBody) =>
   request<{ time_bonus: ITimeBonusSettings }>(`/branches/${branchId}/time-bonus-settings`, { method: "PUT", body });

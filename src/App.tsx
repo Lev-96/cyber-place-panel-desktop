@@ -63,6 +63,7 @@ const Managers = lazy(() => import("@/routes/Managers"));
 const MemberCard = lazy(() => import("@/routes/MemberCard"));
 const MembersList = lazy(() => import("@/routes/MembersList"));
 const BonusCards = lazy(() => import("@/routes/BonusCards"));
+const BonusSettings = lazy(() => import("@/routes/BonusSettings"));
 const Notifications = lazy(() => import("@/routes/Notifications"));
 const SupportChat = lazy(() => import("@/routes/SupportChat"));
 const PcsList = lazy(() => import("@/routes/PcsList"));
@@ -192,6 +193,7 @@ const Authed = () => {
               way into a section, and the backend refuses these reads too. */}
           {/* Cyber Place Club Card (2026-11-25). */}
           <Route path="/branches/:branchId/bonus" element={<RoleGuard perm="branch.bonus"><BonusCards /></RoleGuard>} />
+          <Route path="/branches/:branchId/bonus/settings" element={<RoleGuard perm="branch.bonusSettings"><BonusSettings /></RoleGuard>} />
           <Route
             path="/branches/:branchId/members"
             element={

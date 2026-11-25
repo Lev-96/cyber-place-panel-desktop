@@ -10,6 +10,7 @@ import type { IBonusAccount } from "@/types/bonus";
 import Spinner from "@/components/ui/Spinner";
 import { IBillBreakdown } from "@/api/sessions";
 import { useLang } from "@/i18n/LanguageContext";
+import { centsWhenFractional } from "@/i18n/currency";
 import { fmt } from "@/i18n/translations";
 import { useConfirm } from "@/components/ui/ConfirmProvider";
 import { notify } from "@/ui/notify";
@@ -316,7 +317,19 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved, canRes
    */
   const cancelSession = async () => {
     if (stoppingNow.current) return;
-    if (!(await ask(fmt(t("session.cancel.confirm"), deviceLabel), { destructive: true }))) return;
+    // What goes back of a prepayment, way by way (QA 2026-11-25): the
+    // server's figures — cash from the drawer, a card on the terminal,
+    // bonuses back to the player's card.
+    const ahead = bill?.prepaid ?? null;
+    const ways = ahead ? (ahead.by_method ?? { cash: Number(ahead.amount) }) : null;
+    const back = ways ? [
+      ways.cash ? fmt(t("history.refundCash"), money(Number(ways.cash), centsWhenFractional(Number(ways.cash)))) : null,
+      ways.card ? fmt(t("history.refundCard"), money(Number(ways.card), centsWhenFractional(Number(ways.card)))) : null,
+      ways.other ? fmt(t("history.refundOther"), money(Number(ways.other), centsWhenFractional(Number(ways.other)))) : null,
+      ways.bonus ? fmt(t("history.refundBonus"), money(Number(ways.bonus), centsWhenFractional(Number(ways.bonus)))) : null,
+    ].filter(Boolean).join(", ") : "";
+    const question = fmt(t("session.cancel.confirm"), deviceLabel) + (back ? " " + fmt(t("session.cancel.refund"), back) : "");
+    if (!(await ask(question, { destructive: true }))) return;
     stoppingNow.current = true;
     setBusy(true); setErr(null);
     try {

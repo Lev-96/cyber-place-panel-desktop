@@ -9,7 +9,6 @@ vi.mock("@/repositories/BonusRepository", () => ({
   bonusRepository: { settings: (...a: unknown[]) => repo.settings(...a), list: (...a: unknown[]) => repo.list(...a) },
 }));
 vi.mock("@/auth/AuthContext", () => ({ useAuth: () => ({ user: { role: auth.role } }) }));
-vi.mock("@/components/bonus/BonusSettingsForm", () => ({ default: () => <div data-testid="settings-form" /> }));
 vi.mock("@/components/bonus/RegisterBonusDialog", () => ({ default: () => null }));
 vi.mock("@/i18n/LanguageContext", () => ({ useLang: () => ({ t: (k: string) => k, money: (n: number) => String(n) }) }));
 
@@ -24,12 +23,13 @@ afterEach(() => cleanup());
 beforeEach(() => { repo.settings.mockReset(); repo.list.mockReset(); auth.role = "company_owner"; });
 
 describe("«Бонусные карты»", () => {
-  test("the owner sees the rule and the branch's cards", async () => {
+  test("the owner sees the cards with their ranks and the way to «Настройки бонусной карты»", async () => {
     repo.settings.mockResolvedValue({ enabled: true, percent: "5.00", welcome: "0.00" });
-    repo.list.mockResolvedValue([{ id: 1, branch_id: 7, name: "Arman", phone: "+37491123456", balance: "35.00", opened_at: null }]);
+    repo.list.mockResolvedValue([{ id: 1, branch_id: 7, name: "Arman", phone: "+37491123456", balance: "35.00", opened_at: null, rank: "elite" }]);
     await mount();
-    expect(screen.getByTestId("settings-form")).toBeTruthy();
+    expect(screen.getByTestId("bonus-settings-link").getAttribute("href")).toBe("/branches/7/bonus/settings");
     expect(screen.getByText("Arman")).toBeTruthy();
+    expect(screen.getByTestId("rank-badge").getAttribute("data-rank")).toBe("elite");
     expect(repo.list).toHaveBeenCalledWith(7, undefined);
     expect((screen.getByTestId("bonus-register-open") as HTMLButtonElement).disabled).toBe(false);
   });
@@ -39,7 +39,7 @@ describe("«Бонусные карты»", () => {
     repo.settings.mockResolvedValue({ enabled: true, percent: "5.00", welcome: "0.00" });
     repo.list.mockResolvedValue([]);
     await mount();
-    expect(screen.queryByTestId("settings-form")).toBeNull();
+    expect(screen.queryByTestId("bonus-settings-link")).toBeNull();
     expect(screen.getByText("bonus.state.emptyTitle")).toBeTruthy();
   });
 

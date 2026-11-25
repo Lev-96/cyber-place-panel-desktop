@@ -1,7 +1,6 @@
 import { can } from "@/auth/permissions";
 import { useAuth } from "@/auth/AuthContext";
-import BonusSettingsForm from "@/components/bonus/BonusSettingsForm";
-import TimeBonusSettingsForm from "@/components/bonus/TimeBonusSettingsForm";
+import RankBadge from "@/components/bonus/RankBadge";
 import RegisterBonusDialog from "@/components/bonus/RegisterBonusDialog";
 import Button from "@/components/ui/Button";
 import { ListSkeleton } from "@/components/ui/Skeleton";
@@ -10,11 +9,12 @@ import { useAsync } from "@/hooks/useAsync";
 import { useLang } from "@/i18n/LanguageContext";
 import { bonusRepository } from "@/repositories/BonusRepository";
 import { useState } from "react";
-import { useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 
 /**
- * «Бонусные карты» of one branch (2026-11-25): the owner's rule on top, the
- * branch's cards below with a phone filter, and «Зарегистрировать игрока».
+ * «Бонусные карты» of one branch (2026-11-25): the branch's cards with a
+ * phone filter and their ranks, and «Зарегистрировать игрока». The rules live
+ * on their own page, «Настройки бонусной карты» (owner).
  */
 const BonusCards = () => {
   const { branchId } = useParams();
@@ -42,18 +42,10 @@ const BonusCards = () => {
         </Button>
       </div>
 
-      {settings.data && can(user?.role, "branch.bonusSettings") && (
-        <section className="card col" style={{ gap: 10, padding: 16 }}>
-          <h3 style={{ margin: 0 }}>{t("bonus.settings.title")}</h3>
-          <BonusSettingsForm branchId={id} settings={settings.data} onSaved={() => void settings.reload()} />
-        </section>
-      )}
-      {settings.data?.time_bonus && can(user?.role, "branch.bonusSettings") && (
-        <section className="card col" style={{ gap: 10, padding: 16 }}>
-          <h3 style={{ margin: 0 }}>{t("timeBonus.settings.title")}</h3>
-          <span className="muted" style={{ fontSize: 13 }}>{t("timeBonus.settings.lead")}</span>
-          <TimeBonusSettingsForm branchId={id} settings={settings.data.time_bonus} onSaved={() => void settings.reload()} />
-        </section>
+      {can(user?.role, "branch.bonusSettings") && (
+        <Link to={`/branches/${id}/bonus/settings`} className="btn secondary" style={{ alignSelf: "flex-start" }} data-testid="bonus-settings-link">
+          {t("hub.tile.bonusSettings")}
+        </Link>
       )}
       {settings.data && !enabled && <div className="muted">{t("bonus.disabledHint")}</div>}
 
@@ -74,7 +66,7 @@ const BonusCards = () => {
           {(list.data ?? []).map((a) => (
             <div key={a.id} className="list-item">
               <div>
-                <div className="name">{a.name || t("bonus.noName")}</div>
+                <div className="name row" style={{ gap: 8, alignItems: "center" }}>{a.name || t("bonus.noName")} <RankBadge rank={a.rank} label={settings.data?.rank?.names?.[a.rank ?? "gamer"]} /></div>
                 <div className="meta">{a.phone}</div>
               </div>
               <div style={{ fontWeight: 700, color: "var(--color-primary)" }}>{t("bonus.balance").replace("{0}", money(Number(a.balance)))}</div>

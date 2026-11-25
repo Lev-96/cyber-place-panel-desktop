@@ -83,9 +83,41 @@ const rateNowText = (meta: Record<string, unknown> | null, t: (k: string) => str
  * Paid ahead against the bill at the end (2026-11-15): "Paid ahead 2000 ·
  * Change 500", "· Due 500" or "· No change" — the server's three figures.
  */
+/**
+ * What went back of a prepayment, way by way (2026-11-25, QA): the server's
+ * `prepaid_refund` (only on a seat paid ahead by more than cash). Cash is the
+ * drawer's change; a card goes back on the terminal; bonuses to the player's
+ * card — never counted as cash.
+ */
+const refundByWay = (meta: Record<string, unknown> | null): Record<string, number> | null => {
+  const r = meta?.prepaid_refund;
+  if (r === null || typeof r !== "object" || Array.isArray(r)) return null;
+  const out: Record<string, number> = {};
+  for (const [k, v] of Object.entries(r as Record<string, unknown>)) {
+    const n = Number(v);
+    if (Number.isFinite(n) && n > 0) out[k] = n;
+  }
+  return out;
+};
+const refundOthersText = (ways: Record<string, number>, t: (k: string) => string, money: (n: number) => string): string[] => {
+  const out: string[] = [];
+  if (ways.card) out.push(fmt(t("history.refundCard"), money(ways.card)));
+  if (ways.other) out.push(fmt(t("history.refundOther"), money(ways.other)));
+  if (ways.bonus) out.push(fmt(t("history.refundBonus"), money(ways.bonus)));
+  return out;
+};
+
 const prepaidSettledText = (meta: Record<string, unknown> | null, t: (k: string) => string, money: (n: number) => string): string | null => {
   const prepaid = metaPositive(meta, "prepaid_amount");
   if (prepaid === null) return null;
+  const ways = refundByWay(meta);
+  if (ways !== null) {
+    const due = metaPositive(meta, "due");
+    const head = ways.cash ? fmt(t("history.prepaidChange"), money(prepaid), money(ways.cash))
+      : due !== null ? fmt(t("history.prepaidDue"), money(prepaid), money(due))
+      : fmt(t("history.prepaidExact"), money(prepaid));
+    return [head, ...refundOthersText(ways, t, money)].join(" · ");
+  }
   const change = metaPositive(meta, "change");
   if (change !== null) return fmt(t("history.prepaidChange"), money(prepaid), money(change));
   const due = metaPositive(meta, "due");
@@ -566,7 +598,12 @@ export const eventDetailParts = (
         money(metaNum(meta, "joysticks_total") ?? 0)));
       // Paid ahead (2026-11-15): a cancel hands all of it back.
       const refund = metaPositive(meta, "change") ?? metaPositive(meta, "prepaid_amount");
-      if (metaPositive(meta, "prepaid_amount") !== null && refund !== null) {
+      const ways = refundByWay(meta);
+      if (metaPositive(meta, "prepaid_amount") !== null && ways !== null) {
+        // Each way back (2026-11-25): the cash, the card, the bonuses.
+        parts.push([fmt(t("history.prepaidRefund"), money(refund ?? 0)),
+          ...(ways.cash ? [fmt(t("history.refundCash"), money(ways.cash))] : []), ...refundOthersText(ways, t, money)].join(" · "));
+      } else if (metaPositive(meta, "prepaid_amount") !== null && refund !== null) {
         parts.push(fmt(t("history.prepaidRefund"), money(refund)));
       }
       break;

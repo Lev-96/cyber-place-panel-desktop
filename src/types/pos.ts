@@ -32,6 +32,8 @@ export interface IProduct extends Translated {
   id: number;
   branch_id: number;
   name: string;
+  /** The product's picture on the public disk (2026-11-25): the club menu in the player's app. Absent from an older server. */
+  image_path?: string | null;
   category?: string | null;
   price: number;
   is_active: boolean;

@@ -1,4 +1,6 @@
 import Button from "@/components/ui/Button";
+import ImageUpload from "@/components/ui/ImageUpload";
+import { storageUri } from "@/infrastructure/AppConfig";
 import Input from "@/components/ui/Input";
 import Modal from "@/components/ui/Modal";
 import MultiLangInput, {
@@ -124,6 +126,19 @@ const ProductForm = ({ branchId, initial, onClose, onSaved, kind: kindProp = "re
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const locked = busy || exists !== null;
+  // The product's picture (2026-11-25): sent after the product is saved, on its
+  // own endpoint, so a picture that fails never loses the product.
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [dropImage, setDropImage] = useState(false);
+  const withPicture = async (p: IProduct): Promise<IProduct> => {
+    try {
+      if (imageFile) return await productRepository.setImage(p.id, imageFile);
+      if (dropImage && initial?.image_path) return await productRepository.removeImage(p.id);
+    } catch {
+      notify.warning(t("product.imageFailed"));
+    }
+    return p;
+  };
 
   const saveTranslations = (id: number) =>
     apiSaveEntityTranslations("product", id, { primary_locale: lang, fields: { name, category } });
@@ -149,6 +164,7 @@ const ProductForm = ({ branchId, initial, onClose, onSaved, kind: kindProp = "re
         notify.message("success", fmt(t("product.mergedToast"), tr(r.product, "name", lang), stockChangeText(r.stock_change, t("stock.notCounted"))));
       } else {
         await saveTranslations(r.product.id);
+        r.product = await withPicture(r.product);
         notify.message("success", typeof r.product.stock === "number"
           ? fmt(t("product.createdCounted"), stockNumber(r.product.stock))
           : t("toast.product.created"));
@@ -202,7 +218,7 @@ const ProductForm = ({ branchId, initial, onClose, onSaved, kind: kindProp = "re
 
       await saveTranslations(p.id);
 
-      onSaved(p);
+      onSaved(await withPicture(p));
     } catch (e) {
       setErr(e instanceof Error ? e.message : t("form.errors.failedSave"));
     } finally { setBusy(false); }
@@ -248,6 +264,22 @@ const ProductForm = ({ branchId, initial, onClose, onSaved, kind: kindProp = "re
         />
 
         <PriceInput label={t("label.price")} value={price} onChange={setPrice} required disabled={locked} />
+
+        {kind === "regular" && (
+          <div className="col" style={{ gap: 6 }} data-testid="product-image">
+            <ImageUpload
+              label={t("product.image")}
+              initialUrl={dropImage ? null : storageUri(initial?.image_path)}
+              name={primaryValue(name, lang)}
+              onChange={(f) => { setImageFile(f); if (f) setDropImage(false); }}
+            />
+            {initial?.image_path && !dropImage && !imageFile && (
+              <button type="button" className="cp-link-btn" style={{ alignSelf: "flex-start" }} disabled={locked}
+                onClick={() => setDropImage(true)} data-testid="product-image-remove">{t("product.imageRemove")}</button>
+            )}
+            <span className="muted" style={{ fontSize: 12 }}>{t("product.imageHint")}</span>
+          </div>
+        )}
 
         {/* The joysticks' two answers, in their words (2026-11-17): the price
             is added once, or it changes the seat's hourly rate while the item

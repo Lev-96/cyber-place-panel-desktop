@@ -50,7 +50,7 @@ const BonusCardStartSwitch = ({ branchId, disabled, value, onChange }: Props) =>
         </div>
       )}
       {picking && (
-        <BonusCardPicker branchId={branchId}
+        <BonusCardPicker branchId={branchId} rankNames={settings.data.rank?.names}
           onClose={() => { setPicking(false); if (value === null) setOn(false); }}
           onPick={(a) => { onChange(a); setPicking(false); }} />
       )}

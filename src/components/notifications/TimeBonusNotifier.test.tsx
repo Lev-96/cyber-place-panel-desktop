@@ -74,6 +74,40 @@ describe("TimeBonusNotifier", () => {
     expect(screen.getByTestId("time-bonus")).toBeTruthy();
   });
 
+  test("a Club Card on the seat: the window says the player was asked too", async () => {
+    repo.pendingTimeBonus.mockResolvedValue([win({ asked_player: true })]);
+    await mount();
+    expect(screen.getByTestId("time-bonus-asked-player")).toBeTruthy();
+    expect(screen.getByTestId("time-bonus-grant")).toBeTruthy();
+  });
+
+  test("the player took it in the app (2026-11-25): told, «Понятно» hides it for THIS person only — nothing granted again", async () => {
+    localStorage.clear();
+    repo.pendingTimeBonus.mockResolvedValue([win({ status: "granted", answered_by: "player" })]);
+    await mount();
+    expect(screen.getByTestId("time-bonus-player-answer").textContent).toContain("timeBonus.playerTook");
+    expect(screen.queryByTestId("time-bonus-grant")).toBeNull();
+    await act(async () => { fireEvent.click(screen.getByTestId("time-bonus-seen")); });
+    expect(repo.grantTimeBonus).not.toHaveBeenCalled();
+    expect(screen.queryByTestId("time-bonus-player-answer")).toBeNull();
+    expect(localStorage.getItem("u1:cp.timeBonus.seen")).toBe("[3]");
+    // Read again (the server still lists it): this person is not asked twice…
+    cleanup();
+    await mount();
+    expect(screen.queryByTestId("time-bonus-player-answer")).toBeNull();
+    // …another person on the same branch still is.
+    cleanup();
+    localStorage.removeItem("u1:cp.timeBonus.seen");
+    await mount();
+    expect(screen.getByTestId("time-bonus-player-answer")).toBeTruthy();
+  });
+
+  test("the player declined: said as declined", async () => {
+    repo.pendingTimeBonus.mockResolvedValue([win({ status: "declined", answered_by: "player" })]);
+    await mount();
+    expect(screen.getByTestId("time-bonus-player-answer").textContent).toContain("timeBonus.playerDeclined");
+  });
+
   test("a cashier is never asked, and nothing is read", async () => {
     auth.role = "cashier";
     await mount();

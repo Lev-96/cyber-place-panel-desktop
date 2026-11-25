@@ -10,7 +10,9 @@ import {
   apiGrantTimeBonus,
   apiPendingTimeBonus,
   apiUpdateTimeBonusSettings,
+  apiUpdateRankSettings,
   RegisterBonusBody,
+  UpdateRankSettingsBody,
   UpdateBonusSettingsBody,
   UpdateTimeBonusBody,
 } from "@/api/bonus";
@@ -29,6 +31,7 @@ export class BonusRepository {
   lookup(branchId: number, code: string) { return friendlyMutation(apiLookupBonusCode(branchId, code)); }
   register(branchId: number, b: RegisterBonusBody) { return friendlyMutation(apiRegisterBonusAccount(branchId, b).then((r) => r.account)); }
   bind(sessionId: number, accountId: number | null) { return friendlyMutation(apiBindBonusAccount(sessionId, accountId)); }
+  updateRanks(branchId: number, b: UpdateRankSettingsBody) { return friendlyMutation(apiUpdateRankSettings(branchId, b).then((r) => r.settings)); }
   updateTimeBonus(branchId: number, b: UpdateTimeBonusBody) { return friendlyMutation(apiUpdateTimeBonusSettings(branchId, b).then((r) => r.time_bonus)); }
   pendingTimeBonus() { return apiPendingTimeBonus().then((r) => r.data); }
   grantTimeBonus(winId: number) { return friendlyMutation(apiGrantTimeBonus(winId).then((r) => r.session)); }

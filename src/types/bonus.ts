@@ -9,8 +9,28 @@ export interface IBonusSettings {
   percent: string;
   /** What a new card starts with; "0.00" = none. */
   welcome: string;
+  /** The hours whose games earn the percent ("10:00"); null = every hour. Absent from an older server. */
+  earn_from?: string | null;
+  earn_to?: string | null;
+  /** Ranks (2026-11-25); absent from an older server. */
+  rank?: IRankSettings;
   /** The time bonus (2026-11-25); absent from a server before it. */
   time_bonus?: ITimeBonusSettings;
+}
+
+/** GAMER … LEGEND, lowest first — the server's `BonusRank::LADDER`. */
+export const RANKS = ["gamer", "pro", "elite", "veteran", "legend"] as const;
+export type Rank = (typeof RANKS)[number];
+/** What moves a card up: none, hours played, days visited, money spent. */
+export type RankStrategy = "none" | "hours" | "visits" | "spent";
+export interface RankThresholds { pro: number; elite: number; veteran: number; legend: number }
+/** The names a branch shows for its ranks: the owner's, or the standard ones. */
+export type RankNames = Record<Rank, string>;
+export interface IRankSettings {
+  strategy: RankStrategy;
+  thresholds: RankThresholds | null;
+  /** The owner's own names (2026-11-25); absent from an older server = the standard ones. */
+  names?: RankNames;
 }
 
 /** The owner's time bonus rule: in these hours, `per_window` seats with a limit win `minutes` free. */
@@ -21,12 +41,20 @@ export interface ITimeBonusSettings {
   to: string | null;
   minutes: number;
   per_window: number;
+  /** The seats that may win (place ids); null = every seat. Absent from an older server. */
+  place_ids?: number[] | null;
 }
 
 /** A seat that won free minutes and waits for a manager's answer. */
 export interface ITimeBonusWin {
   id: number;
   branch_id: number;
+  /** pending, or — answered by the player in the app — granted / declined / void (2026-11-25). Absent from an older server = pending. */
+  status?: "pending" | "granted" | "declined" | "void";
+  /** "player": the player answered in the app; the desk is told once. */
+  answered_by?: "staff" | "player" | null;
+  /** The player's phone was offered the win (a Club Card is on the seat). */
+  asked_player?: boolean;
   session_id: number;
   minutes: number;
   drawn_at: string | null;
@@ -43,6 +71,8 @@ export interface IBonusAccount {
   phone: string;
   balance: string;
   opened_at: string | null;
+  /** GAMER … LEGEND (2026-11-25); absent from an older server. */
+  rank?: Rank;
 }
 
 export interface IBonusLookup {
