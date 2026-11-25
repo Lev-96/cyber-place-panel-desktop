@@ -5809,3 +5809,12 @@ when false. Tests: `sessionAmount.productsAtPrice.test.ts` (950 / 870 / 1350 /
   `TimeBonusNotifier` in `Layout` (owners/managers; polls `/time-bonus/pending`
   every 15 s; «Начислить» / «Отказаться»). History names a gift
   `history.timeBonus`.
+- «Настройки бонусной карты» (`/branches/:id/bonus/settings`, `branch.bonusSettings`,
+  hub tile `bonusSettings`): the bonus rule with earning hours, ranks
+  (`RankSettingsForm`), the time bonus with its seats (`SeatChoice`: all, a
+  group — platform · sub-category · VIP — or seat by seat). «Бонусные карты»
+  keeps the list (with `RankBadge`) and registration.
+- Product picture: `ProductForm` (regular products) uploads after the save
+  on `/products/{id}/image`; a failed picture warns and keeps the product.
+  `TimeBonusNotifier` says when the player was asked in the app, and shows a
+  player's answer once per person («Понятно» kept in `u{id}:cp.timeBonus.seen`).
