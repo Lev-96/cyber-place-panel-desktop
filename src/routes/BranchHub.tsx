@@ -233,7 +233,12 @@ const BranchHub = () => {
         className="row"
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
+          // Wide enough for the longest word of a title (am «Համակարգիչներ»),
+          // and every tile one height, the tallest one's (2026-11-26, owner:
+          // the tiles were uneven): rows share a height, tiles stretch to it.
+          gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))",
+          gridAutoRows: "1fr",
+          alignItems: "stretch",
           gap: 12,
           width: "100%",
         }}

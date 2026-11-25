@@ -9986,12 +9986,13 @@ select.input option:disabled {
    grows with its words; the tiles of a row stay one height (the grid). */
 .hub-tile__label {
   min-width: 0;
-  overflow-wrap: anywhere;
+  /* Whole words to the next line; a word is split only when it cannot fit. */
+  overflow-wrap: break-word;
 }
 .hub-tile__hint {
   font-size: 12px;
   line-height: 1.35;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
 }
 
 /* Invoice state / access badges. */
