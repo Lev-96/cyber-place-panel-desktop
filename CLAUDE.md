@@ -5842,3 +5842,6 @@ when false. Tests: `sessionAmount.productsAtPrice.test.ts` (950 / 870 / 1350 /
   84 px and grows with its words; the title wraps (no ellipsis) and the hint
   shows in full (`.hub-tile__label`, `.hub-tile__hint`). Checked ru/am at 1280
   and 900 px: no tile clips.
+  All tiles share one height (`gridAutoRows: 1fr`, the tallest tile's) and
+  columns are at least 240 px so a title word is never split («Համակարգիչներ»);
+  wrapping is whole-word (`overflow-wrap: break-word`).
