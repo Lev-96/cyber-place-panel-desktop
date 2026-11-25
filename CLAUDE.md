@@ -5834,3 +5834,11 @@ when false. Tests: `sessionAmount.productsAtPrice.test.ts` (950 / 870 / 1350 /
   by `groupNational`) in registration, the card search (live, debounced, no
   «Найти»), the player picker and bookings. «Сколько бонусами» applies as it is
   typed (capped at the card and the bill), no «Применить».
+- Register dialog (2026-11-26): a code whose number already has a card here
+  under an earlier copy of the app shows «У этого номера уже есть карта…» with
+  the card and «Перенести карту» (sends `move: true`); a 409 `existing` from the
+  server opens the same offer; changing the number takes it away.
+- Branch hub tiles (2026-11-26, owner: words cut off): a tile is at least
+  84 px and grows with its words; the title wraps (no ellipsis) and the hint
+  shows in full (`.hub-tile__label`, `.hub-tile__hint`). Checked ru/am at 1280
+  and 900 px: no tile clips.
