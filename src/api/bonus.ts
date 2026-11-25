@@ -3,7 +3,11 @@ import type { ISessionApi } from "@/types/sessions";
 import { request } from "./client";
 
 /** No `code`: a player without a smartphone, opened by phone (2026-11-25). */
-export interface RegisterBonusBody { code?: string; name?: string | null; phone: string }
+export interface RegisterBonusBody {
+  code?: string; name?: string | null; phone: string;
+  /** Move this number's card from an earlier copy of the app (2026-11-26). */
+  move?: boolean;
+}
 export interface UpdateBonusSettingsBody {
   enabled: boolean; percent: number; welcome: number;
   /** The earning hours (2026-11-25): both or neither (null = every hour). */

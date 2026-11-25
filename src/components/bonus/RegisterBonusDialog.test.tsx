@@ -8,7 +8,7 @@ vi.mock("@/repositories/BonusRepository", () => ({
 }));
 vi.mock("@/components/scanner/QrScanner", () => ({ default: () => null }));
 vi.mock("@/ui/notify", () => ({ notify: { message: vi.fn() } }));
-vi.mock("@/i18n/LanguageContext", () => ({ useLang: () => ({ t: (k: string) => k }) }));
+vi.mock("@/i18n/LanguageContext", () => ({ useLang: () => ({ t: (k: string) => k, money: (n: number) => String(n) }) }));
 
 import RegisterBonusDialog from "./RegisterBonusDialog";
 
@@ -61,6 +61,47 @@ describe("registering a player at the till", () => {
     expect((screen.getByTestId("bonus-name") as HTMLInputElement).value).toBe("Арман");
     await press("bonus.register.open");
     expect(repo.register).toHaveBeenCalledWith(7, { code: "ABC234", name: "Арман", phone: "+37491556677" });
+  });
+
+  test("the app added again (2026-11-26): this number's card is offered and MOVED, never a second one", async () => {
+    const card = { id: 9, branch_id: 7, name: "Арман", phone: "+37491556677", balance: "950.00", opened_at: null };
+    repo.lookup.mockResolvedValue({ code: "NEW234", registered: false, account: null, player: { name: "Арман", phone: "+37491556677" }, existing: card });
+    repo.register.mockResolvedValue(card);
+    const onSaved = vi.fn();
+    mount(onSaved);
+    fireEvent.change(screen.getByTestId("bonus-code"), { target: { value: "NEW234" } });
+    await press("bonus.register.check");
+    expect(screen.getByTestId("bonus-move").textContent).toContain("bonus.move.title");
+    await press("bonus.move.button");
+    expect(repo.register).toHaveBeenCalledWith(7, { code: "NEW234", name: "Арман", phone: "+37491556677", move: true });
+    expect(onSaved).toHaveBeenCalledWith(card);
+  });
+
+  test("the server says the number has a card (409): the move is offered, then sent", async () => {
+    const card = { id: 9, branch_id: 7, name: "Арман", phone: "+37491556677", balance: "950.00", opened_at: null };
+    repo.lookup.mockResolvedValue({ code: "NEW234", registered: false, account: null, player: { name: "Арман", phone: null } });
+    repo.register.mockRejectedValueOnce(Object.assign(new Error("card-exists"), { status: 409, body: { existing: card } }));
+    repo.register.mockResolvedValueOnce(card);
+    mount();
+    fireEvent.change(screen.getByTestId("bonus-code"), { target: { value: "NEW234" } });
+    await press("bonus.register.check");
+    fireEvent.change(screen.getByTestId("bonus-phone"), { target: { value: "91 556 677" } });
+    await press("bonus.register.open");
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(screen.getByTestId("bonus-move")).toBeTruthy();
+    await press("bonus.move.button");
+    expect(repo.register).toHaveBeenLastCalledWith(7, { code: "NEW234", name: "Арман", phone: "+37491556677", move: true });
+  });
+
+  test("changing the number takes the move offer away", async () => {
+    const card = { id: 9, branch_id: 7, name: "Арман", phone: "+37491556677", balance: "950.00", opened_at: null };
+    repo.lookup.mockResolvedValue({ code: "NEW234", registered: false, account: null, player: { name: "Арман", phone: "+37491556677" }, existing: card });
+    mount();
+    fireEvent.change(screen.getByTestId("bonus-code"), { target: { value: "NEW234" } });
+    await press("bonus.register.check");
+    fireEvent.change(screen.getByTestId("bonus-phone"), { target: { value: "91 000 111" } });
+    expect(screen.queryByTestId("bonus-move")).toBeNull();
+    expect(screen.getByRole("button", { name: "bonus.register.open" })).toBeTruthy();
   });
 
   test("no smartphone: name and phone only, no code is sent", async () => {

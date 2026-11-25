@@ -310,7 +310,9 @@ const Tile = ({ icon, to, title, hint, disabled, disabledHint, dragHint, draggin
     onDrop={onDrop}
     style={{
       position: "relative",
-      height: 84,
+      // At least 84 px, taller when the words need it (2026-11-26, owner:
+      // the hint was cut off): every word of a tile is always shown.
+      minHeight: 84,
       textDecoration: "none",
       display: "flex",
       flexDirection: "column",
@@ -338,7 +340,7 @@ const Tile = ({ icon, to, title, hint, disabled, disabledHint, dragHint, draggin
       <NavIcon id={icon} />
       <span className="hub-tile__label">{title}</span>
     </div>
-    <div className="muted" style={{ fontSize: 12, lineHeight: 1.3, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>{hint}</div>
+    <div className="muted hub-tile__hint">{hint}</div>
   </Link>
 );
 

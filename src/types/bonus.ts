@@ -81,6 +81,11 @@ export interface IBonusLookup {
   account: IBonusAccount | null;
   /** What the player wrote in their app (2026-11-25), offered to staff. */
   player?: { name: string | null; phone: string | null };
+  /**
+   * This number's card held by an earlier copy of the app (2026-11-26): the
+   * player removed it and added it again. Staff move it, never open a second.
+   */
+  existing?: IBonusAccount | null;
 }
 
 /** The 6-character code: the backend's ClubPlayerService::ALPHABET (no 0/O/1/I/L). */
