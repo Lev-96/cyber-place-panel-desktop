@@ -26,11 +26,28 @@ export const orFallback = async <T>(p: Promise<T>, fallback: T): Promise<T> => {
   catch (e) { if (isMissingEndpoint(e)) return fallback; throw e; }
 };
 
-/** Wraps a CRUD mutation: rewrites missing-endpoint errors into a friendly message. */
+/**
+ * Whether a 404/501 carries the server's OWN sentence (2026-11-25): «Карты с
+ * таким кодом нет…» is an answer to show, not a missing endpoint. Only
+ * Laravel's bare words — «Not Found», «The route … could not be found»,
+ * «No query results for model …», or no message at all — mean the route is
+ * not there.
+ */
+const hasServerSentence = (e: unknown): boolean => {
+  const body = (e as Partial<ApiError> | null)?.body as { message?: unknown } | null | undefined;
+  const message = typeof body?.message === "string" ? body.message.trim() : "";
+  if (message === "") return false;
+  return !/^(not found|the route .* could not be found\.?|no query results for model .*)$/i.test(message);
+};
+
+/**
+ * Wraps a CRUD mutation: a missing endpoint becomes a friendly message; the
+ * server's own 404 sentence is passed through as it was said.
+ */
 export const friendlyMutation = async <T>(p: Promise<T>): Promise<T> => {
   try { return await p; }
   catch (e) {
-    if (isMissingEndpoint(e)) {
+    if (isMissingEndpoint(e) && !hasServerSentence(e)) {
       throw new Error("Backend endpoint is not deployed yet. Run `php artisan migrate` and deploy the new Laravel files.");
     }
     throw e;
