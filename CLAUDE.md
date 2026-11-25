@@ -5818,3 +5818,19 @@ when false. Tests: `sessionAmount.productsAtPrice.test.ts` (950 / 870 / 1350 /
   on `/products/{id}/image`; a failed picture warns and keeps the product.
   `TimeBonusNotifier` says when the player was asked in the app, and shows a
   player's answer once per person («Понятно» kept in `u{id}:cp.timeBonus.seen`).
+- Bonuses everywhere money is taken: «Место закончилось» (`DueConfirmNotifier`,
+  the seat's card by `bonus_account_id`) and «Изменить способ оплаты»
+  (`ChangePaymentDialog`, the seat's card by `useSessionBonusCard`) send
+  `billPaymentBody`. «Сколько бонусами» in `BonusUseAll` (`useSomeBonuses`):
+  the named part from the card, the rest on cash. «Удалить» on each card of
+  «Бонусные карты» (asked first). Start's «Бонусная карта» is a tile like
+  «Бесплатная сессия» (`tone="bonus"`); bonus hours use `HoursRange` (Start's
+  clock field).
+- Club news (2026-11-25): `/branches/:id/bonus/news` (`BranchNews`, hub tile
+  «Новости клуба», also linked from «Бонусные карты»; `branch.bonus`): a
+  headline and an optional text, «Опубликовать и отправить игрокам», the list
+  with «Удалить». Card balances are shown to the cent (`bonusAmountText`),
+  never rounded. Phone boxes are `FixedDialPhoneInput` (🇦🇲 +374, digits grouped
+  by `groupNational`) in registration, the card search (live, debounced, no
+  «Найти»), the player picker and bookings. «Сколько бонусами» applies as it is
+  typed (capped at the card and the bill), no «Применить».
