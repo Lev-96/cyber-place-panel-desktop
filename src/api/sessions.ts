@@ -94,12 +94,15 @@ export interface StartSessionBody {
   prepaid_sum?: number;
   /**
    * HOW it was paid ahead (2026-11-17), with `prepaid` or `paid_amount` only:
-   * Stop's own keys. Absent = cash, as every start before it.
+   * Stop's own keys. Absent = cash, as every start before it. `bonus` only
+   * with `bonus_account_id` (2026-11-25).
    */
-  payment_method?: PaymentMethod;
+  payment_method?: PrepaidMethod;
   payment_method_other?: string;
-  payments?: { method: PaymentMethod; amount: number }[];
+  payments?: { method: PrepaidMethod; amount: number }[];
   payment_note?: string;
+  /** The Club Card bound with the start (2026-11-25); sent when bonuses pay ahead. */
+  bonus_account_id?: number;
 }
 
 /** What "+ Время" would charge for N minutes now — the server's own figure. */
@@ -388,8 +391,9 @@ export interface IPrepaidSummary {
   amount: number;
   change: number;
   due: number;
-  by_method?: Partial<Record<PaymentMethod, number>>;
-  refund?: Partial<Record<PaymentMethod, number>>;
+  by_method?: Partial<Record<PrepaidMethod, number>>;
+  /** `bonus` (2026-11-25): bonuses paid ahead and not used, going back to the Club Card. */
+  refund?: Partial<Record<PrepaidMethod, number>>;
 }
 
 export interface AddItemBody {
@@ -431,6 +435,8 @@ export const apiPreviewSession = (id: number) =>
 
 /** How the money was taken. `other` is the only one that carries free text. */
 export type PaymentMethod = "cash" | "card" | "other";
+/** A prepayment's way of paying (2026-11-25): the shared methods, or the seat's Club Card bonuses. */
+export type PrepaidMethod = PaymentMethod | "bonus";
 
 /** One part of a bill's payment (2026-11-07): a split has 2..3, one per method. */
 export interface IPaymentLine {
@@ -720,9 +726,9 @@ export const apiAddSessionTime = (sessionId: number, minutes: number, charge?: n
  * cash ({@link prepaidPaymentFields}).
  */
 export type PrepaidPayment = {
-  payment_method?: PaymentMethod;
+  payment_method?: PrepaidMethod;
   payment_method_other?: string;
-  payments?: { method: PaymentMethod; amount: number }[];
+  payments?: { method: PrepaidMethod; amount: number }[];
   payment_note?: string;
 };
 

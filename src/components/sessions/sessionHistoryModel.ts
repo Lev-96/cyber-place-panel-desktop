@@ -37,7 +37,7 @@ const paidPartsOf = (meta: Record<string, unknown> | null): PaidPart[] => {
   return raw.flatMap((p) => {
     const m = (p as { method?: unknown }).method;
     const a = (p as { amount?: unknown }).amount;
-    return (m === "cash" || m === "card" || m === "other" || m === "deposit") && (typeof a === "number" || typeof a === "string")
+    return (m === "cash" || m === "card" || m === "other" || m === "deposit" || m === "bonus") && (typeof a === "number" || typeof a === "string")
       ? [{ method: m, amount: a } as PaidPart] : [];
   });
 };
@@ -141,19 +141,23 @@ export const paymentLabelOf = (
     return typed === "" ? t("pay.otherShort") : typed;
   }
 
+  // Bonuses (2026-11-25) say so: never read as «Карта», the fallback below.
+  if (method === "bonus") return t("pay.bonus");
+
   return t(method === "cash" ? "session.payCash" : "session.payCard");
 };
 
 /**
  * How a sum paid ahead was paid (2026-11-17), from the line's own
  * `prepaid_payments` / `prepaid_method`: null for cash (every line before it,
- * whose wording already says «наличными»), else "Карта", "Другое", or
+ * whose wording already says «наличными»), else "Карта", "Другое", "Бонусы"
+ * (a Club Card, 2026-11-25), or
  * "Наличные 1 200, Карта 800" for a split.
  */
 const prepaidMethodText = (meta: Record<string, unknown> | null, t: (k: string) => string, money: (n: number) => string): string | null => {
   const method = metaStr(meta, "prepaid_method");
   if (method === null || method === "cash") return null;
-  const name = (m: string) => t(m === "cash" ? "session.payCash" : m === "card" ? "session.payCard" : "pay.otherShort");
+  const name = (m: string) => t(m === "cash" ? "session.payCash" : m === "card" ? "session.payCard" : m === "bonus" ? "pay.bonus" : "pay.otherShort");
   const parts = Array.isArray(meta?.prepaid_payments) ? (meta!.prepaid_payments as Array<{ method?: unknown; amount?: unknown; note?: unknown }>) : [];
   if (method === "split" && parts.length > 1) {
     return parts.map((p) => `${name(String(p.method))} ${money(Number(p.amount))}`).join(", ");
@@ -333,7 +337,9 @@ export const eventDetailParts = (
 
     case "time_added": {
       const minutes = metaNum(meta, "minutes");
-      if (minutes !== null) parts.push(`+${minutes} ${t("time.minShort")}`);
+      // The time bonus (2026-11-25): a gift from the club, never charged.
+      if (metaTrue(meta, "time_bonus") && minutes !== null) parts.push(fmt(t("history.timeBonus"), String(minutes)));
+      else if (minutes !== null) parts.push(`+${minutes} ${t("time.minShort")}`);
       const newEnd = metaStr(meta, "new_ends_at");
       if (newEnd !== null) parts.push(`${t("history.untilLabel")} ${formatTime(new Date(newEnd))}`);
       // A price agreed at the counter (2026-10-25), beside what the rate asked.

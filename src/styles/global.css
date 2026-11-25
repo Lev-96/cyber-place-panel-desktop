@@ -12273,6 +12273,18 @@ button.sales-card:focus-visible { outline: 2px solid var(--color-primary); outli
 .due-confirm__question { margin: 4px 0 0; font-size: 18px; font-weight: 700; }
 .due-confirm__answers { display: flex; gap: 10px; flex-wrap: wrap; }
 .due-confirm__answers > .btn { flex: 1 1 180px; min-height: 48px; font-size: 16px; }
+/* «Бонус времени» (2026-11-25): the due window's frame, a celebration inside. */
+.time-bonus { text-align: center; align-items: center; }
+.time-bonus .due-confirm__answers { width: 100%; }
+.time-bonus__burst { font-size: 44px; line-height: 1; }
+.time-bonus__seat { margin: 0; font-size: 20px; font-weight: 700; overflow-wrap: anywhere; }
+.time-bonus__player { margin: 0; font-size: 18px; overflow-wrap: anywhere; }
+.time-bonus__prize {
+  margin: 4px 0 0; padding: 10px 18px; border-radius: 14px;
+  font-size: 30px; font-weight: 800; color: var(--color-primary);
+  background: rgb(var(--accent-rgb) / 0.10); border: 1px solid rgb(var(--accent-rgb) / 0.45);
+}
+.time-bonus__note { margin: 0; font-size: 14px; }
 .due-confirm__later { align-self: center; }
 
 /* «Незакрытые счета» (2026-11-22, owner; OpenBillsNotifier): a compact amber

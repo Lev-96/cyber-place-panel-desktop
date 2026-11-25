@@ -1,6 +1,7 @@
 import Button from "@/components/ui/Button";
 import PaymentEditor from "@/components/payments/PaymentEditor";
 import { checkPayment, emptyPaymentDraft, prepaidPaymentFields, type PaymentDraft } from "@/components/payments/paymentSplit";
+import { useBoundBonusCard } from "@/components/bonus/useBoundBonusCard";
 import JoystickIcon from "@/components/ui/JoystickIcon";
 import Checkbox from "@/components/ui/Checkbox";
 import PriceInput from "@/components/ui/PriceInput";
@@ -206,6 +207,8 @@ const SessionOptionsDialog = ({ session, platform, onClose, onChanged, platformN
   const grantCharge = grantBy === "time" ? quotedCharge : moneyQuoted?.charge ?? null;
   const grantChargeCents = grantCharge === null ? null : Math.round(grantCharge * 100);
   const paidNowCheck = checkPayment(grantChargeCents ?? 0, paidNowPay);
+  // The seat's Club Card (2026-11-25): «+ Время» may be paid ahead with its bonuses.
+  const [bonusCard] = useBoundBonusCard(current.branch_id, current.bonus_account_id);
   const paidNowPayField = prepaidPaymentFields(paidNowPay, paidNowCheck);
   // Cash adds nothing to the call — the request every «Оплачено сейчас» sent before.
   const paidNowPayArgs: [] | [typeof paidNowPayField] = Object.keys(paidNowPayField).length === 0 ? [] : [paidNowPayField];
@@ -808,6 +811,7 @@ const SessionOptionsDialog = ({ session, platform, onClose, onChanged, platformN
                   check={paidNowCheck}
                   money={money}
                   disabled={busy || !isActive}
+                  bonus={bonusCard ? { balanceCents: Math.round(Number(bonusCard.balance) * 100) } : undefined}
                 />
               )}
               {(() => {

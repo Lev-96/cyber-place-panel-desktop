@@ -8,6 +8,7 @@ import SessionReminderNotifier from "./notifications/SessionReminderNotifier";
 import BillingNoticeNotifier from "./notifications/BillingNoticeNotifier";
 import PanelUpdateNotifier from "./notifications/PanelUpdateNotifier";
 import DueConfirmNotifier from "./notifications/DueConfirmNotifier";
+import TimeBonusNotifier from "@/components/notifications/TimeBonusNotifier";
 import OpenBillsNotifier from "./notifications/OpenBillsNotifier";
 import SupportNotifier from "./notifications/SupportNotifier";
 import { Ps5ControlProvider } from "@/ps5/Ps5ControlProvider";
@@ -58,6 +59,7 @@ const Layout = () => (
     <SessionEndingNotifier />
     {/* A seat paid ahead ended owing more: how was it paid? (2026-11-20) */}
     <DueConfirmNotifier />
+    <TimeBonusNotifier />
     {/* Final bills hidden to close later, until a payment closes them (2026-11-22). */}
     <OpenBillsNotifier />
     {/* A reminder a player asked for has rung (2026-11-15, the server's notification). */}

@@ -11,6 +11,10 @@ import Spinner from "@/components/ui/Spinner";
 import { useAuth } from "@/auth/AuthContext";
 import { can } from "@/auth/permissions";
 import { useLang } from "@/i18n/LanguageContext";
+import BonusCardStartSwitch from "@/components/bonus/BonusCardStartSwitch";
+import { bonusRepository } from "@/repositories/BonusRepository";
+import type { IBonusAccount } from "@/types/bonus";
+import { notify } from "@/ui/notify";
 import { fmt } from "@/i18n/translations";
 import { timePackageNameOf } from "@/i18n/timePackageName";
 import { branchRepository } from "@/repositories/BranchRepository";
@@ -33,7 +37,7 @@ import { EMPTY_DRAFT, clockOfDraft, draftMinutes, isDraftEmpty, type ClockDraft,
 import { useHiddenParts } from "@/hooks/useHiddenParts";
 import UnpaidToggle from "./UnpaidToggle";
 import PaymentEditor from "@/components/payments/PaymentEditor";
-import { checkPayment, emptyPaymentDraft, prepaidPaymentFields, type PaymentDraft } from "@/components/payments/paymentSplit";
+import { bodyUsesBonus, checkPayment, emptyPaymentDraft, prepaidPaymentFields, withoutBonus, type PaymentDraft } from "@/components/payments/paymentSplit";
 import FeeSentence from "./FeeSentence";
 import { useMinuteTick } from "./useMinuteTick";
 import { quoteFor, useServerQuote } from "./useServerQuote";
@@ -173,6 +177,8 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted, bookingId }: Pro
   // pays nothing, so it neither shows nor sends it. Sent back as shown, so the
   // server refuses a figure that changed meanwhile.
   const [outsideFood, setOutsideFood] = useState(false);
+  // Cyber Place Club Card (2026-11-25): bound AFTER the start, never sent with it.
+  const [bonusCard, setBonusCard] = useState<IBonusAccount | null>(null);
   const outsideFoodFee = typeof options?.outside_food_fee === "number" && options.outside_food_fee > 0
     ? options.outside_food_fee
     : null;
@@ -413,6 +419,10 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted, bookingId }: Pro
   const prepaidCents = prepaidSum === null ? 0 : Math.round(prepaidSum * 100);
   const prepaidCheck = checkPayment(prepaidCents, prepaidPay);
   const prepaidPayField = paysAhead ? prepaidPaymentFields(prepaidPay, prepaidCheck) : {};
+  // Bonuses paying ahead (2026-11-25) leave the card at the start, so the card
+  // goes WITH the start; otherwise it is bound after, as always.
+  const bonusPaysAhead = bonusCard !== null && bodyUsesBonus(prepaidPayField);
+  const bonusField = bonusPaysAhead ? { bonus_account_id: bonusCard.id } : {};
 
   const toggleEditPrice = (next: boolean) => {
     setEditPrice(next);
@@ -435,6 +445,20 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted, bookingId }: Pro
 
   /** The start's products, never on a free seat (its bill is waived). */
   const itemsField = !isFree && startItems.length > 0 ? { items: startItems } : {};
+
+  /**
+   * The seat already started: binding its bonus card is a separate request
+   * whose failure never undoes the start. It is said, and the seat runs.
+   */
+  const bindBonusCard = async (started: ISessionApi | undefined) => {
+    if (bonusCard === null || bonusPaysAhead) return;
+    try {
+      if (!started?.id) throw new Error("no session");
+      await bonusRepository.bind(started.id, bonusCard.id);
+    } catch {
+      notify.warning(t("bonus.start.bindFailed"));
+    }
+  };
 
   const submit = async () => {
     setBusy(true); setErr(null);
@@ -482,6 +506,7 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted, bookingId }: Pro
           paid_seconds: quotedAmount.seconds,
           ...itemsField,
           ...prepaidPayField,
+          ...bonusField,
           ...psnField,
           ...bookingField,
           ...outsideFoodField,
@@ -500,6 +525,7 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted, bookingId }: Pro
           ...(unpaid ? { unpaid: true } : {}),
           ...prepaidField,
           ...prepaidPayField,
+          ...bonusField,
           ...outsideFoodField,
         });
       } else {
@@ -527,10 +553,12 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted, bookingId }: Pro
           ...(unpaid ? { unpaid: true } : {}),
           ...prepaidField,
           ...prepaidPayField,
+          ...bonusField,
           ...outsideFoodField,
         });
       }
       if (psnName !== "") rememberPsnName(psnName);
+      await bindBonusCard(started);
       onStarted(started);
     } catch (e) {
       // A tariff for another platform is refused with a code: worded here, in
@@ -753,6 +781,10 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted, bookingId }: Pro
                   </div>
                 )}
               </div>
+            )}
+            {!isFree && (
+              <BonusCardStartSwitch branchId={branchId} disabled={busy} value={bonusCard}
+                onChange={(a) => { setBonusCard(a); if (a === null) setPrepaidPay(withoutBonus); }} />
             )}
 
             {!isFree && (
@@ -1013,6 +1045,7 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted, bookingId }: Pro
                 check={prepaidCheck}
                 money={money}
                 disabled={busy}
+                bonus={bonusCard ? { balanceCents: Math.round(Number(bonusCard.balance) * 100) } : undefined}
               />
             )}
 

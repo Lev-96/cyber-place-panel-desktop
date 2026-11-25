@@ -7,13 +7,15 @@
 type T = (key: string) => string;
 type Money = (n: number) => string;
 
-export type AnyMethod = "cash" | "card" | "other" | "deposit";
+export type AnyMethod = "cash" | "card" | "other" | "deposit" | "bonus";
 
 export const METHOD_LABEL_KEY: Record<AnyMethod, string> = {
   cash: "session.payCash",
   card: "session.payCard",
   other: "session.payOther",
   deposit: "till.payDeposit",
+  // A Club Card's bonuses (2026-11-25).
+  bonus: "pay.bonus",
 };
 
 export interface PaidPart { method: AnyMethod; amount: number | string; note?: string | null }

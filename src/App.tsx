@@ -62,6 +62,7 @@ const GamesList = lazy(() => import("@/routes/GamesList"));
 const Managers = lazy(() => import("@/routes/Managers"));
 const MemberCard = lazy(() => import("@/routes/MemberCard"));
 const MembersList = lazy(() => import("@/routes/MembersList"));
+const BonusCards = lazy(() => import("@/routes/BonusCards"));
 const Notifications = lazy(() => import("@/routes/Notifications"));
 const SupportChat = lazy(() => import("@/routes/SupportChat"));
 const PcsList = lazy(() => import("@/routes/PcsList"));
@@ -189,6 +190,8 @@ const Authed = () => {
           {/* Member cards and deposits are administrative. Guarding the route
               as well as the tile is the point: a bookmarked URL is the other
               way into a section, and the backend refuses these reads too. */}
+          {/* Cyber Place Club Card (2026-11-25). */}
+          <Route path="/branches/:branchId/bonus" element={<RoleGuard perm="branch.bonus"><BonusCards /></RoleGuard>} />
           <Route
             path="/branches/:branchId/members"
             element={

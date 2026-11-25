@@ -1,4 +1,3 @@
-import type { PaymentMethod } from "@/api/sessions";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import PriceInput from "@/components/ui/PriceInput";
@@ -6,17 +5,19 @@ import { useLang } from "@/i18n/LanguageContext";
 import { fmt } from "@/i18n/translations";
 import { apiPaymentLabels } from "@/api/paymentLabels";
 import { useEffect, useState } from "react";
+import BonusUseAll from "./BonusUseAll";
 import { PAYMENT_METHODS } from "./PaymentMethodPicker";
 import {
   OWN_LABEL_MAX, SPLIT_METHODS, addOwnPart, duplicateOwnIds, fillRemaining, hasOwnLabel, ownLabel,
-  OWN_PARTS_MAX, type OwnPart, type PaymentCheck, type PaymentDraft,
+  OWN_PARTS_MAX, type BillMethod, type OwnPart, type PaymentCheck, type PaymentDraft,
 } from "./paymentSplit";
 
 /** A method's full name: the tooltip, the accessible name, the hidden field label. */
-const LABEL_KEY: Record<PaymentMethod, string> = {
+const LABEL_KEY: Record<BillMethod, string> = {
   cash: "session.payCash",
   card: "session.payCard",
   other: "session.payOther",
+  bonus: "pay.bonus",
 };
 
 /**
@@ -24,10 +25,11 @@ const LABEL_KEY: Record<PaymentMethod, string> = {
  * four buttons stay one line and one height. «Другой способ оплаты» broke
  * onto three lines and out of its box; the full name stays on hover.
  */
-const SHORT_KEY: Record<PaymentMethod, string> = {
+const SHORT_KEY: Record<BillMethod, string> = {
   cash: "session.payCash",
   card: "session.payCard",
   other: "pay.otherShort",
+  bonus: "pay.bonus",
 };
 
 interface Props {
@@ -43,6 +45,12 @@ interface Props {
   check: PaymentCheck;
   money: (amount: number) => string;
   disabled?: boolean;
+  /**
+   * A Club Card bound to this bill (2026-11-25): «Бонусы» is offered, as one
+   * method or a part of a split, and «Использовать все бонусы». Absent: the
+   * editor is exactly as before.
+   */
+  bonus?: { balanceCents: number };
 }
 
 /**
@@ -54,9 +62,10 @@ interface Props {
  * «Другое» text). The parts must add up to the bill to the cent; the confirm
  * waits for it. One part above zero is sent as that single method.
  */
-const PaymentEditor = ({ name, dueCents, value, onChange, check, money, disabled = false, branchId }: Props) => {
+const PaymentEditor = ({ name, dueCents, value, onChange, check, money, disabled = false, branchId, bonus }: Props) => {
   const { t } = useLang();
-  const pick = (method: PaymentMethod) => onChange({ ...value, split: false, method });
+  const pick = (method: BillMethod) => onChange({ ...value, split: false, method });
+  const methods: BillMethod[] = bonus ? [...PAYMENT_METHODS, "bonus"] : [...PAYMENT_METHODS];
   /**
    * The names this branch has already paid with (2026-11-18, owner: a
    * created option is kept, nobody types it again): one press each. Read when
@@ -84,7 +93,7 @@ const PaymentEditor = ({ name, dueCents, value, onChange, check, money, disabled
     <div className="col pay-editor" style={{ gap: 8 }} data-testid="payment-editor">
       <strong style={{ fontSize: 13 }}>{t("session.payTitle")}</strong>
       <div className="pay-editor__methods" role="radiogroup" aria-label={t("session.payTitle")}>
-        {PAYMENT_METHODS.map((m) => (
+        {methods.map((m) => (
           <button
             key={m}
             type="button"
@@ -92,7 +101,7 @@ const PaymentEditor = ({ name, dueCents, value, onChange, check, money, disabled
             name={name}
             aria-checked={!value.split && value.method === m}
             className="pay-editor__method"
-            disabled={disabled}
+            disabled={disabled || (m === "bonus" && (bonus?.balanceCents ?? 0) < dueCents)}
             onClick={() => pick(m)}
             data-testid={`pay-${m}`}
             title={t(LABEL_KEY[m])}
@@ -113,6 +122,8 @@ const PaymentEditor = ({ name, dueCents, value, onChange, check, money, disabled
           {t("pay.split")}
         </button>
       </div>
+
+      {bonus && <BonusUseAll balanceCents={bonus.balanceCents} dueCents={dueCents} value={value} onChange={onChange} money={money} disabled={disabled} />}
 
       {!value.split && value.method === "other" && (
         <Input
@@ -149,6 +160,18 @@ const PaymentEditor = ({ name, dueCents, value, onChange, check, money, disabled
               </Button>
             </div>
           ))}
+          {bonus && (
+            <div className="pay-editor__part" data-testid="pay-bonus-row">
+              <span className="pay-editor__part-name" title={t(LABEL_KEY.bonus)}>{t(SHORT_KEY.bonus)}</span>
+              <div className="pay-editor__part-box">
+                <PriceInput label={t(LABEL_KEY.bonus)} value={value.bonus} onChange={(v) => onChange({ ...value, bonus: v })} disabled={disabled} />
+              </div>
+              <Button type="button" variant="secondary" className="pay-editor__rest"
+                disabled={disabled || check.remainingCents <= 0} onClick={() => onChange(fillRemaining(dueCents, value, "bonus"))} data-testid="pay-rest-bonus">
+                {t("pay.restHere")}
+              </Button>
+            </div>
+          )}
           {value.own.map((part) => {
             const duplicate = duplicates.has(part.id);
             return (

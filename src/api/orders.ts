@@ -12,11 +12,13 @@ import { request } from "./client";
 export interface CreateOrderBody {
   branch_id: number;
   /** One method (every server takes it) … */
-  payment_method?: PaymentMethod;
+  payment_method?: PaymentMethod | "bonus";
   /** Only for `other`: what it was (a transfer app, a voucher). */
   payment_method_other?: string;
   /** … or SPLIT (2026-11-07): the parts, summing to the total, and how. Never `deposit`. */
-  payments?: { method: "cash" | "card" | "other"; amount: number }[];
+  payments?: { method: "cash" | "card" | "other" | "bonus"; amount: number }[];
+  /** The Club Card the bonuses are spent from (2026-11-25); this branch's. */
+  bonus_account_id?: number;
   payment_note?: string;
   items: Array<{ product_id: number; quantity: number }>;
   client_request_id: string;

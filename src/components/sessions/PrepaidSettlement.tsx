@@ -54,7 +54,10 @@ const PrepaidSettlement = ({ prepaid, changeAfterStop, dueSettled = false, taken
   // card money out of the drawer.
   const cardBack = Number(prepaid.refund?.card ?? 0);
   const otherBack = Number(prepaid.refund?.other ?? 0);
-  const anyBack = change > 0 || cardBack > 0 || otherBack > 0;
+  // Bonuses paid ahead and not used (2026-11-25): back on the player's Club
+  // Card by the server at the Stop — nothing for the cashier to hand over.
+  const bonusBack = Number(prepaid.refund?.bonus ?? 0);
+  const anyBack = change > 0 || cardBack > 0 || otherBack > 0 || bonusBack > 0;
   const due = changeAfterStop !== undefined || dueSettled ? 0 : Number(prepaid.due);
   return (
     <div className="prepaid-settlement" data-testid="receipt-prepaid">
@@ -82,6 +85,12 @@ const PrepaidSettlement = ({ prepaid, changeAfterStop, dueSettled = false, taken
             <div className="prepaid-change" role="status" data-testid="receipt-prepaid-other-refund">
               <span className="prepaid-change__label">{t("session.prepaid.otherRefund")}</span>
               <span className="prepaid-change__figure">{money(otherBack)}</span>
+            </div>
+          )}
+          {bonusBack > 0 && (
+            <div className="prepaid-settlement__row" data-testid="receipt-prepaid-bonus-back">
+              <span>{t("session.prepaid.bonusBack")}</span>
+              <strong>{money(bonusBack)}</strong>
             </div>
           )}
         </>

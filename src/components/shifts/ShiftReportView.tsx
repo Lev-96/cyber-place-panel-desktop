@@ -58,6 +58,7 @@ const ShiftReportView = ({ shift, report, viewerId = null, acceptanceOnly = fals
   const methodName = (method: string) =>
     method === "cash" ? t("session.payCash") : method === "card" ? t("session.payCard")
       : method === "deposit" ? t("till.payDeposit") : method === "other" ? t("session.payOther")
+        : method === "bonus" ? t("pay.bonus")
         : method === "split" ? t("pay.splitSummary") : t("shift.methodUnrecorded");
   // A line paid in parts (report v4) says each part; an older report, its one method.
   const lineMethod = (l: { method: string; payments?: { method: string; amount: string }[] }) =>
@@ -150,6 +151,9 @@ const ShiftReportView = ({ shift, report, viewerId = null, acceptanceOnly = fals
             {Number(report.by_method.unrecorded) > 0 && <Row label={t("shift.methodUnrecorded")} value={m(report.by_method.unrecorded)} />}
             <div style={divider} />
             <Row muted label={t("shift.byMethodTotal")} value={m(report.revenue_total)} />
+            {/* Bonuses spent (2026-11-25, owner): neither cash nor revenue, so
+                below the total, never in the sum above it. */}
+            {Number(report.by_method.bonus ?? 0) > 0 && <Row muted label={t("shift.bonusNotRevenue")} value={m(report.by_method.bonus!)} testId="shift-method-bonus" />}
           </Section>
 
           <Section title={t("shift.cash")}>

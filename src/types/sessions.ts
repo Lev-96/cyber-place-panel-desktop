@@ -243,7 +243,7 @@ export interface ISessionApi {
    * renders nothing for it rather than inventing a method.
    */
   /** `split` (2026-11-07): paid in parts, see `payments`. */
-  payment_method?: "cash" | "card" | "other" | "split" | null;
+  payment_method?: "cash" | "card" | "other" | "split" | "bonus" | null;
   /** The parts of the payment (2026-11-07); [] for a row from before them. */
   payments?: { method: "cash" | "card" | "other" | "deposit"; amount: number | string; note?: string | null }[];
   /** The words the cashier typed. Only ever set when the method is `other`. */
@@ -430,6 +430,8 @@ export interface ISessionApi {
    * (an older backend): treated as true, which is how that backend counts.
    */
   rounding_covers_products?: boolean;
+  /** The Club Card bound to the seat (2026-11-25), or null. */
+  bonus_account_id?: number | null;
   /** Every period, closed ones included. Present when the relation is loaded. */
   joysticks?: ISessionJoystick[];
   /** Who opened it — the owner's "which of my managers ran this?". */

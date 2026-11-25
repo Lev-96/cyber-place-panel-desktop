@@ -29,6 +29,7 @@ const anyone = () => true;
 export const BRANCH_SECTIONS: readonly BranchSection[] = [
   { key: "sessions", path: "sessions", titleKey: "hub.tile.sessions", hintKey: "hub.tile.sessionsHint", icon: "branch.sessions", allowed: anyone },
   { key: "members", path: "members", titleKey: "hub.tile.members", hintKey: "hub.tile.membersHint", icon: "branch.members", allowed: (r) => can(r, "branch.members") },
+  { key: "bonus", path: "bonus", titleKey: "hub.tile.bonus", hintKey: "hub.tile.bonusHint", icon: "branch.bonus", allowed: (r) => can(r, "branch.bonus") },
   { key: "places", path: "places", titleKey: "hub.tile.places", hintKey: "hub.tile.placesHint", icon: "branch.places", allowed: (r) => can(r, "branch.places") },
   { key: "games", path: "games", titleKey: "hub.tile.games", hintKey: "hub.tile.gamesHint", icon: "nav.games", allowed: (r) => can(r, "game.crud.branch") },
   { key: "pcs", path: "pcs", titleKey: "hub.tile.pcs", hintKey: "hub.tile.pcsHint", icon: "branch.pcs", allowed: anyone },

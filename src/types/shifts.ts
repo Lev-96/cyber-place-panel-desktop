@@ -190,8 +190,8 @@ export interface IShiftReport {
     expired_count: number;
     started_count: number;
     running_count: number;
-    by_method: { cash: Money; card: Money; other: Money; unrecorded: Money };
-    count_by_method: { cash: number; card: number; other: number; unrecorded: number };
+    by_method: { cash: Money; card: Money; other: Money; unrecorded: Money; /** 2026-11-25 */ bonus?: Money };
+    count_by_method: { cash: number; card: number; other: number; unrecorded: number; bonus?: number };
     total: Money;
     /** v2 (2026-10-19): absent from a report frozen before. */
     unique_seats?: number;
@@ -203,8 +203,8 @@ export interface IShiftReport {
   };
   till: {
     paid_count: number;
-    by_method: { cash: Money; card: Money; deposit: Money; other: Money };
-    count_by_method: { cash: number; card: number; deposit: number; other: number };
+    by_method: { cash: Money; card: Money; deposit: Money; other: Money; /** 2026-11-25 */ bonus?: Money };
+    count_by_method: { cash: number; card: number; deposit: number; other: number; bonus?: number };
     total: Money;
     voided_count: number;
     voided_total: Money;
@@ -212,7 +212,8 @@ export interface IShiftReport {
   tournaments: { count: number; total: Money };
   revenue_total: Money;
   /** Places and till together; `unrecorded` also holds tournament fees. Adds up to revenue_total. */
-  by_method: { cash: Money; card: Money; other: Money; deposit: Money; unrecorded: Money };
+  /** Club Card bonuses spent (2026-11-25) are on their own line and NOT in revenue_total. */
+  by_method: { cash: Money; card: Money; other: Money; deposit: Money; unrecorded: Money; bonus?: Money };
   cash: {
     opening: Money;
     places: Money;

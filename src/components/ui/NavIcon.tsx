@@ -189,6 +189,13 @@ const SHAPES: Readonly<Record<string, ReactNode>> = {
     </>
   ),
   // A person and a plus: the branch's customers (after Lucide `user-plus`).
+  "branch.bonus": (
+    <>
+      <rect x="3" y="6" width="18" height="13" rx="2" />
+      <path d="M3 10h18" />
+      <path d="M12 3l1.2 1.8 2.1.3-1.5 1.4.3 2.1L12 7.6l-2.1 1-.3-2.1-1.5-1.4 2.1-.3z" />
+    </>
+  ),
   "branch.members": (
     <>
       <circle cx="9" cy="7" r="4" />

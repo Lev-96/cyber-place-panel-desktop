@@ -211,6 +211,12 @@ describe("paid ahead by card / split / other (2026-11-17)", () => {
     const p = eventPresentation(row("time_added", 500, { minutes: 30, prepaid: true, prepaid_amount: "500.00", prepaid_method: "card", prepaid_payments: [{ method: "card", amount: "500.00" }] }), en, money);
     expect(p.details).toContain("Paid now: 500 AMD (Card)");
   });
+  test("bonuses (2026-11-25): named as bonuses, never «Other»", () => {
+    const p = eventPresentation(row("started", null, { mode: "fixed", is_free: false, prepaid_amount: "2000.00", prepaid_method: "split", prepaid_payments: [{ method: "cash", amount: "1400.00" }, { method: "bonus", amount: "600.00" }] }), en, money);
+    expect(p.details.join(" | ")).toContain("(Cash 1400 AMD, Bonuses 600 AMD)");
+    const q = eventPresentation(row("time_added", 500, { minutes: 30, prepaid: true, prepaid_amount: "500.00", prepaid_method: "bonus", prepaid_payments: [{ method: "bonus", amount: "500.00" }] }), en, money);
+    expect(q.details).toContain("Paid now: 500 AMD (Bonuses)");
+  });
 });
 
 describe("the price per hour changed in place (2026-11-17)", () => {

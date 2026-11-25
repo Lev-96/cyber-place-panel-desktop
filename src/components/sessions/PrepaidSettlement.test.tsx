@@ -58,6 +58,13 @@ describe("PrepaidSettlement", () => {
     expect(screen.getByTestId("receipt-prepaid-due").textContent).toContain("700");
   });
 
+  test("700 cash + 300 bonuses, bill 32.78 (2026-11-25, seen in the browser): 667.22 cash change AND the 300 back to the card", () => {
+    render(<PrepaidSettlement prepaid={{ amount: 1000, change: 967.22, due: 0, by_method: { cash: 700, bonus: 300 }, refund: { cash: 667.22, bonus: 300 } }} t={t} money={money} />);
+    expect(screen.getByTestId("receipt-prepaid-change").textContent).toContain("667.22");
+    expect(screen.getByTestId("receipt-prepaid-bonus-back").textContent).toContain("300");
+    expect(screen.queryByTestId("receipt-prepaid-card-refund")).toBeNull();
+  });
+
   test("owing more: the due, as before", () => {
     render(<PrepaidSettlement prepaid={{ amount: 2000, change: 0, due: 500, by_method: { card: 2000 }, refund: {} }} t={t} money={money} />);
     expect(screen.getByTestId("receipt-prepaid-due").textContent).toContain("500");
