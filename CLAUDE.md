@@ -5752,3 +5752,60 @@ lines) + fixed lines`; true or absent (a bill banked before, an older backend)
 when false. Tests: `sessionAmount.productsAtPrice.test.ts` (950 / 870 / 1350 /
 866.67 / 0 / 900 / 900, 3 mutations), `StopReceiptModal.test.tsx`.
 
+
+## Cyber Place Club Card in the panel (2026-11-25)
+
+- **«Бонусные карты»** = branch section `bonus` (`/branches/:branchId/bonus`,
+  `routes/BonusCards.tsx`): the owner's rule (`BonusSettingsForm`: on/off,
+  percent, welcome bonus; example uses the server's DOWN rounding), the
+  branch's cards with a phone filter, «Зарегистрировать игрока»
+  (`RegisterBonusDialog`: the 6-character code typed or scanned with
+  `QrScanner` → `lookup` → name + phone in E.164 → `register`).
+- Permissions: `branch.bonus` (admin, owner, manager), `branch.bonusSettings`
+  (admin, owner) — the backend's `bonus.manage` / `bonus.settings`.
+- **Start**: `BonusCardStartSwitch` under «Свои продукты», drawn only where the
+  branch has bonuses on and the seat is not free. It NEVER changes the start
+  request: the chosen card is bound AFTER the start (`bonusRepository.bind`);
+  a failed bind is a warning toast, the seat keeps running
+  (`StartSessionDialog.bonus.test.tsx`, 3 mutations caught).
+- Paying WITH bonuses is phase 2 (not built yet).
+- Tests: `types/bonus.test.ts`, `components/bonus/*.test.tsx`,
+  `routes/BonusCards.test.tsx`, `auth/permissions.test.ts` (Club Card block).
+
+## Paying with Club Card bonuses in the panel (2026-11-25)
+
+- `paymentSplit.ts`: `BillMethod = PaymentMethod | "bonus"`; the draft has a
+  `bonus` part (empty by default). `billPaymentBody` (Stop, till) may send
+  bonuses; `paymentBody` (prepayments, change of method, confirmed due) is
+  the same body typed WITHOUT bonus and throws if one ever got in.
+  `useAllBonuses` = never more than the bill; too few → split bonus + the
+  rest on cash, with the shortfall.
+- `PaymentEditor` takes `bonus={{ balanceCents }}` only where a card is bound:
+  «Бонусы» as one method (disabled when the card holds less than the bill), a
+  bonus row in a split, and `BonusUseAll` (balance + «Использовать все
+  бонусы» behind a confirmation, «Не хватает … » when short). Without the
+  prop the editor is exactly as before.
+- `StopReceiptModal`: reads the seat's card (`session.bonus_account_id` →
+  `GET /branches/{b}/bonus-accounts/{id}`), offers «Привязать бонусную карту»
+  when none is bound and the branch has bonuses on, and sends
+  `billPaymentBody`. The till (`SellProductsDialog`) has the «Бонусная карта»
+  switch and sends `bonus_account_id` with the sale.
+- Labels: «Бонусы» in the session history (`paymentLabelOf`, never «Карта»),
+  sales history (`sales.method.bonus`), shift report (below the total as
+  «Бонусы (не выручка)»), `paymentText`.
+- Tests: `paymentSplit.bonus.test.ts`, `BonusUseAll.test.tsx`,
+  `SellProductsDialog.bonus.test.tsx`. Not built yet: bonuses for a prepayment
+  at Start / «+ Время» (phase 2b).
+
+## Club Card additions (2026-11-25)
+- Prepayment with bonuses: `prepaidPaymentFields` now builds from
+  `billPaymentBody` (bonus allowed); Start offers «Бонусы» when a card is
+  chosen and then sends `bonus_account_id` WITH the start (no bind after);
+  otherwise the card is bound after the start as before. «+ Время» offers them
+  when the seat has a card (`useBoundBonusCard`, shared with Stop).
+- Register by phone (no smartphone): `RegisterBonusDialog` «Открыть карту по
+  номеру телефона» sends no `code`.
+- Time bonus: `TimeBonusSettingsForm` (owner, on «Бонусные карты»),
+  `TimeBonusNotifier` in `Layout` (owners/managers; polls `/time-bonus/pending`
+  every 15 s; «Начислить» / «Отказаться»). History names a gift
+  `history.timeBonus`.
