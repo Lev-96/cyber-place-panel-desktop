@@ -131,20 +131,26 @@ describe("the recorded melodies", () => {
     }
   });
 
-  test("by default every kind rings its own melody, so they are told apart by ear", () => {
+  test("by default every notification rings the Cyber Place sound; the two seat alarms keep their own (2026-11-27)", () => {
     const chosen = Object.values(SOUND_DEFAULTS).map((c) => c.sound);
     expect(chosen.every((id) => (FILE_SOUNDS as readonly string[]).includes(id))).toBe(true);
-    expect(new Set(chosen).size).toBe(chosen.length);
+    for (const kind of ["booking_new", "booking_changed", "support", "guests", "system", "platform_billing"] as const) {
+      expect(SOUND_DEFAULTS[kind]).toEqual({ enabled: true, sound: "cyberplace" });
+    }
+    // Told apart by ear: a seat running out and a seat ending unpaid.
+    expect(SOUND_DEFAULTS.session_ending.sound).toBe("digital");
+    expect(SOUND_DEFAULTS.session_unpaid.sound).toBe("arrival");
   });
 
   test("a melody plays from its file, again until it has rung long enough, at the profile's level", async () => {
     setSoundPreferences(defaultSound());
     expect(playFor("booking_new", "r1", 1_000)).toBe(true);
     await flush();
-    expect(fetched.some((u) => u.endsWith("/sounds/melodic.mp3"))).toBe(true);
-    // 1.34 s is short of the standard 3 s: it plays twice, one after the other.
-    expect(sources).toHaveLength(playsFor("standard", RECORDINGS.melodic));
+    expect(fetched.some((u) => u.endsWith("/sounds/cyberplace.mp3"))).toBe(true);
+    // 2.4 s is short of the standard 3 s: it plays twice, one after the other.
+    expect(sources).toHaveLength(playsFor("standard", RECORDINGS.cyberplace));
     expect(sources).toHaveLength(2);
+    // The second play starts after the first ended (this fake decodes every file as 1.34 s).
     expect(sources[1].at).toBeGreaterThan(sources[0].at + 1.34);
     expect(levels).toContain(levelFor("standard", 100));
     expect(made).toHaveLength(0);
@@ -207,18 +213,18 @@ describe("the recorded melodies", () => {
 
   test("the melodies a person will hear are loaded ahead, the switched-off ones are not", () => {
     const prefs = defaultSound();
-    prefs.categories.guests.enabled = false;
+    prefs.categories.session_ending.enabled = false;
     setSoundPreferences(prefs);
-    expect(fetched.some((u) => u.endsWith("/sounds/melodic.mp3"))).toBe(true);
-    expect(fetched.some((u) => u.endsWith(`/sounds/${SOUND_DEFAULTS.guests.sound}.mp3`))).toBe(false);
+    expect(fetched.some((u) => u.endsWith("/sounds/cyberplace.mp3"))).toBe(true);
+    expect(fetched.some((u) => u.endsWith(`/sounds/${SOUND_DEFAULTS.session_ending.sound}.mp3`))).toBe(false);
   });
 
   test("nothing new starts while a melody is still ringing; after it, it does", () => {
     setSoundPreferences(defaultSound());
-    // melodic, standard: 2 × 1.34 s + 0.3 s ≈ 2.98 s.
+    // cyberplace, standard: 2 × 2.4 s + 0.3 s = 5.1 s.
     expect(playFor("booking_new", "a", 1_000)).toBe(true);
-    expect(playFor("booking_changed", "b", 3_500)).toBe(false);
-    expect(playFor("booking_changed", "c", 4_100)).toBe(true);
+    expect(playFor("booking_changed", "b", 5_900)).toBe(false);
+    expect(playFor("booking_changed", "c", 6_200)).toBe(true);
   });
 });
 
@@ -348,8 +354,8 @@ describe("the first click resumes audio", () => {
     expect(resume.mock.calls.length).toBe(before + 1);
   });
 
-  test("a platform payment notice has its own melody, on by default", () => {
-    expect(SOUND_DEFAULTS.platform_billing).toEqual({ enabled: true, sound: "note" });
+  test("a platform payment notice rings, on by default", () => {
+    expect(SOUND_DEFAULTS.platform_billing).toEqual({ enabled: true, sound: "cyberplace" });
     expect(playFor("platform_billing", "n-1")).toBe(true);
     expect(playFor("platform_billing", "n-1")).toBe(false);
   });

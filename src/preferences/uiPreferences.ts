@@ -46,6 +46,8 @@ export const SYNTH_SOUNDS = ["chime", "soft", "ding", "bell", "pulse", "alert"] 
  * 2026-10-27, chosen by the owner): trimmed and levelled to one loudness.
  */
 export const FILE_SOUNDS = [
+  // The Cyber Place notification (2026-11-27, owner): the panel's own default.
+  "cyberplace",
   "melodic", "message", "arrival", "newmsg", "sms", "messenger", "chat", "note",
   "chord", "calm", "social", "woohoo", "beep", "digital", "space",
 ] as const;
@@ -239,22 +241,22 @@ export const PRESETS: Record<Exclude<InterfaceId, "custom">, Layout> = {
 };
 
 /**
- * The sounds a person hears before choosing any (2026-10-27, owner: modern
- * melodies, long enough to be heard at a busy counter): a different recorded
- * melody per kind, so a bell for a seat running out is told apart from a new
- * booking without looking. A person's own choice always wins.
+ * The sounds a person hears before choosing any. Every notification rings
+ * the Cyber Place sound (2026-11-27, owner); the two seat alarms keep their
+ * own melodies (2026-10-27), so a seat running out or ending unpaid is told
+ * apart from a notification without looking. A person's own choice always
+ * wins: a stored choice is never replaced by a default.
  */
 export const SOUND_DEFAULTS: Record<SoundCategory, SoundCategoryPrefs> = {
-  booking_new: { enabled: true, sound: "melodic" },
-  booking_changed: { enabled: true, sound: "message" },
+  booking_new: { enabled: true, sound: "cyberplace" },
+  booking_changed: { enabled: true, sound: "cyberplace" },
   session_ending: { enabled: true, sound: "digital" },
   // A seat ended owing for extra time (2026-11-07): heard across the room.
   session_unpaid: { enabled: true, sound: "arrival" },
-  support: { enabled: true, sound: "chat" },
-  guests: { enabled: true, sound: "chord" },
-  system: { enabled: true, sound: "calm" },
-  // A Cyber Place Platform payment notice (2026-11-09): a melody, not a beep.
-  platform_billing: { enabled: true, sound: "note" },
+  support: { enabled: true, sound: "cyberplace" },
+  guests: { enabled: true, sound: "cyberplace" },
+  system: { enabled: true, sound: "cyberplace" },
+  platform_billing: { enabled: true, sound: "cyberplace" },
 };
 
 /**
