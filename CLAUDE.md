@@ -5845,3 +5845,26 @@ when false. Tests: `sessionAmount.productsAtPrice.test.ts` (950 / 870 / 1350 /
   All tiles share one height (`gridAutoRows: 1fr`, the tallest tile's) and
   columns are at least 240 px so a title word is never split («Համակարգիչներ»);
   wrapping is whole-word (`overflow-wrap: break-word`).
+- Bonus cards, owner's hand (2026-11-26): «Заморозить бонусы» / «Разморозить»
+  and «Понизить ранг» (only lower ranks; «Вернуть автоматический» when held)
+  for `branch.bonusSettings`; both sides' latest ratings shown read-only
+  (`StarRating`). Ratings are given only after a visit (2026-11-27):
+  `RatePlayerNotifier` (Layout, owners/managers, polls `GET /bonus-rate-due`
+  every 30 s + focus) opens «Оцените визит игрока» with the «Гости» sound —
+  stars only, the reason required at 1 star, an optional gift of bonuses at
+  3–5 stars only (`RateVisitForm`, `rateVisitBody`), «Не сейчас» = skip. The
+  feed renders `bonus.club_rated` (stars, the player's tags via
+  `ratingTags.tagLabel`, words); `ClubRatedNotifier` rings («Гости») and
+  raises an OS notice when one arrives. A frozen card on a bill is a red
+  «🔒 …» bar (`.pay-editor__frozen`).
+- Sounds (2026-11-27, owner): `public/sounds/cyberplace.mp3` (the owner's
+  file, −16 LUFS, 2.4 s) is the default for every notification category; the
+  seat alarms `session_ending` / `session_unpaid` keep `digital` / `arrival`.
+  A stored choice is never replaced. The server's `UiPreferences::SOUNDS`
+  must list every sound id: the desktop sends its whole document on each
+  save, so a missing id refuses every save — ship the backend first. Bonus API
+  bodies are plain objects: `request()` encodes them (a JSON string was sent
+  twice-encoded and refused, QA 2026-11-27; `src/api/bonus.body.test.ts`). Every
+  payment screen passes the card through `bonusOffer(card)`; `PaymentEditor`
+  offers no bonuses for a frozen card and says «Бонусная карта заморожена…»
+  (the server refuses them too).
