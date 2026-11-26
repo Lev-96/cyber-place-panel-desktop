@@ -1,3 +1,4 @@
+import { bonusOffer } from "@/components/bonus/bonusAmount";
 import type { ISalesLine } from "@/api/salesSummary";
 import PaymentEditor from "@/components/payments/PaymentEditor";
 import { PAYMENT_PROBLEM_KEY, billPaymentBody, checkPayment, emptyPaymentDraft, type PaymentDraft } from "@/components/payments/paymentSplit";
@@ -75,7 +76,7 @@ const ChangePaymentDialog = ({ branchId, line, onClose, onChanged }: Props) => {
           check={check}
           money={money}
           disabled={busy}
-          bonus={bonusCard ? { balanceCents: Math.round(Number(bonusCard.balance) * 100) } : undefined}
+          bonus={bonusOffer(bonusCard)}
         />
         {problem && <span className="muted" data-testid="change-payment-problem">{problem}</span>}
         {err && <div className="error" role="alert" data-testid="change-payment-error">{err}</div>}

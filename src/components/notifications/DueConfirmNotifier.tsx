@@ -1,3 +1,4 @@
+import { bonusOffer } from "@/components/bonus/bonusAmount";
 import type { IDueToConfirm } from "@/api/sessions";
 import PaymentEditor from "@/components/payments/PaymentEditor";
 import { PAYMENT_PROBLEM_KEY, billPaymentBody, checkPayment, emptyPaymentDraft, type PaymentDraft } from "@/components/payments/paymentSplit";
@@ -218,7 +219,7 @@ const DueConfirmNotifier = () => {
               check={check}
               money={money}
               disabled={busy}
-              bonus={bonusCard ? { balanceCents: Math.round(Number(bonusCard.balance) * 100) } : undefined}
+              bonus={bonusOffer(bonusCard)}
             />
             {!check.ok && check.problem !== null && <span className="muted">{t(PAYMENT_PROBLEM_KEY[check.problem])}</span>}
             {err && <div className="error" role="alert" data-testid="due-confirm-error">{err}</div>}

@@ -1,3 +1,4 @@
+import { bonusOffer } from "@/components/bonus/bonusAmount";
 import { ListSkeleton } from "@/components/ui/Skeleton";
 import { ErrorState, StateView } from "@/components/ui/state";
 import Radio from "@/components/ui/Radio";
@@ -1045,7 +1046,7 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted, bookingId }: Pro
                 check={prepaidCheck}
                 money={money}
                 disabled={busy}
-                bonus={bonusCard ? { balanceCents: Math.round(Number(bonusCard.balance) * 100) } : undefined}
+                bonus={bonusOffer(bonusCard)}
               />
             )}
 

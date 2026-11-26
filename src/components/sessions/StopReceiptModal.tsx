@@ -1,3 +1,4 @@
+import { bonusOffer } from "@/components/bonus/bonusAmount";
 import { SkeletonText } from "@/components/ui/Skeleton";
 import Button from "@/components/ui/Button";
 import Modal from "@/components/ui/Modal";
@@ -783,7 +784,7 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved, canRes
               check={payCheck}
               money={money}
               disabled={busy}
-              bonus={bonusCard ? { balanceCents: Math.round(Number(bonusCard.balance) * 100) } : undefined}
+              bonus={bonusOffer(bonusCard)}
             />
             {/* No card on the seat yet: it can be bound here, before paying
                 (owner, 2026-11-25). A running seat only — the server's rule. */}

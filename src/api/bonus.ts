@@ -1,4 +1,4 @@
-import type { IBonusAccount, IBonusLookup, IBonusSettings, ITimeBonusSettings, ITimeBonusWin, RankStrategy, RankThresholds } from "@/types/bonus";
+import type { IBonusAccount, IBonusLookup, IBonusSettings, ITimeBonusSettings, ITimeBonusWin, Rank, RateVisit, RankStrategy, RankThresholds } from "@/types/bonus";
 import type { ISessionApi } from "@/types/sessions";
 import { request } from "./client";
 
@@ -63,6 +63,21 @@ export const apiDeclineTimeBonus = (winId: number) =>
 /** The Club Card on a seat, or null (2026-11-25): a changed way of paying offers «Бонусы». */
 export const apiSessionBonusCard = (sessionId: number) =>
   request<{ account: IBonusAccount | null }>(`/sessions/${sessionId}/bonus-account`);
+
+/** The owner freezes / thaws a card's bonuses (2026-11-26). */
+export const apiFreezeBonusAccount = (branchId: number, accountId: number, frozen: boolean) =>
+  request<{ account: IBonusAccount }>(`/branches/${branchId}/bonus-accounts/${accountId}/freeze`, { method: "PUT", body: { frozen } });
+
+/** The owner lowers a card's rank; `null` gives it back to the rule (2026-11-26). */
+export const apiSetBonusRank = (branchId: number, accountId: number, rank: Rank | null) =>
+  request<{ account: IBonusAccount }>(`/branches/${branchId}/bonus-accounts/${accountId}/rank`, { method: "PUT", body: { rank } });
+
+/** The club rates the player after a visit, or «Не сейчас» (2026-11-27). */
+export const apiRateBonusAccount = (branchId: number, accountId: number, body: RateVisit) =>
+  request<{ account: IBonusAccount }>(`/branches/${branchId}/bonus-accounts/${accountId}/rating`, { method: "PUT", body });
+
+/** The players the club is asked to rate after a visit, every branch this person works in (2026-11-27). */
+export const apiBonusRateDue = () => request<{ data: IBonusAccount[] }>("/bonus-rate-due");
 
 /** Owner / manager remove a card (2026-11-25): the money records stay. */
 export const apiRemoveBonusAccount = (branchId: number, accountId: number) =>

@@ -1,3 +1,4 @@
+import { bonusOffer } from "@/components/bonus/bonusAmount";
 import { can } from "@/auth/permissions";
 import { useAuth } from "@/auth/AuthContext";
 import Button from "@/components/ui/Button";
@@ -154,7 +155,7 @@ const SellProductsDialog = ({ branchId, onClose, onSold }: Props) => {
           check={payCheck}
           money={money}
           disabled={saving}
-          bonus={bonusCard ? { balanceCents: Math.round(Number(bonusCard.balance) * 100) } : undefined}
+          bonus={bonusOffer(bonusCard)}
         />
 
         <div className="row-between" style={{ borderTop: "1px solid #1f2a44", paddingTop: 12 }}>

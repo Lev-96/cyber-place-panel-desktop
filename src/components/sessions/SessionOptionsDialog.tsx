@@ -1,3 +1,4 @@
+import { bonusOffer } from "@/components/bonus/bonusAmount";
 import Button from "@/components/ui/Button";
 import PaymentEditor from "@/components/payments/PaymentEditor";
 import { checkPayment, emptyPaymentDraft, prepaidPaymentFields, type PaymentDraft } from "@/components/payments/paymentSplit";
@@ -811,7 +812,7 @@ const SessionOptionsDialog = ({ session, platform, onClose, onChanged, platformN
                   check={paidNowCheck}
                   money={money}
                   disabled={busy || !isActive}
-                  bonus={bonusCard ? { balanceCents: Math.round(Number(bonusCard.balance) * 100) } : undefined}
+                  bonus={bonusOffer(bonusCard)}
                 />
               )}
               {(() => {

@@ -50,7 +50,8 @@ interface Props {
    * method or a part of a split, and «Использовать все бонусы». Absent: the
    * editor is exactly as before.
    */
-  bonus?: { balanceCents: number };
+  /** The card on the bill; `frozen` (2026-11-26): the owner froze it, its bonuses cannot pay. */
+  bonus?: { balanceCents: number; frozen?: boolean };
 }
 
 /**
@@ -62,7 +63,10 @@ interface Props {
  * «Другое» text). The parts must add up to the bill to the cent; the confirm
  * waits for it. One part above zero is sent as that single method.
  */
-const PaymentEditor = ({ name, dueCents, value, onChange, check, money, disabled = false, branchId, bonus }: Props) => {
+const PaymentEditor = ({ name, dueCents, value, onChange, check, money, disabled = false, branchId, bonus: cardOffer }: Props) => {
+  // A frozen card offers no bonuses at all (the server refuses them too); the
+  // cashier is told why instead (2026-11-26).
+  const bonus = cardOffer && !cardOffer.frozen ? cardOffer : undefined;
   const { t } = useLang();
   const pick = (method: BillMethod) => onChange({ ...value, split: false, method });
   const methods: BillMethod[] = bonus ? [...PAYMENT_METHODS, "bonus"] : [...PAYMENT_METHODS];
@@ -124,6 +128,7 @@ const PaymentEditor = ({ name, dueCents, value, onChange, check, money, disabled
       </div>
 
       {bonus && <BonusUseAll balanceCents={bonus.balanceCents} dueCents={dueCents} value={value} onChange={onChange} disabled={disabled} />}
+      {cardOffer?.frozen && <div className="pay-editor__frozen" role="note" data-testid="pay-bonus-frozen">{t("pay.bonusFrozen")}</div>}
 
       {!value.split && value.method === "other" && (
         <Input

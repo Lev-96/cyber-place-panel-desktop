@@ -4,6 +4,8 @@ import { afterEach, describe, expect, test, vi } from "vitest";
 import { useState } from "react";
 const labels = vi.hoisted(() => ({ fn: vi.fn(async (_b: number) => ({ data: [] as { label: string; uses: number }[] })) }));
 vi.mock("@/api/paymentLabels", () => ({ apiPaymentLabels: (b: number) => labels.fn(b) }));
+// «Все бонусы» asks first; a card on the bill draws it (2026-11-26 test).
+vi.mock("@/components/ui/ConfirmProvider", () => ({ useConfirm: () => async () => true }));
 import PaymentEditor from "./PaymentEditor";
 import { checkPayment, emptyPaymentDraft, type PaymentDraft } from "./paymentSplit";
 
@@ -213,5 +215,22 @@ describe("PaymentEditor", () => {
     expect(last.own).toHaveLength(6);
     expect(screen.queryByTestId("pay-own-add")).toBeNull();
   });
-});
 
+  test("a frozen card (2026-11-26): no «Бонусы» way, no bonus part, and the cashier is told why", async () => {
+    const Bonus = ({ frozen }: { frozen: boolean }) => {
+      const [d, setD] = useState<PaymentDraft>(emptyPaymentDraft());
+      return <PaymentEditor name="p" dueCents={50000} value={d} onChange={setD} check={checkPayment(50000, d)} money={String} bonus={{ balanceCents: 100000, frozen }} />;
+    };
+    render(<Bonus frozen={false} />);
+    expect(screen.getByTestId("pay-bonus")).toBeTruthy();
+    expect(screen.getByTestId("pay-bonus-box")).toBeTruthy();
+    expect(screen.queryByTestId("pay-bonus-frozen")).toBeNull();
+    cleanup();
+    render(<Bonus frozen />);
+    expect(screen.queryByTestId("pay-bonus")).toBeNull();
+    expect(screen.queryByTestId("pay-bonus-box")).toBeNull();
+    await act(async () => { fireEvent.click(screen.getByTestId("pay-split")); });
+    expect(screen.queryByTestId("pay-bonus-row")).toBeNull();
+    expect(screen.getByTestId("pay-bonus-frozen").textContent).toBe("pay.bonusFrozen");
+  });
+});

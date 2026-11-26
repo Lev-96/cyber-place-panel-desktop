@@ -16,6 +16,8 @@ export interface IBonusSettings {
   rank?: IRankSettings;
   /** The time bonus (2026-11-25); absent from a server before it. */
   time_bonus?: ITimeBonusSettings;
+  /** What the branch's players think of it (2026-11-26); absent from an older server. */
+  rating?: IRating;
 }
 
 /** GAMER … LEGEND, lowest first — the server's `BonusRank::LADDER`. */
@@ -73,7 +75,31 @@ export interface IBonusAccount {
   opened_at: string | null;
   /** GAMER … LEGEND (2026-11-25); absent from an older server. */
   rank?: Rank;
+  /** The owner froze the card's bonuses (2026-11-26): they cannot pay. Absent from an older server. */
+  frozen?: boolean;
+  /** The owner lowered the rank; the rule leaves it until given back (2026-11-26). */
+  rank_held?: boolean;
+  /** This club's 1–5 stars for the player (2026-11-26); null = not rated. */
+  club_stars?: number | null;
+  /** What every club thinks of the player (2026-11-26). */
+  player_rating?: IRating;
+  /** The club's latest words for the player (only at 1 star) (2026-11-27). */
+  club_comment?: string | null;
+  /** The player's latest stars, tags and words for this club (2026-11-27). */
+  player_stars?: number | null;
+  player_tags?: string[];
+  player_comment?: string | null;
+  /** Only in the «rate after a visit» list (`GET /bonus-rate-due`). */
+  rank_name?: string;
+  due_at?: string | null;
 }
+
+/** A rating as the server sends it (2026-11-26): the mean to one decimal, how many gave it; `average` null while nobody has. */
+export interface IRating { average: string | null; count: number }
+
+/** A rating after a visit (2026-11-27), or «Не сейчас». */
+/** The club's rating of a visit (2026-11-27): stars, the reason at 1 star, bonuses as a gift; or «Не сейчас». */
+export type RateVisit = { stars: number; comment: string | null; gift: string | null } | { skip: true };
 
 export interface IBonusLookup {
   code: string;

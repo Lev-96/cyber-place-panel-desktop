@@ -2,6 +2,9 @@ import { can } from "@/auth/permissions";
 import { bonusAmountText } from "@/components/bonus/bonusAmount";
 import { useAuth } from "@/auth/AuthContext";
 import RankBadge from "@/components/bonus/RankBadge";
+import StarRating from "@/components/bonus/StarRating";
+import { tagLabel } from "@/components/bonus/ratingTags";
+import { RANKS, type IBonusAccount, type IRating, type Rank } from "@/types/bonus";
 import RegisterBonusDialog from "@/components/bonus/RegisterBonusDialog";
 import Button from "@/components/ui/Button";
 import { ListSkeleton } from "@/components/ui/Skeleton";
@@ -48,6 +51,36 @@ const BonusCards = () => {
       setRemoving(null);
     }
   };
+  // The owner's hand on a card (2026-11-26, owner): freeze its bonuses,
+  // lower its rank. Ratings are given after a visit (RatePlayerNotifier).
+  const isOwner = can(user?.role, "branch.bonusSettings");
+  const [acting, setActing] = useState<number | null>(null);
+  const who = (a: IBonusAccount) => a.name || a.phone;
+  const act = async (a: IBonusAccount, run: () => Promise<unknown>, done: string) => {
+    setActing(a.id);
+    try {
+      await run();
+      notify.message("success", done);
+      void list.reload();
+    } catch (e) {
+      notify.message("error", e instanceof Error ? e.message : String(e));
+    } finally {
+      setActing(null);
+    }
+  };
+  const toggleFreeze = async (a: IBonusAccount) => {
+    if (!a.frozen && !(await ask(t("bonus.freeze.confirm").replace("{0}", who(a)), { destructive: true, confirmLabel: t("bonus.freeze.button") }))) return;
+    await act(a, () => bonusRepository.freeze(id, a.id, !a.frozen), t(a.frozen ? "bonus.unfreeze.done" : "bonus.freeze.done"));
+  };
+  const rankName = (r: Rank) => settings.data?.rank?.names?.[r] || t(`bonus.rank.${r}`);
+  const changeRank = async (a: IBonusAccount, choice: string) => {
+    if (choice === "auto") { await act(a, () => bonusRepository.setRank(id, a.id, null), t("bonus.rankAuto.done")); return; }
+    const to = choice as Rank;
+    if (!(await ask(t("bonus.rankLower.confirm").replace("{0}", who(a)).replace("{1}", rankName(to)), { destructive: true, confirmLabel: t("bonus.rankLower.label") }))) return;
+    await act(a, () => bonusRepository.setRank(id, a.id, to), t("bonus.rankLower.done"));
+  };
+  const ratingText = (r: IRating | undefined, key: string, none: string) =>
+    r && r.average !== null ? t(key).replace("{0}", r.average).replace("{1}", String(r.count)) : t(none);
   const settings = useAsync(() => bonusRepository.settings(id), [id]);
   const list = useAsync(() => bonusRepository.list(id, applied || undefined), [id, applied]);
 
@@ -74,6 +107,9 @@ const BonusCards = () => {
         <Link to={`/branches/${id}/bonus/news`} className="btn secondary" data-testid="bonus-news-link">{t("hub.tile.news")}</Link>
       </div>
       {settings.data && !enabled && <div className="muted">{t("bonus.disabledHint")}</div>}
+      {settings.data?.rating && (
+        <div className="bonus-club-rating" data-testid="bonus-club-rating">{ratingText(settings.data.rating, "bonus.rating.club", "bonus.rating.clubNone")}</div>
+      )}
 
       <div className="bonus-phone-search">
         <FixedDialPhoneInput countryCode="AM" value={phone} onChange={setPhone}
@@ -88,20 +124,63 @@ const BonusCards = () => {
         noResults={{ descriptionKey: "bonus.state.noResultsDescription" }}
       >
         <div className="list" data-testid="bonus-list">
-          {(list.data ?? []).map((a) => (
-            <div key={a.id} className="list-item">
-              <div>
-                <div className="name row" style={{ gap: 8, alignItems: "center" }}>{a.name || t("bonus.noName")} <RankBadge rank={a.rank} label={settings.data?.rank?.names?.[a.rank ?? "gamer"]} /></div>
-                <div className="meta">{a.phone}</div>
+          {(list.data ?? []).map((a) => {
+            const rank: Rank = a.rank ?? "gamer";
+            const lower = RANKS.slice(0, RANKS.indexOf(rank));
+            const busy = acting === a.id || removing === a.id;
+            return (
+              <div key={a.id} className={"list-item bonus-card-row" + (a.frozen ? " is-frozen" : "")} data-testid={`bonus-row-${a.id}`}>
+                <div className="bonus-card-row__who">
+                  <div className="name row" style={{ gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                    {a.name || t("bonus.noName")} <RankBadge rank={a.rank} label={settings.data?.rank?.names?.[rank]} />
+                    {a.rank_held && <span className="bonus-chip" data-testid={`bonus-rank-held-${a.id}`}>{t("bonus.rankHeld")}</span>}
+                    {a.frozen && <span className="bonus-chip bonus-chip--frozen" data-testid={`bonus-frozen-${a.id}`}>{t("bonus.frozen")}</span>}
+                  </div>
+                  <div className="meta">{a.phone}</div>
+                  {a.player_rating && (
+                    <div className="meta" data-testid={`bonus-player-rating-${a.id}`}>{ratingText(a.player_rating, "bonus.rating.player", "bonus.rating.playerNone")}</div>
+                  )}
+                  {/* Ratings are given after a visit only (2026-11-27, owner): shown here, given in the window. */}
+                  {a.club_stars != null && (
+                    <div className="row bonus-card-row__stars" title={a.club_comment ?? undefined}>
+                      <span className="meta">{t("bonus.rating.yours")}</span>
+                      <StarRating value={a.club_stars} label={t("bonus.rating.yours")} testId={`bonus-stars-${a.id}`} />
+                      {a.club_comment && <span className="meta bonus-rated-by-player">«{a.club_comment}»</span>}
+                    </div>
+                  )}
+                  {a.player_stars != null && (
+                    <div className="row bonus-card-row__stars" data-testid={`bonus-player-stars-${a.id}`}>
+                      <span className="meta">{t("bonus.rating.fromPlayer")}</span>
+                      <StarRating value={a.player_stars} label={t("bonus.rating.fromPlayer")} />
+                      {(a.player_tags ?? []).length > 0 && <span className="meta bonus-rated-by-player">{(a.player_tags ?? []).map((c) => tagLabel(t, c)).join(", ")}</span>}
+                      {a.player_comment && <span className="meta bonus-rated-by-player">«{a.player_comment}»</span>}
+                    </div>
+                  )}
+                </div>
+                <div className="bonus-card-row__side">
+                  <div style={{ fontWeight: 700, color: "var(--color-primary)" }}>{t("bonus.balance").replace("{0}", bonusAmountText(money, a.balance))}</div>
+                  <div className="row" style={{ gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
+                    {isOwner && (
+                      <Button type="button" variant="secondary" disabled={busy} onClick={() => void toggleFreeze(a)} data-testid={`bonus-freeze-${a.id}`}>
+                        {t(a.frozen ? "bonus.unfreeze.button" : "bonus.freeze.button")}
+                      </Button>
+                    )}
+                    {isOwner && (lower.length > 0 || a.rank_held) && (
+                      <select className="input bonus-card-row__rank" value="" disabled={busy} aria-label={t("bonus.rankLower.label")}
+                        onChange={(e) => { const v = e.target.value; e.target.value = ""; if (v) void changeRank(a, v); }} data-testid={`bonus-rank-${a.id}`}>
+                        <option value="">{t("bonus.rankLower.label")}</option>
+                        {lower.map((r) => <option key={r} value={r}>{rankName(r)}</option>)}
+                        {a.rank_held && <option value="auto">{t("bonus.rankLower.auto")}</option>}
+                      </select>
+                    )}
+                    <Button type="button" variant="secondary" disabled={busy} onClick={() => void remove(a)} data-testid={`bonus-remove-${a.id}`}>
+                      {t("bonus.remove.button")}
+                    </Button>
+                  </div>
+                </div>
               </div>
-              <div className="row" style={{ gap: 12, alignItems: "center" }}>
-                <div style={{ fontWeight: 700, color: "var(--color-primary)" }}>{t("bonus.balance").replace("{0}", bonusAmountText(money, a.balance))}</div>
-                <Button type="button" variant="secondary" disabled={removing === a.id} onClick={() => void remove(a)} data-testid={`bonus-remove-${a.id}`}>
-                  {t("bonus.remove.button")}
-                </Button>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </StateSwitch>
       {registering && (
