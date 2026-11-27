@@ -72,6 +72,13 @@ export const apiDeletePc = (id: number) =>
 export const apiRotatePcToken = (id: number) =>
   request<{ pc: IPcApi }>(`/pcs/${id}/rotate-token`, { method: "POST" });
 
+/** A PC's own offline emergency-unlock code (2026-11-28): 8 digits, branch staff only. */
+export interface IPcOfflineUnlock { code: string; rotated_at: string | null }
+export const apiPcOfflineUnlock = (id: number) =>
+  request<{ offline_unlock: IPcOfflineUnlock }>(`/pcs/${id}/offline-unlock`, { noCache: true });
+export const apiRotatePcOfflineUnlock = (id: number) =>
+  request<{ offline_unlock: IPcOfflineUnlock }>(`/pcs/${id}/offline-unlock/rotate`, { method: "POST" });
+
 /**
  * Point a place's console device at a physical PlayStation found on the LAN.
  *
