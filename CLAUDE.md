@@ -421,7 +421,7 @@ pos · places · ps5 · sessions · tournaments · revenue · services · scanne
   renderer focus on Linux WMs. Use the in-app `ConfirmDialog`.
   No native `confirm()` is left (re-checked 2026-10-27): every confirmation
   goes through `useConfirm()`.
-- **DevTools:** auto-detached DevTools also break renderer focus. Gate
+- **DevTools:** never in a packaged build (`devTools: isDev`, 2026-11-28). Auto-detached DevTools also break renderer focus. Gate
   with `ELECTRON_DEVTOOLS=1` env var.
 - **i18n:** language codes are `en` / `ru` / `am` (NOT `hy`). Use the
   `t()` helper from `LanguageContext` and `money()` for currency.
