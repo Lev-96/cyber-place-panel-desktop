@@ -172,6 +172,10 @@ const createWindow = async () => {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
+      // No DevTools in a packaged panel (2026-11-28, security audit): at an
+      // unattended till Ctrl+Shift+I opened them, and the console could read
+      // the staff token. A development build keeps them.
+      devTools: isDev,
       preload: join(__dirname, "preload.js"),
       // The console watcher and its controller run in this page, on timers.
       // Chromium throttles a hidden page's timer chains to ONE run a minute
@@ -251,7 +255,7 @@ const createWindow = async () => {
   }
   // Auto-open DevTools only when explicitly requested. A detached DevTools
   // window would steal keyboard focus from the renderer.
-  if (process.env.ELECTRON_DEVTOOLS === "1") {
+  if (isDev && process.env.ELECTRON_DEVTOOLS === "1") {
     mainWindow.webContents.openDevTools({ mode: "detach" });
   }
 
