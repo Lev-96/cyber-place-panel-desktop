@@ -4,6 +4,7 @@ import { useAuth } from "@/auth/AuthContext";
 import RankBadge from "@/components/bonus/RankBadge";
 import StarRating from "@/components/bonus/StarRating";
 import { tagLabel } from "@/components/bonus/ratingTags";
+import { compactCount } from "@/components/bonus/ratingFormat";
 import { RANKS, type IBonusAccount, type IRating, type Rank } from "@/types/bonus";
 import RegisterBonusDialog from "@/components/bonus/RegisterBonusDialog";
 import Button from "@/components/ui/Button";
@@ -80,7 +81,7 @@ const BonusCards = () => {
     await act(a, () => bonusRepository.setRank(id, a.id, to), t("bonus.rankLower.done"));
   };
   const ratingText = (r: IRating | undefined, key: string, none: string) =>
-    r && r.average !== null ? t(key).replace("{0}", r.average).replace("{1}", String(r.count)) : t(none);
+    r && r.average !== null ? t(key).replace("{0}", r.average).replace("{1}", compactCount(r.count)) : t(none);
   const settings = useAsync(() => bonusRepository.settings(id), [id]);
   const list = useAsync(() => bonusRepository.list(id, applied || undefined), [id, applied]);
 

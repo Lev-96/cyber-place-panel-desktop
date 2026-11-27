@@ -106,7 +106,7 @@ export interface IBonusLookup {
   registered: boolean;
   account: IBonusAccount | null;
   /** What the player wrote in their app (2026-11-25), offered to staff. */
-  player?: { name: string | null; phone: string | null };
+  player?: { name: string | null; phone: string | null; avatar?: string | null; rating?: IRating };
   /**
    * This number's card held by an earlier copy of the app (2026-11-26): the
    * player removed it and added it again. Staff move it, never open a second.

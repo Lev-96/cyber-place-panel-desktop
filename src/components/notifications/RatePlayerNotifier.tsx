@@ -7,6 +7,7 @@ import { useLang } from "@/i18n/LanguageContext";
 import { bonusRepository } from "@/repositories/BonusRepository";
 import { notify } from "@/ui/notify";
 import { playFor } from "@/sound/soundEngine";
+import { compactCount } from "@/components/bonus/ratingFormat";
 import type { IBonusAccount } from "@/types/bonus";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -98,7 +99,7 @@ const RatePlayerNotifier = () => {
             </div>
             <div className="muted rate-player__meta">
               {rating && rating.average !== null
-                ? t("bonus.rating.player").replace("{0}", rating.average).replace("{1}", String(rating.count))
+                ? t("bonus.rating.player").replace("{0}", rating.average).replace("{1}", compactCount(rating.count))
                 : t("bonus.rating.playerNone")}
             </div>
           </div>

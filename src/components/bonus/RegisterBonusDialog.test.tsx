@@ -63,6 +63,29 @@ describe("registering a player at the till", () => {
     expect(repo.register).toHaveBeenCalledWith(7, { code: "ABC234", name: "Арман", phone: "+37491556677" });
   });
 
+  test("after the code, the player is shown: their photo and the rating every club gave them (2026-11-27)", async () => {
+    const photo = "data:image/jpeg;base64,/9j/AAAA";
+    repo.lookup.mockResolvedValue({ code: "ABC234", registered: false, account: null,
+      player: { name: "Арман", phone: "+37491556677", avatar: photo, rating: { average: "4.8", count: 1500 } } });
+    mount();
+    fireEvent.change(screen.getByTestId("bonus-code"), { target: { value: "ABC234" } });
+    await press("bonus.register.check");
+    const badge = screen.getByTestId("bonus-register-player");
+    expect(badge.querySelector("img")?.getAttribute("src")).toBe(photo);
+    expect(screen.getByTestId("bonus-register-player-rating").textContent).toBe("★ 4.8");
+    expect(screen.getByTestId("bonus-register-player-count").textContent).toBe("bonus.rating.countOf".replace("{0}", "1.5K"));
+  });
+
+  test("a player nobody rated yet is «new»; anything but a picture is never shown as one", async () => {
+    repo.lookup.mockResolvedValue({ code: "ABC234", registered: false, account: null,
+      player: { name: "Ани", phone: null, avatar: "javascript:alert(1)", rating: { average: null, count: 0 } } });
+    mount();
+    fireEvent.change(screen.getByTestId("bonus-code"), { target: { value: "ABC234" } });
+    await press("bonus.register.check");
+    expect(screen.getByTestId("bonus-register-player").querySelector("img")).toBeNull();
+    expect(screen.getByTestId("bonus-register-player-rating").textContent).toBe("bonus.rating.new");
+  });
+
   test("the app added again (2026-11-26): this number's card is offered and MOVED, never a second one", async () => {
     const card = { id: 9, branch_id: 7, name: "Арман", phone: "+37491556677", balance: "950.00", opened_at: null };
     repo.lookup.mockResolvedValue({ code: "NEW234", registered: false, account: null, player: { name: "Арман", phone: "+37491556677" }, existing: card });

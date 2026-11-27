@@ -3687,6 +3687,8 @@ export const TRANSLATIONS: Dict = {
   "bonus.rankLower.done": { en: "Rank lowered", ru: "Ранг понижен", am: "Կոչումն իջեցված է" },
   "bonus.rankAuto.done": { en: "The rank is automatic again", ru: "Ранг снова автоматический", am: "Կոչումը կրկին ավտոմատ է" },
   "bonus.rankHeld": { en: "Set by the owner", ru: "Задан владельцем", am: "Սահմանված է սեփականատիրոջ կողմից" },
+  "bonus.rating.new": { en: "New", ru: "Новый", am: "Նոր" },
+  "bonus.rating.countOf": { en: "{0} ratings", ru: "Оценок: {0}", am: "Գնահատականներ՝ {0}" },
   "bonus.rating.player": { en: "Player's rating: ★ {0} ({1})", ru: "Рейтинг игрока: ★ {0} ({1})", am: "Խաղացողի վարկանիշ՝ ★ {0} ({1})" },
   "bonus.rating.playerNone": { en: "Player's rating: no ratings yet", ru: "Рейтинг игрока: пока нет оценок", am: "Խաղացողի վարկանիշ՝ դեռ գնահատականներ չկան" },
   "bonus.rating.yours": { en: "Your rating for the player", ru: "Ваша оценка игроку", am: "Ձեր գնահատականը խաղացողին" },

@@ -5862,7 +5862,11 @@ when false. Tests: `sessionAmount.productsAtPrice.test.ts` (950 / 870 / 1350 /
   seat alarms `session_ending` / `session_unpaid` keep `digital` / `arrival`.
   A stored choice is never replaced. The server's `UiPreferences::SOUNDS`
   must list every sound id: the desktop sends its whole document on each
-  save, so a missing id refuses every save — ship the backend first. Bonus API
+  save, so a missing id refuses every save — ship the backend first.
+- Registering a card (2026-11-27, owner): after the code (typed or scanned)
+  `PlayerBadge` shows the player's photo (`lookup.player.avatar`, a data:
+  image only) in a ring with the clubs' rating on a gold pill and how many
+  rated (`compactCount`: 999, 1K, 1.5K, 1M); nobody yet: «Новый». Bonus API
   bodies are plain objects: `request()` encodes them (a JSON string was sent
   twice-encoded and refused, QA 2026-11-27; `src/api/bonus.body.test.ts`). Every
   payment screen passes the card through `bonusOffer(card)`; `PaymentEditor`

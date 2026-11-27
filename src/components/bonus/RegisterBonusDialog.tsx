@@ -5,7 +5,8 @@ import FixedDialPhoneInput from "@/components/ui/FixedDialPhoneInput";
 import { bonusAmountText } from "@/components/bonus/bonusAmount";
 import { useLang } from "@/i18n/LanguageContext";
 import { bonusRepository } from "@/repositories/BonusRepository";
-import { bonusCodeFromScan, normaliseBonusCode, type IBonusAccount } from "@/types/bonus";
+import { bonusCodeFromScan, normaliseBonusCode, type IBonusAccount, type IBonusLookup } from "@/types/bonus";
+import PlayerBadge from "@/components/bonus/PlayerBadge";
 import { notify } from "@/ui/notify";
 import { parsePhoneNumberFromString } from "libphonenumber-js";
 import { FormEvent, useState } from "react";
@@ -39,6 +40,7 @@ const RegisterBonusDialog = ({ branchId, onClose, onSaved, initialCode }: Props)
   // This number's card under an earlier copy of the app (2026-11-26): offered
   // to move, from the code check or from the server's answer to «open».
   const [existing, setExisting] = useState<IBonusAccount | null>(null);
+  const [player, setPlayer] = useState<IBonusLookup["player"] | null>(null);
 
   const check = async (raw: string) => {
     const c = normaliseBonusCode(raw);
@@ -48,6 +50,8 @@ const RegisterBonusDialog = ({ branchId, onClose, onSaved, initialCode }: Props)
       const r = await bonusRepository.lookup(branchId, c);
       if (r.registered) { setErr(t("bonus.register.already")); return; }
       setExisting(r.existing ?? null);
+      // Who it is, as every club rated them (2026-11-27).
+      setPlayer(r.player ?? null);
       // The player's own name and phone, so they are not typed twice.
       if (r.player?.name) setName(r.player.name);
       if (r.player?.phone) setPhone(r.player.phone.replace(/\D/g, "").replace(/^374/, ""));
@@ -113,6 +117,7 @@ const RegisterBonusDialog = ({ branchId, onClose, onSaved, initialCode }: Props)
           </>
         ) : (
           <>
+            {checked && player && <PlayerBadge name={player.name} avatar={player.avatar} rating={player.rating} testId="bonus-register-player" />}
             <div className="muted" style={{ fontSize: 13 }}>{checked ? t("bonus.register.codeOk").replace("{0}", checked) : t("bonus.register.byPhoneHint")}</div>
             <label className="col" style={{ gap: 4 }}>
               <span className="label">{t("bonus.register.name")}</span>
