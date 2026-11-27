@@ -5872,3 +5872,16 @@ when false. Tests: `sessionAmount.productsAtPrice.test.ts` (950 / 870 / 1350 /
   payment screen passes the card through `bonusOffer(card)`; `PaymentEditor`
   offers no bonuses for a frozen card and says «Бонусная карта заморожена…»
   (the server refuses them too).
+
+## Security pass 2026-11-28 (owner-approved)
+- **PS5 datagrams only to the club's network**: `electron/ps5/lanAddress.ts` (`isLanAddress`, exact IPv4 private /
+  link-local / 100.64/10 / loopback). `ps5:wake`, `ps5:wake-once`, `ps5:rest`, `ps5:pair` refuse other addresses with
+  their existing bad-request shape; `ps5:probe` drops them. The LAN sweep and PC Wake-on-LAN are untouched.
+- **No DevTools in a packaged build** (`devTools: isDev`).
+- **Manager gift caps**: «Оцените визит игрока» reads `gift_limit` (cap shown, send held over it, no gift field when
+  nothing is left); the owner sets the caps in bonus settings (`manager_gift`).
+- **Each PC's emergency code**: «Компьютеры» → «Аварийный код» (`OfflineUnlockModal`, «Новый код» asks first).
+- **New notices**: `agent.emergency_unlock` («🔓 ПК … разблокирован аварийным кодом») and `agent.no_session`
+  («⚠ ПК … работает без открытой сессии»); both open the branch's computers.
+- Design audit fixes: board count chips use the `--status-*` tokens; the start dialog's action row is sticky;
+  invisible hit rings (timer reset, dialog ×, receipt ×); bigger cards at 1920+/2400+ for card size «M» only.
