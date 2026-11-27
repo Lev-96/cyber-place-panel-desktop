@@ -18,7 +18,12 @@ export interface IBonusSettings {
   time_bonus?: ITimeBonusSettings;
   /** What the branch's players think of it (2026-11-26); absent from an older server. */
   rating?: IRating;
+  /** The owner's caps on a manager's gift with a rating (2026-11-28); absent from an older server. */
+  manager_gift?: IGiftLimit;
 }
+
+/** A manager's gift caps (2026-11-28): per rating, per branch per day, and what is left of today's. Money strings. */
+export interface IGiftLimit { max: string; daily: string; left_today: string }
 
 /** GAMER … LEGEND, lowest first — the server's `BonusRank::LADDER`. */
 export const RANKS = ["gamer", "pro", "elite", "veteran", "legend"] as const;
@@ -92,6 +97,8 @@ export interface IBonusAccount {
   /** Only in the «rate after a visit» list (`GET /bonus-rate-due`). */
   rank_name?: string;
   due_at?: string | null;
+  /** What this staff member may give with the rating: null = no cap (owner); absent from an older server. */
+  gift_limit?: IGiftLimit | null;
 }
 
 /** A rating as the server sends it (2026-11-26): the mean to one decimal, how many gave it; `average` null while nobody has. */

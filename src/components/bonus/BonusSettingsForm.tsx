@@ -35,17 +35,25 @@ const BonusSettingsForm = ({ branchId, settings, onSaved }: Props) => {
   const [hoursOn, setHoursOn] = useState(settings.earn_from != null && settings.earn_to != null);
   const [earnFrom, setEarnFrom] = useState(settings.earn_from ?? "10:00");
   const [earnTo, setEarnTo] = useState(settings.earn_to ?? "16:00");
+  // A manager's gift caps (2026-11-28): shown only by a server that sends them.
+  const gift = settings.manager_gift;
+  const [giftMax, setGiftMax] = useState(gift ? String(Number(gift.max)) : "");
+  const [giftDaily, setGiftDaily] = useState(gift ? String(Number(gift.daily)) : "");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
+  const gm = parseAmount(giftMax);
+  const gd = parseAmount(giftDaily);
+  const giftOk = !gift || (Number.isFinite(gm) && gm >= 0 && gm <= 100_000 && Number.isFinite(gd) && gd >= 0 && gd <= 9_999_999);
+  const giftChanged = !!gift && (gm !== Number(gift.max) || gd !== Number(gift.daily));
   const p = parseAmount(percent);
   const w = parseAmount(welcome);
   const clock = /^([01]\d|2[0-3]):[0-5]\d$/;
   const hoursOk = !hoursOn || (clock.test(earnFrom) && clock.test(earnTo) && earnFrom !== earnTo);
-  const valid = Number.isFinite(p) && p >= 0 && p <= 100 && Number.isFinite(w) && w >= 0 && w <= 9_999_999 && hoursOk;
+  const valid = Number.isFinite(p) && p >= 0 && p <= 100 && Number.isFinite(w) && w >= 0 && w <= 9_999_999 && hoursOk && giftOk;
   const hoursChanged = hoursOn !== (settings.earn_from != null && settings.earn_to != null)
     || (hoursOn && (earnFrom !== settings.earn_from || earnTo !== settings.earn_to));
-  const changed = enabled !== settings.enabled || p !== Number(settings.percent) || w !== Number(settings.welcome) || hoursChanged;
+  const changed = enabled !== settings.enabled || p !== Number(settings.percent) || w !== Number(settings.welcome) || hoursChanged || giftChanged;
   // The server's own rule: DOWN to a whole dram.
   const earned = Number.isFinite(p) ? Math.floor((SAMPLE * p) / 100) : 0;
 
@@ -59,6 +67,7 @@ const BonusSettingsForm = ({ branchId, settings, onSaved }: Props) => {
         enabled, percent: p, welcome: w,
         // Sent only by a server that knows them (it answered with the field).
         ...(settings.earn_from !== undefined ? { earn_from: hoursOn ? earnFrom : null, earn_to: hoursOn ? earnTo : null } : {}),
+        ...(gift ? { manager_gift_max: gm, manager_gift_daily: gd } : {}),
       });
       notify.message("success", t("bonus.settings.saved"));
       onSaved(saved);
@@ -94,6 +103,26 @@ const BonusSettingsForm = ({ branchId, settings, onSaved }: Props) => {
             {hoursOn ? t("bonus.settings.earnHoursRule").replace("{0}", earnFrom).replace("{1}", earnTo) : t("bonus.settings.earnAlways")}
           </span>
         </div>
+      )}
+      {gift && (
+        <fieldset className="col" style={{ gap: 6, border: 0, padding: 0, margin: 0 }} data-testid="bonus-manager-gift">
+          <legend className="label" style={{ padding: 0, marginBottom: 6 }}>🎁 {t("bonus.settings.managerGift")}</legend>
+          <div className="row" style={{ gap: 16, flexWrap: "wrap", alignItems: "flex-end" }}>
+            <label className="col" style={{ gap: 4 }}>
+              <span className="label">{t("bonus.settings.managerGiftMax")}</span>
+              <input className="input" type="text" inputMode="decimal" value={giftMax} disabled={busy}
+                onChange={(e) => setGiftMax(e.target.value)} aria-invalid={!Number.isFinite(gm) || gm > 100_000} style={{ width: 140 }} data-testid="bonus-manager-gift-max" />
+            </label>
+            <label className="col" style={{ gap: 4 }}>
+              <span className="label">{t("bonus.settings.managerGiftDaily")}</span>
+              <input className="input" type="text" inputMode="decimal" value={giftDaily} disabled={busy}
+                onChange={(e) => setGiftDaily(e.target.value)} aria-invalid={!Number.isFinite(gd)} style={{ width: 160 }} data-testid="bonus-manager-gift-daily" />
+            </label>
+          </div>
+          <span className="muted" style={{ fontSize: 12 }} data-testid="bonus-manager-gift-hint">
+            {t("bonus.settings.managerGiftHint").replace("{0}", String(Math.floor(Number(gift.left_today))))}
+          </span>
+        </fieldset>
       )}
       <span className="muted" style={{ fontSize: 12 }}>
         {t("bonus.settings.example").replace("{0}", money(SAMPLE)).replace("{1}", String(earned))}

@@ -10,6 +10,13 @@ interface Props {
   onChange: (v: RateVisitValue) => void;
   disabled?: boolean;
   testId?: string;
+  /**
+   * The most this person may give now (2026-11-28): the owner's caps for a
+   * manager; undefined = no cap (the owner). 0 = no gift field at all.
+   */
+  giftMax?: number;
+  /** The line under the gift that says the cap. */
+  giftCapHint?: string;
 }
 
 const reasonNeeded = (stars: number) => stars >= 1 && stars <= CLUB_REASON_UP_TO;
@@ -17,10 +24,10 @@ const reasonNeeded = (stars: number) => stars >= 1 && stars <= CLUB_REASON_UP_TO
 const giftAllowed = (stars: number) => stars >= GIFT_FROM;
 
 /** Whether the club's rating can be sent: stars, the reason at 1 star, a gift within bounds. */
-export const rateVisitReady = (v: RateVisitValue) =>
+export const rateVisitReady = (v: RateVisitValue, giftMax: number = GIFT_MAX) =>
   v.stars >= 1 && v.stars <= 5
   && (!reasonNeeded(v.stars) || v.comment.trim() !== "") && v.comment.trim().length <= COMMENT_MAX
-  && Number.isFinite(v.gift) && v.gift >= 0 && v.gift <= GIFT_MAX;
+  && Number.isFinite(v.gift) && v.gift >= 0 && v.gift <= Math.min(GIFT_MAX, giftMax);
 
 /** What is sent: the reason only at 1 star, the gift only when there is one. */
 export const rateVisitBody = (v: RateVisitValue) => ({
@@ -34,7 +41,8 @@ export const rateVisitBody = (v: RateVisitValue) => ({
  * for them; at 1 star the reason, required; at 3–5 stars, bonuses as a gift
  * from the club if it wants to give some.
  */
-const RateVisitForm = ({ value, onChange, disabled = false, testId = "rate-visit" }: Props) => {
+const RateVisitForm = ({ value, onChange, disabled = false, testId = "rate-visit", giftMax, giftCapHint }: Props) => {
+  const max = giftMax === undefined ? GIFT_MAX : Math.min(GIFT_MAX, Math.max(0, giftMax));
   const { t } = useLang();
   const [hover, setHover] = useState(0);
   const shown = hover || value.stars;
@@ -65,16 +73,18 @@ const RateVisitForm = ({ value, onChange, disabled = false, testId = "rate-visit
         </label>
       )}
 
-      {giftAllowed(value.stars) && (
+      {giftAllowed(value.stars) && max > 0 && (
         <div className="rate-visit__gift" data-testid={`${testId}-gift`}>
           <span className="rate-visit__gift-icon" aria-hidden="true">🎁</span>
           <div className="rate-visit__gift-text">
             <span className="rate-visit__gift-title">{t("rating.gift")}</span>
             <span className="muted rate-visit__gift-hint">{t("rating.giftHint")}</span>
+            {giftCapHint && <span className="muted rate-visit__gift-hint" data-testid={`${testId}-gift-cap`}>{giftCapHint}</span>}
+            {value.gift > max && <span className="error rate-visit__gift-hint">{t("rating.giftCapOver")}</span>}
           </div>
           <div className="rate-visit__gift-amount">
             <NumberStepper label={t("rating.giftAmount")} value={value.gift} onChange={(v) => onChange({ ...value, gift: Math.max(0, Math.round(v)) })}
-              min={0} max={GIFT_MAX} step={100} precision={0} disabled={disabled} suffix="" />
+              min={0} max={max} step={100} precision={0} disabled={disabled} suffix="" />
           </div>
         </div>
       )}
