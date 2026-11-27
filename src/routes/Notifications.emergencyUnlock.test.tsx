@@ -54,3 +54,15 @@ describe("agent.emergency_unlock", () => {
     expect(nav.navigate).toHaveBeenCalledWith("/branches/5/pcs");
   });
 });
+
+describe("agent.no_session", () => {
+  test("says the PC plays with no session and what was done; a press opens the computers", async () => {
+    feed.list = [{ id: "n-2", type: "PC PC 3 is running with no session", read_at: null, created_at: "2026-11-28T12:01:01+04:00",
+      data: { type: "agent.no_session", pc_id: 3, pc_label: "PC 3", branch_id: 5, branch_address: "Abovyan 1", at: "2026-11-28T12:01:01+04:00" } }];
+    await act(async () => { render(<Notifications />); });
+    expect(screen.getByText("⚠ ПК PC 3 работает без сеанса")).toBeTruthy();
+    expect(screen.getByTestId("notification-body").textContent).toContain("Блокировка отправлена снова");
+    await act(async () => { fireEvent.click(screen.getByText("⚠ ПК PC 3 работает без сеанса")); });
+    expect(nav.navigate).toHaveBeenCalledWith("/branches/5/pcs");
+  });
+});
