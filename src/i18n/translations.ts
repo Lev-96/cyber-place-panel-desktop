@@ -3725,7 +3725,7 @@ export const TRANSLATIONS: Dict = {
   "rating.ratePlayer": { en: "Rate the player's visit", ru: "Оцените визит игрока", am: "Գնահատեք խաղացողի այցը" },
   "bonus.rating.fromPlayer": { en: "Player's rating of the club", ru: "Оценка клуба от игрока", am: "Խաղացողի գնահատականը ակումբին" },
   "notifications.clubRatedTitle": { en: "{name} rated the club", ru: "{name} оценил(а) клуб", am: "{name}-ը գնահատեց ակումբը" },
-  "notifications.noSessionTitle": { en: "PC {pc} is running with no session", ru: "ПК {pc} работает без сеанса", am: "{pc} համակարգիչն աշխատում է առանց սեանսի" },
+  "notifications.noSessionTitle": { en: "PC {pc} is running with no open session", ru: "ПК {pc} работает без открытой сессии", am: "{pc} համակարգիչն աշխատում է առանց բաց սեսիայի" },
   "notifications.noSessionBody": { en: "The lock was sent again. Check the PC: it may be playing unpaid.", ru: "Блокировка отправлена снова. Проверьте ПК: возможно, на нём играют без оплаты.", am: "Կողպումը կրկին ուղարկվել է։ Ստուգեք համակարգիչը. հնարավոր է՝ դրա վրա խաղում են առանց վճարման։" },
   "notifications.emergencyUnlockTitle": { en: "PC {pc} unlocked with the emergency code", ru: "ПК {pc} разблокирован аварийным кодом", am: "{pc} համակարգիչն ապակողպվել է արտակարգ կոդով" },
   "notifications.emergencyUnlockBody": { en: "If staff did not do it, check the PC. Its code has already changed.", ru: "Если это сделал не персонал, проверьте ПК. Его код уже сменился.", am: "Եթե դա չի արել անձնակազմը, ստուգեք համակարգիչը։ Դրա կոդն արդեն փոխվել է։" },
