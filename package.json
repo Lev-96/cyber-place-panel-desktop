@@ -1,6 +1,6 @@
 {
   "name": "cyber-place-panel-desktop",
-  "version": "1.0.72-staging.2",
+  "version": "1.0.72-staging.3",
   "private": true,
   "main": "electron/dist/main.js",
   "desktopName": "cyberplace-panel.desktop",
