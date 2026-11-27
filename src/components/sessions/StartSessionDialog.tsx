@@ -1084,7 +1084,7 @@ const StartSessionDialog = ({ branchId, pc, onClose, onStarted, bookingId }: Pro
                 ].filter(Boolean).join(" · ")}
               </strong>
             </div>
-            <div className="row-between">
+            <div className="row-between start-dialog__actions">
               <Button variant="secondary" onClick={onClose} disabled={busy}>{t("action.cancel")}</Button>
               <Button onClick={submit} disabled={startDisabled}>{busy ? "…" : t("action.start")}</Button>
             </div>

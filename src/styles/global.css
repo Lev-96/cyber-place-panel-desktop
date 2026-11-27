@@ -12617,3 +12617,69 @@ button.star-rating__star:focus-visible { outline: 2px solid var(--color-primary)
 .player-badge__who { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 .player-badge__name { font-size: 17px; overflow-wrap: anywhere; }
 .player-badge__count { font-size: 13px; }
+
+/* ── Design audit fixes (2026-11-28; Impeccable + Emil Kowalski) ──────────
+   Visual only: no layout box, logic, money or device behaviour changes. */
+
+/* F1. The board's count chips speak the cards' own status dictionary: busy
+   is the green of a playing seat, free the cyan of a free one, booked the
+   reservation yellow (they were red / green / the «ending soon» amber, the
+   opposite of the cards right under them). */
+.board-count--busy { --count-tone: var(--status-playing-fg); }
+.board-count--free { --count-tone: var(--status-free-fg); }
+.board-count--booked { --count-tone: var(--status-booked-fg); }
+
+/* F4. «Обнулить счётчик»: the 18 px disc stays (the status line keeps its
+   height); an invisible ring makes it a 34 px target, 44 px on a touch
+   screen. Only where the finger lands changes, never what the reset does. */
+.session-timer__reset { position: relative; }
+.session-timer__reset::before { content: ""; position: absolute; inset: -8px; border-radius: 50%; }
+@media (pointer: coarse) { .session-timer__reset::before { inset: -13px; } }
+
+/* F13. The dialog's ×: the 28 px disc stays; it catches a tap 40 px wide. */
+.cp-modal-close::before { content: ""; position: absolute; inset: -6px; border-radius: 50%; }
+
+/* F12. Keyboard focus is always seen on plain buttons and fields (the more
+   specific rings already defined on cards and dialogs still win). */
+.btn:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.input:focus-visible { box-shadow: 0 0 0 3px rgb(var(--accent-rgb) / 0.25); }
+
+/* F21. On a touch screen a tap no longer leaves a button faded or the ×
+   enlarged (sticky hover); the press feedback on :active stays. */
+@media (hover: none) {
+  .btn:hover:not(:disabled) { opacity: 1; }
+  .cp-modal-close:hover { transform: none; box-shadow: none; }
+}
+
+/* F11. The receipt's line-remove ×: same 22 px disc, a 34 px target (44 on
+   touch). The confirmation before removing stays exactly as it was. */
+.receipt-line-remove::before { content: ""; position: absolute; inset: -6px; border-radius: 50%; }
+@media (pointer: coarse) { .receipt-line-remove::before { inset: -11px; } }
+
+/* F3. «Старт» is always on screen: on a short window (1280×720) the start
+   dialog is taller than the view, so its Cancel/Start row stays pinned to the
+   bottom while the form scrolls (the overlay is the one scroll container).
+   Same tint as the card under it; only its position changes. */
+.start-dialog__actions {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  margin: 0 -16px -16px;
+  padding: 12px 16px 16px;
+  background: color-mix(in srgb, var(--dialog-tone, var(--color-primary)) 9%, var(--color-surface));
+  border-top: 1px solid var(--color-border);
+  border-radius: 0 0 12px 12px;
+}
+
+/* F5. Big monitors: with the default card size («M») the board's cards grow
+   a step on wide screens instead of staying 198 px and truncating. A size the
+   owner chose («S»/«L» in Appearance) is never overridden. */
+@media (min-width: 1920px) {
+  :root[data-card-size="m"] { --grid-min: 232px; --control-h-card: 36px; }
+}
+@media (min-width: 2400px) {
+  :root[data-card-size="m"] { --grid-min: 264px; }
+}
+/* The unpaid-bill chip wraps rather than cutting «Счёт не закрыт» to «Счёт не за…». */
+.open-bill-chip { flex-wrap: wrap; white-space: normal; }
+.open-bill-chip__label { overflow: visible; text-overflow: clip; white-space: normal; }

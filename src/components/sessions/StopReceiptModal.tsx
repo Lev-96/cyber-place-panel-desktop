@@ -685,7 +685,7 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved, canRes
                       {money(Number(it.line_total), receiptPrecision)}
                     </span>
                     {!finished && (
-                      <button type="button" onClick={() => void remove(it.id, sessionLineLabel(it, t), it.is_additional === true)} disabled={busy} style={removeBtn} title={t("session.removeItemTitle")}>
+                      <button type="button" onClick={() => void remove(it.id, sessionLineLabel(it, t), it.is_additional === true)} disabled={busy} className="receipt-line-remove" style={removeBtn} title={t("session.removeItemTitle")} aria-label={t("session.removeItemTitle")}>
                         ×
                       </button>
                     )}
@@ -731,7 +731,7 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved, canRes
             )}
 
             {/* Total */}
-            <div style={{ ...row, borderTop: "2px solid #07ddf1", marginTop: 6, paddingTop: 12 }}>
+            <div style={{ ...row, borderTop: "2px solid var(--color-primary)", marginTop: 6, paddingTop: 12 }}>
               <span style={{ flex: 1, fontWeight: 700, fontSize: 16 }}>{t("session.totalDue")}</span>
               {/* A waived bill says so in words. A correct 0 here is exactly
                   what an operator double-checks — it reads as "the till
@@ -864,12 +864,13 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved, canRes
 const row: React.CSSProperties = {
   display: "flex", alignItems: "center",
   padding: "8px 0",
-  borderBottom: "1px solid #131c33",
+  // The theme's own line, a shade quieter (was a dark-only #131c33).
+  borderBottom: "1px solid color-mix(in srgb, var(--color-border) 65%, transparent)",
 };
 
 const removeBtn: React.CSSProperties = {
-  width: 22, height: 22, borderRadius: 11,
-  border: "1px solid #4a1a1a", background: "transparent",
+  width: 22, height: 22, borderRadius: 11, position: "relative",
+  border: "1px solid var(--color-danger-border-dim)", background: "transparent",
   color: "var(--color-danger)", cursor: "pointer", fontSize: 14, lineHeight: 1,
 };
 
