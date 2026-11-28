@@ -5326,20 +5326,27 @@ string edit; `percentText` drops trailing zeros of "10.00").
   (`prepaid-later` / `prepaid-switch`, radios). `PaymentEditor` takes `branchId`
   and offers `GET /branches/{id}/payment-labels` as «+ name» buttons.
 
-## «Сдача смены: товары» — the shortage on the shift it happened on (2026-11-28, owner)
+## The shortage on the shift it happened on — in «Остатки» (2026-11-28, owner)
 
 Backend: `cyber-place/CLAUDE.md` § "The shift that handed the goods over". Owner/admin
-only; the server sends nothing to a manager, so nothing is hidden client-side.
-- `ShiftHistory` row: `shift-history-stock` (red, `shift.handover.listShortage` + up to 5
-  «name −n» + `listMore`) from `IShift.stock_handover`.
-- The report modal passes `summary.stock_handover` to `ShiftReportView handover=`, which
-  renders `ShiftAcceptanceBlock count={handover} handedOverTo={…}` — the SAME component
-  (title `shift.handover.title`, testid `shift-stock-handover`; NOT `shift-handover`,
-  that is the running-places «Передача смены» section) — never with `acceptanceOnly`.
-- Every full count (both views) adds `shift-stock-reasons`: one `shift.handover.reason`
-  sentence per shortage (name, units, value, should-be, counted — server figures only).
-- Tests: `ShiftAcceptanceBlock.test.tsx` (+5), `ShiftHistory.test.tsx` (+2); 5 mutations
-  caught. Live-checked on the local stack (owner en/ru/am, 1440 + 390; manager sees none).
+only; the server sends nothing to a manager, so nothing is hidden client-side. A
+shortage is found only when the NEXT manager counts at acceptance (that count resets the
+shelf), so it is shown on the closed shift as soon as the next one is accepted.
+- `ShiftHistory` row: `shift-history-stock` (`shift.handover.listShortage` + up to 5
+  «name −n» + `listMore`) from `IShift.stock_handover`; colour = danger mixed 70% with
+  text (≥4.5:1 in all seven themes).
+- The report modal passes `summary.stock_handover` → `ShiftReportView handover=` →
+  `ShiftBreakdown` → `ShiftStockTable handover= acceptance={report.acceptance_count}`:
+  «Осталось» of a short product reads «9 → 8 (−1)» in red (`shift-stock-next`, no extra
+  column — the report is a 680px dialog); under the table `shift-stock-handover` (total,
+  who counted, one `shift.handover.reason` sentence per shortage). On the ACCEPTING
+  shift, its «Пересчёт» is explained per shortage (`shift-stock-accepted-row`,
+  `shift.stock.acceptedShort`: the previous shift's, not this one's). Blind counts give
+  nothing. The «Приём смены» block also lists `shift.handover.reason` sentences.
+- testids: never `shift-handover` (that is the running-places «Передача смены»).
+- Tests: `ShiftStockTable.test.tsx` (+3), `ShiftAcceptanceBlock.test.tsx`,
+  `ShiftHistory.test.tsx`; mutations caught (one equivalent: a blind count has no outcome).
+  Live-checked on the local stack (owner en/ru/am, 1440 + 390).
 
 ## «Приём смены»: the blind count at opening (2026-11-18, owner)
 

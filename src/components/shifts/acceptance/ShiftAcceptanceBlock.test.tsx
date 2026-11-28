@@ -134,14 +134,16 @@ describe("in the report", () => {
     expect(screen.getByTestId("shift-acceptance")).toBeTruthy();
   });
 
-  test("the handover (2026-11-28) shows beside the shift's own acceptance, never on a manager's open view", () => {
+  test("the handover (2026-11-28) is shown inside «Остатки», never on a manager's open view", () => {
     const handover: IStockHandover = { ...full, accepted_by_shift: { id: 3, opened_at: "2026-11-19T10:00:00+04:00", opened_by: { id: 2, name: "Anna" } } };
-    const { rerender } = render(<ShiftReportView shift={shift} report={{ ...report, acceptance_count: full }} handover={handover} />);
-    expect(screen.getByTestId("shift-acceptance")).toBeTruthy();
-    expect(screen.getByTestId("shift-stock-handover")).toBeTruthy();
-    rerender(<ShiftReportView shift={shift} report={report} handover={null} />);
+    const stock = { rows: [{ product_id: 1, name: "Cola", start: 10, received: 0, sold: 1, returned: 0, sold_net: 1, corrected: 0, remaining: 9 }],
+      totals: { start: 10, received: 0, sold: 1, returned: 0, sold_net: 1, corrected: 0, remaining: 9 }, count: 1, negative_count: 0 };
+    const closed = { ...shift, status: "closed" as const };
+    const { rerender } = render(<ShiftReportView shift={closed} report={{ ...report, stock }} handover={handover} />);
+    expect(within(screen.getByTestId("shift-stock")).getByTestId("shift-stock-handover")).toBeTruthy();
+    rerender(<ShiftReportView shift={closed} report={{ ...report, stock }} handover={null} />);
     expect(screen.queryByTestId("shift-stock-handover")).toBeNull();
-    rerender(<ShiftReportView shift={shift} report={report} handover={handover} acceptanceOnly />);
+    rerender(<ShiftReportView shift={closed} report={{ ...report, stock }} handover={handover} acceptanceOnly />);
     expect(screen.queryByTestId("shift-stock-handover")).toBeNull();
   });
 });
@@ -151,9 +153,7 @@ describe("in the report", () => {
  * happened on, and every shortage is said in one sentence — name, how many,
  * what it is worth, should-be and counted — with the server's figures only.
  */
-describe("the shift that handed the goods over", () => {
-  const handover: IStockHandover = { ...full, accepted_by_shift: { id: 2, opened_at: "2026-11-18T12:30:00+04:00", opened_by: { id: 3, name: "Boris" } } };
-
+describe("the reason in words", () => {
   test("one sentence per shortage, nothing for a surplus or a first count", () => {
     render(<ShiftAcceptanceBlock count={full} />);
     expect(screen.getAllByTestId("shift-stock-reason").map((li) => li.textContent)).toEqual(["shift.handover.reason Cola|2|1000.00 AMD|9|7"]);
@@ -165,15 +165,4 @@ describe("the shift that handed the goods over", () => {
     expect(screen.queryByTestId("shift-stock-reasons")).toBeNull();
   });
 
-  test("titled as the handover, says who counted it, and keeps the same table and totals", () => {
-    render(<ShiftAcceptanceBlock count={handover} handedOverTo={handover.accepted_by_shift} />);
-    const block = screen.getByTestId("shift-stock-handover");
-    expect(block.querySelector("h3")?.textContent).toBe("shift.handover.title");
-    expect(screen.getByTestId("shift-stock-handover-by").textContent).toContain("Boris");
-    expect(screen.queryByTestId("shift-acceptance-previous")).toBeNull();
-    expect(screen.getByTestId("shift-acceptance-blamed").textContent).toContain("Anna");
-    expect(cells("Cola")).toMatchObject({ expected: "9", counted: "7", diff: "−2", value: "1000.00 AMD" });
-    expect(screen.getByTestId("shift-acceptance-total-shortage").textContent).toContain("1000.00 AMD");
-    expect(within(block).getAllByTestId("shift-stock-reason")).toHaveLength(1);
-  });
 });

@@ -33,8 +33,8 @@ interface Props {
   acceptanceOnly?: boolean;
   /**
    * How this shift handed the goods over (`summary.stock_handover`, owner /
-   * admin only, 2026-11-28): the next shift's count, shown on THIS shift so a
-   * shortage stays where it happened. Absent / null = nothing to show.
+   * admin only, 2026-11-28): the next shift's count, shown in THIS shift's
+   * «Остатки» so a shortage stays where it happened. Absent / null = nothing.
    */
   handover?: IStockHandover | null;
 }
@@ -114,8 +114,6 @@ const ShiftReportView = ({ shift, report, viewerId = null, acceptanceOnly = fals
 
       {/* 2026-11-18: «Приём смены», what the shift began with; blind for a manager (the server's shape). */}
       {report.acceptance_count && <ShiftAcceptanceBlock count={report.acceptance_count} />}
-      {/* 2026-11-28: how this shift handed the goods over (owner / admin; the server sends it only to them). */}
-      {handover && !acceptanceOnly && <ShiftAcceptanceBlock count={handover} handedOverTo={handover.accepted_by_shift} />}
       {acceptanceOnly && !report.acceptance_count && (
         <div className="card muted" data-testid="shift-acceptance-none">{t("shift.acceptCount.none")}</div>
       )}
@@ -225,7 +223,7 @@ const ShiftReportView = ({ shift, report, viewerId = null, acceptanceOnly = fals
           </Section>
         )}
 
-        <ShiftBreakdown report={report} closerId={report.closed?.closed_by.id ?? shift.closed_by?.id ?? viewerId} />
+        <ShiftBreakdown report={report} closerId={report.closed?.closed_by.id ?? shift.closed_by?.id ?? viewerId} handover={handover} />
 
         {(report.member_topups.count > 0 || report.places.running_count > 0 || report.warnings.length > 0) && (
           <section className="card col" style={{ gap: 6, borderColor: "var(--color-warning)" }} data-testid="shift-warnings">

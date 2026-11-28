@@ -12141,8 +12141,27 @@ button.sales-card:focus-visible { outline: 2px solid var(--color-primary); outli
 /* The report's «Приём смены»: a table on a wide box, one card per product
    on a narrow one (the report also sits in a 680px dialog: a container query,
    not a media query). */
-[data-testid="shift-acceptance"],
-[data-testid="shift-stock-handover"] { container-type: inline-size; }
+[data-testid="shift-acceptance"] { container-type: inline-size; }
+/* «Остатки»: the shortage found at the next acceptance (2026-11-28). */
+.shift-stock__found { white-space: nowrap; font-weight: 700; }
+.shift-stock tr.is-short th[scope="row"] { color: color-mix(in srgb, var(--color-danger) 70%, var(--color-text)); }
+.shift-stock__lost {
+  margin-top: 10px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--color-danger) 40%, transparent);
+  background: color-mix(in srgb, var(--color-danger) 8%, transparent);
+  color: var(--color-text, inherit);
+  font-size: 14px;
+  line-height: 1.45;
+}
+.shift-stock__lost strong { color: color-mix(in srgb, var(--color-danger) 70%, var(--color-text)); }
+.shift-stock__lost ul { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; }
+.shift-stock__lost li::marker { color: var(--color-danger); }
+.shift-stock__notes { margin: 8px 0 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--color-muted); }
 /* One plain sentence per shortage (2026-11-28): what is missing and why, first. */
 .shift-acceptance__reasons {
   margin: 0 0 10px;

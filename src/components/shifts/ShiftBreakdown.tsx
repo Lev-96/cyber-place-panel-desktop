@@ -2,7 +2,7 @@ import { formatDateTime, formatTime } from "@/i18n/dates";
 import { useLang } from "@/i18n/LanguageContext";
 import { fmt } from "@/i18n/translations";
 import { shiftAmount } from "@/shifts/cash";
-import type { IShiftProductGroup, IShiftReport, IShiftStaffPart } from "@/types/shifts";
+import type { IShiftProductGroup, IShiftReport, IShiftStaffPart, IStockHandover } from "@/types/shifts";
 import { platformLabel } from "@/utils/platform";
 import type { CSSProperties } from "react";
 import { Row, Section, divider } from "./shiftReportParts";
@@ -22,12 +22,14 @@ interface Props {
   report: IShiftReport;
   /** The person closing (or about to close) the shift: shown first. */
   closerId: number | null;
+  /** How this shift handed the goods over (owner / admin; 2026-11-28): shown in «Остатки». */
+  handover?: IStockHandover | null;
 }
 
 export const staffInOrder = (staff: readonly IShiftStaffPart[], closerId: number | null): IShiftStaffPart[] =>
   [...staff].sort((a, b) => Number(b.id === closerId) - Number(a.id === closerId));
 
-const ShiftBreakdown = ({ report, closerId }: Props) => {
+const ShiftBreakdown = ({ report, closerId, handover = null }: Props) => {
   const { t, money } = useLang();
   const m = (amount: string) => shiftAmount(money, amount);
   const names = new Map((report.staff ?? []).map((p) => [p.id, p.name]));
@@ -56,7 +58,7 @@ const ShiftBreakdown = ({ report, closerId }: Props) => {
       )}
 
       {/* v6 (2026-11-16): the shelf, in pieces. */}
-      {report.stock && <ShiftStockTable stock={report.stock} />}
+      {report.stock && <ShiftStockTable stock={report.stock} handover={handover} acceptance={report.acceptance_count ?? null} />}
 
       {report.staff && (
         <Section title={t("shift.staff")} testId="shift-staff">

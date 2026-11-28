@@ -2001,6 +2001,13 @@ export const TRANSLATIONS: Dict = {
   "shift.stock.remaining": { en: "Left", ru: "Осталось", am: "Մնացել է" },
   "shift.stock.total": { en: "In all", ru: "Итого", am: "Ընդամենը" },
   "shift.stock.negative": { en: "Below zero: {0}. Recount these products.", ru: "Ниже нуля: {0}. Пересчитайте эти товары.", am: "Զրոյից ցածր՝ {0}։ Վերահաշվարկեք այս ապրանքները։" },
+  "shift.stock.nextCount": { en: "Counted by the next shift", ru: "Посчитала следующая смена", am: "Հաշվել է հաջորդ հերթափոխը" },
+  "shift.stock.lostTotal": { en: "Short at handover: {0} pcs, {1}", ru: "Не хватило при сдаче смены: {0} шт., {1}", am: "Հերթափոխը հանձնելիս պակասել է՝ {0} հատ, {1}" },
+  "shift.stock.acceptedShort": {
+    en: "«{0}»: recount {1} at the start of this shift. {2} pcs ({3}) were already missing at the previous shift ({4}), not this one.",
+    ru: "«{0}»: пересчёт {1} при приёме этой смены. Не хватило {2} шт. ({3}) у прошлой смены ({4}), а не у этой.",
+    am: "«{0}»՝ վերահաշվարկ {1} այս հերթափոխն ընդունելիս։ {2} հատ ({3}) պակասել է նախորդ հերթափոխում ({4}), ոչ թե այս մեկում։",
+  },
   "shift.stock.notCounted": { en: "not counted", ru: "без учёта", am: "առանց հաշվառման" },
   // «Приём смены» (2026-11-18): the blind count at opening, and the owner's read of it.
   "shift.accept.title": { en: "Shift handover count", ru: "Приём смены", am: "Հերթափոխի ընդունում" },
@@ -2038,7 +2045,6 @@ export const TRANSLATIONS: Dict = {
   "shift.acceptCount.lastSale": { en: "last sale: {0}", ru: "последняя продажа: {0}", am: "վերջին վաճառք՝ {0}" },
   "shift.acceptCount.totalShortage": { en: "Shortage in total: {0}", ru: "Недостача всего: {0}", am: "Պակասորդ ընդամենը՝ {0}" },
   "shift.acceptCount.totalSurplus": { en: "Surplus in total: {0}", ru: "Излишек всего: {0}", am: "Ավելցուկ ընդամենը՝ {0}" },
-  "shift.handover.title": { en: "Shift handover: goods", ru: "Сдача смены: товары", am: "Հերթափոխի հանձնում՝ ապրանքներ" },
   "shift.handover.acceptedBy": { en: "Counted by the next shift: {0}, {1}", ru: "Пересчитала следующая смена: {0}, {1}", am: "Վերահաշվել է հաջորդ հերթափոխը՝ {0}, {1}" },
   "shift.handover.reason": {
     en: "«{0}»: {1} short ({2}). There should have been {3}, the next shift counted {4}. Most likely sold without going through the program, or missing.",
