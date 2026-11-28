@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, test, vi } from "vitest";
-import type { IAcceptanceCountBlind, IAcceptanceCountFull, IShift, IShiftReport } from "@/types/shifts";
+import type { IAcceptanceCountBlind, IAcceptanceCountFull, IShift, IShiftReport, IStockHandover } from "@/types/shifts";
 
 /**
  * «Приём смены» in the report (2026-11-18): the owner reads the books, the
@@ -12,7 +12,10 @@ import type { IAcceptanceCountBlind, IAcceptanceCountFull, IShift, IShiftReport 
 // Sentences keep their placeholders, so the values really reach the screen.
 const SENTENCES = /\.(lastSale|countedBy|previous|gap|blamed|totalShortage|totalSurplus)$/;
 vi.mock("@/i18n/LanguageContext", () => ({
-  useLang: () => ({ t: (k: string) => (SENTENCES.test(k) ? `${k} {0} {1}` : k), lang: "en", money: (n: number) => `${n.toFixed(2)} AMD` }),
+  useLang: () => ({
+    t: (k: string) => (k === "shift.handover.reason" ? `${k} {0}|{1}|{2}|{3}|{4}` : SENTENCES.test(k) || k === "shift.handover.acceptedBy" ? `${k} {0} {1}` : k),
+    lang: "en", money: (n: number) => `${n.toFixed(2)} AMD`,
+  }),
 }));
 import ShiftAcceptanceBlock from "./ShiftAcceptanceBlock";
 import ShiftReportView from "../ShiftReportView";
@@ -129,5 +132,48 @@ describe("in the report", () => {
     expect(screen.queryByTestId("shift-acceptance")).toBeNull();
     rerender(<ShiftReportView shift={shift} report={{ ...report, acceptance_count: full }} />);
     expect(screen.getByTestId("shift-acceptance")).toBeTruthy();
+  });
+
+  test("the handover (2026-11-28) shows beside the shift's own acceptance, never on a manager's open view", () => {
+    const handover: IStockHandover = { ...full, accepted_by_shift: { id: 3, opened_at: "2026-11-19T10:00:00+04:00", opened_by: { id: 2, name: "Anna" } } };
+    const { rerender } = render(<ShiftReportView shift={shift} report={{ ...report, acceptance_count: full }} handover={handover} />);
+    expect(screen.getByTestId("shift-acceptance")).toBeTruthy();
+    expect(screen.getByTestId("shift-stock-handover")).toBeTruthy();
+    rerender(<ShiftReportView shift={shift} report={report} handover={null} />);
+    expect(screen.queryByTestId("shift-stock-handover")).toBeNull();
+    rerender(<ShiftReportView shift={shift} report={report} handover={handover} acceptanceOnly />);
+    expect(screen.queryByTestId("shift-stock-handover")).toBeNull();
+  });
+});
+
+/**
+ * «Сдача смены» (2026-11-28, owner): the shortage is shown on the shift it
+ * happened on, and every shortage is said in one sentence — name, how many,
+ * what it is worth, should-be and counted — with the server's figures only.
+ */
+describe("the shift that handed the goods over", () => {
+  const handover: IStockHandover = { ...full, accepted_by_shift: { id: 2, opened_at: "2026-11-18T12:30:00+04:00", opened_by: { id: 3, name: "Boris" } } };
+
+  test("one sentence per shortage, nothing for a surplus or a first count", () => {
+    render(<ShiftAcceptanceBlock count={full} />);
+    expect(screen.getAllByTestId("shift-stock-reason").map((li) => li.textContent)).toEqual(["shift.handover.reason Cola|2|1000.00 AMD|9|7"]);
+  });
+
+  test("everything matching says no reason at all", () => {
+    const clean: IAcceptanceCountFull = { ...full, rows: full.rows.map((r) => ({ ...r, diff: 0, value: "0.00", outcome: "none" as const, is_baseline: false })) };
+    render(<ShiftAcceptanceBlock count={clean} />);
+    expect(screen.queryByTestId("shift-stock-reasons")).toBeNull();
+  });
+
+  test("titled as the handover, says who counted it, and keeps the same table and totals", () => {
+    render(<ShiftAcceptanceBlock count={handover} handedOverTo={handover.accepted_by_shift} />);
+    const block = screen.getByTestId("shift-stock-handover");
+    expect(block.querySelector("h3")?.textContent).toBe("shift.handover.title");
+    expect(screen.getByTestId("shift-stock-handover-by").textContent).toContain("Boris");
+    expect(screen.queryByTestId("shift-acceptance-previous")).toBeNull();
+    expect(screen.getByTestId("shift-acceptance-blamed").textContent).toContain("Anna");
+    expect(cells("Cola")).toMatchObject({ expected: "9", counted: "7", diff: "−2", value: "1000.00 AMD" });
+    expect(screen.getByTestId("shift-acceptance-total-shortage").textContent).toContain("1000.00 AMD");
+    expect(within(block).getAllByTestId("shift-stock-reason")).toHaveLength(1);
   });
 });

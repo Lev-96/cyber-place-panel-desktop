@@ -12141,7 +12141,24 @@ button.sales-card:focus-visible { outline: 2px solid var(--color-primary); outli
 /* The report's «Приём смены»: a table on a wide box, one card per product
    on a narrow one (the report also sits in a 680px dialog: a container query,
    not a media query). */
-[data-testid="shift-acceptance"] { container-type: inline-size; }
+[data-testid="shift-acceptance"],
+[data-testid="shift-stock-handover"] { container-type: inline-size; }
+/* One plain sentence per shortage (2026-11-28): what is missing and why, first. */
+.shift-acceptance__reasons {
+  margin: 0 0 10px;
+  padding: 10px 12px 10px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--color-danger) 40%, transparent);
+  background: color-mix(in srgb, var(--color-danger) 8%, transparent);
+  color: var(--color-text, inherit);
+  font-size: 14px;
+  line-height: 1.45;
+}
+.shift-acceptance__reasons li::marker { color: var(--color-danger); }
+.shift-history__stock { font-size: 12px; font-weight: 600; color: var(--color-danger); overflow-wrap: anywhere; }
 .shift-acceptance__facts {
   display: flex;
   flex-direction: column;

@@ -21,7 +21,7 @@ vi.mock("@/repositories/BranchRepository", () => ({
   },
 }));
 vi.mock("@/i18n/LanguageContext", () => ({
-  useLang: () => ({ t: (k: string) => k, lang: "en", money: (n: number) => n.toFixed(2) }),
+  useLang: () => ({ t: (k: string) => (k.startsWith("shift.handover.list") ? `${k} {0} {1}` : k), lang: "en", money: (n: number) => n.toFixed(2) }),
 }));
 
 import ShiftHistory from "./ShiftHistory";
@@ -176,6 +176,36 @@ describe("what is drawn", () => {
     await mount({ canPickStaff: true });
     await waitFor(() => expect(screen.getByText("shift.state.errorTitle")).toBeTruthy());
     expect(screen.queryByText("shift.historyEmpty")).toBeNull();
+  });
+
+  test("goods short at handover are named on the shift they went missing on (2026-11-28)", async () => {
+    repo.list.mockResolvedValue(page([
+      row({ id: 5, stock_handover: { products: 3, units: 4, value: "1700.00", items_total: 3,
+        items: [{ name: "Energy", diff: -1, value: "900.00" }, { name: "Water", diff: -2, value: "400.00" }] } }),
+      row({ id: 6, stock_handover: null }),
+      row({ id: 7 }),
+    ]));
+    await mount({ canPickStaff: true });
+    const lines = await screen.findAllByTestId("shift-history-stock");
+    expect(lines.map((l) => l.textContent)).toEqual(["⚠ shift.handover.listShortage 4 1700.00: Energy −1, Water −2 shift.handover.listMore 1 {1}"]);
+  });
+
+  test("the handover block opens with the report of the shift that handed it over", async () => {
+    const block = { counted_at: "2026-10-19T10:00:00+04:00", counted_by: { id: 20, name: "Ivan" }, previous_shift: null, blamed_user: { id: 10, name: "Anna" },
+      window: null, gap: null, rows: [], accepted_by_shift: { id: 6, opened_at: "2026-10-19T10:00:00+04:00", opened_by: { id: 20, name: "Ivan" } },
+      totals: { products: 0, baseline_products: 0, shortage_products: 0, shortage_units: 0, shortage_value: "0.00", surplus_products: 0, surplus_units: 0, surplus_value: "0.00" } };
+    const report = {
+      period: { opened_at: "2026-10-18T10:00:00+04:00", to: "2026-10-19T02:05:00+04:00", duration_seconds: 1 },
+      places: { closed_count: 0, free_count: 0, expired_count: 0, started_count: 0, running_count: 0, by_method: { cash: "0.00", card: "0.00", other: "0.00", unrecorded: "0.00" }, count_by_method: { cash: 0, card: 0, other: 0, unrecorded: 0 }, total: "0.00" },
+      till: { paid_count: 0, by_method: { cash: "0.00", card: "0.00", deposit: "0.00", other: "0.00" }, count_by_method: { cash: 0, card: 0, deposit: 0, other: 0 }, total: "0.00", voided_count: 0, voided_total: "0.00" },
+      tournaments: { count: 0, total: "0.00" }, revenue_total: "0.00",
+      by_method: { cash: "0.00", card: "0.00", other: "0.00", deposit: "0.00", unrecorded: "0.00" },
+      cash: { opening: "0.00", places: "0.00", till: "0.00", expected: "0.00" }, member_topups: { count: 0, total: "0.00" }, warnings: [],
+    };
+    repo.summary.mockResolvedValue({ shift: row(), report, stock_handover: block });
+    await mount({ canPickStaff: true });
+    await act(async () => { fireEvent.click(await screen.findByText("shift.report")); });
+    expect(await screen.findByTestId("shift-stock-handover")).toBeTruthy();
   });
 
   test("a saved report opens from its row", async () => {

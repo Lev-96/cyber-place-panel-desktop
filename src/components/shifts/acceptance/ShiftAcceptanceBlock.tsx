@@ -5,7 +5,7 @@ import { fmt } from "@/i18n/translations";
 import { shiftAmount } from "@/shifts/cash";
 import {
   type IAcceptanceCount, type IAcceptanceCountBlind, type IAcceptanceCountFull, type IAcceptanceCountRow,
-  STOCK_COUNT_OUTCOME, isBlindCount,
+  type IStockHandover, STOCK_COUNT_OUTCOME, isBlindCount,
 } from "@/types/shifts";
 import { Section } from "../shiftReportParts";
 import { venueMoment, venueSpan } from "./acceptanceCount";
@@ -23,12 +23,19 @@ import { venueMoment, venueSpan } from "./acceptanceCount";
  *
  * Manager: blind, as the server sends it — what was counted, nothing else.
  *
+ * «Сдача смены» (2026-11-28, owner): the same block, read from the shift that
+ * handed the goods over (`handedOverTo` = the shift that counted them), so a
+ * shortage stays on the shift it happened on. Every shortage is also said in
+ * one plain sentence, with the server's figures only.
+ *
  * The table becomes one card per product when its own box is narrow (a
  * container query: the report also sits in a 680px dialog), so no window
  * width scrolls the page sideways.
  */
-const ShiftAcceptanceBlock = ({ count }: { count: IAcceptanceCount }) =>
-  isBlindCount(count) ? <BlindCount count={count} /> : <FullCount count={count} />;
+const ShiftAcceptanceBlock = ({ count, handedOverTo }: {
+  count: IAcceptanceCount;
+  handedOverTo?: IStockHandover["accepted_by_shift"];
+}) => isBlindCount(count) ? <BlindCount count={count} /> : <FullCount count={count} handedOverTo={handedOverTo} />;
 
 const CountedBy = ({ count }: { count: IAcceptanceCount }) => {
   const { t } = useLang();
@@ -70,7 +77,7 @@ const BlindCount = ({ count }: { count: IAcceptanceCountBlind }) => {
   );
 };
 
-const FullCount = ({ count }: { count: IAcceptanceCountFull }) => {
+const FullCount = ({ count, handedOverTo }: { count: IAcceptanceCountFull; handedOverTo?: IStockHandover["accepted_by_shift"] }) => {
   const { t, money } = useLang();
   const m = (amount: string) => shiftAmount(money, amount);
   const showCorrected = count.rows.some((r) => (r.flow?.corrected ?? 0) !== 0);
@@ -91,12 +98,17 @@ const FullCount = ({ count }: { count: IAcceptanceCountFull }) => {
     ["value", t("shift.acceptCount.value")],
   ];
   const label = (key: string) => head.find(([k]) => k === key)?.[1] ?? "";
+  const shortages = count.rows.filter((r) => r.outcome === STOCK_COUNT_OUTCOME.shortage);
 
   return (
-    <Section title={t("shift.accept.title")} testId="shift-acceptance">
+    <Section title={t(handedOverTo ? "shift.handover.title" : "shift.accept.title")} testId={handedOverTo ? "shift-stock-handover" : "shift-acceptance"}>
       <div className="shift-acceptance__facts">
-        <CountedBy count={count} />
-        {prev ? (
+        {handedOverTo ? (
+          <span data-testid="shift-stock-handover-by">
+            {fmt(t("shift.handover.acceptedBy"), handedOverTo.opened_by?.name ?? "", count.counted_at ? formatVenueDateTime(count.counted_at) : "")}
+          </span>
+        ) : <CountedBy count={count} />}
+        {handedOverTo ? null : prev ? (
           <span data-testid="shift-acceptance-previous">
             {fmt(t("shift.acceptCount.previous"), prev.opened_by?.name ?? "", venueSpan(prev.opened_at, prev.closed_at))}
           </span>
@@ -113,6 +125,16 @@ const FullCount = ({ count }: { count: IAcceptanceCountFull }) => {
         )}
         <span className="muted shift-acceptance__rule">{t("shift.acceptCount.flowRule")}</span>
       </div>
+
+      {shortages.length > 0 && (
+        <ul className="shift-acceptance__reasons" data-testid="shift-stock-reasons">
+          {shortages.map((r) => (
+            <li key={r.product_id ?? r.name} data-testid="shift-stock-reason">
+              {fmt(t("shift.handover.reason"), r.name, -r.diff, m(r.value), r.expected, r.counted)}
+            </li>
+          ))}
+        </ul>
+      )}
 
       <div className="shift-acceptance__box">
         <table className="shift-acceptance__table is-full">

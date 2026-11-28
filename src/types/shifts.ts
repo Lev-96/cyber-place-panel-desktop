@@ -31,6 +31,22 @@ export interface IShift {
   branch: { id: number; address: string | null; city: string | null } | null;
   /** What the shift took, from its frozen report; null while open or for a v1 shift. */
   revenue_total: Money | null;
+  /**
+   * Owner / admin only (2026-11-28): the goods short when the NEXT shift
+   * accepted this one; null = none (not accepted yet, all matched, surplus
+   * only, a first count). ABSENT for a manager and from an older backend.
+   */
+  stock_handover?: IStockHandoverSummary | null;
+}
+
+/** One shift's goods shortage, for its row in the history (the server's figures). */
+export interface IStockHandoverSummary {
+  products: number;
+  units: number;
+  value: Money;
+  /** The biggest losses first, at most 5. */
+  items: Array<{ name: string; diff: number; value: Money }>;
+  items_total: number;
 }
 
 export interface IShiftStaff {
@@ -287,7 +303,19 @@ export interface IShiftWithReport {
   shift: IShift;
   /** null only for a shift closed before reports were kept. */
   report: IShiftReport | null;
+  /**
+   * Owner / admin only (2026-11-28): how THIS shift handed the goods over —
+   * the count the next shift was accepted with, read live beside the frozen
+   * report. null = no shift accepted after it with a count yet. ABSENT for a
+   * manager and from an older backend.
+   */
+  stock_handover?: IStockHandover | null;
 }
+
+/** The next shift's acceptance count, read from the shift that handed it over. */
+export type IStockHandover = IAcceptanceCountFull & {
+  accepted_by_shift: { id: number; opened_at: string | null; opened_by: IShiftPerson | null };
+};
 
 /**
  * «Приём смены» (2026-11-18): one product the manager coming on must count.

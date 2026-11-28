@@ -1,7 +1,7 @@
 import { formatDateTime } from "@/i18n/dates";
 import { useLang } from "@/i18n/LanguageContext";
 import { fmt } from "@/i18n/translations";
-import type { DifferenceKind, IShift, IShiftReport } from "@/types/shifts";
+import type { DifferenceKind, IShift, IShiftReport, IStockHandover } from "@/types/shifts";
 import type { CSSProperties, ReactNode } from "react";
 import { shiftAmount } from "@/shifts/cash";
 import { platformLabel } from "@/utils/platform";
@@ -31,6 +31,12 @@ interface Props {
    * screen decides when; a closed report never passes it.
    */
   acceptanceOnly?: boolean;
+  /**
+   * How this shift handed the goods over (`summary.stock_handover`, owner /
+   * admin only, 2026-11-28): the next shift's count, shown on THIS shift so a
+   * shortage stays where it happened. Absent / null = nothing to show.
+   */
+  handover?: IStockHandover | null;
 }
 
 const KIND_KEY: Record<DifferenceKind, string> = {
@@ -53,7 +59,7 @@ const Fact = ({ label, children, testId }: { label: string; children: ReactNode;
   </div>
 );
 
-const ShiftReportView = ({ shift, report, viewerId = null, acceptanceOnly = false }: Props) => {
+const ShiftReportView = ({ shift, report, viewerId = null, acceptanceOnly = false, handover = null }: Props) => {
   const { t, money } = useLang();
   const methodName = (method: string) =>
     method === "cash" ? t("session.payCash") : method === "card" ? t("session.payCard")
@@ -108,6 +114,8 @@ const ShiftReportView = ({ shift, report, viewerId = null, acceptanceOnly = fals
 
       {/* 2026-11-18: «Приём смены», what the shift began with; blind for a manager (the server's shape). */}
       {report.acceptance_count && <ShiftAcceptanceBlock count={report.acceptance_count} />}
+      {/* 2026-11-28: how this shift handed the goods over (owner / admin; the server sends it only to them). */}
+      {handover && !acceptanceOnly && <ShiftAcceptanceBlock count={handover} handedOverTo={handover.accepted_by_shift} />}
       {acceptanceOnly && !report.acceptance_count && (
         <div className="card muted" data-testid="shift-acceptance-none">{t("shift.acceptCount.none")}</div>
       )}
