@@ -335,6 +335,17 @@ branch — so the two yml files never conflict:
   `src/api/psn.ts`, mirrors the backend flag): no PSN name field at start and no
   sender card in Settings. Pairing's `psnLoginExternal` is separate and stays.
 
+- **Asleep by the player's choice during a session (2026-11-28, owner-approved PS5 change).** A player
+  watching YouTube on the smart TV, the TV's HDMI-CEC or the console's own idle timer rests the PS5 mid-session;
+  the panel woke it again (desired active, actual rest), the TV switched back to the PS5 and it fell asleep again:
+  «turns itself on and off». Now `MachineSnapshot.awakeInSession` is set once the console is seen ACTIVE in the
+  session, and a later rest is left alone (state REST, no command) until the session ends. Start still wakes
+  (`obs.starting` / `obs.pressed`; `Ps5Controller.pressed()` clears the flag), a console never seen awake is
+  woken as before, and Stop / time-up rest an awake console as before (an asleep one gets nothing). Our own
+  rest landing late after a Stop→quick Start is told apart by `restAskedAt`: within `REST_SETTLE_MS` of it a
+  sleep is still woken. Tests: `machine.test.ts` «asleep by the player's choice…» (8), `sleepByPlayer.test.ts`;
+  4 mutations caught; `stopStartRace.test.ts` unchanged and green.
+
 ### The console lifecycle (`src/ps5/`)
 `machine.ts` is a pure function of (previous state, observation) → (next state,
 commands): UNKNOWN / OFFLINE / REST / WAKING / ACTIVE / GOING_TO_REST /
