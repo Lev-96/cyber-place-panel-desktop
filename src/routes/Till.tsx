@@ -6,6 +6,7 @@ import SellProductsDialog from "@/components/pos/SellProductsDialog";
 import { useAsync } from "@/hooks/useAsync";
 import { formatTime } from "@/i18n/dates";
 import { useLang } from "@/i18n/LanguageContext";
+import { centsWhenFractional } from "@/i18n/currency";
 import { orderRepository } from "@/repositories/OrderRepository";
 import { IOrder } from "@/types/pos";
 import { useMemo, useState } from "react";
@@ -76,9 +77,16 @@ const Till = () => {
         <div className="row" style={{ gap: 16, flexWrap: "wrap" }}>
           {(["cash", "card", "other"] as const).map((m) => (
             <span key={m} className="muted" style={{ fontSize: 13 }}>
-              {t(LABEL_KEY[m])}: {money(totals.by.get(m) ?? 0)}
+              {t(LABEL_KEY[m])}: {money(totals.by.get(m) ?? 0, centsWhenFractional(totals.by.get(m) ?? 0))}
             </span>
           ))}
+          {/* Paid with Club Card bonuses (QA 2026-11-25): its own line, so the
+              parts add up to the day; not cash, not revenue. */}
+          {(totals.by.get("bonus" as IOrder["payment_method"]) ?? 0) > 0 && (
+            <span className="muted" style={{ fontSize: 13 }} data-testid="till-today-bonus">
+              {t("pay.bonus")}: {money(totals.by.get("bonus" as IOrder["payment_method"]) ?? 0, centsWhenFractional(totals.by.get("bonus" as IOrder["payment_method"]) ?? 0))}
+            </span>
+          )}
         </div>
       </div>
 

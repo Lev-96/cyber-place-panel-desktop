@@ -60,4 +60,17 @@ describe("friendlyMutation", () => {
   test("a 404 still is", async () => {
     await expect(friendlyMutation(Promise.reject(apiError(404)))).rejects.toThrow(/not deployed/);
   });
+
+  test("Laravel's bare 404 words still mean a missing route", async () => {
+    for (const message of ["Not Found", "The route branches/1/news could not be found.", "No query results for model [App\\Models\\X] 5"]) {
+      await expect(friendlyMutation(Promise.reject(apiError(404, { message })))).rejects.toThrow(/not deployed/);
+    }
+  });
+
+  test("the server's own 404 sentence is shown as said (2026-11-25: «Карты с таким кодом нет»)", async () => {
+    const e = Object.assign(new Error("Карты с таким кодом нет. Попросите игрока показать код из приложения."), {
+      status: 404, body: { message: "Карты с таким кодом нет. Попросите игрока показать код из приложения." },
+    });
+    await expect(friendlyMutation(Promise.reject(e))).rejects.toBe(e);
+  });
 });

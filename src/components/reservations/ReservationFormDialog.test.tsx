@@ -74,10 +74,10 @@ describe("a new reservation", () => {
 
   test("the phone is masked as typed and pasted, and sent as +374XXXXXXXX; the name is collapsed", async () => {
     await mount();
-    await type(field("reserve.phone"), "077777");
-    expect(field("reserve.phone").value).toBe("077 777");
-    await type(field("reserve.phone"), "+374 77 123456");
-    expect(field("reserve.phone").value).toBe("077 123 456");
+    await type((screen.getByTestId("reserve-phone") as HTMLInputElement), "077777");
+    expect((screen.getByTestId("reserve-phone") as HTMLInputElement).value).toBe("77 777");
+    await type((screen.getByTestId("reserve-phone") as HTMLInputElement), "+374 77 123456");
+    expect((screen.getByTestId("reserve-phone") as HTMLInputElement).value).toBe("77 123 456");
     await type(field("reserve.name"), "  Aram   Petrosyan ");
     await submit();
     expect(repo.reserve).toHaveBeenCalledWith(10, expect.objectContaining({ name: "Aram Petrosyan", phone: "+37477123456" }));
@@ -85,12 +85,12 @@ describe("a new reservation", () => {
 
   test("a half-typed phone blocks the submit and, once left, says why", async () => {
     await mount();
-    await type(field("reserve.phone"), "077 12");
+    await type((screen.getByTestId("reserve-phone") as HTMLInputElement), "077 12");
     expect(confirmBtn().disabled).toBe(true);
     expect(screen.queryByText("reserve.phoneInvalid")).toBeNull();
-    await act(async () => { fireEvent.blur(field("reserve.phone")); });
+    await act(async () => { fireEvent.blur((screen.getByTestId("reserve-phone") as HTMLInputElement)); });
     expect(screen.getByText("reserve.phoneInvalid")).toBeTruthy();
-    await type(field("reserve.phone"), "");
+    await type((screen.getByTestId("reserve-phone") as HTMLInputElement), "");
     expect(confirmBtn().disabled).toBe(false);
   });
 
@@ -168,7 +168,7 @@ describe("editing a reservation", () => {
   test("prefilled from the row; nothing changed means nothing to save", async () => {
     await mount({ kind: "edit", reservation: staffRow() });
     expect(field("reserve.name").value).toBe("Aram");
-    expect(field("reserve.phone").value).toBe("077 777 777");
+    expect((screen.getByTestId("reserve-phone") as HTMLInputElement).value).toBe("77 777 777");
     expect(field("reserve.date").value).toBe("07.11.26");
     expect(confirmBtn().disabled).toBe(true);
   });
@@ -176,7 +176,7 @@ describe("editing a reservation", () => {
   test("a name or phone change is sent without asking; a cleared phone is sent as null", async () => {
     await mount({ kind: "edit", reservation: staffRow() });
     await type(field("reserve.name"), "Aram P.");
-    await type(field("reserve.phone"), "");
+    await type((screen.getByTestId("reserve-phone") as HTMLInputElement), "");
     await submit();
     expect(confirmFn).not.toHaveBeenCalled();
     expect(repo.updateReservation).toHaveBeenCalledWith(77, { name: "Aram P.", phone: null });

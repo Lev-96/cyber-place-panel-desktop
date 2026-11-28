@@ -38,6 +38,11 @@ const repo = vi.hoisted(() => ({
   clearReminder: vi.fn(),
 }));
 const auth = vi.hoisted(() => ({ role: "company_owner" as string }));
+// The seat's Club Card (2026-11-25): read only for a seat with one bound.
+const bonusRead = vi.hoisted(() => vi.fn());
+vi.mock("@/repositories/BonusRepository", () => ({
+  bonusRepository: { account: (...a: unknown[]) => bonusRead(...a) },
+}));
 // The app-wide toaster, captured so a test can read what a grant announced.
 const toast = vi.hoisted(() => ({ message: vi.fn(), warning: vi.fn() }));
 vi.mock("@/ui/notify", () => ({
@@ -1438,6 +1443,29 @@ describe("«Оплачено сейчас» in «+ Время»", () => {
     await act(async () => { fireEvent.click(screen.getByTestId("pay-card")); });
     await act(async () => { fireEvent.click(confirmGrant()); });
     expect(repo.addTime).toHaveBeenCalledWith(42, 30, undefined, undefined, true, { payment_method: "card" });
+  });
+
+  test("paid now with the seat's Club Card bonuses (2026-11-25)", async () => {
+    bonusRead.mockResolvedValue({ id: 9, branch_id: 7, name: "Arman", phone: "+37491123456", balance: "99999.00", opened_at: null });
+    repo.addTime.mockResolvedValue(session({ prepaid_amount: 2500 }));
+    await mount(session({ prepaid_amount: 2000, bonus_account_id: 9 }));
+    await act(async () => { fireEvent.click(paidNow()!); });
+    await typeMinutes("30");
+    await settle();
+    await act(async () => { fireEvent.click(screen.getByTestId("pay-bonus")); });
+    await act(async () => { fireEvent.click(confirmGrant()); });
+    expect(bonusRead).toHaveBeenCalledWith(expect.any(Number), 9);
+    expect(repo.addTime).toHaveBeenCalledWith(42, 30, undefined, undefined, true, { payment_method: "bonus" });
+  });
+
+  test("no card on the seat: bonuses are not offered and nothing is read", async () => {
+    bonusRead.mockReset();
+    await mount(session({ prepaid_amount: 2000 }));
+    await act(async () => { fireEvent.click(paidNow()!); });
+    await typeMinutes("30");
+    await settle();
+    expect(screen.queryByTestId("pay-bonus")).toBeNull();
+    expect(bonusRead).not.toHaveBeenCalled();
   });
 });
 

@@ -9982,11 +9982,17 @@ select.input option:disabled {
 .hub-tile__title .nav-icon {
   flex-shrink: 0;
 }
+/* The title and the hint wrap and show in full (2026-11-26, owner): a tile
+   grows with its words; the tiles of a row stay one height (the grid). */
 .hub-tile__label {
   min-width: 0;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
+  /* Whole words to the next line; a word is split only when it cannot fit. */
+  overflow-wrap: break-word;
+}
+.hub-tile__hint {
+  font-size: 12px;
+  line-height: 1.35;
+  overflow-wrap: break-word;
 }
 
 /* Invoice state / access badges. */
@@ -12273,6 +12279,18 @@ button.sales-card:focus-visible { outline: 2px solid var(--color-primary); outli
 .due-confirm__question { margin: 4px 0 0; font-size: 18px; font-weight: 700; }
 .due-confirm__answers { display: flex; gap: 10px; flex-wrap: wrap; }
 .due-confirm__answers > .btn { flex: 1 1 180px; min-height: 48px; font-size: 16px; }
+/* «Бонус времени» (2026-11-25): the due window's frame, a celebration inside. */
+.time-bonus { text-align: center; align-items: center; }
+.time-bonus .due-confirm__answers { width: 100%; }
+.time-bonus__burst { font-size: 44px; line-height: 1; }
+.time-bonus__seat { margin: 0; font-size: 20px; font-weight: 700; overflow-wrap: anywhere; }
+.time-bonus__player { margin: 0; font-size: 18px; overflow-wrap: anywhere; }
+.time-bonus__prize {
+  margin: 4px 0 0; padding: 10px 18px; border-radius: 14px;
+  font-size: 30px; font-weight: 800; color: var(--color-primary);
+  background: rgb(var(--accent-rgb) / 0.10); border: 1px solid rgb(var(--accent-rgb) / 0.45);
+}
+.time-bonus__note { margin: 0; font-size: 14px; }
 .due-confirm__later { align-self: center; }
 
 /* «Незакрытые счета» (2026-11-22, owner; OpenBillsNotifier): a compact amber
@@ -12441,3 +12459,161 @@ button.sales-card:focus-visible { outline: 2px solid var(--color-primary); outli
   line-height: 1.25;
 }
 .open-bills__seat-at { font-size: 12px; line-height: 1.3; color: var(--color-muted); }
+
+/* Club Card ranks (2026-11-25): the player's app colours, as a small chip. */
+.rank-badge { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 800; letter-spacing: 0.06em; color: #fff; white-space: nowrap; }
+.rank-badge--gamer { background: linear-gradient(135deg, #5b6b85, #3a4559); }
+.rank-badge--pro { background: linear-gradient(135deg, #2f8cff, #1c5fd1); }
+.rank-badge--elite { background: linear-gradient(135deg, #9d4dff, #6a1fd6); }
+.rank-badge--veteran { background: linear-gradient(135deg, #ff8a3d, #d14b12); }
+.rank-badge--legend { background: linear-gradient(135deg, #ffd36e, #e0a21a); color: #2b1d00; }
+.seat-choice__group { border: 1px solid var(--color-border); border-radius: 12px; padding: 10px 14px 14px; margin: 0; }
+.seat-choice__group legend { padding: 0 6px; }
+/* Seat ticks (2026-11-25, owner: big and easy on the eyes): a 22px box in
+   the accent, the whole label clickable, a chip per seat. */
+.seat-choice__tick { display: inline-flex; align-items: center; gap: 10px; cursor: pointer; font-size: 15px; min-height: 36px; }
+.seat-choice__tick input[type="checkbox"] {
+  appearance: none; -webkit-appearance: none; flex: none; width: 22px; height: 22px; margin: 0;
+  border: 2px solid var(--color-muted); border-radius: 6px;
+  background: var(--color-surface); display: grid; place-content: center; cursor: pointer;
+  transition: background-color .15s ease, border-color .15s ease;
+}
+.seat-choice__tick input[type="checkbox"]::before {
+  content: ""; width: 7px; height: 13px; border: solid #fff; border-width: 0 3px 3px 0;
+  transform: translateY(-1px) rotate(45deg) scale(0); transition: transform .15s ease;
+}
+.seat-choice__tick input[type="checkbox"]:checked { background: rgb(6 182 212); border-color: rgb(6 182 212); }
+.seat-choice__tick input[type="checkbox"]:checked::before { transform: translateY(-1px) rotate(45deg) scale(1); }
+.seat-choice__tick input[type="checkbox"]:focus-visible { outline: 2px solid rgb(6 182 212); outline-offset: 2px; }
+.seat-choice__tick input[type="checkbox"]:disabled { opacity: .5; cursor: default; }
+.seat-choice__seats { display: flex; flex-wrap: wrap; gap: 8px; }
+.seat-choice__seat { padding: 4px 12px 4px 8px; border: 1px solid var(--color-border); border-radius: 10px; }
+.seat-choice__seat:has(input:checked) { border-color: rgb(6 182 212); }
+@media (prefers-reduced-motion: reduce) { .seat-choice__tick input[type="checkbox"], .seat-choice__tick input[type="checkbox"]::before { transition: none; } }
+/* «На карте» and «Сколько бонусами» (2026-11-25, owner): bigger, in the bonus colour. */
+.pay-editor__bonus-balance { font-size: 16px; font-weight: 700; color: rgb(34 211 238); }
+.pay-editor__bonus-part-label { font-size: 15px; font-weight: 600; }
+/* The phone search over the card lists: a phone's width, not the page's. */
+.bonus-phone-search { max-width: 340px; }
+.pay-editor__bonus-part-input { width: 160px; height: 44px; font-size: 18px; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+/* Club Card hours (2026-11-25): «С [13]:[00] — до [18]:[00]», Start's clock field. */
+.hours-range { display: flex; align-items: flex-end; gap: 14px; flex-wrap: wrap; }
+.hours-range__end { display: flex; flex-direction: column; gap: 6px; }
+.hours-range__label { font-size: 13px; font-weight: 600; color: var(--color-muted, inherit); }
+.hours-range__dash { padding-bottom: 14px; font-size: 18px; opacity: 0.6; }
+
+/* «Бонусная карта» in Start (2026-11-25, owner): the free session's tile and
+   switch size, in the Club Card's cyan. */
+.start-dialog__free.start-dialog__bonus { --free-rgb: 6 182 212; }
+.btn.unpaid-toggle--bonus:hover:not(:disabled) .cp-switch-track { border-color: rgb(6 182 212); }
+.btn.unpaid-toggle--bonus:focus-visible .cp-switch-track { border-color: rgb(6 182 212); box-shadow: 0 0 0 3px rgb(6 182 212 / 0.30); }
+.btn.unpaid-toggle--bonus.is-on .cp-switch-track { background: rgb(6 182 212); border-color: rgb(6 182 212); }
+.btn.unpaid-toggle--bonus.is-on .unpaid-toggle__label { color: rgb(34 211 238); }
+:root[data-theme="light"] .btn.unpaid-toggle--bonus.is-on .unpaid-toggle__label { color: rgb(14 116 144); }
+
+/* «Новости клуба» (2026-11-25): a calm form and the posted news. */
+.news-form__text { min-height: 120px; resize: vertical; font: inherit; line-height: 1.5; }
+.news-form__count { align-self: flex-end; font-size: 12px; font-variant-numeric: tabular-nums; }
+.news-item__when { font-size: 12px; }
+.news-item__title { font-size: 16px; overflow-wrap: anywhere; }
+.news-item__body { margin: 0; white-space: pre-line; line-height: 1.5; overflow-wrap: anywhere; }
+.news-item__img { display: block; max-width: 360px; width: 100%; max-height: 240px; object-fit: cover; border-radius: 10px; margin-top: 6px; }
+
+/* «Перенести карту» (2026-11-26): the number's card from the earlier app copy. */
+.bonus-move { display: grid; gap: 8px; padding: 12px 14px; border-radius: 12px; border: 1px solid rgb(6 182 212 / 0.45); background: rgb(6 182 212 / 0.08); }
+.bonus-move__card { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+/* Bonus card row (2026-11-26): who, ratings and stars on the left; balance
+   and the owner's actions on the right; a frozen card wears a cold edge. */
+.bonus-card-row { align-items: flex-start; gap: 16px; flex-wrap: wrap; }
+.bonus-card-row__who { display: grid; gap: 4px; min-width: 0; flex: 1 1 260px; }
+.bonus-card-row__side { display: grid; gap: 8px; justify-items: end; flex: 0 1 auto; }
+.bonus-card-row__stars { gap: 8px; align-items: center; flex-wrap: wrap; }
+.bonus-card-row__rank { width: auto; min-width: 170px; }
+.bonus-card-row.is-frozen { box-shadow: inset 3px 0 0 rgb(56 189 248 / 0.85); }
+.bonus-chip {
+  display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 999px; font-size: var(--fs-xs); font-weight: 600;
+  color: var(--color-muted); border: 1px solid var(--color-border);
+}
+.bonus-chip--frozen { color: rgb(125 211 252); border-color: rgb(56 189 248 / 0.6); background: rgb(56 189 248 / 0.12); }
+.bonus-club-rating { font-weight: 600; color: var(--color-warning); }
+.star-rating { display: inline-flex; gap: 2px; }
+.star-rating__star {
+  appearance: none; border: 0; background: none; padding: 0 1px; font-size: 18px; line-height: 1;
+  color: var(--color-border); cursor: pointer; transition: color 120ms ease, transform 120ms ease;
+}
+span.star-rating__star { cursor: default; }
+.star-rating__star.is-on { color: var(--color-warning); }
+button.star-rating__star:hover:not(:disabled) { transform: scale(1.15); }
+button.star-rating__star:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; border-radius: 4px; }
+/* A frozen card on a bill (2026-11-27, owner: red, a little larger, seen at once). */
+.pay-editor__frozen {
+  display: flex; align-items: center; gap: 10px;
+  padding: 11px 14px; border-radius: 12px; font-size: 15px; font-weight: 600; line-height: 1.35;
+  color: #fff; background: var(--color-danger); border: 1px solid var(--color-danger);
+  box-shadow: 0 4px 14px rgb(220 38 38 / 0.25);
+}
+.pay-editor__frozen::before { content: "🔒"; font-size: 18px; flex: none; }
+
+/* The club rates a player's visit (2026-11-27, owner; RateVisitForm /
+   RatePlayerNotifier): big stars with a word for them, the reason at 1 star,
+   a gift of bonuses if the club wants. */
+.rate-player { max-height: 92vh; overflow-y: auto; gap: 16px; }
+.rate-player__head { display: flex; gap: 14px; align-items: center; }
+.rate-player__avatar {
+  flex: none; width: 52px; height: 52px; border-radius: 50%;
+  display: grid; place-items: center; font-size: 22px; font-weight: 800;
+  color: var(--color-primary); background: rgb(var(--accent-rgb) / 0.12);
+  border: 1px solid rgb(var(--accent-rgb) / 0.45);
+}
+.rate-player__who { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.rate-player__name { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 17px; font-weight: 600; overflow-wrap: anywhere; }
+.rate-player__meta { font-size: 13px; }
+.rate-visit { display: flex; flex-direction: column; gap: 12px; }
+.rate-visit__stars { display: flex; justify-content: center; gap: 6px; }
+.rate-visit__star {
+  all: unset; cursor: pointer; width: 46px; height: 46px; display: grid; place-items: center;
+  border-radius: 12px; transition: transform 120ms ease;
+}
+.rate-visit__star svg { width: 40px; height: 40px; fill: var(--color-border); transition: fill 120ms ease; }
+.rate-visit__star.is-on svg { fill: #ffb800; filter: drop-shadow(0 2px 6px rgb(255 184 0 / 0.35)); }
+.rate-visit__star:hover { transform: scale(1.08); }
+.rate-visit__star:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.rate-visit__star:disabled { cursor: default; transform: none; }
+.rate-visit__caption { text-align: center; font-size: 15px; font-weight: 600; min-height: 20px; }
+.rate-visit__words { display: flex; flex-direction: column; gap: 6px; }
+.rate-visit__words textarea { resize: vertical; min-height: 72px; font-size: 15px; }
+.bonus-rated-by-player { font-size: 13px; overflow-wrap: anywhere; }
+@media (prefers-reduced-motion: reduce) {
+  .rate-visit__star { transition: none; }
+}
+/* The club's gift with its rating (2026-11-27): one quiet row, the amount at its end. */
+.rate-visit__gift {
+  display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 14px;
+  background: rgb(var(--accent-rgb) / 0.06); border: 1px dashed rgb(var(--accent-rgb) / 0.4);
+}
+.rate-visit__gift-icon { font-size: 28px; line-height: 1; flex: none; }
+.rate-visit__gift-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.rate-visit__gift-title { font-weight: 700; font-size: 15px; }
+.rate-visit__gift-hint { font-size: 12.5px; }
+.rate-visit__gift-amount { width: 150px; flex: none; }
+/* The player as staff meet them (2026-11-27; PlayerBadge): the photo in a
+   ring, the clubs' rating on a pill over its foot, as a taxi app shows its
+   driver. */
+.player-badge { display: flex; align-items: center; gap: 16px; padding: 12px 14px; border-radius: 16px;
+  background: rgb(var(--accent-rgb) / 0.06); border: 1px solid rgb(var(--accent-rgb) / 0.25); }
+.player-badge__photo { position: relative; flex: none; width: 68px; height: 68px; margin-bottom: 8px; }
+.player-badge__photo img, .player-badge__photo > span:first-child {
+  width: 68px; height: 68px; border-radius: 50%; object-fit: cover; display: grid; place-items: center;
+  font-size: 28px; font-weight: 800; color: var(--color-primary); background: var(--color-surface-alt);
+  box-shadow: 0 0 0 3px var(--color-surface), 0 0 0 5px rgb(var(--accent-rgb) / 0.55);
+}
+.player-badge__pill {
+  position: absolute; left: 50%; bottom: -10px; transform: translateX(-50%); white-space: nowrap;
+  padding: 2px 9px; border-radius: 999px; font-size: 12.5px; font-weight: 800; line-height: 1.5;
+  color: #1a1300; background: #ffc83d; box-shadow: 0 2px 8px rgb(0 0 0 / 0.35);
+}
+.player-badge__pill.is-new { color: var(--color-text); background: var(--color-surface-alt); border: 1px solid var(--color-border); font-weight: 700; }
+.player-badge__who { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.player-badge__name { font-size: 17px; overflow-wrap: anywhere; }
+.player-badge__count { font-size: 13px; }

@@ -84,6 +84,10 @@ export type Permission =
    * path needs it — the POS charges cash and never reads a member.
    */
   | "branch.members"
+  /** Cyber Place Club Card (2026-11-25): open, find and bind players' bonus cards. */
+  | "branch.bonus"
+  /** The branch's bonus rule (on/off, percent, welcome bonus): the owner's. */
+  | "branch.bonusSettings"
   /**
    * DELETE a product from the branch catalogue. Owner-level: a delete takes
    * the row away for good, so a manager deactivates instead (2026-11-09).
@@ -208,6 +212,7 @@ const PERMS: Record<Role, ReadonlySet<Permission>> = {
     "menu.partners", "partners.manage",
     "branch.create", "branch.edit", "branch.delete", "branch.prices",
     "branch.places", "branch.members", "product.crud", "product.write", "product.history", "product.stockCorrect",
+    "branch.bonus", "branch.bonusSettings",
     "company.create", "company.edit", "company.delete",
     "company.block", "branch.block", "branch.status",
     "manager.create", "manager.delete",
@@ -229,6 +234,8 @@ const PERMS: Record<Role, ReadonlySet<Permission>> = {
     // "branch.members" is deliberately NOT here — member cards and deposits are
     // administrative, and the section is gone from an owner's branch.
     "branch.places", "product.crud", "product.write", "product.history", "product.stockCorrect",
+    // Cyber Place Club Card (2026-11-25): cards and the bonus rule.
+    "branch.bonus", "branch.bonusSettings",
     // Owners manage their branches' game libraries (branch-scoped games):
     // hub tile + place-modal inline create. The shared catalogue itself
     // ("game.crud") stays admin-only — that is what the backend enforces.
@@ -267,6 +274,8 @@ const PERMS: Record<Role, ReadonlySet<Permission>> = {
     // The product catalogue came back on 2026-11-09: create, edit, price and
     // deactivate — never delete, and never the audit trail of it.
     "product.write",
+    // Bonus cards at the till (2026-11-25): open, find, bind. Never the rule.
+    "branch.bonus",
   ]),
 };
 

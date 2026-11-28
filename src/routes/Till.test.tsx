@@ -72,6 +72,20 @@ describe("Касса", () => {
     expect(document.body.textContent).toContain("till.voided");
   });
 
+  test("a sale part-paid with bonuses (QA 2026-11-25): its own «Бонусы» line, to the cent, so the parts add up", async () => {
+    repo.list.mockResolvedValue([{ ...ORDERS[0], id: 99, status: "paid", total: 1200, payment_method: "split",
+      payments: [{ method: "cash", amount: 938.28 }, { method: "bonus", amount: 261.72 }] }]);
+    await mount();
+    expect(document.body.textContent).toContain("session.payCash: 938.28");
+    expect(screen.getByTestId("till-today-bonus").textContent).toBe("pay.bonus: 261.72");
+  });
+
+  test("no bonuses that day: no «Бонусы» line", async () => {
+    repo.list.mockResolvedValue(ORDERS);
+    await mount();
+    expect(screen.queryByTestId("till-today-bonus")).toBeNull();
+  });
+
   test("a failed read is shown as an error with Retry, not as a day with no sales", async () => {
     repo.list.mockRejectedValue(Object.assign(new Error("Server unavailable"), { status: 503, body: { message: "Server unavailable" } }));
     await mount();

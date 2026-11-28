@@ -1,5 +1,5 @@
 import {
-  apiCreateProduct, apiDeleteProduct, apiListProducts, apiProductStock, apiUpdateProduct,
+  apiCreateProduct, apiDeleteProduct, apiListProducts, apiProductStock, apiRemoveProductImage, apiSetProductImage, apiUpdateProduct,
   CreateProductBody, ICreateProductAnswer, StockActionBody, UpdateProductBody,
 } from "@/api/products";
 import { friendlyMutation, orFallback } from "@/api/fallback";
@@ -34,6 +34,9 @@ export class ProductRepository {
   }
   /** `kind` names what is being edited, for its toast; the body's own `kind` wins when sent. */
   async update(id: number, b: UpdateProductBody, kind?: ProductKind): Promise<IProduct> { return withToast(entityOf(b.kind ?? kind), "updated", () => friendlyMutation(apiUpdateProduct(id, b).then((r) => r.product))); }
+  /** The picture (2026-11-25). Errors reach the caller: the product itself is already saved. */
+  setImage(id: number, file: File): Promise<IProduct> { return apiSetProductImage(id, file).then((r) => r.product); }
+  removeImage(id: number): Promise<IProduct> { return apiRemoveProductImage(id).then((r) => r.product); }
   async remove(id: number, kind?: ProductKind): Promise<void> { await withToast(entityOf(kind), "deleted", () => friendlyMutation(apiDeleteProduct(id))); }
   /** Goods received, a recount, or counting switched off. The dialog says the outcome itself. */
   async stock(id: number, body: StockActionBody): Promise<{ product: IProduct; change: IStockChange }> {

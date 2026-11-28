@@ -66,6 +66,8 @@ vi.mock("./notifications/SessionReminderNotifier", () => ({ default: () => <span
 vi.mock("./notifications/BillingNoticeNotifier", () => ({ default: () => null }));
 vi.mock("./notifications/PanelUpdateNotifier", () => ({ default: () => <span data-testid="panel-update-notifier" /> }));
 vi.mock("./notifications/ExpenseReminderNotifier", () => ({ default: () => null }));
+vi.mock("@/components/notifications/RatePlayerNotifier", () => ({ default: () => <span data-testid="rate-player-notifier" /> }));
+vi.mock("@/components/notifications/ClubRatedNotifier", () => ({ default: () => <span data-testid="club-rated-notifier" /> }));
 vi.mock("./appearance/UnsavedInterfaceNotice", () => ({ default: () => null }));
 vi.mock("./appearance/NewInterfacesOffer", () => ({ default: () => null }));
 
@@ -124,6 +126,12 @@ describe("the desktop shell: hide and show the side menu", () => {
   test("mounts the reminder notifier beside the ending-soon one", () => {
     mountShell();
     expect(screen.getByTestId("reminder-notifier")).toBeTruthy();
+  });
+
+  test("mounts the visit-rating window and the rating notice (2026-11-27)", () => {
+    mountShell();
+    expect(screen.getByTestId("rate-player-notifier")).toBeTruthy();
+    expect(screen.getByTestId("club-rated-notifier")).toBeTruthy();
   });
 
   test("mounts the new-version notifier on every screen (2026-11-20)", () => {

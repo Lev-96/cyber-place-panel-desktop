@@ -109,9 +109,9 @@ describe("creating a branch: Armenia and +374", () => {
   test("a pasted full number keeps the code once; letters never land", async () => {
     render(<BranchForm companyId={3} onClose={() => {}} onSaved={() => {}} />);
     fireEvent.change(tel(), { target: { value: "+374 (77) 12-34-56" } });
-    expect(tel().value).toBe("77123456");
+    expect(tel().value).toBe("77 123 456");
     fireEvent.change(tel(), { target: { value: "0037477123456" } });
-    expect(tel().value).toBe("77123456");
+    expect(tel().value).toBe("77 123 456");
     fireEvent.change(tel(), { target: { value: "77abc" } });
     expect(tel().value).toBe("77");
   });
@@ -131,7 +131,7 @@ describe("editing a branch", () => {
   test("an Armenian branch: fixed, the number shown without its code, saved unchanged", async () => {
     render(<BranchForm initial={existing()} onClose={() => {}} onSaved={() => {}} />);
     await screen.findByText("branchForm.pinned");
-    expect(tel().value).toBe("77123456");
+    expect(tel().value).toBe("77 123 456");
     await act(async () => { fireEvent.submit(document.querySelector("form")!); });
 
     await waitFor(() => expect(repo.update).toHaveBeenCalled());

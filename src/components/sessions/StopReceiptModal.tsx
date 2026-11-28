@@ -1,11 +1,17 @@
+import { bonusOffer } from "@/components/bonus/bonusAmount";
 import { SkeletonText } from "@/components/ui/Skeleton";
 import Button from "@/components/ui/Button";
 import Modal from "@/components/ui/Modal";
 import PaymentEditor from "@/components/payments/PaymentEditor";
-import { PAYMENT_PROBLEM_KEY, checkPayment, emptyPaymentDraft, paymentBody, type PaymentCheck, type PaymentDraft } from "@/components/payments/paymentSplit";
+import { PAYMENT_PROBLEM_KEY, billPaymentBody, checkPayment, emptyPaymentDraft, type PaymentCheck, type PaymentDraft } from "@/components/payments/paymentSplit";
+import BonusCardPicker from "@/components/bonus/BonusCardPicker";
+import { bonusRepository } from "@/repositories/BonusRepository";
+import { useBoundBonusCard } from "@/components/bonus/useBoundBonusCard";
+import type { IBonusAccount } from "@/types/bonus";
 import Spinner from "@/components/ui/Spinner";
 import { IBillBreakdown } from "@/api/sessions";
 import { useLang } from "@/i18n/LanguageContext";
+import { centsWhenFractional } from "@/i18n/currency";
 import { fmt } from "@/i18n/translations";
 import { useConfirm } from "@/components/ui/ConfirmProvider";
 import { notify } from "@/ui/notify";
@@ -95,6 +101,16 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved, canRes
   // stays one click rather than two.
   // How it was paid (2026-11-07): one method or split, cash by default.
   const [pay, setPay] = useState<PaymentDraft>(() => emptyPaymentDraft("cash"));
+  // Cyber Place Club Card (2026-11-25): the card bound to this seat, read
+  // when the receipt opens, so «Бонусы» can be offered with its balance.
+  const [bonusCard, setBonusCard] = useBoundBonusCard(session.branch_id, session.bonus_account_id);
+  const [bonusOn, setBonusOn] = useState(false);
+  const [pickingCard, setPickingCard] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    void bonusRepository.settings(session.branch_id).then((st) => { if (alive) setBonusOn(st.enabled); }).catch(() => undefined);
+    return () => { alive = false; };
+  }, [session.branch_id]);
   // A seat that ended by itself, paid afterwards: the answer once it is recorded.
   const [recorded, setRecorded] = useState(false);
   const [stopped, setStopped] = useState<IBillBreakdown | null>(null);
@@ -236,7 +252,7 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved, canRes
     // stays «Способ оплаты не отмечен · 0», never a cash payment of 0.
     ? {}
     : {
-      ...paymentBody(pay, payCheck),
+      ...billPaymentBody(pay, payCheck),
       ...(change?.state === "ok" ? { cash_received: toAmount(change.receivedCents) } : {}),
     });
 
@@ -302,7 +318,19 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved, canRes
    */
   const cancelSession = async () => {
     if (stoppingNow.current) return;
-    if (!(await ask(fmt(t("session.cancel.confirm"), deviceLabel), { destructive: true }))) return;
+    // What goes back of a prepayment, way by way (QA 2026-11-25): the
+    // server's figures — cash from the drawer, a card on the terminal,
+    // bonuses back to the player's card.
+    const ahead = bill?.prepaid ?? null;
+    const ways = ahead ? (ahead.by_method ?? { cash: Number(ahead.amount) }) : null;
+    const back = ways ? [
+      ways.cash ? fmt(t("history.refundCash"), money(Number(ways.cash), centsWhenFractional(Number(ways.cash)))) : null,
+      ways.card ? fmt(t("history.refundCard"), money(Number(ways.card), centsWhenFractional(Number(ways.card)))) : null,
+      ways.other ? fmt(t("history.refundOther"), money(Number(ways.other), centsWhenFractional(Number(ways.other)))) : null,
+      ways.bonus ? fmt(t("history.refundBonus"), money(Number(ways.bonus), centsWhenFractional(Number(ways.bonus)))) : null,
+    ].filter(Boolean).join(", ") : "";
+    const question = fmt(t("session.cancel.confirm"), deviceLabel) + (back ? " " + fmt(t("session.cancel.refund"), back) : "");
+    if (!(await ask(question, { destructive: true }))) return;
     stoppingNow.current = true;
     setBusy(true); setErr(null);
     try {
@@ -756,7 +784,22 @@ const StopReceiptModal = ({ session, onClose, onConfirmed, onItemRemoved, canRes
               check={payCheck}
               money={money}
               disabled={busy}
+              bonus={bonusOffer(bonusCard)}
             />
+            {/* No card on the seat yet: it can be bound here, before paying
+                (owner, 2026-11-25). A running seat only — the server's rule. */}
+            {!bonusCard && bonusOn && !finished && (
+              <Button type="button" variant="secondary" disabled={busy} onClick={() => setPickingCard(true)} data-testid="pay-bonus-bind">
+                {t("pay.bonusBind")}
+              </Button>
+            )}
+            {pickingCard && (
+              <BonusCardPicker branchId={session.branch_id} onClose={() => setPickingCard(false)}
+                onPick={(a) => {
+                  setPickingCard(false);
+                  void bonusRepository.bind(session.id, a.id).then(() => setBonusCard(a)).catch((e2) => setErr(e2 instanceof Error ? e2.message : String(e2)));
+                }} />
+            )}
           </>
         )}
         {recorded && <div className="pay-mark-done" data-testid="pay-mark-done">{fmt(t("pay.recorded"), deviceLabel)}</div>}

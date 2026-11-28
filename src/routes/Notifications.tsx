@@ -16,6 +16,8 @@ import SectionTabs from "@/components/ui/SectionTabs";
 import { reminderSentence } from "@/components/notifications/SessionReminderNotifier";
 import { seatLabel } from "@/components/notifications/SessionEndingNotifier";
 import { SHIFT_STOCK_SHORTAGE, shiftShortageTarget, shiftShortageText } from "@/components/notifications/shiftStockShortage";
+import { tagLabel } from "@/components/bonus/ratingTags";
+import { CLUB_RATED } from "@/components/notifications/ClubRatedNotifier";
 import { shiftAmount } from "@/shifts/cash";
 import Spinner from "@/components/ui/Spinner";
 import { StateSwitch, deriveViewState } from "@/components/ui/state";
@@ -402,6 +404,8 @@ const DbNotificationCard = ({ n, onClick, onDelete }: { n: IDbNotification; onCl
   const isAppUpdate = dataType === PANEL_UPDATE_TYPE;
   // Goods missing when a shift was accepted (2026-11-18, `ShiftStockShortage`, owners only).
   const isStockShortage = dataType === SHIFT_STOCK_SHORTAGE;
+  // A player rated the club after a visit (2026-11-27, `ClubRatedByPlayer`).
+  const isClubRated = dataType === CLUB_RATED;
   const bookingDate = n.data?.booking_date as string | undefined;
   const startTime = n.data?.start_time as string | undefined;
   const extraMinutes = n.data?.extra_minutes as number | undefined;
@@ -531,6 +535,13 @@ const DbNotificationCard = ({ n, onClick, onDelete }: { n: IDbNotification; onCl
     const text = shiftShortageText(n.data, t, (v) => shiftAmount(money, v));
     headline = `⚠ ${text.headline}`;
     body = [text.body, text.items, text.gap].filter(Boolean).join("\n");
+  } else if (isClubRated) {
+    // «★★★★☆ Aram оценил(а) клуб», then what they picked, their words, where.
+    const stars = Math.max(0, Math.min(5, Number(n.data?.stars) || 0));
+    headline = `${"★".repeat(stars)}${"☆".repeat(5 - stars)} ${interpolate(t("notifications.clubRatedTitle"), { name: (n.data?.player_name as string | undefined)?.trim() || "-" })}`;
+    const tags = Array.isArray(n.data?.tags) ? (n.data.tags as unknown[]).filter((c): c is string => typeof c === "string").map((c) => tagLabel(t, c)) : [];
+    const words = (n.data?.comment as string | undefined)?.trim();
+    body = [tags.length > 0 ? tags.join(", ") : null, words ? `«${words}»` : null, venue || null].filter(Boolean).join("\n") || null;
   } else {
     headline = n.type.split("\\").pop() ?? n.type;
   }
@@ -549,6 +560,8 @@ const DbNotificationCard = ({ n, onClick, onDelete }: { n: IDbNotification; onCl
       // The shift whose acceptance found it: its report, with the count.
       const target = shiftShortageTarget(n.data);
       if (target) navigate(target);
+    } else if (isClubRated && n.data?.branch_id) {
+      navigate(`/branches/${n.data.branch_id}/bonus`);
     } else if ((isSessionEndingSoon || isSessionReminder) && n.data?.branch_id) {
       navigate(`/branches/${n.data.branch_id}/sessions`);
     } else if (n.data?.booking_id) {

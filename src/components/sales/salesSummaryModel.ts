@@ -48,6 +48,7 @@ export const methodName = (row: Pick<ISalesMethodRow, "method" | "label">, t: T)
     case "card": return t("sales.method.card");
     case "other": return t("sales.method.other");
     case "deposit": return t("sales.method.deposit");
+    case "bonus": return t("sales.method.bonus");
     default: return t("sales.method.unrecorded");
   }
 };

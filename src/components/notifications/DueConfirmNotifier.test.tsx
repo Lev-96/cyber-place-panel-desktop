@@ -17,13 +17,18 @@ vi.mock("@/sound/soundEngine", () => ({ playFor: vi.fn() }));
 vi.mock("@/ui/notify", () => ({ notify: { message: vi.fn() } }));
 vi.mock("@/components/ui/Modal", () => ({ default: ({ children }: { children: React.ReactNode }) => <div>{children}</div> }));
 vi.mock("@/components/payments/PaymentEditor", () => ({
-  default: ({ value, onChange }: { value: { method: string }; onChange: (v: unknown) => void }) => (
+  default: ({ value, onChange, bonus }: { value: { method: string }; onChange: (v: unknown) => void; bonus?: { balanceCents: number } }) => (
     <div>
       <span data-testid="method">{value.method}</span>
+      <span data-testid="bonus-offered">{bonus ? String(bonus.balanceCents) : "none"}</span>
       <button type="button" onClick={() => onChange({ ...value, method: "cash" })}>to-cash</button>
+      <button type="button" onClick={() => onChange({ ...value, method: "bonus" })}>to-bonus</button>
     </div>
   ),
 }));
+// The seat's Club Card (2026-11-25): read by branch and card.
+const card = vi.hoisted(() => ({ read: vi.fn() }));
+vi.mock("@/repositories/BonusRepository", () => ({ bonusRepository: { account: (...a: unknown[]) => card.read(...a) } }));
 
 import DueConfirmNotifier, { paidAheadMethod } from "./DueConfirmNotifier";
 import { afterDueConfirmed } from "./dueConfirmGate";
@@ -196,5 +201,26 @@ describe("DueConfirmNotifier — first the question, then the bill", () => {
     const bill = vi.fn();
     afterDueConfirmed(7, bill);
     expect(bill).toHaveBeenCalledTimes(1);
+  });
+
+  test("«Место закончилось» with a Club Card on the seat (2026-11-25): «Бонусы» offered and sent", async () => {
+    card.read.mockResolvedValue({ id: 9, branch_id: 1, name: "Arman", phone: "+37491123456", balance: "1500.00", opened_at: null });
+    repo.duesToConfirm.mockResolvedValue([due({ bonus_account_id: 9 })]);
+    await mount();
+    await act(async () => { fireEvent.click(screen.getByTestId("due-confirm-no")); });
+    await act(async () => { await Promise.resolve(); });
+    expect(card.read).toHaveBeenCalledWith(1, 9);
+    expect(screen.getByTestId("bonus-offered").textContent).toBe("150000");
+    await act(async () => { fireEvent.click(screen.getByText("to-bonus")); });
+    await act(async () => { fireEvent.click(screen.getByTestId("due-confirm-save")); });
+    expect(repo.confirmDue).toHaveBeenCalledWith(7, { payment_method: "bonus" });
+  });
+
+  test("no card on the seat: no bonuses offered, nothing read", async () => {
+    card.read.mockReset();
+    await mount();
+    await act(async () => { fireEvent.click(screen.getByTestId("due-confirm-no")); });
+    expect(screen.getByTestId("bonus-offered").textContent).toBe("none");
+    expect(card.read).not.toHaveBeenCalled();
   });
 });

@@ -17,7 +17,7 @@ interface Props {
    * вперёд»): green, money already in the drawer. "free" (2026-11-19, a free
    * session in Start): violet, larger, in its own tile.
    */
-  tone?: "warning" | "accent" | "success" | "free";
+  tone?: "warning" | "accent" | "success" | "free" | "bonus";
 }
 
 /**
@@ -35,7 +35,7 @@ const UnpaidToggle = ({
     aria-checked={on}
     aria-label={fullLabel}
     title={fullLabel}
-    className={["btn unpaid-toggle", tone === "accent" ? "unpaid-toggle--accent" : tone === "success" ? "unpaid-toggle--success" : tone === "free" ? "unpaid-toggle--free" : null, on ? "is-on" : null]
+    className={["btn unpaid-toggle", tone === "accent" ? "unpaid-toggle--accent" : tone === "success" ? "unpaid-toggle--success" : tone === "free" ? "unpaid-toggle--free" : tone === "bonus" ? "unpaid-toggle--free unpaid-toggle--bonus" : null, on ? "is-on" : null]
       .filter(Boolean).join(" ")}
     onClick={() => onChange(!on)}
     disabled={disabled}

@@ -2,6 +2,9 @@ import type { IBillBreakdown } from "@/api/sessions";
 
 type Prepaid = NonNullable<IBillBreakdown["prepaid"]>;
 
+/** How a part was paid ahead, in the receipt's words. */
+const WAY_KEY = { cash: "session.payCash", card: "session.payCard", other: "pay.otherShort", bonus: "pay.bonus" } as const;
+
 /**
  * The CASH change of a prepaid bill (2026-11-17): the server's `refund.cash`
  * when it says by method — a card refund goes back on the terminal, never out
@@ -54,7 +57,10 @@ const PrepaidSettlement = ({ prepaid, changeAfterStop, dueSettled = false, taken
   // card money out of the drawer.
   const cardBack = Number(prepaid.refund?.card ?? 0);
   const otherBack = Number(prepaid.refund?.other ?? 0);
-  const anyBack = change > 0 || cardBack > 0 || otherBack > 0;
+  // Bonuses paid ahead and not used (2026-11-25): back on the player's Club
+  // Card by the server at the Stop — nothing for the cashier to hand over.
+  const bonusBack = Number(prepaid.refund?.bonus ?? 0);
+  const anyBack = change > 0 || cardBack > 0 || otherBack > 0 || bonusBack > 0;
   const due = changeAfterStop !== undefined || dueSettled ? 0 : Number(prepaid.due);
   return (
     <div className="prepaid-settlement" data-testid="receipt-prepaid">
@@ -62,6 +68,15 @@ const PrepaidSettlement = ({ prepaid, changeAfterStop, dueSettled = false, taken
         <span>{t("session.prepaid.atStart")}</span>
         <strong>{money(Number(prepaid.amount))}</strong>
       </div>
+      {/* How it was paid ahead (QA 2026-11-25): «наличными 698 · бонусами 302»,
+          so the change below is plainly the cash part's. Server figures. */}
+      {prepaid.by_method && Object.keys(prepaid.by_method).length > 0 && (
+        <div className="muted" style={{ fontSize: 13 }} data-testid="receipt-prepaid-ways">
+          {(["cash", "card", "other", "bonus"] as const)
+            .filter((m) => Number(prepaid.by_method?.[m] ?? 0) > 0)
+            .map((m) => `${t(WAY_KEY[m])} ${money(Number(prepaid.by_method![m]))}`).join(" · ")}
+        </div>
+      )}
       {anyBack ? (
         <>
           {change > 0 && (
@@ -82,6 +97,12 @@ const PrepaidSettlement = ({ prepaid, changeAfterStop, dueSettled = false, taken
             <div className="prepaid-change" role="status" data-testid="receipt-prepaid-other-refund">
               <span className="prepaid-change__label">{t("session.prepaid.otherRefund")}</span>
               <span className="prepaid-change__figure">{money(otherBack)}</span>
+            </div>
+          )}
+          {bonusBack > 0 && (
+            <div className="prepaid-settlement__row" data-testid="receipt-prepaid-bonus-back">
+              <span>{t("session.prepaid.bonusBack")}</span>
+              <strong>{money(bonusBack)}</strong>
             </div>
           )}
         </>

@@ -20,8 +20,17 @@ import { toAmount } from "@/shifts/cash";
 export const SPLIT_METHODS = ["cash", "card"] as const;
 export type SplitMethod = (typeof SPLIT_METHODS)[number];
 
+/**
+ * A bill's way of paying: the shared methods, plus a Club Card's bonuses
+ * (2026-11-25), which only a bill with a card bound takes (a seat's Stop, a
+ * till sale with a card, a prepayment at Start or «+ Время»). Kept apart from
+ * `PaymentMethod`, which other screens (change of method, a confirmed due,
+ * platform billing) use and which never takes bonuses.
+ */
+export type BillMethod = PaymentMethod | "bonus";
+
 export interface PaymentLine {
-  method: PaymentMethod;
+  method: BillMethod;
   /** Money, 2 decimals, as the server takes it. */
   amount: number;
   /** «Свой вариант» (2026-11-18): the name of the `other` part, when given. */
@@ -52,17 +61,19 @@ export interface OwnPart {
 export interface PaymentDraft {
   split: boolean;
   /** The one method when not split. */
-  method: PaymentMethod;
+  method: BillMethod;
   /** Optional. Not split: what "other" was. Split: how it was paid ("3000 картой, 2000 наличными"). */
   note: string;
   /** Split: what was typed for cash and card (empty = not this method). */
   amounts: Record<SplitMethod, string>;
   /** Split: the «Свой вариант» rows, in the order they were added. */
   own: OwnPart[];
+  /** Split: the bonus part (2026-11-25); empty unless a card is bound and the cashier used it. */
+  bonus: string;
 }
 
 export const emptyPaymentDraft = (method: PaymentMethod = "cash"): PaymentDraft => ({
-  split: false, method, note: "", amounts: { cash: "", card: "" }, own: [],
+  split: false, method, note: "", amounts: { cash: "", card: "" }, own: [], bonus: "",
 });
 
 export type PaymentProblem =
@@ -101,7 +112,7 @@ const OTHER_TEXT_MAX = 120;
  * currency that can carry more than two decimals: a number is rounded to the
  * cent, anything else is not an amount.
  */
-const partCents = (raw: string): number | null => {
+export const partCents = (raw: string): number | null => {
   const s = raw.replace(/[\s ]/g, "").replace(",", ".");
   if (!/^\d{1,8}(\.\d+)?$/.test(s)) return null;
   return Math.round(Number(s) * 100);
@@ -134,8 +145,9 @@ export const checkPayment = (dueCents: number, d: PaymentDraft): PaymentCheck =>
   if (!d.split) return { ok: true, problem: null, lines: [], remainingCents: 0 };
   const lines: PaymentLine[] = [];
   let sum = 0;
-  const parts: { method: PaymentMethod; raw: string; label: string }[] = [
+  const parts: { method: BillMethod; raw: string; label: string }[] = [
     ...SPLIT_METHODS.map((method) => ({ method, raw: d.amounts[method], label: "" })),
+    { method: "bonus" as const, raw: d.bonus ?? "", label: "" },
     ...d.own.map((part) => ({ method: "other" as const, raw: part.amount, label: ownLabel(part) })),
   ];
   for (const part of parts) {
@@ -155,19 +167,21 @@ export const checkPayment = (dueCents: number, d: PaymentDraft): PaymentCheck =>
 };
 
 /** One method, as every server has always taken it; the «Другое» text only when typed. */
-const singleBody = (method: PaymentMethod, text: string): { payment_method: PaymentMethod; payment_method_other?: string } => {
+const singleBody = (method: BillMethod, text: string): { payment_method: BillMethod; payment_method_other?: string } => {
   const typed = method === "other" ? text.trim().slice(0, OTHER_TEXT_MAX) : "";
   return typed === "" ? { payment_method: method } : { payment_method: method, payment_method_other: typed };
 };
 
 /**
- * The body the server takes. One method — or a split with exactly ONE part
- * above zero (2026-11-15, owner) — sends the fields every server has always
- * taken (`payment_method`, `payment_method_other` only when words were
- * typed). Two or more parts: `payments`, and `payment_note` only when written.
+ * The body the server takes, bonuses included (2026-11-25): for the screens
+ * whose bill may be paid with a card's bonuses — a seat's Stop, a till sale.
+ * One method — or a split with exactly ONE part above zero (2026-11-15,
+ * owner) — sends the fields every server has always taken
+ * (`payment_method`, `payment_method_other` only when words were typed). Two
+ * or more parts: `payments`, and `payment_note` only when written.
  */
-export const paymentBody = (d: PaymentDraft, check: PaymentCheck):
-  | { payment_method: PaymentMethod; payment_method_other?: string }
+export const billPaymentBody = (d: PaymentDraft, check: PaymentCheck):
+  | { payment_method: BillMethod; payment_method_other?: string }
   | { payments: PaymentLine[]; payment_note?: string } => {
   if (!d.split) return singleBody(d.method, d.note);
   // One part left: as a single method; a lone «Свой вариант» sends its name
@@ -177,25 +191,45 @@ export const paymentBody = (d: PaymentDraft, check: PaymentCheck):
   return note === "" ? { payments: check.lines } : { payments: check.lines, payment_note: note };
 };
 
+/** A line of a screen that never takes bonuses. */
+export interface MoneyLine extends Omit<PaymentLine, "method"> { method: PaymentMethod }
+
+/**
+ * {@link billPaymentBody} for every screen that never takes bonuses (a change
+ * of method, a confirmed due): the same body, typed
+ * without `bonus`. Those screens never put a bonus in the draft; if one ever
+ * did, this throws rather than send it.
+ */
+export const paymentBody = (d: PaymentDraft, check: PaymentCheck):
+  | { payment_method: PaymentMethod; payment_method_other?: string }
+  | { payments: MoneyLine[]; payment_note?: string } => {
+  const body = billPaymentBody(d, check);
+  const hasBonus = "payment_method" in body ? body.payment_method === "bonus" : body.payments.some((l) => l.method === "bonus");
+  if (hasBonus) throw new Error("This screen does not take bonuses.");
+  return body as { payment_method: PaymentMethod; payment_method_other?: string } | { payments: MoneyLine[]; payment_note?: string };
+};
+
 /**
  * How a sum paid AHEAD was paid (2026-11-17, owner: the Stop methods at Start
  * and in «+ Время» too) — the body {@link paymentBody} sends, except that plain
  * cash sends NOTHING: every server has always read no method as cash, so a
- * cash prepayment leaves the request byte for byte as it was.
+ * cash prepayment leaves the request byte for byte as it was. Bonuses
+ * (2026-11-25) pay ahead too, only where a card is on the seat.
  */
 export const prepaidPaymentFields = (d: PaymentDraft, check: PaymentCheck):
   | Record<string, never>
-  | ReturnType<typeof paymentBody> => {
-  const body = paymentBody(d, check);
+  | ReturnType<typeof billPaymentBody> => {
+  const body = billPaymentBody(d, check);
   return "payment_method" in body && body.payment_method === "cash" && body.payment_method_other === undefined ? {} : body;
 };
 
 /** Where «Остаток сюда» was pressed: cash, card, or an own row by its id. */
-export type RestTarget = SplitMethod | { own: number };
+export type RestTarget = SplitMethod | "bonus" | { own: number };
 
 /** What is still due once every box but the one pressed is counted, as typed text. */
-const restText = (dueCents: number, d: PaymentDraft, skipMethod: SplitMethod | null, skipOwn: number | null): string => {
+const restText = (dueCents: number, d: PaymentDraft, skipMethod: SplitMethod | "bonus" | null, skipOwn: number | null): string => {
   const others = SPLIT_METHODS.filter((m) => m !== skipMethod).reduce((sum, m) => sum + (partCents(d.amounts[m]) ?? 0), 0)
+    + (skipMethod === "bonus" ? 0 : partCents(d.bonus ?? "") ?? 0)
     + d.own.filter((p) => p.id !== skipOwn).reduce((sum, p) => sum + (partCents(p.amount) ?? 0), 0);
   const rest = Math.max(0, dueCents - others);
   return rest === 0 ? "" : toAmount(rest);
@@ -207,6 +241,7 @@ export const fillRemaining = (dueCents: number, d: PaymentDraft, target: RestTar
     const text = restText(dueCents, d, null, target.own);
     return { ...d, own: d.own.map((p) => (p.id === target.own ? { ...p, amount: text } : p)) };
   }
+  if (target === "bonus") return { ...d, bonus: restText(dueCents, d, "bonus", null) };
   return { ...d, amounts: { ...d.amounts, [target]: restText(dueCents, d, target, null) } };
 };
 
@@ -221,3 +256,41 @@ export const hasOwnLabel = (d: PaymentDraft, label: string): boolean => {
   const key = label.trim().toLocaleLowerCase();
   return d.own.some((p) => ownLabel(p).toLocaleLowerCase() === key);
 };
+
+/**
+ * «Использовать все бонусы» (2026-11-25, owner): never more than the bill.
+ * Enough bonuses → one method, `bonus`. Too few → a split: every bonus the
+ * card has, the rest put on cash for the cashier to change if paid another
+ * way, and how much the card is short.
+ */
+export const useAllBonuses = (dueCents: number, d: PaymentDraft, balanceCents: number): { draft: PaymentDraft; shortCents: number } => {
+  const spend = Math.max(0, Math.min(balanceCents, dueCents));
+  if (spend >= dueCents) {
+    return { draft: { ...d, split: false, method: "bonus", bonus: "", amounts: { cash: "", card: "" }, own: [] }, shortCents: 0 };
+  }
+  const short = dueCents - spend;
+  return {
+    draft: { ...d, split: true, bonus: spend === 0 ? "" : toAmount(spend), amounts: { cash: toAmount(short), card: "" }, own: [] },
+    shortCents: short,
+  };
+};
+
+/**
+ * «Сколько бонусами» (2026-11-25, owner): the cashier names the bonus part;
+ * the rest goes on cash, to be moved to a card or «Другое» as any split. The
+ * part is capped by the bill and the card; all of it is a single «Бонусы».
+ */
+export const useSomeBonuses = (dueCents: number, d: PaymentDraft, balanceCents: number, wantCents: number): PaymentDraft => {
+  const spend = Math.max(0, Math.min(wantCents, balanceCents, dueCents));
+  if (spend >= dueCents) return { ...d, split: false, method: "bonus", bonus: "", amounts: { cash: "", card: "" }, own: [] };
+  return { ...d, split: true, bonus: spend === 0 ? "" : toAmount(spend), amounts: { cash: toAmount(dueCents - spend), card: "" }, own: [] };
+};
+
+/** The draft with no bonuses in it (2026-11-25): the card was taken off the screen. */
+export const withoutBonus = (d: PaymentDraft): PaymentDraft =>
+  d.method === "bonus" || d.bonus !== "" ? { ...d, method: d.method === "bonus" ? "cash" : d.method, bonus: "" } : d;
+
+/** Whether a body pays anything with bonuses. */
+export const bodyUsesBonus = (body: Record<string, unknown>): boolean =>
+  body.payment_method === "bonus"
+  || (Array.isArray(body.payments) && (body.payments as { method: string }[]).some((l) => l.method === "bonus"));

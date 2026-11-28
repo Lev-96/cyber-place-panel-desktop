@@ -91,7 +91,7 @@ export const LIBRARY: Record<SynthSoundId, Note[]> = {
  * so a level of 1 never clips and every melody is equally loud.
  */
 export const RECORDINGS: Record<FileSoundId, number> = {
-  melodic: 1.34, message: 1.6, arrival: 1.67, newmsg: 0.79, sms: 2.17,
+  cyberplace: 2.4, melodic: 1.34, message: 1.6, arrival: 1.67, newmsg: 0.79, sms: 2.17,
   messenger: 1.32, chat: 0.63, note: 1.2, chord: 1.24, calm: 1.46,
   social: 1.55, woohoo: 1.95, beep: 3.0, digital: 3.0, space: 6.46,
 };

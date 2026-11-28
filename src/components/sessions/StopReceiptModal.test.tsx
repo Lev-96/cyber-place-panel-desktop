@@ -1207,6 +1207,15 @@ describe("cancelling the seat from the receipt", () => {
     expect(screen.queryByTestId("receipt-cancel")).toBeNull();
   });
 
+  test("paid ahead 1 200 cash + 300 bonuses (QA 2026-11-25): the prompt says what goes back, and how", async () => {
+    repo.preview.mockResolvedValue(bill({ time_cost: 400, total: 400, prepaid: { amount: 1500, change: 1100, due: 0, by_method: { cash: 1200, bonus: 300 }, refund: { cash: 800, bonus: 300 } } }));
+    repo.cancel.mockResolvedValue({ session: session({ status: "stopped" }), breakdown: bill({ total: 0, is_cancelled: true, is_free: true }), cash: null });
+    await mountWith({ canCancel: true });
+    await act(async () => { fireEvent.click(screen.getByTestId("receipt-cancel")); });
+    const q = String(asked.fn.mock.calls[0][0]);
+    expect(q).toBe("session.cancel.confirm session.cancel.refund");
+  });
+
   test("asks first, cancels, and shows the server's result as a cancel — not a paid stop", async () => {
     const onConfirmed = vi.fn();
     repo.preview.mockResolvedValue(bill({ time_cost: 400, total: 700, items_total: 300 }));

@@ -1,9 +1,12 @@
+import { bonusOffer } from "@/components/bonus/bonusAmount";
 import { can } from "@/auth/permissions";
 import { useAuth } from "@/auth/AuthContext";
 import Button from "@/components/ui/Button";
 import Modal from "@/components/ui/Modal";
 import PaymentEditor from "@/components/payments/PaymentEditor";
-import { PAYMENT_PROBLEM_KEY, checkPayment, emptyPaymentDraft, paymentBody, type PaymentDraft } from "@/components/payments/paymentSplit";
+import { PAYMENT_PROBLEM_KEY, billPaymentBody, checkPayment, emptyPaymentDraft, type PaymentDraft } from "@/components/payments/paymentSplit";
+import BonusCardStartSwitch from "@/components/bonus/BonusCardStartSwitch";
+import type { IBonusAccount } from "@/types/bonus";
 import { IItemChoice } from "@/api/sessions";
 import { fmt } from "@/i18n/translations";
 import { useLang } from "@/i18n/LanguageContext";
@@ -46,6 +49,8 @@ const SellProductsDialog = ({ branchId, onClose, onSold }: Props) => {
   const [saving, setSaving] = useState(false);
   // How it was paid (2026-11-07): one method or split, cash by default.
   const [pay, setPay] = useState<PaymentDraft>(() => emptyPaymentDraft("cash"));
+  // A player's Club Card for this sale (2026-11-25): offers «Бонусы» below.
+  const [bonusCard, setBonusCard] = useState<IBonusAccount | null>(null);
   // Cash only: the banknotes handed over, for the change (2026-10-25) — the
   // same panel and arithmetic as the Stop receipt. Cleared on every method
   // switch, so an amount typed for cash never rides along with card.
@@ -94,7 +99,8 @@ const SellProductsDialog = ({ branchId, onClose, onSold }: Props) => {
       await orderRepository.create({
         branch_id: branchId,
         // One method (its "other" text only for other), or the split parts.
-        ...paymentBody(pay, payCheck),
+        ...billPaymentBody(pay, payCheck),
+        ...(bonusCard ? { bonus_account_id: bonusCard.id } : {}),
         items,
         client_request_id: requestIdRef.current,
         ...(change?.state === "ok" ? { cash_received: toAmount(change.receivedCents) } : {}),
@@ -133,6 +139,9 @@ const SellProductsDialog = ({ branchId, onClose, onSold }: Props) => {
         )}
         {mode === "text" && <BasketQuickEntry basket={basket} saving={saving} />}
 
+        <BonusCardStartSwitch branchId={branchId} disabled={saving} value={bonusCard}
+          onChange={(a) => { setBonusCard(a); if (a === null) setPay(emptyPaymentDraft("cash")); }} />
+
         <PaymentEditor
           name={`till-pay-${branchId}`}
           branchId={branchId}
@@ -146,6 +155,7 @@ const SellProductsDialog = ({ branchId, onClose, onSold }: Props) => {
           check={payCheck}
           money={money}
           disabled={saving}
+          bonus={bonusOffer(bonusCard)}
         />
 
         <div className="row-between" style={{ borderTop: "1px solid #1f2a44", paddingTop: 12 }}>

@@ -5752,3 +5752,123 @@ lines) + fixed lines`; true or absent (a bill banked before, an older backend)
 when false. Tests: `sessionAmount.productsAtPrice.test.ts` (950 / 870 / 1350 /
 866.67 / 0 / 900 / 900, 3 mutations), `StopReceiptModal.test.tsx`.
 
+
+## Cyber Place Club Card in the panel (2026-11-25)
+
+- **«Бонусные карты»** = branch section `bonus` (`/branches/:branchId/bonus`,
+  `routes/BonusCards.tsx`): the owner's rule (`BonusSettingsForm`: on/off,
+  percent, welcome bonus; example uses the server's DOWN rounding), the
+  branch's cards with a phone filter, «Зарегистрировать игрока»
+  (`RegisterBonusDialog`: the 6-character code typed or scanned with
+  `QrScanner` → `lookup` → name + phone in E.164 → `register`).
+- Permissions: `branch.bonus` (admin, owner, manager), `branch.bonusSettings`
+  (admin, owner) — the backend's `bonus.manage` / `bonus.settings`.
+- **Start**: `BonusCardStartSwitch` under «Свои продукты», drawn only where the
+  branch has bonuses on and the seat is not free. It NEVER changes the start
+  request: the chosen card is bound AFTER the start (`bonusRepository.bind`);
+  a failed bind is a warning toast, the seat keeps running
+  (`StartSessionDialog.bonus.test.tsx`, 3 mutations caught).
+- Paying WITH bonuses is phase 2 (not built yet).
+- Tests: `types/bonus.test.ts`, `components/bonus/*.test.tsx`,
+  `routes/BonusCards.test.tsx`, `auth/permissions.test.ts` (Club Card block).
+
+## Paying with Club Card bonuses in the panel (2026-11-25)
+
+- `paymentSplit.ts`: `BillMethod = PaymentMethod | "bonus"`; the draft has a
+  `bonus` part (empty by default). `billPaymentBody` (Stop, till) may send
+  bonuses; `paymentBody` (prepayments, change of method, confirmed due) is
+  the same body typed WITHOUT bonus and throws if one ever got in.
+  `useAllBonuses` = never more than the bill; too few → split bonus + the
+  rest on cash, with the shortfall.
+- `PaymentEditor` takes `bonus={{ balanceCents }}` only where a card is bound:
+  «Бонусы» as one method (disabled when the card holds less than the bill), a
+  bonus row in a split, and `BonusUseAll` (balance + «Использовать все
+  бонусы» behind a confirmation, «Не хватает … » when short). Without the
+  prop the editor is exactly as before.
+- `StopReceiptModal`: reads the seat's card (`session.bonus_account_id` →
+  `GET /branches/{b}/bonus-accounts/{id}`), offers «Привязать бонусную карту»
+  when none is bound and the branch has bonuses on, and sends
+  `billPaymentBody`. The till (`SellProductsDialog`) has the «Бонусная карта»
+  switch and sends `bonus_account_id` with the sale.
+- Labels: «Бонусы» in the session history (`paymentLabelOf`, never «Карта»),
+  sales history (`sales.method.bonus`), shift report (below the total as
+  «Бонусы (не выручка)»), `paymentText`.
+- Tests: `paymentSplit.bonus.test.ts`, `BonusUseAll.test.tsx`,
+  `SellProductsDialog.bonus.test.tsx`. Not built yet: bonuses for a prepayment
+  at Start / «+ Время» (phase 2b).
+
+## Club Card additions (2026-11-25)
+- Prepayment with bonuses: `prepaidPaymentFields` now builds from
+  `billPaymentBody` (bonus allowed); Start offers «Бонусы» when a card is
+  chosen and then sends `bonus_account_id` WITH the start (no bind after);
+  otherwise the card is bound after the start as before. «+ Время» offers them
+  when the seat has a card (`useBoundBonusCard`, shared with Stop).
+- Register by phone (no smartphone): `RegisterBonusDialog` «Открыть карту по
+  номеру телефона» sends no `code`.
+- Time bonus: `TimeBonusSettingsForm` (owner, on «Бонусные карты»),
+  `TimeBonusNotifier` in `Layout` (owners/managers; polls `/time-bonus/pending`
+  every 15 s; «Начислить» / «Отказаться»). History names a gift
+  `history.timeBonus`.
+- «Настройки бонусной карты» (`/branches/:id/bonus/settings`, `branch.bonusSettings`,
+  hub tile `bonusSettings`): the bonus rule with earning hours, ranks
+  (`RankSettingsForm`), the time bonus with its seats (`SeatChoice`: all, a
+  group — platform · sub-category · VIP — or seat by seat). «Бонусные карты»
+  keeps the list (with `RankBadge`) and registration.
+- Product picture: `ProductForm` (regular products) uploads after the save
+  on `/products/{id}/image`; a failed picture warns and keeps the product.
+  `TimeBonusNotifier` says when the player was asked in the app, and shows a
+  player's answer once per person («Понятно» kept in `u{id}:cp.timeBonus.seen`).
+- Bonuses everywhere money is taken: «Место закончилось» (`DueConfirmNotifier`,
+  the seat's card by `bonus_account_id`) and «Изменить способ оплаты»
+  (`ChangePaymentDialog`, the seat's card by `useSessionBonusCard`) send
+  `billPaymentBody`. «Сколько бонусами» in `BonusUseAll` (`useSomeBonuses`):
+  the named part from the card, the rest on cash. «Удалить» on each card of
+  «Бонусные карты» (asked first). Start's «Бонусная карта» is a tile like
+  «Бесплатная сессия» (`tone="bonus"`); bonus hours use `HoursRange` (Start's
+  clock field).
+- Club news (2026-11-25): `/branches/:id/bonus/news` (`BranchNews`, hub tile
+  «Новости клуба», also linked from «Бонусные карты»; `branch.bonus`): a
+  headline and an optional text, «Опубликовать и отправить игрокам», the list
+  with «Удалить». Card balances are shown to the cent (`bonusAmountText`),
+  never rounded. Phone boxes are `FixedDialPhoneInput` (🇦🇲 +374, digits grouped
+  by `groupNational`) in registration, the card search (live, debounced, no
+  «Найти»), the player picker and bookings. «Сколько бонусами» applies as it is
+  typed (capped at the card and the bill), no «Применить».
+- Register dialog (2026-11-26): a code whose number already has a card here
+  under an earlier copy of the app shows «У этого номера уже есть карта…» with
+  the card and «Перенести карту» (sends `move: true`); a 409 `existing` from the
+  server opens the same offer; changing the number takes it away.
+- Branch hub tiles (2026-11-26, owner: words cut off): a tile is at least
+  84 px and grows with its words; the title wraps (no ellipsis) and the hint
+  shows in full (`.hub-tile__label`, `.hub-tile__hint`). Checked ru/am at 1280
+  and 900 px: no tile clips.
+  All tiles share one height (`gridAutoRows: 1fr`, the tallest tile's) and
+  columns are at least 240 px so a title word is never split («Համակարգիչներ»);
+  wrapping is whole-word (`overflow-wrap: break-word`).
+- Bonus cards, owner's hand (2026-11-26): «Заморозить бонусы» / «Разморозить»
+  and «Понизить ранг» (only lower ranks; «Вернуть автоматический» when held)
+  for `branch.bonusSettings`; both sides' latest ratings shown read-only
+  (`StarRating`). Ratings are given only after a visit (2026-11-27):
+  `RatePlayerNotifier` (Layout, owners/managers, polls `GET /bonus-rate-due`
+  every 30 s + focus) opens «Оцените визит игрока» with the «Гости» sound —
+  stars only, the reason required at 1 star, an optional gift of bonuses at
+  3–5 stars only (`RateVisitForm`, `rateVisitBody`), «Не сейчас» = skip. The
+  feed renders `bonus.club_rated` (stars, the player's tags via
+  `ratingTags.tagLabel`, words); `ClubRatedNotifier` rings («Гости») and
+  raises an OS notice when one arrives. A frozen card on a bill is a red
+  «🔒 …» bar (`.pay-editor__frozen`).
+- Sounds (2026-11-27, owner): `public/sounds/cyberplace.mp3` (the owner's
+  file, −16 LUFS, 2.4 s) is the default for every notification category; the
+  seat alarms `session_ending` / `session_unpaid` keep `digital` / `arrival`.
+  A stored choice is never replaced. The server's `UiPreferences::SOUNDS`
+  must list every sound id: the desktop sends its whole document on each
+  save, so a missing id refuses every save — ship the backend first.
+- Registering a card (2026-11-27, owner): after the code (typed or scanned)
+  `PlayerBadge` shows the player's photo (`lookup.player.avatar`, a data:
+  image only) in a ring with the clubs' rating on a gold pill and how many
+  rated (`compactCount`: 999, 1K, 1.5K, 1M); nobody yet: «Новый». Bonus API
+  bodies are plain objects: `request()` encodes them (a JSON string was sent
+  twice-encoded and refused, QA 2026-11-27; `src/api/bonus.body.test.ts`). Every
+  payment screen passes the card through `bonusOffer(card)`; `PaymentEditor`
+  offers no bonuses for a frozen card and says «Бонусная карта заморожена…»
+  (the server refuses them too).

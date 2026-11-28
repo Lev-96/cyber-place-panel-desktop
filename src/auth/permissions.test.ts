@@ -246,3 +246,14 @@ describe("can(role, perm)", () => {
     });
   });
 });
+
+describe("Cyber Place Club Card (2026-11-25)", () => {
+  it("cards: admin, owner and manager; the rule: admin and owner only", () => {
+    expect(can("admin", "branch.bonus")).toBe(true);
+    expect(can("company_owner", "branch.bonus")).toBe(true);
+    expect(can("manager", "branch.bonus")).toBe(true);
+    expect(can("admin", "branch.bonusSettings")).toBe(true);
+    expect(can("company_owner", "branch.bonusSettings")).toBe(true);
+    expect(can("manager", "branch.bonusSettings")).toBe(false);
+  });
+});

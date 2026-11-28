@@ -112,3 +112,13 @@ export const productExistsBody = (e: unknown): IProductExistsBody | null => {
     ? (body as IProductExistsBody)
     : null;
 };
+
+/** A product's picture (2026-11-25): its own endpoints, the product's fields untouched. */
+export const apiSetProductImage = (id: number, file: File) => {
+  const fd = new FormData();
+  fd.append("image", file);
+  return request<{ product: IProduct }>(`/products/${id}/image`, { method: "POST", body: fd });
+};
+
+export const apiRemoveProductImage = (id: number) =>
+  request<{ product: IProduct }>(`/products/${id}/image`, { method: "DELETE" });

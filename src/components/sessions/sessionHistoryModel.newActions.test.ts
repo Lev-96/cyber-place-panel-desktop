@@ -211,6 +211,42 @@ describe("paid ahead by card / split / other (2026-11-17)", () => {
     const p = eventPresentation(row("time_added", 500, { minutes: 30, prepaid: true, prepaid_amount: "500.00", prepaid_method: "card", prepaid_payments: [{ method: "card", amount: "500.00" }] }), en, money);
     expect(p.details).toContain("Paid now: 500 AMD (Card)");
   });
+  test("bonuses (2026-11-25): named as bonuses, never «Other»", () => {
+    const p = eventPresentation(row("started", null, { mode: "fixed", is_free: false, prepaid_amount: "2000.00", prepaid_method: "split", prepaid_payments: [{ method: "cash", amount: "1400.00" }, { method: "bonus", amount: "600.00" }] }), en, money);
+    expect(p.details.join(" | ")).toContain("(Cash 1400 AMD, Bonuses 600 AMD)");
+    const q = eventPresentation(row("time_added", 500, { minutes: 30, prepaid: true, prepaid_amount: "500.00", prepaid_method: "bonus", prepaid_payments: [{ method: "bonus", amount: "500.00" }] }), en, money);
+    expect(q.details).toContain("Paid now: 500 AMD (Bonuses)");
+  });
+});
+
+describe("what went back, way by way (QA 2026-11-25)", () => {
+  test("Stop: 698 cash + 302 bonuses ahead, bill 73.33 → change 624.67, bonuses 302 to the card (never «Change 926.67»)", () => {
+    const p = eventPresentation(row("stopped", 73.33, { prepaid_amount: "1000.00", change: "926.67", due: "0.00",
+      prepaid_by_method: { cash: "698.00", bonus: "302.00" }, prepaid_refund: { cash: "624.67", bonus: "302.00" } }), en, money);
+    const text = p.details.join(" | ");
+    expect(text).toContain("Paid ahead 1000 AMD · Change 624.67 AMD");
+    expect(text).toContain("624.67");
+    expect(text).toContain("bonuses back to the player's card 302 AMD");
+    expect(text).not.toContain("926.67");
+  });
+  test("card ahead 2 000, bill 1 500: 500 back on the terminal, no cash change", () => {
+    const p = eventPresentation(row("stopped", 1500, { prepaid_amount: "2000.00", change: "500.00", due: "0.00",
+      prepaid_by_method: { card: "2000.00" }, prepaid_refund: { card: "500.00" } }), en, money);
+    const text = p.details.join(" | ");
+    expect(text).toContain("back to the card 500 AMD");
+    expect(text).toContain("No change");
+  });
+  test("cancel: 1 200 cash + 300 bonuses → said each way", () => {
+    const p = eventPresentation(row("cancelled", 0, { time_cost: 10, items_total: 0, joysticks_total: 0, prepaid_amount: "1500.00", change: "1500.00",
+      prepaid_by_method: { cash: "1200.00", bonus: "300.00" }, prepaid_refund: { cash: "1200.00", bonus: "300.00" } }), en, money);
+    const text = p.details.join(" | ");
+    expect(text).toContain("cash back 1200 AMD");
+    expect(text).toContain("bonuses back to the player's card 300 AMD");
+  });
+  test("all cash (no by-method keys): exactly as before", () => {
+    const p = eventPresentation(row("stopped", 1500, { prepaid_amount: "2000.00", change: "500.00", due: "0.00" }), en, money);
+    expect(p.details.join(" | ")).toContain("Paid ahead 2000 AMD · Change 500 AMD");
+  });
 });
 
 describe("the price per hour changed in place (2026-11-17)", () => {
