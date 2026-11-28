@@ -159,6 +159,25 @@ export interface MachineSnapshot {
   restingSince: number | null;
   /** Set when a command could not be carried out. Shown, never swallowed. */
   error: string | null;
+  /**
+   * This session's console has been seen awake (2026-11-28, owner).
+   *
+   * Once it has, a sleep during the session is the player's or the TV's
+   * choice — a player watching YouTube on the TV, the TV's HDMI-CEC or the
+   * console's own idle timer putting it to rest — and is left alone. Waking
+   * it again switched the TV back to the PS5 and it fell asleep again: «the
+   * PlayStation turns itself on and off». A new Start (a press) clears it, so
+   * every session still begins with a wake; the end of the session clears it
+   * too. Optional so a snapshot from before it reads as «not seen yet».
+   */
+  awakeInSession?: boolean;
+  /**
+   * When this panel last asked the console to sleep (kept through ACTIVE).
+   * A sleep within REST_SETTLE_MS of it may be our own Stop landing late —
+   * a Stop then a quick Start — and is woken as before; only a console seen
+   * awake past that counts as «awake in this session».
+   */
+  restAskedAt?: number | null;
 }
 
 export interface Step {
@@ -216,6 +235,8 @@ export const initialSnapshot = (): MachineSnapshot => ({
   wakingSince: null,
   restingSince: null,
   error: null,
+  awakeInSession: false,
+  restAskedAt: null,
 });
 
 /**
@@ -260,6 +281,8 @@ export const step = (prev: MachineSnapshot, obs: Observation, newEventId: string
 
   const desired = desiredFor(obs, approved);
   next.desired = desired;
+  // Only a running (or starting) session keeps it; anything else ends it.
+  if (desired !== "active") next.awakeInSession = false;
 
   // Start was just pressed and the console has not answered (yet). A PS5 at
   // rest on Wi-Fi answers only now and then (measured at a club 2026-10-19:
@@ -327,6 +350,17 @@ export const step = (prev: MachineSnapshot, obs: Observation, newEventId: string
     next.wakeSeenAt = null;
     next.approvedEventId = null;
 
+    // Asleep during a session whose console has already been awake: the
+    // player or the TV put it to rest. Left asleep (2026-11-28, owner) — the
+    // session, its bill and its Stop are untouched, and the player wakes it
+    // with the controller whenever they like. A fresh Start still wakes it.
+    if (desired === "active" && prev.awakeInSession === true && !obs.starting && obs.pressed !== true) {
+      next.state = "REST";
+      next.restingSince = null;
+      next.wakingSince = null;
+      return { next, commands };
+    }
+
     if (desired === "active") {
       // Nothing can be sent without the key, so nothing is — and the reason is
       // named instead of being spent on datagrams that never leave. Checked
@@ -372,6 +406,10 @@ export const step = (prev: MachineSnapshot, obs: Observation, newEventId: string
   // From here the console is awake.
   if (desired === "active") {
     next.state = "ACTIVE";
+    // Awake in this session — unless our own last sleep could still land on it.
+    next.awakeInSession = prev.awakeInSession === true
+      || prev.restAskedAt === null || prev.restAskedAt === undefined
+      || obs.now - prev.restAskedAt >= REST_SETTLE_MS;
     next.restingSince = null;
     next.wakingSince = null;
     next.wakeEventId = null;
@@ -403,6 +441,7 @@ export const step = (prev: MachineSnapshot, obs: Observation, newEventId: string
 
     next.state = "GOING_TO_REST";
     next.restingSince = prev.restingSince ?? obs.now;
+    next.restAskedAt = obs.now;
     commands.push({ kind: "rest" });
     return { next, commands };
   }
@@ -441,6 +480,7 @@ export const step = (prev: MachineSnapshot, obs: Observation, newEventId: string
 
     next.state = "GOING_TO_REST";
     next.restingSince = prev.restingSince ?? obs.now;
+    next.restAskedAt = obs.now;
     // Carried so the answer this sleep belongs to is still named, when it began
     // as an owner's refusal.
     commands.push(prev.wakeEventId ? { kind: "rest", eventId: prev.wakeEventId } : { kind: "rest" });
@@ -474,6 +514,7 @@ export const step = (prev: MachineSnapshot, obs: Observation, newEventId: string
 
     next.state = "GOING_TO_REST";
     next.restingSince = prev.restingSince ?? obs.now;
+    next.restAskedAt = obs.now;
     commands.push({ kind: "rest", eventId: prev.wakeEventId });
     return { next, commands };
   }
