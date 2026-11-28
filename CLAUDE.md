@@ -335,6 +335,17 @@ branch — so the two yml files never conflict:
   `src/api/psn.ts`, mirrors the backend flag): no PSN name field at start and no
   sender card in Settings. Pairing's `psnLoginExternal` is separate and stays.
 
+- **Asleep by the player's choice during a session (2026-11-28, owner-approved PS5 change).** A player
+  watching YouTube on the smart TV, the TV's HDMI-CEC or the console's own idle timer rests the PS5 mid-session;
+  the panel woke it again (desired active, actual rest), the TV switched back to the PS5 and it fell asleep again:
+  «turns itself on and off». Now `MachineSnapshot.awakeInSession` is set once the console is seen ACTIVE in the
+  session, and a later rest is left alone (state REST, no command) until the session ends. Start still wakes
+  (`obs.starting` / `obs.pressed`; `Ps5Controller.pressed()` clears the flag), a console never seen awake is
+  woken as before, and Stop / time-up rest an awake console as before (an asleep one gets nothing). Our own
+  rest landing late after a Stop→quick Start is told apart by `restAskedAt`: within `REST_SETTLE_MS` of it a
+  sleep is still woken. Tests: `machine.test.ts` «asleep by the player's choice…» (8), `sleepByPlayer.test.ts`;
+  4 mutations caught; `stopStartRace.test.ts` unchanged and green.
+
 ### The console lifecycle (`src/ps5/`)
 `machine.ts` is a pure function of (previous state, observation) → (next state,
 commands): UNKNOWN / OFFLINE / REST / WAKING / ACTIVE / GOING_TO_REST /
@@ -421,7 +432,7 @@ pos · places · ps5 · sessions · tournaments · revenue · services · scanne
   renderer focus on Linux WMs. Use the in-app `ConfirmDialog`.
   No native `confirm()` is left (re-checked 2026-10-27): every confirmation
   goes through `useConfirm()`.
-- **DevTools:** auto-detached DevTools also break renderer focus. Gate
+- **DevTools:** never in a packaged build (`devTools: isDev`, 2026-11-28). Auto-detached DevTools also break renderer focus. Gate
   with `ELECTRON_DEVTOOLS=1` env var.
 - **i18n:** language codes are `en` / `ru` / `am` (NOT `hy`). Use the
   `t()` helper from `LanguageContext` and `money()` for currency.
@@ -5315,6 +5326,28 @@ string edit; `percentText` drops trailing zeros of "10.00").
   (`prepaid-later` / `prepaid-switch`, radios). `PaymentEditor` takes `branchId`
   and offers `GET /branches/{id}/payment-labels` as «+ name» buttons.
 
+## The shortage on the shift it happened on — in «Остатки» (2026-11-28, owner)
+
+Backend: `cyber-place/CLAUDE.md` § "The shift that handed the goods over". Owner/admin
+only; the server sends nothing to a manager, so nothing is hidden client-side. A
+shortage is found only when the NEXT manager counts at acceptance (that count resets the
+shelf), so it is shown on the closed shift as soon as the next one is accepted.
+- `ShiftHistory` row: `shift-history-stock` (`shift.handover.listShortage` + up to 5
+  «name −n» + `listMore`) from `IShift.stock_handover`; colour = danger mixed 70% with
+  text (≥4.5:1 in all seven themes).
+- The report modal passes `summary.stock_handover` → `ShiftReportView handover=` →
+  `ShiftBreakdown` → `ShiftStockTable handover= acceptance={report.acceptance_count}`:
+  «Осталось» of a short product reads «9 → 8 (−1)» in red (`shift-stock-next`, no extra
+  column — the report is a 680px dialog); under the table `shift-stock-handover` (total,
+  who counted, one `shift.handover.reason` sentence per shortage). On the ACCEPTING
+  shift, its «Пересчёт» is explained per shortage (`shift-stock-accepted-row`,
+  `shift.stock.acceptedShort`: the previous shift's, not this one's). Blind counts give
+  nothing. The «Приём смены» block also lists `shift.handover.reason` sentences.
+- testids: never `shift-handover` (that is the running-places «Передача смены»).
+- Tests: `ShiftStockTable.test.tsx` (+3), `ShiftAcceptanceBlock.test.tsx`,
+  `ShiftHistory.test.tsx`; mutations caught (one equivalent: a blind count has no outcome).
+  Live-checked on the local stack (owner en/ru/am, 1440 + 390).
+
 ## «Приём смены»: the blind count at opening (2026-11-18, owner)
 
 Backend contract: `cyber-place/CLAUDE.md` § "Shift acceptance count". The panel
@@ -5872,3 +5905,16 @@ when false. Tests: `sessionAmount.productsAtPrice.test.ts` (950 / 870 / 1350 /
   payment screen passes the card through `bonusOffer(card)`; `PaymentEditor`
   offers no bonuses for a frozen card and says «Бонусная карта заморожена…»
   (the server refuses them too).
+
+## Security pass 2026-11-28 (owner-approved)
+- **PS5 datagrams only to the club's network**: `electron/ps5/lanAddress.ts` (`isLanAddress`, exact IPv4 private /
+  link-local / 100.64/10 / loopback). `ps5:wake`, `ps5:wake-once`, `ps5:rest`, `ps5:pair` refuse other addresses with
+  their existing bad-request shape; `ps5:probe` drops them. The LAN sweep and PC Wake-on-LAN are untouched.
+- **No DevTools in a packaged build** (`devTools: isDev`).
+- **Manager gift caps**: «Оцените визит игрока» reads `gift_limit` (cap shown, send held over it, no gift field when
+  nothing is left); the owner sets the caps in bonus settings (`manager_gift`).
+- **Each PC's emergency code**: «Компьютеры» → «Аварийный код» (`OfflineUnlockModal`, «Новый код» asks first).
+- **New notices**: `agent.emergency_unlock` («🔓 ПК … разблокирован аварийным кодом») and `agent.no_session`
+  («⚠ ПК … работает без открытой сессии»); both open the branch's computers.
+- Design audit fixes: board count chips use the `--status-*` tokens; the start dialog's action row is sticky;
+  invisible hit rings (timer reset, dialog ×, receipt ×); bigger cards at 1920+/2400+ for card size «M» only.

@@ -19,6 +19,7 @@ vi.mock("@/sound/soundEngine", () => ({ playFor: sound.playFor }));
 vi.mock("@/components/ui/Modal", () => ({ default: ({ children }: { children: React.ReactNode }) => <div>{children}</div> }));
 
 import RatePlayerNotifier from "./RatePlayerNotifier";
+import { rateVisitReady } from "@/components/bonus/RateVisitForm";
 
 const card = (over: Partial<IBonusAccount> = {}): IBonusAccount => ({
   id: 4, branch_id: 7, name: "Arman", phone: "+37491123456", balance: "35.00", opened_at: null, rank: "pro", rank_name: "PRO",
@@ -105,6 +106,46 @@ describe("RatePlayerNotifier", () => {
     await click("rate-player-form-star-2");
     await click("rate-player-send");
     expect(repo.rate).toHaveBeenCalledWith(7, 4, { stars: 2, comment: null, gift: null });
+  });
+
+  test("a manager gives within the owner's caps: the cap is said, more is not sent (2026-11-28)", async () => {
+    repo.rateDue.mockReset();
+    repo.rateDue.mockResolvedValueOnce([card({ gift_limit: { max: "1000.00", daily: "10000.00", left_today: "600.00" } })]).mockResolvedValue([]);
+    await mount();
+    await click("rate-player-form-star-5");
+    expect(screen.getByTestId("rate-player-form-gift-cap").textContent).toBe("rating.giftCap");
+    const input = screen.getByTestId("rate-player-form-gift").querySelector("input") as HTMLInputElement;
+    await act(async () => { fireEvent.change(input, { target: { value: "700" } }); });
+    // Over what is left today (600): the stepper holds it at the cap or the send waits.
+    const sent = Number(input.value);
+    if (sent > 600) expect(send().disabled).toBe(true);
+    await act(async () => { fireEvent.change(input, { target: { value: "600" } }); });
+    expect(send().disabled).toBe(false);
+    await click("rate-player-send");
+    expect(repo.rate).toHaveBeenCalledWith(7, 4, { stars: 5, comment: null, gift: "600" });
+  });
+
+  test("ready only within the cap: over it, never (2026-11-28)", () => {
+    const v = { stars: 5, comment: "", gift: 700 };
+    expect(rateVisitReady(v, 600)).toBe(false);
+    expect(rateVisitReady({ ...v, gift: 600 }, 600)).toBe(true);
+    expect(rateVisitReady(v)).toBe(true); // the owner: the server's own 100 000 bound only
+  });
+
+  test("nothing left to give: no gift field, the rating still goes (2026-11-28)", async () => {
+    repo.rateDue.mockReset();
+    repo.rateDue.mockResolvedValueOnce([card({ gift_limit: { max: "1000.00", daily: "10000.00", left_today: "0.00" } })]).mockResolvedValue([]);
+    await mount();
+    await click("rate-player-form-star-5");
+    expect(screen.queryByTestId("rate-player-form-gift")).toBeNull();
+    await click("rate-player-send");
+    expect(repo.rate).toHaveBeenCalledWith(7, 4, { stars: 5, comment: null, gift: null });
+  });
+
+  test("the owner's window says no cap (2026-11-28)", async () => {
+    await mount();
+    await click("rate-player-form-star-5");
+    expect(screen.queryByTestId("rate-player-form-gift-cap")).toBeNull();
   });
 
   test("«Не сейчас» answers the visit without a rating", async () => {

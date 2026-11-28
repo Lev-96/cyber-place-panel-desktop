@@ -12,6 +12,8 @@ export interface UpdateBonusSettingsBody {
   enabled: boolean; percent: number; welcome: number;
   /** The earning hours (2026-11-25): both or neither (null = every hour). */
   earn_from?: string | null; earn_to?: string | null;
+  /** A manager's gift caps (2026-11-28); sent only to a server that knows them. */
+  manager_gift_max?: number; manager_gift_daily?: number;
 }
 export interface UpdateRankSettingsBody {
   strategy: RankStrategy; thresholds?: RankThresholds;

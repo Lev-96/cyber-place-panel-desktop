@@ -8,6 +8,9 @@ import {
   apiUpdatePc,
   CreatePcBody,
   UpdatePcBody,
+  apiPcOfflineUnlock,
+  apiRotatePcOfflineUnlock,
+  type IPcOfflineUnlock,
 } from "@/api/pcs";
 import { friendlyMutation, orFallback } from "@/api/fallback";
 import { withToast } from "@/ui/notify";
@@ -50,6 +53,13 @@ export class PcRepository {
   }
   async rotateToken(id: number): Promise<IPcApi> {
     return friendlyMutation(apiRotatePcToken(id).then((r) => r.pc));
+  }
+  /** The PC's own offline emergency code (2026-11-28). */
+  async offlineUnlock(id: number): Promise<IPcOfflineUnlock> {
+    return (await apiPcOfflineUnlock(id)).offline_unlock;
+  }
+  async rotateOfflineUnlock(id: number): Promise<IPcOfflineUnlock> {
+    return friendlyMutation(apiRotatePcOfflineUnlock(id).then((r) => r.offline_unlock));
   }
 
   /**

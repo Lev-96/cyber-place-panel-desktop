@@ -1,7 +1,7 @@
 import { formatDateTime } from "@/i18n/dates";
 import { useLang } from "@/i18n/LanguageContext";
 import { fmt } from "@/i18n/translations";
-import type { DifferenceKind, IShift, IShiftReport } from "@/types/shifts";
+import type { DifferenceKind, IShift, IShiftReport, IStockHandover } from "@/types/shifts";
 import type { CSSProperties, ReactNode } from "react";
 import { shiftAmount } from "@/shifts/cash";
 import { platformLabel } from "@/utils/platform";
@@ -31,6 +31,12 @@ interface Props {
    * screen decides when; a closed report never passes it.
    */
   acceptanceOnly?: boolean;
+  /**
+   * How this shift handed the goods over (`summary.stock_handover`, owner /
+   * admin only, 2026-11-28): the next shift's count, shown in THIS shift's
+   * «Остатки» so a shortage stays where it happened. Absent / null = nothing.
+   */
+  handover?: IStockHandover | null;
 }
 
 const KIND_KEY: Record<DifferenceKind, string> = {
@@ -53,7 +59,7 @@ const Fact = ({ label, children, testId }: { label: string; children: ReactNode;
   </div>
 );
 
-const ShiftReportView = ({ shift, report, viewerId = null, acceptanceOnly = false }: Props) => {
+const ShiftReportView = ({ shift, report, viewerId = null, acceptanceOnly = false, handover = null }: Props) => {
   const { t, money } = useLang();
   const methodName = (method: string) =>
     method === "cash" ? t("session.payCash") : method === "card" ? t("session.payCard")
@@ -217,7 +223,7 @@ const ShiftReportView = ({ shift, report, viewerId = null, acceptanceOnly = fals
           </Section>
         )}
 
-        <ShiftBreakdown report={report} closerId={report.closed?.closed_by.id ?? shift.closed_by?.id ?? viewerId} />
+        <ShiftBreakdown report={report} closerId={report.closed?.closed_by.id ?? shift.closed_by?.id ?? viewerId} handover={handover} />
 
         {(report.member_topups.count > 0 || report.places.running_count > 0 || report.warnings.length > 0) && (
           <section className="card col" style={{ gap: 6, borderColor: "var(--color-warning)" }} data-testid="shift-warnings">

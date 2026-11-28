@@ -23,6 +23,10 @@ import { venueMoment, venueSpan } from "./acceptanceCount";
  *
  * Manager: blind, as the server sends it — what was counted, nothing else.
  *
+ * Every shortage is also said in one plain sentence (2026-11-28, owner), with
+ * the server's figures only. The same shortage is shown on the shift it
+ * happened on, in that shift's «Остатки» (`ShiftStockTable`).
+ *
  * The table becomes one card per product when its own box is narrow (a
  * container query: the report also sits in a 680px dialog), so no window
  * width scrolls the page sideways.
@@ -91,6 +95,7 @@ const FullCount = ({ count }: { count: IAcceptanceCountFull }) => {
     ["value", t("shift.acceptCount.value")],
   ];
   const label = (key: string) => head.find(([k]) => k === key)?.[1] ?? "";
+  const shortages = count.rows.filter((r) => r.outcome === STOCK_COUNT_OUTCOME.shortage);
 
   return (
     <Section title={t("shift.accept.title")} testId="shift-acceptance">
@@ -113,6 +118,16 @@ const FullCount = ({ count }: { count: IAcceptanceCountFull }) => {
         )}
         <span className="muted shift-acceptance__rule">{t("shift.acceptCount.flowRule")}</span>
       </div>
+
+      {shortages.length > 0 && (
+        <ul className="shift-acceptance__reasons" data-testid="shift-stock-reasons">
+          {shortages.map((r) => (
+            <li key={r.product_id ?? r.name} data-testid="shift-stock-reason">
+              {fmt(t("shift.handover.reason"), r.name, -r.diff, m(r.value), r.expected, r.counted)}
+            </li>
+          ))}
+        </ul>
+      )}
 
       <div className="shift-acceptance__box">
         <table className="shift-acceptance__table is-full">

@@ -15,6 +15,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 export const RATE_DUE_POLL_MS = 30_000;
 
 const STAFF = new Set(["company_owner", "manager"]);
+/** Bonuses are counted, not priced: «1 000», never a currency. */
+const bonusCount = (v: string) => Math.floor(Number(v)).toLocaleString("ru-RU").replace(/\u00a0/g, " ");
 const EMPTY: RateVisitValue = { stars: 0, comment: "", gift: 0 };
 
 /**
@@ -62,8 +64,15 @@ const RatePlayerNotifier = () => {
   }, [dueKey]);
   if (!asks || !current) return null;
 
+  // A manager gives within the owner's caps (2026-11-28); the owner without
+  // (the server sends no cap, or an older server sends nothing).
+  const limit = current.gift_limit ?? null;
+  const giftMax = limit ? Math.max(0, Math.min(Number(limit.max), Number(limit.left_today))) : undefined;
+  const giftCapHint = limit ? t("rating.giftCap").replace("{0}", bonusCount(limit.max)).replace("{1}", bonusCount(limit.left_today)) : undefined;
+  const ready = rateVisitReady(value, giftMax);
+
   const answer = async (skip: boolean) => {
-    if (busy || (!skip && !rateVisitReady(value))) return;
+    if (busy || (!skip && !ready)) return;
     setBusy(true);
     setErr(null);
     try {
@@ -104,10 +113,10 @@ const RatePlayerNotifier = () => {
             </div>
           </div>
         </div>
-        <RateVisitForm value={value} onChange={setValue} disabled={busy} testId="rate-player-form" />
+        <RateVisitForm value={value} onChange={setValue} disabled={busy} testId="rate-player-form" giftMax={giftMax} giftCapHint={giftCapHint} />
         {err && <div className="error" role="alert" data-testid="rate-player-error">{err}</div>}
         <div className="due-confirm__answers">
-          <Button type="submit" disabled={busy || !rateVisitReady(value)} data-testid="rate-player-send">{t("rating.send")}</Button>
+          <Button type="submit" disabled={busy || !ready} data-testid="rate-player-send">{t("rating.send")}</Button>
           <Button type="button" variant="secondary" disabled={busy} onClick={() => void answer(true)} data-testid="rate-player-skip">{t("rating.notNow")}</Button>
         </div>
       </form>

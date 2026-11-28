@@ -406,6 +406,10 @@ const DbNotificationCard = ({ n, onClick, onDelete }: { n: IDbNotification; onCl
   const isStockShortage = dataType === SHIFT_STOCK_SHORTAGE;
   // A player rated the club after a visit (2026-11-27, `ClubRatedByPlayer`).
   const isClubRated = dataType === CLUB_RATED;
+  // A PC was unlocked with its emergency code (2026-11-28, `AgentEmergencyUnlocked`).
+  const isEmergencyUnlock = dataType === "agent.emergency_unlock";
+  // A PC plays with no session on the server; its lock was sent again (2026-11-28).
+  const isNoSession = dataType === "agent.no_session";
   const bookingDate = n.data?.booking_date as string | undefined;
   const startTime = n.data?.start_time as string | undefined;
   const extraMinutes = n.data?.extra_minutes as number | undefined;
@@ -542,6 +546,14 @@ const DbNotificationCard = ({ n, onClick, onDelete }: { n: IDbNotification; onCl
     const tags = Array.isArray(n.data?.tags) ? (n.data.tags as unknown[]).filter((c): c is string => typeof c === "string").map((c) => tagLabel(t, c)) : [];
     const words = (n.data?.comment as string | undefined)?.trim();
     body = [tags.length > 0 ? tags.join(", ") : null, words ? `«${words}»` : null, venue || null].filter(Boolean).join("\n") || null;
+  } else if (isNoSession) {
+    headline = `⚠ ${interpolate(t("notifications.noSessionTitle"), { pc: (n.data?.pc_label as string | undefined)?.trim() || "-" })}`;
+    body = [venue || null, t("notifications.noSessionBody")].filter(Boolean).join("\n") || null;
+  } else if (isEmergencyUnlock) {
+    // «🔓 ПК 7 разблокирован аварийным кодом», then when and where.
+    const at = n.data?.at as string | undefined;
+    headline = `🔓 ${interpolate(t("notifications.emergencyUnlockTitle"), { pc: (n.data?.pc_label as string | undefined)?.trim() || "-" })}`;
+    body = [at ? `${formatDate(at)} ${formatTime(at)}` : null, venue || null, t("notifications.emergencyUnlockBody")].filter(Boolean).join("\n") || null;
   } else {
     headline = n.type.split("\\").pop() ?? n.type;
   }
@@ -560,6 +572,8 @@ const DbNotificationCard = ({ n, onClick, onDelete }: { n: IDbNotification; onCl
       // The shift whose acceptance found it: its report, with the count.
       const target = shiftShortageTarget(n.data);
       if (target) navigate(target);
+    } else if ((isEmergencyUnlock || isNoSession) && n.data?.branch_id) {
+      navigate(`/branches/${n.data.branch_id}/pcs`);
     } else if (isClubRated && n.data?.branch_id) {
       navigate(`/branches/${n.data.branch_id}/bonus`);
     } else if ((isSessionEndingSoon || isSessionReminder) && n.data?.branch_id) {

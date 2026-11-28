@@ -216,7 +216,9 @@ export class Ps5Controller {
     this.failedAt.delete(hostId);
     this.lastError.delete(hostId);
     const snapshot = this.snapshots.get(hostId);
-    if (snapshot) this.snapshots.set(hostId, { ...snapshot, wakingSince: null, error: null });
+    // A press is a new session's intent: its console is woken again even if the
+    // last session's console was left asleep by the player (`awakeInSession`).
+    if (snapshot) this.snapshots.set(hostId, { ...snapshot, wakingSince: null, error: null, awakeInSession: false });
   }
 
   /**

@@ -1,3 +1,4 @@
+import { signedDelta } from "@/components/products/stock";
 import Button from "@/components/ui/Button";
 import Modal from "@/components/ui/Modal";
 import Pagination from "@/components/ui/Pagination";
@@ -8,6 +9,7 @@ import { formatApiError } from "@/api/errors";
 import { useAsync } from "@/hooks/useAsync";
 import { formatDateTime } from "@/i18n/dates";
 import { useLang } from "@/i18n/LanguageContext";
+import { fmt } from "@/i18n/translations";
 import { branchRepository } from "@/repositories/BranchRepository";
 import { shiftRepository } from "@/repositories/ShiftRepository";
 import { shiftAmount } from "@/shifts/cash";
@@ -268,6 +270,16 @@ const ShiftHistory = ({ fixedBranchId, canPickStaff, openShiftId, onReportClosed
                     {s.difference_kind === "shortage" ? "⚠ " : ""}{difference(s)}
                   </div>
                 )}
+                {/* 2026-11-28: goods short when the next shift counted them (owner / admin only). */}
+                {s.stock_handover && (
+                  <div className="shift-history__stock" data-testid="shift-history-stock">
+                    ⚠ {fmt(t("shift.handover.listShortage"), s.stock_handover.units, shiftAmount(money, s.stock_handover.value))}
+                    {": "}{s.stock_handover.items.map((i) => `${i.name} ${signedDelta(i.diff)}`).join(", ")}
+                    {s.stock_handover.items_total > s.stock_handover.items.length
+                      ? ` ${fmt(t("shift.handover.listMore"), s.stock_handover.items_total - s.stock_handover.items.length)}`
+                      : ""}
+                  </div>
+                )}
               </div>
               <Button variant="secondary" onClick={() => void showReport(s.id)} disabled={opening !== null}>
                 {opening === s.id ? "…" : t("shift.report")}
@@ -287,7 +299,7 @@ const ShiftHistory = ({ fixedBranchId, canPickStaff, openShiftId, onReportClosed
               {viewing.shift.branch ? ` · ${branchLabel(viewing.shift.branch)}` : ""}
             </h2>
             {viewing.report
-              ? <ShiftReportView shift={viewing.shift} report={viewing.report} />
+              ? <ShiftReportView shift={viewing.shift} report={viewing.report} handover={viewing.stock_handover ?? null} />
               : <span className="muted">{t("shift.noReport")}</span>}
             <div className="row-between">
               <span />

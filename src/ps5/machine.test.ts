@@ -702,3 +702,111 @@ describe("a wake that never landed", () => {
     expect(steps[1].next.error).toBeNull();
   });
 });
+
+/**
+ * A console the player (or the TV) put to sleep during the session (2026-11-28,
+ * owner): a player watching YouTube on the smart TV, the TV's HDMI-CEC or the
+ * console's own idle timer rests it. Waking it again switched the TV back to
+ * the PS5, which fell asleep again — «the PlayStation turns itself on and off».
+ * Once seen awake in the session it is left asleep; Start still wakes, Stop and
+ * the end of the time still rest it.
+ */
+describe("asleep by the player's choice during a session", () => {
+  const t0 = 10_000_000;
+
+  test("woken at the start, then left asleep when it goes to sleep mid-session", () => {
+    const { snapshot, steps } = run(initialSnapshot(), [
+      { actual: "rest", hasSession: true, starting: true, pressed: true, now: t0 },
+      { actual: "awake", hasSession: true, starting: true, now: t0 + 12_000 },
+      { actual: "awake", hasSession: true, now: t0 + 90_000 },
+      { actual: "rest", hasSession: true, now: t0 + 20 * 60_000 },
+      { actual: "rest", hasSession: true, now: t0 + 21 * 60_000 },
+      { actual: "rest", hasSession: true, now: t0 + 60 * 60_000 },
+    ]);
+    expect(steps[0].commands).toEqual([{ kind: "wake" }]);
+    expect(steps[1].next.state).toBe("ACTIVE");
+    expect(steps.slice(3).flatMap((s) => s.commands)).toEqual([]);
+    expect(snapshot.state).toBe("REST");
+    expect(snapshot.desired).toBe("active");
+  });
+
+  test("the player switches it on again with the controller: simply ACTIVE", () => {
+    const { snapshot, steps } = run(initialSnapshot(), [
+      { actual: "awake", hasSession: true, now: t0 },
+      { actual: "rest", hasSession: true, now: t0 + 60_000 },
+      { actual: "awake", hasSession: true, now: t0 + 120_000 },
+    ]);
+    expect(steps.flatMap((s) => s.commands)).toEqual([]);
+    expect(snapshot.state).toBe("ACTIVE");
+  });
+
+  test("Stop or the end of time on a console already asleep sends nothing; on an awake one it rests it as before", () => {
+    const asleep = run(initialSnapshot(), [
+      { actual: "awake", hasSession: true, now: t0 },
+      { actual: "rest", hasSession: true, now: t0 + 60_000 },
+      { actual: "rest", hasSession: false, stopping: true, now: t0 + 120_000 },
+    ]);
+    expect(asleep.steps.flatMap((s) => s.commands)).toEqual([]);
+    expect(asleep.snapshot.state).toBe("REST");
+
+    const awake = run(initialSnapshot(), [
+      { actual: "awake", hasSession: true, now: t0 },
+      { actual: "awake", hasSession: false, stopping: true, now: t0 + 60_000 },
+    ]);
+    expect(awake.steps[1].commands).toEqual([{ kind: "rest" }]);
+    expect(awake.snapshot.state).toBe("GOING_TO_REST");
+  });
+
+  test("the next session starts with a wake again", () => {
+    const { steps } = run(initialSnapshot(), [
+      { actual: "awake", hasSession: true, now: t0 },
+      { actual: "rest", hasSession: true, now: t0 + 60_000 },
+      { actual: "rest", hasSession: false, stopping: true, now: t0 + 120_000 },
+      { actual: "rest", hasSession: false, now: t0 + 10 * 60_000 },
+      { actual: "rest", hasSession: true, starting: true, pressed: true, now: t0 + 11 * 60_000 },
+    ]);
+    expect(steps[4].commands).toEqual([{ kind: "wake" }]);
+    expect(steps[4].next.state).toBe("WAKING");
+  });
+
+  test("our own Stop landing after a quick Start is woken as before (not the player's choice)", () => {
+    const { steps } = run(initialSnapshot(), [
+      { actual: "awake", hasSession: true, now: t0 },
+      { actual: "awake", hasSession: false, stopping: true, now: t0 + 1_000 },
+      { actual: "awake", hasSession: true, starting: true, pressed: true, now: t0 + 5_000 },
+      { actual: "awake", hasSession: true, now: t0 + 50_000 },
+      { actual: "rest", hasSession: true, now: t0 + 60_000 },
+    ]);
+    expect(steps[1].commands).toEqual([{ kind: "rest" }]);
+    expect(steps[4].commands).toEqual([{ kind: "wake" }]);
+  });
+
+  test("once our sleep can no longer land, a later sleep is the player's", () => {
+    const { steps } = run(initialSnapshot(), [
+      { actual: "awake", hasSession: false, stopping: true, now: t0 },
+      { actual: "awake", hasSession: true, starting: true, pressed: true, now: t0 + 2_000 },
+      { actual: "awake", hasSession: true, now: t0 + REST_SETTLE_MS + 5_000 },
+      { actual: "rest", hasSession: true, now: t0 + REST_SETTLE_MS + 10 * 60_000 },
+    ]);
+    expect(steps[0].commands).toEqual([{ kind: "rest" }]);
+    expect(steps[3].commands).toEqual([]);
+    expect(steps[3].next.state).toBe("REST");
+  });
+
+  test("a console never seen awake in the session is still woken until it answers (as before)", () => {
+    const { steps } = run(initialSnapshot(), [
+      { actual: "rest", hasSession: true, now: t0 },
+      { actual: "rest", hasSession: true, now: t0 + 10_000 },
+    ]);
+    expect(steps[0].commands).toEqual([{ kind: "wake" }]);
+    expect(steps[1].commands).toEqual([{ kind: "wake" }]);
+  });
+
+  test("a snapshot from before the field existed reads as not yet seen awake", () => {
+    const legacy = { ...initialSnapshot(), state: "ACTIVE" as const, desired: "active" as const };
+    delete (legacy as Partial<MachineSnapshot>).awakeInSession;
+    delete (legacy as Partial<MachineSnapshot>).restAskedAt;
+    const { commands } = step(legacy, observe({ actual: "rest", hasSession: true, now: t0 }), "e1");
+    expect(commands).toEqual([{ kind: "wake" }]);
+  });
+});

@@ -12,6 +12,7 @@ import { discover as discoverPlayStations, probe as probePlayStations } from "./
 import { activeTransport, useCredentialVault } from "./ps5/transport";
 import { WakeKeys } from "./ps5/credentials";
 import { wake as wakePlayStation, wakeWithCredential } from "./ps5/wake";
+import { isLanAddress } from "./ps5/lanAddress";
 import { openPsnLoginExternally, pairConsole, psnLoginUrl } from "./ps5/pairing";
 import { isPs5Line, writePs5Line } from "./ps5/ps5Log";
 
@@ -172,6 +173,10 @@ const createWindow = async () => {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
+      // No DevTools in a packaged panel (2026-11-28, security audit): at an
+      // unattended till Ctrl+Shift+I opened them, and the console could read
+      // the staff token. A development build keeps them.
+      devTools: isDev,
       preload: join(__dirname, "preload.js"),
       // The console watcher and its controller run in this page, on timers.
       // Chromium throttles a hidden page's timer chains to ONE run a minute
@@ -251,7 +256,7 @@ const createWindow = async () => {
   }
   // Auto-open DevTools only when explicitly requested. A detached DevTools
   // window would steal keyboard focus from the renderer.
-  if (process.env.ELECTRON_DEVTOOLS === "1") {
+  if (isDev && process.env.ELECTRON_DEVTOOLS === "1") {
     mainWindow.webContents.openDevTools({ mode: "detach" });
   }
 
@@ -370,7 +375,8 @@ app.whenReady().then(async () => {
    * the key itself would be a renderer that could leak it.
    */
   ipcMain.handle("ps5:wake", async (_e: unknown, hostId: unknown, address: unknown) => {
-    if (typeof hostId !== "string" || typeof address !== "string") {
+    // Only inside the club's own network (2026-11-28, security audit).
+    if (typeof hostId !== "string" || !isLanAddress(address)) {
       return { sent: false, reason: "bad-request" };
     }
 
@@ -390,7 +396,7 @@ app.whenReady().then(async () => {
    * the vault. The renderer names a console and is told whether it worked.
    */
   ipcMain.handle("ps5:pair", async (event: unknown, address: unknown, pin: unknown, redirectUrl?: unknown) => {
-    if (typeof address !== "string" || typeof pin !== "string" || !wakeKeys) {
+    if (!isLanAddress(address) || typeof pin !== "string" || !wakeKeys) {
       return { ok: false, code: "FAILED" };
     }
 
@@ -430,7 +436,7 @@ app.whenReady().then(async () => {
    * happened. When a rest-capable transport exists this channel does not change.
    */
   ipcMain.handle("ps5:rest", async (_e: unknown, hostId: unknown, address: unknown) => {
-    if (typeof hostId !== "string" || typeof address !== "string") {
+    if (typeof hostId !== "string" || !isLanAddress(address)) {
       return { sent: false, code: "INVALID_STATE" };
     }
 
@@ -475,7 +481,7 @@ app.whenReady().then(async () => {
    * it back.
    */
   ipcMain.handle("ps5:wake-once", async (_e: unknown, address: unknown, registKey: unknown) => {
-    if (typeof address !== "string" || typeof registKey !== "string") {
+    if (!isLanAddress(address) || typeof registKey !== "string") {
       return { sent: false, reason: "bad-request" };
     }
 
@@ -536,7 +542,8 @@ app.whenReady().then(async () => {
       // Whatever the renderer sends is treated as untrusted shape, not just
       // untrusted values: this is the one boundary where a bad type would
       // otherwise reach a socket call.
-      Array.isArray(addresses) ? addresses.filter((a): a is string => typeof a === "string") : [],
+      // …and only addresses inside the club's own network (2026-11-28).
+      Array.isArray(addresses) ? addresses.filter(isLanAddress) : [],
       typeof timeoutMs === "number" ? timeoutMs : undefined,
     ));
 

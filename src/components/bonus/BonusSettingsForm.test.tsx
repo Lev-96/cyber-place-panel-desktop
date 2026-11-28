@@ -64,4 +64,24 @@ describe("the owner's bonus rule", () => {
     render(<BonusSettingsForm branchId={7} settings={{ enabled: true, percent: "5.00", welcome: "0.00" }} onSaved={vi.fn()} />);
     expect((screen.getByRole("button", { name: "action.save" }) as HTMLButtonElement).disabled).toBe(true);
   });
+
+  test("the owner caps a manager's gift: per rating and per day, sent with the rule (2026-11-28)", async () => {
+    repo.updateSettings.mockResolvedValue({ ...OFF, manager_gift: { max: "500.00", daily: "3000.00", left_today: "3000.00" } });
+    render(<BonusSettingsForm branchId={7} settings={{ ...OFF, manager_gift: { max: "1000.00", daily: "10000.00", left_today: "8000.00" } }} onSaved={vi.fn()} />);
+    expect((screen.getByTestId("bonus-manager-gift-max") as HTMLInputElement).value).toBe("1000");
+    expect((screen.getByTestId("bonus-manager-gift-daily") as HTMLInputElement).value).toBe("10000");
+    set("bonus-manager-gift-max", "500");
+    set("bonus-manager-gift-daily", "3000");
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "action.save" })); });
+    expect(repo.updateSettings).toHaveBeenCalledWith(7, { enabled: false, percent: 0, welcome: 0, manager_gift_max: 500, manager_gift_daily: 3000 });
+  });
+
+  test("an older server without the caps: no fields, nothing extra sent", async () => {
+    repo.updateSettings.mockResolvedValue(OFF);
+    render(<BonusSettingsForm branchId={7} settings={OFF} onSaved={vi.fn()} />);
+    expect(screen.queryByTestId("bonus-manager-gift")).toBeNull();
+    set("bonus-welcome", "100");
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "action.save" })); });
+    expect(repo.updateSettings).toHaveBeenCalledWith(7, { enabled: false, percent: 0, welcome: 100 });
+  });
 });

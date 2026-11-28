@@ -1,5 +1,6 @@
 import { apiWakePc } from "@/api/pcs";
 import { tr } from "@/i18n/translated";
+import OfflineUnlockModal from "@/components/pcs/OfflineUnlockModal";
 import PairingTokenModal from "@/components/pcs/PairingTokenModal";
 import PcForm from "@/components/pcs/PcForm";
 import Button from "@/components/ui/Button";
@@ -28,6 +29,8 @@ const PcsList = () => {
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState<IPcApi | null>(null);
   const [tokenPc, setTokenPc] = useState<IPcApi | null>(null);
+  // The PC's own offline emergency code (2026-11-28).
+  const [codePc, setCodePc] = useState<IPcApi | null>(null);
   const [waking, setWaking] = useState<number | null>(null);
 
   // Places already served by a computer on this screen. One place owns one
@@ -150,6 +153,11 @@ const PcsList = () => {
                   </Button>
                 )}
                 <Button variant="secondary" onClick={() => setEditing(pc)} style={btn}>{t("action.edit")}</Button>
+                {!isPsDevice && !neverPaired && (
+                  <Button variant="secondary" onClick={() => setCodePc(pc)} style={btn} data-testid={`pc-offline-code-${pc.id}`}>
+                    {t("pcs.offlineCode.button")}
+                  </Button>
+                )}
                 {!isPsDevice && (
                   <Button variant="secondary" onClick={() => rotate(pc)} style={btn}>
                     {neverPaired ? t("pcs.getToken") : t("pcs.rotateToken")}
@@ -185,6 +193,7 @@ const PcsList = () => {
           onSaved={() => { setEditing(null); void reload(); }}
         />
       )}
+      {codePc && <OfflineUnlockModal pc={codePc} onClose={() => setCodePc(null)} />}
       {tokenPc && (
         <PairingTokenModal pc={tokenPc} onClose={() => setTokenPc(null)} />
       )}

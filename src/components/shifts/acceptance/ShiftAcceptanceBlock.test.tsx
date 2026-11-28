@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, test, vi } from "vitest";
-import type { IAcceptanceCountBlind, IAcceptanceCountFull, IShift, IShiftReport } from "@/types/shifts";
+import type { IAcceptanceCountBlind, IAcceptanceCountFull, IShift, IShiftReport, IStockHandover } from "@/types/shifts";
 
 /**
  * «Приём смены» in the report (2026-11-18): the owner reads the books, the
@@ -12,7 +12,10 @@ import type { IAcceptanceCountBlind, IAcceptanceCountFull, IShift, IShiftReport 
 // Sentences keep their placeholders, so the values really reach the screen.
 const SENTENCES = /\.(lastSale|countedBy|previous|gap|blamed|totalShortage|totalSurplus)$/;
 vi.mock("@/i18n/LanguageContext", () => ({
-  useLang: () => ({ t: (k: string) => (SENTENCES.test(k) ? `${k} {0} {1}` : k), lang: "en", money: (n: number) => `${n.toFixed(2)} AMD` }),
+  useLang: () => ({
+    t: (k: string) => (k === "shift.handover.reason" ? `${k} {0}|{1}|{2}|{3}|{4}` : SENTENCES.test(k) || k === "shift.handover.acceptedBy" ? `${k} {0} {1}` : k),
+    lang: "en", money: (n: number) => `${n.toFixed(2)} AMD`,
+  }),
 }));
 import ShiftAcceptanceBlock from "./ShiftAcceptanceBlock";
 import ShiftReportView from "../ShiftReportView";
@@ -130,4 +133,36 @@ describe("in the report", () => {
     rerender(<ShiftReportView shift={shift} report={{ ...report, acceptance_count: full }} />);
     expect(screen.getByTestId("shift-acceptance")).toBeTruthy();
   });
+
+  test("the handover (2026-11-28) is shown inside «Остатки», never on a manager's open view", () => {
+    const handover: IStockHandover = { ...full, accepted_by_shift: { id: 3, opened_at: "2026-11-19T10:00:00+04:00", opened_by: { id: 2, name: "Anna" } } };
+    const stock = { rows: [{ product_id: 1, name: "Cola", start: 10, received: 0, sold: 1, returned: 0, sold_net: 1, corrected: 0, remaining: 9 }],
+      totals: { start: 10, received: 0, sold: 1, returned: 0, sold_net: 1, corrected: 0, remaining: 9 }, count: 1, negative_count: 0 };
+    const closed = { ...shift, status: "closed" as const };
+    const { rerender } = render(<ShiftReportView shift={closed} report={{ ...report, stock }} handover={handover} />);
+    expect(within(screen.getByTestId("shift-stock")).getByTestId("shift-stock-handover")).toBeTruthy();
+    rerender(<ShiftReportView shift={closed} report={{ ...report, stock }} handover={null} />);
+    expect(screen.queryByTestId("shift-stock-handover")).toBeNull();
+    rerender(<ShiftReportView shift={closed} report={{ ...report, stock }} handover={handover} acceptanceOnly />);
+    expect(screen.queryByTestId("shift-stock-handover")).toBeNull();
+  });
+});
+
+/**
+ * «Сдача смены» (2026-11-28, owner): the shortage is shown on the shift it
+ * happened on, and every shortage is said in one sentence — name, how many,
+ * what it is worth, should-be and counted — with the server's figures only.
+ */
+describe("the reason in words", () => {
+  test("one sentence per shortage, nothing for a surplus or a first count", () => {
+    render(<ShiftAcceptanceBlock count={full} />);
+    expect(screen.getAllByTestId("shift-stock-reason").map((li) => li.textContent)).toEqual(["shift.handover.reason Cola|2|1000.00 AMD|9|7"]);
+  });
+
+  test("everything matching says no reason at all", () => {
+    const clean: IAcceptanceCountFull = { ...full, rows: full.rows.map((r) => ({ ...r, diff: 0, value: "0.00", outcome: "none" as const, is_baseline: false })) };
+    render(<ShiftAcceptanceBlock count={clean} />);
+    expect(screen.queryByTestId("shift-stock-reasons")).toBeNull();
+  });
+
 });
