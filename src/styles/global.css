@@ -12158,7 +12158,9 @@ button.sales-card:focus-visible { outline: 2px solid var(--color-primary); outli
   line-height: 1.45;
 }
 .shift-acceptance__reasons li::marker { color: var(--color-danger); }
-.shift-history__stock { font-size: 12px; font-weight: 600; color: var(--color-danger); overflow-wrap: anywhere; }
+/* Red, lifted toward the text colour: ≥4.5:1 on the surface in every theme
+   (plain --color-danger is 3.7–4.4 on light/midnight/emerald at 12px). */
+.shift-history__stock { font-size: 12px; font-weight: 600; color: color-mix(in srgb, var(--color-danger) 70%, var(--color-text)); overflow-wrap: anywhere; }
 .shift-acceptance__facts {
   display: flex;
   flex-direction: column;
